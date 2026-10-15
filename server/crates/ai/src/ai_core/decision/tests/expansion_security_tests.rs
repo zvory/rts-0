@@ -1321,3 +1321,75 @@ fn the_live_jeff_leaves_a_guard_raid_defense_holds_to_raid_defense() {
         );
     }
 }
+
+#[test]
+fn the_live_jeff_leaves_a_guard_in_a_home_fight_to_home_defense() {
+    for (profile, live) in [(&JEFFS_AI, true), (&JEFFS_AI_PRE_GUARD_HANDOFF, false)] {
+        let obs = security_observation();
+        let facts = AiFacts::from_observation(&obs);
+        let mut memory = AiDecisionMemory::for_profile(profile);
+        expansion_security::prepare(&obs, &facts, profile, &mut memory, None, &mut |_, _, _| {
+            true
+        });
+        let guards = memory.expansion_security.riflemen.clone();
+        assert_eq!(guards.len(), 2, "{}", profile.id);
+        // Home defense met a raid beside both guards a moment ago, and raid defense saw it.
+        let guard = obs.owned.iter().find(|unit| unit.id == guards[0]).unwrap();
+        memory.note_defensive_contact(obs.tick, (guard.x, guard.y), 100, false);
+        memory
+            .raid_defense
+            .see_raid_for_test(obs.tick, (guard.x, guard.y));
+        let mut actions = AiActionContext::new(&facts, SpendBudget::new(1000, 1000, 20, 80));
+        expansion_security::update_and_stage(&obs, None, &mut memory, &mut actions, profile.id);
+        let commands = actions.into_commands();
+        let ordered = |id: u32| {
+            commands.iter().any(|command| match command {
+                Command::AttackMove { units, .. } | Command::HoldPosition { units, .. } => {
+                    units.contains(&id)
+                }
+                _ => false,
+            })
+        };
+        assert_eq!(ordered(guards[0]), !live, "{}: {commands:?}", profile.id);
+        // Once the contact is old, the guards go out again.
+        let mut later = obs.clone();
+        later.tick += config::TICK_HZ * 3;
+        let mut actions = AiActionContext::new(&facts, SpendBudget::new(1000, 1000, 20, 80));
+        expansion_security::update_and_stage(&later, None, &mut memory, &mut actions, profile.id);
+        let commands = actions.into_commands();
+        assert!(
+            commands.iter().any(|command| matches!(
+                command,
+                Command::AttackMove { units, .. } if units.contains(&guards[0])
+            )),
+            "{}: {commands:?}",
+            profile.id
+        );
+    }
+}
+
+#[test]
+fn the_live_jeff_keeps_guards_out_of_a_raid_raid_defense_leaves_to_the_line() {
+    for (profile, live) in [(&JEFFS_AI, true), (&JEFFS_AI_PRE_GUARD_HANDOFF, false)] {
+        let obs = security_observation();
+        let facts = AiFacts::from_observation(&obs);
+        let mut memory = AiDecisionMemory::for_profile(profile);
+        expansion_security::prepare(&obs, &facts, profile, &mut memory, None, &mut |_, _, _| {
+            true
+        });
+        let guards = memory.expansion_security.riflemen.clone();
+        // A raid raid defense saw but did not answer, three tiles from the first guard.
+        let guard = obs.owned.iter().find(|unit| unit.id == guards[0]).unwrap();
+        let ts = config::TILE_SIZE as f32;
+        memory
+            .raid_defense
+            .see_raid_for_test(obs.tick, (guard.x + 3.0 * ts, guard.y));
+        let mut actions = AiActionContext::new(&facts, SpendBudget::new(1000, 1000, 20, 80));
+        expansion_security::update_and_stage(&obs, None, &mut memory, &mut actions, profile.id);
+        let commands = actions.into_commands();
+        let ordered = commands.iter().any(|command| {
+            matches!(command, Command::AttackMove { units, .. } if units.contains(&guards[0]))
+        });
+        assert_eq!(ordered, !live, "{}: {commands:?}", profile.id);
+    }
+}

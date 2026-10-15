@@ -412,6 +412,13 @@ impl AiDecisionMemory {
         })
     }
 
+    /// Where home defense last met the enemy, if it did within `ticks`.
+    pub(super) fn recent_defensive_contact(&self, tick: u32, ticks: u32) -> Option<(f32, f32)> {
+        self.defensive_incident
+            .filter(|incident| tick.saturating_sub(incident.last_contact_tick) <= ticks)
+            .map(|incident| (incident.x as f32, incident.y as f32))
+    }
+
     pub(super) fn clear_defensive_incident(&mut self) {
         self.defensive_incident = None;
     }

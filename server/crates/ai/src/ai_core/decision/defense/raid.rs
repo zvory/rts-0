@@ -125,6 +125,9 @@ pub(in crate::ai_core::decision) struct RaidDefense {
     sentry_orders: BTreeMap<u32, u32>,
     /// Units handed back to their posts this decision.
     released: Vec<u32>,
+    /// The latest raid on the bases seen, answered here or left to the line or the Tanks: when, and
+    /// its centre.
+    seen: Option<(u32, (i32, i32))>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -163,9 +166,33 @@ impl RaidDefense {
             || self.displaced.contains_key(&id)
     }
 
+    /// Whether a raid on the bases was seen within `ticks` before `tick`, within `radius` of
+    /// `point` (pixels).
+    pub(in crate::ai_core::decision) fn raid_near(
+        &self,
+        tick: u32,
+        ticks: u32,
+        point: (f32, f32),
+        radius: f32,
+    ) -> bool {
+        self.seen.is_some_and(|(seen, center)| {
+            tick.saturating_sub(seen) <= ticks
+                && distance(point, (center.0 as f32, center.1 as f32)) <= radius
+        })
+    }
+
     #[cfg(test)]
     pub(in crate::ai_core::decision) fn hold_for_test(&mut self, id: u32) {
         self.displaced.insert(id, 0);
+    }
+
+    #[cfg(test)]
+    pub(in crate::ai_core::decision) fn see_raid_for_test(
+        &mut self,
+        tick: u32,
+        center: (f32, f32),
+    ) {
+        self.seen = Some((tick, (center.0 as i32, center.1 as i32)));
     }
 
     pub(in crate::ai_core::decision) fn is_sentry(&self, id: u32) -> bool {
@@ -438,15 +465,18 @@ pub(in crate::ai_core::decision) fn respond(
     let tick = observation.tick;
     let defended = Defended::new(observation);
     let dug = dug_in_units(observation, memory);
-    let raid = find_raid(observation, &defended)
+    let seen = find_raid(observation, &defended);
+    if let Some(raid) = seen.as_ref() {
+        memory.raid_defense.seen = Some((tick, (raid.center.0 as i32, raid.center.1 as i32)));
+    }
+    let raid = seen
+        .as_ref()
         .filter(|raid| !raid.armored && !raid_at_the_line(observation, &dug, raid, ts));
     let Some(raid) = raid else {
         // Nothing to answer here. A response keeps its units for a moment, since raiders flicker
         // in and out of sight; then it lets them go.
         if let Some(response) = memory.raid_defense.response.as_ref() {
-            if tick.saturating_sub(response.last_seen) < RAID_GONE_TICKS
-                && find_raid(observation, &defended).is_none()
-            {
+            if tick.saturating_sub(response.last_seen) < RAID_GONE_TICKS && seen.is_none() {
                 let members: Vec<u32> = response.members.iter().copied().collect();
                 return RaidAnswer::Handled(members);
             }

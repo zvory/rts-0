@@ -25,6 +25,10 @@ const NATURAL_RETRY_COOLDOWN_TICKS: u32 = config::TICK_HZ * 20;
 const NATURAL_ROUTE_QUIET_TILES: f32 = 12.0;
 /// The live Jeff's guards leave their posts to an enemy Tank this close to the natural site.
 const GUARD_TANK_CLEAR_TILES: f32 = 16.0;
+/// The live Jeff leaves a guard this close to a raid on the bases or home defense's latest contact,
+/// seen within `HOME_FIGHT_TICKS`, to home defense.
+const HOME_FIGHT_TILES: f32 = 16.0;
+const HOME_FIGHT_TICKS: u32 = config::TICK_HZ * 2;
 /// Enemies this close to the natural site hold it: it cannot be secured.
 const CONTEST_TILES: f32 = 11.0;
 /// Enemy Tanks or anti-tank units this close to the site make clearing it a Tank fight, which the
@@ -373,7 +377,7 @@ pub(super) fn prepare<F: FnMut(EntityKind, u32, u32) -> bool>(
         candidates = eligible
             .iter()
             .copied()
-            .filter(|id| !memory.raid_defense.holds(*id))
+            .filter(|id| !left_to_home_defense(observation, memory, *id))
             .take(PARTY_SIZE)
             .collect();
     }
@@ -415,6 +419,27 @@ pub(super) fn prepare<F: FnMut(EntityKind, u32, u32) -> bool>(
         .containment
         .active_riflemen
         .retain(|id| !memory.expansion_security.riflemen.contains(id));
+}
+
+/// The live Jeff leaves a Rifleman to home defense while raid defense holds it, or while it stands
+/// near a raid on the bases or a fight home defense is answering: when raid defense handed a raid
+/// to the dug-in line it let its members go, and natural security sent them to their posts through
+/// the raid.
+fn left_to_home_defense(observation: &AiObservation, memory: &AiDecisionMemory, id: u32) -> bool {
+    if memory.raid_defense.holds(id) {
+        return true;
+    }
+    let Some(unit) = observation.owned.iter().find(|unit| unit.id == id) else {
+        return false;
+    };
+    let tick = observation.tick;
+    let radius = HOME_FIGHT_TILES * observation.map.tile_size as f32;
+    memory
+        .raid_defense
+        .raid_near(tick, HOME_FIGHT_TICKS, (unit.x, unit.y), radius)
+        || memory
+            .recent_defensive_contact(tick, HOME_FIGHT_TICKS)
+            .is_some_and(|contact| dist2(unit.x, unit.y, contact.0, contact.1) <= squared(radius))
 }
 
 /// Whether one of Jeff's Resource Depots stands on the natural site.
@@ -719,7 +744,7 @@ pub(super) fn update_and_stage(
         .riflemen
         .iter()
         .copied()
-        .filter(|id| profile_id == JEFFS_AI_ID && memory.raid_defense.holds(*id))
+        .filter(|id| profile_id == JEFFS_AI_ID && left_to_home_defense(observation, memory, *id))
         .collect();
     let security = &mut memory.expansion_security;
     let Some(site) = security.site else {
