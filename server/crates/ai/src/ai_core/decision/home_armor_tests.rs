@@ -248,7 +248,7 @@ fn home_tanks_answer_a_siege_they_can_match_and_hold_against_one_they_cannot() {
         &defenders,
         None,
         true,
-        true,
+        JEFFS_AI_ID,
     )
     .unwrap();
     assert!(answered.contains(&20) && answered.contains(&21));
@@ -276,7 +276,7 @@ fn home_tanks_answer_a_siege_they_can_match_and_hold_against_one_they_cannot() {
             &defenders,
             None,
             true,
-            true,
+            JEFFS_AI_ID,
         )
         .is_none());
         assert!(actions.into_commands().is_empty());

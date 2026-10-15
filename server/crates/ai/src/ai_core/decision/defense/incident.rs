@@ -29,7 +29,7 @@ pub(in crate::ai_core::decision) fn respond_to_local_incident(
     local_defenders: &[u32],
     map_analysis: Option<&AiMapAnalysis>,
     stationary_tanks: bool,
-    raid_defense: bool,
+    profile_id: &str,
 ) -> Option<Vec<u32>> {
     let damaged_building = stationary_tanks
         .then(|| note_building_damage(observation, memory))
@@ -37,10 +37,16 @@ pub(in crate::ai_core::decision) fn respond_to_local_incident(
     if damaged_building.is_some() {
         memory.local_defense_building_hit_tick = Some(observation.tick);
     }
-    if raid_defense {
-        if let super::raid::RaidAnswer::Handled(units) =
-            super::raid::respond(actions, observation, memory, local_defenders, map_analysis)
-        {
+    if runs_live_jeff(profile_id) {
+        let resend = profile_id == JEFFS_AI_ID;
+        if let super::raid::RaidAnswer::Handled(units) = super::raid::respond(
+            actions,
+            observation,
+            memory,
+            local_defenders,
+            map_analysis,
+            resend,
+        ) {
             memory.clear_defensive_incident();
             return (!units.is_empty()).then_some(units);
         }

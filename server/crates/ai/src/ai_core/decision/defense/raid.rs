@@ -41,6 +41,9 @@ const GATHER_MARGIN_TILES: f32 = 2.5;
 const GATHERED_TILES: f32 = 3.0;
 /// The gathering point is re-sent only when it has moved this far.
 const GATHER_SHIFT_TILES: f32 = 4.0;
+/// The live Jeff re-sends a gathering member that is this much farther from the gathering point
+/// than its nearest approach since it was sent: another order turned it away.
+const TURNED_AWAY_TILES: f32 = 1.0;
 /// The response goes in once this share of its value has gathered, or after
 /// `GATHER_TIMEOUT_TICKS` if what has gathered already beats the raid.
 const GATHERED_SHARE: (u32, u32) = (3, 4);
@@ -137,6 +140,8 @@ struct Response {
     order_point: (i32, i32),
     /// Members last sent to the gathering point.
     gathering: BTreeSet<u32>,
+    /// The live Jeff: each gathering member's nearest approach to the gathering point, in pixels.
+    closest: BTreeMap<u32, u32>,
 }
 
 impl RaidDefense {
@@ -147,6 +152,20 @@ impl RaidDefense {
             .flat_map(|response| response.members.iter().copied())
             .chain(self.sentries.keys().copied())
             .chain(self.displaced.keys().copied())
+    }
+
+    /// Whether this system holds `id` now: a member of the raid response, or a unit it stepped in
+    /// or back from an outranging enemy. Natural security leaves such a guard to it.
+    pub(in crate::ai_core::decision) fn holds(&self, id: u32) -> bool {
+        self.response
+            .as_ref()
+            .is_some_and(|response| response.members.contains(&id))
+            || self.displaced.contains_key(&id)
+    }
+
+    #[cfg(test)]
+    pub(in crate::ai_core::decision) fn hold_for_test(&mut self, id: u32) {
+        self.displaced.insert(id, 0);
     }
 
     pub(in crate::ai_core::decision) fn is_sentry(&self, id: u32) -> bool {
@@ -405,13 +424,15 @@ fn raid_at_the_line(
 }
 
 /// The live Jeff's answer to a raid (see the module docs). `local_defenders` are the units home
-/// defense may use this decision.
+/// defense may use this decision. `resend`: a member sent to gather that has turned away from the
+/// point is sent again, not only one gone idle.
 pub(in crate::ai_core::decision) fn respond(
     actions: &mut AiActionContext<'_>,
     observation: &AiObservation,
     memory: &mut AiDecisionMemory,
     local_defenders: &[u32],
     map_analysis: Option<&AiMapAnalysis>,
+    resend: bool,
 ) -> RaidAnswer {
     let ts = tile(observation);
     let tick = observation.tick;
@@ -473,6 +494,7 @@ pub(in crate::ai_core::decision) fn respond(
         order_tick: 0,
         order_point: (0, 0),
         gathering: BTreeSet::new(),
+        closest: BTreeMap::new(),
     });
     response.last_seen = tick;
     response
@@ -601,6 +623,7 @@ pub(in crate::ai_core::decision) fn respond(
             clear_mobile_defensive_position(observation, map_analysis, desired).unwrap_or(desired);
         response.gather = Some((point.0 as i32, point.1 as i32));
         response.gathering.clear();
+        response.closest.clear();
     }
     let gather = response
         .gather
@@ -652,6 +675,7 @@ pub(in crate::ai_core::decision) fn respond(
         // The raid backed off: hold the gathering point instead of following it.
         response.engaged = false;
         response.gathering.clear();
+        response.closest.clear();
     }
 
     if response.engaged {
@@ -697,8 +721,26 @@ pub(in crate::ai_core::decision) fn respond(
                     fight.push(*id);
                 }
             } else if distance((unit.x, unit.y), gather) > GATHERED_TILES * ts * 0.5 {
-                if !response.gathering.contains(id) || unit.state == AiEntityState::Idle {
+                // A member sent here once can be turned around by another order: natural security
+                // re-sent pulled-back guards to their posts, into the raid.
+                let away = distance((unit.x, unit.y), gather);
+                let turned = resend
+                    && response
+                        .closest
+                        .get(id)
+                        .is_some_and(|closest| away > *closest as f32 + TURNED_AWAY_TILES * ts);
+                let send =
+                    !response.gathering.contains(id) || unit.state == AiEntityState::Idle || turned;
+                if send {
                     go.push(*id);
+                }
+                if resend {
+                    let closest = response.closest.entry(*id).or_insert(away as u32);
+                    *closest = if send {
+                        away as u32
+                    } else {
+                        (*closest).min(away as u32)
+                    };
                 }
             } else if unit.state == AiEntityState::Move {
                 hold.push(*id);

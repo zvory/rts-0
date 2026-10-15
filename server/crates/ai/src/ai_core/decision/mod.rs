@@ -11,12 +11,11 @@ use crate::ai_core::observation::{
     AiEntityState, AiEntitySummary, AiMapSummary, AiObservation, AiResourceSummary,
 };
 use crate::ai_core::profiles::{
-    is_jeffs_ai_profile, uses_current_jeffs_ai_policy, AiProfile, AttackPolicy, BarracksCurve,
-    ExpansionContainmentPolicy, ExpansionPolicy, ProductionPolicy, ResourcePolicy,
-    runs_live_jeff, TechTransitionPolicy, WorkerPolicy, JEFFS_AI_BETA_ID, JEFFS_AI_ID,
-    JEFFS_AI_PRE_GUARD_HANDOFF_ID,
-    JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID, JEFFS_AI_PRE_OPENING_RUSH_ID, JEFFS_AI_PRE_RIFLE_COVERAGE_ID,
-    JEFFS_AI_PRE_TANK_CATCHUP_ID, JEFFS_AI_PRE_TANK_MICRO_ID,
+    is_jeffs_ai_profile, runs_live_jeff, uses_current_jeffs_ai_policy, AiProfile, AttackPolicy,
+    BarracksCurve, ExpansionContainmentPolicy, ExpansionPolicy, ProductionPolicy, ResourcePolicy,
+    TechTransitionPolicy, WorkerPolicy, JEFFS_AI_BETA_ID, JEFFS_AI_ID,
+    JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID, JEFFS_AI_PRE_GUARD_HANDOFF_ID, JEFFS_AI_PRE_OPENING_RUSH_ID,
+    JEFFS_AI_PRE_RIFLE_COVERAGE_ID, JEFFS_AI_PRE_TANK_CATCHUP_ID, JEFFS_AI_PRE_TANK_MICRO_ID,
 };
 use crate::ai_shared;
 use crate::config;
@@ -318,7 +317,7 @@ where
         map_analysis,
         memory,
         &mut actions,
-        runs_live_jeff(profile.id),
+        profile.id,
     );
     let reserve_expansion =
         expansion_security::reserve_expansion(observation, &facts, profile, memory);
@@ -1027,7 +1026,7 @@ where
                 &local_defenders,
                 map_analysis,
                 uses_current_jeffs_ai_policy(profile.id),
-                runs_live_jeff(profile.id),
+                profile.id,
             ) {
                 local_defense_assigned.extend(units.iter().copied());
                 intents.push(AiIntent::Attack { units });

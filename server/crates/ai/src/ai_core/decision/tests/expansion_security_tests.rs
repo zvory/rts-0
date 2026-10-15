@@ -1,5 +1,5 @@
 use super::*;
-use crate::ai_core::profiles::{JEFFS_AI, JEFFS_AI_PRE_TANK_MICRO};
+use crate::ai_core::profiles::{JEFFS_AI, JEFFS_AI_PRE_GUARD_HANDOFF, JEFFS_AI_PRE_TANK_MICRO};
 
 fn security_observation() -> AiObservation {
     let ts = config::TILE_SIZE as f32;
@@ -300,7 +300,13 @@ fn expansion_security_requires_arrival_and_uncontested_dwell() {
     let step = |obs: &AiObservation, memory: &mut AiDecisionMemory| {
         let facts = AiFacts::from_observation(obs);
         let mut actions = AiActionContext::new(&facts, SpendBudget::new(1000, 1000, 20, 80));
-        expansion_security::update_and_stage(obs, None, memory, &mut actions, false)
+        expansion_security::update_and_stage(
+            obs,
+            None,
+            memory,
+            &mut actions,
+            JEFFS_AI_PRE_TANK_MICRO_ID,
+        )
     };
     assert!(!step(&obs, &mut memory));
     for (index, id) in memory.expansion_security.riflemen.iter().enumerate() {
@@ -361,7 +367,13 @@ fn guards_stuck_just_short_of_their_posts_secure_the_site_after_a_longer_dwell()
     let step = |obs: &AiObservation, memory: &mut AiDecisionMemory| {
         let facts = AiFacts::from_observation(obs);
         let mut actions = AiActionContext::new(&facts, SpendBudget::new(1000, 1000, 20, 80));
-        expansion_security::update_and_stage(obs, None, memory, &mut actions, false)
+        expansion_security::update_and_stage(
+            obs,
+            None,
+            memory,
+            &mut actions,
+            JEFFS_AI_PRE_TANK_MICRO_ID,
+        )
     };
     // Each guard stands a tile short of its post, as one pressed against steel patches does.
     let site = memory.expansion_security.site.unwrap();
@@ -1261,6 +1273,48 @@ fn a_live_guard_keeps_its_post_when_another_rifleman_passes_nearer() {
         assert_eq!(
             memory.expansion_security.riflemen.contains(&guards[0]),
             kept,
+            "{}: {:?}",
+            profile.id,
+            memory.expansion_security.riflemen
+        );
+    }
+}
+
+#[test]
+fn the_live_jeff_leaves_a_guard_raid_defense_holds_to_raid_defense() {
+    for (profile, live) in [(&JEFFS_AI, true), (&JEFFS_AI_PRE_GUARD_HANDOFF, false)] {
+        let obs = security_observation();
+        let facts = AiFacts::from_observation(&obs);
+        let mut memory = AiDecisionMemory::for_profile(profile);
+        expansion_security::prepare(&obs, &facts, profile, &mut memory, None, &mut |_, _, _| {
+            true
+        });
+        let guards = memory.expansion_security.riflemen.clone();
+        assert_eq!(guards.len(), 2, "{}", profile.id);
+        // Raid defense has pulled the first guard back: its post is not re-sent over that.
+        memory.raid_defense.hold_for_test(guards[0]);
+        let mut actions = AiActionContext::new(&facts, SpendBudget::new(1000, 1000, 20, 80));
+        expansion_security::update_and_stage(&obs, None, &mut memory, &mut actions, profile.id);
+        let commands = actions.into_commands();
+        let ordered = |id: u32| {
+            commands.iter().any(|command| match command {
+                Command::AttackMove { units, .. } | Command::HoldPosition { units, .. } => {
+                    units.contains(&id)
+                }
+                _ => false,
+            })
+        };
+        assert_eq!(ordered(guards[0]), !live, "{}: {commands:?}", profile.id);
+        assert!(ordered(guards[1]), "{}: {commands:?}", profile.id);
+        // Nor is a Rifleman raid defense holds picked as a new guard.
+        let mut memory = AiDecisionMemory::for_profile(profile);
+        memory.raid_defense.hold_for_test(guards[0]);
+        expansion_security::prepare(&obs, &facts, profile, &mut memory, None, &mut |_, _, _| {
+            true
+        });
+        assert_eq!(
+            memory.expansion_security.riflemen.contains(&guards[0]),
+            !live,
             "{}: {:?}",
             profile.id,
             memory.expansion_security.riflemen

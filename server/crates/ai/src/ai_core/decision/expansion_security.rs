@@ -366,6 +366,17 @@ pub(super) fn prepare<F: FnMut(EntityKind, u32, u32) -> bool>(
     // the site, which then stuck in a dead raider's trench on the way and never secured it.
     let eligible = candidates.clone();
     candidates.truncate(PARTY_SIZE);
+    // Nor does the live Jeff pick a Rifleman raid defense holds: picked in the middle of a home
+    // fight, it was given its post and the fight every decision. A guard raid defense takes keeps
+    // its place and goes back out once it is let go.
+    if profile.id == JEFFS_AI_ID {
+        candidates = eligible
+            .iter()
+            .copied()
+            .filter(|id| !memory.raid_defense.holds(*id))
+            .take(PARTY_SIZE)
+            .collect();
+    }
     let previous = memory.expansion_security.riflemen.clone();
     let keep = |id: &u32| {
         if runs_live_jeff(profile.id) {
@@ -691,14 +702,25 @@ pub(super) fn surplus_tank_for_forward_base(
         .map(|unit| unit.id)
 }
 
-/// `live_jeff` keeps the guards off their posts while a parked enemy Tank covers them.
+/// The live Jeff and its freeze (`runs_live_jeff`) keep the guards off their posts while a parked
+/// enemy Tank covers them. The live Jeff alone leaves a guard raid defense holds to raid defense.
 pub(super) fn update_and_stage(
     observation: &AiObservation,
     analysis: Option<&AiMapAnalysis>,
     memory: &mut AiDecisionMemory,
     actions: &mut AiActionContext<'_>,
-    live_jeff: bool,
+    profile_id: &str,
 ) -> bool {
+    let live_jeff = runs_live_jeff(profile_id);
+    // On Doppelganger raid defense pulled the first guards back from a six-Rifleman wave, and the
+    // next decision this sent them to their posts again, into it. Both died without a kill.
+    let held: Vec<u32> = memory
+        .expansion_security
+        .riflemen
+        .iter()
+        .copied()
+        .filter(|id| profile_id == JEFFS_AI_ID && memory.raid_defense.holds(*id))
+        .collect();
     let security = &mut memory.expansion_security;
     let Some(site) = security.site else {
         return false;
@@ -758,6 +780,11 @@ pub(super) fn update_and_stage(
     let mut arrived = security.riflemen.len() == PARTY_SIZE && points.len() == PARTY_SIZE;
     let mut near = arrived;
     for id in &security.riflemen {
+        if held.contains(id) {
+            arrived = false;
+            near = false;
+            continue;
+        }
         let Some(point) = security.slots.get(id).and_then(|slot| points.get(*slot)) else {
             arrived = false;
             near = false;

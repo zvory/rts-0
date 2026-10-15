@@ -957,7 +957,7 @@ fn stationary_defense_commands(
         defenders,
         None,
         true,
-        false,
+        JEFFS_AI_PRE_TANK_MICRO_ID,
     );
     actions.into_commands()
 }

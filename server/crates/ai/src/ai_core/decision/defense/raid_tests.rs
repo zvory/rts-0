@@ -67,9 +67,18 @@ fn respond_commands(
     memory: &mut AiDecisionMemory,
     defenders: &[u32],
 ) -> (Option<Vec<u32>>, Vec<Command>) {
+    respond_with(observation, memory, defenders, true)
+}
+
+fn respond_with(
+    observation: &AiObservation,
+    memory: &mut AiDecisionMemory,
+    defenders: &[u32],
+    resend: bool,
+) -> (Option<Vec<u32>>, Vec<Command>) {
     let facts = AiFacts::from_observation(observation);
     let mut actions = AiActionContext::new(&facts, SpendBudget::new(1000, 1000, 20, 80));
-    let answer = match respond(&mut actions, observation, memory, defenders, None) {
+    let answer = match respond(&mut actions, observation, memory, defenders, None, resend) {
         RaidAnswer::NotARaid => None,
         RaidAnswer::Handled(units) => Some(units),
     };
@@ -559,5 +568,50 @@ fn no_sentry_stands_on_the_natural_its_guards_hold() {
         if let Command::Move { x, y, .. } = command {
             assert!(distance((x, y), natural) >= SENTRY_NATURAL_CLEAR_TILES * ts());
         }
+    }
+}
+
+#[test]
+fn a_member_turned_away_from_the_line_is_sent_back_by_the_live_jeff() {
+    for resend in [true, false] {
+        let mut observation = base(1_200);
+        // Two Machine Gunners on the line west of the Depot, two Riflemen east of it.
+        observation.owned.extend([
+            entity(30, 1, EntityKind::MachineGunner, (6.0, 9.0)),
+            entity(31, 1, EntityKind::MachineGunner, (6.0, 12.0)),
+            entity(20, 1, EntityKind::Rifleman, (15.0, 13.0)),
+            entity(21, 1, EntityKind::Rifleman, (15.0, 14.0)),
+        ]);
+        // Ten raiders north-east of the Steel Mine: the Riflemen fall back to the line.
+        for (i, id) in (90..100).enumerate() {
+            observation.visible_enemies.push(entity(
+                id,
+                2,
+                EntityKind::Rifleman,
+                (20.0 + (i % 5) as f32, 2.0 + (i / 5) as f32),
+            ));
+        }
+        let defenders = [20, 21, 30, 31];
+        let mut memory = live_memory();
+        let sent = |commands: &[Command], id: u32| {
+            commands.iter().any(
+                |command| matches!(command, Command::Move { units, .. } if units.contains(&id)),
+            )
+        };
+        let (_, commands) = respond_with(&observation, &mut memory, &defenders, resend);
+        assert!(sent(&commands, 20) && sent(&commands, 21), "{commands:?}");
+        // Another order walks Rifleman 20 two tiles further from the line.
+        observation.tick += 9;
+        for unit in observation.owned.iter_mut() {
+            if unit.id == 20 || unit.id == 21 {
+                unit.state = AiEntityState::Move;
+            }
+            if unit.id == 20 {
+                unit.x += 2.0 * ts();
+            }
+        }
+        let (_, commands) = respond_with(&observation, &mut memory, &defenders, resend);
+        assert_eq!(sent(&commands, 20), resend, "{commands:?}");
+        assert!(!sent(&commands, 21), "{commands:?}");
     }
 }
