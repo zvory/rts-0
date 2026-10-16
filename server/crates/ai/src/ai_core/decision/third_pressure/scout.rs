@@ -228,9 +228,16 @@ fn walk_around(
         .filter(|(_, seen)| tick.saturating_sub(*seen) <= DANGER_MEMORY_TICKS)
         .map(|(spot, _)| unrounded(*spot))
         .collect();
+    let walked_around: Vec<(f32, f32)> =
+        state.walked_around.iter().map(|p| unrounded(*p)).collect();
     let in_the_way = fresh
         .iter()
         .copied()
+        .filter(|danger| {
+            walked_around
+                .iter()
+                .all(|done| distance(*done, *danger) > 8.0 * ts)
+        })
         .filter(|danger| distance(closest_on(from, to, *danger), *danger) < clear)
         .min_by(|left, right| distance(from, *left).total_cmp(&distance(from, *right)));
     let Some(danger) = in_the_way else {
@@ -264,11 +271,20 @@ fn walk_around(
             state.route.insert(state.leg, rounded(point));
             state.leg_since = tick;
             state.detours += 1;
+            state.walked_around.push(rounded(danger));
             state
                 .notes
                 .push(format!("scouts walk around {:?}", rounded(danger)));
         }
     }
+}
+
+/// The route's waypoint a leg before its staging point.
+fn leg_back(state: &ThirdPressure) -> Option<(f32, f32)> {
+    let n = state.route.len();
+    n.checked_sub(2)
+        .and_then(|i| state.route.get(i))
+        .map(|p| unrounded(*p))
 }
 
 /// The point of the segment from `a` to `b` nearest `p`.
@@ -323,7 +339,8 @@ pub(super) fn scout_trip(
     };
     let lead_at = (lead.x, lead.y);
     let rest: Vec<u32> = out.iter().skip(1).map(|unit| unit.id).collect();
-    // On the way: the lead walks the route, the others a leg behind it.
+    // On the way: the lead walks the route, the others two legs behind it, as the lead turns to
+    // the next waypoint 6 tiles before each.
     if let Some(point) = state.route.get(state.leg).map(|p| unrounded(*p)) {
         if distance(lead_at, point) <= LEG_REACHED_TILES * ts
             || tick.saturating_sub(state.leg_since) > LEG_TIMEOUT_TICKS
@@ -336,7 +353,7 @@ pub(super) fn scout_trip(
             send(actions, observation, state, &[lead.id], point, intents);
             let behind = state
                 .leg
-                .checked_sub(1)
+                .checked_sub(2)
                 .and_then(|leg| state.route.get(leg))
                 .map(|p| unrounded(*p));
             if let Some(behind) = behind {
@@ -345,13 +362,15 @@ pub(super) fn scout_trip(
             return;
         }
     }
-    // At the base: the lead finds the Depot while the others wait at the staging point.
+    // At the base: the lead finds the Depot while the others wait a leg back from the staging
+    // point.
     let center = area_center(state);
     let staging = staging_point(state, center);
+    let back = leg_back(state).unwrap_or(staging);
     if let Some(since) = state.sized_up {
-        // The Depot is sized up: all wait for the party out of sight.
-        let ids = state.scouts.clone();
-        send(actions, observation, state, &ids, staging, intents);
+        // The Depot is sized up: they wait for the party out of sight, still a leg apart.
+        send(actions, observation, state, &[lead.id], staging, intents);
+        send(actions, observation, state, &rest, back, intents);
         if commit(observation, map_analysis, memory) {
             return;
         }
@@ -360,7 +379,7 @@ pub(super) fn scout_trip(
         }
         return;
     }
-    send(actions, observation, state, &rest, staging, intents);
+    send(actions, observation, state, &rest, back, intents);
     if state.survey_since.is_none() {
         if let Some((at, id)) = found_depot(observation, state) {
             state.target = Some(at);
@@ -517,6 +536,20 @@ pub(super) fn commit(
     let Some((tanks, more)) = party(observation, memory) else {
         return false;
     };
+    // Enemies beside the units that would go would turn the party straight back: wait.
+    let ts = tile(observation);
+    let leaving: Vec<u32> = tanks.iter().chain(&more).copied().collect();
+    let contact = units(observation, &leaving).iter().any(|unit| {
+        observation.visible_enemies.iter().any(|enemy| {
+            enemy.hp > 0
+                && enemy.kind.is_unit()
+                && enemy.kind != EntityKind::Worker
+                && distance((unit.x, unit.y), (enemy.x, enemy.y)) <= THREAT_TILES * ts
+        })
+    });
+    if contact {
+        return false;
+    }
     let tick = observation.tick;
     let state = &mut memory.third_pressure;
     let Some(goal) = state.target.map(unrounded) else {
@@ -568,6 +601,10 @@ pub(super) fn keep_watch(
     }
     if let Some(point) = state.watch.map(unrounded) {
         let ids = state.scouts.clone();
-        send(actions, observation, state, &ids, point, intents);
+        let back = leg_back(state).unwrap_or(point);
+        if let Some((lead, rest)) = ids.split_first() {
+            send(actions, observation, state, &[*lead], point, intents);
+            send(actions, observation, state, rest, back, intents);
+        }
     }
 }

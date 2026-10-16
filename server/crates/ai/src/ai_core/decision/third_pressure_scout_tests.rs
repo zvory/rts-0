@@ -493,3 +493,107 @@ fn a_scout_that_stops_short_of_its_view_still_sees_the_spot_and_goes_on() {
     let next = move_of(&commands, id).expect("sent on to the next view");
     assert!(distance(next, view) > 1.0 * ts(), "{next:?} {view:?}");
 }
+
+#[test]
+fn the_scouts_walk_around_one_enemy_group_once() {
+    let (mut memory, observation) = scouts_out((40.0, 30.0));
+    step(JEFFS_AI_ID, &observation, &mut memory);
+    let state = &mut memory.third_pressure;
+    let next = unrounded(state.route[state.leg]);
+    let lead_at = (40.0 * ts(), 30.0 * ts());
+    let midway = ((lead_at.0 + next.0) * 0.5, (lead_at.1 + next.1) * 0.5);
+    state.dangers = vec![(rounded(midway), 10_009)];
+    for tick in [10_018, 10_027, 10_036] {
+        let mut later = observation.clone();
+        later.tick = tick;
+        step(JEFFS_AI_ID, &later, &mut memory);
+    }
+    assert_eq!(memory.third_pressure.detours, 1);
+}
+
+#[test]
+fn on_the_way_the_second_scout_keeps_two_legs_behind() {
+    let (mut memory, mut observation) = scouts_out((42.0, 31.0));
+    let state = &mut memory.third_pressure;
+    state.route = [
+        (20.0, 20.0),
+        (30.0, 25.0),
+        (40.0, 30.0),
+        (50.0, 35.0),
+        (60.0, 40.0),
+    ]
+    .iter()
+    .map(|p| rounded((p.0 * ts(), p.1 * ts())))
+    .collect();
+    state.leg = 3;
+    let trailer = state.scouts[1];
+    let two_back = unrounded(state.route[1]);
+    place(&mut observation, trailer, (25.0, 22.0));
+    let commands = step(JEFFS_AI_ID, &observation, &mut memory);
+    let sent = move_of(&commands, trailer).expect("the trailer follows");
+    assert!(distance(sent, two_back) < 1.0, "{sent:?} {two_back:?}");
+}
+
+#[test]
+fn waiting_for_the_party_the_scouts_stay_a_leg_apart() {
+    let (mut memory, mut observation) = scout_at_base((95.0, 62.0));
+    let id = lead(&memory);
+    let trailer = memory.third_pressure.scouts[1];
+    observation
+        .visible_enemies
+        .push(unit(500, 2, EntityKind::ResourceDepot, (121.0, 62.0)));
+    let commands = step(JEFFS_AI_ID, &observation, &mut memory);
+    let watch = move_of(&commands, id).unwrap();
+    // Only two Tanks: they wait.
+    let mut observation = observation.clone();
+    observation.tick = 10_018;
+    observation
+        .owned
+        .retain(|unit| unit.id != 12 && unit.id != 13);
+    place(&mut observation, id, (watch.0 / ts(), watch.1 / ts()));
+    step(JEFFS_AI_ID, &observation, &mut memory);
+    assert!(memory.third_pressure.sized_up.is_some());
+    let mut waiting = observation.clone();
+    waiting.tick = 10_027;
+    let commands = step(JEFFS_AI_ID, &waiting, &mut memory);
+    let route = &memory.third_pressure.route;
+    let staging = unrounded(route[route.len() - 1]);
+    let back = unrounded(route[route.len() - 2]);
+    let lead_to = move_of(&commands, id).unwrap();
+    let trail_to = move_of(&commands, trailer).unwrap();
+    assert!(distance(lead_to, staging) < 1.0);
+    assert!(distance(trail_to, back) < 1.0);
+    assert!(
+        distance(lead_to, trail_to) >= 6.0 * ts(),
+        "{lead_to:?} {trail_to:?}"
+    );
+}
+
+#[test]
+fn no_party_is_sent_into_a_fight_at_home() {
+    let (mut memory, mut observation) = scout_at_base((95.0, 62.0));
+    let id = lead(&memory);
+    observation
+        .visible_enemies
+        .push(unit(500, 2, EntityKind::ResourceDepot, (121.0, 62.0)));
+    let commands = step(JEFFS_AI_ID, &observation, &mut memory);
+    let watch = move_of(&commands, id).unwrap();
+    // Enemy Riflemen beside the home Tanks, outside the base's defense zone.
+    let mut observation = observation.clone();
+    observation.tick = 10_018;
+    place(&mut observation, id, (watch.0 / ts(), watch.1 / ts()));
+    let trailer = memory.third_pressure.scouts[1];
+    place(&mut observation, trailer, (90.0, 62.0));
+    observation
+        .visible_enemies
+        .push(unit(700, 2, EntityKind::Rifleman, (24.0, 13.0)));
+    step(JEFFS_AI_ID, &observation, &mut memory);
+    assert_eq!(memory.third_pressure.phase, Phase::Scout);
+    assert!(memory.third_pressure.tanks.is_empty());
+    // Once they are gone, it goes.
+    let mut clear = observation.clone();
+    clear.tick = 10_027;
+    clear.visible_enemies.retain(|enemy| enemy.id != 700);
+    step(JEFFS_AI_ID, &clear, &mut memory);
+    assert_eq!(memory.third_pressure.phase, Phase::March);
+}

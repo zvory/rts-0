@@ -18,25 +18,29 @@ pub(super) const EARLIEST_SCOUT_TICK: u32 = config::TICK_HZ * 240;
 /// Without a map analysis to time the walk, the scouts leave at 5:00.
 const UNTIMED_SCOUT_TICK: u32 = config::TICK_HZ * 300;
 
-/// When the scouts leave for the base Jeff would raid now; worked out once per target.
+/// The departure is worked out again this often, as the lead to be may have walked elsewhere.
+const RETIME_TICKS: u32 = config::TICK_HZ * 10;
+
+/// When the scouts leave for the base Jeff would raid now, the lead walking from `from`.
 pub(super) fn departure(
     observation: &AiObservation,
     map_analysis: Option<&AiMapAnalysis>,
     memory: &mut AiDecisionMemory,
     goal: (f32, f32),
+    from: (f32, f32),
 ) -> u32 {
     let key = rounded(goal);
-    if let Some((at, tick)) = memory.third_pressure.departure {
-        if at == key {
+    let now = observation.tick;
+    if let Some((at, tick, timed)) = memory.third_pressure.departure {
+        if at == key && now.saturating_sub(timed) < RETIME_TICKS {
             return tick;
         }
     }
-    let home = home_point(observation, memory);
     let tick = match map_analysis {
         Some(analysis) => {
-            let route = flank_route(observation, Some(analysis), home, goal);
-            let rifle = raid_walk_ticks(observation, analysis, home, &route, EntityKind::Rifleman);
-            let car = raid_walk_ticks(observation, analysis, home, &route, EntityKind::ScoutCar);
+            let route = flank_route(observation, Some(analysis), from, goal);
+            let rifle = raid_walk_ticks(observation, analysis, from, &route, EntityKind::Rifleman);
+            let car = raid_walk_ticks(observation, analysis, from, &route, EntityKind::ScoutCar);
             let tick = CAR_LAUNCH_TICK
                 .saturating_add(car)
                 .saturating_sub(rifle)
@@ -48,7 +52,7 @@ pub(super) fn departure(
         }
         None => UNTIMED_SCOUT_TICK,
     };
-    memory.third_pressure.departure = Some((key, tick));
+    memory.third_pressure.departure = Some((key, tick, now));
     tick
 }
 

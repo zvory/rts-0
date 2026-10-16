@@ -1069,17 +1069,17 @@ fn the_scouts_leave_to_reach_the_base_when_a_scout_car_leaving_at_5_30_did() {
     assert!((1500..1650).contains(&car), "{car}");
     assert!((2200..2400).contains(&rifle), "{rifle}");
     let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
-    let leave = timing::departure(&observation, Some(&analysis), &mut memory, goal);
+    let leave = timing::departure(&observation, Some(&analysis), &mut memory, goal, home);
     assert_eq!(leave + rifle, config::TICK_HZ * 330 + car);
     // Worked out once per target.
     assert_eq!(
         memory.third_pressure.departure,
-        Some((rounded(goal), leave))
+        Some((rounded(goal), leave, observation.tick))
     );
     // Without the analysis: 5:00.
     let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
     assert_eq!(
-        timing::departure(&observation, None, &mut memory, goal),
+        timing::departure(&observation, None, &mut memory, goal, home),
         config::TICK_HZ * 300
     );
 }

@@ -179,12 +179,13 @@ pub(in crate::ai_core::decision) struct ThirdPressure {
     flees: u32,
     /// Where the scouts turned away from enemies lately, and when: their way on keeps clear.
     dangers: Vec<((i32, i32), u32)>,
-    /// Waypoints added to walk around them on this trip.
+    /// Waypoints added to walk around them on this trip, and the dangers walked around.
     detours: u32,
+    walked_around: Vec<(i32, i32)>,
     /// When the lead scout finished sizing up the found Depot; the scouts then wait for the party.
     sized_up: Option<u32>,
-    /// The target the scouts' departure was timed for, and the tick they leave.
-    departure: Option<((i32, i32), u32)>,
+    /// The target the scouts' departure was timed for, the tick they leave, and when it was timed.
+    departure: Option<((i32, i32), u32, u32)>,
     /// Since when the party has held to let enemies pass.
     avoid_since: Option<u32>,
     /// How many spots the current search began with.
@@ -281,6 +282,7 @@ impl ThirdPressure {
         self.flees = 0;
         self.dangers.clear();
         self.detours = 0;
+        self.walked_around.clear();
         self.sized_up = None;
         self.avoid_since = None;
         self.leg = 0;
@@ -413,19 +415,19 @@ fn launch_ready(
         return None;
     }
     let goal = target.depot.unwrap_or(target.center);
-    if tick < departure(observation, map_analysis, memory, goal) {
-        return None;
-    }
     let home = home_point(observation, memory);
     let scouts = party_riflemen(observation, memory, home, SCOUT_RIFLEMEN, &[])?;
     // The healthiest go; hurt ones would only turn straight back.
-    if units(observation, &scouts)
-        .iter()
-        .any(|unit| scout::hurt(unit))
-    {
+    let out = units(observation, &scouts);
+    if out.iter().any(|unit| scout::hurt(unit)) {
         return None;
     }
-    let route = flank_route(observation, map_analysis, home, goal);
+    // The way and its timing start where the lead stands, often at a post well out of the main.
+    let from = out.first().map_or(home, |unit| (unit.x, unit.y));
+    if tick < departure(observation, map_analysis, memory, goal, from) {
+        return None;
+    }
+    let route = flank_route(observation, map_analysis, from, goal);
     Some(Launch {
         scouts,
         target,
