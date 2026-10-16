@@ -4,6 +4,7 @@ use crate::ai_core::facts::AiFacts;
 use crate::ai_core::observation::{AiEconomy, AiMapSummary, AiPlayerSummary};
 use crate::ai_core::profiles::{JEFFS_AI, JEFFS_AI_PRE_THIRD_PRESSURE_ID};
 use rts_sim::game::command::SimCommand as Command;
+use targets::{enemy_bases, off_route_tiles, OPEN_OFF_ROUTE_TILES};
 
 fn ts() -> f32 {
     config::TILE_SIZE as f32
@@ -122,7 +123,7 @@ fn step(
 #[test]
 fn the_target_is_the_enemy_third_not_its_natural_or_a_base_on_our_side() {
     let observation = game(10_000);
-    let target = target_site(&observation, &ThirdPressure::default()).expect("a target");
+    let target = target_site(&observation, None, &ThirdPressure::default()).expect("a target");
     let third = (112.0 * ts(), 62.0 * ts());
     assert!(
         distance(target.center, third) < 2.0 * ts(),
@@ -134,7 +135,7 @@ fn the_target_is_the_enemy_third_not_its_natural_or_a_base_on_our_side() {
     // A Depot seen mining it, even outside its ring of patches, is taken exactly.
     let mut state = ThirdPressure::default();
     state.seen_depots.push(rounded((121.0 * ts(), 58.0 * ts())));
-    let target = target_site(&observation, &state).unwrap();
+    let target = target_site(&observation, None, &state).unwrap();
     assert_eq!(
         target.depot.map(rounded),
         Some(rounded((121.0 * ts(), 58.0 * ts())))
@@ -142,11 +143,11 @@ fn the_target_is_the_enemy_third_not_its_natural_or_a_base_on_our_side() {
     // Once found empty, it is skipped for the next base...
     let mut empty = ThirdPressure::default();
     empty.checked.push(rounded(target.center));
-    let next = target_site(&observation, &empty);
+    let next = target_site(&observation, None, &empty);
     assert!(next.is_none(), "{next:?}");
     // ...unless a Depot has been seen there since.
     state.checked.push(rounded(target.center));
-    assert!(target_site(&observation, &state).is_some());
+    assert!(target_site(&observation, None, &state).is_some());
 }
 
 /// The Scout Car sent out at `observation`, then the party sent after it as its report would.
@@ -441,7 +442,7 @@ fn a_base_whose_patches_spread_out_is_one_site() {
         .extend(steel_cluster(150, (97.0, 86.0)));
     let bases = enemy_bases(&observation, &ThirdPressure::default());
     assert_eq!(bases.len(), 3, "{bases:?}");
-    let target = target_site(&observation, &ThirdPressure::default()).unwrap();
+    let target = target_site(&observation, None, &ThirdPressure::default()).unwrap();
     assert!(distance(target.center, (112.0 * ts(), 62.0 * ts())) < 4.0 * ts());
 }
 
@@ -599,11 +600,11 @@ fn with_fourth_base(observation: &mut AiObservation) {
 fn a_seen_depot_beats_a_better_ranked_guess() {
     let mut observation = game(10_000);
     with_fourth_base(&mut observation);
-    let guess = target_site(&observation, &ThirdPressure::default()).unwrap();
+    let guess = target_site(&observation, None, &ThirdPressure::default()).unwrap();
     assert!(distance(guess.center, (112.0 * ts(), 62.0 * ts())) < 2.0 * ts());
     let mut state = ThirdPressure::default();
     state.seen_depots.push(rounded((101.0 * ts(), 43.0 * ts())));
-    let seen = target_site(&observation, &state).unwrap();
+    let seen = target_site(&observation, None, &state).unwrap();
     assert!(distance(seen.center, (100.0 * ts(), 40.0 * ts())) < 2.0 * ts());
     assert_eq!(
         seen.depot.map(rounded),
@@ -675,7 +676,7 @@ fn a_garrison_the_party_would_lose_to_sends_it_home_and_spares_the_base() {
         .iter()
         .any(|(site, _)| distance(unrounded(*site), (112.0 * ts(), 62.0 * ts())) < 2.0 * ts()));
     // The next launch leaves the defended third alone a while.
-    let next = target_site(&observation, state);
+    let next = target_site(&observation, None, state);
     assert!(next.is_none_or(|base| distance(base.center, (112.0 * ts(), 62.0 * ts())) > 8.0 * ts()));
     // A garrison it beats does not stop the siege.
     let mut observation = game(11_009);
@@ -1153,5 +1154,171 @@ fn the_scout_car_keeps_out_of_a_parked_tanks_reach() {
             .push(unit(700, 2, kind, (75.0, 40.0)));
         step(JEFFS_AI_ID, &observation, &mut memory);
         assert_eq!(memory.third_pressure.flees == 1, flees, "{kind:?}");
+    }
+}
+
+/// The analysis of an open grass map the size of `game`'s, with its two starts.
+fn open_analysis() -> AiMapAnalysis {
+    use rts_sim::protocol::{terrain, MapInfo, PlayerStart, StartPayload};
+    let size = 128;
+    let tiles = (size * size) as usize;
+    let start = StartPayload {
+        player_id: 1,
+        spectator: false,
+        prediction_build_id: None,
+        prediction_version: 0,
+        match_run_id: None,
+        capabilities: Default::default(),
+        diagnostics: Default::default(),
+        replay: None,
+        lab: None,
+        observer_view: None,
+        tick: 0,
+        map: MapInfo {
+            width: size,
+            height: size,
+            tile_size: config::TILE_SIZE,
+            elevation: vec![0; tiles],
+            sun: None,
+            terrain: vec![terrain::GRASS; tiles],
+            resources: Vec::new(),
+            doodads: Vec::new(),
+            concealment_tiles: Vec::new(),
+            no_vehicle_tiles: Vec::new(),
+            no_building_tiles: Vec::new(),
+            no_entrenchment_tiles: Vec::new(),
+            damage_reduction_tiles: Vec::new(),
+            slow_movement_tiles: Vec::new(),
+        },
+        players: [(1, (10, 10)), (2, (110, 110))]
+            .into_iter()
+            .map(|(id, (x, y))| PlayerStart {
+                id,
+                team_id: id,
+                faction_id: "kriegsia".to_string(),
+                name: format!("P{id}"),
+                color: "#111111".to_string(),
+                is_ai: true,
+                start_tile_x: x,
+                start_tile_y: y,
+            })
+            .collect(),
+    };
+    AiMapAnalysis::analyze(&start)
+}
+
+/// Player `player`'s view of a real map at 5:33, before anything is built, and its analysis.
+fn real_map(name: &str, player: u32) -> (AiObservation, AiMapAnalysis) {
+    use rts_sim::game::map::Map;
+    use rts_sim::game::{Game, PlayerInit};
+    let players: Vec<_> = (1..=2)
+        .map(|id| PlayerInit {
+            id,
+            team_id: id,
+            faction_id: "kriegsia".into(),
+            name: format!("P{id}"),
+            color: "#ffffff".into(),
+            is_ai: true,
+        })
+        .collect();
+    let map = Map::load_for_players(name, &[(1, 1), (2, 2)], 0).unwrap();
+    let game = Game::new_with_random_ai_profiles_and_map_metadata(
+        &players,
+        0,
+        map,
+        Map::metadata_for_name(name).unwrap(),
+    );
+    let start = game.start_payload();
+    let mut observation = AiObservation::from_snapshot_with_alive(
+        &start,
+        &game.snapshot_for(player),
+        player,
+        [],
+        None,
+    )
+    .unwrap();
+    observation.tick = 10_000;
+    (observation, AiMapAnalysis::analyze(&start))
+}
+
+fn near_tiles(point: (f32, f32), tiles: (f32, f32)) -> bool {
+    distance(point, (tiles.0 * ts(), tiles.1 * ts())) < 2.0 * ts()
+}
+
+#[test]
+fn the_raid_goes_for_a_base_off_the_enemy_route_and_a_natural_off_it_first() {
+    let analysis = open_analysis();
+    let state = ThirdPressure::default();
+    // The natural at (92, 92) stands on the diagonal the enemy army walks to Jeff; the third at
+    // (112, 62) lies 35 tiles off it.
+    let mut observation = game(10_000);
+    let target = target_site(&observation, Some(&analysis), &state).unwrap();
+    assert!(near_tiles(target.center, (112.0, 62.0)), "{target:?}");
+    // A natural off the route comes first: the enemy takes it first, so it surely has a Depot.
+    for patch in observation
+        .resources
+        .iter_mut()
+        .filter(|r| (100..104).contains(&r.id))
+    {
+        patch.x -= 20.0 * ts();
+        patch.y += 18.0 * ts();
+    }
+    let target = target_site(&observation, Some(&analysis), &state).unwrap();
+    assert!(near_tiles(target.center, (72.0, 110.0)), "{target:?}");
+    // With the natural on the route and the third moved to 14 tiles off it, no base lies open.
+    let mut observation = game(10_000);
+    for patch in observation
+        .resources
+        .iter_mut()
+        .filter(|r| (110..114).contains(&r.id))
+    {
+        patch.x -= 22.0 * ts();
+        patch.y += 8.0 * ts();
+    }
+    assert_eq!(target_site(&observation, Some(&analysis), &state), None);
+    // Without the route only the natural is left out, as before.
+    let guess = target_site(&observation, None, &state).unwrap();
+    assert!(near_tiles(guess.center, (90.0, 70.0)), "{guess:?}");
+}
+
+#[test]
+fn on_classic_the_raid_skips_the_base_on_the_enemy_armys_diagonal() {
+    let (observation, analysis) = real_map("Classic", 1);
+    let route = analysis.base_route_tiles(1).unwrap();
+    let state = ThirdPressure::default();
+    // AI 2.1 would take (86, 82) after its natural, but it stands on its army's way to Jeff.
+    let guess = target_site(&observation, None, &state).unwrap();
+    assert!(near_tiles(guess.center, (86.0, 82.0)), "{guess:?}");
+    assert!(off_route_tiles(&observation, route, guess.center) < OPEN_OFF_ROUTE_TILES);
+    let target = target_site(&observation, Some(&analysis), &state).unwrap();
+    assert!(near_tiles(target.center, (91.0, 53.0)), "{target:?}");
+    assert!(off_route_tiles(&observation, route, target.center) >= OPEN_OFF_ROUTE_TILES);
+}
+
+#[test]
+fn on_the_other_maps_the_natural_lies_on_the_enemy_route_and_the_third_off_it() {
+    for (name, third) in [
+        ("Crossroads", (99.0, 116.0)),
+        ("The River", (58.0, 110.0)),
+        ("Schone Tage", (37.0, 103.0)),
+        ("Doppelganger", (82.0, 138.0)),
+    ] {
+        let (observation, analysis) = real_map(name, 1);
+        let route = analysis.base_route_tiles(1).unwrap();
+        let state = ThirdPressure::default();
+        let enemy = enemy_start(&observation).unwrap();
+        let natural = enemy_bases(&observation, &state)
+            .into_iter()
+            .min_by(|left, right| {
+                distance(left.center, enemy).total_cmp(&distance(right.center, enemy))
+            })
+            .unwrap();
+        assert!(
+            off_route_tiles(&observation, route, natural.center) < OPEN_OFF_ROUTE_TILES,
+            "{name}"
+        );
+        let target = target_site(&observation, Some(&analysis), &state).unwrap();
+        assert!(near_tiles(target.center, third), "{name}: {target:?}");
+        assert!(off_route_tiles(&observation, route, target.center) >= OPEN_OFF_ROUTE_TILES);
     }
 }

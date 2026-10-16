@@ -230,6 +230,7 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/ai/src/ai_core/decision/third_pressure.rs",
   "server/crates/ai/src/ai_core/decision/third_pressure/locate.rs",
   "server/crates/ai/src/ai_core/decision/third_pressure/scout.rs",
+  "server/crates/ai/src/ai_core/decision/third_pressure/targets.rs",
   // Unit priority and cap adjustments moved verbatim out of the approved decision orchestrator.
   "server/crates/ai/src/ai_core/decision/unit_mix.rs",
   // Jeff's Kriegsia-only expansion screen and upgrade policy are focused modules beneath the

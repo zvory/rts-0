@@ -555,7 +555,7 @@ pub(super) fn base_empty(
     let state = &mut memory.third_pressure;
     state.checked.push(rounded(center));
     state.empty_bases = state.empty_bases.saturating_add(1);
-    match field_target(observation, state, false) {
+    match field_target(observation, map_analysis, state, false) {
         Some(base) => retarget(observation, map_analysis, state, base),
         None => begin_merge(observation, memory, intents, "base empty"),
     }
@@ -566,6 +566,7 @@ pub(super) fn base_empty(
 /// target's Depot has not been seen.
 pub(super) fn field_target(
     observation: &AiObservation,
+    map_analysis: Option<&AiMapAnalysis>,
     state: &ThirdPressure,
     only_for_a_guess: bool,
 ) -> Option<EnemyBase> {
@@ -579,7 +580,7 @@ pub(super) fn field_target(
     if only_for_a_guess && current_known {
         return None;
     }
-    let base = target_site(observation, state)?;
+    let base = target_site(observation, map_analysis, state)?;
     let depot = base.depot?;
     if distance(base.center, area_center(state)) < SITE_SAME_TILES * ts {
         return None;
