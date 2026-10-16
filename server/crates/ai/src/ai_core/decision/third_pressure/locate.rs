@@ -14,15 +14,12 @@ use super::*;
 /// The looker sizes the found Depot up from this far inside its own sight.
 const SURVEY_BACKOFF_TILES: f32 = 3.0;
 const SURVEY_REACHED_TILES: f32 = 2.0;
-const SURVEY_TIMEOUT_TICKS: u32 = config::TICK_HZ * 15;
-/// Enemy fighters this close to the Depot are its garrison.
-const GARRISON_TILES: f32 = 16.0;
 /// After falling back from contact the looker waits with the party this long.
 const FALLBACK_TICKS: u32 = config::TICK_HZ * 6;
 /// A Depot seen at another base this close to the party becomes the target in the field.
 const FIELD_RETARGET_TILES: f32 = 50.0;
-/// A search out of time that has seen this share of the spots, and no Depot, found the base empty.
-const EMPTY_SEEN_PERCENT: usize = 75;
+/// Enemy buildings' defense zones reach 6 tiles: a looker stops no nearer than this.
+const LOOK_CLEAR_OF_BUILDINGS_TILES: f32 = 8.0;
 
 /// At the staging point: every spot within mining reach of the base's patches could hold its
 /// Depot, so they are all to be seen before the base counts as empty. The Scout Car looks (or the
@@ -44,6 +41,7 @@ pub(super) fn begin_locate(
     state.locator = locators(observation, state);
     state.survey_since = None;
     state.fallback_until = 0;
+    state.watch = None;
     state.phase = Phase::Locate;
     state.phase_since = observation.tick;
     state.clear_orders();
@@ -51,7 +49,7 @@ pub(super) fn begin_locate(
 }
 
 /// Passable spots on a grid within `MINING_ANCHOR_RANGE_TILES` of a patch and off the patches.
-fn depot_spots(
+pub(super) fn depot_spots(
     observation: &AiObservation,
     map_analysis: Option<&AiMapAnalysis>,
     area: &[(f32, f32)],
@@ -107,14 +105,14 @@ pub(super) fn sight(unit: &AiEntitySummary) -> f32 {
 }
 
 /// The centre of the target base's patches.
-fn area_center(state: &ThirdPressure) -> (f32, f32) {
+pub(super) fn area_center(state: &ThirdPressure) -> (f32, f32) {
     let n = state.area.len().max(1) as f32;
     state.area.iter().fold((0.0, 0.0), |sum, p| {
         (sum.0 + p.0 as f32 / n, sum.1 + p.1 as f32 / n)
     })
 }
 
-fn staging_point(state: &ThirdPressure, center: (f32, f32)) -> (f32, f32) {
+pub(super) fn staging_point(state: &ThirdPressure, center: (f32, f32)) -> (f32, f32) {
     state
         .route
         .last()
@@ -220,7 +218,6 @@ pub(super) fn locate(
     intents: &mut Vec<AiIntent>,
 ) {
     let tick = observation.tick;
-    let ts = tile(observation);
     let state = &memory.third_pressure;
     if state.tanks.is_empty() || memory.home_outgunned {
         begin_return(observation, memory, intents, "depot not found");
@@ -245,33 +242,14 @@ pub(super) fn locate(
         return;
     }
     let state = &mut memory.third_pressure;
-    let area: Vec<(f32, f32)> = state.area.iter().map(|p| unrounded(*p)).collect();
     let center = area_center(state);
     if units(observation, &state.locator).is_empty() {
         state.locator = locators(observation, state);
     }
     if state.survey_since.is_none() {
-        // A Depot seen mining the base is the target, at its exact spot.
-        let seen = observation
-            .visible_enemies
-            .iter()
-            .filter(|enemy| enemy.kind == EntityKind::ResourceDepot && enemy.hp > 0)
-            .filter(|enemy| mines_from(observation, (enemy.x, enemy.y), &area))
-            .min_by(|left, right| {
-                distance((left.x, left.y), center).total_cmp(&distance((right.x, right.y), center))
-            });
-        let remembered = state
-            .seen_depots
-            .iter()
-            .copied()
-            .find(|at| mines_from(observation, unrounded(*at), &area));
-        if let Some(depot) = seen {
-            state.target = Some(rounded((depot.x, depot.y)));
-            state.depot = Some(depot.id);
-            state.survey_since = Some(tick);
-        } else if let Some(at) = remembered {
+        if let Some((at, id)) = found_depot(observation, state) {
             state.target = Some(at);
-            state.depot = None;
+            state.depot = id;
             state.survey_since = Some(tick);
         }
     }
@@ -280,22 +258,101 @@ pub(super) fn locate(
         return;
     }
     let members = units(observation, &state.members());
-    state.unseen.retain(|spot| {
-        let spot = unrounded(*spot);
-        !members
-            .iter()
-            .any(|unit| distance((unit.x, unit.y), spot) <= (sight(unit) - SIGHT_MARGIN_TILES) * ts)
-    });
+    clear_seen(observation, state, &members);
     if state.unseen.is_empty() {
         base_empty(observation, map_analysis, memory, intents, center);
         return;
     }
     let lookers = units(observation, &state.locator);
-    let Some(lead) = lookers.first() else {
+    if lookers.is_empty() {
         begin_merge(observation, memory, intents, "no locator");
         return;
-    };
+    }
     let staging = staging_point(state, center);
+    let Some(view) = next_view(observation, map_analysis, state, &lookers, center, staging) else {
+        return;
+    };
+    let view = if tick < state.fallback_until {
+        staging
+    } else {
+        view
+    };
+    send_looker_and_group(
+        actions,
+        observation,
+        state,
+        &lookers,
+        view,
+        staging,
+        intents,
+    );
+}
+
+/// A Depot mining the target base: one in sight (its exact spot and id), else one remembered.
+pub(super) fn found_depot(
+    observation: &AiObservation,
+    state: &ThirdPressure,
+) -> Option<((i32, i32), Option<u32>)> {
+    let area: Vec<(f32, f32)> = state.area.iter().map(|p| unrounded(*p)).collect();
+    let center = area_center(state);
+    let seen = observation
+        .visible_enemies
+        .iter()
+        .filter(|enemy| enemy.kind == EntityKind::ResourceDepot && enemy.hp > 0)
+        .filter(|enemy| mines_from(observation, (enemy.x, enemy.y), &area))
+        .min_by(|left, right| {
+            distance((left.x, left.y), center).total_cmp(&distance((right.x, right.y), center))
+        });
+    if let Some(depot) = seen {
+        return Some((rounded((depot.x, depot.y)), Some(depot.id)));
+    }
+    state
+        .seen_depots
+        .iter()
+        .copied()
+        .find(|at| mines_from(observation, unrounded(*at), &area))
+        .map(|at| (at, None))
+}
+
+/// Drops the spots that could hold the Depot which `lookers` now see.
+pub(super) fn clear_seen(
+    observation: &AiObservation,
+    state: &mut ThirdPressure,
+    lookers: &[&AiEntitySummary],
+) {
+    let ts = tile(observation);
+    state.unseen.retain(|spot| {
+        let spot = unrounded(*spot);
+        !lookers
+            .iter()
+            .any(|unit| distance((unit.x, unit.y), spot) <= (sight(unit) - SIGHT_MARGIN_TILES) * ts)
+    });
+}
+
+fn clear_of_buildings(observation: &AiObservation, point: (f32, f32)) -> bool {
+    let reach = LOOK_CLEAR_OF_BUILDINGS_TILES * tile(observation);
+    observation
+        .visible_enemies
+        .iter()
+        .filter(|enemy| enemy.hp > 0 && enemy.kind.is_building())
+        .all(|enemy| distance((enemy.x, enemy.y), point) >= reach)
+}
+
+/// Where the lookers look from next: the unseen spot most likely to hold the Depot (beside a
+/// seen extractor, near the patches' centre, near the lookers), seen from outside the base, from
+/// the staging side or from where the lead looker is, on passable ground clear of enemy buildings'
+/// defense zones (failing that, on passable ground).
+pub(super) fn next_view(
+    observation: &AiObservation,
+    map_analysis: Option<&AiMapAnalysis>,
+    state: &ThirdPressure,
+    lookers: &[&AiEntitySummary],
+    center: (f32, f32),
+    staging: (f32, f32),
+) -> Option<(f32, f32)> {
+    let ts = tile(observation);
+    let lead = lookers.first()?;
+    let area: Vec<(f32, f32)> = state.area.iter().map(|p| unrounded(*p)).collect();
     // Extractors only stand within reach of the Depot that anchors them.
     let extractors: Vec<(f32, f32)> = observation
         .visible_enemies
@@ -318,49 +375,82 @@ pub(super) fn locate(
             + distance(spot, center)
             + 0.5 * distance(spot, (lead.x, lead.y))
     };
-    let Some(spot) = state
+    let spot = state
         .unseen
         .iter()
         .map(|spot| unrounded(*spot))
-        .min_by(|left, right| score(*left).total_cmp(&score(*right)))
-    else {
-        return;
-    };
+        .min_by(|left, right| score(*left).total_cmp(&score(*right)))?;
     let look = lookers
         .iter()
         .map(|unit| sight(unit))
         .fold(f32::MAX, f32::min);
-    let back = (look - VIEW_BACKOFF_TILES).max(2.0) * ts;
-    // Look from outside the base, else from the staging side, else from where the looker is.
-    let view = [
+    let dirs: Vec<(f32, f32)> = [
         normalized_direction(center, spot),
         normalized_direction(spot, staging),
         normalized_direction(spot, (lead.x, lead.y)),
     ]
     .into_iter()
     .flatten()
-    .map(|dir| {
-        clamp_to_map(
-            (spot.0 + dir.0 * back, spot.1 + dir.1 * back),
-            observation.map,
-        )
-    })
-    .find(|point| passable(observation, map_analysis, *point))
-    .unwrap_or(spot);
-    let view = if tick < state.fallback_until {
-        staging
-    } else {
-        view
+    .collect();
+    let mut passable_view = None;
+    for back in [
+        look - VIEW_BACKOFF_TILES,
+        look - VIEW_BACKOFF_TILES + 1.0,
+        look - 1.0,
+    ] {
+        let back = back.max(2.0) * ts;
+        for dir in &dirs {
+            let point = clamp_to_map(
+                (spot.0 + dir.0 * back, spot.1 + dir.1 * back),
+                observation.map,
+            );
+            if !passable(observation, map_analysis, point) {
+                continue;
+            }
+            if clear_of_buildings(observation, point) {
+                return Some(point);
+            }
+            passable_view.get_or_insert(point);
+        }
+    }
+    Some(passable_view.unwrap_or(spot))
+}
+
+/// Where a looker watches a found Depot from: inside its sight, on the staging side or turned up
+/// to 60 degrees off it, clear of enemy buildings' defense zones if it can be.
+pub(super) fn survey_point(
+    observation: &AiObservation,
+    map_analysis: Option<&AiMapAnalysis>,
+    depot: (f32, f32),
+    staging: (f32, f32),
+    look: f32,
+) -> (f32, f32) {
+    let ts = tile(observation);
+    let look = look.min(15.0);
+    let dir = normalized_direction(depot, staging).unwrap_or((0.0, 1.0));
+    let turned = |angle: f32| {
+        let (sin, cos) = angle.sin_cos();
+        (dir.0 * cos - dir.1 * sin, dir.0 * sin + dir.1 * cos)
     };
-    send_looker_and_group(
-        actions,
-        observation,
-        state,
-        &lookers,
-        view,
-        staging,
-        intents,
-    );
+    let mut passable_point = None;
+    for angle in [0.0, 0.5, -0.5, 1.0, -1.0] {
+        let dir = turned(angle);
+        for back in [look - SURVEY_BACKOFF_TILES, look - 2.0, look - 1.25] {
+            let back = back.max(2.0) * ts;
+            let point = clamp_to_map(
+                (depot.0 + dir.0 * back, depot.1 + dir.1 * back),
+                observation.map,
+            );
+            if !passable(observation, map_analysis, point) {
+                continue;
+            }
+            if clear_of_buildings(observation, point) {
+                return point;
+            }
+            passable_point.get_or_insert(point);
+        }
+    }
+    passable_point.unwrap_or(staging)
 }
 
 fn passable(
@@ -416,19 +506,8 @@ fn survey(
     let look = lookers
         .iter()
         .map(|unit| sight(unit))
-        .fold(f32::MAX, f32::min)
-        .min(15.0);
-    let dir = normalized_direction(depot, staging).unwrap_or((0.0, 1.0));
-    let back = (look - SURVEY_BACKOFF_TILES).max(2.0) * ts;
-    let point = clamp_to_map(
-        (depot.0 + dir.0 * back, depot.1 + dir.1 * back),
-        observation.map,
-    );
-    let point = if passable(observation, map_analysis, point) {
-        point
-    } else {
-        staging
-    };
+        .fold(f32::MAX, f32::min);
+    let point = survey_point(observation, map_analysis, depot, staging, look);
     let watch_from = if tick < state.fallback_until {
         staging
     } else {
@@ -466,7 +545,7 @@ fn survey(
 
 /// Nothing at any spot that could hold the Depot: the base counts as empty. A Depot seen at another
 /// base near the party becomes the target; else the party goes home.
-fn base_empty(
+pub(super) fn base_empty(
     observation: &AiObservation,
     map_analysis: Option<&AiMapAnalysis>,
     memory: &mut AiDecisionMemory,
@@ -522,19 +601,16 @@ pub(super) fn retarget(
     state.notes.push(format!("retarget {:?}", rounded(goal)));
     state.target = Some(rounded(goal));
     state.area = base.patches.iter().map(|p| rounded(*p)).collect();
-    state.depot = None;
-    state.killed_at = None;
     state.route = flank_route(observation, map_analysis, from, goal)
         .into_iter()
         .map(rounded)
         .collect();
-    state.leg = 0;
-    state.leg_since = tick;
-    state.phase = Phase::March;
+    state.reset_trip(tick);
+    // A Scout Car out alone keeps scouting; a party marches.
+    state.phase = if state.tanks.is_empty() {
+        Phase::Scout
+    } else {
+        Phase::March
+    };
     state.phase_since = tick;
-    state.unseen.clear();
-    state.locator.clear();
-    state.survey_since = None;
-    state.fallback_until = 0;
-    state.clear_orders();
 }

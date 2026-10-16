@@ -149,21 +149,42 @@ fn the_target_is_the_enemy_third_not_its_natural_or_a_base_on_our_side() {
     assert!(target_site(&observation, &state).is_some());
 }
 
+/// The Scout Car sent out at `observation`, then the party sent after it as its report would.
+fn launched(observation: &AiObservation) -> AiDecisionMemory {
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+    step(JEFFS_AI_ID, observation, &mut memory);
+    assert_eq!(memory.third_pressure.phase, Phase::Scout);
+    assert!(scout::commit(observation, None, &mut memory));
+    memory
+}
+
 #[test]
-fn the_party_leaves_from_half_past_five_with_army_tanks_riflemen_and_the_scout() {
+fn the_scout_car_goes_out_alone_and_the_party_follows_its_report() {
     let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
     assert!(step(JEFFS_AI_ID, &game(9_000), &mut memory).is_empty());
     assert_eq!(memory.third_pressure.phase, Phase::Idle);
 
     let commands = step(JEFFS_AI_ID, &game(10_000), &mut memory);
     let state = &memory.third_pressure;
+    assert_eq!(state.phase, Phase::Scout);
+    assert_eq!(state.scout, Some(30));
+    assert!(state.tanks.is_empty() && state.riflemen.is_empty());
+    assert_eq!(state.pledged_tanks(), 0);
+    assert!(commands
+        .iter()
+        .any(|command| matches!(command, Command::Move { units, .. } if units == &vec![30])));
+    // No Tank leaves with it.
+    assert!(!commands.iter().any(|command| {
+        matches!(command, Command::Move { units, .. } | Command::AttackMove { units, .. }
+            if units.iter().any(|id| (10..14).contains(id)))
+    }));
+    // Its report sends two army Tanks and five Riflemen.
+    assert!(scout::commit(&game(10_000), None, &mut memory));
+    let state = &memory.third_pressure;
     assert_eq!(state.phase, Phase::March);
     assert_eq!(state.tanks.len(), 2);
     assert_eq!(state.riflemen.len(), 5);
     assert_eq!(state.scout, Some(30));
-    assert!(commands.iter().any(
-        |command| matches!(command, Command::Move { units, .. } if units.contains(&state.tanks[0]))
-    ));
     // The rest of Jeff leaves the party alone.
     let reserved = memory.squad_reserved();
     assert!(state.reserved().all(|id| reserved.contains(&id)));
@@ -171,12 +192,15 @@ fn the_party_leaves_from_half_past_five_with_army_tanks_riflemen_and_the_scout()
 
 #[test]
 fn the_party_never_takes_the_home_reserve() {
-    // Three Tanks: two would leave the main one short of its two-Tank reserve.
+    // Three Tanks: two would leave the main one short of its two-Tank reserve. The Scout Car may
+    // look, but no party is sent.
     let mut observation = game(10_000);
     observation.owned.retain(|unit| unit.id != 13);
     let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
     step(JEFFS_AI_ID, &observation, &mut memory);
-    assert_eq!(memory.third_pressure.phase, Phase::Idle);
+    assert_eq!(memory.third_pressure.phase, Phase::Scout);
+    assert!(!scout::commit(&observation, None, &mut memory));
+    assert!(memory.third_pressure.tanks.is_empty());
     // With a third base of its own Jeff stays home too.
     let mut observation = game(10_000);
     observation.owned.extend([
@@ -295,8 +319,7 @@ fn party_at(observation: &mut AiObservation, memory: &AiDecisionMemory, at: (f32
 #[test]
 fn the_party_turns_home_against_as_many_enemy_tanks() {
     // Still beside home it disbands, back in the hands of home defense.
-    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
-    step(JEFFS_AI_ID, &game(10_000), &mut memory);
+    let mut memory = launched(&game(10_000));
     assert_eq!(memory.third_pressure.phase, Phase::March);
     let mut observation = game(10_090);
     observation.visible_enemies.extend([
@@ -307,8 +330,7 @@ fn the_party_turns_home_against_as_many_enemy_tanks() {
     assert_eq!(memory.third_pressure.phase, Phase::Idle);
     assert!(memory.squad_reserved().is_empty());
     // Far out it walks home, and hands each member back on arrival.
-    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
-    step(JEFFS_AI_ID, &game(10_000), &mut memory);
+    let mut memory = launched(&game(10_000));
     let mut observation = game(11_000);
     party_at(&mut observation, &memory, (70.0, 40.0));
     observation.visible_enemies.extend([
@@ -335,6 +357,7 @@ fn the_natural_forward_tank_stays_out_of_the_party() {
     let forward = expansion_security::surplus_tank_for_forward_base(&observation, &memory);
     assert_eq!(forward, Some(10));
     step(JEFFS_AI_ID, &observation, &mut memory);
+    assert!(scout::commit(&observation, None, &mut memory));
     assert_eq!(memory.third_pressure.phase, Phase::March);
     assert!(!memory.third_pressure.tanks.contains(&10));
     // Nor does the forward pick take a party Tank afterwards.
@@ -374,8 +397,7 @@ fn a_parked_tank_keeps_its_post_while_a_worker_walks_up() {
 
 #[test]
 fn a_losing_party_still_fires_the_volley_that_finishes_the_depot() {
-    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
-    step(JEFFS_AI_ID, &game(10_000), &mut memory);
+    let mut memory = launched(&game(10_000));
     let site = (112.0 * ts(), 62.0 * ts());
     let tanks = memory.third_pressure.tanks.clone();
     let state = &mut memory.third_pressure;
@@ -425,8 +447,7 @@ fn a_base_whose_patches_spread_out_is_one_site() {
 
 /// A party at the third's staging point (west of it), about to look for its Depot.
 fn locating(observation: &mut AiObservation) -> AiDecisionMemory {
-    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
-    step(JEFFS_AI_ID, &game(10_000), &mut memory);
+    let mut memory = launched(&game(10_000));
     party_at(observation, &memory, (92.0, 62.0));
     let state = &mut memory.third_pressure;
     state.route = vec![rounded((92.0 * ts(), 62.0 * ts()))];
@@ -748,7 +769,7 @@ fn after_two_empty_bases_only_a_seen_depot_sends_the_party_out() {
         .seen_depots
         .push(rounded((114.0 * ts(), 60.0 * ts())));
     step(JEFFS_AI_ID, &game(10_009), &mut memory);
-    assert_eq!(memory.third_pressure.phase, Phase::March);
+    assert_eq!(memory.third_pressure.phase, Phase::Scout);
     assert_eq!(
         memory.third_pressure.target,
         Some(rounded((114.0 * ts(), 60.0 * ts())))
@@ -769,6 +790,10 @@ fn the_partys_tanks_count_toward_the_push_until_it_heads_home() {
     let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
     assert_eq!(memory.third_pressure.pledged_tanks(), 0);
     step(JEFFS_AI_ID, &game(10_000), &mut memory);
+    // The Scout Car out alone pledges no Tank.
+    assert_eq!(memory.third_pressure.phase, Phase::Scout);
+    assert_eq!(memory.third_pressure.pledged_tanks(), 0);
+    assert!(scout::commit(&game(10_000), None, &mut memory));
     assert_eq!(memory.third_pressure.phase, Phase::March);
     assert_eq!(memory.third_pressure.pledged_tanks(), 2);
     assert_eq!(memory.third_pressure.joining_tanks(), 0);
@@ -840,4 +865,293 @@ fn a_party_that_meets_no_push_goes_home() {
     party_at(&mut later, &memory, (92.0, 62.0));
     step(JEFFS_AI_ID, &later, &mut memory);
     assert_eq!(memory.third_pressure.phase, Phase::Return);
+}
+
+/// The Scout Car out alone, at the end of its route, standing at `at` (tiles).
+fn scout_at_base(at: (f32, f32)) -> (AiDecisionMemory, AiObservation) {
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+    step(JEFFS_AI_ID, &game(10_000), &mut memory);
+    assert_eq!(memory.third_pressure.phase, Phase::Scout);
+    let state = &mut memory.third_pressure;
+    state.leg = state.route.len();
+    let mut observation = game(10_009);
+    let scout = observation.owned.iter_mut().find(|u| u.id == 30).unwrap();
+    scout.x = at.0 * ts();
+    scout.y = at.1 * ts();
+    (memory, observation)
+}
+
+fn scout_move(commands: &[Command]) -> Option<(f32, f32)> {
+    commands.iter().find_map(|command| match command {
+        Command::Move { units, x, y, .. } if units == &vec![30] => Some((*x, *y)),
+        _ => None,
+    })
+}
+
+#[test]
+fn the_scout_car_turns_away_from_enemies_before_they_see_it() {
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+    step(JEFFS_AI_ID, &game(10_000), &mut memory);
+    let mut observation = game(10_009);
+    let scout = observation.owned.iter_mut().find(|u| u.id == 30).unwrap();
+    scout.x = 60.0 * ts();
+    scout.y = 40.0 * ts();
+    // A Rifleman 12 tiles off: inside the Scout Car's danger range, outside the Rifleman's sight.
+    observation
+        .visible_enemies
+        .push(unit(700, 2, EntityKind::Rifleman, (72.0, 40.0)));
+    let commands = step(JEFFS_AI_ID, &observation, &mut memory);
+    let state = &memory.third_pressure;
+    assert_eq!(state.phase, Phase::Scout);
+    assert_eq!(state.flees, 1);
+    assert!(state.fallback_until > 10_009);
+    let (x, _) = scout_move(&commands).expect("the Scout Car moves");
+    assert!(x < 55.0 * ts(), "{x}");
+    // It never attacks.
+    assert!(!commands.iter().any(|command| matches!(
+        command,
+        Command::AttackMove { units, .. } | Command::Attack { units, .. } if units.contains(&30)
+    )));
+    // Found again and again, it gives the trip up.
+    memory.third_pressure.flees = 4;
+    memory.third_pressure.fallback_until = 0;
+    let mut observation = observation.clone();
+    observation.tick = 10_400;
+    step(JEFFS_AI_ID, &observation, &mut memory);
+    assert_eq!(memory.third_pressure.phase, Phase::Return);
+    assert!(memory.third_pressure.tanks.is_empty());
+}
+
+#[test]
+fn a_hurt_scout_car_comes_home() {
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+    step(JEFFS_AI_ID, &game(10_000), &mut memory);
+    let mut observation = game(10_009);
+    let scout = observation.owned.iter_mut().find(|u| u.id == 30).unwrap();
+    scout.x = 60.0 * ts();
+    scout.y = 40.0 * ts();
+    scout.hp = 60;
+    step(JEFFS_AI_ID, &observation, &mut memory);
+    assert_eq!(memory.third_pressure.phase, Phase::Return);
+}
+
+#[test]
+fn the_scout_car_finds_the_depot_watches_it_from_clear_ground_and_calls_the_party() {
+    let (mut memory, mut observation) = scout_at_base((95.0, 62.0));
+    observation.visible_enemies.extend([
+        unit(500, 2, EntityKind::ResourceDepot, (121.0, 62.0)),
+        unit(510, 2, EntityKind::SteelMine, (110.0, 64.0)),
+    ]);
+    let commands = step(JEFFS_AI_ID, &observation, &mut memory);
+    let state = &memory.third_pressure;
+    assert_eq!(state.phase, Phase::Scout);
+    assert_eq!(state.depot, Some(500));
+    assert!(state.tanks.is_empty());
+    let watch = scout_move(&commands).expect("the Scout Car goes to watch");
+    let depot = (121.0 * ts(), 62.0 * ts());
+    let mine = (110.0 * ts(), 64.0 * ts());
+    assert!(distance(watch, depot) <= 15.0 * ts(), "{watch:?}");
+    assert!(distance(watch, mine) >= 8.0 * ts(), "{watch:?}");
+    // There, with no garrison in sight, it sends the party and keeps watch.
+    let mut observation = observation.clone();
+    observation.tick = 10_018;
+    let scout = observation.owned.iter_mut().find(|u| u.id == 30).unwrap();
+    scout.x = watch.0;
+    scout.y = watch.1;
+    step(JEFFS_AI_ID, &observation, &mut memory);
+    let state = &memory.third_pressure;
+    assert_eq!(state.phase, Phase::March);
+    assert_eq!(state.tanks.len(), 2);
+    assert_eq!(state.riflemen.len(), 5);
+    assert_eq!(
+        state.watch.map(unrounded).map(rounded),
+        Some(rounded(watch))
+    );
+    // The party marches; the Scout Car stays on watch.
+    let mut observation = observation.clone();
+    observation.tick = 10_027;
+    let commands = step(JEFFS_AI_ID, &observation, &mut memory);
+    let state = &memory.third_pressure;
+    assert!(commands.iter().any(|command| {
+        matches!(command, Command::Move { units, .. } if units.contains(&state.tanks[0]))
+    }));
+    assert!(!commands.iter().any(|command| {
+        matches!(command, Command::Move { units, .. } if units.contains(&30) && units.len() > 1)
+    }));
+}
+
+#[test]
+fn a_garrison_the_party_would_lose_to_keeps_every_tank_home() {
+    let (mut memory, mut observation) = scout_at_base((95.0, 62.0));
+    observation
+        .visible_enemies
+        .push(unit(500, 2, EntityKind::ResourceDepot, (121.0, 62.0)));
+    step(JEFFS_AI_ID, &observation, &mut memory);
+    let watch = unrounded(memory.third_pressure.target.unwrap());
+    let mut observation = observation.clone();
+    observation.tick = 10_018;
+    // Three Tanks and six Machine Gunners behind the Depot, out of the Scout Car's danger range.
+    observation
+        .visible_enemies
+        .extend((0..3).map(|i| unit(600 + i, 2, EntityKind::Tank, (130.0, 58.0 + 3.0 * i as f32))));
+    observation.visible_enemies.extend((0..6).map(|i| {
+        unit(
+            610 + i,
+            2,
+            EntityKind::MachineGunner,
+            (128.0, 57.0 + 2.0 * i as f32),
+        )
+    }));
+    // The watch point lies 12 tiles toward the staging point: put the Scout Car there.
+    let staging = unrounded(*memory.third_pressure.route.last().unwrap());
+    let dir = normalized_direction(watch, staging).unwrap();
+    let scout = observation.owned.iter_mut().find(|u| u.id == 30).unwrap();
+    scout.x = watch.0 + dir.0 * 12.0 * ts();
+    scout.y = watch.1 + dir.1 * 12.0 * ts();
+    step(JEFFS_AI_ID, &observation, &mut memory);
+    let state = &memory.third_pressure;
+    assert!(state.tanks.is_empty() && state.riflemen.is_empty());
+    assert_eq!(state.phase, Phase::Return);
+    assert!(state
+        .defended
+        .iter()
+        .any(|(site, _)| distance(unrounded(*site), (112.0 * ts(), 62.0 * ts())) < 2.0 * ts()));
+}
+
+#[test]
+fn an_empty_base_costs_only_the_scout_cars_trip() {
+    let (mut memory, observation) = scout_at_base((95.0, 62.0));
+    step(JEFFS_AI_ID, &observation, &mut memory);
+    let state = &mut memory.third_pressure;
+    assert!(state.spots_total > 20);
+    let last = *state.unseen.first().unwrap();
+    state.unseen = vec![last];
+    let mut observation = observation.clone();
+    observation.tick = 10_018;
+    let scout = observation.owned.iter_mut().find(|u| u.id == 30).unwrap();
+    scout.x = last.0 as f32;
+    scout.y = last.1 as f32;
+    step(JEFFS_AI_ID, &observation, &mut memory);
+    let state = &memory.third_pressure;
+    assert_eq!(state.empty_bases, 1);
+    assert_eq!(state.phase, Phase::Return);
+    assert!(state.tanks.is_empty() && state.riflemen.is_empty());
+}
+
+#[test]
+fn on_the_march_the_party_lets_distant_enemies_pass() {
+    let mut memory = launched(&game(10_000));
+    // A Rifleman 11 tiles from the nearest Rifleman: near, but not closing in.
+    let mut observation = game(10_009);
+    observation
+        .visible_enemies
+        .push(unit(700, 2, EntityKind::Rifleman, (27.0, 10.0)));
+    let commands = step(JEFFS_AI_ID, &observation, &mut memory);
+    assert_eq!(memory.third_pressure.phase, Phase::March);
+    assert!(commands
+        .iter()
+        .any(|command| matches!(command, Command::HoldPosition { .. })));
+    assert!(!commands
+        .iter()
+        .any(|command| matches!(command, Command::AttackMove { .. })));
+    // Once it closes in, the party fights it.
+    let mut close = game(10_018);
+    close
+        .visible_enemies
+        .push(unit(700, 2, EntityKind::Rifleman, (21.0, 10.0)));
+    let commands = step(JEFFS_AI_ID, &close, &mut memory);
+    assert!(commands
+        .iter()
+        .any(|command| matches!(command, Command::AttackMove { .. })));
+    // Standing in the way past the wait, it is fought too.
+    let mut memory = launched(&game(10_000));
+    step(JEFFS_AI_ID, &observation, &mut memory);
+    let mut later = observation.clone();
+    later.tick = 10_009 + config::TICK_HZ * 21;
+    let commands = step(JEFFS_AI_ID, &later, &mut memory);
+    assert!(commands
+        .iter()
+        .any(|command| matches!(command, Command::AttackMove { .. })));
+}
+
+#[test]
+fn the_push_keeps_its_scout_car_and_jeff_trains_another_for_the_raid() {
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+    memory.containment.active_scout = Some(30);
+    step(JEFFS_AI_ID, &game(10_000), &mut memory);
+    assert_eq!(memory.third_pressure.phase, Phase::Idle);
+    assert!(memory.third_pressure.wants_scout);
+    let mut priorities = vec![EntityKind::Tank, EntityKind::ScoutCar];
+    let mut caps = vec![(EntityKind::ScoutCar, 1)];
+    memory
+        .third_pressure
+        .queue_scout(&mut priorities, &mut caps);
+    assert_eq!(priorities[0], EntityKind::ScoutCar);
+    assert_eq!(caps, vec![(EntityKind::ScoutCar, 2)]);
+}
+
+#[test]
+fn the_watching_scout_car_turns_away_while_the_party_marches_on() {
+    let (mut memory, mut observation) = scout_at_base((95.0, 62.0));
+    observation
+        .visible_enemies
+        .push(unit(500, 2, EntityKind::ResourceDepot, (121.0, 62.0)));
+    let commands = step(JEFFS_AI_ID, &observation, &mut memory);
+    let watch = scout_move(&commands).unwrap();
+    let mut observation = observation.clone();
+    observation.tick = 10_018;
+    let scout = observation.owned.iter_mut().find(|u| u.id == 30).unwrap();
+    scout.x = watch.0;
+    scout.y = watch.1;
+    step(JEFFS_AI_ID, &observation, &mut memory);
+    assert_eq!(memory.third_pressure.phase, Phase::March);
+    // A Rifleman walks up to the Scout Car, far from the party.
+    let mut observation = observation.clone();
+    observation.tick = 10_027;
+    observation.visible_enemies.push(unit(
+        700,
+        2,
+        EntityKind::Rifleman,
+        (watch.0 / ts() + 10.0, watch.1 / ts()),
+    ));
+    let commands = step(JEFFS_AI_ID, &observation, &mut memory);
+    let (x, _) = scout_move(&commands).expect("the Scout Car turns away");
+    assert!(x < watch.0 - 4.0 * ts(), "{x}");
+    // The party does not stop for it.
+    assert!(!commands
+        .iter()
+        .any(|command| matches!(command, Command::HoldPosition { .. })));
+    assert_eq!(memory.third_pressure.phase, Phase::March);
+}
+
+#[test]
+fn a_damaged_scout_car_is_not_sent_and_jeff_trains_a_sound_one() {
+    let mut observation = game(10_000);
+    observation
+        .owned
+        .iter_mut()
+        .find(|u| u.id == 30)
+        .unwrap()
+        .hp = 56;
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+    step(JEFFS_AI_ID, &observation, &mut memory);
+    assert_eq!(memory.third_pressure.phase, Phase::Idle);
+    assert!(memory.third_pressure.wants_scout);
+}
+
+#[test]
+fn the_scout_car_keeps_out_of_a_parked_tanks_reach() {
+    for (kind, flees) in [(EntityKind::Tank, true), (EntityKind::Rifleman, false)] {
+        let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+        step(JEFFS_AI_ID, &game(10_000), &mut memory);
+        let mut observation = game(10_009);
+        let scout = observation.owned.iter_mut().find(|u| u.id == 30).unwrap();
+        scout.x = 60.0 * ts();
+        scout.y = 40.0 * ts();
+        observation
+            .visible_enemies
+            .push(unit(700, 2, kind, (75.0, 40.0)));
+        step(JEFFS_AI_ID, &observation, &mut memory);
+        assert_eq!(memory.third_pressure.flees == 1, flees, "{kind:?}");
+    }
 }

@@ -23,9 +23,11 @@ use super::opening_rush::{estimate_trade, fighter, LiveStep};
 use super::*;
 use locate::{begin_locate, field_target, locate, retarget, sight};
 use merge::{begin_merge, merge};
+use scout::{begin_scout, keep_watch, scout_clear, scout_trip};
 
 mod locate;
 mod merge;
+mod scout;
 
 /// The party leaves from 5:30, to reach a third 90-150 tiles off by about 7:00.
 const LAUNCH_FROM_TICK: u32 = config::TICK_HZ * 330;
@@ -96,8 +98,20 @@ const RELAUNCH_COOLDOWN_TICKS: u32 = config::TICK_HZ * 90;
 const SITE_SAME_TILES: f32 = 8.0;
 /// After this many bases found empty the party goes out only to a Depot actually seen.
 const MAX_EMPTY_BASES: u32 = 2;
+/// Only a Scout Car with this share of its hit points goes scouting.
+const SCOUT_LAUNCH_HP_PERCENT: u32 = 90;
 /// A base found defended is left alone this long.
 const DEFENDED_SKIP_TICKS: u32 = config::TICK_HZ * 180;
+/// A looker watches a found Depot this long at most before the garrison it sees decides.
+const SURVEY_TIMEOUT_TICKS: u32 = config::TICK_HZ * 15;
+/// Enemy fighters this close to the Depot are its garrison.
+const GARRISON_TILES: f32 = 16.0;
+/// A search out of time that has seen this share of the spots, and no Depot, found the base empty.
+const EMPTY_SEEN_PERCENT: usize = 75;
+/// On the march and on the way to the push, enemies this close are fought; farther ones are let
+/// pass while the party holds, for up to `AVOID_MAX_TICKS`.
+const ENGAGED_TILES: f32 = 8.0;
+const AVOID_MAX_TICKS: u32 = config::TICK_HZ * 20;
 /// Patches this close to another of a cluster belong to the same base. A base's patches come in
 /// groups up to 9.4 tiles apart; different bases' patches stand at least 17.7 apart.
 const BASE_MERGE_TILES: f32 = 12.0;
@@ -109,6 +123,8 @@ type KeepOut = ((f32, f32), f32);
 enum Phase {
     #[default]
     Idle,
+    /// The Scout Car out alone, finding the target base's Depot before any Tank leaves.
+    Scout,
     March,
     Locate,
     Siege,
@@ -149,6 +165,16 @@ pub(in crate::ai_core::decision) struct ThirdPressure {
     defended: Vec<((i32, i32), u32)>,
     /// Bases found with no Depot at any spot that could hold one.
     empty_bases: u32,
+    /// When the Scout Car began sweeping the base for its Depot.
+    search_since: Option<u32>,
+    /// Where the Scout Car watches the found Depot from while the party marches.
+    watch: Option<(i32, i32)>,
+    /// How often the Scout Car turned away from enemies on this trip.
+    flees: u32,
+    /// Jeff wants a Scout Car for the raid (the push holds the only one).
+    wants_scout: bool,
+    /// Since when the party has held to let enemies pass.
+    avoid_since: Option<u32>,
     /// How many spots the current search began with.
     spots_total: usize,
     route: Vec<(i32, i32)>,
@@ -189,7 +215,7 @@ impl ThirdPressure {
     pub(in crate::ai_core::decision) fn pledged_tanks(&self) -> usize {
         match self.phase {
             Phase::March | Phase::Locate | Phase::Siege | Phase::Merge => self.tanks.len(),
-            Phase::Idle | Phase::Return => 0,
+            Phase::Idle | Phase::Scout | Phase::Return => 0,
         }
     }
 
@@ -210,6 +236,33 @@ impl ThirdPressure {
         self.reserved().collect()
     }
 
+    /// The members that march and fight together: all but a Scout Car keeping watch at the base.
+    fn fighting_members(&self) -> Vec<u32> {
+        if self.watch.is_some() {
+            self.tanks.iter().chain(&self.riflemen).copied().collect()
+        } else {
+            self.members()
+        }
+    }
+
+    /// Clears what the trip learned about its target, for a new target.
+    fn reset_trip(&mut self, tick: u32) {
+        self.depot = None;
+        self.killed_at = None;
+        self.unseen.clear();
+        self.spots_total = 0;
+        self.search_since = None;
+        self.locator.clear();
+        self.survey_since = None;
+        self.watch = None;
+        self.fallback_until = 0;
+        self.flees = 0;
+        self.avoid_since = None;
+        self.leg = 0;
+        self.leg_since = tick;
+        self.clear_orders();
+    }
+
     fn clear_orders(&mut self) {
         self.parked_since.clear();
         self.sent.clear();
@@ -224,13 +277,14 @@ impl ThirdPressure {
         self.scout = self.scout.filter(|id| !ids.contains(id));
     }
 
-    /// While the party has the Scout Car, Jeff trains one more than its usual count, first.
+    /// While the party has the Scout Car, or wants one the push does not hold, Jeff trains one
+    /// more than its usual count, first.
     pub(super) fn queue_scout(
         &self,
         priorities: &mut Vec<EntityKind>,
         max_counts: &mut Vec<(EntityKind, usize)>,
     ) {
-        if self.scout.is_none() {
+        if self.scout.is_none() && !self.wants_scout {
             return;
         }
         match max_counts
@@ -266,30 +320,23 @@ pub(super) fn plan_live(
     state.riflemen.retain(|id| alive.contains(id));
     state.scout = state.scout.filter(|id| alive.contains(id));
     match memory.third_pressure.phase {
-        Phase::Idle => {
-            if let Some(launch) = launch(observation, map_analysis, memory) {
-                let tick = observation.tick;
+        Phase::Idle => match launch(observation, map_analysis, memory) {
+            LaunchCheck::Go(launch) => {
                 let state = &mut memory.third_pressure;
-                state.tanks = launch.tanks;
-                state.riflemen = launch.riflemen;
-                state.scout = launch.scout;
-                state.target = Some(rounded(launch.target.depot.unwrap_or(launch.target.center)));
-                state.area = launch.target.patches.iter().map(|p| rounded(*p)).collect();
-                state.unseen.clear();
-                state.locator.clear();
-                state.survey_since = None;
-                state.fallback_until = 0;
-                state.depot = None;
-                state.killed_at = None;
-                state.route = launch.route.iter().map(|p| rounded(*p)).collect();
-                state.leg = 0;
-                state.leg_since = tick;
-                state.phase_since = tick;
-                state.clear_orders();
-                state.phase = Phase::March;
-                march(actions, observation, map_analysis, memory, intents);
+                state.wants_scout = false;
+                begin_scout(
+                    observation,
+                    state,
+                    launch.scout,
+                    launch.target,
+                    launch.route,
+                );
+                scout_trip(actions, observation, map_analysis, memory, intents);
             }
-        }
+            LaunchCheck::NeedScout => memory.third_pressure.wants_scout = true,
+            LaunchCheck::No => memory.third_pressure.wants_scout = false,
+        },
+        Phase::Scout => scout_trip(actions, observation, map_analysis, memory, intents),
         Phase::March => march(actions, observation, map_analysis, memory, intents),
         Phase::Locate => locate(actions, observation, map_analysis, memory, intents),
         Phase::Siege => siege(actions, observation, map_analysis, memory, intents),
@@ -316,18 +363,36 @@ pub(super) fn plan_live(
 }
 
 struct Launch {
-    tanks: Vec<u32>,
-    riflemen: Vec<u32>,
-    scout: Option<u32>,
+    scout: u32,
     target: EnemyBase,
     route: Vec<(f32, f32)>,
 }
 
+enum LaunchCheck {
+    Go(Launch),
+    /// Everything but a free Scout Car.
+    NeedScout,
+    No,
+}
+
+/// Whether the Scout Car goes to check a base. The Tanks wait until it has found the Depot.
 fn launch(
     observation: &AiObservation,
     map_analysis: Option<&AiMapAnalysis>,
     memory: &AiDecisionMemory,
-) -> Option<Launch> {
+) -> LaunchCheck {
+    match launch_ready(observation, map_analysis, memory) {
+        Some(Ok(launch)) => LaunchCheck::Go(launch),
+        Some(Err(())) => LaunchCheck::NeedScout,
+        None => LaunchCheck::No,
+    }
+}
+
+fn launch_ready(
+    observation: &AiObservation,
+    map_analysis: Option<&AiMapAnalysis>,
+    memory: &AiDecisionMemory,
+) -> Option<Result<Launch, ()>> {
     let tick = observation.tick;
     let state = &memory.third_pressure;
     if tick < LAUNCH_FROM_TICK || tick < state.next_launch {
@@ -351,22 +416,20 @@ fn launch(
         return None;
     }
     let home = home_point(observation, memory);
-    let tanks = party_tanks(observation, memory)?;
-    let riflemen = party_riflemen(observation, memory, home)?;
-    let scout = party_scout(observation, memory);
+    let Some(scout) = party_scout(observation, memory) else {
+        return Some(Err(()));
+    };
     let route = flank_route(
         observation,
         map_analysis,
         home,
         target.depot.unwrap_or(target.center),
     );
-    Some(Launch {
-        tanks,
-        riflemen,
+    Some(Ok(Launch {
         scout,
         target,
         route,
-    })
+    }))
 }
 
 /// Two Tanks from the army: never one pushing, guarding a base, clearing the natural or holding
@@ -446,14 +509,19 @@ fn party_riflemen(
     (party.len() == PARTY_RIFLEMEN).then_some(party)
 }
 
-/// The Scout Car, unless a launched push has it.
+/// A sound Scout Car the push does not hold: taking the one a forming push counted on kept it
+/// home, and a damaged one turned back as soon as it left.
 fn party_scout(observation: &AiObservation, memory: &AiDecisionMemory) -> Option<u32> {
     observation
         .owned
         .iter()
         .filter(|unit| unit.kind == EntityKind::ScoutCar && unit.is_complete && unit.hp > 0)
         .filter(|unit| {
-            !(memory.containment.wave_launched && memory.containment.active_scout == Some(unit.id))
+            let max = config::unit_stats(unit.kind).map_or(unit.hp, |stats| stats.hp);
+            unit.hp.saturating_mul(100) >= max.saturating_mul(SCOUT_LAUNCH_HP_PERCENT)
+        })
+        .filter(|unit| {
+            memory.containment.active_scout != Some(unit.id)
                 && !memory.trap_breach.is_reserved(unit.id)
         })
         .map(|unit| unit.id)
@@ -646,6 +714,9 @@ fn march(
         begin_return(observation, memory, intents, "march over");
         return;
     }
+    if memory.third_pressure.watch.is_some() {
+        keep_watch(actions, observation, map_analysis, memory, intents);
+    }
     if !answer_threat(actions, observation, memory, intents, None) {
         return;
     }
@@ -658,7 +729,7 @@ fn march(
         begin_locate(observation, map_analysis, memory, actions, intents);
         return;
     };
-    let members = units(observation, &state.members());
+    let members = units(observation, &state.fighting_members());
     let ts = tile(observation);
     let reached = members
         .iter()
@@ -672,7 +743,7 @@ fn march(
         }
     }
     let point = unrounded(memory.third_pressure.route[memory.third_pressure.leg]);
-    let members = memory.third_pressure.members();
+    let members = memory.third_pressure.fighting_members();
     send(
         actions,
         observation,
@@ -695,7 +766,8 @@ fn answer_threat(
     finishing: Option<bool>,
 ) -> bool {
     let ts = tile(observation);
-    let members = units(observation, &memory.third_pressure.members());
+    let tick = observation.tick;
+    let members = units(observation, &memory.third_pressure.fighting_members());
     let near: Vec<&AiEntitySummary> = observation
         .visible_enemies
         .iter()
@@ -707,6 +779,7 @@ fn answer_threat(
         })
         .collect();
     if near.is_empty() {
+        memory.third_pressure.avoid_since = None;
         return true;
     }
     let meth = observation
@@ -744,6 +817,24 @@ fn answer_threat(
     }
     if finishing.is_some() {
         return true;
+    }
+    // Enemies passing at a distance are let pass: the party holds (its Tanks still fire at what
+    // comes into reach) and fights only once they close in, or when they stay in the way.
+    let engaged = near.iter().any(|enemy| {
+        members
+            .iter()
+            .any(|unit| distance((unit.x, unit.y), (enemy.x, enemy.y)) <= ENGAGED_TILES * ts)
+    });
+    let state = &mut memory.third_pressure;
+    let since = *state.avoid_since.get_or_insert(tick);
+    if !engaged && tick.saturating_sub(since) < AVOID_MAX_TICKS {
+        let hold: Vec<u32> = members
+            .iter()
+            .map(|unit| unit.id)
+            .filter(|id| state.held.insert(*id))
+            .collect();
+        actions::hold_position_units(actions, hold);
+        return false;
     }
     let n = near.len() as f32;
     let center = near.iter().fold((0.0, 0.0), |sum, enemy| {
@@ -1214,6 +1305,13 @@ fn return_home(
     let tick = observation.tick;
     let ts = tile(observation);
     let home = home_point(observation, memory);
+    let alone = memory.third_pressure.tanks.is_empty() && memory.third_pressure.riflemen.is_empty();
+    if alone
+        && memory.third_pressure.scout.is_some()
+        && !scout_clear(actions, observation, None, memory, intents, false)
+    {
+        return;
+    }
     let state = &mut memory.third_pressure;
     let arrived: Vec<u32> = units(observation, &state.members())
         .iter()
