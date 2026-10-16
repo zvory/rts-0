@@ -110,6 +110,8 @@ pub(crate) struct AiDecisionMemory {
     /// The live Jeff's enemy Tank memory, Tank order overrides, and smoke assault.
     pub(super) tank_micro: super::tank_micro::TankMicro,
     pub(super) trap_breach: super::trap_breach::TrapBreach,
+    /// The live Jeff's raiding party on the enemy's third base.
+    pub(super) third_pressure: super::third_pressure::ThirdPressure,
     /// The live Jeff's raid response, sentries, outranged units and enemy infantry sightings.
     pub(super) raid_defense: super::defense::RaidDefense,
     profile_id: Option<&'static str>,
@@ -173,6 +175,7 @@ impl AiDecisionMemory {
             opening_rush: Default::default(),
             tank_micro: Default::default(),
             trap_breach: Default::default(),
+            third_pressure: Default::default(),
             raid_defense: Default::default(),
             profile_id: Some(profile.id),
             attack_first_size: Some(profile.attack.first_attack_size),
@@ -269,6 +272,7 @@ impl AiDecisionMemory {
         self.expansion_security = Default::default();
         self.tank_micro = Default::default();
         self.trap_breach = Default::default();
+        self.third_pressure = Default::default();
         self.attack_first_size = Some(profile.attack.first_attack_size);
         self.next_attack_size = profile.attack.first_attack_size;
         self.last_attack_tick = None;
@@ -471,6 +475,22 @@ impl AiDecisionMemory {
             .unwrap_or(0)
     }
 
+    /// Units the route line, the opening rush, the trap breach and the third-base party own.
+    pub(super) fn squad_reserved(&self) -> BTreeSet<u32> {
+        self.route_line
+            .reserved()
+            .chain(self.opening_rush.reserved())
+            .chain(self.trap_breach.reserved())
+            .chain(self.third_pressure.reserved())
+            .collect()
+    }
+
+    /// Whether the trap breach (its concave is the defense where it stands) or the third-base
+    /// party (it is away) owns the unit, so it never runs home to defend.
+    pub(super) fn stays_out_of_home_defense(&self, id: u32) -> bool {
+        self.trap_breach.is_reserved(id) || self.third_pressure.is_reserved(id)
+    }
+
     /// How many Tanks Jeff keeps home, the home Tank included: three for every four Tanks in the
     /// largest recent attack, between `HOME_TANK_RESERVE_MIN` and `HOME_TANK_RESERVE_MAX`. Across
     /// 86 AI 2.1 attacks, 2-4 Tanks with the entrenched infantry held attacks of 3-4 Tanks; bases
@@ -631,6 +651,7 @@ impl AiDecisionMemory {
             .iter()
             .filter(|entity| entity.kind == EntityKind::Tank)
             .filter(|entity| !self.trap_breach.is_reserved(entity.id))
+            .filter(|entity| !self.third_pressure.is_reserved(entity.id))
             .filter(|entity| !push_tanks.contains(&entity.id))
             .filter(|entity| {
                 self.home_defensive_tank_assigned_once

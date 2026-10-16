@@ -402,6 +402,7 @@ pub(super) fn sync_containment_recovery(
             .iter()
             .filter(|unit| unit.kind == EntityKind::ScoutCar && unit.is_complete && unit.hp > 0)
             .filter(|unit| !memory.trap_breach.is_reserved(unit.id))
+            .filter(|unit| !memory.third_pressure.is_reserved(unit.id))
             .map(|unit| unit.id)
             .min();
         if let Some(scout) = replacement {

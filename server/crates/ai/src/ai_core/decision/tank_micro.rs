@@ -56,7 +56,11 @@ pub(super) fn finish(
         memory.tank_micro.natural_clear =
             super::expansion_security::natural_clearers(observation, memory)
                 .map(|(tanks, point)| (tanks, stored(point)));
-        let exempt: BTreeSet<u32> = memory.trap_breach.reserved().collect();
+        let exempt: BTreeSet<u32> = memory
+            .trap_breach
+            .reserved()
+            .chain(memory.third_pressure.reserved())
+            .collect();
         decision.trace.notes = govern(
             observation,
             map_analysis,
@@ -75,6 +79,11 @@ pub(super) fn finish(
         .trace
         .notes
         .extend(breach.into_iter().map(|note| format!("breach {note}")));
+    let third = std::mem::take(&mut memory.third_pressure.notes);
+    decision
+        .trace
+        .notes
+        .extend(third.into_iter().map(|note| format!("third {note}")));
 }
 
 const TANK_BASE_RANGE_TILES: f32 = 5.0;

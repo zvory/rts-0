@@ -225,6 +225,10 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/ai/src/ai_core/decision/tank_micro/scout_lead.rs",
   "server/crates/ai/src/ai_core/decision/tank_micro/smoke_assault.rs",
   "server/crates/ai/src/ai_core/decision/trap_breach.rs",
+  // Jeff's raid on the enemy third base picks current-roster Tanks, Riflemen and the Scout Car and
+  // aims at Workers and the Depot; profile/catalog layers still own faction admission.
+  "server/crates/ai/src/ai_core/decision/third_pressure.rs",
+  "server/crates/ai/src/ai_core/decision/third_pressure/locate.rs",
   // Unit priority and cap adjustments moved verbatim out of the approved decision orchestrator.
   "server/crates/ai/src/ai_core/decision/unit_mix.rs",
   // Jeff's Kriegsia-only expansion screen and upgrade policy are focused modules beneath the

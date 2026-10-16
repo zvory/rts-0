@@ -15,8 +15,8 @@ use crate::ai_core::profiles::{
     BarracksCurve, ExpansionContainmentPolicy, ExpansionPolicy, ProductionPolicy, ResourcePolicy,
     TechTransitionPolicy, WorkerPolicy, JEFFS_AI_BETA_ID, JEFFS_AI_ID,
     JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID, JEFFS_AI_PRE_GUARD_HANDOFF_ID, JEFFS_AI_PRE_OPENING_RUSH_ID,
-    JEFFS_AI_PRE_THIRD_PRESSURE_ID,
     JEFFS_AI_PRE_RIFLE_COVERAGE_ID, JEFFS_AI_PRE_TANK_CATCHUP_ID, JEFFS_AI_PRE_TANK_MICRO_ID,
+    JEFFS_AI_PRE_THIRD_PRESSURE_ID,
 };
 use crate::ai_shared;
 use crate::config;
@@ -42,6 +42,7 @@ mod policies;
 mod production;
 mod resources;
 mod tank_micro;
+mod third_pressure;
 mod trace;
 mod trap_breach;
 mod turtle;
@@ -433,13 +434,9 @@ where
     defense::plan_route_line_live(profile.id, memory, live);
     let live = (&mut actions, observation, map_analysis, &mut intents);
     trap_breach::plan_live(profile.id, memory, live);
-    // Units the route line, the opening rush or the trap breach own this decision.
-    let route_line_reserved: BTreeSet<u32> = memory
-        .route_line
-        .reserved()
-        .chain(memory.opening_rush.reserved())
-        .chain(memory.trap_breach.reserved())
-        .collect();
+    let live = (&mut actions, observation, map_analysis, &mut intents);
+    third_pressure::plan_live(profile.id, memory, live);
+    let route_line_reserved = memory.squad_reserved();
 
     let economy_plan = economy_manager_output.plan.clone();
     let save_worker_training_for_tech = defer_economy_for_panic;
@@ -787,7 +784,10 @@ where
     );
     let production_unit_counts =
         unit_counts_for_priorities(observation, &facts, profile, &effective_unit_priorities);
-    let production_max_counts = production_max_counts(profile, observation, map_analysis);
+    let mut production_max_counts = production_max_counts(profile, observation, map_analysis);
+    memory
+        .third_pressure
+        .queue_scout(&mut effective_unit_priorities, &mut production_max_counts);
     let emergency_rifle_target = emergency_rifle_target.and_then(|_| {
         memory
             .opening_rush
@@ -955,6 +955,7 @@ where
     local_ready_units.retain(|id| !expansion_footprint_blockers.contains(id));
     local_ready_units.retain(|id| !push_units.contains(id));
     local_ready_units.retain(|id| !memory.opening_rush.is_reserved(*id));
+    local_ready_units.retain(|id| !memory.third_pressure.is_reserved(*id));
     if profile.home_anti_tank.is_some() {
         local_ready_units.retain(|id| {
             Some(*id) != memory.home_defensive_tank
@@ -1015,8 +1016,7 @@ where
         local_defenders.retain(|id| Some(*id) != memory.route_line.picket());
         local_defenders.retain(|id| !push_units.contains(id));
         local_defenders.retain(|id| !memory.opening_rush.is_reserved(*id));
-        // The trap breach's concave is the defense where it stands.
-        local_defenders.retain(|id| !memory.trap_breach.is_reserved(*id));
+        local_defenders.retain(|id| !memory.stays_out_of_home_defense(*id));
         local_defenders.sort_unstable();
         local_defenders.dedup();
         if new_jeff_defense {
