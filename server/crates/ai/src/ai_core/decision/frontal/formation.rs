@@ -147,6 +147,7 @@ pub(super) fn select_rifle_escorts(
                     .route_line
                     .reserved()
                     .any(|reserved| reserved == unit.id)
+                && !memory.third_pressure.is_reserved(unit.id)
                 && dist2(unit.x, unit.y, anchor.0, anchor.1) <= radius2
         })
         .map(|unit| unit.id)

@@ -228,6 +228,17 @@ impl ThirdPressure {
         }
     }
 
+    /// A raid out with `tanks` and `scout`, for other systems' tests.
+    #[cfg(test)]
+    pub(in crate::ai_core::decision) fn out_with(tanks: Vec<u32>, scout: Option<u32>) -> Self {
+        Self {
+            phase: Phase::March,
+            tanks,
+            scout,
+            ..Self::default()
+        }
+    }
+
     pub(in crate::ai_core::decision) fn is_reserved(&self, id: u32) -> bool {
         self.tanks.contains(&id) || self.riflemen.contains(&id) || self.scout == Some(id)
     }

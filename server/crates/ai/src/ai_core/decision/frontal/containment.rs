@@ -115,11 +115,14 @@ pub(super) fn issue_expansion_containment_wave(
             memory.containment.active_tanks.len() != required_tanks
         };
         if reform || memory.containment.active_scout.is_none() {
+            // The live Jeff's raiding party keeps its units: a re-forming push took the Scout Car the
+            // raid had out scouting and then waited for it.
             let tank_exclusions: BTreeSet<u32> = memory
                 .home_defensive_tank
                 .into_iter()
                 .chain(memory.later_bases.guards.iter().copied())
                 .chain(stuck.iter().copied())
+                .chain(memory.third_pressure.reserved())
                 .collect();
             let mut tanks = actions::select_ready_combat_units_excluding(
                 &observation.owned,
@@ -128,6 +131,7 @@ pub(super) fn issue_expansion_containment_wave(
             );
             let mut scouts =
                 actions::select_ready_combat_units(&observation.owned, &[EntityKind::ScoutCar]);
+            scouts.retain(|scout| !memory.third_pressure.is_reserved(*scout));
             if !memory.containment.wave_launched {
                 tanks.retain(|tank| plan.ready_units.contains(tank));
                 scouts.retain(|scout| plan.ready_units.contains(scout));
@@ -166,6 +170,7 @@ pub(super) fn issue_expansion_containment_wave(
                 .chain(stuck.iter().copied())
                 .collect();
             exclusions.extend(memory.containment.active_tanks.iter().copied());
+            exclusions.extend(memory.third_pressure.reserved());
             let mut newcomers = actions::select_ready_combat_units_excluding(
                 &observation.owned,
                 &[EntityKind::Tank],
