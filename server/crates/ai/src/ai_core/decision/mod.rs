@@ -784,10 +784,7 @@ where
     );
     let production_unit_counts =
         unit_counts_for_priorities(observation, &facts, profile, &effective_unit_priorities);
-    let mut production_max_counts = production_max_counts(profile, observation, map_analysis);
-    memory
-        .third_pressure
-        .queue_scout(&mut effective_unit_priorities, &mut production_max_counts);
+    let production_max_counts = production_max_counts(profile, observation, map_analysis);
     let emergency_rifle_target = emergency_rifle_target.and_then(|_| {
         memory
             .opening_rush

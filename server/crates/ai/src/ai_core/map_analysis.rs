@@ -195,6 +195,9 @@ pub(crate) struct AiMapAnalysis {
     line_of_sight_blocked: Vec<bool>,
     /// Road tiles, where units move faster.
     road: Vec<bool>,
+    /// Authored slow-movement tiles and each tile's elevation, for travel times.
+    slow: Vec<bool>,
+    elevation: Vec<u8>,
     /// Forest (concealment) and authored no-entrenchment tiles, read through `overlays`.
     concealment: Vec<bool>,
     no_entrenchment: Vec<bool>,
@@ -327,6 +330,8 @@ impl AiMapAnalysis {
                     == Some(rts_rules::terrain::TerrainKind::Road)
             })
             .collect();
+        let slow = overlay_grid(width, height, &start.map.slow_movement_tiles);
+        let elevation = start.map.elevation.clone();
         let concealment = overlay_grid(width, height, &start.map.concealment_tiles);
         let no_entrenchment = overlay_grid(width, height, &start.map.no_entrenchment_tiles);
         let clearance = build_clearance(width, height, &passable);
@@ -368,6 +373,8 @@ impl AiMapAnalysis {
             passable,
             line_of_sight_blocked,
             road,
+            slow,
+            elevation,
             concealment,
             no_entrenchment,
             clearance,
@@ -431,43 +438,6 @@ impl AiMapAnalysis {
             .find(|(id, _)| *id == player_id)?;
         let distance = *field.get(tile_index(self.width, self.height, tile.0, tile.1)?)?;
         (distance != u32::MAX).then(|| distance as f32 / 10.0)
-    }
-
-    /// The ground route an attack on `player_id`'s start takes, from the nearest enemy start in.
-    pub(crate) fn base_route_tiles(&self, player_id: u32) -> Option<&[AiTile]> {
-        self.base_routes
-            .iter()
-            .find(|(id, _)| *id == player_id)
-            .map(|(_, route)| route.as_slice())
-    }
-
-    fn build_base_routes(&self) -> Vec<(u32, Vec<AiTile>)> {
-        self.starts
-            .iter()
-            .filter_map(|start| {
-                let enemy = self
-                    .starts
-                    .iter()
-                    .filter(|other| other.team_id != start.team_id)
-                    .min_by_key(|other| {
-                        (
-                            tile_distance2(other.start_tile, start.start_tile),
-                            other.player_id,
-                        )
-                    })?;
-                let own = tile_center_world(start.start_tile, self.tile_size);
-                let from = tile_center_world(enemy.start_tile, self.tile_size);
-                let tile_size = self.tile_size.max(1) as f32;
-                let route = self
-                    .compact_group_route(from, own, 1)
-                    .into_iter()
-                    .map(|point| {
-                        AiTile::new((point.0 / tile_size) as u32, (point.1 / tile_size) as u32)
-                    })
-                    .collect::<Vec<_>>();
-                (!route.is_empty()).then_some((start.player_id, route))
-            })
-            .collect()
     }
 
     #[allow(dead_code)]
@@ -1372,7 +1342,7 @@ fn distance2_to_tile_center(map: &MapInfo, tile: AiTile, resource: &ResourcePoin
     (x - resource.x).powi(2) + (y - resource.y).powi(2)
 }
 
-fn tile_distance2(a: AiTile, b: AiTile) -> u32 {
+pub(super) fn tile_distance2(a: AiTile, b: AiTile) -> u32 {
     let dx = i64::from(a.x) - i64::from(b.x);
     let dy = i64::from(a.y) - i64::from(b.y);
     let distance2 = dx.saturating_mul(dx).saturating_add(dy.saturating_mul(dy));

@@ -34,6 +34,7 @@ use self::pocket::{
 };
 pub(super) use self::pocket::{
     stage_defensive_pocket_machine_gunners, stage_home_defensive_pocket_riflemen,
+    HOME_POCKET_RIFLEMEN,
 };
 pub(super) use self::route_line::{plan_route_line_live, RouteLine};
 

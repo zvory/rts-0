@@ -8,6 +8,8 @@ const CROSSROADS_STARTS: [(u32, u32); 2] = [(47, 8), (117, 78)];
 // (forward, lateral) offsets from the starting Resource Depot centre. These reproduce the
 // approved River pocket, then rotate as one shape toward each base's central approach.
 const RIFLE_SLOTS: [(f32, f32); 4] = [(4.25, 2.83), (4.25, -2.83), (8.15, -0.78), (8.15, 0.78)];
+/// The home pocket's Riflemen: the oldest home Riflemen hold its posts.
+pub(in crate::ai_core::decision) const HOME_POCKET_RIFLEMEN: usize = RIFLE_SLOTS.len();
 const MACHINE_GUNNER_SLOTS: [(f32, f32); 2] = [(7.5, -2.25), (7.5, 2.25)];
 /// Four defensive guns hold one line across the approach: the two pocket posts plus one more on
 /// each wing, half a tile farther forward, so an attack that stands off the centre guns is in

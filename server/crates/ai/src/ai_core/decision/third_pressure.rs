@@ -6,17 +6,17 @@
 //! of the main), and only with units already inside it. Extractors mine only while a finished
 //! Depot anchors them, and a Depot is four Tank shells.
 //!
-//! So from 5:30, while Jeff has fewer than three bases and its own third-base plan has no site in
-//! hand, a party of two Tanks from the army (never the home reserve), five Riflemen and the Scout
-//! Car walks a flank route to the enemy's predicted third. AI 2.1 may stand its Depot anywhere that
-//! mines a patch (11 tiles), even outside the ring of patches, so the party first finds it: the
-//! Scout Car sweeps every spot that could hold it while the rest wait at the staging point. A base
-//! with nothing at any such spot is empty and the party goes home. Once the Depot is seen the party
-//! parks outside the zone around its exact position, the Riflemen and the Scout Car spotting,
-//! shells it from the 14 tiles a parked Tank reaches, then stays to shoot whatever comes to rebuild
-//! it. A replacement Scout Car is queued while the party has the
-//! old one. The party comes home when it meets a fight it loses, when its last Tank falls, or when
-//! enemy Tanks outgun the home Tanks.
+//! So from about 5:00 (timed to arrive when a Scout Car leaving at 5:30 did; see `timing`), while
+//! Jeff has fewer than three bases and its own third-base plan has no site in hand, two Riflemen
+//! walk a flank route to the enemy's predicted third, one a leg behind the other. AI 2.1 may stand its Depot anywhere that mines a patch (11
+//! tiles), even outside the ring of patches, so the lead Rifleman sweeps every spot that could
+//! hold it. A base with nothing at any such spot is empty and the Riflemen come home. Once the
+//! Depot is seen, two Tanks from the army (never the home reserve) and three more Riflemen follow;
+//! they park outside the zone around its exact position and shell it from the 14 tiles a parked
+//! Tank reaches, one Rifleman at a time walking up to spot for them, then stay to shoot whatever
+//! comes to rebuild it. The party comes home when it meets a fight it loses, when its last Tank
+//! falls, or when enemy Tanks outgun the home Tanks. No Scout Car goes, so none is trained for it:
+//! its Factory time cost Tanks at the time they mattered most.
 
 use super::geometry::{clamp_to_map, dist2, normalized_direction, tile_center};
 use super::opening_rush::{estimate_trade, fighter, LiveStep};
@@ -25,16 +25,22 @@ use locate::{begin_locate, field_target, locate, retarget, sight};
 use merge::{begin_merge, merge};
 use scout::{begin_scout, keep_watch, scout_clear, scout_trip};
 use targets::{mines_from, off_route_tiles, target_site};
+use timing::{departure, EARLIEST_SCOUT_TICK};
 
 mod locate;
 mod merge;
 mod scout;
 mod targets;
+mod timing;
 
-/// The party leaves from 5:30, to reach a third 90-150 tiles off by about 7:00.
-const LAUNCH_FROM_TICK: u32 = config::TICK_HZ * 330;
 const PARTY_TANKS: usize = 2;
 const PARTY_RIFLEMEN: usize = 5;
+/// Riflemen who go first and find the Depot, part of the party's five.
+const SCOUT_RIFLEMEN: usize = 2;
+/// One Rifleman spots for the parked Tanks at a time; the next walks up no sooner than this after
+/// the last, and a spotter this hurt steps back behind the Tanks.
+const SPOTTER_FEED_TICKS: u32 = config::TICK_HZ * 8;
+const SPOTTER_RETIRE_HP_PERCENT: u32 = 50;
 /// The party stays this far from every enemy building, extractors included (AI 2.1's zone reaches
 /// 6 tiles past a building), and from every resource patch near the target, which may hold an
 /// extractor not yet seen.
@@ -45,11 +51,10 @@ const WORKER_CLEARANCE_TILES: f32 = 6.5;
 const BASE_RESOURCE_TILES: f32 = 14.0;
 /// Posts around the Depot's centre, tried in order. A parked Tank reaches 14 tiles to a building's
 /// edge, and the Depot's edge stands 1.5 tiles out, so 14.5 keeps a margin; Riflemen stand inside
-/// their 11-tile sight, the Scout Car inside its 15.
+/// their 11-tile sight (a Tank sees 9).
 const TANK_POST_TILES: [f32; 4] = [14.25, 13.75, 14.75, 13.0];
 /// Spotters stand close enough to see a Depot a few tiles off the predicted site.
 const SPOTTER_POST_TILES: [f32; 4] = [9.0, 9.5, 8.5, 10.0];
-const SCOUT_POST_TILES: [f32; 3] = [12.0, 12.5, 11.5];
 /// Posts stay on the party's side of the base: within this angle of the way it came in.
 const POST_CONE_DEGREES: f32 = 75.0;
 const POST_SEPARATION_TILES: f32 = 1.5;
@@ -85,7 +90,7 @@ const SIGHT_MARGIN_TILES: f32 = 1.5;
 const DEPOT_SEARCH_STEP_TILES: f32 = 2.0;
 /// The locator looks at a spot from this far inside its sight, from outside the base, or nearer:
 /// the sight margin and 2.5 tiles more, as a unit stops short of where it is sent. From 1 tile
-/// inside the margin, a Scout Car that stopped 1.3 tiles short never saw the spot it was sent to
+/// inside the margin, a looker that stopped 1.3 tiles short never saw the spot it was sent to
 /// look at, stood still until the search ran out of time, and missed a Depot 7 tiles from the
 /// patches.
 const VIEW_BACKOFF_TILES: f32 = SIGHT_MARGIN_TILES + 2.5;
@@ -102,8 +107,6 @@ const RELAUNCH_COOLDOWN_TICKS: u32 = config::TICK_HZ * 90;
 const SITE_SAME_TILES: f32 = 8.0;
 /// After this many bases found empty the party goes out only to a Depot actually seen.
 const MAX_EMPTY_BASES: u32 = 2;
-/// Only a Scout Car with this share of its hit points goes scouting.
-const SCOUT_LAUNCH_HP_PERCENT: u32 = 90;
 /// A looker watches a found Depot this long at most before the garrison it sees decides.
 const SURVEY_TIMEOUT_TICKS: u32 = config::TICK_HZ * 15;
 /// Enemy fighters this close to the Depot are its garrison.
@@ -122,7 +125,7 @@ type KeepOut = ((f32, f32), f32);
 enum Phase {
     #[default]
     Idle,
-    /// The Scout Car out alone, finding the target base's Depot before any Tank leaves.
+    /// The scout Riflemen out alone, finding the target base's Depot before any Tank leaves.
     Scout,
     March,
     Locate,
@@ -146,7 +149,11 @@ pub(in crate::ai_core::decision) struct ThirdPressure {
     phase: Phase,
     tanks: Vec<u32>,
     riflemen: Vec<u32>,
-    scout: Option<u32>,
+    /// The Riflemen who went first, the lead first; among `riflemen`.
+    scouts: Vec<u32>,
+    /// The Rifleman spotting for the parked Tanks, and when the next may walk up.
+    spotter: Option<u32>,
+    spotter_next: u32,
     /// The target base: its Depot's position once seen, its patches' centre before.
     target: Option<(i32, i32)>,
     depot: Option<u32>,
@@ -164,14 +171,20 @@ pub(in crate::ai_core::decision) struct ThirdPressure {
     defended: Vec<((i32, i32), u32)>,
     /// Bases found with no Depot at any spot that could hold one.
     empty_bases: u32,
-    /// When the Scout Car began sweeping the base for its Depot.
+    /// When the scouts began sweeping the base for its Depot.
     search_since: Option<u32>,
-    /// Where the Scout Car watches the found Depot from while the party marches.
+    /// Where the scouts wait while the party marches: the staging point.
     watch: Option<(i32, i32)>,
-    /// How often the Scout Car turned away from enemies on this trip.
+    /// How often the scouts turned away from enemies on this trip, away from home.
     flees: u32,
-    /// Jeff wants a Scout Car for the raid (the push holds the only one).
-    wants_scout: bool,
+    /// Where the scouts turned away from enemies lately, and when: their way on keeps clear.
+    dangers: Vec<((i32, i32), u32)>,
+    /// Waypoints added to walk around them on this trip.
+    detours: u32,
+    /// When the lead scout finished sizing up the found Depot; the scouts then wait for the party.
+    sized_up: Option<u32>,
+    /// The target the scouts' departure was timed for, and the tick they leave.
+    departure: Option<((i32, i32), u32)>,
     /// Since when the party has held to let enemies pass.
     avoid_since: Option<u32>,
     /// How many spots the current search began with.
@@ -202,11 +215,7 @@ pub(in crate::ai_core::decision) struct ThirdPressure {
 
 impl ThirdPressure {
     pub(in crate::ai_core::decision) fn reserved(&self) -> impl Iterator<Item = u32> + '_ {
-        self.tanks
-            .iter()
-            .chain(&self.riflemen)
-            .copied()
-            .chain(self.scout)
+        self.tanks.iter().chain(&self.riflemen).copied()
     }
 
     /// The party's Tanks the push counts on: all of them while the party is out and not heading
@@ -227,29 +236,32 @@ impl ThirdPressure {
         }
     }
 
-    /// A raid out with `tanks` and `scout`, for other systems' tests.
+    /// A raid out with `tanks` and `riflemen`, for other systems' tests.
     #[cfg(test)]
-    pub(in crate::ai_core::decision) fn out_with(tanks: Vec<u32>, scout: Option<u32>) -> Self {
+    pub(in crate::ai_core::decision) fn out_with(tanks: Vec<u32>, riflemen: Vec<u32>) -> Self {
         Self {
             phase: Phase::March,
             tanks,
-            scout,
+            riflemen,
             ..Self::default()
         }
     }
 
     pub(in crate::ai_core::decision) fn is_reserved(&self, id: u32) -> bool {
-        self.tanks.contains(&id) || self.riflemen.contains(&id) || self.scout == Some(id)
+        self.tanks.contains(&id) || self.riflemen.contains(&id)
     }
 
     fn members(&self) -> Vec<u32> {
         self.reserved().collect()
     }
 
-    /// The members that march and fight together: all but a Scout Car keeping watch at the base.
+    /// The members that march and fight together: all but scouts waiting at the base.
     fn fighting_members(&self) -> Vec<u32> {
         if self.watch.is_some() {
-            self.tanks.iter().chain(&self.riflemen).copied().collect()
+            self.members()
+                .into_iter()
+                .filter(|id| !self.scouts.contains(id))
+                .collect()
         } else {
             self.members()
         }
@@ -267,6 +279,9 @@ impl ThirdPressure {
         self.watch = None;
         self.fallback_until = 0;
         self.flees = 0;
+        self.dangers.clear();
+        self.detours = 0;
+        self.sized_up = None;
         self.avoid_since = None;
         self.leg = 0;
         self.leg_since = tick;
@@ -284,28 +299,10 @@ impl ThirdPressure {
     fn release(&mut self, ids: &[u32]) {
         self.tanks.retain(|id| !ids.contains(id));
         self.riflemen.retain(|id| !ids.contains(id));
-        self.scout = self.scout.filter(|id| !ids.contains(id));
-    }
-
-    /// While the party has the Scout Car, or wants one the push does not hold, Jeff trains one
-    /// more than its usual count, first.
-    pub(super) fn queue_scout(
-        &self,
-        priorities: &mut Vec<EntityKind>,
-        max_counts: &mut Vec<(EntityKind, usize)>,
-    ) {
-        if self.scout.is_none() && !self.wants_scout {
-            return;
+        self.scouts.retain(|id| !ids.contains(id));
+        if self.spotter.is_some_and(|id| ids.contains(&id)) {
+            self.spotter = None;
         }
-        match max_counts
-            .iter_mut()
-            .find(|(kind, _)| *kind == EntityKind::ScoutCar)
-        {
-            Some((_, count)) => *count += 1,
-            None => max_counts.push((EntityKind::ScoutCar, 2)),
-        }
-        priorities.retain(|kind| *kind != EntityKind::ScoutCar);
-        priorities.insert(0, EntityKind::ScoutCar);
     }
 }
 
@@ -328,10 +325,10 @@ pub(super) fn plan_live(
     let state = &mut memory.third_pressure;
     state.tanks.retain(|id| alive.contains(id));
     state.riflemen.retain(|id| alive.contains(id));
-    state.scout = state.scout.filter(|id| alive.contains(id));
+    state.scouts.retain(|id| alive.contains(id));
     match memory.third_pressure.phase {
-        Phase::Idle => match launch(observation, map_analysis, memory) {
-            LaunchCheck::Go(launch) => {
+        Phase::Idle => {
+            if let Some(launch) = launch_ready(observation, map_analysis, memory) {
                 let state = &mut memory.third_pressure;
                 let goal = launch.target.depot.unwrap_or(launch.target.center);
                 if let Some(route) = map_analysis
@@ -343,19 +340,16 @@ pub(super) fn plan_live(
                         rounded(goal)
                     ));
                 }
-                state.wants_scout = false;
                 begin_scout(
                     observation,
                     state,
-                    launch.scout,
+                    launch.scouts,
                     launch.target,
                     launch.route,
                 );
                 scout_trip(actions, observation, map_analysis, memory, intents);
             }
-            LaunchCheck::NeedScout => memory.third_pressure.wants_scout = true,
-            LaunchCheck::No => memory.third_pressure.wants_scout = false,
-        },
+        }
         Phase::Scout => scout_trip(actions, observation, map_analysis, memory, intents),
         Phase::March => march(actions, observation, map_analysis, memory, intents),
         Phase::Locate => locate(actions, observation, map_analysis, memory, intents),
@@ -366,11 +360,12 @@ pub(super) fn plan_live(
     let state = &mut memory.third_pressure;
     if state.phase != Phase::Idle {
         let note = format!(
-            "{:?} tanks={:?} riflemen={:?} scout={:?} target={:?} depot={:?} leg={}/{} killed={:?} unseen={}",
+            "{:?} tanks={:?} riflemen={:?} scouts={:?} spotter={:?} target={:?} depot={:?} leg={}/{} killed={:?} unseen={}",
             state.phase,
             state.tanks,
             state.riflemen,
-            state.scout,
+            state.scouts,
+            state.spotter,
             state.target,
             state.depot,
             state.leg,
@@ -383,39 +378,21 @@ pub(super) fn plan_live(
 }
 
 struct Launch {
-    scout: u32,
+    scouts: Vec<u32>,
     target: EnemyBase,
     route: Vec<(f32, f32)>,
 }
 
-enum LaunchCheck {
-    Go(Launch),
-    /// Everything but a free Scout Car.
-    NeedScout,
-    No,
-}
-
-/// Whether the Scout Car goes to check a base. The Tanks wait until it has found the Depot.
-fn launch(
-    observation: &AiObservation,
-    map_analysis: Option<&AiMapAnalysis>,
-    memory: &AiDecisionMemory,
-) -> LaunchCheck {
-    match launch_ready(observation, map_analysis, memory) {
-        Some(Ok(launch)) => LaunchCheck::Go(launch),
-        Some(Err(())) => LaunchCheck::NeedScout,
-        None => LaunchCheck::No,
-    }
-}
-
+/// Whether two Riflemen go to check a base. The Tanks wait until they have found the Depot; the
+/// scouts then wait for them out of sight a while.
 fn launch_ready(
     observation: &AiObservation,
     map_analysis: Option<&AiMapAnalysis>,
-    memory: &AiDecisionMemory,
-) -> Option<Result<Launch, ()>> {
+    memory: &mut AiDecisionMemory,
+) -> Option<Launch> {
     let tick = observation.tick;
     let state = &memory.third_pressure;
-    if tick < LAUNCH_FROM_TICK || tick < state.next_launch {
+    if tick < EARLIEST_SCOUT_TICK || tick < state.next_launch {
         return None;
     }
     let bases = observation
@@ -435,21 +412,25 @@ fn launch_ready(
     if state.empty_bases >= MAX_EMPTY_BASES && target.depot.is_none() {
         return None;
     }
+    let goal = target.depot.unwrap_or(target.center);
+    if tick < departure(observation, map_analysis, memory, goal) {
+        return None;
+    }
     let home = home_point(observation, memory);
-    let Some(scout) = party_scout(observation, memory) else {
-        return Some(Err(()));
-    };
-    let route = flank_route(
-        observation,
-        map_analysis,
-        home,
-        target.depot.unwrap_or(target.center),
-    );
-    Some(Ok(Launch {
-        scout,
+    let scouts = party_riflemen(observation, memory, home, SCOUT_RIFLEMEN, &[])?;
+    // The healthiest go; hurt ones would only turn straight back.
+    if units(observation, &scouts)
+        .iter()
+        .any(|unit| scout::hurt(unit))
+    {
+        return None;
+    }
+    let route = flank_route(observation, map_analysis, home, goal);
+    Some(Launch {
+        scouts,
         target,
         route,
-    }))
+    })
 }
 
 /// Two Tanks from the army: never one pushing, guarding a base, clearing the natural or holding
@@ -491,11 +472,16 @@ fn party_tanks(observation: &AiObservation, memory: &AiDecisionMemory) -> Option
     (main_left >= memory.home_tank_reserve()).then_some(party)
 }
 
-/// Five healthy Riflemen nobody else holds, nearest home first.
+/// `count` Riflemen nobody else holds, besides `besides`, and never the home pocket's: its posts
+/// go to the oldest home Riflemen (the lowest ids), so those stay home. Riflemen not dug in come
+/// first, so the raid takes those walking to a post, not those holding one; then the healthiest,
+/// then the nearest home.
 fn party_riflemen(
     observation: &AiObservation,
     memory: &AiDecisionMemory,
     home: (f32, f32),
+    count: usize,
+    besides: &[u32],
 ) -> Option<Vec<u32>> {
     let held: BTreeSet<u32> = memory
         .raid_defense
@@ -510,42 +496,28 @@ fn party_riflemen(
         .filter(|unit| unit.kind == EntityKind::Rifleman && unit.is_complete && unit.hp > 0)
         .filter(|unit| {
             !held.contains(&unit.id)
+                && !besides.contains(&unit.id)
                 && !memory.expansion_security.riflemen.contains(&unit.id)
                 && !memory.containment.active_riflemen.contains(&unit.id)
+                && !memory.third_pressure.is_reserved(unit.id)
         })
         .collect();
+    free.sort_by_key(|unit| unit.id);
+    let pocket = defense::HOME_POCKET_RIFLEMEN.min(free.len());
+    let mut free = free.split_off(pocket);
+    let dug_in = |unit: &AiEntitySummary| {
+        memory.estimated_entrenchment_ticks(observation, unit.id)
+            >= rts_rules::balance::ENTRENCHMENT_DIG_IN_TICKS
+    };
     free.sort_by(|left, right| {
-        right
-            .hp
-            .cmp(&left.hp)
+        dug_in(left)
+            .cmp(&dug_in(right))
+            .then(right.hp.cmp(&left.hp))
             .then(distance((left.x, left.y), home).total_cmp(&distance((right.x, right.y), home)))
             .then(left.id.cmp(&right.id))
     });
-    let party: Vec<u32> = free
-        .iter()
-        .take(PARTY_RIFLEMEN)
-        .map(|unit| unit.id)
-        .collect();
-    (party.len() == PARTY_RIFLEMEN).then_some(party)
-}
-
-/// A sound Scout Car the push does not hold: taking the one a forming push counted on kept it
-/// home, and a damaged one turned back as soon as it left.
-fn party_scout(observation: &AiObservation, memory: &AiDecisionMemory) -> Option<u32> {
-    observation
-        .owned
-        .iter()
-        .filter(|unit| unit.kind == EntityKind::ScoutCar && unit.is_complete && unit.hp > 0)
-        .filter(|unit| {
-            let max = config::unit_stats(unit.kind).map_or(unit.hp, |stats| stats.hp);
-            unit.hp.saturating_mul(100) >= max.saturating_mul(SCOUT_LAUNCH_HP_PERCENT)
-        })
-        .filter(|unit| {
-            memory.containment.active_scout != Some(unit.id)
-                && !memory.trap_breach.is_reserved(unit.id)
-        })
-        .map(|unit| unit.id)
-        .min()
+    let party: Vec<u32> = free.iter().take(count).map(|unit| unit.id).collect();
+    (party.len() == count).then_some(party)
 }
 
 /// Waypoints from home to a staging point beside the target: out via a point off the line between
@@ -556,6 +528,35 @@ fn flank_route(
     home: (f32, f32),
     target: (f32, f32),
 ) -> Vec<(f32, f32)> {
+    let (flank, staging) = flank_points(observation, home, target);
+    let Some(analysis) = map_analysis else {
+        return vec![flank, staging];
+    };
+    let mut route = analysis.compact_group_route(home, flank, ROUTE_STRIDE_TILES);
+    route.extend(analysis.compact_group_route(flank, staging, ROUTE_STRIDE_TILES));
+    route
+}
+
+/// The flank route tile by tile: the ground path its waypoints are taken from.
+fn flank_path(
+    observation: &AiObservation,
+    analysis: &AiMapAnalysis,
+    home: (f32, f32),
+    target: (f32, f32),
+) -> Vec<(f32, f32)> {
+    let (flank, staging) = flank_points(observation, home, target);
+    let mut path = analysis.compact_group_route(home, flank, 1);
+    path.extend(analysis.compact_group_route(flank, staging, 1));
+    path
+}
+
+/// The flank route's turn point, off the line between the two mains on the target's side, and its
+/// staging point beside the target, away from the enemy main.
+fn flank_points(
+    observation: &AiObservation,
+    home: (f32, f32),
+    target: (f32, f32),
+) -> ((f32, f32), (f32, f32)) {
     let ts = tile(observation);
     let enemy = enemy_start(observation).unwrap_or(target);
     let axis = normalized_direction(home, enemy).unwrap_or((1.0, 0.0));
@@ -584,12 +585,7 @@ fn flank_route(
         ),
         observation.map,
     );
-    let Some(analysis) = map_analysis else {
-        return vec![flank, staging];
-    };
-    let mut route = analysis.compact_group_route(home, flank, ROUTE_STRIDE_TILES);
-    route.extend(analysis.compact_group_route(flank, staging, ROUTE_STRIDE_TILES));
-    route
+    (flank, staging)
 }
 
 fn march(
@@ -768,6 +764,8 @@ fn begin_siege(
     let state = &mut memory.third_pressure;
     state.phase = Phase::Siege;
     state.phase_since = observation.tick;
+    state.spotter = None;
+    state.spotter_next = 0;
     state.clear_orders();
     siege(actions, observation, map_analysis, memory, intents);
 }
@@ -844,6 +842,17 @@ fn siege(
         None => {}
     }
     let site = state.target.map(unrounded).unwrap_or(site);
+    feed_spotter(observation, state);
+    if depot.is_none() && state.killed_at.is_none() && state.spotter.is_none() && !watched {
+        // Nobody left to see the Depot for the Tanks.
+        if units(observation, &state.riflemen)
+            .iter()
+            .all(|unit| !spotter_sound(unit))
+        {
+            begin_merge(observation, memory, intents, "no spotter left");
+            return;
+        }
+    }
     let Some(posts) = assign_posts(observation, map_analysis, state, site) else {
         begin_merge(observation, memory, intents, "no Tank post");
         return;
@@ -897,9 +906,46 @@ fn siege(
     }
 }
 
-/// Each member's post around `site`: the Tanks', then the Scout Car's, then the Riflemen's. A post
-/// still clear is kept, so a parked Tank keeps its reach; a spotter without one stands behind the
-/// first Tank. `None` when a Tank has no post.
+/// One Rifleman spots for the parked Tanks at a time, so the Riflemen never walk into the base's
+/// defenders together; the rest wait behind the Tanks. When the spotter falls or is hurt it steps
+/// back and the healthiest of the rest walks up, no sooner than `SPOTTER_FEED_TICKS` after the
+/// last one did.
+fn feed_spotter(observation: &AiObservation, state: &mut ThirdPressure) {
+    let tick = observation.tick;
+    let riflemen = units(observation, &state.riflemen);
+    if let Some(id) = state.spotter {
+        match riflemen.iter().find(|unit| unit.id == id) {
+            Some(unit) if spotter_sound(unit) => return,
+            Some(_) => {
+                state.posts.remove(&id);
+                state.held.remove(&id);
+            }
+            None => {}
+        }
+        state.spotter = None;
+    }
+    if tick < state.spotter_next {
+        return;
+    }
+    let next = riflemen
+        .iter()
+        .filter(|unit| spotter_sound(unit))
+        .max_by(|left, right| left.hp.cmp(&right.hp).then(right.id.cmp(&left.id)));
+    if let Some(unit) = next {
+        state.spotter = Some(unit.id);
+        state.spotter_next = tick.saturating_add(SPOTTER_FEED_TICKS);
+        state.notes.push(format!("spotter {} walks up", unit.id));
+    }
+}
+
+fn spotter_sound(unit: &AiEntitySummary) -> bool {
+    let max = config::unit_stats(unit.kind).map_or(unit.hp, |stats| stats.hp);
+    unit.hp.saturating_mul(100) >= max.saturating_mul(SPOTTER_RETIRE_HP_PERCENT)
+}
+
+/// Each member's post around `site`: the Tanks', then the spotter's. A post still clear is kept,
+/// so a parked Tank keeps its reach; the other Riflemen, and a spotter without a post, stand
+/// behind the first Tank. `None` when a Tank has no post.
 fn assign_posts(
     observation: &AiObservation,
     map_analysis: Option<&AiMapAnalysis>,
@@ -919,14 +965,9 @@ fn assign_posts(
         .map(|id| (*id, &TANK_POST_TILES[..], &tank_fixed[..]))
         .chain(
             state
-                .scout
-                .map(|id| (id, &SCOUT_POST_TILES[..], &spotter_fixed[..])),
-        )
-        .chain(
-            state
-                .riflemen
-                .iter()
-                .map(|id| (*id, &SPOTTER_POST_TILES[..], &spotter_fixed[..])),
+                .spotter
+                .filter(|id| state.riflemen.contains(id))
+                .map(|id| (id, &SPOTTER_POST_TILES[..], &spotter_fixed[..])),
         )
         .collect();
     let mut posts: Vec<(u32, (f32, f32))> = Vec::new();
@@ -973,9 +1014,14 @@ fn assign_posts(
             (first.0 + out.0 * 2.0 * ts, first.1 + out.1 * 2.0 * ts),
             observation.map,
         );
-        for (id, _, _) in &roles {
-            if !posts.iter().any(|(other, _)| other == id) {
-                posts.push((*id, behind));
+        let waiting: Vec<u32> = roles
+            .iter()
+            .map(|(id, _, _)| *id)
+            .chain(state.riflemen.iter().copied())
+            .collect();
+        for id in waiting {
+            if !posts.iter().any(|(other, _)| *other == id) {
+                posts.push((id, behind));
             }
         }
     }
@@ -1199,9 +1245,10 @@ fn return_home(
     let tick = observation.tick;
     let ts = tile(observation);
     let home = home_point(observation, memory);
-    let alone = memory.third_pressure.tanks.is_empty() && memory.third_pressure.riflemen.is_empty();
+    // Scouts coming home on their own keep away from enemies on the way.
+    let alone = memory.third_pressure.tanks.is_empty();
     if alone
-        && memory.third_pressure.scout.is_some()
+        && !memory.third_pressure.scouts.is_empty()
         && !scout_clear(actions, observation, None, memory, intents, false)
     {
         return;

@@ -548,7 +548,7 @@ fn containment_orders_only_the_rear_tank_forward_to_catch_up() {
 
 #[test]
 fn a_reforming_push_leaves_the_raiding_partys_units_alone() {
-    // The raid's Scout Car (31) and one of its Tanks (3) stand nearest the rally point.
+    // One of the raid's Tanks (3) stands nearest the rally point.
     let tile = 32.0;
     let observation = test_observation(
         vec![
@@ -557,7 +557,6 @@ fn a_reforming_push_leaves_the_raiding_partys_units_alone() {
             test_entity(4, EntityKind::Tank, 22.0 * tile, 18.0 * tile),
             test_entity(3, EntityKind::Tank, 15.0 * tile, 14.0 * tile),
             test_entity(30, EntityKind::ScoutCar, 25.0 * tile, 20.0 * tile),
-            test_entity(31, EntityKind::ScoutCar, 15.0 * tile, 13.0 * tile),
         ],
         9_000,
     );
@@ -565,7 +564,7 @@ fn a_reforming_push_leaves_the_raiding_partys_units_alone() {
     memory.containment.wave_launched = true;
     memory.containment.recovery_active = true;
     memory.third_pressure =
-        crate::ai_core::decision::third_pressure::ThirdPressure::out_with(vec![3], Some(31));
+        crate::ai_core::decision::third_pressure::ThirdPressure::out_with(vec![3], Vec::new());
     issue_test_containment(&observation, &mut memory);
     assert_eq!(memory.containment.active_scout, Some(30));
     assert!(!memory.containment.active_tanks.contains(&3));

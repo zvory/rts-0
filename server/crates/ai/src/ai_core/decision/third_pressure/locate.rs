@@ -1,7 +1,7 @@
 //! Finding the target base's Depot before the siege. AI 2.1 may stand it anywhere that mines a
 //! patch, so every spot within mining reach of the base's patches is looked at.
 //!
-//! The Tanks and most Riflemen wait at the staging point while the Scout Car looks. Contact near
+//! The Tanks and the other Riflemen wait at the staging point while one Rifleman looks. Contact near
 //! the waiting group is answered as on the march; contact near the looker alone either sends the
 //! party home (a force it would lose to) or brings the looker back to the group, which holds
 //! rather than charging into the base. A found Depot is sized up first: the looker watches it from
@@ -22,8 +22,8 @@ const FIELD_RETARGET_TILES: f32 = 50.0;
 const LOOK_CLEAR_OF_BUILDINGS_TILES: f32 = 8.0;
 
 /// At the staging point: every spot within mining reach of the base's patches could hold its
-/// Depot, so they are all to be seen before the base counts as empty. The Scout Car looks (or the
-/// two healthiest Riflemen without one) while the rest wait.
+/// Depot, so they are all to be seen before the base counts as empty. The healthiest Rifleman
+/// looks while the rest wait.
 pub(super) fn begin_locate(
     observation: &AiObservation,
     map_analysis: Option<&AiMapAnalysis>,
@@ -41,7 +41,9 @@ pub(super) fn begin_locate(
     state.locator = locators(observation, state);
     state.survey_since = None;
     state.fallback_until = 0;
+    // The scouts waiting at the staging point rejoin the party.
     state.watch = None;
+    state.scouts.clear();
     state.phase = Phase::Locate;
     state.phase_since = observation.tick;
     state.clear_orders();
@@ -90,14 +92,11 @@ pub(super) fn depot_spots(
     spots
 }
 
-/// The Scout Car, or the two healthiest Riflemen.
+/// The healthiest Rifleman: one looks at a time, and the next takes over if it falls.
 fn locators(observation: &AiObservation, state: &ThirdPressure) -> Vec<u32> {
-    if let Some(scout) = state.scout {
-        return vec![scout];
-    }
     let mut riflemen = units(observation, &state.riflemen);
     riflemen.sort_by(|left, right| right.hp.cmp(&left.hp).then(left.id.cmp(&right.id)));
-    riflemen.iter().take(2).map(|unit| unit.id).collect()
+    riflemen.iter().take(1).map(|unit| unit.id).collect()
 }
 
 pub(super) fn sight(unit: &AiEntitySummary) -> f32 {

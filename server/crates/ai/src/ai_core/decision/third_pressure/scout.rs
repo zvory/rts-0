@@ -1,12 +1,14 @@
-//! The Scout Car goes out alone first. It walks the flank route to the target base, sweeps every
-//! spot that could hold its Depot, and watches a found Depot from outside to size up the garrison.
-//! Only then are the Tanks and Riflemen sent, so an empty or defended base costs a Scout Car trip
-//! and never the push's Tanks.
+//! Two Riflemen go out first. The lead walks the flank route to the target base with the other a
+//! leg behind it, sweeps every spot that could hold the base's Depot while the other waits at the
+//! staging point, and watches a found Depot from outside to size up the garrison. Only then are the
+//! Tanks and three more Riflemen sent, so an empty or defended base costs two Riflemen's walk and
+//! never the push's Tanks. No Scout Car goes, and none is trained for the raid.
 //!
-//! The Scout Car is kept out of harm's way: it moves with plain move orders (it never attacks),
-//! turns away from any enemy fighter within `SCOUT_DANGER_TILES` (enemy sight is 9-11 tiles), waits
-//! before going on, keeps out of reach of enemy buildings' defense zones, and gives the trip up
-//! when it is hurt or keeps being found.
+//! The scouts keep out of harm's way: they move with plain move orders (they never attack), turn
+//! away from any enemy fighter within `SCOUT_DANGER_TILES` (enemy sight is 9-11 tiles), wait before
+//! going on, and keep out of reach of enemy buildings' defense zones. Strung out a leg apart, one
+//! found is not both: a hurt scout comes home on its own and the other carries on, leading. The
+//! trip is given up when both are gone or they keep being found.
 
 use super::locate::{
     area_center, base_empty, clear_seen, depot_spots, found_depot, next_view, staging_point,
@@ -14,33 +16,44 @@ use super::locate::{
 };
 use super::*;
 
-/// Enemy fighters this close to the Scout Car turn it away; Tanks, which reach 14 tiles parked,
-/// from farther.
+/// Enemy fighters this close to a scout turn it away; Tanks, which reach 14 tiles parked, from
+/// farther.
 const SCOUT_DANGER_TILES: f32 = 14.0;
 const SCOUT_TANK_DANGER_TILES: f32 = 16.0;
-/// It turns this far away from them, then waits before going on.
+/// A scout turns this far away from them, then the scouts wait before going on.
 const SCOUT_FLEE_TILES: f32 = 10.0;
 const SCOUT_FLEE_WAIT_TICKS: u32 = config::TICK_HZ * 8;
-/// Turned away more often than this, the Scout Car gives the trip up.
+/// Turned away more often than this away from home, the scouts give the trip up. Near home the
+/// enemies are raiders home defense answers, and the scouts wait them out.
 const SCOUT_MAX_FLEES: u32 = 4;
-/// Below this share of its hit points it comes home.
+/// Enemies met lately are walked around: the way on keeps this far from where they were seen,
+/// for this long, with at most so many waypoints added on one trip.
+const DANGER_CLEAR_TILES: f32 = 16.0;
+const DANGER_MEMORY_TICKS: u32 = config::TICK_HZ * 30;
+const MAX_DETOURS: u32 = 6;
+/// Below this share of its hit points a scout comes home.
 const SCOUT_ABORT_HP_PERCENT: u32 = 70;
 const SCOUT_TRIP_TIMEOUT_TICKS: u32 = config::TICK_HZ * 240;
-/// A found Depot is watched this long for a party to become free before the Scout Car comes home.
-const COMMIT_WAIT_TICKS: u32 = config::TICK_HZ * 60;
+/// Sized up, a found Depot is waited on this long, out of sight at the staging point, for a party
+/// to become free before the scouts come home: they leave before the Tanks can be spared.
+const COMMIT_WAIT_TICKS: u32 = config::TICK_HZ * 120;
 
-/// Sends the Scout Car alone toward `target`.
+/// A scout turned away: its id, where it stands, and the centre of the enemies near it.
+type Threatened = (u32, (f32, f32), (f32, f32));
+
+/// Sends the scout Riflemen alone toward `target`, the first of them leading.
 pub(super) fn begin_scout(
     observation: &AiObservation,
     state: &mut ThirdPressure,
-    scout: u32,
+    scouts: Vec<u32>,
     target: EnemyBase,
     route: Vec<(f32, f32)>,
 ) {
     let tick = observation.tick;
     state.tanks.clear();
-    state.riflemen.clear();
-    state.scout = Some(scout);
+    state.riflemen = scouts.clone();
+    state.scouts = scouts;
+    state.spotter = None;
     state.target = Some(rounded(target.depot.unwrap_or(target.center)));
     state.area = target.patches.iter().map(|p| rounded(*p)).collect();
     state.route = route.into_iter().map(rounded).collect();
@@ -49,23 +62,45 @@ pub(super) fn begin_scout(
     state.phase_since = tick;
 }
 
-fn scout_car<'o>(
-    observation: &'o AiObservation,
-    state: &ThirdPressure,
-) -> Option<&'o AiEntitySummary> {
-    let id = state.scout?;
-    observation
-        .owned
+/// The scouts still out, the lead first.
+fn scouts<'o>(observation: &'o AiObservation, state: &ThirdPressure) -> Vec<&'o AiEntitySummary> {
+    state
+        .scouts
         .iter()
-        .find(|unit| unit.id == id && unit.hp > 0)
+        .filter_map(|id| {
+            observation
+                .owned
+                .iter()
+                .find(|unit| unit.id == *id && unit.hp > 0)
+        })
+        .collect()
 }
 
-fn hurt(car: &AiEntitySummary) -> bool {
-    let max = config::unit_stats(car.kind).map_or(car.hp, |stats| stats.hp);
-    car.hp.saturating_mul(100) < max.saturating_mul(SCOUT_ABORT_HP_PERCENT)
+pub(super) fn hurt(unit: &AiEntitySummary) -> bool {
+    let max = config::unit_stats(unit.kind).map_or(unit.hp, |stats| stats.hp);
+    unit.hp.saturating_mul(100) < max.saturating_mul(SCOUT_ABORT_HP_PERCENT)
 }
 
-/// Turns the Scout Car away from enemy fighters close enough to see it. Returns whether it is
+/// Lets hurt scouts go home on their own. Returns whether any scout is left.
+fn send_hurt_home(
+    observation: &AiObservation,
+    state: &mut ThirdPressure,
+    intents: &mut Vec<AiIntent>,
+) -> bool {
+    let hurt_ids: Vec<u32> = scouts(observation, state)
+        .into_iter()
+        .filter(|unit| hurt(unit))
+        .map(|unit| unit.id)
+        .collect();
+    if !hurt_ids.is_empty() {
+        state.release(&hurt_ids);
+        state.notes.push(format!("scouts {hurt_ids:?} hurt, home"));
+        intents.push(AiIntent::Assemble { units: hurt_ids });
+    }
+    !state.scouts.is_empty()
+}
+
+/// Turns each scout away from the enemy fighters close enough to see it. Returns whether all are
 /// clear of them; `counting` counts the encounter toward giving the trip up.
 pub(super) fn scout_clear(
     actions: &mut AiActionContext<'_>,
@@ -77,69 +112,174 @@ pub(super) fn scout_clear(
 ) -> bool {
     let tick = observation.tick;
     let ts = tile(observation);
-    let Some(car) = scout_car(observation, &memory.third_pressure) else {
-        return true;
-    };
-    let car_at = (car.x, car.y);
-    let threats: Vec<(f32, f32)> = observation
-        .visible_enemies
-        .iter()
-        .filter(|enemy| enemy.hp > 0 && enemy.kind.is_unit() && enemy.kind != EntityKind::Worker)
-        .filter(|enemy| {
-            let danger = if enemy.kind == EntityKind::Tank {
-                SCOUT_TANK_DANGER_TILES
-            } else {
-                SCOUT_DANGER_TILES
-            };
-            distance((enemy.x, enemy.y), car_at) <= danger * ts
+    let threatened: Vec<Threatened> = scouts(observation, &memory.third_pressure)
+        .into_iter()
+        .filter_map(|scout| {
+            let at = (scout.x, scout.y);
+            let threats: Vec<(f32, f32)> = observation
+                .visible_enemies
+                .iter()
+                .filter(|enemy| {
+                    enemy.hp > 0 && enemy.kind.is_unit() && enemy.kind != EntityKind::Worker
+                })
+                .filter(|enemy| {
+                    let danger = if enemy.kind == EntityKind::Tank {
+                        SCOUT_TANK_DANGER_TILES
+                    } else {
+                        SCOUT_DANGER_TILES
+                    };
+                    distance((enemy.x, enemy.y), at) <= danger * ts
+                })
+                .map(|enemy| (enemy.x, enemy.y))
+                .collect();
+            let n = threats.len() as f32;
+            (n > 0.0).then(|| {
+                let threat = threats
+                    .iter()
+                    .fold((0.0, 0.0), |sum, p| (sum.0 + p.0 / n, sum.1 + p.1 / n));
+                (scout.id, at, threat)
+            })
         })
-        .map(|enemy| (enemy.x, enemy.y))
         .collect();
-    if threats.is_empty() {
+    if threatened.is_empty() {
         return true;
     }
     let home = home_point(observation, memory);
     let state = &mut memory.third_pressure;
-    if counting && tick >= state.fallback_until {
+    for (_, _, threat) in &threatened {
+        note_danger(state, *threat, tick, ts);
+    }
+    let away_from_home = threatened
+        .iter()
+        .any(|(_, at, _)| distance(*at, home) > DISBAND_NEAR_HOME_TILES * ts);
+    if counting && away_from_home && tick >= state.fallback_until {
         state.flees = state.flees.saturating_add(1);
         if state.flees > SCOUT_MAX_FLEES {
-            begin_return(observation, memory, intents, "scout spotted");
+            begin_return(observation, memory, intents, "scouts spotted");
             return false;
         }
     }
-    let n = threats.len() as f32;
-    let threat = threats
-        .iter()
-        .fold((0.0, 0.0), |sum, p| (sum.0 + p.0 / n, sum.1 + p.1 / n));
     let back_along_route = state
         .leg
         .checked_sub(1)
         .and_then(|leg| state.route.get(leg))
         .map(|p| unrounded(*p));
-    let flee = normalized_direction(threat, car_at)
-        .map(|away| {
+    for (id, at, threat) in threatened {
+        let flee = normalized_direction(threat, at)
+            .map(|away| {
+                clamp_to_map(
+                    (
+                        at.0 + away.0 * SCOUT_FLEE_TILES * ts,
+                        at.1 + away.1 * SCOUT_FLEE_TILES * ts,
+                    ),
+                    observation.map,
+                )
+            })
+            .into_iter()
+            .chain(back_along_route)
+            .chain(std::iter::once(home))
+            .find(|point| {
+                map_analysis.is_none_or(|analysis| {
+                    analysis.tile_is_passable((point.0 / ts) as u32, (point.1 / ts) as u32)
+                })
+            })
+            .unwrap_or(home);
+        send(actions, observation, state, &[id], flee, intents);
+    }
+    state.fallback_until = tick.saturating_add(SCOUT_FLEE_WAIT_TICKS);
+    false
+}
+
+/// Remembers enemies seen at `at`, merging with a danger noted nearby.
+fn note_danger(state: &mut ThirdPressure, at: (f32, f32), tick: u32, ts: f32) {
+    state
+        .dangers
+        .retain(|(_, seen)| tick.saturating_sub(*seen) <= DANGER_MEMORY_TICKS);
+    match state
+        .dangers
+        .iter_mut()
+        .find(|(spot, _)| distance(unrounded(*spot), at) <= 6.0 * ts)
+    {
+        Some(danger) => *danger = (rounded(at), tick),
+        None => state.dangers.push((rounded(at), tick)),
+    }
+}
+
+/// When the way from `from` to the next waypoint passes within `DANGER_CLEAR_TILES` of enemies met
+/// lately, adds a waypoint beside them, on the side away from them, so the scouts walk around.
+fn walk_around(
+    observation: &AiObservation,
+    map_analysis: Option<&AiMapAnalysis>,
+    state: &mut ThirdPressure,
+    from: (f32, f32),
+) {
+    let tick = observation.tick;
+    let ts = tile(observation);
+    if state.detours >= MAX_DETOURS {
+        return;
+    }
+    let Some(to) = state.route.get(state.leg).map(|p| unrounded(*p)) else {
+        return;
+    };
+    let clear = DANGER_CLEAR_TILES * ts;
+    let fresh: Vec<(f32, f32)> = state
+        .dangers
+        .iter()
+        .filter(|(_, seen)| tick.saturating_sub(*seen) <= DANGER_MEMORY_TICKS)
+        .map(|(spot, _)| unrounded(*spot))
+        .collect();
+    let in_the_way = fresh
+        .iter()
+        .copied()
+        .filter(|danger| distance(closest_on(from, to, *danger), *danger) < clear)
+        .min_by(|left, right| distance(from, *left).total_cmp(&distance(from, *right)));
+    let Some(danger) = in_the_way else {
+        return;
+    };
+    let closest = closest_on(from, to, danger);
+    let side = normalized_direction(danger, closest)
+        .or_else(|| normalized_direction(from, to).map(|(x, y)| (-y, x)))
+        .unwrap_or((0.0, 1.0));
+    let passable = |point: (f32, f32)| {
+        map_analysis.is_none_or(|analysis| {
+            analysis.tile_is_passable((point.0 / ts) as u32, (point.1 / ts) as u32)
+        })
+    };
+    let around = [1.0, -1.0]
+        .into_iter()
+        .map(|sign| {
             clamp_to_map(
                 (
-                    car_at.0 + away.0 * SCOUT_FLEE_TILES * ts,
-                    car_at.1 + away.1 * SCOUT_FLEE_TILES * ts,
+                    danger.0 + side.0 * sign * (clear + 2.0 * ts),
+                    danger.1 + side.1 * sign * (clear + 2.0 * ts),
                 ),
                 observation.map,
             )
         })
-        .into_iter()
-        .chain(back_along_route)
-        .chain(std::iter::once(home))
         .find(|point| {
-            map_analysis.is_none_or(|analysis| {
-                analysis.tile_is_passable((point.0 / ts) as u32, (point.1 / ts) as u32)
-            })
-        })
-        .unwrap_or(home);
-    state.fallback_until = tick.saturating_add(SCOUT_FLEE_WAIT_TICKS);
-    if let Some(id) = state.scout {
-        send(actions, observation, state, &[id], flee, intents);
+            passable(*point) && fresh.iter().all(|other| distance(*point, *other) >= clear)
+        });
+    if let Some(point) = around {
+        if distance(point, to) > 4.0 * ts {
+            state.route.insert(state.leg, rounded(point));
+            state.leg_since = tick;
+            state.detours += 1;
+            state
+                .notes
+                .push(format!("scouts walk around {:?}", rounded(danger)));
+        }
     }
-    false
+}
+
+/// The point of the segment from `a` to `b` nearest `p`.
+fn closest_on(a: (f32, f32), b: (f32, f32), p: (f32, f32)) -> (f32, f32) {
+    let (dx, dy) = (b.0 - a.0, b.1 - a.1);
+    let length2 = dx * dx + dy * dy;
+    if length2 <= f32::EPSILON {
+        return a;
+    }
+    let t = (((p.0 - a.0) * dx + (p.1 - a.1) * dy) / length2).clamp(0.0, 1.0);
+    (a.0 + dx * t, a.1 + dy * t)
 }
 
 pub(super) fn scout_trip(
@@ -151,26 +291,25 @@ pub(super) fn scout_trip(
 ) {
     let tick = observation.tick;
     let ts = tile(observation);
-    let state = &memory.third_pressure;
-    let Some(car) = scout_car(observation, state) else {
-        // Lost on the way: the base it went to is left alone a while.
-        let center = area_center(state);
+    if memory.third_pressure.scouts.is_empty() {
+        // Lost on the way: the base they went to is left alone a while.
+        let center = area_center(&memory.third_pressure);
         let state = &mut memory.third_pressure;
         state.defended.push((rounded(center), tick));
-        begin_return(observation, memory, intents, "scout lost");
-        return;
-    };
-    if tick.saturating_sub(state.phase_since) > SCOUT_TRIP_TIMEOUT_TICKS {
-        begin_return(observation, memory, intents, "scout out of time");
+        begin_return(observation, memory, intents, "scouts lost");
         return;
     }
-    if hurt(car) {
-        begin_return(observation, memory, intents, "scout hurt");
+    // Waiting on a sized-up Depot has its own limit.
+    if memory.third_pressure.sized_up.is_none()
+        && tick.saturating_sub(memory.third_pressure.phase_since) > SCOUT_TRIP_TIMEOUT_TICKS
+    {
+        begin_return(observation, memory, intents, "scouts out of time");
         return;
     }
-    let car_at = (car.x, car.y);
-    let car_sight = sight(car);
-    let car_id = car.id;
+    if !send_hurt_home(observation, &mut memory.third_pressure, intents) {
+        begin_return(observation, memory, intents, "scouts hurt");
+        return;
+    }
     if !scout_clear(actions, observation, map_analysis, memory, intents, true) {
         return;
     }
@@ -178,22 +317,50 @@ pub(super) fn scout_trip(
     if tick < state.fallback_until {
         return;
     }
-    // On the way.
+    let out = scouts(observation, state);
+    let Some(lead) = out.first().copied() else {
+        return;
+    };
+    let lead_at = (lead.x, lead.y);
+    let rest: Vec<u32> = out.iter().skip(1).map(|unit| unit.id).collect();
+    // On the way: the lead walks the route, the others a leg behind it.
     if let Some(point) = state.route.get(state.leg).map(|p| unrounded(*p)) {
-        if distance(car_at, point) <= LEG_REACHED_TILES * ts
+        if distance(lead_at, point) <= LEG_REACHED_TILES * ts
             || tick.saturating_sub(state.leg_since) > LEG_TIMEOUT_TICKS
         {
             state.leg += 1;
             state.leg_since = tick;
         }
+        walk_around(observation, map_analysis, state, lead_at);
         if let Some(point) = state.route.get(state.leg).map(|p| unrounded(*p)) {
-            send(actions, observation, state, &[car_id], point, intents);
+            send(actions, observation, state, &[lead.id], point, intents);
+            let behind = state
+                .leg
+                .checked_sub(1)
+                .and_then(|leg| state.route.get(leg))
+                .map(|p| unrounded(*p));
+            if let Some(behind) = behind {
+                send(actions, observation, state, &rest, behind, intents);
+            }
             return;
         }
     }
-    // At the base: find the Depot.
+    // At the base: the lead finds the Depot while the others wait at the staging point.
     let center = area_center(state);
     let staging = staging_point(state, center);
+    if let Some(since) = state.sized_up {
+        // The Depot is sized up: all wait for the party out of sight.
+        let ids = state.scouts.clone();
+        send(actions, observation, state, &ids, staging, intents);
+        if commit(observation, map_analysis, memory) {
+            return;
+        }
+        if tick.saturating_sub(since) > COMMIT_WAIT_TICKS {
+            begin_return(observation, memory, intents, "no party free");
+        }
+        return;
+    }
+    send(actions, observation, state, &rest, staging, intents);
     if state.survey_since.is_none() {
         if let Some((at, id)) = found_depot(observation, state) {
             state.target = Some(at);
@@ -206,14 +373,13 @@ pub(super) fn scout_trip(
             begin_return(observation, memory, intents, "no target");
             return;
         };
-        let point = survey_point(observation, map_analysis, depot, staging, car_sight);
-        send(actions, observation, state, &[car_id], point, intents);
-        let arrived = distance(car_at, point) <= 2.0 * ts;
+        let point = survey_point(observation, map_analysis, depot, staging, sight(lead));
+        send(actions, observation, state, &[lead.id], point, intents);
+        let arrived = distance(lead_at, point) <= 2.0 * ts;
         if !arrived && tick.saturating_sub(since) < SURVEY_TIMEOUT_TICKS {
             return;
         }
-        state.watch = Some(rounded(point));
-        report(observation, map_analysis, memory, intents, depot, since);
+        report(observation, map_analysis, memory, intents, depot);
         return;
     }
     if state.spots_total == 0 {
@@ -225,7 +391,7 @@ pub(super) fn scout_trip(
         state.spots_total = state.unseen.len();
     }
     let search_since = *state.search_since.get_or_insert(tick);
-    clear_seen(observation, state, &[car]);
+    clear_seen(observation, state, &out);
     let seen = state.spots_total.saturating_sub(state.unseen.len());
     let mostly_seen = state.spots_total > 0 && seen * 100 >= state.spots_total * EMPTY_SEEN_PERCENT;
     let out_of_time = tick.saturating_sub(search_since) > LOCATE_TIMEOUT_TICKS;
@@ -237,39 +403,48 @@ pub(super) fn scout_trip(
         begin_return(observation, memory, intents, "depot not found");
         return;
     }
-    if let Some(view) = next_view(observation, map_analysis, state, &[car], center, staging) {
-        send(actions, observation, state, &[car_id], view, intents);
+    if let Some(view) = next_view(observation, map_analysis, state, &[lead], center, staging) {
+        send(actions, observation, state, &[lead.id], view, intents);
     }
 }
 
-/// The Scout Car has watched the found Depot: a garrison the party would lose to keeps the Tanks
-/// home; otherwise the party is sent while the Scout Car keeps watch.
+/// The lead scout has watched the found Depot: a garrison the party would lose to keeps the Tanks
+/// home; otherwise the party is sent, now or once Jeff can spare it, while the scouts wait at the
+/// staging point.
 fn report(
     observation: &AiObservation,
     map_analysis: Option<&AiMapAnalysis>,
     memory: &mut AiDecisionMemory,
     intents: &mut Vec<AiIntent>,
     depot: (f32, f32),
-    since: u32,
 ) {
     let tick = observation.tick;
     let ts = tile(observation);
-    let home = home_point(observation, memory);
     let garrison: Vec<&AiEntitySummary> = observation
         .visible_enemies
         .iter()
         .filter(|enemy| enemy.hp > 0 && enemy.kind.is_unit() && enemy.kind != EntityKind::Worker)
         .filter(|enemy| distance((enemy.x, enemy.y), depot) <= GARRISON_TILES * ts)
         .collect();
-    let tanks = party_tanks(observation, memory);
-    let riflemen = party_riflemen(observation, memory, home);
     if !garrison.is_empty() {
-        let would_send: Vec<u32> = tanks
-            .iter()
-            .flatten()
-            .chain(riflemen.iter().flatten())
-            .copied()
-            .collect();
+        let would_send: Vec<u32> = match party(observation, memory) {
+            Some((tanks, riflemen)) => tanks.into_iter().chain(riflemen).collect(),
+            // The Tanks cannot be spared yet: weigh the garrison against two of Jeff's.
+            None => {
+                let mut tanks: Vec<&AiEntitySummary> = observation
+                    .owned
+                    .iter()
+                    .filter(|unit| unit.kind == EntityKind::Tank && unit.is_complete && unit.hp > 0)
+                    .collect();
+                tanks.sort_by(|left, right| right.hp.cmp(&left.hp).then(left.id.cmp(&right.id)));
+                tanks
+                    .iter()
+                    .take(PARTY_TANKS)
+                    .map(|unit| unit.id)
+                    .chain(memory.third_pressure.scouts.iter().copied())
+                    .collect()
+            }
+        };
         if would_send.is_empty() || loses_to(observation, &would_send, &garrison) {
             let center = area_center(&memory.third_pressure);
             memory.third_pressure.defended.push((rounded(center), tick));
@@ -277,12 +452,8 @@ fn report(
             return;
         }
     }
-    if commit(observation, map_analysis, memory) {
-        return;
-    }
-    if tick.saturating_sub(since) > COMMIT_WAIT_TICKS {
-        begin_return(observation, memory, intents, "no party free");
-    }
+    memory.third_pressure.sized_up = Some(tick);
+    commit(observation, map_analysis, memory);
 }
 
 /// Whether `enemies` would beat the party made of `ours`, or bring at least as many Tanks.
@@ -311,8 +482,20 @@ fn loses_to(observation: &AiObservation, ours: &[u32], enemies: &[&AiEntitySumma
         || (their_tanks > 0 && their_tanks >= our_tanks)
 }
 
-/// Sends two army Tanks and five Riflemen to the base the Scout Car found, by the flank route,
-/// when Jeff can spare them now. Returns whether the party left.
+/// The party that would follow the scouts now: two army Tanks and enough Riflemen to make five
+/// with the scouts.
+fn party(observation: &AiObservation, memory: &AiDecisionMemory) -> Option<(Vec<u32>, Vec<u32>)> {
+    let home = home_point(observation, memory);
+    let scouts = &memory.third_pressure.scouts;
+    let more = PARTY_RIFLEMEN.saturating_sub(scouts.len());
+    let tanks = party_tanks(observation, memory)?;
+    let riflemen = party_riflemen(observation, memory, home, more, scouts)?;
+    Some((tanks, riflemen))
+}
+
+/// Sends two army Tanks and three more Riflemen to the base the scouts found, by the flank route,
+/// when Jeff can spare them now; the scouts wait for them at the staging point. Returns whether
+/// the party left.
 pub(super) fn commit(
     observation: &AiObservation,
     map_analysis: Option<&AiMapAnalysis>,
@@ -331,10 +514,7 @@ pub(super) fn commit(
         return false;
     }
     let home = home_point(observation, memory);
-    let Some(tanks) = party_tanks(observation, memory) else {
-        return false;
-    };
-    let Some(riflemen) = party_riflemen(observation, memory, home) else {
+    let Some((tanks, more)) = party(observation, memory) else {
         return false;
     };
     let tick = observation.tick;
@@ -346,22 +526,28 @@ pub(super) fn commit(
         .notes
         .push(format!("party sent to {:?}", rounded(goal)));
     state.tanks = tanks;
-    state.riflemen = riflemen;
+    state.riflemen = state.scouts.iter().chain(&more).copied().collect();
     state.route = flank_route(observation, map_analysis, home, goal)
         .into_iter()
         .map(rounded)
         .collect();
+    state.watch = if state.scouts.is_empty() {
+        None
+    } else {
+        state.route.last().copied()
+    };
     state.leg = 0;
     state.leg_since = tick;
     state.phase = Phase::March;
     state.phase_since = tick;
     state.survey_since = None;
+    state.sized_up = None;
     state.clear_orders();
     true
 }
 
-/// While the party marches, the Scout Car keeps watch on the Depot from outside, turning away
-/// from enemies; hurt, it is let go.
+/// While the party marches, the scouts wait for it at the staging point, turning away from
+/// enemies; a hurt one goes home.
 pub(super) fn keep_watch(
     actions: &mut AiActionContext<'_>,
     observation: &AiObservation,
@@ -369,19 +555,10 @@ pub(super) fn keep_watch(
     memory: &mut AiDecisionMemory,
     intents: &mut Vec<AiIntent>,
 ) {
-    let Some(car) = scout_car(observation, &memory.third_pressure) else {
+    if !send_hurt_home(observation, &mut memory.third_pressure, intents) {
         memory.third_pressure.watch = None;
         return;
-    };
-    if hurt(car) {
-        let id = car.id;
-        let state = &mut memory.third_pressure;
-        state.release(&[id]);
-        state.watch = None;
-        intents.push(AiIntent::Assemble { units: vec![id] });
-        return;
     }
-    let car_id = car.id;
     if !scout_clear(actions, observation, map_analysis, memory, intents, false) {
         return;
     }
@@ -390,6 +567,7 @@ pub(super) fn keep_watch(
         return;
     }
     if let Some(point) = state.watch.map(unrounded) {
-        send(actions, observation, state, &[car_id], point, intents);
+        let ids = state.scouts.clone();
+        send(actions, observation, state, &ids, point, intents);
     }
 }

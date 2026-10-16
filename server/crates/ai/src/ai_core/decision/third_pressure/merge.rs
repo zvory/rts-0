@@ -140,8 +140,7 @@ fn meeting_point(
         .unwrap_or_else(|| point_at(share))
 }
 
-/// The party's units become the push's: its Tanks and Riflemen march with it, and its Scout Car
-/// leads it if the push has none.
+/// The party's units become the push's: its Tanks and Riflemen march with it.
 fn join_push(
     observation: &AiObservation,
     memory: &mut AiDecisionMemory,
@@ -150,12 +149,8 @@ fn join_push(
     let state = &memory.third_pressure;
     let tanks = state.tanks.clone();
     let riflemen = state.riflemen.clone();
-    let scout = state.scout;
     memory.containment.active_tanks.extend(tanks);
     memory.containment.active_riflemen.extend(riflemen);
-    if memory.containment.active_scout.is_none() {
-        memory.containment.active_scout = scout;
-    }
     let state = &mut memory.third_pressure;
     state.notes.push("joined the push".to_string());
     disband(observation.tick, state, intents);
