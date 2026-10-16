@@ -102,11 +102,15 @@ pub(super) fn issue_expansion_containment_wave(
             required_tanks
         };
         let rally = containment_regroup_point(own_base, enemy_base, observation.map)?;
+        // The live Jeff's raiding party's Tanks count toward the push, which they join on the way;
+        // while the party is on its way to meet the push they also count against the enemy.
+        let pledged = memory.third_pressure.pledged_tanks();
+        let joining = memory.third_pressure.joining_tanks();
         // The current Jeff forms its push once from most of the Tanks ready now, and only forms it
         // again if losses before the launch take it below its minimum. Other profiles keep a push
         // of exactly the required size.
         let reform = if push_uses_available_armor {
-            memory.containment.active_tanks.len() < required_tanks
+            memory.containment.active_tanks.len() + pledged < required_tanks
         } else {
             memory.containment.active_tanks.len() != required_tanks
         };
@@ -129,8 +133,9 @@ pub(super) fn issue_expansion_containment_wave(
                 scouts.retain(|scout| plan.ready_units.contains(scout));
             }
             let push_size = if push_uses_available_armor {
-                push_tank_count(
+                push_home_tank_count(
                     tanks.len(),
+                    pledged,
                     required_tanks,
                     push_keep_home(observation, memory),
                 )?
@@ -170,8 +175,9 @@ pub(super) fn issue_expansion_containment_wave(
                 newcomers.retain(|tank| plan.ready_units.contains(tank));
             }
             let pushing = memory.containment.active_tanks.len();
-            let wanted = push_tank_count(
+            let wanted = push_home_tank_count(
                 pushing + newcomers.len(),
+                pledged,
                 required_tanks,
                 push_keep_home(observation, memory),
             )
@@ -243,7 +249,7 @@ pub(super) fn issue_expansion_containment_wave(
         // waiting at home for the rest of the game.
         let most_gathered = live_jeff
             && assembly_elapsed >= ASSEMBLY_GATHERED_TICKS
-            && tanks.len() >= memory.recent_enemy_tanks() + GATHERED_LEAD_TANKS
+            && tanks.len() + joining >= memory.recent_enemy_tanks() + GATHERED_LEAD_TANKS
             && {
                 let gathered = observation
                     .owned
@@ -273,7 +279,7 @@ pub(super) fn issue_expansion_containment_wave(
         } else {
             0
         };
-        let launch_outnumbered = memory.recent_enemy_tanks() + lead_needed > tanks.len();
+        let launch_outnumbered = memory.recent_enemy_tanks() + lead_needed > tanks.len() + joining;
         // Nor while enemy Tanks shelling a base outnumber the home Tanks near them.
         let home_outgunned = push_uses_available_armor && memory.home_outgunned;
         // The live Jeff's push waits while enemies hold its natural before the Depot is up: its

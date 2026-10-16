@@ -1231,6 +1231,23 @@ fn push_tank_count(ready: usize, minimum: usize, keep_home: usize) -> Option<usi
     (size >= minimum).then_some(size)
 }
 
+/// The push's home Tanks while the live Jeff's raiding party has `pledged` Tanks out that join it on
+/// the way: all ready Tanks but `keep_home`, at least one, once home and pledged Tanks reach
+/// `minimum`. Without a party it is `push_tank_count`. Counting the party stops the push waiting at
+/// home to rebuild the Tanks the raid took.
+fn push_home_tank_count(
+    ready: usize,
+    pledged: usize,
+    minimum: usize,
+    keep_home: usize,
+) -> Option<usize> {
+    if pledged == 0 {
+        return push_tank_count(ready, minimum, keep_home);
+    }
+    let home = ready.saturating_sub(keep_home);
+    (home >= 1 && home + pledged >= minimum).then_some(home)
+}
+
 /// Ready Tanks the push leaves at home: the home reserve, less the home Tank already kept there.
 fn push_keep_home(observation: &AiObservation, memory: &AiDecisionMemory) -> usize {
     let home_tank_alive = memory.home_defensive_tank.is_some_and(|id| {

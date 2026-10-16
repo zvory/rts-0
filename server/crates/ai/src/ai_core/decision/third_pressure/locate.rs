@@ -237,7 +237,7 @@ pub(super) fn locate(
             let center = area_center(state);
             base_empty(observation, map_analysis, memory, intents, center);
         } else {
-            begin_return(observation, memory, intents, "depot not found");
+            begin_merge(observation, memory, intents, "depot not found");
         }
         return;
     }
@@ -292,7 +292,7 @@ pub(super) fn locate(
     }
     let lookers = units(observation, &state.locator);
     let Some(lead) = lookers.first() else {
-        begin_return(observation, memory, intents, "no locator");
+        begin_merge(observation, memory, intents, "no locator");
         return;
     };
     let staging = staging_point(state, center);
@@ -408,7 +408,7 @@ fn survey(
     let state = &mut memory.third_pressure;
     let center = area_center(state);
     let Some(depot) = state.target.map(unrounded) else {
-        begin_return(observation, memory, intents, "no target");
+        begin_merge(observation, memory, intents, "no target");
         return;
     };
     let staging = staging_point(state, center);
@@ -478,7 +478,7 @@ fn base_empty(
     state.empty_bases = state.empty_bases.saturating_add(1);
     match field_target(observation, state, false) {
         Some(base) => retarget(observation, map_analysis, state, base),
-        None => begin_return(observation, memory, intents, "base empty"),
+        None => begin_merge(observation, memory, intents, "base empty"),
     }
 }
 

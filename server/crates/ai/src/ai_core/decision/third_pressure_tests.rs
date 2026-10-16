@@ -508,7 +508,7 @@ fn a_depot_outside_the_ring_of_patches_is_found_and_shelled_where_it_stands() {
 }
 
 #[test]
-fn a_base_with_no_depot_on_any_spot_sends_the_party_home() {
+fn a_base_with_no_depot_on_any_spot_sends_the_party_to_join_the_push() {
     let mut observation = game(11_000);
     let mut memory = locating(&mut observation);
     step(JEFFS_AI_ID, &observation, &mut memory);
@@ -522,7 +522,7 @@ fn a_base_with_no_depot_on_any_spot_sends_the_party_home() {
     scout.y = last.1 as f32;
     step(JEFFS_AI_ID, &observation, &mut memory);
     let state = &memory.third_pressure;
-    assert_eq!(state.phase, Phase::Return);
+    assert_eq!(state.phase, Phase::Merge);
     assert!(state
         .checked
         .iter()
@@ -728,7 +728,7 @@ fn a_search_out_of_time_with_most_spots_seen_found_the_base_empty() {
         };
         step(JEFFS_AI_ID, &observation, &mut memory);
         let state = &memory.third_pressure;
-        assert_eq!(state.phase, Phase::Return, "{share_unseen}% unseen");
+        assert_eq!(state.phase, Phase::Merge, "{share_unseen}% unseen");
         assert_eq!(
             state.empty_bases,
             u32::from(empty),
@@ -753,4 +753,91 @@ fn after_two_empty_bases_only_a_seen_depot_sends_the_party_out() {
         memory.third_pressure.target,
         Some(rounded((114.0 * ts(), 60.0 * ts())))
     );
+}
+
+/// A party that found its base empty, at the third's staging point, now on its way to the push.
+fn merging(observation: &mut AiObservation) -> AiDecisionMemory {
+    let mut memory = locating(observation);
+    let state = &mut memory.third_pressure;
+    state.phase = Phase::Merge;
+    state.phase_since = observation.tick;
+    memory
+}
+
+#[test]
+fn the_partys_tanks_count_toward_the_push_until_it_heads_home() {
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+    assert_eq!(memory.third_pressure.pledged_tanks(), 0);
+    step(JEFFS_AI_ID, &game(10_000), &mut memory);
+    assert_eq!(memory.third_pressure.phase, Phase::March);
+    assert_eq!(memory.third_pressure.pledged_tanks(), 2);
+    assert_eq!(memory.third_pressure.joining_tanks(), 0);
+    memory.third_pressure.phase = Phase::Merge;
+    assert_eq!(memory.third_pressure.joining_tanks(), 2);
+    memory.third_pressure.phase = Phase::Return;
+    assert_eq!(memory.third_pressure.pledged_tanks(), 0);
+}
+
+#[test]
+fn while_the_push_forms_the_party_waits_midway_on_its_way() {
+    let mut observation = game(12_000);
+    let mut memory = merging(&mut observation);
+    let commands = step(JEFFS_AI_ID, &observation, &mut memory);
+    assert_eq!(memory.third_pressure.phase, Phase::Merge);
+    // The push forms 8 tiles out of the main toward the enemy; the party heads for the point of
+    // its way to the enemy main nearest it, inside the middle stretch.
+    let own = (10.5 * ts(), 10.5 * ts());
+    let enemy = (110.5 * ts(), 110.5 * ts());
+    let tank = memory.third_pressure.tanks[0];
+    let (x, y) = commands
+        .iter()
+        .find_map(|command| match command {
+            Command::Move { units, x, y, .. } if units.contains(&tank) => Some((*x, *y)),
+            _ => None,
+        })
+        .expect("the party moves to meet the push");
+    let rally = (
+        own.0 + 8.0 * ts() / 2f32.sqrt(),
+        own.1 + 8.0 * ts() / 2f32.sqrt(),
+    );
+    let along = distance(rally, (x, y)) / distance(rally, enemy);
+    assert!((0.29..=0.71).contains(&along), "{along}");
+    let off_line = ((x - rally.0) - (y - rally.1)).abs() / 2f32.sqrt();
+    assert!(off_line < 1.0 * ts(), "{off_line}");
+}
+
+#[test]
+fn the_push_takes_the_party_in_when_it_reaches_it() {
+    let mut observation = game(12_000);
+    let mut memory = merging(&mut observation);
+    // The launched push: two home Tanks marching past the party.
+    observation.owned.extend([
+        unit(40, 1, EntityKind::Tank, (90.0, 64.0)),
+        unit(41, 1, EntityKind::Tank, (91.0, 60.0)),
+    ]);
+    memory.containment.wave_launched = true;
+    memory.containment.active_tanks = [40, 41].into_iter().collect();
+    let party_tanks = memory.third_pressure.tanks.clone();
+    let party_riflemen = memory.third_pressure.riflemen.clone();
+    step(JEFFS_AI_ID, &observation, &mut memory);
+    assert_eq!(memory.third_pressure.phase, Phase::Idle);
+    assert!(memory.squad_reserved().is_empty());
+    assert!(party_tanks
+        .iter()
+        .all(|id| memory.containment.active_tanks.contains(id)));
+    assert!(party_riflemen
+        .iter()
+        .all(|id| memory.containment.active_riflemen.contains(id)));
+    assert_eq!(memory.containment.active_scout, Some(30));
+}
+
+#[test]
+fn a_party_that_meets_no_push_goes_home() {
+    let mut observation = game(12_000);
+    let mut memory = merging(&mut observation);
+    step(JEFFS_AI_ID, &observation, &mut memory);
+    let mut later = game(12_000 + config::TICK_HZ * 151);
+    party_at(&mut later, &memory, (92.0, 62.0));
+    step(JEFFS_AI_ID, &later, &mut memory);
+    assert_eq!(memory.third_pressure.phase, Phase::Return);
 }

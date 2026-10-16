@@ -995,6 +995,23 @@ fn the_push_takes_every_ready_tank_but_the_home_reserve() {
 }
 
 #[test]
+fn the_raiding_partys_tanks_count_toward_the_push() {
+    // No party out: exactly the old count.
+    for (ready, minimum, keep) in [(23, 2, 4), (3, 2, 2), (8, 6, 3), (4, 2, 2)] {
+        assert_eq!(
+            push_home_tank_count(ready, 0, minimum, keep),
+            push_tank_count(ready, minimum, keep)
+        );
+    }
+    // Two party Tanks out: one home Tank past the reserve is enough to set off.
+    assert_eq!(push_home_tank_count(3, 2, 2, 2), Some(1));
+    assert_eq!(push_home_tank_count(6, 2, 2, 2), Some(4));
+    // The reserve stays home, and the push still needs a Tank of its own.
+    assert_eq!(push_home_tank_count(2, 2, 2, 2), None);
+    assert_eq!(push_home_tank_count(3, 2, 4, 2), None);
+}
+
+#[test]
 fn the_home_reserve_scales_with_the_largest_recent_attack() {
     let ts = 32.0;
     let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);

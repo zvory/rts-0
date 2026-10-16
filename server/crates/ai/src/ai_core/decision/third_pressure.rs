@@ -22,8 +22,10 @@ use super::geometry::{clamp_to_map, dist2, normalized_direction, tile_center};
 use super::opening_rush::{estimate_trade, fighter, LiveStep};
 use super::*;
 use locate::{begin_locate, field_target, locate, retarget, sight};
+use merge::{begin_merge, merge};
 
 mod locate;
+mod merge;
 
 /// The party leaves from 5:30, to reach a third 90-150 tiles off by about 7:00.
 const LAUNCH_FROM_TICK: u32 = config::TICK_HZ * 330;
@@ -110,6 +112,8 @@ enum Phase {
     March,
     Locate,
     Siege,
+    /// Over at the target, on the way to join the push.
+    Merge,
     Return,
 }
 
@@ -178,6 +182,24 @@ impl ThirdPressure {
             .chain(&self.riflemen)
             .copied()
             .chain(self.scout)
+    }
+
+    /// The party's Tanks the push counts on: all of them while the party is out and not heading
+    /// home.
+    pub(in crate::ai_core::decision) fn pledged_tanks(&self) -> usize {
+        match self.phase {
+            Phase::March | Phase::Locate | Phase::Siege | Phase::Merge => self.tanks.len(),
+            Phase::Idle | Phase::Return => 0,
+        }
+    }
+
+    /// The party's Tanks on their way to meet the push.
+    pub(in crate::ai_core::decision) fn joining_tanks(&self) -> usize {
+        if self.phase == Phase::Merge {
+            self.tanks.len()
+        } else {
+            0
+        }
     }
 
     pub(in crate::ai_core::decision) fn is_reserved(&self, id: u32) -> bool {
@@ -271,6 +293,7 @@ pub(super) fn plan_live(
         Phase::March => march(actions, observation, map_analysis, memory, intents),
         Phase::Locate => locate(actions, observation, map_analysis, memory, intents),
         Phase::Siege => siege(actions, observation, map_analysis, memory, intents),
+        Phase::Merge => merge(actions, observation, map_analysis, memory, intents),
         Phase::Return => return_home(actions, observation, memory, intents),
     }
     let state = &mut memory.third_pressure;
@@ -774,15 +797,16 @@ fn siege(
     let tick = observation.tick;
     let ts = tile(observation);
     let state = &memory.third_pressure;
-    if state.tanks.is_empty()
-        || memory.home_outgunned
-        || tick.saturating_sub(state.phase_since) > SIEGE_TIMEOUT_TICKS
-    {
+    if state.tanks.is_empty() || memory.home_outgunned {
         begin_return(observation, memory, intents, "siege over");
         return;
     }
+    if tick.saturating_sub(state.phase_since) > SIEGE_TIMEOUT_TICKS {
+        begin_merge(observation, memory, intents, "siege out of time");
+        return;
+    }
     let Some(site) = state.target.map(unrounded) else {
-        begin_return(observation, memory, intents, "no target");
+        begin_merge(observation, memory, intents, "no target");
         return;
     };
     // The Depot the party found, or one standing where a remembered Depot was.
@@ -836,7 +860,7 @@ fn siege(
     }
     let site = state.target.map(unrounded).unwrap_or(site);
     let Some(posts) = assign_posts(observation, map_analysis, state, site) else {
-        begin_return(observation, memory, intents, "no Tank post");
+        begin_merge(observation, memory, intents, "no Tank post");
         return;
     };
     let mut fire_targets_left = false;
@@ -884,7 +908,7 @@ fn siege(
         .is_some_and(|killed| tick.saturating_sub(killed) >= HOLD_AFTER_KILL_TICKS)
         && !fire_targets_left
     {
-        begin_return(observation, memory, intents, "base cleared");
+        begin_merge(observation, memory, intents, "base cleared");
     }
 }
 
