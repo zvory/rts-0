@@ -1322,3 +1322,23 @@ fn on_the_other_maps_the_natural_lies_on_the_enemy_route_and_the_third_off_it() 
         assert!(off_route_tiles(&observation, route, target.center) >= OPEN_OFF_ROUTE_TILES);
     }
 }
+
+#[test]
+fn a_scout_car_that_stops_short_of_its_view_still_sees_the_spot_and_goes_on() {
+    let (mut memory, mut observation) = scout_at_base((100.0, 48.0));
+    let commands = step(JEFFS_AI_ID, &observation, &mut memory);
+    let view = scout_move(&commands).expect("sent to a view");
+    let unseen = memory.third_pressure.unseen.len();
+    assert!(unseen > 0);
+    // It stops 2 tiles short, coming in from outside the base.
+    let center = locate::area_center(&memory.third_pressure);
+    let out = normalized_direction(center, view).unwrap();
+    let scout = observation.owned.iter_mut().find(|u| u.id == 30).unwrap();
+    scout.x = view.0 + out.0 * 2.0 * ts();
+    scout.y = view.1 + out.1 * 2.0 * ts();
+    observation.tick += 9;
+    let commands = step(JEFFS_AI_ID, &observation, &mut memory);
+    assert!(memory.third_pressure.unseen.len() < unseen);
+    let next = scout_move(&commands).expect("sent on to the next view");
+    assert!(distance(next, view) > 1.0 * ts(), "{next:?} {view:?}");
+}

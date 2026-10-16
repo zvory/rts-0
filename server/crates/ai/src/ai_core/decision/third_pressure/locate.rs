@@ -395,8 +395,8 @@ pub(super) fn next_view(
     let mut passable_view = None;
     for back in [
         look - VIEW_BACKOFF_TILES,
-        look - VIEW_BACKOFF_TILES + 1.0,
-        look - 1.0,
+        look - VIEW_BACKOFF_TILES - 1.0,
+        look - VIEW_BACKOFF_TILES - 2.0,
     ] {
         let back = back.max(2.0) * ts;
         for dir in &dirs {

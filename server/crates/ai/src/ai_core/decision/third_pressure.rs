@@ -83,8 +83,12 @@ const THREAT_TILES: f32 = 13.0;
 const SIGHT_MARGIN_TILES: f32 = 1.5;
 /// Spots a Depot could stand on are tried on this grid.
 const DEPOT_SEARCH_STEP_TILES: f32 = 2.0;
-/// The locator looks at a spot from this far inside its sight, from outside the base.
-const VIEW_BACKOFF_TILES: f32 = 2.5;
+/// The locator looks at a spot from this far inside its sight, from outside the base, or nearer:
+/// the sight margin and 2.5 tiles more, as a unit stops short of where it is sent. From 1 tile
+/// inside the margin, a Scout Car that stopped 1.3 tiles short never saw the spot it was sent to
+/// look at, stood still until the search ran out of time, and missed a Depot 7 tiles from the
+/// patches.
+const VIEW_BACKOFF_TILES: f32 = SIGHT_MARGIN_TILES + 2.5;
 const LOCATE_TIMEOUT_TICKS: u32 = config::TICK_HZ * 90;
 /// A remembered Depot this close to the siege target is the same Depot.
 const DEPOT_SAME_TILES: f32 = 3.0;
