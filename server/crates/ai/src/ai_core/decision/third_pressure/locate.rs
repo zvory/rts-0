@@ -218,7 +218,7 @@ pub(super) fn locate(
 ) {
     let tick = observation.tick;
     let state = &memory.third_pressure;
-    if state.tanks.is_empty() || memory.home_outgunned {
+    if state.tanks.is_empty() {
         begin_return(observation, memory, intents, "depot not found");
         return;
     }

@@ -558,6 +558,7 @@ pub(super) fn commit(
     state
         .notes
         .push(format!("party sent to {:?}", rounded(goal)));
+    state.sent_tanks = tanks.len();
     state.tanks = tanks;
     state.riflemen = state.scouts.iter().chain(&more).copied().collect();
     state.route = flank_route(observation, map_analysis, home, goal)

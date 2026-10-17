@@ -324,32 +324,58 @@ fn party_at(observation: &mut AiObservation, memory: &AiDecisionMemory, at: (f32
 }
 
 #[test]
-fn the_party_turns_home_against_as_many_enemy_tanks() {
-    // Still beside home it disbands, back in the hands of home defense.
+fn on_its_way_the_party_lets_a_stronger_force_pass_or_fights_it_and_turns_back_only_after_a_loss() {
+    // Two enemy Tanks near home, 11 tiles from the party's Tanks: it holds while they pass.
     let mut memory = launched(&game(10_000));
     assert_eq!(memory.third_pressure.phase, Phase::March);
     let mut observation = game(10_090);
     observation.visible_enemies.extend([
+        unit(600, 2, EntityKind::Tank, (27.0, 13.0)),
+        unit(601, 2, EntityKind::Tank, (27.0, 15.0)),
+    ]);
+    let commands = step(JEFFS_AI_ID, &observation, &mut memory);
+    assert_eq!(memory.third_pressure.phase, Phase::March);
+    assert!(commands
+        .iter()
+        .any(|command| matches!(command, Command::HoldPosition { .. })));
+    // Closing in, they are fought, not run from.
+    let mut close = game(10_099);
+    close.visible_enemies.extend([
         unit(600, 2, EntityKind::Tank, (20.0, 13.0)),
         unit(601, 2, EntityKind::Tank, (20.0, 15.0)),
     ]);
-    step(JEFFS_AI_ID, &observation, &mut memory);
-    assert_eq!(memory.third_pressure.phase, Phase::Idle);
-    assert!(memory.squad_reserved().is_empty());
-    // Far out it walks home, and hands each member back on arrival.
+    let commands = step(JEFFS_AI_ID, &close, &mut memory);
+    assert_eq!(memory.third_pressure.phase, Phase::March);
+    assert!(commands
+        .iter()
+        .any(|command| matches!(command, Command::AttackMove { .. })));
+    // With a Tank lost, a force like that turns it home, far out, and each member is handed back
+    // on arrival.
     let mut memory = launched(&game(10_000));
+    let lost = memory.third_pressure.tanks[0];
     let mut observation = game(11_000);
     party_at(&mut observation, &memory, (70.0, 40.0));
+    observation.owned.retain(|unit| unit.id != lost);
     observation.visible_enemies.extend([
         unit(600, 2, EntityKind::Tank, (76.0, 40.0)),
         unit(601, 2, EntityKind::Tank, (76.0, 42.0)),
     ]);
     step(JEFFS_AI_ID, &observation, &mut memory);
     assert_eq!(memory.third_pressure.phase, Phase::Return);
-    let observation = game(11_090);
+    let mut observation = game(11_090);
+    observation.owned.retain(|unit| unit.id != lost);
     step(JEFFS_AI_ID, &observation, &mut memory);
     assert_eq!(memory.third_pressure.phase, Phase::Idle);
     assert!(memory.squad_reserved().is_empty());
+}
+
+#[test]
+fn the_party_is_not_recalled_when_home_is_outgunned() {
+    let mut memory = launched(&game(10_000));
+    memory.home_outgunned = true;
+    step(JEFFS_AI_ID, &game(10_090), &mut memory);
+    assert_eq!(memory.third_pressure.phase, Phase::March);
+    assert_eq!(memory.third_pressure.tanks.len(), 2);
 }
 
 #[test]

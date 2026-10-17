@@ -14,8 +14,11 @@
 //! Depot is seen, two Tanks from the army (never the home reserve) and three more Riflemen follow;
 //! they park outside the zone around its exact position and shell it from the 14 tiles a parked
 //! Tank reaches, one Rifleman at a time walking up to spot for them, then stay to shoot whatever
-//! comes to rebuild it. The party comes home when it meets a fight it loses, when its last Tank
-//! falls, or when enemy Tanks outgun the home Tanks. No Scout Car goes, so none is trained for it:
+//! comes to rebuild it. The party is committed: on its way it lets a stronger force pass, or fights
+//! it once it closes in, and turns back only after losing a Tank (on Crossroads 6 of 8 parties that
+//! turned back from AI 2.1's next wave at the base exit came home with their Tanks moving, off their
+//! posts, as the wave arrived). At the base a fight it loses ends the siege, as does its last Tank
+//! falling. It is not recalled to defend home: two Tanks are a small share of the army. No Scout Car goes, so none is trained for it:
 //! its Factory time cost Tanks at the time they mattered most.
 
 use super::geometry::{clamp_to_map, dist2, normalized_direction, tile_center};
@@ -148,6 +151,8 @@ struct EnemyBase {
 pub(in crate::ai_core::decision) struct ThirdPressure {
     phase: Phase,
     tanks: Vec<u32>,
+    /// How many Tanks the party left with.
+    sent_tanks: usize,
     riflemen: Vec<u32>,
     /// The Riflemen who went first, the lead first; among `riflemen`.
     scouts: Vec<u32>,
@@ -599,10 +604,7 @@ fn march(
 ) {
     let tick = observation.tick;
     let state = &memory.third_pressure;
-    if state.tanks.is_empty()
-        || memory.home_outgunned
-        || tick.saturating_sub(state.phase_since) > MARCH_TIMEOUT_TICKS
-    {
+    if state.tanks.is_empty() || tick.saturating_sub(state.phase_since) > MARCH_TIMEOUT_TICKS {
         begin_return(observation, memory, intents, "march over");
         return;
     }
@@ -647,9 +649,11 @@ fn march(
 }
 
 /// Weighs enemy fighters near the party. One it loses, or one against at least as many Tanks,
-/// sends it home, unless the siege is `finishing` the Depot with no enemy Tank close. On the march
-/// it takes a fight it wins, attack-moving at the enemy; at the siege its parked Tanks and holding
-/// spotters fight from their posts. Returns whether the party carries on with its plan.
+/// sends it home, unless the siege is `finishing` the Depot with no enemy Tank close, or the party
+/// is on its way with every Tank it left with (it is committed: such a force is let pass, or fought
+/// once it closes in). On the march it fights what closes in, attack-moving at the enemy; at the
+/// siege its parked Tanks and holding spotters fight from their posts. Returns whether the party
+/// carries on with its plan.
 fn answer_threat(
     actions: &mut AiActionContext<'_>,
     observation: &AiObservation,
@@ -690,9 +694,11 @@ fn answer_threat(
         .filter(|enemy| enemy.kind == EntityKind::Tank)
         .count();
     let estimate = estimate_trade(&ours, &theirs, 0);
-    if estimate.clearly_losing()
-        || (their_tanks > 0 && their_tanks >= memory.third_pressure.tanks.len())
-    {
+    let state = &memory.third_pressure;
+    let committed = state.phase == Phase::March && state.tanks.len() >= state.sent_tanks;
+    let outmatched =
+        estimate.clearly_losing() || (their_tanks > 0 && their_tanks >= state.tanks.len());
+    if outmatched && !committed {
         let tanks_close = near.iter().any(|enemy| {
             enemy.kind == EntityKind::Tank
                 && members.iter().any(|unit| {
@@ -782,7 +788,7 @@ fn siege(
     let tick = observation.tick;
     let ts = tile(observation);
     let state = &memory.third_pressure;
-    if state.tanks.is_empty() || memory.home_outgunned {
+    if state.tanks.is_empty() {
         begin_return(observation, memory, intents, "siege over");
         return;
     }

@@ -45,10 +45,7 @@ pub(super) fn merge(
     let tick = observation.tick;
     let ts = tile(observation);
     let state = &memory.third_pressure;
-    if state.tanks.is_empty()
-        || memory.home_outgunned
-        || tick.saturating_sub(state.phase_since) > MERGE_WAIT_TICKS
-    {
+    if state.tanks.is_empty() || tick.saturating_sub(state.phase_since) > MERGE_WAIT_TICKS {
         begin_return(observation, memory, intents, "no push met");
         return;
     }
