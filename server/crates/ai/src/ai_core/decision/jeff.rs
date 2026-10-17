@@ -11,6 +11,7 @@ pub(super) fn uses_home_rifle_coverage(profile_id: &str) -> bool {
             | JEFFS_AI_PRE_TANK_MICRO_ID
             | JEFFS_AI_PRE_GUARD_HANDOFF_ID
             | JEFFS_AI_PRE_THIRD_PRESSURE_ID
+            | JEFFS_AI_PRE_SAFE_BASES_ID
     )
 }
 
@@ -24,6 +25,7 @@ pub(super) fn uses_current_jeff_defense(profile_id: &str) -> bool {
             | JEFFS_AI_PRE_TANK_MICRO_ID
             | JEFFS_AI_PRE_GUARD_HANDOFF_ID
             | JEFFS_AI_PRE_THIRD_PRESSURE_ID
+            | JEFFS_AI_PRE_SAFE_BASES_ID
     )
 }
 

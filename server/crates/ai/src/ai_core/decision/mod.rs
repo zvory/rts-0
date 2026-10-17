@@ -15,8 +15,8 @@ use crate::ai_core::profiles::{
     BarracksCurve, ExpansionContainmentPolicy, ExpansionPolicy, ProductionPolicy, ResourcePolicy,
     TechTransitionPolicy, WorkerPolicy, JEFFS_AI_BETA_ID, JEFFS_AI_ID,
     JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID, JEFFS_AI_PRE_GUARD_HANDOFF_ID, JEFFS_AI_PRE_OPENING_RUSH_ID,
-    JEFFS_AI_PRE_RIFLE_COVERAGE_ID, JEFFS_AI_PRE_TANK_CATCHUP_ID, JEFFS_AI_PRE_TANK_MICRO_ID,
-    JEFFS_AI_PRE_THIRD_PRESSURE_ID,
+    JEFFS_AI_PRE_RIFLE_COVERAGE_ID, JEFFS_AI_PRE_SAFE_BASES_ID, JEFFS_AI_PRE_TANK_CATCHUP_ID,
+    JEFFS_AI_PRE_TANK_MICRO_ID, JEFFS_AI_PRE_THIRD_PRESSURE_ID,
 };
 use crate::ai_shared;
 use crate::config;

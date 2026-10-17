@@ -27,10 +27,14 @@ pub(crate) const JEFFS_AI_PRE_TANK_MICRO_ID: &str = "jeffs_ai_pre_tank_micro";
 /// shared fixes). Since the third-pressure freeze replaced it in `runs_live_jeff` it no longer
 /// runs the live-Jeff behaviors, like the older freezes. Comparison-only.
 pub(crate) const JEFFS_AI_PRE_GUARD_HANDOFF_ID: &str = "jeffs_ai_pre_guard_handoff";
-/// Frozen immediately before the pressure on the enemy's third base: the live Jeff at 9855cfe91,
-/// guard handoff included. It runs every live-Jeff behavior (`runs_live_jeff`); only the third
-/// pressure branches on the live id. Comparison-only.
+/// Frozen immediately before the pressure on the enemy's third base (9855cfe91, guard handoff
+/// included). Since the safe-bases freeze replaced it in `runs_live_jeff` it no longer runs the
+/// live-Jeff behaviors, like the older freezes. Comparison-only.
 pub(crate) const JEFFS_AI_PRE_THIRD_PRESSURE_ID: &str = "jeffs_ai_pre_third_pressure";
+/// Frozen immediately before the safe-base work (sheltered building sites on every map): the live
+/// Jeff at dc00887b1, the third-base pressure included. It runs every live-Jeff behavior
+/// (`runs_live_jeff`); only the new work branches on the live id. Comparison-only.
+pub(crate) const JEFFS_AI_PRE_SAFE_BASES_ID: &str = "jeffs_ai_pre_safe_bases";
 
 const OPENING_UNITS: [EntityKind; 1] = [EntityKind::MachineGunner];
 const ARMORED_UNITS: [EntityKind; 2] = [EntityKind::Tank, EntityKind::ScoutCar];
@@ -230,6 +234,12 @@ pub(crate) static JEFFS_AI_PRE_GUARD_HANDOFF: AiProfile = AiProfile {
 /// The live Jeff from before the third-base pressure under its own id.
 pub(crate) static JEFFS_AI_PRE_THIRD_PRESSURE: AiProfile = AiProfile {
     id: JEFFS_AI_PRE_THIRD_PRESSURE_ID,
+    ..JEFFS_AI_RUSH
+};
+
+/// The live Jeff from before the safe-base work under its own id.
+pub(crate) static JEFFS_AI_PRE_SAFE_BASES: AiProfile = AiProfile {
+    id: JEFFS_AI_PRE_SAFE_BASES_ID,
     ..JEFFS_AI_RUSH
 };
 

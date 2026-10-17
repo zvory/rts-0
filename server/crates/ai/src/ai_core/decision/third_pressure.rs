@@ -1,4 +1,4 @@
-//! The live Jeff's pressure on the enemy's third base (`JEFFS_AI_ID` only).
+//! The live Jeff's pressure on the enemy's third base (`runs_live_jeff` profiles only).
 //!
 //! AI 2.1 orders a third base around 3:15 on almost every map and leaves it alone: on Doppelganger
 //! no AI fighter came within 30 tiles of it from 6:00 to 8:00 in any game. Its bases answer only
@@ -319,7 +319,7 @@ pub(super) fn plan_live(
     memory: &mut AiDecisionMemory,
     (actions, observation, map_analysis, intents): LiveStep<'_, '_, '_, '_>,
 ) {
-    if profile_id != JEFFS_AI_ID {
+    if !runs_live_jeff(profile_id) {
         return;
     }
     note_enemy_depots(observation, &mut memory.third_pressure);
