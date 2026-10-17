@@ -485,7 +485,7 @@ where
             profile,
             *kind,
             build_search,
-            map_analysis,
+            (map_analysis, &memory.tank_micro),
             &mut placeable,
         ) {
             if *kind == EntityKind::Factory {
@@ -541,7 +541,7 @@ where
             profile,
             EntityKind::Barracks,
             build_search,
-            map_analysis,
+            (map_analysis, &memory.tank_micro),
             &mut placeable,
         )
         .is_some()
@@ -567,7 +567,7 @@ where
             profile,
             EntityKind::Factory,
             build_search,
-            map_analysis,
+            (map_analysis, &memory.tank_micro),
             &mut placeable,
         ) {
             if let Some(enemy_base) = facts.nearest_public_enemy_base {
@@ -612,7 +612,7 @@ where
             profile,
             planned_in_intents(&intents, EntityKind::Steelworks),
         )
-        && try_build_kind(
+        && try_build_production(
             observation,
             &facts,
             &mut actions,
@@ -620,6 +620,7 @@ where
             profile,
             EntityKind::Steelworks,
             build_search,
+            (map_analysis, &memory.tank_micro),
             &mut placeable,
         )
         .is_some()
@@ -653,7 +654,7 @@ where
             + planned_in_intents(&intents, EntityKind::Steelworks)
             == 0
         && !save_for_unplanned_expansion
-        && try_build_kind(
+        && try_build_production(
             observation,
             &facts,
             &mut actions,
@@ -661,6 +662,7 @@ where
             profile,
             EntityKind::Steelworks,
             build_search,
+            (map_analysis, &memory.tank_micro),
             &mut placeable,
         )
         .is_some()
@@ -688,7 +690,7 @@ where
             profile,
             EntityKind::Factory,
             build_search,
-            map_analysis,
+            (map_analysis, &memory.tank_micro),
             &mut placeable,
         )
         .is_some()

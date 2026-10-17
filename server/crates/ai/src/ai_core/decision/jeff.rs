@@ -109,9 +109,8 @@ pub(super) fn crossroads_sheltered_kind(kind: EntityKind) -> bool {
 /// On Crossroads raids walk straight into the first building on their way to the HQ. Every
 /// Factory placed ahead of the HQ on the enemy's walk in (7-8 tiles nearer the enemy than the HQ)
 /// was destroyed, usually more than once, while each main has room behind the HQ, walled off by
-/// water, that the enemy can only reach by walking past it. This is how many tiles farther the
-/// nearest enemy walks to a building at this site than to Jeff's HQ: negative ahead of the HQ,
-/// positive behind it. `None` for other buildings, other maps and without map analysis.
+/// water, that the enemy can only reach by walking past it. This is the site's `site_depth`;
+/// `None` for other buildings, other maps and without map analysis.
 pub(super) fn crossroads_site_depth(
     observation: &AiObservation,
     analysis: Option<&AiMapAnalysis>,
@@ -124,7 +123,18 @@ pub(super) fn crossroads_site_depth(
     {
         return None;
     }
-    let analysis = analysis?;
+    site_depth(observation, analysis?, kind, tile_x, tile_y)
+}
+
+/// How many tiles farther the nearest enemy walks to a `kind` building at this site than to Jeff's
+/// HQ: negative ahead of the HQ, positive behind it.
+pub(super) fn site_depth(
+    observation: &AiObservation,
+    analysis: &AiMapAnalysis,
+    kind: EntityKind,
+    tile_x: u32,
+    tile_y: u32,
+) -> Option<f32> {
     let tile_size = observation.map.tile_size.max(1);
     let center = geometry::building_center((tile_x, tile_y), kind, tile_size)?;
     let center_tile = (

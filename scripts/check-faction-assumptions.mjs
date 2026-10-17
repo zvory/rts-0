@@ -233,6 +233,9 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/ai/src/ai_core/decision/third_pressure/scout.rs",
   "server/crates/ai/src/ai_core/decision/third_pressure/targets.rs",
   "server/crates/ai/src/ai_core/decision/third_pressure/timing.rs",
+  // Jeff's production placement names the current roster's production buildings and Tanks;
+  // profile/catalog layers still own faction admission.
+  "server/crates/ai/src/ai_core/decision/production/placement.rs",
   // Unit priority and cap adjustments moved verbatim out of the approved decision orchestrator.
   "server/crates/ai/src/ai_core/decision/unit_mix.rs",
   // Jeff's Kriegsia-only expansion screen and upgrade policy are focused modules beneath the

@@ -1,5 +1,8 @@
 use super::geometry::{clamp_to_map, normalized_direction};
+use super::tank_micro::TankMicro;
 use super::*;
+
+pub(super) mod placement;
 
 pub(super) const PRODUCTION_BUILDINGS: [EntityKind; 4] = [
     EntityKind::Factory,
@@ -453,12 +456,13 @@ pub(super) const CROSSROADS_SHELTERED_DEPTH_TILES: f32 = 6.0;
 /// How far from the HQ Jeff looks for a sheltered Crossroads site. The sheltered ground starts
 /// 11 tiles from the north HQ, and the east start's usual 6-8 tile Factory band lies almost
 /// entirely on the way-in side.
-const CROSSROADS_SHELTER_SEARCH_MAX_RADIUS: i32 = 18;
+pub(super) const CROSSROADS_SHELTER_SEARCH_MAX_RADIUS: i32 = 18;
 
 /// Builds `kind` like `try_build_kind`, except that on Crossroads the current Jeff places its
 /// Barracks, Training Centre, Engineering Complex and Factory at the nearest sheltered site behind
 /// its HQ, else the nearest site no nearer the enemy on foot than the HQ, and only when neither
-/// exists at the usual site.
+/// exists at the usual site. The live Jeff places its production on every map with
+/// `placement::try_build_live`.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn try_build_production<F>(
     observation: &AiObservation,
@@ -468,12 +472,25 @@ pub(super) fn try_build_production<F>(
     profile: &AiProfile,
     kind: EntityKind,
     build_search: ai_shared::BuildSearch,
-    map_analysis: Option<&AiMapAnalysis>,
+    (map_analysis, micro): (Option<&AiMapAnalysis>, &TankMicro),
     placeable: &mut F,
 ) -> Option<actions::BuildAction>
 where
     F: FnMut(EntityKind, u32, u32) -> bool,
 {
+    if profile.id == JEFFS_AI_ID {
+        return placement::try_build_live(
+            observation,
+            facts,
+            actions,
+            builder_pools,
+            profile,
+            kind,
+            build_search,
+            (map_analysis, micro),
+            placeable,
+        );
+    }
     if uses_current_jeffs_ai_policy(profile.id)
         && jeff::crossroads_sheltered_kind(kind)
         && defense::crossroads_wall_aware_approach_direction(observation).is_some()

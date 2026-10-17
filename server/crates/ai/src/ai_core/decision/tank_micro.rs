@@ -198,6 +198,8 @@ pub(crate) struct TankMicro {
     natural_clear_sent: BTreeMap<u32, (i32, i32)>,
     /// Where unseen fire proved the enemy sees, until when.
     assumed_vision: Vec<((i32, i32), u32)>,
+    /// Jeff's production buildings, and the sites enemy Tanks destroyed them on.
+    pub(super) shelled: super::production::placement::Shelled,
 }
 
 /// A parked enemy Tank's (or an estimated unseen shooter's) reach.
@@ -401,6 +403,7 @@ pub(super) fn observe(observation: &AiObservation, micro: &mut TankMicro) {
         .overrides
         .retain(|id, held| alive.contains(id) && held.until > tick);
     micro.assumed_vision.retain(|(_, until)| *until > tick);
+    super::production::placement::observe(observation, &micro.enemy_tanks, &mut micro.shelled);
 }
 
 /// Enemy Tanks this close to one of our buildings are attacking the base, not holding a line.
