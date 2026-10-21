@@ -3,7 +3,8 @@ use crate::ai_core::actions::{AiActionContext, SpendBudget};
 use crate::ai_core::facts::AiFacts;
 use crate::ai_core::observation::{AiEconomy, AiMapSummary, AiPlayerSummary};
 use crate::ai_core::profiles::{
-    JEFFS_AI, JEFFS_AI_PRE_HELD_SITE_ID, JEFFS_AI_PRE_SAFE_BASES_ID, JEFFS_AI_PRE_THIRD_PRESSURE_ID,
+    JEFFS_AI, JEFFS_AI_PRE_EARLY_NATURAL_ID, JEFFS_AI_PRE_HELD_SITE_ID, JEFFS_AI_PRE_SAFE_BASES_ID,
+    JEFFS_AI_PRE_THIRD_PRESSURE_ID,
 };
 use rts_sim::game::command::SimCommand as Command;
 use targets::{enemy_bases, off_route_tiles, OPEN_OFF_ROUTE_TILES};
@@ -241,13 +242,17 @@ fn the_party_never_takes_the_home_reserve() {
     step(JEFFS_AI_ID, &observation, &mut memory);
     assert_eq!(memory.third_pressure.phase, Phase::Idle);
     // The freezes taken before the newest never press; the newest presses like the live Jeff.
-    for freeze in [JEFFS_AI_PRE_THIRD_PRESSURE_ID, JEFFS_AI_PRE_SAFE_BASES_ID] {
+    for freeze in [
+        JEFFS_AI_PRE_THIRD_PRESSURE_ID,
+        JEFFS_AI_PRE_SAFE_BASES_ID,
+        JEFFS_AI_PRE_HELD_SITE_ID,
+    ] {
         let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
         step(freeze, &game(10_000), &mut memory);
         assert_eq!(memory.third_pressure.phase, Phase::Idle);
     }
     let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
-    step(JEFFS_AI_PRE_HELD_SITE_ID, &game(10_000), &mut memory);
+    step(JEFFS_AI_PRE_EARLY_NATURAL_ID, &game(10_000), &mut memory);
     assert_eq!(memory.third_pressure.phase, Phase::Scout);
 }
 

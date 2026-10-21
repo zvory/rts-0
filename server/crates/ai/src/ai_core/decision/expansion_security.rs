@@ -769,7 +769,7 @@ pub(super) fn update_and_stage(
         enemy.hp > 0
             && (enemy.kind.is_unit() || enemy.kind.is_building())
             && dist2(enemy.x, enemy.y, center.0, center.1) < squared(CONTEST_TILES * ts)
-    }) && (profile_id != JEFFS_AI_ID || site_held(observation, center));
+    }) && (!runs_live_jeff(profile_id) || site_held(observation, center));
     if contested {
         let intruders: Vec<(f32, f32)> = observation
             .visible_enemies

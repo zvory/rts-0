@@ -13,6 +13,7 @@ pub(super) fn uses_home_rifle_coverage(profile_id: &str) -> bool {
             | JEFFS_AI_PRE_THIRD_PRESSURE_ID
             | JEFFS_AI_PRE_SAFE_BASES_ID
             | JEFFS_AI_PRE_HELD_SITE_ID
+            | JEFFS_AI_PRE_EARLY_NATURAL_ID
     )
 }
 
@@ -28,6 +29,7 @@ pub(super) fn uses_current_jeff_defense(profile_id: &str) -> bool {
             | JEFFS_AI_PRE_THIRD_PRESSURE_ID
             | JEFFS_AI_PRE_SAFE_BASES_ID
             | JEFFS_AI_PRE_HELD_SITE_ID
+            | JEFFS_AI_PRE_EARLY_NATURAL_ID
     )
 }
 
