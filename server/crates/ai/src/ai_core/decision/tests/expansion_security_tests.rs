@@ -1,5 +1,7 @@
 use super::*;
-use crate::ai_core::profiles::{JEFFS_AI, JEFFS_AI_PRE_GUARD_HANDOFF, JEFFS_AI_PRE_TANK_MICRO};
+use crate::ai_core::profiles::{
+    JEFFS_AI, JEFFS_AI_PRE_GUARD_HANDOFF, JEFFS_AI_PRE_HELD_SITE_ID, JEFFS_AI_PRE_TANK_MICRO,
+};
 
 fn security_observation() -> AiObservation {
     let ts = config::TILE_SIZE as f32;
@@ -1076,15 +1078,16 @@ fn secured_natural() -> (AiObservation, AiDecisionMemory, (u32, u32)) {
 #[test]
 fn the_natural_is_only_ordered_with_its_full_cost_banked_and_a_quiet_route() {
     let (mut obs, memory, site) = secured_natural();
-    let ready =
-        |obs: &AiObservation| expansion_security::natural_attempt_ready(obs, None, &memory, true);
+    let ready = |obs: &AiObservation| {
+        expansion_security::natural_attempt_ready(obs, None, &memory, true, true)
+    };
     obs.economy.steel = 450;
     obs.economy.oil = 99;
     assert!(!ready(&obs), "one Oil short");
     obs.economy.oil = 100;
     assert!(ready(&obs));
     assert!(
-        !expansion_security::natural_attempt_ready(&obs, None, &memory, false),
+        !expansion_security::natural_attempt_ready(&obs, None, &memory, false, true),
         "unsecured"
     );
 
@@ -1131,11 +1134,11 @@ fn a_dropped_natural_order_waits_out_the_cooldown_before_the_next_try() {
         "kept after one drop"
     );
     assert!(!expansion_security::natural_attempt_ready(
-        &obs, None, &memory, true
+        &obs, None, &memory, true, true
     ));
     obs.tick += config::TICK_HZ * 20;
     assert!(expansion_security::natural_attempt_ready(
-        &obs, None, &memory, true
+        &obs, None, &memory, true, true
     ));
 }
 
@@ -1205,10 +1208,19 @@ fn natural_held_by(
 
 #[test]
 fn enemy_infantry_on_the_natural_is_cleared_by_the_two_nearest_tanks() {
+    // The Tanks stand at home, too far to count toward the site's defence, so the Rifleman holds it.
     let (obs, mut memory) = natural_held_by(
         EntityKind::Rifleman,
-        &[(60, 20.0, 20.0), (61, 18.0, 18.0), (62, 9.0, 9.0)],
+        &[(60, 5.0, 5.0), (61, 4.0, 4.0), (62, 2.0, 2.0)],
     );
+    let mut obs = obs;
+    for unit in obs
+        .owned
+        .iter_mut()
+        .filter(|unit| unit.kind == EntityKind::Rifleman)
+    {
+        unit.x = 4.0 * config::TILE_SIZE as f32;
+    }
     let decision = decide(&obs, &JEFFS_AI, &mut memory);
     assert_eq!(memory.expansion_security.contested_tick, Some(obs.tick));
     assert_eq!(memory.expansion_security.clearers, vec![60, 61]);
@@ -1233,9 +1245,84 @@ fn enemy_infantry_on_the_natural_is_cleared_by_the_two_nearest_tanks() {
 
 #[test]
 fn enemy_armor_on_the_natural_is_left_to_the_tank_fight() {
-    let (obs, mut memory) = natural_held_by(EntityKind::Tank, &[(60, 20.0, 20.0)]);
+    let (obs, mut memory) = natural_held_by(EntityKind::Tank, &[(60, 5.0, 5.0)]);
     decide(&obs, &JEFFS_AI, &mut memory);
+    assert_eq!(memory.expansion_security.contested_tick, Some(obs.tick));
     assert!(memory.expansion_security.clearers.is_empty());
+}
+
+fn stage(obs: &AiObservation, memory: &mut AiDecisionMemory, profile_id: &str) -> bool {
+    let facts = AiFacts::from_observation(obs);
+    let mut actions = AiActionContext::new(&facts, SpendBudget::new(1000, 1000, 20, 80));
+    expansion_security::update_and_stage(obs, None, memory, &mut actions, profile_id)
+}
+
+#[test]
+fn a_passing_enemy_the_live_jeffs_guards_and_tanks_beat_does_not_hold_the_natural() {
+    let ts = config::TILE_SIZE as f32;
+    let (mut obs, mut memory) = natural_held_by(EntityKind::Rifleman, &[]);
+    let points = expansion_security::positions(&obs, None, &memory.expansion_security);
+    for (id, point) in memory
+        .expansion_security
+        .riflemen
+        .clone()
+        .iter()
+        .zip(&points)
+    {
+        let unit = obs.owned.iter_mut().find(|unit| unit.id == *id).unwrap();
+        unit.x = point.0;
+        unit.y = point.1;
+    }
+    let site = memory.expansion_security.site.unwrap();
+    let center = building_center(site, EntityKind::ResourceDepot, obs.map.tile_size).unwrap();
+    obs.owned.push(combat_at(
+        60,
+        EntityKind::Tank,
+        center.0 - 4.0 * ts,
+        center.1 - 4.0 * ts,
+    ));
+    let mut freeze = memory.clone();
+    assert!(!stage(&obs, &mut memory, JEFFS_AI_ID));
+    assert!(!stage(&obs, &mut freeze, JEFFS_AI_PRE_HELD_SITE_ID));
+    obs.tick += config::TICK_HZ * 3;
+    assert!(
+        stage(&obs, &mut memory, JEFFS_AI_ID),
+        "two guards and a Tank beat one Rifleman: the site still secures"
+    );
+    assert_ne!(memory.expansion_security.contested_tick, Some(obs.tick));
+    assert!(
+        !stage(&obs, &mut freeze, JEFFS_AI_PRE_HELD_SITE_ID),
+        "the freeze counts any enemy on the site as holding it"
+    );
+    assert_eq!(freeze.expansion_security.contested_tick, Some(obs.tick));
+
+    // Two enemy Tanks are more than the guards and one Tank beat: they hold it.
+    for id in [901, 902] {
+        let mut tank = combat_at(id, EntityKind::Tank, center.0 + 3.0 * ts, center.1);
+        tank.owner = 2;
+        obs.visible_enemies.push(tank);
+    }
+    obs.tick += 9;
+    assert!(!stage(&obs, &mut memory, JEFFS_AI_ID));
+    assert_eq!(memory.expansion_security.contested_tick, Some(obs.tick));
+}
+
+#[test]
+fn the_live_jeff_sends_the_builder_past_enemies_on_a_site_it_holds() {
+    let ts = config::TILE_SIZE as f32;
+    let (mut obs, memory, site) = secured_natural();
+    obs.economy.steel = 450;
+    obs.economy.oil = 100;
+    let center = building_center(site, EntityKind::ResourceDepot, obs.map.tile_size).unwrap();
+    let mut raider = combat_at(900, EntityKind::Rifleman, center.0 + 3.0 * ts, center.1);
+    raider.owner = 2;
+    obs.visible_enemies.push(raider);
+    assert!(!expansion_security::natural_attempt_ready(
+        &obs, None, &memory, true, true
+    ));
+    assert!(expansion_security::natural_attempt_ready(
+        &obs, None, &memory, true, false
+    ));
 }
 
 /// A guard out at its far post keeps it when another Rifleman passes nearer the site: the live

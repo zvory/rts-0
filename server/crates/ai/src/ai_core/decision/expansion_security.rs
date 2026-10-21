@@ -38,6 +38,8 @@ const CONTEST_ARMOR_TILES: f32 = 16.0;
 /// their damage to armour and a Tank's coaxial gun outranges a Rifleman, so a dug-in opening rush
 /// that held a natural for 5,000 ticks against Riflemen sent two at a time cannot hold it.
 const NATURAL_CLEAR_TANKS: usize = 2;
+/// The live Jeff's fighters this close to the natural site are its defence when enemies come.
+const SITE_DEFENSE_TILES: f32 = 16.0;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(super) struct ExpansionSecurity {
@@ -102,13 +104,15 @@ pub(super) fn expansion_is_next(
 
 /// Whether Jeff may send the builder to the secured natural now: the site is secured, no order
 /// for it is out, the retry cooldown has passed, the Depot's full cost is banked, and nothing
-/// hostile is near the builder, the site or the base's way in. Without this the order goes out,
-/// the builder walks through a raid or the Oil is spent on a Tank on the way, and it is dropped.
+/// hostile is near the builder, the base's way in or, with `watch_site`, the site. Without this
+/// the order goes out, the builder walks through a raid or the Oil is spent on a Tank on the way,
+/// and it is dropped. The live Jeff leaves the site itself to `site_held`.
 pub(super) fn natural_attempt_ready(
     observation: &AiObservation,
     analysis: Option<&AiMapAnalysis>,
     memory: &AiDecisionMemory,
     secured: bool,
+    watch_site: bool,
 ) -> bool {
     let security = &memory.expansion_security;
     let Some(site) = security.site else {
@@ -120,7 +124,7 @@ pub(super) fn natural_attempt_ready(
         && observation.tick >= security.next_attempt_tick
         && observation.economy.steel >= steel
         && observation.economy.oil >= oil
-        && natural_route_quiet(observation, analysis, site)
+        && natural_route_quiet(observation, analysis, site, watch_site)
 }
 
 /// Whether a natural Depot order is out and not yet placed. Its cost must stay banked until the
@@ -139,6 +143,7 @@ fn natural_route_quiet(
     observation: &AiObservation,
     analysis: Option<&AiMapAnalysis>,
     site: (u32, u32),
+    watch_site: bool,
 ) -> bool {
     if defense::local_defense_contact(observation).is_some() {
         return false;
@@ -150,11 +155,13 @@ fn natural_route_quiet(
         .filter(|unit| unit.kind == EntityKind::Worker && unit.hp > 0)
         .map(|unit| (unit.x, unit.y))
         .collect();
-    watch.extend(building_center(
-        site,
-        EntityKind::ResourceDepot,
-        observation.map.tile_size,
-    ));
+    if watch_site {
+        watch.extend(building_center(
+            site,
+            EntityKind::ResourceDepot,
+            observation.map.tile_size,
+        ));
+    }
     watch.extend(analysis.and_then(|analysis| analysis.base_route_entry(observation.player_id)));
     let radius2 = squared(NATURAL_ROUTE_QUIET_TILES * ts);
     !observation
@@ -762,7 +769,7 @@ pub(super) fn update_and_stage(
         enemy.hp > 0
             && (enemy.kind.is_unit() || enemy.kind.is_building())
             && dist2(enemy.x, enemy.y, center.0, center.1) < squared(CONTEST_TILES * ts)
-    });
+    }) && (profile_id != JEFFS_AI_ID || site_held(observation, center));
     if contested {
         let intruders: Vec<(f32, f32)> = observation
             .visible_enemies
@@ -882,6 +889,67 @@ pub(super) fn update_and_stage(
         security.secure_since = None;
         false
     }
+}
+
+/// Whether the enemy holds the live Jeff's natural site: an enemy building stands on it, or Jeff's
+/// fighters near it would not clearly beat the enemy fighters on it, killing them all and losing
+/// less than they kill (enemy Riflemen counted with Meth, enemies standing still once Entrenchment is
+/// possible counted dug in). Enemies that Jeff's guards and Tanks there can beat do not hold it:
+/// on Doppelganger AI 2.1's units crossed the natural every 30-60 s, and counting each pass as an
+/// occupation kept the site from ever being secured.
+fn site_held(observation: &AiObservation, center: (f32, f32)) -> bool {
+    let ts = observation.map.tile_size as f32;
+    let near = |x: f32, y: f32, tiles: f32| dist2(x, y, center.0, center.1) < squared(tiles * ts);
+    if observation.visible_enemies.iter().any(|enemy| {
+        enemy.hp > 0 && enemy.kind.is_building() && near(enemy.x, enemy.y, CONTEST_TILES)
+    }) {
+        return true;
+    }
+    let entrenchment = observation.tick >= opening_rush::EARLIEST_ENTRENCHMENT_TICK;
+    let meth = observation
+        .upgrades
+        .contains(&UpgradeKind::Methamphetamines);
+    // The volley estimate has no ranges, and a parked Tank outranges infantry by nine tiles: enemy
+    // Tanks are weighed against Jeff's Tanks and anti-tank infantry alone.
+    let side = |armor: bool| -> (Vec<opening_rush::Fighter>, Vec<opening_rush::Fighter>) {
+        let theirs = observation
+            .visible_enemies
+            .iter()
+            .filter(|enemy| enemy.hp > 0 && enemy.kind != EntityKind::Worker)
+            .filter(|enemy| (enemy.kind == EntityKind::Tank) == armor)
+            .filter(|enemy| near(enemy.x, enemy.y, CONTEST_TILES))
+            .filter_map(|enemy| {
+                opening_rush::fighter(
+                    enemy,
+                    true,
+                    entrenchment && enemy.state != AiEntityState::Move,
+                )
+            })
+            .collect();
+        let ours = observation
+            .owned
+            .iter()
+            .filter(|unit| unit.hp > 0 && unit.is_complete && unit.kind != EntityKind::Worker)
+            .filter(|unit| {
+                !armor
+                    || matches!(
+                        unit.kind,
+                        EntityKind::Tank | EntityKind::Panzerfaust | EntityKind::AntiTankGun
+                    )
+            })
+            .filter(|unit| near(unit.x, unit.y, SITE_DEFENSE_TILES))
+            .filter_map(|unit| opening_rush::fighter(unit, meth, false))
+            .collect();
+        (ours, theirs)
+    };
+    [true, false].into_iter().any(|armor| {
+        let (ours, theirs) = side(armor);
+        if theirs.is_empty() {
+            return false;
+        }
+        let estimate = opening_rush::estimate_trade(&ours, &theirs, 0);
+        estimate.units_killed < theirs.len() || estimate.value_lost >= estimate.value_killed
+    })
 }
 
 /// The live Jeff's natural, not yet built, held by enemy infantry: up to `NATURAL_CLEAR_TANKS` of

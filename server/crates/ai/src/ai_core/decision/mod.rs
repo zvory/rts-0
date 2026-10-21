@@ -364,6 +364,7 @@ where
             map_analysis,
             memory,
             expansion_secured,
+            profile.id != JEFFS_AI_ID,
         );
     let natural_pending =
         jeff_natural && expansion_security::natural_order_pending(observation, memory);
