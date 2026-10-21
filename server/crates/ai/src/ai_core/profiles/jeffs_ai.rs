@@ -31,10 +31,14 @@ pub(crate) const JEFFS_AI_PRE_GUARD_HANDOFF_ID: &str = "jeffs_ai_pre_guard_hando
 /// included). Since the safe-bases freeze replaced it in `runs_live_jeff` it no longer runs the
 /// live-Jeff behaviors, like the older freezes. Comparison-only.
 pub(crate) const JEFFS_AI_PRE_THIRD_PRESSURE_ID: &str = "jeffs_ai_pre_third_pressure";
-/// Frozen immediately before the safe-base work (sheltered building sites on every map): the live
-/// Jeff at dc00887b1, the third-base pressure included. It runs every live-Jeff behavior
-/// (`runs_live_jeff`); only the new work branches on the live id. Comparison-only.
+/// Frozen immediately before the safe-base work (dc00887b1, the third-base pressure included).
+/// Since the held-site freeze replaced it in `runs_live_jeff` it no longer runs the live-Jeff
+/// behaviors, like the older freezes. Comparison-only.
 pub(crate) const JEFFS_AI_PRE_SAFE_BASES_ID: &str = "jeffs_ai_pre_safe_bases";
+/// Frozen immediately before the held-site rule for the natural (enemies on the site only stop it
+/// when they outmatch Jeff's force there): the live Jeff at e3bc21b85, sheltered production sites included. It runs every live-Jeff behavior
+/// (`runs_live_jeff`); only the new work branches on the live id. Comparison-only.
+pub(crate) const JEFFS_AI_PRE_HELD_SITE_ID: &str = "jeffs_ai_pre_held_site";
 
 const OPENING_UNITS: [EntityKind; 1] = [EntityKind::MachineGunner];
 const ARMORED_UNITS: [EntityKind; 2] = [EntityKind::Tank, EntityKind::ScoutCar];
@@ -240,6 +244,12 @@ pub(crate) static JEFFS_AI_PRE_THIRD_PRESSURE: AiProfile = AiProfile {
 /// The live Jeff from before the safe-base work under its own id.
 pub(crate) static JEFFS_AI_PRE_SAFE_BASES: AiProfile = AiProfile {
     id: JEFFS_AI_PRE_SAFE_BASES_ID,
+    ..JEFFS_AI_RUSH
+};
+
+/// The live Jeff from before the natural's held-site rule, under its own id.
+pub(crate) static JEFFS_AI_PRE_HELD_SITE: AiProfile = AiProfile {
+    id: JEFFS_AI_PRE_HELD_SITE_ID,
     ..JEFFS_AI_RUSH
 };
 

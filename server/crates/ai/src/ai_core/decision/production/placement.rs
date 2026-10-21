@@ -1,4 +1,4 @@
-//! Where the live Jeff (`JEFFS_AI_ID` only) puts its production buildings on every map: behind its
+//! Where the live Jeff (`runs_live_jeff`) puts its production buildings on every map: behind its
 //! HQ on the enemy's walk in, and never in reach of enemy Tanks.
 //!
 //! In the Wald des Todes and Doppelganger losses every production building Jeff lost before its

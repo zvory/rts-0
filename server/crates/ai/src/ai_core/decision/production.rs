@@ -241,6 +241,7 @@ fn uses_jeff_opposite_spawn_layout(observation: &AiObservation, profile: &AiProf
             | JEFFS_AI_PRE_GUARD_HANDOFF_ID
             | JEFFS_AI_PRE_THIRD_PRESSURE_ID
             | JEFFS_AI_PRE_SAFE_BASES_ID
+            | JEFFS_AI_PRE_HELD_SITE_ID
     ) && is_upper_left_diagonal_start(observation.map, observation.own_start_tile)
 }
 
@@ -478,7 +479,7 @@ pub(super) fn try_build_production<F>(
 where
     F: FnMut(EntityKind, u32, u32) -> bool,
 {
-    if profile.id == JEFFS_AI_ID {
+    if runs_live_jeff(profile.id) {
         return placement::try_build_live(
             observation,
             facts,
