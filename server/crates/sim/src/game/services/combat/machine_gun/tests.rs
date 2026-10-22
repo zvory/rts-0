@@ -361,3 +361,5 @@ fn shooting_traps_does_not_disclose_a_concealed_shooter() {
         "visible ground must not expose a concealed shooter"
     );
 }
+
+mod fog_feedback;

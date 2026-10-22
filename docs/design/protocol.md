@@ -828,7 +828,7 @@ constant-gain background combat bed; positional combat events and entities remai
 Full-world diagnostic projections are the explicit exception: they may project those per-entity
 planning and setup details through each entity's real owner so lab/dev inspection overlays are
 complete for every player.
-Anti-Tank Guns that fire from fog create actionable temporary live fog for the recipients that see
+Hostile units that fire from fog create actionable temporary live fog for the recipients that see
 the attack event, except when the resolved shot victim is a Tank Trap. The revealed gun is
 projected as a normal non-`visionOnly` snapshot entity and
 can validate direct attack commands or combat target acquisition until the firing reveal expires.
@@ -836,8 +836,10 @@ Its reveal-only actionable tile is deliberately omitted from `visibleTiles` and 
 `exploredTiles`; clients infer the explicit above-fog `shotReveal` presentation when a projected
 enemy unit occupies a presentation-dark tile. This keeps the unit fully legible without clearing
 the terrain tile beneath it.
-The expiration is calculated from the firing tick plus that gun's firing-cycle cooldown plus
-0.5 seconds (`TICK_HZ / 2`), not from a hardcoded wall-clock duration. The half-second counterfire
+The expiration is 6.5 seconds after the latest shot. Machine-gun rays hitting an owned or allied
+entity deliver normal attack events (shooter reveal, tracer, and weapon audio) even when the
+trajectory crosses unseen terrain. Misses and unrelated rays still require full trajectory
+visibility; the hit reveals no terrain tiles. The half-second counterfire
 reaction applies only while a firing-reveal-stamped tile is the target's necessary source of
 actionable sight;
 ordinary live vision takes precedence and bypasses that reaction gate without changing weapon
@@ -1900,10 +1902,10 @@ emits up to three ray events per viewer. The server resolves damage immediately 
 the client animates short moving streaks along these fixed rays. Ordinary attacks
 omit the field. Version 56 remains decodable.
 
-Prototype ray projection requires current team visibility in every tile intersected by the ray
-and omits impacts on victims hidden by fog, concealment, or smoke, including bodies whose edges
-cross into visible space. Rays crossing hidden space are also omitted
-rather than exposing hidden impact positions.
+Ray hits on owned or allied entities deliver shooter reveal and combat feedback even when the
+trajectory crosses fog. Other ray projection requires current team visibility in every tile
+intersected by the ray and omits impacts on victims hidden by fog, concealment, or smoke,
+including bodies whose edges cross into visible space. Neither path reveals terrain tiles.
 Bursts that only hit traps or miss do not grant a shooter reveal; their rays are withheld
 from enemies when the shooter is concealed. Smoke-hidden shooters are also withheld.
 This can hide some firing feedback at fog edges; it never changes authoritative damage.

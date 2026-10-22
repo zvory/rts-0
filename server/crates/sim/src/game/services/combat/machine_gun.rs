@@ -279,9 +279,13 @@ pub(super) fn fire(
             continue;
         }
         for &(victim, end) in &rays {
-            // Do not expose an incidental hidden victim or its impact position. Require the
-            // entire ray to be currently visible, preventing trajectories across hidden gaps.
-            if !ray_visible(map, fog, teams, *viewer, start, end) {
+            // A hit on the viewer's team discloses the shooter, not the intervening terrain.
+            // Other rays still require full visibility so misses and incidental hidden victims
+            // cannot disclose impact positions beyond the recipient's sight.
+            let hits_viewer_team = entities.get(victim).is_some_and(|target| {
+                target.owner != 0 && teams.same_team_or_same_owner(*viewer, target.owner)
+            });
+            if !hits_viewer_team && !ray_visible(map, fog, teams, *viewer, start, end) {
                 continue;
             }
             // A visible impact can still belong to a hidden body whose edge crosses into
