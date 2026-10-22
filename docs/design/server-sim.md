@@ -1876,7 +1876,9 @@ sources to live fog for players on the victim's team, not for third-party observ
 the combat event. These sources reveal only the firing unit's current tile, are actionable for
 command validation and combat targeting, and expire at
 `fired_at_tick + 13 * TICK_HZ / 2`, a fixed 6.5 seconds (195 ticks) regardless of the weapon's firing cycle.
-Each later shot extends the expiry to 6.5 seconds after that shot. The fog rebuild records each source's stamped tile, whether targeting needs
+Each later shot extends the expiry to 6.5 seconds after that shot. Machine-gun hit rays are sent to
+the victim team even across fog, carrying the shooter reveal and normal combat feedback without
+revealing terrain; other rays still require full trajectory visibility. The fog rebuild records each source's stamped tile, whether targeting needs
 the reveal, and whether the terrain lacked ordinary sight before any firing reveals were stamped,
 keeping provenance attached to the authoritative fog result rather than inferred later. This tile-level record
 also covers colocated entities and does not follow a source that moves to a different tile during
