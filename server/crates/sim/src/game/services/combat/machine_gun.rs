@@ -9,8 +9,8 @@ use crate::game::firing_reveal::{record_firing_reveals_for_victim_team, FiringRe
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::geometry::{
-    building_rect_for_entity, segment_intersects_rect, segment_intersects_unit_body,
-    unit_body_for_entity, RectBody,
+    building_rect_for_entity, closest_combat_target_point, segment_intersects_rect,
+    segment_intersects_unit_body, unit_body_for_entity, RectBody,
 };
 use crate::game::services::line_of_sight::LineOfSight;
 use crate::game::services::spatial::SpatialIndex;
@@ -150,7 +150,9 @@ pub(super) fn fire(
     let Some(target) = entities.get(intended) else {
         return;
     };
-    let angle = (target.pos_y - start.1).atan2(target.pos_x - start.0);
+    // Match acquisition distance: a building surface can be in range while its center is not.
+    let aim = closest_combat_target_point(map, start, target);
+    let angle = (aim.1 - start.1).atan2(aim.0 - start.0);
     if !range.is_finite() || range <= 0.0 {
         return;
     }
@@ -223,7 +225,8 @@ pub(super) fn fire(
             start,
         );
         let damage = entrenchment_combat::reduce_direct_damage(victim, damage);
-        let damage = map.damage_after_reduction_tile(pos.0, pos.1, damage);
+        // A real hit must survive integer protection rounding, even for a lone half-damage ray.
+        let damage = map.damage_after_reduction_tile(pos.0, pos.1, damage).max(1);
         let damaged = entities.get_mut(id).is_some_and(|v| {
             if teams.is_enemy_owner(owner, victim_owner) {
                 v.apply_damage_from_entity(damage, owner, attacker, start, tick)
