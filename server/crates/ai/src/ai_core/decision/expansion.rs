@@ -268,6 +268,25 @@ where
             return placeable(kind, tile.0, tile.1).then_some(tile);
         }
     }
+    if profile_id == JEFFS_AI_ID {
+        if let Some(analysis) = analysis {
+            return defensible_expansion_depot_site_adjusted(
+                observation,
+                Some(analysis),
+                expansion,
+                kind,
+                &resources,
+                placeable,
+                |tile| {
+                    if far_site_on_enemy_route(observation, analysis, kind, tile) {
+                        -ON_ROUTE_PENALTY
+                    } else {
+                        0
+                    }
+                },
+            );
+        }
+    }
     if uses_current_jeffs_ai_policy(profile_id) {
         return defensible_expansion_depot_site(
             observation,
@@ -308,6 +327,58 @@ where
 /// Each tile a site is farther to walk from the main costs this many tiles of head start: a site
 /// far behind the main is out of the enemy's way but stretches the defenders across two bases.
 const EXPANSION_WALK_COST: f32 = 0.5;
+/// A site is on the enemy's way in when walking to it and on to Jeff's HQ is at most this much
+/// longer than walking straight to the HQ.
+const ROUTE_SLACK_TILES: f32 = 12.0;
+/// Sites farther than this walk from the main are out of reach of the main's defence.
+const FAR_SITE_TILES: f32 = 30.0;
+/// The live Jeff ranks a far site on the enemy's way in below every site off it.
+const ON_ROUTE_PENALTY: i32 = 1_000;
+
+/// Whether the enemy walks past a `kind` building at `tile` on its way to Jeff's HQ; `None`
+/// without walking distances.
+pub(super) fn site_on_enemy_route(
+    observation: &AiObservation,
+    analysis: &AiMapAnalysis,
+    kind: EntityKind,
+    tile: (u32, u32),
+) -> Option<bool> {
+    let center = building_center(tile, kind, observation.map.tile_size)?;
+    let ts = observation.map.tile_size.max(1) as f32;
+    let center_tile = ((center.0 / ts) as u32, (center.1 / ts) as u32);
+    let own = analysis.ground_distance_from_start(observation.player_id, center_tile)?;
+    observation
+        .players
+        .iter()
+        .filter(|player| player.is_alive && observation.is_enemy_player(player.id))
+        .filter_map(|player| {
+            let to_site = analysis.ground_distance_from_start(player.id, center_tile)?;
+            let to_hq =
+                analysis.ground_distance_from_start(player.id, observation.own_start_tile)?;
+            Some(to_site + own <= to_hq + ROUTE_SLACK_TILES)
+        })
+        .reduce(|left, right| left || right)
+}
+
+/// A site beyond `FAR_SITE_TILES` of walking from the main that the enemy walks past on its way
+/// in. On Doppelganger the nearest site, 45 tiles out on the diagonal, had AI 2.1's units on it 63-72%
+/// of the time from 2:40 to 7:00 and was destroyed every time it went down; the two edge sites,
+/// 64-67 tiles out, saw none.
+fn far_site_on_enemy_route(
+    observation: &AiObservation,
+    analysis: &AiMapAnalysis,
+    kind: EntityKind,
+    tile: (u32, u32),
+) -> bool {
+    let far = building_center(tile, kind, observation.map.tile_size).is_some_and(|center| {
+        let ts = observation.map.tile_size.max(1) as f32;
+        let center_tile = ((center.0 / ts) as u32, (center.1 / ts) as u32);
+        analysis
+            .ground_distance_from_start(observation.player_id, center_tile)
+            .is_some_and(|own| own > FAR_SITE_TILES)
+    });
+    far && site_on_enemy_route(observation, analysis, kind, tile) == Some(true)
+}
 
 /// Jeff's expansions: the site the defenders reach furthest ahead of the enemy. Straight-line
 /// distance from the main favours sites out toward the enemy's side, which are raided in passing

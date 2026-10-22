@@ -358,13 +358,27 @@ where
     // a pause for the rest of the match, rather than waiting on the economy manager, whose Tank
     // requirements kept a failed natural from ever being ordered again.
     let jeff_natural = uses_current_jeffs_ai_policy(profile.id);
+    // The live Jeff sends the builder to a natural off the enemy's way in without waiting for its
+    // guards to secure it: they follow it out, and when the natural is due (about 1:40) there are
+    // no spare Riflemen to send first.
+    let natural_sheltered = profile.id == JEFFS_AI_ID
+        && map_analysis
+            .zip(memory.expansion_security.site)
+            .is_some_and(|(analysis, site)| {
+                expansion::site_on_enemy_route(
+                    observation,
+                    analysis,
+                    EntityKind::ResourceDepot,
+                    site,
+                ) == Some(false)
+            });
     let natural_ready = jeff_natural
         && expansion_security::expansion_is_next(observation, &facts, profile)
         && expansion_security::natural_attempt_ready(
             observation,
             map_analysis,
             memory,
-            expansion_secured,
+            expansion_secured || natural_sheltered,
             !runs_live_jeff(profile.id),
         );
     let natural_pending =

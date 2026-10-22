@@ -1,6 +1,7 @@
 use super::*;
 use crate::ai_core::profiles::{
-    JEFFS_AI, JEFFS_AI_PRE_GUARD_HANDOFF, JEFFS_AI_PRE_HELD_SITE_ID, JEFFS_AI_PRE_TANK_MICRO,
+    JEFFS_AI, JEFFS_AI_PRE_EARLY_NATURAL, JEFFS_AI_PRE_GUARD_HANDOFF, JEFFS_AI_PRE_HELD_SITE_ID,
+    JEFFS_AI_PRE_TANK_MICRO,
 };
 
 fn security_observation() -> AiObservation {
@@ -529,7 +530,52 @@ fn expansion_security_does_not_start_before_first_tank_commitment() {
     assert!(!expansion_security::expansion_is_next(
         &obs,
         &AiFacts::from_observation(&obs),
-        &JEFFS_AI
+        &JEFFS_AI_PRE_EARLY_NATURAL
+    ));
+}
+
+#[test]
+fn the_live_jeffs_natural_is_due_once_its_engineering_complex_and_opening_guns_are_out() {
+    let ts = config::TILE_SIZE as f32;
+    let mut obs = security_observation();
+    let due = |obs: &AiObservation| {
+        expansion_security::expansion_is_next(obs, &AiFacts::from_observation(obs), &JEFFS_AI)
+    };
+    // A Factory already out keeps it due, Tank or not.
+    obs.owned
+        .iter_mut()
+        .find(|unit| unit.kind == EntityKind::Factory)
+        .unwrap()
+        .production_kind = None;
+    assert!(due(&obs));
+    // Before the Factory: the Engineering Complex stands, but only two of the four guns are out.
+    obs.owned.retain(|unit| unit.kind != EntityKind::Factory);
+    assert!(!due(&obs));
+    // The other two guns queued at the Barracks: due.
+    let barracks = obs
+        .owned
+        .iter_mut()
+        .find(|unit| unit.kind == EntityKind::Barracks)
+        .unwrap();
+    barracks.production_kind = Some(EntityKind::MachineGunner);
+    barracks.production_queue_len = Some(2);
+    assert!(due(&obs));
+    // Without the Engineering Complex it is not.
+    obs.owned
+        .retain(|unit| unit.kind != EntityKind::EngineeringComplex);
+    assert!(!due(&obs));
+    // The freeze still waits for the Factory and first Tank.
+    obs.owned.push(building_at(
+        5,
+        EntityKind::EngineeringComplex,
+        Some(0),
+        4.0 * ts,
+        4.0 * ts,
+    ));
+    assert!(!expansion_security::expansion_is_next(
+        &obs,
+        &AiFacts::from_observation(&obs),
+        &JEFFS_AI_PRE_EARLY_NATURAL
     ));
 }
 

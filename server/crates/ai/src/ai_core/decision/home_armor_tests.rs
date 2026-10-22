@@ -416,3 +416,32 @@ fn the_live_jeffs_home_post_keeps_out_of_forest() {
     );
     assert!(dist2(post.0, post.1, line.0, line.1) <= squared(6.0 * TS));
 }
+
+#[test]
+fn a_site_is_on_the_enemys_way_in_when_it_walks_past_it_to_the_hq() {
+    use crate::ai_core::observation::AiPlayerSummary;
+    let mut observation = home_observation();
+    observation.players = [(1, (8, 8)), (2, (56, 56))]
+        .into_iter()
+        .map(|(id, start_tile)| AiPlayerSummary {
+            id,
+            team_id: id,
+            start_tile,
+            is_ai: true,
+            is_alive: true,
+        })
+        .collect();
+    let analysis = analysis_with_forest(&[]);
+    let on_route = |tile: (u32, u32)| {
+        super::super::expansion::site_on_enemy_route(
+            &observation,
+            &analysis,
+            EntityKind::ResourceDepot,
+            tile,
+        )
+    };
+    // On the diagonal between the two starts.
+    assert_eq!(on_route((29, 29)), Some(true));
+    // Down the near map edge, out of the enemy's way.
+    assert_eq!(on_route((6, 40)), Some(false));
+}

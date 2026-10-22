@@ -81,25 +81,58 @@ impl ExpansionSecurity {
 
 /// The first Tank is paid before the natural; subsequent gas is reserved for the Depot.
 /// This deliberately does not require Depot affordability, a build intent, or a finished Tank.
+/// The live Jeff's natural comes before the Factory instead (`early_natural_due`).
 pub(super) fn expansion_is_next(
     observation: &AiObservation,
     facts: &AiFacts,
     profile: &AiProfile,
 ) -> bool {
-    uses_current_jeffs_ai_policy(profile.id)
-        && observation
+    if !uses_current_jeffs_ai_policy(profile.id)
+        || observation
             .owned
             .iter()
             .filter(|entity| entity.kind == EntityKind::ResourceDepot && entity.hp > 0)
             .count()
-            < 2
-        && facts.complete_building_count(EntityKind::Factory) > 0
+            >= 2
+    {
+        return false;
+    }
+    if profile.id == JEFFS_AI_ID {
+        return early_natural_due(observation, facts, profile);
+    }
+    facts.complete_building_count(EntityKind::Factory) > 0
         && (facts.unit_count(EntityKind::Tank) > 0
             || observation.owned.iter().any(|unit| {
                 unit.kind == EntityKind::Factory
                     && unit.production_kind == Some(EntityKind::Tank)
                     && unit.production_queue_len.unwrap_or(0) > 0
             }))
+}
+
+/// The live Jeff's natural is due once its Engineering Complex is placed and its opening guns are
+/// ordered, before the Factory, the way AI 2.1 orders its natural before its tech. It could pay for
+/// the Depot at about 1:43 but waited for the Factory and first Tank (2:42); a natural much past
+/// 3:00 loses the economy race (on Doppelganger AI 2.1 held three bases from 3:36 against one).
+/// The reserve then holds the Factory back until the Depot is ordered. A Factory or Tank already out
+/// keeps the natural due.
+fn early_natural_due(observation: &AiObservation, facts: &AiFacts, profile: &AiProfile) -> bool {
+    if facts.building_count(EntityKind::Factory) > 0 || facts.unit_count(EntityKind::Tank) > 0 {
+        return true;
+    }
+    let guns = profile
+        .defensive_machine_gunners
+        .map_or(0, |policy| policy.target_count);
+    let queued: usize = observation
+        .owned
+        .iter()
+        .filter(|unit| {
+            unit.kind == EntityKind::Barracks
+                && unit.production_kind == Some(EntityKind::MachineGunner)
+        })
+        .map(|unit| unit.production_queue_len.unwrap_or(0))
+        .sum();
+    facts.building_count(EntityKind::EngineeringComplex) > 0
+        && facts.unit_count(EntityKind::MachineGunner) + queued >= guns
 }
 
 /// Whether Jeff may send the builder to the secured natural now: the site is secured, no order
