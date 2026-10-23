@@ -197,6 +197,17 @@ function isInteractPath(pathname) {
   );
 }
 
+function isMediaTestPath(pathname) {
+  return isInteractPath(pathname) ||
+    pathname.startsWith("scripts/minimap-webm/") ||
+    pathname === "scripts/record-minimap.mjs" ||
+    pathname === "scripts/patch-note-outbox.mjs" ||
+    pathname === "tests/patch_note_outbox.mjs" ||
+    pathname === "tests/run-all.sh" ||
+    pathname === "tests/select-suites.mjs" ||
+    pathname === ".github/workflows/main-tests.yml";
+}
+
 export function ciPolicy(files) {
   const normalized = files.map(normalizeChangedPath).filter(Boolean);
   let ciClass = "full";
@@ -214,11 +225,12 @@ export function ciPolicy(files) {
     run_rust: ciClass === "full",
     run_live_node: ciClass !== "docs_only",
     run_browser: ciClass !== "docs_only",
+    run_media: ciClass !== "docs_only" && (normalized.length === 0 || normalized.some(isMediaTestPath)),
   };
 }
 
 function printCiPolicy(policy) {
-  for (const key of ["ci_class", "docs_only", "run_server_build", "run_rust", "run_live_node", "run_browser"]) {
+  for (const key of ["ci_class", "docs_only", "run_server_build", "run_rust", "run_live_node", "run_browser", "run_media"]) {
     console.log(`${key}=${policy[key]}`);
   }
 }
@@ -617,7 +629,18 @@ function verify() {
   }
 
   const policyCases = [
-    [[], { ci_class: "full", run_rust: true }],
+    [[], { ci_class: "full", run_rust: true, run_media: true }],
+    [["client/src/renderer/unit_ranges.js"], { run_media: false, run_browser: true, run_live_node: true }],
+    [["server/crates/sim/src/game/services/combat.rs"], { run_media: false, run_browser: true }],
+    [["scripts/interact/recording.ts"], { run_media: true }],
+    [["tests/fixtures/interact_fake_driver.mjs"], { run_media: true }],
+    [["scripts/minimap-webm/encode.mjs"], { run_media: true }],
+    [["scripts/patch-note-outbox.mjs"], { run_media: true }],
+    [["package-lock.json"], { run_media: true }],
+    [["tests/run-all.sh"], { run_media: true }],
+    [[".github/workflows/main-tests.yml"], { run_media: true }],
+    [["docs/interact-cli.md"], { run_media: false }],
+    [["client/src/match.js", "scripts/interact/driver.ts"], { run_media: true }],
     [["docs/design/architecture.md"], { ci_class: "docs_only", run_rust: false, run_server_build: false }],
     [["README.md", "--not-markdown.rs"], { ci_class: "full", run_rust: true }],
     [["client/src/match.js"], { ci_class: "client_only", run_rust: false, run_server_build: true }],

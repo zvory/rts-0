@@ -496,6 +496,16 @@ set. WASM-backed tri-state groups also stay opt-in unless `RTS_RUN_WASM_TRI_STAT
 the generated prediction WASM glue is absent, the server serves a JavaScript fallback module that
 disables prediction without a 404; generated WASM files take precedence, and other missing assets
 still return 404. Client smoke reports failing response URLs with browser console resource errors.
+Real media encoding and Interact browser recording smoke are gated separately by the selector's
+`run_media` output. Ordinary client/gameplay changes keep client smoke, tri-state coverage, and
+lightweight Interact control/cleanup contracts, but skip FFmpeg installation, recording/fixed-capture
+contracts, patch-note media integration, minimap encoding integration, and Interact CLI smoke.
+Changes to Interact source/bridges/tests, minimap recording tools, patch-note outbox, Node dependency
+manifests, or the CI selector/runner/workflow enable media coverage. Unknown changed-file ranges
+conservatively enable it; documentation-only changes still skip expensive work. Each CI job installs
+FFmpeg only when media coverage is selected. `RTS_RUN_MEDIA_TESTS=0` applies this split to local
+`tests/run-all.sh` runs; local runs default to complete media coverage.
+
 Changed-file detection classifies PRs and `main` pushes as `docs_only`, `client_only`, or `full`
 from the PR base/head range or the push before/after range. `docs_only` keeps the same check
 contexts green but exits before expensive suites. `client_only` is limited to conservative

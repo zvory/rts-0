@@ -36,6 +36,7 @@
 #   RTS_RUN_TRI_STATE_BROWSER=1 tests/run-all.sh  # env-form local opt-in for tri-state browser scenarios
 #   RTS_RUN_WASM_TRI_STATE=0 tests/run-all.sh     # skip WASM-backed tri-state groups even when assets exist
 #   RTS_NEXTEST_PARTITION=slice:1/2 tests/run-all.sh --only-nextest  # run one nextest shard
+#   RTS_RUN_MEDIA_TESTS=0 tests/run-all.sh  # skip real media/tool integration suites
 #   CHROME=/path/to/chrome tests/run-all.sh
 set -uo pipefail
 
@@ -66,6 +67,12 @@ RUN_LIVE_NODE=1
 RUN_CLIENT=1
 RUN_FULL_AI=0
 RUN_TRI_STATE_BROWSER=0
+RUN_MEDIA_TESTS="${RTS_RUN_MEDIA_TESTS:-1}"
+export RTS_RUN_MEDIA_TESTS="$RUN_MEDIA_TESTS"
+case "$RUN_MEDIA_TESTS" in
+  0|1) ;;
+  *) echo "RTS_RUN_MEDIA_TESTS must be 0 or 1" >&2; exit 2 ;;
+esac
 RUN_WASM_TRI_STATE="${RTS_RUN_WASM_TRI_STATE:-1}"
 NODE_DEPS_READY=0
 BROWSER_SCENARIOS="smoke,phase-0.5,phase-2.5,phase-5,phase-3.5,phase-4.5,phase-6"
@@ -610,12 +617,16 @@ if [ "$RUN_STATIC_JS" = "1" ]; then
     node "$SCRIPT_DIR/interact_bulk_contracts.mjs"
   run_suite_bg "Interact adapter contracts" \
     node "$SCRIPT_DIR/interact_adapter_contracts.mjs"
-  run_suite_bg "Interact recording contracts" \
-    node "$SCRIPT_DIR/interact_recording_contracts.mjs"
-  run_suite_bg "Interact fixed-capture contracts" \
-    node "$SCRIPT_DIR/interact_fixed_capture_contracts.mjs"
-  run_suite_bg "Agent workflow: patch-note outbox" \
-    node "$SCRIPT_DIR/patch_note_outbox.mjs"
+  if [ "$RUN_MEDIA_TESTS" = "1" ]; then
+    run_suite_bg "Interact recording contracts" \
+      node "$SCRIPT_DIR/interact_recording_contracts.mjs"
+    run_suite_bg "Interact fixed-capture contracts" \
+      node "$SCRIPT_DIR/interact_fixed_capture_contracts.mjs"
+    run_suite_bg "Agent workflow: patch-note outbox" \
+      node "$SCRIPT_DIR/patch_note_outbox.mjs"
+  else
+    SKIPPED+=("Interact recording contracts" "Interact fixed-capture contracts" "Agent workflow: patch-note outbox")
+  fi
   run_suite_bg "Interact session coordinator contracts" \
     node "$SCRIPT_DIR/interact_session_coordinator_contracts.mjs"
   run_suite_bg "JS HUD command card" \
@@ -709,8 +720,12 @@ if [ "${SERVER_HEALTHY:-0}" = "1" ]; then
       fi
       if browser_scenario_selected smoke; then
         CHROME="$CHROME" run_suite "Client smoke (headless Chrome)" node "$SCRIPT_DIR/client_smoke.mjs"
-        CHROME="$CHROME" RTS_INTERACT_LAB_BASE_URL="$RTS_URL" \
-          run_suite "Interact CLI smoke (headless Chrome)" node "$SCRIPT_DIR/interact_cli_smoke.mjs"
+        if [ "$RUN_MEDIA_TESTS" = "1" ]; then
+          CHROME="$CHROME" RTS_INTERACT_LAB_BASE_URL="$RTS_URL" \
+            run_suite "Interact CLI smoke (headless Chrome)" node "$SCRIPT_DIR/interact_cli_smoke.mjs"
+        else
+          SKIPPED+=("Interact CLI smoke (media tests not selected)")
+        fi
       else
         SKIPPED+=("Client smoke (not selected for this browser shard)")
         SKIPPED+=("Interact CLI smoke (not selected for this browser shard)")
