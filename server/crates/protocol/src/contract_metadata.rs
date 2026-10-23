@@ -427,6 +427,7 @@ const EVENT_CODES: &[(&str, u8)] = &[
     ("artilleryTarget", 7),
     ("artilleryImpact", 8),
     ("mortarLaunch", 9),
+    ("mortarWarning", 16),
     ("artilleryFiring", 11),
     ("panzerfaustLaunch", 12),
     ("panzerfaustImpact", 13),
@@ -743,6 +744,7 @@ fn event_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("NOTICE", "notice"),
         ("SMOKE_LAUNCH", "smokeLaunch"),
         ("MORTAR_LAUNCH", "mortarLaunch"),
+        ("MORTAR_WARNING", "mortarWarning"),
         ("MORTAR_IMPACT", "mortarImpact"),
         ("ARTILLERY_TARGET", "artilleryTarget"),
         ("ARTILLERY_INCOMING", "artilleryIncoming"),
@@ -1057,6 +1059,16 @@ fn event_slot_schemas() -> BTreeMap<&'static str, Vec<SlotField>> {
                 field(1, "from"),
                 field(2, "to"),
                 field(3, "delayTicks"),
+            ],
+        ),
+        (
+            "mortarWarning",
+            vec![
+                code_field(0, "kind", "event"),
+                field(1, "x"),
+                field(2, "y"),
+                field(3, "radiusTiles"),
+                field(4, "delayTicks"),
             ],
         ),
         (

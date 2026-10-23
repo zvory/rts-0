@@ -91,6 +91,12 @@ export class VisualEffectBuffers {
         this.addSmokeCanister(ev, now);
       } else if (ev && ev.e === EVENT.MORTAR_LAUNCH) {
         this.addMortarLaunch(ev, now, entityById);
+      } else if (ev && ev.e === EVENT.MORTAR_WARNING) {
+        this.mortarTargets.push({
+          x: ev.x, y: ev.y, radiusTiles: ev.radiusTiles,
+          durationMs: Math.max(1, (ev.delayTicks / 30) * 1000),
+          createdAt: now,
+        });
       } else if (ev && ev.e === EVENT.MORTAR_IMPACT) {
         this.addMortarImpact(ev, now);
       } else if (ev && ev.e === EVENT.ARTILLERY_TARGET) {
