@@ -31,6 +31,10 @@ test('CLI preserves an existing output and does not contact the server', () => {
 });
 
 test('encoding preserves a replay shorter than one output frame', t => {
+  if (process.env.RTS_RUN_MEDIA_TESTS === '0') {
+    t.skip('media tests not selected');
+    return;
+  }
   const encoders = spawnSync('ffmpeg', ['-hide_banner', '-encoders'], { encoding: 'utf8' });
   if (!encoders.stdout?.includes('libvpx-vp9') || spawnSync('ffprobe', ['-version']).status !== 0) {
     t.skip('requires ffmpeg with libvpx-vp9 and ffprobe');

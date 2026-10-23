@@ -664,7 +664,9 @@ async fn shutdown_finalization_acks_rooms_and_clears_active_match_count() {
     assert!(!summary.timed_out);
 }
 
-#[tokio::test]
+// Keep the 1 ms test countdown from expiring between queued readiness events
+// when the host is descheduled. Tokio advances only after runnable setup drains.
+#[tokio::test(start_paused = true)]
 async fn deploy_drain_records_aborted_replay_backed_match_before_connection_shutdown() {
     let writer = Arc::new(RecordingMatchHistoryWriter::default());
     let lobby = Lobby::new().with_match_history_writer_for_test(Some(writer.clone()), false);

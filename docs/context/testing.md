@@ -53,6 +53,7 @@ Use for tests, CI/hooks, or focused verification.
 - Local `tests/run-all.sh` uses per-worktree Cargo target dirs under `/tmp/rts-cargo-target/`.
   Override with `CARGO_TARGET_DIR` only when a task needs a specific target location.
 - Skip only when `tests/select-suites.mjs` maps changed files away from the suite.
+- Media CI selection: design §12; local opt-out is `RTS_RUN_MEDIA_TESTS=0`.
 
 ## Self-play failure protocol
 If a self-play test fails and the cause is not obvious, start a fresh server on its own port and

@@ -24,6 +24,7 @@ jobs:
       run_rust: ${{ steps.changed-files.outputs.run_rust }}
       run_live_node: ${{ steps.changed-files.outputs.run_live_node }}
       run_browser: ${{ steps.changed-files.outputs.run_browser }}
+      run_media: ${{ steps.changed-files.outputs.run_media }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -309,13 +310,10 @@ jobs:
           name: rts-server-debug
           path: .ci-server
 
-      - name: Install Interact media tools
-        if: needs.changed-files.outputs.run_live_node == 'true'
-        run: sudo apt-get update && sudo apt-get install --yes ffmpeg
-
       - name: Run live Node suites
         if: needs.changed-files.outputs.run_live_node == 'true'
         env:
+          RTS_RUN_MEDIA_TESTS: "0"
           CI_CLASS: ${{ needs.changed-files.outputs.ci_class }}
         run: |
           if [ "$CI_CLASS" = "client_only" ]; then
@@ -371,12 +369,13 @@ jobs:
           path: client/vendor/sim-wasm
 
       - name: Install Interact media tools
-        if: needs.changed-files.outputs.run_browser == 'true' && matrix.label == 'smoke + phase 0.5'
-        run: sudo apt-get update && sudo apt-get install --yes ffmpeg
+        if: needs.changed-files.outputs.run_media == 'true' && matrix.label == 'smoke + phase 0.5'
+        run: bash scripts/install-ci-media.sh
 
       - name: Run browser shard
         if: needs.changed-files.outputs.run_browser == 'true'
         env:
+          RTS_RUN_MEDIA_TESTS: ${{ needs.changed-files.outputs.run_media == 'true' && '1' || '0' }}
           BROWSER_SCENARIOS: ${{ matrix.scenarios }}
           CHROME: /usr/bin/google-chrome-stable
           RTS_RUN_WASM_TRI_STATE: "0"
