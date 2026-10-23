@@ -1061,7 +1061,16 @@ fn event_slot_schemas() -> BTreeMap<&'static str, Vec<SlotField>> {
                 field(3, "delayTicks"),
             ],
         ),
-        ("mortarWarning", vec![code_field(0, "kind", "event"), field(1, "x"), field(2, "y"), field(3, "radiusTiles"), field(4, "delayTicks")]),
+        (
+            "mortarWarning",
+            vec![
+                code_field(0, "kind", "event"),
+                field(1, "x"),
+                field(2, "y"),
+                field(3, "radiusTiles"),
+                field(4, "delayTicks"),
+            ],
+        ),
         (
             "mortarLaunch",
             vec![
