@@ -263,10 +263,22 @@ mod tests {
                     snapshot.tick,
                     expected.id
                 );
+                // Preserve the historical movement trace. The MG minimum-damage fix
+                // adds these five formerly zero-damage bursts against armored Tanks.
+                let extra_mg_damage = match expected.id {
+                    LEAD_TANK => u32::from(snapshot.tick >= 13_538),
+                    REAR_TANK => [13_575, 13_586, 13_597, 13_609]
+                        .into_iter()
+                        .filter(|tick| snapshot.tick >= *tick)
+                        .count() as u32,
+                    _ => 0,
+                };
                 assert_eq!(
-                    actual.hp, expected.hp,
-                    "tick {} entity {} hp",
-                    snapshot.tick, expected.id
+                    actual.hp,
+                    expected.hp - extra_mg_damage,
+                    "tick {} entity {} hp with minimum MG damage",
+                    snapshot.tick,
+                    expected.id
                 );
                 assert_eq!(
                     actual.state, expected.state,
