@@ -28,6 +28,7 @@ const ENEMY_AT_THREAT_HATCH_ANGLE = Math.PI / 4;
 const ENEMY_AT_THREAT_ARC_STEP_PX = 42;
 const ENEMY_AT_THREAT_OUTLINE_WIDTH = 1.95;
 const SPECTATOR_AT_THREAT_STROKE_SCALE = 2;
+const LIVE_ENEMY_AT_THREAT_STROKE_SCALE = 1.5;
 const SPECTATOR_AT_THREAT_DARK_ALPHA = 0.14;
 const SPECTATOR_AT_THREAT_HATCH_ALPHA = 0.42;
 const SPECTATOR_AT_THREAT_HATCH_WIDTH = 1;
@@ -138,7 +139,9 @@ function drawEnemyAntiTankGunThreats(g, state, tileSize) {
       : spectator ? SPECTATOR_AT_THREAT_OUTLINE_ALPHA : 0.68;
     // Luminance and stroke weight distinguish live threats from stale intel even
     // without red/green hue perception. The dark keyline remains legible on snow.
-    const strokeScale = spectator ? SPECTATOR_AT_THREAT_STROKE_SCALE : 1;
+    const strokeScale = spectator
+      ? SPECTATOR_AT_THREAT_STROKE_SCALE
+      : remembered ? 1 : LIVE_ENEMY_AT_THREAT_STROKE_SCALE;
     gfxStrokePaths(g, paths, keylineWidth * strokeScale, darkColor, darkAlpha);
     gfxStrokePaths(g, paths, hatchWidth * strokeScale, color, hatchAlpha);
     drawFacingWedge(

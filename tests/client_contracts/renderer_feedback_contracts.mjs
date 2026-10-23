@@ -210,13 +210,13 @@ function nearPoint(call, point, epsilon = 0.001) {
   );
   assert(
     threatGfx.calls.some((call) =>
-      call[0] === "lineStyle" && call[1] === 1.3 && call[2] === 0xffb000 && call[3] === 0.78),
+      call[0] === "lineStyle" && Math.abs(call[1] - 1.95) < 1e-10 && call[2] === 0xffb000 && call[3] === 0.78),
     "live enemy anti-tank threat cone uses a colorblind-legible amber hatch stroke",
   );
   assert(
     threatGfx.calls.some((call) =>
-      call[0] === "lineStyle" && call[1] === 1.95 && call[2] === 0xffb000 && call[3] === 0.68),
-    "enemy anti-tank threat cone boundary is 30% thicker without changing hatch width",
+      call[0] === "lineStyle" && Math.abs(call[1] - 2.925) < 1e-10 && call[2] === 0xffb000 && call[3] === 0.68),
+    "live enemy anti-tank threat cone boundary is 1.5x thicker",
   );
   const liveHatchMoves = threatGfx.calls.filter((call) => call[0] === "moveTo").length;
   assert(
