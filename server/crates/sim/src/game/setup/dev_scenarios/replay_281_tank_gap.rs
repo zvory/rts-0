@@ -203,7 +203,7 @@ mod tests {
         );
         setup.game.enqueue(setup.player_id, setup.command());
         // Replay the recorded checkpoint with current balance. The trace was refreshed for
-        // the 1.3x Command Car aura: the former target now dies at tick 13609,
+        // the 1.3x Command Car aura and minimum MG damage: the former target dies at tick 13609,
         // and the lead Tank picks a replacement instead of resuming its route.
         let golden: Vec<GoldenTick> =
             serde_json::from_str(include_str!("fixtures/replay_281_ticks_13537_13620.json"))
@@ -263,23 +263,7 @@ mod tests {
                     snapshot.tick,
                     expected.id
                 );
-                // Preserve the historical movement trace. The MG minimum-damage fix
-                // adds these five formerly zero-damage bursts against armored Tanks.
-                let extra_mg_damage = match expected.id {
-                    LEAD_TANK => u32::from(snapshot.tick >= 13_538),
-                    REAR_TANK => [13_575, 13_586, 13_597, 13_609]
-                        .into_iter()
-                        .filter(|tick| snapshot.tick >= *tick)
-                        .count() as u32,
-                    _ => 0,
-                };
-                assert_eq!(
-                    actual.hp,
-                    expected.hp - extra_mg_damage,
-                    "tick {} entity {} hp with minimum MG damage",
-                    snapshot.tick,
-                    expected.id
-                );
+                assert_eq!(actual.hp, expected.hp, "tick {} entity {} hp", snapshot.tick, expected.id);
                 assert_eq!(
                     actual.state, expected.state,
                     "tick {} entity {} state",
