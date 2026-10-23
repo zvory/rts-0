@@ -22,7 +22,7 @@ use super::projection::{combat_target_distance_sq, max_building_combat_extent_px
 use super::shot_blocker_index::ShotBlockerIndex;
 use super::target_legality::DirectFireLegality;
 use super::weapons::moving_attack_cooldown;
-use super::{FIRING_REVEAL_RESPONSE_DELAY_TICKS, RANGE_SLACK};
+use super::RANGE_SLACK;
 
 const TANK_COAX_HALF_ARC_RAD: f32 = std::f32::consts::PI / 18.0;
 
@@ -81,27 +81,14 @@ pub(super) fn fire_tank_coax_system(
         ) else {
             continue;
         };
-        let (tx, ty) = match entities.get(tid) {
-            Some(target) => (target.pos_x, target.pos_y),
-            None => continue,
-        };
-        if let Some(episode) = fog.team_firing_reveal_only_source(snapshot.owner, (tx, ty), teams) {
-            let reaction_ready = entities.get_mut(id).is_some_and(|e| {
-                e.weapon_firing_reveal_reaction_ready(
-                    weapon_profile.id,
-                    tid,
-                    episode,
-                    tick,
-                    FIRING_REVEAL_RESPONSE_DELAY_TICKS,
-                )
-            });
-            if !reaction_ready {
-                continue;
-            }
-        }
-        super::machine_gun::fire(
+        let cooldown = entities
+            .get(id)
+            .map(|e| moving_attack_cooldown(e, weapon_profile.cooldown))
+            .unwrap_or(weapon_profile.cooldown);
+        super::shot::try_fire(
             map,
             entities,
+            blockers,
             teams,
             spatial,
             los,
@@ -114,15 +101,10 @@ pub(super) fn fire_tank_coax_system(
             tid,
             weapon_profile,
             snapshot.range_px,
+            weapon_profile.dmg,
+            cooldown,
             tick,
         );
-        let cooldown = entities
-            .get(id)
-            .map(|e| moving_attack_cooldown(e, weapon_profile.cooldown))
-            .unwrap_or(weapon_profile.cooldown);
-        if let Some(e) = entities.get_mut(id) {
-            e.set_weapon_cooldown(weapon_profile.id, cooldown);
-        }
     }
 }
 

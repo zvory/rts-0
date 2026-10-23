@@ -1,11 +1,9 @@
-//! Experimental first-hit MG bursts. Rays resolve immediately; travel is presentation only.
+//! First-hit MG geometry and fog-safe ray presentation; impact effects belong to `damage`.
 use std::collections::{BTreeMap, HashMap};
 
 use rand::Rng;
 
 use crate::game::entity::{blocks_line_of_sight, EntityKind, EntityStore};
-use crate::game::entrenchment_combat;
-use crate::game::firing_reveal::{record_firing_reveals_for_victim_team, FiringRevealSource};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::geometry::{
@@ -17,10 +15,10 @@ use crate::game::services::spatial::SpatialIndex;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
 use crate::protocol::Event;
-use crate::rules::terrain::TerrainKind;
 use crate::rules::{combat as rules, projection};
 
-use super::events::{attack_reveal_for, push_under_attack_notices_for_visible_attack};
+use super::damage::{apply_direct_hit, ShotOutcome};
+use super::events::attack_reveal_for;
 
 pub(super) fn is_machine_gun(kind: rules::WeaponKind) -> bool {
     matches!(
@@ -136,25 +134,25 @@ pub(super) fn fire(
     smokes: &SmokeCloudStore,
     rng: &mut impl Rng,
     events: &mut HashMap<u32, Vec<Event>>,
-    firing_reveals: &mut Vec<FiringRevealSource>,
     attacker: u32,
     intended: u32,
     profile: &rules::WeaponProfile,
     range: f32,
+    damage: u32,
     tick: u32,
-) {
+) -> Vec<ShotOutcome> {
     let Some(source) = entities.get(attacker) else {
-        return;
+        return Vec::new();
     };
     let (owner, start) = (source.owner, (source.pos_x, source.pos_y));
     let Some(target) = entities.get(intended) else {
-        return;
+        return Vec::new();
     };
     // Match acquisition distance: a building surface can be in range while its center is not.
     let aim = closest_combat_target_point(map, start, target);
     let angle = (aim.1 - start.1).atan2(aim.0 - start.0);
     if !range.is_finite() || range <= 0.0 {
-        return;
+        return Vec::new();
     }
     // Buildings are indexed by center; pad enough for their attackable footprint.
     let padding = super::projection::max_building_combat_extent_px().max(64.0);
@@ -193,7 +191,7 @@ pub(super) fn fire(
         let (victim, endpoint) = if let Some((id, t)) = hit {
             let victim = entities.get(id);
             if victim.is_some_and(|v| teams.is_enemy_owner(owner, v.owner) || id == intended) {
-                *hits.entry(id).or_default() += profile.dmg / 2;
+                *hits.entry(id).or_default() += damage / 2;
             }
             (
                 id,
@@ -209,60 +207,16 @@ pub(super) fn fire(
     }
     // Aggregate the burst per victim before integer armor/cover rounding. Bodies absorb every
     // intersecting bullet in this simultaneous burst, including lethal overkill.
-    let mut reveals_attacker = false;
-    for (id, damage) in hits {
-        let Some(victim) = entities.get(id) else {
-            continue;
-        };
-        let (victim_owner, pos, kind) = (victim.owner, (victim.pos_x, victim.pos_y), victim.kind);
-        let damage = rules::effective_damage_with_facing_for_weapon(
-            profile,
-            kind,
-            damage,
-            Some(TerrainKind::Open),
-            Some(victim.facing()),
-            pos,
-            start,
-        );
-        let damage = entrenchment_combat::reduce_direct_damage(victim, damage);
-        // A real hit must survive integer protection rounding, even for a lone half-damage ray.
-        let damage = map.damage_after_reduction_tile(pos.0, pos.1, damage).max(1);
-        let damaged = entities.get_mut(id).is_some_and(|v| {
-            if teams.is_enemy_owner(owner, victim_owner) {
-                v.apply_damage_from_entity(damage, owner, attacker, start, tick)
-            } else {
-                v.apply_damage(damage, None)
-            }
-        });
-        if projection::shot_reveals_attacker(kind) {
-            reveals_attacker = true;
-            record_firing_reveals_for_victim_team(
-                firing_reveals,
-                events.keys().copied().collect::<Vec<_>>(),
-                fog,
-                map,
-                teams,
-                victim_owner,
-                owner,
-                attacker,
-                start,
+    let outcomes: Vec<_> = hits
+        .into_iter()
+        .filter_map(|(id, damage)| {
+            apply_direct_hit(
+                map, entities, teams, events, fog, attacker, id, profile, damage, owner, start, 1,
                 tick,
-            );
-        }
-        if damaged {
-            push_under_attack_notices_for_visible_attack(
-                events,
-                fog,
-                teams,
-                victim_owner,
-                owner,
-                start.0,
-                start.1,
-                pos.0,
-                pos.1,
-            );
-        }
-    }
+            )
+        })
+        .collect();
+    let reveals_attacker = outcomes.iter().any(|shot| shot.reveals_attacker);
     let source = entities.get(attacker);
     let reveal = reveals_attacker
         .then(|| attack_reveal_for(source))
@@ -310,6 +264,7 @@ pub(super) fn fire(
             });
         }
     }
+    outcomes
 }
 
 #[cfg(test)]
