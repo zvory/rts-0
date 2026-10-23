@@ -501,7 +501,8 @@ export class GroundDecalLayer {
 }
 ```
 `GroundDecalLayer` normally owns one downsampled OffscreenCanvas-backed Pixi texture and one sprite
-on the `decals` world layer. During an observer-perspective repair it temporarily retains the old
+on the `decals` world layer. Its persistent canvas is clipped to non-water tiles at map reset,
+so ground marks (including shoreline blast footprints) never paint water. During an observer-perspective repair it temporarily retains the old
 visible surface and hydrates a hidden replacement in batches of at most 48 durable records per
 presented frame. Completion atomically adopts the replacement and destroys the old surface; a
 newer reset cancels only the unfinished replacement. A ready decal atlas transfers to the hidden
