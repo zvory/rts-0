@@ -81,8 +81,6 @@ pub(super) fn apply_damage(
     let reveal = reveals_attacker
         .then(|| attack_reveal_for(entities.get(attacker)))
         .flatten();
-    let victim_facing = victim.map(|e| e.facing());
-    let victim_owner = entities.get(shot_victim).map(|e| e.owner).unwrap_or(0);
     let attack_recipients = emit_attack_event(
         events,
         fog,
@@ -110,34 +108,27 @@ pub(super) fn apply_damage(
     } else {
         false
     };
-    let unentrenched_dmg = match victim_kind {
-        Some(vk) => combat_rules::effective_damage_with_facing_for_weapon(
-            weapon_profile,
-            vk,
-            dmg,
-            Some(TerrainKind::Open),
-            victim_facing,
-            shot_victim_pos,
-            (ax, ay),
-        ),
-        _ => dmg,
-    };
-    let entrenched_dmg = entities
-        .get(shot_victim)
-        .map(|victim| entrenchment_combat::reduce_direct_damage(victim, unentrenched_dmg))
-        .unwrap_or(unentrenched_dmg);
-    let effective_dmg =
-        map.damage_after_reduction_tile(shot_victim_pos.0, shot_victim_pos.1, entrenched_dmg);
-    let damaged = if primary_missed {
-        false
-    } else if let Some(v) = entities.get_mut(shot_victim) {
-        if teams.is_enemy_owner(attacker_owner, v.owner) {
-            v.apply_damage_from_entity(effective_dmg, attacker_owner, attacker, (ax, ay), tick)
-        } else {
-            v.apply_damage(effective_dmg, None)
-        }
+    let outcome = if primary_missed {
+        victim.map(|v| ShotOutcome {
+            victim_owner: v.owner,
+            reveals_attacker,
+        })
     } else {
-        false
+        apply_direct_hit(
+            map,
+            entities,
+            teams,
+            events,
+            fog,
+            attacker,
+            shot_victim,
+            weapon_profile,
+            dmg,
+            attacker_owner,
+            (ax, ay),
+            0,
+            tick,
+        )
     };
     if !primary_missed
         && infantry_shell
@@ -157,30 +148,73 @@ pub(super) fn apply_damage(
             tick,
         );
     }
+    outcome
+}
+
+/// Shared direct-impact effects for resolved hits, independent of trajectory geometry.
+/// MG bursts pass their aggregate damage and a one-point floor after protection rounding.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn apply_direct_hit(
+    map: &Map,
+    entities: &mut EntityStore,
+    teams: &TeamRelations,
+    events: &mut HashMap<u32, Vec<Event>>,
+    fog: &Fog,
+    attacker: u32,
+    victim: u32,
+    weapon: &combat_rules::WeaponProfile,
+    damage: u32,
+    owner: u32,
+    source: (f32, f32),
+    minimum_damage: u32,
+    tick: u32,
+) -> Option<ShotOutcome> {
+    let target = entities.get(victim)?;
+    let pos = (target.pos_x, target.pos_y);
+    let outcome = ShotOutcome {
+        victim_owner: target.owner,
+        reveals_attacker: projection_rules::shot_reveals_attacker(target.kind),
+    };
+    let damage = combat_rules::effective_damage_with_facing_for_weapon(
+        weapon,
+        target.kind,
+        damage,
+        Some(TerrainKind::Open),
+        Some(target.facing()),
+        pos,
+        source,
+    );
+    let damage = entrenchment_combat::reduce_direct_damage(target, damage);
+    let damage = map
+        .damage_after_reduction_tile(pos.0, pos.1, damage)
+        .max(minimum_damage);
+    let hostile = teams.is_enemy_owner(owner, outcome.victim_owner);
+    let damaged = entities.get_mut(victim).is_some_and(|target| {
+        if hostile {
+            target.apply_damage_from_entity(damage, owner, attacker, source, tick)
+        } else {
+            target.apply_damage(damage, None)
+        }
+    });
     if damaged {
-        if teams.is_enemy_owner(attacker_owner, victim_owner)
-            && combat_rules::weapon_triggers_tank_armor_reaction(weapon_profile)
-        {
-            if let Some(victim) = entities.get_mut(shot_victim) {
-                victim.lock_tank_armor_reaction_source((ax, ay), tick);
+        if hostile && combat_rules::weapon_triggers_tank_armor_reaction(weapon) {
+            if let Some(target) = entities.get_mut(victim) {
+                target.lock_tank_armor_reaction_source(source, tick);
             }
         }
         push_under_attack_notices_for_visible_attack(
             events,
             fog,
             teams,
-            victim_owner,
-            attacker_owner,
-            ax,
-            ay,
-            shot_victim_pos.0,
-            shot_victim_pos.1,
+            outcome.victim_owner,
+            owner,
+            source.0,
+            source.1,
+            pos.0,
+            pos.1,
         );
     }
-    victim_kind.map(|_| ShotOutcome {
-        victim_owner,
-        reveals_attacker,
-    })
+    Some(outcome)
 }
 
 /// Mortar-style center-distance splash, with direct-fire entrenchment protection.
