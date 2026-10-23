@@ -263,7 +263,11 @@ mod tests {
                     snapshot.tick,
                     expected.id
                 );
-                assert_eq!(actual.hp, expected.hp, "tick {} entity {} hp", snapshot.tick, expected.id);
+                assert_eq!(
+                    actual.hp, expected.hp,
+                    "tick {} entity {} hp",
+                    snapshot.tick, expected.id
+                );
                 assert_eq!(
                     actual.state, expected.state,
                     "tick {} entity {} state",
