@@ -1210,6 +1210,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
 { e: "build",  id: u32, kind: string }         // building completed
 { e: "smokeLaunch", fromX: f32, fromY: f32, toX: f32, toY: f32, delayTicks: u32 }
 { e: "mortarLaunch", from: u32, fromX: f32, fromY: f32, toX: f32, toY: f32, radiusTiles: f32, delayTicks: u32, rocket?: bool }
+{ e: "mortarWarning", x: f32, y: f32, radiusTiles: f32, delayTicks: u32 }
 { e: "mortarImpact", from?: u32, x: f32, y: f32, radiusTiles: f32,
   reveal?: { owner: u32, kind: string, x: f32, y: f32, facing?: f32, weaponFacing?: f32, setupState?: string }, rocket?: bool }
 { e: "artilleryTarget", from: u32, x: f32, y: f32, radiusTiles: f32, delayTicks: u32 }
@@ -1267,8 +1268,11 @@ do not receive hidden smoke launch data. The authoritative smoke cloud appears l
 after the reported launch delay. Mortar launch events are always sent to the firing team, with
 shooter id, shell origin, impact point, radius, and delay so clients can draw launch dust, recoil,
 the projectile, and the warning marker until detonation. Mortar launch events are withheld from
-all enemy recipients, even when their team currently sees the mortar, so enemies do not receive
-pre-impact warning markers. Mortar impact events are sent to the firing team and to enemy recipients
+all enemy recipients. Instead, enemies with team-current visibility at the landing point receive
+`mortarWarning { x, y, radiusTiles, delayTicks }` at launch. This draws the same pre-impact circle
+without a shooter id, origin, trajectory, launch dust, or recoil. Hidden landing points receive no
+warning. Rocket barrages do not emit this warning. Compact event code 16 encodes this as
+`[16, x, y, radiusTiles, delayTicks]`. Mortar impact events are sent to the firing team and to enemy recipients
 with team-current visibility at the impact point, plus enemy players whose entities were damaged by
 the shell. An enemy damaged victim
 owner receives `from` + `reveal` so the attacking mortar can be shown briefly above fog after

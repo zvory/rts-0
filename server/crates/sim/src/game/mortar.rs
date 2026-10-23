@@ -1,3 +1,7 @@
+#[path = "mortar_launch.rs"]
+mod launch;
+use launch::emit_launch;
+
 use std::collections::HashMap;
 
 use crate::config;
@@ -207,6 +211,21 @@ impl MortarShellStore {
         let mut pending = Vec::new();
         let due = std::mem::take(&mut self.shells);
         for mut shell in due {
+            // Enemy warnings expose only a currently visible landing point, never the shooter.
+            if !shell.rocket && shell.launch_tick == tick {
+                for (&pid, player_events) in events.iter_mut() {
+                    if !teams.same_team_or_same_owner(pid, shell.owner)
+                        && projection::team_visible_world(pid, shell.x, shell.y, fog, teams)
+                    {
+                        player_events.push(Event::MortarWarning {
+                            x: shell.x,
+                            y: shell.y,
+                            radius_tiles: config::MORTAR_OUTER_RADIUS_TILES,
+                            delay_ticks: shell.impact_tick.saturating_sub(tick),
+                        });
+                    }
+                }
+            }
             if !shell.launched && shell.launch_tick <= tick {
                 if shell.rocket
                     && !entities.get(shell.attacker).is_some_and(|attacker| {
@@ -262,37 +281,6 @@ impl MortarShellStore {
             }
         }
         self.shells = pending;
-    }
-}
-
-#[allow(clippy::too_many_arguments)]
-fn emit_launch(
-    events: &mut HashMap<u32, Vec<Event>>,
-    teams: &TeamRelations,
-    owner: u32,
-    attacker: u32,
-    from_x: f32,
-    from_y: f32,
-    to_x: f32,
-    to_y: f32,
-    delay_ticks: u32,
-    rocket: bool,
-) {
-    let player_ids: Vec<u32> = events.keys().copied().collect();
-    for pid in player_ids {
-        if !teams.same_team_or_same_owner(pid, owner) {
-            continue;
-        }
-        events.entry(pid).or_default().push(Event::MortarLaunch {
-            from: attacker,
-            from_x,
-            from_y,
-            to_x,
-            to_y,
-            radius_tiles: config::MORTAR_OUTER_RADIUS_TILES,
-            delay_ticks,
-            rocket,
-        });
     }
 }
 

@@ -822,3 +822,20 @@ assert(
   assert(buffers.muzzleFlashes[0].targetPos.x === 300, "ray endpoint remains fixed");
   assertThrows(() => decodeCompactEvent([EVENT_CODE[EVENT.ATTACK], 10, 0, null, [300, 105], WEAPON_KIND_CODE[WEAPON_KIND.MACHINE_GUNNER_MG], [Infinity, 100]], 0), "nonfinite MG ray origin rejected");
 }
+
+// Enemy mortar warnings draw only the landing circle for the shell's flight time.
+{
+  const { decodeCompactEvent } = await import("../../client/src/protocol_snapshot_events.js");
+  const { VisualEffectBuffers } = await import("../../client/src/state_visual_effects.js");
+  const warning = decodeCompactEvent([EVENT_CODE[EVENT.MORTAR_WARNING], 320, 240, 2, 90], 0);
+  const buffers = new VisualEffectBuffers();
+  buffers.applySnapshotEvents([warning], 1000, () => { throw new Error("warning queried shooter"); });
+  const [target] = buffers.liveMortarTargets(1000);
+  assert(target.x === 320 && target.y === 240 && target.radiusTiles === 2, "warning preserves landing circle");
+  assert(target.durationMs === 3000, "warning lasts until impact");
+  assert(target.fromX === undefined && target.fromY === undefined, "warning has no shooter origin or targeting line");
+  assert(buffers.mortarShells.length === 0 && buffers.mortarLaunches.length === 0 && buffers.weaponRecoilById.size === 0,
+    "warning does not create a shell, launch dust, or recoil");
+  assert(buffers.liveMortarTargets(4200).length === 0, "expired warning is removed");
+  assertThrows(() => decodeCompactEvent([EVENT_CODE[EVENT.MORTAR_WARNING], Infinity, 240, 2, 90], 0), "nonfinite warning point rejected");
+}

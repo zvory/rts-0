@@ -1086,6 +1086,12 @@ pub enum Event {
         to_y: f32,
         delay_ticks: u32,
     },
+    MortarWarning {
+        x: f32,
+        y: f32,
+        radius_tiles: f32,
+        delay_ticks: u32,
+    },
     MortarLaunch {
         from: u32,
         from_x: f32,
