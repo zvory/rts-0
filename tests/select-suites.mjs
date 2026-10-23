@@ -202,6 +202,7 @@ function isInteractPath(pathname) {
 function isMediaTestPath(pathname) {
   return isInteractPath(pathname) ||
     pathname.startsWith("scripts/minimap-webm/") ||
+    pathname === "scripts/install-ci-media.sh" ||
     pathname === "scripts/record-minimap.mjs" ||
     pathname === "scripts/patch-note-outbox.mjs" ||
     pathname === "tests/patch_note_outbox.mjs" ||
@@ -641,6 +642,7 @@ function verify() {
     [["client/src/map_editor_interact_bridge.js"], { run_media: true }],
     [["tests/fixtures/interact_fake_driver.mjs"], { run_media: true }],
     [["scripts/minimap-webm/encode.mjs"], { run_media: true }],
+    [["scripts/install-ci-media.sh"], { run_media: true }],
     [["scripts/patch-note-outbox.mjs"], { run_media: true }],
     [["scripts/wait-pr.sh"], { run_media: true }],
     [["package-lock.json"], { run_media: true }],

@@ -503,7 +503,8 @@ contracts, patch-note media integration, minimap encoding integration, and Inter
 Changes to Interact source/bridges/tests, minimap recording tools, patch-note outbox, Node dependency
 manifests, or the CI selector/runner/workflow enable media coverage. Unknown changed-file ranges
 conservatively enable it; documentation-only changes still skip expensive work. Each CI job installs
-FFmpeg only when media coverage is selected. `RTS_RUN_MEDIA_TESTS=0` applies this split to local
+FFmpeg only when media coverage is selected. The shared Ubuntu installer uses the HTTPS Ubuntu
+archive mirror and omits recommended GPU/speech packages. `RTS_RUN_MEDIA_TESTS=0` applies this split to local
 `tests/run-all.sh` runs; local runs default to complete media coverage.
 
 Changed-file detection classifies PRs and `main` pushes as `docs_only`, `client_only`, or `full`

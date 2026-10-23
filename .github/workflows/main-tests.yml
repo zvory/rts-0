@@ -312,7 +312,7 @@ jobs:
 
       - name: Install Interact media tools
         if: needs.changed-files.outputs.run_media == 'true'
-        run: sudo apt-get update && sudo apt-get install --yes ffmpeg
+        run: bash scripts/install-ci-media.sh
 
       - name: Run live Node suites
         if: needs.changed-files.outputs.run_live_node == 'true'
@@ -374,7 +374,7 @@ jobs:
 
       - name: Install Interact media tools
         if: needs.changed-files.outputs.run_media == 'true' && matrix.label == 'smoke + phase 0.5'
-        run: sudo apt-get update && sudo apt-get install --yes ffmpeg
+        run: bash scripts/install-ci-media.sh
 
       - name: Run browser shard
         if: needs.changed-files.outputs.run_browser == 'true'
