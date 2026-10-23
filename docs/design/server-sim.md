@@ -1965,5 +1965,6 @@ the wire protocol or client contract.
 Scout Car, and Tank coax firing cycle. It reuses the tick spatial grid, body geometry,
 and terrain/smoke LOS. Burst-local hit totals and rays are temporary derived values;
 there is no new durable projectile state or Game API. Damage is aggregated per victim
-before existing protection rounding. See the balance prototype section and compact
+before existing protection rounding, with a minimum of 1 damage per hit victim. Building
+aim uses the nearest footprint surface, matching acquisition and stopping distance. See the balance prototype section and compact
 version-57 attack ray contract for tuning and per-viewer projection.

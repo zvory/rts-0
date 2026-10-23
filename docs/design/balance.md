@@ -711,7 +711,7 @@ snapshot immediately while the remaining players keep playing; final match resol
 
 Machine Gunner, Scout Car MG, and Tank coax keep their existing 12-tick firing cycle
 and acquisition ranges. Each cycle emits three simultaneous server rays. The first
-is aimed at the selected target; the other two are uniformly random over a
+is aimed at the selected target (the nearest footprint surface for buildings); the other two are uniformly random over a
 20-degree full cone centered on that target. Each bullet
 contributes half the old shot damage (2 MG/coax, 3 Scout Car). The maximum emitted
 DPS is 15/15/22.5 respectively. A clear center ray hits the selected target;
@@ -723,6 +723,8 @@ is transparent; friendly Tanks and sight-blocking buildings absorb without damag
 except an explicitly commanded self-attack. Neutral obstacles intercept when explicitly
 targeted. Rays stop at opaque terrain, smoke, or weapon range. Damage sums per victim
 within a simultaneous burst before existing integer armor, cover, and entrenchment
-reductions; lethal overkill stays on that victim. Existing non-MG damage is unchanged.
+reductions, with a minimum of 1 damage for a burst that hits an eligible victim; lethal
+overkill stays on that victim. Misses and friendly blockers take no damage. Existing non-MG
+damage is unchanged.
 The three cosmetic yellow tracers launch 20 ms apart, with 2,700 world pixels/second
 travel, a 7.5-pixel tail, and a 1.1-pixel stroke. Server damage is immediate.
