@@ -113,6 +113,13 @@ fn hidden_mortar_launch_is_not_sent_but_impact_reveals_attacker_to_victim() {
         "hidden mortar launch should not leak dust/recoil/shell data: {enemy_events:?}"
     );
 
+    assert!(enemy_events.iter().any(|event| matches!(event,
+        Event::MortarWarning { x, y, radius_tiles, delay_ticks }
+            if *x == impact_pos.0 && *y == impact_pos.1
+                && *radius_tiles == config::MORTAR_OUTER_RADIUS_TILES
+                && *delay_ticks == config::MORTAR_MANUAL_SHELL_DELAY_TICKS
+    )), "visible landing area should warn the enemy without exposing the hidden mortar");
+
     game.state
         .entities
         .get_mut(target)
@@ -188,4 +195,25 @@ fn hidden_mortar_launch_is_not_sent_but_impact_reveals_attacker_to_victim() {
         Some(mortar),
         "victim should be able to target the impact-revealed mortar"
     );
+}
+
+#[test]
+fn mortar_warning_is_withheld_when_landing_area_is_hidden() {
+    let players = [
+        PlayerInit { id: 1, team_id: 1, faction_id: "kriegsia".into(), name: "One".into(), color: "#fff".into(), is_ai: false },
+        PlayerInit { id: 2, team_id: 2, faction_id: "kriegsia".into(), name: "Two".into(), color: "#000".into(), is_ai: false },
+    ];
+    let mut game = empty_flat_game(&players);
+    let origin = game.state.map.tile_center(8, 8);
+    let landing = game.state.map.tile_center(18, 8);
+    let mortar = game.state.entities.spawn_unit(1, EntityKind::MortarTeam, origin.0, origin.1).expect("spawn mortar");
+    game.state.entities.get_mut(mortar).expect("mortar").set_weapon_setup(WeaponSetup::Deployed);
+    game.rebuild_final_spatial();
+    game.state.fog.recompute(&[1, 2], &game.state.entities, &game.state.map);
+    assert!(!game.state.fog.is_visible_world(2, landing.0, landing.1));
+    game.enqueue(1, Command::UseAbility { ability: ability::AbilityKind::MortarFire, units: vec![mortar], x: Some(landing.0), y: Some(landing.1), queued: false });
+    let events = game.tick();
+    assert!(mortar_launch_impact(&events, 1, mortar).is_some());
+    let enemy = &events.iter().find(|(pid, _)| *pid == 2).expect("enemy events").1;
+    assert!(enemy.iter().all(|event| !matches!(event, Event::MortarWarning { .. } | Event::MortarLaunch { .. })));
 }

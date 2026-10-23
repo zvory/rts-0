@@ -1143,6 +1143,15 @@ impl Serialize for CompactEvent<'_> {
                 seq.serialize_element(delay_ticks)?;
                 seq.end()
             }
+            Event::MortarWarning { x, y, radius_tiles, delay_ticks } => {
+                let mut seq = serializer.serialize_seq(Some(5))?;
+                seq.serialize_element(&event_code("mortarWarning"))?;
+                seq.serialize_element(x)?;
+                seq.serialize_element(y)?;
+                seq.serialize_element(radius_tiles)?;
+                seq.serialize_element(delay_ticks)?;
+                seq.end()
+            }
             Event::MortarLaunch {
                 from,
                 from_x,

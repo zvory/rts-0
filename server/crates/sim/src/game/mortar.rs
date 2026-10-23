@@ -207,6 +207,21 @@ impl MortarShellStore {
         let mut pending = Vec::new();
         let due = std::mem::take(&mut self.shells);
         for mut shell in due {
+            // Enemy warnings expose only a currently visible landing point, never the shooter.
+            if !shell.rocket && shell.launch_tick == tick {
+                for (&pid, player_events) in events.iter_mut() {
+                    if !teams.same_team_or_same_owner(pid, shell.owner)
+                        && projection::team_visible_world(pid, shell.x, shell.y, fog, teams)
+                    {
+                        player_events.push(Event::MortarWarning {
+                            x: shell.x,
+                            y: shell.y,
+                            radius_tiles: config::MORTAR_OUTER_RADIUS_TILES,
+                            delay_ticks: shell.impact_tick.saturating_sub(tick),
+                        });
+                    }
+                }
+            }
             if !shell.launched && shell.launch_tick <= tick {
                 if shell.rocket
                     && !entities.get(shell.attacker).is_some_and(|attacker| {
