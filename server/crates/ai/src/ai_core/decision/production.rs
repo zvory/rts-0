@@ -243,6 +243,7 @@ fn uses_jeff_opposite_spawn_layout(observation: &AiObservation, profile: &AiProf
             | JEFFS_AI_PRE_SAFE_BASES_ID
             | JEFFS_AI_PRE_HELD_SITE_ID
             | JEFFS_AI_PRE_EARLY_NATURAL_ID
+            | JEFFS_AI_PRE_FAST_NATURAL_ID
     ) && is_upper_left_diagonal_start(observation.map, observation.own_start_tile)
 }
 

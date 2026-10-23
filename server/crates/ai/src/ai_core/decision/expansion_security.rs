@@ -97,7 +97,7 @@ pub(super) fn expansion_is_next(
     {
         return false;
     }
-    if profile.id == JEFFS_AI_ID {
+    if runs_live_jeff(profile.id) {
         return early_natural_due(observation, facts, profile);
     }
     facts.complete_building_count(EntityKind::Factory) > 0

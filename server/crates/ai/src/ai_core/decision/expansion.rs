@@ -268,7 +268,7 @@ where
             return placeable(kind, tile.0, tile.1).then_some(tile);
         }
     }
-    if profile_id == JEFFS_AI_ID {
+    if runs_live_jeff(profile_id) {
         if let Some(analysis) = analysis {
             return defensible_expansion_depot_site_adjusted(
                 observation,
