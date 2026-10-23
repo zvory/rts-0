@@ -1,5 +1,5 @@
 import { STATS } from "../config.js";
-import { KIND } from "../protocol.js";
+import { KIND, TERRAIN } from "../protocol.js";
 import {
   canLoadGroundDecalAtlas,
   GROUND_DECAL_ATLAS_STATUS,
@@ -97,6 +97,22 @@ export class GroundDecalLayer {
     if (!this.ctx) {
       this.canvas = null;
       return false;
+    }
+    // Keep durable ground marks off water, including the water-facing part of shoreline blasts.
+    // Install once on the persistent context so authored/procedural stamps and history rebuilds
+    // share the same boundary without scanning terrain for every explosion.
+    if (map?.terrain?.includes(TERRAIN.WATER)) {
+      const scale = tileSize / this.downsample;
+      this.ctx.beginPath();
+      for (let y = 0; y < map.height; y += 1) {
+        for (let x = 0; x < map.width; x += 1) {
+          if (map.terrain[y * map.width + x] !== TERRAIN.WATER) {
+            this.ctx.rect(x * scale, y * scale, scale, scale);
+          }
+        }
+      }
+      this.ctx.clip();
+      this.ctx.beginPath();
     }
     this.ctx.imageSmoothingEnabled = false;
     this.texture = this.pixi.Texture.from(this.canvas);
