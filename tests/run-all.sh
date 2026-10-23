@@ -606,7 +606,7 @@ if [ "$RUN_STATIC_JS" = "1" ]; then
   run_suite_bg "JS minimap input contracts" \
     node "$SCRIPT_DIR/minimap_input_contracts.mjs"
   run_suite_bg "Minimap recording tool" \
-    node --test "$REPO_ROOT/scripts/minimap-webm/capture.test.mjs" "$REPO_ROOT/scripts/minimap-webm/cli.test.mjs"
+    env RTS_RUN_MEDIA_TESTS=0 node --test "$REPO_ROOT/scripts/minimap-webm/capture.test.mjs" "$REPO_ROOT/scripts/minimap-webm/cli.test.mjs"
   run_suite_bg "JS rectangular map asset contracts" \
     node "$SCRIPT_DIR/rectangular_map_asset_contracts.mjs"
   run_suite_bg "JS map author CLI contracts" \
@@ -618,14 +618,9 @@ if [ "$RUN_STATIC_JS" = "1" ]; then
   run_suite_bg "Interact adapter contracts" \
     node "$SCRIPT_DIR/interact_adapter_contracts.mjs"
   if [ "$RUN_MEDIA_TESTS" = "1" ]; then
-    run_suite_bg "Interact recording contracts" \
-      node "$SCRIPT_DIR/interact_recording_contracts.mjs"
-    run_suite_bg "Interact fixed-capture contracts" \
-      node "$SCRIPT_DIR/interact_fixed_capture_contracts.mjs"
-    run_suite_bg "Agent workflow: patch-note outbox" \
-      node "$SCRIPT_DIR/patch_note_outbox.mjs"
+    run_suite_bg "Media integration contracts" bash "$SCRIPT_DIR/media-contracts.sh"
   else
-    SKIPPED+=("Interact recording contracts" "Interact fixed-capture contracts" "Agent workflow: patch-note outbox")
+    SKIPPED+=("Media integration contracts")
   fi
   run_suite_bg "Interact session coordinator contracts" \
     node "$SCRIPT_DIR/interact_session_coordinator_contracts.mjs"
@@ -721,6 +716,9 @@ if [ "${SERVER_HEALTHY:-0}" = "1" ]; then
       if browser_scenario_selected smoke; then
         CHROME="$CHROME" run_suite "Client smoke (headless Chrome)" node "$SCRIPT_DIR/client_smoke.mjs"
         if [ "$RUN_MEDIA_TESTS" = "1" ]; then
+          if [ "$RUN_STATIC_JS" = "0" ]; then
+            run_suite "Media integration contracts" bash "$SCRIPT_DIR/media-contracts.sh"
+          fi
           CHROME="$CHROME" RTS_INTERACT_LAB_BASE_URL="$RTS_URL" \
             run_suite "Interact CLI smoke (headless Chrome)" node "$SCRIPT_DIR/interact_cli_smoke.mjs"
         else

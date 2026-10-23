@@ -207,6 +207,7 @@ function isMediaTestPath(pathname) {
     pathname === "scripts/patch-note-outbox.mjs" ||
     pathname === "tests/patch_note_outbox.mjs" ||
     pathname === "scripts/wait-pr.sh" ||
+    pathname === "tests/media-contracts.sh" ||
     pathname === "tests/run-all.sh" ||
     pathname === "tests/select-suites.mjs" ||
     pathname === ".github/workflows/main-tests.yml";
@@ -647,6 +648,7 @@ function verify() {
     [["scripts/wait-pr.sh"], { run_media: true }],
     [["package-lock.json"], { run_media: true }],
     [["tests/run-all.sh"], { run_media: true }],
+    [["tests/media-contracts.sh"], { run_media: true }],
     [[".github/workflows/main-tests.yml"], { run_media: true }],
     [["docs/interact-cli.md"], { run_media: false }],
     [["client/src/match.js", "scripts/interact/driver.ts"], { run_media: true }],

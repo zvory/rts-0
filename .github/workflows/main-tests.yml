@@ -310,14 +310,10 @@ jobs:
           name: rts-server-debug
           path: .ci-server
 
-      - name: Install Interact media tools
-        if: needs.changed-files.outputs.run_media == 'true'
-        run: bash scripts/install-ci-media.sh
-
       - name: Run live Node suites
         if: needs.changed-files.outputs.run_live_node == 'true'
         env:
-          RTS_RUN_MEDIA_TESTS: ${{ needs.changed-files.outputs.run_media == 'true' && '1' || '0' }}
+          RTS_RUN_MEDIA_TESTS: "0"
           CI_CLASS: ${{ needs.changed-files.outputs.ci_class }}
         run: |
           if [ "$CI_CLASS" = "client_only" ]; then

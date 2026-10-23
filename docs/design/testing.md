@@ -502,8 +502,9 @@ lightweight Interact control/cleanup contracts, but skip FFmpeg installation, re
 contracts, patch-note media integration, minimap encoding integration, and Interact CLI smoke.
 Changes to Interact source/bridges/tests, minimap recording tools, patch-note outbox, Node dependency
 manifests, or the CI selector/runner/workflow enable media coverage. Unknown changed-file ranges
-conservatively enable it; documentation-only changes still skip expensive work. Each CI job installs
-FFmpeg only when media coverage is selected. The shared Ubuntu installer uses the HTTPS Ubuntu
+conservatively enable it; documentation-only changes still skip expensive work. Only the smoke browser job installs
+FFmpeg when media coverage is selected; it also runs `tests/media-contracts.sh`, sharing one install
+across the real media contracts and Interact smoke. The live Node job never installs FFmpeg. The shared Ubuntu installer uses the HTTPS Ubuntu
 archive mirror and omits recommended GPU/speech packages. `RTS_RUN_MEDIA_TESTS=0` applies this split to local
 `tests/run-all.sh` runs; local runs default to complete media coverage.
 
