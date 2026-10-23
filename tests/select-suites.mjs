@@ -184,6 +184,8 @@ function isInteractPath(pathname) {
     pathname === "scripts/tailnet-preview.d.mts" ||
     pathname === "scripts/check-interact-architecture.mjs" ||
     pathname === "client/src/interact_bridge.js" ||
+    pathname === "client/src/interact_game_bridge.js" ||
+    pathname === "client/src/map_editor_interact_bridge.js" ||
     pathname === "server/src/interact_lab_artifacts.rs" ||
     pathname.startsWith("tests/interact_") ||
     pathname.startsWith("tests/client_contracts/interact_") ||
@@ -203,6 +205,7 @@ function isMediaTestPath(pathname) {
     pathname === "scripts/record-minimap.mjs" ||
     pathname === "scripts/patch-note-outbox.mjs" ||
     pathname === "tests/patch_note_outbox.mjs" ||
+    pathname === "scripts/wait-pr.sh" ||
     pathname === "tests/run-all.sh" ||
     pathname === "tests/select-suites.mjs" ||
     pathname === ".github/workflows/main-tests.yml";
@@ -633,9 +636,13 @@ function verify() {
     [["client/src/renderer/unit_ranges.js"], { run_media: false, run_browser: true, run_live_node: true }],
     [["server/crates/sim/src/game/services/combat.rs"], { run_media: false, run_browser: true }],
     [["scripts/interact/recording.ts"], { run_media: true }],
+    [["client/src/interact_bridge.js"], { run_media: true }],
+    [["client/src/interact_game_bridge.js"], { run_media: true }],
+    [["client/src/map_editor_interact_bridge.js"], { run_media: true }],
     [["tests/fixtures/interact_fake_driver.mjs"], { run_media: true }],
     [["scripts/minimap-webm/encode.mjs"], { run_media: true }],
     [["scripts/patch-note-outbox.mjs"], { run_media: true }],
+    [["scripts/wait-pr.sh"], { run_media: true }],
     [["package-lock.json"], { run_media: true }],
     [["tests/run-all.sh"], { run_media: true }],
     [[".github/workflows/main-tests.yml"], { run_media: true }],
