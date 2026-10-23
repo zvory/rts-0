@@ -288,12 +288,12 @@ function nearPoint(call, point, epsilon = 0.001) {
   );
   assert(
     spectatorGfx.calls.some((call) =>
-      call[0] === "lineStyle" && call[1] === 1 && call[2] === 0xed5a5a && call[3] === 0.42),
+      call[0] === "lineStyle" && call[1] === 2 && call[2] === 0xed5a5a && call[3] === 0.42),
     "spectator anti-tank cones use a clearly readable light owning-team hatch",
   );
   assert(
     spectatorGfx.calls.some((call) =>
-      call[0] === "lineStyle" && call[1] === 1.95 && call[2] === 0xed5a5a && call[3] === 0.38),
+      call[0] === "lineStyle" && call[1] === 3.9 && call[2] === 0xed5a5a && call[3] === 0.38),
     "spectator anti-tank cones keep a legible team-tinted boundary",
   );
   assert(
