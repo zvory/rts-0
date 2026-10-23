@@ -1959,9 +1959,21 @@ the wire protocol or client contract.
 
 ---
 
-### Machine-gun cone prototype
+### Immediate weapon firing and machine-gun rays
 
-`services/combat/machine_gun.rs` resolves three first-hit rays for each Machine Gunner,
+`services/combat/shot.rs::try_fire` is the common immediate-fire entry point for primary
+weapons and Tank coax after their respective acquisition, alignment, and setup checks.
+It owns per-weapon cooldown readiness, firing-reveal reaction gates, victim-team firing
+reveals, and reload commitment, including missed cycles. New shot-wide effects belong
+here. `services/combat/damage.rs::apply_direct_hit` owns shared armor/facing, entrenchment,
+authored damage-reduction tiles, attribution, armor reaction, and under-attack notices;
+new direct-hit effects belong there. Single-target shots retain blocker redirection,
+movement miss rolls, and Tank HE splash. Detached mortar and Panzerfaust projectiles
+retain their launch/impact lifecycles.
+
+`services/combat/machine_gun.rs` specializes trajectory resolution and fog-safe ray events,
+returning victim outcomes to the shared lifecycle rather than owning reveal or reload effects.
+It resolves three first-hit rays for each Machine Gunner,
 Scout Car, and Tank coax firing cycle. It reuses the tick spatial grid, body geometry,
 and terrain/smoke LOS. Burst-local hit totals and rays are temporary derived values;
 there is no new durable projectile state or Game API. Damage is aggregated per victim
