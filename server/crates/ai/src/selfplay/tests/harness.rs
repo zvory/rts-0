@@ -244,6 +244,7 @@ impl SelfPlayRunner {
                     | Event::ArtilleryIncoming { .. }
                     | Event::ArtilleryFiring { .. }
                     | Event::ArtilleryImpact { .. }
+                    | Event::MortarWarning { .. }
                     | Event::MortarLaunch { .. }
                     | Event::MortarImpact { .. }
                     | Event::PanzerfaustLaunch { .. }
