@@ -1,0 +1,9 @@
+.cmd-btn[data-ability="barrage"] .cmd-cost .c-oil {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+#hud .cmd-btn[data-ability="barrage"] .cmd-cost .res-icon {
+  font-size: 10px;
+  color: inherit;
+}

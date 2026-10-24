@@ -3437,15 +3437,6 @@ input[type="text"]:focus {
 .cmd-btn .cmd-cost .c-oil {
   color: #8aaf6a;
 }
-.cmd-btn[data-ability="barrage"] .cmd-cost .c-oil {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-}
-#hud .cmd-btn[data-ability="barrage"] .cmd-cost .res-icon {
-  font-size: 10px;
-  color: inherit;
-}
 /* Unaffordable cost stays red while the button remains clickable for voice feedback. */
 .cmd-btn.unaffordable .cmd-cost,
 .cmd-btn.unaffordable .cmd-cost .c-steel,
