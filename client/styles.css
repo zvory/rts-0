@@ -3032,6 +3032,11 @@ input[type="text"]:focus {
   color: var(--ink-dim);
   font-variant-numeric: tabular-nums;
 }
+#selected-panel .sel-armor-label {
+  cursor: help;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
 #selected-panel .sel-trench-status {
   flex-wrap: wrap;
   gap: 6px 12px;

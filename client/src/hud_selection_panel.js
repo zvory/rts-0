@@ -415,10 +415,19 @@ export class HudSelectionPanel {
         `${Math.max(0, Math.floor(Number(e.unitsKilled)))}${entityIdHtml}</div>`
       : "";
 
+    const armorHtml = typeof st.armored === "boolean"
+      ? `<div class="sel-stat sel-armor">Armor: <span class="sel-armor-label" tabindex="0" ` +
+        `title="${st.armored
+          ? "Armored: takes 75% less HP damage from attacks without armor penetration. Armor-piercing attacks bypass some or all of this protection."
+          : "Unarmored: no armor damage reduction. Other protection, such as cover, still applies."}">` +
+        `${st.armored ? "Armored" : "Unarmored"}</span></div>`
+      : "";
+
     node.innerHTML =
       `<div class="sel-name">${st.label || e.kind}</div>` +
       hpHtml +
       (unitsKilledHtml || (entityIdHtml ? `<div class="sel-stat">${entityIdHtml}</div>` : "")) +
+      armorHtml +
       resourceRemainingHtml +
       entrenchmentHtml +
       prodHtml;

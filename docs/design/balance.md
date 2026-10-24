@@ -112,6 +112,12 @@ the generated `/wiki/stats` page.
 |----------|----------------|---------------|---------------|
 | `MORTAR_FIRE_TOLERANCE_RAD` | Sim-only mortar aim tolerance exported from `server/crates/sim/src/config.rs` beside mirrored balance constants | Sim-local `server/crates/sim/src/game/mortar.rs` `FIRE_TOLERANCE_RAD`, owned by mortar firing behavior | None; it is not mirrored into `client/src/config.js` and does not change wire shape or balance values |
 
+The single-unit selection panel displays Armored or Unarmored beneath the kill count.
+`STATS[kind].armored` mirrors each Rust `UnitDef.armor_class` through the checked
+`clientConfig.unitStats` dump. Its hover explanation describes the 75% HP damage reduction
+against non-piercing attacks and partial/full armor penetration. Artillery is Small/unarmored
+and receives no armor damage reduction. Buildings and resource nodes omit this unit-only row.
+
 ### Client mirror boundary inventory
 
 Phase 1 records the current source-of-truth map before later phases add broader mechanical checks.

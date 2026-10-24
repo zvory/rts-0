@@ -229,6 +229,7 @@ const EXPECTED_COMMAND_BUDGET_KEYS = Object.freeze([
   "commandCarSupplyCapBonus",
 ]);
 const EXPECTED_UNIT_STAT_FIELDS = Object.freeze([
+  "armored",
   "buildTicks",
   "cost",
   "rangeTiles",
@@ -651,6 +652,7 @@ for (const [kind, expected] of Object.entries(rustClientConfig.unitStats)) {
   assert(clientKind, `client KIND is missing ${kind}`);
   const clientStats = STATS[clientKind];
   assert(clientStats, `client STATS is missing ${kind}`);
+  assert.equal(clientStats.armored, expected.armored, `${kind} armor classification mirrors Rust rules`);
   if (!clientStats.body) {
     assertClientStatField(clientStats, "size", expected.size, `${kind} render size mirrors Rust radius`);
   }

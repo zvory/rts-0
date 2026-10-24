@@ -145,6 +145,34 @@ import { KIND } from "../../client/src/protocol.js";
 
   withFakeHudDocument(({ FakeElement }) => {
     const panel = new FakeElement("section");
+    let kind = KIND.TANK;
+    const hud = new HUD({ querySelector: () => panel }, {
+      selectedEntities: () => [{ id: 999, owner: 1, kind, hp: 100, maxHp: 100, unitsKilled: 0 }],
+    }, {}, null);
+    for (const [selectedKind, armored] of [
+      [KIND.TANK, true], [KIND.ARTILLERY, false], [KIND.RIFLEMAN, false],
+      [KIND.SCOUT_CAR, false], [KIND.COMMAND_CAR, false],
+    ]) {
+      kind = selectedKind;
+      hud._renderSelectedPanel();
+      const html = panel.children[0].innerHTML;
+      assert(html.includes(`>${armored ? "Armored" : "Unarmored"}</span>`),
+        `${kind} selection reports its armor classification`);
+      assert(html.includes(armored ? "75% less HP damage" : "no armor damage reduction") &&
+        html.includes('title="') && (!armored || html.includes("Armor-piercing attacks")),
+      `${kind} armor hover explains damage protection and penetration`);
+      assert(html.indexOf("sel-armor") > html.indexOf("sel-unit-kills"),
+        "armor appears beneath the single-unit kill count");
+    }
+    for (kind of [KIND.STEEL, KIND.BARRACKS]) {
+      hud._renderSelectedPanel();
+      assert(!panel.children[0].innerHTML.includes("sel-armor"),
+        "resource nodes and buildings omit the unit armor row");
+    }
+  });
+
+  withFakeHudDocument(({ FakeElement }) => {
+    const panel = new FakeElement("section");
     const selections = [
       { id: 2001, owner: 0, kind: KIND.STEEL, x: 96, y: 128, hp: 1, maxHp: 1, remaining: 412 },
       { id: 2002, owner: 0, kind: KIND.OIL, x: 160, y: 128, hp: 1, maxHp: 1, remaining: 701 },
