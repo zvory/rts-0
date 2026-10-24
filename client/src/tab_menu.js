@@ -386,6 +386,8 @@ export class TabMenu {
         onClick: (event) => this.adjustProduction(entry.unit, event.shiftKey ? -1 : 1),
       });
       button.dataset.producerKind = entry.producerKind;
+      button.style.gridRow = String(Math.floor(entry.slotIndex / 3) + 1);
+      button.style.gridColumn = String(entry.slotIndex % 3 + 1);
       grid.append(button);
     }
     section.append(heading, grid);
@@ -494,12 +496,13 @@ export function productionGridEntries(state, hotkeyProfiles = null, entities = n
     const producers = producersForUnit(state, entry.unit, entities);
     return {
       ...entry,
+      slotIndex: index,
       hotkeyCode: hotkeyCodes[index],
       hotkey: hotkeyCodes[index]?.replace(/^Key/, "") || "",
       producerIds: producers.map((producer) => producer.id),
       activeCount: producers.filter((producer) => producer.prodRepeatKinds?.includes(entry.unit)).length,
     };
-  });
+  }).filter((entry) => entry.unit !== KIND.ARTILLERY);
 }
 
 function producerKindOrder(kind) {

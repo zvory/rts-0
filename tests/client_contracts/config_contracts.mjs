@@ -1082,7 +1082,7 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
       "Mortar Team tooltip should explain indirect fire inaccuracy and explicit manual fire",
     );
     assert(antiTankGunButton?.dataset.hotkey === "W", "Anti-Tank Gun training should occupy the top-middle W slot");
-    assert(artilleryButton?.dataset.hotkey === "E", "Artillery training should occupy the top-right E slot");
+    assert(!artilleryButton, "Artillery training is hidden for playtests");
     assert(!artilleryResearchButton, "Artillery research should stay out of Gun Works");
     assert(!separateArtilleryResearchButton, "Separate Artillery research should not appear in Gun Works");
 
@@ -1115,11 +1115,8 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
     const engineeringSmokePlusButton = renderedButtons.find((button) => button.innerHTML.includes("SMK+"));
     const engineeringScoutPlaneButton = renderedButtons.find((button) => button.innerHTML.includes("SP+"));
     assert(!engineeringAtGunsResearchButton, "AT Guns research should no longer appear in Engineering Complex");
-    assert(engineeringArtilleryResearchButton?.dataset.hotkey === "W", "Artillery research should keep the W slot");
-    assert(!engineeringArtilleryResearchButton?.disabled, "Artillery should be independently available");
-    assert(engineeringArtilleryFireControlButton?.dataset.hotkey === "E", "Artillery Fire Control research should keep the E slot in Engineering Complex");
-    assert(engineeringArtilleryFireControlButton?.disabled, "Artillery Fire Control should require Artillery");
-    assert(engineeringArtilleryFireControlButton?.title === "Requires Artillery", "Artillery Fire Control should name its prerequisite");
+    assert(!engineeringArtilleryResearchButton, "Artillery research is hidden for playtests");
+    assert(!engineeringArtilleryFireControlButton, "Artillery Fire Control is hidden for playtests");
     assert(engineeringTankResearchButton?.dataset.hotkey === "A", "Tank Production research should appear in Engineering Complex");
     assert(engineeringSmokePlusButton?.dataset.hotkey === "S", "Smoke Plus research should appear in Engineering Complex");
     assert(engineeringScoutPlaneButton?.dataset.hotkey === "D", "Scout Plane research should appear in Engineering Complex");
@@ -1132,9 +1129,8 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
     renderCommandCard(engineeringHud);
     const unlockedArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("ART"));
     const atGunsUnlockedArtilleryFireControlButton = renderedButtons.find((button) => button.innerHTML.includes("AFC"));
-    assert(unlockedArtilleryResearchButton?.dataset.hotkey === "W", "Artillery should retain the W slot");
-    assert(unlockedArtilleryResearchButton && !unlockedArtilleryResearchButton.disabled, "Artillery should remain independently available");
-    assert(atGunsUnlockedArtilleryFireControlButton?.disabled, "Artillery Fire Control should still require Artillery");
+    assert(!unlockedArtilleryResearchButton, "Artillery research stays hidden");
+    assert(!atGunsUnlockedArtilleryFireControlButton, "Artillery Fire Control stays hidden");
 
     renderedButtons.length = 0;
     selectedEngineeringComplex.prodUpgradeQueue = [
@@ -1143,7 +1139,7 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
     engineeringHud._cardSig = null;
     renderCommandCard(engineeringHud);
     const unlockedArtilleryFireControlButton = renderedButtons.find((button) => button.innerHTML.includes("AFC"));
-    assert(unlockedArtilleryFireControlButton && !unlockedArtilleryFireControlButton.disabled, "Artillery Fire Control should enable when Artillery is queued");
+    assert(!unlockedArtilleryFireControlButton, "Artillery Fire Control stays hidden even with queued Artillery research");
 
     renderedButtons.length = 0;
     const playedNotices = [];

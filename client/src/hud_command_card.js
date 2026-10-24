@@ -70,8 +70,16 @@ function card(kind, signature, slots, extras = {}) {
     kind,
     signature,
     ...extras,
-    slots: slots.map((slot, slotIndex) => slot ? renderedDescriptor(slot, slotIndex) : null),
+    // Hide playtest-disabled content only after layout, preserving every other slot/hotkey.
+    slots: slots.map((slot, slotIndex) => slot && !hiddenPlaytestCommand(slot)
+      ? renderedDescriptor(slot, slotIndex) : null),
   };
+}
+
+function hiddenPlaytestCommand(slot) {
+  return slot.id === `train:${KIND.ARTILLERY}` ||
+    slot.id === `research:${UPGRADE.ARTILLERY_UNLOCK}` ||
+    slot.id === `research:${UPGRADE.BALLISTIC_TABLES}`;
 }
 
 function renderedDescriptor(descriptor, slotIndex) {
@@ -86,36 +94,7 @@ function renderedDescriptor(descriptor, slotIndex) {
   };
 }
 
-export function commandCardActivationCandidates(renderedCard, commandId) {
-  return (renderedCard?.slots || [])
-    .filter((slot) => slot?.commandId === commandId)
-    .map((slot) => ({
-      commandId: slot.commandId,
-      slotIndex: slot.slotIndex,
-      hotkey: slot.hotkey,
-      label: slot.label,
-      enabled: !!slot.enabled,
-    }));
-}
-
-export function duplicateCommandIdsForCard(renderedCard) {
-  const firstByCommandId = new Map();
-  const duplicates = [];
-  for (const slot of renderedCard?.slots || []) {
-    if (!slot?.commandId) continue;
-    const first = firstByCommandId.get(slot.commandId);
-    if (first) {
-      duplicates.push({
-        commandId: slot.commandId,
-        firstSlotIndex: first.slotIndex,
-        duplicateSlotIndex: slot.slotIndex,
-      });
-      continue;
-    }
-    firstByCommandId.set(slot.commandId, slot);
-  }
-  return duplicates;
-}
+export { commandCardActivationCandidates, duplicateCommandIdsForCard } from "./hud_train_card_helpers.js";
 
 export function buildCommandCardContextCatalog() {
   const playerId = 1;
