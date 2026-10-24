@@ -17,6 +17,20 @@ pub(crate) const JEFFS_AI_PRE_RIFLE_COVERAGE_ID: &str = "jeffs_ai_pre_rifle_cove
 /// This is comparison-only: it lets the arena test isolate the formation recovery change from
 /// every other active Jeff policy.
 pub(crate) const JEFFS_AI_PRE_TANK_CATCHUP_ID: &str = "jeffs_ai_pre_tank_catchup";
+/// Frozen immediately before the opening rush: the live Jeff whose four starting Riflemen stay in
+/// the home pocket. Comparison-only.
+pub(crate) const JEFFS_AI_PRE_OPENING_RUSH_ID: &str = "jeffs_ai_pre_opening_rush";
+/// Frozen immediately before the Tank micro (enemy Tank memory, the Tank movement governor, and
+/// smoke assaults): the live Jeff with the opening rush. Comparison-only.
+pub(crate) const JEFFS_AI_PRE_TANK_MICRO_ID: &str = "jeffs_ai_pre_tank_micro";
+/// Frozen immediately before the natural's guards defer to raid defense (1d5d98264 plus 9855cfe's
+/// shared fixes). Since the third-pressure freeze replaced it in `runs_live_jeff` it no longer
+/// runs the live-Jeff behaviors, like the older freezes. Comparison-only.
+pub(crate) const JEFFS_AI_PRE_GUARD_HANDOFF_ID: &str = "jeffs_ai_pre_guard_handoff";
+/// Frozen immediately before the pressure on the enemy's third base: the live Jeff at 9855cfe91,
+/// guard handoff included. It runs every live-Jeff behavior (`runs_live_jeff`); only the third
+/// pressure branches on the live id. Comparison-only.
+pub(crate) const JEFFS_AI_PRE_THIRD_PRESSURE_ID: &str = "jeffs_ai_pre_third_pressure";
 
 const OPENING_UNITS: [EntityKind; 1] = [EntityKind::MachineGunner];
 const ARMORED_UNITS: [EntityKind; 2] = [EntityKind::Tank, EntityKind::ScoutCar];
@@ -40,6 +54,14 @@ const TEMPLATE_HOME_ANTI_TANK: HomeAntiTankPolicy = HomeAntiTankPolicy {
     machine_gunner_screen_tiles: 1.0,
     lateral_spacing_tiles: 4.5,
 };
+
+const TEMPLATE_DEFENSIVE_MACHINE_GUNNERS: DefensiveMachineGunnerPolicy =
+    DefensiveMachineGunnerPolicy {
+        target_count: 2,
+        perimeter_distance_tiles: 6.0,
+        lateral_spacing_tiles: 4.5,
+        replacement_health_percent: Some(50),
+    };
 
 /// Server-authoritative port of the champion V3 policy developed in the standalone
 /// `Jeff's AI` workspace. The live controller still emits ordinary fog-constrained
@@ -118,12 +140,7 @@ const JEFFS_AI_TEMPLATE: AiProfile = AiProfile {
         oil_before_steel_in_expansion: true,
         remote_worker_assignment_fallback: true,
     }),
-    defensive_machine_gunners: Some(DefensiveMachineGunnerPolicy {
-        target_count: 2,
-        perimeter_distance_tiles: 6.0,
-        lateral_spacing_tiles: 4.5,
-        replacement_health_percent: Some(50),
-    }),
+    defensive_machine_gunners: Some(TEMPLATE_DEFENSIVE_MACHINE_GUNNERS),
     turtle_defense: None,
     frontal_wave: FrontalWavePolicy {
         exclude_launched_ticks: Some(120),
@@ -177,12 +194,50 @@ const JEFFS_AI_TEMPLATE: AiProfile = AiProfile {
 /// The live Jeff drops the Steelworks and Anti-Tank Gun path: the home Tank reservation and
 /// layered defense stay, and the Steelworks steel and oil go to a second Factory instead.
 /// Frozen comparison profiles keep the template's two guns.
-pub(crate) static JEFFS_AI: AiProfile = AiProfile {
+const JEFFS_AI_LIVE: AiProfile = AiProfile {
     home_anti_tank: Some(HomeAntiTankPolicy {
         target_guns: 0,
         ..TEMPLATE_HOME_ANTI_TANK
     }),
     ..JEFFS_AI_TEMPLATE
+};
+
+/// The live Jeff sends its starting Riflemen out to deny the enemy natural, so home holds four
+/// defensive Machine Gunners instead of two.
+const JEFFS_AI_RUSH: AiProfile = AiProfile {
+    defensive_machine_gunners: Some(DefensiveMachineGunnerPolicy {
+        target_count: 4,
+        ..TEMPLATE_DEFENSIVE_MACHINE_GUNNERS
+    }),
+    ..JEFFS_AI_LIVE
+};
+
+pub(crate) static JEFFS_AI: AiProfile = JEFFS_AI_RUSH;
+
+/// The live Jeff from before the Tank micro under its own id: the same policy, and the Tank
+/// micro only branches on the live id.
+pub(crate) static JEFFS_AI_PRE_TANK_MICRO: AiProfile = AiProfile {
+    id: JEFFS_AI_PRE_TANK_MICRO_ID,
+    ..JEFFS_AI_RUSH
+};
+
+/// The live Jeff from before the natural-guard handoff under its own id.
+pub(crate) static JEFFS_AI_PRE_GUARD_HANDOFF: AiProfile = AiProfile {
+    id: JEFFS_AI_PRE_GUARD_HANDOFF_ID,
+    ..JEFFS_AI_RUSH
+};
+
+/// The live Jeff from before the third-base pressure under its own id.
+pub(crate) static JEFFS_AI_PRE_THIRD_PRESSURE: AiProfile = AiProfile {
+    id: JEFFS_AI_PRE_THIRD_PRESSURE_ID,
+    ..JEFFS_AI_RUSH
+};
+
+/// The live Jeff's policy from before the opening rush under its own id: two defensive Machine
+/// Gunners, and the opening rush only branches on the live id.
+pub(crate) static JEFFS_AI_PRE_OPENING_RUSH: AiProfile = AiProfile {
+    id: JEFFS_AI_PRE_OPENING_RUSH_ID,
+    ..JEFFS_AI_LIVE
 };
 
 /// Comparison-only snapshot of the Jeff profile deployed on beta at build 967078d8ce95.
@@ -226,7 +281,14 @@ mod tests {
         assert_eq!(JEFFS_AI.workers.extra_builder_workers, 0);
         assert!(!JEFFS_AI.workers.train_workers_for_oil);
         assert!(JEFFS_AI.workers.reuse_idle_before_training);
-        assert_eq!(JEFFS_AI.defensive_machine_gunners.unwrap().target_count, 2);
+        assert_eq!(JEFFS_AI.defensive_machine_gunners.unwrap().target_count, 4);
+        assert_eq!(
+            JEFFS_AI_PRE_OPENING_RUSH
+                .defensive_machine_gunners
+                .unwrap()
+                .target_count,
+            2
+        );
         assert_eq!(
             JEFFS_AI
                 .defensive_machine_gunners

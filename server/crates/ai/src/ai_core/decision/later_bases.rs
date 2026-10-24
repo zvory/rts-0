@@ -99,6 +99,11 @@ pub(super) struct LaterBaseStatus {
 }
 
 impl LaterBases {
+    /// Whether a new base's site is in hand.
+    pub(super) fn planning(&self) -> bool {
+        self.site.is_some()
+    }
+
     /// Bases Jeff should currently own: the start, the natural, base 3, plus one per base whose
     /// first oil well has run dry.
     pub(super) fn target_bases(&self) -> usize {
@@ -424,6 +429,9 @@ fn free_tank_ids(observation: &AiObservation, memory: &AiDecisionMemory) -> Vec<
         .filter(|unit| {
             !memory.containment.active_tanks.contains(&unit.id)
                 && !memory.containment.opening_tanks.contains(&unit.id)
+                // The trap breach's Tanks hold their concave; they are not called home.
+                && !memory.trap_breach.is_reserved(unit.id)
+                && !memory.third_pressure.is_reserved(unit.id)
         })
         .map(|unit| unit.id)
         .collect()

@@ -77,7 +77,7 @@ fn main_line(observation: &AiObservation) -> (f32, f32) {
 }
 
 fn post_of(observation: &AiObservation, memory: &mut AiDecisionMemory) -> HomePost {
-    update_home_post(observation, memory, None, Some(enemy_base()), 8.0);
+    update_home_post(observation, memory, None, Some(enemy_base()), 8.0, true);
     memory.home_post.unwrap()
 }
 
@@ -248,6 +248,7 @@ fn home_tanks_answer_a_siege_they_can_match_and_hold_against_one_they_cannot() {
         &defenders,
         None,
         true,
+        JEFFS_AI_ID,
     )
     .unwrap();
     assert!(answered.contains(&20) && answered.contains(&21));
@@ -275,6 +276,7 @@ fn home_tanks_answer_a_siege_they_can_match_and_hold_against_one_they_cannot() {
             &defenders,
             None,
             true,
+            JEFFS_AI_ID,
         )
         .is_none());
         assert!(actions.into_commands().is_empty());
@@ -318,4 +320,99 @@ fn a_small_push_comes_home_and_a_large_one_carries_on() {
         command,
         SimCommand::Move { x, y, .. } if near((*x, *y), post)
     )));
+}
+
+/// A 64x64 grass map whose analysis marks `forest` tiles as forest (concealment).
+fn analysis_with_forest(forest: &[(u32, u32)]) -> AiMapAnalysis {
+    use rts_sim::protocol::{terrain, MapInfo, MapTile, PlayerStart, StartPayload};
+    let size = 64;
+    let tiles = (size * size) as usize;
+    let start = StartPayload {
+        player_id: 1,
+        spectator: false,
+        prediction_build_id: None,
+        prediction_version: 0,
+        match_run_id: None,
+        capabilities: Default::default(),
+        diagnostics: Default::default(),
+        replay: None,
+        lab: None,
+        observer_view: None,
+        tick: 0,
+        map: MapInfo {
+            width: size,
+            height: size,
+            tile_size: config::TILE_SIZE,
+            elevation: vec![0; tiles],
+            sun: None,
+            terrain: vec![terrain::GRASS; tiles],
+            resources: Vec::new(),
+            doodads: Vec::new(),
+            concealment_tiles: forest.iter().map(|&(x, y)| MapTile { x, y }).collect(),
+            no_vehicle_tiles: Vec::new(),
+            no_building_tiles: Vec::new(),
+            no_entrenchment_tiles: Vec::new(),
+            damage_reduction_tiles: Vec::new(),
+            slow_movement_tiles: Vec::new(),
+        },
+        players: [(1, (8, 8)), (2, (56, 56))]
+            .into_iter()
+            .map(|(id, (x, y))| PlayerStart {
+                id,
+                team_id: id,
+                faction_id: "kriegsia".to_string(),
+                name: format!("P{id}"),
+                color: "#111111".to_string(),
+                is_ai: true,
+                start_tile_x: x,
+                start_tile_y: y,
+            })
+            .collect(),
+    };
+    AiMapAnalysis::analyze(&start)
+}
+
+#[test]
+fn the_live_jeffs_home_post_keeps_out_of_forest() {
+    let observation = home_observation();
+    let line = main_line(&observation);
+    let (tx, ty) = ((line.0 / TS) as u32, (line.1 / TS) as u32);
+    // Forest over the main's line: tree trunks stop Tanks, which then drive to the nearest spot
+    // they can reach, on Crossroads across a water wall from the base.
+    let forest: Vec<(u32, u32)> = (tx - 2..=tx + 2)
+        .flat_map(|x| (ty - 2..=ty + 2).map(move |y| (x, y)))
+        .collect();
+    let analysis = analysis_with_forest(&forest);
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+
+    update_home_post(
+        &observation,
+        &mut memory,
+        Some(&analysis),
+        Some(enemy_base()),
+        8.0,
+        false,
+    );
+    assert!(
+        near(memory.home_post.unwrap().center(), line),
+        "frozen profiles keep the old post"
+    );
+
+    update_home_post(
+        &observation,
+        &mut memory,
+        Some(&analysis),
+        Some(enemy_base()),
+        8.0,
+        true,
+    );
+    let post = memory.home_post.unwrap().center();
+    let (px, py) = ((post.0 / TS) as i32, (post.1 / TS) as i32);
+    assert!(
+        forest
+            .iter()
+            .all(|&(x, y)| (x as i32 - px).abs().max((y as i32 - py).abs()) > 1),
+        "post at ({px},{py}) stays a tile clear of the forest"
+    );
+    assert!(dist2(post.0, post.1, line.0, line.1) <= squared(6.0 * TS));
 }

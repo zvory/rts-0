@@ -20,6 +20,10 @@ const NATURAL_COVER_MAX_TILES: f32 = 24.0;
 pub(super) const HOME_POST_RADIUS_TILES: f32 = 8.0;
 /// A post on blocked ground moves to the nearest open tile this close.
 const HOME_POST_SNAP_TILES: i32 = 4;
+/// The live Jeff keeps its post this many tiles clear of forest. Tree trunks stop Tanks, so a post
+/// in a forest sends them to the nearest spot they can reach: on Crossroads' east start that was
+/// across the water wall from the base, where 15-20 Tanks sat for the rest of the game.
+const HOME_POST_FOREST_MARGIN_TILES: i32 = 1;
 /// The home Tank waits this far behind the centre of the home line.
 const HOME_TANK_BEHIND_TILES: f32 = 2.0;
 /// Tanks within this distance of the HQ are in the main.
@@ -68,14 +72,16 @@ impl HomePost {
 }
 
 /// Work out this decision's home post. `distance_tiles` is how far the main's line stands from the
-/// main's steel.
+/// main's steel. With `avoid_forest` the post keeps clear of forest Tanks cannot enter.
 pub(super) fn update_home_post(
     observation: &AiObservation,
     memory: &mut AiDecisionMemory,
     map_analysis: Option<&AiMapAnalysis>,
     enemy_base: Option<EnemyBaseFact>,
     distance_tiles: f32,
+    avoid_forest: bool,
 ) {
+    let forest = map_analysis.filter(|_| avoid_forest);
     let live_steel = defense::main_steel_cluster_center(observation);
     if let Some(steel) = live_steel {
         memory.home_steel_anchor = Some((steel.0.round() as i32, steel.1.round() as i32));
@@ -84,10 +90,16 @@ pub(super) fn update_home_post(
     memory.home_post = steel.zip(enemy_base).and_then(|(steel, enemy_base)| {
         let line = defense::main_steel_line_center(observation, steel, enemy_base, distance_tiles)?;
         let facing = normalized_direction(steel, (enemy_base.x, enemy_base.y))?;
-        let (center, on_main_line) = match natural_cover_point(observation, map_analysis, line) {
-            Some(point) => (point, false),
-            None => (line, live_steel.is_some()),
-        };
+        let (center, on_main_line) =
+            match natural_cover_point(observation, map_analysis, forest, line) {
+                Some(point) => (point, false),
+                None => (
+                    forest
+                        .and_then(|_| open_point_near(observation, map_analysis, forest, line))
+                        .unwrap_or(line),
+                    live_steel.is_some(),
+                ),
+            };
         Some(HomePost {
             center: (center.0.round() as i32, center.1.round() as i32),
             facing: (
@@ -104,6 +116,7 @@ pub(super) fn update_home_post(
 fn natural_cover_point(
     observation: &AiObservation,
     map_analysis: Option<&AiMapAnalysis>,
+    forest: Option<&AiMapAnalysis>,
     line: (f32, f32),
 ) -> Option<(f32, f32)> {
     let natural = natural_depot(observation)?;
@@ -112,7 +125,20 @@ fn natural_cover_point(
         return None;
     }
     let midpoint = ((line.0 + natural.0) * 0.5, (line.1 + natural.1) * 0.5);
-    open_point_near(observation, map_analysis, midpoint)
+    open_point_near(observation, map_analysis, forest, midpoint)
+}
+
+/// Whether forest lies within `HOME_POST_FOREST_MARGIN_TILES` of `point`.
+fn near_forest(observation: &AiObservation, analysis: &AiMapAnalysis, point: (f32, f32)) -> bool {
+    let ts = observation.map.tile_size as f32;
+    let (tx, ty) = ((point.0 / ts).floor() as i32, (point.1 / ts).floor() as i32);
+    let margin = HOME_POST_FOREST_MARGIN_TILES;
+    (-margin..=margin).any(|dy| {
+        (-margin..=margin).any(|dx| {
+            let (x, y) = (tx + dx, ty + dy);
+            x >= 0 && y >= 0 && analysis.tile_is_concealment(x as u32, y as u32)
+        })
+    })
 }
 
 /// Jeff's nearest finished Depot other than the HQ.
@@ -137,12 +163,18 @@ fn natural_depot(observation: &AiObservation) -> Option<(f32, f32)> {
 }
 
 /// `point` if units can stand there, else the nearest open tile within `HOME_POST_SNAP_TILES`.
+/// With `forest`, open also means clear of its forest.
 fn open_point_near(
     observation: &AiObservation,
     map_analysis: Option<&AiMapAnalysis>,
+    forest: Option<&AiMapAnalysis>,
     point: (f32, f32),
 ) -> Option<(f32, f32)> {
-    if defense::defensive_position_is_open(observation, map_analysis, point.0, point.1) {
+    let open = |x: f32, y: f32| {
+        defense::defensive_position_is_open(observation, map_analysis, x, y)
+            && forest.is_none_or(|analysis| !near_forest(observation, analysis, (x, y)))
+    };
+    if open(point.0, point.1) {
         return Some(point);
     }
     let ts = observation.map.tile_size as f32;
@@ -157,12 +189,7 @@ fn open_point_near(
                     (point.0 + dx as f32 * ts, point.1 + dy as f32 * ts),
                     observation.map,
                 );
-                if !defense::defensive_position_is_open(
-                    observation,
-                    map_analysis,
-                    candidate.0,
-                    candidate.1,
-                ) {
+                if !open(candidate.0, candidate.1) {
                     continue;
                 }
                 let distance = dist2(candidate.0, candidate.1, point.0, point.1);

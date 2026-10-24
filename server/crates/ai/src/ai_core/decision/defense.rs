@@ -8,8 +8,10 @@ mod envelope;
 mod incident;
 mod line;
 mod pocket;
+mod raid;
 mod route_line;
 mod spacing;
+pub(super) use raid::{plan_home_infantry, rifle_answer, RaidDefense};
 pub(super) use spacing::{separated_rifle_position, separated_rifle_position_where};
 
 use self::envelope::{
@@ -27,12 +29,14 @@ pub(super) use self::line::{
 #[cfg(test)]
 use self::pocket::{
     defensive_pocket_basis, defensive_pocket_machine_gunner_assignments,
-    home_defensive_pocket_rifle_assignments,
+    forest_tiles_on_sight_line, home_defensive_pocket_rifle_assignments, pocket_rifle_assignments,
+    wide_pocket_machine_gunner_assignments,
 };
 pub(super) use self::pocket::{
     stage_defensive_pocket_machine_gunners, stage_home_defensive_pocket_riflemen,
+    HOME_POCKET_RIFLEMEN,
 };
-pub(super) use self::route_line::{plan_route_line, RouteLine};
+pub(super) use self::route_line::{plan_route_line_live, RouteLine};
 
 pub(super) fn crossroads_wall_aware_approach_direction(
     observation: &AiObservation,

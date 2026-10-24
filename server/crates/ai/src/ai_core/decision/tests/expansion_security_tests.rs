@@ -1,5 +1,5 @@
 use super::*;
-use crate::ai_core::profiles::JEFFS_AI;
+use crate::ai_core::profiles::{JEFFS_AI, JEFFS_AI_PRE_GUARD_HANDOFF, JEFFS_AI_PRE_TANK_MICRO};
 
 fn security_observation() -> AiObservation {
     let ts = config::TILE_SIZE as f32;
@@ -300,7 +300,13 @@ fn expansion_security_requires_arrival_and_uncontested_dwell() {
     let step = |obs: &AiObservation, memory: &mut AiDecisionMemory| {
         let facts = AiFacts::from_observation(obs);
         let mut actions = AiActionContext::new(&facts, SpendBudget::new(1000, 1000, 20, 80));
-        expansion_security::update_and_stage(obs, None, memory, &mut actions)
+        expansion_security::update_and_stage(
+            obs,
+            None,
+            memory,
+            &mut actions,
+            JEFFS_AI_PRE_TANK_MICRO_ID,
+        )
     };
     assert!(!step(&obs, &mut memory));
     for (index, id) in memory.expansion_security.riflemen.iter().enumerate() {
@@ -361,7 +367,13 @@ fn guards_stuck_just_short_of_their_posts_secure_the_site_after_a_longer_dwell()
     let step = |obs: &AiObservation, memory: &mut AiDecisionMemory| {
         let facts = AiFacts::from_observation(obs);
         let mut actions = AiActionContext::new(&facts, SpendBudget::new(1000, 1000, 20, 80));
-        expansion_security::update_and_stage(obs, None, memory, &mut actions)
+        expansion_security::update_and_stage(
+            obs,
+            None,
+            memory,
+            &mut actions,
+            JEFFS_AI_PRE_TANK_MICRO_ID,
+        )
     };
     // Each guard stands a tile short of its post, as one pressed against steel patches does.
     let site = memory.expansion_security.site.unwrap();
@@ -405,14 +417,22 @@ fn guards_stuck_just_short_of_their_posts_secure_the_site_after_a_longer_dwell()
     assert!(!step(&obs, &mut memory));
 }
 
+/// The guards on a contested natural are left to local defense: the frozen Jeff sends them at the
+/// raider, and the live Jeff's raid response takes them in.
 #[test]
 fn contested_expansion_guards_are_available_to_local_defense() {
+    for profile in [&JEFFS_AI_PRE_TANK_MICRO, &JEFFS_AI] {
+        contested_expansion_guards_answer_the_raid(profile);
+    }
+}
+
+fn contested_expansion_guards_answer_the_raid(profile: &'static AiProfile) {
     let mut obs = security_observation();
-    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+    let mut memory = AiDecisionMemory::for_profile(profile);
     expansion_security::prepare(
         &obs,
         &AiFacts::from_observation(&obs),
-        &JEFFS_AI,
+        profile,
         &mut memory,
         None,
         &mut |_, _, _| true,
@@ -436,7 +456,20 @@ fn contested_expansion_guards_are_available_to_local_defense() {
     enemy.owner = 2;
     obs.visible_enemies.push(enemy);
 
-    let decision = decide(&obs, &JEFFS_AI, &mut memory);
+    let decision = decide(&obs, profile, &mut memory);
+    if profile.id == JEFFS_AI_ID {
+        let answering: BTreeSet<u32> = memory.raid_defense.reserved().collect();
+        assert!(
+            memory
+                .expansion_security
+                .riflemen
+                .iter()
+                .all(|id| answering.contains(id)),
+            "{:?}",
+            decision.commands
+        );
+        return;
+    }
     assert!(decision.commands.iter().any(|command| matches!(
         command,
         Command::Attack { units, target, .. }
@@ -867,9 +900,21 @@ fn surplus_tank_moves_forward_while_reserved_tank_stays_home() {
         .push(combat_at(51, EntityKind::Tank, 10.0 * ts, 10.0 * ts));
     obs.owned
         .push(combat_at(52, EntityKind::Tank, 11.0 * ts, 10.0 * ts));
+    // A push of two Tanks and a Scout Car is out on the map.
+    for (id, kind) in [
+        (53, EntityKind::Tank),
+        (54, EntityKind::Tank),
+        (55, EntityKind::ScoutCar),
+    ] {
+        obs.owned
+            .push(combat_at(id, kind, (40 + id) as f32 * ts, 40.0 * ts));
+    }
     let target = expansion_security::tank_staging_center(&obs, None).unwrap();
     let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
     memory.containment.wave_launched = true;
+    memory.containment.active_tanks = [53, 54].into_iter().collect();
+    memory.containment.active_scout = Some(55);
+    memory.containment.launch_tanks = 2;
     memory.home_defensive_tank = Some(51);
     memory.home_defensive_tank_assigned_once = true;
 
@@ -1128,4 +1173,223 @@ fn a_pending_natural_order_keeps_its_oil_from_the_next_tank() {
         site.1,
     )];
     assert!(!decide(&obs, &JEFFS_AI, &mut memory).intents.contains(&tank));
+}
+
+/// The site of the natural, with Tanks at `(id, x tile, y tile)` and an enemy unit of `kind` on it.
+fn natural_held_by(
+    kind: EntityKind,
+    tanks: &[(u32, f32, f32)],
+) -> (AiObservation, AiDecisionMemory) {
+    let ts = config::TILE_SIZE as f32;
+    let mut obs = security_observation();
+    for (id, x, y) in tanks {
+        obs.owned
+            .push(combat_at(*id, EntityKind::Tank, x * ts, y * ts));
+    }
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+    expansion_security::prepare(
+        &obs,
+        &AiFacts::from_observation(&obs),
+        &JEFFS_AI,
+        &mut memory,
+        None,
+        &mut |_, _, _| true,
+    );
+    let site = memory.expansion_security.site.unwrap();
+    let center = building_center(site, EntityKind::ResourceDepot, obs.map.tile_size).unwrap();
+    let mut enemy = combat_at(900, kind, center.0 + 2.0 * ts, center.1);
+    enemy.owner = 2;
+    obs.visible_enemies.push(enemy);
+    (obs, memory)
+}
+
+#[test]
+fn enemy_infantry_on_the_natural_is_cleared_by_the_two_nearest_tanks() {
+    let (obs, mut memory) = natural_held_by(
+        EntityKind::Rifleman,
+        &[(60, 20.0, 20.0), (61, 18.0, 18.0), (62, 9.0, 9.0)],
+    );
+    let decision = decide(&obs, &JEFFS_AI, &mut memory);
+    assert_eq!(memory.expansion_security.contested_tick, Some(obs.tick));
+    assert_eq!(memory.expansion_security.clearers, vec![60, 61]);
+    for tank in [60, 61] {
+        assert!(
+            decision.commands.iter().any(|command| matches!(
+                command,
+                Command::AttackMove { units, .. } if units == &[tank]
+            )),
+            "Tank {tank} is sent: {:?}",
+            decision.commands
+        );
+    }
+    // No Depot money is held back while the site is held.
+    assert!(!expansion_security::reserve_expansion(
+        &obs,
+        &AiFacts::from_observation(&obs),
+        &JEFFS_AI,
+        &mut memory,
+    ));
+}
+
+#[test]
+fn enemy_armor_on_the_natural_is_left_to_the_tank_fight() {
+    let (obs, mut memory) = natural_held_by(EntityKind::Tank, &[(60, 20.0, 20.0)]);
+    decide(&obs, &JEFFS_AI, &mut memory);
+    assert!(memory.expansion_security.clearers.is_empty());
+}
+
+/// A guard out at its far post keeps it when another Rifleman passes nearer the site: the live
+/// Jeff fills only vacancies, where the frozen Jeff re-picks the nearest two every decision.
+#[test]
+fn a_live_guard_keeps_its_post_when_another_rifleman_passes_nearer() {
+    for (profile, kept) in [(&JEFFS_AI, true), (&JEFFS_AI_PRE_TANK_MICRO, false)] {
+        let mut obs = security_observation();
+        // Beyond the four oldest, kept home, four Riflemen can guard the natural.
+        let ts = config::TILE_SIZE as f32;
+        obs.owned
+            .extend((16..18).map(|id| combat_at(id, EntityKind::Rifleman, 14.0 * ts, 14.0 * ts)));
+        let mut memory = AiDecisionMemory::for_profile(profile);
+        let prepare = |obs: &AiObservation, memory: &mut AiDecisionMemory| {
+            let facts = AiFacts::from_observation(obs);
+            expansion_security::prepare(obs, &facts, profile, memory, None, &mut |_, _, _| true);
+        };
+        prepare(&obs, &mut memory);
+        let guards = memory.expansion_security.riflemen.clone();
+        assert_eq!(guards.len(), 2, "{}", profile.id);
+        let site = memory.expansion_security.site.unwrap();
+        let center = building_center(site, EntityKind::ResourceDepot, obs.map.tile_size).unwrap();
+        let passer = (14..18).find(|id| !guards.contains(id)).unwrap();
+        for unit in obs.owned.iter_mut() {
+            if unit.id == guards[0] {
+                unit.x = 60.0 * ts;
+                unit.y = 60.0 * ts;
+            } else if unit.id == passer {
+                unit.x = center.0 + ts;
+                unit.y = center.1;
+            }
+        }
+        obs.tick += 9;
+        prepare(&obs, &mut memory);
+        assert_eq!(
+            memory.expansion_security.riflemen.contains(&guards[0]),
+            kept,
+            "{}: {:?}",
+            profile.id,
+            memory.expansion_security.riflemen
+        );
+    }
+}
+
+#[test]
+fn the_live_jeff_leaves_a_guard_raid_defense_holds_to_raid_defense() {
+    for (profile, live) in [(&JEFFS_AI, true), (&JEFFS_AI_PRE_GUARD_HANDOFF, false)] {
+        let obs = security_observation();
+        let facts = AiFacts::from_observation(&obs);
+        let mut memory = AiDecisionMemory::for_profile(profile);
+        expansion_security::prepare(&obs, &facts, profile, &mut memory, None, &mut |_, _, _| {
+            true
+        });
+        let guards = memory.expansion_security.riflemen.clone();
+        assert_eq!(guards.len(), 2, "{}", profile.id);
+        // Raid defense has pulled the first guard back: its post is not re-sent over that.
+        memory.raid_defense.hold_for_test(guards[0]);
+        let mut actions = AiActionContext::new(&facts, SpendBudget::new(1000, 1000, 20, 80));
+        expansion_security::update_and_stage(&obs, None, &mut memory, &mut actions, profile.id);
+        let commands = actions.into_commands();
+        let ordered = |id: u32| {
+            commands.iter().any(|command| match command {
+                Command::AttackMove { units, .. } | Command::HoldPosition { units, .. } => {
+                    units.contains(&id)
+                }
+                _ => false,
+            })
+        };
+        assert_eq!(ordered(guards[0]), !live, "{}: {commands:?}", profile.id);
+        assert!(ordered(guards[1]), "{}: {commands:?}", profile.id);
+        // Nor is a Rifleman raid defense holds picked as a new guard.
+        let mut memory = AiDecisionMemory::for_profile(profile);
+        memory.raid_defense.hold_for_test(guards[0]);
+        expansion_security::prepare(&obs, &facts, profile, &mut memory, None, &mut |_, _, _| {
+            true
+        });
+        assert_eq!(
+            memory.expansion_security.riflemen.contains(&guards[0]),
+            !live,
+            "{}: {:?}",
+            profile.id,
+            memory.expansion_security.riflemen
+        );
+    }
+}
+
+#[test]
+fn the_live_jeff_leaves_a_guard_in_a_home_fight_to_home_defense() {
+    for (profile, live) in [(&JEFFS_AI, true), (&JEFFS_AI_PRE_GUARD_HANDOFF, false)] {
+        let obs = security_observation();
+        let facts = AiFacts::from_observation(&obs);
+        let mut memory = AiDecisionMemory::for_profile(profile);
+        expansion_security::prepare(&obs, &facts, profile, &mut memory, None, &mut |_, _, _| {
+            true
+        });
+        let guards = memory.expansion_security.riflemen.clone();
+        assert_eq!(guards.len(), 2, "{}", profile.id);
+        // Home defense met a raid beside both guards a moment ago, and raid defense saw it.
+        let guard = obs.owned.iter().find(|unit| unit.id == guards[0]).unwrap();
+        memory.note_defensive_contact(obs.tick, (guard.x, guard.y), 100, false);
+        memory
+            .raid_defense
+            .see_raid_for_test(obs.tick, (guard.x, guard.y));
+        let mut actions = AiActionContext::new(&facts, SpendBudget::new(1000, 1000, 20, 80));
+        expansion_security::update_and_stage(&obs, None, &mut memory, &mut actions, profile.id);
+        let commands = actions.into_commands();
+        let ordered = |id: u32| {
+            commands.iter().any(|command| match command {
+                Command::AttackMove { units, .. } | Command::HoldPosition { units, .. } => {
+                    units.contains(&id)
+                }
+                _ => false,
+            })
+        };
+        assert_eq!(ordered(guards[0]), !live, "{}: {commands:?}", profile.id);
+        // Once the contact is old, the guards go out again.
+        let mut later = obs.clone();
+        later.tick += config::TICK_HZ * 3;
+        let mut actions = AiActionContext::new(&facts, SpendBudget::new(1000, 1000, 20, 80));
+        expansion_security::update_and_stage(&later, None, &mut memory, &mut actions, profile.id);
+        let commands = actions.into_commands();
+        assert!(
+            commands.iter().any(|command| matches!(
+                command,
+                Command::AttackMove { units, .. } if units.contains(&guards[0])
+            )),
+            "{}: {commands:?}",
+            profile.id
+        );
+    }
+}
+
+#[test]
+fn the_live_jeff_keeps_guards_out_of_a_raid_raid_defense_leaves_to_the_line() {
+    for (profile, live) in [(&JEFFS_AI, true), (&JEFFS_AI_PRE_GUARD_HANDOFF, false)] {
+        let obs = security_observation();
+        let facts = AiFacts::from_observation(&obs);
+        let mut memory = AiDecisionMemory::for_profile(profile);
+        expansion_security::prepare(&obs, &facts, profile, &mut memory, None, &mut |_, _, _| {
+            true
+        });
+        let guards = memory.expansion_security.riflemen.clone();
+        // A raid raid defense saw but did not answer, three tiles from the first guard.
+        let guard = obs.owned.iter().find(|unit| unit.id == guards[0]).unwrap();
+        let ts = config::TILE_SIZE as f32;
+        memory
+            .raid_defense
+            .see_raid_for_test(obs.tick, (guard.x + 3.0 * ts, guard.y));
+        let mut actions = AiActionContext::new(&facts, SpendBudget::new(1000, 1000, 20, 80));
+        expansion_security::update_and_stage(&obs, None, &mut memory, &mut actions, profile.id);
+        let commands = actions.into_commands();
+        let ordered = commands.iter().any(|command| {
+            matches!(command, Command::AttackMove { units, .. } if units.contains(&guards[0]))
+        });
+        assert_eq!(ordered, !live, "{}: {commands:?}", profile.id);
+    }
 }
