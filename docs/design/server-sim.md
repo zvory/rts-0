@@ -1920,7 +1920,9 @@ scouts any remembered footprint tile. The store retains that per-player clear ti
 observer union compares its newest positive sighting with its newest clear; a clear at the same or
 a later tick wins and keeps the destroyed building absent after current vision leaves. Clears are
 discarded once no positive memory of that building remains. Individual player views retain their
-independent knowledge, and no clear record is sent on the wire. This keeps hidden destruction stale
+independent knowledge, and no clear record is sent on the wire. A selected owner also suppresses
+other selected players' stale memories of its buildings that no longer exist, regardless of current
+footprint visibility; opponent-only views retain their own memory. This keeps hidden destruction stale
 until the location is checked without adding wire-protocol fields.
 
 `game::anti_tank_gun_memory::AntiTankGunMemory` is the corresponding server-authoritative
