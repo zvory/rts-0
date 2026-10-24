@@ -1,3 +1,6 @@
+import { ABILITY } from "./protocol.js";
+import { resourceIconHtml } from "./resource_icons.js";
+
 export function renderDescriptorCardDom(card, descriptorCard, buttonForDescriptor) {
   const frag = document.createDocumentFragment();
   const slots = Array.isArray(descriptorCard?.slots) ? descriptorCard.slots : [];
@@ -103,7 +106,7 @@ export function createCommandButton(opts) {
     ? `<span class="cmd-cost">` +
       (opts.cost.steel ? `<span class="c-steel">${opts.cost.steel}</span>` : "") +
       (opts.cost.steel && opts.cost.oil ? `<span class="c-sep">/</span>` : "") +
-      (opts.cost.oil ? `<span class="c-oil">${opts.cost.oil}</span>` : "") +
+      (opts.cost.oil ? `<span class="c-oil">${opts.ability === ABILITY.BARRAGE ? resourceIconHtml("oil") : ""}${opts.cost.oil}</span>` : "") +
       `</span>`
     : "";
   const cooldownClocks = Array.isArray(opts.cooldownClocks) ? opts.cooldownClocks : [];
