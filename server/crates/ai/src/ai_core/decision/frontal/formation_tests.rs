@@ -369,6 +369,7 @@ fn containment_timeout_allows_minor_screen_pathing_slop() {
         &formation,
         (8.5 * 32.0, 8.5 * 32.0),
         (56.5 * 32.0, 48.5 * 32.0),
+        MarchShape::LEGACY,
     ));
 }
 
@@ -474,7 +475,12 @@ fn containment_detects_a_tank_that_has_run_ahead() {
         100,
     );
 
-    assert!(!tank_group_is_cohesive(&observation, &[1, 2], (1.0, 0.0)));
+    assert!(!tank_group_is_cohesive(
+        &observation,
+        &[1, 2],
+        (1.0, 0.0),
+        MarchShape::LEGACY
+    ));
 }
 
 #[test]

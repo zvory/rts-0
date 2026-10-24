@@ -189,6 +189,8 @@ pub(crate) struct AiMapAnalysis {
     tile_size: u32,
     passable: Vec<bool>,
     line_of_sight_blocked: Vec<bool>,
+    /// Road tiles, where units move faster.
+    road: Vec<bool>,
     clearance: Vec<u16>,
     component_by_tile: Vec<Option<u32>>,
     components: Vec<AiMapComponent>,
@@ -309,6 +311,15 @@ impl AiMapAnalysis {
             .copied()
             .map(rts_rules::terrain::blocks_line_of_sight)
             .collect();
+        let road = start
+            .map
+            .terrain
+            .iter()
+            .map(|code| {
+                rts_rules::terrain::TerrainKind::from_map_code(*code)
+                    == Some(rts_rules::terrain::TerrainKind::Road)
+            })
+            .collect();
         let clearance = build_clearance(width, height, &passable);
         let (component_by_tile, components) =
             build_components(width, height, &passable, &clearance);
@@ -347,6 +358,7 @@ impl AiMapAnalysis {
             tile_size,
             passable,
             line_of_sight_blocked,
+            road,
             clearance,
             component_by_tile,
             components,
