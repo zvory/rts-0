@@ -211,6 +211,16 @@ impl OpeningRush {
         self.starters.contains(&id)
     }
 
+    /// A rush that took `starters` and has ended.
+    #[cfg(test)]
+    pub(in crate::ai_core::decision) fn ended_with_starters(starters: &[u32]) -> Self {
+        Self {
+            phase: RushPhase::Done,
+            starters: starters.iter().copied().collect(),
+            ..Self::default()
+        }
+    }
+
     /// Whether the enemy's opening attack slipped past the squad toward Jeff's base.
     pub(in crate::ai_core::decision) fn missed_contact(&self) -> bool {
         self.missed_contact

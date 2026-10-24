@@ -596,6 +596,51 @@ fn four_gun_line_keeps_the_pocket_posts_and_adds_a_wing_on_each_side() {
 }
 
 #[test]
+fn six_gun_line_carries_the_four_gun_line_one_post_farther_out_on_each_wing() {
+    let (observation, enemy_base) = river_pocket_observation();
+    let tile_size = observation.map.tile_size as f32;
+    let four =
+        wide_pocket_machine_gunner_assignments(&observation, None, &[50, 60, 70, 80], enemy_base)
+            .unwrap();
+    let six = six_pocket_machine_gunner_assignments(
+        &observation,
+        None,
+        &[100, 90, 80, 70, 60, 50],
+        enemy_base,
+    )
+    .unwrap();
+
+    assert_eq!(
+        six.iter().map(|post| post.unit_id).collect::<Vec<_>>(),
+        vec![50, 60, 70, 80, 90, 100]
+    );
+    for (post, four_post) in six.iter().zip(&four) {
+        assert_eq!((post.x, post.y), (four_post.x, four_post.y));
+    }
+    let anchor = tile_center(observation.own_start_tile, observation.map.tile_size);
+    let direction = normalized_direction(anchor, (enemy_base.x, enemy_base.y)).unwrap();
+    let perpendicular = (-direction.1, direction.0);
+    for (post, expected) in six.iter().skip(4).zip([(8.5, -5.25), (8.5, 5.25)]) {
+        let offset = (post.x - anchor.0, post.y - anchor.1);
+        let forward = (offset.0 * direction.0 + offset.1 * direction.1) / tile_size;
+        let lateral = (offset.0 * perpendicular.0 + offset.1 * perpendicular.1) / tile_size;
+        assert!(
+            (forward - expected.0).abs() < 0.01,
+            "{forward} vs {expected:?}"
+        );
+        assert!(
+            (lateral - expected.1).abs() < 0.01,
+            "{lateral} vs {expected:?}"
+        );
+    }
+    for post in &six {
+        for other in six.iter().filter(|other| other.unit_id != post.unit_id) {
+            assert!(dist2(post.x, post.y, other.x, other.y) >= squared(1.45 * tile_size));
+        }
+    }
+}
+
+#[test]
 fn a_gun_on_its_post_keeps_it_when_another_gun_falls() {
     let (mut observation, enemy_base) = river_pocket_observation();
     let full =

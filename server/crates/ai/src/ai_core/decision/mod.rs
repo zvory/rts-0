@@ -264,6 +264,23 @@ where
     idle_builders.sort_unstable();
     gathering_builders.sort_unstable();
     let builder_pools = [idle_builders.as_slice(), gathering_builders.as_slice()];
+    // The live Jeff builds at home with the Engineer nearest its HQ. By id the first pick was the
+    // natural's builder, which stands at the natural once a second Engineer is home.
+    let mut home_builders = idle_builders.clone();
+    if profile.id == JEFFS_AI_ID {
+        let home = tile_center(observation.own_start_tile, observation.map.tile_size);
+        let from_home = |id: &u32| {
+            observation
+                .owned
+                .iter()
+                .find(|unit| unit.id == *id)
+                .map_or(f32::MAX, |unit| {
+                    geometry::dist2(unit.x, unit.y, home.0, home.1)
+                })
+        };
+        home_builders.sort_by(|a, b| from_home(a).total_cmp(&from_home(b)).then(a.cmp(b)));
+    }
+    let production_builders = [home_builders.as_slice(), gathering_builders.as_slice()];
     if let Some((tile_x, tile_y)) = resource_depot_to_resume(observation, memory) {
         if actions::try_resume_construction_at(
             &mut actions,
@@ -414,10 +431,20 @@ where
     }
     let save_for_unplanned_expansion = (save_for_expansion || reserve_expansion)
         && planned_in_intents(&intents, EntityKind::ResourceDepot) == 0;
+    // Once the live Jeff's natural order is out, its cost stays set aside (the Steel committed to
+    // the order, the Oil held back below), so its tech goes on while the builder walks. The Factory
+    // used to wait for the foundation and then for the builder's walk home: on Doppelganger's edge
+    // natural the Factory ordered at 2:24 went down near 3:00, and Tank Unlock came at 3:08.
+    let live_natural_pending = profile.id == JEFFS_AI_ID && natural_pending;
+    let hold_tech_for_expansion = save_for_unplanned_expansion && !live_natural_pending;
     if (reserve_expansion || natural_pending)
         && planned_in_intents(&intents, EntityKind::ResourceDepot) == 0
     {
         let (steel, oil) = rts_rules::economy::cost(EntityKind::ResourceDepot);
+        // The budget already leaves out a pending order's Steel (the facts' committed Steel), so the
+        // live Jeff holds back only its Oil while the builder walks. Holding the Steel back again
+        // froze every Steel purchase until the foundation went down.
+        let steel = if live_natural_pending { 0 } else { steel };
         actions.holdback_resources(steel, oil);
     }
     // Jeff's bases beyond the natural. A second Factory that is due takes priority this decision.
@@ -456,7 +483,16 @@ where
 
     let economy_plan = economy_manager_output.plan.clone();
     let save_worker_training_for_tech = defer_economy_for_panic;
-    let should_train_workers = economy_manager_output.proposes(EconomyProposal::TrainWorker);
+    // The live Jeff trains a second Engineer once its natural is ordered, so the Factory and the
+    // rest of home's building do not wait for the natural's builder to walk back.
+    let target_workers =
+        if profile.id == JEFFS_AI_ID && facts.building_count(EntityKind::ResourceDepot) >= 2 {
+            economy_plan.target_workers.max(2)
+        } else {
+            economy_plan.target_workers
+        };
+    let should_train_workers = economy_manager_output.proposes(EconomyProposal::TrainWorker)
+        || (!defer_economy_for_panic && facts.worker_count < target_workers);
     if should_train_workers {
         for trained in actions::train_units(
             &mut actions,
@@ -468,7 +504,7 @@ where
                 max_queue_depth: 1,
                 save_for_tech: save_worker_training_for_tech,
                 current_counts: &[(EntityKind::Worker, facts.worker_count)],
-                max_counts: &[(EntityKind::Worker, economy_plan.target_workers)],
+                max_counts: &[(EntityKind::Worker, target_workers)],
                 balance_unit_priorities: false,
             },
         ) {
@@ -487,7 +523,7 @@ where
         if turtle_should_delay_tech_for_entrenchment(profile, memory, &facts, *kind) {
             continue;
         }
-        if expansion_blocks_tech_path || save_for_unplanned_expansion {
+        if expansion_blocks_tech_path || hold_tech_for_expansion {
             continue;
         }
         if facts.building_count(*kind) + planned_in_intents(&intents, *kind) > 0 {
@@ -497,7 +533,7 @@ where
             observation,
             &facts,
             &mut actions,
-            &builder_pools,
+            &production_builders,
             profile,
             *kind,
             build_search,
@@ -553,7 +589,7 @@ where
             observation,
             &facts,
             &mut actions,
-            &builder_pools,
+            &production_builders,
             profile,
             EntityKind::Barracks,
             build_search,
@@ -572,14 +608,14 @@ where
             + planned_in_intents(&intents, EntityKind::Factory)
             < profile.buildings.factory_target
         && !expansion_blocks_tech_path
-        && !save_for_unplanned_expansion
+        && !hold_tech_for_expansion
         && planned_in_intents(&intents, EntityKind::Factory) == 0;
     if first_factory_needed {
         if let Some(build_action) = try_build_production(
             observation,
             &facts,
             &mut actions,
-            &builder_pools,
+            &production_builders,
             profile,
             EntityKind::Factory,
             build_search,
@@ -632,7 +668,7 @@ where
             observation,
             &facts,
             &mut actions,
-            &builder_pools,
+            &production_builders,
             profile,
             EntityKind::Steelworks,
             build_search,
@@ -674,7 +710,7 @@ where
             observation,
             &facts,
             &mut actions,
-            &builder_pools,
+            &production_builders,
             profile,
             EntityKind::Steelworks,
             build_search,
@@ -702,7 +738,7 @@ where
             observation,
             &facts,
             &mut actions,
-            &builder_pools,
+            &production_builders,
             profile,
             EntityKind::Factory,
             build_search,
@@ -760,10 +796,26 @@ where
         &effective_unit_priorities,
     );
     let mut effective_unit_priorities = effective_unit_priorities;
-    if uses_current_jeffs_ai_policy(profile.id)
-        && memory.expansion_security.site.is_some()
-        && facts.unit_count(EntityKind::Rifleman) < 6
+    // Riflemen recruited ahead of tech for the natural: the Rifleman count (in training included)
+    // to reach. The freezes top every Rifleman up to six. The live Jeff fills only the guard party,
+    // and before its first Tank only once the opening guns are ordered; its extra guns take the
+    // other Riflemen's place.
+    let security_rifle_target = if !uses_current_jeffs_ai_policy(profile.id)
+        || memory.expansion_security.site.is_none()
     {
+        None
+    } else if profile.id == JEFFS_AI_ID {
+        let guns_first = facts.unit_count(EntityKind::Tank) == 0
+            && !expansion_security::opening_guns_ordered(
+                observation,
+                &facts,
+                expansion_security::OPENING_GUNS,
+            );
+        expansion_security::party_rifle_target(observation, &facts, memory).filter(|_| !guns_first)
+    } else {
+        (facts.unit_count(EntityKind::Rifleman) < 6).then_some(6)
+    };
+    if security_rifle_target.is_some() {
         effective_unit_priorities.insert(0, EntityKind::Rifleman);
     }
     let emergency_rifle_target = memory
@@ -817,13 +869,11 @@ where
         let key_tech_unit = production_policy
             .save_for_first_tech_unit
             .unwrap_or(EntityKind::Worker);
-        let security_recruits = uses_current_jeffs_ai_policy(profile.id)
-            && memory.expansion_security.site.is_some()
-            && facts.unit_count(EntityKind::Rifleman) < 6
-            && building_kind == EntityKind::Barracks;
+        let security_recruits =
+            security_rifle_target.filter(|_| building_kind == EntityKind::Barracks);
         let emergency_recruits =
             emergency_rifle_target.filter(|_| building_kind == EntityKind::Barracks);
-        let save_for_tech = !security_recruits
+        let save_for_tech = security_recruits.is_none()
             && emergency_recruits.is_none()
             && (save_for_unplanned_expansion
                 || (save_for_first_tech_unit
@@ -863,7 +913,7 @@ where
                 current
                     .saturating_add(affordable_above_reserve)
                     .min(surplus_cap)
-                    .max(if security_recruits { 6 } else { 0 }),
+                    .max(security_recruits.unwrap_or(0)),
             ));
         }
         if let Some(target) = emergency_recruits {

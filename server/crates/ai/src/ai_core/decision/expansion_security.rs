@@ -3,6 +3,9 @@ use super::*;
 
 const HOME_RIFLES: usize = 4;
 const PARTY_SIZE: usize = 2;
+/// The opening guns ordered before the natural is due. The live Jeff holds six defensive guns; the
+/// other two come with the Steel the natural's order leaves spare.
+pub(super) const OPENING_GUNS: usize = 4;
 const SECURE_TICKS: u32 = config::TICK_HZ * 3;
 /// A guard that stops just short of its post, pressed against the natural's steel patches, never
 /// reaches the arrival tolerance. Guards this close to their posts, with nothing hostile near,
@@ -114,14 +117,25 @@ pub(super) fn expansion_is_next(
 /// the Depot at about 1:43 but waited for the Factory and first Tank (2:42); a natural much past
 /// 3:00 loses the economy race (on Doppelganger AI 2.1 held three bases from 3:36 against one).
 /// The reserve then holds the Factory back until the Depot is ordered. A Factory or Tank already out
-/// keeps the natural due.
+/// keeps the natural due. The live Jeff holds six guns; the natural waits only for the first four.
 fn early_natural_due(observation: &AiObservation, facts: &AiFacts, profile: &AiProfile) -> bool {
     if facts.building_count(EntityKind::Factory) > 0 || facts.unit_count(EntityKind::Tank) > 0 {
         return true;
     }
     let guns = profile
         .defensive_machine_gunners
-        .map_or(0, |policy| policy.target_count);
+        .map_or(0, |policy| policy.target_count)
+        .min(OPENING_GUNS);
+    facts.building_count(EntityKind::EngineeringComplex) > 0
+        && opening_guns_ordered(observation, facts, guns)
+}
+
+/// Whether `guns` Machine Gunners are out or in training.
+pub(super) fn opening_guns_ordered(
+    observation: &AiObservation,
+    facts: &AiFacts,
+    guns: usize,
+) -> bool {
     let queued: usize = observation
         .owned
         .iter()
@@ -131,8 +145,28 @@ fn early_natural_due(observation: &AiObservation, facts: &AiFacts, profile: &AiP
         })
         .map(|unit| unit.production_queue_len.unwrap_or(0))
         .sum();
-    facts.building_count(EntityKind::EngineeringComplex) > 0
-        && facts.unit_count(EntityKind::MachineGunner) + queued >= guns
+    facts.unit_count(EntityKind::MachineGunner) + queued >= guns
+}
+
+/// While the natural's guard party lacks Riflemen (those in training count toward it), the Rifleman
+/// count, in training included, that fills it. The live Jeff recruits only these while its natural
+/// is next: topping every Rifleman up to six put three Riflemen ahead of the opening guns once the
+/// starters were lost.
+pub(super) fn party_rifle_target(
+    observation: &AiObservation,
+    facts: &AiFacts,
+    memory: &AiDecisionMemory,
+) -> Option<usize> {
+    let queued: usize = observation
+        .owned
+        .iter()
+        .filter(|unit| {
+            unit.kind == EntityKind::Barracks && unit.production_kind == Some(EntityKind::Rifleman)
+        })
+        .map(|unit| unit.production_queue_len.unwrap_or(0))
+        .sum();
+    let short = PARTY_SIZE.saturating_sub(memory.expansion_security.riflemen.len() + queued);
+    (short > 0).then(|| facts.unit_count(EntityKind::Rifleman) + queued + short)
 }
 
 /// Whether Jeff may send the builder to the secured natural now: the site is secured, no order

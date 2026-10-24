@@ -229,7 +229,16 @@ const JEFFS_AI_RUSH: AiProfile = AiProfile {
     ..JEFFS_AI_LIVE
 };
 
-pub(crate) static JEFFS_AI: AiProfile = JEFFS_AI_RUSH;
+/// The live Jeff holds six defensive Machine Gunners where its freezes hold four, in place of the
+/// Riflemen it used to top up to six while the natural was next: guns outrange Riflemen and fight
+/// raids from their trenches. The natural waits only for the first four (`early_natural_due`).
+pub(crate) static JEFFS_AI: AiProfile = AiProfile {
+    defensive_machine_gunners: Some(DefensiveMachineGunnerPolicy {
+        target_count: 6,
+        ..TEMPLATE_DEFENSIVE_MACHINE_GUNNERS
+    }),
+    ..JEFFS_AI_RUSH
+};
 
 /// The live Jeff from before the Tank micro under its own id: the same policy, and the Tank
 /// micro only branches on the live id.
@@ -322,7 +331,14 @@ mod tests {
         assert_eq!(JEFFS_AI.workers.extra_builder_workers, 0);
         assert!(!JEFFS_AI.workers.train_workers_for_oil);
         assert!(JEFFS_AI.workers.reuse_idle_before_training);
-        assert_eq!(JEFFS_AI.defensive_machine_gunners.unwrap().target_count, 4);
+        assert_eq!(JEFFS_AI.defensive_machine_gunners.unwrap().target_count, 6);
+        assert_eq!(
+            JEFFS_AI_PRE_FAST_NATURAL
+                .defensive_machine_gunners
+                .unwrap()
+                .target_count,
+            4
+        );
         assert_eq!(
             JEFFS_AI_PRE_OPENING_RUSH
                 .defensive_machine_gunners

@@ -17,6 +17,16 @@ const MACHINE_GUNNER_SLOTS: [(f32, f32); 2] = [(7.5, -2.25), (7.5, 2.25)];
 /// bullets stray about a tile at combat range, so the posts stay 1.5 tiles apart.
 const WIDE_MACHINE_GUNNER_SLOTS: [(f32, f32); 4] =
     [(7.5, -2.25), (7.5, 2.25), (8.0, -3.75), (8.0, 3.75)];
+/// Six guns (the live Jeff) carry the same line one post farther out on each wing, again half a
+/// tile forward: raids that come at the base from the side meet the wing guns first.
+const SIX_MACHINE_GUNNER_SLOTS: [(f32, f32); 6] = [
+    (7.5, -2.25),
+    (7.5, 2.25),
+    (8.0, -3.75),
+    (8.0, 3.75),
+    (8.5, -5.25),
+    (8.5, 5.25),
+];
 
 /// With `forest_posts`, a pocket Rifleman may hold a forest edge within this many tiles of its post
 /// instead: hidden from the enemy until it fires, taking a quarter less damage, and dug in.
@@ -142,7 +152,9 @@ pub(in crate::ai_core::decision) fn stage_defensive_pocket_machine_gunners(
     enemy_base: EnemyBaseFact,
     target_count: usize,
 ) -> Option<Vec<u32>> {
-    let assignments = if target_count > MACHINE_GUNNER_SLOTS.len() {
+    let assignments = if target_count > WIDE_MACHINE_GUNNER_SLOTS.len() {
+        six_pocket_machine_gunner_assignments(observation, map_analysis, ready_units, enemy_base)
+    } else if target_count > MACHINE_GUNNER_SLOTS.len() {
         wide_pocket_machine_gunner_assignments(observation, map_analysis, ready_units, enemy_base)
     } else {
         defensive_pocket_machine_gunner_assignments(
@@ -208,8 +220,42 @@ pub(super) fn wide_pocket_machine_gunner_assignments(
     ready_units: &[u32],
     enemy_base: EnemyBaseFact,
 ) -> Option<Vec<DefensiveLineAssignment>> {
+    line_pocket_machine_gunner_assignments(
+        observation,
+        map_analysis,
+        ready_units,
+        enemy_base,
+        &WIDE_MACHINE_GUNNER_SLOTS,
+    )
+}
+
+/// The six-gun line, held the same way as the four-gun line.
+pub(super) fn six_pocket_machine_gunner_assignments(
+    observation: &AiObservation,
+    map_analysis: Option<&AiMapAnalysis>,
+    ready_units: &[u32],
+    enemy_base: EnemyBaseFact,
+) -> Option<Vec<DefensiveLineAssignment>> {
+    line_pocket_machine_gunner_assignments(
+        observation,
+        map_analysis,
+        ready_units,
+        enemy_base,
+        &SIX_MACHINE_GUNNER_SLOTS,
+    )
+}
+
+/// A gun line over `slots`: a gun already on a post keeps it, and the others take the free posts in
+/// slot order.
+fn line_pocket_machine_gunner_assignments(
+    observation: &AiObservation,
+    map_analysis: Option<&AiMapAnalysis>,
+    ready_units: &[u32],
+    enemy_base: EnemyBaseFact,
+    slots: &[(f32, f32)],
+) -> Option<Vec<DefensiveLineAssignment>> {
     let (anchor, direction) = defensive_pocket_basis(observation, map_analysis, enemy_base)?;
-    let mut posts: Vec<Option<(f32, f32)>> = WIDE_MACHINE_GUNNER_SLOTS
+    let mut posts: Vec<Option<(f32, f32)>> = slots
         .iter()
         .map(|slot| {
             let desired = slot_target(observation, anchor, direction, *slot);

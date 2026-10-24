@@ -30,7 +30,7 @@ pub(super) use self::line::{
 use self::pocket::{
     defensive_pocket_basis, defensive_pocket_machine_gunner_assignments,
     forest_tiles_on_sight_line, home_defensive_pocket_rifle_assignments, pocket_rifle_assignments,
-    wide_pocket_machine_gunner_assignments,
+    six_pocket_machine_gunner_assignments, wide_pocket_machine_gunner_assignments,
 };
 pub(super) use self::pocket::{
     stage_defensive_pocket_machine_gunners, stage_home_defensive_pocket_riflemen,
