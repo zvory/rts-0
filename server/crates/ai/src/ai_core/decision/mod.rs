@@ -875,6 +875,13 @@ where
             .unmet_emergency_target(&production_unit_counts)
     });
     let emergency_rifle_target = emergency_rifle_target.max(rifle_answer);
+    // While the live Jeff's natural order is out, the Steel it leaves spare goes to tech, Engineers
+    // and guns, not Riflemen; nothing at all could be bought during the walk before. On Chokes,
+    // where Steel is short, two Riflemen bought then held Tank Unlock back from 2:45 to 3:02.
+    if live_natural_pending {
+        effective_unit_priorities.retain(|unit| *unit != EntityKind::Rifleman);
+    }
+    let emergency_rifle_target = emergency_rifle_target.filter(|_| !live_natural_pending);
     for building_kind in production_building_order(&effective_unit_priorities) {
         let buildings = facts.production_buildings(building_kind);
         if buildings.is_empty() {

@@ -231,3 +231,33 @@ fn the_live_jeff_trains_no_second_engineer_once_its_factory_is_out() {
         EntityKind::Worker
     ));
 }
+
+#[test]
+fn while_the_natural_order_is_out_the_live_jeff_trains_no_riflemen() {
+    let (mut obs, mut memory, site) = early_natural(&JEFFS_AI);
+    decide(&obs, &JEFFS_AI, &mut memory);
+    order_out(&mut obs, site);
+    // No Rifleman home, so the natural's recruits want six; the order leaves Steel to spare.
+    obs.economy.steel = 450 + 50 + 120;
+    obs.economy.oil = 100 + 20;
+    let decision = decide(&obs, &JEFFS_AI, &mut memory);
+    assert!(!trains(&decision, EntityKind::Rifleman));
+    assert!(trains(&decision, EntityKind::MachineGunner));
+    // Once the foundation is down they come again.
+    obs.pending_builds.clear();
+    let ts = config::TILE_SIZE as f32;
+    let mut natural = building_at(
+        6,
+        EntityKind::ResourceDepot,
+        Some(0),
+        site.0 as f32 * ts,
+        site.1 as f32 * ts,
+    );
+    natural.is_complete = false;
+    obs.owned.push(natural);
+    obs.economy.steel = 120;
+    assert!(trains(
+        &decide(&obs, &JEFFS_AI, &mut memory),
+        EntityKind::Rifleman
+    ));
+}
