@@ -302,14 +302,8 @@ function buttonSlots(card) {
       researchedDepotCard,
       kriegsiaCommandId("ability", ABILITY.SCOUT_PLANE),
     ),
-    [{
-      commandId: kriegsiaCommandId("ability", ABILITY.SCOUT_PLANE),
-      slotIndex: 8,
-      hotkey: "C",
-      label: "Scout Plane",
-      enabled: true,
-    }],
-    "researched Resource Depot exposes its discounted Scout Plane ability on C",
+    [],
+    "researched Resource Depot cannot activate Scout Plane",
   );
   assert.deepEqual(
     resourceDepotCard.slots.slice(0, 3).map((slot) => slot?.commandId),
