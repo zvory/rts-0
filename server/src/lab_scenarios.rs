@@ -1184,7 +1184,7 @@ mod tests {
             .iter()
             .map(|player| (player.id, player.supply_used))
             .collect();
-        assert_eq!(supply, vec![(1, 244), (2, 244), (3, 244), (4, 244)]);
+        assert_eq!(supply, vec![(1, 228), (2, 228), (3, 228), (4, 228)]);
 
         let mut expected_counts = BTreeMap::from([
             ("barracks".to_string(), 1),

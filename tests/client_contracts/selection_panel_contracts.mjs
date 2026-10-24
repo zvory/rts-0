@@ -18,12 +18,12 @@ import { KIND } from "../../client/src/protocol.js";
 // HUD selection budget grid
 // ---------------------------------------------------------------------------
 {
-  const riflemen = Array.from({ length: 24 }, (_, index) => ({
+  const riflemen = Array.from({ length: 25 }, (_, index) => ({
     id: 1000 + index,
     owner: 1,
     kind: KIND.RIFLEMAN,
   }));
-  const tanks = Array.from({ length: 4 }, (_, index) => ({
+  const tanks = Array.from({ length: 5 }, (_, index) => ({
     id: 1100 + index,
     owner: 1,
     kind: KIND.TANK,
@@ -32,23 +32,23 @@ import { KIND } from "../../client/src/protocol.js";
   const artillery = { id: 1300, owner: 1, kind: KIND.ARTILLERY };
 
   const infantryModel = selectionBudgetGridModel(riflemen);
-  assert(infantryModel.used === 24 && infantryModel.cap === BASE_COMMAND_SUPPLY_CAP, "HUD budget grid reports 24/24 infantry supply");
-  assert(infantryModel.cols === 12 && infantryModel.rows === 4,
-    "HUD base budget grid uses four rows of twelve large cells");
+  assert(infantryModel.used === 25 && infantryModel.cap === BASE_COMMAND_SUPPLY_CAP, "HUD budget grid reports 25/25 infantry supply");
+  assert(infantryModel.cols === 13 && infantryModel.rows === 4,
+    "HUD base budget grid uses four rows of thirteen large cells");
   assert(infantryModel.blocks.every((block) => block.weight === 1 && block.cols === 1 && block.rows === 1 && block.placed),
     "HUD infantry blocks occupy one fixed cell each");
 
   const tankModel = selectionBudgetGridModel(tanks);
-  assert(tankModel.used === 24 && tankModel.cap === BASE_COMMAND_SUPPLY_CAP, "HUD budget grid reports four Tanks as 24/24");
-  assert(tankModel.blocks.every((block) => block.weight === 6 && block.cols === 3 && block.rows === 2 && block.placed),
+  assert(tankModel.used === 25 && tankModel.cap === BASE_COMMAND_SUPPLY_CAP, "HUD budget grid reports five Tanks as 25/25");
+  assert(tankModel.blocks.every((block) => block.weight === 5 && block.cols === 3 && block.rows === 2 && block.placed),
     "HUD Tank blocks occupy a two-row by three-column shape");
 
   const commandCarModel = selectionBudgetGridModel(tanks.concat(commandCar));
-  assert(commandCarModel.used === 24 &&
+  assert(commandCarModel.used === 25 &&
     commandCarModel.cap === BASE_COMMAND_SUPPLY_CAP + COMMAND_CAR_SUPPLY_CAP_BONUS,
     "HUD budget grid shows zero command cost and no cap increase for Command Car");
-  assert(commandCarModel.cols === 12 && commandCarModel.rows === 4 && commandCarModel.pages.length === 1,
-    "HUD four-row grid holds a four Tanks and a free Command Car without shrinking");
+  assert(commandCarModel.cols === 13 && commandCarModel.rows === 4 && commandCarModel.pages.length === 1,
+    "HUD four-row grid holds a five Tanks and a free Command Car without shrinking");
   assert(commandCarModel.blocks.every((block) => block.placed),
     "HUD paginated budget grid places every block without fallback overlap");
 
@@ -77,7 +77,7 @@ import { KIND } from "../../client/src/protocol.js";
     kind: `test_unique_kind_${index}`,
   }));
   const manyUniqueModel = selectionBudgetGridModel(manyUniqueKinds);
-  assert(manyUniqueModel.pages.length === 2 && manyUniqueModel.pages[1].blocks.length === 12,
+  assert(manyUniqueModel.pages.length === 2 && manyUniqueModel.pages[1].blocks.length === 8,
     "HUD packs representatives that overflow the first page together before placing duplicates");
 
   const mixedSelection = [
@@ -104,7 +104,7 @@ import { KIND } from "../../client/src/protocol.js";
     }
   }
   assert(mixedModel.pages.length === 1 && mixedModel.blocks.every((block) => block.placed) && !hasOverlap,
-    "HUD packs late large units ahead of infantry without overlapping the mixed 24-supply selection");
+    "HUD packs late large units ahead of infantry without overlapping the mixed 21-supply selection");
 
   const artilleryShape = selectionBudgetBlockShape(STATS[KIND.ARTILLERY].supply);
   assert(artilleryShape.cols === 2 && artilleryShape.rows === 2 && artilleryShape.reservedCells == null,
@@ -247,9 +247,9 @@ import { KIND } from "../../client/src/protocol.js";
     const grid = panel.querySelector(".sel-budget-grid");
     const blocks = panel.querySelectorAll(".sel-budget-block");
     const overflow = panel.querySelector(".sel-budget-overflow");
-    assert(grid && grid.style.values.get("--sel-budget-cols") === "12", "HUD renders grid columns into selected panel DOM");
-    assert(blocks.length === 4 && blocks.every((block) => block.className.includes("weight-6")),
-      "HUD renders four Tank budget blocks into selected panel DOM");
+    assert(grid && grid.style.values.get("--sel-budget-cols") === "13", "HUD renders grid columns into selected panel DOM");
+    assert(blocks.length === 5 && blocks.every((block) => block.className.includes("weight-5")),
+      "HUD renders five Tank budget blocks into selected panel DOM");
     assert(overflow?.textContent === "Selection limit reached", "HUD renders overflow flash text near the budget counter");
     const stableChildren = panel.children;
     hud._renderSelectedPanel();

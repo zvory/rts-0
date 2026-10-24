@@ -29,7 +29,7 @@ import {
     };
   }
 
-  const tanks = Array.from({ length: 5 }, (_, index) => ({
+  const tanks = Array.from({ length: 6 }, (_, index) => ({
     id: index + 1,
     owner: 1,
     kind: KIND.TANK,
@@ -39,7 +39,7 @@ import {
     budgetState(tanks),
     cmd.move(tanks.map((tank) => tank.id), 100, 100),
   );
-  assert(!overBudget.ok, "client command guard rejects five tanks without a Command Car");
+  assert(!overBudget.ok, "client command guard rejects six tanks without a Command Car");
   assert(overBudget.used === 30 && overBudget.cap === BASE_COMMAND_SUPPLY_CAP, "client reports base command budget usage");
 
   const commandCar = { id: 99, owner: 1, kind: KIND.COMMAND_CAR, state: STATE.IDLE };
@@ -47,20 +47,20 @@ import {
     budgetState(tanks.concat(commandCar)),
     cmd.attackMove(tanks.map((tank) => tank.id).concat(commandCar.id), 100, 100),
   );
-  assert(!stillOverWithCar.ok, "Command Car does not make five tanks commandable");
+  assert(!stillOverWithCar.ok, "Command Car does not make six tanks commandable");
   assert(
     stillOverWithCar.used === 30 &&
       stillOverWithCar.cap === BASE_COMMAND_SUPPLY_CAP + COMMAND_CAR_SUPPLY_CAP_BONUS,
     "Command Car has zero command cost and adds no capacity",
   );
 
-  const fourTanksWithCar = commandWithinBudget(
-    budgetState(tanks.slice(0, 4).concat(commandCar)),
-    cmd.stop(tanks.slice(0, 4).map((tank) => tank.id).concat(commandCar.id)),
+  const fiveTanksWithCar = commandWithinBudget(
+    budgetState(tanks.slice(0, 5).concat(commandCar)),
+    cmd.stop(tanks.slice(0, 5).map((tank) => tank.id).concat(commandCar.id)),
   );
-  assert(fourTanksWithCar.ok && fourTanksWithCar.used === 24, "four Tanks and a Command Car fit the base budget");
+  assert(fiveTanksWithCar.ok && fiveTanksWithCar.used === 25, "five Tanks and a Command Car fit the base budget");
 
-  const legalInfantry = Array.from({ length: 24 }, (_, index) => ({
+  const legalInfantry = Array.from({ length: 25 }, (_, index) => ({
     id: index + 200,
     owner: 1,
     kind: KIND.RIFLEMAN,
@@ -71,7 +71,7 @@ import {
       budgetState(legalInfantry),
       cmd.stop(legalInfantry.map((entity) => entity.id)),
     ).ok,
-    "client command guard allows 24 one-supply units",
+    "client command guard allows 25 one-supply units",
   );
 
   const labState = budgetState(tanks);

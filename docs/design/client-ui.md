@@ -1711,7 +1711,7 @@ presentation assembly, worker rendering, HUD, and minimap remain live; fixed-cap
 unbounded worker flooding are not benchmark paths.
 
 Playable own selections and human multi-unit commands use the mirrored command-supply budget from
-`command_budget.js`: 24 base command supply. Command Cars have zero command weight and add no
+`command_budget.js`: 25 base command supply. Command Cars have zero command weight and add no
 capacity (`COMMAND_CAR_SUPPLY_CAP_BONUS = 0`); other units use mirrored supply as weight with a
 fallback weight of 1. Drag selection, shift-add, double-click same-kind selection, and control-group
 save/add/recall preserve their normal candidate ordering. Overflow candidates are ignored

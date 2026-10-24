@@ -50,8 +50,8 @@ state.applySnapshot({
 });
 
 assert(
-  Array.from(state.selection).join(",") === "1,2,3,4",
-  "losing a selected Command Car keeps four Tanks within the base command budget",
+  Array.from(state.selection).join(",") === "1,2,3,4,5",
+  "losing a selected Command Car keeps five Tanks within the base command budget",
 );
 assert(
   commandWithinBudget(state, cmd.move(Array.from(state.selection), 10, 20)).ok,

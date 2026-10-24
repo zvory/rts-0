@@ -307,7 +307,7 @@ pub const UNITS: &[UnitDef] = &[
             sight_tiles: 9,
             cost_steel: 425,
             cost_oil: 175,
-            supply: 6,
+            supply: 5,
             build_ticks: 750,
             radius: 18.0,
         },
