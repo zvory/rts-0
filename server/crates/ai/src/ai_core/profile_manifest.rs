@@ -9,7 +9,8 @@ use super::profiles::{
     JEFFS_AI_ID, JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID, JEFFS_AI_PRE_EARLY_NATURAL_ID,
     JEFFS_AI_PRE_FAST_NATURAL_ID, JEFFS_AI_PRE_GUARD_HANDOFF_ID, JEFFS_AI_PRE_HELD_SITE_ID,
     JEFFS_AI_PRE_OPENING_RUSH_ID, JEFFS_AI_PRE_RIFLE_COVERAGE_ID, JEFFS_AI_PRE_SAFE_BASES_ID,
-    JEFFS_AI_PRE_TANK_CATCHUP_ID, JEFFS_AI_PRE_TANK_MICRO_ID, JEFFS_AI_PRE_THIRD_PRESSURE_ID,
+    JEFFS_AI_PRE_SPEND_PLAN_ID, JEFFS_AI_PRE_TANK_CATCHUP_ID, JEFFS_AI_PRE_TANK_MICRO_ID,
+    JEFFS_AI_PRE_THIRD_PRESSURE_ID,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -142,7 +143,8 @@ fn baseline_metadata(profile_id: &str) -> (&'static str, &'static str, Vec<&'sta
         | JEFFS_AI_PRE_SAFE_BASES_ID
         | JEFFS_AI_PRE_HELD_SITE_ID
         | JEFFS_AI_PRE_EARLY_NATURAL_ID
-        | JEFFS_AI_PRE_FAST_NATURAL_ID => (
+        | JEFFS_AI_PRE_FAST_NATURAL_ID
+        | JEFFS_AI_PRE_SPEND_PLAN_ID => (
             "Jeff's AI",
             "Fast-Tank containment profile with a two-Tank opening wave, a reserved home Tank and spread Machine Gunner screen, deployed Anti-Tank Guns, and a post-natural advance on the enemy main.",
             vec![

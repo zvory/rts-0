@@ -43,11 +43,15 @@ pub(crate) const JEFFS_AI_PRE_HELD_SITE_ID: &str = "jeffs_ai_pre_held_site";
 /// fast-natural freeze replaced it in `runs_live_jeff` it no longer runs the live-Jeff behaviors, like
 /// the older freezes. Comparison-only.
 pub(crate) const JEFFS_AI_PRE_EARLY_NATURAL_ID: &str = "jeffs_ai_pre_early_natural";
-/// Frozen immediately before the fast natural (a second Worker, tech bought while the natural's
-/// builder walks, Machine Gunners before the natural): the live Jeff at f24bebb1b, the early natural
-/// included. It runs every live-Jeff behavior (`runs_live_jeff`); only the new work branches on the
-/// live id. Comparison-only.
+/// Frozen immediately before the fast natural (f24bebb1b, the early natural included). Since the
+/// spend-plan freeze replaced it in `runs_live_jeff` it no longer runs the live-Jeff behaviors, like
+/// the older freezes. Comparison-only.
 pub(crate) const JEFFS_AI_PRE_FAST_NATURAL_ID: &str = "jeffs_ai_pre_fast_natural";
+/// Frozen immediately before the spend plan (income forecast, the natural's builder sent ahead of
+/// its money, Steel spent only where it delays no planned step): the live Jeff at bf4143471, the fast
+/// natural included. It runs every live-Jeff behavior (`runs_live_jeff`); only the new work branches
+/// on the live id. Comparison-only.
+pub(crate) const JEFFS_AI_PRE_SPEND_PLAN_ID: &str = "jeffs_ai_pre_spend_plan";
 
 const OPENING_UNITS: [EntityKind; 1] = [EntityKind::MachineGunner];
 const ARMORED_UNITS: [EntityKind; 2] = [EntityKind::Tank, EntityKind::ScoutCar];
@@ -232,13 +236,15 @@ const JEFFS_AI_RUSH: AiProfile = AiProfile {
 /// The live Jeff holds six defensive Machine Gunners before its first Tank where its freezes hold
 /// four: guns outrange Riflemen and fight raids from their trenches. The natural waits only for the
 /// first four (`early_natural_due`), and once a Tank is out lost guns are replaced only up to four.
-pub(crate) static JEFFS_AI: AiProfile = AiProfile {
+const JEFFS_AI_SIX_GUNS: AiProfile = AiProfile {
     defensive_machine_gunners: Some(DefensiveMachineGunnerPolicy {
         target_count: 6,
         ..TEMPLATE_DEFENSIVE_MACHINE_GUNNERS
     }),
     ..JEFFS_AI_RUSH
 };
+
+pub(crate) static JEFFS_AI: AiProfile = JEFFS_AI_SIX_GUNS;
 
 /// The live Jeff from before the Tank micro under its own id: the same policy, and the Tank
 /// micro only branches on the live id.
@@ -281,6 +287,12 @@ pub(crate) static JEFFS_AI_PRE_EARLY_NATURAL: AiProfile = AiProfile {
 pub(crate) static JEFFS_AI_PRE_FAST_NATURAL: AiProfile = AiProfile {
     id: JEFFS_AI_PRE_FAST_NATURAL_ID,
     ..JEFFS_AI_RUSH
+};
+
+/// The live Jeff from before the spend plan, under its own id: six guns.
+pub(crate) static JEFFS_AI_PRE_SPEND_PLAN: AiProfile = AiProfile {
+    id: JEFFS_AI_PRE_SPEND_PLAN_ID,
+    ..JEFFS_AI_SIX_GUNS
 };
 
 /// The live Jeff's policy from before the opening rush under its own id: two defensive Machine
@@ -332,6 +344,13 @@ mod tests {
         assert!(!JEFFS_AI.workers.train_workers_for_oil);
         assert!(JEFFS_AI.workers.reuse_idle_before_training);
         assert_eq!(JEFFS_AI.defensive_machine_gunners.unwrap().target_count, 6);
+        assert_eq!(
+            JEFFS_AI_PRE_SPEND_PLAN
+                .defensive_machine_gunners
+                .unwrap()
+                .target_count,
+            6
+        );
         assert_eq!(
             JEFFS_AI_PRE_FAST_NATURAL
                 .defensive_machine_gunners

@@ -1,5 +1,5 @@
 use super::*;
-use crate::ai_core::profiles::{JEFFS_AI, JEFFS_AI_PRE_FAST_NATURAL};
+use crate::ai_core::profiles::{JEFFS_AI, JEFFS_AI_PRE_SPEND_PLAN};
 
 /// Jeff at its early natural: the HQ, Barracks, Training Centre and Engineering Complex up, the four
 /// opening guns home, no Factory yet, and the natural's site picked. Returns the site too.
@@ -71,8 +71,8 @@ fn trains(decision: &AiDecision, kind: EntityKind) -> bool {
 
 #[test]
 fn with_the_natural_ordered_the_live_jeff_trains_a_second_engineer_who_builds_the_factory() {
-    for profile in [&JEFFS_AI, &JEFFS_AI_PRE_FAST_NATURAL] {
-        let live = profile.id == JEFFS_AI_ID;
+    for profile in [&JEFFS_AI, &JEFFS_AI_PRE_SPEND_PLAN] {
+        let live = runs_live_jeff(profile.id);
         let (mut obs, mut memory, site) = early_natural(profile);
         // The bounded reserve is running.
         decide(&obs, profile, &mut memory);
@@ -111,8 +111,8 @@ fn with_the_natural_ordered_the_live_jeff_trains_a_second_engineer_who_builds_th
 
 #[test]
 fn a_pending_natural_order_holds_back_only_its_oil_for_the_live_jeff() {
-    for profile in [&JEFFS_AI, &JEFFS_AI_PRE_FAST_NATURAL] {
-        let live = profile.id == JEFFS_AI_ID;
+    for profile in [&JEFFS_AI, &JEFFS_AI_PRE_SPEND_PLAN] {
+        let live = runs_live_jeff(profile.id);
         let (mut obs, mut memory, site) = early_natural(profile);
         // Six Riflemen home, two of them the natural's party: no recruits.
         let ts = config::TILE_SIZE as f32;
@@ -159,8 +159,8 @@ fn the_live_jeffs_home_builds_take_the_engineer_nearest_the_hq() {
 
 #[test]
 fn the_live_jeffs_opening_gun_comes_before_a_rifleman_when_it_can_pay_for_it() {
-    for profile in [&JEFFS_AI, &JEFFS_AI_PRE_FAST_NATURAL] {
-        let live = profile.id == JEFFS_AI_ID;
+    for profile in [&JEFFS_AI, &JEFFS_AI_PRE_SPEND_PLAN] {
+        let live = runs_live_jeff(profile.id);
         let (mut obs, mut memory, _) = early_natural(profile);
         // Two of the four opening guns are lost and no Rifleman is home: the starters fell on the
         // rush. There is Steel for one more unit and no natural reserve yet.
@@ -191,8 +191,8 @@ fn the_live_jeffs_opening_gun_comes_before_a_rifleman_when_it_can_pay_for_it() {
 #[test]
 fn the_live_jeffs_fifth_and_sixth_guns_come_only_before_its_first_tank() {
     let ts = config::TILE_SIZE as f32;
-    for profile in [&JEFFS_AI, &JEFFS_AI_PRE_FAST_NATURAL] {
-        let live = profile.id == JEFFS_AI_ID;
+    for profile in [&JEFFS_AI, &JEFFS_AI_PRE_SPEND_PLAN] {
+        let live = runs_live_jeff(profile.id);
         let (mut obs, mut memory, _) = early_natural(profile);
         // Four guns and six Riflemen home, and Steel above the natural's reserve.
         obs.owned

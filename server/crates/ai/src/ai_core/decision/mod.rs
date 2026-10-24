@@ -16,8 +16,8 @@ use crate::ai_core::profiles::{
     TechTransitionPolicy, WorkerPolicy, JEFFS_AI_BETA_ID, JEFFS_AI_ID,
     JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID, JEFFS_AI_PRE_EARLY_NATURAL_ID, JEFFS_AI_PRE_FAST_NATURAL_ID,
     JEFFS_AI_PRE_GUARD_HANDOFF_ID, JEFFS_AI_PRE_HELD_SITE_ID, JEFFS_AI_PRE_OPENING_RUSH_ID,
-    JEFFS_AI_PRE_RIFLE_COVERAGE_ID, JEFFS_AI_PRE_SAFE_BASES_ID, JEFFS_AI_PRE_TANK_CATCHUP_ID,
-    JEFFS_AI_PRE_TANK_MICRO_ID, JEFFS_AI_PRE_THIRD_PRESSURE_ID,
+    JEFFS_AI_PRE_RIFLE_COVERAGE_ID, JEFFS_AI_PRE_SAFE_BASES_ID, JEFFS_AI_PRE_SPEND_PLAN_ID,
+    JEFFS_AI_PRE_TANK_CATCHUP_ID, JEFFS_AI_PRE_TANK_MICRO_ID, JEFFS_AI_PRE_THIRD_PRESSURE_ID,
 };
 use crate::ai_shared;
 use crate::config;
@@ -267,7 +267,7 @@ where
     // The live Jeff builds at home with the Engineer nearest its HQ. By id the first pick was the
     // natural's builder, which stands at the natural once a second Engineer is home.
     let mut home_builders = idle_builders.clone();
-    if profile.id == JEFFS_AI_ID {
+    if runs_live_jeff(profile.id) {
         let home = tile_center(observation.own_start_tile, observation.map.tile_size);
         let from_home = |id: &u32| {
             observation
@@ -435,7 +435,7 @@ where
     // the order, the Oil held back below), so its tech goes on while the builder walks. The Factory
     // used to wait for the foundation and then for the builder's walk home: on Doppelganger's edge
     // natural the Factory ordered at 2:24 went down near 3:00, and Tank Unlock came at 3:08.
-    let live_natural_pending = profile.id == JEFFS_AI_ID && natural_pending;
+    let live_natural_pending = runs_live_jeff(profile.id) && natural_pending;
     let hold_tech_for_expansion = save_for_unplanned_expansion && !live_natural_pending;
     if (reserve_expansion || natural_pending)
         && planned_in_intents(&intents, EntityKind::ResourceDepot) == 0
@@ -486,7 +486,7 @@ where
     // The live Jeff trains a second Engineer once its natural is ordered ahead of its Factory, so
     // the Factory does not wait for the natural's builder to walk back. With the Factory already out
     // the Steel goes elsewhere: on Chokes, where Steel is short, it delayed Tank Unlock 23 s.
-    let target_workers = if profile.id == JEFFS_AI_ID
+    let target_workers = if runs_live_jeff(profile.id)
         && facts.building_count(EntityKind::ResourceDepot) >= 2
         && facts.building_count(EntityKind::Factory) == 0
     {
@@ -809,7 +809,7 @@ where
         && facts.unit_count(EntityKind::Rifleman) < 6)
         .then_some(6);
     if security_rifle_target.is_some() {
-        let guns_first = profile.id == JEFFS_AI_ID
+        let guns_first = runs_live_jeff(profile.id)
             && facts.unit_count(EntityKind::Tank) == 0
             && !expansion_security::opening_guns_ordered(
                 observation,
@@ -862,7 +862,7 @@ where
     let mut production_max_counts = production_max_counts(profile, observation, map_analysis);
     // The live Jeff's two extra guns are opening guns: once a Tank is out, lost guns are replaced
     // only up to the usual four, and the Oil goes to Tanks.
-    if profile.id == JEFFS_AI_ID && facts.unit_count(EntityKind::Tank) > 0 {
+    if runs_live_jeff(profile.id) && facts.unit_count(EntityKind::Tank) > 0 {
         for (kind, max) in &mut production_max_counts {
             if *kind == EntityKind::MachineGunner {
                 *max = (*max).min(expansion_security::OPENING_GUNS);
