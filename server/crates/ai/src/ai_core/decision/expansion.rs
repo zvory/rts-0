@@ -191,6 +191,7 @@ pub(super) fn try_build_expansion_resource_depot<F>(
     profile: &AiProfile,
     secured_site: Option<(u32, u32)>,
     retrying_stalled_order: bool,
+    on_credit: bool,
     placeable: &mut F,
 ) -> Option<actions::BuildAction>
 where
@@ -220,11 +221,22 @@ where
     } else {
         expansion_resource_depot_site(observation, expansion, kind, profile.id, None, placeable)?
     };
-    if uses_current_jeffs_ai_policy(profile.id)
+    let river_approach = (uses_current_jeffs_ai_policy(profile.id)
         && observation.own_start_tile == (9, 9)
-        && uses_jeff_river_layout(observation)
-    {
-        let approach = tile_center((15, 27), observation.map.tile_size);
+        && uses_jeff_river_layout(observation))
+    .then(|| tile_center((15, 27), observation.map.tile_size));
+    // The live Jeff's spend plan sends the builder ahead of the money (`on_credit`).
+    if on_credit && !actions.budget().can_afford_building(kind) {
+        return actions::try_build_at_on_credit(
+            actions,
+            builder_pools,
+            kind,
+            tile_x,
+            tile_y,
+            river_approach,
+        );
+    }
+    if let Some(approach) = river_approach {
         return actions::try_move_then_build_at(
             actions,
             builder_pools,

@@ -114,6 +114,8 @@ pub(crate) struct AiDecisionMemory {
     pub(super) third_pressure: super::third_pressure::ThirdPressure,
     /// The live Jeff's raid response, sentries, outranged units and enemy infantry sightings.
     pub(super) raid_defense: super::defense::RaidDefense,
+    /// The live Jeff's spend plan's timings of unfinished buildings and Tank Unlock.
+    pub(super) spend_plan: super::spend_plan::SpendPlanMemory,
     profile_id: Option<&'static str>,
     attack_first_size: Option<usize>,
     next_attack_size: usize,
@@ -177,6 +179,7 @@ impl AiDecisionMemory {
             trap_breach: Default::default(),
             third_pressure: Default::default(),
             raid_defense: Default::default(),
+            spend_plan: Default::default(),
             profile_id: Some(profile.id),
             attack_first_size: Some(profile.attack.first_attack_size),
             next_attack_size: profile.attack.first_attack_size,
@@ -270,6 +273,7 @@ impl AiDecisionMemory {
         }
         self.profile_id = Some(profile.id);
         self.expansion_security = Default::default();
+        self.spend_plan = Default::default();
         self.tank_micro = Default::default();
         self.trap_breach = Default::default();
         self.third_pressure = Default::default();

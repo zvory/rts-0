@@ -42,6 +42,7 @@ mod opening_rush;
 mod policies;
 mod production;
 mod resources;
+mod spend_plan;
 mod tank_micro;
 mod third_pressure;
 mod trace;
@@ -205,6 +206,10 @@ where
     memory
         .pending_upgrades
         .retain(|upgrade| !observation.upgrades.contains(upgrade));
+    if profile.id == JEFFS_AI_ID {
+        let unlock_pending = memory.pending_upgrades.contains(&UpgradeKind::TankUnlock);
+        memory.spend_plan.observe(observation, unlock_pending);
+    }
 
     let facts = AiFacts::from_observation(observation);
     memory.sync_home_defensive_tank(observation, profile);
@@ -389,17 +394,63 @@ where
                     site,
                 ) == Some(false)
             });
-    let natural_ready = jeff_natural
-        && expansion_security::expansion_is_next(observation, &facts, profile)
-        && expansion_security::natural_attempt_ready(
-            observation,
-            map_analysis,
-            memory,
-            expansion_secured || natural_sheltered,
-            !runs_live_jeff(profile.id),
-        );
     let natural_pending =
         jeff_natural && expansion_security::natural_order_pending(observation, memory);
+    // The live Jeff's spend plan (decision/spend_plan.rs): the income forecast and the opening's
+    // costly steps laid out from it. The natural's builder goes once the Depot will be paid for by
+    // its arrival, and Steel the steps do not need is the only Steel routine Riflemen and a second
+    // Barracks may take.
+    let spend_plan = (profile.id == JEFFS_AI_ID).then(|| {
+        let site = memory.expansion_security.site;
+        let natural_builder = site
+            .and_then(|site| {
+                observation
+                    .pending_builds
+                    .iter()
+                    .find(|intent| {
+                        intent.kind == EntityKind::ResourceDepot
+                            && (intent.tile_x, intent.tile_y) == site
+                    })
+                    .map(|intent| intent.worker_id)
+            })
+            .or_else(|| {
+                expansion_builder_pools
+                    .iter()
+                    .flat_map(|pool| pool.iter())
+                    .copied()
+                    .find(|id| !actions.reservations().worker_reserved(*id))
+            });
+        spend_plan::plan(
+            observation,
+            &facts,
+            &memory.spend_plan,
+            spend_plan::PlanInput {
+                natural_due: !natural_pending
+                    && expansion_security::expansion_is_next(observation, &facts, profile),
+                natural_site: site,
+                natural_builder,
+            },
+        )
+    });
+    let natural_ready = jeff_natural
+        && expansion_security::expansion_is_next(observation, &facts, profile)
+        && match spend_plan.as_ref() {
+            Some(plan) => expansion_security::natural_attempt_ready_funded(
+                observation,
+                map_analysis,
+                memory,
+                expansion_secured || natural_sheltered,
+                !runs_live_jeff(profile.id),
+                plan.natural_funded_on_arrival,
+            ),
+            None => expansion_security::natural_attempt_ready(
+                observation,
+                map_analysis,
+                memory,
+                expansion_secured || natural_sheltered,
+                !runs_live_jeff(profile.id),
+            ),
+        };
     if (jeff_natural && natural_ready)
         || (!jeff_natural
             && (should_build_expansion_from_economy_manager(&economy_manager_output)
@@ -413,6 +464,7 @@ where
             profile,
             memory.expansion_security.site,
             !retry_builder.is_empty(),
+            spend_plan.is_some(),
             &mut expansion_placeable,
         ) {
             // Track every secured-site order, not only the predicted-natural maps: without an
@@ -588,6 +640,10 @@ where
         && !expansion_blocks_tech_path
         && !save_for_unplanned_expansion
         && planned_in_intents(&intents, EntityKind::Barracks) == 0
+        && (facts.building_count(EntityKind::Barracks) == 0
+            || spend_plan.as_ref().is_none_or(|plan| {
+                plan.affords_off_plan(&intents, rts_rules::economy::cost(EntityKind::Barracks).0)
+            }))
         && try_build_production(
             observation,
             &facts,
@@ -939,6 +995,25 @@ where
         }
         if let Some(target) = emergency_recruits {
             opening_rush::raise_rifle_cap(&mut building_max_counts, target);
+        }
+        // The live Jeff's routine Riflemen come only from Steel its spend plan leaves spare; raid
+        // answers and a defensive panic are not routine.
+        if let Some(cap) = spend_plan
+            .as_ref()
+            .filter(|_| {
+                building_kind == EntityKind::Barracks
+                    && !defensive_panic.active
+                    && emergency_recruits.is_none()
+            })
+            .and_then(|plan| plan.rifle_cap(&intents, &production_unit_counts))
+        {
+            match building_max_counts
+                .iter_mut()
+                .find(|(kind, _)| *kind == EntityKind::Rifleman)
+            {
+                Some((_, max)) => *max = (*max).min(cap),
+                None => building_max_counts.push((EntityKind::Rifleman, cap)),
+            }
         }
         let home_holds_tank_reserve = !uses_current_jeffs_ai_policy(profile.id)
             || later_bases::main_tank_ids(observation, memory).len() >= memory.home_tank_reserve();
@@ -1532,6 +1607,7 @@ where
         commands: actions.into_commands(),
         trace,
     };
+    decision.trace.plan = spend_plan.as_ref().map(|plan| plan.trace_line(observation));
     tank_micro::finish(&mut decision, observation, map_analysis, memory);
     decision
 }

@@ -160,16 +160,29 @@ pub(super) fn natural_attempt_ready(
     secured: bool,
     watch_site: bool,
 ) -> bool {
+    let (steel, oil) = rts_rules::economy::cost(EntityKind::ResourceDepot);
+    let banked = observation.economy.steel >= steel && observation.economy.oil >= oil;
+    natural_attempt_ready_funded(observation, analysis, memory, secured, watch_site, banked)
+}
+
+/// `natural_attempt_ready` with the money question answered by the caller: the live Jeff's spend
+/// plan asks whether the Depot is paid for by the time the builder can arrive.
+pub(super) fn natural_attempt_ready_funded(
+    observation: &AiObservation,
+    analysis: Option<&AiMapAnalysis>,
+    memory: &AiDecisionMemory,
+    secured: bool,
+    watch_site: bool,
+    funded: bool,
+) -> bool {
     let security = &memory.expansion_security;
     let Some(site) = security.site else {
         return false;
     };
-    let (steel, oil) = rts_rules::economy::cost(EntityKind::ResourceDepot);
     secured
         && !depot_order_pending(observation, site)
         && observation.tick >= security.next_attempt_tick
-        && observation.economy.steel >= steel
-        && observation.economy.oil >= oil
+        && funded
         && natural_route_quiet(observation, analysis, site, watch_site)
 }
 
