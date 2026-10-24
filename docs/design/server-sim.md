@@ -1922,7 +1922,9 @@ a later tick wins and keeps the destroyed building absent after current vision l
 discarded once no positive memory of that building remains. Individual player views retain their
 independent knowledge, and no clear record is sent on the wire. A selected owner also suppresses
 other selected players' stale memories of its buildings that no longer exist, regardless of current
-footprint visibility; opponent-only views retain their own memory. This keeps hidden destruction stale
+footprint visibility; opponent-only views retain their own memory. Tank Traps are excluded from
+owner-based inference because they become neutral on completion and require observed-empty clears.
+This keeps hidden destruction stale
 until the location is checked without adding wire-protocol fields.
 
 `game::anti_tank_gun_memory::AntiTankGunMemory` is the corresponding server-authoritative
