@@ -32,6 +32,15 @@ assertDeepEqual(
   "global Auto-Build grid uses the complete command-card keyboard grid and leaves overflow clickable",
 );
 const rifleman = gridEntries.find((entry) => entry.unit === KIND.RIFLEMAN);
+const directCodes = new Map(gridEntries.map((entry, index) => [entry.commandId, `Key${"ABCDEFGHI"[index]}`]));
+const directEntries = productionGridEntries(state, {
+  getActiveProfile: () => ({ mode: "direct" }),
+  hotkeyCodeForCommand: (commandId) => directCodes.get(commandId) || "",
+});
+assertDeepEqual(directEntries.map((entry) => entry.hotkey), [..."ABCDEFGHI"],
+  "hidden Artillery's missing binding does not force valid direct bindings back to grid");
+assertDeepEqual(directEntries.map((entry) => entry.slotIndex), gridEntries.map((entry) => entry.slotIndex),
+  "direct bindings preserve the same empty Artillery grid position");
 assertDeepEqual(rifleman.producerIds, [10, 11], "global Auto-Build includes every owned compatible producer, including unfinished buildings");
 assert(rifleman.activeCount === 1, "global Auto-Build reports the authoritative active/compatible producer count");
 assertDeepEqual(

@@ -481,7 +481,8 @@ export function productionGridEntries(state, hotkeyProfiles = null, entities = n
       producerKind: kind,
       producerLabel: STATS[kind]?.label || kind,
       commandId: factionCommandId(factionId, "train", unit),
-    })));
+    }))).map((entry, slotIndex) => ({ ...entry, slotIndex }))
+    .filter((entry) => entry.unit !== KIND.ARTILLERY);
   const profile = hotkeyProfiles?.getActiveProfile?.();
   let hotkeyCodes = base.map((entry) =>
     hotkeyProfiles?.hotkeyCodeForCommand?.(entry.commandId, profile) || "");
@@ -490,19 +491,18 @@ export function productionGridEntries(state, hotkeyProfiles = null, entities = n
     hotkeyCodes.some((code) => !code) ||
     new Set(hotkeyCodes).size !== hotkeyCodes.length
   ) {
-    hotkeyCodes = base.map((_, index) => `Key${GRID_HOTKEYS[index] || ""}`);
+    hotkeyCodes = base.map((entry) => `Key${GRID_HOTKEYS[entry.slotIndex] || ""}`);
   }
   return base.map((entry, index) => {
     const producers = producersForUnit(state, entry.unit, entities);
     return {
       ...entry,
-      slotIndex: index,
       hotkeyCode: hotkeyCodes[index],
       hotkey: hotkeyCodes[index]?.replace(/^Key/, "") || "",
       producerIds: producers.map((producer) => producer.id),
       activeCount: producers.filter((producer) => producer.prodRepeatKinds?.includes(entry.unit)).length,
     };
-  }).filter((entry) => entry.unit !== KIND.ARTILLERY);
+  });
 }
 
 function producerKindOrder(kind) {
