@@ -58,7 +58,7 @@ fn scout_plane_is_no_longer_trained_at_resource_depots() {
 }
 
 #[test]
-fn researched_resource_depot_launches_a_free_scout_plane_ability_without_resources() {
+fn researched_resource_depot_cannot_launch_scout_plane() {
     let map = flat_map(32);
     let mut entities = EntityStore::new();
     let (depot_x, depot_y) = footprint_center(&map, EntityKind::ResourceDepot, 6, 6);
@@ -69,7 +69,7 @@ fn researched_resource_depot_launches_a_free_scout_plane_ability_without_resourc
     players[0].upgrades.insert(UpgradeKind::ScoutPlaneUnlock);
     players[0].set_resources(0, 0);
 
-    let events = apply_with_players(
+    let _events = apply_with_players(
         &map,
         &mut entities,
         &mut players,
@@ -82,17 +82,9 @@ fn researched_resource_depot_launches_a_free_scout_plane_ability_without_resourc
             .get(resource_depot)
             .expect("resource depot")
             .ability_cooldown_ticks(AbilityKind::ScoutPlane),
-        config::SCOUT_PLANE_ABILITY_COOLDOWN_TICKS
+        0
     );
-    let plane = entities
-        .iter()
-        .find(|entity| entity.kind == EntityKind::ScoutPlane)
-        .expect("Scout Plane should spawn");
-    assert_eq!((plane.pos_x, plane.pos_y), (depot_x, depot_y));
-    let state = plane.scout_plane_state().expect("plane state");
-    assert_eq!(state.source_command_car, None);
-    assert_eq!(state.orbit_center, (592.0, 592.0));
-    assert_notice(&events, 1, "Scout Plane");
+    assert!(entities.iter().all(|entity| entity.kind != EntityKind::ScoutPlane));
 }
 
 #[test]

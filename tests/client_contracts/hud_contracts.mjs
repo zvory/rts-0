@@ -1097,11 +1097,7 @@ withFakeHudDocument(({ FakeElement }) => {
     resources: { steel: 0, oil: 0, supplyUsed: 0, supplyCap: 10 },
     upgrades: [UPGRADE.SCOUT_PLANE_UNLOCK],
   }));
-  const depotScoutPlaneAbility = buttonByLabel(resourceDepotScoutPlaneCard, "Scout Plane");
-  assert(depotScoutPlaneAbility.slotIndex === 8, "Resource Depot Scout Plane ability should use the C slot");
-  assert(depotScoutPlaneAbility.intent.readyIds.join(",") === "70", "Scout Plane ability should use the selected Resource Depot");
-  assert(depotScoutPlaneAbility.cost.steel === 0 && depotScoutPlaneAbility.cost.oil === 0, "Resource Depot Scout Plane should show zero resource cost");
-  assert(depotScoutPlaneAbility.enabled, "Resource Depot Scout Plane ability should enable after research");
+  assert(!buttonByLabel(resourceDepotScoutPlaneCard, "Scout Plane"), "Resource Depot must not offer Scout Plane after research");
 
   const busyScoutPlaneDepot = { ...scoutPlaneResourceDepot, prodQueue: 1 };
   const busyDepotCard = buildCommandCardDescriptors(commandCardCtx({
@@ -1110,8 +1106,8 @@ withFakeHudDocument(({ FakeElement }) => {
     resources: { steel: 0, oil: 0, supplyUsed: 0, supplyCap: 10 },
     upgrades: [UPGRADE.SCOUT_PLANE_UNLOCK],
   }));
-  assert(buttonByLabel(busyDepotCard, "Scout Plane").slotIndex === 8, "busy Resource Depot keeps Scout Plane on C");
-  assert(buttonByLabel(busyDepotCard, "Cancel").slotIndex !== 8, "busy Resource Depot moves production cancel out of the shared Scout Plane slot");
+  assert(!buttonByLabel(busyDepotCard, "Scout Plane"), "busy Resource Depot must not offer Scout Plane");
+  assert(buttonByLabel(busyDepotCard, "Cancel").slotIndex === 8, "busy Resource Depot keeps production cancel on C");
 
   const commandCar = {
     id: 74,
