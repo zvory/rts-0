@@ -540,7 +540,7 @@ function buttonByLabel(card, label) {
   });
   budgetSelectionState.setControlGroup(2, budgetTanks.map((entity) => entity.id).concat([budgetCommandCar.id, secondBudgetCommandCar.id]));
   assert(
-    budgetSelectionState.controlGroups[2].join(",") === "400,401,402,403,450,451",
+    budgetSelectionState.controlGroups[2].join(",") === "400,401,402,403,404,450,451",
     "control-group save includes free Command Cars without adding capacity",
   );
   budgetSelectionState.controlGroups[3] = budgetTanks.map((entity) => entity.id).concat(budgetCommandCar.id);
@@ -553,7 +553,7 @@ function buttonByLabel(card, label) {
     budgetSelectionState.controlGroups[3].join(",") === "400,401,402,403,404,450",
     "control-group recall rewrites old over-budget runtime groups to legal admitted order",
   );
-  budgetSelectionState.controlGroups[4] = budgetTanks.map((entity) => entity.id);
+  budgetSelectionState.controlGroups[4] = budgetTanks.map((entity) => entity.id).concat(budgetExtraTank.id);
   const recalledOverBudgetTanks = budgetSelectionState.selectControlGroup(4);
   assert(
     recalledOverBudgetTanks.join(",") === "400,401,402,403,404",
@@ -577,7 +577,7 @@ function buttonByLabel(card, label) {
     },
   };
   guardedControlGroupIssuer.issueCommand(cmd.move(Array.from(budgetSelectionState.selection), 10, 20));
-  guardedControlGroupIssuer.issueCommand(cmd.move(budgetTanks.map((entity) => entity.id), 10, 20));
+  guardedControlGroupIssuer.issueCommand(cmd.move(budgetTanks.map((entity) => entity.id).concat(budgetExtraTank.id), 10, 20));
   assert(controlGroupCommands.length === 1, "legal recalled control-group command is sent through the budget guard");
   assert(controlGroupToasts.length === 1, "over-budget command restored from stale group data is blocked before send");
 
