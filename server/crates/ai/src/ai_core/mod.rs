@@ -12,3 +12,4 @@ pub(crate) mod observation;
 pub(crate) mod profile_manifest;
 pub(crate) mod profiles;
 pub(crate) mod resource_availability;
+pub(crate) mod squad_micro;

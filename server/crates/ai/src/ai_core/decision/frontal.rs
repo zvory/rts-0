@@ -1,6 +1,7 @@
 use super::geometry::{clamp_to_map, dist2, normalized_direction, tile_center};
 use super::*;
 
+pub(super) mod approach;
 mod catch_up;
 mod containment;
 mod formation;
@@ -244,6 +245,7 @@ pub(super) fn issue_frontal_wave(
                 is_jeffs_ai_profile(profile.id),
                 profile.id != JEFFS_AI_PRE_TANK_CATCHUP_ID,
                 uses_current_jeffs_ai_policy(profile.id),
+                profile.id == JEFFS_AI_ID,
                 map_analysis,
                 memory,
             );
@@ -346,12 +348,33 @@ pub(super) fn sync_containment_recovery(
     if !memory.containment.wave_launched || memory.enemy_main_destroyed {
         return;
     }
-    if memory.containment.recovery_active || memory.containment.active_tanks.is_empty() {
+    if memory.containment.recovery_active {
         return;
     }
     let owned: BTreeSet<u32> = observation.owned.iter().map(|entity| entity.id).collect();
+    // The live Jeff's push that lost every Tank (killed, or let go as stuck) is over: it falls back
+    // and forms again. Left launched with no Tanks, it sent nothing out for the rest of the game
+    // while 40 Tanks gathered at home.
+    if memory.containment.active_tanks.is_empty() {
+        if profile.id == JEFFS_AI_ID {
+            begin_containment_recovery(memory);
+        }
+        return;
+    }
     // The current Jeff's push, most of its Tanks, carries on through losses until half of it is gone
     // or it drops below the policy minimum. Other profiles fall back on the first loss.
+    // The live Jeff counts Tanks let go as stuck as not lost: on Crossroads Tanks wedged against
+    // the cliff by its own base ended a push of 11 that had lost two.
+    let stuck_alive = if profile.id == JEFFS_AI_ID {
+        memory
+            .containment
+            .stuck_tanks
+            .keys()
+            .filter(|tank| owned.contains(tank))
+            .count()
+    } else {
+        0
+    };
     let tanks_left = memory
         .containment
         .active_tanks
@@ -359,19 +382,41 @@ pub(super) fn sync_containment_recovery(
         .filter(|tank| owned.contains(tank))
         .count();
     let tanks_intact = if uses_current_jeffs_ai_policy(profile.id) {
-        tanks_left * 2 >= memory.containment.launch_tanks
+        (tanks_left + stuck_alive) * 2 >= memory.containment.launch_tanks
             && profile
                 .expansion_containment
                 .is_some_and(|policy| tanks_left >= policy.minimum_tanks_to_continue)
     } else {
         tanks_left == memory.containment.active_tanks.len()
     };
-    let scout_intact = memory
+    let mut scout_intact = memory
         .containment
         .active_scout
         .is_some_and(|scout| owned.contains(&scout));
+    // The live Jeff's push that lost only its Scout Car takes another and carries on: on
+    // Crossroads the Scout Car fell near the enemy main again and again, and each time a push of
+    // 20 Tanks drove home to form again.
+    if !scout_intact && tanks_intact && profile.id == JEFFS_AI_ID {
+        let replacement = observation
+            .owned
+            .iter()
+            .filter(|unit| unit.kind == EntityKind::ScoutCar && unit.is_complete && unit.hp > 0)
+            .filter(|unit| !memory.trap_breach.is_reserved(unit.id))
+            .map(|unit| unit.id)
+            .min();
+        if let Some(scout) = replacement {
+            memory.containment.active_scout = Some(scout);
+            scout_intact = true;
+        }
+    }
     if tanks_intact && scout_intact {
         return;
+    }
+    // The current Jeff comes at the target from another side next time.
+    if uses_current_jeffs_ai_policy(profile.id) {
+        memory
+            .approach
+            .note_failed_push(observation.player_id, observation.tick);
     }
     begin_containment_recovery(memory);
 }
@@ -431,6 +476,43 @@ fn begin_containment_recovery(memory: &mut AiDecisionMemory) {
     memory.containment.waypoint_started_tick = None;
     memory.containment.stationary_since = None;
     memory.containment.contact_last_tick = None;
+    memory.containment.watchdog = None;
+    memory.containment.watchdog_checked = None;
+    memory.containment.watchdog_assault_until = None;
+}
+
+/// Record where this decision's commands send the live Jeff's push Tanks; any other order forgets it.
+pub(super) fn note_push_move_targets(commands: &[Command], memory: &mut AiDecisionMemory) {
+    for command in commands {
+        let (units, target) = match command {
+            Command::Move { units, x, y, .. } | Command::AttackMove { units, x, y, .. } => {
+                (units, Some((*x, *y)))
+            }
+            Command::FormationMove { units, points, .. } => (units, points.last().copied()),
+            Command::Attack { units, .. }
+            | Command::AttackTankTrapCluster { units, .. }
+            | Command::ClearObstacleArea { units, .. }
+            | Command::HoldPosition { units, .. }
+            | Command::Stop { units } => (units, None),
+            _ => continue,
+        };
+        for id in units {
+            if !memory.containment.active_tanks.contains(id) {
+                continue;
+            }
+            match target {
+                Some((x, y)) => {
+                    memory
+                        .containment
+                        .move_targets
+                        .insert(*id, (x.round() as i32, y.round() as i32));
+                }
+                None => {
+                    memory.containment.move_targets.remove(id);
+                }
+            }
+        }
+    }
 }
 
 /// Record which units the push left holding: a Hold marks a unit, any other order replaces it.
@@ -680,6 +762,27 @@ fn compact_tank_formation_assignments(
     map: AiMapSummary,
     spacing_tiles: f32,
 ) -> Vec<(u32, (f32, f32))> {
+    ranked_tank_formation_assignments(
+        observation,
+        tank_ids,
+        center,
+        toward_objective,
+        map,
+        spacing_tiles,
+        TANK_FORMATION_RANK_WIDTH,
+    )
+}
+
+/// `compact_tank_formation_assignments` with `rank_width` Tanks to a rank.
+fn ranked_tank_formation_assignments(
+    observation: &AiObservation,
+    tank_ids: &[u32],
+    center: (f32, f32),
+    toward_objective: (f32, f32),
+    map: AiMapSummary,
+    spacing_tiles: f32,
+    rank_width: usize,
+) -> Vec<(u32, (f32, f32))> {
     let mut tank_ids = tank_ids.to_vec();
     let perpendicular = (-toward_objective.1, toward_objective.0);
     let by_id: BTreeMap<u32, &AiEntitySummary> = observation
@@ -702,7 +805,7 @@ fn compact_tank_formation_assignments(
     });
     let tile_size = map.tile_size as f32;
     let mut assignments = Vec::with_capacity(tank_ids.len());
-    for (rank, rank_ids) in tank_ids.chunks(TANK_FORMATION_RANK_WIDTH).enumerate() {
+    for (rank, rank_ids) in tank_ids.chunks(rank_width.max(1)).enumerate() {
         let mut rank_ids = rank_ids.to_vec();
         rank_ids.sort_by(|left, right| {
             along(left, perpendicular)
@@ -751,7 +854,8 @@ fn frontmost_unit_position(
         .map(|unit| (unit.x, unit.y))
 }
 
-fn enemy_natural_edge(
+/// The Steel nearest the enemy start outside its starting resources: the edge of its natural.
+pub(super) fn enemy_natural_edge(
     observation: &AiObservation,
     enemy_base: EnemyBaseFact,
 ) -> Option<(f32, f32)> {

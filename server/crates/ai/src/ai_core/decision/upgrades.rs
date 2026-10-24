@@ -98,6 +98,31 @@ pub(super) fn queue_jeff_infantry_mass_methamphetamines(
     );
 }
 
+/// The live Jeff researches Smoke Plus once it has smoked into a parked Tank line and its Tank
+/// count makes larger assaults worth it: the 4-tile, 10-second cloud covers the drive in and the
+/// three-second charge with room to spare, and holds a large assault, where the base 5-second
+/// cloud barely does. Without parked lines it is not worth it: the push's isolation smoke works
+/// worse with the larger, longer cloud (in 120-game tests it cost Jeff its River wins), and it
+/// costs as much oil as a Tank.
+const SMOKE_PLUS_TANKS: usize = 8;
+
+pub(super) fn queue_jeff_smoke_plus(
+    actions: &mut AiActionContext<'_>,
+    facts: &AiFacts,
+    memory: &mut AiDecisionMemory,
+    intents: &mut Vec<AiIntent>,
+    profile: &AiProfile,
+) {
+    if !super::tank_micro::uses_tank_micro(profile.id)
+        || memory.tank_micro.assaults_started == 0
+        || facts.unit_count(EntityKind::Tank) < SMOKE_PLUS_TANKS
+        || facts.unit_count(EntityKind::ScoutCar) == 0
+    {
+        return;
+    }
+    queue_upgrade_if_available(actions, facts, memory, intents, UpgradeKind::SmokePlus);
+}
+
 pub(super) fn queue_required_unit_unlocks(
     actions: &mut AiActionContext<'_>,
     facts: &AiFacts,

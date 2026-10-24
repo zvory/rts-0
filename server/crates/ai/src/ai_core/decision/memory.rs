@@ -84,6 +84,18 @@ pub(crate) struct ContainmentPush {
     pub(super) smoke_expires_tick: Option<u32>,
     /// When the push was last ordered to clear a Tank Trap in its way.
     pub(super) trap_order_tick: Option<u32>,
+    /// The live Jeff's push Tanks: where each last stood when it made progress, and when.
+    pub(super) progress_marks: BTreeMap<u32, ((i32, i32), u32)>,
+    /// Tanks let go as stuck and where they stood; no push takes them until they move.
+    pub(super) stuck_tanks: BTreeMap<u32, (i32, i32)>,
+    /// The live Jeff's push Tanks: where the last movement order sent each, in world units.
+    pub(super) move_targets: BTreeMap<u32, (i32, i32)>,
+    /// The live Jeff's launched push: its nearest approach to its objective so far, and when.
+    pub(super) watchdog: Option<(i32, u32)>,
+    /// When the watchdog last looked: time in contact since then does not count as stalled.
+    pub(super) watchdog_checked: Option<u32>,
+    /// Until when a push the watchdog sent straight at its objective is left to its attack-move.
+    pub(super) watchdog_assault_until: Option<u32>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -93,6 +105,11 @@ pub(crate) struct AiDecisionMemory {
     pub(super) later_bases: super::later_bases::LaterBases,
     /// Jeff's forward picket and the Riflemen sealing the home line during a raid alert.
     pub(super) route_line: super::defense::RouteLine,
+    /// Jeff's starting Riflemen marching on the enemy, until they fall back home.
+    pub(super) opening_rush: super::opening_rush::OpeningRush,
+    /// The live Jeff's enemy Tank memory, Tank order overrides, and smoke assault.
+    pub(super) tank_micro: super::tank_micro::TankMicro,
+    pub(super) trap_breach: super::trap_breach::TrapBreach,
     profile_id: Option<&'static str>,
     attack_first_size: Option<usize>,
     next_attack_size: usize,
@@ -114,6 +131,8 @@ pub(crate) struct AiDecisionMemory {
     launched_frontal_units: BTreeMap<u32, u32>,
     /// The push under way (or forming), its units, route and firing state.
     pub(super) containment: ContainmentPush,
+    /// How the push comes at its target: the side after failed pushes, and the current leg.
+    pub(super) approach: super::frontal::approach::PushApproach,
     /// The Tank Trap home Tanks were last sent to clear, and when.
     pub(super) trap_order: Option<(u32, u32)>,
     /// How many enemy Tanks were in sight together, by tick, over the last
@@ -149,6 +168,9 @@ impl AiDecisionMemory {
             expansion_security: Default::default(),
             later_bases: Default::default(),
             route_line: Default::default(),
+            opening_rush: Default::default(),
+            tank_micro: Default::default(),
+            trap_breach: Default::default(),
             profile_id: Some(profile.id),
             attack_first_size: Some(profile.attack.first_attack_size),
             next_attack_size: profile.attack.first_attack_size,
@@ -165,6 +187,7 @@ impl AiDecisionMemory {
             pending_upgrades: BTreeSet::new(),
             launched_frontal_units: BTreeMap::new(),
             containment: ContainmentPush::default(),
+            approach: Default::default(),
             trap_order: None,
             enemy_tank_sightings: BTreeMap::new(),
             enemy_attack_sightings: BTreeMap::new(),
@@ -241,6 +264,8 @@ impl AiDecisionMemory {
         }
         self.profile_id = Some(profile.id);
         self.expansion_security = Default::default();
+        self.tank_micro = Default::default();
+        self.trap_breach = Default::default();
         self.attack_first_size = Some(profile.attack.first_attack_size);
         self.next_attack_size = profile.attack.first_attack_size;
         self.last_attack_tick = None;
@@ -567,11 +592,21 @@ impl AiDecisionMemory {
             self.home_defensive_tank = None;
             return;
         }
+        // The live Jeff never takes a Tank of the launched push for home: home defense would hold it
+        // at the home post while the push waited for it to catch up, for the rest of the game.
+        let push_tanks: BTreeSet<u32> = if profile.id == crate::ai_core::profiles::JEFFS_AI_ID
+            && !self.containment.recovery_active
+        {
+            self.containment.active_tanks.clone()
+        } else {
+            BTreeSet::new()
+        };
         if self.home_defensive_tank.is_some_and(|id| {
-            observation
-                .owned
-                .iter()
-                .any(|entity| entity.id == id && entity.kind == EntityKind::Tank)
+            !push_tanks.contains(&id)
+                && observation
+                    .owned
+                    .iter()
+                    .any(|entity| entity.id == id && entity.kind == EntityKind::Tank)
         }) {
             return;
         }
@@ -580,6 +615,8 @@ impl AiDecisionMemory {
             .owned
             .iter()
             .filter(|entity| entity.kind == EntityKind::Tank)
+            .filter(|entity| !self.trap_breach.is_reserved(entity.id))
+            .filter(|entity| !push_tanks.contains(&entity.id))
             .filter(|entity| {
                 self.home_defensive_tank_assigned_once
                     || !self.containment.opening_tanks.contains(&entity.id)

@@ -424,6 +424,8 @@ fn free_tank_ids(observation: &AiObservation, memory: &AiDecisionMemory) -> Vec<
         .filter(|unit| {
             !memory.containment.active_tanks.contains(&unit.id)
                 && !memory.containment.opening_tanks.contains(&unit.id)
+                // The trap breach's Tanks hold their concave; they are not called home.
+                && !memory.trap_breach.is_reserved(unit.id)
         })
         .map(|unit| unit.id)
         .collect()

@@ -12,9 +12,11 @@ use rts_protocol::{
 use rts_sim::protocol::{kinds, MapInfo, PlayerStart, ResourceNode, StartPayload};
 
 mod chokes;
+mod overlays;
 mod regions;
 mod routes;
 use chokes::build_chokes;
+use overlays::{hash_overlays, overlay_grid};
 use regions::{build_regions, nearest_region, region_id_for_tile};
 
 const MAX_CLEARANCE_TILES: u16 = 16;
@@ -58,6 +60,7 @@ pub(crate) struct AiMapAnalysisKey {
     pub(crate) terrain_hash: u64,
     pub(crate) starts_hash: u64,
     pub(crate) resources_hash: u64,
+    pub(crate) overlays_hash: u64,
 }
 
 impl AiMapAnalysisKey {
@@ -69,6 +72,7 @@ impl AiMapAnalysisKey {
             terrain_hash: fnv_bytes(FNV_OFFSET_BASIS, &start.map.terrain),
             starts_hash: hash_player_starts(&start.players),
             resources_hash: hash_resources(&start.map.resources),
+            overlays_hash: hash_overlays(&start.map),
         }
     }
 }
@@ -189,6 +193,11 @@ pub(crate) struct AiMapAnalysis {
     tile_size: u32,
     passable: Vec<bool>,
     line_of_sight_blocked: Vec<bool>,
+    /// Road tiles, where units move faster.
+    road: Vec<bool>,
+    /// Forest (concealment) and authored no-entrenchment tiles, read through `overlays`.
+    concealment: Vec<bool>,
+    no_entrenchment: Vec<bool>,
     clearance: Vec<u16>,
     component_by_tile: Vec<Option<u32>>,
     components: Vec<AiMapComponent>,
@@ -309,6 +318,17 @@ impl AiMapAnalysis {
             .copied()
             .map(rts_rules::terrain::blocks_line_of_sight)
             .collect();
+        let road = start
+            .map
+            .terrain
+            .iter()
+            .map(|code| {
+                rts_rules::terrain::TerrainKind::from_map_code(*code)
+                    == Some(rts_rules::terrain::TerrainKind::Road)
+            })
+            .collect();
+        let concealment = overlay_grid(width, height, &start.map.concealment_tiles);
+        let no_entrenchment = overlay_grid(width, height, &start.map.no_entrenchment_tiles);
         let clearance = build_clearance(width, height, &passable);
         let (component_by_tile, components) =
             build_components(width, height, &passable, &clearance);
@@ -347,6 +367,9 @@ impl AiMapAnalysis {
             tile_size,
             passable,
             line_of_sight_blocked,
+            road,
+            concealment,
+            no_entrenchment,
             clearance,
             component_by_tile,
             components,
@@ -467,6 +490,13 @@ impl AiMapAnalysis {
     pub(crate) fn tile_is_passable(&self, x: u32, y: u32) -> bool {
         tile_index(self.width, self.height, x, y)
             .and_then(|idx| self.passable.get(idx).copied())
+            .unwrap_or(false)
+    }
+
+    /// Whether units on this tile move at road speed.
+    pub(crate) fn tile_is_road(&self, x: u32, y: u32) -> bool {
+        tile_index(self.width, self.height, x, y)
+            .and_then(|idx| self.road.get(idx).copied())
             .unwrap_or(false)
     }
 
@@ -1454,7 +1484,7 @@ fn hash_resources(resources: &[ResourceNode]) -> u64 {
     hash
 }
 
-fn fnv_u32(hash: u64, value: u32) -> u64 {
+pub(super) fn fnv_u32(hash: u64, value: u32) -> u64 {
     fnv_bytes(hash, &value.to_le_bytes())
 }
 
