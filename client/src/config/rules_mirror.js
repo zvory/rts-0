@@ -114,7 +114,7 @@ export const EKAT_MAGIC_ANCHOR_DURATION_TICKS = TICK_HZ * 10;
 export const EKAT_MAGIC_ANCHOR_RADIUS_TILES = 3.0;
 export const EKAT_MAGIC_ANCHOR_PULL_AWAY_MULTIPLIER = 0.45;
 export const EKAT_MAGIC_ANCHOR_PULL_TOWARD_MULTIPLIER = 1.35;
-export const BASE_COMMAND_SUPPLY_CAP = 24;
+export const BASE_COMMAND_SUPPLY_CAP = 25;
 export const COMMAND_CAR_SUPPLY_CAP_BONUS = 0;
 export const SCOUT_PLANE_ORBIT_RADIUS_TILES = 2;
 export const SCOUT_PLANE_SPEED_PX_PER_TICK = 2.6;
@@ -165,7 +165,7 @@ export const STATS = Object.freeze({
     blocksGroundPlacement: false,
     rangeTiles: 0, cost: { steel: 0, oil: 0 }, supply: 0, buildTicks: 0 },
   [KIND.TANK]: { armored: true, label: "Tank", icon: "TK", size: 18, sight: 9, body: TANK_BODY,
-    rangeTiles: 5, cost: { steel: 425, oil: 175 }, supply: 6, buildTicks: 750,
+    rangeTiles: 5, cost: { steel: 425, oil: 175 }, supply: 5, buildTicks: 750,
     requires: KIND.FACTORY, upgradeRequires: UPGRADE.TANK_UNLOCK,
     upgradeRequiresText: "Requires research in Engineering Complex" },
   [KIND.COMMAND_CAR]: { armored: false, label: "Command Car", icon: "CAR", size: 12.6, sight: 8, body: COMMAND_CAR_BODY,

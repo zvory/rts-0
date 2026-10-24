@@ -1,10 +1,10 @@
 use super::*;
 
 #[test]
-fn command_budget_allows_twenty_four_one_supply_units() {
+fn command_budget_allows_twenty_five_one_supply_units() {
     let map = flat_map(64);
     let mut entities = EntityStore::new();
-    let units = spawn_units(&mut entities, 1, EntityKind::Rifleman, 24);
+    let units = spawn_units(&mut entities, 1, EntityKind::Rifleman, 25);
     mark_units_moving(&mut entities, &units);
 
     apply(
@@ -23,15 +23,42 @@ fn command_budget_allows_twenty_four_one_supply_units() {
             entities.get(*id).map(|entity| entity.order()),
             Some(Order::Idle)
         )),
-        "24 one-supply units should fit the base command budget"
+        "25 one-supply units should fit the base command budget"
     );
 }
 
 #[test]
-fn command_budget_rejects_fifth_tank_without_command_car() {
+fn command_budget_allows_five_tanks() {
     let map = flat_map(64);
     let mut entities = EntityStore::new();
     let units = spawn_units(&mut entities, 1, EntityKind::Tank, 5);
+    mark_units_moving(&mut entities, &units);
+
+    apply(
+        &map,
+        &mut entities,
+        vec![(
+            1,
+            SimCommand::Stop {
+                units: units.clone(),
+            },
+        )],
+    );
+
+    assert!(
+        units.iter().all(|id| matches!(
+            entities.get(*id).map(|entity| entity.order()),
+            Some(Order::Idle)
+        )),
+        "five five-supply tanks should fit the base command budget"
+    );
+}
+
+#[test]
+fn command_budget_rejects_sixth_tank_without_command_car() {
+    let map = flat_map(64);
+    let mut entities = EntityStore::new();
+    let units = spawn_units(&mut entities, 1, EntityKind::Tank, 6);
     mark_units_moving(&mut entities, &units);
     let events = apply_with_players(
         &map,
@@ -50,7 +77,7 @@ fn command_budget_rejects_fifth_tank_without_command_car() {
             entities.get(*id).map(|entity| entity.order()),
             Some(Order::Move(_))
         )),
-        "five tanks should exceed the base command budget and keep their orders"
+        "six tanks should exceed the base command budget and keep their orders"
     );
     assert_notice(&events, 1, "Command supply exceeded");
 }
@@ -60,7 +87,7 @@ fn command_car_has_zero_command_cost_without_raising_cap() {
     let map = flat_map(64);
 
     let mut one_car_entities = EntityStore::new();
-    let mut one_car_units = spawn_units(&mut one_car_entities, 1, EntityKind::Tank, 5);
+    let mut one_car_units = spawn_units(&mut one_car_entities, 1, EntityKind::Tank, 6);
     one_car_units.extend(spawn_units(
         &mut one_car_entities,
         1,
@@ -84,12 +111,12 @@ fn command_car_has_zero_command_cost_without_raising_cap() {
             one_car_entities.get(*id).map(|entity| entity.order()),
             Some(Order::Move(_))
         )),
-        "one Command Car must not make five tanks legal"
+        "one Command Car must not make six tanks legal"
     );
     assert_notice(&events, 1, "Command supply exceeded");
 
     let mut two_car_entities = EntityStore::new();
-    let mut two_car_units = spawn_units(&mut two_car_entities, 1, EntityKind::Tank, 4);
+    let mut two_car_units = spawn_units(&mut two_car_entities, 1, EntityKind::Tank, 5);
     two_car_units.extend(spawn_units(
         &mut two_car_entities,
         1,
@@ -112,7 +139,7 @@ fn command_car_has_zero_command_cost_without_raising_cap() {
             two_car_entities.get(*id).map(|entity| entity.order()),
             Some(Order::Idle)
         )),
-        "four tanks and two zero-cost Command Cars should fit the base 24 budget"
+        "five tanks and two zero-cost Command Cars should fit the base 25 budget"
     );
 }
 
