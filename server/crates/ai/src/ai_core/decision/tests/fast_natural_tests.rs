@@ -1,4 +1,3 @@
-use super::opening_rush::OpeningRush;
 use super::*;
 use crate::ai_core::profiles::{JEFFS_AI, JEFFS_AI_PRE_FAST_NATURAL};
 
@@ -159,7 +158,7 @@ fn the_live_jeffs_home_builds_take_the_engineer_nearest_the_hq() {
 }
 
 #[test]
-fn the_live_jeff_trains_its_opening_guns_before_the_party_and_no_riflemen_beyond_it() {
+fn the_live_jeffs_opening_gun_comes_before_a_rifleman_when_it_can_pay_for_it() {
     for profile in [&JEFFS_AI, &JEFFS_AI_PRE_FAST_NATURAL] {
         let live = profile.id == JEFFS_AI_ID;
         let (mut obs, mut memory, _) = early_natural(profile);
@@ -182,30 +181,53 @@ fn the_live_jeff_trains_its_opening_guns_before_the_party_and_no_riflemen_beyond
             "{}",
             profile.id
         );
+        // Without the gun's Oil, a Rifleman comes for both.
+        obs.economy.oil = 5;
+        let decision = decide(&obs, profile, &mut memory);
+        assert!(trains(&decision, EntityKind::Rifleman), "{}", profile.id);
     }
+}
 
-    // The rush took starters 30-33 and lost them. Four guns are home and the natural is due: Steel
-    // above its reserve goes to the guard party first.
+#[test]
+fn the_live_jeffs_fifth_and_sixth_guns_come_only_before_its_first_tank() {
     let ts = config::TILE_SIZE as f32;
-    let (mut obs, mut memory, _) = early_natural(&JEFFS_AI);
-    memory.opening_rush = OpeningRush::ended_with_starters(&[30, 31, 32, 33]);
-    obs.economy.steel = 450 + 120;
-    obs.economy.oil = 100 + 30;
-    assert!(trains(
+    for profile in [&JEFFS_AI, &JEFFS_AI_PRE_FAST_NATURAL] {
+        let live = profile.id == JEFFS_AI_ID;
+        let (mut obs, mut memory, _) = early_natural(profile);
+        // Four guns and six Riflemen home, and Steel above the natural's reserve.
+        obs.owned
+            .extend((10..16).map(|id| combat_at(id, EntityKind::Rifleman, 14.0 * ts, 14.0 * ts)));
+        obs.economy.steel = 450 + 120;
+        obs.economy.oil = 100 + 30;
+        let decision = decide(&obs, profile, &mut memory);
+        assert_eq!(
+            trains(&decision, EntityKind::MachineGunner),
+            live,
+            "{}",
+            profile.id
+        );
+        // Once a Tank is out, four guns are enough.
+        obs.owned
+            .push(combat_at(40, EntityKind::Tank, 12.0 * ts, 12.0 * ts));
+        let decision = decide(&obs, profile, &mut memory);
+        assert!(
+            !trains(&decision, EntityKind::MachineGunner),
+            "{}",
+            profile.id
+        );
+    }
+}
+
+#[test]
+fn the_live_jeff_trains_no_second_engineer_once_its_factory_is_out() {
+    let (mut obs, mut memory, site) = early_natural(&JEFFS_AI);
+    obs.owned.push(building(8, EntityKind::Factory, Some(0)));
+    decide(&obs, &JEFFS_AI, &mut memory);
+    order_out(&mut obs, site);
+    obs.economy.steel = 450 + 200;
+    obs.economy.oil = 100 + 140;
+    assert!(!trains(
         &decide(&obs, &JEFFS_AI, &mut memory),
-        EntityKind::Rifleman
+        EntityKind::Worker
     ));
-    // With the party's two Riflemen home, the freeze still tops Riflemen up to six; the live Jeff
-    // trains its fifth gun instead.
-    obs.owned
-        .extend((10..12).map(|id| combat_at(id, EntityKind::Rifleman, 14.0 * ts, 14.0 * ts)));
-    let decision = decide(&obs, &JEFFS_AI, &mut memory);
-    assert_eq!(memory.expansion_security.riflemen.len(), 2);
-    assert!(!trains(&decision, EntityKind::Rifleman));
-    assert!(trains(&decision, EntityKind::MachineGunner));
-    let (_, mut frozen, _) = early_natural(&JEFFS_AI_PRE_FAST_NATURAL);
-    frozen.opening_rush = OpeningRush::ended_with_starters(&[30, 31, 32, 33]);
-    let decision = decide(&obs, &JEFFS_AI_PRE_FAST_NATURAL, &mut frozen);
-    assert!(trains(&decision, EntityKind::Rifleman));
-    assert!(!trains(&decision, EntityKind::MachineGunner));
 }

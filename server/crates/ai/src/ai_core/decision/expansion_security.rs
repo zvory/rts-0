@@ -148,27 +148,6 @@ pub(super) fn opening_guns_ordered(
     facts.unit_count(EntityKind::MachineGunner) + queued >= guns
 }
 
-/// While the natural's guard party lacks Riflemen (those in training count toward it), the Rifleman
-/// count, in training included, that fills it. The live Jeff recruits only these while its natural
-/// is next: topping every Rifleman up to six put three Riflemen ahead of the opening guns once the
-/// starters were lost.
-pub(super) fn party_rifle_target(
-    observation: &AiObservation,
-    facts: &AiFacts,
-    memory: &AiDecisionMemory,
-) -> Option<usize> {
-    let queued: usize = observation
-        .owned
-        .iter()
-        .filter(|unit| {
-            unit.kind == EntityKind::Barracks && unit.production_kind == Some(EntityKind::Rifleman)
-        })
-        .map(|unit| unit.production_queue_len.unwrap_or(0))
-        .sum();
-    let short = PARTY_SIZE.saturating_sub(memory.expansion_security.riflemen.len() + queued);
-    (short > 0).then(|| facts.unit_count(EntityKind::Rifleman) + queued + short)
-}
-
 /// Whether Jeff may send the builder to the secured natural now: the site is secured, no order
 /// for it is out, the retry cooldown has passed, the Depot's full cost is banked, and nothing
 /// hostile is near the builder, the base's way in or, with `watch_site`, the site. Without this

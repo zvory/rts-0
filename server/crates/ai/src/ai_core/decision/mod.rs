@@ -483,14 +483,17 @@ where
 
     let economy_plan = economy_manager_output.plan.clone();
     let save_worker_training_for_tech = defer_economy_for_panic;
-    // The live Jeff trains a second Engineer once its natural is ordered, so the Factory and the
-    // rest of home's building do not wait for the natural's builder to walk back.
-    let target_workers =
-        if profile.id == JEFFS_AI_ID && facts.building_count(EntityKind::ResourceDepot) >= 2 {
-            economy_plan.target_workers.max(2)
-        } else {
-            economy_plan.target_workers
-        };
+    // The live Jeff trains a second Engineer once its natural is ordered ahead of its Factory, so
+    // the Factory does not wait for the natural's builder to walk back. With the Factory already out
+    // the Steel goes elsewhere: on Chokes, where Steel is short, it delayed Tank Unlock 23 s.
+    let target_workers = if profile.id == JEFFS_AI_ID
+        && facts.building_count(EntityKind::ResourceDepot) >= 2
+        && facts.building_count(EntityKind::Factory) == 0
+    {
+        economy_plan.target_workers.max(2)
+    } else {
+        economy_plan.target_workers
+    };
     let should_train_workers = economy_manager_output.proposes(EconomyProposal::TrainWorker)
         || (!defer_economy_for_panic && facts.worker_count < target_workers);
     if should_train_workers {
@@ -796,27 +799,29 @@ where
         &effective_unit_priorities,
     );
     let mut effective_unit_priorities = effective_unit_priorities;
-    // Riflemen recruited ahead of tech for the natural: the Rifleman count (in training included)
-    // to reach. The freezes top every Rifleman up to six. The live Jeff fills only the guard party,
-    // and before its first Tank only once the opening guns are ordered; its extra guns take the
-    // other Riflemen's place.
-    let security_rifle_target = if !uses_current_jeffs_ai_policy(profile.id)
-        || memory.expansion_security.site.is_none()
-    {
-        None
-    } else if profile.id == JEFFS_AI_ID {
-        let guns_first = facts.unit_count(EntityKind::Tank) == 0
+    // Riflemen recruited ahead of tech for the natural, up to six (in training included). While the
+    // live Jeff's opening guns are short before its first Tank, they come after the next gun: ahead
+    // of it they took the Barracks from guns three and four once the starters were lost (Fastest
+    // Map Possible: two guns home at 3:00). A Rifleman still comes while the gun waits for Oil; on
+    // Wald the Factory takes it first, and the Rifleman that came then held the 2:12 raid.
+    let security_rifle_target = (uses_current_jeffs_ai_policy(profile.id)
+        && memory.expansion_security.site.is_some()
+        && facts.unit_count(EntityKind::Rifleman) < 6)
+        .then_some(6);
+    if security_rifle_target.is_some() {
+        let guns_first = profile.id == JEFFS_AI_ID
+            && facts.unit_count(EntityKind::Tank) == 0
             && !expansion_security::opening_guns_ordered(
                 observation,
                 &facts,
                 expansion_security::OPENING_GUNS,
             );
-        expansion_security::party_rifle_target(observation, &facts, memory).filter(|_| !guns_first)
-    } else {
-        (facts.unit_count(EntityKind::Rifleman) < 6).then_some(6)
-    };
-    if security_rifle_target.is_some() {
-        effective_unit_priorities.insert(0, EntityKind::Rifleman);
+        let at = effective_unit_priorities
+            .iter()
+            .position(|unit| *unit == EntityKind::MachineGunner)
+            .filter(|_| guns_first)
+            .map_or(0, |gun| gun + 1);
+        effective_unit_priorities.insert(at, EntityKind::Rifleman);
     }
     let emergency_rifle_target = memory
         .opening_rush
@@ -854,7 +859,16 @@ where
     );
     let production_unit_counts =
         unit_counts_for_priorities(observation, &facts, profile, &effective_unit_priorities);
-    let production_max_counts = production_max_counts(profile, observation, map_analysis);
+    let mut production_max_counts = production_max_counts(profile, observation, map_analysis);
+    // The live Jeff's two extra guns are opening guns: once a Tank is out, lost guns are replaced
+    // only up to the usual four, and the Oil goes to Tanks.
+    if profile.id == JEFFS_AI_ID && facts.unit_count(EntityKind::Tank) > 0 {
+        for (kind, max) in &mut production_max_counts {
+            if *kind == EntityKind::MachineGunner {
+                *max = (*max).min(expansion_security::OPENING_GUNS);
+            }
+        }
+    }
     let emergency_rifle_target = emergency_rifle_target.and_then(|_| {
         memory
             .opening_rush

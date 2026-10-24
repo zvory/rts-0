@@ -229,9 +229,9 @@ const JEFFS_AI_RUSH: AiProfile = AiProfile {
     ..JEFFS_AI_LIVE
 };
 
-/// The live Jeff holds six defensive Machine Gunners where its freezes hold four, in place of the
-/// Riflemen it used to top up to six while the natural was next: guns outrange Riflemen and fight
-/// raids from their trenches. The natural waits only for the first four (`early_natural_due`).
+/// The live Jeff holds six defensive Machine Gunners before its first Tank where its freezes hold
+/// four: guns outrange Riflemen and fight raids from their trenches. The natural waits only for the
+/// first four (`early_natural_due`), and once a Tank is out lost guns are replaced only up to four.
 pub(crate) static JEFFS_AI: AiProfile = AiProfile {
     defensive_machine_gunners: Some(DefensiveMachineGunnerPolicy {
         target_count: 6,
