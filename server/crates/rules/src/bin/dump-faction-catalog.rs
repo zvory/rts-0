@@ -204,8 +204,9 @@ fn print_client_config(indent: &str) {
             ","
         };
         println!(
-            "{indent}    \"{}\": {{\"size\":{},\"sight\":{},\"rangeTiles\":{},\"cost\":{{\"steel\":{},\"oil\":{}}},\"supply\":{},\"buildTicks\":{}}}{comma}",
+            "{indent}    \"{}\": {{\"armored\":{},\"size\":{},\"sight\":{},\"rangeTiles\":{},\"cost\":{{\"steel\":{},\"oil\":{}}},\"supply\":{},\"buildTicks\":{}}}{comma}",
             def.kind.stable_id(),
+            def.armor_class == defs::ArmorClass::Armored,
             json_f32(def.stats.radius),
             def.stats.sight_tiles,
             client_visible_range_tiles(def.kind, def.stats.range_tiles),
