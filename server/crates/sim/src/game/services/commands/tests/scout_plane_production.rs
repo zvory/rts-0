@@ -84,7 +84,9 @@ fn researched_resource_depot_cannot_launch_scout_plane() {
             .ability_cooldown_ticks(AbilityKind::ScoutPlane),
         0
     );
-    assert!(entities.iter().all(|entity| entity.kind != EntityKind::ScoutPlane));
+    assert!(entities
+        .iter()
+        .all(|entity| entity.kind != EntityKind::ScoutPlane));
 }
 
 #[test]

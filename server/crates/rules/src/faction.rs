@@ -325,15 +325,13 @@ const ARTILLERY_ABILITY_CARRIERS: &[EntityKind] = &[EntityKind::Artillery];
 const ROCKET_LAUNCHER_ABILITY_CARRIERS: &[EntityKind] = &[EntityKind::RocketLauncher];
 const SCOUT_PLANE_COMMAND_CAR_CARRIER: EntityKind = EntityKind::CommandCar;
 const SCOUT_PLANE_ABILITY_CARRIERS: &[EntityKind] = &[SCOUT_PLANE_COMMAND_CAR_CARRIER];
-const SCOUT_PLANE_CARRIER_COSTS: &[(EntityKind, ResourceCost)] = &[
-    (
-        SCOUT_PLANE_COMMAND_CAR_CARRIER,
-        ResourceCost::new(
-            balance::SCOUT_PLANE_COMMAND_CAR_COST_STEEL,
-            balance::SCOUT_PLANE_COMMAND_CAR_COST_OIL,
-        ),
+const SCOUT_PLANE_CARRIER_COSTS: &[(EntityKind, ResourceCost)] = &[(
+    SCOUT_PLANE_COMMAND_CAR_CARRIER,
+    ResourceCost::new(
+        balance::SCOUT_PLANE_COMMAND_CAR_COST_STEEL,
+        balance::SCOUT_PLANE_COMMAND_CAR_COST_OIL,
     ),
-];
+)];
 
 const LEGACY_ANTI_TANK_GUN_UNLOCK: UpgradeCatalogEntry = UpgradeCatalogEntry {
     kind: UpgradeKind::AntiTankGunUnlock,
