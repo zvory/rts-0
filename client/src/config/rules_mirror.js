@@ -347,7 +347,7 @@ export const ABILITIES = Object.freeze({
     icon: "SP",
     hotkey: "C",
     title: "Launch a scout plane sortie",
-    carriers: Object.freeze([KIND.RESOURCE_DEPOT, KIND.COMMAND_CAR]),
+    carriers: Object.freeze([KIND.COMMAND_CAR]),
     targetMode: "worldPoint",
     rangeTiles: null,
     cooldownTicks: SCOUT_PLANE_ABILITY_COOLDOWN_TICKS,

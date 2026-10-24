@@ -248,8 +248,8 @@ support readable gameplay, clear unit roles, and strong terrain identity without
 or regime-specific iconography.
 
 MVP scope:
-- No combat air forces. `scout_plane` is non-combat reconnaissance launched by the Resource Depot
-  or Command Car Scout Plane ability. Each sortie has a 30-second total lifetime from launch, flies
+- No combat air forces. `scout_plane` is non-combat reconnaissance launched by the
+  Command Car Scout Plane ability. Each sortie has a 30-second total lifetime from launch, flies
   to a targeted orbit, provides vision throughout transit and any remaining orbit time, and then
   disappears.
 - Late-game Artillery is implemented as the Superior Firepower capstone; Mortar Teams remain the
@@ -545,7 +545,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   takes 600 ticks (~20s). Once complete, future Scout Car Smoke casts by that player use a 4-tile
   cloud radius and last 10 seconds instead of the base 2-tile radius and 5-second duration.
 - **Scout Plane** (Engineering Complex research, protocol id `scout_plane_unlock`): costs 100 steel /
-  200 oil and takes 600 ticks (~20s). Once complete, Resource Depots and Command Cars owned by that
+  200 oil and takes 600 ticks (~20s). Once complete, Command Cars owned by that
   player can use their C-slot Scout Plane ability for free.
 - Ability metadata is Rust-authoritative in `server/crates/rules/src/faction.rs`. The faction
   catalog records carriers, target mode, ranges, cooldowns, charges, base and carrier-specific
@@ -679,7 +679,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | artillery       | 200 | 75 AP inner / 75-20 outer AOE | 10-35 artillery fire | 180 | 1.6 | 7 | 150 | 50 | 4 | 600 (~20s); requires Gun Works (`steelworks` kind) and Artillery (`artillery_unlock`) researched in Engineering Complex; rendered at 75% of its prior size with a matching 75%-of-Tank gameplay footprint; 2/3-tile inner and 2-tile outer blast radii; soft target with no armor damage reduction |
 | rocket_launcher (Rocket Truck) | 150 | 16 rockets, each 21 outer / 53 inner AOE; a rocket whose impact point intersects a target deals 70 armor-piercing damage instead; all resulting damage is reduced to 25% against buildings | 10-44 Barrage | 1800-tick (~60s) cooldown from activation | 2.0 | 8 | 225 | 100 | 6 | 600 (~20s); requires Gun Works (`steelworks` kind), a completed owned Vehicle Works (`factory` kind), and Rockets (`rockets`) researched in Engineering Complex; vehicle movement; must stop to launch; one manual command unloads exactly 16 rockets over 120 ticks (~4s) into a 6-tile scatter radius and then stops; its team-tinted rack carries 16 rounds, empties one slot per launch, and refills at cooldown completion; the PNG and collision footprint are enlarged by 20% (48×26.4 px body, 1.2 px clearance, 21.6 px selection radius); Barrage accepts in-range world points without requiring current vision; first barrage is free and later barrages cost 150 oil |
 | scout_car       | 100 | 6   | 7     | 12  | 2.35  | 15    | 125 | 60  | 3   | 480 (~16s) |
-| scout_plane     | 40  | 0   | 0     | 0  | 2.6   | 19    | 0   | 0   | 0   | 0; instant sorties are free from a Resource Depot or Command Car; both use the C slot after research; unlimited independent active sorties; non-combat recon with 2-tile orbit radius and a 30-second total lifetime from launch, including transit, followed by despawn; 30-second carrier-local cooldown, no ground collision reservation, and 48x34 px client render body |
+| scout_plane     | 40  | 0   | 0     | 0  | 2.6   | 19    | 0   | 0   | 0   | 0; instant sorties are free from a Command Car; uses the C slot after research; unlimited independent active sorties; non-combat recon with 2-tile orbit radius and a 30-second total lifetime from launch, including transit, followed by despawn; 30-second carrier-local cooldown, no ground collision reservation, and 48x34 px client render body |
 | tank            | 292 | 60 cannon; 4 coax | 5 moving / 14 fully stationary cannon; 6 coax | 144 cannon; 12 coax | 2.0   | 9     | 425 | 175 | 6   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in Engineering Complex; coax is a secondary small-arms weapon that fires through the current turret arc |
 | command_car     | 150 | 0   | 0     | 0  | 2.35  | 8     | 150 | 85  | 4   | 450 (~15s); trained at Vehicle Works (`factory` kind) and requires a completed Engineering Complex, but no Tank Production research; no weapon; Scout Car-style movement with a smaller jeep-sized body |
 | ekat       | 150 | 0   | 0     | 0  | 1.6   | 12    | 0   | 0   | 0   | 0; Ekat faction hero; no default attack; no passive regeneration; consumes nearby Golems for recovery |

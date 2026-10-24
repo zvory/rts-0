@@ -113,7 +113,7 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
   assert(
     !STATS[KIND.RESOURCE_DEPOT].trains.includes(KIND.SCOUT_PLANE) &&
       !trainableUnitsForFaction("kriegsia", KIND.RESOURCE_DEPOT).includes(KIND.SCOUT_PLANE) &&
-      ABILITIES[ABILITY.SCOUT_PLANE].carriers.includes(KIND.RESOURCE_DEPOT) &&
+      !ABILITIES[ABILITY.SCOUT_PLANE].carriers.includes(KIND.RESOURCE_DEPOT) &&
       ABILITIES[ABILITY.SCOUT_PLANE].carriers.includes(KIND.COMMAND_CAR) &&
       ABILITIES[ABILITY.SCOUT_PLANE].hotkey === "C" &&
       ABILITIES[ABILITY.SCOUT_PLANE].requires == null &&
@@ -121,7 +121,7 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
       ABILITIES[ABILITY.SCOUT_PLANE].cost.steel === 0 &&
       ABILITIES[ABILITY.SCOUT_PLANE].cost.oil === 0 &&
       ABILITIES[ABILITY.SCOUT_PLANE].durationTicks === 900,
-    "Resource Depot and Command Car expose free Scout Plane sorties on the C slot",
+    "Only Command Cars expose free Scout Plane sorties on the C slot",
   );
   assert(
     Array.isArray(STATS[KIND.TRAINING_CENTRE].requires),
