@@ -224,3 +224,34 @@ function researchesOf(kind) {
   const st = STATS[kind];
   return (st && st.researches) || [];
 }
+
+export function commandCardActivationCandidates(renderedCard, commandId) {
+  return (renderedCard?.slots || [])
+    .filter((slot) => slot?.commandId === commandId)
+    .map((slot) => ({
+      commandId: slot.commandId,
+      slotIndex: slot.slotIndex,
+      hotkey: slot.hotkey,
+      label: slot.label,
+      enabled: !!slot.enabled,
+    }));
+}
+
+export function duplicateCommandIdsForCard(renderedCard) {
+  const firstByCommandId = new Map();
+  const duplicates = [];
+  for (const slot of renderedCard?.slots || []) {
+    if (!slot?.commandId) continue;
+    const first = firstByCommandId.get(slot.commandId);
+    if (first) {
+      duplicates.push({
+        commandId: slot.commandId,
+        firstSlotIndex: first.slotIndex,
+        duplicateSlotIndex: slot.slotIndex,
+      });
+      continue;
+    }
+    firstByCommandId.set(slot.commandId, slot);
+  }
+  return duplicates;
+}

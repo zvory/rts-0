@@ -25,13 +25,22 @@ const state = {
 const gridEntries = productionGridEntries(state, {
   getActiveProfile: () => ({ mode: "grid" }),
 });
-assert(gridEntries.length === 10, "global Auto-Build grid exposes all ten Barracks, Gunworks, and Vehicle Works units");
+assert(gridEntries.length === 9 && gridEntries.every((entry) => entry.unit !== KIND.ARTILLERY), "global Auto-Build hides Artillery");
 assertDeepEqual(
   gridEntries.map((entry) => entry.hotkey),
-  ["Q", "W", "E", "A", "S", "D", "Z", "X", "C", ""],
+  ["Q", "W", "E", "A", "S", "Z", "X", "C", ""],
   "global Auto-Build grid uses the complete command-card keyboard grid and leaves overflow clickable",
 );
 const rifleman = gridEntries.find((entry) => entry.unit === KIND.RIFLEMAN);
+const directCodes = new Map(gridEntries.map((entry, index) => [entry.commandId, `Key${"ABCDEFGHI"[index]}`]));
+const directEntries = productionGridEntries(state, {
+  getActiveProfile: () => ({ mode: "direct" }),
+  hotkeyCodeForCommand: (commandId) => directCodes.get(commandId) || "",
+});
+assertDeepEqual(directEntries.map((entry) => entry.hotkey), [..."ABCDEFGHI"],
+  "hidden Artillery's missing binding does not force valid direct bindings back to grid");
+assertDeepEqual(directEntries.map((entry) => entry.slotIndex), gridEntries.map((entry) => entry.slotIndex),
+  "direct bindings preserve the same empty Artillery grid position");
 assertDeepEqual(rifleman.producerIds, [10, 11], "global Auto-Build includes every owned compatible producer, including unfinished buildings");
 assert(rifleman.activeCount === 1, "global Auto-Build reports the authoritative active/compatible producer count");
 assertDeepEqual(
@@ -51,7 +60,7 @@ const conflictingClassicEntries = productionGridEntries(state, {
 });
 assertDeepEqual(
   conflictingClassicEntries.map((entry) => entry.hotkey),
-  ["Q", "W", "E", "A", "S", "D", "Z", "X", "C", ""],
+  ["Q", "W", "E", "A", "S", "Z", "X", "C", ""],
   "conflicting classic bindings fall back to the deterministic grid",
 );
 
@@ -83,3 +92,6 @@ assertDeepEqual(
   }],
   "global Auto-Build derives producer kinds and trainables from the local faction catalog",
 );
+
+assertDeepEqual(gridEntries.map((entry) => entry.slotIndex), [0, 1, 2, 3, 4, 6, 7, 8, 9],
+  "Auto-Build preserves original grid positions and leaves the artillery slot empty");
