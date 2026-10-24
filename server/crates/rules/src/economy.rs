@@ -367,7 +367,7 @@ mod tests {
         assert_eq!(supply_cost(EntityKind::MortarTeam), 3);
         assert_eq!(supply_cost(EntityKind::Golem), 4);
         assert_eq!(cost(EntityKind::Steelworks), (150, 100));
-        assert_eq!(supply_cost(EntityKind::Tank), 6);
+        assert_eq!(supply_cost(EntityKind::Tank), 5);
         assert_eq!(supply_cost(EntityKind::Depot), 0);
         assert_eq!(
             trainable_units_for_faction(DEFAULT_FACTION_ID, EntityKind::Factory),
