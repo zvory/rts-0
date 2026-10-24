@@ -1105,7 +1105,11 @@ remains a world-coordinate ability; remembered buildings help the player know wh
 not become target ids. Its selected radius and server-authoritative clicked center do not make
 remembered buildings target ids.
 Union views build remembered buildings from the selected real
-players' memory stores. If more than one selected player has stale memory for the same building id,
+players' memory stores. When the building's owner is selected, its knowledge of destruction
+suppresses other selected players' stale memories even if the footprint is currently hidden.
+Tank Traps are excluded from this inference because their scaffold ownership expires on completion;
+their memories still require observed-empty knowledge to clear.
+Selecting only opponents preserves their independent last-seen intel. If more than one selected player has stale memory for the same building id,
 the server sends one record: the newest `observedTick` wins, with selected-player order as the
 deterministic tie-breaker. The server also retains per-player, checkpointed clear ticks when a
 remembered footprint is observed empty while another player's stale positive memory remains. A

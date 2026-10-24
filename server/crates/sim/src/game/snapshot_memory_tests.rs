@@ -4,6 +4,9 @@ use crate::game::lab::{LabOp, LabSpawnEntity};
 use crate::game::{systems, SmokeCloudStore};
 use crate::protocol::terrain;
 
+#[path = "snapshot_owner_memory_tests.rs"]
+mod owner_knowledge;
+
 fn players() -> [PlayerInit; 2] {
     [
         PlayerInit {

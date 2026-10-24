@@ -122,7 +122,7 @@ impl PrivateDetailProjection<'_> {
 }
 
 pub fn entity_visible_to(viewer: u32, entity: &Entity, fog: &Fog) -> bool {
-    entity.owner == viewer
+    (entity.owner != 0 && entity.owner == viewer)
         || entity.is_node()
         || fog.is_visible_world(viewer, entity.pos_x, entity.pos_y)
 }
