@@ -865,13 +865,22 @@ where
         && facts.unit_count(EntityKind::Rifleman) < 6)
         .then_some(6);
     if security_rifle_target.is_some() {
+        // Once the live Jeff's natural is ordered, its fifth and sixth guns come first too. They
+        // used to be bought with the Steel the builder's walk left spare, and a builder sent ahead
+        // of its money leaves none: 1v1 No Terrain s2p2 met its 2:24 raid with four guns and fell.
+        let gun_target =
+            if profile.id == JEFFS_AI_ID && facts.building_count(EntityKind::ResourceDepot) >= 2 {
+                profile
+                    .defensive_machine_gunners
+                    .map_or(expansion_security::OPENING_GUNS, |policy| {
+                        policy.target_count
+                    })
+            } else {
+                expansion_security::OPENING_GUNS
+            };
         let guns_first = runs_live_jeff(profile.id)
             && facts.unit_count(EntityKind::Tank) == 0
-            && !expansion_security::opening_guns_ordered(
-                observation,
-                &facts,
-                expansion_security::OPENING_GUNS,
-            );
+            && !expansion_security::opening_guns_ordered(observation, &facts, gun_target);
         let at = effective_unit_priorities
             .iter()
             .position(|unit| *unit == EntityKind::MachineGunner)

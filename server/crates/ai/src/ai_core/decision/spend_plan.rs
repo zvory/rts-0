@@ -36,6 +36,8 @@ const ON_NODE_TILES: f32 = 0.75;
 const DISPATCH_INCOME_SHARE: f32 = 0.9;
 /// The home worker's walk to a Factory site behind the HQ.
 const FACTORY_WALK_TICKS: u32 = config::TICK_HZ * 3;
+/// The builder's walk to a natural not picked yet, for the plan before the natural is due.
+const ASSUMED_NATURAL_WALK_TICKS: u32 = config::TICK_HZ * 20;
 /// The most Riflemen the slack is sized for in one decision.
 const MAX_SLACK_RIFLEMEN: u32 = 8;
 
@@ -318,6 +320,9 @@ fn forecast_for(
 /// One costly step of the opening.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum StepKind {
+    /// An opening gun still to order before the natural is due.
+    Gun,
+    EngineeringComplex,
     Natural,
     Factory,
     TankUnlock,
@@ -327,6 +332,10 @@ pub(super) enum StepKind {
 impl StepKind {
     fn cost(self) -> (u32, u32) {
         match self {
+            StepKind::Gun => rts_rules::economy::cost(EntityKind::MachineGunner),
+            StepKind::EngineeringComplex => {
+                rts_rules::economy::cost(EntityKind::EngineeringComplex)
+            }
             StepKind::Natural => rts_rules::economy::cost(EntityKind::ResourceDepot),
             StepKind::Factory => rts_rules::economy::cost(EntityKind::Factory),
             StepKind::TankUnlock => {
@@ -339,6 +348,8 @@ impl StepKind {
 
     fn label(self) -> &'static str {
         match self {
+            StepKind::Gun => "gun",
+            StepKind::EngineeringComplex => "ec",
             StepKind::Natural => "natural",
             StepKind::Factory => "factory",
             StepKind::TankUnlock => "unlock",
@@ -445,6 +456,11 @@ struct Step {
 #[derive(Clone, Copy)]
 enum Ready {
     At(u32),
+    /// Ticks after the previous gun is ordered: the Barracks trains one at a time.
+    AfterGun(u32),
+    /// Ticks after the opening guns and the Engineering Complex are ordered: the natural is due
+    /// then, and its builder walks this long.
+    AfterOpening(u32),
     /// Ticks after the natural's order goes out (its charge less the builder's walk).
     AfterNaturalOrder(u32),
     /// Ticks after the Factory is charged.
@@ -473,10 +489,50 @@ fn steps(
         })
     });
     let planned_natural = (input.natural_due || natural_pending) && natural_walk.is_some();
+    let factory_planned = facts.building_count(EntityKind::Factory) > 0;
+    // Before the natural is due: the opening guns and Engineering Complex that make it due, then the
+    // natural.
+    let natural_ahead =
+        !planned_natural && !factory_planned && facts.building_count(EntityKind::ResourceDepot) < 2;
     if planned_natural {
         steps.push(Step {
             kind: StepKind::Natural,
             ready: Ready::At(now + natural_walk.unwrap_or(0)),
+        });
+    } else if natural_ahead {
+        if facts.building_count(EntityKind::EngineeringComplex) == 0 {
+            steps.push(Step {
+                kind: StepKind::EngineeringComplex,
+                ready: Ready::At(now + FACTORY_WALK_TICKS),
+            });
+        }
+        let queued: usize = observation
+            .owned
+            .iter()
+            .filter(|unit| {
+                unit.kind == EntityKind::Barracks
+                    && unit.production_kind == Some(EntityKind::MachineGunner)
+            })
+            .map(|unit| unit.production_queue_len.unwrap_or(0))
+            .sum();
+        let guns = (facts.unit_count(EntityKind::MachineGunner) + queued)
+            .min(expansion_security::OPENING_GUNS);
+        let train =
+            config::unit_stats(EntityKind::MachineGunner).map_or(400, |stats| stats.build_ticks);
+        for index in guns..expansion_security::OPENING_GUNS {
+            steps.push(Step {
+                kind: StepKind::Gun,
+                ready: if index == guns {
+                    // A gun in training holds the Barracks about half its time more.
+                    Ready::At(now + if queued > 0 { train / 2 } else { 0 })
+                } else {
+                    Ready::AfterGun(train)
+                },
+            });
+        }
+        steps.push(Step {
+            kind: StepKind::Natural,
+            ready: Ready::AfterOpening(natural_walk.unwrap_or(ASSUMED_NATURAL_WALK_TICKS)),
         });
     }
     let factory = observation
@@ -622,6 +678,8 @@ fn lay_out(
     );
     let mut out = Vec::new();
     let mut natural_charge = None;
+    let mut gun_charge: Option<u32> = None;
+    let mut ec_charge: Option<u32> = None;
     let mut factory_charge = None;
     let mut unlock_charge = None;
     let mut blocked = false;
@@ -632,6 +690,10 @@ fn lay_out(
         }
         let ready = match step.ready {
             Ready::At(tick) => Some(tick),
+            Ready::AfterGun(train) => gun_charge.map(|charge| charge + train),
+            Ready::AfterOpening(walk) => {
+                Some(gun_charge.unwrap_or(now).max(ec_charge.unwrap_or(now)) + walk)
+            }
             Ready::AfterNaturalOrder(walk) => natural_charge
                 .map(|charge: u32| charge.saturating_sub(natural_walk.unwrap_or(0)).max(now) + walk)
                 .or(Some(now + walk)),
@@ -667,6 +729,8 @@ fn lay_out(
         spent = (spent.0 + cost_steel as f32, spent.1 + cost_oil as f32);
         out.push((step.kind, Some(tick)));
         match step.kind {
+            StepKind::Gun => gun_charge = Some(tick),
+            StepKind::EngineeringComplex => ec_charge = Some(tick),
             StepKind::Natural => {
                 natural_charge = Some(tick);
                 // The natural's own mines and Pump Jacks pay from its foundation on.
@@ -775,9 +839,13 @@ pub(super) fn plan(
                 && observation.economy.oil as f32 + oil - owed_oil >= cost_oil as f32
         });
     let expected = [450, 900, 1800].map(|ticks: u32| forecast.mined_within(ticks));
+    let natural_pending = input.natural_site.is_some_and(|site| {
+        observation.pending_builds.iter().any(|intent| {
+            intent.kind == EntityKind::ResourceDepot && (intent.tile_x, intent.tile_y) == site
+        })
+    });
     let gates = steps.iter().any(|step| step.kind == StepKind::Tank)
-        && (steps.iter().any(|step| step.kind == StepKind::Natural)
-            || facts.building_count(EntityKind::Factory) > 0);
+        && (input.natural_due || natural_pending || facts.building_count(EntityKind::Factory) > 0);
     SpendPlan {
         steps: laid,
         natural_funded_on_arrival,
