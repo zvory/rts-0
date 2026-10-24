@@ -416,11 +416,11 @@ export class HudSelectionPanel {
       : "";
 
     const armorHtml = typeof st.armored === "boolean"
-      ? `<div class="sel-stat sel-armor">Armor: <span class="sel-armor-label" tabindex="0" ` +
+      ? `<div class="sel-stat sel-armor">Armor: <abbr class="sel-armor-label" tabindex="0" ` +
         `title="${st.armored
           ? "Armored: takes 75% less HP damage from attacks without armor penetration. Armor-piercing attacks bypass some or all of this protection."
           : "Unarmored: no armor damage reduction. Other protection, such as cover, still applies."}">` +
-        `${st.armored ? "Armored" : "Unarmored"}</span></div>`
+        `${st.armored ? "Armored" : "Unarmored"}</abbr></div>`
       : "";
 
     node.innerHTML =

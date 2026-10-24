@@ -156,7 +156,7 @@ import { KIND } from "../../client/src/protocol.js";
       kind = selectedKind;
       hud._renderSelectedPanel();
       const html = panel.children[0].innerHTML;
-      assert(html.includes(`>${armored ? "Armored" : "Unarmored"}</span>`),
+      assert(html.includes(`>${armored ? "Armored" : "Unarmored"}</abbr>`),
         `${kind} selection reports its armor classification`);
       assert(html.includes(armored ? "75% less HP damage" : "no armor damage reduction") &&
         html.includes('title="') && (!armored || html.includes("Armor-piercing attacks")),
