@@ -187,8 +187,9 @@ while the search continues through other resource locations.
 ### Rush AI
 
 `rush_ai` runs `RushStrategy` through the typed SDK and canonical controller cadence. The four
-starting Riflemen join the same staging system as later infantry, facing the first living enemy
-start. The starting Engineer advances toward that start between builds, stopping outside a 30-tile
+starting Riflemen attack the first living enemy start on the first decision, bypassing staging
+and any Methamphetamines research wait. They use the same trench-aware flow as later waves.
+The starting Engineer advances toward that start between builds, stopping outside a 30-tile
 exclusion radius. Movement and full construction footprints use a two-tile buffer; straight
 construction approaches retain at least one tile of clearance beyond the exclusion radius. At the
 standoff line, remaining buildings can be placed beside or behind the Engineer rather than
@@ -213,11 +214,10 @@ perpendicular to the smoothed local approach direction. Riflemen and Machine Gun
 stable, spaced slots from the main line's centre outward. Panzerfausts use a separate parallel
 line three tiles behind it. Blocked slots are skipped without placing front infantry into the
 Panzerfaust line. Only owned and currently visible buildings affect slot avoidance. Units move to
-their slots and Hold Position after arriving. The first assembled wave attack-moves to the enemy
-start as soon as Methamphetamines reaches 90% research progress (or is already complete); if
-nobody has arrived yet, the trigger stays unlocked until arrivals. Subsequent waves require at
-least five units actually at their slots, rather than counting en-route reinforcements. Each wave
-launches with one group command. Launched units are never added to a later wave or pulled back to
+their slots and Hold Position after arriving. After the immediate four-Rifleman opening, every
+reinforcement wave requires at least five units actually at their slots, rather than counting
+en-route reinforcements. No wave waits for Methamphetamines research. Each wave launches with
+one group command. Launched units are never added to a later wave or pulled back to
 staging, and later production gathers into a fresh cohort.
 
 `AiActions::queue_research` emits an ordinary research queue request without requiring or
