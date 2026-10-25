@@ -235,7 +235,8 @@ base damage and cooldown, without inferring hidden upgrades, firing arcs, or lin
 
 Only launched units follow this flow. Short Move waypoints keep a bypass from auto-acquiring and
 chasing trench defenders; an unavoidable firing-zone crossing switches to AttackMove. Reaching the
-objective ring restores AttackMove toward the base. Route fields rebuild when their known obstacle
+objective ring restores AttackMove toward the base. If a new obstacle invalidates every route,
+Rush also restores the ordinary base attack instead of retaining a stale movement order. Route fields rebuild when their known obstacle
 or threat inputs change. Orders refresh at most once a second unless those inputs or the movement/
 attack mode change. Last-seen
 trench contacts last five seconds to avoid immediate reversals at a fog boundary; seeing a unit

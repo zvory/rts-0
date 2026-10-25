@@ -264,3 +264,29 @@ fn frame_maps_public_trench_occupation_and_known_buildings_block_routes() {
     let path = route(&grid, (7.5 * 32.0, 16.5 * 32.0), true);
     assert!(path.iter().all(|&cell| !grid.input.blocked[cell]));
 }
+
+#[test]
+fn late_obstacle_replaces_a_stale_move_when_no_route_remains() {
+    let (start, mut snapshot) = fixture();
+    let mut flow = RushFlow::default();
+    assert!(matches!(
+        step(&mut flow, &start, &snapshot).as_slice(),
+        [AiActionRequest::Move { .. }]
+    ));
+    // A visible building now occupies this unit's cell. The AI grid has no route from it,
+    // but the simulation can resolve occupancy and combat through the ordinary base attack.
+    snapshot.entities.push(EntityView::new(
+        401,
+        2,
+        "barracks",
+        7.5 * 32.0,
+        16.5 * 32.0,
+        100,
+        100,
+        "idle",
+    ));
+    snapshot.tick += 9;
+    assert!(
+        matches!(step(&mut flow, &start, &snapshot).as_slice(), [AiActionRequest::AttackMove { units, x, y, .. }] if units==&vec![100] && *x==44.5*32.0 && *y==16.0*32.0)
+    );
+}

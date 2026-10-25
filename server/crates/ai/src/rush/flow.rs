@@ -104,9 +104,9 @@ impl RushFlow {
         }
         let Some(grid) = &self.grid else { return };
         for entity in frame.owned().iter().filter(|e| launched.contains(&e.id)) {
-            let Some((point, breach)) = grid.waypoint(entity.position) else {
-                continue;
-            };
+            // A newly observed building can invalidate an old waypoint or every arrival tile.
+            // Let ordinary combat/pathing handle that objective instead of retaining a stale Move.
+            let (point, breach) = grid.waypoint(entity.position).unwrap_or((target, true));
             let prior = self.orders.get(&entity.id);
             let due = prior.is_none_or(|(tick, previous, was_breach)| {
                 changed
