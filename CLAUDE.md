@@ -175,35 +175,37 @@ is loaded from the CDN, and `cargo run` from `server/` serves the client.
   and Interact do this check automatically and return a local copy when unavailable; use that
   result without probing again. For local interactive pages without Tailscale, share localhost.
   The Tailnet-only rules below apply only when Tailscale is available.
-- Local visual inspection through Tailscale: Tailscale links are the default delivery channel
-  whenever the user needs to view a locally served game, browser result, replay, or other visual
-  artifact. Interact screenshots and videos already return an opaque Tailnet Preview URL: share
-  that URL directly. Provide Tailnet Preview artifacts as normal clickable Markdown links, never
-  embedded image syntax, because private Tailnet resources may not load through the app image
-  renderer. Never offer the raw `target/interact/lab` path, and do not start a separate game server
-  for that artifact. Do not infer the user's device: they may be on a phone or desktop.
-  Verify Tailscale state with `tailscale status --json`, start the server with `RTS_ADDR=0.0.0.0:8080 cargo run
-  --release` if port 8080 is not already served, then use `Self.DNSName` from the status response,
-  remove its trailing dot, and provide an `http://<machine>.<tailnet>.ts.net:8080/...` MagicDNS link
-  rather than a numeric-IP link or beta deployment. Fall back to the reported Tailscale IPv4 only
-  when `Self.DNSName` is unavailable. Any user-facing link backed by a live local server
-  must remain available for 12 hours by default unless the user requests another lifetime. Launch
-  the server with a durable host-level background/keepalive mechanism and timed cleanup; do not rely
-  on an agent tool's foreground shell session. Verify the detached server is healthy before sharing
-  the link, and tell the user when it expires. If an existing listener cannot be confirmed durable
-  for the full window, use another free port without killing or replacing it. For a live spectator
-  AI matchup, use the existing
-  launch convention with a fresh room name, for example `/?rtsLaunch=match&rtsRoom=mobile-ai-<unique>&rtsRole=spectator&rtsAi=1:ai_2_1&rtsAi=2:ai_turtle&rtsStart=1`.
-  This starts an ordinary authoritative AI-vs-AI room. Prefer a Tailscale Serve HTTPS URL only when
-  `tailscale serve status` already reports a working endpoint; do not block a preview on the one-time
-  tailnet Serve enablement. Never enable Tailscale Funnel or another public tunnel unless the user
-  explicitly requests public sharing. For a standalone artifact such as an MP4 or screenshot, use
-  `scripts/tailnet-preview [--ttl <duration>|--keep] <file>`; it copies the artifact into the OS
-  temporary directory, prints a Tailnet URL on port 8091, enforces a 24-hour default TTL, and never
-  changes the game listener on port 8080. For deterministic, seekable review, run `cargo run --release
-  --bin ai-matchup -- ai_2_1 ai_turtle --seed <n> --save-replay <name>` from `server/`, then share
-  `/?replayArtifact=<name>` through the same local server. Do not kill or replace an existing
-  listener merely to create a preview link.
+- Preview power and cleanup: prefer screenshots, recordings, and local artifact links when they
+  satisfy the request. A request to inspect or capture a visual does not authorize a persistent
+  server. Start a server that outlives the task only when the user explicitly requests a live link
+  or continued availability. Reuse a suitable existing listener before starting another one.
+  Do not create login items, persistent LaunchAgent/LaunchDaemon files, automatic restart jobs,
+  or sleep-prevention assertions (including `caffeinate`) unless the user explicitly requests that
+  behavior. Never change the user's existing sleep settings or sleep-prevention processes.
+- Local visual inspection through Tailscale: when Tailscale is available and a live link is
+  requested, use `Self.DNSName` without its trailing dot for a MagicDNS link, falling back to the
+  Tailscale IPv4 only when DNSName is unavailable. Use `RTS_ADDR=0.0.0.0:<port> cargo run --release`
+  for a needed game server. Do not infer the user's device or substitute a beta deployment.
+  Prefer Tailscale Serve HTTPS only when `tailscale serve status` already reports a working
+  endpoint. Never enable Tailscale Funnel or another public tunnel without explicit user request.
+  For a live spectator AI matchup, use a fresh room name with the existing launch convention,
+  for example `/?rtsLaunch=match&rtsRoom=mobile-ai-<unique>&rtsRole=spectator&rtsAi=1:ai_2_1&rtsAi=2:ai_turtle&rtsStart=1`.
+  For deterministic replay review, run `cargo run --release --bin ai-matchup -- ai_2_1 ai_turtle
+  --seed <n> --save-replay <name>` from `server/`, then use `/?replayArtifact=<name>`.
+- Preview lifetime: live links expire after one hour unless the user requests another duration.
+  Use a bounded detached process with timed cleanup, and report its PID, purpose, port, and expiry.
+  Verify the server is healthy before sharing. At expiry, cleanup must stop the owned server and
+  supervisor, remove any owned scheduler registration and launch file, and release any explicitly
+  authorized sleep assertion. Expiry must survive a restart and must never reset on relaunch.
+  Stop task-only servers before completion. Never kill or replace an unrelated existing listener.
+- Artifact sharing: Interact returns an opaque Tailnet Preview URL; share it as a normal clickable
+  Markdown link. Do not embed private Tailnet URLs as images or offer raw `target/interact/lab`
+  paths. Do not start another game server for an Interact artifact. When a Tailnet artifact link is
+  requested, use `scripts/tailnet-preview --ttl <duration> <file>` with the requested lifetime
+  (one hour by default); do not use `--keep` unless explicitly requested. The helper copies files
+  into OS temporary storage and uses port 8091. Its file TTL does not stop the shared service:
+  arrange a bounded cleanup of an owned service when its last required artifact expires, without
+  interrupting other active previews. Otherwise deliver the image/video or local artifact directly.
 
 ## Completion
 
