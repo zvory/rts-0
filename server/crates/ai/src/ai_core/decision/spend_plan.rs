@@ -470,6 +470,9 @@ struct Step {
     kind: StepKind,
     /// The step can be charged no sooner than this.
     ready: Ready,
+    /// The natural ordered only once its cost is banked: its cost is set aside then and charged a
+    /// walk later.
+    banked: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -521,12 +524,14 @@ fn steps(
         };
         steps.push(Step {
             kind: StepKind::Natural,
+            banked: !natural_pending && factory_planned,
             ready: Ready::At(now + wait + natural_walk.unwrap_or(0)),
         });
     } else if natural_ahead {
         if facts.building_count(EntityKind::EngineeringComplex) == 0 {
             steps.push(Step {
                 kind: StepKind::EngineeringComplex,
+                banked: false,
                 ready: Ready::At(now + FACTORY_WALK_TICKS),
             });
         }
@@ -546,6 +551,7 @@ fn steps(
         for index in guns..expansion_security::OPENING_GUNS {
             steps.push(Step {
                 kind: StepKind::Gun,
+                banked: false,
                 ready: if index == guns {
                     // A gun in training holds the Barracks about half its time more.
                     Ready::At(now + if queued > 0 { train / 2 } else { 0 })
@@ -556,6 +562,7 @@ fn steps(
         }
         steps.push(Step {
             kind: StepKind::Natural,
+            banked: false,
             ready: Ready::AfterOpening(natural_walk.unwrap_or(ASSUMED_NATURAL_WALK_TICKS)),
         });
     }
@@ -606,6 +613,7 @@ fn steps(
         steps.push(Step {
             kind: StepKind::Factory,
             ready,
+            banked: false,
         });
     }
     let unlock_research = config::TICK_HZ * 20;
@@ -620,6 +628,7 @@ fn steps(
     if !unlocked && memory.unlock_ordered.is_none() {
         steps.push(Step {
             kind: StepKind::TankUnlock,
+            banked: false,
             ready: if factory.is_some() {
                 Ready::At(now)
             } else {
@@ -636,6 +645,7 @@ fn steps(
     if !tank_out {
         steps.push(Step {
             kind: StepKind::Tank,
+            banked: false,
             ready: Ready::FactoryAndUnlock {
                 factory_done,
                 unlock_done,
@@ -746,7 +756,12 @@ fn lay_out(
             continue;
         };
         let (cost_steel, cost_oil) = step.kind.cost();
-        let first = (ready.saturating_sub(now)).div_ceil(STEP_TICKS) as usize;
+        let earliest = if step.banked {
+            ready.saturating_sub(natural_walk.unwrap_or(0))
+        } else {
+            ready
+        };
+        let first = (earliest.saturating_sub(now)).div_ceil(STEP_TICKS) as usize;
         let charge = (first..=HORIZON_STEPS).find(|&index| {
             bank.0 + forecast.steel[index] - spent.0 >= cost_steel as f32
                 && bank.1 + forecast.oil[index] - spent.1 >= cost_oil as f32
@@ -756,7 +771,11 @@ fn lay_out(
             out.push((step.kind, None));
             continue;
         };
-        let tick = (now + index as u32 * STEP_TICKS).max(ready);
+        let tick = if step.banked {
+            (now + index as u32 * STEP_TICKS + natural_walk.unwrap_or(0)).max(ready)
+        } else {
+            (now + index as u32 * STEP_TICKS).max(ready)
+        };
         spent = (spent.0 + cost_steel as f32, spent.1 + cost_oil as f32);
         out.push((step.kind, Some(tick)));
         match step.kind {
@@ -860,15 +879,22 @@ pub(super) fn plan(
     let slack_steel = (low * rifle).min(observation.economy.steel);
     // Dispatch: on a forecast cut to DISPATCH_INCOME_SHARE, the natural is charged by the time its
     // builder can arrive.
+    // With a Factory up the natural waits for its cost banked, as before: ordered on credit it took
+    // the Steel Tank Unlock used to get during the builder's walk (Chokes: Unlock 2:32 to 2:56).
+    let (depot_steel, depot_oil) = StepKind::Natural.cost();
     let natural_funded_on_arrival = input.natural_due
-        && natural_walk.is_some_and(|walk| {
-            let cautious = forecast_for(observation, memory, &known, DISPATCH_INCOME_SHARE);
-            let (steel, oil) = cautious.mined_within(walk);
-            let (owed_steel, owed_oil) = off_plan_orders(observation, input, &steps);
-            let (cost_steel, cost_oil) = StepKind::Natural.cost();
-            observation.economy.steel as f32 + steel - owed_steel >= cost_steel as f32
-                && observation.economy.oil as f32 + oil - owed_oil >= cost_oil as f32
-        });
+        && if facts.building_count(EntityKind::Factory) > 0 {
+            observation.economy.steel >= depot_steel && observation.economy.oil >= depot_oil
+        } else {
+            natural_walk.is_some_and(|walk| {
+                let cautious = forecast_for(observation, memory, &known, DISPATCH_INCOME_SHARE);
+                let (steel, oil) = cautious.mined_within(walk);
+                let (owed_steel, owed_oil) = off_plan_orders(observation, input, &steps);
+                let (cost_steel, cost_oil) = StepKind::Natural.cost();
+                observation.economy.steel as f32 + steel - owed_steel >= cost_steel as f32
+                    && observation.economy.oil as f32 + oil - owed_oil >= cost_oil as f32
+            })
+        };
     let expected = [450, 900, 1800].map(|ticks: u32| forecast.mined_within(ticks));
     let natural_pending = input.natural_site.is_some_and(|site| {
         observation.pending_builds.iter().any(|intent| {

@@ -246,3 +246,25 @@ fn a_mine_counts_once_where_patches_are_packed_tighter_than_a_tile() {
     let (steel15, _) = plan(&obs, &facts, &memory, no_natural()).expected[0];
     assert!((steel15 - 6.0 * 0.05 * 430.0).abs() < 4.0, "{steel15}");
 }
+
+#[test]
+fn with_a_factory_up_the_natural_waits_for_its_cost_banked() {
+    let input = PlanInput {
+        natural_due: true,
+        natural_site: Some((40, 8)),
+        natural_builder: Some(1),
+        natural_wait: 0,
+    };
+    let mut memory = SpendPlanMemory::default();
+    for (steel, oil, funded) in [(420, 120, false), (450, 100, true)] {
+        let mut obs = main_base(steel, oil);
+        obs.owned.push(building(6, EntityKind::Factory, Some(0)));
+        memory.observe(&obs, false);
+        let facts = AiFacts::from_observation(&obs);
+        let laid = plan(&obs, &facts, &memory, input);
+        assert_eq!(laid.natural_funded_on_arrival, funded, "{steel}/{oil}");
+        // Planned: set aside once banked, down a walk later.
+        let natural = laid.charged_at(StepKind::Natural).unwrap();
+        assert!(natural >= obs.tick + 400, "{natural}");
+    }
+}
