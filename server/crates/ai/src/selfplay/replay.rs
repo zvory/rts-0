@@ -322,12 +322,14 @@ pub fn available_profile_ids() -> Vec<&'static str> {
     required_profiles()
         .into_iter()
         .map(|profile| profile.id)
+        .chain([crate::rush::RUSH_AI_ID])
         .collect()
 }
 
 pub fn canonical_profile_id(input: &str) -> Option<&'static str> {
     match input {
         "ai" | "default" => Some(DEFAULT_LIVE_PROFILE_ID),
+        crate::rush::RUSH_AI_ID => Some(crate::rush::RUSH_AI_ID),
         id => profile_by_id(id).map(|profile| profile.id),
     }
 }
@@ -335,9 +337,9 @@ pub fn canonical_profile_id(input: &str) -> Option<&'static str> {
 pub fn run_profile_matchup_result(
     options: ProfileMatchupOptions,
 ) -> Result<ProfileMatchupResult, String> {
-    let profile_a = profile_by_id(&options.profile_a)
+    let profile_a = canonical_profile_id(&options.profile_a)
         .ok_or_else(|| format!("unknown profile: {}", options.profile_a))?;
-    let profile_b = profile_by_id(&options.profile_b)
+    let profile_b = canonical_profile_id(&options.profile_b)
         .ok_or_else(|| format!("unknown profile: {}", options.profile_b))?;
     if options.max_ticks == 0 {
         return Err("max ticks must be greater than zero".to_string());
@@ -353,7 +355,7 @@ pub fn run_profile_matchup_result(
             id: 1,
             team_id: 1,
             faction_id: "kriegsia".to_string(),
-            name: profile_a.id.to_string(),
+            name: profile_a.to_string(),
             color: "#4cc9f0".to_string(),
             is_ai: true,
         },
@@ -361,7 +363,7 @@ pub fn run_profile_matchup_result(
             id: 2,
             team_id: 2,
             faction_id: "kriegsia".to_string(),
-            name: profile_b.id.to_string(),
+            name: profile_b.to_string(),
             color: "#f72585".to_string(),
             is_ai: true,
         },
@@ -383,8 +385,8 @@ pub fn run_profile_matchup_result(
     let start = game.start_payload();
     let mut objective = StartingResourceDepotObjective::capture(&game, &start, &players)?;
     let mut controllers = vec![
-        AiController::with_profile_id(1, profile_a.id),
-        AiController::with_profile_id(2, profile_b.id),
+        AiController::with_profile_id(1, profile_a),
+        AiController::with_profile_id(2, profile_b),
     ];
     let mut event_log = Vec::new();
     let mut first_damage_tick = None;
@@ -512,9 +514,9 @@ pub fn run_profile_matchup_result(
             ProfileMatchupPlayerResult {
                 player_id: player.id,
                 profile: if player.id == 1 {
-                    profile_a.id.to_string()
+                    profile_a.to_string()
                 } else {
-                    profile_b.id.to_string()
+                    profile_b.to_string()
                 },
                 alive: alive.contains(&player.id),
                 army_value: values.army,
@@ -543,8 +545,8 @@ pub fn run_profile_matchup_result(
 
     Ok(ProfileMatchupResult {
         map_name,
-        profile_a: profile_a.id.to_string(),
-        profile_b: profile_b.id.to_string(),
+        profile_a: profile_a.to_string(),
+        profile_b: profile_b.to_string(),
         seed: options.seed,
         max_ticks: options.max_ticks,
         ticks: game.tick_count(),
@@ -1011,7 +1013,7 @@ mod tests {
         );
         assert_eq!(
             available_profile_ids(),
-            vec![AI_2_1_ID, "jeffs_ai", AI_TURTLE_ID]
+            vec![AI_2_1_ID, "jeffs_ai", AI_TURTLE_ID, "rush_ai"]
         );
         assert_eq!(canonical_profile_id(AI_2_1_ID), Some(AI_2_1_ID));
         assert_eq!(canonical_profile_id(AI_TURTLE_ID), Some(AI_TURTLE_ID));

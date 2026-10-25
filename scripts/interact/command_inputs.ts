@@ -323,10 +323,10 @@ function validateGameNamespaceInput(command: string, value: CommandInput, sessio
     exact(value, ["workspaceRoot", "map", "opponent", "spectate", "autoSpectator", "viewport"], "game open");
     if (value.workspaceRoot != null && (typeof value.workspaceRoot !== "string" || !value.workspaceRoot)) invalid("game open.workspaceRoot", "must be a non-empty string");
     if (value.map != null) displayName(value.map, "game open.map", 64);
-    if (value.opponent != null && !["ai_2_1", "ai_turtle"].includes(String(value.opponent))) invalid("game open.opponent", "must be ai_2_1 or ai_turtle");
+    if (value.opponent != null && !["ai_2_1", "ai_turtle", "jeffs_ai", "rush_ai"].includes(String(value.opponent))) invalid("game open.opponent", "must be ai_2_1, ai_turtle, jeffs_ai, or rush_ai");
     if (value.spectate != null) {
       array(value.spectate, "game open.spectate", 2, 2, (entry: unknown) => {
-        if (!["ai_2_1", "ai_turtle"].includes(String(entry))) invalid("game open.spectate", "must contain ai_2_1 or ai_turtle profiles");
+        if (!["ai_2_1", "ai_turtle", "jeffs_ai", "rush_ai"].includes(String(entry))) invalid("game open.spectate", "must contain ai_2_1, ai_turtle, jeffs_ai, or rush_ai profiles");
       });
       if (value.opponent != null) invalid("game open", "cannot combine opponent with spectate");
     }
