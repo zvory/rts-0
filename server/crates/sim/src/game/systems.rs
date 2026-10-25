@@ -157,6 +157,7 @@ pub(crate) fn run_tick(
     tick: u32,
     mut perf: Option<&mut crate::perf::TickPerf>,
 ) -> SpatialIndex {
+    sync_tank_plus(entities, |owner| players.iter().any(|p| p.id == owner && p.has_upgrade(UpgradeKind::TankPlus)));
     let mut occupancy_cache = OccupancyPhaseCache::new(map);
     let pre_command = crate::perf::timed(perf.as_deref_mut(), "pre_command_derived", || {
         PreCommandDerivedState::rebuild(map, entities, &mut occupancy_cache)
@@ -450,9 +451,21 @@ pub(crate) fn run_tick(
         services::supply::recompute_supply(players, entities);
     });
 
+    sync_tank_plus(entities, |owner| players.iter().any(|p| p.id == owner && p.has_upgrade(UpgradeKind::TankPlus)));
     crate::perf::timed(perf, "final_derived", || {
         FinalDerivedState::rebuild(map, entities).spatial
     })
+}
+
+fn sync_tank_plus(entities: &mut EntityStore, researched: impl Fn(u32) -> bool) {
+    for id in entities.ids() {
+        let Some(entity) = entities.get_mut(id) else { continue; };
+        if entity.kind == crate::game::entity::EntityKind::Tank {
+            if let Some(combat) = entity.combat.as_mut() {
+                combat.tank_plus = researched(entity.owner);
+            }
+        }
+    }
 }
 
 pub(crate) use services::supply::recompute_supply;

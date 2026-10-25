@@ -802,3 +802,10 @@ for (const researched of [false, true]) {
   assert.deepEqual(point.intent, { type: "beginCommandTarget", target: "pointTanks" });
   assert.equal(buildCommandCardDescriptors({ ...ctx, playerId: 2 }).slots.some((s) => s?.commandId === "unit.pointTanks"), false);
 }
+
+{
+  const card = engineeringComplexCard([UPGRADE.TANK_UNLOCK]);
+  assert.equal(card.slots[7]?.id, `research:${UPGRADE.TANK_PLUS}`);
+  assert.equal(card.slots[7]?.label, "Tank Plus");
+  assert.equal(card.slots[7]?.enabled, true);
+}

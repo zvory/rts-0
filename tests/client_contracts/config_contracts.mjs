@@ -348,6 +348,7 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
       UPGRADE.SMOKE_PLUS,
       UPGRADE.SCOUT_PLANE_UNLOCK,
       UPGRADE.ROCKETS,
+      UPGRADE.TANK_PLUS,
     ],
     "Engineering Complex should preserve an empty former AT Guns slot before Artillery and Fire Control",
   );

@@ -20,6 +20,7 @@ pub(super) fn tick_tank_stationary_range(e: &mut Entity) {
     if e.kind != EntityKind::Tank || e.hp == 0 {
         return;
     }
+    let increment = if e.tank_plus() { 2 } else { 1 };
     let Some(c) = e.combat.as_mut() else {
         return;
     };
@@ -28,7 +29,7 @@ pub(super) fn tick_tank_stationary_range(e: &mut Entity) {
     } else {
         c.tank_stationary_range_ticks = c
             .tank_stationary_range_ticks
-            .saturating_add(1)
+            .saturating_add(increment)
             .min(TANK_STATIONARY_RANGE_RAMP_TICKS);
     }
 }
@@ -42,7 +43,7 @@ pub(super) fn rotate_vehicle_weapon_for_combat(e: &mut Entity, target_angle: f32
         .weapon_facing()
         .filter(|facing| facing.is_finite())
         .unwrap_or_else(|| e.facing());
-    let rotated = rotate_toward(current, target_angle, TANK_TURRET_TURN_RATE_RAD_PER_TICK);
+    let rotated = rotate_toward(current, target_angle, TANK_TURRET_TURN_RATE_RAD_PER_TICK * e.tank_turn_multiplier());
     if rotated.is_finite() {
         e.set_weapon_facing(rotated);
     }
@@ -59,7 +60,7 @@ pub(super) fn relax_vehicle_weapon_toward_body(e: &mut Entity) {
         .weapon_facing()
         .filter(|facing| facing.is_finite())
         .unwrap_or(body);
-    let rotated = rotate_toward(current, body, TANK_TURRET_TURN_RATE_RAD_PER_TICK);
+    let rotated = rotate_toward(current, body, TANK_TURRET_TURN_RATE_RAD_PER_TICK * e.tank_turn_multiplier());
     if rotated.is_finite() {
         e.set_weapon_facing(rotated);
     }
@@ -343,5 +344,23 @@ fn maybe_begin_support_weapon_setup_after_alignment(e: &mut Entity) {
             return;
         };
         e.set_weapon_setup(WeaponSetup::SettingUp { ticks });
+    }
+}
+
+#[cfg(test)]
+mod tank_plus_tests {
+    use super::*;
+
+    #[test]
+    fn tank_plus_turret_tracks_and_relaxes_fifty_percent_faster() {
+        let mut entities = EntityStore::new();
+        let id = entities.spawn_unit(1, EntityKind::Tank, 500.0, 500.0).unwrap();
+        let tank = entities.get_mut(id).unwrap();
+        tank.combat.as_mut().unwrap().tank_plus = true;
+        rotate_vehicle_weapon_for_combat(tank, std::f32::consts::PI);
+        assert!((tank.weapon_facing().unwrap().abs() - TANK_TURRET_TURN_RATE_RAD_PER_TICK * 1.5).abs() < 0.0001);
+        tank.set_weapon_facing(1.0);
+        relax_vehicle_weapon_toward_body(tank);
+        assert!((tank.weapon_facing().unwrap() - (1.0 - TANK_TURRET_TURN_RATE_RAD_PER_TICK * 1.5)).abs() < 0.0001);
     }
 }
