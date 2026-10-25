@@ -252,6 +252,10 @@ const approvedCurrentFactionFiles = new Set([
   // Kriegsia-only AI resource scanner; non-Kriegsia AI remains unsupported by public lobby flow.
   "server/crates/ai/src/ai_core/resource_availability.rs",
   "server/crates/ai/src/ai_shared.rs",
+  // Rush is an explicitly Kriegsia-only roster policy using the public strategy SDK; the lobby
+  // and faction catalog still own faction admission, while costs remain catalog-derived.
+  "server/crates/ai/src/rush.rs",
+  "server/crates/ai/src/rush/staging.rs",
   // The SDK frame adapter converts the protocol's dedicated remembered-anti-tank-gun records back
   // into the typed kind that the wire record omits. Keep this exception at one occurrence.
   "server/crates/ai/src/sdk/frame.rs",
