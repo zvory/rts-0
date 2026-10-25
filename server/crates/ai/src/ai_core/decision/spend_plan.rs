@@ -217,6 +217,37 @@ fn extractors(
         } else {
             config::STEEL_PATCH_AMOUNT
         } as f32;
+        // Each extractor stands on one patch or well, the nearest (it is built on the node's
+        // centre); Jeff's own, or anyone else's. Matching by distance alone counted one mine twice
+        // where patches are packed tight (Fastest Map Possible has 36 around a Depot).
+        let mut on_node: BTreeMap<u32, (&AiEntitySummary, bool)> = BTreeMap::new();
+        for (entity, own) in observation
+            .owned
+            .iter()
+            .map(|entity| (entity, true))
+            .chain(
+                observation
+                    .visible_enemies
+                    .iter()
+                    .chain(&observation.visible_allies)
+                    .map(|entity| (entity, false)),
+            )
+            .filter(|(entity, _)| entity.kind == extractor_kind && entity.hp > 0)
+        {
+            let nearest = observation
+                .resources
+                .iter()
+                .filter(|node| node.kind == node_kind)
+                .min_by(|a, b| {
+                    dist2(a.x, a.y, entity.x, entity.y)
+                        .total_cmp(&dist2(b.x, b.y, entity.x, entity.y))
+                        .then(a.id.cmp(&b.id))
+                })
+                .filter(|node| dist2(node.x, node.y, entity.x, entity.y) <= on_node2);
+            if let Some(node) = nearest {
+                on_node.entry(node.id).or_insert((entity, own));
+            }
+        }
         for (index, base) in bases.iter().enumerate() {
             // Each patch or well belongs to its nearest base in reach.
             let mut nodes: Vec<&AiResourceSummary> = observation
@@ -252,27 +283,13 @@ fn extractors(
             let mut next_free = base.ready.max(now);
             let mut free_nodes = Vec::new();
             for node in nodes {
-                let standing = observation.owned.iter().find(|entity| {
-                    entity.kind == extractor_kind
-                        && entity.hp > 0
-                        && dist2(entity.x, entity.y, node.x, node.y) <= on_node2
-                });
-                let taken_by_others = observation
-                    .visible_enemies
-                    .iter()
-                    .chain(&observation.visible_allies)
-                    .any(|entity| {
-                        entity.kind == extractor_kind
-                            && entity.hp > 0
-                            && dist2(entity.x, entity.y, node.x, node.y) <= on_node2
-                    });
-                match standing {
-                    Some(extractor) if extractor.is_complete => out.push(Extractor {
+                match on_node.get(&node.id) {
+                    Some((extractor, true)) if extractor.is_complete => out.push(Extractor {
                         oil,
                         pays_from: now + RUNNING_PHASE_TICKS,
                         amount: amount(node),
                     }),
-                    Some(extractor) => {
+                    Some((extractor, true)) => {
                         let done = memory.finished_at(extractor.id, now, free_ticks);
                         next_free = next_free.max(done);
                         out.push(Extractor {
@@ -281,8 +298,8 @@ fn extractors(
                             amount: amount(node),
                         });
                     }
-                    None if !taken_by_others => free_nodes.push(amount(node)),
-                    None => {}
+                    Some((_, false)) => {}
+                    None => free_nodes.push(amount(node)),
                 }
             }
             for amount in free_nodes {
@@ -366,6 +383,8 @@ pub(super) struct PlanInput {
     /// The natural's site, and the worker that would build it or is on the way.
     pub(super) natural_site: Option<(u32, u32)>,
     pub(super) natural_builder: Option<u32>,
+    /// Ticks the natural's order still waits for its guards to secure the site.
+    pub(super) natural_wait: u32,
 }
 
 /// The opening's steps with the tick each is charged, laid out from now.
@@ -495,9 +514,14 @@ fn steps(
     let natural_ahead =
         !planned_natural && !factory_planned && facts.building_count(EntityKind::ResourceDepot) < 2;
     if planned_natural {
+        let wait = if natural_pending {
+            0
+        } else {
+            input.natural_wait
+        };
         steps.push(Step {
             kind: StepKind::Natural,
-            ready: Ready::At(now + natural_walk.unwrap_or(0)),
+            ready: Ready::At(now + wait + natural_walk.unwrap_or(0)),
         });
     } else if natural_ahead {
         if facts.building_count(EntityKind::EngineeringComplex) == 0 {
@@ -540,6 +564,11 @@ fn steps(
         .iter()
         .find(|entity| entity.kind == EntityKind::Factory && entity.hp > 0);
     let factory_ticks = build_ticks(EntityKind::Factory);
+    let second_engineer = if facts.worker_count < 2 {
+        config::unit_stats(EntityKind::Worker).map_or(150, |stats| stats.build_ticks)
+    } else {
+        0
+    };
     let factory_done = match factory {
         Some(factory) if factory.is_complete => Some(now),
         Some(factory) => Some(memory.finished_at(factory.id, now, factory_ticks)),
@@ -566,10 +595,12 @@ fn steps(
                     });
                 Ready::At(now + arrival)
             }
-            // The live Jeff's tech waits for the natural's order while the natural is due.
-            None if planned_natural && !natural_pending => {
-                Ready::AfterNaturalOrder(FACTORY_WALK_TICKS)
+            // The live Jeff's tech waits for the natural's order while the natural is due, and with
+            // one Engineer, which builds the natural, for the second to be trained.
+            None if (planned_natural || natural_ahead) && !natural_pending => {
+                Ready::AfterNaturalOrder(FACTORY_WALK_TICKS + second_engineer)
             }
+            None if natural_pending => Ready::At(now + FACTORY_WALK_TICKS + second_engineer),
             None => Ready::At(now + FACTORY_WALK_TICKS),
         };
         steps.push(Step {

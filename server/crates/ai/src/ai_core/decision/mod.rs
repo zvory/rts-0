@@ -429,6 +429,12 @@ where
                     && expansion_security::expansion_is_next(observation, &facts, profile),
                 natural_site: site,
                 natural_builder,
+                natural_wait: if expansion_secured || natural_sheltered {
+                    0
+                } else {
+                    expansion_security::secure_wait_ticks(observation, map_analysis, memory)
+                        .unwrap_or(config::TICK_HZ * 30)
+                },
             },
         )
     });

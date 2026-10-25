@@ -186,6 +186,33 @@ pub(super) fn natural_attempt_ready_funded(
         && natural_route_quiet(observation, analysis, site, watch_site)
 }
 
+/// Ticks until the guards could have secured the natural: the slowest one's walk to its post plus
+/// the dwell. None without a full party.
+pub(super) fn secure_wait_ticks(
+    observation: &AiObservation,
+    analysis: Option<&AiMapAnalysis>,
+    memory: &AiDecisionMemory,
+) -> Option<u32> {
+    let guards = &memory.expansion_security.riflemen;
+    let posts = positions(observation, analysis, &memory.expansion_security);
+    if guards.len() < PARTY_SIZE || posts.len() < guards.len() {
+        return None;
+    }
+    let speed = config::unit_stats(EntityKind::Rifleman).map_or(1.6, |stats| stats.speed);
+    guards
+        .iter()
+        .zip(&posts)
+        .map(|(id, post)| {
+            observation
+                .owned
+                .iter()
+                .find(|unit| unit.id == *id)
+                .map(|unit| (dist2(unit.x, unit.y, post.0, post.1).sqrt() / speed).ceil() as u32)
+        })
+        .collect::<Option<Vec<_>>>()
+        .map(|walks| walks.into_iter().max().unwrap_or(0) + SECURE_TICKS)
+}
+
 /// Whether a natural Depot order is out and not yet placed. Its cost must stay banked until the
 /// foundation goes down, because the simulation only charges it then.
 pub(super) fn natural_order_pending(

@@ -72,6 +72,7 @@ fn no_natural() -> PlanInput {
         natural_due: false,
         natural_site: None,
         natural_builder: None,
+        natural_wait: 0,
     }
 }
 
@@ -119,6 +120,7 @@ fn the_naturals_builder_goes_once_the_depot_is_paid_for_by_its_arrival() {
         natural_due: true,
         natural_site: Some(site),
         natural_builder: Some(1),
+        natural_wait: 0,
     };
     // 300 Steel and 80 Oil banked: the Depot (450/100) is 150/20 short. The 31-tile walk takes
     // about 16 s, in which six mines and a Pump Jack bring in about 140 Steel and 23 Oil: short at
@@ -222,4 +224,25 @@ fn slack_keeps_steel_from_a_steel_bound_unlock_but_not_from_an_oil_bound_one() {
     let facts = AiFacts::from_observation(&obs);
     let laid = plan(&obs, &facts, &memory, no_natural());
     assert!(laid.slack_steel >= 140, "{}", laid.slack_steel);
+}
+
+#[test]
+fn a_mine_counts_once_where_patches_are_packed_tighter_than_a_tile() {
+    // A second patch a third of a tile from each mined one (Fastest Map Possible packs 36 around a
+    // Depot): still six mines paying.
+    let mut obs = main_base(0, 0);
+    for i in 0..6u32 {
+        let tile = (4.5 + i as f32 + 0.3, 4.5);
+        obs.resources.push(resource(
+            700 + i,
+            EntityKind::Steel,
+            tile.0 * ts(),
+            tile.1 * ts(),
+        ));
+    }
+    let mut memory = SpendPlanMemory::default();
+    memory.observe(&obs, false);
+    let facts = AiFacts::from_observation(&obs);
+    let (steel15, _) = plan(&obs, &facts, &memory, no_natural()).expected[0];
+    assert!((steel15 - 6.0 * 0.05 * 430.0).abs() < 4.0, "{steel15}");
 }
