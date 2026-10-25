@@ -1042,7 +1042,13 @@ try {
   git(["branch", "zvorygin/docdrift-sweep", docsOnlyHead]);
   git(["push", "origin", "zvorygin/docdrift-sweep"]);
   git(["worktree", "add", path.join(repo, ".docdrift/worktrees/docdrift-sweep"), "zvorygin/docdrift-sweep"]);
+  const ambiguousLegacyGh = writeFakeGh("fake-gh-legacy-ambiguous", [
+    { number: 626, state: "CLOSED", headRefOid: docsOnlyHead, headRefName: "zvorygin/docdrift-sweep" },
+    { number: 627, state: "CLOSED", headRefOid: docsOnlyHead, headRefName: "zvorygin/docdrift-sweep" },
+  ]);
+  assert.match(fullSweepFailure(["--run-id", "ambiguous-legacy", "--adopt-legacy"], { env: recoveryEnv(ambiguousLegacyGh) }), /ambiguous PR matches/);
   const legacyGh = writeFakeGh("fake-gh-legacy", [
+    { number: 551, url: "https://example.invalid/pr/551", state: "MERGED", headRefOid: simCommit, headRefName: "zvorygin/docdrift-sweep", mergedAt: "2026-06-20T12:00:00Z" },
     { number: 627, url: "https://example.invalid/pr/627", state: "CLOSED", mergeStateStatus: "DIRTY", headRefOid: docsOnlyHead, headRefName: "zvorygin/docdrift-sweep", mergedAt: null },
   ]);
   const legacyReport = JSON.parse(fullSweep(["--run-id", "after-legacy", "--adopt-legacy", "--no-codex", "--fixture", "classifier-basic", "--format", "json"], { env: recoveryEnv(legacyGh) }));
