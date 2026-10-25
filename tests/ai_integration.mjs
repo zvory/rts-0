@@ -75,6 +75,10 @@ const { ok } = assertions;
     "unsupported AI profile selection does not mutate the lobby",
   );
 
+  A.send({ t: "setAiProfile", id: ai.id, aiProfileId: "rush_ai" });
+  const withRush = await A.waitNext((m) => m.t === "lobby" && m.players.some((p) => p.id === ai.id && p.aiProfileId === "rush_ai"), 3000, "Rush AI selection");
+  ok(withRush.players.find((p) => p.id === ai.id)?.name === "Rush AI", "player lobby selects and labels Rush AI");
+
   // Send a hand-built future faction field. Phase 3 keeps addAi team-only, so the server may
   // ignore or reject the unsupported request, but it must never create a non-Kriegsia AI seat.
   A.send({ t: "selectMap", map: "Chokes" });

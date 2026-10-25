@@ -14,6 +14,7 @@ mod config {
     pub(crate) use rts_rules::balance::*;
 }
 mod live;
+mod rush;
 
 pub use live::{
     canonical_live_profile_id, is_player_live_profile_id, live_profile_label,

@@ -10,10 +10,11 @@ When several seats use the same profile, their lobby names receive deterministic
 
 ### Canonical profiles
 
-The player-facing lobby supports two AI profile IDs:
+The player-facing lobby supports three AI profile IDs:
 
 - ai_2_1 — AI 2.1, the default pressure profile.
 - jeffs_ai — Jeff's AI, the server-authoritative port of the locally evaluated V3 champion policy.
+- rush_ai — Rush AI, an immediate infantry attack with forward construction.
 
 `ai_turtle` is deprecated and internal-only. It remains registered for offline self-play,
 diagnostics, and observer-only AI sessions, but it is not exposed in the lobby and the server
@@ -23,7 +24,7 @@ human match.
 
 Those IDs are concrete match profile IDs used by controllers and diagnostics. Live AI selection
 also accepts suite request IDs, such as ai_2_0, which resolve to concrete profiles for a match.
-The convenience inputs ai and default resolve to ai_2_1. The lobby exposes AI 2.1 and Jeff's AI;
+The convenience inputs ai and default resolve to ai_2_1. The lobby exposes AI 2.1, Jeff's AI, and Rush AI;
 unsupported or internal profile IDs fall back to AI 2.1 when adding a seat and are ignored when
 changing a seat in a player lobby.
 
@@ -133,7 +134,7 @@ the SDK because no Phase 4 consumer required them.
 
 ### Shared decision core
 
-Each controller runs on a staggered cadence and constructs the typed `AiFrame`. Built-in profiles
+Each controller runs on a staggered cadence and constructs the typed `AiFrame`. Legacy built-in profiles
 run through the crate-private `LegacyProfileStrategy`, which projects that frame back into the
 internal `AiObservation` before the generic decision loop applies the selected `AiProfile` policy.
 That compatibility projection alone preserves the historical false `is_ai` value, synthetic
@@ -181,6 +182,46 @@ visible Resource Depot, including unfinished depots and the controller’s pendi
 Patches inside a known Depot’s mining range are also excluded, so occupied sites are skipped
 while the search continues through other resource locations.
 
+### Rush AI
+
+`rush_ai` runs `RushStrategy` through the typed SDK and canonical controller cadence. The four
+starting Riflemen join the same staging system as later infantry, facing the first living enemy
+start. The starting Engineer advances toward that start between builds, stopping outside a 30-tile
+exclusion radius. Movement and full construction footprints use a two-tile buffer; straight
+construction approaches retain at least one tile of clearance beyond the exclusion radius. At the
+standoff line, remaining buildings can be placed beside or behind the Engineer rather than
+advancing closer. A near-boundary pathing correction runs before construction/travel handling. As
+resources permit, the Engineer builds a Barracks, a Training Centre, then two more Barracks,
+completing one building before starting the next. Failed sites are retried. Rush disables the
+shared worker-retreat reflex; a lost Engineer is not replaced.
+
+Every completed Barracks rallies to the staging line. Initially it alternates Riflemen and Machine
+Gunners through standing production allocations. When the first Training Centre completes, all
+Barracks disable Rifleman repeat without cancelling existing paid or queued Riflemen; later
+Barracks start with Machine Gunner repeat only. Methamphetamines is queued on the first decision
+that observes the Training Centre scaffold, followed by Entrenchment. Panzerfausts is queued on
+the first decision at or after two minutes (3,600 simulation ticks), behind earlier research. Once
+it completes, each Barracks alternates Machine Gunners and Panzerfausts. The home Resource Depot
+auto-builds Steel Mines and Pump Jacks to sustain income. There is no expansion or additional tech
+path.
+
+Rush picks a staging point 25 world-space tiles from the enemy start along a shortest octile route
+through the public terrain map, without cutting blocked diagonal corners. The formation is
+perpendicular to the smoothed local approach direction. Riflemen and Machine Gunners receive
+stable, spaced slots from the main line's centre outward. Panzerfausts use a separate parallel
+line three tiles behind it. Blocked slots are skipped without placing front infantry into the
+Panzerfaust line. Only owned and currently visible buildings affect slot avoidance. Units move to
+their slots and Hold Position after arriving. The first assembled wave attack-moves to the enemy
+start as soon as Methamphetamines reaches 90% research progress (or is already complete); if
+nobody has arrived yet, the trigger stays unlocked until arrivals. Subsequent waves require at
+least five units actually at their slots, rather than counting en-route reinforcements. Each wave
+launches with one group command. Launched units are never added to a later wave or pulled back to
+staging, and later production gathers into a fresh cohort.
+
+`AiActions::queue_research` emits an ordinary research queue request without requiring or
+reserving its eventual cost. Unlike the affordable `research` helper, it permits construction-
+time/unpaid queues; authoritative simulation validation and payment still apply.
+
 ### Profile behavior
 
 AI 2.0 resolves only to the `ai_2_0_tank_pressure` profile. The retired
@@ -209,7 +250,7 @@ the main choke first, can defend a second close-spawn choke, and reinforces unde
 Staged defenders emit HoldPosition once after reaching their defensive slot rather than repeating
 the command on every think.
 
-All three profiles are self-contained policy records in the same registry. Each profile selects
+The three legacy profiles are self-contained policy records in the same registry. Each profile selects
 whether to use the proposal economy manager; AI 2.1, Jeff's AI, and AI Turtle enable it. None
 inherits behavior from a retired version or resolves through a second profile name.
 
