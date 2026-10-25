@@ -1696,13 +1696,17 @@ function assertCleanWorktree(worktreePath, branch) {
   }
 }
 
-function lookupOwnedPr(options, branch) {
+function lookupOwnedPr(options, branch, exactHead = null) {
   const ghCommand = process.env.DOC_DRIFT_GH_COMMAND || "gh";
   const output = execFileSync(ghCommand, [
-    "pr", "list", "--head", branch, "--state", "all", "--json",
+    "pr", "list", "--head", branch, "--state", "all", "--limit", "1000", "--json",
     "number,url,state,mergeStateStatus,headRefOid,headRefName,mergedAt",
   ], { cwd: options.repoRoot, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-  const matches = JSON.parse(output).filter((pr) => pr.headRefName === branch);
+  // The legacy sweep reused one branch across runs. Historical PRs at other
+  // heads do not identify the verified local/remote/worktree head being adopted.
+  const matches = JSON.parse(output).filter((pr) =>
+    pr.headRefName === branch && (exactHead === null || pr.headRefOid === exactHead),
+  );
   if (matches.length > 1) {
     throw new Error(`ambiguous PR matches for ${branch}: ${matches.map((pr) => `#${pr.number}`).join(", ")}`);
   }
@@ -1874,7 +1878,7 @@ function adoptLegacyRun(options) {
   if (local !== remote || local !== worktreeHead) {
     throw new Error(`legacy head mismatch branch=${legacySweepBranch} local=${local} remote=${remote} worktree=${worktreeHead}`);
   }
-  const pr = lookupOwnedPr(options, legacySweepBranch);
+  const pr = lookupOwnedPr(options, legacySweepBranch, local);
   if (!pr || !["CLOSED", "MERGED"].includes(pr.state) || pr.headRefOid !== local) {
     throw new Error(`legacy adoption requires exactly one terminal PR with exact head: branch=${legacySweepBranch} head=${local} pr=${pr ? `#${pr.number}/${pr.state}/${pr.headRefOid}` : "missing"}`);
   }
