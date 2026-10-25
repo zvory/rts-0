@@ -552,8 +552,24 @@ where
     } else {
         economy_plan.target_workers
     };
+    // The live Jeff counts the Engineers in training: with the natural's Depot up as well, each
+    // Depot trained one, and Fastest Map Possible got three Engineers for the one wanted.
+    let workers = facts.worker_count
+        + if profile.id == JEFFS_AI_ID {
+            observation
+                .owned
+                .iter()
+                .filter(|depot| {
+                    depot.kind == EntityKind::ResourceDepot
+                        && depot.production_kind == Some(EntityKind::Worker)
+                })
+                .map(|depot| depot.production_queue_len.unwrap_or(0))
+                .sum::<usize>()
+        } else {
+            0
+        };
     let should_train_workers = economy_manager_output.proposes(EconomyProposal::TrainWorker)
-        || (!defer_economy_for_panic && facts.worker_count < target_workers);
+        || (!defer_economy_for_panic && workers < target_workers);
     if should_train_workers {
         for trained in actions::train_units(
             &mut actions,
@@ -564,7 +580,7 @@ where
                 completed_upgrades: facts.completed_upgrades(),
                 max_queue_depth: 1,
                 save_for_tech: save_worker_training_for_tech,
-                current_counts: &[(EntityKind::Worker, facts.worker_count)],
+                current_counts: &[(EntityKind::Worker, workers)],
                 max_counts: &[(EntityKind::Worker, target_workers)],
                 balance_unit_priorities: false,
             },

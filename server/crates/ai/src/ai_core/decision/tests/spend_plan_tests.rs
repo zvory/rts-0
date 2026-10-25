@@ -268,3 +268,26 @@ fn with_a_factory_up_the_natural_waits_for_its_cost_banked() {
         assert!(natural >= obs.tick + 400, "{natural}");
     }
 }
+
+#[test]
+fn the_live_jeff_trains_one_second_engineer_with_two_depots_up() {
+    let mut obs = main_base(400, 100);
+    let mut natural = building_at(
+        7,
+        EntityKind::ResourceDepot,
+        Some(0),
+        40.5 * ts(),
+        8.5 * ts(),
+    );
+    natural.production_queue_len = Some(0);
+    obs.owned.push(natural);
+    // The HQ already has the second Engineer in training: the natural trains none.
+    let hq = obs.owned.iter_mut().find(|unit| unit.id == 2).unwrap();
+    hq.production_kind = Some(EntityKind::Worker);
+    hq.production_queue_len = Some(1);
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+    let decision = decide(&obs, &JEFFS_AI, &mut memory);
+    assert!(!decision.intents.contains(&AiIntent::Train {
+        kind: EntityKind::Worker
+    }));
+}
