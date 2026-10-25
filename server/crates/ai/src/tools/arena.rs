@@ -851,6 +851,15 @@ mod tests {
 
     #[test]
     fn tiny_arena_run_writes_agent_artifacts() {
+        check_tiny_arena_run(DEFAULT_CANDIDATE);
+    }
+
+    #[test]
+    fn tiny_rush_arena_run_writes_agent_artifacts() {
+        check_tiny_arena_run(crate::rush::RUSH_AI_ID);
+    }
+
+    fn check_tiny_arena_run(candidate: &str) {
         let out_dir = std::env::temp_dir().join(format!(
             "rts-ai-arena-test-{}-{}",
             process::id(),
@@ -860,7 +869,7 @@ mod tests {
                 .as_nanos()
         ));
         let config = CliConfig {
-            candidate: DEFAULT_CANDIDATE.to_string(),
+            candidate: candidate.to_string(),
             baseline: DEFAULT_BASELINE.to_string(),
             seeds: 1,
             seed_start: 3,
@@ -875,6 +884,9 @@ mod tests {
         assert_eq!(report.runs.len(), 2);
         assert!(out_dir.join("arena-summary.json").exists());
         for run in &report.runs {
+            let identity = &run.manifest.profiles[candidate];
+            assert_eq!(identity.profile_id, candidate);
+            validate_profile_identity(identity).expect("candidate identity should validate");
             let dir = PathBuf::from(&run.artifact_dir);
             assert!(dir.join("replay.json").exists());
             assert!(dir.join("manifest.json").exists());

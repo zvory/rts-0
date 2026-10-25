@@ -45,6 +45,27 @@ pub(crate) fn profile_identity(profile: &AiProfile) -> AiProfileIdentity {
 }
 
 pub(crate) fn profile_identity_by_id(id: &str) -> Option<AiProfileIdentity> {
+    if id == crate::rush::RUSH_AI_ID {
+        let label = "Rush AI";
+        let summary =
+            "Forward construction and staged infantry waves through the typed strategy SDK.";
+        let modules = ["typed_strategy_sdk", "terrain_routed_staging"];
+        // Rush is a strategy implementation rather than an AiProfile policy record. Fingerprint
+        // its source inputs so arena manifests still identify the policy they actually ran.
+        let sources = (
+            include_str!("../rush.rs"),
+            include_str!("../rush/staging.rs"),
+        );
+        return Some(AiProfileIdentity {
+            profile_id: id.to_string(),
+            label: label.to_string(),
+            base_profile_id: None,
+            summary: summary.to_string(),
+            modules: modules.iter().map(|module| module.to_string()).collect(),
+            overlays: Vec::new(),
+            fingerprint: profile_fingerprint(&sources, label, None, summary, &modules, &[]),
+        });
+    }
     profile_by_id(id).map(profile_identity)
 }
 
@@ -175,8 +196,8 @@ fn baseline_metadata(profile_id: &str) -> (&'static str, &'static str, Vec<&'sta
     }
 }
 
-fn profile_fingerprint(
-    profile: &AiProfile,
+fn profile_fingerprint<P: Serialize>(
+    profile: &P,
     label: &str,
     base_profile_id: Option<&str>,
     summary: &str,
@@ -184,8 +205,8 @@ fn profile_fingerprint(
     overlays: &[AiOverlayIdentity],
 ) -> String {
     #[derive(Serialize)]
-    struct FingerprintInput<'a> {
-        profile: &'a AiProfile,
+    struct FingerprintInput<'a, P> {
+        profile: &'a P,
         label: &'a str,
         base_profile_id: Option<&'a str>,
         summary: &'a str,
@@ -228,6 +249,15 @@ mod tests {
             validate_profile_identity(&identity).expect("identity should validate");
             assert!(!identity.fingerprint.is_empty());
             assert!(!identity.modules.is_empty());
+        }
+    }
+
+    #[test]
+    fn every_matchup_profile_has_a_valid_manifest_identity() {
+        for id in crate::selfplay::available_profile_ids() {
+            let identity = profile_identity_by_id(id).expect("matchup profile identity");
+            assert_eq!(identity.profile_id, id);
+            validate_profile_identity(&identity).expect("identity should validate");
         }
     }
 
