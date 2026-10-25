@@ -241,7 +241,7 @@ fn frame_maps_public_trench_occupation_and_known_buildings_block_routes() {
         2,
         "barracks",
         12.5 * 32.0,
-        16.5 * 32.0,
+        16.0 * 32.0,
         100,
         100,
         "idle",
@@ -259,7 +259,18 @@ fn frame_maps_public_trench_occupation_and_known_buildings_block_routes() {
     assert_eq!(frame.owned()[0].occupied_trench_id, None);
     assert_eq!(frame.map().terrain[0], AiTerrain::Grass);
     let input = GridInput::from_frame(&frame, (44.5 * 32.0, 16.0 * 32.0), vec![]);
-    assert!(input.blocked[input.cell((12.5 * 32.0, 16.5 * 32.0)).unwrap()]);
+    // Construction centers the 3x2 Barracks on a tile boundary on its even-height axis.
+    // Check the entire footprint, including the adjacent open tiles, against simulation occupancy.
+    let blocked = input
+        .blocked
+        .iter()
+        .enumerate()
+        .filter_map(|(cell, &blocked)| blocked.then_some((cell % 48, cell / 48)))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        blocked,
+        vec![(11, 15), (12, 15), (13, 15), (11, 16), (12, 16), (13, 16)]
+    );
     let grid = FlowGrid::new(input).unwrap();
     let path = route(&grid, (7.5 * 32.0, 16.5 * 32.0), true);
     assert!(path.iter().all(|&cell| !grid.input.blocked[cell]));
@@ -280,7 +291,7 @@ fn late_obstacle_replaces_a_stale_move_when_no_route_remains() {
         2,
         "barracks",
         7.5 * 32.0,
-        16.5 * 32.0,
+        16.0 * 32.0,
         100,
         100,
         "idle",
