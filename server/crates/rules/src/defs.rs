@@ -402,7 +402,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
         kind: EntityKind::ResourceDepot,
         stats: balance::BuildingStats {
-            hp: 225,
+            hp: 180,
             sight_tiles: 1,
             cost_steel: 450,
             cost_oil: 100,
@@ -421,7 +421,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
         kind: EntityKind::Portal,
         stats: balance::BuildingStats {
-            hp: 123,
+            hp: 98,
             sight_tiles: 1,
             cost_steel: 150,
             cost_oil: 0,
@@ -440,7 +440,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
         kind: EntityKind::Zamok,
         stats: balance::BuildingStats {
-            hp: 450,
+            hp: 360,
             sight_tiles: 1,
             cost_steel: 0,
             cost_oil: 0,
@@ -459,7 +459,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
         kind: EntityKind::Depot,
         stats: balance::BuildingStats {
-            hp: 82,
+            hp: 65,
             sight_tiles: 1,
             cost_steel: 100,
             cost_oil: 0,
@@ -478,7 +478,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
         kind: EntityKind::Barracks,
         stats: balance::BuildingStats {
-            hp: 123,
+            hp: 98,
             sight_tiles: 1,
             cost_steel: 150,
             cost_oil: 0,
@@ -497,7 +497,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
         kind: EntityKind::TrainingCentre,
         stats: balance::BuildingStats {
-            hp: 150,
+            hp: 120,
             sight_tiles: 1,
             cost_steel: 100,
             cost_oil: 25,
@@ -516,7 +516,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
         kind: EntityKind::Factory,
         stats: balance::BuildingStats {
-            hp: 150,
+            hp: 120,
             sight_tiles: 1,
             cost_steel: 125,
             cost_oil: 125,
@@ -535,7 +535,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
         kind: EntityKind::EngineeringComplex,
         stats: balance::BuildingStats {
-            hp: 123,
+            hp: 98,
             sight_tiles: 1,
             cost_steel: 100,
             cost_oil: 100,
@@ -554,7 +554,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
         kind: EntityKind::Steelworks,
         stats: balance::BuildingStats {
-            hp: 150,
+            hp: 120,
             sight_tiles: 1,
             cost_steel: 150,
             cost_oil: 100,
@@ -573,7 +573,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
         kind: EntityKind::TankTrap,
         stats: balance::BuildingStats {
-            hp: 90,
+            hp: 72,
             sight_tiles: 0,
             cost_steel: 20,
             cost_oil: 0,
