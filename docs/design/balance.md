@@ -439,7 +439,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   `ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK = 0.070` to track targets inside that cone;
   targets outside the cone are ignored until teardown and redeployment. While packed and mobile, an
   Anti-Tank Gun moves at 1.7556 px/tick and turns its body at
-  `ANTI_TANK_GUN_BODY_TURN_RATE_DEGREES_PER_SECOND = 110`; sharp heading changes still reduce throttle
+  `ANTI_TANK_GUN_BODY_TURN_RATE_DEGREES_PER_SECOND = 70`; sharp heading changes still reduce throttle
   until the gun pivots in place.
 - Panzerfaust units carry a one-shot 5-tile loaded weapon that targets only visible
   Scout Cars, Tanks, and Command Cars with
