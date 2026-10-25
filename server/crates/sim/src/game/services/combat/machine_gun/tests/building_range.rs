@@ -15,6 +15,7 @@ fn replay_419_scout_cars_hit_barracks_at_acquired_edge_range() {
         let target = entities
             .spawn_building(2, EntityKind::Barracks, 2032.0, 1888.0, true)
             .unwrap();
+        let hp_before = entities.get(target).unwrap().hp;
         let range = 237.6;
         assert!(
             super::super::super::projection::combat_target_distance_sq(
@@ -48,7 +49,7 @@ fn replay_419_scout_cars_hit_barracks_at_acquired_edge_range() {
             "aimed ray from ({x}, {y}) must reach the wall"
         );
         assert!(
-            entities.get(target).unwrap().hp < 123,
+            entities.get(target).unwrap().hp < hp_before,
             "a landed burst must damage the barracks"
         );
     }

@@ -782,15 +782,15 @@ mod tests {
     }
 
     #[test]
-    fn depot_and_barracks_hp_keep_requested_ratio() {
+    fn depot_and_barracks_hp_use_reduced_rounded_values() {
         let depot_hp = building_def(EntityKind::Depot).expect("depot def").stats.hp;
         let barracks_hp = building_def(EntityKind::Barracks)
             .expect("barracks def")
             .stats
             .hp;
 
-        assert_eq!(depot_hp, 82);
-        assert_eq!(barracks_hp, depot_hp * 3 / 2);
+        assert_eq!(depot_hp, 65);
+        assert_eq!(barracks_hp, 98);
     }
 
     #[test]
@@ -876,7 +876,7 @@ mod tests {
     fn tank_trap_uses_active_obstacle_stats() {
         let def = building_def(EntityKind::TankTrap).expect("tank trap def");
 
-        assert_eq!(def.stats.hp, 90);
+        assert_eq!(def.stats.hp, 72);
         assert_eq!(def.stats.sight_tiles, 0);
         assert_eq!((def.stats.cost_steel, def.stats.cost_oil), (20, 0));
         assert_eq!((def.stats.foot_w, def.stats.foot_h), (1, 1));
@@ -908,7 +908,7 @@ mod tests {
             .expect("engineering complex def")
             .stats;
 
-        assert_eq!(stats.hp, 123);
+        assert_eq!(stats.hp, 98);
         assert_eq!((stats.cost_steel, stats.cost_oil), (100, 100));
         assert_eq!((stats.foot_w, stats.foot_h), (3, 3));
         assert_eq!(stats.build_ticks, balance::TICK_HZ * 15);
