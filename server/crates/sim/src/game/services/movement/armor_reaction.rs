@@ -45,7 +45,8 @@ pub(super) fn turn_stationary_tanks_toward_locked_ap_source<F>(
             continue;
         }
 
-        let rotated = rotate_toward(current, desired, vehicle_body_turn_rate(kind));
+        let multiplier = entities.get(id).map_or(1.0, |e| e.tank_turn_multiplier());
+        let rotated = rotate_toward(current, desired, vehicle_body_turn_rate(kind) * multiplier);
         if angle_delta(current, rotated).abs() <= FACING_EPS_RAD
             || !turn_is_allowed(owner, kind, x, y, rotated)
         {

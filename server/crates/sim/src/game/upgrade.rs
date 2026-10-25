@@ -79,6 +79,14 @@ pub fn definition(kind: UpgradeKind) -> UpgradeDefinition {
             cost_oil: crate::config::TANK_UNLOCK_COST_OIL,
             research_ticks: crate::config::TANK_UNLOCK_RESEARCH_TICKS,
         },
+        UpgradeKind::TankPlus => UpgradeDefinition {
+            kind,
+            researched_at: catalog.researched_at,
+            requires_upgrade: Some(UpgradeKind::TankUnlock),
+            cost_steel: crate::config::TANK_PLUS_COST_STEEL,
+            cost_oil: crate::config::TANK_PLUS_COST_OIL,
+            research_ticks: crate::config::TANK_PLUS_RESEARCH_TICKS,
+        },
         UpgradeKind::SmokePlus => UpgradeDefinition {
             kind,
             researched_at: catalog.researched_at,
@@ -139,6 +147,7 @@ mod tests {
                 UpgradeKind::SmokePlus,
                 UpgradeKind::ScoutPlaneUnlock,
                 UpgradeKind::Rockets,
+                UpgradeKind::TankPlus,
             ]
         );
         assert!(ALL.contains(&UpgradeKind::ArtilleryUnlock));

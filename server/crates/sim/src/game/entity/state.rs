@@ -231,6 +231,9 @@ pub struct CombatState {
     pub autocast_enabled: bool,
     /// Ticks this tank has spent still enough to extend its weapon range.
     pub tank_stationary_range_ticks: u16,
+    /// Materialized owner research; refreshed each tick, including newly spawned tanks.
+    #[serde(default)]
+    pub tank_plus: bool,
     /// Set when tank movement reset the range this tick, so combat does not immediately re-add one
     /// stationary tick after the movement phase.
     pub tank_stationary_range_reset_this_tick: bool,
@@ -257,6 +260,7 @@ impl Default for CombatState {
             pending_redeploy_facing: None,
             autocast_enabled: true,
             tank_stationary_range_ticks: 0,
+            tank_plus: false,
             tank_stationary_range_reset_this_tick: false,
             tank_armor_reaction_lock: None,
             panzerfaust: None,

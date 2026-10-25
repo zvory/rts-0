@@ -25,6 +25,7 @@ pub enum UpgradeKind {
     ArtilleryUnlock,
     BallisticTables,
     TankUnlock,
+    TankPlus,
     SmokePlus,
     ScoutPlaneUnlock,
     Rockets,
@@ -39,6 +40,7 @@ impl UpgradeKind {
         Self::ArtilleryUnlock,
         Self::BallisticTables,
         Self::TankUnlock,
+        Self::TankPlus,
         Self::SmokePlus,
         Self::ScoutPlaneUnlock,
         Self::Rockets,
@@ -53,6 +55,7 @@ impl UpgradeKind {
             Self::ArtilleryUnlock => "artillery_unlock",
             Self::BallisticTables => "ballistic_tables",
             Self::TankUnlock => "tank_unlock",
+            Self::TankPlus => "tank_plus",
             Self::SmokePlus => "smoke_plus",
             Self::ScoutPlaneUnlock => "scout_plane_unlock",
             Self::Rockets => "rockets",
@@ -152,6 +155,7 @@ pub const ANTI_TANK_GUN_UNLOCK_UPGRADE: &str = UpgradeKind::AntiTankGunUnlock.st
 pub const ARTILLERY_UNLOCK_UPGRADE: &str = UpgradeKind::ArtilleryUnlock.stable_id();
 pub const BALLISTIC_TABLES_UPGRADE: &str = UpgradeKind::BallisticTables.stable_id();
 pub const TANK_UNLOCK_UPGRADE: &str = UpgradeKind::TankUnlock.stable_id();
+pub const TANK_PLUS_UPGRADE: &str = UpgradeKind::TankPlus.stable_id();
 pub const SMOKE_PLUS_UPGRADE: &str = UpgradeKind::SmokePlus.stable_id();
 pub const SCOUT_PLANE_UNLOCK_UPGRADE: &str = UpgradeKind::ScoutPlaneUnlock.stable_id();
 pub const ROCKETS_UPGRADE: &str = UpgradeKind::Rockets.stable_id();
@@ -338,7 +342,7 @@ const LEGACY_ANTI_TANK_GUN_UNLOCK: UpgradeCatalogEntry = UpgradeCatalogEntry {
     researched_at: EntityKind::EngineeringComplex,
 };
 
-const DEFAULT_UPGRADES: [UpgradeCatalogEntry; 9] = [
+const DEFAULT_UPGRADES: [UpgradeCatalogEntry; 10] = [
     UpgradeCatalogEntry {
         kind: UpgradeKind::Methamphetamines,
         researched_at: EntityKind::TrainingCentre,
@@ -373,6 +377,10 @@ const DEFAULT_UPGRADES: [UpgradeCatalogEntry; 9] = [
     },
     UpgradeCatalogEntry {
         kind: UpgradeKind::Rockets,
+        researched_at: EntityKind::EngineeringComplex,
+    },
+    UpgradeCatalogEntry {
+        kind: UpgradeKind::TankPlus,
         researched_at: EntityKind::EngineeringComplex,
     },
 ];
@@ -997,7 +1005,7 @@ pub fn ability_cost_for_carrier(kind: AbilityKind, carrier: EntityKind) -> Resou
 }
 
 pub fn upgrade_definition(kind: UpgradeKind) -> UpgradeCatalogEntry {
-    let [methamphetamines, panzerfausts, entrenchment, artillery_unlock, ballistic_tables, tank_unlock, smoke_plus, scout_plane_unlock, rockets] =
+    let [methamphetamines, panzerfausts, entrenchment, artillery_unlock, ballistic_tables, tank_unlock, smoke_plus, scout_plane_unlock, rockets, tank_plus] =
         DEFAULT_UPGRADES;
     match kind {
         UpgradeKind::Methamphetamines => methamphetamines,
@@ -1006,6 +1014,7 @@ pub fn upgrade_definition(kind: UpgradeKind) -> UpgradeCatalogEntry {
         UpgradeKind::AntiTankGunUnlock => LEGACY_ANTI_TANK_GUN_UNLOCK,
         UpgradeKind::BallisticTables => ballistic_tables,
         UpgradeKind::TankUnlock => tank_unlock,
+        UpgradeKind::TankPlus => tank_plus,
         UpgradeKind::SmokePlus => smoke_plus,
         UpgradeKind::ArtilleryUnlock => artillery_unlock,
         UpgradeKind::ScoutPlaneUnlock => scout_plane_unlock,

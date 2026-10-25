@@ -17,7 +17,11 @@ pub(super) fn advance(map: &Map, entities: &mut EntityStore, occ: &Occupancy) {
         if tank.kind != EntityKind::Tank || tank.hp == 0 || !facing.is_finite() {
             continue;
         }
-        let next = rotate_toward(tank.facing(), facing, vehicle_body_turn_rate(tank.kind));
+        let next = rotate_toward(
+            tank.facing(),
+            facing,
+            vehicle_body_turn_rate(tank.kind) * tank.tank_turn_multiplier(),
+        );
         if standability::unit_static_standable(occ, map, tank.kind, tank.pos_x, tank.pos_y, next) {
             tank.set_facing(next);
         }

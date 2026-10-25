@@ -35,6 +35,13 @@ inherits Rifleman combat and movement but carries one disposable anti-armor shot
 base damage with 50% armor penetration and no tank-facing modifier. The shot is detached at launch;
 the same Panzerfaust immediately returns to normal movement and rifle combat while the projectile
 travels, preserving its kind, orders, HP, control-group identity, and trench.
+Tank Plus (`tank_plus`) is researched at the Engineering Complex after Tank Production for
+150 steel and 150 oil over 20 seconds. It applies to existing and future owned Tanks: hull and
+turret turn rates multiply by 1.5, top movement speed multiplies by 1.1 (including other speed
+effects), sight increases from 9 to 11 tiles, and stationary cannon range ramps from 5 to 14 tiles
+in 45 ticks (1.5 seconds) instead of 90 ticks. Movement still resets the range ramp; maximum range,
+attack cooldowns, and damage are unchanged. Existing research hotkeys are preserved.
+
 Tanks also have a live secondary `tank_coax` profile owned by combat rules: 6-tile range, 4 small-arms
 damage, 12-tick cooldown, no Tank armor-facing multiplier, and single-target direct fire.
 Tank HE: cannon shots aimed at infantry (Workers, Golems, Warriors,
@@ -699,7 +706,7 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 | depot                      | Supply Depot       | 65 | 1     | 100 | 2x2  | 300       | disabled in the current experiment (not buildable and no command-card button); retained for replay and fixture compatibility; no supply |
 | barracks                   | Barracks           | 98 | 1     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, and panzerfaust; Machine Gunner requires a completed Training Centre and Panzerfaust requires completed Panzerfausts research; requires a Resource Depot |
 | training_centre            | Training Centre    | 120 | 1     | 100 steel + 25 oil | 3x2  | 560       | shared prerequisite before either advanced path; unlocks machine_gunner training at barracks and researches Methamphetamines, Panzerfausts, and Entrenchment; requires a Resource Depot and Barracks |
-| engineering_complex           | Engineering Complex        | 98 | 1     | 100 steel + 100 oil | 3x3  | 450       | research-only building for Artillery, Rockets, Tank Production, Smoke Plus, and Scout Plane; its first command-card slot remains empty to preserve existing research hotkeys; requires a Resource Depot and Training Centre |
+| engineering_complex           | Engineering Complex        | 98 | 1     | 100 steel + 100 oil | 3x3  | 450       | research-only building for Artillery, Rockets, Tank Production, Tank Plus, Smoke Plus, and Scout Plane; its first command-card slot remains empty to preserve existing research hotkeys; requires a Resource Depot and Training Centre |
 | factory                    | Vehicle Works      | 120 | 1     | 125 steel + 125 oil | 3x3  | 749       | Mobile Warfare path building; trains scout_car immediately, command_car after a completed Engineering Complex, and tank after Tank Production research; requires a Resource Depot and Training Centre |
 | steelworks                 | Gun Works          | 120 | 1     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team and Anti-Tank Guns immediately, Artillery after Artillery research, and Rocket Trucks after Rockets research while owning a completed Vehicle Works; requires a Resource Depot and Training Centre |
 | tank_trap                  | Tank Trap          | 72 | 0     | 20 steel + 0 oil | 1x1  | 150       | engineer-built vehicle obstacle available from the worker build card after a completed Training Centre; A-clicking a visible or remembered completed trap creates a four-tile clear-area Attack Move objective whose actionable traps outrank ordinary enemies; workers deconstruct completed traps in 75 ticks and refund the cost to the deconstructing player; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, no fog reveal, not an elimination building |
