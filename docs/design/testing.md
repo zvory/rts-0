@@ -627,6 +627,17 @@ branch/worktree, PR identity and state, checkpoint target, and recovery action. 
 `--run-id`, recovery resumes only the single recorded nonterminal run; multiple candidates fail
 closed.
 
+Full sweeps automatically select the largest ancestry-complete batch that fits the existing
+classifier commit, per-prompt, and total-token budgets. Batches end at first-parent commit
+boundaries and include every side-branch ancestor introduced by a merge; checkpoint advancement
+therefore cannot silently skip an unclassified side commit. Cache hits consume the commit limit
+but no prompt-token budget. Reports and PR bodies record `batch.checkpointSha` and deferred commit
+counts. Docs generation still reads the fetched current head, while a completed batch advances
+only to its processed boundary, even after its documentation PR merges. Later daily runs continue
+from that checkpoint. If the first ancestry-complete group cannot fit, the command fails for
+operator review rather than raising limits or skipping commits. Standalone `--classify` and
+`--generate-docs` keep their fail-fast budget behavior.
+
 An open PR resumes its exact recorded branch, head, PR, and first incomplete step. A missing
 worktree can be recreated from an exact local or remote recorded head, and the only automatic ref
 reconciliation is a clean local fast-forward to that exact remote head. Merged runs may finish
@@ -665,7 +676,7 @@ that latest `scripts/docdrift-sweep.mjs` with `--repo` pointed back at the prima
 primary checkout still owns `.docdrift` checkpoints, caches, reports, and sweep worktrees, while the
 runner worktree prevents stale local `main` from running obsolete sweeper code. Set
 `DOC_DRIFT_RUNNER_WORKTREE` to override the runner location. The wrapper defaults scheduled runs to
-`--max-commits 300` so ordinary daily backlog does not trip the interactive classifier guard; set
+`--max-commits 300` as the maximum considered commits per daily batch; set
 `DOC_DRIFT_MAX_COMMITS` to override that limit. It also passes `--codex-timeout-seconds` from
 `DOC_DRIFT_CODEX_TIMEOUT_SECONDS`, defaulting to 300 seconds per Codex call. When the daily command
 exits non-zero, it writes an ignored `.docdrift/last-failure.md` marker with the command, UTC

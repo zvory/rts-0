@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { selectClassifierBatch } from "../scripts/docdrift-batch.mjs";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -219,6 +220,18 @@ try {
     skippedDocsOnlyCommits: 1,
     noCommits: false,
   });
+
+  const batchEntries = jsonReport.commits.filter((commit) => commit.status === "considered").map((commit) => ({ commit, promptTokens: 10, cacheHit: false }));
+  const batchOptions = { repoRoot: repo, maxCommits: 1, maxPromptTokens: 100, maxTotalPromptTokens: 100 };
+  const selectedBatch = selectClassifierBatch(jsonReport, batchEntries, batchOptions);
+  assert.equal(selectedBatch.entries.length, 1);
+  assert.ok(!selectedBatch.report.commits.some((commit) => commit.sha === testCommit));
+  assert.ok(git(["rev-list", `${checkpointCommit}..${selectedBatch.report.batch.checkpointSha}`]).split("\n").every((sha) => selectedBatch.report.commits.some((commit) => commit.sha === sha)));
+  const tokenBatch = selectClassifierBatch(jsonReport, batchEntries, { ...batchOptions, maxCommits: 100, maxTotalPromptTokens: 15 });
+  assert.equal(tokenBatch.entries.length, 1);
+  const cachedBatch = selectClassifierBatch(jsonReport, batchEntries.map((entry) => ({ ...entry, cacheHit: true })), { ...batchOptions, maxCommits: 100, maxTotalPromptTokens: 1 });
+  assert.equal(cachedBatch.report, jsonReport);
+  assert.throws(() => selectClassifierBatch(jsonReport, batchEntries, { ...batchOptions, maxPromptTokens: 1 }), /cannot fit the first ancestry-complete/);
 
   const simEntry = jsonReport.commits.find((commit) => commit.sha === simCommit);
   assert.ok(simEntry, "expected sim commit in report");
@@ -1055,6 +1068,23 @@ try {
   assert.match(legacyReport.sweep.recoveryAction, /legacy/);
   assert.equal(git(["rev-parse", "zvorygin/docdrift-sweep"]), docsOnlyHead);
   assert.ok(fs.existsSync(path.join(repo, ".docdrift/runs", `legacy-docdrift-sweep-${docsOnlyHead.slice(0, 12)}`, "run-state.json")));
+
+  const batchRepo = path.join(fixtureRoot, "batch-checkpoints");
+  run("git", ["clone", "--single-branch", "--branch", "main", bareOrigin, batchRepo], { cwd: fixtureRoot });
+  run("git", ["config", "user.email", "agent@example.invalid"], { cwd: batchRepo });
+  run("git", ["config", "user.name", "Agent"], { cwd: batchRepo });
+  fs.mkdirSync(path.join(batchRepo, ".docdrift"), { recursive: true });
+  fs.writeFileSync(path.join(batchRepo, ".docdrift/checkpoint.txt"), `${checkpointCommit}\n`);
+  const noPatchFixture = path.join(fixtureRoot, "batch-move-on.json");
+  fs.writeFileSync(noPatchFixture, JSON.stringify({ decisions: [], docPatches: [], default: { decision: "move_on", likelyDocs: [], evidenceNote: "No documentation impact." } }));
+  const batchArgs = ["--repo", batchRepo, "--head", head, "--max-commits", "1", "--no-codex", "--fixture", noPatchFixture, "--format", "json"];
+  const firstBatch = JSON.parse(fullSweep([...batchArgs, "--run-id", "first-batch"], { env: recoveryEnv(initializedGh) }));
+  assert.equal(firstBatch.batch.checkpointSha, selectedBatch.report.batch.checkpointSha);
+  assert.equal(firstBatch.checkpoint.after.sha, selectedBatch.report.batch.checkpointSha);
+  const secondBatch = JSON.parse(fullSweep([...batchArgs, "--run-id", "second-batch"], { env: recoveryEnv(initializedGh) }));
+  assert.equal(secondBatch.base.sha, firstBatch.checkpoint.after.sha);
+  assert.equal(secondBatch.summary.consideredCommits, 1);
+  assert.equal(secondBatch.checkpoint.after.sha, head);
 
   const remoteUpdateRepo = path.join(fixtureRoot, "remote-update");
   run("git", ["clone", "--branch", "main", bareOrigin, remoteUpdateRepo], { cwd: fixtureRoot });

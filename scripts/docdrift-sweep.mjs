@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { enforceClassifierBudgets, selectClassifierBatch } from "./docdrift-batch.mjs";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
@@ -789,31 +790,11 @@ function buildClassifierRecord({ commit, decision, promptHash, promptTokens, cac
   };
 }
 
-function enforceClassifierBudgets(commits, prompts, options) {
-  if (commits.length > options.maxCommits) {
-    throw new Error(
-      `classify budget exceeded: ${commits.length} considered commits exceeds --max-commits ${options.maxCommits}`,
-    );
-  }
-  const uncachedPrompts = prompts.filter((entry) => !entry.cacheHit);
-  const tooLarge = uncachedPrompts.find((entry) => entry.promptTokens > options.maxPromptTokens);
-  if (tooLarge) {
-    throw new Error(
-      `classify budget exceeded: ${tooLarge.commit.shortSha} prompt estimate ${tooLarge.promptTokens} tokens exceeds --max-prompt-tokens ${options.maxPromptTokens}`,
-    );
-  }
-  const totalTokens = uncachedPrompts.reduce((sum, entry) => sum + entry.promptTokens, 0);
-  if (totalTokens > options.maxTotalPromptTokens) {
-    throw new Error(
-      `classify budget exceeded: prompt estimate ${totalTokens} tokens exceeds --max-total-prompt-tokens ${options.maxTotalPromptTokens}`,
-    );
-  }
-}
 
 export function classifyReport(report, options) {
-  const considered = report.commits.filter((commit) => commit.status === "considered");
+  let considered = report.commits.filter((commit) => commit.status === "considered");
   const cacheRoot = path.resolve(options.repoRoot, options.classifierCacheDir);
-  const promptEntries = considered.map((commit) => {
+  let promptEntries = considered.map((commit) => {
     const cachePath = classifierCachePath(options.repoRoot, options.classifierCacheDir, commit.sha);
     const cached = readCachedClassifierRecord(cachePath);
     const cacheInput = classifierPromptInput(commit, null);
@@ -839,6 +820,10 @@ export function classifyReport(report, options) {
       promptTokens: estimatePromptTokens(prompt),
     };
   });
+  if (options.batchClassifier) {
+    ({ report, entries: promptEntries } = selectClassifierBatch(report, promptEntries, options));
+    considered = promptEntries.map((entry) => entry.commit);
+  }
   enforceClassifierBudgets(considered, promptEntries, options);
 
   const loadedFixture = options.noCodex ? loadClassifierFixture(options.repoRoot, options.fixture) : null;
@@ -1935,7 +1920,7 @@ function checkpointAdvanceTarget(report, sweepHeadSha) {
   if (report.docPatch?.partial) {
     return null;
   }
-  return sweepHeadSha || report.head.sha;
+  return report.batch?.checkpointSha || sweepHeadSha || report.head.sha;
 }
 
 function partialCheckpointTarget(report) {
@@ -1964,6 +1949,7 @@ function fullReport({ options, runId, runDir, lifecycle, collectionReport, gener
     head: sourceReport.head,
     traceMap: sourceReport.traceMap,
     summary: sourceReport.summary,
+    batch: sourceReport.batch ?? null,
     classifier: generatedReport?.classifier ?? null,
     docPatch: generatedReport?.docPatch ?? null,
     lifecycle,
@@ -2217,7 +2203,7 @@ export function runFullSweep(options) {
   if (state.generatedHeadSha && existsSync(generatedPath)) {
     generatedReport = JSON.parse(readFileSync(generatedPath, "utf8"));
   } else {
-    generatedReport = classifyReport(buildReport(sweepOptions), sweepOptions);
+    generatedReport = classifyReport(buildReport(sweepOptions), { ...sweepOptions, batchClassifier: true });
     generatedReport = generateDocsReport(generatedReport, sweepOptions);
     writeOutputs(generatedReport, activeRunDir);
     state.status = "generated";
