@@ -43,7 +43,11 @@ pub(super) fn rotate_vehicle_weapon_for_combat(e: &mut Entity, target_angle: f32
         .weapon_facing()
         .filter(|facing| facing.is_finite())
         .unwrap_or_else(|| e.facing());
-    let rotated = rotate_toward(current, target_angle, TANK_TURRET_TURN_RATE_RAD_PER_TICK * e.tank_turn_multiplier());
+    let rotated = rotate_toward(
+        current,
+        target_angle,
+        TANK_TURRET_TURN_RATE_RAD_PER_TICK * e.tank_turn_multiplier(),
+    );
     if rotated.is_finite() {
         e.set_weapon_facing(rotated);
     }
@@ -60,7 +64,11 @@ pub(super) fn relax_vehicle_weapon_toward_body(e: &mut Entity) {
         .weapon_facing()
         .filter(|facing| facing.is_finite())
         .unwrap_or(body);
-    let rotated = rotate_toward(current, body, TANK_TURRET_TURN_RATE_RAD_PER_TICK * e.tank_turn_multiplier());
+    let rotated = rotate_toward(
+        current,
+        body,
+        TANK_TURRET_TURN_RATE_RAD_PER_TICK * e.tank_turn_multiplier(),
+    );
     if rotated.is_finite() {
         e.set_weapon_facing(rotated);
     }
@@ -354,13 +362,22 @@ mod tank_plus_tests {
     #[test]
     fn tank_plus_turret_tracks_and_relaxes_fifty_percent_faster() {
         let mut entities = EntityStore::new();
-        let id = entities.spawn_unit(1, EntityKind::Tank, 500.0, 500.0).unwrap();
+        let id = entities
+            .spawn_unit(1, EntityKind::Tank, 500.0, 500.0)
+            .unwrap();
         let tank = entities.get_mut(id).unwrap();
         tank.combat.as_mut().unwrap().tank_plus = true;
         rotate_vehicle_weapon_for_combat(tank, std::f32::consts::PI);
-        assert!((tank.weapon_facing().unwrap().abs() - TANK_TURRET_TURN_RATE_RAD_PER_TICK * 1.5).abs() < 0.0001);
+        assert!(
+            (tank.weapon_facing().unwrap().abs() - TANK_TURRET_TURN_RATE_RAD_PER_TICK * 1.5).abs()
+                < 0.0001
+        );
         tank.set_weapon_facing(1.0);
         relax_vehicle_weapon_toward_body(tank);
-        assert!((tank.weapon_facing().unwrap() - (1.0 - TANK_TURRET_TURN_RATE_RAD_PER_TICK * 1.5)).abs() < 0.0001);
+        assert!(
+            (tank.weapon_facing().unwrap() - (1.0 - TANK_TURRET_TURN_RATE_RAD_PER_TICK * 1.5))
+                .abs()
+                < 0.0001
+        );
     }
 }

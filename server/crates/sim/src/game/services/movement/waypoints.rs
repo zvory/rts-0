@@ -127,7 +127,10 @@ pub(super) fn advance_moving_units(
             breakthrough_ticks,
             recent_smoke_ticks,
         );
-        let tank_plus = kind == EntityKind::Tank && players.iter().any(|p| p.id == owner && p.has_upgrade(UpgradeKind::TankPlus));
+        let tank_plus = kind == EntityKind::Tank
+            && players
+                .iter()
+                .any(|p| p.id == owner && p.has_upgrade(UpgradeKind::TankPlus));
         let speed_multiplier = if crate::rules::is_rifle_infantry(kind) && has_meth {
             config::METHAMPHETAMINES_SPEED_MULTIPLIER
         } else if breakthrough_multiplier > 1.0 {
@@ -147,7 +150,11 @@ pub(super) fn advance_moving_units(
             .map(|s| {
                 s.speed
                     * speed_multiplier
-                    * if tank_plus { config::TANK_PLUS_SPEED_MULTIPLIER } else { 1.0 }
+                    * if tank_plus {
+                        config::TANK_PLUS_SPEED_MULTIPLIER
+                    } else {
+                        1.0
+                    }
                     * terrain_speed_multiplier
                     * map.slow_movement_multiplier_at(x, y)
             })

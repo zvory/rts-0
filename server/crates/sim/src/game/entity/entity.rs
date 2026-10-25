@@ -1306,13 +1306,22 @@ impl Entity {
     }
 
     pub(in crate::game) fn tank_turn_multiplier(&self) -> f32 {
-        if self.tank_plus() { config::TANK_PLUS_TURN_MULTIPLIER } else { 1.0 }
+        if self.tank_plus() {
+            config::TANK_PLUS_TURN_MULTIPLIER
+        } else {
+            1.0
+        }
     }
 
     /// Sight radius in tiles for fog computation.
     pub fn sight_tiles(&self) -> u32 {
         if let Some(s) = config::unit_stats(self.kind) {
-            s.sight_tiles + if self.tank_plus() { config::TANK_PLUS_SIGHT_BONUS } else { 0 }
+            s.sight_tiles
+                + if self.tank_plus() {
+                    config::TANK_PLUS_SIGHT_BONUS
+                } else {
+                    0
+                }
         } else if let Some(s) = config::building_stats(self.kind) {
             s.sight_tiles
         } else {
