@@ -153,6 +153,8 @@ pub struct AiEntity {
     pub production: Option<AiProduction>,
     pub latched_resource: Option<u32>,
     pub target: Option<u32>,
+    /// Public active trench occupation, already gated by the recipient snapshot.
+    pub occupied_trench_id: Option<u32>,
     /// Owner-only ability availability. Enemy entities intentionally expose no private state.
     pub abilities: Vec<AiAbilityState>,
 }
@@ -526,6 +528,7 @@ fn normalize_entity(
         }),
         latched_resource: view.latched_node,
         target: view.target_id,
+        occupied_trench_id: view.occupied_trench_id,
         abilities: view
             .abilities
             .iter()

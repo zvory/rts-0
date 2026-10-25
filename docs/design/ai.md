@@ -69,6 +69,8 @@ memory facts. Its collections use stable id ordering; completed upgrades and sub
 additionally sorted and deduplicated.
 Active production identifies either its typed unit kind or its typed research upgrade when one is
 present in the recipient snapshot.
+Entity records retain the public `occupied_trench_id` from that same recipient snapshot so
+strategies can recognize active entrenchment without inspecting enemy research or private state.
 Owned entities, currently visible allies, currently visible enemies, and remembered contacts are
 separate collections. A remembered contact is stale last-seen knowledge, never a current target.
 
@@ -221,6 +223,25 @@ staging, and later production gathers into a fresh cohort.
 `AiActions::queue_research` emits an ordinary research queue request without requiring or
 reserving its eventual cost. Unlike the affordable `research` helper, it permits construction-
 time/unpaid queues; authoritative simulation validation and payment still apply.
+
+Launched Rush infantry share a reverse terrain flow toward a three-tile arrival ring around the
+enemy start. Visible entrenched Riflemen, Machine Gunners, and Panzerfausts contribute circular
+exclusion zones at their base weapon range plus the Entrenchment bonus and one tile of clearance.
+Known building footprints also block the route; infantry can cross Tank Traps. A safe route treats
+those firing zones as impassable. If no safe route reaches the objective, a second field minimizes
+integrated nominal anti-infantry DPS exposure, adding overlapping weapons, then travel distance.
+This chooses a weak crossing instead of waiting forever at a sealed wall. The estimate uses public
+base damage and cooldown, without inferring hidden upgrades, firing arcs, or line-of-sight cover.
+
+Only launched units follow this flow. Short Move waypoints keep a bypass from auto-acquiring and
+chasing trench defenders; an unavoidable firing-zone crossing switches to AttackMove. Reaching the
+objective ring restores AttackMove toward the base. Route fields rebuild when their known obstacle
+or threat inputs change. Orders refresh at most once a second unless those inputs or the movement/
+attack mode change. Last-seen
+trench contacts last five seconds to avoid immediate reversals at a fog boundary; seeing a unit
+leave its trench clears that contact immediately. When the last contact expires, steered survivors
+resume their base attack. These are AI orders through the ordinary command seam, with no simulation,
+wire, balance, or other profile behavior changes.
 
 ### Profile behavior
 

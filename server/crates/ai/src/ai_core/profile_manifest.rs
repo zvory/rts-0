@@ -49,12 +49,17 @@ pub(crate) fn profile_identity_by_id(id: &str) -> Option<AiProfileIdentity> {
         let label = "Rush AI";
         let summary =
             "Forward construction and staged infantry waves through the typed strategy SDK.";
-        let modules = ["typed_strategy_sdk", "terrain_routed_staging"];
+        let modules = [
+            "typed_strategy_sdk",
+            "terrain_routed_staging",
+            "trench_threat_flow",
+        ];
         // Rush is a strategy implementation rather than an AiProfile policy record. Fingerprint
         // its source inputs so arena manifests still identify the policy they actually ran.
         let sources = (
             include_str!("../rush.rs"),
             include_str!("../rush/staging.rs"),
+            include_str!("../rush/flow.rs"),
         );
         return Some(AiProfileIdentity {
             profile_id: id.to_string(),
