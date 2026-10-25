@@ -524,7 +524,8 @@ const approvedSpecialCaseBudgets = new Map([
   ["server/crates/ai/src/sdk/rulebook.rs", 6],
   ["server/crates/ai/src/sdk/world_queries.rs", 12],
   // Cultivators intentionally reuses the existing depot/worker kinds in catalog rows and tests.
-  ["server/crates/rules/src/faction.rs", 138],
+  // Tank Plus adds one Engineering Complex research row in the authoritative catalog.
+  ["server/crates/rules/src/faction.rs", 139],
   ["server/crates/rules/src/economy.rs", 109],
   ["server/crates/sim/src/game/setup.rs", 30],
   ["server/crates/sim/src/game/services/ability_orders.rs", 18],
