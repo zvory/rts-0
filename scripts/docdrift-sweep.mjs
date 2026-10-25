@@ -1697,16 +1697,12 @@ function assertCleanWorktree(worktreePath, branch) {
 }
 
 function lookupOwnedPr(options, branch, exactHead = null) {
-  const ghCommand = process.env.DOC_DRIFT_GH_COMMAND || "gh";
-  const output = execFileSync(ghCommand, [
+  const output = execFileSync(process.env.DOC_DRIFT_GH_COMMAND || "gh", [
     "pr", "list", "--head", branch, "--state", "all", "--limit", "1000", "--json",
     "number,url,state,mergeStateStatus,headRefOid,headRefName,mergedAt",
   ], { cwd: options.repoRoot, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
-  // The legacy sweep reused one branch across runs. Historical PRs at other
-  // heads do not identify the verified local/remote/worktree head being adopted.
-  const matches = JSON.parse(output).filter((pr) =>
-    pr.headRefName === branch && (exactHead === null || pr.headRefOid === exactHead),
-  );
+  // Legacy runs reused a branch: match the already verified head, ignoring older PRs.
+  const matches = JSON.parse(output).filter((pr) => pr.headRefName === branch && (exactHead === null || pr.headRefOid === exactHead));
   if (matches.length > 1) {
     throw new Error(`ambiguous PR matches for ${branch}: ${matches.map((pr) => `#${pr.number}`).join(", ")}`);
   }
