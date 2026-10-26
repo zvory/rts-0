@@ -373,7 +373,11 @@ fn pressure_caps_factories_at_four_with_five_bases_and_float() {
     ));
     // Foundations count toward the cap before they complete.
     let mut obs = pressure_economy_observation(5, 4);
-    obs.owned.iter_mut().find(|e| e.id == 103).unwrap().is_complete = false;
+    obs.owned
+        .iter_mut()
+        .find(|e| e.id == 103)
+        .unwrap()
+        .is_complete = false;
     assert!(!should_build_extra_factory(
         &obs,
         &AiFacts::from_observation(&obs),
