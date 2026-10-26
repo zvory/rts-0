@@ -6,8 +6,9 @@ use crate::sdk::{AiActions, AiEntity, AiEntityState, AiFrame, EntityKind, UnitGr
 use rts_rules::balance::{self, TICK_HZ};
 
 type Point = (f32, f32);
-type Cost = (u64, u8, u32, usize); // Fire exposure, extractor priority, distance, goal tie.
-const UNREACHABLE: Cost = (u64::MAX, u8::MAX, u32::MAX, usize::MAX);
+// All objectives are Pump Jacks, so a field needs no extractor-type priority.
+type Cost = (u64, u32, usize); // Fire exposure, distance, goal tie.
+const UNREACHABLE: Cost = (u64::MAX, u32::MAX, usize::MAX);
 const CONTACT_MEMORY: u32 = TICK_HZ * 5;
 const ORDER_INTERVAL: u32 = TICK_HZ;
 const GOAL_RADIUS: f32 = 3.0;
@@ -410,7 +411,7 @@ impl FlowGrid {
         )
     }
 
-    fn goal_seeds(&self) -> Vec<(usize, u8, usize)> {
+    fn goal_seeds(&self) -> Vec<(usize, usize)> {
         let mut seeds = Vec::new();
         for cell in 0..self.input.blocked.len() {
             if !self.passable(cell, false) {
@@ -419,7 +420,7 @@ impl FlowGrid {
             let point = self.input.center(cell);
             if self.input.objectives.is_empty() {
                 if distance(point, self.input.target) <= GOAL_RADIUS * self.input.size {
-                    seeds.push((cell, 2, 0));
+                    seeds.push((cell, 0));
                 }
                 continue;
             }
@@ -427,15 +428,7 @@ impl FlowGrid {
                 if self.within_range(point, objective, self.input.range - 0.4)
                     && self.firing_lane(point, objective.position)
                 {
-                    seeds.push((
-                        cell,
-                        if objective.kind == EntityKind::PumpJack {
-                            0
-                        } else {
-                            1
-                        },
-                        index,
-                    ));
+                    seeds.push((cell, index));
                 }
             }
         }
@@ -473,10 +466,10 @@ impl FlowGrid {
         })
     }
 
-    fn field(&self, safe: bool, seeds: &[(usize, u8, usize)], has_safe_goal: bool) -> Vec<Cost> {
+    fn field(&self, safe: bool, seeds: &[(usize, usize)], has_safe_goal: bool) -> Vec<Cost> {
         let mut costs = vec![UNREACHABLE; self.input.blocked.len()];
         let mut open = BinaryHeap::new();
-        for &(cell, priority, goal) in seeds {
+        for &(cell, goal) in seeds {
             if !self.passable(cell, safe) || (has_safe_goal && self.danger[cell] > 0) {
                 continue;
             }
@@ -486,7 +479,6 @@ impl FlowGrid {
                 } else {
                     self.danger[cell] as u64 * 30
                 },
-                priority,
                 0,
                 goal,
             );
@@ -506,9 +498,8 @@ impl FlowGrid {
                 let edge = self.edge(cell, next, if dx == 0 || dy == 0 { 10 } else { 14 }, safe);
                 let candidate = (
                     cost.0.saturating_add(edge.0),
-                    cost.1,
-                    cost.2.saturating_add(edge.1),
-                    cost.3,
+                    cost.1.saturating_add(edge.1),
+                    cost.2,
                 );
                 if candidate < costs[next] {
                     costs[next] = candidate;
@@ -536,9 +527,8 @@ impl FlowGrid {
                 let edge = self.edge(cell, next, if dx == 0 || dy == 0 { 10 } else { 14 }, safe);
                 let total = (
                     costs[next].0.saturating_add(edge.0),
-                    costs[next].1,
-                    costs[next].2.saturating_add(edge.1),
-                    costs[next].3,
+                    costs[next].1.saturating_add(edge.1),
+                    costs[next].2,
                 );
                 (total == costs[cell] && costs[next] < costs[cell]).then_some((total, next))
             })
@@ -603,8 +593,8 @@ impl FlowGrid {
     fn intent(&self, entity: &AiEntity) -> Option<Intent> {
         let cell = self.input.cell(entity.position)?;
         if !self.input.objectives.is_empty() && self.safe[cell] != UNREACHABLE {
-            let goal = self.input.objectives.get(self.safe[cell].3)?;
-            if self.safe[cell].2 == 0 {
+            let goal = self.input.objectives.get(self.safe[cell].2)?;
+            if self.safe[cell].1 == 0 {
                 if !self.within_range(entity.position, goal, self.input.range - 0.1)
                     || !self.firing_lane(entity.position, goal.position)
                 {
@@ -661,11 +651,11 @@ impl FlowGrid {
         if costs.get(cell) == Some(&UNREACHABLE) {
             return None;
         }
-        if costs.get(cell).is_some_and(|cost| cost.2 == 0) {
+        if costs.get(cell).is_some_and(|cost| cost.1 == 0) {
             let point = self
                 .input
                 .objectives
-                .get(costs[cell].3)
+                .get(costs[cell].2)
                 .map_or(self.input.target, |goal| goal.position);
             return Some((point, true));
         }

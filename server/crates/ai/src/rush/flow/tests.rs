@@ -24,7 +24,7 @@ fn route(grid: &FlowGrid, start: Point, safe: bool) -> Vec<usize> {
     let mut path = vec![cell];
     let costs = if safe { &grid.safe } else { &grid.soft };
     for _ in 0..grid.danger.len() {
-        if costs[cell].2 == 0 {
+        if costs[cell].1 == 0 {
             return path;
         }
         cell = grid.next(cell, safe).expect("route must make progress");
@@ -531,7 +531,7 @@ fn unreachable_safe_pump_does_not_hide_a_reachable_guarded_pump() {
     assert_eq!(grid.safe[cell], UNREACHABLE);
     assert_eq!(grid.escape[cell], UNREACHABLE);
     assert_ne!(grid.soft[cell], UNREACHABLE);
-    assert_eq!(grid.input.objectives[grid.soft[cell].3].id, 301);
+    assert_eq!(grid.input.objectives[grid.soft[cell].2].id, 301);
 }
 
 #[test]
