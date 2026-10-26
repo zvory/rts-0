@@ -236,6 +236,9 @@ const approvedCurrentFactionFiles = new Set([
   // Jeff's production placement names the current roster's production buildings and Tanks;
   // profile/catalog layers still own faction admission.
   "server/crates/ai/src/ai_core/decision/production/placement.rs",
+  // Jeff's spend plan forecasts current-roster extractor income and prices the natural Depot,
+  // Factory, Tank Unlock and Tank; profile/catalog layers still own faction admission.
+  "server/crates/ai/src/ai_core/decision/spend_plan.rs",
   // Unit priority and cap adjustments moved verbatim out of the approved decision orchestrator.
   "server/crates/ai/src/ai_core/decision/unit_mix.rs",
   // Jeff's Kriegsia-only expansion screen and upgrade policy are focused modules beneath the

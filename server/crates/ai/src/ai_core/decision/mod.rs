@@ -269,22 +269,7 @@ where
     idle_builders.sort_unstable();
     gathering_builders.sort_unstable();
     let builder_pools = [idle_builders.as_slice(), gathering_builders.as_slice()];
-    // The live Jeff builds at home with the Engineer nearest its HQ. By id the first pick was the
-    // natural's builder, which stands at the natural once a second Engineer is home.
-    let mut home_builders = idle_builders.clone();
-    if runs_live_jeff(profile.id) {
-        let home = tile_center(observation.own_start_tile, observation.map.tile_size);
-        let from_home = |id: &u32| {
-            observation
-                .owned
-                .iter()
-                .find(|unit| unit.id == *id)
-                .map_or(f32::MAX, |unit| {
-                    geometry::dist2(unit.x, unit.y, home.0, home.1)
-                })
-        };
-        home_builders.sort_by(|a, b| from_home(a).total_cmp(&from_home(b)).then(a.cmp(b)));
-    }
+    let home_builders = jeff::home_builders(observation, profile.id, &idle_builders);
     let production_builders = [home_builders.as_slice(), gathering_builders.as_slice()];
     if let Some((tile_x, tile_y)) = resource_depot_to_resume(observation, memory) {
         if actions::try_resume_construction_at(
@@ -380,64 +365,20 @@ where
     // a pause for the rest of the match, rather than waiting on the economy manager, whose Tank
     // requirements kept a failed natural from ever being ordered again.
     let jeff_natural = uses_current_jeffs_ai_policy(profile.id);
-    // The live Jeff sends the builder to a natural off the enemy's way in without waiting for its
-    // guards to secure it: they follow it out, and when the natural is due (about 1:40) there are
-    // no spare Riflemen to send first.
-    let natural_sheltered = runs_live_jeff(profile.id)
-        && map_analysis
-            .zip(memory.expansion_security.site)
-            .is_some_and(|(analysis, site)| {
-                expansion::site_on_enemy_route(
-                    observation,
-                    analysis,
-                    EntityKind::ResourceDepot,
-                    site,
-                ) == Some(false)
-            });
+    let natural_sheltered = jeff::natural_sheltered(observation, map_analysis, memory, profile.id);
     let natural_pending =
         jeff_natural && expansion_security::natural_order_pending(observation, memory);
-    // The live Jeff's spend plan (decision/spend_plan.rs): the income forecast and the opening's
-    // costly steps laid out from it. The natural's builder goes once the Depot will be paid for by
-    // its arrival, and Steel the steps do not need is the only Steel routine Riflemen and a second
-    // Barracks may take.
-    let spend_plan = (profile.id == JEFFS_AI_ID).then(|| {
-        let site = memory.expansion_security.site;
-        let natural_builder = site
-            .and_then(|site| {
-                observation
-                    .pending_builds
-                    .iter()
-                    .find(|intent| {
-                        intent.kind == EntityKind::ResourceDepot
-                            && (intent.tile_x, intent.tile_y) == site
-                    })
-                    .map(|intent| intent.worker_id)
-            })
-            .or_else(|| {
-                expansion_builder_pools
-                    .iter()
-                    .flat_map(|pool| pool.iter())
-                    .copied()
-                    .find(|id| !actions.reservations().worker_reserved(*id))
-            });
-        spend_plan::plan(
-            observation,
-            &facts,
-            &memory.spend_plan,
-            spend_plan::PlanInput {
-                natural_due: !natural_pending
-                    && expansion_security::expansion_is_next(observation, &facts, profile),
-                natural_site: site,
-                natural_builder,
-                natural_wait: if expansion_secured || natural_sheltered {
-                    0
-                } else {
-                    expansion_security::secure_wait_ticks(observation, map_analysis, memory)
-                        .unwrap_or(config::TICK_HZ * 30)
-                },
-            },
-        )
-    });
+    let spend_plan = jeff::live_spend_plan(
+        observation,
+        &facts,
+        profile,
+        memory,
+        map_analysis,
+        &actions,
+        &expansion_builder_pools,
+        natural_pending,
+        expansion_secured || natural_sheltered,
+    );
     let natural_ready = jeff_natural
         && expansion_security::expansion_is_next(observation, &facts, profile)
         && match spend_plan.as_ref() {
@@ -541,33 +482,8 @@ where
 
     let economy_plan = economy_manager_output.plan.clone();
     let save_worker_training_for_tech = defer_economy_for_panic;
-    // The live Jeff trains a second Engineer once its natural is ordered ahead of its Factory, so
-    // the Factory does not wait for the natural's builder to walk back. With the Factory already out
-    // the Steel goes elsewhere: on Chokes, where Steel is short, it delayed Tank Unlock 23 s.
-    let target_workers = if runs_live_jeff(profile.id)
-        && facts.building_count(EntityKind::ResourceDepot) >= 2
-        && facts.building_count(EntityKind::Factory) == 0
-    {
-        economy_plan.target_workers.max(2)
-    } else {
-        economy_plan.target_workers
-    };
-    // The live Jeff counts the Engineers in training: with the natural's Depot up as well, each
-    // Depot trained one, and Fastest Map Possible got three Engineers for the one wanted.
-    let workers = facts.worker_count
-        + if profile.id == JEFFS_AI_ID {
-            observation
-                .owned
-                .iter()
-                .filter(|depot| {
-                    depot.kind == EntityKind::ResourceDepot
-                        && depot.production_kind == Some(EntityKind::Worker)
-                })
-                .map(|depot| depot.production_queue_len.unwrap_or(0))
-                .sum::<usize>()
-        } else {
-            0
-        };
+    let (target_workers, workers) =
+        jeff::engineers(observation, &facts, profile.id, economy_plan.target_workers);
     let should_train_workers = economy_manager_output.proposes(EconomyProposal::TrainWorker)
         || (!defer_economy_for_panic && workers < target_workers);
     if should_train_workers {
@@ -877,39 +793,13 @@ where
         &effective_unit_priorities,
     );
     let mut effective_unit_priorities = effective_unit_priorities;
-    // Riflemen recruited ahead of tech for the natural, up to six (in training included). While the
-    // live Jeff's opening guns are short before its first Tank, they come after the next gun: ahead
-    // of it they took the Barracks from guns three and four once the starters were lost (Fastest
-    // Map Possible: two guns home at 3:00). A Rifleman still comes while the gun waits for Oil; on
-    // Wald the Factory takes it first, and the Rifleman that came then held the 2:12 raid.
-    let security_rifle_target = (uses_current_jeffs_ai_policy(profile.id)
-        && memory.expansion_security.site.is_some()
-        && facts.unit_count(EntityKind::Rifleman) < 6)
-        .then_some(6);
-    if security_rifle_target.is_some() {
-        // Once the live Jeff's natural is ordered, its fifth and sixth guns come first too. They
-        // used to be bought with the Steel the builder's walk left spare, and a builder sent ahead
-        // of its money leaves none: 1v1 No Terrain s2p2 met its 2:24 raid with four guns and fell.
-        let gun_target =
-            if profile.id == JEFFS_AI_ID && facts.building_count(EntityKind::ResourceDepot) >= 2 {
-                profile
-                    .defensive_machine_gunners
-                    .map_or(expansion_security::OPENING_GUNS, |policy| {
-                        policy.target_count
-                    })
-            } else {
-                expansion_security::OPENING_GUNS
-            };
-        let guns_first = runs_live_jeff(profile.id)
-            && facts.unit_count(EntityKind::Tank) == 0
-            && !expansion_security::opening_guns_ordered(observation, &facts, gun_target);
-        let at = effective_unit_priorities
-            .iter()
-            .position(|unit| *unit == EntityKind::MachineGunner)
-            .filter(|_| guns_first)
-            .map_or(0, |gun| gun + 1);
-        effective_unit_priorities.insert(at, EntityKind::Rifleman);
-    }
+    let security_rifle_target = jeff::security_rifle_target(
+        observation,
+        &facts,
+        profile,
+        memory,
+        &mut effective_unit_priorities,
+    );
     let emergency_rifle_target = memory
         .opening_rush
         .lead_with_emergency_riflemen(&mut effective_unit_priorities);
@@ -947,15 +837,7 @@ where
     let production_unit_counts =
         unit_counts_for_priorities(observation, &facts, profile, &effective_unit_priorities);
     let mut production_max_counts = production_max_counts(profile, observation, map_analysis);
-    // The live Jeff's two extra guns are opening guns: once a Tank is out, lost guns are replaced
-    // only up to the usual four, and the Oil goes to Tanks.
-    if runs_live_jeff(profile.id) && facts.unit_count(EntityKind::Tank) > 0 {
-        for (kind, max) in &mut production_max_counts {
-            if *kind == EntityKind::MachineGunner {
-                *max = (*max).min(expansion_security::OPENING_GUNS);
-            }
-        }
-    }
+    jeff::cap_opening_guns(profile.id, &facts, &mut production_max_counts);
     let emergency_rifle_target = emergency_rifle_target.and_then(|_| {
         memory
             .opening_rush
@@ -1027,25 +909,15 @@ where
         if let Some(target) = emergency_recruits {
             opening_rush::raise_rifle_cap(&mut building_max_counts, target);
         }
-        // The live Jeff's routine Riflemen come only from Steel its spend plan leaves spare; raid
-        // answers and a defensive panic are not routine.
-        if let Some(cap) = spend_plan
-            .as_ref()
-            .filter(|_| {
-                building_kind == EntityKind::Barracks
-                    && !defensive_panic.active
-                    && emergency_recruits.is_none()
-            })
-            .and_then(|plan| plan.rifle_cap(&intents, &production_unit_counts))
-        {
-            match building_max_counts
-                .iter_mut()
-                .find(|(kind, _)| *kind == EntityKind::Rifleman)
-            {
-                Some((_, max)) => *max = (*max).min(cap),
-                None => building_max_counts.push((EntityKind::Rifleman, cap)),
-            }
-        }
+        jeff::cap_routine_riflemen(
+            spend_plan.as_ref(),
+            building_kind == EntityKind::Barracks
+                && !defensive_panic.active
+                && emergency_recruits.is_none(),
+            &intents,
+            &production_unit_counts,
+            &mut building_max_counts,
+        );
         let home_holds_tank_reserve = !uses_current_jeffs_ai_policy(profile.id)
             || later_bases::main_tank_ids(observation, memory).len() >= memory.home_tank_reserve();
         let production_rally = is_jeffs_ai_profile(profile.id)
@@ -1300,83 +1172,9 @@ where
             && is_jeffs_ai_profile(profile.id)
             && profile.home_anti_tank.is_some()
         {
-            let riflemen: Vec<u32> = if uses_home_rifle_coverage(profile.id) {
-                observation
-                    .owned
-                    .iter()
-                    .filter(|unit| {
-                        unit.kind == EntityKind::Rifleman
-                            && unit.is_complete
-                            && unit.hp > 0
-                            && !local_defense_assigned.contains(&unit.id)
-                            && !memory.containment.active_riflemen.contains(&unit.id)
-                            && !memory.expansion_security.riflemen.contains(&unit.id)
-                            && !route_line_reserved.contains(&unit.id)
-                    })
-                    .map(|unit| unit.id)
-                    .collect()
-            } else {
-                actions::select_ready_combat_units(&observation.owned, &[EntityKind::Rifleman])
-                    .into_iter()
-                    .filter(|id| !local_defense_assigned.contains(id))
-                    .collect()
-            };
-            let own_base =
-                geometry::tile_center(observation.own_start_tile, observation.map.tile_size);
-            let fallback_armor = observation
-                .owned
-                .iter()
-                .filter(|entity| {
-                    entity.is_complete
-                        && matches!(entity.kind, EntityKind::Tank | EntityKind::ScoutCar)
-                        && !memory.containment.active_tanks.contains(&entity.id)
-                        && memory.containment.active_scout != Some(entity.id)
-                })
-                .min_by(|left, right| {
-                    geometry::dist2(left.x, left.y, own_base.0, own_base.1)
-                        .total_cmp(&geometry::dist2(right.x, right.y, own_base.0, own_base.1))
-                })
-                .map(|entity| entity.id);
-            if let Some(enemy_base) = facts.nearest_public_enemy_base {
-                let staged = if uses_current_jeff_defense(profile.id) {
-                    stage_home_defensive_pocket_riflemen(
-                        &mut actions,
-                        observation,
-                        map_analysis,
-                        &riflemen,
-                        enemy_base,
-                        memory.opening_rush.missed_contact(),
-                    )
-                } else if profile.id == JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID {
-                    defense::stage_home_rifleman_coverage(
-                        &mut actions,
-                        observation,
-                        map_analysis,
-                        &riflemen,
-                        enemy_base,
-                    )
-                } else if profile.id == JEFFS_AI_PRE_RIFLE_COVERAGE_ID {
-                    memory
-                        .home_defensive_tank
-                        .or(fallback_armor)
-                        .and_then(|armor_id| {
-                            stage_home_rifleman_screen(
-                                &mut actions,
-                                observation,
-                                &riflemen,
-                                armor_id,
-                                enemy_base,
-                                3.0,
-                                1.75,
-                            )
-                        })
-                } else {
-                    None
-                };
-                if let Some(units) = staged {
-                    intents.push(AiIntent::Stage { units });
-                }
-            }
+            let live = (&mut actions, observation, map_analysis, &mut intents);
+            let assigned = (&local_defense_assigned, &route_line_reserved);
+            jeff::stage_home_riflemen(live, memory, profile, &facts, assigned);
         }
 
         if !handled_local_defense && turtle_defense_active {
@@ -1569,39 +1367,10 @@ where
         // none sits idle in a corner of the main or out on the map.
         if uses_current_jeffs_ai_policy(profile.id) {
             let mut excluded: BTreeSet<u32> = local_defense_assigned.clone();
-            excluded.extend(memory.home_defensive_tank);
             excluded.extend(forward_defensive_tank);
-            excluded.extend(memory.later_bases.guards.iter().copied());
             excluded.extend(route_line_reserved.iter().copied());
-            excluded.extend(memory.route_line.picket());
             excluded.extend(expansion_footprint_blockers.iter().copied());
-            let ordered: BTreeSet<u32> = actions
-                .unit_orders_since(0)
-                .into_iter()
-                .map(|(unit, _)| unit)
-                .collect();
-            let covered_sites: Vec<(f32, f32)> = [
-                memory.later_bases.covered_site(),
-                memory.expansion_security.site,
-            ]
-            .into_iter()
-            .flatten()
-            .filter_map(|site| {
-                geometry::building_center(
-                    site,
-                    EntityKind::ResourceDepot,
-                    observation.map.tile_size,
-                )
-            })
-            .collect();
-            let gathered = home_armor::gather_resting_tanks(
-                &mut actions,
-                observation,
-                memory,
-                &excluded,
-                &ordered,
-                &covered_sites,
-            );
+            let gathered = jeff::gather_resting_tanks(&mut actions, observation, memory, excluded);
             if !gathered.is_empty() {
                 intents.push(AiIntent::Move { units: gathered });
             }
