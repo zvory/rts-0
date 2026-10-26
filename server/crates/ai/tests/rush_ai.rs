@@ -189,7 +189,9 @@ fn check_rush_opening(map_name: Option<&str>) {
     let waves = commands
         .iter()
         .filter_map(|entry| match &entry.command {
-            Command::AttackMove { units, x, y, .. } => Some((entry.tick, units, *x, *y)),
+            Command::AttackMove { units, x, y, .. } if units.len() > 1 => {
+                Some((entry.tick, units, *x, *y))
+            }
             _ => None,
         })
         .collect::<Vec<_>>();
@@ -285,7 +287,7 @@ fn check_rush_opening(map_name: Option<&str>) {
             if kind == "panzerfaust" {
                 assert!(addition.0 >= panzerfausts_complete.unwrap());
             }
-            assert!(commands.iter().any(|entry| matches!(&entry.command, Command::SetRally { building, x, y, kind, .. } if *building == addition.1 && (*x, *y) != target && (((*x-target.0).hypot(*y-target.1)/size)-25.0).abs()<0.01 && kind.as_deref() == Some("move"))));
+            assert!(commands.iter().any(|entry| matches!(&entry.command, Command::SetRally { building, x, y, kind, .. } if *building == addition.1 && (*x, *y) != target && (((*x-target.0).hypot(*y-target.1)/size)-20.0).abs()<0.01 && kind.as_deref() == Some("move"))));
         }
     }
     assert!(

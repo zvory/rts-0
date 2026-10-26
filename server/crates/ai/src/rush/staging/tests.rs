@@ -60,7 +60,7 @@ fn waves_wait_for_ninety_percent_then_require_five_arrivals_without_retasking_ol
     );
     let mut waves = RushWaves::default();
     let rally = waves.rally(&frame, 2, target).unwrap();
-    assert!((distance(rally, target) / size - 25.0).abs() < 0.001);
+    assert!((distance(rally, target) / size - 20.0).abs() < 0.001);
     let specimen = snapshot
         .entities
         .iter()
@@ -181,9 +181,9 @@ fn route_and_staging_follow_the_passable_approach_around_a_wall() {
     assert!(path.iter().any(|point| point.1 >= 60.0 * 32.0));
     assert!(path.iter().all(|point| passable_world(&blocked, *point)));
     let line = StagingLine::on_route(&blocked, home, enemy).unwrap();
-    assert!((distance(line.center, enemy) / 32.0 - 25.0).abs() < 0.001);
+    assert!((distance(line.center, enemy) / 32.0 - 20.0).abs() < 0.001);
     assert!(
-        line.center.1 > 25.0 * 32.0,
+        line.center.1 > enemy.1 + 0.25 * 32.0,
         "staging must use the route around water, not the blocked base diagonal"
     );
     assert!(passable_world(&blocked, line.center));

@@ -11,7 +11,10 @@ fn grid(width: usize, height: usize, threats: Vec<Threat>) -> FlowGrid {
         size: 32.0,
         target: ((width as f32 - 3.5) * 32.0, height as f32 * 16.0),
         blocked: vec![false; width * height],
+        shot_blocked: vec![false; width * height],
         threats,
+        objectives: Vec::new(),
+        range: 5.0,
     })
     .unwrap()
 }
@@ -21,7 +24,7 @@ fn route(grid: &FlowGrid, start: Point, safe: bool) -> Vec<usize> {
     let mut path = vec![cell];
     let costs = if safe { &grid.safe } else { &grid.soft };
     for _ in 0..grid.danger.len() {
-        if costs[cell] == (0, 0) {
+        if costs[cell].2 == 0 {
             return path;
         }
         cell = grid.next(cell, safe).expect("route must make progress");
@@ -215,7 +218,7 @@ fn only_launched_units_are_steered_and_fog_memory_expires_without_command_spam()
 }
 
 #[test]
-fn visible_departure_clears_a_trench_and_vision_only_contacts_never_add_one() {
+fn visible_noncombat_contact_clears_threat_and_vision_only_contacts_never_add_one() {
     let (start, mut snapshot) = fixture();
     let mut flow = RushFlow::default();
     snapshot.entities[1].vision_only = true;
@@ -225,6 +228,7 @@ fn visible_departure_clears_a_trench_and_vision_only_contacts_never_add_one() {
     step(&mut flow, &start, &snapshot);
     assert_eq!(flow.contacts.len(), 1);
     snapshot.entities[1].occupied_trench_id = None;
+    snapshot.entities[1].kind = "worker".into();
     snapshot.tick += 9;
     assert!(matches!(
         step(&mut flow, &start, &snapshot).as_slice(),
@@ -300,4 +304,155 @@ fn late_obstacle_replaces_a_stale_move_when_no_route_remains() {
     assert!(
         matches!(step(&mut flow, &start, &snapshot).as_slice(), [AiActionRequest::AttackMove { units, x, y, .. }] if units==&vec![100] && *x==44.5*32.0 && *y==16.0*32.0)
     );
+}
+
+fn extractor(snapshot: &mut Snapshot, id: u32, kind: &str, x: f32, y: f32) {
+    snapshot.entities.push(EntityView::new(
+        id,
+        2,
+        kind,
+        x * 32.0,
+        y * 32.0,
+        100,
+        100,
+        "idle",
+    ));
+}
+
+#[test]
+fn safe_pump_jack_takes_priority_over_a_closer_steel_mine() {
+    let (start, mut snapshot) = fixture();
+    snapshot.entities.retain(|e| e.owner == 1);
+    snapshot.entities[0].x = 20.5 * 32.0;
+    extractor(&mut snapshot, 300, "steel_mine", 21.5, 16.5);
+    extractor(&mut snapshot, 301, "pump_jack", 24.5, 16.5);
+    let mut flow = RushFlow::default();
+    assert!(
+        matches!(step(&mut flow,&start,&snapshot).as_slice(),[AiActionRequest::Attack {target:301,units,..}] if units==&vec![100])
+    );
+    snapshot.tick += 9;
+    snapshot.entities[0].state = "attack".into();
+    snapshot.entities[0].target_id = Some(301);
+    assert!(
+        step(&mut flow, &start, &snapshot).is_empty(),
+        "do not reset the same extractor attack every decision"
+    );
+    snapshot.entities.retain(|e| e.id != 301);
+    snapshot.tick += 9;
+    assert!(matches!(
+        step(&mut flow, &start, &snapshot).as_slice(),
+        [AiActionRequest::Attack { target: 300, .. }]
+    ));
+}
+
+#[test]
+fn protected_pump_is_skipped_for_a_safe_steel_mine() {
+    let (start, mut snapshot) = fixture();
+    snapshot.entities[1].x = 30.5 * 32.0;
+    snapshot.entities[1].kind = "tank".into();
+    extractor(&mut snapshot, 300, "pump_jack", 30.5, 16.5);
+    extractor(&mut snapshot, 301, "steel_mine", 10.5, 16.5);
+    let mut flow = RushFlow::default();
+    assert!(matches!(
+        step(&mut flow, &start, &snapshot).as_slice(),
+        [AiActionRequest::Attack { target: 301, .. }]
+    ));
+}
+
+#[test]
+fn engaged_infantry_escape_toward_a_safe_extractor_but_fight_if_every_one_is_covered() {
+    let (start, mut snapshot) = fixture();
+    snapshot.entities[0].x = 20.5 * 32.0;
+    snapshot.entities[0].state = "attack".into();
+    snapshot.entities[0].target_id = Some(200);
+    extractor(&mut snapshot, 300, "pump_jack", 6.5, 5.5);
+    let mut flow = RushFlow::default();
+    assert!(
+        matches!(
+            step(&mut flow, &start, &snapshot).as_slice(),
+            [AiActionRequest::Move { .. }]
+        ),
+        "leave the current fight for a safe extractor route"
+    );
+    let pump = snapshot.entities.iter_mut().find(|e| e.id == 300).unwrap();
+    pump.x = 24.5 * 32.0;
+    pump.y = 16.5 * 32.0;
+    snapshot.tick += 9;
+    assert!(
+        matches!(
+            step(&mut flow, &start, &snapshot).as_slice(),
+            [AiActionRequest::Attack { target: 200, .. }]
+        ),
+        "when all shooting positions are guarded, fight instead of locking onto the extractor"
+    );
+}
+
+#[test]
+fn extractor_footprints_are_walkable_and_a_longer_weapon_range_is_used() {
+    let (start, mut snapshot) = fixture();
+    snapshot.entities.retain(|e| e.owner == 1);
+    extractor(&mut snapshot, 300, "pump_jack", 20.5, 16.5);
+    extractor(&mut snapshot, 301, "steel_mine", 27.5, 16.5);
+    snapshot.entities[0].x = 14.5 * 32.0;
+    let frame = frame_for(&start, &snapshot);
+    let input = GridInput::from_frame(&frame, (44.5 * 32.0, 16.0 * 32.0), vec![]);
+    assert!(!input.blocked[16 * 48 + 20]);
+    assert!(!input.blocked[16 * 48 + 27]);
+    let mut flow = RushFlow::default();
+    assert!(matches!(
+        step(&mut flow, &start, &snapshot).as_slice(),
+        [AiActionRequest::Move { .. }]
+    ));
+    snapshot.entities[0].kind = "machine_gunner".into();
+    snapshot.tick += 9;
+    assert!(matches!(
+        step(&mut flow, &start, &snapshot).as_slice(),
+        [AiActionRequest::Attack { target: 300, .. }]
+    ));
+}
+
+fn frame_for(start: &StartPayload, snapshot: &Snapshot) -> AiFrame {
+    AiFrame::from_host(start, snapshot, 1, [], Some(&[1, 2])).unwrap()
+}
+
+#[test]
+fn remembered_extractor_is_a_scouting_destination_not_a_direct_attack_target() {
+    let (start, mut snapshot) = fixture();
+    snapshot.entities.retain(|e| e.owner == 1);
+    snapshot
+        .remembered_buildings
+        .push(rts_sim::protocol::RememberedBuildingView {
+            id: 300,
+            owner: 2,
+            kind: "pump_jack".into(),
+            x: 10.5 * 32.0,
+            y: 16.5 * 32.0,
+            footprint: vec![],
+            observed_tick: 0,
+        });
+    let mut flow = RushFlow::default();
+    assert!(matches!(
+        step(&mut flow, &start, &snapshot).as_slice(),
+        [AiActionRequest::AttackMove { .. }]
+    ));
+    assert!(!step(&mut flow, &start, &snapshot)
+        .iter()
+        .any(|a| matches!(a, AiActionRequest::Attack { .. })));
+}
+
+#[test]
+fn extractor_can_be_shot_across_water_without_a_walking_route_to_its_center() {
+    let (mut start, mut snapshot) = fixture();
+    snapshot.entities.retain(|e| e.owner == 1);
+    snapshot.entities[0].x = 14.5 * 32.0;
+    snapshot.entities[0].kind = "machine_gunner".into();
+    for y in 0..32 {
+        start.map.terrain[y * 48 + 17] = rts_sim::protocol::terrain::WATER;
+    }
+    extractor(&mut snapshot, 300, "pump_jack", 20.5, 16.5);
+    let mut flow = RushFlow::default();
+    assert!(matches!(
+        step(&mut flow, &start, &snapshot).as_slice(),
+        [AiActionRequest::Attack { target: 300, .. }]
+    ));
 }

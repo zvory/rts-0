@@ -7,7 +7,7 @@ use crate::sdk::{
 };
 
 type Point = (f32, f32);
-const STAGING_DISTANCE_TILES: f32 = 25.0;
+const STAGING_DISTANCE_TILES: f32 = 20.0;
 const PANZERFAUST_REAR_OFFSET_TILES: f32 = 3.0;
 const FIRST_WAVE_RESEARCH_PROGRESS: f32 = 0.9;
 const SLOT_SPACING_TILES: f32 = 1.5;

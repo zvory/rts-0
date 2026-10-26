@@ -207,7 +207,7 @@ it completes, each Barracks alternates Machine Gunners and Panzerfausts. The hom
 auto-builds Steel Mines and Pump Jacks to sustain income. There is no expansion or additional tech
 path.
 
-Rush picks a staging point 25 world-space tiles from the enemy start along a shortest octile route
+Rush picks a staging point 20 world-space tiles from the enemy start along a shortest octile route
 through the public terrain map, without cutting blocked diagonal corners. The formation is
 perpendicular to the smoothed local approach direction. Riflemen and Machine Gunners receive
 stable, spaced slots from the main line's centre outward. Panzerfausts use a separate parallel
@@ -224,25 +224,31 @@ staging, and later production gathers into a fresh cohort.
 reserving its eventual cost. Unlike the affordable `research` helper, it permits construction-
 time/unpaid queues; authoritative simulation validation and payment still apply.
 
-Launched Rush infantry share a reverse terrain flow toward a three-tile arrival ring around the
-enemy start. Visible entrenched Riflemen, Machine Gunners, and Panzerfausts contribute circular
-exclusion zones at their base weapon range plus the Entrenchment bonus and one tile of clearance.
-Known building footprints also block the route; infantry can cross Tank Traps. A safe route treats
-those firing zones as impassable. If no safe route reaches the objective, a second field minimizes
-integrated nominal anti-infantry DPS exposure, adding overlapping weapons, then travel distance.
-This chooses a weak crossing instead of waiting forever at a sealed wall. The estimate uses public
-base damage and cooldown, without inferring hidden upgrades, firing arcs, or line-of-sight cover.
+Launched Rush infantry raid known enemy extractors. The flow seeds reachable firing positions
+around recipient-visible or remembered Pump Jacks and Steel Mines, prioritizing any safely
+reachable Pump Jack over Steel Mines, then choosing the shorter safe route within that priority.
+Each weapon range uses its own shared field; the AI accounts for the extractor footprint and keeps
+a firing-distance margin. Visible extractors receive ordinary explicit Attack commands only from
+a clear, in-range firing position. Remembered extractors are scouting destinations, never direct
+attack targets. With no known extractors, the enemy start remains the exploration objective.
 
-Only launched units follow this flow. Short Move waypoints keep a bypass from auto-acquiring and
-chasing trench defenders; an unavoidable firing-zone crossing switches to AttackMove. Reaching the
-objective ring restores AttackMove toward the base. If a new obstacle invalidates every route,
-Rush also restores the ordinary base attack instead of retaining a stale movement order. Route fields rebuild when their known obstacle
-or threat inputs change. Orders refresh at most once a second unless those inputs or the movement/
-attack mode change. Last-seen
-trench contacts last five seconds to avoid immediate reversals at a fog boundary; seeing a unit
-leave its trench clears that contact immediately. When the last contact expires, steered survivors
-resume their base attack. These are AI orders through the ordinary command seam, with no simulation,
-wire, balance, or other profile behavior changes.
+Observed armed enemy combat units contribute circular exclusion zones using public base range
+and nominal DPS, plus the range bonus for visible trench occupation. Hidden upgrades are not
+inferred. Known all-ground building blockers obstruct the route; extractors and Tank Traps remain
+walkable for infantry, matching authoritative obstacle classifications. Safe firing positions
+inside enemy coverage are excluded. Move waypoints suppress opportunistic combat while seeking a
+safe extractor. A unit already in a fight can escape along the least-exposure route into a region
+with a safe extractor approach. If no safe approach exists, the weighted field chooses a weaker
+crossing, moves toward that fight without stopping on buildings, and explicitly attacks a visible
+combat defender once it is in range. If no defender is currently visible, it uses AttackMove toward
+the weak approach to reacquire contact. There is no separate damage-triggered re-flow or game combat-rule change.
+
+The flow is reevaluated from fog-filtered observations on the normal AI cadence. Orders are
+bounded to one per second while following the same movement mode, with immediate mode/objective
+changes. Last-seen combat contacts expire after five seconds; observed noncombat contacts clear
+immediately. Fields are shared by units with the same base weapon range. Only launched units are
+controlled; staging cohorts, the 90% Methamphetamines opening wait, research order, and the
+Engineer's 30-tile exclusion radius remain independent of raid target selection.
 
 ### Profile behavior
 
