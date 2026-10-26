@@ -250,9 +250,17 @@ mod tests {
             EntityKind::AntiTankGun,
             &[EntityKind::TrainingCentre]
         ));
-        assert!(train_requirement_met(
+        assert!(!train_requirement_met(
             EntityKind::AntiTankGun,
             &[EntityKind::Steelworks]
+        ));
+        assert!(!train_requirement_met(
+            EntityKind::AntiTankGun,
+            &[EntityKind::EngineeringComplex]
+        ));
+        assert!(train_requirement_met(
+            EntityKind::AntiTankGun,
+            &[EntityKind::Steelworks, EntityKind::EngineeringComplex]
         ));
         assert!(train_requirement_met(
             EntityKind::Artillery,

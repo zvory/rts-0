@@ -787,13 +787,18 @@ withFakeHudDocument(({ FakeElement }) => {
   p2Selection = [p2Steelworks];
   p2LabHudState.playerResources[1] = { id: 2, steel: 1000, oil: 1000, supplyUsed: 4,
     supplyCap: 50, upgrades: [] };
-  const p2SteelworksCard = buildCommandCardDescriptors(
+  const atGunButton = () => buttonByLabel(buildCommandCardDescriptors(
     p2Hud._commandDescriptorContext({ selectedEntities: p2Selection, currentEntities: p2Entities }),
-  );
-  assert(
-    buttonByLabel(p2SteelworksCard, "Anti-Tank Gun").enabled,
-    "lab command card exposes Anti-Tank Guns without selected-owner research",
-  );
+  ), "Anti-Tank Gun");
+  assert(!atGunButton().enabled, "Anti-Tank Guns require an Engineering Complex");
+  const p2EngineeringComplex = { id: 706, owner: 1, kind: KIND.ENGINEERING_COMPLEX, buildProgress: null };
+  p2Entities.push(p2EngineeringComplex);
+  assert(!atGunButton().enabled, "another owner's Engineering Complex does not unlock Anti-Tank Guns");
+  p2EngineeringComplex.owner = 2;
+  p2EngineeringComplex.buildProgress = 0.5;
+  assert(!atGunButton().enabled, "an unfinished Engineering Complex does not unlock Anti-Tank Guns");
+  p2EngineeringComplex.buildProgress = null;
+  assert(atGunButton().enabled, "a completed owned Engineering Complex unlocks Anti-Tank Guns without research");
 
   const p1CommandCar = { id: 705, owner: 1, kind: KIND.COMMAND_CAR };
   const p1LabHudState = {
@@ -1288,7 +1293,7 @@ withFakeHudDocument(({ FakeElement }) => {
     resources: { steel: 125, oil: 125 },
   }));
   const antiTankGun = buttonByLabel(upgradeCard, "Anti-Tank Gun");
-  assert(antiTankGun && antiTankGun.enabled, "Anti-Tank Gun should be available as soon as Gun Works is complete");
+  assert(antiTankGun && !antiTankGun.enabled, "Anti-Tank Gun stays locked until an Engineering Complex is complete");
   assert(!buttonByLabel(upgradeCard, "AT Guns"), "Gun Works should not expose Engineering Complex research");
   const artilleryResearchId = defaultFactionCommandId("research", UPGRADE.ARTILLERY_UNLOCK);
   assert(!commandButtons(upgradeCard).some((button) => button.commandId === artilleryResearchId), "Gun Works should not expose Artillery research");

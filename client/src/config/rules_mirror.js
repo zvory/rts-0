@@ -142,7 +142,7 @@ export const STATS = Object.freeze({
     rangeTiles: 6.1, cost: { steel: 75, oil: 10 }, supply: 2, buildTicks: 400, requires: KIND.TRAINING_CENTRE },
   [KIND.ANTI_TANK_GUN]: { armored: false, label: "Anti-Tank Gun", icon: "ATG", size: 20, sight: 9, body: ANTI_TANK_GUN_BODY,
     rangeTiles: ANTI_TANK_GUN_DEPLOYED_RANGE_TILES, cost: { steel: 150, oil: 40 }, supply: 3, buildTicks: 440,
-    requires: KIND.STEELWORKS },
+    requires: [KIND.STEELWORKS, KIND.ENGINEERING_COMPLEX] },
   [KIND.MORTAR_TEAM]: { armored: false, label: "Mortar Team", icon: "MT", size: 18, sight: 10,
     rangeTiles: MORTAR_RANGE_TILES, minRangeTiles: MORTAR_MIN_RANGE_TILES,
     cost: { steel: 100, oil: 40 }, supply: 3, buildTicks: 460,

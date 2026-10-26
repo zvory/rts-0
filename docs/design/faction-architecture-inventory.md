@@ -120,8 +120,8 @@ completed Resource Depot and Training Centre; Tank Trap requires a completed Tra
 Depot trains Workers. Barracks trains Riflemen immediately and Machine
 Gunners after the Training Centre requirement is met. Factory trains Scout Cars immediately,
 Command Cars once an Engineering Complex is complete, and Tanks after Tank Production research. Gun Works
-trains Mortar Teams and Anti-Tank Guns immediately, and Artillery after
-Artillery research.
+trains Mortar Teams immediately, Anti-Tank Guns while owning a completed Engineering Complex, and
+Artillery after Artillery research.
 
 Research unlocks live in `server/crates/sim/src/game/upgrade.rs` and client descriptors in
 `client/src/config.js`. Training Centre researches Methamphetamines. Engineering Complex researches
