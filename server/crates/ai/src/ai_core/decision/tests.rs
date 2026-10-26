@@ -11,6 +11,7 @@ use rts_sim::game::command::SimCommand as Command;
 
 mod economy_manager_tests;
 mod expansion_security_tests;
+mod pressure_tests;
 mod steel_line_tests;
 mod turtle_tests;
 

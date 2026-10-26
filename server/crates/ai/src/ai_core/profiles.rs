@@ -3,6 +3,8 @@ use rts_sim::game::upgrade::UpgradeKind;
 use serde::Serialize;
 
 mod ai_2_1_pre_third_base;
+mod pressure;
+pub(crate) use pressure::{PRESSURE, PRESSURE_AI_ID};
 mod jeffs_ai;
 mod jeffs_ai_chat_start;
 mod turtle;
@@ -419,8 +421,8 @@ pub(crate) static AI_2_1: AiProfile = AiProfile {
 /// Canonical profiles that must be complete for live play and profile manifests.
 /// The frozen chat-start snapshot remains addressable by id for internal comparisons,
 /// but must not weaken the completeness contract for the active Jeff profile.
-pub(crate) fn required_profiles() -> [&'static AiProfile; 3] {
-    [&AI_2_1, &JEFFS_AI, &AI_TURTLE]
+pub(crate) fn required_profiles() -> [&'static AiProfile; 4] {
+    [&AI_2_1, &JEFFS_AI, &AI_TURTLE, &PRESSURE]
 }
 
 pub(crate) fn profile_by_id(id: &str) -> Option<&'static AiProfile> {
@@ -473,7 +475,7 @@ mod tests {
     fn required_profile_ids_are_canonical_and_deterministic() {
         assert_eq!(
             required_profiles().map(|profile| profile.id),
-            [AI_2_1_ID, JEFFS_AI_ID, AI_TURTLE_ID]
+            [AI_2_1_ID, JEFFS_AI_ID, AI_TURTLE_ID, PRESSURE_AI_ID]
         );
         assert_eq!(profile_by_id(AI_2_1_ID).unwrap().id, AI_2_1_ID);
         assert_eq!(profile_by_id(AI_TURTLE_ID).unwrap().id, AI_TURTLE_ID);

@@ -12,7 +12,7 @@ use crate::ai_core::decision::{
 use crate::ai_core::map_analysis::AiStaticMapContextCache;
 use crate::ai_core::observation::AiObservation;
 use crate::ai_core::profiles::{
-    profile_by_id, AiProfile, AI_2_1, AI_2_1_ID, AI_TURTLE_ID, JEFFS_AI_ID,
+    profile_by_id, AiProfile, AI_2_1, AI_2_1_ID, AI_TURTLE_ID, JEFFS_AI_ID, PRESSURE_AI_ID,
 };
 use crate::ai_shared;
 use crate::compositions::{composition_by_id, AI_2_2_ID};
@@ -38,8 +38,14 @@ pub const DEFAULT_LIVE_PROFILE_ID: &str = AI_2_2_ID;
 
 /// Canonical profile ids understood by the live adapter. Experimental profiles are available to
 /// internal observer-only sessions; the room actor prevents them from entering human matches.
-pub const LIVE_PROFILE_IDS: [&str; 5] =
-    [AI_2_2_ID, AI_2_1_ID, JEFFS_AI_ID, AI_TURTLE_ID, RUSH_AI_ID];
+pub const LIVE_PROFILE_IDS: [&str; 6] = [
+    AI_2_2_ID,
+    AI_2_1_ID,
+    JEFFS_AI_ID,
+    AI_TURTLE_ID,
+    RUSH_AI_ID,
+    PRESSURE_AI_ID,
+];
 
 pub fn canonical_live_profile_id(input: &str) -> Option<&'static str> {
     match input {
@@ -48,6 +54,7 @@ pub fn canonical_live_profile_id(input: &str) -> Option<&'static str> {
         AI_2_1_ID => Some(AI_2_1_ID),
         JEFFS_AI_ID => Some(JEFFS_AI_ID),
         RUSH_AI_ID => Some(RUSH_AI_ID),
+        PRESSURE_AI_ID => Some(PRESSURE_AI_ID),
         AI_TURTLE_ID => Some(AI_TURTLE_ID),
         _ => None,
     }
@@ -62,13 +69,17 @@ pub fn live_profile_label(profile_id: &str) -> &'static str {
         Some(AI_2_1_ID) => "AI 2.1",
         Some(JEFFS_AI_ID) => "Jeff's AI",
         Some(RUSH_AI_ID) => "Rush AI",
+        Some(PRESSURE_AI_ID) => "Pressure AI",
         Some(AI_TURTLE_ID) => "AI Turtle",
         _ => "AI",
     }
 }
 
 pub fn is_player_live_profile_id(profile_id: &str) -> bool {
-    matches!(profile_id, AI_2_2_ID | JEFFS_AI_ID | RUSH_AI_ID)
+    matches!(
+        profile_id,
+        AI_2_2_ID | JEFFS_AI_ID | RUSH_AI_ID | PRESSURE_AI_ID
+    )
 }
 
 pub fn random_live_profile_id(rng: &mut impl Rng) -> &'static str {
@@ -258,6 +269,7 @@ pub struct AiController {
     last_debug_map_layers: Vec<ObserverMapAnalysisLayer>,
     custom_strategy: Option<Box<dyn AiStrategy>>,
     strategy_initialized: bool,
+    pressure_waves: crate::pressure::PressureWaves,
 }
 
 struct LegacyProfileStrategy;
@@ -304,6 +316,7 @@ impl AiController {
             custom_strategy: (profile_id == RUSH_AI_ID)
                 .then(|| Box::<RushStrategy>::default() as Box<dyn AiStrategy>),
             strategy_initialized: false,
+            pressure_waves: Default::default(),
         }
     }
 
@@ -515,6 +528,33 @@ impl AiController {
             &decision.intents,
             decision.commands,
         ));
+        if self.behavior_profile_id == PRESSURE_AI_ID {
+            if let Some(enemy) = frame
+                .players()
+                .iter()
+                .find(|p| p.team_id != frame.team_id() && p.is_alive)
+            {
+                let size = frame.map().tile_size as f32;
+                let target = (
+                    (enemy.start_tile.0 as f32 + 0.5) * size,
+                    (enemy.start_tile.1 as f32 + 0.5) * size,
+                );
+                self.pressure_waves.rally(&frame, enemy.id, target);
+                let mut actions = AiActions::for_frame(&frame);
+                self.pressure_waves.step(
+                    &frame,
+                    target,
+                    &decision.pressure_wave_units,
+                    &mut actions,
+                );
+                commands.extend(
+                    actions
+                        .into_requests()
+                        .into_iter()
+                        .map(crate::action_emitter::emit_request),
+                );
+            }
+        }
         self.pending_builds.record_commands_with_factory_clearance(
             tick,
             &commands,
@@ -1187,7 +1227,14 @@ mod tests {
     fn live_adapter_knows_public_and_internal_profiles() {
         assert_eq!(
             LIVE_PROFILE_IDS,
-            [AI_2_2_ID, AI_2_1_ID, JEFFS_AI_ID, AI_TURTLE_ID, RUSH_AI_ID]
+            [
+                AI_2_2_ID,
+                AI_2_1_ID,
+                JEFFS_AI_ID,
+                AI_TURTLE_ID,
+                RUSH_AI_ID,
+                PRESSURE_AI_ID
+            ]
         );
     }
 
@@ -1205,7 +1252,14 @@ mod tests {
         }
         assert_eq!(
             selected,
-            BTreeSet::from([AI_2_2_ID, AI_2_1_ID, JEFFS_AI_ID, AI_TURTLE_ID, RUSH_AI_ID])
+            BTreeSet::from([
+                AI_2_2_ID,
+                AI_2_1_ID,
+                JEFFS_AI_ID,
+                AI_TURTLE_ID,
+                RUSH_AI_ID,
+                PRESSURE_AI_ID
+            ])
         );
     }
 

@@ -311,6 +311,7 @@ import { textWithin } from "./dom_text.mjs";
       { id: "ai_2_2", label: "AI 2.2" },
       { id: "jeffs_ai", label: "Jeff's AI" },
       { id: "rush_ai", label: "Rush AI" },
+      { id: "pressure_ai", label: "Pressure AI" },
     ],
     "lobby AI profile selector exposes all supported player opponents",
   );
@@ -456,7 +457,7 @@ import { textWithin } from "./dom_text.mjs";
       "host lobby exposes an AI 2.2 profile selector",
     );
     assert(textWithin(root).includes("AI 2.2"), "host lobby labels AI seats as AI 2.2");
-    assert(profileSelectors[0].children.length === 3, "host lobby exposes all player-facing AI profiles");
+    assert(profileSelectors[0].children.length === 4, "host lobby exposes all player-facing AI profiles");
     assert(!findFakes(root, (el) => String(el.className).includes("player-faction")).length,
       "non-beta lobby seats do not render faction controls");
     assert(!findFakes(root, (el) => String(el.className).includes("lobby-seat-meta")).length,
@@ -566,7 +567,7 @@ import { textWithin } from "./dom_text.mjs";
     assert(
       staleProfileSelectors.length === 1 &&
         staleProfileSelectors[0].value === "ai_2_2" &&
-        staleProfileSelectors[0].children.length === 3,
+        staleProfileSelectors[0].children.length === 4,
       "player lobby does not expose an internal Turtle profile received from stale state",
     );
   });
