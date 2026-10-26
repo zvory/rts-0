@@ -36,6 +36,15 @@ pub(crate) struct AiOverlayIdentity {
 
 pub(crate) fn profile_identity(profile: &AiProfile) -> AiProfileIdentity {
     let (label, summary, modules) = baseline_metadata(profile.id);
+    let (label, summary, modules) = if profile.id == super::profiles::PRESSURE_AI_ID {
+        (
+            "Pressure AI",
+            "AI 2.1 economy and defenses with independently owned terrain-routed assault waves.",
+            vec!["pressure_staging", "legacy_economy"],
+        )
+    } else {
+        (label, summary, modules)
+    };
     let overlays = Vec::new();
     let base_profile_id = None;
     AiProfileIdentity {
@@ -46,7 +55,22 @@ pub(crate) fn profile_identity(profile: &AiProfile) -> AiProfileIdentity {
         summary: summary.to_string(),
         modules: modules.iter().map(|module| module.to_string()).collect(),
         overlays,
-        fingerprint: profile_fingerprint(profile, label, None, summary, modules.as_slice(), &[]),
+        fingerprint: if profile.id == super::profiles::PRESSURE_AI_ID {
+            profile_fingerprint(
+                &(
+                    profile,
+                    include_str!("../pressure.rs"),
+                    include_str!("../pressure/production.rs"),
+                ),
+                "Pressure AI",
+                None,
+                summary,
+                modules.as_slice(),
+                &[],
+            )
+        } else {
+            profile_fingerprint(profile, label, None, summary, modules.as_slice(), &[])
+        },
     }
 }
 
@@ -302,7 +326,7 @@ mod tests {
     fn profile_identities_are_complete_and_valid() {
         let identities = required_profile_identities();
 
-        assert_eq!(identities.len(), 3);
+        assert_eq!(identities.len(), 4);
         for identity in identities {
             validate_profile_identity(&identity).expect("identity should validate");
             assert!(!identity.fingerprint.is_empty());
@@ -340,7 +364,7 @@ mod tests {
             value["composition"]["members"],
             serde_json::json!([
                 {"profileId": "rush_ai", "weight": 1},
-                {"profileId": "ai_2_1", "weight": 1},
+                {"profileId": "pressure_ai", "weight": 1},
             ])
         );
     }

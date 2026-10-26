@@ -13,6 +13,7 @@ use crate::ai_core::map_analysis::AiStaticMapContextCache;
 use crate::ai_core::observation::AiObservation;
 use crate::ai_core::profiles::{
     profile_by_id, runs_live_jeff, AiProfile, AI_2_1, AI_2_1_ID, AI_TURTLE_ID, JEFFS_AI_ID,
+    PRESSURE_AI_ID,
 };
 use crate::ai_shared;
 use crate::compositions::{composition_by_id, AI_2_2_ID};
@@ -38,8 +39,14 @@ pub const DEFAULT_LIVE_PROFILE_ID: &str = AI_2_2_ID;
 
 /// Canonical profile ids understood by the live adapter. Experimental profiles are available to
 /// internal observer-only sessions; the room actor prevents them from entering human matches.
-pub const LIVE_PROFILE_IDS: [&str; 5] =
-    [AI_2_2_ID, AI_2_1_ID, JEFFS_AI_ID, AI_TURTLE_ID, RUSH_AI_ID];
+pub const LIVE_PROFILE_IDS: [&str; 6] = [
+    AI_2_2_ID,
+    AI_2_1_ID,
+    JEFFS_AI_ID,
+    AI_TURTLE_ID,
+    RUSH_AI_ID,
+    PRESSURE_AI_ID,
+];
 
 pub fn canonical_live_profile_id(input: &str) -> Option<&'static str> {
     match input {
@@ -48,6 +55,7 @@ pub fn canonical_live_profile_id(input: &str) -> Option<&'static str> {
         AI_2_1_ID => Some(AI_2_1_ID),
         JEFFS_AI_ID => Some(JEFFS_AI_ID),
         RUSH_AI_ID => Some(RUSH_AI_ID),
+        PRESSURE_AI_ID => Some(PRESSURE_AI_ID),
         AI_TURTLE_ID => Some(AI_TURTLE_ID),
         _ => None,
     }
@@ -62,13 +70,17 @@ pub fn live_profile_label(profile_id: &str) -> &'static str {
         Some(AI_2_1_ID) => "AI 2.1",
         Some(JEFFS_AI_ID) => "Jeff's AI",
         Some(RUSH_AI_ID) => "Rush AI",
+        Some(PRESSURE_AI_ID) => "Pressure AI",
         Some(AI_TURTLE_ID) => "AI Turtle",
         _ => "AI",
     }
 }
 
 pub fn is_player_live_profile_id(profile_id: &str) -> bool {
-    matches!(profile_id, AI_2_2_ID | JEFFS_AI_ID | RUSH_AI_ID)
+    matches!(
+        profile_id,
+        AI_2_2_ID | JEFFS_AI_ID | RUSH_AI_ID | PRESSURE_AI_ID
+    )
 }
 
 pub fn random_live_profile_id(rng: &mut impl Rng) -> &'static str {
@@ -258,6 +270,7 @@ pub struct AiController {
     last_debug_map_layers: Vec<ObserverMapAnalysisLayer>,
     custom_strategy: Option<Box<dyn AiStrategy>>,
     strategy_initialized: bool,
+    pressure_waves: crate::pressure::PressureWaves,
 }
 
 struct LegacyProfileStrategy;
@@ -304,6 +317,7 @@ impl AiController {
             custom_strategy: (profile_id == RUSH_AI_ID)
                 .then(|| Box::<RushStrategy>::default() as Box<dyn AiStrategy>),
             strategy_initialized: false,
+            pressure_waves: Default::default(),
         }
     }
 
@@ -400,6 +414,12 @@ impl AiController {
         ) else {
             return commands;
         };
+
+        let frame = frame.with_base_sites(
+            self.static_map_context
+                .get_or_analyze(context.start)
+                .base_sites(),
+        );
 
         #[cfg(test)]
         {
@@ -524,6 +544,33 @@ impl AiController {
             &decision.intents,
             decision.commands,
         ));
+        if self.behavior_profile_id == PRESSURE_AI_ID {
+            if let Some(enemy) = frame
+                .players()
+                .iter()
+                .find(|p| p.team_id != frame.team_id() && p.is_alive)
+            {
+                let size = frame.map().tile_size as f32;
+                let target = (
+                    (enemy.start_tile.0 as f32 + 0.5) * size,
+                    (enemy.start_tile.1 as f32 + 0.5) * size,
+                );
+                self.pressure_waves.rally(&frame, enemy.id, target);
+                let mut actions = AiActions::for_frame(&frame);
+                self.pressure_waves.step(
+                    &frame,
+                    target,
+                    &decision.pressure_wave_units,
+                    &mut actions,
+                );
+                commands.extend(
+                    actions
+                        .into_requests()
+                        .into_iter()
+                        .map(crate::action_emitter::emit_request),
+                );
+            }
+        }
         self.pending_builds.record_commands_with_factory_clearance(
             tick,
             &commands,
@@ -942,7 +989,25 @@ mod tests {
         struct MoveStrategy;
 
         impl AiStrategy for MoveStrategy {
-            fn step(&mut self, _frame: &AiFrame, actions: &mut AiActions) {
+            fn initialize(&mut self, frame: &AiFrame) {
+                assert!(WorldQueries::new(frame).base(1, 3).is_some());
+                assert!(WorldQueries::new(frame).base(2, 3).is_some());
+            }
+
+            fn step(&mut self, frame: &AiFrame, actions: &mut AiActions) {
+                assert!(!frame.base_sites().is_empty());
+                let site_resources: std::collections::BTreeSet<_> = frame
+                    .base_sites()
+                    .iter()
+                    .flat_map(|site| site.resource_ids.iter().copied())
+                    .collect();
+                assert_eq!(
+                    site_resources,
+                    frame.resources().iter().map(|node| node.id).collect()
+                );
+                assert!(WorldQueries::new(frame)
+                    .known_base_depots(crate::sdk::AiBaseSiteId::Start(2))
+                    .is_empty());
                 let group = crate::sdk::UnitGroup::new([7]).unwrap();
                 actions.move_group(&group, 128.0, 160.0, false).unwrap();
             }
@@ -995,6 +1060,12 @@ mod tests {
         let mut ai = AiController::new(1);
         let start = cache_test_start_payload();
 
+        let first_sites = ai
+            .static_map_context
+            .get_or_analyze(&start)
+            .base_sites()
+            .to_vec();
+        assert_eq!(first_sites.len(), start.players.len());
         let first_key = ai.static_map_context.get_or_analyze(&start).key();
         let second_key = ai.static_map_context.get_or_analyze(&start).key();
         assert_eq!(second_key, first_key);
@@ -1003,11 +1074,24 @@ mod tests {
             Some(first_key)
         );
 
+        let mut no_resources = start.clone();
+        no_resources.map.resources.clear();
+        let empty_sites = ai
+            .static_map_context
+            .get_or_analyze(&no_resources)
+            .base_sites();
+        assert_eq!(empty_sites.len(), 1);
+        assert!(empty_sites[0].resource_ids.is_empty());
+
         let mut moved_start = start.clone();
         moved_start.players[0].start_tile_x = 2;
         let moved_key = ai.static_map_context.get_or_analyze(&moved_start).key();
 
         assert_ne!(moved_key, first_key);
+        assert_ne!(
+            ai.static_map_context.current().unwrap().base_sites(),
+            first_sites
+        );
         assert_eq!(
             ai.static_map_context.current().map(|context| context.key()),
             Some(moved_key)
@@ -1196,7 +1280,14 @@ mod tests {
     fn live_adapter_knows_public_and_internal_profiles() {
         assert_eq!(
             LIVE_PROFILE_IDS,
-            [AI_2_2_ID, AI_2_1_ID, JEFFS_AI_ID, AI_TURTLE_ID, RUSH_AI_ID]
+            [
+                AI_2_2_ID,
+                AI_2_1_ID,
+                JEFFS_AI_ID,
+                AI_TURTLE_ID,
+                RUSH_AI_ID,
+                PRESSURE_AI_ID
+            ]
         );
     }
 
@@ -1214,7 +1305,14 @@ mod tests {
         }
         assert_eq!(
             selected,
-            BTreeSet::from([AI_2_2_ID, AI_2_1_ID, JEFFS_AI_ID, AI_TURTLE_ID, RUSH_AI_ID])
+            BTreeSet::from([
+                AI_2_2_ID,
+                AI_2_1_ID,
+                JEFFS_AI_ID,
+                AI_TURTLE_ID,
+                RUSH_AI_ID,
+                PRESSURE_AI_ID
+            ])
         );
     }
 

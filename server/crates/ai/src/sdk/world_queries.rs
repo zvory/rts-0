@@ -92,7 +92,7 @@ impl KnownBuildSiteExclusions {
 /// The query layer has no simulation access. Current contacts, remembered contacts, public static
 /// resources, and controller-owned exclusions remain distinct inputs.
 pub struct WorldQueries<'a> {
-    frame: &'a AiFrame,
+    pub(super) frame: &'a AiFrame,
     owned_by_id: BTreeMap<u32, usize>,
     ally_by_id: BTreeMap<u32, usize>,
     enemy_by_id: BTreeMap<u32, usize>,

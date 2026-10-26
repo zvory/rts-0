@@ -11,6 +11,7 @@ use rts_protocol::{
 };
 use rts_sim::protocol::{kinds, MapInfo, PlayerStart, ResourceNode, StartPayload};
 
+mod base_sites;
 mod chokes;
 mod overlays;
 mod regions;
@@ -243,17 +244,24 @@ pub(crate) struct AiStaticMapContext {
     key: AiMapAnalysisKey,
     analysis: AiMapAnalysis,
     diagnostics: ObserverMapAnalysisDiagnostics,
+    base_sites: Vec<crate::sdk::AiBaseSite>,
 }
 
 impl AiStaticMapContext {
     fn analyze_with_key(start: &StartPayload, key: AiMapAnalysisKey) -> Self {
         let analysis = AiMapAnalysis::analyze_with_key(start, key);
         let diagnostics = analysis.debug_overlay();
+        let base_sites = analysis.sdk_base_sites();
         Self {
             key,
             analysis,
             diagnostics,
+            base_sites,
         }
+    }
+
+    pub(crate) fn base_sites(&self) -> &[crate::sdk::AiBaseSite] {
+        &self.base_sites
     }
 
     pub(crate) fn key(&self) -> AiMapAnalysisKey {

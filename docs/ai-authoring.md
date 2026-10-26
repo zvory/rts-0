@@ -49,6 +49,28 @@ coordinate-based requests. Known build-site answers are exactly `Invalid`, `Know
 buildings, production exits, and explicit controller exclusions reveal no conflict. It never means
 legal, clear, placeable, reachable, or accepted, and hidden dynamic state is never consulted.
 
+## Address numbered base sites
+
+`WorldQueries::base(player_id, 3)` finds that player's third geographic base site. Rank 1 is
+always their original main; later ranks use straight-line distance with deterministic ties.
+This is independent of which sites they actually occupy. Sites include every player's main and
+inferred resource clusters, and remain numbered after depletion or a Depot's destruction.
+
+```rust
+let world = WorldQueries::new(frame);
+if let Some(third) = world.base(enemy_player_id, 3) {
+    let (x, y) = third.site.position;
+    // Use (x, y) as a scouting or attack-move objective.
+    let evidence = world.known_base_depots(third.site.id);
+    // Inspect owner and Owned / Visible / Remembered evidence before assuming occupation.
+}
+```
+
+`frame.base_sites()` supplies the static landmarks and resource IDs; `ranked_bases(player_id)`
+returns the complete order. Positions are world pixels, not legal building footprints. An empty
+Depot evidence list means no known occupant, and remembered evidence is stale. Geography reveals
+no hidden enemy buildings. The ranking does not promise ground reachability.
+
 ## Emit actions
 
 Call typed helpers on the `AiActions` supplied to `step`. The builder supports `paid_build`,

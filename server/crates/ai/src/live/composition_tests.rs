@@ -3,7 +3,7 @@ use rts_sim::game::PlayerInit;
 
 #[test]
 fn composition_selects_once_and_keeps_the_requested_identity() {
-    for member in [AI_2_1_ID, RUSH_AI_ID] {
+    for member in [PRESSURE_AI_ID, RUSH_AI_ID] {
         let composition = composition_by_id(AI_2_2_ID).unwrap();
         let seed = (0..128)
             .find(|seed| composition.select(*seed, 1) == Some(member))
@@ -28,7 +28,7 @@ fn composition_selects_once_and_keeps_the_requested_identity() {
 #[test]
 fn both_composition_members_emit_the_same_commands_as_explicit_profiles() {
     let composition = composition_by_id(AI_2_2_ID).unwrap();
-    for member in [AI_2_1_ID, RUSH_AI_ID] {
+    for member in [PRESSURE_AI_ID, RUSH_AI_ID] {
         let seed = (0..128)
             .find(|seed| composition.select(*seed, 1) == Some(member))
             .unwrap();
