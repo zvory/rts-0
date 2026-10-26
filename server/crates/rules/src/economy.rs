@@ -189,6 +189,7 @@ mod tests {
     #[test]
     fn ww2_production_chain_matches_design() {
         let barracks = EntityKind::Barracks;
+        let anti_tank_gun = EntityKind::AntiTankGun;
 
         assert_eq!(DEFAULT_FACTION_ID, "kriegsia");
         assert_eq!(
@@ -221,7 +222,7 @@ mod tests {
             trainable_units(EntityKind::Steelworks),
             &[
                 EntityKind::MortarTeam,
-                EntityKind::AntiTankGun,
+                anti_tank_gun,
                 EntityKind::Artillery,
                 EntityKind::RocketLauncher
             ]
@@ -231,7 +232,7 @@ mod tests {
         assert!(train_requirement_met(EntityKind::Panzerfaust, &[]));
         assert!(!train_requirement_met(EntityKind::MachineGunner, &[]));
         assert!(!train_requirement_met(EntityKind::MortarTeam, &[]));
-        assert!(!train_requirement_met(EntityKind::AntiTankGun, &[]));
+        assert!(!train_requirement_met(anti_tank_gun, &[]));
         assert!(!train_requirement_met(EntityKind::Tank, &[]));
         assert!(!train_requirement_met(EntityKind::Artillery, &[]));
         assert!(
@@ -247,12 +248,20 @@ mod tests {
             &[EntityKind::Steelworks]
         ));
         assert!(!train_requirement_met(
-            EntityKind::AntiTankGun,
+            anti_tank_gun,
             &[EntityKind::TrainingCentre]
         ));
-        assert!(train_requirement_met(
-            EntityKind::AntiTankGun,
+        assert!(!train_requirement_met(
+            anti_tank_gun,
             &[EntityKind::Steelworks]
+        ));
+        assert!(!train_requirement_met(
+            anti_tank_gun,
+            &[EntityKind::EngineeringComplex]
+        ));
+        assert!(train_requirement_met(
+            anti_tank_gun,
+            &[EntityKind::Steelworks, EntityKind::EngineeringComplex]
         ));
         assert!(train_requirement_met(
             EntityKind::Artillery,
@@ -333,8 +342,8 @@ mod tests {
         assert_eq!(cost(EntityKind::Portal), (150, 0));
         assert_eq!(cost(EntityKind::TrainingCentre), (100, 25));
         assert_eq!(cost(EntityKind::Depot), (100, 0));
-        assert_eq!(cost(EntityKind::AntiTankGun), (150, 40));
-        assert_eq!(supply_cost(EntityKind::AntiTankGun), 3);
+        assert_eq!(cost(anti_tank_gun), (150, 40));
+        assert_eq!(supply_cost(anti_tank_gun), 3);
         assert_eq!(cost(EntityKind::Artillery), (150, 50));
         assert_eq!(cost(EntityKind::EngineeringComplex), (100, 100));
         assert_eq!(supply_cost(EntityKind::Artillery), 4);

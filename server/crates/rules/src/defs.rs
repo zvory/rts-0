@@ -234,7 +234,10 @@ pub const UNITS: &[UnitDef] = &[
         armor_class: ArmorClass::Small,
         weapon: WeaponClass::AntiTank,
         trained_at: Some(EntityKind::Steelworks),
-        train_requirement: TechRequirement::All(STEELWORKS_REQUIRED),
+        train_requirement: TechRequirement::All(&[
+            EntityKind::Steelworks,
+            EntityKind::EngineeringComplex,
+        ]),
     },
     UnitDef {
         kind: EntityKind::MortarTeam,
