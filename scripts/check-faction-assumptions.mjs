@@ -256,6 +256,11 @@ const approvedCurrentFactionFiles = new Set([
   // and faction catalog still own faction admission, while costs remain catalog-derived.
   "server/crates/ai/src/rush.rs",
   "server/crates/ai/src/rush/staging.rs",
+  // Pressure independently owns a Kriegsia-only copied macro policy, staging formation, and
+  // timed Panzerfaust production; public faction admission and catalog-derived costs stay shared.
+  "server/crates/ai/src/ai_core/profiles/pressure.rs",
+  "server/crates/ai/src/pressure.rs",
+  "server/crates/ai/src/pressure/production.rs",
   // The SDK frame adapter converts the protocol's dedicated remembered-anti-tank-gun records back
   // into the typed kind that the wire record omits. Keep this exception at one occurrence.
   "server/crates/ai/src/sdk/frame.rs",
