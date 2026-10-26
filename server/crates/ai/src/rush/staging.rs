@@ -145,7 +145,7 @@ impl RushWaves {
                         .tick()
                         .saturating_sub(*self.issued.get(&entity.id).unwrap_or(&0))
                         >= RETRY_TICKS))
-                && actions.move_group(&group, slot.0, slot.1, false).is_ok()
+                && actions.attack_move(&group, slot.0, slot.1, false).is_ok()
             {
                 self.issued.insert(entity.id, frame.tick());
                 self.held.remove(&entity.id);

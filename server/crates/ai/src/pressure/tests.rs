@@ -72,13 +72,17 @@ fn waves_wait_for_ninety_percent_then_require_five_arrivals_without_retasking_ol
     assert_eq!(
         initial
             .iter()
-            .filter(|action| matches!(action, AiActionRequest::Move { .. }))
+            .filter(|action| matches!(action, AiActionRequest::AttackMove { .. }))
             .count(),
         4
     );
+    assert!(initial.iter().all(|action| matches!(action,
+        AiActionRequest::AttackMove { units, x, y, queued: false }
+        if units.len() == 1 && waves.slots.get(&units[0]) == Some(&(*x, *y))
+    )));
     assert!(!initial
         .iter()
-        .any(|action| matches!(action, AiActionRequest::AttackMove { .. })));
+        .any(|action| matches!(action, AiActionRequest::Move { .. })));
     let line = waves.plan.unwrap().1;
     for slot in waves.slots.values() {
         let along =
@@ -147,7 +151,7 @@ fn waves_wait_for_ninety_percent_then_require_five_arrivals_without_retasking_ol
     assert!(
         !step(&mut waves, &start, &snapshot, target)
             .iter()
-            .any(|action| matches!(action, AiActionRequest::AttackMove { .. })),
+            .any(|action| matches!(action, AiActionRequest::AttackMove { x, y, .. } if (*x, *y) == target)),
         "an en-route fifth unit does not count"
     );
     assemble(&mut snapshot, &waves);
@@ -160,7 +164,9 @@ fn waves_wait_for_ninety_percent_then_require_five_arrivals_without_retasking_ol
     add_rifle(&mut snapshot, &specimen, 1006);
     snapshot.tick += 9;
     let next = step(&mut waves, &start, &snapshot, target);
-    assert!(matches!(next.as_slice(),[AiActionRequest::Move {units,..}] if units==&vec![1006]));
+    assert!(
+        matches!(next.as_slice(),[AiActionRequest::AttackMove {units,..}] if units==&vec![1006])
+    );
 }
 
 #[test]
@@ -270,7 +276,7 @@ fn defense_can_borrow_unlaunched_units_and_they_resume_staging_when_released() {
     snapshot.tick += 9;
     let released = step(&mut waves, &start, &snapshot, target);
     assert!(released.iter().any(
-        |request| matches!(request, AiActionRequest::Move { units, .. } if units.contains(&id))
+        |request| matches!(request, AiActionRequest::AttackMove { units, .. } if units.contains(&id))
     ));
 }
 
@@ -553,13 +559,13 @@ fn pressure_retargets_only_unlaunched_units_and_reissues_their_movement() {
         assert!(
             requests
                 .iter()
-                .filter(|a| matches!(a, AiActionRequest::Move { .. }))
+                .filter(|a| matches!(a, AiActionRequest::AttackMove { .. }))
                 .count()
                 >= 3
         );
         assert!(requests
             .iter()
-            .all(|a| !matches!(a,AiActionRequest::Move{units,..} if units.contains(&1))));
+            .all(|a| !matches!(a,AiActionRequest::AttackMove{units,..} if units.contains(&1))));
         assert_ne!(waves.slots, previous);
     }
 }

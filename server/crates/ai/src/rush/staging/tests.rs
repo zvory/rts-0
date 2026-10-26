@@ -1,5 +1,6 @@
 use super::*;
 use crate::sdk::actions::AiActionRequest;
+use crate::sdk::AiStrategy;
 use rts_sim::game::{Game, PlayerInit};
 use rts_sim::protocol::{EntityView, Snapshot, StartPayload};
 
@@ -71,13 +72,17 @@ fn waves_wait_for_ninety_percent_then_require_five_arrivals_without_retasking_ol
     assert_eq!(
         initial
             .iter()
-            .filter(|action| matches!(action, AiActionRequest::Move { .. }))
+            .filter(|action| matches!(action, AiActionRequest::AttackMove { .. }))
             .count(),
         4
     );
+    assert!(initial.iter().all(|action| matches!(action,
+        AiActionRequest::AttackMove { units, x, y, queued: false }
+        if units.len() == 1 && waves.slots.get(&units[0]) == Some(&(*x, *y))
+    )));
     assert!(!initial
         .iter()
-        .any(|action| matches!(action, AiActionRequest::AttackMove { .. })));
+        .any(|action| matches!(action, AiActionRequest::Move { .. })));
     let line = waves.plan.unwrap().1;
     for slot in waves.slots.values() {
         let along =
@@ -146,7 +151,7 @@ fn waves_wait_for_ninety_percent_then_require_five_arrivals_without_retasking_ol
     assert!(
         !step(&mut waves, &start, &snapshot, target)
             .iter()
-            .any(|action| matches!(action, AiActionRequest::AttackMove { .. })),
+            .any(|action| matches!(action, AiActionRequest::AttackMove { x, y, .. } if (*x, *y) == target)),
         "an en-route fifth unit does not count"
     );
     assemble(&mut snapshot, &waves);
@@ -159,7 +164,9 @@ fn waves_wait_for_ninety_percent_then_require_five_arrivals_without_retasking_ol
     add_rifle(&mut snapshot, &specimen, 1006);
     snapshot.tick += 9;
     let next = step(&mut waves, &start, &snapshot, target);
-    assert!(matches!(next.as_slice(),[AiActionRequest::Move {units,..}] if units==&vec![1006]));
+    assert!(
+        matches!(next.as_slice(),[AiActionRequest::AttackMove {units,..}] if units==&vec![1006])
+    );
 }
 
 #[test]
@@ -240,4 +247,29 @@ fn panzerfausts_stage_on_a_parallel_line_three_tiles_behind_front_infantry() {
         );
     }
     assert!((1001..=1003).all(|id| waves.slots.contains_key(&id)));
+}
+
+#[test]
+fn barracks_rally_and_new_recruits_attack_move_to_staging_before_wave_unlock() {
+    let (start, mut snapshot) = fixture();
+    snapshot.entities.push(EntityView::new(
+        900, 1, "barracks", 432.0, 496.0, 500, 500, "idle",
+    ));
+    let frame = frame(&start, &snapshot);
+    let mut strategy = crate::rush::RushStrategy::default();
+    let mut actions = AiActions::for_frame(&frame);
+    strategy.step(&frame, &mut actions);
+    let requests = actions.into_requests();
+    let rally = strategy.waves.plan.unwrap().1.center;
+    assert!(requests.iter().any(|action| matches!(action,
+        AiActionRequest::SetRally { building: 900, x, y, kind: rts_sim::game::entity::RallyKind::AttackMove, queued: false }
+        if (*x, *y) == rally
+    )));
+    for (id, slot) in &strategy.waves.slots {
+        assert!(requests.iter().any(|action| matches!(action,
+            AiActionRequest::AttackMove { units, x, y, queued: false }
+            if units == &vec![*id] && (*x, *y) == *slot
+        )));
+    }
+    assert!(!strategy.waves.first_wave_launched);
 }

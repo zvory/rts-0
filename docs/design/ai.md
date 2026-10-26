@@ -247,8 +247,8 @@ redefine base two or three between timed phase changes.
 Missing ranked sites fall back toward the enemy main without duplicate queued destinations.
 
 Riflemen and Panzerfausts occupy the front; Tanks stand three tiles behind at three-tile spacing.
-Units move to clear slots and Hold Position. Later lines may span blocked terrain: their center
-and orientation remain exact. Blocked slots and slots disconnected from Pressure’s original main
+Units attack-move to clear slots, engaging enemies en route, and Hold Position after arriving.
+Later lines may span blocked terrain: their center and orientation remain exact. Blocked slots and slots disconnected from Pressure’s original main
 are skipped using cached static ground connectivity without diagonal corner cutting; ordinary
 unit movement routes around terrain. The opening wave unlocks at 90% Methamphetamines research (or completion). Before 4:00
 it launches once at least one unit arrives, with five arrivals required thereafter. From 4:00
@@ -302,8 +302,8 @@ resources permit, the Engineer builds a Barracks, a Training Centre, then two mo
 completing one building before starting the next. Failed sites are retried. Rush disables the
 shared worker-retreat reflex; a lost Engineer is not replaced.
 
-Every completed Barracks rallies to the staging line. Initially it alternates Riflemen and Machine
-Gunners through standing production allocations. When the first Training Centre completes, all
+Every completed Barracks uses an attack-move rally to the staging line. Initially it alternates
+Riflemen and Machine Gunners through standing production allocations. When the first Training Centre completes, all
 Barracks disable Rifleman repeat without cancelling existing paid or queued Riflemen; later
 Barracks start with Machine Gunner repeat only. Methamphetamines is queued on the first decision
 that observes the Training Centre scaffold, followed by Entrenchment. Panzerfausts is queued on
@@ -317,9 +317,9 @@ through the public terrain map, without cutting blocked diagonal corners. The fo
 perpendicular to the smoothed local approach direction. Riflemen and Machine Gunners receive
 stable, spaced slots from the main line's centre outward. Panzerfausts use a separate parallel
 line three tiles behind it. Blocked slots are skipped without placing front infantry into the
-Panzerfaust line. Only owned and currently visible buildings affect slot avoidance. Units move to
-their slots and Hold Position after arriving. The first assembled wave attack-moves to the enemy
-start as soon as Methamphetamines reaches 90% research progress (or is already complete); if
+Panzerfaust line. Only owned and currently visible buildings affect slot avoidance. Units attack-move
+to their slots, engaging enemies en route, and Hold Position after arriving. The first assembled wave
+attack-moves to the enemy start as soon as Methamphetamines reaches 90% research progress (or is already complete); if
 nobody has arrived yet, the trigger stays unlocked until arrivals. Subsequent waves require at
 least five units actually at their slots, rather than counting en-route reinforcements. Each wave
 launches with one group command. Launched units are never added to a later wave or pulled back to
