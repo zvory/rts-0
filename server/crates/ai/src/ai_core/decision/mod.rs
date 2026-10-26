@@ -201,6 +201,7 @@ where
         .pending_upgrades
         .retain(|upgrade| !observation.upgrades.contains(upgrade));
 
+    memory.sync_pressure_research(observation);
     let facts = AiFacts::from_observation(observation);
     memory.sync_home_defensive_tank(observation, profile);
     if uses_current_jeffs_ai_policy(profile.id) {
@@ -929,6 +930,12 @@ where
     let attack_due = frontal_wave.attack_due;
     let mut local_ready_units =
         actions::select_ready_combat_units(&observation.owned, &ALL_COMBAT_UNITS);
+    if profile.id == crate::ai_core::profiles::PRESSURE_AI_ID {
+        local_ready_units.extend(actions::select_ready_combat_units(
+            &observation.owned,
+            &[EntityKind::Panzerfaust],
+        ));
+    }
     local_ready_units.retain(|id| !expansion_footprint_blockers.contains(id));
     local_ready_units.retain(|id| !push_units.contains(id));
     if profile.home_anti_tank.is_some() {

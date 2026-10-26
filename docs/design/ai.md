@@ -206,7 +206,10 @@ The legacy decision loop hands unreserved offensive
 Riflemen, Panzerfausts, and Tanks to a separate SDK staging owner after home-defense and construction-clearance
 orders have claimed their units. Pressure replaces the legacy frontal-wave issuer rather than
 layering competing attack orders over it. Home defenders retain priority; temporarily borrowed,
-unlaunched units resume their staging orders when released.
+unlaunched units resume their staging orders when released. Nearby Panzerfausts participate in
+that home-defense handoff. Pressure tracks legacy research producers and retries interrupted
+research on a replacement producer, so losing a Training Centre cannot leave the first wave
+permanently locked.
 
 `server/crates/ai/src/pressure.rs` intentionally copies Rush's terrain route, stable-slot, arrival,
 and cohort policy instead of calling Rush code. Its constants and persistent state are independent.

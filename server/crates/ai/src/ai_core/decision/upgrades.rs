@@ -28,6 +28,7 @@ pub(super) fn queue_upgrade_if_available(
         upgrade,
     ) {
         memory.pending_upgrades.insert(researched.upgrade);
+        memory.note_research_producer(researched.upgrade, researched.building);
         intents.push(AiIntent::Research {
             upgrade: researched.upgrade,
         });
