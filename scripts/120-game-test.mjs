@@ -180,6 +180,9 @@ Options:
                       Used only for the quiet agent wait estimate.
   --status DIR        Print compact status for an output directory; no profiles required.
   --dry-run           Print the fixed test plan without building or running games.
+  --names "A,B,C"     Display names for the 3 profile inputs, in order. Matchup labels and output
+                      folders use them (e.g. "AI 2.1,Rush AI,Jeff" gives "Jeff vs Rush AI" in
+                      jeff-vs-rush-ai/) instead of the AI 2.1 / pre-change / post-change roles.
   -h, --help          Show this help.
 
 Default output:
@@ -200,6 +203,7 @@ function parseArgs(argv) {
     expectedGameSeconds: DEFAULT_EXPECTED_FULL_GAME_SECONDS,
     statusDir: "",
     dryRun: false,
+    names: null,
     help: false,
   };
   const positionals = [];
@@ -225,6 +229,7 @@ function parseArgs(argv) {
     }
     else if (arg === "--status") parsed.statusDir = path.resolve(value());
     else if (arg === "--dry-run") parsed.dryRun = true;
+    else if (arg === "--names") parsed.names = parseNames(value());
     else if (!arg.startsWith("-")) positionals.push(arg);
     else throw new Error(`unknown argument: ${arg}\n\n${usage()}`);
   }
@@ -245,7 +250,7 @@ function parseArgs(argv) {
     if (new Set(positionals).size !== 3) {
       throw new Error("the 3 profile inputs must be distinct");
     }
-    parsed.profiles = { ai21, preChangeJeff, postChangeJeff };
+    parsed.profiles = { ai21, preChangeJeff, postChangeJeff, names: parsed.names };
   }
   if (!parsed.outDir) {
     parsed.outDir = path.join(repoRoot, "comparison-results", `120-game-test-${utcStamp()}`);
@@ -254,26 +259,37 @@ function parseArgs(argv) {
 }
 
 function createMatchups(profiles) {
-  return [
-    {
-      id: "ai21-vs-prechange-jeff",
-      label: "AI 2.1 vs pre-change Jeff",
-      candidate: profiles.ai21,
-      baseline: profiles.preChangeJeff,
-    },
-    {
-      id: "postchange-jeff-vs-ai21",
-      label: "Post-change Jeff vs AI 2.1",
-      candidate: profiles.postChangeJeff,
-      baseline: profiles.ai21,
-    },
-    {
-      id: "postchange-jeff-vs-prechange-jeff",
-      label: "Post-change Jeff vs pre-change Jeff",
-      candidate: profiles.postChangeJeff,
-      baseline: profiles.preChangeJeff,
-    },
+  const slots = [profiles.ai21, profiles.preChangeJeff, profiles.postChangeJeff];
+  // [standard id, standard label, candidate slot, baseline slot]
+  const standard = [
+    ["ai21-vs-prechange-jeff", "AI 2.1 vs pre-change Jeff", 0, 1],
+    ["postchange-jeff-vs-ai21", "Post-change Jeff vs AI 2.1", 2, 0],
+    ["postchange-jeff-vs-prechange-jeff", "Post-change Jeff vs pre-change Jeff", 2, 1],
   ];
+  return standard.map(([id, label, candidate, baseline]) => {
+    const names = profiles.names;
+    return {
+      id: names ? `${nameSlug(names[candidate])}-vs-${nameSlug(names[baseline])}` : id,
+      label: names ? `${names[candidate]} vs ${names[baseline]}` : label,
+      candidate: slots[candidate],
+      baseline: slots[baseline],
+    };
+  });
+}
+
+function nameSlug(name) {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
+function parseNames(raw) {
+  const names = raw.split(",").map((name) => name.trim());
+  if (names.length !== 3 || names.some((name) => !nameSlug(name))) {
+    throw new Error("--names needs 3 comma-separated names, one per profile input");
+  }
+  if (new Set(names.map(nameSlug)).size !== 3) {
+    throw new Error("--names must give the 3 profile inputs distinct names");
+  }
+  return names;
 }
 
 function positiveInteger(raw, flag) {
@@ -321,6 +337,7 @@ function launchBackground(runOptions) {
   if (runOptions.skipBuild) args.push("--skip-build");
   if (runOptions.verifyReplay) args.push("--verify-replay");
   if (runOptions.progress) args.push("--progress");
+  if (runOptions.names) args.push("--names", runOptions.names.join(","));
   args.push("--expected-game-seconds", String(runOptions.expectedGameSeconds));
 
   let child;
