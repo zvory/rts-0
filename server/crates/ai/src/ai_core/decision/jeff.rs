@@ -285,6 +285,59 @@ pub(super) fn gather_resting_tanks(
     )
 }
 
+/// Whether the current Jeff's builder may go for the natural now. `secured`: the site is secured or
+/// off the enemy's way in. With the live Jeff's spend plan the Depot must be paid for by the
+/// builder's arrival; otherwise its cost must be banked.
+pub(super) fn natural_attempt_ready(
+    (observation, map_analysis, memory): (
+        &AiObservation,
+        Option<&AiMapAnalysis>,
+        &AiDecisionMemory,
+    ),
+    profile_id: &str,
+    secured: bool,
+    spend_plan: Option<&spend_plan::SpendPlan>,
+) -> bool {
+    match spend_plan {
+        Some(plan) => expansion_security::natural_attempt_ready_funded(
+            observation,
+            map_analysis,
+            memory,
+            secured,
+            !runs_live_jeff(profile_id),
+            plan.natural_funded_on_arrival,
+        ),
+        None => expansion_security::natural_attempt_ready(
+            observation,
+            map_analysis,
+            memory,
+            secured,
+            !runs_live_jeff(profile_id),
+        ),
+    }
+}
+
+/// The current Jeff's launched push keeps its units: home defense answers raids with what stayed
+/// home, and the push keeps its own orders meanwhile. It used to lose all but two Tanks to home
+/// defense within moments of leaving.
+pub(super) fn push_units(profile_id: &str, memory: &AiDecisionMemory) -> BTreeSet<u32> {
+    if uses_current_jeffs_ai_policy(profile_id)
+        && memory.containment.wave_launched
+        && !memory.containment.recovery_active
+    {
+        memory
+            .containment
+            .active_tanks
+            .iter()
+            .copied()
+            .chain(memory.containment.active_scout)
+            .chain(memory.containment.active_riflemen.iter().copied())
+            .collect()
+    } else {
+        BTreeSet::new()
+    }
+}
+
 /// The live Jeff builds at home with the Engineer nearest its HQ. By id the first pick was the
 /// natural's builder, which stands at the natural once a second Engineer is home.
 pub(super) fn home_builders(

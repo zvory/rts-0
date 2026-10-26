@@ -134,6 +134,7 @@ pub(crate) struct AiDecisionMemory {
     defender_posture: BTreeMap<u32, DefenderPostureMemory>,
     entrenchment_available_since: Option<u32>,
     pub(super) pending_upgrades: BTreeSet<UpgradeKind>,
+    pressure_research_producers: BTreeMap<UpgradeKind, u32>,
     launched_frontal_units: BTreeMap<u32, u32>,
     /// The push under way (or forming), its units, route and firing state.
     pub(super) containment: ContainmentPush,
@@ -169,6 +170,32 @@ pub(crate) struct AiDecisionMemory {
 }
 
 impl AiDecisionMemory {
+    /// Pressure must retry interrupted research on a replacement producer. Other profiles retain
+    /// their existing research bookkeeping and policy.
+    pub(super) fn note_research_producer(&mut self, upgrade: UpgradeKind, producer: u32) {
+        if self.profile_id == Some(crate::ai_core::profiles::PRESSURE_AI_ID) {
+            self.pressure_research_producers.insert(upgrade, producer);
+        }
+    }
+
+    pub(super) fn sync_pressure_research(&mut self, observation: &AiObservation) {
+        let pending = &mut self.pending_upgrades;
+        self.pressure_research_producers
+            .retain(|upgrade, producer| {
+                if observation.upgrades.contains(upgrade)
+                    || !observation
+                        .owned
+                        .iter()
+                        .any(|e| e.id == *producer && e.hp > 0)
+                {
+                    pending.remove(upgrade);
+                    false
+                } else {
+                    true
+                }
+            });
+    }
+
     pub(crate) fn for_profile(profile: &AiProfile) -> Self {
         Self {
             expansion_security: Default::default(),
@@ -194,6 +221,7 @@ impl AiDecisionMemory {
             defender_posture: BTreeMap::new(),
             entrenchment_available_since: None,
             pending_upgrades: BTreeSet::new(),
+            pressure_research_producers: BTreeMap::new(),
             launched_frontal_units: BTreeMap::new(),
             containment: ContainmentPush::default(),
             approach: Default::default(),
@@ -287,6 +315,7 @@ impl AiDecisionMemory {
         self.defender_posture.clear();
         self.entrenchment_available_since = None;
         self.pending_upgrades.clear();
+        self.pressure_research_producers.clear();
         self.launched_frontal_units.clear();
         self.containment.stationary_since = None;
         self.containment.wave_launched = false;

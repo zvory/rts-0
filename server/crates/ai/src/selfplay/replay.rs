@@ -1016,7 +1016,14 @@ mod tests {
         );
         assert_eq!(
             available_profile_ids(),
-            vec![AI_2_1_ID, "jeffs_ai", AI_TURTLE_ID, "rush_ai", "ai_2_2"]
+            vec![
+                AI_2_1_ID,
+                "jeffs_ai",
+                AI_TURTLE_ID,
+                "pressure_ai",
+                "rush_ai",
+                "ai_2_2"
+            ]
         );
         assert_eq!(canonical_profile_id(AI_2_1_ID), Some(AI_2_1_ID));
         assert_eq!(canonical_profile_id(AI_TURTLE_ID), Some(AI_TURTLE_ID));

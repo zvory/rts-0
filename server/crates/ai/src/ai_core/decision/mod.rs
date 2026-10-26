@@ -97,6 +97,8 @@ use self::turtle::{
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct AiDecision {
+    /// Pressure assault candidates after home defense and construction clearance have claimed units.
+    pub(crate) pressure_wave_units: BTreeSet<u32>,
     pub(crate) profile_id: &'static str,
     pub(crate) intents: Vec<AiIntent>,
     pub(crate) commands: Vec<Command>,
@@ -211,6 +213,7 @@ where
         memory.spend_plan.observe(observation, unlock_pending);
     }
 
+    memory.sync_pressure_research(observation);
     let facts = AiFacts::from_observation(observation);
     memory.sync_home_defensive_tank(observation, profile);
     if uses_current_jeffs_ai_policy(profile.id) {
@@ -381,23 +384,12 @@ where
     );
     let natural_ready = jeff_natural
         && expansion_security::expansion_is_next(observation, &facts, profile)
-        && match spend_plan.as_ref() {
-            Some(plan) => expansion_security::natural_attempt_ready_funded(
-                observation,
-                map_analysis,
-                memory,
-                expansion_secured || natural_sheltered,
-                !runs_live_jeff(profile.id),
-                plan.natural_funded_on_arrival,
-            ),
-            None => expansion_security::natural_attempt_ready(
-                observation,
-                map_analysis,
-                memory,
-                expansion_secured || natural_sheltered,
-                !runs_live_jeff(profile.id),
-            ),
-        };
+        && jeff::natural_attempt_ready(
+            (observation, map_analysis, memory),
+            profile.id,
+            expansion_secured || natural_sheltered,
+            spend_plan.as_ref(),
+        );
     if (jeff_natural && natural_ready)
         || (!jeff_natural
             && (should_build_expansion_from_economy_manager(&economy_manager_output)
@@ -793,6 +785,16 @@ where
         &effective_unit_priorities,
     );
     let mut effective_unit_priorities = effective_unit_priorities;
+    if profile.id == crate::ai_core::profiles::PRESSURE_AI_ID
+        && crate::pressure::uses_panzerfaust_production(
+            observation.tick,
+            facts.completed_upgrades(),
+        )
+    {
+        // Pressure's standing Panzerfaust allocation replaces new Rifleman orders; paid queues
+        // finish normally. Keep the legacy home Machine Gunners and Tank production policy.
+        effective_unit_priorities.retain(|unit| *unit != EntityKind::Rifleman);
+    }
     let security_rifle_target = jeff::security_rifle_target(
         observation,
         &facts,
@@ -971,24 +973,7 @@ where
         frontal_exclusions.insert(tank_id);
     }
     sync_containment_recovery(observation, profile, memory);
-    // The current Jeff's launched push keeps its units: home defense answers raids with what stayed
-    // home, and the push keeps its own orders meanwhile. It used to lose all but two Tanks to
-    // home defense within moments of leaving.
-    let push_units: BTreeSet<u32> = if uses_current_jeffs_ai_policy(profile.id)
-        && memory.containment.wave_launched
-        && !memory.containment.recovery_active
-    {
-        memory
-            .containment
-            .active_tanks
-            .iter()
-            .copied()
-            .chain(memory.containment.active_scout)
-            .chain(memory.containment.active_riflemen.iter().copied())
-            .collect()
-    } else {
-        BTreeSet::new()
-    };
+    let push_units = jeff::push_units(profile.id, memory);
     let forward_tank_position = uses_current_jeffs_ai_policy(profile.id)
         .then(|| expansion_security::tank_staging_center(observation, map_analysis))
         .flatten();
@@ -1016,6 +1001,12 @@ where
     let attack_due = frontal_wave.attack_due;
     let mut local_ready_units =
         actions::select_ready_combat_units(&observation.owned, &ALL_COMBAT_UNITS);
+    if profile.id == crate::ai_core::profiles::PRESSURE_AI_ID {
+        local_ready_units.extend(actions::select_ready_combat_units(
+            &observation.owned,
+            &[EntityKind::Panzerfaust],
+        ));
+    }
     local_ready_units.retain(|id| !expansion_footprint_blockers.contains(id));
     local_ready_units.retain(|id| !push_units.contains(id));
     local_ready_units.retain(|id| !memory.opening_rush.is_reserved(*id));
@@ -1031,7 +1022,9 @@ where
                 })
         });
     }
-    if !frontal_wave.ready_units.is_empty()
+    let mut pressure_wave_units = BTreeSet::new();
+    if profile.id == crate::ai_core::profiles::PRESSURE_AI_ID
+        || !frontal_wave.ready_units.is_empty()
         || !local_ready_units.is_empty()
         || !defensive_machine_gunners.is_empty()
     {
@@ -1328,7 +1321,33 @@ where
         };
         // During a raid at home only a launched push is still commanded here.
         let push_only = handled_local_defense && containment_recall_target.is_none();
-        if (!push_only || !push_units.is_empty())
+        if profile.id == crate::ai_core::profiles::PRESSURE_AI_ID {
+            let engaged_home = local_target
+                .map(|_| defense::engaged_local_defense_units(observation))
+                .unwrap_or_default();
+            let ordered: BTreeSet<u32> = actions
+                .unit_orders_since(0)
+                .into_iter()
+                .map(|(id, _)| id)
+                .collect();
+            pressure_wave_units.extend(
+                observation
+                    .owned
+                    .iter()
+                    .filter(|unit| {
+                        unit.is_complete
+                            && unit.hp > 0
+                            && attack_policy.unit_kinds.contains(&unit.kind)
+                            && !frontal_exclusions.contains(&unit.id)
+                            && !ordered.contains(&unit.id)
+                            && !local_defense_assigned.contains(&unit.id)
+                            && !engaged_home.contains(&unit.id)
+                    })
+                    .map(|unit| unit.id),
+            );
+        }
+        if profile.id != crate::ai_core::profiles::PRESSURE_AI_ID
+            && (!push_only || !push_units.is_empty())
             && !turtle_defense_active
             && (!frontal_wave.ready_units.is_empty() || containment_needs_control)
         {
@@ -1402,6 +1421,7 @@ where
     });
 
     let mut decision = AiDecision {
+        pressure_wave_units,
         profile_id: profile.id,
         intents,
         commands: actions.into_commands(),
