@@ -248,8 +248,9 @@ Missing ranked sites fall back toward the enemy main without duplicate queued de
 
 Riflemen and Panzerfausts occupy the front; Tanks stand three tiles behind at three-tile spacing.
 Units move to clear slots and Hold Position. Later lines may span blocked terrain: their center
-and orientation remain exact, blocked slots are skipped, and ordinary unit movement routes around
-terrain. The opening wave unlocks at 90% Methamphetamines research (or completion). Before 4:00
+and orientation remain exact. Blocked slots and slots disconnected from Pressure’s original main
+are skipped using cached static ground connectivity without diagonal corner cutting; ordinary
+unit movement routes around terrain. The opening wave unlocks at 90% Methamphetamines research (or completion). Before 4:00
 it launches once at least one unit arrives, with five arrivals required thereafter. From 4:00
 all new waves require at least ten arrivals; from 8:00 they require twenty. The research gate
 still applies if the opening wave has not launched. En-route units do not count.

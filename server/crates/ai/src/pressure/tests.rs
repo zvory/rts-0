@@ -607,3 +607,55 @@ fn pressure_keeps_initial_ranked_landmarks_when_later_resources_or_site_rankings
     assert_eq!(objective.target(), third);
     assert_eq!(objective.followups(), &[second, main]);
 }
+
+#[test]
+fn later_axis_slots_skip_disconnected_ground_without_moving_the_line() {
+    let (mut start, mut snapshot, sites, main) = timed_fixture(20);
+    snapshot.tick = 14400;
+    let size = start.map.tile_size as f32;
+    let expected = StagingLine::on_axis(
+        frame(&start, &snapshot).map(),
+        sites[0].position,
+        sites[3].position,
+    )
+    .unwrap();
+    let wall_x = (expected.center.0 / size) as usize + 2;
+    for y in 0..start.map.height as usize {
+        start.map.terrain[y * start.map.width as usize + wall_x] =
+            rts_rules::terrain::MAP_TERRAIN_WATER;
+    }
+    let mut waves = PressureWaves::default();
+    timed_step(&mut waves, &start, &snapshot, &sites, main);
+    assert_eq!(waves.plan.unwrap().1.center, expected.center);
+    assert!(
+        !waves.slots.is_empty(),
+        "home={:?} wall={} center={:?} forward={:?} reachable={}",
+        sites[0].position,
+        wall_x,
+        expected.center,
+        expected.forward,
+        waves.reachable.iter().filter(|v| **v).count()
+    );
+    for point in waves.slots.values() {
+        let x = (point.0 / size) as usize;
+        let y = (point.1 / size) as usize;
+        assert!(x < wall_x, "slot must remain on the main's connected side");
+        assert!(waves.reachable[y * start.map.width as usize + x]);
+    }
+}
+
+#[test]
+fn pressure_ground_connectivity_does_not_cut_diagonally_blocked_corners() {
+    let mut map = AiMap {
+        width: 3,
+        height: 3,
+        tile_size: 32,
+        terrain: vec![AiTerrain::Grass; 9],
+        no_building_tiles: BTreeSet::new(),
+    };
+    map.terrain[1] = AiTerrain::Water;
+    map.terrain[3] = AiTerrain::Rock;
+    let reachable = ground_reachable(&map, (16.0, 16.0));
+    assert!(reachable[0]);
+    assert!(!reachable[4]);
+}

@@ -1,7 +1,7 @@
 //! Copied from Rush staging, intentionally owned independently by Pressure.
 //! Cohorts assemble on a timed front before receiving a shared attack route.
 use std::cmp::Reverse;
-use std::collections::{BTreeMap, BTreeSet, BinaryHeap};
+use std::collections::{BTreeMap, BTreeSet, BinaryHeap, VecDeque};
 
 use crate::sdk::{
     AiActions, AiEntityState, AiFrame, AiMap, AiTerrain, EntityKind, UnitGroup, UpgradeKind,
@@ -25,6 +25,7 @@ pub(crate) struct PressureWaves {
     production: production::PressureProduction,
     plan: Option<(u32, StagingLine)>,
     objective: Option<Objective>,
+    reachable: Vec<bool>,
     slots: BTreeMap<u32, Point>,
     issued: BTreeMap<u32, u32>,
     held: BTreeSet<u32>,
@@ -64,6 +65,7 @@ impl PressureWaves {
             } else {
                 StagingLine::on_axis(frame.map(), home, objective.target())
             };
+            self.reachable = ground_reachable(frame.map(), home);
             self.plan = line.map(|line| (enemy_id, line));
             self.objective = Some(objective);
             self.slots.clear();
@@ -119,7 +121,12 @@ impl PressureWaves {
             if self.slots.contains_key(&entity.id) {
                 continue;
             }
-            if let Some(point) = line.free_slot(frame, entity.kind, self.slots.values().copied()) {
+            if let Some(point) = line.free_slot(
+                frame,
+                entity.kind,
+                self.slots.values().copied(),
+                &self.reachable,
+            ) {
                 self.slots.insert(entity.id, point);
             }
         }
@@ -257,6 +264,7 @@ impl StagingLine {
         frame: &AiFrame,
         kind: EntityKind,
         occupied: impl Iterator<Item = Point>,
+        reachable: &[bool],
     ) -> Option<Point> {
         let occupied = occupied.collect::<Vec<_>>();
         let size = frame.map().tile_size as f32;
@@ -306,12 +314,68 @@ impl StagingLine {
                         ),
                     )
                 });
-            if connected && clear_slot(frame, point) {
+            let tile = ((point.0 / size) as usize, (point.1 / size) as usize);
+            let home_connected = self.routed
+                || (point.0 >= 0.0
+                    && point.1 >= 0.0
+                    && tile.0 < frame.map().width as usize
+                    && tile.1 < frame.map().height as usize
+                    && reachable
+                        .get(tile.1 * frame.map().width as usize + tile.0)
+                        .copied()
+                        .unwrap_or(false));
+            if connected && home_connected && clear_slot(frame, point) {
                 return Some(point);
             }
         }
         None
     }
+}
+
+/// Static ground connectivity from Pressure's original main, ignoring dynamic occupants.
+/// Later straight staging lines may cross water, but recruits must stay on reachable ground.
+fn ground_reachable(map: &AiMap, home: Point) -> Vec<bool> {
+    let mut reachable = vec![false; map.terrain.len()];
+    let size = map.tile_size as f32;
+    if size <= 0.0 {
+        return reachable;
+    }
+    let start = ((home.0 / size) as i32, (home.1 / size) as i32);
+    if !passable(map, start.0, start.1) {
+        return reachable;
+    }
+    let index = |x: i32, y: i32| y as usize * map.width as usize + x as usize;
+    let Some(cell) = reachable.get_mut(index(start.0, start.1)) else {
+        return reachable;
+    };
+    *cell = true;
+    let mut queue = VecDeque::from([start]);
+    while let Some((x, y)) = queue.pop_front() {
+        for (dx, dy) in [
+            (-1, -1),
+            (0, -1),
+            (1, -1),
+            (-1, 0),
+            (1, 0),
+            (-1, 1),
+            (0, 1),
+            (1, 1),
+        ] {
+            let (nx, ny) = (x + dx, y + dy);
+            if !passable(map, nx, ny)
+                || (dx != 0 && dy != 0 && (!passable(map, x + dx, y) || !passable(map, x, y + dy)))
+            {
+                continue;
+            }
+            if let Some(cell) = reachable.get_mut(index(nx, ny)) {
+                if !*cell {
+                    *cell = true;
+                    queue.push_back((nx, ny));
+                }
+            }
+        }
+    }
+    reachable
 }
 
 fn clear_slot(frame: &AiFrame, point: Point) -> bool {
