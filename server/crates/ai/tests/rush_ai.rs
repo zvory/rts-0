@@ -186,11 +186,16 @@ fn check_rush_opening(map_name: Option<&str>) {
         research_queued.unwrap() - training_started.unwrap() <= 9,
         "research must queue on first think after scaffold appears"
     );
+    let mut previously_launched = BTreeSet::new();
     let waves = commands
         .iter()
         .filter_map(|entry| match &entry.command {
-            Command::AttackMove { units, x, y, .. } if units.len() > 1 => {
-                Some((entry.tick, units, *x, *y))
+            Command::AttackMove { units, x, y, .. } => {
+                // Flow orders retask already launched units individually. Keep singleton
+                // opening launches in the assertions as well as every shared wave order.
+                let first_launch = units.iter().any(|id| !previously_launched.contains(id));
+                previously_launched.extend(units.iter().copied());
+                (first_launch || units.len() > 1).then_some((entry.tick, units, *x, *y))
             }
             _ => None,
         })
