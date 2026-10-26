@@ -8,7 +8,7 @@ import { ALL_CATALOG_CATEGORIES, INTERACT_LIMITS } from "./command_inputs.ts";
 import { commandDefinition } from "./command_registry.ts";
 import { SessionCoordinator } from "./session_coordinator.ts";
 import { gameSessionCapabilities, scenarioSessionCapabilities } from "./game_session.ts";
-import { defaultMapForMode } from "./session_defaults.ts";
+import { defaultMapForMode, DEFAULT_GAME_AI_PROFILE_ID } from "./session_defaults.ts";
 import { executeLabCommand } from "./namespaces/lab/commands.ts";
 import { executeGameCommand } from "./namespaces/game/commands.ts";
 import { executeDevScenarioCommand } from "./namespaces/dev_scenario/commands.ts";
@@ -132,7 +132,7 @@ export class InteractService {
         visualProfile: typeof input.visualProfile === "string" ? input.visualProfile : "",
         devScenario: { id: input.id || "", unit: input.unit || "", count: input.count || 1,
           blocker: input.blocker || "", case: input.case || "" },
-        opponent: input.opponent || "ai_2_1",
+        opponent: input.opponent || DEFAULT_GAME_AI_PROFILE_ID,
         spectate: input.spectate || null,
         autoSpectator: input.autoSpectator === true,
         viewport: input.viewport,
@@ -150,7 +150,7 @@ export class InteractService {
           source: "launch", kind, scenario: kind === "lab" ? input.scenario || "blank" : null,
           visualProfile: kind === "lab" ? input.visualProfile || null : null,
           map, seed: kind === "lab" ? input.seed ?? null : null,
-          opponent: kind === "game" && !input.spectate ? input.opponent || "ai_2_1" : null,
+          opponent: kind === "game" && !input.spectate ? input.opponent || DEFAULT_GAME_AI_PROFILE_ID : null,
           spectate: kind === "game" ? input.spectate || null : null,
           autoSpectator: kind === "game" ? input.autoSpectator === true : false,
           role: kind === "game" ? (input.spectate ? "spectator" : "player") : kind === "scenario" ? "observer" : null,
