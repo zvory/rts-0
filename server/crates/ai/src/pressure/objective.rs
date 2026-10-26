@@ -16,10 +16,12 @@ impl Objective {
         let queries = WorldQueries::new(frame);
         let second = queries
             .base(enemy_id, 2)
+            .filter(|base| base.distance_from_main.is_some())
             .map(|base| base.site.position)
             .unwrap_or(main);
         let third = queries
             .base(enemy_id, 3)
+            .filter(|base| base.distance_from_main.is_some())
             .map(|base| base.site.position)
             .unwrap_or(second);
         Self {

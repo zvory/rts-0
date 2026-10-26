@@ -389,28 +389,40 @@ fn timed_fixture(count: usize) -> (StartPayload, Snapshot, Vec<crate::sdk::AiBas
     let main = point(2);
     let second = (main.0 - 20.0 * size, main.1);
     let third = (main.0 - 40.0 * size, main.1 - 10.0 * size);
-    let sites = vec![
+    let mut sites = vec![
         AiBaseSite {
             id: AiBaseSiteId::Start(1),
             position: home,
             resource_ids: vec![],
+            ground_distances_from_starts: Default::default(),
         },
         AiBaseSite {
             id: AiBaseSiteId::Start(2),
             position: main,
             resource_ids: vec![],
+            ground_distances_from_starts: Default::default(),
         },
         AiBaseSite {
             id: AiBaseSiteId::ResourceCluster(1),
             position: second,
             resource_ids: vec![],
+            ground_distances_from_starts: Default::default(),
         },
         AiBaseSite {
             id: AiBaseSiteId::ResourceCluster(2),
             position: third,
             resource_ids: vec![],
+            ground_distances_from_starts: Default::default(),
         },
     ];
+    for site in &mut sites {
+        site.ground_distances_from_starts = [
+            (1, distance(home, site.position)),
+            (2, distance(main, site.position)),
+        ]
+        .into_iter()
+        .collect();
+    }
     snapshot.entities.clear();
     snapshot
         .upgrades

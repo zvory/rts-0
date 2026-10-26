@@ -127,7 +127,8 @@ where
     for base in queries.ranked_bases(observation.player_id) {
         // Geography includes every player's main. Never expand into an original start or a site
         // with owned, allied, visible enemy, or remembered Depot evidence.
-        if matches!(base.site.id, AiBaseSiteId::Start(_))
+        if base.distance_from_main.is_none()
+            || matches!(base.site.id, AiBaseSiteId::Start(_))
             || !queries.known_base_depots(base.site.id).is_empty()
         {
             continue;

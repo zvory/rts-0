@@ -271,7 +271,7 @@ Pressure's infantry staging line and its normal arrival-counted waves. This poli
 are independent of Rush.
 
 Pressure expands up to five Resource Depots. It uses the SDK's player-relative ranked base sites,
-skips original player starts and sites with known owned/allied/enemy or remembered Depot evidence,
+skips unreachable sites, original player starts, and sites with known owned/allied/enemy or remembered Depot evidence,
 and searches legal footprints covering the selected cluster's available resources. Unknown
 occupancy remains unknown; ordinary authoritative placement validates each build. Blocked or
 exhausted sites yield to the next usable ranked site. A map with no usable site does not halt Tank

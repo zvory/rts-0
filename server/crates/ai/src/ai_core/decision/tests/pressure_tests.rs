@@ -519,28 +519,37 @@ fn pressure_ranked_sites_skip_occupied_or_exhausted_clusters_and_original_starts
             y: y * ts,
         })
         .to_vec();
-    let sites = [
+    let mut sites = [
         AiBaseSite {
             id: AiBaseSiteId::Start(1),
             position: (9.5 * ts, 9.5 * ts),
             resource_ids: vec![],
+            ground_distances_from_starts: Default::default(),
         },
         AiBaseSite {
             id: AiBaseSiteId::Start(2),
             position: (15.5 * ts, 25.5 * ts),
             resource_ids: vec![],
+            ground_distances_from_starts: Default::default(),
         },
         AiBaseSite {
             id: AiBaseSiteId::ResourceCluster(0),
             position: (20.5 * ts, 30.5 * ts),
             resource_ids: vec![1000],
+            ground_distances_from_starts: Default::default(),
         },
         AiBaseSite {
             id: AiBaseSiteId::ResourceCluster(1),
             position: (50.5 * ts, 30.5 * ts),
             resource_ids: vec![1001],
+            ground_distances_from_starts: Default::default(),
         },
     ];
+    for site in &mut sites {
+        let (dx, dy) = (site.position.0 - 9.5 * ts, site.position.1 - 9.5 * ts);
+        site.ground_distances_from_starts
+            .insert(1, (dx * dx + dy * dy).sqrt());
+    }
     let mut snapshot = game.snapshot_for(1);
     snapshot.entities.clear();
     let choose =
