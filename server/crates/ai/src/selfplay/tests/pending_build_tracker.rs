@@ -157,7 +157,7 @@ fn pending_build_tracker_expires_stuck_worker() {
 }
 
 #[test]
-fn pending_factory_build_waits_for_clearance_and_retries_same_site() {
+fn pending_factory_build_waits_for_clearance_then_excludes_failed_site() {
     let start = pending_tracker_start_payload();
     let mut tracker = PendingBuildTracker::default();
     tracker.record_commands_with_factory_clearance(
@@ -177,6 +177,7 @@ fn pending_factory_build_waits_for_clearance_and_retries_same_site() {
     idle_snapshot.entities[0].state = states::IDLE.to_string();
     tracker.observe(pending_tracker_view(20, &start, &idle_snapshot));
     assert_eq!(tracker.intents().len(), 1);
+    assert!(!tracker.failed(EntityKind::Factory, 20, 70));
 
     let expiry_tick = 10 + BUILD_SITE_CLEARANCE_GRACE_TICKS;
     let expiry_snapshot = pending_tracker_snapshot(expiry_tick, 100.0, 200.0);
@@ -185,5 +186,5 @@ fn pending_factory_build_waits_for_clearance_and_retries_same_site() {
     tracker.observe(pending_tracker_view(expiry_tick, &start, &expiry_snapshot));
 
     assert!(tracker.intents().is_empty());
-    assert!(!tracker.failed(EntityKind::Factory, 20, 70));
+    assert!(tracker.failed(EntityKind::Factory, 20, 70));
 }
