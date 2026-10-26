@@ -98,10 +98,12 @@ build; it is not an accepted, legal, or active-build receipt.
 
 `AiActions` is a typed per-think builder that retains at most 256 emitted actions in helper-call
 order. Its supported helpers are paid explicit-site build, resume-without-repay, train, standing
-production repeat, research, gather, move, attack-move, direct attack, Hold Position, and Anti-Tank
+production repeat, research, gather, move, attack-move, attack-move routes, direct attack, Hold Position, and Anti-Tank
 Gun setup. `UnitGroup`
 canonicalizes tactical unit IDs into a sorted, deduplicated, non-empty set; caller-ordered worker,
-resource-node, and producer candidate lists are not normalized.
+resource-node, and producer candidate lists are not normalized. `attack_move_route` reserves a
+group once and emits an initial unqueued AttackMove followed by queued waypoints in order. Its
+whole route must fit the local action capacity before any request or reservation changes.
 
 The builder tracks Steel, Oil, and free Supply plus independent actor, resource-node, and producer
 reservation namespaces. Every helper completes local preflight before changing the budget,
@@ -163,7 +165,8 @@ tiles, using stable-ID ties. It reports owner and owned/currently visible/rememb
 including last-seen tick for remembered contacts. Current evidence supersedes memory of the same
 entity. Empty evidence means unknown occupancy, never confirmed vacancy. Construction sites count
 as Depot evidence; none of these queries reads hidden state. The canonical host attaches the cached
-landmarks before either strategy initialization or step; built-in policy decisions are unchanged.
+landmarks before either strategy initialization or step. Pressure uses these queries to order its
+expansions; other built-in profiles retain their existing placement policies.
 
 ### Shared decision core
 
@@ -217,8 +220,8 @@ while the search continues through other resource locations.
 
 ### Pressure AI
 
-`pressure_ai` owns a copy of the AI 2.1 policy, retaining its economy, expansion, Tank technology
-and production, and home-defense decisions, with independent infantry research and production.
+`pressure_ai` owns a copy of the AI 2.1 opening, Tank technology, three-base Tank production,
+and home-defense decisions, with independent expansion, infantry research, and production.
 The legacy decision loop hands unreserved offensive
 Riflemen, Panzerfausts, and Tanks to a separate SDK staging owner after home-defense and construction-clearance
 orders have claimed their units. Pressure replaces the legacy frontal-wave issuer rather than
@@ -230,12 +233,27 @@ permanently locked.
 
 `server/crates/ai/src/pressure.rs` intentionally copies Rush's terrain route, stable-slot, arrival,
 and cohort policy instead of calling Rush code. Its constants and persistent state are independent.
-The line sits 35 tiles outside the enemy start, perpendicular to the routed approach. Riflemen
-and Panzerfausts occupy the front; Tanks stand three tiles behind at three-tile spacing. Units move to their slots
-and Hold Position. The first wave unlocks at 90% Methamphetamines research (or completion), and
-launches once at least one unit has arrived; later waves need five actual arrivals. En-route units
-do not count. Each wave receives one AttackMove to the enemy start, and launched units never
-rejoin staging. Pressure retains ordinary attack-move combat after launch; Rush's extractor-raiding
+Before 4:00 the line sits 35 tiles outside the enemy start, perpendicular to the routed approach.
+At 4:00 it moves to 25 tiles from the opponent's geographically ranked second base, toward
+Pressure's original main. It is perpendicular to the straight main-to-target axis. At 8:00 it
+moves to the opponent's third base with the same 25-tile distance and perpendicular geometry.
+These SDK ranks describe public geography, not knowledge that an enemy Depot exists there.
+Pressure snapshots these landmarks on its first decision for the opponent, so depletion cannot
+redefine base two or three between timed phase changes.
+Missing ranked sites fall back toward the enemy main without duplicate queued destinations.
+
+Riflemen and Panzerfausts occupy the front; Tanks stand three tiles behind at three-tile spacing.
+Units move to clear slots and Hold Position. Later lines may span blocked terrain: their center
+and orientation remain exact, blocked slots are skipped, and ordinary unit movement routes around
+terrain. The opening wave unlocks at 90% Methamphetamines research (or completion). Before 4:00
+it launches once at least one unit arrives, with five arrivals required thereafter. From 4:00
+all new waves require at least ten arrivals; from 8:00 they require twenty. The research gate
+still applies if the opening wave has not launched. En-route units do not count.
+
+A second-base wave receives AttackMove to base two followed by queued AttackMove to the main.
+A third-base wave receives AttackMove to base three, then queued AttackMoves to base two and the
+main. Waves launched before a time boundary retain their route. Only unlaunched recruits move
+to the new staging line; already launched units never rejoin staging. Pressure retains ordinary attack-move combat after launch; Rush's extractor-raiding
 flow is not part of this copied staging policy.
 
 Pressure includes a Training Centre in its initial tech path so its infantry research does not
@@ -247,6 +265,24 @@ on every completed Barracks, including replacements. Already paid or queued Rifl
 Home Machine Gunner and Tank production remain under the existing policy. New Panzerfausts join
 Pressure's infantry staging line and its normal arrival-counted waves. This policy and its state
 are independent of Rush.
+
+Pressure expands up to five Resource Depots. It uses the SDK's player-relative ranked base sites,
+skips original player starts and sites with known owned/allied/enemy or remembered Depot evidence,
+and searches legal footprints covering the selected cluster's available resources. Unknown
+occupancy remains unknown; ordinary authoritative placement validates each build. Blocked or
+exhausted sites yield to the next usable ranked site. A map with no usable site does not halt Tank
+production while saving for an impossible expansion.
+
+The second Vehicle Works retains its three-completed-Depot gate and float above 500 Steel and
+325 Oil. After both Vehicle Works complete, fourth and fifth Depots are surplus purchases at the
+full 450 Steel / 100 Oil cost. Pressure keeps queuing Tanks from resources above that purchase or
+a travelling Depot's committed cost; it does not pause Tank production to save for these bases.
+Once five Depots are complete, the two-Works cap is lifted: the same float threshold allows one
+additional Vehicle Works at a time, subject to the ordinary pending-build and placement limits.
+All completed Vehicle Works then enable standing Tank production. Existing queues finish first;
+new manual Tank orders stop so they do not compete with repeat production. New and replacement
+Works receive the repeat allocation once, including after a later base loss. Extra Works beyond
+two require five currently completed Depots; lost bases can be replaced up to the five-base target.
 
 ### Rush AI
 

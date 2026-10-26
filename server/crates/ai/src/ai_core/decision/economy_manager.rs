@@ -68,3 +68,26 @@ pub(super) fn propose_economy(input: EconomyManagerInput<'_>) -> EconomyManagerO
     }
     EconomyManagerOutput { plan, proposals }
 }
+
+fn turtle_opening_pending(profile: &AiProfile, memory: &AiDecisionMemory) -> bool {
+    profile
+        .turtle_defense
+        .map(|policy| memory.turtle_opening_riflemen_ordered < policy.opening_riflemen)
+        .unwrap_or(false)
+}
+
+pub(super) fn oil_demand_signal(
+    profile: &AiProfile,
+    memory: &AiDecisionMemory,
+    panic_plan: Option<DefensivePanicPlan>,
+) -> OilDemandSignal {
+    // Start one Pump Jack while Turtle is still assembling its compact Rifleman
+    // screen. This preserves the screen without diverting the whole early worker
+    // economy into oil before its Training Centre can use the income.
+    if turtle_opening_pending(profile, memory) {
+        return OilDemandSignal::ExactWorkers(1);
+    }
+    panic_plan
+        .map(|plan| OilDemandSignal::ExactWorkers(plan.oil_workers))
+        .unwrap_or(OilDemandSignal::ProfileDefault)
+}

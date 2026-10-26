@@ -17,8 +17,15 @@ pub(super) fn should_build_extra_factory(
     let Some(policy) = profile.extra_factories else {
         return false;
     };
+    let depots = facts.complete_building_count(EntityKind::ResourceDepot);
+    let pressure = profile.id == crate::ai_core::profiles::PRESSURE_AI_ID;
     if profile.production_expansion.is_some_and(|expansion| {
-        facts.complete_building_count(EntityKind::ResourceDepot) < expansion.target_resource_depots
+        depots
+            < if pressure {
+                3
+            } else {
+                expansion.target_resource_depots
+            }
     }) {
         return false;
     }
@@ -33,7 +40,11 @@ pub(super) fn should_build_extra_factory(
     facts
         .building_count(EntityKind::Factory)
         .saturating_add(planned_factories)
-        < policy.target_count
+        < if pressure && depots >= pressure_economy::TARGET_BASES {
+            usize::MAX
+        } else {
+            policy.target_count
+        }
 }
 
 pub(super) fn should_build_extra_turtle_gun_works(
@@ -510,6 +521,19 @@ where
         build_search,
         placeable,
     )
+}
+
+pub(super) fn planned_in_intents(intents: &[AiIntent], kind: EntityKind) -> usize {
+    intents
+        .iter()
+        .filter(|intent| matches!(intent, AiIntent::Build { kind: built } if *built == kind))
+        .count()
+}
+
+pub(super) fn planned_train_in_intents(intents: &[AiIntent], kind: EntityKind) -> bool {
+    intents
+        .iter()
+        .any(|intent| matches!(intent, AiIntent::Train { kind: trained } if *trained == kind))
 }
 
 #[cfg(test)]

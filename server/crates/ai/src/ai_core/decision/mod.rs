@@ -36,6 +36,7 @@ mod later_bases;
 mod memory;
 mod obstacles;
 mod policies;
+mod pressure_economy;
 mod production;
 mod resources;
 mod trace;
@@ -58,8 +59,7 @@ use self::defense::{
     DefensivePanicPlan, DefensivePanicResponse, ALL_COMBAT_UNITS, DEFENSIVE_PANIC_RIFLE_TECH_PATH,
 };
 use self::economy_manager::{
-    propose_economy, EconomyManagerInput, EconomyManagerOutput, EconomyManagerSignals,
-    EconomyProposal, OilDemandSignal,
+    oil_demand_signal, propose_economy, EconomyManagerInput, EconomyManagerSignals, EconomyProposal,
 };
 use self::expansion::{
     plan_expansion, resource_depot_to_resume, try_build_expansion_resource_depot, ExpansionBlocker,
@@ -76,11 +76,12 @@ use self::policies::{
     active_required_tech_path, active_tech_transition,
 };
 use self::production::{
-    producer_for_unit, production_building_order, production_uses_building,
-    relocate_machine_gunners_blocking_factory, relocate_machine_gunners_from_factory_site,
-    should_build_extra_factory, should_build_extra_turtle_gun_works,
-    should_save_for_first_tech_unit, should_save_for_required_tech_building, try_build_kind,
-    try_build_production, unit_counts_for_priorities,
+    planned_in_intents, planned_train_in_intents, producer_for_unit, production_building_order,
+    production_uses_building, relocate_machine_gunners_blocking_factory,
+    relocate_machine_gunners_from_factory_site, should_build_extra_factory,
+    should_build_extra_turtle_gun_works, should_save_for_first_tech_unit,
+    should_save_for_required_tech_building, try_build_kind, try_build_production,
+    unit_counts_for_priorities,
 };
 use self::trace::{build_manager_trace, ManagerOutputTrace, TraceInput};
 use self::turtle::{
@@ -157,6 +158,7 @@ where
         profile,
         memory,
         None,
+        None,
         build_search,
         &mut placeable,
     )
@@ -167,6 +169,7 @@ pub(crate) fn decide_profile_with_analysis<F>(
     profile: &'static AiProfile,
     memory: &mut AiDecisionMemory,
     map_analysis: &AiMapAnalysis,
+    world_queries: &crate::sdk::WorldQueries<'_>,
     build_search: ai_shared::BuildSearch,
     mut placeable: F,
 ) -> AiDecision
@@ -178,6 +181,7 @@ where
         profile,
         memory,
         Some(map_analysis),
+        Some(world_queries),
         build_search,
         &mut placeable,
     )
@@ -188,6 +192,7 @@ fn decide_profile_inner<F>(
     profile: &'static AiProfile,
     memory: &mut AiDecisionMemory,
     map_analysis: Option<&AiMapAnalysis>,
+    world_queries: Option<&crate::sdk::WorldQueries<'_>>,
     build_search: ai_shared::BuildSearch,
     mut placeable: F,
 ) -> AiDecision
@@ -218,6 +223,12 @@ where
     let start_budget = budget;
     let mut actions = AiActionContext::new(&facts, budget);
     let mut intents = Vec::new();
+    pressure_economy::protect_depot_in_transit(observation, profile, &mut actions);
+    if profile.id == crate::ai_core::profiles::PRESSURE_AI_ID {
+        memory
+            .pressure_economy
+            .configure_tanks(observation, &facts, &mut actions);
+    }
 
     let local_threat_response =
         defensive_panic_response(observation, uses_current_jeff_defense(profile.id));
@@ -313,6 +324,13 @@ where
         expansion_security::update_and_stage(observation, map_analysis, memory, &mut actions);
     let reserve_expansion =
         expansion_security::reserve_expansion(observation, &facts, profile, memory);
+    let pressure_site = pressure_economy::plan_site(
+        observation,
+        profile,
+        world_queries,
+        &mut expansion_plan,
+        &mut expansion_placeable,
+    );
     let expansion_blocks_tech_path = expansion_plan.blocks_tech_path;
     let save_for_expansion = expansion_plan.should_save;
     if reserve_expansion && !expansion_secured {
@@ -359,7 +377,7 @@ where
         jeff_natural && expansion_security::natural_order_pending(observation, memory);
     if (jeff_natural && natural_ready)
         || (!jeff_natural
-            && (should_build_expansion_from_economy_manager(&economy_manager_output)
+            && (economy_manager_output.proposes(EconomyProposal::BuildExpansionResourceDepot)
                 || !retry_builder.is_empty()))
     {
         if let Some(build_action) = try_build_expansion_resource_depot(
@@ -368,7 +386,7 @@ where
             &mut actions,
             &expansion_builder_pools,
             profile,
-            memory.expansion_security.site,
+            pressure_site.or(memory.expansion_security.site),
             !retry_builder.is_empty(),
             &mut expansion_placeable,
         ) {
@@ -387,7 +405,8 @@ where
         }
     }
     let save_for_unplanned_expansion = (save_for_expansion || reserve_expansion)
-        && planned_in_intents(&intents, EntityKind::ResourceDepot) == 0;
+        && planned_in_intents(&intents, EntityKind::ResourceDepot) == 0
+        && !pressure_economy::spend_surplus_only(profile, &facts);
     if (reserve_expansion || natural_pending)
         && planned_in_intents(&intents, EntityKind::ResourceDepot) == 0
     {
@@ -746,6 +765,9 @@ where
         // Pressure's standing Panzerfaust allocation replaces new Rifleman orders; paid queues
         // finish normally. Keep the legacy home Machine Gunners and Tank production policy.
         effective_unit_priorities.retain(|unit| *unit != EntityKind::Rifleman);
+    }
+    if memory.pressure_economy.tank_repeat_enabled() {
+        effective_unit_priorities.retain(|unit| *unit != EntityKind::Tank);
     }
     if uses_current_jeffs_ai_policy(profile.id)
         && memory.expansion_security.site.is_some()
@@ -1443,46 +1465,6 @@ where
         commands: actions.into_commands(),
         trace,
     }
-}
-
-fn planned_in_intents(intents: &[AiIntent], kind: EntityKind) -> usize {
-    intents
-        .iter()
-        .filter(|intent| matches!(intent, AiIntent::Build { kind: built } if *built == kind))
-        .count()
-}
-
-fn planned_train_in_intents(intents: &[AiIntent], kind: EntityKind) -> bool {
-    intents
-        .iter()
-        .any(|intent| matches!(intent, AiIntent::Train { kind: trained } if *trained == kind))
-}
-
-fn turtle_opening_pending(profile: &AiProfile, memory: &AiDecisionMemory) -> bool {
-    profile
-        .turtle_defense
-        .map(|policy| memory.turtle_opening_riflemen_ordered < policy.opening_riflemen)
-        .unwrap_or(false)
-}
-
-fn oil_demand_signal(
-    profile: &AiProfile,
-    memory: &AiDecisionMemory,
-    panic_plan: Option<DefensivePanicPlan>,
-) -> OilDemandSignal {
-    // Start one Pump Jack while Turtle is still assembling its compact Rifleman
-    // screen. This preserves the screen without diverting the whole early worker
-    // economy into oil before its Training Centre can use the income.
-    if turtle_opening_pending(profile, memory) {
-        return OilDemandSignal::ExactWorkers(1);
-    }
-    panic_plan
-        .map(|plan| OilDemandSignal::ExactWorkers(plan.oil_workers))
-        .unwrap_or(OilDemandSignal::ProfileDefault)
-}
-
-fn should_build_expansion_from_economy_manager(output: &EconomyManagerOutput) -> bool {
-    output.proposes(EconomyProposal::BuildExpansionResourceDepot)
 }
 
 #[cfg(test)]

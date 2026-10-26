@@ -64,7 +64,7 @@ pub(crate) static PRESSURE: AiProfile = AiProfile {
         }),
     },
     production_expansion: Some(ExpansionPolicy {
-        target_resource_depots: 3,
+        target_resource_depots: 5,
         required_complete_building: EntityKind::Factory,
         defensive_unit: EntityKind::Rifleman,
         defensive_unit_count: 0,

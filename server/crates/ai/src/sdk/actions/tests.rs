@@ -264,3 +264,58 @@ fn unpaid_research_queue_preserves_budget_and_reserves_producer() {
         }]
     ));
 }
+
+#[test]
+fn attack_move_route_reserves_once_and_emits_ordered_queue_flags() {
+    let mut batch = actions(0, 0, 0);
+    let group = UnitGroup::new([9, 2]).unwrap();
+    batch
+        .attack_move_route(&group, (30.0, 40.0), &[(20.0, 40.0), (10.0, 40.0)])
+        .unwrap();
+    assert_eq!(batch.reservation_counts().actors, 2);
+    let before = state(&batch);
+    assert!(batch.hold_position(&group, false).is_err());
+    assert_eq!(state(&batch), before);
+    assert!(matches!(batch.into_requests().as_slice(), [
+        AiActionRequest::AttackMove { units:a,x:30.0,y:40.0,queued:false },
+        AiActionRequest::AttackMove { units:b,x:20.0,y:40.0,queued:true },
+        AiActionRequest::AttackMove { units:c,x:10.0,y:40.0,queued:true },
+    ] if a==&[2,9] && a==b && b==c));
+}
+
+#[test]
+fn attack_move_route_capacity_failure_does_not_emit_a_partial_route() {
+    let mut batch = actions(0, 0, 0);
+    for _ in 0..MAX_ACTIONS_PER_STEP - 2 {
+        batch.emit_compat(AiActionRequest::HoldPosition {
+            units: vec![1],
+            queued: false,
+        });
+    }
+    let before = state(&batch);
+    let group = UnitGroup::new([9]).unwrap();
+    assert_eq!(
+        batch
+            .attack_move_route(&group, (1.0, 2.0), &[(3.0, 4.0), (5.0, 6.0)])
+            .unwrap_err()
+            .blocker(),
+        &ActionBlocker::ActionCapacity
+    );
+    assert_eq!(state(&batch), before);
+    batch
+        .attack_move_route(&group, (1.0, 2.0), &[(3.0, 4.0)])
+        .unwrap();
+    assert_eq!(batch.len(), MAX_ACTIONS_PER_STEP);
+}
+
+#[test]
+fn attack_move_route_reservation_failure_leaves_existing_orders_unchanged() {
+    let mut batch = actions(0, 0, 0);
+    let group = UnitGroup::new([9]).unwrap();
+    batch.hold_position(&group, false).unwrap();
+    let before = state(&batch);
+    assert!(batch
+        .attack_move_route(&group, (1.0, 2.0), &[(3.0, 4.0)])
+        .is_err());
+    assert_eq!(state(&batch), before);
+}

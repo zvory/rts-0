@@ -93,6 +93,7 @@ pub(crate) struct AiDecisionMemory {
     pub(super) later_bases: super::later_bases::LaterBases,
     /// Jeff's forward picket and the Riflemen sealing the home line during a raid alert.
     pub(super) route_line: super::defense::RouteLine,
+    pub(super) pressure_economy: super::pressure_economy::PressureEconomy,
     profile_id: Option<&'static str>,
     attack_first_size: Option<usize>,
     next_attack_size: usize,
@@ -176,6 +177,7 @@ impl AiDecisionMemory {
             expansion_security: Default::default(),
             later_bases: Default::default(),
             route_line: Default::default(),
+            pressure_economy: Default::default(),
             profile_id: Some(profile.id),
             attack_first_size: Some(profile.attack.first_attack_size),
             next_attack_size: profile.attack.first_attack_size,
@@ -269,6 +271,7 @@ impl AiDecisionMemory {
         }
         self.profile_id = Some(profile.id);
         self.expansion_security = Default::default();
+        self.pressure_economy = Default::default();
         self.attack_first_size = Some(profile.attack.first_attack_size);
         self.next_attack_size = profile.attack.first_attack_size;
         self.last_attack_tick = None;
