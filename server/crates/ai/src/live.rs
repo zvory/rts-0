@@ -414,6 +414,12 @@ impl AiController {
             return commands;
         };
 
+        let frame = frame.with_base_sites(
+            self.static_map_context
+                .get_or_analyze(context.start)
+                .base_sites(),
+        );
+
         #[cfg(test)]
         {
             let direct = AiObservation::from_snapshot_with_alive(
@@ -973,7 +979,25 @@ mod tests {
         struct MoveStrategy;
 
         impl AiStrategy for MoveStrategy {
-            fn step(&mut self, _frame: &AiFrame, actions: &mut AiActions) {
+            fn initialize(&mut self, frame: &AiFrame) {
+                assert!(WorldQueries::new(frame).base(1, 3).is_some());
+                assert!(WorldQueries::new(frame).base(2, 3).is_some());
+            }
+
+            fn step(&mut self, frame: &AiFrame, actions: &mut AiActions) {
+                assert!(!frame.base_sites().is_empty());
+                let site_resources: std::collections::BTreeSet<_> = frame
+                    .base_sites()
+                    .iter()
+                    .flat_map(|site| site.resource_ids.iter().copied())
+                    .collect();
+                assert_eq!(
+                    site_resources,
+                    frame.resources().iter().map(|node| node.id).collect()
+                );
+                assert!(WorldQueries::new(frame)
+                    .known_base_depots(crate::sdk::AiBaseSiteId::Start(2))
+                    .is_empty());
                 let group = crate::sdk::UnitGroup::new([7]).unwrap();
                 actions.move_group(&group, 128.0, 160.0, false).unwrap();
             }
@@ -1026,6 +1050,12 @@ mod tests {
         let mut ai = AiController::new(1);
         let start = cache_test_start_payload();
 
+        let first_sites = ai
+            .static_map_context
+            .get_or_analyze(&start)
+            .base_sites()
+            .to_vec();
+        assert_eq!(first_sites.len(), start.players.len());
         let first_key = ai.static_map_context.get_or_analyze(&start).key();
         let second_key = ai.static_map_context.get_or_analyze(&start).key();
         assert_eq!(second_key, first_key);
@@ -1034,11 +1064,24 @@ mod tests {
             Some(first_key)
         );
 
+        let mut no_resources = start.clone();
+        no_resources.map.resources.clear();
+        let empty_sites = ai
+            .static_map_context
+            .get_or_analyze(&no_resources)
+            .base_sites();
+        assert_eq!(empty_sites.len(), 1);
+        assert!(empty_sites[0].resource_ids.is_empty());
+
         let mut moved_start = start.clone();
         moved_start.players[0].start_tile_x = 2;
         let moved_key = ai.static_map_context.get_or_analyze(&moved_start).key();
 
         assert_ne!(moved_key, first_key);
+        assert_ne!(
+            ai.static_map_context.current().unwrap().base_sites(),
+            first_sites
+        );
         assert_eq!(
             ai.static_map_context.current().map(|context| context.key()),
             Some(moved_key)

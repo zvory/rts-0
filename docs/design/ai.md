@@ -148,6 +148,23 @@ a narrow compatibility policy, while all other placement work is shared. Static 
 dynamic pathing, firing lanes, target legality, line of fire, and hidden occupancy remain outside
 the SDK because no Phase 4 consumer required them.
 
+`AiFrame::base_sites()` exposes cached public base landmarks from the existing static map
+analysis: a site for each original player start and each non-home resource cluster. Start sites
+absorb their mapped home cluster; empty-resource starts still have a main landmark. IDs are
+`Start(player_id)` or `ResourceCluster(cluster_id)` and remain stable while public map inputs are
+unchanged. Cluster sites are inferred geography, not authoritative build footprints.
+`WorldQueries::ranked_bases(player_id)` and `base(player_id, rank)` rank all sites relative to that
+player's original main: main is always 1, then increasing straight-line world-pixel distance,
+with stable site-ID ties. This is geographic order, not acquisition order, walking distance,
+reachability, or ownership. Other players' starting sites remain in the list. Depletion, destroyed
+Depots, and fog never renumber sites; a Lab map edit can rebuild them.
+`known_base_depots(site_id)` associates known Resource Depots with the nearest site within twelve
+tiles, using stable-ID ties. It reports owner and owned/currently visible/remembered evidence,
+including last-seen tick for remembered contacts. Current evidence supersedes memory of the same
+entity. Empty evidence means unknown occupancy, never confirmed vacancy. Construction sites count
+as Depot evidence; none of these queries reads hidden state. The canonical host attaches the cached
+landmarks before either strategy initialization or step; built-in policy decisions are unchanged.
+
 ### Shared decision core
 
 Each controller runs on a staggered cadence and constructs the typed `AiFrame`. Legacy built-in profiles

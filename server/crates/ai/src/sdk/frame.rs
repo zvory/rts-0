@@ -207,6 +207,7 @@ pub struct AiBuildObservation {
 #[derive(Clone, Debug, PartialEq)]
 pub struct AiFrame {
     player_id: u32,
+    base_sites: Vec<super::AiBaseSite>,
     faction_id: String,
     tick: u32,
     team_id: u32,
@@ -227,6 +228,16 @@ pub struct AiFrame {
 }
 
 impl AiFrame {
+    /// Static sites shared by every player; use WorldQueries for per-player ranking.
+    pub fn base_sites(&self) -> &[super::AiBaseSite] {
+        &self.base_sites
+    }
+
+    pub(crate) fn with_base_sites(mut self, sites: &[super::AiBaseSite]) -> Self {
+        self.base_sites = sites.to_vec();
+        self
+    }
+
     pub fn player_id(&self) -> u32 {
         self.player_id
     }
@@ -440,6 +451,7 @@ impl AiFrame {
         smokes.sort_by_key(|cloud| cloud.id);
 
         Some(Self {
+            base_sites: Vec::new(),
             player_id,
             faction_id: own.faction_id.clone(),
             tick: snapshot.tick,
@@ -751,5 +763,126 @@ mod tests {
             Some(&[1, 2]),
         );
         assert_eq!(projected, direct);
+    }
+    fn base_test_frame() -> AiFrame {
+        use super::super::{AiBaseSite, AiBaseSiteId};
+        let game = Game::new_without_ai_controllers(&players(), 41);
+        AiFrame::from_host(
+            &game.start_payload(),
+            &game.snapshot_for(1),
+            1,
+            [],
+            Some(&[1, 2]),
+        )
+        .unwrap()
+        .with_base_sites(&[
+            AiBaseSite {
+                id: AiBaseSiteId::Start(1),
+                position: (100.0, 100.0),
+                resource_ids: vec![10],
+            },
+            AiBaseSite {
+                id: AiBaseSiteId::Start(2),
+                position: (500.0, 100.0),
+                resource_ids: vec![20],
+            },
+            AiBaseSite {
+                id: AiBaseSiteId::ResourceCluster(2),
+                position: (200.0, 100.0),
+                resource_ids: vec![30],
+            },
+            AiBaseSite {
+                id: AiBaseSiteId::ResourceCluster(3),
+                position: (400.0, 100.0),
+                resource_ids: vec![40],
+            },
+            AiBaseSite {
+                id: AiBaseSiteId::ResourceCluster(4),
+                position: (100.0, 200.0),
+                resource_ids: vec![50],
+            },
+        ])
+    }
+
+    #[test]
+    fn base_rankings_are_player_relative_one_based_and_stable() {
+        use super::super::{AiBaseSiteId::*, WorldQueries};
+        let mut frame = base_test_frame();
+        let order = |frame: &AiFrame, player| {
+            WorldQueries::new(frame)
+                .ranked_bases(player)
+                .iter()
+                .map(|base| (base.rank, base.site.id))
+                .collect::<Vec<_>>()
+        };
+        let expected = vec![
+            (1, Start(1)),
+            (2, ResourceCluster(2)),
+            (3, ResourceCluster(4)),
+            (4, ResourceCluster(3)),
+            (5, Start(2)),
+        ];
+        assert_eq!(order(&frame, 1), expected);
+        assert_eq!(
+            WorldQueries::new(&frame).base(2, 2).unwrap().site.id,
+            ResourceCluster(3)
+        );
+        assert!(WorldQueries::new(&frame).base(1, 0).is_none());
+        assert!(WorldQueries::new(&frame).base(1, 6).is_none());
+        assert!(WorldQueries::new(&frame).base(99, 1).is_none());
+        frame.owned.clear();
+        frame.resources.clear();
+        frame.base_sites.reverse();
+        assert_eq!(order(&frame, 1), expected);
+    }
+
+    #[test]
+    fn base_occupation_keeps_fog_evidence_distinct_and_never_claims_vacancy() {
+        use super::super::{AiBaseEvidence, AiBaseSiteId::*, WorldQueries};
+        let mut frame = base_test_frame();
+        let mut depot = frame
+            .owned
+            .iter()
+            .find(|e| e.kind == EntityKind::ResourceDepot)
+            .unwrap()
+            .clone();
+        frame.owned.clear();
+        frame.visible_allies.clear();
+        frame.visible_enemies.clear();
+        frame.remembered_contacts.clear();
+        assert!(WorldQueries::new(&frame)
+            .known_base_depots(Start(2))
+            .is_empty());
+        depot.id = 987;
+        depot.owner = 2;
+        depot.position = (500.0, 100.0);
+        frame.remembered_contacts.push(AiRememberedContact {
+            id: depot.id,
+            owner: 2,
+            kind: depot.kind,
+            position: depot.position,
+            observed_tick: 17,
+        });
+        let query = WorldQueries::new(&frame);
+        assert_eq!(
+            query.known_base_depots(Start(2))[0].evidence,
+            AiBaseEvidence::Remembered { observed_tick: 17 }
+        );
+        frame.visible_enemies.push(depot.clone());
+        assert_eq!(
+            WorldQueries::new(&frame).known_base_depots(Start(2))[0].evidence,
+            AiBaseEvidence::Visible
+        );
+        frame.visible_enemies.clear();
+        depot.position = (100.0, 100.0);
+        depot.owner = 1;
+        frame.owned.push(depot);
+        assert!(WorldQueries::new(&frame)
+            .known_base_depots(Start(2))
+            .is_empty());
+        assert_eq!(
+            WorldQueries::new(&frame).known_base_depots(Start(1))[0].evidence,
+            AiBaseEvidence::Owned
+        );
     }
 }
