@@ -6,6 +6,7 @@
 pub(crate) mod actions;
 mod bases;
 mod frame;
+mod pullback;
 mod rulebook;
 mod strategy;
 mod world_queries;
@@ -20,6 +21,7 @@ pub use frame::{
     AiEntityState, AiFrame, AiHealth, AiMap, AiPlayer, AiProduction, AiRememberedContact,
     AiResource, AiResourceAmount, AiSmokeCloud, AiTerrain,
 };
+pub use pullback::{PullbackMemory, PullbackMove, PullbackParams, PullbackPlan, PullbackUnit};
 pub(crate) use rts_rules::balance::unit_placement_radius;
 pub use rts_rules::faction::{AbilityKind, UpgradeKind};
 pub use rts_rules::EntityKind;

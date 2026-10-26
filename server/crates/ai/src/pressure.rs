@@ -4,7 +4,8 @@ use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet, BinaryHeap, VecDeque};
 
 use crate::sdk::{
-    AiActions, AiEntityState, AiFrame, AiMap, AiTerrain, EntityKind, UnitGroup, UpgradeKind,
+    AiActions, AiEntityState, AiFrame, AiMap, AiTerrain, EntityKind, PullbackMemory,
+    PullbackParams, UnitGroup, UpgradeKind,
 };
 
 mod objective;
@@ -23,6 +24,9 @@ const RETRY_TICKS: u32 = 90;
 #[derive(Default)]
 pub(crate) struct PressureWaves {
     production: production::PressureProduction,
+    pullback: PullbackMemory,
+    wave_routes: BTreeMap<u32, Objective>,
+    resume: BTreeSet<u32>,
     plan: Option<(u32, StagingLine)>,
     objective: Option<Objective>,
     reachable: Vec<bool>,
@@ -103,6 +107,8 @@ impl PressureWaves {
         self.slots
             .retain(|id, _| alive.contains(id) && !self.launched.contains(id));
         self.launched.retain(|id| alive.contains(id));
+        self.wave_routes.retain(|id, _| alive.contains(id));
+        self.resume.retain(|id| alive.contains(id));
         self.issued.retain(|id, _| alive.contains(id));
         self.held.retain(|id| alive.contains(id));
         // A home-defense or construction-clearance order temporarily owns these units. Reset
@@ -130,8 +136,50 @@ impl PressureWaves {
                 self.slots.insert(entity.id, point);
             }
         }
+        // Only Riflemen participate. Home-defense and clearance ownership has already been
+        // removed by `eligible`; active pull-backs must also be excluded on subsequent decisions.
+        let rifles: Vec<_> = units
+            .iter()
+            .filter(|entity| entity.kind == EntityKind::Rifleman)
+            .map(|entity| entity.id)
+            .collect();
+        let pullback = self
+            .pullback
+            .step(frame, &rifles, PullbackParams::default(), actions);
+        for id in pullback.active.iter().chain(&pullback.released) {
+            if !self.launched.contains(id) {
+                self.issued.remove(id);
+                self.held.remove(id);
+            }
+        }
+        self.resume.extend(
+            pullback
+                .released
+                .iter()
+                .filter(|id| self.launched.contains(id)),
+        );
+        let resumed: Vec<_> = self
+            .resume
+            .iter()
+            .copied()
+            .filter(|id| eligible.contains(id) && !pullback.active.contains(id))
+            .collect();
+        for id in resumed {
+            let Some(route) = self.wave_routes.get(&id) else {
+                continue;
+            };
+            if UnitGroup::new([id])
+                .and_then(|group| {
+                    actions.attack_move_route(&group, route.target(), route.followups())
+                })
+                .is_ok()
+            {
+                self.resume.remove(&id);
+            }
+        }
         let ready = units
             .iter()
+            .filter(|entity| !pullback.active.contains(&entity.id))
             .filter_map(|entity| {
                 let slot = self.slots.get(&entity.id)?;
                 (distance(entity.position, *slot) <= ARRIVAL_TILES * size).then_some(entity.id)
@@ -168,6 +216,7 @@ impl PressureWaves {
                     self.first_wave_launched = true;
                     for id in &ready {
                         self.launched.insert(*id);
+                        self.wave_routes.insert(*id, objective);
                         self.slots.remove(id);
                         self.held.remove(id);
                     }
@@ -175,6 +224,9 @@ impl PressureWaves {
             }
         }
         for entity in units {
+            if pullback.active.contains(&entity.id) {
+                continue;
+            }
             let Some(slot) = self.slots.get(&entity.id) else {
                 continue;
             };

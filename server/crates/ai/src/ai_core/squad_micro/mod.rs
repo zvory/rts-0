@@ -14,7 +14,9 @@ use rts_rules::defs::unit_def;
 use rts_sim::game::entity::EntityKind;
 
 use crate::ai_core::observation::{AiEntityState, AiEntitySummary, AiObservation};
-use crate::sdk::{AiActions, AiFrame, AiStrategy, UnitGroup};
+use crate::sdk::{
+    AiActions, AiFrame, AiStrategy, PullbackMemory, PullbackParams, PullbackUnit, UnitGroup,
+};
 
 mod params;
 
@@ -36,7 +38,7 @@ pub(crate) enum SquadOrder {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct SquadMicroMemory {
     holding: BTreeSet<u32>,
-    retreating: BTreeMap<u32, u32>,
+    retreating: PullbackMemory,
     advance_point: Option<(f32, f32)>,
     advancing: BTreeSet<u32>,
 }
@@ -49,8 +51,7 @@ impl SquadMicroMemory {
     fn prune(&mut self, alive: &BTreeSet<u32>, tick: u32) {
         self.holding.retain(|id| alive.contains(id));
         self.advancing.retain(|id| alive.contains(id));
-        self.retreating
-            .retain(|id, until| alive.contains(id) && *until > tick);
+        self.retreating.retain(alive, tick);
     }
 }
 
@@ -140,15 +141,7 @@ pub(crate) fn plan_rifle_squad(
     }
 
     let retreating = if params.retreat_hp > 0 {
-        plan_retreats(
-            observation,
-            &units,
-            &enemies,
-            params,
-            tile,
-            memory,
-            &mut batch,
-        )
+        plan_retreats(observation, &units, &enemies, params, memory, &mut batch)
     } else {
         BTreeSet::new()
     };
@@ -243,51 +236,35 @@ fn plan_retreats(
     units: &[&AiEntitySummary],
     enemies: &[&AiEntitySummary],
     params: &RifleSquadParams,
-    tile: f32,
     memory: &mut SquadMicroMemory,
     batch: &mut OrderBatch,
 ) -> BTreeSet<u32> {
-    let healthy = units
-        .iter()
-        .filter(|unit| unit.hp > params.retreat_hp)
-        .count();
-    if healthy == 0 {
-        memory.retreating.clear();
-        return BTreeSet::new();
+    let project = |unit: &&AiEntitySummary| PullbackUnit {
+        id: unit.id,
+        position: (unit.x, unit.y),
+        hp: unit.hp,
+        target: unit.target_id,
+    };
+    let plan = memory.retreating.plan(
+        observation.tick,
+        (
+            observation.map.width,
+            observation.map.height,
+            observation.map.tile_size,
+        ),
+        &units.iter().map(project).collect::<Vec<_>>(),
+        &enemies.iter().map(project).collect::<Vec<_>>(),
+        PullbackParams {
+            hp: params.retreat_hp,
+            tiles: params.retreat_tiles,
+            ticks: params.retreat_ticks,
+        },
+    );
+    for movement in plan.moves {
+        batch.move_to(movement.unit, movement.position);
+        memory.advancing.remove(&movement.unit);
     }
-    let mut retreating: BTreeSet<u32> = memory.retreating.keys().copied().collect();
-    let map_w = observation.map.width as f32 * tile;
-    let map_h = observation.map.height as f32 * tile;
-    for unit in units {
-        if retreating.contains(&unit.id) || unit.hp > params.retreat_hp {
-            continue;
-        }
-        let targeted = enemies.iter().any(|enemy| enemy.target_id == Some(unit.id));
-        let Some(threat) = nearest(unit, enemies) else {
-            continue;
-        };
-        if !targeted {
-            continue;
-        }
-        let (mut dx, mut dy) = (unit.x - threat.x, unit.y - threat.y);
-        let len = dx.hypot(dy);
-        if len <= f32::EPSILON {
-            (dx, dy) = (1.0, 0.0);
-        } else {
-            (dx, dy) = (dx / len, dy / len);
-        }
-        let step = params.retreat_tiles.max(0.0) * tile;
-        let x = (unit.x + dx * step).clamp(tile * 0.5, (map_w - tile * 0.5).max(tile * 0.5));
-        let y = (unit.y + dy * step).clamp(tile * 0.5, (map_h - tile * 0.5).max(tile * 0.5));
-        batch.move_to(unit.id, (x, y));
-        memory.advancing.remove(&unit.id);
-        memory.retreating.insert(
-            unit.id,
-            observation.tick.saturating_add(params.retreat_ticks),
-        );
-        retreating.insert(unit.id);
-    }
-    retreating
+    plan.active
 }
 
 /// Assign each rifleman one target. Riflemen with fewer targets in range choose first; with the
@@ -381,17 +358,6 @@ fn centroid(units: &[&AiEntitySummary]) -> (f32, f32) {
         .iter()
         .fold((0.0, 0.0), |(sx, sy), unit| (sx + unit.x, sy + unit.y));
     (sx / n, sy / n)
-}
-
-fn nearest<'a>(
-    unit: &AiEntitySummary,
-    enemies: &[&'a AiEntitySummary],
-) -> Option<&'a AiEntitySummary> {
-    enemies.iter().copied().min_by(|a, b| {
-        distance(unit, a)
-            .total_cmp(&distance(unit, b))
-            .then(a.id.cmp(&b.id))
-    })
 }
 
 fn distance(a: &AiEntitySummary, b: &AiEntitySummary) -> f32 {

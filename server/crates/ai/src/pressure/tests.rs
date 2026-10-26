@@ -676,3 +676,107 @@ fn pressure_ground_connectivity_does_not_cut_diagonally_blocked_corners() {
     assert!(reachable[0]);
     assert!(!reachable[4]);
 }
+
+#[test]
+fn wounded_launched_rifle_resumes_its_original_route_and_yields_to_home_defense() {
+    let (start, mut snapshot) = fixture();
+    let target = (2000.0, 2000.0);
+    let mut waves = PressureWaves::default();
+    waves.rally(&frame(&start, &snapshot), 2, target).unwrap();
+    step(&mut waves, &start, &snapshot, target);
+    assemble(&mut snapshot, &waves);
+    waves.first_wave_unlocked = true;
+    step(&mut waves, &start, &snapshot, target);
+    let id = *waves.launched.first().unwrap();
+    let original = waves.wave_routes[&id];
+    let rifle = snapshot.entities.iter_mut().find(|e| e.id == id).unwrap();
+    rifle.hp = 10;
+    let mut enemy = rifle.clone();
+    enemy.id = 999;
+    enemy.owner = 2;
+    enemy.hp = 45;
+    enemy.x += 64.0;
+    enemy.target_id = Some(id);
+    snapshot.entities.push(enemy);
+    snapshot.tick += 9;
+    let orders = step(&mut waves, &start, &snapshot, target);
+    assert!(orders
+        .iter()
+        .any(|a| matches!(a, AiActionRequest::Move { units, .. } if units == &[id])));
+    snapshot.tick += 9;
+    assert!(!step(&mut waves, &start, &snapshot, target).iter().any(|a| matches!(a,
+        AiActionRequest::AttackMove { units, .. } | AiActionRequest::Move { units, .. } if units.contains(&id))));
+    // The global objective changes while the old wave is pulling back. Resume its original route.
+    snapshot.tick = 7200;
+    snapshot.entities.last_mut().unwrap().target_id = None;
+    waves.rally(&frame(&start, &snapshot), 2, target).unwrap();
+    let orders = step(&mut waves, &start, &snapshot, target);
+    assert!(orders.iter().any(
+        |a| matches!(a, AiActionRequest::AttackMove { units, x, y, queued: false }
+        if units == &[id] && (*x, *y) == original.target())
+    ));
+    // Re-target, then withdraw eligibility as if home defense had claimed this unit.
+    snapshot.tick += 9;
+    snapshot.entities.last_mut().unwrap().target_id = Some(id);
+    step(&mut waves, &start, &snapshot, target);
+    snapshot.tick += 9;
+    let frame = frame(&start, &snapshot);
+    let eligible = frame
+        .owned()
+        .iter()
+        .filter(|e| e.id != id)
+        .map(|e| e.id)
+        .collect();
+    let mut actions = AiActions::for_frame(&frame);
+    waves.step(&frame, target, &eligible, &mut actions);
+    assert!(!actions.into_requests().iter().any(|a| matches!(a,
+        AiActionRequest::AttackMove { units, .. } | AiActionRequest::Move { units, .. } if units.contains(&id))));
+}
+
+#[test]
+fn released_third_base_rifle_restores_all_queued_objectives() {
+    let (start, mut snapshot, sites, main) = timed_fixture(20);
+    snapshot.tick = 14400;
+    let mut waves = PressureWaves::default();
+    timed_step(&mut waves, &start, &snapshot, &sites, main);
+    assemble(&mut snapshot, &waves);
+    timed_step(&mut waves, &start, &snapshot, &sites, main);
+    assert!(waves.launched.contains(&1));
+    let rifle = snapshot.entities.iter_mut().find(|e| e.id == 1).unwrap();
+    rifle.hp = 10;
+    let mut enemy = rifle.clone();
+    enemy.id = 999;
+    enemy.owner = 2;
+    enemy.hp = 45;
+    enemy.x += 64.0;
+    enemy.target_id = Some(1);
+    snapshot.entities.push(enemy);
+    snapshot.tick += 9;
+    let retreat = timed_step(&mut waves, &start, &snapshot, &sites, main);
+    assert!(retreat
+        .iter()
+        .any(|a| matches!(a, AiActionRequest::Move { units, .. } if units == &[1])));
+    snapshot.tick += 45;
+    snapshot.entities.last_mut().unwrap().target_id = None;
+    let released = timed_step(&mut waves, &start, &snapshot, &sites, main);
+    let route: Vec<_> = released
+        .iter()
+        .filter_map(|a| match a {
+            AiActionRequest::AttackMove {
+                units,
+                x,
+                y,
+                queued,
+            } if units == &[1] => Some(((*x, *y), *queued)),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(
+        route,
+        vec![
+            (sites[3].position, false),
+            (sites[2].position, true),
+            (main, true)
+        ]
+    );
+}
