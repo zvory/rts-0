@@ -186,13 +186,26 @@ fn check_rush_opening(map_name: Option<&str>) {
         research_queued.unwrap() - training_started.unwrap() <= 9,
         "research must queue on first think after scaffold appears"
     );
+    assert!(
+        commands
+            .iter()
+            .filter(|entry| entry.tick < meth_ninety.unwrap())
+            .filter(|entry| {
+                matches!(&entry.command, Command::AttackMove { units, x, y, .. }
+            if units.len() == 1 && (*x, *y) != target)
+            })
+            .count()
+            >= 4,
+        "starting infantry must attack-move into staging before the wave unlocks"
+    );
     let mut previously_launched = BTreeSet::new();
     let waves = commands
         .iter()
         .filter_map(|entry| match &entry.command {
-            Command::AttackMove { units, x, y, .. } => {
-                // Flow orders retask already launched units individually. Keep singleton
-                // opening launches in the assertions as well as every shared wave order.
+            Command::AttackMove { units, x, y, .. } if (*x, *y) == target => {
+                // Staging attack-moves are assembly, not wave launches. Flow orders retask
+                // already launched units individually; keep singleton opening launches and
+                // every shared wave order aimed at the enemy start.
                 let first_launch = units.iter().any(|id| !previously_launched.contains(id));
                 previously_launched.extend(units.iter().copied());
                 (first_launch || units.len() > 1).then_some((entry.tick, units, *x, *y))
@@ -292,7 +305,7 @@ fn check_rush_opening(map_name: Option<&str>) {
             if kind == "panzerfaust" {
                 assert!(addition.0 >= panzerfausts_complete.unwrap());
             }
-            assert!(commands.iter().any(|entry| matches!(&entry.command, Command::SetRally { building, x, y, kind, .. } if *building == addition.1 && (*x, *y) != target && (((*x-target.0).hypot(*y-target.1)/size)-20.0).abs()<0.01 && kind.as_deref() == Some("move"))));
+            assert!(commands.iter().any(|entry| matches!(&entry.command, Command::SetRally { building, x, y, kind, .. } if *building == addition.1 && (*x, *y) != target && (((*x-target.0).hypot(*y-target.1)/size)-20.0).abs()<0.01 && kind.as_deref() == Some("attackMove"))));
         }
     }
     assert!(
