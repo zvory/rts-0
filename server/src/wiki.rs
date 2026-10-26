@@ -988,7 +988,7 @@ mod tests {
             .find(|row| row[1] == EntityKind::AntiTankGun.stable_id())
             .expect("anti-tank gun stats row");
         assert_eq!(anti_tank_gun[15], "Gun Works");
-        assert_eq!(anti_tank_gun[16], "Gun Works");
+        assert_eq!(anti_tank_gun[16], "Gun Works, Engineering Complex");
 
         assert_eq!(factions.rows.len(), faction::CATALOGS.len());
         assert!(factions
