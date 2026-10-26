@@ -76,13 +76,21 @@ fn waves_wait_for_ninety_percent_then_require_five_arrivals_without_retasking_ol
             .count(),
         4
     );
-    assert!(initial.iter().all(|action| matches!(action,
-        AiActionRequest::AttackMove { units, x, y, queued: false }
-        if units.len() == 1 && waves.slots.get(&units[0]) == Some(&(*x, *y))
-    )));
-    assert!(!initial
-        .iter()
-        .any(|action| matches!(action, AiActionRequest::Move { .. })));
+    for action in &initial {
+        if let AiActionRequest::AttackMove {
+            units,
+            x,
+            y,
+            queued,
+        } = action
+        {
+            assert_eq!(units.len(), 1);
+            assert_eq!((*x, *y), waves.slots[&units[0]]);
+            assert!(!queued);
+        }
+        assert!(!matches!(action, AiActionRequest::Move { .. }));
+    }
+    assert!(waves.launched.is_empty());
     let line = waves.plan.unwrap().1;
     for slot in waves.slots.values() {
         let along =
@@ -148,10 +156,13 @@ fn waves_wait_for_ninety_percent_then_require_five_arrivals_without_retasking_ol
         .any(|action| matches!(action, AiActionRequest::AttackMove { .. })));
     add_rifle(&mut snapshot, &specimen, 1005);
     snapshot.tick += 9;
+    let en_route = step(&mut waves, &start, &snapshot, target);
+    assert!(en_route.iter().any(|action| matches!(action,
+        AiActionRequest::AttackMove { units, x, y, queued: false }
+        if units == &vec![1005] && (*x, *y) == waves.slots[&1005]
+    )));
     assert!(
-        !step(&mut waves, &start, &snapshot, target)
-            .iter()
-            .any(|action| matches!(action, AiActionRequest::AttackMove { x, y, .. } if (*x, *y) == target)),
+        (1001..=1005).all(|id| !waves.launched.contains(&id)),
         "an en-route fifth unit does not count"
     );
     assemble(&mut snapshot, &waves);
