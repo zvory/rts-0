@@ -1,4 +1,4 @@
-//! Pump Jack raids and least-exposure combat routes from fog-filtered observations.
+//! Extractor raids and least-exposure combat routes from fog-filtered observations.
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet, BinaryHeap};
 
@@ -6,9 +6,8 @@ use crate::sdk::{AiActions, AiEntity, AiEntityState, AiFrame, EntityKind, UnitGr
 use rts_rules::balance::{self, TICK_HZ};
 
 type Point = (f32, f32);
-// All objectives are Pump Jacks, so a field needs no extractor-type priority.
-type Cost = (u64, u32, usize); // Fire exposure, distance, goal tie.
-const UNREACHABLE: Cost = (u64::MAX, u32::MAX, usize::MAX);
+type Cost = (u64, u8, u32, usize); // Fire exposure, extractor priority, distance, goal tie.
+const UNREACHABLE: Cost = (u64::MAX, u8::MAX, u32::MAX, usize::MAX);
 const CONTACT_MEMORY: u32 = TICK_HZ * 5;
 const ORDER_INTERVAL: u32 = TICK_HZ;
 const GOAL_RADIUS: f32 = 3.0;
@@ -103,7 +102,7 @@ impl RushFlow {
             .map(|(threat, _)| threat.clone())
             .collect::<Vec<_>>();
         let mut active_ranges = BTreeSet::new();
-        let mut urgent_ranges = BTreeSet::new();
+        let mut changed_ranges = BTreeSet::new();
         for entity in frame.owned().iter().filter(|e| launched.contains(&e.id)) {
             let Some(stats) = balance::unit_stats(entity.kind) else {
                 continue;
@@ -116,15 +115,7 @@ impl RushFlow {
                 input.objectives = objectives.clone();
                 let changed = self.grids.get(&key).is_none_or(|grid| grid.input != input);
                 if changed {
-                    let urgent = self.grids.get(&key).is_none_or(|grid| {
-                        grid.input.target != input.target
-                            || grid.input.objectives != input.objectives
-                            || grid.input.blocked != input.blocked
-                            || grid.input.shot_blocked != input.shot_blocked
-                    });
-                    if urgent {
-                        urgent_ranges.insert(key);
-                    }
+                    changed_ranges.insert(key);
                     if let Some(grid) = FlowGrid::new(input) {
                         self.grids.insert(key, grid);
                     }
@@ -134,25 +125,15 @@ impl RushFlow {
                 continue;
             };
             let mut intent = grid.intent(entity).unwrap_or(Intent::AttackMove(target));
-            match intent {
-                Intent::Move(point) | Intent::AttackMove(point)
-                    if grid.input.objectives.is_empty() =>
-                {
-                    // No Pump Jack raid remains: engage reachable defenders instead of
-                    // retaining an old building target, while preserving route fallbacks.
-                    if let attack @ Intent::Attack(_) = grid.fight_intent(frame, entity, point) {
-                        intent = attack;
-                    }
-                }
-                Intent::AttackMove(point)
-                    if grid
+            if let Intent::AttackMove(point) = intent {
+                if !grid.input.objectives.is_empty()
+                    && grid
                         .input
                         .cell(entity.position)
-                        .is_some_and(|cell| grid.safe[cell] == UNREACHABLE) =>
+                        .is_some_and(|cell| grid.safe[cell] == UNREACHABLE)
                 {
                     intent = grid.fight_intent(frame, entity, point);
                 }
-                _ => {}
             }
             let prior = self.orders.get(&entity.id);
             let due = prior.is_none_or(|(tick, previous)| {
@@ -163,7 +144,7 @@ impl RushFlow {
                 if *previous == intent && committed {
                     return false;
                 }
-                urgent_ranges.contains(&key)
+                changed_ranges.contains(&key)
                     || previous.mode() != intent.mode()
                     || frame.tick().saturating_sub(*tick) >= ORDER_INTERVAL
             });
@@ -213,7 +194,7 @@ struct Objective {
 fn objectives(frame: &AiFrame) -> Vec<Objective> {
     let mut known = BTreeMap::new();
     for contact in frame.remembered_contacts() {
-        if contact.kind == EntityKind::PumpJack {
+        if matches!(contact.kind, EntityKind::PumpJack | EntityKind::SteelMine) {
             known.insert(
                 contact.id,
                 Objective {
@@ -226,7 +207,9 @@ fn objectives(frame: &AiFrame) -> Vec<Objective> {
         }
     }
     for entity in frame.visible_enemies() {
-        if entity.kind == EntityKind::PumpJack && entity.health.current > 0 {
+        if matches!(entity.kind, EntityKind::PumpJack | EntityKind::SteelMine)
+            && entity.health.current > 0
+        {
             known.insert(
                 entity.id,
                 Objective {
@@ -419,7 +402,7 @@ impl FlowGrid {
         )
     }
 
-    fn goal_seeds(&self) -> Vec<(usize, usize)> {
+    fn goal_seeds(&self) -> Vec<(usize, u8, usize)> {
         let mut seeds = Vec::new();
         for cell in 0..self.input.blocked.len() {
             if !self.passable(cell, false) {
@@ -428,7 +411,7 @@ impl FlowGrid {
             let point = self.input.center(cell);
             if self.input.objectives.is_empty() {
                 if distance(point, self.input.target) <= GOAL_RADIUS * self.input.size {
-                    seeds.push((cell, 0));
+                    seeds.push((cell, 2, 0));
                 }
                 continue;
             }
@@ -436,7 +419,15 @@ impl FlowGrid {
                 if self.within_range(point, objective, self.input.range - 0.4)
                     && self.firing_lane(point, objective.position)
                 {
-                    seeds.push((cell, index));
+                    seeds.push((
+                        cell,
+                        if objective.kind == EntityKind::PumpJack {
+                            0
+                        } else {
+                            1
+                        },
+                        index,
+                    ));
                 }
             }
         }
@@ -463,72 +454,21 @@ impl FlowGrid {
     }
 
     fn firing_lane(&self, from: Point, to: Point) -> bool {
-        let (Some(start), Some(end)) = (self.input.cell(from), self.input.cell(to)) else {
-            return false;
-        };
-        let width = self.input.width;
-        let (mut x, mut y) = ((start % width) as i32, (start / width) as i32);
-        let target = ((end % width) as i32, (end / width) as i32);
-        let clear = |x: i32, y: i32| {
-            x >= 0
-                && y >= 0
-                && (x as usize) < width
-                && (y as usize) < self.input.height
-                && !self.input.shot_blocked[y as usize * width + x as usize]
-        };
-        // Visit every crossed tile, including both neighbors at exact corners.
-        // Sampling can miss thin rock intersections and select a position that cannot fire.
-        let axis = |origin: f32, delta: f32, tile: i32| {
-            if delta > 0.0 {
-                (1, (tile as f32 + 1.0 - origin) / delta, 1.0 / delta)
-            } else if delta < 0.0 {
-                (-1, (origin - tile as f32) / -delta, 1.0 / -delta)
-            } else {
-                (0, f32::INFINITY, f32::INFINITY)
-            }
-        };
-        let size = self.input.size;
-        let (sx, mut tx, dx) = axis(from.0 / size, to.0 / size - from.0 / size, x);
-        let (sy, mut ty, dy) = axis(from.1 / size, to.1 / size - from.1 / size, y);
-        if (x, y) == target {
-            return clear(x, y);
-        }
-        // The origin is ignored, matching authoritative terrain line of sight.
-        for _ in 0..=width + self.input.height {
-            if tx < ty {
-                x += sx;
-                tx += dx;
-            } else if ty < tx {
-                y += sy;
-                ty += dy;
-            } else {
-                for (nx, ny) in [(x + sx, y), (x, y + sy)] {
-                    if !clear(nx, ny) {
-                        return false;
-                    }
-                    if (nx, ny) == target {
-                        return true;
-                    }
-                }
-                x += sx;
-                y += sy;
-                tx += dx;
-                ty += dy;
-            }
-            if !clear(x, y) {
-                return false;
-            }
-            if (x, y) == target {
-                return true;
-            }
-        }
-        false
+        let steps = (distance(from, to) / (self.input.size * 0.25))
+            .ceil()
+            .max(1.0) as usize;
+        (0..=steps).all(|i| {
+            let t = i as f32 / steps as f32;
+            self.input
+                .cell((from.0 + (to.0 - from.0) * t, from.1 + (to.1 - from.1) * t))
+                .is_some_and(|cell| !self.input.shot_blocked[cell])
+        })
     }
 
-    fn field(&self, safe: bool, seeds: &[(usize, usize)], has_safe_goal: bool) -> Vec<Cost> {
+    fn field(&self, safe: bool, seeds: &[(usize, u8, usize)], has_safe_goal: bool) -> Vec<Cost> {
         let mut costs = vec![UNREACHABLE; self.input.blocked.len()];
         let mut open = BinaryHeap::new();
-        for &(cell, goal) in seeds {
+        for &(cell, priority, goal) in seeds {
             if !self.passable(cell, safe) || (has_safe_goal && self.danger[cell] > 0) {
                 continue;
             }
@@ -538,6 +478,7 @@ impl FlowGrid {
                 } else {
                     self.danger[cell] as u64 * 30
                 },
+                priority,
                 0,
                 goal,
             );
@@ -557,8 +498,9 @@ impl FlowGrid {
                 let edge = self.edge(cell, next, if dx == 0 || dy == 0 { 10 } else { 14 }, safe);
                 let candidate = (
                     cost.0.saturating_add(edge.0),
-                    cost.1.saturating_add(edge.1),
-                    cost.2,
+                    cost.1,
+                    cost.2.saturating_add(edge.1),
+                    cost.3,
                 );
                 if candidate < costs[next] {
                     costs[next] = candidate;
@@ -586,8 +528,9 @@ impl FlowGrid {
                 let edge = self.edge(cell, next, if dx == 0 || dy == 0 { 10 } else { 14 }, safe);
                 let total = (
                     costs[next].0.saturating_add(edge.0),
-                    costs[next].1.saturating_add(edge.1),
-                    costs[next].2,
+                    costs[next].1,
+                    costs[next].2.saturating_add(edge.1),
+                    costs[next].3,
                 );
                 (total == costs[cell] && costs[next] < costs[cell]).then_some((total, next))
             })
@@ -652,8 +595,8 @@ impl FlowGrid {
     fn intent(&self, entity: &AiEntity) -> Option<Intent> {
         let cell = self.input.cell(entity.position)?;
         if !self.input.objectives.is_empty() && self.safe[cell] != UNREACHABLE {
-            let goal = self.input.objectives.get(self.safe[cell].2)?;
-            if self.safe[cell].1 == 0 {
+            let goal = self.input.objectives.get(self.safe[cell].3)?;
+            if self.safe[cell].2 == 0 {
                 if !self.within_range(entity.position, goal, self.input.range - 0.1)
                     || !self.firing_lane(entity.position, goal.position)
                 {
@@ -710,11 +653,11 @@ impl FlowGrid {
         if costs.get(cell) == Some(&UNREACHABLE) {
             return None;
         }
-        if costs.get(cell).is_some_and(|cost| cost.1 == 0) {
+        if costs.get(cell).is_some_and(|cost| cost.2 == 0) {
             let point = self
                 .input
                 .objectives
-                .get(costs[cell].2)
+                .get(costs[cell].3)
                 .map_or(self.input.target, |goal| goal.position);
             return Some((point, true));
         }
