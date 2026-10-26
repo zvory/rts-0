@@ -346,14 +346,16 @@ fn pressure_protects_pending_depot_cost_but_keeps_tank_orders_above_it() {
 }
 
 #[test]
-fn pressure_keeps_second_factory_at_three_and_adds_more_only_at_five_with_float() {
+fn pressure_caps_factories_at_four_with_five_bases_and_float() {
     for (depots, factories, expected) in [
         (2, 1, false),
         (3, 1, true),
         (3, 2, false),
         (4, 2, false),
         (5, 2, true),
-        (5, 9, true),
+        (5, 3, true),
+        (5, 4, false),
+        (5, 9, false),
     ] {
         let obs = pressure_economy_observation(depots, factories);
         assert_eq!(
@@ -361,6 +363,23 @@ fn pressure_keeps_second_factory_at_three_and_adds_more_only_at_five_with_float(
             expected
         );
     }
+    // A Works already planned this decision consumes the fourth slot too.
+    let obs = pressure_economy_observation(5, 3);
+    assert!(!should_build_extra_factory(
+        &obs,
+        &AiFacts::from_observation(&obs),
+        &PRESSURE,
+        1
+    ));
+    // Foundations count toward the cap before they complete.
+    let mut obs = pressure_economy_observation(5, 4);
+    obs.owned.iter_mut().find(|e| e.id == 103).unwrap().is_complete = false;
+    assert!(!should_build_extra_factory(
+        &obs,
+        &AiFacts::from_observation(&obs),
+        &PRESSURE,
+        0
+    ));
     for (steel, oil) in [(500, 326), (501, 325)] {
         let mut obs = pressure_economy_observation(5, 2);
         obs.economy.steel = steel;

@@ -3,6 +3,7 @@ use super::*;
 use crate::sdk::{actions::AiActionRequest, AiBaseSiteId, WorldQueries};
 
 pub(super) const TARGET_BASES: usize = 5;
+pub(super) const MAX_FACTORIES: usize = 4;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(super) struct PressureEconomy {

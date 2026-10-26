@@ -282,8 +282,10 @@ The second Vehicle Works retains its three-completed-Depot gate and float above 
 325 Oil. After both Vehicle Works complete, fourth and fifth Depots are surplus purchases at the
 full 450 Steel / 100 Oil cost. Pressure keeps queuing Tanks from resources above that purchase or
 a travelling Depot's committed cost; it does not pause Tank production to save for these bases.
-Once five Depots are complete, the two-Works cap is lifted: the same float threshold allows one
-additional Vehicle Works at a time, subject to the ordinary pending-build and placement limits.
+Once five Depots are complete, the cap rises to four Vehicle Works: the same float threshold
+allows one additional Vehicle Works at a time, subject to the ordinary pending-build and placement
+limits. Completed Works, foundations, and Works planned in the current decision count toward the
+cap; losing a Works opens a replacement slot.
 All completed Vehicle Works then enable standing Tank production. Existing queues finish first;
 new manual Tank orders stop so they do not compete with repeat production. New and replacement
 Works receive the repeat allocation once, including after a later base loss. Extra Works beyond

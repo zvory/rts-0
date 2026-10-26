@@ -44,7 +44,7 @@ pub(super) fn should_build_extra_factory(
         .building_count(EntityKind::Factory)
         .saturating_add(planned_factories)
         < if pressure && depots >= pressure_economy::TARGET_BASES {
-            usize::MAX
+            pressure_economy::MAX_FACTORIES
         } else {
             policy.target_count
         }
