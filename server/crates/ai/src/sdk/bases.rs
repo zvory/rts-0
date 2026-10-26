@@ -14,6 +14,10 @@ pub struct AiBaseSite {
     /// World pixels. Starting sites use the center of the public start tile.
     pub position: (f32, f32),
     pub resource_ids: Vec<u32>,
+    /// Static ground path lengths in world pixels, keyed by original-main player ID.
+    /// Missing entries mean no ground route. Ignores units and buildings; terrain paths use
+    /// cardinal/diagonal tile costs of 1/1.4 and never cut blocked corners.
+    pub ground_distances_from_starts: std::collections::BTreeMap<u32, f32>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -21,8 +25,8 @@ pub struct AiRankedBase<'a> {
     pub site: &'a AiBaseSite,
     /// One-based geography rank: original main is always 1, regardless of its survival.
     pub rank: usize,
-    /// Straight-line world-pixel distance from the original main; not walking distance.
-    pub distance_from_main: f32,
+    /// Static ground path length in world pixels; `None` means unreachable by ground.
+    pub distance_from_main: Option<f32>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -42,7 +46,8 @@ pub struct AiBaseDepot {
 impl WorldQueries<'_> {
     /// All public sites ordered relative to `player_id`, including other players' starting sites.
     /// Stable site IDs break equal-distance ties. Resource depletion and occupancy never reorder
-    /// sites. Unknown players return no sites. Rank describes geography, not construction order.
+    /// sites. Reachable sites precede unreachable sites, which are ordered by stable ID and
+    /// report no distance. Unknown players return no sites. Rank is not construction order.
     pub fn ranked_bases(&self, player_id: u32) -> Vec<AiRankedBase<'_>> {
         let Some(main) = self
             .frame
@@ -57,8 +62,15 @@ impl WorldQueries<'_> {
             (a.id != main.id)
                 .cmp(&(b.id != main.id))
                 .then_with(|| {
-                    distance2(a.position, main.position)
-                        .total_cmp(&distance2(b.position, main.position))
+                    match (
+                        a.ground_distances_from_starts.get(&player_id),
+                        b.ground_distances_from_starts.get(&player_id),
+                    ) {
+                        (Some(a), Some(b)) => a.total_cmp(b),
+                        (Some(_), None) => std::cmp::Ordering::Less,
+                        (None, Some(_)) => std::cmp::Ordering::Greater,
+                        (None, None) => std::cmp::Ordering::Equal,
+                    }
                 })
                 .then_with(|| a.id.cmp(&b.id))
         });
@@ -68,7 +80,7 @@ impl WorldQueries<'_> {
             .map(|(index, site)| AiRankedBase {
                 site,
                 rank: index + 1,
-                distance_from_main: distance2(site.position, main.position).sqrt(),
+                distance_from_main: site.ground_distances_from_starts.get(&player_id).copied(),
             })
             .collect()
     }

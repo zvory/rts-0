@@ -146,7 +146,7 @@ production-exit, ring traversal, and tie-breaking approximation. Results are nam
 `KnownBlocked`, and `NoKnownConflict`; none claims authoritative legality, clearance, reachability,
 or command acceptance. Public queries depend only on `AiFrame` and explicit controller-owned
 failed-site exclusions. Legacy profiles retain their historical global-producer exit check through
-a narrow compatibility policy, while all other placement work is shared. Static connectivity,
+a narrow compatibility policy, while all other placement work is shared. General route queries,
 dynamic pathing, firing lanes, target legality, line of fire, and hidden occupancy remain outside
 the SDK because no Phase 4 consumer required them.
 
@@ -156,9 +156,13 @@ absorb their mapped home cluster; empty-resource starts still have a main landma
 `Start(player_id)` or `ResourceCluster(cluster_id)` and remain stable while public map inputs are
 unchanged. Cluster sites are inferred geography, not authoritative build footprints.
 `WorldQueries::ranked_bases(player_id)` and `base(player_id, rank)` rank all sites relative to that
-player's original main: main is always 1, then increasing straight-line world-pixel distance,
-with stable site-ID ties. This is geographic order, not acquisition order, walking distance,
-reachability, or ownership. Other players' starting sites remain in the list. Depletion, destroyed
+player's original main: main is always 1, then increasing static ground path length in world
+pixels, with stable site-ID ties. The existing cached start-distance fields route around blocked
+terrain with cardinal/diagonal costs of 1/1.4 tiles and forbid diagonal corner cutting. Distances
+ignore dynamic units and buildings and do not model a specific unit's footprint. Each site's
+`ground_distances_from_starts` contains the reachable players' distances; unreachable sites sort
+last by stable ID and have `AiRankedBase::distance_from_main = None`. This is geographic order,
+not acquisition order or ownership. Other players' starting sites remain in the list. Depletion, destroyed
 Depots, and fog never renumber sites; a Lab map edit can rebuild them.
 `known_base_depots(site_id)` associates known Resource Depots with the nearest site within twelve
 tiles, using stable-ID ties. It reports owner and owned/currently visible/remembered evidence,
