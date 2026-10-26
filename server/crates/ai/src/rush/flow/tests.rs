@@ -456,3 +456,75 @@ fn extractor_can_be_shot_across_water_without_a_walking_route_to_its_center() {
         [AiActionRequest::Attack { target: 300, .. }]
     ));
 }
+
+#[test]
+fn destroyed_extractor_retargets_every_unit_of_the_same_range_immediately() {
+    let (start, mut snapshot) = fixture();
+    snapshot.entities.retain(|e| e.owner == 1);
+    snapshot.entities[0].x = 20.5 * 32.0;
+    let mut second = snapshot.entities[0].clone();
+    second.id = 101;
+    snapshot.entities.push(second);
+    extractor(&mut snapshot, 300, "steel_mine", 21.5, 16.5);
+    extractor(&mut snapshot, 301, "pump_jack", 24.5, 16.5);
+    let run = |flow: &mut RushFlow, snapshot: &Snapshot| {
+        let frame = frame_for(&start, snapshot);
+        let mut actions = AiActions::for_frame(&frame);
+        flow.step(
+            &frame,
+            (44.5 * 32.0, 16.0 * 32.0),
+            &BTreeSet::from([100, 101]),
+            &mut actions,
+        );
+        actions.into_requests()
+    };
+    let mut flow = RushFlow::default();
+    assert_eq!(run(&mut flow, &snapshot).len(), 2);
+    snapshot.entities.retain(|e| e.id != 301);
+    for e in snapshot.entities.iter_mut().filter(|e| e.owner == 1) {
+        e.state = "attack".into();
+        e.target_id = Some(301);
+    }
+    snapshot.tick += 9;
+    let retargets = run(&mut flow, &snapshot);
+    assert_eq!(retargets.len(), 2);
+    assert!(retargets
+        .iter()
+        .all(|a| matches!(a, AiActionRequest::Attack { target: 300, .. })));
+}
+
+#[test]
+fn unreachable_safe_pump_does_not_hide_a_reachable_guarded_mine() {
+    let mut grid = grid(
+        48,
+        32,
+        vec![Threat {
+            position: (8.5 * 32.0, 16.5 * 32.0),
+            radius: 6.0 * 32.0,
+            dps: 1000,
+        }],
+    );
+    for y in 0..32 {
+        grid.input.blocked[y * 48 + 24] = true;
+    }
+    grid.input.objectives = vec![
+        Objective {
+            id: 300,
+            kind: EntityKind::PumpJack,
+            position: (40.5 * 32.0, 16.5 * 32.0),
+            visible: true,
+        },
+        Objective {
+            id: 301,
+            kind: EntityKind::SteelMine,
+            position: (8.5 * 32.0, 16.5 * 32.0),
+            visible: true,
+        },
+    ];
+    let grid = FlowGrid::new(grid.input).unwrap();
+    let cell = grid.input.cell((7.5 * 32.0, 16.5 * 32.0)).unwrap();
+    assert_eq!(grid.safe[cell], UNREACHABLE);
+    assert_eq!(grid.escape[cell], UNREACHABLE);
+    assert_ne!(grid.soft[cell], UNREACHABLE);
+    assert_eq!(grid.input.objectives[grid.soft[cell].3].id, 301);
+}

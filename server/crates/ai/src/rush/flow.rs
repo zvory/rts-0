@@ -102,19 +102,20 @@ impl RushFlow {
             .map(|(threat, _)| threat.clone())
             .collect::<Vec<_>>();
         let mut active_ranges = BTreeSet::new();
+        let mut changed_ranges = BTreeSet::new();
         for entity in frame.owned().iter().filter(|e| launched.contains(&e.id)) {
             let Some(stats) = balance::unit_stats(entity.kind) else {
                 continue;
             };
             let key = (stats.range_tiles * 1000.0).round() as u32;
             let first = active_ranges.insert(key);
-            let mut changed = false;
             if first {
                 let mut input = GridInput::from_frame(frame, target, threats.clone());
                 input.range = stats.range_tiles;
                 input.objectives = objectives.clone();
-                changed = self.grids.get(&key).is_none_or(|grid| grid.input != input);
+                let changed = self.grids.get(&key).is_none_or(|grid| grid.input != input);
                 if changed {
+                    changed_ranges.insert(key);
                     if let Some(grid) = FlowGrid::new(input) {
                         self.grids.insert(key, grid);
                     }
@@ -143,7 +144,7 @@ impl RushFlow {
                 if *previous == intent && committed {
                     return false;
                 }
-                changed
+                changed_ranges.contains(&key)
                     || previous.mode() != intent.mode()
                     || frame.tick().saturating_sub(*tick) >= ORDER_INTERVAL
             });
@@ -331,6 +332,7 @@ struct FlowGrid {
     danger: Vec<u32>,
     safe: Vec<Cost>,
     soft: Vec<Cost>,
+    escape: Vec<Cost>,
 }
 
 impl FlowGrid {
@@ -343,6 +345,7 @@ impl FlowGrid {
             input,
             safe: Vec::new(),
             soft: Vec::new(),
+            escape: Vec::new(),
         };
         for cell in 0..grid.danger.len() {
             let center = grid.input.center(cell);
@@ -354,9 +357,11 @@ impl FlowGrid {
             }
         }
         let seeds = grid.goal_seeds();
-        let has_safe_goal = seeds.iter().any(|(cell, _, _)| grid.danger[*cell] == 0);
-        grid.safe = grid.field(true, &seeds, has_safe_goal);
-        grid.soft = grid.field(false, &seeds, has_safe_goal);
+        grid.safe = grid.field(true, &seeds, true);
+        // Combat considers every reachable goal, even if a safe goal exists on a disconnected island.
+        grid.soft = grid.field(false, &seeds, false);
+        // Escape considers only safe firing positions, so a covered nearby extractor cannot pin us.
+        grid.escape = grid.field(false, &seeds, true);
         Some(grid)
     }
 
@@ -506,8 +511,13 @@ impl FlowGrid {
         costs
     }
 
+    #[cfg(test)]
     fn next(&self, cell: usize, safe: bool) -> Option<usize> {
         let costs = if safe { &self.safe } else { &self.soft };
+        self.next_on(cell, safe, costs)
+    }
+
+    fn next_on(&self, cell: usize, safe: bool, costs: &[Cost]) -> Option<usize> {
         NEIGHBORS
             .into_iter()
             .filter_map(|(dx, dy)| {
@@ -606,8 +616,12 @@ impl FlowGrid {
         let escape = !self.input.objectives.is_empty()
             && self.danger[cell] > 0
             && self.escape_reaches_safe_goal(cell);
+        if escape {
+            let (point, _) = self.waypoint_on(entity.position, false, &self.escape)?;
+            return Some(Intent::Move(point));
+        }
         let (point, breach) = self.waypoint(entity.position)?;
-        Some(if escape || !breach {
+        Some(if !breach {
             Intent::Move(point)
         } else {
             Intent::AttackMove(point)
@@ -619,7 +633,7 @@ impl FlowGrid {
             if self.danger[cell] == 0 {
                 return self.safe[cell] != UNREACHABLE;
             }
-            let Some(next) = self.next(cell, false) else {
+            let Some(next) = self.next_on(cell, false, &self.escape) else {
                 return false;
             };
             cell = next;
@@ -629,9 +643,13 @@ impl FlowGrid {
 
     /// Safe detours use Move. An unavoidable firing zone uses AttackMove at its weak approach.
     fn waypoint(&self, position: Point) -> Option<(Point, bool)> {
-        let mut cell = self.input.cell(position)?;
+        let cell = self.input.cell(position)?;
         let safe = self.safe.get(cell).is_some_and(|cost| *cost != UNREACHABLE);
-        let costs = if safe { &self.safe } else { &self.soft };
+        self.waypoint_on(position, safe, if safe { &self.safe } else { &self.soft })
+    }
+
+    fn waypoint_on(&self, position: Point, safe: bool, costs: &[Cost]) -> Option<(Point, bool)> {
+        let mut cell = self.input.cell(position)?;
         if costs.get(cell) == Some(&UNREACHABLE) {
             return None;
         }
@@ -646,7 +664,7 @@ impl FlowGrid {
         let mut point = self.input.center(cell);
         let mut breach = !safe && self.danger[cell] > 0;
         for _ in 0..WAYPOINT_TILES {
-            let Some(next) = self.next(cell, safe) else {
+            let Some(next) = self.next_on(cell, safe, costs) else {
                 break;
             };
             let candidate = self.input.center(next);
