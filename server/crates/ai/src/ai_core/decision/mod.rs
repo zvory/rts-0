@@ -89,6 +89,8 @@ use self::turtle::{
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct AiDecision {
+    /// Pressure assault candidates after home defense and construction clearance have claimed units.
+    pub(crate) pressure_wave_units: BTreeSet<u32>,
     pub(crate) profile_id: &'static str,
     pub(crate) intents: Vec<AiIntent>,
     pub(crate) commands: Vec<Command>,
@@ -734,6 +736,16 @@ where
         &effective_unit_priorities,
     );
     let mut effective_unit_priorities = effective_unit_priorities;
+    if profile.id == crate::ai_core::profiles::PRESSURE_AI_ID
+        && crate::pressure::uses_panzerfaust_production(
+            observation.tick,
+            facts.completed_upgrades(),
+        )
+    {
+        // Pressure's standing Panzerfaust allocation replaces new Rifleman orders; paid queues
+        // finish normally. Keep the legacy home Machine Gunners and Tank production policy.
+        effective_unit_priorities.retain(|unit| *unit != EntityKind::Rifleman);
+    }
     if uses_current_jeffs_ai_policy(profile.id)
         && memory.expansion_security.site.is_some()
         && facts.unit_count(EntityKind::Rifleman) < 6
@@ -930,7 +942,9 @@ where
                 })
         });
     }
-    if !frontal_wave.ready_units.is_empty()
+    let mut pressure_wave_units = BTreeSet::new();
+    if profile.id == crate::ai_core::profiles::PRESSURE_AI_ID
+        || !frontal_wave.ready_units.is_empty()
         || !local_ready_units.is_empty()
         || !defensive_machine_gunners.is_empty()
     {
@@ -1287,7 +1301,29 @@ where
         };
         // During a raid at home only a launched push is still commanded here.
         let push_only = handled_local_defense && containment_recall_target.is_none();
-        if (!push_only || !push_units.is_empty())
+        if profile.id == crate::ai_core::profiles::PRESSURE_AI_ID {
+            let ordered: BTreeSet<u32> = actions
+                .unit_orders_since(0)
+                .into_iter()
+                .map(|(id, _)| id)
+                .collect();
+            pressure_wave_units.extend(
+                observation
+                    .owned
+                    .iter()
+                    .filter(|unit| {
+                        unit.is_complete
+                            && unit.hp > 0
+                            && attack_policy.unit_kinds.contains(&unit.kind)
+                            && !frontal_exclusions.contains(&unit.id)
+                            && !ordered.contains(&unit.id)
+                            && !local_defense_assigned.contains(&unit.id)
+                    })
+                    .map(|unit| unit.id),
+            );
+        }
+        if profile.id != crate::ai_core::profiles::PRESSURE_AI_ID
+            && (!push_only || !push_units.is_empty())
             && !turtle_defense_active
             && (!frontal_wave.ready_units.is_empty() || containment_needs_control)
         {
@@ -1390,6 +1426,7 @@ where
     });
 
     AiDecision {
+        pressure_wave_units,
         profile_id: profile.id,
         intents,
         commands: actions.into_commands(),

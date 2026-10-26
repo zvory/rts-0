@@ -10,11 +10,12 @@ When several seats use the same profile, their lobby names receive deterministic
 
 ### Canonical profiles
 
-The player-facing lobby supports three AI profile IDs:
+The player-facing lobby supports four AI profile IDs:
 
-- ai_2_2 — AI 2.2, the default weighted composition: 50% Rush AI and 50% original AI 2.1.
+- ai_2_2 — AI 2.2, the default weighted composition: 50% Rush AI and 50% Pressure AI.
 - jeffs_ai — Jeff's AI, the server-authoritative port of the locally evaluated V3 champion policy.
 - rush_ai — Rush AI, an immediate infantry attack with forward construction.
+- pressure_ai — Pressure AI, the AI 2.1 economy, technology, and home defenses with independent forward staging.
 
 `ai_turtle` is deprecated and internal-only. It remains registered for offline self-play,
 diagnostics, and observer-only AI sessions, but it is not exposed in the lobby and the server
@@ -22,8 +23,7 @@ replaces it with `ai_2_2` whenever a room has an active human player. The replac
 again at the authoritative match-start seam, so stale or crafted clients cannot put Turtle into a
 human match.
 
-The convenience inputs ai and default resolve to ai_2_2. The lobby exposes AI 2.2, Jeff's AI, and
-Rush AI. AI 2.1 remains a concrete internal profile (`ai_2_1`) for compositions, offline tools, and
+The convenience inputs ai and default resolve to ai_2_2. The lobby exposes AI 2.2, Jeff's AI, Rush AI, and Pressure AI. AI 2.1 remains a concrete internal profile (`ai_2_1`) for offline tools and
 observer-only sessions, but is hidden and rejected as a direct selection in human player lobbies.
 Unsupported or internal IDs fall back to AI 2.2 when adding a seat and are ignored when changing a
 seat; stale internal seats are normalized to AI 2.2 when humans join and again at match start.
@@ -198,6 +198,36 @@ visible Resource Depot, including unfinished depots and the controller’s pendi
 Patches inside a known Depot’s mining range are also excluded, so occupied sites are skipped
 while the search continues through other resource locations.
 
+### Pressure AI
+
+`pressure_ai` owns a copy of the AI 2.1 policy, retaining its economy, expansion, Tank technology
+and production, and home-defense decisions, with independent infantry research and production.
+The legacy decision loop hands unreserved offensive
+Riflemen, Panzerfausts, and Tanks to a separate SDK staging owner after home-defense and construction-clearance
+orders have claimed their units. Pressure replaces the legacy frontal-wave issuer rather than
+layering competing attack orders over it. Home defenders retain priority; temporarily borrowed,
+unlaunched units resume their staging orders when released.
+
+`server/crates/ai/src/pressure.rs` intentionally copies Rush's terrain route, stable-slot, arrival,
+and cohort policy instead of calling Rush code. Its constants and persistent state are independent.
+The line sits 35 tiles outside the enemy start, perpendicular to the routed approach. Riflemen
+and Panzerfausts occupy the front; Tanks stand three tiles behind at three-tile spacing. Units move to their slots
+and Hold Position. The first wave unlocks at 90% Methamphetamines research (or completion), and
+launches once at least one unit has arrived; later waves need five actual arrivals. En-route units
+do not count. Each wave receives one AttackMove to the enemy start, and launched units never
+rejoin staging. Pressure retains ordinary attack-move combat after launch; Rush's extractor-raiding
+flow is not part of this copied staging policy.
+
+Pressure includes a Training Centre in its initial tech path so its infantry research does not
+wait for the Tank transition. On the first decision at or after two minutes (3,600 ticks), it queues
+Panzerfausts on an owned Training Centre, including an unfinished or currently researching one.
+Research waits for authoritative completion, prerequisites, and payment. Once the upgrade completes,
+Pressure stops issuing new Rifleman orders, disables Rifleman repeat, and enables Panzerfaust repeat
+on every completed Barracks, including replacements. Already paid or queued Riflemen finish normally.
+Home Machine Gunner and Tank production remain under the existing policy. New Panzerfausts join
+Pressure's infantry staging line and its normal arrival-counted waves. This policy and its state
+are independent of Rush.
+
 ### Rush AI
 
 `rush_ai` runs `RushStrategy` through the typed SDK and canonical controller cadence. The four
@@ -271,7 +301,7 @@ AI 2.0 resolves only to the `ai_2_0_tank_pressure` profile. The retired
 panic does not override an already-active tech transition, so tank pressure continues its Factory
 path during pressure.
 
-AI 2.1 is the original pressure behavior used as an AI 2.2 component. It fills in-range Steel and Oil extractor slots over time,
+AI 2.1 is the original behavior copied into Pressure, the non-Rush AI 2.2 component. It fills in-range Steel and Oil extractor slots over time,
 keeps an eight-supply buffer, opens one Barracks, expands to two Resource Depots, and reserves four
 Machine Gunners for defense. It begins with Rifleman pressure, then transitions into mixed
 Tank/Rifleman pressure once its tank-tech resource threshold is met. After its first Vehicle Works (Factory) completes, it seeks a third Resource Depot using the
