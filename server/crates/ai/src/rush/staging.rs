@@ -1,12 +1,15 @@
-//! Opening Riflemen attack immediately; reinforcement cohorts assemble on a terrain-routed front.
+//! Cohorts assemble on a terrain-routed front before receiving one shared attack order.
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet, BinaryHeap};
 
-use crate::sdk::{AiActions, AiEntityState, AiFrame, AiMap, AiTerrain, EntityKind, UnitGroup};
+use crate::sdk::{
+    AiActions, AiEntityState, AiFrame, AiMap, AiTerrain, EntityKind, UnitGroup, UpgradeKind,
+};
 
 type Point = (f32, f32);
 const STAGING_DISTANCE_TILES: f32 = 25.0;
 const PANZERFAUST_REAR_OFFSET_TILES: f32 = 3.0;
+const FIRST_WAVE_RESEARCH_PROGRESS: f32 = 0.9;
 const SLOT_SPACING_TILES: f32 = 1.5;
 const ARRIVAL_TILES: f32 = 0.75;
 const RETRY_TICKS: u32 = 90;
@@ -18,7 +21,8 @@ pub(super) struct RushWaves {
     issued: BTreeMap<u32, u32>,
     held: BTreeSet<u32>,
     launched: BTreeSet<u32>,
-    opening_dispatched: bool,
+    first_wave_launched: bool,
+    first_wave_unlocked: bool,
     flow: super::flow::RushFlow,
 }
 
@@ -49,28 +53,7 @@ impl RushWaves {
     }
 
     pub(super) fn step(&mut self, frame: &AiFrame, target: Point, actions: &mut AiActions) {
-        if !self.opening_dispatched {
-            let opening = frame
-                .owned()
-                .iter()
-                .filter(|entity| entity.kind == EntityKind::Rifleman)
-                .take(4)
-                .map(|entity| entity.id)
-                .collect::<Vec<_>>();
-            if opening.is_empty() {
-                self.opening_dispatched = true;
-            } else if let Ok(group) = UnitGroup::new(opening.iter().copied()) {
-                if actions
-                    .attack_move(&group, target.0, target.1, false)
-                    .is_ok()
-                {
-                    self.launched.extend(opening);
-                    self.opening_dispatched = true;
-                }
-            }
-        }
         let Some((_, line)) = self.plan else {
-            self.flow.step(frame, target, &self.launched, actions);
             return;
         };
         let units = frame
@@ -112,12 +95,30 @@ impl RushWaves {
             })
             .take(rts_contract::MAX_UNITS_PER_COMMAND)
             .collect::<Vec<_>>();
-        if ready.len() >= 5 {
+        self.first_wave_unlocked |= frame
+            .completed_upgrades()
+            .contains(&UpgradeKind::Methamphetamines)
+            || frame.owned().iter().any(|entity| {
+                entity.kind == EntityKind::TrainingCentre
+                    && entity.production.is_some_and(|production| {
+                        production.current_upgrade == Some(UpgradeKind::Methamphetamines)
+                            && production
+                                .progress
+                                .is_some_and(|progress| progress >= FIRST_WAVE_RESEARCH_PROGRESS)
+                    })
+            });
+        let may_launch = if self.first_wave_launched {
+            ready.len() >= 5
+        } else {
+            !ready.is_empty() && self.first_wave_unlocked
+        };
+        if may_launch {
             if let Ok(group) = UnitGroup::new(ready.iter().copied()) {
                 if actions
                     .attack_move(&group, target.0, target.1, false)
                     .is_ok()
                 {
+                    self.first_wave_launched = true;
                     for id in &ready {
                         self.launched.insert(*id);
                         self.slots.remove(id);

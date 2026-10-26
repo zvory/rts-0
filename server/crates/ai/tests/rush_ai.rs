@@ -202,13 +202,8 @@ fn check_rush_opening(map_name: Option<&str>) {
     );
     assert!(!waves.is_empty());
     assert!(
-        waves[0].0 <= 9 && waves[0].0 < meth_ninety.unwrap(),
-        "opening wave must launch on the first decision, without waiting for research"
-    );
-    assert_eq!(
-        waves[0].1.len(),
-        4,
-        "opening contains the four starting Riflemen"
+        waves[0].0 >= meth_ninety.unwrap(),
+        "opening wave must wait for 90% Methamphetamines research"
     );
     let mut launched = BTreeSet::new();
     for (index, (tick, units, x, y)) in waves.iter().enumerate() {

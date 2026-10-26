@@ -49,17 +49,17 @@ fn add_rifle(snapshot: &mut Snapshot, specimen: &EntityView, id: u32) {
 }
 
 #[test]
-fn opening_attacks_immediately_then_reinforcements_require_five_arrivals() {
+fn waves_wait_for_ninety_percent_then_require_five_arrivals_without_retasking_old_waves() {
     let (start, mut snapshot) = fixture();
-    let initial_frame = frame(&start, &snapshot);
-    let enemy = initial_frame.players().iter().find(|p| p.id == 2).unwrap();
-    let size = initial_frame.map().tile_size as f32;
+    let frame = frame(&start, &snapshot);
+    let enemy = frame.players().iter().find(|p| p.id == 2).unwrap();
+    let size = frame.map().tile_size as f32;
     let target = (
         (enemy.start_tile.0 as f32 + 0.5) * size,
         (enemy.start_tile.1 as f32 + 0.5) * size,
     );
     let mut waves = RushWaves::default();
-    let rally = waves.rally(&initial_frame, 2, target).unwrap();
+    let rally = waves.rally(&frame, 2, target).unwrap();
     assert!((distance(rally, target) / size - 25.0).abs() < 0.001);
     let specimen = snapshot
         .entities
@@ -67,85 +67,99 @@ fn opening_attacks_immediately_then_reinforcements_require_five_arrivals() {
         .find(|e| e.owner == 1 && e.kind == "rifleman")
         .unwrap()
         .clone();
-    let opening = initial_frame
-        .owned()
-        .iter()
-        .filter(|e| e.kind == EntityKind::Rifleman)
-        .map(|e| e.id)
-        .collect::<Vec<_>>();
-    assert_eq!(opening.len(), 4);
-    assert!(snapshot.upgrades.is_empty());
     let initial = step(&mut waves, &start, &snapshot, target);
-    assert!(
-        matches!(initial.as_slice(), [AiActionRequest::AttackMove { units, x, y, .. }] if units == &opening && (*x, *y) == target)
-    );
-    assert!(
-        waves.slots.is_empty(),
-        "opening Riflemen bypass staging entirely"
-    );
-    assert!(waves.held.is_empty());
-    snapshot.tick += 9;
-    assert!(
-        step(&mut waves, &start, &snapshot, target).is_empty(),
-        "opening must not be reissued every decision"
-    );
-
-    for id in 1001..=1004 {
-        add_rifle(&mut snapshot, &specimen, id);
-    }
-    snapshot.tick += 9;
-    let staging = step(&mut waves, &start, &snapshot, target);
     assert_eq!(
-        staging
+        initial
             .iter()
-            .filter(|a| matches!(a, AiActionRequest::Move { .. }))
+            .filter(|action| matches!(action, AiActionRequest::Move { .. }))
             .count(),
         4
     );
+    assert!(!initial
+        .iter()
+        .any(|action| matches!(action, AiActionRequest::AttackMove { .. })));
     let line = waves.plan.unwrap().1;
     for slot in waves.slots.values() {
         let along =
             (slot.0 - line.center.0) * line.forward.0 + (slot.1 - line.center.1) * line.forward.1;
         assert!(
             along.abs() < 0.01,
-            "reinforcements retain the perpendicular staging line"
+            "opening slots must form a perpendicular line"
         );
     }
     assemble(&mut snapshot, &waves);
     snapshot.tick += 9;
     assert!(!step(&mut waves, &start, &snapshot, target)
         .iter()
-        .any(|a| matches!(a, AiActionRequest::AttackMove { .. })));
+        .any(|action| matches!(action, AiActionRequest::AttackMove { .. })));
+    let mut centre = EntityView::new(
+        999,
+        1,
+        "training_centre",
+        specimen.x,
+        specimen.y,
+        120,
+        120,
+        "train",
+    );
+    centre.prod_upgrade = Some("methamphetamines".into());
+    centre.prod_progress = Some(0.899);
+    centre.prod_queue = Some(1);
+    snapshot.entities.push(centre);
+    snapshot.tick += 9;
+    assert!(!step(&mut waves, &start, &snapshot, target)
+        .iter()
+        .any(|action| matches!(action, AiActionRequest::AttackMove { .. })));
+    snapshot
+        .entities
+        .iter_mut()
+        .find(|entity| entity.id == 999)
+        .unwrap()
+        .prod_progress = Some(0.9);
+    snapshot.tick += 9;
+    let launch = step(&mut waves, &start, &snapshot, target);
+    let groups = launch
+        .iter()
+        .filter_map(|action| match action {
+            AiActionRequest::AttackMove { units, x, y, .. } => {
+                assert_eq!((*x, *y), target);
+                Some(units.clone())
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(groups.len(), 1);
+    assert_eq!(groups[0].len(), 4);
+    let first_wave = groups[0].clone();
+    for id in 1001..=1004 {
+        add_rifle(&mut snapshot, &specimen, id);
+    }
+    snapshot.tick += 9;
+    step(&mut waves, &start, &snapshot, target);
+    assemble(&mut snapshot, &waves);
+    snapshot.tick += 9;
+    assert!(!step(&mut waves, &start, &snapshot, target)
+        .iter()
+        .any(|action| matches!(action, AiActionRequest::AttackMove { .. })));
     add_rifle(&mut snapshot, &specimen, 1005);
     snapshot.tick += 9;
     assert!(
         !step(&mut waves, &start, &snapshot, target)
             .iter()
-            .any(|a| matches!(a, AiActionRequest::AttackMove { .. })),
+            .any(|action| matches!(action, AiActionRequest::AttackMove { .. })),
         "an en-route fifth unit does not count"
     );
     assemble(&mut snapshot, &waves);
     snapshot.tick += 9;
     let launch = step(&mut waves, &start, &snapshot, target);
     assert!(
-        matches!(launch.as_slice(), [AiActionRequest::AttackMove { units, .. }] if units == &vec![1001,1002,1003,1004,1005])
+        matches!(launch.as_slice(),[AiActionRequest::AttackMove { units,.. }] if units==&vec![1001,1002,1003,1004,1005])
     );
-    assert!(opening.iter().all(|id| waves.launched.contains(id)));
+    assert!(first_wave.iter().all(|id| waves.launched.contains(id)));
     add_rifle(&mut snapshot, &specimen, 1006);
     snapshot.tick += 9;
-    assert!(
-        matches!(step(&mut waves, &start, &snapshot, target).as_slice(), [AiActionRequest::Move { units, .. }] if units==&vec![1006])
-    );
-}
-
-#[test]
-fn opening_dispatch_does_not_depend_on_a_staging_route() {
-    let (start, snapshot) = fixture();
-    let mut waves = RushWaves::default();
-    assert!(waves.plan.is_none());
-    assert!(
-        matches!(step(&mut waves, &start, &snapshot, (1000.0,1000.0)).as_slice(), [AiActionRequest::AttackMove { units, .. }] if units.len()==4)
-    );
+    let next = step(&mut waves, &start, &snapshot, target);
+    assert!(matches!(next.as_slice(),[AiActionRequest::Move {units,..}] if units==&vec![1006]));
 }
 
 #[test]
@@ -197,9 +211,6 @@ fn panzerfausts_stage_on_a_parallel_line_three_tiles_behind_front_infantry() {
         .find(|entity| entity.owner == 1 && entity.kind == "rifleman")
         .unwrap()
         .clone();
-    for id in 1101..=1104 {
-        add_rifle(&mut snapshot, &specimen, id);
-    }
     for id in 1001..=1003 {
         let mut panzer = specimen.clone();
         panzer.id = id;
