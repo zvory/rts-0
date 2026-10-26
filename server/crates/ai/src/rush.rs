@@ -7,6 +7,7 @@ use crate::sdk::{
 };
 use rts_sim::game::entity::RallyKind;
 
+mod flow;
 mod staging;
 
 pub(crate) const RUSH_AI_ID: &str = "rush_ai";

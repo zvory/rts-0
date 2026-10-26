@@ -69,6 +69,8 @@ memory facts. Its collections use stable id ordering; completed upgrades and sub
 additionally sorted and deduplicated.
 Active production identifies either its typed unit kind or its typed research upgrade when one is
 present in the recipient snapshot.
+Entity records retain the public `occupied_trench_id` from that same recipient snapshot so
+strategies can recognize active entrenchment without inspecting enemy research or private state.
 Owned entities, currently visible allies, currently visible enemies, and remembered contacts are
 separate collections. A remembered contact is stale last-seen knowledge, never a current target.
 
@@ -205,7 +207,7 @@ it completes, each Barracks alternates Machine Gunners and Panzerfausts. The hom
 auto-builds Steel Mines and Pump Jacks to sustain income. There is no expansion or additional tech
 path.
 
-Rush picks a staging point 25 world-space tiles from the enemy start along a shortest octile route
+Rush picks a staging point 20 world-space tiles from the enemy start along a shortest octile route
 through the public terrain map, without cutting blocked diagonal corners. The formation is
 perpendicular to the smoothed local approach direction. Riflemen and Machine Gunners receive
 stable, spaced slots from the main line's centre outward. Panzerfausts use a separate parallel
@@ -221,6 +223,32 @@ staging, and later production gathers into a fresh cohort.
 `AiActions::queue_research` emits an ordinary research queue request without requiring or
 reserving its eventual cost. Unlike the affordable `research` helper, it permits construction-
 time/unpaid queues; authoritative simulation validation and payment still apply.
+
+Launched Rush infantry raid known enemy extractors. The flow seeds reachable firing positions
+around recipient-visible or remembered Pump Jacks and Steel Mines, prioritizing any safely
+reachable Pump Jack over Steel Mines, then choosing the shorter safe route within that priority.
+Each weapon range uses its own shared field; the AI accounts for the extractor footprint and keeps
+a firing-distance margin. Visible extractors receive ordinary explicit Attack commands only from
+a clear, in-range firing position. Remembered extractors are scouting destinations, never direct
+attack targets. With no known extractors, the enemy start remains the exploration objective.
+
+Observed armed enemy combat units contribute circular exclusion zones using public base range
+and nominal DPS, plus the range bonus for visible trench occupation. Hidden upgrades are not
+inferred. Known all-ground building blockers obstruct the route; extractors and Tank Traps remain
+walkable for infantry, matching authoritative obstacle classifications. Safe firing positions
+inside enemy coverage are excluded. Move waypoints suppress opportunistic combat while seeking a
+safe extractor. A unit already in a fight can escape along the least-exposure route into a region
+with a safe extractor approach. If no safe approach exists, the weighted field chooses a weaker
+crossing, moves toward that fight without stopping on buildings, and explicitly attacks a visible
+combat defender once it is in range. If no defender is currently visible, it uses AttackMove toward
+the weak approach to reacquire contact. There is no separate damage-triggered re-flow or game combat-rule change.
+
+The flow is reevaluated from fog-filtered observations on the normal AI cadence. Orders are
+bounded to one per second while following the same movement mode, with immediate mode/objective
+changes. Last-seen combat contacts expire after five seconds; observed noncombat contacts clear
+immediately. Fields are shared by units with the same base weapon range. Only launched units are
+controlled; staging cohorts, the 90% Methamphetamines opening wait, research order, and the
+Engineer's 30-tile exclusion radius remain independent of raid target selection.
 
 ### Profile behavior
 

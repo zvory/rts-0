@@ -7,7 +7,7 @@ use crate::sdk::{
 };
 
 type Point = (f32, f32);
-const STAGING_DISTANCE_TILES: f32 = 25.0;
+const STAGING_DISTANCE_TILES: f32 = 20.0;
 const PANZERFAUST_REAR_OFFSET_TILES: f32 = 3.0;
 const FIRST_WAVE_RESEARCH_PROGRESS: f32 = 0.9;
 const SLOT_SPACING_TILES: f32 = 1.5;
@@ -23,6 +23,7 @@ pub(super) struct RushWaves {
     launched: BTreeSet<u32>,
     first_wave_launched: bool,
     first_wave_unlocked: bool,
+    flow: super::flow::RushFlow,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -71,6 +72,7 @@ impl RushWaves {
             .collect::<BTreeSet<_>>();
         self.slots
             .retain(|id, _| alive.contains(id) && !self.launched.contains(id));
+        self.launched.retain(|id| alive.contains(id));
         self.issued.retain(|id, _| alive.contains(id));
         self.held.retain(|id| alive.contains(id));
         let size = frame.map().tile_size as f32;
@@ -125,6 +127,7 @@ impl RushWaves {
                 }
             }
         }
+        self.flow.step(frame, target, &self.launched, actions);
         for entity in units {
             let Some(slot) = self.slots.get(&entity.id) else {
                 continue;
@@ -287,7 +290,7 @@ fn passable_world(map: &AiMap, point: Point) -> bool {
     passable(map, (point.0 / size) as i32, (point.1 / size) as i32)
 }
 
-fn passable(map: &AiMap, x: i32, y: i32) -> bool {
+pub(super) fn passable(map: &AiMap, x: i32, y: i32) -> bool {
     let (Ok(x), Ok(y)) = (u32::try_from(x), u32::try_from(y)) else {
         return false;
     };
