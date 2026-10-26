@@ -1222,6 +1222,15 @@ where
                             .defensive_machine_gunners
                             .map_or(0, |policy| policy.target_count),
                     )
+                } else if profile.id == crate::ai_core::profiles::PRESSURE_AI_ID {
+                    defense::stage_pressure_machine_gunners(
+                        &mut actions,
+                        observation,
+                        map_analysis,
+                        profile,
+                        &defensive_machine_gunners_available,
+                        memory.home_defensive_tank.is_some(),
+                    )
                 } else if memory.home_defensive_tank.is_some() {
                     let distance = profile
                         .defensive_machine_gunners
