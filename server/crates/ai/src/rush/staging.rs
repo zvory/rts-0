@@ -3,7 +3,8 @@ use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet, BinaryHeap};
 
 use crate::sdk::{
-    AiActions, AiEntityState, AiFrame, AiMap, AiTerrain, EntityKind, UnitGroup, UpgradeKind,
+    AiActions, AiEntityState, AiFrame, AiMap, AiTerrain, EntityKind, PullbackMemory,
+    PullbackParams, UnitGroup, UpgradeKind,
 };
 
 type Point = (f32, f32);
@@ -24,6 +25,9 @@ pub(super) struct RushWaves {
     first_wave_launched: bool,
     first_wave_unlocked: bool,
     flow: super::flow::RushFlow,
+    pullback: PullbackMemory,
+    /// Once a member reaches staging, the existing staging/flow policy keeps ownership.
+    staged: BTreeSet<u32>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -48,6 +52,7 @@ impl RushWaves {
             self.slots.clear();
             self.issued.clear();
             self.held.clear();
+            self.staged.clear();
         }
         self.plan.as_ref().map(|(_, line)| line.center)
     }
@@ -73,6 +78,7 @@ impl RushWaves {
         self.slots
             .retain(|id, _| alive.contains(id) && !self.launched.contains(id));
         self.launched.retain(|id| alive.contains(id));
+        self.staged.retain(|id| alive.contains(id));
         self.issued.retain(|id, _| alive.contains(id));
         self.held.retain(|id| alive.contains(id));
         let size = frame.map().tile_size as f32;
@@ -86,6 +92,34 @@ impl RushWaves {
             if let Some(point) = line.free_slot(frame, entity.kind, self.slots.values().copied()) {
                 self.slots.insert(entity.id, point);
             }
+        }
+        self.staged.extend(
+            units
+                .iter()
+                .filter(|entity| {
+                    self.slots.get(&entity.id).is_some_and(|slot| {
+                        distance(entity.position, *slot) <= ARRIVAL_TILES * size
+                    })
+                })
+                .map(|entity| entity.id),
+        );
+        let approaching: Vec<_> = units
+            .iter()
+            .filter(|entity| {
+                entity.kind == EntityKind::Rifleman
+                    && !self.staged.contains(&entity.id)
+                    && !self.launched.contains(&entity.id)
+                    && self.slots.contains_key(&entity.id)
+            })
+            .map(|entity| entity.id)
+            .collect();
+        let pullback = self
+            .pullback
+            .step(frame, &approaching, PullbackParams::default(), actions);
+        // Resume toward the slot immediately after a retreat, without the normal idle retry delay.
+        for id in pullback.active.iter().chain(&pullback.released) {
+            self.issued.remove(id);
+            self.held.remove(id);
         }
         let ready = units
             .iter()
@@ -129,6 +163,9 @@ impl RushWaves {
         }
         self.flow.step(frame, target, &self.launched, actions);
         for entity in units {
+            if pullback.active.contains(&entity.id) {
+                continue;
+            }
             let Some(slot) = self.slots.get(&entity.id) else {
                 continue;
             };

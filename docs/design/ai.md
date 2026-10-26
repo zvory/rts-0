@@ -123,6 +123,18 @@ controller ordering, all-controller observation before enqueue, worker-retreat-f
 normal simulation validation, and replay logging are unchanged. The builder is deliberately not a
 planner, task system, command receipt, or cross-tick scheduler.
 
+`PullbackMemory` is an optional tactical helper shared by Jeff, Pressure, and approaching Rush
+Riflemen. Its pure `plan` accepts explicit live squad facts and currently visible enemy-unit facts;
+its `step` adapter reads those facts from `AiFrame` and emits SDK Moves. The default policy pulls a
+member at or below 15 HP three tiles away from the nearest visible enemy when a visible enemy is
+targeting it, then excludes it from normal orders for 45 ticks. At least one squad member must
+remain above the threshold. Destinations are map-clamped; the helper does not establish terrain
+safety or reachability. Callers choose squad membership and keep route and combat ownership.
+They suppress normal orders for returned `active` IDs and restore their own movement for
+`released` IDs. The adapter remembers new retreats only after local emission succeeds; this does
+not imply simulation acceptance. Jeff retains his existing squad-planner invocation and early-return
+semantics, including resuming ordinary advancement when its caller sees no enemies.
+
 The public-SDK-only [reference strategy](../ai-authoring.md) is the executable authoring specimen.
 It runs through `AiController::with_strategy` and the canonical driver, enables Pump Jack repeat,
 uses `UnitGroup` plus cross-tick memory to dispatch its Engineer as an attack-move scout, and is
@@ -259,7 +271,12 @@ A second-base wave receives AttackMove to base two followed by queued AttackMove
 A third-base wave receives AttackMove to base three, then queued AttackMoves to base two and the
 main. Waves launched before a time boundary retain their route. Only unlaunched recruits move
 to the new staging line; already launched units never rejoin staging. Pressure retains ordinary attack-move combat after launch; Rush's extractor-raiding
-flow is not part of this copied staging policy.
+flow is not part of this copied staging policy. Eligible offensive Riflemen additionally use the
+shared pull-back helper while staging or attacking. Active retreats cannot receive staging or
+launch orders. Released staging members resume their slots immediately; released launched members
+receive their original wave route again, including its queued lower-base objectives. A later phase
+boundary does not replace that saved route. Home-defense and construction-clearance ownership
+continues to take priority. Tanks and Panzerfausts retain their existing behavior.
 
 Pressure includes a Training Centre in its initial tech path so its infantry research does not
 wait for the Tank transition. On the first decision at or after two minutes (3,600 ticks), it queues
@@ -311,6 +328,12 @@ the first decision at or after two minutes (3,600 simulation ticks), behind earl
 it completes, each Barracks alternates Machine Gunners and Panzerfausts. The home Resource Depot
 auto-builds Steel Mines and Pump Jacks to sustain income. There is no expansion or additional tech
 path.
+
+Rush enables the shared wounded-unit pull-back only for Riflemen still approaching their first
+staging slot. Active retreats temporarily suppress slot movement, which resumes immediately when
+the retreat ends. Reaching staging hands ownership back to the existing staging and launched flow
+controllers, even if a unit subsequently moves away. Machine Gunners and Panzerfausts do not use
+the helper.
 
 Rush picks a staging point 20 world-space tiles from the enemy start along a shortest octile route
 through the public terrain map, without cutting blocked diagonal corners. The formation is

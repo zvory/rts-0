@@ -273,3 +273,63 @@ fn barracks_rally_and_new_recruits_attack_move_to_staging_before_wave_unlock() {
     }
     assert!(!strategy.waves.first_wave_launched);
 }
+
+#[test]
+fn pullback_owns_only_riflemen_approaching_staging_and_resumes_the_slot() {
+    let (start, mut snapshot) = fixture();
+    let target = (2000.0, 2000.0);
+    let mut waves = RushWaves::default();
+    waves.rally(&frame(&start, &snapshot), 2, target).unwrap();
+    let rifle = snapshot
+        .entities
+        .iter_mut()
+        .find(|e| e.owner == 1 && e.kind == "rifleman")
+        .unwrap();
+    rifle.hp = 10;
+    rifle.x = 320.0;
+    rifle.y = 320.0;
+    let id = rifle.id;
+    let mut enemy = rifle.clone();
+    enemy.id = 999;
+    enemy.owner = 2;
+    enemy.hp = 45;
+    enemy.x += 64.0;
+    enemy.target_id = Some(id);
+    snapshot.entities.push(enemy);
+    let orders = step(&mut waves, &start, &snapshot, target);
+    assert!(orders
+        .iter()
+        .any(|a| matches!(a, AiActionRequest::Move { units, .. } if units == &[id])));
+    assert!(!orders
+        .iter()
+        .any(|a| matches!(a, AiActionRequest::AttackMove { units, .. } if units.contains(&id))));
+    snapshot.tick += 9;
+    assert!(!step(&mut waves, &start, &snapshot, target).iter().any(|a| {
+        matches!(a, AiActionRequest::AttackMove { units, .. } | AiActionRequest::HoldPosition { units, .. } if units.contains(&id))
+    }));
+    snapshot.tick += 36;
+    snapshot.entities.last_mut().unwrap().target_id = None;
+    let orders = step(&mut waves, &start, &snapshot, target);
+    assert!(orders.iter().any(
+        |a| matches!(a, AiActionRequest::AttackMove { units, x, y, queued: false }
+        if units == &[id] && (*x, *y) == waves.slots[&id])
+    ));
+    assemble(&mut snapshot, &waves);
+    snapshot.tick += 9;
+    let post = waves.slots[&id];
+    let enemy = snapshot.entities.last_mut().unwrap();
+    enemy.x = post.0 + 64.0;
+    enemy.y = post.1;
+    enemy.target_id = Some(id);
+    let orders = step(&mut waves, &start, &snapshot, target);
+    assert!(waves.staged.contains(&id));
+    assert_eq!(waves.pullback, PullbackMemory::default());
+    assert!(!orders
+        .iter()
+        .any(|a| matches!(a, AiActionRequest::Move { units, .. } if units.contains(&id))));
+    waves.first_wave_unlocked = true;
+    snapshot.tick += 9;
+    step(&mut waves, &start, &snapshot, target);
+    assert!(waves.launched.contains(&id));
+    assert_eq!(waves.pullback, PullbackMemory::default());
+}

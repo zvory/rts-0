@@ -110,3 +110,19 @@ cargo nextest run --config-file .config/nextest.toml \
 Upgrade costs remain owned by the simulation; `research` consults that existing definition for
 local affordability without publishing a duplicate rule table. Cross-tick goals, command receipts,
 task status, automatic planning, and completion inference remain outside this SDK.
+
+## Optional wounded-unit pull-back
+
+Keep one `PullbackMemory` per caller-owned squad. Call `memory.step(frame, &rifle_ids,
+PullbackParams::default(), actions)` before issuing that squad's ordinary orders. It emits only
+new retreat Moves; skip normal orders for the returned `active` IDs on every decision and restore
+your objective or route for `released` IDs. Defaults match Jeff's rifle micro: at most 15 HP,
+three tiles, 45 ticks, triggered by a visible enemy targeting the unit while a healthier squad
+member remains. The helper never chooses squads, attack objectives, or routes. Use current owned
+IDs and choose membership explicitly; its SDK adapter filters dead/incomplete members and uses
+only currently visible enemy units. Failed local Move emission is retried on a later decision.
+
+`plan` is the lower-level pure planner for integrations that emit their own orders; supply live
+`PullbackUnit` facts and manage emission failures there. Destinations are clamped to map bounds,
+without a terrain or safety guarantee. This helper does not reserve existing active members in
+later action batches, so caller-side ownership checks are required throughout a retreat.
