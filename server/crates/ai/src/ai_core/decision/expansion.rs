@@ -212,7 +212,9 @@ where
     {
         return None;
     }
-    let (tile_x, tile_y) = if uses_current_jeffs_ai_policy(profile.id) {
+    let (tile_x, tile_y) = if uses_current_jeffs_ai_policy(profile.id)
+        || profile.id == crate::ai_core::profiles::PRESSURE_AI_ID
+    {
         let site = secured_site?;
         if !expansion_site_is_separate(observation, site) || !placeable(kind, site.0, site.1) {
             return None;

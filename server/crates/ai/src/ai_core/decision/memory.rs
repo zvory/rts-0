@@ -105,6 +105,7 @@ pub(crate) struct AiDecisionMemory {
     pub(super) later_bases: super::later_bases::LaterBases,
     /// Jeff's forward picket and the Riflemen sealing the home line during a raid alert.
     pub(super) route_line: super::defense::RouteLine,
+    pub(super) pressure_economy: super::pressure_economy::PressureEconomy,
     /// Jeff's starting Riflemen marching on the enemy, until they fall back home.
     pub(super) opening_rush: super::opening_rush::OpeningRush,
     /// The live Jeff's enemy Tank memory, Tank order overrides, and smoke assault.
@@ -201,6 +202,7 @@ impl AiDecisionMemory {
             expansion_security: Default::default(),
             later_bases: Default::default(),
             route_line: Default::default(),
+            pressure_economy: Default::default(),
             opening_rush: Default::default(),
             tank_micro: Default::default(),
             trap_breach: Default::default(),
@@ -301,6 +303,7 @@ impl AiDecisionMemory {
         }
         self.profile_id = Some(profile.id);
         self.expansion_security = Default::default();
+        self.pressure_economy = Default::default();
         self.spend_plan = Default::default();
         self.tank_micro = Default::default();
         self.trap_breach = Default::default();

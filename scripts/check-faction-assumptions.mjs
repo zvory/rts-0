@@ -258,6 +258,8 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/ai/src/ai_core/decision/memory.rs",
   "server/crates/ai/src/ai_core/decision/mod.rs",
   "server/crates/ai/src/ai_core/decision/production.rs",
+  // Pressure owns its Kriegsia Depot expansion and standing Tank production policy.
+  "server/crates/ai/src/ai_core/decision/pressure_economy.rs",
   "server/crates/ai/src/ai_core/decision/proxy.rs",
   "server/crates/ai/src/ai_core/decision/raids.rs",
   "server/crates/ai/src/ai_core/decision/resources.rs",

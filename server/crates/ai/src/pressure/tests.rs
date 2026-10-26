@@ -371,3 +371,291 @@ fn panzerfaust_repeat_starts_only_after_research_and_configures_replacement_barr
     }] if buildings == &[991])
     );
 }
+
+fn timed_fixture(count: usize) -> (StartPayload, Snapshot, Vec<crate::sdk::AiBaseSite>, Point) {
+    use crate::sdk::{AiBaseSite, AiBaseSiteId};
+    let (mut start, mut snapshot) = fixture();
+    start.map.terrain.fill(0);
+    start.map.no_building_tiles.clear();
+    let size = start.map.tile_size as f32;
+    let point = |id| {
+        let p = start.players.iter().find(|p| p.id == id).unwrap();
+        (
+            (p.start_tile_x as f32 + 0.5) * size,
+            (p.start_tile_y as f32 + 0.5) * size,
+        )
+    };
+    let home = point(1);
+    let main = point(2);
+    let second = (main.0 - 20.0 * size, main.1);
+    let third = (main.0 - 40.0 * size, main.1 - 10.0 * size);
+    let mut sites = vec![
+        AiBaseSite {
+            id: AiBaseSiteId::Start(1),
+            position: home,
+            resource_ids: vec![],
+            ground_distances_from_starts: Default::default(),
+        },
+        AiBaseSite {
+            id: AiBaseSiteId::Start(2),
+            position: main,
+            resource_ids: vec![],
+            ground_distances_from_starts: Default::default(),
+        },
+        AiBaseSite {
+            id: AiBaseSiteId::ResourceCluster(1),
+            position: second,
+            resource_ids: vec![],
+            ground_distances_from_starts: Default::default(),
+        },
+        AiBaseSite {
+            id: AiBaseSiteId::ResourceCluster(2),
+            position: third,
+            resource_ids: vec![],
+            ground_distances_from_starts: Default::default(),
+        },
+    ];
+    for site in &mut sites {
+        site.ground_distances_from_starts = [
+            (1, distance(home, site.position)),
+            (2, distance(main, site.position)),
+        ]
+        .into_iter()
+        .collect();
+    }
+    snapshot.entities.clear();
+    snapshot
+        .upgrades
+        .extend(["methamphetamines".into(), "panzerfausts".into()]);
+    for id in 1..=count as u32 {
+        snapshot.entities.push(EntityView::new(
+            id, 1, "rifleman", home.0, home.1, 45, 45, "idle",
+        ));
+    }
+    (start, snapshot, sites, main)
+}
+
+fn timed_step(
+    waves: &mut PressureWaves,
+    start: &StartPayload,
+    snapshot: &Snapshot,
+    sites: &[crate::sdk::AiBaseSite],
+    main: Point,
+) -> Vec<AiActionRequest> {
+    let current = frame(start, snapshot).with_base_sites(sites);
+    waves.rally(&current, 2, main).unwrap();
+    let eligible = current.owned().iter().map(|e| e.id).collect();
+    let mut actions = AiActions::for_frame(&current);
+    waves.step(&current, main, &eligible, &mut actions);
+    actions.into_requests()
+}
+
+#[test]
+fn pressure_retargets_at_exact_four_and_eight_minute_boundaries_on_the_main_base_axis() {
+    let (start, mut snapshot, sites, main) = timed_fixture(4);
+    let home = sites[0].position;
+    let size = start.map.tile_size as f32;
+    let mut waves = PressureWaves::default();
+    for (tick, phase, target) in [
+        (7199, 0, main),
+        (7200, 1, sites[2].position),
+        (14399, 1, sites[2].position),
+        (14400, 2, sites[3].position),
+    ] {
+        snapshot.tick = tick;
+        let current = frame(&start, &snapshot).with_base_sites(&sites);
+        waves.rally(&current, 2, main).unwrap();
+        let line = waves.plan.unwrap().1;
+        let objective = waves.objective.unwrap();
+        assert_eq!(objective.phase, phase);
+        assert_eq!(objective.target(), target);
+        assert_eq!(objective.minimum_wave_size(), 5 << phase);
+        let radius = if phase == 0 { 35.0 } else { 25.0 };
+        assert!((distance(line.center, target) / size - radius).abs() < 0.001);
+        if phase > 0 {
+            let axis = (
+                (target.0 - home.0) / distance(home, target),
+                (target.1 - home.1) / distance(home, target),
+            );
+            assert!(
+                (line.forward.0 - axis.0).abs() < 0.0001
+                    && (line.forward.1 - axis.1).abs() < 0.0001
+            );
+            let offset = (line.center.0 - home.0, line.center.1 - home.1);
+            assert!((offset.0 * axis.1 - offset.1 * axis.0).abs() < 0.01);
+        }
+    }
+}
+
+#[test]
+fn pressure_waits_for_ten_then_twenty_arrivals_and_queues_each_lower_base() {
+    for (tick, minimum, expected) in [(7200, 10, vec![2, 1]), (14400, 20, vec![3, 2, 1])] {
+        let (start, mut snapshot, sites, main) = timed_fixture(minimum - 1);
+        snapshot.tick = tick;
+        let mut waves = PressureWaves {
+            first_wave_launched: true,
+            ..Default::default()
+        };
+        timed_step(&mut waves, &start, &snapshot, &sites, main);
+        assemble(&mut snapshot, &waves);
+        let below = timed_step(&mut waves, &start, &snapshot, &sites, main);
+        assert!(!below
+            .iter()
+            .any(|a| matches!(a, AiActionRequest::AttackMove { .. })));
+        let specimen = snapshot.entities[0].clone();
+        add_rifle(&mut snapshot, &specimen, minimum as u32);
+        timed_step(&mut waves, &start, &snapshot, &sites, main);
+        assemble(&mut snapshot, &waves);
+        let launch = timed_step(&mut waves, &start, &snapshot, &sites, main);
+        let route: Vec<_> = launch
+            .iter()
+            .filter_map(|a| match a {
+                AiActionRequest::AttackMove {
+                    units,
+                    x,
+                    y,
+                    queued,
+                } => Some((units, (*x, *y), *queued)),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(route.len(), expected.len());
+        for (i, ((units, point, queued), rank)) in route.iter().zip(expected).enumerate() {
+            let target = match rank {
+                1 => main,
+                2 => sites[2].position,
+                _ => sites[3].position,
+            };
+            assert_eq!(units.len(), minimum);
+            assert_eq!(*point, target);
+            assert_eq!(*queued, i > 0);
+            assert_eq!(*units, route[0].0);
+        }
+        assert_eq!(waves.launched.len(), minimum);
+        snapshot.tick += 9;
+        assert!(timed_step(&mut waves, &start, &snapshot, &sites, main).is_empty());
+    }
+}
+
+#[test]
+fn pressure_retargets_only_unlaunched_units_and_reissues_their_movement() {
+    let (start, mut snapshot, sites, main) = timed_fixture(4);
+    snapshot.tick = 7199;
+    let mut waves = PressureWaves::default();
+    waves.launched.insert(1);
+    timed_step(&mut waves, &start, &snapshot, &sites, main);
+    let previous = waves.slots.clone();
+    for tick in [7200, 14400] {
+        snapshot.tick = tick;
+        let requests = timed_step(&mut waves, &start, &snapshot, &sites, main);
+        assert!(waves.launched.contains(&1));
+        assert!(!waves.slots.contains_key(&1));
+        assert!(
+            requests
+                .iter()
+                .filter(|a| matches!(a, AiActionRequest::Move { .. }))
+                .count()
+                >= 3
+        );
+        assert!(requests
+            .iter()
+            .all(|a| !matches!(a,AiActionRequest::Move{units,..} if units.contains(&1))));
+        assert_ne!(waves.slots, previous);
+    }
+}
+
+#[test]
+fn pressure_late_wave_still_requires_opening_research_and_handles_missing_ranked_sites() {
+    let (start, mut snapshot, _, main) = timed_fixture(20);
+    snapshot.tick = 14400;
+    snapshot.upgrades.clear();
+    let mut waves = PressureWaves::default();
+    timed_step(&mut waves, &start, &snapshot, &[], main);
+    assemble(&mut snapshot, &waves);
+    assert!(!timed_step(&mut waves, &start, &snapshot, &[], main)
+        .iter()
+        .any(|a| matches!(a, AiActionRequest::AttackMove { .. })));
+    snapshot.upgrades.push("methamphetamines".into());
+    let requests = timed_step(&mut waves, &start, &snapshot, &[], main);
+    assert_eq!(
+        requests
+            .iter()
+            .filter(|a| matches!(a, AiActionRequest::AttackMove { .. }))
+            .count(),
+        1
+    );
+    assert!(requests
+        .iter()
+        .any(|a| matches!(a,AiActionRequest::AttackMove{x,y,queued:false,..}if (*x,*y)==main)));
+}
+
+#[test]
+fn pressure_keeps_initial_ranked_landmarks_when_later_resources_or_site_rankings_change() {
+    let (start, mut snapshot, mut sites, main) = timed_fixture(4);
+    let mut waves = PressureWaves::default();
+    timed_step(&mut waves, &start, &snapshot, &sites, main);
+    let second = sites[2].position;
+    let third = sites[3].position;
+    sites.remove(2);
+    snapshot.tick = 7200;
+    timed_step(&mut waves, &start, &snapshot, &sites, main);
+    assert_eq!(waves.objective.unwrap().target(), second);
+    sites.clear();
+    snapshot.tick = 14400;
+    timed_step(&mut waves, &start, &snapshot, &sites, main);
+    let objective = waves.objective.unwrap();
+    assert_eq!(objective.target(), third);
+    assert_eq!(objective.followups(), &[second, main]);
+}
+
+#[test]
+fn later_axis_slots_skip_disconnected_ground_without_moving_the_line() {
+    let (mut start, mut snapshot, sites, main) = timed_fixture(20);
+    snapshot.tick = 14400;
+    let size = start.map.tile_size as f32;
+    let expected = StagingLine::on_axis(
+        frame(&start, &snapshot).map(),
+        sites[0].position,
+        sites[3].position,
+    )
+    .unwrap();
+    let wall_x = (expected.center.0 / size) as usize + 2;
+    for y in 0..start.map.height as usize {
+        start.map.terrain[y * start.map.width as usize + wall_x] =
+            rts_rules::terrain::MAP_TERRAIN_WATER;
+    }
+    let mut waves = PressureWaves::default();
+    timed_step(&mut waves, &start, &snapshot, &sites, main);
+    assert_eq!(waves.plan.unwrap().1.center, expected.center);
+    assert!(
+        !waves.slots.is_empty(),
+        "home={:?} wall={} center={:?} forward={:?} reachable={}",
+        sites[0].position,
+        wall_x,
+        expected.center,
+        expected.forward,
+        waves.reachable.iter().filter(|v| **v).count()
+    );
+    for point in waves.slots.values() {
+        let x = (point.0 / size) as usize;
+        let y = (point.1 / size) as usize;
+        assert!(x < wall_x, "slot must remain on the main's connected side");
+        assert!(waves.reachable[y * start.map.width as usize + x]);
+    }
+}
+
+#[test]
+fn pressure_ground_connectivity_does_not_cut_diagonally_blocked_corners() {
+    let mut map = AiMap {
+        width: 3,
+        height: 3,
+        tile_size: 32,
+        terrain: vec![AiTerrain::Grass; 9],
+        no_building_tiles: BTreeSet::new(),
+    };
+    map.terrain[1] = AiTerrain::Water;
+    map.terrain[3] = AiTerrain::Rock;
+    let reachable = ground_reachable(&map, (16.0, 16.0));
+    assert!(reachable[0]);
+    assert!(!reachable[4]);
+}

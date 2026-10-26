@@ -493,6 +493,7 @@ impl AiController {
             profile,
             &mut self.memory,
             map_analysis,
+            &world_queries,
             ai_shared::BuildSearch {
                 min_radius: 2,
                 max_radius: ai_shared::DEFAULT_BUILD_SEARCH_MAX_RADIUS,

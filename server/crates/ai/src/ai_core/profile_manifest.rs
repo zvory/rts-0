@@ -39,8 +39,8 @@ pub(crate) fn profile_identity(profile: &AiProfile) -> AiProfileIdentity {
     let (label, summary, modules) = if profile.id == super::profiles::PRESSURE_AI_ID {
         (
             "Pressure AI",
-            "AI 2.1 economy and defenses with independently owned terrain-routed assault waves.",
-            vec!["pressure_staging", "legacy_economy"],
+            "Ranked expansion to five bases, floating-resource Vehicle Works growth, and independently owned terrain-routed assault waves.",
+            vec!["pressure_staging", "ranked_five_base_economy", "tank_repeat"],
         )
     } else {
         (label, summary, modules)
@@ -61,6 +61,8 @@ pub(crate) fn profile_identity(profile: &AiProfile) -> AiProfileIdentity {
                     profile,
                     include_str!("../pressure.rs"),
                     include_str!("../pressure/production.rs"),
+                    include_str!("../pressure/objective.rs"),
+                    include_str!("decision/pressure_economy.rs"),
                 ),
                 "Pressure AI",
                 None,
