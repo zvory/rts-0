@@ -96,19 +96,19 @@ is a draw; army value and other material metrics are diagnostics, not tiebreaker
 ```bash
 cd server
 cargo run --bin ai-matchup -- ai ai
-cargo run --bin ai-matchup -- ai_2_1 ai_turtle --seed 7 --ticks 3000 --json
+cargo run --bin ai-matchup -- ai_2_2 ai_turtle --seed 7 --ticks 3000 --json
 cargo run --bin ai-matchup -- default ai_turtle --seed 7 --ticks 25000 --json
 cargo run --bin ai-matchup -- --list-profiles
 ```
 
 The `ai-arena` binary is the agent-facing profile comparison layer. It runs side-swapped seed pairs
-around the same profile matchup result, defaults to AI 2.1 against AI Turtle, and writes a
+around the same profile matchup result, defaults to AI 2.2 against AI Turtle, and writes a
 top-level `arena-summary.json` plus per-run sidecars:
 
 ```bash
 cd server
-cargo run --bin ai-arena -- --candidate ai_2_1 --baseline ai_turtle --seeds 3 --ticks 9000
-cargo run --bin ai-arena -- --candidate ai_turtle --baseline ai_2_1 --out-dir target/ai-arena
+cargo run --bin ai-arena -- --candidate ai_2_2 --baseline ai_turtle --seeds 3 --ticks 9000
+cargo run --bin ai-arena -- --candidate ai_turtle --baseline ai_2_2 --out-dir target/ai-arena
 ```
 
 Each run directory contains a deterministic `replay.json` plus `manifest.json`, `summary.json`,

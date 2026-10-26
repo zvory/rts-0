@@ -43,7 +43,8 @@ fn real_ai_vs_real_ai() {
         .expect("real-ai replay start should export");
     let mut controllers: Vec<AiController> = players
         .iter()
-        .map(|player| AiController::new(player.id))
+        // This milestone lane verifies the original pressure policy, including Tank production.
+        .map(|player| AiController::with_profile_id(player.id, crate::ai_core::profiles::AI_2_1_ID))
         .collect();
 
     let mut event_log = Vec::new();

@@ -15,6 +15,7 @@ use crate::ai_core::profiles::{
     profile_by_id, AiProfile, AI_2_1, AI_2_1_ID, AI_TURTLE_ID, JEFFS_AI_ID,
 };
 use crate::ai_shared;
+use crate::compositions::{composition_by_id, AI_2_2_ID};
 use crate::rush::{RushStrategy, RUSH_AI_ID};
 use crate::sdk::{AiActions, AiFrame, AiStrategy, KnownBuildSite, WorldQueries};
 use crate::selfplay::pending_build::PendingBuildTracker;
@@ -33,15 +34,18 @@ const LIVE_DECISION_TRACE_TRUNCATED_LINE: &str = "trace_truncated=true";
 const CUSTOM_STRATEGY_PROFILE_ID: &str = "custom_strategy";
 
 /// The default live-lobby profile id.
-pub const DEFAULT_LIVE_PROFILE_ID: &str = AI_2_1_ID;
+pub const DEFAULT_LIVE_PROFILE_ID: &str = AI_2_2_ID;
 
 /// Canonical profile ids understood by the live adapter. Experimental profiles are available to
 /// internal observer-only sessions; the room actor prevents them from entering human matches.
-pub const LIVE_PROFILE_IDS: [&str; 4] = [AI_2_1_ID, JEFFS_AI_ID, AI_TURTLE_ID, RUSH_AI_ID];
+pub const LIVE_PROFILE_IDS: [&str; 5] =
+    [AI_2_2_ID, AI_2_1_ID, JEFFS_AI_ID, AI_TURTLE_ID, RUSH_AI_ID];
 
 pub fn canonical_live_profile_id(input: &str) -> Option<&'static str> {
     match input {
-        "ai" | "default" | AI_2_1_ID => Some(AI_2_1_ID),
+        "ai" | "default" => Some(DEFAULT_LIVE_PROFILE_ID),
+        id if composition_by_id(id).is_some() => composition_by_id(id).map(|c| c.id),
+        AI_2_1_ID => Some(AI_2_1_ID),
         JEFFS_AI_ID => Some(JEFFS_AI_ID),
         RUSH_AI_ID => Some(RUSH_AI_ID),
         AI_TURTLE_ID => Some(AI_TURTLE_ID),
@@ -50,7 +54,11 @@ pub fn canonical_live_profile_id(input: &str) -> Option<&'static str> {
 }
 
 pub fn live_profile_label(profile_id: &str) -> &'static str {
-    match canonical_live_profile_id(profile_id) {
+    let canonical = canonical_live_profile_id(profile_id);
+    if let Some(composition) = canonical.and_then(composition_by_id) {
+        return composition.label;
+    }
+    match canonical {
         Some(AI_2_1_ID) => "AI 2.1",
         Some(JEFFS_AI_ID) => "Jeff's AI",
         Some(RUSH_AI_ID) => "Rush AI",
@@ -60,7 +68,7 @@ pub fn live_profile_label(profile_id: &str) -> &'static str {
 }
 
 pub fn is_player_live_profile_id(profile_id: &str) -> bool {
-    matches!(profile_id, AI_2_1_ID | JEFFS_AI_ID | RUSH_AI_ID)
+    matches!(profile_id, AI_2_2_ID | JEFFS_AI_ID | RUSH_AI_ID)
 }
 
 pub fn random_live_profile_id(rng: &mut impl Rng) -> &'static str {
@@ -72,6 +80,8 @@ pub fn resolve_live_profile_id_for_match(profile_id: &str) -> &'static str {
 }
 
 pub struct AiThinkContext<'a> {
+    /// Host-owned seed used only for once-per-match behavior selection.
+    pub match_seed: u32,
     pub start: &'a StartPayload,
     pub snapshot: &'a Snapshot,
     pub alive_player_ids: &'a [u32],
@@ -172,6 +182,7 @@ impl CanonicalAiTickDriver {
             let retreat_commands = game.worker_retreat_commands_for(player_id);
             let reported_retreat_commands = capture_report.then(|| retreat_commands.clone());
             let emitted_commands = controller.think(AiThinkContext {
+                match_seed: game.seed(),
                 start: &start,
                 snapshot: &snapshot,
                 alive_player_ids: &alive_player_ids,
@@ -234,7 +245,9 @@ pub struct AiDecisionTraceSnapshot {
 /// Drives a single AI-controlled player by emitting ordinary commands each think.
 pub struct AiController {
     player: u32,
+    behavior_profile_id: &'static str,
     profile_id: &'static str,
+    selection_pending: bool,
     memory: AiDecisionMemory,
     static_map_context: AiStaticMapContextCache,
     pending_builds: PendingBuildTracker,
@@ -266,14 +279,20 @@ impl AiController {
     }
 
     pub fn with_profile_id(player: u32, profile_id: &'static str) -> Self {
-        let profile = profile_by_id(profile_id).unwrap_or_else(default_live_profile);
+        let profile_id = canonical_live_profile_id(profile_id)
+            .or_else(|| profile_by_id(profile_id).map(|profile| profile.id))
+            .unwrap_or(DEFAULT_LIVE_PROFILE_ID);
+        let composition = composition_by_id(profile_id);
+        let profile = profile_by_id(profile_id).unwrap_or_else(legacy_fallback_profile);
         Self {
             player,
-            profile_id: if profile_id == RUSH_AI_ID {
+            behavior_profile_id: if profile_id == RUSH_AI_ID {
                 RUSH_AI_ID
             } else {
                 profile.id
             },
+            profile_id,
+            selection_pending: composition.is_some(),
             memory: AiDecisionMemory::for_profile(profile),
             static_map_context: AiStaticMapContextCache::default(),
             pending_builds: PendingBuildTracker::default(),
@@ -292,7 +311,9 @@ impl AiController {
     /// built-in profiles.
     pub fn with_strategy(player: u32, strategy: Box<dyn AiStrategy>) -> Self {
         let mut controller = Self::new(player);
+        controller.behavior_profile_id = CUSTOM_STRATEGY_PROFILE_ID;
         controller.profile_id = CUSTOM_STRATEGY_PROFILE_ID;
+        controller.selection_pending = false;
         controller.custom_strategy = Some(strategy);
         controller
     }
@@ -301,8 +322,26 @@ impl AiController {
         self.player
     }
 
+    /// Canonical requested identity; a composition keeps its identity after selecting a member.
     pub fn profile_id(&self) -> &'static str {
         self.profile_id
+    }
+
+    /// The concrete behavior chosen for this match, after the first host invocation.
+    pub fn selected_profile_id(&self) -> Option<&'static str> {
+        (!self.selection_pending).then_some(self.behavior_profile_id)
+    }
+
+    fn select_for_match(&mut self, seed: u32) {
+        if !self.selection_pending {
+            return;
+        }
+        let requested = self.profile_id;
+        let selected = composition_by_id(requested)
+            .and_then(|composition| composition.select(seed, self.player))
+            .unwrap_or(AI_2_1_ID);
+        *self = Self::with_profile_id(self.player, selected);
+        self.profile_id = requested;
     }
 
     pub fn latest_decision_trace(&self) -> Option<AiDecisionTraceSnapshot> {
@@ -320,12 +359,13 @@ impl AiController {
     }
 
     fn profile(&self) -> &'static AiProfile {
-        profile_by_id(self.profile_id).unwrap_or_else(default_live_profile)
+        profile_by_id(self.behavior_profile_id).unwrap_or_else(legacy_fallback_profile)
     }
 
     pub fn think(&mut self, context: AiThinkContext<'_>) -> Vec<SimCommand> {
+        self.select_for_match(context.match_seed);
         // Rush deliberately keeps its Engineer advancing, including under fire.
-        let mut commands = if self.profile_id == RUSH_AI_ID {
+        let mut commands = if self.behavior_profile_id == RUSH_AI_ID {
             Vec::new()
         } else {
             context.retreat_commands
@@ -342,6 +382,7 @@ impl AiController {
         }
 
         let view = PlayerView {
+            match_seed: context.match_seed,
             player_id: self.player,
             tick,
             start: context.start,
@@ -386,6 +427,20 @@ impl AiController {
                     .map(crate::action_emitter::emit_request),
             );
             self.pending_builds.record_commands(tick, &commands);
+            if self.profile_id != self.behavior_profile_id {
+                self.last_decision_trace = Some(AiDecisionTraceSnapshot {
+                    player_id: self.player,
+                    profile_id: self.profile_id,
+                    trace_tick: tick,
+                    lines: vec![
+                        format!("profile={} tick={tick}", self.profile_id),
+                        format!(
+                            "composition={} selected={}",
+                            self.profile_id, self.behavior_profile_id
+                        ),
+                    ],
+                });
+            }
             return commands;
         }
 
@@ -425,13 +480,23 @@ impl AiController {
                 })
             },
         );
-        debug_assert_eq!(decision.profile_id, self.profile_id);
+        debug_assert_eq!(decision.profile_id, self.behavior_profile_id);
 
+        let mut trace_lines = decision.trace.format_lines();
+        if self.profile_id != self.behavior_profile_id {
+            trace_lines.insert(
+                0,
+                format!(
+                    "composition={} selected={}",
+                    self.profile_id, self.behavior_profile_id
+                ),
+            );
+        }
         self.last_decision_trace = Some(AiDecisionTraceSnapshot {
             player_id: self.player,
             profile_id: self.profile_id,
             trace_tick: tick,
-            lines: bounded_decision_trace_lines(decision.trace.format_lines()),
+            lines: bounded_decision_trace_lines(trace_lines),
         });
         let factory_clearance_ordered = decision
             .intents
@@ -619,8 +684,8 @@ impl AiController {
     }
 }
 
-fn default_live_profile() -> &'static AiProfile {
-    profile_by_id(DEFAULT_LIVE_PROFILE_ID).unwrap_or(&AI_2_1)
+fn legacy_fallback_profile() -> &'static AiProfile {
+    profile_by_id(AI_2_1_ID).unwrap_or(&AI_2_1)
 }
 
 fn bounded_decision_trace_lines(lines: Vec<String>) -> Vec<String> {
@@ -851,6 +916,7 @@ mod tests {
         let (commands, trace) = CanonicalAiTickDriver::run_prepared_controller(
             &mut controller,
             AiThinkContext {
+                match_seed: 0,
                 start: &start,
                 snapshot: &snapshot,
                 alive_player_ids: &[1, 2],
@@ -887,6 +953,7 @@ mod tests {
         let mut controller = AiController::with_strategy(1, Box::new(MoveStrategy));
 
         let commands = controller.think(AiThinkContext {
+            match_seed: 0,
             start: &start,
             snapshot: &snapshot,
             alive_player_ids: &[1, 2],
@@ -910,7 +977,7 @@ mod tests {
         let ai = AiController::new(2);
 
         assert_eq!(ai.player_id(), 2);
-        assert_eq!(ai.profile_id(), AI_2_1_ID);
+        assert_eq!(ai.profile_id(), DEFAULT_LIVE_PROFILE_ID);
         assert_eq!(ai.latest_decision_trace(), None);
     }
 
@@ -1120,13 +1187,13 @@ mod tests {
     fn live_adapter_knows_public_and_internal_profiles() {
         assert_eq!(
             LIVE_PROFILE_IDS,
-            [AI_2_1_ID, JEFFS_AI_ID, AI_TURTLE_ID, RUSH_AI_ID]
+            [AI_2_2_ID, AI_2_1_ID, JEFFS_AI_ID, AI_TURTLE_ID, RUSH_AI_ID]
         );
     }
 
     #[test]
-    fn live_default_is_ai_2_1() {
-        assert_eq!(DEFAULT_LIVE_PROFILE_ID, AI_2_1_ID);
+    fn live_default_is_ai_2_2() {
+        assert_eq!(DEFAULT_LIVE_PROFILE_ID, AI_2_2_ID);
     }
 
     #[test]
@@ -1138,7 +1205,7 @@ mod tests {
         }
         assert_eq!(
             selected,
-            BTreeSet::from([AI_2_1_ID, JEFFS_AI_ID, AI_TURTLE_ID, RUSH_AI_ID])
+            BTreeSet::from([AI_2_2_ID, AI_2_1_ID, JEFFS_AI_ID, AI_TURTLE_ID, RUSH_AI_ID])
         );
     }
 
@@ -1180,8 +1247,12 @@ mod tests {
         assert_eq!(live_profile_label(AI_2_1_ID), "AI 2.1");
         assert_eq!(live_profile_label(JEFFS_AI_ID), "Jeff's AI");
         assert_eq!(live_profile_label(AI_TURTLE_ID), "AI Turtle");
-        assert_eq!(live_profile_label("default"), "AI 2.1");
+        assert_eq!(live_profile_label("default"), "AI 2.2");
         assert_eq!(live_profile_label("unsupported_profile"), "AI");
         assert_eq!(live_profile_label("unknown"), "AI");
     }
 }
+
+#[cfg(test)]
+#[path = "live/composition_tests.rs"]
+mod composition_tests;

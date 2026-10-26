@@ -158,6 +158,7 @@ impl SelfPlayRunner {
                     continue;
                 };
                 let view = PlayerView {
+                    match_seed: self.game.seed(),
                     player_id: pid,
                     tick,
                     start: &self.start,

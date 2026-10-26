@@ -20,6 +20,8 @@ pub(crate) struct AiProfileIdentity {
     pub(crate) modules: Vec<String>,
     pub(crate) overlays: Vec<AiOverlayIdentity>,
     pub(crate) fingerprint: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) composition: Option<&'static crate::compositions::AiComposition>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -34,6 +36,7 @@ pub(crate) fn profile_identity(profile: &AiProfile) -> AiProfileIdentity {
     let overlays = Vec::new();
     let base_profile_id = None;
     AiProfileIdentity {
+        composition: None,
         profile_id: profile.id.to_string(),
         label: label.to_string(),
         base_profile_id,
@@ -45,6 +48,43 @@ pub(crate) fn profile_identity(profile: &AiProfile) -> AiProfileIdentity {
 }
 
 pub(crate) fn profile_identity_by_id(id: &str) -> Option<AiProfileIdentity> {
+    if let Some(composition) = crate::compositions::composition_by_id(id) {
+        let members = composition
+            .members
+            .iter()
+            .map(|member| {
+                profile_identity_by_id(member.profile_id)
+                    .map(|identity| (member.weight, identity.fingerprint))
+            })
+            .collect::<Option<Vec<_>>>()?;
+        let modules = ["weighted_match_selection"];
+        let summary = format!(
+            "One weighted behavior selection per match: {}.",
+            composition
+                .members
+                .iter()
+                .map(|member| format!("{} (weight {})", member.profile_id, member.weight))
+                .collect::<Vec<_>>()
+                .join(", ")
+        );
+        return Some(AiProfileIdentity {
+            composition: Some(composition),
+            profile_id: id.to_string(),
+            label: composition.label.to_string(),
+            base_profile_id: None,
+            summary: summary.to_string(),
+            modules: modules.iter().map(|s| s.to_string()).collect(),
+            overlays: Vec::new(),
+            fingerprint: profile_fingerprint(
+                &(composition, members, include_str!("../compositions.rs")),
+                composition.label,
+                None,
+                &summary,
+                &modules,
+                &[],
+            ),
+        });
+    }
     if id == crate::rush::RUSH_AI_ID {
         let label = "Rush AI";
         let summary =
@@ -62,6 +102,7 @@ pub(crate) fn profile_identity_by_id(id: &str) -> Option<AiProfileIdentity> {
             include_str!("../rush/flow.rs"),
         );
         return Some(AiProfileIdentity {
+            composition: None,
             profile_id: id.to_string(),
             label: label.to_string(),
             base_profile_id: None,
@@ -275,6 +316,21 @@ mod tests {
 
         let turtle = profile_identity_by_id(AI_TURTLE_ID).expect("AI Turtle identity");
         assert_eq!(turtle.label, "AI Turtle");
+    }
+
+    #[test]
+    fn mixture_manifest_exposes_member_ids_and_weights() {
+        let identity = profile_identity_by_id(crate::compositions::AI_2_2_ID).unwrap();
+        validate_profile_identity(&identity).unwrap();
+        let value = serde_json::to_value(identity).unwrap();
+        assert_eq!(value["label"], "AI 2.2");
+        assert_eq!(
+            value["composition"]["members"],
+            serde_json::json!([
+                {"profileId": "rush_ai", "weight": 1},
+                {"profileId": "ai_2_1", "weight": 1},
+            ])
+        );
     }
 
     #[test]

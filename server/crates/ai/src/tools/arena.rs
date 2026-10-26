@@ -21,7 +21,7 @@ use crate::selfplay::{
 
 const DEFAULT_TICKS: u32 = 25_000;
 const DEFAULT_SEEDS: u32 = 3;
-const DEFAULT_CANDIDATE: &str = "ai_2_1";
+const DEFAULT_CANDIDATE: &str = crate::DEFAULT_LIVE_PROFILE_ID;
 const DEFAULT_BASELINE: &str = "ai_turtle";
 const ARENA_SCHEMA_VERSION: u32 = 1;
 

@@ -116,6 +116,7 @@ fn run_resource_regression_profile(max_ticks: u32) -> ResourceRegressionEvidence
                 continue;
             };
             let view = PlayerView {
+                match_seed: game.seed(),
                 player_id: pid,
                 tick,
                 start: &start,
