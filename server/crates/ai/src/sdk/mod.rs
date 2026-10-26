@@ -4,6 +4,7 @@
 //! allowed to know, and action requests still pass through the ordinary simulation command path.
 
 pub(crate) mod actions;
+mod bases;
 mod frame;
 mod rulebook;
 mod strategy;
@@ -13,6 +14,7 @@ pub use actions::{
     ActionBlocker, ActionBudgetSnapshot, ActionError, AiActions, ReservationCounts,
     ReservationNamespace, UnitGroup, MAX_ACTIONS_PER_STEP,
 };
+pub use bases::{AiBaseDepot, AiBaseEvidence, AiBaseSite, AiBaseSiteId, AiRankedBase};
 pub use frame::{
     AiAbilityState, AiBuildObservation, AiBuildObservationPhase, AiCompletion, AiEconomy, AiEntity,
     AiEntityState, AiFrame, AiHealth, AiMap, AiPlayer, AiProduction, AiRememberedContact,
