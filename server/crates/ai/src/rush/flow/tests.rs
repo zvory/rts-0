@@ -547,3 +547,30 @@ fn only_steel_mines_remain_so_engaged_units_fight_defenders() {
         [AiActionRequest::Attack { target: 200, .. }]
     ));
 }
+
+#[test]
+fn firing_lane_rejects_rock_corners_and_thin_intersections() {
+    let mut grid = grid(48, 32, vec![]);
+    grid.input.shot_blocked[2 * 48 + 3] = true;
+    grid.input.shot_blocked[3 * 48 + 2] = true;
+    assert!(!grid.firing_lane((2.5 * 32.0, 2.5 * 32.0), (3.5 * 32.0, 3.5 * 32.0)));
+    assert!(!grid.firing_lane((3.5 * 32.0, 3.5 * 32.0), (2.5 * 32.0, 2.5 * 32.0)));
+    assert!(!grid.firing_lane((2.5 * 32.0, 2.5 * 32.0), (3.5 * 32.0, 3.49 * 32.0)));
+    grid.input.shot_blocked.fill(false);
+    for to in [(3.5 * 32.0, 3.5 * 32.0), (32.0, 31.0 * 32.0), (0.0, 0.0)] {
+        assert!(grid.firing_lane((2.5 * 32.0, 2.5 * 32.0), to));
+    }
+}
+
+#[test]
+fn moving_threats_respect_the_same_mode_order_interval() {
+    let (start, mut snapshot) = fixture();
+    let mut flow = RushFlow::default();
+    assert_eq!(step(&mut flow, &start, &snapshot).len(), 1);
+    snapshot.tick += 9;
+    snapshot.entities[0].x += 32.0;
+    snapshot.entities[1].x += 0.01;
+    assert!(step(&mut flow, &start, &snapshot).is_empty());
+    snapshot.tick += ORDER_INTERVAL;
+    assert_eq!(step(&mut flow, &start, &snapshot).len(), 1);
+}

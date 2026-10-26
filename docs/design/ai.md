@@ -246,8 +246,9 @@ the weak approach to reacquire contact. There is no separate damage-triggered re
 
 The flow is reevaluated from fog-filtered observations on the normal AI cadence. Orders are
 bounded to one per second while following the same movement mode, with immediate mode/objective
-changes. Last-seen combat contacts expire after five seconds; observed noncombat contacts clear
-immediately. Fields are shared by units with the same base weapon range. Only launched units are
+changes for raid objectives and observed obstacles; moving threats alone do not bypass the interval.
+Terrain firing lanes trace every crossed cell, including rock-corner neighbors. Last-seen combat
+contacts expire after five seconds; observed noncombat contacts clear immediately. Fields are shared by units with the same base weapon range. Only launched units are
 controlled; staging cohorts, the 90% Methamphetamines opening wait, research order, and the
 Engineer's 30-tile exclusion radius remain independent of raid target selection.
 
