@@ -269,6 +269,10 @@ const approvedCurrentFactionFiles = new Set([
   // corresponding occurrence budgets exact so new assumptions still fail this ratchet.
   "server/crates/ai/src/sdk/rulebook.rs",
   "server/crates/ai/src/sdk/world_queries.rs",
+  // This explicitly named Depot-evidence query recognizes ResourceDepot only, including the
+  // Cultivators' reused kind. Geography is faction-neutral; this does not classify every faction's
+  // production buildings as bases. Keep the two current/remembered kind checks bounded.
+  "server/crates/ai/src/sdk/bases.rs",
   "server/crates/ai/src/selfplay/milestones.rs",
   "server/crates/ai/src/selfplay/pending_build.rs",
   "server/crates/ai/src/selfplay/player_view.rs",
@@ -529,9 +533,11 @@ const approvedSpecialCaseBudgets = new Map([
   // the typed enum declarations and catalog rows intentionally raise the owner-file baseline.
   // The standard opening roster adds Rifleman and its count constant to the authoritative
   // Kriegsia loadout.
-  ["server/crates/ai/src/sdk/frame.rs", 1],
+  // Frame tests select a real Depot to verify fog-scoped base evidence.
+  ["server/crates/ai/src/sdk/frame.rs", 2],
   ["server/crates/ai/src/sdk/rulebook.rs", 6],
   ["server/crates/ai/src/sdk/world_queries.rs", 12],
+  ["server/crates/ai/src/sdk/bases.rs", 2],
   // Cultivators intentionally reuses the existing depot/worker kinds in catalog rows and tests.
   // Tank Plus adds one Engineering Complex research row in the authoritative catalog.
   ["server/crates/rules/src/faction.rs", 139],
