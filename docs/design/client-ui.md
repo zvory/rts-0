@@ -501,7 +501,8 @@ export class GroundDecalLayer {
 }
 ```
 `GroundDecalLayer` normally owns one downsampled OffscreenCanvas-backed Pixi texture and one sprite
-on the `decals` world layer. During an observer-perspective repair it temporarily retains the old
+on the `decals` world layer. Its persistent canvas is clipped to non-water tiles at map reset,
+so ground marks (including shoreline blast footprints) never paint water. During an observer-perspective repair it temporarily retains the old
 visible surface and hydrates a hidden replacement in batches of at most 48 durable records per
 presented frame. Completion atomically adopts the replacement and destroys the old surface; a
 newer reset cancels only the unfinished replacement. A ready decal atlas transfers to the hidden
@@ -1710,7 +1711,7 @@ presentation assembly, worker rendering, HUD, and minimap remain live; fixed-cap
 unbounded worker flooding are not benchmark paths.
 
 Playable own selections and human multi-unit commands use the mirrored command-supply budget from
-`command_budget.js`: 24 base command supply. Command Cars have zero command weight and add no
+`command_budget.js`: 25 base command supply. Command Cars have zero command weight and add no
 capacity (`COMMAND_CAR_SUPPLY_CAP_BONUS = 0`); other units use mirrored supply as weight with a
 fallback weight of 1. Drag selection, shift-add, double-click same-kind selection, and control-group
 save/add/recall preserve their normal candidate ordering. Overflow candidates are ignored
@@ -2755,10 +2756,10 @@ Supported match-launch parameters:
 - `rtsName=<display name>` defaults to `Spectator` or `Commander` from the selected role.
 - `rtsMap=<map display name>` optionally selects a server-advertised lobby map before seating AIs.
 - Repeated `rtsAi=<team>:<profile>` entries seat AI opponents in order, for example
-  `rtsAi=1:ai_2_1&rtsAi=2:ai_turtle`. The player-facing profile id is `ai_2_1`.
+  `rtsAi=1:ai_2_1&rtsAi=2:ai_turtle`. The default player-facing profile is `ai_2_2`; `ai_2_1` is internal-only.
   `ai_turtle` is accepted only for internal observer launches; player-role launches normalize it
-  to `ai_2_1`. A profile-only observer entry such as `rtsAi=ai_turtle` uses the next team slot.
-  Unsupported values normalize to AI 2.1; if omitted, the launch defaults to two AI 2.1 seats on
+  to `ai_2_2`. A profile-only observer entry such as `rtsAi=ai_turtle` uses the next team slot.
+  Unsupported values normalize to AI 2.2; if omitted, the launch defaults to two AI 2.2 seats on
   teams 1 and 2.
 - `rtsStart=1|0` defaults to `1`. `0` prepares the lobby without pressing Start.
 

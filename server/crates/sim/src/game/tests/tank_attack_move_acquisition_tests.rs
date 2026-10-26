@@ -1,6 +1,7 @@
 use super::fixtures::*;
 use super::*;
 use crate::game::entity::MovePhase;
+use crate::game::upgrade::UpgradeKind;
 
 fn refresh_fixture(game: &mut Game) {
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
@@ -103,4 +104,81 @@ fn paused_attack_move_reacquires_a_new_target_during_reload() {
     assert_eq!(unit.target_id(), Some(replacement));
     assert!(unit.path_is_empty(), "tank should not resume its route");
     assert_eq!((unit.pos_x, unit.pos_y), (100.0, 100.0));
+}
+
+#[test]
+fn tank_plus_applies_to_existing_and_future_owned_tanks() {
+    let mut game = empty_flat_game(&human_vs_ai_players());
+    let tank = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Tank, 500.0, 500.0)
+        .unwrap();
+    let enemy = game
+        .state
+        .entities
+        .spawn_unit(2, EntityKind::Tank, 1500.0, 500.0)
+        .unwrap();
+    game.state
+        .players
+        .iter_mut()
+        .find(|p| p.id == 1)
+        .unwrap()
+        .upgrades
+        .insert(UpgradeKind::TankPlus);
+    for _ in 0..45 {
+        game.tick();
+    }
+    let upgraded = game.state.entities.get(tank).unwrap();
+    assert!(upgraded.tank_plus());
+    assert_eq!(upgraded.sight_tiles(), 11);
+    assert_eq!(
+        upgraded
+            .combat
+            .as_ref()
+            .unwrap()
+            .tank_stationary_range_ticks,
+        90
+    );
+    let baseline = game.state.entities.get(enemy).unwrap();
+    assert!(!baseline.tank_plus());
+    assert_eq!(baseline.sight_tiles(), 9);
+    assert_eq!(
+        baseline
+            .combat
+            .as_ref()
+            .unwrap()
+            .tank_stationary_range_ticks,
+        45
+    );
+    let future = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Tank, 700.0, 500.0)
+        .unwrap();
+    game.tick();
+    assert!(game.state.entities.get(future).unwrap().tank_plus());
+    game.enqueue(
+        1,
+        Command::Move {
+            units: vec![tank],
+            x: 1000.0,
+            y: 500.0,
+            queued: false,
+        },
+    );
+    game.tick();
+    let upgraded = game.state.entities.get(tank).unwrap();
+    assert!(
+        (upgraded.pos_x - 502.2).abs() < 0.001,
+        "top speed is 2.2 px/tick"
+    );
+    assert_eq!(
+        upgraded
+            .combat
+            .as_ref()
+            .unwrap()
+            .tank_stationary_range_ticks,
+        0
+    );
 }

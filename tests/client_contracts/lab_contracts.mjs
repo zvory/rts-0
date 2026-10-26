@@ -432,7 +432,7 @@ await withFakeDocument(async () => {
     issued.sent && requests[0].playerId === 2 && requests[0].ignoreCommandLimits === true,
     "lab control policy routes gameplay commands through issue-as with command limits disabled by default",
   );
-  const overBudgetUnits = Array.from({ length: 25 }, (_, index) => ({
+  const overBudgetUnits = Array.from({ length: 26 }, (_, index) => ({
     id: 100 + index,
     owner: 2,
     kind: KIND.RIFLEMAN,

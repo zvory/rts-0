@@ -182,7 +182,7 @@ mod tests {
     }
 
     #[test]
-    fn recorded_replay_matches_until_tank_reacquisition_changes_the_outcome() {
+    fn recorded_checkpoint_matches_current_balance_until_tank_reacquisition() {
         let mut setup = scenario(CASE_TICK_PERFECT);
         assert_eq!(setup.game.tick_count(), REPLAY_PRE_COMMAND_TICK);
         assert_eq!(setup.issue_after_ticks, REPLAY_PRE_COMMAND_TICK);
@@ -202,9 +202,9 @@ mod tests {
             vec![6, 8, 38]
         );
         setup.game.enqueue(setup.player_id, setup.command());
-        // Match the historical replay up to the intentional attack-move behavior change.
-        // The former target dies at tick 13612; the lead Tank now picks a replacement
-        // instead of resuming its route at tick 13613.
+        // Replay the recorded checkpoint with current balance. The trace was refreshed for
+        // the 1.3x Command Car aura and minimum MG damage: the former target dies at tick 13609,
+        // and the lead Tank picks a replacement instead of resuming its route.
         let golden: Vec<GoldenTick> =
             serde_json::from_str(include_str!("fixtures/replay_281_ticks_13537_13620.json"))
                 .expect("valid replay-281 golden trace");
@@ -231,7 +231,7 @@ mod tests {
                 "golden tick {} must cover every surviving replay actor",
                 expected_tick.tick
             );
-            if expected_tick.tick == 13_613 {
+            if expected_tick.tick == 13_610 {
                 break;
             }
             setup.game.tick();
@@ -287,7 +287,7 @@ mod tests {
                 );
             }
         }
-        assert_eq!(setup.game.tick_count(), 13_612);
+        assert_eq!(setup.game.tick_count(), 13_609);
         let lead_position = setup
             .game
             .state
@@ -302,7 +302,7 @@ mod tests {
             .entities
             .get(LEAD_TANK)
             .expect("lead Tank after replay divergence");
-        assert_eq!(setup.game.tick_count(), 13_613);
+        assert_eq!(setup.game.tick_count(), 13_610);
         assert_eq!((lead.pos_x, lead.pos_y), lead_position);
         assert_eq!(lead.target_id(), Some(177));
         assert!(lead.path_is_empty());
@@ -360,9 +360,9 @@ mod tests {
                 rear_slowed_at = Some(tick);
             }
         }
-        assert_eq!(acquired_at, Some(13_544));
-        assert_eq!(rear_slowed_at, Some(13_580));
-        assert_eq!(target_removed_at, Some(13_612));
+        assert_eq!(acquired_at, Some(13_543));
+        assert_eq!(rear_slowed_at, Some(13_579));
+        assert_eq!(target_removed_at, Some(13_609));
         assert!(setup.game.state.entities.contains(COMMAND_CAR));
         assert!(!setup.game.state.entities.contains(219));
         assert!(!setup.game.state.entities.contains(250));

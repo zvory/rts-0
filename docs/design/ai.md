@@ -10,22 +10,37 @@ When several seats use the same profile, their lobby names receive deterministic
 
 ### Canonical profiles
 
-The player-facing lobby supports two AI profile IDs:
+The player-facing lobby supports three AI profile IDs:
 
-- ai_2_1 — AI 2.1, the default pressure profile.
+- ai_2_2 — AI 2.2, the default weighted composition: 50% Rush AI and 50% original AI 2.1.
 - jeffs_ai — Jeff's AI, the server-authoritative port of the locally evaluated V3 champion policy.
+- rush_ai — Rush AI, an immediate infantry attack with forward construction.
 
 `ai_turtle` is deprecated and internal-only. It remains registered for offline self-play,
 diagnostics, and observer-only AI sessions, but it is not exposed in the lobby and the server
-replaces it with `ai_2_1` whenever a room has an active human player. The replacement is enforced
+replaces it with `ai_2_2` whenever a room has an active human player. The replacement is enforced
 again at the authoritative match-start seam, so stale or crafted clients cannot put Turtle into a
 human match.
 
-Those IDs are concrete match profile IDs used by controllers and diagnostics. Live AI selection
-also accepts suite request IDs, such as ai_2_0, which resolve to concrete profiles for a match.
-The convenience inputs ai and default resolve to ai_2_1. The lobby exposes AI 2.1 and Jeff's AI;
-unsupported or internal profile IDs fall back to AI 2.1 when adding a seat and are ignored when
-changing a seat in a player lobby.
+The convenience inputs ai and default resolve to ai_2_2. The lobby exposes AI 2.2, Jeff's AI, and
+Rush AI. AI 2.1 remains a concrete internal profile (`ai_2_1`) for compositions, offline tools, and
+observer-only sessions, but is hidden and rejected as a direct selection in human player lobbies.
+Unsupported or internal IDs fall back to AI 2.2 when adding a seat and are ignored when changing a
+seat; stale internal seats are normalized to AI 2.2 when humans join and again at match start.
+
+`server/crates/ai/src/compositions.rs` defines compositions as weighted lists of registered concrete
+profiles. Add another member and its positive integer weight to extend a composition; nested
+compositions are deliberately not supported. Each controller chooses one member on its first host
+invocation, before worker reflexes or strategy initialization, and keeps it for the whole match.
+Selection uses a separate RNG seeded by the host's match seed and player ID, so controller order
+and simulation RNG consumption cannot affect the choice. The normal and prepared host paths carry
+that seed in `AiThinkContext` (and the synthetic fixture's `PlayerView`). No seed is added to the
+wire or strategy observation. Equal weights mean equal probability, not forced alternation.
+
+The lobby/request identity stays AI 2.2. Controller diagnostics expose the selected concrete
+profile separately; mixed decision traces identify both the composition and member. Arena
+manifests record the weighted member list, and their fingerprints include member policy
+fingerprints and selector source. Explicit AI 2.1 and Rush requests preserve their existing behavior.
 
 Internal observer launch URLs may still use both IDs. For example, a spectator can launch an AI
 2.1 versus Turtle diagnostic match with:
@@ -68,6 +83,8 @@ memory facts. Its collections use stable id ordering; completed upgrades and sub
 additionally sorted and deduplicated.
 Active production identifies either its typed unit kind or its typed research upgrade when one is
 present in the recipient snapshot.
+Entity records retain the public `occupied_trench_id` from that same recipient snapshot so
+strategies can recognize active entrenchment without inspecting enemy research or private state.
 Owned entities, currently visible allies, currently visible enemies, and remembered contacts are
 separate collections. A remembered contact is stale last-seen knowledge, never a current target.
 
@@ -133,7 +150,7 @@ the SDK because no Phase 4 consumer required them.
 
 ### Shared decision core
 
-Each controller runs on a staggered cadence and constructs the typed `AiFrame`. Built-in profiles
+Each controller runs on a staggered cadence and constructs the typed `AiFrame`. Legacy built-in profiles
 run through the crate-private `LegacyProfileStrategy`, which projects that frame back into the
 internal `AiObservation` before the generic decision loop applies the selected `AiProfile` policy.
 That compatibility projection alone preserves the historical false `is_ai` value, synthetic
@@ -181,6 +198,72 @@ visible Resource Depot, including unfinished depots and the controller’s pendi
 Patches inside a known Depot’s mining range are also excluded, so occupied sites are skipped
 while the search continues through other resource locations.
 
+### Rush AI
+
+`rush_ai` runs `RushStrategy` through the typed SDK and canonical controller cadence. The four
+starting Riflemen join the same staging system as later infantry, facing the first living enemy
+start. The starting Engineer advances toward that start between builds, stopping outside a 30-tile
+exclusion radius. Movement and full construction footprints use a two-tile buffer; straight
+construction approaches retain at least one tile of clearance beyond the exclusion radius. At the
+standoff line, remaining buildings can be placed beside or behind the Engineer rather than
+advancing closer. A near-boundary pathing correction runs before construction/travel handling. As
+resources permit, the Engineer builds a Barracks, a Training Centre, then two more Barracks,
+completing one building before starting the next. Failed sites are retried. Rush disables the
+shared worker-retreat reflex; a lost Engineer is not replaced.
+
+Every completed Barracks rallies to the staging line. Initially it alternates Riflemen and Machine
+Gunners through standing production allocations. When the first Training Centre completes, all
+Barracks disable Rifleman repeat without cancelling existing paid or queued Riflemen; later
+Barracks start with Machine Gunner repeat only. Methamphetamines is queued on the first decision
+that observes the Training Centre scaffold, followed by Entrenchment. Panzerfausts is queued on
+the first decision at or after two minutes (3,600 simulation ticks), behind earlier research. Once
+it completes, each Barracks alternates Machine Gunners and Panzerfausts. The home Resource Depot
+auto-builds Steel Mines and Pump Jacks to sustain income. There is no expansion or additional tech
+path.
+
+Rush picks a staging point 20 world-space tiles from the enemy start along a shortest octile route
+through the public terrain map, without cutting blocked diagonal corners. The formation is
+perpendicular to the smoothed local approach direction. Riflemen and Machine Gunners receive
+stable, spaced slots from the main line's centre outward. Panzerfausts use a separate parallel
+line three tiles behind it. Blocked slots are skipped without placing front infantry into the
+Panzerfaust line. Only owned and currently visible buildings affect slot avoidance. Units move to
+their slots and Hold Position after arriving. The first assembled wave attack-moves to the enemy
+start as soon as Methamphetamines reaches 90% research progress (or is already complete); if
+nobody has arrived yet, the trigger stays unlocked until arrivals. Subsequent waves require at
+least five units actually at their slots, rather than counting en-route reinforcements. Each wave
+launches with one group command. Launched units are never added to a later wave or pulled back to
+staging, and later production gathers into a fresh cohort.
+
+`AiActions::queue_research` emits an ordinary research queue request without requiring or
+reserving its eventual cost. Unlike the affordable `research` helper, it permits construction-
+time/unpaid queues; authoritative simulation validation and payment still apply.
+
+Launched Rush infantry raid known enemy extractors. The flow seeds reachable firing positions
+around recipient-visible or remembered Pump Jacks and Steel Mines, prioritizing any safely
+reachable Pump Jack over Steel Mines, then choosing the shorter safe route within that priority.
+Each weapon range uses its own shared field; the AI accounts for the extractor footprint and keeps
+a firing-distance margin. Visible extractors receive ordinary explicit Attack commands only from
+a clear, in-range firing position. Remembered extractors are scouting destinations, never direct
+attack targets. With no known extractors, the enemy start remains the exploration objective.
+
+Observed armed enemy combat units contribute circular exclusion zones using public base range
+and nominal DPS, plus the range bonus for visible trench occupation. Hidden upgrades are not
+inferred. Known all-ground building blockers obstruct the route; extractors and Tank Traps remain
+walkable for infantry, matching authoritative obstacle classifications. Safe firing positions
+inside enemy coverage are excluded. Move waypoints suppress opportunistic combat while seeking a
+safe extractor. A unit already in a fight can escape along the least-exposure route into a region
+with a safe extractor approach. If no safe approach exists, the weighted field chooses a weaker
+crossing, moves toward that fight without stopping on buildings, and explicitly attacks a visible
+combat defender once it is in range. If no defender is currently visible, it uses AttackMove toward
+the weak approach to reacquire contact. There is no separate damage-triggered re-flow or game combat-rule change.
+
+The flow is reevaluated from fog-filtered observations on the normal AI cadence. Orders are
+bounded to one per second while following the same movement mode, with immediate mode/objective
+changes. Last-seen combat contacts expire after five seconds; observed noncombat contacts clear
+immediately. Fields are shared by units with the same base weapon range. Only launched units are
+controlled; staging cohorts, the 90% Methamphetamines opening wait, research order, and the
+Engineer's 30-tile exclusion radius remain independent of raid target selection.
+
 ### Profile behavior
 
 AI 2.0 resolves only to the `ai_2_0_tank_pressure` profile. The retired
@@ -188,7 +271,7 @@ AI 2.0 resolves only to the `ai_2_0_tank_pressure` profile. The retired
 panic does not override an already-active tech transition, so tank pressure continues its Factory
 path during pressure.
 
-AI 2.1 is the promoted pressure profile. It fills in-range Steel and Oil extractor slots over time,
+AI 2.1 is the original pressure behavior used as an AI 2.2 component. It fills in-range Steel and Oil extractor slots over time,
 keeps an eight-supply buffer, opens one Barracks, expands to two Resource Depots, and reserves four
 Machine Gunners for defense. It begins with Rifleman pressure, then transitions into mixed
 Tank/Rifleman pressure once its tank-tech resource threshold is met. After its first Vehicle Works (Factory) completes, it seeks a third Resource Depot using the
@@ -209,7 +292,7 @@ the main choke first, can defend a second close-spawn choke, and reinforces unde
 Staged defenders emit HoldPosition once after reaching their defensive slot rather than repeating
 the command on every think.
 
-All three profiles are self-contained policy records in the same registry. Each profile selects
+The three legacy profiles are self-contained policy records in the same registry. Each profile selects
 whether to use the proposal economy manager; AI 2.1, Jeff's AI, and AI Turtle enable it. None
 inherits behavior from a retired version or resolves through a second profile name.
 
@@ -360,19 +443,19 @@ horizon is a draw.
 
 The ai-arena binary runs side-swapped seed pairs and writes a top-level arena-summary.json plus
 per-run replay.json, manifest.json, summary.json, decision-trace.jsonl, and brief.md files. Its
-defaults compare AI 2.1 against AI Turtle. The manifest records canonical profile IDs and
+defaults compare AI 2.2 against AI Turtle. The manifest records canonical profile IDs and
 fingerprints, rather than a requested/resolved identity pair.
 
     cd server
     cargo run --bin ai-arena -- --candidate ai_2_1 --baseline ai_turtle --seeds 3 --ticks 9000
 
 The repository term **120 game test** means `scripts/120-game-test.mjs`. It requires profile IDs for
-the current AI 2.1, pre-change Jeff, and post-change Jeff in that order. The runner builds ai-arena,
+the current AI 2.2, pre-change Jeff, and post-change Jeff in that order. The runner builds ai-arena,
 runs all three pairings on The River, Schone Tage, Classic, and Crossroads with five side-swapped seeds,
 caps parallel work, resumes completed seed jobs when an output directory is reused, and writes
 Markdown, JSON, and CSV summaries.
 
-    node scripts/120-game-test.mjs ai_2_1 jeffs_ai_pre_defense_envelope jeffs_ai
+    node scripts/120-game-test.mjs ai_2_2 jeffs_ai_pre_defense_envelope jeffs_ai
 
 Per-seed console progress is off by default. For unattended runs, `--background` starts the test in
 a hidden detached process and returns immediately; `--status <output-directory>` reads compact

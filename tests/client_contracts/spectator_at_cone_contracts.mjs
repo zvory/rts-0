@@ -200,7 +200,7 @@ _drawSelectedUnitRanges.call(
 );
 assert(
   spectatorFallbackGfx.calls.some((call) =>
-    call[0] === "lineStyle" && call[1] === 1 && call[2] === 0xffb000 && call[3] === 0.42),
+    call[0] === "lineStyle" && call[1] === 2 && call[2] === 0xffb000 && call[3] === 0.42),
   "spectator cones without a valid owner color retain the established threat-color fallback",
 );
 
@@ -228,7 +228,7 @@ _drawSelectedUnitRanges.call(
 );
 assert(
   spectatorMemoryGfx.calls.some((call) =>
-    call[0] === "lineStyle" && call[1] === 0.65 && call[2] === 0xed5a5a && call[3] === 0.18),
+    call[0] === "lineStyle" && call[1] === 1.3 && call[2] === 0xed5a5a && call[3] === 0.18),
   "spectator stale-intel cones retain their owning-team tint with remembered opacity",
 );
 assert(

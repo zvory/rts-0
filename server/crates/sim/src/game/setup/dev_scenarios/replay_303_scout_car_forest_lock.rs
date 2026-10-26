@@ -138,8 +138,9 @@ mod tests {
         }
 
         let former_lock = former_lock_position.expect("former lock tick");
-        assert_eq!(former_lock.0.to_bits(), 2_145.732_4_f32.to_bits());
-        assert_eq!(former_lock.1.to_bits(), 3_983.169_7_f32.to_bits());
+        // Current-balance position at the recorded lock tick, with the 1.3x Command Car aura.
+        assert_eq!(former_lock.0.to_bits(), 2_147.24_f32.to_bits());
+        assert_eq!(former_lock.1.to_bits(), 3_983.724_6_f32.to_bits());
         assert!(distance(former_lock, position(&setup.game, SCOUT_CAR)) > 10.0);
         assert!(distance(tank_start, position(&setup.game, 322)) > 10.0);
         let scout = setup.game.state.entities.get(SCOUT_CAR).expect("Scout Car");

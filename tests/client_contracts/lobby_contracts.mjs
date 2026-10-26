@@ -225,7 +225,7 @@ import { textWithin } from "./dom_text.mjs";
       "custom map selector renders every server-advertised map name");
     assertDeepEqual(
       selector.optionButtons.map((button) => button.dataset.mapName),
-      ["3 Player Map", "4 Player Map", "Crossroads", "Doppelganger", "Fastest Map Possible",
+      ["3 Player Map", "4 Player Map", "Classic V2", "Crossroads", "Doppelganger", "Fastest Map Possible",
         "Schone Tage", "The River", "Wald des Todes", "1v1 No Terrain", "Classic", "Chokes", "Lighting Test",
         "Open Basin"],
       "custom map selector groups archived maps after active maps",
@@ -308,10 +308,11 @@ import { textWithin } from "./dom_text.mjs";
   assertDeepEqual(
     AI_PROFILES,
     [
-      { id: "ai_2_1", label: "AI 2.1" },
+      { id: "ai_2_2", label: "AI 2.2" },
       { id: "jeffs_ai", label: "Jeff's AI" },
+      { id: "rush_ai", label: "Rush AI" },
     ],
-    "lobby AI profile selector exposes both supported player opponents",
+    "lobby AI profile selector exposes all supported player opponents",
   );
   const slots = teamSlotsForLobby([
     { id: 3, teamId: 1 },
@@ -430,12 +431,12 @@ import { textWithin } from "./dom_text.mjs";
         { id: 1, name: "Host", color: "#0072b2", ready: false, teamId: 1 },
         {
           id: 2,
-          name: "AI 2.1",
+          name: "AI 2.2",
           color: "#d55e00",
           ready: true,
           teamId: 2,
           isAi: true,
-          aiProfileId: "ai_2_1",
+          aiProfileId: "ai_2_2",
         },
       ],
       myId: 1,
@@ -451,11 +452,11 @@ import { textWithin } from "./dom_text.mjs";
       (el) => el.tagName === "SELECT" && el.className === "player-ai-profile-select",
     );
     assert(
-      profileSelectors.length === 1 && profileSelectors[0].value === "ai_2_1",
-      "host lobby exposes an AI 2.1 profile selector",
+      profileSelectors.length === 1 && profileSelectors[0].value === "ai_2_2",
+      "host lobby exposes an AI 2.2 profile selector",
     );
-    assert(textWithin(root).includes("AI 2.1"), "host lobby labels AI seats as AI 2.1");
-    assert(profileSelectors[0].children.length === 2, "host lobby exposes both player-facing AI profiles");
+    assert(textWithin(root).includes("AI 2.2"), "host lobby labels AI seats as AI 2.2");
+    assert(profileSelectors[0].children.length === 3, "host lobby exposes all player-facing AI profiles");
     assert(!findFakes(root, (el) => String(el.className).includes("player-faction")).length,
       "non-beta lobby seats do not render faction controls");
     assert(!findFakes(root, (el) => String(el.className).includes("lobby-seat-meta")).length,
@@ -564,8 +565,8 @@ import { textWithin } from "./dom_text.mjs";
     );
     assert(
       staleProfileSelectors.length === 1 &&
-        staleProfileSelectors[0].value === "ai_2_1" &&
-        staleProfileSelectors[0].children.length === 2,
+        staleProfileSelectors[0].value === "ai_2_2" &&
+        staleProfileSelectors[0].children.length === 3,
       "player lobby does not expose an internal Turtle profile received from stale state",
     );
   });

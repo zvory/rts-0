@@ -787,13 +787,18 @@ withFakeHudDocument(({ FakeElement }) => {
   p2Selection = [p2Steelworks];
   p2LabHudState.playerResources[1] = { id: 2, steel: 1000, oil: 1000, supplyUsed: 4,
     supplyCap: 50, upgrades: [] };
-  const p2SteelworksCard = buildCommandCardDescriptors(
+  const atGunButton = () => buttonByLabel(buildCommandCardDescriptors(
     p2Hud._commandDescriptorContext({ selectedEntities: p2Selection, currentEntities: p2Entities }),
-  );
-  assert(
-    buttonByLabel(p2SteelworksCard, "Anti-Tank Gun").enabled,
-    "lab command card exposes Anti-Tank Guns without selected-owner research",
-  );
+  ), "Anti-Tank Gun");
+  assert(!atGunButton().enabled, "Anti-Tank Guns require an Engineering Complex");
+  const p2EngineeringComplex = { id: 706, owner: 1, kind: KIND.ENGINEERING_COMPLEX, buildProgress: null };
+  p2Entities.push(p2EngineeringComplex);
+  assert(!atGunButton().enabled, "another owner's Engineering Complex does not unlock Anti-Tank Guns");
+  p2EngineeringComplex.owner = 2;
+  p2EngineeringComplex.buildProgress = 0.5;
+  assert(!atGunButton().enabled, "an unfinished Engineering Complex does not unlock Anti-Tank Guns");
+  p2EngineeringComplex.buildProgress = null;
+  assert(atGunButton().enabled, "a completed owned Engineering Complex unlocks Anti-Tank Guns without research");
 
   const p1CommandCar = { id: 705, owner: 1, kind: KIND.COMMAND_CAR };
   const p1LabHudState = {
@@ -1097,11 +1102,7 @@ withFakeHudDocument(({ FakeElement }) => {
     resources: { steel: 0, oil: 0, supplyUsed: 0, supplyCap: 10 },
     upgrades: [UPGRADE.SCOUT_PLANE_UNLOCK],
   }));
-  const depotScoutPlaneAbility = buttonByLabel(resourceDepotScoutPlaneCard, "Scout Plane");
-  assert(depotScoutPlaneAbility.slotIndex === 8, "Resource Depot Scout Plane ability should use the C slot");
-  assert(depotScoutPlaneAbility.intent.readyIds.join(",") === "70", "Scout Plane ability should use the selected Resource Depot");
-  assert(depotScoutPlaneAbility.cost.steel === 0 && depotScoutPlaneAbility.cost.oil === 0, "Resource Depot Scout Plane should show zero resource cost");
-  assert(depotScoutPlaneAbility.enabled, "Resource Depot Scout Plane ability should enable after research");
+  assert(!buttonByLabel(resourceDepotScoutPlaneCard, "Scout Plane"), "Resource Depot must not offer Scout Plane after research");
 
   const busyScoutPlaneDepot = { ...scoutPlaneResourceDepot, prodQueue: 1 };
   const busyDepotCard = buildCommandCardDescriptors(commandCardCtx({
@@ -1110,8 +1111,8 @@ withFakeHudDocument(({ FakeElement }) => {
     resources: { steel: 0, oil: 0, supplyUsed: 0, supplyCap: 10 },
     upgrades: [UPGRADE.SCOUT_PLANE_UNLOCK],
   }));
-  assert(buttonByLabel(busyDepotCard, "Scout Plane").slotIndex === 8, "busy Resource Depot keeps Scout Plane on C");
-  assert(buttonByLabel(busyDepotCard, "Cancel").slotIndex !== 8, "busy Resource Depot moves production cancel out of the shared Scout Plane slot");
+  assert(!buttonByLabel(busyDepotCard, "Scout Plane"), "busy Resource Depot must not offer Scout Plane");
+  assert(buttonByLabel(busyDepotCard, "Cancel").slotIndex === 8, "busy Resource Depot keeps production cancel on C");
 
   const commandCar = {
     id: 74,
@@ -1292,7 +1293,7 @@ withFakeHudDocument(({ FakeElement }) => {
     resources: { steel: 125, oil: 125 },
   }));
   const antiTankGun = buttonByLabel(upgradeCard, "Anti-Tank Gun");
-  assert(antiTankGun && antiTankGun.enabled, "Anti-Tank Gun should be available as soon as Gun Works is complete");
+  assert(antiTankGun && !antiTankGun.enabled, "Anti-Tank Gun stays locked until an Engineering Complex is complete");
   assert(!buttonByLabel(upgradeCard, "AT Guns"), "Gun Works should not expose Engineering Complex research");
   const artilleryResearchId = defaultFactionCommandId("research", UPGRADE.ARTILLERY_UNLOCK);
   assert(!commandButtons(upgradeCard).some((button) => button.commandId === artilleryResearchId), "Gun Works should not expose Artillery research");
@@ -1308,24 +1309,24 @@ withFakeHudDocument(({ FakeElement }) => {
     resources: { steel: 200, oil: 200 },
   }));
   assert(!buttonByLabel(researchCard, "AT Guns"), "retired AT Guns research should stay out of the command card");
-  const lockedArtillery = buttonByLabel(researchCard, "Artillery");
-  assert(lockedArtillery && lockedArtillery.enabled, "Engineering Complex should expose Artillery independently");
-  assert(lockedArtillery.slotIndex === 1, "Artillery should keep W while the former Q slot stays empty");
-  assert(!buttonByLabel(researchCard, "Unlock Artillery"), "Engineering Complex should not expose a separate Artillery unlock");
-  const artilleryResearchCard = buildCommandCardDescriptors(commandCardCtx({
-    selection: [engineeringComplex],
-    entities: [
-      { id: 51, owner: 1, kind: KIND.RESOURCE_DEPOT },
-      { id: 52, owner: 1, kind: KIND.TRAINING_CENTRE },
-      engineeringComplex,
-    ],
-    resources: { steel: 500, oil: 500 },
-    upgrades: [],
+  assert(researchCard.slots[1] === null, "hidden Artillery leaves its W slot empty");
+  assert(!buttonByLabel(researchCard, "Artillery Fire Control"), "Artillery upgrade is hidden");
+  const gunCard = buildCommandCardDescriptors(commandCardCtx({
+    selection: [steelworks], entities: [steelworks],
+    upgrades: [UPGRADE.ARTILLERY_UNLOCK],
   }));
-  const artilleryResearch = buttonByLabel(artilleryResearchCard, "Artillery");
-  assert(artilleryResearch && artilleryResearch.enabled, "Artillery should remain enabled without AT Guns research");
-  assert(artilleryResearch.slotIndex === lockedArtillery.slotIndex, "Artillery should retain its permanent button slot");
-  assert(artilleryResearch.commandId === defaultFactionCommandId("research", UPGRADE.ARTILLERY_UNLOCK), "Artillery should use the artillery unlock identity");
+  assert(!buttonByLabel(gunCard, "Artillery"), "unlocked Artillery remains hidden");
+  assert(gunCard.slots[2] === null, "Artillery leaves its E slot empty");
+  assert(buttonByLabel(gunCard, "Rocket Truck")?.slotIndex === 3,
+    "Rocket Truck retains its A slot after hiding Artillery");
+  for (const upgrades of [[], [UPGRADE.ARTILLERY_UNLOCK], [UPGRADE.ARTILLERY_UNLOCK, UPGRADE.BALLISTIC_TABLES]]) {
+    const hiddenCard = buildCommandCardDescriptors(commandCardCtx({
+      selection: [engineeringComplex], entities: [engineeringComplex], upgrades,
+    }));
+    assert(!commandButtons(hiddenCard).some((button) =>
+      [artilleryResearchId, defaultFactionCommandId("research", UPGRADE.BALLISTIC_TABLES)].includes(button.commandId)),
+    "artillery research stays hidden regardless of completed upgrades");
+  }
   const catalog = buildCommandCardContextCatalog();
   assert(catalog.some((entry) => entry.id === "worker-build"), "command-card context catalog includes worker build context");
   assert(catalog.every((entry) => duplicateCommandIdsForCard(entry.card).length === 0), "catalog contexts have unique command identities");

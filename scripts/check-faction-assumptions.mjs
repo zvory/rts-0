@@ -281,6 +281,10 @@ const approvedCurrentFactionFiles = new Set([
   // Kriegsia-only AI resource scanner; non-Kriegsia AI remains unsupported by public lobby flow.
   "server/crates/ai/src/ai_core/resource_availability.rs",
   "server/crates/ai/src/ai_shared.rs",
+  // Rush is an explicitly Kriegsia-only roster policy using the public strategy SDK; the lobby
+  // and faction catalog still own faction admission, while costs remain catalog-derived.
+  "server/crates/ai/src/rush.rs",
+  "server/crates/ai/src/rush/staging.rs",
   // The SDK frame adapter converts the protocol's dedicated remembered-anti-tank-gun records back
   // into the typed kind that the wire record omits. Keep this exception at one occurrence.
   "server/crates/ai/src/sdk/frame.rs",
@@ -553,7 +557,8 @@ const approvedSpecialCaseBudgets = new Map([
   ["server/crates/ai/src/sdk/rulebook.rs", 6],
   ["server/crates/ai/src/sdk/world_queries.rs", 12],
   // Cultivators intentionally reuses the existing depot/worker kinds in catalog rows and tests.
-  ["server/crates/rules/src/faction.rs", 138],
+  // Tank Plus adds one Engineering Complex research row in the authoritative catalog.
+  ["server/crates/rules/src/faction.rs", 139],
   ["server/crates/rules/src/economy.rs", 109],
   ["server/crates/sim/src/game/setup.rs", 30],
   ["server/crates/sim/src/game/services/ability_orders.rs", 18],

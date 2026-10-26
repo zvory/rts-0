@@ -6,7 +6,7 @@
 //   - addAi is host-only (a non-host's addAi is ignored)
 //   - a 1-human + 1-AI match skips the countdown, starts as a real 2-player match
 //     (distinct start tiles), and stays live — the AI's actual build/attack behavior is verified
-//     deterministically by the Rust unit test `game::tests::ai_builds_economy_and_attacks`.
+//     deterministically by the Rust AI composition command-parity tests.
 //
 // Usage: start the server (`cd server && cargo run`), then `node tests/ai_integration.mjs`.
 // Override the endpoint with RTS_WS (default ws://127.0.0.1:8081/ws).
@@ -44,7 +44,7 @@ const { ok } = assertions;
   ok(ai && ai.id !== A.playerId, "AI got its own player id");
   ok(ai && ai.factionId === DEFAULT_FACTION_ID, `AI defaults to ${DEFAULT_FACTION_ID}`);
   ok(ai && ai.aiProfileId === DEFAULT_AI_PROFILE_ID, `AI defaults to ${DEFAULT_AI_PROFILE_ID}`);
-  ok(ai && ai.name === "AI 2.1", `AI uses the default profile label as its name (${ai?.name})`);
+  ok(ai && ai.name === "AI 2.2", `AI uses the default profile label as its name (${ai?.name})`);
 
   const lobbyCountBeforeTurtleSelection = A.msgs.filter((m) => m.t === "lobby").length;
   A.send({ t: "setAiProfile", id: ai.id, aiProfileId: "ai_turtle" });
@@ -59,7 +59,13 @@ const { ok } = assertions;
     A.msgs.filter((m) => m.t === "lobby").length === lobbyCountBeforeTurtleSelection,
     "internal Turtle selection does not mutate the player lobby",
   );
-  ok(turtleAi && turtleAi.name === "AI 2.1", `AI seat keeps the supported label (${turtleAi?.name})`);
+  ok(turtleAi && turtleAi.name === "AI 2.2", `AI seat keeps the supported label (${turtleAi?.name})`);
+
+  const beforeLegacySelection = A.msgs.filter((m) => m.t === "lobby").length;
+  A.send({ t: "setAiProfile", id: ai.id, aiProfileId: "ai_2_1" });
+  await sleep(400);
+  ok(A.msgs.filter((m) => m.t === "lobby").length === beforeLegacySelection,
+    "player lobby cannot select hidden AI 2.1 directly");
 
   const lobbyCountBeforeUnsupportedSelection = A.msgs.filter((m) => m.t === "lobby").length;
   A.send({ t: "setAiProfile", id: ai.id, aiProfileId: "unsupported_profile" });
@@ -74,6 +80,10 @@ const { ok } = assertions;
     A.msgs.filter((m) => m.t === "lobby").length === lobbyCountBeforeUnsupportedSelection,
     "unsupported AI profile selection does not mutate the lobby",
   );
+
+  A.send({ t: "setAiProfile", id: ai.id, aiProfileId: "rush_ai" });
+  const withRush = await A.waitNext((m) => m.t === "lobby" && m.players.some((p) => p.id === ai.id && p.aiProfileId === "rush_ai"), 3000, "Rush AI selection");
+  ok(withRush.players.find((p) => p.id === ai.id)?.name === "Rush AI", "player lobby selects and labels Rush AI");
 
   // Send a hand-built future faction field. Phase 3 keeps addAi team-only, so the server may
   // ignore or reject the unsupported request, but it must never create a non-Kriegsia AI seat.

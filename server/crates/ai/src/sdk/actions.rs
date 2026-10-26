@@ -455,6 +455,25 @@ impl AiActions {
         Ok(producer)
     }
 
+    /// Queue research even before its building completes or resources are available.
+    /// Payment and prerequisites are validated by the simulation, as for a human queue.
+    pub fn queue_research(
+        &mut self,
+        producers: &[u32],
+        research: UpgradeKind,
+    ) -> Result<u32, ActionError> {
+        let definition = upgrade::definition(research);
+        let producer =
+            self.preflight_producer(producers, |kind| kind == definition.researched_at)?;
+        self.preflight_capacity()?;
+        self.reservations.reserve_production_building(producer);
+        self.requests.push(AiActionRequest::Research {
+            building: producer,
+            upgrade: research,
+        });
+        Ok(producer)
+    }
+
     pub fn gather(
         &mut self,
         workers: &[u32],

@@ -158,6 +158,7 @@ pub mod upgrades {
     pub const TANK_UNLOCK: &str = "tank_unlock";
     pub const ARTILLERY_UNLOCK: &str = "artillery_unlock";
     pub const BALLISTIC_TABLES: &str = "ballistic_tables";
+    pub const TANK_PLUS: &str = "tank_plus";
     pub const SMOKE_PLUS: &str = "smoke_plus";
     pub const SCOUT_PLANE_UNLOCK: &str = "scout_plane_unlock";
     pub const ROCKETS: &str = "rockets";
@@ -169,6 +170,7 @@ pub mod upgrades {
         ARTILLERY_UNLOCK,
         BALLISTIC_TABLES,
         TANK_UNLOCK,
+        TANK_PLUS,
         SMOKE_PLUS,
         SCOUT_PLANE_UNLOCK,
         ROCKETS,
@@ -427,6 +429,7 @@ const EVENT_CODES: &[(&str, u8)] = &[
     ("artilleryTarget", 7),
     ("artilleryImpact", 8),
     ("mortarLaunch", 9),
+    ("mortarWarning", 16),
     ("artilleryFiring", 11),
     ("panzerfaustLaunch", 12),
     ("panzerfaustImpact", 13),
@@ -488,6 +491,7 @@ const UPGRADE_CODES: &[(&str, u8)] = &[
     (upgrades::ARTILLERY_UNLOCK, 4),
     (upgrades::BALLISTIC_TABLES, 7),
     (upgrades::ENTRENCHMENT, 8),
+    (upgrades::TANK_PLUS, 13),
     (upgrades::SMOKE_PLUS, 9),
     (upgrades::SCOUT_PLANE_UNLOCK, 11),
     (upgrades::ROCKETS, 12),
@@ -743,6 +747,7 @@ fn event_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("NOTICE", "notice"),
         ("SMOKE_LAUNCH", "smokeLaunch"),
         ("MORTAR_LAUNCH", "mortarLaunch"),
+        ("MORTAR_WARNING", "mortarWarning"),
         ("MORTAR_IMPACT", "mortarImpact"),
         ("ARTILLERY_TARGET", "artilleryTarget"),
         ("ARTILLERY_INCOMING", "artilleryIncoming"),
@@ -796,6 +801,7 @@ fn upgrade_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("TANK_UNLOCK", upgrades::TANK_UNLOCK),
         ("ARTILLERY_UNLOCK", upgrades::ARTILLERY_UNLOCK),
         ("BALLISTIC_TABLES", upgrades::BALLISTIC_TABLES),
+        ("TANK_PLUS", upgrades::TANK_PLUS),
         ("SMOKE_PLUS", upgrades::SMOKE_PLUS),
         ("SCOUT_PLANE_UNLOCK", upgrades::SCOUT_PLANE_UNLOCK),
         ("ROCKETS", upgrades::ROCKETS),
@@ -1057,6 +1063,16 @@ fn event_slot_schemas() -> BTreeMap<&'static str, Vec<SlotField>> {
                 field(1, "from"),
                 field(2, "to"),
                 field(3, "delayTicks"),
+            ],
+        ),
+        (
+            "mortarWarning",
+            vec![
+                code_field(0, "kind", "event"),
+                field(1, "x"),
+                field(2, "y"),
+                field(3, "radiusTiles"),
+                field(4, "delayTicks"),
             ],
         ),
         (

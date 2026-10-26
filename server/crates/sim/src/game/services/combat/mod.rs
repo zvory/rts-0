@@ -7,7 +7,7 @@ use std::collections::HashMap;
 
 use crate::config;
 use crate::game::entity::{AttackPhase, EntityKind, EntityStore, Order};
-use crate::game::firing_reveal::{record_firing_reveals_for_victim_team, FiringRevealSource};
+use crate::game::firing_reveal::FiringRevealSource;
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::panzerfaust_shot::PanzerfaustShotStore;
@@ -30,6 +30,7 @@ mod panzerfaust;
 mod pre_movement;
 mod priority;
 mod projection;
+mod shot;
 mod shot_blocker_index;
 mod target_legality;
 mod target_policy;
@@ -40,6 +41,7 @@ mod tests;
 #[cfg(test)]
 use acquisition::{combat_mode, resolve_target as resolve_target_for_test};
 use acquisition::{combat_mode_with_moving_fire, CombatMode};
+#[cfg(test)]
 use damage::apply_damage;
 use projection::combat_target_distance_sq;
 use shot_blocker_index::ShotBlockerIndex;
@@ -47,7 +49,7 @@ use target_legality::{direct_fire_target_legal, DirectFireLegality};
 use weapons::{
     begin_idle_deployed_weapon_setup, can_fire_while_moving, deployed_weapon_ready_to_fire,
     effective_attack_profile, mirror_weapon_to_body, moving_attack_cooldown,
-    moving_fire_miss_chance, moving_fire_move_order_holds_path, relax_vehicle_weapon_toward_body,
+    moving_fire_move_order_holds_path, relax_vehicle_weapon_toward_body,
     rotate_anti_tank_gun_for_combat, rotate_vehicle_weapon_for_combat, tick_deployed_weapon_setup,
     update_attack_move_no_target_teardown, uses_vehicle_weapon_policy,
 };
@@ -194,7 +196,6 @@ pub(in crate::game) fn combat_system(
             dmg,
             cd_reset,
             mode,
-            is_unit,
             can_move_fire,
         ) = {
             let e = match entities.get(id) {
@@ -243,7 +244,6 @@ pub(in crate::game) fn combat_system(
                 dmg,
                 cd,
                 mode,
-                e.is_unit(),
                 can_move_fire,
             )
         };
@@ -426,89 +426,26 @@ pub(in crate::game) fn combat_system(
             if !deployed_weapon_ready_to_fire(entities, id) {
                 continue;
             }
-            let reveal_only_source = fog.team_firing_reveal_only_source(owner, (tx, ty), teams);
-            if let Some(episode) = reveal_only_source {
-                let reaction_ready = entities.get_mut(id).is_some_and(|e| {
-                    e.weapon_firing_reveal_reaction_ready(
-                        weapon_profile.id,
-                        tid,
-                        episode,
-                        tick,
-                        FIRING_REVEAL_RESPONSE_DELAY_TICKS,
-                    )
-                });
-                if !reaction_ready {
-                    continue;
-                }
-            }
-            let ready =
-                matches!(entities.get(id), Some(e) if e.weapon_cooldown(weapon_profile.id) == 0);
-            if ready {
-                let extra_miss_chance =
-                    entities.get(id).map(moving_fire_miss_chance).unwrap_or(0.0);
-                let shot_victim = if machine_gun::is_machine_gun(weapon_profile.id) {
-                    machine_gun::fire(
-                        map,
-                        entities,
-                        teams,
-                        spatial,
-                        &los,
-                        fog,
-                        smokes,
-                        rng,
-                        events,
-                        firing_reveals,
-                        id,
-                        tid,
-                        weapon_profile,
-                        range_px,
-                        tick,
-                    );
-                    None
-                } else {
-                    apply_damage(
-                        map,
-                        entities,
-                        &blockers,
-                        teams,
-                        events,
-                        fog,
-                        rng,
-                        id,
-                        tid,
-                        weapon_profile,
-                        dmg,
-                        owner,
-                        px,
-                        py,
-                        tx,
-                        ty,
-                        extra_miss_chance,
-                        tick,
-                    )
-                };
-                if is_unit {
-                    if let Some(shot) = shot_victim.filter(|shot| shot.reveals_attacker) {
-                        let player_ids = events.keys().copied().collect::<Vec<_>>();
-                        record_firing_reveals_for_victim_team(
-                            firing_reveals,
-                            player_ids,
-                            fog,
-                            map,
-                            teams,
-                            shot.victim_owner,
-                            owner,
-                            id,
-                            (px, py),
-                            tick,
-                        );
-                    }
-                }
-                if let Some(e) = entities.get_mut(id) {
-                    e.set_weapon_cooldown(weapon_profile.id, cd_reset);
-                }
-                fired = true;
-            }
+            fired = shot::try_fire(
+                map,
+                entities,
+                &blockers,
+                teams,
+                spatial,
+                &los,
+                fog,
+                smokes,
+                rng,
+                events,
+                firing_reveals,
+                id,
+                tid,
+                weapon_profile,
+                range_px,
+                dmg,
+                cd_reset,
+                tick,
+            );
         } else if mode == CombatMode::Ordered || clear_area_priority_target {
             if let Some(e) = entities.get_mut(id) {
                 e.mark_attack_phase(AttackPhase::Waiting);

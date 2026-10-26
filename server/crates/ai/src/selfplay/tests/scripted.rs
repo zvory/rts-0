@@ -56,6 +56,7 @@ fn scripted_self_play_mine_only_steel_fairness() {
             continue;
         };
         let view = PlayerView {
+            match_seed: game.seed(),
             player_id: pid,
             tick: 0,
             start: &start,
@@ -130,6 +131,7 @@ fn assert_scripted_runs_identical_for_ticks(
                 continue;
             };
             let view = PlayerView {
+                match_seed: game_a.seed(),
                 player_id: pid,
                 tick,
                 start,
@@ -150,6 +152,7 @@ fn assert_scripted_runs_identical_for_ticks(
                 continue;
             };
             let view = PlayerView {
+                match_seed: game_b.seed(),
                 player_id: pid,
                 tick,
                 start,

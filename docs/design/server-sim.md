@@ -297,7 +297,7 @@ architecture failures.
 | Field | Category | Checkpoint policy | Evidence and notes |
 | --- | --- | --- | --- |
 | `map` | `authoritative/serialized` | Internal cold checkpoints serialize the full live `Map` value. Public `GameCheckpointV1` payloads do not embed a map body; they carry `mapBinding` facts and import only with the exact container-supplied `Map`. See §3.1.3. | `Game::new_inner_with_map` stores the generated or supplied map; `systems::run_tick`, pathing, fog, placement, resource setup, and `start_payload` all read it. Runtime ownership and external artifact composition are intentionally separate contracts. |
-| `entities` | `authoritative/serialized` | Serialize the full `EntityStore`, including stable entity ids, allocator/high-water state, HP, orders, queues, movement state, selected waypoints, path goals, weapon cooldowns, ability charges and charge-recharge timers, episode-keyed firing-reveal reaction gates, combat state, per-unit kill totals and last-damaging entity attribution, production/build progress, rally plans, Scout Plane source-car/orbit/remaining-lifetime state, resource reservations, body/weapon/setup facing, and entity flags. | `systems::run_tick` mutates the store every tick; snapshots, score, survival, command validation, replay determinism tests, and the Phase 0.5 comparator all treat entity state as semantic authority. Chosen movement paths and aerial orbit state live on entities, not in `pathing`. Scout Plane entities are excluded from standard fog sight stamping and contribute independent team aerial vision through the dedicated smoke-only pass. |
+| `entities` | `authoritative/serialized` | Serialize the full `EntityStore`, including stable entity ids, allocator/high-water state, HP, orders, queues, movement state, selected waypoints, path goals, weapon cooldowns, ability charges and charge-recharge timers, episode-keyed firing-reveal reaction gates, combat state (including the materialized `tank_plus` owner-research flag, refreshed before movement and after production each tick so new and existing Tanks share modifiers), per-unit kill totals and last-damaging entity attribution, production/build progress, rally plans, Scout Plane source-car/orbit/remaining-lifetime state, resource reservations, body/weapon/setup facing, and entity flags. | `systems::run_tick` mutates the store every tick; snapshots, score, survival, command validation, replay determinism tests, and the Phase 0.5 comparator all treat entity state as semantic authority. Chosen movement paths and aerial orbit state live on entities, not in `pathing`. Scout Plane entities are excluded from standard fog sight stamping and contribute independent team aerial vision through the dedicated smoke-only pass. |
 | `fog` | `authoritative/serialized` | Serialize the latest 15 Hz actionable visibility sample and its bounded per-viewer firing-reveal provenance map. | `recompute_live_fog` separately records whether each sampled entity needs its firing reveal for targeting and whether the stamped terrain tile lacked ordinary sight. Combat consumes the first fact; snapshot `visibleTiles` removes only terrain-reveal-only stamps. Phase 0.5 compares per-player actionable tiles as semantic state. |
 | `building_memory` | `authoritative/serialized` | Serialize remembered building entries and cleared-observation ticks per player. | `BuildingMemory::refresh` records last-seen enemy building state, while match setup seeds entity-backed neutral buildings authored into the map for every player. Hidden destroyed entries are removed only after the footprint is scouted again; that clear tick prevents older positive memory from another selected player from resurrecting the building in union observer projections. Spectator/player snapshots project remembered buildings while fogged. |
 | `anti_tank_gun_memory` | `authoritative/serialized` | Serialize last-observed deployed enemy Anti-Tank Gun position, facing, owner, and observation tick per player. | `AntiTankGunMemory::refresh` records ordinary team sight and actionable firing reveals, retains stale records through hidden movement/teardown/destruction, and clears them only when that player's team observes the gun changed or the remembered position empty; observer snapshots select the requested players' stores. |
@@ -1376,7 +1376,7 @@ contract begins when a `SimCommand` reaches `services::commands`: the command se
 dedupes and caps unit-id lists, rejects over-budget human unit-list commands, builds issue-time
 facts for the referenced units/targets, and must produce unit-local actions that match the policy
 below. The budget scalars live in the sim-owned `command_budget` helper so parity checks can dump
-them without moving ownership into rules. Human command budget is supply-based: 24 base command
+them without moving ownership into rules. Human command budget is supply-based: 25 base command
 supply. Command Cars have zero command weight and add no capacity
 (`COMMAND_CAR_SUPPLY_CAP_BONUS = 0`); other units use mirrored supply as command weight.
 AI-owned players are exempt from this budget because live AI
@@ -1920,7 +1920,11 @@ scouts any remembered footprint tile. The store retains that per-player clear ti
 observer union compares its newest positive sighting with its newest clear; a clear at the same or
 a later tick wins and keeps the destroyed building absent after current vision leaves. Clears are
 discarded once no positive memory of that building remains. Individual player views retain their
-independent knowledge, and no clear record is sent on the wire. This keeps hidden destruction stale
+independent knowledge, and no clear record is sent on the wire. A selected owner also suppresses
+other selected players' stale memories of its buildings that no longer exist, regardless of current
+footprint visibility; opponent-only views retain their own memory. Tank Traps are excluded from
+owner-based inference because they become neutral on completion and require observed-empty clears.
+This keeps hidden destruction stale
 until the location is checked without adding wire-protocol fields.
 
 `game::anti_tank_gun_memory::AntiTankGunMemory` is the corresponding server-authoritative
@@ -1959,11 +1963,24 @@ the wire protocol or client contract.
 
 ---
 
-### Machine-gun cone prototype
+### Immediate weapon firing and machine-gun rays
 
-`services/combat/machine_gun.rs` resolves three first-hit rays for each Machine Gunner,
+`services/combat/shot.rs::try_fire` is the common immediate-fire entry point for primary
+weapons and Tank coax after their respective acquisition, alignment, and setup checks.
+It owns per-weapon cooldown readiness, firing-reveal reaction gates, victim-team firing
+reveals, and reload commitment, including missed cycles. New shot-wide effects belong
+here. `services/combat/damage.rs::apply_direct_hit` owns shared armor/facing, entrenchment,
+authored damage-reduction tiles, attribution, armor reaction, and under-attack notices;
+new direct-hit effects belong there. Single-target shots retain blocker redirection,
+movement miss rolls, and Tank HE splash. Detached mortar and Panzerfaust projectiles
+retain their launch/impact lifecycles.
+
+`services/combat/machine_gun.rs` specializes trajectory resolution and fog-safe ray events,
+returning victim outcomes to the shared lifecycle rather than owning reveal or reload effects.
+It resolves three first-hit rays for each Machine Gunner,
 Scout Car, and Tank coax firing cycle. It reuses the tick spatial grid, body geometry,
 and terrain/smoke LOS. Burst-local hit totals and rays are temporary derived values;
 there is no new durable projectile state or Game API. Damage is aggregated per victim
-before existing protection rounding. See the balance prototype section and compact
+before existing protection rounding, with a minimum of 1 damage per hit victim. Building
+aim uses the nearest footprint surface, matching acquisition and stopping distance. See the balance prototype section and compact
 version-57 attack ray contract for tuning and per-viewer projection.

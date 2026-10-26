@@ -222,28 +222,30 @@ fn live_spectator_receives_observer_analysis_but_active_players_do_not() {
 
 #[test]
 fn player_lobby_replaces_internal_ai_profile_with_supported_opponent() {
-    let mut task = RoomTask::new(
-        "live-ai-profile-selection-test".to_string(),
-        RoomMode::Normal,
-        None,
-        false,
-        DrainHandle::default(),
-    );
-    let host_id = next_player_id();
-    task.host_id = Some(host_id);
-    add_test_room_player(&mut task, host_id, true);
+    for internal_profile in ["ai_turtle", "ai_2_1"] {
+        let mut task = RoomTask::new(
+            "live-ai-profile-selection-test".to_string(),
+            RoomMode::Normal,
+            None,
+            false,
+            DrainHandle::default(),
+        );
+        let host_id = next_player_id();
+        task.host_id = Some(host_id);
+        add_test_room_player(&mut task, host_id, true);
 
-    task.on_add_ai(host_id, Some(2), Some("ai_turtle".to_string()));
-    assert_eq!(
-        task.ai_players.first().map(|ai| ai.profile_id),
-        Some("ai_2_1")
-    );
-    assert_eq!(ai_slot_names(&task), vec!["AI 2.1"]);
+        task.on_add_ai(host_id, Some(2), Some(internal_profile.to_string()));
+        assert_eq!(
+            task.ai_players.first().map(|ai| ai.profile_id),
+            Some("ai_2_2")
+        );
+        assert_eq!(ai_slot_names(&task), vec!["AI 2.2"]);
 
-    task.start_match();
+        task.start_match();
 
-    assert_eq!(task.ai_controllers.len(), 1);
-    assert_eq!(task.ai_controllers[0].profile_id(), "ai_2_1");
+        assert_eq!(task.ai_controllers.len(), 1);
+        assert_eq!(task.ai_controllers[0].profile_id(), "ai_2_2");
+    }
 }
 
 #[test]
@@ -290,8 +292,8 @@ fn match_start_cannot_launch_internal_ai_profile_against_human() {
     task.ai_players[0].profile_id = "ai_turtle";
     task.start_match();
 
-    assert_eq!(task.ai_players[0].profile_id, "ai_2_1");
-    assert_eq!(task.ai_controllers[0].profile_id(), "ai_2_1");
+    assert_eq!(task.ai_players[0].profile_id, "ai_2_2");
+    assert_eq!(task.ai_controllers[0].profile_id(), "ai_2_2");
 }
 
 #[test]
@@ -308,7 +310,7 @@ fn internal_ai_profiles_remain_available_to_observer_only_sessions() {
     add_test_room_spectator(&mut task, host_id);
     task.on_select_map(host_id, "Chokes".to_string());
 
-    task.on_add_ai(host_id, Some(1), None);
+    task.on_add_ai(host_id, Some(1), Some("ai_2_1".to_string()));
     task.on_add_ai(host_id, Some(2), Some("ai_turtle".to_string()));
     assert_eq!(ai_slot_names(&task), vec!["AI 2.1", "AI Turtle"]);
 
@@ -734,7 +736,7 @@ fn ai_only_live_start_payload_advertises_speed_controls_without_seek() {
         .iter()
         .map(|player| player.name.as_str())
         .collect();
-    assert_eq!(ai_names, vec!["AI 2.1 1", "AI 2.1 2"]);
+    assert_eq!(ai_names, vec!["AI 2.2 1", "AI 2.2 2"]);
 
     let state = writer
         .room_time_state
@@ -800,7 +802,13 @@ fn ai_only_live_spectator_all_view_scopes_omniscient_map_analysis() {
             .lines
             .iter()
             .any(|line| line.contains("profile=")));
-        assert!(diagnostics.lines.iter().any(|line| line.contains("goal=")));
+        assert!(
+            diagnostics
+                .lines
+                .iter()
+                .any(|line| line.contains("goal=") || line.contains("selected=rush_ai")),
+            "legacy decisions report goals; delegated Rush decisions report the selected strategy"
+        );
     }
 }
 

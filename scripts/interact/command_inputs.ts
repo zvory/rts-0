@@ -1,3 +1,4 @@
+import { GAME_AI_PROFILE_IDS } from "./session_defaults.ts";
 import { FIXED_CAPTURE_LIMITS } from "./fixed_capture.ts";
 import { GAME_TIMELAPSE_LIMITS, timelapseFrameBound } from "./game_timelapse.ts";
 import { RECORDING_LIMITS } from "./recording.ts";
@@ -323,10 +324,10 @@ function validateGameNamespaceInput(command: string, value: CommandInput, sessio
     exact(value, ["workspaceRoot", "map", "opponent", "spectate", "autoSpectator", "viewport"], "game open");
     if (value.workspaceRoot != null && (typeof value.workspaceRoot !== "string" || !value.workspaceRoot)) invalid("game open.workspaceRoot", "must be a non-empty string");
     if (value.map != null) displayName(value.map, "game open.map", 64);
-    if (value.opponent != null && !["ai_2_1", "ai_turtle"].includes(String(value.opponent))) invalid("game open.opponent", "must be ai_2_1 or ai_turtle");
+    if (value.opponent != null && !GAME_AI_PROFILE_IDS.includes(String(value.opponent))) invalid("game open.opponent", `must be one of ${GAME_AI_PROFILE_IDS.join(", ")}`);
     if (value.spectate != null) {
       array(value.spectate, "game open.spectate", 2, 2, (entry: unknown) => {
-        if (!["ai_2_1", "ai_turtle"].includes(String(entry))) invalid("game open.spectate", "must contain ai_2_1 or ai_turtle profiles");
+        if (!GAME_AI_PROFILE_IDS.includes(String(entry))) invalid("game open.spectate", `must contain profiles from ${GAME_AI_PROFILE_IDS.join(", ")}`);
       });
       if (value.opponent != null) invalid("game open", "cannot combine opponent with spectate");
     }

@@ -19,7 +19,7 @@ import { PrivateServer } from "./private_server.ts";
 import { findChrome, validateWorkspaceRoot } from "./workspace_inspection.ts";
 import { interactLaunchUrl } from "./game_launch_url.ts";
 import { createInteractSessionDirectory, interactArtifactRoot } from "./interact_paths.ts";
-import { defaultMapForMode } from "./session_defaults.ts";
+import { defaultMapForMode, DEFAULT_GAME_AI_PROFILE_ID } from "./session_defaults.ts";
 import { waitForInteractStartup } from "./bridge_startup.ts";
 import { evaluateInteractBridgeCall } from "./bridge_call.ts";
 import { performMouseDrag, type MouseDragInput } from "./mouse_drag.ts";
@@ -193,7 +193,7 @@ export class InteractDriver {
     seed = "",
     scenario = "blank", visualProfile = "",
     devScenario = { id: "", unit: "", count: 1, blocker: "", case: "" },
-    opponent = "ai_2_1",
+    opponent = DEFAULT_GAME_AI_PROFILE_ID,
     spectate = null, autoSpectator = false,
     viewport = DEFAULT_VIEWPORT,
     timeoutMs = DEFAULT_TIMEOUT_MS,

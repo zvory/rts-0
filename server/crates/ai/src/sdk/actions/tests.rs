@@ -239,3 +239,28 @@ fn capacity_blocker_is_mutation_free() {
     );
     assert_eq!(state(&batch), before);
 }
+
+#[test]
+fn unpaid_research_queue_preserves_budget_and_reserves_producer() {
+    let mut batch = actions(0, 0, 0);
+    batch.owned_kinds.insert(20, EntityKind::TrainingCentre);
+    let budget = batch.remaining_budget();
+    assert_eq!(
+        batch.queue_research(&[20], UpgradeKind::Methamphetamines),
+        Ok(20)
+    );
+    assert_eq!(batch.remaining_budget(), budget);
+    assert_eq!(batch.reservation_counts().producers, 1);
+    let before = state(&batch);
+    assert!(batch
+        .queue_research(&[20], UpgradeKind::Entrenchment)
+        .is_err());
+    assert_eq!(state(&batch), before);
+    assert!(matches!(
+        batch.into_requests().as_slice(),
+        [AiActionRequest::Research {
+            building: 20,
+            upgrade: UpgradeKind::Methamphetamines
+        }]
+    ));
+}

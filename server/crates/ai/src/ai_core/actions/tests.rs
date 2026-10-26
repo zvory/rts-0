@@ -499,6 +499,7 @@ fn support_training_requires_tech_and_can_balance_priorities() {
             production_building(22, EntityKind::Steelworks, 0),
             complete_building(30, EntityKind::TrainingCentre),
             complete_building(31, EntityKind::Steelworks),
+            complete_building(32, EntityKind::EngineeringComplex),
         ],
         Vec::new(),
     );

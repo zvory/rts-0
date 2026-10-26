@@ -279,7 +279,7 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   use the moving-fire rifleman model permanently, move at tank speed, and attack 25% faster.
   Legacy `charge` commands remain decodable but have no eligible carriers, cooldown, or runtime
   status.
-- **Advanced research locks**: Anti-Tank Guns are immediately trainable from a completed Gun Works;
+- **Advanced research locks**: Anti-Tank Guns require a completed owned Engineering Complex to train at Gun Works;
   `anti_tank_gun_unlock` remains protocol-decodable only for legacy replays and is not researchable.
   Engineering Complex can queue `artillery_unlock` for 200 steel / 100 oil over 750 ticks,
   unlocking Artillery training at Gun Works;

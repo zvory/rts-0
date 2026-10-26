@@ -3,7 +3,7 @@ import type { CommandInput } from "./command_inputs.ts";
 import {
   MEDIA_REQUEST_TIMEOUT_MS, REQUEST_TIMEOUT_MS, STARTUP_REQUEST_TIMEOUT_MS,
 } from "./runtime.ts";
-import { DEFAULT_LAB_MAP } from "./session_defaults.ts";
+import { DEFAULT_LAB_MAP, DEFAULT_GAME_AI_PROFILE_ID, GAME_AI_PROFILE_IDS } from "./session_defaults.ts";
 
 export type CommandScope = "daemon" | "session";
 export type CommandLane = "serialized" | "observation" | "cancellation" | "lifecycle";
@@ -193,9 +193,9 @@ const COMMAND_RECORDS = Object.freeze({
   "game-open": descriptor("Open or recover one isolated human-vs-AI match or AI-vs-AI spectator match.", "{workspaceRoot?:string,map?:string,opponent?:ai-profile,spectate?:[ai-profile,ai-profile],autoSpectator?:boolean,viewport?:viewport}", {
     scope: "daemon", lane: "lifecycle", timeoutClass: "startup", recordable: false,
     variants: ["opponent opens one local player versus one AI", "spectate opens a spectator with two AI seats", "autoSpectator=true enables Follow active fights before the first match frame"],
-    defaults: ["workspaceRoot=current worktree", "map=Chokes", "opponent=ai_2_1", "viewport=1440x900 at DPR 1"],
-    bounds: ["one session across Lab, game, and dev-scenario", "autoSpectator=true requires spectate", "AI profiles are ai_2_1 or ai_turtle", "map <=64 UTF-8 bytes", "viewport 320-4096 x 240-4096"],
-    example: { spectate: ["ai_2_1", "ai_turtle"], autoSpectator: true, viewport: { width: 1200, height: 800, deviceScaleFactor: 1 } },
+    defaults: ["workspaceRoot=current worktree", "map=Chokes", `opponent=${DEFAULT_GAME_AI_PROFILE_ID}`, "viewport=1440x900 at DPR 1"],
+    bounds: ["one session across Lab, game, and dev-scenario", "autoSpectator=true requires spectate", `AI profiles are ${GAME_AI_PROFILE_IDS.join(", ")}`, "map <=64 UTF-8 bytes", "viewport 320-4096 x 240-4096"],
+    example: { spectate: ["rush_ai", "jeffs_ai"], autoSpectator: true, viewport: { width: 1200, height: 800, deviceScaleFactor: 1 } },
   }),
   "game-inspect": descriptor("Inspect the isolated match's bounded fog-filtered entities, player state, camera, and semantic UI.", "{sessionId:string,ids?:u32[],kinds?:token[],ownership?:\"owned\"|\"visible\",cameraViewport?:boolean,limit?:int}", {
     lane: "observation",

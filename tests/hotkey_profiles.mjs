@@ -140,12 +140,12 @@ function ekatCard() {
     "hotkey command catalog keeps the artillery Point Fire ability discoverable",
   );
   assert(
-    catalog.commands.some((command) =>
-      command.commandId === kriegsiaCommandId("research", UPGRADE.ARTILLERY_UNLOCK) &&
-        command.label === "Artillery" &&
-        command.slotIndex === 1
+    !catalog.commands.some((command) =>
+      command.commandId === kriegsiaCommandId("research", UPGRADE.ARTILLERY_UNLOCK) ||
+      command.commandId === kriegsiaCommandId("research", UPGRADE.BALLISTIC_TABLES) ||
+      command.commandId === kriegsiaCommandId("train", KIND.ARTILLERY)
     ),
-    "hotkey command catalog keeps Artillery research in its permanent W slot",
+    "hidden artillery production and upgrades cannot be activated through hotkey profiles",
   );
   assert(
     catalog.contexts.some((context) =>
@@ -216,7 +216,7 @@ function ekatCard() {
       scoutPlane: classic.factionBindings.kriegsia[kriegsiaCommandId("ability", ABILITY.SCOUT_PLANE)],
       artillery: classic.factionBindings.kriegsia[kriegsiaCommandId("train", KIND.ARTILLERY)],
     },
-    { tankTrap: "KeyK", smoke: "KeyD", scoutPlane: "KeyP", artillery: "KeyR" },
+    { tankTrap: "KeyK", smoke: "KeyD", scoutPlane: "KeyP", artillery: undefined },
     "Classic RTS conflict resolutions are mnemonic rather than Grid-slot fallbacks",
   );
   assert.deepEqual(

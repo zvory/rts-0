@@ -120,8 +120,8 @@ completed Resource Depot and Training Centre; Tank Trap requires a completed Tra
 Depot trains Workers. Barracks trains Riflemen immediately and Machine
 Gunners after the Training Centre requirement is met. Factory trains Scout Cars immediately,
 Command Cars once an Engineering Complex is complete, and Tanks after Tank Production research. Gun Works
-trains Mortar Teams and Anti-Tank Guns immediately, and Artillery after
-Artillery research.
+trains Mortar Teams immediately, Anti-Tank Guns while owning a completed Engineering Complex, and
+Artillery after Artillery research.
 
 Research unlocks live in `server/crates/sim/src/game/upgrade.rs` and client descriptors in
 `client/src/config.js`. Training Centre researches Methamphetamines. Engineering Complex researches
@@ -161,12 +161,17 @@ client-exposed descriptor data against the Rust catalog dump.
 
 ## Current AI Coupling
 
-AI is Kriegsia-only through the public lobby seat flow. The AI decision layer assumes Workers gather
-Steel directly and build Pump Jacks for Oil, Resource Depots anchor bases and expansions,
-Barracks/Factory/Gun Works drive production, Tanks influence oil demand, and Steel/Oil/Supply
-budgets are fixed fields. Public `addAi` requests
-do not accept a faction id and always create Kriegsia AI seats; non-Kriegsia AI support needs an
-explicit AI phase.
+AI is Kriegsia-only through the public lobby seat flow. Legacy profiles and Rush AI select current
+Kriegsia roster kinds directly; Resource Depots auto-build Steel Mines and Pump Jacks, Engineers
+construct production and research buildings, and Steel/Oil/Supply budgets remain fixed fields.
+Public `addAi` requests do not accept a faction id and always create Kriegsia AI seats;
+non-Kriegsia AI support needs an explicit AI phase.
+
+Rush's roster policy and staging modules (`server/crates/ai/src/rush.rs` and `rush/staging.rs`)
+intentionally select Riflemen, Machine Gunners, Panzerfausts and their production/research path.
+They receive fog-filtered SDK frames and use catalog-derived costs and building footprints. The
+faction assumption checker lists these two policy modules explicitly; they do not broaden the
+generic SDK or public faction admission boundary.
 
 ## Current Prediction And WASM Coupling
 

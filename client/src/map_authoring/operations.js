@@ -62,11 +62,11 @@ export function applyMapOperation(draft, operation, {
     return paintTerrain(draft, expandTerrain(dimensions, source, character, symmetry), protectedTerrain, operation);
   }
   if (type === "road") {
-    const { points, tiles, radius } = pathTiles(dimensions, { ...operation, roughness: operation.roughness ?? 0 });
+    const { points, tiles } = pathTiles(dimensions, { ...operation, roughness: operation.roughness ?? 0 });
     const decorated = tiles.map((tile) => {
       const start = points[tile.segmentIndex] || points[0];
       const end = points[tile.segmentIndex + 1] || start;
-      return { ...tile, character: tile.distance <= Math.max(0.35, radius * 0.16) ? roadCenterCharacter(start, end) : "=" };
+      return { ...tile, character: tile.distance <= 0.35 ? roadCenterCharacter(start, end) : "=" };
     });
     return paintTerrain(draft, expandSymmetricPoints(dimensions, decorated, symmetry, {
       decorate: (tile, transform) => ({ ...tile, character: transformRoadCharacter(tile.character, transform) }),

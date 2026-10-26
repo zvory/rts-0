@@ -366,6 +366,36 @@ assert.throws(
   /more than 4 start locations/,
   "the shared engine rejects a fifth start before either adapter can silently truncate it",
 );
+// Marking thickness must not scale with pavement width (diagonal neighbors are
+// only 1 / sqrt(2) tiles from the center and used to become extra yellow lines).
+for (const width of [1, 3, 5, 9, 15]) {
+  for (const [start, end, character] of [
+    [[8, 8], [24, 24], "\\"],
+    [[8, 24], [24, 8], "/"],
+    [[8, 16], [24, 16], "-"],
+    [[16, 8], [16, 24], "|"],
+  ]) {
+    const map = buildMapFromRecipe({
+      name: "Single road center", width: 32, height: 32, symmetry: "none",
+      operations: [{ type: "road", points: [start, end], width }],
+    });
+    const marked = [];
+    for (let y = 0; y < map.height; y += 1) {
+      for (let x = 0; x < map.width; x += 1) {
+        if ("-|\\/".includes(map.terrain[y][x])) marked.push([x, y, map.terrain[y][x]]);
+      }
+    }
+    const expected = Array.from({ length: 17 }, (_, i) => [
+      start[0] + Math.sign(end[0] - start[0]) * i,
+      start[1] + Math.sign(end[1] - start[1]) * i,
+      character,
+    ]);
+    assert.deepEqual(marked.sort(), expected.sort(),
+      `width ${width} road ${character} has exactly one continuous center line`);
+    if (width >= 3) assert(map.terrain.some((row) => row.includes("=")),
+      "wide roads retain bare pavement around the marked center");
+  }
+}
 const pathologicalPathRecipe = {
   name: "Compact pathological path",
   width: 256,

@@ -158,6 +158,7 @@ impl SelfPlayRunner {
                     continue;
                 };
                 let view = PlayerView {
+                    match_seed: self.game.seed(),
                     player_id: pid,
                     tick,
                     start: &self.start,
@@ -244,6 +245,7 @@ impl SelfPlayRunner {
                     | Event::ArtilleryIncoming { .. }
                     | Event::ArtilleryFiring { .. }
                     | Event::ArtilleryImpact { .. }
+                    | Event::MortarWarning { .. }
                     | Event::MortarLaunch { .. }
                     | Event::MortarImpact { .. }
                     | Event::PanzerfaustLaunch { .. }

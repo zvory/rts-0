@@ -468,7 +468,7 @@ function buttonByLabel(card, label) {
   budgetSelectionState.setSelection(budgetRiflemen.map((entity) => entity.id));
   assert(
     budgetSelectionState.selection.size === BASE_COMMAND_SUPPLY_CAP,
-    "selection budget admits 24 one-supply units by command supply",
+    "selection budget admits 25 one-supply units by command supply",
   );
   assert(
     budgetSelectionState.selectionBudgetOverflow?.cap === BASE_COMMAND_SUPPLY_CAP,
@@ -476,29 +476,29 @@ function buttonByLabel(card, label) {
   );
   budgetSelectionState.setSelection(budgetTanks.map((entity) => entity.id));
   assert(
-    Array.from(budgetSelectionState.selection).join(",") === "400,401,402,403",
-    "selection budget admits four six-supply Tanks without a Command Car",
+    Array.from(budgetSelectionState.selection).join(",") === "400,401,402,403,404",
+    "selection budget admits five five-supply Tanks without a Command Car",
   );
   budgetSelectionState.setSelection(budgetTanks.map((entity) => entity.id).concat([budgetExtraTank.id, budgetCommandCar.id]));
   assert(
-    Array.from(budgetSelectionState.selection).join(",") === "400,401,402,403,450",
-    "selection budget admits four Tanks and a free Command Car",
+    Array.from(budgetSelectionState.selection).join(",") === "400,401,402,403,404,450",
+    "selection budget admits five Tanks and a free Command Car",
   );
-  budgetSelectionState.setSelection(budgetTanks.slice(0, 4).map((entity) => entity.id));
+  budgetSelectionState.setSelection(budgetTanks.map((entity) => entity.id));
   budgetSelectionState.addToSelection([budgetRiflemen[0].id]);
   assert(
-    Array.from(budgetSelectionState.selection).join(",") === "400,401,402,403",
+    Array.from(budgetSelectionState.selection).join(",") === "400,401,402,403,404",
     "shift-add ignores overflow without replacing the existing selection",
   );
-  budgetSelectionState.addToSelection([budgetCommandCar.id, budgetTanks[4].id]);
+  budgetSelectionState.addToSelection([budgetCommandCar.id, budgetExtraTank.id]);
   assert(
-    Array.from(budgetSelectionState.selection).join(",") === "400,401,402,403,450",
+    Array.from(budgetSelectionState.selection).join(",") === "400,401,402,403,404,450",
     "shift-add admits a free Command Car without exceeding the base budget",
   );
   budgetSelectionState.setControlGroup(0, budgetRiflemen.map((entity) => entity.id));
   assert(
     budgetSelectionState.controlGroups[0].length === BASE_COMMAND_SUPPLY_CAP,
-    "control-group save admits 24 one-supply units",
+    "control-group save admits 25 one-supply units",
   );
   assert(
     budgetSelectionState.selectionBudgetOverflow?.cap === BASE_COMMAND_SUPPLY_CAP,
@@ -506,17 +506,17 @@ function buttonByLabel(card, label) {
   );
   budgetSelectionState.setControlGroup(1, budgetTanks.map((entity) => entity.id));
   assert(
-    budgetSelectionState.controlGroups[1].join(",") === "400,401,402,403",
+    budgetSelectionState.controlGroups[1].join(",") === "400,401,402,403,404",
     "control-group save ignores over-budget Tanks",
   );
   budgetSelectionState.addToControlGroup(1, [budgetRiflemen[0].id]);
   assert(
-    budgetSelectionState.controlGroups[1].join(",") === "400,401,402,403",
+    budgetSelectionState.controlGroups[1].join(",") === "400,401,402,403,404",
     "control-group add ignores overflow without trimming existing legal members",
   );
-  budgetSelectionState.addToControlGroup(1, [budgetCommandCar.id, budgetTanks[4].id]);
+  budgetSelectionState.addToControlGroup(1, [budgetCommandCar.id, budgetExtraTank.id]);
   assert(
-    budgetSelectionState.controlGroups[1].join(",") === "400,401,402,403,450",
+    budgetSelectionState.controlGroups[1].join(",") === "400,401,402,403,404,450",
     "control-group add admits a free Command Car without expanding the budget",
   );
   const secondBudgetCommandCar = {
@@ -540,23 +540,23 @@ function buttonByLabel(card, label) {
   });
   budgetSelectionState.setControlGroup(2, budgetTanks.map((entity) => entity.id).concat([budgetCommandCar.id, secondBudgetCommandCar.id]));
   assert(
-    budgetSelectionState.controlGroups[2].join(",") === "400,401,402,403,450,451",
+    budgetSelectionState.controlGroups[2].join(",") === "400,401,402,403,404,450,451",
     "control-group save includes free Command Cars without adding capacity",
   );
   budgetSelectionState.controlGroups[3] = budgetTanks.map((entity) => entity.id).concat(budgetCommandCar.id);
   const recalledLateCar = budgetSelectionState.selectControlGroup(3);
   assert(
-    recalledLateCar.join(",") === "400,401,402,403,450",
+    recalledLateCar.join(",") === "400,401,402,403,404,450",
     "control-group recall preserves legal order and includes a free Command Car",
   );
   assert(
-    budgetSelectionState.controlGroups[3].join(",") === "400,401,402,403,450",
+    budgetSelectionState.controlGroups[3].join(",") === "400,401,402,403,404,450",
     "control-group recall rewrites old over-budget runtime groups to legal admitted order",
   );
-  budgetSelectionState.controlGroups[4] = budgetTanks.map((entity) => entity.id);
+  budgetSelectionState.controlGroups[4] = budgetTanks.map((entity) => entity.id).concat(budgetExtraTank.id);
   const recalledOverBudgetTanks = budgetSelectionState.selectControlGroup(4);
   assert(
-    recalledOverBudgetTanks.join(",") === "400,401,402,403",
+    recalledOverBudgetTanks.join(",") === "400,401,402,403,404",
     "control-group recall filters old over-budget Tank groups before selection",
   );
   assert(
@@ -577,7 +577,7 @@ function buttonByLabel(card, label) {
     },
   };
   guardedControlGroupIssuer.issueCommand(cmd.move(Array.from(budgetSelectionState.selection), 10, 20));
-  guardedControlGroupIssuer.issueCommand(cmd.move(budgetTanks.map((entity) => entity.id), 10, 20));
+  guardedControlGroupIssuer.issueCommand(cmd.move(budgetTanks.map((entity) => entity.id).concat(budgetExtraTank.id), 10, 20));
   assert(controlGroupCommands.length === 1, "legal recalled control-group command is sent through the budget guard");
   assert(controlGroupToasts.length === 1, "over-budget command restored from stale group data is blocked before send");
 
@@ -778,14 +778,14 @@ function buttonByLabel(card, label) {
   );
   budgetSelectionInput._commitClickSelection({ x: doubleClickRiflemen[0].x, y: doubleClickRiflemen[0].y }, false, true);
   assert(
-    Array.from(budgetInputState.selection).length === BASE_COMMAND_SUPPLY_CAP / STATS[KIND.MACHINE_GUNNER].supply &&
+    Array.from(budgetInputState.selection).length === Math.floor(BASE_COMMAND_SUPPLY_CAP / STATS[KIND.MACHINE_GUNNER].supply) &&
       Array.from(budgetInputState.selection).every((id) => id >= 5200 && id < 5300),
     "double-click same-kind selection is filtered by command supply",
   );
   budgetSelectionInput._commitBoxSelection({ x0: 0, y0: 204, x1: 120, y1: 236 }, false);
   assert(
-    Array.from(budgetInputState.selection).join(",") === "5300,5301,5302,5303,5400",
-    "drag selection includes a late free Command Car after four Tanks",
+    Array.from(budgetInputState.selection).join(",") === "5300,5301,5302,5303,5304,5400",
+    "drag selection includes a late free Command Car after five Tanks",
   );
   const alliedRightClickCommands = [];
   const rightClickInput = Object.create(Input.prototype);

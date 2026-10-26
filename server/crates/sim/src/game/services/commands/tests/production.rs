@@ -64,32 +64,62 @@ fn locked_units_require_finished_unlock_upgrades() {
 }
 
 #[test]
-fn anti_tank_guns_are_immediately_trainable_from_gun_works() {
+fn anti_tank_guns_require_an_owned_completed_engineering_complex() {
     let map = flat_map(24);
-    let mut entities = EntityStore::new();
-    let (x, y) = footprint_center(&map, EntityKind::Steelworks, 6, 6);
-    let gun_works = entities
-        .spawn_building(1, EntityKind::Steelworks, x, y, true)
-        .expect("gun works should spawn");
-    let mut players = vec![player_state(1), player_state(2)];
+    for (tech_building, allowed) in [
+        (None, false),
+        (Some((2, true)), false),
+        (Some((1, false)), false),
+        (Some((1, true)), true),
+    ] {
+        let mut entities = EntityStore::new();
+        let (x, y) = footprint_center(&map, EntityKind::Steelworks, 6, 6);
+        let gun_works = entities
+            .spawn_building(1, EntityKind::Steelworks, x, y, true)
+            .expect("gun works should spawn");
+        if let Some((owner, complete)) = tech_building {
+            let (x, y) = footprint_center(&map, EntityKind::EngineeringComplex, 12, 6);
+            entities
+                .spawn_building(owner, EntityKind::EngineeringComplex, x, y, complete)
+                .expect("engineering complex should spawn");
+        }
+        let mut players = vec![player_state(1), player_state(2)];
+        let resources_before = (players[0].steel, players[0].oil, players[0].supply_used);
+        assert!(players[0].upgrades.is_empty());
+        let events = apply_with_players(
+            &map,
+            &mut entities,
+            &mut players,
+            vec![(
+                1,
+                SimCommand::Train {
+                    building: gun_works,
+                    unit: EntityKind::AntiTankGun,
+                },
+            )],
+        );
 
-    let events = apply_with_players(
-        &map,
-        &mut entities,
-        &mut players,
-        vec![(
-            1,
-            SimCommand::Train {
-                building: gun_works,
-                unit: EntityKind::AntiTankGun,
-            },
-        )],
-    );
-
-    assert!(events.get(&1).is_none_or(Vec::is_empty));
-    let queue = entities.get(gun_works).expect("gun works").prod_queue();
-    assert_eq!(queue.len(), 1);
-    assert_eq!(queue[0].unit, EntityKind::AntiTankGun);
+        let queue = entities.get(gun_works).expect("gun works").prod_queue();
+        if allowed {
+            assert!(events.get(&1).is_none_or(Vec::is_empty));
+            assert_eq!(queue.len(), 1);
+            assert_eq!(queue[0].unit, EntityKind::AntiTankGun);
+            assert!(
+                queue[0].paid,
+                "no research is required after the building completes"
+            );
+        } else {
+            assert!(queue.is_empty(), "tech building: {tech_building:?}");
+            assert!(matches!(
+                events.get(&1).and_then(|events| events.first()),
+                Some(Event::Notice { msg, .. }) if msg == "Requirement not met"
+            ));
+            assert_eq!(
+                (players[0].steel, players[0].oil, players[0].supply_used),
+                resources_before,
+            );
+        }
+    }
 }
 
 #[test]

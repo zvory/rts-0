@@ -35,6 +35,13 @@ inherits Rifleman combat and movement but carries one disposable anti-armor shot
 base damage with 50% armor penetration and no tank-facing modifier. The shot is detached at launch;
 the same Panzerfaust immediately returns to normal movement and rifle combat while the projectile
 travels, preserving its kind, orders, HP, control-group identity, and trench.
+Tank Plus (`tank_plus`) is researched at the Engineering Complex after Tank Production for
+150 steel and 150 oil over 20 seconds. It applies to existing and future owned Tanks: hull and
+turret turn rates multiply by 1.5, top movement speed multiplies by 1.1 (including other speed
+effects), sight increases from 9 to 11 tiles, and stationary cannon range ramps from 5 to 14 tiles
+in 45 ticks (1.5 seconds) instead of 90 ticks. Movement still resets the range ramp; maximum range,
+attack cooldowns, and damage are unchanged. Existing research hotkeys are preserved.
+
 Tanks also have a live secondary `tank_coax` profile owned by combat rules: 6-tile range, 4 small-arms
 damage, 12-tick cooldown, no Tank armor-facing multiplier, and single-target direct fire.
 Tank HE: cannon shots aimed at infantry (Workers, Golems, Warriors,
@@ -111,6 +118,12 @@ the generated `/wiki/stats` page.
 | Constant | Before cleanup | After cleanup | Mirror impact |
 |----------|----------------|---------------|---------------|
 | `MORTAR_FIRE_TOLERANCE_RAD` | Sim-only mortar aim tolerance exported from `server/crates/sim/src/config.rs` beside mirrored balance constants | Sim-local `server/crates/sim/src/game/mortar.rs` `FIRE_TOLERANCE_RAD`, owned by mortar firing behavior | None; it is not mirrored into `client/src/config.js` and does not change wire shape or balance values |
+
+The single-unit selection panel displays Armored or Unarmored beneath the kill count.
+`STATS[kind].armored` mirrors each Rust `UnitDef.armor_class` through the checked
+`clientConfig.unitStats` dump. Its hover explanation describes the 75% HP damage reduction
+against non-piercing attacks and partial/full armor penetration. Artillery is Small/unarmored
+and receives no armor damage reduction. Buildings and resource nodes omit this unit-only row.
 
 ### Client mirror boundary inventory
 
@@ -242,8 +255,8 @@ support readable gameplay, clear unit roles, and strong terrain identity without
 or regime-specific iconography.
 
 MVP scope:
-- No combat air forces. `scout_plane` is non-combat reconnaissance launched by the Resource Depot
-  or Command Car Scout Plane ability. Each sortie has a 30-second total lifetime from launch, flies
+- No combat air forces. `scout_plane` is non-combat reconnaissance launched by the
+  Command Car Scout Plane ability. Each sortie has a 30-second total lifetime from launch, flies
   to a targeted orbit, provides vision throughout transit and any remaining orbit time, and then
   disappears.
 - Late-game Artillery is implemented as the Superior Firepower capstone; Mortar Teams remain the
@@ -433,7 +446,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   `ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK = 0.070` to track targets inside that cone;
   targets outside the cone are ignored until teardown and redeployment. While packed and mobile, an
   Anti-Tank Gun moves at 1.7556 px/tick and turns its body at
-  `ANTI_TANK_GUN_BODY_TURN_RATE_DEGREES_PER_SECOND = 110`; sharp heading changes still reduce throttle
+  `ANTI_TANK_GUN_BODY_TURN_RATE_DEGREES_PER_SECOND = 70`; sharp heading changes still reduce throttle
   until the gun pivots in place.
 - Panzerfaust units carry a one-shot 5-tile loaded weapon that targets only visible
   Scout Cars, Tanks, and Command Cars with
@@ -491,10 +504,10 @@ profiles and explicit activation/autocast policy instead of being folded into de
 - Tank stationary range ramps from the base 5-tile weapon range to 14 tiles over
   `TICK_HZ * 3` ticks. Movement-path translation or hull rotation resets the ramp; autonomous armor
   reaction, turret aiming, collision shoves, and external pulls do not.
-- Human selection and command bandwidth is supply-based: `BASE_COMMAND_SUPPLY_CAP = 24` command
+- Human selection and command bandwidth is supply-based: `BASE_COMMAND_SUPPLY_CAP = 25` command
   supply. Units use their mirrored supply as command weight, except Command Cars have zero command
-  weight and add no capacity (`COMMAND_CAR_SUPPLY_CAP_BONUS = 0`). Tanks consume 6 command supply,
-  so four Tanks fill the budget. A Command Car still uses 4 production supply.
+  weight and add no capacity (`COMMAND_CAR_SUPPLY_CAP_BONUS = 0`). Tanks consume 5 command supply,
+  so five Tanks fill the budget. A Command Car still uses 4 production supply.
 - **Methamphetamines** (Training Centre research): costs 100 steel / 100 oil and takes 600 ticks
   (~20s). Once complete, all current and future Riflemen for that player gain permanent moving rifle fire,
   1.25x movement speed (matching tank speed at 2.0 px/tick), no extra movement miss chance, and 50%
@@ -539,7 +552,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   takes 600 ticks (~20s). Once complete, future Scout Car Smoke casts by that player use a 4-tile
   cloud radius and last 10 seconds instead of the base 2-tile radius and 5-second duration.
 - **Scout Plane** (Engineering Complex research, protocol id `scout_plane_unlock`): costs 100 steel /
-  200 oil and takes 600 ticks (~20s). Once complete, Resource Depots and Command Cars owned by that
+  200 oil and takes 600 ticks (~20s). Once complete, Command Cars owned by that
   player can use their C-slot Scout Plane ability for free.
 - Ability metadata is Rust-authoritative in `server/crates/rules/src/faction.rs`. The faction
   catalog records carriers, target mode, ranges, cooldowns, charges, base and carrier-specific
@@ -595,14 +608,14 @@ profiles and explicit activation/autocast policy instead of being folded into de
   missing charge regenerates, the ability's existing clock animation shows progress toward the
   next charge; recharge does not disable a stored charge that is still available.
 - **Command Car aura and Breakthrough!** (hotkey `E`): Each completed Command Car continuously gives
-  owned units within 9 tiles a 1.2x speed multiplier. This passive aura has no smoke interaction,
+  owned units within 9 tiles a 1.3x speed multiplier. This passive aura has no smoke interaction,
   and overlapping Command Cars do not stack. Breakthrough is the self-targeted instant active
-  version: it applies the full 1.4x speed status to owned units currently within that same radius
+  version: it applies the full 1.6x speed status to owned units currently within that same radius
   for 180 ticks (~6s), with a 750-tick (~25s) per-caster cooldown, no resource cost, queueability,
   and movement during casting. While an affected unit is actually moving, Breakthrough lets it
   fire without stopping and halves the cooldown of each weapon fired on that tick. Stationary
   attacks retain their normal cooldown, and setup weapons still obey their setup requirements. The
-  active status uses the 1.6x multiplier while the affected unit is inside smoke or during the
+  active status uses the 1.9x multiplier while the affected unit is inside smoke or during the
   60-tick (~2s) recent-smoke grace window after leaving it; it overrides the passive aura. Multiple
   active Breakthrough effects do not stack; a shorter refresh cannot reduce an active buff. Enemies
   see the active status only when the affected unit is
@@ -669,16 +682,18 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | panzerfaust     | 45  | 5 rifle / 100 launcher | 5 | 32 rifle / one lifetime launcher | 1.6 | 11 | 55 | 10 | 1 | 300 (~10s); requires completed Panzerfausts research |
 | machine_gunner  | 55  | 4   | 6.1   | 12  | 1.28  | 11    | 75  | 10  | 2   | 400 (~13s) |
 | mortar_team     | 75  | 40 outer / 100 inner AOE | 5-17 | 120 | 1.6 | 10 | 100 | 40 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
-| anti_tank_gun         | 45  | 100 deployed; cannot target infantry | 20 deployed | 144 | 1.7556 | 9    | 150 | 40  | 3   | 440 (~15s); cannot fire while packed or transitioning; available immediately from a completed Gun Works (`steelworks` kind) |
+| anti_tank_gun         | 45  | 100 deployed; cannot target infantry | 20 deployed | 144 | 1.7556 | 9    | 150 | 40  | 3   | 440 (~15s); cannot fire while packed or transitioning; requires a completed owned Gun Works (`steelworks` kind) and Engineering Complex; no research required |
 | artillery       | 200 | 75 AP inner / 75-20 outer AOE | 10-35 artillery fire | 180 | 1.6 | 7 | 150 | 50 | 4 | 600 (~20s); requires Gun Works (`steelworks` kind) and Artillery (`artillery_unlock`) researched in Engineering Complex; rendered at 75% of its prior size with a matching 75%-of-Tank gameplay footprint; 2/3-tile inner and 2-tile outer blast radii; soft target with no armor damage reduction |
 | rocket_launcher (Rocket Truck) | 150 | 16 rockets, each 21 outer / 53 inner AOE; a rocket whose impact point intersects a target deals 70 armor-piercing damage instead; all resulting damage is reduced to 25% against buildings | 10-44 Barrage | 1800-tick (~60s) cooldown from activation | 2.0 | 8 | 225 | 100 | 6 | 600 (~20s); requires Gun Works (`steelworks` kind), a completed owned Vehicle Works (`factory` kind), and Rockets (`rockets`) researched in Engineering Complex; vehicle movement; must stop to launch; one manual command unloads exactly 16 rockets over 120 ticks (~4s) into a 6-tile scatter radius and then stops; its team-tinted rack carries 16 rounds, empties one slot per launch, and refills at cooldown completion; the PNG and collision footprint are enlarged by 20% (48×26.4 px body, 1.2 px clearance, 21.6 px selection radius); Barrage accepts in-range world points without requiring current vision; first barrage is free and later barrages cost 150 oil |
 | scout_car       | 100 | 6   | 7     | 12  | 2.35  | 15    | 125 | 60  | 3   | 480 (~16s) |
-| scout_plane     | 40  | 0   | 0     | 0  | 2.6   | 19    | 0   | 0   | 0   | 0; instant sorties are free from a Resource Depot or Command Car; both use the C slot after research; unlimited independent active sorties; non-combat recon with 2-tile orbit radius and a 30-second total lifetime from launch, including transit, followed by despawn; 30-second carrier-local cooldown, no ground collision reservation, and 48x34 px client render body |
-| tank            | 292 | 60 cannon; 4 coax | 5 moving / 14 fully stationary cannon; 6 coax | 144 cannon; 12 coax | 2.0   | 9     | 425 | 175 | 6   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in Engineering Complex; coax is a secondary small-arms weapon that fires through the current turret arc |
+| scout_plane     | 40  | 0   | 0     | 0  | 2.6   | 19    | 0   | 0   | 0   | 0; instant sorties are free from a Command Car; uses the C slot after research; unlimited independent active sorties; non-combat recon with 2-tile orbit radius and a 30-second total lifetime from launch, including transit, followed by despawn; 30-second carrier-local cooldown, no ground collision reservation, and 48x34 px client render body |
+| tank            | 292 | 60 cannon; 4 coax | 5 moving / 14 fully stationary cannon; 6 coax | 144 cannon; 12 coax | 2.0   | 9     | 425 | 175 | 5   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in Engineering Complex; coax is a secondary small-arms weapon that fires through the current turret arc |
 | command_car     | 150 | 0   | 0     | 0  | 2.35  | 8     | 150 | 85  | 4   | 450 (~15s); trained at Vehicle Works (`factory` kind) and requires a completed Engineering Complex, but no Tank Production research; no weapon; Scout Car-style movement with a smaller jeep-sized body |
 | ekat       | 150 | 0   | 0     | 0  | 1.6   | 12    | 0   | 0   | 0   | 0; Ekat faction hero; no default attack; no passive regeneration; consumes nearby Golems for recovery |
 
-All building HP values are 25% below the pre-halving baseline, rounding down to whole HP.
+Building HP is reduced by a further 20% from the previous values, rounding down to whole HP,
+except Steel Mines (37 HP) and Pump Jacks (56 HP), which are unchanged. This includes
+legacy Portal (98 HP) and Supply Depot (65 HP) buildings and Tank Traps (72 HP).
 
 Building stats (hp, sight, cost, footprint tiles wxh, buildTicks, extra). Building sight is measured
 outward from the footprint edge, not from only the building center, so sight 1 reveals the full
@@ -686,15 +701,15 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 
 | kind                       | player-facing name | hp  | sight | cost | foot | buildTicks | notes |
 |----------------------------|--------------------|-----|-------|-----|------|-----------|-------|
-| resource_depot                | Resource Depot        | 225 | 1     | 450 steel + 100 oil | 3x3  | 150       | trains workers and permanently auto-builds free Steel Mines and Pump Jacks concurrently; no supply; players start with one free |
-| zamok                      | Zamok              | 450 | 1     | 0   | 3x3  | 0         | Ekat start building; no supply; trains Golem; no research in first playable slice |
-| depot                      | Supply Depot       | 82 | 1     | 100 | 2x2  | 300       | disabled in the current experiment (not buildable and no command-card button); retained for replay and fixture compatibility; no supply |
-| barracks                   | Barracks           | 123 | 1     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, and panzerfaust; Machine Gunner requires a completed Training Centre and Panzerfaust requires completed Panzerfausts research; requires a Resource Depot |
-| training_centre            | Training Centre    | 150 | 1     | 100 steel + 25 oil | 3x2  | 560       | shared prerequisite before either advanced path; unlocks machine_gunner training at barracks and researches Methamphetamines, Panzerfausts, and Entrenchment; requires a Resource Depot and Barracks |
-| engineering_complex           | Engineering Complex        | 123 | 1     | 100 steel + 100 oil | 3x3  | 450       | research-only building for Artillery, Rockets, Tank Production, Smoke Plus, and Scout Plane; its first command-card slot remains empty to preserve existing research hotkeys; requires a Resource Depot and Training Centre |
-| factory                    | Vehicle Works      | 150 | 1     | 125 steel + 125 oil | 3x3  | 749       | Mobile Warfare path building; trains scout_car immediately, command_car after a completed Engineering Complex, and tank after Tank Production research; requires a Resource Depot and Training Centre |
-| steelworks                 | Gun Works          | 150 | 1     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team and Anti-Tank Guns immediately, Artillery after Artillery research, and Rocket Trucks after Rockets research while owning a completed Vehicle Works; requires a Resource Depot and Training Centre |
-| tank_trap                  | Tank Trap          | 90 | 0     | 20 steel + 0 oil | 1x1  | 150       | engineer-built vehicle obstacle available from the worker build card after a completed Training Centre; A-clicking a visible or remembered completed trap creates a four-tile clear-area Attack Move objective whose actionable traps outrank ordinary enemies; workers deconstruct completed traps in 75 ticks and refund the cost to the deconstructing player; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, no fog reveal, not an elimination building |
+| resource_depot                | Resource Depot        | 180 | 1     | 450 steel + 100 oil | 3x3  | 150       | trains workers and permanently auto-builds free Steel Mines and Pump Jacks concurrently; no supply; players start with one free |
+| zamok                      | Zamok              | 360 | 1     | 0   | 3x3  | 0         | Ekat start building; no supply; trains Golem; no research in first playable slice |
+| depot                      | Supply Depot       | 65 | 1     | 100 | 2x2  | 300       | disabled in the current experiment (not buildable and no command-card button); retained for replay and fixture compatibility; no supply |
+| barracks                   | Barracks           | 98 | 1     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, and panzerfaust; Machine Gunner requires a completed Training Centre and Panzerfaust requires completed Panzerfausts research; requires a Resource Depot |
+| training_centre            | Training Centre    | 120 | 1     | 100 steel + 25 oil | 3x2  | 560       | shared prerequisite before either advanced path; unlocks machine_gunner training at barracks and researches Methamphetamines, Panzerfausts, and Entrenchment; requires a Resource Depot and Barracks |
+| engineering_complex           | Engineering Complex        | 98 | 1     | 100 steel + 100 oil | 3x3  | 450       | research-only building for Artillery, Rockets, Tank Production, Tank Plus, Smoke Plus, and Scout Plane; its first command-card slot remains empty to preserve existing research hotkeys; requires a Resource Depot and Training Centre |
+| factory                    | Vehicle Works      | 120 | 1     | 125 steel + 125 oil | 3x3  | 749       | Mobile Warfare path building; trains scout_car immediately, command_car after a completed Engineering Complex, and tank after Tank Production research; requires a Resource Depot and Training Centre |
+| steelworks                 | Gun Works          | 120 | 1     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team immediately, Anti-Tank Guns after a completed Engineering Complex, Artillery after Artillery research, and Rocket Trucks after Rockets research while owning a completed Vehicle Works; requires a Resource Depot and Training Centre |
+| tank_trap                  | Tank Trap          | 72 | 0     | 20 steel + 0 oil | 1x1  | 150       | engineer-built vehicle obstacle available from the worker build card after a completed Training Centre; A-clicking a visible or remembered completed trap creates a four-tile clear-area Attack Move objective whose actionable traps outrank ordinary enemies; workers deconstruct completed traps in 75 ticks and refund the cost to the deconstructing player; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, no fog reveal, not an elimination building |
 | steel_mine                 | Steel Mine         | 37  | 1     | 0 | 1x1  | 720       | free permanent Resource Depot background job on in-range Steel patches; mines 2 steel per 40 ticks; unarmored, immobile, no trains, no supply, and no weapon |
 | pump_jack                  | Pump Jack          | 56  | 1     | 150 steel | 1x1  | 300      | manual Engineer construction; also a free 1080-tick permanent Resource Depot background job on in-range Oil patches; mines 2 oil per 40 ticks; unarmored, immobile, no trains, no supply, no weapon, and does not block shots or line of sight |
 
@@ -711,7 +726,7 @@ snapshot immediately while the remaining players keep playing; final match resol
 
 Machine Gunner, Scout Car MG, and Tank coax keep their existing 12-tick firing cycle
 and acquisition ranges. Each cycle emits three simultaneous server rays. The first
-is aimed at the selected target; the other two are uniformly random over a
+is aimed at the selected target (the nearest footprint surface for buildings); the other two are uniformly random over a
 20-degree full cone centered on that target. Each bullet
 contributes half the old shot damage (2 MG/coax, 3 Scout Car). The maximum emitted
 DPS is 15/15/22.5 respectively. A clear center ray hits the selected target;
@@ -723,6 +738,8 @@ is transparent; friendly Tanks and sight-blocking buildings absorb without damag
 except an explicitly commanded self-attack. Neutral obstacles intercept when explicitly
 targeted. Rays stop at opaque terrain, smoke, or weapon range. Damage sums per victim
 within a simultaneous burst before existing integer armor, cover, and entrenchment
-reductions; lethal overkill stays on that victim. Existing non-MG damage is unchanged.
+reductions, with a minimum of 1 damage for a burst that hits an eligible victim; lethal
+overkill stays on that victim. Misses and friendly blockers take no damage. Existing non-MG
+damage is unchanged.
 The three cosmetic yellow tracers launch 20 ms apart, with 2,700 world pixels/second
 travel, a 7.5-pixel tail, and a 1.1-pixel stroke. Server damage is immediate.

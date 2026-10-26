@@ -96,19 +96,19 @@ is a draw; army value and other material metrics are diagnostics, not tiebreaker
 ```bash
 cd server
 cargo run --bin ai-matchup -- ai ai
-cargo run --bin ai-matchup -- ai_2_1 ai_turtle --seed 7 --ticks 3000 --json
+cargo run --bin ai-matchup -- ai_2_2 ai_turtle --seed 7 --ticks 3000 --json
 cargo run --bin ai-matchup -- default ai_turtle --seed 7 --ticks 25000 --json
 cargo run --bin ai-matchup -- --list-profiles
 ```
 
 The `ai-arena` binary is the agent-facing profile comparison layer. It runs side-swapped seed pairs
-around the same profile matchup result, defaults to AI 2.1 against AI Turtle, and writes a
+around the same profile matchup result, defaults to AI 2.2 against AI Turtle, and writes a
 top-level `arena-summary.json` plus per-run sidecars:
 
 ```bash
 cd server
-cargo run --bin ai-arena -- --candidate ai_2_1 --baseline ai_turtle --seeds 3 --ticks 9000
-cargo run --bin ai-arena -- --candidate ai_turtle --baseline ai_2_1 --out-dir target/ai-arena
+cargo run --bin ai-arena -- --candidate ai_2_2 --baseline ai_turtle --seeds 3 --ticks 9000
+cargo run --bin ai-arena -- --candidate ai_turtle --baseline ai_2_2 --out-dir target/ai-arena
 ```
 
 Each run directory contains a deterministic `replay.json` plus `manifest.json`, `summary.json`,
@@ -541,6 +541,18 @@ set. WASM-backed tri-state groups also stay opt-in unless `RTS_RUN_WASM_TRI_STAT
 the generated prediction WASM glue is absent, the server serves a JavaScript fallback module that
 disables prediction without a 404; generated WASM files take precedence, and other missing assets
 still return 404. Client smoke reports failing response URLs with browser console resource errors.
+Real media encoding and Interact browser recording smoke are gated separately by the selector's
+`run_media` output. Ordinary client/gameplay changes keep client smoke, tri-state coverage, and
+lightweight Interact control/cleanup contracts, but skip FFmpeg installation, recording/fixed-capture
+contracts, patch-note media integration, minimap encoding integration, and Interact CLI smoke.
+Changes to Interact source/bridges/tests, minimap recording tools, patch-note outbox, Node dependency
+manifests, or the CI selector/runner/workflow enable media coverage. Unknown changed-file ranges
+conservatively enable it; documentation-only changes still skip expensive work. Only the smoke browser job installs
+FFmpeg when media coverage is selected; it also runs `tests/media-contracts.sh`, sharing one install
+across the real media contracts and Interact smoke. The live Node job never installs FFmpeg. The shared Ubuntu installer uses the HTTPS Ubuntu
+archive mirror and omits recommended GPU/speech packages. `RTS_RUN_MEDIA_TESTS=0` applies this split to local
+`tests/run-all.sh` runs; local runs default to complete media coverage.
+
 Changed-file detection classifies PRs and `main` pushes as `docs_only`, `client_only`, or `full`
 from the PR base/head range or the push before/after range. `docs_only` keeps the same check
 contexts green but exits before expensive suites. `client_only` is limited to conservative
@@ -660,6 +672,17 @@ branch/worktree, PR identity and state, checkpoint target, and recovery action. 
 `--run-id`, recovery resumes only the single recorded nonterminal run; multiple candidates fail
 closed.
 
+Full sweeps automatically select the largest ancestry-complete batch that fits the existing
+classifier commit, per-prompt, and total-token budgets. Batches end at first-parent commit
+boundaries and include every side-branch ancestor introduced by a merge; checkpoint advancement
+therefore cannot silently skip an unclassified side commit. Cache hits consume the commit limit
+but no prompt-token budget. Reports and PR bodies record `batch.checkpointSha` and deferred commit
+counts. Docs generation still reads the fetched current head, while a completed batch advances
+only to its processed boundary, even after its documentation PR merges. Later daily runs continue
+from that checkpoint. If the first ancestry-complete group cannot fit, the command fails for
+operator review rather than raising limits or skipping commits. Standalone `--classify` and
+`--generate-docs` keep their fail-fast budget behavior.
+
 An open PR resumes its exact recorded branch, head, PR, and first incomplete step. A missing
 worktree can be recreated from an exact local or remote recorded head, and the only automatic ref
 reconciliation is a clean local fast-forward to that exact remote head. Merged runs may finish
@@ -698,7 +721,7 @@ that latest `scripts/docdrift-sweep.mjs` with `--repo` pointed back at the prima
 primary checkout still owns `.docdrift` checkpoints, caches, reports, and sweep worktrees, while the
 runner worktree prevents stale local `main` from running obsolete sweeper code. Set
 `DOC_DRIFT_RUNNER_WORKTREE` to override the runner location. The wrapper defaults scheduled runs to
-`--max-commits 300` so ordinary daily backlog does not trip the interactive classifier guard; set
+`--max-commits 300` as the maximum considered commits per daily batch; set
 `DOC_DRIFT_MAX_COMMITS` to override that limit. It also passes `--codex-timeout-seconds` from
 `DOC_DRIFT_CODEX_TIMEOUT_SECONDS`, defaulting to 300 seconds per Codex call. When the daily command
 exits non-zero, it writes an ignored `.docdrift/last-failure.md` marker with the command, UTC

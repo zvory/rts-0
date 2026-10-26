@@ -1,4 +1,5 @@
 use super::*;
+use crate::game::firing_reveal::FiringRevealSource;
 use rand::{rngs::SmallRng, SeedableRng};
 fn open_map(size: u32) -> Map {
     Map {
@@ -360,4 +361,47 @@ fn shooting_traps_does_not_disclose_a_concealed_shooter() {
         events[&2].is_empty(),
         "visible ground must not expose a concealed shooter"
     );
+}
+
+mod building_range;
+
+#[allow(clippy::too_many_arguments)]
+fn fire(
+    map: &Map,
+    entities: &mut EntityStore,
+    teams: &TeamRelations,
+    spatial: &SpatialIndex,
+    los: &LineOfSight<'_>,
+    fog: &Fog,
+    smokes: &SmokeCloudStore,
+    rng: &mut impl Rng,
+    events: &mut HashMap<u32, Vec<Event>>,
+    reveals: &mut Vec<FiringRevealSource>,
+    attacker: u32,
+    intended: u32,
+    profile: &rules::WeaponProfile,
+    range: f32,
+    tick: u32,
+) {
+    let blockers = super::super::ShotBlockerIndex::build(map, entities);
+    assert!(super::super::shot::try_fire(
+        map,
+        entities,
+        &blockers,
+        teams,
+        spatial,
+        los,
+        fog,
+        smokes,
+        rng,
+        events,
+        reveals,
+        attacker,
+        intended,
+        profile,
+        range,
+        profile.dmg,
+        profile.cooldown,
+        tick,
+    ));
 }

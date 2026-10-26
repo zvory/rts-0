@@ -79,6 +79,15 @@ export function decodeCompactEvent(record, index) {
         delayTicks: readU32(fields[3], "event.smokeLaunch.delayTicks"),
       };
     }
+    case EVENT.MORTAR_WARNING:
+      requireLength(fields, 5, `mortar warning event ${index}`);
+      return {
+        e: EVENT.MORTAR_WARNING,
+        x: readNumber(fields[1], "event.mortarWarning.x"),
+        y: readNumber(fields[2], "event.mortarWarning.y"),
+        radiusTiles: readNumber(fields[3], "event.mortarWarning.radiusTiles"),
+        delayTicks: readU32(fields[4], "event.mortarWarning.delayTicks"),
+      };
     case EVENT.MORTAR_LAUNCH: {
       if (fields.length !== 6 && fields.length !== 7) {
         throw new Error(`mortar launch event ${index} field count mismatch`);
