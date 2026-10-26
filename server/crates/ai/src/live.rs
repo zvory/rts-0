@@ -1037,6 +1037,79 @@ mod tests {
     }
 
     #[test]
+    fn sdk_base_rankings_follow_ground_paths_and_mark_unreachable() {
+        use crate::sdk::AiBaseSiteId::Start;
+        struct InspectBases;
+        impl AiStrategy for InspectBases {
+            fn step(&mut self, frame: &AiFrame, _actions: &mut AiActions) {
+                let world = WorldQueries::new(frame);
+                let first = world.ranked_bases(1);
+                // Start 2 is only two tiles away across water, but twelve tiles by ground.
+                // Start 3 is four tiles straight down, so it must rank before Start 2.
+                assert_eq!(
+                    first.iter().map(|base| base.site.id).collect::<Vec<_>>(),
+                    vec![Start(1), Start(3), Start(2), Start(4)]
+                );
+                let tile_size = frame.map().tile_size as f32;
+                assert_eq!(first[0].distance_from_main, Some(0.0));
+                assert_eq!(first[1].distance_from_main, Some(4.0 * tile_size));
+                // Twelve, rather than a shorter diagonal route, proves no blocked-corner cuts.
+                assert_eq!(first[2].distance_from_main, Some(12.0 * tile_size));
+                assert_eq!(first[3].distance_from_main, None);
+                assert_eq!(world.base(2, 2).unwrap().site.id, Start(3));
+                assert_eq!(world.base(2, 3).unwrap().site.id, Start(1));
+                let isolated = world.ranked_bases(4);
+                assert_eq!(isolated[0].site.id, Start(4));
+                assert_eq!(isolated[0].distance_from_main, Some(0.0));
+                assert_eq!(
+                    isolated[1..]
+                        .iter()
+                        .map(|base| base.site.id)
+                        .collect::<Vec<_>>(),
+                    vec![Start(1), Start(2), Start(3)]
+                );
+                assert!(isolated[1..]
+                    .iter()
+                    .all(|base| base.distance_from_main.is_none()));
+            }
+        }
+
+        let mut start = cache_test_start_payload();
+        start.map.resources.clear();
+        // A partial water wall requires a detour; a full wall isolates the fourth start.
+        for y in 0..6 {
+            start.map.terrain[y * 8 + 2] = terrain::WATER;
+        }
+        for y in 0..8 {
+            start.map.terrain[y * 8 + 6] = terrain::WATER;
+        }
+        let template = start.players[0].clone();
+        start.players = [(1, 1, 1), (2, 3, 1), (3, 1, 5), (4, 7, 1)]
+            .into_iter()
+            .map(|(id, x, y)| {
+                let mut player = template.clone();
+                player.id = id;
+                player.team_id = id;
+                player.start_tile_x = x;
+                player.start_tile_y = y;
+                player
+            })
+            .collect();
+        let game = Game::new_without_ai_controllers(&driver_test_players(), 13);
+        let mut snapshot = game.snapshot_for(1);
+        snapshot.tick = 8;
+        let mut controller = AiController::with_strategy(1, Box::new(InspectBases));
+        let context = AiThinkContext {
+            match_seed: 0,
+            start: &start,
+            snapshot: &snapshot,
+            alive_player_ids: &[1, 2, 3, 4],
+            retreat_commands: Vec::new(),
+        };
+        assert!(controller.think(context).is_empty());
+    }
+
+    #[test]
     fn live_controller_uses_default_profile_id() {
         let ai = AiController::new(2);
 
