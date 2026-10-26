@@ -13,6 +13,7 @@ mod ai_shared;
 mod config {
     pub(crate) use rts_rules::balance::*;
 }
+mod compositions;
 mod live;
 mod rush;
 

@@ -96,6 +96,7 @@ fn pending_tracker_view<'a>(
     snapshot: &'a Snapshot,
 ) -> PlayerView<'a> {
     PlayerView {
+        match_seed: 0,
         player_id: 1,
         tick,
         start,

@@ -12,21 +12,35 @@ When several seats use the same profile, their lobby names receive deterministic
 
 The player-facing lobby supports three AI profile IDs:
 
-- ai_2_1 — AI 2.1, the default pressure profile.
+- ai_2_2 — AI 2.2, the default weighted composition: 50% Rush AI and 50% original AI 2.1.
 - jeffs_ai — Jeff's AI, the server-authoritative port of the locally evaluated V3 champion policy.
 - rush_ai — Rush AI, an immediate infantry attack with forward construction.
 
 `ai_turtle` is deprecated and internal-only. It remains registered for offline self-play,
 diagnostics, and observer-only AI sessions, but it is not exposed in the lobby and the server
-replaces it with `ai_2_1` whenever a room has an active human player. The replacement is enforced
+replaces it with `ai_2_2` whenever a room has an active human player. The replacement is enforced
 again at the authoritative match-start seam, so stale or crafted clients cannot put Turtle into a
 human match.
 
-Those IDs are concrete match profile IDs used by controllers and diagnostics. Live AI selection
-also accepts suite request IDs, such as ai_2_0, which resolve to concrete profiles for a match.
-The convenience inputs ai and default resolve to ai_2_1. The lobby exposes AI 2.1, Jeff's AI, and Rush AI;
-unsupported or internal profile IDs fall back to AI 2.1 when adding a seat and are ignored when
-changing a seat in a player lobby.
+The convenience inputs ai and default resolve to ai_2_2. The lobby exposes AI 2.2, Jeff's AI, and
+Rush AI. AI 2.1 remains a concrete internal profile (`ai_2_1`) for compositions, offline tools, and
+observer-only sessions, but is hidden and rejected as a direct selection in human player lobbies.
+Unsupported or internal IDs fall back to AI 2.2 when adding a seat and are ignored when changing a
+seat; stale internal seats are normalized to AI 2.2 when humans join and again at match start.
+
+`server/crates/ai/src/compositions.rs` defines compositions as weighted lists of registered concrete
+profiles. Add another member and its positive integer weight to extend a composition; nested
+compositions are deliberately not supported. Each controller chooses one member on its first host
+invocation, before worker reflexes or strategy initialization, and keeps it for the whole match.
+Selection uses a separate RNG seeded by the host's match seed and player ID, so controller order
+and simulation RNG consumption cannot affect the choice. The normal and prepared host paths carry
+that seed in `AiThinkContext` (and the synthetic fixture's `PlayerView`). No seed is added to the
+wire or strategy observation. Equal weights mean equal probability, not forced alternation.
+
+The lobby/request identity stays AI 2.2. Controller diagnostics expose the selected concrete
+profile separately; mixed decision traces identify both the composition and member. Arena
+manifests record the weighted member list, and their fingerprints include member policy
+fingerprints and selector source. Explicit AI 2.1 and Rush requests preserve their existing behavior.
 
 Internal observer launch URLs may still use both IDs. For example, a spectator can launch an AI
 2.1 versus Turtle diagnostic match with:
@@ -257,7 +271,7 @@ AI 2.0 resolves only to the `ai_2_0_tank_pressure` profile. The retired
 panic does not override an already-active tech transition, so tank pressure continues its Factory
 path during pressure.
 
-AI 2.1 is the promoted pressure profile. It fills in-range Steel and Oil extractor slots over time,
+AI 2.1 is the original pressure behavior used as an AI 2.2 component. It fills in-range Steel and Oil extractor slots over time,
 keeps an eight-supply buffer, opens one Barracks, expands to two Resource Depots, and reserves four
 Machine Gunners for defense. It begins with Rifleman pressure, then transitions into mixed
 Tank/Rifleman pressure once its tank-tech resource threshold is met. After its first Vehicle Works (Factory) completes, it seeks a third Resource Depot using the
@@ -429,19 +443,19 @@ horizon is a draw.
 
 The ai-arena binary runs side-swapped seed pairs and writes a top-level arena-summary.json plus
 per-run replay.json, manifest.json, summary.json, decision-trace.jsonl, and brief.md files. Its
-defaults compare AI 2.1 against AI Turtle. The manifest records canonical profile IDs and
+defaults compare AI 2.2 against AI Turtle. The manifest records canonical profile IDs and
 fingerprints, rather than a requested/resolved identity pair.
 
     cd server
     cargo run --bin ai-arena -- --candidate ai_2_1 --baseline ai_turtle --seeds 3 --ticks 9000
 
 The repository term **120 game test** means `scripts/120-game-test.mjs`. It requires profile IDs for
-the current AI 2.1, pre-change Jeff, and post-change Jeff in that order. The runner builds ai-arena,
+the current AI 2.2, pre-change Jeff, and post-change Jeff in that order. The runner builds ai-arena,
 runs all three pairings on The River, Schone Tage, Classic, and Crossroads with five side-swapped seeds,
 caps parallel work, resumes completed seed jobs when an output directory is reused, and writes
 Markdown, JSON, and CSV summaries.
 
-    node scripts/120-game-test.mjs ai_2_1 jeffs_ai_pre_defense_envelope jeffs_ai
+    node scripts/120-game-test.mjs ai_2_2 jeffs_ai_pre_defense_envelope jeffs_ai
 
 Per-seed console progress is off by default. For unattended runs, `--background` starts the test in
 a hidden detached process and returns immediately; `--status <output-directory>` reads compact

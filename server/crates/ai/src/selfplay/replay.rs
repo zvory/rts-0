@@ -323,6 +323,7 @@ pub fn available_profile_ids() -> Vec<&'static str> {
         .into_iter()
         .map(|profile| profile.id)
         .chain([crate::rush::RUSH_AI_ID])
+        .chain(crate::compositions::COMPOSITIONS.iter().map(|c| c.id))
         .collect()
 }
 
@@ -330,7 +331,9 @@ pub fn canonical_profile_id(input: &str) -> Option<&'static str> {
     match input {
         "ai" | "default" => Some(DEFAULT_LIVE_PROFILE_ID),
         crate::rush::RUSH_AI_ID => Some(crate::rush::RUSH_AI_ID),
-        id => profile_by_id(id).map(|profile| profile.id),
+        id => crate::compositions::composition_by_id(id)
+            .map(|c| c.id)
+            .or_else(|| profile_by_id(id).map(|profile| profile.id)),
     }
 }
 
@@ -1013,7 +1016,7 @@ mod tests {
         );
         assert_eq!(
             available_profile_ids(),
-            vec![AI_2_1_ID, "jeffs_ai", AI_TURTLE_ID, "rush_ai"]
+            vec![AI_2_1_ID, "jeffs_ai", AI_TURTLE_ID, "rush_ai", "ai_2_2"]
         );
         assert_eq!(canonical_profile_id(AI_2_1_ID), Some(AI_2_1_ID));
         assert_eq!(canonical_profile_id(AI_TURTLE_ID), Some(AI_TURTLE_ID));

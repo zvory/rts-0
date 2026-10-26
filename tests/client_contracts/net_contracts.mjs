@@ -429,11 +429,11 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   assert(msg.setName("Renamed").name === "Renamed", "lobby name builder payload");
   assert(msg.setTeam(7, 2).teamId === 2, "team assignment builder payload");
   assert(msg.setFaction("ekat").factionId === "ekat", "faction selection builder payload");
-  assert(DEFAULT_AI_PROFILE_ID === "ai_2_1", "lobby defaults to AI 2.1");
+  assert(DEFAULT_AI_PROFILE_ID === "ai_2_2", "lobby defaults to AI 2.2");
   assert(
     AI_PROFILES.length === 3 &&
-      AI_PROFILES[0].id === "ai_2_1" &&
-      AI_PROFILES[0].label === "AI 2.1" &&
+      AI_PROFILES[0].id === "ai_2_2" &&
+      AI_PROFILES[0].label === "AI 2.2" &&
       AI_PROFILES[1].id === "jeffs_ai" &&
       AI_PROFILES[1].label === "Jeff's AI" &&
       AI_PROFILES[2].id === "rush_ai" &&
@@ -446,8 +446,8 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
     "addAi builder can include default aiProfileId",
   );
   assert(
-    msg.addAi(2, "ai_2_1").aiProfileId === "ai_2_1",
-    "addAi builder can request AI 2.1 explicitly",
+    msg.addAi(2, "ai_2_2").aiProfileId === "ai_2_2",
+    "addAi builder can request AI 2.2 explicitly",
   );
   assert(msg.requestBranchFromTick().t === "requestBranchFromTick", "replay branch builder tag");
   assert(msg.claimBranchSeat(7).t === "claimBranchSeat", "branch seat claim builder tag");

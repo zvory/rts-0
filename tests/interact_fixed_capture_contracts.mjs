@@ -36,6 +36,8 @@ try {
   );
   const gameSessionId = `game_${"b".repeat(32)}`;
   const scenarioSessionId = `scenario_${"c".repeat(32)}`;
+  assert.doesNotThrow(() => validateCommandInput("game-open", { opponent: "ai_2_2" }));
+  assert.doesNotThrow(() => validateCommandInput("game-open", { spectate: ["ai_2_2", "ai_2_1"] }));
   assert.doesNotThrow(() => validateCommandInput("game-open", { spectate: ["ai_2_1", "ai_turtle"] }));
   assert.doesNotThrow(() => validateCommandInput("game-open", { spectate: ["rush_ai", "jeffs_ai"] }));
   assert.doesNotThrow(() => validateCommandInput("game-open", { spectate: ["ai_2_1", "ai_turtle"], autoSpectator: true }));

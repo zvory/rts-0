@@ -19,6 +19,7 @@ pub(super) fn is_kind(e: &EntityView, kind: EntityKind) -> bool {
 
 #[derive(Clone, Copy)]
 pub(crate) struct PlayerView<'a> {
+    pub(crate) match_seed: u32,
     pub(crate) player_id: u32,
     pub(crate) tick: u32,
     pub(crate) start: &'a StartPayload,

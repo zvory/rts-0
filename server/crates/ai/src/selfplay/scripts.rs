@@ -66,6 +66,7 @@ impl ScriptedPlayer for ProfileBackedScript {
         let (mut commands, trace) = CanonicalAiTickDriver::run_prepared_controller(
             &mut self.controller,
             AiThinkContext {
+                match_seed: view.match_seed,
                 start: view.start,
                 snapshot: view.snapshot,
                 alive_player_ids: view.alive_player_ids,
