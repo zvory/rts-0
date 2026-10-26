@@ -1,12 +1,49 @@
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 
-use super::{tile_center_world, tile_index, AiMapAnalysis, AiTile, NEIGHBORS};
+use super::{tile_center_world, tile_distance2, tile_index, AiMapAnalysis, AiTile, NEIGHBORS};
 
 const CARDINAL_COST: u32 = 10;
 const DIAGONAL_COST: u32 = 14;
 
 impl AiMapAnalysis {
+    /// The ground route an attack on `player_id`'s start takes, from the nearest enemy start in.
+    pub(crate) fn base_route_tiles(&self, player_id: u32) -> Option<&[AiTile]> {
+        self.base_routes
+            .iter()
+            .find(|(id, _)| *id == player_id)
+            .map(|(_, route)| route.as_slice())
+    }
+
+    pub(super) fn build_base_routes(&self) -> Vec<(u32, Vec<AiTile>)> {
+        self.starts
+            .iter()
+            .filter_map(|start| {
+                let enemy = self
+                    .starts
+                    .iter()
+                    .filter(|other| other.team_id != start.team_id)
+                    .min_by_key(|other| {
+                        (
+                            tile_distance2(other.start_tile, start.start_tile),
+                            other.player_id,
+                        )
+                    })?;
+                let own = tile_center_world(start.start_tile, self.tile_size);
+                let from = tile_center_world(enemy.start_tile, self.tile_size);
+                let tile_size = self.tile_size.max(1) as f32;
+                let route = self
+                    .compact_group_route(from, own, 1)
+                    .into_iter()
+                    .map(|point| {
+                        AiTile::new((point.0 / tile_size) as u32, (point.1 / tile_size) as u32)
+                    })
+                    .collect::<Vec<_>>();
+                (!route.is_empty()).then_some((start.player_id, route))
+            })
+            .collect()
+    }
+
     /// Returns sparse, passable world-space waypoints for a compact vehicle group.
     /// Two-tile clearance is preferred; narrow one-tile passages remain a fallback.
     pub(crate) fn compact_group_route(
@@ -169,6 +206,147 @@ impl AiMapAnalysis {
         Some(route)
     }
 
+    /// How long walking `route` from `from` takes, in tiles of open ground: a road tile counts for
+    /// less, as units move half again as fast on roads.
+    pub(crate) fn route_travel_tiles(&self, from: (f32, f32), route: &[(f32, f32)]) -> f32 {
+        let tile_size = self.tile_size.max(1) as f32;
+        let mut previous = from;
+        let mut total = 0.0;
+        for point in route {
+            let length = (point.0 - previous.0).hypot(point.1 - previous.1) / tile_size;
+            let (x, y) = (point.0 / tile_size, point.1 / tile_size);
+            let on_road = x >= 0.0
+                && y >= 0.0
+                && tile_index(self.width, self.height, x as u32, y as u32)
+                    .and_then(|idx| self.road.get(idx).copied())
+                    .unwrap_or(false);
+            total += if on_road {
+                length / rts_rules::terrain::ROAD_MOVEMENT_SPEED_MULTIPLIER
+            } else {
+                length
+            };
+            previous = *point;
+        }
+        total
+    }
+
+    /// Whether the straight line from `from` to `to` keeps to passable tiles (sampled every quarter
+    /// tile).
+    pub(crate) fn line_is_open(&self, from: (f32, f32), to: (f32, f32)) -> bool {
+        let ts = self.tile_size.max(1) as f32;
+        let steps = ((to.0 - from.0).hypot(to.1 - from.1) / (0.25 * ts))
+            .ceil()
+            .max(1.0) as usize;
+        (0..=steps).all(|i| {
+            let t = i as f32 / steps as f32;
+            let (x, y) = (from.0 + (to.0 - from.0) * t, from.1 + (to.1 - from.1) * t);
+            x >= 0.0 && y >= 0.0 && self.tile_is_passable((x / ts) as u32, (y / ts) as u32)
+        })
+    }
+
+    /// How many ticks a unit moving `speed` pixels a tick takes to walk `route` from `from`, by the
+    /// sim's movement rules: each tick it covers `speed` times 1.5 with its centre on a road tile,
+    /// times 3/4 on a slow tile, and times 0.8 while the tile up to one tile ahead toward its next
+    /// waypoint stands higher (1.3 lower), using what is left over at a waypoint toward the next.
+    /// Collisions, traffic and vehicles' turning are not counted.
+    pub(crate) fn walk_ticks(&self, from: (f32, f32), route: &[(f32, f32)], speed: f32) -> u32 {
+        const MAX_WALK_TICKS: u32 = 60 * 60 * 30;
+        if speed <= 0.0 {
+            return MAX_WALK_TICKS;
+        }
+        let ts = self.tile_size.max(1) as f32;
+        let index = |point: (f32, f32)| {
+            (point.0 >= 0.0 && point.1 >= 0.0)
+                .then(|| {
+                    tile_index(
+                        self.width,
+                        self.height,
+                        (point.0 / ts) as u32,
+                        (point.1 / ts) as u32,
+                    )
+                })
+                .flatten()
+        };
+        let mut at = from;
+        let mut next = 0;
+        let mut ticks = 0;
+        while next < route.len() && ticks < MAX_WALK_TICKS {
+            let target = route[next];
+            let (dx, dy) = (target.0 - at.0, target.1 - at.1);
+            let length = dx.hypot(dy);
+            if length <= f32::EPSILON {
+                next += 1;
+                continue;
+            }
+            let here = index(at);
+            let reach = length.min(ts) / length;
+            let ahead = index((at.0 + dx * reach, at.1 + dy * reach));
+            let mut multiplier = 1.0;
+            if here
+                .and_then(|idx| self.road.get(idx).copied())
+                .unwrap_or(false)
+            {
+                multiplier *= rts_rules::terrain::ROAD_MOVEMENT_SPEED_MULTIPLIER;
+            }
+            if here
+                .and_then(|idx| self.slow.get(idx).copied())
+                .unwrap_or(false)
+            {
+                multiplier *= rts_rules::terrain::SLOW_MOVEMENT_TILE_SPEED_MULTIPLIER;
+            }
+            let height = |idx: Option<usize>| {
+                idx.and_then(|idx| self.elevation.get(idx).copied())
+                    .unwrap_or(0)
+            };
+            multiplier *= rts_rules::terrain::elevation_movement_speed_multiplier(
+                height(here),
+                height(ahead),
+            );
+            let mut budget = speed * multiplier;
+            ticks += 1;
+            while budget > 0.0 && next < route.len() {
+                let target = route[next];
+                let (dx, dy) = (target.0 - at.0, target.1 - at.1);
+                let length = dx.hypot(dy);
+                if length <= budget {
+                    at = target;
+                    budget -= length;
+                    next += 1;
+                } else {
+                    at = (at.0 + dx / length * budget, at.1 + dy / length * budget);
+                    budget = 0.0;
+                }
+            }
+        }
+        ticks
+    }
+
+    /// The centre of the open tile nearest `point` with at least `minimum_clearance`, searching at
+    /// most `max_radius_tiles` out, in the same ground component as Jeff's units can reach from
+    /// `from`.
+    pub(crate) fn open_ground_near(
+        &self,
+        from: (f32, f32),
+        point: (f32, f32),
+        minimum_clearance: u16,
+        max_radius_tiles: i32,
+    ) -> Option<(f32, f32)> {
+        let start = self.nearest_route_tile(from, 1, None)?;
+        let component =
+            self.component_by_tile[tile_index(self.width, self.height, start.x, start.y)?];
+        let tile = self.nearest_route_tile(point, minimum_clearance, component)?;
+        let tile_size = self.tile_size.max(1) as f32;
+        let wanted = (
+            (point.0 / tile_size).floor() as i32,
+            (point.1 / tile_size).floor() as i32,
+        );
+        ((tile.x as i32 - wanted.0)
+            .abs()
+            .max((tile.y as i32 - wanted.1).abs())
+            <= max_radius_tiles)
+            .then(|| tile_center_world(tile, self.tile_size))
+    }
+
     fn nearest_route_tile(
         &self,
         point: (f32, f32),
@@ -265,12 +443,18 @@ mod tests {
                 terrain_hash: 0,
                 starts_hash: 0,
                 resources_hash: 0,
+                overlays_hash: 0,
             },
             width,
             height,
             tile_size,
             passable,
             line_of_sight_blocked: vec![false; (width * height) as usize],
+            road: vec![false; (width * height) as usize],
+            slow: vec![false; (width * height) as usize],
+            elevation: vec![0; (width * height) as usize],
+            concealment: vec![false; (width * height) as usize],
+            no_entrenchment: vec![false; (width * height) as usize],
             clearance: vec![2; (width * height) as usize],
             component_by_tile,
             components: Vec::new(),
@@ -300,5 +484,22 @@ mod tests {
         assert_eq!(field[(width + 3) as usize], 20);
         assert!((90..u32::MAX).contains(&across), "{across}");
         assert_eq!(field[(width + 4) as usize], u32::MAX);
+
+        // Walking times follow the sim: 2 pixels a tick covers 3 tiles (96 px) in 48 ticks on open
+        // ground, 32 on road, 64 on slow tiles; uphill takes 0.8 of the pace until on the rise.
+        let walk = [(48.0, 16.0), (144.0, 16.0)];
+        assert_eq!(analysis.walk_ticks(walk[0], &walk[1..], 2.0), 48);
+        let mut road = analysis.clone();
+        road.road = vec![true; (width * height) as usize];
+        assert_eq!(road.walk_ticks(walk[0], &walk[1..], 2.0), 32);
+        let mut slow = analysis.clone();
+        slow.slow = vec![true; (width * height) as usize];
+        assert_eq!(slow.walk_ticks(walk[0], &walk[1..], 2.0), 64);
+        let mut hill = analysis.clone();
+        hill.elevation = (0..width * height)
+            .map(|i| u8::from(i % width >= 3))
+            .collect();
+        let uphill = hill.walk_ticks(walk[0], &walk[1..], 2.0);
+        assert!((49..60).contains(&uphill), "{uphill}");
     }
 }

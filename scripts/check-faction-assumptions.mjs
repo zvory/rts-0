@@ -204,6 +204,9 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/ai/src/ai_core/decision/defense/incident.rs",
   // Jeff's route picket and warned sealing is a further focused defense module.
   "server/crates/ai/src/ai_core/decision/defense/route_line.rs",
+  // Jeff's raid response, sentries and outranged-infantry rule weigh current-roster Riflemen,
+  // Machine Gunners and Tanks; profile/catalog layers still own faction admission.
+  "server/crates/ai/src/ai_core/decision/defense/raid.rs",
   "server/crates/ai/src/ai_core/decision/expansion.rs",
   // Jeff's Kriegsia-only home Tank post, later bases, Tank Trap clearing and Crossroads placement
   // policies are focused modules beneath the approved decision controller; profile/catalog layers
@@ -212,6 +215,30 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/ai/src/ai_core/decision/jeff.rs",
   "server/crates/ai/src/ai_core/decision/later_bases.rs",
   "server/crates/ai/src/ai_core/decision/obstacles.rs",
+  // Jeff's opening rush sends its starting Kriegsia Riflemen out and reads enemy Rifleman and
+  // Machine Gunner speed; profile/catalog layers still own faction admission.
+  "server/crates/ai/src/ai_core/decision/opening_rush.rs",
+  // Jeff's Tank micro remembers enemy Kriegsia Tanks, keeps Tanks out of their reach, and smokes
+  // assaults with the Scout Car; profile/catalog layers still own faction admission.
+  "server/crates/ai/src/ai_core/decision/tank_micro.rs",
+  "server/crates/ai/src/ai_core/decision/tank_micro/engage.rs",
+  "server/crates/ai/src/ai_core/decision/tank_micro/scout_lead.rs",
+  "server/crates/ai/src/ai_core/decision/tank_micro/smoke_assault.rs",
+  "server/crates/ai/src/ai_core/decision/trap_breach.rs",
+  // Jeff's raid on the enemy third base picks current-roster Tanks and Riflemen, times their walks
+  // against a Scout Car's, and aims at Workers and the Depot; profile/catalog layers still own
+  // faction admission.
+  "server/crates/ai/src/ai_core/decision/third_pressure.rs",
+  "server/crates/ai/src/ai_core/decision/third_pressure/locate.rs",
+  "server/crates/ai/src/ai_core/decision/third_pressure/scout.rs",
+  "server/crates/ai/src/ai_core/decision/third_pressure/targets.rs",
+  "server/crates/ai/src/ai_core/decision/third_pressure/timing.rs",
+  // Jeff's production placement names the current roster's production buildings and Tanks;
+  // profile/catalog layers still own faction admission.
+  "server/crates/ai/src/ai_core/decision/production/placement.rs",
+  // Jeff's spend plan forecasts current-roster extractor income and prices the natural Depot,
+  // Factory, Tank Unlock and Tank; profile/catalog layers still own faction admission.
+  "server/crates/ai/src/ai_core/decision/spend_plan.rs",
   // Unit priority and cap adjustments moved verbatim out of the approved decision orchestrator.
   "server/crates/ai/src/ai_core/decision/unit_mix.rs",
   // Jeff's Kriegsia-only expansion screen and upgrade policy are focused modules beneath the
@@ -250,6 +277,11 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/ai/src/ai_core/profiles/turtle.rs",
   "server/crates/ai/src/ai_core/facts.rs",
   "server/crates/ai/src/ai_core/observation.rs",
+  // The rifle squad micro planner (trained by the ai-skirmish harness) controls Kriegsia
+  // Riflemen and ranks enemy workers last; profile/catalog layers still own faction admission.
+  "server/crates/ai/src/ai_core/squad_micro/mod.rs",
+  // The ai-tank-lab harness spawns Kriegsia Tanks, Scout Cars, and Tank tech for Tank micro fights.
+  "server/crates/ai/src/tools/tank_lab.rs",
   "server/crates/ai/src/ai_core/profiles.rs",
   // Kriegsia-only AI resource scanner; non-Kriegsia AI remains unsupported by public lobby flow.
   "server/crates/ai/src/ai_core/resource_availability.rs",

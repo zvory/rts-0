@@ -851,6 +851,44 @@ pub(crate) fn clear_obstacle_area(
     Some(units)
 }
 
+/// Orders `building` before its cost is banked: the simulation charges a building when its foundation
+/// goes down, and a builder that arrives short of the money waits at the site. What the budget has
+/// of the cost is held back for the rest of the decision. With `approach` the builder walks there
+/// first.
+pub(crate) fn try_build_at_on_credit(
+    ctx: &mut AiActionContext<'_>,
+    worker_pools: &[&[u32]],
+    building: EntityKind,
+    tile_x: u32,
+    tile_y: u32,
+    approach: Option<(f32, f32)>,
+) -> Option<BuildAction> {
+    let worker = ctx.reserve_worker_from_pools(worker_pools)?;
+    let (steel, oil) = rts_rules::economy::cost(building);
+    ctx.budget.holdback_resources(steel, oil);
+    if let Some((x, y)) = approach {
+        ctx.emit_action(AiActionRequest::Move {
+            units: vec![worker],
+            x,
+            y,
+            queued: false,
+        });
+    }
+    ctx.emit_action(AiActionRequest::Build {
+        units: vec![worker],
+        building,
+        tile_x,
+        tile_y,
+        queued: approach.is_some(),
+    });
+    Some(BuildAction {
+        worker,
+        building,
+        tile_x,
+        tile_y,
+    })
+}
+
 pub(crate) fn try_move_then_build_at(
     ctx: &mut AiActionContext<'_>,
     worker_pools: &[&[u32]],

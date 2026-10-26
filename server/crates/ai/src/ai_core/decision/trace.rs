@@ -99,6 +99,10 @@ pub(crate) struct ManagerOutputTrace {
     pub(crate) commands: Vec<String>,
     pub(crate) budget: BudgetTrace,
     pub(crate) reservations: ReservationTrace,
+    /// Decisions the live Jeff's Tank micro took after the other systems issued their orders.
+    pub(crate) notes: Vec<String>,
+    /// The live Jeff's spend plan: income expected and its steps' planned ticks.
+    pub(crate) plan: Option<String>,
 }
 
 impl ManagerOutputTrace {
@@ -118,6 +122,8 @@ impl ManagerOutputTrace {
             self.reservations.resource_nodes,
             self.reservations.production_buildings
         ));
+        // Second, so the line cap never drops it.
+        lines.extend(self.plan.clone());
         for goal in &self.goals {
             let blockers = format_blockers(&goal.blockers);
             let intents = if goal.intents.is_empty() {
@@ -132,6 +138,9 @@ impl ManagerOutputTrace {
         }
         for command in &self.commands {
             lines.push(format!("command={command}"));
+        }
+        for note in &self.notes {
+            lines.push(format!("tank_micro {note}"));
         }
         lines
     }
@@ -183,6 +192,8 @@ pub(super) fn build_manager_trace(input: TraceInput<'_>) -> ManagerOutputTrace {
         commands: input.command_trace.to_vec(),
         budget: BudgetTrace::new(input.start_budget, input.end_budget),
         reservations: input.reservations.into(),
+        notes: Vec::new(),
+        plan: None,
     }
 }
 
