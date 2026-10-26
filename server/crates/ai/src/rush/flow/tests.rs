@@ -320,7 +320,7 @@ fn extractor(snapshot: &mut Snapshot, id: u32, kind: &str, x: f32, y: f32) {
 }
 
 #[test]
-fn safe_pump_jack_takes_priority_over_a_closer_steel_mine() {
+fn safe_pump_jack_is_raided_but_a_steel_mine_is_not() {
     let (start, mut snapshot) = fixture();
     snapshot.entities.retain(|e| e.owner == 1);
     snapshot.entities[0].x = 20.5 * 32.0;
@@ -341,21 +341,22 @@ fn safe_pump_jack_takes_priority_over_a_closer_steel_mine() {
     snapshot.tick += 9;
     assert!(matches!(
         step(&mut flow, &start, &snapshot).as_slice(),
-        [AiActionRequest::Attack { target: 300, .. }]
+        [AiActionRequest::AttackMove { .. }]
     ));
 }
 
 #[test]
-fn protected_pump_is_skipped_for_a_safe_steel_mine() {
+fn protected_pump_means_fight_even_with_a_safe_steel_mine() {
     let (start, mut snapshot) = fixture();
-    snapshot.entities[1].x = 30.5 * 32.0;
+    snapshot.entities[0].x = 20.5 * 32.0;
+    snapshot.entities[1].x = 24.5 * 32.0;
     snapshot.entities[1].kind = "tank".into();
-    extractor(&mut snapshot, 300, "pump_jack", 30.5, 16.5);
+    extractor(&mut snapshot, 300, "pump_jack", 24.5, 16.5);
     extractor(&mut snapshot, 301, "steel_mine", 10.5, 16.5);
     let mut flow = RushFlow::default();
     assert!(matches!(
         step(&mut flow, &start, &snapshot).as_slice(),
-        [AiActionRequest::Attack { target: 301, .. }]
+        [AiActionRequest::Attack { target: 200, .. }]
     ));
 }
 
@@ -465,7 +466,7 @@ fn destroyed_extractor_retargets_every_unit_of_the_same_range_immediately() {
     let mut second = snapshot.entities[0].clone();
     second.id = 101;
     snapshot.entities.push(second);
-    extractor(&mut snapshot, 300, "steel_mine", 21.5, 16.5);
+    extractor(&mut snapshot, 300, "pump_jack", 27.5, 16.5);
     extractor(&mut snapshot, 301, "pump_jack", 24.5, 16.5);
     let run = |flow: &mut RushFlow, snapshot: &Snapshot| {
         let frame = frame_for(&start, snapshot);
@@ -479,7 +480,11 @@ fn destroyed_extractor_retargets_every_unit_of_the_same_range_immediately() {
         actions.into_requests()
     };
     let mut flow = RushFlow::default();
-    assert_eq!(run(&mut flow, &snapshot).len(), 2);
+    let first = run(&mut flow, &snapshot);
+    assert_eq!(first.len(), 2);
+    assert!(first
+        .iter()
+        .all(|a| matches!(a, AiActionRequest::Attack { target: 301, .. })));
     snapshot.entities.retain(|e| e.id != 301);
     for e in snapshot.entities.iter_mut().filter(|e| e.owner == 1) {
         e.state = "attack".into();
@@ -490,11 +495,11 @@ fn destroyed_extractor_retargets_every_unit_of_the_same_range_immediately() {
     assert_eq!(retargets.len(), 2);
     assert!(retargets
         .iter()
-        .all(|a| matches!(a, AiActionRequest::Attack { target: 300, .. })));
+        .all(|a| matches!(a, AiActionRequest::Move { .. })));
 }
 
 #[test]
-fn unreachable_safe_pump_does_not_hide_a_reachable_guarded_mine() {
+fn unreachable_safe_pump_does_not_hide_a_reachable_guarded_pump() {
     let mut grid = grid(
         48,
         32,
@@ -516,7 +521,7 @@ fn unreachable_safe_pump_does_not_hide_a_reachable_guarded_mine() {
         },
         Objective {
             id: 301,
-            kind: EntityKind::SteelMine,
+            kind: EntityKind::PumpJack,
             position: (8.5 * 32.0, 16.5 * 32.0),
             visible: true,
         },
@@ -527,4 +532,18 @@ fn unreachable_safe_pump_does_not_hide_a_reachable_guarded_mine() {
     assert_eq!(grid.escape[cell], UNREACHABLE);
     assert_ne!(grid.soft[cell], UNREACHABLE);
     assert_eq!(grid.input.objectives[grid.soft[cell].3].id, 301);
+}
+
+#[test]
+fn only_steel_mines_remain_so_engaged_units_fight_defenders() {
+    let (start, mut snapshot) = fixture();
+    snapshot.entities[0].x = 20.5 * 32.0;
+    snapshot.entities[0].state = "attack".into();
+    snapshot.entities[0].target_id = Some(300);
+    extractor(&mut snapshot, 300, "steel_mine", 21.5, 16.5);
+    let mut flow = RushFlow::default();
+    assert!(matches!(
+        step(&mut flow, &start, &snapshot).as_slice(),
+        [AiActionRequest::Attack { target: 200, .. }]
+    ));
 }

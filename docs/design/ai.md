@@ -224,13 +224,14 @@ staging, and later production gathers into a fresh cohort.
 reserving its eventual cost. Unlike the affordable `research` helper, it permits construction-
 time/unpaid queues; authoritative simulation validation and payment still apply.
 
-Launched Rush infantry raid known enemy extractors. The flow seeds reachable firing positions
-around recipient-visible or remembered Pump Jacks and Steel Mines, prioritizing any safely
-reachable Pump Jack over Steel Mines, then choosing the shorter safe route within that priority.
+Launched Rush infantry raid known enemy Pump Jacks. The flow seeds reachable firing positions
+around recipient-visible or remembered Pump Jacks, choosing the shorter safe route. Steel Mines
+are not raid objectives. If no safely reachable Pump Jack remains, units fight defenders rather
+than diverting toward Steel Mines; there is no persistent camping or respawn suppression order.
 Each weapon range uses its own shared field; the AI accounts for the extractor footprint and keeps
 a firing-distance margin. Visible extractors receive ordinary explicit Attack commands only from
 a clear, in-range firing position. Remembered extractors are scouting destinations, never direct
-attack targets. With no known extractors, the enemy start remains the exploration objective.
+attack targets. With no known Pump Jacks, the enemy start remains the combat/exploration objective.
 
 Observed armed enemy combat units contribute circular exclusion zones using public base range
 and nominal DPS, plus the range bonus for visible trench occupation. Hidden upgrades are not

@@ -1,4 +1,4 @@
-//! Extractor raids and least-exposure combat routes from fog-filtered observations.
+//! Pump Jack raids and least-exposure combat routes from fog-filtered observations.
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet, BinaryHeap};
 
@@ -125,15 +125,25 @@ impl RushFlow {
                 continue;
             };
             let mut intent = grid.intent(entity).unwrap_or(Intent::AttackMove(target));
-            if let Intent::AttackMove(point) = intent {
-                if !grid.input.objectives.is_empty()
-                    && grid
+            match intent {
+                Intent::Move(point) | Intent::AttackMove(point)
+                    if grid.input.objectives.is_empty() =>
+                {
+                    // No Pump Jack raid remains: engage reachable defenders instead of
+                    // retaining an old building target, while preserving route fallbacks.
+                    if let attack @ Intent::Attack(_) = grid.fight_intent(frame, entity, point) {
+                        intent = attack;
+                    }
+                }
+                Intent::AttackMove(point)
+                    if grid
                         .input
                         .cell(entity.position)
-                        .is_some_and(|cell| grid.safe[cell] == UNREACHABLE)
+                        .is_some_and(|cell| grid.safe[cell] == UNREACHABLE) =>
                 {
                     intent = grid.fight_intent(frame, entity, point);
                 }
+                _ => {}
             }
             let prior = self.orders.get(&entity.id);
             let due = prior.is_none_or(|(tick, previous)| {
@@ -194,7 +204,7 @@ struct Objective {
 fn objectives(frame: &AiFrame) -> Vec<Objective> {
     let mut known = BTreeMap::new();
     for contact in frame.remembered_contacts() {
-        if matches!(contact.kind, EntityKind::PumpJack | EntityKind::SteelMine) {
+        if contact.kind == EntityKind::PumpJack {
             known.insert(
                 contact.id,
                 Objective {
@@ -207,9 +217,7 @@ fn objectives(frame: &AiFrame) -> Vec<Objective> {
         }
     }
     for entity in frame.visible_enemies() {
-        if matches!(entity.kind, EntityKind::PumpJack | EntityKind::SteelMine)
-            && entity.health.current > 0
-        {
+        if entity.kind == EntityKind::PumpJack && entity.health.current > 0 {
             known.insert(
                 entity.id,
                 Objective {
