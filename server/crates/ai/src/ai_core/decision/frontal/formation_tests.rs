@@ -94,6 +94,7 @@ fn issue_test_containment(
         true,
         // Formation mechanics are tested on a fixed two-Tank push, not the sized one.
         false,
+        false,
         None,
         memory,
     );
@@ -369,6 +370,7 @@ fn containment_timeout_allows_minor_screen_pathing_slop() {
         &formation,
         (8.5 * 32.0, 8.5 * 32.0),
         (56.5 * 32.0, 48.5 * 32.0),
+        MarchShape::LEGACY,
     ));
 }
 
@@ -474,7 +476,12 @@ fn containment_detects_a_tank_that_has_run_ahead() {
         100,
     );
 
-    assert!(!tank_group_is_cohesive(&observation, &[1, 2], (1.0, 0.0)));
+    assert!(!tank_group_is_cohesive(
+        &observation,
+        &[1, 2],
+        (1.0, 0.0),
+        MarchShape::LEGACY
+    ));
 }
 
 #[test]
@@ -537,4 +544,29 @@ fn containment_orders_only_the_rear_tank_forward_to_catch_up() {
     assert!(!commands
         .iter()
         .any(|command| { matches!(command, Command::AttackMove { units, .. } if units == &[2]) }));
+}
+
+#[test]
+fn a_reforming_push_leaves_the_raiding_partys_units_alone() {
+    // One of the raid's Tanks (3) stands nearest the rally point.
+    let tile = 32.0;
+    let observation = test_observation(
+        vec![
+            test_entity(1, EntityKind::Tank, 20.0 * tile, 18.0 * tile),
+            test_entity(2, EntityKind::Tank, 21.0 * tile, 18.0 * tile),
+            test_entity(4, EntityKind::Tank, 22.0 * tile, 18.0 * tile),
+            test_entity(3, EntityKind::Tank, 15.0 * tile, 14.0 * tile),
+            test_entity(30, EntityKind::ScoutCar, 25.0 * tile, 20.0 * tile),
+        ],
+        9_000,
+    );
+    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+    memory.containment.wave_launched = true;
+    memory.containment.recovery_active = true;
+    memory.third_pressure =
+        crate::ai_core::decision::third_pressure::ThirdPressure::out_with(vec![3], Vec::new());
+    issue_test_containment(&observation, &mut memory);
+    assert_eq!(memory.containment.active_scout, Some(30));
+    assert!(!memory.containment.active_tanks.contains(&3));
+    assert!(memory.containment.active_tanks.contains(&1));
 }

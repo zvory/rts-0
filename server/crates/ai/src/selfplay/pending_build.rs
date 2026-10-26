@@ -162,6 +162,13 @@ impl PendingBuildTracker {
         }
     }
 
+    /// Stops excluding `tile` for `kind` after a dropped order there.
+    pub(crate) fn forget_failed(&mut self, kind: EntityKind, tile: (u32, u32)) {
+        if let Some(spots) = self.failed_spots.get_mut(&kind) {
+            spots.remove(&tile);
+        }
+    }
+
     pub(crate) fn failed(&self, kind: EntityKind, tile_x: u32, tile_y: u32) -> bool {
         self.failed_spots
             .get(&kind)
@@ -182,5 +189,23 @@ impl PendingBuildTracker {
             }
         }
         exclusions
+    }
+}
+
+#[cfg(test)]
+mod forget_tests {
+    use super::*;
+
+    #[test]
+    fn a_forgotten_failure_no_longer_marks_its_site() {
+        let mut tracker = PendingBuildTracker::default();
+        tracker
+            .failed_spots
+            .entry(EntityKind::ResourceDepot)
+            .or_default()
+            .extend([(108, 93), (40, 40)]);
+        tracker.forget_failed(EntityKind::ResourceDepot, (108, 93));
+        assert!(!tracker.failed(EntityKind::ResourceDepot, 108, 93));
+        assert!(tracker.failed(EntityKind::ResourceDepot, 40, 40));
     }
 }

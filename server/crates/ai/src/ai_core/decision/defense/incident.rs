@@ -20,7 +20,8 @@ const BUILDINGS_UNDER_FIRE_TICKS: u32 = config::TICK_HZ * 4;
 
 /// `stationary_tanks` keeps defending Tanks parked for their stationary range bonus and sends
 /// infantry forward to provide the vision for those long shots, instead of ordering the Tanks to
-/// attack (which drives them to the 5-tile base range).
+/// attack (which drives them to the 5-tile base range). `raid_defense` (the live Jeff) answers
+/// raids without Tanks away from the dug-in line with `super::raid` instead.
 pub(in crate::ai_core::decision) fn respond_to_local_incident(
     actions: &mut AiActionContext<'_>,
     observation: &AiObservation,
@@ -28,12 +29,26 @@ pub(in crate::ai_core::decision) fn respond_to_local_incident(
     local_defenders: &[u32],
     map_analysis: Option<&AiMapAnalysis>,
     stationary_tanks: bool,
+    profile_id: &str,
 ) -> Option<Vec<u32>> {
     let damaged_building = stationary_tanks
         .then(|| note_building_damage(observation, memory))
         .flatten();
     if damaged_building.is_some() {
         memory.local_defense_building_hit_tick = Some(observation.tick);
+    }
+    if runs_live_jeff(profile_id) {
+        if let super::raid::RaidAnswer::Handled(units) = super::raid::respond(
+            actions,
+            observation,
+            memory,
+            local_defenders,
+            map_analysis,
+            true,
+        ) {
+            memory.clear_defensive_incident();
+            return (!units.is_empty()).then_some(units);
+        }
     }
     let buildings_under_fire = stationary_tanks
         && memory

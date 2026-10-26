@@ -1,7 +1,7 @@
 use super::*;
-use crate::ai_core::profiles::JEFFS_AI;
+use crate::ai_core::profiles::{JEFFS_AI, JEFFS_AI_PRE_EARLY_NATURAL, JEFFS_AI_PRE_TANK_MICRO};
 
-fn security_observation() -> AiObservation {
+pub(super) fn security_observation() -> AiObservation {
     let ts = config::TILE_SIZE as f32;
     let mut units = vec![
         worker(1, AiEntityState::Idle),
@@ -300,7 +300,13 @@ fn expansion_security_requires_arrival_and_uncontested_dwell() {
     let step = |obs: &AiObservation, memory: &mut AiDecisionMemory| {
         let facts = AiFacts::from_observation(obs);
         let mut actions = AiActionContext::new(&facts, SpendBudget::new(1000, 1000, 20, 80));
-        expansion_security::update_and_stage(obs, None, memory, &mut actions)
+        expansion_security::update_and_stage(
+            obs,
+            None,
+            memory,
+            &mut actions,
+            JEFFS_AI_PRE_TANK_MICRO_ID,
+        )
     };
     assert!(!step(&obs, &mut memory));
     for (index, id) in memory.expansion_security.riflemen.iter().enumerate() {
@@ -361,7 +367,13 @@ fn guards_stuck_just_short_of_their_posts_secure_the_site_after_a_longer_dwell()
     let step = |obs: &AiObservation, memory: &mut AiDecisionMemory| {
         let facts = AiFacts::from_observation(obs);
         let mut actions = AiActionContext::new(&facts, SpendBudget::new(1000, 1000, 20, 80));
-        expansion_security::update_and_stage(obs, None, memory, &mut actions)
+        expansion_security::update_and_stage(
+            obs,
+            None,
+            memory,
+            &mut actions,
+            JEFFS_AI_PRE_TANK_MICRO_ID,
+        )
     };
     // Each guard stands a tile short of its post, as one pressed against steel patches does.
     let site = memory.expansion_security.site.unwrap();
@@ -405,14 +417,22 @@ fn guards_stuck_just_short_of_their_posts_secure_the_site_after_a_longer_dwell()
     assert!(!step(&obs, &mut memory));
 }
 
+/// The guards on a contested natural are left to local defense: the frozen Jeff sends them at the
+/// raider, and the live Jeff's raid response takes them in.
 #[test]
 fn contested_expansion_guards_are_available_to_local_defense() {
+    for profile in [&JEFFS_AI_PRE_TANK_MICRO, &JEFFS_AI] {
+        contested_expansion_guards_answer_the_raid(profile);
+    }
+}
+
+fn contested_expansion_guards_answer_the_raid(profile: &'static AiProfile) {
     let mut obs = security_observation();
-    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
+    let mut memory = AiDecisionMemory::for_profile(profile);
     expansion_security::prepare(
         &obs,
         &AiFacts::from_observation(&obs),
-        &JEFFS_AI,
+        profile,
         &mut memory,
         None,
         &mut |_, _, _| true,
@@ -436,7 +456,20 @@ fn contested_expansion_guards_are_available_to_local_defense() {
     enemy.owner = 2;
     obs.visible_enemies.push(enemy);
 
-    let decision = decide(&obs, &JEFFS_AI, &mut memory);
+    let decision = decide(&obs, profile, &mut memory);
+    if profile.id == JEFFS_AI_ID {
+        let answering: BTreeSet<u32> = memory.raid_defense.reserved().collect();
+        assert!(
+            memory
+                .expansion_security
+                .riflemen
+                .iter()
+                .all(|id| answering.contains(id)),
+            "{:?}",
+            decision.commands
+        );
+        return;
+    }
     assert!(decision.commands.iter().any(|command| matches!(
         command,
         Command::Attack { units, target, .. }
@@ -494,7 +527,52 @@ fn expansion_security_does_not_start_before_first_tank_commitment() {
     assert!(!expansion_security::expansion_is_next(
         &obs,
         &AiFacts::from_observation(&obs),
-        &JEFFS_AI
+        &JEFFS_AI_PRE_EARLY_NATURAL
+    ));
+}
+
+#[test]
+fn the_live_jeffs_natural_is_due_once_its_engineering_complex_and_opening_guns_are_out() {
+    let ts = config::TILE_SIZE as f32;
+    let mut obs = security_observation();
+    let due = |obs: &AiObservation| {
+        expansion_security::expansion_is_next(obs, &AiFacts::from_observation(obs), &JEFFS_AI)
+    };
+    // A Factory already out keeps it due, Tank or not.
+    obs.owned
+        .iter_mut()
+        .find(|unit| unit.kind == EntityKind::Factory)
+        .unwrap()
+        .production_kind = None;
+    assert!(due(&obs));
+    // Before the Factory: the Engineering Complex stands, but only two of the four guns are out.
+    obs.owned.retain(|unit| unit.kind != EntityKind::Factory);
+    assert!(!due(&obs));
+    // The other two guns queued at the Barracks: due.
+    let barracks = obs
+        .owned
+        .iter_mut()
+        .find(|unit| unit.kind == EntityKind::Barracks)
+        .unwrap();
+    barracks.production_kind = Some(EntityKind::MachineGunner);
+    barracks.production_queue_len = Some(2);
+    assert!(due(&obs));
+    // Without the Engineering Complex it is not.
+    obs.owned
+        .retain(|unit| unit.kind != EntityKind::EngineeringComplex);
+    assert!(!due(&obs));
+    // The freeze still waits for the Factory and first Tank.
+    obs.owned.push(building_at(
+        5,
+        EntityKind::EngineeringComplex,
+        Some(0),
+        4.0 * ts,
+        4.0 * ts,
+    ));
+    assert!(!expansion_security::expansion_is_next(
+        &obs,
+        &AiFacts::from_observation(&obs),
+        &JEFFS_AI_PRE_EARLY_NATURAL
     ));
 }
 
@@ -867,9 +945,21 @@ fn surplus_tank_moves_forward_while_reserved_tank_stays_home() {
         .push(combat_at(51, EntityKind::Tank, 10.0 * ts, 10.0 * ts));
     obs.owned
         .push(combat_at(52, EntityKind::Tank, 11.0 * ts, 10.0 * ts));
+    // A push of two Tanks and a Scout Car is out on the map.
+    for (id, kind) in [
+        (53, EntityKind::Tank),
+        (54, EntityKind::Tank),
+        (55, EntityKind::ScoutCar),
+    ] {
+        obs.owned
+            .push(combat_at(id, kind, (40 + id) as f32 * ts, 40.0 * ts));
+    }
     let target = expansion_security::tank_staging_center(&obs, None).unwrap();
     let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
     memory.containment.wave_launched = true;
+    memory.containment.active_tanks = [53, 54].into_iter().collect();
+    memory.containment.active_scout = Some(55);
+    memory.containment.launch_tanks = 2;
     memory.home_defensive_tank = Some(51);
     memory.home_defensive_tank_assigned_once = true;
 
@@ -1010,122 +1100,4 @@ fn expansion_security_live_opening_reaches_second_base() {
             );
         }
     }
-}
-
-/// Secure the natural in the standard fixture and return it with the site.
-fn secured_natural() -> (AiObservation, AiDecisionMemory, (u32, u32)) {
-    let obs = security_observation();
-    let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI);
-    expansion_security::prepare(
-        &obs,
-        &AiFacts::from_observation(&obs),
-        &JEFFS_AI,
-        &mut memory,
-        None,
-        &mut |_, _, _| true,
-    );
-    let site = memory.expansion_security.site.expect("natural site");
-    (obs, memory, site)
-}
-
-#[test]
-fn the_natural_is_only_ordered_with_its_full_cost_banked_and_a_quiet_route() {
-    let (mut obs, memory, site) = secured_natural();
-    let ready =
-        |obs: &AiObservation| expansion_security::natural_attempt_ready(obs, None, &memory, true);
-    obs.economy.steel = 450;
-    obs.economy.oil = 99;
-    assert!(!ready(&obs), "one Oil short");
-    obs.economy.oil = 100;
-    assert!(ready(&obs));
-    assert!(
-        !expansion_security::natural_attempt_ready(&obs, None, &memory, false),
-        "unsecured"
-    );
-
-    // An enemy next to the builder keeps it home.
-    let builder = obs
-        .owned
-        .iter()
-        .find(|unit| unit.kind == EntityKind::Worker)
-        .unwrap();
-    let mut raider = combat_at(900, EntityKind::Rifleman, builder.x + 64.0, builder.y);
-    raider.owner = 2;
-    obs.visible_enemies.push(raider);
-    assert!(!ready(&obs));
-
-    // So does an order already on its way to the site.
-    obs.visible_enemies.clear();
-    obs.pending_builds = vec![crate::ai_core::observation::AiBuildIntent::to_site(
-        1,
-        EntityKind::ResourceDepot,
-        site.0,
-        site.1,
-    )];
-    assert!(!ready(&obs));
-}
-
-#[test]
-fn a_dropped_natural_order_waits_out_the_cooldown_before_the_next_try() {
-    let (mut obs, mut memory, site) = secured_natural();
-    obs.economy.steel = 1000;
-    obs.economy.oil = 1000;
-    memory.expansion_security.note_build_attempt(obs.tick, 1);
-    obs.tick += config::TICK_HZ * 4;
-    expansion_security::prepare(
-        &obs,
-        &AiFacts::from_observation(&obs),
-        &JEFFS_AI,
-        &mut memory,
-        None,
-        &mut |_, _, _| true,
-    );
-    assert_eq!(
-        memory.expansion_security.site,
-        Some(site),
-        "kept after one drop"
-    );
-    assert!(!expansion_security::natural_attempt_ready(
-        &obs, None, &memory, true
-    ));
-    obs.tick += config::TICK_HZ * 20;
-    assert!(expansion_security::natural_attempt_ready(
-        &obs, None, &memory, true
-    ));
-}
-
-#[test]
-fn a_pending_natural_order_keeps_its_oil_from_the_next_tank() {
-    let (mut obs, mut memory, site) = secured_natural();
-    // Start the natural's bounded reserve, then let it expire, so only the pending order can be
-    // what holds the Depot's cost back.
-    decide(&obs, &JEFFS_AI, &mut memory);
-    obs.tick += config::TICK_HZ * 61;
-    let factory = obs
-        .owned
-        .iter_mut()
-        .find(|unit| unit.kind == EntityKind::Factory)
-        .unwrap();
-    factory.production_kind = None;
-    factory.production_queue_len = Some(0);
-    // Enough for a Tank (425/175), but not once the Depot's 450/100 is set aside.
-    obs.economy.steel = 700;
-    obs.economy.oil = 250;
-    let tank = AiIntent::Train {
-        kind: EntityKind::Tank,
-    };
-    let mut control = memory.clone();
-    assert!(
-        decide(&obs, &JEFFS_AI, &mut control)
-            .intents
-            .contains(&tank),
-        "with nothing pending the Tank is trained"
-    );
-    obs.pending_builds = vec![crate::ai_core::observation::AiBuildIntent::to_site(
-        1,
-        EntityKind::ResourceDepot,
-        site.0,
-        site.1,
-    )];
-    assert!(!decide(&obs, &JEFFS_AI, &mut memory).intents.contains(&tank));
 }

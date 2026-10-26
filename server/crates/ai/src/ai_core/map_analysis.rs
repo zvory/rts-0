@@ -13,9 +13,11 @@ use rts_sim::protocol::{kinds, MapInfo, PlayerStart, ResourceNode, StartPayload}
 
 mod base_sites;
 mod chokes;
+mod overlays;
 mod regions;
 mod routes;
 use chokes::build_chokes;
+use overlays::{hash_overlays, overlay_grid};
 use regions::{build_regions, nearest_region, region_id_for_tile};
 
 const MAX_CLEARANCE_TILES: u16 = 16;
@@ -59,6 +61,7 @@ pub(crate) struct AiMapAnalysisKey {
     pub(crate) terrain_hash: u64,
     pub(crate) starts_hash: u64,
     pub(crate) resources_hash: u64,
+    pub(crate) overlays_hash: u64,
 }
 
 impl AiMapAnalysisKey {
@@ -70,6 +73,7 @@ impl AiMapAnalysisKey {
             terrain_hash: fnv_bytes(FNV_OFFSET_BASIS, &start.map.terrain),
             starts_hash: hash_player_starts(&start.players),
             resources_hash: hash_resources(&start.map.resources),
+            overlays_hash: hash_overlays(&start.map),
         }
     }
 }
@@ -190,6 +194,14 @@ pub(crate) struct AiMapAnalysis {
     tile_size: u32,
     passable: Vec<bool>,
     line_of_sight_blocked: Vec<bool>,
+    /// Road tiles, where units move faster.
+    road: Vec<bool>,
+    /// Authored slow-movement tiles and each tile's elevation, for travel times.
+    slow: Vec<bool>,
+    elevation: Vec<u8>,
+    /// Forest (concealment) and authored no-entrenchment tiles, read through `overlays`.
+    concealment: Vec<bool>,
+    no_entrenchment: Vec<bool>,
     clearance: Vec<u16>,
     component_by_tile: Vec<Option<u32>>,
     components: Vec<AiMapComponent>,
@@ -317,6 +329,19 @@ impl AiMapAnalysis {
             .copied()
             .map(rts_rules::terrain::blocks_line_of_sight)
             .collect();
+        let road = start
+            .map
+            .terrain
+            .iter()
+            .map(|code| {
+                rts_rules::terrain::TerrainKind::from_map_code(*code)
+                    == Some(rts_rules::terrain::TerrainKind::Road)
+            })
+            .collect();
+        let slow = overlay_grid(width, height, &start.map.slow_movement_tiles);
+        let elevation = start.map.elevation.clone();
+        let concealment = overlay_grid(width, height, &start.map.concealment_tiles);
+        let no_entrenchment = overlay_grid(width, height, &start.map.no_entrenchment_tiles);
         let clearance = build_clearance(width, height, &passable);
         let (component_by_tile, components) =
             build_components(width, height, &passable, &clearance);
@@ -355,6 +380,11 @@ impl AiMapAnalysis {
             tile_size,
             passable,
             line_of_sight_blocked,
+            road,
+            slow,
+            elevation,
+            concealment,
+            no_entrenchment,
             clearance,
             component_by_tile,
             components,
@@ -418,43 +448,6 @@ impl AiMapAnalysis {
         (distance != u32::MAX).then(|| distance as f32 / 10.0)
     }
 
-    /// The ground route an attack on `player_id`'s start takes, from the nearest enemy start in.
-    pub(crate) fn base_route_tiles(&self, player_id: u32) -> Option<&[AiTile]> {
-        self.base_routes
-            .iter()
-            .find(|(id, _)| *id == player_id)
-            .map(|(_, route)| route.as_slice())
-    }
-
-    fn build_base_routes(&self) -> Vec<(u32, Vec<AiTile>)> {
-        self.starts
-            .iter()
-            .filter_map(|start| {
-                let enemy = self
-                    .starts
-                    .iter()
-                    .filter(|other| other.team_id != start.team_id)
-                    .min_by_key(|other| {
-                        (
-                            tile_distance2(other.start_tile, start.start_tile),
-                            other.player_id,
-                        )
-                    })?;
-                let own = tile_center_world(start.start_tile, self.tile_size);
-                let from = tile_center_world(enemy.start_tile, self.tile_size);
-                let tile_size = self.tile_size.max(1) as f32;
-                let route = self
-                    .compact_group_route(from, own, 1)
-                    .into_iter()
-                    .map(|point| {
-                        AiTile::new((point.0 / tile_size) as u32, (point.1 / tile_size) as u32)
-                    })
-                    .collect::<Vec<_>>();
-                (!route.is_empty()).then_some((start.player_id, route))
-            })
-            .collect()
-    }
-
     #[allow(dead_code)]
     pub(crate) fn key(&self) -> AiMapAnalysisKey {
         self.key
@@ -475,6 +468,13 @@ impl AiMapAnalysis {
     pub(crate) fn tile_is_passable(&self, x: u32, y: u32) -> bool {
         tile_index(self.width, self.height, x, y)
             .and_then(|idx| self.passable.get(idx).copied())
+            .unwrap_or(false)
+    }
+
+    /// Whether units on this tile move at road speed.
+    pub(crate) fn tile_is_road(&self, x: u32, y: u32) -> bool {
+        tile_index(self.width, self.height, x, y)
+            .and_then(|idx| self.road.get(idx).copied())
             .unwrap_or(false)
     }
 
@@ -1350,7 +1350,7 @@ fn distance2_to_tile_center(map: &MapInfo, tile: AiTile, resource: &ResourcePoin
     (x - resource.x).powi(2) + (y - resource.y).powi(2)
 }
 
-fn tile_distance2(a: AiTile, b: AiTile) -> u32 {
+pub(super) fn tile_distance2(a: AiTile, b: AiTile) -> u32 {
     let dx = i64::from(a.x) - i64::from(b.x);
     let dy = i64::from(a.y) - i64::from(b.y);
     let distance2 = dx.saturating_mul(dx).saturating_add(dy.saturating_mul(dy));
@@ -1462,7 +1462,7 @@ fn hash_resources(resources: &[ResourceNode]) -> u64 {
     hash
 }
 
-fn fnv_u32(hash: u64, value: u32) -> u64 {
+pub(super) fn fnv_u32(hash: u64, value: u32) -> u64 {
     fnv_bytes(hash, &value.to_le_bytes())
 }
 
