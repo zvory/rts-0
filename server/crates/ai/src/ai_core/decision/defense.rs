@@ -8,6 +8,8 @@ mod envelope;
 mod incident;
 mod line;
 mod pocket;
+mod pressure_line;
+pub(super) use pressure_line::stage_pressure_machine_gunners;
 mod raid;
 mod route_line;
 mod spacing;
@@ -399,6 +401,14 @@ pub(super) fn stage_home_machine_gunner_screen(
         clear_machine_gunner_screen_assignment(observation, map_analysis, assignment, enemy_base)
     })
     .collect::<Vec<_>>();
+    move_and_hold_machine_gunner_slots(actions, observation, assignments)
+}
+
+fn move_and_hold_machine_gunner_slots(
+    actions: &mut AiActionContext<'_>,
+    observation: &AiObservation,
+    assignments: Vec<DefensiveLineAssignment>,
+) -> Option<Vec<u32>> {
     let by_id: BTreeMap<u32, &AiEntitySummary> = observation
         .owned
         .iter()

@@ -241,7 +241,10 @@ and home-defense decisions, with independent expansion, infantry research, and p
 The legacy decision loop hands unreserved offensive
 Riflemen, Panzerfausts, and Tanks to a separate SDK staging owner after home-defense and construction-clearance
 orders have claimed their units. Pressure replaces the legacy frontal-wave issuer rather than
-layering competing attack orders over it. Home defenders retain priority; temporarily borrowed,
+layering competing attack orders over it. Pressure’s defensive Machine Gunner line is centered at its configured walking distance along
+the terrain route from its original main toward the enemy main, perpendicular to the local route
+direction. Its firing clearance follows that same direction, including when screening the home Tank.
+Home defenders retain priority; temporarily borrowed,
 unlaunched units resume their staging orders when released. Nearby Panzerfausts participate in
 that home-defense handoff. Pressure tracks legacy research producers and retries interrupted
 research on a replacement producer, so losing a Training Centre cannot leave the first wave

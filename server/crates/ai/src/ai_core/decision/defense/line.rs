@@ -109,7 +109,7 @@ pub(super) fn stage_main_steel_defensive_line_with_spacing(
     attack_move_to_line_slots(actions, observation, assignments)
 }
 
-fn attack_move_to_line_slots(
+pub(super) fn attack_move_to_line_slots(
     actions: &mut AiActionContext<'_>,
     observation: &AiObservation,
     assignments: Vec<DefensiveLineAssignment>,
