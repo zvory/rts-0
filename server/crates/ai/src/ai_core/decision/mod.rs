@@ -1309,6 +1309,9 @@ where
         // During a raid at home only a launched push is still commanded here.
         let push_only = handled_local_defense && containment_recall_target.is_none();
         if profile.id == crate::ai_core::profiles::PRESSURE_AI_ID {
+            let engaged_home = local_target
+                .map(|_| defense::engaged_local_defense_units(observation))
+                .unwrap_or_default();
             let ordered: BTreeSet<u32> = actions
                 .unit_orders_since(0)
                 .into_iter()
@@ -1325,6 +1328,7 @@ where
                             && !frontal_exclusions.contains(&unit.id)
                             && !ordered.contains(&unit.id)
                             && !local_defense_assigned.contains(&unit.id)
+                            && !engaged_home.contains(&unit.id)
                     })
                     .map(|unit| unit.id),
             );

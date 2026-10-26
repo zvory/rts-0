@@ -152,3 +152,60 @@ fn pressure_gives_nearby_panzerfausts_to_home_defense_before_staging() {
         "home defense must keep the Panzerfaust this decision"
     );
 }
+
+#[test]
+fn pressure_keeps_engaged_home_defenders_but_can_stage_engaged_units_outside_home() {
+    let home = 8.5 * config::TILE_SIZE as f32;
+    for kind in [EntityKind::Panzerfaust, EntityKind::Rifleman] {
+        let mut defender = combat_at(99, kind, home, home);
+        defender.state = AiEntityState::Attack;
+        defender.target_id = Some(100);
+        defender.free_for_combat = false;
+        let mut obs = observation(
+            AiEconomy {
+                steel: 0,
+                oil: 0,
+                supply_used: 10,
+                supply_cap: 300,
+            },
+            vec![
+                worker_at(1, AiEntityState::Idle, home, home),
+                building_at(2, EntityKind::ResourceDepot, Some(0), home, home),
+                defender,
+            ],
+        );
+        obs.tick = 6009;
+        obs.upgrades
+            .extend([UpgradeKind::Methamphetamines, UpgradeKind::Panzerfausts]);
+        let mut enemy = combat_at(100, EntityKind::Tank, home + 32.0, home);
+        enemy.owner = 2;
+        obs.visible_enemies.push(enemy);
+        let mut memory = AiDecisionMemory::for_profile(&PRESSURE);
+        let defending = decide(&obs, &PRESSURE, &mut memory);
+        assert!(
+            !defending.pressure_wave_units.contains(&99),
+            "engaged {kind:?} must retain home defense across decisions"
+        );
+        obs.owned.iter_mut().filter(|e| e.id == 99).for_each(|e| {
+            e.x = 1300.0;
+            e.y = 1300.0;
+        });
+        obs.tick += 9;
+        let away = decide(&obs, &PRESSURE, &mut memory);
+        assert!(
+            away.pressure_wave_units.contains(&99),
+            "a fight outside home must not permanently reserve staging recruits"
+        );
+        obs.owned.iter_mut().filter(|e| e.id == 99).for_each(|e| {
+            e.x = home;
+            e.y = home;
+        });
+        obs.visible_enemies.clear();
+        obs.tick += 9;
+        let released = decide(&obs, &PRESSURE, &mut memory);
+        assert!(
+            released.pressure_wave_units.contains(&99),
+            "staging resumes when the home threat is gone"
+        );
+    }
+}
