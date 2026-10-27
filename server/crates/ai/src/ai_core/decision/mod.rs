@@ -1286,12 +1286,8 @@ where
             }
         }
         let live = (&mut actions, observation, map_analysis, &mut intents);
-        let guns = (
-            defensive_machine_gunners.as_slice(),
-            &local_defense_assigned,
-        );
-        let enemy_base = facts.nearest_public_enemy_base;
-        jeff_v1_1::stage_base_guns(live, memory, profile, enemy_base, guns);
+        let held = &(&local_defense_assigned | &route_line_reserved) | &push_units;
+        jeff_v1_1::base_line::hold(live, memory, profile, &defensive_machine_gunners, &held);
 
         // The current Jeff's home Tank waits behind the home post once that has moved off the
         // main's line; it sat beside the HQ all game while the natural was shelled.

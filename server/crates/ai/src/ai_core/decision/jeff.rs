@@ -163,7 +163,8 @@ pub(super) fn site_depth(
 }
 
 /// Jeff's home Riflemen while no raid is being answered: the current Jeff's defensive pocket, or
-/// a frozen profile's coverage or screen. `assigned`: units home defense already ordered, and units
+/// a frozen profile's coverage or screen; V1.1's hold its base lines instead
+/// (`jeff_v1_1::base_line`). `assigned`: units home defense already ordered, and units
 /// the route line holds.
 pub(super) fn stage_home_riflemen(
     (actions, observation, map_analysis, intents): opening_rush::LiveStep<'_, '_, '_, '_>,
@@ -172,6 +173,9 @@ pub(super) fn stage_home_riflemen(
     facts: &AiFacts,
     (local_defense_assigned, route_line_reserved): (&BTreeSet<u32>, &BTreeSet<u32>),
 ) {
+    if is_jeff_v1_1(profile.id) {
+        return;
+    }
     let riflemen: Vec<u32> = if uses_home_rifle_coverage(profile.id) {
         observation
             .owned

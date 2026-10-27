@@ -243,6 +243,8 @@ const approvedCurrentFactionFiles = new Set([
   // Rifleman line) names current-roster units and upgrades; profile/catalog layers still own faction
   // admission.
   "server/crates/ai/src/ai_core/decision/jeff_v1_1.rs",
+  // Its base lines (V1.1 only) find each base by its Depot and extractors.
+  "server/crates/ai/src/ai_core/decision/jeff_v1_1/base_line.rs",
   // Unit priority and cap adjustments moved verbatim out of the approved decision orchestrator.
   "server/crates/ai/src/ai_core/decision/unit_mix.rs",
   // Jeff's Kriegsia-only expansion screen and upgrade policy are focused modules beneath the

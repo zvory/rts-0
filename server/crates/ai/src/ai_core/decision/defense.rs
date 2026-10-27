@@ -724,7 +724,7 @@ fn primary_weighted_approach_slot(
     (approach_index, local_slot)
 }
 
-fn clear_mobile_defensive_position(
+pub(in crate::ai_core::decision) fn clear_mobile_defensive_position(
     observation: &AiObservation,
     map_analysis: Option<&AiMapAnalysis>,
     desired: (f32, f32),
