@@ -134,7 +134,7 @@ fn line_coordinates(point: (f32, f32)) -> (f32, f32) {
 fn v1_1_holds_its_line_two_tiles_past_the_forward_most_mine_with_guns_on_the_wings() {
     let ts = config::TILE_SIZE as f32;
     let obs = base_line_observation(Vec::new());
-    let lines = base_lines(&obs, None);
+    let lines = base_lines(&obs, None, &BTreeMap::new());
     assert_eq!(lines.len(), 1);
     assert!(lines[0].main);
     // Two mines; without a map there is no route, so they are not doubled.
@@ -143,7 +143,7 @@ fn v1_1_holds_its_line_two_tiles_past_the_forward_most_mine_with_guns_on_the_win
     let forward = 5.0 * std::f32::consts::FRAC_1_SQRT_2;
     let side = 3.0 * std::f32::consts::FRAC_1_SQRT_2 + 1.0;
     let rifles: Vec<(f32, f32)> = lines[0]
-        .rifle_points(3, ts)
+        .rifle_points(3, 0, ts)
         .into_iter()
         .map(line_coordinates)
         .collect();
@@ -161,7 +161,7 @@ fn v1_1_holds_its_line_two_tiles_past_the_forward_most_mine_with_guns_on_the_win
         assert!((across - wanted).abs() < 0.01, "{guns:?}");
     }
     // From four Riflemen one stands picket seven tiles past the line.
-    let picket = line_coordinates(*lines[0].rifle_points(4, ts).last().unwrap());
+    let picket = line_coordinates(*lines[0].rifle_points(4, 0, ts).first().unwrap());
     assert!((picket.0 - (forward + 9.0)).abs() < 0.01, "{picket:?}");
 }
 
@@ -178,7 +178,7 @@ fn v1_1_splits_line_units_by_exposure_without_walking_units_off_a_base() {
         30.5 * ts,
         20.5 * ts,
     ));
-    let lines = base_lines(&obs, None);
+    let lines = base_lines(&obs, None, &BTreeMap::new());
     assert_eq!(
         lines.iter().map(|line| line.depot).collect::<Vec<_>>(),
         vec![1, 4]

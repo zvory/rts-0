@@ -583,6 +583,8 @@ where
         )
     };
     let target_barracks = turtle_barracks_target(profile, &facts, target_barracks);
+    let banked = jeff_v1_1::third_base::banked(observation, memory);
+    let target_barracks = jeff_v1_1::third_base::barracks_target(profile.id, banked, target_barracks);
     let surplus_barracks_enabled = profile.surplus_steel_production.is_some_and(|policy| {
         let (barracks_steel, _) = rts_rules::economy::cost(EntityKind::Barracks);
         actions.budget().steel() >= policy.reserve.saturating_add(barracks_steel)
@@ -743,12 +745,17 @@ where
         && !expansion_blocks_tech_path
         && !save_for_unplanned_expansion
         && planned_in_intents(&intents, EntityKind::Factory) == 0
-        && should_build_extra_factory(
+        && (should_build_extra_factory(
             observation,
             &facts,
             profile,
             planned_in_intents(&intents, EntityKind::Factory),
-        )
+        ) || jeff_v1_1::third_base::extra_factory(
+            profile.id,
+            banked,
+            observation,
+            facts.building_count(EntityKind::Factory),
+        ))
         && try_build_production(
             observation,
             &facts,
@@ -865,8 +872,7 @@ where
         memory,
         &mut effective_unit_priorities,
     );
-    let banked = jeff_v1_1::third_base::banked(observation, memory);
-    let rifle_line = jeff_v1_1::rifle_line(profile.id, &facts, banked, &mut effective_unit_priorities);
+    let rifle_line =jeff_v1_1::rifle_line(profile.id, &facts, banked, &mut effective_unit_priorities);
     let production_unit_counts =
         unit_counts_for_priorities(observation, &facts, profile, &effective_unit_priorities);
     let mut production_max_counts = production_max_counts(profile, observation, map_analysis);
@@ -964,6 +970,7 @@ where
         let rifleman_rally = uses_home_rifle_coverage(profile.id)
             .then(|| jeffs_rifleman_home_rally(observation, &facts))
             .flatten();
+        let push_rally = jeff_v1_1::push::reinforcement_rally(memory);
         let limits = (
             production_unit_counts.as_slice(),
             building_max_counts.as_slice(),
@@ -992,6 +999,10 @@ where
                         unit == EntityKind::Rifleman
                             || (unit == EntityKind::Tank && home_holds_tank_reserve)
                     }) {
+                        return Some((x, y, RallyKind::AttackMove));
+                    }
+                    // Jeff's AI V1.1's new Tanks join its push where it holds.
+                    if let Some((x, y)) = push_rally.filter(|_| unit == EntityKind::Tank) {
                         return Some((x, y, RallyKind::AttackMove));
                     }
                     if unit == EntityKind::Rifleman {
@@ -1288,6 +1299,8 @@ where
         }
         let live = (&mut actions, observation, map_analysis, &mut intents);
         let held = &(&local_defense_assigned | &route_line_reserved) | &push_units;
+        jeff_v1_1::strike::strike_gathering_wave(live, memory, profile.id, &held);
+        let live = (&mut actions, observation, map_analysis, &mut intents);
         jeff_v1_1::base_line::hold(live, memory, profile, &defensive_machine_gunners, &held);
 
         // The current Jeff's home Tank waits behind the home post once that has moved off the

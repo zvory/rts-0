@@ -25,14 +25,20 @@ pub(in crate::ai_core::decision) const RETRY_TICKS: u32 = config::TICK_HZ * 20;
 const ESCORT_POST_TILES: f32 = 5.0;
 const ESCORT_SPACING_TILES: f32 = 1.75;
 
-/// Notes how long V1.1's Steel has stood at `BANK_STEEL` or more.
+/// Notes how long V1.1's Steel has stood at `BANK_STEEL` or more with a Tank out. Before the first
+/// Tank the bank is the spend plan's savings for the natural, the Factory and the Tank, not spare:
+/// counted then, it took a third base at 3:26 on Classic and put the first Tank back 45 s.
 pub(in crate::ai_core::decision) fn note_bank(
     observation: &AiObservation,
     memory: &mut AiDecisionMemory,
     profile_id: &str,
 ) {
     let state = &mut memory.jeff_v1_1;
-    if !is_jeff_v1_1(profile_id) || observation.economy.steel < BANK_STEEL {
+    let tank_out = observation
+        .owned
+        .iter()
+        .any(|unit| unit.kind == EntityKind::Tank && unit.is_complete && unit.hp > 0);
+    if !is_jeff_v1_1(profile_id) || !tank_out || observation.economy.steel < BANK_STEEL {
         state.banked_since = None;
     } else if state.banked_since.is_none() {
         state.banked_since = Some(observation.tick);
@@ -48,6 +54,47 @@ pub(in crate::ai_core::decision) fn banked(
         .jeff_v1_1
         .banked_since
         .is_some_and(|since| observation.tick.saturating_sub(since) >= BANK_TICKS)
+}
+
+/// Banked Steel builds production to spend it: V1.1 mines about 2,000 Steel a minute by 5:00 on
+/// Classic and floated 900-1,000 of it with two Barracks and one or two Factories, while Pressure
+/// AI grows to four Vehicle Works on its float.
+const BANKED_BARRACKS: usize = 4;
+const BANKED_FACTORIES: usize = 4;
+/// A Factory more needs this much Oil in the bank too, for the Tanks it is to build.
+const BANKED_FACTORY_OIL: u32 = 250;
+
+/// The Barracks V1.1 builds toward. Its oldest Barracks trains only guns, so from V1.0's second
+/// Barracks on it keeps one more for the Riflemen: with two, it fielded 4-14 Riflemen against
+/// Pressure AI's 10-12 Panzerfausts where V1.0 fielded 20-33. While its Steel is banked, at least
+/// `BANKED_BARRACKS`.
+pub(in crate::ai_core::decision) fn barracks_target(
+    profile_id: &str,
+    banked: bool,
+    target: usize,
+) -> usize {
+    if !is_jeff_v1_1(profile_id) {
+        return target;
+    }
+    let target = if target >= 2 { target + 1 } else { target };
+    if banked {
+        target.max(BANKED_BARRACKS)
+    } else {
+        target
+    }
+}
+
+/// Whether V1.1 builds another Factory on banked Steel and Oil, up to `BANKED_FACTORIES`.
+pub(in crate::ai_core::decision) fn extra_factory(
+    profile_id: &str,
+    banked: bool,
+    observation: &AiObservation,
+    factories: usize,
+) -> bool {
+    is_jeff_v1_1(profile_id)
+        && banked
+        && observation.economy.oil >= BANKED_FACTORY_OIL
+        && factories < BANKED_FACTORIES
 }
 
 /// The escort that would take a base at `site`: the two Tanks nearest it that no push and not the

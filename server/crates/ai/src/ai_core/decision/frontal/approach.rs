@@ -139,6 +139,8 @@ pub(crate) struct PushApproach {
     lane: Option<CachedLane>,
     /// The current push gave up its side lane and goes straight in.
     lane_abandoned: bool,
+    /// Jeff's AI V1.1 picks the side itself, away from the enemy it has seen on the way.
+    forced: Option<Approach>,
     phase: PushPhase,
     phase_since: Option<u32>,
     /// The staging point the current leg is measured against.
@@ -151,7 +153,9 @@ pub(crate) struct PushApproach {
 impl PushApproach {
     /// The approach the next (or current) push takes.
     pub(crate) fn approach(&self) -> Approach {
-        if SIDE_APPROACHES {
+        if let Some(side) = self.forced {
+            side
+        } else if SIDE_APPROACHES {
             self.loop_approach()
         } else {
             Approach::Direct
@@ -169,6 +173,17 @@ impl PushApproach {
 
     pub(super) fn phase(&self) -> PushPhase {
         self.phase
+    }
+
+    /// Jeff's AI V1.1 sets the side its push takes (`None`: the usual approach). A new side starts
+    /// the push's legs over, out to the new side's staging point.
+    pub(in crate::ai_core::decision) fn force(&mut self, side: Option<Approach>) {
+        if self.forced != side {
+            self.forced = side;
+            self.lane = None;
+            self.lane_abandoned = false;
+            self.restart_legs();
+        }
     }
 
     /// A push failed: the next one takes the next approach in the loop.
@@ -340,6 +355,59 @@ pub(super) fn flank_lane(
             approach_from: stored(at(swing_tiles + APPROACH_EXTRA_TILES)),
         })
     })
+}
+
+/// How much remembered enemy strength (`threat` at a point) lies along the ground route from `from`
+/// to `to`, sampled at the route's waypoints.
+pub(in crate::ai_core::decision) fn route_threat(
+    analysis: &AiMapAnalysis,
+    from: (f32, f32),
+    to: (f32, f32),
+    threat: &dyn Fn((f32, f32)) -> f32,
+) -> f32 {
+    analysis
+        .compact_group_route(from, to, 4)
+        .into_iter()
+        .map(threat)
+        .fold(0.0, f32::max)
+}
+
+/// Jeff's AI V1.1: the side lane onto `objective` with the least remembered enemy strength along
+/// its way out and in, and that strength. `None` when neither side has a workable lane.
+#[allow(clippy::too_many_arguments)]
+pub(in crate::ai_core::decision) fn safest_side(
+    analysis: &AiMapAnalysis,
+    observation: &AiObservation,
+    from: (f32, f32),
+    enemy_main: (f32, f32),
+    objective: (f32, f32),
+    standoff_tiles: f32,
+    threat: &dyn Fn((f32, f32)) -> f32,
+) -> Option<(Approach, f32)> {
+    let ts = observation.map.tile_size as f32;
+    let back = normalized_direction(objective, from)?;
+    let direct_point = (
+        objective.0 + back.0 * standoff_tiles * ts,
+        objective.1 + back.1 * standoff_tiles * ts,
+    );
+    [Approach::Left, Approach::Right]
+        .into_iter()
+        .filter_map(|side| {
+            let lane = flank_lane(
+                analysis,
+                observation,
+                from,
+                enemy_main,
+                objective,
+                direct_point,
+                standoff_tiles,
+                side,
+            )?;
+            let out = route_threat(analysis, from, world(lane.swing), threat);
+            let closing = route_threat(analysis, world(lane.swing), world(lane.attack), threat);
+            Some((side, out.max(closing)))
+        })
+        .min_by(|a, b| a.1.total_cmp(&b.1))
 }
 
 /// The side lane the current push takes, worked out once per approach and target, or `None` to go

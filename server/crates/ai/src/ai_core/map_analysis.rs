@@ -465,6 +465,14 @@ impl AiMapAnalysis {
             .and_then(|idx| self.region_by_tile.get(idx).copied().flatten())
     }
 
+    pub(crate) fn resource_clusters(&self) -> &[AiResourceCluster] {
+        &self.resource_clusters
+    }
+
+    pub(crate) fn chokes(&self) -> &[AiMapChoke] {
+        &self.chokes
+    }
+
     pub(crate) fn tile_is_passable(&self, x: u32, y: u32) -> bool {
         tile_index(self.width, self.height, x, y)
             .and_then(|idx| self.passable.get(idx).copied())

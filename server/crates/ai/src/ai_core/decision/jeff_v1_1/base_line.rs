@@ -4,19 +4,27 @@
 //!
 //! - **Threat axis**: the way the enemy's shortest ground route reaches the base, the tile
 //!   `AXIS_RING_TILES` out from the Depot the enemy walks to soonest, not the straight line to the
-//!   enemy start.
+//!   enemy start; turned toward where attacks on that base have actually come from once there have
+//!   been some (`CONTACT_WEIGHT`).
 //! - **The line**: `LINE_AHEAD_TILES` past the forward-most mine along that axis, as wide as the
 //!   mines' sideways spread and `LINE_WING_TILES` more each side. Riflemen stand
-//!   `RIFLE_SPACING_TILES` apart from its centre out, in ranks; Machine Gunners hold its two wings;
-//!   one Rifleman stands picket `PICKET_TILES` further out on the axis once a base has
-//!   `PICKET_MIN_RIFLES`.
-//! - **Units per base**: Riflemen split over the bases by exposure, the base's mines doubled when
-//!   it is on the enemy's route to the main; the guns past the home pocket's split the same way
-//!   over the bases past the main, or hold the main's wings while there are none.
+//!   `RIFLE_SPACING_TILES` apart from its centre out, in ranks; Panzerfausts between and behind
+//!   them; Machine Gunners hold its two wings; Tanks stand `TANK_BACK_TILES` behind it, inside their
+//!   stationary reach of it; one Rifleman stands picket `PICKET_TILES` further out on the axis once
+//!   a base has `PICKET_MIN_RIFLES`.
+//! - **Units per base**: Riflemen, Panzerfausts and resting Tanks split over the bases by exposure,
+//!   the base's mines doubled when it is on the enemy's route to the main; the guns past the home
+//!   pocket's split the same way over the bases past the main, or hold the main's wings while there
+//!   are none.
+//! - **Alarm**: enemy fighters within `ALARM_TILES` of a base's Depot or mines are that base's
+//!   contact. Its Riflemen, Panzerfausts and Tanks go at them, joined by the nearest other base's
+//!   when the contact outweighs them; its guns keep their trenches. V1.0's local defense counted no
+//!   threat while outlying bases were attacked.
 //! - **Stable posts**: a unit keeps its base while that base is at most one over its share, and a
 //!   unit on a post keeps it, so new units and losses never walk dug-in units out of their trenches.
 //!   Units with an enemy in sight nearby are left to fight.
 
+use super::push::unit_value;
 use super::*;
 use crate::ai_core::decision::geometry::{dist2, squared};
 
@@ -28,6 +36,12 @@ const MAIN_TILES: f32 = 8.0;
 /// `AXIS_SAMPLES` around it.
 const AXIS_RING_TILES: f32 = 10.0;
 const AXIS_SAMPLES: usize = 32;
+/// Remembered contacts turn the axis toward them this much at most (against 1 for the route), in
+/// full from `CONTACTS_FOR_FULL_WEIGHT` contacts; the axis turns in `AXIS_STEP_DEGREES` steps, so
+/// small shifts do not walk units off their posts.
+const CONTACT_WEIGHT: f32 = 1.5;
+const CONTACTS_FOR_FULL_WEIGHT: u32 = 5;
+const AXIS_STEP_DEGREES: f32 = 15.0;
 /// The line stands this far past the forward-most mine, and at least `MIN_LINE_DEPTH_TILES` in
 /// front of the Depot.
 const LINE_AHEAD_TILES: f32 = 2.0;
@@ -40,11 +54,18 @@ const MAX_HALF_WIDTH_TILES: f32 = 8.0;
 const RIFLE_SPACING_TILES: f32 = 1.75;
 /// Each further rank, and each further pair of guns, stands this far behind the one before.
 const RANK_BACK_TILES: f32 = 1.5;
+/// Panzerfausts stand this far behind the Riflemen's front rank, between them.
+const FAUST_BACK_TILES: f32 = 1.0;
 /// The wing guns stand this far behind the Riflemen's front rank.
 const GUN_BACK_TILES: f32 = 0.5;
+/// Tanks stand this far behind the line, this far apart, in ranks this far apart.
+const TANK_BACK_TILES: f32 = 4.0;
+const TANK_SPACING_TILES: f32 = 2.5;
 /// The picket stands this far past the line on the axis, for vision.
 const PICKET_TILES: f32 = 7.0;
 const PICKET_MIN_RIFLES: usize = 4;
+/// Spare points worked out beyond the units to post, for points that clear onto one another.
+const SPARE_POINTS: usize = 4;
 /// A base within this distance of the enemy's route to the main is on it.
 const ON_ROUTE_TILES: f32 = 12.0;
 /// A unit this close to its post holds it.
@@ -57,6 +78,12 @@ const FIGHTING_TILES: f32 = 14.0;
 /// but never sooner than `MIN_REORDER_TICKS`.
 const REORDER_TICKS: u32 = config::TICK_HZ * 10;
 const MIN_REORDER_TICKS: u32 = config::TICK_HZ * 2;
+/// Enemy fighters this close to a base's Depot or mines are its contact.
+const ALARM_TILES: f32 = 12.0;
+/// Responders from another base join until the response outweighs the contact this much.
+const ALARM_MARGIN: f32 = 1.2;
+/// Responders are sent again this often.
+const ALARM_REORDER_TICKS: u32 = config::TICK_HZ * 2;
 
 /// The post a line unit was last sent to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -66,8 +93,31 @@ pub(in crate::ai_core::decision) struct LinePost {
     ordered: u32,
 }
 
+/// Where attacks on a base have come from: the average direction, in thousandths, and how many.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(in crate::ai_core::decision) struct BaseContact {
+    direction: (i32, i32),
+    count: u32,
+}
+
+/// What V1.1's base lines remember.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub(in crate::ai_core::decision) struct LineMemory {
+    posts: BTreeMap<u32, LinePost>,
+    contacts: BTreeMap<u32, BaseContact>,
+}
+
+/// The kinds of units on a line.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Class {
+    Rifle,
+    Faust,
+    Gun,
+    Tank,
+}
+
 /// One base's line, in world pixels.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub(in crate::ai_core::decision) struct BaseLine {
     pub(in crate::ai_core::decision) depot: u32,
     pub(in crate::ai_core::decision) main: bool,
@@ -79,6 +129,8 @@ pub(in crate::ai_core::decision) struct BaseLine {
     depth: f32,
     /// Its extent across the axis, from the Depot's centre line.
     lateral: (f32, f32),
+    /// The base's extractors.
+    mines: Vec<(f32, f32)>,
     pub(in crate::ai_core::decision) exposure: usize,
 }
 
@@ -90,33 +142,62 @@ impl BaseLine {
         )
     }
 
-    /// Where the `count` Riflemen stand: the front rank from its centre out, then ranks behind it,
-    /// and the picket out on the axis from `PICKET_MIN_RIFLES` on.
-    pub(in crate::ai_core::decision) fn rifle_points(
-        &self,
-        count: usize,
-        ts: f32,
-    ) -> Vec<(f32, f32)> {
-        let picket = count >= PICKET_MIN_RIFLES;
-        let spacing = RIFLE_SPACING_TILES * ts;
+    fn middle(&self) -> f32 {
+        (self.lateral.0 + self.lateral.1) * 0.5
+    }
+
+    /// Points across the line `back` behind its front, `spacing` apart from its centre out (shifted
+    /// half a step by `offset`), in ranks `rank_back` apart.
+    fn ranks(&self, count: usize, back: f32, spacing: f32, rank_back: f32, offset: f32) -> Vec<(f32, f32)> {
         let half = (self.lateral.1 - self.lateral.0) * 0.5;
-        let middle = (self.lateral.0 + self.lateral.1) * 0.5;
         let per_rank = ((half / spacing).floor() as usize) * 2 + 1;
-        let mut points: Vec<(f32, f32)> = (0..count - usize::from(picket))
+        (0..count)
             .map(|index| {
                 let (rank, slot) = (index / per_rank, index % per_rank);
                 let step = slot.div_ceil(2) as f32 * spacing;
                 let side = if slot % 2 == 1 { step } else { -step };
                 self.at(
-                    self.depth - rank as f32 * RANK_BACK_TILES * ts,
-                    middle + side,
+                    self.depth - back - rank as f32 * rank_back,
+                    (self.middle() + side + offset).clamp(self.lateral.0, self.lateral.1),
                 )
             })
-            .collect();
+            .collect()
+    }
+
+    /// Where `count` Riflemen stand, with `spares` more points: the picket out on the axis first
+    /// from `PICKET_MIN_RIFLES` on, then the front rank from its centre out and ranks behind it.
+    pub(in crate::ai_core::decision) fn rifle_points(
+        &self,
+        count: usize,
+        spares: usize,
+        ts: f32,
+    ) -> Vec<(f32, f32)> {
+        let picket = count >= PICKET_MIN_RIFLES;
+        let mut points = Vec::new();
         if picket {
-            points.push(self.at(self.depth + PICKET_TILES * ts, middle));
+            points.push(self.at(self.depth + PICKET_TILES * ts, self.middle()));
         }
+        let spacing = RIFLE_SPACING_TILES * ts;
+        points.extend(self.ranks(
+            count - usize::from(picket) + spares,
+            0.0,
+            spacing,
+            RANK_BACK_TILES * ts,
+            0.0,
+        ));
         points
+    }
+
+    /// Where the `count` Panzerfausts stand: between the Riflemen, just behind them.
+    fn faust_points(&self, count: usize, ts: f32) -> Vec<(f32, f32)> {
+        let spacing = RIFLE_SPACING_TILES * ts;
+        self.ranks(
+            count,
+            FAUST_BACK_TILES * ts,
+            spacing,
+            RANK_BACK_TILES * ts,
+            spacing * 0.5,
+        )
     }
 
     /// Where the `count` guns stand: the two wings first, then pairs further in and back.
@@ -139,12 +220,62 @@ impl BaseLine {
             })
             .collect()
     }
+
+    /// Where the `count` Tanks stand: `TANK_BACK_TILES` behind the line, from its centre out.
+    pub(in crate::ai_core::decision) fn tank_points(&self, count: usize, ts: f32) -> Vec<(f32, f32)> {
+        let spacing = TANK_SPACING_TILES * ts;
+        self.ranks(count, TANK_BACK_TILES * ts, spacing, spacing, 0.0)
+    }
+
+    fn points(&self, class: Class, count: usize, ts: f32) -> Vec<(f32, f32)> {
+        let wanted = count + SPARE_POINTS;
+        match class {
+            Class::Rifle => self.rifle_points(count, SPARE_POINTS, ts),
+            Class::Faust => self.faust_points(wanted, ts),
+            Class::Gun => self.gun_points(wanted, ts),
+            Class::Tank => self.tank_points(wanted, ts),
+        }
+    }
+
+    /// The enemy fighters in sight within `ALARM_TILES` of the Depot or a mine: their value and
+    /// centre.
+    fn contact(&self, observation: &AiObservation) -> Option<(f32, (f32, f32))> {
+        let ts = observation.map.tile_size as f32;
+        let reach = squared(ALARM_TILES * ts);
+        let raiders: Vec<&AiEntitySummary> = observation
+            .visible_enemies
+            .iter()
+            .filter(|enemy| {
+                enemy.kind.is_unit()
+                    && !matches!(enemy.kind, EntityKind::Worker | EntityKind::Golem)
+                    && enemy.hp > 0
+            })
+            .filter(|enemy| {
+                std::iter::once(&self.origin)
+                    .chain(self.mines.iter())
+                    .any(|site| dist2(enemy.x, enemy.y, site.0, site.1) <= reach)
+            })
+            .collect();
+        (!raiders.is_empty()).then(|| {
+            let n = raiders.len() as f32;
+            let value: u32 = raiders.iter().map(|enemy| unit_value(enemy.kind)).sum();
+            (
+                value as f32,
+                (
+                    raiders.iter().map(|enemy| enemy.x).sum::<f32>() / n,
+                    raiders.iter().map(|enemy| enemy.y).sum::<f32>() / n,
+                ),
+            )
+        })
+    }
 }
 
-/// V1.1's lines at every finished Depot, the main's first.
+/// V1.1's lines at every finished Depot, the main's first. `contacts`: where attacks on each base
+/// have come from.
 pub(in crate::ai_core::decision) fn base_lines(
     observation: &AiObservation,
     map_analysis: Option<&AiMapAnalysis>,
+    contacts: &BTreeMap<u32, BaseContact>,
 ) -> Vec<BaseLine> {
     let ts = observation.map.tile_size as f32;
     let home = tile_center(observation.own_start_tile, observation.map.tile_size);
@@ -159,7 +290,10 @@ pub(in crate::ai_core::decision) fn base_lines(
         .iter()
         .filter_map(|depot| {
             let origin = (depot.x, depot.y);
-            let axis = threat_axis(observation, map_analysis, origin, enemy?)?;
+            let route_axis = threat_axis(observation, map_analysis, origin, enemy?)?;
+            let axis = contacts
+                .get(&depot.id)
+                .map_or(route_axis, |contact| turned(route_axis, contact));
             let across = (-axis.1, axis.0);
             let mines: Vec<(f32, f32)> = observation
                 .owned
@@ -173,16 +307,20 @@ pub(in crate::ai_core::decision) fn base_lines(
                                 <= dist2(unit.x, unit.y, other.x, other.y)
                         })
                 })
-                .map(|unit| (unit.x - depot.x, unit.y - depot.y))
+                .map(|unit| (unit.x, unit.y))
+                .collect();
+            let offsets: Vec<(f32, f32)> = mines
+                .iter()
+                .map(|mine| (mine.0 - depot.x, mine.1 - depot.y))
                 .collect();
             let ahead = |point: &(f32, f32)| point.0 * axis.0 + point.1 * axis.1;
             let side = |point: &(f32, f32)| point.0 * across.0 + point.1 * across.1;
-            let forward = mines.iter().map(ahead).fold(0.0_f32, f32::max);
+            let forward = offsets.iter().map(ahead).fold(0.0_f32, f32::max);
             let depth = (forward + LINE_AHEAD_TILES * ts).max(MIN_LINE_DEPTH_TILES * ts);
             let wing = LINE_WING_TILES * ts;
             let mut lateral = (
-                mines.iter().map(side).fold(0.0_f32, f32::min) - wing,
-                mines.iter().map(side).fold(0.0_f32, f32::max) + wing,
+                offsets.iter().map(side).fold(0.0_f32, f32::min) - wing,
+                offsets.iter().map(side).fold(0.0_f32, f32::max) + wing,
             );
             let middle = (lateral.0 + lateral.1) * 0.5;
             let half = ((lateral.1 - lateral.0) * 0.5)
@@ -203,11 +341,48 @@ pub(in crate::ai_core::decision) fn base_lines(
                 depth,
                 lateral,
                 exposure: mines.len().max(1) * if on_route { 2 } else { 1 },
+                mines,
             })
         })
         .collect();
     lines.sort_by(|a, b| b.main.cmp(&a.main).then(a.depot.cmp(&b.depot)));
     lines
+}
+
+/// `route_axis` turned toward where attacks have come from, in `AXIS_STEP_DEGREES` steps.
+fn turned(route_axis: (f32, f32), contact: &BaseContact) -> (f32, f32) {
+    let weight =
+        CONTACT_WEIGHT * contact.count.min(CONTACTS_FOR_FULL_WEIGHT) as f32 / CONTACTS_FOR_FULL_WEIGHT as f32;
+    let toward = (
+        contact.direction.0 as f32 / 1000.0,
+        contact.direction.1 as f32 / 1000.0,
+    );
+    let sum = (route_axis.0 + toward.0 * weight, route_axis.1 + toward.1 * weight);
+    if sum.0.hypot(sum.1) < 1e-3 {
+        return route_axis;
+    }
+    let step = AXIS_STEP_DEGREES.to_radians();
+    let angle = (sum.1.atan2(sum.0) / step).round() * step;
+    (angle.cos(), angle.sin())
+}
+
+/// Notes an attack on base `depot` from `at`.
+fn note_contact(memory: &mut LineMemory, depot: u32, origin: (f32, f32), at: (f32, f32)) {
+    let Some(toward) = normalized_direction(origin, at) else {
+        return;
+    };
+    let contact = memory.contacts.entry(depot).or_default();
+    let count = contact.count.min(CONTACTS_FOR_FULL_WEIGHT) as f32;
+    let sum = (
+        contact.direction.0 as f32 / 1000.0 * count + toward.0,
+        contact.direction.1 as f32 / 1000.0 * count + toward.1,
+    );
+    let length = sum.0.hypot(sum.1).max(1e-3);
+    contact.direction = (
+        (sum.0 / length * 1000.0).round() as i32,
+        (sum.1 / length * 1000.0).round() as i32,
+    );
+    contact.count = contact.count.saturating_add(1).min(CONTACTS_FOR_FULL_WEIGHT);
 }
 
 /// The nearest living enemy: its player id and start, in world pixels.
@@ -308,16 +483,15 @@ pub(in crate::ai_core::decision) fn allocate(
     }
     rest.sort_by_key(|(id, _, _)| *id);
     for (id, at, _) in rest {
-        let best =
-            (0..lines.len())
-                .filter(|index| weights[*index] > 0)
-                .min_by(|a, b| {
-                    let short = |index: usize| shares[index] as i64 - counts[index] as i64;
-                    short(*b).cmp(&short(*a)).then(
-                        dist2(at.0, at.1, lines[*a].origin.0, lines[*a].origin.1)
-                            .total_cmp(&dist2(at.0, at.1, lines[*b].origin.0, lines[*b].origin.1)),
-                    )
-                });
+        let best = (0..lines.len())
+            .filter(|index| weights[*index] > 0)
+            .min_by(|a, b| {
+                let short = |index: usize| shares[index] as i64 - counts[index] as i64;
+                short(*b).cmp(&short(*a)).then(
+                    dist2(at.0, at.1, lines[*a].origin.0, lines[*a].origin.1)
+                        .total_cmp(&dist2(at.0, at.1, lines[*b].origin.0, lines[*b].origin.1)),
+                )
+            });
         if let Some(index) = best {
             counts[index] += 1;
             placed.push((*id, index));
@@ -391,7 +565,7 @@ fn clear_points(
     points
 }
 
-/// The units V1.1 posts on its base lines, with the base each held before.
+/// The units V1.1 posts on its base lines.
 fn line_units<'a>(
     observation: &'a AiObservation,
     memory: &AiDecisionMemory,
@@ -404,7 +578,11 @@ fn line_units<'a>(
         .filter(|unit| unit.kind == kind && unit.is_complete && unit.hp > 0)
         .filter(|unit| {
             !memory.containment.active_riflemen.contains(&unit.id)
+                && !memory.containment.active_tanks.contains(&unit.id)
+                && !memory.containment.stuck_tanks.contains_key(&unit.id)
                 && memory.containment.active_scout != Some(unit.id)
+                && memory.home_defensive_tank != Some(unit.id)
+                && !memory.jeff_v1_1.strike.party.contains(&unit.id)
                 && !memory.expansion_security.riflemen.contains(&unit.id)
                 && !memory.later_bases.guards.contains(&unit.id)
                 && !memory.opening_rush.is_reserved(unit.id)
@@ -415,9 +593,9 @@ fn line_units<'a>(
         .collect()
 }
 
-/// V1.1's Riflemen and the guns past the home pocket's (`home_guns`) hold the lines in front of
-/// each base's mines (see the module docs). `held` are the units other systems ordered or keep
-/// this decision.
+/// V1.1's Riflemen, Panzerfausts, resting Tanks and the guns past the home pocket's (`home_guns`)
+/// hold the lines in front of each base's mines, and answer contact at their base (see the module
+/// docs). `held` are the units other systems ordered or keep this decision.
 pub(in crate::ai_core::decision) fn hold(
     (actions, observation, map_analysis, intents): opening_rush::LiveStep<'_, '_, '_, '_>,
     memory: &mut AiDecisionMemory,
@@ -429,40 +607,50 @@ pub(in crate::ai_core::decision) fn hold(
         return;
     }
     let ts = observation.map.tile_size as f32;
-    let lines = base_lines(observation, map_analysis);
+    let tick = observation.tick;
+    let lines = base_lines(observation, map_analysis, &memory.jeff_v1_1.base_lines.contacts);
     if lines.is_empty() {
-        memory.jeff_v1_1.base_lines.clear();
+        memory.jeff_v1_1.base_lines.posts.clear();
         return;
     }
     let healthy = profile
         .defensive_machine_gunners
         .and_then(|policy| policy.replacement_health_percent)
         .unwrap_or(0);
-    let riflemen = line_units(observation, memory, EntityKind::Rifleman, |unit| {
-        !held.contains(&unit.id)
-    });
-    let guns = line_units(observation, memory, EntityKind::MachineGunner, |unit| {
-        !held.contains(&unit.id)
-            && !home_guns.contains(&unit.id)
-            && defense::machine_gunner_meets_replacement_health(unit.hp, healthy)
-    });
-    let rifle_weights: Vec<usize> = lines.iter().map(|line| line.exposure).collect();
+    let free = |unit: &AiEntitySummary| !held.contains(&unit.id);
+    let classes = [
+        (Class::Rifle, line_units(observation, memory, EntityKind::Rifleman, free)),
+        (Class::Faust, line_units(observation, memory, EntityKind::Panzerfaust, free)),
+        (
+            Class::Gun,
+            line_units(observation, memory, EntityKind::MachineGunner, |unit| {
+                free(unit)
+                    && !home_guns.contains(&unit.id)
+                    && defense::machine_gunner_meets_replacement_health(unit.hp, healthy)
+            }),
+        ),
+        (Class::Tank, line_units(observation, memory, EntityKind::Tank, free)),
+    ];
+    let exposure: Vec<usize> = lines.iter().map(|line| line.exposure).collect();
     let outer = lines.iter().any(|line| !line.main);
     let gun_weights: Vec<usize> = lines
         .iter()
         .map(|line| if outer && line.main { 0 } else { line.exposure })
         .collect();
-    let previous = &memory.jeff_v1_1.base_lines;
+    let previous = &memory.jeff_v1_1.base_lines.posts;
     let near_post = |unit: &AiEntitySummary| {
         previous.get(&unit.id).is_some_and(|post| {
             dist2(unit.x, unit.y, post.at.0 as f32, post.at.1 as f32) <= squared(ON_POST_TILES * ts)
         })
     };
-    let mut seated: Vec<(u32, u32, (f32, f32), bool)> = Vec::new();
-    for (units, weights, guns) in [
-        (&riflemen, &rifle_weights, false),
-        (&guns, &gun_weights, true),
-    ] {
+    // (unit, line index, post, class)
+    let mut seated: Vec<(u32, usize, (f32, f32), Class)> = Vec::new();
+    for (class, units) in &classes {
+        let weights = if *class == Class::Gun {
+            &gun_weights
+        } else {
+            &exposure
+        };
         let entries: Vec<(u32, (f32, f32), Option<u32>)> = units
             .iter()
             .map(|unit| {
@@ -488,21 +676,16 @@ pub(in crate::ai_core::decision) fn hold(
             if members.is_empty() {
                 continue;
             }
-            // A few spare points, for posts that clear onto one another.
-            let wanted = if guns {
-                line.gun_points(members.len() + 4, ts)
-            } else {
-                line.rifle_points(members.len() + 4, ts)
-            };
-            let facing = guns.then_some(line.axis);
+            let wanted = line.points(*class, members.len(), ts);
+            let facing = (*class == Class::Gun).then_some(line.axis);
             let points = clear_points(observation, map_analysis, wanted, facing);
             let points = &points[..points.len().min(members.len())];
             for (id, point) in seat(&members, points, ts) {
-                seated.push((id, line.depot, point, guns));
+                seated.push((id, index, point, *class));
             }
         }
     }
-    let tick = observation.tick;
+    let alarmed = sound_alarm(actions, observation, memory, &lines, &seated, intents);
     let fighting = |unit: &AiEntitySummary| {
         observation.visible_enemies.iter().any(|enemy| {
             enemy.kind.is_unit()
@@ -512,12 +695,13 @@ pub(in crate::ai_core::decision) fn hold(
     };
     let mut posts = BTreeMap::new();
     let mut ordered = Vec::new();
-    for (id, depot, point, _) in seated {
+    for (id, index, point, _) in seated {
         let Some(unit) = observation.owned.iter().find(|unit| unit.id == id) else {
             continue;
         };
+        let depot = lines[index].depot;
         let at = (point.0.round() as i32, point.1.round() as i32);
-        let last = memory.jeff_v1_1.base_lines.get(&id).copied();
+        let last = memory.jeff_v1_1.base_lines.posts.get(&id).copied();
         let same = last.filter(|post| {
             post.depot == depot
                 && dist2(post.at.0 as f32, post.at.1 as f32, point.0, point.1)
@@ -528,6 +712,11 @@ pub(in crate::ai_core::decision) fn hold(
             at,
             ordered: same.map_or(0, |post| post.ordered),
         };
+        if let Some(sent) = alarmed.get(&id) {
+            post.ordered = *sent;
+            posts.insert(id, post);
+            continue;
+        }
         let on = dist2(unit.x, unit.y, point.0, point.1) <= squared(ON_POST_TILES * ts);
         let since = same.map(|post| tick.saturating_sub(post.ordered));
         let waiting = since.is_some_and(|since| {
@@ -542,9 +731,93 @@ pub(in crate::ai_core::decision) fn hold(
         }
         posts.insert(id, post);
     }
-    memory.jeff_v1_1.base_lines = posts;
+    memory.jeff_v1_1.base_lines.posts = posts;
     if !ordered.is_empty() {
         // Clears the live adapter's cached staging, so a unit moved to a new post gets the order.
         intents.push(AiIntent::Assemble { units: ordered });
     }
+}
+
+/// Sends each base's Riflemen, Panzerfausts and Tanks at enemy fighters near its Depot or mines,
+/// with the nearest other base's when the contact outweighs them; guns keep their trenches. Returns
+/// the units answering, each with the tick it was last sent.
+fn sound_alarm(
+    actions: &mut AiActionContext<'_>,
+    observation: &AiObservation,
+    memory: &mut AiDecisionMemory,
+    lines: &[BaseLine],
+    seated: &[(u32, usize, (f32, f32), Class)],
+    intents: &mut Vec<AiIntent>,
+) -> BTreeMap<u32, u32> {
+    let tick = observation.tick;
+    let mut answering = BTreeMap::new();
+    let value = |id: u32| {
+        observation
+            .owned
+            .iter()
+            .find(|unit| unit.id == id)
+            .map_or(0.0, |unit| unit_value(unit.kind) as f32)
+    };
+    for (index, line) in lines.iter().enumerate() {
+        let Some((threat, at)) = line.contact(observation) else {
+            continue;
+        };
+        note_contact(&mut memory.jeff_v1_1.base_lines, line.depot, line.origin, at);
+        let mobile = |of: usize| -> Vec<u32> {
+            seated
+                .iter()
+                .filter(|(id, line, _, class)| {
+                    *line == of && *class != Class::Gun && !answering.contains_key(id)
+                })
+                .map(|(id, _, _, _)| *id)
+                .collect()
+        };
+        let mut responders = mobile(index);
+        let mut strength: f32 = responders.iter().map(|id| value(*id)).sum();
+        if strength < threat * ALARM_MARGIN {
+            let mut others: Vec<usize> = (0..lines.len()).filter(|other| *other != index).collect();
+            others.sort_by(|a, b| {
+                let (a, b) = (&lines[*a].origin, &lines[*b].origin);
+                dist2(a.0, a.1, line.origin.0, line.origin.1)
+                    .total_cmp(&dist2(b.0, b.1, line.origin.0, line.origin.1))
+            });
+            if let Some(nearest) = others.first() {
+                for id in mobile(*nearest) {
+                    if strength >= threat * ALARM_MARGIN {
+                        break;
+                    }
+                    strength += value(id);
+                    responders.push(id);
+                }
+            }
+        }
+        let due: Vec<u32> = responders
+            .iter()
+            .copied()
+            .filter(|id| {
+                memory
+                    .jeff_v1_1
+                    .base_lines
+                    .posts
+                    .get(id)
+                    .is_none_or(|post| tick.saturating_sub(post.ordered) >= ALARM_REORDER_TICKS)
+            })
+            .collect();
+        for id in &responders {
+            let last = memory
+                .jeff_v1_1
+                .base_lines
+                .posts
+                .get(id)
+                .map_or(0, |post| post.ordered);
+            answering.insert(*id, last);
+        }
+        if let Some(units) = actions::attack_move_units(actions, due, at.0, at.1) {
+            for id in &units {
+                answering.insert(*id, tick);
+            }
+            intents.push(AiIntent::Attack { units });
+        }
+    }
+    answering
 }

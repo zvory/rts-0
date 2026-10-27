@@ -257,7 +257,7 @@ pub(super) fn issue_expansion_containment_wave(
         );
         let nearby_rifles = nearby_rifle_escort_count(observation, &riflemen, formation_center);
         // Jeff's AI V1.1 weighs whole armies instead of Tank counts, and strikes a gathering wave.
-        let v1_1_launch = jeff_v1_1::push::launch_ready(observation, memory, joining);
+        let v1_1_launch = jeff_v1_1::push::launch_ready(observation, map_analysis, memory, joining);
         // The live Jeff also launches once most of its Tanks have gathered, a while after the hard
         // timeout: one Tank held behind a building, or the Scout Car elsewhere, kept a 24-Tank push
         // waiting at home for the rest of the game.
@@ -386,20 +386,25 @@ pub(super) fn issue_expansion_containment_wave(
             observation.map,
             memory.endgame_search_waypoint,
         )
-    } else if memory.enemy_natural_destroyed {
-        (enemy_base.x, enemy_base.y)
     } else {
-        // Jeff's AI V1.1 rolls its line forward anchor by anchor.
-        jeff_v1_1::push::objective(observation, map_analysis, memory, own_base, natural_objective)
-            .unwrap_or(natural_objective)
+        let fallback = if memory.enemy_natural_destroyed {
+            (enemy_base.x, enemy_base.y)
+        } else {
+            natural_objective
+        };
+        // Jeff's AI V1.1 raids the enemy's softest base, or rolls its line forward anchor by anchor.
+        jeff_v1_1::push::objective(
+            observation,
+            map_analysis,
+            memory,
+            own_base,
+            (enemy_base.x, enemy_base.y),
+            fallback,
+            policy.tank_standoff_tiles,
+        )
+        .unwrap_or(fallback)
     };
-    let holding_short = jeff_v1_1::push::holding_short(
-        observation,
-        map_analysis,
-        memory,
-        own_base,
-        natural_objective,
-    );
+    let holding_short = jeff_v1_1::push::holding_short(memory);
     let (tank_point, legacy_scout_point) = if endgame_search_active {
         let scout_point = scout_forward_from_tanks(
             objective,
@@ -480,7 +485,8 @@ pub(super) fn issue_expansion_containment_wave(
     // and its two Tanks decide a duel by where they stand when they meet the enemy's.
     let legs = if push_uses_available_armor
         && !endgame_search_active
-        && tanks.len() >= super::approach::MIN_TANKS_FOR_LEGS
+        && tanks.len()
+            >= jeff_v1_1::push::legs_min_tanks(memory, super::approach::MIN_TANKS_FOR_LEGS)
     {
         containment_regroup_point(own_base, enemy_base, observation.map).map(|rally| {
             let legs = super::approach::push_legs(

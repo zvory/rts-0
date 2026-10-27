@@ -174,11 +174,13 @@ where
             } else {
                 REQUIRED_TOTAL_TANKS
             };
+        let home = geometry::tile_center(observation.own_start_tile, observation.map.tile_size);
+        let escort_ready =
+            v1_1 && jeff_v1_1::third_base::escort(observation, memory, home).is_some();
         let army_ready = if v1_1 {
-            let home = geometry::tile_center(observation.own_start_tile, observation.map.tile_size);
             (total_tanks >= required_total_tanks
                 || jeff_v1_1::third_base::banked(observation, memory))
-                && jeff_v1_1::third_base::escort(observation, memory, home).is_some()
+                && escort_ready
         } else {
             total_tanks >= required_total_tanks
                 // The two guards leave, so the home reserve must still be there after they go.
@@ -191,6 +193,11 @@ where
             && observation.economy.steel >= steel
             && observation.economy.oil >= oil
             && !factory_due;
+        // V1.1 keeps the Depot's Oil aside once an escort is free, so the base is not held up by
+        // Oil that Tanks spent first.
+        if escort_ready && !ready {
+            actions.holdback_resources(0, oil);
+        }
         if ready {
             let resources = expansion::expansion_candidate_resources(observation);
             let rejected = memory.later_bases.rejected_sites.clone();
@@ -413,6 +420,10 @@ pub(super) fn recall_tanks_to_main(
     claimed: &BTreeSet<u32>,
     keep_out: Option<u32>,
 ) -> Vec<u32> {
+    // Jeff's AI V1.1's base lines split its resting Tanks over its bases.
+    if memory.later_bases.v1_1 {
+        return Vec::new();
+    }
     let at_main = main_tank_ids(observation, memory);
     let short = memory.home_tank_reserve().saturating_sub(at_main.len());
     if short == 0 {

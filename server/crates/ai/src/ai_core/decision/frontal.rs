@@ -1264,10 +1264,18 @@ fn push_keep_home(observation: &AiObservation, memory: &AiDecisionMemory) -> usi
             .iter()
             .any(|unit| unit.id == id && unit.hp > 0)
     });
-    memory
-        .home_tank_reserve()
-        .saturating_sub(usize::from(home_tank_alive))
+    // Jeff's AI V1.1 keeps at most two: its base lines hold the bases, and against Pressure AI the
+    // whole reserve (up to five) stayed behind while the push never had the Tanks to leave.
+    let reserve = if memory.profile_id().is_some_and(is_jeff_v1_1) {
+        memory.home_tank_reserve().min(V1_1_HOME_TANKS)
+    } else {
+        memory.home_tank_reserve()
+    };
+    reserve.saturating_sub(usize::from(home_tank_alive))
 }
+
+/// The most Tanks Jeff's AI V1.1's push leaves at home, the home Tank included.
+const V1_1_HOME_TANKS: usize = 2;
 
 /// Enemy Tanks this close to any push Tank count toward the push being outnumbered.
 const PUSH_OUTNUMBERED_RADIUS_TILES: f32 = 16.0;

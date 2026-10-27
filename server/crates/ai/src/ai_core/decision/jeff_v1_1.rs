@@ -6,6 +6,7 @@ use crate::ai_core::facts::ProductionBuildingFact;
 
 pub(super) mod base_line;
 pub(super) mod push;
+pub(super) mod strike;
 pub(super) mod third_base;
 
 /// What V1.1 remembers between decisions.
@@ -15,10 +16,11 @@ pub(super) struct V1_1Memory {
     /// Entrenchment's research would end, so the Training Centre stays free for Meth.
     pub(super) entrenchment_waits: bool,
     /// Each base-line unit's post (`base_line`).
-    pub(super) base_lines: BTreeMap<u32, base_line::LinePost>,
+    pub(super) base_lines: base_line::LineMemory,
     /// Since when Steel has stood at `third_base::BANK_STEEL` or more.
     pub(super) banked_since: Option<u32>,
     pub(super) push: push::PushMemory,
+    pub(super) strike: strike::StrikeMemory,
 }
 
 /// Methamphetamines comes first. It is ordered the moment the Training Centre is free and its cost
@@ -190,8 +192,18 @@ pub(super) fn rifle_line(
     {
         priorities.push(EntityKind::Rifleman);
     }
+    // ...and into Panzerfausts, which also answer the enemy's Tanks (`BANKED_FAUSTS`).
+    if banked
+        && facts.unit_count(EntityKind::Panzerfaust) < BANKED_FAUSTS
+        && !priorities.contains(&EntityKind::Panzerfaust)
+    {
+        priorities.push(EntityKind::Panzerfaust);
+    }
     Some(line)
 }
+
+/// The most Panzerfausts banked Steel buys.
+const BANKED_FAUSTS: usize = 8;
 
 /// V1.1 trains Machine Gunners for every gun post it has: the home pocket's, four in front of each
 /// finished Depot past the main, and four more held at home. Guns past the home pocket wait while
@@ -229,6 +241,14 @@ pub(super) fn gun_cap(
     {
         Some((_, max)) => *max = cap,
         None => max_counts.push((EntityKind::MachineGunner, cap)),
+    }
+    let fausts = if banked { BANKED_FAUSTS } else { 0 };
+    match max_counts
+        .iter_mut()
+        .find(|(kind, _)| *kind == EntityKind::Panzerfaust)
+    {
+        Some((_, max)) => *max = (*max).max(fausts),
+        None => max_counts.push((EntityKind::Panzerfaust, fausts)),
     }
 }
 
