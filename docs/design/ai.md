@@ -289,8 +289,10 @@ boundary does not replace that saved route. Construction-clearance ownership con
 in the response.
 
 Pressure includes a Training Centre in its initial tech path so its infantry research does not
-wait for the Tank transition. On the first decision at or after two minutes (3,600 ticks), it queues
+wait for the Tank transition. After observing nine newly trained Riflemen, it queues
 Panzerfausts on an owned Training Centre, including an unfinished or currently researching one.
+The match-local counter excludes starting Riflemen, retains casualties, and survives the Rush
+handoff; only owned units observed in player snapshots count.
 Research waits for authoritative completion, prerequisites, and payment. Once the upgrade completes,
 Pressure stops issuing new Rifleman orders, disables Rifleman repeat, and enables Panzerfaust repeat
 on every completed Barracks, including replacements. Already paid or queued Riflemen finish normally.
@@ -341,12 +343,20 @@ the first decision at or after two minutes (3,600 simulation ticks), behind earl
 it completes, each Barracks alternates Machine Gunners and Panzerfausts. The home Resource Depot
 auto-builds Steel Mines and Pump Jacks to sustain income during the opening.
 
-At four minutes (7,200 simulation ticks), Rush cancels all queued production and standing
+Thirty seconds after its fifth wave launch, Rush cancels all queued production and standing
 allocations at the two surviving Barracks nearest the first living enemy start, retaining at least
 one rear Barracks if fewer than three survive. It then hands over to the full Pressure AI economy,
 defense, production, and wave controller on the normal decision cadence. Retired Barracks remain
 idle; Pressure may use the rear Barracks and any new producers. Existing units and construction
-survive, while Rush wave memory is discarded. The requested Rush or AI 2.2 match identity remains
+survive, while Rush wave memory is discarded. Losing its only Engineer independently arms the
+same thirty-second recovery handoff; Pressure can then replace the Engineer and rebuild income.
+Rush suspends new wave launches during that recovery grace period, preserving Rush micro for
+already launched units without launching a cohort just before the switch. Later waves do not
+postpone a handoff already armed by wave five; the earlier of the wave and recovery deadlines
+wins. Rush retains its original two-minute Panzerfaust gate. After handoff, Pressure uses the
+cumulative Rifleman production milestone for research while retaining its timed target selection
+and wave-size doubling.
+The requested Rush or AI 2.3 match identity remains
 unchanged; the active behavior and decision traces identify Pressure after the handoff.
 
 Rush enables the shared wounded-unit pull-back only for Riflemen still approaching their first

@@ -14,6 +14,9 @@ const FIRST_WAVE_RESEARCH_PROGRESS: f32 = 0.9;
 const SLOT_SPACING_TILES: f32 = 1.5;
 const ARRIVAL_TILES: f32 = 0.75;
 const RETRY_TICKS: u32 = 90;
+// Most baseline openings launch five waves before the former four-minute handoff.
+pub(crate) const HANDOFF_WAVES: u32 = 5;
+pub(crate) const HANDOFF_DELAY_TICKS: u32 = rts_rules::balance::TICK_HZ * 30;
 
 #[derive(Default)]
 pub(super) struct RushWaves {
@@ -23,6 +26,9 @@ pub(super) struct RushWaves {
     held: BTreeSet<u32>,
     launched: BTreeSet<u32>,
     first_wave_launched: bool,
+    waves_launched: u32,
+    launches_suspended: bool,
+    handoff_tick: Option<u32>,
     first_wave_unlocked: bool,
     flow: super::flow::RushFlow,
     pullback: PullbackMemory,
@@ -37,6 +43,17 @@ struct StagingLine {
 }
 
 impl RushWaves {
+    pub(super) fn suspend_launches(&mut self) {
+        self.launches_suspended = true;
+    }
+    pub(super) fn handoff_tick(&self) -> Option<u32> {
+        self.handoff_tick
+    }
+    #[cfg(test)]
+    pub(super) fn set_handoff_tick_for_test(&mut self, tick: u32) {
+        self.handoff_tick = Some(tick);
+    }
+
     pub(super) fn rally(&mut self, frame: &AiFrame, enemy_id: u32, target: Point) -> Option<Point> {
         if self.plan.as_ref().is_none_or(|(id, _)| *id != enemy_id) {
             let home = frame
@@ -141,17 +158,22 @@ impl RushWaves {
                                 .is_some_and(|progress| progress >= FIRST_WAVE_RESEARCH_PROGRESS)
                     })
             });
-        let may_launch = if self.first_wave_launched {
-            ready.len() >= 5
-        } else {
-            !ready.is_empty() && self.first_wave_unlocked
-        };
+        let may_launch = !self.launches_suspended
+            && if self.first_wave_launched {
+                ready.len() >= 5
+            } else {
+                !ready.is_empty() && self.first_wave_unlocked
+            };
         if may_launch {
             if let Ok(group) = UnitGroup::new(ready.iter().copied()) {
                 if actions
                     .attack_move(&group, target.0, target.1, false)
                     .is_ok()
                 {
+                    self.waves_launched = self.waves_launched.saturating_add(1);
+                    if self.waves_launched == HANDOFF_WAVES {
+                        self.handoff_tick = Some(frame.tick().saturating_add(HANDOFF_DELAY_TICKS));
+                    }
                     self.first_wave_launched = true;
                     for id in &ready {
                         self.launched.insert(*id);

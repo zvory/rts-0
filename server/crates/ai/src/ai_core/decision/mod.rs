@@ -808,10 +808,7 @@ where
     );
     let mut effective_unit_priorities = effective_unit_priorities;
     if profile.id == crate::ai_core::profiles::PRESSURE_AI_ID
-        && crate::pressure::uses_panzerfaust_production(
-            observation.tick,
-            facts.completed_upgrades(),
-        )
+        && crate::pressure::uses_panzerfaust_production(facts.completed_upgrades())
     {
         // Pressure's standing Panzerfaust allocation replaces new Rifleman orders; paid queues
         // finish normally. Keep the legacy home Machine Gunners and Tank production policy.

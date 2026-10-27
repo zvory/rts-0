@@ -23,6 +23,7 @@ pub(crate) struct RushStrategy {
     barracks_repeats: BTreeMap<u32, BTreeSet<EntityKind>>,
     research_queued: BTreeSet<(u32, UpgradeKind)>,
     riflemen_retired: bool,
+    recovery_handoff_tick: Option<u32>,
     exclusions: KnownBuildSiteExclusions,
     last_build: Option<(EntityKind, u32, u32)>,
 }
@@ -322,4 +323,23 @@ fn safe_construction_site(
     };
     (position.0 + segment.0 * along - target.0).hypot(position.1 + segment.1 * along - target.1)
         >= (ENGINEER_MIN_DISTANCE_TILES + 1.0) * size
+}
+
+impl RushStrategy {
+    /// Rush cannot rebuild its opening after losing its only Engineer. Give the current attack
+    /// thirty seconds of Rush micro, then let Pressure replace the Engineer and economy.
+    pub(crate) fn observe_engineer(&mut self, tick: u32, alive: bool) {
+        if !alive && self.recovery_handoff_tick.is_none() {
+            self.recovery_handoff_tick = Some(tick.saturating_add(staging::HANDOFF_DELAY_TICKS));
+            self.waves.suspend_launches();
+        }
+    }
+    pub(crate) fn handoff_due(&self, tick: u32) -> bool {
+        self.waves.handoff_tick().is_some_and(|due| tick >= due)
+            || self.recovery_handoff_tick.is_some_and(|due| tick >= due)
+    }
+    #[cfg(test)]
+    pub(crate) fn set_handoff_tick_for_test(&mut self, tick: u32) {
+        self.waves.set_handoff_tick_for_test(tick);
+    }
 }

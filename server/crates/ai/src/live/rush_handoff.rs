@@ -1,11 +1,19 @@
 //! One-time Rush opening handoff to the ordinary Pressure controller.
 use super::*;
 
-pub(crate) const HANDOFF_TICK: u32 = rts_rules::balance::TICK_HZ * 240;
-
 impl AiController {
     pub(super) fn handoff_rush(&mut self, context: &AiThinkContext<'_>) -> Vec<SimCommand> {
-        if self.behavior_profile_id != RUSH_AI_ID || context.snapshot.tick < HANDOFF_TICK {
+        if self.behavior_profile_id != RUSH_AI_ID {
+            return Vec::new();
+        }
+        let engineer_alive = context
+            .snapshot
+            .entities
+            .iter()
+            .any(|e| e.owner == self.player && e.kind == "worker" && e.hp > 0);
+        self.rush_strategy
+            .observe_engineer(context.snapshot.tick, engineer_alive);
+        if !self.rush_strategy.handoff_due(context.snapshot.tick) {
             return Vec::new();
         }
         let team = context
@@ -55,6 +63,7 @@ impl AiController {
         }
         self.behavior_profile_id = PRESSURE_AI_ID;
         self.memory = AiDecisionMemory::for_profile(self.profile());
+        self.rush_strategy = RushStrategy::default();
         self.custom_strategy = None;
         self.strategy_initialized = false;
         self.staged_units.clear();
@@ -69,6 +78,7 @@ impl AiController {
 mod tests {
     use super::*;
     use rts_sim::protocol::EntityView;
+    const HANDOFF_TICK: u32 = 7_200;
 
     #[test]
     fn sparse_rush_opening_preserves_one_producer_and_composition_identity() {
@@ -90,11 +100,15 @@ mod tests {
                     "idle",
                 ));
             }
-            let composition = composition_by_id(AI_2_2_ID).unwrap();
+            let composition = composition_by_id(AI_2_3_ID).unwrap();
             let seed = (0..128)
                 .find(|seed| composition.select(*seed, 1) == Some(RUSH_AI_ID))
                 .unwrap();
             let mut controller = AiController::new(1);
+            controller.select_for_match(seed);
+            controller
+                .rush_strategy
+                .set_handoff_tick_for_test(HANDOFF_TICK);
             controller.think(AiThinkContext {
                 match_seed: seed,
                 start: &start,
@@ -102,7 +116,7 @@ mod tests {
                 alive_player_ids: &[1, 2],
                 retreat_commands: vec![],
             });
-            assert_eq!(controller.profile_id(), AI_2_2_ID);
+            assert_eq!(controller.profile_id(), AI_2_3_ID);
             assert_eq!(controller.selected_profile_id(), Some(PRESSURE_AI_ID));
             assert_eq!(
                 controller.retired_barracks.len(),
@@ -112,7 +126,7 @@ mod tests {
     }
 
     #[test]
-    fn rush_hands_off_once_at_four_minutes_and_retires_nearest_two() {
+    fn rush_hands_off_once_when_wave_delay_expires_and_retires_nearest_two() {
         let players = super::super::tests::driver_test_players();
         let game = Game::new_without_ai_controllers(&players, 13);
         let start = game.start_payload();
@@ -143,6 +157,9 @@ mod tests {
                 retreat_commands: vec![],
             })
         };
+        controller
+            .rush_strategy
+            .set_handoff_tick_for_test(HANDOFF_TICK);
         snapshot.tick = HANDOFF_TICK - 1;
         run(&mut controller, &snapshot);
         assert_eq!(controller.selected_profile_id(), Some(RUSH_AI_ID));
@@ -167,5 +184,54 @@ mod tests {
             SimCommand::AdjustProductionRepeat { buildings, delta, .. }
             if *delta > 0 && buildings.iter().any(|id| [901, 902].contains(id)))));
         assert!(controller.custom_strategy.is_none());
+        assert!(!controller.rush_strategy.handoff_due(u32::MAX));
+    }
+}
+
+#[cfg(test)]
+mod recovery_tests {
+    use super::*;
+
+    #[test]
+    fn clock_alone_does_not_switch_but_engineer_loss_recovers_without_five_waves() {
+        let players = super::super::tests::driver_test_players();
+        let game = Game::new_without_ai_controllers(&players, 13);
+        let start = game.start_payload();
+        let mut snapshot = game.snapshot_for(1);
+        let mut controller = AiController::with_profile_id(1, RUSH_AI_ID);
+        let run = |controller: &mut AiController, snapshot: &Snapshot| {
+            controller.think(AiThinkContext {
+                match_seed: 0,
+                start: &start,
+                snapshot,
+                alive_player_ids: &[1, 2],
+                retreat_commands: vec![],
+            })
+        };
+        snapshot.tick = 20_000;
+        run(&mut controller, &snapshot);
+        assert_eq!(controller.selected_profile_id(), Some(RUSH_AI_ID));
+        assert_eq!(controller.opening.trained_riflemen(), 0);
+        // Units trained during Rush count toward Pressure's research milestone after handoff.
+        for id in 1000..1009 {
+            snapshot.entities.push(rts_sim::protocol::EntityView::new(
+                id, 1, "rifleman", 500.0, 500.0, 45, 45, "idle",
+            ));
+        }
+        snapshot.tick += 1;
+        run(&mut controller, &snapshot);
+        assert_eq!(controller.opening.trained_riflemen(), 9);
+        snapshot
+            .entities
+            .retain(|e| !(e.owner == 1 && e.kind == "worker"));
+        snapshot.tick = 20_001;
+        run(&mut controller, &snapshot);
+        snapshot.tick += crate::config::TICK_HZ * 30 - 1;
+        run(&mut controller, &snapshot);
+        assert_eq!(controller.selected_profile_id(), Some(RUSH_AI_ID));
+        snapshot.tick += 1;
+        run(&mut controller, &snapshot);
+        assert_eq!(controller.selected_profile_id(), Some(PRESSURE_AI_ID));
+        assert_eq!(controller.opening.trained_riflemen(), 9);
     }
 }
