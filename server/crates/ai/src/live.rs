@@ -30,6 +30,9 @@ use rts_sim::protocol::{Snapshot, StartPayload};
 
 const DECISION_INTERVAL: u32 = 9;
 const LIVE_DECISION_TRACE_MAX_LINES: usize = 24;
+/// Jeff's AI V1.1: a fight is over for a unit with no visible enemy unit this close for this long.
+const QUIET_FIGHT_TILES: f32 = 10.0;
+const QUIET_FIGHT_TICKS: u32 = crate::config::TICK_HZ * 4;
 const LIVE_DECISION_TRACE_MAX_LINE_CHARS: usize = 256;
 const LIVE_DECISION_TRACE_TRUNCATED_LINE: &str = "trace_truncated=true";
 const CUSTOM_STRATEGY_PROFILE_ID: &str = "custom_strategy";
@@ -280,6 +283,8 @@ pub struct AiController {
     staged_units: BTreeSet<u32>,
     held_stage_units: BTreeSet<u32>,
     active_attack_units: BTreeMap<u32, u32>,
+    /// Jeff's AI V1.1: since when each attack-held unit has had no enemy near (`release_quiet_fights`).
+    quiet_since: BTreeMap<u32, u32>,
     last_decision_trace: Option<AiDecisionTraceSnapshot>,
     last_debug_map_layers: Vec<ObserverMapAnalysisLayer>,
     custom_strategy: Option<Box<dyn AiStrategy>>,
@@ -326,6 +331,7 @@ impl AiController {
             staged_units: BTreeSet::new(),
             held_stage_units: BTreeSet::new(),
             active_attack_units: BTreeMap::new(),
+            quiet_since: BTreeMap::new(),
             last_decision_trace: None,
             last_debug_map_layers: Vec::new(),
             custom_strategy: (profile_id == RUSH_AI_ID)
@@ -606,6 +612,36 @@ impl AiController {
         self.active_attack_units.retain(|id, issued| {
             owned.contains(id) && tick.saturating_sub(*issued) < suppress_ticks
         });
+        if crate::ai_core::profiles::is_jeff_v1_1(self.behavior_profile_id) {
+            self.release_quiet_fights(observation, tick);
+        }
+    }
+
+    /// Jeff's AI V1.1 sends a defender back to its post once its fight is over, when no visible
+    /// enemy unit has come within `QUIET_FIGHT_TILES` of it for `QUIET_FIGHT_TICKS`. An attack order
+    /// otherwise holds it out of staging for up to two minutes, and the units that won a fight stood
+    /// where it ended: none was back on its post 120 s after a fight.
+    fn release_quiet_fights(&mut self, observation: &AiObservation, tick: u32) {
+        let reach = QUIET_FIGHT_TILES * observation.map.tile_size as f32;
+        let quiet: BTreeSet<u32> = observation
+            .owned
+            .iter()
+            .filter(|unit| self.active_attack_units.contains_key(&unit.id))
+            .filter(|unit| {
+                !observation.visible_enemies.iter().any(|enemy| {
+                    enemy.kind.is_unit() && (enemy.x - unit.x).hypot(enemy.y - unit.y) <= reach
+                })
+            })
+            .map(|unit| unit.id)
+            .collect();
+        self.quiet_since.retain(|id, _| quiet.contains(id));
+        for id in quiet {
+            let since = *self.quiet_since.entry(id).or_insert(tick);
+            if tick.saturating_sub(since) >= QUIET_FIGHT_TICKS {
+                self.active_attack_units.remove(&id);
+                self.quiet_since.remove(&id);
+            }
+        }
     }
 
     fn filter_repeated_stage_commands(
@@ -1329,6 +1365,75 @@ mod tests {
             ai.filter_repeated_stage_commands(97, &stage, vec![regroup.clone()]),
             vec![regroup]
         );
+    }
+
+    #[test]
+    fn jeffs_ai_v1_1_sends_defenders_home_once_their_fight_is_quiet() {
+        use crate::ai_core::observation::{
+            AiEconomy, AiEntityState, AiEntitySummary, AiMapSummary,
+        };
+        let rifleman = |id, x, owner| AiEntitySummary {
+            id,
+            owner,
+            kind: EntityKind::Rifleman,
+            x,
+            y: 320.0,
+            hp: 45,
+            state: AiEntityState::Idle,
+            is_complete: true,
+            production_queue_len: None,
+            production_kind: None,
+            latched_node: None,
+            target_id: None,
+            free_for_combat: true,
+        };
+        let fighting = AiObservation {
+            player_id: 1,
+            tick: 0,
+            map: AiMapSummary {
+                width: 64,
+                height: 64,
+                tile_size: 32,
+            },
+            economy: AiEconomy {
+                steel: 0,
+                oil: 0,
+                supply_used: 0,
+                supply_cap: 100,
+            },
+            own_start_tile: (8, 8),
+            players: Vec::new(),
+            owned: vec![rifleman(43, 320.0, 1)],
+            resources: Vec::new(),
+            visible_allies: Vec::new(),
+            visible_enemies: vec![rifleman(90, 480.0, 2)],
+            ability_states: Vec::new(),
+            smokes: Vec::new(),
+            visible_tank_traps: Vec::new(),
+            pending_builds: Vec::new(),
+            upgrades: Vec::new(),
+        };
+        let quiet = AiObservation {
+            visible_enemies: Vec::new(),
+            ..fighting.clone()
+        };
+        for profile in [JEFFS_AI_ID, JEFFS_AI_V1_1_ID] {
+            let mut ai = AiController::with_profile_id(1, profile);
+            ai.active_attack_units.insert(43, 0);
+            // An enemy five tiles away: the fight goes on.
+            ai.prune_combat_memory(&fighting, 200);
+            assert!(ai.active_attack_units.contains_key(&43));
+            // Quiet from tick 300: V1.1 sends the unit back after four seconds; V1.0 holds it.
+            ai.prune_combat_memory(&quiet, 300);
+            ai.prune_combat_memory(&quiet, 419);
+            assert!(ai.active_attack_units.contains_key(&43));
+            ai.prune_combat_memory(&quiet, 420);
+            assert_eq!(
+                ai.active_attack_units.contains_key(&43),
+                profile == JEFFS_AI_ID,
+                "{profile}"
+            );
+        }
     }
 
     #[test]
