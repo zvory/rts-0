@@ -308,7 +308,7 @@ import { textWithin } from "./dom_text.mjs";
   assertDeepEqual(
     AI_PROFILES,
     [
-      { id: "ai_2_2", label: "AI 2.2" },
+      { id: "ai_2_3", label: "AI 2.3" },
       { id: "jeffs_ai", label: "Jeff's AI" },
       { id: "rush_ai", label: "Rush AI" },
       { id: "pressure_ai", label: "Pressure AI" },
@@ -432,12 +432,12 @@ import { textWithin } from "./dom_text.mjs";
         { id: 1, name: "Host", color: "#0072b2", ready: false, teamId: 1 },
         {
           id: 2,
-          name: "AI 2.2",
+          name: "AI 2.3",
           color: "#d55e00",
           ready: true,
           teamId: 2,
           isAi: true,
-          aiProfileId: "ai_2_2",
+          aiProfileId: "ai_2_3",
         },
       ],
       myId: 1,
@@ -453,10 +453,10 @@ import { textWithin } from "./dom_text.mjs";
       (el) => el.tagName === "SELECT" && el.className === "player-ai-profile-select",
     );
     assert(
-      profileSelectors.length === 1 && profileSelectors[0].value === "ai_2_2",
-      "host lobby exposes an AI 2.2 profile selector",
+      profileSelectors.length === 1 && profileSelectors[0].value === "ai_2_3",
+      "host lobby exposes an AI 2.3 profile selector",
     );
-    assert(textWithin(root).includes("AI 2.2"), "host lobby labels AI seats as AI 2.2");
+    assert(textWithin(root).includes("AI 2.3"), "host lobby labels AI seats as AI 2.3");
     assert(profileSelectors[0].children.length === 4, "host lobby exposes all player-facing AI profiles");
     assert(!findFakes(root, (el) => String(el.className).includes("player-faction")).length,
       "non-beta lobby seats do not render faction controls");
@@ -566,7 +566,7 @@ import { textWithin } from "./dom_text.mjs";
     );
     assert(
       staleProfileSelectors.length === 1 &&
-        staleProfileSelectors[0].value === "ai_2_2" &&
+        staleProfileSelectors[0].value === "ai_2_3" &&
         staleProfileSelectors[0].children.length === 4,
       "player lobby does not expose an internal Turtle profile received from stale state",
     );

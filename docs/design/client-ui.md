@@ -2756,10 +2756,10 @@ Supported match-launch parameters:
 - `rtsName=<display name>` defaults to `Spectator` or `Commander` from the selected role.
 - `rtsMap=<map display name>` optionally selects a server-advertised lobby map before seating AIs.
 - Repeated `rtsAi=<team>:<profile>` entries seat AI opponents in order, for example
-  `rtsAi=1:ai_2_1&rtsAi=2:ai_turtle`. The default player-facing profile is `ai_2_2`; `ai_2_1` is internal-only.
+  `rtsAi=1:ai_2_1&rtsAi=2:ai_turtle`. The default player-facing profile is `ai_2_3`; `ai_2_1` is internal-only.
   `ai_turtle` is accepted only for internal observer launches; player-role launches normalize it
-  to `ai_2_2`. A profile-only observer entry such as `rtsAi=ai_turtle` uses the next team slot.
-  Unsupported values normalize to AI 2.2; if omitted, the launch defaults to two AI 2.2 seats on
+  to `ai_2_3`. A profile-only observer entry such as `rtsAi=ai_turtle` uses the next team slot.
+  Unsupported values normalize to AI 2.3; if omitted, the launch defaults to two AI 2.3 seats on
   teams 1 and 2.
 - `rtsStart=1|0` defaults to `1`. `0` prepares the lobby without pressing Start.
 

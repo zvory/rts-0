@@ -16,7 +16,7 @@ use crate::ai_core::profiles::{
     PRESSURE_AI_ID,
 };
 use crate::ai_shared;
-use crate::compositions::{composition_by_id, AI_2_2_ID};
+use crate::compositions::{composition_by_id, AI_2_3_ID};
 use crate::rush::{RushStrategy, RUSH_AI_ID};
 use crate::sdk::{AiActions, AiFrame, AiStrategy, KnownBuildSite, WorldQueries};
 use crate::selfplay::pending_build::PendingBuildTracker;
@@ -35,12 +35,12 @@ const LIVE_DECISION_TRACE_TRUNCATED_LINE: &str = "trace_truncated=true";
 const CUSTOM_STRATEGY_PROFILE_ID: &str = "custom_strategy";
 
 /// The default live-lobby profile id.
-pub const DEFAULT_LIVE_PROFILE_ID: &str = AI_2_2_ID;
+pub const DEFAULT_LIVE_PROFILE_ID: &str = AI_2_3_ID;
 
 /// Canonical profile ids understood by the live adapter. Experimental profiles are available to
 /// internal observer-only sessions; the room actor prevents them from entering human matches.
 pub const LIVE_PROFILE_IDS: [&str; 6] = [
-    AI_2_2_ID,
+    AI_2_3_ID,
     AI_2_1_ID,
     JEFFS_AI_ID,
     AI_TURTLE_ID,
@@ -79,7 +79,7 @@ pub fn live_profile_label(profile_id: &str) -> &'static str {
 pub fn is_player_live_profile_id(profile_id: &str) -> bool {
     matches!(
         profile_id,
-        AI_2_2_ID | JEFFS_AI_ID | RUSH_AI_ID | PRESSURE_AI_ID
+        AI_2_3_ID | JEFFS_AI_ID | RUSH_AI_ID | PRESSURE_AI_ID
     )
 }
 
@@ -1355,7 +1355,7 @@ mod tests {
         assert_eq!(
             LIVE_PROFILE_IDS,
             [
-                AI_2_2_ID,
+                AI_2_3_ID,
                 AI_2_1_ID,
                 JEFFS_AI_ID,
                 AI_TURTLE_ID,
@@ -1366,8 +1366,8 @@ mod tests {
     }
 
     #[test]
-    fn live_default_is_ai_2_2() {
-        assert_eq!(DEFAULT_LIVE_PROFILE_ID, AI_2_2_ID);
+    fn live_default_is_ai_2_3() {
+        assert_eq!(DEFAULT_LIVE_PROFILE_ID, AI_2_3_ID);
     }
 
     #[test]
@@ -1380,7 +1380,7 @@ mod tests {
         assert_eq!(
             selected,
             BTreeSet::from([
-                AI_2_2_ID,
+                AI_2_3_ID,
                 AI_2_1_ID,
                 JEFFS_AI_ID,
                 AI_TURTLE_ID,
@@ -1428,7 +1428,7 @@ mod tests {
         assert_eq!(live_profile_label(AI_2_1_ID), "AI 2.1");
         assert_eq!(live_profile_label(JEFFS_AI_ID), "Jeff's AI");
         assert_eq!(live_profile_label(AI_TURTLE_ID), "AI Turtle");
-        assert_eq!(live_profile_label("default"), "AI 2.2");
+        assert_eq!(live_profile_label("default"), "AI 2.3");
         assert_eq!(live_profile_label("unsupported_profile"), "AI");
         assert_eq!(live_profile_label("unknown"), "AI");
     }
