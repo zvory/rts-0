@@ -117,6 +117,8 @@ pub(crate) struct AiDecisionMemory {
     pub(super) raid_defense: super::defense::RaidDefense,
     /// The live Jeff's spend plan's timings of unfinished buildings and Tank Unlock.
     pub(super) spend_plan: super::spend_plan::SpendPlanMemory,
+    /// Jeff's AI V1.1's own state.
+    pub(super) jeff_v1_1: super::jeff_v1_1::V1_1Memory,
     profile_id: Option<&'static str>,
     attack_first_size: Option<usize>,
     next_attack_size: usize,
@@ -209,6 +211,7 @@ impl AiDecisionMemory {
             third_pressure: Default::default(),
             raid_defense: Default::default(),
             spend_plan: Default::default(),
+            jeff_v1_1: Default::default(),
             profile_id: Some(profile.id),
             attack_first_size: Some(profile.attack.first_attack_size),
             next_attack_size: profile.attack.first_attack_size,

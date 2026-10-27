@@ -385,6 +385,8 @@ pub(super) struct PlanInput {
     pub(super) natural_builder: Option<u32>,
     /// Ticks the natural's order still waits for its guards to secure the site.
     pub(super) natural_wait: u32,
+    /// Steel and Oil already promised ahead of every step (Jeff's AI V1.1's opening research).
+    pub(super) prepaid: (u32, u32),
 }
 
 /// The opening's steps with the tick each is charged, laid out from now.
@@ -840,7 +842,7 @@ pub(super) fn plan(
         &steps,
         &base,
         natural_walk,
-        (0, 0),
+        input.prepaid,
     );
     // Slack: the most Steel spent now that moves no step.
     let moves_a_step = |steel: u32| {
@@ -851,7 +853,7 @@ pub(super) fn plan(
             &steps,
             &base,
             natural_walk,
-            (steel, 0),
+            (steel + input.prepaid.0, input.prepaid.1),
         );
         with.iter()
             .zip(&laid)
@@ -890,6 +892,10 @@ pub(super) fn plan(
                 let cautious = forecast_for(observation, memory, &known, DISPATCH_INCOME_SHARE);
                 let (steel, oil) = cautious.mined_within(walk);
                 let (owed_steel, owed_oil) = off_plan_orders(observation, input, &steps);
+                let (owed_steel, owed_oil) = (
+                    owed_steel + input.prepaid.0 as f32,
+                    owed_oil + input.prepaid.1 as f32,
+                );
                 let (cost_steel, cost_oil) = StepKind::Natural.cost();
                 observation.economy.steel as f32 + steel - owed_steel >= cost_steel as f32
                     && observation.economy.oil as f32 + oil - owed_oil >= cost_oil as f32

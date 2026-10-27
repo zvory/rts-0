@@ -4,6 +4,7 @@ pub(super) fn uses_home_rifle_coverage(profile_id: &str) -> bool {
     matches!(
         profile_id,
         JEFFS_AI_ID
+            | JEFFS_AI_V1_1_ID
             | JEFFS_AI_BETA_ID
             | JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID
             | JEFFS_AI_PRE_TANK_CATCHUP_ID
@@ -23,6 +24,7 @@ pub(super) fn uses_current_jeff_defense(profile_id: &str) -> bool {
     matches!(
         profile_id,
         JEFFS_AI_ID
+            | JEFFS_AI_V1_1_ID
             | JEFFS_AI_BETA_ID
             | JEFFS_AI_PRE_TANK_CATCHUP_ID
             | JEFFS_AI_PRE_OPENING_RUSH_ID
@@ -400,7 +402,7 @@ pub(super) fn live_spend_plan(
     natural_pending: bool,
     secured: bool,
 ) -> Option<spend_plan::SpendPlan> {
-    (profile.id == JEFFS_AI_ID).then(|| {
+    is_live_jeff(profile.id).then(|| {
         let site = memory.expansion_security.site;
         let natural_builder = site
             .and_then(|site| {
@@ -435,6 +437,7 @@ pub(super) fn live_spend_plan(
                     expansion_security::secure_wait_ticks(observation, map_analysis, memory)
                         .unwrap_or(config::TICK_HZ * 30)
                 },
+                prepaid: jeff_v1_1::research_ahead(profile.id, facts, memory),
             },
         )
     })
@@ -463,7 +466,7 @@ pub(super) fn engineers(
         target_workers
     };
     let workers = facts.worker_count
-        + if profile_id == JEFFS_AI_ID {
+        + if is_live_jeff(profile_id) {
             observation
                 .owned
                 .iter()
@@ -501,7 +504,7 @@ pub(super) fn security_rifle_target(
         // used to be bought with the Steel the builder's walk left spare, and a builder sent ahead
         // of its money leaves none: 1v1 No Terrain s2p2 met its 2:24 raid with four guns and fell.
         let gun_target =
-            if profile.id == JEFFS_AI_ID && facts.building_count(EntityKind::ResourceDepot) >= 2 {
+            if is_live_jeff(profile.id) && facts.building_count(EntityKind::ResourceDepot) >= 2 {
                 profile
                     .defensive_machine_gunners
                     .map_or(expansion_security::OPENING_GUNS, |policy| {

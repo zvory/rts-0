@@ -11,9 +11,10 @@ use crate::ai_core::observation::{
     AiEntityState, AiEntitySummary, AiMapSummary, AiObservation, AiResourceSummary,
 };
 use crate::ai_core::profiles::{
-    is_jeffs_ai_profile, runs_live_jeff, uses_current_jeffs_ai_policy, AiProfile, AttackPolicy,
-    BarracksCurve, ExpansionContainmentPolicy, ExpansionPolicy, ProductionPolicy, ResourcePolicy,
-    TechTransitionPolicy, WorkerPolicy, JEFFS_AI_BETA_ID, JEFFS_AI_ID,
+    is_jeff_v1_1, is_jeffs_ai_profile, is_live_jeff, runs_live_jeff, uses_current_jeffs_ai_policy,
+    AiProfile, AttackPolicy, BarracksCurve, ExpansionContainmentPolicy, ExpansionPolicy,
+    ProductionPolicy, ResourcePolicy, TechTransitionPolicy, WorkerPolicy, JEFFS_AI_BETA_ID,
+    JEFFS_AI_ID, JEFFS_AI_V1_1_ID,
     JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID, JEFFS_AI_PRE_EARLY_NATURAL_ID, JEFFS_AI_PRE_FAST_NATURAL_ID,
     JEFFS_AI_PRE_GUARD_HANDOFF_ID, JEFFS_AI_PRE_HELD_SITE_ID, JEFFS_AI_PRE_OPENING_RUSH_ID,
     JEFFS_AI_PRE_RIFLE_COVERAGE_ID, JEFFS_AI_PRE_SAFE_BASES_ID, JEFFS_AI_PRE_SPEND_PLAN_ID,
@@ -35,6 +36,7 @@ mod frontal;
 mod geometry;
 mod home_armor;
 mod jeff;
+mod jeff_v1_1;
 mod later_bases;
 mod memory;
 mod obstacles;
@@ -213,7 +215,7 @@ where
     memory
         .pending_upgrades
         .retain(|upgrade| !observation.upgrades.contains(upgrade));
-    if profile.id == JEFFS_AI_ID {
+    if is_live_jeff(profile.id) {
         let unlock_pending = memory.pending_upgrades.contains(&UpgradeKind::TankUnlock);
         memory.spend_plan.observe(observation, unlock_pending);
     }
@@ -460,6 +462,8 @@ where
         let steel = if live_natural_pending { 0 } else { steel };
         actions.holdback_resources(steel, oil);
     }
+    let live = (&mut actions, &facts, &mut *memory, &mut intents);
+    jeff_v1_1::early_research(live, profile.id, spend_plan.as_ref());
     // Jeff's bases beyond the natural. A second Factory that is due takes priority this decision.
     let factory_due = uses_current_jeffs_ai_policy(profile.id)
         && should_build_extra_factory(
@@ -1103,6 +1107,7 @@ where
         local_defenders.retain(|id| !memory.stays_out_of_home_defense(*id));
         local_defenders.sort_unstable();
         local_defenders.dedup();
+        jeff_v1_1::keep_guns_on_posts(profile.id, observation, &mut local_defenders);
         if new_jeff_defense {
             if let Some(units) = defense::respond_to_local_incident(
                 &mut actions,

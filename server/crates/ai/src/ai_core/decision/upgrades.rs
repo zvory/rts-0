@@ -53,6 +53,9 @@ pub(super) fn queue_profile_upgrades(
         {
             continue;
         }
+        if *upgrade == UpgradeKind::Entrenchment && memory.jeff_v1_1.entrenchment_waits {
+            continue;
+        }
         queue_upgrade_if_available(actions, facts, memory, intents, *upgrade);
     }
 }

@@ -309,7 +309,8 @@ import { textWithin } from "./dom_text.mjs";
     AI_PROFILES,
     [
       { id: "ai_2_2", label: "AI 2.2" },
-      { id: "jeffs_ai", label: "Jeff's AI" },
+      { id: "jeffs_ai", label: "Jeff's AI V1.0" },
+      { id: "jeffs_ai_v1_1", label: "Jeff's AI V1.1" },
       { id: "rush_ai", label: "Rush AI" },
       { id: "pressure_ai", label: "Pressure AI" },
     ],
@@ -466,7 +467,7 @@ import { textWithin } from "./dom_text.mjs";
       "team headers omit redundant member counts");
     assert(
       profileSelectors[0].children[1].value === "jeffs_ai" &&
-        profileSelectors[0].children[1].textContent === "Jeff's AI",
+        profileSelectors[0].children[1].textContent === "Jeff's AI V1.0",
       "host lobby exposes the locally developed Jeff's AI profile",
     );
 

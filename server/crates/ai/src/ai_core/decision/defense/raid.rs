@@ -452,7 +452,8 @@ fn raid_at_the_line(
 
 /// The live Jeff's answer to a raid (see the module docs). `local_defenders` are the units home
 /// defense may use this decision. `resend`: a member sent to gather that has turned away from the
-/// point is sent again, not only one gone idle.
+/// point is sent again, not only one gone idle. `front`: where the base's line faces, when it is not
+/// the straight line to the enemy start (Jeff's AI V1.1, `front_direction`).
 pub(in crate::ai_core::decision) fn respond(
     actions: &mut AiActionContext<'_>,
     observation: &AiObservation,
@@ -460,6 +461,7 @@ pub(in crate::ai_core::decision) fn respond(
     local_defenders: &[u32],
     map_analysis: Option<&AiMapAnalysis>,
     resend: bool,
+    front: Option<(f32, f32)>,
 ) -> RaidAnswer {
     let ts = tile(observation);
     let tick = observation.tick;
@@ -555,7 +557,7 @@ pub(in crate::ai_core::decision) fn respond(
         && enemy_start(observation).is_none_or(|enemy| {
             let (Some(to_raid), Some(to_enemy)) = (
                 normalized_direction(home, raid.center),
-                normalized_direction(home, enemy),
+                front.or_else(|| normalized_direction(home, enemy)),
             ) else {
                 return false;
             };
@@ -896,6 +898,26 @@ fn line_anchor(
         line.iter().map(|p| p.0).sum::<f32>() / n,
         line.iter().map(|p| p.1).sum::<f32>() / n,
     )
+}
+
+/// Jeff's AI V1.1 measures a flank raid from where its line faces, the side the enemy's ground route
+/// enters the base, rather than from the straight line to the enemy start: Crossroads' water walls
+/// send every attack in about 100 degrees off that line, so V1.0 called all of them flank raids and
+/// walked its guns and trenches out to meet them.
+pub(in crate::ai_core::decision) fn front_direction(
+    profile_id: &str,
+    observation: &AiObservation,
+    map_analysis: Option<&AiMapAnalysis>,
+) -> Option<(f32, f32)> {
+    if !is_jeff_v1_1(profile_id) {
+        return None;
+    }
+    let home = tile_center(observation.own_start_tile, observation.map.tile_size);
+    super::pocket::crossroads_wall_aware_direction_for_observation(observation).or_else(|| {
+        map_analysis
+            .and_then(|analysis| analysis.base_route_entry(observation.player_id))
+            .and_then(|entry| normalized_direction(home, entry))
+    })
 }
 
 /// The nearest living enemy's start, in world pixels.

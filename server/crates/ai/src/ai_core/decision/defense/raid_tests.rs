@@ -78,7 +78,7 @@ fn respond_with(
 ) -> (Option<Vec<u32>>, Vec<Command>) {
     let facts = AiFacts::from_observation(observation);
     let mut actions = AiActionContext::new(&facts, SpendBudget::new(1000, 1000, 20, 80));
-    let answer = match respond(&mut actions, observation, memory, defenders, None, resend) {
+    let answer = match respond(&mut actions, observation, memory, defenders, None, resend, None) {
         RaidAnswer::NotARaid => None,
         RaidAnswer::Handled(units) => Some(units),
     };

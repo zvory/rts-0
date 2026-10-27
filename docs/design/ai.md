@@ -10,10 +10,11 @@ When several seats use the same profile, their lobby names receive deterministic
 
 ### Canonical profiles
 
-The player-facing lobby supports four AI profile IDs:
+The player-facing lobby supports five AI profile IDs:
 
 - ai_2_2 — AI 2.2, the default weighted composition: 50% Rush AI and 50% Pressure AI.
-- jeffs_ai — Jeff's AI, the server-authoritative port of the locally evaluated V3 champion policy.
+- jeffs_ai — Jeff's AI V1.0, the server-authoritative port of the locally evaluated V3 champion policy.
+- jeffs_ai_v1_1 — Jeff's AI V1.1, a separate bot grown from V1.0. It runs every live-Jeff behavior, and its own changes branch on `is_jeff_v1_1`, so V1.0 plays exactly as before. Random profile picks never choose it.
 - rush_ai — Rush AI, an immediate infantry attack with forward construction.
 - pressure_ai — Pressure AI, the AI 2.1 economy and technology with independent forward staging and a value-based response.
 
@@ -23,7 +24,7 @@ replaces it with `ai_2_2` whenever a room has an active human player. The replac
 again at the authoritative match-start seam, so stale or crafted clients cannot put Turtle into a
 human match.
 
-The convenience inputs ai and default resolve to ai_2_2. The lobby exposes AI 2.2, Jeff's AI, Rush AI, and Pressure AI. AI 2.1 remains a concrete internal profile (`ai_2_1`) for offline tools and
+The convenience inputs ai and default resolve to ai_2_2. The lobby exposes AI 2.2, Jeff's AI V1.0, Jeff's AI V1.1, Rush AI, and Pressure AI. AI 2.1 remains a concrete internal profile (`ai_2_1`) for offline tools and
 observer-only sessions, but is hidden and rejected as a direct selection in human player lobbies.
 Unsupported or internal IDs fall back to AI 2.2 when adding a seat and are ignored when changing a
 seat; stale internal seats are normalized to AI 2.2 when humans join and again at match start.

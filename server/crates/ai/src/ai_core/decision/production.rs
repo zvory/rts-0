@@ -245,6 +245,7 @@ fn uses_jeff_opposite_spawn_layout(observation: &AiObservation, profile: &AiProf
     matches!(
         profile.id,
         JEFFS_AI_ID
+            | JEFFS_AI_V1_1_ID
             | JEFFS_AI_BETA_ID
             | JEFFS_AI_PRE_TANK_CATCHUP_ID
             | JEFFS_AI_PRE_OPENING_RUSH_ID

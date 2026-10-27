@@ -73,6 +73,7 @@ fn no_natural() -> PlanInput {
         natural_site: None,
         natural_builder: None,
         natural_wait: 0,
+        prepaid: (0, 0),
     }
 }
 
@@ -121,6 +122,7 @@ fn the_naturals_builder_goes_once_the_depot_is_paid_for_by_its_arrival() {
         natural_site: Some(site),
         natural_builder: Some(1),
         natural_wait: 0,
+        prepaid: (0, 0),
     };
     // 300 Steel and 80 Oil banked: the Depot (450/100) is 150/20 short. The 31-tile walk takes
     // about 16 s, in which six mines and a Pump Jack bring in about 140 Steel and 23 Oil: short at
@@ -254,6 +256,7 @@ fn with_a_factory_up_the_natural_waits_for_its_cost_banked() {
         natural_site: Some((40, 8)),
         natural_builder: Some(1),
         natural_wait: 0,
+        prepaid: (0, 0),
     };
     let mut memory = SpendPlanMemory::default();
     for (steel, oil, funded) in [(420, 120, false), (450, 100, true)] {
