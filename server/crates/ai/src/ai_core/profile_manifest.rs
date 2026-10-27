@@ -359,15 +359,16 @@ mod tests {
 
     #[test]
     fn mixture_manifest_exposes_member_ids_and_weights() {
-        let identity = profile_identity_by_id(crate::compositions::AI_2_2_ID).unwrap();
+        let identity = profile_identity_by_id(crate::compositions::AI_2_3_ID).unwrap();
         validate_profile_identity(&identity).unwrap();
         let value = serde_json::to_value(identity).unwrap();
-        assert_eq!(value["label"], "AI 2.2");
+        assert_eq!(value["label"], "AI 2.3");
         assert_eq!(
             value["composition"]["members"],
             serde_json::json!([
                 {"profileId": "rush_ai", "weight": 1},
                 {"profileId": "pressure_ai", "weight": 1},
+                {"profileId": "jeffs_ai", "weight": 1},
             ])
         );
     }

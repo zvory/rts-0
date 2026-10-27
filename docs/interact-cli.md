@@ -51,7 +51,7 @@ node scripts/interact/cli.mjs lab screenshot --help
 The bounded normal-match surface is separate from Lab authoring:
 
 ```bash
-node scripts/interact/cli.mjs game open '{"opponent":"ai_2_2","viewport":{"width":1200,"height":800,"deviceScaleFactor":1}}'
+node scripts/interact/cli.mjs game open '{"opponent":"ai_2_3","viewport":{"width":1200,"height":800,"deviceScaleFactor":1}}'
 node scripts/interact/cli.mjs game open '{"spectate":["ai_2_1","ai_turtle"],"autoSpectator":true,"viewport":{"width":1200,"height":800,"deviceScaleFactor":1}}'
 node scripts/interact/cli.mjs game inspect '{"sessionId":"<id>","ownership":"owned","limit":100}'
 node scripts/interact/cli.mjs game select '{"sessionId":"<id>","ids":[42]}'
@@ -119,7 +119,7 @@ and queued-order gestures without exposing arbitrary keyboard or browser input.
 The complete `game` surface is `open`, `close`, `status`, `inspect`, `select`, `move`, `camera`, `screenshot`,
 `record-start`, `record-stop`, `record-wait`, `capture-timelapse`, `capture-cancel`, `give-up`, and
 `shutdown`. `game open` creates a fresh public-name-prefixed lobby. `opponent` creates exactly one
-local player and one AI (AI 2.2 by default); `spectate:[ai,ai]` creates exactly two opposing AI seats and one spectator,
+local player and one AI (AI 2.3 by default); `spectate:[ai,ai]` creates exactly two opposing AI seats and one spectator,
 then starts through the ordinary lobby flow. The launch gate requires `interact-game-*`, player or
 spectator role, and `interact=game`, so it cannot attach to an arbitrary room. `move` accepts only
 currently visible, locally owned unit ids and an in-map destination. There is no arbitrary command,

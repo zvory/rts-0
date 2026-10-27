@@ -3,13 +3,13 @@ use rts_sim::game::PlayerInit;
 
 #[test]
 fn composition_selects_once_and_keeps_the_requested_identity() {
-    for member in [PRESSURE_AI_ID, RUSH_AI_ID] {
-        let composition = composition_by_id(AI_2_2_ID).unwrap();
+    for member in [PRESSURE_AI_ID, RUSH_AI_ID, JEFFS_AI_ID] {
+        let composition = composition_by_id(AI_2_3_ID).unwrap();
         let seed = (0..128)
             .find(|seed| composition.select(*seed, 1) == Some(member))
             .unwrap();
         let mut controller = AiController::new(1);
-        assert_eq!(controller.profile_id(), AI_2_2_ID);
+        assert_eq!(controller.profile_id(), AI_2_3_ID);
         assert_eq!(controller.selected_profile_id(), None);
         controller.select_for_match(seed);
         assert_eq!(controller.selected_profile_id(), Some(member));
@@ -17,18 +17,18 @@ fn composition_selects_once_and_keeps_the_requested_identity() {
             controller.select_for_match(other_seed);
             assert_eq!(controller.selected_profile_id(), Some(member));
         }
-        assert_eq!(controller.profile_id(), AI_2_2_ID);
+        assert_eq!(controller.profile_id(), AI_2_3_ID);
         assert_eq!(controller.custom_strategy.is_some(), member == RUSH_AI_ID);
     }
-    assert!(is_player_live_profile_id(AI_2_2_ID));
+    assert!(is_player_live_profile_id(AI_2_3_ID));
     assert!(!is_player_live_profile_id(AI_2_1_ID));
-    assert_eq!(live_profile_label("default"), "AI 2.2");
+    assert_eq!(live_profile_label("default"), "AI 2.3");
 }
 
 #[test]
-fn both_composition_members_emit_the_same_commands_as_explicit_profiles() {
-    let composition = composition_by_id(AI_2_2_ID).unwrap();
-    for member in [PRESSURE_AI_ID, RUSH_AI_ID] {
+fn all_composition_members_emit_the_same_commands_as_explicit_profiles() {
+    let composition = composition_by_id(AI_2_3_ID).unwrap();
+    for member in [PRESSURE_AI_ID, RUSH_AI_ID, JEFFS_AI_ID] {
         let seed = (0..128)
             .find(|seed| composition.select(*seed, 1) == Some(member))
             .unwrap();
@@ -52,7 +52,7 @@ fn both_composition_members_emit_the_same_commands_as_explicit_profiles() {
         ];
         let mut mixed_game = Game::new(&players, seed);
         let mut explicit_game = Game::new(&players, seed);
-        let mut mixed = [AiController::with_profile_id(1, AI_2_2_ID)];
+        let mut mixed = [AiController::with_profile_id(1, AI_2_3_ID)];
         let mut explicit = [AiController::with_profile_id(1, member)];
         for _ in 0..900 {
             CanonicalAiTickDriver::run(&mut mixed_game, &mut mixed, AiAlivePolicy::Normal);
@@ -65,11 +65,11 @@ fn both_composition_members_emit_the_same_commands_as_explicit_profiles() {
         let trace = mixed[0]
             .latest_decision_trace()
             .expect("composition decision trace");
-        assert_eq!(trace.profile_id, AI_2_2_ID);
+        assert_eq!(trace.profile_id, AI_2_3_ID);
         assert!(trace
             .lines
             .iter()
-            .any(|line| line == &format!("composition=ai_2_2 selected={member}")));
+            .any(|line| line == &format!("composition=ai_2_3 selected={member}")));
         assert_eq!(
             mixed_game.command_log(),
             explicit_game.command_log(),

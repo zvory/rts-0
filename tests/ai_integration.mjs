@@ -44,7 +44,7 @@ const { ok } = assertions;
   ok(ai && ai.id !== A.playerId, "AI got its own player id");
   ok(ai && ai.factionId === DEFAULT_FACTION_ID, `AI defaults to ${DEFAULT_FACTION_ID}`);
   ok(ai && ai.aiProfileId === DEFAULT_AI_PROFILE_ID, `AI defaults to ${DEFAULT_AI_PROFILE_ID}`);
-  ok(ai && ai.name === "AI 2.2", `AI uses the default profile label as its name (${ai?.name})`);
+  ok(ai && ai.name === "AI 2.3", `AI uses the default profile label as its name (${ai?.name})`);
 
   const lobbyCountBeforeTurtleSelection = A.msgs.filter((m) => m.t === "lobby").length;
   A.send({ t: "setAiProfile", id: ai.id, aiProfileId: "ai_turtle" });
@@ -59,7 +59,7 @@ const { ok } = assertions;
     A.msgs.filter((m) => m.t === "lobby").length === lobbyCountBeforeTurtleSelection,
     "internal Turtle selection does not mutate the player lobby",
   );
-  ok(turtleAi && turtleAi.name === "AI 2.2", `AI seat keeps the supported label (${turtleAi?.name})`);
+  ok(turtleAi && turtleAi.name === "AI 2.3", `AI seat keeps the supported label (${turtleAi?.name})`);
 
   const beforeLegacySelection = A.msgs.filter((m) => m.t === "lobby").length;
   A.send({ t: "setAiProfile", id: ai.id, aiProfileId: "ai_2_1" });

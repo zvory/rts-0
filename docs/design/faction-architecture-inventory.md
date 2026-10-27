@@ -177,7 +177,7 @@ Pressure's copied policy (`server/crates/ai/src/ai_core/profiles/pressure.rs`), 
 staging (`server/crates/ai/src/pressure.rs`), and timed infantry production (`pressure/production.rs`)
 likewise select the current Kriegsia roster directly. The checker lists those three policy files
 explicitly. Pressure uses the same fog-filtered SDK and catalog-derived production costs; adding
-it as an AI 2.2 member or standalone opponent does not admit another AI faction.
+it as an AI 2.3 member or standalone opponent does not admit another AI faction.
 
 ## Current Prediction And WASM Coupling
 
