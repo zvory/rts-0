@@ -780,26 +780,31 @@ mod tests {
                 id: AiBaseSiteId::Start(1),
                 position: (100.0, 100.0),
                 resource_ids: vec![10],
+                ground_distances_from_starts: [(1, 0.0), (2, 400.0)].into_iter().collect(),
             },
             AiBaseSite {
                 id: AiBaseSiteId::Start(2),
                 position: (500.0, 100.0),
                 resource_ids: vec![20],
+                ground_distances_from_starts: [(1, 400.0), (2, 0.0)].into_iter().collect(),
             },
             AiBaseSite {
                 id: AiBaseSiteId::ResourceCluster(2),
                 position: (200.0, 100.0),
                 resource_ids: vec![30],
+                ground_distances_from_starts: [(1, 100.0), (2, 300.0)].into_iter().collect(),
             },
             AiBaseSite {
                 id: AiBaseSiteId::ResourceCluster(3),
                 position: (400.0, 100.0),
                 resource_ids: vec![40],
+                ground_distances_from_starts: [(1, 300.0), (2, 100.0)].into_iter().collect(),
             },
             AiBaseSite {
                 id: AiBaseSiteId::ResourceCluster(4),
                 position: (100.0, 200.0),
                 resource_ids: vec![50],
+                ground_distances_from_starts: [(1, 100.0), (2, 440.0)].into_iter().collect(),
             },
         ])
     }

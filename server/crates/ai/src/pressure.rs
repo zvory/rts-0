@@ -1,13 +1,17 @@
 //! Copied from Rush staging, intentionally owned independently by Pressure.
-//! Cohorts assemble on a terrain-routed front before receiving one shared attack order.
+//! Cohorts assemble on a timed front before receiving a shared attack route.
 use std::cmp::Reverse;
-use std::collections::{BTreeMap, BTreeSet, BinaryHeap};
+use std::collections::{BTreeMap, BTreeSet, BinaryHeap, VecDeque};
 
 use crate::sdk::{
-    AiActions, AiEntityState, AiFrame, AiMap, AiTerrain, EntityKind, UnitGroup, UpgradeKind,
+    AiActions, AiEntityState, AiFrame, AiMap, AiTerrain, EntityKind, PullbackMemory,
+    PullbackParams, UnitGroup, UpgradeKind,
 };
 
+mod objective;
 mod production;
+mod response;
+use objective::Objective;
 pub(crate) use production::uses_panzerfaust_production;
 
 type Point = (f32, f32);
@@ -20,8 +24,14 @@ const RETRY_TICKS: u32 = 90;
 
 #[derive(Default)]
 pub(crate) struct PressureWaves {
+    response: response::PressureResponse,
     production: production::PressureProduction,
+    pullback: PullbackMemory,
+    wave_routes: BTreeMap<u32, Objective>,
+    resume: BTreeSet<u32>,
     plan: Option<(u32, StagingLine)>,
+    objective: Option<Objective>,
+    reachable: Vec<bool>,
     slots: BTreeMap<u32, Point>,
     issued: BTreeMap<u32, u32>,
     held: BTreeSet<u32>,
@@ -34,11 +44,19 @@ pub(crate) struct PressureWaves {
 struct StagingLine {
     center: Point,
     forward: Point,
+    routed: bool,
 }
 
 impl PressureWaves {
     pub(crate) fn rally(&mut self, frame: &AiFrame, enemy_id: u32, target: Point) -> Option<Point> {
-        if self.plan.as_ref().is_none_or(|(id, _)| *id != enemy_id) {
+        // Snapshot the public geography once for this opponent. Resource depletion must not
+        // silently redefine "second" and "third" between the timed phase changes.
+        let objective = self
+            .objective
+            .filter(|objective| objective.enemy_id == enemy_id)
+            .map(|objective| objective.at_tick(frame.tick()))
+            .unwrap_or_else(|| Objective::new(frame, enemy_id, target));
+        if self.plan.is_none() || self.objective != Some(objective) {
             let home = frame
                 .players()
                 .iter()
@@ -48,7 +66,14 @@ impl PressureWaves {
                 (home.start_tile.0 as f32 + 0.5) * size,
                 (home.start_tile.1 as f32 + 0.5) * size,
             );
-            self.plan = Some((enemy_id, StagingLine::on_route(frame.map(), home, target)?));
+            let line = if objective.phase == 0 {
+                StagingLine::on_route(frame.map(), home, objective.target())
+            } else {
+                StagingLine::on_axis(frame.map(), home, objective.target())
+            };
+            self.reachable = ground_reachable(frame.map(), home);
+            self.plan = line.map(|line| (enemy_id, line));
+            self.objective = Some(objective);
             self.slots.clear();
             self.issued.clear();
             self.held.clear();
@@ -64,6 +89,18 @@ impl PressureWaves {
         actions: &mut AiActions,
     ) {
         self.production.step(frame, actions);
+        let response = self.response.step(frame, eligible, actions);
+        for id in &response.released {
+            // Recalled survivors become staging recruits again, including previously launched units.
+            self.launched.remove(id);
+            self.wave_routes.remove(id);
+            self.resume.remove(id);
+            self.slots.remove(id);
+            self.issued.remove(id);
+            self.held.remove(id);
+        }
+        self.issued.retain(|id, _| !response.active.contains(id));
+        self.held.retain(|id| !response.active.contains(id));
         let Some((_, line)) = self.plan else {
             return;
         };
@@ -84,6 +121,8 @@ impl PressureWaves {
         self.slots
             .retain(|id, _| alive.contains(id) && !self.launched.contains(id));
         self.launched.retain(|id| alive.contains(id));
+        self.wave_routes.retain(|id, _| alive.contains(id));
+        self.resume.retain(|id| alive.contains(id));
         self.issued.retain(|id, _| alive.contains(id));
         self.held.retain(|id| alive.contains(id));
         // A home-defense or construction-clearance order temporarily owns these units. Reset
@@ -92,7 +131,7 @@ impl PressureWaves {
         self.held.retain(|id| eligible.contains(id));
         let units = units
             .into_iter()
-            .filter(|entity| eligible.contains(&entity.id))
+            .filter(|entity| eligible.contains(&entity.id) && !response.active.contains(&entity.id))
             .collect::<Vec<_>>();
         let size = frame.map().tile_size as f32;
         for entity in units
@@ -102,12 +141,63 @@ impl PressureWaves {
             if self.slots.contains_key(&entity.id) {
                 continue;
             }
-            if let Some(point) = line.free_slot(frame, entity.kind, self.slots.values().copied()) {
+            if let Some(point) = line.free_slot(
+                frame,
+                entity.kind,
+                self.slots.values().copied(),
+                &self.reachable,
+            ) {
                 self.slots.insert(entity.id, point);
+            }
+        }
+        // Only Riflemen participate. Response and clearance ownership have already been
+        // removed; active pull-backs must also be excluded on subsequent decisions.
+        let rifles: Vec<_> = units
+            .iter()
+            .filter(|entity| entity.kind == EntityKind::Rifleman)
+            .map(|entity| entity.id)
+            .collect();
+        let pullback = self
+            .pullback
+            .step(frame, &rifles, PullbackParams::default(), actions);
+        for id in pullback.active.iter().chain(&pullback.released) {
+            if !self.launched.contains(id) {
+                self.issued.remove(id);
+                self.held.remove(id);
+            }
+        }
+        self.resume.extend(
+            pullback
+                .released
+                .iter()
+                .filter(|id| self.launched.contains(id)),
+        );
+        let resumed: Vec<_> = self
+            .resume
+            .iter()
+            .copied()
+            .filter(|id| {
+                eligible.contains(id)
+                    && !response.active.contains(id)
+                    && !pullback.active.contains(id)
+            })
+            .collect();
+        for id in resumed {
+            let Some(route) = self.wave_routes.get(&id) else {
+                continue;
+            };
+            if UnitGroup::new([id])
+                .and_then(|group| {
+                    actions.attack_move_route(&group, route.target(), route.followups())
+                })
+                .is_ok()
+            {
+                self.resume.remove(&id);
             }
         }
         let ready = units
             .iter()
+            .filter(|entity| !pullback.active.contains(&entity.id))
             .filter_map(|entity| {
                 let slot = self.slots.get(&entity.id)?;
                 (distance(entity.position, *slot) <= ARRIVAL_TILES * size).then_some(entity.id)
@@ -126,20 +216,25 @@ impl PressureWaves {
                                 .is_some_and(|progress| progress >= FIRST_WAVE_RESEARCH_PROGRESS)
                     })
             });
-        let may_launch = if self.first_wave_launched {
-            ready.len() >= 5
+        let objective = self
+            .objective
+            .unwrap_or_else(|| Objective::new(frame, 0, target));
+        let may_launch = if self.first_wave_launched || objective.phase > 0 {
+            ready.len() >= objective.minimum_wave_size()
+                && (self.first_wave_launched || self.first_wave_unlocked)
         } else {
             !ready.is_empty() && self.first_wave_unlocked
         };
         if may_launch {
             if let Ok(group) = UnitGroup::new(ready.iter().copied()) {
                 if actions
-                    .attack_move(&group, target.0, target.1, false)
+                    .attack_move_route(&group, objective.target(), objective.followups())
                     .is_ok()
                 {
                     self.first_wave_launched = true;
                     for id in &ready {
                         self.launched.insert(*id);
+                        self.wave_routes.insert(*id, objective);
                         self.slots.remove(id);
                         self.held.remove(id);
                     }
@@ -147,6 +242,9 @@ impl PressureWaves {
             }
         }
         for entity in units {
+            if pullback.active.contains(&entity.id) {
+                continue;
+            }
             let Some(slot) = self.slots.get(&entity.id) else {
                 continue;
             };
@@ -163,7 +261,7 @@ impl PressureWaves {
                         .tick()
                         .saturating_sub(*self.issued.get(&entity.id).unwrap_or(&0))
                         >= RETRY_TICKS))
-                && actions.move_group(&group, slot.0, slot.1, false).is_ok()
+                && actions.attack_move(&group, slot.0, slot.1, false).is_ok()
             {
                 self.issued.insert(entity.id, frame.tick());
                 self.held.remove(&entity.id);
@@ -173,6 +271,20 @@ impl PressureWaves {
 }
 
 impl StagingLine {
+    fn on_axis(map: &AiMap, home: Point, target: Point) -> Option<Self> {
+        let length = distance(home, target);
+        if length <= f32::EPSILON {
+            return None;
+        }
+        let forward = ((target.0 - home.0) / length, (target.1 - home.1) / length);
+        let radius = 25.0 * map.tile_size as f32;
+        Some(Self {
+            center: (target.0 - forward.0 * radius, target.1 - forward.1 * radius),
+            forward,
+            routed: false,
+        })
+    }
+
     fn on_route(map: &AiMap, home: Point, target: Point) -> Option<Self> {
         let path = shortest_route(map, home, target)?;
         let radius = STAGING_DISTANCE_TILES * map.tile_size as f32;
@@ -211,6 +323,7 @@ impl StagingLine {
             return Some(Self {
                 center,
                 forward: ((ahead.0 - behind.0) / length, (ahead.1 - behind.1) / length),
+                routed: true,
             });
         }
         None
@@ -221,6 +334,7 @@ impl StagingLine {
         frame: &AiFrame,
         kind: EntityKind,
         occupied: impl Iterator<Item = Point>,
+        reachable: &[bool],
     ) -> Option<Point> {
         let occupied = occupied.collect::<Vec<_>>();
         let size = frame.map().tile_size as f32;
@@ -257,22 +371,81 @@ impl StagingLine {
             let steps = (distance(self.center, point) / (size * 0.5))
                 .ceil()
                 .max(1.0) as usize;
-            let connected = (0..=steps).all(|step| {
-                let t = step as f32 / steps as f32;
-                passable_world(
-                    frame.map(),
-                    (
-                        self.center.0 + (point.0 - self.center.0) * t,
-                        self.center.1 + (point.1 - self.center.1) * t,
-                    ),
-                )
-            });
-            if connected && clear_slot(frame, point) {
+            // A later axis may cross blocked terrain. Keep its exact requested geometry and
+            // use clear slots on either side; ordinary movement owns routes around obstacles.
+            let connected = !self.routed
+                || (0..=steps).all(|step| {
+                    let t = step as f32 / steps as f32;
+                    passable_world(
+                        frame.map(),
+                        (
+                            self.center.0 + (point.0 - self.center.0) * t,
+                            self.center.1 + (point.1 - self.center.1) * t,
+                        ),
+                    )
+                });
+            let tile = ((point.0 / size) as usize, (point.1 / size) as usize);
+            let home_connected = self.routed
+                || (point.0 >= 0.0
+                    && point.1 >= 0.0
+                    && tile.0 < frame.map().width as usize
+                    && tile.1 < frame.map().height as usize
+                    && reachable
+                        .get(tile.1 * frame.map().width as usize + tile.0)
+                        .copied()
+                        .unwrap_or(false));
+            if connected && home_connected && clear_slot(frame, point) {
                 return Some(point);
             }
         }
         None
     }
+}
+
+/// Static ground connectivity from Pressure's original main, ignoring dynamic occupants.
+/// Later straight staging lines may cross water, but recruits must stay on reachable ground.
+fn ground_reachable(map: &AiMap, home: Point) -> Vec<bool> {
+    let mut reachable = vec![false; map.terrain.len()];
+    let size = map.tile_size as f32;
+    if size <= 0.0 {
+        return reachable;
+    }
+    let start = ((home.0 / size) as i32, (home.1 / size) as i32);
+    if !passable(map, start.0, start.1) {
+        return reachable;
+    }
+    let index = |x: i32, y: i32| y as usize * map.width as usize + x as usize;
+    let Some(cell) = reachable.get_mut(index(start.0, start.1)) else {
+        return reachable;
+    };
+    *cell = true;
+    let mut queue = VecDeque::from([start]);
+    while let Some((x, y)) = queue.pop_front() {
+        for (dx, dy) in [
+            (-1, -1),
+            (0, -1),
+            (1, -1),
+            (-1, 0),
+            (1, 0),
+            (-1, 1),
+            (0, 1),
+            (1, 1),
+        ] {
+            let (nx, ny) = (x + dx, y + dy);
+            if !passable(map, nx, ny)
+                || (dx != 0 && dy != 0 && (!passable(map, x + dx, y) || !passable(map, x, y + dy)))
+            {
+                continue;
+            }
+            if let Some(cell) = reachable.get_mut(index(nx, ny)) {
+                if !*cell {
+                    *cell = true;
+                    queue.push_back((nx, ny));
+                }
+            }
+        }
+    }
+    reachable
 }
 
 fn clear_slot(frame: &AiFrame, point: Point) -> bool {

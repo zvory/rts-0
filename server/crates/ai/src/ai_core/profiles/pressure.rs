@@ -64,7 +64,7 @@ pub(crate) static PRESSURE: AiProfile = AiProfile {
         }),
     },
     production_expansion: Some(ExpansionPolicy {
-        target_resource_depots: 3,
+        target_resource_depots: 5,
         required_complete_building: EntityKind::Factory,
         defensive_unit: EntityKind::Rifleman,
         defensive_unit_count: 0,
@@ -91,12 +91,7 @@ pub(crate) static PRESSURE: AiProfile = AiProfile {
         oil_before_steel_in_expansion: true,
         remote_worker_assignment_fallback: true,
     }),
-    defensive_machine_gunners: Some(DefensiveMachineGunnerPolicy {
-        target_count: 4,
-        perimeter_distance_tiles: 20.0,
-        lateral_spacing_tiles: 1.5,
-        replacement_health_percent: None,
-    }),
+    defensive_machine_gunners: None,
     turtle_defense: None,
     frontal_wave: FrontalWavePolicy {
         exclude_launched_ticks: Some(FRONTAL_COHORT_TICKS),

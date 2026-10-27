@@ -472,8 +472,40 @@ pub fn run_profile_matchup_result(
     }
 
     let replay_verified = if options.verify_replay {
-        assert_replay_matches_live(&game, &players, &event_log)
-            .map_err(|failure| format!("replay determinism failed: {}", failure.reason))?;
+        // Verify the actual captured map/checkpoint, not replay_commands' default map.
+        let artifact = replay_start.finalize(&game, None, game.scores());
+        let map = Map::load_for_players(&map_name, &player_slots, options.seed)?;
+        let metadata = Map::metadata_for_name(&map_name)?;
+        let mut replay = artifact
+            .restore_start_game(map, metadata)
+            .map_err(|e| e.to_string())?;
+        let mut commands = artifact.command_log.iter().peekable();
+        let mut replay_events = Vec::new();
+        for tick in 1..=game.tick_count() {
+            while commands.peek().is_some_and(|entry| entry.tick == tick) {
+                if let Some(entry) = commands.next() {
+                    replay.enqueue(
+                        entry.player_id,
+                        rts_sim::game::command::SimCommand::from_protocol(entry.command.clone()),
+                    );
+                }
+            }
+            for (player_id, events) in replay.tick() {
+                replay_events.extend(events.into_iter().map(|event| EventLogEntry {
+                    tick,
+                    player_id,
+                    event,
+                }));
+            }
+        }
+        let live = live_outcome_for(&game, &players, &event_log);
+        let replay = live_outcome_for(&replay, &players, &replay_events);
+        if replay != live {
+            return Err(format!(
+                "checkpoint replay determinism failed: {}",
+                first_replay_diff(&live, &replay)
+            ));
+        }
         true
     } else {
         false
@@ -1153,6 +1185,23 @@ mod tests {
         let player = stats.get(&1).expect("player command stats");
         assert_eq!(player.attack_command_count, 1);
         assert_eq!(player.first_attack_command_tick, Some(42));
+    }
+
+    #[test]
+    fn pressure_matchup_verifies_the_classic_checkpoint_instead_of_the_default_map() {
+        let result = run_profile_matchup_result(ProfileMatchupOptions {
+            profile_a: "pressure_ai".to_string(),
+            profile_b: "jeffs_ai".to_string(),
+            seed: 0,
+            max_ticks: 1000,
+            verify_replay: true,
+            save_replay_name: None,
+            replay_dir: None,
+            map_name: Some("Classic".to_string()),
+        })
+        .expect("Classic command log must replay on its captured map");
+        assert!(result.replay_verified);
+        assert_eq!(result.map_name, "Classic");
     }
 
     #[test]

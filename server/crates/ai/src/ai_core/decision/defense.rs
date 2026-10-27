@@ -399,6 +399,14 @@ pub(super) fn stage_home_machine_gunner_screen(
         clear_machine_gunner_screen_assignment(observation, map_analysis, assignment, enemy_base)
     })
     .collect::<Vec<_>>();
+    move_and_hold_machine_gunner_slots(actions, observation, assignments)
+}
+
+fn move_and_hold_machine_gunner_slots(
+    actions: &mut AiActionContext<'_>,
+    observation: &AiObservation,
+    assignments: Vec<DefensiveLineAssignment>,
+) -> Option<Vec<u32>> {
     let by_id: BTreeMap<u32, &AiEntitySummary> = observation
         .owned
         .iter()
@@ -1255,19 +1263,6 @@ pub(super) fn local_defense_target(observation: &AiObservation) -> Option<u32> {
                 .then_with(|| left_id.cmp(right_id))
         })
         .map(|(id, _)| id)
-}
-
-/// Defenders already fighting are not free for a new combat order, but still own their home post.
-pub(super) fn engaged_local_defense_units(observation: &AiObservation) -> BTreeSet<u32> {
-    let engaged: Vec<u32> = observation
-        .owned
-        .iter()
-        .filter(|unit| unit.target_id.is_some())
-        .map(|unit| unit.id)
-        .collect();
-    local_defense_units(observation, &engaged)
-        .into_iter()
-        .collect()
 }
 
 pub(super) fn local_defense_units(observation: &AiObservation, ready_units: &[u32]) -> Vec<u32> {

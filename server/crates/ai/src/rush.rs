@@ -62,7 +62,7 @@ impl AiStrategy for RushStrategy {
             if entity.kind == EntityKind::Barracks && entity.completion == AiCompletion::Complete {
                 if let Some(rally) = rally.filter(|_| !self.configured.contains(&entity.id)) {
                     if actions
-                        .set_rally(entity.id, rally.0, rally.1, RallyKind::Move, false)
+                        .set_rally(entity.id, rally.0, rally.1, RallyKind::AttackMove, false)
                         .is_ok()
                     {
                         self.configured.insert(entity.id);

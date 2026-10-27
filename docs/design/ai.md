@@ -15,7 +15,7 @@ The player-facing lobby supports four AI profile IDs:
 - ai_2_2 — AI 2.2, the default weighted composition: 50% Rush AI and 50% Pressure AI.
 - jeffs_ai — Jeff's AI, the server-authoritative port of the locally evaluated V3 champion policy.
 - rush_ai — Rush AI, an immediate infantry attack with forward construction.
-- pressure_ai — Pressure AI, the AI 2.1 economy, technology, and home defenses with independent forward staging.
+- pressure_ai — Pressure AI, the AI 2.1 economy and technology with independent forward staging and a value-based response.
 
 `ai_turtle` is deprecated and internal-only. It remains registered for offline self-play,
 diagnostics, and observer-only AI sessions, but it is not exposed in the lobby and the server
@@ -98,10 +98,12 @@ build; it is not an accepted, legal, or active-build receipt.
 
 `AiActions` is a typed per-think builder that retains at most 256 emitted actions in helper-call
 order. Its supported helpers are paid explicit-site build, resume-without-repay, train, standing
-production repeat, research, gather, move, attack-move, direct attack, Hold Position, and Anti-Tank
+production repeat, research, gather, move, attack-move, attack-move routes, direct attack, Hold Position, and Anti-Tank
 Gun setup. `UnitGroup`
 canonicalizes tactical unit IDs into a sorted, deduplicated, non-empty set; caller-ordered worker,
-resource-node, and producer candidate lists are not normalized.
+resource-node, and producer candidate lists are not normalized. `attack_move_route` reserves a
+group once and emits an initial unqueued AttackMove followed by queued waypoints in order. Its
+whole route must fit the local action capacity before any request or reservation changes.
 
 The builder tracks Steel, Oil, and free Supply plus independent actor, resource-node, and producer
 reservation namespaces. Every helper completes local preflight before changing the budget,
@@ -120,6 +122,21 @@ queue flags, command traces, and Jeff's Steel-only cross-tick submitted-build co
 controller ordering, all-controller observation before enqueue, worker-retreat-first ordering,
 normal simulation validation, and replay logging are unchanged. The builder is deliberately not a
 planner, task system, command receipt, or cross-tick scheduler.
+
+`PullbackMemory` is an optional tactical helper shared by Pressure and approaching Rush
+Riflemen. Jeff's rifle squad planner keeps its own copy of the same policy in
+`ai_core::squad_micro::pullback`, so changes to the SDK helper do not reach Jeff and Jeff's
+changes do not reach the SDK. Its pure `plan` accepts explicit live squad facts and currently visible enemy-unit facts;
+its `step` adapter reads those facts from `AiFrame` and emits SDK Moves. The default policy pulls a
+member at or below 15 HP three tiles away from the nearest visible enemy when a visible enemy is
+targeting it, then excludes it from normal orders for 45 ticks. At least one squad member must
+remain above the threshold. Destinations are map-clamped; the helper does not establish terrain
+safety or reachability. Callers choose squad membership and keep route and combat ownership.
+They suppress normal orders for returned `active` IDs and restore their own movement for
+`released` IDs. The adapter remembers new retreats only after local emission succeeds; this does
+not imply simulation acceptance. Jeff's copy has no SDK adapter: his squad planner calls `plan`
+directly and keeps its early-return semantics, including resuming ordinary advancement when its
+caller sees no enemies.
 
 The public-SDK-only [reference strategy](../ai-authoring.md) is the executable authoring specimen.
 It runs through `AiController::with_strategy` and the canonical driver, enables Pump Jack repeat,
@@ -144,7 +161,7 @@ production-exit, ring traversal, and tie-breaking approximation. Results are nam
 `KnownBlocked`, and `NoKnownConflict`; none claims authoritative legality, clearance, reachability,
 or command acceptance. Public queries depend only on `AiFrame` and explicit controller-owned
 failed-site exclusions. Legacy profiles retain their historical global-producer exit check through
-a narrow compatibility policy, while all other placement work is shared. Static connectivity,
+a narrow compatibility policy, while all other placement work is shared. General route queries,
 dynamic pathing, firing lanes, target legality, line of fire, and hidden occupancy remain outside
 the SDK because no Phase 4 consumer required them.
 
@@ -154,16 +171,21 @@ absorb their mapped home cluster; empty-resource starts still have a main landma
 `Start(player_id)` or `ResourceCluster(cluster_id)` and remain stable while public map inputs are
 unchanged. Cluster sites are inferred geography, not authoritative build footprints.
 `WorldQueries::ranked_bases(player_id)` and `base(player_id, rank)` rank all sites relative to that
-player's original main: main is always 1, then increasing straight-line world-pixel distance,
-with stable site-ID ties. This is geographic order, not acquisition order, walking distance,
-reachability, or ownership. Other players' starting sites remain in the list. Depletion, destroyed
+player's original main: main is always 1, then increasing static ground path length in world
+pixels, with stable site-ID ties. The existing cached start-distance fields route around blocked
+terrain with cardinal/diagonal costs of 1/1.4 tiles and forbid diagonal corner cutting. Distances
+ignore dynamic units and buildings and do not model a specific unit's footprint. Each site's
+`ground_distances_from_starts` contains the reachable players' distances; unreachable sites sort
+last by stable ID and have `AiRankedBase::distance_from_main = None`. This is geographic order,
+not acquisition order or ownership. Other players' starting sites remain in the list. Depletion, destroyed
 Depots, and fog never renumber sites; a Lab map edit can rebuild them.
 `known_base_depots(site_id)` associates known Resource Depots with the nearest site within twelve
 tiles, using stable-ID ties. It reports owner and owned/currently visible/remembered evidence,
 including last-seen tick for remembered contacts. Current evidence supersedes memory of the same
 entity. Empty evidence means unknown occupancy, never confirmed vacancy. Construction sites count
 as Depot evidence; none of these queries reads hidden state. The canonical host attaches the cached
-landmarks before either strategy initialization or step; built-in policy decisions are unchanged.
+landmarks before either strategy initialization or step. Pressure uses these queries to order its
+expansions; other built-in profiles retain their existing placement policies.
 
 ### Shared decision core
 
@@ -217,26 +239,57 @@ while the search continues through other resource locations.
 
 ### Pressure AI
 
-`pressure_ai` owns a copy of the AI 2.1 policy, retaining its economy, expansion, Tank technology
-and production, and home-defense decisions, with independent infantry research and production.
-The legacy decision loop hands unreserved offensive
-Riflemen, Panzerfausts, and Tanks to a separate SDK staging owner after home-defense and construction-clearance
-orders have claimed their units. Pressure replaces the legacy frontal-wave issuer rather than
-layering competing attack orders over it. Home defenders retain priority; temporarily borrowed,
-unlaunched units resume their staging orders when released. Nearby Panzerfausts participate in
-that home-defense handoff. Pressure tracks legacy research producers and retries interrupted
-research on a replacement producer, so losing a Training Centre cannot leave the first wave
-permanently locked.
+`pressure_ai` owns a copy of the AI 2.1 opening and Tank technology, with independent
+expansion, infantry research, production, and staging. The legacy home
+response, defensive panic production override, and dedicated Machine Gunner policy are disabled
+for Pressure. Other profiles retain them. Construction clearance still has priority.
+Pressure retries interrupted research on replacement producers so a lost Training Centre cannot
+permanently lock its first wave.
+
+The single Pressure response controller borrows mobile Riflemen, Panzerfausts, and Tanks nearest
+to observed attackers until their full purchase value (Steel plus Oil) reaches at least 150% of
+the remembered enemy unit value, or all available units are committed. It triggers only on visible
+enemy units on Pressure's half of the map: the half-plane containing its original main, split by the perpendicular bisector
+between the two starting bases. Sightings on the enemy half never create or refresh a contact,
+even during offensive wave fights. When an enemy crosses that boundary, its last friendly-half
+position remains remembered for 30 seconds; the response never follows refreshed positions into
+enemy territory. All enemy units spotted on the friendly half contribute to the incident value;
+new recruits and replacements join as needed. Response orders are AttackMove to the nearest
+remembered attacker position. Each contact keeps its last visible position for 900 ticks (30 s)
+after it leaves vision. When all contacts expire, surviving responders return to the current
+staging line, including units borrowed from launched waves. Units already committed remain in the
+response until that timeout; the controller shares a value budget across simultaneous contacts.
 
 `server/crates/ai/src/pressure.rs` intentionally copies Rush's terrain route, stable-slot, arrival,
 and cohort policy instead of calling Rush code. Its constants and persistent state are independent.
-The line sits 35 tiles outside the enemy start, perpendicular to the routed approach. Riflemen
-and Panzerfausts occupy the front; Tanks stand three tiles behind at three-tile spacing. Units move to their slots
-and Hold Position. The first wave unlocks at 90% Methamphetamines research (or completion), and
-launches once at least one unit has arrived; later waves need five actual arrivals. En-route units
-do not count. Each wave receives one AttackMove to the enemy start, and launched units never
-rejoin staging. Pressure retains ordinary attack-move combat after launch; Rush's extractor-raiding
-flow is not part of this copied staging policy.
+Before 4:00 the line sits 35 tiles outside the enemy start, perpendicular to the routed approach.
+At 4:00 it moves to 25 tiles from the opponent's geographically ranked second base, toward
+Pressure's original main. It is perpendicular to the straight main-to-target axis. At 8:00 it
+moves to the opponent's third base with the same 25-tile distance and perpendicular geometry.
+These SDK ranks describe public geography, not knowledge that an enemy Depot exists there.
+Pressure snapshots these landmarks on its first decision for the opponent, so depletion cannot
+redefine base two or three between timed phase changes.
+Missing ranked sites fall back toward the enemy main without duplicate queued destinations.
+
+Riflemen and Panzerfausts occupy the front; Tanks stand three tiles behind at three-tile spacing.
+Units attack-move to clear slots, engaging enemies en route, and Hold Position after arriving.
+Later lines may span blocked terrain: their center and orientation remain exact. Blocked slots and slots disconnected from Pressure’s original main
+are skipped using cached static ground connectivity without diagonal corner cutting; ordinary
+unit movement routes around terrain. The opening wave unlocks at 90% Methamphetamines research (or completion). Before 4:00
+it launches once at least one unit arrives, with five arrivals required thereafter. From 4:00
+all new waves require at least ten arrivals; from 8:00 they require twenty. The research gate
+still applies if the opening wave has not launched. En-route units do not count.
+
+A second-base wave receives AttackMove to base two followed by queued AttackMove to the main.
+A third-base wave receives AttackMove to base three, then queued AttackMoves to base two and the
+main. Waves launched before a time boundary retain their route. Only unlaunched recruits move
+to the new staging line; launched units keep their route unless borrowed by the response controller. Pressure retains ordinary attack-move combat after launch; Rush's extractor-raiding
+flow is not part of this copied staging policy. Eligible offensive Riflemen additionally use the
+shared pull-back helper while staging or attacking outside the active response. Response ownership
+has priority over pull-back orders. Active retreats cannot receive staging or launch orders. Released staging members resume their slots immediately; released launched members
+receive their original wave route again, including its queued lower-base objectives. A later phase
+boundary does not replace that saved route. Construction-clearance ownership continues to take priority. Tanks and Panzerfausts also participate
+in the response.
 
 Pressure includes a Training Centre in its initial tech path so its infantry research does not
 wait for the Tank transition. On the first decision at or after two minutes (3,600 ticks), it queues
@@ -244,9 +297,30 @@ Panzerfausts on an owned Training Centre, including an unfinished or currently r
 Research waits for authoritative completion, prerequisites, and payment. Once the upgrade completes,
 Pressure stops issuing new Rifleman orders, disables Rifleman repeat, and enables Panzerfaust repeat
 on every completed Barracks, including replacements. Already paid or queued Riflemen finish normally.
-Home Machine Gunner and Tank production remain under the existing policy. New Panzerfausts join
+Tank production remains under the existing policy; Pressure disables dedicated home Machine
+Gunner production. New Panzerfausts join
 Pressure's infantry staging line and its normal arrival-counted waves. This policy and its state
 are independent of Rush.
+
+Pressure expands up to five Resource Depots. It uses the SDK's player-relative ranked base sites,
+skips unreachable sites, original player starts, and sites with known owned/allied/enemy or remembered Depot evidence,
+and searches legal footprints covering the selected cluster's available resources. Unknown
+occupancy remains unknown; ordinary authoritative placement validates each build. Blocked or
+exhausted sites yield to the next usable ranked site. A map with no usable site does not halt Tank
+production while saving for an impossible expansion.
+
+The second Vehicle Works retains its three-completed-Depot gate and float above 500 Steel and
+325 Oil. After both Vehicle Works complete, fourth and fifth Depots are surplus purchases at the
+full 450 Steel / 100 Oil cost. Pressure keeps queuing Tanks from resources above that purchase or
+a travelling Depot's committed cost; it does not pause Tank production to save for these bases.
+Once five Depots are complete, the cap rises to four Vehicle Works: the same float threshold
+allows one additional Vehicle Works at a time, subject to the ordinary pending-build and placement
+limits. Completed Works, foundations, and Works planned in the current decision count toward the
+cap; losing a Works opens a replacement slot.
+All completed Vehicle Works then enable standing Tank production. Existing queues finish first;
+new manual Tank orders stop so they do not compete with repeat production. New and replacement
+Works receive the repeat allocation once, including after a later base loss. Extra Works beyond
+two require five currently completed Depots; lost bases can be replaced up to the five-base target.
 
 ### Rush AI
 
@@ -261,8 +335,8 @@ resources permit, the Engineer builds a Barracks, a Training Centre, then two mo
 completing one building before starting the next. Failed sites are retried. Rush disables the
 shared worker-retreat reflex; a lost Engineer is not replaced.
 
-Every completed Barracks rallies to the staging line. Initially it alternates Riflemen and Machine
-Gunners through standing production allocations. When the first Training Centre completes, all
+Every completed Barracks uses an attack-move rally to the staging line. Initially it alternates
+Riflemen and Machine Gunners through standing production allocations. When the first Training Centre completes, all
 Barracks disable Rifleman repeat without cancelling existing paid or queued Riflemen; later
 Barracks start with Machine Gunner repeat only. Methamphetamines is queued on the first decision
 that observes the Training Centre scaffold, followed by Entrenchment. Panzerfausts is queued on
@@ -271,14 +345,20 @@ it completes, each Barracks alternates Machine Gunners and Panzerfausts. The hom
 auto-builds Steel Mines and Pump Jacks to sustain income. There is no expansion or additional tech
 path.
 
+Rush enables the shared wounded-unit pull-back only for Riflemen still approaching their first
+staging slot. Active retreats temporarily suppress slot movement, which resumes immediately when
+the retreat ends. Reaching staging hands ownership back to the existing staging and launched flow
+controllers, even if a unit subsequently moves away. Machine Gunners and Panzerfausts do not use
+the helper.
+
 Rush picks a staging point 20 world-space tiles from the enemy start along a shortest octile route
 through the public terrain map, without cutting blocked diagonal corners. The formation is
 perpendicular to the smoothed local approach direction. Riflemen and Machine Gunners receive
 stable, spaced slots from the main line's centre outward. Panzerfausts use a separate parallel
 line three tiles behind it. Blocked slots are skipped without placing front infantry into the
-Panzerfaust line. Only owned and currently visible buildings affect slot avoidance. Units move to
-their slots and Hold Position after arriving. The first assembled wave attack-moves to the enemy
-start as soon as Methamphetamines reaches 90% research progress (or is already complete); if
+Panzerfaust line. Only owned and currently visible buildings affect slot avoidance. Units attack-move
+to their slots, engaging enemies en route, and Hold Position after arriving. The first assembled wave
+attack-moves to the enemy start as soon as Methamphetamines reaches 90% research progress (or is already complete); if
 nobody has arrived yet, the trigger stays unlocked until arrivals. Subsequent waves require at
 least five units actually at their slots, rather than counting en-route reinforcements. Each wave
 launches with one group command. Launched units are never added to a later wave or pulled back to

@@ -533,6 +533,29 @@ impl AiActions {
         )
     }
 
+    /// Issue one attack-move followed by queued attack-moves as a single reserved group action.
+    /// The entire route must fit before any request or reservation changes.
+    pub fn attack_move_route(
+        &mut self,
+        group: &UnitGroup,
+        first: (f32, f32),
+        queued_waypoints: &[(f32, f32)],
+    ) -> Result<(), ActionError> {
+        if queued_waypoints.len() >= MAX_ACTIONS_PER_STEP.saturating_sub(self.requests.len()) {
+            return Err(ActionBlocker::ActionCapacity.into());
+        }
+        self.attack_move(group, first.0, first.1, false)?;
+        for &(x, y) in queued_waypoints {
+            self.requests.push(AiActionRequest::AttackMove {
+                units: group.0.clone(),
+                x,
+                y,
+                queued: true,
+            });
+        }
+        Ok(())
+    }
+
     pub fn attack(
         &mut self,
         group: &UnitGroup,

@@ -99,7 +99,9 @@ impl PendingBuildTracker {
             });
             if succeeded {
                 self.failed_spots.remove(&pending.kind);
-            } else if pending.clearance_grace_until.is_none() {
+            } else {
+                // Clearance grants a bounded wait, not an exemption from failed-site tracking.
+                // Once the worker drops the order after that wait, try another footprint.
                 let set = self.failed_spots.entry(pending.kind).or_default();
                 set.insert((pending.tile_x, pending.tile_y));
                 if set.len() > FAILED_SPOTS_CAP {

@@ -1,5 +1,6 @@
 use super::*;
 use crate::sdk::actions::AiActionRequest;
+use crate::sdk::AiStrategy;
 use rts_sim::game::{Game, PlayerInit};
 use rts_sim::protocol::{EntityView, Snapshot, StartPayload};
 
@@ -71,13 +72,17 @@ fn waves_wait_for_ninety_percent_then_require_five_arrivals_without_retasking_ol
     assert_eq!(
         initial
             .iter()
-            .filter(|action| matches!(action, AiActionRequest::Move { .. }))
+            .filter(|action| matches!(action, AiActionRequest::AttackMove { .. }))
             .count(),
         4
     );
+    assert!(initial.iter().all(|action| matches!(action,
+        AiActionRequest::AttackMove { units, x, y, queued: false }
+        if units.len() == 1 && waves.slots.get(&units[0]) == Some(&(*x, *y))
+    )));
     assert!(!initial
         .iter()
-        .any(|action| matches!(action, AiActionRequest::AttackMove { .. })));
+        .any(|action| matches!(action, AiActionRequest::Move { .. })));
     let line = waves.plan.unwrap().1;
     for slot in waves.slots.values() {
         let along =
@@ -146,7 +151,7 @@ fn waves_wait_for_ninety_percent_then_require_five_arrivals_without_retasking_ol
     assert!(
         !step(&mut waves, &start, &snapshot, target)
             .iter()
-            .any(|action| matches!(action, AiActionRequest::AttackMove { .. })),
+            .any(|action| matches!(action, AiActionRequest::AttackMove { x, y, .. } if (*x, *y) == target)),
         "an en-route fifth unit does not count"
     );
     assemble(&mut snapshot, &waves);
@@ -159,7 +164,9 @@ fn waves_wait_for_ninety_percent_then_require_five_arrivals_without_retasking_ol
     add_rifle(&mut snapshot, &specimen, 1006);
     snapshot.tick += 9;
     let next = step(&mut waves, &start, &snapshot, target);
-    assert!(matches!(next.as_slice(),[AiActionRequest::Move {units,..}] if units==&vec![1006]));
+    assert!(
+        matches!(next.as_slice(),[AiActionRequest::AttackMove {units,..}] if units==&vec![1006])
+    );
 }
 
 #[test]
@@ -240,4 +247,89 @@ fn panzerfausts_stage_on_a_parallel_line_three_tiles_behind_front_infantry() {
         );
     }
     assert!((1001..=1003).all(|id| waves.slots.contains_key(&id)));
+}
+
+#[test]
+fn barracks_rally_and_new_recruits_attack_move_to_staging_before_wave_unlock() {
+    let (start, mut snapshot) = fixture();
+    snapshot.entities.push(EntityView::new(
+        900, 1, "barracks", 432.0, 496.0, 500, 500, "idle",
+    ));
+    let frame = frame(&start, &snapshot);
+    let mut strategy = crate::rush::RushStrategy::default();
+    let mut actions = AiActions::for_frame(&frame);
+    strategy.step(&frame, &mut actions);
+    let requests = actions.into_requests();
+    let rally = strategy.waves.plan.unwrap().1.center;
+    assert!(requests.iter().any(|action| matches!(action,
+        AiActionRequest::SetRally { building: 900, x, y, kind: rts_sim::game::entity::RallyKind::AttackMove, queued: false }
+        if (*x, *y) == rally
+    )));
+    for (id, slot) in &strategy.waves.slots {
+        assert!(requests.iter().any(|action| matches!(action,
+            AiActionRequest::AttackMove { units, x, y, queued: false }
+            if units == &vec![*id] && (*x, *y) == *slot
+        )));
+    }
+    assert!(!strategy.waves.first_wave_launched);
+}
+
+#[test]
+fn pullback_owns_only_riflemen_approaching_staging_and_resumes_the_slot() {
+    let (start, mut snapshot) = fixture();
+    let target = (2000.0, 2000.0);
+    let mut waves = RushWaves::default();
+    waves.rally(&frame(&start, &snapshot), 2, target).unwrap();
+    let rifle = snapshot
+        .entities
+        .iter_mut()
+        .find(|e| e.owner == 1 && e.kind == "rifleman")
+        .unwrap();
+    rifle.hp = 10;
+    rifle.x = 320.0;
+    rifle.y = 320.0;
+    let id = rifle.id;
+    let mut enemy = rifle.clone();
+    enemy.id = 999;
+    enemy.owner = 2;
+    enemy.hp = 45;
+    enemy.x += 64.0;
+    enemy.target_id = Some(id);
+    snapshot.entities.push(enemy);
+    let orders = step(&mut waves, &start, &snapshot, target);
+    assert!(orders
+        .iter()
+        .any(|a| matches!(a, AiActionRequest::Move { units, .. } if units == &[id])));
+    assert!(!orders
+        .iter()
+        .any(|a| matches!(a, AiActionRequest::AttackMove { units, .. } if units.contains(&id))));
+    snapshot.tick += 9;
+    assert!(!step(&mut waves, &start, &snapshot, target).iter().any(|a| {
+        matches!(a, AiActionRequest::AttackMove { units, .. } | AiActionRequest::HoldPosition { units, .. } if units.contains(&id))
+    }));
+    snapshot.tick += 36;
+    snapshot.entities.last_mut().unwrap().target_id = None;
+    let orders = step(&mut waves, &start, &snapshot, target);
+    assert!(orders.iter().any(
+        |a| matches!(a, AiActionRequest::AttackMove { units, x, y, queued: false }
+        if units == &[id] && (*x, *y) == waves.slots[&id])
+    ));
+    assemble(&mut snapshot, &waves);
+    snapshot.tick += 9;
+    let post = waves.slots[&id];
+    let enemy = snapshot.entities.last_mut().unwrap();
+    enemy.x = post.0 + 64.0;
+    enemy.y = post.1;
+    enemy.target_id = Some(id);
+    let orders = step(&mut waves, &start, &snapshot, target);
+    assert!(waves.staged.contains(&id));
+    assert_eq!(waves.pullback, PullbackMemory::default());
+    assert!(!orders
+        .iter()
+        .any(|a| matches!(a, AiActionRequest::Move { units, .. } if units.contains(&id))));
+    waves.first_wave_unlocked = true;
+    snapshot.tick += 9;
+    step(&mut waves, &start, &snapshot, target);
+    assert!(waves.launched.contains(&id));
+    assert_eq!(waves.pullback, PullbackMemory::default());
 }
