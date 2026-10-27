@@ -119,8 +119,8 @@ assert.equal(labUrl.searchParams.get("map"), "Classic", "blank Interact labs use
 const defaultGameDriver = new InteractDriver({ workspaceRoot: root, mode: "game" });
 defaultGameDriver.server = { baseUrl: "http://127.0.0.1:8081/" };
 defaultGameDriver.workspace = workspace;
-assert.deepEqual(new URL(defaultGameDriver.launchUrl()).searchParams.getAll("rtsAi"), ["2:ai_2_2"],
-  "player sessions launch AI 2.2 by default");
+assert.deepEqual(new URL(defaultGameDriver.launchUrl()).searchParams.getAll("rtsAi"), ["2:ai_2_3"],
+  "player sessions launch AI 2.3 by default");
 const spectatorDriver = new InteractDriver({ workspaceRoot: root, mode: "game", spectate: ["ai_2_1", "ai_turtle"] });
 spectatorDriver.server = { baseUrl: "http://127.0.0.1:8081/" };
 spectatorDriver.workspace = workspace;

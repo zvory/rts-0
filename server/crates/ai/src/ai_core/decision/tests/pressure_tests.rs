@@ -19,7 +19,7 @@ fn pressure_stops_legacy_rifleman_orders_only_after_panzerfaust_research_complet
         },
         owned,
     );
-    obs.tick = 3600;
+    obs.tick = 1;
     obs.upgrades.push(UpgradeKind::Methamphetamines);
     let before = decide(
         &obs,

@@ -188,7 +188,7 @@ try {
   sessionId = null;
 
   const gameOpened = callGame("open", {
-    opponent: "ai_2_2",
+    opponent: "ai_2_3",
     viewport: { width: 1000, height: 700, deviceScaleFactor: 1 },
   });
   sessionId = testArtifacts.ownGameSession(gameOpened.sessionId);

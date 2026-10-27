@@ -1054,7 +1054,7 @@ mod tests {
                 AI_TURTLE_ID,
                 "pressure_ai",
                 "rush_ai",
-                "ai_2_2"
+                "ai_2_3"
             ]
         );
         assert_eq!(canonical_profile_id(AI_2_1_ID), Some(AI_2_1_ID));

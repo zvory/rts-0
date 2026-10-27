@@ -16,7 +16,7 @@ use crate::ai_core::profiles::{
     JEFFS_AI_V1_1_ID, PRESSURE_AI_ID,
 };
 use crate::ai_shared;
-use crate::compositions::{composition_by_id, AI_2_2_ID};
+use crate::compositions::{composition_by_id, AI_2_3_ID};
 use crate::rush::{RushStrategy, RUSH_AI_ID};
 use crate::sdk::{AiActions, AiFrame, AiStrategy, KnownBuildSite, WorldQueries};
 use crate::selfplay::pending_build::PendingBuildTracker;
@@ -28,6 +28,9 @@ use rts_sim::game::entity::EntityKind;
 use rts_sim::game::Game;
 use rts_sim::protocol::{Snapshot, StartPayload};
 
+mod opening;
+mod rush_handoff;
+
 const DECISION_INTERVAL: u32 = 9;
 const LIVE_DECISION_TRACE_MAX_LINES: usize = 24;
 /// Jeff's AI V1.1: a fight is over for a unit with no visible enemy unit this close for this long.
@@ -38,12 +41,12 @@ const LIVE_DECISION_TRACE_TRUNCATED_LINE: &str = "trace_truncated=true";
 const CUSTOM_STRATEGY_PROFILE_ID: &str = "custom_strategy";
 
 /// The default live-lobby profile id.
-pub const DEFAULT_LIVE_PROFILE_ID: &str = AI_2_2_ID;
+pub const DEFAULT_LIVE_PROFILE_ID: &str = AI_2_3_ID;
 
 /// Canonical profile ids understood by the live adapter. Experimental profiles are available to
 /// internal observer-only sessions; the room actor prevents them from entering human matches.
 pub const LIVE_PROFILE_IDS: [&str; 7] = [
-    AI_2_2_ID,
+    AI_2_3_ID,
     AI_2_1_ID,
     JEFFS_AI_ID,
     JEFFS_AI_V1_1_ID,
@@ -55,7 +58,7 @@ pub const LIVE_PROFILE_IDS: [&str; 7] = [
 /// The pool random picks draw from: every live profile but Jeff's AI V1.1, which is chosen only by
 /// name.
 const RANDOM_LIVE_PROFILE_IDS: [&str; 6] = [
-    AI_2_2_ID,
+    AI_2_3_ID,
     AI_2_1_ID,
     JEFFS_AI_ID,
     AI_TURTLE_ID,
@@ -96,7 +99,7 @@ pub fn live_profile_label(profile_id: &str) -> &'static str {
 pub fn is_player_live_profile_id(profile_id: &str) -> bool {
     matches!(
         profile_id,
-        AI_2_2_ID | JEFFS_AI_ID | JEFFS_AI_V1_1_ID | RUSH_AI_ID | PRESSURE_AI_ID
+        AI_2_3_ID | JEFFS_AI_ID | JEFFS_AI_V1_1_ID | RUSH_AI_ID | PRESSURE_AI_ID
     )
 }
 
@@ -290,6 +293,9 @@ pub struct AiController {
     custom_strategy: Option<Box<dyn AiStrategy>>,
     strategy_initialized: bool,
     pressure_waves: crate::pressure::PressureWaves,
+    retired_barracks: BTreeSet<u32>,
+    rush_strategy: RushStrategy,
+    opening: opening::OpeningProgress,
 }
 
 struct LegacyProfileStrategy;
@@ -334,10 +340,12 @@ impl AiController {
             quiet_since: BTreeMap::new(),
             last_decision_trace: None,
             last_debug_map_layers: Vec::new(),
-            custom_strategy: (profile_id == RUSH_AI_ID)
-                .then(|| Box::<RushStrategy>::default() as Box<dyn AiStrategy>),
+            custom_strategy: None,
             strategy_initialized: false,
             pressure_waves: Default::default(),
+            retired_barracks: BTreeSet::new(),
+            rush_strategy: Default::default(),
+            opening: Default::default(),
         }
     }
 
@@ -398,6 +406,25 @@ impl AiController {
 
     pub fn think(&mut self, context: AiThinkContext<'_>) -> Vec<SimCommand> {
         self.select_for_match(context.match_seed);
+        if matches!(self.behavior_profile_id, RUSH_AI_ID | PRESSURE_AI_ID) {
+            self.opening.observe(context.snapshot, self.player);
+        }
+        let mut commands = self.handoff_rush(&context);
+        commands.extend(self.think_active(context));
+        commands.retain_mut(|command| match command {
+            SimCommand::Train { building, .. } => !self.retired_barracks.contains(building),
+            SimCommand::AdjustProductionRepeat {
+                buildings, delta, ..
+            } if *delta > 0 => {
+                buildings.retain(|id| !self.retired_barracks.contains(id));
+                !buildings.is_empty()
+            }
+            _ => true,
+        });
+        commands
+    }
+
+    fn think_active(&mut self, context: AiThinkContext<'_>) -> Vec<SimCommand> {
         // Rush deliberately keeps its Engineer advancing, including under fire.
         let mut commands = if self.behavior_profile_id == RUSH_AI_ID {
             Vec::new()
@@ -405,7 +432,7 @@ impl AiController {
             context.retreat_commands
         };
         let tick = context.snapshot.tick;
-        if self.custom_strategy.is_none() {
+        if self.custom_strategy.is_none() && self.behavior_profile_id != RUSH_AI_ID {
             self.static_map_context.get_or_analyze(context.start);
         }
         if !tick
@@ -453,7 +480,14 @@ impl AiController {
             assert_eq!(LegacyProfileStrategy::project(&frame), direct);
         }
 
-        if let Some(strategy) = self.custom_strategy.as_mut() {
+        let strategy: Option<&mut dyn AiStrategy> = if self.behavior_profile_id == RUSH_AI_ID {
+            Some(&mut self.rush_strategy)
+        } else {
+            self.custom_strategy
+                .as_mut()
+                .map(|strategy| strategy.as_mut() as &mut dyn AiStrategy)
+        };
+        if let Some(strategy) = strategy {
             if !self.strategy_initialized {
                 strategy.initialize(&frame);
                 self.strategy_initialized = true;
@@ -484,9 +518,16 @@ impl AiController {
             return commands;
         }
 
-        let Some(observation) = LegacyProfileStrategy::project(&frame) else {
+        let Some(mut observation) = LegacyProfileStrategy::project(&frame) else {
             return commands;
         };
+        // Keep retired structures in economy/defense facts, but never budget manual training
+        // against a producer whose commands would be suppressed after the handoff.
+        for entity in &mut observation.owned {
+            if self.retired_barracks.contains(&entity.id) {
+                entity.production_queue_len = None;
+            }
+        }
         self.prune_combat_memory(&observation, tick);
 
         let profile = self.profile();
@@ -582,6 +623,7 @@ impl AiController {
                     &frame,
                     target,
                     &decision.pressure_wave_units,
+                    self.opening.trained_riflemen(),
                     &mut actions,
                 );
                 commands.extend(
@@ -873,7 +915,7 @@ mod tests {
         }
     }
 
-    fn driver_test_players() -> Vec<PlayerInit> {
+    pub(super) fn driver_test_players() -> Vec<PlayerInit> {
         vec![
             PlayerInit {
                 id: 1,
@@ -1405,7 +1447,7 @@ mod tests {
         assert_eq!(
             LIVE_PROFILE_IDS,
             [
-                AI_2_2_ID,
+                AI_2_3_ID,
                 AI_2_1_ID,
                 JEFFS_AI_ID,
                 JEFFS_AI_V1_1_ID,
@@ -1417,8 +1459,8 @@ mod tests {
     }
 
     #[test]
-    fn live_default_is_ai_2_2() {
-        assert_eq!(DEFAULT_LIVE_PROFILE_ID, AI_2_2_ID);
+    fn live_default_is_ai_2_3() {
+        assert_eq!(DEFAULT_LIVE_PROFILE_ID, AI_2_3_ID);
     }
 
     #[test]
@@ -1431,7 +1473,7 @@ mod tests {
         assert_eq!(
             selected,
             BTreeSet::from([
-                AI_2_2_ID,
+                AI_2_3_ID,
                 AI_2_1_ID,
                 JEFFS_AI_ID,
                 AI_TURTLE_ID,
@@ -1484,7 +1526,7 @@ mod tests {
         assert_eq!(live_profile_label(JEFFS_AI_ID), "Jeff's AI V1.0");
         assert_eq!(live_profile_label(JEFFS_AI_V1_1_ID), "Jeff's AI V1.1");
         assert_eq!(live_profile_label(AI_TURTLE_ID), "AI Turtle");
-        assert_eq!(live_profile_label("default"), "AI 2.2");
+        assert_eq!(live_profile_label("default"), "AI 2.3");
         assert_eq!(live_profile_label("unsupported_profile"), "AI");
         assert_eq!(live_profile_label("unknown"), "AI");
     }

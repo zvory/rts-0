@@ -329,10 +329,10 @@ async function testMatchLaunchConfig() {
   assert(config.room === "ai-selfplay-0", "match launch generates a safe room when omitted");
   assert(
     JSON.stringify(config.ai) === JSON.stringify([
-      { teamId: 1, aiProfileId: "ai_2_2" },
-      { teamId: 2, aiProfileId: "ai_2_2" },
+      { teamId: 1, aiProfileId: "ai_2_3" },
+      { teamId: 2, aiProfileId: "ai_2_3" },
     ]),
-    "match launch defaults to a two-team AI 2.2 self-play",
+    "match launch defaults to a two-team AI 2.3 self-play",
   );
 
   config = matchLaunchConfig(new URL(
@@ -347,14 +347,14 @@ async function testMatchLaunchConfig() {
     "http://localhost/?rtsLaunch=match&rtsRoom=player-match&rtsRole=player&rtsAi=2:ai_turtle",
   ));
   assert(
-    JSON.stringify(config.ai) === JSON.stringify([{ teamId: 2, aiProfileId: "ai_2_2" }]),
+    JSON.stringify(config.ai) === JSON.stringify([{ teamId: 2, aiProfileId: "ai_2_3" }]),
     "player launch URLs cannot select the internal Turtle profile",
   );
 
   config = matchLaunchConfig(new URL(
     "http://localhost/?rtsLaunch=match&rtsRole=player&rtsAi=2:ai_2_1",
   ));
-  assert(JSON.stringify(config.ai) === JSON.stringify([{ teamId: 2, aiProfileId: "ai_2_2" }]),
+  assert(JSON.stringify(config.ai) === JSON.stringify([{ teamId: 2, aiProfileId: "ai_2_3" }]),
     "player launch cannot select hidden AI 2.1 directly");
 
   config = matchLaunchConfig(new URL("http://localhost/?rtsLaunch=match&rtsRoom=bad%0Aroom"));

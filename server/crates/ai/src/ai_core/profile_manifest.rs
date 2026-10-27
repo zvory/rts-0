@@ -118,11 +118,12 @@ pub(crate) fn profile_identity_by_id(id: &str) -> Option<AiProfileIdentity> {
     if id == crate::rush::RUSH_AI_ID {
         let label = "Rush AI";
         let summary =
-            "Forward construction and staged infantry waves through the typed strategy SDK.";
+            "Forward infantry rush, retiring two forward Barracks and handing over to Pressure AI at four minutes.";
         let modules = [
             "typed_strategy_sdk",
             "terrain_routed_staging",
             "trench_threat_flow",
+            "four_minute_pressure_handoff",
         ];
         // Rush is a strategy implementation rather than an AiProfile policy record. Fingerprint
         // its source inputs so arena manifests still identify the policy they actually ran.
@@ -130,6 +131,8 @@ pub(crate) fn profile_identity_by_id(id: &str) -> Option<AiProfileIdentity> {
             include_str!("../rush.rs"),
             include_str!("../rush/staging.rs"),
             include_str!("../rush/flow.rs"),
+            include_str!("../live/rush_handoff.rs"),
+            profile_identity_by_id(super::profiles::PRESSURE_AI_ID).map(|p| p.fingerprint),
         );
         return Some(AiProfileIdentity {
             composition: None,
@@ -369,15 +372,16 @@ mod tests {
 
     #[test]
     fn mixture_manifest_exposes_member_ids_and_weights() {
-        let identity = profile_identity_by_id(crate::compositions::AI_2_2_ID).unwrap();
+        let identity = profile_identity_by_id(crate::compositions::AI_2_3_ID).unwrap();
         validate_profile_identity(&identity).unwrap();
         let value = serde_json::to_value(identity).unwrap();
-        assert_eq!(value["label"], "AI 2.2");
+        assert_eq!(value["label"], "AI 2.3");
         assert_eq!(
             value["composition"]["members"],
             serde_json::json!([
                 {"profileId": "rush_ai", "weight": 1},
                 {"profileId": "pressure_ai", "weight": 1},
+                {"profileId": "jeffs_ai", "weight": 1},
             ])
         );
     }

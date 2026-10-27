@@ -237,14 +237,14 @@ fn player_lobby_replaces_internal_ai_profile_with_supported_opponent() {
         task.on_add_ai(host_id, Some(2), Some(internal_profile.to_string()));
         assert_eq!(
             task.ai_players.first().map(|ai| ai.profile_id),
-            Some("ai_2_2")
+            Some("ai_2_3")
         );
-        assert_eq!(ai_slot_names(&task), vec!["AI 2.2"]);
+        assert_eq!(ai_slot_names(&task), vec!["AI 2.3"]);
 
         task.start_match();
 
         assert_eq!(task.ai_controllers.len(), 1);
-        assert_eq!(task.ai_controllers[0].profile_id(), "ai_2_2");
+        assert_eq!(task.ai_controllers[0].profile_id(), "ai_2_3");
     }
 }
 
@@ -292,8 +292,8 @@ fn match_start_cannot_launch_internal_ai_profile_against_human() {
     task.ai_players[0].profile_id = "ai_turtle";
     task.start_match();
 
-    assert_eq!(task.ai_players[0].profile_id, "ai_2_2");
-    assert_eq!(task.ai_controllers[0].profile_id(), "ai_2_2");
+    assert_eq!(task.ai_players[0].profile_id, "ai_2_3");
+    assert_eq!(task.ai_controllers[0].profile_id(), "ai_2_3");
 }
 
 #[test]
@@ -736,7 +736,7 @@ fn ai_only_live_start_payload_advertises_speed_controls_without_seek() {
         .iter()
         .map(|player| player.name.as_str())
         .collect();
-    assert_eq!(ai_names, vec!["AI 2.2 1", "AI 2.2 2"]);
+    assert_eq!(ai_names, vec!["AI 2.3 1", "AI 2.3 2"]);
 
     let state = writer
         .room_time_state

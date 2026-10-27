@@ -10,24 +10,23 @@ When several seats use the same profile, their lobby names receive deterministic
 
 ### Canonical profiles
 
-The player-facing lobby supports five AI profile IDs:
+The player-facing lobby supports four AI profile IDs:
 
-- ai_2_2 — AI 2.2, the default weighted composition: 50% Rush AI and 50% Pressure AI.
-- jeffs_ai — Jeff's AI V1.0, the server-authoritative port of the locally evaluated V3 champion policy.
-- jeffs_ai_v1_1 — Jeff's AI V1.1, a separate bot grown from V1.0. It runs every live-Jeff behavior, and its own changes branch on `is_jeff_v1_1`, so V1.0 plays exactly as before. Random profile picks never choose it.
+- ai_2_3 — AI 2.3, the default weighted composition: equal thirds Rush AI, Pressure AI, and Jeff's AI (one-third probability each).
+- jeffs_ai — Jeff's AI, the server-authoritative port of the locally evaluated V3 champion policy.
 - rush_ai — Rush AI, an immediate infantry attack with forward construction.
 - pressure_ai — Pressure AI, the AI 2.1 economy and technology with independent forward staging and a value-based response.
 
 `ai_turtle` is deprecated and internal-only. It remains registered for offline self-play,
 diagnostics, and observer-only AI sessions, but it is not exposed in the lobby and the server
-replaces it with `ai_2_2` whenever a room has an active human player. The replacement is enforced
+replaces it with `ai_2_3` whenever a room has an active human player. The replacement is enforced
 again at the authoritative match-start seam, so stale or crafted clients cannot put Turtle into a
 human match.
 
-The convenience inputs ai and default resolve to ai_2_2. The lobby exposes AI 2.2, Jeff's AI V1.0, Jeff's AI V1.1, Rush AI, and Pressure AI. AI 2.1 remains a concrete internal profile (`ai_2_1`) for offline tools and
+The convenience inputs ai and default resolve to ai_2_3. The lobby exposes AI 2.3, Jeff's AI, Rush AI, and Pressure AI. AI 2.1 remains a concrete internal profile (`ai_2_1`) for offline tools and
 observer-only sessions, but is hidden and rejected as a direct selection in human player lobbies.
-Unsupported or internal IDs fall back to AI 2.2 when adding a seat and are ignored when changing a
-seat; stale internal seats are normalized to AI 2.2 when humans join and again at match start.
+Unsupported or internal IDs fall back to AI 2.3 when adding a seat and are ignored when changing a
+seat; stale internal seats are normalized to AI 2.3 when humans join and again at match start.
 
 `server/crates/ai/src/compositions.rs` defines compositions as weighted lists of registered concrete
 profiles. Add another member and its positive integer weight to extend a composition; nested
@@ -38,7 +37,7 @@ and simulation RNG consumption cannot affect the choice. The normal and prepared
 that seed in `AiThinkContext` (and the synthetic fixture's `PlayerView`). No seed is added to the
 wire or strategy observation. Equal weights mean equal probability, not forced alternation.
 
-The lobby/request identity stays AI 2.2. Controller diagnostics expose the selected concrete
+The lobby/request identity stays AI 2.3. Controller diagnostics expose the selected concrete
 profile separately; mixed decision traces identify both the composition and member. Arena
 manifests record the weighted member list, and their fingerprints include member policy
 fingerprints and selector source. Explicit AI 2.1 and Rush requests preserve their existing behavior.
@@ -124,10 +123,8 @@ controller ordering, all-controller observation before enqueue, worker-retreat-f
 normal simulation validation, and replay logging are unchanged. The builder is deliberately not a
 planner, task system, command receipt, or cross-tick scheduler.
 
-`PullbackMemory` is an optional tactical helper shared by Pressure and approaching Rush
-Riflemen. Jeff's rifle squad planner keeps its own copy of the same policy in
-`ai_core::squad_micro::pullback`, so changes to the SDK helper do not reach Jeff and Jeff's
-changes do not reach the SDK. Its pure `plan` accepts explicit live squad facts and currently visible enemy-unit facts;
+`PullbackMemory` is an optional tactical helper shared by Jeff, Pressure, and approaching Rush
+Riflemen. Its pure `plan` accepts explicit live squad facts and currently visible enemy-unit facts;
 its `step` adapter reads those facts from `AiFrame` and emits SDK Moves. The default policy pulls a
 member at or below 15 HP three tiles away from the nearest visible enemy when a visible enemy is
 targeting it, then excludes it from normal orders for 45 ticks. At least one squad member must
@@ -135,9 +132,8 @@ remain above the threshold. Destinations are map-clamped; the helper does not es
 safety or reachability. Callers choose squad membership and keep route and combat ownership.
 They suppress normal orders for returned `active` IDs and restore their own movement for
 `released` IDs. The adapter remembers new retreats only after local emission succeeds; this does
-not imply simulation acceptance. Jeff's copy has no SDK adapter: his squad planner calls `plan`
-directly and keeps its early-return semantics, including resuming ordinary advancement when its
-caller sees no enemies.
+not imply simulation acceptance. Jeff retains his existing squad-planner invocation and early-return
+semantics, including resuming ordinary advancement when its caller sees no enemies.
 
 The public-SDK-only [reference strategy](../ai-authoring.md) is the executable authoring specimen.
 It runs through `AiController::with_strategy` and the canonical driver, enables Pump Jack repeat,
@@ -293,8 +289,10 @@ boundary does not replace that saved route. Construction-clearance ownership con
 in the response.
 
 Pressure includes a Training Centre in its initial tech path so its infantry research does not
-wait for the Tank transition. On the first decision at or after two minutes (3,600 ticks), it queues
+wait for the Tank transition. After observing nine newly trained Riflemen, it queues
 Panzerfausts on an owned Training Centre, including an unfinished or currently researching one.
+The match-local counter excludes starting Riflemen, retains casualties, and survives the Rush
+handoff; only owned units observed in player snapshots count.
 Research waits for authoritative completion, prerequisites, and payment. Once the upgrade completes,
 Pressure stops issuing new Rifleman orders, disables Rifleman repeat, and enables Panzerfaust repeat
 on every completed Barracks, including replacements. Already paid or queued Riflemen finish normally.
@@ -343,8 +341,23 @@ Barracks start with Machine Gunner repeat only. Methamphetamines is queued on th
 that observes the Training Centre scaffold, followed by Entrenchment. Panzerfausts is queued on
 the first decision at or after two minutes (3,600 simulation ticks), behind earlier research. Once
 it completes, each Barracks alternates Machine Gunners and Panzerfausts. The home Resource Depot
-auto-builds Steel Mines and Pump Jacks to sustain income. There is no expansion or additional tech
-path.
+auto-builds Steel Mines and Pump Jacks to sustain income during the opening.
+
+Thirty seconds after its fifth wave launch, Rush cancels all queued production and standing
+allocations at the two surviving Barracks nearest the first living enemy start, retaining at least
+one rear Barracks if fewer than three survive. It then hands over to the full Pressure AI economy,
+defense, production, and wave controller on the normal decision cadence. Retired Barracks remain
+idle; Pressure may use the rear Barracks and any new producers. Existing units and construction
+survive, while Rush wave memory is discarded. Losing its only Engineer independently arms the
+same thirty-second recovery handoff; Pressure can then replace the Engineer and rebuild income.
+Rush suspends new wave launches during that recovery grace period, preserving Rush micro for
+already launched units without launching a cohort just before the switch. Later waves do not
+postpone a handoff already armed by wave five; the earlier of the wave and recovery deadlines
+wins. Rush retains its original two-minute Panzerfaust gate. After handoff, Pressure uses the
+cumulative Rifleman production milestone for research while retaining its timed target selection
+and wave-size doubling.
+The requested Rush or AI 2.3 match identity remains
+unchanged; the active behavior and decision traces identify Pressure after the handoff.
 
 Rush enables the shared wounded-unit pull-back only for Riflemen still approaching their first
 staging slot. Active retreats temporarily suppress slot movement, which resumes immediately when
@@ -402,7 +415,7 @@ AI 2.0 resolves only to the `ai_2_0_tank_pressure` profile. The retired
 panic does not override an already-active tech transition, so tank pressure continues its Factory
 path during pressure.
 
-AI 2.1 is the original behavior copied into Pressure, the non-Rush AI 2.2 component. It fills in-range Steel and Oil extractor slots over time,
+AI 2.1 is the original behavior copied into Pressure, one of the AI 2.3 components. It fills in-range Steel and Oil extractor slots over time,
 keeps an eight-supply buffer, opens one Barracks, expands to two Resource Depots, and reserves four
 Machine Gunners for defense. It begins with Rifleman pressure, then transitions into mixed
 Tank/Rifleman pressure once its tank-tech resource threshold is met. After its first Vehicle Works (Factory) completes, it seeks a third Resource Depot using the
@@ -574,19 +587,19 @@ horizon is a draw.
 
 The ai-arena binary runs side-swapped seed pairs and writes a top-level arena-summary.json plus
 per-run replay.json, manifest.json, summary.json, decision-trace.jsonl, and brief.md files. Its
-defaults compare AI 2.2 against AI Turtle. The manifest records canonical profile IDs and
+defaults compare AI 2.3 against AI Turtle. The manifest records canonical profile IDs and
 fingerprints, rather than a requested/resolved identity pair.
 
     cd server
     cargo run --bin ai-arena -- --candidate ai_2_1 --baseline ai_turtle --seeds 3 --ticks 9000
 
 The repository term **120 game test** means `scripts/120-game-test.mjs`. It requires profile IDs for
-the current AI 2.2, pre-change Jeff, and post-change Jeff in that order. The runner builds ai-arena,
+the current AI 2.3, pre-change Jeff, and post-change Jeff in that order. The runner builds ai-arena,
 runs all three pairings on The River, Schone Tage, Classic, and Crossroads with five side-swapped seeds,
 caps parallel work, resumes completed seed jobs when an output directory is reused, and writes
 Markdown, JSON, and CSV summaries.
 
-    node scripts/120-game-test.mjs ai_2_2 jeffs_ai_pre_defense_envelope jeffs_ai
+    node scripts/120-game-test.mjs ai_2_3 jeffs_ai_pre_defense_envelope jeffs_ai
 
 Per-seed console progress is off by default. For unattended runs, `--background` starts the test in
 a hidden detached process and returns immediately; `--status <output-directory>` reads compact

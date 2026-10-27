@@ -333,3 +333,75 @@ fn pullback_owns_only_riflemen_approaching_staging_and_resumes_the_slot() {
     assert!(waves.launched.contains(&id));
     assert_eq!(waves.pullback, PullbackMemory::default());
 }
+
+#[test]
+fn handoff_is_armed_by_the_fifth_successful_wave_and_later_waves_do_not_delay_it() {
+    let (start, mut snapshot) = fixture();
+    snapshot.upgrades.push("methamphetamines".into());
+    let target = (2000.0, 2000.0);
+    let mut waves = RushWaves::default();
+    waves.rally(&frame(&start, &snapshot), 2, target).unwrap();
+    let specimen = snapshot
+        .entities
+        .iter()
+        .find(|e| e.owner == 1 && e.kind == "rifleman")
+        .unwrap()
+        .clone();
+    snapshot.entities.retain(|e| e.kind != "rifleman");
+    // A very late match clock cannot finish an opening that has not launched its waves.
+    snapshot.tick = 20000;
+    assert_eq!(waves.handoff_tick(), None);
+    let mut scheduled = None;
+    for wave in 1..=HANDOFF_WAVES + 1 {
+        for i in 0..5 {
+            add_rifle(&mut snapshot, &specimen, 1000 + wave * 5 + i);
+        }
+        step(&mut waves, &start, &snapshot, target);
+        assemble(&mut snapshot, &waves);
+        snapshot.tick += 9;
+        let actions = step(&mut waves, &start, &snapshot, target);
+        assert!(actions.iter().any(
+            |a| matches!(a, AiActionRequest::AttackMove { units, x, y, queued: false }
+            if units.len() == 5 && (*x, *y) == target)
+        ));
+        assert_eq!(waves.waves_launched, wave);
+        if wave < HANDOFF_WAVES {
+            assert_eq!(waves.handoff_tick(), None);
+        } else if wave == HANDOFF_WAVES {
+            scheduled = Some(snapshot.tick + HANDOFF_DELAY_TICKS);
+            assert_eq!(waves.handoff_tick(), scheduled);
+        } else {
+            assert_eq!(waves.handoff_tick(), scheduled);
+        }
+        snapshot.tick += 9;
+    }
+}
+
+#[test]
+fn losing_the_engineer_arms_a_fixed_recovery_delay_and_suspends_new_waves() {
+    let mut strategy = crate::rush::RushStrategy::default();
+    strategy.observe_engineer(20_000, true);
+    assert!(!strategy.handoff_due(u32::MAX));
+    strategy.observe_engineer(20_010, false);
+    strategy.observe_engineer(20_020, false);
+    assert!(strategy.waves.launches_suspended);
+    assert!(!strategy.handoff_due(20_010 + HANDOFF_DELAY_TICKS - 1));
+    assert!(strategy.handoff_due(20_010 + HANDOFF_DELAY_TICKS));
+}
+
+#[test]
+fn recovery_grace_keeps_a_ready_cohort_from_launching_just_before_handoff() {
+    let (start, mut snapshot) = fixture();
+    snapshot.upgrades.push("methamphetamines".into());
+    let target = (2000.0, 2000.0);
+    let mut waves = RushWaves::default();
+    waves.rally(&frame(&start, &snapshot), 2, target).unwrap();
+    waves.suspend_launches();
+    step(&mut waves, &start, &snapshot, target);
+    assemble(&mut snapshot, &waves);
+    snapshot.tick += 9;
+    step(&mut waves, &start, &snapshot, target);
+    assert_eq!(waves.waves_launched, 0);
+    assert!(!waves.first_wave_launched);
+    assert_eq!(waves.handoff_tick(), None);
+}

@@ -86,9 +86,10 @@ impl PressureWaves {
         frame: &AiFrame,
         target: Point,
         eligible: &BTreeSet<u32>,
+        trained_riflemen: u32,
         actions: &mut AiActions,
     ) {
-        self.production.step(frame, actions);
+        self.production.step(frame, trained_riflemen, actions);
         let response = self.response.step(frame, eligible, actions);
         for id in &response.released {
             // Recalled survivors become staging recruits again, including previously launched units.
