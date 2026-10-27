@@ -29,7 +29,7 @@ fn step(
     let frame = frame(start, snapshot);
     let mut actions = AiActions::for_frame(&frame);
     let eligible = frame.owned().iter().map(|e| e.id).collect();
-    waves.step(&frame, target, &eligible, &mut actions);
+    waves.step(&frame, target, &eligible, 0, &mut actions);
     actions.into_requests()
 }
 
@@ -279,7 +279,7 @@ fn defense_can_borrow_unlaunched_units_and_they_resume_staging_when_released() {
     let current = frame(&start, &snapshot);
     let eligible = BTreeSet::new();
     let mut actions = AiActions::for_frame(&current);
-    waves.step(&current, target, &eligible, &mut actions);
+    waves.step(&current, target, &eligible, 0, &mut actions);
     assert!(
         actions.into_requests().is_empty(),
         "defense owns every unit this decision"
@@ -298,12 +298,16 @@ fn production_step(
 ) -> Vec<AiActionRequest> {
     let current = frame(start, snapshot);
     let mut actions = AiActions::for_frame(&current);
-    production.step(&current, &mut actions);
+    production.step(
+        &current,
+        production::PANZERFAUST_RIFLEMEN_TRAINED,
+        &mut actions,
+    );
     actions.into_requests()
 }
 
 #[test]
-fn panzerfaust_research_waits_for_two_minutes_and_recovers_if_its_centre_dies() {
+fn panzerfaust_research_waits_for_riflemen_trained_and_recovers_if_its_centre_dies() {
     let (start, mut snapshot) = fixture();
     let mut production = production::PressureProduction::default();
     snapshot.entities.push(EntityView::new(
@@ -318,9 +322,19 @@ fn panzerfaust_research_waits_for_two_minutes_and_recovers_if_its_centre_dies() 
     ));
     snapshot.steel = 0;
     snapshot.oil = 0;
-    snapshot.tick = 3599;
-    assert!(production_step(&mut production, &start, &snapshot).is_empty());
-    snapshot.tick = 3600;
+    snapshot.tick = 20000;
+    let current = frame(&start, &snapshot);
+    let mut actions = AiActions::for_frame(&current);
+    production.step(
+        &current,
+        production::PANZERFAUST_RIFLEMEN_TRAINED - 1,
+        &mut actions,
+    );
+    assert!(
+        actions.into_requests().is_empty(),
+        "time alone must not unlock research"
+    );
+    snapshot.tick = 1;
     assert!(matches!(
         production_step(&mut production, &start, &snapshot).as_slice(),
         [AiActionRequest::Research {
@@ -463,7 +477,7 @@ fn timed_step(
     waves.rally(&current, 2, main).unwrap();
     let eligible = current.owned().iter().map(|e| e.id).collect();
     let mut actions = AiActions::for_frame(&current);
-    waves.step(&current, main, &eligible, &mut actions);
+    waves.step(&current, main, &eligible, 0, &mut actions);
     actions.into_requests()
 }
 
@@ -782,7 +796,7 @@ fn recalled_launched_units_return_to_staging_after_contact_expires() {
     // Construction clearance retains ownership even while a response is active.
     let f = frame(&start, &snapshot);
     let mut actions = AiActions::for_frame(&f);
-    waves.step(&f, target, &BTreeSet::new(), &mut actions);
+    waves.step(&f, target, &BTreeSet::new(), 0, &mut actions);
     assert!(!actions
         .into_requests()
         .iter()
@@ -975,7 +989,7 @@ fn wounded_launched_rifle_resumes_its_original_route_and_yields_to_construction_
         .map(|e| e.id)
         .collect();
     let mut actions = AiActions::for_frame(&frame);
-    waves.step(&frame, target, &eligible, &mut actions);
+    waves.step(&frame, target, &eligible, 0, &mut actions);
     assert!(!actions.into_requests().iter().any(|a| matches!(a,
         AiActionRequest::AttackMove { units, .. } | AiActionRequest::Move { units, .. } if units.contains(&id))));
 }

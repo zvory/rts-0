@@ -1,12 +1,13 @@
-//! Pressure's timed infantry research and standing Panzerfaust production.
+//! Pressure's production-gated infantry research and standing Panzerfaust production.
 use std::collections::BTreeSet;
 
 use crate::sdk::{AiActions, AiCompletion, AiFrame, EntityKind, UpgradeKind};
 
-const PANZERFAUST_RESEARCH_TICK: u32 = rts_rules::balance::TICK_HZ * 120;
+// Baseline calibration: nine newly trained Riflemen on most map/side samples at two minutes.
+pub(crate) const PANZERFAUST_RIFLEMEN_TRAINED: u32 = 9;
 
-pub(crate) fn uses_panzerfaust_production(tick: u32, upgrades: &[UpgradeKind]) -> bool {
-    tick >= PANZERFAUST_RESEARCH_TICK && upgrades.contains(&UpgradeKind::Panzerfausts)
+pub(crate) fn uses_panzerfaust_production(upgrades: &[UpgradeKind]) -> bool {
+    upgrades.contains(&UpgradeKind::Panzerfausts)
 }
 
 #[derive(Default)]
@@ -16,12 +17,16 @@ pub(super) struct PressureProduction {
 }
 
 impl PressureProduction {
-    pub(super) fn step(&mut self, frame: &AiFrame, actions: &mut AiActions) {
+    pub(super) fn step(&mut self, frame: &AiFrame, trained_riflemen: u32, actions: &mut AiActions) {
         self.research_queued
             .retain(|id| frame.owned().iter().any(|e| e.id == *id));
         self.configured_barracks
             .retain(|id| frame.owned().iter().any(|e| e.id == *id));
-        if frame.tick() < PANZERFAUST_RESEARCH_TICK {
+        if trained_riflemen < PANZERFAUST_RIFLEMEN_TRAINED
+            && !frame
+                .completed_upgrades()
+                .contains(&UpgradeKind::Panzerfausts)
+        {
             return;
         }
         if !frame

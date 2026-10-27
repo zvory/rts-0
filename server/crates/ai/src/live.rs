@@ -28,6 +28,7 @@ use rts_sim::game::entity::EntityKind;
 use rts_sim::game::Game;
 use rts_sim::protocol::{Snapshot, StartPayload};
 
+mod opening;
 mod rush_handoff;
 
 const DECISION_INTERVAL: u32 = 9;
@@ -274,6 +275,8 @@ pub struct AiController {
     strategy_initialized: bool,
     pressure_waves: crate::pressure::PressureWaves,
     retired_barracks: BTreeSet<u32>,
+    rush_strategy: RushStrategy,
+    opening: opening::OpeningProgress,
 }
 
 struct LegacyProfileStrategy;
@@ -317,11 +320,12 @@ impl AiController {
             active_attack_units: BTreeMap::new(),
             last_decision_trace: None,
             last_debug_map_layers: Vec::new(),
-            custom_strategy: (profile_id == RUSH_AI_ID)
-                .then(|| Box::<RushStrategy>::default() as Box<dyn AiStrategy>),
+            custom_strategy: None,
             strategy_initialized: false,
             pressure_waves: Default::default(),
             retired_barracks: BTreeSet::new(),
+            rush_strategy: Default::default(),
+            opening: Default::default(),
         }
     }
 
@@ -382,6 +386,9 @@ impl AiController {
 
     pub fn think(&mut self, context: AiThinkContext<'_>) -> Vec<SimCommand> {
         self.select_for_match(context.match_seed);
+        if matches!(self.behavior_profile_id, RUSH_AI_ID | PRESSURE_AI_ID) {
+            self.opening.observe(context.snapshot, self.player);
+        }
         let mut commands = self.handoff_rush(&context);
         commands.extend(self.think_active(context));
         commands.retain_mut(|command| match command {
@@ -405,7 +412,7 @@ impl AiController {
             context.retreat_commands
         };
         let tick = context.snapshot.tick;
-        if self.custom_strategy.is_none() {
+        if self.custom_strategy.is_none() && self.behavior_profile_id != RUSH_AI_ID {
             self.static_map_context.get_or_analyze(context.start);
         }
         if !tick
@@ -453,7 +460,14 @@ impl AiController {
             assert_eq!(LegacyProfileStrategy::project(&frame), direct);
         }
 
-        if let Some(strategy) = self.custom_strategy.as_mut() {
+        let strategy: Option<&mut dyn AiStrategy> = if self.behavior_profile_id == RUSH_AI_ID {
+            Some(&mut self.rush_strategy)
+        } else {
+            self.custom_strategy
+                .as_mut()
+                .map(|strategy| strategy.as_mut() as &mut dyn AiStrategy)
+        };
+        if let Some(strategy) = strategy {
             if !self.strategy_initialized {
                 strategy.initialize(&frame);
                 self.strategy_initialized = true;
@@ -589,6 +603,7 @@ impl AiController {
                     &frame,
                     target,
                     &decision.pressure_wave_units,
+                    self.opening.trained_riflemen(),
                     &mut actions,
                 );
                 commands.extend(

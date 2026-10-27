@@ -18,7 +18,7 @@ fn composition_selects_once_and_keeps_the_requested_identity() {
             assert_eq!(controller.selected_profile_id(), Some(member));
         }
         assert_eq!(controller.profile_id(), AI_2_3_ID);
-        assert_eq!(controller.custom_strategy.is_some(), member == RUSH_AI_ID);
+        assert!(controller.custom_strategy.is_none());
     }
     assert!(is_player_live_profile_id(AI_2_3_ID));
     assert!(!is_player_live_profile_id(AI_2_1_ID));
