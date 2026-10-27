@@ -85,10 +85,10 @@ fn v1_1_builds_guns_for_the_home_pocket_each_bases_line_and_a_home_reserve() {
     let obs = observation(economy(), owned);
     let facts = AiFacts::from_observation(&obs);
     let mut caps = vec![(EntityKind::MachineGunner, 6)];
-    gun_cap(&JEFFS_AI_V1_1, &facts, None, &[], &mut caps);
+    gun_cap(&JEFFS_AI_V1_1, &facts, (None, false), &[], &mut caps);
     assert_eq!(caps, vec![(EntityKind::MachineGunner, 14)]);
     let mut caps = vec![(EntityKind::MachineGunner, 6)];
-    gun_cap(&JEFFS_AI, &facts, None, &[], &mut caps);
+    gun_cap(&JEFFS_AI, &facts, (None, false), &[], &mut caps);
     assert_eq!(caps, vec![(EntityKind::MachineGunner, 6)]);
 }
 
@@ -100,12 +100,12 @@ fn v1_1_keeps_two_riflemen_for_every_tank_and_four_at_home() {
     let facts = AiFacts::from_observation(&obs);
     let mut priorities = vec![EntityKind::Tank];
     assert_eq!(
-        rifle_line(JEFFS_AI_V1_1_ID, &facts, &mut priorities),
+        rifle_line(JEFFS_AI_V1_1_ID, &facts, false, &mut priorities),
         Some(10)
     );
     assert_eq!(priorities, vec![EntityKind::Tank, EntityKind::Rifleman]);
     let mut priorities = vec![EntityKind::Tank];
-    assert_eq!(rifle_line(JEFFS_AI_ID, &facts, &mut priorities), None);
+    assert_eq!(rifle_line(JEFFS_AI_ID, &facts, false, &mut priorities), None);
     assert_eq!(priorities, vec![EntityKind::Tank]);
 }
 

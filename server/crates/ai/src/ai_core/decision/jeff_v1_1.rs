@@ -5,6 +5,7 @@ use super::*;
 use crate::ai_core::facts::ProductionBuildingFact;
 
 pub(super) mod base_line;
+pub(super) mod third_base;
 
 /// What V1.1 remembers between decisions.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -14,6 +15,8 @@ pub(super) struct V1_1Memory {
     pub(super) entrenchment_waits: bool,
     /// Each base-line unit's post (`base_line`).
     pub(super) base_lines: BTreeMap<u32, base_line::LinePost>,
+    /// Since when Steel has stood at `third_base::BANK_STEEL` or more.
+    pub(super) banked_since: Option<u32>,
 }
 
 /// Methamphetamines comes first. It is ordered the moment the Training Centre is free and its cost
@@ -169,13 +172,18 @@ pub(super) const MAX_PUSH_RIFLES: usize = 20;
 pub(super) fn rifle_line(
     profile_id: &str,
     facts: &AiFacts,
+    banked: bool,
     priorities: &mut Vec<EntityKind>,
 ) -> Option<usize> {
     if !is_jeff_v1_1(profile_id) {
         return None;
     }
-    let line =
-        (HOME_RIFLES + RIFLES_PER_TANK * facts.unit_count(EntityKind::Tank)).min(MAX_RIFLE_LINE);
+    // Steel banked with nothing else to buy goes into Riflemen, up to the most a line takes.
+    let line = if banked {
+        MAX_RIFLE_LINE
+    } else {
+        (HOME_RIFLES + RIFLES_PER_TANK * facts.unit_count(EntityKind::Tank)).min(MAX_RIFLE_LINE)
+    };
     if facts.unit_count(EntityKind::Rifleman) < line && !priorities.contains(&EntityKind::Rifleman)
     {
         priorities.push(EntityKind::Rifleman);
@@ -186,11 +194,12 @@ pub(super) fn rifle_line(
 /// V1.1 trains Machine Gunners for every gun post it has: the home pocket's, four in front of each
 /// finished Depot past the main, and four more held at home. Guns past the home pocket wait while
 /// the spend plan has no Steel to spare for them, before the first Tank; the opening guns, the
-/// expansions and the first Tank's savings still come first.
+/// expansions and the first Tank's savings still come first. Banked Steel (`third_base::banked`)
+/// buys guns up to `MAX_GUNS`.
 pub(super) fn gun_cap(
     profile: &AiProfile,
     facts: &AiFacts,
-    plan: Option<&spend_plan::SpendPlan>,
+    (plan, banked): (Option<&spend_plan::SpendPlan>, bool),
     intents: &[AiIntent],
     max_counts: &mut Vec<(EntityKind, usize)>,
 ) {
@@ -203,10 +212,14 @@ pub(super) fn gun_cap(
     let bases = facts
         .complete_building_count(EntityKind::ResourceDepot)
         .saturating_sub(1);
-    let posts = (home + GUNS_PER_BASE * bases + HOME_GUN_RESERVE).min(MAX_GUNS);
+    let posts = if banked {
+        MAX_GUNS
+    } else {
+        (home + GUNS_PER_BASE * bases + HOME_GUN_RESERVE).min(MAX_GUNS)
+    };
     let guns = facts.unit_count(EntityKind::MachineGunner);
     let (gun_steel, _) = rts_rules::economy::cost(EntityKind::MachineGunner);
-    let spare = plan.is_none_or(|plan| plan.affords_off_plan(intents, gun_steel));
+    let spare = banked || plan.is_none_or(|plan| plan.affords_off_plan(intents, gun_steel));
     let cap = if guns < home || spare { posts } else { guns };
     match max_counts
         .iter_mut()

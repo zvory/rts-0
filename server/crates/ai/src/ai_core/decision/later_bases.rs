@@ -86,6 +86,8 @@ pub(super) struct LaterBases {
     /// The Depot currently being covered (a site being taken or a Depot that just finished).
     guard_site: Option<(u32, u32)>,
     guard_release_tick: Option<u32>,
+    /// Jeff's AI V1.1 takes bases by escort and bank (`jeff_v1_1::third_base`).
+    v1_1: bool,
 }
 
 /// What the rest of the decision needs from this cycle.
@@ -138,6 +140,9 @@ where
         return status;
     }
     note_dry_wells(observation, &mut memory.later_bases);
+    let v1_1 = is_jeff_v1_1(profile.id);
+    memory.later_bases.v1_1 = v1_1;
+    jeff_v1_1::third_base::note_bank(observation, memory, profile.id);
     let Some(expansion) = profile.expansion else {
         return status;
     };
@@ -169,11 +174,19 @@ where
             } else {
                 REQUIRED_TOTAL_TANKS
             };
-        let ready = total_tanks >= required_total_tanks
-            // The two guards leave, so the home reserve must still be there after they go.
-            && free_tanks.len()
-                >= REQUIRED_FREE_TANKS.max(GUARD_TANKS + memory.home_tank_reserve())
-            && main_tank_ids(observation, memory).len() >= memory.home_tank_reserve()
+        let army_ready = if v1_1 {
+            let home = geometry::tile_center(observation.own_start_tile, observation.map.tile_size);
+            (total_tanks >= required_total_tanks
+                || jeff_v1_1::third_base::banked(observation, memory))
+                && jeff_v1_1::third_base::escort(observation, memory, home).is_some()
+        } else {
+            total_tanks >= required_total_tanks
+                // The two guards leave, so the home reserve must still be there after they go.
+                && free_tanks.len()
+                    >= REQUIRED_FREE_TANKS.max(GUARD_TANKS + memory.home_tank_reserve())
+                && main_tank_ids(observation, memory).len() >= memory.home_tank_reserve()
+        };
+        let ready = army_ready
             && defense::local_defense_contact(observation).is_none()
             && observation.economy.steel >= steel
             && observation.economy.oil >= oil
@@ -190,7 +203,14 @@ where
                 EntityKind::ResourceDepot,
                 &resources,
                 &mut |kind, x, y| !site_is_rejected(&rejected, (x, y)) && placeable(kind, x, y),
-                |tile| route_exposure_penalty(observation, route, tile),
+                |tile| {
+                    let scale = if v1_1 {
+                        jeff_v1_1::third_base::ROUTE_PENALTY_SCALE
+                    } else {
+                        1
+                    };
+                    route_exposure_penalty(observation, route, tile) * scale
+                },
             );
             let site_center = site.and_then(|site| {
                 building_center(site, EntityKind::ResourceDepot, observation.map.tile_size)
@@ -229,7 +249,13 @@ where
             return status;
         }
     }
-    let slots = guard_post_slots(observation, map_analysis, site_center, enemy);
+    // V1.1's infantry escort stands in a line, one post each.
+    let escort = memory.later_bases.guards.len();
+    let slots = if escort > GUARD_TANKS {
+        jeff_v1_1::third_base::escort_posts(observation, map_analysis, site_center, enemy, escort)
+    } else {
+        guard_post_slots(observation, map_analysis, site_center, enemy)
+    };
     status.guard_posts = memory
         .later_bases
         .guards
@@ -468,10 +494,10 @@ fn refresh_guard_site(observation: &AiObservation, memory: &mut AiDecisionMemory
     } else if state.guard_site_built {
         // The Depot was destroyed while still covered. The base is due again, but not at once:
         // whatever killed it is probably still there, and a second loss rules the site out.
-        if note_site_failure(state, guard_site) {
+        if note_site_failure(state, guard_site) || state.v1_1 {
             state.rejected_sites.insert(guard_site);
         }
-        state.retry_after_tick = tick.saturating_add(SITE_RETRY_COOLDOWN_TICKS);
+        state.retry_after_tick = tick.saturating_add(retry_ticks(state));
         state.guard_site_built = false;
     }
     if state.site.is_none()
@@ -556,13 +582,22 @@ pub(super) fn issue_guard_orders(
     ordered
 }
 
+/// How long after a failed or lost base the next is taken: V1.1 tries the next site sooner.
+fn retry_ticks(state: &LaterBases) -> u32 {
+    if state.v1_1 {
+        jeff_v1_1::third_base::RETRY_TICKS
+    } else {
+        SITE_RETRY_COOLDOWN_TICKS
+    }
+}
+
 /// Give up on a site for now: release the guards and wait out the cooldown. A rejected site is
-/// never chosen again.
+/// never chosen again; V1.1 rejects every site it gives up, and tries the next.
 fn abandon_site(state: &mut LaterBases, site: (u32, u32), tick: u32, reject: bool) {
-    if reject {
+    if reject || state.v1_1 {
         state.rejected_sites.insert(site);
     }
-    state.retry_after_tick = tick.saturating_add(SITE_RETRY_COOLDOWN_TICKS);
+    state.retry_after_tick = tick.saturating_add(retry_ticks(state));
     state.site = None;
     state.guard_site = None;
     state.guard_site_built = false;
@@ -574,10 +609,12 @@ fn abandon_site(state: &mut LaterBases, site: (u32, u32), tick: u32, reject: boo
 
 /// Drop guards that died or became the home Tank; true when one died.
 fn drop_lost_guards(observation: &AiObservation, memory: &mut AiDecisionMemory) -> bool {
+    // V1.1's escort may be infantry.
+    let any_kind = memory.later_bases.v1_1;
     let alive: BTreeSet<u32> = observation
         .owned
         .iter()
-        .filter(|unit| unit.kind == EntityKind::Tank && unit.hp > 0)
+        .filter(|unit| (unit.kind == EntityKind::Tank || any_kind) && unit.hp > 0)
         .map(|unit| unit.id)
         .collect();
     let home_tank = memory.home_defensive_tank;
@@ -592,6 +629,11 @@ fn drop_lost_guards(observation: &AiObservation, memory: &mut AiDecisionMemory) 
 /// Pick the two Tanks nearest the site that neither the push nor home defense is using. Guards are
 /// chosen once per site: losses are not replaced, because that would send Tanks in one at a time.
 fn select_guards(observation: &AiObservation, memory: &mut AiDecisionMemory, site: (f32, f32)) {
+    if memory.later_bases.v1_1 {
+        let escort = jeff_v1_1::third_base::escort(observation, memory, site);
+        memory.later_bases.guards = escort.unwrap_or_default();
+        return;
+    }
     let home_tank = memory.home_defensive_tank;
     let mut candidates: Vec<&AiEntitySummary> = observation
         .owned
