@@ -974,6 +974,7 @@ where
             building_max_counts.as_slice(),
         );
         let priorities = &effective_unit_priorities;
+        jeff_v1_1::reserve_tank_steel(profile.id, building_kind, &facts, observation, &mut actions);
         for (buildings, unit_priorities) in
             jeff_v1_1::barracks_batches(profile.id, building_kind, buildings, priorities, limits)
         {

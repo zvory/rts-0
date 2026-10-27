@@ -114,6 +114,33 @@ pub(super) fn keep_guns_on_posts(
     });
 }
 
+/// The Barracks leave a Tank's Steel in the bank while a Factory stands idle with the Tank's Oil
+/// in: the Factory trains first each decision but could never gather 425 Steel while three
+/// Barracks spent every 75. On The River V1.1 then sat at 5 Tanks from 7:00 to 12:00 with 1,000-
+/// 1,500 Oil unspent and Steel near 0, where V1.0 fielded 8-11 Tanks.
+pub(super) fn reserve_tank_steel(
+    profile_id: &str,
+    building_kind: EntityKind,
+    facts: &AiFacts,
+    observation: &AiObservation,
+    actions: &mut AiActionContext<'_>,
+) {
+    if !is_jeff_v1_1(profile_id) || building_kind != EntityKind::Barracks || off("tankreserve") {
+        return;
+    }
+    let (steel, oil) = rts_rules::economy::cost(EntityKind::Tank);
+    let idle_factory = facts
+        .production_buildings(EntityKind::Factory)
+        .iter()
+        .any(|factory| factory.queue_len == 0);
+    if idle_factory
+        && facts.completed_upgrades().contains(&UpgradeKind::TankUnlock)
+        && observation.economy.oil >= oil
+    {
+        actions.holdback_resources(steel, 0);
+    }
+}
+
 /// Local ablation testing only: `JEFF_V11_OFF=scout,raid,...` turns the named V1.1 features off.
 pub(super) fn off(feature: &str) -> bool {
     static OFF: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
