@@ -212,9 +212,9 @@ where
     {
         return None;
     }
-    let (tile_x, tile_y) = if uses_current_jeffs_ai_policy(profile.id)
-        || profile.id == crate::ai_core::profiles::PRESSURE_AI_ID
-    {
+    let (tile_x, tile_y) = if profile.id == crate::ai_core::profiles::PRESSURE_AI_ID {
+        pressure_economy::checked_site(observation, secured_site, placeable)?
+    } else if uses_current_jeffs_ai_policy(profile.id) {
         let site = secured_site?;
         if !expansion_site_is_separate(observation, site) || !placeable(kind, site.0, site.1) {
             return None;
@@ -804,7 +804,7 @@ fn near_known_depot(observation: &AiObservation, point: (f32, f32), radius_tiles
         .any(|center| dist2(point.0, point.1, center.0, center.1) <= radius2)
 }
 
-fn expansion_site_is_separate(observation: &AiObservation, tile: (u32, u32)) -> bool {
+pub(super) fn expansion_site_is_separate(observation: &AiObservation, tile: (u32, u32)) -> bool {
     building_center(tile, EntityKind::ResourceDepot, observation.map.tile_size).is_some_and(
         |center| !near_known_depot(observation, center, MIN_EXPANSION_DEPOT_DISTANCE_TILES),
     )
