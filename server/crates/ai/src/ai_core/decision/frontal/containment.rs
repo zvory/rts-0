@@ -68,6 +68,7 @@ pub(super) fn issue_expansion_containment_wave(
     if live_jeff {
         drop_stuck_push_tanks(observation, memory);
     }
+    jeff_v1_1::push::note_enemy_army(observation, memory);
     let stuck: Vec<u32> = memory.containment.stuck_tanks.keys().copied().collect();
     // A Tank seen moving or attacking was given another order since the push held it.
     let still_standing: BTreeSet<u32> = observation
@@ -148,6 +149,10 @@ pub(super) fn issue_expansion_containment_wave(
             };
             select_nearest_units(observation, &mut tanks, rally, push_size);
             select_nearest_units(observation, &mut scouts, rally, 1);
+            // Jeff's AI V1.1 sends a Rifleman ahead when it has no Scout Car.
+            if scouts.is_empty() {
+                scouts.extend(jeff_v1_1::push::spotter(observation, memory, rally));
+            }
             if tanks.len() != push_size || scouts.is_empty() {
                 return None;
             }
@@ -155,6 +160,7 @@ pub(super) fn issue_expansion_containment_wave(
             memory.containment.active_scout = scouts.first().copied();
             memory.containment.active_riflemen = select_rifle_escorts(observation, memory, rally)
                 .into_iter()
+                .filter(|rifleman| Some(*rifleman) != memory.containment.active_scout)
                 .collect();
             reset_containment_route(memory);
             memory.containment.last_formation_command_tick = None;
@@ -210,6 +216,7 @@ pub(super) fn issue_expansion_containment_wave(
             memory.containment.active_riflemen =
                 select_rifle_escorts(observation, memory, formation_center)
                     .into_iter()
+                    .filter(|rifleman| *rifleman != scout)
                     .collect();
         }
         let riflemen: Vec<u32> = memory.containment.active_riflemen.iter().copied().collect();
@@ -249,12 +256,15 @@ pub(super) fn issue_expansion_containment_wave(
             assembly_shape,
         );
         let nearby_rifles = nearby_rifle_escort_count(observation, &riflemen, formation_center);
+        // Jeff's AI V1.1 weighs whole armies instead of Tank counts, and strikes a gathering wave.
+        let v1_1_launch = jeff_v1_1::push::launch_ready(observation, memory, joining);
         // The live Jeff also launches once most of its Tanks have gathered, a while after the hard
         // timeout: one Tank held behind a building, or the Scout Car elsewhere, kept a 24-Tank push
         // waiting at home for the rest of the game.
         let most_gathered = live_jeff
             && assembly_elapsed >= ASSEMBLY_GATHERED_TICKS
-            && tanks.len() + joining >= memory.recent_enemy_tanks() + GATHERED_LEAD_TANKS
+            && (v1_1_launch.is_some()
+                || tanks.len() + joining >= memory.recent_enemy_tanks() + GATHERED_LEAD_TANKS)
             && {
                 let gathered = observation
                     .owned
@@ -272,7 +282,8 @@ pub(super) fn issue_expansion_containment_wave(
                 && core_grouped
                 && nearby_rifles >= MIN_CONTAINMENT_RIFLE_ESCORTS)
             || (assembly_hard_timed_out && vehicle_core_grouped)
-            || most_gathered;
+            || most_gathered
+            || (v1_1_launch.is_some() && memory.jeff_v1_1.push.striking());
         let river_opening_guard = !memory.containment.wave_launched
             && expansion::has_jeff_river_expansion_site(observation)
             && river_opening_guard_active(observation, &tanks, assembly_started, memory);
@@ -284,7 +295,10 @@ pub(super) fn issue_expansion_containment_wave(
         } else {
             0
         };
-        let launch_outnumbered = memory.recent_enemy_tanks() + lead_needed > tanks.len() + joining;
+        let launch_outnumbered = match v1_1_launch {
+            Some(ready) => !ready,
+            None => memory.recent_enemy_tanks() + lead_needed > tanks.len() + joining,
+        };
         // Nor while enemy Tanks shelling a base outnumber the home Tanks near them.
         let home_outgunned = push_uses_available_armor && memory.home_outgunned;
         // The live Jeff's push waits while enemies hold its natural before the Depot is up: its
@@ -336,7 +350,9 @@ pub(super) fn issue_expansion_containment_wave(
 
     // Outnumbered in Tanks out in the field: fall back to the regroup point and rebuild one Tank
     // larger, instead of losing the push a Tank at a time.
-    if !memory.enemy_main_destroyed && push_outnumbered(observation, &tanks) {
+    let outnumbered = jeff_v1_1::push::outweighed(observation, memory)
+        .unwrap_or_else(|| push_outnumbered(observation, &tanks));
+    if !memory.enemy_main_destroyed && outnumbered {
         if push_uses_available_armor {
             memory
                 .approach
@@ -373,8 +389,17 @@ pub(super) fn issue_expansion_containment_wave(
     } else if memory.enemy_natural_destroyed {
         (enemy_base.x, enemy_base.y)
     } else {
-        natural_objective
+        // Jeff's AI V1.1 rolls its line forward anchor by anchor.
+        jeff_v1_1::push::objective(observation, map_analysis, memory, own_base, natural_objective)
+            .unwrap_or(natural_objective)
     };
+    let holding_short = jeff_v1_1::push::holding_short(
+        observation,
+        map_analysis,
+        memory,
+        own_base,
+        natural_objective,
+    );
     let (tank_point, legacy_scout_point) = if endgame_search_active {
         let scout_point = scout_forward_from_tanks(
             objective,
@@ -404,7 +429,11 @@ pub(super) fn issue_expansion_containment_wave(
     // straight at the objective and is left to that order for a while. The two-Tank opening, which
     // marches as one rank, is left alone: on Schone Tage it waited out the trap line behind its own
     // exit, and sent at the enemy it drove into the traps.
-    if live_jeff && !endgame_search_active && tanks.len() >= super::approach::MIN_TANKS_FOR_LEGS {
+    if live_jeff
+        && !endgame_search_active
+        && !holding_short
+        && tanks.len() >= super::approach::MIN_TANKS_FOR_LEGS
+    {
         if let Some(center) = group_center(observation, &tanks) {
             let tick = observation.tick;
             if memory

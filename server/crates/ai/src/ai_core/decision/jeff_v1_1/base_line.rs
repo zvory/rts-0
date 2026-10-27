@@ -404,6 +404,7 @@ fn line_units<'a>(
         .filter(|unit| unit.kind == kind && unit.is_complete && unit.hp > 0)
         .filter(|unit| {
             !memory.containment.active_riflemen.contains(&unit.id)
+                && memory.containment.active_scout != Some(unit.id)
                 && !memory.expansion_security.riflemen.contains(&unit.id)
                 && !memory.later_bases.guards.contains(&unit.id)
                 && !memory.opening_rush.is_reserved(unit.id)

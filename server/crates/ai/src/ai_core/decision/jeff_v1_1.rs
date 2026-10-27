@@ -5,6 +5,7 @@ use super::*;
 use crate::ai_core::facts::ProductionBuildingFact;
 
 pub(super) mod base_line;
+pub(super) mod push;
 pub(super) mod third_base;
 
 /// What V1.1 remembers between decisions.
@@ -17,6 +18,7 @@ pub(super) struct V1_1Memory {
     pub(super) base_lines: BTreeMap<u32, base_line::LinePost>,
     /// Since when Steel has stood at `third_base::BANK_STEEL` or more.
     pub(super) banked_since: Option<u32>,
+    pub(super) push: push::PushMemory,
 }
 
 /// Methamphetamines comes first. It is ordered the moment the Training Centre is free and its cost

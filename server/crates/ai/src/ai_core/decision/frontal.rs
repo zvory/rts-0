@@ -407,7 +407,13 @@ pub(super) fn sync_containment_recovery(
             .filter(|unit| !memory.third_pressure.is_reserved(unit.id))
             .map(|unit| unit.id)
             .min();
-        if let Some(scout) = replacement {
+        // Jeff's AI V1.1 sends one of the push's Riflemen ahead instead.
+        let rifle_spotter = || {
+            let escort = memory.containment.active_riflemen.iter().copied().min();
+            escort.filter(|_| is_jeff_v1_1(profile.id))
+        };
+        if let Some(scout) = replacement.or_else(rifle_spotter) {
+            memory.containment.active_riflemen.remove(&scout);
             memory.containment.active_scout = Some(scout);
             scout_intact = true;
         }
@@ -1211,7 +1217,7 @@ fn outbound_wave_target_priority(kind: EntityKind) -> u8 {
     }
 }
 
-fn group_center(observation: &AiObservation, unit_ids: &[u32]) -> Option<(f32, f32)> {
+pub(super) fn group_center(observation: &AiObservation, unit_ids: &[u32]) -> Option<(f32, f32)> {
     let (sum_x, sum_y, count) = observation
         .owned
         .iter()
