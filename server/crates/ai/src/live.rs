@@ -28,6 +28,8 @@ use rts_sim::game::entity::EntityKind;
 use rts_sim::game::Game;
 use rts_sim::protocol::{Snapshot, StartPayload};
 
+mod rush_handoff;
+
 const DECISION_INTERVAL: u32 = 9;
 const LIVE_DECISION_TRACE_MAX_LINES: usize = 24;
 const LIVE_DECISION_TRACE_MAX_LINE_CHARS: usize = 256;
@@ -271,6 +273,7 @@ pub struct AiController {
     custom_strategy: Option<Box<dyn AiStrategy>>,
     strategy_initialized: bool,
     pressure_waves: crate::pressure::PressureWaves,
+    retired_barracks: BTreeSet<u32>,
 }
 
 struct LegacyProfileStrategy;
@@ -318,6 +321,7 @@ impl AiController {
                 .then(|| Box::<RushStrategy>::default() as Box<dyn AiStrategy>),
             strategy_initialized: false,
             pressure_waves: Default::default(),
+            retired_barracks: BTreeSet::new(),
         }
     }
 
@@ -378,6 +382,22 @@ impl AiController {
 
     pub fn think(&mut self, context: AiThinkContext<'_>) -> Vec<SimCommand> {
         self.select_for_match(context.match_seed);
+        let mut commands = self.handoff_rush(&context);
+        commands.extend(self.think_active(context));
+        commands.retain_mut(|command| match command {
+            SimCommand::Train { building, .. } => !self.retired_barracks.contains(building),
+            SimCommand::AdjustProductionRepeat {
+                buildings, delta, ..
+            } if *delta > 0 => {
+                buildings.retain(|id| !self.retired_barracks.contains(id));
+                !buildings.is_empty()
+            }
+            _ => true,
+        });
+        commands
+    }
+
+    fn think_active(&mut self, context: AiThinkContext<'_>) -> Vec<SimCommand> {
         // Rush deliberately keeps its Engineer advancing, including under fire.
         let mut commands = if self.behavior_profile_id == RUSH_AI_ID {
             Vec::new()
@@ -464,9 +484,16 @@ impl AiController {
             return commands;
         }
 
-        let Some(observation) = LegacyProfileStrategy::project(&frame) else {
+        let Some(mut observation) = LegacyProfileStrategy::project(&frame) else {
             return commands;
         };
+        // Keep retired structures in economy/defense facts, but never budget manual training
+        // against a producer whose commands would be suppressed after the handoff.
+        for entity in &mut observation.owned {
+            if self.retired_barracks.contains(&entity.id) {
+                entity.production_queue_len = None;
+            }
+        }
         self.prune_combat_memory(&observation, tick);
 
         let profile = self.profile();
@@ -823,7 +850,7 @@ mod tests {
         }
     }
 
-    fn driver_test_players() -> Vec<PlayerInit> {
+    pub(super) fn driver_test_players() -> Vec<PlayerInit> {
         vec![
             PlayerInit {
                 id: 1,
