@@ -240,6 +240,8 @@ while the search continues through other resource locations.
 expansion, infantry research, production, and staging. The legacy home
 response, defensive panic production override, and dedicated Machine Gunner policy are disabled
 for Pressure. Other profiles retain them. Construction clearance still has priority.
+Pressure retries interrupted research on replacement producers so a lost Training Centre cannot
+permanently lock its first wave.
 
 The single Pressure response controller borrows mobile Riflemen, Panzerfausts, and Tanks nearest
 to observed attackers until their full purchase value (Steel plus Oil) reaches at least 150% of

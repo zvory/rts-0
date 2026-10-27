@@ -297,3 +297,43 @@ fn nothing_moves_while_an_enemy_is_inside_the_base() {
     let orders = plan(&observation, &mut memory, &analysis);
     assert!(orders.ordered.is_empty(), "{orders:?}");
 }
+
+#[test]
+fn pressure_machine_gunners_stage_on_reachable_ground_on_the_bent_main_route() {
+    let (analysis, mut observation) = schone();
+    home(&mut observation, 0);
+    let main = observation.own_start_tile;
+    observation.owned.extend([101, 102].map(|id| {
+        unit(
+            id,
+            1,
+            EntityKind::MachineGunner,
+            (main.0 as f32 + 2.0, main.1 as f32),
+        )
+    }));
+    let profile = crate::ai_core::profiles::profile_by_id("pressure_ai").unwrap();
+    for has_home_tank in [false, true] {
+        let facts = AiFacts::from_observation(&observation);
+        let mut actions = AiActionContext::new(&facts, SpendBudget::new(0, 0, 0, 100));
+        let staged = super::super::pressure_line::stage_pressure_machine_gunners(
+            &mut actions,
+            &observation,
+            Some(&analysis),
+            profile,
+            &[101, 102],
+            has_home_tank,
+        );
+        assert_eq!(staged, Some(vec![101, 102]));
+        let anchor = tile_center(main, observation.map.tile_size);
+        for command in actions.into_commands() {
+            use rts_sim::game::command::SimCommand;
+            let (x, y) = match command {
+                SimCommand::AttackMove { x, y, .. } if !has_home_tank => (x, y),
+                SimCommand::Move { x, y, .. } if has_home_tank => (x, y),
+                _ => panic!("expected existing movement policy"),
+            };
+            assert!(y < anchor.1, "the ground approach enters from the north");
+            assert!(analysis.open_ground_near(anchor, (x, y), 1, 0).is_some());
+        }
+    }
+}
