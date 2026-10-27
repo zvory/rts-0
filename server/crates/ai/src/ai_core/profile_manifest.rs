@@ -40,7 +40,7 @@ pub(crate) fn profile_identity(profile: &AiProfile) -> AiProfileIdentity {
         (
             "Pressure AI",
             "Ranked expansion to five bases, floating-resource growth to at most four Vehicle Works, and independently owned terrain-routed assault waves.",
-            vec!["pressure_staging", "ranked_five_base_economy", "tank_repeat"],
+            vec!["pressure_staging", "ranked_five_base_economy", "tank_repeat", "value_response"],
         )
     } else {
         (label, summary, modules)
@@ -62,6 +62,7 @@ pub(crate) fn profile_identity(profile: &AiProfile) -> AiProfileIdentity {
                     include_str!("../pressure.rs"),
                     include_str!("../pressure/production.rs"),
                     include_str!("../pressure/objective.rs"),
+                    include_str!("../pressure/response.rs"),
                     include_str!("decision/pressure_economy.rs"),
                 ),
                 "Pressure AI",
