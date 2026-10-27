@@ -531,7 +531,10 @@ pub(crate) fn uses_current_jeffs_ai_policy(id: &str) -> bool {
 /// change under test branches on `JEFFS_AI_ID` alone, so the freeze plays exactly as the live Jeff
 /// did just before it. When a new freeze is taken, it replaces the old one here.
 pub(crate) fn runs_live_jeff(id: &str) -> bool {
-    matches!(id, JEFFS_AI_ID | JEFFS_AI_V1_1_ID | JEFFS_AI_PRE_SPEND_PLAN_ID)
+    matches!(
+        id,
+        JEFFS_AI_ID | JEFFS_AI_V1_1_ID | JEFFS_AI_PRE_SPEND_PLAN_ID
+    )
 }
 
 /// The live Jeff bots, Jeff's AI V1.0 (`jeffs_ai`) and V1.1: what only the live Jeff did, both do.

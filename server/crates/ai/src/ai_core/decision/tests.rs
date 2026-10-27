@@ -12,6 +12,7 @@ use rts_sim::game::command::SimCommand as Command;
 mod economy_manager_tests;
 mod expansion_security_tests;
 mod fast_natural_tests;
+mod jeff_v1_1_tests;
 mod natural_site_tests;
 mod pressure_tests;
 mod spend_plan_tests;

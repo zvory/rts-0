@@ -44,6 +44,8 @@ const RIFLE_SCREEN_FORWARD_TILES: f32 = 2.0;
 const RIFLE_SCREEN_SPACING_TILES: f32 = 2.0;
 const RIFLE_SCREEN_SECOND_RANK_BACK_TILES: f32 = 1.5;
 const RIFLE_SCREEN_FIRST_RANK: usize = 4;
+/// Ranks behind the first hold up to this many Riflemen each, a further rank-depth back every time.
+const RIFLE_SCREEN_LATER_RANK: usize = 6;
 const MAX_CONTAINMENT_RIFLE_ESCORTS: usize = 6;
 const MIN_CONTAINMENT_RIFLE_ESCORTS: usize = 2;
 const CONTAINMENT_HOME_RIFLE_RESERVE: usize = 4;

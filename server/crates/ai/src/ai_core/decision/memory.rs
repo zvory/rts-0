@@ -515,6 +515,11 @@ impl AiDecisionMemory {
     }
 
     /// Units the route line, the opening rush, the trap breach and the third-base party own.
+    /// The profile this memory belongs to.
+    pub(super) fn profile_id(&self) -> Option<&'static str> {
+        self.profile_id
+    }
+
     pub(super) fn squad_reserved(&self) -> BTreeSet<u32> {
         self.route_line
             .reserved()

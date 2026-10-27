@@ -239,6 +239,10 @@ const approvedCurrentFactionFiles = new Set([
   // Jeff's spend plan forecasts current-roster extractor income and prices the natural Depot,
   // Factory, Tank Unlock and Tank; profile/catalog layers still own faction admission.
   "server/crates/ai/src/ai_core/decision/spend_plan.rs",
+  // Jeff's AI V1.1's own policy (early Methamphetamines, its gun Barracks and gun posts, its
+  // Rifleman line) names current-roster units and upgrades; profile/catalog layers still own faction
+  // admission.
+  "server/crates/ai/src/ai_core/decision/jeff_v1_1.rs",
   // Unit priority and cap adjustments moved verbatim out of the approved decision orchestrator.
   "server/crates/ai/src/ai_core/decision/unit_mix.rs",
   // Jeff's Kriegsia-only expansion screen and upgrade policy are focused modules beneath the

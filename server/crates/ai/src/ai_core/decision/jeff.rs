@@ -533,7 +533,11 @@ pub(super) fn cap_opening_guns(
     facts: &AiFacts,
     max_counts: &mut [(EntityKind, usize)],
 ) {
-    if runs_live_jeff(profile_id) && facts.unit_count(EntityKind::Tank) > 0 {
+    // Jeff's AI V1.1 keeps building guns for its gun posts (`jeff_v1_1::gun_cap`).
+    if runs_live_jeff(profile_id)
+        && !is_jeff_v1_1(profile_id)
+        && facts.unit_count(EntityKind::Tank) > 0
+    {
         for (kind, max) in max_counts {
             if *kind == EntityKind::MachineGunner {
                 *max = (*max).min(expansion_security::OPENING_GUNS);
@@ -562,5 +566,26 @@ pub(super) fn cap_routine_riflemen(
             Some((_, max)) => *max = (*max).min(cap),
             None => max_counts.push((EntityKind::Rifleman, cap)),
         }
+    }
+}
+
+/// On Crossroads Jeff stops turning surplus Steel into Riflemen at this many. It fielded 30-40,
+/// most of them idle, while Oil held it to 2-4 Tanks and it never took a third base.
+const CROSSROADS_MAX_SURPLUS_RIFLEMEN: usize = 24;
+
+/// The most surplus-Steel units of `unit` to train. On Crossroads Jeff is short of Oil, not Steel:
+/// past a home garrison, more Riflemen only spend the Steel the third base and Factory rebuilds need.
+pub(super) fn surplus_cap(
+    profile_id: &str,
+    unit: EntityKind,
+    observation: &AiObservation,
+) -> usize {
+    if uses_current_jeffs_ai_policy(profile_id)
+        && unit == EntityKind::Rifleman
+        && defense::crossroads_wall_aware_approach_direction(observation).is_some()
+    {
+        CROSSROADS_MAX_SURPLUS_RIFLEMEN
+    } else {
+        usize::MAX
     }
 }

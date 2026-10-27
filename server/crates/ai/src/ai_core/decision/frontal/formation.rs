@@ -152,10 +152,19 @@ pub(super) fn select_rifle_escorts(
         })
         .map(|unit| unit.id)
         .collect();
-    let escort_count = riflemen
-        .len()
-        .div_ceil(2)
-        .clamp(MIN_CONTAINMENT_RIFLE_ESCORTS, MAX_CONTAINMENT_RIFLE_ESCORTS);
+    // Jeff's AI V1.1 screens its Tanks against Panzerfausts with two Riflemen for every Tank.
+    let escort_count = if memory.profile_id().is_some_and(is_jeff_v1_1) {
+        let line = jeff_v1_1::RIFLES_PER_TANK * memory.containment.active_tanks.len();
+        riflemen
+            .len()
+            .min(line)
+            .clamp(MIN_CONTAINMENT_RIFLE_ESCORTS, jeff_v1_1::MAX_PUSH_RIFLES)
+    } else {
+        riflemen
+            .len()
+            .div_ceil(2)
+            .clamp(MIN_CONTAINMENT_RIFLE_ESCORTS, MAX_CONTAINMENT_RIFLE_ESCORTS)
+    };
     riflemen.sort_by(|left, right| {
         let left_distance = by_id.get(left).map_or(f32::INFINITY, |unit| {
             dist2(unit.x, unit.y, anchor.0, anchor.1)
@@ -208,15 +217,19 @@ pub(super) fn rifle_screen_points(
     let spacing = RIFLE_SCREEN_SPACING_TILES * map.tile_size as f32;
     (0..count)
         .map(|index| {
-            let (rank_index, rank_count, rank_back) = if index < RIFLE_SCREEN_FIRST_RANK {
-                (index, count.min(RIFLE_SCREEN_FIRST_RANK), 0.0)
+            let (rank_index, rank_count, rank) = if index < RIFLE_SCREEN_FIRST_RANK {
+                (index, count.min(RIFLE_SCREEN_FIRST_RANK), 0)
             } else {
+                let behind = index - RIFLE_SCREEN_FIRST_RANK;
+                let start = behind / RIFLE_SCREEN_LATER_RANK * RIFLE_SCREEN_LATER_RANK;
                 (
-                    index - RIFLE_SCREEN_FIRST_RANK,
-                    count - RIFLE_SCREEN_FIRST_RANK,
-                    RIFLE_SCREEN_SECOND_RANK_BACK_TILES * map.tile_size as f32,
+                    behind - start,
+                    (count - RIFLE_SCREEN_FIRST_RANK - start).min(RIFLE_SCREEN_LATER_RANK),
+                    behind / RIFLE_SCREEN_LATER_RANK + 1,
                 )
             };
+            let rank_back =
+                RIFLE_SCREEN_SECOND_RANK_BACK_TILES * rank as f32 * map.tile_size as f32;
             let center_index = (rank_count.saturating_sub(1)) as f32 / 2.0;
             let offset = (rank_index as f32 - center_index) * spacing;
             clamp_to_map(

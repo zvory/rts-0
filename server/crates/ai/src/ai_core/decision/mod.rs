@@ -14,11 +14,11 @@ use crate::ai_core::profiles::{
     is_jeff_v1_1, is_jeffs_ai_profile, is_live_jeff, runs_live_jeff, uses_current_jeffs_ai_policy,
     AiProfile, AttackPolicy, BarracksCurve, ExpansionContainmentPolicy, ExpansionPolicy,
     ProductionPolicy, ResourcePolicy, TechTransitionPolicy, WorkerPolicy, JEFFS_AI_BETA_ID,
-    JEFFS_AI_ID, JEFFS_AI_V1_1_ID,
-    JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID, JEFFS_AI_PRE_EARLY_NATURAL_ID, JEFFS_AI_PRE_FAST_NATURAL_ID,
-    JEFFS_AI_PRE_GUARD_HANDOFF_ID, JEFFS_AI_PRE_HELD_SITE_ID, JEFFS_AI_PRE_OPENING_RUSH_ID,
-    JEFFS_AI_PRE_RIFLE_COVERAGE_ID, JEFFS_AI_PRE_SAFE_BASES_ID, JEFFS_AI_PRE_SPEND_PLAN_ID,
-    JEFFS_AI_PRE_TANK_CATCHUP_ID, JEFFS_AI_PRE_TANK_MICRO_ID, JEFFS_AI_PRE_THIRD_PRESSURE_ID,
+    JEFFS_AI_ID, JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID, JEFFS_AI_PRE_EARLY_NATURAL_ID,
+    JEFFS_AI_PRE_FAST_NATURAL_ID, JEFFS_AI_PRE_GUARD_HANDOFF_ID, JEFFS_AI_PRE_HELD_SITE_ID,
+    JEFFS_AI_PRE_OPENING_RUSH_ID, JEFFS_AI_PRE_RIFLE_COVERAGE_ID, JEFFS_AI_PRE_SAFE_BASES_ID,
+    JEFFS_AI_PRE_SPEND_PLAN_ID, JEFFS_AI_PRE_TANK_CATCHUP_ID, JEFFS_AI_PRE_TANK_MICRO_ID,
+    JEFFS_AI_PRE_THIRD_PRESSURE_ID, JEFFS_AI_V1_1_ID,
 };
 use crate::ai_shared;
 use crate::config;
@@ -865,10 +865,19 @@ where
         memory,
         &mut effective_unit_priorities,
     );
+    let rifle_line = jeff_v1_1::rifle_line(profile.id, &facts, &mut effective_unit_priorities);
     let production_unit_counts =
         unit_counts_for_priorities(observation, &facts, profile, &effective_unit_priorities);
     let mut production_max_counts = production_max_counts(profile, observation, map_analysis);
     jeff::cap_opening_guns(profile.id, &facts, &mut production_max_counts);
+    let v1_1_plan = spend_plan.as_ref();
+    jeff_v1_1::gun_cap(
+        profile,
+        &facts,
+        v1_1_plan,
+        &intents,
+        &mut production_max_counts,
+    );
     let emergency_rifle_target = emergency_rifle_target.and_then(|_| {
         memory
             .opening_rush
@@ -918,16 +927,7 @@ where
                 actions.budget().steel().saturating_sub(policy.reserve) as usize
                     / unit_steel as usize
             };
-            // On Crossroads Jeff is short of Oil, not Steel: past a home garrison, more Riflemen
-            // only spend the Steel the third base and Factory rebuilds need.
-            let surplus_cap = if uses_current_jeffs_ai_policy(profile.id)
-                && policy.unit == EntityKind::Rifleman
-                && defense::crossroads_wall_aware_approach_direction(observation).is_some()
-            {
-                CROSSROADS_MAX_SURPLUS_RIFLEMEN
-            } else {
-                usize::MAX
-            };
+            let surplus_cap = jeff::surplus_cap(profile.id, policy.unit, observation);
             building_max_counts.retain(|(kind, _)| *kind != policy.unit);
             building_max_counts.push((
                 policy.unit,
@@ -937,7 +937,13 @@ where
                     .max(security_recruits.unwrap_or(0)),
             ));
         }
-        if let Some(target) = emergency_recruits {
+        for target in [
+            emergency_recruits,
+            rifle_line.filter(|_| building_kind == EntityKind::Barracks),
+        ]
+        .into_iter()
+        .flatten()
+        {
             opening_rush::raise_rifle_cap(&mut building_max_counts, target);
         }
         jeff::cap_routine_riflemen(
@@ -957,40 +963,51 @@ where
         let rifleman_rally = uses_home_rifle_coverage(profile.id)
             .then(|| jeffs_rifleman_home_rally(observation, &facts))
             .flatten();
-        let trained_units = actions::train_units_with_rally_for_unit(
-            &mut actions,
-            TrainUnitsRequest {
-                buildings,
-                unit_priorities: &effective_unit_priorities,
-                completed_building_kinds: facts.complete_building_kinds(),
-                completed_upgrades: facts.completed_upgrades(),
-                max_queue_depth: production_policy.queue_depth,
-                save_for_tech,
-                current_counts: &production_unit_counts,
-                max_counts: &building_max_counts,
-                balance_unit_priorities: production_policy.balance_unit_priorities,
-            },
-            |unit| {
-                // While a new base is being taken, fresh Tanks and Riflemen join its guards, but
-                // Tanks only once the main holds its reserve.
-                if let Some((x, y)) = later_base.rally.filter(|_| {
-                    unit == EntityKind::Rifleman
-                        || (unit == EntityKind::Tank && home_holds_tank_reserve)
-                }) {
-                    return Some((x, y, RallyKind::AttackMove));
-                }
-                if unit == EntityKind::Rifleman {
-                    rifleman_rally
-                        .map(|(x, y)| (x, y, RallyKind::Move))
-                        .or_else(|| production_rally.map(|(x, y)| (x, y, RallyKind::AttackMove)))
-                } else {
-                    production_rally.map(|(x, y)| (x, y, RallyKind::AttackMove))
-                }
-            },
+        let limits = (
+            production_unit_counts.as_slice(),
+            building_max_counts.as_slice(),
         );
-        for trained in trained_units {
-            memory.note_turtle_train(profile, trained.unit);
-            intents.push(AiIntent::Train { kind: trained.unit });
+        let priorities = &effective_unit_priorities;
+        for (buildings, unit_priorities) in
+            jeff_v1_1::barracks_batches(profile.id, building_kind, buildings, priorities, limits)
+        {
+            let trained_units = actions::train_units_with_rally_for_unit(
+                &mut actions,
+                TrainUnitsRequest {
+                    buildings: &buildings,
+                    unit_priorities: &unit_priorities,
+                    completed_building_kinds: facts.complete_building_kinds(),
+                    completed_upgrades: facts.completed_upgrades(),
+                    max_queue_depth: production_policy.queue_depth,
+                    save_for_tech,
+                    current_counts: &production_unit_counts,
+                    max_counts: &building_max_counts,
+                    balance_unit_priorities: production_policy.balance_unit_priorities,
+                },
+                |unit| {
+                    // While a new base is being taken, fresh Tanks and Riflemen join its guards, but
+                    // Tanks only once the main holds its reserve.
+                    if let Some((x, y)) = later_base.rally.filter(|_| {
+                        unit == EntityKind::Rifleman
+                            || (unit == EntityKind::Tank && home_holds_tank_reserve)
+                    }) {
+                        return Some((x, y, RallyKind::AttackMove));
+                    }
+                    if unit == EntityKind::Rifleman {
+                        rifleman_rally
+                            .map(|(x, y)| (x, y, RallyKind::Move))
+                            .or_else(|| {
+                                production_rally.map(|(x, y)| (x, y, RallyKind::AttackMove))
+                            })
+                    } else {
+                        production_rally.map(|(x, y)| (x, y, RallyKind::AttackMove))
+                    }
+                },
+            );
+            for trained in trained_units {
+                memory.note_turtle_train(profile, trained.unit);
+                intents.push(AiIntent::Train { kind: trained.unit });
+            }
         }
     }
 
@@ -1268,6 +1285,13 @@ where
                 }
             }
         }
+        let live = (&mut actions, observation, map_analysis, &mut intents);
+        let guns = (
+            defensive_machine_gunners.as_slice(),
+            &local_defense_assigned,
+        );
+        let enemy_base = facts.nearest_public_enemy_base;
+        jeff_v1_1::stage_base_guns(live, memory, profile, enemy_base, guns);
 
         // The current Jeff's home Tank waits behind the home post once that has moved off the
         // main's line; it sat beside the HQ all game while the natural was shelled.
@@ -1464,7 +1488,3 @@ where
 mod tests;
 #[cfg(test)]
 mod vehicle_worker_tests;
-
-/// On Crossroads Jeff stops turning surplus Steel into Riflemen at this many. It fielded 30-40,
-/// most of them idle, while Oil held it to 2-4 Tanks and it never took a third base.
-const CROSSROADS_MAX_SURPLUS_RIFLEMEN: usize = 24;

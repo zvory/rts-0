@@ -570,3 +570,43 @@ fn a_reforming_push_leaves_the_raiding_partys_units_alone() {
     assert!(!memory.containment.active_tanks.contains(&3));
     assert!(memory.containment.active_tanks.contains(&1));
 }
+
+#[test]
+fn a_large_rifle_screen_stands_in_ranks_of_six_behind_the_first_four() {
+    let map = test_observation(Vec::new(), 0).map;
+    // Facing +x, so each rank back stands 1.5 tiles further left.
+    let anchor = (20.0 * 32.0, 30.0 * 32.0);
+    let objective = (50.0 * 32.0, 30.0 * 32.0);
+    let ranks = |count: usize| {
+        let points = rifle_screen_points(anchor, objective, map, count);
+        let front = points[0].0;
+        let mut ranks: BTreeMap<i32, usize> = BTreeMap::new();
+        for point in points {
+            *ranks
+                .entry(((front - point.0) / 32.0 * 10.0).round() as i32)
+                .or_default() += 1;
+        }
+        ranks.into_iter().collect::<Vec<_>>()
+    };
+    assert_eq!(ranks(20), vec![(0, 4), (15, 6), (30, 6), (45, 4)]);
+    // Up to ten it is the old two-rank screen.
+    assert_eq!(ranks(6), vec![(0, 4), (15, 2)]);
+}
+
+#[test]
+fn jeffs_ai_v1_1_screens_its_push_with_two_riflemen_per_tank() {
+    let mut force: Vec<_> = (100..116)
+        .map(|id| test_entity(id, EntityKind::Rifleman, 9.0 * 32.0, 8.0 * 32.0))
+        .collect();
+    force.extend((200..205).map(|id| test_entity(id, EntityKind::Tank, 10.0 * 32.0, 8.0 * 32.0)));
+    let observation = test_observation(force, 100);
+    let anchor = (9.0 * 32.0, 8.0 * 32.0);
+    let mut escorts = Vec::new();
+    for profile in [&JEFFS_AI, &crate::ai_core::profiles::JEFFS_AI_V1_1] {
+        let mut memory = AiDecisionMemory::for_profile(profile);
+        memory.containment.active_tanks = (200..205).collect();
+        escorts.push(select_rifle_escorts(&observation, &memory, anchor).len());
+    }
+    // Twelve free Riflemen past the home four: V1.0 takes half, at most six; V1.1 two per Tank.
+    assert_eq!(escorts, vec![6, 10]);
+}

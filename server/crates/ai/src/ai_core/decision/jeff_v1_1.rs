@@ -1,7 +1,9 @@
 //! Jeff's AI V1.1: what it does differently from V1.0. Every function here acts only for V1.1
 //! (`is_jeff_v1_1`); for V1.0 each returns without touching the decision.
 
+use super::geometry::{dist2, squared};
 use super::*;
+use crate::ai_core::facts::ProductionBuildingFact;
 
 /// What V1.1 remembers between decisions.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -30,8 +32,7 @@ pub(super) fn early_research(
     plan: Option<&spend_plan::SpendPlan>,
 ) {
     memory.jeff_v1_1.entrenchment_waits = false;
-    if !is_jeff_v1_1(profile_id) || facts.complete_building_count(EntityKind::TrainingCentre) == 0
-    {
+    if !is_jeff_v1_1(profile_id) || facts.complete_building_count(EntityKind::TrainingCentre) == 0 {
         return;
     }
     let meth = UpgradeKind::Methamphetamines;
@@ -61,7 +62,11 @@ pub(super) fn early_research(
 
 /// The Steel and Oil V1.1's opening research still has to pay for, charged at once in the spend
 /// plan so the natural, the Factory and the first Tank are timed after it.
-pub(super) fn research_ahead(profile_id: &str, facts: &AiFacts, memory: &AiDecisionMemory) -> (u32, u32) {
+pub(super) fn research_ahead(
+    profile_id: &str,
+    facts: &AiFacts,
+    memory: &AiDecisionMemory,
+) -> (u32, u32) {
     if !is_jeff_v1_1(profile_id) {
         return (0, 0);
     }
@@ -126,7 +131,12 @@ fn research(
 
 /// Oil the spend plan's forecast expects within `ticks`, between its 15, 30 and 60 s marks.
 fn oil_within(plan: &spend_plan::SpendPlan, ticks: u32) -> f32 {
-    let marks = [(0, 0.0), (450, plan.expected[0].1), (900, plan.expected[1].1), (1800, plan.expected[2].1)];
+    let marks = [
+        (0, 0.0),
+        (450, plan.expected[0].1),
+        (900, plan.expected[1].1),
+        (1800, plan.expected[2].1),
+    ];
     for pair in marks.windows(2) {
         let ((t0, o0), (t1, o1)) = (pair[0], pair[1]);
         if ticks <= t1 {
@@ -134,4 +144,242 @@ fn oil_within(plan: &spend_plan::SpendPlan, ticks: u32) -> f32 {
         }
     }
     plan.expected[2].1
+}
+
+/// Guns on the line in front of each finished Depot past the main.
+const GUNS_PER_BASE: usize = 4;
+/// Guns held at the home post on top of the home pocket's and the bases' posts.
+const HOME_GUN_RESERVE: usize = 4;
+const MAX_GUNS: usize = 30;
+/// V1.1 keeps four Riflemen home and two for every Tank, a screen in front of the Tanks against
+/// Panzerfausts.
+const HOME_RIFLES: usize = 4;
+pub(super) const RIFLES_PER_TANK: usize = 2;
+const MAX_RIFLE_LINE: usize = 30;
+/// The most Riflemen a push takes as its screen.
+pub(super) const MAX_PUSH_RIFLES: usize = 20;
+/// A base's gun line stands this far in front of its Depot, toward the enemy start.
+const BASE_GUN_LINE_TILES: f32 = 5.0;
+const BASE_GUN_OFFSETS: [f32; GUNS_PER_BASE] = [-4.5, -1.5, 1.5, 4.5];
+/// A gun this close to a post is holding it.
+const ON_POST_TILES: f32 = 1.5;
+
+/// The Rifleman line V1.1 trains toward: four home and two for every Tank. Riflemen go into the
+/// production priorities, after Tanks and guns, while the line is short; the training loop raises
+/// each Barracks' Rifleman cap to it (`opening_rush::raise_rifle_cap`), and the spend plan still caps
+/// routine Riflemen before the first Tank.
+pub(super) fn rifle_line(
+    profile_id: &str,
+    facts: &AiFacts,
+    priorities: &mut Vec<EntityKind>,
+) -> Option<usize> {
+    if !is_jeff_v1_1(profile_id) {
+        return None;
+    }
+    let line =
+        (HOME_RIFLES + RIFLES_PER_TANK * facts.unit_count(EntityKind::Tank)).min(MAX_RIFLE_LINE);
+    if facts.unit_count(EntityKind::Rifleman) < line && !priorities.contains(&EntityKind::Rifleman)
+    {
+        priorities.push(EntityKind::Rifleman);
+    }
+    Some(line)
+}
+
+/// V1.1 trains Machine Gunners for every gun post it has: the home pocket's, four in front of each
+/// finished Depot past the main, and four more held at home. Guns past the home pocket wait while
+/// the spend plan has no Steel to spare for them, before the first Tank; the opening guns, the
+/// expansions and the first Tank's savings still come first.
+pub(super) fn gun_cap(
+    profile: &AiProfile,
+    facts: &AiFacts,
+    plan: Option<&spend_plan::SpendPlan>,
+    intents: &[AiIntent],
+    max_counts: &mut Vec<(EntityKind, usize)>,
+) {
+    if !is_jeff_v1_1(profile.id) {
+        return;
+    }
+    let home = profile
+        .defensive_machine_gunners
+        .map_or(0, |policy| policy.target_count);
+    let bases = facts
+        .complete_building_count(EntityKind::ResourceDepot)
+        .saturating_sub(1);
+    let posts = (home + GUNS_PER_BASE * bases + HOME_GUN_RESERVE).min(MAX_GUNS);
+    let guns = facts.unit_count(EntityKind::MachineGunner);
+    let (gun_steel, _) = rts_rules::economy::cost(EntityKind::MachineGunner);
+    let spare = plan.is_none_or(|plan| plan.affords_off_plan(intents, gun_steel));
+    let cap = if guns < home || spare { posts } else { guns };
+    match max_counts
+        .iter_mut()
+        .find(|(kind, _)| *kind == EntityKind::MachineGunner)
+    {
+        Some((_, max)) => *max = cap,
+        None => max_counts.push((EntityKind::MachineGunner, cap)),
+    }
+}
+
+/// Unit counts or caps by kind.
+type UnitCounts<'a> = &'a [(EntityKind, usize)];
+/// Barracks that train from the same priorities.
+type BarracksBatch = (Vec<ProductionBuildingFact>, Vec<EntityKind>);
+
+/// V1.1's Barracks, each with the priorities it trains from. With two or more, the oldest trains
+/// only Machine Gunners while there are guns to train, and the others train no guns; one Barracks
+/// trains everything as before, guns first.
+pub(super) fn barracks_batches(
+    profile_id: &str,
+    building_kind: EntityKind,
+    buildings: &[ProductionBuildingFact],
+    priorities: &[EntityKind],
+    (counts, max_counts): (UnitCounts<'_>, UnitCounts<'_>),
+) -> Vec<BarracksBatch> {
+    let gun = EntityKind::MachineGunner;
+    let Some(gun_barracks) = buildings
+        .iter()
+        .map(|building| building.id)
+        .min()
+        .filter(|_| {
+            is_jeff_v1_1(profile_id) && building_kind == EntityKind::Barracks && buildings.len() > 1
+        })
+    else {
+        return vec![(buildings.to_vec(), priorities.to_vec())];
+    };
+    let of = |list: &[(EntityKind, usize)]| {
+        list.iter()
+            .find_map(|(kind, count)| (*kind == gun).then_some(*count))
+    };
+    let guns_wanted =
+        priorities.contains(&gun) && of(counts).unwrap_or(0) < of(max_counts).unwrap_or(0);
+    let no_guns: Vec<EntityKind> = priorities
+        .iter()
+        .copied()
+        .filter(|unit| *unit != gun)
+        .collect();
+    let (guns, others): (Vec<_>, Vec<_>) = buildings
+        .iter()
+        .copied()
+        .partition(|building| building.id == gun_barracks);
+    let gun_priorities = if guns_wanted {
+        vec![gun]
+    } else {
+        no_guns.clone()
+    };
+    vec![(guns, gun_priorities), (others, no_guns)]
+}
+
+/// V1.1's guns past the home pocket hold posts: four on a line in front of each finished Depot past
+/// the main, facing the enemy start, nearest base first, and the rest at the home post. A gun on a
+/// post keeps it, so a loss never walks a dug-in gun out of its trench; free guns take the free
+/// posts in id order. Wounded guns, which the home pocket replaces, stay where they are.
+pub(super) fn stage_base_guns(
+    (actions, observation, map_analysis, intents): opening_rush::LiveStep<'_, '_, '_, '_>,
+    memory: &AiDecisionMemory,
+    profile: &AiProfile,
+    enemy_base: Option<EnemyBaseFact>,
+    (home_guns, assigned): (&[u32], &BTreeSet<u32>),
+) {
+    let Some(enemy) = enemy_base.filter(|_| is_jeff_v1_1(profile.id)) else {
+        return;
+    };
+    let healthy = profile
+        .defensive_machine_gunners
+        .and_then(|policy| policy.replacement_health_percent)
+        .unwrap_or(0);
+    let reserved = memory.squad_reserved();
+    let mut guns: Vec<&AiEntitySummary> = observation
+        .owned
+        .iter()
+        .filter(|unit| {
+            unit.kind == EntityKind::MachineGunner
+                && unit.is_complete
+                && defense::machine_gunner_meets_replacement_health(unit.hp, healthy)
+                && !home_guns.contains(&unit.id)
+                && !assigned.contains(&unit.id)
+                && !reserved.contains(&unit.id)
+        })
+        .collect();
+    if guns.is_empty() {
+        return;
+    }
+    guns.sort_by_key(|unit| unit.id);
+    let tile = observation.map.tile_size as f32;
+    let home = tile_center(observation.own_start_tile, observation.map.tile_size);
+    let mut depots: Vec<&AiEntitySummary> = observation
+        .owned
+        .iter()
+        .filter(|unit| {
+            unit.kind == EntityKind::ResourceDepot
+                && unit.is_complete
+                && dist2(unit.x, unit.y, home.0, home.1) > squared(8.0 * tile)
+        })
+        .collect();
+    depots.sort_by(|a, b| {
+        dist2(a.x, a.y, home.0, home.1)
+            .total_cmp(&dist2(b.x, b.y, home.0, home.1))
+            .then(a.id.cmp(&b.id))
+    });
+    let mut posts = Vec::new();
+    for depot in depots {
+        let Some(facing) = normalized_direction((depot.x, depot.y), (enemy.x, enemy.y)) else {
+            continue;
+        };
+        let across = (-facing.1, facing.0);
+        let center = (
+            depot.x + facing.0 * BASE_GUN_LINE_TILES * tile,
+            depot.y + facing.1 * BASE_GUN_LINE_TILES * tile,
+        );
+        posts.extend(BASE_GUN_OFFSETS.iter().filter_map(|offset| {
+            let desired = clamp_to_map(
+                (
+                    center.0 + across.0 * offset * tile,
+                    center.1 + across.1 * offset * tile,
+                ),
+                observation.map,
+            );
+            defense::clear_machine_gunner_position(observation, map_analysis, desired, facing)
+        }));
+    }
+    let on = |unit: &AiEntitySummary, post: (f32, f32)| {
+        dist2(unit.x, unit.y, post.0, post.1) <= squared(ON_POST_TILES * tile)
+    };
+    let mut held = BTreeSet::new();
+    let mut free_posts = Vec::new();
+    for post in posts {
+        match guns
+            .iter()
+            .find(|gun| !held.contains(&gun.id) && on(gun, post))
+        {
+            Some(gun) => {
+                held.insert(gun.id);
+            }
+            None => free_posts.push(post),
+        }
+    }
+    let mut free_posts = free_posts.into_iter();
+    let mut staged = Vec::new();
+    let mut spare = Vec::new();
+    for gun in guns.into_iter().filter(|gun| !held.contains(&gun.id)) {
+        match free_posts.next() {
+            Some(post) => staged.extend(
+                actions::attack_move_units(actions, [gun.id], post.0, post.1).unwrap_or_default(),
+            ),
+            None => spare.push(gun.id),
+        }
+    }
+    if let Some(post) = memory.home_post.filter(|_| !spare.is_empty()) {
+        staged.extend(
+            defense::stage_defensive_line_at(
+                actions,
+                observation,
+                &spare,
+                post.center(),
+                post.facing(),
+            )
+            .unwrap_or_default(),
+        );
+    }
+    if !staged.is_empty() {
+        intents.push(AiIntent::Stage { units: staged });
+    }
 }
