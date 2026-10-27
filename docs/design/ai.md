@@ -339,8 +339,15 @@ Barracks start with Machine Gunner repeat only. Methamphetamines is queued on th
 that observes the Training Centre scaffold, followed by Entrenchment. Panzerfausts is queued on
 the first decision at or after two minutes (3,600 simulation ticks), behind earlier research. Once
 it completes, each Barracks alternates Machine Gunners and Panzerfausts. The home Resource Depot
-auto-builds Steel Mines and Pump Jacks to sustain income. There is no expansion or additional tech
-path.
+auto-builds Steel Mines and Pump Jacks to sustain income during the opening.
+
+At four minutes (7,200 simulation ticks), Rush cancels all queued production and standing
+allocations at the two surviving Barracks nearest the first living enemy start, retaining at least
+one rear Barracks if fewer than three survive. It then hands over to the full Pressure AI economy,
+defense, production, and wave controller on the normal decision cadence. Retired Barracks remain
+idle; Pressure may use the rear Barracks and any new producers. Existing units and construction
+survive, while Rush wave memory is discarded. The requested Rush or AI 2.2 match identity remains
+unchanged; the active behavior and decision traces identify Pressure after the handoff.
 
 Rush enables the shared wounded-unit pull-back only for Riflemen still approaching their first
 staging slot. Active retreats temporarily suppress slot movement, which resumes immediately when
