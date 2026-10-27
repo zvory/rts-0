@@ -295,6 +295,8 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/ai/src/ai_core/profiles/pressure.rs",
   "server/crates/ai/src/pressure.rs",
   "server/crates/ai/src/pressure/production.rs",
+  // Pressure is a Kriegsia-only profile: this owner selects its mobile roster; costs use AiRulebook.
+  "server/crates/ai/src/pressure/response.rs",
   // The SDK frame adapter converts the protocol's dedicated remembered-anti-tank-gun records back
   // into the typed kind that the wire record omits. Keep this exception at one occurrence.
   "server/crates/ai/src/sdk/frame.rs",

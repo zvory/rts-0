@@ -98,7 +98,7 @@ use self::turtle::{
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct AiDecision {
-    /// Pressure assault candidates after home defense and construction clearance have claimed units.
+    /// Pressure mobile units after construction clearance; response and staging share one owner.
     pub(crate) pressure_wave_units: BTreeSet<u32>,
     pub(crate) profile_id: &'static str,
     pub(crate) intents: Vec<AiIntent>,
@@ -243,8 +243,11 @@ where
             .configure_tanks(observation, &facts, &mut actions);
     }
 
-    let local_threat_response =
-        defensive_panic_response(observation, uses_current_jeff_defense(profile.id));
+    let local_threat_response = if profile.id == crate::ai_core::profiles::PRESSURE_AI_ID {
+        None // Pressure's SDK response is its only defense controller, including production policy.
+    } else {
+        defensive_panic_response(observation, uses_current_jeff_defense(profile.id))
+    };
     let defensive_panic = memory.defensive_panic(local_threat_response, observation.tick);
     let panic_plan = defensive_panic
         .active
@@ -1065,7 +1068,9 @@ where
                 }
             }
         }
-        let local_target = local_defense_target(observation);
+        let local_target = (profile.id != crate::ai_core::profiles::PRESSURE_AI_ID)
+            .then(|| local_defense_target(observation))
+            .flatten();
         let new_jeff_defense = uses_current_jeff_defense(profile.id);
         let mut jeff_layered_home_defense = local_target.is_some()
             && is_jeffs_ai_profile(profile.id)
@@ -1222,15 +1227,6 @@ where
                             .defensive_machine_gunners
                             .map_or(0, |policy| policy.target_count),
                     )
-                } else if profile.id == crate::ai_core::profiles::PRESSURE_AI_ID {
-                    defense::stage_pressure_machine_gunners(
-                        &mut actions,
-                        observation,
-                        map_analysis,
-                        profile,
-                        &defensive_machine_gunners_available,
-                        memory.home_defensive_tank.is_some(),
-                    )
                 } else if memory.home_defensive_tank.is_some() {
                     let distance = profile
                         .defensive_machine_gunners
@@ -1353,9 +1349,6 @@ where
         // During a raid at home only a launched push is still commanded here.
         let push_only = handled_local_defense && containment_recall_target.is_none();
         if profile.id == crate::ai_core::profiles::PRESSURE_AI_ID {
-            let engaged_home = local_target
-                .map(|_| defense::engaged_local_defense_units(observation))
-                .unwrap_or_default();
             let ordered: BTreeSet<u32> = actions
                 .unit_orders_since(0)
                 .into_iter()
@@ -1372,7 +1365,6 @@ where
                             && !frontal_exclusions.contains(&unit.id)
                             && !ordered.contains(&unit.id)
                             && !local_defense_assigned.contains(&unit.id)
-                            && !engaged_home.contains(&unit.id)
                     })
                     .map(|unit| unit.id),
             );

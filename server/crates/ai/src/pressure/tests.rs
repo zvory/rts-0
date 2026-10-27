@@ -678,7 +678,250 @@ fn pressure_ground_connectivity_does_not_cut_diagonally_blocked_corners() {
 }
 
 #[test]
-fn wounded_launched_rifle_resumes_its_original_route_and_yields_to_home_defense() {
+fn response_recruits_value_escalates_tracks_fog_and_releases_at_thirty_seconds() {
+    let (start, mut snapshot) = fixture();
+    let rifle = snapshot
+        .entities
+        .iter()
+        .find(|e| e.owner == 1 && e.kind == "rifleman")
+        .unwrap()
+        .clone();
+    snapshot.entities.retain(|e| e.kind != "rifleman");
+    for id in 1000..1008 {
+        let mut own = rifle.clone();
+        own.id = id;
+        own.x = rifle.x + (id - 1000) as f32 * 32.0;
+        snapshot.entities.push(own);
+    }
+    let mut enemy = rifle.clone();
+    enemy.id = 999;
+    enemy.owner = 2;
+    enemy.x += 64.0;
+    enemy.target_id = Some(1000);
+    snapshot.entities.push(enemy.clone());
+    let mut response = response::PressureResponse::default();
+    let run = |response: &mut response::PressureResponse, snapshot: &Snapshot| {
+        let f = frame(&start, snapshot);
+        let eligible = f.owned().iter().map(|e| e.id).collect();
+        let mut actions = AiActions::for_frame(&f);
+        let plan = response.step(&f, &eligible, &mut actions);
+        (plan, actions.into_requests())
+    };
+    let (first, orders) = run(&mut response, &snapshot);
+    assert_eq!(
+        first.active.len(),
+        2,
+        "one enemy Rifleman needs two whole Riflemen for >=150% value"
+    );
+    assert!(orders.iter().all(|a| matches!(a, AiActionRequest::AttackMove { x, y, queued: false, .. } if (*x,*y) == (enemy.x,enemy.y))));
+    enemy.id = 998;
+    snapshot.entities.push(enemy.clone());
+    snapshot.tick += 9;
+    let (reinforced, _) = run(&mut response, &snapshot);
+    assert_eq!(
+        reinforced.active.len(),
+        3,
+        "two enemy Riflemen need three responders"
+    );
+    let last_seen = snapshot.tick;
+    snapshot.entities.retain(|e| e.owner != 2);
+    snapshot.tick = last_seen + 899;
+    let (unseen, orders) = run(&mut response, &snapshot);
+    assert_eq!(unseen.active, reinforced.active);
+    assert!(orders.iter().all(
+        |a| matches!(a, AiActionRequest::AttackMove { x, y, .. } if (*x,*y) == (enemy.x,enemy.y))
+    ));
+    snapshot.tick = last_seen + 900;
+    let (expired, _) = run(&mut response, &snapshot);
+    assert!(expired.active.is_empty());
+    assert_eq!(expired.released, reinforced.active);
+}
+
+#[test]
+fn recalled_launched_units_return_to_staging_after_contact_expires() {
+    let (start, mut snapshot) = fixture();
+    let target = (2000.0, 2000.0);
+    let mut waves = PressureWaves::default();
+    waves.rally(&frame(&start, &snapshot), 2, target).unwrap();
+    step(&mut waves, &start, &snapshot, target);
+    assemble(&mut snapshot, &waves);
+    waves.first_wave_unlocked = true;
+    step(&mut waves, &start, &snapshot, target);
+    let id = *waves.launched.first().unwrap();
+    // This is a home-side incident recalling a previously launched unit.
+    let f = frame(&start, &snapshot);
+    let home = f.players().iter().find(|p| p.id == 1).unwrap().start_tile;
+    let size = f.map().tile_size as f32;
+    for entity in snapshot
+        .entities
+        .iter_mut()
+        .filter(|entity| entity.id == id)
+    {
+        entity.x = (home.0 as f32 + 0.5) * size;
+        entity.y = (home.1 as f32 + 0.5) * size;
+    }
+    let mut enemy = snapshot
+        .entities
+        .iter()
+        .find(|e| e.id == id)
+        .unwrap()
+        .clone();
+    enemy.id = 999;
+    enemy.owner = 2;
+    enemy.target_id = Some(id);
+    snapshot.entities.push(enemy);
+    snapshot.tick += 9;
+    let orders = step(&mut waves, &start, &snapshot, target);
+    assert!(orders.iter().any(|a| matches!(a, AiActionRequest::AttackMove { units, queued: false, .. } if units.contains(&id))));
+    // A pending pull-back resume must not take a responder back to its offensive route.
+    waves.resume.insert(id);
+    snapshot.tick += 9;
+    let orders = step(&mut waves, &start, &snapshot, target);
+    assert!(!orders.iter().any(|action| matches!(action,
+        AiActionRequest::AttackMove { units, .. } if units.contains(&id))));
+    // Construction clearance retains ownership even while a response is active.
+    let f = frame(&start, &snapshot);
+    let mut actions = AiActions::for_frame(&f);
+    waves.step(&f, target, &BTreeSet::new(), &mut actions);
+    assert!(!actions
+        .into_requests()
+        .iter()
+        .any(|a| matches!(a, AiActionRequest::AttackMove { .. })));
+    snapshot.entities.retain(|e| e.owner != 2);
+    snapshot.tick += 900;
+    step(&mut waves, &start, &snapshot, target);
+    assert!(!waves.launched.contains(&id));
+    assert!(!waves.wave_routes.contains_key(&id));
+    assert!(waves.slots.contains_key(&id));
+}
+
+#[test]
+fn response_budgets_mixed_purchase_values_and_replaces_dead_responders() {
+    let (start, mut snapshot) = fixture();
+    let rifle = snapshot
+        .entities
+        .iter()
+        .find(|e| e.owner == 1 && e.kind == "rifleman")
+        .unwrap()
+        .clone();
+    snapshot.entities.retain(|e| e.kind != "rifleman");
+    for id in 1000..1010 {
+        let mut unit = rifle.clone();
+        unit.id = id;
+        unit.x += (id - 1000) as f32 * 16.0;
+        if id >= 1004 {
+            unit.kind = "tank".into();
+        }
+        snapshot.entities.push(unit);
+    }
+    let mut enemy = rifle.clone();
+    enemy.id = 999;
+    enemy.owner = 2;
+    enemy.kind = "tank".into();
+    enemy.target_id = Some(1000);
+    snapshot.entities.push(enemy);
+    let mut response = response::PressureResponse::default();
+    let f = frame(&start, &snapshot);
+    let book = crate::sdk::AiRulebook::for_frame(&f).unwrap();
+    let tank = book.cost(EntityKind::Tank).unwrap();
+    let required = (tank.steel + tank.oil) * 3 / 2;
+    let eligible = f.owned().iter().map(|e| e.id).collect();
+    let mut actions = AiActions::for_frame(&f);
+    let plan = response.step(&f, &eligible, &mut actions);
+    let committed: u32 = f
+        .owned()
+        .iter()
+        .filter(|e| plan.active.contains(&e.id))
+        .map(|e| {
+            let cost = book.cost(e.kind).unwrap();
+            cost.steel + cost.oil
+        })
+        .sum();
+    assert!(committed >= required);
+    assert!(
+        committed - (tank.steel + tank.oil) < required,
+        "stop as soon as full unit costs reach the budget"
+    );
+    let lost = *plan.active.last().unwrap();
+    snapshot.entities.retain(|e| e.id != lost);
+    snapshot.tick += 9;
+    let f = frame(&start, &snapshot);
+    let mut actions = AiActions::for_frame(&f);
+    let eligible = f.owned().iter().map(|e| e.id).collect();
+    let replacement = response.step(&f, &eligible, &mut actions);
+    assert!(!replacement.active.contains(&lost));
+    assert!(replacement
+        .active
+        .iter()
+        .any(|id| !plan.active.contains(id)));
+}
+
+#[test]
+fn response_ignores_forward_fights_and_never_refreshes_a_contact_across_the_midpoint() {
+    let (start, mut snapshot) = fixture();
+    let f = frame(&start, &snapshot);
+    let size = f.map().tile_size as f32;
+    let enemy_start = f.players().iter().find(|p| p.id == 2).unwrap().start_tile;
+    let enemy_position = (
+        (enemy_start.0 as f32 + 0.5) * size,
+        (enemy_start.1 as f32 + 0.5) * size,
+    );
+    let rifle = snapshot
+        .entities
+        .iter()
+        .find(|e| e.owner == 1 && e.kind == "rifleman")
+        .unwrap()
+        .clone();
+    let mut enemy = rifle.clone();
+    enemy.id = 999;
+    enemy.owner = 2;
+    enemy.x = enemy_position.0;
+    enemy.y = enemy_position.1;
+    enemy.target_id = Some(rifle.id);
+    enemy.state = "attack".into();
+    snapshot.entities.push(enemy);
+    let mut response = response::PressureResponse::default();
+    let run = |response: &mut response::PressureResponse, snapshot: &Snapshot| {
+        let f = frame(&start, snapshot);
+        let eligible = f.owned().iter().map(|e| e.id).collect();
+        let mut actions = AiActions::for_frame(&f);
+        let plan = response.step(&f, &eligible, &mut actions);
+        (plan, actions.into_requests())
+    };
+    let (forward, orders) = run(&mut response, &snapshot);
+    assert!(
+        forward.active.is_empty(),
+        "even an attacking enemy on its half cannot trigger a response"
+    );
+    assert!(orders.is_empty());
+    snapshot.entities.last_mut().unwrap().x = rifle.x;
+    snapshot.entities.last_mut().unwrap().y = rifle.y;
+    snapshot.tick += 9;
+    let last_home_sighting = snapshot.tick;
+    let (home, _) = run(&mut response, &snapshot);
+    assert!(!home.active.is_empty());
+    snapshot.entities.last_mut().unwrap().x = enemy_position.0;
+    snapshot.entities.last_mut().unwrap().y = enemy_position.1;
+    snapshot.tick += 899;
+    let (remembered, orders) = run(&mut response, &snapshot);
+    assert_eq!(remembered.active, home.active);
+    assert!(
+        orders.iter().all(
+            |a| matches!(a, AiActionRequest::AttackMove { x,y,.. } if (*x,*y) == (rifle.x,rifle.y))
+        ),
+        "pursuit stays at the last friendly-half location"
+    );
+    snapshot.tick = last_home_sighting + 900;
+    let (expired, _) = run(&mut response, &snapshot);
+    assert!(
+        expired.active.is_empty(),
+        "continued vision across the midpoint cannot extend the timeout"
+    );
+    assert_eq!(expired.released, home.active);
+}
+
+#[test]
+fn wounded_launched_rifle_resumes_its_original_route_and_yields_to_construction_clearance() {
     let (start, mut snapshot) = fixture();
     let target = (2000.0, 2000.0);
     let mut waves = PressureWaves::default();
@@ -690,6 +933,10 @@ fn wounded_launched_rifle_resumes_its_original_route_and_yields_to_home_defense(
     let id = *waves.launched.first().unwrap();
     let original = waves.wave_routes[&id];
     let rifle = snapshot.entities.iter_mut().find(|e| e.id == id).unwrap();
+    // Offensive pull-backs remain independent of the home-half response controller.
+    let enemy_start = start.players.iter().find(|player| player.id == 2).unwrap();
+    rifle.x = (enemy_start.start_tile_x as f32 + 0.5) * start.map.tile_size as f32;
+    rifle.y = (enemy_start.start_tile_y as f32 + 0.5) * start.map.tile_size as f32;
     rifle.hp = 10;
     let mut enemy = rifle.clone();
     enemy.id = 999;
@@ -715,7 +962,7 @@ fn wounded_launched_rifle_resumes_its_original_route_and_yields_to_home_defense(
         |a| matches!(a, AiActionRequest::AttackMove { units, x, y, queued: false }
         if units == &[id] && (*x, *y) == original.target())
     ));
-    // Re-target, then withdraw eligibility as if home defense had claimed this unit.
+    // Re-target, then withdraw eligibility as if construction clearance had claimed this unit.
     snapshot.tick += 9;
     snapshot.entities.last_mut().unwrap().target_id = Some(id);
     step(&mut waves, &start, &snapshot, target);
@@ -743,6 +990,10 @@ fn released_third_base_rifle_restores_all_queued_objectives() {
     timed_step(&mut waves, &start, &snapshot, &sites, main);
     assert!(waves.launched.contains(&1));
     let rifle = snapshot.entities.iter_mut().find(|e| e.id == 1).unwrap();
+    // Offensive pull-backs remain independent of the home-half response controller.
+    let enemy_start = start.players.iter().find(|player| player.id == 2).unwrap();
+    rifle.x = (enemy_start.start_tile_x as f32 + 0.5) * start.map.tile_size as f32;
+    rifle.y = (enemy_start.start_tile_y as f32 + 0.5) * start.map.tile_size as f32;
     rifle.hp = 10;
     let mut enemy = rifle.clone();
     enemy.id = 999;
@@ -778,5 +1029,74 @@ fn released_third_base_rifle_restores_all_queued_objectives() {
             (sites[2].position, true),
             (main, true)
         ]
+    );
+}
+
+#[test]
+fn response_defends_even_without_a_staging_route() {
+    let (start, mut snapshot) = fixture();
+    let mut enemy = snapshot
+        .entities
+        .iter()
+        .find(|e| e.owner == 1 && e.kind == "rifleman")
+        .unwrap()
+        .clone();
+    enemy.id = 999;
+    enemy.owner = 2;
+    snapshot.entities.push(enemy.clone());
+    let mut waves = PressureWaves::default();
+    assert!(waves.plan.is_none());
+    let actions = step(&mut waves, &start, &snapshot, (2000.0, 2000.0));
+    assert!(actions.iter().any(|action| matches!(action, AiActionRequest::AttackMove { x,y,.. } if (*x,*y) == (enemy.x,enemy.y))));
+    assert!(waves.slots.is_empty());
+}
+
+#[test]
+fn response_reissues_immediately_after_construction_clearance_releases_a_moving_unit() {
+    let (start, mut snapshot) = fixture();
+    let mut enemy = snapshot
+        .entities
+        .iter()
+        .find(|e| e.owner == 1 && e.kind == "rifleman")
+        .unwrap()
+        .clone();
+    enemy.id = 999;
+    enemy.owner = 2;
+    snapshot.entities.push(enemy);
+    let mut response = response::PressureResponse::default();
+    let f = frame(&start, &snapshot);
+    let eligible: BTreeSet<_> = f.owned().iter().map(|e| e.id).collect();
+    let mut actions = AiActions::for_frame(&f);
+    let first = response.step(&f, &eligible, &mut actions);
+    let id = *first.active.first().unwrap();
+    snapshot
+        .entities
+        .iter_mut()
+        .find(|e| e.id == id)
+        .unwrap()
+        .state = "move".into();
+    snapshot.tick += 9;
+    let f = frame(&start, &snapshot);
+    let borrowed = eligible
+        .iter()
+        .copied()
+        .filter(|unit| *unit != id)
+        .collect();
+    let mut actions = AiActions::for_frame(&f);
+    response.step(&f, &borrowed, &mut actions);
+    assert!(!actions
+        .into_requests()
+        .iter()
+        .any(|a| matches!(a, AiActionRequest::AttackMove { units,.. } if units.contains(&id))));
+    snapshot.tick += 9;
+    let f = frame(&start, &snapshot);
+    let mut actions = AiActions::for_frame(&f);
+    response.step(&f, &eligible, &mut actions);
+    assert!(
+        actions
+            .into_requests()
+            .iter()
+            .any(|a| matches!(a, AiActionRequest::AttackMove { units,.. } if units.contains(&id))),
+        "do not wait for clearance movement to finish or the 90-tick retry"
     );
 }

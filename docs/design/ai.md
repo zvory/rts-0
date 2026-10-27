@@ -15,7 +15,7 @@ The player-facing lobby supports four AI profile IDs:
 - ai_2_2 — AI 2.2, the default weighted composition: 50% Rush AI and 50% Pressure AI.
 - jeffs_ai — Jeff's AI, the server-authoritative port of the locally evaluated V3 champion policy.
 - rush_ai — Rush AI, an immediate infantry attack with forward construction.
-- pressure_ai — Pressure AI, the AI 2.1 economy, technology, and home defenses with independent forward staging.
+- pressure_ai — Pressure AI, the AI 2.1 economy and technology with independent forward staging and a value-based response.
 
 `ai_turtle` is deprecated and internal-only. It remains registered for offline self-play,
 diagnostics, and observer-only AI sessions, but it is not exposed in the lobby and the server
@@ -236,19 +236,26 @@ while the search continues through other resource locations.
 
 ### Pressure AI
 
-`pressure_ai` owns a copy of the AI 2.1 opening, Tank technology, three-base Tank production,
-and home-defense decisions, with independent expansion, infantry research, and production.
-The legacy decision loop hands unreserved offensive
-Riflemen, Panzerfausts, and Tanks to a separate SDK staging owner after home-defense and construction-clearance
-orders have claimed their units. Pressure replaces the legacy frontal-wave issuer rather than
-layering competing attack orders over it. Pressure’s defensive Machine Gunner line is centered at its configured walking distance along
-the terrain route from its original main toward the enemy main, perpendicular to the local route
-direction. Its firing clearance follows that same direction, including when screening the home Tank.
-Home defenders retain priority; temporarily borrowed,
-unlaunched units resume their staging orders when released. Nearby Panzerfausts participate in
-that home-defense handoff. Pressure tracks legacy research producers and retries interrupted
-research on a replacement producer, so losing a Training Centre cannot leave the first wave
-permanently locked.
+`pressure_ai` owns a copy of the AI 2.1 opening and Tank technology, with independent
+expansion, infantry research, production, and staging. The legacy home
+response, defensive panic production override, and dedicated Machine Gunner policy are disabled
+for Pressure. Other profiles retain them. Construction clearance still has priority.
+Pressure retries interrupted research on replacement producers so a lost Training Centre cannot
+permanently lock its first wave.
+
+The single Pressure response controller borrows mobile Riflemen, Panzerfausts, and Tanks nearest
+to observed attackers until their full purchase value (Steel plus Oil) reaches at least 150% of
+the remembered enemy unit value, or all available units are committed. It triggers only on visible
+enemy units on Pressure's half of the map: the half-plane containing its original main, split by the perpendicular bisector
+between the two starting bases. Sightings on the enemy half never create or refresh a contact,
+even during offensive wave fights. When an enemy crosses that boundary, its last friendly-half
+position remains remembered for 30 seconds; the response never follows refreshed positions into
+enemy territory. All enemy units spotted on the friendly half contribute to the incident value;
+new recruits and replacements join as needed. Response orders are AttackMove to the nearest
+remembered attacker position. Each contact keeps its last visible position for 900 ticks (30 s)
+after it leaves vision. When all contacts expire, surviving responders return to the current
+staging line, including units borrowed from launched waves. Units already committed remain in the
+response until that timeout; the controller shares a value budget across simultaneous contacts.
 
 `server/crates/ai/src/pressure.rs` intentionally copies Rush's terrain route, stable-slot, arrival,
 and cohort policy instead of calling Rush code. Its constants and persistent state are independent.
@@ -273,13 +280,13 @@ still applies if the opening wave has not launched. En-route units do not count.
 A second-base wave receives AttackMove to base two followed by queued AttackMove to the main.
 A third-base wave receives AttackMove to base three, then queued AttackMoves to base two and the
 main. Waves launched before a time boundary retain their route. Only unlaunched recruits move
-to the new staging line; already launched units never rejoin staging. Pressure retains ordinary attack-move combat after launch; Rush's extractor-raiding
+to the new staging line; launched units keep their route unless borrowed by the response controller. Pressure retains ordinary attack-move combat after launch; Rush's extractor-raiding
 flow is not part of this copied staging policy. Eligible offensive Riflemen additionally use the
-shared pull-back helper while staging or attacking. Active retreats cannot receive staging or
-launch orders. Released staging members resume their slots immediately; released launched members
+shared pull-back helper while staging or attacking outside the active response. Response ownership
+has priority over pull-back orders. Active retreats cannot receive staging or launch orders. Released staging members resume their slots immediately; released launched members
 receive their original wave route again, including its queued lower-base objectives. A later phase
-boundary does not replace that saved route. Home-defense and construction-clearance ownership
-continues to take priority. Tanks and Panzerfausts retain their existing behavior.
+boundary does not replace that saved route. Construction-clearance ownership continues to take priority. Tanks and Panzerfausts also participate
+in the response.
 
 Pressure includes a Training Centre in its initial tech path so its infantry research does not
 wait for the Tank transition. On the first decision at or after two minutes (3,600 ticks), it queues
@@ -287,7 +294,8 @@ Panzerfausts on an owned Training Centre, including an unfinished or currently r
 Research waits for authoritative completion, prerequisites, and payment. Once the upgrade completes,
 Pressure stops issuing new Rifleman orders, disables Rifleman repeat, and enables Panzerfaust repeat
 on every completed Barracks, including replacements. Already paid or queued Riflemen finish normally.
-Home Machine Gunner and Tank production remain under the existing policy. New Panzerfausts join
+Tank production remains under the existing policy; Pressure disables dedicated home Machine
+Gunner production. New Panzerfausts join
 Pressure's infantry staging line and its normal arrival-counted waves. This policy and its state
 are independent of Rush.
 

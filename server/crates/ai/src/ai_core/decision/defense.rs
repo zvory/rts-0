@@ -8,8 +8,6 @@ mod envelope;
 mod incident;
 mod line;
 mod pocket;
-mod pressure_line;
-pub(super) use pressure_line::stage_pressure_machine_gunners;
 mod raid;
 mod route_line;
 mod spacing;
@@ -1265,19 +1263,6 @@ pub(super) fn local_defense_target(observation: &AiObservation) -> Option<u32> {
                 .then_with(|| left_id.cmp(right_id))
         })
         .map(|(id, _)| id)
-}
-
-/// Defenders already fighting are not free for a new combat order, but still own their home post.
-pub(super) fn engaged_local_defense_units(observation: &AiObservation) -> BTreeSet<u32> {
-    let engaged: Vec<u32> = observation
-        .owned
-        .iter()
-        .filter(|unit| unit.target_id.is_some())
-        .map(|unit| unit.id)
-        .collect();
-    local_defense_units(observation, &engaged)
-        .into_iter()
-        .collect()
 }
 
 pub(super) fn local_defense_units(observation: &AiObservation, ready_units: &[u32]) -> Vec<u32> {

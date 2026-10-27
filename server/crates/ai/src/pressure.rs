@@ -10,6 +10,7 @@ use crate::sdk::{
 
 mod objective;
 mod production;
+mod response;
 use objective::Objective;
 pub(crate) use production::uses_panzerfaust_production;
 
@@ -23,6 +24,7 @@ const RETRY_TICKS: u32 = 90;
 
 #[derive(Default)]
 pub(crate) struct PressureWaves {
+    response: response::PressureResponse,
     production: production::PressureProduction,
     pullback: PullbackMemory,
     wave_routes: BTreeMap<u32, Objective>,
@@ -87,6 +89,18 @@ impl PressureWaves {
         actions: &mut AiActions,
     ) {
         self.production.step(frame, actions);
+        let response = self.response.step(frame, eligible, actions);
+        for id in &response.released {
+            // Recalled survivors become staging recruits again, including previously launched units.
+            self.launched.remove(id);
+            self.wave_routes.remove(id);
+            self.resume.remove(id);
+            self.slots.remove(id);
+            self.issued.remove(id);
+            self.held.remove(id);
+        }
+        self.issued.retain(|id, _| !response.active.contains(id));
+        self.held.retain(|id| !response.active.contains(id));
         let Some((_, line)) = self.plan else {
             return;
         };
@@ -117,7 +131,7 @@ impl PressureWaves {
         self.held.retain(|id| eligible.contains(id));
         let units = units
             .into_iter()
-            .filter(|entity| eligible.contains(&entity.id))
+            .filter(|entity| eligible.contains(&entity.id) && !response.active.contains(&entity.id))
             .collect::<Vec<_>>();
         let size = frame.map().tile_size as f32;
         for entity in units
@@ -136,8 +150,8 @@ impl PressureWaves {
                 self.slots.insert(entity.id, point);
             }
         }
-        // Only Riflemen participate. Home-defense and clearance ownership has already been
-        // removed by `eligible`; active pull-backs must also be excluded on subsequent decisions.
+        // Only Riflemen participate. Response and clearance ownership have already been
+        // removed; active pull-backs must also be excluded on subsequent decisions.
         let rifles: Vec<_> = units
             .iter()
             .filter(|entity| entity.kind == EntityKind::Rifleman)
@@ -162,7 +176,11 @@ impl PressureWaves {
             .resume
             .iter()
             .copied()
-            .filter(|id| eligible.contains(id) && !pullback.active.contains(id))
+            .filter(|id| {
+                eligible.contains(id)
+                    && !response.active.contains(id)
+                    && !pullback.active.contains(id)
+            })
             .collect();
         for id in resumed {
             let Some(route) = self.wave_routes.get(&id) else {

@@ -117,7 +117,7 @@ fn pressure_retries_first_wave_research_on_a_replacement_training_centre() {
 }
 
 #[test]
-fn pressure_gives_nearby_panzerfausts_to_home_defense_before_staging() {
+fn pressure_hands_nearby_panzerfausts_to_the_single_sdk_controller() {
     let home = 8.5 * config::TILE_SIZE as f32;
     let mut obs = observation(
         AiEconomy {
@@ -143,18 +143,18 @@ fn pressure_gives_nearby_panzerfausts_to_home_defense_before_staging() {
         &PRESSURE,
         &mut AiDecisionMemory::for_profile(&PRESSURE),
     );
-    assert!(decision
+    assert!(!decision
         .commands
         .iter()
-        .any(|c| matches!(c, Command::Attack { units, target: 100, .. } if units.contains(&99))));
+        .any(|c| matches!(c, Command::Attack { units, .. } if units.contains(&99))));
     assert!(
-        !decision.pressure_wave_units.contains(&99),
-        "home defense must keep the Panzerfaust this decision"
+        decision.pressure_wave_units.contains(&99),
+        "the SDK response owns home threats as well as staging"
     );
 }
 
 #[test]
-fn pressure_keeps_engaged_home_defenders_but_can_stage_engaged_units_outside_home() {
+fn pressure_has_no_legacy_home_reservation_for_engaged_mobile_units() {
     let home = 8.5 * config::TILE_SIZE as f32;
     for kind in [EntityKind::Panzerfaust, EntityKind::Rifleman] {
         let mut defender = combat_at(99, kind, home, home);
@@ -183,8 +183,8 @@ fn pressure_keeps_engaged_home_defenders_but_can_stage_engaged_units_outside_hom
         let mut memory = AiDecisionMemory::for_profile(&PRESSURE);
         let defending = decide(&obs, &PRESSURE, &mut memory);
         assert!(
-            !defending.pressure_wave_units.contains(&99),
-            "engaged {kind:?} must retain home defense across decisions"
+            defending.pressure_wave_units.contains(&99),
+            "engaged {kind:?} belongs to the SDK controller"
         );
         obs.owned.iter_mut().filter(|e| e.id == 99).for_each(|e| {
             e.x = 1300.0;
