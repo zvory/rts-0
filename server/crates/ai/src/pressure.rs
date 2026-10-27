@@ -89,9 +89,6 @@ impl PressureWaves {
         actions: &mut AiActions,
     ) {
         self.production.step(frame, actions);
-        let Some((_, line)) = self.plan else {
-            return;
-        };
         let response = self.response.step(frame, eligible, actions);
         for id in &response.released {
             // Recalled survivors become staging recruits again, including previously launched units.
@@ -104,6 +101,9 @@ impl PressureWaves {
         }
         self.issued.retain(|id, _| !response.active.contains(id));
         self.held.retain(|id| !response.active.contains(id));
+        let Some((_, line)) = self.plan else {
+            return;
+        };
         let units = frame
             .owned()
             .iter()

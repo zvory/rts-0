@@ -1031,3 +1031,72 @@ fn released_third_base_rifle_restores_all_queued_objectives() {
         ]
     );
 }
+
+#[test]
+fn response_defends_even_without_a_staging_route() {
+    let (start, mut snapshot) = fixture();
+    let mut enemy = snapshot
+        .entities
+        .iter()
+        .find(|e| e.owner == 1 && e.kind == "rifleman")
+        .unwrap()
+        .clone();
+    enemy.id = 999;
+    enemy.owner = 2;
+    snapshot.entities.push(enemy.clone());
+    let mut waves = PressureWaves::default();
+    assert!(waves.plan.is_none());
+    let actions = step(&mut waves, &start, &snapshot, (2000.0, 2000.0));
+    assert!(actions.iter().any(|action| matches!(action, AiActionRequest::AttackMove { x,y,.. } if (*x,*y) == (enemy.x,enemy.y))));
+    assert!(waves.slots.is_empty());
+}
+
+#[test]
+fn response_reissues_immediately_after_construction_clearance_releases_a_moving_unit() {
+    let (start, mut snapshot) = fixture();
+    let mut enemy = snapshot
+        .entities
+        .iter()
+        .find(|e| e.owner == 1 && e.kind == "rifleman")
+        .unwrap()
+        .clone();
+    enemy.id = 999;
+    enemy.owner = 2;
+    snapshot.entities.push(enemy);
+    let mut response = response::PressureResponse::default();
+    let f = frame(&start, &snapshot);
+    let eligible: BTreeSet<_> = f.owned().iter().map(|e| e.id).collect();
+    let mut actions = AiActions::for_frame(&f);
+    let first = response.step(&f, &eligible, &mut actions);
+    let id = *first.active.first().unwrap();
+    snapshot
+        .entities
+        .iter_mut()
+        .find(|e| e.id == id)
+        .unwrap()
+        .state = "move".into();
+    snapshot.tick += 9;
+    let f = frame(&start, &snapshot);
+    let borrowed = eligible
+        .iter()
+        .copied()
+        .filter(|unit| *unit != id)
+        .collect();
+    let mut actions = AiActions::for_frame(&f);
+    response.step(&f, &borrowed, &mut actions);
+    assert!(!actions
+        .into_requests()
+        .iter()
+        .any(|a| matches!(a, AiActionRequest::AttackMove { units,.. } if units.contains(&id))));
+    snapshot.tick += 9;
+    let f = frame(&start, &snapshot);
+    let mut actions = AiActions::for_frame(&f);
+    response.step(&f, &eligible, &mut actions);
+    assert!(
+        actions
+            .into_requests()
+            .iter()
+            .any(|a| matches!(a, AiActionRequest::AttackMove { units,.. } if units.contains(&id))),
+        "do not wait for clearance movement to finish or the 90-tick retry"
+    );
+}

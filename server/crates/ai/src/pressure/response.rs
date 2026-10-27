@@ -68,6 +68,9 @@ impl PressureResponse {
             .map(base_position);
         let owned: BTreeSet<_> = frame.owned().iter().map(|unit| unit.id).collect();
         self.responders.retain(|id| owned.contains(id));
+        // Construction clearance may replace the unit's order while we cannot command it.
+        // Its next eligible decision must issue a fresh response, even if it is still moving.
+        self.issued.retain(|id, _| eligible.contains(id));
         self.contacts
             .retain(|_, contact| frame.tick().saturating_sub(contact.seen) < MEMORY_TICKS);
         // Only sightings on our half start or refresh a response. Crossing the midpoint cannot
