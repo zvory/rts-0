@@ -264,7 +264,7 @@ pub(super) fn gather_resting_tanks(
     mut excluded: BTreeSet<u32>,
 ) -> Vec<u32> {
     // Jeff's AI V1.1's resting Tanks stand behind its base lines (`jeff_v1_1::base_line`).
-    if memory.profile_id().is_some_and(is_jeff_v1_1) {
+    if memory.profile_id().is_some_and(is_jeff_v1_1) && !jeff_v1_1::off("linetanks") {
         return Vec::new();
     }
     excluded.extend(memory.home_defensive_tank);

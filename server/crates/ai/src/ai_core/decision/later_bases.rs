@@ -179,7 +179,11 @@ where
             v1_1 && jeff_v1_1::third_base::escort(observation, memory, home).is_some();
         let army_ready = if v1_1 {
             (total_tanks >= required_total_tanks
-                || jeff_v1_1::third_base::base_banked(observation, memory))
+                || if jeff_v1_1::off("base3bank") {
+                    jeff_v1_1::third_base::banked(observation, memory)
+                } else {
+                    jeff_v1_1::third_base::base_banked(observation, memory)
+                })
                 && escort_ready
         } else {
             total_tanks >= required_total_tanks
@@ -421,7 +425,7 @@ pub(super) fn recall_tanks_to_main(
     keep_out: Option<u32>,
 ) -> Vec<u32> {
     // Jeff's AI V1.1's base lines split its resting Tanks over its bases.
-    if memory.later_bases.v1_1 {
+    if memory.later_bases.v1_1 && !jeff_v1_1::off("linetanks") {
         return Vec::new();
     }
     let at_main = main_tank_ids(observation, memory);

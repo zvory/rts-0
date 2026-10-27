@@ -61,7 +61,7 @@ pub(in crate::ai_core::decision) fn scout(
     profile_id: &str,
     held: &BTreeSet<u32>,
 ) {
-    if !is_jeff_v1_1(profile_id) {
+    if !is_jeff_v1_1(profile_id) || super::off("scout") {
         return;
     }
     let Some(analysis) = map_analysis else {

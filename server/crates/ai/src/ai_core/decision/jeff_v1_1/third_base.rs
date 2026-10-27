@@ -94,7 +94,11 @@ pub(in crate::ai_core::decision) fn barracks_target(
     if !is_jeff_v1_1(profile_id) {
         return target;
     }
-    let target = if target >= 2 { target + 1 } else { target };
+    let target = if target >= 2 && !super::off("extrabarracks") {
+        target + 1
+    } else {
+        target
+    };
     if banked {
         target.max(BANKED_BARRACKS)
     } else {

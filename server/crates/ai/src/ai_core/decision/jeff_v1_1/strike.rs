@@ -91,7 +91,7 @@ pub(in crate::ai_core::decision) fn strike_gathering_wave(
     profile_id: &str,
     held: &BTreeSet<u32>,
 ) {
-    if !is_jeff_v1_1(profile_id) {
+    if !is_jeff_v1_1(profile_id) || super::off("strike") {
         return;
     }
     let tick = observation.tick;

@@ -114,6 +114,18 @@ pub(super) fn keep_guns_on_posts(
     });
 }
 
+/// Local ablation testing only: `JEFF_V11_OFF=scout,raid,...` turns the named V1.1 features off.
+pub(super) fn off(feature: &str) -> bool {
+    static OFF: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
+    OFF.get_or_init(|| {
+        std::env::var("JEFF_V11_OFF")
+            .map(|value| value.split(',').map(str::to_string).collect())
+            .unwrap_or_default()
+    })
+    .iter()
+    .any(|name| name == feature)
+}
+
 fn ordered(facts: &AiFacts, memory: &AiDecisionMemory, upgrade: UpgradeKind) -> bool {
     facts.completed_upgrades().contains(&upgrade) || memory.pending_upgrades.contains(&upgrade)
 }

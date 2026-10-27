@@ -515,7 +515,7 @@ fn raid_target(
 ) -> Option<RaidTarget> {
     let tick = observation.tick;
     let ts = observation.map.tile_size as f32;
-    let analysis = map_analysis?;
+    let analysis = map_analysis.filter(|_| !super::off("raid"))?;
     let push = &mut memory.jeff_v1_1.push;
     push.hot.retain(|_, until| tick < *until);
     if push.target.is_some() && tick.saturating_sub(push.retargeted) < RETARGET_TICKS {
@@ -618,7 +618,11 @@ pub(in crate::ai_core::decision) fn objective(
     }
     let tanks: Vec<u32> = memory.containment.active_tanks.iter().copied().collect();
     let center = super::super::frontal::group_center(observation, &tanks)?;
-    let anchors = anchors(observation, map_analysis, own_base, fallback);
+    let anchors = if super::off("anchors") {
+        Vec::new()
+    } else {
+        anchors(observation, map_analysis, own_base, fallback)
+    };
     let target = |anchor: usize| anchors.get(anchor).copied().unwrap_or(fallback);
     if let Some(raid) = raid_target(
         observation,

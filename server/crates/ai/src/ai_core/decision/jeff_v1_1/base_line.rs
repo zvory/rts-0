@@ -631,7 +631,12 @@ pub(in crate::ai_core::decision) fn hold(
                     && defense::machine_gunner_meets_replacement_health(unit.hp, healthy)
             }),
         ),
-        (Class::Tank, line_units(observation, memory, EntityKind::Tank, free)),
+        (
+            Class::Tank,
+            line_units(observation, memory, EntityKind::Tank, |unit| {
+                free(unit) && !super::off("linetanks")
+            }),
+        ),
     ];
     let exposure: Vec<usize> = lines.iter().map(|line| line.exposure).collect();
     let outer = lines.iter().any(|line| !line.main);
@@ -642,7 +647,11 @@ pub(in crate::ai_core::decision) fn hold(
     // Tanks stand in groups of `TANK_GROUP` or more, at the most exposed bases: spread one or two
     // to a base, they were picked off by groups of 3-7 enemy Tanks.
     let tanks = classes[3].1.len();
-    let groups = (tanks / TANK_GROUP).max(usize::from(tanks > 0));
+    let groups = if super::off("tankgroup") {
+        lines.len()
+    } else {
+        (tanks / TANK_GROUP).max(usize::from(tanks > 0))
+    };
     let mut by_exposure: Vec<usize> = (0..lines.len()).collect();
     by_exposure.sort_by_key(|index| (std::cmp::Reverse(lines[*index].exposure), *index));
     let tank_weights: Vec<usize> = (0..lines.len())
@@ -702,7 +711,11 @@ pub(in crate::ai_core::decision) fn hold(
             }
         }
     }
-    let alarmed = sound_alarm(actions, observation, memory, &lines, &seated, intents);
+    let alarmed = if super::off("alarm") {
+        BTreeMap::new()
+    } else {
+        sound_alarm(actions, observation, memory, &lines, &seated, intents)
+    };
     let fighting = |unit: &AiEntitySummary| {
         observation.visible_enemies.iter().any(|enemy| {
             enemy.kind.is_unit()

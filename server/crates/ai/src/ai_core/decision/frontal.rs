@@ -1266,7 +1266,7 @@ fn push_keep_home(observation: &AiObservation, memory: &AiDecisionMemory) -> usi
     });
     // Jeff's AI V1.1 keeps at most two: its base lines hold the bases, and against Pressure AI the
     // whole reserve (up to five) stayed behind while the push never had the Tanks to leave.
-    let reserve = if memory.profile_id().is_some_and(is_jeff_v1_1) {
+    let reserve = if memory.profile_id().is_some_and(is_jeff_v1_1) && !jeff_v1_1::off("keephome") {
         memory.home_tank_reserve().min(V1_1_HOME_TANKS)
     } else {
         memory.home_tank_reserve()
