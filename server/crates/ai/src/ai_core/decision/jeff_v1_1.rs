@@ -46,7 +46,10 @@ pub(super) fn early_research(
     plan: Option<&spend_plan::SpendPlan>,
 ) {
     memory.jeff_v1_1.entrenchment_waits = false;
-    if !is_jeff_v1_1(profile_id) || facts.complete_building_count(EntityKind::TrainingCentre) == 0 {
+    if !is_jeff_v1_1(profile_id)
+        || off("meth")
+        || facts.complete_building_count(EntityKind::TrainingCentre) == 0
+    {
         return;
     }
     let meth = UpgradeKind::Methamphetamines;
@@ -81,7 +84,7 @@ pub(super) fn research_ahead(
     facts: &AiFacts,
     memory: &AiDecisionMemory,
 ) -> (u32, u32) {
-    if !is_jeff_v1_1(profile_id) {
+    if !is_jeff_v1_1(profile_id) || off("meth") {
         return (0, 0);
     }
     [UpgradeKind::Methamphetamines, UpgradeKind::Entrenchment]
@@ -260,7 +263,7 @@ pub(super) fn gun_cap(
     intents: &[AiIntent],
     max_counts: &mut Vec<(EntityKind, usize)>,
 ) {
-    if !is_jeff_v1_1(profile.id) {
+    if !is_jeff_v1_1(profile.id) || off("guncap") {
         return;
     }
     let home = profile
@@ -316,7 +319,10 @@ pub(super) fn barracks_batches(
         .map(|building| building.id)
         .min()
         .filter(|_| {
-            is_jeff_v1_1(profile_id) && building_kind == EntityKind::Barracks && buildings.len() > 1
+            is_jeff_v1_1(profile_id)
+                && building_kind == EntityKind::Barracks
+                && buildings.len() > 1
+                && !off("gunrax")
         })
     else {
         return vec![(buildings.to_vec(), priorities.to_vec())];

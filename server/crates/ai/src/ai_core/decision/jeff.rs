@@ -173,7 +173,7 @@ pub(super) fn stage_home_riflemen(
     facts: &AiFacts,
     (local_defense_assigned, route_line_reserved): (&BTreeSet<u32>, &BTreeSet<u32>),
 ) {
-    if is_jeff_v1_1(profile.id) {
+    if is_jeff_v1_1(profile.id) && !jeff_v1_1::off("lines") {
         return;
     }
     let riflemen: Vec<u32> = if uses_home_rifle_coverage(profile.id) {

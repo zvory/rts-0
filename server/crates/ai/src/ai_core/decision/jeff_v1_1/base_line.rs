@@ -605,7 +605,7 @@ pub(in crate::ai_core::decision) fn hold(
     home_guns: &[u32],
     held: &BTreeSet<u32>,
 ) {
-    if !is_jeff_v1_1(profile.id) {
+    if !is_jeff_v1_1(profile.id) || super::off("lines") {
         return;
     }
     let ts = observation.map.tile_size as f32;
