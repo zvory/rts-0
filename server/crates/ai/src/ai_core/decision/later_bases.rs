@@ -179,7 +179,7 @@ where
             v1_1 && jeff_v1_1::third_base::escort(observation, memory, home).is_some();
         let army_ready = if v1_1 {
             (total_tanks >= required_total_tanks
-                || jeff_v1_1::third_base::banked(observation, memory))
+                || jeff_v1_1::third_base::base_banked(observation, memory))
                 && escort_ready
         } else {
             total_tanks >= required_total_tanks

@@ -532,7 +532,9 @@ impl AiDecisionMemory {
     /// Whether the trap breach (its concave is the defense where it stands) or the third-base
     /// party (it is away) owns the unit, so it never runs home to defend.
     pub(super) fn stays_out_of_home_defense(&self, id: u32) -> bool {
-        self.trap_breach.is_reserved(id) || self.third_pressure.is_reserved(id)
+        self.trap_breach.is_reserved(id)
+            || self.third_pressure.is_reserved(id)
+            || self.jeff_v1_1.scout.unit == Some(id)
     }
 
     /// How many Tanks Jeff keeps home, the home Tank included: three for every four Tanks in the

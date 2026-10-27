@@ -3,9 +3,9 @@
 //! 20 arrivals: in front of Jeff's natural, in sight of its line's picket, and long before Jeff's
 //! push has the Tanks to leave. A group of enemy fighters standing within `STRIKE_TILES` of a Jeff
 //! Depot but clear of its buildings, that the home Riflemen and Tanks outweigh `STRIKE_RATIO`
-//! times, is struck by the nearest of them until they outweigh it `PARTY_RATIO` times. The strike
-//! ends when the group is gone, has left, or outweighs the party; the base lines then take the
-//! party back.
+//! times, is struck by the nearest of them until they outweigh it `PARTY_RATIO` times, Tanks only
+//! when the group holds no Panzerfausts. The strike ends when the group is gone, has left, or
+//! outweighs the party; the base lines then take the party back.
 
 use super::push::unit_value;
 use super::*;
@@ -35,8 +35,9 @@ fn is_fighter(kind: EntityKind) -> bool {
     kind.is_unit() && !matches!(kind, EntityKind::Worker | EntityKind::Golem)
 }
 
-/// The heaviest group of enemy fighters gathering near a Jeff base: its value and centre.
-fn gathering_group(observation: &AiObservation) -> Option<(f32, (f32, f32))> {
+/// The heaviest group of enemy fighters gathering near a Jeff base: its value, centre, and whether
+/// it holds Panzerfausts.
+fn gathering_group(observation: &AiObservation) -> Option<(f32, (f32, f32), bool)> {
     let ts = observation.map.tile_size as f32;
     let depots: Vec<(f32, f32)> = observation
         .owned
@@ -73,7 +74,10 @@ fn gathering_group(observation: &AiObservation) -> Option<(f32, (f32, f32))> {
                     members.iter().map(|member| member.x).sum::<f32>() / n,
                     members.iter().map(|member| member.y).sum::<f32>() / n,
                 );
-                (value as f32, at)
+                let fausts = members
+                    .iter()
+                    .any(|member| member.kind == EntityKind::Panzerfaust);
+                (value as f32, at, fausts)
             })
         })
         .max_by(|a, b| a.0.total_cmp(&b.0).then(a.1 .0.total_cmp(&b.1 .0)))
@@ -103,6 +107,8 @@ pub(in crate::ai_core::decision) fn strike_gathering_wave(
         .party
         .retain(|id| alive.contains(id) && !held.contains(id));
     let group = gathering_group(observation);
+    // Tanks go only at a group without Panzerfausts.
+    let fausts = group.is_some_and(|(_, _, fausts)| fausts);
     let value_of = |ids: &BTreeSet<u32>| -> f32 {
         observation
             .owned
@@ -116,7 +122,7 @@ pub(in crate::ai_core::decision) fn strike_gathering_wave(
         .owned
         .iter()
         .filter(|unit| {
-            matches!(unit.kind, EntityKind::Rifleman | EntityKind::Tank)
+            (unit.kind == EntityKind::Rifleman || (unit.kind == EntityKind::Tank && !fausts))
                 && unit.is_complete
                 && unit.hp > 0
                 && !held.contains(&unit.id)
@@ -132,7 +138,7 @@ pub(in crate::ai_core::decision) fn strike_gathering_wave(
         .collect();
     let state = &mut memory.jeff_v1_1.strike;
     match group {
-        Some((value, at)) => {
+        Some((value, at, _)) => {
             let near_target = state.target.is_none_or(|(target, _)| {
                 let ts = observation.map.tile_size as f32;
                 dist2(at.0, at.1, target.0 as f32, target.1 as f32)

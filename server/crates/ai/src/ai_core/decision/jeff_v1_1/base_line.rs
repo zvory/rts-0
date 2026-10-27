@@ -61,6 +61,8 @@ const GUN_BACK_TILES: f32 = 0.5;
 /// Tanks stand this far behind the line, this far apart, in ranks this far apart.
 const TANK_BACK_TILES: f32 = 4.0;
 const TANK_SPACING_TILES: f32 = 2.5;
+/// Resting Tanks stand at a base only this many together.
+const TANK_GROUP: usize = 3;
 /// The picket stands this far past the line on the axis, for vision.
 const PICKET_TILES: f32 = 7.0;
 const PICKET_MIN_RIFLES: usize = 4;
@@ -637,6 +639,21 @@ pub(in crate::ai_core::decision) fn hold(
         .iter()
         .map(|line| if outer && line.main { 0 } else { line.exposure })
         .collect();
+    // Tanks stand in groups of `TANK_GROUP` or more, at the most exposed bases: spread one or two
+    // to a base, they were picked off by groups of 3-7 enemy Tanks.
+    let tanks = classes[3].1.len();
+    let groups = (tanks / TANK_GROUP).max(usize::from(tanks > 0));
+    let mut by_exposure: Vec<usize> = (0..lines.len()).collect();
+    by_exposure.sort_by_key(|index| (std::cmp::Reverse(lines[*index].exposure), *index));
+    let tank_weights: Vec<usize> = (0..lines.len())
+        .map(|index| {
+            if by_exposure[..groups.min(lines.len())].contains(&index) {
+                lines[index].exposure
+            } else {
+                0
+            }
+        })
+        .collect();
     let previous = &memory.jeff_v1_1.base_lines.posts;
     let near_post = |unit: &AiEntitySummary| {
         previous.get(&unit.id).is_some_and(|post| {
@@ -646,10 +663,10 @@ pub(in crate::ai_core::decision) fn hold(
     // (unit, line index, post, class)
     let mut seated: Vec<(u32, usize, (f32, f32), Class)> = Vec::new();
     for (class, units) in &classes {
-        let weights = if *class == Class::Gun {
-            &gun_weights
-        } else {
-            &exposure
+        let weights = match class {
+            Class::Gun => &gun_weights,
+            Class::Tank => &tank_weights,
+            _ => &exposure,
         };
         let entries: Vec<(u32, (f32, f32), Option<u32>)> = units
             .iter()
@@ -767,7 +784,9 @@ fn sound_alarm(
             seated
                 .iter()
                 .filter(|(id, line, _, class)| {
-                    *line == of && *class != Class::Gun && !answering.contains_key(id)
+                    *line == of
+                        && !matches!(class, Class::Gun | Class::Tank)
+                        && !answering.contains_key(id)
                 })
                 .map(|(id, _, _, _)| *id)
                 .collect()

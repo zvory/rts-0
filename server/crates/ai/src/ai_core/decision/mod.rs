@@ -462,6 +462,7 @@ where
         let steel = if live_natural_pending { 0 } else { steel };
         actions.holdback_resources(steel, oil);
     }
+    jeff_v1_1::push::note_enemy_army(observation, memory);
     let live = (&mut actions, &facts, &mut *memory, &mut intents);
     jeff_v1_1::early_research(live, profile.id, spend_plan.as_ref());
     // Jeff's bases beyond the natural. A second Factory that is due takes priority this decision.
@@ -1301,6 +1302,8 @@ where
         let held = &(&local_defense_assigned | &route_line_reserved) | &push_units;
         jeff_v1_1::strike::strike_gathering_wave(live, memory, profile.id, &held);
         let live = (&mut actions, observation, map_analysis, &mut intents);
+        jeff_v1_1::scout::scout(live, memory, profile.id, &held);
+        let live = (&mut actions, observation, map_analysis, &mut intents);
         jeff_v1_1::base_line::hold(live, memory, profile, &defensive_machine_gunners, &held);
 
         // The current Jeff's home Tank waits behind the home post once that has moved off the
@@ -1490,6 +1493,7 @@ where
         trace,
     };
     decision.trace.plan = spend_plan.as_ref().map(|plan| plan.trace_line(observation));
+    decision.trace.push = jeff_v1_1::push::trace_line(observation, map_analysis, memory);
     tank_micro::finish(&mut decision, observation, map_analysis, memory);
     decision
 }

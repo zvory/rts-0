@@ -68,7 +68,6 @@ pub(super) fn issue_expansion_containment_wave(
     if live_jeff {
         drop_stuck_push_tanks(observation, memory);
     }
-    jeff_v1_1::push::note_enemy_army(observation, memory);
     let stuck: Vec<u32> = memory.containment.stuck_tanks.keys().copied().collect();
     // A Tank seen moving or attacking was given another order since the push held it.
     let still_standing: BTreeSet<u32> = observation
@@ -133,6 +132,7 @@ pub(super) fn issue_expansion_containment_wave(
             let mut scouts =
                 actions::select_ready_combat_units(&observation.owned, &[EntityKind::ScoutCar]);
             scouts.retain(|scout| !memory.third_pressure.is_reserved(*scout));
+            scouts.retain(|scout| memory.jeff_v1_1.scout.unit != Some(*scout));
             if !memory.containment.wave_launched {
                 tanks.retain(|tank| plan.ready_units.contains(tank));
                 scouts.retain(|scout| plan.ready_units.contains(scout));

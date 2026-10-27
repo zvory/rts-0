@@ -103,6 +103,8 @@ pub(crate) struct ManagerOutputTrace {
     pub(crate) notes: Vec<String>,
     /// The live Jeff's spend plan: income expected and its steps' planned ticks.
     pub(crate) plan: Option<String>,
+    /// Jeff's AI V1.1's push: its target, side, anchor and the armies it weighs.
+    pub(crate) push: Option<String>,
 }
 
 impl ManagerOutputTrace {
@@ -124,6 +126,7 @@ impl ManagerOutputTrace {
         ));
         // Second, so the line cap never drops it.
         lines.extend(self.plan.clone());
+        lines.extend(self.push.clone());
         for goal in &self.goals {
             let blockers = format_blockers(&goal.blockers);
             let intents = if goal.intents.is_empty() {
@@ -194,6 +197,7 @@ pub(super) fn build_manager_trace(input: TraceInput<'_>) -> ManagerOutputTrace {
         reservations: input.reservations.into(),
         notes: Vec::new(),
         plan: None,
+        push: None,
     }
 }
 

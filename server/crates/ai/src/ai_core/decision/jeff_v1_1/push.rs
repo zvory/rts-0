@@ -476,6 +476,32 @@ fn candidates(
     found
 }
 
+/// Where the scout looks (`super::scout`): the enemy bases seen and the resource fields nearer the
+/// enemy start not seen empty, the enemy main left out.
+pub(in crate::ai_core::decision) fn scout_points(
+    observation: &AiObservation,
+    analysis: &AiMapAnalysis,
+    memory: &mut AiDecisionMemory,
+    enemy_main: (f32, f32),
+) -> Vec<(f32, f32)> {
+    let ts = observation.map.tile_size as f32;
+    candidates(observation, analysis, &mut memory.jeff_v1_1.push, enemy_main)
+        .into_iter()
+        .map(|candidate| candidate.at)
+        .filter(|at| dist2(at.0, at.1, enemy_main.0, enemy_main.1) > squared(BASE_TILES * ts))
+        .collect()
+}
+
+/// Remembered enemy strength within `radius_tiles` of `at`.
+pub(in crate::ai_core::decision) fn threat_near(
+    observation: &AiObservation,
+    memory: &AiDecisionMemory,
+    at: (f32, f32),
+    radius_tiles: f32,
+) -> f32 {
+    threat_at(observation, &memory.jeff_v1_1.push, at, radius_tiles)
+}
+
 /// The base the launched push raids, and the side it comes in from (see the module docs).
 #[allow(clippy::too_many_arguments)]
 fn raid_target(
@@ -787,6 +813,39 @@ fn anchors(
         })
         .filter(|at| dist2(at.0, at.1, own_base.0, own_base.1) < limit)
         .collect()
+}
+
+/// V1.1's push for the decision trace: launched, its weight and the enemy's near the route, its
+/// raid target and side, anchor, strike, the bases it knows and the targets it has dropped.
+pub(in crate::ai_core::decision) fn trace_line(
+    observation: &AiObservation,
+    map_analysis: Option<&AiMapAnalysis>,
+    memory: &AiDecisionMemory,
+) -> Option<String> {
+    if !v1_1(memory) {
+        return None;
+    }
+    let push = &memory.jeff_v1_1.push;
+    let launched = memory.containment.wave_launched && !memory.containment.recovery_active;
+    let units = push_units(memory);
+    let bases = push
+        .buildings
+        .values()
+        .filter(|building| building.kind == EntityKind::ResourceDepot)
+        .count();
+    Some(format!(
+        "v1_1_push launched={launched} tanks={} ours={:.0} route_army={:.0} target={:?} anchor={} short={} strike={:?} rally={:?} enemy_depots_known={bases} enemies_known={} hot={}",
+        memory.containment.active_tanks.len(),
+        push_army(observation, &units, 0),
+        route_army(observation, map_analysis, memory),
+        push.target.map(|target| (target.at, target.side)),
+        push.anchor,
+        push.short,
+        push.strike.map(|(at, _)| at),
+        push.rally,
+        push.enemies.len(),
+        push.hot.len(),
+    ))
 }
 
 /// V1.1's spotter when no Scout Car is ready: the free Rifleman nearest `rally`.

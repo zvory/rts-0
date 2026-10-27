@@ -6,6 +6,7 @@ use crate::ai_core::facts::ProductionBuildingFact;
 
 pub(super) mod base_line;
 pub(super) mod push;
+pub(super) mod scout;
 pub(super) mod strike;
 pub(super) mod third_base;
 
@@ -19,8 +20,11 @@ pub(super) struct V1_1Memory {
     pub(super) base_lines: base_line::LineMemory,
     /// Since when Steel has stood at `third_base::BANK_STEEL` or more.
     pub(super) banked_since: Option<u32>,
+    /// Since when Steel has stood at `third_base::BANK_STEEL` or more, Tank or not.
+    pub(super) base_bank_since: Option<u32>,
     pub(super) push: push::PushMemory,
     pub(super) strike: strike::StrikeMemory,
+    pub(super) scout: scout::ScoutMemory,
 }
 
 /// Methamphetamines comes first. It is ordered the moment the Training Centre is free and its cost

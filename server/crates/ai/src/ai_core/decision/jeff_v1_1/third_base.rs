@@ -25,9 +25,10 @@ pub(in crate::ai_core::decision) const RETRY_TICKS: u32 = config::TICK_HZ * 20;
 const ESCORT_POST_TILES: f32 = 5.0;
 const ESCORT_SPACING_TILES: f32 = 1.75;
 
-/// Notes how long V1.1's Steel has stood at `BANK_STEEL` or more with a Tank out. Before the first
-/// Tank the bank is the spend plan's savings for the natural, the Factory and the Tank, not spare:
-/// counted then, it took a third base at 3:26 on Classic and put the first Tank back 45 s.
+/// Notes how long V1.1's Steel has stood at `BANK_STEEL` or more, for base 3, and how long with a
+/// Tank out, for spending on more production and infantry. Before the first Tank the bank is the
+/// spend plan's savings for the natural, the Factory and the Tank: spent on Barracks and Riflemen
+/// then, it would put the first Tank back.
 pub(in crate::ai_core::decision) fn note_bank(
     observation: &AiObservation,
     memory: &mut AiDecisionMemory,
@@ -38,11 +39,28 @@ pub(in crate::ai_core::decision) fn note_bank(
         .owned
         .iter()
         .any(|unit| unit.kind == EntityKind::Tank && unit.is_complete && unit.hp > 0);
-    if !is_jeff_v1_1(profile_id) || !tank_out || observation.economy.steel < BANK_STEEL {
+    let rich = is_jeff_v1_1(profile_id) && observation.economy.steel >= BANK_STEEL;
+    if !rich {
+        state.base_bank_since = None;
+    } else if state.base_bank_since.is_none() {
+        state.base_bank_since = Some(observation.tick);
+    }
+    if !rich || !tank_out {
         state.banked_since = None;
     } else if state.banked_since.is_none() {
         state.banked_since = Some(observation.tick);
     }
+}
+
+/// Whether V1.1 has banked `BANK_STEEL` Steel for `BANK_TICKS`, Tank or not: base 3 is due.
+pub(in crate::ai_core::decision) fn base_banked(
+    observation: &AiObservation,
+    memory: &AiDecisionMemory,
+) -> bool {
+    memory
+        .jeff_v1_1
+        .base_bank_since
+        .is_some_and(|since| observation.tick.saturating_sub(since) >= BANK_TICKS)
 }
 
 /// Whether V1.1 has banked `BANK_STEEL` Steel for `BANK_TICKS`.
