@@ -113,7 +113,10 @@ mod tests {
                 })
             })
             .collect::<BTreeSet<_>>();
-        assert_eq!(selected, BTreeSet::from([RUSH_AI_ID, PRESSURE_AI_ID, JEFFS_AI_ID]));
+        assert_eq!(
+            selected,
+            BTreeSet::from([RUSH_AI_ID, PRESSURE_AI_ID, JEFFS_AI_ID])
+        );
     }
 
     #[test]
