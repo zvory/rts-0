@@ -6,6 +6,7 @@ The worker uses the native async `Application.init({preference:"webgl"})` lifecy
 the sole visible transferred canvas. The production backend bundle creates the existing
 orthographic semantic camera and asynchronous Pixi worker host for live play, Lab, spectators, and
 replays. `Match` owns the only animation-frame loop.
+The default worker build catalog excludes Supply Depots; the command card preserves an empty W slot.
 
 ```
 index.html        # PINNED — #app + module entry + screens markup; no main-thread Pixi script
@@ -1442,8 +1443,12 @@ export class ClientIntent {
 `Match` remains the app-shell composer and owner of cross-area dependency injection. It constructs
 `GameState` for authoritative snapshot display data and constructs `ClientIntent` for browser-local
 cursor/command intent, then injects the intent facade into HUD, input, minimap, and renderer
-feedback. Map-editor symmetry repair rolls back partial site relocation when no complete spawn slot
-can be preserved and tries alternate split slots before rejecting symmetry selection. The app shell owns DOM-presentation resize handling. Renderer teardown destroys renderer-owned
+feedback. WASM reconciliation preserves authoritative terminal holds, and prediction promotes queued
+movement from idle and held states. Map-editor symmetry repair rolls back partial site relocation when no complete spawn slot
+can be preserved and tries alternate split slots before rejecting symmetry selection. Map-only Lab
+round trips preserve layout-local site edits and rich editor metadata. Map-editor base clearances
+match authored-map validation. Start additions that would exceed the permanent-base cap are rejected. The editor supports map-fit zoom, tolerates unavailable local
+storage, and prunes sites removed with layouts. The app shell owns DOM-presentation resize handling. Renderer teardown destroys renderer-owned
 adjusted canvas textures and clears its texture maps without destroying raw Pixi asset-cache
 textures; raster loads completing after teardown are not cached or displayed. Artillery landing audio is scheduled from the authoritative impact delay,
 and match teardown cancels pending landing timers. Mobile camera pan and pinch gestures track only touch identifiers whose touches begin on

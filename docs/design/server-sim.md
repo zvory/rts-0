@@ -731,13 +731,16 @@ driver work on the same serial lane, and do not hide driver cost outside the mea
   descriptor for the current room mode and phase matrix, including dev-watch, replay-room,
   branch-staging, speed-only live-game room-time controls, countdown, speed-source, and match-history
   decisions. Authored map minimum and maximum player counts are exposed in the lobby map catalog.
+  The authored `4_player_map.json` map is 126×126, has four corner starts and twelve neutral resource sites, and supports loading with one through four active players.
+  New normal lobbies select the two-player `1v1` map by default; Labs and generic simulation setup
+  retain the four-player `Default` map.
   The selected map's minimum and maximum bound match start eligibility, while its maximum limits
   joins, AI seats, spectator returns, and lobby browser slots. Selecting a lower-capacity map removes overflow AI seats first, then
   moves overflow humans to spectators. Live-match handlers live in `room_task/live.rs`,
   replay-branch handlers live in `room_task/branch.rs`, lab request handling lives in
   `room_task/lab.rs`, durable decal repair lives in `room_task/ground_decals.rs`, dev-watch scenario
   handling lives in `room_task/dev.rs`, and room lifecycle bookkeeping lives in
-  `room_task/lifecycle.rs`; `RoomTask` remains the owner of mutation and tick authority. Plain
+  `room_task/lifecycle.rs`; `RoomTask` remains the owner of mutation and tick authority. Successful Lab artifact transfers consume their transfer IDs so repeated operations do not exhaust the bounded bridge store. Authoritative replay reconstruction is bounded ahead of the lobby timeout; expiry preserves the current room. Plain
   `/lab` is a client-side catalog selector. Its Blank Lab entry launches blank startup on
   the current default `Classic` map, while catalog setups retain their selected maps. Direct lab URLs keep
   compatibility: `scenario=lategame` requests the bundled catalog setup, `scenario=blank` keeps
@@ -1321,6 +1324,14 @@ Systems should consume the derived-state object for their phase instead of carry
 spatial indexes across later mutations.
 
 ### 3.5 Command planning and queued order semantics
+
+Active hold-position markers stay aligned with the server's order projection.
+
+In Lab, deleting a rally resource target clears the resource-target reference while preserving its point-rally fallback.
+
+Produced units retain the selected rally marker but receive a direct first-move order to the closest reachable, unoccupied, body-standable tile. Active friendly destinations are reserved so simultaneous production cannot converge on one tile. Enemy occupancy checks remain fog-safe.
+
+Repeat production revalidates durable repeat intent against the producer's faction catalog before enqueueing. Stale incompatible repeat intent can still be cleared. Idle repeat retries share production prerequisite scans. Repeat production remains authoritative-only in the WASM predictor, while the command is exposed in diagnostics.
 
 Tank Point (`SimCommand::PointTanks`) filters to living owned tanks after ordinary command
 admission, then calculates a shared heading from their centroid to the clicked world point.

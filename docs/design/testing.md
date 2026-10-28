@@ -276,14 +276,23 @@ daemon startup to the child through a random nonce lease before socket bind. Det
 errors surface immediately, partial startup ownership and runtime resources are cleaned up, and idle
 expiry uses monotonic time. Dead-parent locks are preserved for a bounded grace period, only verified
 stale records are reclaimed, and lock release requires nonce ownership. Malformed bridge inspection
-filters fail closed so invalid bounds cannot broaden a query. The driver evaluates capture fallback and render errors against the
+filters fail closed so invalid bounds cannot broaden a query. Lab update confirmations treat an
+accepted update as observed when a fresh authoritative snapshot omits its target under the active
+projection, while still rejecting visible state that contradicts the result. The driver evaluates capture fallback and render errors against the
 current frame so transient startup work does not block a later clean capture, and clamps seeks to
-the supported range.
+the supported range. Fixed capture keeps state and renderer visual time in one continuous domain,
+while snapshot interpolation timestamps remain on real monotonic time. It explicitly presents Pixi
+frames with the ticker suspended and bounds PNG disk usage. During an active recording, screenshot presentation and viewport changes are
+rejected. Representative frame numbering stays contiguous so short-clip contact sheets include the
+final frame. The recorder's capped monotonic duration is the single authority for frame slots,
+media validation, and manifest timing. Streamed encoder backpressure fails promptly when FFmpeg
+exits, with regression coverage for that failure path.
 
 Lab preview contracts require a 24-hour-or-longer artifact TTL and prove that a published URL remains
 fetchable after the Lab publisher closes and its originating worktree is removed. CLI coverage also
 proves daemon shutdown leaves issued screenshot links valid, while concurrent recording wait/stop
-callers receive the same deduplicated durable publication.
+callers receive the same deduplicated durable publication. Artifact boundary checks reject oversized
+files before allocation, bound alias sidecars, and enforce the recorded Lab room on replay transfers.
 
 Interact source, page-bridge, Rust artifact-bridge, focused-test, CLI-documentation, and local
 skill changes select `interact-contracts` plus the browser `client-smoke` shard. The fast
@@ -475,6 +484,7 @@ changed-file mapping selects the skipped behavior.
 ## 12. PR CI contract
 
 The canonical required PR check context is `./tests/run-all.sh` in the `Main test gate` workflow.
+Whenever the static JavaScript contracts run, they include launcher routing and visible-copy assertions.
 It is an aggregate check over split coverage jobs for server binary build, Rust policy/lint, two
 complementary Rust nextest partitions, live Node, and two complementary browser/tri-state shards on
 pull requests targeting `main` and on pushes to `main`. The two nextest jobs use complementary

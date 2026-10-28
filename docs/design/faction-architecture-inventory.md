@@ -98,7 +98,8 @@ must validate before building a `Game`.
 
 The standard Ekat match start is defined by the `ekat.standard` faction loadout: one completed
 Zamok and one Ekat hero, with no starting Steel/Oil or Supply requirement. Zamok trains Golems for
-the current Ekat economy and recovery slice. The
+the current Ekat economy and recovery slice. Starting Resource Depots and the Ekat starting Zamok
+use the shared base-city supply rule of 50. The
 `phase2_empty_fixture.scout_depot` loadout starts one Depot and one Scout Car for explicit
 fixture tests only; catalog existence does not make that id product-playable.
 The `cultivators.standard` loadout reuses Kriegsia starting resources and economy entities, without Riflemen.
@@ -147,6 +148,8 @@ ability vocabulary and compact codes remain mirrored through `server/crates/prot
 and `client/src/protocol.js`.
 Scout Car Smoke requires the owning player to retain a completed Engineering Complex; the command card
 keeps the ability visible but disabled with the missing-tech reason until that building is present.
+Command Cars continuously grant nearby owned units a passive 1.2x speed multiplier. Active Breakthrough
+overrides the passive aura with its 1.4x multiplier and smoke-only 1.8x bonus.
 
 ## Current Client Command Cards
 

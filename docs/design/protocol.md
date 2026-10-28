@@ -968,7 +968,8 @@ Compact numeric codes:
 This inventory records the current source-of-truth map after the protocol mirror split. It does not
 change the wire shape or compact snapshot version. Public lab catalog, import, export, and authoring
 validation errors use checkpoint setup terminology; legacy `LabScenario` wire and type names remain
-compatibility internals.
+compatibility internals. One-use map handoffs are consumed with POST. Private Labs materialized
+from authored maps honor the authored player count.
 
 | Value/path | Rust owner | JS mirror path | Category | Current checker | Proposed future checker | Client-only exclusion reason | Compact version impact |
 |------------|------------|----------------|----------|-----------------|-------------------------|------------------------------|------------------------|

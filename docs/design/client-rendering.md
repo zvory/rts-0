@@ -33,7 +33,9 @@ selecting another renderer.
 
 All public screen coordinates are viewport-local CSS pixels. DOM offsets, DPR, canvas backing size,
 engine matrices, and hardware scaling stay inside the adapter. All public numbers are finite;
-invalid mutation input leaves the current view unchanged.
+invalid mutation input leaves the current view unchanged. The live orthographic camera and detached
+projection snapshots share one pure query core, which rejects derived non-finite outputs.
+Repeated subscriptions of the same callback are independently removable.
 
 ```text
 WorldPoint       = { x, y }
@@ -128,6 +130,14 @@ successfully presented selection scene active. Selection never uses mesh picking
 bounds, shadow proxies, or fresh mutable state.
 
 ## 4. Presentation frame
+
+Frame-strip units clear cached movement when leaving `MOVE`, preventing a later move state from
+reviving stale walking art. The visual movement hold is derived from the configured snapshot cadence.
+
+Resource, building, and fog Graphics skip clearing and rebuilding when their render inputs are
+unchanged. Caching preserves live transforms and fog alpha, invalidates changed inputs, and retries
+transient draw failures. Static cache metadata lives on each pooled Graphics object, so eviction
+and teardown follow the pool lifecycle.
 
 Static map presentation changes only with the static-map revision. Per-rAF data is assembled once
 by Match. Large grids cross the boundary as source-detached cloneable buffers:

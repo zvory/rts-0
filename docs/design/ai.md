@@ -230,7 +230,7 @@ panic does not override an already-active tech transition, so tank pressure cont
 path during pressure.
 
 AI 2.1 is the promoted pressure profile. It fills in-range Steel and Oil extractor slots over time,
-keeps an eight-supply buffer, opens one Barracks, expands to two Resource Depots, and reserves four
+opens one Barracks, expands to two Resource Depots, and reserves four
 Machine Gunners for defense. It begins with Rifleman pressure, then transitions into mixed
 Tank/Rifleman pressure once its tank-tech resource threshold is met. After its first Vehicle Works (Factory) completes, it seeks a third Resource Depot using the
 existing expansion resource/supply trigger. The third-base step does not require surviving
@@ -240,7 +240,7 @@ float; the Vehicle Works cap remains two. The internal `ai_2_1_pre_third_base` p
 AI 2.1 from main commit `69d1e29a6` for comparison. Frontal waves stage in cohorts so newly produced units do not immediately
 join an already-launched wave.
 
-AI Turtle shares AI 2.1 extractor, supply, and first-Barracks cadence, but uses a two-Rifleman
+AI Turtle shares AI 2.1 extractor and first-Barracks cadence, but uses a two-Rifleman
 opening and does not launch frontal waves. It prioritizes a Training Centre, an early second Resource
 Depot, Entrenchment, support technology, Machine Gunners, and Anti-Tank Guns. It identifies up
 to three own-base chokepoints from the static map analysis, caps Machine Gunner production by
