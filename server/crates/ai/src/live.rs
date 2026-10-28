@@ -426,6 +426,7 @@ impl AiController {
         }
 
         let view = PlayerView {
+            known_losses: &context.known_losses,
             match_seed: context.match_seed,
             player_id: self.player,
             tick,
