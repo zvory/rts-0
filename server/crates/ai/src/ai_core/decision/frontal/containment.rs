@@ -220,10 +220,13 @@ pub(super) fn issue_expansion_containment_wave(
                     .collect();
         }
         let riflemen: Vec<u32> = memory.containment.active_riflemen.iter().copied().collect();
-        let assembly_shape = if push_uses_available_armor {
-            MarchShape::TIGHT
-        } else {
-            MarchShape::LEGACY
+        let assembly_shape = MarchShape {
+            rifle_spread: jeff_v1_1::screen::spread(memory),
+            ..if push_uses_available_armor {
+                MarchShape::TIGHT
+            } else {
+                MarchShape::LEGACY
+            }
         };
         let formation = containment_formation(
             observation,
@@ -517,10 +520,13 @@ pub(super) fn issue_expansion_containment_wave(
         Some(orders) => (orders.destination, orders.face_from, orders.face_to),
         None => (tank_point, own_base, objective),
     };
-    let shape = match legs.map(|orders| orders.phase) {
-        Some(super::approach::PushPhase::Travel) => MarchShape::TRAVEL,
-        _ if push_uses_available_armor => MarchShape::TIGHT,
-        _ => MarchShape::LEGACY,
+    let shape = MarchShape {
+        rifle_spread: jeff_v1_1::screen::spread(memory),
+        ..match legs.map(|orders| orders.phase) {
+            Some(super::approach::PushPhase::Travel) => MarchShape::TRAVEL,
+            _ if push_uses_available_armor => MarchShape::TIGHT,
+            _ => MarchShape::LEGACY,
+        }
     };
     let toward_objective = normalized_direction(face_from, face_to)?;
     let tank_assignments = if tight_formation {
@@ -750,8 +756,11 @@ pub(super) fn issue_expansion_containment_wave(
                     scout_point.1,
                 );
             }
-            let screen_points =
-                rifle_screen_points(tank_anchor, objective, observation.map, riflemen.len());
+            let screen_points = if shape.rifle_spread {
+                jeff_v1_1::screen::points(tank_anchor, objective, observation.map, riflemen.len())
+            } else {
+                rifle_screen_points(tank_anchor, objective, observation.map, riflemen.len())
+            };
             for (rifleman, screen_point) in riflemen.iter().zip(screen_points) {
                 if let Some(target) = rifle_sector_target(
                     observation,

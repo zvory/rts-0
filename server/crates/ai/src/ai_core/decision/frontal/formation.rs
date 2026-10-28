@@ -20,6 +20,8 @@ pub(super) struct MarchShape {
     /// Whether a waypoint is reached once the Tanks' centre is within `arrival_tiles` of it,
     /// whether or not every Tank has found its slot.
     pub(super) advance_on_center: bool,
+    /// Whether the rifle screen is Jeff's AI V1.1's spread one.
+    pub(super) rifle_spread: bool,
 }
 
 impl MarchShape {
@@ -34,6 +36,7 @@ impl MarchShape {
         ranked: false,
         rank_width: TANK_FORMATION_RANK_WIDTH,
         advance_on_center: false,
+        rifle_spread: false,
     };
     /// The current Jeff forming up, reforming and closing in: as tight, but a push of more than six
     /// Tanks is formed in ranks and is that much deeper. Held to one rank of depth, a large push
@@ -58,6 +61,7 @@ impl MarchShape {
         ranked: true,
         rank_width: 4,
         advance_on_center: true,
+        rifle_spread: false,
     };
 }
 
@@ -290,7 +294,11 @@ pub(super) fn containment_formation(
         observation.map,
         policy.scout_trailing_tiles,
     )?;
-    let rifle_points = rifle_screen_points(tank_center, objective, observation.map, riflemen.len());
+    let rifle_points = if shape.rifle_spread {
+        jeff_v1_1::screen::points(tank_center, objective, observation.map, riflemen.len())
+    } else {
+        rifle_screen_points(tank_center, objective, observation.map, riflemen.len())
+    };
     let riflemen = riflemen.iter().copied().zip(rifle_points).collect();
     Some(ContainmentFormation {
         tanks,

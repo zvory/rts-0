@@ -8,6 +8,7 @@ pub(super) mod base_line;
 pub(super) mod hunt;
 pub(super) mod push;
 pub(super) mod scout;
+pub(super) mod screen;
 pub(super) mod strike;
 pub(super) mod third_base;
 
