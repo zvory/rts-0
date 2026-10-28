@@ -407,7 +407,8 @@ fn launch_ready(
         .iter()
         .filter(|unit| unit.kind == EntityKind::ResourceDepot && unit.is_complete && unit.hp > 0)
         .count();
-    if bases >= 3 || memory.later_bases.planning() {
+    // Jeff's AI V1.1 denies the enemy's expansions whatever its own base count (`v1_1_denial`).
+    if (bases >= 3 || memory.later_bases.planning()) && !v1_1_denial(memory) {
         return None;
     }
     if memory.home_outgunned || defense::local_defense_contact(observation).is_some() {
@@ -475,8 +476,21 @@ fn party_tanks(observation: &AiObservation, memory: &AiDecisionMemory) -> Option
     if party.len() < PARTY_TANKS {
         return None;
     }
+    if v1_1_denial(memory) {
+        // V1.1's base lines, Panzerfausts and converging Tanks hold its bases: the party goes while
+        // one free Tank stays.
+        return (army.len() > PARTY_TANKS).then_some(party);
+    }
     let main_left = at_main.iter().filter(|id| !party.contains(id)).count();
     (main_left >= memory.home_tank_reserve()).then_some(party)
+}
+
+/// Jeff's AI V1.1 sends its party at the enemy's newest base however many bases it holds itself, and
+/// with one free Tank left home rather than the whole reserve. Against Pressure AI, which stood on
+/// five bases by 8:00, V1.0's scouts found the third's Depot and then waited all game for two Tanks
+/// the reserve never freed: Jeff killed one enemy Depot in eight games.
+fn v1_1_denial(memory: &AiDecisionMemory) -> bool {
+    memory.profile_id().is_some_and(is_jeff_v1_1) && !jeff_v1_1::off("denial")
 }
 
 /// `count` Riflemen nobody else holds, besides `besides`, and never the home pocket's: its posts

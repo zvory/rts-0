@@ -74,6 +74,13 @@ pub(super) fn early_research(
     }
     if !ordered(facts, memory, entrenchment) {
         research(actions, facts, memory, intents, entrenchment);
+        return;
+    }
+    // Then the Panzerfausts research, without which no Panzerfaust can be trained: V1.0 never took
+    // it, and V1.1's Panzerfaust target trained none in sixteen games until it did.
+    let panzerfausts = UpgradeKind::Panzerfausts;
+    if !ordered(facts, memory, panzerfausts) && !off("fausts") {
+        research(actions, facts, memory, intents, panzerfausts);
     }
 }
 
@@ -238,11 +245,15 @@ pub(super) fn rifle_line(
     {
         priorities.push(EntityKind::Rifleman);
     }
-    // Panzerfausts up to `faust_target`.
+    // Panzerfausts up to `faust_target`, ahead of the Riflemen: behind them they were never trained,
+    // as surplus Steel kept raising the Rifleman cap.
     if facts.unit_count(EntityKind::Panzerfaust) < fausts
         && !priorities.contains(&EntityKind::Panzerfaust)
     {
-        priorities.push(EntityKind::Panzerfaust);
+        match priorities.iter().position(|unit| *unit == EntityKind::Rifleman) {
+            Some(index) => priorities.insert(index, EntityKind::Panzerfaust),
+            None => priorities.push(EntityKind::Panzerfaust),
+        }
     }
     Some(line)
 }
