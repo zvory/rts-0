@@ -809,3 +809,21 @@ for (const researched of [false, true]) {
   assert.equal(card.slots[7]?.label, "Tank Plus");
   assert.equal(card.slots[7]?.enabled, true);
 }
+
+{
+  const depot = { id: 900, owner: 1, kind: KIND.RESOURCE_DEPOT, state: "idle" };
+  const context = {
+    playerId: 1, factionId: "kriegsia", selection: [depot], currentEntities: [depot],
+    resources: { steel: 800, oil: 300, supplyUsed: 90, supplyCap: 100 },
+    upgrades: [], playerHasCompleteKind: () => true, groupCooldownClocks: () => [],
+  };
+  const upgrade = (ctx) => buildCommandCardDescriptors(ctx).slots.find((s) => s?.id === `research:${UPGRADE.INDUSTRIAL_CENTER}`);
+  assert.equal(upgrade(context)?.enabled, true);
+  assert.deepEqual(upgrade(context)?.cost, { steel: 800, oil: 300 });
+  const pending = { ...depot, id: 901, prodUpgradeQueue: [UPGRADE.INDUSTRIAL_CENTER] };
+  assert.equal(upgrade({ ...context, currentEntities: [depot, pending] })?.enabled, true, "another depot can upgrade concurrently");
+  const complete = { ...depot, id: 902, industrialCenter: true };
+  assert.equal(upgrade({ ...context, currentEntities: [depot, pending, complete] })?.enabled, false, "two centers include pending upgrades");
+  assert.equal(upgrade({ ...context, selection: [complete], currentEntities: [complete] })?.enabled, false);
+  assert.equal(upgrade({ ...context, selection: [{ ...depot, state: "construct", buildProgress: 0.5 }] })?.enabled, false);
+}

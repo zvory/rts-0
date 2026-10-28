@@ -12,6 +12,7 @@ use rts_sim::game::command::SimCommand as Command;
 mod economy_manager_tests;
 mod expansion_security_tests;
 mod fast_natural_tests;
+mod industrial_center_tests;
 mod natural_site_tests;
 mod pressure_tests;
 mod spend_plan_tests;
@@ -24,6 +25,7 @@ fn worker(id: u32, state: AiEntityState) -> AiEntitySummary {
 
 fn worker_at(id: u32, state: AiEntityState, x: f32, y: f32) -> AiEntitySummary {
     AiEntitySummary {
+        industrial_center_slot_reserved: false,
         id,
         owner: 1,
         kind: EntityKind::Worker,
@@ -68,6 +70,7 @@ fn building_at(
     y: f32,
 ) -> AiEntitySummary {
     AiEntitySummary {
+        industrial_center_slot_reserved: false,
         id,
         owner: 1,
         kind,
@@ -93,6 +96,7 @@ fn combat(id: u32, kind: EntityKind) -> AiEntitySummary {
 
 fn combat_at(id: u32, kind: EntityKind, x: f32, y: f32) -> AiEntitySummary {
     AiEntitySummary {
+        industrial_center_slot_reserved: false,
         id,
         owner: 1,
         kind,

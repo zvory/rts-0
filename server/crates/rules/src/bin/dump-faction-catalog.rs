@@ -630,6 +630,15 @@ fn print_upgrades(indent: &str) {
     );
     print_upgrade(
         indent,
+        "industrial_center",
+        balance::INDUSTRIAL_CENTER_COST_STEEL,
+        balance::INDUSTRIAL_CENTER_COST_OIL,
+        balance::INDUSTRIAL_CENTER_RESEARCH_TICKS,
+        None,
+        true,
+    );
+    print_upgrade(
+        indent,
         faction::ROCKETS_UPGRADE,
         balance::ROCKETS_COST_STEEL,
         balance::ROCKETS_COST_OIL,

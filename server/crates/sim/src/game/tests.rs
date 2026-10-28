@@ -44,3 +44,5 @@ mod smoke_mortar_visibility_tests;
 mod tank_attack_move_acquisition_tests;
 mod tank_trap_tests;
 mod warrior_tests;
+
+mod industrial_center_tests;

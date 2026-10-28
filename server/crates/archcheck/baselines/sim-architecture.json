@@ -1,5 +1,5 @@
 {
-  "reason": "MG prototype reuses existing geometry, LOS and spatial query services for first-hit burst rays",
+  "reason": "Extract existing research command mutation into commands/research.rs to keep commands below its frozen size limit while adding depot-local Industrial Centers",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -1272,6 +1272,10 @@
     {
       "path": "services/combat/machine_gun/tests.rs",
       "lines": 165
+    },
+    {
+      "path": "services/commands/research.rs",
+      "lines": 85
     }
   ],
   "service_edges": [
@@ -1913,6 +1917,11 @@
       "path": "systems.rs",
       "line": 135,
       "name": "run_tick"
+    },
+    {
+      "path": "services/commands/research.rs",
+      "line": 3,
+      "name": "enqueue"
     }
   ],
   "player_state_usages": [
@@ -2194,6 +2203,11 @@
     {
       "path": "systems.rs",
       "line": 138,
+      "code": "players: &mut [PlayerState],"
+    },
+    {
+      "path": "services/commands/research.rs",
+      "line": 5,
       "code": "players: &mut [PlayerState],"
     }
   ],

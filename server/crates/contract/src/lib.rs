@@ -673,6 +673,8 @@ pub struct RememberedBuildingView {
     pub x: f32,
     pub y: f32,
     pub footprint: Vec<[u32; 2]>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub industrial_center: bool,
     pub observed_tick: u32,
 }
 
@@ -921,6 +923,9 @@ pub struct EntityView {
     /// Whether a visible completed Pump Jack can currently extract oil.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extractor_active: Option<bool>,
+    /// Public physical upgrade state, projected only with the visible/remembered depot.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub industrial_center: bool,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub build_progress: Option<f32>,
@@ -1009,6 +1014,7 @@ impl EntityView {
             prod_scout_plane_queued: false,
             prod_waiting: false,
             extractor_active: None,
+            industrial_center: false,
             build_progress: None,
             build_active: false,
             deconstruct_progress: None,

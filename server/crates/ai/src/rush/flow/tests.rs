@@ -422,6 +422,7 @@ fn remembered_extractor_is_a_scouting_destination_not_a_direct_attack_target() {
     snapshot
         .remembered_buildings
         .push(rts_sim::protocol::RememberedBuildingView {
+            industrial_center: false,
             id: 300,
             owner: 2,
             kind: "pump_jack".into(),

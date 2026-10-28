@@ -95,14 +95,42 @@ impl PlayerState {
         self.upgrades.contains(&upgrade)
     }
 
-    pub(crate) fn can_reserve_supply(&self, supply: u32) -> bool {
-        self.supply_used
-            .checked_add(supply)
-            .is_some_and(|next| next <= config::PLAYER_SUPPLY_CAP)
+    pub(crate) fn supply_cap(&self, entities: &crate::game::entity::EntityStore) -> u32 {
+        if self.faction_id != crate::rules::faction::DEFAULT_FACTION_ID {
+            return config::PLAYER_SUPPLY_CAP;
+        }
+        let centers = entities
+            .iter()
+            .filter(|e| {
+                e.owner == self.id
+                    && e.hp > 0
+                    && !e.under_construction()
+                    && e.is_industrial_center()
+            })
+            .count() as u32;
+        config::STARTING_SUPPLY_CAP
+            .saturating_add(centers.saturating_mul(config::INDUSTRIAL_CENTER_SUPPLY))
+            .min(config::PLAYER_SUPPLY_CAP)
     }
 
-    pub(crate) fn reserve_supply(&mut self, supply: u32) -> bool {
-        if !self.can_reserve_supply(supply) {
+    pub(crate) fn can_reserve_supply(
+        &self,
+        supply: u32,
+        entities: &crate::game::entity::EntityStore,
+    ) -> bool {
+        supply == 0
+            || self
+                .supply_used
+                .checked_add(supply)
+                .is_some_and(|next| next <= self.supply_cap(entities))
+    }
+
+    pub(crate) fn reserve_supply(
+        &mut self,
+        supply: u32,
+        entities: &crate::game::entity::EntityStore,
+    ) -> bool {
+        if !self.can_reserve_supply(supply, entities) {
             return false;
         }
         self.supply_used += supply;
