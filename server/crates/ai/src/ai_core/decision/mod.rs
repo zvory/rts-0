@@ -1101,6 +1101,7 @@ where
     local_ready_units.retain(|id| !push_units.contains(id));
     local_ready_units.retain(|id| !memory.opening_rush.is_reserved(*id));
     local_ready_units.retain(|id| !memory.jeff_v1_1.front_line.holds(*id));
+    local_ready_units.retain(|id| !memory.jeff_v1_1.deny.holds(*id));
     local_ready_units.retain(|id| !memory.third_pressure.is_reserved(*id)
                 && !memory.jeff_v1_1.tank_raid.holds(*id));
     if profile.home_anti_tank.is_some() {
@@ -1513,6 +1514,9 @@ where
         let live = (&mut actions, observation, map_analysis, &mut intents);
         jeff_v1_1::tank_raid::raid(live, memory, profile.id);
         jeff_v1_1::smoke_cover::cover_push_retreat(&mut actions, observation, memory);
+        let raiders: BTreeSet<u32> = memory.jeff_v1_1.tank_raid.units().collect();
+        let held = &(&route_line_reserved | &raiders);
+        jeff_v1_1::deny::watch(&mut actions, observation, memory, &mut intents, held);
         let raiders: BTreeSet<u32> = memory.jeff_v1_1.tank_raid.units().collect();
         let reserved = &(&route_line_reserved | &raiders);
         jeff_v1_1::charge::charge_tanks(&mut actions, observation, memory, &mut intents, profile.id, reserved);

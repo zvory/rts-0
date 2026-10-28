@@ -189,6 +189,7 @@ pub(super) fn stage_home_riflemen(
                     && !memory.jeff_v1_1.base_lines.posted(unit.id)
                     && !memory.jeff_v1_1.natural.holds(unit.id)
                     && !memory.jeff_v1_1.front_line.holds(unit.id)
+                    && !memory.jeff_v1_1.deny.holds(unit.id)
             })
             .map(|unit| unit.id)
             .collect()

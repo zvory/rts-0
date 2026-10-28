@@ -527,6 +527,7 @@ impl AiDecisionMemory {
             .chain(self.trap_breach.reserved())
             .chain(self.third_pressure.reserved())
             .chain(self.jeff_v1_1.tank_raid.units())
+            .chain(self.jeff_v1_1.deny.units())
             .collect()
     }
 
@@ -536,6 +537,7 @@ impl AiDecisionMemory {
         self.trap_breach.is_reserved(id)
             || self.third_pressure.is_reserved(id)
             || self.jeff_v1_1.tank_raid.holds(id)
+            || self.jeff_v1_1.deny.holds(id)
             || self.jeff_v1_1.scout.unit == Some(id)
     }
 

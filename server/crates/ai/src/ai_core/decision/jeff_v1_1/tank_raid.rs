@@ -33,6 +33,12 @@ use super::*;
 use crate::ai_core::decision::geometry::{dist2, squared, tile_center};
 
 const PARTY_TANKS: usize = 3;
+/// With this many free Tanks besides `HOME_TANKS`, the party takes one more (`raid4`).
+const BIG_PARTY_TANKS: usize = 4;
+/// Remembered enemy strength this close to a target is the answer it would get.
+const RESPONSE_TILES: f32 = 30.0;
+/// A target with more than this many times the party's strength near it is left alone.
+const RESPONSE_SKIP: f32 = 2.5;
 const HOME_TANKS: usize = 1;
 const SCOUT_LEAD_TILES: f32 = 8.0;
 const WAYPOINT_TILES: f32 = 4.0;
@@ -97,6 +103,8 @@ pub(in crate::ai_core::decision) struct TankRaidMemory {
     parked_since: Option<u32>,
     /// When its Scout Car last smoked for it.
     smoked: u32,
+    /// Whether the Depot raided was seen standing at the base: its fall is the raid's kill.
+    depot_seen: bool,
 }
 
 impl TankRaidMemory {
@@ -106,6 +114,16 @@ impl TankRaidMemory {
 
     pub(in crate::ai_core::decision) fn units(&self) -> impl Iterator<Item = u32> + '_ {
         self.tanks.iter().copied().chain(self.scout)
+    }
+
+    /// Whether the raid is on its way to a base or at it.
+    pub(in crate::ai_core::decision) fn going(&self) -> bool {
+        matches!(self.phase, Some(Phase::Out | Phase::Hit))
+    }
+
+    /// The raid's Tanks.
+    pub(in crate::ai_core::decision) fn tank_ids(&self) -> impl Iterator<Item = u32> + '_ {
+        self.tanks.iter().copied()
     }
 }
 
@@ -193,6 +211,16 @@ pub(in crate::ai_core::decision) fn raid(
     memory.jeff_v1_1.tank_raid.weighed = (strength as u32, danger as u32);
     let state = &memory.jeff_v1_1.tank_raid;
     let phase = state.phase.unwrap_or(Phase::Home);
+    // A Depot seen standing and now gone from a site in sight is the raid's kill.
+    if let Some(target) = memory.jeff_v1_1.tank_raid.target.map(point) {
+        if memory.jeff_v1_1.tank_raid.depot_seen
+            && visible_depot(observation, target, ts).is_none()
+            && site_in_sight(observation, memory, target, ts)
+        {
+            memory.jeff_v1_1.tank_raid.depot_seen = false;
+            super::deny::note_kill(memory, target, tick);
+        }
+    }
     // Run: too much near it, or worn down.
     if phase != Phase::Home && (danger >= strength * RUN_SHARE || health < LOW_HP) {
         let state = &mut memory.jeff_v1_1.tank_raid;
@@ -245,11 +273,7 @@ pub(in crate::ai_core::decision) fn raid(
         }
         Phase::Hit => {
             let target = memory.jeff_v1_1.tank_raid.target.map(point).unwrap_or(center);
-            let in_sight = observation
-                .owned
-                .iter()
-                .filter(|unit| memory.jeff_v1_1.tank_raid.holds(unit.id))
-                .any(|unit| dist2(unit.x, unit.y, target.0, target.1) <= squared(CLEARED_TILES * ts));
+            let in_sight = site_in_sight(observation, memory, target, ts);
             if visible_depot(observation, target, ts).is_none() && in_sight {
                 // The Depot is down, or was never there: its extractors decay on their own. On to the
                 // next base while healthy and unseen, else home.
@@ -425,13 +449,18 @@ fn launch(
     if tanks.len() < PARTY_TANKS {
         return;
     }
+    let party_size = if !super::off("raid4") && tanks.len() >= BIG_PARTY_TANKS + HOME_TANKS {
+        BIG_PARTY_TANKS
+    } else {
+        PARTY_TANKS
+    };
     // The Tanks nearest the enemy go.
     tanks.sort_by(|a, b| {
         dist2(a.x, a.y, enemy_main.0, enemy_main.1)
             .total_cmp(&dist2(b.x, b.y, enemy_main.0, enemy_main.1))
             .then(a.id.cmp(&b.id))
     });
-    tanks.truncate(PARTY_TANKS);
+    tanks.truncate(party_size);
     let n = tanks.len() as f32;
     let center = (
         tanks.iter().map(|unit| unit.x).sum::<f32>() / n,
@@ -492,6 +521,16 @@ fn choose_target(
         if defence > strength * DEFENCE_SHARE {
             continue;
         }
+        // The answer it would get: the enemy army remembered near it (`raidwindow`). Busy at Jeff's
+        // bases, it is far from the enemy's own.
+        let response = if super::off("raidwindow") {
+            0.0
+        } else {
+            super::push::threat_near(observation, memory, at, RESPONSE_TILES)
+        };
+        if response > strength * RESPONSE_SKIP {
+            continue;
+        }
         let Some(route) = best_route(observation, analysis, memory, from, at, strength) else {
             continue;
         };
@@ -500,7 +539,8 @@ fn choose_target(
             .map(|pair| dist2(pair[0].0 as f32, pair[0].1 as f32, pair[1].0 as f32, pair[1].1 as f32).sqrt())
             .sum::<f32>()
             / ts;
-        let score = worth / (1.0 + defence / strength.max(1.0)) / (1.0 + length / TRAVEL_TILES);
+        let score = worth / (1.0 + defence / strength.max(1.0) + 0.5 * response / strength.max(1.0))
+            / (1.0 + length / TRAVEL_TILES);
         if best.as_ref().is_none_or(|(top, _, _)| score > *top) {
             best = Some((score, at, route));
         }
@@ -714,6 +754,7 @@ fn shell_depot(
         }
         return;
     };
+    state.depot_seen = true;
     let standoff = if scout.is_some() { RANGED_STANDOFF_TILES } else { SIGHT_STANDOFF_TILES };
     let back = normalized_direction((depot.x, depot.y), center).unwrap_or((1.0, 0.0));
     let across = (-back.1, back.0);
@@ -777,6 +818,19 @@ fn shell_depot(
     }
 }
 
+/// Whether a party Tank stands within its sight of `at`, or its Scout Car within the car's.
+fn site_in_sight(observation: &AiObservation, memory: &AiDecisionMemory, at: (f32, f32), ts: f32) -> bool {
+    observation
+        .owned
+        .iter()
+        .filter(|unit| memory.jeff_v1_1.tank_raid.holds(unit.id) && unit.hp > 0)
+        .any(|unit| {
+            let sight = config::unit_stats(unit.kind)
+                .map_or(CLEARED_TILES, |stats| stats.sight_tiles as f32 - 1.0);
+            dist2(unit.x, unit.y, at.0, at.1) <= squared(sight * ts)
+        })
+}
+
 /// The enemy Depot standing within `DEPOT_TILES` of `at`, in sight.
 fn visible_depot(observation: &AiObservation, at: (f32, f32), ts: f32) -> Option<&AiEntitySummary> {
     observation
@@ -791,7 +845,7 @@ pub(in crate::ai_core::decision) fn trace_line(memory: &AiDecisionMemory) -> Opt
     let state = &memory.jeff_v1_1.tank_raid;
     (memory.profile_id().is_some_and(is_jeff_v1_1) && !super::off("tankraid")).then(|| {
         format!(
-            "v1_1_raid phase={:?} target={:?} tanks={:?} scout={:?} leg={}/{} strength={} danger={} hot={:?} rest_until={}",
+            "v1_1_raid phase={:?} target={:?} tanks={:?} scout={:?} leg={}/{} strength={} danger={} hot={:?} rest_until={} seen={} deny={}",
             state.phase,
             state.target,
             state.tanks,
@@ -802,6 +856,8 @@ pub(in crate::ai_core::decision) fn trace_line(memory: &AiDecisionMemory) -> Opt
             state.weighed.1,
             state.hot.keys().collect::<Vec<_>>(),
             state.rest_until,
+            state.depot_seen,
+            memory.jeff_v1_1.deny.trace(),
         )
     })
 }

@@ -6,6 +6,7 @@ use crate::ai_core::facts::ProductionBuildingFact;
 
 pub(super) mod base_line;
 pub(super) mod charge;
+pub(super) mod deny;
 pub(super) mod front_line;
 pub(super) mod hunt;
 pub(super) mod natural;
@@ -40,6 +41,7 @@ pub(super) struct V1_1Memory {
     pub(super) tank_raid: tank_raid::TankRaidMemory,
     pub(super) front_line: front_line::FrontLineMemory,
     pub(super) smoke: smoke_cover::SmokeMemory,
+    pub(super) deny: deny::DenyMemory,
 }
 
 /// Methamphetamines comes first. It is ordered the moment the Training Centre is free and its cost

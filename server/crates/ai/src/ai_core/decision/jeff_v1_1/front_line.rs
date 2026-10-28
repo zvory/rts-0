@@ -162,6 +162,7 @@ pub(in crate::ai_core::decision) fn hold(
             && !memory.expansion_security.riflemen.contains(&unit.id)
             && !memory.jeff_v1_1.natural.holds(unit.id)
             && !memory.jeff_v1_1.tank_raid.holds(unit.id)
+            && !memory.jeff_v1_1.deny.holds(unit.id)
             && !memory.jeff_v1_1.base_lines.posted(unit.id)
     };
     let tanks: Vec<&AiEntitySummary> = observation
