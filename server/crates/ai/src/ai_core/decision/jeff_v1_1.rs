@@ -21,8 +21,6 @@ pub(super) struct V1_1Memory {
     /// Entrenchment waits for Methamphetamines this decision: Meth's Oil comes in before
     /// Entrenchment's research would end, so the Training Centre stays free for Meth.
     pub(super) entrenchment_waits: bool,
-    /// Methamphetamines waits for its Oil this decision, its cost held back.
-    pub(super) meth_waits: bool,
     /// Each base-line unit's post (`base_line`).
     pub(super) base_lines: base_line::LineMemory,
     /// Since when Steel has stood at `third_base::BANK_STEEL` or more.
@@ -57,7 +55,6 @@ pub(super) fn early_research(
     plan: Option<&spend_plan::SpendPlan>,
 ) {
     memory.jeff_v1_1.entrenchment_waits = false;
-    memory.jeff_v1_1.meth_waits = false;
     if !is_jeff_v1_1(profile_id)
         || off("meth")
         || facts.complete_building_count(EntityKind::TrainingCentre) == 0
@@ -82,7 +79,6 @@ pub(super) fn early_research(
             }
         }
         actions.holdback_resources(definition.cost_steel, definition.cost_oil);
-        memory.jeff_v1_1.meth_waits = true;
         return;
     }
     if !ordered(facts, memory, entrenchment) {
@@ -166,9 +162,10 @@ pub(super) fn reserve_tank_steel(
 /// The natural's guards V1.1 trains before its opening guns.
 const NATURAL_GUARDS: usize = 2;
 
-/// V1.1's Barracks trains Riflemen first while Meth waits for its Oil, and while the natural lacks
-/// its guards. Each opening gun takes 10 Oil, which Meth holds back: against Pressure AI on Classic
-/// the Barracks stood idle from 0:45 to 1:15 with 390 Steel in the bank. And with the four starters
+/// V1.1's Barracks trains Riflemen first from the moment its Training Centre goes down until Meth is
+/// ordered, and while the natural lacks its guards. Each opening gun takes 10 Oil, which Meth holds
+/// back: against Pressure AI on Classic the Barracks stood idle from 0:30, when the Training Centre
+/// was placed, to 1:15, with up to 390 Steel in the bank. And with the four starters
 /// out on the opening rush, V1.0's natural guards were the Riflemen trained after four guns, out at
 /// 2:15-2:30, so the natural waited for them with its 450 Steel set aside from 1:53. Returns the
 /// Riflemen to train up to, past the spend plan's routine cap.
@@ -194,7 +191,10 @@ pub(super) fn riflemen_first(
         && fresh < NATURAL_GUARDS;
     let target = if guards_short {
         riflemen + NATURAL_GUARDS - fresh
-    } else if memory.jeff_v1_1.meth_waits {
+    } else if facts.building_count(EntityKind::TrainingCentre) > 0
+        && !off("meth")
+        && !ordered(facts, memory, UpgradeKind::Methamphetamines)
+    {
         riflemen + 1
     } else {
         return None;
@@ -242,6 +242,36 @@ pub(super) fn rifles_past_first_tank(
         && !off("surplus")
         && building_kind == EntityKind::Barracks
         && steel >= tank + rifle
+}
+
+/// The Steel V1.1's building orders still owe. An order stays pending while its builder is in its
+/// build state, which lasts through construction, and is dropped only once the builder has stood
+/// still for 10 s: for 10 s after each foundation went down Jeff held its cost back a second time
+/// (the Training Centre's 100 Steel from 0:28 to 0:38 against Pressure AI on Classic, with the
+/// Barracks idle). An order whose foundation stands owes nothing more.
+pub(super) fn committed_steel(profile_id: &str, observation: &AiObservation, facts: &AiFacts) -> u32 {
+    if !is_jeff_v1_1(profile_id) || off("committed") {
+        return facts.committed_steel;
+    }
+    let ts = observation.map.tile_size;
+    observation
+        .pending_builds
+        .iter()
+        .filter(|build| build.phase == crate::ai_core::observation::AiBuildIntentPhase::ToSite)
+        .filter(|build| {
+            let Some(center) =
+                super::geometry::building_center((build.tile_x, build.tile_y), build.kind, ts)
+            else {
+                return true;
+            };
+            !observation.owned.iter().any(|entity| {
+                entity.kind == build.kind
+                    && super::geometry::dist2(entity.x, entity.y, center.0, center.1)
+                        <= super::geometry::squared(ts as f32)
+            })
+        })
+        .map(|build| rts_rules::economy::cost(build.kind).0)
+        .fold(0u32, u32::saturating_add)
 }
 
 /// Local ablation testing only: `JEFF_V11_OFF=scout,raid,...` turns the named V1.1 features off,

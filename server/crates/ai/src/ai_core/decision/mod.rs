@@ -233,7 +233,7 @@ where
         observation.economy.oil,
         observation.economy.supply_used,
         observation.economy.supply_cap,
-        facts.committed_steel,
+        jeff_v1_1::committed_steel(profile.id, observation, &facts),
     );
     let start_budget = budget;
     let mut actions = AiActionContext::new(&facts, budget);
