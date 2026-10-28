@@ -1336,6 +1336,7 @@ mod tests {
             serde_json::json!([[1, 256.0, 512.0], [2, 320.0, 544.0]])
         );
         assert_eq!(value["e"][2][34], serde_json::json!(true));
+        assert_eq!(value["e"][2][44], serde_json::json!(true));
         let repeat_codes = [kind_code(kinds::WORKER), kind_code(kinds::SCOUT_CAR)];
         assert_eq!(value["e"][2][36], serde_json::json!(repeat_codes));
         assert_eq!(
@@ -1366,7 +1367,7 @@ mod tests {
         assert_eq!(value["eg"], serde_json::json!([1, 3, 2, 1]));
         assert_eq!(
             value["mb"],
-            serde_json::json!([[99, 2, 7, 640.0, 672.0, [[20, 21], [21, 21]], 39]])
+            serde_json::json!([[99, 2, 7, 640.0, 672.0, [[20, 21], [21, 21]], 39, true]])
         );
         assert_eq!(value["u"], serde_json::json!([4]));
         assert_eq!(value["ev"].as_array().unwrap().len(), 12);

@@ -175,6 +175,7 @@ pub mod upgrades {
         SMOKE_PLUS,
         SCOUT_PLANE_UNLOCK,
         ROCKETS,
+        INDUSTRIAL_CENTER,
     ];
 }
 
