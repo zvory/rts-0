@@ -526,6 +526,7 @@ impl AiDecisionMemory {
             .chain(self.opening_rush.reserved())
             .chain(self.trap_breach.reserved())
             .chain(self.third_pressure.reserved())
+            .chain(self.jeff_v1_1.tank_raid.units())
             .collect()
     }
 
@@ -534,6 +535,7 @@ impl AiDecisionMemory {
     pub(super) fn stays_out_of_home_defense(&self, id: u32) -> bool {
         self.trap_breach.is_reserved(id)
             || self.third_pressure.is_reserved(id)
+            || self.jeff_v1_1.tank_raid.holds(id)
             || self.jeff_v1_1.scout.unit == Some(id)
     }
 
@@ -698,6 +700,7 @@ impl AiDecisionMemory {
             .filter(|entity| entity.kind == EntityKind::Tank)
             .filter(|entity| !self.trap_breach.is_reserved(entity.id))
             .filter(|entity| !self.third_pressure.is_reserved(entity.id))
+            .filter(|entity| !self.jeff_v1_1.tank_raid.holds(entity.id))
             .filter(|entity| !push_tanks.contains(&entity.id))
             .filter(|entity| {
                 self.home_defensive_tank_assigned_once

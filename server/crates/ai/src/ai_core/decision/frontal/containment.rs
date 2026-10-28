@@ -123,6 +123,7 @@ pub(super) fn issue_expansion_containment_wave(
                 .chain(memory.later_bases.guards.iter().copied())
                 .chain(stuck.iter().copied())
                 .chain(memory.third_pressure.reserved())
+                .chain(memory.jeff_v1_1.tank_raid.units())
                 .collect();
             let mut tanks = actions::select_ready_combat_units_excluding(
                 &observation.owned,
@@ -132,6 +133,7 @@ pub(super) fn issue_expansion_containment_wave(
             let mut scouts =
                 actions::select_ready_combat_units(&observation.owned, &[EntityKind::ScoutCar]);
             scouts.retain(|scout| !memory.third_pressure.is_reserved(*scout));
+            scouts.retain(|scout| !memory.jeff_v1_1.tank_raid.holds(*scout));
             scouts.retain(|scout| memory.jeff_v1_1.scout.unit != Some(*scout));
             if !memory.containment.wave_launched {
                 tanks.retain(|tank| plan.ready_units.contains(tank));
@@ -177,6 +179,7 @@ pub(super) fn issue_expansion_containment_wave(
                 .collect();
             exclusions.extend(memory.containment.active_tanks.iter().copied());
             exclusions.extend(memory.third_pressure.reserved());
+            exclusions.extend(memory.jeff_v1_1.tank_raid.units());
             let mut newcomers = actions::select_ready_combat_units_excluding(
                 &observation.owned,
                 &[EntityKind::Tank],

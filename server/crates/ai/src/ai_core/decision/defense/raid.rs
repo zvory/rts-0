@@ -1292,6 +1292,7 @@ pub(in crate::ai_core::decision) fn rifle_answer(
                 && unit.hp > 0
                 && !memory.opening_rush.is_reserved(unit.id)
                 && !memory.third_pressure.is_reserved(unit.id)
+                && !memory.jeff_v1_1.tank_raid.holds(unit.id)
                 && !memory.containment.active_riflemen.contains(&unit.id)
         })
         .count();

@@ -13,6 +13,7 @@ pub(super) mod reveal;
 pub(super) mod scout;
 pub(super) mod screen;
 pub(super) mod strike;
+pub(super) mod tank_raid;
 pub(super) mod third_base;
 
 /// What V1.1 remembers between decisions.
@@ -34,6 +35,7 @@ pub(super) struct V1_1Memory {
     pub(super) natural: natural::NaturalMemory,
     pub(super) charge: charge::ChargeMemory,
     pub(super) reveal: reveal::RevealMemory,
+    pub(super) tank_raid: tank_raid::TankRaidMemory,
 }
 
 /// Methamphetamines comes first. It is ordered the moment the Training Centre is free and its cost

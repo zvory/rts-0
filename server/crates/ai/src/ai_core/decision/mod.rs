@@ -1099,7 +1099,8 @@ where
     local_ready_units.retain(|id| !expansion_footprint_blockers.contains(id));
     local_ready_units.retain(|id| !push_units.contains(id));
     local_ready_units.retain(|id| !memory.opening_rush.is_reserved(*id));
-    local_ready_units.retain(|id| !memory.third_pressure.is_reserved(*id));
+    local_ready_units.retain(|id| !memory.third_pressure.is_reserved(*id)
+                && !memory.jeff_v1_1.tank_raid.holds(*id));
     if profile.home_anti_tank.is_some() {
         local_ready_units.retain(|id| {
             Some(*id) != memory.home_defensive_tank
@@ -1494,6 +1495,7 @@ where
             excluded.extend(forward_defensive_tank);
             excluded.extend(route_line_reserved.iter().copied());
             excluded.extend(expansion_footprint_blockers.iter().copied());
+            excluded.extend(memory.jeff_v1_1.tank_raid.units());
             let gathered = jeff::gather_resting_tanks(&mut actions, observation, memory, excluded);
             if !gathered.is_empty() {
                 intents.push(AiIntent::Move { units: gathered });
@@ -1501,7 +1503,11 @@ where
         }
         // Jeff's AI V1.1's Riflemen charge Tanks shelling its bases, and its seen Tanks keep out of
         // reach of more enemy Tanks, over every other order.
-        let reserved = &route_line_reserved;
+        // Jeff's AI V1.1's Tank party raids the enemy's outlying bases.
+        let live = (&mut actions, observation, map_analysis, &mut intents);
+        jeff_v1_1::tank_raid::raid(live, memory, profile.id);
+        let raiders: BTreeSet<u32> = memory.jeff_v1_1.tank_raid.units().collect();
+        let reserved = &(&route_line_reserved | &raiders);
         jeff_v1_1::charge::charge_tanks(&mut actions, observation, memory, &mut intents, profile.id, reserved);
         jeff_v1_1::reveal::keep_out_of_reach(&mut actions, observation, memory, &mut intents, profile.id, reserved);
     }
@@ -1538,7 +1544,13 @@ where
         trace,
     };
     decision.trace.plan = spend_plan.as_ref().map(|plan| plan.trace_line(observation));
-    decision.trace.push = jeff_v1_1::push::trace_line(observation, map_analysis, memory);
+    decision.trace.push = match (
+        jeff_v1_1::push::trace_line(observation, map_analysis, memory),
+        jeff_v1_1::tank_raid::trace_line(memory),
+    ) {
+        (Some(push), Some(raid)) => Some(format!("{push} | {raid}")),
+        (push, raid) => push.or(raid),
+    };
     tank_micro::finish(&mut decision, observation, map_analysis, memory);
     decision
 }

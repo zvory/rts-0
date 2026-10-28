@@ -485,6 +485,7 @@ fn free_tank_ids(observation: &AiObservation, memory: &AiDecisionMemory) -> Vec<
                 // The trap breach's Tanks hold their concave; they are not called home.
                 && !memory.trap_breach.is_reserved(unit.id)
                 && !memory.third_pressure.is_reserved(unit.id)
+                && !memory.jeff_v1_1.tank_raid.holds(unit.id)
         })
         .map(|unit| unit.id)
         .collect()

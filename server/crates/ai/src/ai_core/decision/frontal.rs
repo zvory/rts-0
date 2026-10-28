@@ -404,7 +404,8 @@ pub(super) fn sync_containment_recovery(
             .iter()
             .filter(|unit| unit.kind == EntityKind::ScoutCar && unit.is_complete && unit.hp > 0)
             .filter(|unit| !memory.trap_breach.is_reserved(unit.id))
-            .filter(|unit| !memory.third_pressure.is_reserved(unit.id))
+            .filter(|unit| !memory.third_pressure.is_reserved(unit.id)
+                && !memory.jeff_v1_1.tank_raid.holds(unit.id))
             .map(|unit| unit.id)
             .min();
         // Jeff's AI V1.1 sends one of the push's Riflemen ahead instead.

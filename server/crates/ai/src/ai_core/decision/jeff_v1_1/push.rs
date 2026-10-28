@@ -170,7 +170,8 @@ pub(in crate::ai_core::decision) fn note_enemy_army(
     observation: &AiObservation,
     memory: &mut AiDecisionMemory,
 ) {
-    if !v1_1(memory) {
+    let raids = memory.profile_id().is_some_and(is_jeff_v1_1) && !super::off("tankraid");
+    if !v1_1(memory) && !raids {
         return;
     }
     let tick = observation.tick;
@@ -503,6 +504,29 @@ pub(in crate::ai_core::decision) fn scout_points(
         .map(|candidate| candidate.at)
         .filter(|at| dist2(at.0, at.1, enemy_main.0, enemy_main.1) > squared(BASE_TILES * ts))
         .collect()
+}
+
+/// The enemy bases and likely base sites a raid might hit, with their worth: the enemy main left out.
+pub(in crate::ai_core::decision) fn raid_candidates(
+    observation: &AiObservation,
+    analysis: &AiMapAnalysis,
+    memory: &mut AiDecisionMemory,
+    enemy_main: (f32, f32),
+) -> Vec<((f32, f32), f32)> {
+    let ts = observation.map.tile_size as f32;
+    candidates(observation, analysis, &mut memory.jeff_v1_1.push, enemy_main)
+        .into_iter()
+        .filter(|candidate| {
+            dist2(candidate.at.0, candidate.at.1, enemy_main.0, enemy_main.1)
+                > squared(BASE_TILES * ts)
+        })
+        .map(|candidate| (candidate.at, candidate.worth))
+        .collect()
+}
+
+/// The nearest living enemy's start.
+pub(in crate::ai_core::decision) fn enemy_main(observation: &AiObservation) -> Option<(f32, f32)> {
+    enemy_player(observation).map(|player| tile_center(player.start_tile, observation.map.tile_size))
 }
 
 /// Remembered enemy strength within `radius_tiles` of `at`.

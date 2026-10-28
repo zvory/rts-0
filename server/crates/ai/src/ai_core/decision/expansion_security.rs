@@ -444,7 +444,8 @@ pub(super) fn prepare<F: FnMut(EntityKind, u32, u32) -> bool>(
     // The route picket and raid sealers are held by the home line.
     candidates.retain(|id| !memory.route_line.reserved().any(|reserved| reserved == *id));
     candidates.retain(|id| !memory.opening_rush.is_reserved(*id));
-    candidates.retain(|id| !memory.third_pressure.is_reserved(*id));
+    candidates.retain(|id| !memory.third_pressure.is_reserved(*id)
+                && !memory.jeff_v1_1.tank_raid.holds(*id));
     candidates.retain(|id| !memory.raid_defense.is_sentry(*id));
     if let Some(center) = building_center(
         memory.expansion_security.site.unwrap(),
@@ -826,6 +827,7 @@ pub(super) fn surplus_tank_for_forward_base(
                 && !memory.containment.opening_tanks.contains(&unit.id)
                 && !memory.later_bases.guards.contains(&unit.id)
                 && !memory.third_pressure.is_reserved(unit.id)
+                && !memory.jeff_v1_1.tank_raid.holds(unit.id)
         })
         .min_by_key(|unit| unit.id)
         .map(|unit| unit.id)
@@ -1081,7 +1083,8 @@ pub(super) fn natural_clearers(
         .filter(|unit| unit.kind == EntityKind::Tank && unit.is_complete && unit.hp > 0)
         .filter(|unit| !memory.trap_breach.is_reserved(unit.id))
         .filter(|unit| !memory.opening_rush.is_reserved(unit.id))
-        .filter(|unit| !memory.third_pressure.is_reserved(unit.id))
+        .filter(|unit| !memory.third_pressure.is_reserved(unit.id)
+                && !memory.jeff_v1_1.tank_raid.holds(unit.id))
         .filter(|unit| !route_line.contains(&unit.id))
         .filter(|unit| !memory.later_bases.guards.contains(&unit.id))
         .filter(|unit| !(launched_push && push.active_tanks.contains(&unit.id)))
