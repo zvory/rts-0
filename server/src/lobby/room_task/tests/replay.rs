@@ -446,6 +446,63 @@ fn replay_seek_started_reaches_every_viewer_before_incremental_results() {
 }
 
 #[test]
+fn replay_metric_history_tracks_current_unit_value() {
+    use crate::lobby::replay_resource_history::ReplayResourceHistory;
+
+    let mut game = replay_test_game(&replay_test_players(2), 0x5150_2202);
+    let mut history = ReplayResourceHistory::default();
+    history.record(&game);
+    let before = *history.samples.last().unwrap();
+    let tank = spawn_replay_test_entity(&mut game, 1, EntityKind::Tank, tile_center(10, 10));
+    for _ in 0..30 {
+        game.tick();
+    }
+    history.record(&game);
+    let after = *history.samples.last().unwrap();
+    assert!(after.unit_steel > before.unit_steel);
+    assert!(after.unit_oil > before.unit_oil);
+    let analysis = game.observer_analysis();
+    let first = analysis
+        .players
+        .iter()
+        .find(|player| player.id == 1)
+        .unwrap();
+    let second = analysis
+        .players
+        .iter()
+        .find(|player| player.id == 2)
+        .unwrap();
+    let steel = |player: &rts_protocol::ObserverAnalysisPlayer| {
+        player
+            .units
+            .iter()
+            .map(|unit| i64::from(unit.steel_value))
+            .sum::<i64>()
+    };
+    assert_eq!(after.unit_steel, steel(first) - steel(second));
+    assert_eq!(
+        after.lost_steel,
+        i64::from(first.resources_lost.steel) - i64::from(second.resources_lost.steel)
+    );
+    assert_eq!(
+        after.lost_oil,
+        i64::from(first.resources_lost.oil) - i64::from(second.resources_lost.oil)
+    );
+    delete_replay_test_entity(&mut game, tank);
+    for _ in 0..30 {
+        game.tick();
+    }
+    history.record(&game);
+    assert_eq!(
+        history.samples.last().unwrap().unit_steel,
+        before.unit_steel
+    );
+    history.truncate(30);
+    assert_eq!(history.samples.last().unwrap().tick, 30);
+    assert_eq!(history.samples.last().unwrap().unit_steel, after.unit_steel);
+}
+
+#[test]
 fn replay_join_and_seek_emit_authoritative_analysis() {
     let players = replay_test_players(2);
     let (_live, artifact) = replay_test_artifact(&players, 35);

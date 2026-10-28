@@ -63,10 +63,15 @@ import { textWithin } from "./dom_text.mjs";
   const aliveSample = sample(1230, 160, 30, 30, 10);
   aliveSample.players[0].resourcesLost = { steel: 200, oil: 5 };
   aliveSample.players[1].resourcesLost = { steel: 10, oil: 30 };
+  aliveSample.players[0].units = [{ count: 2, steelValue: 100, oilValue: 20 }];
+  aliveSample.players[1].units = [{ count: 3, steelValue: 180, oilValue: 5 }];
   aliveSample.players.reverse();
   history.record(aliveSample);
   assert(history.samples.at(-1).aliveSteel === -60 && history.samples.at(-1).aliveOil === 45,
     "alive history subtracts losses from lifetime income in stable player order, independently of collection windows");
+  assert(history.samples.at(-1).lostSteel === 190 && history.samples.at(-1).lostOil === -25
+      && history.samples.at(-1).unitSteel === -80 && history.samples.at(-1).unitOil === 15,
+    "metric history records loss and current-unit total values in stable player order without multiplying totals by count");
   const points = collectionAdvantageAreaPoints(
     [{ tick: 0, steel: 0 }, { tick: 30, steel: 10 }, { tick: 120, steel: 20 }],
     "steel",
@@ -832,6 +837,26 @@ import { textWithin } from "./dom_text.mjs";
     ] });
     assert(findFakes(root, (el) => el.classList.contains("replay-resource-advantage-chart")).length === 0,
       "backward seek replaces alive history and clears future charts without a new analysis message");
+    for (const [tab, metric] of [["resources-lost", "resources lost"], ["units", "current army value"]]) {
+      restored.selectedTab = tab;
+      overlay.render();
+      const sample = (tick, value) => ({ tick, steel: 0, oil: 0, lostSteel: value, lostOil: -value, unitSteel: -value, unitOil: value });
+      overlay.applyReplayResourceHistory({ replace: true, samples: [sample(0, 0), sample(30, 50)] });
+      const charts = findFakes(root, (el) => el.classList.contains("replay-resource-advantage-chart"));
+      assert(charts.length === 2, `${tab} renders matching steel and oil charts on history arrival`);
+      assert(findFakes(charts[0], (el) => el.getAttribute("aria-label")?.includes(metric)).length === 1,
+        `${tab} describes its own metric`);
+      const outline = findFakes(charts[0], (el) => el.getAttribute("class") === "replay-resource-advantage-outline")[0];
+      assert(outline.getAttribute("d").includes(tab === "units" ? "87.0" : "5.0"), `${tab} plots its own values`);
+      overlay.applyReplayResourceHistory({ replace: true, samples: [sample(0, 0), sample(30, -50)] });
+      assert(findFakes(root, (el) => el.classList.contains("replay-resource-advantage-chart"))[0] !== charts[0],
+        `${tab} invalidates its body when only history changes`);
+      overlay.applyReplayResourceHistory({ replace: true, samples: [sample(0, 0)] });
+      assert(findFakes(root, (el) => el.classList.contains("replay-resource-advantage-chart")).length === 0,
+        `${tab} clears future charts after a backward seek`);
+    }
+    restored.selectedTab = "alive-resources";
+    overlay.render();
     const aliveResourcesText = textWithin(root);
     assert(
       aliveResourcesText.includes("Lifetime resources still alive")

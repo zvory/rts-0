@@ -1,7 +1,7 @@
 use crate::protocol::ReplayResourceSample;
 use rts_sim::game::Game;
 
-/// Replay-owned collection and alive-resource timeline, independent of replaceable observer-analysis messages.
+/// Replay-owned observer metric timeline, independent of replaceable observer-analysis messages.
 #[derive(Default)]
 pub(super) struct ReplayResourceHistory {
     pub(super) samples: Vec<ReplayResourceSample>,
@@ -52,7 +52,26 @@ impl ReplayResourceHistory {
             _ => (0, 0),
         };
         self.totals.push((tick, steel, oil));
+        let unit_value = |index: usize, oil: bool| -> i64 {
+            players[index]
+                .units
+                .iter()
+                .map(|unit| {
+                    i64::from(if oil {
+                        unit.oil_value
+                    } else {
+                        unit.steel_value
+                    })
+                })
+                .sum()
+        };
         self.samples.push(ReplayResourceSample {
+            lost_steel: i64::from(players[0].resources_lost.steel)
+                - i64::from(players[1].resources_lost.steel),
+            lost_oil: i64::from(players[0].resources_lost.oil)
+                - i64::from(players[1].resources_lost.oil),
+            unit_steel: unit_value(0, false) - unit_value(1, false),
+            unit_oil: unit_value(0, true) - unit_value(1, true),
             tick,
             steel: window_steel,
             oil: window_oil,

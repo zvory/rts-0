@@ -3,6 +3,13 @@ import { resourceIconHtml, resourceValueElement } from "./resource_icons.js";
 import { HARVEST_TICKS, OIL_LOAD, TICK_HZ } from "./config.js";
 
 const SAMPLE_INTERVAL_TICKS = 30;
+const HISTORY_METRICS = Object.freeze({
+  collection: { label: "collection", fields: ["steel", "oil"], minExtent: true },
+  alive: { label: "alive resources", fields: ["aliveSteel", "aliveOil"] },
+  lost: { label: "resources lost", fields: ["lostSteel", "lostOil"] },
+  units: { label: "current army value", fields: ["unitSteel", "unitOil"] },
+});
+const HISTORY_FIELDS = Object.values(HISTORY_METRICS).flatMap((metric) => metric.fields);
 const SVG_NS = "http://www.w3.org/2000/svg";
 export const RESOURCE_COLLECTION_WINDOW_SECONDS = 8;
 const COLLECTION_WINDOW_TICKS = TICK_HZ * RESOURCE_COLLECTION_WINDOW_SECONDS;
@@ -31,13 +38,12 @@ export class ResourceCollectionHistory {
       const oil = Number(entry?.oil);
       if (!Number.isSafeInteger(steel) || !Number.isSafeInteger(oil)) continue;
       if (this.samples.length && this.samples.at(-1).tick >= tick) continue;
-      const aliveSteel = Number(entry?.aliveSteel);
-      const aliveOil = Number(entry?.aliveOil);
-      this.samples.push({
-        tick, steel, oil,
-        aliveSteel: Number.isSafeInteger(aliveSteel) ? aliveSteel : null,
-        aliveOil: Number.isSafeInteger(aliveOil) ? aliveOil : null,
-      });
+      const sample = { tick };
+      for (const field of HISTORY_FIELDS) {
+        const value = entry?.[field];
+        sample[field] = Number.isSafeInteger(value) ? value : null;
+      }
+      this.samples.push(sample);
     }
     this.revision += 1;
   }
@@ -52,7 +58,7 @@ export class ResourceCollectionHistory {
 
     const ids = players.map((player) => player.id).sort((a, b) => a - b);
     const last = this.samples[this.samples.length - 1];
-    if (last && (last.playerIds[0] !== ids[0] || last.playerIds[1] !== ids[1])) {
+    if (last && (last.playerIds?.[0] !== ids[0] || last.playerIds?.[1] !== ids[1])) {
       this.samples = [];
     } else if (last && tick < last.tick) {
       this.samples = this.samples.filter((sample) => sample.tick <= tick);
@@ -81,12 +87,21 @@ export class ResourceCollectionHistory {
       playerIds: ids,
       cumulativeSteel,
       cumulativeOil,
+      lostSteel: (first.resourcesLost?.steel || 0) - (second.resourcesLost?.steel || 0),
+      lostOil: (first.resourcesLost?.oil || 0) - (second.resourcesLost?.oil || 0),
+      unitSteel: unitValue(first, "steelValue") - unitValue(second, "steelValue"),
+      unitOil: unitValue(first, "oilValue") - unitValue(second, "oilValue"),
       aliveSteel: cumulativeSteel - (first.resourcesLost?.steel || 0) + (second.resourcesLost?.steel || 0),
       aliveOil: cumulativeOil - (first.resourcesLost?.oil || 0) + (second.resourcesLost?.oil || 0),
       steel: hasWindowBaseline ? cumulativeSteel - baseline.cumulativeSteel : 0,
       oil: hasWindowBaseline ? cumulativeOil - baseline.cumulativeOil : 0,
     });
+    this.revision += 1;
   }
+}
+
+function unitValue(player, field) {
+  return (player.units || []).reduce((total, unit) => total + (unit[field] || 0), 0);
 }
 
 export function normalizeResourceWindows(resources) {
@@ -110,7 +125,7 @@ export function renderResourcesMetric({ analysis, players, collectionHistory = [
     return wrap;
   }
 
-  wrap.appendChild(renderCollectionAdvantage({
+  wrap.appendChild(renderMetricAdvantage({
     rows,
     samples: collectionHistory,
     currentTick: analysis.tick,
@@ -167,16 +182,59 @@ export function renderAliveResourcesMetric({ analysis, players, collectionHistor
     return wrap;
   }
 
-  wrap.appendChild(renderCollectionAdvantage({
+  wrap.appendChild(renderMetricAdvantage({
     rows,
-    samples: collectionHistory.filter((sample) => Number.isSafeInteger(sample.aliveSteel) && Number.isSafeInteger(sample.aliveOil))
-      .map((sample) => ({ tick: sample.tick, steel: sample.aliveSteel, oil: sample.aliveOil })),
+    samples: collectionHistory,
     currentTick: analysis.tick,
-    metric: "alive resources",
+    metric: "alive",
   }));
 
   for (const player of rows) {
     wrap.appendChild(renderAliveResourcesRow(player));
+  }
+  return wrap;
+}
+
+export function renderResourcesLostMetric({ analysis, players, collectionHistory = [] }) {
+  const wrap = renderAnalysisMetric("replay-resources-lost", "Destroyed resource value");
+  const note = document.createElement("div");
+  note.className = "replay-analysis-note";
+  note.textContent = "Spent steel and oil value of units and buildings that were destroyed. Cancelled queues, refunds, harvesting, and stockpile changes are excluded. Higher graph values mean more resources lost.";
+  wrap.appendChild(note);
+
+  const rows = playerAnalysisRows({ analysis, players });
+  if (!analysis) {
+    wrap.appendChild(renderEmptyMetric("Waiting for observer analysis"));
+    return wrap;
+  }
+  if (!rows.length) {
+    wrap.appendChild(renderEmptyMetric("No players"));
+    return wrap;
+  }
+
+  wrap.appendChild(renderMetricAdvantage({ rows, samples: collectionHistory, currentTick: analysis.tick, metric: "lost" }));
+
+  const total = rows.reduce((acc, player) => {
+    acc.steel += player.resourcesLost.steel;
+    acc.oil += player.resourcesLost.oil;
+    return acc;
+  }, { steel: 0, oil: 0 });
+  wrap.appendChild(renderResourceLostRow({
+    className: "replay-resources-lost-row is-total",
+    name: "Total",
+    color: "#e7dfc5",
+    steel: total.steel,
+    oil: total.oil,
+  }));
+
+  for (const player of rows) {
+    wrap.appendChild(renderResourceLostRow({
+      className: "replay-resources-lost-row",
+      name: player.name,
+      color: player.color,
+      steel: player.resourcesLost.steel,
+      oil: player.resourcesLost.oil,
+    }));
   }
   return wrap;
 }
@@ -187,28 +245,38 @@ const RESOURCE_WINDOWS = [
   { label: "Lifetime", resourceKey: "lifetime" },
 ];
 
-function renderCollectionAdvantage({ rows, samples, currentTick, metric = "collection" }) {
+export function renderMetricAdvantage({ rows, samples, currentTick, metric = "collection" }) {
+  const descriptor = HISTORY_METRICS[metric];
+  const metricLabel = descriptor.label;
+  samples = (samples || []).filter((sample) => descriptor.fields.every((field) => Number.isSafeInteger(sample[field])));
   const section = document.createElement("section");
   section.className = "replay-resource-advantage";
 
   if (rows.length !== 2) {
-    section.appendChild(renderEmptyMetric(`${metric === "collection" ? "Collection" : "Alive resource"} graphs are shown for 1v1 replays.`));
+    section.appendChild(renderEmptyMetric(`${metricLabel} graphs are shown for 1v1 replays.`));
     return section;
   }
 
   if (!Array.isArray(samples) || samples.length < 2) {
-    section.appendChild(renderEmptyMetric(`Play the replay to build its ${metric} timeline.`));
+    section.appendChild(renderEmptyMetric(`Play the replay to build its ${metricLabel} timeline.`));
     return section;
   }
 
-  section.append(
-    renderAdvantageChart({ resource: "steel", label: "Steel", rows, samples, currentTick, metric, serial: 0 }),
-    renderAdvantageChart({ resource: "oil", label: "Oil", rows, samples, currentTick, metric, serial: 1 }),
-  );
+  for (const [index, resource] of ["steel", "oil"].entries()) {
+    section.appendChild(renderAdvantageChart({
+      resource,
+      label: resource === "steel" ? "Steel" : "Oil",
+      rows, samples, currentTick,
+      metric: metricLabel,
+      field: descriptor.fields[index],
+      minExtent: descriptor.minExtent ? RESOURCE_ADVANTAGE_MIN_EXTENT[resource] : 0,
+      serial: index,
+    }));
+  }
   return section;
 }
 
-function renderAdvantageChart({ resource, label, rows, samples, currentTick, metric, serial }) {
+function renderAdvantageChart({ resource, label, rows, samples, currentTick, metric, field, minExtent, serial }) {
   const width = 420;
   const chartHeight = 92;
   const labelHeight = 18;
@@ -216,17 +284,17 @@ function renderAdvantageChart({ resource, label, rows, samples, currentTick, met
   const mid = chartHeight / 2;
   const points = collectionAdvantageAreaPoints(
     samples,
-    resource,
+    field,
     width - plotLeft,
     chartHeight,
-    metric === "collection" ? RESOURCE_ADVANTAGE_MIN_EXTENT[resource] : 0,
+    minExtent,
     currentTick,
   )
     .map((point) => ({ ...point, x: point.x + plotLeft }));
   const curve = points.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" L ");
   const area = `M ${plotLeft},${mid} L ${curve} L ${width},${mid} Z`;
-  const clipTopId = `resource-advantage-top-${resource}-${serial}`;
-  const clipBottomId = `resource-advantage-bottom-${resource}-${serial}`;
+  const clipTopId = `resource-advantage-top-${field}-${serial}`;
+  const clipBottomId = `resource-advantage-bottom-${field}-${serial}`;
 
   const figure = document.createElement("figure");
   figure.className = "replay-resource-advantage-chart";
@@ -404,4 +472,24 @@ function renderAliveResourcesRow(player) {
 
 function safeCssColor(color) {
   return typeof color === "string" && /^#[0-9a-fA-F]{3,8}$/.test(color) ? color : "#e7dfc5";
+}
+
+function renderResourceLostRow({ className, name, color, steel, oil }) {
+  const row = document.createElement("div");
+  row.className = className;
+
+  const swatch = document.createElement("span");
+  swatch.className = "replay-analysis-player-swatch";
+  swatch.setAttribute("style", `background:${safeCssColor(color)};`);
+  swatch.setAttribute("aria-hidden", "true");
+
+  const nameEl = document.createElement("span");
+  nameEl.className = "replay-resources-lost-name";
+  nameEl.textContent = name;
+
+  const steelEl = resourceValueElement("steel", steel, "replay-resources-lost-steel");
+  const oilEl = resourceValueElement("oil", oil, "replay-resources-lost-oil");
+
+  row.append(swatch, nameEl, steelEl, oilEl);
+  return row;
 }
