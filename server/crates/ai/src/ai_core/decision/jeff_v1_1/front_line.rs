@@ -20,7 +20,10 @@
 //! - **Breaking**: facing `BREAK_RATIO` of its strength in sight, or having lost `BREAK_LOSS_SHARE`
 //!   of it over `LOSS_TICKS`, the line breaks: for `BROKEN_TICKS` it holds no unit, and every unit
 //!   falls back to V1.0's defence of the bases (the home pocket, raid response, the resting Tanks'
-//!   gathering), then the line forms again.
+//!   gathering), then the line forms again. It breaks the same way when a base behind it is hit:
+//!   enemy strength within `BASE_ATTACK_TILES` of the main's Depot worth `MAIN_BREAK_VALUE`, or of
+//!   any Depot worth `BASE_BREAK_SHARE` of the line's. Against Pressure AI, with the line out at
+//!   the forward bases, 5 of 16 games ended 7:15-7:55 with the main's Depot shot down.
 
 use super::*;
 use crate::ai_core::decision::geometry::{building_center, dist2, squared, tile_center};
@@ -46,6 +49,10 @@ const FALL_RATIO: f32 = 1.2;
 const BREAK_RATIO: f32 = 1.5;
 const BREAK_LOSS_SHARE: f32 = 0.4;
 const BROKEN_TICKS: u32 = config::TICK_HZ * 30;
+const BASE_ATTACK_TILES: f32 = 16.0;
+/// Two Tanks' worth (each its cost, Oil counted double).
+const MAIN_BREAK_VALUE: f32 = 1500.0;
+const BASE_BREAK_SHARE: f32 = 0.6;
 /// Enemy fighters in sight this close to the line's centre weigh against it.
 const NEAR_LINE_TILES: f32 = 18.0;
 /// Most units within this of their posts: the line is settled.
@@ -84,6 +91,8 @@ pub(in crate::ai_core::decision) struct FrontLineMemory {
     tanks: usize,
     /// The line stands broken until then.
     broken_until: u32,
+    /// The line's middle, last decision, where a raid falls back to.
+    middle: Option<(i32, i32)>,
 }
 
 impl FrontLineMemory {
@@ -93,6 +102,11 @@ impl FrontLineMemory {
 
     pub(in crate::ai_core::decision) fn units(&self) -> impl Iterator<Item = u32> + '_ {
         self.members.keys().copied()
+    }
+
+    /// Where the line stands, while it holds.
+    pub(in crate::ai_core::decision) fn rally(&self) -> Option<(f32, f32)> {
+        self.middle.map(|(x, y)| (x as f32, y as f32))
     }
 }
 
@@ -179,6 +193,16 @@ pub(in crate::ai_core::decision) fn hold(
     let Some(axis) = normalized_direction(main, enemy_main) else {
         return;
     };
+    let depots: Vec<(f32, f32)> = observation
+        .owned
+        .iter()
+        .filter(|unit| unit.kind == EntityKind::ResourceDepot && unit.hp > 0)
+        .map(|unit| (unit.x, unit.y))
+        .collect();
+    let main_depot = depots
+        .iter()
+        .copied()
+        .find(|depot| dist2(depot.0, depot.1, main.0, main.1) <= squared(4.0 * ts));
     let across = (-axis.1, axis.0);
     // The frontier: Jeff's extractors, and the Steel and Oil at the sites it is about to take.
     let mut anchors: Vec<(f32, f32)> = observation
@@ -246,8 +270,17 @@ pub(in crate::ai_core::decision) fn hold(
             .count();
         let settled = !state.members.is_empty()
             && on_post as f32 >= state.members.len() as f32 * SETTLED_SHARE;
+        let main_hit = attack_value(observation, main_depot, ts);
+        let base_hit = depots
+            .iter()
+            .map(|depot| attack_value(observation, Some(*depot), ts))
+            .fold(0.0, f32::max);
+        let base_attacked = !super::off("linehome")
+            && (main_hit >= MAIN_BREAK_VALUE || base_hit >= strength * BASE_BREAK_SHARE);
         if !super::off("linebreak")
-            && (lost >= strength * BREAK_LOSS_SHARE || enemy_near >= strength * BREAK_RATIO)
+            && (base_attacked
+                || lost >= strength * BREAK_LOSS_SHARE
+                || enemy_near >= strength * BREAK_RATIO)
         {
             state.broken_until = tick + BROKEN_TICKS;
             state.back = (MAX_BACK_TILES * 10.0) as u32;
@@ -273,6 +306,7 @@ pub(in crate::ai_core::decision) fn hold(
         state.members.clear();
         state.ordered.clear();
         state.tanks = 0;
+        state.middle = None;
         return;
     }
     let line_depth = frontier + (AHEAD_TILES - memory.jeff_v1_1.front_line.back as f32 / 10.0) * ts;
@@ -458,6 +492,7 @@ pub(in crate::ai_core::decision) fn hold(
     }
     let charging = memory.jeff_v1_1.charge.riflemen.clone();
     let state = &mut memory.jeff_v1_1.front_line;
+    state.middle = Some((centre.0.round() as i32, centre.1.round() as i32));
     state.members = assignments
         .iter()
         .map(|(unit, _)| (unit.id, super::push::unit_value(unit.kind)))
@@ -600,4 +635,18 @@ fn seat<'u>(
     let mut posts = posts.to_vec();
     posts.sort_by(|a, b| lateral(a.0, a.1).total_cmp(&lateral(b.0, b.1)));
     units.into_iter().zip(posts).collect()
+}
+
+/// Enemy fighters in sight within `BASE_ATTACK_TILES` of `depot`, by value.
+fn attack_value(observation: &AiObservation, depot: Option<(f32, f32)>, ts: f32) -> f32 {
+    let Some(depot) = depot else {
+        return 0.0;
+    };
+    observation
+        .visible_enemies
+        .iter()
+        .filter(|enemy| enemy.hp > 0 && enemy.kind.is_unit() && enemy.kind != EntityKind::Worker)
+        .filter(|enemy| dist2(enemy.x, enemy.y, depot.0, depot.1) <= squared(BASE_ATTACK_TILES * ts))
+        .map(|enemy| super::push::unit_value(enemy.kind) as f32)
+        .sum()
 }

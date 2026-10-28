@@ -13,7 +13,13 @@
 //!   to the side, whichever passes the least remembered enemy strength; a route past more than
 //!   `ROUTE_SHARE` of the party's is not taken. It moves, not attack-moves, so it is not drawn into
 //!   the fights it goes around, and looks again as it goes.
-//! - **Hit and run**: at the base it shoots the Depot first, then the extractors and the rest. Once
+//! - **Depots only**: a Depot's extractors decay to nothing within 20 s of it (#1707), so a raid
+//!   goes only for Depots it has seen (the scout finds them; 16 of 27 raids on likely sites found
+//!   none), parks `SIGHT_STANDOFF_TILES` from it (`RANGED_STANDOFF_TILES` with its Scout Car to see
+//!   for it), and once parked `RAMP_TICKS`, when a Tank reaches 14 tiles, shells it: 180 HP, one
+//!   volley of three. It leaves once the Depot is down. It used to drive in to 5 tiles past the
+//!   extractors, firing its first shell at the Depot 9 s after arriving.
+//! - **Hit and run**: once
 //!   enemy strength in sight near it reaches `RUN_SHARE` of its own (a Depot has 180 HP, one volley
 //!   of three Tanks, so it need only get there; run at 40% a lone Tank turned every raid back), or its Tanks
 //!   are down to `LOW_HP` of their health, it steps `BREAK_TILES` away from the danger, makes for
@@ -52,6 +58,15 @@ const REST_TICKS: u32 = config::TICK_HZ * 20;
 const REORDER_TICKS: u32 = config::TICK_HZ * 2;
 /// A base with no building seen within this of it, while a party unit is this close, is cleared.
 const CLEARED_TILES: f32 = 8.0;
+const SIGHT_STANDOFF_TILES: f32 = 8.0;
+const RANGED_STANDOFF_TILES: f32 = 11.0;
+const SLOT_SPACING_TILES: f32 = 2.5;
+/// A Tank this close to its slot is parked there.
+const PARK_TILES: f32 = 1.5;
+/// A parked Tank's range reaches 14 tiles after 3 s.
+const RAMP_TICKS: u32 = config::TICK_HZ * 7 / 2;
+/// A Depot this close to the target point is the one raided.
+const DEPOT_TILES: f32 = 6.0;
 /// Running, the party first steps this far away from the danger.
 const BREAK_TILES: f32 = 12.0;
 /// The Scout Car falls back to the Tanks from enemy fighters this close.
@@ -78,6 +93,8 @@ pub(in crate::ai_core::decision) struct TankRaidMemory {
     rest_until: u32,
     /// The party's strength and the danger near it at the last decision, for the decision log.
     weighed: (u32, u32),
+    /// Since when the party has stood parked on its slots at the Depot.
+    parked_since: Option<u32>,
 }
 
 impl TankRaidMemory {
@@ -160,7 +177,13 @@ pub(in crate::ai_core::decision) fn raid(
         tanks.iter().map(|unit| unit.x).sum::<f32>() / n,
         tanks.iter().map(|unit| unit.y).sum::<f32>() / n,
     );
-    let home = nearest_depot(observation, center).unwrap_or_else(|| home_point(observation));
+    let home = memory
+        .jeff_v1_1
+        .front_line
+        .rally()
+        .filter(|_| !super::off("raidline"))
+        .or_else(|| nearest_depot(observation, center))
+        .unwrap_or_else(|| home_point(observation));
     let strength = party_strength(&tanks);
     let danger = danger_near(observation, &tanks);
     let away = danger_centre(observation, center);
@@ -225,9 +248,9 @@ pub(in crate::ai_core::decision) fn raid(
                 .iter()
                 .filter(|unit| memory.jeff_v1_1.tank_raid.holds(unit.id))
                 .any(|unit| dist2(unit.x, unit.y, target.0, target.1) <= squared(CLEARED_TILES * ts));
-            let standing = buildings_at(observation, target, ts);
-            if standing.is_empty() && in_sight {
-                // Cleared: on to the next base while healthy, else home.
+            if visible_depot(observation, target, ts).is_none() && in_sight {
+                // The Depot is down, or was never there: its extractors decay on their own. On to the
+                // next base while healthy and unseen, else home.
                 let next = (health >= SET_OUT_HP && danger == 0.0)
                     .then(|| choose_target(observation, analysis, memory, center, enemy_main, strength))
                     .flatten();
@@ -435,7 +458,10 @@ fn choose_target(
     strength: f32,
 ) -> Option<((f32, f32), Vec<(i32, i32)>)> {
     let ts = observation.map.tile_size as f32;
-    let found = super::push::raid_candidates(observation, analysis, memory, enemy_main);
+    let found: Vec<((f32, f32), f32)> = super::push::known_depots(observation, memory, enemy_main)
+        .into_iter()
+        .map(|at| (at, 1.0))
+        .collect();
     let hot: Vec<(f32, f32)> = memory.jeff_v1_1.tank_raid.hot.keys().map(|at| point(*at)).collect();
     let mut best: Option<(f32, (f32, f32), Vec<(i32, i32)>)> = None;
     for (at, worth) in found {
@@ -551,6 +577,7 @@ fn go_home(
         })
         .unwrap_or(from);
     state.phase = Some(Phase::Home);
+    state.parked_since = None;
     state.route = std::iter::once(start)
         .filter(|at| *at != from)
         .chain(analysis.compact_group_route(start, home, 4).into_iter())
@@ -586,6 +613,10 @@ fn order(
         }
         state.leg += 1;
         state.ordered = 0;
+    }
+    if phase == Phase::Hit {
+        shell_depot(actions, observation, memory, intents, tanks, center, ts);
+        return;
     }
     if tick.saturating_sub(state.ordered) < REORDER_TICKS {
         return;
@@ -631,31 +662,111 @@ fn order(
             }
             intents.push(AiIntent::Assemble { units: moved });
         }
-        Phase::Hit => {
-            let target = state.target.map(point).unwrap_or(center);
-            match buildings_at(observation, target, ts).first() {
-                Some(building) => {
-                    if let Some(units) = actions::attack_units(actions, tanks.iter().copied(), building.id) {
-                        intents.push(AiIntent::Attack { units });
-                    }
-                }
-                None => {
-                    actions::attack_move_units(actions, tanks.iter().copied(), target.0, target.1);
-                    intents.push(AiIntent::Attack { units: tanks.to_vec() });
+        Phase::Hit => {}
+    }
+}
+
+/// The raid at its Depot: Tanks to slots `SIGHT_STANDOFF_TILES` (`RANGED_STANDOFF_TILES` with the
+/// Scout Car) out from it on their side, held there, and once parked `RAMP_TICKS` set on it. Not
+/// yet in sight, they close on the target point.
+fn shell_depot(
+    actions: &mut AiActionContext<'_>,
+    observation: &AiObservation,
+    memory: &mut AiDecisionMemory,
+    intents: &mut Vec<AiIntent>,
+    tanks: &[u32],
+    center: (f32, f32),
+    ts: f32,
+) {
+    let tick = observation.tick;
+    let state = &mut memory.jeff_v1_1.tank_raid;
+    let target = state.target.map(point).unwrap_or(center);
+    let scout = state.scout;
+    let due = tick.saturating_sub(state.ordered) >= REORDER_TICKS;
+    let Some(depot) = visible_depot(observation, target, ts) else {
+        state.parked_since = None;
+        if due {
+            state.ordered = tick;
+            actions::move_units(actions, tanks.iter().copied(), target.0, target.1);
+            let mut moved = tanks.to_vec();
+            if let Some(scout) = scout {
+                actions::move_units(actions, [scout], target.0, target.1);
+                moved.push(scout);
+            }
+            intents.push(AiIntent::Assemble { units: moved });
+        }
+        return;
+    };
+    let standoff = if scout.is_some() { RANGED_STANDOFF_TILES } else { SIGHT_STANDOFF_TILES };
+    let back = normalized_direction((depot.x, depot.y), center).unwrap_or((1.0, 0.0));
+    let across = (-back.1, back.0);
+    let n = tanks.len();
+    let mut slots: Vec<(f32, f32)> = (0..n)
+        .map(|index| {
+            let side = (index as f32 - (n as f32 - 1.0) * 0.5) * SLOT_SPACING_TILES;
+            clamp_to_map(
+                (
+                    depot.x + (back.0 * standoff + across.0 * side) * ts,
+                    depot.y + (back.1 * standoff + across.1 * side) * ts,
+                ),
+                observation.map,
+            )
+        })
+        .collect();
+    let lateral = |x: f32, y: f32| x * across.0 + y * across.1;
+    let mut party: Vec<&AiEntitySummary> = observation
+        .owned
+        .iter()
+        .filter(|unit| tanks.contains(&unit.id))
+        .collect();
+    party.sort_by(|a, b| lateral(a.x, a.y).total_cmp(&lateral(b.x, b.y)).then(a.id.cmp(&b.id)));
+    slots.sort_by(|a, b| lateral(a.0, a.1).total_cmp(&lateral(b.0, b.1)));
+    let parked = party
+        .iter()
+        .zip(&slots)
+        .all(|(unit, slot)| dist2(unit.x, unit.y, slot.0, slot.1) <= squared(PARK_TILES * ts));
+    if parked {
+        let first = state.parked_since.is_none();
+        let since = *state.parked_since.get_or_insert(tick);
+        if first {
+            actions::hold_position_units(actions, tanks.iter().copied());
+        } else if tick.saturating_sub(since) >= RAMP_TICKS && due {
+            state.ordered = tick;
+            if let Some(units) = actions::attack_units(actions, tanks.iter().copied(), depot.id) {
+                intents.push(AiIntent::Attack { units });
+            }
+        }
+    } else {
+        state.parked_since = None;
+        if due {
+            state.ordered = tick;
+            let mut moved = Vec::new();
+            for (unit, slot) in party.iter().zip(&slots) {
+                if dist2(unit.x, unit.y, slot.0, slot.1) > squared(PARK_TILES * ts) {
+                    actions::move_units(actions, [unit.id], slot.0, slot.1);
+                    moved.push(unit.id);
                 }
             }
-            if let Some(scout) = scout {
-                // The Scout Car watches from behind the Tanks.
-                let back = normalized_direction(target, center).unwrap_or((0.0, 0.0));
-                let spot = clamp_to_map(
-                    (center.0 + back.0 * 4.0 * ts, center.1 + back.1 * 4.0 * ts),
-                    observation.map,
-                );
-                actions::move_units(actions, [scout], spot.0, spot.1);
-                intents.push(AiIntent::Assemble { units: vec![scout] });
+            if !moved.is_empty() {
+                intents.push(AiIntent::Assemble { units: moved });
             }
         }
     }
+    if let Some(scout) = scout {
+        // The Scout Car stands with the Tanks and sees the Depot for them.
+        if due {
+            actions::move_units(actions, [scout], center.0, center.1);
+        }
+    }
+}
+
+/// The enemy Depot standing within `DEPOT_TILES` of `at`, in sight.
+fn visible_depot(observation: &AiObservation, at: (f32, f32), ts: f32) -> Option<&AiEntitySummary> {
+    observation
+        .visible_enemies
+        .iter()
+        .filter(|enemy| enemy.kind == EntityKind::ResourceDepot && enemy.hp > 0)
+        .find(|enemy| dist2(enemy.x, enemy.y, at.0, at.1) <= squared(DEPOT_TILES * ts))
 }
 
 /// The decision-log line: phase, target, party, way and the strength weighed.

@@ -524,6 +524,24 @@ pub(in crate::ai_core::decision) fn raid_candidates(
         .collect()
 }
 
+/// The enemy Depots seen and not since seen gone, the enemy main's left out.
+pub(in crate::ai_core::decision) fn known_depots(
+    observation: &AiObservation,
+    memory: &AiDecisionMemory,
+    enemy_main: (f32, f32),
+) -> Vec<(f32, f32)> {
+    let ts = observation.map.tile_size as f32;
+    memory
+        .jeff_v1_1
+        .push
+        .buildings
+        .values()
+        .filter(|building| building.kind == EntityKind::ResourceDepot)
+        .map(|building| point(building.at))
+        .filter(|at| dist2(at.0, at.1, enemy_main.0, enemy_main.1) > squared(BASE_TILES * ts))
+        .collect()
+}
+
 /// The nearest living enemy's start.
 pub(in crate::ai_core::decision) fn enemy_main(observation: &AiObservation) -> Option<(f32, f32)> {
     enemy_player(observation).map(|player| tile_center(player.start_tile, observation.map.tile_size))
