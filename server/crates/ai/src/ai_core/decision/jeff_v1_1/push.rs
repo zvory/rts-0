@@ -91,6 +91,7 @@ const TRAVEL_TILES: f32 = 60.0;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(in crate::ai_core::decision) struct Sighting {
     tick: u32,
+    kind: EntityKind,
     value: u32,
     at: (i32, i32),
 }
@@ -181,7 +182,8 @@ pub(in crate::ai_core::decision) fn note_enemy_army(
         let at = stored((enemy.x, enemy.y));
         if is_fighter(enemy.kind) {
             let value = unit_value(enemy.kind);
-            push.enemies.insert(enemy.id, Sighting { tick, value, at });
+            let kind = enemy.kind;
+            push.enemies.insert(enemy.id, Sighting { tick, kind, value, at });
         } else if enemy.kind.is_building() {
             let kind = enemy.kind;
             push.buildings.insert(enemy.id, BuildingSighting { kind, at });
@@ -200,6 +202,17 @@ pub(in crate::ai_core::decision) fn note_enemy_army(
     });
     push.buildings
         .retain(|id, building| seen.contains(id) || !in_sight(building.at));
+}
+
+/// The enemy Tanks remembered (seen within `ARMY_FADE_TICKS` and not since seen gone).
+pub(in crate::ai_core::decision) fn remembered_tanks(memory: &AiDecisionMemory) -> usize {
+    memory
+        .jeff_v1_1
+        .push
+        .enemies
+        .values()
+        .filter(|sighting| sighting.kind == EntityKind::Tank)
+        .count()
 }
 
 /// Remembered enemy strength within `radius_tiles` of `at`, each fighter fading with age.

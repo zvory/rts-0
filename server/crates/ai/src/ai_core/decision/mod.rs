@@ -870,7 +870,9 @@ where
         memory,
         &mut effective_unit_priorities,
     );
-    let rifle_line =jeff_v1_1::rifle_line(profile.id, &facts, banked, &mut effective_unit_priorities);
+    let fausts = jeff_v1_1::faust_target(profile.id, &facts, memory, banked);
+    let rifle_line =
+        jeff_v1_1::rifle_line(profile.id, &facts, (banked, fausts), &mut effective_unit_priorities);
     let production_unit_counts =
         unit_counts_for_priorities(observation, &facts, profile, &effective_unit_priorities);
     let mut production_max_counts = production_max_counts(profile, observation, map_analysis);
@@ -879,7 +881,7 @@ where
     jeff_v1_1::gun_cap(
         profile,
         &facts,
-        (v1_1_plan, banked),
+        (v1_1_plan, banked, fausts),
         &intents,
         &mut production_max_counts,
     );

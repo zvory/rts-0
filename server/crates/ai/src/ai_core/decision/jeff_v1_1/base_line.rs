@@ -84,6 +84,9 @@ const MIN_REORDER_TICKS: u32 = config::TICK_HZ * 2;
 const ALARM_TILES: f32 = 12.0;
 /// Responders from another base join until the response outweighs the contact this much.
 const ALARM_MARGIN: f32 = 1.2;
+/// Enemy Tanks this close to a base's Depot or mines (inside their 14-tile stationary reach of it)
+/// draw every resting Tank to that base's line.
+const TANK_ALARM_TILES: f32 = 16.0;
 /// Responders are sent again this often.
 const ALARM_REORDER_TICKS: u32 = config::TICK_HZ * 2;
 
@@ -237,6 +240,21 @@ impl BaseLine {
             Class::Gun => self.gun_points(wanted, ts),
             Class::Tank => self.tank_points(wanted, ts),
         }
+    }
+
+    /// The enemy Tanks in sight within `TANK_ALARM_TILES` of the Depot or a mine.
+    fn enemy_tanks(&self, observation: &AiObservation) -> usize {
+        let reach = squared(TANK_ALARM_TILES * observation.map.tile_size as f32);
+        observation
+            .visible_enemies
+            .iter()
+            .filter(|enemy| enemy.kind == EntityKind::Tank && enemy.hp > 0)
+            .filter(|enemy| {
+                std::iter::once(&self.origin)
+                    .chain(self.mines.iter())
+                    .any(|site| dist2(enemy.x, enemy.y, site.0, site.1) <= reach)
+            })
+            .count()
     }
 
     /// The enemy fighters in sight within `ALARM_TILES` of the Depot or a mine: their value and
@@ -654,13 +672,22 @@ pub(in crate::ai_core::decision) fn hold(
     };
     let mut by_exposure: Vec<usize> = (0..lines.len()).collect();
     by_exposure.sort_by_key(|index| (std::cmp::Reverse(lines[*index].exposure), *index));
+    // Enemy Tanks at a base draw every resting Tank to it, so they fight together: Tank waves of
+    // 5-8 took the natural's and third's extractors from 1-3 Jeff Tanks while more stood elsewhere.
+    let besieged = lines
+        .iter()
+        .enumerate()
+        .map(|(index, line)| (line.enemy_tanks(observation), index))
+        .filter(|(tanks, _)| *tanks > 0)
+        .max()
+        .map(|(_, index)| index)
+        .filter(|_| !super::off("converge"));
     let tank_weights: Vec<usize> = (0..lines.len())
-        .map(|index| {
-            if by_exposure[..groups.min(lines.len())].contains(&index) {
-                lines[index].exposure
-            } else {
-                0
-            }
+        .map(|index| match besieged {
+            Some(besieged) if besieged == index => lines[index].exposure.max(1),
+            Some(_) => 0,
+            None if by_exposure[..groups.min(lines.len())].contains(&index) => lines[index].exposure,
+            None => 0,
         })
         .collect();
     let previous = &memory.jeff_v1_1.base_lines.posts;

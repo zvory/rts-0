@@ -88,6 +88,8 @@ pub(super) struct LaterBases {
     guard_release_tick: Option<u32>,
     /// Jeff's AI V1.1 takes bases by escort and bank (`jeff_v1_1::third_base`).
     v1_1: bool,
+    /// V1.1: each Steel node's fullest reading and where it lies.
+    steel_start: BTreeMap<u32, (u32, (i32, i32))>,
 }
 
 /// What the rest of the decision needs from this cycle.
@@ -142,6 +144,9 @@ where
     note_dry_wells(observation, &mut memory.later_bases);
     let v1_1 = is_jeff_v1_1(profile.id);
     memory.later_bases.v1_1 = v1_1;
+    if v1_1 && !jeff_v1_1::off("steelunlock") {
+        note_low_steel(observation, &mut memory.later_bases);
+    }
     jeff_v1_1::third_base::note_bank(observation, memory, profile.id);
     let Some(expansion) = profile.expansion else {
         return status;
@@ -703,6 +708,45 @@ fn guard_post_slots(
         slots.push(chosen.unwrap_or(site));
     }
     slots
+}
+
+/// Jeff's AI V1.1: a base with half its Steel mined unlocks one more base, as a dry oil well does.
+/// The main's first Steel Mine ran dry at 6:57 in every one of eight games against Pressure AI,
+/// with no base yet taken to replace it; Pressure stood on five by then.
+fn note_low_steel(observation: &AiObservation, state: &mut LaterBases) {
+    let ts = observation.map.tile_size as f32;
+    for node in observation
+        .resources
+        .iter()
+        .filter(|node| node.kind == EntityKind::Steel)
+    {
+        let at = (node.x.round() as i32, node.y.round() as i32);
+        let entry = state.steel_start.entry(node.id).or_insert((node.remaining, at));
+        entry.0 = entry.0.max(node.remaining);
+    }
+    for depot in observation
+        .owned
+        .iter()
+        .filter(|unit| unit.kind == EntityKind::ResourceDepot && unit.is_complete && unit.hp > 0)
+    {
+        let (mut start, mut left) = (0_u64, 0_u64);
+        for (id, (full, at)) in &state.steel_start {
+            if dist2(at.0 as f32, at.1 as f32, depot.x, depot.y)
+                > squared(BASE_MINING_RANGE_TILES * ts)
+            {
+                continue;
+            }
+            start += u64::from(*full);
+            left += observation
+                .resources
+                .iter()
+                .find(|node| node.id == *id)
+                .map_or(0, |node| u64::from(node.remaining));
+        }
+        if start > 0 && left * 2 < start {
+            state.unlocking_depots.insert(depot.id);
+        }
+    }
 }
 
 /// Record live readings of the wells under Jeff's Pump Jacks, and mark a base the first time one
