@@ -4,8 +4,9 @@
 //! then sent the Tanks out as one push.
 //!
 //! - **Line**: `AHEAD_TILES` in front of Jeff's frontier, across the way from its main to the enemy
-//!   main: the frontier is the most forward of its Depots and the sites it is about to take (the
-//!   natural's, the next later base's), so the line moves up as Jeff expands, and its middle sits
+//!   main: the frontier is the most forward of its Steel Mines and Pump Jacks and of the Steel and
+//!   Oil at the sites it is about to take (the natural's, the next later base's), not the Depots,
+//!   which stand behind them, so the line moves up as Jeff expands, and its middle sits
 //!   across the bases near that front. Tanks `TANK_SPACING_TILES` apart, Riflemen `RIFLE_SPACING_TILES` apart
 //!   `RIFLE_AHEAD_TILES` in front of them, each post pulled back onto open ground. Its centre leans
 //!   up to `LEAN_TILES` toward the side where more enemy strength was seen lately.
@@ -25,7 +26,9 @@ const RIFLE_SPACING_TILES: f32 = 4.0;
 const RIFLE_AHEAD_TILES: f32 = 3.0;
 const HOME_RIFLES: usize = 6;
 const MAX_RIFLES: usize = 24;
-const AHEAD_TILES: f32 = 10.0;
+const AHEAD_TILES: f32 = 3.0;
+/// Steel and Oil this close to a site being taken are that base's.
+const SITE_FIELD_TILES: f32 = 10.0;
 /// Depots and sites this far behind the frontier still set where the line's middle sits.
 const FRONT_BAND_TILES: f32 = 25.0;
 const STEP_TILES: f32 = 4.0;
@@ -154,17 +157,31 @@ pub(in crate::ai_core::decision) fn hold(
         return;
     };
     let across = (-axis.1, axis.0);
-    // The frontier: Jeff's Depots and the sites it is about to take.
+    // The frontier: Jeff's extractors, and the Steel and Oil at the sites it is about to take.
     let mut anchors: Vec<(f32, f32)> = observation
         .owned
         .iter()
-        .filter(|unit| unit.kind == EntityKind::ResourceDepot && unit.hp > 0)
+        .filter(|unit| matches!(unit.kind, EntityKind::SteelMine | EntityKind::PumpJack))
+        .filter(|unit| unit.hp > 0)
         .map(|unit| (unit.x, unit.y))
         .collect();
-    let sites = [memory.expansion_security.site, memory.later_bases.site()];
-    anchors.extend(sites.into_iter().flatten().filter_map(|site| {
-        building_center(site, EntityKind::ResourceDepot, observation.map.tile_size)
-    }));
+    let sites: Vec<(f32, f32)> = [memory.expansion_security.site, memory.later_bases.site()]
+        .into_iter()
+        .flatten()
+        .filter_map(|site| building_center(site, EntityKind::ResourceDepot, observation.map.tile_size))
+        .collect();
+    anchors.extend(
+        observation
+            .resources
+            .iter()
+            .filter(|node| matches!(node.kind, EntityKind::Steel | EntityKind::Oil))
+            .filter(|node| {
+                sites.iter().any(|site| {
+                    dist2(node.x, node.y, site.0, site.1) <= squared(SITE_FIELD_TILES * ts)
+                })
+            })
+            .map(|node| (node.x, node.y)),
+    );
     let depth = |at: (f32, f32)| (at.0 - main.0) * axis.0 + (at.1 - main.1) * axis.1;
     let lateral = |at: (f32, f32)| (at.0 - main.0) * across.0 + (at.1 - main.1) * across.1;
     let frontier = anchors.iter().map(|at| depth(*at)).fold(f32::MIN, f32::max);
