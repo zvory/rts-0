@@ -207,6 +207,7 @@ where
                 && main_tank_ids(observation, memory).len() >= memory.home_tank_reserve()
         };
         let ready = army_ready
+            && jeff_v1_1::front_line::covers_next_base(memory, depots)
             && defense::local_defense_contact(observation).is_none()
             && observation.economy.steel >= steel
             && observation.economy.oil >= oil

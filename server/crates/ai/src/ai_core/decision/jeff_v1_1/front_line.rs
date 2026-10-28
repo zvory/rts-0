@@ -17,6 +17,10 @@
 //!   `FALL_RATIO` of it in sight, every `STEP_TICKS` it steps `STEP_TILES` back toward the frontier,
 //!   up to `MAX_BACK_TILES`; holding with little loss and the enemy near it under `ADVANCE_RATIO`
 //!   of it, it steps forward again.
+//! - **Breaking**: facing `BREAK_RATIO` of its strength in sight, or having lost `BREAK_LOSS_SHARE`
+//!   of it over `LOSS_TICKS`, the line breaks: for `BROKEN_TICKS` it holds no unit, and every unit
+//!   falls back to V1.0's defence of the bases (the home pocket, raid response, the resting Tanks'
+//!   gathering), then the line forms again.
 
 use super::*;
 use crate::ai_core::decision::geometry::{building_center, dist2, squared, tile_center};
@@ -39,6 +43,9 @@ const HOLD_LOSS_SHARE: f32 = 0.1;
 const FALL_LOSS_SHARE: f32 = 0.3;
 const ADVANCE_RATIO: f32 = 0.6;
 const FALL_RATIO: f32 = 1.2;
+const BREAK_RATIO: f32 = 1.5;
+const BREAK_LOSS_SHARE: f32 = 0.4;
+const BROKEN_TICKS: u32 = config::TICK_HZ * 30;
 /// Enemy fighters in sight this close to the line's centre weigh against it.
 const NEAR_LINE_TILES: f32 = 18.0;
 /// Most units within this of their posts: the line is settled.
@@ -48,6 +55,16 @@ const LEAN_TILES: f32 = 8.0;
 /// A unit with an enemy fighter this close fights where it stands.
 const FIGHT_TILES: f32 = 7.0;
 const REORDER_TICKS: u32 = config::TICK_HZ * 3;
+/// Enemy fighters this close to a Depot or a line unit are an attack coming in.
+const CONTACT_TILES: f32 = 25.0;
+const CONTACT_TICKS: u32 = config::TICK_HZ * 20;
+const RESERVE_BACK_TILES: f32 = 5.0;
+const RESERVE_SPACING_TILES: f32 = 3.0;
+/// A base's extractors and fields this close to its Depot or site.
+const BASE_FIELD_TILES: f32 = 14.0;
+/// A stretched line spans the front bases and this much more.
+const FIT_MARGIN_TILES: f32 = 8.0;
+const MAX_FIT_SPACING_TILES: f32 = 20.0;
 
 /// V1.1's front line.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -61,6 +78,12 @@ pub(in crate::ai_core::decision) struct FrontLineMemory {
     losses: Vec<(u32, u32)>,
     /// When each unit was last sent to its post.
     ordered: BTreeMap<u32, u32>,
+    /// Where and when enemy fighters last came near a Depot or the line.
+    contact: Option<((i32, i32), u32)>,
+    /// The line's Tanks, last decision.
+    tanks: usize,
+    /// The line stands broken until then.
+    broken_until: u32,
 }
 
 impl FrontLineMemory {
@@ -223,6 +246,13 @@ pub(in crate::ai_core::decision) fn hold(
             .count();
         let settled = !state.members.is_empty()
             && on_post as f32 >= state.members.len() as f32 * SETTLED_SHARE;
+        if !super::off("linebreak")
+            && (lost >= strength * BREAK_LOSS_SHARE || enemy_near >= strength * BREAK_RATIO)
+        {
+            state.broken_until = tick + BROKEN_TICKS;
+            state.back = (MAX_BACK_TILES * 10.0) as u32;
+            state.losses.clear();
+        }
         if tick.saturating_sub(state.last_step) >= STEP_TICKS {
             if lost >= strength * FALL_LOSS_SHARE || enemy_near >= strength * FALL_RATIO {
                 state.back = (state.back as f32 + STEP_TILES * 10.0).min(MAX_BACK_TILES * 10.0) as u32;
@@ -236,6 +266,14 @@ pub(in crate::ai_core::decision) fn hold(
                 state.last_step = tick;
             }
         }
+    }
+    // Broken, the line lets its units go back to the bases' defence until it forms again.
+    if tick < memory.jeff_v1_1.front_line.broken_until {
+        let state = &mut memory.jeff_v1_1.front_line;
+        state.members.clear();
+        state.ordered.clear();
+        state.tanks = 0;
+        return;
     }
     let line_depth = frontier + (AHEAD_TILES - memory.jeff_v1_1.front_line.back as f32 / 10.0) * ts;
     let direction = axis;
@@ -267,57 +305,252 @@ pub(in crate::ai_core::decision) fn hold(
         (centre.0 + across.0 * lean * ts, centre.1 + across.1 * lean * ts),
         observation.map,
     );
-    let rifle_centre = (
-        centre.0 + direction.0 * RIFLE_AHEAD_TILES * ts,
-        centre.1 + direction.1 * RIFLE_AHEAD_TILES * ts,
-    );
-    let tank_posts = posts(observation, map_analysis, centre, direction, tanks.len(), TANK_SPACING_TILES);
-    let rifle_posts = posts(observation, map_analysis, rifle_centre, direction, riflemen.len(), RIFLE_SPACING_TILES);
+    let params = LineParams::read();
+    // Where the enemy last came at Jeff: fighters in sight near a Depot or the line, for a while.
+    let near_ours = |x: f32, y: f32| {
+        observation.owned.iter().any(|unit| {
+            (unit.kind == EntityKind::ResourceDepot || memory.jeff_v1_1.front_line.holds(unit.id))
+                && dist2(unit.x, unit.y, x, y) <= squared(CONTACT_TILES * ts)
+        })
+    };
+    let attackers: Vec<(f32, f32)> = observation
+        .visible_enemies
+        .iter()
+        .filter(|enemy| enemy.hp > 0 && enemy.kind.is_unit() && enemy.kind != EntityKind::Worker)
+        .filter(|enemy| near_ours(enemy.x, enemy.y))
+        .map(|enemy| (enemy.x, enemy.y))
+        .collect();
+    if !attackers.is_empty() {
+        let n = attackers.len() as f32;
+        let at = (
+            (attackers.iter().map(|a| a.0).sum::<f32>() / n).round() as i32,
+            (attackers.iter().map(|a| a.1).sum::<f32>() / n).round() as i32,
+        );
+        memory.jeff_v1_1.front_line.contact = Some((at, tick));
+    }
+    let contact = memory
+        .jeff_v1_1
+        .front_line
+        .contact
+        .filter(|(_, at)| tick.saturating_sub(*at) <= CONTACT_TICKS)
+        .map(|((x, y), _)| (x as f32, y as f32));
+    // The roaming reserve: the Tanks nearest where the enemy came, or the line's middle.
+    let focus = contact.unwrap_or(centre);
+    let mut tanks = tanks;
+    tanks.sort_by(|a, b| {
+        dist2(a.x, a.y, focus.0, focus.1)
+            .total_cmp(&dist2(b.x, b.y, focus.0, focus.1))
+            .then(a.id.cmp(&b.id))
+    });
+    let reserve_count = params.reserve.min(tanks.len().saturating_sub(1));
+    let reserve: Vec<&AiEntitySummary> = tanks.drain(..reserve_count).collect();
+    let mut assignments: Vec<(&AiEntitySummary, (f32, f32))> = Vec::new();
+    match params.shape {
+        Shape::PerBase => {
+            // A segment in front of each base, two or more Tanks to a base, the most threatened first.
+            let mut bases: Vec<Base> = observation
+                .owned
+                .iter()
+                .filter(|unit| unit.kind == EntityKind::ResourceDepot && unit.hp > 0)
+                .map(|unit| (unit.x, unit.y))
+                .chain(sites.iter().copied())
+                .map(|at| {
+                    let field: Vec<(f32, f32)> = anchors
+                        .iter()
+                        .copied()
+                        .filter(|a| dist2(a.0, a.1, at.0, at.1) <= squared(BASE_FIELD_TILES * ts))
+                        .collect();
+                    let front = field.iter().map(|a| depth(*a)).fold(depth(at), f32::max);
+                    let side = if field.is_empty() {
+                        lateral(at)
+                    } else {
+                        field.iter().map(|a| lateral(*a)).sum::<f32>() / field.len() as f32
+                    };
+                    let threat = super::push::threat_near(observation, memory, at, 25.0);
+                    Base { at, front, side, threat }
+                })
+                .collect();
+            if bases.len() > 1 {
+                // The main has V1.0's pocket and home Tank.
+                bases.retain(|base| dist2(base.at.0, base.at.1, main.0, main.1) > squared(8.0 * ts));
+            }
+            bases.sort_by(|a, b| {
+                b.threat
+                    .total_cmp(&a.threat)
+                    .then(b.front.total_cmp(&a.front))
+            });
+            let covered = bases.len().min((tanks.len() / 2).max(1));
+            bases.truncate(covered);
+            let back = memory.jeff_v1_1.front_line.back as f32 / 10.0;
+            let mut left_tanks: Vec<&AiEntitySummary> = tanks.clone();
+            let mut left_rifles: Vec<&AiEntitySummary> = riflemen.clone();
+            for (index, base) in bases.iter().enumerate() {
+                let share = |total: usize| total / covered + usize::from(index < total % covered);
+                let segment = (
+                    main.0 + axis.0 * (base.front + (AHEAD_TILES - back) * ts) + across.0 * base.side,
+                    main.1 + axis.1 * (base.front + (AHEAD_TILES - back) * ts) + across.1 * base.side,
+                );
+                for (pool, count, spacing, ahead) in [
+                    (&mut left_tanks, share(tanks.len()), params.spacing, 0.0),
+                    (&mut left_rifles, share(riflemen.len()), RIFLE_SPACING_TILES, RIFLE_AHEAD_TILES),
+                ] {
+                    pool.sort_by(|a, b| {
+                        dist2(a.x, a.y, segment.0, segment.1)
+                            .total_cmp(&dist2(b.x, b.y, segment.0, segment.1))
+                            .then(a.id.cmp(&b.id))
+                    });
+                    let mine: Vec<&AiEntitySummary> = pool.drain(..count.min(pool.len())).collect();
+                    let at = (segment.0 + axis.0 * ahead * ts, segment.1 + axis.1 * ahead * ts);
+                    let slots = posts(observation, map_analysis, at, axis, mine.len(), spacing);
+                    assignments.extend(seat(&mine, &slots, across));
+                }
+            }
+        }
+        Shape::Axis | Shape::Fit => {
+            // One line; stretched, it spans the bases near the front.
+            let span = front.iter().map(|at| lateral(**at)).fold(f32::MIN, f32::max)
+                - front.iter().map(|at| lateral(**at)).fold(f32::MAX, f32::min);
+            let spacing = if params.shape == Shape::Fit && tanks.len() > 1 {
+                ((span / ts + FIT_MARGIN_TILES) / (tanks.len() - 1) as f32)
+                    .clamp(params.spacing, MAX_FIT_SPACING_TILES)
+            } else {
+                params.spacing
+            };
+            let rifle_centre = (
+                centre.0 + direction.0 * RIFLE_AHEAD_TILES * ts,
+                centre.1 + direction.1 * RIFLE_AHEAD_TILES * ts,
+            );
+            let tank_posts = posts(observation, map_analysis, centre, direction, tanks.len(), spacing);
+            let rifle_posts = posts(
+                observation,
+                map_analysis,
+                rifle_centre,
+                direction,
+                riflemen.len(),
+                RIFLE_SPACING_TILES,
+            );
+            assignments.extend(seat(&tanks, &tank_posts, across));
+            assignments.extend(seat(&riflemen, &rifle_posts, across));
+        }
+    }
+    // The reserve stands behind the line where the enemy came, or behind its middle.
+    if !reserve.is_empty() {
+        let behind = |at: (f32, f32)| {
+            clamp_to_map(
+                (at.0 - axis.0 * RESERVE_BACK_TILES * ts, at.1 - axis.1 * RESERVE_BACK_TILES * ts),
+                observation.map,
+            )
+        };
+        let anchor = contact
+            .and_then(|contact| {
+                assignments
+                    .iter()
+                    .filter(|(unit, _)| unit.kind == EntityKind::Tank)
+                    .map(|(_, post)| *post)
+                    .min_by(|a, b| {
+                        dist2(a.0, a.1, contact.0, contact.1)
+                            .total_cmp(&dist2(b.0, b.1, contact.0, contact.1))
+                    })
+            })
+            .unwrap_or(centre);
+        let slots = posts(observation, map_analysis, behind(anchor), axis, reserve.len(), RESERVE_SPACING_TILES);
+        assignments.extend(seat(&reserve, &slots, across));
+    }
     let charging = memory.jeff_v1_1.charge.riflemen.clone();
     let state = &mut memory.jeff_v1_1.front_line;
-    state.members = tanks
+    state.members = assignments
         .iter()
-        .chain(riflemen.iter())
-        .map(|unit| (unit.id, super::push::unit_value(unit.kind)))
+        .map(|(unit, _)| (unit.id, super::push::unit_value(unit.kind)))
         .collect();
+    state.tanks = assignments
+        .iter()
+        .filter(|(unit, _)| unit.kind == EntityKind::Tank)
+        .count();
     state.ordered.retain(|id, _| state.members.contains_key(id));
     let mut sent = Vec::new();
-    for (group, slots) in [(&tanks, &tank_posts), (&riflemen, &rifle_posts)] {
-        for (unit, post) in seat(group, slots, across) {
-            if charging.contains(&unit.id) {
-                continue;
-            }
-            let fighting = observation.visible_enemies.iter().any(|enemy| {
-                enemy.hp > 0
-                    && enemy.kind.is_unit()
-                    && enemy.kind != EntityKind::Worker
-                    && dist2(enemy.x, enemy.y, unit.x, unit.y) <= squared(FIGHT_TILES * ts)
-            });
-            if fighting {
-                continue;
-            }
-            let near = dist2(unit.x, unit.y, post.0, post.1) <= squared(1.5 * ts);
-            if near {
-                if unit.state == AiEntityState::Move {
-                    actions::hold_position_units(actions, [unit.id]);
-                }
-                continue;
-            }
-            if state
-                .ordered
-                .get(&unit.id)
-                .is_some_and(|at| tick.saturating_sub(*at) < REORDER_TICKS)
-            {
-                continue;
-            }
-            actions::attack_move_units(actions, [unit.id], post.0, post.1);
-            state.ordered.insert(unit.id, tick);
-            sent.push(unit.id);
+    for (unit, post) in assignments {
+        if charging.contains(&unit.id) {
+            continue;
         }
+        let fighting = observation.visible_enemies.iter().any(|enemy| {
+            enemy.hp > 0
+                && enemy.kind.is_unit()
+                && enemy.kind != EntityKind::Worker
+                && dist2(enemy.x, enemy.y, unit.x, unit.y) <= squared(FIGHT_TILES * ts)
+        });
+        if fighting {
+            continue;
+        }
+        let near = dist2(unit.x, unit.y, post.0, post.1) <= squared(1.5 * ts);
+        if near {
+            if unit.state == AiEntityState::Move {
+                actions::hold_position_units(actions, [unit.id]);
+            }
+            continue;
+        }
+        if state
+            .ordered
+            .get(&unit.id)
+            .is_some_and(|at| tick.saturating_sub(*at) < REORDER_TICKS)
+        {
+            continue;
+        }
+        actions::attack_move_units(actions, [unit.id], post.0, post.1);
+        state.ordered.insert(unit.id, tick);
+        sent.push(unit.id);
     }
     if !sent.is_empty() {
         intents.push(AiIntent::Assemble { units: sent });
     }
+}
+
+/// A base the line stands in front of: its Depot or site, how far toward the enemy its extractors
+/// reach, where they sit across the way, and the enemy strength remembered near it.
+struct Base {
+    at: (f32, f32),
+    front: f32,
+    side: f32,
+    threat: f32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Shape {
+    /// One line in front of the frontier.
+    Axis,
+    /// One line stretched across the bases near the front.
+    Fit,
+    /// A segment in front of each base.
+    PerBase,
+}
+
+/// The line's shape, its Tanks' spacing and its roaming reserve, set by `JEFF_V11_LINE` for
+/// testing (`shape=0|1|2,spacing=8,reserve=2,cover=2`).
+struct LineParams {
+    shape: Shape,
+    spacing: f32,
+    reserve: usize,
+}
+
+impl LineParams {
+    fn read() -> Self {
+        let param = crate::ai_core::profiles::jeff_v1_1_param;
+        Self {
+            shape: match param("shape").map(|value| value as u32) {
+                Some(1) => Shape::Fit,
+                Some(2) => Shape::PerBase,
+                _ => Shape::Axis,
+            },
+            spacing: param("spacing").unwrap_or(TANK_SPACING_TILES),
+            reserve: param("reserve").map_or(0, |value| value as usize),
+        }
+    }
+}
+
+/// Whether the line has the Tanks to cover the next base: `cover` (`JEFF_V11_LINE`, testing) for
+/// each base past the main once it is taken. Without it, or without the line, any time.
+pub(in crate::ai_core::decision) fn covers_next_base(memory: &AiDecisionMemory, depots: usize) -> bool {
+    let cover = crate::ai_core::profiles::jeff_v1_1_param("cover").map_or(0, |value| value as usize);
+    !active(memory) || cover == 0 || memory.jeff_v1_1.front_line.tanks >= cover * depots
 }
 
 /// `count` posts across `direction` through `centre`, `spacing` tiles apart, each pulled back

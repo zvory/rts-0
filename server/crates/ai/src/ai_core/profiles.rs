@@ -559,6 +559,30 @@ pub(crate) fn jeff_v1_1_feature_off(feature: &str) -> bool {
         || only.as_ref().is_some_and(|only| !only.iter().any(|name| name == feature))
 }
 
+/// Local testing only: `JEFF_V11_LINE=shape=2,spacing=8,reserve=2,cover=2` sets the Tank line's
+/// numbers (`jeff_v1_1::front_line`).
+pub(crate) fn jeff_v1_1_param(name: &str) -> Option<f32> {
+    static PARAMS: std::sync::OnceLock<Vec<(String, f32)>> = std::sync::OnceLock::new();
+    PARAMS
+        .get_or_init(|| {
+            std::env::var("JEFF_V11_LINE")
+                .ok()
+                .map(|value| {
+                    value
+                        .split(',')
+                        .filter_map(|pair| {
+                            let (key, value) = pair.split_once('=')?;
+                            Some((key.trim().to_string(), value.trim().parse().ok()?))
+                        })
+                        .collect()
+                })
+                .unwrap_or_default()
+        })
+        .iter()
+        .find(|(key, _)| key == name)
+        .map(|(_, value)| *value)
+}
+
 /// Jeff's AI V1.1 alone: every change V1.1 makes over V1.0 branches here.
 pub(crate) fn is_jeff_v1_1(id: &str) -> bool {
     id == JEFFS_AI_V1_1_ID
