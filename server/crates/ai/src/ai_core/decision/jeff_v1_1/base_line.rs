@@ -603,6 +603,7 @@ fn line_units<'a>(
                 && memory.containment.active_scout != Some(unit.id)
                 && memory.home_defensive_tank != Some(unit.id)
                 && !memory.jeff_v1_1.strike.party.contains(&unit.id)
+                && !memory.jeff_v1_1.hunt.hunters.contains_key(&unit.id)
                 && !memory.expansion_security.riflemen.contains(&unit.id)
                 && !memory.later_bases.guards.contains(&unit.id)
                 && !memory.opening_rush.is_reserved(unit.id)

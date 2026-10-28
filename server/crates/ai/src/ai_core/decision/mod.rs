@@ -1447,6 +1447,10 @@ where
             }
         }
 
+        // Jeff's AI V1.1's Riflemen hunt the enemy's Panzerfausts, over every other order.
+        let reserved = &route_line_reserved;
+        jeff_v1_1::hunt::hunt_panzerfausts(&mut actions, observation, memory, &mut intents, profile.id, reserved);
+
         // Last: the current Jeff's resting Tanks with no other orders gather on the home post, so
         // none sits idle in a corner of the main or out on the map.
         if uses_current_jeffs_ai_policy(profile.id) {

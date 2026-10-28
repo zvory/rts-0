@@ -5,6 +5,7 @@ use super::*;
 use crate::ai_core::facts::ProductionBuildingFact;
 
 pub(super) mod base_line;
+pub(super) mod hunt;
 pub(super) mod push;
 pub(super) mod scout;
 pub(super) mod strike;
@@ -25,6 +26,7 @@ pub(super) struct V1_1Memory {
     pub(super) push: push::PushMemory,
     pub(super) strike: strike::StrikeMemory,
     pub(super) scout: scout::ScoutMemory,
+    pub(super) hunt: hunt::HuntMemory,
 }
 
 /// Methamphetamines comes first. It is ordered the moment the Training Centre is free and its cost
