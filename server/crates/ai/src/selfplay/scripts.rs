@@ -66,6 +66,7 @@ impl ScriptedPlayer for ProfileBackedScript {
         let (mut commands, trace) = CanonicalAiTickDriver::run_prepared_controller(
             &mut self.controller,
             AiThinkContext {
+                known_losses: view.known_losses.clone(),
                 match_seed: view.match_seed,
                 start: view.start,
                 snapshot: view.snapshot,
@@ -209,5 +210,62 @@ impl ScriptedPlayer for MineOnlyScript {
         assign_steel_workers(&observation, &mut actions, self.initial_gather_sent);
         self.initial_gather_sent = true;
         actions.into_commands()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sdk::{AiActions, AiFrame, AiStrategy};
+    use rts_sim::game::{Game, PlayerInit};
+    use std::collections::BTreeMap;
+    use std::sync::{Arc, Mutex};
+
+    #[test]
+    fn profile_script_forwards_prepared_loss_counts() {
+        struct InspectLosses(Arc<Mutex<Vec<u32>>>);
+        impl AiStrategy for InspectLosses {
+            fn step(&mut self, frame: &AiFrame, _: &mut AiActions) {
+                self.0.lock().unwrap().push(frame.own_losses().units_lost());
+            }
+        }
+        let game = Game::new_without_ai_controllers(
+            &[PlayerInit {
+                id: 1,
+                team_id: 1,
+                faction_id: "kriegsia".into(),
+                name: "Observer".into(),
+                color: "#ffffff".into(),
+                is_ai: false,
+            }],
+            13,
+        );
+        let start = game.start_payload();
+        let mut snapshot = game.snapshot_for(1);
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let mut script = ProfileBackedScript {
+            controller: AiController::with_strategy(1, Box::new(InspectLosses(seen.clone()))),
+            allow_combat_commands: true,
+            script_name: "loss-probe",
+            last_trace_lines: None,
+        };
+        for (tick, count) in [(8, 2), (17, 3)] {
+            snapshot.tick = tick;
+            let known_losses =
+                BTreeMap::from([(1, BTreeMap::from([(EntityKind::Rifleman, count)]))]);
+            script.commands(
+                PlayerView {
+                    match_seed: game.seed(),
+                    player_id: 1,
+                    tick,
+                    start: &start,
+                    snapshot: &snapshot,
+                    alive_player_ids: &[1],
+                    known_losses: &known_losses,
+                },
+                Vec::new(),
+            );
+        }
+        assert_eq!(*seen.lock().unwrap(), [2, 3]);
     }
 }

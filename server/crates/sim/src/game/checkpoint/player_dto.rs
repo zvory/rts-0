@@ -39,6 +39,8 @@ pub(super) struct ScoreStateV1 {
     #[serde(default)]
     resources_mined: super::super::ResourceTotals,
     #[serde(default)]
+    observed_losses: BTreeMap<u32, BTreeMap<super::super::entity::EntityKind, u32>>,
+    #[serde(default)]
     resource_income_history: Vec<super::super::ResourceIncomeRecord>,
 }
 

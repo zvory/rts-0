@@ -158,6 +158,7 @@ impl SelfPlayRunner {
                     continue;
                 };
                 let view = PlayerView {
+                    known_losses: &self.game.known_losses_for(pid),
                     match_seed: self.game.seed(),
                     player_id: pid,
                     tick,

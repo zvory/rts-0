@@ -56,6 +56,7 @@ fn scripted_self_play_mine_only_steel_fairness() {
             continue;
         };
         let view = PlayerView {
+            known_losses: &game.known_losses_for(pid),
             match_seed: game.seed(),
             player_id: pid,
             tick: 0,
@@ -131,6 +132,7 @@ fn assert_scripted_runs_identical_for_ticks(
                 continue;
             };
             let view = PlayerView {
+                known_losses: &game_a.known_losses_for(pid),
                 match_seed: game_a.seed(),
                 player_id: pid,
                 tick,
@@ -152,6 +154,7 @@ fn assert_scripted_runs_identical_for_ticks(
                 continue;
             };
             let view = PlayerView {
+                known_losses: &game_b.known_losses_for(pid),
                 match_seed: game_b.seed(),
                 player_id: pid,
                 tick,

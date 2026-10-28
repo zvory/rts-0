@@ -424,6 +424,9 @@ pub struct ResourceNodeState {
 pub struct ResourceExtractorState {
     /// Ticks accumulated toward the next attached harvest payout.
     pub progress: u32,
+    /// Fractional HP numerator for unsupported decay, modulo EXTRACTOR_DECAY_TICKS.
+    #[serde(default)]
+    pub(crate) decay_remainder: u32,
     /// Resource Depot whose permanent background job created this extractor. Unlike the
     /// construction-local association, this survives completion so combat death can delay only
     /// the responsible depot job.

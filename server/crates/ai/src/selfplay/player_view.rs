@@ -1,4 +1,4 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use crate::ai_core::observation::{AiBuildIntent, AiObservation};
 use crate::ai_shared;
@@ -25,6 +25,7 @@ pub(crate) struct PlayerView<'a> {
     pub(crate) start: &'a StartPayload,
     pub(crate) snapshot: &'a Snapshot,
     pub(crate) alive_player_ids: &'a [u32],
+    pub(crate) known_losses: &'a BTreeMap<u32, BTreeMap<EntityKind, u32>>,
 }
 
 impl PlayerView<'_> {

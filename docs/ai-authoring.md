@@ -29,6 +29,13 @@ locations, and controller-inferred submitted builds. Remembered contacts are sta
 amounts may be `Unknown`, and submitted builds are not acceptance receipts. Strategies receive no
 full simulation snapshot, hidden occupancy, private pathing state, or command-completion status.
 
+Use `frame.own_losses().units_lost()` for your total destroyed units, and
+`frame.own_losses().buildings_lost()` for buildings. `units` and `buildings` maps break counts down
+by `EntityKind`; `steel_value` and `oil_value` give their combined nominal cost. Query
+`frame.observed_enemy_losses().get(&enemy_id)` for the same summary of witnessed enemy deaths.
+An absent entry means none observed. Deaths in hidden areas are excluded, and an enemy leaving
+sight is never assumed dead. Totals accumulate every simulation tick and survive checkpoints.
+
 ## Read rules and query the known world
 
 Create `AiRulebook::for_frame(frame)` to bind authoritative `rts-rules` answers to the frame

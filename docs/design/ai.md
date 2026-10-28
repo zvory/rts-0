@@ -81,6 +81,15 @@ submitted-build bookkeeping. The frame adapter is the only production path that 
 start/snapshot DTOs into strategy-visible kind, state, production, upgrade, terrain, resource, and
 memory facts. Its collections use stable id ordering; completed upgrades and submitted builds are
 additionally sorted and deduplicated.
+`AiFrame::own_losses()` exposes cumulative own unit/building deaths; `observed_enemy_losses()`
+returns the same typed `AiLosses` per enemy player id for witnessed deaths only. Each summary has
+per-kind unit/building maps, total-count helpers, and nominal Steel/Oil value, matching the Losses
+tab. Missing enemy entries mean zero observed deaths, not zero actual deaths. The canonical host
+passes `Game::known_losses_for(player)` in `AiThinkContext::known_losses`; prepared hosts must do
+likewise. Simulation death processing accumulates witnessed losses every tick using the existing
+Death-event visibility gate (team vision, smoke, concealment, firing reveals). Counts survive
+checkpoints and do not depend on AI decision cadence or prior entity sightings. Disappearance,
+cancellation, administrative elimination, and depleted neutral resources do not count.
 Active production identifies either its typed unit kind or its typed research upgrade when one is
 present in the recipient snapshot.
 Entity records retain the public `occupied_trench_id` from that same recipient snapshot so
@@ -350,6 +359,10 @@ defense, production, and wave controller on the normal decision cadence. Retired
 idle; Pressure may use the rear Barracks and any new producers. Existing units and construction
 survive, while Rush wave memory is discarded. Losing its only Engineer independently arms the
 same thirty-second recovery handoff; Pressure can then replace the Engineer and rebuild income.
+Independently, cumulative owned unit and building losses worth at least 1,000 Steel trigger an
+immediate handoff, even before the first wave launches. This uses the SDK's nominal Steel loss
+value (excluding Oil, cancellations, refunds, and administrative removals) and bypasses either
+thirty-second grace period, so contested staging cannot trap Rush indefinitely.
 Rush suspends new wave launches during that recovery grace period, preserving Rush micro for
 already launched units without launching a cohort just before the switch. Later waves do not
 postpone a handoff already armed by wave five; the earlier of the wave and recovery deadlines
@@ -377,6 +390,14 @@ nobody has arrived yet, the trigger stays unlocked until arrivals. Subsequent wa
 least five units actually at their slots, rather than counting en-route reinforcements. Each wave
 launches with one group command. Launched units are never added to a later wave or pulled back to
 staging, and later production gathers into a fresh cohort.
+
+If a visible enemy targets an unlaunched unit that has reached staging, all staged,
+unlaunched infantry attack-move to that enemy’s current position. The response remembers
+attackers while they remain visible, pauses wave launches, and keeps staged membership even
+when defenders leave their slots. Incoming recruits continue assembling normally; launched
+waves keep their own orders. Once all remembered attackers disappear or die, defenders return
+to their assigned slots and normal arrival-based wave launches resume. Unrelated visible enemies
+do not prolong the response.
 
 `AiActions::queue_research` emits an ordinary research queue request without requiring or
 reserving its eventual cost. Unlike the affordable `research` helper, it permits construction-

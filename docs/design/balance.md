@@ -422,7 +422,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   `ANTI_TANK_GUN_TEARDOWN_TICKS = 40` (~1.33s).
 - Mortar Teams have no setup or teardown timing. They use `MORTAR_MIN_RANGE_TILES = 5`,
   `MORTAR_RANGE_TILES = 17`, and `MORTAR_FIELD_OF_FIRE_RAD = 360 degrees total`,
-  `MORTAR_MANUAL_SHELL_DELAY_TICKS = 17` (~0.57s manual travel),
+  `MORTAR_MANUAL_SHELL_DELAY_TICKS = 26` (~0.87s manual travel),
   `MORTAR_OUTER_RADIUS_TILES = 2.0`,
   `MORTAR_INNER_RADIUS_TILES = 0.5`,
   `MORTAR_OUTER_DAMAGE = 40`, and `MORTAR_INNER_DAMAGE = 100`.
@@ -656,6 +656,13 @@ profiles and explicit activation/autocast policy instead of being folded into de
   Completed Pump Jacks mine `OIL_LOAD = 2` every `HARVEST_TICKS = 40`, matching one worker's former
   oil rate, and deplete the underlying oil node. When that final load empties the patch, its Pump
   Jack disappears with it and the permanent Depot job moves to the next eligible patch.
+- Unsupported extractors: completed Steel Mines and Pump Jacks without a living, completed
+  friendly Resource Depot or Zamok within the existing 11-tile mining-anchor range lose 5% of
+  maximum HP per second (`EXTRACTOR_DECAY_TICKS = 600`). A full-health extractor dies after
+  exactly 20 seconds without support; damaged extractors die sooner. Allied bases count.
+  Restoring support stops decay and clears fractional damage without healing lost HP.
+  Extractors under construction do not decay. Decay uses ordinary unattributed damage/death
+  handling; the underlying resource patch remains available.
 - One gatherer per direct-mined patch: each direct-mined node has a single harvest slot
   (`Entity::miner`). A patch is
   occupied only after the gatherer reaches `GatherPhase::Harvesting`; right-clicking a patch

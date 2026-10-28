@@ -186,6 +186,9 @@ pub(crate) struct ScoreState {
     units_lost_by_kind: BTreeMap<EntityKind, u32>,
     #[serde(default)]
     buildings_lost_by_kind: BTreeMap<EntityKind, u32>,
+    /// Enemy deaths witnessed through the same projection as Death events.
+    #[serde(default)]
+    observed_losses: BTreeMap<u32, BTreeMap<EntityKind, u32>>,
     resources_mined: ResourceTotals,
     resource_income_history: Vec<ResourceIncomeRecord>,
 }

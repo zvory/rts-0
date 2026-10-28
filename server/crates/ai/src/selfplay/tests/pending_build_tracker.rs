@@ -95,7 +95,12 @@ fn pending_tracker_view<'a>(
     start: &'a StartPayload,
     snapshot: &'a Snapshot,
 ) -> PlayerView<'a> {
+    static EMPTY_LOSSES: std::collections::BTreeMap<
+        u32,
+        std::collections::BTreeMap<EntityKind, u32>,
+    > = std::collections::BTreeMap::new();
     PlayerView {
+        known_losses: &EMPTY_LOSSES,
         match_seed: 0,
         player_id: 1,
         tick,
