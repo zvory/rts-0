@@ -194,7 +194,12 @@ pub(super) fn secure_wait_ticks(
     memory: &AiDecisionMemory,
 ) -> Option<u32> {
     let guards = &memory.expansion_security.riflemen;
-    let posts = positions(observation, analysis, &memory.expansion_security);
+    let posts = positions(
+        observation,
+        analysis,
+        &memory.expansion_security,
+        jeff_v1_1::natural::forward(memory),
+    );
     if guards.len() < PARTY_SIZE || posts.len() < guards.len() {
         return None;
     }
@@ -659,6 +664,7 @@ pub(super) fn positions(
     observation: &AiObservation,
     analysis: Option<&AiMapAnalysis>,
     security: &ExpansionSecurity,
+    forward: bool,
 ) -> Vec<(f32, f32)> {
     let Some(site) = security.site else {
         return Vec::new();
@@ -680,7 +686,10 @@ pub(super) fn positions(
         .or_else(|| normalized_direction(center, target))
         .or_else(|| normalized_direction(home, center))
         .unwrap_or((1.0, 0.0));
-    let forward_tiles = if crossroads_direction.is_some() {
+    // Jeff's AI V1.1's guards stand past the natural's extractors.
+    let forward_tiles = if forward {
+        jeff_v1_1::natural::GUARD_FORWARD_TILES
+    } else if crossroads_direction.is_some() {
         4.5
     } else {
         3.5
@@ -832,6 +841,7 @@ pub(super) fn update_and_stage(
     profile_id: &str,
 ) -> bool {
     let live_jeff = runs_live_jeff(profile_id);
+    let forward = jeff_v1_1::natural::forward(memory);
     // On Doppelganger raid defense pulled the first guards back from a six-Rifleman wave, and the
     // next decision this sent them to their posts again, into it. Both died without a kill.
     let held: Vec<u32> = memory
@@ -849,7 +859,7 @@ pub(super) fn update_and_stage(
     else {
         return false;
     };
-    let points = positions(observation, analysis, security);
+    let points = positions(observation, analysis, security, forward);
     let ts = observation.map.tile_size as f32;
     let contested = observation.visible_enemies.iter().any(|enemy| {
         enemy.hp > 0

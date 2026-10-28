@@ -5,8 +5,11 @@ use super::*;
 use crate::ai_core::facts::ProductionBuildingFact;
 
 pub(super) mod base_line;
+pub(super) mod charge;
 pub(super) mod hunt;
+pub(super) mod natural;
 pub(super) mod push;
+pub(super) mod reveal;
 pub(super) mod scout;
 pub(super) mod screen;
 pub(super) mod strike;
@@ -18,6 +21,8 @@ pub(super) struct V1_1Memory {
     /// Entrenchment waits for Methamphetamines this decision: Meth's Oil comes in before
     /// Entrenchment's research would end, so the Training Centre stays free for Meth.
     pub(super) entrenchment_waits: bool,
+    /// Methamphetamines waits for its Oil this decision, its cost held back.
+    pub(super) meth_waits: bool,
     /// Each base-line unit's post (`base_line`).
     pub(super) base_lines: base_line::LineMemory,
     /// Since when Steel has stood at `third_base::BANK_STEEL` or more.
@@ -28,6 +33,9 @@ pub(super) struct V1_1Memory {
     pub(super) strike: strike::StrikeMemory,
     pub(super) scout: scout::ScoutMemory,
     pub(super) hunt: hunt::HuntMemory,
+    pub(super) natural: natural::NaturalMemory,
+    pub(super) charge: charge::ChargeMemory,
+    pub(super) reveal: reveal::RevealMemory,
 }
 
 /// Methamphetamines comes first. It is ordered the moment the Training Centre is free and its cost
@@ -49,6 +57,7 @@ pub(super) fn early_research(
     plan: Option<&spend_plan::SpendPlan>,
 ) {
     memory.jeff_v1_1.entrenchment_waits = false;
+    memory.jeff_v1_1.meth_waits = false;
     if !is_jeff_v1_1(profile_id)
         || off("meth")
         || facts.complete_building_count(EntityKind::TrainingCentre) == 0
@@ -73,6 +82,7 @@ pub(super) fn early_research(
             }
         }
         actions.holdback_resources(definition.cost_steel, definition.cost_oil);
+        memory.jeff_v1_1.meth_waits = true;
         return;
     }
     if !ordered(facts, memory, entrenchment) {
@@ -151,6 +161,87 @@ pub(super) fn reserve_tank_steel(
     if tanks > 0 {
         actions.holdback_resources(steel * tanks, 0);
     }
+}
+
+/// The natural's guards V1.1 trains before its opening guns.
+const NATURAL_GUARDS: usize = 2;
+
+/// V1.1's Barracks trains Riflemen first while Meth waits for its Oil, and while the natural lacks
+/// its guards. Each opening gun takes 10 Oil, which Meth holds back: against Pressure AI on Classic
+/// the Barracks stood idle from 0:45 to 1:15 with 390 Steel in the bank. And with the four starters
+/// out on the opening rush, V1.0's natural guards were the Riflemen trained after four guns, out at
+/// 2:15-2:30, so the natural waited for them with its 450 Steel set aside from 1:53. Returns the
+/// Riflemen to train up to, past the spend plan's routine cap.
+pub(super) fn riflemen_first(
+    profile_id: &str,
+    observation: &AiObservation,
+    facts: &AiFacts,
+    memory: &AiDecisionMemory,
+    priorities: &mut Vec<EntityKind>,
+) -> Option<usize> {
+    if !is_jeff_v1_1(profile_id) || off("earlyrifles") {
+        return None;
+    }
+    let riflemen = facts.unit_count(EntityKind::Rifleman);
+    let fresh = observation
+        .owned
+        .iter()
+        .filter(|unit| unit.kind == EntityKind::Rifleman && unit.hp > 0)
+        .filter(|unit| !memory.opening_rush.is_starter(unit.id))
+        .count();
+    let guards_short = memory.expansion_security.site.is_some()
+        && facts.building_count(EntityKind::ResourceDepot) < 2
+        && fresh < NATURAL_GUARDS;
+    let target = if guards_short {
+        riflemen + NATURAL_GUARDS - fresh
+    } else if memory.jeff_v1_1.meth_waits {
+        riflemen + 1
+    } else {
+        return None;
+    };
+    priorities.retain(|unit| *unit != EntityKind::Rifleman);
+    priorities.insert(0, EntityKind::Rifleman);
+    Some(target)
+}
+
+/// V1.1 builds its first Factory while the natural waits to be secured, once the bank holds both:
+/// V1.0 held the Factory back for the natural, and against Pressure AI on Classic its bank stood at
+/// 800-1,000 Steel and 180-290 Oil from 2:15 to 2:45 with the Factory paid for. The natural's cost
+/// stays held back from the budget, so only Steel and Oil past it go to the Factory.
+pub(super) fn factory_alongside_natural(profile_id: &str, facts: &AiFacts) -> bool {
+    is_jeff_v1_1(profile_id)
+        && !off("factoryfirst")
+        && facts.building_count(EntityKind::ResourceDepot) < 2
+}
+
+/// The Steel V1.1 keeps before surplus Steel goes into Riflemen and Barracks: a Tank's 425 and a
+/// little. V1.0 kept 600, and against Pressure AI on Classic its one Barracks stood idle from 2:45 to
+/// 3:45 with 500-950 Steel in the bank while the first Tank waited on its Oil.
+const SURPLUS_RESERVE: u32 = 450;
+
+pub(super) fn surplus_reserve(profile_id: &str, reserve: u32) -> u32 {
+    if is_jeff_v1_1(profile_id) && !off("surplus") {
+        reserve.min(SURPLUS_RESERVE)
+    } else {
+        reserve
+    }
+}
+
+/// Whether V1.1's Barracks trains Riflemen while it would save for the first Tank: Riflemen take
+/// no Oil, and the first Tank waits on its Oil, not its Steel. V1.0's Barracks saved everything for
+/// it, and against Pressure AI on Classic stood idle 3:30-3:45 with 565-885 Steel in the bank. Only
+/// the Steel past the Tank's goes.
+pub(super) fn rifles_past_first_tank(
+    profile_id: &str,
+    building_kind: EntityKind,
+    steel: u32,
+) -> bool {
+    let tank = rts_rules::economy::cost(EntityKind::Tank).0;
+    let rifle = rts_rules::economy::cost(EntityKind::Rifleman).0;
+    is_jeff_v1_1(profile_id)
+        && !off("surplus")
+        && building_kind == EntityKind::Barracks
+        && steel >= tank + rifle
 }
 
 /// Local ablation testing only: `JEFF_V11_OFF=scout,raid,...` turns the named V1.1 features off,

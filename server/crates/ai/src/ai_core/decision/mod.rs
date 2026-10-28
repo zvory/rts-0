@@ -535,7 +535,10 @@ where
         if turtle_should_delay_tech_for_entrenchment(profile, memory, &facts, *kind) {
             continue;
         }
-        if expansion_blocks_tech_path || hold_tech_for_expansion {
+        if (expansion_blocks_tech_path || hold_tech_for_expansion)
+            && !(*kind == EntityKind::Factory
+                && jeff_v1_1::factory_alongside_natural(profile.id, &facts))
+        {
             continue;
         }
         if facts.building_count(*kind) + planned_in_intents(&intents, *kind) > 0 {
@@ -588,7 +591,8 @@ where
     let target_barracks = jeff_v1_1::third_base::barracks_target(profile.id, banked, target_barracks);
     let surplus_barracks_enabled = profile.surplus_steel_production.is_some_and(|policy| {
         let (barracks_steel, _) = rts_rules::economy::cost(EntityKind::Barracks);
-        actions.budget().steel() >= policy.reserve.saturating_add(barracks_steel)
+        let reserve = jeff_v1_1::surplus_reserve(profile.id, policy.reserve);
+        actions.budget().steel() >= reserve.saturating_add(barracks_steel)
     });
     if (production_uses_building(production_policy, EntityKind::Barracks)
         || surplus_barracks_enabled)
@@ -625,8 +629,8 @@ where
         && facts.building_count(EntityKind::Factory)
             + planned_in_intents(&intents, EntityKind::Factory)
             < profile.buildings.factory_target
-        && !expansion_blocks_tech_path
-        && !hold_tech_for_expansion
+        && (!(expansion_blocks_tech_path || hold_tech_for_expansion)
+            || jeff_v1_1::factory_alongside_natural(profile.id, &facts))
         && planned_in_intents(&intents, EntityKind::Factory) == 0;
     if first_factory_needed {
         if let Some(build_action) = try_build_production(
@@ -841,7 +845,8 @@ where
         .lead_with_emergency_riflemen(&mut effective_unit_priorities);
     if let Some(policy) = profile.surplus_steel_production {
         let (unit_steel, _) = rts_rules::economy::cost(policy.unit);
-        if actions.budget().steel() >= policy.reserve.saturating_add(unit_steel)
+        let reserve = jeff_v1_1::surplus_reserve(profile.id, policy.reserve);
+        if actions.budget().steel() >= reserve.saturating_add(unit_steel)
             && !effective_unit_priorities.contains(&policy.unit)
         {
             effective_unit_priorities.push(policy.unit);
@@ -871,6 +876,13 @@ where
         &mut effective_unit_priorities,
     );
     let fausts = jeff_v1_1::faust_target(profile.id, &facts, memory, banked);
+    let early_rifles = jeff_v1_1::riflemen_first(
+        profile.id,
+        observation,
+        &facts,
+        memory,
+        &mut effective_unit_priorities,
+    );
     let rifle_line =
         jeff_v1_1::rifle_line(profile.id, &facts, (banked, fausts), &mut effective_unit_priorities);
     let production_unit_counts =
@@ -910,14 +922,23 @@ where
             security_rifle_target.filter(|_| building_kind == EntityKind::Barracks);
         let emergency_recruits =
             emergency_rifle_target.filter(|_| building_kind == EntityKind::Barracks);
+        let early_recruits = early_rifles.filter(|_| building_kind == EntityKind::Barracks);
         let save_for_tech = security_recruits.is_none()
             && emergency_recruits.is_none()
+            && early_recruits.is_none()
             && (save_for_unplanned_expansion
                 || (save_for_first_tech_unit
                     && !planned_train_in_intents(&intents, key_tech_unit))
                 || save_for_required_tech_building)
             && !rts_rules::economy::trainable_units(building_kind).contains(&key_tech_unit)
             && !can_train_pre_tank_defensive_machine_gunner(profile, &facts, building_kind);
+        // Jeff's AI V1.1 trains Riflemen from the Steel past the first Tank's while that Tank waits.
+        let rifles_only = save_for_tech
+            && save_for_first_tech_unit
+            && !save_for_unplanned_expansion
+            && !save_for_required_tech_building
+            && jeff_v1_1::rifles_past_first_tank(profile.id, building_kind, actions.budget().steel());
+        let save_for_tech = save_for_tech && !rifles_only;
         let mut building_max_counts = production_max_counts.clone();
         if let Some(policy) = profile
             .surplus_steel_production
@@ -931,7 +952,8 @@ where
             let affordable_above_reserve = if unit_steel == 0 {
                 0
             } else {
-                actions.budget().steel().saturating_sub(policy.reserve) as usize
+                let reserve = jeff_v1_1::surplus_reserve(profile.id, policy.reserve);
+                actions.budget().steel().saturating_sub(reserve) as usize
                     / unit_steel as usize
             };
             let surplus_cap = jeff::surplus_cap(profile.id, policy.unit, observation);
@@ -947,6 +969,7 @@ where
         for target in [
             emergency_recruits,
             rifle_line.filter(|_| building_kind == EntityKind::Barracks),
+            early_recruits,
         ]
         .into_iter()
         .flatten()
@@ -957,7 +980,8 @@ where
             spend_plan.as_ref(),
             building_kind == EntityKind::Barracks
                 && !defensive_panic.active
-                && emergency_recruits.is_none(),
+                && emergency_recruits.is_none()
+                && early_recruits.is_none(),
             &intents,
             &production_unit_counts,
             &mut building_max_counts,
@@ -975,7 +999,12 @@ where
             production_unit_counts.as_slice(),
             building_max_counts.as_slice(),
         );
-        let priorities = &effective_unit_priorities;
+        let rifle_priority = [EntityKind::Rifleman];
+        let priorities: &[EntityKind] = if rifles_only {
+            &rifle_priority
+        } else {
+            &effective_unit_priorities
+        };
         jeff_v1_1::reserve_tank_steel(profile.id, building_kind, &facts, observation, &mut actions);
         for (buildings, unit_priorities) in
             jeff_v1_1::barracks_batches(profile.id, building_kind, buildings, priorities, limits)
@@ -1045,6 +1074,7 @@ where
     frontal_exclusions.extend(expansion_footprint_blockers.iter().copied());
     // New-base guards stay out of the push until the base is covered.
     frontal_exclusions.extend(memory.later_bases.guards.iter().copied());
+    frontal_exclusions.extend(memory.jeff_v1_1.natural.support.keys().copied());
     frontal_exclusions.extend(route_line_reserved.iter().copied());
     // Raid responders, sentries and units stepping out of reach are home defense's.
     frontal_exclusions.extend(memory.raid_defense.reserved());
@@ -1216,10 +1246,15 @@ where
         // one crowded firing position.
         handled_local_defense |= jeff_layered_home_defense;
 
+        // Jeff's AI V1.1 sends some of the main's guns and Riflemen to hold its natural.
+        let live = (&mut actions, observation, map_analysis, &mut intents);
+        let held = &(&local_defense_assigned | &route_line_reserved) | &push_units;
+        jeff_v1_1::natural::support(live, memory, profile.id, &defensive_machine_gunners, &held);
         let defensive_machine_gunners_available: Vec<u32> = defensive_machine_gunners
             .iter()
             .copied()
             .filter(|id| !local_defense_assigned.contains(id))
+            .filter(|id| !memory.jeff_v1_1.natural.holds(*id))
             .collect();
         let turtle_defense_active = profile.turtle_defense.is_some();
 
@@ -1304,6 +1339,7 @@ where
         let live = (&mut actions, observation, map_analysis, &mut intents);
         jeff_v1_1::scout::scout(live, memory, profile.id, &held);
         let live = (&mut actions, observation, map_analysis, &mut intents);
+        let held = &held | &memory.jeff_v1_1.natural.support.keys().copied().collect();
         jeff_v1_1::base_line::hold(live, memory, profile, &defensive_machine_gunners, &held);
 
         // The current Jeff's home Tank waits behind the home post once that has moved off the
@@ -1463,6 +1499,11 @@ where
                 intents.push(AiIntent::Move { units: gathered });
             }
         }
+        // Jeff's AI V1.1's Riflemen charge Tanks shelling its bases, and its seen Tanks keep out of
+        // reach of more enemy Tanks, over every other order.
+        let reserved = &route_line_reserved;
+        jeff_v1_1::charge::charge_tanks(&mut actions, observation, memory, &mut intents, profile.id, reserved);
+        jeff_v1_1::reveal::keep_out_of_reach(&mut actions, observation, memory, &mut intents, profile.id, reserved);
     }
 
     let trace = build_manager_trace(TraceInput {
