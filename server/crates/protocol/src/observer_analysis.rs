@@ -79,6 +79,10 @@ pub struct ReplayResourceSample {
     pub oil: i64,
     pub alive_steel: i64,
     pub alive_oil: i64,
+    pub lost_steel: i64,
+    pub lost_oil: i64,
+    pub unit_steel: i64,
+    pub unit_oil: i64,
 }
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -323,6 +327,10 @@ mod tests {
                 oil: -4,
                 alive_steel: -20,
                 alive_oil: 8,
+                lost_steel: 32,
+                lost_oil: -12,
+                unit_steel: -50,
+                unit_oil: 25,
             }],
         };
         let json = serde_json::to_value(msg).unwrap();
@@ -332,5 +340,9 @@ mod tests {
         assert_eq!(json["samples"][0]["oil"], -4);
         assert_eq!(json["samples"][0]["aliveSteel"], -20);
         assert_eq!(json["samples"][0]["aliveOil"], 8);
+        assert_eq!(json["samples"][0]["lostSteel"], 32);
+        assert_eq!(json["samples"][0]["lostOil"], -12);
+        assert_eq!(json["samples"][0]["unitSteel"], -50);
+        assert_eq!(json["samples"][0]["unitOil"], 25);
     }
 }
