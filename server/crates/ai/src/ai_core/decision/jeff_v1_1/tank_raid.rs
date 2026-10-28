@@ -95,6 +95,8 @@ pub(in crate::ai_core::decision) struct TankRaidMemory {
     weighed: (u32, u32),
     /// Since when the party has stood parked on its slots at the Depot.
     parked_since: Option<u32>,
+    /// When its Scout Car last smoked for it.
+    smoked: u32,
 }
 
 impl TankRaidMemory {
@@ -283,6 +285,12 @@ pub(in crate::ai_core::decision) fn raid(
             }
         }
     }
+    // The Scout Car smokes the enemy Tanks shooting at the party, above all on the way home.
+    let running = memory.jeff_v1_1.tank_raid.phase == Some(Phase::Home);
+    let scout = memory.jeff_v1_1.tank_raid.scout;
+    let mut smoked = memory.jeff_v1_1.tank_raid.smoked;
+    super::smoke_cover::cover(actions, observation, memory, scout, &tank_ids, running, &mut smoked);
+    memory.jeff_v1_1.tank_raid.smoked = smoked;
     order(actions, observation, memory, intents, &tank_ids, center, ts);
 }
 

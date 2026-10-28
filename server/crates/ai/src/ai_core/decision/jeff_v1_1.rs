@@ -12,6 +12,7 @@ pub(super) mod natural;
 pub(super) mod push;
 pub(super) mod reveal;
 pub(super) mod scout;
+pub(super) mod smoke_cover;
 pub(super) mod screen;
 pub(super) mod strike;
 pub(super) mod tank_raid;
@@ -38,6 +39,7 @@ pub(super) struct V1_1Memory {
     pub(super) reveal: reveal::RevealMemory,
     pub(super) tank_raid: tank_raid::TankRaidMemory,
     pub(super) front_line: front_line::FrontLineMemory,
+    pub(super) smoke: smoke_cover::SmokeMemory,
 }
 
 /// Methamphetamines comes first. It is ordered the moment the Training Centre is free and its cost

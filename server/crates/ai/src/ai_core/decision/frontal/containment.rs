@@ -359,6 +359,8 @@ pub(super) fn issue_expansion_containment_wave(
     let outnumbered = jeff_v1_1::push::outweighed(observation, memory)
         .unwrap_or_else(|| push_outnumbered(observation, &tanks));
     if !memory.enemy_main_destroyed && outnumbered {
+        // Jeff's AI V1.1's Scout Car smokes for the falling-back Tanks.
+        jeff_v1_1::smoke_cover::note_retreat(memory, &tanks, scouts.first().copied(), observation.tick);
         if push_uses_available_armor {
             memory
                 .approach

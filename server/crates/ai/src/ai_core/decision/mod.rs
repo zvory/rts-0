@@ -1512,6 +1512,7 @@ where
         // Jeff's AI V1.1's Tank party raids the enemy's outlying bases.
         let live = (&mut actions, observation, map_analysis, &mut intents);
         jeff_v1_1::tank_raid::raid(live, memory, profile.id);
+        jeff_v1_1::smoke_cover::cover_push_retreat(&mut actions, observation, memory);
         let raiders: BTreeSet<u32> = memory.jeff_v1_1.tank_raid.units().collect();
         let reserved = &(&route_line_reserved | &raiders);
         jeff_v1_1::charge::charge_tanks(&mut actions, observation, memory, &mut intents, profile.id, reserved);
