@@ -74,13 +74,6 @@ pub(super) fn early_research(
     }
     if !ordered(facts, memory, entrenchment) {
         research(actions, facts, memory, intents, entrenchment);
-        return;
-    }
-    // Then the Panzerfausts research, without which no Panzerfaust can be trained: V1.0 never took
-    // it, and V1.1's Panzerfaust target trained none in sixteen games until it did.
-    let panzerfausts = UpgradeKind::Panzerfausts;
-    if !ordered(facts, memory, panzerfausts) && !off("fausts") {
-        research(actions, facts, memory, intents, panzerfausts);
     }
 }
 
@@ -258,35 +251,16 @@ pub(super) fn rifle_line(
     Some(line)
 }
 
-/// Panzerfausts each base past the main keeps, and the most V1.1 trains; banked Steel buys at
-/// least `BANKED_FAUSTS`.
-const FAUSTS_PER_BASE: usize = 2;
-const MAX_FAUSTS: usize = 16;
-const BANKED_FAUSTS: usize = 8;
-
-/// The Panzerfausts V1.1 keeps: two for every base past the main and one for every enemy Tank it
-/// remembers, from the natural on. Pressure AI's Tank waves destroyed 74 of V1.1's natural and
-/// third extractors in four games against 1-3 Jeff Tanks and no Panzerfausts; the Riflemen and guns
-/// on the lines do nothing to Tanks.
+/// The Panzerfausts V1.1 keeps: none.
 pub(super) fn faust_target(
-    profile_id: &str,
-    facts: &AiFacts,
-    memory: &AiDecisionMemory,
-    banked: bool,
+    _profile_id: &str,
+    _facts: &AiFacts,
+    _memory: &AiDecisionMemory,
+    _banked: bool,
 ) -> usize {
-    if !is_jeff_v1_1(profile_id) || off("fausts") {
-        return if is_jeff_v1_1(profile_id) && banked { BANKED_FAUSTS } else { 0 };
-    }
-    let outer = facts
-        .complete_building_count(EntityKind::ResourceDepot)
-        .saturating_sub(1);
-    let tanks = push::remembered_tanks(memory);
-    if outer == 0 && tanks == 0 {
-        return 0;
-    }
-    let target = FAUSTS_PER_BASE * outer + tanks;
-    let target = if banked { target.max(BANKED_FAUSTS) } else { target };
-    target.min(MAX_FAUSTS)
+    // No Panzerfausts: the owner's call is Riflemen and guns to kill the enemy's Panzerfausts, and
+    // Tanks to trade with its Tanks. With 16-32 a game, V1.1 fielded 7-15 Tanks and did worse.
+    0
 }
 
 /// V1.1 trains Machine Gunners for every gun post it has: the home pocket's, four in front of each
