@@ -110,6 +110,7 @@ mod tests {
                 .rush_strategy
                 .set_handoff_tick_for_test(HANDOFF_TICK);
             controller.think(AiThinkContext {
+                known_losses: Default::default(),
                 match_seed: seed,
                 start: &start,
                 snapshot: &snapshot,
@@ -150,6 +151,7 @@ mod tests {
         let mut controller = AiController::with_profile_id(1, RUSH_AI_ID);
         let run = |controller: &mut AiController, snapshot: &Snapshot| {
             controller.think(AiThinkContext {
+                known_losses: Default::default(),
                 match_seed: 0,
                 start: &start,
                 snapshot,
@@ -201,6 +203,7 @@ mod recovery_tests {
         let mut controller = AiController::with_profile_id(1, RUSH_AI_ID);
         let run = |controller: &mut AiController, snapshot: &Snapshot| {
             controller.think(AiThinkContext {
+                known_losses: Default::default(),
                 match_seed: 0,
                 start: &start,
                 snapshot,

@@ -207,6 +207,8 @@ pub struct AiBuildObservation {
 #[derive(Clone, Debug, PartialEq)]
 pub struct AiFrame {
     player_id: u32,
+    own_losses: super::AiLosses,
+    observed_enemy_losses: BTreeMap<u32, super::AiLosses>,
     base_sites: Vec<super::AiBaseSite>,
     faction_id: String,
     tick: u32,
@@ -235,6 +237,30 @@ impl AiFrame {
 
     pub(crate) fn with_base_sites(mut self, sites: &[super::AiBaseSite]) -> Self {
         self.base_sites = sites.to_vec();
+        self
+    }
+
+    /// All own simulated deaths, including deaths outside allied vision.
+    pub fn own_losses(&self) -> &super::AiLosses {
+        &self.own_losses
+    }
+
+    /// Cumulative witnessed deaths by enemy player id; absent entries mean zero observed.
+    /// Leaving sight or disappearing from a snapshot never counts as a death.
+    pub fn observed_enemy_losses(&self) -> &BTreeMap<u32, super::AiLosses> {
+        &self.observed_enemy_losses
+    }
+
+    pub(crate) fn with_losses(mut self, losses: &BTreeMap<u32, BTreeMap<EntityKind, u32>>) -> Self {
+        self.own_losses = losses
+            .get(&self.player_id)
+            .map(super::AiLosses::from_counts)
+            .unwrap_or_default();
+        self.observed_enemy_losses = losses
+            .iter()
+            .filter(|(id, _)| is_enemy(&self.players, self.player_id, self.team_id, **id))
+            .map(|(&id, counts)| (id, super::AiLosses::from_counts(counts)))
+            .collect();
         self
     }
 
@@ -451,6 +477,8 @@ impl AiFrame {
         smokes.sort_by_key(|cloud| cloud.id);
 
         Some(Self {
+            own_losses: Default::default(),
+            observed_enemy_losses: BTreeMap::new(),
             base_sites: Vec::new(),
             player_id,
             faction_id: own.faction_id.clone(),
