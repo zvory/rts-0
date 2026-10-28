@@ -119,10 +119,12 @@ pub(super) fn keep_guns_on_posts(
     });
 }
 
-/// The Barracks leave a Tank's Steel in the bank while a Factory stands idle with the Tank's Oil
-/// in: the Factory trains first each decision but could never gather 425 Steel while three
-/// Barracks spent every 75. On The River V1.1 then sat at 5 Tanks from 7:00 to 12:00 with 1,000-
-/// 1,500 Oil unspent and Steel near 0, where V1.0 fielded 8-11 Tanks.
+/// The Barracks leave each Factory's next Tank's Steel in the bank, from the moment that Factory has
+/// one Tank or none in hand, while the Oil for it is in: the Factories train first each decision
+/// but, with Jeff queuing one Tank at a time, stood idle 37-66% of the time against Pressure AI,
+/// nearly always with the Oil for a Tank and under its 425 Steel, as three Barracks spent the bank
+/// while each Tank was built. Saving only once a Factory stood idle still left each next Tank
+/// waiting 15-25 s for its Steel.
 pub(super) fn reserve_tank_steel(
     profile_id: &str,
     building_kind: EntityKind,
@@ -133,16 +135,20 @@ pub(super) fn reserve_tank_steel(
     if !is_jeff_v1_1(profile_id) || building_kind != EntityKind::Barracks || off("tankreserve") {
         return;
     }
+    if !facts.completed_upgrades().contains(&UpgradeKind::TankUnlock) {
+        return;
+    }
     let (steel, oil) = rts_rules::economy::cost(EntityKind::Tank);
-    let idle_factory = facts
+    let waiting = facts
         .production_buildings(EntityKind::Factory)
         .iter()
-        .any(|factory| factory.queue_len == 0);
-    if idle_factory
-        && facts.completed_upgrades().contains(&UpgradeKind::TankUnlock)
-        && observation.economy.oil >= oil
-    {
-        actions.holdback_resources(steel, 0);
+        .filter(|factory| factory.queue_len <= 1 || off("nexttank"))
+        .filter(|factory| factory.queue_len == 0 || !off("nexttank"))
+        .count() as u32;
+    let fundable = observation.economy.oil / oil.max(1);
+    let tanks = waiting.min(fundable);
+    if tanks > 0 {
+        actions.holdback_resources(steel * tanks, 0);
     }
 }
 
