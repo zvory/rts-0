@@ -566,11 +566,9 @@ export class ClientLane {
   }
 
   async currentTick() {
-    return this.page.evaluate(() => {
-      const roomTimeTick = window.__rts?.match?.roomTimeControls?.roomTimeState?.currentTick;
-      if (Number.isFinite(roomTimeTick)) return roomTimeTick;
-      return window.__rts?.match?.state?._cur?.tick ?? null;
-    });
+    // Use the same snapshot clock as waitForSnapshot and summary; room-time
+    // controls can still describe a different tick when a step starts.
+    return this.page.evaluate(() => window.__rts?.match?.state?._cur?.tick ?? null);
   }
 
   async ownEntity(kind, index = 0) {

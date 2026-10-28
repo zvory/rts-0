@@ -76,31 +76,34 @@ const root = fs.mkdtempSync(path.join(os.tmpdir(), "rts-tri-state-test-"));
 
 // A paused room emits exactly one new snapshot for a step. Exercise both sides
 // of the browser/CDP scheduling race without allowing a second snapshot.
-for (const arrivedBeforeWait of [true, false]) {
+for (const { arrivedBeforeWait, roomTimeTick } of [true, false].flatMap((arrivedBeforeWait) =>
+  [39, 40, 41].map((roomTimeTick) => ({ arrivedBeforeWait, roomTimeTick })))) {
   const lane = new ClientLane({ scenario: { network: {} }, room: "step-race", artifacts: {} });
   const originalWindow = globalThis.window;
   const state = { _cur: { tick: 40 } };
-  globalThis.window = { __rts: { match: { state } } };
+  globalThis.window = { __rts: { match: { state, roomTimeControls: { roomTimeState: { currentTick: roomTimeTick } } } } };
   let baselineReads = 0;
   lane.page = {
     evaluate: async (fn) => { baselineReads++; return fn(); },
     waitForFunction: async (fn, options, args) => {
       if (!arrivedBeforeWait) {
         assert.equal(fn(args), false, "wait must not resolve before the step snapshot");
-        state._cur.tick = 41;
+        state._cur.tick += 1;
       }
       assert.equal(fn(args), true, "the single step snapshot must satisfy the original baseline");
     },
   };
-  lane.currentTick = async () => 40; // Room-time controls may lag the snapshot.
-  lane.stepRoomTime = async () => { if (arrivedBeforeWait) state._cur.tick = 41; };
+  // Keep room-time metadata fixed, including across consecutive steps.
+  lane.stepRoomTime = async () => { if (arrivedBeforeWait) state._cur.tick += 1; };
   lane.summary = async () => ({ tick: state._cur.tick });
   const context = { lanes: { client: lane }, tickMarks: [], artifacts: { diff() {} } };
   try {
     await executeStep(context, { op: "stepRoomTime" });
     await executeStep(context, { op: "assertTickAdvanced", delta: 1 });
-    assert.deepEqual(context.tickMarks, [{ before: 40, after: 41 }]);
-    assert.equal(baselineReads, 0, "do not recapture a baseline after sending a step");
+    await executeStep(context, { op: "stepRoomTime" });
+    await executeStep(context, { op: "assertTickAdvanced", delta: 1 });
+    assert.deepEqual(context.tickMarks, [{ before: 40, after: 41 }, { before: 41, after: 42 }]);
+    assert.equal(baselineReads, 2, "read each baseline once, before sending its step");
   } finally {
     if (originalWindow === undefined) delete globalThis.window;
     else globalThis.window = originalWindow;
