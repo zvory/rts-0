@@ -726,6 +726,13 @@ try {
 
   await page.keyboard.press("Escape");
   await sleep(100);
+  // Selection changes before the next rendered HUD frame. Wait for the card as well,
+  // rather than assuming a loaded CI browser has rendered it within 100 ms.
+  await page.waitForFunction(() =>
+    window.__rts.match.state.selection.size === 0 &&
+    document.querySelectorAll("#command-card .cmd-empty").length === 9 &&
+    document.querySelectorAll("#command-card button").length === 0,
+  { timeout: 3000 });
   const afterGameplayEscape = await page.evaluate(() => ({
     menuHidden: document.getElementById("settings-menu")?.hidden,
     selected: window.__rts.match.state.selection.size,
