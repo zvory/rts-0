@@ -909,7 +909,7 @@ pub(in crate::ai_core::decision) fn front_direction(
     observation: &AiObservation,
     map_analysis: Option<&AiMapAnalysis>,
 ) -> Option<(f32, f32)> {
-    if !is_jeff_v1_1(profile_id) {
+    if !is_jeff_v1_1(profile_id) || super::super::jeff_v1_1::off("front") {
         return None;
     }
     let home = tile_center(observation.own_start_tile, observation.map.tile_size);

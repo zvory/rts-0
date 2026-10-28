@@ -654,7 +654,9 @@ impl AiController {
         self.active_attack_units.retain(|id, issued| {
             owned.contains(id) && tick.saturating_sub(*issued) < suppress_ticks
         });
-        if crate::ai_core::profiles::is_jeff_v1_1(self.behavior_profile_id) {
+        if crate::ai_core::profiles::is_jeff_v1_1(self.behavior_profile_id)
+            && !crate::ai_core::profiles::jeff_v1_1_feature_off("quiet")
+        {
             self.release_quiet_fights(observation, tick);
         }
     }

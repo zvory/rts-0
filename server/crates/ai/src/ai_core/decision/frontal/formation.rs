@@ -153,7 +153,7 @@ pub(super) fn select_rifle_escorts(
         .map(|unit| unit.id)
         .collect();
     // Jeff's AI V1.1 screens its Tanks against Panzerfausts with two Riflemen for every Tank.
-    let escort_count = if memory.profile_id().is_some_and(is_jeff_v1_1) {
+    let escort_count = if memory.profile_id().is_some_and(is_jeff_v1_1) && !jeff_v1_1::off("escort") {
         let line = jeff_v1_1::RIFLES_PER_TANK * memory.containment.active_tanks.len();
         riflemen
             .len()

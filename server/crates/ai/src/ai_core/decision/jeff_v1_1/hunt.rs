@@ -4,7 +4,7 @@
 //! which sends 2-11 Panzerfausts with every Tank wave, only half the Panzerfausts that died had a
 //! Jeff Rifleman or gun near them.
 //!
-//! Every enemy Panzerfaust in sight within `THREAT_TILES` of a Jeff Tank or building is a quarry.
+//! Every enemy Panzerfaust in sight within `THREAT_TILES` of a Jeff Tank is a quarry.
 //! Each, the nearest to Jeff's Tanks first, gets up to `HUNTERS_PER_FAUST` of the nearest Riflemen
 //! within `HUNT_TILES` that no other system holds, push escorts included, ordered to attack it and
 //! sent again every `REORDER_TICKS`. The hunt runs last in the decision, so its orders stand over
@@ -14,10 +14,10 @@ use super::*;
 use crate::ai_core::decision::geometry::{dist2, squared};
 
 /// Panzerfausts this close to a Jeff Tank or building are hunted.
-const THREAT_TILES: f32 = 16.0;
+const THREAT_TILES: f32 = 10.0;
 /// Riflemen this close to a Panzerfaust hunt it.
 const HUNT_TILES: f32 = 20.0;
-const HUNTERS_PER_FAUST: usize = 3;
+const HUNTERS_PER_FAUST: usize = 2;
 /// A hunter is sent again this often while its quarry lives, so formation and post orders given in
 /// between do not pull it off.
 const REORDER_TICKS: u32 = config::TICK_HZ;
@@ -47,7 +47,7 @@ pub(in crate::ai_core::decision) fn hunt_panzerfausts(
     let anchors: Vec<(f32, f32)> = observation
         .owned
         .iter()
-        .filter(|unit| unit.hp > 0 && (unit.kind == EntityKind::Tank || unit.kind.is_building()))
+        .filter(|unit| unit.hp > 0 && unit.kind == EntityKind::Tank)
         .map(|unit| (unit.x, unit.y))
         .collect();
     let tanks: Vec<(f32, f32)> = observation

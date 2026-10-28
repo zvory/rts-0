@@ -542,6 +542,23 @@ pub(crate) fn is_live_jeff(id: &str) -> bool {
     matches!(id, JEFFS_AI_ID | JEFFS_AI_V1_1_ID)
 }
 
+/// Local ablation testing only: whether `JEFF_V11_OFF` names `feature`, or `JEFF_V11_ONLY` is set
+/// and does not name it.
+pub(crate) fn jeff_v1_1_feature_off(feature: &str) -> bool {
+    type Lists = (Vec<String>, Option<Vec<String>>);
+    static LISTS: std::sync::OnceLock<Lists> = std::sync::OnceLock::new();
+    let (off, only) = LISTS.get_or_init(|| {
+        let list = |name: &str| {
+            std::env::var(name)
+                .ok()
+                .map(|value| value.split(',').map(str::to_string).collect::<Vec<_>>())
+        };
+        (list("JEFF_V11_OFF").unwrap_or_default(), list("JEFF_V11_ONLY"))
+    });
+    off.iter().any(|name| name == feature)
+        || only.as_ref().is_some_and(|only| !only.iter().any(|name| name == feature))
+}
+
 /// Jeff's AI V1.1 alone: every change V1.1 makes over V1.0 branches here.
 pub(crate) fn is_jeff_v1_1(id: &str) -> bool {
     id == JEFFS_AI_V1_1_ID

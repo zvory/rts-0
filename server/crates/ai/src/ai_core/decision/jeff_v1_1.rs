@@ -108,7 +108,7 @@ pub(super) fn keep_guns_on_posts(
     observation: &AiObservation,
     local_defenders: &mut Vec<u32>,
 ) {
-    if !is_jeff_v1_1(profile_id) {
+    if !is_jeff_v1_1(profile_id) || off("gunposts") {
         return;
     }
     local_defenders.retain(|id| {
@@ -152,16 +152,10 @@ pub(super) fn reserve_tank_steel(
     }
 }
 
-/// Local ablation testing only: `JEFF_V11_OFF=scout,raid,...` turns the named V1.1 features off.
+/// Local ablation testing only: `JEFF_V11_OFF=scout,raid,...` turns the named V1.1 features off,
+/// and `JEFF_V11_ONLY=meth,lines,...` turns off every feature it does not name.
 pub(super) fn off(feature: &str) -> bool {
-    static OFF: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
-    OFF.get_or_init(|| {
-        std::env::var("JEFF_V11_OFF")
-            .map(|value| value.split(',').map(str::to_string).collect())
-            .unwrap_or_default()
-    })
-    .iter()
-    .any(|name| name == feature)
+    crate::ai_core::profiles::jeff_v1_1_feature_off(feature)
 }
 
 fn ordered(facts: &AiFacts, memory: &AiDecisionMemory, upgrade: UpgradeKind) -> bool {
@@ -210,11 +204,12 @@ fn oil_within(plan: &spend_plan::SpendPlan, ticks: u32) -> f32 {
     plan.expected[2].1
 }
 
-/// Guns on the line in front of each finished Depot past the main.
-const GUNS_PER_BASE: usize = 4;
+/// Guns on the line in front of each finished Depot past the main. (Milder than at first: four a
+/// base, four more held home and up to 30 cost V1.1 games against Pressure AI's Tank waves.)
+const GUNS_PER_BASE: usize = 2;
 /// Guns held at the home post on top of the home pocket's and the bases' posts.
-const HOME_GUN_RESERVE: usize = 4;
-const MAX_GUNS: usize = 30;
+const HOME_GUN_RESERVE: usize = 0;
+const MAX_GUNS: usize = 16;
 /// V1.1 keeps four Riflemen home and two for every Tank, a screen in front of the Tanks against
 /// Panzerfausts.
 const HOME_RIFLES: usize = 4;
@@ -233,7 +228,7 @@ pub(super) fn rifle_line(
     (banked, fausts): (bool, usize),
     priorities: &mut Vec<EntityKind>,
 ) -> Option<usize> {
-    if !is_jeff_v1_1(profile_id) {
+    if !is_jeff_v1_1(profile_id) || off("rifleline") {
         return None;
     }
     // Steel banked with nothing else to buy goes into Riflemen, up to the most a line takes.
@@ -340,7 +335,7 @@ pub(super) fn barracks_batches(
         .filter(|_| {
             is_jeff_v1_1(profile_id)
                 && building_kind == EntityKind::Barracks
-                && buildings.len() > 1
+                && buildings.len() > 2
                 && !off("gunrax")
         })
     else {

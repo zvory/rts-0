@@ -163,7 +163,7 @@ pub(super) fn site_depth(
 }
 
 /// Jeff's home Riflemen while no raid is being answered: the current Jeff's defensive pocket, or
-/// a frozen profile's coverage or screen; V1.1's hold its base lines instead
+/// a frozen profile's coverage or screen. V1.1's Riflemen on its outer base lines stay there
 /// (`jeff_v1_1::base_line`). `assigned`: units home defense already ordered, and units
 /// the route line holds.
 pub(super) fn stage_home_riflemen(
@@ -173,9 +173,6 @@ pub(super) fn stage_home_riflemen(
     facts: &AiFacts,
     (local_defense_assigned, route_line_reserved): (&BTreeSet<u32>, &BTreeSet<u32>),
 ) {
-    if is_jeff_v1_1(profile.id) && !jeff_v1_1::off("lines") {
-        return;
-    }
     let riflemen: Vec<u32> = if uses_home_rifle_coverage(profile.id) {
         observation
             .owned
@@ -188,6 +185,8 @@ pub(super) fn stage_home_riflemen(
                     && !memory.containment.active_riflemen.contains(&unit.id)
                     && !memory.expansion_security.riflemen.contains(&unit.id)
                     && !route_line_reserved.contains(&unit.id)
+                    // Jeff's AI V1.1's base lines hold a few Riflemen past the main.
+                    && !memory.jeff_v1_1.base_lines.posted(unit.id)
             })
             .map(|unit| unit.id)
             .collect()
@@ -543,7 +542,7 @@ pub(super) fn cap_opening_guns(
 ) {
     // Jeff's AI V1.1 keeps building guns for its gun posts (`jeff_v1_1::gun_cap`).
     if runs_live_jeff(profile_id)
-        && !is_jeff_v1_1(profile_id)
+        && (!is_jeff_v1_1(profile_id) || jeff_v1_1::off("guncap"))
         && facts.unit_count(EntityKind::Tank) > 0
     {
         for (kind, max) in max_counts {

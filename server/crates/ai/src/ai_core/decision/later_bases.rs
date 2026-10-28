@@ -142,7 +142,7 @@ where
         return status;
     }
     note_dry_wells(observation, &mut memory.later_bases);
-    let v1_1 = is_jeff_v1_1(profile.id);
+    let v1_1 = is_jeff_v1_1(profile.id) && !jeff_v1_1::off("base3");
     memory.later_bases.v1_1 = v1_1;
     if v1_1 && !jeff_v1_1::off("steelunlock") {
         note_low_steel(observation, &mut memory.later_bases);

@@ -70,6 +70,8 @@ const PICKET_MIN_RIFLES: usize = 4;
 const SPARE_POINTS: usize = 4;
 /// A base within this distance of the enemy's route to the main is on it.
 const ON_ROUTE_TILES: f32 = 12.0;
+/// Riflemen on each line past the main; the rest stay in the home pocket.
+const OUTER_RIFLES: usize = 3;
 /// A unit this close to its post holds it.
 const ON_POST_TILES: f32 = 1.5;
 /// Two posts this close are one.
@@ -137,6 +139,13 @@ pub(in crate::ai_core::decision) struct BaseLine {
     /// The base's extractors.
     mines: Vec<(f32, f32)>,
     pub(in crate::ai_core::decision) exposure: usize,
+}
+
+impl LineMemory {
+    /// Whether `id` holds a post on a base line.
+    pub(in crate::ai_core::decision) fn posted(&self, id: u32) -> bool {
+        self.posts.contains_key(&id)
+    }
 }
 
 impl BaseLine {
@@ -657,8 +666,25 @@ pub(in crate::ai_core::decision) fn hold(
             }),
         ),
     ];
-    let exposure: Vec<usize> = lines.iter().map(|line| line.exposure).collect();
     let outer = lines.iter().any(|line| !line.main);
+    // Milder than at first: the main keeps V1.0's home pocket, and only the bases past it hold a
+    // line, of `OUTER_RIFLES` Riflemen each.
+    if !outer {
+        memory.jeff_v1_1.base_lines.posts.clear();
+        return;
+    }
+    let exposure: Vec<usize> = lines
+        .iter()
+        .map(|line| if line.main { 0 } else { line.exposure })
+        .collect();
+    let outer_lines = lines.iter().filter(|line| !line.main).count();
+    let previous = &memory.jeff_v1_1.base_lines.posts;
+    let mut classes = classes;
+    {
+        let rifles = &mut classes[0].1;
+        rifles.sort_by_key(|unit| (!previous.contains_key(&unit.id), unit.id));
+        rifles.truncate(OUTER_RIFLES * outer_lines);
+    }
     let gun_weights: Vec<usize> = lines
         .iter()
         .map(|line| if outer && line.main { 0 } else { line.exposure })
@@ -691,7 +717,6 @@ pub(in crate::ai_core::decision) fn hold(
             None => 0,
         })
         .collect();
-    let previous = &memory.jeff_v1_1.base_lines.posts;
     let near_post = |unit: &AiEntitySummary| {
         previous.get(&unit.id).is_some_and(|post| {
             dist2(unit.x, unit.y, post.at.0 as f32, post.at.1 as f32) <= squared(ON_POST_TILES * ts)

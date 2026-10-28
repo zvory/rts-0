@@ -144,7 +144,7 @@ impl PushMemory {
 }
 
 fn v1_1(memory: &AiDecisionMemory) -> bool {
-    memory.profile_id().is_some_and(is_jeff_v1_1)
+    memory.profile_id().is_some_and(is_jeff_v1_1) && !super::off("push")
 }
 
 fn is_fighter(kind: EntityKind) -> bool {

@@ -99,7 +99,7 @@ pub(in crate::ai_core::decision) fn barracks_target(
     } else {
         target
     };
-    if banked {
+    if banked && !super::off("bankprod") {
         target.max(BANKED_BARRACKS)
     } else {
         target
@@ -114,6 +114,7 @@ pub(in crate::ai_core::decision) fn extra_factory(
     factories: usize,
 ) -> bool {
     is_jeff_v1_1(profile_id)
+        && !super::off("bankprod")
         && banked
         && observation.economy.oil >= BANKED_FACTORY_OIL
         && factories < BANKED_FACTORIES

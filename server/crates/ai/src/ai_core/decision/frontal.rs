@@ -410,7 +410,7 @@ pub(super) fn sync_containment_recovery(
         // Jeff's AI V1.1 sends one of the push's Riflemen ahead instead.
         let rifle_spotter = || {
             let escort = memory.containment.active_riflemen.iter().copied().min();
-            escort.filter(|_| is_jeff_v1_1(profile.id))
+            escort.filter(|_| is_jeff_v1_1(profile.id) && !jeff_v1_1::off("push"))
         };
         if let Some(scout) = replacement.or_else(rifle_spotter) {
             memory.containment.active_riflemen.remove(&scout);
