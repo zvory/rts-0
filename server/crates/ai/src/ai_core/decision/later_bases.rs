@@ -182,7 +182,11 @@ where
         let home = geometry::tile_center(observation.own_start_tile, observation.map.tile_size);
         let escort_ready =
             v1_1 && jeff_v1_1::third_base::escort(observation, memory, home).is_some();
-        let army_ready = if v1_1 {
+        let save = !jeff_v1_1::off("depotsave");
+        let army_ready = if v1_1 && save {
+            // V1.1 saves the Depot's cost below (`depotsave`): an escort is all base 3 waits for.
+            escort_ready
+        } else if v1_1 {
             (total_tanks >= required_total_tanks
                 || if jeff_v1_1::off("base3bank") {
                     jeff_v1_1::third_base::banked(observation, memory)
@@ -202,10 +206,13 @@ where
             && observation.economy.steel >= steel
             && observation.economy.oil >= oil
             && !factory_due;
-        // V1.1 keeps the Depot's Oil aside once an escort is free, so the base is not held up by
-        // Oil that Tanks spent first.
+        // V1.1 keeps the Depot's cost aside once an escort is free and the bases are quiet, so
+        // Tanks and Barracks do not spend it first: on The River V1.1 held two bases all game with
+        // under 250 Steel in the bank while Pressure AI took five.
         if escort_ready && !ready {
-            actions.holdback_resources(0, oil);
+            let quiet = defense::local_defense_contact(observation).is_none() && !factory_due;
+            let steel_kept = if save && quiet { steel } else { 0 };
+            actions.holdback_resources(steel_kept, oil);
         }
         if ready {
             let resources = expansion::expansion_candidate_resources(observation);
