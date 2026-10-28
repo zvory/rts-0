@@ -1,4 +1,4 @@
-import { STATE, isBuilding } from "./protocol.js";
+import { UPGRADE, STATE, isBuilding } from "./protocol.js";
 import { STATS, UPGRADES } from "./config.js";
 
 export function constructionCancelDescriptor(building) {
@@ -108,6 +108,10 @@ export function trainDisabledReason(ctx, unit, resources, isOwn) {
 export function researchAvailability(ctx, upgrade, resources, isOwn) {
   const def = UPGRADES[upgrade];
   if (!def) return "locked";
+  if (upgrade === UPGRADE.INDUSTRIAL_CENTER) {
+    if (industrialCenterSlots(ctx, isOwn) >= 2 || !selectedResearchBuilding(ctx, upgrade, isOwn)) return "locked";
+    return affordable(def.cost, resources) ? "ready" : "unaffordable";
+  }
   if ((ctx.upgrades || []).includes(upgrade)) return "locked";
   if (researchQueuedBuilding(ctx, def.researchedAt, upgrade, isOwn)) return "locked";
   if (!selectedResearchBuilding(ctx, upgrade, isOwn)) return "locked";
@@ -117,6 +121,11 @@ export function researchAvailability(ctx, upgrade, resources, isOwn) {
 export function researchDisabledReason(ctx, upgrade, resources, isOwn) {
   const def = UPGRADES[upgrade];
   if (!def) return "";
+  if (upgrade === UPGRADE.INDUSTRIAL_CENTER) {
+    if (!selectedResearchBuilding(ctx, upgrade, isOwn)) return "Select a completed, unupgraded Resource Depot";
+    if (industrialCenterSlots(ctx, isOwn) >= 2) return "Maximum two Industrial Centers (including queued upgrades)";
+    return affordable(def.cost, resources) ? "+100 supply while this depot exists" : "Queue now; upgrade waits for resources";
+  }
   if ((ctx.upgrades || []).includes(upgrade)) return "Researched";
   const queuedAt = researchQueuedBuilding(ctx, def.researchedAt, upgrade, isOwn);
   if (queuedAt?.prodUpgrade === upgrade) return "Researching";
@@ -141,6 +150,11 @@ export function researchSlotForUpgrade(buildingKind, upgrade, trains) {
   return afterTrainSlot >= 0 ? afterTrainSlot : trains.length;
 }
 
+function industrialCenterSlots(ctx, isOwn) {
+  return researchBuildings(ctx, UPGRADES[UPGRADE.INDUSTRIAL_CENTER].researchedAt, isOwn)
+    .filter((e) => e.industrialCenter || (e.prodUpgradeQueue || []).includes(UPGRADE.INDUSTRIAL_CENTER)).length;
+}
+
 function researchQueuedBuilding(ctx, buildingKind, upgrade, isOwn) {
   return researchBuildings(ctx, buildingKind, isOwn).find((entity) =>
     (entity.prodUpgradeQueue || []).includes(upgrade));
@@ -162,6 +176,7 @@ export function selectedResearchBuilding(ctx, upgrade, isOwn) {
   return (ctx.selection || []).find((entity) =>
     isOwn(ctx, entity) &&
     entity.kind === def.researchedAt &&
+    (upgrade !== UPGRADE.INDUSTRIAL_CENTER || (!entity.industrialCenter && entity.state !== STATE.CONSTRUCT)) &&
     !(entity.prodUpgradeQueue || []).includes(upgrade) &&
     (prerequisiteResearched ||
       (entity.prodUpgradeQueue || []).includes(def.requiresUpgrade))) || null;

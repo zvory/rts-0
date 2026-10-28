@@ -3,6 +3,22 @@ use crate::game::entity::{ResearchItem, MAX_PRODUCTION_QUEUE};
 use super::Entity;
 
 impl Entity {
+    pub(crate) fn is_industrial_center(&self) -> bool {
+        self.kind == crate::game::entity::EntityKind::ResourceDepot
+            && self
+                .production
+                .as_ref()
+                .is_some_and(|p| p.industrial_center)
+    }
+
+    pub(crate) fn industrial_center_slot_reserved(&self) -> bool {
+        self.hp > 0
+            && (self.is_industrial_center()
+                || self.research_queue().iter().any(|item| {
+                    item.upgrade == crate::game::upgrade::UpgradeKind::IndustrialCenter
+                }))
+    }
+
     pub(crate) fn research_queue(&self) -> &[ResearchItem] {
         self.production
             .as_ref()

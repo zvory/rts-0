@@ -2773,3 +2773,9 @@ When that launch produces an all-AI live match, the score screen retains the liv
 through automatic post-match replay playback and renders it as an Observation ID. The id is the
 handoff key for replay recovery and server lag-log inspection; it is not a player identity or a
 new gameplay control.
+
+Industrial Centers retain the Resource Depot kind and sprite. The research command card upgrades
+one selected completed depot; completed/pending centers lock out further upgrades at two.
+The renderer receives the public `industrialCenter` physical flag through presentation snapshots
+and draws a gold footprint rim in the existing building overlay pool. Fog memory uses the last
+observed flag. Dedicated art/audio are deferred.

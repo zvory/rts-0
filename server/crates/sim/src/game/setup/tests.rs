@@ -38,7 +38,7 @@ fn fixture_faction_start_uses_catalog_loadout_and_shared_resources() {
     assert_eq!(fixture.faction_id, EMPTY_FIXTURE_FACTION_ID);
     assert_eq!(fixture.steel, 125);
     assert_eq!(fixture.oil, 25);
-    assert_eq!(game.snapshot_for(2).supply_cap, config::PLAYER_SUPPLY_CAP);
+    assert_eq!(game.snapshot_for(2).supply_cap, config::STARTING_SUPPLY_CAP);
     assert_eq!(
         fixture.supply_used,
         crate::rules::economy::supply_cost(EntityKind::ScoutCar)
@@ -242,7 +242,7 @@ fn standard_starting_loadout_matches_phase0_inventory() {
         assert_eq!(player.oil, config::STARTING_OIL);
         assert_eq!(
             game.snapshot_for(player.id).supply_cap,
-            config::PLAYER_SUPPLY_CAP
+            config::STARTING_SUPPLY_CAP
         );
         assert_eq!(
             player.supply_used,

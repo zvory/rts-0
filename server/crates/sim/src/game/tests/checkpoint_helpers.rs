@@ -193,7 +193,7 @@ fn semantic_game_view(game: &Game) -> SemanticGameView {
             steel: player.steel,
             oil: player.oil,
             supply_used: player.supply_used,
-            supply_cap: crate::config::PLAYER_SUPPLY_CAP,
+            supply_cap: player.supply_cap(&game.state.entities),
             is_ai: player.is_ai,
             score: format!("{:?}", player.score),
             upgrades: player

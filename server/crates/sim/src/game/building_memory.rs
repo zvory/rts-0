@@ -20,6 +20,8 @@ pub(crate) struct BuildingMemoryEntry {
     pub(crate) hp: u32,
     pub(crate) max_hp: u32,
     pub(crate) build_progress: Option<f32>,
+    #[serde(default)]
+    pub(crate) industrial_center: bool,
     pub(crate) under_construction: bool,
     pub(crate) observed_tick: u32,
     #[serde(default)]
@@ -262,6 +264,7 @@ fn entry_from_entity(
         hp: entity.hp,
         max_hp: entity.max_hp,
         build_progress: entity.build_progress_fraction(),
+        industrial_center: entity.is_industrial_center(),
         under_construction: entity.under_construction(),
         observed_tick,
         map_authored,

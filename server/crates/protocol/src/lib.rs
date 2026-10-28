@@ -1100,6 +1100,7 @@ mod tests {
             500,
             states::TRAIN,
         );
+        center.industrial_center = true;
         center.prod_kind = Some(kinds::WORKER.to_string());
         center.prod_progress = Some(0.25);
         center.prod_queue = Some(2);
@@ -1174,6 +1175,7 @@ mod tests {
             visible_tiles: vec![1, 1, 0, 0, 0, 1],
             explored_tiles: vec![1, 1, 1, 0, 0, 1],
             remembered_buildings: vec![RememberedBuildingView {
+                industrial_center: true,
                 id: 99,
                 owner: 2,
                 kind: kinds::DEPOT.to_string(),

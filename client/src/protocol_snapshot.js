@@ -185,8 +185,8 @@ function decodeVisibilityRuns(record, field = "visibleTiles") {
 }
 
 function decodeCompactRememberedBuilding(record, index) {
-  const fields = readArray(record, `remembered building ${index}`, 7);
-  if (fields.length !== 7) throw new Error(`remembered building ${index} field count mismatch`);
+  const fields = readArray(record, `remembered building ${index}`, 8);
+  if (fields.length !== 7 && fields.length !== 8) throw new Error(`remembered building ${index} field count mismatch`);
   return {
     id: readU32(fields[0], "rememberedBuilding.id"),
     owner: readU32(fields[1], "rememberedBuilding.owner"),
@@ -208,6 +208,7 @@ function decodeCompactRememberedBuilding(record, index) {
       ];
     }),
     observedTick: readU32(fields[6], "rememberedBuilding.observedTick"),
+    industrialCenter: fields.length > 7 ? readBool(fields[7], "rememberedBuilding.industrialCenter") : false,
   };
 }
 
@@ -323,7 +324,7 @@ function decodeCompactPlayerResource(record, index) {
 }
 
 function decodeCompactEntity(record, index) {
-  const fields = readArray(record, `entity ${index}`, 44);
+  const fields = readArray(record, `entity ${index}`, 45);
   if (fields.length < 8) throw new Error(`entity ${index} is too short`);
   const entity = {
     id: readU32(fields[0], "entity.id"),
@@ -372,6 +373,7 @@ function decodeCompactEntity(record, index) {
   assignOptional(entity, "panzerfaustWindupProgress", fields, 41, readNumber);
   assignOptional(entity, "unitsKilled", fields, 42, readU32);
   assignOptional(entity, "rocketRackCount", fields, 43, readU32);
+  assignOptional(entity, "industrialCenter", fields, 44, readBool);
   return entity;
 }
 

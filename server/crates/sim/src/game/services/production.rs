@@ -107,10 +107,10 @@ pub(crate) fn production_system(
                 };
                 let cost = rules::economy::resource_cost(unit);
                 let supply = rules::economy::supply_cost(unit);
-                let supply_available = player.can_reserve_supply(supply);
+                let supply_available = player.can_reserve_supply(supply, entities);
                 let auto_build_allowed = player.can_auto_build(cost);
                 if supply_available && auto_build_allowed && player.spend_cost(cost) {
-                    if player.reserve_supply(supply) {
+                    if player.reserve_supply(supply, entities) {
                         let queued = entities.get_mut(id).is_some_and(|producer| {
                             let queued = producer.push_production(ProdItem {
                                 unit,
@@ -176,9 +176,9 @@ pub(crate) fn production_system(
             let cost = rules::economy::resource_cost(unit);
             let supply = rules::economy::supply_cost(unit);
             if let Some(player) = players.iter_mut().find(|player| player.id == owner) {
-                let supply_available = player.can_reserve_supply(supply);
+                let supply_available = player.can_reserve_supply(supply, entities);
                 if supply_available && player.spend_cost(cost) {
-                    if player.reserve_supply(supply) {
+                    if player.reserve_supply(supply, entities) {
                         if !entities
                             .get_mut(id)
                             .is_some_and(|building| building.mark_front_production_paid())
@@ -216,9 +216,16 @@ pub(crate) fn production_system(
 
         if let Some((owner, upgrade)) = completed_research {
             if let Some(player) = players.iter_mut().find(|p| p.id == owner) {
-                player.upgrades.insert(upgrade);
+                if upgrade != upgrade::UpgradeKind::IndustrialCenter {
+                    player.upgrades.insert(upgrade);
+                }
             }
             if let Some(b) = entities.get_mut(id) {
+                if upgrade == upgrade::UpgradeKind::IndustrialCenter {
+                    if let Some(production) = b.production.as_mut() {
+                        production.industrial_center = true;
+                    }
+                }
                 if let Some(queue) = b.research_queue_mut() {
                     if !queue.is_empty() {
                         queue.remove(0);

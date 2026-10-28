@@ -162,6 +162,7 @@ pub mod upgrades {
     pub const SMOKE_PLUS: &str = "smoke_plus";
     pub const SCOUT_PLANE_UNLOCK: &str = "scout_plane_unlock";
     pub const ROCKETS: &str = "rockets";
+    pub const INDUSTRIAL_CENTER: &str = "industrial_center";
     pub const ALL: &[&str] = &[
         METHAMPHETAMINES,
         PANZERFAUSTS,
@@ -495,6 +496,7 @@ const UPGRADE_CODES: &[(&str, u8)] = &[
     (upgrades::SMOKE_PLUS, 9),
     (upgrades::SCOUT_PLANE_UNLOCK, 11),
     (upgrades::ROCKETS, 12),
+    (upgrades::INDUSTRIAL_CENTER, 14),
 ];
 
 const WEAPON_KIND_CODES: &[(&str, u8)] = &[
@@ -805,6 +807,7 @@ fn upgrade_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("SMOKE_PLUS", upgrades::SMOKE_PLUS),
         ("SCOUT_PLANE_UNLOCK", upgrades::SCOUT_PLANE_UNLOCK),
         ("ROCKETS", upgrades::ROCKETS),
+        ("INDUSTRIAL_CENTER", upgrades::INDUSTRIAL_CENTER),
     ])
 }
 
@@ -960,6 +963,7 @@ fn compact_slot_schemas() -> CompactSlotSchemas {
             optional_field(41, "panzerfaustWindupProgress"),
             optional_field(42, "unitsKilled"),
             optional_field(43, "rocketRackCount"),
+            optional_field(44, "industrialCenter"),
         ],
         event: event_slot_schemas(),
         trench: vec![

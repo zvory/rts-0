@@ -12,6 +12,7 @@ fn rifle(hp: u32, entrenched: bool) -> Fighter {
 
 fn enemy(id: u32, kind: EntityKind, tiles_away: f32, hp: u32) -> AiEntitySummary {
     AiEntitySummary {
+        industrial_center_slot_reserved: false,
         id,
         owner: 2,
         kind,

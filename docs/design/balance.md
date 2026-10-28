@@ -636,9 +636,12 @@ profiles and explicit activation/autocast policy instead of being folded into de
   holding 625 steel each split into two six-wide fields four tiles out on opposite sides of the
   base + 3 oil patches with 962 oil each nearby. Each base therefore holds 7,500 steel and 2,886
   oil, a 2.599:1 Steel/Oil ratio (the nearest whole-unit node capacity to the 2.6:1 target).
-- Supply: every active player has an intrinsic `300` supply allowance, which is also the hard cap.
-  Buildings do not provide supply: Resource Depots, Zamoks, and legacy fixture/replay Depots all grant
-  `+0`. Supply remains an army-size limit without forcing expansion or supply-building chores.
+- Supply: Kriegsia starts at 100. A Resource Depot can upgrade in place to an Industrial
+  Center for 800 steel + 300 oil over 1,800 ticks (60 seconds), granting +100 global supply
+  while alive. At most two completed or queued centers per player; absolute cap 300. Losing
+  a center removes its supply and frees a replacement slot. Existing units survive over cap;
+  further supply reservations wait. Local upgrade state preserves all depot functions/stats.
+  Other factions retain their existing 300 supply allowance. See [Industrial Centers](industrial-centers.md).
 - Attached steel mining: gatherers walk to a steel patch, latch onto it, and mine in place.
   Every `HARVEST_TICKS = 40` the base load (`STEEL_LOAD = 2`) is deposited directly into the
   player's economy only if the resource node is within `MINING_ANCHOR_RANGE_TILES = 11.0` tiles of a
@@ -708,7 +711,7 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 
 | kind                       | player-facing name | hp  | sight | cost | foot | buildTicks | notes |
 |----------------------------|--------------------|-----|-------|-----|------|-----------|-------|
-| resource_depot                | Resource Depot        | 180 | 1     | 450 steel + 100 oil | 3x3  | 150       | trains workers and permanently auto-builds free Steel Mines and Pump Jacks concurrently; no supply; players start with one free |
+| resource_depot                | Resource Depot        | 180 | 1     | 450 steel + 100 oil | 3x3  | 150       | trains workers and permanently auto-builds free Steel Mines and Pump Jacks concurrently; Industrial Center upgrade provides +100 supply; players start with one free |
 | zamok                      | Zamok              | 360 | 1     | 0   | 3x3  | 0         | Ekat start building; no supply; trains Golem; no research in first playable slice |
 | depot                      | Supply Depot       | 65 | 1     | 100 | 2x2  | 300       | disabled in the current experiment (not buildable and no command-card button); retained for replay and fixture compatibility; no supply |
 | barracks                   | Barracks           | 98 | 1     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, and panzerfaust; Machine Gunner requires a completed Training Centre and Panzerfaust requires completed Panzerfausts research; requires a Resource Depot |

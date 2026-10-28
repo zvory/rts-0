@@ -200,8 +200,9 @@ export function _drawBuilding(e, colorByOwner, state) {
   const extractorInactive = (e.kind === KIND.STEEL_MINE || e.kind === KIND.PUMP_JACK)
     && e.extractorActive === false
     && !underConstruction;
-  if (hasProductionProgress || extractorInactive) {
-    const overlayKey = `${e.x}|${y0}|${w}|${e.prodProgress ?? ""}|${extractorInactive}`;
+  const industrialCenter = e.industrialCenter === true;
+  if (hasProductionProgress || extractorInactive || industrialCenter) {
+    const overlayKey = `${e.x}|${y0}|${w}|${e.prodProgress ?? ""}|${extractorInactive}|${industrialCenter}`;
     const overlay = this._staticSlot?.(
       "buildingOverlays",
       e.id,
@@ -209,6 +210,12 @@ export function _drawBuilding(e, colorByOwner, state) {
     ) || this._slot("buildingOverlays", e.id);
     overlay.position.set(0, 0);
     if (overlay.rtsStaticRedraw !== false) {
+      if (industrialCenter) {
+        gfxNoFill(overlay);
+        gfxStroke(overlay, 4, 0xe7bb49, 1);
+        gfxRect(overlay, x0 + 2, y0 + 2, w - 4, h - 4);
+        gfxStroke(overlay, 0);
+      }
       if (hasProductionProgress) {
         // Unit production progress bar along the roof line.
         const bw = w * 0.78;
