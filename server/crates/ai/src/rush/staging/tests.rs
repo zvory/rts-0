@@ -327,6 +327,7 @@ fn pullback_owns_only_riflemen_approaching_staging_and_resumes_the_slot() {
     assert!(!orders
         .iter()
         .any(|a| matches!(a, AiActionRequest::Move { units, .. } if units.contains(&id))));
+    snapshot.entities.retain(|entity| entity.id != 999);
     waves.first_wave_unlocked = true;
     snapshot.tick += 9;
     step(&mut waves, &start, &snapshot, target);
@@ -404,4 +405,82 @@ fn recovery_grace_keeps_a_ready_cohort_from_launching_just_before_handoff() {
     assert_eq!(waves.waves_launched, 0);
     assert!(!waves.first_wave_launched);
     assert_eq!(waves.handoff_tick(), None);
+}
+
+#[test]
+fn staging_defense_supports_the_cohort_then_regroups_without_retasking_other_units() {
+    let (start, mut snapshot) = fixture();
+    let target = (2000.0, 2000.0);
+    let mut waves = RushWaves::default();
+    waves.rally(&frame(&start, &snapshot), 2, target).unwrap();
+    step(&mut waves, &start, &snapshot, target);
+    assemble(&mut snapshot, &waves);
+    snapshot.tick += 9;
+    step(&mut waves, &start, &snapshot, target);
+    let staged: Vec<_> = waves.staged.iter().copied().collect();
+    assert_eq!(staged.len(), 4);
+    let specimen = snapshot
+        .entities
+        .iter()
+        .find(|e| e.id == staged[0])
+        .unwrap()
+        .clone();
+    add_rifle(&mut snapshot, &specimen, 1001);
+    add_rifle(&mut snapshot, &specimen, 1002);
+    waves.launched.insert(1002);
+    let mut enemy = specimen.clone();
+    enemy.id = 2001;
+    enemy.owner = 2;
+    enemy.x += 64.0;
+    enemy.target_id = Some(staged[0]);
+    let threat = (enemy.x, enemy.y);
+    snapshot.entities.push(enemy.clone());
+    // A visible bystander must not prolong the response after the actual attackers vanish.
+    enemy.id = 2002;
+    enemy.target_id = None;
+    snapshot.entities.push(enemy);
+    waves.first_wave_unlocked = true;
+    snapshot.tick += 9;
+    let orders = step(&mut waves, &start, &snapshot, target);
+    assert!(orders.iter().any(|a| matches!(a,
+        AiActionRequest::AttackMove { units, x, y, queued: false }
+        if units == &staged && (*x, *y) == threat)));
+    assert!(!orders.iter().any(|a| matches!(a,
+        AiActionRequest::AttackMove { units, x, y, .. }
+        if units.contains(&1002) && (*x, *y) == threat)));
+    assert!(!waves.defending.contains(&1002));
+    assert!(!waves.defending.contains(&1001));
+    assert_eq!(waves.waves_launched, 0);
+    // The threat stays visible between shots; defenders keep their cohort away from the line.
+    for entity in &mut snapshot.entities {
+        if staged.contains(&entity.id) {
+            entity.x += 128.0;
+            entity.state = "moving".into();
+        }
+        if entity.id == 2001 {
+            entity.target_id = None;
+            entity.x += 32.0;
+        }
+    }
+    snapshot.tick += 9;
+    let orders = step(&mut waves, &start, &snapshot, target);
+    assert!(orders.iter().any(|a| matches!(a,
+        AiActionRequest::AttackMove { units, x, y, .. }
+        if units == &staged && (*x, *y) == (threat.0 + 32.0, threat.1))));
+    snapshot.entities.retain(|entity| entity.id != 2001);
+    snapshot.tick += 9;
+    let orders = step(&mut waves, &start, &snapshot, target);
+    assert!(waves.defending.is_empty());
+    assert_eq!(waves.waves_launched, 0);
+    for id in &staged {
+        assert!(orders.iter().any(|a| matches!(a,
+            AiActionRequest::AttackMove { units, x, y, queued: false }
+            if units == &[*id] && (*x, *y) == waves.slots[id])));
+    }
+    assemble(&mut snapshot, &waves);
+    snapshot.tick += 9;
+    let orders = step(&mut waves, &start, &snapshot, target);
+    assert!(orders.iter().any(|a| matches!(a,
+        AiActionRequest::AttackMove { units, x, y, .. }
+        if units.len() == 5 && (*x, *y) == target)));
 }

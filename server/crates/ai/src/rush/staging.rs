@@ -34,6 +34,8 @@ pub(super) struct RushWaves {
     pullback: PullbackMemory,
     /// Once a member reaches staging, the existing staging/flow policy keeps ownership.
     staged: BTreeSet<u32>,
+    staging_attackers: BTreeSet<u32>,
+    defending: BTreeSet<u32>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -70,6 +72,8 @@ impl RushWaves {
             self.issued.clear();
             self.held.clear();
             self.staged.clear();
+            self.staging_attackers.clear();
+            self.defending.clear();
         }
         self.plan.as_ref().map(|(_, line)| line.center)
     }
@@ -138,6 +142,7 @@ impl RushWaves {
             self.issued.remove(id);
             self.held.remove(id);
         }
+        let defending_stage = self.defend_stage(frame, actions);
         let ready = units
             .iter()
             .filter_map(|entity| {
@@ -158,7 +163,8 @@ impl RushWaves {
                                 .is_some_and(|progress| progress >= FIRST_WAVE_RESEARCH_PROGRESS)
                     })
             });
-        let may_launch = !self.launches_suspended
+        let may_launch = !defending_stage
+            && !self.launches_suspended
             && if self.first_wave_launched {
                 ready.len() >= 5
             } else {
@@ -185,7 +191,7 @@ impl RushWaves {
         }
         self.flow.step(frame, target, &self.launched, actions);
         for entity in units {
-            if pullback.active.contains(&entity.id) {
+            if pullback.active.contains(&entity.id) || self.defending.contains(&entity.id) {
                 continue;
             }
             let Some(slot) = self.slots.get(&entity.id) else {
@@ -210,6 +216,55 @@ impl RushWaves {
                 self.held.remove(&entity.id);
             }
         }
+    }
+
+    /// A staged cohort stays together until its visible attackers are gone, then regroups.
+    fn defend_stage(&mut self, frame: &AiFrame, actions: &mut AiActions) -> bool {
+        let members: BTreeSet<_> = self
+            .staged
+            .iter()
+            .copied()
+            .filter(|id| self.slots.contains_key(id))
+            .collect();
+        let enemies: Vec<_> = frame
+            .visible_enemies()
+            .iter()
+            .filter(|enemy| enemy.health.current > 0 && enemy.state != AiEntityState::Dead)
+            .collect();
+        self.staging_attackers
+            .retain(|id| enemies.iter().any(|enemy| enemy.id == *id));
+        self.staging_attackers.extend(
+            enemies
+                .iter()
+                .filter(|enemy| enemy.target.is_some_and(|id| members.contains(&id)))
+                .map(|enemy| enemy.id),
+        );
+        let threat = enemies
+            .iter()
+            .filter(|enemy| self.staging_attackers.contains(&enemy.id))
+            .min_by_key(|enemy| enemy.id);
+        if let Some(threat) = threat.filter(|_| !members.is_empty()) {
+            // Preserve the same destination for every command-sized slice of the cohort.
+            let ids: Vec<_> = members.into_iter().collect();
+            for chunk in ids.chunks(rts_contract::MAX_UNITS_PER_COMMAND) {
+                if let Ok(group) = UnitGroup::new(chunk.iter().copied()) {
+                    if actions
+                        .attack_move(&group, threat.position.0, threat.position.1, false)
+                        .is_ok()
+                    {
+                        self.defending.extend(chunk.iter().copied());
+                    }
+                }
+            }
+            return true;
+        }
+        self.staging_attackers.clear();
+        for id in std::mem::take(&mut self.defending) {
+            // Force a return order even if the previous defense attack-move is still active.
+            self.issued.remove(&id);
+            self.held.remove(&id);
+        }
+        false
     }
 }
 

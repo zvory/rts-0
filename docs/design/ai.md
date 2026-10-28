@@ -391,6 +391,14 @@ least five units actually at their slots, rather than counting en-route reinforc
 launches with one group command. Launched units are never added to a later wave or pulled back to
 staging, and later production gathers into a fresh cohort.
 
+If a visible enemy targets an unlaunched unit that has reached staging, all staged,
+unlaunched infantry attack-move to that enemy’s current position. The response remembers
+attackers while they remain visible, pauses wave launches, and keeps staged membership even
+when defenders leave their slots. Incoming recruits continue assembling normally; launched
+waves keep their own orders. Once all remembered attackers disappear or die, defenders return
+to their assigned slots and normal arrival-based wave launches resume. Unrelated visible enemies
+do not prolong the response.
+
 `AiActions::queue_research` emits an ordinary research queue request without requiring or
 reserving its eventual cost. Unlike the affordable `research` helper, it permits construction-
 time/unpaid queues; authoritative simulation validation and payment still apply.
