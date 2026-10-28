@@ -103,6 +103,11 @@ pub(super) struct LaterBaseStatus {
 }
 
 impl LaterBases {
+    /// The site of the base being taken, if any.
+    pub(super) fn site(&self) -> Option<(u32, u32)> {
+        self.site
+    }
+
     /// Whether a new base's site is in hand.
     pub(super) fn planning(&self) -> bool {
         self.site.is_some()

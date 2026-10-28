@@ -61,6 +61,7 @@ pub(super) fn finish(
             .reserved()
             .chain(memory.third_pressure.reserved())
             .chain(memory.jeff_v1_1.tank_raid.units())
+            .chain(memory.jeff_v1_1.front_line.units())
             .collect();
         decision.trace.notes = govern(
             observation,

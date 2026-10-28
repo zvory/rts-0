@@ -1075,6 +1075,7 @@ where
     // New-base guards stay out of the push until the base is covered.
     frontal_exclusions.extend(memory.later_bases.guards.iter().copied());
     frontal_exclusions.extend(memory.jeff_v1_1.natural.support.keys().copied());
+    frontal_exclusions.extend(memory.jeff_v1_1.front_line.units());
     frontal_exclusions.extend(route_line_reserved.iter().copied());
     // Raid responders, sentries and units stepping out of reach are home defense's.
     frontal_exclusions.extend(memory.raid_defense.reserved());
@@ -1099,6 +1100,7 @@ where
     local_ready_units.retain(|id| !expansion_footprint_blockers.contains(id));
     local_ready_units.retain(|id| !push_units.contains(id));
     local_ready_units.retain(|id| !memory.opening_rush.is_reserved(*id));
+    local_ready_units.retain(|id| !memory.jeff_v1_1.front_line.holds(*id));
     local_ready_units.retain(|id| !memory.third_pressure.is_reserved(*id)
                 && !memory.jeff_v1_1.tank_raid.holds(*id));
     if profile.home_anti_tank.is_some() {
@@ -1251,6 +1253,9 @@ where
         let live = (&mut actions, observation, map_analysis, &mut intents);
         let held = &(&local_defense_assigned | &route_line_reserved) | &push_units;
         jeff_v1_1::natural::support(live, memory, profile.id, &defensive_machine_gunners, &held);
+        // Jeff's AI V1.1 holds a Tank line in front of its bases and the ones it is taking.
+        let live = (&mut actions, observation, map_analysis, &mut intents);
+        jeff_v1_1::front_line::hold(live, memory, &held);
         let defensive_machine_gunners_available: Vec<u32> = defensive_machine_gunners
             .iter()
             .copied()
@@ -1496,6 +1501,7 @@ where
             excluded.extend(route_line_reserved.iter().copied());
             excluded.extend(expansion_footprint_blockers.iter().copied());
             excluded.extend(memory.jeff_v1_1.tank_raid.units());
+            excluded.extend(memory.jeff_v1_1.front_line.units());
             let gathered = jeff::gather_resting_tanks(&mut actions, observation, memory, excluded);
             if !gathered.is_empty() {
                 intents.push(AiIntent::Move { units: gathered });
