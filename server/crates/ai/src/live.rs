@@ -100,6 +100,8 @@ pub struct AiThinkContext<'a> {
     pub start: &'a StartPayload,
     pub snapshot: &'a Snapshot,
     pub alive_player_ids: &'a [u32],
+    /// Recipient-scoped cumulative loss counts from Game::known_losses_for.
+    pub known_losses: BTreeMap<u32, BTreeMap<rts_rules::EntityKind, u32>>,
     pub retreat_commands: Vec<SimCommand>,
 }
 
@@ -197,6 +199,7 @@ impl CanonicalAiTickDriver {
             let retreat_commands = game.worker_retreat_commands_for(player_id);
             let reported_retreat_commands = capture_report.then(|| retreat_commands.clone());
             let emitted_commands = controller.think(AiThinkContext {
+                known_losses: game.known_losses_for(player_id),
                 match_seed: game.seed(),
                 start: &start,
                 snapshot: &snapshot,
@@ -423,6 +426,7 @@ impl AiController {
         }
 
         let view = PlayerView {
+            known_losses: &context.known_losses,
             match_seed: context.match_seed,
             player_id: self.player,
             tick,
@@ -442,6 +446,7 @@ impl AiController {
             return commands;
         };
 
+        let frame = frame.with_losses(&context.known_losses);
         let frame = frame.with_base_sites(
             self.static_map_context
                 .get_or_analyze(context.start)
@@ -1015,6 +1020,7 @@ mod tests {
         let (commands, trace) = CanonicalAiTickDriver::run_prepared_controller(
             &mut controller,
             AiThinkContext {
+                known_losses: Default::default(),
                 match_seed: 0,
                 start: &start,
                 snapshot: &snapshot,
@@ -1070,6 +1076,7 @@ mod tests {
         let mut controller = AiController::with_strategy(1, Box::new(MoveStrategy));
 
         let commands = controller.think(AiThinkContext {
+            known_losses: Default::default(),
             match_seed: 0,
             start: &start,
             snapshot: &snapshot,
@@ -1153,6 +1160,7 @@ mod tests {
         snapshot.tick = 8;
         let mut controller = AiController::with_strategy(1, Box::new(InspectBases));
         let context = AiThinkContext {
+            known_losses: Default::default(),
             match_seed: 0,
             start: &start,
             snapshot: &snapshot,
@@ -1479,3 +1487,7 @@ mod tests {
 #[cfg(test)]
 #[path = "live/composition_tests.rs"]
 mod composition_tests;
+
+#[cfg(test)]
+#[path = "live/losses_tests.rs"]
+mod losses_tests;

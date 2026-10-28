@@ -116,6 +116,7 @@ fn run_resource_regression_profile(max_ticks: u32) -> ResourceRegressionEvidence
                 continue;
             };
             let view = PlayerView {
+                known_losses: &game.known_losses_for(pid),
                 match_seed: game.seed(),
                 player_id: pid,
                 tick,

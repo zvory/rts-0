@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 use rts_ai::sdk::{
-    AbilityKind, AiActions, AiFrame, AiRulebook, AiStrategy, EntityKind, WorldQueries,
+    AbilityKind, AiActions, AiFrame, AiLosses, AiRulebook, AiStrategy, EntityKind, WorldQueries,
 };
 use rts_ai::{AiAlivePolicy, AiController, CanonicalAiTickDriver};
 use rts_sim::game::replay::{replay_commands, CommandLogEntry};
@@ -19,6 +19,7 @@ const TICKS: u32 = 36;
 #[test]
 fn sdk_reexports_ability_kinds() {
     assert_eq!(AbilityKind::Smoke.stable_id(), "smoke");
+    assert_eq!(AiLosses::default().units_lost(), 0);
 }
 
 #[derive(Default)]
@@ -40,6 +41,8 @@ impl<S: AiStrategy> AiStrategy for LifecycleProbe<S> {
             rules.entity(EntityKind::ResourceDepot).unwrap().builders,
             vec![EntityKind::Worker]
         );
+        assert_eq!(frame.own_losses().units_lost(), 0);
+        assert!(frame.observed_enemy_losses().is_empty());
         let queries = WorldQueries::new(frame);
         assert!(queries.known_resources(EntityKind::Steel).next().is_some());
         self.log.lock().unwrap().initialized_at.push(frame.tick());

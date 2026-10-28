@@ -819,3 +819,130 @@ fn allied_death_vision_allows_teammate_attacks_and_auto_acquisition() {
         "allied death vision should drive teammate auto-acquisition"
     );
 }
+
+#[test]
+fn known_losses_count_only_witnessed_deaths_and_survive_checkpoint() {
+    let mut game = Game::new(&human_vs_ai_players(), 0x0515_C0DE);
+    // A clean open map and one observer sight source make visibility unambiguous.
+    game.state.entities = EntityStore::new();
+    game.state.map.terrain.fill(crate::protocol::terrain::GRASS);
+    game.state.map.concealment_tiles.clear();
+    game.state
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, 320.0, 320.0)
+        .unwrap();
+    let visible = game
+        .state
+        .entities
+        .spawn_unit(2, EntityKind::Worker, 330.0, 320.0)
+        .unwrap();
+    let hidden = game
+        .state
+        .entities
+        .spawn_unit(2, EntityKind::Rifleman, 1800.0, 1800.0)
+        .unwrap();
+    let building = game
+        .state
+        .entities
+        .spawn_building(2, EntityKind::Depot, 350.0, 320.0, true)
+        .unwrap();
+    game.state.fog = fog::Fog::new(game.state.map.width, game.state.map.height);
+    game.state
+        .fog
+        .recompute(&[1, 2], &game.state.entities, &game.state.map);
+    assert!(game.state.fog.is_visible_world(1, 330.0, 320.0));
+    assert!(!game.state.fog.is_visible_world(1, 1800.0, 1800.0));
+    for id in [visible, hidden, building] {
+        game.state
+            .entities
+            .get_mut(id)
+            .unwrap()
+            .apply_damage(u32::MAX, None);
+    }
+    let events = game.tick();
+    let witnessed = game.known_losses_for(1);
+    assert_eq!(witnessed[&2].get(&EntityKind::Worker), Some(&1));
+    assert_eq!(witnessed[&2].get(&EntityKind::Depot), Some(&1));
+    assert_eq!(witnessed[&2].get(&EntityKind::Rifleman), None);
+    assert_eq!(
+        game.known_losses_for(2)[&2].get(&EntityKind::Rifleman),
+        Some(&1)
+    );
+    assert!(game.known_losses_for(999).is_empty());
+    assert_eq!(
+        events
+            .iter()
+            .find(|(id, _)| *id == 1)
+            .unwrap()
+            .1
+            .iter()
+            .filter(|event| matches!(event, Event::Death { .. }))
+            .count(),
+        2
+    );
+    game.tick();
+    assert_eq!(game.known_losses_for(1), witnessed, "deaths count once");
+    let checkpoint = game.checkpoint_payload_text_for_test().unwrap();
+    let restored = Game::restore_checkpoint_payload_text_for_test(
+        &checkpoint,
+        game.state.map.clone(),
+        game.state.map_metadata.clone(),
+    )
+    .unwrap();
+    assert_eq!(restored.known_losses_for(1), witnessed);
+    assert_eq!(restored.known_losses_for(2), game.known_losses_for(2));
+}
+
+#[test]
+fn known_enemy_losses_respect_smoke_concealment_and_alliances() {
+    for (allied, smoked, concealed, observed) in [
+        (false, false, false, true),
+        (false, true, false, false),
+        (false, false, true, false),
+        (true, false, false, false),
+    ] {
+        let mut players = human_vs_ai_players();
+        if allied {
+            players[1].team_id = players[0].team_id;
+        }
+        let mut game = Game::new(&players, 0x0515_C0DE);
+        game.state.entities = EntityStore::new();
+        game.state.map.terrain.fill(crate::protocol::terrain::GRASS);
+        game.state.map.concealment_tiles.clear();
+        game.state
+            .entities
+            .spawn_unit(1, EntityKind::Rifleman, 320.0, 320.0)
+            .unwrap();
+        let victim = game
+            .state
+            .entities
+            .spawn_unit(2, EntityKind::Worker, 400.0, 320.0)
+            .unwrap();
+        game.state.fog = fog::Fog::new(game.state.map.width, game.state.map.height);
+        game.state
+            .fog
+            .recompute(&[1, 2], &game.state.entities, &game.state.map);
+        assert!(game.state.fog.is_visible_world(1, 400.0, 320.0));
+        if smoked {
+            game.state.smokes.spawn(400.0, 320.0, 2.0, 100, 0).unwrap();
+        }
+        if concealed {
+            game.state
+                .map
+                .concealment_tiles
+                .push(game.state.map.tile_of(400.0, 320.0));
+        }
+        game.state
+            .entities
+            .get_mut(victim)
+            .unwrap()
+            .apply_damage(u32::MAX, None);
+        game.tick();
+        assert_eq!(
+            game.known_losses_for(1).contains_key(&2),
+            observed,
+            "allied={allied}, smoked={smoked}, concealed={concealed}"
+        );
+        assert_eq!(game.known_losses_for(2)[&2][&EntityKind::Worker], 1);
+    }
+}

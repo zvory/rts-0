@@ -7,6 +7,32 @@ use crate::protocol::{
 };
 
 impl Game {
+    /// Own authoritative losses and witnessed enemy losses, keyed by owner then kind.
+    /// Enemy counts share Death-event fog, smoke, concealment, and team visibility rules.
+    /// Missing/invalid players receive an empty result. Counts persist across checkpoints.
+    pub fn known_losses_for(&self, player_id: u32) -> BTreeMap<u32, BTreeMap<EntityKind, u32>> {
+        let Some(player) = self
+            .state
+            .players
+            .iter()
+            .find(|player| player.id == player_id)
+        else {
+            return BTreeMap::new();
+        };
+        let mut losses = player.score.observed_losses.clone();
+        losses.insert(
+            player_id,
+            player
+                .score
+                .units_lost_by_kind
+                .iter()
+                .chain(&player.score.buildings_lost_by_kind)
+                .map(|(&kind, &count)| (kind, count))
+                .collect(),
+        );
+        losses
+    }
+
     /// Authoritative analysis state for observer overlays.
     ///
     /// This is rebuilt from the current simulation state instead of stored in replay keyframes, so

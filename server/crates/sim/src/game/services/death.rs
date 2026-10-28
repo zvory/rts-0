@@ -177,6 +177,20 @@ pub(crate) fn death_system(
             ) {
                 continue;
             }
+            if teams.is_enemy_owner(pid, dead.owner)
+                && (dead.kind.is_unit() || dead.kind.is_building())
+            {
+                if let Some(observer) = players.iter_mut().find(|player| player.id == pid) {
+                    let count = observer
+                        .score
+                        .observed_losses
+                        .entry(dead.owner)
+                        .or_default()
+                        .entry(dead.kind)
+                        .or_default();
+                    *count = count.saturating_add(1);
+                }
+            }
             events.entry(pid).or_default().push(Event::Death {
                 id: dead.id,
                 x: dead.x,

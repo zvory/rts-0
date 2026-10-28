@@ -81,6 +81,15 @@ submitted-build bookkeeping. The frame adapter is the only production path that 
 start/snapshot DTOs into strategy-visible kind, state, production, upgrade, terrain, resource, and
 memory facts. Its collections use stable id ordering; completed upgrades and submitted builds are
 additionally sorted and deduplicated.
+`AiFrame::own_losses()` exposes cumulative own unit/building deaths; `observed_enemy_losses()`
+returns the same typed `AiLosses` per enemy player id for witnessed deaths only. Each summary has
+per-kind unit/building maps, total-count helpers, and nominal Steel/Oil value, matching the Losses
+tab. Missing enemy entries mean zero observed deaths, not zero actual deaths. The canonical host
+passes `Game::known_losses_for(player)` in `AiThinkContext::known_losses`; prepared hosts must do
+likewise. Simulation death processing accumulates witnessed losses every tick using the existing
+Death-event visibility gate (team vision, smoke, concealment, firing reveals). Counts survive
+checkpoints and do not depend on AI decision cadence or prior entity sightings. Disappearance,
+cancellation, administrative elimination, and depleted neutral resources do not count.
 Active production identifies either its typed unit kind or its typed research upgrade when one is
 present in the recipient snapshot.
 Entity records retain the public `occupied_trench_id` from that same recipient snapshot so
