@@ -232,7 +232,11 @@ pub(crate) fn production_system(
                     }
                 }
             }
-            continue;
+            // Depot-local research runs alongside worker production, including its
+            // completion tick. Other research keeps its existing completion behavior.
+            if upgrade != upgrade::UpgradeKind::IndustrialCenter {
+                continue;
+            }
         }
 
         if !extractors::ensure_scaffold(entities, id) {

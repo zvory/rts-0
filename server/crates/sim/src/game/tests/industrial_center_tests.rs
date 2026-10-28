@@ -172,3 +172,23 @@ fn industrial_center_over_cap_blocks_only_new_supply_and_other_factions_stay_unc
         assert_eq!(game.snapshot_for(1).supply_cap, 300);
     }
 }
+
+#[test]
+fn industrial_center_completion_does_not_pause_worker_training() {
+    let (mut game, depots) = fixture();
+    upgrade(&mut game, depots[0]);
+    let depot = game.state.entities.get_mut(depots[0]).unwrap();
+    let research = depot.research_queue_mut().unwrap().first_mut().unwrap();
+    research.progress = research.total - 1;
+    game.enqueue(
+        1,
+        Command::Train {
+            building: depots[0],
+            unit: EntityKind::Worker,
+        },
+    );
+    game.tick();
+    let depot = game.state.entities.get(depots[0]).unwrap();
+    assert!(depot.is_industrial_center());
+    assert_eq!(depot.prod_queue()[0].progress, 1);
+}
