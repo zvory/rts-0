@@ -77,6 +77,8 @@ pub(in crate::ai_core::decision) fn scout(
             && memory.containment.active_scout != Some(unit.id)
             && !memory.third_pressure.is_reserved(unit.id)
             && !memory.trap_breach.is_reserved(unit.id)
+            // The raid borrows the Scout Car while it is out.
+            && !memory.jeff_v1_1.tank_raid.holds(unit.id)
     };
     let current = memory.jeff_v1_1.scout.unit;
     let scout = observation

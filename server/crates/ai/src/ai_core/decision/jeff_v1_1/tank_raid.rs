@@ -403,6 +403,15 @@ fn launch(
             && !memory.later_bases.guards.contains(&unit.id)
             && memory.jeff_v1_1.scout.unit != Some(unit.id)
     };
+    // The scout's Scout Car goes with the raid (`raidcar`): Jeff keeps one, and without it the raid
+    // had no smoke and parked within its Tanks' 9 tiles of sight.
+    let free_car = |unit: &&AiEntitySummary| {
+        unit.is_complete
+            && unit.hp > 0
+            && !reserved.contains(&unit.id)
+            && memory.containment.active_scout != Some(unit.id)
+            && (memory.jeff_v1_1.scout.unit != Some(unit.id) || !super::off("raidcar"))
+    };
     let mut tanks: Vec<&AiEntitySummary> = observation
         .owned
         .iter()
@@ -434,7 +443,7 @@ fn launch(
         .owned
         .iter()
         .filter(|unit| unit.kind == EntityKind::ScoutCar)
-        .filter(free)
+        .filter(free_car)
         .min_by(|a, b| {
             dist2(a.x, a.y, center.0, center.1)
                 .total_cmp(&dist2(b.x, b.y, center.0, center.1))
