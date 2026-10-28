@@ -12,6 +12,8 @@ pub const AUTOMATIC_PUMP_JACK_BUILD_TICKS: u32 = super::TICK_HZ * 36;
 pub const STEEL_LOAD: u32 = 2;
 pub const OIL_LOAD: u32 = 2;
 pub const HARVEST_TICKS: u32 = 40;
+/// Unsupported completed extractors lose their full maximum HP over twenty seconds.
+pub const EXTRACTOR_DECAY_TICKS: u32 = super::TICK_HZ * 20;
 pub const STEEL_PATCH_AMOUNT: u32 = 625;
 // Twelve steel patches and three oil patches yield a 2.599:1 Steel/Oil base ratio, the nearest
 // whole-unit oil capacity to the 2.6:1 target.

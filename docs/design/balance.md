@@ -656,6 +656,13 @@ profiles and explicit activation/autocast policy instead of being folded into de
   Completed Pump Jacks mine `OIL_LOAD = 2` every `HARVEST_TICKS = 40`, matching one worker's former
   oil rate, and deplete the underlying oil node. When that final load empties the patch, its Pump
   Jack disappears with it and the permanent Depot job moves to the next eligible patch.
+- Unsupported extractors: completed Steel Mines and Pump Jacks without a living, completed
+  friendly Resource Depot or Zamok within the existing 11-tile mining-anchor range lose 5% of
+  maximum HP per second (`EXTRACTOR_DECAY_TICKS = 600`). A full-health extractor dies after
+  exactly 20 seconds without support; damaged extractors die sooner. Allied bases count.
+  Restoring support stops decay and clears fractional damage without healing lost HP.
+  Extractors under construction do not decay. Decay uses ordinary unattributed damage/death
+  handling; the underlying resource patch remains available.
 - One gatherer per direct-mined patch: each direct-mined node has a single harvest slot
   (`Entity::miner`). A patch is
   occupied only after the gatherer reaches `GatherPhase::Harvesting`; right-clicking a patch
