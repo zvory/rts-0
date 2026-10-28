@@ -359,6 +359,10 @@ defense, production, and wave controller on the normal decision cadence. Retired
 idle; Pressure may use the rear Barracks and any new producers. Existing units and construction
 survive, while Rush wave memory is discarded. Losing its only Engineer independently arms the
 same thirty-second recovery handoff; Pressure can then replace the Engineer and rebuild income.
+Independently, cumulative owned unit and building losses worth at least 1,000 Steel trigger an
+immediate handoff, even before the first wave launches. This uses the SDK's nominal Steel loss
+value (excluding Oil, cancellations, refunds, and administrative removals) and bypasses either
+thirty-second grace period, so contested staging cannot trap Rush indefinitely.
 Rush suspends new wave launches during that recovery grace period, preserving Rush micro for
 already launched units without launching a cohort just before the switch. Later waves do not
 postpone a handoff already armed by wave five; the earlier of the wave and recovery deadlines

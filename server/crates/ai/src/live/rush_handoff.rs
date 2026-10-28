@@ -1,6 +1,8 @@
 //! One-time Rush opening handoff to the ordinary Pressure controller.
 use super::*;
 
+const RUSH_STEEL_LOSS_LIMIT: u32 = 1_000;
+
 impl AiController {
     pub(super) fn handoff_rush(&mut self, context: &AiThinkContext<'_>) -> Vec<SimCommand> {
         if self.behavior_profile_id != RUSH_AI_ID {
@@ -13,7 +15,14 @@ impl AiController {
             .any(|e| e.owner == self.player && e.kind == "worker" && e.hp > 0);
         self.rush_strategy
             .observe_engineer(context.snapshot.tick, engineer_alive);
-        if !self.rush_strategy.handoff_due(context.snapshot.tick) {
+        let steel_lost = context
+            .known_losses
+            .get(&self.player)
+            .map(crate::sdk::AiLosses::from_counts)
+            .map_or(0, |losses| losses.steel_value);
+        if steel_lost < RUSH_STEEL_LOSS_LIMIT
+            && !self.rush_strategy.handoff_due(context.snapshot.tick)
+        {
             return Vec::new();
         }
         let team = context
@@ -193,6 +202,61 @@ mod tests {
 #[cfg(test)]
 mod recovery_tests {
     use super::*;
+
+    #[test]
+    fn steel_losses_switch_without_waves_and_bypass_engineer_recovery_delay() {
+        use rts_rules::EntityKind::{Barracks, Tank};
+
+        let players = super::super::tests::driver_test_players();
+        let game = Game::new_without_ai_controllers(&players, 13);
+        let start = game.start_payload();
+        for engineer_alive in [true, false] {
+            let mut snapshot = game.snapshot_for(1);
+            snapshot.tick = 100;
+            if !engineer_alive {
+                snapshot
+                    .entities
+                    .retain(|e| !(e.owner == 1 && e.kind == "worker"));
+            }
+            let mut controller = AiController::with_profile_id(1, RUSH_AI_ID);
+            let run = |controller: &mut AiController, snapshot: &Snapshot, own_losses| {
+                controller.think(AiThinkContext {
+                    // Enemy losses cannot trigger our handoff.
+                    known_losses: BTreeMap::from([
+                        (1, own_losses),
+                        (2, BTreeMap::from([(Tank, 100)])),
+                    ]),
+                    match_seed: 0,
+                    start: &start,
+                    snapshot,
+                    alive_player_ids: &[1, 2],
+                    retreat_commands: vec![],
+                })
+            };
+            run(&mut controller, &snapshot, BTreeMap::new());
+            assert_eq!(controller.selected_profile_id(), Some(RUSH_AI_ID));
+            // 850 Steel plus 350 Oil is still below the Steel-only threshold.
+            snapshot.tick += 1;
+            run(&mut controller, &snapshot, BTreeMap::from([(Tank, 2)]));
+            assert_eq!(controller.selected_profile_id(), Some(RUSH_AI_ID));
+            // Unit and building losses together reach exactly 1,000 Steel.
+            snapshot.tick += 1;
+            run(
+                &mut controller,
+                &snapshot,
+                BTreeMap::from([(Tank, 2), (Barracks, 1)]),
+            );
+            assert_eq!(controller.selected_profile_id(), Some(PRESSURE_AI_ID));
+            assert_eq!(controller.profile_id(), RUSH_AI_ID);
+            snapshot.tick += 1;
+            run(
+                &mut controller,
+                &snapshot,
+                BTreeMap::from([(Tank, 3), (Barracks, 1)]),
+            );
+            assert_eq!(controller.selected_profile_id(), Some(PRESSURE_AI_ID));
+        }
+    }
 
     #[test]
     fn clock_alone_does_not_switch_but_engineer_loss_recovers_without_five_waves() {
