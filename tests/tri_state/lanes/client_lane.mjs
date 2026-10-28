@@ -335,8 +335,10 @@ export class ClientLane {
     return issued;
   }
 
-  async waitForSnapshot({ minTickDelta = 1, timeoutMs = 10000 } = {}) {
-    const startTick = await this.page.evaluate(() => window.__rts.match.state._cur?.tick ?? -1);
+  async waitForSnapshot({ minTickDelta = 1, timeoutMs = 10000, startTick = null } = {}) {
+    // Callers issuing a one-shot step must retain the pre-command baseline: its
+    // snapshot may already have arrived by the time this wait begins.
+    startTick ??= await this.page.evaluate(() => window.__rts.match.state._cur?.tick ?? -1);
     if (minTickDelta <= 0 || startTick < 0) {
       await this.page.waitForFunction(
         () => window.__rts.match.state._cur?.tick != null,
@@ -564,11 +566,9 @@ export class ClientLane {
   }
 
   async currentTick() {
-    return this.page.evaluate(() => {
-      const roomTimeTick = window.__rts?.match?.roomTimeControls?.roomTimeState?.currentTick;
-      if (Number.isFinite(roomTimeTick)) return roomTimeTick;
-      return window.__rts?.match?.state?._cur?.tick ?? null;
-    });
+    // Use the same snapshot clock as waitForSnapshot and summary; room-time
+    // controls can still describe a different tick when a step starts.
+    return this.page.evaluate(() => window.__rts?.match?.state?._cur?.tick ?? null);
   }
 
   async ownEntity(kind, index = 0) {
