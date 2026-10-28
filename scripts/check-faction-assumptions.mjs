@@ -576,7 +576,8 @@ const approvedSpecialCaseBudgets = new Map([
   ["server/crates/ai/src/sdk/bases.rs", 2],
   // Cultivators intentionally reuses the existing depot/worker kinds in catalog rows and tests.
   // Tank Plus adds one Engineering Complex research row in the authoritative catalog.
-  ["server/crates/rules/src/faction.rs", 139],
+  // Industrial Center adds one Resource Depot upgrade row to the Kriegsia catalog.
+  ["server/crates/rules/src/faction.rs", 140],
   ["server/crates/rules/src/economy.rs", 109],
   ["server/crates/sim/src/game/setup.rs", 30],
   ["server/crates/sim/src/game/services/ability_orders.rs", 18],

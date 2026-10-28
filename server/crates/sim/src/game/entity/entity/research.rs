@@ -4,7 +4,11 @@ use super::Entity;
 
 impl Entity {
     pub(crate) fn is_industrial_center(&self) -> bool {
-        self.kind == crate::game::entity::EntityKind::ResourceDepot
+        self.kind
+            == crate::rules::faction::upgrade_definition(
+                crate::game::upgrade::UpgradeKind::IndustrialCenter,
+            )
+            .researched_at
             && self
                 .production
                 .as_ref()
