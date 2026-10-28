@@ -14,7 +14,7 @@
 //!   `ROUTE_SHARE` of the party's is not taken. It moves, not attack-moves, so it is not drawn into
 //!   the fights it goes around, and looks again as it goes.
 //! - **Depots only**: a Depot's extractors decay to nothing within 20 s of it (#1707), so a raid
-//!   goes only for Depots it has seen (the scout finds them; 16 of 27 raids on likely sites found
+//!   goes only for Depots it has seen (the scout finds them; 7 of 27 raids on likely sites found
 //!   none), parks `SIGHT_STANDOFF_TILES` from it (`RANGED_STANDOFF_TILES` with its Scout Car to see
 //!   for it), and once parked `RAMP_TICKS`, when a Tank reaches 14 tiles, shells it: 180 HP, one
 //!   volley of three. It leaves once the Depot is down. It used to drive in to 5 tiles past the
@@ -25,8 +25,8 @@
 //!   are down to `LOW_HP` of their health, it steps `BREAK_TILES` away from the danger, makes for
 //!   the nearest Jeff Depot, and leaves the base alone for `HOT_TICKS`. Running straight home down
 //!   the way it came took it through the answering army: every Tank of two raids died on the way
-//!   back. A base cleared, it goes on to the next while still healthy and with no enemy in sight,
-//!   else home: the answer to a kill is on its way. The Scout Car falls back to
+//!   back. A base cleared, it goes home (`raidchain`: on to the next while healthy and with no enemy
+//!   in sight): moving on after a kill, a party was caught 10 s later by 5 Tanks answering it. The Scout Car falls back to
 //!   the Tanks from enemies within `SCOUT_SHY_TILES`.
 
 use super::*;
@@ -251,7 +251,7 @@ pub(in crate::ai_core::decision) fn raid(
             if visible_depot(observation, target, ts).is_none() && in_sight {
                 // The Depot is down, or was never there: its extractors decay on their own. On to the
                 // next base while healthy and unseen, else home.
-                let next = (health >= SET_OUT_HP && danger == 0.0)
+                let next = (!super::off("raidchain") && health >= SET_OUT_HP && danger == 0.0)
                     .then(|| choose_target(observation, analysis, memory, center, enemy_main, strength))
                     .flatten();
                 let state = &mut memory.jeff_v1_1.tank_raid;
