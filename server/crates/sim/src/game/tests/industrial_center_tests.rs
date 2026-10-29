@@ -85,6 +85,7 @@ fn industrial_center_cost_timing_limit_loss_and_replacement() {
         .find(|e| e.id == depots[0])
         .unwrap();
     assert!(center.industrial_center);
+    assert_eq!((center.hp, center.max_hp), (540, 540));
     assert_eq!(center.kind, "resource_depot");
     game.tick();
     game.tick();
@@ -211,4 +212,24 @@ fn critical_events_report_authoritative_supply_and_only_accepted_depot_upgrades(
     upgrade(&mut game, depots[1]);
     upgrade(&mut game, depots[2]);
     assert_eq!(game.critical_event_state()[0].upgrading_depots.len(), 2);
+}
+
+#[test]
+fn industrial_center_hp_bonus_preserves_damage_and_applies_once() {
+    let (mut game, depots) = fixture();
+    upgrade(&mut game, depots[0]);
+    let depot = game.state.entities.get_mut(depots[0]).unwrap();
+    depot.apply_damage(40, None);
+    assert_eq!((depot.hp, depot.max_hp), (140, 180));
+    let research = depot.research_queue_mut().unwrap().first_mut().unwrap();
+    research.progress = research.total - 1;
+    game.tick();
+    let depot = game.state.entities.get(depots[0]).unwrap();
+    assert_eq!((depot.hp, depot.max_hp), (500, 540));
+    let ordinary = game.state.entities.get(depots[1]).unwrap();
+    assert_eq!((ordinary.hp, ordinary.max_hp), (180, 180));
+    upgrade(&mut game, depots[0]);
+    let depot = game.state.entities.get(depots[0]).unwrap();
+    assert_eq!((depot.hp, depot.max_hp), (500, 540));
+    restore_checkpoint_and_assert_equivalent(&game, "damaged industrial center HP");
 }

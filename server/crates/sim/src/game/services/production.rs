@@ -222,9 +222,7 @@ pub(crate) fn production_system(
             }
             if let Some(b) = entities.get_mut(id) {
                 if upgrade == upgrade::UpgradeKind::IndustrialCenter {
-                    if let Some(production) = b.production.as_mut() {
-                        production.industrial_center = true;
-                    }
+                    b.complete_industrial_center();
                 }
                 if let Some(queue) = b.research_queue_mut() {
                     if !queue.is_empty() {
