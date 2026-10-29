@@ -194,13 +194,22 @@ pub(super) fn research_ahead(
 /// gun has to pack up (1 s) and set up again (half that with Meth) around every move, and V1.0's
 /// raid responses re-sent theirs every decision toward a shifting point: against Rush AI its guns
 /// packed up under fire 138-248 times before 6:00 in the losses. They fire at what comes into reach
-/// of their posts, and the posts cover the base's ways in.
+/// of their posts, and the posts cover the base's ways in. Before the first Tank the guns answer as
+/// V1.0's do: kept on their posts, the guns out at the natural watched Pressure AI's five opening
+/// Riflemen shoot the main's Depot down at 3:08 on Crossroads.
 pub(super) fn keep_guns_on_posts(
     profile_id: &str,
     observation: &AiObservation,
     local_defenders: &mut Vec<u32>,
 ) {
     if !is_jeff_v1_1(profile_id) || off("gunposts") {
+        return;
+    }
+    if !observation
+        .owned
+        .iter()
+        .any(|unit| unit.kind == EntityKind::Tank && unit.is_complete && unit.hp > 0)
+    {
         return;
     }
     local_defenders.retain(|id| {

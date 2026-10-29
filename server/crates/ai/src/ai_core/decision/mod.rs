@@ -1261,7 +1261,8 @@ where
         let held = &(&local_defense_assigned | &route_line_reserved) | &push_units;
         jeff_v1_1::natural::support(live, memory, profile.id, &defensive_machine_gunners, &held);
         // Jeff's AI V1.1 keeps Tanks parked in front of its main, and holds a Tank line in front of
-        // its bases and the ones it is taking.
+        // its bases and the ones it is taking. Tanks the home defense took stay with it a while.
+        jeff_v1_1::front_line::note_yielded(observation, memory, &local_defense_assigned);
         let live = (&mut actions, observation, map_analysis, &mut intents);
         jeff_v1_1::home_guard::guard(live, memory, &held);
         let live = (&mut actions, observation, map_analysis, &mut intents);
@@ -1576,6 +1577,48 @@ where
         (push, raid) => push.or(raid),
     };
     tank_micro::finish(&mut decision, observation, map_analysis, memory);
+    if memory.profile_id().is_some_and(is_jeff_v1_1) {
+        // Which system holds each Tank, for the decision trace: two short lines, under the
+        // trace's line cap.
+        let tank_ids: BTreeSet<u32> = observation
+            .owned
+            .iter()
+            .filter(|unit| unit.kind == EntityKind::Tank)
+            .map(|unit| unit.id)
+            .collect();
+        let tanks_of = |ids: &mut dyn Iterator<Item = u32>| {
+            ids.filter(|id| tank_ids.contains(id))
+                .collect::<BTreeSet<u32>>()
+        };
+        let intent_units = |attack: bool| {
+            tanks_of(
+                &mut decision
+                    .intents
+                    .iter()
+                    .filter_map(|intent| match intent {
+                        AiIntent::Attack { units } if attack => Some(units.iter().copied()),
+                        AiIntent::Stage { units } if !attack => Some(units.iter().copied()),
+                        _ => None,
+                    })
+                    .flatten(),
+            )
+        };
+        let first = format!(
+            "v1_1_roles line={:?} guard={:?} push={:?} home={:?}",
+            tanks_of(&mut memory.jeff_v1_1.front_line.units()),
+            tanks_of(&mut memory.jeff_v1_1.home_guard.units()),
+            memory.containment.active_tanks,
+            memory.home_defensive_tank,
+        );
+        let second = format!(
+            "v1_1_roles2 attack={:?} stage={:?} {}",
+            intent_units(true),
+            intent_units(false),
+            memory.jeff_v1_1.front_line.trace(),
+        );
+        decision.trace.notes.push(first);
+        decision.trace.notes.push(second);
+    }
     decision
 }
 

@@ -107,6 +107,10 @@ pub(in crate::ai_core::decision) struct FrontLineMemory {
     broken_until: u32,
     /// The line's middle, last decision, where a raid falls back to.
     middle: Option<(i32, i32)>,
+    /// Why the line last broke, for the decision trace.
+    why: &'static str,
+    /// Tanks V1.0's home defense took, and when it last had them (`lineyield`).
+    yielded: BTreeMap<u32, u32>,
 }
 
 impl FrontLineMemory {
@@ -122,6 +126,52 @@ impl FrontLineMemory {
     pub(in crate::ai_core::decision) fn rally(&self) -> Option<(f32, f32)> {
         self.middle.map(|(x, y)| (x as f32, y as f32))
     }
+
+    /// The decision-trace note: broken until when and why, how far back, the Tanks yielded.
+    pub(in crate::ai_core::decision) fn trace(&self) -> String {
+        format!(
+            "broken_until={} why={} back={} yielded={:?}",
+            self.broken_until,
+            self.why,
+            self.back,
+            self.yielded.keys().collect::<Vec<_>>()
+        )
+    }
+
+    /// Whether V1.0's home defense had this Tank within `YIELD_TICKS`: the line and the home guard
+    /// leave it there.
+    pub(in crate::ai_core::decision) fn yielded(&self, id: u32) -> bool {
+        self.yielded.contains_key(&id)
+    }
+}
+
+/// A Tank V1.0's home defense takes stays out of the line and the home guard this long. Both took
+/// it back the next decision: against Pressure AI two Tanks swapped between the line and the
+/// defense's attack every decision, driving between the two, and never parked for their 14-tile
+/// charge.
+const YIELD_TICKS: u32 = config::TICK_HZ * 10;
+
+/// Notes the Tanks V1.0's home defense took this decision (`defended`), with `lineyield`.
+pub(in crate::ai_core::decision) fn note_yielded(
+    observation: &AiObservation,
+    memory: &mut AiDecisionMemory,
+    defended: &BTreeSet<u32>,
+) {
+    let on = memory.profile_id().is_some_and(is_jeff_v1_1) && !super::off("lineyield");
+    let state = &mut memory.jeff_v1_1.front_line;
+    if !on {
+        state.yielded.clear();
+        return;
+    }
+    let tick = observation.tick;
+    for unit in observation.owned.iter() {
+        if unit.kind == EntityKind::Tank && defended.contains(&unit.id) {
+            state.yielded.insert(unit.id, tick);
+        }
+    }
+    state
+        .yielded
+        .retain(|_, at| tick.saturating_sub(*at) <= YIELD_TICKS);
 }
 
 /// Whether V1.1 holds a front line.
@@ -180,6 +230,7 @@ pub(in crate::ai_core::decision) fn hold(
             && !memory.jeff_v1_1.base_lines.posted(unit.id)
             && !memory.jeff_v1_1.home_guard.holds(unit.id)
             && !memory.jeff_v1_1.rovers.holds(unit.id)
+            && !memory.jeff_v1_1.front_line.yielded(unit.id)
     };
     let tanks: Vec<&AiEntitySummary> = observation
         .owned
@@ -301,6 +352,15 @@ pub(in crate::ai_core::decision) fn hold(
                 || lost >= strength * BREAK_LOSS_SHARE
                 || enemy_near >= strength * BREAK_RATIO)
         {
+            state.why = if main_hit >= MAIN_BREAK_VALUE && !super::off("linehome") {
+                "main"
+            } else if base_attacked {
+                "base"
+            } else if lost >= strength * BREAK_LOSS_SHARE {
+                "losses"
+            } else {
+                "outnumbered"
+            };
             state.broken_until = tick + BROKEN_TICKS;
             state.back = (MAX_BACK_TILES * 10.0) as u32;
             state.losses.clear();

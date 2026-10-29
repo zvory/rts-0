@@ -74,6 +74,7 @@ pub(in crate::ai_core::decision) fn guard(
             && !memory.trap_breach.is_reserved(unit.id)
             && !memory.third_pressure.is_reserved(unit.id)
             && !memory.jeff_v1_1.tank_raid.holds(unit.id)
+            && !memory.jeff_v1_1.front_line.yielded(unit.id)
     };
     // The guards keep their place; new ones are the Tanks nearest the main.
     let mut picked: Vec<&AiEntitySummary> = tanks
