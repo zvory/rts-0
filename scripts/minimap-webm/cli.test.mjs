@@ -153,7 +153,8 @@ test('articulated minimap layers follow live facing and setup without loading ea
   assert.equal(loaded.length, 6, 'continuous aim uses cached components');
   const packed = liveUnitIconMarkupFor('anti_tank_gun', { minimapPart: 'packed-base' });
   const deployed = liveUnitIconMarkupFor('anti_tank_gun', { minimapPart: 'deployed-base' });
-  assert.doesNotMatch(packed, /data-unit-icon-component="[^"]*Trail/);
+  assert.match(packed, /data-unit-icon-component="sprite.at.leftTrail.deployed"/);
+  assert.match(packed, /data-unit-icon-component="sprite.at.rightTrail.deployed"/);
   assert.match(deployed, /data-unit-icon-component="sprite.at.leftTrail.deployed"/);
   assert.match(deployed, /data-unit-icon-component="sprite.at.rightTrail.deployed"/);
   assert.equal(packed.match(/viewBox="[^"]*"/)[0], deployed.match(/viewBox="[^"]*"/)[0]);

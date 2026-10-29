@@ -1,3 +1,8 @@
+import {
+  ANTI_TANK_GUN_SETUP_TICKS,
+  ANTI_TANK_GUN_TEARDOWN_TICKS,
+  TICK_HZ,
+} from "../config.js";
 import { KIND, SETUP, STATE } from "../protocol.js";
 import { ARTILLERY_DEPLOYED_WEAPON_ANIM_MS, DEPLOYED_WEAPON_ANIM_MS } from "./palette.js";
 import { clamp01, smoothstep01 } from "./shared.js";
@@ -18,7 +23,9 @@ export function supportWeaponSetupVisual(e, records, now) {
   }
   const rec = records.get(e.id);
   const elapsed = now - rec.changedAt;
-  const durationMs = e.kind === KIND.ARTILLERY
+  const durationMs = e.kind === KIND.ANTI_TANK_GUN
+    ? ((setupState === SETUP.TEARING_DOWN ? ANTI_TANK_GUN_TEARDOWN_TICKS : ANTI_TANK_GUN_SETUP_TICKS) / TICK_HZ) * 1000
+    : e.kind === KIND.ARTILLERY
     ? ARTILLERY_DEPLOYED_WEAPON_ANIM_MS
     : DEPLOYED_WEAPON_ANIM_MS;
   const progress = clamp01(elapsed / durationMs);
