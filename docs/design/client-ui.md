@@ -2777,8 +2777,10 @@ through automatic post-match replay playback and renders it as an Observation ID
 handoff key for replay recovery and server lag-log inspection; it is not a player identity or a
 new gameplay control.
 
-Industrial Centers retain the Resource Depot kind and sprite. The research command card upgrades
+Industrial Centers retain the Resource Depot kind and footprint. The research command card upgrades
 one selected completed depot; completed/pending centers lock out further upgrades at two.
 The renderer receives the public `industrialCenter` physical flag through presentation snapshots
-and draws a gold footprint rim in the existing building overlay pool. Fog memory uses the last
-observed flag. Dedicated art/audio are deferred.
+and selects the simplified Refinery Works PNG atlas for completed upgrades. Its neutral-white
+paint receives the owning team color; the ordinary depot retains its worksite atlas. There is no
+gold footprint rim. The atlas variant participates in body cache identity and normal rig teardown.
+Fog memory uses the last observed flag. Dedicated audio is deferred.

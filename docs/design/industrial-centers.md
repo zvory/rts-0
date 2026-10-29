@@ -15,8 +15,10 @@ command/card (first free research slot); cancellation uses ordinary research ref
 unpaid upgrades reserve a center slot. Completion is local to the depot, not permanent player
 research. Starting a second upgrade on the same depot or a third across the player is rejected.
 
-The completed sprite gains a gold footprint rim. Existing construction, damage, selection,
-minimap and death visuals stay; dedicated art and audio are explicitly deferred. Completion is
+The completed sprite uses the simplified Refinery Works art: three white-painted storage tanks,
+a processing tower, dark pipes and an orange furnace. White paint receives owner tint; there is
+no gold footprint rim. The ordinary Resource Depot keeps its worksite art. Existing construction,
+damage, selection, minimap and death visuals stay; dedicated audio is deferred. Completion is
 visible to anyone who can see the building, retained in fog memory, and preserved in checkpoints
 and replays; queue/payment details retain existing owner-only projection. AI should buy this
 upgrade when approaching its current supply cap.
