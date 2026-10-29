@@ -68,7 +68,13 @@ pub(in crate::ai_core::decision) fn keep_out_of_reach(
     }
     let mut sent = Vec::new();
     for tank in &tanks {
-        if held.contains(&tank.id) || memory.containment.active_tanks.contains(&tank.id) {
+        // The grouped line's Tanks and the home guard hold parked: backing off, a Tank was sent
+        // back to its post by the line 3 s later, and moved under fire at 5 tiles' reach both ways.
+        if held.contains(&tank.id)
+            || memory.containment.active_tanks.contains(&tank.id)
+            || memory.jeff_v1_1.home_guard.holds(tank.id)
+            || (!super::off("linegroups") && memory.jeff_v1_1.front_line.holds(tank.id))
+        {
             continue;
         }
         let threats: Vec<&&AiEntitySummary> = enemy_tanks

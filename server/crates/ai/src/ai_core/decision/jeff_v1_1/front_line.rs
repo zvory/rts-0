@@ -72,6 +72,20 @@ const BASE_FIELD_TILES: f32 = 14.0;
 /// A stretched line spans the front bases and this much more.
 const FIT_MARGIN_TILES: f32 = 8.0;
 const MAX_FIT_SPACING_TILES: f32 = 20.0;
+/// Grouped (`linegroups`): Tanks to a base's group, and how far apart they stand. One or two to a
+/// base, 8 tiles apart, each Tank was alone: against Pressure AI 79 of the 185 Tanks the line lost
+/// had no other Jeff Tank within 8 tiles.
+const GROUP_TANKS: usize = 3;
+const GROUP_SPACING_TILES: f32 = 2.5;
+/// Enemy fighters in sight this close to a base or its segment are contact there, from this value.
+const ROLL_TILES: f32 = 20.0;
+const ROLL_MIN_VALUE: f32 = 400.0;
+/// The base in contact takes Tanks until they are worth this much of the enemy there.
+const ROLL_MATCH: f32 = 1.2;
+const GROUP_ON_POST_TILES: f32 = 2.5;
+/// An enemy Tank this close to a grouped line Tank holds it on its spot, up to this far off its post.
+const ENGAGED_TILES: f32 = 15.0;
+const LEASH_TILES: f32 = 6.0;
 
 /// V1.1's front line.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -164,6 +178,8 @@ pub(in crate::ai_core::decision) fn hold(
             && !memory.jeff_v1_1.tank_raid.holds(unit.id)
             && !memory.jeff_v1_1.deny.holds(unit.id)
             && !memory.jeff_v1_1.base_lines.posted(unit.id)
+            && !memory.jeff_v1_1.home_guard.holds(unit.id)
+            && !memory.jeff_v1_1.rovers.holds(unit.id)
     };
     let tanks: Vec<&AiEntitySummary> = observation
         .owned
@@ -181,10 +197,12 @@ pub(in crate::ai_core::decision) fn hold(
             .total_cmp(&dist2(b.x, b.y, main.0, main.1))
             .then(a.id.cmp(&b.id))
     });
+    // With the roaming force (`rovers`) the Riflemen are its, not the line's.
+    let max_rifles = if super::rovers::active(memory) { 0 } else { MAX_RIFLES };
     let riflemen: Vec<&AiEntitySummary> = riflemen
         .into_iter()
         .skip(HOME_RIFLES)
-        .take(MAX_RIFLES)
+        .take(max_rifles)
         .collect();
     if tanks.is_empty() {
         // No line without Tanks: the infantry goes back to V1.0's posts.
@@ -341,6 +359,7 @@ pub(in crate::ai_core::decision) fn hold(
         observation.map,
     );
     let params = LineParams::read();
+    let groups = !super::off("linegroups");
     // Where the enemy last came at Jeff: fighters in sight near a Depot or the line, for a while.
     let near_ours = |x: f32, y: f32| {
         observation.owned.iter().any(|unit| {
@@ -402,31 +421,73 @@ pub(in crate::ai_core::decision) fn hold(
                         field.iter().map(|a| lateral(*a)).sum::<f32>() / field.len() as f32
                     };
                     let threat = super::push::threat_near(observation, memory, at, 25.0);
-                    Base { at, front, side, threat }
+                    Base { at, front, side, threat, contact: 0.0 }
                 })
                 .collect();
             if bases.len() > 1 {
                 // The main has V1.0's pocket and home Tank.
                 bases.retain(|base| dist2(base.at.0, base.at.1, main.0, main.1) > squared(8.0 * ts));
             }
+            let back = memory.jeff_v1_1.front_line.back as f32 / 10.0;
+            let segment_of = |base: &Base| {
+                (
+                    main.0 + axis.0 * (base.front + (AHEAD_TILES - back) * ts) + across.0 * base.side,
+                    main.1 + axis.1 * (base.front + (AHEAD_TILES - back) * ts) + across.1 * base.side,
+                )
+            };
+            // Grouped (`linegroups`): enemy fighters in sight at a base now weigh before the threat
+            // remembered there, and draw the line's Tanks to it.
+            if groups {
+                for base in &mut bases {
+                    let segment = segment_of(base);
+                    let value: f32 = observation
+                        .visible_enemies
+                        .iter()
+                        .filter(|enemy| {
+                            enemy.hp > 0 && enemy.kind.is_unit() && enemy.kind != EntityKind::Worker
+                        })
+                        .filter(|enemy| {
+                            dist2(enemy.x, enemy.y, base.at.0, base.at.1) <= squared(ROLL_TILES * ts)
+                                || dist2(enemy.x, enemy.y, segment.0, segment.1)
+                                    <= squared(ROLL_TILES * ts)
+                        })
+                        .map(|enemy| super::push::unit_value(enemy.kind) as f32)
+                        .sum();
+                    base.contact = if value >= ROLL_MIN_VALUE { value } else { 0.0 };
+                }
+            }
             bases.sort_by(|a, b| {
-                b.threat
-                    .total_cmp(&a.threat)
+                b.contact
+                    .total_cmp(&a.contact)
+                    .then(b.threat.total_cmp(&a.threat))
                     .then(b.front.total_cmp(&a.front))
             });
-            let covered = bases.len().min((tanks.len() / 2).max(1));
+            let per_base = if groups { GROUP_TANKS } else { 2 };
+            let covered = bases.len().min((tanks.len() / per_base).max(1));
             bases.truncate(covered);
-            let back = memory.jeff_v1_1.front_line.back as f32 / 10.0;
+            let share_of = |total: usize, index: usize| total / covered + usize::from(index < total % covered);
+            let mut tank_counts: Vec<usize> = (0..covered).map(|index| share_of(tanks.len(), index)).collect();
+            // Support rolls in: the base in contact takes Tanks from the others until it has
+            // `ROLL_MATCH` of the enemy strength there.
+            if groups && covered > 1 && bases[0].contact > 0.0 {
+                let tank_value = super::push::unit_value(EntityKind::Tank) as f32;
+                let need = (bases[0].contact * ROLL_MATCH / tank_value).ceil() as usize;
+                let first = need.clamp(tank_counts[0], tanks.len());
+                let rest = tanks.len() - first;
+                let others = covered - 1;
+                tank_counts[0] = first;
+                for (index, count) in tank_counts.iter_mut().enumerate().skip(1) {
+                    *count = rest / others + usize::from(index - 1 < rest % others);
+                }
+            }
+            let tank_spacing = if groups { GROUP_SPACING_TILES } else { params.spacing };
             let mut left_tanks: Vec<&AiEntitySummary> = tanks.clone();
             let mut left_rifles: Vec<&AiEntitySummary> = riflemen.clone();
             for (index, base) in bases.iter().enumerate() {
-                let share = |total: usize| total / covered + usize::from(index < total % covered);
-                let segment = (
-                    main.0 + axis.0 * (base.front + (AHEAD_TILES - back) * ts) + across.0 * base.side,
-                    main.1 + axis.1 * (base.front + (AHEAD_TILES - back) * ts) + across.1 * base.side,
-                );
+                let share = |total: usize| share_of(total, index);
+                let segment = segment_of(base);
                 for (pool, count, spacing, ahead) in [
-                    (&mut left_tanks, share(tanks.len()), params.spacing, 0.0),
+                    (&mut left_tanks, tank_counts[index], tank_spacing, 0.0),
                     (&mut left_rifles, share(riflemen.len()), RIFLE_SPACING_TILES, RIFLE_AHEAD_TILES),
                 ] {
                     pool.sort_by(|a, b| {
@@ -517,7 +578,22 @@ pub(in crate::ai_core::decision) fn hold(
         if fighting {
             continue;
         }
-        let near = dist2(unit.x, unit.y, post.0, post.1) <= squared(1.5 * ts);
+        // Grouped, a Tank in a parked enemy Tank's reach stays parked unless far off its post:
+        // moving drops its own reach to 5 tiles.
+        let off_post = dist2(unit.x, unit.y, post.0, post.1);
+        if groups
+            && unit.kind == EntityKind::Tank
+            && off_post <= squared(LEASH_TILES * ts)
+            && observation.visible_enemies.iter().any(|enemy| {
+                enemy.kind == EntityKind::Tank
+                    && enemy.hp > 0
+                    && dist2(enemy.x, enemy.y, unit.x, unit.y) <= squared(ENGAGED_TILES * ts)
+            })
+        {
+            continue;
+        }
+        let on_post_tiles = if groups { GROUP_ON_POST_TILES } else { 1.5 };
+        let near = off_post <= squared(on_post_tiles * ts);
         if near {
             if unit.state == AiEntityState::Move {
                 actions::hold_position_units(actions, [unit.id]);
@@ -547,6 +623,8 @@ struct Base {
     front: f32,
     side: f32,
     threat: f32,
+    /// Enemy fighters in sight there now, by value (`linegroups`).
+    contact: f32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

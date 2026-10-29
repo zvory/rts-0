@@ -138,6 +138,7 @@ pub(in crate::ai_core::decision) fn escort(
             && !memory.expansion_security.riflemen.contains(&unit.id)
             && !memory.opening_rush.is_reserved(unit.id)
             && !reserved.contains(&unit.id)
+            && !memory.jeff_v1_1.home_guard.holds(unit.id)
     };
     let nearest = |kind: EntityKind, count: usize| {
         let mut units: Vec<&AiEntitySummary> = observation

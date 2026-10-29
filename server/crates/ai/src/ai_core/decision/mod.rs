@@ -1079,6 +1079,8 @@ where
     frontal_exclusions.extend(memory.later_bases.guards.iter().copied());
     frontal_exclusions.extend(memory.jeff_v1_1.natural.support.keys().copied());
     frontal_exclusions.extend(memory.jeff_v1_1.front_line.units());
+    frontal_exclusions.extend(memory.jeff_v1_1.home_guard.units());
+    frontal_exclusions.extend(memory.jeff_v1_1.rovers.units());
     frontal_exclusions.extend(route_line_reserved.iter().copied());
     // Raid responders, sentries and units stepping out of reach are home defense's.
     frontal_exclusions.extend(memory.raid_defense.reserved());
@@ -1104,6 +1106,9 @@ where
     local_ready_units.retain(|id| !push_units.contains(id));
     local_ready_units.retain(|id| !memory.opening_rush.is_reserved(*id));
     local_ready_units.retain(|id| !memory.jeff_v1_1.front_line.holds(*id));
+    local_ready_units.retain(|id| {
+        !memory.jeff_v1_1.home_guard.holds(*id) && !memory.jeff_v1_1.rovers.holds(*id)
+    });
     local_ready_units.retain(|id| !memory.jeff_v1_1.deny.holds(*id));
     local_ready_units.retain(|id| !memory.third_pressure.is_reserved(*id)
                 && !memory.jeff_v1_1.tank_raid.holds(*id));
@@ -1257,7 +1262,10 @@ where
         let live = (&mut actions, observation, map_analysis, &mut intents);
         let held = &(&local_defense_assigned | &route_line_reserved) | &push_units;
         jeff_v1_1::natural::support(live, memory, profile.id, &defensive_machine_gunners, &held);
-        // Jeff's AI V1.1 holds a Tank line in front of its bases and the ones it is taking.
+        // Jeff's AI V1.1 keeps Tanks parked in front of its main, and holds a Tank line in front of
+        // its bases and the ones it is taking.
+        let live = (&mut actions, observation, map_analysis, &mut intents);
+        jeff_v1_1::home_guard::guard(live, memory, &held);
         let live = (&mut actions, observation, map_analysis, &mut intents);
         jeff_v1_1::front_line::hold(live, memory, &held);
         let defensive_machine_gunners_available: Vec<u32> = defensive_machine_gunners
@@ -1351,6 +1359,9 @@ where
         let live = (&mut actions, observation, map_analysis, &mut intents);
         let held = &held | &memory.jeff_v1_1.natural.support.keys().copied().collect();
         jeff_v1_1::base_line::hold(live, memory, profile, &defensive_machine_gunners, &held);
+        // Jeff's AI V1.1's free Riflemen roam between its bases and run at raids on them.
+        let live = (&mut actions, observation, map_analysis, &mut intents);
+        jeff_v1_1::rovers::roam(live, memory, &held);
 
         // The current Jeff's home Tank waits behind the home post once that has moved off the
         // main's line; it sat beside the HQ all game while the natural was shelled.
@@ -1506,6 +1517,7 @@ where
             excluded.extend(expansion_footprint_blockers.iter().copied());
             excluded.extend(memory.jeff_v1_1.tank_raid.units());
             excluded.extend(memory.jeff_v1_1.front_line.units());
+            excluded.extend(memory.jeff_v1_1.home_guard.units());
             let gathered = jeff::gather_resting_tanks(&mut actions, observation, memory, excluded);
             if !gathered.is_empty() {
                 intents.push(AiIntent::Move { units: gathered });

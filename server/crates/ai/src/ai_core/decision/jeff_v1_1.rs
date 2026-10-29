@@ -8,10 +8,12 @@ pub(super) mod base_line;
 pub(super) mod charge;
 pub(super) mod deny;
 pub(super) mod front_line;
+pub(super) mod home_guard;
 pub(super) mod hunt;
 pub(super) mod natural;
 pub(super) mod push;
 pub(super) mod reveal;
+pub(super) mod rovers;
 pub(super) mod scout;
 pub(super) mod smoke_cover;
 pub(super) mod screen;
@@ -40,6 +42,8 @@ pub(super) struct V1_1Memory {
     pub(super) reveal: reveal::RevealMemory,
     pub(super) tank_raid: tank_raid::TankRaidMemory,
     pub(super) front_line: front_line::FrontLineMemory,
+    pub(super) home_guard: home_guard::HomeGuardMemory,
+    pub(super) rovers: rovers::RoverMemory,
     pub(super) smoke: smoke_cover::SmokeMemory,
     pub(super) deny: deny::DenyMemory,
 }

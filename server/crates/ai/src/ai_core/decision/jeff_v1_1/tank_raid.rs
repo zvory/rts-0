@@ -426,6 +426,7 @@ fn launch(
             && memory.home_defensive_tank != Some(unit.id)
             && !memory.later_bases.guards.contains(&unit.id)
             && memory.jeff_v1_1.scout.unit != Some(unit.id)
+            && !memory.jeff_v1_1.home_guard.holds(unit.id)
     };
     // The scout's Scout Car goes with the raid (`raidcar`): Jeff keeps one, and without it the raid
     // had no smoke and parked within its Tanks' 9 tiles of sight.

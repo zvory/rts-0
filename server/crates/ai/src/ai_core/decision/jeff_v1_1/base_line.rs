@@ -111,7 +111,7 @@ pub(in crate::ai_core::decision) struct BaseContact {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(in crate::ai_core::decision) struct LineMemory {
     posts: BTreeMap<u32, LinePost>,
-    contacts: BTreeMap<u32, BaseContact>,
+    pub(in crate::ai_core::decision) contacts: BTreeMap<u32, BaseContact>,
 }
 
 /// The kinds of units on a line.
@@ -633,7 +633,11 @@ pub(in crate::ai_core::decision) fn hold(
     home_guns: &[u32],
     held: &BTreeSet<u32>,
 ) {
-    if !is_jeff_v1_1(profile.id) || super::off("lines") {
+    // `basemgs` without `lines`: the guns alone hold the outer bases' lines, in their trenches; the
+    // Riflemen roam (`rovers`) and the Tanks hold the Tank line. A gun fires only set up, a Meth
+    // Rifleman on the move.
+    let guns_only = super::off("lines");
+    if !is_jeff_v1_1(profile.id) || (guns_only && super::off("basemgs")) {
         return;
     }
     let ts = observation.map.tile_size as f32;
@@ -648,9 +652,10 @@ pub(in crate::ai_core::decision) fn hold(
         .and_then(|policy| policy.replacement_health_percent)
         .unwrap_or(0);
     let free = |unit: &AiEntitySummary| !held.contains(&unit.id);
+    let mobile = |unit: &AiEntitySummary| free(unit) && !guns_only;
     let classes = [
-        (Class::Rifle, line_units(observation, memory, EntityKind::Rifleman, free)),
-        (Class::Faust, line_units(observation, memory, EntityKind::Panzerfaust, free)),
+        (Class::Rifle, line_units(observation, memory, EntityKind::Rifleman, mobile)),
+        (Class::Faust, line_units(observation, memory, EntityKind::Panzerfaust, mobile)),
         (
             Class::Gun,
             line_units(observation, memory, EntityKind::MachineGunner, |unit| {
@@ -662,7 +667,7 @@ pub(in crate::ai_core::decision) fn hold(
         (
             Class::Tank,
             line_units(observation, memory, EntityKind::Tank, |unit| {
-                free(unit) && !super::off("linetanks")
+                free(unit) && !super::off("linetanks") && !guns_only
             }),
         ),
     ];
