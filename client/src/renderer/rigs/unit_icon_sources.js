@@ -1,4 +1,4 @@
-import { KIND } from "../../protocol.js";
+import { KIND, SETUP } from "../../protocol.js";
 import { lightenColor } from "../shared.js";
 import { createLiveFrameStrips } from "./frame_strip_routing.js";
 import { liveRigIconSvgFor, LOADED_RIFLEMAN_RIG_KEY } from "./live_routing.js";
@@ -21,7 +21,7 @@ const ICON_COMPOSITION_STATE = Object.freeze({
  * PNG frame strips/atlases are authoritative for raster units. SVG portraits are used only for
  * units that do not yet have a PNG route.
  */
-export function liveUnitIconMarkupFor(kind, { teamColor = "#0072b2" } = {}) {
+export function liveUnitIconMarkupFor(kind, { teamColor = "#0072b2", minimapPart = null } = {}) {
   const tintColor = normalizeTeamColor(teamColor);
   const rigKey = kind === KIND.PANZERFAUST ? LOADED_RIFLEMAN_RIG_KEY : kind;
   const strip = LIVE_FRAME_STRIPS.get(rigKey);
@@ -52,6 +52,7 @@ export function liveUnitIconMarkupFor(kind, { teamColor = "#0072b2" } = {}) {
   }
 
   const atlas = LIVE_PNG_ATLASES.get(rigKey);
+  if (minimapPart && atlas) return minimapPartMarkup(kind, atlas, tintColor, minimapPart);
   const atlasIcon = atlasPortrait(atlas, tintColor);
   if (atlasIcon?.components) {
     return composedRasterIconMarkup({ ...atlasIcon, teamColor: tintColor });
@@ -259,6 +260,29 @@ function applyAnimatedIconPart(record, state) {
   record.scaleNode?.setAttribute("transform", `scale(${number(scaleX)} ${number(scaleY)})`);
 }
 
+// Minimap layers share an origin and square viewBox, so independent rotations cannot shift
+// or resize the hull, turret, carriage, or barrel relative to each other.
+function minimapPartMarkup(kind, atlas, teamColor, part) {
+  const packed = part.startsWith("packed");
+  const entity = { kind, facing: 0, weaponFacing: 0,
+    setupState: packed ? SETUP.PACKED : SETUP.DEPLOYED };
+  const definition = RASTER_RIG_DEFINITIONS.get(kind);
+  const pose = sampleRigAnimation(definition, entity, createRigRenderContext(entity));
+  const components = atlas.sprites.filter(sprite => {
+    if (kind === KIND.TANK) return part === "hull"
+      ? !["part.turret", "part.barrel"].includes(sprite.animationPart)
+      : ["part.turret", "part.barrel"].includes(sprite.animationPart);
+    return sprite.id.endsWith(packed ? ".packed" : ".deployed")
+      && (part.endsWith("barrel") === sprite.id.includes("barrelAssembly"));
+  }).sort((a, b) => a.drawOrder - b.drawOrder).map(sprite => {
+    const transform = resolvePngSpriteTransform(pose.parts[sprite.animationPart], sprite.frame, sprite);
+    return { id: sprite.id, frame: sprite.frame, ...transform, teamTint: sprite.tintSlot !== "fixed" };
+  });
+  return composedRasterIconMarkup({ source: "png-atlas-minimap", image: atlas.image,
+    sheetWidth: atlas.grid.width, sheetHeight: atlas.grid.height, components,
+    teamTint: true, teamColor, fixedBounds: { x: -64, y: -64, w: 128, h: 128 } });
+}
+
 function atlasPortrait(atlas, teamColor) {
   if (!atlas?.image || !atlas?.grid) return null;
   const assembled = atlas.grid.components?.assembledReference;
@@ -441,6 +465,7 @@ function composedRasterIconMarkup({
   sheetWidth,
   sheetHeight,
   components,
+  fixedBounds = null,
   teamTint = false,
   teamColor = "#0072b2",
 }) {
@@ -451,7 +476,7 @@ function composedRasterIconMarkup({
   const safeComponents = components.map((component) => normalizedCompositionComponent(component))
     .filter(Boolean);
   if (safeComponents.length !== components.length || safeComponents.length === 0) return "";
-  const bounds = compositionBounds(safeComponents);
+  const bounds = fixedBounds || compositionBounds(safeComponents);
   if (!bounds) return "";
   const padX = bounds.w * ICON_VISIBLE_PADDING_RATIO;
   const padY = bounds.h * ICON_VISIBLE_PADDING_RATIO;

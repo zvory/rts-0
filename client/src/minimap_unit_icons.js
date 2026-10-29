@@ -1,3 +1,5 @@
+import { SETUP } from "./protocol.js";
+
 // Shared live/export unit presentation. Images are supplied by the host; no unit-dot fallback.
 const SIZES = Object.freeze({
   worker: 9, rifleman: 9, panzerfaust: 10, machine_gunner: 12, tank: 26,
@@ -22,15 +24,15 @@ export class MinimapUnitIcons {
     this.controller = new AbortController();
   }
 
-  request(kind, color) {
-    const key = `${kind}:${color}`;
+  request(kind, color, part = null) {
+    const key = `${kind}:${color}:${part || "portrait"}`;
     if (this.entries.has(key)) return this.entries.get(key);
-    const entry = { key, image: null, mask: null, error: null };
+    const entry = { key, part, image: null, mask: null, error: null };
     this.entries.set(key, entry);
     entry.promise = Promise.resolve().then(() => {
       if (this.controller.signal.aborted) return null;
       if (!this.loadImage) throw Error("Minimap unit image loader is unavailable");
-      return this.loadImage(kind, color, { signal: this.controller.signal });
+      return this.loadImage(kind, color, { signal: this.controller.signal, minimapPart: part });
     }).then(image => {
       if (this.controller.signal.aborted) { image?.close?.(); return; }
       if (!image?.width || !image?.height) throw Error(`Empty minimap portrait: ${kind}`);
@@ -49,7 +51,7 @@ export class MinimapUnitIcons {
   }
 
   async prepare(requests) {
-    const entries = requests.map(({ kind, color }) => this.request(kind, color));
+    const entries = requests.flatMap(({ kind, color }) => this._parts(kind).map(part => this.request(kind, color, part)));
     await Promise.all(entries.map(entry => entry.promise));
     const failed = entries.find(entry => entry.error);
     if (failed) throw failed.error;
@@ -74,7 +76,9 @@ export class MinimapUnitIcons {
     const index = flash ? 1 : 0;
     if (entry.sprites[index]) return entry.sprites[index];
     const { image, mask } = entry;
-    const scale = unitPngSize(kind, canvasSize) / Math.max(image.width, image.height);
+    // Articulated layers reserve a shared square for rotations; compensate for its padding.
+    const scale = unitPngSize(kind, canvasSize) * (entry.part ? 1.8 : 1)
+      / Math.max(image.width, image.height);
     const width = image.width * scale, height = image.height * scale;
     const outline = canvasSize / 480;
     // Oversample the small cached portrait so rotation remains smooth at any device pixel ratio.
@@ -93,13 +97,35 @@ export class MinimapUnitIcons {
     return sprite;
   }
 
+  _parts(kind) {
+    if (kind === "tank") return ["hull", "turret"];
+    if (kind === "anti_tank_gun") return ["packed-base", "packed-barrel", "deployed-base", "deployed-barrel"];
+    return [null];
+  }
+
   draw(context, entity, color, point, canvasSize, flash = false) {
-    const entry = this.request(entity.kind, color);
+    const facing = unitPngFacing(entity);
+    const weaponFacing = Number.isFinite(entity.weaponFacing) ? entity.weaponFacing : facing;
+    let layers = [[null, facing]];
+    if (entity.kind === "tank") layers = [["hull", facing], ["turret", weaponFacing]];
+    if (entity.kind === "anti_tank_gun") {
+      const deployed = [SETUP.DEPLOYED, SETUP.TEARING_DOWN].includes(entity.setupState);
+      const pose = deployed ? "deployed" : "packed";
+      const baseFacing = deployed && Number.isFinite(entity.setupFacing) ? entity.setupFacing : facing;
+      layers = [[`${pose}-base`, baseFacing], [`${pose}-barrel`, deployed ? weaponFacing : facing]];
+    }
+    for (const [part, rotation] of layers) {
+      this._drawLayer(context, entity, color, point, canvasSize, flash, part, rotation);
+    }
+  }
+
+  _drawLayer(context, entity, color, point, canvasSize, flash, part, rotation) {
+    const entry = this.request(entity.kind, color, part);
     if (!entry.image) return;
     const sprite = this._sprite(entry, entity.kind, canvasSize, flash);
     context.save();
     context.translate(point.x, point.y);
-    context.rotate(unitPngFacing(entity));
+    context.rotate(rotation);
     context.drawImage(sprite, -sprite.width / 8, -sprite.height / 8, sprite.width / 4, sprite.height / 4);
     context.restore();
   }
