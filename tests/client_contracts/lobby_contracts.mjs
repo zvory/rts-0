@@ -225,7 +225,7 @@ import { textWithin } from "./dom_text.mjs";
       "custom map selector renders every server-advertised map name");
     assertDeepEqual(
       selector.optionButtons.map((button) => button.dataset.mapName),
-      ["3 Player Map", "4 Player Map", "Classic V2", "Crossroads", "Doppelganger", "Fastest Map Possible",
+      ["Afrika (2v2)", "3 Player Map", "4 Player Map", "Classic V2", "Crossroads", "Doppelganger", "Fastest Map Possible",
         "Schone Tage", "The River", "Wald des Todes", "1v1 No Terrain", "Classic", "Chokes", "Lighting Test",
         "Open Basin"],
       "custom map selector groups archived maps after active maps",
