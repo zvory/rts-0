@@ -369,7 +369,7 @@ export class ObserverAnalysisOverlay {
     for (const player of rows) {
       if (!player.production.length) continue;
       wrap.appendChild(this.renderPlayerHeading(player));
-      for (const item of player.production) {
+      for (const item of groupConstructionRows(player.production)) {
         const row = document.createElement("div");
         row.className = "replay-production-row";
 
@@ -380,15 +380,13 @@ export class ObserverAnalysisOverlay {
         const main = document.createElement("span");
         main.className = "replay-production-main";
         const itemLabel = itemLabelFor(item.itemKind, item.itemType, this.stats);
-        const buildingLabel = kindLabel(item.buildingKind, this.stats);
-        main.textContent = item.itemType === "building"
-          ? `Constructing ${itemLabel}`
-          : `${itemLabel} at ${buildingLabel}`;
+        main.textContent = item.count > 1 ? `${itemLabel} ×${item.count}` : itemLabel;
 
         const progress = document.createElement("span");
         progress.className = "replay-production-progress";
         progress.textContent = `${formatPercent(item.progress)}%`;
-        progress.title = item.itemType === "building" ? "Construction progress" : "Production progress";
+        progress.title = item.count > 1 ? "Average construction progress"
+          : item.itemType === "building" ? "Construction progress" : "Production progress";
 
         const queue = document.createElement("span");
         queue.className = "replay-production-queue";
@@ -634,6 +632,28 @@ function normalizeKindRows(rows) {
     steelValue: Math.max(0, Math.trunc(Number(row?.steelValue) || 0)),
     oilValue: Math.max(0, Math.trunc(Number(row?.oilValue) || 0)),
   })).filter((row) => row.kind && row.count > 0);
+}
+
+// Keep producer queues separate; combine matching construction sites per player.
+function groupConstructionRows(rows) {
+  const result = [];
+  const construction = new Map();
+  for (const item of rows) {
+    if (item.itemType !== "building") {
+      result.push(item);
+      continue;
+    }
+    let group = construction.get(item.itemKind);
+    if (!group) {
+      group = { ...item, count: 0, progress: 0 };
+      construction.set(item.itemKind, group);
+      result.push(group);
+    }
+    group.count += 1;
+    group.progress += item.progress;
+  }
+  for (const group of construction.values()) group.progress /= group.count;
+  return result;
 }
 
 function normalizeProductionRows(rows) {
