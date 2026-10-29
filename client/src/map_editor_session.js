@@ -967,9 +967,9 @@ function normalizeDraft(draft) {
   const dimensions = { width, height };
   draft.width = width;
   draft.height = height;
-  const originalStarts = draft.startLocations || [];
+  const originalStarts = Array.isArray(draft.startLocations) ? draft.startLocations : [];
   draft.startLocations = normalizeLocations(originalStarts, dimensions).slice(0, MAP_EDITOR_MAX_START_LOCATIONS).map((start) => {
-    const group = originalStarts.find((candidate) => sameLocation(candidate, start))?.teamGroup;
+    const group = originalStarts.find((candidate) => sameLocation(validMapTile(candidate, dimensions), start))?.teamGroup;
     if (group === undefined) return start;
     if (!Number.isInteger(group) || group < 1 || group > 4) throw new Error("Start teamGroup must be an integer from 1 to 4.");
     return { ...start, teamGroup: group };

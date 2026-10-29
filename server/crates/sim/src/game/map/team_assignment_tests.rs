@@ -250,4 +250,10 @@ fn authored_team_groups_reject_incompatible_rosters_and_invalid_groups() {
         assert!(Map::materialize_authored_json(&map.to_string(), 1).is_err());
         assert!(authored::player_count_bounds(&map.to_string()).is_err());
     }
+    let mut map: serde_json::Value = serde_json::from_str(&json).unwrap();
+    for start in map["startLocations"].as_array_mut().unwrap() {
+        start["teamGroup"] = serde_json::Value::Null;
+    }
+    assert!(Map::materialize_authored_json(&map.to_string(), 1).is_err());
+    assert!(authored::player_count_bounds(&map.to_string()).is_err());
 }

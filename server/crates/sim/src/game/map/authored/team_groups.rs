@@ -5,8 +5,15 @@ use serde::Deserialize;
 pub(super) struct AuthoredStartLocation {
     pub(super) x: u32,
     pub(super) y: u32,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_team_group")]
     team_group: Option<u32>,
+}
+
+fn deserialize_team_group<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<u32>, D::Error> {
+    // Only omission means automatic assignment; explicit null is not a group.
+    u32::deserialize(deserializer).map(Some)
 }
 
 pub(super) fn parse_team_groups(starts: &[AuthoredStartLocation]) -> Result<Vec<u32>, String> {

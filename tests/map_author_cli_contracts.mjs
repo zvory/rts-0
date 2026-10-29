@@ -120,6 +120,12 @@ assert.equal(groupedSession.exportMap().startLocations[0].teamGroup, 1);
 const partialGroups = structuredClone(groupedMap);
 delete partialGroups.startLocations[0].teamGroup;
 assert(validateMap(partialGroups).warnings.some((warning) => warning.includes("every start")));
+const normalizedGroupedMap = structuredClone(groupedMap);
+normalizedGroupedMap.startLocations.forEach((start) => { start.x = String(start.x); });
+const normalizedGroupedSession = new MapEditorSession({ storage: null });
+normalizedGroupedSession.loadAuthoredMap(normalizedGroupedMap);
+assert.deepEqual(normalizedGroupedSession.exportMap().startLocations, groupedMap.startLocations,
+  "coordinate normalization preserves authored team groups");
 
 const operationlessRecipe = { name: "Operationless recipe", width: 16, height: 18 };
 assert.deepEqual(buildMapFromRecipe(operationlessRecipe).terrain, Array(18).fill(".".repeat(16)));
