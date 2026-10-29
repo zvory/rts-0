@@ -721,13 +721,18 @@ fn critical_events_track_lost_prerequisites_and_recovery_without_duplicates() {
             .set_repeat_production(Some(EntityKind::AntiTankGun), true);
     }
     assert!(game.critical_event_state()[0].blocked_production.is_empty());
-    game.state.entities.get_mut(engineering).unwrap().hp = 0;
+    game.state
+        .entities
+        .get_mut(engineering)
+        .unwrap()
+        .apply_damage(u32::MAX, None);
     assert_eq!(
         game.critical_event_state()[0].blocked_production,
         vec![(EntityKind::AntiTankGun, EntityKind::EngineeringComplex)]
     );
     assert!(game.critical_event_state()[1].blocked_production.is_empty());
-    game.state.entities.get_mut(engineering).unwrap().hp = 100;
+    game.state.entities.remove(engineering);
+    let engineering = spawn_building(&mut game, 1, EntityKind::EngineeringComplex, (24, 8));
     assert!(game.critical_event_state()[0].blocked_production.is_empty());
     game.state.entities.remove(engineering);
     for id in [gun_works, second] {

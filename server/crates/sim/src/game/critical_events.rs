@@ -33,7 +33,8 @@ impl Game {
                 let mut blocked_production = Vec::new();
                 let mut upgrading_depots = Vec::new();
                 for building in buildings {
-                    if building.kind == EntityKind::ResourceDepot
+                    if building.kind
+                        == super::upgrade::definition(UpgradeKind::IndustrialCenter).researched_at
                         && building
                             .research_queue()
                             .first()
