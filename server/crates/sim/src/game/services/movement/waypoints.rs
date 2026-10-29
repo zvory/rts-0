@@ -314,12 +314,7 @@ pub(super) fn advance_moving_units(
                     }
                 }
 
-                if !uses_vehicle_movement {
-                    let facing = dy.atan2(dx);
-                    if facing.is_finite() {
-                        new_facing = Some(facing);
-                    }
-                }
+                let step_start = (x, y);
                 let can_reach_waypoint = if is_car {
                     path_len == 1 && dist <= budget
                 } else {
@@ -398,6 +393,21 @@ pub(super) fn advance_moving_units(
                             y = ny;
                         }
                     }
+                }
+                if !uses_vehicle_movement {
+                    // Face the accepted step, including avoidance or wall sliding, rather than
+                    // the unsteered waypoint bearing. Arrival-only snaps above keep the last
+                    // walking heading; collision cleanup later must not turn stationary crews.
+                    let step_dx = x - step_start.0;
+                    let step_dy = y - step_start.1;
+                    if step_dx.hypot(step_dy) > 0.01 {
+                        let facing = step_dy.atan2(step_dx);
+                        if facing.is_finite() {
+                            new_facing = Some(facing);
+                        }
+                    }
+                }
+                if !can_reach_waypoint {
                     break;
                 }
             }

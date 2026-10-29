@@ -1545,6 +1545,11 @@ General rules:
   cooldown expiry, future tech, or future affordability.
 - Same-tile movement goals count as arrived rather than path-failed. Plain move orders clear back to
   idle on arrival; attack-move orders keep their aggressive stance.
+  Infantry body facing follows the accepted movement step after local avoidance or wall sliding;
+  blocked steps and arrival-only position snaps retain the last walking heading. Collision cleanup
+  does not choose facing. When a Machine Gunner arrives without a combat target, automatic setup
+  copies body facing into weapon facing so deployment preserves that heading; an acquired target
+  still chooses combat aim normally. Vehicle movement retains its separate turning rules.
 - Non-queued `HoldPosition` clears each selected unit's active order and queued intents, then marks
   the unit as held. Queued `HoldPosition` appends a terminal intent, so the unit finishes earlier
   queued stages before entering that same held stance. Held units keep normal collision behavior
