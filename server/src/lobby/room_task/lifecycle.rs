@@ -379,6 +379,7 @@ impl RoomTask {
         self.reset_room_time_state();
         self.replay_start = None;
         self.match_chat_log.clear();
+        self.critical_events = Default::default();
         self.lab_driver = None;
     }
 
@@ -405,6 +406,7 @@ impl RoomTask {
         self.branch_live_seat_by_connection.clear();
         self.pending_recipient_notices.clear();
         self.match_chat_log.clear();
+        self.critical_events = Default::default();
         self.recent_chat_times.clear();
         self.observer_views.clear();
         self.ground_decal_request_times.clear();
@@ -436,6 +438,7 @@ impl RoomTask {
         self.branch_live_seat_by_connection.clear();
         self.pending_recipient_notices.clear();
         self.match_chat_log.clear();
+        self.critical_events = Default::default();
         self.recent_chat_times.clear();
         self.reset_live_pause_state();
         self.lab_session = None;

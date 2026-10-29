@@ -400,6 +400,7 @@ transport/browser/prediction/render behavior, not as gameplay authority.
 | `branchFromTickCreated` | `branchRoom: string`, `sourceTick: u32`, `seats: ReplayBranchSeat[]` — a separate practice branch room has been created from the source replay's current authoritative tick. |
 | `branchStaging` | `room: string`, `sourceTick: u32`, `hostId: u32`, `seats: BranchStagingSeat[]`, `occupants: BranchStagingOccupant[]`, `canStart: bool` — reliable current state for a replay branch staging room. Sent after joins, leaves, claims, and releases. |
 | `chat` | `scope: "lobby" or "game"`, `channel: "all" or "team"`, `tick?: u32`, `senderId: u32`, `senderName: string`, `text: string` — reliable server-authored chat delivery. Lobby deliveries omit `tick`; live and replay deliveries carry the authoritative presentation tick. Clients render all fields as text, never HTML. |
+
 | `roomNotice` | `msg: string` — reliable, ephemeral room activity shown through the normal brief toast. Active replay joins notify existing viewers; departures notify remaining viewers. Delivered even while paused, seeking, or ended; never recorded or replayed on seek. |
 | `shutdownWarning` | `deadlineUnixMs: u64`, `secondsRemaining: u64` — deploy/termination drain has started; active matches may continue until the deadline, but new match starts are disabled. |
 | `observationReady` | `matchRunId: string` — a watched all-AI match has resolved; this id retrieves its saved replay and joins its structured server logs. |
@@ -407,6 +408,16 @@ transport/browser/prediction/render behavior, not as gameplay authority.
 | `pong`     | `ts: number` (echo of the ping ts) |
 | `commandReceipt` | `clientSeq: u32`, `serverTick: u32`, `accepted: bool`, `reason?: string` — reliable diagnostics-only room receipt. Does not reconcile prediction. |
 | `error`    | `msg: string` |
+
+Game-generated critical alerts reuse `chat` with `senderId: 0`, `senderName: "Game"`, and
+`channel: "all"`. Supply-cap and lost auto-production prerequisite warnings are delivered only
+to the owning active seat, never teammates or spectators, with an independent 30-second
+simulation-time cooldown per seat and warning (unit/prerequisite for production). Persistent
+blocked conditions may remind after the cooldown. Supply text uses actual used/cap values and
+recommends upgrading a Resource Depot while below the maximum cap. Industrial Center research
+starts broadcast `Color (Player name) has started upgrading a resource depot.` to every connection,
+including spectators, once per accepted start. Only these public announcements enter replay chat;
+private economy warnings are excluded. No positional information is included.
 
 `LobbyPlayer`: `{ id: u32, teamId: u32, factionId: string, name: string, ready: bool, color: string, isAi: bool, aiProfileId?: string, isSpectator: bool }`. `isAi` is
 true for computer opponents (always shown ready; the client renders an "AI" tag, a host-only
@@ -668,7 +679,7 @@ and a tick-zero `GameCheckpointV1` text payload, plus ordered `players[]` with e
 loadoutId, startingSteel, startingOil }` record per player. Replay reconstruction restores the
 start `Game` from the checkpoint payload and then applies the authoritative `commandLog[]` on the
 recorded ticks. Its bounded ordered `chatLog[]` stores `{tick, senderId, senderName, channel, text}`
-for accepted in-game chat only; replay playback reliably emits each entry when the shared cursor
+for accepted in-game chat and public Game announcements; replay playback reliably emits each entry when the shared cursor
 reaches that tick. Seeking clears the client's transient chat presentation and positions the chat
 cursor after the target tick, so already-passed messages do not flood the screen and appear again
 only after rewinding before them and resuming. Both all-chat and formerly private team-chat are part

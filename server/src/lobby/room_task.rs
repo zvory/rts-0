@@ -60,7 +60,6 @@ pub(super) use types::{
 pub(super) struct RoomTask {
     pub(in crate::lobby) room: String,
     mode: RoomMode,
-    /// Connected players in join order (join order drives lobby display and host fallback).
     pub(in crate::lobby) order: Vec<u32>,
     /// Wall-clock creation/reset time for the public lobby browser age column.
     created_at_unix_ms: u64,
@@ -95,7 +94,6 @@ pub(super) struct RoomTask {
     dev_view_player_id: Option<u32>,
     lab_driver: Option<LabScenarioDriver>,
     ai_controllers: Vec<AiController>,
-    /// Room-time speed multiplier; 1.0 = real-time, 2.0 = 2x faster, etc.
     room_time_speed: f32,
     /// Room-time pause flag. Kept separate from room_time_speed so interval creation never divides
     /// by zero and resume can restore the previous non-zero multiplier.
@@ -103,16 +101,14 @@ pub(super) struct RoomTask {
     lab_room_time_controller_id: Option<u32>,
     slow_tick_count: u32,
     pending_client_command_acks: Vec<PendingClientCommandAck>,
-    /// Recipient-specific room-owned notices appended to the next live snapshot for each
-    /// connection id. Used when the notice is about room membership rather than sim events.
+    /// Room membership notices appended to each recipient’s next live snapshot.
     pending_recipient_notices: HashMap<u32, Vec<Event>>,
-    /// Accepted live-match chat copied into the replay artifact at finalization. Lobby chat is
-    /// deliberately never retained here.
+    /// Accepted live chat and public game announcements retained for replay.
     match_chat_log: Vec<rts_sim::game::replay::ChatLogEntry>,
+    critical_events: super::critical_events::CriticalEventTracker,
     /// Short rolling windows used to bound chat spam per connected human.
     recent_chat_times: HashMap<u32, std::collections::VecDeque<std::time::Instant>>,
-    /// Per-connection observer perspective. This is read-only projection state and never an
-    /// issuer/command capability.
+    /// Read-only observer perspective per connection.
     pub(in crate::lobby) observer_views: HashMap<u32, ObserverView>,
     /// Last accepted durable-decal repair request per connection; bounds reliable response spam.
     ground_decal_request_times: HashMap<u32, std::time::Instant>,
@@ -120,9 +116,8 @@ pub(super) struct RoomTask {
     match_history_writer: Option<match_history_writes::SharedMatchHistoryWriter>,
     /// When true, rows written by this room are hidden from non-localhost match-history reads.
     match_history_local_only: bool,
-    /// Wall-clock start time of the currently-running match. `None` outside `Phase::InGame`.
+    /// Match start time; `None` outside live matches.
     match_started_at: Option<chrono::DateTime<chrono::Utc>>,
-    /// Correlates every high-signal log line for one live match attempt.
     match_run_id: Option<String>,
     /// Map name the active match was started on. Empty outside `Phase::InGame`.
     match_map_name: String,
@@ -182,6 +177,7 @@ impl RoomTask {
             pending_client_command_acks: Vec::new(),
             pending_recipient_notices: HashMap::new(),
             match_chat_log: Vec::new(),
+            critical_events: Default::default(),
             recent_chat_times: HashMap::new(),
             observer_views: HashMap::new(),
             ground_decal_request_times: HashMap::new(),
