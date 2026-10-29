@@ -211,16 +211,25 @@ mod tests {
     #[test]
     fn debt_blocks_new_free_extractors_but_existing_scaffolds_finish() {
         let mut entities = EntityStore::new();
-        let depot = entities
-            .spawn_building(1, EntityKind::ResourceDepot, 64.0, 64.0, true)
+        let producer_kind = CURRENT_CATALOG
+            .production_anchors
+            .iter()
+            .copied()
+            .find(|kind| {
+                crate::rules::economy::trainable_units(*kind).contains(&EntityKind::SteelMine)
+            })
             .unwrap();
-        entities.spawn_node(EntityKind::Steel, 128.0, 64.0).unwrap();
-        advance_automatic(&mut entities, depot, "kriegsia", 1, false);
+        let node_kind = EntityKind::SteelMine.extracted_resource_kind().unwrap();
+        let depot = entities
+            .spawn_building(1, producer_kind, 64.0, 64.0, true)
+            .unwrap();
+        entities.spawn_node(node_kind, 128.0, 64.0).unwrap();
+        advance_automatic(&mut entities, depot, CURRENT_CATALOG.id, 1, false);
         assert!(scaffold_id(&entities, depot, EntityKind::SteelMine).is_none());
-        advance_automatic(&mut entities, depot, "kriegsia", 2, true);
+        advance_automatic(&mut entities, depot, CURRENT_CATALOG.id, 2, true);
         let scaffold = scaffold_id(&entities, depot, EntityKind::SteelMine).unwrap();
         let progress = entities.get(scaffold).unwrap().build_progress_fraction();
-        advance_automatic(&mut entities, depot, "kriegsia", 3, false);
+        advance_automatic(&mut entities, depot, CURRENT_CATALOG.id, 3, false);
         assert!(entities.get(scaffold).unwrap().build_progress_fraction() > progress);
     }
 
