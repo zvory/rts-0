@@ -1,3 +1,4 @@
+import { createMinimapAnimation } from "../../client/src/renderer/rigs/minimap_animation.js";
 // Host adapter only. Every minimap pixel is drawn by the production Minimap class.
 import fs from 'node:fs/promises';
 import { Minimap } from '../../client/src/minimap.js';
@@ -45,7 +46,8 @@ export async function createRegularMinimap(header, { createCanvas, loadImage, ra
     const fog = new Fog(map.width, map.height, map.terrain);
     const minimap = new Minimap(canvas, state, null, fog, null, null, {
       commandsEnabled: false, artilleryIconImage,
-      loadUnitIcon: async (kind, teamColor, { minimapPart }) => {
+      unitAnimation: createMinimapAnimation(),
+        loadUnitIcon: async (kind, teamColor, { minimapPart }) => {
         const svg = await inlineSvgImageSources(liveUnitIconMarkupFor(kind, { teamColor, minimapPart }), async href => {
           const asset = new URL(`../../client/${href.replace(/^\//, '')}`, import.meta.url);
           return `data:image/png;base64,${(await fs.readFile(asset)).toString('base64')}`;

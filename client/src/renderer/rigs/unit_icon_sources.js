@@ -23,10 +23,12 @@ const ICON_COMPOSITION_STATE = Object.freeze({
  */
 export function liveUnitIconMarkupFor(kind, { teamColor = "#0072b2", minimapPart = null } = {}) {
   const tintColor = normalizeTeamColor(teamColor);
-  const rigKey = kind === KIND.PANZERFAUST ? LOADED_RIFLEMAN_RIG_KEY : kind;
+  const rigKey = kind === KIND.PANZERFAUST
+    ? (minimapPart?.startsWith("unloaded-frame:") ? KIND.RIFLEMAN : LOADED_RIFLEMAN_RIG_KEY) : kind;
   const strip = LIVE_FRAME_STRIPS.get(rigKey);
   if (strip) {
-    const frameX = strip.frameWidth * (strip.idleFrame || 0);
+    const frameIndex = minimapPart?.includes("frame:") ? Number(minimapPart.split(":").at(-1)) : (strip.idleFrame || 0);
+    const frameX = strip.frameWidth * frameIndex;
     return rasterIconMarkup({
       source: "frame-strip",
       image: strip.image,
@@ -38,7 +40,9 @@ export function liveUnitIconMarkupFor(kind, { teamColor = "#0072b2", minimapPart
         w: strip.frameWidth,
         h: strip.frameHeight,
       },
-      visibleFrame: strip.iconVisibleBounds
+      visibleFrame: minimapPart?.includes("frame:")
+        ? { x: frameX, y: 0, w: strip.frameWidth, h: strip.frameHeight }
+        : strip.iconVisibleBounds
         ? {
             x: frameX + strip.iconVisibleBounds.x,
             y: strip.iconVisibleBounds.y,
@@ -52,6 +56,16 @@ export function liveUnitIconMarkupFor(kind, { teamColor = "#0072b2", minimapPart
   }
 
   const atlas = LIVE_PNG_ATLASES.get(rigKey);
+  if (minimapPart?.startsWith("sprite:") && atlas) {
+    const sprite = atlas.sprites.find(sprite => sprite.id === minimapPart.slice(7));
+    if (!sprite) throw new Error(`Unknown minimap sprite: ${minimapPart}`);
+    const frame = sprite.frame;
+    return composedRasterIconMarkup({ source: "png-atlas-minimap", image: atlas.image,
+      sheetWidth: atlas.grid.width, sheetHeight: atlas.grid.height,
+      components: [{ id: sprite.id, frame, teamTint: sprite.tintSlot !== "fixed" }],
+      teamTint: sprite.tintSlot !== "fixed", teamColor: tintColor,
+      fixedBounds: { x: -64, y: -64, w: 128, h: 128 } });
+  }
   if (minimapPart && atlas) return minimapPartMarkup(kind, atlas, tintColor, minimapPart);
   const atlasIcon = atlasPortrait(atlas, tintColor);
   if (atlasIcon?.components) {

@@ -1,3 +1,4 @@
+import { createMinimapAnimation } from "./renderer/rigs/minimap_animation.js";
 import { createFormationGesture } from "./input/formation_gesture.js";
 import { createMinimapUnitIconLoader } from "./minimap_icon_image.js";
 import { initializeCameraView } from "./camera_view_selection.js";
@@ -333,6 +334,7 @@ export class Match {
         createFormationGesture,
         clientIntent: this.clientIntent,
         controlPolicy: this.controlPolicy,
+        unitAnimation: createMinimapAnimation(),
         loadUnitIcon: createMinimapUnitIconLoader(liveUnitIconMarkupFor, dom.minimap),
         artilleryIconMarkup: liveUnitIconMarkupFor(KIND.ARTILLERY),
       }),
