@@ -13,8 +13,13 @@ export function createMinimapAnimation() {
   const strips = createLiveFrameStrips(), atlases = createLivePngRigAtlases();
   const definitions = createLiveRigDefinitions();
   const records = new Map(), layers = new Map(), stages = new Map();
-  const sprites = new Map([...atlases].map(([kind, atlas]) => [kind,
-    atlas.sprites.filter(sprite => sprite.frame).sort((a, b) => a.drawOrder - b.drawOrder)]));
+  const sprites = new Map([...atlases].map(([kind, atlas]) => {
+    // Declared blank atlas cells contain no pixels. Exclude them before preparing images or
+    // compiling poses; the visible hull, turret and independently recoiling barrel remain.
+    const blankCells = new Set(atlas.grid?.normalization?.blankCells || []);
+    return [kind, atlas.sprites.filter(sprite => sprite.frame && !blankCells.has(sprite.sourceCell))
+      .sort((a, b) => a.drawOrder - b.drawOrder)];
+  }));
   const keyFor = kind => kind === KIND.PANZERFAUST ? LOADED_RIFLEMAN_RIG_KEY : kind;
   let state = {}, now = 0;
   return {

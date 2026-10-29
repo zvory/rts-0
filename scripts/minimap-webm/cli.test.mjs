@@ -274,3 +274,28 @@ test('animated strip images retain full setup silhouettes and switch unloaded Pa
   assert.equal(animation.layers(entity)[0].part, 'frame:0');
   animation.destroy();
 });
+
+
+test('minimap tank omits only atlas cells declared and verified transparent', async () => {
+  const { PNG } = await import('pngjs');
+  const { createLivePngRigAtlases } = await import('../../client/src/renderer/rigs/png_routing.js');
+  const { createMinimapAnimation } = await import('../../client/src/renderer/rigs/minimap_animation.js');
+  const atlas = createLivePngRigAtlases().get('tank');
+  const image = PNG.sync.read(fs.readFileSync(new URL(`../../client${atlas.image}`, import.meta.url)));
+  const blank = new Set(atlas.grid.normalization.blankCells);
+  const animation = createMinimapAnimation();
+  const parts = animation.parts('tank');
+  assert.equal(parts.length, 3, 'retain hull, turret and the visible independent barrel');
+  for (const sprite of atlas.sprites) {
+    const { x, y, w, h } = sprite.frame;
+    let visible = false;
+    for (let row = y; row < y + h && !visible; row++) {
+      for (let col = x; col < x + w; col++) {
+        if (image.data[(row * image.width + col) * 4 + 3]) { visible = true; break; }
+      }
+    }
+    assert.equal(visible, !blank.has(sprite.sourceCell), `${sprite.id} matches blank-cell metadata`);
+    assert.equal(parts.includes(`sprite:${sprite.id}`), visible);
+  }
+  animation.destroy();
+});
