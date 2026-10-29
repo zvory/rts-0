@@ -400,7 +400,6 @@ transport/browser/prediction/render behavior, not as gameplay authority.
 | `branchFromTickCreated` | `branchRoom: string`, `sourceTick: u32`, `seats: ReplayBranchSeat[]` — a separate practice branch room has been created from the source replay's current authoritative tick. |
 | `branchStaging` | `room: string`, `sourceTick: u32`, `hostId: u32`, `seats: BranchStagingSeat[]`, `occupants: BranchStagingOccupant[]`, `canStart: bool` — reliable current state for a replay branch staging room. Sent after joins, leaves, claims, and releases. |
 | `chat` | `scope: "lobby" or "game"`, `channel: "all" or "team"`, `tick?: u32`, `senderId: u32`, `senderName: string`, `text: string` — reliable server-authored chat delivery. Lobby deliveries omit `tick`; live and replay deliveries carry the authoritative presentation tick. Clients render all fields as text, never HTML. |
-
 | `roomNotice` | `msg: string` — reliable, ephemeral room activity shown through the normal brief toast. Active replay joins notify existing viewers; departures notify remaining viewers. Delivered even while paused, seeking, or ended; never recorded or replayed on seek. |
 | `shutdownWarning` | `deadlineUnixMs: u64`, `secondsRemaining: u64` — deploy/termination drain has started; active matches may continue until the deadline, but new match starts are disabled. |
 | `observationReady` | `matchRunId: string` — a watched all-AI match has resolved; this id retrieves its saved replay and joins its structured server logs. |
@@ -416,8 +415,9 @@ simulation-time cooldown per seat and warning (unit/prerequisite for production)
 blocked conditions may remind after the cooldown. Supply text uses actual used/cap values and
 recommends upgrading a Resource Depot while below the maximum cap. Industrial Center research
 starts broadcast `Color (Player name) has started upgrading a resource depot.` to every connection,
-including spectators, once per accepted start. Only these public announcements enter replay chat;
-private economy warnings are excluded. No positional information is included.
+including spectators, when paid research is first observed. Unpaid queued research does not announce.
+Starts cancelled or restarted within one tick may coalesce because detection samples active research
+after each tick. Only these public announcements enter replay chat; private economy warnings are excluded. No positional information is included.
 
 `LobbyPlayer`: `{ id: u32, teamId: u32, factionId: string, name: string, ready: bool, color: string, isAi: bool, aiProfileId?: string, isSpectator: bool }`. `isAi` is
 true for computer opponents (always shown ready; the client renders an "AI" tag, a host-only

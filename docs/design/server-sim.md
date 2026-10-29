@@ -52,8 +52,8 @@ new code should prefer the owning crate directly when that does not make local c
 The `lobby`/networking layer interacts with the simulation ONLY through this surface.
 `Game::critical_event_state() -> Vec<PlayerCriticalEventState>` exposes read-only per-seat
 supply used/cap, deduplicated blocked auto-production `(unit, prerequisite)` pairs, and ids of
-depots actively researching Industrial Center. The room owns chat routing and 30-second
-simulation-time warning cooldowns; notification state is session-only, outside checkpoints.
+depots actively researching Industrial Center (paid research only). The room owns chat routing and
+30-second simulation-time warning cooldowns; notification state is session-only, outside checkpoints.
 Completed living buildings satisfy prerequisites; destroyed or unfinished buildings do not.
 `game-core` implementer: provide exactly these. `server-shell` implementer: call only these.
 The server shell may also serve non-simulation HTTP routes such as `/wiki`, `/wiki/`, and

@@ -115,9 +115,14 @@ fn industrial_center_unpaid_cancel_and_invalid_ownership() {
     game.state.players[0].set_resources(0, 0);
     upgrade(&mut game, depots[0]);
     assert!(!game.state.entities.get(depots[0]).unwrap().research_queue()[0].paid);
+    assert!(game.critical_event_state()[0].upgrading_depots.is_empty());
     game.state.players[0].set_resources(800, 300);
     game.tick();
     assert!(game.state.entities.get(depots[0]).unwrap().research_queue()[0].paid);
+    assert_eq!(
+        game.critical_event_state()[0].upgrading_depots,
+        vec![depots[0]]
+    );
     assert_eq!(game.snapshot_for(1).supply_cap, 100);
     game.enqueue(
         1,

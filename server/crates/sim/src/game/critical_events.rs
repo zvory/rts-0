@@ -35,10 +35,9 @@ impl Game {
                 for building in buildings {
                     if building.kind
                         == super::upgrade::definition(UpgradeKind::IndustrialCenter).researched_at
-                        && building
-                            .research_queue()
-                            .first()
-                            .is_some_and(|item| item.upgrade == UpgradeKind::IndustrialCenter)
+                        && building.research_queue().first().is_some_and(|item| {
+                            item.upgrade == UpgradeKind::IndustrialCenter && item.paid
+                        })
                     {
                         upgrading_depots.push(building.id);
                     }
