@@ -238,8 +238,8 @@ fn standard_starting_loadout_matches_phase0_inventory() {
 
     for player in &game.state.players {
         assert_eq!(player.faction_id, DEFAULT_FACTION_ID);
-        assert_eq!(player.steel, config::STARTING_STEEL);
-        assert_eq!(player.oil, config::STARTING_OIL);
+        assert_eq!(player.steel, i64::from(config::STARTING_STEEL));
+        assert_eq!(player.oil, i64::from(config::STARTING_OIL));
         assert_eq!(
             game.snapshot_for(player.id).supply_cap,
             config::STARTING_SUPPLY_CAP

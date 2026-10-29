@@ -110,7 +110,7 @@ export function researchAvailability(ctx, upgrade, resources, isOwn) {
   if (!def) return "locked";
   if (upgrade === UPGRADE.INDUSTRIAL_CENTER) {
     if (industrialCenterSlots(ctx, isOwn) >= 2 || !selectedResearchBuilding(ctx, upgrade, isOwn)) return "locked";
-    return affordable(def.cost, resources) ? "ready" : "unaffordable";
+    return "ready";
   }
   if ((ctx.upgrades || []).includes(upgrade)) return "locked";
   if (researchQueuedBuilding(ctx, def.researchedAt, upgrade, isOwn)) return "locked";
@@ -123,8 +123,8 @@ export function researchDisabledReason(ctx, upgrade, resources, isOwn) {
   if (!def) return "";
   if (upgrade === UPGRADE.INDUSTRIAL_CENTER) {
     if (!selectedResearchBuilding(ctx, upgrade, isOwn)) return "Select a completed, unupgraded Resource Depot";
-    if (industrialCenterSlots(ctx, isOwn) >= 2) return "Maximum two Industrial Centers (including queued upgrades)";
-    return affordable(def.cost, resources) ? "+100 supply while this depot exists" : "Queue now; upgrade waits for resources";
+    if (industrialCenterSlots(ctx, isOwn) >= 2) return "Maximum two Industrial Centers";
+    return "Instant +100 supply; cost may make resources negative and delay new production";
   }
   if ((ctx.upgrades || []).includes(upgrade)) return "Researched";
   const queuedAt = researchQueuedBuilding(ctx, def.researchedAt, upgrade, isOwn);

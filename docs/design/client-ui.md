@@ -2787,7 +2787,8 @@ handoff key for replay recovery and server lag-log inspection; it is not a playe
 new gameplay control.
 
 Industrial Centers retain the Resource Depot kind and footprint. The research command card upgrades
-one selected completed depot; completed/pending centers lock out further upgrades at two.
+one selected completed depot immediately, even with insufficient resources; two centers lock out
+further upgrades. The card explains resource debt, and the HUD displays signed steel/oil balances.
 The renderer receives the public `industrialCenter` physical flag through presentation snapshots
 and selects the simplified Refinery Works PNG atlas for completed upgrades. Its neutral-white
 paint receives the owning team color; the ordinary depot retains its worksite atlas. There is no

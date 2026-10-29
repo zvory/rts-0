@@ -316,11 +316,13 @@ fn overlapping_build_race_charges_only_the_worker_that_spawns_scaffold() {
     assert_eq!(game.state.players[0].steel, 0);
     assert_eq!(game.state.players[0].oil, 0);
     assert_eq!(
-        game.state.players[1].steel, cost.steel,
+        game.state.players[1].steel,
+        i64::from(cost.steel),
         "losing worker must not pay for a footprint already claimed by a building"
     );
     assert_eq!(
-        game.state.players[1].oil, cost.oil,
+        game.state.players[1].oil,
+        i64::from(cost.oil),
         "losing worker must not pay oil for a footprint already claimed by a building"
     );
     assert_eq!(notice_count(&events, 2, "Cannot build there"), 1);

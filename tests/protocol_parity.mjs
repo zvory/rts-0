@@ -601,7 +601,8 @@ assert(
   center[40] = [UPGRADE_CODE[UPGRADE.INDUSTRIAL_CENTER]];
   center[44] = true;
   const decoded = decodeServerMessage({
-    t: "snapshot", v: COMPACT_SNAPSHOT_VERSION, s: [12, 0, 0, 5, 200],
+    t: "snapshot", v: COMPACT_SNAPSHOT_VERSION, s: [12, -800, -300, 5, 200],
+    pr: [[1, -800, -300, 5, 200, 0, []]],
     e: [depot, center],
     n: [0, 0, 0, 0, 0],
     mb: [
@@ -609,6 +610,8 @@ assert(
       [93, 2, KIND_CODE[KIND.RESOURCE_DEPOT], 736, 672, [[23, 21]], 10, true],
     ],
   });
+  assert(decoded.steel === -800 && decoded.oil === -300, "compact snapshot preserves resource debt");
+  assert(decoded.playerResources[0].steel === -800 && decoded.playerResources[0].oil === -300, "observer balances preserve debt");
   assert(!decoded.entities[0].industrialCenter, "ordinary depot has no completed local upgrade");
   assert(decoded.entities[1].industrialCenter === true, "compact Industrial Center flag decodes at slot 44");
   assert(decoded.entities[1].prodUpgradeQueue[0] === UPGRADE.INDUSTRIAL_CENTER, "local upgrade queue code decodes");

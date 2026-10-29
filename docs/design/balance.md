@@ -641,7 +641,8 @@ profiles and explicit activation/autocast policy instead of being folded into de
   while alive. At most two completed or queued centers per player; absolute cap 300. Losing
   a center removes its supply and frees a replacement slot. Existing units survive over cap;
   further supply reservations wait. Local upgrade state preserves all depot functions/stats.
-  Other factions retain their existing 300 supply allowance. See [Industrial Centers](industrial-centers.md).
+  Other factions retain their existing 300 supply allowance. Industrial Center upgrades cost 800 steel and 300 oil immediately, permitting signed resource
+  debt; no new production/construction starts until both balances cover the cost. See [Industrial Centers](industrial-centers.md).
 - Attached steel mining: gatherers walk to a steel patch, latch onto it, and mine in place.
   Every `HARVEST_TICKS = 40` the base load (`STEEL_LOAD = 2`) is deposited directly into the
   player's economy only if the resource node is within `MINING_ANCHOR_RANGE_TILES = 11.0` tiles of a

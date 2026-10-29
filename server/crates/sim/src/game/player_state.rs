@@ -21,31 +21,40 @@ impl PlayerState {
     }
 
     pub(crate) fn can_afford(&self, steel: u32, oil: u32) -> bool {
-        self.steel >= steel && self.oil >= oil
+        self.steel >= i64::from(steel) && self.oil >= i64::from(oil)
     }
 
     pub(crate) fn spend_resources(&mut self, steel: u32, oil: u32) -> bool {
         if !self.can_afford(steel, oil) {
             return false;
         }
-        self.steel -= steel;
-        self.oil -= oil;
+        self.steel -= i64::from(steel);
+        self.oil -= i64::from(oil);
         true
     }
 
-    #[cfg_attr(not(test), allow(dead_code))]
-    pub(crate) fn set_resources(&mut self, steel: u32, oil: u32) {
-        self.steel = steel;
-        self.oil = oil;
+    pub(crate) fn set_resources(&mut self, steel: impl Into<i64>, oil: impl Into<i64>) {
+        self.steel = steel.into();
+        self.oil = oil.into();
     }
 
     pub(crate) fn spend_cost(&mut self, cost: ResourceCost) -> bool {
         self.spend_resources(cost.steel, cost.oil)
     }
 
+    /// Only instantaneous depot upgrades can bypass affordability and incur debt.
+    pub(crate) fn spend_industrial_center_cost(&mut self) {
+        self.steel = self
+            .steel
+            .saturating_sub(i64::from(config::INDUSTRIAL_CENTER_COST_STEEL));
+        self.oil = self
+            .oil
+            .saturating_sub(i64::from(config::INDUSTRIAL_CENTER_COST_OIL));
+    }
+
     pub(crate) fn refund_resources(&mut self, steel: u32, oil: u32) {
-        self.steel = self.steel.saturating_add(steel);
-        self.oil = self.oil.saturating_add(oil);
+        self.steel = self.steel.saturating_add(i64::from(steel));
+        self.oil = self.oil.saturating_add(i64::from(oil));
     }
 
     pub(crate) fn refund_cost(&mut self, cost: ResourceCost) {
@@ -62,8 +71,8 @@ impl PlayerState {
             _ => return,
         };
         match kind {
-            EntityKind::Oil => self.oil = self.oil.saturating_add(amount),
-            EntityKind::Steel => self.steel = self.steel.saturating_add(amount),
+            EntityKind::Oil => self.oil = self.oil.saturating_add(i64::from(amount)),
+            EntityKind::Steel => self.steel = self.steel.saturating_add(i64::from(amount)),
             _ => {}
         }
         self.score.resources_mined.steel = self.score.resources_mined.steel.saturating_add(steel);

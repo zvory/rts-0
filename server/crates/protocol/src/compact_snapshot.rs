@@ -92,13 +92,13 @@ impl Serialize for CompactSnapshot<'_> {
         }
         map.serialize_entry(
             "s",
-            &[
+            &(
                 snapshot.tick,
                 snapshot.steel,
                 snapshot.oil,
                 snapshot.supply_used,
                 snapshot.supply_cap,
-            ],
+            ),
         )?;
         if let Some(settings) = snapshot.auto_build {
             map.serialize_entry(

@@ -44,8 +44,8 @@ export function decodeCompactSnapshot(raw) {
     worldCombatPosition: raw.wc == null
       ? null
       : decodeCompactPoint(raw.wc, "worldCombatPosition"),
-    steel: readU32(scalars[1], "steel"),
-    oil: readU32(scalars[2], "oil"),
+    steel: readResourceBalance(scalars[1], "steel"),
+    oil: readResourceBalance(scalars[2], "oil"),
     supplyUsed: readU32(scalars[3], "supplyUsed"),
     supplyCap: readU32(scalars[4], "supplyCap"),
     autoBuild: decodeAutoBuildSettings(raw.ab),
@@ -308,8 +308,8 @@ function decodeCompactPlayerResource(record, index) {
   if (fields.length < 6) throw new Error(`playerResource ${index} is too short`);
   return {
     id: readU32(fields[0], "playerResource.id"),
-    steel: readU32(fields[1], "playerResource.steel"),
-    oil: readU32(fields[2], "playerResource.oil"),
+    steel: readResourceBalance(fields[1], "playerResource.steel"),
+    oil: readResourceBalance(fields[2], "playerResource.oil"),
     supplyUsed: readU32(fields[3], "playerResource.supplyUsed"),
     supplyCap: readU32(fields[4], "playerResource.supplyCap"),
     apm: readU32(fields[5], "playerResource.apm"),
@@ -548,6 +548,12 @@ function readString(value, name) {
     throw new Error(`${name} must be a non-empty bounded string`);
   }
   return value;
+}
+
+function readResourceBalance(value, name) {
+  const number = readNumber(value, name);
+  if (!Number.isSafeInteger(number)) throw new Error(`${name} must be a safe signed integer`);
+  return number;
 }
 
 function readU32(value, name) {

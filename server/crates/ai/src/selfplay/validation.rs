@@ -4,7 +4,7 @@ use super::replay::SelfPlayFailure;
 use crate::config;
 use rts_sim::protocol::{kinds, MapInfo, Snapshot};
 
-const RESOURCE_SANITY_LIMIT: u32 = 1_000_000;
+const RESOURCE_SANITY_LIMIT: i64 = 1_000_000;
 
 pub(super) fn validate_snapshot(
     player_id: u32,

@@ -996,7 +996,7 @@ mod tests {
 
         assert_eq!(
             players[0].steel,
-            steel_before + rules::economy::resource_cost(EntityKind::TankTrap).steel,
+            steel_before + i64::from(rules::economy::resource_cost(EntityKind::TankTrap).steel),
             "deconstructing player should receive the Tank Trap steel refund"
         );
         assert_eq!(

@@ -168,7 +168,7 @@ fn deliver_notifications(
                 (
                     None,
                     format!(
-                        "{} ({}) has started upgrading a resource depot.",
+                        "{} ({}) has upgraded a resource depot to an Industrial Center.",
                         color_name(&player.color),
                         player.name
                     ),
@@ -357,7 +357,7 @@ mod delivery_tests {
         for writer in &mut writers {
             assert!(
                 matches!(writer.reliable_rx.try_recv(), Ok(ServerMessage::Chat { sender_id: 0, text, .. })
-                if text == "Blue (Alice) has started upgrading a resource depot.")
+                if text == "Blue (Alice) has upgraded a resource depot to an Industrial Center.")
             );
         }
         assert_eq!(log.len(), 1);

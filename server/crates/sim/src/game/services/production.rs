@@ -44,7 +44,13 @@ pub(crate) fn production_system(
                 .find(|player| player.id == owner)
                 .map(|player| player.faction_id.as_str())
                 .unwrap_or("");
-            for (owner, kind) in extractors::advance_automatic(entities, id, faction_id, tick) {
+            let can_start = players
+                .iter()
+                .find(|player| player.id == owner)
+                .is_some_and(|player| player.can_afford(0, 0));
+            for (owner, kind) in
+                extractors::advance_automatic(entities, id, faction_id, tick, can_start)
+            {
                 if let Some(player) = players.iter_mut().find(|player| player.id == owner) {
                     player.record_entity_created(kind);
                 }

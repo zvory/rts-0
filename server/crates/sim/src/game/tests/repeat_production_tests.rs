@@ -384,7 +384,7 @@ fn worker_auto_build_ignores_unspent_oil_reserve() {
     assert!(queue[0].paid);
     assert_eq!(
         (game.state.players[0].steel, game.state.players[0].oil),
-        (reserve_steel, 0)
+        (i64::from(reserve_steel), 0)
     );
 }
 
@@ -458,8 +458,10 @@ fn auto_build_waits_when_either_resource_would_cross_its_floor() {
         reserve_steel: 200,
         reserve_oil: 100,
     };
-    game.state.players[0]
-        .set_resources(cost.steel.saturating_add(199), cost.oil.saturating_add(100));
+    game.state.players[0].set_resources(
+        i64::from(cost.steel.saturating_add(199)),
+        i64::from(cost.oil.saturating_add(100)),
+    );
 
     game.tick();
 
@@ -472,7 +474,10 @@ fn auto_build_waits_when_either_resource_would_cross_its_floor() {
         .is_empty());
     assert_eq!(
         (game.state.players[0].steel, game.state.players[0].oil),
-        (cost.steel.saturating_add(199), cost.oil.saturating_add(100))
+        (
+            i64::from(cost.steel.saturating_add(199)),
+            i64::from(cost.oil.saturating_add(100))
+        )
     );
 }
 
@@ -609,8 +614,8 @@ fn repeat_production_revalidates_producer_compatibility() {
         .expect("barracks")
         .prod_queue()
         .is_empty());
-    assert_eq!(game.state.players[0].steel, cost.steel);
-    assert_eq!(game.state.players[0].oil, cost.oil);
+    assert_eq!(game.state.players[0].steel, i64::from(cost.steel));
+    assert_eq!(game.state.players[0].oil, i64::from(cost.oil));
     assert_eq!(game.state.players[0].supply_used, 0);
 }
 

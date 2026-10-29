@@ -418,7 +418,7 @@ fn tank_trap_construction_charges_on_arrival_and_uses_spec_build_time() {
 
     assert_eq!(
         players[0].steel,
-        steel_before - trap_stats.cost_steel,
+        steel_before - i64::from(trap_stats.cost_steel),
         "construction should charge the authoritative Tank Trap steel cost"
     );
     let site = entities

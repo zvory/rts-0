@@ -93,7 +93,7 @@ fn player_with_oil(id: u32, oil: u32) -> PlayerState {
         color: "#ffffff".to_string(),
         start_tile: (0, 0),
         steel: 0,
-        oil,
+        oil: i64::from(oil),
         supply_used: 0,
         is_ai: false,
         score: ScoreState::default(),

@@ -32,8 +32,8 @@ const UNSUPPORTED_FIELDS: &[&str] = &[
 pub struct OwnedPredictionBaseline {
     pub tick: u32,
     pub player_id: u32,
-    pub steel: Option<u32>,
-    pub oil: Option<u32>,
+    pub steel: Option<i64>,
+    pub oil: Option<i64>,
     pub supply_used: Option<u32>,
     pub supply_cap: Option<u32>,
     #[serde(default)]
@@ -443,8 +443,8 @@ struct CorePredictor {
     player_id: u32,
     tick: u32,
     map: MapInfo,
-    steel: Option<u32>,
-    oil: Option<u32>,
+    steel: Option<i64>,
+    oil: Option<i64>,
     supply_used: Option<u32>,
     supply_cap: Option<u32>,
     owned: BTreeMap<u32, EntityState>,
