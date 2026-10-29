@@ -454,6 +454,9 @@ pub(super) fn recall_tanks_to_main(
     let hq = geometry::tile_center(observation.own_start_tile, observation.map.tile_size);
     // They go to the home post, where the home Tanks stand, rather than to the HQ.
     let home = memory.home_post.map_or(hq, |post| post.center());
+    // Jeff's AI V1.1's line and home guard Tanks hold their posts (`tug`): called home, they
+    // drove between the two every decision.
+    let tug = memory.profile_id().is_some_and(is_jeff_v1_1) && !jeff_v1_1::off("tug");
     let mut away: Vec<&AiEntitySummary> = free_tank_ids(observation, memory)
         .into_iter()
         .filter(|id| {
@@ -461,6 +464,9 @@ pub(super) fn recall_tanks_to_main(
                 && !memory.later_bases.guards.contains(id)
                 && Some(*id) != keep_out
                 && !claimed.contains(id)
+                && !(tug
+                    && (memory.jeff_v1_1.front_line.holds(*id)
+                        || memory.jeff_v1_1.home_guard.holds(*id)))
         })
         .filter_map(|id| observation.owned.iter().find(|unit| unit.id == id))
         .filter(|unit| unit.is_complete && unit.hp > 0 && unit.state == AiEntityState::Idle)

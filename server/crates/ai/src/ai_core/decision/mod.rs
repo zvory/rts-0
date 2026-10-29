@@ -1272,11 +1272,18 @@ where
         // Jeff's AI V1.1 keeps Tanks parked in front of its main, and holds a Tank line in front of
         // its bases and the ones it is taking. Tanks the home defense took stay with it a while.
         jeff_v1_1::front_line::note_yielded(observation, memory, &local_defense_assigned);
+        // The forward base's Tank is staged there below (`tug`): taken too, it got both orders
+        // every decision.
+        let tug = is_jeff_v1_1(profile.id) && !jeff_v1_1::off("tug");
+        let mut tank_held = held.clone();
+        if tug {
+            tank_held.extend(forward_defensive_tank);
+        }
         let live = (&mut actions, observation, map_analysis, &mut intents);
-        jeff_v1_1::home_guard::guard(live, memory, &held);
+        jeff_v1_1::home_guard::guard(live, memory, &tank_held);
         actions.mark("guard");
         let live = (&mut actions, observation, map_analysis, &mut intents);
-        jeff_v1_1::front_line::hold(live, memory, &held);
+        jeff_v1_1::front_line::hold(live, memory, &tank_held);
         actions.mark("line");
         let defensive_machine_gunners_available: Vec<u32> = defensive_machine_gunners
             .iter()
@@ -1414,10 +1421,18 @@ where
 
         actions.mark("hometank");
         if let Some((tank_id, position)) = forward_defensive_tank.zip(forward_tank_position) {
-            if let Some(units) =
-                stage_defensive_tank_at(&mut actions, observation, tank_id, position)
-            {
-                intents.push(AiIntent::Stage { units });
+            // Jeff's AI V1.1's forward Tank answers the home defense first, as the home Tank does
+            // (`tug`): restaged after it, it took both orders every decision.
+            let defending = is_jeff_v1_1(profile.id)
+                && !jeff_v1_1::off("tug")
+                && (local_defense_assigned.contains(&tank_id)
+                    || memory.trap_breach.is_reserved(tank_id));
+            if !defending {
+                if let Some(units) =
+                    stage_defensive_tank_at(&mut actions, observation, tank_id, position)
+                {
+                    intents.push(AiIntent::Stage { units });
+                }
             }
         }
 
