@@ -24,6 +24,7 @@ use crate::game::services::pathing::PathingService;
 use crate::game::services::standability;
 use crate::game::{PlayerState, ScoreState};
 use rayon::prelude::*;
+mod infantry_facing;
 mod pivot_drive;
 mod side_push;
 mod static_repath;

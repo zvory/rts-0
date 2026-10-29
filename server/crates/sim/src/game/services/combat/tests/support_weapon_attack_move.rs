@@ -212,3 +212,75 @@ fn attack_move_deployed_anti_tank_gun_tears_down_after_no_target_grace() {
         "packed anti-tank gun should continue the still-active attack-move"
     );
 }
+
+#[test]
+fn machine_gunner_arrival_deploys_along_last_walking_heading() {
+    for attack_move in [false, true] {
+        let map = open_map(32);
+        let mut entities = EntityStore::new();
+        let id = entities
+            .spawn_unit(1, EntityKind::MachineGunner, 400.0, 400.0)
+            .unwrap();
+        let goal = (380.0, 370.0);
+        {
+            let mg = entities.get_mut(id).unwrap();
+            mg.set_order(if attack_move {
+                Order::attack_move_to(goal.0, goal.1)
+            } else {
+                Order::move_to(goal.0, goal.1)
+            });
+            mg.set_path(vec![goal]);
+            mg.set_path_goal(Some(goal));
+            mg.mark_move_phase(MovePhase::Moving);
+            // A prior engagement may leave any stale bearing, not just the spawn default.
+            mg.set_weapon_facing(1.0);
+        }
+        for tick in 1..=100 {
+            run_movement_tick_on_map(&mut entities, &map, tick);
+            if entities.get(id).unwrap().path_is_empty() {
+                break;
+            }
+        }
+        let mg = entities.get(id).unwrap();
+        assert!(mg.path_is_empty());
+        let heading = mg.facing();
+        assert!(heading < -1.0);
+        run_combat_tick_on_map(&mut entities, &[player_state(1, false)], &map);
+        let mg = entities.get(id).unwrap();
+        assert!(matches!(mg.weapon_setup(), WeaponSetup::SettingUp { .. }));
+        assert_eq!(mg.weapon_facing(), Some(heading));
+        for _ in 0..config::MACHINE_GUNNER_SETUP_TICKS {
+            run_combat_tick_on_map(&mut entities, &[player_state(1, false)], &map);
+        }
+        let mg = entities.get(id).unwrap();
+        assert_eq!(mg.weapon_setup(), WeaponSetup::Deployed);
+        assert_eq!(mg.facing(), heading);
+        assert_eq!(mg.weapon_facing(), Some(heading));
+    }
+}
+
+#[test]
+fn machine_gunner_deployment_aims_at_target_instead_of_previous_walk() {
+    let map = open_map(16);
+    let mut entities = EntityStore::new();
+    let id = entities
+        .spawn_unit(1, EntityKind::MachineGunner, 200.0, 200.0)
+        .unwrap();
+    let target = entities
+        .spawn_unit(2, EntityKind::Rifleman, 200.0, 160.0)
+        .unwrap();
+    let mg = entities.get_mut(id).unwrap();
+    mg.set_facing(std::f32::consts::PI);
+    mg.set_weapon_facing(1.0);
+    run_combat_tick_on_map(
+        &mut entities,
+        &[player_state(1, false), player_state(2, false)],
+        &map,
+    );
+    let mg = entities.get(id).unwrap();
+    assert_eq!(mg.target_id(), Some(target));
+    assert!(matches!(mg.weapon_setup(), WeaponSetup::SettingUp { .. }));
+    let aim = -std::f32::consts::FRAC_PI_2;
+    assert!(angle_delta(mg.facing(), aim).abs() < 0.0001);
+    assert!(angle_delta(mg.weapon_facing().unwrap(), aim).abs() < 0.0001);
+}

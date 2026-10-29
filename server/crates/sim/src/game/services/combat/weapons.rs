@@ -138,6 +138,9 @@ pub(super) fn begin_idle_deployed_weapon_setup(e: &mut Entity) {
         return;
     }
     if matches!(e.weapon_setup(), WeaponSetup::Packed) {
+        // No target chose an aim direction: deploy along the last walking heading instead
+        // of exposing a stale weapon bearing when presentation switches to the setup pose.
+        mirror_weapon_to_body(e, e.facing());
         e.set_weapon_setup(WeaponSetup::SettingUp {
             ticks: config::MACHINE_GUNNER_SETUP_TICKS,
         });
