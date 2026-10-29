@@ -4,6 +4,8 @@ use serde::Deserialize;
 
 mod assignment;
 mod forest_spans;
+mod team_groups;
+use team_groups::{parse_team_groups, AuthoredStartLocation};
 
 use forest_spans::{merge_overlay_locations, parse_forest_spans};
 
@@ -50,6 +52,7 @@ pub(super) fn player_count_bounds(json: &str) -> Result<(u32, u32), String> {
             "startLocations must contain 1 to {MAX_START_LOCATIONS} locations"
         ));
     }
+    parse_team_groups(&authored.start_locations)?;
     Ok((1, starts as u32))
 }
 
@@ -69,7 +72,12 @@ pub(super) fn load_for_players(
     seed: u32,
 ) -> Result<Map, String> {
     let materialized = materialize(players.len(), json)?;
-    let starts = assignment::assign_start_locations(&materialized.starts, players, seed)?;
+    let starts = assignment::assign_start_locations(
+        &materialized.starts,
+        &materialized.start_team_groups,
+        players,
+        seed,
+    )?;
 
     Ok(Map {
         width: materialized.width,
@@ -108,7 +116,8 @@ pub(super) fn materialize(player_count: usize, json: &str) -> Result<AuthoredMap
     let elevation = parse_elevation(&authored.elevation, width, height)?;
     super::validate_elevation_sun(&elevation, authored.sun)?;
     let start_locations =
-        parse_locations(width, height, &authored.start_locations, "startLocations")?;
+        team_groups::parse_start_locations(width, height, &authored.start_locations)?;
+    let start_team_groups = parse_team_groups(&authored.start_locations)?;
     let base_sites = parse_base_sites(width, height, &authored.base_sites)?;
     let base_locations: Vec<_> = base_sites.iter().map(|site| (site.x, site.y)).collect();
 
@@ -201,6 +210,7 @@ pub(super) fn materialize(player_count: usize, json: &str) -> Result<AuthoredMap
         elevation,
         sun: authored.sun,
         starts: start_locations,
+        start_team_groups,
         base_sites: base_locations,
         base_resource_counts,
         doodads,
@@ -230,7 +240,7 @@ struct AuthoredMap {
     elevation: Vec<String>,
     #[serde(default)]
     sun: Option<MapSun>,
-    start_locations: Vec<AuthoredLocation>,
+    start_locations: Vec<AuthoredStartLocation>,
     base_sites: Vec<AuthoredBaseSite>,
     #[serde(default)]
     doodads: Vec<crate::protocol::MapDoodad>,

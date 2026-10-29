@@ -13,7 +13,7 @@ import {
 } from "../scripts/map-author.mjs";
 import { expandSymmetricPoints } from "../client/src/map_authoring/symmetry.js";
 import { MAP_AUTHORING_LAYER } from "../client/src/map_authoring/layers.js";
-import { MapEditorSession, mapEditorRectTiles, MAP_EDITOR_SYMMETRY, symmetricTerrainTiles } from "../client/src/map_editor_session.js";
+import { MapEditorSession, moveSymmetricDraftLocation, mapEditorRectTiles, MAP_EDITOR_SYMMETRY, symmetricTerrainTiles } from "../client/src/map_editor_session.js";
 import { TERRAIN } from "../client/src/protocol.js";
 
 const repoRoot = new URL("../", import.meta.url);
@@ -99,6 +99,33 @@ assert.deepEqual(
   "materialized recipe output preserves impassable protected terrain through authored-map import",
 );
 assert(validateMap(protectedMap).warnings.some((warning) => warning.includes("protected area")));
+
+const groupedSession = new MapEditorSession({ storage: null });
+const groupedMap = structuredClone(map);
+groupedMap.startLocations.forEach((start, index) => { start.teamGroup = index + 1; });
+groupedSession.loadAuthoredMap(groupedMap);
+assert.deepEqual(groupedSession.exportMap().startLocations, groupedMap.startLocations);
+assert(!validateMap(groupedMap).warnings.some((warning) => warning.includes("teamGroup")));
+assert(groupedSession.resize({ width: 40, height: 40 }).ok);
+assert.deepEqual(groupedSession.exportMap().startLocations.map((start) => start.teamGroup), [1, 2]);
+groupedSession.mutate("Move grouped start", (draft) => {
+  const start = draft.startLocations[0];
+  assert(moveSymmetricDraftLocation(draft, { kind: "start", locationIndex: 0, tile: { x: start.x + 1, y: start.y } }).ok);
+});
+assert.equal(groupedSession.exportMap().startLocations[0].teamGroup, 1);
+groupedSession.undo();
+assert.equal(groupedSession.exportMap().startLocations[0].teamGroup, 1);
+groupedSession.redo();
+assert.equal(groupedSession.exportMap().startLocations[0].teamGroup, 1);
+const partialGroups = structuredClone(groupedMap);
+delete partialGroups.startLocations[0].teamGroup;
+assert(validateMap(partialGroups).warnings.some((warning) => warning.includes("every start")));
+const normalizedGroupedMap = structuredClone(groupedMap);
+normalizedGroupedMap.startLocations.forEach((start) => { start.x = String(start.x); });
+const normalizedGroupedSession = new MapEditorSession({ storage: null });
+normalizedGroupedSession.loadAuthoredMap(normalizedGroupedMap);
+assert.deepEqual(normalizedGroupedSession.exportMap().startLocations, groupedMap.startLocations,
+  "coordinate normalization preserves authored team groups");
 
 const operationlessRecipe = { name: "Operationless recipe", width: 16, height: 18 };
 assert.deepEqual(buildMapFromRecipe(operationlessRecipe).terrain, Array(18).fill(".".repeat(16)));

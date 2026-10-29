@@ -54,3 +54,25 @@ export function updateMapEditorPendingBasePatchCount(panel, fieldName, value) {
   }
   panel.setStatus("New base resource counts updated.");
 }
+
+export function createMapEditorStartTeamGroup(panel, start) {
+const teamGroup = document.createElement("select");
+teamGroup.setAttribute("aria-label", "Start team group");
+for (let value = 0; value <= 4; value++) {
+  const option = document.createElement("option");
+  option.value = String(value);
+  option.textContent = value ? `Group ${value}` : "Automatic";
+  teamGroup.appendChild(option);
+}
+teamGroup.value = String(start?.teamGroup || 0);
+teamGroup.disabled = !start;
+teamGroup.addEventListener("change", () => {
+  const index = panel.selectedStartIndex;
+  const value = Number(teamGroup.value);
+  panel.session.mutate("Changed start team group", (draft) => {
+    if (value) draft.startLocations[index].teamGroup = value;
+    else delete draft.startLocations[index].teamGroup;
+  });
+});
+  return teamGroup;
+}

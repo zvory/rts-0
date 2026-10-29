@@ -1565,7 +1565,19 @@ unique, in-bounds tile-coordinate pairs and can independently supplement forest-
 Schema v10 is the only accepted authored-map schema. Older documents are rejected rather than
 migrated, and every shipped map declares `forestSpans` even when it is empty.
 Each dimension is bounded to 256 tiles. Start locations determine the
-supported player count; every base site is a permanent resource location, including unoccupied
+supported player count. Each start optionally carries `teamGroup` (integer 1–4).
+Either every start has a group or none do. On grouped maps, all members of a team must occupy
+one group, and different teams must occupy different groups. Group numbers are map-local affinities,
+not lobby team ids. Unused starts/groups are allowed, so groups `[1,2,1,2]` support 2v2, 1v2,
+and 1v1, but reject 1v3 and three- or four-team FFA. Incompatible rosters fail map loading and the
+lobby reports the error to the host without starting the match. Assignment remains deterministic
+for a given map, roster, and seed. Maps without groups retain the existing FFA shuffle and
+team-distance heuristic. This optional v10 extension affects authored-map JSON only; start/snapshot
+wire payloads carry the already-assigned positions and need no new fields. The editor preserves
+groups through import/export, move, resize, and undo/redo, and exposes them per start. Lab materialized
+maps hold explicit positions rather than lobby assignment policy; returning a materialized Lab map
+to the editor does not reconstruct authored groups.
+Every base site is a permanent resource location, including unoccupied
 start locations. Each base site carries authoritative `steelPatches` (0–36) and `oilPatches` (0–9)
 counts. Doodads use unique nonzero `u32` ids and integer world-pixel positions, are canonicalized
 by ascending id, and are capped at 4,096 entries. The server allowlist is `tree.oak`, `tree.pine`,

@@ -8,7 +8,7 @@ import { LabPanelWindowChrome } from "./lab_panel_window.js";
 import { MAP_AUTHORING_LAYERS } from "./map_authoring/layers.js";
 import { mapSymmetryWarnings } from "./map_authoring/symmetry_validation.js";
 import { createMapEditorPreviewButton } from "./map_editor_preview_button.js";
-import { armMapEditorLocation, mapEditorLocationResourceState, updateMapEditorBasePatchCount, updateMapEditorPendingBasePatchCount } from "./map_editor_location_resources.js";
+import { createMapEditorStartTeamGroup, armMapEditorLocation, mapEditorLocationResourceState, updateMapEditorBasePatchCount, updateMapEditorPendingBasePatchCount } from "./map_editor_location_resources.js";
 import { createMapEditorTerrainPalettes } from "./map_editor_terrain_controls.js";
 import { createMapEditorSunSettings } from "./map_editor_sun_controls.js";
 import {
@@ -802,8 +802,11 @@ export class MapEditorPanel {
       readout("Bases and starts reserve a passable grass area."),
     );
     if (this.locationContent === "start") {
+      const teamGroup = createMapEditorStartTeamGroup(this, start);
       section.append(
         startPicker,
+        field("Start team group", teamGroup),
+        readout("Use Automatic for every start, or assign every start a group. Teammates share a group; opponents use separate groups. Group sizes limit team sizes."),
         readout(start ? `Start ${this.selectedStartIndex + 1}: ${start.x}, ${start.y}` : "No start locations yet. Choose Add, then click the map."),
         patchCountField("Start-base steel patches", resourceBase?.steelPatches, MAP_EDITOR_MAX_STEEL_PATCHES, (value) => {
           if (addingLocation) this.updatePendingBasePatchCount("steelPatches", value);
