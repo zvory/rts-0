@@ -75,6 +75,8 @@ pub(in crate::ai_core::decision) fn guard(
             && !memory.third_pressure.is_reserved(unit.id)
             && !memory.jeff_v1_1.tank_raid.holds(unit.id)
             && !memory.jeff_v1_1.front_line.yielded(unit.id)
+            // A later base's guard keeps its post (`tug2`): taken by both, it drove between them.
+            && (super::off("tug2") || !memory.later_bases.guards.contains(&unit.id))
     };
     // The guards keep their place; new ones are the Tanks nearest the main.
     let mut picked: Vec<&AiEntitySummary> = tanks

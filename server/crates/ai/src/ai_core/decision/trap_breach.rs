@@ -261,6 +261,14 @@ pub(super) fn plan_live(
     let zones = super::tank_micro::zones(observation, &memory.tank_micro);
     let home_tank = memory.home_defensive_tank;
     let guards: BTreeSet<u32> = memory.later_bases.guards.iter().copied().collect();
+    // Jeff's AI V1.1's Tank raid keeps its Tanks (`tug2`): taken by both, they drove between the
+    // raid and the breach.
+    let raiding: BTreeSet<u32> =
+        if memory.profile_id().is_some_and(is_jeff_v1_1) && !jeff_v1_1::off("tug2") {
+            memory.jeff_v1_1.tank_raid.tank_ids().collect()
+        } else {
+            BTreeSet::new()
+        };
     let home_attacked = defense::local_defense_contact(observation).is_some();
     let breach = &mut memory.trap_breach;
     let owned_ok = |id: &u32| {
@@ -269,8 +277,8 @@ pub(super) fn plan_live(
             .iter()
             .any(|unit| unit.id == *id && unit.hp > 0)
     };
-    breach.tanks.retain(|id| owned_ok(id));
-    breach.posts.retain(|id, _| owned_ok(id));
+    breach.tanks.retain(|id| owned_ok(id) && !raiding.contains(id));
+    breach.posts.retain(|id, _| owned_ok(id) && !raiding.contains(id));
     if breach.phase == Phase::Done {
         // A line still across the route (one an opponent built, or one left standing) starts a
         // new breach, a while after one stopped for want of a safe trap.
@@ -292,7 +300,7 @@ pub(super) fn plan_live(
         .iter()
         .filter(|unit| unit.kind == EntityKind::Tank && unit.is_complete && unit.hp > 0)
         .filter(|unit| Some(unit.id) != home_tank && !guards.contains(&unit.id))
-        .filter(|unit| !breach.tanks.contains(&unit.id))
+        .filter(|unit| !breach.tanks.contains(&unit.id) && !raiding.contains(&unit.id))
         .filter(|unit| {
             breach
                 .dropped
