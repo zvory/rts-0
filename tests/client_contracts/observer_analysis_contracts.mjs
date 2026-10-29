@@ -669,11 +669,15 @@ import { textWithin } from "./dom_text.mjs";
     overlay.applyObserverAnalysis({
       tick: 14,
       players: [
-        { id: 1, units: [], production: [], upgrades: [UPGRADE.METHAMPHETAMINES, UPGRADE.TANK_UNLOCK] },
-        { id: 2, units: [], production: [], upgrades: [] },
+        { id: 1, units: [], production: [], upgrades: [UPGRADE.METHAMPHETAMINES, UPGRADE.TANK_UNLOCK, UPGRADE.ANTI_TANK_GUN_UNLOCK] },
+        { id: 2, units: [], production: [], upgrades: [UPGRADE.ANTI_TANK_GUN_UNLOCK] },
       ],
     });
     const researchText = textWithin(root);
+    assert(
+      findFakes(root, (el) => el.classList.contains("replay-research-row")).length === 2,
+      "ownership-history markers do not appear as completed research",
+    );
     assert(
       researchText.includes("Completed research")
         && researchText.includes("Red")
