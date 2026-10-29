@@ -2,10 +2,7 @@ use super::*;
 
 #[test]
 fn infantry_face_actual_avoidance_step_around_deployed_gunner() {
-    for kind in [
-        EntityKind::MachineGunner,
-        EntityKind::Rifleman,
-    ] {
+    for kind in [EntityKind::MachineGunner, EntityKind::Rifleman] {
         let map = flat_map(1);
         let mut entities = EntityStore::new();
         let start = map.tile_center(20, 20);
