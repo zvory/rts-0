@@ -116,9 +116,14 @@ fn industrial_center_unpaid_cancel_and_invalid_ownership() {
     game.state.players[0].set_resources(0, 0);
     upgrade(&mut game, depots[0]);
     assert!(!game.state.entities.get(depots[0]).unwrap().research_queue()[0].paid);
+    assert!(game.critical_event_state()[0].upgrading_depots.is_empty());
     game.state.players[0].set_resources(800, 300);
     game.tick();
     assert!(game.state.entities.get(depots[0]).unwrap().research_queue()[0].paid);
+    assert_eq!(
+        game.critical_event_state()[0].upgrading_depots,
+        vec![depots[0]]
+    );
     assert_eq!(game.snapshot_for(1).supply_cap, 100);
     game.enqueue(
         1,
@@ -192,6 +197,21 @@ fn industrial_center_completion_does_not_pause_worker_training() {
     let depot = game.state.entities.get(depots[0]).unwrap();
     assert!(depot.is_industrial_center());
     assert_eq!(depot.prod_queue()[0].progress, 1);
+}
+
+#[test]
+fn critical_events_report_authoritative_supply_and_only_accepted_depot_upgrades() {
+    let (mut game, depots) = fixture();
+    assert!(game.critical_event_state()[0].upgrading_depots.is_empty());
+    upgrade(&mut game, depots[0]);
+    let facts = game.critical_event_state();
+    assert_eq!(facts[0].upgrading_depots, vec![depots[0]]);
+    assert_eq!(facts[0].supply_cap, game.snapshot_for(1).supply_cap);
+    assert_eq!(facts[0].supply_used, game.snapshot_for(1).supply_used);
+    assert!(facts[1].upgrading_depots.is_empty());
+    upgrade(&mut game, depots[1]);
+    upgrade(&mut game, depots[2]);
+    assert_eq!(game.critical_event_state()[0].upgrading_depots.len(), 2);
 }
 
 #[test]

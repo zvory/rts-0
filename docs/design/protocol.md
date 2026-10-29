@@ -408,6 +408,17 @@ transport/browser/prediction/render behavior, not as gameplay authority.
 | `commandReceipt` | `clientSeq: u32`, `serverTick: u32`, `accepted: bool`, `reason?: string` — reliable diagnostics-only room receipt. Does not reconcile prediction. |
 | `error`    | `msg: string` |
 
+Game-generated critical alerts reuse `chat` with `senderId: 0`, `senderName: "Game"`, and
+`channel: "all"`. Supply-cap and lost auto-production prerequisite warnings are delivered only
+to the owning active seat, never teammates or spectators, with an independent 30-second
+simulation-time cooldown per seat and warning (unit/prerequisite for production). Persistent
+blocked conditions may remind after the cooldown. Supply text uses actual used/cap values and
+recommends upgrading a Resource Depot while below the maximum cap. Industrial Center research
+starts broadcast `Color (Player name) has started upgrading a resource depot.` to every connection,
+including spectators, when paid research is first observed. Unpaid queued research does not announce.
+Starts cancelled or restarted within one tick may coalesce because detection samples active research
+after each tick. Only these public announcements enter replay chat; private economy warnings are excluded. No positional information is included.
+
 `LobbyPlayer`: `{ id: u32, teamId: u32, factionId: string, name: string, ready: bool, color: string, isAi: bool, aiProfileId?: string, isSpectator: bool }`. `isAi` is
 true for computer opponents (always shown ready; the client renders an "AI" tag, a host-only
 profile selector, and a host-only remove control instead of a ready toggle). `aiProfileId` is
@@ -668,7 +679,7 @@ and a tick-zero `GameCheckpointV1` text payload, plus ordered `players[]` with e
 loadoutId, startingSteel, startingOil }` record per player. Replay reconstruction restores the
 start `Game` from the checkpoint payload and then applies the authoritative `commandLog[]` on the
 recorded ticks. Its bounded ordered `chatLog[]` stores `{tick, senderId, senderName, channel, text}`
-for accepted in-game chat only; replay playback reliably emits each entry when the shared cursor
+for accepted in-game chat and public Game announcements; replay playback reliably emits each entry when the shared cursor
 reaches that tick. Seeking clears the client's transient chat presentation and positions the chat
 cursor after the target tick, so already-passed messages do not flood the screen and appear again
 only after rewinding before them and resuming. Both all-chat and formerly private team-chat are part

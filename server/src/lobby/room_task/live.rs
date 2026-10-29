@@ -628,6 +628,8 @@ impl RoomTask {
             ai_controllers: &mut self.ai_controllers,
             pending_client_command_acks: &mut self.pending_client_command_acks,
             pending_recipient_notices: &mut self.pending_recipient_notices,
+            critical_events: &mut self.critical_events,
+            match_chat_log: &mut self.match_chat_log,
             slow_tick_count: &mut self.slow_tick_count,
             observer_views,
             observer_include_private_notices: record_lab_timeline,

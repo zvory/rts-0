@@ -540,6 +540,8 @@ const approvedCurrentFactionFiles = new Set([
   "server/src/bin/generate_fixed_roster_hellhole.rs",
   // The matching Lab driver deliberately churns that fixed current-roster stress fixture.
   "server/src/lobby/lab_scenario_driver.rs",
+  // Game chat translates existing roster ids to player-facing labels; it does not admit factions.
+  "server/src/lobby/critical_events.rs",
   "server/src/lobby/room_task.rs",
   "server/src/protocol.rs",
   // Deterministic Hellhole stress fixtures intentionally construct the current Kriegsia roster.
