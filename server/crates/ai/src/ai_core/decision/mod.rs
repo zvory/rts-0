@@ -761,7 +761,7 @@ where
             banked,
             observation,
             facts.building_count(EntityKind::Factory),
-        ))
+        ) || jeff_v1_1::factory_for_float(profile.id, observation, &facts))
         && try_build_production(
             observation,
             &facts,
@@ -803,6 +803,8 @@ where
         queue_profile_upgrades(&mut actions, &facts, memory, &mut intents, profile);
     }
     queue_fast_tank_optional_upgrades(&mut actions, &facts, memory, &mut intents, profile);
+    let research = (&mut actions, &facts, &mut *memory, &mut intents);
+    let tanks_wait_for_tank_plus = jeff_v1_1::tank_plus_first(research, observation, profile.id);
     let effective_unit_priorities = effective_unit_priorities_for_upgrades(
         profile,
         production_policy.unit_priorities,
@@ -831,7 +833,7 @@ where
         // finish normally. Keep the legacy home Machine Gunners and Tank production policy.
         effective_unit_priorities.retain(|unit| *unit != EntityKind::Rifleman);
     }
-    if memory.pressure_economy.tank_repeat_enabled() {
+    if memory.pressure_economy.tank_repeat_enabled() || tanks_wait_for_tank_plus {
         effective_unit_priorities.retain(|unit| *unit != EntityKind::Tank);
     }
     let security_rifle_target = jeff::security_rifle_target(

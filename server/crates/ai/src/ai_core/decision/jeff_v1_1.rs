@@ -94,6 +94,79 @@ pub(super) fn early_research(
     }
 }
 
+/// Tanks in the field before Tank+ comes ahead of the next one.
+const TANK_PLUS_TANKS: usize = 4;
+
+/// Tank+ (Engineering Complex, 150 Steel and 150 Oil, 20 s: Tanks turn half as fast again, move a
+/// tenth faster and see 2 tiles farther) comes before a fifth Tank. With `TANK_PLUS_TANKS` Tanks
+/// out it is ordered the moment the Engineering Complex is free and its cost is in the bank; until
+/// then this decision's budget holds its Oil back and no Tank is trained. Returns whether Tanks
+/// wait for it.
+pub(super) fn tank_plus_first(
+    (actions, facts, memory, intents): (
+        &mut AiActionContext<'_>,
+        &AiFacts,
+        &mut AiDecisionMemory,
+        &mut Vec<AiIntent>,
+    ),
+    observation: &AiObservation,
+    profile_id: &str,
+) -> bool {
+    let tank_plus = UpgradeKind::TankPlus;
+    if !is_jeff_v1_1(profile_id)
+        || off("tankplus")
+        || ordered(facts, memory, tank_plus)
+        || facts.complete_building_count(EntityKind::EngineeringComplex) == 0
+    {
+        return false;
+    }
+    let tanks = observation
+        .owned
+        .iter()
+        .filter(|unit| unit.kind == EntityKind::Tank && unit.is_complete && unit.hp > 0)
+        .count();
+    if tanks < TANK_PLUS_TANKS {
+        return false;
+    }
+    if research(actions, facts, memory, intents, tank_plus) {
+        return false;
+    }
+    actions.holdback_resources(0, upgrade::definition(tank_plus).cost_oil);
+    true
+}
+
+/// Factories V1.1 builds toward on a floating bank.
+const FLOAT_FACTORIES: usize = 4;
+
+/// Another Factory while every finished one is training, none is going up, and the bank holds a
+/// Factory and a Tank besides. V1.0 keeps to two, the second after three Tanks and three Depots:
+/// taking bases early against Pressure AI, V1.1 ran four Depots on one Factory from 4:00 to 5:30
+/// with 800-1,300 Steel and 300-500 Oil in the bank, and 2-3 Tanks to hold them. One Factory turns
+/// at most 1,020 Steel and 420 Oil a minute into Tanks; Pressure AI builds four Vehicle Works.
+pub(super) fn factory_for_float(
+    profile_id: &str,
+    observation: &AiObservation,
+    facts: &AiFacts,
+) -> bool {
+    let factories = facts.building_count(EntityKind::Factory);
+    if !is_jeff_v1_1(profile_id)
+        || off("factories")
+        || factories == 0
+        || factories >= FLOAT_FACTORIES
+        || facts.complete_building_count(EntityKind::Factory) < factories
+    {
+        return false;
+    }
+    let (factory_steel, factory_oil) = rts_rules::economy::cost(EntityKind::Factory);
+    let (tank_steel, tank_oil) = rts_rules::economy::cost(EntityKind::Tank);
+    facts
+        .production_buildings(EntityKind::Factory)
+        .iter()
+        .all(|factory| factory.queue_len > 0)
+        && observation.economy.steel >= factory_steel + tank_steel
+        && observation.economy.oil >= factory_oil + tank_oil
+}
+
 /// The Steel and Oil V1.1's opening research still has to pay for, charged at once in the spend
 /// plan so the natural, the Factory and the first Tank are timed after it.
 pub(super) fn research_ahead(
