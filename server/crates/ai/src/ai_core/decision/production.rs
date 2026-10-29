@@ -387,7 +387,13 @@ pub(super) fn should_save_for_required_tech_building(
                 facts.complete_building_kinds(),
             );
     }
-    if rts_rules::economy::train_requirement_met(unit, facts.complete_building_kinds()) {
+    if rts_rules::economy::train_requirement_met_with_at_gun_history(
+        unit,
+        facts.complete_building_kinds(),
+        facts
+            .completed_upgrades()
+            .contains(&UpgradeKind::AntiTankGunUnlock),
+    ) {
         return false;
     }
     required_tech_path.iter().copied().any(|kind| {
