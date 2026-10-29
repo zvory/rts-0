@@ -588,7 +588,13 @@ fn train_unit_choice(request: TrainUnitChoiceRequest<'_>) -> Option<EntityKind> 
         if !request.trainable.contains(&unit) {
             continue;
         }
-        if !rts_rules::economy::train_requirement_met(unit, request.completed_building_kinds) {
+        if !rts_rules::economy::train_requirement_met_with_at_gun_history(
+            unit,
+            request.completed_building_kinds,
+            request
+                .completed_upgrades
+                .contains(&UpgradeKind::AntiTankGunUnlock),
+        ) {
             continue;
         }
         if upgrade::required_for_unit(unit)

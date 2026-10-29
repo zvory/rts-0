@@ -21,8 +21,12 @@ pub(super) fn next_eligible(
         let unit = entities
             .get(producer_id)
             .and_then(Entity::repeat_production)?;
-        let requirements_met =
-            rules::economy::train_requirement_met_for_faction(faction_id, unit, owned_complete);
+        let requirements_met = rules::economy::train_requirement_met_with_at_gun_history(
+            unit,
+            owned_complete,
+            completed_upgrades
+                .is_some_and(|upgrades| upgrades.contains(&UpgradeKind::AntiTankGunUnlock)),
+        );
         let producer_compatible = trainable.contains(&unit);
         let upgrade_met = upgrade::required_for_unit(unit).is_none_or(|required| {
             completed_upgrades.is_some_and(|upgrades| upgrades.contains(&required))

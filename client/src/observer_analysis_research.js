@@ -1,4 +1,5 @@
 import { playerAnalysisRows } from "./observer_analysis_rows.js";
+import { UPGRADE } from "./protocol.js";
 
 export function renderResearchMetric({ analysis, players, upgrades, renderPlayerHeading }) {
   const wrap = document.createElement("div");
@@ -22,11 +23,13 @@ export function renderResearchMetric({ analysis, players, upgrades, renderPlayer
 
   for (const player of rows) {
     wrap.appendChild(renderPlayerHeading(player));
-    if (!player.upgrades.length) {
+    // The retired AT Gun upgrade id records building ownership, not completed research.
+    const research = player.upgrades.filter((upgrade) => upgrade !== UPGRADE.ANTI_TANK_GUN_UNLOCK);
+    if (!research.length) {
       wrap.appendChild(renderEmpty("No completed research", "replay-research-empty"));
       continue;
     }
-    for (const upgrade of player.upgrades) {
+    for (const upgrade of research) {
       const definition = upgrades[upgrade];
       const row = document.createElement("div");
       row.className = "replay-research-row";
