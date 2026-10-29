@@ -237,6 +237,7 @@ where
     );
     let start_budget = budget;
     let mut actions = AiActionContext::new(&facts, budget);
+    actions.set_marking(is_jeff_v1_1(profile.id));
     let mut intents = Vec::new();
     queue_industrial_center(&mut actions, observation, &facts, &mut intents);
     pressure_economy::protect_depot_in_transit(observation, profile, &mut actions);
@@ -486,18 +487,23 @@ where
         &mut expansion_placeable,
     );
     intents.extend(later_base.intents.iter().cloned());
+    actions.mark("early");
 
     // The live Jeff's starting Riflemen march on the enemy until a fallback sends them home.
     let live = (&mut actions, observation, map_analysis, &mut intents);
     opening_rush::plan_live(profile.id, &facts, memory, live);
+    actions.mark("opening");
     // Jeff's picket on the enemy's route and warned sealing of the home line, and the live Jeff's
     // breach of Schone Tage's trap V. Their units are reserved from every other system.
     let live = (&mut actions, observation, map_analysis, &mut intents);
     defense::plan_route_line_live(profile.id, memory, live);
+    actions.mark("route");
     let live = (&mut actions, observation, map_analysis, &mut intents);
     trap_breach::plan_live(profile.id, memory, live);
+    actions.mark("breach");
     let live = (&mut actions, observation, map_analysis, &mut intents);
     third_pressure::plan_live(profile.id, memory, live);
+    actions.mark("third");
     let route_line_reserved = memory.squad_reserved();
 
     let economy_plan = economy_manager_output.plan.clone();
@@ -1178,6 +1184,7 @@ where
         local_defenders.sort_unstable();
         local_defenders.dedup();
         jeff_v1_1::keep_guns_on_posts(profile.id, observation, &mut local_defenders);
+        actions.mark("eco");
         if new_jeff_defense {
             if let Some(units) = defense::respond_to_local_incident(
                 &mut actions,
@@ -1213,6 +1220,7 @@ where
                 let assigned = &mut local_defense_assigned;
                 defense::plan_home_infantry(live, memory, enemy_base, &held, assigned);
             }
+            actions.mark("localdef");
         } else if jeff_layered_home_defense {
             let local_targets: Vec<u32> = defense::local_defense_targets(observation)
                 .into_iter()
@@ -1260,13 +1268,16 @@ where
         let live = (&mut actions, observation, map_analysis, &mut intents);
         let held = &(&local_defense_assigned | &route_line_reserved) | &push_units;
         jeff_v1_1::natural::support(live, memory, profile.id, &defensive_machine_gunners, &held);
+        actions.mark("natural");
         // Jeff's AI V1.1 keeps Tanks parked in front of its main, and holds a Tank line in front of
         // its bases and the ones it is taking. Tanks the home defense took stay with it a while.
         jeff_v1_1::front_line::note_yielded(observation, memory, &local_defense_assigned);
         let live = (&mut actions, observation, map_analysis, &mut intents);
         jeff_v1_1::home_guard::guard(live, memory, &held);
+        actions.mark("guard");
         let live = (&mut actions, observation, map_analysis, &mut intents);
         jeff_v1_1::front_line::hold(live, memory, &held);
+        actions.mark("line");
         let defensive_machine_gunners_available: Vec<u32> = defensive_machine_gunners
             .iter()
             .copied()
@@ -1350,17 +1361,22 @@ where
                 }
             }
         }
+        actions.mark("homestage");
         let live = (&mut actions, observation, map_analysis, &mut intents);
         let held = &(&local_defense_assigned | &route_line_reserved) | &push_units;
         jeff_v1_1::strike::strike_gathering_wave(live, memory, profile.id, &held);
+        actions.mark("strike");
         let live = (&mut actions, observation, map_analysis, &mut intents);
         jeff_v1_1::scout::scout(live, memory, profile.id, &held);
+        actions.mark("scout");
         let live = (&mut actions, observation, map_analysis, &mut intents);
         let held = &held | &memory.jeff_v1_1.natural.support.keys().copied().collect();
         jeff_v1_1::base_line::hold(live, memory, profile, &defensive_machine_gunners, &held);
+        actions.mark("baseline");
         // Jeff's AI V1.1's free Riflemen roam between its bases and run at raids on them.
         let live = (&mut actions, observation, map_analysis, &mut intents);
         jeff_v1_1::rovers::roam(live, memory, &held);
+        actions.mark("rovers");
 
         // The current Jeff's home Tank waits behind the home post once that has moved off the
         // main's line; it sat beside the HQ all game while the natural was shelled.
@@ -1396,6 +1412,7 @@ where
             }
         }
 
+        actions.mark("hometank");
         if let Some((tank_id, position)) = forward_defensive_tank.zip(forward_tank_position) {
             if let Some(units) =
                 stage_defensive_tank_at(&mut actions, observation, tank_id, position)
@@ -1404,6 +1421,7 @@ where
             }
         }
 
+        actions.mark("fwdtank");
         let guard_units = later_bases::issue_guard_orders(
             &mut actions,
             observation,
@@ -1414,6 +1432,7 @@ where
         if !guard_units.is_empty() {
             intents.push(AiIntent::Move { units: guard_units });
         }
+        actions.mark("laterguard");
         if uses_current_jeffs_ai_policy(profile.id) {
             let returning = later_bases::recall_tanks_to_main(
                 &mut actions,
@@ -1436,6 +1455,7 @@ where
             }
         }
 
+        actions.mark("recallmain");
         let containment_needs_control = profile.id != JEFFS_AI_BETA_ID
             && profile.expansion_containment.is_some()
             && frontal::containment_wave_needs_control(memory);
@@ -1503,9 +1523,11 @@ where
             }
         }
 
+        actions.mark("frontal");
         // Jeff's AI V1.1's Riflemen hunt the enemy's Panzerfausts, over every other order.
         let reserved = &route_line_reserved;
         jeff_v1_1::hunt::hunt_panzerfausts(&mut actions, observation, memory, &mut intents, profile.id, reserved);
+        actions.mark("hunt");
 
         // Last: the current Jeff's resting Tanks with no other orders gather on the home post, so
         // none sits idle in a corner of the main or out on the map.
@@ -1522,21 +1544,28 @@ where
                 intents.push(AiIntent::Move { units: gathered });
             }
         }
+        actions.mark("gather");
         // Jeff's AI V1.1's Riflemen charge Tanks shelling its bases, and its seen Tanks keep out of
         // reach of more enemy Tanks, over every other order.
         // Jeff's AI V1.1's Tank party raids the enemy's outlying bases.
         let live = (&mut actions, observation, map_analysis, &mut intents);
         jeff_v1_1::tank_raid::raid(live, memory, profile.id);
+        actions.mark("raid");
         jeff_v1_1::smoke_cover::cover_push_retreat(&mut actions, observation, memory);
+        actions.mark("smokecover");
         let raiders: BTreeSet<u32> = memory.jeff_v1_1.tank_raid.units().collect();
         let held = &(&route_line_reserved | &raiders);
         jeff_v1_1::deny::watch(&mut actions, observation, memory, &mut intents, held);
+        actions.mark("deny");
         let raiders: BTreeSet<u32> = memory.jeff_v1_1.tank_raid.units().collect();
         let reserved = &(&route_line_reserved | &raiders);
         jeff_v1_1::charge::charge_tanks(&mut actions, observation, memory, &mut intents, profile.id, reserved);
+        actions.mark("charge");
         jeff_v1_1::reveal::keep_out_of_reach(&mut actions, observation, memory, &mut intents, profile.id, reserved);
+        actions.mark("reveal");
     }
 
+    actions.mark("rest");
     let trace = build_manager_trace(TraceInput {
         observation,
         profile,
