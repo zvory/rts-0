@@ -2384,8 +2384,11 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   it samples production rig transforms and frame strips using `GameState`'s visual clock and shot
   recoil envelopes, including weapon-specific rifle fire and machine-gunner setup/teardown frames.
   The world renderer and minimap share `supportWeaponSetupVisual` transition timing. Atlas sprites
-  and strip frames are cached per kind/color, with continuous pose transforms applied at draw time;
-  repeated outline/foreground passes reuse one pose per entity per frame. Teardown clears pose,
+  and strip frames are cached per kind/color, with continuous pose transforms applied at draw time.
+  Minimap pose compilation and image preparation omit atlas cells explicitly declared blank: the
+  tank's two transparent track overlays do no work, while hull, turret and independent barrel recoil
+  remain visible. This does not alter world track marks. Repeated drawing passes reuse one sampled
+  pose per entity per frame. Teardown clears pose,
   setup, and raster caches. The offline minimap exporter uses this same drawing path with a native image
   loader. Buildings use their owner’s assigned player color, retaining cost-scaled boxes and the
   merged white outline mask; resources

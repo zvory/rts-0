@@ -283,7 +283,18 @@ Its payload lifetimes are explicit:
 Responses are `ready` after all renderer assets are ready, `retained`, `presented` with frame id and worker
 update/present timings, `superseded`, bounded `failed`, and `destroyed`. The message builder never
 transfers an assembler-owned buffer: it transfers copies so retained Phase 2 source records remain
-usable and unchanged.
+usable and unchanged. Dynamic frame packets borrow the assembler's already detached, immutable
+records until dispatch. The message builder creates separate frame/layer/grid wrappers to omit grid
+values and durable ground decals without mutating retained records; it does not deep-clone the
+entire graph locally. The host posts each packet synchronously, and `postMessage` performs the
+worker-isolating structured clone. Static-map, durable-decal and transferred grid copies retain their
+existing lifetimes. Pending and capture frames keep their original immutable source snapshots.
+
+Worker diagnostics retain counters and bounded timing histories on every event, but compute
+summaries only when `diagnostics()`, the control snapshot, or the published diagnostic getter is read.
+Frame submission/completion never copy and sort histories just to publish an unread snapshot. The
+published getter returns current counters and ages; teardown replaces an owned getter with a detached
+final record so global diagnostics cannot retain the destroyed host or overwrite a replacement match.
 
 The immutable static-map DTO also carries optional authored sun conditions. Any authored sun applies
 the world warmth tint and directional projected unit shadows. When elevation varies,

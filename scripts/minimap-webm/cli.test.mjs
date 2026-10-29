@@ -228,13 +228,15 @@ test('minimap uses production setup frames and shot envelopes, with a bounded im
   });
   await icons.prepare([{ kind: 'tank', color: '#0072b2' }, { kind: 'machine_gunner', color: '#0072b2' }]);
   const count = requested.length;
-  const context = { globalAlpha: 1, save() {}, restore() {}, translate() {}, rotate() {}, scale() {}, drawImage() {} };
+  let visibleDraws = 0;
+  const context = { globalAlpha: 1, save() {}, restore() {}, translate() {}, rotate() {}, scale() {}, drawImage() { visibleDraws++; } };
   for (let i = 0; i < 50; i++) {
     tank.weaponFacing = i / 7; recoil = i / 50;
     icons.beginFrame([tank], state, 2400 + i);
     icons.draw(context, tank, '#0072b2', { x: 0, y: 0 }, 480);
   }
   assert.equal(requested.length, count, 'angles and recoil never create image variants');
+  assert.equal(visibleDraws, 50 * 3, 'empty tracks never issue a Canvas draw');
   icons.destroy();
 });
 
