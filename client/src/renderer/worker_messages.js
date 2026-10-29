@@ -1,3 +1,4 @@
+import { minimapTexturePacket, validateMinimapImage } from "./minimap_wire.js";
 import {
   MAX_PRESENTED_DOODADS,
   PRESENTATION_FRAME_VERSION,
@@ -12,6 +13,7 @@ export const RENDER_WORKER_MESSAGE = Object.freeze({
   DURABLE_DECALS: "durableDecals",
   REVISIONED_GRIDS: "revisionedGrids",
   FRAME: "frame",
+  MINIMAP_TEXTURES: "minimapTextures",
   RESIZE: "resize",
   CAPTURE: "capture",
   PRESENTATION_PREFERENCES: "presentationPreferences",
@@ -76,8 +78,11 @@ export function createFrameMessages(frame, state = createRenderWorkerWireState()
     state.generation = frame.generation;
     state.visibleRevision = -1;
     state.exploredRevision = -1;
+    state.minimapSize = 0;
   }
   const messages = [];
+  const minimap = minimapTexturePacket(frame, state, RENDER_WORKER_MESSAGE.MINIMAP_TEXTURES, RENDER_WORKER_MESSAGE_VERSION);
+  if (minimap) messages.push(minimap);
   const gridPayload = {};
   const transfer = [];
   if (frame.visible.revision !== state.visibleRevision) {
@@ -211,6 +216,11 @@ export function validateRenderWorkerRequest(message, { requireCanvas = false } =
         throw new TypeError("initialize castShadowsEnabled must be boolean");
       }
       if (requireCanvas && !payload?.canvas) throw new TypeError("initialize requires a transferred canvas");
+      break;
+    case RENDER_WORKER_MESSAGE.MINIMAP_TEXTURES:
+      if (!Array.isArray(payload.images) || payload.images.length > 2048) throw new TypeError("Invalid minimap images");
+      positiveFinite(payload.size, "minimap size");
+      for (const image of payload.images) validateMinimapImage(image);
       break;
     case RENDER_WORKER_MESSAGE.MAP_GENERATION:
       validateGrid(payload?.map?.terrain, "terrain");
@@ -420,7 +430,8 @@ function validateDoodads(records) {
 }
 
 function cloneFrameWithoutGridValues(frame) {
-  const clone = structuredClone(frame);
+  const clone = structuredClone(frame.minimap
+    ? { ...frame, minimap: { ...frame.minimap, images: [] } } : frame);
   clone.visible = { ...clone.visible, values: null };
   clone.explored = { ...clone.explored, values: null };
   clone.layers.persistentGroundMark = clone.layers.persistentGroundMark

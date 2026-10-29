@@ -110,6 +110,7 @@ export class MinimapUnitIcons {
   }
 
   draw(context, entity, color, point, canvasSize, flash = false) {
+    if (context.unit) { context.unit(entity, color, point, canvasSize, flash, this); return; }
     const animated = this.animation?.layers(entity);
     if (animated) {
       // Live matches do not call prepare(). Load the bounded frame set on first sight,

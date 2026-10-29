@@ -74,7 +74,9 @@ src/
   tab_menu.js # hold-Tab Auto-Build controls with optimistic state through authoritative acknowledgement
   chat_overlay.js # App-owned docked lobby chat plus game direct-text overlay
   resource_icons.js # Shared DOM resource icon helpers for HUD and observer analysis
-  minimap.js      # Minimap: draw terrain+entities+viewport; click to move camera/command
+  minimap.js      # Minimap: terrain/entities/viewport authoring; click to move camera/command
+  minimap_gpu_bridge.js # Experimental scene recorder/texture snapshots for the existing render worker
+  match_minimap.js # App-shell composition of minimap loaders, animation, and GPU bridge
   minimap_road_layer.js # Cached post-fog dotted road-marking overlay
   minimap_forest_layer.js # Cached pre-fog foliage-centered tree-symbol overlay
   lobby.js        # Lobby screen controller: browser polling, joins, ready/start, host controls

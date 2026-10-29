@@ -1,3 +1,4 @@
+import { renderMinimap } from "./minimap_render.js";
 import { updateMinimapPointPreview } from "./minimap_point_preview.js";
 import { MinimapFormation } from "./minimap_formation.js";
 import { cmd } from "./protocol.js";
@@ -144,6 +145,7 @@ export class Minimap {
   constructor(canvasEl, state, camera, fog, commandInteraction, inputRouter = null, options = {}) {
     this.canvas = canvasEl;
     this.ctx = canvasEl.getContext("2d");
+    this._gpuBridge = options.gpuBridge || null;
     this.state = state;
     this.camera = camera;
     this.fog = fog;
@@ -309,53 +311,7 @@ export class Minimap {
 
   /** Draw the full minimap for the current frame. */
   render(frameViews = null, { profiler = null, capturePresentation = false } = {}) {
-    this._profiler = profiler || null;
-    const ctx = this.ctx;
-    if (!ctx) return;
-    // Keep CSS dimensions and marker proportions independent of backing resolution.
-    // Explicit captures/offline hosts own their requested pixel dimensions.
-    const browserWindow = this.canvas.ownerDocument?.defaultView;
-    if (!capturePresentation && browserWindow) {
-      const rect = this.canvas.getBoundingClientRect();
-      const dpr = Math.max(2, Number(browserWindow.devicePixelRatio) || 1);
-      const pixels = Math.ceil(rect.width * dpr);
-      if (pixels > 0 && this.canvas.width !== pixels) {
-        this.canvas.width = pixels;
-        this.canvas.height = pixels;
-      }
-    }
-    this._syncCanvasSize();
-
-    // Void background (outside the map / before a map exists).
-    ctx.fillStyle = hex(COLORS.bgVoid);
-    ctx.fillRect(0, 0, this.size, this.size);
-
-    if (!this._ensureTransform()) return;
-    const entities = this._minimapEntities(frameViews);
-    const now = performance.now();
-    this._unitIcons.beginFrame(entities, this.state, this.state?.visualNow?.() ?? now);
-    const attackFlashIds = this._underAttackFlashEntityIds(entities, now);
-    this._drawTerrainLayer();
-    this._forestLayer.draw({
-      ctx: this.ctx, map: this._renderMap(), size: this.size,
-      scale: this._scale, offX: this._offX, offY: this._offY,
-      presentationScale: this._presentationScale(),
-      presentation: this._canvasPresentationSignature(),
-    });
-    this._drawEntities(entities, { deferForegroundPlayer: true, attackFlashIds });
-    this._drawFog();
-    this._roadMarkingLayer.draw({
-      ctx: this.ctx, map: this._renderMap(), size: this.size,
-      scale: this._scale, offX: this._offX, offY: this._offY,
-      presentation: this._canvasPresentationSignature() });
-    this._drawResourceLayer();
-    this._drawPlayerOwnedEntityOutline(entities);
-    this._drawEntities(entities, { foregroundPlayerOnly: true, attackFlashIds });
-    this._drawEntities(entities.filter((entity) => entity.aboveFogReveal), { attackFlashIds });
-    if (!capturePresentation) this._drawArtilleryFiringMarkers(now);
-    if (!capturePresentation) this._drawViewport();
-    if (!capturePresentation) this._drawPings(now);
-    if (!capturePresentation) this._formation.draw();
+    return renderMinimap.call(this, frameViews, { profiler, capturePresentation });
   }
 
   /**
@@ -510,7 +466,7 @@ export class Minimap {
 
   _ensurePlayerBlipMaskLayer() {
     if (!this._playerBlipMaskLayer) {
-      this._playerBlipMaskLayer = this._createDynamicCanvas();
+      this._playerBlipMaskLayer = this._gpuBridge?.createCanvas() || this._createDynamicCanvas();
     }
     const canvas = this._playerBlipMaskLayer;
     if (!canvas) return null;
@@ -525,6 +481,7 @@ export class Minimap {
 
   _createStaticCanvas() {
     if (this._staticCanvasFactory) return this._staticCanvasFactory();
+    if (this._gpuBridge) return this._gpuBridge.createCanvas();
     return this._createDynamicCanvas();
   }
 
@@ -591,6 +548,7 @@ export class Minimap {
     const map = this._renderMap();
     const fog = this.fog;
     if (!fog) return;
+    if (this.ctx.fog) { this.ctx.fog(this, map, fog); return; }
     const signature = this._fogLayerStaticSignature(map, fog);
     if (!signature) {
       this._recordMinimapDiagnostic("minimap.cache.fog.uncached");
@@ -762,11 +720,12 @@ export class Minimap {
     if (!layer) return;
 
     const { canvas, ctx: maskCtx } = layer;
-    maskCtx.clearRect(0, 0, this.size, this.size);
-
-    for (const e of entities) {
-      if (!this._isForegroundPlayerMinimapEntity(e)) continue;
-      this._drawEntityBlip(maskCtx, e, MINIMAP_PLAYER_BLIP_OUTLINE_COLOR, true);
+    if (!this._gpuBridge || this._gpuBridge.buildingOutlineChanged(entities, this.size)) {
+      maskCtx.clearRect(0, 0, this.size, this.size);
+      for (const e of entities) {
+        if (!this._isForegroundPlayerMinimapEntity(e)) continue;
+        this._drawEntityBlip(maskCtx, e, MINIMAP_PLAYER_BLIP_OUTLINE_COLOR, true);
+      }
     }
 
     const ctx = this.ctx;
@@ -815,7 +774,12 @@ export class Minimap {
       .map(e => ({ kind: e.kind, color: this._unitIconColor(e) })));
   }
 
-  unitIconReadiness() { return this._unitIcons.readiness(); }
+  unitIconReadiness() {
+    const icons = this._unitIcons.readiness(), gpu = this._gpuBridge?.readiness();
+    if (!gpu) return icons;
+    return { ready: icons.ready && gpu.ready, pendingAssets: [...icons.pendingAssets, ...gpu.pendingAssets],
+      failedAssets: [...icons.failedAssets, ...gpu.failedAssets] };
+  }
 
   _recordMinimapInvalidation(kind, prev, next) {
     this._recordMinimapDiagnostic(`minimap.invalidate.${kind}`);
@@ -986,6 +950,7 @@ export class Minimap {
    * minimaps stop driving an old camera. Mirrors Input.destroy().
    */
   destroy() {
+    this._gpuBridge?.destroy();
     this._formation.destroy();
     this.canvas.width = this._basePresentationSize;
     this.canvas.height = this._originalCanvasHeight;

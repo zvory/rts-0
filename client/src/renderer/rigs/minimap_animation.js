@@ -1,3 +1,4 @@
+import { weaponRecoilOffset } from "../shared.js";
 import { KIND } from "../../protocol.js";
 import { createLiveFrameStrips } from "./frame_strip_routing.js";
 import { createLivePngRigAtlases } from "./png_routing.js";
@@ -9,7 +10,7 @@ import { supportWeaponSetupVisual } from "../support_weapon_setup_visual.js";
 
 // Injected into the canvas minimap by the host. Production poses drive cached raster layers;
 // neither image decoding nor SVG generation depends on an entity, angle, or recoil sample.
-export function createMinimapAnimation() {
+export function createMinimapAnimation({ simpleTank = false } = {}) {
   const strips = createLiveFrameStrips(), atlases = createLivePngRigAtlases();
   const definitions = createLiveRigDefinitions();
   const records = new Map(), layers = new Map(), stages = new Map();
@@ -24,6 +25,7 @@ export function createMinimapAnimation() {
       for (const id of records.keys()) if (!ids.has(id)) records.delete(id);
     },
     parts(kind) {
+      if (simpleTank && kind === KIND.TANK) return ["hull", "turret"];
       const strip = strips.get(keyFor(kind));
       if (strip) {
         const parts = Array.from({ length: strip.frameCount }, (_, i) => `frame:${i}`);
@@ -35,6 +37,21 @@ export function createMinimapAnimation() {
     },
     layers(entity) {
       if (layers.has(entity.id)) return layers.get(entity.id);
+      if (simpleTank && entity.kind === KIND.TANK) {
+        const facing = Number.isFinite(entity.facing) ? entity.facing : 0;
+        const aim = Number.isFinite(entity.weaponFacing) ? entity.weaponFacing : facing;
+        const recoil = state.weaponRecoil?.(entity.id, entity.kind, now) || 0;
+        const scale = 1.8 / (128 * 1.05);
+        const kick = -weaponRecoilOffset(KIND.TANK, recoil) * scale;
+        const result = [
+          { part: "hull", rotation: facing, x: Math.cos(aim) * kick * 0.85,
+            y: Math.sin(aim) * kick * 0.85, scaleX: 1, scaleY: 1, alpha: 1 },
+          { part: "turret", rotation: aim, x: Math.cos(aim) * kick * 1.35,
+            y: Math.sin(aim) * kick * 1.35, scaleX: 1, scaleY: 1, alpha: 1 },
+        ];
+        layers.set(entity.id, result);
+        return result;
+      }
       const strip = strips.get(liveRigKeyForEntity(entity));
       const entries = sprites.get(entity.kind);
       if (!strip && !entries) return null;

@@ -145,6 +145,7 @@ function runMatchFrame(match, now, { capture = false } = {}) {
     const groundDecalRevision = Array.isArray(groundDecalBatch)
       ? 0
       : groundDecalBatch.revision || 0;
+    time("match.minimap", () => match.minimap.render(frameViews, { profiler: match.frameProfiler }));
     const presentationFrame = time("match.presentationFrame", () => presentationAssembler.assemble({
       map: match.state.map,
       frameContext: frameViews,
@@ -163,6 +164,7 @@ function runMatchFrame(match, now, { capture = false } = {}) {
       observerMapAnalysis,
       screenOverlay,
       visualTimeMs,
+      minimap: match.minimap._gpuBridge?.frame || null,
       mode: capture ? "fixedCapture" : "live",
       sourceTick: match.state.tick,
     }));
@@ -201,7 +203,6 @@ function runMatchFrame(match, now, { capture = false } = {}) {
     });
     time("match.hud", () => match.hud.update(frameViews, { profiler: match.frameProfiler }));
     time("match.tabMenu", () => match.tabMenu?.update(frameViews));
-    time("match.minimap", () => match.minimap.render(frameViews, { profiler: match.frameProfiler }));
     time("match.observerAnalysis", () => match.observerDiagnostics?.update(frameViews, { profiler: match.frameProfiler }));
     if (!capture) time("match.healthPublish", () => match.health.publish());
     return presentation;
