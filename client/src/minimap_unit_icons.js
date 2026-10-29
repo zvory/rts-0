@@ -17,10 +17,12 @@ export function unitPngSize(kind, canvasSize = 480) {
 }
 
 export class MinimapUnitIcons {
-  constructor({ loadImage, createCanvas }) {
+  constructor({ loadImage, createCanvas, animation = null }) {
+    this.animation = animation;
     this.loadImage = loadImage;
     this.createCanvas = createCanvas;
     this.entries = new Map();
+    this.primedAnimations = new Set();
     this.controller = new AbortController();
   }
 
@@ -77,7 +79,7 @@ export class MinimapUnitIcons {
     if (entry.sprites[index]) return entry.sprites[index];
     const { image, mask } = entry;
     // Articulated layers reserve a shared square for rotations; compensate for its padding.
-    const scale = unitPngSize(kind, canvasSize) * (entry.part ? 1.8 : 1)
+    const scale = unitPngSize(kind, canvasSize) * (entry.part && !entry.part.includes("frame:") ? 1.8 : 1)
       / Math.max(image.width, image.height);
     const width = image.width * scale, height = image.height * scale;
     const outline = canvasSize / 480;
@@ -97,13 +99,33 @@ export class MinimapUnitIcons {
     return sprite;
   }
 
+  beginFrame(entities, state, now) { this.animation?.beginFrame(entities, state, now); }
+
   _parts(kind) {
+    const parts = this.animation?.parts(kind);
+    if (parts) return parts;
     if (kind === "tank") return ["hull", "turret"];
     if (kind === "anti_tank_gun") return ["packed-base", "packed-barrel", "deployed-base", "deployed-barrel"];
     return [null];
   }
 
   draw(context, entity, color, point, canvasSize, flash = false) {
+    if (context.unit) { context.unit(entity, color, point, canvasSize, flash, this); return; }
+    const animated = this.animation?.layers(entity);
+    if (animated) {
+      // Live matches do not call prepare(). Load the bounded frame set on first sight,
+      // so a later shot or setup transition does not start decoding a missing marker.
+      const key = `${entity.kind}:${color}`;
+      if (!this.primedAnimations.has(key)) {
+        this.primedAnimations.add(key);
+        for (const part of this._parts(entity.kind)) this.request(entity.kind, color, part);
+      }
+      const size = unitPngSize(entity.kind, canvasSize);
+      for (const layer of animated) this._drawLayer(context, entity, color,
+        { x: point.x + layer.x * size, y: point.y + layer.y * size },
+        canvasSize, flash, layer.part, layer.rotation, layer);
+      return;
+    }
     const facing = unitPngFacing(entity);
     const weaponFacing = Number.isFinite(entity.weaponFacing) ? entity.weaponFacing : facing;
     let layers = [[null, facing]];
@@ -119,18 +141,23 @@ export class MinimapUnitIcons {
     }
   }
 
-  _drawLayer(context, entity, color, point, canvasSize, flash, part, rotation) {
+  _drawLayer(context, entity, color, point, canvasSize, flash, part, rotation, transform = null) {
     const entry = this.request(entity.kind, color, part);
     if (!entry.image) return;
     const sprite = this._sprite(entry, entity.kind, canvasSize, flash);
     context.save();
     context.translate(point.x, point.y);
     context.rotate(rotation);
+    if (transform) {
+      context.scale(transform.scaleX, transform.scaleY);
+      context.globalAlpha *= transform.alpha;
+    }
     context.drawImage(sprite, -sprite.width / 8, -sprite.height / 8, sprite.width / 4, sprite.height / 4);
     context.restore();
   }
 
   destroy() {
+    this.animation?.destroy();
     this.controller.abort();
     for (const entry of this.entries.values()) {
       entry.image?.close?.();
@@ -141,5 +168,6 @@ export class MinimapUnitIcons {
       entry.image = null; entry.mask = null;
     }
     this.entries.clear();
+    this.primedAnimations.clear();
   }
 }

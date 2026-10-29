@@ -22,7 +22,8 @@ in [client-ui.md](client-ui.md), and implementation status lives in
 - The backend root owns its canvas, engine/renderer, scene, and shared GPU resources. Entity/effect
   children own instances only and cannot dispose shared resources.
 - There is no renderer selector or runtime fallback engine. Every route uses Pixi.
-- HUD, lobby, minimap, audio, diagnostics, and Lab panels remain shared external surfaces.
+- HUD, lobby, audio, diagnostics, and Lab panels remain shared external surfaces. The experimental
+  GPU minimap keeps DOM input/chrome on the main thread and submits its scene to the same worker.
 
 Rendering work does not change the Rust server, protocol, simulation, fog authority, replay format,
 or command coordinates. A Pixi worker failure is a visible bounded fatal presentation error for
@@ -153,6 +154,7 @@ PresentationFrameV2 = {
   visible: GridSnapshotV2,
   explored: GridSnapshotV2,
   layers: LayerRecordsV1,
+  minimap: MinimapSceneV1 | null,
   diagnosticsContext
 }
 ```
@@ -260,6 +262,35 @@ The `PixiPresentationAdapter` is the sole bridge to existing Pixi helpers. Its e
 allowlist uses `{id, reviewTrigger}` records: a trigger is a concrete reason to reconsider a read,
 not a promised cleanup phase. New reads fail the contract.
 
+### Experimental GPU minimap
+
+`MinimapSceneV1` carries `{version:1,size,bounds,hidden,visualTimeMs,commands,bundles}`.
+Bounds are CSS pixels relative to the world canvas; size is the square minimap backing resolution
+(at least 2x CSS size). Ordered commands are detached shape paths/transforms/styles, image ids and
+destination rectangles, or unit records with bundle id, position, visual size, and sampled recoil.
+Units carry only animation fields (identity/kind/owner/state, body/weapon/setup facing, setup state,
+Panzerfaust load/windup and ability cooldowns); no mutable state or callbacks cross the boundary.
+The existing minimap selects fog-filtered entities and preserves below/above-fog command order.
+
+Revisioned RGBA snapshots travel in `minimapTextures` messages before the referencing frame. Each
+image includes id/revision, width/height, full uncropped dimensions and crop offsets, atlas/filter
+hints, and a transferred copy of its pixels. Source snapshots stay intact. The host advances texture
+revisions only on dispatch, so replacing an undispatched frame cannot lose uploads. Resizing resets
+retained textures. Frame cloning excludes the pixel snapshots; unchanged pixels never cross per frame.
+Static terrain and icons retain their authored raster caches; unit images share worker atlas pages.
+Fog uses one nearest-filtered texel per tile, uploaded only when visibility changes. This intentionally
+changes Canvas2D's overlapping tile-edge rasterization. The worker samples current unit poses, batches
+contiguous icon runs without changing ordering, and renders the scene to a backing-size RenderTexture
+before compositing it into the sole world canvas. Texture-message CPU time is included in worker update
+timing. GPU completion measurements include both minimap and world rendering.
+
+The DOM minimap canvas keeps its border and input listeners; its transparent interior exposes the
+worker canvas under the panel. Teardown restores the panel styles and destroys worker minimap textures,
+render target, mask and display objects. Explicit minimap exports still use Canvas2D. Experimental tanks
+use only hull and turret/gun layers, with independent body/aim facing and recoil; separate track layers
+and full rig articulation are omitted intentionally. This prototype regresses Hellhole throughput and
+must remain a draft experiment; see `docs/minimap-gpu-experiment.md`.
+
 ### 4.1 Render-worker message boundary
 
 `RenderWorkerMessageV1` is the only Phase 3 worker vocabulary. Every request has
@@ -271,7 +302,8 @@ Its payload lifetimes are explicit:
   versions, and immutable configuration;
 - map generation: one static-map payload and transferred terrain/elevation copies per generation;
 - durable update: monotonic ground-decal revision plus its detached records;
-- revisioned data: transferred visible/explored copies only when each revision changes;
+- revisioned data: transferred visible/explored copies only when each revision changes, plus
+  experimental minimap texture snapshots keyed by image id/revision;
 - frame: dynamic layers, plain projection, visual time, ids, and grid revision references;
 - control: resize, capture/flush, presentation preferences, generation reset, perspective-decal
   reset/empty-repair completion, and destroy. Perspective-decal reset retains the currently visible

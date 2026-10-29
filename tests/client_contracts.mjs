@@ -20,6 +20,7 @@ runFrameProfilerContracts();
 await import("./client_contracts/frame_entity_contracts.mjs");
 await import("./client_contracts/presentation_frame_contracts.mjs");
 await import("./client_contracts/render_worker_message_contracts.mjs");
+await import("./client_contracts/minimap_gpu_contracts.mjs");
 await import("./client_contracts/pixi_worker_host_contracts.mjs");
 await import("./client_contracts/renderer_preparation_slot_contracts.mjs");
 await import("./client_contracts/worker_rehydration_contracts.mjs");

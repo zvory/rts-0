@@ -1,5 +1,4 @@
-import { createFormationGesture } from "./input/formation_gesture.js";
-import { createMinimapUnitIconLoader } from "./minimap_icon_image.js";
+import { createMatchMinimap } from "./match_minimap.js";
 import { initializeCameraView } from "./camera_view_selection.js";
 import { autoSpectatorCameraMinZoom, createMatchAutoSpectator } from "./match_auto_spectator.js";
 import {
@@ -13,7 +12,6 @@ import { createMatchHud, createMatchTabMenu } from "./match_hud.js";
 import { ApmTracker } from "./apm_tracker.js";
 import { Input } from "./input/index.js";
 import { DomClickInputZone, MatchInputRouter } from "./input/router.js";
-import { Minimap } from "./minimap.js";
 import { MatchHealth } from "./match_health.js";
 import * as matchLabTools from "./match_lab_tools.js";
 import { PredictionController } from "./prediction_controller.js";
@@ -25,7 +23,6 @@ import {
 } from "./prediction_runtime_startup.js";
 import { createPixiBackendBundle } from "./renderer/backend_bundle.js";
 import { prepareRenderer } from "./renderer/preparation.js";
-import { liveUnitIconMarkupFor } from "./renderer/rigs/unit_icon_sources.js";
 import { LivePauseOverlay } from "./live_pause_overlay.js";
 import { MatchObserverDiagnostics } from "./match_observer_diagnostics.js";
 import { GroundDecalSync } from "./match_ground_decal_sync.js";
@@ -44,7 +41,7 @@ import { ClientIntent } from "./client_intent.js";
 import { CommandInteraction } from "./command_interaction.js";
 import { createControlPolicyProjection } from "./control_policy_projection.js";
 import { CAMERA, INTERP_DELAY_MS, SNAPSHOT_MS } from "./config.js";
-import { EVENT, KIND, S } from "./protocol.js";
+import { EVENT, S } from "./protocol.js";
 import { dom, isTextEntry } from "./bootstrap.js";
 import { COMMAND_BUDGET_OVERFLOW_NOTICE, commandWithinBudget } from "./command_budget.js";
 
@@ -328,14 +325,7 @@ export class Match {
     this.unregisterDomInputZone = this.inputRouter.registerZone(this.domInputZone);
     this.minimap = this._timeInit(
       "match.minimap",
-      () => new Minimap(dom.minimap, this.state, this.camera, this.fog, this.commandInteraction, this.inputRouter, {
-        commandsEnabled: !!this.capabilities.commands.gameplay,
-        createFormationGesture,
-        clientIntent: this.clientIntent,
-        controlPolicy: this.controlPolicy,
-        loadUnitIcon: createMinimapUnitIconLoader(liveUnitIconMarkupFor, dom.minimap),
-        artilleryIconMarkup: liveUnitIconMarkupFor(KIND.ARTILLERY),
-      }),
+      () => createMatchMinimap(this, dom),
     );
     this.noticePresenter = this._timeInit(
       "match.noticePresenter",

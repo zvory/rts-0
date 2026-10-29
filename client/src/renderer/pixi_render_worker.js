@@ -1,3 +1,4 @@
+import { MinimapGpuLayer } from "./minimap_gpu_layer.js";
 import {
   RENDER_WORKER_MESSAGE,
   RENDER_WORKER_RESPONSE,
@@ -9,6 +10,8 @@ import { PIXI_WORKER_URL, configurePixiForWorker, installPixiWorkerEnvironment }
 import { compatibilityState, createWorkerPresentationState } from "./worker_rehydration.js";
 
 let renderer = null;
+let minimap = null;
+let minimapTextureMs = 0;
 let adapter = null;
 let surface = "match";
 let generation = 0;
@@ -68,6 +71,11 @@ async function handleMessage(candidate) {
     case RENDER_WORKER_MESSAGE.RESET_GENERATION:
       generation = message.generation;
       presentation.reset(generation);
+      break;
+    case RENDER_WORKER_MESSAGE.MINIMAP_TEXTURES:
+      { const startedAt = performance.now();
+        minimap?.textures.update(message.payload);
+        minimapTextureMs += performance.now() - startedAt; }
       break;
     case RENDER_WORKER_MESSAGE.MAP_GENERATION:
       presentation.map(message);
@@ -160,6 +168,7 @@ async function initialize(message) {
       staticMap: () => presentation.staticMap,
     }, { renderer });
     await waitForRendererAssets();
+    minimap = new MinimapGpuLayer(renderer);
   }
   const gl = renderer.app.renderer.gl;
   respond(RENDER_WORKER_RESPONSE.READY, generation, {
@@ -198,6 +207,7 @@ async function presentFrame(message) {
   const startedAtEpochMs = epochNow();
   let frameId;
   let submission = null;
+  let additionalWorkerUpdateMs = 0;
   if (message.payload.editor) {
     frameId = message.payload.editor.frameId;
     adapter.present(message.payload.editor);
@@ -207,6 +217,10 @@ async function presentFrame(message) {
     compatibility = compatibilityState(frame.pixiCompatibility);
     visualProfile = frame.visualProfile || null;
     visualTimeMs = frame.visualTimeMs;
+    const minimapStartedAt = performance.now();
+    minimap?.update(frame.minimap);
+    additionalWorkerUpdateMs = performance.now() - minimapStartedAt + minimapTextureMs;
+    minimapTextureMs = 0;
     submission = adapter.render(frame);
     const retained = await submission.retained;
     if (retained?.status === "retained") presentation.decalsPresented(frame.groundDecalRevision);
@@ -223,7 +237,7 @@ async function presentFrame(message) {
   const submittedAtMs = Number(message.payload.submittedAtMs);
   const response = {
     frameId,
-    workerUpdateMs: timing.workerUpdateMs,
+    workerUpdateMs: timing.workerUpdateMs + additionalWorkerUpdateMs,
     workerPresentMs: timing.workerPresentMs,
     queueAgeMs: Number.isFinite(submittedAtMs) ? Math.max(0, startedAtEpochMs - submittedAtMs) : 0,
     displayAgeMs: Number.isFinite(submittedAtMs) ? Math.max(0, presentedAtEpochMs - submittedAtMs) : 0,
@@ -344,6 +358,8 @@ function safeGlParameter(gl, parameter) {
 function destroy(responseGeneration) {
   if (destroyed) return;
   destroyed = true;
+  try { minimap?.destroy(); } catch {}
+  minimap = null;
   try { adapter?.destroy?.(); } catch {}
   adapter = null;
   renderer = null;
