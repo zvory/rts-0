@@ -8,7 +8,11 @@ Kriegsia starts at 100 supply; the absolute maximum remains 300. At most two own
 including pending upgrades, may exist. A destroyed center frees its slot; existing units survive
 being over cap, but new supply cannot be reserved until room is available.
 
-The source depot keeps its identity, HP, armor, footprint, sight, mining-anchor status, worker
+On completion, maximum HP becomes three times the base Resource Depot HP (540 versus 180).
+Current HP increases by the same 360 HP, preserving damage already taken. Pending or cancelled
+upgrades do not change HP.
+
+The source depot keeps its identity, armor, footprint, sight, mining-anchor status, worker
 training, free extractor jobs, rally orders, repair, elimination and targeting behavior. There is
 no new weapon, capture rule, aura or research prerequisite. Upgrade through the normal research
 command/card (first free research slot); cancellation uses ordinary research refunds. Pending

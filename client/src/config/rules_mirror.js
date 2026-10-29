@@ -431,7 +431,7 @@ export const UPGRADES = Object.freeze({
     upgrade: UPGRADE.INDUSTRIAL_CENTER, label: "Industrial Center", icon: "IC",
     researchedAt: KIND.RESOURCE_DEPOT, cost: { steel: 800, oil: 300 },
     researchTicks: TICK_HZ * 60,
-    description: "Upgrade this Resource Depot: +100 global supply while it exists. Maximum two Industrial Centers; absolute cap 300.",
+    description: "Upgrade this Resource Depot: triple maximum HP and +100 global supply while it exists. Maximum two Industrial Centers; absolute cap 300.",
   }),
   [UPGRADE.METHAMPHETAMINES]: Object.freeze({
     upgrade: UPGRADE.METHAMPHETAMINES,
