@@ -835,7 +835,10 @@ can validate direct attack commands or combat target acquisition until the firin
 Its reveal-only actionable tile is deliberately omitted from `visibleTiles` and does not enter
 `exploredTiles`; clients infer the explicit above-fog `shotReveal` presentation when a projected
 enemy unit occupies a presentation-dark tile. This keeps the unit fully legible without clearing
-the terrain tile beneath it.
+the terrain tile beneath it. An authoritative deployed AT gun presented above fog still draws its
+live threat cone from `setupFacing`. When the reveal expires without ordinary sight, the server
+projects its last observed arc in `rememberedAntiTankGuns` and the client draws the stale
+question-mark memory cone instead. Event-only shot ghosts do not provide authoritative live arcs.
 The expiration is calculated from the firing tick plus that gun's firing-cycle cooldown plus
 0.5 seconds (`TICK_HZ / 2`), not from a hardcoded wall-clock duration. The half-second counterfire
 reaction applies only while a firing-reveal-stamped tile is the target's necessary source of
