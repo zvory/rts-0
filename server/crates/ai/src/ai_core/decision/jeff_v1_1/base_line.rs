@@ -640,6 +640,17 @@ pub(in crate::ai_core::decision) fn hold(
     if !is_jeff_v1_1(profile.id) || (guns_only && super::off("basemgs")) {
         return;
     }
+    // The guns stay home until the first Tank: posted at the natural in the opening, 4 of them stood
+    // there while Rush AI's 10-15 guns took the main at 3:12-4:44 (4 games of 16).
+    if guns_only
+        && !observation
+            .owned
+            .iter()
+            .any(|unit| unit.kind == EntityKind::Tank && unit.is_complete && unit.hp > 0)
+    {
+        memory.jeff_v1_1.base_lines.posts.clear();
+        return;
+    }
     let ts = observation.map.tile_size as f32;
     let tick = observation.tick;
     let lines = base_lines(observation, map_analysis, &memory.jeff_v1_1.base_lines.contacts);

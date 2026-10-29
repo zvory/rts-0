@@ -1106,9 +1106,7 @@ where
     local_ready_units.retain(|id| !push_units.contains(id));
     local_ready_units.retain(|id| !memory.opening_rush.is_reserved(*id));
     local_ready_units.retain(|id| !memory.jeff_v1_1.front_line.holds(*id));
-    local_ready_units.retain(|id| {
-        !memory.jeff_v1_1.home_guard.holds(*id) && !memory.jeff_v1_1.rovers.holds(*id)
-    });
+    local_ready_units.retain(|id| !memory.jeff_v1_1.home_guard.holds(*id));
     local_ready_units.retain(|id| !memory.jeff_v1_1.deny.holds(*id));
     local_ready_units.retain(|id| !memory.third_pressure.is_reserved(*id)
                 && !memory.jeff_v1_1.tank_raid.holds(*id));

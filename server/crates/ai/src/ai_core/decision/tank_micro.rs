@@ -56,12 +56,16 @@ pub(super) fn finish(
         memory.tank_micro.natural_clear =
             super::expansion_security::natural_clearers(observation, memory)
                 .map(|(tanks, point)| (tanks, stored(point)));
+        // V1.1's line Tanks come under the governor with `linemicro`: exempt, they drove into
+        // parked Tanks' reach to their posts and to the base in contact (against Pressure AI 0.70
+        // enemy Tanks killed per Tank lost, V1.0 1.54).
+        let line_exempt = crate::ai_core::profiles::jeff_v1_1_feature_off("linemicro");
         let exempt: BTreeSet<u32> = memory
             .trap_breach
             .reserved()
             .chain(memory.third_pressure.reserved())
             .chain(memory.jeff_v1_1.tank_raid.units())
-            .chain(memory.jeff_v1_1.front_line.units())
+            .chain(memory.jeff_v1_1.front_line.units().filter(|_| line_exempt))
             .chain(memory.jeff_v1_1.home_guard.units())
             .collect();
         decision.trace.notes = govern(

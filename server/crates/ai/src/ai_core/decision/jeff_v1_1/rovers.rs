@@ -71,6 +71,16 @@ pub(in crate::ai_core::decision) fn roam(
         memory.jeff_v1_1.rovers = RoverMemory::default();
         return;
     }
+    // The opening's Riflemen are V1.0's until the first Tank: roaming from the start, the force left
+    // the main to Rush AI's and Pressure AI's first waves (6 games lost at 3:08-4:44, none without).
+    if !observation
+        .owned
+        .iter()
+        .any(|unit| unit.kind == EntityKind::Tank && unit.is_complete && unit.hp > 0)
+    {
+        memory.jeff_v1_1.rovers = RoverMemory::default();
+        return;
+    }
     let ts = observation.map.tile_size as f32;
     let tick = observation.tick;
     let main = tile_center(observation.own_start_tile, observation.map.tile_size);
