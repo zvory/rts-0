@@ -224,6 +224,11 @@ pub(crate) fn production_system(
                 if upgrade == upgrade::UpgradeKind::IndustrialCenter {
                     if let Some(production) = b.production.as_mut() {
                         production.industrial_center = true;
+                        let max_hp = b.max_hp
+                            .saturating_mul(config::INDUSTRIAL_CENTER_HP_MULTIPLIER);
+                        let gained_hp = max_hp.saturating_sub(b.max_hp);
+                        b.max_hp = max_hp;
+                        b.hp = b.hp.saturating_add(gained_hp).min(max_hp);
                     }
                 }
                 if let Some(queue) = b.research_queue_mut() {
