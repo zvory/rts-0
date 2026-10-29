@@ -3,6 +3,22 @@ use crate::game::entity::{ResearchItem, MAX_PRODUCTION_QUEUE};
 use super::Entity;
 
 impl Entity {
+    pub(in crate::game) fn complete_industrial_center(&mut self) {
+        if self.hp == 0 || self.is_industrial_center() {
+            return;
+        }
+        let Some(production) = self.production.as_mut() else {
+            return;
+        };
+        production.industrial_center = true;
+        let max_hp = self
+            .max_hp
+            .saturating_mul(crate::config::INDUSTRIAL_CENTER_HP_MULTIPLIER);
+        let gained_hp = max_hp.saturating_sub(self.max_hp);
+        self.max_hp = max_hp;
+        self.hp = self.hp.saturating_add(gained_hp).min(max_hp);
+    }
+
     pub(crate) fn is_industrial_center(&self) -> bool {
         self.kind
             == crate::rules::faction::upgrade_definition(
