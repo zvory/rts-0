@@ -585,12 +585,39 @@ import { textWithin } from "./dom_text.mjs";
     const constructionText = textWithin(root);
     assert(
       constructionText.includes("Current production")
-        && constructionText.includes("Constructing Barracks")
+        && constructionText.includes("Barracks")
+        && !constructionText.includes("Constructing")
         && constructionText.includes("30")
         && !constructionText.includes("Q 0")
         && !constructionText.includes("No active production"),
       "production tab labels and renders construction progress without a queue depth",
     );
+
+    overlay.applyObserverAnalysis({
+      tick: 3,
+      players: [1, 2].map((id) => ({ id, production: [
+        ...Array.from({ length: id === 1 ? 7 : 1 }, (_, index) => ({
+          buildingId: id * 100 + index,
+          buildingKind: KIND.BARRACKS,
+          itemKind: KIND.BARRACKS,
+          itemType: "building",
+          progress: index / 10,
+        })),
+        {
+          buildingId: id * 100 + 20,
+          buildingKind: KIND.FACTORY,
+          itemKind: KIND.FACTORY,
+          itemType: "building",
+          progress: 0.5,
+        },
+      ] })),
+    });
+    const constructionRows = findFakes(root, (el) => el.classList.contains("replay-production-row"));
+    assert(constructionRows.length === 4, "construction groups matching kinds within each player only");
+    assert(textWithin(constructionRows[0]).includes("Barracks ×7"), "repeated construction shows a compact count");
+    assert(constructionRows[0].querySelector(".replay-production-progress").textContent === "30%",
+      "grouped construction shows average progress across its sites");
+    assert(!textWithin(constructionRows[2]).includes("×"), "single construction omits the count");
 
     overlay.applyObserverAnalysis({
       tick: 12,
@@ -629,11 +656,11 @@ import { textWithin } from "./dom_text.mjs";
     assert(productionText.includes("Red"), "production tab groups rows by first player");
     assert(productionText.includes("Blue"), "production tab groups rows by second player");
     assert(
-      productionText.includes("Machine Gunner at Barracks") && productionText.includes("42") && productionText.includes("Q 2"),
+      productionText.includes("Machine Gunner") && !productionText.includes(" at Barracks") && productionText.includes("42") && productionText.includes("Q 2"),
       "production tab renders active unit production with progress and queue depth",
     );
     assert(
-      productionText.includes("Tank Production at Engineering Complex") && productionText.includes("75"),
+      productionText.includes("Tank Production") && !productionText.includes(" at Engineering Complex") && productionText.includes("75"),
       "production tab renders active research with mirrored upgrade labels",
     );
 
