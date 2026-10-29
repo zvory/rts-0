@@ -163,6 +163,11 @@ pub(in crate::ai_core::decision) fn escort(
     if let Some(tanks) = nearest(EntityKind::Tank, ESCORT_TANKS) {
         return Some(tanks.into_iter().collect());
     }
+    // Under `mghome` the guns stay home and Riflemen take their places.
+    if !super::off("mghome") {
+        return nearest(EntityKind::Rifleman, ESCORT_RIFLES + ESCORT_GUNS)
+            .map(|rifles| rifles.into_iter().collect());
+    }
     let rifles = nearest(EntityKind::Rifleman, ESCORT_RIFLES)?;
     let guns = nearest(EntityKind::MachineGunner, ESCORT_GUNS)?;
     Some(rifles.into_iter().chain(guns).collect())

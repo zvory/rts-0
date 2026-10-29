@@ -1184,6 +1184,7 @@ where
         local_defenders.sort_unstable();
         local_defenders.dedup();
         jeff_v1_1::keep_guns_on_posts(profile.id, observation, &mut local_defenders);
+        jeff_v1_1::guns_hold(profile.id, observation, &mut local_defenders);
         actions.mark("eco");
         if new_jeff_defense {
             if let Some(units) = defense::respond_to_local_incident(

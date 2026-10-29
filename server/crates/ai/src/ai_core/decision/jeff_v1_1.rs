@@ -220,6 +220,43 @@ pub(super) fn keep_guns_on_posts(
     });
 }
 
+/// A Machine Gunner with an enemy this close may answer it; the rest hold their posts (`mghome`).
+const GUN_LEASH_TILES: f32 = 8.0;
+
+/// Jeff's AI V1.1's Machine Gunners hold where they stand (`mghome`). A gun sets up for a second
+/// before it fires and cannot fire on the move: against Pressure AI half the guns lost died
+/// walking, sent by home defense to a fight or to the natural, and a gun parked at home fired 31
+/// shots for each one lost, one walking out 11. Home defense takes a gun only with an enemy within
+/// `GUN_LEASH_TILES` of it; the Riflemen, which fire on the move, run to the rest.
+pub(super) fn guns_hold(
+    profile_id: &str,
+    observation: &AiObservation,
+    local_defenders: &mut Vec<u32>,
+) {
+    if !is_jeff_v1_1(profile_id) || off("mghome") {
+        return;
+    }
+    let reach = crate::ai_core::decision::geometry::squared(
+        GUN_LEASH_TILES * observation.map.tile_size as f32,
+    );
+    local_defenders.retain(|id| {
+        observation
+            .owned
+            .iter()
+            .find(|unit| unit.id == *id)
+            .is_none_or(|gun| {
+                gun.kind != EntityKind::MachineGunner
+                    || observation.visible_enemies.iter().any(|enemy| {
+                        enemy.hp > 0
+                            && enemy.kind.is_unit()
+                            && crate::ai_core::decision::geometry::dist2(
+                                enemy.x, enemy.y, gun.x, gun.y,
+                            ) <= reach
+                    })
+            })
+    });
+}
+
 /// The Barracks leave each Factory's next Tank's Steel in the bank, from the moment that Factory has
 /// one Tank or none in hand, while the Oil for it is in: the Factories train first each decision
 /// but, with Jeff queuing one Tank at a time, stood idle 37-66% of the time against Pressure AI,

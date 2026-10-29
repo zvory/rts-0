@@ -90,6 +90,18 @@ pub(in crate::ai_core::decision) fn support(
     };
     let by_id: BTreeMap<u32, &AiEntitySummary> =
         observation.owned.iter().map(|unit| (unit.id, unit)).collect();
+    // Under `mghome` the guns go only once the natural's Depot stands: sent to a line in front of
+    // an empty site, they walked out ahead of it and died there or on the way.
+    let guns_go = super::off("mghome")
+        || observation.owned.iter().any(|unit| {
+            unit.kind == EntityKind::ResourceDepot
+                && unit.is_complete
+                && unit.hp > 0
+                && dist2(unit.x, unit.y, center.0, center.1) <= squared(ts)
+        });
+    let free = |unit: &AiEntitySummary| {
+        free(unit) && (guns_go || unit.kind != EntityKind::MachineGunner)
+    };
     // Keep the support it has while each is still free.
     let mut members: Vec<u32> = memory
         .jeff_v1_1
