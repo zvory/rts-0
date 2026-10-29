@@ -8,7 +8,8 @@ It does not isolate the incremental cost of this PR alone.
 ## Revisions and method
 
 - Before: `f28b4a465` (first parent of the merge of PR #1712, `84e6e8019`). Clean detached worktree.
-- After: `zvorygin/minimap-recoil`, based on `913c0ac18`, with this PR's source changes.
+- After: `d4d8f9bd6` on `zvorygin/minimap-recoil`, based on `913c0ac18`, including the
+  reviewed first-use animation preload fix.
 - Canonical `fixed-roster-hellhole-stream`; identical checked-in stream, harness, terrain,
   camera, viewport 1440×900, DPR 1, Chrome 156, CPU throttle 1, default terrain shadow mode.
 - Three alternating before/after runs, 15 measured seconds each after harness warmup. No
@@ -23,14 +24,14 @@ It does not isolate the incremental cost of this PR alone.
 
 | Revision | Run | Presentations/s | Frame work avg ms | Frame work p95 ms | Minimap avg ms | Minimap p95 ms |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| before | 1 | 133.07 | 2.7 | 4 | 0.4 | 1 |
-| before | 2 | 131.4 | 2.8 | 4 | 0.4 | 1 |
-| before | 3 | 132.53 | 2.7 | 4 | 0.4 | 1 |
-| after | 1 | 123.33 | 3.7 | 8 | 1.4 | 2 |
-| after | 2 | 122.53 | 3.7 | 8 | 1.4 | 2 |
-| after | 3 | 124.67 | 3.8 | 8 | 1.4 | 2 |
+| before | 1 | 134.2 | 2.7 | 4 | 0.4 | 1 |
+| before | 2 | 132.53 | 2.7 | 4 | 0.4 | 1 |
+| before | 3 | 132.73 | 2.8 | 4 | 0.5 | 1 |
+| after | 1 | 120.8 | 3.7 | 8 | 1.4 | 2 |
+| after | 2 | 119.67 | 3.7 | 8 | 1.4 | 2 |
+| after | 3 | 119.07 | 3.8 | 8 | 1.4 | 2 |
 
-Median completed throughput: **132.53 → 123.33/s (−6.94%)**. Median frame work average:
+Median completed throughput: **132.73 → 119.67/s (−9.84%)**. Median frame work average:
 **2.7 → 3.7 ms (+1.0 ms)**. Minimap average: **0.4 → 1.4 ms (+1.0 ms)**.
 Frame-work p95 moved from the **4 ms to 8 ms histogram bucket**, and minimap p95 from **1 to
 2 ms**. Histogram percentiles are coarse bucket estimates, not exact latency quantiles.
@@ -58,7 +59,8 @@ with no page errors; full strip frames retain the deployed head and barrel. An a
 Interact Lab scene also passed capture readiness. Exact parity with the old icons is not expected:
 these animation and articulated silhouette differences are the intended presentation changes.
 
-Raw run JSON and profiles are local under `/tmp/minimap-perf/`; the rendered storyboard is
+Final headline run JSON is under `/tmp/minimap-perf/final/`; profiles and earlier development
+runs are under `/tmp/minimap-perf/`. the rendered storyboard is
 `/tmp/minimap-perf/animation-storyboard.png`. These artifacts are not committed. Reproduce each
 headline run from the corresponding checkout:
 
@@ -70,7 +72,7 @@ RTS_CLIENT_PERF_UNCAPPED=1 node scripts/client-perf-harness.mjs \
 ```
 
 Focused checks passed for minimap inputs, production rig runtime, frame-strip and mortar setup
-contracts, protocol, client architecture, docs health, and all 11 minimap export/icon tests. Browser
+contracts, protocol, client architecture, docs health, and all 12 minimap export/icon tests. Browser
 smoke fails the starting-steel assertion (`49` versus `>=50`) on both this branch and the untouched
 `913c0ac18` main client served by the same server binary. The clean-main comparison also showed
 prediction/progress timing failures; the branch rerun showed only the steel assertion. These smoke
