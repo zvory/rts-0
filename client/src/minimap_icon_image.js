@@ -60,8 +60,8 @@ async function fetchImageDataUrl(href, { signal = null } = {}) {
 // Share source bytes across team-colored portraits, but keep their tinted images independent.
 export function createMinimapUnitIconLoader(markupFor, canvas) {
   const sources = new Map();
-  return async (kind, color, { signal }) => {
-    let markup = await inlineSvgImageSources(markupFor(kind, { teamColor: color }), href => {
+  return async (kind, color, { signal, minimapPart = null }) => {
+    let markup = await inlineSvgImageSources(markupFor(kind, { teamColor: color, minimapPart }), href => {
       if (!sources.has(href)) sources.set(href, fetchImageDataUrl(href, { signal }));
       return sources.get(href);
     });

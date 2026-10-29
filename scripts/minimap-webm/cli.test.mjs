@@ -103,14 +103,14 @@ test('shared live/export portraits cache drawing, preserve scale and rotate with
 
 test('portrait failures are visible to capture readiness and teardown discards late loads', async () => {
   const broken = new MinimapUnitIcons({ loadImage: async () => { throw Error('asset failed'); } });
-  await assert.rejects(broken.prepare([{ kind: 'tank', color: '#0072b2' }]), /asset failed/);
+  await assert.rejects(broken.prepare([{ kind: 'rifleman', color: '#0072b2' }]), /asset failed/);
   assert.equal(broken.readiness().ready, false);
   assert.equal(broken.readiness().failedAssets.length, 1);
   broken.destroy();
   let resolve, closed = 0;
   const late = new MinimapUnitIcons({ loadImage: () => new Promise(r => { resolve = r; }),
     createCanvas: () => { throw Error('must not allocate after destroy'); } });
-  const pending = late.prepare([{ kind: 'tank', color: '#0072b2' }]);
+  const pending = late.prepare([{ kind: 'rifleman', color: '#0072b2' }]);
   await Promise.resolve();
   late.destroy();
   resolve({ width: 10, height: 10, close: () => closed++ });
@@ -130,4 +130,32 @@ test('browser portrait loader produces standalone SVG images with a namespace', 
   assert.equal(loaded, image);
   assert.match(decodeURIComponent(source), /<svg xmlns="http:\/\/www.w3.org\/2000\/svg"/);
   assert.equal(image.onload, null);
+});
+
+import { liveUnitIconMarkupFor } from '../../client/src/renderer/rigs/unit_icon_sources.js';
+test('articulated minimap layers follow live facing and setup without loading each angle', async () => {
+  const loaded = [], rotations = [];
+  const icons = new MinimapUnitIcons({
+    createCanvas: () => ({ width: 0, height: 0, getContext: () => ({ drawImage() {}, fillRect() {} }) }),
+    loadImage: async (kind, color, options) => {
+      loaded.push([kind, options.minimapPart]); return { width: 128, height: 128 };
+    },
+  });
+  await icons.prepare([{ kind: 'tank', color: '#0072b2' }, { kind: 'anti_tank_gun', color: '#0072b2' }]);
+  const ctx = { save() {}, restore() {}, translate() {}, drawImage() {}, rotate: a => rotations.push(a) };
+  const draw = e => icons.draw(ctx, e, '#0072b2', { x: 0, y: 0 }, 480);
+  draw({ kind: 'tank', facing: 1, weaponFacing: 2 });
+  draw({ kind: 'anti_tank_gun', facing: 1, weaponFacing: 2, setupFacing: 3, setupState: 'packed' });
+  draw({ kind: 'anti_tank_gun', facing: 1, weaponFacing: 2, setupFacing: 3, setupState: 'deployed' });
+  assert.deepEqual(rotations, [1, 2, 1, 1, 3, 2]);
+  assert.equal(loaded.length, 6);
+  draw({ kind: 'tank', facing: 2, weaponFacing: 3 });
+  assert.equal(loaded.length, 6, 'continuous aim uses cached components');
+  const packed = liveUnitIconMarkupFor('anti_tank_gun', { minimapPart: 'packed-base' });
+  const deployed = liveUnitIconMarkupFor('anti_tank_gun', { minimapPart: 'deployed-base' });
+  assert.doesNotMatch(packed, /data-unit-icon-component="[^"]*Trail/);
+  assert.match(deployed, /data-unit-icon-component="sprite.at.leftTrail.deployed"/);
+  assert.match(deployed, /data-unit-icon-component="sprite.at.rightTrail.deployed"/);
+  assert.equal(packed.match(/viewBox="[^"]*"/)[0], deployed.match(/viewBox="[^"]*"/)[0]);
+  icons.destroy();
 });
