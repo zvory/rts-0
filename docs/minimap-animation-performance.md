@@ -69,4 +69,11 @@ RTS_CLIENT_PERF_UNCAPPED=1 node scripts/client-perf-harness.mjs \
   --viewport 1440x900 --dpr 1 --output-root /tmp/minimap-perf/reproduction
 ```
 
+Focused checks passed for minimap inputs, production rig runtime, frame-strip and mortar setup
+contracts, protocol, client architecture, docs health, and all 11 minimap export/icon tests. Browser
+smoke fails the starting-steel assertion (`49` versus `>=50`) on both this branch and the untouched
+`913c0ac18` main client served by the same server binary. The clean-main comparison also showed
+prediction/progress timing failures; the branch rerun showed only the steel assertion. These smoke
+failures are recorded without changing unrelated economy or prediction behavior.
+
 The PR intentionally remains unmerged with auto-merge disabled for performance review.
