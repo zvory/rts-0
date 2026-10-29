@@ -185,7 +185,7 @@ impl GameCheckpointV1 {
                 .map(|player| {
                     serde_convert(PlayerCheckpointRef {
                         state: player,
-                        supply_cap: crate::config::PLAYER_SUPPLY_CAP,
+                        supply_cap: player.supply_cap(&state.entities),
                     })
                 })
                 .collect::<Result<_, _>>()?,

@@ -141,7 +141,7 @@ export async function runScenario(scenario, args = {}) {
   return { status, artifactDir: artifacts.dir, failure };
 }
 
-async function executeStep(context, step) {
+export async function executeStep(context, step) {
   const { scenario, lanes, artifacts } = context;
   switch (step.op) {
     case "selectOwn":
@@ -484,8 +484,10 @@ async function executeStep(context, step) {
     case "stepRoomTime": {
       const before = await lanes.client.currentTick();
       await lanes.client.stepRoomTime();
-      await lanes.client.waitForSnapshot({ minTickDelta: 1, timeoutMs: 8000 });
-      const after = await lanes.client.currentTick();
+      const snapshot = await lanes.client.waitForSnapshot({ startTick: before, minTickDelta: 1, timeoutMs: 8000 });
+      // Snapshot and room-time messages can arrive in either order. Assert the
+      // authoritative snapshot tick instead of reading possibly older controls.
+      const after = snapshot.tick;
       context.tickMarks.push({ before, after });
       artifacts.diff({ assertion: "stepRoomTime", before, after, delta: after - before });
       break;

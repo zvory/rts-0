@@ -305,6 +305,19 @@ for (const spec of BUILDING_PNG_SPECS) {
   BUILDING_PNG_ATLASES.set(spec.kind, atlas(spec));
 }
 
+export const INDUSTRIAL_CENTRE_PNG_KEY = "resource_depot.industrial-centre";
+BUILDING_PNG_ATLASES.set(INDUSTRIAL_CENTRE_PNG_KEY, atlas(buildingSpec(
+  KIND.RESOURCE_DEPOT, 384, 384,
+  "/assets/rigs/industrial-centre-refinery/industrial-centre-atlas.png?v=1",
+  { emblem: true, visualScale: 1.1 },
+)));
+
+export function buildingPngRigKey(entity) {
+  return entity.kind === KIND.RESOURCE_DEPOT && entity.industrialCenter === true
+    ? INDUSTRIAL_CENTRE_PNG_KEY
+    : entity.kind;
+}
+
 export function createBuildingPngRigDefinitions() {
   return new Map(BUILDING_PNG_DEFINITIONS);
 }

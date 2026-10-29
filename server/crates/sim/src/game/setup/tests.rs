@@ -242,7 +242,7 @@ fn standard_starting_loadout_matches_phase0_inventory() {
         assert_eq!(player.oil, config::STARTING_OIL);
         assert_eq!(
             game.snapshot_for(player.id).supply_cap,
-            config::PLAYER_SUPPLY_CAP
+            config::STARTING_SUPPLY_CAP
         );
         assert_eq!(
             player.supply_used,

@@ -94,7 +94,12 @@ impl Game {
         let ps = self.player(player);
         let teams = self.team_relations();
         let (steel, oil, supply_used, supply_cap) = match ps {
-            Some(p) => (p.steel, p.oil, p.supply_used, config::PLAYER_SUPPLY_CAP),
+            Some(p) => (
+                p.steel,
+                p.oil,
+                p.supply_used,
+                p.supply_cap(&self.state.entities),
+            ),
             None => (0, 0, 0, 0),
         };
 
@@ -346,6 +351,7 @@ impl Game {
                     x: entry.x,
                     y: entry.y,
                     footprint: entry.footprint.iter().map(|&(tx, ty)| [tx, ty]).collect(),
+                    industrial_center: entry.industrial_center,
                     observed_tick: entry.observed_tick,
                 };
                 match views.iter_mut().find(|existing| existing.id == view.id) {
@@ -416,7 +422,7 @@ impl Game {
                 steel: player.steel,
                 oil: player.oil,
                 supply_used: player.supply_used,
-                supply_cap: config::PLAYER_SUPPLY_CAP,
+                supply_cap: player.supply_cap(&self.state.entities),
                 apm: self.current_apm(player.id),
                 upgrades: player
                     .upgrades

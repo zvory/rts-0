@@ -5,7 +5,7 @@ export const PRESENTATION_ENTITY_FIELDS = Object.freeze([
   "setupState", "setupFacing", "recoilPhase", "recoilProgress",
   "panzerfaustLoaded", "panzerfaustWindupProgress", "rocketRackCount",
   "breakthroughTicks", "breakthroughAuraTicks", "abilities",
-  "extractorActive",
+  "extractorActive", "industrialCenter",
   "orderPlan", "rally", "rallyPlan", "optimisticRally", "debugPath",
   "attackArcRad", "attackMinRangePx", "attackMinRangeTiles", "attackRangePx",
   "attackRangeTiles", "attackRangeProfile", "firingArcRad", "firingMinRangePx",

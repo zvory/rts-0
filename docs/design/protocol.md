@@ -390,7 +390,7 @@ transport/browser/prediction/render behavior, not as gameplay authority.
 | `matchCountdown` | `countdownId: u32`, `durationMs: u32`, `words: string[]` — reliable pre-match countdown sent to every lobby participant after the host starts and before `start`. Active human clients begin warming their renderer when they become ready, then acknowledge this exact nonzero countdown generation with `matchLoadReady` once warmup completes. During this interval the server keeps the room in lobby setup, disables `canStart`, freezes lobby edits, and rejects new joins. At expiry it sends `start` only if every active human acknowledged; otherwise it returns the room to editable lobby state and broadcasts `<name> failed to load the game.` Spectators and AI do not block launch. |
 | `start`    | `Game start payload` (see 2.3). |
 | `snapshot` | `Per-player snapshot` (see 2.4). |
-| `replayResourceHistory` | `replace: bool`, `samples: [{ tick: u32, steel: i64, oil: i64, aliveSteel: i64, aliveOil: i64 }]` — reliable replay-only collection and alive-resource advantage timeline for 1v1 viewers. A full replacement is sent on join and after seek; one sample is appended per replay second (`steel`/`oil`: trailing 8-second collection advantage; `aliveSteel`/`aliveOil`: lifetime mined minus destroyed value, first player minus second in ascending player-id order) during ordinary playback. Samples span from replay start through the current tick and are not subject to the latest-only observer-analysis lane. |
+| `replayResourceHistory` | `replace: bool`, `samples: [{ tick: u32, steel: i64, oil: i64, aliveSteel: i64, aliveOil: i64, lostSteel: i64, lostOil: i64, unitSteel: i64, unitOil: i64 }]` — reliable replay-only collection, alive-resource, destroyed-value, and current-army-value comparison timeline for 1v1 viewers. A full replacement is sent on join and after seek; one sample is appended per replay second (`steel`/`oil`: trailing 8-second collection advantage; `aliveSteel`/`aliveOil`: lifetime mined minus destroyed value, `lostSteel`/`lostOil`: cumulative destroyed unit and building value; `unitSteel`/`unitOil`: summed current unit value; all fields are first player minus second in ascending player-id order) during ordinary playback. Samples span from replay start through the current tick and are not subject to the latest-only observer-analysis lane. |
 | `groundDecals` | `requestId: u32`, `revision: u32`, `decals: GroundDecalView[]`, `tankTrails: TankTrailView[]` — reliable fog/observer-scoped delta response. `requestId` echoes the request so stale pre-seek or pre-view-change responses cannot enter the current cache. A trail row carries an immutable chunk `id` and sparse `[xQuarterPx, yQuarterPx, headingI16]` poses; these wire units remain stable even though historical poses are deliberately coarsened before projection. The server discloses a historical chunk when its indexed swept bounds first intersect current team vision. As an explicit best-effort-cosmetic exception to positional fog secrecy, the client may therefore hold nearby hidden tread geometry from that bounded chunk; no live entity or command state is included. It reconstructs and permanently rasterizes the approximate swept left/right tread footprint only inside individual currently visible map tiles. Ordinary decal rows carry `id`, `decalClass`, `sourceKind`, `x`, `y`, `owner`, `seed`, and optional `facing`, `weaponFacing`, or `radiusTiles`. |
 | `roomTimeState` | `Room-controlled time state` (see 2.6). |
 | `roomTimeSeekStarted` | `controllerId: u32`, `fromTick: u32`, `targetTick: u32` — reliable broadcast to every replay viewer immediately before an accepted shared replay seek resets timeline-derived presentation and begins incremental fast-forward. Rejected and rate-limited seeks do not emit it. |
@@ -407,6 +407,17 @@ transport/browser/prediction/render behavior, not as gameplay authority.
 | `pong`     | `ts: number` (echo of the ping ts) |
 | `commandReceipt` | `clientSeq: u32`, `serverTick: u32`, `accepted: bool`, `reason?: string` — reliable diagnostics-only room receipt. Does not reconcile prediction. |
 | `error`    | `msg: string` |
+
+Game-generated critical alerts reuse `chat` with `senderId: 0`, `senderName: "Game"`, and
+`channel: "all"`. Supply-cap and lost auto-production prerequisite warnings are delivered only
+to the owning active seat, never teammates or spectators, with an independent 30-second
+simulation-time cooldown per seat and warning (unit/prerequisite for production). Persistent
+blocked conditions may remind after the cooldown. Supply text uses actual used/cap values and
+recommends upgrading a Resource Depot while below the maximum cap. Industrial Center research
+starts broadcast `Color (Player name) has started upgrading a resource depot.` to every connection,
+including spectators, when paid research is first observed. Unpaid queued research does not announce.
+Starts cancelled or restarted within one tick may coalesce because detection samples active research
+after each tick. Only these public announcements enter replay chat; private economy warnings are excluded. No positional information is included.
 
 `LobbyPlayer`: `{ id: u32, teamId: u32, factionId: string, name: string, ready: bool, color: string, isAi: bool, aiProfileId?: string, isSpectator: bool }`. `isAi` is
 true for computer opponents (always shown ready; the client renders an "AI" tag, a host-only
@@ -668,7 +679,7 @@ and a tick-zero `GameCheckpointV1` text payload, plus ordered `players[]` with e
 loadoutId, startingSteel, startingOil }` record per player. Replay reconstruction restores the
 start `Game` from the checkpoint payload and then applies the authoritative `commandLog[]` on the
 recorded ticks. Its bounded ordered `chatLog[]` stores `{tick, senderId, senderName, channel, text}`
-for accepted in-game chat only; replay playback reliably emits each entry when the shared cursor
+for accepted in-game chat and public Game announcements; replay playback reliably emits each entry when the shared cursor
 reaches that tick. Seeking clears the client's transient chat presentation and positions the chat
 cursor after the target tick, so already-passed messages do not flood the screen and appear again
 only after rewinding before them and resuming. Both all-chat and formerly private team-chat are part
@@ -835,7 +846,10 @@ can validate direct attack commands or combat target acquisition until the firin
 Its reveal-only actionable tile is deliberately omitted from `visibleTiles` and does not enter
 `exploredTiles`; clients infer the explicit above-fog `shotReveal` presentation when a projected
 enemy unit occupies a presentation-dark tile. This keeps the unit fully legible without clearing
-the terrain tile beneath it.
+the terrain tile beneath it. An authoritative deployed AT gun presented above fog still draws its
+live threat cone from `setupFacing`. When the reveal expires without ordinary sight, the server
+projects its last observed arc in `rememberedAntiTankGuns` and the client draws the stale
+question-mark memory cone instead. Event-only shot ghosts do not provide authoritative live arcs.
 The expiration is calculated from the firing tick plus that gun's firing-cycle cooldown plus
 0.5 seconds (`TICK_HZ / 2`), not from a hardcoded wall-clock duration. The half-second counterfire
 reaction applies only while a firing-reveal-stamped tile is the target's necessary source of
@@ -958,7 +972,7 @@ Compact numeric codes:
 | `orderStage` | 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, 5 `build`, 6 `smoke`, 7 `setupAntiTankGuns`, 8 `charge`, 9 `mortarFire`, 10 `pointFire`, 11 `breakthrough`, 12 `ekatTeleport`, 13 `ekatLineShot`, 14 `ekatMagicAnchor`, 15 `deconstruct`, 16 `ekatConsumeGolem`, 17 `blanketFire`, 18 `dismissScoutPlane`, 19 `scoutPlane`, 20 `holdPosition`, 21 `barrage` |
 | `ability` | 1 `charge`, 2 `smoke`, 3 `mortarFire`, 4 `pointFire`, 5 `breakthrough`, 6 `ekatTeleport`, 7 `ekatLineShot`, 8 `ekatMagicAnchor`, 9 `ekatConsumeGolem`, 10 `blanketFire`, 11 `dismissScoutPlane`, 12 `scoutPlane`, 13 `barrage` |
 | `abilityObject.kind` | 1 `returnMarker`, 2 `magicAnchor`, 3 `lineProjectile` |
-| `upgrade` | 1 `methamphetamines`, 2 `anti_tank_gun_unlock`, 3 `tank_unlock`, 4 `artillery_unlock`, 7 `ballistic_tables`, 8 `entrenchment`, 9 `smoke_plus`, 10 `panzerfausts`, 11 `scout_plane_unlock`, 12 `rockets`, 13 `tank_plus` |
+| `upgrade` | 1 `methamphetamines`, 2 `anti_tank_gun_unlock`, 3 `tank_unlock`, 4 `artillery_unlock`, 7 `ballistic_tables`, 8 `entrenchment`, 9 `smoke_plus`, 10 `panzerfausts`, 11 `scout_plane_unlock`, 12 `rockets`, 13 `tank_plus`, 14 `industrial_center` |
 | `weaponKind` | 1 `worker_tools`, 2 `golem_fists`, 3 `rifleman_rifle`, 4 `machine_gunner_mg`, 5 `scout_car_mg`, 6 `anti_tank_gun`, 7 `panzerfaust_loaded_shot`, 8 `mortar_team_mortar`, 9 `artillery_gun`, 10 `tank_cannon`, 11 `tank_coax`, 12 `warrior_sword` |
 | `notice.severity` | 1 `info`, 2 `warn`, 3 `alert` |
 | `EventRecord` | `[1, from, to]` attack, `[1, from, to, reveal?, toPos?]` legacy attack with optional shooter reveal and target position, `[1, from, to, revealOrNull, toPosOrNull, weaponKind]` attack with compact weapon hint, `[2, id, x, y, kind]` death, `[3, id, kind]` build, `[4, msg]` notice, `[4, msg, severity]` position-free notice with severity, `[4, msg, severity, x, y]` positioned notice, `[5, [fromX, fromY], [toX, toY], delayTicks]` smoke launch, `[6, x, y, radiusTiles]` mortar impact/marker, `[6, x, y, radiusTiles, from?, reveal?]` mortar impact with optional shooter reveal, `[7, from, [x, y], radiusTiles, delayTicks]` artillery target marker, `[8, x, y, radiusTiles]` artillery impact, `[9, from, [fromX, fromY], [toX, toY], radiusTiles, delayTicks]` mortar launch, `[11, owner, x, y, facing]` global artillery firing minimap marker, `[12, from, [fromX, fromY], [toX, toY], delayTicks]` Panzerfaust launch, `[13, x, y]` Panzerfaust impact, `[15, to]` missed direct shot (14 removed with conversion) |
@@ -1164,6 +1178,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   targetId?: u32,                // current attack target, for drawing tracers
   weaponRangeTiles?: f32,        // owner/allied Tanks only; current authoritative weapon range
   occupiedTrenchId?: u32,        // visible eligible infantry only while actively stopped in a trench
+  industrialCenter?: boolean,    // completed local Resource Depot supply upgrade, public when visible
   rocketRackCount?: u8,           // 0–16 physical rounds; visible Rocket Trucks only
   panzerfaustLoaded?: bool,       // Panzerfaust units only; false after disposable launch
   panzerfaustWindupProgress?: f32,// Panzerfaust wind-up only; authoritative normalized 0..1 timing
@@ -1915,3 +1930,11 @@ rather than exposing hidden impact positions.
 Bursts that only hit traps or miss do not grant a shooter reveal; their rays are withheld
 from enemies when the shooter is concealed. Smoke-hidden shooters are also withheld.
 This can hide some firing feedback at fog edges; it never changes authoritative damage.
+
+Industrial Centers use `research {building, upgrade:"industrial_center"}` (upgrade code 14).
+Completion belongs to that Resource Depot and never enters player `upgrades`.
+`EntityView.industrialCenter` is appended at compact entity slot 44 (false/absent otherwise).
+Remembered buildings append `industrialCenter` at slot 7, using the last observed state;
+completion while unseen never updates enemy memory. Supply scalars and observer rows reflect
+Kriegsia’s 100 base +100 per living completed center, clamped at 300; other factions retain 300. Queue/payment details keep their
+existing owner/allied visibility. Two completed or pending upgrades reserve both available slots.

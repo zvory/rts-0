@@ -152,7 +152,6 @@ function visibleEnemyAntiTankGunThreats(
     entity?.setupState === SETUP.DEPLOYED &&
     !entity?.visionOnly &&
     !entity?.shotReveal &&
-    !entity?.aboveFogReveal &&
     isThreatEnemyOwner(state?.players, perspectivePlayerId, entity?.owner));
   const liveIds = new Set(liveThreats.map((entity) => Number(entity.id)));
   const staleThreats = arrayOrEmpty(rememberedThreats).filter((memory) =>
@@ -170,8 +169,7 @@ function spectatorAntiTankGunThreats(players, entities, rememberedThreats) {
     entity?.kind === KIND.ANTI_TANK_GUN &&
     entity?.setupState === SETUP.DEPLOYED &&
     !entity?.visionOnly &&
-    !entity?.shotReveal &&
-    !entity?.aboveFogReveal);
+    !entity?.shotReveal);
   const liveIds = new Set(liveThreats.map((entity) => Number(entity.id)));
   const staleThreats = arrayOrEmpty(rememberedThreats).filter((memory) =>
     !liveIds.has(Number(memory?.id)));

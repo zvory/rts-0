@@ -26,7 +26,7 @@ export function renderObserverAnalysisBody(overlay, tab, frameViews, ids, { prof
   } else if (tab.id === ids.research) {
     replace(analysisSig, () => overlay.renderResearch(overlay.analysis));
   } else if (tab.id === ids.units) {
-    replace(analysisSig, () => overlay.renderUnits(overlay.analysis));
+    replace(`${analysisSig}|history:${overlay.resourceCollectionHistory.revision}`, () => overlay.renderUnits(overlay.analysis));
   } else if (tab.id === ids.resources) {
     replace(`${analysisSig}|history:${overlay.resourceCollectionHistory.revision}`, () => overlay.renderResources(overlay.analysis));
   } else if (tab.id === ids.aliveResources) {
@@ -34,7 +34,7 @@ export function renderObserverAnalysisBody(overlay, tab, frameViews, ids, { prof
   } else if (tab.id === ids.unitsLost) {
     replace(analysisSig, () => overlay.renderUnitsLost(overlay.analysis));
   } else if (tab.id === ids.resourcesLost) {
-    replace(analysisSig, () => overlay.renderResourcesLost(overlay.analysis));
+    replace(`${analysisSig}|history:${overlay.resourceCollectionHistory.revision}`, () => overlay.renderResourcesLost(overlay.analysis));
   } else {
     replace("placeholder", () => overlay.renderPlaceholder(tab));
   }

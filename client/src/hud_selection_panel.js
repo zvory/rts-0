@@ -424,7 +424,7 @@ export class HudSelectionPanel {
       : "";
 
     node.innerHTML =
-      `<div class="sel-name">${st.label || e.kind}</div>` +
+      `<div class="sel-name">${e.industrialCenter ? "Industrial Center" : (st.label || e.kind)}</div>` +
       hpHtml +
       (unitsKilledHtml || (entityIdHtml ? `<div class="sel-stat">${entityIdHtml}</div>` : "")) +
       armorHtml +
@@ -497,6 +497,7 @@ function selectionDetailSignature(entity, state = null) {
     resource ? `${resource.kind}:${formatResourceRemaining(resource.remaining)}` : "",
     sigValue(entity.prodQueue),
     sigValue(entity.prodKind),
+    sigValue(entity.industrialCenter),
     sigValue(entity.prodUpgrade),
     productionPct,
     entity.prodWaiting ? 1 : 0,

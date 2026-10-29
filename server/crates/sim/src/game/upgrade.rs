@@ -23,6 +23,14 @@ pub fn researchable_upgrades(building: EntityKind) -> Vec<UpgradeKind> {
 pub fn definition(kind: UpgradeKind) -> UpgradeDefinition {
     let catalog = crate::rules::faction::upgrade_definition(kind);
     match kind {
+        UpgradeKind::IndustrialCenter => UpgradeDefinition {
+            kind,
+            researched_at: catalog.researched_at,
+            requires_upgrade: None,
+            cost_steel: crate::config::INDUSTRIAL_CENTER_COST_STEEL,
+            cost_oil: crate::config::INDUSTRIAL_CENTER_COST_OIL,
+            research_ticks: crate::config::INDUSTRIAL_CENTER_RESEARCH_TICKS,
+        },
         UpgradeKind::Methamphetamines => UpgradeDefinition {
             kind,
             researched_at: catalog.researched_at,

@@ -588,12 +588,24 @@ fn anti_tank_gun_firing_reveal_lasts_six_and_a_half_seconds() {
         fired_at_tick + reveal_ticks - 1,
         "test should stop on the final active reveal tick"
     );
+    let revealed = game.snapshot_for(1);
+    let live = revealed
+        .entities
+        .iter()
+        .find(|entity| entity.id == enemy_at)
+        .expect("firing reveal should project the live AT gun");
+    let live_arc = (
+        live.x,
+        live.y,
+        live.setup_facing
+            .expect("live cone needs fixed setup facing"),
+    );
     assert!(
-        game.snapshot_for(1)
-            .entities
+        revealed
+            .remembered_anti_tank_guns
             .iter()
-            .any(|entity| entity.id == enemy_at),
-        "AT gun should remain visible through the full 6.5-second reveal window"
+            .all(|memory| memory.id != enemy_at),
+        "live firing reveal should replace the memory cone"
     );
 
     game.tick();
@@ -610,11 +622,14 @@ fn anti_tank_gun_firing_reveal_lasts_six_and_a_half_seconds() {
         !hidden.entities.iter().any(|entity| entity.id == enemy_at),
         "AT gun should disappear from snapshots once the firing reveal expires"
     );
-    assert!(
-        hidden
-            .remembered_anti_tank_guns
-            .iter()
-            .any(|memory| memory.id == enemy_at),
-        "an expired firing reveal should leave authoritative stale AT-gun memory"
+    let memory = hidden
+        .remembered_anti_tank_guns
+        .iter()
+        .find(|memory| memory.id == enemy_at)
+        .expect("an expired firing reveal should leave authoritative stale AT-gun memory");
+    assert_eq!(
+        (memory.x, memory.y, memory.facing),
+        live_arc,
+        "memory cone should preserve the last live position and fixed setup facing"
     );
 }

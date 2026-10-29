@@ -355,6 +355,9 @@ impl WeaponSetup {
 /// Production queue state. Present only on buildings that can train units.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ProductionState {
+    /// Completed local supply upgrade; preserved with this depot in checkpoints.
+    #[serde(default)]
+    pub industrial_center: bool,
     /// FIFO production queue (front = item being produced).
     pub queue: Vec<ProdItem>,
     /// FIFO research queue (front = item being researched).

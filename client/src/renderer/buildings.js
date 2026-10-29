@@ -11,6 +11,7 @@ import {
 import { buildingRigDefinitionFor } from "./rigs/building_routing.js";
 import {
   buildingPngRigAtlasFor,
+  buildingPngRigKey,
   buildingPngRigDefinitionFor,
 } from "./rigs/building_png.js";
 import { isConstructionScaffold } from "./entity_state.js";
@@ -73,12 +74,13 @@ export function _drawBuilding(e, colorByOwner, state) {
   const pngDefinition = e.kind === KIND.TANK_TRAP
     ? null
     : buildingPngRigDefinitionFor(this._buildingPngRigDefinitions, e.kind);
+  const pngKey = buildingPngRigKey(e);
   const pngAtlas = e.kind === KIND.TANK_TRAP
     ? null
-    : buildingPngRigAtlasFor(this._buildingPngRigAtlasesByKind, e.kind);
+    : buildingPngRigAtlasFor(this._buildingPngRigAtlasesByKind, pngKey);
   const pngAtlasTexture = e.kind === KIND.TANK_TRAP
     ? null
-    : this._buildingPngRigAtlasTextures?.get?.(e.kind) ?? null;
+    : this._buildingPngRigAtlasTextures?.get?.(pngKey) ?? null;
   const usePngRig = !!(pngDefinition && pngAtlas && pngAtlasTexture);
   const definition = usePngRig ? pngDefinition : svgDefinition;
 
@@ -120,7 +122,7 @@ export function _drawBuilding(e, colorByOwner, state) {
   const bodyKey = e.kind === KIND.TANK_TRAP
     ? `tankTrap|${e.x}|${e.y}|${ts}|${e.id}|${bodyAlpha}`
     : definition
-      ? `${usePngRig ? "png" : "rig"}|${e.kind}`
+      ? `${usePngRig ? "png" : "rig"}|${pngKey}`
       : `fallback|${e.kind}|${e.x}|${e.y}|${w}|${h}|${bodyAlpha}|${tint}`;
   const g = this._staticSlot?.("buildings", e.id, bodyKey)
     || this._slot("buildings", e.id);

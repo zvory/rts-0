@@ -371,6 +371,7 @@ mod tests {
 
     fn owned_entity(id: u32, kind: EntityKind, state: AiEntityState) -> AiEntitySummary {
         AiEntitySummary {
+            industrial_center_slot_reserved: false,
             id,
             owner: 1,
             kind,

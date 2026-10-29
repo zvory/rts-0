@@ -75,7 +75,7 @@ const { ok } = assertions;
      `server sends compact v${COMPACT_SNAPSHOT_VERSION} snapshot frames`);
   ok(snap.steel === 25, `A starts with 25 steel (${snap.steel})`);
   ok(snap.oil === 0, `A starts with 0 oil (${snap.oil})`);
-  ok(snap.supplyCap === 300, `A intrinsic supply cap = 300 (${snap.supplyCap})`);
+  ok(snap.supplyCap === 100, `A starting supply cap = 100 (${snap.supplyCap})`);
   ok(snap.supplyUsed === 5, `A supply used = 5 (${snap.supplyUsed})`);
   ok(snap.netStatus?.predictionVersion === 1 && snap.netStatus?.lastSimConsumedClientSeq === 0,
      `prediction ACK fields start at zero (v=${snap.netStatus?.predictionVersion}, seq=${snap.netStatus?.lastSimConsumedClientSeq})`);

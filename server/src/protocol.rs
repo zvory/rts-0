@@ -1,8 +1,8 @@
-// replayResourceHistory samples carry signed steel/oil collection and aliveSteel/aliveOil lifetime-minus-loss advantages.
+// replayResourceHistory samples carry signed steel/oil collection and aliveSteel/aliveOil lifetime-minus-loss advantages, lostSteel/lostOil destroyed-value differences, and unitSteel/unitOil current-army-value differences.
 //! Server-shell adapter for the extracted protocol crate.
 //!
 //! Keeps existing `rts_server::protocol` call sites stable while wire protocol DTOs live in
-//! `rts_protocol` (including public Rocket Truck rack counts) and rules-aware kind conversion lives in the simulation adapter.
+//! `rts_protocol` (including public Rocket Truck rack counts and Industrial Center state) and rules-aware kind conversion lives in the simulation adapter.
 
 pub use rts_protocol::*;
 pub use rts_sim::protocol::{kind_from_wire, kind_to_wire};

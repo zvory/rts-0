@@ -5,6 +5,7 @@ const TILE: f32 = 32.0;
 
 fn rifleman(id: u32, owner: u32, tile_x: f32, tile_y: f32, hp: u32) -> AiEntitySummary {
     AiEntitySummary {
+        industrial_center_slot_reserved: false,
         id,
         owner,
         kind: SQUAD_KIND,

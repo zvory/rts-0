@@ -603,9 +603,12 @@ to one fully extracting base over that window (144 Steel or 36 Oil). Backward re
 truncate future samples before rebuilding the timeline. Alive Resources subtracts destroyed-unit and destroyed-building steel/oil value from
 lifetime mined resources; because starting resources are not lifetime mined income, the derived
 value can be negative. For 1v1s it also renders steel and oil advantage charts using that
-lifetime-minus-loss difference, with a symmetric Y extent fitted to the history. Both tabs use
+lifetime-minus-loss difference, with a symmetric Y extent fitted to the history. Resources Lost uses the cumulative destroyed-value difference, and Units uses the summed steel/oil
+value of current units (including economy units, excluding buildings). These four tabs share one
+metric-configured chart renderer and sample history. Positive destroyed value means more losses,
+not a better position. All four tabs use
 reliable server-authored one-second replay samples, replaced on join and seek; live spectators
-accumulate samples from observer analysis. History arrival invalidates either tab independently
+accumulate samples from observer analysis. History arrival invalidates each tab independently
 of the latest analysis payload.
 Research groups
 completed permanent upgrades by player, retaining an explicit empty row when a player has
@@ -2773,3 +2776,11 @@ When that launch produces an all-AI live match, the score screen retains the liv
 through automatic post-match replay playback and renders it as an Observation ID. The id is the
 handoff key for replay recovery and server lag-log inspection; it is not a player identity or a
 new gameplay control.
+
+Industrial Centers retain the Resource Depot kind and footprint. The research command card upgrades
+one selected completed depot; completed/pending centers lock out further upgrades at two.
+The renderer receives the public `industrialCenter` physical flag through presentation snapshots
+and selects the simplified Refinery Works PNG atlas for completed upgrades. Its neutral-white
+paint receives the owning team color; the ordinary depot retains its worksite atlas. There is no
+gold footprint rim. The atlas variant participates in body cache identity and normal rig teardown.
+Fog memory uses the last observed flag. Dedicated audio is deferred.

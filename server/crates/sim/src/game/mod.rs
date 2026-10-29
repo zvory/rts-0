@@ -13,6 +13,8 @@ pub(crate) mod ability_projectile;
 mod ability_projection;
 pub(crate) mod ability_runtime;
 mod analysis;
+mod critical_events;
+pub use critical_events::PlayerCriticalEventState;
 mod anti_tank_gun_memory;
 mod apm;
 mod artillery;

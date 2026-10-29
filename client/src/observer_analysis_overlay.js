@@ -16,6 +16,8 @@ import {
   normalizeResourceWindows,
   renderAliveResourcesMetric,
   renderResourcesMetric,
+  renderResourcesLostMetric,
+  renderMetricAdvantage,
 } from "./observer_analysis_resources.js";
 import { renderResearchMetric } from "./observer_analysis_research.js";
 import { renderObserverAnalysisBody } from "./observer_analysis_signatures.js";
@@ -289,7 +291,7 @@ export class ObserverAnalysisOverlay {
 
   applyReplayResourceHistory(payload) {
     this.resourceCollectionHistory.applyReplaySamples(payload);
-    if (this.bodyEl && !this.bodyEl.hidden && [RESOURCES_TAB_ID, ALIVE_RESOURCES_TAB_ID].includes(this.preferences.selectedTab)) {
+    if (this.bodyEl && !this.bodyEl.hidden && [RESOURCES_TAB_ID, ALIVE_RESOURCES_TAB_ID, RESOURCES_LOST_TAB_ID, UNITS_TAB_ID].includes(this.preferences.selectedTab)) {
       this.renderBody(OBSERVER_ANALYSIS_TABS.find((tab) => tab.id === this.preferences.selectedTab));
     }
   }
@@ -367,7 +369,7 @@ export class ObserverAnalysisOverlay {
     for (const player of rows) {
       if (!player.production.length) continue;
       wrap.appendChild(this.renderPlayerHeading(player));
-      for (const item of player.production) {
+      for (const item of groupConstructionRows(player.production)) {
         const row = document.createElement("div");
         row.className = "replay-production-row";
 
@@ -378,15 +380,13 @@ export class ObserverAnalysisOverlay {
         const main = document.createElement("span");
         main.className = "replay-production-main";
         const itemLabel = itemLabelFor(item.itemKind, item.itemType, this.stats);
-        const buildingLabel = kindLabel(item.buildingKind, this.stats);
-        main.textContent = item.itemType === "building"
-          ? `Constructing ${itemLabel}`
-          : `${itemLabel} at ${buildingLabel}`;
+        main.textContent = item.count > 1 ? `${itemLabel} ×${item.count}` : itemLabel;
 
         const progress = document.createElement("span");
         progress.className = "replay-production-progress";
         progress.textContent = `${formatPercent(item.progress)}%`;
-        progress.title = item.itemType === "building" ? "Construction progress" : "Production progress";
+        progress.title = item.count > 1 ? "Average construction progress"
+          : item.itemType === "building" ? "Construction progress" : "Production progress";
 
         const queue = document.createElement("span");
         queue.className = "replay-production-queue";
@@ -409,6 +409,7 @@ export class ObserverAnalysisOverlay {
       wrap.appendChild(renderEmptyMetric("Waiting for observer analysis"));
       return wrap;
     }
+    wrap.appendChild(renderMetricAdvantage({ rows, samples: this.resourceCollectionHistory.samples, currentTick: analysis.tick, metric: "units" }));
     if (!rows.some((row) => row.units.length > 0)) {
       wrap.appendChild(renderEmptyMetric("No units"));
       return wrap;
@@ -529,45 +530,9 @@ export class ObserverAnalysisOverlay {
   }
 
   renderResourcesLost(analysis) {
-    const wrap = this.renderAnalysisMetric("replay-resources-lost", "Destroyed resource value");
-    const note = document.createElement("div");
-    note.className = "replay-analysis-note";
-    note.textContent = "Spent steel and oil value of units and buildings that were destroyed. Cancelled queues, refunds, harvesting, and stockpile changes are excluded.";
-    wrap.appendChild(note);
-
-    const rows = playerAnalysisRows({ analysis, players: this.getPlayers() });
-    if (!analysis) {
-      wrap.appendChild(renderEmptyMetric("Waiting for observer analysis"));
-      return wrap;
-    }
-    if (!rows.length) {
-      wrap.appendChild(renderEmptyMetric("No players"));
-      return wrap;
-    }
-
-    const total = rows.reduce((acc, player) => {
-      acc.steel += player.resourcesLost.steel;
-      acc.oil += player.resourcesLost.oil;
-      return acc;
-    }, { steel: 0, oil: 0 });
-    wrap.appendChild(renderResourceLostRow({
-      className: "replay-resources-lost-row is-total",
-      name: "Total",
-      color: "#e7dfc5",
-      steel: total.steel,
-      oil: total.oil,
-    }));
-
-    for (const player of rows) {
-      wrap.appendChild(renderResourceLostRow({
-        className: "replay-resources-lost-row",
-        name: player.name,
-        color: player.color,
-        steel: player.resourcesLost.steel,
-        oil: player.resourcesLost.oil,
-      }));
-    }
-    return wrap;
+    return renderResourcesLostMetric({
+      analysis, players: this.getPlayers(), collectionHistory: this.resourceCollectionHistory.samples,
+    });
   }
 
   renderAnalysisMetric(className, headingText) {
@@ -669,6 +634,28 @@ function normalizeKindRows(rows) {
   })).filter((row) => row.kind && row.count > 0);
 }
 
+// Keep producer queues separate; combine matching construction sites per player.
+function groupConstructionRows(rows) {
+  const result = [];
+  const construction = new Map();
+  for (const item of rows) {
+    if (item.itemType !== "building") {
+      result.push(item);
+      continue;
+    }
+    let group = construction.get(item.itemKind);
+    if (!group) {
+      group = { ...item, count: 0, progress: 0 };
+      construction.set(item.itemKind, group);
+      result.push(group);
+    }
+    group.count += 1;
+    group.progress += item.progress;
+  }
+  for (const group of construction.values()) group.progress /= group.count;
+  return result;
+}
+
 function normalizeProductionRows(rows) {
   if (!Array.isArray(rows)) return [];
   return rows.map((row) => ({
@@ -711,25 +698,6 @@ function renderUnitRow({ className, icon, label, count, steel, oil }) {
   return row;
 }
 
-function renderResourceLostRow({ className, name, color, steel, oil }) {
-  const row = document.createElement("div");
-  row.className = className;
-
-  const swatch = document.createElement("span");
-  swatch.className = "replay-analysis-player-swatch";
-  swatch.setAttribute("style", `background:${safeCssColor(color)};`);
-  swatch.setAttribute("aria-hidden", "true");
-
-  const nameEl = document.createElement("span");
-  nameEl.className = "replay-resources-lost-name";
-  nameEl.textContent = name;
-
-  const steelEl = resourceValueElement("steel", steel, "replay-resources-lost-steel");
-  const oilEl = resourceValueElement("oil", oil, "replay-resources-lost-oil");
-
-  row.append(swatch, nameEl, steelEl, oilEl);
-  return row;
-}
 
 function compareKindRows(stats) {
   return (a, b) => {

@@ -229,6 +229,7 @@ fn a_push_in_ranks_is_as_cohesive_as_its_ranks_allow() {
             let rank = (index / 6) as f32;
             let file = (index % 6) as f32;
             AiEntitySummary {
+                industrial_center_slot_reserved: false,
                 id: index + 1,
                 owner: 1,
                 kind: EntityKind::Tank,

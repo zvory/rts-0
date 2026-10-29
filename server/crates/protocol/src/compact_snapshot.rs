@@ -486,7 +486,8 @@ impl Serialize for CompactRememberedBuilding<'_> {
         S: Serializer,
     {
         let building = self.0;
-        let mut seq = serializer.serialize_seq(Some(7))?;
+        let mut seq =
+            serializer.serialize_seq(Some(if building.industrial_center { 8 } else { 7 }))?;
         seq.serialize_element(&building.id)?;
         seq.serialize_element(&building.owner)?;
         seq.serialize_element(&kind_code(&building.kind))?;
@@ -494,6 +495,9 @@ impl Serialize for CompactRememberedBuilding<'_> {
         seq.serialize_element(&building.y)?;
         seq.serialize_element(&building.footprint)?;
         seq.serialize_element(&building.observed_tick)?;
+        if building.industrial_center {
+            seq.serialize_element(&true)?;
+        }
         seq.end()
     }
 }
@@ -786,6 +790,9 @@ impl Serialize for CompactEntity<'_> {
             len = 44;
         }
 
+        if entity.industrial_center {
+            len = 45;
+        }
         let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&entity.id)?;
         seq.serialize_element(&entity.owner)?;
@@ -932,6 +939,9 @@ impl Serialize for CompactEntity<'_> {
         }
         if len > 43 {
             seq.serialize_element(&entity.rocket_rack_count)?;
+        }
+        if len > 44 {
+            seq.serialize_element(&entity.industrial_center)?;
         }
         seq.end()
     }

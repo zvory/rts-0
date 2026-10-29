@@ -366,6 +366,7 @@ pub fn project_entity(
                 .any(|item| item.unit == EntityKind::ScoutPlane);
         }
     }
+    view.industrial_center = entity.is_industrial_center();
     if entity.is_building() && !entity.research_queue().is_empty() {
         if let Some(front) = entity.research_queue().first() {
             view.prod_upgrade = Some(front.upgrade.to_protocol_str().to_string());
