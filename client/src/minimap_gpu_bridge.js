@@ -93,8 +93,8 @@ export class MinimapGpuBridge {
       recoilKind: state.weaponRecoilKind?.(entity.id) || null });
   }
 
-  buildingOutlineChanged(entities, size) {
-    const signature = `${size}|${entities.map(e => `${e.id}:${e.x}:${e.y}:${e.kind}`).join("|")}`;
+  buildingOutlineChanged(entities, minimap) {
+    const signature = `${minimap.size}:${minimap._scale}:${minimap._offX}:${minimap._offY}|${entities.map(e => `${e.id}:${e.x}:${e.y}:${e.kind}`).join("|")}`;
     const changed = signature !== this.buildingSignature;
     this.buildingSignature = signature;
     return changed;

@@ -35,6 +35,11 @@ export class MinimapGpuAssets {
       }
     }
     const canvas = source.canvas || image;
+    // Canvas resizing clears pixels without calling a drawing method. Give that change a
+    // revision too, so host/worker revision caches cannot retain the old dimensions.
+    if (source.snapshot && (source.snapshot.fullWidth !== canvas.width || source.snapshot.fullHeight !== canvas.height)) {
+      source.revision++;
+    }
     if (!source.snapshot || source.snapshot.revision !== source.revision
       || source.snapshot.fullWidth !== canvas.width || source.snapshot.fullHeight !== canvas.height) {
       const pixels = source.context.getImageData(0, 0, canvas.width, canvas.height);

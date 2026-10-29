@@ -10,6 +10,13 @@ export class MinimapGpuTextures {
     for (const image of images) {
       let record = this.images.get(image.id);
       if (record?.revision === image.revision) continue;
+      if (record && (record.width !== image.width || record.height !== image.height)) {
+        // Fog/map canvases can change shape without changing minimap backing size.
+        // Atlas slots are immutable; mutable raster layers use standalone textures.
+        record.texture.destroy(!record.page);
+        this.images.delete(image.id);
+        record = null;
+      }
       if (!record) {
         const slot = image.atlas && image.width + 4 <= 2048 && image.height + 4 <= 2048
           ? this._slot(image.width, image.height) : this._standalone(image.width, image.height);
@@ -22,6 +29,8 @@ export class MinimapGpuTextures {
           offsetX: image.offsetX || 0, offsetY: image.offsetY || 0 };
         this.images.set(image.id, record);
       }
+      record.fullWidth = image.fullWidth; record.fullHeight = image.fullHeight;
+      record.offsetX = image.offsetX; record.offsetY = image.offsetY;
       if (!record.page) record.texture.source.scaleMode = image.smooth === false ? "nearest" : "linear";
       record.context.putImageData(new ImageData(new Uint8ClampedArray(image.pixels.buffer,
         image.pixels.byteOffset, image.pixels.byteLength), image.width, image.height), record.x, record.y);

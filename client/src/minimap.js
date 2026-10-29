@@ -713,14 +713,14 @@ export class Minimap {
 
   _drawPlayerOwnedEntityOutline(entities) {
     if (!Array.isArray(entities)) return;
-    entities = entities.filter(e => isBuilding(e.kind));
-    if (!entities.some((e) => this._isForegroundPlayerMinimapEntity(e))) return;
+    entities = entities.filter(e => isBuilding(e.kind) && this._isForegroundPlayerMinimapEntity(e));
+    if (!entities.length) return;
 
     const layer = this._ensurePlayerBlipMaskLayer();
     if (!layer) return;
 
     const { canvas, ctx: maskCtx } = layer;
-    if (!this._gpuBridge || this._gpuBridge.buildingOutlineChanged(entities, this.size)) {
+    if (!this._gpuBridge || this._gpuBridge.buildingOutlineChanged(entities, this)) {
       maskCtx.clearRect(0, 0, this.size, this.size);
       for (const e of entities) {
         if (!this._isForegroundPlayerMinimapEntity(e)) continue;
