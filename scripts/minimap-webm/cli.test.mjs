@@ -159,3 +159,145 @@ test('articulated minimap layers follow live facing and setup without loading ea
   assert.equal(packed.match(/viewBox="[^"]*"/)[0], deployed.match(/viewBox="[^"]*"/)[0]);
   icons.destroy();
 });
+
+import { createMinimapAnimation } from '../../client/src/renderer/rigs/minimap_animation.js';
+test('live minimap primes animation frames before the first setup or firing transition', async () => {
+  const animation = createMinimapAnimation();
+  const requested = [];
+  const icons = new MinimapUnitIcons({ animation,
+    createCanvas: () => ({ width: 0, height: 0, getContext: () => ({ drawImage() {}, fillRect() {} }) }),
+    loadImage: async (kind, color, { minimapPart }) => {
+      requested.push(minimapPart);
+      return { width: 128, height: 128 };
+    },
+  });
+  let draws = 0;
+  const context = { globalAlpha: 1, save() {}, restore() {}, translate() {}, rotate() {}, scale() {},
+    drawImage() { draws++; } };
+  const entity = { id: 1, kind: 'machine_gunner', setupState: 'packed' };
+  icons.beginFrame([entity], {}, 0);
+  icons.draw(context, entity, '#0072b2', { x: 0, y: 0 }, 480);
+  await Promise.all([...icons.entries.values()].map(entry => entry.promise));
+  assert.deepEqual(requested, animation.parts(entity.kind), 'first live draw loads every bounded frame');
+  entity.setupState = 'deployed';
+  icons.beginFrame([entity], { weaponRecoil: () => 1, weaponRecoilPhase: () => 0.5 }, 100);
+  icons.draw(context, entity, '#0072b2', { x: 0, y: 0 }, 480);
+  assert.equal(draws, 1, 'the first firing frame draws immediately without capture preparation');
+  assert.equal(requested.length, animation.parts(entity.kind).length);
+  icons.destroy();
+  assert.equal(icons.primedAnimations.size, 0);
+});
+
+test('minimap uses production setup frames and shot envelopes, with a bounded image cache', async () => {
+  const animation = createMinimapAnimation();
+  let recoil = 0, phase = 0;
+  const state = { weaponRecoil: () => recoil, weaponRecoilPhase: () => phase,
+    weaponRecoilKind: () => 'rifleman_rifle' };
+  const mg = { id: 1, kind: 'machine_gunner', facing: 1, weaponFacing: 2, setupState: 'packed' };
+  const sample = now => { animation.beginFrame([mg], state, now); return animation.layers(mg); };
+  assert.equal(sample(0)[0].part, 'frame:0');
+  mg.setupState = 'setting_up';
+  assert.equal(sample(100)[0].part, 'frame:6');
+  assert.equal(sample(600)[0].part, 'frame:9');
+  mg.setupState = 'deployed';
+  assert.equal(sample(1100)[0].part, 'frame:11');
+  assert.equal(sample(1100)[0].rotation, 2 - Math.PI / 2);
+  recoil = 1; phase = 0.5;
+  assert.equal(sample(1150)[0].part, 'frame:13');
+  recoil = 0;
+  mg.setupState = 'tearing_down';
+  assert.equal(sample(1200)[0].part, 'frame:11');
+  assert.equal(sample(1700)[0].part, 'frame:9');
+  assert.equal(sample(2200)[0].part, 'frame:6');
+  const tank = { id: 2, kind: 'tank', facing: 0.3, weaponFacing: 1.2 };
+  animation.beginFrame([tank], state, 2300);
+  const resting = animation.layers(tank);
+  recoil = 1;
+  animation.beginFrame([tank], state, 2310);
+  const firing = animation.layers(tank);
+  assert.notDeepEqual(firing, resting, 'recoil moves the hull/turret and retracts the barrel');
+  assert.equal(firing.find(layer => layer.part.includes('barrel')).rotation, 1.2);
+  const requested = [];
+  const icons = new MinimapUnitIcons({ animation,
+    createCanvas: () => ({ width: 0, height: 0, getContext: () => ({ drawImage() {}, fillRect() {} }) }),
+    loadImage: async (kind, color, { minimapPart }) => {
+      requested.push(minimapPart);
+      assert.match(liveUnitIconMarkupFor(kind, { minimapPart }), /<image/);
+      return { width: 128, height: 128 };
+    },
+  });
+  await icons.prepare([{ kind: 'tank', color: '#0072b2' }, { kind: 'machine_gunner', color: '#0072b2' }]);
+  const count = requested.length;
+  let visibleDraws = 0;
+  const context = { globalAlpha: 1, save() {}, restore() {}, translate() {}, rotate() {}, scale() {}, drawImage() { visibleDraws++; } };
+  for (let i = 0; i < 50; i++) {
+    tank.weaponFacing = i / 7; recoil = i / 50;
+    icons.beginFrame([tank], state, 2400 + i);
+    icons.draw(context, tank, '#0072b2', { x: 0, y: 0 }, 480);
+  }
+  assert.equal(requested.length, count, 'angles and recoil never create image variants');
+  assert.equal(visibleDraws, 50 * 3, 'empty tracks never issue a Canvas draw');
+  icons.destroy();
+});
+
+test('all production atlas and strip minimap routes can sample each setup state', () => {
+  const animation = createMinimapAnimation();
+  const kinds = ['rifleman', 'panzerfaust', 'machine_gunner', 'anti_tank_gun', 'mortar_team',
+    'artillery', 'scout_car', 'tank', 'command_car', 'rocket_launcher', 'scout_plane'];
+  for (const kind of kinds) for (const setupState of ['packed', 'setting_up', 'deployed', 'tearing_down']) {
+    const entity = { id: 1, kind, setupState, facing: 0.4, weaponFacing: 1.1 };
+    animation.beginFrame([entity], { weaponRecoil: () => 1, weaponRecoilPhase: () => 0.2 }, 100);
+    const layers = animation.layers(entity);
+    assert.ok(layers.length > 0, `${kind} ${setupState}`);
+    const parts = animation.parts(kind);
+    for (const layer of layers) {
+      assert.ok(parts.includes(layer.part));
+      for (const field of ['rotation', 'x', 'y', 'scaleX', 'scaleY', 'alpha']) {
+        assert.ok(Number.isFinite(layer[field]), `${kind} ${field}`);
+      }
+    }
+  }
+  animation.destroy();
+});
+
+
+test('animated strip images retain full setup silhouettes and switch unloaded Panzerfaust art', () => {
+  const markup = liveUnitIconMarkupFor('machine_gunner', { minimapPart: 'frame:11' });
+  assert.match(markup, /viewBox="1408 0 128 128"/,
+    'deployed heads and barrels must not be clipped to the carry portrait bounds');
+  const animation = createMinimapAnimation();
+  const entity = { id: 1, kind: 'panzerfaust', panzerfaustLoaded: false };
+  animation.beginFrame([entity], {}, 0);
+  assert.equal(animation.layers(entity)[0].part, 'unloaded-frame:0');
+  const unloaded = liveUnitIconMarkupFor('panzerfaust', { minimapPart: 'unloaded-frame:0' });
+  assert.match(unloaded, /rifleman-recoil-review-strip/);
+  entity.panzerfaustLoaded = true;
+  animation.beginFrame([entity], {}, 0);
+  assert.equal(animation.layers(entity)[0].part, 'frame:0');
+  animation.destroy();
+});
+
+
+test('minimap tank omits only atlas cells declared and verified transparent', async () => {
+  const { PNG } = await import('pngjs');
+  const { createLivePngRigAtlases } = await import('../../client/src/renderer/rigs/png_routing.js');
+  const { createMinimapAnimation } = await import('../../client/src/renderer/rigs/minimap_animation.js');
+  const atlas = createLivePngRigAtlases().get('tank');
+  const image = PNG.sync.read(fs.readFileSync(new URL(`../../client${atlas.image}`, import.meta.url)));
+  const blank = new Set(atlas.grid.normalization.blankCells);
+  const animation = createMinimapAnimation();
+  const parts = animation.parts('tank');
+  assert.equal(parts.length, 3, 'retain hull, turret and the visible independent barrel');
+  for (const sprite of atlas.sprites) {
+    const { x, y, w, h } = sprite.frame;
+    let visible = false;
+    for (let row = y; row < y + h && !visible; row++) {
+      for (let col = x; col < x + w; col++) {
+        if (image.data[(row * image.width + col) * 4 + 3]) { visible = true; break; }
+      }
+    }
+    assert.equal(visible, !blank.has(sprite.sourceCell), `${sprite.id} matches blank-cell metadata`);
+    assert.equal(parts.includes(`sprite:${sprite.id}`), visible);
+  }
+  animation.destroy();
+});

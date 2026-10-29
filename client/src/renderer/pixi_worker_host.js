@@ -126,7 +126,13 @@ export class PixiWorkerPresentationAdapter {
       snapshot: () => this.diagnostics(),
     };
     globalThis.__rtsRenderWorkerControl = this._control;
-    this._publishStats();
+    // Sorting timing histories belongs to diagnostics reads, not the frame path.
+    this._statsGetter = () => this._publicStats();
+    Object.defineProperty(globalThis, "__rtsRenderWorkerStats", {
+      configurable: true,
+      enumerable: true,
+      get: this._statsGetter,
+    });
   }
 
   render(frame) {
@@ -295,8 +301,16 @@ export class PixiWorkerPresentationAdapter {
     }
     this._teardownWorker();
     this._stats.destroyed = true;
+    if (Object.getOwnPropertyDescriptor(globalThis, "__rtsRenderWorkerStats")?.get === this._statsGetter) {
+      // Preserve the final diagnostic record without retaining this host globally.
+      Object.defineProperty(globalThis, "__rtsRenderWorkerStats", {
+        configurable: true,
+        enumerable: true,
+        writable: true,
+        value: this._publicStats(),
+      });
+    }
     if (globalThis.__rtsRenderWorkerControl === this._control) delete globalThis.__rtsRenderWorkerControl;
-    this._publishStats();
   }
 
   _initialize(canvas, size) {
@@ -404,7 +418,6 @@ export class PixiWorkerPresentationAdapter {
     this._pending = job;
     this._stats.retainedPending += 1;
     this._recordCounter("renderWorker.frames.retainedPending");
-    this._publishStats();
   }
 
   _submit(job) {
@@ -441,7 +454,6 @@ export class PixiWorkerPresentationAdapter {
       if (countsInWindow) pushTiming(this._stats.mainSubmitMs, mainSubmitMs);
       this._inFlight = job;
       if (countsInWindow) this._stats.dispatched += 1;
-      this._publishStats();
     } catch (error) {
       this._settleJob(job, PRESENTATION_OUTCOME.FAILED, error);
       this._failFatal(error);
@@ -489,7 +501,6 @@ export class PixiWorkerPresentationAdapter {
     if (message.generation !== this._generation) {
       this._stats.staleResponses += 1;
       this._recordCounter("renderWorker.responses.stale");
-      this._publishStats();
       return;
     }
     if (message.type === RENDER_WORKER_RESPONSE.READY) return;
@@ -526,7 +537,6 @@ export class PixiWorkerPresentationAdapter {
     }
     this._stats.retained += 1;
     this._recordCounter("renderWorker.frames.retained");
-    this._publishStats();
   }
 
   _acceptPresented(message) {
@@ -585,7 +595,6 @@ export class PixiWorkerPresentationAdapter {
     if (countsInWindow) this._recordCounter("renderWorker.frames.presented");
     const next = this._takePending();
     this._flushResize();
-    this._publishStats();
     if (next) this._submit(next);
   }
 
@@ -636,7 +645,6 @@ export class PixiWorkerPresentationAdapter {
     this._showFatal(this._fatal.message);
     this._teardownWorker();
     this._recordCounter("renderWorker.frames.failed");
-    this._publishStats();
     const incident = this._publicStats();
     queueMicrotask(() => {
       try {
@@ -689,11 +697,6 @@ export class PixiWorkerPresentationAdapter {
     this._sources?.profiler?.()?.recordDiagnosticCounter?.(label, amount);
   }
 
-  _publishStats() {
-    if (globalThis.__rtsRenderWorkerControl !== this._control) return;
-    globalThis.__rtsRenderWorkerStats = this._publicStats();
-  }
-
   _resetStats() {
     const carriedInFlight = Number(!!this._inFlight) + Number(!!this._pending);
     const active = {
@@ -716,7 +719,6 @@ export class PixiWorkerPresentationAdapter {
     if (this._gpuShadowTimingEnabled && !this._destroyed && !this._fatal) {
       this._post(createResetDiagnosticsMessage(this._generation));
     }
-    this._publishStats();
   }
 
   _publicStats() {

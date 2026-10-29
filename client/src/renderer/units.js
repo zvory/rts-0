@@ -1,5 +1,6 @@
+import { supportWeaponSetupVisual } from "./support_weapon_setup_visual.js";
 import { SNAPSHOT_MS, STATS } from "../config.js";
-import { KIND, SETUP, STATE } from "../protocol.js";
+import { KIND, STATE } from "../protocol.js";
 import {
   isRasterRigKey,
   liveRigDefinitionFor,
@@ -20,10 +21,6 @@ import { renderPngUnitRig } from "./rigs/png_runtime.js";
 import { renderLiveUnitRig } from "./rigs/runtime.js";
 import { hasProjectedUnitShadow } from "./unified_gpu_shadows.js";
 import {
-  ARTILLERY_DEPLOYED_WEAPON_ANIM_MS,
-  DEPLOYED_WEAPON_ANIM_MS,
-} from "./palette.js";
-import {
   angleDelta,
   clamp01,
   isVehicleBodyKind,
@@ -35,38 +32,7 @@ import {
 const FRAME_STRIP_MOVEMENT_HOLD_MS = SNAPSHOT_MS * 3;
 
 export function _deployedWeaponSetupVisual(e) {
-  if (e.kind === KIND.MORTAR_TEAM) {
-    const deployed = e.state === STATE.MOVE ? 0 : 1;
-    return {
-      prongFactor: deployed,
-      frameProgress: deployed,
-      barrel: deployed === 1,
-    };
-  }
-  const now = rendererVisualNow(this);
-  const setupState = e.setupState || SETUP.PACKED;
-  const prev = this._setupVisuals.get(e.id);
-  if (!prev || prev.state !== setupState) {
-    this._setupVisuals.set(e.id, { state: setupState, changedAt: now });
-  }
-  const rec = this._setupVisuals.get(e.id);
-  const elapsed = now - rec.changedAt;
-  const durationMs = e.kind === KIND.ARTILLERY
-    ? ARTILLERY_DEPLOYED_WEAPON_ANIM_MS
-    : DEPLOYED_WEAPON_ANIM_MS;
-  const progress = clamp01(elapsed / durationMs);
-  const t = smoothstep01(progress);
-
-  if (setupState === SETUP.SETTING_UP) {
-    return { prongFactor: t, frameProgress: progress, barrel: false };
-  }
-  if (setupState === SETUP.TEARING_DOWN) {
-    return { prongFactor: 1 - t, frameProgress: 1 - progress, barrel: false };
-  }
-  if (setupState === SETUP.DEPLOYED) {
-    return { prongFactor: 1, frameProgress: 1, barrel: e.state !== STATE.MOVE };
-  }
-  return { prongFactor: 0, frameProgress: 0, barrel: false };
+  return supportWeaponSetupVisual(e, this?._setupVisuals, this ? rendererVisualNow(this) : 0);
 }
 
 export function _sweepSetupVisuals(liveIds) {
