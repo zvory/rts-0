@@ -71,8 +71,9 @@ impl Game {
     /// locations. A map owns flat `startLocations`, `baseSites`, movement- and sight-affecting
     /// `elevation`, presentation-only `sun`, and static `doodads`: start locations determine its
     /// capacity, while every base site receives its authored 0–36 Steel and 0–9 Oil patches.
-    /// Singleton-team FFA
-    /// matches shuffle fixed start locations by `seed`; team matches choose ordered starts from the
+    /// Maps with `teamGroup` constrain each team to its own authored group and reject rosters that do
+    /// not fit. Ungrouped singleton-team matches shuffle fixed start locations by `seed`;
+    /// ungrouped team matches choose ordered starts from the
     /// same fixed set, preferring lower teammate spread, higher nearest enemy-team distance, lower
     /// exposure imbalance, and finally a deterministic seed-influenced tie break. No player-count
     /// layouts or player-owned natural groups exist in authored maps. Generated oil clusters place each oil patch on a unique passable tile

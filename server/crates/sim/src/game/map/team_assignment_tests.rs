@@ -173,3 +173,81 @@ fn tile_distance_sq(a: Tile, b: Tile) -> u64 {
     let dy = i64::from(a.1) - i64::from(b.1);
     (dx * dx + dy * dy) as u64
 }
+
+fn grouped_map_json() -> String {
+    let mut map: serde_json::Value = serde_json::from_str(DEFAULT_MAP_JSON).unwrap();
+    for (index, start) in map["startLocations"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .enumerate()
+    {
+        // Deliberately use authored order rather than inferring groups from distance.
+        start["teamGroup"] = serde_json::json!(index % 2 + 1);
+    }
+    map.to_string()
+}
+
+#[test]
+fn authored_team_groups_constrain_even_and_uneven_rosters() {
+    let json = grouped_map_json();
+    let materialized = Map::materialize_authored_json(&json, 1).unwrap();
+    for roster in [
+        vec![(7, 9), (2, 4), (5, 9), (6, 4)],
+        vec![(7, 9), (2, 4), (6, 4)],
+        vec![(7, 9), (2, 4)],
+    ] {
+        for seed in 0..32 {
+            let assigned =
+                Map::from_authored_json_with_name_for_players(&roster, "test", &json, seed)
+                    .unwrap();
+            let repeated =
+                Map::from_authored_json_with_name_for_players(&roster, "test", &json, seed)
+                    .unwrap();
+            assert_eq!(assigned.starts, repeated.starts);
+            let groups: Vec<_> = assigned
+                .starts
+                .iter()
+                .map(|tile| {
+                    let index = materialized
+                        .starts
+                        .iter()
+                        .position(|start| start == tile)
+                        .unwrap();
+                    materialized.start_team_groups[index]
+                })
+                .collect();
+            for i in 0..roster.len() {
+                for j in i + 1..roster.len() {
+                    assert_eq!(roster[i].1 == roster[j].1, groups[i] == groups[j]);
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn authored_team_groups_reject_incompatible_rosters_and_invalid_groups() {
+    let json = grouped_map_json();
+    for roster in [
+        vec![(1, 1), (2, 2), (3, 2), (4, 2)],
+        vec![(1, 1), (2, 2), (3, 3)],
+        vec![(1, 0), (2, 0), (3, 0)],
+    ] {
+        let error =
+            Map::from_authored_json_with_name_for_players(&roster, "test", &json, 0).unwrap_err();
+        assert!(error.contains("cannot fit this roster"), "{error}");
+    }
+    for group in [
+        serde_json::Value::Null,
+        serde_json::json!(0),
+        serde_json::json!(5),
+        serde_json::json!(1.5),
+        serde_json::json!("1"),
+    ] {
+        let mut map: serde_json::Value = serde_json::from_str(&json).unwrap();
+        map["startLocations"][0]["teamGroup"] = group;
+        assert!(Map::materialize_authored_json(&map.to_string(), 1).is_err());
+        assert!(authored::player_count_bounds(&map.to_string()).is_err());
+    }
+}
