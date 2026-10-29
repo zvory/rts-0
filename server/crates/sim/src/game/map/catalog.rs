@@ -307,17 +307,52 @@ mod tests {
     }
 
     #[test]
+    fn afrika_two_vs_two_uses_authored_team_sides() {
+        let available = Map::list_available();
+        let entry = available.iter().find(|entry| entry.name == "Afrika (2v2)")
+            .expect("Afrika (2v2) must be selectable in the lobby");
+        assert_eq!((entry.min_players, entry.max_players), (1, 4));
+        let side_one = [(26, 117), (12, 104)]; // Authored S1 and S3.
+        let side_two = [(173, 8), (187, 21)]; // Authored S2 and S4.
+        for roster in [
+            [(1, 1), (2, 1), (3, 2), (4, 2)],
+            [(7, 9), (2, 4), (5, 9), (6, 4)],
+        ] {
+            for seed in 0..32 {
+                let map = Map::load_for_players("Afrika (2v2)", &roster, seed).unwrap();
+                assert_eq!((map.width, map.height), (200, 126));
+                assert_eq!(map.base_sites.len(), 20);
+                for (i, start) in map.starts.iter().enumerate() {
+                    assert!(side_one.contains(start) || side_two.contains(start));
+                    for j in 0..i {
+                        assert_eq!(roster[i].1 == roster[j].1,
+                            side_one.contains(start) == side_one.contains(&map.starts[j]));
+                    }
+                }
+            }
+        }
+        assert!(Map::load_for_players("Afrika (2v2)", &[(1, 1), (2, 2), (3, 3), (4, 4)], 1).is_err());
+    }
+
+    #[test]
     fn every_catalog_map_materializes_for_its_advertised_player_counts() {
         for entry in Map::list_available() {
             for player_count in entry.min_players..=entry.max_players {
-                let map = Map::load(&entry.name, player_count as usize, 0x1234_5678)
+                let (_, json) = authored_json_for_name(&entry.name).unwrap();
+                // Player counts do not imply a roster: grouped maps can reject FFA.
+                let map = Map::materialize_authored_json(&json, player_count as usize)
                     .unwrap_or_else(|error| {
                         panic!(
                             "catalog map {:?} failed to load for {player_count} player(s): {error}",
                             entry.name
                         )
                     });
-                assert_eq!(map.starts.len(), player_count as usize);
+                assert_eq!(map.starts.len(), entry.max_players as usize);
+                if map.start_team_groups.is_empty() {
+                    let assigned = Map::load(&entry.name, player_count as usize, 0x1234_5678)
+                        .expect("ungrouped maps must also load with an FFA roster");
+                    assert_eq!(assigned.starts.len(), player_count as usize);
+                }
                 assert_eq!(
                     map.terrain.len(),
                     (map.width * map.height) as usize,
