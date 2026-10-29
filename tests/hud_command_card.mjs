@@ -827,3 +827,22 @@ for (const researched of [false, true]) {
   assert.equal(upgrade({ ...context, selection: [complete], currentEntities: [complete] })?.enabled, false);
   assert.equal(upgrade({ ...context, selection: [{ ...depot, state: "construct", buildProgress: 0.5 }] })?.enabled, false);
 }
+
+// TEMPORARY HACK regression: historical Engineering Complex ownership keeps only AT Guns ready.
+{
+  const gunWorks = { id: 950, owner: 1, kind: KIND.STEELWORKS };
+  const context = {
+    selection: [gunWorks], playerId: 1,
+    resources: { steel: 1000, oil: 1000, supplyUsed: 0, supplyCap: 100 },
+    playerHasCompleteKind: (kind) => kind === KIND.STEELWORKS,
+    upgrades: [],
+  };
+  const atSlot = (card) => card.slots.find((slot) => slot?.id === `train:${KIND.ANTI_TANK_GUN}`);
+  assert.equal(atSlot(buildCommandCardDescriptors(context)).enabled, false);
+  const unlocked = buildCommandCardDescriptors({ ...context, upgrades: [UPGRADE.ANTI_TANK_GUN_UNLOCK] });
+  assert.equal(atSlot(unlocked).enabled, true);
+  assert.equal(atSlot(unlocked).title.includes("Requires Engineering Complex"), false);
+  const withoutWorks = buildCommandCardDescriptors({ ...context,
+    upgrades: [UPGRADE.ANTI_TANK_GUN_UNLOCK], playerHasCompleteKind: () => false });
+  assert.equal(atSlot(withoutWorks).enabled, false);
+}

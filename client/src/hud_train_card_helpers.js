@@ -1,4 +1,4 @@
-import { UPGRADE, STATE, isBuilding } from "./protocol.js";
+import { KIND, UPGRADE, STATE, isBuilding } from "./protocol.js";
 import { STATS, UPGRADES } from "./config.js";
 
 export function constructionCancelDescriptor(building) {
@@ -80,7 +80,7 @@ export function productionRepeatAffordance(automatic, producerIds, repeatingIds,
 export function trainAvailability(ctx, unit, resources, isOwn) {
   const st = STATS[unit];
   if (!st) return "locked";
-  if (requirementsOf(st).some((req) => !playerHasCompleteKind(ctx, req))) return "locked";
+  if (requirementsOf(st).some((req) => !trainRequirementMet(ctx, unit, req))) return "locked";
   if (!playerHasAnyCompleteKind(ctx, requirementsAnyOf(st))) return "locked";
   if (st.upgradeRequires && !(ctx.upgrades || []).includes(st.upgradeRequires)) return "locked";
   return affordable(st.cost, resources) && hasSupplyFor(st, resources) ? "ready" : "unaffordable";
@@ -89,7 +89,7 @@ export function trainAvailability(ctx, unit, resources, isOwn) {
 export function trainDisabledReason(ctx, unit, resources, isOwn) {
   const st = STATS[unit];
   if (!st) return "";
-  const missing = requirementsOf(st).find((req) => !playerHasCompleteKind(ctx, req));
+  const missing = requirementsOf(st).find((req) => !trainRequirementMet(ctx, unit, req));
   if (missing) return `Requires ${STATS[missing]?.label || missing}`;
   if (!playerHasAnyCompleteKind(ctx, requirementsAnyOf(st))) {
     return st.requiresAnyText || `Requires ${requirementsAnyOf(st)
@@ -210,6 +210,14 @@ function requirementsOf(definition) {
 function requirementsAnyOf(definition) {
   if (!definition || !definition.requiresAny) return [];
   return Array.isArray(definition.requiresAny) ? definition.requiresAny : [definition.requiresAny];
+}
+
+// TEMPORARY HACK: mirror the server's historical Engineering Complex exception for AT Guns.
+// TODO: remove with train_requirement_met_with_at_gun_history and its retired upgrade marker.
+function trainRequirementMet(ctx, unit, kind) {
+  return (unit === KIND.ANTI_TANK_GUN && kind === KIND.ENGINEERING_COMPLEX &&
+    (ctx.upgrades || []).includes(UPGRADE.ANTI_TANK_GUN_UNLOCK)) ||
+    playerHasCompleteKind(ctx, kind);
 }
 
 function playerHasCompleteKind(ctx, kind) {
