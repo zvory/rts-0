@@ -24,3 +24,18 @@ pub(super) fn parse_team_groups(starts: &[AuthoredStartLocation]) -> Result<Vec<
         })
         .collect()
 }
+
+pub(super) fn parse_start_locations(
+    width: u32,
+    height: u32,
+    starts: &[AuthoredStartLocation],
+) -> Result<Vec<(u32, u32)>, String> {
+    let locations: Vec<_> = starts
+        .iter()
+        .map(|start| super::AuthoredLocation {
+            x: start.x,
+            y: start.y,
+        })
+        .collect();
+    super::parse_locations(width, height, &locations, "startLocations")
+}

@@ -115,19 +115,8 @@ pub(super) fn materialize(player_count: usize, json: &str) -> Result<AuthoredMap
     }
     let elevation = parse_elevation(&authored.elevation, width, height)?;
     super::validate_elevation_sun(&elevation, authored.sun)?;
-    let start_locations = parse_locations(
-        width,
-        height,
-        &authored
-            .start_locations
-            .iter()
-            .map(|start| AuthoredLocation {
-                x: start.x,
-                y: start.y,
-            })
-            .collect::<Vec<_>>(),
-        "startLocations",
-    )?;
+    let start_locations =
+        team_groups::parse_start_locations(width, height, &authored.start_locations)?;
     let start_team_groups = parse_team_groups(&authored.start_locations)?;
     let base_sites = parse_base_sites(width, height, &authored.base_sites)?;
     let base_locations: Vec<_> = base_sites.iter().map(|site| (site.x, site.y)).collect();
