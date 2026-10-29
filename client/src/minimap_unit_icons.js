@@ -22,6 +22,7 @@ export class MinimapUnitIcons {
     this.loadImage = loadImage;
     this.createCanvas = createCanvas;
     this.entries = new Map();
+    this.primedAnimations = new Set();
     this.controller = new AbortController();
   }
 
@@ -111,6 +112,13 @@ export class MinimapUnitIcons {
   draw(context, entity, color, point, canvasSize, flash = false) {
     const animated = this.animation?.layers(entity);
     if (animated) {
+      // Live matches do not call prepare(). Load the bounded frame set on first sight,
+      // so a later shot or setup transition does not start decoding a missing marker.
+      const key = `${entity.kind}:${color}`;
+      if (!this.primedAnimations.has(key)) {
+        this.primedAnimations.add(key);
+        for (const part of this._parts(entity.kind)) this.request(entity.kind, color, part);
+      }
       const size = unitPngSize(entity.kind, canvasSize);
       for (const layer of animated) this._drawLayer(context, entity, color,
         { x: point.x + layer.x * size, y: point.y + layer.y * size },
@@ -159,5 +167,6 @@ export class MinimapUnitIcons {
       entry.image = null; entry.mask = null;
     }
     this.entries.clear();
+    this.primedAnimations.clear();
   }
 }

@@ -47,7 +47,7 @@ export async function createRegularMinimap(header, { createCanvas, loadImage, ra
     const minimap = new Minimap(canvas, state, null, fog, null, null, {
       commandsEnabled: false, artilleryIconImage,
       unitAnimation: createMinimapAnimation(),
-        loadUnitIcon: async (kind, teamColor, { minimapPart }) => {
+      loadUnitIcon: async (kind, teamColor, { minimapPart }) => {
         const svg = await inlineSvgImageSources(liveUnitIconMarkupFor(kind, { teamColor, minimapPart }), async href => {
           const asset = new URL(`../../client/${href.replace(/^\//, '')}`, import.meta.url);
           return `data:image/png;base64,${(await fs.readFile(asset)).toString('base64')}`;

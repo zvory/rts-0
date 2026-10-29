@@ -161,6 +161,33 @@ test('articulated minimap layers follow live facing and setup without loading ea
 });
 
 import { createMinimapAnimation } from '../../client/src/renderer/rigs/minimap_animation.js';
+test('live minimap primes animation frames before the first setup or firing transition', async () => {
+  const animation = createMinimapAnimation();
+  const requested = [];
+  const icons = new MinimapUnitIcons({ animation,
+    createCanvas: () => ({ width: 0, height: 0, getContext: () => ({ drawImage() {}, fillRect() {} }) }),
+    loadImage: async (kind, color, { minimapPart }) => {
+      requested.push(minimapPart);
+      return { width: 128, height: 128 };
+    },
+  });
+  let draws = 0;
+  const context = { globalAlpha: 1, save() {}, restore() {}, translate() {}, rotate() {}, scale() {},
+    drawImage() { draws++; } };
+  const entity = { id: 1, kind: 'machine_gunner', setupState: 'packed' };
+  icons.beginFrame([entity], {}, 0);
+  icons.draw(context, entity, '#0072b2', { x: 0, y: 0 }, 480);
+  await Promise.all([...icons.entries.values()].map(entry => entry.promise));
+  assert.deepEqual(requested, animation.parts(entity.kind), 'first live draw loads every bounded frame');
+  entity.setupState = 'deployed';
+  icons.beginFrame([entity], { weaponRecoil: () => 1, weaponRecoilPhase: () => 0.5 }, 100);
+  icons.draw(context, entity, '#0072b2', { x: 0, y: 0 }, 480);
+  assert.equal(draws, 1, 'the first firing frame draws immediately without capture preparation');
+  assert.equal(requested.length, animation.parts(entity.kind).length);
+  icons.destroy();
+  assert.equal(icons.primedAnimations.size, 0);
+});
+
 test('minimap uses production setup frames and shot envelopes, with a bounded image cache', async () => {
   const animation = createMinimapAnimation();
   let recoil = 0, phase = 0;
