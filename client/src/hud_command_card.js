@@ -476,7 +476,7 @@ export function buildTrainCard(ctx, building, { underConstruction = false } = {}
       title: researchDisabledReason(ctx, upgrade, resources, isOwn),
       tooltipUpgrade: upgrade,
       repeatable: false,
-      onUnavailableIntent: { type: "playNotEnough", cost: def.cost },
+      onUnavailableIntent: { type: "playNotEnough", cost: def.cost, actionCostOnly: true },
     };
   }
 

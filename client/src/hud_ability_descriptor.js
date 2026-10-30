@@ -47,7 +47,7 @@ export function abilityButtonDescriptor({
       active ? "active" : "",
       affordance.autocastEnabledIds.length > 0 ? "autocast-enabled" : "",
     ].filter(Boolean).join(" "),
-    onUnavailableIntent: { type: "playNotEnough", cost: affordance.cost },
+    onUnavailableIntent: { type: "playNotEnough", cost: affordance.cost, actionCostOnly: true },
     contextIntent: definition.autocast
       ? {
           type: "setAutocast",
