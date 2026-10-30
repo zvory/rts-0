@@ -32,10 +32,12 @@ This change applies only to Kriegsia. Ekat and Cultivators retain their existing
 allowance and cannot research Industrial Centers.
 
 
-While either steel or oil is negative, no new unit production, research, building construction, or
+While either steel or oil is negative, no new unit production, building construction, or
 free automatic extractor scaffold starts. Queued intents wait until both balances can cover their
 cost; already paid production and existing construction continue. Income and refunds repay debt
-before restoring spendable resources. Another eligible center may still upgrade immediately.
+before restoring spendable resources. Free abilities remain usable in debt. Research and paid
+abilities require enough of each resource they actually consume; debt in an unused resource does
+not block them. Another eligible center may still upgrade immediately.
 
 ## Delivery checklist
 

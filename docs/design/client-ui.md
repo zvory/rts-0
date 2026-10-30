@@ -2798,3 +2798,7 @@ and selects the simplified Refinery Works PNG atlas for completed upgrades. Its 
 paint receives the owning team color; the ordinary depot retains its worksite atlas. There is no
 gold footprint rim. The atlas variant participates in body cache identity and normal rig teardown.
 Fog memory uses the last observed flag. Dedicated audio is deferred.
+
+Command-card ability and research affordability checks only resources with a nonzero cost.
+Free abilities remain enabled during resource debt when their normal charge/cooldown/tech
+requirements are met. Train/build cards retain the creation-only debt gate.

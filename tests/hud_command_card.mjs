@@ -387,7 +387,7 @@ for (const [kind, upgrade] of [
   const abilityCard = buildCommandCardDescriptors({
     playerId: 1,
     selection: [scoutCar],
-    resources: { steel: 1000, oil: 1000 },
+    resources: { steel: -800, oil: -300 },
     upgrades: [],
     playerHasCompleteKind: () => true,
     groupCooldownClocks: testGroupCooldownClocks,
@@ -847,4 +847,28 @@ for (const researched of [false, true]) {
   const withoutWorks = buildCommandCardDescriptors({ ...context,
     upgrades: [UPGRADE.ANTI_TANK_GUN_UNLOCK], playerHasCompleteKind: () => false });
   assert.equal(atSlot(withoutWorks).enabled, false);
+}
+
+// Debt gates new unit/building starts, while action costs ignore unused resources.
+{
+  const context = (selection, resources) => ({
+    playerId: 1, selection, currentEntities: selection, resources,
+    upgrades: [UPGRADE.ROCKETS], playerHasCompleteKind: () => true,
+    groupCooldownClocks: testGroupCooldownClocks,
+  });
+  const center = { id: 950, owner: 1, kind: KIND.TRAINING_CENTRE, state: "idle" };
+  const research = buildCommandCardDescriptors(context([center], { steel: 100, oil: -300 }))
+    .slots.find((slot) => slot?.id === `research:${UPGRADE.ENTRENCHMENT}`);
+  assert.equal(research?.unaffordable, false, "research ignores debt in an unused resource");
+  const truck = { id: 951, owner: 1, kind: KIND.ROCKET_LAUNCHER,
+    abilities: [{ ability: ABILITY.BARRAGE, cooldownLeft: 0, remainingUses: 0 }] };
+  for (const [oil, enabled] of [[150, true], [149, false]]) {
+    const barrage = buildCommandCardDescriptors(context([truck], { steel: -800, oil }))
+      .slots.find((slot) => slot?.ability === ABILITY.BARRAGE);
+    assert.equal(barrage?.enabled, enabled, "paid barrage checks oil without a steel debt block");
+  }
+  const barracks = { id: 952, owner: 1, kind: KIND.BARRACKS, state: "idle" };
+  const rifleman = buildCommandCardDescriptors(context([barracks], { steel: 1000, oil: -300 }))
+    .slots.find((slot) => slot?.id === `train:${KIND.RIFLEMAN}`);
+  assert.equal(rifleman?.unaffordable, true, "new units still wait for either resource debt");
 }

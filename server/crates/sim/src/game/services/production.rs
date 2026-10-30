@@ -47,7 +47,9 @@ pub(crate) fn production_system(
             let can_start = players
                 .iter()
                 .find(|player| player.id == owner)
-                .is_some_and(|player| player.can_afford(0, 0));
+                .is_some_and(|player| {
+                    player.can_start_production(rules::economy::ResourceCost::new(0, 0))
+                });
             for (owner, kind) in
                 extractors::advance_automatic(entities, id, faction_id, tick, can_start)
             {
@@ -115,7 +117,7 @@ pub(crate) fn production_system(
                 let supply = rules::economy::supply_cost(unit);
                 let supply_available = player.can_reserve_supply(supply, entities);
                 let auto_build_allowed = player.can_auto_build(cost);
-                if supply_available && auto_build_allowed && player.spend_cost(cost) {
+                if supply_available && auto_build_allowed && player.spend_production_cost(cost) {
                     if player.reserve_supply(supply, entities) {
                         let queued = entities.get_mut(id).is_some_and(|producer| {
                             let queued = producer.push_production(ProdItem {
@@ -183,7 +185,7 @@ pub(crate) fn production_system(
             let supply = rules::economy::supply_cost(unit);
             if let Some(player) = players.iter_mut().find(|player| player.id == owner) {
                 let supply_available = player.can_reserve_supply(supply, entities);
-                if supply_available && player.spend_cost(cost) {
+                if supply_available && player.spend_production_cost(cost) {
                     if player.reserve_supply(supply, entities) {
                         if !entities
                             .get_mut(id)

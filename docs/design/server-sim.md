@@ -1999,6 +1999,9 @@ aim uses the nearest footprint surface, matching acquisition and stopping distan
 version-57 attack ray contract for tuning and per-viewer projection.
 
 Industrial Center upgrades apply during research command execution without enqueueing. Player
-steel/oil balances and checkpoint balances are signed. All ordinary spending requires both
-balances to cover the unsigned cost, including zero-cost starts. Existing paid jobs continue;
-automatic extractor creation checks debt separately from advancing existing scaffolds.
+steel/oil balances and checkpoint balances are signed. General affordability checks only resources
+with a nonzero cost, so free abilities work in debt and paid actions need enough of each resource
+they consume. New unit production and building construction additionally require both balances
+to be nonnegative through `can_start_production` / `spend_production_cost`; research does not use
+this debt gate. Existing paid jobs continue; automatic extractor creation checks production
+eligibility separately from advancing existing scaffolds.

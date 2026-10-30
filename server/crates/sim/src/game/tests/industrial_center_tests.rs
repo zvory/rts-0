@@ -117,7 +117,7 @@ fn industrial_center_debt_is_projected_saved_and_repaid_by_income() {
     player.add_gathered_resources(EntityKind::Steel, 900, tick);
     assert_eq!((player.steel, player.oil), (100, -300));
     assert!(
-        !player.can_afford(0, 0),
+        !player.can_start_production(crate::rules::economy::ResourceCost::new(0, 0)),
         "even free jobs wait while either balance is negative"
     );
     player.add_gathered_resources(EntityKind::Oil, 300, tick);
@@ -190,6 +190,9 @@ fn industrial_center_debt_keeps_paid_training_running_and_unpaid_training_waitin
     let depot = game.state.entities.get(depots[0]).unwrap();
     assert!(depot.is_industrial_center());
     assert_eq!(depot.prod_queue()[0].progress, progress + 1);
+    let cost = crate::rules::economy::resource_cost(EntityKind::Worker);
+    let tick = game.tick_count();
+    game.state.players[0].add_gathered_resources(EntityKind::Steel, 800 + cost.steel, tick);
     game.enqueue(
         1,
         Command::Train {
@@ -201,9 +204,6 @@ fn industrial_center_debt_keeps_paid_training_running_and_unpaid_training_waitin
     let waiting = &game.state.entities.get(depots[1]).unwrap().prod_queue()[0];
     assert!(!waiting.paid);
     assert_eq!(waiting.progress, 0);
-    let cost = crate::rules::economy::resource_cost(EntityKind::Worker);
-    let tick = game.tick_count();
-    game.state.players[0].add_gathered_resources(EntityKind::Steel, 800 + cost.steel, tick);
     game.tick();
     assert!(
         !game.state.entities.get(depots[1]).unwrap().prod_queue()[0].paid,
@@ -244,4 +244,41 @@ fn industrial_center_hp_bonus_preserves_damage_and_applies_once() {
     let depot = game.state.entities.get(depots[0]).unwrap();
     assert_eq!((depot.hp, depot.max_hp), (500, 540));
     restore_checkpoint_and_assert_equivalent(&game, "damaged industrial center HP");
+}
+
+#[test]
+fn debt_does_not_block_research_that_can_pay_its_actual_cost() {
+    for initially_funded in [false, true] {
+        let (mut game, _) = fixture();
+        let center = game
+            .state
+            .entities
+            .spawn_building(1, EntityKind::TrainingCentre, 800.0, 1_000.0, true)
+            .unwrap();
+        let cost = crate::game::upgrade::definition(UpgradeKind::Entrenchment);
+        assert_eq!(cost.cost_oil, 0);
+        game.state.players[0]
+            .set_resources(if initially_funded { cost.cost_steel } else { 0 }, -300);
+        game.enqueue(
+            1,
+            Command::Research {
+                building: center,
+                upgrade: UpgradeKind::Entrenchment,
+            },
+        );
+        game.tick();
+        if !initially_funded {
+            assert!(!game.state.entities.get(center).unwrap().research_queue()[0].paid);
+            let tick = game.tick_count();
+            game.state.players[0].add_gathered_resources(EntityKind::Steel, cost.cost_steel, tick);
+            game.tick();
+        }
+        let research = &game.state.entities.get(center).unwrap().research_queue()[0];
+        assert!(research.paid);
+        assert_eq!(research.progress, 1);
+        assert_eq!(
+            (game.state.players[0].steel, game.state.players[0].oil),
+            (0, -300)
+        );
+    }
 }
