@@ -317,8 +317,8 @@ export class GameState extends VisualEffectBackedState {
     for (const e of entities) this._curById.set(e.id, e);
     this.visualEffects.pruneRecoilForSnapshot(this._curById);
     this.resources = {
-      steel: msg.steel | 0,
-      oil: msg.oil | 0,
+      steel: msg.steel ?? 0,
+      oil: msg.oil ?? 0,
       supplyUsed: msg.supplyUsed | 0,
       supplyCap: msg.supplyCap | 0,
     };

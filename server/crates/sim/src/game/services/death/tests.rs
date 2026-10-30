@@ -71,8 +71,8 @@ fn destroyed_producer_refunds_paid_work_but_not_unpaid_queue_entries() {
         .iter()
         .find(|player| player.id == 1)
         .expect("player one should exist");
-    assert_eq!(player.steel, starting_steel - worker_cost.steel);
-    assert_eq!(player.oil, starting_oil - worker_cost.oil);
+    assert_eq!(player.steel, starting_steel - i64::from(worker_cost.steel));
+    assert_eq!(player.oil, starting_oil - i64::from(worker_cost.oil));
     assert_eq!(player.supply_used, starting_supply + worker_supply);
 
     {
@@ -373,8 +373,11 @@ fn destroyed_research_building_refunds_in_progress_research() {
         .iter()
         .find(|player| player.id == 1)
         .expect("player one should exist");
-    assert_eq!(player.steel, starting_steel - definition.cost_steel);
-    assert_eq!(player.oil, starting_oil - definition.cost_oil);
+    assert_eq!(
+        player.steel,
+        starting_steel - i64::from(definition.cost_steel)
+    );
+    assert_eq!(player.oil, starting_oil - i64::from(definition.cost_oil));
 
     {
         let entity = game

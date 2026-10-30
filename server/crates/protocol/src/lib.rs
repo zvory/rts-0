@@ -1131,8 +1131,8 @@ mod tests {
             ground_decal_revision: 17,
             ground_decal_delta: None,
             world_combat_position: Some([1024.0, 2048.0]),
-            steel: 100,
-            oil: 25,
+            steel: -800,
+            oil: -300,
             supply_used: 3,
             supply_cap: 10,
             auto_build: Some(AutoBuildSettingsSnapshot {
@@ -1301,7 +1301,7 @@ mod tests {
         let value: serde_json::Value = serde_json::from_str(&compact).unwrap();
         assert_eq!(value["t"], "snapshot");
         assert_eq!(value["v"], COMPACT_SNAPSHOT_VERSION);
-        assert_eq!(value["s"], serde_json::json!([42, 100, 25, 3, 10]));
+        assert_eq!(value["s"], serde_json::json!([42, -800, -300, 3, 10]));
         assert_eq!(value["ab"], serde_json::json!([true, 250, 150]));
         assert_eq!(value["wc"], serde_json::json!([1024.0, 2048.0]));
         assert_eq!(value["e"].as_array().unwrap().len(), 3);

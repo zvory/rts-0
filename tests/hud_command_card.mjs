@@ -820,6 +820,8 @@ for (const researched of [false, true]) {
   const upgrade = (ctx) => buildCommandCardDescriptors(ctx).slots.find((s) => s?.id === `research:${UPGRADE.INDUSTRIAL_CENTER}`);
   assert.equal(upgrade(context)?.enabled, true);
   assert.deepEqual(upgrade(context)?.cost, { steel: 800, oil: 300 });
+  assert.equal(upgrade({ ...context, resources: { ...context.resources, steel: -800, oil: -300 } })?.enabled, true, "instant upgrade can incur debt");
+  assert.equal(upgrade({ ...context, resources: { ...context.resources, steel: 0, oil: 0 } })?.enabled, true);
   const pending = { ...depot, id: 901, prodUpgradeQueue: [UPGRADE.INDUSTRIAL_CENTER] };
   assert.equal(upgrade({ ...context, currentEntities: [depot, pending] })?.enabled, true, "another depot can upgrade concurrently");
   const complete = { ...depot, id: 902, industrialCenter: true };

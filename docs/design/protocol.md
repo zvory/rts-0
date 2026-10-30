@@ -413,11 +413,10 @@ Game-generated critical alerts reuse `chat` with `senderId: 0`, `senderName: "Ga
 to the owning active seat, never teammates or spectators, with an independent 30-second
 simulation-time cooldown per seat and warning (unit/prerequisite for production). Persistent
 blocked conditions may remind after the cooldown. Supply text uses actual used/cap values and
-recommends upgrading a Resource Depot while below the maximum cap. Industrial Center research
-starts broadcast `Color (Player name) has started upgrading a resource depot.` to every connection,
-including spectators, when paid research is first observed. Unpaid queued research does not announce.
-Starts cancelled or restarted within one tick may coalesce because detection samples active research
-after each tick. Only these public announcements enter replay chat; private economy warnings are excluded. No positional information is included.
+recommends upgrading a Resource Depot while below the maximum cap. Completed Industrial Centers
+broadcast `Color (Player name) has upgraded a resource depot to an Industrial Center.` to every
+connection, including spectators, when first observed. Only these public announcements enter
+replay chat; private economy warnings are excluded. No positional information is included.
 
 `LobbyPlayer`: `{ id: u32, teamId: u32, factionId: string, name: string, ready: bool, color: string, isAi: bool, aiProfileId?: string, isSpectator: bool }`. `isAi` is
 true for computer opponents (always shown ready; the client renders an "AI" tag, a host-only
@@ -730,7 +729,7 @@ transport decode:
     decals: GroundDecalView[]    // at most 64 fog/observer-entitled rows
   },
   worldCombatPosition?: [f32, f32], // coarse global combat area; omitted when inactive
-  steel: u32, oil: u32,       // your resources
+  steel: i64, oil: i64,       // signed balances; Industrial Center may incur debt
   supplyUsed: u32, supplyCap: u32,
   autoBuild?: {paused: bool, reserveSteel: u32, reserveOil: u32}, // projected player's authoritative policy
   entities: Entity[],            // your non-resource entities (always) + entities visible to living-team current/firing/death vision
@@ -1949,4 +1948,7 @@ Completion belongs to that Resource Depot and never enters player `upgrades`.
 Remembered buildings append `industrialCenter` at slot 7, using the last observed state;
 completion while unseen never updates enemy memory. Supply scalars and observer rows reflect
 Kriegsia’s 100 base +100 per living completed center, clamped at 300; other factions retain 300. Queue/payment details keep their
-existing owner/allied visibility. Two completed or pending upgrades reserve both available slots.
+existing owner/allied visibility. Two completed centers occupy both available slots.
+The command applies immediately without a queue, spending 800 steel and 300 oil even if balances
+become negative. Snapshot scalars and observer resource rows carry signed balances in JSON and
+MessagePack; supply, costs, income totals, and Lab resource-setting inputs remain unsigned.

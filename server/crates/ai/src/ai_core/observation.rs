@@ -335,8 +335,16 @@ impl AiObservation {
             tile_size: start.map.tile_size,
         };
         let economy = AiEconomy {
-            steel: snapshot.steel,
-            oil: snapshot.oil,
+            steel: if snapshot.steel < 0 || snapshot.oil < 0 {
+                0
+            } else {
+                snapshot.steel.min(i64::from(u32::MAX)) as u32
+            },
+            oil: if snapshot.steel < 0 || snapshot.oil < 0 {
+                0
+            } else {
+                snapshot.oil.min(i64::from(u32::MAX)) as u32
+            },
             supply_used: snapshot.supply_used,
             supply_cap: snapshot.supply_cap,
         };

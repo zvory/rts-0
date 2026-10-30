@@ -583,8 +583,8 @@ pub struct Snapshot {
     /// Coarse world combat area shared identically with every recipient for directional ambience.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub world_combat_position: Option<[f32; 2]>,
-    pub steel: u32,
-    pub oil: u32,
+    pub steel: i64,
+    pub oil: i64,
     pub supply_used: u32,
     pub supply_cap: u32,
     /// Authoritative settings for the player whose private resources this snapshot projects.
@@ -783,8 +783,8 @@ fn is_zero_u32(value: &u32) -> bool {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PlayerResourceSnapshot {
     pub id: u32,
-    pub steel: u32,
-    pub oil: u32,
+    pub steel: i64,
+    pub oil: i64,
     pub supply_used: u32,
     pub supply_cap: u32,
     /// Rolling command-envelope rate over the last ten simulated seconds.

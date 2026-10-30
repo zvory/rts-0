@@ -8,7 +8,12 @@ import {
   predictionCompatibility,
   predictionRuntimeCompatibility,
 } from "../client/src/prediction_compatibility.js";
-import { DEFAULT_FACTION_ID, PREDICTION_PROTOCOL_VERSION } from "../client/src/protocol.js";
+import {
+  COMPACT_SNAPSHOT_VERSION,
+  decodeServerMessage,
+  DEFAULT_FACTION_ID,
+  PREDICTION_PROTOCOL_VERSION,
+} from "../client/src/protocol.js";
 import { createRigRenderContext } from "../client/src/renderer/rigs/animation.js";
 import { GameState } from "../client/src/state.js";
 import { SimWasmPredictionAdapter } from "../client/src/sim_wasm_adapter.js";
@@ -21,6 +26,23 @@ import {
 
 function assert(cond, msg) {
   if (!cond) throw new Error(msg || "Assertion failed");
+}
+
+{
+  const state = new GameState({
+    playerId: 1,
+    spectator: false,
+    map: { width: 1, height: 1, tileSize: 32, terrain: [0], resources: [] },
+    players: [{ id: 1, name: "A", color: "#f00", startTileX: 0, startTileY: 0 }],
+  });
+  for (const [steel, oil] of [[-800, -300], [2 ** 32, -(2 ** 32)], [0, 0]]) {
+    state.applySnapshot(decodeServerMessage({
+      t: "snapshot", v: COMPACT_SNAPSHOT_VERSION,
+      s: [1, steel, oil, 0, 100], e: [], n: [0, 0, 0, 0, 0],
+    }));
+    assert(state.resources.steel === steel && state.resources.oil === oil,
+      "decoded signed balances reach the HUD model without 32-bit truncation");
+  }
 }
 
 {

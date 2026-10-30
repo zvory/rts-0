@@ -74,6 +74,14 @@ pub(super) fn enqueue(
         return;
     }
     let cost = rules::economy::ResourceCost::new(definition.cost_steel, definition.cost_oil);
+    if local_upgrade {
+        // This depot-local upgrade bypasses production and may incur resource debt.
+        ps.spend_industrial_center_cost();
+        if let Some(depot) = entities.get_mut(building) {
+            depot.complete_industrial_center();
+        }
+        return;
+    }
     let (queue_empty, building_complete) = entities.get(building).map_or((false, false), |b| {
         (b.research_queue().is_empty(), !b.under_construction())
     });

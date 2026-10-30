@@ -3,33 +3,39 @@
 ## Approved brief and rules (Phases 0 and 1)
 
 The requested Industrial Center is an in-place Resource Depot upgrade, available in normal play.
-It trades 800 steel, 300 oil and 60 seconds (1,800 ticks) for 100 global supply while alive.
-Kriegsia starts at 100 supply; the absolute maximum remains 300. At most two owned centers,
-including pending upgrades, may exist. A destroyed center frees its slot; existing units survive
+It immediately spends 800 steel and 300 oil for 100 global supply while alive, allowing either
+resource balance to become negative. It never enters a research or production queue.
+Kriegsia starts at 100 supply; the absolute maximum remains 300. At most two owned centers
+may exist. A destroyed center frees its slot; existing units survive
 being over cap, but new supply cannot be reserved until room is available.
 
 On completion, maximum HP becomes three times the base Resource Depot HP (540 versus 180).
-Current HP increases by the same 360 HP, preserving damage already taken. Pending or cancelled
-upgrades do not change HP.
+Current HP increases by the same 360 HP, preserving damage already taken. The upgrade cannot be
+cancelled or refunded.
 
 The source depot keeps its identity, armor, footprint, sight, mining-anchor status, worker
 training, free extractor jobs, rally orders, repair, elimination and targeting behavior. There is
 no new weapon, capture rule, aura or research prerequisite. Upgrade through the normal research
-command/card (first free research slot); cancellation uses ordinary research refunds. Pending
-unpaid upgrades reserve a center slot. Completion is local to the depot, not permanent player
-research. Starting a second upgrade on the same depot or a third across the player is rejected.
+command/card regardless of available resources or production queue occupancy. Completion is local
+to the depot, not permanent player research. Starting a second upgrade on the same depot or a
+third across the player is rejected.
 
 The completed sprite uses the simplified Refinery Works art: three white-painted storage tanks,
 a processing tower, dark pipes and an orange furnace. White paint receives owner tint; there is
 no gold footprint rim. The ordinary Resource Depot keeps its worksite art. Existing construction,
 damage, selection, minimap and death visuals stay; dedicated audio is deferred. Completion is
 visible to anyone who can see the building, retained in fog memory, and preserved in checkpoints
-and replays; queue/payment details retain existing owner-only projection. AI should buy this
+and replays; signed resource balances retain existing private/observer projection. AI should buy this
 upgrade when approaching its current supply cap.
 
 This change applies only to Kriegsia. Ekat and Cultivators retain their existing 300 supply
 allowance and cannot research Industrial Centers.
 
+
+While either steel or oil is negative, no new unit production, research, building construction, or
+free automatic extractor scaffold starts. Queued intents wait until both balances can cover their
+cost; already paid production and existing construction continue. Income and refunds repay debt
+before restoring spendable resources. Another eligible center may still upgrade immediately.
 
 ## Delivery checklist
 

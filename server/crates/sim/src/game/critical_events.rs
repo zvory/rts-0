@@ -1,4 +1,4 @@
-use super::{entity::EntityKind, upgrade::UpgradeKind, Game};
+use super::{entity::EntityKind, Game};
 use crate::rules::defs::{self, TechRequirement};
 
 /// Read-only facts for room-owned chat notifications; never sent directly to clients.
@@ -33,12 +33,7 @@ impl Game {
                 let mut blocked_production = Vec::new();
                 let mut upgrading_depots = Vec::new();
                 for building in buildings {
-                    if building.kind
-                        == super::upgrade::definition(UpgradeKind::IndustrialCenter).researched_at
-                        && building.research_queue().first().is_some_and(|item| {
-                            item.upgrade == UpgradeKind::IndustrialCenter && item.paid
-                        })
-                    {
+                    if building.is_industrial_center() {
                         upgrading_depots.push(building.id);
                     }
                     if let Some(production) = &building.production {

@@ -81,7 +81,7 @@ fn blanket_fire_command_starts_runtime_order() {
     let gun = entities.get(artillery).expect("artillery should exist");
     assert_eq!(
         players[0].steel,
-        steel_before - config::ARTILLERY_AMMO_COST_STEEL,
+        steel_before - i64::from(config::ARTILLERY_AMMO_COST_STEEL),
         "Blanket Fire should spend the same artillery ammunition as Point Fire"
     );
     assert_eq!(

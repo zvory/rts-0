@@ -32,99 +32,74 @@ fn upgrade(game: &mut Game, depot: u32) {
 }
 
 #[test]
-fn industrial_center_cost_timing_limit_loss_and_replacement() {
+fn industrial_center_instant_cost_limit_loss_and_replacement() {
     let (mut game, depots) = fixture();
-    assert_eq!(game.snapshot_for(1).supply_cap, 100);
     upgrade(&mut game, depots[0]);
     assert_eq!(
         (game.state.players[0].steel, game.state.players[0].oil),
         (9_200, 9_700)
     );
+    let center = game.state.entities.get(depots[0]).unwrap();
+    assert!(center.is_industrial_center());
+    assert!(center.research_queue().is_empty());
+    assert_eq!((center.hp, center.max_hp), (540, 540));
+    assert_eq!(game.snapshot_for(1).supply_cap, 200);
+    upgrade(&mut game, depots[0]);
     assert_eq!(
-        game.state.entities.get(depots[0]).unwrap().research_queue()[0].total,
-        1_800
-    );
-    upgrade(&mut game, depots[0]); // Same depot cannot reserve a second center.
-    assert_eq!(
-        game.state
-            .entities
-            .get(depots[0])
-            .unwrap()
-            .research_queue()
-            .len(),
-        1
+        (game.state.players[0].steel, game.state.players[0].oil),
+        (9_200, 9_700)
     );
     upgrade(&mut game, depots[1]);
-    upgrade(&mut game, depots[2]); // Two pending centers reserve both slots.
-    assert!(game
+    upgrade(&mut game, depots[2]);
+    assert!(!game
         .state
         .entities
         .get(depots[2])
         .unwrap()
-        .research_queue()
-        .is_empty());
-    assert_eq!(game.snapshot_for(1).supply_cap, 100);
-    let mut restored =
-        restore_checkpoint_and_assert_equivalent(&game, "pending industrial centers");
-    while game.tick_count() < 1_799 {
-        game.tick();
-        restored.tick();
-    }
-    assert_eq!(game.snapshot_for(1).supply_cap, 100);
-    game.tick();
-    restored.tick();
-    assert_eq!(game.snapshot_for(1).supply_cap, 200);
-    assert_eq!(restored.snapshot_for(1).supply_cap, 200);
+        .is_industrial_center());
+    assert_eq!(
+        (game.state.players[0].steel, game.state.players[0].oil),
+        (8_400, 9_400)
+    );
+    assert_eq!(game.snapshot_for(1).supply_cap, 300);
     assert!(!game.state.players[0]
         .upgrades
         .contains(&UpgradeKind::IndustrialCenter));
-    let center = game
-        .snapshot_for(1)
-        .entities
-        .into_iter()
-        .find(|e| e.id == depots[0])
-        .unwrap();
-    assert!(center.industrial_center);
-    assert_eq!((center.hp, center.max_hp), (540, 540));
-    assert_eq!(center.kind, "resource_depot");
-    game.tick();
-    game.tick();
-    assert_eq!(game.snapshot_for(1).supply_cap, 300);
     game.state
         .entities
         .get_mut(depots[0])
         .unwrap()
         .apply_damage(u32::MAX, None);
-    // Capacity reacts to death before cleanup and before the next production reservation.
     assert_eq!(game.snapshot_for(1).supply_cap, 200);
     upgrade(&mut game, depots[2]);
-    assert_eq!(
-        game.state
-            .entities
-            .get(depots[2])
-            .unwrap()
-            .research_queue()
-            .len(),
-        1
-    );
-    restore_checkpoint_and_assert_equivalent(&game, "completed and replacement industrial centers");
+    assert!(game
+        .state
+        .entities
+        .get(depots[2])
+        .unwrap()
+        .is_industrial_center());
+    restore_checkpoint_and_assert_equivalent(&game, "instant industrial centers");
 }
 
 #[test]
-fn industrial_center_unpaid_cancel_and_invalid_ownership() {
+fn industrial_center_debt_is_projected_saved_and_repaid_by_income() {
     let (mut game, depots) = fixture();
     game.state.players[0].set_resources(0, 0);
     upgrade(&mut game, depots[0]);
-    assert!(!game.state.entities.get(depots[0]).unwrap().research_queue()[0].paid);
-    assert!(game.critical_event_state()[0].upgrading_depots.is_empty());
-    game.state.players[0].set_resources(800, 300);
-    game.tick();
-    assert!(game.state.entities.get(depots[0]).unwrap().research_queue()[0].paid);
     assert_eq!(
-        game.critical_event_state()[0].upgrading_depots,
-        vec![depots[0]]
+        (game.snapshot_for(1).steel, game.snapshot_for(1).oil),
+        (-800, -300)
     );
-    assert_eq!(game.snapshot_for(1).supply_cap, 100);
+    assert_eq!(game.snapshot_for(1).supply_cap, 200);
+    let observer = game.snapshot_for_spectator(&[1, 2]);
+    let row = observer
+        .player_resources
+        .iter()
+        .find(|p| p.id == 1)
+        .unwrap();
+    assert_eq!((row.steel, row.oil), (-800, -300));
+    restore_checkpoint_and_assert_equivalent(&game, "industrial center debt");
+    // Cancellation cannot refund an instantaneous, completed upgrade.
     game.enqueue(
         1,
         Command::Cancel {
@@ -133,59 +108,74 @@ fn industrial_center_unpaid_cancel_and_invalid_ownership() {
         },
     );
     game.tick();
-    assert!(game
-        .state
-        .entities
-        .get(depots[0])
-        .unwrap()
-        .research_queue()
-        .is_empty());
     assert_eq!(
         (game.state.players[0].steel, game.state.players[0].oil),
-        (800, 300)
+        (-800, -300)
     );
+    let tick = game.tick_count();
+    let player = &mut game.state.players[0];
+    player.add_gathered_resources(EntityKind::Steel, 900, tick);
+    assert_eq!((player.steel, player.oil), (100, -300));
+    assert!(
+        !player.can_afford(0, 0),
+        "even free jobs wait while either balance is negative"
+    );
+    player.add_gathered_resources(EntityKind::Oil, 300, tick);
+    assert!(player.can_afford(100, 0));
+    assert!(player.spend_resources(100, 0));
+    assert_eq!((player.steel, player.oil), (0, 0));
+    assert!(player.can_afford(0, 0));
+    // A second eligible depot may incur additional debt as well.
+    upgrade(&mut game, depots[1]);
+    assert_eq!(
+        (game.snapshot_for(1).steel, game.snapshot_for(1).oil),
+        (-800, -300)
+    );
+    assert_eq!(game.snapshot_for(1).supply_cap, 300);
+}
+
+#[test]
+fn industrial_center_rejects_enemy_unfinished_and_other_faction_depots() {
+    let (mut game, depots) = fixture();
     upgrade(&mut game, depots[3]);
-    assert!(game
+    assert!(!game
         .state
         .entities
         .get(depots[3])
         .unwrap()
-        .research_queue()
-        .is_empty());
+        .is_industrial_center());
     let unfinished = game
         .state
         .entities
         .spawn_building(1, EntityKind::ResourceDepot, 800.0, 800.0, false)
         .unwrap();
     upgrade(&mut game, unfinished);
-    assert!(game
+    assert!(!game
         .state
         .entities
         .get(unfinished)
         .unwrap()
-        .research_queue()
-        .is_empty());
-}
-
-#[test]
-fn industrial_center_over_cap_blocks_only_new_supply_and_other_factions_stay_unchanged() {
-    let (mut game, _) = fixture();
-    game.state.players[0].set_supply_used(110);
-    assert!(!game.state.players[0].can_reserve_supply(1, &game.state.entities));
-    assert!(game.state.players[0].can_reserve_supply(0, &game.state.entities));
+        .is_industrial_center());
     for faction in ["ekat", "cultivators"] {
         game.state.players[0].faction_id = faction.into();
+        upgrade(&mut game, depots[0]);
+        assert!(!game
+            .state
+            .entities
+            .get(depots[0])
+            .unwrap()
+            .is_industrial_center());
         assert_eq!(game.snapshot_for(1).supply_cap, 300);
     }
+    assert_eq!(
+        (game.state.players[0].steel, game.state.players[0].oil),
+        (10_000, 10_000)
+    );
 }
 
 #[test]
-fn industrial_center_completion_does_not_pause_worker_training() {
+fn industrial_center_debt_keeps_paid_training_running_and_unpaid_training_waiting() {
     let (mut game, depots) = fixture();
-    upgrade(&mut game, depots[0]);
-    let depot = game.state.entities.get_mut(depots[0]).unwrap();
-    let research = depot.research_queue_mut().unwrap().first_mut().unwrap();
-    research.progress = research.total - 1;
     game.enqueue(
         1,
         Command::Train {
@@ -194,36 +184,58 @@ fn industrial_center_completion_does_not_pause_worker_training() {
         },
     );
     game.tick();
+    let progress = game.state.entities.get(depots[0]).unwrap().prod_queue()[0].progress;
+    game.state.players[0].set_resources(0, 0);
+    upgrade(&mut game, depots[0]);
     let depot = game.state.entities.get(depots[0]).unwrap();
     assert!(depot.is_industrial_center());
-    assert_eq!(depot.prod_queue()[0].progress, 1);
+    assert_eq!(depot.prod_queue()[0].progress, progress + 1);
+    game.enqueue(
+        1,
+        Command::Train {
+            building: depots[1],
+            unit: EntityKind::Worker,
+        },
+    );
+    game.tick();
+    let waiting = &game.state.entities.get(depots[1]).unwrap().prod_queue()[0];
+    assert!(!waiting.paid);
+    assert_eq!(waiting.progress, 0);
+    let cost = crate::rules::economy::resource_cost(EntityKind::Worker);
+    let tick = game.tick_count();
+    game.state.players[0].add_gathered_resources(EntityKind::Steel, 800 + cost.steel, tick);
+    game.tick();
+    assert!(
+        !game.state.entities.get(depots[1]).unwrap().prod_queue()[0].paid,
+        "oil debt blocks a steel-only unit"
+    );
+    game.state.players[0].add_gathered_resources(EntityKind::Oil, 300 + cost.oil, tick);
+    game.tick();
+    let started = &game.state.entities.get(depots[1]).unwrap().prod_queue()[0];
+    assert!(started.paid);
+    assert_eq!(started.progress, 1);
 }
 
 #[test]
-fn critical_events_report_authoritative_supply_and_only_accepted_depot_upgrades() {
+fn critical_events_report_immediate_industrial_centers() {
     let (mut game, depots) = fixture();
     assert!(game.critical_event_state()[0].upgrading_depots.is_empty());
     upgrade(&mut game, depots[0]);
     let facts = game.critical_event_state();
     assert_eq!(facts[0].upgrading_depots, vec![depots[0]]);
-    assert_eq!(facts[0].supply_cap, game.snapshot_for(1).supply_cap);
-    assert_eq!(facts[0].supply_used, game.snapshot_for(1).supply_used);
+    assert_eq!(facts[0].supply_cap, 200);
     assert!(facts[1].upgrading_depots.is_empty());
-    upgrade(&mut game, depots[1]);
-    upgrade(&mut game, depots[2]);
-    assert_eq!(game.critical_event_state()[0].upgrading_depots.len(), 2);
 }
 
 #[test]
 fn industrial_center_hp_bonus_preserves_damage_and_applies_once() {
     let (mut game, depots) = fixture();
+    game.state
+        .entities
+        .get_mut(depots[0])
+        .unwrap()
+        .apply_damage(40, None);
     upgrade(&mut game, depots[0]);
-    let depot = game.state.entities.get_mut(depots[0]).unwrap();
-    depot.apply_damage(40, None);
-    assert_eq!((depot.hp, depot.max_hp), (140, 180));
-    let research = depot.research_queue_mut().unwrap().first_mut().unwrap();
-    research.progress = research.total - 1;
-    game.tick();
     let depot = game.state.entities.get(depots[0]).unwrap();
     assert_eq!((depot.hp, depot.max_hp), (500, 540));
     let ordinary = game.state.entities.get(depots[1]).unwrap();

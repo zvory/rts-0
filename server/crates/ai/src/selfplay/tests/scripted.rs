@@ -85,7 +85,7 @@ fn scripted_self_play_mine_only_steel_fairness() {
     let diff = snap_a.steel.abs_diff(snap_b.steel);
 
     assert!(
-        diff <= STEEL_TOLERANCE,
+        diff <= u64::from(STEEL_TOLERANCE),
         "after two minutes of passive mining, player 1 has {} steel and player 2 has {} steel (diff = {}, tolerance = {})",
         snap_a.steel,
         snap_b.steel,

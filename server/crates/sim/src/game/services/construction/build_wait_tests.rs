@@ -487,3 +487,34 @@ fn eject_helper_searches_beyond_eight_tiles() {
         "ejection must not strand a worker behind an arbitrary eight-tile search limit"
     );
 }
+
+#[test]
+fn oil_debt_blocks_steel_only_building_until_repaid_then_construction_continues() {
+    let map = flat_map(16);
+    let mut entities = EntityStore::new();
+    let (x, y) = footprint_center(&map, EntityKind::Depot, 4, 4);
+    let worker = entities.spawn_unit(1, EntityKind::Worker, x, y).unwrap();
+    entities
+        .get_mut(worker)
+        .unwrap()
+        .set_order(Order::build(EntityKind::Depot, 4, 4));
+    let mut players = vec![player_state(1)];
+    let cost = rules::economy::resource_cost(EntityKind::Depot);
+    players[0].set_resources(cost.steel, -1);
+    let mut events = HashMap::new();
+    run_construction_tick!(&map, &mut entities, &mut players, &mut events);
+    assert!(!entities.iter().any(|e| e.kind == EntityKind::Depot));
+    players[0].add_gathered_resources(EntityKind::Oil, 1, 1);
+    run_construction_tick!(&map, &mut entities, &mut players, &mut events);
+    let scaffold = entities
+        .iter()
+        .find(|e| e.kind == EntityKind::Depot)
+        .unwrap();
+    let (id, progress) = (scaffold.id, scaffold.build_progress_fraction());
+    players[0].set_resources(-800, -300);
+    run_construction_tick!(&map, &mut entities, &mut players, &mut events);
+    assert!(
+        entities.get(id).unwrap().build_progress_fraction() > progress,
+        "already paid construction continues in debt"
+    );
+}
