@@ -754,7 +754,10 @@ fn intrinsic_supply_and_alert_cap_remain_300_without_depots() {
             game.state.entities.remove(depot);
         }
         assert_eq!(game.snapshot_for(1).supply_cap, 300);
-        assert!(game.critical_event_state().iter().all(|state| state.supply_cap == 300));
+        assert!(game
+            .critical_event_state()
+            .iter()
+            .all(|state| state.supply_cap == 300));
         let player = &mut game.state.players[0];
         player.set_supply_used(0);
         assert!(player.reserve_supply(300));

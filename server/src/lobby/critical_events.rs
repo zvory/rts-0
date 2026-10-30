@@ -101,14 +101,7 @@ pub(super) fn deliver(
     if notifications.is_empty() {
         return;
     }
-    deliver_notifications(
-        notifications,
-        tick,
-        room,
-        players,
-        order,
-        seats,
-    );
+    deliver_notifications(notifications, tick, room, players, order, seats);
 }
 
 fn deliver_notifications(
