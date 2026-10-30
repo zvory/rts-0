@@ -21,49 +21,31 @@ impl PlayerState {
     }
 
     pub(crate) fn can_afford(&self, steel: u32, oil: u32) -> bool {
-        (steel == 0 || self.steel >= i64::from(steel)) && (oil == 0 || self.oil >= i64::from(oil))
+        self.steel >= steel && self.oil >= oil
     }
 
     pub(crate) fn spend_resources(&mut self, steel: u32, oil: u32) -> bool {
         if !self.can_afford(steel, oil) {
             return false;
         }
-        self.steel -= i64::from(steel);
-        self.oil -= i64::from(oil);
+        self.steel -= steel;
+        self.oil -= oil;
         true
     }
 
-    pub(crate) fn set_resources(&mut self, steel: impl Into<i64>, oil: impl Into<i64>) {
-        self.steel = steel.into();
-        self.oil = oil.into();
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) fn set_resources(&mut self, steel: u32, oil: u32) {
+        self.steel = steel;
+        self.oil = oil;
     }
 
     pub(crate) fn spend_cost(&mut self, cost: ResourceCost) -> bool {
         self.spend_resources(cost.steel, cost.oil)
     }
 
-    /// New units and construction wait for all debt, even when their own cost is zero.
-    pub(crate) fn can_start_production(&self, cost: ResourceCost) -> bool {
-        self.steel >= 0 && self.oil >= 0 && self.can_afford(cost.steel, cost.oil)
-    }
-
-    pub(crate) fn spend_production_cost(&mut self, cost: ResourceCost) -> bool {
-        self.can_start_production(cost) && self.spend_cost(cost)
-    }
-
-    /// Only instantaneous depot upgrades can bypass affordability and incur debt.
-    pub(crate) fn spend_industrial_center_cost(&mut self) {
-        self.steel = self
-            .steel
-            .saturating_sub(i64::from(config::INDUSTRIAL_CENTER_COST_STEEL));
-        self.oil = self
-            .oil
-            .saturating_sub(i64::from(config::INDUSTRIAL_CENTER_COST_OIL));
-    }
-
     pub(crate) fn refund_resources(&mut self, steel: u32, oil: u32) {
-        self.steel = self.steel.saturating_add(i64::from(steel));
-        self.oil = self.oil.saturating_add(i64::from(oil));
+        self.steel = self.steel.saturating_add(steel);
+        self.oil = self.oil.saturating_add(oil);
     }
 
     pub(crate) fn refund_cost(&mut self, cost: ResourceCost) {
@@ -80,8 +62,8 @@ impl PlayerState {
             _ => return,
         };
         match kind {
-            EntityKind::Oil => self.oil = self.oil.saturating_add(i64::from(amount)),
-            EntityKind::Steel => self.steel = self.steel.saturating_add(i64::from(amount)),
+            EntityKind::Oil => self.oil = self.oil.saturating_add(amount),
+            EntityKind::Steel => self.steel = self.steel.saturating_add(amount),
             _ => {}
         }
         self.score.resources_mined.steel = self.score.resources_mined.steel.saturating_add(steel);
@@ -113,42 +95,14 @@ impl PlayerState {
         self.upgrades.contains(&upgrade)
     }
 
-    pub(crate) fn supply_cap(&self, entities: &crate::game::entity::EntityStore) -> u32 {
-        if self.faction_id != crate::rules::faction::DEFAULT_FACTION_ID {
-            return config::PLAYER_SUPPLY_CAP;
-        }
-        let centers = entities
-            .iter()
-            .filter(|e| {
-                e.owner == self.id
-                    && e.hp > 0
-                    && !e.under_construction()
-                    && e.is_industrial_center()
-            })
-            .count() as u32;
-        config::STARTING_SUPPLY_CAP
-            .saturating_add(centers.saturating_mul(config::INDUSTRIAL_CENTER_SUPPLY))
-            .min(config::PLAYER_SUPPLY_CAP)
+    pub(crate) fn can_reserve_supply(&self, supply: u32) -> bool {
+        self.supply_used
+            .checked_add(supply)
+            .is_some_and(|next| next <= config::PLAYER_SUPPLY_CAP)
     }
 
-    pub(crate) fn can_reserve_supply(
-        &self,
-        supply: u32,
-        entities: &crate::game::entity::EntityStore,
-    ) -> bool {
-        supply == 0
-            || self
-                .supply_used
-                .checked_add(supply)
-                .is_some_and(|next| next <= self.supply_cap(entities))
-    }
-
-    pub(crate) fn reserve_supply(
-        &mut self,
-        supply: u32,
-        entities: &crate::game::entity::EntityStore,
-    ) -> bool {
-        if !self.can_reserve_supply(supply, entities) {
+    pub(crate) fn reserve_supply(&mut self, supply: u32) -> bool {
+        if !self.can_reserve_supply(supply) {
             return false;
         }
         self.supply_used += supply;

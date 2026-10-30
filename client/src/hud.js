@@ -634,7 +634,7 @@ export class HUD {
         ));
         return;
       case "playNotEnough":
-        this._playNotEnoughForCost(intent.cost, intent.supply, intent.actionCostOnly);
+        this._playNotEnoughForCost(intent.cost, intent.supply);
         return;
       case "playCannotBuild":
         this.audio?.play("notice_cannot_build", { category: "alert", priority: 4 });
@@ -864,13 +864,11 @@ export class HUD {
     return steel >= (cost.steel ?? 0) && oil >= (cost.oil ?? 0);
   }
 
-  _missingResourceSoundId(cost, res = null, supply = null, actionCostOnly = false) {
+  _missingResourceSoundId(cost, res = null, supply = null) {
     if (!cost) return null;
     const resources = res || this._commandResources();
-    const steelShort = (!actionCostOnly || cost.steel > 0) &&
-      (resources.steel ?? 0) < (cost.steel ?? 0);
-    const oilShort = (!actionCostOnly || cost.oil > 0) &&
-      (resources.oil ?? 0) < (cost.oil ?? 0);
+    const steelShort = (resources.steel ?? 0) < (cost.steel ?? 0);
+    const oilShort = (resources.oil ?? 0) < (cost.oil ?? 0);
     if (steelShort) return "notice_steel";
     if (oilShort) return "notice_oil";
     if (Number.isFinite(supply) && supply > 0) {
@@ -881,8 +879,8 @@ export class HUD {
     return null;
   }
 
-  _playNotEnoughForCost(cost, supply = null, actionCostOnly = false) {
-    const soundId = this._missingResourceSoundId(cost, undefined, supply, actionCostOnly);
+  _playNotEnoughForCost(cost, supply = null) {
+    const soundId = this._missingResourceSoundId(cost, undefined, supply);
     if (soundId && this.audio) {
       this.audio.play(soundId, { category: "alert", priority: 4 });
     }

@@ -113,8 +113,8 @@ fn cancel_unworked_scaffold_refunds_owner_and_rejects_enemy() {
         entities.contains(site),
         "another player cannot cancel the scaffold"
     );
-    assert_eq!(players[0].steel, starting_steel - i64::from(cost.steel));
-    assert_eq!(players[0].oil, starting_oil - i64::from(cost.oil));
+    assert_eq!(players[0].steel, starting_steel - cost.steel);
+    assert_eq!(players[0].oil, starting_oil - cost.oil);
 
     apply_with_players(
         &map,

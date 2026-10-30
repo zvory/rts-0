@@ -337,7 +337,7 @@ assert(
   "compact snapshot scalar schema must match JS decoder",
 );
 assert(
-  protocolContract.compactSlotSchemas.entity.at(-1).name === "industrialCenter",
+  protocolContract.compactSlotSchemas.entity.at(-1).name === "rocketRackCount",
   "compact entity slot schema must include the latest appended field",
 );
 assert(
@@ -594,31 +594,6 @@ assert(
   JSON.stringify(msg.addAi(2)) === JSON.stringify({ t: "addAi", teamId: 2 }),
   "addAi builder must support optional teamId",
 );
-{
-  const depot = [90, 1, KIND_CODE[KIND.RESOURCE_DEPOT], 320, 352, 180, 180, STATE_CODE[STATE.IDLE]];
-  const center = [...depot, ...Array(37).fill(null)];
-  center[0] = 91;
-  center[40] = [UPGRADE_CODE[UPGRADE.INDUSTRIAL_CENTER]];
-  center[44] = true;
-  const decoded = decodeServerMessage({
-    t: "snapshot", v: COMPACT_SNAPSHOT_VERSION, s: [12, -800, -300, 5, 200],
-    pr: [[1, -800, -300, 5, 200, 0, []]],
-    e: [depot, center],
-    n: [0, 0, 0, 0, 0],
-    mb: [
-      [92, 2, KIND_CODE[KIND.RESOURCE_DEPOT], 640, 672, [[20, 21]], 10],
-      [93, 2, KIND_CODE[KIND.RESOURCE_DEPOT], 736, 672, [[23, 21]], 10, true],
-    ],
-  });
-  assert(decoded.steel === -800 && decoded.oil === -300, "compact snapshot preserves resource debt");
-  assert(decoded.playerResources[0].steel === -800 && decoded.playerResources[0].oil === -300, "observer balances preserve debt");
-  assert(!decoded.entities[0].industrialCenter, "ordinary depot has no completed local upgrade");
-  assert(decoded.entities[1].industrialCenter === true, "compact Industrial Center flag decodes at slot 44");
-  assert(decoded.entities[1].prodUpgradeQueue[0] === UPGRADE.INDUSTRIAL_CENTER, "local upgrade queue code decodes");
-  assert(decoded.rememberedBuildings[0].industrialCenter === false, "ordinary fog memory defaults to no local upgrade");
-  assert(decoded.rememberedBuildings[1].industrialCenter === true, "fog memory retains the observed Industrial Center flag");
-}
-
 const decodedAck = decodeServerMessage({
   t: "snapshot",
   v: COMPACT_SNAPSHOT_VERSION,

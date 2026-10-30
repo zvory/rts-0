@@ -836,7 +836,8 @@ impl Game {
             .ok_or(LabError::InvalidPlayer {
                 player_id: input.player_id,
             })?;
-        player.set_resources(input.steel, input.oil);
+        player.steel = input.steel;
+        player.oil = input.oil;
         Ok(LabOpOutcome::PlayerResourcesSet {
             player_id: input.player_id,
             steel: input.steel,

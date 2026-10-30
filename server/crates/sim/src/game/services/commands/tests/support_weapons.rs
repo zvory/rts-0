@@ -177,10 +177,7 @@ fn artillery_point_fire_inside_arc_keeps_setup_facing_fixed() {
         unit.emplacement_facing().unwrap_or_default().abs() < 0.001,
         "in-arc point fire must not recenter the deployed field of fire"
     );
-    assert_eq!(
-        players[0].steel,
-        1_000 - i64::from(config::ARTILLERY_AMMO_COST_STEEL)
-    );
+    assert_eq!(players[0].steel, 1_000 - config::ARTILLERY_AMMO_COST_STEEL);
     assert!(events.get(&1).is_some_and(|events| events
         .iter()
         .any(|event| matches!(event, Event::ArtilleryTarget { from, .. } if *from == artillery))));

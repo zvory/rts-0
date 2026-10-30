@@ -1100,7 +1100,6 @@ mod tests {
             500,
             states::TRAIN,
         );
-        center.industrial_center = true;
         center.prod_kind = Some(kinds::WORKER.to_string());
         center.prod_progress = Some(0.25);
         center.prod_queue = Some(2);
@@ -1131,8 +1130,8 @@ mod tests {
             ground_decal_revision: 17,
             ground_decal_delta: None,
             world_combat_position: Some([1024.0, 2048.0]),
-            steel: -800,
-            oil: -300,
+            steel: 100,
+            oil: 25,
             supply_used: 3,
             supply_cap: 10,
             auto_build: Some(AutoBuildSettingsSnapshot {
@@ -1175,7 +1174,6 @@ mod tests {
             visible_tiles: vec![1, 1, 0, 0, 0, 1],
             explored_tiles: vec![1, 1, 1, 0, 0, 1],
             remembered_buildings: vec![RememberedBuildingView {
-                industrial_center: true,
                 id: 99,
                 owner: 2,
                 kind: kinds::DEPOT.to_string(),
@@ -1301,7 +1299,7 @@ mod tests {
         let value: serde_json::Value = serde_json::from_str(&compact).unwrap();
         assert_eq!(value["t"], "snapshot");
         assert_eq!(value["v"], COMPACT_SNAPSHOT_VERSION);
-        assert_eq!(value["s"], serde_json::json!([42, -800, -300, 3, 10]));
+        assert_eq!(value["s"], serde_json::json!([42, 100, 25, 3, 10]));
         assert_eq!(value["ab"], serde_json::json!([true, 250, 150]));
         assert_eq!(value["wc"], serde_json::json!([1024.0, 2048.0]));
         assert_eq!(value["e"].as_array().unwrap().len(), 3);
@@ -1336,7 +1334,6 @@ mod tests {
             serde_json::json!([[1, 256.0, 512.0], [2, 320.0, 544.0]])
         );
         assert_eq!(value["e"][2][34], serde_json::json!(true));
-        assert_eq!(value["e"][2][44], serde_json::json!(true));
         let repeat_codes = [kind_code(kinds::WORKER), kind_code(kinds::SCOUT_CAR)];
         assert_eq!(value["e"][2][36], serde_json::json!(repeat_codes));
         assert_eq!(
@@ -1367,7 +1364,7 @@ mod tests {
         assert_eq!(value["eg"], serde_json::json!([1, 3, 2, 1]));
         assert_eq!(
             value["mb"],
-            serde_json::json!([[99, 2, 7, 640.0, 672.0, [[20, 21], [21, 21]], 39, true]])
+            serde_json::json!([[99, 2, 7, 640.0, 672.0, [[20, 21], [21, 21]], 39]])
         );
         assert_eq!(value["u"], serde_json::json!([4]));
         assert_eq!(value["ev"].as_array().unwrap().len(), 12);

@@ -166,25 +166,21 @@ pub fn cost(kind: EntityKind) -> (u32, u32) {
 }
 
 /// Human-readable notice for a fixed Steel/Oil resource shortage.
-pub fn resource_shortage_notice_for_cost(
-    steel: impl Into<i64>,
-    oil: impl Into<i64>,
-    cost: ResourceCost,
-) -> &'static str {
+pub fn resource_shortage_notice_for_cost(steel: u32, oil: u32, cost: ResourceCost) -> &'static str {
     resource_shortage_notice(steel, oil, cost.steel, cost.oil)
 }
 
 /// Human-readable notice for a resource shortage. Oil is reported first because
 /// mixed steel/oil units are usually blocked by oil in practice.
 pub fn resource_shortage_notice(
-    steel: impl Into<i64>,
-    oil: impl Into<i64>,
+    steel: u32,
+    oil: u32,
     cost_steel: u32,
     cost_oil: u32,
 ) -> &'static str {
-    if oil.into() < i64::from(cost_oil) {
+    if oil < cost_oil {
         "Not enough oil"
-    } else if steel.into() < i64::from(cost_steel) {
+    } else if steel < cost_steel {
         "Not enough steel"
     } else {
         "Not enough resources"

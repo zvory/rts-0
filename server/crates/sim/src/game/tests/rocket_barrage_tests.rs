@@ -519,9 +519,8 @@ fn barrage_commitment_rejects_immediate_stop_and_hold_position() {
 }
 
 #[test]
-fn later_barrage_costs_one_hundred_fifty_oil_despite_steel_debt() {
+fn later_barrage_costs_one_hundred_fifty_oil() {
     let (mut game, launcher, target) = fixture(150);
-    game.state.players[0].set_resources(-800, 150);
     order_barrage(&mut game, launcher, target);
     game.tick();
     assert_eq!(game.state.players[0].oil, 150, "first barrage remains free");
@@ -532,7 +531,6 @@ fn later_barrage_costs_one_hundred_fifty_oil_despite_steel_debt() {
     order_barrage(&mut game, launcher, target);
     game.tick();
     assert_eq!(game.state.players[0].oil, 0);
-    assert_eq!(game.state.players[0].steel, -800);
 }
 
 #[test]

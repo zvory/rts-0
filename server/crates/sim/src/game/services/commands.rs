@@ -1931,14 +1931,10 @@ fn order_train(
     let queue_empty = entities
         .get(building)
         .is_some_and(|producer| producer.prod_queue().is_empty());
-    let can_reserve_supply = ps.can_reserve_supply(supply, entities);
+    let can_reserve_supply = ps.can_reserve_supply(supply);
     let mut paid = false;
-    if queue_empty
-        && !unit.is_resource_extractor()
-        && can_reserve_supply
-        && ps.spend_production_cost(cost)
-    {
-        if ps.reserve_supply(supply, entities) {
+    if queue_empty && !unit.is_resource_extractor() && can_reserve_supply && ps.spend_cost(cost) {
+        if ps.reserve_supply(supply) {
             paid = true;
         } else {
             ps.refund_cost(cost);

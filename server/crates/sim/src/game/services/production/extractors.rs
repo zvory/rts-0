@@ -11,7 +11,6 @@ pub(super) fn advance_automatic(
     producer_id: u32,
     faction_id: &str,
     tick: u32,
-    can_start: bool,
 ) -> Vec<(u32, EntityKind)> {
     let Some((owner, producer_kind, active)) = entities.get(producer_id).map(|producer| {
         (
@@ -54,9 +53,6 @@ pub(super) fn advance_automatic(
             continue;
         }
         let scaffold = scaffold_id(entities, producer_id, kind).or_else(|| {
-            if !can_start {
-                return None;
-            }
             let (x, y) = target(entities, producer_id, kind)?;
             let scaffold = entities.spawn_building(owner, kind, x, y, false)?;
             let associated = entities.get_mut(scaffold).is_some_and(|entity| {
@@ -207,31 +203,6 @@ mod tests {
     use super::*;
     use crate::game::entity::{GatherPhase, Order};
     use crate::rules::faction::{CATALOGS, CURRENT_CATALOG};
-
-    #[test]
-    fn debt_blocks_new_free_extractors_but_existing_scaffolds_finish() {
-        let mut entities = EntityStore::new();
-        let producer_kind = CURRENT_CATALOG
-            .production_anchors
-            .iter()
-            .copied()
-            .find(|kind| {
-                crate::rules::economy::trainable_units(*kind).contains(&EntityKind::SteelMine)
-            })
-            .unwrap();
-        let node_kind = EntityKind::SteelMine.extracted_resource_kind().unwrap();
-        let depot = entities
-            .spawn_building(1, producer_kind, 64.0, 64.0, true)
-            .unwrap();
-        entities.spawn_node(node_kind, 128.0, 64.0).unwrap();
-        advance_automatic(&mut entities, depot, CURRENT_CATALOG.id, 1, false);
-        assert!(scaffold_id(&entities, depot, EntityKind::SteelMine).is_none());
-        advance_automatic(&mut entities, depot, CURRENT_CATALOG.id, 2, true);
-        let scaffold = scaffold_id(&entities, depot, EntityKind::SteelMine).unwrap();
-        let progress = entities.get(scaffold).unwrap().build_progress_fraction();
-        advance_automatic(&mut entities, depot, CURRENT_CATALOG.id, 3, false);
-        assert!(entities.get(scaffold).unwrap().build_progress_fraction() > progress);
-    }
 
     #[test]
     fn direct_miner_reservation_blocks_extractor_target() {

@@ -2789,16 +2789,3 @@ When that launch produces an all-AI live match, the score screen retains the liv
 through automatic post-match replay playback and renders it as an Observation ID. The id is the
 handoff key for replay recovery and server lag-log inspection; it is not a player identity or a
 new gameplay control.
-
-Industrial Centers retain the Resource Depot kind and footprint. The research command card upgrades
-one selected completed depot immediately, even with insufficient resources; two centers lock out
-further upgrades. The card explains resource debt, and the HUD displays signed steel/oil balances.
-The renderer receives the public `industrialCenter` physical flag through presentation snapshots
-and selects the simplified Refinery Works PNG atlas for completed upgrades. Its neutral-white
-paint receives the owning team color; the ordinary depot retains its worksite atlas. There is no
-gold footprint rim. The atlas variant participates in body cache identity and normal rig teardown.
-Fog memory uses the last observed flag. Dedicated audio is deferred.
-
-Command-card ability and research affordability checks only resources with a nonzero cost.
-Free abilities remain enabled during resource debt when their normal charge/cooldown/tech
-requirements are met. Train/build cards retain the creation-only debt gate.

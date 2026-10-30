@@ -548,7 +548,7 @@ fn world_ability_intent_valid(
     let Some(ps) = players.iter().find(|p| p.id == owner) else {
         return false;
     };
-    ps.can_afford(definition.cost.steel, definition.cost.oil)
+    ps.steel >= definition.cost.steel && ps.oil >= definition.cost.oil
 }
 
 fn self_ability_intent_valid(

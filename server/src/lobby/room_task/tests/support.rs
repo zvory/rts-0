@@ -335,7 +335,7 @@ pub(super) fn lab_snapshot(task: &RoomTask) -> Snapshot {
     game.snapshot_full_for(LAB_PLAYER_ONE_ID)
 }
 
-pub(super) fn lab_player_resources(task: &RoomTask, player_id: u32) -> (i64, i64) {
+pub(super) fn lab_player_resources(task: &RoomTask, player_id: u32) -> (u32, u32) {
     let snapshot = lab_snapshot(task);
     let resources = snapshot
         .player_resources

@@ -384,7 +384,7 @@ fn worker_auto_build_ignores_unspent_oil_reserve() {
     assert!(queue[0].paid);
     assert_eq!(
         (game.state.players[0].steel, game.state.players[0].oil),
-        (i64::from(reserve_steel), 0)
+        (reserve_steel, 0)
     );
 }
 
@@ -458,10 +458,8 @@ fn auto_build_waits_when_either_resource_would_cross_its_floor() {
         reserve_steel: 200,
         reserve_oil: 100,
     };
-    game.state.players[0].set_resources(
-        i64::from(cost.steel.saturating_add(199)),
-        i64::from(cost.oil.saturating_add(100)),
-    );
+    game.state.players[0]
+        .set_resources(cost.steel.saturating_add(199), cost.oil.saturating_add(100));
 
     game.tick();
 
@@ -474,10 +472,7 @@ fn auto_build_waits_when_either_resource_would_cross_its_floor() {
         .is_empty());
     assert_eq!(
         (game.state.players[0].steel, game.state.players[0].oil),
-        (
-            i64::from(cost.steel.saturating_add(199)),
-            i64::from(cost.oil.saturating_add(100))
-        )
+        (cost.steel.saturating_add(199), cost.oil.saturating_add(100))
     );
 }
 
@@ -614,8 +609,8 @@ fn repeat_production_revalidates_producer_compatibility() {
         .expect("barracks")
         .prod_queue()
         .is_empty());
-    assert_eq!(game.state.players[0].steel, i64::from(cost.steel));
-    assert_eq!(game.state.players[0].oil, i64::from(cost.oil));
+    assert_eq!(game.state.players[0].steel, cost.steel);
+    assert_eq!(game.state.players[0].oil, cost.oil);
     assert_eq!(game.state.players[0].supply_used, 0);
 }
 
@@ -748,4 +743,40 @@ fn critical_events_track_lost_prerequisites_and_recovery_without_duplicates() {
             .set_repeat_production(Some(EntityKind::AntiTankGun), false);
     }
     assert!(game.critical_event_state()[0].blocked_production.is_empty());
+}
+
+#[test]
+fn intrinsic_supply_and_alert_cap_remain_300_without_depots() {
+    let mut game = empty_flat_game(&players());
+    let depot = spawn_building(&mut game, 1, EntityKind::ResourceDepot, (3, 3));
+    for remove_depot in [false, true] {
+        if remove_depot {
+            game.state.entities.remove(depot);
+        }
+        assert_eq!(game.snapshot_for(1).supply_cap, 300);
+        assert!(game
+            .critical_event_state()
+            .iter()
+            .all(|state| state.supply_cap == 300));
+        let player = &mut game.state.players[0];
+        player.set_supply_used(0);
+        assert!(player.reserve_supply(300));
+        assert!(!player.reserve_supply(1));
+        assert!(!player.reserve_supply(u32::MAX));
+    }
+}
+
+#[test]
+fn resource_spending_cannot_create_debt_or_partially_charge() {
+    let mut game = empty_flat_game(&players());
+    let player = &mut game.state.players[0];
+    player.set_resources(25, 0);
+    for (steel, oil) in [(26, 0), (0, 1), (25, 1), (u32::MAX, u32::MAX)] {
+        assert!(!player.spend_resources(steel, oil));
+        assert_eq!((player.steel, player.oil), (25, 0));
+    }
+    assert!(player.spend_resources(25, 0));
+    assert_eq!((player.steel, player.oil), (0, 0));
+    assert!(player.spend_resources(0, 0));
+    assert!(!player.spend_resources(1, 0));
 }

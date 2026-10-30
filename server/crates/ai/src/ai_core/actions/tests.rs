@@ -5,7 +5,6 @@ use crate::config;
 
 fn worker(id: u32, x: f32, y: f32, state: AiEntityState) -> AiEntitySummary {
     AiEntitySummary {
-        industrial_center_slot_reserved: false,
         id,
         owner: 1,
         kind: EntityKind::Worker,
@@ -24,7 +23,6 @@ fn worker(id: u32, x: f32, y: f32, state: AiEntityState) -> AiEntitySummary {
 
 fn production_building(id: u32, kind: EntityKind, queue_len: usize) -> AiEntitySummary {
     AiEntitySummary {
-        industrial_center_slot_reserved: false,
         id,
         owner: 1,
         kind,
@@ -43,7 +41,6 @@ fn production_building(id: u32, kind: EntityKind, queue_len: usize) -> AiEntityS
 
 fn complete_building(id: u32, kind: EntityKind) -> AiEntitySummary {
     AiEntitySummary {
-        industrial_center_slot_reserved: false,
         id,
         owner: 1,
         kind,

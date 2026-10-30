@@ -198,10 +198,7 @@ fn golem_mines_four_worker_loads_near_zamok() {
         game.tick();
     }
 
-    assert_eq!(
-        game.state.players[0].steel,
-        i64::from(config::STEEL_LOAD * 4)
-    );
+    assert_eq!(game.state.players[0].steel, config::STEEL_LOAD * 4);
 }
 
 #[test]

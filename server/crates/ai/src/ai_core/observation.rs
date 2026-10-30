@@ -115,7 +115,6 @@ impl From<AiBuildIntent> for AiBuildObservation {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct AiEntitySummary {
-    pub(crate) industrial_center_slot_reserved: bool,
     pub(crate) id: u32,
     pub(crate) owner: u32,
     pub(crate) kind: EntityKind,
@@ -335,16 +334,8 @@ impl AiObservation {
             tile_size: start.map.tile_size,
         };
         let economy = AiEconomy {
-            steel: if snapshot.steel < 0 || snapshot.oil < 0 {
-                0
-            } else {
-                snapshot.steel.min(i64::from(u32::MAX)) as u32
-            },
-            oil: if snapshot.steel < 0 || snapshot.oil < 0 {
-                0
-            } else {
-                snapshot.oil.min(i64::from(u32::MAX)) as u32
-            },
+            steel: snapshot.steel,
+            oil: snapshot.oil,
             supply_used: snapshot.supply_used,
             supply_cap: snapshot.supply_cap,
         };
@@ -541,9 +532,6 @@ fn project_entity(entity: &SdkEntity) -> AiEntitySummary {
         SdkEntityState::Unknown => AiEntityState::Unknown,
     };
     AiEntitySummary {
-        industrial_center_slot_reserved: entity
-            .production
-            .is_some_and(|p| p.industrial_center_slot_reserved),
         id: entity.id,
         owner: entity.owner,
         kind: entity.kind,
@@ -595,11 +583,6 @@ impl AiEntitySummary {
         let kind: EntityKind = view.kind.parse().ok()?;
         let state = AiEntityState::from_protocol_state(&view.state);
         Some(Self {
-            industrial_center_slot_reserved: view.industrial_center
-                || view
-                    .prod_upgrade_queue
-                    .iter()
-                    .any(|id| id == "industrial_center"),
             id: view.id,
             owner: view.owner,
             kind,
