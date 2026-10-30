@@ -14,11 +14,12 @@ use rts_rules::defs::unit_def;
 use rts_sim::game::entity::EntityKind;
 
 use crate::ai_core::observation::{AiEntityState, AiEntitySummary, AiObservation};
-use crate::sdk::{
-    AiActions, AiFrame, AiStrategy, PullbackMemory, PullbackParams, PullbackUnit, UnitGroup,
-};
+use crate::sdk::{AiActions, AiFrame, AiStrategy, UnitGroup};
 
 mod params;
+mod pullback;
+
+use pullback::{PullbackMemory, PullbackParams, PullbackUnit};
 
 pub(crate) use params::{FocusMode, RifleSquadParams};
 
