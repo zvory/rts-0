@@ -281,15 +281,16 @@ function minimapPartMarkup(kind, atlas, teamColor, part) {
   const entity = { kind, facing: 0, weaponFacing: 0,
     setupState: packed ? SETUP.PACKED : SETUP.DEPLOYED };
   const definition = RASTER_RIG_DEFINITIONS.get(kind);
-  const pose = sampleRigAnimation(definition, entity, createRigRenderContext(entity));
+  const context = createRigRenderContext(entity);
+  const pose = sampleRigAnimation(definition, entity, context);
   const components = atlas.sprites.filter(sprite => {
     if (kind === KIND.TANK) return part === "hull"
       ? !["part.turret", "part.barrel"].includes(sprite.animationPart)
       : ["part.turret", "part.barrel"].includes(sprite.animationPart);
-    return sprite.id.endsWith(packed ? ".packed" : ".deployed")
+    return sprite.id.endsWith(packed && kind !== KIND.ANTI_TANK_GUN ? ".packed" : ".deployed")
       && (part.endsWith("barrel") === sprite.id.includes("barrelAssembly"));
   }).sort((a, b) => a.drawOrder - b.drawOrder).map(sprite => {
-    const transform = resolvePngSpriteTransform(pose.parts[sprite.animationPart], sprite.frame, sprite);
+    const transform = resolvePngSpriteTransform(pose.parts[sprite.animationPart], sprite.frame, sprite, {}, context);
     return { id: sprite.id, frame: sprite.frame, ...transform, teamTint: sprite.tintSlot !== "fixed" };
   });
   return composedRasterIconMarkup({ source: "png-atlas-minimap", image: atlas.image,

@@ -2549,7 +2549,11 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   a rifle shot) and shifts the whole sprite four world pixels backward before returning to the
   standing or movement pose.
   Anti-Tank Guns field a wheeled anti-tank gun with a long recoiling barrel,
-  carriage, two wheels, and animated deployment bracing, and machine gunners carry an MG42-style
+  carriage, two wheels, and permanently attached rear trails. Packed trails stay folded behind
+  the carriage; setup swings them outward, pauses, then snaps the final 10° into place.
+  World sprites and minimap layers share the same opaque assembly, hinge transforms, and
+  setup/teardown clock (120/40 ticks at 30 Hz), mirrored from the rules constants.
+  Machine gunners carry an MG42-style
   long machine gun across the body while packed that extends forward with bracing during
   setup/deployment. Units that fire from outside presentation vision remain actionable server-side
   but their reveal-only tile stays absent from `visibleTiles`. `GameState` recognizes the projected

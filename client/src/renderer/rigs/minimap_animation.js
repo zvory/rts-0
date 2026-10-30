@@ -74,7 +74,7 @@ export function createMinimapAnimation() {
           const part = pose.parts[sprite.animationPart];
           if (!part?.visible || part.alpha <= 0) continue;
           const frame = sprite.frame;
-          const transform = resolvePngSpriteTransform(part, frame, sprite);
+          const transform = resolvePngSpriteTransform(part, frame, sprite, {}, context);
           const px = frame.pixelsPerUnitX || frame.pixelsPerUnit || 1;
           const py = frame.pixelsPerUnitY || frame.pixelsPerUnit || 1;
           const dx = (transform.pivotX - frame.originX) * transform.scaleX;

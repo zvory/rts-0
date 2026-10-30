@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { assertAntiTankTrailContracts } from "./helpers/anti_tank_trail_contracts.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
@@ -984,9 +985,10 @@ test("anti-tank gun PNG atlas covers the unit route and keeps barrel recoil spli
   });
   const packedCarriage = unit.parts.get("sprite.at.carriage.packed").display;
   assert.equal(packedCarriage.visible, true);
-  assert.equal(packedCarriage.alpha, 1);
-  assert.equal(leftTrail.alpha, 0);
-  assert.equal(rightTrail.alpha, 0);
+  assert.equal(packedCarriage.alpha, 0);
+  assert.equal(leftTrail.alpha, 1);
+  assert.equal(rightTrail.alpha, 1);
+  assertAntiTankTrailContracts(renderer, entity);
 });
 
 test("mortar PNG atlas supplies the animated half-tile base plate", () => {

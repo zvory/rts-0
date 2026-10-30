@@ -173,12 +173,6 @@ const SCOUT_PLANE_DEFINITION = definition({
 
 const AT_ANIMATION_PARTS = animatedRasterParts(ANTI_TANK_GUN_PNG_RIG_ATLAS);
 const AT_PACKED = Object.freeze(["part.at.axle.packed", "part.at.barrel.packed"]);
-const AT_DEPLOYED = Object.freeze([
-  "part.at.trail.left.deployed",
-  "part.at.trail.right.deployed",
-  "part.at.axle.deployed",
-  "part.at.barrel.deployed",
-]);
 const AT_CARRIAGE = Object.freeze([
   "part.at.trail.left.deployed",
   "part.at.trail.right.deployed",
@@ -190,8 +184,8 @@ const AT_ANIMATIONS = [
   ...bindingsFor(["part.shadow"], [...SHADOW_FACING, ...SHADOW_RECOIL]),
   ...bindingsFor(AT_CARRIAGE, [...WEAPON_MOTION, ["weaponRecoilX", "transform.x", 0.12], ["weaponRecoilY", "transform.y", 0.12]]),
   ...bindingsFor(AT_BARRELS, [...WEAPON_MOTION, ["weaponRecoilX", "transform.x"], ["weaponRecoilY", "transform.y"]]),
-  ...bindingsFor(AT_PACKED, [["setupVisual", "alpha", -1, 1]]),
-  ...bindingsFor(AT_DEPLOYED, [["setupVisual", "alpha"]]),
+  // Use one fully opaque articulated assembly in every setup state.
+  ...bindingsFor(AT_PACKED, [["setupVisual", "alpha", 0, 0]]),
 ];
 const ANTI_TANK_GUN_DEFINITION = definition({
   id: "anti-tank-gun.raster",

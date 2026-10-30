@@ -1,9 +1,11 @@
+import { applyAntiTankTrailTransform } from "./anti_tank_trails.js";
+
 /**
  * Resolve the Pixi transform for one atlas sprite without touching display state.
  * Runtime rendering and assembled HUD icons share this so authored atlas offsets
  * and pivots cannot drift between the two presentations.
  */
-export function resolvePngSpriteTransform(state, frame, part, output = {}) {
+export function resolvePngSpriteTransform(state, frame, part, output = {}, context = null) {
   const pixelsPerUnitX = frame.pixelsPerUnitX || frame.pixelsPerUnit || 1;
   const pixelsPerUnitY = frame.pixelsPerUnitY || frame.pixelsPerUnit || 1;
   const stateRotation = state.transform.rotation;
@@ -50,5 +52,6 @@ export function resolvePngSpriteTransform(state, frame, part, output = {}) {
     state.transform.scaleY * (state.geometryScale?.y ?? 1)
   ) / pixelsPerUnitY;
   output.rotation = stateRotation + (part?.rotationOffset ?? frame.rotationOffset ?? 0);
+  applyAntiTankTrailTransform(output, state, part, context);
   return output;
 }
