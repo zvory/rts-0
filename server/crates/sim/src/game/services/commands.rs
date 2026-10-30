@@ -1933,7 +1933,11 @@ fn order_train(
         .is_some_and(|producer| producer.prod_queue().is_empty());
     let can_reserve_supply = ps.can_reserve_supply(supply, entities);
     let mut paid = false;
-    if queue_empty && !unit.is_resource_extractor() && can_reserve_supply && ps.spend_cost(cost) {
+    if queue_empty
+        && !unit.is_resource_extractor()
+        && can_reserve_supply
+        && ps.spend_production_cost(cost)
+    {
         if ps.reserve_supply(supply, entities) {
             paid = true;
         } else {

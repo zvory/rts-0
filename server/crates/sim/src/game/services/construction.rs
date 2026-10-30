@@ -135,7 +135,7 @@ pub(crate) fn construction_system(
             mark_build_waiting_for_resources(entities, worker);
             continue;
         };
-        if !players[player_index].can_afford(cost.steel, cost.oil) {
+        if !players[player_index].can_start_production(cost) {
             if phase == BuildPhase::ToSite || was_unit_blocked_wait {
                 notice_build_failure(
                     events,
@@ -181,7 +181,7 @@ pub(crate) fn construction_system(
             }
         }
 
-        if !players[player_index].spend_cost(cost) {
+        if !players[player_index].spend_production_cost(cost) {
             mark_build_waiting_for_resources(entities, worker);
             continue;
         }

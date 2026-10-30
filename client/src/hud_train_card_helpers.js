@@ -115,7 +115,7 @@ export function researchAvailability(ctx, upgrade, resources, isOwn) {
   if ((ctx.upgrades || []).includes(upgrade)) return "locked";
   if (researchQueuedBuilding(ctx, def.researchedAt, upgrade, isOwn)) return "locked";
   if (!selectedResearchBuilding(ctx, upgrade, isOwn)) return "locked";
-  return affordable(def.cost, resources) ? "ready" : "unaffordable";
+  return actionAffordable(def.cost, resources) ? "ready" : "unaffordable";
 }
 
 export function researchDisabledReason(ctx, upgrade, resources, isOwn) {
@@ -133,7 +133,7 @@ export function researchDisabledReason(ctx, upgrade, resources, isOwn) {
   if (def.requiresUpgrade && !selectedResearchBuilding(ctx, upgrade, isOwn)) {
     return def.requiresText || `Requires ${UPGRADES[def.requiresUpgrade]?.label || def.requiresUpgrade}`;
   }
-  if (!affordable(def.cost, resources)) return "Queue now; research waits for resources";
+  if (!actionAffordable(def.cost, resources)) return "Queue now; research waits for resources";
   return "";
 }
 
@@ -226,6 +226,12 @@ function playerHasCompleteKind(ctx, kind) {
 
 function playerHasAnyCompleteKind(ctx, kinds) {
   return kinds.length === 0 || kinds.some((kind) => playerHasCompleteKind(ctx, kind));
+}
+
+// Only creation starts have a blanket debt gate. Actions pay for resources they consume.
+export function actionAffordable(cost, resources) {
+  return (!(cost?.steel > 0) || (resources.steel ?? 0) >= cost.steel) &&
+    (!(cost?.oil > 0) || (resources.oil ?? 0) >= cost.oil);
 }
 
 function affordable(cost, resources) {

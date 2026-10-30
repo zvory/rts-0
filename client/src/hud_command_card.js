@@ -28,6 +28,7 @@ import {
 } from "./hud_unit_commands.js";
 import { abilityButtonDescriptor } from "./hud_ability_descriptor.js";
 import {
+  actionAffordable,
   constructionCancelDescriptor,
   firstOpenCommandSlot,
   productionRepeatAffordance,
@@ -475,7 +476,7 @@ export function buildTrainCard(ctx, building, { underConstruction = false } = {}
       title: researchDisabledReason(ctx, upgrade, resources, isOwn),
       tooltipUpgrade: upgrade,
       repeatable: false,
-      onUnavailableIntent: { type: "playNotEnough", cost: def.cost },
+      onUnavailableIntent: { type: "playNotEnough", cost: def.cost, actionCostOnly: true },
     };
   }
 
@@ -515,7 +516,7 @@ export function selectedAbilityAffordances(ctx, selection) {
       const hasFreeBarrage = definition.ability === ABILITY.BARRAGE && carriers.some(
         (e) => (abilityRemainingUses(e, definition.ability) ?? 0) > 0,
       );
-      const canAfford = hasFreeBarrage || affordable(cost, resources);
+      const canAfford = hasFreeBarrage || actionAffordable(cost, resources);
       const readyUnits = carriers.filter((e) => abilityUnitReady(e, definition));
       const queueAdmissibleUnits = carriers.filter((e) =>
         abilityUnitQueueAdmissible(e, definition));

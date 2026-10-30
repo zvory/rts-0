@@ -1,5 +1,5 @@
 {
-  "reason": "Extract existing research command mutation into commands/research.rs to keep commands below its frozen size limit while adding depot-local Industrial Centers",
+  "reason": "Separate production/construction debt eligibility and spending from general resource affordability in PlayerState; free abilities and research must not inherit the creation-only debt gate",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -2488,7 +2488,7 @@
     },
     {
       "path": "player_state.rs",
-      "count": 15
+      "count": 19
     },
     {
       "path": "replay.rs",

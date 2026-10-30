@@ -670,53 +670,55 @@ fn queued_smoke_distributes_one_click_per_ready_scout_by_queue_length() {
 }
 
 #[test]
-fn smoke_launches_without_resource_cost() {
-    let map = flat_map(32);
-    let mut entities = EntityStore::new();
-    let target = map.tile_center(12, 8);
-    let scout = entities
-        .spawn_unit(1, EntityKind::ScoutCar, target.0 - 96.0, target.1)
-        .expect("scout car should spawn");
-    let (sx, sy) = footprint_center(&map, EntityKind::EngineeringComplex, 4, 4);
-    entities
-        .spawn_building(1, EntityKind::EngineeringComplex, sx, sy, true)
-        .expect("Engineering Complex should spawn");
-    let mut players = vec![player_state(1), player_state(2)];
-    assert!(players[0].spend_cost(rules::economy::ResourceCost::new(1_000, 1_000)));
-    let mut smokes = SmokeCloudStore::new();
+fn smoke_launches_without_resource_cost_even_in_debt() {
+    for (steel, oil) in [(0, 0), (-800, -300), (100, -300), (-800, 100)] {
+        let map = flat_map(32);
+        let mut entities = EntityStore::new();
+        let target = map.tile_center(12, 8);
+        let scout = entities
+            .spawn_unit(1, EntityKind::ScoutCar, target.0 - 96.0, target.1)
+            .expect("scout car should spawn");
+        let (sx, sy) = footprint_center(&map, EntityKind::EngineeringComplex, 4, 4);
+        entities
+            .spawn_building(1, EntityKind::EngineeringComplex, sx, sy, true)
+            .expect("Engineering Complex should spawn");
+        let mut players = vec![player_state(1), player_state(2)];
+        players[0].set_resources(steel, oil);
+        let mut smokes = SmokeCloudStore::new();
 
-    let events = apply_with_players_and_smokes(
-        &map,
-        &mut entities,
-        &mut players,
-        &mut smokes,
-        None,
-        normal_pending(vec![(
-            1,
-            SimCommand::UseAbility {
-                ability: AbilityKind::Smoke,
-                units: vec![scout],
-                x: Some(target.0),
-                y: Some(target.1),
-                queued: false,
-            },
-        )]),
-    );
+        let events = apply_with_players_and_smokes(
+            &map,
+            &mut entities,
+            &mut players,
+            &mut smokes,
+            None,
+            normal_pending(vec![(
+                1,
+                SimCommand::UseAbility {
+                    ability: AbilityKind::Smoke,
+                    units: vec![scout],
+                    x: Some(target.0),
+                    y: Some(target.1),
+                    queued: false,
+                },
+            )]),
+        );
 
-    assert_eq!(smokes.iter().count(), 0);
-    smokes.spawn_due(1 + config::SMOKE_LAUNCH_MAX_DELAY_TICKS);
-    assert_eq!(smokes.iter().count(), 1);
-    assert_eq!(players[0].steel, 0);
-    assert_eq!(players[0].oil, 0);
-    assert!(events.get(&1).is_none_or(|events| {
-        events.iter().all(|ev| {
-            matches!(
-                ev,
-                Event::Notice {
-                    severity: crate::protocol::NoticeSeverity::Info,
-                    ..
-                } | Event::SmokeLaunch { .. }
-            )
-        })
-    }));
+        assert_eq!(smokes.iter().count(), 0);
+        smokes.spawn_due(1 + config::SMOKE_LAUNCH_MAX_DELAY_TICKS);
+        assert_eq!(smokes.iter().count(), 1);
+        assert_eq!(players[0].steel, steel);
+        assert_eq!(players[0].oil, oil);
+        assert!(events.get(&1).is_none_or(|events| {
+            events.iter().all(|ev| {
+                matches!(
+                    ev,
+                    Event::Notice {
+                        severity: crate::protocol::NoticeSeverity::Info,
+                        ..
+                    } | Event::SmokeLaunch { .. }
+                )
+            })
+        }));
+    }
 }

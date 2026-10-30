@@ -21,7 +21,7 @@ impl PlayerState {
     }
 
     pub(crate) fn can_afford(&self, steel: u32, oil: u32) -> bool {
-        self.steel >= i64::from(steel) && self.oil >= i64::from(oil)
+        (steel == 0 || self.steel >= i64::from(steel)) && (oil == 0 || self.oil >= i64::from(oil))
     }
 
     pub(crate) fn spend_resources(&mut self, steel: u32, oil: u32) -> bool {
@@ -40,6 +40,15 @@ impl PlayerState {
 
     pub(crate) fn spend_cost(&mut self, cost: ResourceCost) -> bool {
         self.spend_resources(cost.steel, cost.oil)
+    }
+
+    /// New units and construction wait for all debt, even when their own cost is zero.
+    pub(crate) fn can_start_production(&self, cost: ResourceCost) -> bool {
+        self.steel >= 0 && self.oil >= 0 && self.can_afford(cost.steel, cost.oil)
+    }
+
+    pub(crate) fn spend_production_cost(&mut self, cost: ResourceCost) -> bool {
+        self.can_start_production(cost) && self.spend_cost(cost)
     }
 
     /// Only instantaneous depot upgrades can bypass affordability and incur debt.
