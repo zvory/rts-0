@@ -50,7 +50,6 @@ fn los_test_observation(blocker: EntityKind) -> AiObservation {
         own_start_tile: (5, 5),
         players: Vec::new(),
         owned: vec![AiEntitySummary {
-            industrial_center_slot_reserved: false,
             id: 10,
             owner: 1,
             kind: blocker,
@@ -199,7 +198,6 @@ fn infantry_at_home_defends_a_forward_building_under_attack() {
     observation.owned[0].y = 5.5 * ts;
     for (id, kind) in [(20, EntityKind::Rifleman), (21, EntityKind::MachineGunner)] {
         observation.owned.push(AiEntitySummary {
-            industrial_center_slot_reserved: false,
             id,
             owner: 1,
             kind,
@@ -216,7 +214,6 @@ fn infantry_at_home_defends_a_forward_building_under_attack() {
         });
     }
     observation.visible_enemies.push(AiEntitySummary {
-        industrial_center_slot_reserved: false,
         id: 30,
         owner: 2,
         kind: EntityKind::Rifleman,
@@ -782,7 +779,6 @@ fn planned_factory_is_part_of_the_local_defense_envelope() {
     let stats = config::building_stats(EntityKind::Factory).expect("Factory stats");
     let right_edge = (18 + stats.foot_w) as f32 * ts;
     observation.visible_enemies.push(AiEntitySummary {
-        industrial_center_slot_reserved: false,
         id: 30,
         owner: 2,
         kind: EntityKind::Rifleman,
@@ -819,7 +815,6 @@ fn incomplete_factory_is_part_of_the_local_defense_envelope() {
         building_center((18, 4), EntityKind::Factory, observation.map.tile_size)
             .expect("Factory footprint");
     observation.owned.push(AiEntitySummary {
-        industrial_center_slot_reserved: false,
         id: 20,
         owner: 1,
         kind: EntityKind::Factory,
@@ -836,7 +831,6 @@ fn incomplete_factory_is_part_of_the_local_defense_envelope() {
     });
     let stats = config::building_stats(EntityKind::Factory).expect("Factory stats");
     observation.visible_enemies.push(AiEntitySummary {
-        industrial_center_slot_reserved: false,
         id: 30,
         owner: 2,
         kind: EntityKind::Rifleman,
@@ -875,7 +869,6 @@ fn planned_factory_does_not_move_the_standing_rifle_formation() {
 fn standing_rifle_formation_ignores_extractors() {
     let mut observation = los_test_observation(EntityKind::Depot);
     observation.owned.push(AiEntitySummary {
-        industrial_center_slot_reserved: false,
         id: 21,
         owner: 1,
         kind: EntityKind::PumpJack,
@@ -934,7 +927,6 @@ fn strongest_local_sector_wins_over_a_lone_flanker() {
         (32, 5.5 * ts, 11.5 * ts),
     ] {
         observation.visible_enemies.push(AiEntitySummary {
-            industrial_center_slot_reserved: false,
             id,
             owner: 2,
             kind: EntityKind::Rifleman,
@@ -980,7 +972,6 @@ fn stationary_defense_observation() -> AiObservation {
 
 fn combat_unit(id: u32, kind: EntityKind, x: f32, y: f32) -> AiEntitySummary {
     AiEntitySummary {
-        industrial_center_slot_reserved: false,
         id,
         owner: 1,
         kind,

@@ -4,22 +4,16 @@ use super::replay::SelfPlayFailure;
 use crate::config;
 use rts_sim::protocol::{kinds, MapInfo, Snapshot};
 
-const RESOURCE_SANITY_LIMIT: i64 = 1_000_000;
+const RESOURCE_SANITY_LIMIT: u32 = 1_000_000;
 
 pub(super) fn validate_snapshot(
     player_id: u32,
     map: &MapInfo,
     snapshot: &Snapshot,
 ) -> Result<(), SelfPlayFailure> {
-    if ![
-        config::STARTING_SUPPLY_CAP,
-        config::STARTING_SUPPLY_CAP + config::INDUSTRIAL_CENTER_SUPPLY,
-        config::PLAYER_SUPPLY_CAP,
-    ]
-    .contains(&snapshot.supply_cap)
-    {
+    if snapshot.supply_cap != config::PLAYER_SUPPLY_CAP {
         return Err(SelfPlayFailure::new(format!(
-            "player {player_id} has invalid supply cap: {}",
+            "player {player_id} has invalid intrinsic supply cap: {}",
             snapshot.supply_cap
         )));
     }

@@ -236,7 +236,6 @@ where
     let start_budget = budget;
     let mut actions = AiActionContext::new(&facts, budget);
     let mut intents = Vec::new();
-    queue_industrial_center(&mut actions, observation, &facts, &mut intents);
     pressure_economy::protect_depot_in_transit(observation, profile, &mut actions);
     if profile.id == crate::ai_core::profiles::PRESSURE_AI_ID {
         memory

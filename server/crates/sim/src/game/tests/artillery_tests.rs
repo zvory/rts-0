@@ -112,7 +112,7 @@ fn artillery_attack_move_uses_team_vision_and_preserves_the_route() {
     assert_eq!(artillery_entity.target_id(), Some(enemy));
     assert_eq!(
         game.state.players[0].steel,
-        initial_steel - i64::from(config::ARTILLERY_AMMO_COST_STEEL)
+        initial_steel - config::ARTILLERY_AMMO_COST_STEEL
     );
 }
 
@@ -948,7 +948,7 @@ fn manually_deployed_artillery_can_point_fire() {
 
     assert_eq!(
         game.state.players[0].steel,
-        initial_steel - i64::from(config::ARTILLERY_AMMO_COST_STEEL)
+        initial_steel - config::ARTILLERY_AMMO_COST_STEEL
     );
     assert!(
         events.iter().any(|(pid, events)| {

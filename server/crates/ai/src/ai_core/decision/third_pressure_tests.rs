@@ -20,7 +20,6 @@ fn unit(id: u32, owner: u32, kind: EntityKind, tiles: (f32, f32)) -> AiEntitySum
         .or_else(|| config::building_stats(kind).map(|stats| stats.hp))
         .unwrap_or(100);
     AiEntitySummary {
-        industrial_center_slot_reserved: false,
         id,
         owner,
         kind,

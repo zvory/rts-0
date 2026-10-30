@@ -44,15 +44,7 @@ pub(crate) fn production_system(
                 .find(|player| player.id == owner)
                 .map(|player| player.faction_id.as_str())
                 .unwrap_or("");
-            let can_start = players
-                .iter()
-                .find(|player| player.id == owner)
-                .is_some_and(|player| {
-                    player.can_start_production(rules::economy::ResourceCost::new(0, 0))
-                });
-            for (owner, kind) in
-                extractors::advance_automatic(entities, id, faction_id, tick, can_start)
-            {
+            for (owner, kind) in extractors::advance_automatic(entities, id, faction_id, tick) {
                 if let Some(player) = players.iter_mut().find(|player| player.id == owner) {
                     player.record_entity_created(kind);
                 }
@@ -115,10 +107,10 @@ pub(crate) fn production_system(
                 };
                 let cost = rules::economy::resource_cost(unit);
                 let supply = rules::economy::supply_cost(unit);
-                let supply_available = player.can_reserve_supply(supply, entities);
+                let supply_available = player.can_reserve_supply(supply);
                 let auto_build_allowed = player.can_auto_build(cost);
-                if supply_available && auto_build_allowed && player.spend_production_cost(cost) {
-                    if player.reserve_supply(supply, entities) {
+                if supply_available && auto_build_allowed && player.spend_cost(cost) {
+                    if player.reserve_supply(supply) {
                         let queued = entities.get_mut(id).is_some_and(|producer| {
                             let queued = producer.push_production(ProdItem {
                                 unit,
@@ -184,9 +176,9 @@ pub(crate) fn production_system(
             let cost = rules::economy::resource_cost(unit);
             let supply = rules::economy::supply_cost(unit);
             if let Some(player) = players.iter_mut().find(|player| player.id == owner) {
-                let supply_available = player.can_reserve_supply(supply, entities);
-                if supply_available && player.spend_production_cost(cost) {
-                    if player.reserve_supply(supply, entities) {
+                let supply_available = player.can_reserve_supply(supply);
+                if supply_available && player.spend_cost(cost) {
+                    if player.reserve_supply(supply) {
                         if !entities
                             .get_mut(id)
                             .is_some_and(|building| building.mark_front_production_paid())
@@ -224,25 +216,16 @@ pub(crate) fn production_system(
 
         if let Some((owner, upgrade)) = completed_research {
             if let Some(player) = players.iter_mut().find(|p| p.id == owner) {
-                if upgrade != upgrade::UpgradeKind::IndustrialCenter {
-                    player.upgrades.insert(upgrade);
-                }
+                player.upgrades.insert(upgrade);
             }
             if let Some(b) = entities.get_mut(id) {
-                if upgrade == upgrade::UpgradeKind::IndustrialCenter {
-                    b.complete_industrial_center();
-                }
                 if let Some(queue) = b.research_queue_mut() {
                     if !queue.is_empty() {
                         queue.remove(0);
                     }
                 }
             }
-            // Depot-local research runs alongside worker production, including its
-            // completion tick. Other research keeps its existing completion behavior.
-            if upgrade != upgrade::UpgradeKind::IndustrialCenter {
-                continue;
-            }
+            continue;
         }
 
         if !extractors::ensure_scaffold(entities, id) {

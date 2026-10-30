@@ -4,7 +4,6 @@ use crate::ai_core::profiles::JEFFS_AI;
 
 fn target_test_entity(id: u32, kind: EntityKind, x: f32, y: f32) -> AiEntitySummary {
     AiEntitySummary {
-        industrial_center_slot_reserved: false,
         id,
         owner: if id == 1 { 1 } else { 2 },
         kind,

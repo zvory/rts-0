@@ -8,7 +8,6 @@ import {
   factionCommandId,
 } from "../client/src/hud_command_card.js";
 import { createLabControlPolicy } from "../client/src/lab_control_policy.js";
-import { HUD } from "../client/src/hud.js";
 import {
   EKAT_FACTION_ID,
   FIXTURE_FACTION_ID,
@@ -388,7 +387,7 @@ for (const [kind, upgrade] of [
   const abilityCard = buildCommandCardDescriptors({
     playerId: 1,
     selection: [scoutCar],
-    resources: { steel: -800, oil: -300 },
+    resources: { steel: 1000, oil: 1000 },
     upgrades: [],
     playerHasCompleteKind: () => true,
     groupCooldownClocks: testGroupCooldownClocks,
@@ -811,26 +810,6 @@ for (const researched of [false, true]) {
   assert.equal(card.slots[7]?.enabled, true);
 }
 
-{
-  const depot = { id: 900, owner: 1, kind: KIND.RESOURCE_DEPOT, state: "idle" };
-  const context = {
-    playerId: 1, factionId: "kriegsia", selection: [depot], currentEntities: [depot],
-    resources: { steel: 800, oil: 300, supplyUsed: 90, supplyCap: 100 },
-    upgrades: [], playerHasCompleteKind: () => true, groupCooldownClocks: () => [],
-  };
-  const upgrade = (ctx) => buildCommandCardDescriptors(ctx).slots.find((s) => s?.id === `research:${UPGRADE.INDUSTRIAL_CENTER}`);
-  assert.equal(upgrade(context)?.enabled, true);
-  assert.deepEqual(upgrade(context)?.cost, { steel: 800, oil: 300 });
-  assert.equal(upgrade({ ...context, resources: { ...context.resources, steel: -800, oil: -300 } })?.enabled, true, "instant upgrade can incur debt");
-  assert.equal(upgrade({ ...context, resources: { ...context.resources, steel: 0, oil: 0 } })?.enabled, true);
-  const pending = { ...depot, id: 901, prodUpgradeQueue: [UPGRADE.INDUSTRIAL_CENTER] };
-  assert.equal(upgrade({ ...context, currentEntities: [depot, pending] })?.enabled, true, "another depot can upgrade concurrently");
-  const complete = { ...depot, id: 902, industrialCenter: true };
-  assert.equal(upgrade({ ...context, currentEntities: [depot, pending, complete] })?.enabled, false, "two centers include pending upgrades");
-  assert.equal(upgrade({ ...context, selection: [complete], currentEntities: [complete] })?.enabled, false);
-  assert.equal(upgrade({ ...context, selection: [{ ...depot, state: "construct", buildProgress: 0.5 }] })?.enabled, false);
-}
-
 // TEMPORARY HACK regression: historical Engineering Complex ownership keeps only AT Guns ready.
 {
   const gunWorks = { id: 950, owner: 1, kind: KIND.STEELWORKS };
@@ -848,42 +827,4 @@ for (const researched of [false, true]) {
   const withoutWorks = buildCommandCardDescriptors({ ...context,
     upgrades: [UPGRADE.ANTI_TANK_GUN_UNLOCK], playerHasCompleteKind: () => false });
   assert.equal(atSlot(withoutWorks).enabled, false);
-}
-
-// Debt gates new unit/building starts, while action costs ignore unused resources.
-{
-  const context = (selection, resources) => ({
-    playerId: 1, selection, currentEntities: selection, resources,
-    upgrades: [UPGRADE.ROCKETS], playerHasCompleteKind: () => true,
-    groupCooldownClocks: testGroupCooldownClocks,
-  });
-  const hud = Object.create(HUD.prototype);
-  let sound;
-  hud.audio = { play: (id) => { sound = id; } };
-  const unavailableSound = (slot, resources) => {
-    sound = null;
-    hud._commandResources = () => resources;
-    hud._dispatchCommandIntent(slot.onUnavailableIntent);
-    return sound;
-  };
-  const center = { id: 950, owner: 1, kind: KIND.TRAINING_CENTRE, state: "idle" };
-  const research = buildCommandCardDescriptors(context([center], { steel: 100, oil: -300 }))
-    .slots.find((slot) => slot?.id === `research:${UPGRADE.ENTRENCHMENT}`);
-  assert.equal(research?.unaffordable, false, "research ignores debt in an unused resource");
-  const unfundedResearch = buildCommandCardDescriptors(context([center], { steel: 0, oil: -300 }))
-    .slots.find((slot) => slot?.id === `research:${UPGRADE.ENTRENCHMENT}`);
-  assert.equal(unavailableSound(unfundedResearch, { steel: 0, oil: -300 }), "notice_steel");
-  const truck = { id: 951, owner: 1, kind: KIND.ROCKET_LAUNCHER,
-    abilities: [{ ability: ABILITY.BARRAGE, cooldownLeft: 0, remainingUses: 0 }] };
-  for (const [oil, enabled] of [[150, true], [149, false]]) {
-    const barrage = buildCommandCardDescriptors(context([truck], { steel: -800, oil }))
-      .slots.find((slot) => slot?.ability === ABILITY.BARRAGE);
-    assert.equal(barrage?.enabled, enabled, "paid barrage checks oil without a steel debt block");
-    if (!enabled) assert.equal(unavailableSound(barrage, { steel: -800, oil }), "notice_oil");
-  }
-  const barracks = { id: 952, owner: 1, kind: KIND.BARRACKS, state: "idle" };
-  const rifleman = buildCommandCardDescriptors(context([barracks], { steel: 1000, oil: -300 }))
-    .slots.find((slot) => slot?.id === `train:${KIND.RIFLEMAN}`);
-  assert.equal(rifleman?.unaffordable, true, "new units still wait for either resource debt");
-  assert.equal(unavailableSound(rifleman, { steel: 1000, oil: -300 }), "notice_oil");
 }

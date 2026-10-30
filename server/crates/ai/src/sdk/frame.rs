@@ -114,7 +114,6 @@ pub enum AiCompletion {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct AiProduction {
-    pub industrial_center_slot_reserved: bool,
     /// Owner/allied queue detail; `None` for opponents.
     pub queue_len: Option<usize>,
     pub current_kind: Option<EntityKind>,
@@ -486,16 +485,8 @@ impl AiFrame {
             tick: snapshot.tick,
             team_id,
             economy: AiEconomy {
-                steel: if snapshot.steel < 0 || snapshot.oil < 0 {
-                    0
-                } else {
-                    snapshot.steel.min(i64::from(u32::MAX)) as u32
-                },
-                oil: if snapshot.steel < 0 || snapshot.oil < 0 {
-                    0
-                } else {
-                    snapshot.oil.min(i64::from(u32::MAX)) as u32
-                },
+                steel: snapshot.steel,
+                oil: snapshot.oil,
                 supply_used: snapshot.supply_used,
                 supply_cap: snapshot.supply_cap,
             },
@@ -569,11 +560,6 @@ fn normalize_entity(
                 }
             }),
         production: can_produce.then_some(AiProduction {
-            industrial_center_slot_reserved: view.industrial_center
-                || view
-                    .prod_upgrade_queue
-                    .iter()
-                    .any(|id| id == "industrial_center"),
             queue_len: production_details_known.then_some(view.prod_queue.unwrap_or(0) as usize),
             current_kind: view.prod_kind.as_deref().and_then(|id| id.parse().ok()),
             current_upgrade: view.prod_upgrade.as_deref().and_then(|id| id.parse().ok()),
@@ -688,7 +674,6 @@ mod tests {
         assert_eq!(frame, variant);
 
         let remembered = rts_sim::protocol::RememberedBuildingView {
-            industrial_center: false,
             id: hidden.id,
             owner: hidden.owner,
             kind: hidden.kind.clone(),

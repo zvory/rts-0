@@ -108,24 +108,15 @@ export function trainDisabledReason(ctx, unit, resources, isOwn) {
 export function researchAvailability(ctx, upgrade, resources, isOwn) {
   const def = UPGRADES[upgrade];
   if (!def) return "locked";
-  if (upgrade === UPGRADE.INDUSTRIAL_CENTER) {
-    if (industrialCenterSlots(ctx, isOwn) >= 2 || !selectedResearchBuilding(ctx, upgrade, isOwn)) return "locked";
-    return "ready";
-  }
   if ((ctx.upgrades || []).includes(upgrade)) return "locked";
   if (researchQueuedBuilding(ctx, def.researchedAt, upgrade, isOwn)) return "locked";
   if (!selectedResearchBuilding(ctx, upgrade, isOwn)) return "locked";
-  return actionAffordable(def.cost, resources) ? "ready" : "unaffordable";
+  return affordable(def.cost, resources) ? "ready" : "unaffordable";
 }
 
 export function researchDisabledReason(ctx, upgrade, resources, isOwn) {
   const def = UPGRADES[upgrade];
   if (!def) return "";
-  if (upgrade === UPGRADE.INDUSTRIAL_CENTER) {
-    if (!selectedResearchBuilding(ctx, upgrade, isOwn)) return "Select a completed, unupgraded Resource Depot";
-    if (industrialCenterSlots(ctx, isOwn) >= 2) return "Maximum two Industrial Centers";
-    return "Instant +100 supply; cost may make resources negative and delay new production";
-  }
   if ((ctx.upgrades || []).includes(upgrade)) return "Researched";
   const queuedAt = researchQueuedBuilding(ctx, def.researchedAt, upgrade, isOwn);
   if (queuedAt?.prodUpgrade === upgrade) return "Researching";
@@ -133,7 +124,7 @@ export function researchDisabledReason(ctx, upgrade, resources, isOwn) {
   if (def.requiresUpgrade && !selectedResearchBuilding(ctx, upgrade, isOwn)) {
     return def.requiresText || `Requires ${UPGRADES[def.requiresUpgrade]?.label || def.requiresUpgrade}`;
   }
-  if (!actionAffordable(def.cost, resources)) return "Queue now; research waits for resources";
+  if (!affordable(def.cost, resources)) return "Queue now; research waits for resources";
   return "";
 }
 
@@ -148,11 +139,6 @@ export function researchSlotForUpgrade(buildingKind, upgrade, trains) {
   if (researchIndex >= 0) return researchIndex;
   const afterTrainSlot = trains.findIndex((unit) => STATS[unit] == null);
   return afterTrainSlot >= 0 ? afterTrainSlot : trains.length;
-}
-
-function industrialCenterSlots(ctx, isOwn) {
-  return researchBuildings(ctx, UPGRADES[UPGRADE.INDUSTRIAL_CENTER].researchedAt, isOwn)
-    .filter((e) => e.industrialCenter || (e.prodUpgradeQueue || []).includes(UPGRADE.INDUSTRIAL_CENTER)).length;
 }
 
 function researchQueuedBuilding(ctx, buildingKind, upgrade, isOwn) {
@@ -176,7 +162,6 @@ export function selectedResearchBuilding(ctx, upgrade, isOwn) {
   return (ctx.selection || []).find((entity) =>
     isOwn(ctx, entity) &&
     entity.kind === def.researchedAt &&
-    (upgrade !== UPGRADE.INDUSTRIAL_CENTER || (!entity.industrialCenter && entity.state !== STATE.CONSTRUCT)) &&
     !(entity.prodUpgradeQueue || []).includes(upgrade) &&
     (prerequisiteResearched ||
       (entity.prodUpgradeQueue || []).includes(def.requiresUpgrade))) || null;
@@ -226,12 +211,6 @@ function playerHasCompleteKind(ctx, kind) {
 
 function playerHasAnyCompleteKind(ctx, kinds) {
   return kinds.length === 0 || kinds.some((kind) => playerHasCompleteKind(ctx, kind));
-}
-
-// Only creation starts have a blanket debt gate. Actions pay for resources they consume.
-export function actionAffordable(cost, resources) {
-  return (!(cost?.steel > 0) || (resources.steel ?? 0) >= cost.steel) &&
-    (!(cost?.oil > 0) || (resources.oil ?? 0) >= cost.oil);
 }
 
 function affordable(cost, resources) {

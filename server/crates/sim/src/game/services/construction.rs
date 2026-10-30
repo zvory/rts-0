@@ -135,7 +135,7 @@ pub(crate) fn construction_system(
             mark_build_waiting_for_resources(entities, worker);
             continue;
         };
-        if !players[player_index].can_start_production(cost) {
+        if !players[player_index].can_afford(cost.steel, cost.oil) {
             if phase == BuildPhase::ToSite || was_unit_blocked_wait {
                 notice_build_failure(
                     events,
@@ -181,7 +181,7 @@ pub(crate) fn construction_system(
             }
         }
 
-        if !players[player_index].spend_production_cost(cost) {
+        if !players[player_index].spend_cost(cost) {
             mark_build_waiting_for_resources(entities, worker);
             continue;
         }
@@ -1044,7 +1044,7 @@ mod tests {
 
         assert_eq!(
             players[0].steel,
-            steel_before + i64::from(rules::economy::resource_cost(EntityKind::TankTrap).steel),
+            steel_before + rules::economy::resource_cost(EntityKind::TankTrap).steel,
             "deconstructing player should receive the Tank Trap steel refund"
         );
         assert_eq!(

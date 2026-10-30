@@ -33,6 +33,6 @@ impl PlayerState {
     }
 }
 
-fn reserve_allows_spend(balance: i64, cost: u32, reserve: u32) -> bool {
-    cost == 0 || balance.saturating_sub(i64::from(cost)) >= i64::from(reserve)
+fn reserve_allows_spend(balance: u32, cost: u32, reserve: u32) -> bool {
+    cost == 0 || balance.saturating_sub(cost) >= reserve
 }

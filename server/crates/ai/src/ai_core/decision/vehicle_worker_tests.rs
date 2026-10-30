@@ -7,7 +7,6 @@ use crate::ai_core::profiles::{AiProfile, AI_2_1, JEFFS_AI};
 
 fn worker(id: u32, state: AiEntityState) -> AiEntitySummary {
     AiEntitySummary {
-        industrial_center_slot_reserved: false,
         id,
         owner: 1,
         kind: EntityKind::Worker,
@@ -46,7 +45,6 @@ fn building(id: u32, kind: EntityKind, queue_len: Option<usize>) -> AiEntitySumm
 
 fn combat_unit(id: u32, kind: EntityKind) -> AiEntitySummary {
     AiEntitySummary {
-        industrial_center_slot_reserved: false,
         id,
         owner: 1,
         kind,
@@ -71,7 +69,6 @@ fn building_at(
     y: f32,
 ) -> AiEntitySummary {
     AiEntitySummary {
-        industrial_center_slot_reserved: false,
         id,
         owner: 1,
         kind,

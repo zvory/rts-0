@@ -201,8 +201,8 @@ impl ScriptedPlayer for MineOnlyScript {
         let mut actions = AiActionContext::new(
             &facts,
             SpendBudget::new(
-                view.snapshot.steel.clamp(0, i64::from(u32::MAX)) as u32,
-                view.snapshot.oil.clamp(0, i64::from(u32::MAX)) as u32,
+                view.snapshot.steel,
+                view.snapshot.oil,
                 view.snapshot.supply_used,
                 view.snapshot.supply_cap,
             ),

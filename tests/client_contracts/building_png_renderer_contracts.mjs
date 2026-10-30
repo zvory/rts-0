@@ -7,8 +7,6 @@ import { KIND } from "../../client/src/protocol.js";
 import { Renderer } from "../../client/src/renderer/index.js";
 import {
   createBuildingPngRigAtlases,
-  buildingPngRigKey,
-  INDUSTRIAL_CENTRE_PNG_KEY,
   createBuildingPngRigDefinitions,
 } from "../../client/src/renderer/rigs/building_png.js";
 import {
@@ -52,15 +50,7 @@ const emblemKinds = new Set([
 const definitions = createBuildingPngRigDefinitions();
 const atlases = createBuildingPngRigAtlases();
 strictAssert.equal(definitions.size, expectedFootprints.size);
-strictAssert.equal(atlases.size, expectedFootprints.size + 1);
-strictAssert.equal(buildingPngRigKey({ kind: KIND.RESOURCE_DEPOT }), KIND.RESOURCE_DEPOT);
-strictAssert.equal(buildingPngRigKey({ kind: KIND.RESOURCE_DEPOT, industrialCenter: true }), INDUSTRIAL_CENTRE_PNG_KEY);
-strictAssert.equal(buildingPngRigKey({ kind: KIND.BARRACKS, industrialCenter: true }), KIND.BARRACKS);
-const refineryAtlas = atlases.get(INDUSTRIAL_CENTRE_PNG_KEY);
-strictAssert.ok(refineryAtlas.image.includes("industrial-centre-refinery"));
-strictAssert.deepEqual(refineryAtlas.grid, atlases.get(KIND.RESOURCE_DEPOT).grid);
-strictAssert.deepEqual(readPngDimensions(path.join(repoRoot, "client", refineryAtlas.image.split("?")[0])), { width: 1536, height: 384 });
-
+strictAssert.equal(atlases.size, expectedFootprints.size);
 for (const excludedKind of [KIND.DEPOT, KIND.TANK_TRAP]) {
   strictAssert.equal(definitions.has(excludedKind), false);
   strictAssert.equal(atlases.has(excludedKind), false);
@@ -323,26 +313,6 @@ try {
       renderer.world.children.indexOf(renderer.layers.buildings),
     "the queue-label layer renders above the building-body layer",
   );
-
-  const depot = { ...entity, id: 508, kind: KIND.RESOURCE_DEPOT, state: "idle",
-    buildProgress: 1, prodProgress: 0, prodQueue: 0 };
-  renderer._buildingPngRigAtlasTextures.set(KIND.RESOURCE_DEPOT, PIXI.Texture.from("depot-test"));
-  renderer._buildingPngRigAtlasTextures.set(INDUSTRIAL_CENTRE_PNG_KEY, PIXI.Texture.from("refinery-test"));
-  renderer._drawBuilding(depot, colorByOwner, state);
-  const ordinaryBody = renderer._liveRigPools.buildingRigs.get(depot.id);
-  strictAssert.equal(ordinaryBody.atlas, atlases.get(KIND.RESOURCE_DEPOT));
-  depot.industrialCenter = true;
-  renderer._drawBuilding(depot, colorByOwner, state);
-  const upgradedBody = renderer._liveRigPools.buildingRigs.get(depot.id);
-  strictAssert.notEqual(upgradedBody, ordinaryBody);
-  strictAssert.equal(ordinaryBody._destroyed, true);
-  strictAssert.equal(upgradedBody.atlas, refineryAtlas);
-  strictAssert.equal(renderer._pools.buildingOverlays?.has(depot.id) ?? false, false,
-    "completed refinery has no gold footprint overlay");
-  depot.industrialCenter = false;
-  renderer._drawBuilding(depot, colorByOwner, state);
-  strictAssert.equal(renderer._liveRigPools.buildingRigs.get(depot.id).atlas, atlases.get(KIND.RESOURCE_DEPOT),
-    "replay rewind restores ordinary depot artwork");
 
   const steelMine = {
     ...entity,

@@ -62,7 +62,6 @@ fn schone() -> (AiMapAnalysis, AiObservation) {
 
 fn unit(id: u32, owner: u32, kind: EntityKind, tile: (f32, f32)) -> AiEntitySummary {
     AiEntitySummary {
-        industrial_center_slot_reserved: false,
         id,
         owner,
         kind,

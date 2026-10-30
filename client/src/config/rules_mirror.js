@@ -178,8 +178,7 @@ export const STATS = Object.freeze({
 
   [KIND.RESOURCE_DEPOT]: { label: "Resource Depot", icon: "RD", footW: 3, footH: 3, sight: 1,
     cost: { steel: 450, oil: 100 }, buildTicks: TICK_HZ * 5,
-    trains: [KIND.WORKER, KIND.STEEL_MINE, KIND.PUMP_JACK],
-    researches: [UPGRADE.INDUSTRIAL_CENTER] },
+    trains: [KIND.WORKER, KIND.STEEL_MINE, KIND.PUMP_JACK] },
   [KIND.PORTAL]: { label: "Portal", icon: "PRT", footW: 3, footH: 3, sight: 1,
     cost: { steel: 150, oil: 0 }, buildTicks: TICK_HZ * 5, trains: [KIND.WARRIOR],
     description: "A supernatural gateway that trains Cultivator Warriors." },
@@ -429,12 +428,6 @@ export const ABILITIES = Object.freeze({
 });
 
 export const UPGRADES = Object.freeze({
-  [UPGRADE.INDUSTRIAL_CENTER]: Object.freeze({
-    upgrade: UPGRADE.INDUSTRIAL_CENTER, label: "Industrial Center", icon: "IC",
-    researchedAt: KIND.RESOURCE_DEPOT, cost: { steel: 800, oil: 300 },
-    researchTicks: 0,
-    description: "Instantly upgrade this Resource Depot, allowing resource debt: triple maximum HP and +100 global supply while it exists. Maximum two Industrial Centers; absolute cap 300.",
-  }),
   [UPGRADE.METHAMPHETAMINES]: Object.freeze({
     upgrade: UPGRADE.METHAMPHETAMINES,
     label: "Methamphetamines",

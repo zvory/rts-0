@@ -66,10 +66,7 @@ fn unpaid_manual_research_waits_then_pays_and_starts() {
     assert_eq!(waiting.progress, 0);
 
     let definition = upgrade::definition(UpgradeKind::Entrenchment);
-    players[0].set_resources(
-        i64::from(definition.cost_steel),
-        i64::from(definition.cost_oil),
-    );
+    players[0].set_resources(definition.cost_steel, definition.cost_oil);
     tick_production(&map, &mut entities, &mut players);
     let started = &entities
         .get(training_centre)
@@ -99,10 +96,7 @@ fn unfinished_building_keeps_queued_research_inert_until_completion() {
         });
     let mut players = vec![player(1)];
     let definition = upgrade::definition(UpgradeKind::Entrenchment);
-    players[0].set_resources(
-        i64::from(definition.cost_steel),
-        i64::from(definition.cost_oil),
-    );
+    players[0].set_resources(definition.cost_steel, definition.cost_oil);
 
     tick_production(&map, &mut entities, &mut players);
     let waiting = &entities
@@ -113,10 +107,7 @@ fn unfinished_building_keeps_queued_research_inert_until_completion() {
     assert_eq!(waiting.progress, 0);
     assert_eq!(
         (players[0].steel, players[0].oil),
-        (
-            i64::from(definition.cost_steel),
-            i64::from(definition.cost_oil)
-        )
+        (definition.cost_steel, definition.cost_oil)
     );
 
     while entities

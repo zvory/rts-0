@@ -412,11 +412,8 @@ Game-generated critical alerts reuse `chat` with `senderId: 0`, `senderName: "Ga
 `channel: "all"`. Supply-cap and lost auto-production prerequisite warnings are delivered only
 to the owning active seat, never teammates or spectators, with an independent 30-second
 simulation-time cooldown per seat and warning (unit/prerequisite for production). Persistent
-blocked conditions may remind after the cooldown. Supply text uses actual used/cap values and
-recommends upgrading a Resource Depot while below the maximum cap. Completed Industrial Centers
-broadcast `Color (Player name) has upgraded a resource depot to an Industrial Center.` to every
-connection, including spectators, when first observed. Only these public announcements enter
-replay chat; private economy warnings are excluded. No positional information is included.
+blocked conditions may remind after the cooldown. Supply text uses actual used/cap values.
+These private economy warnings are excluded from replay chat and contain no positional information.
 
 `LobbyPlayer`: `{ id: u32, teamId: u32, factionId: string, name: string, ready: bool, color: string, isAi: bool, aiProfileId?: string, isSpectator: bool }`. `isAi` is
 true for computer opponents (always shown ready; the client renders an "AI" tag, a host-only
@@ -729,7 +726,7 @@ transport decode:
     decals: GroundDecalView[]    // at most 64 fog/observer-entitled rows
   },
   worldCombatPosition?: [f32, f32], // coarse global combat area; omitted when inactive
-  steel: i64, oil: i64,       // signed balances; Industrial Center may incur debt
+  steel: u32, oil: u32,       // your resources
   supplyUsed: u32, supplyCap: u32,
   autoBuild?: {paused: bool, reserveSteel: u32, reserveOil: u32}, // projected player's authoritative policy
   entities: Entity[],            // your non-resource entities (always) + entities visible to living-team current/firing/death vision
@@ -971,7 +968,7 @@ Compact numeric codes:
 | `orderStage` | 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, 5 `build`, 6 `smoke`, 7 `setupAntiTankGuns`, 8 `charge`, 9 `mortarFire`, 10 `pointFire`, 11 `breakthrough`, 12 `ekatTeleport`, 13 `ekatLineShot`, 14 `ekatMagicAnchor`, 15 `deconstruct`, 16 `ekatConsumeGolem`, 17 `blanketFire`, 18 `dismissScoutPlane`, 19 `scoutPlane`, 20 `holdPosition`, 21 `barrage` |
 | `ability` | 1 `charge`, 2 `smoke`, 3 `mortarFire`, 4 `pointFire`, 5 `breakthrough`, 6 `ekatTeleport`, 7 `ekatLineShot`, 8 `ekatMagicAnchor`, 9 `ekatConsumeGolem`, 10 `blanketFire`, 11 `dismissScoutPlane`, 12 `scoutPlane`, 13 `barrage` |
 | `abilityObject.kind` | 1 `returnMarker`, 2 `magicAnchor`, 3 `lineProjectile` |
-| `upgrade` | 1 `methamphetamines`, 2 `anti_tank_gun_unlock`, 3 `tank_unlock`, 4 `artillery_unlock`, 7 `ballistic_tables`, 8 `entrenchment`, 9 `smoke_plus`, 10 `panzerfausts`, 11 `scout_plane_unlock`, 12 `rockets`, 13 `tank_plus`, 14 `industrial_center` |
+| `upgrade` | 1 `methamphetamines`, 2 `anti_tank_gun_unlock`, 3 `tank_unlock`, 4 `artillery_unlock`, 7 `ballistic_tables`, 8 `entrenchment`, 9 `smoke_plus`, 10 `panzerfausts`, 11 `scout_plane_unlock`, 12 `rockets`, 13 `tank_plus` |
 | `weaponKind` | 1 `worker_tools`, 2 `golem_fists`, 3 `rifleman_rifle`, 4 `machine_gunner_mg`, 5 `scout_car_mg`, 6 `anti_tank_gun`, 7 `panzerfaust_loaded_shot`, 8 `mortar_team_mortar`, 9 `artillery_gun`, 10 `tank_cannon`, 11 `tank_coax`, 12 `warrior_sword` |
 | `notice.severity` | 1 `info`, 2 `warn`, 3 `alert` |
 | `EventRecord` | `[1, from, to]` attack, `[1, from, to, reveal?, toPos?]` legacy attack with optional shooter reveal and target position, `[1, from, to, revealOrNull, toPosOrNull, weaponKind]` attack with compact weapon hint, `[2, id, x, y, kind]` death, `[3, id, kind]` build, `[4, msg]` notice, `[4, msg, severity]` position-free notice with severity, `[4, msg, severity, x, y]` positioned notice, `[5, [fromX, fromY], [toX, toY], delayTicks]` smoke launch, `[6, x, y, radiusTiles]` mortar impact/marker, `[6, x, y, radiusTiles, from?, reveal?]` mortar impact with optional shooter reveal, `[7, from, [x, y], radiusTiles, delayTicks]` artillery target marker, `[8, x, y, radiusTiles]` artillery impact, `[9, from, [fromX, fromY], [toX, toY], radiusTiles, delayTicks]` mortar launch, `[11, owner, x, y, facing]` global artillery firing minimap marker, `[12, from, [fromX, fromY], [toX, toY], delayTicks]` Panzerfaust launch, `[13, x, y]` Panzerfaust impact, `[15, to]` missed direct shot (14 removed with conversion) |
@@ -1177,7 +1174,6 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   targetId?: u32,                // current attack target, for drawing tracers
   weaponRangeTiles?: f32,        // owner/allied Tanks only; current authoritative weapon range
   occupiedTrenchId?: u32,        // visible eligible infantry only while actively stopped in a trench
-  industrialCenter?: boolean,    // completed local Resource Depot supply upgrade, public when visible
   rocketRackCount?: u8,           // 0–16 physical rounds; visible Rocket Trucks only
   panzerfaustLoaded?: bool,       // Panzerfaust units only; false after disposable launch
   panzerfaustWindupProgress?: f32,// Panzerfaust wind-up only; authoritative normalized 0..1 timing
@@ -1941,14 +1937,3 @@ rather than exposing hidden impact positions.
 Bursts that only hit traps or miss do not grant a shooter reveal; their rays are withheld
 from enemies when the shooter is concealed. Smoke-hidden shooters are also withheld.
 This can hide some firing feedback at fog edges; it never changes authoritative damage.
-
-Industrial Centers use `research {building, upgrade:"industrial_center"}` (upgrade code 14).
-Completion belongs to that Resource Depot and never enters player `upgrades`.
-`EntityView.industrialCenter` is appended at compact entity slot 44 (false/absent otherwise).
-Remembered buildings append `industrialCenter` at slot 7, using the last observed state;
-completion while unseen never updates enemy memory. Supply scalars and observer rows reflect
-Kriegsia’s 100 base +100 per living completed center, clamped at 300; other factions retain 300. Queue/payment details keep their
-existing owner/allied visibility. Two completed centers occupy both available slots.
-The command applies immediately without a queue, spending 800 steel and 300 oil even if balances
-become negative. Snapshot scalars and observer resource rows carry signed balances in JSON and
-MessagePack; supply, costs, income totals, and Lab resource-setting inputs remain unsigned.

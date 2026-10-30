@@ -1,39 +1,5 @@
 use super::*;
 
-pub(super) fn queue_industrial_center(
-    actions: &mut AiActionContext<'_>,
-    observation: &AiObservation,
-    facts: &AiFacts,
-    intents: &mut Vec<AiIntent>,
-) {
-    if observation.economy.supply_used.saturating_add(25) < observation.economy.supply_cap
-        || observation
-            .owned
-            .iter()
-            .filter(|e| e.industrial_center_slot_reserved && e.hp > 0)
-            .count()
-            >= 2
-    {
-        return;
-    }
-    let eligible: Vec<_> = facts
-        .production_buildings(EntityKind::ResourceDepot)
-        .iter()
-        .filter(|b| {
-            observation
-                .owned
-                .iter()
-                .any(|e| e.id == b.id && !e.industrial_center_slot_reserved)
-        })
-        .cloned()
-        .collect();
-    if actions::try_research_upgrade(actions, &eligible, UpgradeKind::IndustrialCenter).is_some() {
-        intents.push(AiIntent::Research {
-            upgrade: UpgradeKind::IndustrialCenter,
-        });
-    }
-}
-
 pub(super) fn queue_upgrade_if_available(
     actions: &mut AiActionContext<'_>,
     facts: &AiFacts,

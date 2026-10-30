@@ -583,8 +583,8 @@ pub struct Snapshot {
     /// Coarse world combat area shared identically with every recipient for directional ambience.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub world_combat_position: Option<[f32; 2]>,
-    pub steel: i64,
-    pub oil: i64,
+    pub steel: u32,
+    pub oil: u32,
     pub supply_used: u32,
     pub supply_cap: u32,
     /// Authoritative settings for the player whose private resources this snapshot projects.
@@ -673,8 +673,6 @@ pub struct RememberedBuildingView {
     pub x: f32,
     pub y: f32,
     pub footprint: Vec<[u32; 2]>,
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub industrial_center: bool,
     pub observed_tick: u32,
 }
 
@@ -783,8 +781,8 @@ fn is_zero_u32(value: &u32) -> bool {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PlayerResourceSnapshot {
     pub id: u32,
-    pub steel: i64,
-    pub oil: i64,
+    pub steel: u32,
+    pub oil: u32,
     pub supply_used: u32,
     pub supply_cap: u32,
     /// Rolling command-envelope rate over the last ten simulated seconds.
@@ -923,9 +921,6 @@ pub struct EntityView {
     /// Whether a visible completed Pump Jack can currently extract oil.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extractor_active: Option<bool>,
-    /// Public physical upgrade state, projected only with the visible/remembered depot.
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub industrial_center: bool,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub build_progress: Option<f32>,
@@ -1014,7 +1009,6 @@ impl EntityView {
             prod_scout_plane_queued: false,
             prod_waiting: false,
             extractor_active: None,
-            industrial_center: false,
             build_progress: None,
             build_active: false,
             deconstruct_progress: None,
