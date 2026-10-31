@@ -400,6 +400,19 @@ The code and focused contracts are the executable specification:
 Update this document when those cross-file contracts change. Record actual backend capability in
 the parity ledger; do not add speculative future implementation detail here.
 
+### Resource Depot artwork sizing
+
+The depot's 384×384 atlas frames retain the original 1.1 padding compensation. Frame size in
+world pixels is `footprint tiles × 32 × 1.1`; changing the footprint from 3×3 to 4×4 already
+scales every sprite layer by 4/3. Do not apply that multiplier again to `visualScale`.
+The base layer has 88,083 non-transparent pixels, with alpha bounds `[25, 359) × [15, 356)`:
+334×341 source pixels. Its visible bounds grow from 91.85×93.775 world pixels at 3×3 to
+122.4667×125.0333 at 4×4. Its frame-relative edge margins and slight top overlap keep the same
+proportions. The shadow's 360×367 source-pixel bounds likewise retain the original overlap ratio.
+The renderer contract decodes the PNG and checks all four alpha edges of every layer through the
+runtime sprite transform against the original 96-pixel footprint ratios. The SVG fallback is
+scaled once from its authored 96×96 geometry to 128×128.
+
 ### Rocket Truck raster preview
 
 The Rocket Truck uses the selected PNG with team-light multiplication and a 20% larger
