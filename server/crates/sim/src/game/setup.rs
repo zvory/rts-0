@@ -543,10 +543,12 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
         if field_patches == 0 {
             continue;
         }
-        let block_dist = side * config::STEEL_BLOCK_DIST_TILES * ts;
+        // Multi-row fields need another half tile to clear the 4x4 depot corners.
+        let rows = field_patches.div_ceil(STEEL_FIELD_COLUMNS);
+        let extra_clearance = if rows > 1 { 0.5 } else { 0.0 };
+        let block_dist = side * (config::STEEL_BLOCK_DIST_TILES + extra_clearance) * ts;
         let block_cx = hx + block_dist * lateral_x;
         let block_cy = hy + block_dist * lateral_y;
-        let rows = field_patches.div_ceil(STEEL_FIELD_COLUMNS);
         let row_center = (rows - 1) as f32 / 2.0;
         let row_spacing = if rows > 1 { ts / (rows - 1) as f32 } else { ts };
         let col_center = (STEEL_FIELD_COLUMNS - 1) as f32 / 2.0;

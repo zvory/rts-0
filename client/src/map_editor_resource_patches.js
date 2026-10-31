@@ -2,7 +2,7 @@ import { PASSABLE } from "./protocol.js";
 import { terrainCharacterAt } from "./map_authoring/terrain_layers.js";
 
 const TILE_SIZE = 32;
-const STEEL_BLOCK_DIST_TILES = 4;
+const STEEL_BLOCK_DIST_TILES = 4.5;
 const STEEL_FIELD_COLUMNS = 6;
 const START_RESOURCE_MIN_DIST_TILES = 3.5;
 const START_RESOURCE_MAX_DIST_TILES = 7;
@@ -81,10 +81,12 @@ function steelPatchRecords(site, anchorX, anchorY, baseAngle) {
     const count = fieldCounts[sideIndex];
     if (!count) continue;
     const side = sideIndex === 0 ? 1 : -1;
-    const blockDistance = side * STEEL_BLOCK_DIST_TILES * TILE_SIZE;
+    // Match server clearance for multi-row fields around the 4x4 depot.
+    const rows = Math.ceil(count / STEEL_FIELD_COLUMNS);
+    const extraClearance = rows > 1 ? 0.5 : 0;
+    const blockDistance = side * (STEEL_BLOCK_DIST_TILES + extraClearance) * TILE_SIZE;
     const blockX = anchorX + blockDistance * lateralX;
     const blockY = anchorY + blockDistance * lateralY;
-    const rows = Math.ceil(count / STEEL_FIELD_COLUMNS);
     const rowCenter = (rows - 1) / 2;
     const rowSpacing = rows > 1 ? TILE_SIZE / (rows - 1) : TILE_SIZE;
     const columnCenter = (STEEL_FIELD_COLUMNS - 1) / 2;

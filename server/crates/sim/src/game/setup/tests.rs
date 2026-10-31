@@ -690,6 +690,35 @@ fn base_resources_flank_the_centreline_and_put_oil_outward() {
 }
 
 #[test]
+fn bundled_base_sites_fit_resource_depot_between_steel_patches() {
+    let stats = config::building_stats(EntityKind::ResourceDepot).unwrap();
+    for available_map in Map::list_available() {
+        let map = Map::load(&available_map.name, available_map.min_players as usize, 0)
+            .unwrap_or_else(|err| panic!("map {} should load: {err}", available_map.name));
+        let resources = spawned_resource_sites(&map);
+        for &(x, y) in map.starts.iter().chain(&map.base_sites) {
+            let rect = services::geometry::building_rect_for_footprint(
+                EntityKind::ResourceDepot,
+                x.checked_sub(stats.foot_w / 2).expect("base x clearance"),
+                y.checked_sub(stats.foot_h / 2).expect("base y clearance"),
+            ).unwrap();
+            for steel in resources.iter().filter(|node| node.kind == EntityKind::Steel) {
+                let body = services::geometry::CircleBody {
+                    x: steel.pos_x,
+                    y: steel.pos_y,
+                    radius: steel.radius(),
+                };
+                assert!(
+                    !services::geometry::circle_intersects_rect(body, rect),
+                    "Resource Depot must fit between steel patches at base ({x}, {y}) on map={}",
+                    available_map.name,
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn bundled_oil_patches_have_buildable_pump_jack_sites() {
     for available_map in Map::list_available() {
         // Base resource placement depends only on authored geometry; player count and seed only
