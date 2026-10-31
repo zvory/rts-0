@@ -21,7 +21,8 @@ pub const OIL_GEYSER_AMOUNT: u32 = 962;
 pub const STEEL_PATCHES_PER_BASE: u32 = 12;
 pub const OIL_PATCHES_PER_BASE: u32 = 3;
 
-pub const START_RESOURCE_MIN_DIST_TILES: f32 = 3.5;
+// Keep tile-centered oil patches clear of the 4x4 starting Resource Depot footprint.
+pub const START_RESOURCE_MIN_DIST_TILES: f32 = 4.0;
 pub const START_RESOURCE_MAX_DIST_TILES: f32 = 7.0;
 // Four-tile mining buffer beyond authored/base resource cluster placement.
 pub const MINING_ANCHOR_RANGE_TILES: f32 = 11.0;

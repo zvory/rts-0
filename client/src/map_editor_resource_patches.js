@@ -4,7 +4,7 @@ import { terrainCharacterAt } from "./map_authoring/terrain_layers.js";
 const TILE_SIZE = 32;
 const STEEL_BLOCK_DIST_TILES = 4.5;
 const STEEL_FIELD_COLUMNS = 6;
-const START_RESOURCE_MIN_DIST_TILES = 3.5;
+const START_RESOURCE_MIN_DIST_TILES = 4;
 const START_RESOURCE_MAX_DIST_TILES = 7;
 const RESOURCE_NODE_RADIUS = TILE_SIZE / 2;
 

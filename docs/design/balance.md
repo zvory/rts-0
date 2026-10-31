@@ -677,7 +677,8 @@ profiles and explicit activation/autocast policy instead of being folded into de
   starts and all other base sites keep their resource clusters as neutral expansion locations.
   Steel fields use a 4.5-tile lateral offset, increased to five tiles for multi-row fields
   so dense resource clusters clear the Resource Depot’s 4x4 footprint. The map editor mirrors
-  this placement.
+  this placement. Tile-centered Oil patches stay at least four tiles from the base anchor
+  to clear the enlarged depot footprint too.
   The seed only determines player-to-start assignment, never which base sites exist. This lets a
   map have any safe bounded number of base locations without assigning natural sites to players or
   maintaining multiple player-count layouts.

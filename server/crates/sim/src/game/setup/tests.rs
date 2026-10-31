@@ -690,7 +690,7 @@ fn base_resources_flank_the_centreline_and_put_oil_outward() {
 }
 
 #[test]
-fn bundled_base_sites_fit_resource_depot_between_steel_patches() {
+fn bundled_base_sites_fit_resource_depot_between_resource_patches() {
     let stats = config::building_stats(EntityKind::ResourceDepot).unwrap();
     for available_map in Map::list_available() {
         let map = Map::load(&available_map.name, available_map.min_players as usize, 0)
@@ -701,16 +701,18 @@ fn bundled_base_sites_fit_resource_depot_between_steel_patches() {
                 EntityKind::ResourceDepot,
                 x.checked_sub(stats.foot_w / 2).expect("base x clearance"),
                 y.checked_sub(stats.foot_h / 2).expect("base y clearance"),
-            ).unwrap();
-            for steel in resources.iter().filter(|node| node.kind == EntityKind::Steel) {
+            )
+            .unwrap();
+            for node in resources.iter().filter(|node| node.kind.is_node()) {
                 let body = services::geometry::CircleBody {
-                    x: steel.pos_x,
-                    y: steel.pos_y,
-                    radius: steel.radius(),
+                    x: node.pos_x,
+                    y: node.pos_y,
+                    radius: node.radius(),
                 };
                 assert!(
                     !services::geometry::circle_intersects_rect(body, rect),
-                    "Resource Depot must fit between steel patches at base ({x}, {y}) on map={}",
+                    "Resource Depot must clear {:?} patch at base ({x}, {y}) on map={}",
+                    node.kind,
                     available_map.name,
                 );
             }
