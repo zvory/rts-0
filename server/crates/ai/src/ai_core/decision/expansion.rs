@@ -721,7 +721,8 @@ pub(super) fn expansion_cluster_resources_for_anchor<'a>(
     resources: &[&'a AiResourceSummary],
 ) -> Vec<&'a AiResourceSummary> {
     let center = tile_center(anchor, observation.map.tile_size);
-    let radius = (config::MINING_ANCHOR_RANGE_TILES + 2.0) * observation.map.tile_size as f32;
+    let radius = (config::MINING_ANCHOR_RANGE_TILES + config::START_RESOURCE_MAX_DIST_TILES)
+        * observation.map.tile_size as f32;
     let radius2 = squared(radius);
     resources
         .iter()
@@ -865,22 +866,7 @@ pub(super) fn expansion_site_candidate_better(
     let Some(current) = current else {
         return true;
     };
-    // Cover one complete base before comparing exposure; extra patches beyond that
-    // baseline must not pull an expansion away from a safer site.
-    candidate
-        .steel_in_range
-        .min(config::STEEL_PATCHES_PER_BASE as usize)
-        .cmp(
-            &current
-                .steel_in_range
-                .min(config::STEEL_PATCHES_PER_BASE as usize),
-        )
-        .then_with(|| {
-            expansion_approach_exposure_order(
-                candidate.approach_exposure,
-                current.approach_exposure,
-            )
-        })
+    expansion_approach_exposure_order(candidate.approach_exposure, current.approach_exposure)
         .then_with(|| {
             current
                 .max_resource_distance2
