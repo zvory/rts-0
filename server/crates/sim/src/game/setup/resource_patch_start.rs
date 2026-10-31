@@ -105,12 +105,22 @@ mod tests {
     #[test]
     fn starting_extractors_skip_duplicate_tiles_and_continue_to_other_patches() {
         let mut entities = EntityStore::new();
+        let extractor = CURRENT_CATALOG
+            .loadout
+            .starting_entities
+            .iter()
+            .find(|group| group.formation == StartingFormation::ResourcePatches)
+            .expect("catalog resource extractor")
+            .kind;
+        let node_kind = extractor
+            .extracted_resource_kind()
+            .expect("extractor resource");
         let ids: Vec<_> = [(320.0, 320.0), (325.0, 325.0), (384.0, 320.0)]
             .into_iter()
-            .filter_map(|(x, y)| entities.spawn_node(EntityKind::Steel, x, y))
+            .filter_map(|(x, y)| entities.spawn_node(node_kind, x, y))
             .collect();
         let spawned = spawn(&mut entities, 1, CURRENT_CATALOG.loadout, &ids, 0.0, 0.0);
-        assert_eq!(spawned, vec![EntityKind::SteelMine; 2]);
+        assert_eq!(spawned, vec![extractor; 2]);
     }
 
     #[test]
