@@ -66,10 +66,10 @@ const PUMP_JACK_COMPONENT_RIG = Object.freeze({
 
 // Supply Depots and Tank Traps intentionally stay off this visual pass.
 const BUILDING_PNG_SPECS = Object.freeze([
-  // Enlarge the depot artwork by a further third; the four-tile footprint stays authoritative.
+  // The footprint already scales the artwork; preserve the original transparent-padding ratio.
   buildingSpec(KIND.RESOURCE_DEPOT, 384, 384,
     "/assets/rigs/resource-depot-worksite-preview/resource_depot-atlas.png?v=oil-silo-foundry-worksite-preview-08",
-    { emblem: true, visualScale: 1.1 * 4 / 3 }),
+    { emblem: true, visualScale: 1.1 }),
   buildingSpec(KIND.BARRACKS, 384, 256,
     "/assets/rigs/building-emblems-preview/barracks-atlas-m14-team-tint.png?v=building-emblems-preview-04",
     { emblem: true }),
