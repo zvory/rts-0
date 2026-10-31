@@ -52,7 +52,7 @@ export function buildClientPerfWorkloads(env = process.env) {
         gpuShadowTimingEnabled: env.RTS_CLIENT_PERF_GPU_TIMING === "1",
         uncappedPresentationsEnabled,
         gpuCompletePresentationsEnabled,
-        waitForMinEntities: 382,
+        waitForMinEntities: 381,
         resetPerfAfterSetup: true,
       },
     },

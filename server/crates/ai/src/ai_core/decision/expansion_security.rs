@@ -683,7 +683,7 @@ pub(super) fn positions(
     let forward_tiles = if crossroads_direction.is_some() {
         4.5
     } else {
-        3.5
+        4.5
     };
     let ts = observation.map.tile_size as f32;
     let Some(depot) = config::building_stats(EntityKind::ResourceDepot) else {

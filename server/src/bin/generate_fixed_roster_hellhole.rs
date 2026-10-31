@@ -313,6 +313,10 @@ fn grant_lab_state(game: &mut Game) -> Result<(), String> {
             }),
         )?;
         for &upgrade in upgrade::ALL {
+            // This retired marker is granted by owning an Engineering Complex, not research.
+            if upgrade == upgrade::UpgradeKind::AntiTankGunUnlock {
+                continue;
+            }
             apply(
                 game,
                 LabOp::SetCompletedResearch(LabSetCompletedResearch {

@@ -72,7 +72,7 @@ fn depot_completes_steel_mine_on_nearest_in_range_patch() {
             total: 1,
             paid: true,
         });
-    let near = game.state.map.tile_center(14, 10);
+    let near = game.state.map.tile_center(15, 12);
     let far = game.state.map.tile_center(18, 10);
     spawn_node(&mut game, EntityKind::Steel, far);
     spawn_node(&mut game, EntityKind::Steel, near);
@@ -100,7 +100,7 @@ fn depot_extractor_scaffold_matches_front_queue_progress() {
     let mut game = empty_flat_game(&players());
     let depot = spawn_building(&mut game, 1, EntityKind::ResourceDepot, (10, 10));
     spawn_building(&mut game, 2, EntityKind::ResourceDepot, (50, 50));
-    let patch = game.state.map.tile_center(14, 10);
+    let patch = game.state.map.tile_center(15, 12);
     let total = config::building_stats(EntityKind::SteelMine)
         .expect("steel mine stats")
         .build_ticks;
@@ -139,7 +139,7 @@ fn cancelling_legacy_extractor_scaffold_restarts_free_without_refund() {
     let mut game = empty_flat_game(&players());
     let depot = spawn_building(&mut game, 1, EntityKind::ResourceDepot, (10, 10));
     spawn_building(&mut game, 2, EntityKind::ResourceDepot, (50, 50));
-    let patch = game.state.map.tile_center(14, 10);
+    let patch = game.state.map.tile_center(15, 12);
     spawn_node(&mut game, EntityKind::Steel, patch);
     game.state.players[0].set_resources(450, 0);
     game.state
@@ -186,7 +186,7 @@ fn automatic_extractor_pauses_when_saturated_and_restarts_free_after_destruction
     let mut game = empty_flat_game(&players());
     let depot = spawn_building(&mut game, 1, EntityKind::ResourceDepot, (10, 10));
     spawn_building(&mut game, 2, EntityKind::ResourceDepot, (50, 50));
-    let patch = game.state.map.tile_center(14, 10);
+    let patch = game.state.map.tile_center(15, 12);
     spawn_node(&mut game, EntityKind::Steel, patch);
     let mine = game
         .state
@@ -224,7 +224,7 @@ fn depot_builds_free_steel_and_oil_extractors_concurrently() {
     let mut game = empty_flat_game(&players());
     let depot = spawn_building(&mut game, 1, EntityKind::ResourceDepot, (10, 10));
     spawn_building(&mut game, 2, EntityKind::ResourceDepot, (50, 50));
-    let steel_patch = game.state.map.tile_center(14, 10);
+    let steel_patch = game.state.map.tile_center(15, 12);
     let oil_patch = game.state.map.tile_center(16, 10);
     spawn_node(&mut game, EntityKind::Steel, steel_patch);
     spawn_node(&mut game, EntityKind::Oil, oil_patch);

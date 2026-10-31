@@ -10,6 +10,17 @@ pub(super) fn spawn(
     home_y: f32,
 ) -> Vec<EntityKind> {
     let mut spawned = Vec::new();
+    let tile_size = crate::config::TILE_SIZE as f32;
+    let mut occupied: std::collections::BTreeSet<_> = entities
+        .iter()
+        .filter(|entity| entity.kind.is_resource_extractor())
+        .map(|entity| {
+            (
+                (entity.pos_x / tile_size) as u32,
+                (entity.pos_y / tile_size) as u32,
+            )
+        })
+        .collect();
     let producer_id = entities
         .iter()
         .find(|entity| {
@@ -40,7 +51,34 @@ pub(super) fn spawn(
             })
             .collect::<Vec<_>>();
         nodes.sort_by(|a, b| a.1.total_cmp(&b.1).then_with(|| a.0.cmp(&b.0)));
-        for (_, _, x, y) in nodes.into_iter().take(group.count as usize) {
+        let mut remaining = group.count;
+        for (_, _, x, y) in nodes {
+            if remaining == 0 {
+                break;
+            }
+            let tile = ((x / tile_size) as u32, (y / tile_size) as u32);
+            if occupied.contains(&tile) {
+                continue;
+            }
+            if let Some(rect) = crate::game::services::geometry::building_rect_for_footprint(
+                group.kind, tile.0, tile.1,
+            ) {
+                if entities
+                    .iter()
+                    .filter(|entity| entity.is_unit())
+                    .any(|entity| {
+                        crate::game::services::geometry::unit_body_for_entity(entity).is_some_and(
+                            |body| {
+                                crate::game::services::geometry::unit_body_intersects_rect(
+                                    body, rect,
+                                )
+                            },
+                        )
+                    })
+                {
+                    continue;
+                }
+            }
             if let Some(id) = entities.spawn_building(owner, group.kind, x, y, group.completed) {
                 if let Some(producer_id) = producer_id {
                     if let Some(extractor) = entities
@@ -50,6 +88,8 @@ pub(super) fn spawn(
                         extractor.producer_id = Some(producer_id);
                     }
                 }
+                occupied.insert(tile);
+                remaining -= 1;
                 spawned.push(group.kind);
             }
         }
@@ -61,6 +101,17 @@ pub(super) fn spawn(
 mod tests {
     use super::*;
     use crate::rules::faction::CURRENT_CATALOG;
+
+    #[test]
+    fn starting_extractors_skip_duplicate_tiles_and_continue_to_other_patches() {
+        let mut entities = EntityStore::new();
+        let ids: Vec<_> = [(320.0, 320.0), (325.0, 325.0), (384.0, 320.0)]
+            .into_iter()
+            .filter_map(|(x, y)| entities.spawn_node(EntityKind::Steel, x, y))
+            .collect();
+        let spawned = spawn(&mut entities, 1, CURRENT_CATALOG.loadout, &ids, 0.0, 0.0);
+        assert_eq!(spawned, vec![EntityKind::SteelMine; 2]);
+    }
 
     #[test]
     fn starting_extractor_uses_only_its_newly_spawned_base_resources() {

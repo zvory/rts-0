@@ -8,7 +8,7 @@ fn spectator_union_uses_selected_owner_knowledge_of_destroyed_buildings() {
         EntityKind::PumpJack,
     ] {
         let mut game = empty_flat_game_with_players(&three_players());
-        let scout_pos = game.state.map.tile_center(20, 20);
+        let scout_pos = game.state.map.tile_center(19, 20);
         let building_pos = game.state.map.tile_center(22, 20);
         let scout = game
             .state

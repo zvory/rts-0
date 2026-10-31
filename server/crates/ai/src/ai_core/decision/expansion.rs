@@ -865,7 +865,22 @@ pub(super) fn expansion_site_candidate_better(
     let Some(current) = current else {
         return true;
     };
-    expansion_approach_exposure_order(candidate.approach_exposure, current.approach_exposure)
+    // Cover one complete base before comparing exposure; extra patches beyond that
+    // baseline must not pull an expansion away from a safer site.
+    candidate
+        .steel_in_range
+        .min(config::STEEL_PATCHES_PER_BASE as usize)
+        .cmp(
+            &current
+                .steel_in_range
+                .min(config::STEEL_PATCHES_PER_BASE as usize),
+        )
+        .then_with(|| {
+            expansion_approach_exposure_order(
+                candidate.approach_exposure,
+                current.approach_exposure,
+            )
+        })
         .then_with(|| {
             current
                 .max_resource_distance2

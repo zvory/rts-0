@@ -791,7 +791,16 @@ fn crossroads_natural_is_the_base_behind_the_main_not_the_one_toward_the_enemy()
             policy,
             EntityKind::ResourceDepot,
             &expansion::expansion_candidate_resources(&obs),
-            &mut |_, _, _| true,
+            &mut |kind, x, y| {
+                let center = building_center((x, y), kind, obs.map.tile_size).unwrap();
+                let ts = obs.map.tile_size as f32;
+                analysis
+                    .ground_distance_from_start(
+                        player,
+                        ((center.0 / ts) as u32, (center.1 / ts) as u32),
+                    )
+                    .is_some()
+            },
         )
         .unwrap();
         let walk = |site: (u32, u32), from: u32| {
