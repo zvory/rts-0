@@ -22,7 +22,7 @@ import { installFakePixi } from "./pixi_fakes.mjs";
 
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const expectedFootprints = new Map([
-  [KIND.RESOURCE_DEPOT, [3, 3]],
+  [KIND.RESOURCE_DEPOT, [4, 4]],
   [KIND.BARRACKS, [3, 2]],
   [KIND.TRAINING_CENTRE, [3, 2]],
   [KIND.ENGINEERING_COMPLEX, [3, 3]],
