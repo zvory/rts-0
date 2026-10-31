@@ -1,20 +1,21 @@
 // Building SVG rigs — one per building kind.
 //
 // Authored at world-pixel scale (tileSize=32), centered at origin.
-// Footprints: 3×3 = 96×96 px, 2×2 = 64×64 px, 3×2 = 96×64 px.
+// Footprints: 4×4 = 128×128 px, 3×3 = 96×96 px, 2×2 = 64×64 px, 3×2 = 96×64 px.
 //
 // No animation attributes — buildings are static.
 // data-rts-tint="team" applies the player color at runtime.
 // Unit geometry is borrowed and scaled where it reinforces the building's role.
 
 // ---------------------------------------------------------------------------
-// Resource Depot — 3×3 (96×96)
+// Resource Depot — 4×4 (128×128)
 // Grand command seat. Trapezoidal hall widening toward the base, flanking
 // wings, central tower spire, and gold command medallions (borrowed from the
 // Command Car badge motif).
 // ---------------------------------------------------------------------------
 
-export const RESOURCE_DEPOT_BUILDING_SVG = `<svg viewBox="-48 -48 96 96" data-rts-rig-kind="resource_depot" data-rts-rig-version="1" data-rts-origin="center">
+export const RESOURCE_DEPOT_BUILDING_SVG = `<svg viewBox="-64 -64 128 128" data-rts-rig-kind="resource_depot" data-rts-rig-version="1" data-rts-origin="center">
+  <g transform="scale(1.3333333333333333)">
   <rect id="part.base" x="-48" y="-48" width="96" height="96" fill="#2b2a23" stroke="#1a1712" stroke-width="2" />
   <polygon id="part.hall" points="-30,-40 30,-40 38,38 -38,38" fill="#6d89b8" fill-opacity="0.88" data-rts-tint="team" />
   <rect id="part.wing.left" x="-48" y="-22" width="20" height="52" fill="#6d89b8" fill-opacity="0.78" data-rts-tint="team-light-soft" />
@@ -27,6 +28,7 @@ export const RESOURCE_DEPOT_BUILDING_SVG = `<svg viewBox="-48 -48 96 96" data-rt
   <circle id="anchor.origin" cx="0" cy="0" r="1" fill="#000000" />
   <circle id="anchor.selection" cx="0" cy="0" r="1" fill="#000000" />
   <circle id="anchor.hp" cx="0" cy="-48" r="1" fill="#000000" />
+  </g>
 </svg>`;
 
 // ---------------------------------------------------------------------------

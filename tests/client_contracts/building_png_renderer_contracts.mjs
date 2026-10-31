@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { HARVEST_TICKS, STATS, TICK_HZ } from "../../client/src/config.js";
 import { KIND } from "../../client/src/protocol.js";
+import { createBuildingRigDefinitions } from "../../client/src/renderer/rigs/building_routing.js";
 import { Renderer } from "../../client/src/renderer/index.js";
 import {
   createBuildingPngRigAtlases,
@@ -47,6 +48,12 @@ const emblemKinds = new Set([
   KIND.FACTORY,
   KIND.STEELWORKS,
 ]);
+const depotFallback = createBuildingRigDefinitions().get(KIND.RESOURCE_DEPOT);
+const depotFallbackBase = depotFallback.parts.find((part) => part.id === "part.base");
+strictAssert.ok(Math.abs(depotFallbackBase.geometry.width * depotFallbackBase.transform.scaleX - 128) < 0.001,
+  "depot fallback artwork scales to four tiles");
+strictAssert.equal(depotFallback.anchors.hp.y, -64);
+
 const definitions = createBuildingPngRigDefinitions();
 const atlases = createBuildingPngRigAtlases();
 strictAssert.equal(definitions.size, expectedFootprints.size);
@@ -121,7 +128,7 @@ for (const [kind, footprint] of expectedFootprints) {
       `${kind}.${sprite.id} frame fits grid`,
     );
     const expectedVisualScale = kind === KIND.RESOURCE_DEPOT
-      ? 1.1
+      ? 1.1 * 4 / 3
       : kind === KIND.STEEL_MINE
         ? 1.35
         : 1;
