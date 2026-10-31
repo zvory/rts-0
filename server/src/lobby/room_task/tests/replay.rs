@@ -453,7 +453,7 @@ fn replay_metric_history_tracks_current_unit_value() {
     let mut history = ReplayResourceHistory::default();
     history.record(&game);
     let before = *history.samples.last().unwrap();
-    let tank = spawn_replay_test_entity(&mut game, 1, EntityKind::Tank, tile_center(10, 10));
+    let tank = spawn_replay_test_entity(&mut game, 1, EntityKind::Tank, tile_center(8, 8));
     for _ in 0..30 {
         game.tick();
     }

@@ -1,8 +1,12 @@
 import assert from "node:assert/strict";
 
+import { STATS } from "../../client/src/config.js";
+import { KIND } from "../../client/src/protocol.js";
 import { mapEditorResourcePatches } from "../../client/src/map_editor_resource_patches.js";
 import { MAP_EDITOR_SYMMETRY } from "../../client/src/map_editor_session.js";
 import { MapEditorViewport } from "../../client/src/map_editor_viewport.js";
+
+const TILE_SIZE = 32;
 
 const draft = {
   width: 32,
@@ -19,6 +23,30 @@ assert.equal(patches.filter(({ kind }) => kind === "oil").length, 3,
 assert.deepEqual(patches.filter(({ kind }) => kind === "oil").map(({ x, y }) => [x, y]), [
   [144, 144], [176, 80], [80, 176],
 ], "editor Oil stand-ins mirror server tile offsets for the north-west base");
+
+const denseDraft = {
+  width: 64,
+  height: 64,
+  terrain: Array(64).fill(".".repeat(64)),
+  startLocations: [{ x: 21, y: 5 }],
+  baseSites: [{ x: 21, y: 5, steelPatches: 36, oilPatches: 9 }],
+};
+for (const layout of [draft, denseDraft]) {
+  const { footW, footH } = STATS[KIND.RESOURCE_DEPOT];
+  const site = layout.baseSites[0];
+  const minX = (site.x - Math.floor(footW / 2)) * TILE_SIZE;
+  const minY = (site.y - Math.floor(footH / 2)) * TILE_SIZE;
+  const maxX = minX + footW * TILE_SIZE;
+  const maxY = minY + footH * TILE_SIZE;
+  const resources = mapEditorResourcePatches(layout);
+  assert.equal(resources.length, site.steelPatches + site.oilPatches);
+  for (const patch of resources) {
+    const dx = patch.x - Math.max(minX, Math.min(maxX, patch.x));
+    const dy = patch.y - Math.max(minY, Math.min(maxY, patch.y));
+    assert(dx * dx + dy * dy > (TILE_SIZE / 2) ** 2,
+      `${patch.kind} patches must clear the Resource Depot, including dense fields near map edges`);
+  }
+}
 
 const withoutOil = structuredClone(draft);
 withoutOil.baseSites[0].oilPatches = 0;

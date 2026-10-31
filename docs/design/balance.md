@@ -675,6 +675,11 @@ profiles and explicit activation/autocast policy instead of being folded into de
   locations limits player count, while every base site remains present in every match. A player
   receives a Resource Depot, workers, and the normal resource cluster at an assigned start; unclaimed
   starts and all other base sites keep their resource clusters as neutral expansion locations.
+  Steel fields use a 4.5-tile lateral offset, increased to five tiles for multi-row fields
+  so dense resource clusters clear the Resource Depot’s 4x4 footprint. The map editor mirrors
+  this placement. Starting extractors skip already occupied tiles and units when selecting
+  their resource patches. Tile-centered Oil patches stay at least four tiles from the base anchor
+  to clear the enlarged depot footprint too.
   The seed only determines player-to-start assignment, never which base sites exist. This lets a
   map have any safe bounded number of base locations without assigning natural sites to players or
   maintaining multiple player-count layouts.
@@ -709,7 +714,7 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 
 | kind                       | player-facing name | hp  | sight | cost | foot | buildTicks | notes |
 |----------------------------|--------------------|-----|-------|-----|------|-----------|-------|
-| resource_depot                | Resource Depot        | 180 | 1     | 450 steel + 100 oil | 3x3  | 150       | trains workers and permanently auto-builds free Steel Mines and Pump Jacks concurrently; no supply; players start with one free |
+| resource_depot                | Resource Depot        | 180 | 1     | 450 steel + 100 oil | 4x4  | 150       | trains workers and permanently auto-builds free Steel Mines and Pump Jacks concurrently; no supply; players start with one free |
 | zamok                      | Zamok              | 360 | 1     | 0   | 3x3  | 0         | Ekat start building; no supply; trains Golem; no research in first playable slice |
 | depot                      | Supply Depot       | 65 | 1     | 100 | 2x2  | 300       | disabled in the current experiment (not buildable and no command-card button); retained for replay and fixture compatibility; no supply |
 | barracks                   | Barracks           | 98 | 1     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, and panzerfaust; Machine Gunner requires a completed Training Centre and Panzerfaust requires completed Panzerfausts research; requires a Resource Depot |
