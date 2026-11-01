@@ -2,13 +2,13 @@ use std::collections::HashMap;
 
 use super::{connection::send_or_log, room_task::RoomPlayer};
 use crate::protocol::{ChatChannel, ChatScope, ServerMessage};
-use rts_sim::game::{Game, PlayerCriticalEventState};
+use rts_sim::game::{entity::EntityKind, Game, PlayerCriticalEventState};
 
 const WARNING_COOLDOWN_TICKS: u32 = 30 * rts_rules::balance::TICK_HZ;
 
 #[derive(Default)]
 pub(super) struct CriticalEventTracker {
-    last_warning: HashMap<(u32, String), u32>,
+    last_warning: HashMap<u32, u32>,
 }
 
 enum Notification {
@@ -16,8 +16,8 @@ enum Notification {
 }
 
 impl CriticalEventTracker {
-    fn warning_allowed(&mut self, player: u32, key: String, tick: u32) -> bool {
-        let last = self.last_warning.entry((player, key));
+    fn warning_allowed(&mut self, player: u32, tick: u32) -> bool {
+        let last = self.last_warning.entry(player);
         match last {
             std::collections::hash_map::Entry::Occupied(mut entry) => {
                 if tick.saturating_sub(*entry.get()) < WARNING_COOLDOWN_TICKS {
@@ -35,16 +35,42 @@ impl CriticalEventTracker {
     fn observe(&mut self, tick: u32, states: Vec<PlayerCriticalEventState>) -> Vec<Notification> {
         let mut notifications = Vec::new();
         for state in states {
-            if !state.blocked_production.is_empty()
-                && self.warning_allowed(state.player_id, "production".into(), tick)
-            {
+            if !state.blocked_production.is_empty() && self.warning_allowed(state.player_id, tick) {
+                let mut prerequisites: Vec<_> = state
+                    .blocked_production
+                    .iter()
+                    .map(|&(_, prerequisite)| prerequisite_name(prerequisite))
+                    .collect();
+                prerequisites.sort_unstable();
+                prerequisites.dedup();
                 notifications.push(Notification::Private {
                     recipient: state.player_id,
-                    text: "Rebuild Engineering Complex!".into(),
+                    text: format!("Rebuild {}!", prerequisites.join(", ")),
                 });
             }
         }
         notifications
+    }
+}
+
+fn prerequisite_name(kind: EntityKind) -> String {
+    match kind {
+        EntityKind::Steelworks => "Gun Works".into(),
+        EntityKind::Factory => "Vehicle Works".into(),
+        _ => kind
+            .stable_id()
+            .split('_')
+            .map(|word| {
+                let mut chars = word.chars();
+                let mut name = String::new();
+                if let Some(first) = chars.next() {
+                    name.extend(first.to_uppercase());
+                }
+                name.extend(chars);
+                name
+            })
+            .collect::<Vec<_>>()
+            .join(" "),
     }
 }
 
@@ -97,7 +123,6 @@ fn deliver_notifications(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rts_sim::game::entity::EntityKind;
 
     fn state() -> PlayerCriticalEventState {
         PlayerCriticalEventState {
@@ -106,7 +131,7 @@ mod tests {
             supply_cap: 300,
             blocked_production: vec![
                 (EntityKind::AntiTankGun, EntityKind::EngineeringComplex),
-                (EntityKind::MortarTeam, EntityKind::EngineeringComplex),
+                (EntityKind::CommandCar, EntityKind::EngineeringComplex),
             ],
         }
     }
@@ -149,6 +174,43 @@ mod tests {
         assert!(tracker.observe(1, vec![current.clone()]).is_empty());
         current.supply_used = 1;
         assert!(tracker.observe(1000, vec![current]).is_empty());
+    }
+
+    #[test]
+    fn critical_events_name_the_actual_missing_prerequisites() {
+        for (unit, prerequisite, expected) in [
+            (
+                EntityKind::MachineGunner,
+                EntityKind::TrainingCentre,
+                "Rebuild Training Centre!",
+            ),
+            (
+                EntityKind::RocketLauncher,
+                EntityKind::Factory,
+                "Rebuild Vehicle Works!",
+            ),
+        ] {
+            let mut current = state();
+            current.blocked_production = vec![(unit, prerequisite)];
+            let notifications = CriticalEventTracker::default().observe(1, vec![current]);
+            assert_eq!(notifications.len(), 1);
+            assert!(
+                matches!(&notifications[0], Notification::Private { text, .. }
+                if text == expected)
+            );
+        }
+
+        let mut current = state();
+        current.blocked_production.extend([
+            (EntityKind::RocketLauncher, EntityKind::Factory),
+            (EntityKind::MachineGunner, EntityKind::TrainingCentre),
+        ]);
+        let notifications = CriticalEventTracker::default().observe(1, vec![current]);
+        assert_eq!(notifications.len(), 1);
+        assert!(
+            matches!(&notifications[0], Notification::Private { text, .. }
+            if text == "Rebuild Engineering Complex, Training Centre, Vehicle Works!")
+        );
     }
 }
 

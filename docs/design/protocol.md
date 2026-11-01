@@ -410,8 +410,9 @@ transport/browser/prediction/render behavior, not as gameplay authority.
 
 Game-generated critical alerts reuse `chat` with `senderId: 0`, `senderName: "Game"`, and
 `channel: "all"`. Lost auto-production prerequisite warnings are delivered only
-to the owning active seat, never teammates or spectators, as `Rebuild Engineering Complex!`,
-with a 30-second simulation-time cooldown per seat. Multiple blocked units produce one reminder.
+to the owning active seat, never teammates or spectators, as `Rebuild Engineering Complex!`
+(or the other missing prerequisites' display names), with a 30-second simulation-time cooldown
+per seat. Multiple blocked units produce one reminder listing each missing prerequisite once.
 Persistent blocked conditions may remind after the cooldown. Supply-cap warnings are disabled.
 The client displays these alerts as bare text without channel or sender prefixes, with a subtle
 size pulse (disabled for reduced-motion preferences). These private economy warnings are excluded
