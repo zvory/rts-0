@@ -38,6 +38,20 @@
 
 .chat-message.is-fading { opacity: 0; }
 
+.chat-message-critical {
+  transform-origin: left center;
+  animation: critical-alert-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes critical-alert-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.025); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-message-critical { animation: none; }
+}
+
 .chat-composer {
   display: flex;
   align-items: baseline;

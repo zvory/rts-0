@@ -171,6 +171,21 @@ assert(
     "chat is rendered as literal text rather than HTML",
   );
 
+  handlers.get("chat")({
+    scope: "game", channel: "all", senderId: 0,
+    senderName: "Game", text: "Rebuild Engineering Complex!",
+  });
+  assert(messages.children.at(-1)?.textContent === "Rebuild Engineering Complex!",
+    "critical alerts render without sender or channel prefixes");
+  assert(messages.children.at(-1)?.className.includes("chat-message-critical"),
+    "critical alerts opt into the subtle pulse");
+  handlers.get("chat")({
+    scope: "game", channel: "all", senderId: 2,
+    senderName: "Game", text: "ordinary player message",
+  });
+  assert(messages.children.at(-1)?.textContent === "[ALL] Game: ordinary player message",
+    "player names cannot opt into critical-alert styling");
+
   chat.setLobbyContext({ room: "ordinary-room" });
   assert(
     !root.hidden && chat.scope === "lobby" && !chat.readOnly && root.parentNode === lobbyDock,
@@ -198,7 +213,7 @@ assert(
     senderName: "Branch host",
     text: "claim a seat",
   });
-  assert(timeoutCalls === 2,
+  assert(timeoutCalls === 4,
     "floating branch-staging chat retains the bounded fading overlay behavior");
 
   chat.setGameContext({ replay: {}, playerId: 99, spectator: true, players: [] });

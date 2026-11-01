@@ -409,11 +409,13 @@ transport/browser/prediction/render behavior, not as gameplay authority.
 | `error`    | `msg: string` |
 
 Game-generated critical alerts reuse `chat` with `senderId: 0`, `senderName: "Game"`, and
-`channel: "all"`. Supply-cap and lost auto-production prerequisite warnings are delivered only
-to the owning active seat, never teammates or spectators, with an independent 30-second
-simulation-time cooldown per seat and warning (unit/prerequisite for production). Persistent
-blocked conditions may remind after the cooldown. Supply text uses actual used/cap values.
-These private economy warnings are excluded from replay chat and contain no positional information.
+`channel: "all"`. Lost auto-production prerequisite warnings are delivered only
+to the owning active seat, never teammates or spectators, as `Rebuild Engineering Complex!`,
+with a 30-second simulation-time cooldown per seat. Multiple blocked units produce one reminder.
+Persistent blocked conditions may remind after the cooldown. Supply-cap warnings are disabled.
+The client displays these alerts as bare text without channel or sender prefixes, with a subtle
+size pulse (disabled for reduced-motion preferences). These private economy warnings are excluded
+from replay chat and contain no positional information.
 
 `LobbyPlayer`: `{ id: u32, teamId: u32, factionId: string, name: string, ready: bool, color: string, isAi: bool, aiProfileId?: string, isSpectator: bool }`. `isAi` is
 true for computer opponents (always shown ready; the client renders an "AI" tag, a host-only

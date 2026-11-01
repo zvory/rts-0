@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use super::{connection::send_or_log, room_task::RoomPlayer};
 use crate::protocol::{ChatChannel, ChatScope, ServerMessage};
-use rts_sim::game::{entity::EntityKind, Game, PlayerCriticalEventState};
+use rts_sim::game::{Game, PlayerCriticalEventState};
 
 const WARNING_COOLDOWN_TICKS: u32 = 30 * rts_rules::balance::TICK_HZ;
 
@@ -35,56 +35,16 @@ impl CriticalEventTracker {
     fn observe(&mut self, tick: u32, states: Vec<PlayerCriticalEventState>) -> Vec<Notification> {
         let mut notifications = Vec::new();
         for state in states {
-            if state.supply_cap > 0
-                && state.supply_used >= state.supply_cap
-                && self.warning_allowed(state.player_id, "supply".into(), tick)
+            if !state.blocked_production.is_empty()
+                && self.warning_allowed(state.player_id, "production".into(), tick)
             {
                 notifications.push(Notification::Private {
                     recipient: state.player_id,
-                    text: format!(
-                        "You have reached {} out of {} supply.",
-                        state.supply_used, state.supply_cap
-                    ),
+                    text: "Rebuild Engineering Complex!".into(),
                 });
-            }
-            for (unit, prerequisite) in state.blocked_production {
-                if self.warning_allowed(state.player_id, format!("{unit:?}:{prerequisite:?}"), tick)
-                {
-                    notifications.push(Notification::Private {
-                        recipient: state.player_id,
-                        text: format!(
-                            "{} lost, {} production blocked.",
-                            display_kind(prerequisite),
-                            display_kind(unit)
-                        ),
-                    });
-                }
             }
         }
         notifications
-    }
-}
-
-fn display_kind(kind: EntityKind) -> String {
-    match kind {
-        EntityKind::AntiTankGun => "AT gun".into(),
-        EntityKind::Steelworks => "Gun works".into(),
-        EntityKind::Factory => "Vehicle works".into(),
-        _ => {
-            let name = format!("{kind:?}");
-            let mut text = String::new();
-            for (index, ch) in name.chars().enumerate() {
-                if index > 0 && ch.is_uppercase() {
-                    text.push(' ');
-                }
-                if index == 0 {
-                    text.push(ch);
-                } else {
-                    text.extend(ch.to_lowercase());
-                }
-            }
-            text
-        }
     }
 }
 
@@ -137,13 +97,17 @@ fn deliver_notifications(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rts_sim::game::entity::EntityKind;
 
     fn state() -> PlayerCriticalEventState {
         PlayerCriticalEventState {
             player_id: 1,
             supply_used: 300,
             supply_cap: 300,
-            blocked_production: vec![(EntityKind::AntiTankGun, EntityKind::EngineeringComplex)],
+            blocked_production: vec![
+                (EntityKind::AntiTankGun, EntityKind::EngineeringComplex),
+                (EntityKind::MortarTeam, EntityKind::EngineeringComplex),
+            ],
         }
     }
 
@@ -151,14 +115,10 @@ mod tests {
     fn critical_events_cooldowns_are_independent_and_exact() {
         let mut tracker = CriticalEventTracker::default();
         let initial = tracker.observe(1, vec![state()]);
-        assert_eq!(initial.len(), 2);
+        assert_eq!(initial.len(), 1);
         assert!(
             matches!(&initial[0], Notification::Private { recipient: 1, text }
-            if text == "You have reached 300 out of 300 supply.")
-        );
-        assert!(
-            matches!(&initial[1], Notification::Private { recipient: 1, text }
-            if text == "Engineering complex lost, AT gun production blocked.")
+            if text == "Rebuild Engineering Complex!")
         );
         assert!(tracker
             .observe(WARNING_COOLDOWN_TICKS, vec![state()])
@@ -167,7 +127,7 @@ mod tests {
             tracker
                 .observe(WARNING_COOLDOWN_TICKS + 1, vec![state()])
                 .len(),
-            2
+            1
         );
         let mut other = state();
         other.player_id = 2;
@@ -175,7 +135,7 @@ mod tests {
             tracker
                 .observe(WARNING_COOLDOWN_TICKS + 2, vec![state(), other])
                 .len(),
-            2
+            1
         );
     }
 
@@ -186,10 +146,7 @@ mod tests {
         current.blocked_production.clear();
         current.supply_used = rts_rules::balance::PLAYER_SUPPLY_CAP;
         current.supply_cap = current.supply_used;
-        let notifications = tracker.observe(1, vec![current.clone()]);
-        assert!(
-            matches!(&notifications[0], Notification::Private { text, .. } if !text.contains("Upgrade"))
-        );
+        assert!(tracker.observe(1, vec![current.clone()]).is_empty());
         current.supply_used = 1;
         assert!(tracker.observe(1000, vec![current]).is_empty());
     }
