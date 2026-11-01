@@ -8,7 +8,7 @@ const WARNING_COOLDOWN_TICKS: u32 = 30 * rts_rules::balance::TICK_HZ;
 
 #[derive(Default)]
 pub(super) struct CriticalEventTracker {
-    last_warning: HashMap<(u32, String), u32>,
+    last_warning: HashMap<u32, u32>,
 }
 
 enum Notification {
@@ -16,8 +16,8 @@ enum Notification {
 }
 
 impl CriticalEventTracker {
-    fn warning_allowed(&mut self, player: u32, key: String, tick: u32) -> bool {
-        let last = self.last_warning.entry((player, key));
+    fn warning_allowed(&mut self, player: u32, tick: u32) -> bool {
+        let last = self.last_warning.entry(player);
         match last {
             std::collections::hash_map::Entry::Occupied(mut entry) => {
                 if tick.saturating_sub(*entry.get()) < WARNING_COOLDOWN_TICKS {
@@ -35,56 +35,42 @@ impl CriticalEventTracker {
     fn observe(&mut self, tick: u32, states: Vec<PlayerCriticalEventState>) -> Vec<Notification> {
         let mut notifications = Vec::new();
         for state in states {
-            if state.supply_cap > 0
-                && state.supply_used >= state.supply_cap
-                && self.warning_allowed(state.player_id, "supply".into(), tick)
-            {
+            if !state.blocked_production.is_empty() && self.warning_allowed(state.player_id, tick) {
+                let mut prerequisites: Vec<_> = state
+                    .blocked_production
+                    .iter()
+                    .map(|&(_, prerequisite)| prerequisite_name(prerequisite))
+                    .collect();
+                prerequisites.sort_unstable();
+                prerequisites.dedup();
                 notifications.push(Notification::Private {
                     recipient: state.player_id,
-                    text: format!(
-                        "You have reached {} out of {} supply.",
-                        state.supply_used, state.supply_cap
-                    ),
+                    text: format!("Rebuild {}!", prerequisites.join(", ")),
                 });
-            }
-            for (unit, prerequisite) in state.blocked_production {
-                if self.warning_allowed(state.player_id, format!("{unit:?}:{prerequisite:?}"), tick)
-                {
-                    notifications.push(Notification::Private {
-                        recipient: state.player_id,
-                        text: format!(
-                            "{} lost, {} production blocked.",
-                            display_kind(prerequisite),
-                            display_kind(unit)
-                        ),
-                    });
-                }
             }
         }
         notifications
     }
 }
 
-fn display_kind(kind: EntityKind) -> String {
+fn prerequisite_name(kind: EntityKind) -> String {
     match kind {
-        EntityKind::AntiTankGun => "AT gun".into(),
-        EntityKind::Steelworks => "Gun works".into(),
-        EntityKind::Factory => "Vehicle works".into(),
-        _ => {
-            let name = format!("{kind:?}");
-            let mut text = String::new();
-            for (index, ch) in name.chars().enumerate() {
-                if index > 0 && ch.is_uppercase() {
-                    text.push(' ');
+        EntityKind::Steelworks => "Gun Works".into(),
+        EntityKind::Factory => "Vehicle Works".into(),
+        _ => kind
+            .stable_id()
+            .split('_')
+            .map(|word| {
+                let mut chars = word.chars();
+                let mut name = String::new();
+                if let Some(first) = chars.next() {
+                    name.extend(first.to_uppercase());
                 }
-                if index == 0 {
-                    text.push(ch);
-                } else {
-                    text.extend(ch.to_lowercase());
-                }
-            }
-            text
-        }
+                name.extend(chars);
+                name
+            })
+            .collect::<Vec<_>>()
+            .join(" "),
     }
 }
 
@@ -143,7 +129,10 @@ mod tests {
             player_id: 1,
             supply_used: 300,
             supply_cap: 300,
-            blocked_production: vec![(EntityKind::AntiTankGun, EntityKind::EngineeringComplex)],
+            blocked_production: vec![
+                (EntityKind::AntiTankGun, EntityKind::EngineeringComplex),
+                (EntityKind::CommandCar, EntityKind::EngineeringComplex),
+            ],
         }
     }
 
@@ -151,14 +140,10 @@ mod tests {
     fn critical_events_cooldowns_are_independent_and_exact() {
         let mut tracker = CriticalEventTracker::default();
         let initial = tracker.observe(1, vec![state()]);
-        assert_eq!(initial.len(), 2);
+        assert_eq!(initial.len(), 1);
         assert!(
             matches!(&initial[0], Notification::Private { recipient: 1, text }
-            if text == "You have reached 300 out of 300 supply.")
-        );
-        assert!(
-            matches!(&initial[1], Notification::Private { recipient: 1, text }
-            if text == "Engineering complex lost, AT gun production blocked.")
+            if text == "Rebuild Engineering Complex!")
         );
         assert!(tracker
             .observe(WARNING_COOLDOWN_TICKS, vec![state()])
@@ -167,7 +152,7 @@ mod tests {
             tracker
                 .observe(WARNING_COOLDOWN_TICKS + 1, vec![state()])
                 .len(),
-            2
+            1
         );
         let mut other = state();
         other.player_id = 2;
@@ -175,7 +160,7 @@ mod tests {
             tracker
                 .observe(WARNING_COOLDOWN_TICKS + 2, vec![state(), other])
                 .len(),
-            2
+            1
         );
     }
 
@@ -186,12 +171,46 @@ mod tests {
         current.blocked_production.clear();
         current.supply_used = rts_rules::balance::PLAYER_SUPPLY_CAP;
         current.supply_cap = current.supply_used;
-        let notifications = tracker.observe(1, vec![current.clone()]);
-        assert!(
-            matches!(&notifications[0], Notification::Private { text, .. } if !text.contains("Upgrade"))
-        );
+        assert!(tracker.observe(1, vec![current.clone()]).is_empty());
         current.supply_used = 1;
         assert!(tracker.observe(1000, vec![current]).is_empty());
+    }
+
+    #[test]
+    fn critical_events_name_the_actual_missing_prerequisites() {
+        for (unit, prerequisite, expected) in [
+            (
+                EntityKind::MachineGunner,
+                EntityKind::TrainingCentre,
+                "Rebuild Training Centre!",
+            ),
+            (
+                EntityKind::RocketLauncher,
+                EntityKind::Factory,
+                "Rebuild Vehicle Works!",
+            ),
+        ] {
+            let mut current = state();
+            current.blocked_production = vec![(unit, prerequisite)];
+            let notifications = CriticalEventTracker::default().observe(1, vec![current]);
+            assert_eq!(notifications.len(), 1);
+            assert!(
+                matches!(&notifications[0], Notification::Private { text, .. }
+                if text == expected)
+            );
+        }
+
+        let mut current = state();
+        current.blocked_production.extend([
+            (EntityKind::RocketLauncher, EntityKind::Factory),
+            (EntityKind::MachineGunner, EntityKind::TrainingCentre),
+        ]);
+        let notifications = CriticalEventTracker::default().observe(1, vec![current]);
+        assert_eq!(notifications.len(), 1);
+        assert!(
+            matches!(&notifications[0], Notification::Private { text, .. }
+            if text == "Rebuild Engineering Complex, Training Centre, Vehicle Works!")
+        );
     }
 }
 
