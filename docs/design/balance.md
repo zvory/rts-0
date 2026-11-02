@@ -365,11 +365,11 @@ creates a four-tile clear-area objective: units retain normal Attack Move engage
 on the approach, but currently actionable traps inside that objective preempt ordinary targets.
 Hidden traps remain ineligible until revealed, while vehicle pathfinding continues routing around
 the obstacles. Anti-armor default weapons
-prefer anti-armor threats and armored units over ordinary soft units. Anti-Tank Guns can
-auto-acquire and accept direct Attack orders against infantry-sized targets: Workers, Golems,
-Riflemen, Panzerfausts, and Machine Gunners. Those intended hits are reliable but deal only 30% of
-normal damage; infantry remain fallback targets behind anti-armor threats and armored units. Crewed
-support weapons and other non-infantry targets remain legal and take full damage. Tanks keep a narrower
+prefer anti-armor threats and armored units over ordinary soft units. Anti-Tank Guns cannot
+auto-acquire or accept direct Attack orders against infantry: Workers, Golems, Warriors,
+Riflemen, Panzerfausts, and Machine Gunners. Crewed support weapons, including Mortar Teams,
+remain legal targets and take full damage. AT Guns automatically prefer a fireable Tank over a
+nearer Mortar Team; an explicit Attack order may select the mortar instead. Tanks keep a narrower
 immediate-threat override for targets already in relevant range: Anti-Tank Guns are first, then
 other anti-armor threats, armored obstacles, support weapons, and only then ordinary soft targets.
 The rules-owned `TargetFacts` surface records the current target-policy facts for every
