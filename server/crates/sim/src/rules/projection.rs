@@ -21,7 +21,8 @@ use crate::protocol::{AbilityCooldownView, DebugPathPoint, DebugPathView};
 use crate::protocol::{EntityView, OrderPlanMarker};
 
 use super::projection_abilities::{
-    active_ability_object_expires_in, active_return_object_id, return_available_tick,
+    active_ability_object_expires_in, active_return_object_id, mortar_team_cooldown,
+    return_available_tick,
 };
 use super::projection_panzerfaust::project_panzerfaust_state;
 pub(crate) use super::projection_visibility::entity_hidden_by_concealment_from_team;
@@ -482,6 +483,11 @@ pub fn project_entity(
                 });
             }
         }
+    }
+
+    // Share only Mortar Fire's timer with allies, never other private details.
+    if private_detail_viewer.is_none() && entity.kind == EntityKind::MortarTeam && owner_or_ally {
+        view.abilities.push(mortar_team_cooldown(entity));
     }
 
     if context.debug_path_projection.includes(viewer, entity) {

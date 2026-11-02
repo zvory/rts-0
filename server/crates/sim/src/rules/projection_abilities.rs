@@ -57,3 +57,18 @@ pub(super) fn active_ability_object_expires_in(
         .active_return_marker(entity.owner, entity.id, ability, None, context.tick)
         .and_then(|object| object.expires_in(context.tick))
 }
+
+/// The only ability affordance shared with allied players: a mortar readiness timer.
+pub(super) fn mortar_team_cooldown(entity: &Entity) -> crate::protocol::AbilityCooldownView {
+    crate::protocol::AbilityCooldownView {
+        ability: crate::protocol::abilities::MORTAR_FIRE.to_string(),
+        cooldown_left: entity.ability_cooldown_ticks(AbilityKind::MortarFire),
+        remaining_uses: None,
+        autocast_enabled: None,
+        active_object_id: None,
+        available_tick: None,
+        lockout_until_tick: None,
+        expires_in: None,
+        charge_recharge_left: None,
+    }
+}

@@ -339,3 +339,63 @@ fn recast_return_execution_rejects_missing_too_early_and_stale_state() {
         9,
     ));
 }
+
+#[test]
+fn mortar_cooldown_is_team_private_including_observer_perspectives() {
+    let mut players = human_vs_ai_players().to_vec();
+    players[1].team_id = 1;
+    let mut enemy = players[1].clone();
+    enemy.id = 3;
+    enemy.team_id = 3;
+    players.push(enemy);
+    let mut game = Game::new_for_replay(&players, 0xCAFE_BABE);
+    for tile in &mut game.state.map.terrain {
+        *tile = crate::protocol::terrain::GRASS;
+    }
+    let point = (1024.0, 1024.0);
+    let mortar = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::MortarTeam, point.0, point.1)
+        .expect("mortar should spawn");
+    game.state
+        .entities
+        .get_mut(mortar)
+        .expect("mortar exists")
+        .start_ability_cooldown(ability::AbilityKind::MortarFire, 90);
+    game.rebuild_final_spatial();
+    // Ensure the ally actually sees this entity, so denial cannot pass through fog alone.
+    game.state
+        .entities
+        .spawn_unit(2, EntityKind::Rifleman, point.0 + 32.0, point.1)
+        .expect("allied spotter should spawn");
+    game.state
+        .entities
+        .spawn_unit(3, EntityKind::Rifleman, point.0 - 32.0, point.1)
+        .expect("enemy spotter should spawn");
+    game.rebuild_final_spatial();
+    game.state
+        .fog
+        .recompute(&[1, 2, 3], &game.state.entities, &game.state.map);
+    let timer = |snapshot: Snapshot| {
+        let entity = snapshot
+            .entities
+            .iter()
+            .find(|entity| entity.id == mortar)
+            .expect("mortar must be visible to test recipient");
+        assert!(entity.order_plan.is_empty());
+        entity.abilities.clone()
+    };
+    let owner = timer(game.snapshot_for(1));
+    let ally = timer(game.snapshot_for(2));
+    assert_eq!(ally.len(), 1);
+    assert_eq!(ally[0].ability, crate::protocol::abilities::MORTAR_FIRE);
+    assert!(ally[0].cooldown_left > 0);
+    assert_eq!(ally[0].cooldown_left, owner[0].cooldown_left);
+    assert!(ally[0].remaining_uses.is_none());
+    assert!(ally[0].active_object_id.is_none());
+    assert!(timer(game.snapshot_for(3)).is_empty());
+    assert!(timer(game.snapshot_for_observer(&ObserverView::Players(vec![3]))).is_empty());
+    assert!(!timer(game.snapshot_for_observer(&ObserverView::Players(vec![2]))).is_empty());
+    assert!(!timer(game.snapshot_full_for(1)).is_empty());
+}
