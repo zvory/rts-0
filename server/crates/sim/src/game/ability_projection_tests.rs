@@ -344,10 +344,11 @@ fn recast_return_execution_rejects_missing_too_early_and_stale_state() {
 fn mortar_cooldown_is_team_private_including_observer_perspectives() {
     let mut players = human_vs_ai_players().to_vec();
     players[1].team_id = 1;
-    let mut enemy = players[1].clone();
-    enemy.id = 3;
-    enemy.team_id = 3;
-    players.push(enemy);
+    players.push(PlayerInit {
+        id: 3,
+        team_id: 3,
+        ..players[1].clone()
+    });
     let mut game = Game::new_for_replay(&players, 0xCAFE_BABE);
     for tile in &mut game.state.map.terrain {
         *tile = crate::protocol::terrain::GRASS;
