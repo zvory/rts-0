@@ -58,11 +58,14 @@ pub(super) fn active_ability_object_expires_in(
         .and_then(|object| object.expires_in(context.tick))
 }
 
-/// The only ability affordance shared with allied players: a mortar readiness timer.
-pub(super) fn mortar_team_cooldown(entity: &Entity) -> crate::protocol::AbilityCooldownView {
+/// Timer-only team affordance; the projection caller owns ability-specific admission.
+pub(super) fn team_cooldown(
+    entity: &Entity,
+    kind: AbilityKind,
+) -> crate::protocol::AbilityCooldownView {
     crate::protocol::AbilityCooldownView {
-        ability: crate::protocol::abilities::MORTAR_FIRE.to_string(),
-        cooldown_left: entity.ability_cooldown_ticks(AbilityKind::MortarFire),
+        ability: kind.to_protocol_str().to_string(),
+        cooldown_left: entity.ability_cooldown_ticks(kind),
         remaining_uses: None,
         autocast_enabled: None,
         active_object_id: None,
