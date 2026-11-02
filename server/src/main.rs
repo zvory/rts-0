@@ -964,11 +964,11 @@ mod tests {
             "1v1.json".to_string(),
             include_str!("../assets/maps/1v1.json"),
         )
-        .expect("current-schema Classic map should be listed for the editor");
+        .expect("current-schema Vintage map should be listed for the editor");
 
         assert_eq!(entry.file, "1v1.json");
-        assert_eq!(entry.name, "Classic");
-        assert_eq!(entry.description, "Classic two-player map");
+        assert_eq!(entry.name, "Vintage");
+        assert_eq!(entry.description, "Original two-player map");
     }
 
     #[test]
