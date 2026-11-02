@@ -504,7 +504,9 @@ profiles and explicit activation/autocast policy instead of being folded into de
   sorties are otherwise independent and every plane contributes aerial sight.
 - Tank stationary range ramps from the base 5-tile weapon range to 14 tiles over
   `TICK_HZ * 3` ticks. Movement-path translation or hull rotation resets the ramp; autonomous armor
-  reaction, turret aiming, collision shoves, and external pulls do not.
+  reaction, turret aiming, collision shoves, and external pulls do not. Direct Attack orders hold
+  position for targets inside the maximum stationary range while the ramp builds, and pursue
+  targets beyond that range. Shots still require the current ramped range.
 - Human selection and command bandwidth is supply-based: `BASE_COMMAND_SUPPLY_CAP = 25` command
   supply. Units use their mirrored supply as command weight, except Command Cars have zero command
   weight and add no capacity (`COMMAND_CAR_SUPPLY_CAP_BONUS = 0`). Tanks consume 5 command supply,
