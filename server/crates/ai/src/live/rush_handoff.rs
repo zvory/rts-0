@@ -235,7 +235,7 @@ mod recovery_tests {
             };
             run(&mut controller, &snapshot, BTreeMap::new());
             assert_eq!(controller.selected_profile_id(), Some(RUSH_AI_ID));
-            // 850 Steel plus 350 Oil is still below the Steel-only threshold.
+            // 700 Steel plus 290 Oil is still below the Steel-only threshold.
             snapshot.tick += 1;
             run(&mut controller, &snapshot, BTreeMap::from([(Tank, 2)]));
             assert_eq!(controller.selected_profile_id(), Some(RUSH_AI_ID));
@@ -244,7 +244,7 @@ mod recovery_tests {
             run(
                 &mut controller,
                 &snapshot,
-                BTreeMap::from([(Tank, 2), (Barracks, 1)]),
+                BTreeMap::from([(Tank, 2), (Barracks, 2)]),
             );
             assert_eq!(controller.selected_profile_id(), Some(PRESSURE_AI_ID));
             assert_eq!(controller.profile_id(), RUSH_AI_ID);
