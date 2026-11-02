@@ -20,10 +20,11 @@ helpers read the defs table.
 Default attack range, damage, cooldown, weapon class, and weapon-policy metadata are exposed through
 `server/crates/rules/src/combat.rs` weapon profiles; current profile values mirror the defs records
 so legacy `attack_profile(kind)` and `weapon_class(kind)` callers remain behavior-compatible.
-All repeating unit attack cooldowns are doubled from the original cadence, including melee,
+All repeating unit attack cooldowns are at least doubled from the original cadence, including melee,
 tank coax, mortar/artillery fire, Rocket Truck barrage reload, and Ekat Line Shot. Damage,
 first-shot readiness, windups, projectile travel, and barrage unload duration are unchanged.
 The disposable Panzerfaust rocket has no repeat cooldown; its rifle follows the doubled cadence.
+Mortar Fire has a further 50% cooldown increase to 180 ticks (6 seconds).
 Non-attack ability timers and attack-speed multipliers are unchanged.
 Base weapon ranges use fractional tiles (`f32`) throughout stat records and attack profiles.
 The Machine Gunner has 6.1 tiles of base range (7.1 while entrenched), giving an approaching
@@ -423,6 +424,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   matching world and minimap trail animation.
 - Mortar Teams have no setup or teardown timing. They use `MORTAR_MIN_RANGE_TILES = 5`,
   `MORTAR_RANGE_TILES = 17`, and `MORTAR_FIELD_OF_FIRE_RAD = 360 degrees total`,
+  `MORTAR_FIRE_COOLDOWN_TICKS = 180` (6s between shells),
   `MORTAR_MANUAL_SHELL_DELAY_TICKS = 26` (~0.87s manual travel),
   `MORTAR_OUTER_RADIUS_TILES = 2.0`,
   `MORTAR_INNER_RADIUS_TILES = 0.5`,
@@ -694,7 +696,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | rifleman        | 45  | 5   | 5     | 32 | 1.6   | 11    | 35  | 0   | 1   | 300 (~10s) |
 | panzerfaust     | 45  | 5 rifle / 100 launcher | 5 | 32 rifle / one lifetime launcher | 1.6 | 11 | 55 | 10 | 1 | 300 (~10s); requires completed Panzerfausts research |
 | machine_gunner  | 55  | 4   | 6.1   | 12  | 1.28  | 11    | 75  | 10  | 2   | 400 (~13s) |
-| mortar_team     | 75  | 40 outer / 100 inner AOE | 5-17 | 120 | 1.6 | 10 | 100 | 40 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
+| mortar_team     | 75  | 40 outer / 100 inner AOE | 5-17 | 180 | 1.6 | 10 | 100 | 40 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
 | anti_tank_gun         | 45  | 100 deployed; cannot target infantry | 20 deployed | 144 | 1.7556 | 9    | 150 | 40  | 3   | 440 (~15s); cannot fire while packed or transitioning; requires a completed owned Gun Works (`steelworks` kind) and past ownership of a completed Engineering Complex; no research required (temporary hack; remove later) |
 | artillery       | 200 | 75 AP inner / 75-20 outer AOE | 10-35 artillery fire | 180 | 1.6 | 7 | 150 | 50 | 4 | 600 (~20s); requires Gun Works (`steelworks` kind) and Artillery (`artillery_unlock`) researched in Engineering Complex; rendered at 75% of its prior size with a matching 75%-of-Tank gameplay footprint; 2/3-tile inner and 2-tile outer blast radii; soft target with no armor damage reduction |
 | rocket_launcher (Rocket Truck) | 150 | 16 rockets, each 21 outer / 53 inner AOE; a rocket whose impact point intersects a target deals 70 armor-piercing damage instead; all resulting damage is reduced to 25% against buildings | 10-44 Barrage | 1800-tick (~60s) cooldown from activation | 2.0 | 8 | 225 | 100 | 6 | 600 (~20s); requires Gun Works (`steelworks` kind), a completed owned Vehicle Works (`factory` kind), and Rockets (`rockets`) researched in Engineering Complex; vehicle movement; must stop to launch; one manual command unloads exactly 16 rockets over 120 ticks (~4s) into a 6-tile scatter radius and then stops; its team-tinted rack carries 16 rounds, empties one slot per launch, and refills at cooldown completion; the PNG and collision footprint are enlarged by 20% (48×26.4 px body, 1.2 px clearance, 21.6 px selection radius); Barrage accepts in-range world points without requiring current vision; first barrage is free and later barrages cost 150 oil |
