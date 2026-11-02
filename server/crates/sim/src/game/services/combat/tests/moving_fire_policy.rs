@@ -278,7 +278,7 @@ fn attack_move_prefers_in_range_armored_fallback_over_out_of_range_soft_target()
 }
 
 #[test]
-fn out_of_range_direct_tank_attack_creates_a_pursuit_path() {
+fn direct_tank_attack_inside_stationary_range_does_not_create_a_pursuit_path() {
     let mut entities = EntityStore::new();
     let tank_id = entities
         .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
@@ -301,8 +301,8 @@ fn out_of_range_direct_tank_attack_creates_a_pursuit_path() {
 
     let tank = entities.get(tank_id).expect("tank should exist");
     assert_eq!((tank.pos_x, tank.pos_y), (100.0, 100.0));
-    assert!(!tank.path_is_empty());
-    assert!(tank.path_goal().is_some());
+    assert!(tank.path_is_empty());
+    assert!(tank.path_goal().is_none());
     assert_eq!(tank.target_id(), None);
 }
 

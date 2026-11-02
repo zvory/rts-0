@@ -357,7 +357,17 @@ pub(in crate::game) fn combat_system(
                     .and_then(|entity| entity.order().attack_target())
                     == Some(tid));
         let target_in_weapon_range = dist >= min_range_px && dist <= range_px;
-        if commanded_direct_target && target_in_weapon_range {
+        // A direct tank order can wait for its stationary range instead of spending that
+        // range by starting a chase. Fire eligibility still uses the current ramped range.
+        let wait_for_stationary_range = commanded_direct_target
+            && entities.get(id).is_some_and(|e| {
+                e.kind == EntityKind::Tank
+                    && dist
+                        <= projection::TANK_STATIONARY_RANGE_MAX_TILES * config::TILE_SIZE as f32
+                            + e.radius()
+                            + RANGE_SLACK
+            });
+        if commanded_direct_target && (target_in_weapon_range || wait_for_stationary_range) {
             if let Some(e) = entities.get_mut(id) {
                 e.clear_path();
                 e.set_path_goal(None);
@@ -450,7 +460,7 @@ pub(in crate::game) fn combat_system(
             if let Some(e) = entities.get_mut(id) {
                 e.mark_attack_phase(AttackPhase::Waiting);
             }
-            if commanded_direct_target {
+            if commanded_direct_target && !wait_for_stationary_range {
                 coordinator.request_direct_attack_path(entities, id, tid, min_range_px, range_px);
             }
         }
