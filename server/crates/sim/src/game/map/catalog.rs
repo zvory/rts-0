@@ -196,6 +196,7 @@ mod tests {
         let names: Vec<&str> = available.iter().map(|entry| entry.name.as_str()).collect();
         assert!(names.contains(&"Chokes"), "got: {names:?}");
         assert!(names.contains(&"Classic"), "got: {names:?}");
+        assert!(names.contains(&"Vintage"), "got: {names:?}");
         assert!(names.contains(&"1v1 No Terrain"), "got: {names:?}");
         assert!(names.contains(&"4 Player Map"), "got: {names:?}");
         for entry in &available {
@@ -221,33 +222,33 @@ mod tests {
         assert_eq!(map.width, 126);
         assert_eq!(map.starts.len(), 2);
 
-        let classic_authored = available
-            .iter()
-            .find(|entry| entry.name == "Classic")
-            .expect("Classic map should be listed");
-        assert_eq!(classic_authored.min_players, 1);
-        assert_eq!(classic_authored.max_players, 2);
-        let classic_map = Map::load("Classic", 2, 0x1234_5678)
-            .expect("Classic should load for two active players");
-        assert_eq!(
-            classic_map.base_sites.len(),
-            10,
-            "Classic must retain all ten permanent resource bases"
-        );
-        assert!(
-            Map::load("Classic", 3, 0x1234_5678).is_err(),
-            "Classic should not expose a third start location"
-        );
-        for seed in 0..32 {
-            let mut starts = Map::load("Classic", 2, seed)
-                .expect("Classic should load for two active players")
-                .starts;
-            starts.sort_unstable();
-            assert_eq!(
-                starts,
-                vec![(9, 9), (116, 116)],
-                "Classic must only use its two authored start locations for seed {seed}"
+        for (name, dimensions, base_count, expected_starts) in [
+            ("Vintage", (126, 126), 10, [(9, 9), (116, 116)]),
+            ("Classic", (189, 126), 12, [(40, 9), (147, 116)]),
+        ] {
+            let authored = available
+                .iter()
+                .find(|entry| entry.name == name)
+                .unwrap_or_else(|| panic!("{name} map should be listed"));
+            assert_eq!((authored.min_players, authored.max_players), (1, 2));
+            let map = Map::load(name, 2, 0x1234_5678)
+                .unwrap_or_else(|error| panic!("{name} should load: {error}"));
+            assert_eq!((map.width, map.height), dimensions, "{name} dimensions");
+            assert_eq!(map.base_sites.len(), base_count, "{name} permanent bases");
+            assert!(
+                Map::load(name, 3, 0x1234_5678).is_err(),
+                "{name} should not expose a third start location"
             );
+            for seed in 0..32 {
+                let mut starts = Map::load(name, 2, seed)
+                    .unwrap_or_else(|error| panic!("{name} should load: {error}"))
+                    .starts;
+                starts.sort_unstable();
+                assert_eq!(
+                    starts, expected_starts,
+                    "{name} must only use its two authored start locations for seed {seed}"
+                );
+            }
         }
 
         let classic_v2 = available

@@ -72,6 +72,7 @@ function schemaThreeReplayFixture() {
   const mapBytes = fs.readFileSync(REPLAY_MAP);
   const currentMap = JSON.parse(mapBytes);
   const currentContentHash = fnv1a64(mapBytes);
+  checkpoint.mapBinding.name = currentMap.name;
   checkpoint.mapBinding.schemaVersion = currentMap.version;
   checkpoint.mapBinding.contentHash = currentContentHash;
   checkpoint.mapBinding.materializedMapHash = CURRENT_REPLAY_MAP_MATERIALIZED_HASH;
@@ -86,14 +87,14 @@ function schemaThreeReplayFixture() {
   return {
     artifactSchemaVersion: 3,
     serverBuildSha: "live-node-fixture",
-    mapName: setup.map.name,
+    mapName: currentMap.name,
     mapSchemaVersion: currentMap.version,
     mapContentHash: currentContentHash,
     seed: setup.seed,
     playerLoadouts: checkpoint.startingLoadouts,
     players,
     startState: {
-      mapName: setup.map.name,
+      mapName: currentMap.name,
       mapSchemaVersion: currentMap.version,
       mapContentHash: currentContentHash,
       seed: setup.seed,

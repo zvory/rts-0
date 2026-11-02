@@ -24,7 +24,8 @@ impl Game {
         }
         let worker_build_ticks = worker_build_ticks()?;
 
-        let mut map = Map::load("Classic", 1, seed)
+        // Keep the reconstructed replay on its original terrain and world coordinates.
+        let mut map = Map::load("Vintage", 1, seed)
             .map_err(|error| format!("failed to load replay-256 map: {error}"))?;
         let start_tile = (9, 9);
         if let Some(slot) = map.starts.get_mut(0) {
