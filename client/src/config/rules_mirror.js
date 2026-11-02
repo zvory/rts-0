@@ -167,7 +167,7 @@ export const STATS = Object.freeze({
     blocksGroundPlacement: false,
     rangeTiles: 0, cost: { steel: 0, oil: 0 }, supply: 0, buildTicks: 0 },
   [KIND.TANK]: { armored: true, label: "Tank", icon: "TK", size: 18, sight: 9, body: TANK_BODY,
-    rangeTiles: 5, cost: { steel: 425, oil: 175 }, supply: 5, buildTicks: 750,
+    rangeTiles: 5, cost: { steel: 350, oil: 145 }, supply: 5, buildTicks: 750,
     requires: KIND.FACTORY, upgradeRequires: UPGRADE.TANK_UNLOCK,
     upgradeRequiresText: "Requires research in Engineering Complex" },
   [KIND.COMMAND_CAR]: { armored: false, label: "Command Car", icon: "CAR", size: 12.6, sight: 8, body: COMMAND_CAR_BODY,
