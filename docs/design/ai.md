@@ -132,8 +132,10 @@ controller ordering, all-controller observation before enqueue, worker-retreat-f
 normal simulation validation, and replay logging are unchanged. The builder is deliberately not a
 planner, task system, command receipt, or cross-tick scheduler.
 
-`PullbackMemory` is an optional tactical helper shared by Jeff, Pressure, and approaching Rush
-Riflemen. Its pure `plan` accepts explicit live squad facts and currently visible enemy-unit facts;
+`PullbackMemory` is an optional tactical helper shared by Pressure and approaching Rush
+Riflemen. Jeff's rifle squad planner keeps its own copy of the same policy in
+`ai_core::squad_micro::pullback`, so changes to the SDK helper do not reach Jeff and Jeff's
+changes do not reach the SDK. Its pure `plan` accepts explicit live squad facts and currently visible enemy-unit facts;
 its `step` adapter reads those facts from `AiFrame` and emits SDK Moves. The default policy pulls a
 member at or below 15 HP three tiles away from the nearest visible enemy when a visible enemy is
 targeting it, then excludes it from normal orders for 45 ticks. At least one squad member must
@@ -141,8 +143,9 @@ remain above the threshold. Destinations are map-clamped; the helper does not es
 safety or reachability. Callers choose squad membership and keep route and combat ownership.
 They suppress normal orders for returned `active` IDs and restore their own movement for
 `released` IDs. The adapter remembers new retreats only after local emission succeeds; this does
-not imply simulation acceptance. Jeff retains his existing squad-planner invocation and early-return
-semantics, including resuming ordinary advancement when its caller sees no enemies.
+not imply simulation acceptance. Jeff's copy has no SDK adapter: his squad planner calls `plan`
+directly and keeps its early-return semantics, including resuming ordinary advancement when its
+caller sees no enemies.
 
 The public-SDK-only [reference strategy](../ai-authoring.md) is the executable authoring specimen.
 It runs through `AiController::with_strategy` and the canonical driver, enables Pump Jack repeat,
