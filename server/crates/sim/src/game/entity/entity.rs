@@ -251,6 +251,14 @@ impl Entity {
     /// previous path, target latch, and path goal no longer belong to the new order.
     pub(crate) fn replace_active_order(&mut self, order: Order) {
         self.cancel_panzerfaust_windup();
+        // Leaving an occupied trench is immediate, including a deployed Machine Gunner's
+        // weapon. Capture occupation before replacing the order clears it below.
+        if self.kind == EntityKind::MachineGunner
+            && self.movement.as_ref().is_some_and(|m| m.occupied_trench_id.is_some())
+            && matches!(order, Order::Move(_) | Order::AttackMove(_) | Order::Attack(_))
+        {
+            self.set_weapon_setup(WeaponSetup::Packed);
+        }
         if let Some(m) = self.movement.as_mut() {
             m.order = order;
             m.path.clear();

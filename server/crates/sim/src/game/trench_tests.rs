@@ -969,3 +969,35 @@ fn occupied_visible_units_project_without_revealing_hidden_occupants() {
         "hidden occupied unit should not be projected"
     );
 }
+
+#[test]
+fn entrenched_infantry_moves_on_first_tick_of_departure() {
+    for kind in [EntityKind::Rifleman, EntityKind::Panzerfaust, EntityKind::MachineGunner] {
+        for attack_move in [false, true] {
+            let mut game = empty_flat_game(&players());
+            let start = game.state.map.tile_center(24, 24);
+            let goal = game.state.map.tile_center(32, 24);
+            let trench = game.spawn_trench_for_test(start.0, start.1).expect("trench");
+            let id = game.state.entities.spawn_unit(1, kind, start.0, start.1).expect("infantry");
+            repair_world(&mut game);
+            game.tick();
+            let unit = game.state.entities.get_mut(id).expect("infantry");
+            assert_eq!(active_trench_occupation(unit), Some(trench));
+            if kind == EntityKind::MachineGunner {
+                unit.set_weapon_setup(crate::game::entity::WeaponSetup::Deployed);
+            }
+            let before = (unit.pos_x, unit.pos_y);
+            let command = if attack_move {
+                SimCommand::AttackMove { units: vec![id], x: goal.0, y: goal.1, queued: false }
+            } else {
+                SimCommand::Move { units: vec![id], x: goal.0, y: goal.1, queued: false }
+            };
+            game.enqueue(1, command);
+            game.tick();
+            let unit = game.state.entities.get(id).expect("infantry");
+            assert_ne!((unit.pos_x, unit.pos_y), before, "{kind:?}, attack_move={attack_move}");
+            assert_eq!(active_trench_occupation(unit), None);
+            assert_eq!(game.state.trenches.all().len(), 1, "departure preserves the trench");
+        }
+    }
+}

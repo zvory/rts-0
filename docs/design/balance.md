@@ -528,6 +528,8 @@ profiles and explicit activation/autocast policy instead of being folded into de
   holding ground on untrenched terrain for 90 ticks (~3s), and any eligible infantry can occupy an
   existing empty trench while stopped in its footprint. A trench can actively hold only one
   infantry unit, so nearby eligible infantry dig their own adjacent trenches instead of sharing one.
+  Leaving an occupied trench has no delay: movement orders release occupation immediately,
+  and Machine Gunners skip weapon pack-up when ordered to move or attack from a trench.
   Active occupation grants +1 tile weapon range, reduces incoming direct damage by 50% after
   normal weapon/armor/facing calculations,
   reduces incoming area damage by 25% after existing falloff/armor rules. Entrenchment does not add a direct-shot
