@@ -529,7 +529,8 @@ profiles and explicit activation/autocast policy instead of being folded into de
   existing empty trench while stopped in its footprint. A trench can actively hold only one
   infantry unit, so nearby eligible infantry dig their own adjacent trenches instead of sharing one.
   Leaving an occupied trench has no delay: movement orders release occupation immediately,
-  and Machine Gunners skip weapon pack-up when ordered to move or attack from a trench.
+  and Machine Gunners skip weapon pack-up when leaving a trench, including Attack-order pursuit.
+  Attacking a target in range preserves trench occupation and weapon deployment.
   Active occupation grants +1 tile weapon range, reduces incoming direct damage by 50% after
   normal weapon/armor/facing calculations,
   reduces incoming area damage by 25% after existing falloff/armor rules. Entrenchment does not add a direct-shot

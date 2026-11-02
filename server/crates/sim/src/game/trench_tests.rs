@@ -972,13 +972,23 @@ fn occupied_visible_units_project_without_revealing_hidden_occupants() {
 
 #[test]
 fn entrenched_infantry_moves_on_first_tick_of_departure() {
-    for kind in [EntityKind::Rifleman, EntityKind::Panzerfaust, EntityKind::MachineGunner] {
+    for kind in [
+        EntityKind::Rifleman,
+        EntityKind::Panzerfaust,
+        EntityKind::MachineGunner,
+    ] {
         for attack_move in [false, true] {
             let mut game = empty_flat_game(&players());
             let start = game.state.map.tile_center(24, 24);
             let goal = game.state.map.tile_center(32, 24);
-            let trench = game.spawn_trench_for_test(start.0, start.1).expect("trench");
-            let id = game.state.entities.spawn_unit(1, kind, start.0, start.1).expect("infantry");
+            let trench = game
+                .spawn_trench_for_test(start.0, start.1)
+                .expect("trench");
+            let id = game
+                .state
+                .entities
+                .spawn_unit(1, kind, start.0, start.1)
+                .expect("infantry");
             repair_world(&mut game);
             game.tick();
             let unit = game.state.entities.get_mut(id).expect("infantry");
@@ -988,16 +998,105 @@ fn entrenched_infantry_moves_on_first_tick_of_departure() {
             }
             let before = (unit.pos_x, unit.pos_y);
             let command = if attack_move {
-                SimCommand::AttackMove { units: vec![id], x: goal.0, y: goal.1, queued: false }
+                SimCommand::AttackMove {
+                    units: vec![id],
+                    x: goal.0,
+                    y: goal.1,
+                    queued: false,
+                }
             } else {
-                SimCommand::Move { units: vec![id], x: goal.0, y: goal.1, queued: false }
+                SimCommand::Move {
+                    units: vec![id],
+                    x: goal.0,
+                    y: goal.1,
+                    queued: false,
+                }
             };
             game.enqueue(1, command);
             game.tick();
             let unit = game.state.entities.get(id).expect("infantry");
-            assert_ne!((unit.pos_x, unit.pos_y), before, "{kind:?}, attack_move={attack_move}");
+            assert_ne!(
+                (unit.pos_x, unit.pos_y),
+                before,
+                "{kind:?}, attack_move={attack_move}"
+            );
             assert_eq!(active_trench_occupation(unit), None);
-            assert_eq!(game.state.trenches.all().len(), 1, "departure preserves the trench");
+            assert_eq!(
+                game.state.trenches.all().len(),
+                1,
+                "departure preserves the trench"
+            );
+        }
+    }
+}
+
+#[test]
+fn entrenched_machine_gunner_attack_preserves_deployment_until_pursuit() {
+    use crate::game::entity::WeaponSetup;
+
+    for pursue in [false, true] {
+        let mut game = empty_flat_game(&players());
+        let start = game.state.map.tile_center(24, 24);
+        let trench = game
+            .spawn_trench_for_test(start.0, start.1)
+            .expect("trench");
+        let id = game
+            .state
+            .entities
+            .spawn_unit(1, EntityKind::MachineGunner, start.0, start.1)
+            .expect("machine gunner");
+        repair_world(&mut game);
+        game.tick();
+        let unit = game.state.entities.get_mut(id).expect("machine gunner");
+        assert_eq!(active_trench_occupation(unit), Some(trench));
+        unit.set_weapon_setup(WeaponSetup::Deployed);
+        let range = crate::rules::combat::attack_profile(EntityKind::MachineGunner).range_tiles;
+        let target_distance = range + if pursue { 8.0 } else { 0.75 };
+        let target_pos = (
+            start.0 + target_distance * config::TILE_SIZE as f32,
+            start.1,
+        );
+        // A friendly commanded target stays visible and cannot return fire during the check.
+        let target = game
+            .state
+            .entities
+            .spawn_unit(1, EntityKind::Rifleman, target_pos.0, target_pos.1)
+            .expect("target");
+        let target_hp = game.state.entities.get(target).expect("target").hp;
+        repair_world(&mut game);
+        game.enqueue(
+            1,
+            SimCommand::Attack {
+                units: vec![id],
+                target,
+                queued: false,
+            },
+        );
+        game.tick();
+        let unit = game.state.entities.get(id).expect("machine gunner");
+        if !pursue {
+            assert_eq!(
+                unit.weapon_setup(),
+                WeaponSetup::Deployed,
+                "attacking in range must not restart setup"
+            );
+            assert_eq!(active_trench_occupation(unit), Some(trench));
+            assert!(game.state.entities.get(target).expect("target").hp < target_hp);
+        } else {
+            assert_eq!(
+                unit.weapon_setup(),
+                WeaponSetup::Packed,
+                "pursuit must skip trench pack-up"
+            );
+            assert_eq!(active_trench_occupation(unit), None);
+            assert!(!unit.path_is_empty(), "pursuit should have a path");
+            game.tick();
+            let unit = game.state.entities.get(id).expect("machine gunner");
+            assert_ne!(
+                (unit.pos_x, unit.pos_y),
+                start,
+                "pursuit must move without pack-up delay"
+            );
         }
     }
 }
