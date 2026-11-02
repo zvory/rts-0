@@ -668,8 +668,8 @@ mod tests {
     }
 
     #[test]
-    fn route_facing_keeps_the_river_and_classic_pockets() {
-        for map_name in ["The River", "Classic"] {
+    fn route_facing_keeps_the_river_and_vintage_pockets() {
+        for map_name in ["The River", "Vintage"] {
             for (route, central) in route_facing(map_name) {
                 let alignment = route.0 * central.0 + route.1 * central.1;
                 assert!(
