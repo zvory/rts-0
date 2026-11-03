@@ -65,7 +65,7 @@ pub(in crate::ai_core::decision) fn charge_tanks(
                 && !reserved.contains(&unit.id)
                 && memory.containment.active_scout != Some(unit.id)
                 && !memory.containment.active_riflemen.contains(&unit.id)
-                && !memory.opening_rush.is_reserved(unit.id)
+                && !memory.rush_reserved(unit.id)
         })
         .collect();
     let defenders: Vec<&&AiEntitySummary> = free

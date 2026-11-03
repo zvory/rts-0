@@ -173,6 +173,39 @@ pub(crate) struct AiDecisionMemory {
 }
 
 impl AiDecisionMemory {
+    /// Records the fighters each side has lost so far, from the host's loss counts: Jeff's own, and
+    /// the enemy's as Jeff saw them die. Engineers are left out: this is the fights' trade, which
+    /// Jeff's AI V1.1's opening reads (`ecafter`).
+    pub(crate) fn note_losses(
+        &mut self,
+        own: &crate::sdk::AiLosses,
+        enemies: &BTreeMap<u32, crate::sdk::AiLosses>,
+    ) {
+        let fighters = |losses: &crate::sdk::AiLosses| {
+            losses
+                .units
+                .iter()
+                .filter(|(kind, _)| **kind != EntityKind::Worker)
+                .map(|(_, count)| *count)
+                .fold(0u32, u32::saturating_add)
+        };
+        self.jeff_v1_1.deaths = fighters(own);
+        self.jeff_v1_1.kills = enemies.values().map(fighters).fold(0u32, u32::saturating_add);
+        // Every unit's cost, Oil counted twice (`tradeexpand`).
+        let value = |losses: &crate::sdk::AiLosses| {
+            losses
+                .units
+                .iter()
+                .map(|(kind, count)| {
+                    let (steel, oil) = rts_rules::economy::cost(*kind);
+                    steel.saturating_add(oil.saturating_mul(2)).saturating_mul(*count)
+                })
+                .fold(0u32, u32::saturating_add)
+        };
+        self.jeff_v1_1.value_lost = value(own);
+        self.jeff_v1_1.value_killed = enemies.values().map(value).fold(0u32, u32::saturating_add);
+    }
+
     /// Pressure must retry interrupted research on a replacement producer. Other profiles retain
     /// their existing research bookkeeping and policy.
     pub(super) fn note_research_producer(&mut self, upgrade: UpgradeKind, producer: u32) {
@@ -528,7 +561,13 @@ impl AiDecisionMemory {
             .chain(self.third_pressure.reserved())
             .chain(self.jeff_v1_1.tank_raid.units())
             .chain(self.jeff_v1_1.deny.units())
+            .chain(self.jeff_v1_1.meth_strike.units())
             .collect()
+    }
+
+    /// Whether the opening rush or Jeff's AI V1.1's Meth strike owns the unit.
+    pub(super) fn rush_reserved(&self, id: u32) -> bool {
+        self.opening_rush.is_reserved(id) || self.jeff_v1_1.meth_strike.holds(id)
     }
 
     /// Whether the trap breach (its concave is the defense where it stands) or the third-base
@@ -538,6 +577,7 @@ impl AiDecisionMemory {
             || self.third_pressure.is_reserved(id)
             || self.jeff_v1_1.tank_raid.holds(id)
             || self.jeff_v1_1.deny.holds(id)
+            || self.jeff_v1_1.meth_strike.holds(id)
             || self.jeff_v1_1.scout.unit == Some(id)
     }
 

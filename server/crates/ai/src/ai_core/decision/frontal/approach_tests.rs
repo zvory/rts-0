@@ -243,6 +243,7 @@ fn a_push_in_ranks_is_as_cohesive_as_its_ranks_allow() {
                 latched_node: None,
                 target_id: None,
                 free_for_combat: true,
+                research: None,
             }
         })
         .collect();

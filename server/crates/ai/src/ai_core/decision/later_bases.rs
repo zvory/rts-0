@@ -166,7 +166,14 @@ where
 
     let depots = facts.building_count(EntityKind::ResourceDepot);
     let natural_done = facts.complete_building_count(EntityKind::ResourceDepot) >= 2;
-    let base_due = natural_done && depots < memory.later_bases.target_bases();
+    // Jeff's AI V1.1 takes another base whenever its army and bank allow (`nowellgate`), rather
+    // than base 4 and later only as a well of an older base runs dry, which kept a fixed count of
+    // bases rather than as many as it could hold. Gated, ahead on the trade (`tradeexpand`) still
+    // takes base 4 without waiting for a dry well.
+    let ungated = memory.profile_id().is_some_and(is_jeff_v1_1) && !jeff_v1_1::off("nowellgate");
+    let extra_base = usize::from(jeff_v1_1::trading_ahead(memory));
+    let base_due =
+        natural_done && (ungated || depots < memory.later_bases.target_bases() + extra_base);
 
     if base_due && memory.later_bases.site.is_none() && tick >= memory.later_bases.retry_after_tick
     {
@@ -184,10 +191,15 @@ where
             } else {
                 REQUIRED_TOTAL_TANKS
             };
+        // Jeff's AI V1.1 ahead on the trade needs fewer Tanks (`tradeexpand`).
+        let required_total_tanks = jeff_v1_1::expansion_tanks(memory, required_total_tanks);
         let home = geometry::tile_center(observation.own_start_tile, observation.map.tile_size);
         let escort_ready =
             v1_1 && jeff_v1_1::third_base::escort(observation, memory, home).is_some();
-        let save = !jeff_v1_1::off("depotsave");
+        // The Rifleman opening (`riflenat`): a Tank and its Riflemen escort are all a later base
+        // waits for, its Depot kept from the Riflemen like `depotsave`'s.
+        let rifle_opening = jeff_v1_1::rifle_opening(profile.id);
+        let save = !jeff_v1_1::off("depotsave") || rifle_opening;
         let army_ready = if v1_1 && save {
             // V1.1 saves the Depot's cost below (`depotsave`): an escort is all base 3 waits for.
             escort_ready
@@ -206,6 +218,14 @@ where
                     >= REQUIRED_FREE_TANKS.max(GUARD_TANKS + memory.home_tank_reserve())
                 && main_tank_ids(observation, memory).len() >= memory.home_tank_reserve()
         };
+        // Jeff's AI V1.1 (`fastnat`) takes its third base without Tanks once the natural's gun line
+        // holds, as soupman did against Pressure AI (3:50-4:16, guns going over as it went up);
+        // V1.1 waited for five Tanks and placed it at 5:21-6:36.
+        let army_ready = army_ready
+            || (v1_1
+                && depots == 2
+                && escort_ready
+                && jeff_v1_1::fast_third_ready(observation, profile.id));
         let ready = army_ready
             && jeff_v1_1::front_line::covers_next_base(memory, depots)
             && defense::local_defense_contact(observation).is_none()
@@ -215,7 +235,9 @@ where
         // V1.1 keeps the Depot's cost aside once an escort is free and the bases are quiet, so
         // Tanks and Barracks do not spend it first: on The River V1.1 held two bases all game with
         // under 250 Steel in the bank while Pressure AI took five.
-        if escort_ready && !ready {
+        // Ungated, a next base is always due: its Oil is kept back only once the army is ready
+        // for it, or it would sit out of the Tanks' reach all game.
+        if escort_ready && !ready && (!ungated || army_ready) {
             let quiet = defense::local_defense_contact(observation).is_none() && !factory_due;
             let steel_kept = if save && quiet { steel } else { 0 };
             actions.holdback_resources(steel_kept, oil);

@@ -19,6 +19,7 @@ fn jeffs_ai_v1_1_sends_defenders_home_once_their_fight_is_quiet() {
         latched_node: None,
         target_id: None,
         free_for_combat: true,
+        research: None,
     };
     let fighting = AiObservation {
         player_id: 1,

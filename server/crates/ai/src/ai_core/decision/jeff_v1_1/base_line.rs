@@ -306,13 +306,25 @@ pub(in crate::ai_core::decision) fn base_lines(
     map_analysis: Option<&AiMapAnalysis>,
     contacts: &BTreeMap<u32, BaseContact>,
 ) -> Vec<BaseLine> {
+    base_lines_with(observation, map_analysis, contacts, false)
+}
+
+/// `base_lines`, counting Depots still being built when `building`.
+fn base_lines_with(
+    observation: &AiObservation,
+    map_analysis: Option<&AiMapAnalysis>,
+    contacts: &BTreeMap<u32, BaseContact>,
+    building: bool,
+) -> Vec<BaseLine> {
     let ts = observation.map.tile_size as f32;
     let home = tile_center(observation.own_start_tile, observation.map.tile_size);
     let enemy = nearest_enemy(observation);
     let depots: Vec<&AiEntitySummary> = observation
         .owned
         .iter()
-        .filter(|unit| unit.kind == EntityKind::ResourceDepot && unit.is_complete && unit.hp > 0)
+        .filter(|unit| {
+            unit.kind == EntityKind::ResourceDepot && (building || unit.is_complete) && unit.hp > 0
+        })
         .collect();
     let route = map_analysis.and_then(|analysis| analysis.base_route_tiles(observation.player_id));
     let mut lines: Vec<BaseLine> = depots
@@ -615,7 +627,7 @@ fn line_units<'a>(
                 && !memory.jeff_v1_1.hunt.hunters.contains_key(&unit.id)
                 && !memory.expansion_security.riflemen.contains(&unit.id)
                 && !memory.later_bases.guards.contains(&unit.id)
-                && !memory.opening_rush.is_reserved(unit.id)
+                && !memory.rush_reserved(unit.id)
                 && !memory.stays_out_of_home_defense(unit.id)
                 && memory.route_line.picket() != Some(unit.id)
         })
@@ -633,6 +645,20 @@ pub(in crate::ai_core::decision) fn hold(
     home_guns: &[u32],
     held: &BTreeSet<u32>,
 ) {
+    // `mgline` / `tankline` without `lines`: soupman's layout (`hold_spread`).
+    let spread_guns = !super::off("mgline");
+    let spread_tanks = !super::off("tankline");
+    if is_jeff_v1_1(profile.id) && super::off("lines") && (spread_guns || spread_tanks) {
+        hold_spread(
+            (actions, observation, map_analysis, intents),
+            memory,
+            profile,
+            home_guns,
+            held,
+            (spread_guns, spread_tanks),
+        );
+        return;
+    }
     // `basemgs` without `lines`: the guns alone hold the outer bases' lines, in their trenches; the
     // Riflemen roam (`rovers`) and the Tanks hold the Tank line. A gun fires only set up, a Meth
     // Rifleman on the move.
@@ -921,4 +947,242 @@ fn sound_alarm(
         }
     }
     answering
+}
+
+/// `mgline`: the guns' posts in front of a base past the main, as (tiles ahead of its Depot along
+/// the threat axis, tiles across it), filled in order: the centre, its wings, a forward screen, then
+/// wider and deeper. soupman's guns against Pressure AI (replays 461 and 462) stood 0-16 tiles in
+/// front of his natural, 4-8 tiles apart with one or two out as screens, and Pressure AI's waves
+/// died on them: 640 lost to 1,615 on his half in 461. V1.1's four stood together 6 tiles out.
+const SPREAD_GUN_POSTS: [(f32, f32); 16] = [
+    (8.0, 0.0),
+    (7.0, -5.0),
+    (7.0, 5.0),
+    (12.0, 0.0),
+    (4.0, -9.0),
+    (4.0, 9.0),
+    (10.0, -9.0),
+    (10.0, 9.0),
+    (15.0, 0.0),
+    (3.0, 0.0),
+    (6.0, -13.0),
+    (6.0, 13.0),
+    (13.0, -5.0),
+    (13.0, 5.0),
+    (2.0, -5.0),
+    (2.0, 5.0),
+];
+/// `tankline`: the resting Tanks' posts, behind the guns and in front of the Depot, parked on hold
+/// position, all at one base. soupman's Tanks stood 1-7 tiles in front of his bases with the guns
+/// 5-14 out; V1.1's waited 22-28 tiles out, alone, where Panzerfausts reached them.
+const SPREAD_TANK_POSTS: [(f32, f32); 15] = [
+    (4.5, -2.0),
+    (4.5, 2.0),
+    (4.5, -6.0),
+    (4.5, 6.0),
+    (1.5, -4.0),
+    (1.5, 4.0),
+    (1.5, 0.0),
+    (4.5, -10.0),
+    (4.5, 10.0),
+    (-1.5, -2.0),
+    (-1.5, 2.0),
+    (-1.5, -6.0),
+    (-1.5, 6.0),
+    (-1.5, -10.0),
+    (-1.5, 10.0),
+];
+/// The main keeps this many of its pocket's guns, the ones nearest it, while bases past it hold
+/// lines: V1.1's four. Keeping two, the lines lost 7 of 16 games to Rush AI, which comes at the
+/// main (6 of them at 12:27-13:45), where V1.1 lost 2.
+const MAIN_GUNS: usize = 4;
+
+/// soupman's layout (`mgline`, `tankline`). Once a base past the main is placed (its Depot may still
+/// be building), the guns past the `MAIN_GUNS` of the home pocket nearest the main spread over
+/// `SPREAD_GUN_POSTS` in front of the bases past it, split by exposure; the resting Tanks park on
+/// `SPREAD_TANK_POSTS` behind them, in groups of `TANK_GROUP` at the most exposed bases, all at a
+/// base enemy Tanks reach. Riflemen stay free for the raids and the push.
+fn hold_spread(
+    (actions, observation, map_analysis, intents): opening_rush::LiveStep<'_, '_, '_, '_>,
+    memory: &mut AiDecisionMemory,
+    profile: &AiProfile,
+    home_guns: &[u32],
+    held: &BTreeSet<u32>,
+    (guns_on, tanks_on): (bool, bool),
+) {
+    let ts = observation.map.tile_size as f32;
+    let tick = observation.tick;
+    let lines = base_lines_with(
+        observation,
+        map_analysis,
+        &memory.jeff_v1_1.base_lines.contacts,
+        true,
+    );
+    if !lines.iter().any(|line| !line.main) {
+        memory.jeff_v1_1.base_lines.posts.clear();
+        return;
+    }
+    let home = tile_center(observation.own_start_tile, observation.map.tile_size);
+    let mut pocket: Vec<&AiEntitySummary> = observation
+        .owned
+        .iter()
+        .filter(|unit| home_guns.contains(&unit.id) && unit.hp > 0)
+        .collect();
+    pocket.sort_by(|a, b| {
+        dist2(a.x, a.y, home.0, home.1)
+            .total_cmp(&dist2(b.x, b.y, home.0, home.1))
+            .then(a.id.cmp(&b.id))
+    });
+    let kept: BTreeSet<u32> = pocket.iter().take(MAIN_GUNS).map(|unit| unit.id).collect();
+    let healthy = profile
+        .defensive_machine_gunners
+        .and_then(|policy| policy.replacement_health_percent)
+        .unwrap_or(0);
+    let free = |unit: &AiEntitySummary| {
+        !held.contains(&unit.id)
+            && !memory.jeff_v1_1.tank_raid.holds(unit.id)
+            && !memory.third_pressure.is_reserved(unit.id)
+    };
+    let guns = if guns_on {
+        line_units(observation, memory, EntityKind::MachineGunner, |unit| {
+            free(unit)
+                && !kept.contains(&unit.id)
+                && defense::machine_gunner_meets_replacement_health(unit.hp, healthy)
+        })
+    } else {
+        Vec::new()
+    };
+    let tanks = if tanks_on {
+        line_units(observation, memory, EntityKind::Tank, free)
+    } else {
+        Vec::new()
+    };
+    let gun_weights: Vec<usize> = lines
+        .iter()
+        .map(|line| if line.main { 0 } else { line.exposure })
+        .collect();
+    // One group: split three to a base, they died parked 2-3 at a time to Pressure AI's groups of
+    // 4-9 Tanks (Crossroads, 17 lost for 9 on Jeff's half; V1.1's one staged group lost 8 for 32).
+    let groups = usize::from(!tanks.is_empty());
+    let mut by_exposure: Vec<usize> = (0..lines.len()).filter(|index| !lines[*index].main).collect();
+    by_exposure.sort_by_key(|index| (std::cmp::Reverse(lines[*index].exposure), *index));
+    let besieged = lines
+        .iter()
+        .enumerate()
+        .filter(|(_, line)| !line.main)
+        .map(|(index, line)| (line.enemy_tanks(observation), index))
+        .filter(|(tanks, _)| *tanks > 0)
+        .max()
+        .map(|(_, index)| index);
+    let tank_weights: Vec<usize> = (0..lines.len())
+        .map(|index| match besieged {
+            Some(besieged) if besieged == index => lines[index].exposure.max(1),
+            Some(_) => 0,
+            None if by_exposure[..groups.min(by_exposure.len())].contains(&index) => {
+                lines[index].exposure.max(1)
+            }
+            None => 0,
+        })
+        .collect();
+    let previous = &memory.jeff_v1_1.base_lines.posts;
+    let near_post = |unit: &AiEntitySummary| {
+        previous.get(&unit.id).is_some_and(|post| {
+            dist2(unit.x, unit.y, post.at.0 as f32, post.at.1 as f32) <= squared(ON_POST_TILES * ts)
+        })
+    };
+    let mut seated: Vec<(u32, usize, (f32, f32), Class)> = Vec::new();
+    for (class, units, weights) in [
+        (Class::Gun, &guns, &gun_weights),
+        (Class::Tank, &tanks, &tank_weights),
+    ] {
+        let entries: Vec<(u32, (f32, f32), Option<u32>)> = units
+            .iter()
+            .map(|unit| (unit.id, (unit.x, unit.y), previous.get(&unit.id).map(|post| post.depot)))
+            .collect();
+        let on_post: BTreeSet<u32> = units
+            .iter()
+            .filter(|unit| near_post(unit))
+            .map(|unit| unit.id)
+            .collect();
+        let placed = allocate(&entries, &lines, weights, &on_post);
+        for (index, line) in lines.iter().enumerate() {
+            let members: Vec<&AiEntitySummary> = placed
+                .iter()
+                .filter(|(_, at)| *at == index)
+                .filter_map(|(id, _)| units.iter().find(|unit| unit.id == *id).copied())
+                .collect();
+            if members.is_empty() {
+                continue;
+            }
+            let layout: &[(f32, f32)] = if class == Class::Gun {
+                &SPREAD_GUN_POSTS
+            } else {
+                &SPREAD_TANK_POSTS
+            };
+            let wanted: Vec<(f32, f32)> = layout
+                .iter()
+                .take(members.len() + SPARE_POINTS)
+                .map(|(ahead, side)| line.at(ahead * ts, side * ts))
+                .collect();
+            let facing = (class == Class::Gun).then_some(line.axis);
+            let points = clear_points(observation, map_analysis, wanted, facing);
+            let points = &points[..points.len().min(members.len())];
+            for (id, point) in seat(&members, points, ts) {
+                seated.push((id, index, point, class));
+            }
+        }
+    }
+    let fighting = |unit: &AiEntitySummary| {
+        observation.visible_enemies.iter().any(|enemy| {
+            enemy.kind.is_unit()
+                && enemy.hp > 0
+                && dist2(enemy.x, enemy.y, unit.x, unit.y) <= squared(FIGHTING_TILES * ts)
+        })
+    };
+    let mut posts = BTreeMap::new();
+    let mut ordered = Vec::new();
+    for (id, index, point, class) in seated {
+        let Some(unit) = observation.owned.iter().find(|unit| unit.id == id) else {
+            continue;
+        };
+        let depot = lines[index].depot;
+        let at = (point.0.round() as i32, point.1.round() as i32);
+        let same = memory.jeff_v1_1.base_lines.posts.get(&id).copied().filter(|post| {
+            post.depot == depot
+                && dist2(post.at.0 as f32, post.at.1 as f32, point.0, point.1)
+                    <= squared(SAME_POST_TILES * ts)
+        });
+        let mut post = LinePost {
+            depot,
+            at,
+            ordered: same.map_or(0, |post| post.ordered),
+        };
+        let on = dist2(unit.x, unit.y, point.0, point.1) <= squared(ON_POST_TILES * ts);
+        let since = same.map(|post| tick.saturating_sub(post.ordered));
+        let waiting = since.is_some_and(|since| {
+            since < MIN_REORDER_TICKS
+                || (since < REORDER_TICKS && unit.state != AiEntityState::Idle)
+        });
+        if on {
+            // A Tank parks on its post: standing on hold it reaches 14 tiles.
+            if class == Class::Tank && unit.state == AiEntityState::Move {
+                actions::hold_position_units(actions, [id]);
+            }
+        } else if !waiting && !fighting(unit) {
+            let sent = if class == Class::Tank {
+                actions::move_units(actions, [id], point.0, point.1)
+            } else {
+                actions::attack_move_units(actions, [id], point.0, point.1)
+            };
+            if let Some(units) = sent {
+                ordered.extend(units);
+                post.ordered = tick;
+            }
+        }
+        posts.insert(id, post);
+    }
+    memory.jeff_v1_1.base_lines.posts = posts;
+    if !ordered.is_empty() {
+        intents.push(AiIntent::Assemble { units: ordered });
+    }
 }

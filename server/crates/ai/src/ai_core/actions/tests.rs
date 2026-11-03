@@ -19,6 +19,7 @@ fn worker(id: u32, x: f32, y: f32, state: AiEntityState) -> AiEntitySummary {
         latched_node: None,
         target_id: None,
         free_for_combat: false,
+        research: None,
     }
 }
 
@@ -38,6 +39,7 @@ fn production_building(id: u32, kind: EntityKind, queue_len: usize) -> AiEntityS
         latched_node: None,
         target_id: None,
         free_for_combat: false,
+        research: None,
     }
 }
 
@@ -57,6 +59,7 @@ fn complete_building(id: u32, kind: EntityKind) -> AiEntitySummary {
         latched_node: None,
         target_id: None,
         free_for_combat: false,
+        research: None,
     }
 }
 

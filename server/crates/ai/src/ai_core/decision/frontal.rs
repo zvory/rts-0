@@ -235,7 +235,10 @@ pub(super) fn issue_frontal_wave(
                 return Some(intent);
             }
         } else if profile.id != JEFFS_AI_BETA_ID
-            && (plan.should_attack() || relaxed_start || containment_active)
+            && (plan.should_attack()
+                || relaxed_start
+                || containment_active
+                || jeff_v1_1::push::forced_due(observation, memory))
         {
             let orders_start = actions.emitted_len();
             let intent = issue_expansion_containment_wave(
@@ -282,6 +285,23 @@ pub(super) fn issue_frontal_wave(
     }
 
     if !plan.should_stage() && !(hold_for_push && !plan.ready_units.is_empty()) {
+        return None;
+    }
+    // Jeff's AI V1.1's resting Tanks park in front of their bases (`tankline`), and its guns hold
+    // the lines there (`mgline`), until the push takes them; staged, the Tanks waited 22-28 tiles
+    // out in front of the natural.
+    let spread = is_jeff_v1_1(profile.id)
+        && (!jeff_v1_1::off("tankline") || !jeff_v1_1::off("mgline"));
+    let plan = &FrontalWavePlan {
+        ready_units: plan
+            .ready_units
+            .iter()
+            .copied()
+            .filter(|id| !(spread && memory.jeff_v1_1.base_lines.posted(*id)))
+            .collect(),
+        ..plan.clone()
+    };
+    if plan.ready_units.is_empty() {
         return None;
     }
 

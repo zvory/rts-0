@@ -61,6 +61,7 @@ fn building(id: u32, owner: u32, kind: EntityKind, (x, y): (f32, f32)) -> AiEnti
         latched_node: None,
         target_id: None,
         free_for_combat: false,
+        research: None,
     }
 }
 

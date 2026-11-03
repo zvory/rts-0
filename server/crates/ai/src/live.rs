@@ -554,6 +554,8 @@ impl AiController {
             .analysis();
         self.last_debug_map_layers =
             observer_debug_map_layers_for_profile(&observation, map_analysis, profile);
+        self.memory
+            .note_losses(frame.own_losses(), frame.observed_enemy_losses());
         let decision = decide_profile_with_analysis(
             &observation,
             profile,

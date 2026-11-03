@@ -54,6 +54,24 @@ pub(crate) struct AiFacts {
     production_buildings: BTreeMap<EntityKind, Vec<ProductionBuildingFact>>,
     unit_counts: BTreeMap<EntityKind, usize>,
     free_combat_units: BTreeMap<EntityKind, Vec<u32>>,
+    /// Jeff's AI V1.1's opening order (`ecafter`), set by the decision from its memory; `None`
+    /// for every other profile and with the switch off.
+    pub(crate) v1_1_opening: Option<OpeningOrder>,
+    /// Jeff's AI V1.1 has ordered its first Scout Car at some point (`ecafter`).
+    pub(crate) v1_1_car_ordered: bool,
+}
+
+/// Jeff's AI V1.1's opening (`ecafter`): the Engineering Complex comes after the Factory, and the
+/// early fights decide whether the natural or the Factory comes first.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum OpeningOrder {
+    /// The opening guns are not all ordered yet: neither the natural nor the Factory goes down.
+    Undecided,
+    /// The early fights went at least 3 kills for each death: the natural goes with the opening
+    /// guns, before the Factory.
+    NaturalFirst,
+    /// The Factory first, so the first Scout Car comes out sooner; the natural follows it.
+    FactoryFirst,
 }
 
 impl AiFacts {
@@ -172,6 +190,8 @@ impl AiFacts {
             production_buildings,
             unit_counts,
             free_combat_units,
+            v1_1_opening: None,
+            v1_1_car_ordered: false,
         }
     }
 
@@ -385,6 +405,7 @@ mod tests {
             latched_node: None,
             target_id: None,
             free_for_combat: state == AiEntityState::Idle,
+            research: None,
         }
     }
 

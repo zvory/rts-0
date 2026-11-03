@@ -133,7 +133,7 @@ pub(in crate::ai_core::decision) fn strike_gathering_wave(
                 && !memory.containment.active_riflemen.contains(&unit.id)
                 && !memory.expansion_security.riflemen.contains(&unit.id)
                 && !memory.later_bases.guards.contains(&unit.id)
-                && !memory.opening_rush.is_reserved(unit.id)
+                && !memory.rush_reserved(unit.id)
         })
         .collect();
     let state = &mut memory.jeff_v1_1.strike;

@@ -22,6 +22,8 @@ pub(super) struct MarchShape {
     pub(super) advance_on_center: bool,
     /// Whether the rifle screen is Jeff's AI V1.1's spread one.
     pub(super) rifle_spread: bool,
+    /// Whether Jeff's AI V1.1 marches Riflemen first, then the Scout Car, then the Tanks.
+    pub(super) column: bool,
 }
 
 impl MarchShape {
@@ -37,6 +39,7 @@ impl MarchShape {
         rank_width: TANK_FORMATION_RANK_WIDTH,
         advance_on_center: false,
         rifle_spread: false,
+        column: false,
     };
     /// The current Jeff forming up, reforming and closing in: as tight, but a push of more than six
     /// Tanks is formed in ranks and is that much deeper. Held to one rank of depth, a large push
@@ -62,6 +65,7 @@ impl MarchShape {
         rank_width: 4,
         advance_on_center: true,
         rifle_spread: false,
+        column: false,
     };
 }
 
@@ -135,8 +139,13 @@ pub(super) fn select_rifle_escorts(
         .collect::<Vec<_>>();
     defensive_riflemen.sort_unstable();
     defensive_riflemen.truncate(CONTAINMENT_HOME_RIFLE_RESERVE);
-    let radius2 =
-        (CONTAINMENT_ESCORT_SELECTION_RADIUS_TILES * observation.map.tile_size as f32).powi(2);
+    // A forced wave (`forcepush`) takes every free Rifleman, wherever it stands.
+    let forced = jeff_v1_1::push::forced_due(observation, memory);
+    let radius2 = if forced {
+        f32::INFINITY
+    } else {
+        (CONTAINMENT_ESCORT_SELECTION_RADIUS_TILES * observation.map.tile_size as f32).powi(2)
+    };
     let mut riflemen: Vec<u32> = observation
         .owned
         .iter()
@@ -159,7 +168,9 @@ pub(super) fn select_rifle_escorts(
         .map(|unit| unit.id)
         .collect();
     // Jeff's AI V1.1 screens its Tanks against Panzerfausts with two Riflemen for every Tank.
-    let escort_count = if memory.profile_id().is_some_and(is_jeff_v1_1) && !jeff_v1_1::off("escort") {
+    let escort_count = if forced {
+        riflemen.len().min(jeff_v1_1::MAX_PUSH_RIFLES)
+    } else if memory.profile_id().is_some_and(is_jeff_v1_1) && !jeff_v1_1::off("escort") {
         let line = jeff_v1_1::RIFLES_PER_TANK * memory.containment.active_tanks.len();
         riflemen
             .len()
@@ -289,14 +300,20 @@ pub(super) fn containment_formation(
         shape.tank_spacing_tiles,
         shape.rank_width,
     );
-    let scout_point = scout_trailing_point(
-        tank_center,
-        own_base,
-        objective,
-        observation.map,
-        policy.scout_trailing_tiles,
-    )?;
-    let rifle_points = if shape.rifle_spread {
+    let scout_point = if shape.column {
+        jeff_v1_1::screen::column_scout(tank_center, objective, observation.map)?
+    } else {
+        scout_trailing_point(
+            tank_center,
+            own_base,
+            objective,
+            observation.map,
+            policy.scout_trailing_tiles,
+        )?
+    };
+    let rifle_points = if shape.column {
+        jeff_v1_1::screen::column_points(tank_center, objective, observation.map, riflemen.len())
+    } else if shape.rifle_spread {
         jeff_v1_1::screen::points(tank_center, objective, observation.map, riflemen.len())
     } else {
         rifle_screen_points(tank_center, objective, observation.map, riflemen.len())
@@ -426,12 +443,14 @@ pub(super) fn stored_waypoint(memory: &AiDecisionMemory) -> Option<(f32, f32)> {
         .map(|(x, y)| (x as f32, y as f32))
 }
 
+/// Keeps the push's Riflemen within `radius_tiles` of `anchor`, the Tanks' centre.
 pub(super) fn retain_nearby_rifle_escorts(
     observation: &AiObservation,
     riflemen: &mut BTreeSet<u32>,
     anchor: (f32, f32),
+    radius_tiles: f32,
 ) {
-    let radius2 = (CONTAINMENT_RIFLE_COHESION_TILES * observation.map.tile_size as f32).powi(2);
+    let radius2 = (radius_tiles * observation.map.tile_size as f32).powi(2);
     riflemen.retain(|id| {
         observation.owned.iter().any(|unit| {
             unit.id == *id && unit.hp > 0 && dist2(unit.x, unit.y, anchor.0, anchor.1) <= radius2

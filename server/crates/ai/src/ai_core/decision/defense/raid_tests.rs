@@ -26,6 +26,7 @@ fn entity(id: u32, owner: u32, kind: EntityKind, tiles: (f32, f32)) -> AiEntityS
         latched_node: None,
         target_id: None,
         free_for_combat: true,
+        research: None,
     }
 }
 

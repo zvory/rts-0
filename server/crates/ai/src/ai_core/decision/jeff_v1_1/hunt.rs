@@ -95,7 +95,7 @@ pub(in crate::ai_core::decision) fn hunt_panzerfausts(
                 && !reserved.contains(&unit.id)
                 && memory.containment.active_scout != Some(unit.id)
                 && !memory.expansion_security.riflemen.contains(&unit.id)
-                && !memory.opening_rush.is_reserved(unit.id)
+                && !memory.rush_reserved(unit.id)
                 && !memory.stays_out_of_home_defense(unit.id)
         })
         .collect();

@@ -509,6 +509,7 @@ fn party_riflemen(
         .reserved()
         .chain(memory.route_line.reserved())
         .chain(memory.opening_rush.reserved())
+        .chain(memory.jeff_v1_1.meth_strike.units())
         .chain(memory.trap_breach.reserved())
         .collect();
     let mut free: Vec<&AiEntitySummary> = observation

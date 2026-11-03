@@ -2,13 +2,15 @@
 //! (`is_jeff_v1_1`); for V1.0 each returns without touching the decision.
 
 use super::*;
-use crate::ai_core::facts::ProductionBuildingFact;
+use crate::ai_core::decision::geometry::{dist2, squared};
+use crate::ai_core::facts::{OpeningOrder, ProductionBuildingFact};
 
 pub(super) mod base_line;
 pub(super) mod charge;
 pub(super) mod deny;
 pub(super) mod front_line;
 pub(super) mod home_guard;
+pub(super) mod meth_strike;
 pub(super) mod hunt;
 pub(super) mod natural;
 pub(super) mod push;
@@ -18,6 +20,7 @@ pub(super) mod scout;
 pub(super) mod smoke_cover;
 pub(super) mod screen;
 pub(super) mod strike;
+pub(super) mod tank_pause;
 pub(super) mod tank_raid;
 pub(super) mod third_base;
 
@@ -46,6 +49,17 @@ pub(super) struct V1_1Memory {
     pub(super) rovers: rovers::RoverMemory,
     pub(super) smoke: smoke_cover::SmokeMemory,
     pub(super) deny: deny::DenyMemory,
+    pub(super) meth_strike: meth_strike::MethStrikeMemory,
+    pub(super) tank_pause: tank_pause::TankPauseMemory,
+    /// Enemy fighters seen dying and Jeff's fighters lost so far (`AiDecisionMemory::note_losses`).
+    pub(super) kills: u32,
+    pub(super) deaths: u32,
+    /// The unit value killed and lost so far, Oil counted twice (`tradeexpand`).
+    pub(super) value_killed: u32,
+    pub(super) value_lost: u32,
+    /// The opening order once decided (`ecafter`), and whether the first Scout Car was ordered.
+    pub(super) opening: Option<OpeningOrder>,
+    pub(super) car_ordered: bool,
 }
 
 /// Methamphetamines comes first. It is ordered the moment the Training Centre is free and its cost
@@ -290,8 +304,172 @@ pub(super) fn reserve_tank_steel(
     }
 }
 
+/// The early fights must reach this many kills, and this many for each death, for the natural to
+/// come before the Factory (`ecafter`). At 3 the natural never came first in 16 games against
+/// Pressure AI and Rush AI (the trade at the choice ran 0/4 to 6/4).
+const NATURAL_FIRST_TRADE: u32 = 2;
+
+/// Jeff's AI V1.1 (`ecafter`), Factory first: once the Factory's first Scout Car is ordered, the
+/// Engineering Complex no longer waits for the natural's order, and until it is placed it goes
+/// ahead of the natural's money (the natural's cost is not held back meanwhile, unless its order is
+/// already out). Behind the natural's order it came at 2:54-3:09 against Pressure AI and Tank Unlock
+/// at 3:25-3:52, the first Tank 20-40 s later than V1.0's; waiting for the bank to hold both left
+/// it as late.
+pub(super) fn complex_alongside_natural(facts: &AiFacts) -> bool {
+    facts.v1_1_opening == Some(OpeningOrder::FactoryFirst)
+        && facts.building_count(EntityKind::Factory) > 0
+        && facts.v1_1_car_ordered
+}
+
+/// Unit value killed for each unit value lost (Oil counted twice) from which V1.1 takes its later
+/// bases on fewer Tanks (`tradeexpand`), and the share of the Tanks those bases otherwise wait for
+/// that then do, rounded down.
+const EXPAND_TRADE: f32 = 1.5;
+const EXPAND_TANK_SHARE: f32 = 0.7;
+
+/// Whether V1.1 is ahead on the trade (`tradeexpand`): it has killed at least `EXPAND_TRADE` times
+/// the unit value it has lost, Oil counted twice. Ahead, its army can spare the Tanks a later base
+/// waits for sooner, and base 4 comes before any of its wells runs dry.
+pub(super) fn trading_ahead(memory: &AiDecisionMemory) -> bool {
+    let state = &memory.jeff_v1_1;
+    memory.profile_id().is_some_and(is_jeff_v1_1)
+        && !off("tradeexpand")
+        && state.value_killed > 0
+        && state.value_killed as f32 >= EXPAND_TRADE * state.value_lost as f32
+}
+
+/// The Tanks a later base waits for: `required`, or `EXPAND_TANK_SHARE` of it rounded down while V1.1
+/// is ahead on the trade (`trading_ahead`).
+pub(super) fn expansion_tanks(memory: &AiDecisionMemory, required: usize) -> usize {
+    if trading_ahead(memory) {
+        (required as f32 * EXPAND_TANK_SHARE).floor() as usize
+    } else {
+        required
+    }
+}
+
+/// Jeff's AI V1.1's opening order (`ecafter`). The Engineering Complex comes after the Factory: it
+/// only researches Tank Unlock, so ahead of the natural or the Factory it bought nothing yet (V1.0
+/// placed it at 1:31 against Pressure AI, with the natural at 2:09 and the Factory at 2:29). Whether
+/// the natural or the Factory comes first is decided once, when the opening guns are all ordered:
+/// with the early fights at `NATURAL_FIRST_TRADE` kills or more and as many for each death, the
+/// natural goes then; otherwise the Factory goes first, so its first Scout Car comes out sooner, and
+/// the natural after that car. Until then neither goes down.
+pub(super) fn opening_order(
+    profile_id: &str,
+    observation: &AiObservation,
+    facts: &AiFacts,
+    memory: &mut AiDecisionMemory,
+) -> Option<OpeningOrder> {
+    if !is_jeff_v1_1(profile_id) || (off("ecafter") && !rifle_opening(profile_id)) {
+        memory.jeff_v1_1.opening = None;
+        memory.jeff_v1_1.car_ordered = false;
+        return None;
+    }
+    // Kept once seen, so a first car lost early holds nothing up.
+    memory.jeff_v1_1.car_ordered |= expansion_security::first_scout_car_ordered(observation, facts);
+    // `riflenat`: always the natural first, held by Riflemen.
+    if rifle_opening(profile_id) {
+        memory.jeff_v1_1.opening = Some(OpeningOrder::NaturalFirst);
+    }
+    if let Some(order) = memory.jeff_v1_1.opening {
+        return Some(order);
+    }
+    let decided = facts.building_count(EntityKind::Factory) > 0
+        || facts.building_count(EntityKind::ResourceDepot) >= 2
+        || expansion_security::guns_ordered(
+            observation,
+            facts,
+            profile_id,
+            expansion_security::OPENING_GUNS,
+        );
+    if !decided {
+        return Some(OpeningOrder::Undecided);
+    }
+    let state = &mut memory.jeff_v1_1;
+    let order = if state.kills >= NATURAL_FIRST_TRADE
+        && state.kills >= state.deaths.saturating_mul(NATURAL_FIRST_TRADE)
+    {
+        OpeningOrder::NaturalFirst
+    } else {
+        OpeningOrder::FactoryFirst
+    };
+    state.opening = Some(order);
+    Some(order)
+}
+
 /// The natural's guards V1.1 trains before its opening guns.
 const NATURAL_GUARDS: usize = 2;
+/// New Riflemen the opening trains, from the Training Centre's placing, before the guns.
+pub(super) const OPENING_RIFLES: usize = 4;
+
+/// `nomg`: no Machine Gunners; two Riflemen stand in for every gun V1.1 would train. A gun fires
+/// only set up and stood idle on its post, where a Meth Rifleman fires on the move.
+pub(super) const RIFLES_PER_GUN: usize = 2;
+/// The Riflemen past which, under `nomg`, two count as one gun: the four starters and the
+/// `OPENING_RIFLES` trained first.
+pub(super) const NOMG_RIFLE_BASE: usize = 4 + OPENING_RIFLES;
+
+/// Whether this profile trains Riflemen in place of guns (`nomg`).
+pub(super) fn no_guns(profile_id: &str) -> bool {
+    is_jeff_v1_1(profile_id) && !off("nomg")
+}
+
+/// `nomg`: the gun's place in the production priorities goes to Riflemen. Returns the most guns
+/// the caps allowed (`max_counts`), each of which `rifle_cap_for_guns` turns into two Riflemen;
+/// `None` without `nomg`.
+pub(super) fn guns_to_riflemen(
+    profile_id: &str,
+    priorities: &mut Vec<EntityKind>,
+    max_counts: &[(EntityKind, usize)],
+) -> Option<usize> {
+    if !no_guns(profile_id) {
+        return None;
+    }
+    let Some(at) = priorities
+        .iter()
+        .position(|unit| *unit == EntityKind::MachineGunner)
+    else {
+        return Some(0);
+    };
+    let guns = max_counts
+        .iter()
+        .find_map(|(kind, count)| (*kind == EntityKind::MachineGunner).then_some(*count))
+        .unwrap_or(0);
+    priorities.remove(at);
+    match priorities
+        .iter()
+        .position(|unit| *unit == EntityKind::Rifleman)
+    {
+        Some(rifle) if rifle < at => {}
+        Some(rifle) => {
+            priorities.remove(rifle);
+            priorities.insert(at, EntityKind::Rifleman);
+        }
+        None => priorities.insert(at, EntityKind::Rifleman),
+    }
+    Some(guns)
+}
+
+/// `nomg`: the Barracks' Rifleman cap, raised to two Riflemen for each of `guns` above `base`, the
+/// Riflemen V1.1 trains anyway (its Rifleman line, the natural's party, and at least
+/// `NOMG_RIFLE_BASE`). A fixed target, not the count so far plus two, or it never stops; with no
+/// Rifleman cap yet the target becomes one, since Riflemen now hold the gun's place in the
+/// priorities.
+pub(super) fn rifle_cap_for_guns(
+    guns: usize,
+    base: usize,
+    max_counts: &mut Vec<(EntityKind, usize)>,
+) {
+    let target = base.max(NOMG_RIFLE_BASE) + RIFLES_PER_GUN * guns;
+    match max_counts
+        .iter_mut()
+        .find(|(kind, _)| *kind == EntityKind::Rifleman)
+    {
+        Some((_, max)) => *max = (*max).max(target),
+        None => max_counts.push((EntityKind::Rifleman, target)),
+    }
+}
 
 /// V1.1's Barracks trains Riflemen first from the moment its Training Centre goes down until Meth is
 /// ordered, and while the natural lacks its guards. Each opening gun takes 10 Oil, which Meth holds
@@ -317,6 +495,23 @@ pub(super) fn riflemen_first(
         .filter(|unit| unit.kind == EntityKind::Rifleman && unit.hp > 0)
         .filter(|unit| !memory.opening_rush.is_starter(unit.id))
         .count();
+    // `opening4`: until Meth is in, no Rifleman before the Training Centre is placed, then
+    // Riflemen until `OPENING_RIFLES` new ones stand, then the guns.
+    // The Rifleman opening (`riflenat`) places its second Barracks first: bought after the opening
+    // Riflemen, it went down at 1:57.
+    let second_barracks_waits =
+        rifle_opening(profile_id) && facts.building_count(EntityKind::Barracks) < 2;
+    if !off("opening4") && !observation.upgrades.contains(&UpgradeKind::Methamphetamines) {
+        priorities.retain(|unit| *unit != EntityKind::Rifleman);
+        if facts.building_count(EntityKind::TrainingCentre) == 0
+            || fresh >= OPENING_RIFLES
+            || second_barracks_waits
+        {
+            return Some(riflemen);
+        }
+        priorities.insert(0, EntityKind::Rifleman);
+        return Some(riflemen + OPENING_RIFLES - fresh);
+    }
     let guards_short = memory.expansion_security.site.is_some()
         && facts.building_count(EntityKind::ResourceDepot) < 2
         && fresh < NATURAL_GUARDS;
@@ -342,8 +537,108 @@ pub(super) fn riflemen_first(
 pub(super) fn factory_alongside_natural(profile_id: &str, facts: &AiFacts) -> bool {
     is_jeff_v1_1(profile_id)
         && !off("factoryfirst")
+        && !rifle_opening(profile_id)
         && facts.building_count(EntityKind::ResourceDepot) < 2
 }
+
+/// `riflenat`, the user's Rifleman opening (2026-11-03): Barracks, Training Centre, a second
+/// Barracks, Riflemen from both nonstop; once Methamphetamines is in and `natural_rifles` Riflemen
+/// stand at home, the natural, held by them; then Factory, first Scout Car, Engineering Complex,
+/// Tank Unlock and the first Tank; then the third base, taken by `THIRD_BASE_RIFLES` Riflemen and a
+/// Tank. No Rifleman ceiling: Riflemen are bought from the Steel the next expansion and Tank leave.
+pub(super) fn rifle_opening(profile_id: &str) -> bool {
+    is_jeff_v1_1(profile_id) && !off("riflenat")
+}
+
+/// The Riflemen standing at home before the natural goes, all of whom then hold it: 14, or
+/// `natrifles` in `JEFF_V11_LINE` (testing, to fit each map within five either way).
+pub(super) fn natural_rifles() -> usize {
+    crate::ai_core::profiles::jeff_v1_1_param("natrifles").map_or(NATURAL_RIFLES, |value| value as usize)
+}
+const NATURAL_RIFLES: usize = 14;
+
+/// The Riflemen that take and hold the third base with a Tank (`riflenat`), or `thirdrifles` in
+/// `JEFF_V11_LINE` (testing).
+pub(super) fn third_base_rifles() -> usize {
+    crate::ai_core::profiles::jeff_v1_1_param("thirdrifles")
+        .map_or(THIRD_BASE_RIFLES, |value| value as usize)
+}
+const THIRD_BASE_RIFLES: usize = 16;
+
+/// Riflemen this close to the main's start count as at home for the natural (`riflenat`): far
+/// enough to take in those already holding the natural, not the starters out raiding.
+const HOME_RIFLE_TILES: f32 = 40.0;
+
+/// `riflenat`: the Riflemen at home, out or in training at a Barracks.
+pub(super) fn home_riflemen(observation: &AiObservation) -> usize {
+    let ts = observation.map.tile_size as f32;
+    let home = tile_center(observation.own_start_tile, observation.map.tile_size);
+    let out = observation
+        .owned
+        .iter()
+        .filter(|unit| unit.kind == EntityKind::Rifleman && unit.is_complete && unit.hp > 0)
+        .filter(|unit| dist2(unit.x, unit.y, home.0, home.1) <= squared(HOME_RIFLE_TILES * ts))
+        .count();
+    let queued: usize = observation
+        .owned
+        .iter()
+        .filter(|unit| {
+            unit.kind == EntityKind::Barracks && unit.production_kind == Some(EntityKind::Rifleman)
+        })
+        .map(|unit| unit.production_queue_len.unwrap_or(0))
+        .sum();
+    out + queued
+}
+
+/// `riflenat`: two Barracks from the Training Centre's placing; past them, one more at a time while
+/// Steel stays banked (`third_base::banked`, 30 s at 600 or more with a Tank out) and every Barracks
+/// is busy: Steel the Tanks, the two Barracks and the expansions cannot spend.
+pub(super) fn rifle_barracks_target(
+    profile_id: &str,
+    observation: &AiObservation,
+    facts: &AiFacts,
+    memory: &AiDecisionMemory,
+    target: usize,
+) -> usize {
+    if !rifle_opening(profile_id) || facts.building_count(EntityKind::TrainingCentre) == 0 {
+        return target;
+    }
+    let barracks = facts.building_count(EntityKind::Barracks);
+    let all_busy = observation
+        .owned
+        .iter()
+        .filter(|unit| unit.kind == EntityKind::Barracks && unit.hp > 0)
+        .all(|unit| unit.is_complete && unit.production_queue_len.unwrap_or(0) > 0);
+    let more = third_base::banked(observation, memory) && all_busy;
+    target.max(OPENING_BARRACKS).max(barracks + usize::from(more))
+}
+const OPENING_BARRACKS: usize = 2;
+
+/// `riflenat`: the Barracks' Rifleman cap. Before the first Tank, the Riflemen the spend plan's
+/// slack pays for (its steps keep the Barracks, the natural, the Factory, the Scout Car, the
+/// Engineering Complex, Tank Unlock and the Tank on time); after it, the Riflemen the Steel past
+/// `RIFLE_STEEL_RESERVE` pays for, the next base's Depot already held back by `later_bases`.
+pub(super) fn rifle_opening_cap(
+    plan: Option<&spend_plan::SpendPlan>,
+    intents: &[AiIntent],
+    counts: &[(EntityKind, usize)],
+    steel: u32,
+    tank_out: bool,
+) -> usize {
+    let current = counts
+        .iter()
+        .find_map(|(kind, count)| (*kind == EntityKind::Rifleman).then_some(*count))
+        .unwrap_or(0);
+    if !tank_out {
+        if let Some(cap) = plan.and_then(|plan| plan.rifle_cap(intents, counts)) {
+            return cap;
+        }
+    }
+    let rifle = rts_rules::economy::cost(EntityKind::Rifleman).0.max(1);
+    current + (steel.saturating_sub(RIFLE_STEEL_RESERVE) / rifle) as usize
+}
+/// After the first Tank Riflemen leave a Tank's Steel in the bank.
+const RIFLE_STEEL_RESERVE: u32 = 425;
 
 /// The Steel V1.1 keeps before surplus Steel goes into Riflemen and Barracks: a Tank's 425 and a
 /// little. V1.0 kept 600, and against Pressure AI on Classic its one Barracks stood idle from 2:45 to
@@ -463,6 +758,43 @@ const GUNS_PER_BASE: usize = 2;
 /// Guns held at the home post on top of the home pocket's and the bases' posts.
 const HOME_GUN_RESERVE: usize = 0;
 const MAX_GUNS: usize = 16;
+/// `mgline`: guns trained for every Depot (`gun_cap`).
+const SPREAD_GUNS_PER_BASE: usize = 5;
+/// `fastnat`: the third base goes up without Tanks from this time on, once this many guns stand
+/// within `NATURAL_GUN_TILES` of the natural's Depot.
+const FAST_THIRD_TICKS: u32 = config::TICK_HZ * 210;
+const FAST_THIRD_GUNS: usize = 4;
+const NATURAL_GUN_TILES: f32 = 18.0;
+/// A Depot this far from the main's start is a base past it.
+const PAST_MAIN_TILES: f32 = 12.0;
+
+/// `fastnat`: whether the third base may go up without Tanks: from `FAST_THIRD_TICKS` on, with
+/// `FAST_THIRD_GUNS` guns holding the natural.
+pub(super) fn fast_third_ready(observation: &AiObservation, profile_id: &str) -> bool {
+    if !is_jeff_v1_1(profile_id) || off("fastnat") || observation.tick < FAST_THIRD_TICKS {
+        return false;
+    }
+    let ts = observation.map.tile_size as f32;
+    let home = tile_center(observation.own_start_tile, observation.map.tile_size);
+    let naturals: Vec<(f32, f32)> = observation
+        .owned
+        .iter()
+        .filter(|unit| unit.kind == EntityKind::ResourceDepot && unit.is_complete && unit.hp > 0)
+        .filter(|unit| dist2(unit.x, unit.y, home.0, home.1) > squared(PAST_MAIN_TILES * ts))
+        .map(|unit| (unit.x, unit.y))
+        .collect();
+    observation
+        .owned
+        .iter()
+        .filter(|unit| unit.kind == EntityKind::MachineGunner && unit.is_complete && unit.hp > 0)
+        .filter(|unit| {
+            naturals
+                .iter()
+                .any(|depot| dist2(unit.x, unit.y, depot.0, depot.1) <= squared(NATURAL_GUN_TILES * ts))
+        })
+        .count()
+        >= FAST_THIRD_GUNS
+}
 /// V1.1 keeps four Riflemen home and two for every Tank, a screen in front of the Tanks against
 /// Panzerfausts.
 const HOME_RIFLES: usize = 4;
@@ -531,7 +863,25 @@ pub(super) fn gun_cap(
     intents: &[AiIntent],
     max_counts: &mut Vec<(EntityKind, usize)>,
 ) {
-    if !is_jeff_v1_1(profile.id) || off("guncap") {
+    if !is_jeff_v1_1(profile.id) {
+        return;
+    }
+    // `mgline`: `SPREAD_GUNS_PER_BASE` for every Depot, building or built, trained as soon as the
+    // Barracks is free. soupman trained guns from 1:06 on and had 8-10 by 3:00 and 10-15 by 4:00;
+    // V1.1 held at the opening's four once its first Tank was out.
+    if !off("mgline") {
+        let cap = (SPREAD_GUNS_PER_BASE * facts.building_count(EntityKind::ResourceDepot))
+            .clamp(expansion_security::OPENING_GUNS, MAX_GUNS);
+        match max_counts
+            .iter_mut()
+            .find(|(kind, _)| *kind == EntityKind::MachineGunner)
+        {
+            Some((_, max)) => *max = cap,
+            None => max_counts.push((EntityKind::MachineGunner, cap)),
+        }
+        return;
+    }
+    if off("guncap") {
         return;
     }
     let home = profile

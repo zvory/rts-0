@@ -24,6 +24,8 @@ pub(in crate::ai_core::decision) const RETRY_TICKS: u32 = config::TICK_HZ * 20;
 /// The escort's posts stand this far in front of the site and this far apart across it.
 const ESCORT_POST_TILES: f32 = 5.0;
 const ESCORT_SPACING_TILES: f32 = 1.75;
+const ESCORT_RANK_WIDTH: usize = 6;
+const ESCORT_RANK_TILES: f32 = 2.0;
 
 /// Notes how long V1.1's Steel has stood at `BANK_STEEL` or more, for base 3, and how long with a
 /// Tank out, for spending on more production and infantry. Before the first Tank the bank is the
@@ -136,7 +138,7 @@ pub(in crate::ai_core::decision) fn escort(
             && !memory.containment.opening_tanks.contains(&unit.id)
             && !memory.containment.active_riflemen.contains(&unit.id)
             && !memory.expansion_security.riflemen.contains(&unit.id)
-            && !memory.opening_rush.is_reserved(unit.id)
+            && !memory.rush_reserved(unit.id)
             && !reserved.contains(&unit.id)
             && !memory.jeff_v1_1.home_guard.holds(unit.id)
     };
@@ -160,6 +162,32 @@ pub(in crate::ai_core::decision) fn escort(
                 .collect::<Vec<_>>()
         })
     };
+    // The Rifleman opening (`riflenat`) takes its later bases with a Tank and
+    // `third_base_rifles` Riflemen, none of them the natural's holders.
+    if memory.profile_id().is_some_and(super::rifle_opening) {
+        let tank = nearest(EntityKind::Tank, 1)?;
+        let mut riflemen: Vec<&AiEntitySummary> = observation
+            .owned
+            .iter()
+            .filter(|unit| unit.kind == EntityKind::Rifleman)
+            .filter(free)
+            .filter(|unit| !memory.jeff_v1_1.natural.holds(unit.id))
+            .collect();
+        let wanted = super::third_base_rifles();
+        if riflemen.len() < wanted {
+            return None;
+        }
+        riflemen.sort_by(|a, b| {
+            dist2(a.x, a.y, site.0, site.1)
+                .total_cmp(&dist2(b.x, b.y, site.0, site.1))
+                .then(a.id.cmp(&b.id))
+        });
+        return Some(
+            tank.into_iter()
+                .chain(riflemen.into_iter().take(wanted).map(|unit| unit.id))
+                .collect(),
+        );
+    }
     if let Some(tanks) = nearest(EntityKind::Tank, ESCORT_TANKS) {
         return Some(tanks.into_iter().collect());
     }
@@ -185,10 +213,14 @@ pub(in crate::ai_core::decision) fn escort_posts(
     let ts = observation.map.tile_size as f32;
     let direction = normalized_direction(site, enemy).unwrap_or((0.0, 1.0));
     let across = (-direction.1, direction.0);
+    // Ranks of `ESCORT_RANK_WIDTH`, later ones further out: the Rifleman opening's escort of 17
+    // stood in one line 30 tiles wide.
     (0..count)
         .map(|index| {
-            let side = (index as f32 - (count as f32 - 1.0) * 0.5) * ESCORT_SPACING_TILES;
-            let mut ahead = ESCORT_POST_TILES;
+            let (rank, slot) = (index / ESCORT_RANK_WIDTH, index % ESCORT_RANK_WIDTH);
+            let width = (count - rank * ESCORT_RANK_WIDTH).min(ESCORT_RANK_WIDTH);
+            let side = (slot as f32 - (width as f32 - 1.0) * 0.5) * ESCORT_SPACING_TILES;
+            let mut ahead = ESCORT_POST_TILES + rank as f32 * ESCORT_RANK_TILES;
             while ahead >= 2.0 {
                 let point = clamp_to_map(
                     (

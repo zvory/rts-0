@@ -129,6 +129,8 @@ pub(crate) struct AiEntitySummary {
     pub(crate) latched_node: Option<u32>,
     pub(crate) target_id: Option<u32>,
     pub(crate) free_for_combat: bool,
+    /// The upgrade a building is researching and how far along it is (0-1); public to every viewer.
+    pub(crate) research: Option<(UpgradeKind, f32)>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -553,6 +555,9 @@ fn project_entity(entity: &SdkEntity) -> AiEntitySummary {
         latched_node: entity.latched_resource,
         target_id: entity.target,
         free_for_combat: snapshot_free_for_combat(state, entity.target),
+        research: entity
+            .production
+            .and_then(|production| production.current_upgrade.map(|upgrade| (upgrade, production.progress.unwrap_or(0.0)))),
     }
 }
 
@@ -608,6 +613,11 @@ impl AiEntitySummary {
             latched_node: view.latched_node,
             target_id: view.target_id,
             free_for_combat: snapshot_free_for_combat(state, view.target_id),
+            research: view
+                .prod_upgrade
+                .as_deref()
+                .and_then(|id| id.parse::<UpgradeKind>().ok())
+                .map(|upgrade| (upgrade, view.prod_progress.unwrap_or(0.0))),
         })
     }
 }

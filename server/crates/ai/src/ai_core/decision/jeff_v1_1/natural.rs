@@ -18,6 +18,20 @@ const SUPPORT: usize = 4;
 const HOME_GUNS_KEPT: usize = 2;
 const LINE_FORWARD_TILES: f32 = 6.0;
 const LINE_SPACING_TILES: f32 = 2.5;
+/// Supporters to a rank of the line, later ranks this far behind: the Rifleman opening's twelve
+/// stand two deep instead of 30 tiles wide.
+const RANK_WIDTH: usize = 6;
+const RANK_BACK_TILES: f32 = 2.0;
+
+/// How many units support the natural: `SUPPORT`, or under the Rifleman opening (`riflenat`) all of
+/// its holders but the two guards.
+fn support_size(profile_id: &str) -> usize {
+    if super::rifle_opening(profile_id) {
+        super::natural_rifles().saturating_sub(2)
+    } else {
+        SUPPORT
+    }
+}
 /// A unit this close to its post holds there.
 const ON_POST_TILES: f32 = 1.0;
 /// A unit with an enemy this close fights where it stands.
@@ -84,7 +98,7 @@ pub(in crate::ai_core::decision) fn support(
             && !reserved.contains(&unit.id)
             && !memory.expansion_security.riflemen.contains(&unit.id)
             && !memory.containment.active_riflemen.contains(&unit.id)
-            && !memory.opening_rush.is_reserved(unit.id)
+            && !memory.rush_reserved(unit.id)
             && !memory.later_bases.guards.contains(&unit.id)
             && !memory.jeff_v1_1.base_lines.posted(unit.id)
     };
@@ -99,6 +113,8 @@ pub(in crate::ai_core::decision) fn support(
                 && unit.hp > 0
                 && dist2(unit.x, unit.y, center.0, center.1) <= squared(ts)
         });
+    // Under `mgline` the guns hold the spread lines in front of the bases (`base_line`) instead.
+    let guns_go = guns_go && super::off("mgline");
     let free = |unit: &AiEntitySummary| {
         free(unit) && (guns_go || unit.kind != EntityKind::MachineGunner)
     };
@@ -139,8 +155,9 @@ pub(in crate::ai_core::decision) fn support(
         .map(|unit| unit.id)
         .collect();
     riflemen.sort_by(|a, b| to_natural(a).total_cmp(&to_natural(b)).then(a.cmp(b)));
+    let support = support_size(profile_id);
     for id in spare_guns.into_iter().chain(riflemen) {
-        if members.len() >= SUPPORT {
+        if members.len() >= support {
             break;
         }
         if !members.contains(&id) {
@@ -156,8 +173,10 @@ pub(in crate::ai_core::decision) fn support(
     let count = members.len();
     let posts: Vec<(f32, f32)> = (0..count)
         .map(|index| {
-            let side = (index as f32 - (count as f32 - 1.0) * 0.5) * LINE_SPACING_TILES;
-            let mut ahead = LINE_FORWARD_TILES;
+            let (rank, slot) = (index / RANK_WIDTH, index % RANK_WIDTH);
+            let width = (count - rank * RANK_WIDTH).min(RANK_WIDTH);
+            let side = (slot as f32 - (width as f32 - 1.0) * 0.5) * LINE_SPACING_TILES;
+            let mut ahead = LINE_FORWARD_TILES - rank as f32 * RANK_BACK_TILES;
             loop {
                 let point = clamp_to_map(
                     (

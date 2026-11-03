@@ -95,7 +95,7 @@ pub(in crate::ai_core::decision) fn roam(
                 && !memory.containment.active_riflemen.contains(&unit.id)
                 && !memory.expansion_security.riflemen.contains(&unit.id)
                 && !memory.later_bases.guards.contains(&unit.id)
-                && !memory.opening_rush.is_reserved(unit.id)
+                && !memory.rush_reserved(unit.id)
                 && memory.route_line.picket() != Some(unit.id)
                 && !memory.jeff_v1_1.natural.holds(unit.id)
                 && !memory.jeff_v1_1.deny.holds(unit.id)

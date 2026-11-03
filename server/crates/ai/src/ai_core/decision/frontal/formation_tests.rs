@@ -18,6 +18,7 @@ fn test_entity(id: u32, kind: EntityKind, x: f32, y: f32) -> AiEntitySummary {
         latched_node: None,
         target_id: None,
         free_for_combat: true,
+        research: None,
     }
 }
 

@@ -86,6 +86,12 @@ const OWN_FIELD_TILES: f32 = 15.0;
 const ROUT_RATIO: f32 = 1.5;
 /// Travel to a target costs its score one share per this many tiles.
 const TRAVEL_TILES: f32 = 60.0;
+/// `forcepush`: the push leaves at 4:30 and again every 2 minutes it is home, whatever it weighs
+/// against the enemy it remembers. Weighed, it left at 6:23-8:51 on Classic, Schone Tage and The
+/// River and never on Crossroads, where Pressure AI's fifth base stood by 7:30. At 4:30 Pressure AI
+/// fields Panzerfausts and at most two Tanks against Jeff's 17-25 Riflemen and first Tanks.
+const FORCED_FIRST_TICKS: u32 = config::TICK_HZ * 270;
+const FORCED_EVERY_TICKS: u32 = config::TICK_HZ * 120;
 
 /// An enemy fighter as last seen.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -134,6 +140,10 @@ pub(in crate::ai_core::decision) struct PushMemory {
     short: bool,
     /// Where new Tanks gather to join the launched push.
     rally: Option<(i32, i32)>,
+    /// `forcepush`: the forced waves used up, one per 2-minute slot, and whether the push out left
+    /// on one.
+    forced_waves: u32,
+    forced: bool,
 }
 
 impl PushMemory {
@@ -145,6 +155,41 @@ impl PushMemory {
 
 fn v1_1(memory: &AiDecisionMemory) -> bool {
     memory.profile_id().is_some_and(is_jeff_v1_1) && !super::off("push")
+}
+
+/// The 2-minute slot `tick` falls in, from 4:30; `None` before.
+fn forced_slot(tick: u32) -> Option<u32> {
+    tick.checked_sub(FORCED_FIRST_TICKS)
+        .map(|since| since / FORCED_EVERY_TICKS)
+}
+
+/// `forcepush`: whether the push is home and this slot's wave has not left yet.
+pub(in crate::ai_core::decision) fn forced_due(
+    observation: &AiObservation,
+    memory: &AiDecisionMemory,
+) -> bool {
+    v1_1(memory)
+        && !super::off("forcepush")
+        && forced_slot(observation.tick).is_some_and(|slot| slot >= memory.jeff_v1_1.push.forced_waves)
+}
+
+/// Uses up the current slot: the push left on it, or was already out during it. `forced` says
+/// whether this launch was a forced one.
+pub(in crate::ai_core::decision) fn note_forced_slot(
+    observation: &AiObservation,
+    memory: &mut AiDecisionMemory,
+    forced: Option<bool>,
+) {
+    if !v1_1(memory) || super::off("forcepush") {
+        return;
+    }
+    let push = &mut memory.jeff_v1_1.push;
+    if let Some(slot) = forced_slot(observation.tick) {
+        push.forced_waves = push.forced_waves.max(slot + 1);
+    }
+    if let Some(forced) = forced {
+        push.forced = forced;
+    }
 }
 
 fn is_fighter(kind: EntityKind) -> bool {
@@ -893,8 +938,11 @@ pub(in crate::ai_core::decision) fn trace_line(
         .filter(|building| building.kind == EntityKind::ResourceDepot)
         .count();
     Some(format!(
-        "v1_1_push launched={launched} tanks={} ours={:.0} route_army={:.0} target={:?} anchor={} short={} strike={:?} rally={:?} enemy_depots_known={bases} enemies_known={} hot={}",
+        "v1_1_push launched={launched} tanks={} riflemen={} forced={}/{} ours={:.0} route_army={:.0} target={:?} anchor={} short={} strike={:?} rally={:?} enemy_depots_known={bases} enemies_known={} hot={} {}",
         memory.containment.active_tanks.len(),
+        memory.containment.active_riflemen.len(),
+        push.forced,
+        push.forced_waves,
         push_army(observation, &units, 0),
         route_army(observation, map_analysis, memory),
         push.target.map(|target| (target.at, target.side)),
@@ -904,6 +952,7 @@ pub(in crate::ai_core::decision) fn trace_line(
         push.rally,
         push.enemies.len(),
         push.hot.len(),
+        memory.jeff_v1_1.tank_pause.trace(),
     ))
 }
 
@@ -957,6 +1006,11 @@ pub(in crate::ai_core::decision) fn outweighed(
     if let Some(target) = push.target.take() {
         push.hot.insert(target.at, tick + HOT_TICKS);
         push.retargeted = 0;
+        return Some(front > ours * ROUT_RATIO);
+    }
+    // A forced wave short of its first anchor falls back only when routed, as on a raid: it would
+    // otherwise turn round at the first enemy it saw.
+    if push.forced && push.anchor == 0 {
         return Some(front > ours * ROUT_RATIO);
     }
     Some(push.anchor == 0)

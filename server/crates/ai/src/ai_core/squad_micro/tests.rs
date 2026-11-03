@@ -19,6 +19,7 @@ fn rifleman(id: u32, owner: u32, tile_x: f32, tile_y: f32, hp: u32) -> AiEntityS
         latched_node: None,
         target_id: None,
         free_for_combat: true,
+        research: None,
     }
 }
 

@@ -119,15 +119,115 @@ pub(super) fn expansion_is_next(
 /// The reserve then holds the Factory back until the Depot is ordered. A Factory or Tank already out
 /// keeps the natural due. The live Jeff holds six guns; the natural waits only for the first four.
 fn early_natural_due(observation: &AiObservation, facts: &AiFacts, profile: &AiProfile) -> bool {
-    if facts.building_count(EntityKind::Factory) > 0 || facts.unit_count(EntityKind::Tank) > 0 {
-        return true;
-    }
     let guns = profile
         .defensive_machine_gunners
         .map_or(0, |policy| policy.target_count)
         .min(OPENING_GUNS);
+    // Jeff's AI V1.1's Rifleman opening (`riflenat`): the natural once Methamphetamines is in and
+    // `natural_rifles` Riflemen stand at home to take and hold it.
+    if jeff_v1_1::rifle_opening(profile.id) {
+        return facts
+            .completed_upgrades()
+            .contains(&UpgradeKind::Methamphetamines)
+            && jeff_v1_1::home_riflemen(observation) >= jeff_v1_1::natural_rifles();
+    }
+    // Jeff's AI V1.1 (`fastnat`) takes its natural once Methamphetamines is under way and its four
+    // opening guns are ordered, without waiting for the Engineering Complex: soupman took his at
+    // 1:16-1:27 against Pressure AI, V1.1 at 2:21-2:57. Before the guns, Rush AI's first Riflemen
+    // shot the main down at 2:19 with one gun out, while the natural stood.
+    if is_jeff_v1_1(profile.id) && !jeff_v1_1::off("fastnat") {
+        return meth_started(observation, facts)
+            && guns_ordered(observation, facts, profile.id, OPENING_GUNS);
+    }
+    // Jeff's AI V1.1 (`ecafter`): its Engineering Complex follows the Factory, so it makes nothing
+    // due. Dominating the early fights takes the natural with the opening guns; otherwise the
+    // natural follows the Factory's first Scout Car.
+    match facts.v1_1_opening {
+        Some(OpeningOrder::NaturalFirst) => {
+            return facts.building_count(EntityKind::Factory) > 0
+                || facts.unit_count(EntityKind::Tank) > 0
+                || guns_ordered(observation, facts, profile.id, guns);
+        }
+        Some(OpeningOrder::FactoryFirst) => {
+            return facts.unit_count(EntityKind::Tank) > 0
+                || facts.v1_1_car_ordered
+                || first_scout_car_ordered(observation, facts)
+                || factory_up_and_both_banked(observation, facts);
+        }
+        Some(OpeningOrder::Undecided) => return false,
+        None => {}
+    }
+    if facts.building_count(EntityKind::Factory) > 0 || facts.unit_count(EntityKind::Tank) > 0 {
+        return true;
+    }
     facts.building_count(EntityKind::EngineeringComplex) > 0
-        && opening_guns_ordered(observation, facts, guns)
+        && guns_ordered(observation, facts, profile.id, guns)
+}
+
+/// Whether Methamphetamines is researched or being researched.
+fn meth_started(observation: &AiObservation, facts: &AiFacts) -> bool {
+    facts
+        .completed_upgrades()
+        .contains(&UpgradeKind::Methamphetamines)
+        || observation.owned.iter().any(|unit| {
+            unit.research
+                .is_some_and(|(upgrade, _)| upgrade == UpgradeKind::Methamphetamines)
+        })
+}
+
+/// Whether a Scout Car is out or in training.
+pub(super) fn first_scout_car_ordered(observation: &AiObservation, facts: &AiFacts) -> bool {
+    facts.unit_count(EntityKind::ScoutCar) > 0
+        || observation.owned.iter().any(|unit| {
+            unit.kind == EntityKind::Factory
+                && unit.production_kind == Some(EntityKind::ScoutCar)
+                && unit.production_queue_len.unwrap_or(0) > 0
+        })
+}
+
+/// A finished Factory with both the natural's Depot and a Scout Car paid for in the bank: the
+/// natural no longer waits for a car that is not coming.
+fn factory_up_and_both_banked(observation: &AiObservation, facts: &AiFacts) -> bool {
+    let (depot_steel, depot_oil) = rts_rules::economy::cost(EntityKind::ResourceDepot);
+    let (car_steel, car_oil) = rts_rules::economy::cost(EntityKind::ScoutCar);
+    facts.complete_building_count(EntityKind::Factory) > 0
+        && observation.economy.steel >= depot_steel + car_steel
+        && observation.economy.oil >= depot_oil + car_oil
+}
+
+/// The guns out or in training, and how many of them are queued. Under Jeff's AI V1.1's `nomg`
+/// two Riflemen past the opening's (`NOMG_RIFLE_BASE`) count as one gun.
+pub(super) fn guns_out(observation: &AiObservation, facts: &AiFacts, no_guns: bool) -> (usize, usize) {
+    let kind = if no_guns {
+        EntityKind::Rifleman
+    } else {
+        EntityKind::MachineGunner
+    };
+    let queued: usize = observation
+        .owned
+        .iter()
+        .filter(|unit| unit.kind == EntityKind::Barracks && unit.production_kind == Some(kind))
+        .map(|unit| unit.production_queue_len.unwrap_or(0))
+        .sum();
+    let out = facts.unit_count(kind) + queued;
+    if no_guns {
+        (
+            out.saturating_sub(jeff_v1_1::NOMG_RIFLE_BASE) / jeff_v1_1::RIFLES_PER_GUN,
+            queued.div_ceil(jeff_v1_1::RIFLES_PER_GUN),
+        )
+    } else {
+        (out, queued)
+    }
+}
+
+/// `opening_guns_ordered`, counting the Riflemen that stand in for guns under `nomg`.
+pub(super) fn guns_ordered(
+    observation: &AiObservation,
+    facts: &AiFacts,
+    profile_id: &str,
+    guns: usize,
+) -> bool {
+    guns_out(observation, facts, jeff_v1_1::no_guns(profile_id)).0 >= guns
 }
 
 /// Whether `guns` Machine Gunners are out or in training.
@@ -443,7 +543,7 @@ pub(super) fn prepare<F: FnMut(EntityKind, u32, u32) -> bool>(
     let mut candidates = rifles.get(home_rifles..).unwrap_or(&[]).to_vec();
     // The route picket and raid sealers are held by the home line.
     candidates.retain(|id| !memory.route_line.reserved().any(|reserved| reserved == *id));
-    candidates.retain(|id| !memory.opening_rush.is_reserved(*id));
+    candidates.retain(|id| !memory.rush_reserved(*id));
     candidates.retain(|id| !memory.third_pressure.is_reserved(*id)
                 && !memory.jeff_v1_1.tank_raid.holds(*id));
     candidates.retain(|id| !memory.raid_defense.is_sentry(*id));
@@ -1082,7 +1182,7 @@ pub(super) fn natural_clearers(
         .iter()
         .filter(|unit| unit.kind == EntityKind::Tank && unit.is_complete && unit.hp > 0)
         .filter(|unit| !memory.trap_breach.is_reserved(unit.id))
-        .filter(|unit| !memory.opening_rush.is_reserved(unit.id))
+        .filter(|unit| !memory.rush_reserved(unit.id))
         .filter(|unit| !memory.third_pressure.is_reserved(unit.id)
                 && !memory.jeff_v1_1.tank_raid.holds(unit.id))
         .filter(|unit| !route_line.contains(&unit.id))

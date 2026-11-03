@@ -40,6 +40,7 @@ fn worker_at(id: u32, state: AiEntityState, x: f32, y: f32) -> AiEntitySummary {
         latched_node: None,
         target_id: None,
         free_for_combat: false,
+        research: None,
     }
 }
 
@@ -88,6 +89,7 @@ fn building_at(
         latched_node: None,
         target_id: None,
         free_for_combat: false,
+        research: None,
     }
 }
 
@@ -111,6 +113,7 @@ fn combat_at(id: u32, kind: EntityKind, x: f32, y: f32) -> AiEntitySummary {
         latched_node: None,
         target_id: None,
         free_for_combat: true,
+        research: None,
     }
 }
 

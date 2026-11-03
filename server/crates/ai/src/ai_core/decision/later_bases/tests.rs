@@ -48,6 +48,7 @@ fn entity(id: u32, kind: EntityKind, tile: (f32, f32)) -> AiEntitySummary {
         latched_node: None,
         target_id: None,
         free_for_combat: true,
+        research: None,
     }
 }
 

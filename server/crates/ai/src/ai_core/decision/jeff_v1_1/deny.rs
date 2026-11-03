@@ -217,7 +217,7 @@ fn excluded(memory: &AiDecisionMemory, id: u32) -> bool {
         || memory.jeff_v1_1.front_line.holds(id)
         || memory.jeff_v1_1.base_lines.posted(id)
         || memory.jeff_v1_1.charge.riflemen.contains(&id)
-        || memory.opening_rush.is_reserved(id)
+        || memory.rush_reserved(id)
 }
 
 /// With no site to watch: the squad rides behind the raid while it goes out, and comes home when
