@@ -68,7 +68,7 @@ fn tank_coax_fires_in_arc_with_small_arms_damage_and_weapon_event() {
 
     assert_eq!(
         worker_hp_before - entities.get(worker).expect("worker should exist").hp,
-        6,
+        7,
         "three seeded burst rays should hit this infantry target"
     );
     let tank_entity = entities.get(tank).expect("tank should exist");
@@ -117,7 +117,7 @@ fn clear_obstacle_area_coax_bullets_can_be_intercepted_by_infantry() {
 
     assert_eq!(
         entities.get(worker).expect("worker should exist").hp,
-        worker_hp - 6
+        worker_hp - 7
     );
     assert_eq!(entities.get(trap).expect("trap should exist").hp, trap_hp);
 }
@@ -182,7 +182,7 @@ fn tank_coax_attack_events_remain_fog_projected() {
 
     assert_eq!(
         worker_hp_before - entities.get(worker).expect("worker should exist").hp,
-        6
+        7
     );
     assert_eq!(
         attack_weapon_kinds(&events, 1, tank),
@@ -296,7 +296,7 @@ fn tank_coax_burst_does_not_reach_a_body_beyond_weapon_range() {
 
     assert_eq!(
         primary_before - entities.get(primary).expect("primary should exist").hp,
-        6
+        7
     );
     assert_eq!(
         secondary_before - entities.get(secondary).expect("secondary should exist").hp,
@@ -337,7 +337,7 @@ fn tank_coax_prioritizes_infantry_over_nearer_fallback_targets() {
 
     assert_eq!(
         worker_hp_before - entities.get(worker).expect("worker should exist").hp,
-        6,
+        7,
         "infantry-priority aim should send three seeded rays into the worker"
     );
     assert_eq!(
@@ -494,7 +494,7 @@ fn tank_coax_does_not_mutate_tank_target_or_path_state() {
 
     assert_eq!(
         worker_hp_before - entities.get(worker).expect("worker should exist").hp,
-        6
+        7
     );
     let tank_entity = entities.get(tank).expect("tank should exist");
     assert_eq!(

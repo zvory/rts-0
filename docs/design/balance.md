@@ -748,8 +748,10 @@ Machine Gunner, Scout Car MG, and Tank coax keep their existing 12-tick firing c
 and acquisition ranges. Each cycle emits three simultaneous server rays. The first
 is aimed at the selected target (the nearest footprint surface for buildings); the other two are uniformly random over a
 20-degree full cone centered on that target. Each bullet
-contributes half the old shot damage (2 MG/coax, 3 Scout Car). The maximum emitted
-DPS is 15/15/22.5 respectively. A clear center ray hits the selected target;
+contributes 60% of the profile damage (2.4 MG/coax, 3.6 Scout Car), a 20% increase
+from the previous half-damage rays. Damage sums per victim and rounds to the nearest
+whole point once per burst before protection reductions. The nominal maximum emitted
+DPS is 18/18/27 respectively; actual HP damage reflects integer rounding. A clear center ray hits the selected target;
 terrain, smoke, or another body can still intercept it. Spread rays may hit that
 target, another target, or nothing.
 
