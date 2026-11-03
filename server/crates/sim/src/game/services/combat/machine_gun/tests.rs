@@ -148,7 +148,7 @@ fn burst_damages_front_only_and_emits_fixed_rays_without_hidden_viewer_data() {
         209.2,
         1,
     );
-    assert_eq!(entities.get(front).unwrap().hp, 39);
+    assert_eq!(entities.get(front).unwrap().hp, 38);
     assert_eq!(entities.get(rear).unwrap().hp, 45);
     assert_eq!(
         events[&1]
@@ -199,7 +199,7 @@ fn scout_car_burst_cannot_one_shot_completed_resource_buildings() {
         );
         let remaining_hp = entities.get(target).unwrap().hp;
         assert!(
-            (max_hp - 9..=max_hp - 3).contains(&remaining_hp),
+            (max_hp - 11..=max_hp - 4).contains(&remaining_hp),
             "{kind:?} takes one to three Scout Car rays, not a lethal burst"
         );
         assert!(matches!(events[&1].first(), Some(Event::Attack { to, .. }) if *to == target));
@@ -207,7 +207,11 @@ fn scout_car_burst_cannot_one_shot_completed_resource_buildings() {
             .iter()
             .filter(|event| matches!(event, Event::Attack { to, .. } if *to == target))
             .count();
-        assert_eq!(max_hp - remaining_hp, target_rays as u32 * 3, "{kind:?}");
+        assert_eq!(
+            max_hp - remaining_hp,
+            (target_rays as f32 * 3.6).round() as u32,
+            "{kind:?}"
+        );
     }
 }
 
@@ -273,7 +277,7 @@ fn hidden_incidental_victims_do_not_disclose_impact_positions() {
         );
         assert_eq!(
             entities.get(hidden).unwrap().hp,
-            39,
+            38,
             "{hidden_by}: authoritative hits still resolve"
         );
         assert!(
