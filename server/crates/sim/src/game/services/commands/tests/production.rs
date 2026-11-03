@@ -182,6 +182,7 @@ fn anti_tank_gun_history_survives_complex_loss_for_manual_and_repeat_production(
         &SmokeCloudStore::new(),
         &mut HashMap::new(),
         2,
+        HashMap::new(),
     );
     assert_eq!(
         entities.get(gun_works).unwrap().prod_queue()[0].unit,
