@@ -2,6 +2,8 @@
 
 pub const MG_HALF_SPREAD_RAD: f32 = std::f32::consts::PI / 18.0;
 pub const MG_BURST_BULLETS: usize = 3;
+// Each ray contributes 60% of profile damage, up 20% from the original 50%.
+pub const MG_RAY_DAMAGE_MULTIPLIER: f32 = 0.6;
 
 use crate::defs::{self, ArmorClass, WeaponClass};
 use crate::terrain::{self, TerrainKind};

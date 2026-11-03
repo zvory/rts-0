@@ -191,7 +191,7 @@ pub(super) fn fire(
         let (victim, endpoint) = if let Some((id, t)) = hit {
             let victim = entities.get(id);
             if victim.is_some_and(|v| teams.is_enemy_owner(owner, v.owner) || id == intended) {
-                *hits.entry(id).or_default() += damage / 2;
+                *hits.entry(id).or_default() += 1;
             }
             (
                 id,
@@ -209,7 +209,9 @@ pub(super) fn fire(
     // intersecting bullet in this simultaneous burst, including lethal overkill.
     let outcomes: Vec<_> = hits
         .into_iter()
-        .filter_map(|(id, damage)| {
+        .filter_map(|(id, hit_count)| {
+            let damage =
+                (damage as f32 * hit_count as f32 * rules::MG_RAY_DAMAGE_MULTIPLIER).round() as u32;
             apply_direct_hit(
                 map, entities, teams, events, fog, attacker, id, profile, damage, owner, start, 1,
                 tick,

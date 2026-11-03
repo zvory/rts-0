@@ -1994,6 +1994,8 @@ It resolves three first-hit rays for each Machine Gunner,
 Scout Car, and Tank coax firing cycle. It reuses the tick spatial grid, body geometry,
 and terrain/smoke LOS. Burst-local hit totals and rays are temporary derived values;
 there is no new durable projectile state or Game API. Damage is aggregated per victim
-before existing protection rounding, with a minimum of 1 damage per hit victim. Building
+and multiplied by the rules-owned 0.6 ray damage scalar (20% above the original 0.5),
+then rounded once to the nearest whole point before existing protection rounding,
+with a minimum of 1 damage per hit victim. Building
 aim uses the nearest footprint surface, matching acquisition and stopping distance. See the balance prototype section and compact
 version-57 attack ray contract for tuning and per-viewer projection.
