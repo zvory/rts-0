@@ -27,12 +27,11 @@ enum ImmediateThreatPolicy {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum TargetGroupPolicy {
     CombatUnitsThenEconomyUnitsThenNonUnits,
-    CoaxCombatInfantryThenEconomyUnitsThenFallback,
+    CommanderMachineGun,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum WeaponFitPolicy {
-    None,
     DefaultWeapon,
     TankCannonDefaultWeapon,
 }
@@ -70,8 +69,8 @@ impl TargetPriorityPolicy {
             combat_rules::TargetPriorityPolicyId::TankCoaxMachineGun => Self {
                 candidate_eligibility: CandidateEligibility::ExcludeResourceNodes,
                 immediate_threats: ImmediateThreatPolicy::None,
-                target_group: TargetGroupPolicy::CoaxCombatInfantryThenEconomyUnitsThenFallback,
-                weapon_fit: WeaponFitPolicy::None,
+                target_group: TargetGroupPolicy::CommanderMachineGun,
+                weapon_fit: WeaponFitPolicy::DefaultWeapon,
                 retention: RetentionPolicy::None,
             },
         }
@@ -116,18 +115,16 @@ impl TargetPriorityPolicy {
                 }
             }
             TargetGroupPolicy::CombatUnitsThenEconomyUnitsThenNonUnits => 0,
-            TargetGroupPolicy::CoaxCombatInfantryThenEconomyUnitsThenFallback
-                if attacker_is_unit =>
-            {
-                if facts.is_coax_infantry_priority {
-                    0
-                } else if facts.is_economy_unit {
-                    1
-                } else {
-                    2
-                }
-            }
-            TargetGroupPolicy::CoaxCombatInfantryThenEconomyUnitsThenFallback => 0,
+            TargetGroupPolicy::CommanderMachineGun => match facts.kind {
+                EntityKind::Panzerfaust => 0,
+                _ if facts.is_coax_infantry_priority => 1,
+                EntityKind::AntiTankGun => 2,
+                EntityKind::MortarTeam => 3,
+                EntityKind::ScoutCar => 4,
+                _ if facts.is_unit && !facts.is_economy_unit => 5,
+                _ if facts.is_economy_unit => 6,
+                _ => 7,
+            },
         }
     }
 
@@ -138,7 +135,6 @@ impl TargetPriorityPolicy {
         in_weapon_range: bool,
     ) -> u8 {
         match self.weapon_fit {
-            WeaponFitPolicy::None => 0,
             WeaponFitPolicy::TankCannonDefaultWeapon if !in_weapon_range => 3,
             WeaponFitPolicy::DefaultWeapon | WeaponFitPolicy::TankCannonDefaultWeapon => {
                 default_weapon_fit_order(attacker_weapon_class, facts)

@@ -5,6 +5,11 @@ import {
   relativeColorAdjustment,
 } from "./color_adjustment.js";
 
+import { SCOUT_CAR_PNG_RIG_ATLAS } from "./scout_car_png_atlas.js";
+
+const SCOUT_GUN = SCOUT_CAR_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.rearMachineGun");
+const ROOF_GUN_SCALE = 0.7;
+
 function deepFreeze(value) {
   if (!value || typeof value !== "object") return value;
   Object.freeze(value);
@@ -41,7 +46,7 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
     "layout": "tight",
     "profile": "semantic",
     "width": 1145,
-    "height": 1373,
+    "height": 1538,
     "sourceSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-11-white-alpha.png",
     "cells": [
       "reference.full",
@@ -103,8 +108,22 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
       "hue": 100
     }
   },
+  // Pack the existing Scout Car gun into the texture at load time, without changing either asset.
+  attachments: [{ atlas: SCOUT_CAR_PNG_RIG_ATLAS, source: SCOUT_GUN.frame, x: 0, y: 1373 }],
   "frames": {},
   "sprites": [
+    {
+      id: "sprite.commanderGun",
+      animationPart: "part.coaxBarrel",
+      sourceParts: ["part.coaxBarrel"],
+      tintSlot: SCOUT_GUN.tintSlot,
+      drawOrder: 40,
+      frame: {
+        ...SCOUT_GUN.frame, x: 0, y: 1373,
+        pixelsPerUnitX: SCOUT_GUN.frame.pixelsPerUnitX / ROOF_GUN_SCALE,
+        pixelsPerUnitY: SCOUT_GUN.frame.pixelsPerUnitY / ROOF_GUN_SCALE,
+      },
+    },
     {
       "id": "sprite.track.left",
       "sourceCell": "sprite.track",

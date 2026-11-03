@@ -323,12 +323,12 @@ fn tank_coax_prioritizes_infantry_over_nearer_fallback_targets() {
     let nearer_tank = entities
         .spawn_unit(2, EntityKind::Tank, 250.0, 118.0)
         .expect("enemy tank should spawn");
-    let worker = entities
-        .spawn_unit(2, EntityKind::Worker, COAX_TARGET_X, 100.0)
-        .expect("worker should spawn");
+    let infantry = entities
+        .spawn_unit(2, EntityKind::Rifleman, COAX_TARGET_X, 100.0)
+        .expect("infantry should spawn");
     prepare_coax_tank(&mut entities, tank);
     let tank_hp_before = entities.get(nearer_tank).expect("tank should exist").hp;
-    let worker_hp_before = entities.get(worker).expect("worker should exist").hp;
+    let infantry_hp_before = entities.get(infantry).expect("infantry should exist").hp;
 
     run_combat_tick_on_map(
         &mut entities,
@@ -337,9 +337,9 @@ fn tank_coax_prioritizes_infantry_over_nearer_fallback_targets() {
     );
 
     assert_eq!(
-        worker_hp_before - entities.get(worker).expect("worker should exist").hp,
+        infantry_hp_before - entities.get(infantry).expect("infantry should exist").hp,
         6,
-        "infantry-priority aim should send three seeded rays into the worker"
+        "infantry-priority aim should send three seeded rays into the infantry"
     );
     assert_eq!(
         entities.get(nearer_tank).expect("tank should exist").hp,

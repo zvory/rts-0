@@ -426,9 +426,12 @@ warning overlays are suppressed. Mortar and Panzerfaust rendering remain unchang
 
 ### Tank commander machine gun
 
-The Tank keeps its raster hull, turret, and cannon. A native roof mount sits at turret-local
+The Tank keeps its raster hull, turret, and cannon. The Scout Car gun/commander sprite is reused
+at 70% of its Scout Car dimensions, packed into the Tank atlas at load time from the existing
+source image. Its roof pivot sits at turret-local
 `(0, 5)` (halfway toward the right edge), rotates its position with `weaponFacing`, and turns
-the gun and commander separately using interpolated authoritative `commanderFacing`. Native
-parts draw above the turret. The `coaxMuzzle` anchor uses the independent gun transform so
+the gun and commander separately using interpolated authoritative `commanderFacing`. The sprite
+draws above the turret. `commanderFacing` is admitted by the presentation entity schema so the
+worker receives its independent angle. The `coaxMuzzle` anchor uses the independent gun transform so
 MG tracers/flashes follow its barrel rather than the cannon. Cannon recoil carries the entire
 roof assembly; MG bursts do not kick the hull or cannon.

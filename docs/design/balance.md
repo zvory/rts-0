@@ -375,10 +375,10 @@ nearer Mortar Team; an explicit Attack order may select the mortar instead. Tank
 immediate-threat override for targets already in relevant range: Anti-Tank Guns are first, then
 other anti-armor threats, armored obstacles, support weapons, and only then ordinary soft targets.
 The rules-owned `TargetFacts` surface records the current target-policy facts for every
-`EntityKind`, including the Tank coax infantry-priority group. The live coax policy ranks Riflemen
-and Machine Gunners first, economy workers (`Worker` and `Golem`) second, and fallback legal
-targets such as vehicles, buildings, support weapons, and field obstacles last; resource nodes are
-not legal coax targets.
+`EntityKind`, including the Tank coax infantry-priority group. The commander MG ranks Panzerfausts first, combat infantry
+(Warrior, Rifleman, Machine Gunner) second, Anti-Tank Guns third, Mortar Teams fourth, and
+Scout Cars fifth. All remaining legal targets use the default weapon group/material order,
+then distance/id ties; resource nodes are not legal MG targets.
 Default weapons perform a full acquisition pass when ready and targetless, immediately after each
 shot to prepare the next engagement during reload, or when the prepared target is no longer
 fireable on the ready tick. Tanks additionally rerank automatic targets every five ticks, staggered
