@@ -807,6 +807,8 @@ does not count destroyed buildings or friendly fire.
 Tank `commanderFacing` is the independent roof MG world angle. It is included only for a visible,
 non-vision-only Tank when its secondary target is visible to the recipient (or absent); owners and
 omniscient observers receive it directly. It never carries a secondary target id.
+When the secondary target is absent, its aim follows the cannon and also requires the cannon's
+target-direction visibility gate.
 
 Combat `targetId` and `weaponFacing` for allied units are sent whenever an attack-capable entity has
 a visible acquired target, including autonomous acquisition while its explicit order state remains
