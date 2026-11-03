@@ -19,9 +19,15 @@ pub(super) fn pay_and_protect(
         }) {
             continue;
         }
+        if !active_producer {
+            continue;
+        }
         pay_front(entities, players, id);
+        // Claim a paid extractor's patch before another front can pay against it.
+        // Scaffolds used to be created between payments in the per-producer loop.
+        extractors::ensure_scaffold(entities, id);
 
-        let Some(building) = entities.get(id).filter(|_| active_producer) else {
+        let Some(building) = entities.get(id) else {
             continue;
         };
         let research_cost = building
@@ -37,6 +43,10 @@ pub(super) fn pay_and_protect(
             .prod_queue()
             .first()
             .filter(|item| !item.paid)
+            .filter(|item| {
+                !item.unit.is_resource_extractor()
+                    || extractors::target(entities, id, item.unit).is_some()
+            })
             .map(|item| rules::economy::resource_cost(item.unit))
             .unwrap_or(ResourceCost::new(0, 0));
         let total = pending

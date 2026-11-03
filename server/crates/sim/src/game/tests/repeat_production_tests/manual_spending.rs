@@ -68,6 +68,39 @@ fn manual_unit_gets_new_income_before_an_earlier_automatic_producer() {
 }
 
 #[test]
+fn manual_extractor_payment_claims_the_patch_before_the_next_depot() {
+    let mut game = empty_flat_game(&players());
+    let first = spawn_building(&mut game, 1, EntityKind::ResourceDepot, (10, 10));
+    let second = spawn_building(&mut game, 1, EntityKind::ResourceDepot, (18, 10));
+    spawn_building(&mut game, 2, EntityKind::ResourceDepot, (50, 50));
+    let patch = game.state.map.tile_center(15, 15);
+    spawn_node(&mut game, EntityKind::Steel, patch);
+    queued_unit(&mut game, first, EntityKind::SteelMine, false);
+    queued_unit(&mut game, second, EntityKind::SteelMine, false);
+    game.state.players[0].set_resources(10_000, 10_000);
+
+    game.tick();
+
+    let first_item = &game.state.entities.get(first).unwrap().prod_queue()[0];
+    assert!(first_item.paid);
+    assert_eq!(first_item.progress, 1);
+    let second_item = &game.state.entities.get(second).unwrap().prod_queue()[0];
+    assert!(
+        !second_item.paid,
+        "an occupied patch must leave the order unpaid"
+    );
+    assert_eq!(second_item.progress, 0);
+    assert_eq!(
+        game.state
+            .entities
+            .iter()
+            .filter(|entity| entity.kind == EntityKind::SteelMine)
+            .count(),
+        1
+    );
+}
+
+#[test]
 fn oil_starved_manual_unit_allows_only_surplus_steel_to_auto_build() {
     let (mut game, automatic) = repeat_fixture();
     let second_auto = spawn_building(&mut game, 1, EntityKind::Barracks, (15, 8));
