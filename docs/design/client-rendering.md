@@ -428,7 +428,9 @@ warning overlays are suppressed. Mortar and Panzerfaust rendering remain unchang
 
 The Tank keeps its raster hull, turret, and cannon. The Scout Car gun/commander sprite is reused
 at 70% of its Scout Car dimensions, packed into the Tank atlas at load time from the existing
-source image. Its roof pivot sits at turret-local
+source image. SVG portraits and minimap layers resolve attached sprites back to their original
+image/crop; the Tank source-sheet dimensions stay unchanged while the worker allocates the
+extra packed texture space. Its roof pivot sits at turret-local
 `(0, 5)` (halfway toward the right edge), rotates its position with `weaponFacing`, and turns
 the gun and commander separately using interpolated authoritative `commanderFacing`. The sprite
 draws above the turret. `commanderFacing` is admitted by the presentation entity schema so the

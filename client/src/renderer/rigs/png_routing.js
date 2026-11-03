@@ -44,7 +44,8 @@ export async function loadPngRigAtlasTexture(pixi, atlas) {
   });
   if (!atlas.attachments?.length) return base;
   try {
-    const canvas = createWorkerSafeCanvas(atlas.grid.width, atlas.grid.height);
+    const height = Math.max(atlas.grid.height, ...atlas.attachments.map((part) => part.y + part.source.h));
+    const canvas = createWorkerSafeCanvas(atlas.grid.width, height);
     const context = canvas.getContext("2d");
     if (!context) throw new Error("PNG rig attachment canvas is unavailable");
     context.imageSmoothingEnabled = false;

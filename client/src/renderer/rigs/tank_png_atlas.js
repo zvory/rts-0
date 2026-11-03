@@ -46,7 +46,7 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
     "layout": "tight",
     "profile": "semantic",
     "width": 1145,
-    "height": 1538,
+    "height": 1373,
     "sourceSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-11-white-alpha.png",
     "cells": [
       "reference.full",
