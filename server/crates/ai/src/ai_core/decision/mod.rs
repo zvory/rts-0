@@ -640,8 +640,12 @@ where
         let reserve = jeff_v1_1::surplus_reserve(profile.id, policy.reserve);
         actions.budget().steel() >= reserve.saturating_add(barracks_steel)
     });
+    // The Rifleman opening's second Barracks goes up whatever the armored production policy
+    // trains: from the Training Centre it lists only Tanks and Scout Cars, and the Barracks then
+    // waited for 600 Steel of surplus (1:45-1:48).
     if (production_uses_building(production_policy, EntityKind::Barracks)
-        || surplus_barracks_enabled)
+        || surplus_barracks_enabled
+        || planned_barracks)
         && !delay_opening_barracks
         && facts.building_count(EntityKind::Barracks)
             + planned_in_intents(&intents, EntityKind::Barracks)
