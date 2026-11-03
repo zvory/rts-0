@@ -117,8 +117,8 @@ impl TargetPriorityPolicy {
             TargetGroupPolicy::CombatUnitsThenEconomyUnitsThenNonUnits => 0,
             TargetGroupPolicy::CommanderMachineGun => match facts.kind {
                 EntityKind::Panzerfaust => 0,
-                _ if facts.is_coax_infantry_priority => 1,
-                EntityKind::AntiTankGun => 2,
+                EntityKind::AntiTankGun => 1,
+                _ if facts.is_coax_infantry_priority => 2,
                 EntityKind::MortarTeam => 3,
                 EntityKind::ScoutCar => 4,
                 _ if facts.is_unit && !facts.is_economy_unit => 5,

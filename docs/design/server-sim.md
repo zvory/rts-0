@@ -1609,8 +1609,8 @@ General rules:
   tie-breaks. Auto-acquisition only ranks candidates already inside current weapon range. Explicit
   `Attack` orders keep their commanded target while it remains hostile and visible without moving
   toward it. The
-  `tank_coax_machine_gun` policy is used by the Tank secondary-fire pass; it ranks Panzerfausts, combat
-  infantry (Warrior, Rifleman, Machine Gunner), Anti-Tank Guns, Mortar Teams, then Scout Cars.
+  `tank_coax_machine_gun` policy is used by the Tank secondary-fire pass; it ranks Panzerfausts, Anti-Tank Guns,
+  combat infantry (Warrior, Rifleman, Machine Gunner), Mortar Teams, then Scout Cars.
   Remaining legal targets follow default weapon group/material order and distance/id ties. The ranker does
   not decide fog, smoke, line-of-sight, blocker, ownership, or acquisition-radius legality.
   Tanks run the coax pass after their normal cannon aim/fire/relax work for the tick. The pass reads

@@ -349,7 +349,7 @@ mod tests {
     }
 
     #[test]
-    fn coax_policy_excludes_support_and_other_infantry_from_priority_bucket() {
+    fn coax_policy_prefers_at_guns_over_combat_infantry() {
         let candidates = [
             candidate(10, EntityKind::Golem, 100.0, false),
             candidate(11, EntityKind::MortarTeam, 200.0, false),
@@ -359,7 +359,7 @@ mod tests {
             candidate(15, EntityKind::Rifleman, 2_500.0, false),
         ];
 
-        assert_eq!(choose_target(&coax_context(), &candidates), Some(15));
+        assert_eq!(choose_target(&coax_context(), &candidates), Some(13));
     }
 
     #[test]
@@ -427,8 +427,8 @@ mod tests {
     fn commander_mg_priority_cascade_beats_distance_and_preserves_default_fallback() {
         let kinds = [
             EntityKind::Panzerfaust,
-            EntityKind::Rifleman,
             EntityKind::AntiTankGun,
+            EntityKind::Rifleman,
             EntityKind::MortarTeam,
             EntityKind::ScoutCar,
             EntityKind::Artillery,

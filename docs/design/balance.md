@@ -375,8 +375,8 @@ nearer Mortar Team; an explicit Attack order may select the mortar instead. Tank
 immediate-threat override for targets already in relevant range: Anti-Tank Guns are first, then
 other anti-armor threats, armored obstacles, support weapons, and only then ordinary soft targets.
 The rules-owned `TargetFacts` surface records the current target-policy facts for every
-`EntityKind`, including the Tank coax infantry-priority group. The commander MG ranks Panzerfausts first, combat infantry
-(Warrior, Rifleman, Machine Gunner) second, Anti-Tank Guns third, Mortar Teams fourth, and
+`EntityKind`, including the Tank coax infantry-priority group. The commander MG ranks Panzerfausts first, Anti-Tank Guns second, combat infantry
+(Warrior, Rifleman, Machine Gunner) third, Mortar Teams fourth, and
 Scout Cars fifth. All remaining legal targets use the default weapon group/material order,
 then distance/id ties; resource nodes are not legal MG targets.
 Default weapons perform a full acquisition pass when ready and targetless, immediately after each
