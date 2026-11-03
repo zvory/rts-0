@@ -617,7 +617,7 @@ const OPENING_BARRACKS: usize = 2;
 /// `riflenat`: the Barracks' Rifleman cap. Before the first Tank, the Riflemen the spend plan's
 /// slack pays for (its steps keep the Barracks, the natural, the Factory, the Scout Car, the
 /// Engineering Complex, Tank Unlock and the Tank on time); after it, the Riflemen the Steel past
-/// `RIFLE_STEEL_RESERVE` pays for, the next base's Depot already held back by `later_bases`.
+/// a Tank's Steel pays for, the next base's Depot already held back by `later_bases`.
 pub(super) fn rifle_opening_cap(
     plan: Option<&spend_plan::SpendPlan>,
     intents: &[AiIntent],
@@ -634,11 +634,11 @@ pub(super) fn rifle_opening_cap(
             return cap;
         }
     }
+    // After the first Tank Riflemen leave a Tank's Steel in the bank.
+    let reserve = rts_rules::economy::cost(EntityKind::Tank).0;
     let rifle = rts_rules::economy::cost(EntityKind::Rifleman).0.max(1);
-    current + (steel.saturating_sub(RIFLE_STEEL_RESERVE) / rifle) as usize
+    current + (steel.saturating_sub(reserve) / rifle) as usize
 }
-/// After the first Tank Riflemen leave a Tank's Steel in the bank.
-const RIFLE_STEEL_RESERVE: u32 = 425;
 
 /// The Steel V1.1 keeps before surplus Steel goes into Riflemen and Barracks: a Tank's 425 and a
 /// little. V1.0 kept 600, and against Pressure AI on Classic its one Barracks stood idle from 2:45 to
