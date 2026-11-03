@@ -207,7 +207,11 @@ fn scout_car_burst_cannot_one_shot_completed_resource_buildings() {
             .iter()
             .filter(|event| matches!(event, Event::Attack { to, .. } if *to == target))
             .count();
-        assert_eq!(max_hp - remaining_hp, (target_rays as f32 * 3.6).round() as u32, "{kind:?}");
+        assert_eq!(
+            max_hp - remaining_hp,
+            (target_rays as f32 * 3.6).round() as u32,
+            "{kind:?}"
+        );
     }
 }
 
