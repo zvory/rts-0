@@ -1,3 +1,4 @@
+import { KIND, WEAPON_KIND } from "../protocol.js";
 import {
   createCompleteGroundDecalTransitionMessage,
   createCaptureMessage,
@@ -826,13 +827,15 @@ function compatibilitySnapshot(frame, state) {
     let recoil = 0;
     let recoilPhase = 0;
     let recoilKind = null;
+    let coaxRecoil = 0;
     try {
+      if (entity.kind === KIND.TANK) coaxRecoil = finiteOrZero(state?.weaponRecoil?.(entity.id, entity.kind, frame.visualTimeMs, WEAPON_KIND.TANK_COAX));
       recoil = finiteOrZero(state?.weaponRecoil?.(entity.id, entity.kind, frame.visualTimeMs));
       recoilPhase = finiteOrZero(state?.weaponRecoilPhase?.(entity.id, entity.kind, frame.visualTimeMs));
       if (recoil > 0) recoilKind = state?.weaponRecoilKind?.(entity.id) || null;
     } catch {}
-    if (current || previous || recoil || recoilPhase || recoilKind) {
-      poses.push({ id: entity.id, current, previous, recoil, recoilPhase, recoilKind });
+    if (current || previous || recoil || recoilPhase || recoilKind || coaxRecoil) {
+      poses.push({ id: entity.id, current, previous, recoil, recoilPhase, recoilKind, coaxRecoil });
     }
   }
   return {
