@@ -160,10 +160,10 @@ function usage() {
 Example:
   node scripts/120-game-test.mjs ai_2_1 jeffs_ai_pre_defense_envelope jeffs_ai
 
-Runs the standard 120 game test:
-  - supplied AI 2.1 vs supplied pre-change Jeff
+Runs the standard 120 game test, in this order (post-change Jeff's games first):
   - supplied post-change Jeff vs supplied AI 2.1
   - supplied post-change Jeff vs supplied pre-change Jeff
+  - supplied AI 2.1 vs supplied pre-change Jeff (last)
   - The River, Schone Tage, Classic, and Crossroads
   - seeds 0-4 with both player assignments (120 games total)
 
@@ -402,8 +402,17 @@ function createJobs(runOptions) {
 }
 
 function createJobsForMatchups(runOptions, matchups) {
+  // Post-change Jeff's games run first so the new build's results arrive soonest; the 40
+  // games without it (AI 2.1 vs pre-change Jeff) run last. Reports keep the matchup order.
+  const postChange = runOptions.profiles.postChangeJeff;
+  const playsPostChange = (matchup) =>
+    matchup.candidate === postChange || matchup.baseline === postChange;
+  const runOrder = [
+    ...matchups.filter(playsPostChange),
+    ...matchups.filter((matchup) => !playsPostChange(matchup)),
+  ];
   const planned = [];
-  for (const matchup of matchups) {
+  for (const matchup of runOrder) {
     for (const map of MAPS) {
       for (let seed = 0; seed < SEEDS_PER_MAP; seed += 1) {
         const outDir = path.join(runOptions.outDir, matchup.id, map.id, `seed-${seed}`);
@@ -547,9 +556,10 @@ function printPlan(runOptions, plannedJobs) {
   console.log(
     `  quiet wait:  ${formatDuration(agentWait.waitSeconds)} (${estimateScope} plus ${agentWait.safetyMarginPercent}%)`,
   );
-  for (const matchup of MATCHUPS) {
-    console.log(`  matchup:     ${matchup.label}`);
-  }
+  const runOrder = [...new Set(plannedJobs.map((job) => job.matchup))];
+  runOrder.forEach((matchup, index) => {
+    console.log(`  matchup ${index + 1}:   ${matchup.label}`);
+  });
   console.log(`  maps:        ${MAPS.map((map) => map.name).join(", ")}`);
   console.log(`  seeds:       0-${SEEDS_PER_MAP - 1}, side-swapped`);
 }

@@ -618,7 +618,8 @@ The repository term **120 game test** means `scripts/120-game-test.mjs`. It requ
 the current AI 2.3, pre-change Jeff, and post-change Jeff in that order. The runner builds ai-arena,
 runs all three pairings on The River, Schone Tage, Classic, and Crossroads with five side-swapped seeds,
 caps parallel work, resumes completed seed jobs when an output directory is reused, and writes
-Markdown, JSON, and CSV summaries.
+Markdown, JSON, and CSV summaries. Post-change Jeff's 80 games run first, so the new build's results
+arrive soonest; the 40 AI vs pre-change Jeff games run last.
 
     node scripts/120-game-test.mjs ai_2_3 jeffs_ai_pre_defense_envelope jeffs_ai
 
