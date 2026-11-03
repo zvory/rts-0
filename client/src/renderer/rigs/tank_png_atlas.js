@@ -77,7 +77,6 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
       "part.hull.nose": "sprite.hull",
       "part.hull.noseShadow": "sprite.hull",
       "part.noseTick": "sprite.hull",
-      "part.coaxBarrel": "sprite.turret",
       "part.turret": "sprite.turret",
       "part.barrel": "sprite.barrel"
     },
@@ -198,7 +197,6 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
       "id": "sprite.turret",
       "animationPart": "part.turret",
       "sourceParts": [
-        "part.coaxBarrel",
         "part.turret"
       ],
       "tintSlot": "team-light",

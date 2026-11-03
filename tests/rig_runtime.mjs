@@ -190,17 +190,17 @@ test("tank rig exposes transformed main and coax muzzle anchors", () => {
     state: STATE.IDLE,
     facing: 0,
     weaponFacing: Math.PI / 2,
+    commanderFacing: 0,
   };
 
   const mainMuzzle = transformedRigAnchorPoint(definition, entity, "muzzle", { now: fixedNow });
   const coaxMuzzle = transformedRigAnchorPoint(definition, entity, "coaxMuzzle", { now: fixedNow });
 
-  assert.ok(mainMuzzle, "tank main muzzle anchor should resolve");
   assert.ok(coaxMuzzle, "tank coax muzzle anchor should resolve");
   assert.ok(Math.abs(mainMuzzle.x - 100) < 0.001);
   assert.ok(Math.abs(mainMuzzle.y - 133.2) < 0.001);
-  assert.ok(Math.abs(coaxMuzzle.x - 105.55) < 0.001);
-  assert.ok(Math.abs(coaxMuzzle.y - 116.6) < 0.001);
+  assert.ok(Math.abs(coaxMuzzle.x - 108) < 0.001);
+  assert.ok(Math.abs(coaxMuzzle.y - 100) < 0.001);
 
   const recoilingMainMuzzle = transformedRigAnchorPoint(definition, entity, "muzzle", {
     now: fixedNow,
@@ -213,8 +213,8 @@ test("tank rig exposes transformed main and coax muzzle anchors", () => {
 
   assert.ok(Math.abs(recoilingMainMuzzle.x - 100) < 0.001);
   assert.ok(Math.abs(recoilingMainMuzzle.y - 124.875) < 0.001);
-  assert.ok(Math.abs(recoilingCoaxMuzzle.x - 105.55) < 0.001);
-  assert.ok(Math.abs(recoilingCoaxMuzzle.y - 112.775) < 0.001);
+  assert.ok(Math.abs(recoilingCoaxMuzzle.x - 108) < 0.001);
+  assert.ok(Math.abs(recoilingCoaxMuzzle.y - 96.175) < 0.001);
 });
 
 test("tank rig adds a half-scale artillery-style muzzle flare on cannon recoil", () => {
@@ -692,7 +692,7 @@ test("default Tank draw uses its PNG atlas with native shadow and effect metadat
 
   assert.equal(renderer._liveRigPools.liveUnitRigShadows.size, 1);
   assert.equal(renderer._liveRigPools.liveUnitRigs.size, 1);
-  assert.equal(renderer._liveRigPools.liveUnitRigOverlays.size, 0);
+  assert.equal(renderer._liveRigPools.liveUnitRigOverlays.size, 1);
   assert.equal(renderer._liveRigPools.liveUnitRigEffects.size, 1);
   const unit = renderer._liveRigPools.liveUnitRigs.get(entity.id);
   const effects = renderer._liveRigPools.liveUnitRigEffects.get(entity.id);
@@ -708,12 +708,12 @@ test("tank PNG atlas route splits native shadow, unit, and muzzle flash metadata
   const definition = createLiveRigDefinitions().get(KIND.TANK);
   const [shadowRoute, unitRoute, effectRoute] = liveRigRoutesFor(KIND.TANK);
   assert.equal(pngAtlasCanRenderRoute(definition, TANK_PNG_RIG_ATLAS, shadowRoute), false);
-  assert.equal(pngAtlasCanRenderRoute(definition, TANK_PNG_RIG_ATLAS, unitRoute), true);
+  assert.equal(pngAtlasCanRenderRoute(definition, TANK_PNG_RIG_ATLAS, unitRoute), false);
   assert.equal(pngAtlasCanRenderRoute(definition, TANK_PNG_RIG_ATLAS, effectRoute), false);
   const unitCoverage = pngAtlasRouteCoverage(definition, TANK_PNG_RIG_ATLAS, unitRoute);
   assert.equal(unitCoverage.coveredParts.includes("part.hull"), true);
   assert.equal(unitCoverage.coveredParts.includes("part.turret"), true);
-  assert.deepEqual(unitCoverage.missingParts, []);
+  assert.deepEqual(unitCoverage.missingParts, ["part.commanderMount", "part.coaxBarrel", "part.commander"]);
   assert.equal(TANK_PNG_RIG_ATLAS.grid?.normalization?.worldScale, 1.2);
   for (const spriteId of ["sprite.hull", "sprite.turret", "sprite.barrel"]) {
     const sprite = TANK_PNG_RIG_ATLAS.sprites.find((candidate) => candidate.id === spriteId);
@@ -1348,7 +1348,7 @@ test("tank PNG atlas native effects are destroyed when the same id becomes an SV
   renderer._drawUnit(entity, new Map([[1, 0x336699]]), { playerId: 1, resources: { oil: 10 }, weaponRecoil: () => 0 });
 
   const effects = renderer._liveRigPools.liveUnitRigEffects.get(entity.id);
-  assert.equal(renderer._liveRigPools.liveUnitRigOverlays.has(entity.id), false);
+  assert.equal(renderer._liveRigPools.liveUnitRigOverlays.has(entity.id), true);
   assert.equal(typeof effects.matches, "function");
 
   renderer._drawUnit({

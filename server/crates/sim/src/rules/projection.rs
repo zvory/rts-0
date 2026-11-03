@@ -277,46 +277,53 @@ pub fn project_entity(
     let acquired_combat_target = entity.can_attack() && entity.target_id().is_some();
     let active_combat_target =
         matches!(entity.order(), Order::Attack(_) | Order::AttackMove(_)) || acquired_combat_target;
-    let target_visible = if let Some(target_id) = entity.target_id() {
-        context
-            .target
-            .filter(|target| target.id == target_id)
-            .map(|target| {
-                exact_owner
-                    || !context.fogged
-                    || (!vision_only
-                        && !context.map.zip(context.teams).is_some_and(|(map, teams)| {
-                            context
-                                .private_detail_projection
-                                .entity_hidden_by_concealment(
-                                    viewer,
-                                    target,
-                                    map,
-                                    concealment_fog,
-                                    teams,
-                                )
-                        })
-                        && context
-                            .smokes
-                            .map(|smokes| {
-                                entity_visible_to_with_smoke_melee(
-                                    viewer,
-                                    target,
-                                    actionable_fog,
-                                    smokes,
-                                    context.entities,
-                                    context.teams,
-                                    context.private_detail_projection,
-                                )
-                            })
-                            .unwrap_or_else(|| {
-                                actionable_fog.is_visible_world(viewer, target.pos_x, target.pos_y)
-                            }))
-            })
-            .unwrap_or(false)
-    } else {
-        false
+    let combat_target_visible = |target: &Entity| {
+        exact_owner
+            || !context.fogged
+            || (!vision_only
+                && !context.map.zip(context.teams).is_some_and(|(map, teams)| {
+                    context
+                        .private_detail_projection
+                        .entity_hidden_by_concealment(viewer, target, map, concealment_fog, teams)
+                })
+                && context
+                    .smokes
+                    .map(|smokes| {
+                        entity_visible_to_with_smoke_melee(
+                            viewer,
+                            target,
+                            actionable_fog,
+                            smokes,
+                            context.entities,
+                            context.teams,
+                            context.private_detail_projection,
+                        )
+                    })
+                    .unwrap_or_else(|| {
+                        actionable_fog.is_visible_world(viewer, target.pos_x, target.pos_y)
+                    }))
     };
+    let target_visible = entity
+        .target_id()
+        .and_then(|id| context.target.filter(|t| t.id == id))
+        .is_some_and(combat_target_visible);
+    let commander_target_visible = entity
+        .combat
+        .as_ref()
+        .and_then(|c| c.commander_target_id)
+        .and_then(|id| context.entities.get(id))
+        .is_some_and(combat_target_visible);
+    if entity.kind == EntityKind::Tank && !vision_only {
+        if let Some(combat) = entity.combat.as_ref() {
+            if exact_owner
+                || !context.fogged
+                || combat.commander_target_id.is_none()
+                || commander_target_visible
+            {
+                view.commander_facing = Some(combat.commander_facing);
+            }
+        }
+    }
     let weapon_facing_useful = fires_while_moving(entity.kind)
         || active_combat_target
         || (entity.is_building() && entity.can_attack());
@@ -922,6 +929,9 @@ mod tests {
             tank.set_order(Order::attack(hidden_target_id));
             tank.set_target_id(Some(hidden_target_id));
             tank.set_weapon_facing(1.2);
+            let combat = tank.combat.as_mut().expect("combat");
+            combat.commander_facing = -0.8;
+            combat.commander_target_id = Some(hidden_target_id);
         }
         let map = Map {
             width: 64,
@@ -942,12 +952,14 @@ mod tests {
                 .expect("viewer should see nearby tank");
         assert_eq!(enemy_view.target_id, None);
         assert_eq!(enemy_view.weapon_facing, None);
+        assert_eq!(enemy_view.commander_facing, None);
 
         let owner_view =
             project_for_test(2, tank, &fog, true, &entities, Some(hidden_target), false)
                 .expect("owner should see own tank");
         assert_eq!(owner_view.target_id, Some(hidden_target_id));
         assert_eq!(owner_view.weapon_facing, Some(1.2));
+        assert_eq!(owner_view.commander_facing, Some(-0.8));
     }
 
     #[test]

@@ -595,6 +595,8 @@ fn seed_combat_state(
         tank.set_desired_weapon_facing(0.7);
         tank.lock_tank_armor_reaction_source((640.0, 384.0), reaction_tick);
         let combat = tank.combat.as_mut().expect("tank should have combat");
+        combat.commander_facing = -1.1;
+        combat.commander_target_id = Some(target);
         combat.attack_move_no_target_ticks = 2;
         combat.tank_stationary_range_ticks = 4;
     }

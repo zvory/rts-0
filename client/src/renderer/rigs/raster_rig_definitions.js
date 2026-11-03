@@ -320,7 +320,22 @@ const SCOUT_CAR_DEFINITION = definition({
 });
 
 const TANK_NATIVE_PARTS = Object.freeze([
-  part("part.coaxBarrel", 26),
+  part("part.commanderMount", 32, {
+    geometry: { type: "circle", cx: 0, cy: 0, r: 3.4 },
+    paint: paint({ fill: "#53564b", stroke: "#252a25", strokeWidth: 0.8 }),
+  }),
+  part("part.coaxBarrel", 34, {
+    geometry: { type: "polygon", points: [
+      { x: -3, y: -1.9 }, { x: 3, y: -1.9 }, { x: 3, y: -0.8 },
+      { x: 13, y: -0.8 }, { x: 13, y: 0.8 }, { x: 3, y: 0.8 },
+      { x: 3, y: 1.9 }, { x: -3, y: 1.9 },
+    ] },
+    paint: paint({ fill: "#333c39", stroke: "#171e1c", strokeWidth: 0.55 }),
+  }),
+  part("part.commander", 35, {
+    geometry: { type: "circle", cx: -4, cy: 0, r: 2.3 },
+    paint: paint({ fill: "#6e7660", stroke: "#30382e", strokeWidth: 0.6 }),
+  }),
   part("part.tank.flashCone", 29, {
     geometry: { type: "polygon", points: [{ x: -1.35, y: 0 }, { x: 4.5, y: -2.25 }, { x: 4.5, y: 2.25 }] },
     paint: paint({ fill: "#ffd84a", fillOpacity: 0.78, stroke: "#d8d0b0", strokeWidth: 1.1, strokeOpacity: 0.62 }),
@@ -339,8 +354,13 @@ const TANK_ANIMATION_PARTS = animatedRasterParts(TANK_PNG_RIG_ATLAS, {
   "part.barrel": { paint: paint({ opacity: 0.95 }) },
 });
 const TANK_ANIMATIONS = [
+  ...bindingsFor(["part.commanderMount", "part.coaxBarrel", "part.commander"], [
+    ["commanderMountX", "transform.x"], ["commanderMountY", "transform.y"],
+    ...SHADOW_RECOIL,
+  ]),
+  ...bindingsFor(["part.coaxBarrel", "part.commander"], [["commanderFacing", "transform.rotation"]]),
   ...bindingsFor(["part.shadow", "part.track.left", "part.track.right", "part.hull"], [...SHADOW_FACING, ...SHADOW_RECOIL]),
-  ...bindingsFor(["part.turret", "part.coaxBarrel"], [["weaponFacing", "transform.rotation"], ...SHADOW_RECOIL]),
+  ...bindingsFor(["part.turret"], [["weaponFacing", "transform.rotation"], ...SHADOW_RECOIL]),
   ...bindingsFor(["part.barrel"], [["weaponFacing", "transform.rotation"], ["recoilPx", "transform.scaleX", -0.0301204819], ...SHADOW_RECOIL]),
   ...bindingsFor(TANK_FLASH_IDS, [
     ["weaponFacing", "transform.rotation"],
@@ -360,7 +380,7 @@ const TANK_DEFINITION = definition({
   id: "tank.raster",
   kind: KIND.TANK,
   parts: [polygonShadow("part.shadow", 29.7, 18.9, 6.615, 3), ...TANK_ANIMATION_PARTS, ...TANK_NATIVE_PARTS],
-  anchors: { origin: { x: 0, y: 0 }, selection: { x: 0, y: 2 }, hp: { x: 0, y: -26 }, muzzle: { x: 33.2, y: 0 }, coaxMuzzle: { x: 16.6, y: -5.55 }, turret: { x: 1, y: 0 } },
+  anchors: { origin: { x: 0, y: 0 }, selection: { x: 0, y: 2 }, hp: { x: 0, y: -26 }, muzzle: { x: 33.2, y: 0 }, coaxMuzzle: { x: 13, y: 0 }, turret: { x: 1, y: 0 } },
   bounds: { selection: { x: -29.2, y: -19.4, width: 58.4, height: 38.8 }, hp: { x: -16, y: -31, width: 32, height: 5 } },
   animations: TANK_ANIMATIONS,
 });
@@ -391,7 +411,7 @@ const RASTER_PART_ENTRIES = Object.freeze([
   [KIND.SCOUT_PLANE, { shadow: ["part.shadow"], unit: ["raster.frame"] }],
   [KIND.TANK, {
     shadow: ["part.shadow"],
-    unit: atlasSourceParts(TANK_PNG_RIG_ATLAS),
+    unit: [...atlasSourceParts(TANK_PNG_RIG_ATLAS), "part.commanderMount", "part.coaxBarrel", "part.commander"],
     effects: TANK_FLASH_IDS,
   }],
 ]);

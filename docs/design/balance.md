@@ -44,7 +44,9 @@ in 45 ticks (1.5 seconds) instead of 90 ticks. Movement still resets the range r
 attack cooldowns, and damage are unchanged. Existing research hotkeys are preserved.
 
 Tanks also have a live secondary `tank_coax` profile owned by combat rules: 6-tile range, 4 small-arms
-damage, 12-tick cooldown, no Tank armor-facing multiplier, and single-target direct fire.
+damage, 12-tick cooldown, no Tank armor-facing multiplier, and single-target direct fire. The
+commander roof MG acquires and aims independently through 360 degrees, including while moving.
+Its right-offset mount follows the main turret; `tank_coax` remains its internal weapon id.
 Tank HE: cannon shots aimed at infantry (Workers, Golems, Warriors,
 Riflemen, Panzerfausts, and Machine Gunners) retain the normal immediate 60-damage direct hit.
 On a successful resolved infantry hit, every other eligible entity within 1.4 tiles of the
@@ -391,8 +393,8 @@ only for moving-fire units and keeps following its commanded path. Both movement
 the same committed-target rule. Except for the Tank's five-tick rerank, a
 still-fireable prepared target receives the next shot even if a higher-priority threat appeared
 during reload. The post-shot pass may then select that higher-priority threat for the following
-cycle. Tank coax fire has no independent retained
-target slot, so its acquisition pass runs only when the coax cooldown is ready. This cadence is
+cycle. Tank commander MG acquisition and rotation run every tick, including during reload.
+Its secondary target is independent of the cannon target and never requests movement. This cadence is
 limited to default attacks; future grenades, satchels, or demolition attacks need separate attack
 profiles and explicit activation/autocast policy instead of being folded into default targeting.
 
@@ -707,7 +709,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | rocket_launcher (Rocket Truck) | 150 | 16 rockets, each 21 outer / 53 inner AOE; a rocket whose impact point intersects a target deals 70 armor-piercing damage instead; all resulting damage is reduced to 25% against buildings | 10-44 Barrage | 1800-tick (~60s) cooldown from activation | 2.0 | 8 | 225 | 100 | 6 | 600 (~20s); requires Gun Works (`steelworks` kind), a completed owned Vehicle Works (`factory` kind), and Rockets (`rockets`) researched in Engineering Complex; vehicle movement; must stop to launch; one manual command unloads exactly 16 rockets over 120 ticks (~4s) into a 6-tile scatter radius and then stops; its team-tinted rack carries 16 rounds, empties one slot per launch, and refills at cooldown completion; the PNG and collision footprint are enlarged by 20% (48×26.4 px body, 1.2 px clearance, 21.6 px selection radius); Barrage accepts in-range world points without requiring current vision; first barrage is free and later barrages cost 150 oil |
 | scout_car       | 100 | 6   | 7     | 12  | 2.35  | 15    | 125 | 60  | 3   | 480 (~16s) |
 | scout_plane     | 40  | 0   | 0     | 0  | 2.6   | 19    | 0   | 0   | 0   | 0; instant sorties are free from a Command Car; uses the C slot after research; unlimited independent active sorties; non-combat recon with 2-tile orbit radius and a 30-second total lifetime from launch, including transit, followed by despawn; 30-second carrier-local cooldown, no ground collision reservation, and 48x34 px client render body |
-| tank            | 292 | 60 cannon; 4 coax | 5 moving / 14 fully stationary cannon; 6 coax | 144 cannon; 12 coax | 2.0   | 9     | 350 | 145 | 5   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in Engineering Complex; coax is a secondary small-arms weapon that fires through the current turret arc |
+| tank            | 292 | 60 cannon; 4 coax | 5 moving / 14 fully stationary cannon; 6 coax | 144 cannon; 12 coax | 2.0   | 9     | 350 | 145 | 5   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in Engineering Complex; coax is a secondary small-arms weapon that aims independently in all directions |
 | command_car     | 150 | 0   | 0     | 0  | 2.35  | 8     | 150 | 85  | 4   | 450 (~15s); trained at Vehicle Works (`factory` kind) and requires a completed Engineering Complex, but no Tank Production research; no weapon; Scout Car-style movement with a smaller jeep-sized body |
 | ekat       | 150 | 0   | 0     | 0  | 1.6   | 12    | 0   | 0   | 0   | 0; Ekat faction hero; no default attack; no passive regeneration; consumes nearby Golems for recovery |
 

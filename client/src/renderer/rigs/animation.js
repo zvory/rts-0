@@ -99,6 +99,10 @@ export function createRigRenderContext(entity, {
     visualScale: entity.kind === KIND.ARTILLERY ? ARTILLERY_VISUAL_SCALE : 1,
     mapTileSize: finite(map?.tileSize, 32),
     facing,
+    commanderFacing: finite(entity.commanderFacing, weaponFacing),
+    // Positive local Y is the turret's right when its barrel points north.
+    commanderMountX: -Math.sin(weaponFacing) * 5,
+    commanderMountY: Math.cos(weaponFacing) * 5,
     weaponFacing,
     weaponFacingCos: Math.cos(weaponFacing),
     weaponFacingSin: Math.sin(weaponFacing),

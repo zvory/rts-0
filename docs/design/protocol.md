@@ -804,6 +804,10 @@ legacy Scout Plane queue presence, construction progress, gatherer latched node,
 status, per-unit enemy-unit kill totals, and safe combat tracers. `unitsKilled` is present on units
 only, starts at zero, increments when that unit deals the final hostile damage to another unit, and
 does not count destroyed buildings or friendly fire.
+Tank `commanderFacing` is the independent roof MG world angle. It is included only for a visible,
+non-vision-only Tank when its secondary target is visible to the recipient (or absent); owners and
+omniscient observers receive it directly. It never carries a secondary target id.
+
 Combat `targetId` and `weaponFacing` for allied units are sent whenever an attack-capable entity has
 a visible acquired target, including autonomous acquisition while its explicit order state remains
 idle. They are omitted when the target is not visible in the recipient's team-current actionable
@@ -942,7 +946,7 @@ adds an explicit application compression envelope.
       visionOnly?, debugPath?, rallyPlan?, prodUpgrade?, buildActive?, deconstructProgress?,
       weaponRangeTiles?, occupiedTrenchId?, scoutPlane?, prodScoutPlaneQueued?,
       panzerfaustLoaded?, prodRepeatKinds?, prodWaiting?, breakthroughAuraTicks?, extractorActive?,
-      prodUpgradeQueue?, panzerfaustWindupProgress?
+      prodUpgradeQueue?, panzerfaustWindupProgress?, unitsKilled?, rocketRackCount?, commanderFacing?
     ]
   ],
   "r": [[id, remaining]],         // omitted when empty
@@ -1157,6 +1161,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   state: string,                 // "idle","move","attack","gather","build","train","construct","dead"
   facing?: f32,                  // radians, for unit body/hull orientation (optional)
   weaponFacing?: f32,            // radians, for independent weapon/barrel orientation (optional)
+  commanderFacing?: f32,         // Tank roof MG world angle; compact entity slot 44
   // production buildings:
   prodKind?: string,             // unit currently being produced
   prodUpgrade?: string,          // upgrade currently being researched

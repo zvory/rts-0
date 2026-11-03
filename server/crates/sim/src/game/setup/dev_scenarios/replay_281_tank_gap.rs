@@ -203,8 +203,8 @@ mod tests {
         );
         setup.game.enqueue(setup.player_id, setup.command());
         // Replay the recorded checkpoint with current balance. The trace was refreshed for
-        // the 1.3x Command Car aura and minimum MG damage: the former target dies at tick 13609,
-        // and the lead Tank picks a replacement instead of resuming its route.
+        // independently traversing commander MG (including its changed shot/RNG cadence).
+        // The movement regression must still keep the lead Tank engaged instead of resuming its route.
         let golden: Vec<GoldenTick> =
             serde_json::from_str(include_str!("fixtures/replay_281_ticks_13537_13620.json"))
                 .expect("valid replay-281 golden trace");

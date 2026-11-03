@@ -61,11 +61,10 @@ function interpolateEntity(entity, prior, alpha) {
     x: prior.x + (entity.x - prior.x) * alpha,
     y: prior.y + (entity.y - prior.y) * alpha,
   };
-  if (typeof prior.facing === "number" && typeof entity.facing === "number") {
-    next.facing = lerpAngle(prior.facing, entity.facing, alpha);
-  }
-  if (typeof prior.weaponFacing === "number" && typeof entity.weaponFacing === "number") {
-    next.weaponFacing = lerpAngle(prior.weaponFacing, entity.weaponFacing, alpha);
+  for (const key of ["facing", "weaponFacing", "commanderFacing"]) {
+    if (typeof prior[key] === "number" && typeof entity[key] === "number") {
+      next[key] = lerpAngle(prior[key], entity[key], alpha);
+    }
   }
   return next;
 }

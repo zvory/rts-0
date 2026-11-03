@@ -423,3 +423,12 @@ owner/facing and begin at server-provided rack coordinates. Projectiles reuse th
 trail, and fade toward the already-authorized impact coordinate. Only their PNG body,
 team tint, and rack origin differ. Rocket-specific legacy rectangles, mortar muzzle flashes, and dashed impact
 warning overlays are suppressed. Mortar and Panzerfaust rendering remain unchanged.
+
+### Tank commander machine gun
+
+The Tank keeps its raster hull, turret, and cannon. A native roof mount sits at turret-local
+`(0, 5)` (halfway toward the right edge), rotates its position with `weaponFacing`, and turns
+the gun and commander separately using interpolated authoritative `commanderFacing`. Native
+parts draw above the turret. The `coaxMuzzle` anchor uses the independent gun transform so
+MG tracers/flashes follow its barrel rather than the cannon. Cannon recoil carries the entire
+roof assembly; MG bursts do not kick the hull or cannon.
