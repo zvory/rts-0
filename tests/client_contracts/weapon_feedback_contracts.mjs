@@ -40,8 +40,8 @@ const start = {
     "unknown weapon identity falls back to the attacker's recoil duration",
   );
   assert(
-    sampleWeaponRecoilCycle(KIND.TANK, 0, WEAPON_KIND.TANK_COAX).active === false,
-    "tank coax feedback does not create a cannon recoil cycle",
+    weaponRecoilDurationMs(KIND.TANK, WEAPON_KIND.TANK_COAX) === weaponRecoilDurationMs(KIND.SCOUT_CAR, WEAPON_KIND.SCOUT_CAR_MG),
+    "tank machine gun reuses scout car recoil timing",
   );
 
   const initial = sampleWeaponRecoilCycle(KIND.TANK, 0, WEAPON_KIND.TANK_CANNON);
@@ -153,7 +153,11 @@ const start = {
   });
   assert(state.liveMuzzleFlashes(performance.now())[0]?.weaponKind === WEAPON_KIND.TANK_COAX, "tank coax weapon hint is retained on muzzle feedback");
   assert(state.weaponRecoil(15, KIND.TANK, performance.now()) === 0, "tank coax attack events do not start Tank cannon recoil");
-  assert(state.weaponRecoilPhase(15, KIND.TANK, performance.now()) === 0, "tank coax attack events do not start a recoil phase");
+  assert(state.weaponRecoilPhase(15, KIND.TANK, performance.now()) === 0, "tank coax attack events do not start a cannon recoil phase");
+  const now = performance.now();
+  assert(state.weaponRecoil(15, KIND.TANK, now, WEAPON_KIND.TANK_COAX) > 0, "coax attack starts its independent recoil");
+  assert(state.weaponRecoil(15, KIND.TANK, now + 200, WEAPON_KIND.TANK_COAX) === 0, "coax recoil settles after 160 ms");
+  assert(!state.visualEffects.tankCoaxRecoilById.has(15), "expired coax recoil is removed");
 }
 
 {
@@ -178,6 +182,7 @@ const start = {
   assert(flashes[0].weaponKind === WEAPON_KIND.TANK_CANNON, "same-tick cannon feedback stays first");
   assert(flashes[1].weaponKind === WEAPON_KIND.TANK_COAX, "same-tick coax feedback stays second");
   assert(state.weaponRecoil(25, KIND.TANK, performance.now()) > 0, "same-tick cannon recoil is preserved when followed by coax feedback");
+  assert(state.weaponRecoil(25, KIND.TANK, performance.now(), WEAPON_KIND.TANK_COAX) > 0, "same-tick coax recoil survives cannon recoil");
   assert(state.weaponRecoilKind(25) === WEAPON_KIND.TANK_CANNON, "recoil preserves the weapon that owns the authored animation");
 }
 
