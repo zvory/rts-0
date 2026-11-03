@@ -46,6 +46,7 @@ const MAP_FIELDS = new Set([
   "noEntrenchmentTiles",
 ]);
 const START_FIELDS = new Set(["x", "y"]);
+const GROUPED_START_FIELDS = new Set(["x", "y", "teamGroup"]);
 const BASE_FIELDS = new Set(["x", "y", "steelPatches", "oilPatches"]);
 const DOODAD_FIELDS = new Set(["id", "typeId", "x", "y", "color"]);
 const SVG_COLORS = Object.freeze({
@@ -219,7 +220,7 @@ export function validateMap(map, { symmetry = "none" } = {}) {
       if (seen.has(key)) warnings.push(`${kind} location (${key}) is duplicated`);
       seen.add(key);
       if (!inBounds(width, height, location.x, location.y)) warnings.push(`${kind} location (${key}) is outside the map`);
-      const allowedFields = kind === "base" ? BASE_FIELDS : START_FIELDS;
+      const allowedFields = kind === "base" ? BASE_FIELDS : GROUPED_START_FIELDS;
       for (const field of Object.keys(location)) {
         if (!allowedFields.has(field)) warnings.push(`${kind} location ${index} has unsupported field ${JSON.stringify(field)}`);
       }
@@ -232,6 +233,10 @@ export function validateMap(map, { symmetry = "none" } = {}) {
         warnings.push(`base site ${index} ${field} must be an unsigned integer from 0 to ${maximum}`);
       }
     }
+  }
+  if (starts.some((start) => start?.teamGroup !== undefined)
+    && starts.some((start) => !Number.isInteger(start?.teamGroup) || start.teamGroup < 1 || start.teamGroup > 4)) {
+    warnings.push("when using teamGroup, every start must have an integer teamGroup from 1 to 4");
   }
   const startKeys = new Set(validStarts.map(locationKey));
   const terrainIsRectangular = terrainRows.length === height && terrainRows.every((row) => typeof row === "string" && [...row].length === width);

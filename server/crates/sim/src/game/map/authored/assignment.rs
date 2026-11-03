@@ -8,13 +8,14 @@ use crate::game::map::{StartAssignmentPlayer, Tile};
 
 pub(super) fn assign_start_locations(
     locations: &[Tile],
+    groups: &[u32],
     players: &[StartAssignmentPlayer],
     seed: u32,
 ) -> Result<Vec<Tile>, String> {
     if locations.len() < players.len() {
         return Err("map has no assignable start locations".to_string());
     }
-    if all_singleton_teams(players) {
+    if groups.is_empty() && all_singleton_teams(players) {
         let mut shuffled = locations.to_vec();
         let mut rng = SmallRng::seed_from_u64(seed as u64);
         shuffled.shuffle(&mut rng);
@@ -27,6 +28,7 @@ pub(super) fn assign_start_locations(
     let mut used = vec![false; locations.len()];
     evaluate_start_orders(
         locations,
+        groups,
         players,
         seed,
         &mut selected,
@@ -34,7 +36,7 @@ pub(super) fn assign_start_locations(
         &mut best,
     );
     best.map(|(_, starts)| starts)
-        .ok_or_else(|| "map has no assignable start locations".to_string())
+        .ok_or_else(|| "map team groups cannot fit this roster; keep each team within one group and use a separate group for each team".to_string())
 }
 
 fn all_singleton_teams(players: &[StartAssignmentPlayer]) -> bool {
@@ -46,6 +48,7 @@ fn all_singleton_teams(players: &[StartAssignmentPlayer]) -> bool {
 
 fn evaluate_start_orders(
     locations: &[Tile],
+    groups: &[u32],
     players: &[StartAssignmentPlayer],
     seed: u32,
     selected: &mut Vec<usize>,
@@ -70,9 +73,20 @@ fn evaluate_start_orders(
         if used[index] {
             continue;
         }
+        if !groups.is_empty()
+            && selected
+                .iter()
+                .enumerate()
+                .any(|(player_index, &start_index)| {
+                    let teammates = same_team(players[player_index], players[selected.len()]);
+                    teammates != (groups[start_index] == groups[index])
+                })
+        {
+            continue;
+        }
         used[index] = true;
         selected.push(index);
-        evaluate_start_orders(locations, players, seed, selected, used, best);
+        evaluate_start_orders(locations, groups, players, seed, selected, used, best);
         selected.pop();
         used[index] = false;
     }

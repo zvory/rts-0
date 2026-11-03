@@ -265,7 +265,7 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   // Perspective decal swaps add only a narrow empty-repair completion callback; hydration and
   // surface ownership remain isolated in the renderer and decal sync modules.
   // Replay resource history adds one injected diagnostic listener and symmetric teardown.
-  "match.js": 50855, // Inject the shared formation gesture into Minimap.
+  "match.js": 50983, // Inject renderer-authored minimap animation alongside its cached icon loader.
   // Artillery minimap markers add a compact visual-only firing event.
   "protocol.js": 45366,
   // Protocol cleanup split compact snapshot decoding behind protocol.js.

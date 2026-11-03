@@ -252,7 +252,7 @@ function applySpriteState(rec, frame, state, context, diagnosticCounts) {
     return;
   }
 
-  applyDisplayTransform(display, state, frame, part, rec.transform);
+  applyDisplayTransform(display, state, frame, part, rec.transform, context);
   display.alpha = state.alpha;
   display.tint = tintForSlot(part.tintSlot ?? state.tintSlot, context, part);
   diagnosticCounts[PNG_RIG_COMPLETED] += 1;
@@ -336,9 +336,9 @@ function spriteMatchesRoute(sprite, includeParts) {
   return sprite.sourceParts.some((partId) => includeParts.has(partId));
 }
 
-function applyDisplayTransform(display, state, frame, part, last) {
+function applyDisplayTransform(display, state, frame, part, last, context) {
   if (!last.next) last.next = {};
-  const next = resolvePngSpriteTransform(state, frame, part, last.next);
+  const next = resolvePngSpriteTransform(state, frame, part, last.next, context);
   if (!last.initialized || last.x !== next.x || last.y !== next.y) {
     setPoint(display.position, next.x, next.y);
   }

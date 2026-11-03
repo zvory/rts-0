@@ -26,38 +26,19 @@ pub(super) fn enqueue(
         notice(events, player, "Cannot research that here");
         return;
     }
-    let local_upgrade = upgrade == upgrade::UpgradeKind::IndustrialCenter;
-    if local_upgrade
-        && (entities.get(building).is_none_or(|b| {
-            b.hp == 0 || b.under_construction() || b.industrial_center_slot_reserved()
-        }) || entities
-            .iter()
-            .filter(|e| e.owner == player && e.industrial_center_slot_reserved())
-            .count()
-            >= config::INDUSTRIAL_CENTER_LIMIT)
-    {
-        notice(
-            events,
-            player,
-            "Industrial Center unavailable: completed depot and a free center slot required",
-        );
-        return;
-    }
-    if !local_upgrade
-        && entities.iter().any(|e| {
-            e.owner == player
-                && e.research_queue()
-                    .iter()
-                    .any(|item| item.upgrade == upgrade)
-        })
-    {
+    if entities.iter().any(|e| {
+        e.owner == player
+            && e.research_queue()
+                .iter()
+                .any(|item| item.upgrade == upgrade)
+    }) {
         notice(events, player, "Already researching");
         return;
     }
     let Some(ps) = players.iter_mut().find(|p| p.id == player) else {
         return;
     };
-    if !local_upgrade && ps.upgrades.contains(&upgrade) {
+    if ps.upgrades.contains(&upgrade) {
         notice(events, player, "Already researched");
         return;
     }

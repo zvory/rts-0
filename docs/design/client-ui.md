@@ -2374,13 +2374,22 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
 - Minimap roads reuse the world's deterministic dark-charcoal surface variants so revealed terrain stays visually coherent. Authored marked-road tiles draw small yellow centerline dots above fog, keeping the route network legible in unexplored territory; the dotted overlay is a cached static layer, while bare road tiles widen the charcoal surface without adding markings.
 - Authored tree doodads draw compact, dark cartographic pine symbols centered on their foliage bounds rather than their grounded trunk anchors. The cached forest layer renders beneath minimap fog, so trees are clear in current vision, dim when explored without vision, and nearly hidden when unexplored; roads, resources, and foreground player markers remain above it for tactical readability.
 - Minimap units use the renderer-authored team-colored HUD portraits as their only marker path.
-  Whole portraits follow body facing, with a 90° counterclockwise machine-gunner art correction;
-  turret aim is not independently articulated. At a 480px backing size, riflemen are roughly 18px
+  Production atlas parts follow independent body/weapon aim and recoil; frame-strip units use
+  the production facing convention for their current animation frame. At a 480px backing size, riflemen are roughly 18px
   and tanks 53px, with a 1px white silhouette outline; dimensions scale with backing resolution.
   `Match` injects the image loader, `MinimapUnitIcons` caches loaded assets and outlined portraits,
   and each frame draws the current position/facing without throttling. Pending images never fall
   back to dots. Failed/pending loads participate in Interact readiness; teardown aborts loads and
-  releases canvases. The offline minimap exporter uses this same drawing path with a native image
+  releases canvases. `Match` injects a renderer-owned `createMinimapAnimation()` collaborator:
+  it samples production rig transforms and frame strips using `GameState`'s visual clock and shot
+  recoil envelopes, including weapon-specific rifle fire and machine-gunner setup/teardown frames.
+  The world renderer and minimap share `supportWeaponSetupVisual` transition timing. Atlas sprites
+  and strip frames are cached per kind/color, with continuous pose transforms applied at draw time.
+  Minimap pose compilation and image preparation omit atlas cells explicitly declared blank: the
+  tank's two transparent track overlays do no work, while hull, turret and independent barrel recoil
+  remain visible. This does not alter world track marks. Repeated drawing passes reuse one sampled
+  pose per entity per frame. Teardown clears pose,
+  setup, and raster caches. The offline minimap exporter uses this same drawing path with a native image
   loader. Buildings use their owner’s assigned player color, retaining cost-scaled boxes and the
   merged white outline mask; resources
   retain their previous markers. Foreground owned entities draw above resources; legacy vision-only
@@ -2540,7 +2549,11 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   a rifle shot) and shifts the whole sprite four world pixels backward before returning to the
   standing or movement pose.
   Anti-Tank Guns field a wheeled anti-tank gun with a long recoiling barrel,
-  carriage, two wheels, and animated deployment bracing, and machine gunners carry an MG42-style
+  carriage, two wheels, and permanently attached rear trails. Packed trails stay folded behind
+  the carriage; setup swings them outward, pauses, then snaps the final 10° into place.
+  World sprites and minimap layers share the same opaque assembly, hinge transforms, and
+  setup/teardown clock (120/40 ticks at 30 Hz), mirrored from the rules constants.
+  Machine gunners carry an MG42-style
   long machine gun across the body while packed that extends forward with bracing during
   setup/deployment. Units that fire from outside presentation vision remain actionable server-side
   but their reveal-only tile stays absent from `visibleTiles`. `GameState` recognizes the projected
@@ -2776,11 +2789,3 @@ When that launch produces an all-AI live match, the score screen retains the liv
 through automatic post-match replay playback and renders it as an Observation ID. The id is the
 handoff key for replay recovery and server lag-log inspection; it is not a player identity or a
 new gameplay control.
-
-Industrial Centers retain the Resource Depot kind and footprint. The research command card upgrades
-one selected completed depot; completed/pending centers lock out further upgrades at two.
-The renderer receives the public `industrialCenter` physical flag through presentation snapshots
-and selects the simplified Refinery Works PNG atlas for completed upgrades. Its neutral-white
-paint receives the owning team color; the ordinary depot retains its worksite atlas. There is no
-gold footprint rim. The atlas variant participates in body cache identity and normal rig teardown.
-Fog memory uses the last observed flag. Dedicated audio is deferred.

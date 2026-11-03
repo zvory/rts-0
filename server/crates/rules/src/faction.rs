@@ -29,7 +29,6 @@ pub enum UpgradeKind {
     SmokePlus,
     ScoutPlaneUnlock,
     Rockets,
-    IndustrialCenter,
 }
 
 impl UpgradeKind {
@@ -45,7 +44,6 @@ impl UpgradeKind {
         Self::SmokePlus,
         Self::ScoutPlaneUnlock,
         Self::Rockets,
-        Self::IndustrialCenter,
     ];
 
     pub const fn stable_id(self) -> &'static str {
@@ -61,7 +59,6 @@ impl UpgradeKind {
             Self::SmokePlus => "smoke_plus",
             Self::ScoutPlaneUnlock => "scout_plane_unlock",
             Self::Rockets => "rockets",
-            Self::IndustrialCenter => "industrial_center",
         }
     }
 
@@ -345,11 +342,7 @@ const LEGACY_ANTI_TANK_GUN_UNLOCK: UpgradeCatalogEntry = UpgradeCatalogEntry {
     researched_at: EntityKind::EngineeringComplex,
 };
 
-const DEFAULT_UPGRADES: [UpgradeCatalogEntry; 11] = [
-    UpgradeCatalogEntry {
-        kind: UpgradeKind::IndustrialCenter,
-        researched_at: EntityKind::ResourceDepot,
-    },
+const DEFAULT_UPGRADES: [UpgradeCatalogEntry; 10] = [
     UpgradeCatalogEntry {
         kind: UpgradeKind::Methamphetamines,
         researched_at: EntityKind::TrainingCentre,
@@ -1012,7 +1005,7 @@ pub fn ability_cost_for_carrier(kind: AbilityKind, carrier: EntityKind) -> Resou
 }
 
 pub fn upgrade_definition(kind: UpgradeKind) -> UpgradeCatalogEntry {
-    let [industrial_center, methamphetamines, panzerfausts, entrenchment, artillery_unlock, ballistic_tables, tank_unlock, smoke_plus, scout_plane_unlock, rockets, tank_plus] =
+    let [methamphetamines, panzerfausts, entrenchment, artillery_unlock, ballistic_tables, tank_unlock, smoke_plus, scout_plane_unlock, rockets, tank_plus] =
         DEFAULT_UPGRADES;
     match kind {
         UpgradeKind::Methamphetamines => methamphetamines,
@@ -1026,7 +1019,6 @@ pub fn upgrade_definition(kind: UpgradeKind) -> UpgradeCatalogEntry {
         UpgradeKind::ArtilleryUnlock => artillery_unlock,
         UpgradeKind::ScoutPlaneUnlock => scout_plane_unlock,
         UpgradeKind::Rockets => rockets,
-        UpgradeKind::IndustrialCenter => industrial_center,
     }
 }
 

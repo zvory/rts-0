@@ -1,3 +1,4 @@
+import { spriteRasterSource } from "./png_icon_source.js";
 import { KIND, SETUP } from "../../protocol.js";
 import { lightenColor } from "../shared.js";
 import { createLiveFrameStrips } from "./frame_strip_routing.js";
@@ -23,10 +24,12 @@ const ICON_COMPOSITION_STATE = Object.freeze({
  */
 export function liveUnitIconMarkupFor(kind, { teamColor = "#0072b2", minimapPart = null } = {}) {
   const tintColor = normalizeTeamColor(teamColor);
-  const rigKey = kind === KIND.PANZERFAUST ? LOADED_RIFLEMAN_RIG_KEY : kind;
+  const rigKey = kind === KIND.PANZERFAUST
+    ? (minimapPart?.startsWith("unloaded-frame:") ? KIND.RIFLEMAN : LOADED_RIFLEMAN_RIG_KEY) : kind;
   const strip = LIVE_FRAME_STRIPS.get(rigKey);
   if (strip) {
-    const frameX = strip.frameWidth * (strip.idleFrame || 0);
+    const frameIndex = minimapPart?.includes("frame:") ? Number(minimapPart.split(":").at(-1)) : (strip.idleFrame || 0);
+    const frameX = strip.frameWidth * frameIndex;
     return rasterIconMarkup({
       source: "frame-strip",
       image: strip.image,
@@ -38,7 +41,9 @@ export function liveUnitIconMarkupFor(kind, { teamColor = "#0072b2", minimapPart
         w: strip.frameWidth,
         h: strip.frameHeight,
       },
-      visibleFrame: strip.iconVisibleBounds
+      visibleFrame: minimapPart?.includes("frame:")
+        ? { x: frameX, y: 0, w: strip.frameWidth, h: strip.frameHeight }
+        : strip.iconVisibleBounds
         ? {
             x: frameX + strip.iconVisibleBounds.x,
             y: strip.iconVisibleBounds.y,
@@ -52,6 +57,15 @@ export function liveUnitIconMarkupFor(kind, { teamColor = "#0072b2", minimapPart
   }
 
   const atlas = LIVE_PNG_ATLASES.get(rigKey);
+  if (minimapPart?.startsWith("sprite:") && atlas) {
+    const sprite = atlas.sprites.find(sprite => sprite.id === minimapPart.slice(7));
+    if (!sprite) throw new Error(`Unknown minimap sprite: ${minimapPart}`);
+    const { frame, ...source } = spriteRasterSource(atlas, sprite);
+    return composedRasterIconMarkup({ source: "png-atlas-minimap", ...source,
+      components: [{ id: sprite.id, frame, teamTint: sprite.tintSlot !== "fixed" }],
+      teamTint: sprite.tintSlot !== "fixed", teamColor: tintColor,
+      fixedBounds: { x: -64, y: -64, w: 128, h: 128 } });
+  }
   if (minimapPart && atlas) return minimapPartMarkup(kind, atlas, tintColor, minimapPart);
   const atlasIcon = atlasPortrait(atlas, tintColor);
   if (atlasIcon?.components) {
@@ -193,7 +207,8 @@ function createAnimatedRasterIcon(root, kind, atlas, definition, teamColor) {
 let animatedIconSequence = 0;
 
 function animatedRasterLayerMarkup(sprite, atlas, tintId) {
-  const frame = sprite.frame;
+  const source = spriteRasterSource(atlas, sprite);
+  const frame = source.frame;
   const pixelsPerUnitX = frame.pixelsPerUnitX || frame.pixelsPerUnit || 1;
   const pixelsPerUnitY = frame.pixelsPerUnitY || frame.pixelsPerUnit || 1;
   const w = frame.w / Math.abs(pixelsPerUnitX);
@@ -211,7 +226,7 @@ function animatedRasterLayerMarkup(sprite, atlas, tintId) {
     `<g data-unit-icon-scale>` +
       `<svg x="${number(x)}" y="${number(y)}" width="${number(w)}" height="${number(h)}" ` +
         `viewBox="${frame.x} ${frame.y} ${frame.w} ${frame.h}" preserveAspectRatio="none" overflow="hidden">` +
-        `<image href="${atlas.image}" x="0" y="0" width="${atlas.grid.width}" height="${atlas.grid.height}" ` +
+        `<image href="${source.image}" x="0" y="0" width="${source.sheetWidth}" height="${source.sheetHeight}" ` +
           `preserveAspectRatio="none"${filter} />` +
       `</svg>` +
     `</g>` +
@@ -267,16 +282,17 @@ function minimapPartMarkup(kind, atlas, teamColor, part) {
   const entity = { kind, facing: 0, weaponFacing: 0,
     setupState: packed ? SETUP.PACKED : SETUP.DEPLOYED };
   const definition = RASTER_RIG_DEFINITIONS.get(kind);
-  const pose = sampleRigAnimation(definition, entity, createRigRenderContext(entity));
+  const context = createRigRenderContext(entity);
+  const pose = sampleRigAnimation(definition, entity, context);
   const components = atlas.sprites.filter(sprite => {
     if (kind === KIND.TANK) return part === "hull"
       ? !["part.turret", "part.barrel"].includes(sprite.animationPart)
       : ["part.turret", "part.barrel"].includes(sprite.animationPart);
-    return sprite.id.endsWith(packed ? ".packed" : ".deployed")
+    return sprite.id.endsWith(packed && kind !== KIND.ANTI_TANK_GUN ? ".packed" : ".deployed")
       && (part.endsWith("barrel") === sprite.id.includes("barrelAssembly"));
   }).sort((a, b) => a.drawOrder - b.drawOrder).map(sprite => {
-    const transform = resolvePngSpriteTransform(pose.parts[sprite.animationPart], sprite.frame, sprite);
-    return { id: sprite.id, frame: sprite.frame, ...transform, teamTint: sprite.tintSlot !== "fixed" };
+    const transform = resolvePngSpriteTransform(pose.parts[sprite.animationPart], sprite.frame, sprite, {}, context);
+    return { id: sprite.id, ...spriteRasterSource(atlas, sprite), ...transform, teamTint: sprite.tintSlot !== "fixed" };
   });
   return composedRasterIconMarkup({ source: "png-atlas-minimap", image: atlas.image,
     sheetWidth: atlas.grid.width, sheetHeight: atlas.grid.height, components,
@@ -507,8 +523,8 @@ function composedRasterIconMarkup({
             `width="${number(component.w)}" height="${number(component.h)}" ` +
             `viewBox="${number(frame.x)} ${number(frame.y)} ${number(frame.w)} ${number(frame.h)}" ` +
             `preserveAspectRatio="none" style="overflow:hidden">` +
-            `<image href="${image}" x="0" y="0" width="${number(safeSheetWidth)}" ` +
-              `height="${number(safeSheetHeight)}" preserveAspectRatio="none" />` +
+            `<image href="${component.image || image}" x="0" y="0" width="${number(component.sheetWidth || safeSheetWidth)}" ` +
+              `height="${number(component.sheetHeight || safeSheetHeight)}" preserveAspectRatio="none" />` +
           `</svg>` +
         `</g>` +
       `</g>`
@@ -559,6 +575,9 @@ function normalizedCompositionComponent(component) {
   const localY = Math.min(originWorldY, farWorldY);
   return {
     id: component.id,
+    image: component.image,
+    sheetWidth: positiveDimension(component.sheetWidth),
+    sheetHeight: positiveDimension(component.sheetHeight),
     teamTint: component.teamTint === true,
     frame: {
       x: finiteNumber(frame.x),

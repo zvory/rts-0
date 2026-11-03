@@ -72,7 +72,7 @@ fn depot_completes_steel_mine_on_nearest_in_range_patch() {
             total: 1,
             paid: true,
         });
-    let near = game.state.map.tile_center(14, 10);
+    let near = game.state.map.tile_center(15, 12);
     let far = game.state.map.tile_center(18, 10);
     spawn_node(&mut game, EntityKind::Steel, far);
     spawn_node(&mut game, EntityKind::Steel, near);
@@ -100,7 +100,7 @@ fn depot_extractor_scaffold_matches_front_queue_progress() {
     let mut game = empty_flat_game(&players());
     let depot = spawn_building(&mut game, 1, EntityKind::ResourceDepot, (10, 10));
     spawn_building(&mut game, 2, EntityKind::ResourceDepot, (50, 50));
-    let patch = game.state.map.tile_center(14, 10);
+    let patch = game.state.map.tile_center(15, 12);
     let total = config::building_stats(EntityKind::SteelMine)
         .expect("steel mine stats")
         .build_ticks;
@@ -139,7 +139,7 @@ fn cancelling_legacy_extractor_scaffold_restarts_free_without_refund() {
     let mut game = empty_flat_game(&players());
     let depot = spawn_building(&mut game, 1, EntityKind::ResourceDepot, (10, 10));
     spawn_building(&mut game, 2, EntityKind::ResourceDepot, (50, 50));
-    let patch = game.state.map.tile_center(14, 10);
+    let patch = game.state.map.tile_center(15, 12);
     spawn_node(&mut game, EntityKind::Steel, patch);
     game.state.players[0].set_resources(450, 0);
     game.state
@@ -186,7 +186,7 @@ fn automatic_extractor_pauses_when_saturated_and_restarts_free_after_destruction
     let mut game = empty_flat_game(&players());
     let depot = spawn_building(&mut game, 1, EntityKind::ResourceDepot, (10, 10));
     spawn_building(&mut game, 2, EntityKind::ResourceDepot, (50, 50));
-    let patch = game.state.map.tile_center(14, 10);
+    let patch = game.state.map.tile_center(15, 12);
     spawn_node(&mut game, EntityKind::Steel, patch);
     let mine = game
         .state
@@ -224,7 +224,7 @@ fn depot_builds_free_steel_and_oil_extractors_concurrently() {
     let mut game = empty_flat_game(&players());
     let depot = spawn_building(&mut game, 1, EntityKind::ResourceDepot, (10, 10));
     spawn_building(&mut game, 2, EntityKind::ResourceDepot, (50, 50));
-    let steel_patch = game.state.map.tile_center(14, 10);
+    let steel_patch = game.state.map.tile_center(15, 12);
     let oil_patch = game.state.map.tile_center(16, 10);
     spawn_node(&mut game, EntityKind::Steel, steel_patch);
     spawn_node(&mut game, EntityKind::Oil, oil_patch);
@@ -743,4 +743,40 @@ fn critical_events_track_lost_prerequisites_and_recovery_without_duplicates() {
             .set_repeat_production(Some(EntityKind::AntiTankGun), false);
     }
     assert!(game.critical_event_state()[0].blocked_production.is_empty());
+}
+
+#[test]
+fn intrinsic_supply_and_alert_cap_remain_300_without_depots() {
+    let mut game = empty_flat_game(&players());
+    let depot = spawn_building(&mut game, 1, EntityKind::ResourceDepot, (3, 3));
+    for remove_depot in [false, true] {
+        if remove_depot {
+            game.state.entities.remove(depot);
+        }
+        assert_eq!(game.snapshot_for(1).supply_cap, 300);
+        assert!(game
+            .critical_event_state()
+            .iter()
+            .all(|state| state.supply_cap == 300));
+        let player = &mut game.state.players[0];
+        player.set_supply_used(0);
+        assert!(player.reserve_supply(300));
+        assert!(!player.reserve_supply(1));
+        assert!(!player.reserve_supply(u32::MAX));
+    }
+}
+
+#[test]
+fn resource_spending_cannot_create_debt_or_partially_charge() {
+    let mut game = empty_flat_game(&players());
+    let player = &mut game.state.players[0];
+    player.set_resources(25, 0);
+    for (steel, oil) in [(26, 0), (0, 1), (25, 1), (u32::MAX, u32::MAX)] {
+        assert!(!player.spend_resources(steel, oil));
+        assert_eq!((player.steel, player.oil), (25, 0));
+    }
+    assert!(player.spend_resources(25, 0));
+    assert_eq!((player.steel, player.oil), (0, 0));
+    assert!(player.spend_resources(0, 0));
+    assert!(!player.spend_resources(1, 0));
 }

@@ -84,6 +84,21 @@ pub fn train_requirement_met(
     }
 }
 
+/// TEMPORARY HACK: historical Engineering Complex ownership keeps AT Guns unlocked.
+/// TODO: remove this exception and its AntiTankGunUnlock marker when tech rules are revisited.
+/// The live Gun Works prerequisite still applies; other units keep their normal prerequisites.
+pub fn train_requirement_met_with_at_gun_history(
+    unit_kind: EntityKind,
+    owned_complete_building_kinds: &[EntityKind],
+    at_gun_history: bool,
+) -> bool {
+    if unit_kind == EntityKind::AntiTankGun && at_gun_history {
+        owned_complete_building_kinds.contains(&EntityKind::Steelworks)
+    } else {
+        train_requirement_met(unit_kind, owned_complete_building_kinds)
+    }
+}
+
 /// Whether `unit_kind` is in this faction's catalog and its training tech has been unlocked.
 pub fn train_requirement_met_for_faction(
     faction_id: &str,
@@ -334,7 +349,7 @@ mod tests {
         assert_eq!(cost(EntityKind::Panzerfaust), (55, 10));
         assert_eq!(cost(EntityKind::ScoutCar), (125, 60));
         assert_eq!(cost(EntityKind::ScoutPlane), (0, 0));
-        assert_eq!(cost(EntityKind::Tank), (425, 175));
+        assert_eq!(cost(EntityKind::Tank), (350, 145));
         assert_eq!(cost(EntityKind::CommandCar), (150, 85));
         assert_eq!(cost(EntityKind::MortarTeam), (100, 40));
         assert_eq!(cost(EntityKind::Factory), (125, 125));

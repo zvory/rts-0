@@ -1,4 +1,4 @@
-use super::{entity::EntityKind, upgrade::UpgradeKind, Game};
+use super::{entity::EntityKind, Game};
 use crate::rules::defs::{self, TechRequirement};
 
 /// Read-only facts for room-owned chat notifications; never sent directly to clients.
@@ -8,7 +8,6 @@ pub struct PlayerCriticalEventState {
     pub supply_used: u32,
     pub supply_cap: u32,
     pub blocked_production: Vec<(EntityKind, EntityKind)>,
-    pub upgrading_depots: Vec<u32>,
 }
 
 impl Game {
@@ -31,16 +30,7 @@ impl Game {
                     .collect();
                 let completed: Vec<_> = buildings.iter().map(|entity| entity.kind).collect();
                 let mut blocked_production = Vec::new();
-                let mut upgrading_depots = Vec::new();
                 for building in buildings {
-                    if building.kind
-                        == super::upgrade::definition(UpgradeKind::IndustrialCenter).researched_at
-                        && building.research_queue().first().is_some_and(|item| {
-                            item.upgrade == UpgradeKind::IndustrialCenter && item.paid
-                        })
-                    {
-                        upgrading_depots.push(building.id);
-                    }
                     if let Some(production) = &building.production {
                         for &unit in &production.repeat_units {
                             let Some(definition) = defs::unit_def(unit) else {
@@ -66,9 +56,8 @@ impl Game {
                 PlayerCriticalEventState {
                     player_id: player.id,
                     supply_used: player.supply_used,
-                    supply_cap: player.supply_cap(&self.state.entities),
+                    supply_cap: crate::config::PLAYER_SUPPLY_CAP,
                     blocked_production,
-                    upgrading_depots,
                 }
             })
             .collect()

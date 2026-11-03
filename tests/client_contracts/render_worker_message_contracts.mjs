@@ -114,6 +114,42 @@ assert(!frameMessage.payload.frame.layers.persistentGroundMark.some((record) => 
   "dynamic frame excludes decals carried by the durable-update lifetime");
 for (const entry of firstMessages) validateRenderWorkerRequest(entry);
 
+const sourceJson = JSON.stringify(representative);
+const outgoingFrame = frameMessage.payload.frame;
+assert(Object.isFrozen(representative) && Object.isFrozen(representative.layers)
+  && Object.isFrozen(representative.layers.fogGatedWorld[0].anchors.ground),
+  "the wire borrows detached immutable assembler records, including nested entity data");
+assert(outgoingFrame !== representative && outgoingFrame.layers !== representative.layers
+  && outgoingFrame.visible !== representative.visible && outgoingFrame.explored !== representative.explored,
+  "wire sanitization owns its frame, layer and grid wrappers without mutating frozen assembler snapshots");
+assert(outgoingFrame.layers.fogGatedWorld === representative.layers.fogGatedWorld
+  && outgoingFrame.layers.fogGatedWorld[0] === representative.layers.fogGatedWorld[0],
+  "immutable entity records avoid a redundant local clone before postMessage isolation");
+outgoingFrame.pixiCompatibility = { oil: 10, poses: [] };
+assert(!Object.hasOwn(representative, "pixiCompatibility")
+  && JSON.stringify(representative) === sourceJson,
+  "host compatibility decoration and lifetime filtering leave the retained source frame unchanged");
+// Simulate the actual synchronous postMessage boundary, including grid transfer detachment.
+const receivedMessages = firstMessages.map(({ message, transfer }) =>
+  structuredClone(message, { transfer: [...transfer] }));
+const receivedFrame = receivedMessages.at(-1).payload.frame;
+assert(gridMessage.transfer.every((buffer) => buffer.byteLength === 0)
+  && representative.visible.values.byteLength === 4 && representative.explored.values.byteLength === 4,
+  "posting transfers only wire-owned grid copies and retains source buffers for queued frames and capture");
+assert(receivedFrame.layers.fogGatedWorld !== representative.layers.fogGatedWorld
+  && receivedFrame.layers.fogGatedWorld[0].anchors !== representative.layers.fogGatedWorld[0].anchors,
+  "postMessage supplies the worker's independent entity graph even though local assembly borrows records");
+receivedFrame.layers.fogGatedWorld[0].anchors.ground.x = 999;
+receivedFrame.projection.camera.focus.x = 999;
+receivedFrame.pixiCompatibility.oil = 999;
+receivedMessages[0].payload.revisions.visible.values.fill(0);
+assert(JSON.stringify(representative) === sourceJson && outgoingFrame.pixiCompatibility.oil === 10,
+  "worker-side mutation cannot reach retained frame records, transferred source grids or host decoration");
+assert(receivedFrame.visible.values === null && receivedFrame.explored.values === null
+  && !receivedFrame.layers.persistentGroundMark.some((record) => record.type === "groundDecal")
+  && receivedMessages.find((message) => message.type === "durableDecals").payload.decals.length === 1,
+  "actual posting preserves separate dynamic, revisioned-grid and durable-decal lifetimes");
+
 const repeat = createFrameMessages(representative, state);
 assert(repeat.map((entry) => entry.message.type).join(",") === "durableDecals,frame",
   "unchanged large grids are omitted while an unacknowledged durable revision remains explicit");

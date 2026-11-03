@@ -242,7 +242,6 @@ where
     let mut actions = AiActionContext::new(&facts, budget);
     actions.set_marking(is_jeff_v1_1(profile.id));
     let mut intents = Vec::new();
-    queue_industrial_center(&mut actions, observation, &facts, &mut intents);
     pressure_economy::protect_depot_in_transit(observation, profile, &mut actions);
     if profile.id == crate::ai_core::profiles::PRESSURE_AI_ID {
         memory

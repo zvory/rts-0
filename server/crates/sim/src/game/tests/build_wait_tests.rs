@@ -254,7 +254,7 @@ fn overlapping_build_race_charges_only_the_worker_that_spawns_scaffold() {
     let mut game = empty_flat_game(&players);
     let (tile_x, tile_y) = (10, 10);
     let left = staging_point(&game, tile_x, tile_y, -1);
-    let right = staging_point(&game, tile_x, tile_y, 3);
+    let right = staging_point(&game, tile_x, tile_y, 4);
     let worker_a = game
         .state
         .entities

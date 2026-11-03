@@ -1,17 +1,36 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { INTERACT_LIMITS, InteractService, validateCommandInput } from "../scripts/interact/command_service.ts";
 import { openInteractDriver } from "./fixtures/interact_fake_driver.mjs";
 import { InteractTestArtifacts } from "./fixtures/interact_test_artifacts.mjs";
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+// Export fault injection removes the artifact directory: never run it in the
+// repository workspace shared with parallel contract suites or local artifacts.
+const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "rts-interact-artifacts-")));
 const testArtifacts = new InteractTestArtifacts(root);
 let service;
 
 try {
+  const siblingArtifacts = new InteractTestArtifacts(root);
+  fs.mkdirSync(testArtifacts.artifactDirectory, { recursive: true });
+  siblingArtifacts.cleanup();
+  assert.ok(fs.existsSync(testArtifacts.artifactDirectory), "cleanup preserves an empty shared directory between another writer's mkdir and write");
+  const sibling = siblingArtifacts.ownPortableArtifact({
+    artifactId: `artifact_${"a".repeat(32)}`,
+    path: path.join(testArtifacts.artifactDirectory, `artifact_${"a".repeat(32)}.setup.json`),
+    sidecarPath: path.join(testArtifacts.artifactDirectory, `artifact_${"a".repeat(32)}.aliases.json`),
+  });
+  fs.writeFileSync(sibling.path, "sibling artifact");
+  fs.writeFileSync(sibling.sidecarPath, "sibling aliases");
+  testArtifacts.cleanup();
+  assert.equal(fs.readFileSync(sibling.path, "utf8"), "sibling artifact", "cleanup preserves another suite's files");
+  assert.equal(fs.readFileSync(sibling.sidecarPath, "utf8"), "sibling aliases");
+  siblingArtifacts.cleanup();
+  siblingArtifacts.assertClean();
+
   service = new InteractService({ workspaceRoot: root, driverFactory: openInteractDriver });
   const opened = await service.execute("open", {});
   const sessionId = testArtifacts.ownSession(opened.sessionId);
@@ -123,4 +142,5 @@ try {
   await service?.shutdown("test");
   testArtifacts.cleanup();
   testArtifacts.assertClean();
+  fs.rmSync(root, { recursive: true, force: true });
 }

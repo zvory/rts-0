@@ -133,7 +133,7 @@ the transport envelope only and is intentionally absent from replay/simulation c
 | `train`      | `building: u32`, `unit: string` | Queue one manual production item. Most items are units; a Resource Depot also accepts `steel_mine` and `pump_jack`. A paid front extractor item immediately creates an under-construction scaffold on the nearest deterministic live, unoccupied matching resource patch within that producer's mining range. Its public `buildProgress` equals the depot item's `prodProgress`, and completing the queue item completes that same scaffold. An extractor waits unpaid at zero progress while no eligible patch exists. Other legal manual requests may wait for Steel, Oil, or supply. Later FIFO items do not prepay. |
 | `adjustProductionRepeat` | `buildings: u32[]`, `unit: string`, `delta: -1\|1` | Atomically adjust a production item across selected compatible producers. `+1` enables it on one producer that does not already repeat it, preferring the producer with the fewest standing repeat items; `-1` removes it from one producer that repeats it, preferring the producer with the most standing repeat items so another automatic order survives when possible. Stable opposite entity-id tie-breaks make repeated additions followed by removals reversible. When a producer's ordinary queue is empty, it silently retries the ordered list's current eligible entry. Entries missing a completed building or upgrade prerequisite stay enabled but are skipped until unlocked; resource, supply, pause, and reserve failures wait without skipping the selected eligible entry. A repeated Steel Mine or Pump Jack creates no queue item and spends nothing while every matching patch in that producer's range is occupied; destroying an extractor makes the repeat eligible again. Each successful automatic enqueue advances to the next enabled item. Any production cancel clears the affected producer's whole repeat list. |
 | `setAutoBuildSettings` | `paused: bool`, `reserveSteel: u32`, `reserveOil: u32` | Replace the issuing player's authoritative Auto-Build policy. New players start unpaused with both resource floors at 0. The server clamps each reserve to 0–9,950. While paused, standing repeat orders do not enqueue new units. Otherwise, for each resource an automatic item actually spends, the resulting stockpile must stay at or above that resource's floor. A zero-cost resource does not gate the item, so Worker Auto-Build can run below the Oil floor without spending Oil. Already-queued and manual production remain ordinary FIFO work and are unaffected. |
-| `research`   | `building: u32`, `upgrade: string` | Queue a permanent player upgrade at a tech building, including a valid Training Centre or Engineering Complex that is still under construction. Research queued during construction remains unpaid and at zero progress until the building completes. A legal manual request may also wait unpaid at zero progress until its cost is available. A prerequisite must either be complete or already appear earlier in the same building's authoritative FIFO research queue. Current Kriegsia upgrade ids: `methamphetamines`, `panzerfausts`, and `entrenchment` at the Training Centre; `artillery_unlock` (Artillery), `ballistic_tables` (Artillery Fire Control), `tank_unlock`, `tank_plus` (Tank Plus), `smoke_plus`, `scout_plane_unlock` (Scout Plane), and `rockets` (Rockets) at the Engineering Complex (`engineering_complex`). `panzerfausts` unlocks Panzerfaust training at the Barracks without changing Riflemen. Anti-Tank Guns need no research and are trainable from a completed Gun Works while owning a completed Engineering Complex. `anti_tank_gun_unlock` remains decodable for legacy commands and replays but is not researchable. `artillery_unlock` independently unlocks Artillery training; `ballistic_tables` requires `artillery_unlock` and reduces the Artillery Fire minimum radius from 6 tiles to 3; `tank_unlock` unlocks Tank training. `smoke_plus` doubles Scout Car Smoke radius and duration. `scout_plane_unlock` unlocks the Resource Depot and Command Car Scout Plane ability. `rockets` costs 75 steel and 125 oil, takes 25 seconds, and unlocks Rocket Truck production at Gun Works. |
+| `research`   | `building: u32`, `upgrade: string` | Queue a permanent player upgrade at a tech building, including a valid Training Centre or Engineering Complex that is still under construction. Research queued during construction remains unpaid and at zero progress until the building completes. A legal manual request may also wait unpaid at zero progress until its cost is available. A prerequisite must either be complete or already appear earlier in the same building's authoritative FIFO research queue. Current Kriegsia upgrade ids: `methamphetamines`, `panzerfausts`, and `entrenchment` at the Training Centre; `artillery_unlock` (Artillery), `ballistic_tables` (Artillery Fire Control), `tank_unlock`, `tank_plus` (Tank Plus), `smoke_plus`, `scout_plane_unlock` (Scout Plane), and `rockets` (Rockets) at the Engineering Complex (`engineering_complex`). `panzerfausts` unlocks Panzerfaust training at the Barracks without changing Riflemen. Anti-Tank Guns need no research and are trainable from a completed Gun Works after having owned a completed Engineering Complex. TEMPORARY HACK (TODO: remove when tech requirements are revisited): `anti_tank_gun_unlock` is automatically granted as a permanent ownership-history marker in existing `upgrades` rows, survives loss of the complex, and remains non-researchable. `artillery_unlock` independently unlocks Artillery training; `ballistic_tables` requires `artillery_unlock` and reduces the Artillery Fire minimum radius from 6 tiles to 3; `tank_unlock` unlocks Tank training. `smoke_plus` doubles Scout Car Smoke radius and duration. `scout_plane_unlock` unlocks the Resource Depot and Command Car Scout Plane ability. `rockets` costs 75 steel and 125 oil, takes 25 seconds, and unlocks Rocket Truck production at Gun Works. |
 | `cancel`     | `building: u32`, `construction?: bool` | With `construction: true`, cancel an owned unfinished building for a full construction-cost refund; an extractor scaffold instead cancels and refunds its owning Resource Depot item. Otherwise cancel the latest item in a completed building's production queue; cancelling its active extractor item also removes the linked scaffold. The explicit construction scope prevents a delayed scaffold action from cancelling production after the building completes. Attached builders return to ordinary order handling when a construction site is canceled. |
 | `stop`       | `units: u32[]` | Clear orders and return selected units to ordinary idle behavior. |
 | `holdPosition` | `units: u32[]`, `queued?: bool` | Stand ground. Without `queued`, clear active and queued unit orders immediately. With `queued: true`, append a terminal hold-position intent so units complete earlier queued stages before standing ground. Held units still fire at enemies already in weapon range and can still be pushed by collision resolution. |
@@ -409,15 +409,14 @@ transport/browser/prediction/render behavior, not as gameplay authority.
 | `error`    | `msg: string` |
 
 Game-generated critical alerts reuse `chat` with `senderId: 0`, `senderName: "Game"`, and
-`channel: "all"`. Supply-cap and lost auto-production prerequisite warnings are delivered only
-to the owning active seat, never teammates or spectators, with an independent 30-second
-simulation-time cooldown per seat and warning (unit/prerequisite for production). Persistent
-blocked conditions may remind after the cooldown. Supply text uses actual used/cap values and
-recommends upgrading a Resource Depot while below the maximum cap. Industrial Center research
-starts broadcast `Color (Player name) has started upgrading a resource depot.` to every connection,
-including spectators, when paid research is first observed. Unpaid queued research does not announce.
-Starts cancelled or restarted within one tick may coalesce because detection samples active research
-after each tick. Only these public announcements enter replay chat; private economy warnings are excluded. No positional information is included.
+`channel: "all"`. Lost auto-production prerequisite warnings are delivered only
+to the owning active seat, never teammates or spectators, as `Rebuild Engineering Complex!`
+(or the other missing prerequisites' display names), with a 30-second simulation-time cooldown
+per seat. Multiple blocked units produce one reminder listing each missing prerequisite once.
+Persistent blocked conditions may remind after the cooldown. Supply-cap warnings are disabled.
+The client displays these alerts as bare text without channel or sender prefixes, with a subtle
+size pulse (disabled for reduced-motion preferences). These private economy warnings are excluded
+from replay chat and contain no positional information.
 
 `LobbyPlayer`: `{ id: u32, teamId: u32, factionId: string, name: string, ready: bool, color: string, isAi: bool, aiProfileId?: string, isSpectator: bool }`. `isAi` is
 true for computer opponents (always shown ready; the client renders an "AI" tag, a host-only
@@ -805,6 +804,12 @@ legacy Scout Plane queue presence, construction progress, gatherer latched node,
 status, per-unit enemy-unit kill totals, and safe combat tracers. `unitsKilled` is present on units
 only, starts at zero, increments when that unit deals the final hostile damage to another unit, and
 does not count destroyed buildings or friendly fire.
+Tank `commanderFacing` is the independent roof MG world angle. It is included only for a visible,
+non-vision-only Tank when its secondary target is visible to the recipient (or absent); owners and
+omniscient observers receive it directly. It never carries a secondary target id.
+When the secondary target is absent, its aim follows the cannon and also requires the cannon's
+target-direction visibility gate.
+
 Combat `targetId` and `weaponFacing` for allied units are sent whenever an attack-capable entity has
 a visible acquired target, including autonomous acquisition while its explicit order state remains
 idle. They are omitted when the target is not visible in the recipient's team-current actionable
@@ -943,7 +948,7 @@ adds an explicit application compression envelope.
       visionOnly?, debugPath?, rallyPlan?, prodUpgrade?, buildActive?, deconstructProgress?,
       weaponRangeTiles?, occupiedTrenchId?, scoutPlane?, prodScoutPlaneQueued?,
       panzerfaustLoaded?, prodRepeatKinds?, prodWaiting?, breakthroughAuraTicks?, extractorActive?,
-      prodUpgradeQueue?, panzerfaustWindupProgress?
+      prodUpgradeQueue?, panzerfaustWindupProgress?, unitsKilled?, rocketRackCount?, commanderFacing?
     ]
   ],
   "r": [[id, remaining]],         // omitted when empty
@@ -972,7 +977,7 @@ Compact numeric codes:
 | `orderStage` | 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, 5 `build`, 6 `smoke`, 7 `setupAntiTankGuns`, 8 `charge`, 9 `mortarFire`, 10 `pointFire`, 11 `breakthrough`, 12 `ekatTeleport`, 13 `ekatLineShot`, 14 `ekatMagicAnchor`, 15 `deconstruct`, 16 `ekatConsumeGolem`, 17 `blanketFire`, 18 `dismissScoutPlane`, 19 `scoutPlane`, 20 `holdPosition`, 21 `barrage` |
 | `ability` | 1 `charge`, 2 `smoke`, 3 `mortarFire`, 4 `pointFire`, 5 `breakthrough`, 6 `ekatTeleport`, 7 `ekatLineShot`, 8 `ekatMagicAnchor`, 9 `ekatConsumeGolem`, 10 `blanketFire`, 11 `dismissScoutPlane`, 12 `scoutPlane`, 13 `barrage` |
 | `abilityObject.kind` | 1 `returnMarker`, 2 `magicAnchor`, 3 `lineProjectile` |
-| `upgrade` | 1 `methamphetamines`, 2 `anti_tank_gun_unlock`, 3 `tank_unlock`, 4 `artillery_unlock`, 7 `ballistic_tables`, 8 `entrenchment`, 9 `smoke_plus`, 10 `panzerfausts`, 11 `scout_plane_unlock`, 12 `rockets`, 13 `tank_plus`, 14 `industrial_center` |
+| `upgrade` | 1 `methamphetamines`, 2 `anti_tank_gun_unlock`, 3 `tank_unlock`, 4 `artillery_unlock`, 7 `ballistic_tables`, 8 `entrenchment`, 9 `smoke_plus`, 10 `panzerfausts`, 11 `scout_plane_unlock`, 12 `rockets`, 13 `tank_plus` |
 | `weaponKind` | 1 `worker_tools`, 2 `golem_fists`, 3 `rifleman_rifle`, 4 `machine_gunner_mg`, 5 `scout_car_mg`, 6 `anti_tank_gun`, 7 `panzerfaust_loaded_shot`, 8 `mortar_team_mortar`, 9 `artillery_gun`, 10 `tank_cannon`, 11 `tank_coax`, 12 `warrior_sword` |
 | `notice.severity` | 1 `info`, 2 `warn`, 3 `alert` |
 | `EventRecord` | `[1, from, to]` attack, `[1, from, to, reveal?, toPos?]` legacy attack with optional shooter reveal and target position, `[1, from, to, revealOrNull, toPosOrNull, weaponKind]` attack with compact weapon hint, `[2, id, x, y, kind]` death, `[3, id, kind]` build, `[4, msg]` notice, `[4, msg, severity]` position-free notice with severity, `[4, msg, severity, x, y]` positioned notice, `[5, [fromX, fromY], [toX, toY], delayTicks]` smoke launch, `[6, x, y, radiusTiles]` mortar impact/marker, `[6, x, y, radiusTiles, from?, reveal?]` mortar impact with optional shooter reveal, `[7, from, [x, y], radiusTiles, delayTicks]` artillery target marker, `[8, x, y, radiusTiles]` artillery impact, `[9, from, [fromX, fromY], [toX, toY], radiusTiles, delayTicks]` mortar launch, `[11, owner, x, y, facing]` global artillery firing minimap marker, `[12, from, [fromX, fromY], [toX, toY], delayTicks]` Panzerfaust launch, `[13, x, y]` Panzerfaust impact, `[15, to]` missed direct shot (14 removed with conversion) |
@@ -1158,6 +1163,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   state: string,                 // "idle","move","attack","gather","build","train","construct","dead"
   facing?: f32,                  // radians, for unit body/hull orientation (optional)
   weaponFacing?: f32,            // radians, for independent weapon/barrel orientation (optional)
+  commanderFacing?: f32,         // Tank roof MG world angle; compact entity slot 44
   // production buildings:
   prodKind?: string,             // unit currently being produced
   prodUpgrade?: string,          // upgrade currently being researched
@@ -1178,7 +1184,6 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   targetId?: u32,                // current attack target, for drawing tracers
   weaponRangeTiles?: f32,        // owner/allied Tanks only; current authoritative weapon range
   occupiedTrenchId?: u32,        // visible eligible infantry only while actively stopped in a trench
-  industrialCenter?: boolean,    // completed local Resource Depot supply upgrade, public when visible
   rocketRackCount?: u8,           // 0–16 physical rounds; visible Rocket Trucks only
   panzerfaustLoaded?: bool,       // Panzerfaust units only; false after disposable launch
   panzerfaustWindupProgress?: f32,// Panzerfaust wind-up only; authoritative normalized 0..1 timing
@@ -1565,7 +1570,19 @@ unique, in-bounds tile-coordinate pairs and can independently supplement forest-
 Schema v10 is the only accepted authored-map schema. Older documents are rejected rather than
 migrated, and every shipped map declares `forestSpans` even when it is empty.
 Each dimension is bounded to 256 tiles. Start locations determine the
-supported player count; every base site is a permanent resource location, including unoccupied
+supported player count. Each start optionally carries `teamGroup` (integer 1–4).
+Either every start has a group or none do. On grouped maps, all members of a team must occupy
+one group, and different teams must occupy different groups. Group numbers are map-local affinities,
+not lobby team ids. Unused starts/groups are allowed, so groups `[1,2,1,2]` support 2v2, 1v2,
+and 1v1, but reject 1v3 and three- or four-team FFA. Incompatible rosters fail map loading and the
+lobby reports the error to the host without starting the match. Assignment remains deterministic
+for a given map, roster, and seed. Maps without groups retain the existing FFA shuffle and
+team-distance heuristic. This optional v10 extension affects authored-map JSON only; start/snapshot
+wire payloads carry the already-assigned positions and need no new fields. The editor preserves
+groups through import/export, move, resize, and undo/redo, and exposes them per start. Lab materialized
+maps hold explicit positions rather than lobby assignment policy; returning a materialized Lab map
+to the editor does not reconstruct authored groups.
+Every base site is a permanent resource location, including unoccupied
 start locations. Each base site carries authoritative `steelPatches` (0–36) and `oilPatches` (0–9)
 counts. Doodads use unique nonzero `u32` ids and integer world-pixel positions, are canonicalized
 by ascending id, and are capped at 4,096 entries. The server allowlist is `tree.oak`, `tree.pine`,
@@ -1930,11 +1947,3 @@ rather than exposing hidden impact positions.
 Bursts that only hit traps or miss do not grant a shooter reveal; their rays are withheld
 from enemies when the shooter is concealed. Smoke-hidden shooters are also withheld.
 This can hide some firing feedback at fog edges; it never changes authoritative damage.
-
-Industrial Centers use `research {building, upgrade:"industrial_center"}` (upgrade code 14).
-Completion belongs to that Resource Depot and never enters player `upgrades`.
-`EntityView.industrialCenter` is appended at compact entity slot 44 (false/absent otherwise).
-Remembered buildings append `industrialCenter` at slot 7, using the last observed state;
-completion while unseen never updates enemy memory. Supply scalars and observer rows reflect
-Kriegsia’s 100 base +100 per living completed center, clamped at 300; other factions retain 300. Queue/payment details keep their
-existing owner/allied visibility. Two completed or pending upgrades reserve both available slots.

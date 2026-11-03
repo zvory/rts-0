@@ -721,7 +721,8 @@ pub(super) fn expansion_cluster_resources_for_anchor<'a>(
     resources: &[&'a AiResourceSummary],
 ) -> Vec<&'a AiResourceSummary> {
     let center = tile_center(anchor, observation.map.tile_size);
-    let radius = (config::MINING_ANCHOR_RANGE_TILES + 2.0) * observation.map.tile_size as f32;
+    let radius = (config::MINING_ANCHOR_RANGE_TILES + config::START_RESOURCE_MAX_DIST_TILES)
+        * observation.map.tile_size as f32;
     let radius2 = squared(radius);
     resources
         .iter()

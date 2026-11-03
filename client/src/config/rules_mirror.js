@@ -52,6 +52,8 @@ export const ANTI_TANK_GUN_FIELD_OF_FIRE_RAD = 40 * Math.PI / 180;
 export const ARTILLERY_MIN_RANGE_TILES = 10;
 export const ARTILLERY_MAX_RANGE_TILES = 35;
 export const ARTILLERY_FIELD_OF_FIRE_RAD = 30 * Math.PI / 180;
+export const ANTI_TANK_GUN_SETUP_TICKS = 120;
+export const ANTI_TANK_GUN_TEARDOWN_TICKS = 40;
 export const ARTILLERY_SETUP_TICKS = TICK_HZ * 6;
 export const ARTILLERY_SHELL_DELAY_TICKS = TICK_HZ * 5;
 export const ARTILLERY_OUTER_RADIUS_TILES = 2;
@@ -75,7 +77,7 @@ export const MORTAR_MIN_RANGE_TILES = 5;
 export const MORTAR_FIELD_OF_FIRE_RAD = Math.PI * 2;
 export const MORTAR_OUTER_RADIUS_TILES = 2;
 export const MORTAR_INNER_RADIUS_TILES = 0.5;
-export const MORTAR_FIRE_COOLDOWN_TICKS = TICK_HZ * 4;
+export const MORTAR_FIRE_COOLDOWN_TICKS = TICK_HZ * 6;
 export const PANZERFAUST_RANGE_TILES = 5;
 export const PANZERFAUST_DAMAGE = 100;
 export const PANZERFAUST_ARMOR_PENETRATION = 0.5;
@@ -165,7 +167,7 @@ export const STATS = Object.freeze({
     blocksGroundPlacement: false,
     rangeTiles: 0, cost: { steel: 0, oil: 0 }, supply: 0, buildTicks: 0 },
   [KIND.TANK]: { armored: true, label: "Tank", icon: "TK", size: 18, sight: 9, body: TANK_BODY,
-    rangeTiles: 5, cost: { steel: 425, oil: 175 }, supply: 5, buildTicks: 750,
+    rangeTiles: 5, cost: { steel: 350, oil: 145 }, supply: 5, buildTicks: 750,
     requires: KIND.FACTORY, upgradeRequires: UPGRADE.TANK_UNLOCK,
     upgradeRequiresText: "Requires research in Engineering Complex" },
   [KIND.COMMAND_CAR]: { armored: false, label: "Command Car", icon: "CAR", size: 12.6, sight: 8, body: COMMAND_CAR_BODY,
@@ -174,10 +176,9 @@ export const STATS = Object.freeze({
   [KIND.EKAT]: { armored: false, label: "Ekat", icon: "EK", size: 10, sight: 12,
     rangeTiles: 0, cost: { steel: 0, oil: 0 }, supply: 0, buildTicks: 0 },
 
-  [KIND.RESOURCE_DEPOT]: { label: "Resource Depot", icon: "RD", footW: 3, footH: 3, sight: 1,
+  [KIND.RESOURCE_DEPOT]: { label: "Resource Depot", icon: "RD", footW: 4, footH: 4, sight: 1,
     cost: { steel: 450, oil: 100 }, buildTicks: TICK_HZ * 5,
-    trains: [KIND.WORKER, KIND.STEEL_MINE, KIND.PUMP_JACK],
-    researches: [UPGRADE.INDUSTRIAL_CENTER] },
+    trains: [KIND.WORKER, KIND.STEEL_MINE, KIND.PUMP_JACK] },
   [KIND.PORTAL]: { label: "Portal", icon: "PRT", footW: 3, footH: 3, sight: 1,
     cost: { steel: 150, oil: 0 }, buildTicks: TICK_HZ * 5, trains: [KIND.WARRIOR],
     description: "A supernatural gateway that trains Cultivator Warriors." },
@@ -427,12 +428,6 @@ export const ABILITIES = Object.freeze({
 });
 
 export const UPGRADES = Object.freeze({
-  [UPGRADE.INDUSTRIAL_CENTER]: Object.freeze({
-    upgrade: UPGRADE.INDUSTRIAL_CENTER, label: "Industrial Center", icon: "IC",
-    researchedAt: KIND.RESOURCE_DEPOT, cost: { steel: 800, oil: 300 },
-    researchTicks: TICK_HZ * 60,
-    description: "Upgrade this Resource Depot: triple maximum HP and +100 global supply while it exists. Maximum two Industrial Centers; absolute cap 300.",
-  }),
   [UPGRADE.METHAMPHETAMINES]: Object.freeze({
     upgrade: UPGRADE.METHAMPHETAMINES,
     label: "Methamphetamines",

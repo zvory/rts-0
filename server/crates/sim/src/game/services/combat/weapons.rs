@@ -54,6 +54,29 @@ pub(super) fn rotate_vehicle_weapon_for_combat(e: &mut Entity, target_angle: f32
     angle_delta(rotated, target_angle).abs() <= TANK_TURRET_FIRE_TOLERANCE_RAD
 }
 
+pub(super) fn rotate_tank_commander_weapon(
+    tank: &mut Entity,
+    target: Option<u32>,
+    target_angle: Option<f32>,
+) -> bool {
+    let turret_facing = tank.weapon_facing().unwrap_or(tank.facing());
+    let Some(combat) = tank.combat.as_mut() else {
+        return false;
+    };
+    combat.commander_target_id = target;
+    let desired = target_angle.unwrap_or(turret_facing);
+    if !desired.is_finite() {
+        return false;
+    }
+    let current = if combat.commander_facing.is_finite() {
+        combat.commander_facing
+    } else {
+        turret_facing
+    };
+    combat.commander_facing = rotate_toward(current, desired, TANK_TURRET_TURN_RATE_RAD_PER_TICK);
+    angle_delta(combat.commander_facing, desired).abs() <= TANK_TURRET_FIRE_TOLERANCE_RAD
+}
+
 pub(super) fn relax_vehicle_weapon_toward_body(e: &mut Entity) {
     let body = e.facing();
     if !body.is_finite() {
@@ -138,6 +161,9 @@ pub(super) fn begin_idle_deployed_weapon_setup(e: &mut Entity) {
         return;
     }
     if matches!(e.weapon_setup(), WeaponSetup::Packed) {
+        // No target chose an aim direction: deploy along the last walking heading instead
+        // of exposing a stale weapon bearing when presentation switches to the setup pose.
+        mirror_weapon_to_body(e, e.facing());
         e.set_weapon_setup(WeaponSetup::SettingUp {
             ticks: config::MACHINE_GUNNER_SETUP_TICKS,
         });

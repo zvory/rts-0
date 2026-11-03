@@ -7,7 +7,7 @@ import { RENDER_WORKER_RESPONSE } from "../../client/src/renderer/worker_message
 
 const priorDocument = globalThis.document;
 const priorRaf = globalThis.requestAnimationFrame;
-const priorStats = globalThis.__rtsRenderWorkerStats;
+const priorStatsDescriptor = Object.getOwnPropertyDescriptor(globalThis, "__rtsRenderWorkerStats");
 const priorControl = globalThis.__rtsRenderWorkerControl;
 globalThis.requestAnimationFrame = (callback) => { callback(10); return 1; };
 
@@ -150,6 +150,9 @@ async function generationAndFatalContracts() {
     "an out-of-order current-generation acknowledgment fails the renderer boundedly");
   assert(adapter.diagnostics().failed === 1 && worker.terminated === 1,
     "fatal protocol failure tears down the worker and records one failed renderer lifecycle");
+  assert(globalThis.__rtsRenderWorkerStats.failed === 1
+    && globalThis.__rtsRenderWorkerStats.lastError === adapter.diagnostics().lastError,
+  "lazy global reads expose the fatal incident immediately");
   assert(root.children[0]?.className === "renderer-fatal-error" && root.children[0]?.role === "alert",
     "fatal worker failure leaves a visible bounded match error and does not construct a fallback");
   adapter.destroy();
@@ -360,6 +363,62 @@ async function measurementBoundaryContracts() {
   }
 }
 
+async function lazyDiagnosticsContracts() {
+  const savedPerformance = globalThis.performance;
+  let now = 10;
+  globalThis.performance = { timeOrigin: 1000, now: () => now };
+  const { adapter, worker, assembler } = createFixture();
+  const control = globalThis.__rtsRenderWorkerControl;
+  const getter = Object.getOwnPropertyDescriptor(globalThis, "__rtsRenderWorkerStats").get;
+  let snapshots = 0;
+  const original = adapter._publicStats;
+  adapter._publicStats = function () { snapshots += 1; return original.call(this); };
+  try {
+    const firstFrame = assemble(assembler, 1);
+    const first = adapter.render(firstFrame);
+    const secondFrame = assemble(assembler, 2);
+    const second = adapter.render(secondFrame);
+    now = 25;
+    worker.present(firstFrame);
+    await first.settled;
+    now = 40;
+    worker.present(secondFrame);
+    await second.settled;
+    assert(snapshots === 0, "submission, pending dispatch and completion never summarize unread diagnostics");
+    assert(Object.getOwnPropertyDescriptor(globalThis, "__rtsRenderWorkerStats").get === getter,
+      "frame lifecycle keeps one installed diagnostics getter");
+    const stats = globalThis.__rtsRenderWorkerStats;
+    assert(stats.submitted === 2 && stats.completed === 2 && stats.mainSubmitMs.samples === 2,
+      "a lazy global read includes every frame counter and timing sample");
+    assert(control.snapshot().completed === stats.completed && adapter.diagnostics().completed === stats.completed,
+      "global, control and adapter diagnostics expose the same current counters");
+    now = 90;
+    assert(globalThis.__rtsRenderWorkerStats.lastPresentedAgeMs === 50,
+      "lazy global reads refresh ages even when no frame has been submitted");
+    control.reset();
+    assert(globalThis.__rtsRenderWorkerStats.completed === 0
+      && globalThis.__rtsRenderWorkerStats.mainSubmitMs.samples === 0,
+    "diagnostic reset is visible immediately through the installed getter");
+
+    const replacement = createFixture();
+    const replacementControl = globalThis.__rtsRenderWorkerControl;
+    const replacementGetter = Object.getOwnPropertyDescriptor(globalThis, "__rtsRenderWorkerStats").get;
+    adapter.destroy();
+    assert(globalThis.__rtsRenderWorkerControl === replacementControl
+      && Object.getOwnPropertyDescriptor(globalThis, "__rtsRenderWorkerStats").get === replacementGetter
+      && !globalThis.__rtsRenderWorkerStats.destroyed,
+    "destroying an old match cannot overwrite the replacement match's diagnostics or control");
+    replacement.adapter.destroy();
+    const finalDescriptor = Object.getOwnPropertyDescriptor(globalThis, "__rtsRenderWorkerStats");
+    assert(!finalDescriptor.get && finalDescriptor.value.destroyed
+      && globalThis.__rtsRenderWorkerControl === undefined,
+    "teardown preserves a final detached record and removes global references to the host");
+  } finally {
+    adapter.destroy();
+    globalThis.performance = savedPerformance;
+  }
+}
+
 function createFixture({ surface = "match", gpuShadowTiming = false } = {}) {
   const map = { width: 2, height: 2, tileSize: 32, terrain: [0, 1, 2, 3], resources: [] };
   const assembler = new PresentationFrameAssembler({ map });
@@ -462,9 +521,11 @@ try {
   await decalResetContracts();
   await editorFatalContracts();
   await measurementBoundaryContracts();
+  await lazyDiagnosticsContracts();
 } finally {
   restoreGlobal("document", priorDocument);
   restoreGlobal("requestAnimationFrame", priorRaf);
-  restoreGlobal("__rtsRenderWorkerStats", priorStats);
+  if (priorStatsDescriptor) Object.defineProperty(globalThis, "__rtsRenderWorkerStats", priorStatsDescriptor);
+  else delete globalThis.__rtsRenderWorkerStats;
   restoreGlobal("__rtsRenderWorkerControl", priorControl);
 }

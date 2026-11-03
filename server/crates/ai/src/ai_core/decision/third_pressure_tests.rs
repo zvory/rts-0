@@ -20,7 +20,6 @@ fn unit(id: u32, owner: u32, kind: EntityKind, tiles: (f32, f32)) -> AiEntitySum
         .or_else(|| config::building_stats(kind).map(|stats| stats.hp))
         .unwrap_or(100);
     AiEntitySummary {
-        industrial_center_slot_reserved: false,
         id,
         owner,
         kind,
@@ -1056,8 +1055,8 @@ fn the_raid_goes_for_a_base_off_the_enemy_route_and_a_natural_off_it_first() {
 }
 
 #[test]
-fn on_classic_the_raid_skips_the_base_on_the_enemy_armys_diagonal() {
-    let (observation, analysis) = real_map("Classic", 1);
+fn on_vintage_the_raid_skips_the_base_on_the_enemy_armys_diagonal() {
+    let (observation, analysis) = real_map("Vintage", 1);
     let route = analysis.base_route_tiles(1).unwrap();
     let state = ThirdPressure::default();
     // AI 2.1 would take (86, 82) after its natural, but it stands on its army's way to Jeff.

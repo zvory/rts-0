@@ -163,7 +163,7 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
   );
   assert(STATS[KIND.SCOUT_CAR].cost.steel === 125, "Scout Car steel cost mirrors server");
   assert(STATS[KIND.SCOUT_CAR].cost.oil === 60, "Scout Car oil cost mirrors server");
-  assert(STATS[KIND.TANK].cost.oil === 175, "Tank oil cost mirrors server");
+  assert(STATS[KIND.TANK].cost.oil === 145, "Tank oil cost mirrors server");
   assert(STATS[KIND.SCOUT_CAR].rangeTiles === 7, "Scout Car weapon range mirrors server");
   assert(STATS[KIND.SCOUT_CAR].sight === 15, "Scout Car sight radius mirrors server");
   assert(SMOKE_ABILITY_COST.steel === 0 && SMOKE_ABILITY_COST.oil === 0, "Scout Car smoke has no resource cost");

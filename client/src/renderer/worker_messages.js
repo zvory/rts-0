@@ -108,7 +108,7 @@ export function createFrameMessages(frame, state = createRenderWorkerWireState()
     }));
   }
   messages.push(request(RENDER_WORKER_MESSAGE.FRAME, frame.generation, {
-    frame: cloneFrameWithoutGridValues(frame),
+    frame: frameWithoutGridValues(frame),
   }));
   return messages;
 }
@@ -419,13 +419,21 @@ function validateDoodads(records) {
   }
 }
 
-function cloneFrameWithoutGridValues(frame) {
-  const clone = structuredClone(frame);
-  clone.visible = { ...clone.visible, values: null };
-  clone.explored = { ...clone.explored, values: null };
-  clone.layers.persistentGroundMark = clone.layers.persistentGroundMark
-    .filter((record) => record?.type !== "groundDecal");
-  return clone;
+function frameWithoutGridValues(frame) {
+  // The assembler already owns detached, immutable presentation records. Borrow those
+  // records until the host's synchronous postMessage clones them into the worker; only
+  // replace the wrappers we sanitize or decorate. A local deep clone would serialize the
+  // same entity graph twice, including grid values that are immediately discarded.
+  return {
+    ...frame,
+    visible: { ...frame.visible, values: null },
+    explored: { ...frame.explored, values: null },
+    layers: {
+      ...frame.layers,
+      persistentGroundMark: frame.layers.persistentGroundMark
+        .filter((record) => record?.type !== "groundDecal"),
+    },
+  };
 }
 
 function gridRecord(grid, values) {

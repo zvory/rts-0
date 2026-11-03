@@ -26,7 +26,7 @@ pub const ANTI_TANK_GUN_FIELD_OF_FIRE_RAD: f32 = 40.0_f32 * std::f32::consts::PI
 pub const ANTI_TANK_GUN_INFANTRY_DAMAGE_MULTIPLIER: f32 = 0.30;
 
 /// Shared manual-fire ability and weapon reload for mortars.
-pub const MORTAR_FIRE_COOLDOWN_TICKS: u32 = TICK_HZ * 4;
+pub const MORTAR_FIRE_COOLDOWN_TICKS: u32 = TICK_HZ * 6;
 
 pub const PANZERFAUST_RANGE_TILES: u32 = 5;
 pub const PANZERFAUST_DAMAGE: u32 = 100;

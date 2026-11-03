@@ -172,7 +172,7 @@ export class Minimap {
       ? options.staticCanvasFactory
       : null;
     this._unitIcons = new MinimapUnitIcons({
-      loadImage: options.loadUnitIcon,
+      loadImage: options.loadUnitIcon, animation: options.unitAnimation,
       createCanvas: () => this._createStaticCanvas(),
     });
     this._terrainLayer = null;
@@ -331,9 +331,9 @@ export class Minimap {
     ctx.fillRect(0, 0, this.size, this.size);
 
     if (!this._ensureTransform()) return;
-
     const entities = this._minimapEntities(frameViews);
     const now = performance.now();
+    this._unitIcons.beginFrame(entities, this.state, this.state?.visualNow?.() ?? now);
     const attackFlashIds = this._underAttackFlashEntityIds(entities, now);
     this._drawTerrainLayer();
     this._forestLayer.draw({

@@ -123,6 +123,79 @@ fn anti_tank_guns_require_an_owned_completed_engineering_complex() {
 }
 
 #[test]
+fn anti_tank_gun_history_survives_complex_loss_for_manual_and_repeat_production() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let (x, y) = footprint_center(&map, EntityKind::Steelworks, 6, 6);
+    let gun_works = entities
+        .spawn_building(1, EntityKind::Steelworks, x, y, true)
+        .unwrap();
+    let (x, y) = footprint_center(&map, EntityKind::EngineeringComplex, 12, 6);
+    let complex = entities
+        .spawn_building(1, EntityKind::EngineeringComplex, x, y, true)
+        .unwrap();
+    let mut players = vec![player_state(1), player_state(2)];
+    // An idle tick must latch ownership even if the player never requests an AT Gun.
+    apply_with_players(&map, &mut entities, &mut players, vec![]);
+    assert!(players[0]
+        .upgrades
+        .contains(&UpgradeKind::AntiTankGunUnlock));
+    assert!(!players[1]
+        .upgrades
+        .contains(&UpgradeKind::AntiTankGunUnlock));
+    entities.remove(complex);
+    let events = apply_with_players(
+        &map,
+        &mut entities,
+        &mut players,
+        vec![(
+            1,
+            SimCommand::Train {
+                building: gun_works,
+                unit: EntityKind::AntiTankGun,
+            },
+        )],
+    );
+    assert!(events[&1].is_empty());
+    assert_eq!(
+        entities.get(gun_works).unwrap().prod_queue()[0].unit,
+        EntityKind::AntiTankGun
+    );
+    entities
+        .get_mut(gun_works)
+        .unwrap()
+        .set_repeat_production(Some(EntityKind::AntiTankGun), true);
+    let completed = world_query::completed_building_kinds(&entities, 1);
+    let occ = Occupancy::build(&map, &entities);
+    let mut pathing = PathingService::new(1024, 32);
+    pathing.advance_tick(2);
+    let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 2);
+    let fog = Fog::new(map.width, map.height);
+    // Drain the manual queue so standing repeat must create the next item itself.
+    entities.get_mut(gun_works).unwrap().pop_last_production();
+    crate::game::services::production::production_system(
+        &map,
+        &mut entities,
+        &mut players,
+        &mut coordinator,
+        &fog,
+        &SmokeCloudStore::new(),
+        &mut HashMap::new(),
+        2,
+    );
+    assert_eq!(
+        entities.get(gun_works).unwrap().prod_queue()[0].unit,
+        EntityKind::AntiTankGun
+    );
+    // The workaround must not unlock other Engineering Complex-dependent units.
+    assert!(!rules::economy::train_requirement_met_with_at_gun_history(
+        EntityKind::CommandCar,
+        &completed,
+        true,
+    ));
+}
+
+#[test]
 fn advanced_unlocks_research_only_at_engineering_complex() {
     let map = flat_map(24);
     for (wrong_building_kind, upgrade) in [

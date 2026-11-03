@@ -66,6 +66,7 @@ const PUMP_JACK_COMPONENT_RIG = Object.freeze({
 
 // Supply Depots and Tank Traps intentionally stay off this visual pass.
 const BUILDING_PNG_SPECS = Object.freeze([
+  // The footprint already scales the artwork; preserve the original transparent-padding ratio.
   buildingSpec(KIND.RESOURCE_DEPOT, 384, 384,
     "/assets/rigs/resource-depot-worksite-preview/resource_depot-atlas.png?v=oil-silo-foundry-worksite-preview-08",
     { emblem: true, visualScale: 1.1 }),
@@ -303,19 +304,6 @@ const BUILDING_PNG_ATLASES = new Map();
 for (const spec of BUILDING_PNG_SPECS) {
   BUILDING_PNG_DEFINITIONS.set(spec.kind, definition(spec));
   BUILDING_PNG_ATLASES.set(spec.kind, atlas(spec));
-}
-
-export const INDUSTRIAL_CENTRE_PNG_KEY = "resource_depot.industrial-centre";
-BUILDING_PNG_ATLASES.set(INDUSTRIAL_CENTRE_PNG_KEY, atlas(buildingSpec(
-  KIND.RESOURCE_DEPOT, 384, 384,
-  "/assets/rigs/industrial-centre-refinery/industrial-centre-atlas.png?v=1",
-  { emblem: true, visualScale: 1.1 },
-)));
-
-export function buildingPngRigKey(entity) {
-  return entity.kind === KIND.RESOURCE_DEPOT && entity.industrialCenter === true
-    ? INDUSTRIAL_CENTRE_PNG_KEY
-    : entity.kind;
 }
 
 export function createBuildingPngRigDefinitions() {

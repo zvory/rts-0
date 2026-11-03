@@ -244,6 +244,15 @@ pub(crate) fn construction_system(
             completed.then_some(completion)
         };
         if let Some((owner, kind, x, y)) = completed {
+            // TEMPORARY HACK: latch the AT Gun tech history immediately on completion.
+            // TODO: remove with the historical Engineering Complex prerequisite workaround.
+            if kind == EntityKind::EngineeringComplex {
+                if let Some(player) = players.iter_mut().find(|player| player.id == owner) {
+                    player
+                        .upgrades
+                        .insert(crate::game::upgrade::UpgradeKind::AntiTankGunUnlock);
+                }
+            }
             for pid in events.keys().copied().collect::<Vec<_>>() {
                 if !teams.same_team_or_same_owner(pid, owner)
                     && !projection::team_visible_world(pid, x, y, fog, &teams)
@@ -787,6 +796,45 @@ mod tests {
             &[OrderIntent::move_to(fallback.0, fallback.1)]
         );
         assert_eq!(second.target_id(), None);
+    }
+
+    #[test]
+    fn engineering_complex_completion_immediately_latches_at_gun_history() {
+        let map = flat_map(16);
+        let mut entities = EntityStore::new();
+        let kind = EntityKind::EngineeringComplex;
+        let (x, y) = footprint_center(&map, kind, 4, 4);
+        let site = entities.spawn_building(1, kind, x, y, false).unwrap();
+        let progress = entities
+            .get(site)
+            .unwrap()
+            .construction
+            .as_ref()
+            .unwrap()
+            .total
+            - 1;
+        entities
+            .get_mut(site)
+            .unwrap()
+            .set_construction_progress(progress);
+        let worker = entities.spawn_unit(1, EntityKind::Worker, x, y).unwrap();
+        let builder = entities.get_mut(worker).unwrap();
+        builder.set_order(Order::build(kind, 4, 4));
+        builder.mark_build_phase(BuildPhase::Constructing { site });
+        let mut players = vec![player_state(1), player_state(2)];
+        construction_system(
+            &map,
+            &mut entities,
+            &mut players,
+            &mut HashMap::new(),
+            &Fog::new(map.width, map.height),
+            &mut BTreeSet::new(),
+        );
+        assert!(!entities.get(site).unwrap().under_construction());
+        assert!(players[0]
+            .upgrades
+            .contains(&crate::game::upgrade::UpgradeKind::AntiTankGunUnlock));
+        assert!(players[1].upgrades.is_empty());
     }
 
     #[test]

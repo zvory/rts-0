@@ -8,7 +8,7 @@ This document owns the cross-file contract for the shareable client-only Hellhol
 `/stress-test` automatically launches the checked-in `fixed-roster-hellhole.rtsstream` through
 `SnapshotStreamNet`. It uses the normal snapshot decode, `GameState`, `Match`, Pixi module worker, fog, HUD,
 minimap, and animation-frame paths, but never opens a WebSocket or runs a server simulation.
-The canonical recording starts with 389 projected entities: the fixed 77-unit-per-player 2v2 armies and structures
+The canonical recording starts with 388 projected entities: the fixed 77-unit-per-player 2v2 armies and structures
 plus Player 1's 120 map-wide, deterministically scattered Tank Traps.
 The roster is an authored mix—1 Worker, 1 Golem, 8 Riflemen, 8 Machine Gunners, 8 Panzerfausts,
 8 Anti-Tank Guns, 8 Mortar Teams, 1 Artillery, 9 Scout Cars, 16 Tanks, and 9 Command Cars per

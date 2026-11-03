@@ -72,6 +72,7 @@ function schemaThreeReplayFixture() {
   const mapBytes = fs.readFileSync(REPLAY_MAP);
   const currentMap = JSON.parse(mapBytes);
   const currentContentHash = fnv1a64(mapBytes);
+  checkpoint.mapBinding.name = currentMap.name;
   checkpoint.mapBinding.schemaVersion = currentMap.version;
   checkpoint.mapBinding.contentHash = currentContentHash;
   checkpoint.mapBinding.materializedMapHash = CURRENT_REPLAY_MAP_MATERIALIZED_HASH;
@@ -86,14 +87,14 @@ function schemaThreeReplayFixture() {
   return {
     artifactSchemaVersion: 3,
     serverBuildSha: "live-node-fixture",
-    mapName: setup.map.name,
+    mapName: currentMap.name,
     mapSchemaVersion: currentMap.version,
     mapContentHash: currentContentHash,
     seed: setup.seed,
     playerLoadouts: checkpoint.startingLoadouts,
     players,
     startState: {
-      mapName: setup.map.name,
+      mapName: currentMap.name,
       mapSchemaVersion: currentMap.version,
       mapContentHash: currentContentHash,
       seed: setup.seed,
@@ -238,8 +239,8 @@ async function main() {
   );
   ok(Object.keys(replayRow).sort().join(",") === SAFE_REPLAY_LOBBY_ROW_KEYS,
     "replay browser row exposes only safe lobby metadata");
-  const replaySetup = JSON.parse(fs.readFileSync(LAB_SETUP_FIXTURE, "utf8"));
-  ok(replayRow.map === replaySetup.map.name, "replay browser row shows the artifact map name");
+  const replayMap = JSON.parse(fs.readFileSync(REPLAY_MAP, "utf8"));
+  ok(replayRow.map === replayMap.name, "replay browser row shows the artifact map name");
 
   const ReplayGuest = await connectClient("browser-replay-guest");
   ReplayGuest.send({ t: "join", name: "Viewer", room: replayRoom, spectator: true });
@@ -286,7 +287,7 @@ async function main() {
     replayRoom,
     (row) => row.kind === "replay" &&
       row.joinState === "inGame" &&
-      row.map === replaySetup.map.name &&
+      row.map === replayMap.name &&
       row.spectatorCount === 2,
     "active replay playback browser row",
   );

@@ -317,7 +317,7 @@ fn pressure_protects_pending_depot_cost_but_keeps_tank_orders_above_it() {
     obs.owned[0].state = AiEntityState::Build;
     obs.pending_builds
         .push(AiBuildIntent::to_site(1, EntityKind::ResourceDepot, 30, 30));
-    for (steel, oil, should_train) in [(874, 500, false), (1500, 274, false), (875, 275, true)] {
+    for (steel, oil, should_train) in [(799, 500, false), (1500, 244, false), (800, 245, true)] {
         obs.economy.steel = steel;
         obs.economy.oil = oil;
         let decision = decide(

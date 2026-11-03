@@ -137,23 +137,7 @@ pub(super) fn validate_player_supply(
     for player in players {
         let catalog = rules::faction::catalog_for(&player.faction_id);
         let mut expected_used = 0u32;
-        let centers = entities
-            .entities
-            .iter()
-            .filter(|e| {
-                e.owner == player.id
-                    && e.hp > 0
-                    && !e.under_construction()
-                    && e.is_industrial_center()
-            })
-            .count() as u32;
-        let expected_cap = if player.faction_id == rules::faction::DEFAULT_FACTION_ID {
-            config::STARTING_SUPPLY_CAP
-                .saturating_add(centers.saturating_mul(config::INDUSTRIAL_CENTER_SUPPLY))
-                .min(config::PLAYER_SUPPLY_CAP)
-        } else {
-            config::PLAYER_SUPPLY_CAP
-        };
+        let expected_cap = config::PLAYER_SUPPLY_CAP;
         for entity in &entities.entities {
             if entity.owner != player.id {
                 continue;

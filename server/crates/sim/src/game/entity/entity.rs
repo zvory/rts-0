@@ -251,6 +251,9 @@ impl Entity {
     /// previous path, target latch, and path goal no longer belong to the new order.
     pub(crate) fn replace_active_order(&mut self, order: Order) {
         self.cancel_panzerfaust_windup();
+        if matches!(order, Order::Move(_) | Order::AttackMove(_)) {
+            self.leave_trench_for_movement();
+        }
         if let Some(m) = self.movement.as_mut() {
             m.order = order;
             m.path.clear();
@@ -258,7 +261,10 @@ impl Entity {
             m.last_move_delta = (0.0, 0.0);
             m.scout_car_reverse_waypoint = None;
             m.entrenchment_dig_ticks = 0;
-            m.occupied_trench_id = None;
+            // Keep occupation until combat decides whether an Attack order needs pursuit.
+            if !matches!(m.order, Order::Attack(_)) {
+                m.occupied_trench_id = None;
+            }
         }
         self.set_target_id(None);
         self.reset_attack_move_no_target_ticks();
@@ -1115,6 +1121,7 @@ impl Entity {
     /// Start or continue the weapon transition required before this entity can move.
     /// Returns whether the entity is already packed and may move immediately.
     pub(in crate::game) fn begin_weapon_teardown_for_movement(&mut self) -> bool {
+        self.leave_trench_for_movement();
         let Some(teardown_ticks) = config::support_weapon_teardown_ticks(self.kind) else {
             return true;
         };
@@ -1138,6 +1145,16 @@ impl Entity {
                 });
                 false
             }
+        }
+    }
+
+    fn leave_trench_for_movement(&mut self) {
+        let occupied = self
+            .movement
+            .as_mut()
+            .is_some_and(|m| m.occupied_trench_id.take().is_some());
+        if occupied && self.kind == EntityKind::MachineGunner {
+            self.set_weapon_setup(WeaponSetup::Packed);
         }
     }
 

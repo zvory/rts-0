@@ -283,7 +283,18 @@ Its payload lifetimes are explicit:
 Responses are `ready` after all renderer assets are ready, `retained`, `presented` with frame id and worker
 update/present timings, `superseded`, bounded `failed`, and `destroyed`. The message builder never
 transfers an assembler-owned buffer: it transfers copies so retained Phase 2 source records remain
-usable and unchanged.
+usable and unchanged. Dynamic frame packets borrow the assembler's already detached, immutable
+records until dispatch. The message builder creates separate frame/layer/grid wrappers to omit grid
+values and durable ground decals without mutating retained records; it does not deep-clone the
+entire graph locally. The host posts each packet synchronously, and `postMessage` performs the
+worker-isolating structured clone. Static-map, durable-decal and transferred grid copies retain their
+existing lifetimes. Pending and capture frames keep their original immutable source snapshots.
+
+Worker diagnostics retain counters and bounded timing histories on every event, but compute
+summaries only when `diagnostics()`, the control snapshot, or the published diagnostic getter is read.
+Frame submission/completion never copy and sort histories just to publish an unread snapshot. The
+published getter returns current counters and ages; teardown replaces an owned getter with a detached
+final record so global diagnostics cannot retain the destroyed host or overwrite a replacement match.
 
 The immutable static-map DTO also carries optional authored sun conditions. Any authored sun applies
 the world warmth tint and directional projected unit shadows. When elevation varies,
@@ -389,6 +400,19 @@ The code and focused contracts are the executable specification:
 Update this document when those cross-file contracts change. Record actual backend capability in
 the parity ledger; do not add speculative future implementation detail here.
 
+### Resource Depot artwork sizing
+
+The depot's 384×384 atlas frames retain the original 1.1 padding compensation. Frame size in
+world pixels is `footprint tiles × 32 × 1.1`; changing the footprint from 3×3 to 4×4 already
+scales every sprite layer by 4/3. Do not apply that multiplier again to `visualScale`.
+The base layer has 88,083 non-transparent pixels, with alpha bounds `[25, 359) × [15, 356)`:
+334×341 source pixels. Its visible bounds grow from 91.85×93.775 world pixels at 3×3 to
+122.4667×125.0333 at 4×4. Its frame-relative edge margins and slight top overlap keep the same
+proportions. The shadow's 360×367 source-pixel bounds likewise retain the original overlap ratio.
+The renderer contract decodes the PNG and checks all four alpha edges of every layer through the
+runtime sprite transform against the original 96-pixel footprint ratios. The SVG fallback is
+scaled once from its authored 96×96 geometry to 128×128.
+
 ### Rocket Truck raster preview
 
 The Rocket Truck uses the selected PNG with team-light multiplication and a 20% larger
@@ -399,3 +423,17 @@ owner/facing and begin at server-provided rack coordinates. Projectiles reuse th
 trail, and fade toward the already-authorized impact coordinate. Only their PNG body,
 team tint, and rack origin differ. Rocket-specific legacy rectangles, mortar muzzle flashes, and dashed impact
 warning overlays are suppressed. Mortar and Panzerfaust rendering remain unchanged.
+
+### Tank commander machine gun
+
+The Tank keeps its raster hull, turret, and cannon. The Scout Car gun/commander sprite is reused
+at 70% of its Scout Car dimensions, packed into the Tank atlas at load time from the existing
+source image. SVG portraits and minimap layers resolve attached sprites back to their original
+image/crop; the Tank source-sheet dimensions stay unchanged while the worker allocates the
+extra packed texture space. Its roof pivot sits at turret-local
+`(0, 5)` (halfway toward the right edge), rotates its position with `weaponFacing`, and turns
+the gun and commander separately using interpolated authoritative `commanderFacing`. The sprite
+draws above the turret. `commanderFacing` is admitted by the presentation entity schema so the
+worker receives its independent angle. The `coaxMuzzle` anchor uses the independent gun transform so
+MG tracers/flashes follow its barrel rather than the cannon. Cannon recoil carries the entire
+roof assembly; MG bursts do not kick the hull or cannon.

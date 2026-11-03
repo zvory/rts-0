@@ -55,7 +55,7 @@ export function runFrameProfilerContracts() {
         && stream?.setup?.snapshotStreamSpectator === false
         && JSON.stringify(stream?.setup?.snapshotStreamTeamIds) === JSON.stringify([1, 2, 1, 2])
         && stream?.setup?.snapshotStreamVisibilityTileCount === 126 * 126
-        && stream?.setup?.waitForMinEntities === 382,
+        && stream?.setup?.waitForMinEntities === 381,
       "client-only Hellhole measures the full-cadence Player 1 2v2 projection",
     );
     assert(!defaultIds.includes("fixed-roster-hellhole-integrated"), "live server/client Hellhole is opt-in and cannot contaminate default isolated measurements");

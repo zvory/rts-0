@@ -66,6 +66,8 @@ fn check_rush_opening(map_name: Option<&str>) {
     assert!(!starting_infantry.is_empty());
     let mut controllers = [AiController::with_profile_id(1, "rush_ai")];
     assert_eq!(controllers[0].profile_id(), "rush_ai");
+    let mut built_ids = BTreeSet::new();
+    let mut built_kinds = Vec::new();
     let mut training_started = None;
     let mut research_queued = None;
     let mut training_complete = None;
@@ -84,6 +86,13 @@ fn check_rush_opening(map_name: Option<&str>) {
         );
         game.tick();
         let snapshot = game.snapshot_for(1);
+        for entity in snapshot.entities.iter().filter(|entity| {
+            entity.owner == 1 && matches!(entity.kind.as_str(), "barracks" | "training_centre")
+        }) {
+            if built_ids.insert(entity.id) {
+                built_kinds.push(entity.kind.clone());
+            }
+        }
         // Put an explicit Rifleman behind the current unit just before the transition.
         if !manual_rifle_queued
             && snapshot.entities.iter().any(|e| {
@@ -193,7 +202,8 @@ fn check_rush_opening(map_name: Option<&str>) {
         game.snapshot_for(1).upgrades
     );
     assert_eq!(
-        builds.iter().map(|b| b.1).collect::<Vec<_>>(),
+        // Placement attempts can retry around the enlarged depot. Count actual scaffolds.
+        built_kinds.iter().map(String::as_str).collect::<Vec<_>>(),
         ["barracks", "training_centre", "barracks", "barracks"]
     );
     assert!(

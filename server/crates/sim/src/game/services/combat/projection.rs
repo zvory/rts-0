@@ -9,7 +9,7 @@ use crate::game::teams::TeamRelations;
 
 use super::shot_blocker_index::{ShotBlockerBounds, ShotBlockerIndex};
 
-const TANK_STATIONARY_RANGE_MAX_TILES: f32 = 14.0;
+pub(super) const TANK_STATIONARY_RANGE_MAX_TILES: f32 = 14.0;
 const TANK_STATIONARY_RANGE_RAMP_TICKS: u16 = config::TICK_HZ as u16 * 3;
 
 /// Squared combat distance from an attacker's center to the target's attackable surface.

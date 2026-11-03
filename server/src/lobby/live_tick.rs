@@ -49,7 +49,6 @@ pub(super) struct LiveTickDriver<'a> {
     pub(super) pending_client_command_acks: &'a mut Vec<PendingClientCommandAck>,
     pub(super) pending_recipient_notices: &'a mut HashMap<u32, Vec<Event>>,
     pub(super) critical_events: &'a mut super::critical_events::CriticalEventTracker,
-    pub(super) match_chat_log: &'a mut Vec<rts_sim::game::replay::ChatLogEntry>,
     pub(super) slow_tick_count: &'a mut u32,
     pub(super) observer_views: HashMap<u32, ObserverView>,
     pub(super) observer_include_private_notices: bool,
@@ -113,7 +112,6 @@ impl LiveTickDriver<'_> {
             self.players,
             self.order,
             self.branch_live_seat_by_connection,
-            self.match_chat_log,
         );
         self.record_consumed_client_sequences(game.tick_count());
         self.fan_out_snapshots(

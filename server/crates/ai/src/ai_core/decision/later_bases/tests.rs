@@ -34,7 +34,6 @@ fn observation(tick: u32) -> AiObservation {
 
 fn entity(id: u32, kind: EntityKind, tile: (f32, f32)) -> AiEntitySummary {
     AiEntitySummary {
-        industrial_center_slot_reserved: false,
         id,
         owner: 1,
         kind,
@@ -260,12 +259,13 @@ fn a_later_base_on_the_enemys_route_in_is_marked_down() {
             is_ai: true,
         })
         .collect();
-    let map = Map::load_for_players("Classic", &[(1, 1), (2, 2)], 0).unwrap();
+    // These coordinates reproduce the original map, now archived as Vintage.
+    let map = Map::load_for_players("Vintage", &[(1, 1), (2, 2)], 0).unwrap();
     let game = Game::new_with_random_ai_profiles_and_map_metadata(
         &players,
         0,
         map,
-        Map::metadata_for_name("Classic").unwrap(),
+        Map::metadata_for_name("Vintage").unwrap(),
     );
     let start = game.start_payload();
     let analysis = AiMapAnalysis::analyze(&start);

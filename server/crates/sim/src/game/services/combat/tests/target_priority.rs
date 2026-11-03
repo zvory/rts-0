@@ -8,7 +8,7 @@ fn tank_prefers_nearby_unit_over_armored_command_center() {
         .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
         .expect("tank should spawn");
     let resource_depot = entities
-        .spawn_building(2, EntityKind::ResourceDepot, 160.0, 100.0, true)
+        .spawn_building(2, EntityKind::ResourceDepot, 256.0, 100.0, true)
         .expect("resource depot should spawn");
     let worker = entities
         .spawn_unit(2, EntityKind::Worker, 100.0, 180.0)

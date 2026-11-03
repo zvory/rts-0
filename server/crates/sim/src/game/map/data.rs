@@ -16,6 +16,8 @@ pub struct AuthoredMapData {
     pub elevation: Vec<u8>,
     pub sun: Option<MapSun>,
     pub starts: Vec<(u32, u32)>,
+    /// Empty for unrestricted maps; otherwise one authored team group per start.
+    pub start_team_groups: Vec<u32>,
     pub base_sites: Vec<(u32, u32)>,
     pub base_resource_counts: HashMap<(u32, u32), BaseResourceCounts>,
     pub doodads: Vec<MapDoodad>,

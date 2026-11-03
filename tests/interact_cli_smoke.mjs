@@ -36,6 +36,7 @@ let daemonPid = null;
 try {
   assert.equal(call("shutdown").alreadyStopped, true, "isolated smoke starts from a stopped daemon");
   const opened = call("open", {
+    map: "1v1-no-terrain", seed: 1234,
     viewport: { width: 1000, height: 700, deviceScaleFactor: 1 },
   });
   sessionId = testArtifacts.ownSession(opened.sessionId);
@@ -168,6 +169,7 @@ try {
   sessionId = null;
   assert.equal(callFailure("inspect", { sessionId: closedSessionId }).code, "unknownSession", "closed session ids are rejected as stale");
   const reopened = call("open", {
+    map: "1v1-no-terrain", seed: 1234,
     viewport: { width: 1000, height: 700, deviceScaleFactor: 1 },
   });
   sessionId = testArtifacts.ownSession(reopened.sessionId);

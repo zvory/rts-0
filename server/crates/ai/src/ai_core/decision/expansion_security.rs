@@ -790,10 +790,8 @@ pub(super) fn positions(
     // Jeff's AI V1.1's guards stand past the natural's extractors.
     let forward_tiles = if forward {
         jeff_v1_1::natural::GUARD_FORWARD_TILES
-    } else if crossroads_direction.is_some() {
-        4.5
     } else {
-        3.5
+        4.5
     };
     let ts = observation.map.tile_size as f32;
     let Some(depot) = config::building_stats(EntityKind::ResourceDepot) else {

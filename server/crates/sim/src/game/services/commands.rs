@@ -105,6 +105,21 @@ pub(in crate::game) fn apply_commands(
     events: &mut HashMap<u32, Vec<Event>>,
     tick: u32,
 ) {
+    // TEMPORARY HACK: reuse the retired AT research id as durable ownership history.
+    // TODO: remove with train_requirement_met_with_at_gun_history when tech rules are revisited.
+    // Existing upgrade serialization preserves the marker across checkpoints and reconnects.
+    for player in players.iter_mut() {
+        if !player.upgrades.contains(&UpgradeKind::AntiTankGunUnlock)
+            && entities.iter().any(|entity| {
+                entity.owner == player.id
+                    && entity.kind == EntityKind::EngineeringComplex
+                    && entity.hp > 0
+                    && !entity.under_construction()
+            })
+        {
+            player.upgrades.insert(UpgradeKind::AntiTankGunUnlock);
+        }
+    }
     let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
     macro_rules! command_context {
         () => {
@@ -1882,7 +1897,13 @@ fn order_train(
         return;
     }
     let owned_complete = world_query::completed_building_kinds(entities, player);
-    if !rules::economy::train_requirement_met_for_faction(&faction_id, unit, &owned_complete) {
+    if !rules::economy::train_requirement_met_with_at_gun_history(
+        unit,
+        &owned_complete,
+        players
+            .iter()
+            .any(|p| p.id == player && p.upgrades.contains(&UpgradeKind::AntiTankGunUnlock)),
+    ) {
         notice(events, player, "Requirement not met");
         return;
     }
@@ -1910,10 +1931,10 @@ fn order_train(
     let queue_empty = entities
         .get(building)
         .is_some_and(|producer| producer.prod_queue().is_empty());
-    let can_reserve_supply = ps.can_reserve_supply(supply, entities);
+    let can_reserve_supply = ps.can_reserve_supply(supply);
     let mut paid = false;
     if queue_empty && !unit.is_resource_extractor() && can_reserve_supply && ps.spend_cost(cost) {
-        if ps.reserve_supply(supply, entities) {
+        if ps.reserve_supply(supply) {
             paid = true;
         } else {
             ps.refund_cost(cost);

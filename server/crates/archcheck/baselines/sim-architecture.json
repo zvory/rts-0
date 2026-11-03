@@ -1,5 +1,5 @@
 {
-  "reason": "Extract existing research command mutation into commands/research.rs to keep commands below its frozen size limit while adding depot-local Industrial Centers",
+  "reason": "Remove Industrial Center and debt helpers while retaining the ordinary research command service",
   "line_counts": [
     {
       "path": "ability.rs",

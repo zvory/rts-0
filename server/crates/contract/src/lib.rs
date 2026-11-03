@@ -673,8 +673,6 @@ pub struct RememberedBuildingView {
     pub x: f32,
     pub y: f32,
     pub footprint: Vec<[u32; 2]>,
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub industrial_center: bool,
     pub observed_tick: u32,
 }
 
@@ -893,6 +891,9 @@ pub struct EntityView {
     pub facing: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub weapon_facing: Option<f32>,
+    /// Independent Tank commander machine-gun orientation.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub commander_facing: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub weapon_range_tiles: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -923,9 +924,6 @@ pub struct EntityView {
     /// Whether a visible completed Pump Jack can currently extract oil.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extractor_active: Option<bool>,
-    /// Public physical upgrade state, projected only with the visible/remembered depot.
-    #[serde(default, skip_serializing_if = "is_false")]
-    pub industrial_center: bool,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub build_progress: Option<f32>,
@@ -1002,6 +1000,7 @@ impl EntityView {
             rocket_rack_count: None,
             facing: None,
             weapon_facing: None,
+            commander_facing: None,
             weapon_range_tiles: None,
             panzerfaust_loaded: None,
             panzerfaust_windup_progress: None,
@@ -1014,7 +1013,6 @@ impl EntityView {
             prod_scout_plane_queued: false,
             prod_waiting: false,
             extractor_active: None,
-            industrial_center: false,
             build_progress: None,
             build_active: false,
             deconstruct_progress: None,

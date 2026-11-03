@@ -1,4 +1,4 @@
-import { UPGRADE, STATE, isBuilding } from "./protocol.js";
+import { KIND, UPGRADE, STATE, isBuilding } from "./protocol.js";
 import { STATS, UPGRADES } from "./config.js";
 
 export function constructionCancelDescriptor(building) {
@@ -80,7 +80,7 @@ export function productionRepeatAffordance(automatic, producerIds, repeatingIds,
 export function trainAvailability(ctx, unit, resources, isOwn) {
   const st = STATS[unit];
   if (!st) return "locked";
-  if (requirementsOf(st).some((req) => !playerHasCompleteKind(ctx, req))) return "locked";
+  if (requirementsOf(st).some((req) => !trainRequirementMet(ctx, unit, req))) return "locked";
   if (!playerHasAnyCompleteKind(ctx, requirementsAnyOf(st))) return "locked";
   if (st.upgradeRequires && !(ctx.upgrades || []).includes(st.upgradeRequires)) return "locked";
   return affordable(st.cost, resources) && hasSupplyFor(st, resources) ? "ready" : "unaffordable";
@@ -89,7 +89,7 @@ export function trainAvailability(ctx, unit, resources, isOwn) {
 export function trainDisabledReason(ctx, unit, resources, isOwn) {
   const st = STATS[unit];
   if (!st) return "";
-  const missing = requirementsOf(st).find((req) => !playerHasCompleteKind(ctx, req));
+  const missing = requirementsOf(st).find((req) => !trainRequirementMet(ctx, unit, req));
   if (missing) return `Requires ${STATS[missing]?.label || missing}`;
   if (!playerHasAnyCompleteKind(ctx, requirementsAnyOf(st))) {
     return st.requiresAnyText || `Requires ${requirementsAnyOf(st)
@@ -108,10 +108,6 @@ export function trainDisabledReason(ctx, unit, resources, isOwn) {
 export function researchAvailability(ctx, upgrade, resources, isOwn) {
   const def = UPGRADES[upgrade];
   if (!def) return "locked";
-  if (upgrade === UPGRADE.INDUSTRIAL_CENTER) {
-    if (industrialCenterSlots(ctx, isOwn) >= 2 || !selectedResearchBuilding(ctx, upgrade, isOwn)) return "locked";
-    return affordable(def.cost, resources) ? "ready" : "unaffordable";
-  }
   if ((ctx.upgrades || []).includes(upgrade)) return "locked";
   if (researchQueuedBuilding(ctx, def.researchedAt, upgrade, isOwn)) return "locked";
   if (!selectedResearchBuilding(ctx, upgrade, isOwn)) return "locked";
@@ -121,11 +117,6 @@ export function researchAvailability(ctx, upgrade, resources, isOwn) {
 export function researchDisabledReason(ctx, upgrade, resources, isOwn) {
   const def = UPGRADES[upgrade];
   if (!def) return "";
-  if (upgrade === UPGRADE.INDUSTRIAL_CENTER) {
-    if (!selectedResearchBuilding(ctx, upgrade, isOwn)) return "Select a completed, unupgraded Resource Depot";
-    if (industrialCenterSlots(ctx, isOwn) >= 2) return "Maximum two Industrial Centers (including queued upgrades)";
-    return affordable(def.cost, resources) ? "+100 supply while this depot exists" : "Queue now; upgrade waits for resources";
-  }
   if ((ctx.upgrades || []).includes(upgrade)) return "Researched";
   const queuedAt = researchQueuedBuilding(ctx, def.researchedAt, upgrade, isOwn);
   if (queuedAt?.prodUpgrade === upgrade) return "Researching";
@@ -150,11 +141,6 @@ export function researchSlotForUpgrade(buildingKind, upgrade, trains) {
   return afterTrainSlot >= 0 ? afterTrainSlot : trains.length;
 }
 
-function industrialCenterSlots(ctx, isOwn) {
-  return researchBuildings(ctx, UPGRADES[UPGRADE.INDUSTRIAL_CENTER].researchedAt, isOwn)
-    .filter((e) => e.industrialCenter || (e.prodUpgradeQueue || []).includes(UPGRADE.INDUSTRIAL_CENTER)).length;
-}
-
 function researchQueuedBuilding(ctx, buildingKind, upgrade, isOwn) {
   return researchBuildings(ctx, buildingKind, isOwn).find((entity) =>
     (entity.prodUpgradeQueue || []).includes(upgrade));
@@ -176,7 +162,6 @@ export function selectedResearchBuilding(ctx, upgrade, isOwn) {
   return (ctx.selection || []).find((entity) =>
     isOwn(ctx, entity) &&
     entity.kind === def.researchedAt &&
-    (upgrade !== UPGRADE.INDUSTRIAL_CENTER || (!entity.industrialCenter && entity.state !== STATE.CONSTRUCT)) &&
     !(entity.prodUpgradeQueue || []).includes(upgrade) &&
     (prerequisiteResearched ||
       (entity.prodUpgradeQueue || []).includes(def.requiresUpgrade))) || null;
@@ -210,6 +195,14 @@ function requirementsOf(definition) {
 function requirementsAnyOf(definition) {
   if (!definition || !definition.requiresAny) return [];
   return Array.isArray(definition.requiresAny) ? definition.requiresAny : [definition.requiresAny];
+}
+
+// TEMPORARY HACK: mirror the server's historical Engineering Complex exception for AT Guns.
+// TODO: remove with train_requirement_met_with_at_gun_history and its retired upgrade marker.
+function trainRequirementMet(ctx, unit, kind) {
+  return (unit === KIND.ANTI_TANK_GUN && kind === KIND.ENGINEERING_COMPLEX &&
+    (ctx.upgrades || []).includes(UPGRADE.ANTI_TANK_GUN_UNLOCK)) ||
+    playerHasCompleteKind(ctx, kind);
 }
 
 function playerHasCompleteKind(ctx, kind) {

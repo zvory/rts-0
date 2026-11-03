@@ -79,7 +79,6 @@ fn a_reach_the_enemy_cannot_see_does_not_stop_the_tank() {
 
 fn summary(id: u32, owner: u32, kind: EntityKind, at: (f32, f32), hp: u32) -> AiEntitySummary {
     AiEntitySummary {
-        industrial_center_slot_reserved: false,
         id,
         owner,
         kind,

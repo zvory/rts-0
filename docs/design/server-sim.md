@@ -51,8 +51,8 @@ new code should prefer the owning crate directly when that does not make local c
 ### 3.1 `game::Game` public API (seam between `game` and `lobby`/`main`)
 The `lobby`/networking layer interacts with the simulation ONLY through this surface.
 `Game::critical_event_state() -> Vec<PlayerCriticalEventState>` exposes read-only per-seat
-supply used/cap, deduplicated blocked auto-production `(unit, prerequisite)` pairs, and ids of
-depots actively researching Industrial Center (paid research only). The room owns chat routing and
+supply used/cap and deduplicated blocked auto-production `(unit, prerequisite)` pairs.
+The room owns chat routing and
 30-second simulation-time warning cooldowns; notification state is session-only, outside checkpoints.
 Completed living buildings satisfy prerequisites; destroyed or unfinished buildings do not.
 `game-core` implementer: provide exactly these. `server-shell` implementer: call only these.
@@ -71,8 +71,9 @@ impl Game {
     /// locations. A map owns flat `startLocations`, `baseSites`, movement- and sight-affecting
     /// `elevation`, presentation-only `sun`, and static `doodads`: start locations determine its
     /// capacity, while every base site receives its authored 0–36 Steel and 0–9 Oil patches.
-    /// Singleton-team FFA
-    /// matches shuffle fixed start locations by `seed`; team matches choose ordered starts from the
+    /// Maps with `teamGroup` constrain each team to its own authored group and reject rosters that do
+    /// not fit. Ungrouped singleton-team matches shuffle fixed start locations by `seed`;
+    /// ungrouped team matches choose ordered starts from the
     /// same fixed set, preferring lower teammate spread, higher nearest enemy-team distance, lower
     /// exposure imbalance, and finally a deterministic seed-influenced tie break. No player-count
     /// layouts or player-owned natural groups exist in authored maps. Generated oil clusters place each oil patch on a unique passable tile
@@ -304,11 +305,11 @@ architecture failures.
 | Field | Category | Checkpoint policy | Evidence and notes |
 | --- | --- | --- | --- |
 | `map` | `authoritative/serialized` | Internal cold checkpoints serialize the full live `Map` value. Public `GameCheckpointV1` payloads do not embed a map body; they carry `mapBinding` facts and import only with the exact container-supplied `Map`. See §3.1.3. | `Game::new_inner_with_map` stores the generated or supplied map; `systems::run_tick`, pathing, fog, placement, resource setup, and `start_payload` all read it. Runtime ownership and external artifact composition are intentionally separate contracts. |
-| `entities` | `authoritative/serialized` | Serialize the full `EntityStore`, including stable entity ids, allocator/high-water state, HP, orders, queues, movement state, selected waypoints, path goals, weapon cooldowns, ability charges and charge-recharge timers, episode-keyed firing-reveal reaction gates, combat state (including the materialized `tank_plus` owner-research flag, refreshed before movement and after production each tick so new and existing Tanks share modifiers), per-unit kill totals and last-damaging entity attribution, production/build progress, depot-local `production.industrial_center` completion (supply cap is derived from living completed centers), rally plans, Scout Plane source-car/orbit/remaining-lifetime state, resource reservations, extractor fractional unsupported-decay damage (serialized with extractor harvest progress), body/weapon/setup facing, and entity flags. | `systems::run_tick` mutates the store every tick; snapshots, score, survival, command validation, replay determinism tests, and the Phase 0.5 comparator all treat entity state as semantic authority. Chosen movement paths and aerial orbit state live on entities, not in `pathing`. Scout Plane entities are excluded from standard fog sight stamping and contribute independent team aerial vision through the dedicated smoke-only pass. |
+| `entities` | `authoritative/serialized` | Serialize the full `EntityStore`, including stable entity ids, allocator/high-water state, HP, orders, queues, movement state, selected waypoints, path goals, weapon cooldowns, ability charges and charge-recharge timers, episode-keyed firing-reveal reaction gates, combat state (including the materialized `tank_plus` owner-research flag, refreshed before movement and after production each tick so new and existing Tanks share modifiers), per-unit kill totals and last-damaging entity attribution, production/build progress, rally plans, Scout Plane source-car/orbit/remaining-lifetime state, resource reservations, extractor fractional unsupported-decay damage (serialized with extractor harvest progress), body/weapon/setup facing, Tank commander MG facing and secondary target id, and entity flags. | `systems::run_tick` mutates the store every tick; snapshots, score, survival, command validation, replay determinism tests, and the Phase 0.5 comparator all treat entity state as semantic authority. Chosen movement paths and aerial orbit state live on entities, not in `pathing`. Scout Plane entities are excluded from standard fog sight stamping and contribute independent team aerial vision through the dedicated smoke-only pass. |
 | `fog` | `authoritative/serialized` | Serialize the latest 15 Hz actionable visibility sample and its bounded per-viewer firing-reveal provenance map. | `recompute_live_fog` separately records whether each sampled entity needs its firing reveal for targeting and whether the stamped terrain tile lacked ordinary sight. Combat consumes the first fact; snapshot `visibleTiles` removes only terrain-reveal-only stamps. Phase 0.5 compares per-player actionable tiles as semantic state. |
 | `building_memory` | `authoritative/serialized` | Serialize remembered building entries and cleared-observation ticks per player. | `BuildingMemory::refresh` records last-seen enemy building state, while match setup seeds entity-backed neutral buildings authored into the map for every player. Hidden destroyed entries are removed only after the footprint is scouted again; that clear tick prevents older positive memory from another selected player from resurrecting the building in union observer projections. Spectator/player snapshots project remembered buildings while fogged. |
 | `anti_tank_gun_memory` | `authoritative/serialized` | Serialize last-observed deployed enemy Anti-Tank Gun position, facing, owner, and observation tick per player. | `AntiTankGunMemory::refresh` records ordinary team sight and actionable firing reveals, retains stale records through hidden movement/teardown/destruction, and clears them only when that player's team observes the gun changed or the remembered position empty; observer snapshots select the requested players' stores. |
-| `players` | `authoritative/serialized` | Serialize all `PlayerState` rows, including id/team/faction/name/color/start tile, current Steel/Oil, supply, AI flag, score counters, unit/building loss counts by kind, per-recipient witnessed enemy loss counts by owner/kind, mined-resource lifetime totals, rolling mined-resource income history, completed upgrades, and the paused/Steel-floor/Oil-floor Auto-Build policy. | Economy, command authority, team relations, alive checks, scores, observer-analysis resource income and losses, faction-specific tech, automatic-production spending, and snapshot resource/settings rows are all read from `players`. |
+| `players` | `authoritative/serialized` | Serialize all `PlayerState` rows, including id/team/faction/name/color/start tile, current Steel/Oil, supply, AI flag, score counters, unit/building loss counts by kind, per-recipient witnessed enemy loss counts by owner/kind, mined-resource lifetime totals, rolling mined-resource income history, completed upgrades (including the temporary `AntiTankGunUnlock` Engineering Complex ownership-history hack; TODO: remove when tech rules are revisited), and the paused/Steel-floor/Oil-floor Auto-Build policy. | Economy, command authority, team relations, alive checks, scores, observer-analysis resource income and losses, faction-specific tech, automatic-production spending, and snapshot resource/settings rows are all read from `players`. |
 | `pending` | `authoritative/serialized` | Serialize unapplied pending commands unless a future checkpoint caller explicitly proves it captures only immediately after command drain with `pending` empty. | `Game::enqueue` appends commands between ticks; `tick_inner` drains `pending`, records them in `command_log`, and applies them. Dropping a non-empty queue would skip authoritative player/AI intent. |
 | `command_log` | `compatibility metadata` | Serialize command history for replay/crash/API continuity; do not replay it during normal checkpoint import unless building a replay artifact. | `Game::command_log` is public, schema 3 replay artifacts finalize the stored launch-time `ReplayStartComposition` with this log, and tick logic only appends/applies new pending commands instead of reading old log entries. |
 | `tick` | `authoritative/serialized` | Serialize the exact tick count. | `tick_inner` increments it before systems, logs commands with it, drives expirations/cooldowns, passes it to projection/runtime stores, and advances `PathingService` to the same tick. |
@@ -1354,7 +1355,7 @@ and barrel turn together to track an in-cone target before firing, while the set
 remains fixed. Targets outside the cone do not cause rotation and require teardown and redeployment
 before the gun can engage them.
 
-Automatic acquisition considers only legal enemy candidates inside the attacker's current weapon range, then applies the existing target-priority ranking. Range to buildings is measured from the attacker's center to the closest point on the authoritative building footprint; range to non-building entities remains center-to-center. Building acquisition broadphase queries include the maximum building half-extent so a footprint inside range is discoverable even when its indexed center is not. Explicit Attack orders may target the issuing player's own units or buildings, but not allied teammate entities, and retain their commanded target while it remains legal and visible. A direct attack pursues that target to the current weapon range band, using the closest footprint-boundary point for buildings, stops to fire, and repaths if the same target moves out of range; it never switches targets while the commanded target remains valid. Opportunistic moving-fire acquisition for a plain Move uses the same in-range boundary. Attack Move may pause for an in-range engagement and resumes only its original player-issued destination afterward. While retaining a building target, Attack Move rechecks for visible enemy combat units in weapon range each tick and switches to a legal shot on one when available, even during weapon cooldown. This does not change the movement destination, pursue retreating defenders, or override explicit Attack orders.
+Automatic acquisition considers only legal enemy candidates inside the attacker's current weapon range, then applies the existing target-priority ranking. Range to buildings is measured from the attacker's center to the closest point on the authoritative building footprint; range to non-building entities remains center-to-center. Building acquisition broadphase queries include the maximum building half-extent so a footprint inside range is discoverable even when its indexed center is not. Explicit Attack orders may target the issuing player's own units or buildings, but not allied teammate entities, and retain their commanded target while it remains legal and visible. A direct attack pursues that target to the current weapon range band, using the closest footprint-boundary point for buildings, stops to fire, and repaths if the same target moves out of range. Tanks instead hold position when the commanded target is within their maximum stationary cannon range (including the usual attacker radius and range slack), allowing the range ramp to reach it; they still fire only inside the current range and pursue if the target leaves the maximum stationary range. A direct attack never switches targets while the commanded target remains valid. Opportunistic moving-fire acquisition for a plain Move uses the same in-range boundary. Attack Move may pause for an in-range engagement and resumes only its original player-issued destination afterward. While retaining a building target, Attack Move rechecks for visible enemy combat units in weapon range each tick and switches to a legal shot on one when available, even during weapon cooldown. This does not change the movement destination, pursue retreating defenders, or override explicit Attack orders.
 
 After the 50 Steel / 100 Oil, 20-second Scout Plane research completes at the Engineering Complex, Resource Depots and Command Cars activate Scout Plane on the C grid slot. A Resource Depot sortie costs 38 Steel / 56 Oil; a Command Car sortie costs 63 Steel / 94 Oil. Activation launches immediately from a selected ready carrier and starts that carrier's 30-second cooldown. Sorties are independent: any number may coexist and each contributes its own team aerial vision. Activation does not replace or clear a selected Command Car's active or queued orders. The plane has a 30-second total lifetime from launch: transit consumes that lifetime, it orbits only for any time remaining after arrival, and it despawns when the timer expires even if it never reaches the target. Scout Planes have no fuel reserve, Oil upkeep, selected-plane retargeting, return leg, or dismissal commands.
 
@@ -1544,6 +1545,11 @@ General rules:
   cooldown expiry, future tech, or future affordability.
 - Same-tile movement goals count as arrived rather than path-failed. Plain move orders clear back to
   idle on arrival; attack-move orders keep their aggressive stance.
+  Infantry body facing follows the accepted movement step after local avoidance or wall sliding;
+  blocked steps and arrival-only position snaps retain the last walking heading. Collision cleanup
+  does not choose facing. When a Machine Gunner arrives without a combat target, automatic setup
+  copies body facing into weapon facing so deployment preserves that heading; an acquired target
+  still chooses combat aim normally. Vehicle movement retains its separate turning rules.
 - Non-queued `HoldPosition` clears each selected unit's active order and queued intents, then marks
   the unit as held. Queued `HoldPosition` appends a terminal intent, so the unit finishes earlier
   queued stages before entering that same held stance. Held units keep normal collision behavior
@@ -1603,16 +1609,17 @@ General rules:
   tie-breaks. Auto-acquisition only ranks candidates already inside current weapon range. Explicit
   `Attack` orders keep their commanded target while it remains hostile and visible without moving
   toward it. The
-  `tank_coax_machine_gun` policy is used by the Tank secondary-fire pass; it ranks Rifleman and
-  Machine Gunner targets first, Worker and Golem targets second, and all other legal non-resource
-  fallbacks last, then uses distance/id ties without Tank cannon threat ordering. The ranker does
+  `tank_coax_machine_gun` policy is used by the Tank secondary-fire pass; it ranks Panzerfausts, Anti-Tank Guns,
+  combat infantry (Warrior, Rifleman, Machine Gunner), Mortar Teams, then Scout Cars.
+  Remaining legal targets follow default weapon group/material order and distance/id ties. The ranker does
   not decide fog, smoke, line-of-sight, blocker, ownership, or acquisition-radius legality.
   Tanks run the coax pass after their normal cannon aim/fire/relax work for the tick. The pass reads
-  the current authoritative turret facing, accepts only targets within a 10-degree half arc and the
-  6-tile coax range, uses intended-target direct-fire legality so enemy hard blockers can reject a
+  independent checkpointed commander MG facing and target state, acquires targets in all directions
+  within the 6-tile MG range, uses intended-target direct-fire legality so enemy hard blockers can reject a
   behind-them infantry target, and never rotates the turret, changes the cannon target slot, clears
-  paths, or requests chase movement. It skips candidate construction while the coax weapon is on
-  cooldown. Same-tick Tank cannon/coax events are emitted cannon first, then coax.
+  paths, or requests chase movement. It checks the coax weapon
+  cooldown only for firing; acquisition and independent rotation run every tick, using the Scout
+  Car turn rate and fire tolerance. Idle aim relaxes toward the main turret. Same-tick Tank cannon/coax events are emitted cannon first, then coax.
   The first successful enemy Tank cannon, Anti-Tank Gun, or Panzerfaust hit on a surviving Tank
   establishes a three-second hull-facing preference toward its source. Later qualifying hits
   refresh that under-fire window without redirecting the preference, preventing rapid threat
@@ -1988,6 +1995,8 @@ It resolves three first-hit rays for each Machine Gunner,
 Scout Car, and Tank coax firing cycle. It reuses the tick spatial grid, body geometry,
 and terrain/smoke LOS. Burst-local hit totals and rays are temporary derived values;
 there is no new durable projectile state or Game API. Damage is aggregated per victim
-before existing protection rounding, with a minimum of 1 damage per hit victim. Building
+and multiplied by the rules-owned 0.6 ray damage scalar (20% above the original 0.5),
+then rounded once to the nearest whole point before existing protection rounding,
+with a minimum of 1 damage per hit victim. Building
 aim uses the nearest footprint surface, matching acquisition and stopping distance. See the balance prototype section and compact
 version-57 attack ray contract for tuning and per-viewer projection.

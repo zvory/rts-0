@@ -47,8 +47,8 @@ export class InteractTestArtifacts {
     for (const directory of this.ownedSessionDirectories) {
       fs.rmSync(directory, { recursive: true, force: true });
     }
-    removeIfEmpty(this.artifactDirectory);
-    removeIfEmpty(this.root);
+    // Other suites may have created these shared directories but not written yet.
+    // Delete only owned paths; even removing an empty shared parent races writers.
   }
 
   assertClean() {
@@ -58,13 +58,5 @@ export class InteractTestArtifacts {
     for (const directory of this.ownedSessionDirectories) {
       assert.equal(fs.existsSync(directory), false, `test-owned session artifacts were cleaned: ${path.basename(directory)}`);
     }
-  }
-}
-
-function removeIfEmpty(directory) {
-  try {
-    fs.rmdirSync(directory);
-  } catch (error) {
-    if (!["ENOENT", "ENOTEMPTY", "EEXIST"].includes(error?.code)) throw error;
   }
 }

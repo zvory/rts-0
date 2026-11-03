@@ -452,8 +452,8 @@ mod tests {
     }
 
     #[test]
-    fn one_v_one_map_is_rotationally_symmetric() {
-        let map = Map::load("Classic", 2, 0x1234_5678).expect("Classic should load");
+    fn vintage_map_is_rotationally_symmetric() {
+        let map = Map::load("Vintage", 2, 0x1234_5678).expect("Vintage should load");
         let size = map.width as usize;
 
         for y in 0..size {
@@ -463,7 +463,7 @@ mod tests {
                 assert_eq!(
                     map.terrain[y * size + x],
                     map.terrain[rotated_y * size + rotated_x],
-                    "Classic terrain differs at ({x},{y}) and its rotation ({rotated_x},{rotated_y})"
+                    "Vintage terrain differs at ({x},{y}) and its rotation ({rotated_x},{rotated_y})"
                 );
             }
         }
@@ -472,7 +472,7 @@ mod tests {
         for &(x, y) in &map.starts {
             assert!(
                 starts.contains(&(map.width - 1 - x, map.width - 1 - y)),
-                "Classic start ({x},{y}) has no rotational counterpart"
+                "Vintage start ({x},{y}) has no rotational counterpart"
             );
         }
 
@@ -480,7 +480,7 @@ mod tests {
         for &(x, y) in &map.base_sites {
             assert!(
                 base_sites.contains(&(map.width - 1 - x, map.width - 1 - y)),
-                "Classic base site ({x},{y}) has no rotational counterpart"
+                "Vintage base site ({x},{y}) has no rotational counterpart"
             );
         }
     }

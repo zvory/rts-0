@@ -1,14 +1,15 @@
 import strictAssert from "node:assert/strict";
 import fs from "node:fs";
+import { PNG } from "pngjs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { HARVEST_TICKS, STATS, TICK_HZ } from "../../client/src/config.js";
 import { KIND } from "../../client/src/protocol.js";
+import { createBuildingRigDefinitions } from "../../client/src/renderer/rigs/building_routing.js";
+import { resolvePngSpriteTransform } from "../../client/src/renderer/rigs/png_transform.js";
 import { Renderer } from "../../client/src/renderer/index.js";
 import {
   createBuildingPngRigAtlases,
-  buildingPngRigKey,
-  INDUSTRIAL_CENTRE_PNG_KEY,
   createBuildingPngRigDefinitions,
 } from "../../client/src/renderer/rigs/building_png.js";
 import {
@@ -24,7 +25,7 @@ import { installFakePixi } from "./pixi_fakes.mjs";
 
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const expectedFootprints = new Map([
-  [KIND.RESOURCE_DEPOT, [3, 3]],
+  [KIND.RESOURCE_DEPOT, [4, 4]],
   [KIND.BARRACKS, [3, 2]],
   [KIND.TRAINING_CENTRE, [3, 2]],
   [KIND.ENGINEERING_COMPLEX, [3, 3]],
@@ -49,18 +50,46 @@ const emblemKinds = new Set([
   KIND.FACTORY,
   KIND.STEELWORKS,
 ]);
+const depotFallback = createBuildingRigDefinitions().get(KIND.RESOURCE_DEPOT);
+const depotFallbackBase = depotFallback.parts.find((part) => part.id === "part.base");
+strictAssert.ok(Math.abs(depotFallbackBase.geometry.width * depotFallbackBase.transform.scaleX - 128) < 0.001,
+  "depot fallback artwork scales to four tiles");
+strictAssert.equal(depotFallback.anchors.hp.y, -64);
+
 const definitions = createBuildingPngRigDefinitions();
 const atlases = createBuildingPngRigAtlases();
-strictAssert.equal(definitions.size, expectedFootprints.size);
-strictAssert.equal(atlases.size, expectedFootprints.size + 1);
-strictAssert.equal(buildingPngRigKey({ kind: KIND.RESOURCE_DEPOT }), KIND.RESOURCE_DEPOT);
-strictAssert.equal(buildingPngRigKey({ kind: KIND.RESOURCE_DEPOT, industrialCenter: true }), INDUSTRIAL_CENTRE_PNG_KEY);
-strictAssert.equal(buildingPngRigKey({ kind: KIND.BARRACKS, industrialCenter: true }), KIND.BARRACKS);
-const refineryAtlas = atlases.get(INDUSTRIAL_CENTRE_PNG_KEY);
-strictAssert.ok(refineryAtlas.image.includes("industrial-centre-refinery"));
-strictAssert.deepEqual(refineryAtlas.grid, atlases.get(KIND.RESOURCE_DEPOT).grid);
-strictAssert.deepEqual(readPngDimensions(path.join(repoRoot, "client", refineryAtlas.image.split("?")[0])), { width: 1536, height: 384 });
+// Measure actual alpha coverage, then resolve the same sprite transform used by Pixi.
+// Preserve every edge's proportion of the original 96px depot footprint, including shadows.
+const depotAtlas = atlases.get(KIND.RESOURCE_DEPOT);
+const depotPixels = PNG.sync.read(fs.readFileSync(path.join(repoRoot, "client", depotAtlas.image.split("?")[0])));
+const depotEntity = { id: 903, kind: KIND.RESOURCE_DEPOT };
+const depotPose = sampleRigAnimation(definitions.get(KIND.RESOURCE_DEPOT), depotEntity,
+  createRigRenderContext(depotEntity, { now: 0 }));
+for (const sprite of depotAtlas.sprites) {
+  const frame = sprite.frame;
+  const bounds = alphaBounds(depotPixels, frame);
+  if (sprite.id === "sprite.base") {
+    strictAssert.deepEqual(bounds, { minX: 25, minY: 15, maxX: 359, maxY: 356, count: 88083 });
+  }
+  if (sprite.id === "sprite.shadow") {
+    strictAssert.deepEqual(bounds, { minX: 12, minY: 9, maxX: 372, maxY: 376, count: 106187 });
+  }
+  const transform = resolvePngSpriteTransform(depotPose.parts[sprite.animationPart], frame, sprite);
+  for (const [axis, edges, origin, scale, pivot, position, footprint] of [
+    ["x", [bounds.minX, bounds.maxX], frame.originX, transform.scaleX, transform.pivotX, transform.x, 128],
+    ["y", [bounds.minY, bounds.maxY], frame.originY, transform.scaleY, transform.pivotY, transform.y, 128],
+  ]) {
+    for (const edge of edges) {
+      const originalNormalizedEdge = (edge - origin) * (96 * 1.1 / 384) / 96;
+      const renderedNormalizedEdge = ((edge - pivot) * scale + position) / footprint;
+      strictAssert.ok(Math.abs(renderedNormalizedEdge - originalNormalizedEdge) < 1e-9,
+        `${sprite.id} ${axis} alpha edge preserves original padding/overlap ratio`);
+    }
+  }
+}
 
+strictAssert.equal(definitions.size, expectedFootprints.size);
+strictAssert.equal(atlases.size, expectedFootprints.size);
 for (const excludedKind of [KIND.DEPOT, KIND.TANK_TRAP]) {
   strictAssert.equal(definitions.has(excludedKind), false);
   strictAssert.equal(atlases.has(excludedKind), false);
@@ -324,26 +353,6 @@ try {
     "the queue-label layer renders above the building-body layer",
   );
 
-  const depot = { ...entity, id: 508, kind: KIND.RESOURCE_DEPOT, state: "idle",
-    buildProgress: 1, prodProgress: 0, prodQueue: 0 };
-  renderer._buildingPngRigAtlasTextures.set(KIND.RESOURCE_DEPOT, PIXI.Texture.from("depot-test"));
-  renderer._buildingPngRigAtlasTextures.set(INDUSTRIAL_CENTRE_PNG_KEY, PIXI.Texture.from("refinery-test"));
-  renderer._drawBuilding(depot, colorByOwner, state);
-  const ordinaryBody = renderer._liveRigPools.buildingRigs.get(depot.id);
-  strictAssert.equal(ordinaryBody.atlas, atlases.get(KIND.RESOURCE_DEPOT));
-  depot.industrialCenter = true;
-  renderer._drawBuilding(depot, colorByOwner, state);
-  const upgradedBody = renderer._liveRigPools.buildingRigs.get(depot.id);
-  strictAssert.notEqual(upgradedBody, ordinaryBody);
-  strictAssert.equal(ordinaryBody._destroyed, true);
-  strictAssert.equal(upgradedBody.atlas, refineryAtlas);
-  strictAssert.equal(renderer._pools.buildingOverlays?.has(depot.id) ?? false, false,
-    "completed refinery has no gold footprint overlay");
-  depot.industrialCenter = false;
-  renderer._drawBuilding(depot, colorByOwner, state);
-  strictAssert.equal(renderer._liveRigPools.buildingRigs.get(depot.id).atlas, atlases.get(KIND.RESOURCE_DEPOT),
-    "replay rewind restores ordinary depot artwork");
-
   const steelMine = {
     ...entity,
     id: 507,
@@ -424,4 +433,20 @@ function readPngDimensions(filePath) {
   strictAssert.equal(buffer.toString("hex", 0, 8), "89504e470d0a1a0a");
   strictAssert.equal(buffer.toString("ascii", 12, 16), "IHDR");
   return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
+}
+
+function alphaBounds(png, frame) {
+  const bounds = { minX: frame.w, minY: frame.h, maxX: 0, maxY: 0, count: 0 };
+  for (let y = 0; y < frame.h; y++) {
+    for (let x = 0; x < frame.w; x++) {
+      if (png.data[((frame.y + y) * png.width + frame.x + x) * 4 + 3] === 0) continue;
+      bounds.minX = Math.min(bounds.minX, x);
+      bounds.minY = Math.min(bounds.minY, y);
+      bounds.maxX = Math.max(bounds.maxX, x + 1);
+      bounds.maxY = Math.max(bounds.maxY, y + 1);
+      bounds.count++;
+    }
+  }
+  strictAssert.ok(bounds.count > 0, "depot layer has visible pixels");
+  return bounds;
 }

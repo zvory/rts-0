@@ -286,3 +286,75 @@ fn deployed_anti_tank_gun_drops_commanded_target_that_leaves_fixed_arc() {
         "a commanded target that leaves the fixed field must not lock the gun forever"
     );
 }
+
+#[test]
+fn deployed_anti_tank_gun_fires_at_mortars_but_prioritizes_tanks() {
+    // A direct order may pick the mortar even while a higher-priority tank is available.
+    for (with_tank, command_mortar) in [(false, false), (true, false), (true, true)] {
+        let map = open_map(16);
+        let mut entities = EntityStore::new();
+        let gun = entities
+            .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
+            .expect("AT gun should spawn");
+        let mortar = entities
+            .spawn_unit(2, EntityKind::MortarTeam, 180.0, 120.0)
+            .expect("mortar should spawn");
+        let mortar_hp = entities.get(mortar).expect("mortar should exist").hp;
+        let tank = with_tank.then(|| {
+            entities
+                .spawn_unit(2, EntityKind::Tank, 260.0, 100.0)
+                .expect("tank should spawn")
+        });
+        let expected = if command_mortar {
+            mortar
+        } else {
+            tank.unwrap_or(mortar)
+        };
+        let target = entities.get(expected).expect("target should exist");
+        let before_hp = target.hp;
+        let aim = (target.pos_y - 100.0).atan2(target.pos_x - 100.0);
+        let at = entities.get_mut(gun).expect("AT gun should exist");
+        at.set_weapon_setup(WeaponSetup::Deployed);
+        at.set_emplacement_facing(Some(0.0));
+        at.set_facing(aim);
+        at.set_weapon_facing(aim);
+        if command_mortar {
+            at.set_order(Order::attack(mortar));
+        }
+        let fog = visible_fog(&map, &entities);
+        assert!(
+            crate::game::services::world_query::unit_explicit_attack_target_valid(
+                crate::game::services::world_query::ExplicitAttackQuery {
+                    map: &map,
+                    entities: &entities,
+                    teams: &default_team_relations(),
+                    fog: &fog,
+                    smokes: None,
+                    attacker_owner: 1,
+                },
+                gun,
+                mortar,
+            ),
+            "a direct Attack command against a mortar must be accepted"
+        );
+
+        let events = run_combat_tick_on_map(
+            &mut entities,
+            &[player_state(1, false), player_state(2, false)],
+            &map,
+        );
+        assert!(
+            events.values().flatten().any(|event| {
+                matches!(event, Event::Attack { from, to, .. } if *from == gun && *to == expected)
+            }),
+            "with_tank={with_tank}, command_mortar={command_mortar}"
+        );
+        assert!(entities.get(expected).map_or(0, |target| target.hp) < before_hp);
+        if expected != mortar {
+            assert_eq!(
+                entities.get(mortar).expect("mortar should exist").hp,
+                mortar_hp
+            );
+        }
+    }
+}

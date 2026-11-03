@@ -2,12 +2,16 @@
 // Lobby owns authoritative selection state; guests can browse previews but only hosts may select.
 
 export const LOBBY_MAP_PRESENTATION = Object.freeze({
+  "Afrika (2v2)": Object.freeze({
+    author: "Alex",
+    preview: "/assets/map-previews/afrika-2v2.jpg",
+  }),
   "1v1 No Terrain": Object.freeze({
     author: "Alex",
     preview: "/assets/map-previews/1v1-no-terrain.jpg",
     archived: true,
   }),
-  Classic: Object.freeze({
+  Vintage: Object.freeze({
     author: "Alex",
     preview: "/assets/map-previews/1v1.jpg",
     archived: true,
@@ -19,6 +23,10 @@ export const LOBBY_MAP_PRESENTATION = Object.freeze({
   "4 Player Map": Object.freeze({
     author: "Alex",
     preview: "/assets/map-previews/4-player-map.jpg",
+  }),
+  Classic: Object.freeze({
+    author: "Alex",
+    preview: "/assets/map-previews/classic.jpg",
   }),
   "Classic V2": Object.freeze({
     author: "Alex",

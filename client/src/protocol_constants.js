@@ -414,7 +414,6 @@ export const UPGRADE = Object.freeze({
   SMOKE_PLUS: "smoke_plus",
   SCOUT_PLANE_UNLOCK: "scout_plane_unlock",
   ROCKETS: "rockets",
-  INDUSTRIAL_CENTER: "industrial_center",
 });
 
 export const UPGRADE_CODE = Object.freeze({
@@ -429,7 +428,6 @@ export const UPGRADE_CODE = Object.freeze({
   [UPGRADE.SMOKE_PLUS]: 9,
   [UPGRADE.SCOUT_PLANE_UNLOCK]: 11,
   [UPGRADE.ROCKETS]: 12,
-  [UPGRADE.INDUSTRIAL_CENTER]: 14,
 });
 
 export const WEAPON_KIND_CODE = Object.freeze({

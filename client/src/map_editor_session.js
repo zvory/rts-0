@@ -704,11 +704,11 @@ export function moveSymmetricDraftLocation(draft, {
   }
   for (const plan of plans) {
     if (kind === "start") {
-      draft.startLocations[plan.index] = copyLocation(plan.to);
+      draft.startLocations[plan.index] = { ...draft.startLocations[plan.index], ...copyLocation(plan.to) };
       if (plan.baseIndex >= 0) draft.baseSites[plan.baseIndex] = movedBaseSite(draft.baseSites[plan.baseIndex], plan.to);
     } else {
       draft.baseSites[plan.index] = movedBaseSite(draft.baseSites[plan.index], plan.to);
-      if (plan.startIndex >= 0) draft.startLocations[plan.startIndex] = copyLocation(plan.to);
+      if (plan.startIndex >= 0) draft.startLocations[plan.startIndex] = { ...draft.startLocations[plan.startIndex], ...copyLocation(plan.to) };
     }
   }
   return { ok: true, count: plans.length };
@@ -967,7 +967,13 @@ function normalizeDraft(draft) {
   const dimensions = { width, height };
   draft.width = width;
   draft.height = height;
-  draft.startLocations = normalizeLocations(draft.startLocations, dimensions).slice(0, MAP_EDITOR_MAX_START_LOCATIONS);
+  const originalStarts = Array.isArray(draft.startLocations) ? draft.startLocations : [];
+  draft.startLocations = normalizeLocations(originalStarts, dimensions).slice(0, MAP_EDITOR_MAX_START_LOCATIONS).map((start) => {
+    const group = originalStarts.find((candidate) => sameLocation(validMapTile(candidate, dimensions), start))?.teamGroup;
+    if (group === undefined) return start;
+    if (!Number.isInteger(group) || group < 1 || group > 4) throw new Error("Start teamGroup must be an integer from 1 to 4.");
+    return { ...start, teamGroup: group };
+  });
   draft.baseSites = normalizeBaseSites(draft.baseSites, draft.startLocations, dimensions);
   draft.forestSpans = normalizeForestSpans(draft.forestSpans, dimensions);
   draft.doodads = normalizeDraftDoodads(draft.doodads, dimensions);

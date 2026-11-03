@@ -230,7 +230,13 @@ export class ChatOverlay {
     const line = this.documentLike.createElement("div");
     line.className = `chat-message chat-message-${message.channel === "team" ? "team" : "all"}`;
     const prefix = message.channel === "team" ? "TEAM" : "ALL";
-    line.textContent = `[${prefix}] ${String(message.senderName || "Commander")}: ${String(message.text || "")}`;
+    const isCriticalAlert = this.scope === "game" && message.senderId === 0;
+    if (isCriticalAlert) {
+      line.className += " chat-message-critical";
+      line.textContent = String(message.text || "");
+    } else {
+      line.textContent = `[${prefix}] ${String(message.senderName || "Commander")}: ${String(message.text || "")}`;
+    }
     this.messages.appendChild(line);
     const persistentLobby = this.scope === "lobby" && this.docked;
     const maxMessages = persistentLobby
