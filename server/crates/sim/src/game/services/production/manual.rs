@@ -8,6 +8,9 @@ pub(super) fn pay_and_protect(
     players: &mut [PlayerState],
     pending: &mut HashMap<u32, ResourceCost>,
 ) {
+    if players.iter().all(|player| player.is_ai) {
+        return;
+    }
     for id in entities.ids() {
         let active_producer = entities.get(id).is_some_and(|producer| {
             producer.hp > 0 && producer.is_building() && !producer.under_construction()

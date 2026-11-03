@@ -142,11 +142,13 @@ pub(crate) fn production_system(
                 }
             }
         }
-        if entities.get(id).is_some_and(|building| {
-            players
-                .iter()
-                .any(|player| player.id == building.owner && player.is_ai)
-        }) {
+        if active_producer
+            && entities.get(id).is_some_and(|building| {
+                players
+                    .iter()
+                    .any(|player| player.id == building.owner && player.is_ai)
+            })
+        {
             manual::pay_front(entities, players, id);
         }
         let completed_research = {

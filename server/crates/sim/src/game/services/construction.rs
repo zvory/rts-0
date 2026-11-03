@@ -478,6 +478,9 @@ pub(crate) fn pending_spending(
     players: &[PlayerState],
 ) -> std::collections::HashMap<u32, rules::economy::ResourceCost> {
     let mut pending = std::collections::HashMap::new();
+    if players.iter().all(|player| player.is_ai) {
+        return pending;
+    }
     let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
     for (worker, kind, tx, ty, _) in arrived_build_orders(map, entities) {
         let Some(builder) = entities.get(worker) else {
