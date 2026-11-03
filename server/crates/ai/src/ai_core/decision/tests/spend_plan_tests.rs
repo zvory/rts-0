@@ -184,7 +184,7 @@ fn the_live_jeff_orders_its_natural_ahead_of_the_money_and_the_freeze_waits_for_
             &mut |_, _, _| true,
         );
         // The guards stand on their posts through the secure dwell.
-        let posts = expansion_security::positions(&obs, None, &memory.expansion_security);
+        let posts = expansion_security::positions(&obs, None, &memory.expansion_security, false);
         for (id, post) in memory
             .expansion_security
             .riflemen

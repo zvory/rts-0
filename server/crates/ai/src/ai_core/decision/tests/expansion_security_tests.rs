@@ -291,7 +291,7 @@ fn expansion_security_requires_arrival_and_uncontested_dwell() {
         None,
         &mut |_, _, _| true,
     );
-    let points = expansion_security::positions(&obs, None, &memory.expansion_security);
+    let points = expansion_security::positions(&obs, None, &memory.expansion_security, false);
     assert_eq!(points.len(), 2);
     assert!(
         geometry::dist2(points[0].0, points[0].1, points[1].0, points[1].1).sqrt()
@@ -363,7 +363,7 @@ fn guards_stuck_just_short_of_their_posts_secure_the_site_after_a_longer_dwell()
         None,
         &mut |_, _, _| true,
     );
-    let points = expansion_security::positions(&obs, None, &memory.expansion_security);
+    let points = expansion_security::positions(&obs, None, &memory.expansion_security, false);
     let step = |obs: &AiObservation, memory: &mut AiDecisionMemory| {
         let facts = AiFacts::from_observation(obs);
         let mut actions = AiActionContext::new(&facts, SpendBudget::new(1000, 1000, 20, 80));
@@ -438,7 +438,7 @@ fn contested_expansion_guards_answer_the_raid(profile: &'static AiProfile) {
         &mut |_, _, _| true,
     );
     let site = memory.expansion_security.site.unwrap();
-    let points = expansion_security::positions(&obs, None, &memory.expansion_security);
+    let points = expansion_security::positions(&obs, None, &memory.expansion_security, false);
     for (id, point) in memory.expansion_security.riflemen.iter().zip(&points) {
         let unit = obs.owned.iter_mut().find(|unit| unit.id == *id).unwrap();
         unit.x = point.0;
@@ -625,7 +625,7 @@ fn expansion_security_spends_only_resources_above_the_depot_reserve() {
         kind: EntityKind::ResourceDepot
     }));
     let site = memory.expansion_security.site.unwrap();
-    let points = expansion_security::positions(&obs, None, &memory.expansion_security);
+    let points = expansion_security::positions(&obs, None, &memory.expansion_security, false);
     for (id, point) in memory.expansion_security.riflemen.iter().zip(&points) {
         let unit = obs.owned.iter_mut().find(|unit| unit.id == *id).unwrap();
         unit.x = point.0;
@@ -700,7 +700,7 @@ fn expansion_security_has_spaced_reachable_posts_on_river_and_crossroads() {
             .unwrap();
             let mut security = expansion_security::ExpansionSecurity::default();
             security.site = Some(site);
-            let points = expansion_security::positions(&obs, Some(&analysis), &security);
+            let points = expansion_security::positions(&obs, Some(&analysis), &security, false);
             assert_eq!(points.len(), 2, "{name} player {player} site {site:?}");
             let center =
                 building_center(site, EntityKind::ResourceDepot, obs.map.tile_size).unwrap();
@@ -875,7 +875,7 @@ fn crossroads_expansion_tank_uses_the_same_wall_aware_approach_as_its_rifles() {
         ));
         let mut security = expansion_security::ExpansionSecurity::default();
         security.site = Some(site);
-        let rifles = expansion_security::positions(&obs, Some(&analysis), &security);
+        let rifles = expansion_security::positions(&obs, Some(&analysis), &security, false);
         let tank = expansion_security::tank_staging_center(&obs, Some(&analysis)).unwrap();
         let direction = defense::crossroads_wall_aware_approach_direction(&obs).unwrap();
         let projection = |point: (f32, f32)| {
@@ -922,7 +922,7 @@ fn completed_expansion_stages_tanks_between_the_depot_and_rifle_screen() {
         |point: (f32, f32)| (point.0 - center.0) * direction.0 + (point.1 - center.1) * direction.1;
     let mut security = expansion_security::ExpansionSecurity::default();
     security.site = Some(site);
-    let rifles = expansion_security::positions(&obs, None, &security);
+    let rifles = expansion_security::positions(&obs, None, &security, false);
 
     assert_eq!(rifles.len(), 2);
     assert!(projection(tank) > 0.0);
@@ -1103,7 +1103,7 @@ fn expansion_security_live_opening_reaches_second_base() {
                 .collect();
             panic!(
                 "{name}: expansion stalled: site={site:?} blockers={blocked:?} party={party:?} posts={:?} enemies={:?} units={units:?}, trace={:?}",
-                expansion_security::positions(&obs, None, security),
+                expansion_security::positions(&obs, None, security, false),
                 obs.visible_enemies,
                 controllers[0].latest_decision_trace()
             );

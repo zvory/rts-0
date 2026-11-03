@@ -565,6 +565,32 @@ pub(super) fn third_base_rifles() -> usize {
 }
 const THIRD_BASE_RIFLES: usize = 16;
 
+/// The Rifleman opening's Factory no longer waits for the natural's order (`facwait`): from
+/// `factorywait` seconds in `JEFF_V11_LINE`, 180 by default. Rush AI's guns parked 8-15 tiles off
+/// Jeff's Classic natural kept it contested from 2:23 on; the order never went out, so no Factory
+/// and no Tank came to clear them, and 1,250 Steel sat banked at 3:20.
+pub(super) fn rifle_factory_free(profile_id: &str, tick: u32) -> bool {
+    let wait = crate::ai_core::profiles::jeff_v1_1_param("factorywait").map_or(180.0, |s| s.max(0.0));
+    rifle_opening(profile_id) && !off("facwait") && tick >= (wait * config::TICK_HZ as f32) as u32
+}
+
+/// Jeff's AI V1.1's hand-placed naturals refit to the 4x4 Resource Depot (`depot4`). The 3x3 sites
+/// (Schone Tage (19,24) and (144,24), The River (108,93)) each now touch a resource node's body,
+/// which Jeff's placement check rejects, so the natural was never ordered on Schone Tage (20 of 20
+/// games) or from The River's lower-right start; these are the nearest full sites that place.
+pub(super) fn refit_natural(profile_id: &str, observation: &AiObservation) -> Option<(u32, u32)> {
+    if !is_jeff_v1_1(profile_id) || off("depot4") {
+        return None;
+    }
+    match (observation.map.width, observation.map.height, observation.own_start_tile) {
+        (166, 166, (8, 47)) => Some((21, 24)),
+        (166, 166, (157, 47)) => Some((141, 24)),
+        (126, 126, (9, 9)) => Some((15, 30)),
+        (126, 126, (116, 116)) => Some((107, 92)),
+        _ => None,
+    }
+}
+
 /// Riflemen this close to the main's start count as at home for the natural (`riflenat`): far
 /// enough to take in those already holding the natural, not the starters out raiding.
 const HOME_RIFLE_TILES: f32 = 40.0;

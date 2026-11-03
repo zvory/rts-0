@@ -547,6 +547,8 @@ where
     // Factory).
     let natural_ordered_or_up =
         natural_pending || facts.building_count(EntityKind::ResourceDepot) >= 2;
+    // ... until the Factory stops waiting for it (`facwait`).
+    let rifle_factory_free = jeff_v1_1::rifle_factory_free(profile.id, observation.tick);
     for kind in required_tech_path {
         if *kind == EntityKind::Barracks && delay_opening_barracks {
             continue;
@@ -556,7 +558,8 @@ where
         }
         if (expansion_blocks_tech_path || hold_tech_for_expansion)
             && !(*kind == EntityKind::Factory
-                && jeff_v1_1::factory_alongside_natural(profile.id, &facts))
+                && (jeff_v1_1::factory_alongside_natural(profile.id, &facts)
+                    || rifle_factory_free))
             && !(*kind == EntityKind::EngineeringComplex
                 && jeff_v1_1::complex_alongside_natural(&facts))
         {
@@ -580,7 +583,7 @@ where
         // The Rifleman opening (`riflenat`): the Factory after the natural's order, the
         // Engineering Complex after the Factory's first Scout Car.
         if jeff_v1_1::rifle_opening(profile.id)
-            && ((*kind == EntityKind::Factory && !natural_ordered_or_up)
+            && ((*kind == EntityKind::Factory && !natural_ordered_or_up && !rifle_factory_free)
                 || (*kind == EntityKind::EngineeringComplex && !facts.v1_1_car_ordered))
         {
             continue;
@@ -681,10 +684,11 @@ where
             + planned_in_intents(&intents, EntityKind::Factory)
             < profile.buildings.factory_target
         && (!(expansion_blocks_tech_path || hold_tech_for_expansion)
-            || jeff_v1_1::factory_alongside_natural(profile.id, &facts))
+            || jeff_v1_1::factory_alongside_natural(profile.id, &facts)
+            || rifle_factory_free)
         && planned_in_intents(&intents, EntityKind::Factory) == 0
         && facts.v1_1_opening != Some(OpeningOrder::Undecided)
-        && !(jeff_v1_1::rifle_opening(profile.id) && !natural_ordered_or_up);
+        && !(jeff_v1_1::rifle_opening(profile.id) && !natural_ordered_or_up && !rifle_factory_free);
     if first_factory_needed {
         if let Some(build_action) = try_build_production(
             observation,
@@ -1765,6 +1769,7 @@ where
         );
         decision.trace.notes.push(first);
         decision.trace.notes.push(second);
+        decision.trace.notes.push(memory.expansion_security.trace());
         decision.trace.strike = Some(format!(
             "v1_1_meth {} opening={:?} trade={}/{} value={}/{} ahead={}",
             memory.jeff_v1_1.meth_strike.trace(),

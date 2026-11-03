@@ -266,6 +266,19 @@ where
     if resources.is_empty() {
         return None;
     }
+    // Jeff's AI V1.1 (`depot4`): the hand-placed naturals refit to the 4x4 Depot, on the maps whose
+    // hand-placed site this is (the full base in reach).
+    if let Some(tile) = super::jeff_v1_1::refit_natural(profile_id, observation) {
+        let full = expansion_site_candidate(observation, kind, tile.0, tile.1, &resources)
+            .is_some_and(|candidate| {
+                candidate.steel_in_range >= config::STEEL_PATCHES_PER_BASE as usize
+                    && candidate.oil_in_range >= config::OIL_PATCHES_PER_BASE as usize
+            });
+        if full {
+            return (expansion_site_is_separate(observation, tile) && placeable(kind, tile.0, tile.1))
+                .then_some(tile);
+        }
+    }
     if uses_current_jeffs_ai_policy(profile_id) {
         if let Some(instruction) = instructed_river_expansion_site(observation, kind, &resources) {
             // The River's natural has one known good footprint per side. Do not
@@ -1063,6 +1076,95 @@ mod tests {
             sum_resource_distance2: 500.0,
             own_distance2,
             approach_exposure: Some(approach_exposure),
+        }
+    }
+
+    /// Local probe (run with `--ignored --nocapture`): on Schone Tage and The River, whether the
+    /// hand-placed natural footprints still place a Resource Depot with the full base in reach, and
+    /// the footprints near them that do.
+    #[test]
+    #[ignore]
+    fn probe_instructed_natural_footprints() {
+        use crate::selfplay::player_view::{
+            footprint_placeable_from_snapshot, occupied_tiles_from_snapshot,
+        };
+        use rts_sim::game::map::Map;
+        use rts_sim::game::{Game, PlayerInit};
+        let players: Vec<_> = (1..=2)
+            .map(|id| PlayerInit {
+                id,
+                team_id: id,
+                faction_id: "kriegsia".into(),
+                name: format!("P{id}"),
+                color: "#ffffff".into(),
+                is_ai: true,
+            })
+            .collect();
+        let kind = EntityKind::ResourceDepot;
+        let stats = config::building_stats(kind).unwrap();
+        println!("depot footprint {}x{}", stats.foot_w, stats.foot_h);
+        for name in ["Schone Tage", "The River"] {
+            let map = Map::load_for_players(name, &[(1, 1), (2, 2)], 0x1234_5678).unwrap();
+            let game = Game::new_with_random_ai_profiles_and_map_metadata(
+                &players,
+                0x1234_5678,
+                map,
+                Map::metadata_for_name(name).unwrap(),
+            );
+            let start = game.start_payload();
+            for player in [1, 2] {
+                let snapshot = game.snapshot_for(player);
+                let obs = AiObservation::from_snapshot_with_alive(&start, &snapshot, player, [], None)
+                    .unwrap();
+                let occupied = occupied_tiles_from_snapshot(&start.map, &snapshot);
+                let place = |x: u32, y: u32| {
+                    footprint_placeable_from_snapshot(&start.map, &snapshot, player, kind, x, y, &occupied)
+                        && !super::super::jeff::resource_body_blocks_site(&obs, kind, x, y)
+                };
+                let resources = expansion_candidate_resources(&obs);
+                let tile = match (name, obs.own_start_tile) {
+                    ("Schone Tage", (157, 47)) => (144, 24),
+                    ("Schone Tage", (8, 47)) => (19, 24),
+                    (_, start) => river_expansion_instruction(obs.map, start)
+                        .map_or((0, 0), |instruction| instruction.tile),
+                };
+                let full = |x: u32, y: u32| {
+                    expansion_site_candidate(&obs, kind, x, y, &resources).map(|candidate| {
+                        (candidate.steel_in_range, candidate.oil_in_range)
+                    })
+                };
+                println!(
+                    "{name} player {player} start {:?}: instructed {:?} placeable {} resources {:?}",
+                    obs.own_start_tile,
+                    tile,
+                    place(tile.0, tile.1),
+                    full(tile.0, tile.1)
+                );
+                let old_center = (tile.0 as f32 + 1.5, tile.1 as f32 + 1.5);
+                let mut good = Vec::new();
+                for dy in -5i32..=5 {
+                    for dx in -5i32..=5 {
+                        let (x, y) = ((tile.0 as i32 + dx) as u32, (tile.1 as i32 + dy) as u32);
+                        let Some((steel, oil)) = full(x, y) else { continue };
+                        if steel < config::STEEL_PATCHES_PER_BASE as usize
+                            || oil < config::OIL_PATCHES_PER_BASE as usize
+                            || !place(x, y)
+                        {
+                            continue;
+                        }
+                        let center = (x as f32 + stats.foot_w as f32 * 0.5, y as f32 + stats.foot_h as f32 * 0.5);
+                        let shift = ((center.0 - old_center.0).powi(2) + (center.1 - old_center.1).powi(2)).sqrt();
+                        good.push((shift, (x, y), steel, oil));
+                    }
+                }
+                good.sort_by(|a, b| a.0.total_cmp(&b.0));
+                for (shift, at, steel, oil) in good.iter().take(6) {
+                    println!("    {at:?} centre shift {shift:.2} tiles, steel {steel} oil {oil}");
+                }
+                if good.is_empty() {
+                    println!("    no full placeable footprint within 5 tiles");
+                }
+            }
         }
     }
 

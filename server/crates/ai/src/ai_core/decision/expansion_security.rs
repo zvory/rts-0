@@ -80,6 +80,22 @@ impl ExpansionSecurity {
     pub(super) fn retry_builder(&self) -> Option<u32> {
         self.retry_builder
     }
+
+    /// One trace line of the natural's state (local debugging).
+    pub(super) fn trace(&self) -> String {
+        format!(
+            "natural site={:?} guards={:?} secure_since={:?} near_since={:?} attempt={:?} next={} rejected={:?} failures={:?} contested={:?}",
+            self.site,
+            self.riflemen,
+            self.secure_since,
+            self.near_since,
+            self.build_attempt_tick,
+            self.next_attempt_tick,
+            self.rejected_sites,
+            self.site_failures,
+            self.contested_tick
+        )
+    }
 }
 
 /// The first Tank is paid before the natural; subsequent gas is reserved for the Depot.
