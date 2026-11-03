@@ -5,6 +5,8 @@ use crate::game::services::occupancy::footprint_center;
 use crate::game::upgrade::UpgradeKind;
 use crate::rules;
 
+mod manual_spending;
+
 fn players() -> [PlayerInit; 2] {
     [
         PlayerInit {

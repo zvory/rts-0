@@ -12,6 +12,7 @@ use crate::game::PlayerState;
 use crate::rules;
 
 mod extractors;
+mod manual;
 mod repeat;
 
 /// Advance each building's front production item; on completion spawn the unit adjacent to the
@@ -28,7 +29,9 @@ pub(crate) fn production_system(
     smokes: &SmokeCloudStore,
     _events: &mut std::collections::HashMap<u32, Vec<crate::protocol::Event>>,
     tick: u32,
+    mut pending_spending: std::collections::HashMap<u32, rules::economy::ResourceCost>,
 ) {
+    manual::pay_and_protect(entities, players, &mut pending_spending);
     let mut completed_buildings_by_owner = None;
     for id in entities.ids() {
         let active_producer = entities.get(id).is_some_and(|producer| {
@@ -108,7 +111,13 @@ pub(crate) fn production_system(
                 let cost = rules::economy::resource_cost(unit);
                 let supply = rules::economy::supply_cost(unit);
                 let supply_available = player.can_reserve_supply(supply);
-                let auto_build_allowed = player.can_auto_build(cost);
+                let auto_build_allowed = player.can_auto_build(
+                    cost,
+                    pending_spending
+                        .get(&owner)
+                        .copied()
+                        .unwrap_or(rules::economy::ResourceCost::new(0, 0)),
+                );
                 if supply_available && auto_build_allowed && player.spend_cost(cost) {
                     if player.reserve_supply(supply) {
                         let queued = entities.get_mut(id).is_some_and(|producer| {
@@ -133,64 +142,12 @@ pub(crate) fn production_system(
                 }
             }
         }
-        if let Some((owner, research)) =
-            entities
-                .get(id)
-                .filter(|_| active_producer)
-                .and_then(|building| {
-                    building
-                        .research_queue()
-                        .first()
-                        .filter(|item| !item.paid)
-                        .map(|item| (building.owner, item.upgrade))
-                })
-        {
-            let definition = upgrade::definition(research);
-            let cost =
-                rules::economy::ResourceCost::new(definition.cost_steel, definition.cost_oil);
-            if let Some(player) = players.iter_mut().find(|player| player.id == owner) {
-                if player.spend_cost(cost)
-                    && !entities
-                        .get_mut(id)
-                        .is_some_and(|building| building.mark_front_research_paid())
-                {
-                    player.refund_cost(cost);
-                }
-            }
-        }
-        if let Some((owner, unit)) =
-            entities
-                .get(id)
-                .filter(|_| active_producer)
-                .and_then(|building| {
-                    building
-                        .prod_queue()
-                        .first()
-                        .filter(|item| !item.paid)
-                        .map(|item| (building.owner, item.unit))
-                })
-        {
-            if unit.is_resource_extractor() && extractors::target(entities, id, unit).is_none() {
-                continue;
-            }
-            let cost = rules::economy::resource_cost(unit);
-            let supply = rules::economy::supply_cost(unit);
-            if let Some(player) = players.iter_mut().find(|player| player.id == owner) {
-                let supply_available = player.can_reserve_supply(supply);
-                if supply_available && player.spend_cost(cost) {
-                    if player.reserve_supply(supply) {
-                        if !entities
-                            .get_mut(id)
-                            .is_some_and(|building| building.mark_front_production_paid())
-                        {
-                            player.refund_cost(cost);
-                            player.release_supply(supply);
-                        }
-                    } else {
-                        player.refund_cost(cost);
-                    }
-                }
-            }
+        if entities.get(id).is_some_and(|building| {
+            players
+                .iter()
+                .any(|player| player.id == building.owner && player.is_ai)
+        }) {
+            manual::pay_front(entities, players, id);
         }
         let completed_research = {
             match entities.get_mut(id) {
@@ -607,6 +564,7 @@ mod tests {
             &smokes,
             &mut events,
             1,
+            HashMap::new(),
         );
         coordinator.process_awaiting_paths(&mut entities);
 
@@ -834,6 +792,7 @@ mod tests {
             &smokes,
             &mut events,
             1,
+            HashMap::new(),
         );
     }
 

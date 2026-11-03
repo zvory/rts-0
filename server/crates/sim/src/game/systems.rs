@@ -340,6 +340,7 @@ pub(crate) fn run_tick(
         );
     });
     crate::perf::timed(perf.as_deref_mut(), "production", || {
+        let pending_spending = services::construction::pending_spending(map, entities, players);
         services::production::production_system(
             map,
             entities,
@@ -349,6 +350,7 @@ pub(crate) fn run_tick(
             smokes,
             events,
             tick,
+            pending_spending,
         );
     });
     crate::perf::timed(perf.as_deref_mut(), "player_ability_cooldowns", || {
