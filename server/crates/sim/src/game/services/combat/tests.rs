@@ -2006,7 +2006,7 @@ fn tank_combat_keeps_body_stable_and_rotates_turret() {
 }
 
 #[test]
-fn tank_cannot_fire_until_turret_aligned() {
+fn tank_cannon_cannot_fire_until_turret_aligned() {
     let mut entities = EntityStore::new();
     let tank_id = entities
         .spawn_unit(1, EntityKind::Tank, 100.0, 100.0)
@@ -2018,6 +2018,7 @@ fn tank_cannot_fire_until_turret_aligned() {
         tank.set_facing(std::f32::consts::FRAC_PI_2);
         tank.set_weapon_facing(std::f32::consts::FRAC_PI_2);
         tank.set_order(Order::attack(enemy_id));
+        tank.set_weapon_cooldown(combat_rules::WeaponKind::TankCoax, 999);
     }
     let enemy_hp = entities.get(enemy_id).expect("enemy should exist").hp;
 

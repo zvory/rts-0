@@ -960,6 +960,7 @@ fn compact_slot_schemas() -> CompactSlotSchemas {
             optional_field(41, "panzerfaustWindupProgress"),
             optional_field(42, "unitsKilled"),
             optional_field(43, "rocketRackCount"),
+            optional_field(44, "commanderFacing"),
         ],
         event: event_slot_schemas(),
         trench: vec![

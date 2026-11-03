@@ -210,7 +210,7 @@ test('minimap uses production setup frames and shot envelopes, with a bounded im
   assert.equal(sample(1200)[0].part, 'frame:11');
   assert.equal(sample(1700)[0].part, 'frame:9');
   assert.equal(sample(2200)[0].part, 'frame:6');
-  const tank = { id: 2, kind: 'tank', facing: 0.3, weaponFacing: 1.2 };
+  const tank = { id: 2, kind: 'tank', facing: 0.3, weaponFacing: 1.2, commanderFacing: -0.5 };
   animation.beginFrame([tank], state, 2300);
   const resting = animation.layers(tank);
   recoil = 1;
@@ -218,6 +218,8 @@ test('minimap uses production setup frames and shot envelopes, with a bounded im
   const firing = animation.layers(tank);
   assert.notDeepEqual(firing, resting, 'recoil moves the hull/turret and retracts the barrel');
   assert.equal(firing.find(layer => layer.part.includes('barrel')).rotation, 1.2);
+  assert.equal(firing.find(layer => layer.part === 'sprite:sprite.commanderGun').rotation, -0.5);
+  assert.match(liveUnitIconMarkupFor('tank', { minimapPart: 'sprite:sprite.commanderGun' }), /scout-car-white-atlas/);
   const requested = [];
   const icons = new MinimapUnitIcons({ animation,
     createCanvas: () => ({ width: 0, height: 0, getContext: () => ({ drawImage() {}, fillRect() {} }) }),
@@ -237,7 +239,7 @@ test('minimap uses production setup frames and shot envelopes, with a bounded im
     icons.draw(context, tank, '#0072b2', { x: 0, y: 0 }, 480);
   }
   assert.equal(requested.length, count, 'angles and recoil never create image variants');
-  assert.equal(visibleDraws, 50 * 3, 'empty tracks never issue a Canvas draw');
+  assert.equal(visibleDraws, 50 * 4, 'draw hull, turret, cannon and roof MG; empty tracks never draw');
   icons.destroy();
 });
 
@@ -284,13 +286,15 @@ test('minimap tank omits only atlas cells declared and verified transparent', as
   const { createLivePngRigAtlases } = await import('../../client/src/renderer/rigs/png_routing.js');
   const { createMinimapAnimation } = await import('../../client/src/renderer/rigs/minimap_animation.js');
   const atlas = createLivePngRigAtlases().get('tank');
-  const image = PNG.sync.read(fs.readFileSync(new URL(`../../client${atlas.image}`, import.meta.url)));
+  const { spriteRasterSource } = await import('../../client/src/renderer/rigs/png_icon_source.js');
   const blank = new Set(atlas.grid.normalization.blankCells);
   const animation = createMinimapAnimation();
   const parts = animation.parts('tank');
-  assert.equal(parts.length, 3, 'retain hull, turret and the visible independent barrel');
+  assert.equal(parts.length, 4, 'retain hull, turret, cannon and independent roof MG');
   for (const sprite of atlas.sprites) {
-    const { x, y, w, h } = sprite.frame;
+    const source = spriteRasterSource(atlas, sprite);
+    const image = PNG.sync.read(fs.readFileSync(new URL(`../../client${source.image}`, import.meta.url)));
+    const { x, y, w, h } = source.frame;
     let visible = false;
     for (let row = y; row < y + h && !visible; row++) {
       for (let col = x; col < x + w; col++) {

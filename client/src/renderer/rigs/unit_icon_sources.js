@@ -1,3 +1,4 @@
+import { spriteRasterSource } from "./png_icon_source.js";
 import { KIND, SETUP } from "../../protocol.js";
 import { lightenColor } from "../shared.js";
 import { createLiveFrameStrips } from "./frame_strip_routing.js";
@@ -59,9 +60,8 @@ export function liveUnitIconMarkupFor(kind, { teamColor = "#0072b2", minimapPart
   if (minimapPart?.startsWith("sprite:") && atlas) {
     const sprite = atlas.sprites.find(sprite => sprite.id === minimapPart.slice(7));
     if (!sprite) throw new Error(`Unknown minimap sprite: ${minimapPart}`);
-    const frame = sprite.frame;
-    return composedRasterIconMarkup({ source: "png-atlas-minimap", image: atlas.image,
-      sheetWidth: atlas.grid.width, sheetHeight: atlas.grid.height,
+    const { frame, ...source } = spriteRasterSource(atlas, sprite);
+    return composedRasterIconMarkup({ source: "png-atlas-minimap", ...source,
       components: [{ id: sprite.id, frame, teamTint: sprite.tintSlot !== "fixed" }],
       teamTint: sprite.tintSlot !== "fixed", teamColor: tintColor,
       fixedBounds: { x: -64, y: -64, w: 128, h: 128 } });
@@ -207,7 +207,8 @@ function createAnimatedRasterIcon(root, kind, atlas, definition, teamColor) {
 let animatedIconSequence = 0;
 
 function animatedRasterLayerMarkup(sprite, atlas, tintId) {
-  const frame = sprite.frame;
+  const source = spriteRasterSource(atlas, sprite);
+  const frame = source.frame;
   const pixelsPerUnitX = frame.pixelsPerUnitX || frame.pixelsPerUnit || 1;
   const pixelsPerUnitY = frame.pixelsPerUnitY || frame.pixelsPerUnit || 1;
   const w = frame.w / Math.abs(pixelsPerUnitX);
@@ -225,7 +226,7 @@ function animatedRasterLayerMarkup(sprite, atlas, tintId) {
     `<g data-unit-icon-scale>` +
       `<svg x="${number(x)}" y="${number(y)}" width="${number(w)}" height="${number(h)}" ` +
         `viewBox="${frame.x} ${frame.y} ${frame.w} ${frame.h}" preserveAspectRatio="none" overflow="hidden">` +
-        `<image href="${atlas.image}" x="0" y="0" width="${atlas.grid.width}" height="${atlas.grid.height}" ` +
+        `<image href="${source.image}" x="0" y="0" width="${source.sheetWidth}" height="${source.sheetHeight}" ` +
           `preserveAspectRatio="none"${filter} />` +
       `</svg>` +
     `</g>` +
@@ -291,7 +292,7 @@ function minimapPartMarkup(kind, atlas, teamColor, part) {
       && (part.endsWith("barrel") === sprite.id.includes("barrelAssembly"));
   }).sort((a, b) => a.drawOrder - b.drawOrder).map(sprite => {
     const transform = resolvePngSpriteTransform(pose.parts[sprite.animationPart], sprite.frame, sprite, {}, context);
-    return { id: sprite.id, frame: sprite.frame, ...transform, teamTint: sprite.tintSlot !== "fixed" };
+    return { id: sprite.id, ...spriteRasterSource(atlas, sprite), ...transform, teamTint: sprite.tintSlot !== "fixed" };
   });
   return composedRasterIconMarkup({ source: "png-atlas-minimap", image: atlas.image,
     sheetWidth: atlas.grid.width, sheetHeight: atlas.grid.height, components,
@@ -522,8 +523,8 @@ function composedRasterIconMarkup({
             `width="${number(component.w)}" height="${number(component.h)}" ` +
             `viewBox="${number(frame.x)} ${number(frame.y)} ${number(frame.w)} ${number(frame.h)}" ` +
             `preserveAspectRatio="none" style="overflow:hidden">` +
-            `<image href="${image}" x="0" y="0" width="${number(safeSheetWidth)}" ` +
-              `height="${number(safeSheetHeight)}" preserveAspectRatio="none" />` +
+            `<image href="${component.image || image}" x="0" y="0" width="${number(component.sheetWidth || safeSheetWidth)}" ` +
+              `height="${number(component.sheetHeight || safeSheetHeight)}" preserveAspectRatio="none" />` +
           `</svg>` +
         `</g>` +
       `</g>`
@@ -574,6 +575,9 @@ function normalizedCompositionComponent(component) {
   const localY = Math.min(originWorldY, farWorldY);
   return {
     id: component.id,
+    image: component.image,
+    sheetWidth: positiveDimension(component.sheetWidth),
+    sheetHeight: positiveDimension(component.sheetHeight),
     teamTint: component.teamTint === true,
     frame: {
       x: finiteNumber(frame.x),

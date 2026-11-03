@@ -190,17 +190,17 @@ test("tank rig exposes transformed main and coax muzzle anchors", () => {
     state: STATE.IDLE,
     facing: 0,
     weaponFacing: Math.PI / 2,
+    commanderFacing: 0,
   };
 
   const mainMuzzle = transformedRigAnchorPoint(definition, entity, "muzzle", { now: fixedNow });
   const coaxMuzzle = transformedRigAnchorPoint(definition, entity, "coaxMuzzle", { now: fixedNow });
 
-  assert.ok(mainMuzzle, "tank main muzzle anchor should resolve");
   assert.ok(coaxMuzzle, "tank coax muzzle anchor should resolve");
   assert.ok(Math.abs(mainMuzzle.x - 100) < 0.001);
   assert.ok(Math.abs(mainMuzzle.y - 133.2) < 0.001);
-  assert.ok(Math.abs(coaxMuzzle.x - 105.55) < 0.001);
-  assert.ok(Math.abs(coaxMuzzle.y - 116.6) < 0.001);
+  assert.ok(Math.abs(coaxMuzzle.x - 106.1384) < 0.001);
+  assert.ok(Math.abs(coaxMuzzle.y - 100) < 0.001);
 
   const recoilingMainMuzzle = transformedRigAnchorPoint(definition, entity, "muzzle", {
     now: fixedNow,
@@ -213,8 +213,8 @@ test("tank rig exposes transformed main and coax muzzle anchors", () => {
 
   assert.ok(Math.abs(recoilingMainMuzzle.x - 100) < 0.001);
   assert.ok(Math.abs(recoilingMainMuzzle.y - 124.875) < 0.001);
-  assert.ok(Math.abs(recoilingCoaxMuzzle.x - 105.55) < 0.001);
-  assert.ok(Math.abs(recoilingCoaxMuzzle.y - 112.775) < 0.001);
+  assert.ok(Math.abs(recoilingCoaxMuzzle.x - 106.1384) < 0.001);
+  assert.ok(Math.abs(recoilingCoaxMuzzle.y - 96.175) < 0.001);
 });
 
 test("tank rig adds a half-scale artillery-style muzzle flare on cannon recoil", () => {

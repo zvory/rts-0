@@ -339,17 +339,17 @@ mod tests {
     }
 
     #[test]
-    fn coax_policy_prioritizes_economy_units_over_fallback_targets() {
+    fn coax_policy_uses_default_combat_unit_order_after_explicit_tiers() {
         let candidates = [
             candidate(10, EntityKind::Tank, 400.0, false),
             candidate(11, EntityKind::Worker, 2_500.0, false),
         ];
 
-        assert_eq!(choose_target(&coax_context(), &candidates), Some(11));
+        assert_eq!(choose_target(&coax_context(), &candidates), Some(10));
     }
 
     #[test]
-    fn coax_policy_excludes_support_and_other_infantry_from_priority_bucket() {
+    fn coax_policy_prefers_at_guns_over_combat_infantry() {
         let candidates = [
             candidate(10, EntityKind::Golem, 100.0, false),
             candidate(11, EntityKind::MortarTeam, 200.0, false),
@@ -359,18 +359,18 @@ mod tests {
             candidate(15, EntityKind::Rifleman, 2_500.0, false),
         ];
 
-        assert_eq!(choose_target(&coax_context(), &candidates), Some(15));
+        assert_eq!(choose_target(&coax_context(), &candidates), Some(13));
     }
 
     #[test]
-    fn coax_policy_falls_back_by_distance_across_legal_materials() {
+    fn coax_policy_falls_back_to_default_unit_and_material_order() {
         let candidates = [
             candidate(10, EntityKind::Tank, 2_500.0, false),
             candidate(11, EntityKind::Barracks, 900.0, false),
             candidate(12, EntityKind::TankTrap, 400.0, false),
         ];
 
-        assert_eq!(choose_target(&coax_context(), &candidates), Some(12));
+        assert_eq!(choose_target(&coax_context(), &candidates), Some(10));
     }
 
     #[test]
@@ -405,13 +405,13 @@ mod tests {
     }
 
     #[test]
-    fn coax_policy_has_no_tank_cannon_threat_ordering() {
+    fn coax_policy_prioritizes_at_guns_over_fallback_tanks() {
         let candidates = [
             candidate(10, EntityKind::AntiTankGun, 2_500.0, false),
             candidate(11, EntityKind::Tank, 400.0, false),
         ];
 
-        assert_eq!(choose_target(&coax_context(), &candidates), Some(11));
+        assert_eq!(choose_target(&coax_context(), &candidates), Some(10));
     }
 
     #[test]
@@ -422,5 +422,41 @@ mod tests {
         ];
 
         assert_eq!(choose_target(&coax_context(), &candidates), Some(11));
+    }
+    #[test]
+    fn commander_mg_priority_cascade_beats_distance_and_preserves_default_fallback() {
+        let kinds = [
+            EntityKind::Panzerfaust,
+            EntityKind::AntiTankGun,
+            EntityKind::Rifleman,
+            EntityKind::MortarTeam,
+            EntityKind::ScoutCar,
+            EntityKind::Artillery,
+            EntityKind::Tank,
+            EntityKind::Worker,
+            EntityKind::Barracks,
+        ];
+        let candidates: Vec<_> = kinds
+            .into_iter()
+            .enumerate()
+            .map(|(index, kind)| {
+                candidate(index as u32 + 1, kind, (100 - index) as f32 * 100.0, false)
+            })
+            .collect();
+        // Every higher-priority tier wins despite being farther away.
+        for index in 0..5 {
+            assert_eq!(
+                choose_target(&coax_context(), &candidates[index..]),
+                Some(index as u32 + 1)
+            );
+        }
+        let mut default = coax_context();
+        default.policy_id = combat_rules::TargetPriorityPolicyId::DefaultWeapon;
+        for index in 5..candidates.len() {
+            assert_eq!(
+                choose_target(&coax_context(), &candidates[index..]),
+                choose_target(&default, &candidates[index..])
+            );
+        }
     }
 }

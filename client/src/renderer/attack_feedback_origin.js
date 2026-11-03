@@ -44,7 +44,7 @@ export function attackFeedbackOriginForWeapon({
   const originKind = attackFeedbackOriginKindForWeapon(attacker.kind, weaponKind);
   const facing = attackFeedbackFacing(attacker, targetPos);
   const fallbackOrigin = fallbackAttackFeedbackOrigin(attacker, originKind, stat, facing, map);
-  const rigOrigin = attackFeedbackRigOrigin(definitionsByKind, attacker, weaponKind, state, now, map);
+  const rigOrigin = attackFeedbackRigOrigin(definitionsByKind, attacker, weaponKind, state, now, map, targetPos);
   return rigOrigin ?? fallbackOrigin;
 }
 
@@ -62,11 +62,14 @@ function attackFeedbackFacing(attacker, targetPos) {
   return 0;
 }
 
-function attackFeedbackRigOrigin(definitionsByKind, attacker, weaponKind, state, now, map) {
+function attackFeedbackRigOrigin(definitionsByKind, attacker, weaponKind, state, now, map, targetPos) {
   const anchorName = attackFeedbackAnchorNameForWeapon(attacker.kind, weaponKind);
   if (!anchorName) return null;
   const definition = liveRigDefinitionFor(definitionsByKind, attacker.kind);
-  return transformedRigAnchorPoint(definition, attacker, anchorName, { state, now, map });
+  const source = weaponKind === WEAPON_KIND.TANK_COAX && !Number.isFinite(attacker.commanderFacing) && targetPos
+    ? { ...attacker, commanderFacing: Math.atan2(targetPos.y - attacker.y, targetPos.x - attacker.x) }
+    : attacker;
+  return transformedRigAnchorPoint(definition, source, anchorName, { state, now, map });
 }
 
 function attackFeedbackAnchorNameForWeapon(attackerKind, weaponKind) {

@@ -609,6 +609,7 @@ function projectEntity(entity) {
     activity: targetId != null ? "engaging" : state,
     targetId,
     weaponFacing: finiteOrNull(entity.weaponFacing),
+    commanderFacing: finiteOrNull(entity.commanderFacing),
     setupState: typeof entity.setupState === "string" ? entity.setupState : null,
     orderPlan: Array.isArray(entity.orderPlan) ? entity.orderPlan.slice(0, 8).map(projectOrderStage) : [],
   };

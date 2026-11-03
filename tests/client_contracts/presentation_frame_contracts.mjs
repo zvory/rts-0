@@ -65,6 +65,8 @@ const normal = {
   prodQueue: 1,
   prodWaiting: true,
   extractorActive: false,
+  weaponFacing: 0.8,
+  commanderFacing: -1.2,
   panzerfaustWindupProgress: 0.4,
   secretAuthoritativeVariant: { x: 999, y: 999 },
 };
@@ -228,6 +230,7 @@ assert(frame.layers.fogGatedWorld[0].selected === true, "visual selected state i
 assert(frame.layers.fogGatedWorld[0].relationship === "own", "viewer relationship is resolved before the backend boundary");
 assert(frame.layers.fogGatedWorld[0].teamColor === "#123456", "team color is resolved before the backend boundary");
 assert(frame.layers.fogGatedWorld[0].anchors.hp.heightPx === 10, "presentation anchors use semantic mirrored size");
+assert(frame.layers.fogGatedWorld[0].commanderFacing === -1.2, "independent MG aim survives the worker presentation handoff");
 assert(frame.layers.fogGatedWorld[0].extractorActive === false, "extractor status crosses the presentation boundary");
 assert(frame.layers.fogGatedWorld[0].panzerfaustWindupProgress === 0.4, "Panzerfaust wind-up progress crosses the presentation boundary");
 assert(frame.groundDecalRevision === 0, "detached frames carry an explicit zero revision when no durable batch id was supplied");

@@ -251,6 +251,7 @@ fn tank_coax_pairwise_precedence_alternates_by_tick() {
             assert!(higher.apply_damage(higher.hp.saturating_sub(1), None));
             higher.set_facing(std::f32::consts::PI);
             higher.set_weapon_facing(std::f32::consts::PI);
+            higher.combat.as_mut().expect("combat").commander_facing = std::f32::consts::PI;
         }
         let smokes = SmokeCloudStore::new();
         run_combat_tick_on_map_with_seed_smokes_and_tick(
@@ -322,12 +323,12 @@ fn tank_coax_prioritizes_infantry_over_nearer_fallback_targets() {
     let nearer_tank = entities
         .spawn_unit(2, EntityKind::Tank, 250.0, 118.0)
         .expect("enemy tank should spawn");
-    let worker = entities
-        .spawn_unit(2, EntityKind::Worker, COAX_TARGET_X, 100.0)
-        .expect("worker should spawn");
+    let infantry = entities
+        .spawn_unit(2, EntityKind::Rifleman, COAX_TARGET_X, 100.0)
+        .expect("infantry should spawn");
     prepare_coax_tank(&mut entities, tank);
     let tank_hp_before = entities.get(nearer_tank).expect("tank should exist").hp;
-    let worker_hp_before = entities.get(worker).expect("worker should exist").hp;
+    let infantry_hp_before = entities.get(infantry).expect("infantry should exist").hp;
 
     run_combat_tick_on_map(
         &mut entities,
@@ -336,9 +337,9 @@ fn tank_coax_prioritizes_infantry_over_nearer_fallback_targets() {
     );
 
     assert_eq!(
-        worker_hp_before - entities.get(worker).expect("worker should exist").hp,
+        infantry_hp_before - entities.get(infantry).expect("infantry should exist").hp,
         7,
-        "infantry-priority aim should send three seeded rays into the worker"
+        "infantry-priority aim should send three seeded rays into the infantry"
     );
     assert_eq!(
         entities.get(nearer_tank).expect("tank should exist").hp,
@@ -348,7 +349,7 @@ fn tank_coax_prioritizes_infantry_over_nearer_fallback_targets() {
 }
 
 #[test]
-fn tank_coax_rejects_targets_outside_turret_arc() {
+fn tank_commander_mg_rotates_and_fires_outside_cannon_arc() {
     let map = open_map(16);
     let mut entities = EntityStore::new();
     let tank = entities
@@ -360,19 +361,28 @@ fn tank_coax_rejects_targets_outside_turret_arc() {
     prepare_coax_tank(&mut entities, tank);
     let worker_hp_before = entities.get(worker).expect("worker should exist").hp;
 
-    let events = run_combat_tick_on_map(
-        &mut entities,
-        &[player_state(1, false), player_state(2, false)],
-        &map,
-    );
-
-    assert_eq!(
-        entities.get(worker).expect("worker should exist").hp,
-        worker_hp_before
-    );
+    // Give the independent mount time to traverse; keep the cannon reloading.
+    let mut fired = false;
+    for _ in 0..20 {
+        let events = run_combat_tick_on_map(
+            &mut entities,
+            &[player_state(1, false), player_state(2, false)],
+            &map,
+        );
+        fired |= !attack_weapon_kinds(&events, 1, tank).is_empty();
+    }
+    assert!(fired, "the commander MG must engage outside the cannon arc");
+    assert!(entities.get(worker).expect("worker").hp < worker_hp_before);
+    assert_eq!(entities.get(tank).expect("tank").weapon_facing(), Some(0.0));
     assert!(
-        attack_weapon_kinds(&events, 1, tank).is_empty(),
-        "coax must not fire outside its 10-degree half arc"
+        entities
+            .get(tank)
+            .expect("tank")
+            .combat
+            .as_ref()
+            .expect("combat")
+            .commander_facing
+            > 0.2
     );
 }
 
@@ -507,4 +517,37 @@ fn tank_coax_does_not_mutate_tank_target_or_path_state() {
         !tank_entity.path_is_empty(),
         "coax opportunity fire should not clear or replace movement paths"
     );
+}
+
+#[test]
+fn tank_commander_mg_engages_behind_turret_without_redirecting_cannon() {
+    for (dx, dy) in [(-120.0, 0.0), (0.0, -120.0), (0.0, 120.0)] {
+        let map = open_map(32);
+        let mut entities = EntityStore::new();
+        let tank = entities
+            .spawn_unit(1, EntityKind::Tank, 400.0, 400.0)
+            .expect("tank");
+        let infantry = entities
+            .spawn_unit(2, EntityKind::Rifleman, 400.0 + dx, 400.0 + dy)
+            .expect("infantry");
+        prepare_coax_tank(&mut entities, tank);
+        let hp = entities.get(infantry).expect("infantry").hp;
+        for _ in 0..100 {
+            run_combat_tick_on_map(
+                &mut entities,
+                &[player_state(1, false), player_state(2, false)],
+                &map,
+            );
+            if entities.get(infantry).expect("infantry").hp < hp {
+                break;
+            }
+        }
+        assert!(
+            entities.get(infantry).expect("infantry").hp < hp,
+            "MG must traverse to ({dx}, {dy})"
+        );
+        let tank = entities.get(tank).expect("tank");
+        assert_eq!(tank.weapon_facing(), Some(0.0));
+        assert_eq!(tank.target_id(), None);
+    }
 }
