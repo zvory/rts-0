@@ -1183,9 +1183,14 @@ pub(super) fn natural_clearers(
         .filter(|unit| unit.kind == EntityKind::ResourceDepot && unit.hp > 0)
         .count();
     let security = &memory.expansion_security;
+    // Jeff's AI V1.1 (`natsiege`) keeps clearing for a while after the enemies drop out of sight.
     let held = security.site.is_some()
         && depots < 2
-        && security.contested_tick == Some(observation.tick)
+        && jeff_v1_1::natsiege::contest_current(
+            memory.profile_id(),
+            security.contested_tick,
+            observation.tick,
+        )
         && !security.contest_armor;
     let point = security.contest_point.filter(|_| held);
     let Some(point) = point else {

@@ -1802,6 +1802,7 @@ where
         decision.trace.notes.push(second);
         decision.trace.notes.push(memory.expansion_security.trace());
         decision.trace.notes.push(memory.jeff_v1_1.natclear.trace());
+        decision.trace.notes.push(jeff_v1_1::south_route::trace(memory));
         decision.trace.strike = Some(format!(
             "v1_1_meth {} opening={:?} trade={}/{} value={}/{} ahead={}",
             memory.jeff_v1_1.meth_strike.trace(),

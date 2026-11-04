@@ -232,7 +232,10 @@ pub(super) fn plan_live(
     memory: &mut AiDecisionMemory,
     (actions, observation, map_analysis, intents): LiveStep<'_, '_, '_, '_>,
 ) {
-    if !uses_trap_breach(profile_id) {
+    // Jeff's AI V1.1 (`southroute`) goes round Schone Tage's V instead of shooting it down.
+    if !uses_trap_breach(profile_id)
+        || super::jeff_v1_1::south_route::skips_breach(profile_id, observation)
+    {
         return;
     }
     memory.trap_breach.notes.clear();

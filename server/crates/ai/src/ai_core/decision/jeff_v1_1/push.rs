@@ -176,6 +176,11 @@ impl PushMemory {
         self.convoy.contains(&id)
     }
 
+    /// The Tanks driving out in a convoy (`tankgroup`).
+    pub(in crate::ai_core::decision) fn convoy_units(&self) -> impl Iterator<Item = u32> + '_ {
+        self.convoy.iter().copied()
+    }
+
     /// Whether a gathering enemy group is being struck.
     pub(in crate::ai_core::decision) fn striking(&self) -> bool {
         self.strike.is_some()
@@ -1004,19 +1009,25 @@ pub(in crate::ai_core::decision) fn convoy(
             .then(a.id.cmp(&b.id))
     });
     let spare: Vec<u32> = free.iter().skip(keep_home).map(|unit| unit.id).collect();
+    let fresh = memory.jeff_v1_1.push.convoy.is_empty() && spare.len() >= CONVOY_TANKS;
     if spare.len() >= CONVOY_TANKS {
         memory.jeff_v1_1.push.convoy.extend(spare);
         memory.jeff_v1_1.push.convoy_ordered = 0;
     }
     let tick = observation.tick;
-    let push = &mut memory.jeff_v1_1.push;
-    if !push.convoy.is_empty()
-        && (push.convoy_ordered == 0 || tick.saturating_sub(push.convoy_ordered) >= CONVOY_REORDER_TICKS)
-    {
-        actions::attack_move_units(actions, push.convoy.iter().copied(), center.0, center.1);
-        push.convoy_ordered = tick.max(1);
+    let members: Vec<u32> = memory.jeff_v1_1.push.convoy.iter().copied().collect();
+    let due = !members.is_empty()
+        && (memory.jeff_v1_1.push.convoy_ordered == 0
+            || tick.saturating_sub(memory.jeff_v1_1.push.convoy_ordered) >= CONVOY_REORDER_TICKS);
+    if due {
+        // `southroute`: on Schone Tage along the southern way up to where the push is.
+        let target = super::super::frontal::group_center(observation, &members)
+            .map(|at| super::south_route::convoy_waypoint(observation, memory, at, center, fresh))
+            .unwrap_or(center);
+        actions::attack_move_units(actions, members.iter().copied(), target.0, target.1);
+        memory.jeff_v1_1.push.convoy_ordered = tick.max(1);
     }
-    push.convoy.clone()
+    memory.jeff_v1_1.push.convoy.clone()
 }
 
 /// The fewest Tanks that march in legs: V1.1 takes a side lane with two.
@@ -1112,8 +1123,11 @@ pub(in crate::ai_core::decision) fn trace_line(
         .filter(|building| building.kind == EntityKind::ResourceDepot)
         .count();
     Some(format!(
-        "v1_1_push launched={launched} tanks={} convoy={} goin={} enemy_army={:.0} riflemen={} forced={}/{} ours={:.0} route_army={:.0} target={:?} anchor={} short={} strike={:?} rally={:?} enemy_depots_known={bases} enemies_known={} hot={} {}",
+        "v1_1_push launched={launched} tanks={} ids={:?} scout={:?} {} convoy={} goin={} enemy_army={:.0} riflemen={} forced={}/{} ours={:.0} route_army={:.0} target={:?} anchor={} short={} strike={:?} rally={:?} enemy_depots_known={bases} enemies_known={} hot={} {}",
         memory.containment.active_tanks.len(),
+        memory.containment.active_tanks,
+        memory.containment.active_scout,
+        super::south_route::trace(memory),
         push.convoy.len(),
         push.going_in,
         enemy_army(observation, memory),

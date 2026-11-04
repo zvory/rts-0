@@ -371,6 +371,9 @@ pub(super) fn issue_expansion_containment_wave(
         reset_containment_route(memory);
         memory.containment.last_formation_command_tick = None;
         memory.containment.assembly_started_tick = None;
+        // Jeff's AI V1.1 (`southroute`) picks up Schone Tage's southern way where the push stands.
+        let center = group_center(observation, &tanks);
+        jeff_v1_1::south_route::start(observation, memory, center);
     }
 
     let tanks: Vec<u32> = memory.containment.active_tanks.iter().copied().collect();
@@ -398,11 +401,29 @@ pub(super) fn issue_expansion_containment_wave(
         }
         begin_containment_recovery(memory);
         let rally = containment_regroup_point(own_base, enemy_base, observation.map)?;
+        // Jeff's AI V1.1 (`southroute`) falls back a waypoint along Schone Tage's southern way: the
+        // straight way home runs into the V.
+        let rally = group_center(observation, &tanks)
+            .and_then(|center| jeff_v1_1::south_route::back_waypoint(observation, memory, center))
+            .unwrap_or(rally);
         let mut units = tanks;
         units.extend(scouts);
         units.extend(riflemen);
         actions::move_units(actions, units.iter().copied(), rally.0, rally.1);
         return Some(AiIntent::Assemble { units });
+    }
+    // Jeff's AI V1.1 (`southroute`) marches Schone Tage's southern way waypoint by waypoint before
+    // its usual targeting, all its push together.
+    if let Some(waypoint) = group_center(observation, &tanks)
+        .and_then(|center| jeff_v1_1::south_route::push_waypoint(observation, memory, center))
+    {
+        if jeff_v1_1::south_route::order_due(memory, observation.tick) {
+            let mut units = tanks.clone();
+            units.extend(scouts.iter().copied());
+            units.extend(riflemen.iter().copied());
+            actions::attack_move_units(actions, units, waypoint.0, waypoint.1);
+        }
+        return Some(AiIntent::Attack { units: tanks });
     }
 
     // A natural mined out is no objective: the nearest steel left can be far off, or the current
@@ -447,12 +468,12 @@ pub(super) fn issue_expansion_containment_wave(
     // its push instead of holding outside it: against Pressure AI a 34-Tank push stood off its
     // natural to the tick cap with 7 enemy Tanks left.
     if !endgame_search_active && jeff_v1_1::push::going_in(memory) {
-        if formation_command_due(memory, observation.tick) {
+        // Its own order clock, as the southern way's: the shared formation clock is reset by others.
+        if jeff_v1_1::south_route::order_due(memory, observation.tick) {
             let mut units = tanks.clone();
             units.extend(scouts.iter().copied());
             units.extend(riflemen.iter().copied());
             actions::attack_move_units(actions, units, objective.0, objective.1);
-            note_formation_command(memory, observation.tick);
         }
         return Some(AiIntent::Attack { units: tanks });
     }

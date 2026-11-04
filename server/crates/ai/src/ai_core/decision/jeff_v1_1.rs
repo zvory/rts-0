@@ -20,6 +20,8 @@ pub(super) mod rovers;
 pub(super) mod scout;
 pub(super) mod smoke_cover;
 pub(super) mod screen;
+pub(super) mod south_route;
+pub(super) mod natsiege;
 pub(super) mod strike;
 pub(super) mod tank_pause;
 pub(super) mod tank_raid;
@@ -43,6 +45,7 @@ pub(super) struct V1_1Memory {
     pub(super) hunt: hunt::HuntMemory,
     pub(super) natural: natural::NaturalMemory,
     pub(super) natclear: natclear::NatClearMemory,
+    pub(super) south: south_route::SouthRouteMemory,
     pub(super) charge: charge::ChargeMemory,
     pub(super) reveal: reveal::RevealMemory,
     pub(super) tank_raid: tank_raid::TankRaidMemory,
