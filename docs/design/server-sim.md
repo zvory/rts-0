@@ -1046,8 +1046,24 @@ pays immediately when the queue is empty and its cost (plus unit supply) is avai
 is stored unpaid at zero progress and retries each production tick. Entries appended behind existing
 work never prepay. An unpaid unit reserves neither resources nor supply, cancellation and producer
 death refund only paid entries, and owner/team projections expose `prodWaiting` so clients do not
-extrapolate false progress. Production buildings are visited in stable entity-id order, before
-construction, when multiple waiting purchases compete for the same newly available resources.
+extrapolate false progress. Human manual front entries attempt payment in stable entity-id order
+before any standing repeat admission, still before construction payment. AI producers retain their
+per-producer repeat/payment order.
+
+Human Auto-Build protects the combined Steel/Oil cost of remaining unpaid manual front entries on
+living, completed producers and active worker build purchases already in interaction range at a
+currently valid site. Construction is checked after movement, including first arrival; travelling
+workers, queued build intents, blocked/invalid placements, and resuming existing scaffolds protect
+nothing. Friendly unit blockers that a Pump Jack can eject do not prevent its purchase being ready.
+Only fronts ready at the production phase boundary participate; items behind existing work and
+research on unfinished buildings do not. The budget is transient, derived from live orders every
+tick, and disappears when commitments are paid, cancelled, invalidated, or their issuers die.
+For each resource an automatic item spends, its post-purchase stockpile must remain at or above
+the greater of this pending budget and the configured menu floor. A zero-cost resource never gates
+that item. Manual purchases may spend normally, and supply reservation rules are unchanged.
+Already-paid automatic items continue normal progress. No additional client UI or wire state is
+introduced.
+
 Research may be queued on an unfinished valid research building; those entries remain unpaid and
 inert until the building completes, then enter the same front-entry payment and progress path.
 Standing repeat production deliberately does not use unpaid entries: it continues retrying while the

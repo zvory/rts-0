@@ -436,4 +436,10 @@ the gun and commander separately using interpolated authoritative `commanderFaci
 draws above the turret. `commanderFacing` is admitted by the presentation entity schema so the
 worker receives its independent angle. The `coaxMuzzle` anchor uses the independent gun transform so
 MG tracers/flashes follow its barrel rather than the cannon. Cannon recoil carries the entire
-roof assembly; MG bursts do not kick the hull or cannon.
+roof assembly. MG bursts reuse the Scout Car’s 160 ms recoil envelope and 6.5-world-pixel
+backward translation along `commanderFacing`, without kicking the hull or cannon. Separate
+client recoil records keep overlapping cannon and MG shots independent. The frame’s
+`pixiCompatibility.poses[].coaxRecoil` carries the sampled MG envelope across the worker
+boundary alongside the existing cannon recoil; the worker facade selects it for explicit
+`weaponRecoil(id, kind, now, WEAPON_KIND.TANK_COAX)` reads. Muzzle anchors use the same
+combined cannon/body and independent MG transforms.

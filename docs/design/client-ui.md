@@ -2575,7 +2575,9 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   fixed neutral metal, and its 90% brightness/saturation target is applied at runtime rather than
   baked into owner-specific palette frames.
   Attack `weaponKind` selects feedback scale and rig muzzle origin; TankCoax uses a small
-  machine-gun flash/tracer/tail from the authored coax muzzle anchor and no Tank recoil, while
+  machine-gun flash/tracer/tail from the authored coax muzzle anchor and the Scout Car’s 160 ms
+  gun recoil along commander facing. Its independent recoil channel preserves overlapping cannon
+  recoil without kicking the hull or cannon on machine-gun shots, while
   TankCannon or default Tank attacks use a direct tracer from the main muzzle anchor plus the
   tank rig's half-scale artillery-style muzzle flare.
   Direct-shot `miss` events draw a tiny `Miss!` Pixi text toast above and to the right of the

@@ -1197,7 +1197,7 @@ function nearPoint(call, point, epsilon = 0.001) {
     y: 100,
   };
   const mainMuzzle = { x: tank.x + 24.875, y: tank.y };
-  const coaxMuzzle = { x: tank.x + 7.3134, y: tank.y + 5 };
+  const coaxMuzzle = { x: tank.x + 7.3134 - 3.25, y: tank.y + 5 };
 
   performance.now = () => fixedNow - 100;
   try {

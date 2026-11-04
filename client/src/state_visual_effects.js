@@ -34,6 +34,7 @@ export class VisualEffectBuffers {
     this.panzerfaustImpacts = [];
     /** @type {Map<number, number|{startedAt:number,weaponKind?:string}>} attacker id -> latest shot receive time. */
     this.weaponRecoilById = new Map();
+    this.tankCoaxRecoilById = new Map();
     /** @type {Array<{x:number,y:number,createdAt:number}>} */
     this.pendingMortarTargets = [];
     /** @type {Map<number, object>} attacker id -> temporary fog reveal entity. */
@@ -42,8 +43,10 @@ export class VisualEffectBuffers {
   }
 
   pruneRecoilForSnapshot(curById) {
-    for (const id of this.weaponRecoilById.keys()) {
-      if (!curById.has(id)) this.weaponRecoilById.delete(id);
+    for (const records of [this.weaponRecoilById, this.tankCoaxRecoilById]) {
+      for (const id of records.keys()) {
+        if (!curById.has(id)) records.delete(id);
+      }
     }
   }
 
@@ -78,9 +81,9 @@ export class VisualEffectBuffers {
           });
         }
         if (ev.shotOrigin) burstIndices.set(ev.from, (burstIndices.get(ev.from) || 0) + 1);
-        if (ev.weaponKind !== WEAPON_KIND.TANK_COAX) {
-          this.weaponRecoilById.set(ev.from, recoilRecord(now, ev.weaponKind));
-        }
+        const recoilRecords = ev.weaponKind === WEAPON_KIND.TANK_COAX
+          ? this.tankCoaxRecoilById : this.weaponRecoilById;
+        recoilRecords.set(ev.from, recoilRecord(now, ev.weaponKind));
       } else if (ev && ev.e === EVENT.MISS && typeof ev.to === "number") {
         this.missToasts.push({
           id: this._nextMissToastId++,
@@ -387,15 +390,15 @@ export class VisualEffectBuffers {
       kind = undefined;
       weaponKind = undefined;
     }
-    const record = this.weaponRecoilById.get(id);
+    const records = weaponKind === WEAPON_KIND.TANK_COAX
+      ? this.tankCoaxRecoilById : this.weaponRecoilById;
+    const record = records.get(id);
     const startedAt = typeof record === "number" ? record : record?.startedAt;
     if (typeof startedAt !== "number") return null;
     const recoilWeaponKind = normalizedWeaponKind(weaponKind) || normalizedWeaponKind(record?.weaponKind);
     const age = now - startedAt;
     const sample = sampleWeaponRecoilCycle(kind, age, recoilWeaponKind);
-    if (!sample.active && recoilWeaponKind !== WEAPON_KIND.TANK_COAX) {
-      this.weaponRecoilById.delete(id);
-    }
+    if (!sample.active) records.delete(id);
     return sample.active ? sample : null;
   }
 

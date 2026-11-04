@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { KIND, SETUP, STATE } from "../client/src/protocol.js";
+import { KIND, SETUP, STATE, WEAPON_KIND } from "../client/src/protocol.js";
 import { _rigRenderContextFor } from "../client/src/renderer/units.js";
 import { _sweep } from "../client/src/renderer/layers.js";
 import {
@@ -93,7 +93,7 @@ test("animation sampler applies game-state bindings without Pixi", () => {
   };
   const context = createRigRenderContext(entity, {
     now: fixedNow,
-    state: { playerId: 1, weaponRecoil: () => 0.5 },
+    state: { playerId: 1, weaponRecoil: (id, kind, now, weaponKind) => weaponKind === WEAPON_KIND.TANK_COAX ? 0 : 0.5 },
     colorByOwner: new Map([[1, 0x336699]]),
     vehicleMotion: { activity: 0.75 },
   });
@@ -204,11 +204,11 @@ test("tank rig exposes transformed main and coax muzzle anchors", () => {
 
   const recoilingMainMuzzle = transformedRigAnchorPoint(definition, entity, "muzzle", {
     now: fixedNow,
-    state: { weaponRecoil: () => 0.5 },
+    state: { weaponRecoil: (id, kind, now, weaponKind) => weaponKind === WEAPON_KIND.TANK_COAX ? 0 : 0.5 },
   });
   const recoilingCoaxMuzzle = transformedRigAnchorPoint(definition, entity, "coaxMuzzle", {
     now: fixedNow,
-    state: { weaponRecoil: () => 0.5 },
+    state: { weaponRecoil: (id, kind, now, weaponKind) => weaponKind === WEAPON_KIND.TANK_COAX ? 0 : 0.5 },
   });
 
   assert.ok(Math.abs(recoilingMainMuzzle.x - 100) < 0.001);

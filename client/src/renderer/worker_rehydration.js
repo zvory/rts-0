@@ -1,3 +1,5 @@
+import { WEAPON_KIND } from "../protocol.js";
+
 export function createWorkerPresentationState() {
   let staticMap = null;
   let visible = null;
@@ -99,12 +101,14 @@ export function compatibilityState(record) {
   const currentById = new Map();
   const previousById = new Map();
   const recoilById = new Map();
+  const coaxRecoilById = new Map();
   const recoilPhaseById = new Map();
   const recoilKindById = new Map();
   for (const pose of record?.poses || []) {
     if (pose.current) currentById.set(pose.id, pose.current);
     if (pose.previous) previousById.set(pose.id, pose.previous);
     if (pose.recoil) recoilById.set(pose.id, pose.recoil);
+    if (pose.coaxRecoil) coaxRecoilById.set(pose.id, pose.coaxRecoil);
     if (pose.recoilPhase) recoilPhaseById.set(pose.id, pose.recoilPhase);
     if (pose.recoilKind) recoilKindById.set(pose.id, pose.recoilKind);
   }
@@ -112,7 +116,8 @@ export function compatibilityState(record) {
     resources: { oil: Number.isFinite(record?.oil) ? record.oil : null },
     _curById: currentById,
     _prevById: previousById,
-    weaponRecoil: (id) => recoilById.get(id) || 0,
+    weaponRecoil: (id, kind, now, weaponKind) =>
+      (weaponKind === WEAPON_KIND.TANK_COAX ? coaxRecoilById : recoilById).get(id) || 0,
     weaponRecoilPhase: (id) => recoilPhaseById.get(id) || 0,
     weaponRecoilKind: (id) => recoilKindById.get(id),
   };
