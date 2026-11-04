@@ -90,6 +90,21 @@ const TRAVEL_TILES: f32 = 60.0;
 /// against the enemy it remembers. Weighed, it left at 6:23-8:51 on Classic, Schone Tage and The
 /// River and never on Crossroads, where Pressure AI's fifth base stood by 7:30. At 4:30 Pressure AI
 /// fields Panzerfausts and at most two Tanks against Jeff's 17-25 Riflemen and first Tanks.
+/// `tankgroup`: free Tanks leave home to join the launched push this many or more at once.
+const CONVOY_TANKS: usize = 3;
+/// A convoy Tank this close to the push's centre joins it.
+const CONVOY_JOIN_TILES: f32 = 10.0;
+/// The convoy is ordered on toward the push this often.
+const CONVOY_REORDER_TICKS: u32 = config::TICK_HZ * 3;
+/// `strikebig`: a gathering group calls the push back only when worth this share of the push.
+const STRIKE_SHARE: f32 = 0.25;
+/// `goin`: the push drives into enemy bases once it outweighs every enemy fighter remembered this
+/// many times.
+const GOIN_RATIO: f32 = 2.0;
+/// `goin`: how long the most enemy Tanks remembered at once stands.
+const PEAK_TANK_TICKS: u32 = config::TICK_HZ * 180;
+/// `wideline`: tiles between Tanks in a rank.
+const WIDE_SPACING_TILES: f32 = 2.0;
 const FORCED_FIRST_TICKS: u32 = config::TICK_HZ * 270;
 const FORCED_EVERY_TICKS: u32 = config::TICK_HZ * 120;
 
@@ -144,9 +159,23 @@ pub(in crate::ai_core::decision) struct PushMemory {
     /// on one.
     forced_waves: u32,
     forced: bool,
+    /// `tankgroup`: Tanks driving out together to join the launched push, and when they were last
+    /// ordered.
+    convoy: std::collections::BTreeSet<u32>,
+    convoy_ordered: u32,
+    /// `goin`: whether the push outweighs every enemy fighter remembered `GOIN_RATIO` times and
+    /// drives straight into the nearest known enemy base.
+    going_in: bool,
+    /// The most enemy Tanks remembered at once within `PEAK_TANK_TICKS`, and when.
+    peak_tanks: (usize, u32),
 }
 
 impl PushMemory {
+    /// Whether the Tank drives out with a convoy to join the push (`tankgroup`).
+    pub(in crate::ai_core::decision) fn convoy_holds(&self, id: u32) -> bool {
+        self.convoy.contains(&id)
+    }
+
     /// Whether a gathering enemy group is being struck.
     pub(in crate::ai_core::decision) fn striking(&self) -> bool {
         self.strike.is_some()
@@ -246,6 +275,15 @@ pub(in crate::ai_core::decision) fn note_enemy_army(
         seen.contains(id)
             || (!in_sight(sighting.at) && tick.saturating_sub(sighting.tick) < ARMY_FADE_TICKS)
     });
+    // `goin`: the most enemy Tanks remembered at once lately.
+    let tanks_now = push
+        .enemies
+        .values()
+        .filter(|sighting| sighting.kind == EntityKind::Tank)
+        .count();
+    if tanks_now >= push.peak_tanks.0 || tick.saturating_sub(push.peak_tanks.1) > PEAK_TANK_TICKS {
+        push.peak_tanks = (tanks_now, tick);
+    }
     push.buildings
         .retain(|id, building| seen.contains(id) || !in_sight(building.at));
 }
@@ -427,8 +465,11 @@ fn note_strike(observation: &AiObservation, memory: &mut AiDecisionMemory, ours:
         })
         .max_by(|a, b| a.0.cmp(&b.0).then(a.1 .0.total_cmp(&b.1 .0)));
     let push = &mut memory.jeff_v1_1.push;
+    // `strikebig`: only a group worth `STRIKE_SHARE` of the push calls it back; smaller ones are
+    // home defense's.
+    let big = |value: u32| super::off("strikebig") || value as f32 >= ours * STRIKE_SHARE;
     match group {
-        Some((value, at)) if ours >= value as f32 * STRIKE_RATIO => {
+        Some((value, at)) if ours >= value as f32 * STRIKE_RATIO && big(value) => {
             push.strike = Some((stored(at), tick));
         }
         Some(_) => push.strike = None,
@@ -718,6 +759,26 @@ pub(in crate::ai_core::decision) fn objective(
     }
     let tanks: Vec<u32> = memory.containment.active_tanks.iter().copied().collect();
     let center = super::super::frontal::group_center(observation, &tanks)?;
+    // `goin`: far ahead, the push drives into the nearest known enemy base instead of holding short.
+    memory.jeff_v1_1.push.going_in = false;
+    let enemy_tanks = memory.jeff_v1_1.push.peak_tanks.0.max(memory.recent_enemy_tanks());
+    if !super::off("goin")
+        && ours >= enemy_army(observation, memory) * GOIN_RATIO
+        && tanks.len() as f32 >= enemy_tanks as f32 * GOIN_RATIO
+    {
+        let nearest = known_depots(observation, memory, enemy_main)
+            .into_iter()
+            .chain(std::iter::once(enemy_main))
+            .min_by(|a, b| {
+                dist2(a.0, a.1, center.0, center.1).total_cmp(&dist2(b.0, b.1, center.0, center.1))
+            });
+        if let Some(base) = nearest {
+            memory.approach.force(None);
+            memory.jeff_v1_1.push.going_in = true;
+            memory.jeff_v1_1.push.rally = None;
+            return Some(base);
+        }
+    }
     let anchors = if super::off("anchors") {
         Vec::new()
     } else {
@@ -832,7 +893,10 @@ fn join_reinforcements(observation: &AiObservation, memory: &mut AiDecisionMemor
     memory.containment.active_riflemen.extend(riflemen);
 }
 
-/// Where V1.1's new Tanks rally while its push is out: the push's rally point.
+/// Where V1.1's new Tanks rally while its push is out: the push's rally point. Under `tankgroup`
+/// they rally home and leave in a convoy (`convoy`): each new Tank drove alone to the rally point,
+/// at times the enemy natural, across the map past the enemy (Classic against Pressure AI, from
+/// 7:29).
 pub(in crate::ai_core::decision) fn reinforcement_rally(
     memory: &AiDecisionMemory,
 ) -> Option<(f32, f32)> {
@@ -841,8 +905,118 @@ pub(in crate::ai_core::decision) fn reinforcement_rally(
         .jeff_v1_1
         .push
         .rally
-        .filter(|_| launched && v1_1(memory))
+        .filter(|_| launched && v1_1(memory) && super::off("tankgroup"))
         .map(point)
+}
+
+/// Every enemy fighter remembered, at full value: a sighting leaves only once its spot is seen
+/// without it. Faded, Pressure AI's 12 Tanks unseen for a minute counted 3,354 against a 9,740 push,
+/// which drove in and lost 5 Tanks.
+fn enemy_army(observation: &AiObservation, memory: &AiDecisionMemory) -> f32 {
+    let _ = observation;
+    memory
+        .jeff_v1_1
+        .push
+        .enemies
+        .values()
+        .map(|sighting| sighting.value as f32)
+        .sum()
+}
+
+/// Whether the push drives straight into an enemy base (`goin`).
+pub(in crate::ai_core::decision) fn going_in(memory: &AiDecisionMemory) -> bool {
+    v1_1(memory) && memory.jeff_v1_1.push.going_in
+}
+
+/// `wideline`: the push's fighting ranks (not its travel column) are three quarters of its Tanks
+/// wide, 2 tiles apart, not six abreast 1.5 tiles apart: sixteen Tanks stood three deep, and
+/// moving Tanks reach 5 tiles, so only the front rank fired. Returns the rank width and spacing.
+pub(in crate::ai_core::decision) fn wide_ranks(
+    memory: &AiDecisionMemory,
+    tanks: usize,
+) -> Option<(usize, f32)> {
+    (v1_1(memory) && !super::off("wideline"))
+        .then(|| ((tanks * 3).div_ceil(4).max(6), WIDE_SPACING_TILES))
+}
+
+/// `tankgroup`: while the push is out, free Tanks leave home only `CONVOY_TANKS` or more at once,
+/// beyond the `keep_home` the home keeps, and drive together to the push, joining it once near it.
+/// Returns the convoy, which other systems leave be. On Classic against Pressure AI 12 Tanks
+/// waited at the main's exit at 8:00 beside a 2-Tank push.
+pub(in crate::ai_core::decision) fn convoy(
+    actions: &mut AiActionContext<'_>,
+    observation: &AiObservation,
+    memory: &mut AiDecisionMemory,
+    held: &std::collections::BTreeSet<u32>,
+    keep_home: usize,
+) -> std::collections::BTreeSet<u32> {
+    let launched = memory.containment.wave_launched && !memory.containment.recovery_active;
+    let tanks: Vec<u32> = memory.containment.active_tanks.iter().copied().collect();
+    let center = super::super::frontal::group_center(observation, &tanks);
+    let Some(center) = center.filter(|_| launched && v1_1(memory) && !super::off("tankgroup")) else {
+        memory.jeff_v1_1.push.convoy.clear();
+        return Default::default();
+    };
+    let ts = observation.map.tile_size as f32;
+    let alive: std::collections::BTreeSet<u32> = observation
+        .owned
+        .iter()
+        .filter(|unit| unit.kind == EntityKind::Tank && unit.hp > 0)
+        .map(|unit| unit.id)
+        .collect();
+    memory.jeff_v1_1.push.convoy.retain(|id| alive.contains(id));
+    // Those that reached the push join it.
+    let arrived: Vec<u32> = observation
+        .owned
+        .iter()
+        .filter(|unit| memory.jeff_v1_1.push.convoy.contains(&unit.id))
+        .filter(|unit| dist2(unit.x, unit.y, center.0, center.1) <= squared(CONVOY_JOIN_TILES * ts))
+        .map(|unit| unit.id)
+        .collect();
+    for id in &arrived {
+        memory.jeff_v1_1.push.convoy.remove(id);
+        memory.containment.active_tanks.insert(*id);
+    }
+    let reserved = memory.squad_reserved();
+    let home = tile_center(observation.own_start_tile, observation.map.tile_size);
+    let mut free: Vec<&AiEntitySummary> = observation
+        .owned
+        .iter()
+        .filter(|unit| {
+            unit.kind == EntityKind::Tank
+                && unit.is_complete
+                && unit.hp > 0
+                && unit.free_for_combat
+                && Some(unit.id) != memory.home_defensive_tank
+                && !memory.containment.active_tanks.contains(&unit.id)
+                && !memory.containment.stuck_tanks.contains_key(&unit.id)
+                && !memory.later_bases.guards.contains(&unit.id)
+                && !memory.third_pressure.is_reserved(unit.id)
+                && !memory.jeff_v1_1.push.convoy.contains(&unit.id)
+                && !reserved.contains(&unit.id)
+                && !held.contains(&unit.id)
+        })
+        .collect();
+    // The home keeps the nearest to the main.
+    free.sort_by(|a, b| {
+        dist2(a.x, a.y, home.0, home.1)
+            .total_cmp(&dist2(b.x, b.y, home.0, home.1))
+            .then(a.id.cmp(&b.id))
+    });
+    let spare: Vec<u32> = free.iter().skip(keep_home).map(|unit| unit.id).collect();
+    if spare.len() >= CONVOY_TANKS {
+        memory.jeff_v1_1.push.convoy.extend(spare);
+        memory.jeff_v1_1.push.convoy_ordered = 0;
+    }
+    let tick = observation.tick;
+    let push = &mut memory.jeff_v1_1.push;
+    if !push.convoy.is_empty()
+        && (push.convoy_ordered == 0 || tick.saturating_sub(push.convoy_ordered) >= CONVOY_REORDER_TICKS)
+    {
+        actions::attack_move_units(actions, push.convoy.iter().copied(), center.0, center.1);
+        push.convoy_ordered = tick.max(1);
+    }
+    push.convoy.clone()
 }
 
 /// The fewest Tanks that march in legs: V1.1 takes a side lane with two.
@@ -938,8 +1112,11 @@ pub(in crate::ai_core::decision) fn trace_line(
         .filter(|building| building.kind == EntityKind::ResourceDepot)
         .count();
     Some(format!(
-        "v1_1_push launched={launched} tanks={} riflemen={} forced={}/{} ours={:.0} route_army={:.0} target={:?} anchor={} short={} strike={:?} rally={:?} enemy_depots_known={bases} enemies_known={} hot={} {}",
+        "v1_1_push launched={launched} tanks={} convoy={} goin={} enemy_army={:.0} riflemen={} forced={}/{} ours={:.0} route_army={:.0} target={:?} anchor={} short={} strike={:?} rally={:?} enemy_depots_known={bases} enemies_known={} hot={} {}",
         memory.containment.active_tanks.len(),
+        push.convoy.len(),
+        push.going_in,
+        enemy_army(observation, memory),
         memory.containment.active_riflemen.len(),
         push.forced,
         push.forced_waves,

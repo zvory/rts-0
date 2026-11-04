@@ -960,12 +960,17 @@ pub(super) fn update_and_stage(
     let forward = jeff_v1_1::natural::forward(memory);
     // On Doppelganger raid defense pulled the first guards back from a six-Rifleman wave, and the
     // next decision this sent them to their posts again, into it. Both died without a kill.
+    // Jeff's AI V1.1's clearing group (`natclear`) keeps the guards it took: sent to their posts
+    // alone past Rush AI's guns on the way to Classic's natural, 14 died one at a time.
     let held: Vec<u32> = memory
         .expansion_security
         .riflemen
         .iter()
         .copied()
-        .filter(|id| live_jeff && left_to_home_defense(observation, memory, *id))
+        .filter(|id| {
+            (live_jeff && left_to_home_defense(observation, memory, *id))
+                || memory.jeff_v1_1.natclear.holds(*id)
+        })
         .collect();
     let security = &mut memory.expansion_security;
     let Some(site) = security.site else {

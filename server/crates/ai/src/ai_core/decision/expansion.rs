@@ -305,7 +305,8 @@ where
                 &resources,
                 placeable,
                 |tile| {
-                    if far_site_on_enemy_route(observation, analysis, kind, tile) {
+                    let far = super::jeff_v1_1::far_site_tiles(profile_id, FAR_SITE_TILES);
+                    if far_site_on_enemy_route(observation, analysis, kind, tile, far) {
                         -ON_ROUTE_PENALTY
                     } else {
                         0
@@ -358,7 +359,7 @@ const EXPANSION_WALK_COST: f32 = 0.5;
 /// longer than walking straight to the HQ.
 const ROUTE_SLACK_TILES: f32 = 12.0;
 /// Sites farther than this walk from the main are out of reach of the main's defence.
-const FAR_SITE_TILES: f32 = 30.0;
+pub(super) const FAR_SITE_TILES: f32 = 30.0;
 /// The live Jeff ranks a far site on the enemy's way in below every site off it.
 const ON_ROUTE_PENALTY: i32 = 1_000;
 
@@ -396,13 +397,14 @@ fn far_site_on_enemy_route(
     analysis: &AiMapAnalysis,
     kind: EntityKind,
     tile: (u32, u32),
+    far_tiles: f32,
 ) -> bool {
     let far = building_center(tile, kind, observation.map.tile_size).is_some_and(|center| {
         let ts = observation.map.tile_size.max(1) as f32;
         let center_tile = ((center.0 / ts) as u32, (center.1 / ts) as u32);
         analysis
             .ground_distance_from_start(observation.player_id, center_tile)
-            .is_some_and(|own| own > FAR_SITE_TILES)
+            .is_some_and(|own| own > far_tiles)
     });
     far && site_on_enemy_route(observation, analysis, kind, tile) == Some(true)
 }
@@ -1165,6 +1167,96 @@ mod tests {
                     println!("    no full placeable footprint within 5 tiles");
                 }
             }
+        }
+    }
+
+    /// Local probe (run with `--ignored --nocapture`, `PROBE_MAP` to pick the map, Classic by
+    /// default): every natural candidate the live Jeff's search sees from each start, with its
+    /// walk from the main and from the enemy, its defensibility score and on-route penalty, and the
+    /// site V1.1 picks.
+    #[test]
+    #[ignore]
+    fn probe_natural_candidates() {
+        use crate::ai_core::map_analysis::AiMapAnalysis;
+        use crate::selfplay::player_view::{
+            footprint_placeable_from_snapshot, occupied_tiles_from_snapshot,
+        };
+        use rts_sim::game::map::Map;
+        use rts_sim::game::{Game, PlayerInit};
+        let name = std::env::var("PROBE_MAP").unwrap_or_else(|_| "Classic".to_string());
+        let players: Vec<_> = (1..=2)
+            .map(|id| PlayerInit {
+                id,
+                team_id: id,
+                faction_id: "kriegsia".into(),
+                name: format!("P{id}"),
+                color: "#ffffff".into(),
+                is_ai: true,
+            })
+            .collect();
+        let kind = EntityKind::ResourceDepot;
+        let map = Map::load_for_players(&name, &[(1, 1), (2, 2)], 0x1234_5678).unwrap();
+        let game = Game::new_with_random_ai_profiles_and_map_metadata(
+            &players,
+            0x1234_5678,
+            map,
+            Map::metadata_for_name(&name).unwrap(),
+        );
+        let start = game.start_payload();
+        let analysis = AiMapAnalysis::analyze(&start);
+        let profile = crate::ai_core::profiles::profile_by_id("jeffs_ai_v1_1").unwrap();
+        let policy = profile.expansion.unwrap();
+        println!("{name} {}x{}", start.map.width, start.map.height);
+        for player in [1, 2] {
+            let snapshot = game.snapshot_for(player);
+            let obs = AiObservation::from_snapshot_with_alive(&start, &snapshot, player, [], None)
+                .unwrap();
+            let occupied = occupied_tiles_from_snapshot(&start.map, &snapshot);
+            let mut place = |k: EntityKind, x: u32, y: u32| {
+                footprint_placeable_from_snapshot(&start.map, &snapshot, player, k, x, y, &occupied)
+                    && !super::super::jeff::resource_body_blocks_site(&obs, k, x, y)
+            };
+            let resources = expansion_candidate_resources(&obs);
+            println!("player {player} start {:?}", obs.own_start_tile);
+            let mut candidates =
+                expansion_site_candidates(&obs, policy, kind, &resources, &mut place);
+            candidates.sort_by_key(|candidate| candidate.tile);
+            for candidate in &candidates {
+                let center = building_center(candidate.tile, kind, obs.map.tile_size).unwrap();
+                let ts = obs.map.tile_size as f32;
+                let ct = ((center.0 / ts) as u32, (center.1 / ts) as u32);
+                let own = analysis.ground_distance_from_start(player, ct);
+                let enemy = analysis.ground_distance_from_start(3 - player, ct);
+                let straight = ((ct.0 as f32 - obs.own_start_tile.0 as f32).powi(2)
+                    + (ct.1 as f32 - obs.own_start_tile.1 as f32).powi(2))
+                .sqrt();
+                println!(
+                    "  {:?} steel {} oil {} straight {:.0} walk own {:?} enemy {:?} score {:?} far+on-route {}",
+                    candidate.tile,
+                    candidate.steel_in_range,
+                    candidate.oil_in_range,
+                    straight,
+                    own.map(|d| d.round()),
+                    enemy.map(|d| d.round()),
+                    expansion_site_defensibility(&obs, &analysis, kind, candidate.tile),
+                    far_site_on_enemy_route(
+                        &obs,
+                        &analysis,
+                        kind,
+                        candidate.tile,
+                        super::super::jeff_v1_1::far_site_tiles("jeffs_ai_v1_1", FAR_SITE_TILES),
+                    ),
+                );
+            }
+            let picked = expansion_resource_depot_site(
+                &obs,
+                policy,
+                kind,
+                "jeffs_ai_v1_1",
+                Some(&analysis),
+                &mut place,
+            );
+            println!("  V1.1 picks {picked:?}");
         }
     }
 

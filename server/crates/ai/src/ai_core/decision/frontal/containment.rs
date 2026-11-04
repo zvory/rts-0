@@ -240,6 +240,15 @@ pub(super) fn issue_expansion_containment_wave(
                 MarchShape::LEGACY
             }
         };
+        // Jeff's AI V1.1 (`wideline`) forms its fighting ranks wide.
+        let assembly_shape = match jeff_v1_1::push::wide_ranks(memory, tanks.len()) {
+            Some((rank_width, spacing)) if push_uses_available_armor => MarchShape {
+                rank_width,
+                tank_spacing_tiles: spacing,
+                ..assembly_shape
+            },
+            _ => assembly_shape,
+        };
         let formation = containment_formation(
             observation,
             &tanks,
@@ -434,6 +443,19 @@ pub(super) fn issue_expansion_containment_wave(
         .unwrap_or(fallback)
     };
     let holding_short = jeff_v1_1::push::holding_short(memory);
+    // Jeff's AI V1.1 (`goin`), far ahead, attack-moves into the nearest known enemy base with all of
+    // its push instead of holding outside it: against Pressure AI a 34-Tank push stood off its
+    // natural to the tick cap with 7 enemy Tanks left.
+    if !endgame_search_active && jeff_v1_1::push::going_in(memory) {
+        if formation_command_due(memory, observation.tick) {
+            let mut units = tanks.clone();
+            units.extend(scouts.iter().copied());
+            units.extend(riflemen.iter().copied());
+            actions::attack_move_units(actions, units, objective.0, objective.1);
+            note_formation_command(memory, observation.tick);
+        }
+        return Some(AiIntent::Attack { units: tanks });
+    }
     let (tank_point, legacy_scout_point) = if endgame_search_active {
         let scout_point = scout_forward_from_tanks(
             objective,
@@ -551,7 +573,15 @@ pub(super) fn issue_expansion_containment_wave(
         column: jeff_v1_1::screen::column(memory),
         ..match legs.map(|orders| orders.phase) {
             Some(super::approach::PushPhase::Travel) => MarchShape::TRAVEL,
-            _ if push_uses_available_armor => MarchShape::TIGHT,
+            _ if push_uses_available_armor => match jeff_v1_1::push::wide_ranks(memory, tanks.len()) {
+                // Jeff's AI V1.1 (`wideline`) closes in wide.
+                Some((rank_width, spacing)) => MarchShape {
+                    rank_width,
+                    tank_spacing_tiles: spacing,
+                    ..MarchShape::TIGHT
+                },
+                None => MarchShape::TIGHT,
+            },
             _ => MarchShape::LEGACY,
         }
     };

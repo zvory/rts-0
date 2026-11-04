@@ -345,6 +345,7 @@ where
     } else {
         Vec::new()
     };
+    actions.mark("prep");
     let expansion_secured = expansion_security::update_and_stage(
         observation,
         map_analysis,
@@ -352,6 +353,7 @@ where
         &mut actions,
         profile.id,
     );
+    actions.mark("natguards");
     let reserve_expansion =
         expansion_security::reserve_expansion(observation, &facts, profile, memory);
     let pressure_site = pressure_economy::plan_site(
@@ -966,7 +968,7 @@ where
     let rifle_opening = jeff_v1_1::rifle_opening(profile.id);
     if rifle_opening
         && facts.building_count(EntityKind::TrainingCentre) > 0
-        && facts.building_count(EntityKind::Barracks) >= 2
+        && (facts.building_count(EntityKind::Barracks) >= 2 || !jeff_v1_1::off("tcrifles"))
         && !effective_unit_priorities.contains(&EntityKind::Rifleman)
     {
         effective_unit_priorities.push(EntityKind::Rifleman);
@@ -1179,12 +1181,20 @@ where
     // New-base guards stay out of the push until the base is covered.
     frontal_exclusions.extend(memory.later_bases.guards.iter().copied());
     frontal_exclusions.extend(memory.jeff_v1_1.natural.support.keys().copied());
+    frontal_exclusions.extend(memory.jeff_v1_1.natclear.units());
     frontal_exclusions.extend(memory.jeff_v1_1.front_line.units());
     frontal_exclusions.extend(memory.jeff_v1_1.home_guard.units());
     frontal_exclusions.extend(memory.jeff_v1_1.rovers.units());
     frontal_exclusions.extend(route_line_reserved.iter().copied());
     // Raid responders, sentries and units stepping out of reach are home defense's.
     frontal_exclusions.extend(memory.raid_defense.reserved());
+    // Jeff's AI V1.1 (`tankgroup`) sends its spare Tanks to the launched push together.
+    let keep_home = frontal::push_keep_home(observation, memory);
+    actions.mark("production");
+    let convoy =
+        jeff_v1_1::push::convoy(&mut actions, observation, memory, &frontal_exclusions, keep_home);
+    actions.mark("convoy");
+    frontal_exclusions.extend(convoy);
     let frontal_wave = plan_frontal_wave(
         observation,
         attack_policy,
@@ -1250,6 +1260,18 @@ where
         let mut jeff_layered_home_defense = local_target.is_some()
             && is_jeffs_ai_profile(profile.id)
             && profile.home_anti_tank.is_some();
+        // Jeff's AI V1.1 clears enemy infantry off the natural with massed Riflemen (`natclear`).
+        // The group picks before home defense, which then leaves its Riflemen be
+        // (`stays_out_of_home_defense`), as does every system below.
+        actions.mark("production");
+        let live = (&mut actions, observation, map_analysis, &mut intents);
+        let clearing_held = &route_line_reserved | &push_units;
+        let clear_first = jeff_v1_1::natclear::flag("ncfirst", true);
+        if clear_first {
+            let clearing = jeff_v1_1::natclear::plan(live, memory, profile.id, &clearing_held);
+            local_defense_assigned.extend(clearing);
+        }
+        actions.mark("natclear");
         let mut local_defenders = local_ready_units.clone();
         local_defenders.extend(defensive_machine_gunners.iter().copied());
         if new_jeff_defense {
@@ -1360,6 +1382,15 @@ where
         // one crowded firing position.
         handled_local_defense |= jeff_layered_home_defense;
 
+        // `ncfirst=0` (testing): the clearing group picks after home defense instead.
+        if !clear_first {
+            actions.mark("localdef2");
+            let live = (&mut actions, observation, map_analysis, &mut intents);
+            let held = &(&local_defense_assigned | &route_line_reserved) | &push_units;
+            let clearing = jeff_v1_1::natclear::plan(live, memory, profile.id, &held);
+            local_defense_assigned.extend(clearing);
+            actions.mark("natclear");
+        }
         // Jeff's AI V1.1 sends some of the main's guns and Riflemen to hold its natural.
         let live = (&mut actions, observation, map_analysis, &mut intents);
         let held = &(&local_defense_assigned | &route_line_reserved) | &push_units;
@@ -1770,6 +1801,7 @@ where
         decision.trace.notes.push(first);
         decision.trace.notes.push(second);
         decision.trace.notes.push(memory.expansion_security.trace());
+        decision.trace.notes.push(memory.jeff_v1_1.natclear.trace());
         decision.trace.strike = Some(format!(
             "v1_1_meth {} opening={:?} trade={}/{} value={}/{} ahead={}",
             memory.jeff_v1_1.meth_strike.trace(),

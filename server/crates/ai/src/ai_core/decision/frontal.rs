@@ -1278,7 +1278,7 @@ fn push_home_tank_count(
 }
 
 /// Ready Tanks the push leaves at home: the home reserve, less the home Tank already kept there.
-fn push_keep_home(observation: &AiObservation, memory: &AiDecisionMemory) -> usize {
+pub(super) fn push_keep_home(observation: &AiObservation, memory: &AiDecisionMemory) -> usize {
     let home_tank_alive = memory.home_defensive_tank.is_some_and(|id| {
         observation
             .owned

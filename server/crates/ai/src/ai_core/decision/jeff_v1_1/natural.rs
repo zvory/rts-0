@@ -69,9 +69,12 @@ pub(in crate::ai_core::decision) fn support(
 ) {
     let ts = observation.map.tile_size as f32;
     let site = memory.expansion_security.site;
+    // While enemy infantry holds the natural, its clearing group (`natclear`) fights for it: the
+    // support walked to posts in among the enemy, one or two at a time.
     let active = is_jeff_v1_1(profile_id)
         && !super::off("natsupport")
-        && !memory.expansion_security.riflemen.is_empty();
+        && !memory.expansion_security.riflemen.is_empty()
+        && !(memory.jeff_v1_1.natclear.active() && !super::off("natclear"));
     let Some(center) = site
         .filter(|_| active)
         .and_then(|site| building_center(site, EntityKind::ResourceDepot, observation.map.tile_size))

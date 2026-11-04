@@ -579,6 +579,8 @@ impl AiDecisionMemory {
             || self.jeff_v1_1.deny.holds(id)
             || self.jeff_v1_1.meth_strike.holds(id)
             || self.jeff_v1_1.scout.unit == Some(id)
+            || self.jeff_v1_1.natclear.holds(id)
+            || self.jeff_v1_1.push.convoy_holds(id)
     }
 
     /// How many Tanks Jeff keeps home, the home Tank included: three for every four Tanks in the

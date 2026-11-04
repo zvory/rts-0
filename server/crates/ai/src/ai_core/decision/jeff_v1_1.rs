@@ -12,6 +12,7 @@ pub(super) mod front_line;
 pub(super) mod home_guard;
 pub(super) mod meth_strike;
 pub(super) mod hunt;
+pub(super) mod natclear;
 pub(super) mod natural;
 pub(super) mod push;
 pub(super) mod reveal;
@@ -41,6 +42,7 @@ pub(super) struct V1_1Memory {
     pub(super) scout: scout::ScoutMemory,
     pub(super) hunt: hunt::HuntMemory,
     pub(super) natural: natural::NaturalMemory,
+    pub(super) natclear: natclear::NatClearMemory,
     pub(super) charge: charge::ChargeMemory,
     pub(super) reveal: reveal::RevealMemory,
     pub(super) tank_raid: tank_raid::TankRaidMemory,
@@ -501,6 +503,22 @@ pub(super) fn riflemen_first(
     // Riflemen, it went down at 1:57.
     let second_barracks_waits =
         rifle_opening(profile_id) && facts.building_count(EntityKind::Barracks) < 2;
+    // `tcrifles`: the Rifleman opening's Barracks train Riflemen nonstop from the Training Centre's
+    // placing until Methamphetamines is in, first in the priorities. On Classic against Pressure AI
+    // the first Barracks stood idle from 0:30, when the Training Centre went down, to 0:52, the
+    // bank reaching 243 Steel: the second Barracks waited on the one Engineer building the Training
+    // Centre, not on Steel. And past four new Riflemen one Barracks idled again, 1:13-1:20, with
+    // 141-214 Steel in the bank. A Barracks trains one at a time, 3.5 Steel a second against about
+    // 10 mined, so the second Barracks and Meth are still paid for on time.
+    if rifle_opening(profile_id)
+        && !off("tcrifles")
+        && facts.building_count(EntityKind::TrainingCentre) > 0
+        && !observation.upgrades.contains(&UpgradeKind::Methamphetamines)
+    {
+        priorities.retain(|unit| *unit != EntityKind::Rifleman);
+        priorities.insert(0, EntityKind::Rifleman);
+        return Some(riflemen + facts.building_count(EntityKind::Barracks).max(1));
+    }
     if !off("opening4") && !observation.upgrades.contains(&UpgradeKind::Methamphetamines) {
         priorities.retain(|unit| *unit != EntityKind::Rifleman);
         if facts.building_count(EntityKind::TrainingCentre) == 0
@@ -590,6 +608,20 @@ pub(super) fn refit_natural(profile_id: &str, observation: &AiObservation) -> Op
         _ => None,
     }
 }
+
+/// `nearnat`: V1.1's natural is ranked below every other site for lying on the enemy's way in only
+/// past this walk from the main, not the shared 30 tiles. On Classic the full base at the top-left
+/// main's door, 31 tiles' walk east (score 92), fell under that rule by one tile, and the natural went
+/// to the base around the water, 60 tiles' walk south (score 47). Doppelganger's diagonal site, 45
+/// tiles out and raided every time it went down, stays under it.
+pub(super) fn far_site_tiles(profile_id: &str, shared: f32) -> f32 {
+    if is_jeff_v1_1(profile_id) && !off("nearnat") {
+        NEAR_NATURAL_WALK_TILES
+    } else {
+        shared
+    }
+}
+const NEAR_NATURAL_WALK_TILES: f32 = 40.0;
 
 /// Riflemen this close to the main's start count as at home for the natural (`riflenat`): far
 /// enough to take in those already holding the natural, not the starters out raiding.
