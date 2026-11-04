@@ -18,7 +18,7 @@ const SUPPORT: usize = 4;
 const HOME_GUNS_KEPT: usize = 2;
 const LINE_FORWARD_TILES: f32 = 6.0;
 const LINE_SPACING_TILES: f32 = 2.5;
-/// Supporters to a rank of the line, later ranks this far behind: the Rifleman opening's twelve
+/// Supporters to a rank of the line, later ranks this far behind: the Rifleman opening's holders
 /// stand two deep instead of 30 tiles wide.
 const RANK_WIDTH: usize = 6;
 const RANK_BACK_TILES: f32 = 2.0;

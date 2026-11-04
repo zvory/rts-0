@@ -568,20 +568,24 @@ pub(super) fn rifle_opening(profile_id: &str) -> bool {
     is_jeff_v1_1(profile_id) && !off("riflenat")
 }
 
-/// The Riflemen standing at home before the natural goes, all of whom then hold it: 14, or
-/// `natrifles` in `JEFF_V11_LINE` (testing, to fit each map within five either way).
+/// The Riflemen standing at home before the natural goes, all of whom then hold it: 10, or
+/// `natrifles` in `JEFF_V11_LINE` (testing, to fit each map within five either way). Of the
+/// 120s at 0.5x, 0.75x, 1x, 1.5x and 2x the user's 14 (2026-11-04), 0.75x did best against
+/// Pressure AI: 0-9-31 with 8 draws ahead, against 0-21-19 with 2 at 14; it took the natural
+/// earlier (The River 2:30, was 3:31), and against Rush AI went 1-7-32 (was 0-4-36).
 pub(super) fn natural_rifles() -> usize {
     crate::ai_core::profiles::jeff_v1_1_param("natrifles").map_or(NATURAL_RIFLES, |value| value as usize)
 }
-const NATURAL_RIFLES: usize = 14;
+const NATURAL_RIFLES: usize = 10;
 
-/// The Riflemen that take and hold the third base with a Tank (`riflenat`), or `thirdrifles` in
-/// `JEFF_V11_LINE` (testing).
+/// The Riflemen that take and hold the third base with a Tank (`riflenat`): 12, three quarters of
+/// the user's 16 with the natural's (see `natural_rifles`), or `thirdrifles` in `JEFF_V11_LINE`
+/// (testing).
 pub(super) fn third_base_rifles() -> usize {
     crate::ai_core::profiles::jeff_v1_1_param("thirdrifles")
         .map_or(THIRD_BASE_RIFLES, |value| value as usize)
 }
-const THIRD_BASE_RIFLES: usize = 16;
+const THIRD_BASE_RIFLES: usize = 12;
 
 /// The Rifleman opening's Factory no longer waits for the natural's order (`facwait`): from
 /// `factorywait` seconds in `JEFF_V11_LINE`, 180 by default. Rush AI's guns parked 8-15 tiles off
