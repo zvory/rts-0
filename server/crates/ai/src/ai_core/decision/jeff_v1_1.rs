@@ -15,6 +15,7 @@ pub(super) mod hunt;
 pub(super) mod natclear;
 pub(super) mod natural;
 pub(super) mod push;
+pub(super) mod resume;
 pub(super) mod reveal;
 pub(super) mod rovers;
 pub(super) mod scout;
@@ -45,6 +46,7 @@ pub(super) struct V1_1Memory {
     pub(super) hunt: hunt::HuntMemory,
     pub(super) natural: natural::NaturalMemory,
     pub(super) natclear: natclear::NatClearMemory,
+    pub(super) resume: resume::ResumeMemory,
     pub(super) south: south_route::SouthRouteMemory,
     pub(super) charge: charge::ChargeMemory,
     pub(super) reveal: reveal::RevealMemory,
@@ -207,6 +209,19 @@ pub(super) fn research_ahead(
         .fold((0, 0), |(steel, oil), definition| {
             (steel + definition.cost_steel, oil + definition.cost_oil)
         })
+}
+
+/// The natural's two security guards stay out of home defense (`keepguards`): they hold their
+/// posts and fire at what comes into reach of them. The natural is placed only once both have
+/// stood on their posts for `SECURE_TICKS`, and home defense kept taking one of them: on The River
+/// vs Pressure AI (P2, seeds 2/3) it pulled guard 164 home seven times from 2:20 to 3:50, once
+/// 9 ticks after the site first counted as secure, so the natural never went down while 20-28
+/// Riflemen stood in the main and 1,100 Steel waited.
+pub(super) fn natural_guards_kept(profile_id: &str, memory: &AiDecisionMemory) -> BTreeSet<u32> {
+    if !is_jeff_v1_1(profile_id) || off("keepguards") {
+        return BTreeSet::new();
+    }
+    memory.expansion_security.riflemen.iter().copied().collect()
 }
 
 /// The guns hold their trenches: no home-defense response moves V1.1's Machine Gunners. A set-up

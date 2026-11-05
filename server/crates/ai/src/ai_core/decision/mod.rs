@@ -309,6 +309,12 @@ where
             });
         }
     }
+    // Jeff's AI V1.1 also finishes the other buildings it left unfinished (`resume`).
+    if let Some(kind) =
+        jeff_v1_1::resume::resume(&mut actions, observation, memory, profile.id, &builder_pools)
+    {
+        intents.push(AiIntent::ResumeConstruction { kind });
+    }
     let save_for_required_tech_building =
         should_save_for_required_tech_building(&facts, required_tech_path, production_policy);
     let delay_opening_barracks = profile.fast_tank_timing.is_some_and(|timing| {
@@ -520,6 +526,9 @@ where
     let save_worker_training_for_tech = defer_economy_for_panic;
     let (target_workers, workers) =
         jeff::engineers(observation, &facts, profile.id, economy_plan.target_workers);
+    // Jeff's AI V1.1 keeps a spare Engineer while Steel piles up (`spareworker`).
+    let target_workers =
+        jeff_v1_1::resume::spare_engineer(profile.id, observation, workers, target_workers);
     let should_train_workers = economy_manager_output.proposes(EconomyProposal::TrainWorker)
         || (!defer_economy_for_panic && workers < target_workers);
     if should_train_workers {
@@ -1298,6 +1307,8 @@ where
         local_defenders.retain(|id| !push_units.contains(id));
         local_defenders.retain(|id| !memory.rush_reserved(*id));
         local_defenders.retain(|id| !memory.stays_out_of_home_defense(*id));
+        let natural_guards = jeff_v1_1::natural_guards_kept(profile.id, memory);
+        local_defenders.retain(|id| !natural_guards.contains(id));
         local_defenders.sort_unstable();
         local_defenders.dedup();
         jeff_v1_1::keep_guns_on_posts(profile.id, observation, &mut local_defenders);
@@ -1332,7 +1343,11 @@ where
                 }
             }
             if runs_live_jeff(profile.id) {
-                let held: BTreeSet<u32> = push_units.union(&route_line_reserved).copied().collect();
+                let held: BTreeSet<u32> = push_units
+                    .union(&route_line_reserved)
+                    .chain(natural_guards.iter())
+                    .copied()
+                    .collect();
                 let enemy_base = facts.nearest_public_enemy_base.map(|base| (base.x, base.y));
                 let live = (&mut actions, observation, map_analysis, &mut intents);
                 let assigned = &mut local_defense_assigned;
@@ -1801,6 +1816,7 @@ where
         decision.trace.notes.push(first);
         decision.trace.notes.push(second);
         decision.trace.notes.push(memory.expansion_security.trace());
+        decision.trace.notes.extend(jeff_v1_1::resume::trace_line(memory));
         decision.trace.notes.push(memory.jeff_v1_1.natclear.trace());
         decision.trace.notes.push(jeff_v1_1::south_route::trace(memory));
         decision.trace.strike = Some(format!(

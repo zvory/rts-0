@@ -77,6 +77,12 @@ const DEPOT_TILES: f32 = 6.0;
 const BREAK_TILES: f32 = 12.0;
 /// The Scout Car falls back to the Tanks from enemy fighters this close.
 const SCOUT_SHY_TILES: f32 = 10.0;
+/// An enemy Tank counts toward the enemy's Tanks this long after it was last seen (`raidodds`).
+const ENEMY_SEEN_TICKS: u32 = config::TICK_HZ * 60;
+/// No raid sets out while the enemy Tanks known outnumber all of Jeff's by more than this
+/// (`raidodds`). On Crossroads vs Pressure AI (seeds 0/1) a raid took 3 of Jeff's 5 Tanks out at
+/// 6:54 with Pressure on 6-9; Jeff was down to 2 Tanks by 8:00 and its push never set out.
+const ODDS_MARGIN: usize = 1;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Phase {
@@ -105,6 +111,10 @@ pub(in crate::ai_core::decision) struct TankRaidMemory {
     smoked: u32,
     /// Whether the Depot raided was seen standing at the base: its fall is the raid's kill.
     depot_seen: bool,
+    /// Each enemy Tank seen and when it was last seen (`raidodds`).
+    enemy_tanks: BTreeMap<u32, u32>,
+    /// The enemy Tanks known and Jeff's at the last launch check, for the decision log.
+    odds: (u32, u32),
 }
 
 impl TankRaidMemory {
@@ -163,6 +173,16 @@ pub(in crate::ai_core::decision) fn raid(
     let alive = |id: &u32| by_id.get(id).is_some_and(|unit| unit.hp > 0);
     {
         let state = &mut memory.jeff_v1_1.tank_raid;
+        for enemy in observation
+            .visible_enemies
+            .iter()
+            .filter(|enemy| enemy.kind == EntityKind::Tank && enemy.hp > 0)
+        {
+            state.enemy_tanks.insert(enemy.id, tick);
+        }
+        state
+            .enemy_tanks
+            .retain(|_, seen| tick.saturating_sub(*seen) <= ENEMY_SEEN_TICKS);
         state.hot.retain(|_, until| tick < *until);
         state.tanks.retain(|id| alive(id));
         if state.scout.is_some_and(|id| !alive(&id)) {
@@ -419,6 +439,22 @@ fn launch(
     memory: &mut AiDecisionMemory,
     enemy_main: (f32, f32),
 ) {
+    // Outnumbered in Tanks, Jeff keeps them together (`raidodds`).
+    let ours = observation
+        .owned
+        .iter()
+        .filter(|unit| unit.kind == EntityKind::Tank && unit.is_complete && unit.hp > 0)
+        .count();
+    let theirs = memory
+        .jeff_v1_1
+        .tank_raid
+        .enemy_tanks
+        .len()
+        .max(memory.recent_enemy_tanks());
+    memory.jeff_v1_1.tank_raid.odds = (theirs as u32, ours as u32);
+    if !super::off("raidodds") && theirs > ours + ODDS_MARGIN {
+        return;
+    }
     let reserved = memory.squad_reserved();
     let free = |unit: &&AiEntitySummary| {
         unit.is_complete
@@ -849,8 +885,10 @@ pub(in crate::ai_core::decision) fn trace_line(memory: &AiDecisionMemory) -> Opt
     let state = &memory.jeff_v1_1.tank_raid;
     (memory.profile_id().is_some_and(is_jeff_v1_1) && !super::off("tankraid")).then(|| {
         format!(
-            "v1_1_raid phase={:?} target={:?} tanks={:?} scout={:?} leg={}/{} strength={} danger={} hot={:?} rest_until={} seen={} deny={}",
+            "v1_1_raid phase={:?} odds={}/{} target={:?} tanks={:?} scout={:?} leg={}/{} strength={} danger={} hot={:?} rest_until={} seen={} deny={}",
             state.phase,
+            state.odds.0,
+            state.odds.1,
             state.target,
             state.tanks,
             state.scout,
