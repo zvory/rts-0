@@ -219,7 +219,8 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   movement path while firing at enemies in range instead of stopping to shoot. While on a plain
   `Move` or active `AttackMove`, upgraded riflemen only fire opportunistically at enemies already in
   range and never create enemy-directed movement. Moving Methamphetamines shots use normal rifleman
-  accuracy and do not add a movement miss roll; the upgrade sets their rifle cooldown to 16 ticks.
+  accuracy and do not add a movement miss roll; the upgrade sets Rifleman and Panzerfaust rifle
+  cooldowns to 24 ticks.
   Moving Riflemen take full incoming damage. Legacy Charge commands have no eligible carriers and
   cannot activate a status or cooldown.
 - **Scout car movement and weapon facing**: scout cars are light unarmored vehicles with a
@@ -276,7 +277,8 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   remain authoritative economy deductions.
 - **Methamphetamines research**: Training Centres can queue one permanent player upgrade costing
   100 steel / 100 oil and taking 600 ticks. Once completed, all current and future owned riflemen
-  use the moving-fire rifleman model permanently, move at tank speed, and attack 25% faster.
+  use the moving-fire rifleman model permanently, move at tank speed, and share a 24-tick rifle
+  cooldown with upgraded Panzerfausts (down from 32 ticks).
   Legacy `charge` commands remain decodable but have no eligible carriers, cooldown, or runtime
   status.
 - **Advanced research locks**: Anti-Tank Guns require a completed owned Engineering Complex to train at Gun Works;

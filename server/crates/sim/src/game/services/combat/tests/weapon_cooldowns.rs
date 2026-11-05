@@ -93,28 +93,66 @@ fn default_weapon_cooldown_cadence_matches_profiles() {
 }
 
 #[test]
-fn methamphetamines_sets_rifleman_weapon_cooldown_to_sixteen_ticks() {
-    let mut entities = EntityStore::new();
-    let attacker_id = entities
-        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
-        .expect("rifleman should spawn");
-    let target_id = entities
-        .spawn_unit(2, EntityKind::Rifleman, 140.0, 100.0)
-        .expect("target should spawn");
-    entities
-        .get_mut(attacker_id)
-        .expect("rifleman should exist")
-        .set_order(Order::attack(target_id));
-    let mut meth_player = player_state(1, false);
-    meth_player.upgrades.insert(UpgradeKind::Methamphetamines);
-
-    run_combat_tick_with_players(&mut entities, &[meth_player, player_state(2, false)]);
-
-    assert_eq!(
+fn methamphetamines_gives_both_rifle_units_a_twenty_four_tick_cadence() {
+    for kind in [EntityKind::Rifleman, EntityKind::Panzerfaust] {
+        let mut entities = EntityStore::new();
+        let attacker_id = entities
+            .spawn_unit(1, kind, 100.0, 100.0)
+            .expect("attacker should spawn");
+        let target_id = entities
+            .spawn_unit(2, EntityKind::Rifleman, 140.0, 100.0)
+            .expect("target should spawn");
         entities
-            .get(attacker_id)
-            .expect("rifleman should exist")
-            .attack_cd(),
-        16
-    );
+            .get_mut(attacker_id)
+            .expect("attacker should exist")
+            .set_order(Order::attack(target_id));
+        let mut meth_player = player_state(1, false);
+        meth_player.upgrades.insert(UpgradeKind::Methamphetamines);
+        let players = [meth_player, player_state(2, false)];
+        assert_eq!(
+            crate::rules::combat::default_weapon_profile(kind)
+                .expect("rifle profile")
+                .cooldown,
+            32
+        );
+        run_combat_tick_with_players(&mut entities, &players);
+        assert_eq!(
+            entities
+                .get(attacker_id)
+                .expect("attacker should exist")
+                .attack_cd(),
+            24,
+            "{kind}"
+        );
+        let hp_after_first = entities.get(target_id).expect("target should exist").hp;
+        for _ in 1..24 {
+            run_combat_tick_with_players(&mut entities, &players);
+        }
+        assert_eq!(
+            entities
+                .get(attacker_id)
+                .expect("attacker should exist")
+                .attack_cd(),
+            1,
+            "{kind}"
+        );
+        assert_eq!(
+            entities.get(target_id).expect("target should exist").hp,
+            hp_after_first,
+            "{kind} must wait for cooldown"
+        );
+        run_combat_tick_with_players(&mut entities, &players);
+        assert_eq!(
+            entities
+                .get(attacker_id)
+                .expect("attacker should exist")
+                .attack_cd(),
+            24,
+            "{kind}"
+        );
+        assert!(
+            entities.get(target_id).expect("target should exist").hp < hp_after_first,
+            "{kind} should fire at 24 ticks"
+        );
+    }
 }

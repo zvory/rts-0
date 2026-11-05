@@ -334,9 +334,9 @@ its source for three seconds. Hits during that window neither redirect the hull 
 after it expires, the next qualifying hit may establish a new lock. Active movement paths and zero
 oil prevent this response, while Hold Position explicitly allows it. Riflemen take full incoming
 damage while moving. Riflemen upgraded with Methamphetamines gain permanent moving fire, keep
-advancing while firing with normal accuracy, move at tank speed, and use a 16-tick rifle cooldown.
+advancing while firing with normal accuracy, move at tank speed, and use a 24-tick rifle cooldown.
 Panzerfausts upgraded with Methamphetamines receive the normal Rifleman moving fire, tank-speed
-movement, and 25% faster rifle attacks plus the Panzerfaust windup boost. Machine Gunners upgraded with
+movement, and the same 24-tick rifle cooldown plus the Panzerfaust windup boost. Machine Gunners upgraded with
 Methamphetamines move at unupgraded Rifleman speed and use half-length setup/teardown timers; other
 mobile combat units still hold position once a target is in weapon range. Scout cars also fire while
 moving using an independent rear machine-gun facing. They are unarmored light vehicles and do not
@@ -517,8 +517,9 @@ profiles and explicit activation/autocast policy instead of being folded into de
   so five Tanks fill the budget. A Command Car still uses 4 production supply.
 - **Methamphetamines** (Training Centre research): costs 100 steel / 100 oil and takes 600 ticks
   (~20s). Once complete, all current and future Riflemen for that player gain permanent moving rifle fire,
-  1.25x movement speed (matching tank speed at 2.0 px/tick), no extra movement miss chance, and 50%
-  faster attacks (32 tick cooldown becomes 16). It also increases that
+  1.25x movement speed (matching tank speed at 2.0 px/tick), no extra movement miss chance, and a
+  shared Rifleman/Panzerfaust rifle cooldown of 24 ticks instead of 32 (25% shorter cooldown, or
+  33⅓% more shots per second). It also increases that
   player's Machine Gunners from 1.28 px/tick to unupgraded Rifleman speed (1.6 px/tick) and halves
   their setup and teardown timers from 30 ticks to 15. Panzerfausts also use the reduced
   12-tick Panzerfaust windup.
