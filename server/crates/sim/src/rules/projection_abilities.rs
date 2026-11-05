@@ -43,7 +43,7 @@ pub(super) fn active_ability_object_expires_in(
     entity: &Entity,
     ability: AbilityKind,
 ) -> Option<u16> {
-    if ability == AbilityKind::Charge {
+    if ability::definition(ability).effect_hook == ability::AbilityEffectHook::SelfStatus {
         return (entity.charge_ticks() > 0).then_some(entity.charge_ticks());
     }
     if ability::definition(ability).effect_hook == ability::AbilityEffectHook::OwnedAreaStatus {
