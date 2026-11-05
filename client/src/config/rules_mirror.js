@@ -158,7 +158,7 @@ export const STATS = Object.freeze({
   [KIND.ROCKET_LAUNCHER]: { armored: false, label: "Rocket Truck", icon: "RT", size: 21.6, sight: 8, body: ROCKET_LAUNCHER_BODY,
     rangeTiles: 0, minRangeTiles: 10,
     cost: { steel: 225, oil: 100 }, supply: 6, buildTicks: TICK_HZ * 20,
-    requires: [KIND.STEELWORKS, KIND.FACTORY], upgradeRequires: UPGRADE.ROCKETS,
+    requires: [KIND.STEELWORKS], upgradeRequires: UPGRADE.ROCKETS,
     upgradeRequiresText: "Requires Rockets research in Engineering Complex",
     description: "Mobile rocket artillery. Stop and manually fire a 16-rocket Barrage over a wide area." },
   [KIND.SCOUT_CAR]: { armored: false, label: "Scout Car", icon: "SC", size: 14.4, sight: 15, body: SCOUT_CAR_BODY,
@@ -519,7 +519,7 @@ export const UPGRADES = Object.freeze({
     icon: "RKT+",
     cost: Object.freeze({ steel: 75, oil: 125 }),
     researchTicks: ROCKETS_RESEARCH_TICKS,
-    description: "Unlock Rocket Truck training at the Gun Works with a completed Vehicle Works",
+    description: "Unlock Rocket Truck training at the Gun Works",
     researchedAt: KIND.ENGINEERING_COMPLEX,
   }),
 });

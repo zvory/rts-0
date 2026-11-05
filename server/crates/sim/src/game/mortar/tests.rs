@@ -138,6 +138,47 @@ fn rocket_damage_preserves_unit_damage_but_is_reduced_against_buildings() {
 }
 
 #[test]
+fn rocket_center_hit_pierces_tank_armor_but_nearby_splash_does_not() {
+    let map = open_map(20);
+    for (offset, expected_damage) in [(0.0, 70), (30.0, 5)] {
+        let mut entities = EntityStore::new();
+        let victim = entities
+            .spawn_unit(2, EntityKind::Tank, 160.0, 160.0)
+            .expect("tank should spawn");
+        let before = entities.get(victim).unwrap().hp;
+        let teams = TeamRelations::from_player_teams([(1, 1), (2, 2)]);
+        let fog = visible_team_fog(&map, &entities);
+        let mut events = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
+        let mut firing_reveals = Vec::new();
+        let shell = MortarShell {
+            owner: 1,
+            attacker: 0,
+            x: 160.0,
+            y: 160.0 + offset,
+            from_x: 100.0,
+            from_y: 100.0,
+            launch_tick: 0,
+            impact_tick: 0,
+            launched: true,
+            rocket: true,
+        };
+        resolve(
+            MortarResolutionContext {
+                entities: &mut entities,
+                teams: &teams,
+                fog: &fog,
+                map: &map,
+                events: &mut events,
+                firing_reveals: &mut firing_reveals,
+                tick: 10,
+            },
+            &shell,
+        );
+        assert_eq!(before - entities.get(victim).unwrap().hp, expected_damage);
+    }
+}
+
+#[test]
 fn rocket_impact_point_uses_the_target_body_for_direct_hits() {
     let mut entities = EntityStore::new();
     let tank_id = entities
