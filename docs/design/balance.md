@@ -423,7 +423,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
 - `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown for support weapons), halved to
   `METHAMPHETAMINES_MACHINE_GUNNER_SETUP_TICKS = 15` after Methamphetamines research.
 - Anti-Tank Guns use `ANTI_TANK_GUN_SETUP_TICKS = 120` (4s) and
-  `ANTI_TANK_GUN_TEARDOWN_TICKS = 40` (~1.33s). The client mirrors these ticks for
+  `ANTI_TANK_GUN_TEARDOWN_TICKS = 30` (1s). The client mirrors these ticks for
   matching world and minimap trail animation.
 - Mortar Teams have no setup or teardown timing. They use `MORTAR_MIN_RANGE_TILES = 5`,
   `MORTAR_RANGE_TILES = 17`, and `MORTAR_FIELD_OF_FIRE_RAD = 360 degrees total`,
@@ -452,7 +452,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   `ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK = 0.070` to track targets inside that cone;
   targets outside the cone are ignored until teardown and redeployment. While packed and mobile, an
   Anti-Tank Gun moves at 1.7556 px/tick and turns its body at
-  `ANTI_TANK_GUN_BODY_TURN_RATE_DEGREES_PER_SECOND = 70`; sharp heading changes still reduce throttle
+  `ANTI_TANK_GUN_BODY_TURN_RATE_DEGREES_PER_SECOND = 110`; sharp heading changes still reduce throttle
   until the gun pivots in place.
 - Panzerfaust units carry a one-shot 5-tile loaded weapon that targets only visible
   Scout Cars, Tanks, and Command Cars with
