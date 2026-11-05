@@ -58,6 +58,40 @@ pub(in crate::ai_core::decision) fn forward(memory: &AiDecisionMemory) -> bool {
     memory.profile_id().is_some_and(is_jeff_v1_1) && !super::off("natforward")
 }
 
+/// Whether one of Jeff's own units stands on the natural's Depot footprint, which then reads as
+/// unplaceable (`sitewalk`). Natural security dropped such a site with its guards and their timer:
+/// on The River against Pressure AI the support, let go once the clearing group was done, walked
+/// across the site just as the guards had held it, twice, and the Depot went down at 2:59 instead
+/// of 1:56. Units move; the site is kept while they stand on it.
+pub(in crate::ai_core::decision) fn own_units_on_site(
+    profile_id: &str,
+    observation: &AiObservation,
+    site: (u32, u32),
+) -> bool {
+    if !is_jeff_v1_1(profile_id) || super::off("sitewalk") {
+        return false;
+    }
+    let Some(stats) = config::building_stats(EntityKind::ResourceDepot) else {
+        return false;
+    };
+    let ts = observation.map.tile_size as f32;
+    let rect = (
+        site.0 as f32 * ts,
+        site.1 as f32 * ts,
+        site.0.saturating_add(stats.foot_w) as f32 * ts,
+        site.1.saturating_add(stats.foot_h) as f32 * ts,
+    );
+    observation.owned.iter().any(|unit| {
+        unit.kind.is_unit()
+            && unit.hp > 0
+            && crate::sdk::unit_circle_touches_rect(
+                (unit.x, unit.y),
+                rts_rules::balance::unit_placement_radius(unit.kind),
+                rect,
+            )
+    })
+}
+
 /// Picks and posts the natural's support (see the module docs). `home_guns`: the main's defensive
 /// guns; `held`: units other systems keep this decision.
 pub(in crate::ai_core::decision) fn support(

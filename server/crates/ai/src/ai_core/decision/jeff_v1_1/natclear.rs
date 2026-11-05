@@ -291,11 +291,16 @@ pub(in crate::ai_core::decision) fn plan(
     };
     let reserved = memory.squad_reserved();
     let charging_riflemen = memory.jeff_v1_1.charge.riflemen.clone();
+    // Without `ncguards` the natural's guards are never taken (`ncskipguards`): taken as free
+    // Riflemen at the main, one charged with the group while natural security sent it back to its
+    // post the same decision, and the natural went unsecured until the group was done.
+    let skip_guards = !flag("ncguards", false) && !super::off("ncskipguards");
     let free = |unit: &AiEntitySummary| {
         unit.kind == EntityKind::Rifleman
             && unit.is_complete
             && unit.hp > 0
             && !held.contains(&unit.id)
+            && !(skip_guards && memory.expansion_security.riflemen.contains(&unit.id))
             && !reserved.contains(&unit.id)
             && !busy(unit)
             && !charging_riflemen.contains(&unit.id)

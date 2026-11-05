@@ -494,7 +494,8 @@ pub(super) fn prepare<F: FnMut(EntityKind, u32, u32) -> bool>(
             && !depot_order_pending(observation, site)
             && (site_blocked_by_owned_building(observation, site)
                 || (security_wait_complete
-                    && !placeable(EntityKind::ResourceDepot, site.0, site.1)))
+                    && !placeable(EntityKind::ResourceDepot, site.0, site.1)
+                    && !jeff_v1_1::natural::own_units_on_site(profile.id, observation, site)))
     });
     if site_became_blocked {
         let security = &mut memory.expansion_security;
