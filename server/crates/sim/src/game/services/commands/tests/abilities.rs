@@ -139,9 +139,12 @@ fn legacy_charge_command_is_noop_after_removal() {
         .spawn_building(1, EntityKind::TrainingCentre, tx, ty, true)
         .expect("training centre should spawn");
 
-    apply(
+    let mut players = vec![player_state(1), player_state(2)];
+    players[0].upgrades.insert(UpgradeKind::Methamphetamines);
+    apply_with_players(
         &map,
         &mut entities,
+        &mut players,
         vec![(
             1,
             SimCommand::UseAbility {
@@ -160,7 +163,7 @@ fn legacy_charge_command_is_noop_after_removal() {
             .unwrap()
             .ability_cooldown_ticks(AbilityKind::Charge),
         0,
-        "legacy Charge should no longer activate riflemen"
+        "legacy Charge should not activate even after Methamphetamines research"
     );
     assert_eq!(
         entities

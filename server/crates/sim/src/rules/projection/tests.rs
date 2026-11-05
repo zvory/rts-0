@@ -653,10 +653,15 @@ fn legacy_charge_cooldown_is_not_projected() {
     let owner_view = project_for_test(1, rifle, &fog, true, &entities, None, false)
         .expect("owner should see own rifleman");
     assert_eq!(owner_view.charge_cooldown_left, None);
+    assert!(owner_view
+        .abilities
+        .iter()
+        .all(|entry| entry.ability != "charge"));
 
     let enemy_view = project_for_test(2, rifle, &fog, false, &entities, None, false)
         .expect("full view should include rifleman");
     assert_eq!(enemy_view.charge_cooldown_left, None);
+    assert!(enemy_view.abilities.is_empty());
 }
 
 #[test]

@@ -557,7 +557,10 @@ fn self_ability_intent_valid(
     caster: u32,
     ability: crate::game::ability::AbilityKind,
 ) -> bool {
-    crate::game::services::ability_orders::caster_can_attempt(entities, owner, caster, ability)
+    crate::game::ability::definition(ability).may_queue
+        && crate::game::services::ability_orders::caster_can_attempt(
+            entities, owner, caster, ability,
+        )
         && crate::game::services::ability_orders::tech_requirement_met(entities, owner, ability)
         && crate::game::ability::definition(ability).target_mode
             == crate::game::ability::AbilityTargetMode::SelfTarget
