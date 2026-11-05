@@ -211,17 +211,37 @@ pub(super) fn research_ahead(
         })
 }
 
-/// The natural's two security guards stay out of home defense (`keepguards`): they hold their
-/// posts and fire at what comes into reach of them. The natural is placed only once both have
-/// stood on their posts for `SECURE_TICKS`, and home defense kept taking one of them: on The River
-/// vs Pressure AI (P2, seeds 2/3) it pulled guard 164 home seven times from 2:20 to 3:50, once
-/// 9 ticks after the site first counted as secure, so the natural never went down while 20-28
-/// Riflemen stood in the main and 1,100 Steel waited.
-pub(super) fn natural_guards_kept(profile_id: &str, memory: &AiDecisionMemory) -> BTreeSet<u32> {
+/// The natural's two security guards out at the natural, within `KEPT_GUARD_TILES` of the site,
+/// stay out of home defense (`keepguards`): they hold their posts and fire at what comes into reach
+/// of them. The natural is placed only once both have stood on their posts for `SECURE_TICKS`, and
+/// home defense kept taking one of them: on The River vs Pressure AI (P2, seeds 2/3) it pulled
+/// guard 164 home from its post seven times from 2:20 to 3:50, once 9 ticks after the site first
+/// counted as secure, so the natural never went down while 20-28 Riflemen stood in the main and
+/// 1,100 Steel waited. Guards still in the main answer a raid there: kept out of it wherever they
+/// stood, the main lost the 2:21 fight of the same game and then the game.
+const KEPT_GUARD_TILES: f32 = 12.0;
+
+pub(super) fn natural_guards_kept(
+    profile_id: &str,
+    observation: &AiObservation,
+    memory: &AiDecisionMemory,
+) -> BTreeSet<u32> {
     if !is_jeff_v1_1(profile_id) || off("keepguards") {
         return BTreeSet::new();
     }
-    memory.expansion_security.riflemen.iter().copied().collect()
+    let Some(center) = memory.expansion_security.site.and_then(|site| {
+        super::geometry::building_center(site, EntityKind::ResourceDepot, observation.map.tile_size)
+    }) else {
+        return BTreeSet::new();
+    };
+    let reach = squared(KEPT_GUARD_TILES * observation.map.tile_size as f32);
+    observation
+        .owned
+        .iter()
+        .filter(|unit| memory.expansion_security.riflemen.contains(&unit.id))
+        .filter(|unit| dist2(unit.x, unit.y, center.0, center.1) <= reach)
+        .map(|unit| unit.id)
+        .collect()
 }
 
 /// The guns hold their trenches: no home-defense response moves V1.1's Machine Gunners. A set-up

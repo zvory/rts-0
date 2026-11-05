@@ -1307,7 +1307,7 @@ where
         local_defenders.retain(|id| !push_units.contains(id));
         local_defenders.retain(|id| !memory.rush_reserved(*id));
         local_defenders.retain(|id| !memory.stays_out_of_home_defense(*id));
-        let natural_guards = jeff_v1_1::natural_guards_kept(profile.id, memory);
+        let natural_guards = jeff_v1_1::natural_guards_kept(profile.id, observation, memory);
         local_defenders.retain(|id| !natural_guards.contains(id));
         local_defenders.sort_unstable();
         local_defenders.dedup();
