@@ -792,8 +792,8 @@ for (const researched of [false, true]) {
     });
     const rocketTruck = card.slots.find((slot) => slot?.id === `train:${KIND.ROCKET_LAUNCHER}`);
     assert(rocketTruck, "Gun Works should show Rocket Truck training");
-    assert.equal(rocketTruck.enabled, researched && hasVehicleWorks,
-      "Rocket Truck training requires Rockets research and a completed Vehicle Works");
+    assert.equal(rocketTruck.enabled, researched,
+      "Rocket Truck training requires Rockets research regardless of Vehicle Works ownership");
   }
 }
 
