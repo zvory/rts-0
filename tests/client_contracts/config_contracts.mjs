@@ -372,7 +372,7 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
       ABILITIES[ABILITY.BARRAGE].cost.oil === 150,
     "Rocket Truck Barrage mirrors its range band, sixty-second cooldown, and repeat cost",
   );
-  assert(!ABILITIES[ABILITY.CHARGE], "client no longer exposes Rifleman Charge as a command-card ability");
+  assert(ABILITIES[ABILITY.CHARGE].upgradeRequirement === UPGRADE.METHAMPHETAMINES && ABILITIES[ABILITY.CHARGE].cooldownTicks === TICK_HZ * 20, "Charge requires Methamphetamines and has a twenty-second cooldown");
   assert(
     STATS[KIND.TRAINING_CENTRE].researches.includes(UPGRADE.METHAMPHETAMINES),
     "Training Centre should expose Methamphetamines research",

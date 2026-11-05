@@ -97,7 +97,7 @@ fn blanket_fire_command_starts_runtime_order() {
 }
 
 #[test]
-fn legacy_charge_command_is_noop_after_removal() {
+fn charge_requires_research_even_with_completed_training_centre() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
     let rifle = entities
@@ -160,7 +160,7 @@ fn legacy_charge_command_is_noop_after_removal() {
             .unwrap()
             .ability_cooldown_ticks(AbilityKind::Charge),
         0,
-        "legacy Charge should no longer activate riflemen"
+        "Charge should not activate riflemen without research"
     );
     assert_eq!(
         entities
@@ -181,7 +181,7 @@ fn legacy_charge_command_is_noop_after_removal() {
 }
 
 #[test]
-fn repeated_legacy_charge_command_remains_noop() {
+fn repeated_charge_without_research_remains_noop() {
     let map = flat_map(24);
     let mut entities = EntityStore::new();
     let rifle = entities
@@ -719,4 +719,81 @@ fn smoke_launches_without_resource_cost() {
             )
         })
     }));
+}
+
+#[test]
+fn researched_charge_is_owned_carrier_only_preserves_orders_and_expires_in_five_seconds() {
+    let map = flat_map(24);
+    let mut entities = EntityStore::new();
+    let rifle = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .unwrap();
+    let panzer = entities
+        .spawn_unit(1, EntityKind::Panzerfaust, 120.0, 100.0)
+        .unwrap();
+    let worker = entities
+        .spawn_unit(1, EntityKind::Worker, 140.0, 100.0)
+        .unwrap();
+    let enemy = entities
+        .spawn_unit(2, EntityKind::Rifleman, 160.0, 100.0)
+        .unwrap();
+    entities
+        .get_mut(rifle)
+        .unwrap()
+        .set_order(Order::move_to(300.0, 100.0));
+    let mut players = vec![player_state(1), player_state(2)];
+    players[0].upgrades.insert(UpgradeKind::Methamphetamines);
+    let cast = || {
+        vec![(
+            1,
+            SimCommand::UseAbility {
+                ability: AbilityKind::Charge,
+                units: vec![rifle, panzer, worker, enemy, rifle],
+                x: None,
+                y: None,
+                queued: false,
+            },
+        )]
+    };
+    apply_with_players(&map, &mut entities, &mut players, cast());
+    for id in [rifle, panzer] {
+        assert_eq!(
+            entities.get(id).unwrap().charge_ticks(),
+            config::CHARGE_DURATION_TICKS
+        );
+    }
+    for id in [worker, enemy] {
+        assert_eq!(
+            entities
+                .get(id)
+                .unwrap()
+                .ability_cooldown_ticks(AbilityKind::Charge),
+            0
+        );
+    }
+    assert!(matches!(
+        entities.get(rifle).unwrap().order(),
+        Order::Move(_)
+    ));
+    // The activation tick decrements cooldowns during movement, before combat.
+    entities.get_mut(rifle).unwrap().tick_ability_cooldowns();
+    for _ in 0..config::CHARGE_DURATION_TICKS - 1 {
+        entities.get_mut(rifle).unwrap().tick_ability_cooldowns();
+    }
+    assert_eq!(entities.get(rifle).unwrap().charge_ticks(), 1);
+    apply_with_players(&map, &mut entities, &mut players, cast());
+    assert_eq!(
+        entities.get(rifle).unwrap().charge_ticks(),
+        1,
+        "recasting on cooldown cannot refresh Charge"
+    );
+    entities.get_mut(rifle).unwrap().tick_ability_cooldowns();
+    assert_eq!(entities.get(rifle).unwrap().charge_ticks(), 0);
+    assert!(
+        entities
+            .get(rifle)
+            .unwrap()
+            .ability_cooldown_ticks(AbilityKind::Charge)
+            > 0
+    );
 }

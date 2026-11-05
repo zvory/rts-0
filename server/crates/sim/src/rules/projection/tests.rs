@@ -629,7 +629,7 @@ fn debug_path_is_owner_only_and_in_movement_order() {
 }
 
 #[test]
-fn legacy_charge_cooldown_is_not_projected() {
+fn charge_active_window_is_owner_only_in_generic_ability_projection() {
     let mut entities = EntityStore::new();
     let rifle_id = entities
         .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
@@ -637,7 +637,10 @@ fn legacy_charge_cooldown_is_not_projected() {
     entities
         .get_mut(rifle_id)
         .expect("rifleman should exist")
-        .start_ability_cooldown(ability::AbilityKind::Charge, 42);
+        .start_ability_cooldown(
+            ability::AbilityKind::Charge,
+            crate::config::CHARGE_COOLDOWN_TICKS,
+        );
 
     let map = Map {
         width: 64,
@@ -653,10 +656,21 @@ fn legacy_charge_cooldown_is_not_projected() {
     let owner_view = project_for_test(1, rifle, &fog, true, &entities, None, false)
         .expect("owner should see own rifleman");
     assert_eq!(owner_view.charge_cooldown_left, None);
+    let charge = owner_view
+        .abilities
+        .iter()
+        .find(|entry| entry.ability == "charge")
+        .unwrap();
+    assert_eq!(charge.cooldown_left, crate::config::CHARGE_COOLDOWN_TICKS);
+    assert_eq!(
+        charge.expires_in,
+        Some(crate::config::CHARGE_DURATION_TICKS)
+    );
 
     let enemy_view = project_for_test(2, rifle, &fog, false, &entities, None, false)
         .expect("full view should include rifleman");
     assert_eq!(enemy_view.charge_cooldown_left, None);
+    assert!(enemy_view.abilities.is_empty());
 }
 
 #[test]

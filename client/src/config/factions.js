@@ -87,6 +87,7 @@ export const FACTION_CATALOGS = Object.freeze({
       ],
     },
     abilities: [
+      ABILITY.CHARGE,
       ABILITY.SMOKE,
       ABILITY.MORTAR_FIRE,
       ABILITY.POINT_FIRE,

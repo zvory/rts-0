@@ -1484,7 +1484,7 @@ fn rifleman_attack_move_without_meth_holds_position_while_firing() {
 }
 
 #[test]
-fn meth_rifleman_move_order_keeps_path_while_firing_without_charge_state() {
+fn charging_meth_rifleman_move_order_keeps_path_while_firing() {
     let mut entities = EntityStore::new();
     let rifleman_id = entities
         .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
@@ -1493,6 +1493,10 @@ fn meth_rifleman_move_order_keeps_path_while_firing_without_charge_state() {
         .spawn_unit(2, EntityKind::Rifleman, 100.0, 120.0)
         .expect("enemy should spawn");
     if let Some(rifleman) = entities.get_mut(rifleman_id) {
+        rifleman.start_ability_cooldown(
+            crate::game::ability::AbilityKind::Charge,
+            config::CHARGE_COOLDOWN_TICKS,
+        );
         rifleman.set_order(Order::move_to(300.0, 100.0));
         rifleman.set_path(vec![(300.0, 100.0)]);
         rifleman.set_path_goal(Some((300.0, 100.0)));

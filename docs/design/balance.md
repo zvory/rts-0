@@ -333,15 +333,16 @@ path, turret aim, or stationary range. The first Tank cannon, Anti-Tank Gun, or 
 its source for three seconds. Hits during that window neither redirect the hull nor extend the lock;
 after it expires, the next qualifying hit may establish a new lock. Active movement paths and zero
 oil prevent this response, while Hold Position explicitly allows it. Riflemen take full incoming
-damage while moving. Riflemen upgraded with Methamphetamines gain permanent moving fire, keep
-advancing while firing with normal accuracy, move at tank speed, and use a 16-tick rifle cooldown.
-Panzerfausts upgraded with Methamphetamines receive the normal Rifleman moving fire, tank-speed
-movement, and 25% faster rifle attacks plus the Panzerfaust windup boost. Machine Gunners upgraded with
+damage while moving. Riflemen and Panzerfausts upgraded with Methamphetamines permanently move at tank speed.
+Research unlocks Charge: for five seconds, Riflemen and Panzerfausts can fire while moving
+with normal accuracy; Riflemen use a 16-tick rifle cooldown and Panzerfausts use a 25% shorter
+rifle cooldown. Outside Charge, they stop to fire and use their normal rifle cooldowns.
+Panzerfausts retain the research's permanent Panzerfaust windup boost. Machine Gunners upgraded with
 Methamphetamines move at unupgraded Rifleman speed and use half-length setup/teardown timers; other
 mobile combat units still hold position once a target is in weapon range. Scout cars also fire while
 moving using an independent rear machine-gun facing. They are unarmored light vehicles and do not
 receive armored damage reduction; Anti-Tank Guns deal their full damage to them.
-Plain `Move` tanks, scout cars, and Methamphetamines-upgraded Riflemen and Panzerfausts only fire at enemies already in
+Plain `Move` tanks, scout cars, and charging Riflemen and Panzerfausts only fire at enemies already in
 weapon range. Their active `AttackMove` orders use the same moving-fire policy while they are still
 following the player-issued path: auto-acquisition can aim and fire only at targets that are
 currently inside weapon range and pass hostile, visibility, smoke, line-of-sight, and blocker
@@ -516,9 +517,13 @@ profiles and explicit activation/autocast policy instead of being folded into de
   weight and add no capacity (`COMMAND_CAR_SUPPLY_CAP_BONUS = 0`). Tanks consume 5 command supply,
   so five Tanks fill the budget. A Command Car still uses 4 production supply.
 - **Methamphetamines** (Training Centre research): costs 100 steel / 100 oil and takes 600 ticks
-  (~20s). Once complete, all current and future Riflemen for that player gain permanent moving rifle fire,
-  1.25x movement speed (matching tank speed at 2.0 px/tick), no extra movement miss chance, and 50%
-  faster attacks (32 tick cooldown becomes 16). It also increases that
+  (~20s). Once complete, all current and future Riflemen and Panzerfausts for that player gain
+  permanent 1.25x movement speed (matching tank speed at 2.0 px/tick) and unlock **Charge** (C).
+  Charge has no resource cost, a 20-second cooldown from activation, and a five-second duration.
+  It preserves the current order and cannot be queued or refreshed during cooldown. During Charge,
+  both units can shoot while moving with no extra movement miss chance; Riflemen use a 16-tick
+  rifle cooldown instead of 32, and Panzerfaust rifle cooldowns are reduced by 25%.
+  Research alone gives neither moving fire nor faster rifle attacks. It also increases that
   player's Machine Gunners from 1.28 px/tick to unupgraded Rifleman speed (1.6 px/tick) and halves
   their setup and teardown timers from 30 ticks to 15. Panzerfausts also use the reduced
   12-tick Panzerfaust windup.
@@ -570,13 +575,13 @@ profiles and explicit activation/autocast policy instead of being folded into de
   command-card affordances;
   `client/src/config.js` is mechanically checked
   against that registry for client-visible ability descriptors. Server execution maps those
-  registry rows to a small set of sim-local effect hooks: legacy no-op, owned area status, delayed
+  registry rows to a small set of sim-local effect hooks: self status, owned area status, delayed
   world effect, dash return, line projectile, Magic Anchor placement, Golem consumption, and the
   artillery fire path. The visible `pointFire` catalog row supplies the unified Fire button, while
   the hidden `blanketFire` row backs the radius-bearing server order. Both retain the same range
-  band, ammunition cost, and reload cadence. The legacy `charge` ability id remains
-  registry-backed only for old command/replay decoding and has no carriers, cooldown, command-card
-  entry, or runtime status.
+  band, ammunition cost, and reload cadence. The `charge` ability uses an owner-private
+  `expiresIn` affordance derived from the first 150 ticks of its 600-tick cooldown, keeping
+  checkpoints and replays on the existing authoritative ability clock.
 - **Ekat** is the first playable one-hero faction unit. The `ekat` catalog starts with
   one Ekat and one Zamok, no workers, no buildable menu, no research, and no other
   controllable combat units besides Golems produced from Zamok. Ekat has 150 HP, no passive
