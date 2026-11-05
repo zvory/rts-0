@@ -584,8 +584,11 @@ Map policy:
   or silently accepting a nearby map.
 
 Concealment applies to units, not buildings or doodads. Sight rays traverse at most four
-concealment tiles, excluding the origin and including the target, while weapon line of fire remains
-unrestricted by concealment. This lets a unit at a forest edge retain normal outward vision while
+concealment tiles, excluding the origin and including the target. Direct-fire rays use the same
+four-tile depth into cover and stop when leaving concealment entered along the ray: a visible unit
+inside a forest can be shot, but units and buildings beyond it cannot, even with a plane, ally, or
+side spotter revealing them. The origin tile is ignored so units at the forest edge can fire outward.
+Mortars retain indirect fire and do not require a clear direct-fire ray. This lets a unit at a forest edge retain normal outward vision while
 limiting vision through a forest interior. Owners and allies always receive their units. Enemy
 projection, auto-acquisition, explicit attack validation, and retained targets reject a concealed
 unit unless a hostile unit is within two tiles measured between body edges, or that unit has fired.
@@ -1894,8 +1897,8 @@ auto-acquisition, snapshot projection, and direct fire share the same range pred
 auto-acquisition and firing otherwise use the smoke-aware LOS query; explicit attack orders remain
 stationary behind terrain, smoke, or entity blockers and cannot fire until the shot is clear. Direct-fire shot
 projection also checks hard entity blockers: tanks and non-Tank-Trap building footprints intercept
-shots, while Tank Traps do not. Future forest visibility/cover rules should extend the terrain rules
-and this service instead of adding ad hoc checks to fog or combat.
+shots, while Tank Traps do not. Forest direct-fire blocking also applies to secondary weapons,
+Panzerfaust launch checks, and machine-gun burst endpoints through the shared LOS service.
 
 `Game` samples raw live fog per player every second simulation tick (15 Hz). Command validation,
 combat targeting, event visibility, building-memory refreshes, and snapshots all consume the same

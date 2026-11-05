@@ -4,7 +4,7 @@ use super::super::activation::{
 use super::super::target_legality::{direct_fire_target_legal, DirectFireLegality};
 use super::*;
 
-fn direct_fire_legal(
+pub(super) fn direct_fire_legal(
     map: &Map,
     entities: &EntityStore,
     smokes: &SmokeCloudStore,
