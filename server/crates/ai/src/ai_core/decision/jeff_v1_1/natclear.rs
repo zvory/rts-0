@@ -13,8 +13,11 @@
 //!
 //! While the natural is next and not yet standing, and enemy infantry stands within `CLEAR_TILES`
 //! of the site or within `ROUTE_TILES` of the way there from the main (past
-//! `ROUTE_FROM_MAIN_TILES`), with no enemy Tank near the site; the natural's two guards join the
-//! group rather than walk to their posts alone (on Classic, 14 of 21 Riflemen lost did):
+//! `ROUTE_FROM_MAIN_TILES`), with no enemy Tank near the site. The natural's two guards are not
+//! drafted into it (`ncguards=1` drafts them): drafted, they stood in a block short of the 8-10
+//! Riflemen it needed while the natural waited for them on their posts, and The River's natural went
+//! down at 2:32-3:35 instead of 1:56 on every seed (120s: vs Pressure 5-9-26 drafted, 8-8-24 not;
+//! vs Rush 10-6-24 and 12-0-28):
 //!
 //! - **Size**: at least `rifles_per_gun` (3, `clearper` in `JEFF_V11_LINE`) Riflemen for each
 //!   Machine Gunner and `RIFLES_PER_INFANTRY` for each other enemy, and up to `max_rifles_per_gun`
@@ -304,13 +307,13 @@ pub(in crate::ai_core::decision) fn plan(
     };
     let by_id: BTreeMap<u32, &AiEntitySummary> =
         observation.owned.iter().map(|unit| (unit.id, unit)).collect();
-    // The natural's guards (they walked to their posts alone past the guns otherwise), the members
-    // still free, then the free Riflemen at the main nearest the block, up to the most the enemy is
-    // worth, always leaving `HOME_KEEP` free at the main.
+    // The members still free (with `ncguards=1` the natural's guards first), then the free Riflemen
+    // at the main nearest the block, up to the most the enemy is worth, always leaving `HOME_KEEP`
+    // free at the main.
     let mut members: BTreeSet<u32> = previous
         .members
         .iter()
-        .chain(memory.expansion_security.riflemen.iter().filter(|_| flag("ncguards", true)))
+        .chain(memory.expansion_security.riflemen.iter().filter(|_| flag("ncguards", false)))
         .copied()
         .filter(|id| by_id.get(id).is_some_and(|unit| free(unit)))
         .collect();
