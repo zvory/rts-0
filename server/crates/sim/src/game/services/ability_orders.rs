@@ -457,13 +457,6 @@ pub(crate) fn launch_self_ability(
         return false;
     }
     match (definition.effect_hook, ability) {
-        (AbilityEffectHook::SelfStatus, AbilityKind::Charge) => {
-            let Some(unit) = entities.get_mut(caster) else {
-                return false;
-            };
-            unit.start_ability_cooldown(ability, definition.cooldown_ticks);
-            true
-        }
         (AbilityEffectHook::OwnedAreaStatus, AbilityKind::Breakthrough) => {
             let Some((caster_x, caster_y)) = entities.get(caster).map(|e| (e.pos_x, e.pos_y))
             else {

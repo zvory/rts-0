@@ -324,7 +324,7 @@ fn non_entrenched_idle_rifleman_also_ignores_out_of_range_enemy() {
 }
 
 #[test]
-fn entrenched_meth_rifleman_keeps_base_attack_cooldown_without_charge() {
+fn entrenched_meth_rifleman_keeps_faster_attack_cooldown() {
     let mut entities = EntityStore::new();
     let rifleman_id = entities
         .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
@@ -342,8 +342,8 @@ fn entrenched_meth_rifleman_keeps_base_attack_cooldown_without_charge() {
     let rifleman = entities.get(rifleman_id).expect("rifleman should exist");
     assert_eq!(
         rifleman.attack_cd(),
-        32,
-        "Methamphetamines alone should keep base attack cadence while entrenched"
+        config::METHAMPHETAMINES_RIFLEMAN_ATTACK_COOLDOWN_TICKS,
+        "Methamphetamines attack cadence should still apply while entrenched"
     );
     assert!(
         entities.get(enemy_id).expect("enemy should exist").hp < enemy_hp,

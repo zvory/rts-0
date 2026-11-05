@@ -196,9 +196,6 @@ assert(
 
 const currentFactionSpecialCase = /\b(?:EntityKind|AbilityKind)::(?:Worker|Golem|ResourceDepot|Depot|Barracks|TrainingCentre|EngineeringComplex|Factory|Steelworks|Steel|Oil|Tank|ScoutCar|CommandCar|MortarTeam|AntiTankGun|Artillery|Rifleman|MachineGunner|Smoke|MortarFire|PointFire|Breakthrough|Charge)\b|\b(?:STARTING_STEEL|STARTING_OIL|STARTING_WORKERS|STARTING_RIFLEMEN)\b/;
 const approvedCurrentFactionFiles = new Set([
-  // Charge's sim-only active-window helper reads its authoritative cooldown clock; carrier
-  // admission and research requirements remain in the rules faction registry.
-  "server/crates/sim/src/game/entity/entity/helpers.rs",
   "server/crates/ai/src/ai_core/actions.rs",
   "server/crates/ai/src/ai_core/decision/defense.rs",
   // Jeff's Kriegsia-only defense policy is split into focused geometry and incident-response
@@ -561,7 +558,6 @@ const sourceRoots = [
 ];
 const offenders = [];
 const approvedSpecialCaseBudgets = new Map([
-  ["server/crates/sim/src/game/entity/entity/helpers.rs", 1],
   // Phase 7 final audit: catalog, economy helper, and command-service references intentionally
   // grew during the fixture, ability, and client-surface phases; keep the ratchet explicit until
   // those helpers shrink or move behind catalog APIs.
@@ -582,8 +578,7 @@ const approvedSpecialCaseBudgets = new Map([
   ["server/crates/ai/src/sdk/bases.rs", 2],
   // Cultivators intentionally reuses the existing depot/worker kinds in catalog rows and tests.
   // Tank Plus adds one Engineering Complex research row in the authoritative catalog.
-  // Charge restores two infantry carriers in its authoritative registry row.
-  ["server/crates/rules/src/faction.rs", 141],
+  ["server/crates/rules/src/faction.rs", 139],
   ["server/crates/rules/src/economy.rs", 109],
   ["server/crates/sim/src/game/setup.rs", 30],
   ["server/crates/sim/src/game/services/ability_orders.rs", 18],

@@ -1088,7 +1088,7 @@ kind/catalog row and dependency-required protocol wire mirror, extending their p
 updating the client mirror, and then adding only effect-specific code the registry cannot express.
 
 `AbilityDefinition` also carries a sim-local `AbilityEffectHook` discriminator for the reusable
-effect shapes that actually exist today: self status (`charge`, derived from its cooldown), reserved no-op
+effect shapes that actually exist today: legacy no-op (`charge` compatibility), reserved no-op
 (`blanketFire`), owned area status (`breakthrough`), delayed world effects (`smoke`,
 `mortarFire`), Scout Plane dispatch, dash return, line projectile, Magic Anchor placement, Golem
 consumption, and the intentionally one-off artillery point-fire path. Panzerfaust damage resolves against the locked live vehicle when it is enemy-owned or owned by the

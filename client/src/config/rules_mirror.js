@@ -235,20 +235,6 @@ export const STATS = Object.freeze({
 });
 
 export const ABILITIES = Object.freeze({
-  [ABILITY.CHARGE]: Object.freeze({
-    ability: ABILITY.CHARGE,
-    label: "Charge",
-    icon: "CHG",
-    hotkey: "C",
-    title: "Fire faster and shoot while moving for 5 seconds",
-    carriers: Object.freeze([KIND.RIFLEMAN, KIND.PANZERFAUST]),
-    targetMode: "self",
-    cooldownTicks: TICK_HZ * 20,
-    cost: Object.freeze({ steel: 0, oil: 0 }),
-    upgradeRequirement: UPGRADE.METHAMPHETAMINES,
-    queued: false,
-    queuePolicy: "notQueueable",
-  }),
   [ABILITY.SMOKE]: Object.freeze({
     ability: ABILITY.SMOKE,
     label: "Smoke",
@@ -448,7 +434,7 @@ export const UPGRADES = Object.freeze({
     icon: "METH",
     cost: Object.freeze({ steel: 100, oil: 100 }),
     researchTicks: METHAMPHETAMINES_RESEARCH_TICKS,
-    description: "Increase infantry speed and unlock 5-second Charge; speed up Machine Gunner setup",
+    description: "Boost Riflemen; speed up Machine Gunner movement and setup",
     researchedAt: KIND.TRAINING_CENTRE,
   }),
   [UPGRADE.PANZERFAUSTS]: Object.freeze({
