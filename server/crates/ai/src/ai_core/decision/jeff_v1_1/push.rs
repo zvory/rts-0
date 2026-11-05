@@ -1048,7 +1048,22 @@ pub(in crate::ai_core::decision) fn convoy(
     let due = !members.is_empty()
         && (memory.jeff_v1_1.push.convoy_ordered == 0
             || tick.saturating_sub(memory.jeff_v1_1.push.convoy_ordered) >= CONVOY_REORDER_TICKS);
-    if due {
+    // `convoyway`: on Schone Tage's southern way each Tank goes by the way from where it is.
+    let own_way: Vec<(u32, (f32, f32))> = observation
+        .owned
+        .iter()
+        .filter(|unit| members.contains(&unit.id))
+        .filter_map(|unit| {
+            super::south_route::convoy_member_waypoint(observation, memory, (unit.x, unit.y), center)
+                .map(|target| (unit.id, target))
+        })
+        .collect();
+    if due && !own_way.is_empty() {
+        for (id, target) in own_way {
+            actions::attack_move_units(actions, [id], target.0, target.1);
+        }
+        memory.jeff_v1_1.push.convoy_ordered = tick.max(1);
+    } else if due {
         // `southroute`: on Schone Tage along the southern way up to where the push is.
         let target = super::super::frontal::group_center(observation, &members)
             .map(|at| super::south_route::convoy_waypoint(observation, memory, at, center, fresh))

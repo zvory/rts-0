@@ -440,6 +440,35 @@ pub(in crate::ai_core::decision) fn convoy_waypoint(
     push
 }
 
+/// `convoyway`: where one convoy Tank at `at` makes for: the next waypoint from where it is
+/// itself, up to where the push is along the way, then the push. The convoy took its waypoint
+/// from the middle of all its members, Tanks fresh from the factory and Tanks far down the way
+/// alike: from 11:40 a 14-Tank convoy stood spread over the central plateau and the V, new Tanks
+/// sent straight from the main at a waypoint far down the corridor. `None` off the way.
+pub(in crate::ai_core::decision) fn convoy_member_waypoint(
+    observation: &AiObservation,
+    memory: &AiDecisionMemory,
+    at: (f32, f32),
+    push: (f32, f32),
+) -> Option<(f32, f32)> {
+    if super::off("convoyway") {
+        return None;
+    }
+    let way = memory.profile_id().and_then(|profile| way(profile, observation))?;
+    let ts = observation.map.tile_size as f32;
+    let push_leg = memory.jeff_v1_1.south.leg.min(way.len());
+    let mut leg = nearest_leg(&way, at);
+    let between = |leg: usize| {
+        leg + 1 < way.len()
+            && dist2(at.0, at.1, way[leg + 1].0, way[leg + 1].1)
+                < dist2(way[leg].0, way[leg].1, way[leg + 1].0, way[leg + 1].1)
+    };
+    if between(leg) || dist2(at.0, at.1, way[leg].0, way[leg].1) <= squared(ARRIVED_TILES * ts) {
+        leg += 1;
+    }
+    Some(if leg >= push_leg { push } else { way[leg] })
+}
+
 /// The trace note.
 pub(in crate::ai_core::decision) fn trace(memory: &AiDecisionMemory) -> String {
     format!(
