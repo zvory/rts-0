@@ -1,7 +1,8 @@
 //! Line-of-sight queries over map terrain plus optional dynamic blockers.
 //!
-//! Stone blocks both vision and ranged attacks. Fog can also supply current building-footprint
-//! blockers, while smoke supplies dynamic cloud blockers. This service owns the tile raycast so
+//! Stone blocks both vision and ranged attacks. Forest permits shots into visible cover but
+//! blocks shots beyond it, independently of shared team vision. Fog can also supply current
+//! building-footprint blockers, while smoke supplies dynamic cloud blockers. This service owns the tile raycast so
 //! fog, combat, and future terrain features share one interpretation of "can see/shoot through".
 
 use crate::config;
@@ -76,8 +77,10 @@ impl<'a> LineOfSight<'a> {
 
     /// True when no opaque terrain lies on the segment between two world-pixel points.
     /// The origin tile is ignored; the target tile is treated as blocking if it is opaque.
+    /// Forest allows up to the normal sight depth into cover, but no shot may exit cover
+    /// entered along the ray. Shared vision cannot bypass this weapon-local check.
     pub(crate) fn clear_between_world_points(&self, from: (f32, f32), to: (f32, f32)) -> bool {
-        self.raycast_clear(from, to, false, false, None)
+        self.raycast_clear(from, to, false, false, true)
     }
 
     /// True when `tile` is visible from a world-pixel origin. The target tile itself may be
@@ -91,7 +94,7 @@ impl<'a> LineOfSight<'a> {
             self.map.tile_center(tile.0, tile.1),
             true,
             true,
-            Some(crate::rules::terrain::CONCEALMENT_SIGHT_DEPTH_TILES),
+            false,
         )
     }
 
@@ -101,7 +104,7 @@ impl<'a> LineOfSight<'a> {
         to: (f32, f32),
         allow_opaque_target: bool,
         allow_dynamic_target: bool,
-        concealment_budget: Option<u32>,
+        block_forest_exit: bool,
     ) -> bool {
         let (from_x, from_y) = from;
         let (to_x, to_y) = to;
@@ -170,7 +173,7 @@ impl<'a> LineOfSight<'a> {
                     (tx, ty),
                     target,
                     allow_opaque_target,
-                    concealment_budget,
+                    block_forest_exit,
                     &mut concealment_tiles,
                     true,
                 ) {
@@ -185,7 +188,7 @@ impl<'a> LineOfSight<'a> {
                     (tx, ty),
                     target,
                     allow_opaque_target,
-                    concealment_budget,
+                    block_forest_exit,
                     &mut concealment_tiles,
                     true,
                 ) {
@@ -200,7 +203,7 @@ impl<'a> LineOfSight<'a> {
                     (next_tx, ty),
                     target,
                     allow_opaque_target,
-                    concealment_budget,
+                    block_forest_exit,
                     &mut concealment_tiles,
                     false,
                 ) {
@@ -212,7 +215,7 @@ impl<'a> LineOfSight<'a> {
                     (tx, next_ty),
                     target,
                     allow_opaque_target,
-                    concealment_budget,
+                    block_forest_exit,
                     &mut concealment_tiles,
                     false,
                 ) {
@@ -226,7 +229,7 @@ impl<'a> LineOfSight<'a> {
                     (tx, ty),
                     target,
                     allow_opaque_target,
-                    concealment_budget,
+                    block_forest_exit,
                     &mut concealment_tiles,
                     true,
                 ) {
@@ -247,7 +250,7 @@ impl<'a> LineOfSight<'a> {
         tile: (i32, i32),
         target: (u32, u32),
         allow_opaque_target: bool,
-        concealment_budget: Option<u32>,
+        block_forest_exit: bool,
         concealment_tiles: &mut u32,
         count_concealment: bool,
     ) -> RaycastStep {
@@ -257,9 +260,16 @@ impl<'a> LineOfSight<'a> {
         let current = (tile.0 as u32, tile.1 as u32);
         if count_concealment && self.map.is_concealment_tile(current.0, current.1) {
             *concealment_tiles = concealment_tiles.saturating_add(1);
-            if concealment_budget.is_some_and(|budget| *concealment_tiles > budget) {
+            if *concealment_tiles > terrain::CONCEALMENT_SIGHT_DEPTH_TILES {
                 return RaycastStep::Blocked;
             }
+        }
+        if block_forest_exit
+            && count_concealment
+            && *concealment_tiles > 0
+            && !self.map.is_concealment_tile(current.0, current.1)
+        {
+            return RaycastStep::Blocked;
         }
         if current == target {
             if allow_opaque_target || !self.tile_blocks(current) {
@@ -385,7 +395,7 @@ mod tests {
         assert!(los.tile_visible_from_world(origin, (2, 4)));
         assert!(los.tile_visible_from_world(origin, (5, 4)));
         assert!(!los.tile_visible_from_world(origin, (6, 4)));
-        assert!(los.clear_between_world_points(origin, map.tile_center(7, 4)));
+        assert!(!los.clear_between_world_points(origin, map.tile_center(7, 4)));
     }
 
     #[test]
@@ -394,6 +404,36 @@ mod tests {
         map.concealment_tiles = vec![(2, 4)];
         let los = LineOfSight::new(&map);
         assert!(los.tile_visible_from_world(map.tile_center(2, 4), (8, 4)));
+    }
+
+    #[test]
+    fn shots_enter_forest_but_cannot_leave_it_or_exceed_sight_depth() {
+        let mut map = flat_map(12);
+        map.concealment_tiles = (3..=7).map(|x| (x, 4)).collect();
+        let los = LineOfSight::new(&map);
+        let origin = map.tile_center(1, 4);
+        for x in 3..=6 {
+            assert!(los.clear_between_world_points(origin, map.tile_center(x, 4)));
+        }
+        for x in 7..=9 {
+            assert!(!los.clear_between_world_points(origin, map.tile_center(x, 4)));
+        }
+        assert!(los.clear_between_world_points(map.tile_center(3, 4), origin));
+        assert!(!los.clear_between_world_points(map.tile_center(9, 4), origin));
+    }
+
+    #[test]
+    fn shots_cannot_cross_even_one_forest_tile() {
+        let mut map = flat_map(10);
+        map.concealment_tiles = vec![(4, 4)];
+        let los = LineOfSight::new(&map);
+        for (from, to) in [((2, 4), (6, 4)), ((2, 2), (6, 6)), ((6, 6), (2, 2))] {
+            assert!(!los.clear_between_world_points(
+                map.tile_center(from.0, from.1), map.tile_center(to.0, to.1)));
+            assert!(los.clear_between_world_points(
+                map.tile_center(from.0, from.1), map.tile_center(4, 4)));
+        }
+        assert!(los.clear_between_world_points(map.tile_center(2, 3), map.tile_center(6, 3)));
     }
 
     #[test]

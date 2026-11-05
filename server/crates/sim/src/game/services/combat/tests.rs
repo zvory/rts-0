@@ -20,6 +20,7 @@ mod coax;
 mod direct_hits;
 mod entrenchment;
 mod fog_visibility;
+mod forest;
 mod moving_fire_policy;
 mod range_targeting;
 mod retention;
