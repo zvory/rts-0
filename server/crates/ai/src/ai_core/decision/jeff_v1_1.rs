@@ -16,6 +16,7 @@ pub(super) mod natclear;
 pub(super) mod natural;
 pub(super) mod push;
 pub(super) mod resume;
+pub(super) mod stations;
 pub(super) mod reveal;
 pub(super) mod rovers;
 pub(super) mod scout;
@@ -47,6 +48,7 @@ pub(super) struct V1_1Memory {
     pub(super) natural: natural::NaturalMemory,
     pub(super) natclear: natclear::NatClearMemory,
     pub(super) resume: resume::ResumeMemory,
+    pub(super) stations: stations::StationMemory,
     pub(super) south: south_route::SouthRouteMemory,
     pub(super) charge: charge::ChargeMemory,
     pub(super) reveal: reveal::RevealMemory,

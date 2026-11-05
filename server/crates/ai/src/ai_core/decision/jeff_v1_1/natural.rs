@@ -40,11 +40,15 @@ const FIGHT_TILES: f32 = 7.0;
 const HOME_TILES: f32 = 16.0;
 /// A unit off its post is sent back this often.
 const REORDER_TICKS: u32 = config::TICK_HZ * 3;
+/// A supporter home defense took keeps its post this long (`postreturn`).
+const AWAY_TICKS: u32 = config::TICK_HZ * 60;
 
 /// V1.1's natural support and when each was last sent to its post.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(in crate::ai_core::decision) struct NaturalMemory {
     pub(in crate::ai_core::decision) support: BTreeMap<u32, u32>,
+    /// Supporters home defense holds, and since when (`postreturn`).
+    away: BTreeMap<u32, u32>,
 }
 
 impl NaturalMemory {
@@ -93,13 +97,15 @@ pub(in crate::ai_core::decision) fn own_units_on_site(
 }
 
 /// Picks and posts the natural's support (see the module docs). `home_guns`: the main's defensive
-/// guns; `held`: units other systems keep this decision.
+/// guns; `held`: units other systems keep this decision. `defending`: the units home defense holds this
+/// decision: supporters among them keep their posts while away (`postreturn`).
 pub(in crate::ai_core::decision) fn support(
     (actions, observation, map_analysis, intents): opening_rush::LiveStep<'_, '_, '_, '_>,
     memory: &mut AiDecisionMemory,
     profile_id: &str,
     home_guns: &[u32],
     held: &BTreeSet<u32>,
+    defending: &BTreeSet<u32>,
 ) {
     let ts = observation.map.tile_size as f32;
     let site = memory.expansion_security.site;
@@ -114,6 +120,7 @@ pub(in crate::ai_core::decision) fn support(
         .and_then(|site| building_center(site, EntityKind::ResourceDepot, observation.map.tile_size))
     else {
         memory.jeff_v1_1.natural.support.clear();
+        memory.jeff_v1_1.natural.away.clear();
         return;
     };
     let main = tile_center(observation.own_start_tile, observation.map.tile_size);
@@ -156,13 +163,32 @@ pub(in crate::ai_core::decision) fn support(
         free(unit) && (guns_go || unit.kind != EntityKind::MachineGunner)
     };
     // Keep the support it has while each is still free.
+    // Under `postreturn` a supporter home defense took keeps its post for up to `AWAY_TICKS`, and
+    // walks back to it once free: let go, it joined the home pocket at the main while a Rifleman
+    // from the main took its post.
+    let tick = observation.tick;
+    let returning = !super::off("postreturn");
+    let away_before = memory.jeff_v1_1.natural.away.clone();
+    let away_ok = |id: &u32| {
+        returning
+            && defending.contains(id)
+            && by_id.contains_key(id)
+            && away_before
+                .get(id)
+                .is_none_or(|since| tick.saturating_sub(*since) < AWAY_TICKS)
+    };
     let mut members: Vec<u32> = memory
         .jeff_v1_1
         .natural
         .support
         .keys()
         .copied()
-        .filter(|id| by_id.get(id).is_some_and(|unit| free(unit)))
+        .filter(|id| by_id.get(id).is_some_and(|unit| free(unit)) || away_ok(id))
+        .collect();
+    let away: BTreeMap<u32, u32> = members
+        .iter()
+        .filter(|id| defending.contains(id))
+        .map(|id| (*id, away_before.get(id).copied().unwrap_or(tick)))
         .collect();
     let to_natural = |id: &u32| {
         by_id
@@ -202,6 +228,7 @@ pub(in crate::ai_core::decision) fn support(
         }
     }
     let previous = std::mem::take(&mut memory.jeff_v1_1.natural.support);
+    memory.jeff_v1_1.natural.away = away;
     if members.is_empty() {
         return;
     }
@@ -237,7 +264,6 @@ pub(in crate::ai_core::decision) fn support(
         })
     };
     members.sort_by(|a, b| lateral(a).total_cmp(&lateral(b)).then(a.cmp(b)));
-    let tick = observation.tick;
     let charging = memory.jeff_v1_1.charge.riflemen.clone();
     let mut sent = Vec::new();
     for (id, post) in members.iter().zip(posts) {
@@ -251,7 +277,8 @@ pub(in crate::ai_core::decision) fn support(
                 && enemy.kind.is_unit()
                 && dist2(enemy.x, enemy.y, unit.x, unit.y) <= squared(FIGHT_TILES * ts)
         });
-        if fighting || charging.contains(id) {
+        // Away with home defense: its post waits for it.
+        if fighting || charging.contains(id) || defending.contains(id) {
             continue;
         }
         let on_post = dist2(unit.x, unit.y, post.0, post.1) <= squared(ON_POST_TILES * ts);

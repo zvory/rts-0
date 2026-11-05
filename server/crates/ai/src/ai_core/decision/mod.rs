@@ -1409,7 +1409,14 @@ where
         // Jeff's AI V1.1 sends some of the main's guns and Riflemen to hold its natural.
         let live = (&mut actions, observation, map_analysis, &mut intents);
         let held = &(&local_defense_assigned | &route_line_reserved) | &push_units;
-        jeff_v1_1::natural::support(live, memory, profile.id, &defensive_machine_gunners, &held);
+        jeff_v1_1::natural::support(
+            live,
+            memory,
+            profile.id,
+            &defensive_machine_gunners,
+            &held,
+            &local_defense_assigned,
+        );
         actions.mark("natural");
         // Jeff's AI V1.1 keeps Tanks parked in front of its main, and holds a Tank line in front of
         // its bases and the ones it is taking. Tanks the home defense took stay with it a while.
@@ -1702,9 +1709,16 @@ where
             excluded.extend(memory.jeff_v1_1.tank_raid.units());
             excluded.extend(memory.jeff_v1_1.front_line.units());
             excluded.extend(memory.jeff_v1_1.home_guard.units());
-            let gathered = jeff::gather_resting_tanks(&mut actions, observation, memory, excluded);
-            if !gathered.is_empty() {
-                intents.push(AiIntent::Move { units: gathered });
+            // Jeff's AI V1.1 stations them at its bases instead (`stations`).
+            if jeff_v1_1::stations::active(profile.id) {
+                let live = (&mut actions, observation, map_analysis, &mut intents);
+                jeff_v1_1::stations::station(live, memory, &excluded);
+            } else {
+                let gathered =
+                    jeff::gather_resting_tanks(&mut actions, observation, memory, excluded);
+                if !gathered.is_empty() {
+                    intents.push(AiIntent::Move { units: gathered });
+                }
             }
         }
         actions.mark("gather");
@@ -1818,6 +1832,9 @@ where
         decision.trace.notes.push(memory.expansion_security.trace());
         decision.trace.notes.extend(jeff_v1_1::resume::trace_line(memory));
         decision.trace.notes.push(memory.jeff_v1_1.natclear.trace());
+        if jeff_v1_1::stations::active(profile.id) {
+            decision.trace.stations = Some(memory.jeff_v1_1.stations.trace());
+        }
         decision.trace.notes.push(jeff_v1_1::south_route::trace(memory));
         decision.trace.strike = Some(format!(
             "v1_1_meth {} opening={:?} trade={}/{} value={}/{} ahead={}",

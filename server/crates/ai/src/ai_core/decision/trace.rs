@@ -107,6 +107,8 @@ pub(crate) struct ManagerOutputTrace {
     pub(crate) push: Option<String>,
     /// Jeff's AI V1.1's Meth strike: its phase and squad.
     pub(crate) strike: Option<String>,
+    /// Jeff's AI V1.1's Tank stations.
+    pub(crate) stations: Option<String>,
 }
 
 impl ManagerOutputTrace {
@@ -130,6 +132,7 @@ impl ManagerOutputTrace {
         lines.extend(self.plan.clone());
         lines.extend(self.push.clone());
         lines.extend(self.strike.clone());
+        lines.extend(self.stations.clone());
         for goal in &self.goals {
             let blockers = format_blockers(&goal.blockers);
             let intents = if goal.intents.is_empty() {
@@ -202,6 +205,7 @@ pub(super) fn build_manager_trace(input: TraceInput<'_>) -> ManagerOutputTrace {
         plan: None,
         push: None,
         strike: None,
+        stations: None,
     }
 }
 

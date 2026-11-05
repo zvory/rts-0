@@ -292,12 +292,21 @@ pub(super) fn issue_frontal_wave(
     // out in front of the natural.
     let spread = is_jeff_v1_1(profile.id)
         && (!jeff_v1_1::off("tankline") || !jeff_v1_1::off("mgline"));
+    // Its Tanks wait for the push at its stations (`stations`).
+    let stationed = |id: &u32| {
+        jeff_v1_1::stations::active(profile.id)
+            && observation
+                .owned
+                .iter()
+                .any(|unit| unit.id == *id && unit.kind == EntityKind::Tank)
+    };
     let plan = &FrontalWavePlan {
         ready_units: plan
             .ready_units
             .iter()
             .copied()
             .filter(|id| !(spread && memory.jeff_v1_1.base_lines.posted(*id)))
+            .filter(|id| !stationed(id))
             .collect(),
         ..plan.clone()
     };

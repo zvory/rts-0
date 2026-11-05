@@ -468,6 +468,10 @@ pub(super) fn recall_tanks_to_main(
     if memory.later_bases.v1_1 && !jeff_v1_1::off("linetanks") {
         return Vec::new();
     }
+    // Its stations hold the bases' Tanks, the main's among them (`stations`).
+    if jeff_v1_1::stations::on(memory) {
+        return Vec::new();
+    }
     let at_main = main_tank_ids(observation, memory);
     let short = memory.home_tank_reserve().saturating_sub(at_main.len());
     if short == 0 {
