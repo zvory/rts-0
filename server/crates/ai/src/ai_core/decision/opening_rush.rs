@@ -995,7 +995,7 @@ fn trade(
 pub(super) fn fighter(unit: &AiEntitySummary, meth: bool, entrenched: bool) -> Option<Fighter> {
     let weapon = rts_rules::combat::default_weapon_profile(unit.kind)?;
     let cooldown = if meth && matches!(unit.kind, EntityKind::Rifleman) {
-        rts_rules::balance::METHAMPHETAMINES_RIFLEMAN_ATTACK_COOLDOWN_TICKS
+        rts_rules::balance::METHAMPHETAMINES_RIFLE_ATTACK_COOLDOWN_TICKS
     } else {
         weapon.cooldown
     };

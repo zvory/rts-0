@@ -148,8 +148,7 @@ fn tick_windup(
             .map(|profile| profile.cooldown)
             .unwrap_or(32);
         let rifle_cooldown = if methamphetamines_researched(owner) {
-            base_rifle_cooldown.saturating_mul(config::METHAMPHETAMINES_ATTACK_COOLDOWN_NUMERATOR)
-                / config::METHAMPHETAMINES_ATTACK_COOLDOWN_DENOMINATOR
+            config::METHAMPHETAMINES_RIFLE_ATTACK_COOLDOWN_TICKS
         } else {
             base_rifle_cooldown
         };
