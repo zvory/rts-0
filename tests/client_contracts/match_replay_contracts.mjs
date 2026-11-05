@@ -326,14 +326,24 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     assert(!selectionArea.hidden, "lab operator keeps the selected-unit HUD area visible");
     assert(!commandCard.hidden, "lab operator keeps the command card visible");
 
-    selectionArea.hidden = false;
+    selectionArea.hidden = true;
+    commandCard.hidden = false;
+    const spectatorMatch = Object.create(Match.prototype);
+    spectatorMatch.replayViewer = false;
+    spectatorMatch.state = { spectator: true };
+    spectatorMatch.applySpectatorUi();
+    assert(!selectionArea.hidden, "live spectators see selected units and buildings for inspection");
+    assert(commandCard.hidden, "live spectator inspection keeps gameplay commands hidden");
+    assert(giveUpConfirm.hidden, "live spectator inspection keeps give-up confirmation hidden");
+
+    selectionArea.hidden = true;
     commandCard.hidden = false;
     const labViewerMatch = Object.create(Match.prototype);
     labViewerMatch.replayViewer = false;
     labViewerMatch.state = { spectator: true };
     labViewerMatch.controlPolicy = createLabControlPolicy({ metadata: { role: LAB_ROLE.READ_ONLY } });
     labViewerMatch.applySpectatorUi();
-    assert(selectionArea.hidden, "read-only lab viewer hides the selected-unit HUD area");
+    assert(!selectionArea.hidden, "read-only lab viewer shows the selected-unit HUD area for inspection");
     assert(commandCard.hidden, "read-only lab viewer hides the command card");
 
     const staleConfirm = { hidden: true };

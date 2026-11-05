@@ -2155,11 +2155,14 @@ a decisive conclusion, a smaller line below the headline names who gave up, was 
 all their buildings, or lost their primary base. The score table
 includes a Team column, highlights every row matching `winnerTeamId`, and falls back to `winnerId`
 for singleton FFA compatibility.
-For spectator starts without command-surface permission, `match.js` hides the command card and
-give-up action, computes local fog from the server-filtered union snapshot, and keeps the ordinary
-renderer/minimap/HUD pointed at snapshots with `playerResources`. Lab operators are the exception:
-their projection remains spectator-shaped, but `LabControlPolicy.canUseCommandSurface(state)` keeps
-the selected-unit panel and real command card visible while prediction stays disabled and issue-as
+For spectator starts without command-surface permission, `match.js` keeps the selected-unit panel
+visible for passive inspection while hiding the command card and give-up action. Click selects a
+unit or building, drag selects multiple units, and Shift adds to or removes from the selection.
+Single-entity details include units killed and current production or research progress. Read-only
+Lab viewers share this inspection panel. The client computes local fog from the server-filtered
+union snapshot and keeps the ordinary renderer/minimap/HUD pointed at snapshots with
+`playerResources`. Lab operators also retain a real command card through
+`LabControlPolicy.canUseCommandSurface(state)` while prediction stays disabled and issue-as
 remains the command authority. Spectators still receive admitted notice toasts and minimap alert
 pings, but the match-owned notice presenter suppresses notice audio so observers do not hear player
 callouts. Repeated under-attack events in one match-scoped incident are admitted once across toast,
