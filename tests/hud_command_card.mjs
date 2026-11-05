@@ -633,6 +633,11 @@ for (const [kind, upgrade] of [
     playerHasCompleteKind: () => true,
     groupCooldownClocks: () => [],
   });
+  const consume = card.slots.find((slot) =>
+    slot?.commandId === ekatCommandId("ability", ABILITY.EKAT_CONSUME_GOLEM),
+  );
+  assert.equal(consume.enabled, true, "non-queueable Consume remains usable immediately");
+  assert.deepEqual(consume.intent.readyIds, [41]);
   const dash = card.slots.find((slot) =>
     slot?.commandId === ekatCommandId("ability", ABILITY.EKAT_TELEPORT),
   );
