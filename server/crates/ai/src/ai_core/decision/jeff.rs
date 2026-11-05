@@ -191,6 +191,7 @@ pub(super) fn stage_home_riflemen(
                     && !memory.jeff_v1_1.front_line.holds(unit.id)
                     && !memory.jeff_v1_1.deny.holds(unit.id)
                     && !memory.jeff_v1_1.rovers.holds(unit.id)
+                    && !super::jeff_v1_1::south_route::push_spotter(memory, unit.id)
             })
             .map(|unit| unit.id)
             .collect()

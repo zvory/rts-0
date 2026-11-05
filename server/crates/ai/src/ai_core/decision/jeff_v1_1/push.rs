@@ -176,6 +176,11 @@ impl PushMemory {
         self.convoy.contains(&id)
     }
 
+    /// Where the gathering group being struck stands.
+    pub(in crate::ai_core::decision) fn strike_point(&self) -> Option<(f32, f32)> {
+        self.strike.map(|(at, _)| point(at))
+    }
+
     /// The Tanks driving out in a convoy (`tankgroup`).
     pub(in crate::ai_core::decision) fn convoy_units(&self) -> impl Iterator<Item = u32> + '_ {
         self.convoy.iter().copied()
@@ -427,6 +432,25 @@ pub(in crate::ai_core::decision) fn launch_ready(
         memory.jeff_v1_1.push.strike.is_some()
             || ours >= route_army(observation, map_analysis, memory) * ADVANCE_RATIO,
     )
+}
+
+/// The push marching Schone Tage's southern way looks for a group to strike as its usual
+/// targeting would (`marchstrike`), or with `strikes` false drops any.
+pub(in crate::ai_core::decision) fn note_march_strike(
+    observation: &AiObservation,
+    memory: &mut AiDecisionMemory,
+    strikes: bool,
+) {
+    if !v1_1(memory) {
+        return;
+    }
+    if !strikes {
+        memory.jeff_v1_1.push.strike = None;
+        return;
+    }
+    let units = push_units(memory);
+    let ours = push_army(observation, &units, 0);
+    note_strike(observation, memory, ours);
 }
 
 /// The enemy fighters near a Jeff base forming a group the push outweighs `STRIKE_RATIO` times:
@@ -926,6 +950,11 @@ fn enemy_army(observation: &AiObservation, memory: &AiDecisionMemory) -> f32 {
         .values()
         .map(|sighting| sighting.value as f32)
         .sum()
+}
+
+/// The most enemy Tanks remembered at once lately (`goin`, `southroute`).
+pub(in crate::ai_core::decision) fn peak_enemy_tanks(memory: &AiDecisionMemory) -> usize {
+    memory.jeff_v1_1.push.peak_tanks.0
 }
 
 /// Whether the push drives straight into an enemy base (`goin`).

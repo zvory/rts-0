@@ -428,10 +428,21 @@ pub(super) fn sync_containment_recovery(
                 && !memory.jeff_v1_1.tank_raid.holds(unit.id))
             .map(|unit| unit.id)
             .min();
-        // Jeff's AI V1.1 sends one of the push's Riflemen ahead instead.
+        // Jeff's AI V1.1 sends one of the push's Riflemen ahead instead, or with none left
+        // (`keepspotter`) the free Rifleman nearest the push: a 15-Tank push on Schone Tage's
+        // corridor whose spotter fell with no escorts left broke up at 10:46 to form again, and
+        // never left again.
         let rifle_spotter = || {
             let escort = memory.containment.active_riflemen.iter().copied().min();
-            escort.filter(|_| is_jeff_v1_1(profile.id) && !jeff_v1_1::off("push"))
+            let tanks: Vec<u32> = memory.containment.active_tanks.iter().copied().collect();
+            let nearest = || {
+                group_center(observation, &tanks)
+                    .and_then(|center| jeff_v1_1::push::spotter(observation, memory, center))
+                    .filter(|_| !jeff_v1_1::off("keepspotter"))
+            };
+            escort
+                .or_else(nearest)
+                .filter(|_| is_jeff_v1_1(profile.id) && !jeff_v1_1::off("push"))
         };
         if let Some(scout) = replacement.or_else(rifle_spotter) {
             memory.containment.active_riflemen.remove(&scout);

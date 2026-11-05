@@ -146,7 +146,10 @@ pub(in crate::ai_core::decision) fn raid(
     memory: &mut AiDecisionMemory,
     profile_id: &str,
 ) {
-    if !is_jeff_v1_1(profile_id) || super::off("tankraid") {
+    if !is_jeff_v1_1(profile_id)
+        || super::off("tankraid")
+        || super::south_route::skips_raid(profile_id, observation)
+    {
         memory.jeff_v1_1.tank_raid = TankRaidMemory::default();
         return;
     }

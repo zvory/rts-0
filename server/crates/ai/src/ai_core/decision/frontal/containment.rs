@@ -391,6 +391,10 @@ pub(super) fn issue_expansion_containment_wave(
     // larger, instead of losing the push a Tank at a time.
     let outnumbered = jeff_v1_1::push::outweighed(observation, memory)
         .unwrap_or_else(|| push_outnumbered(observation, &tanks));
+    // Jeff's AI V1.1 (`southhold`) on Schone Tage's southern way stays together and walks back to
+    // its third base instead.
+    let outnumbered = outnumbered
+        && !(!memory.enemy_main_destroyed && jeff_v1_1::south_route::hold_way(observation, memory));
     if !memory.enemy_main_destroyed && outnumbered {
         // Jeff's AI V1.1's Scout Car smokes for the falling-back Tanks.
         jeff_v1_1::smoke_cover::note_retreat(memory, &tanks, scouts.first().copied(), observation.tick);
@@ -406,22 +410,37 @@ pub(super) fn issue_expansion_containment_wave(
         let rally = group_center(observation, &tanks)
             .and_then(|center| jeff_v1_1::south_route::back_waypoint(observation, memory, center))
             .unwrap_or(rally);
+        let mut infantry = scouts;
+        infantry.extend(riflemen);
+        if !jeff_v1_1::south_route::order_fall_back(actions, memory, &tanks, &infantry, rally) {
+            let mut units = tanks.clone();
+            units.extend(infantry.iter().copied());
+            actions::move_units(actions, units, rally.0, rally.1);
+        }
         let mut units = tanks;
-        units.extend(scouts);
-        units.extend(riflemen);
-        actions::move_units(actions, units.iter().copied(), rally.0, rally.1);
+        units.extend(infantry);
         return Some(AiIntent::Assemble { units });
     }
     // Jeff's AI V1.1 (`southroute`) marches Schone Tage's southern way waypoint by waypoint before
     // its usual targeting, all its push together.
-    if let Some(waypoint) = group_center(observation, &tanks)
-        .and_then(|center| jeff_v1_1::south_route::push_waypoint(observation, memory, center))
-    {
+    let tank_positions: Vec<(f32, f32)> = observation
+        .owned
+        .iter()
+        .filter(|unit| tanks.contains(&unit.id) && unit.hp > 0)
+        .map(|unit| (unit.x, unit.y))
+        .collect();
+    if let Some(waypoint) = group_center(observation, &tanks).and_then(|center| {
+        jeff_v1_1::south_route::push_waypoint(observation, memory, center, &tank_positions)
+    }) {
         if jeff_v1_1::south_route::order_due(memory, observation.tick) {
-            let mut units = tanks.clone();
-            units.extend(scouts.iter().copied());
-            units.extend(riflemen.iter().copied());
-            actions::attack_move_units(actions, units, waypoint.0, waypoint.1);
+            let mut infantry = scouts.clone();
+            infantry.extend(riflemen.iter().copied());
+            if jeff_v1_1::south_route::returning(memory) {
+                actions::move_units(actions, tanks.iter().copied(), waypoint.0, waypoint.1);
+                actions::move_units(actions, infantry.iter().copied(), waypoint.0, waypoint.1);
+            } else if !jeff_v1_1::south_route::guard_orders(actions, observation, memory, &tanks, &infantry) {
+                jeff_v1_1::south_route::order_push(actions, &tanks, &infantry, waypoint);
+            }
         }
         return Some(AiIntent::Attack { units: tanks });
     }
@@ -470,10 +489,9 @@ pub(super) fn issue_expansion_containment_wave(
     if !endgame_search_active && jeff_v1_1::push::going_in(memory) {
         // Its own order clock, as the southern way's: the shared formation clock is reset by others.
         if jeff_v1_1::south_route::order_due(memory, observation.tick) {
-            let mut units = tanks.clone();
-            units.extend(scouts.iter().copied());
-            units.extend(riflemen.iter().copied());
-            actions::attack_move_units(actions, units, objective.0, objective.1);
+            let mut infantry = scouts.clone();
+            infantry.extend(riflemen.iter().copied());
+            jeff_v1_1::south_route::order_push(actions, &tanks, &infantry, objective);
         }
         return Some(AiIntent::Attack { units: tanks });
     }
