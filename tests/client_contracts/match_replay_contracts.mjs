@@ -294,10 +294,9 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   {
     const selectionArea = { hidden: false };
     const commandCard = { hidden: false };
-    const giveUpConfirm = { hidden: false };
     dom.selectionArea = selectionArea;
     dom.commandCard = commandCard;
-    dom.giveUpConfirm = giveUpConfirm;
+    dom.giveUpConfirm = { hidden: false };
 
     const replayMatch = Object.create(Match.prototype);
     replayMatch.replayViewer = true;
@@ -305,7 +304,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     replayMatch.applySpectatorUi();
     assert(!selectionArea.hidden, "replay viewer shows the selected-unit HUD area for inspection");
     assert(commandCard.hidden, "replay viewer keeps command card hidden");
-    assert(giveUpConfirm.hidden, "replay viewer hides give-up confirmation");
+    assert(dom.giveUpConfirm.hidden, "replay viewer hides give-up confirmation");
 
     selectionArea.hidden = true;
     commandCard.hidden = true;
@@ -325,7 +324,6 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     labOperatorMatch.applySpectatorUi();
     assert(!selectionArea.hidden, "lab operator keeps the selected-unit HUD area visible");
     assert(!commandCard.hidden, "lab operator keeps the command card visible");
-
     liveMatch.state.spectator = true;
     liveMatch.applySpectatorUi();
     assert(!selectionArea.hidden, "live spectators see selected units and buildings for inspection");
