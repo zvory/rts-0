@@ -207,3 +207,35 @@ fn methamphetamines_halves_machine_gunner_setup_and_teardown() {
         "machine gunner should move after meth-shortened teardown completes"
     );
 }
+
+#[test]
+fn charge_has_150_active_combat_ticks_in_the_real_tick_loop() {
+    for kind in [EntityKind::Rifleman, EntityKind::Panzerfaust] {
+        let (mut game, unit, _goal) = meth_unit_fixture(kind, false);
+        game.state.players[0]
+            .upgrades
+            .insert(UpgradeKind::Methamphetamines);
+        game.enqueue(
+            1,
+            Command::UseAbility {
+                ability: ability::AbilityKind::Charge,
+                units: vec![unit],
+                x: None,
+                y: None,
+                queued: false,
+            },
+        );
+        for elapsed in 0..config::CHARGE_DURATION_TICKS {
+            game.tick();
+            let entity = game.state.entities.get(unit).unwrap();
+            assert_eq!(
+                entity.charge_ticks(),
+                config::CHARGE_DURATION_TICKS - elapsed
+            );
+        }
+        game.tick();
+        let entity = game.state.entities.get(unit).unwrap();
+        assert_eq!(entity.charge_ticks(), 0);
+        assert!(entity.ability_cooldown_ticks(ability::AbilityKind::Charge) > 0);
+    }
+}

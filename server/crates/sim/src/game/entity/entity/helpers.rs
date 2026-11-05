@@ -18,3 +18,21 @@ pub(super) fn construction_hp_for_progress(max_hp: u32, progress: u32, total: u3
         .unwrap_or(remaining_hp as u64) as u32;
     start_hp.saturating_add(gained_hp).min(max_hp)
 }
+
+impl super::Entity {
+    pub(crate) fn charge_ticks(&self) -> u16 {
+        if !crate::rules::is_rifle_infantry(self.kind) {
+            return 0;
+        }
+        let cooldown = self.ability_cooldown_ticks(crate::game::ability::AbilityKind::Charge);
+        if cooldown == 0 {
+            return 0;
+        }
+        // Movement decrements ability cooldowns before combat, including on activation.
+        // Discount that first decrement so combat receives all 150 boosted ticks.
+        let elapsed = crate::config::CHARGE_COOLDOWN_TICKS
+            .saturating_sub(cooldown)
+            .saturating_sub(1);
+        crate::config::CHARGE_DURATION_TICKS.saturating_sub(elapsed)
+    }
+}

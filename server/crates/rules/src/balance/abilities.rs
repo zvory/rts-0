@@ -2,6 +2,10 @@
 
 use super::TICK_HZ;
 
+/// Charge's active window is derived from its cooldown, so replay/checkpoint state stays unified.
+pub const CHARGE_DURATION_TICKS: u16 = (TICK_HZ as u16) * 5;
+pub const CHARGE_COOLDOWN_TICKS: u16 = (TICK_HZ as u16) * 20;
+
 pub const BREAKTHROUGH_RADIUS_TILES: f32 = 9.0;
 pub const BREAKTHROUGH_DURATION_TICKS: u16 = (TICK_HZ as u16) * 6;
 pub const BREAKTHROUGH_COOLDOWN_TICKS: u16 = (TICK_HZ as u16) * 25;

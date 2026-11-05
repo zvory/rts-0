@@ -217,10 +217,11 @@ pub(in crate::game) fn combat_system(
             };
             let (range_tiles, dmg, cd) = (profile.range_tiles, profile.dmg, profile.cooldown);
             let owner_has_meth = methamphetamines_researched(e.owner);
+            let charging = owner_has_meth && e.charge_ticks() > 0;
             let can_move_fire = can_fire_while_moving(e, owner_has_meth);
-            let cd = if e.kind == EntityKind::Rifleman && owner_has_meth {
+            let cd = if e.kind == EntityKind::Rifleman && charging {
                 config::METHAMPHETAMINES_RIFLEMAN_ATTACK_COOLDOWN_TICKS
-            } else if e.kind == EntityKind::Panzerfaust && owner_has_meth {
+            } else if e.kind == EntityKind::Panzerfaust && charging {
                 cd.saturating_mul(config::METHAMPHETAMINES_ATTACK_COOLDOWN_NUMERATOR)
                     / config::METHAMPHETAMINES_ATTACK_COOLDOWN_DENOMINATOR
             } else {
