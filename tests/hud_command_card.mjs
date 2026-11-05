@@ -66,6 +66,32 @@ function buttonSlots(card) {
 }
 
 {
+  const selection = [
+    { id: 1, owner: 1, kind: KIND.RIFLEMAN },
+    { id: 2, owner: 1, kind: KIND.PANZERFAUST },
+    { id: 3, owner: 1, kind: KIND.RIFLEMAN,
+      abilities: [{ ability: ABILITY.CHARGE, cooldownLeft: 300 }] },
+    { id: 4, owner: 2, kind: KIND.RIFLEMAN },
+    { id: 5, owner: 1, kind: KIND.WORKER },
+  ];
+  const chargeButton = (units, upgrades = [UPGRADE.METHAMPHETAMINES]) =>
+    buildCommandCardDescriptors({
+      playerId: 1,
+      selection: units,
+      upgrades,
+      resources: { steel: 0, oil: 0 },
+      playerHasCompleteKind: () => false,
+      groupCooldownClocks: testGroupCooldownClocks,
+    }).slots.find((slot) => slot?.ability === ABILITY.CHARGE);
+  const charge = chargeButton(selection);
+  assert.equal(charge.enabled, true, "ready Charge is usable despite being non-queueable");
+  assert.equal(charge.hotkey, "C");
+  assert.deepEqual(charge.intent.readyIds, [1, 2], "Charge activates every ready owned infantry carrier");
+  assert.equal(chargeButton(selection, []).enabled, false, "Charge requires research");
+  assert.equal(chargeButton([selection[2]]).enabled, false, "Charge cannot refresh during cooldown");
+}
+
+{
   const ids = slotIds(engineeringComplexCard());
   assert.equal(ids[0], null);
   assert.equal(ids[1], null);

@@ -563,7 +563,8 @@ export function selectedAbilityAffordances(ctx, selection) {
 }
 
 function intentReadyIds(definition, affordance) {
-  if (definition.targetMode !== "self" || affordance.readyUnits.length <= 1) {
+  if (definition.targetMode !== "self" || definition.ability === ABILITY.CHARGE ||
+      affordance.readyUnits.length <= 1) {
     return affordance.readyIds;
   }
   const center = averagePosition(affordance.readyUnits);
