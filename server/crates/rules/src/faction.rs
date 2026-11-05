@@ -390,21 +390,21 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 9] = [
         kind: AbilityKind::Charge,
         label: "Charge",
         icon: "CHG",
-        hotkey: Some("C"),
-        title: "Fire faster and shoot while moving for 5 seconds",
-        carriers: &[EntityKind::Rifleman, EntityKind::Panzerfaust],
+        hotkey: None,
+        title: "Legacy Charge command compatibility",
+        carriers: &[],
         target_mode: AbilityTargetMode::SelfTarget,
         range_tiles: None,
         min_range_tiles: None,
-        cooldown_ticks: balance::CHARGE_COOLDOWN_TICKS,
+        cooldown_ticks: 0,
         charges: None,
         charge_recharge_ticks: None,
         cost: ResourceCost::new(0, 0),
         tech_requirement: None,
-        upgrade_requirement: Some(UpgradeKind::Methamphetamines),
+        upgrade_requirement: None,
         queue_policy: AbilityQueuePolicy::NotQueueable,
         autocast: false,
-        command_card: true,
+        command_card: false,
         protocol_code: 1,
         order_stage_code: 8,
     },
@@ -1098,7 +1098,7 @@ mod tests {
         for carrier in SCOUT_PLANE_ABILITY_CARRIERS {
             assert!(catalog.allows_ability(AbilityKind::ScoutPlane, *carrier));
         }
-        assert!(catalog.allows_ability(AbilityKind::Charge, EntityKind::Rifleman));
+        assert!(!catalog.allows_ability(AbilityKind::Charge, EntityKind::Rifleman));
         assert!(!catalog.allows_ability(AbilityKind::DismissScoutPlane, EntityKind::ScoutPlane));
         assert!(!catalog.allows_ability(AbilityKind::Smoke, EntityKind::Worker));
     }
@@ -1221,12 +1221,9 @@ mod tests {
         assert_eq!(dismiss.order_stage_code, 18);
 
         let charge = ability_definition(AbilityKind::Charge);
-        assert!(charge.command_card);
-        assert_eq!(
-            charge.carriers,
-            &[EntityKind::Rifleman, EntityKind::Panzerfaust]
-        );
-        assert_eq!(charge.cooldown_ticks, balance::CHARGE_COOLDOWN_TICKS);
+        assert!(!charge.command_card);
+        assert!(charge.carriers.is_empty());
+        assert_eq!(charge.cooldown_ticks, 0);
 
         let teleport = EKAT_CATALOG.ability(AbilityKind::EkatTeleport).unwrap();
         assert_eq!(teleport.carriers, &[EntityKind::Ekat]);

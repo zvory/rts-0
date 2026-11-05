@@ -93,7 +93,7 @@ fn default_weapon_cooldown_cadence_matches_profiles() {
 }
 
 #[test]
-fn methamphetamines_alone_keeps_base_rifleman_cooldown() {
+fn methamphetamines_sets_rifleman_weapon_cooldown_to_sixteen_ticks() {
     let mut entities = EntityStore::new();
     let attacker_id = entities
         .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
@@ -107,41 +107,6 @@ fn methamphetamines_alone_keeps_base_rifleman_cooldown() {
         .set_order(Order::attack(target_id));
     let mut meth_player = player_state(1, false);
     meth_player.upgrades.insert(UpgradeKind::Methamphetamines);
-
-    run_combat_tick_with_players(&mut entities, &[meth_player, player_state(2, false)]);
-
-    assert_eq!(
-        entities
-            .get(attacker_id)
-            .expect("rifleman should exist")
-            .attack_cd(),
-        32
-    );
-}
-
-#[test]
-fn charge_sets_rifleman_weapon_cooldown_to_sixteen_ticks() {
-    let mut entities = EntityStore::new();
-    let attacker_id = entities
-        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
-        .expect("rifleman should spawn");
-    let target_id = entities
-        .spawn_unit(2, EntityKind::Rifleman, 140.0, 100.0)
-        .expect("target should spawn");
-    entities
-        .get_mut(attacker_id)
-        .expect("rifleman should exist")
-        .set_order(Order::attack(target_id));
-    let mut meth_player = player_state(1, false);
-    meth_player.upgrades.insert(UpgradeKind::Methamphetamines);
-
-    entities
-        .get_mut(attacker_id)
-        .unwrap()
-        .start_ability_cooldown(
-            crate::game::ability::AbilityKind::Charge,
-            config::CHARGE_COOLDOWN_TICKS,
-        );
 
     run_combat_tick_with_players(&mut entities, &[meth_player, player_state(2, false)]);
 
@@ -152,23 +117,4 @@ fn charge_sets_rifleman_weapon_cooldown_to_sixteen_ticks() {
             .attack_cd(),
         16
     );
-}
-
-#[test]
-fn charge_combat_bonuses_require_research_and_end_after_five_seconds() {
-    for kind in [EntityKind::Rifleman, EntityKind::Panzerfaust] {
-        let mut unit = crate::game::entity::Entity::new_unit(1, kind, 100.0, 100.0).unwrap();
-        assert!(!can_fire_while_moving(&unit, true));
-        unit.start_ability_cooldown(
-            crate::game::ability::AbilityKind::Charge,
-            config::CHARGE_COOLDOWN_TICKS,
-        );
-        assert!(!can_fire_while_moving(&unit, false));
-        unit.tick_ability_cooldowns(); // activation tick movement phase
-        for _ in 0..config::CHARGE_DURATION_TICKS {
-            assert!(can_fire_while_moving(&unit, true));
-            unit.tick_ability_cooldowns();
-        }
-        assert!(!can_fire_while_moving(&unit, true));
-    }
 }

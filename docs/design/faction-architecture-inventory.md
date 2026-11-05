@@ -135,7 +135,7 @@ Golem-converted tech buildings are still planned work.
 
 ## Current Ability Surface
 
-Current ability ids are Charge (Methamphetamines-gated infantry combat burst), Smoke, Mortar Fire, Point Fire,
+Current ability ids are Charge (legacy no-op compatibility only), Smoke, Mortar Fire, Point Fire,
 Breakthrough, Ekat Teleport, Ekat Line Shot, Ekat Magic Anchor, and Ekat Consume Golem. The Rust
 faction catalog in
 `server/crates/rules/src/faction.rs` is authoritative for ability id, carrier, target mode,

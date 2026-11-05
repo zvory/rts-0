@@ -215,13 +215,13 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   nearest-target acquisition, so drive-by fire tends to finish one enemy instead of spreading damage
   across every passing unit. Projection omits enemy `weaponFacing` when it would reveal a hidden
   target direction.
-- **Infantry Charge**: Methamphetamines permanently increases Rifleman and Panzerfaust speed,
-  but moving rifle fire and shorter rifle cooldowns require the five-second Charge window.
-  Charge validates ownership, carrier kind, completed research, and cooldown before activation.
-  While on a plain `Move` or active `AttackMove`, charging infantry only fire opportunistically
-  at enemies already in range and never create enemy-directed movement. Shots use normal accuracy;
-  moving Riflemen take full incoming damage. The active window derives from the existing ability
-  cooldown clock and projects owner-only through `abilities[].expiresIn`.
+- **Rifleman Methamphetamines fire**: upgraded riflemen gain permanent moving fire and keep their
+  movement path while firing at enemies in range instead of stopping to shoot. While on a plain
+  `Move` or active `AttackMove`, upgraded riflemen only fire opportunistically at enemies already in
+  range and never create enemy-directed movement. Moving Methamphetamines shots use normal rifleman
+  accuracy and do not add a movement miss roll; the upgrade sets their rifle cooldown to 16 ticks.
+  Moving Riflemen take full incoming damage. Legacy Charge commands have no eligible carriers and
+  cannot activate a status or cooldown.
 - **Scout car movement and weapon facing**: scout cars are light unarmored vehicles with a
   rear-mounted machine gun (higher damage, same range and cooldown as machine gunners). They use the
   same oriented-body/pathing/collision model as tanks and fire while moving, but they use simplified

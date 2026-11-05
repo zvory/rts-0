@@ -5,7 +5,7 @@ pub use crate::rules::faction::{AbilityKind, AbilityQueuePolicy, AbilityTargetMo
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AbilityEffectHook {
-    SelfStatus,
+    LegacyNoop,
     ReservedNoop,
     OwnedAreaStatus,
     DelayedWorld,
@@ -106,7 +106,7 @@ pub(in crate::game) fn from_planner_code(code: u16) -> Option<AbilityKind> {
 
 pub fn effect_hook(kind: AbilityKind) -> AbilityEffectHook {
     match kind {
-        AbilityKind::Charge => AbilityEffectHook::SelfStatus,
+        AbilityKind::Charge => AbilityEffectHook::LegacyNoop,
         AbilityKind::Smoke | AbilityKind::MortarFire | AbilityKind::Barrage => {
             AbilityEffectHook::DelayedWorld
         }
@@ -135,7 +135,7 @@ mod tests {
     fn existing_abilities_are_classified_by_effect_hook() {
         assert_eq!(
             definition(AbilityKind::Charge).effect_hook,
-            AbilityEffectHook::SelfStatus
+            AbilityEffectHook::LegacyNoop
         );
         assert_eq!(
             definition(AbilityKind::Smoke).effect_hook,

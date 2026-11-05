@@ -513,10 +513,6 @@ fn reloading_plain_move_acquires_once_keeps_moving_and_retains_its_target() {
         }
         let mut owner = player_state(1, false);
         if methamphetamines {
-            entities.get_mut(attacker).unwrap().start_ability_cooldown(
-                crate::game::ability::AbilityKind::Charge,
-                config::CHARGE_COOLDOWN_TICKS,
-            );
             owner.upgrades.insert(UpgradeKind::Methamphetamines);
         }
         let players = [owner, player_state(2, false)];
