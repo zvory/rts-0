@@ -429,9 +429,13 @@ mod tests {
         let los = LineOfSight::new(&map);
         for (from, to) in [((2, 4), (6, 4)), ((2, 2), (6, 6)), ((6, 6), (2, 2))] {
             assert!(!los.clear_between_world_points(
-                map.tile_center(from.0, from.1), map.tile_center(to.0, to.1)));
+                map.tile_center(from.0, from.1),
+                map.tile_center(to.0, to.1)
+            ));
             assert!(los.clear_between_world_points(
-                map.tile_center(from.0, from.1), map.tile_center(4, 4)));
+                map.tile_center(from.0, from.1),
+                map.tile_center(4, 4)
+            ));
         }
         assert!(los.clear_between_world_points(map.tile_center(2, 3), map.tile_center(6, 3)));
     }
