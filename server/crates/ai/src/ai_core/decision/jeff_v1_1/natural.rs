@@ -53,6 +53,8 @@ const FIGHT_TILES: f32 = 7.0;
 const HOME_TILES: f32 = 16.0;
 /// A unit off its post is sent back this often.
 const REORDER_TICKS: u32 = config::TICK_HZ * 3;
+/// A Rifleman not shooting with an enemy close is sent at it this often (`natfight`).
+const FIGHT_REORDER_TICKS: u32 = config::TICK_HZ * 2;
 /// A supporter home defense took keeps its post this long (`postreturn`).
 const AWAY_TICKS: u32 = config::TICK_HZ * 60;
 
@@ -316,7 +318,35 @@ pub(in crate::ai_core::decision) fn support(
                 && dist2(enemy.x, enemy.y, unit.x, unit.y) <= squared(FIGHT_TILES * ts)
         });
         // Away with home defense: its post waits for it.
-        if fighting || charging.contains(id) || defending.contains(id) {
+        if charging.contains(id) || defending.contains(id) {
+            continue;
+        }
+        if fighting {
+            // A Rifleman not shooting closes on the nearest enemy (`natfight`). Held on its post
+            // it stood at the edge of its reach while Panzerfausts, with the same 5 tiles, and a
+            // Tank shot the line apart: The River against Pressure AI, 19 Riflemen to 6 in 20 s.
+            let idle_under_fire = !super::off("natfight")
+                && unit.kind == EntityKind::Rifleman
+                && unit.state != AiEntityState::Attack
+                && tick.saturating_sub(last) >= FIGHT_REORDER_TICKS;
+            let nearest = observation
+                .visible_enemies
+                .iter()
+                .filter(|enemy| {
+                    enemy.hp > 0 && enemy.kind.is_unit() && enemy.kind != EntityKind::Worker
+                })
+                .min_by(|a, b| {
+                    dist2(a.x, a.y, unit.x, unit.y)
+                        .total_cmp(&dist2(b.x, b.y, unit.x, unit.y))
+                        .then(a.id.cmp(&b.id))
+                })
+                .filter(|enemy| dist2(enemy.x, enemy.y, unit.x, unit.y) <= squared(FIGHT_TILES * ts));
+            if let Some(enemy) = nearest.filter(|_| idle_under_fire) {
+                if actions::attack_move_units(actions, [*id], enemy.x, enemy.y).is_some() {
+                    memory.jeff_v1_1.natural.support.insert(*id, tick);
+                    sent.push(*id);
+                }
+            }
             continue;
         }
         let on_post = dist2(unit.x, unit.y, post.0, post.1) <= squared(ON_POST_TILES * ts);
