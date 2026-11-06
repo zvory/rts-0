@@ -81,7 +81,7 @@ impl Game {
     /// Pump Jack footprint would collide with non-oil resources while preserving Resource Depot
     /// resource-distance bounds. Schema-v5 doodads are catalog-validated and id-canonicalized.
     /// Tree species share a 4.5px authoritative circular trunk. Vehicles use exact trunk
-    /// standability; infantry use finite path cost plus best-effort local steering with pass-through.
+    /// standability; infantry use finite tree path cost with pass-through, without tree-avoidance steering.
     /// Wildflowers remain presentation-only. Lab-restored oil nodes are normalized to passable tile centers and
     /// keep one free tile between oil patches.
     /// AI players are spawned as normal match participants; external AI orchestration owns any
@@ -563,7 +563,7 @@ Map policy:
   required forest array are rejected rather than migrated.
 - `GameState.map` remains authoritative runtime state because systems read terrain, selected starts,
   permanent base sites, six sparse gameplay-overlay tile sets, vehicle tree-trunk collision, and
-  infantry tree path-cost/local-steering data on every tick, while start/export
+  infantry tree path-cost data on every tick, while start/export
   boundaries read all static doodads. Internal cold checkpoints may still clone the full `Map` while
   they are private test machinery.
 - `GameCheckpointV1` never embeds map JSON, terrain bytes, starts, base-site bodies, or doodad bodies. It
