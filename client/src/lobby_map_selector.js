@@ -28,10 +28,6 @@ export const LOBBY_MAP_PRESENTATION = Object.freeze({
     author: "Alex",
     preview: "/assets/map-previews/classic.jpg",
   }),
-  "Classic V2": Object.freeze({
-    author: "Alex",
-    preview: "/assets/map-previews/classic-v2.jpg",
-  }),
   Chokes: Object.freeze({
     author: "Alex",
     preview: "/assets/map-previews/chokes.jpg",

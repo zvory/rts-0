@@ -251,20 +251,11 @@ mod tests {
             }
         }
 
-        let classic_v2 = available
-            .iter()
-            .find(|entry| entry.name == "Classic V2")
-            .expect("Classic V2 should be listed separately from Classic");
-        assert_eq!(classic_v2.min_players, 1);
-        assert_eq!(classic_v2.max_players, 2);
-        let classic_v2_map = Map::load("Classic V2", 2, 0x1234_5678)
-            .expect("Classic V2 should load for two active players");
-        assert_eq!((classic_v2_map.width, classic_v2_map.height), (189, 126));
-        assert_eq!(classic_v2_map.base_sites.len(), 12);
-        assert_ne!(
-            Map::metadata_for_name("Classic").unwrap().content_hash,
-            Map::metadata_for_name("Classic V2").unwrap().content_hash,
-        );
+        assert!(available.iter().all(|entry| entry.name != "Classic V2"));
+        for name in ["Classic V2", "classic-v2"] {
+            assert!(Map::load(name, 2, 0x1234_5678).is_err());
+            assert!(Map::metadata_for_name(name).is_err());
+        }
 
         let one_v_one = available
             .iter()
