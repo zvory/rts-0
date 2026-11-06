@@ -370,3 +370,102 @@ fn scout_plane_sight_does_not_gain_an_elevation_bonus() {
     assert!(fog.is_visible(1, origin_tile.0 + base_sight, origin_tile.1));
     assert!(!fog.is_visible(1, origin_tile.0 + base_sight + 1, origin_tile.1));
 }
+
+/// Deliberately evaluates every eligible ray, including cells already visible. Keep this
+/// independent reference when optimizing the additive sight-stamping path.
+fn reference_stamp_sight(grid: &mut [bool], entity: &Entity, map: &Map, los: &LineOfSight<'_>) {
+    let radius = sight_tiles_at_elevation(map, entity.pos_x, entity.pos_y, entity.sight_tiles());
+    if radius == 0 {
+        return;
+    }
+    let origins = if entity.is_building() {
+        building_footprint(map, entity)
+            .into_iter()
+            .filter(|&(x, y)| x < map.width && y < map.height)
+            .map(|(x, y)| map.tile_center(x, y))
+            .collect::<Vec<_>>()
+    } else {
+        vec![(entity.pos_x, entity.pos_y)]
+    };
+    for origin in origins {
+        let origin_tile = map.tile_of(origin.0, origin.1);
+        for y in 0..map.height {
+            for x in 0..map.width {
+                let dx = i64::from(x) - i64::from(origin_tile.0);
+                let dy = i64::from(y) - i64::from(origin_tile.1);
+                let radius = i64::from(radius);
+                let in_range = if entity.is_building() {
+                    dx.abs() <= radius && dy.abs() <= radius
+                } else {
+                    dx * dx + dy * dy <= radius * radius
+                };
+                if in_range && los.tile_visible_from_world(origin, (x, y)) {
+                    grid[(y * map.width + x) as usize] = true;
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn overlapping_sight_matches_all_rays_reference_with_terrain_buildings_and_smoke() {
+    use rand::{rngs::SmallRng, Rng, SeedableRng};
+
+    for seed in 0..12 {
+        let mut rng = SmallRng::seed_from_u64(seed);
+        let mut map = open_map(32);
+        map.elevation = (0..map.width * map.height)
+            .map(|_| rng.gen_range(0..10))
+            .collect();
+        for y in 0..map.height {
+            for x in 0..map.width {
+                if rng.gen_ratio(1, 12) {
+                    map.terrain[(y * map.width + x) as usize] = terrain::ROCK;
+                }
+                if rng.gen_ratio(1, 8) {
+                    map.concealment_tiles.push((x, y));
+                }
+            }
+        }
+        map.concealment_tiles.sort_unstable();
+        let mut entities = EntityStore::new();
+        for i in 0..20 {
+            // Cluster most sources to exercise repeated union writes, including within one
+            // building footprint. Include edge sources and off-center unit positions too.
+            let (x, y) = if i < 16 {
+                (rng.gen_range(12..20), rng.gen_range(12..20))
+            } else {
+                (rng.gen_range(0..32), rng.gen_range(0..32))
+            };
+            let center = map.tile_center(x, y);
+            if i % 3 == 0 {
+                entities
+                    .spawn_building(1, EntityKind::Barracks, center.0, center.1, true)
+                    .expect("reference building should spawn");
+            } else {
+                entities
+                    .spawn_unit(
+                        1,
+                        EntityKind::Worker,
+                        center.0 + rng.gen_range(-7.0..7.0),
+                        center.1 + rng.gen_range(-7.0..7.0),
+                    )
+                    .expect("reference unit should spawn");
+            }
+        }
+        let mut smoke = SmokeCloudStore::new();
+        if seed % 2 == 0 {
+            let center = map.tile_center(19, 18);
+            smoke.spawn(center.0, center.1, 2.5, 100, 0).unwrap();
+        }
+        let mask = BuildingLosMask::new(&entities, &map);
+        let los = LineOfSight::with_smoke_and_building_blockers(&map, &smoke, &mask.blockers);
+        let mut actual = vec![false; (map.width * map.height) as usize];
+        let mut expected = actual.clone();
+        for entity in entities.iter() {
+            stamp_sight(&mut actual, map.width, map.height, entity, &map, &los);
+            reference_stamp_sight(&mut expected, entity, &map, &los);
+            assert_eq!(actual, expected, "seed={seed} after entity={}", entity.id);
+        }
+    }
+}
