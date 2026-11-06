@@ -1833,7 +1833,12 @@ where
         decision.trace.notes.extend(jeff_v1_1::resume::trace_line(memory));
         decision.trace.notes.push(memory.jeff_v1_1.natclear.trace());
         if jeff_v1_1::stations::active(profile.id) {
-            decision.trace.stations = Some(memory.jeff_v1_1.stations.trace());
+            decision.trace.stations = Some(format!(
+                "{} call={} launched={}",
+                memory.jeff_v1_1.stations.trace(),
+                memory.jeff_v1_1.push.call_trace(),
+                memory.containment.wave_launched
+            ));
         }
         decision.trace.notes.push(jeff_v1_1::south_route::trace(memory));
         decision.trace.strike = Some(format!(

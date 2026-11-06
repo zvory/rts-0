@@ -98,6 +98,15 @@ const CONVOY_JOIN_TILES: f32 = 10.0;
 const CONVOY_REORDER_TICKS: u32 = config::TICK_HZ * 3;
 /// `strikebig`: a gathering group calls the push back only when worth this share of the push.
 const STRIKE_SHARE: f32 = 0.25;
+/// `pushstation`: enemies this close to a base's Depot or extractors (those within
+/// `CALL_MINE_TILES` of it) call the push when they outweigh Jeff's other fighters there this many
+/// times; the push answers from this far, when it and those fighters together outweigh the force
+/// `ANSWER_RATIO` times.
+const CALL_TILES: f32 = 16.0;
+const CALL_MINE_TILES: f32 = 12.0;
+const CALL_MARGIN: f32 = 1.2;
+const ANSWER_TILES: f32 = 45.0;
+const ANSWER_RATIO: f32 = 1.0;
 /// `goin`: the push drives into enemy bases once it outweighs every enemy fighter remembered this
 /// many times.
 const GOIN_RATIO: f32 = 2.0;
@@ -168,6 +177,8 @@ pub(in crate::ai_core::decision) struct PushMemory {
     going_in: bool,
     /// The most enemy Tanks remembered at once within `PEAK_TANK_TICKS`, and when.
     peak_tanks: (usize, u32),
+    /// `pushstation`: the heaviest call looked at this decision, for the trace.
+    call: String,
 }
 
 impl PushMemory {
@@ -189,6 +200,11 @@ impl PushMemory {
     /// Whether a gathering enemy group is being struck.
     pub(in crate::ai_core::decision) fn striking(&self) -> bool {
         self.strike.is_some()
+    }
+
+    /// `pushstation`: the heaviest base call looked at last, for the trace.
+    pub(in crate::ai_core::decision) fn call_trace(&self) -> &str {
+        &self.call
     }
 }
 
@@ -510,6 +526,118 @@ fn note_strike(observation: &AiObservation, memory: &mut AiDecisionMemory, ours:
     }
 }
 
+/// `pushstation`: the launched push is one of Jeff's Tank stations (`stations`), and a base calls
+/// it home like any other. On Crossroads against Pressure AI the push's 11 Tanks held their anchor
+/// 25 tiles from the third while a wave of 8 Tanks and 9 Panzerfausts walked past them to it, where
+/// 1 of Jeff's 15 Tanks stood: the strike rule wanted the push alone 1.5 times the wave.
+///
+/// A base calls when an enemy force worth at least a Tank stands within `CALL_TILES` of its Depot
+/// or extractors and outweighs Jeff's other fighters there `CALL_MARGIN` times. The push answers
+/// when its centre lies within `ANSWER_TILES` of the base and it and those fighters together at
+/// least match the force: it strikes the force, the base calling with the largest shortfall first,
+/// and takes up its anchor or raid again once the force is gone (`STRIKE_MEMORY_TICKS` unseen).
+fn answer_base(observation: &AiObservation, memory: &mut AiDecisionMemory, ours: f32, units: &[u32]) {
+    memory.jeff_v1_1.push.call.clear();
+    if super::off("pushstation") {
+        return;
+    }
+    if memory.jeff_v1_1.push.strike.is_some() {
+        memory.jeff_v1_1.push.call = "striking".to_string();
+        return;
+    }
+    let tanks: Vec<u32> = memory.containment.active_tanks.iter().copied().collect();
+    let Some(center) = super::super::frontal::group_center(observation, &tanks) else {
+        return;
+    };
+    // The heaviest force at any base, answered or not, for the trace.
+    let mut heaviest: Option<(f32, String)> = None;
+    let ts = observation.map.tile_size as f32;
+    let depots: Vec<&AiEntitySummary> = observation
+        .owned
+        .iter()
+        .filter(|unit| unit.kind == EntityKind::ResourceDepot && unit.is_complete && unit.hp > 0)
+        .collect();
+    let mut call: Option<(f32, (f32, f32))> = None;
+    for depot in &depots {
+        let far = dist2(center.0, center.1, depot.x, depot.y) > squared(ANSWER_TILES * ts);
+        let sites: Vec<(f32, f32)> = std::iter::once((depot.x, depot.y))
+            .chain(
+                observation
+                    .owned
+                    .iter()
+                    .filter(|unit| {
+                        matches!(unit.kind, EntityKind::SteelMine | EntityKind::PumpJack)
+                            && unit.hp > 0
+                            && dist2(unit.x, unit.y, depot.x, depot.y)
+                                <= squared(CALL_MINE_TILES * ts)
+                            && depots.iter().all(|other| {
+                                dist2(unit.x, unit.y, depot.x, depot.y)
+                                    <= dist2(unit.x, unit.y, other.x, other.y)
+                            })
+                    })
+                    .map(|unit| (unit.x, unit.y)),
+            )
+            .collect();
+        let near = |x: f32, y: f32| {
+            sites
+                .iter()
+                .any(|site| dist2(x, y, site.0, site.1) <= squared(CALL_TILES * ts))
+        };
+        let force: Vec<&AiEntitySummary> = observation
+            .visible_enemies
+            .iter()
+            .filter(|enemy| is_fighter(enemy.kind) && enemy.hp > 0 && near(enemy.x, enemy.y))
+            .collect();
+        let value: f32 = force.iter().map(|enemy| unit_value(enemy.kind) as f32).sum();
+        if force.is_empty() || value < unit_value(EntityKind::Tank) as f32 {
+            continue;
+        }
+        let local: f32 = observation
+            .owned
+            .iter()
+            .filter(|unit| {
+                is_fighter(unit.kind)
+                    && unit.is_complete
+                    && unit.hp > 0
+                    && !units.contains(&unit.id)
+                    && near(unit.x, unit.y)
+            })
+            .map(|unit| unit_value(unit.kind) as f32)
+            .sum();
+        let verdict = if far {
+            "far"
+        } else if value <= local * CALL_MARGIN {
+            "held"
+        } else if ours + local < value * ANSWER_RATIO {
+            "weak"
+        } else {
+            "answer"
+        };
+        if heaviest.as_ref().is_none_or(|(best, _)| value > *best) {
+            heaviest = Some((
+                value,
+                format!("{} v{:.0} l{:.0} o{:.0} {verdict}", depot.id, value, local, ours),
+            ));
+        }
+        if verdict != "answer" {
+            continue;
+        }
+        let n = force.len() as f32;
+        let at = (
+            force.iter().map(|enemy| enemy.x).sum::<f32>() / n,
+            force.iter().map(|enemy| enemy.y).sum::<f32>() / n,
+        );
+        let shortfall = value - local;
+        if call.is_none_or(|(best, _)| shortfall > best) {
+            call = Some((shortfall, at));
+        }
+    }
+    if let Some((_, at)) = call {
+        memory.jeff_v1_1.push.strike = Some((stored(at), observation.tick));
+    }
+    memory.jeff_v1_1.push.call = heaviest.map(|(_, text)| text).unwrap_or_default();
+}
+
 /// A place the push might raid: where, and what is there.
 struct Candidate {
     at: (f32, f32),
@@ -781,6 +909,7 @@ pub(in crate::ai_core::decision) fn objective(
     let units = push_units(memory);
     let ours = push_army(observation, &units, 0);
     note_strike(observation, memory, ours);
+    answer_base(observation, memory, ours, &units);
     memory.jeff_v1_1.push.short = memory.jeff_v1_1.push.strike.is_some();
     if let Some((at, _)) = memory.jeff_v1_1.push.strike {
         memory.approach.force(None);
