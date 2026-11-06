@@ -13,6 +13,8 @@ use rts_sim::protocol::{kinds, MapInfo, PlayerStart, ResourceNode, StartPayload}
 
 mod base_sites;
 mod chokes;
+mod context;
+pub(crate) use context::AiStaticMapContextCache;
 mod overlays;
 mod regions;
 mod routes;
@@ -237,69 +239,6 @@ pub(crate) struct AiMapAnalysisDebugSnapshot {
     pub(crate) chokes: Vec<AiMapChoke>,
     pub(crate) starts: Vec<AiStartMapping>,
     pub(crate) resource_clusters: Vec<AiResourceCluster>,
-}
-
-#[derive(Clone, Debug)]
-pub(crate) struct AiStaticMapContext {
-    key: AiMapAnalysisKey,
-    analysis: AiMapAnalysis,
-    diagnostics: ObserverMapAnalysisDiagnostics,
-    base_sites: Vec<crate::sdk::AiBaseSite>,
-}
-
-impl AiStaticMapContext {
-    fn analyze_with_key(start: &StartPayload, key: AiMapAnalysisKey) -> Self {
-        let analysis = AiMapAnalysis::analyze_with_key(start, key);
-        let diagnostics = analysis.debug_overlay();
-        let base_sites = analysis.sdk_base_sites();
-        Self {
-            key,
-            analysis,
-            diagnostics,
-            base_sites,
-        }
-    }
-
-    pub(crate) fn base_sites(&self) -> &[crate::sdk::AiBaseSite] {
-        &self.base_sites
-    }
-
-    pub(crate) fn key(&self) -> AiMapAnalysisKey {
-        self.key
-    }
-
-    pub(crate) fn analysis(&self) -> &AiMapAnalysis {
-        &self.analysis
-    }
-
-    pub(crate) fn diagnostics(&self) -> &ObserverMapAnalysisDiagnostics {
-        &self.diagnostics
-    }
-}
-
-#[derive(Clone, Debug, Default)]
-pub(crate) struct AiStaticMapContextCache {
-    context: Option<AiStaticMapContext>,
-}
-
-impl AiStaticMapContextCache {
-    pub(crate) fn get_or_analyze(&mut self, start: &StartPayload) -> &AiStaticMapContext {
-        let key = AiMapAnalysisKey::from_start(start);
-        let refresh = self
-            .context
-            .as_ref()
-            .map(|context| context.key() != key)
-            .unwrap_or(true);
-        if refresh {
-            self.context = None;
-        }
-        self.context
-            .get_or_insert_with(|| AiStaticMapContext::analyze_with_key(start, key))
-    }
-
-    pub(crate) fn current(&self) -> Option<&AiStaticMapContext> {
-        self.context.as_ref()
-    }
 }
 
 struct AiMapTileLookups<'a> {
