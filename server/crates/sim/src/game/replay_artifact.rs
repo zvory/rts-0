@@ -40,6 +40,21 @@ pub(in crate::game) struct ReplayStartStateV1 {
     pub(in crate::game) checkpoint_payload: String,
 }
 
+/// Administrative removal applied after the recorded tick, including tick zero.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ReplayElimination {
+    pub tick: u32,
+    pub player_id: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ReplayEndStateHash {
+    pub algorithm: String,
+    pub digest: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ReplayArtifactV1 {
@@ -63,6 +78,10 @@ pub struct ReplayArtifactV1 {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub conclusion: Option<MatchConclusion>,
     pub final_scores: Vec<PlayerScore>,
+    #[serde(default)]
+    pub eliminations: Vec<ReplayElimination>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub end_state_hash: Option<ReplayEndStateHash>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -153,6 +172,7 @@ pub struct ReplayStartComposition {
     server_build_sha: String,
     start_state: ReplayStartStateV1,
     start_tick: u32,
+    eliminations: Vec<ReplayElimination>,
     player_loadouts: Vec<PlayerStartingLoadout>,
     players: Vec<PlayerInit>,
 }
@@ -180,9 +200,18 @@ impl ReplayStartComposition {
                 checkpoint_payload,
             },
             start_tick: game.tick_count(),
+            eliminations: Vec::new(),
             player_loadouts: game.starting_loadouts().to_vec(),
             players: game.player_inits(),
         })
+    }
+
+    /// Record room-authored give-up/disconnect removal at the current post-tick boundary.
+    pub fn record_elimination(&mut self, game: &Game, player_id: u32) {
+        self.eliminations.push(ReplayElimination {
+            tick: game.tick_count(),
+            player_id,
+        });
     }
 
     pub fn finalize(
@@ -197,6 +226,23 @@ impl ReplayStartComposition {
         debug_assert_eq!(self.start_state.map_content_hash, map.content_hash);
         debug_assert_eq!(self.start_state.seed, game.seed());
         debug_assert!(game.tick_count() >= self.start_tick);
+        let started = std::time::Instant::now();
+        let end_state_hash = match game.replay_end_state_hash() {
+            Ok(digest) => Some(ReplayEndStateHash {
+                algorithm: super::checkpoint::END_STATE_HASH_ALGORITHM.to_string(),
+                digest,
+            }),
+            Err(error) => {
+                tracing::warn!(%error, "replay end-state hash capture failed");
+                None
+            }
+        };
+        tracing::info!(
+            hash_us = started.elapsed().as_micros() as u64,
+            tick = game.tick_count(),
+            captured = end_state_hash.is_some(),
+            "replay end-state hash capture finished"
+        );
         ReplayArtifactV1 {
             artifact_schema_version: REPLAY_ARTIFACT_CURRENT_SCHEMA_VERSION,
             server_build_sha: self.server_build_sha.clone(),
@@ -219,6 +265,8 @@ impl ReplayStartComposition {
             winner_team_id: winner_id.and_then(|id| game.team_of_player(id)),
             conclusion: None,
             final_scores,
+            eliminations: self.eliminations.clone(),
+            end_state_hash,
         }
     }
 }

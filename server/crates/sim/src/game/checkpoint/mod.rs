@@ -24,6 +24,8 @@ use super::{setup, Game, MapMetadata, PlayerStartingLoadout};
 mod anti_tank_gun_memory;
 mod conversion;
 mod error;
+mod fingerprint;
+pub(in crate::game) use fingerprint::END_STATE_HASH_ALGORITHM;
 mod metadata;
 mod player_dto;
 mod validation;

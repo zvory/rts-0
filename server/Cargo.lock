@@ -1434,6 +1434,7 @@ dependencies = [
  "rts-rules",
  "serde",
  "serde_json",
+ "sha2",
  "tracing",
 ]
 
