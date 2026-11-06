@@ -217,6 +217,22 @@ pub(super) fn stage_home_riflemen(
                 .total_cmp(&geometry::dist2(right.x, right.y, own_base.0, own_base.1))
         })
         .map(|entity| entity.id);
+    // Jeff's AI V1.1 (`mainfront`): on the main's line, in front of the stationed Tanks.
+    if is_jeff_v1_1(profile.id) && !jeff_v1_1::off("mainfront") {
+        if let Some(units) = jeff_v1_1::base_line::stage_main(
+            actions,
+            observation,
+            map_analysis,
+            memory,
+            &riflemen,
+            false,
+        ) {
+            if !units.is_empty() {
+                intents.push(AiIntent::Stage { units });
+            }
+            return;
+        }
+    }
     if let Some(enemy_base) = facts.nearest_public_enemy_base {
         let staged = if uses_current_jeff_defense(profile.id) {
             stage_home_defensive_pocket_riflemen(

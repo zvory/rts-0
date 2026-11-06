@@ -124,6 +124,14 @@ impl StationMemory {
     pub(in crate::ai_core::decision) fn posted_out(&self, id: u32) -> bool {
         matches!(self.rifle_post(id), Some(RiflePost::Base(_)))
     }
+
+    /// Tanks on a station now, not away with another system (`breakout` lends them out).
+    pub(in crate::ai_core::decision) fn stationed(&self) -> impl Iterator<Item = u32> + '_ {
+        self.posts
+            .keys()
+            .copied()
+            .filter(|id| !self.away.contains_key(id))
+    }
 }
 
 /// Whether Jeff's AI V1.1 stations its Tanks.
@@ -534,20 +542,33 @@ pub(in crate::ai_core::decision) fn station(
         .or_else(|| enemy_start.and_then(|start| normalized_direction(home, start)))
         .unwrap_or((1.0, 0.0));
     let mut stations: Vec<Station> = Vec::new();
+    let lines = super::base_line::base_lines(observation, map_analysis, &memory.jeff_v1_1.base_lines.contacts);
+    // `mainfront`: the main's Tanks stand behind the main's line, which faces where the enemy walks
+    // in, so its infantry stands in front of them; the home post faced the straight line to the
+    // enemy start and put them out in front of the infantry.
+    let main_line = (!super::off("mainfront"))
+        .then(|| lines.iter().position(|line| line.main))
+        .flatten();
     if let Some(main) = main {
+        let (center, facing) = match main_line {
+            Some(index) => (
+                lines[index].tank_points(1, ts).first().copied().unwrap_or(main_center),
+                lines[index].facing(),
+            ),
+            None => (main_center, main_facing),
+        };
         stations.push(Station {
             anchor: main.depot,
             bases: vec![main.depot],
-            center: main_center,
-            facing: main_facing,
-            line: None,
+            center,
+            facing,
+            line: main_line,
             remote: 1.0,
             weight: main.extractors.len() as f32 + MAIN_WEIGHT,
             floor: floor_of(main.depot),
             main: true,
         });
     }
-    let lines = super::base_line::base_lines(observation, map_analysis, &memory.jeff_v1_1.base_lines.contacts);
     for (index, line) in lines.iter().enumerate() {
         if line.main {
             continue;

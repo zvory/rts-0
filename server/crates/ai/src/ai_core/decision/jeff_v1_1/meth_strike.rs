@@ -80,6 +80,26 @@ const OUT_FALLBACK_TILES: f32 = 25.0;
 const NATURAL_REACHED_TILES: f32 = 8.0;
 const WORKER_TILES: f32 = 14.0;
 const NATURAL_WAIT_TICKS: u32 = config::TICK_HZ * 15;
+/// `openfight`: the fight in the middle Rifleman by Rifleman. All four on the weakest enemy lost the
+/// first fight on Crossroads, Schone Tage and The River in every game of the b4 120 (Jeff lost 108
+/// starters and killed 56 vs Pressure there, 110 for 10 vs Rush): the squad walked in single file so
+/// the lead met all four enemies alone, and once an enemy Rifleman was wounded Pressure and Rush walked
+/// it away while all four followed it 5.5-7 tiles back, out of their own reach, past the three still
+/// shooting them from 1-3 tiles. Now each Rifleman shoots the weakest enemy in its reach, spreading
+/// shots so none are wasted; with nothing in reach it goes for the nearest enemy not walking away; the
+/// lead waits for the rest at first contact; and a wounded Rifleman under fire steps back.
+/// A Rifleman at or below `PULL_HP` that an enemy shoots at steps `PULL_TILES` away for `PULL_TICKS`.
+const PULL_HP: u32 = 15;
+const PULL_TILES: f32 = 3.0;
+const PULL_TICKS: u32 = 45;
+/// At first contact a Rifleman this much nearer the enemy than the squad's last holds, for at most
+/// `REGROUP_TICKS`.
+const REGROUP_TILES: f32 = 2.0;
+const REGROUP_TICKS: u32 = config::TICK_HZ * 2;
+/// An enemy that moved this far away from the squad since the last decision is walking away.
+const LEAVING_TILES: f32 = 0.15;
+/// Mirrors the simulation combat service's range slack.
+const SIM_RANGE_SLACK_PX: f32 = 4.0;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 enum Phase {
@@ -114,6 +134,14 @@ pub(in crate::ai_core::decision) struct MethStrikeMemory {
     /// `wideswing`: the enemy natural's field, and whether the squad has been there after the raid.
     natural: Option<(i32, i32)>,
     at_natural_since: Option<u32>,
+    /// `openfight`: wounded Riflemen stepping back, until when; each Rifleman's last target; where
+    /// each enemy near stood at the last decision; when the first contact began; who holds for the
+    /// rest to come up.
+    pulled: BTreeMap<u32, u32>,
+    aim: BTreeMap<u32, u32>,
+    seen: BTreeMap<u32, (i32, i32)>,
+    contact_since: Option<u32>,
+    holding: BTreeSet<u32>,
 }
 
 impl MethStrikeMemory {
@@ -233,7 +261,18 @@ pub(in crate::ai_core::decision) fn strike(
                     })
                 })
                 .collect();
-            if let Some(target) = near.iter().min_by(|a, b| a.hp.cmp(&b.hp).then(a.id.cmp(&b.id))) {
+            if !super::off("openfight") {
+                if !near.is_empty() {
+                    fight(actions, intents, observation, state, &squad, &near);
+                    state.fought = true;
+                    for id in &ids {
+                        state.sent.insert(*id, None);
+                    }
+                    return;
+                }
+            } else if let Some(target) =
+                near.iter().min_by(|a, b| a.hp.cmp(&b.hp).then(a.id.cmp(&b.id)))
+            {
                 state.fought = true;
                 if let Some(units) = actions::attack_units(actions, ids.iter().copied(), target.id) {
                     intents.push(AiIntent::Attack { units });
@@ -243,6 +282,7 @@ pub(in crate::ai_core::decision) fn strike(
                 }
                 return;
             }
+            state.holding.clear();
             let across = share(mid, main, enemy_main);
             if state.fought || across >= SNEAK_FROM {
                 state.phase = Phase::Sneak;
@@ -256,10 +296,186 @@ pub(in crate::ai_core::decision) fn strike(
             sneak(actions, intents, observation, map_analysis, state, &squad, side, flank, enemy_main);
         }
         Phase::Sneak => {
+            // `openfight`: before Meth a Rifleman cannot shoot on the move, so the sneak stops and
+            // fights what comes near instead of walking on past it. On Classic two wounded Pressure
+            // Riflemen that stepped back out of the fight shot the sneaking squad for 20 s.
+            let meth = observation.upgrades.contains(&UpgradeKind::Methamphetamines);
+            if !super::off("openfight") && !meth {
+                let near: Vec<&AiEntitySummary> = fighters
+                    .iter()
+                    .copied()
+                    .filter(|enemy| {
+                        squad.iter().any(|unit| {
+                            dist2(enemy.x, enemy.y, unit.x, unit.y) <= squared(ENGAGE_TILES * ts)
+                        })
+                    })
+                    .collect();
+                if !near.is_empty() {
+                    fight(actions, intents, observation, state, &squad, &near);
+                    for id in &ids {
+                        state.sent.insert(*id, None);
+                    }
+                    return;
+                }
+            }
+            state.holding.clear();
             sneak(actions, intents, observation, map_analysis, state, &squad, side, flank, enemy_main);
         }
         Phase::Raid => raid(actions, observation, intents, state, &squad, &fighters, enemy_main, flank),
         Phase::Natural => to_natural(actions, observation, intents, state, &squad, &fighters),
+    }
+}
+
+/// `openfight`: the fight in the middle, Rifleman by Rifleman (see `PULL_HP`). It lasts while any
+/// enemy fighter stands within `ENGAGE_TILES`: one walking away is never chased, the squad stands.
+fn fight(
+    actions: &mut AiActionContext<'_>,
+    intents: &mut Vec<AiIntent>,
+    observation: &AiObservation,
+    state: &mut MethStrikeMemory,
+    squad: &[&AiEntitySummary],
+    near: &[&AiEntitySummary],
+) {
+    let tick = observation.tick;
+    let ts = observation.map.tile_size as f32;
+    let weapon = rts_rules::combat::default_weapon_profile(EntityKind::Rifleman);
+    let radius = rts_rules::defs::unit_def(EntityKind::Rifleman).map_or(9.0, |def| def.stats.radius);
+    let reach = weapon.map_or(5.0, |w| w.range_tiles) * ts + radius + SIM_RANGE_SLACK_PX;
+    let damage = weapon.map_or(5, |w| w.dmg).max(1);
+    let mid = center(squad.iter().copied());
+    // Enemies walking away from the squad since the last decision.
+    let leaving: BTreeSet<u32> = near
+        .iter()
+        .filter(|enemy| {
+            state.seen.get(&enemy.id).is_some_and(|&(x, y)| {
+                let Some(out) = normalized_direction(mid, (enemy.x, enemy.y)) else {
+                    return false;
+                };
+                (enemy.x - x as f32) * out.0 + (enemy.y - y as f32) * out.1 > LEAVING_TILES * ts
+            })
+        })
+        .map(|enemy| enemy.id)
+        .collect();
+    state.seen = near
+        .iter()
+        .map(|enemy| (enemy.id, (enemy.x.round() as i32, enemy.y.round() as i32)))
+        .collect();
+    let in_reach = |unit: &AiEntitySummary, enemy: &AiEntitySummary| {
+        dist2(unit.x, unit.y, enemy.x, enemy.y) <= squared(reach)
+    };
+    // A wounded Rifleman under fire steps back while any of the squad is still healthy.
+    state
+        .pulled
+        .retain(|id, until| *until > tick && squad.iter().any(|unit| unit.id == *id));
+    let healthy = squad.iter().any(|unit| unit.hp > PULL_HP);
+    for unit in squad {
+        if !healthy || unit.hp > PULL_HP || state.pulled.contains_key(&unit.id) {
+            continue;
+        }
+        if !near.iter().any(|enemy| enemy.target_id == Some(unit.id)) {
+            continue;
+        }
+        let Some(threat) = near.iter().min_by(|a, b| {
+            dist2(a.x, a.y, unit.x, unit.y)
+                .total_cmp(&dist2(b.x, b.y, unit.x, unit.y))
+                .then(a.id.cmp(&b.id))
+        }) else {
+            continue;
+        };
+        let to = away((threat.x, threat.y), (unit.x, unit.y), PULL_TILES * ts, observation);
+        if let Some(units) = actions::move_units(actions, [unit.id], to.0, to.1) {
+            intents.push(AiIntent::Assemble { units });
+        }
+        state.pulled.insert(unit.id, tick + PULL_TICKS);
+        state.aim.remove(&unit.id);
+        state.holding.remove(&unit.id);
+    }
+    let fighters: Vec<&AiEntitySummary> = squad
+        .iter()
+        .copied()
+        .filter(|unit| !state.pulled.contains_key(&unit.id))
+        .collect();
+    let anyone_in_reach = fighters
+        .iter()
+        .any(|unit| near.iter().any(|enemy| in_reach(unit, enemy)));
+    // One ranking for the whole squad, weakest first, then nearest the squad: every Rifleman with
+    // the top enemy in reach shoots it, so the squad's shots land on one man (nine to a kill).
+    let mut ranked: Vec<&AiEntitySummary> = near.to_vec();
+    ranked.sort_by(|a, b| {
+        a.hp.cmp(&b.hp)
+            .then_with(|| dist2(a.x, a.y, mid.0, mid.1).total_cmp(&dist2(b.x, b.y, mid.0, mid.1)))
+            .then(a.id.cmp(&b.id))
+    });
+    // At first contact the lead waits for the last to come up.
+    let since = *state.contact_since.get_or_insert(tick);
+    let gap = |unit: &AiEntitySummary| {
+        near.iter()
+            .map(|enemy| dist2(unit.x, unit.y, enemy.x, enemy.y).sqrt())
+            .fold(f32::INFINITY, f32::min)
+    };
+    let last = fighters.iter().map(|unit| gap(unit)).fold(0.0_f32, f32::max);
+    let regrouping = !anyone_in_reach && tick.saturating_sub(since) < REGROUP_TICKS;
+    // Riflemen with fewer enemies in reach choose first; shots stop going to an enemy once those
+    // already aimed at it cover its HP.
+    let mut choosers: Vec<(&AiEntitySummary, Vec<&AiEntitySummary>)> = fighters
+        .iter()
+        .map(|unit| {
+            let options = near
+                .iter()
+                .copied()
+                .filter(|enemy| in_reach(unit, enemy))
+                .collect::<Vec<_>>();
+            (*unit, options)
+        })
+        .collect();
+    choosers.sort_by(|(a, a_options), (b, b_options)| {
+        a_options.len().cmp(&b_options.len()).then(a.id.cmp(&b.id))
+    });
+    let mut committed: BTreeMap<u32, u32> = BTreeMap::new();
+    for (unit, options) in choosers {
+        if regrouping && last - gap(unit) > REGROUP_TILES * ts {
+            if state.holding.insert(unit.id) {
+                if let Some(units) = actions::hold_position_units(actions, [unit.id]) {
+                    intents.push(AiIntent::Assemble { units });
+                }
+            }
+            state.aim.remove(&unit.id);
+            continue;
+        }
+        let open = |enemy: &&&AiEntitySummary| committed.get(&enemy.id).copied().unwrap_or(0) < enemy.hp;
+        let target = if options.is_empty() {
+            // Nothing in reach: on to the top enemy not walking away, or stand.
+            ranked.iter().find(|enemy| !leaving.contains(&enemy.id)).copied()
+        } else {
+            ranked
+                .iter()
+                .filter(|enemy| in_reach(unit, enemy))
+                .find(open)
+                .or_else(|| ranked.iter().find(|enemy| in_reach(unit, enemy)))
+                .copied()
+        };
+        let Some(target) = target else {
+            if state.holding.insert(unit.id) {
+                if let Some(units) = actions::hold_position_units(actions, [unit.id]) {
+                    intents.push(AiIntent::Assemble { units });
+                }
+            }
+            state.aim.remove(&unit.id);
+            continue;
+        };
+        state.holding.remove(&unit.id);
+        if !options.is_empty() {
+            *committed.entry(target.id).or_insert(0) += damage;
+        }
+        let engaged = state.aim.get(&unit.id) == Some(&target.id)
+            && unit.target_id == Some(target.id)
+            && unit.state == AiEntityState::Attack;
+        if !engaged {
+            if let Some(units) = actions::attack_units(actions, [unit.id], target.id) {
+                intents.push(AiIntent::Attack { units });
+            }
+            state.aim.insert(unit.id, target.id);
+        }
     }
 }
 

@@ -149,6 +149,11 @@ impl LineMemory {
 }
 
 impl BaseLine {
+    /// The way the line faces: toward where the enemy arrives.
+    pub(in crate::ai_core::decision) fn facing(&self) -> (f32, f32) {
+        self.axis
+    }
+
     fn at(&self, ahead: f32, side: f32) -> (f32, f32) {
         (
             self.origin.0 + self.axis.0 * ahead + self.across.0 * side,
@@ -540,6 +545,48 @@ pub(in crate::ai_core::decision) fn allocate(
     }
     placed.sort_unstable();
     placed
+}
+
+/// `mainfront`: the main's own Riflemen (or guns, `guns`) on the main's line, which faces where the
+/// enemy walks in, in front of the Tanks the stations keep behind it. The home pocket faced a fixed
+/// way (Crossroads' east start: south-west), and the Riflemen past its four posts faced the straight
+/// line to the enemy start: across Crossroads' water, into a dead corner. Sends the units off their
+/// posts (attack-move) and holds the ones on them; returns the units ordered, or `None` without a
+/// main line.
+pub(in crate::ai_core::decision) fn stage_main(
+    actions: &mut AiActionContext<'_>,
+    observation: &AiObservation,
+    map_analysis: Option<&AiMapAnalysis>,
+    memory: &AiDecisionMemory,
+    units: &[u32],
+    guns: bool,
+) -> Option<Vec<u32>> {
+    let ts = observation.map.tile_size as f32;
+    let lines = base_lines(observation, map_analysis, &memory.jeff_v1_1.base_lines.contacts);
+    let line = lines.iter().find(|line| line.main)?;
+    let members: Vec<&AiEntitySummary> = observation
+        .owned
+        .iter()
+        .filter(|unit| units.contains(&unit.id) && unit.hp > 0)
+        .collect();
+    let class = if guns { Class::Gun } else { Class::Rifle };
+    let wanted = line.points(class, members.len(), ts);
+    let points = clear_points(observation, map_analysis, wanted, guns.then_some(line.axis));
+    let points = &points[..points.len().min(members.len())];
+    let mut ordered = Vec::new();
+    for (id, point) in seat(&members, points, ts) {
+        let Some(unit) = members.iter().find(|unit| unit.id == id) else {
+            continue;
+        };
+        let on = dist2(unit.x, unit.y, point.0, point.1) <= squared(ON_POST_TILES * ts);
+        let sent = if on {
+            (!guns).then(|| actions::hold_position_units(actions, [id])).flatten()
+        } else {
+            actions::attack_move_units(actions, [id], point.0, point.1)
+        };
+        ordered.extend(sent.unwrap_or_default());
+    }
+    Some(ordered)
 }
 
 /// Each unit's post among `points`: a unit standing on one keeps it, and the other posts, in order,

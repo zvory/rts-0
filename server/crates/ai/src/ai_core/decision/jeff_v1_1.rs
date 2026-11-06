@@ -6,6 +6,7 @@ use crate::ai_core::decision::geometry::{dist2, squared};
 use crate::ai_core::facts::{OpeningOrder, ProductionBuildingFact};
 
 pub(super) mod base_line;
+pub(super) mod breakout;
 pub(super) mod charge;
 pub(super) mod deny;
 pub(super) mod front_line;
@@ -47,6 +48,7 @@ pub(super) struct V1_1Memory {
     pub(super) hunt: hunt::HuntMemory,
     pub(super) natural: natural::NaturalMemory,
     pub(super) natclear: natclear::NatClearMemory,
+    pub(super) breakout: breakout::BreakoutMemory,
     pub(super) resume: resume::ResumeMemory,
     pub(super) stations: stations::StationMemory,
     pub(super) south: south_route::SouthRouteMemory,

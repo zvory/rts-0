@@ -580,6 +580,7 @@ impl AiDecisionMemory {
             || self.jeff_v1_1.meth_strike.holds(id)
             || self.jeff_v1_1.scout.unit == Some(id)
             || self.jeff_v1_1.natclear.holds(id)
+            || self.jeff_v1_1.breakout.holds(id)
             || self.jeff_v1_1.push.convoy_holds(id)
     }
 

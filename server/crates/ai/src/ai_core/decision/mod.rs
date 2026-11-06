@@ -1191,6 +1191,7 @@ where
     frontal_exclusions.extend(memory.later_bases.guards.iter().copied());
     frontal_exclusions.extend(memory.jeff_v1_1.natural.support.keys().copied());
     frontal_exclusions.extend(memory.jeff_v1_1.natclear.units());
+    frontal_exclusions.extend(memory.jeff_v1_1.breakout.units());
     frontal_exclusions.extend(memory.jeff_v1_1.front_line.units());
     frontal_exclusions.extend(memory.jeff_v1_1.home_guard.units());
     frontal_exclusions.extend(memory.jeff_v1_1.rovers.units());
@@ -1281,6 +1282,13 @@ where
             local_defense_assigned.extend(clearing);
         }
         actions.mark("natclear");
+        // Jeff's AI V1.1 goes out at a contain outside its bases (`breakout`), lending station Tanks
+        // and home infantry; home defense and every system below leave them be.
+        let live = (&mut actions, observation, map_analysis, &mut intents);
+        let sortie_held = &(&clearing_held | &local_defense_assigned) | &frontal_exclusions;
+        let sortie = jeff_v1_1::breakout::plan(live, memory, profile.id, &sortie_held);
+        local_defense_assigned.extend(sortie);
+        actions.mark("breakout");
         let mut local_defenders = local_ready_units.clone();
         local_defenders.extend(defensive_machine_gunners.iter().copied());
         if new_jeff_defense {
@@ -1478,7 +1486,24 @@ where
             && !turtle_defense_active
             && !defensive_machine_gunners_available.is_empty()
         {
-            if let Some(enemy_base) = facts.nearest_public_enemy_base {
+            // Jeff's AI V1.1 (`mainfront`): the home guns hold the main line's wings.
+            let main_line_guns = (is_jeff_v1_1(profile.id) && !jeff_v1_1::off("mainfront"))
+                .then(|| {
+                    jeff_v1_1::base_line::stage_main(
+                        &mut actions,
+                        observation,
+                        map_analysis,
+                        memory,
+                        &defensive_machine_gunners_available,
+                        true,
+                    )
+                })
+                .flatten();
+            if let Some(units) = main_line_guns {
+                if !units.is_empty() {
+                    intents.push(AiIntent::Stage { units });
+                }
+            } else if let Some(enemy_base) = facts.nearest_public_enemy_base {
                 let staged = if uses_current_jeff_defense(profile.id) {
                     stage_defensive_pocket_machine_gunners(
                         &mut actions,
@@ -1839,6 +1864,7 @@ where
         decision.trace.notes.push(memory.expansion_security.trace());
         decision.trace.notes.extend(jeff_v1_1::resume::trace_line(memory));
         decision.trace.notes.push(memory.jeff_v1_1.natclear.trace());
+        decision.trace.notes.push(memory.jeff_v1_1.breakout.trace());
         if jeff_v1_1::stations::active(profile.id) {
             decision.trace.stations = Some(format!(
                 "{} call={} launched={}",

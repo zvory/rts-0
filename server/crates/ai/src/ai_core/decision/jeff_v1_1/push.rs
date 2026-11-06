@@ -182,6 +182,15 @@ pub(in crate::ai_core::decision) struct PushMemory {
 }
 
 impl PushMemory {
+    /// Every enemy fighter remembered: id, kind, value, where and when last seen (`breakout`).
+    pub(in crate::ai_core::decision) fn remembered(
+        &self,
+    ) -> impl Iterator<Item = (u32, EntityKind, u32, (f32, f32), u32)> + '_ {
+        self.enemies
+            .iter()
+            .map(|(id, seen)| (*id, seen.kind, seen.value, point(seen.at), seen.tick))
+    }
+
     /// Whether the Tank drives out with a convoy to join the push (`tankgroup`).
     pub(in crate::ai_core::decision) fn convoy_holds(&self, id: u32) -> bool {
         self.convoy.contains(&id)
