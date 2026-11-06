@@ -213,10 +213,12 @@ if ! declared_dependencies_present; then
     fi
     rm -f "$install_log"
     install_log=""
+    # Publish the completed install and its readiness marker in one rename.
+    # Readers should only observe a cache after its ready marker is in place.
+    touch "$temporary_dir/.ready"
     rm -rf "$cache_dir"
     mv "$temporary_dir" "$cache_dir"
     temporary_dir=""
-    touch "$ready_file"
     release_lock
   elif [ "$owns_lock" = "1" ]; then
     # Another worktree may publish the cache just before this process acquires
