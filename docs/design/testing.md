@@ -519,6 +519,12 @@ changed-file mapping selects the skipped behavior.
 
 ## 12. PR CI contract
 
+The server-build job also runs the `rng_portability` integration fixture under
+`wasm-bindgen-test-runner` on wasm32. This is a narrow exception to the native nextest policy:
+nextest cannot execute the WASM test runner. Native nextest and WASM assert identical fixed
+Xoshiro/seed-expansion/sampling/shuffle answers to catch target-dependent RNG drift.
+
+
 The canonical required PR check context is `./tests/run-all.sh` in the `Main test gate` workflow.
 It is an aggregate check over split coverage jobs for server binary build, Rust policy/lint, two
 complementary Rust nextest partitions, live Node, and two complementary browser/tri-state shards on
