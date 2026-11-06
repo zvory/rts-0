@@ -303,7 +303,8 @@ function renderPlayerHistoryChart({ rows, samples, currentTick, resource, field,
   }
   const width = 420;
   const height = 110;
-  const plotLeft = 45;
+  const plotLeft = 6;
+  const plotRight = width - 49;
   const values = timeline.flatMap((sample) => rows.map((row) =>
     sample.players.find((player) => player.id === row.id)[field]));
   const lower = Math.min(0, ...values);
@@ -316,15 +317,26 @@ function renderPlayerHistoryChart({ rows, samples, currentTick, resource, field,
     "aria-label": `${label} ${metric} by player over game time. ${rows.map((row) => row.name).join(", ")}.`,
   });
   svg.appendChild(svgElement("path", {
-    d: `M ${plotLeft},${y(0)} H ${width}`,
+    d: `M ${plotLeft},${y(0)} H ${plotRight}`,
     class: "replay-resource-advantage-zero",
   }));
-  appendTimeLabel(svg, plotLeft - 4, 12, String(upper), "end");
-  appendTimeLabel(svg, plotLeft - 4, height, String(lower), "end");
+  svg.appendChild(svgElement("path", {
+    d: `M ${plotRight},5 V ${height - 5}`,
+    class: "replay-resource-advantage-axis",
+  }));
+  for (const fraction of [0, 0.5, 1]) {
+    const value = lower + fraction * (upper - lower);
+    svg.appendChild(svgElement("path", {
+      d: `M ${plotLeft},${y(value)} H ${plotRight + 4}`,
+      class: "replay-resource-advantage-grid",
+    }));
+    appendTimeLabel(svg, plotRight + 8, y(value) + 3,
+      value.toLocaleString("en-US", { maximumFractionDigits: 1 }), "start");
+  }
   for (const row of rows) {
     const points = timeline.map((sample) => {
       const value = sample.players.find((player) => player.id === row.id)[field];
-      return `${(plotLeft + sample.tick / lastTick * (width - plotLeft)).toFixed(1)},${y(value).toFixed(1)}`;
+      return `${(plotLeft + sample.tick / lastTick * (plotRight - plotLeft)).toFixed(1)},${y(value).toFixed(1)}`;
     });
     svg.appendChild(svgElement("path", {
       d: `M ${points.join(" L ")}`, fill: "none", stroke: safeCssColor(row.color),
@@ -332,7 +344,7 @@ function renderPlayerHistoryChart({ rows, samples, currentTick, resource, field,
     }));
   }
   for (const fraction of [0, 0.5, 1]) {
-    appendTimeLabel(svg, plotLeft + fraction * (width - plotLeft), height + 13,
+    appendTimeLabel(svg, plotLeft + fraction * (plotRight - plotLeft), height + 13,
       formatReplayTick(lastTick * fraction), fraction === 0 ? "start" : fraction === 1 ? "end" : "middle");
   }
   figure.appendChild(svg);
@@ -357,19 +369,23 @@ function renderAdvantageChart({ resource, label, rows, samples, currentTick, met
   const width = 420;
   const chartHeight = 92;
   const labelHeight = 18;
-  const plotLeft = 100;
+  const plotLeft = 6;
+  const plotRight = width - 49;
+  const rawExtent = Math.max(1, minExtent, ...samples.map((sample) => Math.abs(sample[field])));
+  const magnitude = 10 ** Math.floor(Math.log10(rawExtent));
+  const extent = [1, 2, 2.5, 5, 10].map((step) => step * magnitude).find((value) => value >= rawExtent);
   const mid = chartHeight / 2;
   const points = collectionAdvantageAreaPoints(
     samples,
     field,
-    width - plotLeft,
+    plotRight - plotLeft,
     chartHeight,
-    minExtent,
+    extent,
     currentTick,
   )
     .map((point) => ({ ...point, x: point.x + plotLeft }));
   const curve = points.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" L ");
-  const area = `M ${plotLeft},${mid} L ${curve} L ${width},${mid} Z`;
+  const area = `M ${plotLeft},${mid} L ${curve} L ${plotRight},${mid} Z`;
   const clipTopId = `resource-advantage-top-${field}-${serial}`;
   const clipBottomId = `resource-advantage-bottom-${field}-${serial}`;
 
@@ -405,38 +421,51 @@ function renderAdvantageChart({ resource, label, rows, samples, currentTick, met
     "clip-path": `url(#${clipBottomId})`,
   }));
   svg.appendChild(svgElement("path", {
-    d: `M 0,${mid} H ${width}`,
+    d: `M ${plotLeft},${mid} H ${plotRight}`,
     class: "replay-resource-advantage-zero",
   }));
   svg.appendChild(svgElement("path", {
     d: `M ${curve}`,
     class: "replay-resource-advantage-outline",
   }));
-  appendPlayerLabel(svg, rows[0], 8, mid - 10);
-  appendPlayerLabel(svg, rows[1], 8, mid + 16);
+  svg.appendChild(svgElement("path", {
+    d: `M ${plotRight},5 V ${chartHeight - 5}`,
+    class: "replay-resource-advantage-axis",
+  }));
+  for (const fraction of [1, 0.5, 0, -0.5, -1]) {
+    const y = mid - fraction * (mid - 5);
+    svg.appendChild(svgElement("path", {
+      d: `M ${plotLeft},${y} H ${plotRight + 4}`,
+      class: fraction === 0 ? "replay-resource-advantage-zero" : "replay-resource-advantage-grid",
+    }));
+    const tick = svgElement("text", { x: plotRight + 8, y: y + 3 });
+    const value = extent * fraction;
+    tick.textContent = `${value > 0 ? "+" : value < 0 ? "−" : ""}${Math.abs(value).toLocaleString("en-US", { maximumFractionDigits: 1 })}`;
+    svg.appendChild(tick);
+  }
+  for (const [index, player] of rows.entries()) {
+    const name = svgElement("text", {
+      x: plotLeft + 4,
+      y: index === 0 ? mid - 8 : mid + 16,
+      class: "replay-resource-advantage-player-label",
+      style: `fill:${safeCssColor(player.color)};`,
+    });
+    name.textContent = player.name;
+    svg.appendChild(name);
+  }
   const lastSampleTick = Math.max(0, Number(samples[samples.length - 1]?.tick) || 0);
   const lastTick = Math.max(lastSampleTick, Number(currentTick) || 0);
   appendTimeLabel(svg, plotLeft, chartHeight + 13, formatReplayTick(0), "start");
   appendTimeLabel(
     svg,
-    plotLeft + ((width - plotLeft) / 2),
+    plotLeft + ((plotRight - plotLeft) / 2),
     chartHeight + 13,
     formatReplayTick(lastTick / 2),
     "middle",
   );
-  appendTimeLabel(svg, width, chartHeight + 13, formatReplayTick(lastTick), "end");
+  appendTimeLabel(svg, plotRight, chartHeight + 13, formatReplayTick(lastTick), "end");
   figure.appendChild(svg);
   return figure;
-}
-
-function appendPlayerLabel(svg, player, x, y) {
-  const label = svgElement("text", {
-    x,
-    y,
-    class: "replay-resource-advantage-player-label",
-  });
-  label.textContent = player.name;
-  svg.appendChild(label);
 }
 
 function svgElement(tag, attributes = {}) {

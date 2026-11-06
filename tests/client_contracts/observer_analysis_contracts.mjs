@@ -179,6 +179,9 @@ import { textWithin } from "./dom_text.mjs";
         const paths = findFakes(chart, (el) => el.getAttribute("data-player-id"));
         assert(paths.length === count * 2 && paths.every((path) => !/NaN|undefined/.test(path.getAttribute("d"))),
           `${metric} charts draw a steel and oil line for every player in ${count}-player games`);
+        const axes = findFakes(chart, (el) => el.getAttribute("class") === "replay-resource-advantage-axis");
+        assert(axes.length === 2 && axes.every((axis) => axis.getAttribute("d").startsWith("M 371,")),
+          "multiplayer graphs keep their numeric axes on the right");
         assert(findFakes(chart, (el) => el.classList.contains("replay-resource-history-legend")).length === 2,
           "each resource chart includes its player color legend");
       }
@@ -912,7 +915,14 @@ import { textWithin } from "./dom_text.mjs";
     assert(findFakes(aliveCharts[0], (el) => el.getAttribute("aria-label")?.includes("alive resources advantage")).length === 1,
       "alive chart describes the alive-resource comparison");
     const aliveOutline = findFakes(aliveCharts[0], (el) => el.getAttribute("class") === "replay-resource-advantage-outline")[0];
-    assert(aliveOutline.getAttribute("d").includes("87.0"), "alive chart plots negative alive advantage below zero despite positive collection advantage");
+    assert(Number(aliveOutline.getAttribute("d").split(" L ").at(-1).split(",")[1]) > 46, "alive chart plots negative alive advantage below zero despite positive collection advantage");
+    assert(findFakes(aliveCharts[0], (el) => el.getAttribute("class") === "replay-resource-advantage-axis").length === 1,
+      "comparison chart includes a right-side Y axis");
+    const graphNames = findFakes(aliveCharts[0], (el) => el.getAttribute("class") === "replay-resource-advantage-player-label");
+    assert(graphNames.length === 2 && Number(graphNames[0].getAttribute("y")) < 46 && Number(graphNames[1].getAttribute("y")) > 46,
+      "player names sit above and below the zero line inside the left edge of each graph");
+    assert(textWithin(aliveCharts[0]).includes("+500") && textWithin(aliveCharts[0]).includes("−500"),
+      "comparison chart labels its rounded symmetric numeric extent");
     overlay.applyReplayResourceHistory({ replace: true, samples: [
       { tick: 0, steel: 0, oil: 0, aliveSteel: 0, aliveOil: 0 },
     ] });
