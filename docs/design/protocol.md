@@ -61,10 +61,11 @@ but the server assigns lobby/start colors and the client keeps a fallback/render
 cross-surface guard intentionally lives with the protocol parity smoke test until a structured
 lobby/config dump replaces the source scrape.
 
-`pointTanks { units, x, y }` is an immediate tank-only command. The server validates the unit
+`pointTanks { units, x, y, queued? }` is a tank-only command; `queued` defaults to false. The server validates the unit
 list and computes one heading from the eligible tanks’ centroid to the world point. It clears
-active/queued orders and holds the hulls at that heading using normal turn speed. A click at
-the centroid is a no-op. It has no queued form, research requirement, cost, or cooldown.
+active/queued orders for immediate issue, or appends a bounded queued heading when `queued` is true.
+Hulls use normal turn speed; following orders wait for alignment. A click at the centroid is a no-op.
+It has no research requirement, cost, or cooldown.
 
 ### 2.1 Client → Server (`ClientMessage`)
 
@@ -1016,6 +1017,7 @@ snapshot `orderPlan` is the only authoritative queued-plan contract and stale lo
 reconcile to it. Each compact stage is `[kind, x, y]`, where `kind` uses the `orderStage` compact
 code table above. Build stages append a fourth `buildingKind` kind code, forming
 `[kind, x, y, buildingKind]`; other stages retain three fields.
+Tank Point stores a heading rather than a destination and is omitted from these positional markers.
 Stages carry safe world points only, never target ids; hidden attack target stages may be omitted
 rather than leaking enemy positions through fog. Production building rally points are exposed
 separately through `rally` and `rallyPlan` and are not part of `orderPlan`. `rallyPlan` is appended
