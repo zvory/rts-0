@@ -116,6 +116,12 @@ impl NatClearMemory {
         self.members.iter().copied()
     }
 
+    /// Whether the group stands short of the fewest it needs, not charging: `breakout` may take it
+    /// in front of the station Tanks (`ncbreak`).
+    pub(in crate::ai_core::decision) fn stuck(&self) -> bool {
+        self.why == "active" && self.charge.is_empty() && self.members.len() < self.need
+    }
+
     pub(in crate::ai_core::decision) fn trace(&self) -> String {
         format!(
             "v1_1_natclear why={} members={} charge={} gathered={} need={} targets={} block={:?}",

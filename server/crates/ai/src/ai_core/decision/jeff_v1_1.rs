@@ -804,6 +804,17 @@ pub(super) fn committed_steel(profile_id: &str, observation: &AiObservation, fac
         .fold(0u32, u32::saturating_add)
 }
 
+/// `rebuild`: past `REBUILD_AFTER_TICKS`, V1.1 short of its natural keeps the natural's money set
+/// aside until the order goes out, not for the shared 60 s (enemies on the site still release it,
+/// so Tanks can be bought to clear them). With the 60 s up before the guards had the site, Tanks
+/// and Riflemen spent the bank and the Depot was never ordered: 10 of 80 games of the c1-all 120
+/// ended on one Depot, Classic vs Rush seed 3 from 3:30 on, the site secured at 8:22 with 62-273
+/// Steel banked.
+pub(super) fn rebuild_reserve(profile_id: &str, tick: u32) -> bool {
+    is_jeff_v1_1(profile_id) && !off("rebuild") && tick >= REBUILD_AFTER_TICKS
+}
+const REBUILD_AFTER_TICKS: u32 = config::TICK_HZ * 240;
+
 /// Local ablation testing only: `JEFF_V11_OFF=scout,raid,...` turns the named V1.1 features off,
 /// and `JEFF_V11_ONLY=meth,lines,...` turns off every feature it does not name.
 pub(super) fn off(feature: &str) -> bool {

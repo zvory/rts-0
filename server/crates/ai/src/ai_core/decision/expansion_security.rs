@@ -419,6 +419,7 @@ pub(super) fn reserve_expansion(
         .reserve_since
         .get_or_insert(observation.tick);
     observation.tick.saturating_sub(since) < EXPANSION_RESERVE_LIMIT_TICKS
+        || jeff_v1_1::rebuild_reserve(profile.id, observation.tick)
 }
 
 pub(super) fn predicts_natural_from_opening(observation: &AiObservation) -> bool {

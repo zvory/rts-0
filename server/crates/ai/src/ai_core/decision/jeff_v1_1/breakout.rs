@@ -246,13 +246,22 @@ fn run(
             return BTreeSet::new();
         }
         // The force: stationed Tanks within reach, and the main's free infantry past `HOME_KEEP`.
+        // A natural clearing group stuck short of the Riflemen it needs comes too (`ncbreak`): on
+        // Classic against Rush AI 8 of them waited 4 minutes for 21 while Rush's dug-in guns between
+        // the main and the natural grew from 4 to 11 and 5-8 station Tanks stood by.
+        let take_clearing = !super::off("ncbreak") && memory.jeff_v1_1.natclear.stuck();
+        let clearing = |unit: &AiEntitySummary| memory.jeff_v1_1.natclear.holds(unit.id);
         let usable = |unit: &AiEntitySummary| {
             unit.is_complete
                 && unit.hp > 0
                 && unit.free_for_combat
-                && !held.contains(&unit.id)
-                && !memory.stays_out_of_home_defense(unit.id)
-                && !memory.jeff_v1_1.natclear.holds(unit.id)
+                && if take_clearing && clearing(unit) {
+                    true
+                } else {
+                    !held.contains(&unit.id)
+                        && !memory.stays_out_of_home_defense(unit.id)
+                        && !clearing(unit)
+                }
                 && !memory.jeff_v1_1.natural.holds(unit.id)
         };
         let stationed: BTreeSet<u32> = memory.jeff_v1_1.stations.stationed().collect();
@@ -270,9 +279,12 @@ fn run(
             .iter()
             .filter(|unit| matches!(unit.kind, EntityKind::Rifleman | EntityKind::Panzerfaust))
             .filter(|unit| usable(unit))
-            .filter(|unit| match memory.jeff_v1_1.stations.rifle_post(unit.id) {
-                Some(post) => post == RiflePost::Main,
-                None => dist2(unit.x, unit.y, main.0, main.1) <= squared(22.0 * ts),
+            .filter(|unit| {
+                (take_clearing && clearing(unit))
+                    || match memory.jeff_v1_1.stations.rifle_post(unit.id) {
+                        Some(post) => post == RiflePost::Main,
+                        None => dist2(unit.x, unit.y, main.0, main.1) <= squared(22.0 * ts),
+                    }
             })
             .collect();
         // The main keeps the `HOME_KEEP` Riflemen nearest its start.
@@ -359,7 +371,16 @@ fn run(
         .filter(|enemy| dist2(enemy.x, enemy.y, mid.0, mid.1) <= squared(FIGHT_TILES * ts))
         .map(|enemy| unit_value(enemy.kind))
         .sum();
-    let screen_gone = !state.infantry.iter().any(|id| members.iter().any(|unit| unit.id == *id));
+    // With its infantry dead the sortie turns back, unless (`baregun`) no Panzerfaust or Anti-Tank
+    // Gun is in sight of it: against Rush AI's dug-in guns 3 Riflemen died in 4 s and 3 Tanks the
+    // guns could not hurt went home.
+    let anti_tank_near = observation.visible_enemies.iter().any(|enemy| {
+        enemy.hp > 0
+            && matches!(enemy.kind, EntityKind::Panzerfaust | EntityKind::AntiTankGun)
+            && dist2(enemy.x, enemy.y, mid.0, mid.1) <= squared(FIGHT_TILES * ts)
+    });
+    let screen_gone = !state.infantry.iter().any(|id| members.iter().any(|unit| unit.id == *id))
+        && (super::off("baregun") || anti_tank_near);
     let why = if members.is_empty() || state.tanks.is_empty() {
         Some("lost")
     } else if screen_gone {
