@@ -2368,6 +2368,10 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
 [client-rendering.md](client-rendering.md) and its active
 [rendering parity ledger](rendering-parity.md).
 
+- Cooling-down Mortar Teams carry a translucent circular clock above their health-bar position,
+  matching the command card's single clockwise accent hand. It is independent of selection and
+  disappears at zero cooldown. Only server-projected Mortar Fire timers drive it: owners and
+  teammates receive them; enemies do not. Privileged observer views use their selected scope.
 - Game settings persist a minimap-only size slider in `rts.minimap.size`. The default retains
   the responsive canvas size; maximum fits within both 50vw and 50vh, retaining its square
   aspect ratio. CSS recalculates on resize and orientation changes; on tiny viewports the
@@ -2402,7 +2406,7 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
 
 - Layers (back→front): terrain → ground decals → trench terrain → transient infantry corpses → local visual samples → resource nodes → building shadows → buildings →
   building overlays → unit shadows → occupied-trench shadows → occupied-trench lips → units → smoke/ability ground effects → selection rings →
-  health bars → fog overlay → local visual-sample labels → shot-revealed units → damaged actionable-reveal health bars → observer map-analysis diagnostics → command/hover feedback and miss toasts → placement ghost and Lab ruler →
+  health bars and mortar cooldown clocks → fog overlay → local visual-sample labels → shot-revealed units → damaged actionable-reveal health bars → observer map-analysis diagnostics → command/hover feedback and miss toasts → placement ghost and Lab ruler →
   selection drag-box → (HUD is DOM, not Pixi). Occupied-trench shadows and lips render only when the
   snapshot's `occupiedTrenchId` matches authoritative trench terrain; orphaned ids do not synthesize
   client-only trench geometry. The below-unit occupied-trench berm cue renders at 115% of the

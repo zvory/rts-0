@@ -9,6 +9,7 @@ import {
   isProducerBuilding,
 } from "../config.js";
 import { KIND, SETUP, STATE, isBuilding, isResource } from "../protocol.js";
+import { drawMortarCooldownClock } from "./mortar_cooldown_clock.js";
 import { buildingProgressStatus } from "./entity_state.js";
 import {
   DEPLOYED_WEAPON_ANIM_MS,
@@ -139,6 +140,7 @@ export function _vehicleShadow(g, cx, cy, body, facing) {
 }
 
 export function _drawSelectionAndHp(e, selection, state, ownerColor = null) {
+  drawMortarCooldownClock.call(this, e);
   const selected = selection.has(e.id);
   const hasHealth = !isResource(e.kind) && Number.isFinite(e.maxHp) && e.maxHp > 0;
   const damaged = hasHealth && Number.isFinite(e.hp) && e.hp < e.maxHp;
