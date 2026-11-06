@@ -25,6 +25,14 @@ use placement_policy::{build_placement_policy, BuildPlacementPolicy};
 #[allow(dead_code)]
 const BUILD_SITE_SPATIAL_PADDING_TILES: i32 = 8;
 
+fn stored_position(x: f32, y: f32) -> Option<(f32, f32)> {
+    use rts_rules::math::Coord;
+    Some((
+        Coord::try_from_world(x)?.to_world(),
+        Coord::try_from_world(y)?.to_world(),
+    ))
+}
+
 pub(crate) fn unit_static_standable(
     map: &Map,
     occ: &Occupancy,
@@ -47,13 +55,9 @@ pub(crate) fn unit_static_standable_with_facing(
     y: f32,
     facing: f32,
 ) -> bool {
-    let (Some(x), Some(y)) = (
-        rts_rules::math::Coord::try_from_world(x),
-        rts_rules::math::Coord::try_from_world(y),
-    ) else {
+    let Some((x, y)) = stored_position(x, y) else {
         return false;
     };
-    let (x, y) = (x.to_world(), y.to_world());
     let Some(body) = unit_body_with_facing(kind, x, y, facing) else {
         return false;
     };
@@ -126,6 +130,9 @@ pub(crate) fn unit_spawn_standable(
     x: f32,
     y: f32,
 ) -> bool {
+    let Some((x, y)) = stored_position(x, y) else {
+        return false;
+    };
     let Some(body) = unit_body(kind, x, y) else {
         return false;
     };
@@ -231,6 +238,9 @@ pub(crate) fn unit_position_clear_of_building_footprint(
     tile_x: u32,
     tile_y: u32,
 ) -> bool {
+    let Some((x, y)) = stored_position(x, y) else {
+        return false;
+    };
     let Some(site_rect) = building_rect_for_footprint(building, tile_x, tile_y) else {
         return false;
     };
@@ -649,6 +659,32 @@ mod tests {
             EntityKind::Worker,
             160.0,
             160.0,
+        ));
+    }
+
+    #[test]
+    fn placement_checks_use_the_stored_position_for_unit_contacts() {
+        let map = flat_map(12);
+        let mut entities = EntityStore::new();
+        let kind = EntityKind::Worker;
+        entities.spawn_unit(1, kind, 160.0, 160.0).unwrap();
+        let occ = Occupancy::build(&map, &entities);
+        let radius = config::unit_stats(kind).unwrap().radius;
+        // The float candidate clears the neighbor, but its stored center touches it.
+        let x = 160.0 + radius * 2.0 + 0.25 / rts_rules::math::Coord::SCALE as f32;
+        assert!(!unit_spawn_standable(&map, &occ, &entities, kind, x, 160.0));
+        assert!(!unit_position_clear_of_building_footprint(
+            &map,
+            &occ,
+            &entities,
+            &BTreeSet::new(),
+            kind,
+            0.0,
+            x,
+            160.0,
+            EntityKind::Depot,
+            8,
+            8,
         ));
     }
 

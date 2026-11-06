@@ -3,7 +3,7 @@
 //! This service owns unit-facing trench lifecycle state. The neutral trench terrain itself lives
 //! in [`crate::game::trench::TrenchStore`].
 
-use rts_rules::math::GameplayMath as _;
+use rts_rules::math::{Coord, GameplayMath as _};
 use std::collections::BTreeMap;
 
 use crate::config;
@@ -245,7 +245,7 @@ fn occupation_search_distance_sq(trench: Trench, entity: &Entity) -> Option<f32>
 fn standing_in_trench(trenches: &TrenchSpatialIndex, x: f32, y: f32) -> bool {
     trenches
         .containing_candidates(x, y)
-        .any(|trench| trench_contains_point(trench, x, y))
+        .any(|trench| trench.contains_point(x, y))
 }
 
 fn slot_candidate(
@@ -256,7 +256,7 @@ fn slot_candidate(
     entity: &Entity,
     trench: Trench,
 ) -> Option<Option<(f32, f32)>> {
-    if trench_contains_point(trench, entity.pos_x(), entity.pos_y())
+    if trench.contains_point(entity.pos_x(), entity.pos_y())
         && slot_position_legal(
             map,
             entities,
@@ -329,7 +329,16 @@ fn slot_positions(entity: &Entity, trench: Trench) -> Vec<(f32, f32)> {
             ));
         }
     }
+    // Legality, ranking, and the spatial index must see the center that set_position stores.
     candidates
+        .into_iter()
+        .filter_map(|(x, y)| {
+            Some((
+                Coord::try_from_world(x)?.to_world(),
+                Coord::try_from_world(y)?.to_world(),
+            ))
+        })
+        .collect()
 }
 
 fn slot_position_legal(
@@ -341,7 +350,7 @@ fn slot_position_legal(
     trench: Trench,
     candidate: (f32, f32),
 ) -> bool {
-    if !trench_contains_point(trench, candidate.0, candidate.1) {
+    if !trench.contains_point(candidate.0, candidate.1) {
         return false;
     }
     if !standability::unit_static_standable_with_facing(
@@ -513,16 +522,6 @@ fn decrement_occupied_trench_count(
 
 fn trench_radius_px(trench: Trench) -> f32 {
     trench.radius_tiles * config::TILE_SIZE as f32
-}
-
-fn trench_contains_point(trench: Trench, x: f32, y: f32) -> bool {
-    if !x.is_finite() || !y.is_finite() {
-        return false;
-    }
-    let dx = x - trench.x.to_world();
-    let dy = y - trench.y.to_world();
-    let radius = trench_radius_px(trench);
-    dx * dx + dy * dy <= radius * radius
 }
 
 fn distance(a: (f32, f32), b: (f32, f32)) -> f32 {

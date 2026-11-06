@@ -22,7 +22,7 @@ impl Trench {
         self.radius_tiles * config::TILE_SIZE as f32
     }
 
-    fn contains_point(self, x: f32, y: f32) -> bool {
+    pub(crate) fn contains_point(self, x: f32, y: f32) -> bool {
         if !x.is_finite() || !y.is_finite() {
             return false;
         }
