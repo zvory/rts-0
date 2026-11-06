@@ -13,6 +13,7 @@ use crate::game::pathfinding::{self, Passability};
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::standability;
 use cache::{CacheEntry, CacheKey};
+use rts_rules::math::GameplayMath as _;
 use std::collections::HashMap;
 
 mod authoring;
@@ -274,7 +275,7 @@ pub(crate) fn simplify_reverse_waypoints_with_limit(
 fn distance_between(a: (f32, f32), b: (f32, f32)) -> f32 {
     let dx = b.0 - a.0;
     let dy = b.1 - a.1;
-    (dx * dx + dy * dy).sqrt()
+    (dx * dx + dy * dy).det_sqrt()
 }
 
 #[cfg(test)]
@@ -494,7 +495,7 @@ mod tests {
     }
 
     fn segment_angle(from: (f32, f32), to: (f32, f32)) -> f32 {
-        (to.1 - from.1).atan2(to.0 - from.0)
+        (to.1 - from.1).det_atan2(to.0 - from.0)
     }
 
     fn angle_delta(from: f32, to: f32) -> f32 {

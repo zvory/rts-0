@@ -1,4 +1,5 @@
 use super::*;
+use rts_rules::math::GameplayMath as _;
 
 #[test]
 fn artillery_fire_samples_uniformly_inside_selected_circle() {
@@ -141,8 +142,8 @@ fn artillery_point_fire_inside_arc_keeps_setup_facing_fixed() {
     let angle = config::ARTILLERY_FIELD_OF_FIRE_RAD * 0.45;
     let distance = config::TILE_SIZE as f32 * 30.0;
     let target = (
-        pos.0 + angle.cos() * distance,
-        pos.1 + angle.sin() * distance,
+        pos.0 + angle.det_cos() * distance,
+        pos.1 + angle.det_sin() * distance,
     );
     let artillery = entities
         .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
@@ -334,8 +335,8 @@ fn artillery_point_fire_outside_arc_replaces_active_fire_with_redeploy() {
     let angle = config::ARTILLERY_FIELD_OF_FIRE_RAD;
     let distance = config::TILE_SIZE as f32 * 30.0;
     let target = (
-        pos.0 + angle.cos() * distance,
-        pos.1 + angle.sin() * distance,
+        pos.0 + angle.det_cos() * distance,
+        pos.1 + angle.det_sin() * distance,
     );
     let artillery = entities
         .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
@@ -402,12 +403,12 @@ fn artillery_point_fire_can_retarget_while_redeploying() {
     let new_angle = -config::ARTILLERY_FIELD_OF_FIRE_RAD;
     let distance = config::TILE_SIZE as f32 * 30.0;
     let old_target = (
-        pos.0 + old_angle.cos() * distance,
-        pos.1 + old_angle.sin() * distance,
+        pos.0 + old_angle.det_cos() * distance,
+        pos.1 + old_angle.det_sin() * distance,
     );
     let target = (
-        pos.0 + new_angle.cos() * distance,
-        pos.1 + new_angle.sin() * distance,
+        pos.0 + new_angle.det_cos() * distance,
+        pos.1 + new_angle.det_sin() * distance,
     );
     let artillery = entities
         .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)

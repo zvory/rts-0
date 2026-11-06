@@ -24,8 +24,8 @@ impl SpatialIndex {
         let cell_count = map_width.saturating_mul(map_height) as usize;
         let mut cells = vec![Vec::new(); cell_count];
         for e in entities.iter() {
-            let tx = (e.pos_x / config::TILE_SIZE as f32).floor() as i32;
-            let ty = (e.pos_y / config::TILE_SIZE as f32).floor() as i32;
+            let tx = (e.pos_x() / config::TILE_SIZE as f32).floor() as i32;
+            let ty = (e.pos_y() / config::TILE_SIZE as f32).floor() as i32;
             if tx < 0 || ty < 0 || tx >= map_width as i32 || ty >= map_height as i32 {
                 continue;
             }

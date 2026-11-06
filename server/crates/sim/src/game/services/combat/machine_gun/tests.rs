@@ -43,7 +43,10 @@ fn cone_geometry_has_expected_single_target_and_dense_coverage() {
             } else {
                 rng.gen_range(-rules::MG_HALF_SPREAD_RAD..=rules::MG_HALF_SPREAD_RAD)
             };
-            let end = (100.0 + angle.cos() * 214.0, 300.0 + angle.sin() * 214.0);
+            let end = (
+                100.0 + angle.det_cos() * 214.0,
+                300.0 + angle.det_sin() * 214.0,
+            );
             let single_hit = first_hit(
                 &map,
                 &entities,

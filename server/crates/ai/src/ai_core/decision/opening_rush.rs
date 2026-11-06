@@ -38,6 +38,7 @@ use crate::ai_core::map_analysis::AiTile;
 use crate::ai_core::squad_micro::{
     plan_rifle_squad, RifleSquadParams, SquadMicroMemory, SquadOrder,
 };
+use rts_rules::math::GameplayMath as _;
 
 /// The middle of the map: the squad is as close to the enemy base as to its own. Against AI 2.1 the
 /// two opening groups always come into sight before this (they meet at 46-49% of the route).
@@ -1217,7 +1218,7 @@ fn centroid(units: &[&AiEntitySummary]) -> (f32, f32) {
 }
 
 fn distance(a: (f32, f32), b: (f32, f32)) -> f32 {
-    (a.0 - b.0).hypot(a.1 - b.1)
+    (a.0 - b.0).det_hypot(a.1 - b.1)
 }
 
 #[cfg(test)]

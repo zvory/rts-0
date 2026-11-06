@@ -191,8 +191,8 @@ impl EntityStore {
             .find(|entity| {
                 entity.hp > 0
                     && entity.kind.extracted_resource_kind() == Some(node.kind)
-                    && (entity.pos_x - node.pos_x).abs() <= RESOURCE_EXTRACTOR_POSITION_EPS_PX
-                    && (entity.pos_y - node.pos_y).abs() <= RESOURCE_EXTRACTOR_POSITION_EPS_PX
+                    && (entity.pos_x() - node.pos_x()).abs() <= RESOURCE_EXTRACTOR_POSITION_EPS_PX
+                    && (entity.pos_y() - node.pos_y()).abs() <= RESOURCE_EXTRACTOR_POSITION_EPS_PX
             })
             .map(|entity| entity.id)
     }

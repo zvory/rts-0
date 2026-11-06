@@ -90,8 +90,8 @@ pub(crate) fn main_base_steel_saturation_target_from_entities(
             .map(|e| AiResourceSummary {
                 id: e.id,
                 kind: e.kind,
-                x: e.pos_x,
-                y: e.pos_y,
+                x: e.pos_x(),
+                y: e.pos_y(),
                 remaining: e.remaining().unwrap_or(0),
             }),
     )

@@ -1,5 +1,6 @@
 use super::*;
 use crate::ai_core::observation::AiEconomy;
+use rts_rules::math::GameplayMath as _;
 use rts_sim::game::map::Map;
 use rts_sim::game::{Game, MapMetadata, PlayerInit};
 
@@ -151,7 +152,7 @@ fn the_picket_heads_up_the_route_toward_the_corridor() {
     let mut memory = AiDecisionMemory::default();
     let point = picket_point(&observation, Some(&analysis)).expect("picket point");
     let main = tile_center(observation.own_start_tile, observation.map.tile_size);
-    let distance = dist2(point.0, point.1, main.0, main.1).sqrt() / TS;
+    let distance = dist2(point.0, point.1, main.0, main.1).det_sqrt() / TS;
     assert!(
         (20.0..=28.0).contains(&distance),
         "picket {distance} tiles out"

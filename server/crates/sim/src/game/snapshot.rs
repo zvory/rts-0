@@ -109,7 +109,7 @@ impl Game {
             let target = e
                 .target_id()
                 .and_then(|target| self.state.entities.get(target));
-            if e.is_node() && (!fogged || fog.is_visible_world(player, e.pos_x, e.pos_y)) {
+            if e.is_node() && (!fogged || fog.is_visible_world(player, e.pos_x(), e.pos_y())) {
                 if let Some(remaining) = e.remaining() {
                     resource_deltas.push(ResourceDelta {
                         id: e.id,
@@ -187,8 +187,8 @@ impl Game {
                 })
                 .map(|cloud| crate::protocol::SmokeCloudView {
                     id: cloud.id,
-                    x: cloud.x,
-                    y: cloud.y,
+                    x: cloud.x.to_world(),
+                    y: cloud.y.to_world(),
                     radius_tiles: cloud.radius_tiles,
                     expires_in: cloud.expires_in(self.state.tick),
                 })
@@ -199,8 +199,8 @@ impl Game {
                 .iter()
                 .map(|cloud| crate::protocol::SmokeCloudView {
                     id: cloud.id,
-                    x: cloud.x,
-                    y: cloud.y,
+                    x: cloud.x.to_world(),
+                    y: cloud.y.to_world(),
                     radius_tiles: cloud.radius_tiles,
                     expires_in: cloud.expires_in(self.state.tick),
                 })

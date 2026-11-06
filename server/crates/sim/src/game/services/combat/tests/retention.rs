@@ -75,7 +75,7 @@ fn shoot_while_moving_units_reacquire_when_retained_target_is_hidden() {
         .get(retained)
         .expect("retained target should exist");
     assert!(
-        !fog.is_visible_world(1, retained_entity.pos_x, retained_entity.pos_y),
+        !fog.is_visible_world(1, retained_entity.pos_x(), retained_entity.pos_y()),
         "test setup requires the retained target to be hidden"
     );
     let smokes = SmokeCloudStore::new();
@@ -91,8 +91,8 @@ fn shoot_while_moving_units_reacquire_when_retained_target_is_hidden() {
         &smokes,
         tank,
         tank_entity.owner,
-        tank_entity.pos_x,
-        tank_entity.pos_y,
+        tank_entity.pos_x(),
+        tank_entity.pos_y(),
         512.0,
         combat_mode(tank_entity),
     );
@@ -462,7 +462,13 @@ fn shoot_while_moving_units_reacquire_when_retained_target_is_smoke_covered() {
         .get(retained)
         .expect("retained target should exist");
     smokes
-        .spawn(retained_entity.pos_x, retained_entity.pos_y, 1.0, 100, 0)
+        .spawn(
+            retained_entity.pos_x(),
+            retained_entity.pos_y(),
+            1.0,
+            100,
+            0,
+        )
         .expect("smoke should spawn");
     let los = LineOfSight::with_smoke(&map, &smokes);
     let spatial = SpatialIndex::build(&entities, map.width, map.height);
@@ -480,8 +486,8 @@ fn shoot_while_moving_units_reacquire_when_retained_target_is_smoke_covered() {
         &smokes,
         tank,
         tank_entity.owner,
-        tank_entity.pos_x,
-        tank_entity.pos_y,
+        tank_entity.pos_x(),
+        tank_entity.pos_y(),
         192.0,
         combat_mode(tank_entity),
     );
@@ -540,7 +546,7 @@ fn shoot_while_moving_units_reacquire_when_retained_target_is_out_of_range() {
             .get(retained)
             .expect("retained target should exist");
         assert!(
-            fog.is_visible_world(1, retained_entity.pos_x, retained_entity.pos_y),
+            fog.is_visible_world(1, retained_entity.pos_x(), retained_entity.pos_y()),
             "{kind:?} retained target should be visible so range is the failing fireability gate"
         );
         let smokes = SmokeCloudStore::new();
@@ -558,8 +564,8 @@ fn shoot_while_moving_units_reacquire_when_retained_target_is_out_of_range() {
             &smokes,
             attacker_id,
             attacker.owner,
-            attacker.pos_x,
-            attacker.pos_y,
+            attacker.pos_x(),
+            attacker.pos_y(),
             512.0,
             combat_mode(attacker),
         );

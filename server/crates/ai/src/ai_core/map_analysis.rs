@@ -3,6 +3,7 @@
 //! This records stable terrain, region, choke, start, and resource facts for later route analysis
 //! without feeding them into command decisions yet.
 
+use rts_rules::math::GameplayMath as _;
 use std::collections::VecDeque;
 
 use crate::config;
@@ -714,7 +715,7 @@ fn generated_line_strip_markers(
 ) -> Vec<ObserverMapAnalysisPrimitive> {
     let dx = end.0 - start.0;
     let dy = end.1 - start.1;
-    let len = (dx * dx + dy * dy).sqrt();
+    let len = (dx * dx + dy * dy).det_sqrt();
     if !len.is_finite() || len <= f32::EPSILON {
         return Vec::new();
     }
@@ -1286,7 +1287,7 @@ fn distance2_to_tile_center(map: &MapInfo, tile: AiTile, resource: &ResourcePoin
     let tile_size = map.tile_size as f32;
     let x = tile.x as f32 * tile_size + tile_size * 0.5;
     let y = tile.y as f32 * tile_size + tile_size * 0.5;
-    (x - resource.x).powi(2) + (y - resource.y).powi(2)
+    (x - resource.x).det_powi(2) + (y - resource.y).det_powi(2)
 }
 
 pub(super) fn tile_distance2(a: AiTile, b: AiTile) -> u32 {
@@ -1348,7 +1349,7 @@ fn choke_line_world_endpoints(
     let mut end = tile_center_world(choke.endpoint_b_tile, tile_size);
     let dx = end.0 - start.0;
     let dy = end.1 - start.1;
-    let len = (dx * dx + dy * dy).sqrt();
+    let len = (dx * dx + dy * dy).det_sqrt();
     if len.is_finite() && len > f32::EPSILON {
         let ux = dx / len;
         let uy = dy / len;

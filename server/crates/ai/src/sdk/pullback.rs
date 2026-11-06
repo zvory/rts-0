@@ -1,4 +1,5 @@
 //! Optional wounded-unit movement policy. Callers retain squad, route and combat ownership.
+use rts_rules::math::GameplayMath as _;
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::{AiActions, AiCompletion, AiEntity, AiEntityState, AiFrame, UnitGroup};
@@ -97,7 +98,8 @@ impl PullbackMemory {
                     continue;
                 }
                 let distance = |enemy: &PullbackUnit| {
-                    (unit.position.0 - enemy.position.0).hypot(unit.position.1 - enemy.position.1)
+                    (unit.position.0 - enemy.position.0)
+                        .det_hypot(unit.position.1 - enemy.position.1)
                 };
                 let Some(threat) = enemies
                     .iter()
@@ -109,7 +111,7 @@ impl PullbackMemory {
                     unit.position.0 - threat.position.0,
                     unit.position.1 - threat.position.1,
                 );
-                let len = dx.hypot(dy);
+                let len = dx.det_hypot(dy);
                 if len <= f32::EPSILON {
                     (dx, dy) = (1.0, 0.0);
                 } else {

@@ -33,8 +33,8 @@ fn scenario_prepares_target_during_reload_and_attack_move_stops() {
         .expect("scenario target should exist");
     let cannon = crate::rules::combat::weapon_profile(WeaponKind::TankCannon)
         .expect("Tank cannon profile should exist");
-    let dx = target.pos_x - attacker.pos_x;
-    let dy = target.pos_y - attacker.pos_y;
+    let dx = target.pos_x() - attacker.pos_x();
+    let dy = target.pos_y() - attacker.pos_y();
     let current_range = cannon.range_tiles * config::TILE_SIZE as f32 + attacker.radius();
     assert!(
         dx * dx + dy * dy < current_range * current_range,
@@ -94,7 +94,7 @@ fn scenario_prepares_target_during_reload_and_attack_move_stops() {
         "the real attack-move command should begin while the cannon remains reloading"
     );
 
-    let stopped_at = (attacker.pos_x, attacker.pos_y);
+    let stopped_at = (attacker.pos_x(), attacker.pos_y());
     let target_hp = game
         .state
         .entities
@@ -110,7 +110,7 @@ fn scenario_prepares_target_during_reload_and_attack_move_stops() {
         .get(attacker_id)
         .expect("scenario attacker should remain alive while reloading");
     assert_eq!(
-        (attacker.pos_x, attacker.pos_y),
+        (attacker.pos_x(), attacker.pos_y()),
         stopped_at,
         "the reloading attacker should wait at the acquisition boundary"
     );

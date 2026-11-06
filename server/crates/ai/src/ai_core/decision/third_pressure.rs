@@ -26,6 +26,7 @@ use super::opening_rush::{estimate_trade, fighter, LiveStep};
 use super::*;
 use locate::{begin_locate, field_target, locate, retarget, sight};
 use merge::{begin_merge, merge};
+use rts_rules::math::GameplayMath as _;
 use scout::{begin_scout, keep_watch, scout_clear, scout_trip};
 use targets::{mines_from, off_route_tiles, target_site};
 use timing::{departure, EARLIEST_SCOUT_TICK};
@@ -1163,15 +1164,15 @@ fn post_near(
     taken: &[(f32, f32)],
 ) -> Option<(f32, f32)> {
     let ts = tile(observation);
-    let wanted_angle = facing.1.atan2(facing.0);
+    let wanted_angle = facing.1.det_atan2(facing.0);
     for radius in radii {
         let best = (0..48)
             .map(|step| step as f32 * std::f32::consts::TAU / 48.0)
             .map(|angle| {
                 let point = clamp_to_map(
                     (
-                        site.0 + angle.cos() * radius * ts,
-                        site.1 + angle.sin() * radius * ts,
+                        site.0 + angle.det_cos() * radius * ts,
+                        site.1 + angle.det_sin() * radius * ts,
                     ),
                     observation.map,
                 );
@@ -1391,7 +1392,7 @@ fn tile(observation: &AiObservation) -> f32 {
 }
 
 fn distance(a: (f32, f32), b: (f32, f32)) -> f32 {
-    dist2(a.0, a.1, b.0, b.1).sqrt()
+    dist2(a.0, a.1, b.0, b.1).det_sqrt()
 }
 
 fn rounded(point: (f32, f32)) -> (i32, i32) {

@@ -424,7 +424,7 @@ pub(crate) fn run_tick(
             entities
                 .iter()
                 .filter(|entity| entity.is_unit())
-                .map(|entity| (entity.id, (entity.pos_x, entity.pos_y)))
+                .map(|entity| (entity.id, (entity.pos_x(), entity.pos_y())))
                 .collect::<HashMap<_, _>>()
         });
     crate::perf::timed(perf.as_deref_mut(), "collision", || {

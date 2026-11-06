@@ -121,9 +121,9 @@ fn dynamic_construction_path_block_repaths_around_new_building() {
             saw_repath_request |= mover_state.movement.as_ref().is_some_and(|movement| {
                 movement.last_repath_tick > config::STATIC_BLOCKED_REPATH_TICKS as u32
             });
-            let dx = mover_state.pos_x - setup.goal.0;
-            let dy = mover_state.pos_y - setup.goal.1;
-            if (dx * dx + dy * dy).sqrt() <= config::TILE_SIZE as f32 {
+            let dx = mover_state.pos_x() - setup.goal.0;
+            let dy = mover_state.pos_y() - setup.goal.1;
+            if (dx * dx + dy * dy).det_sqrt() <= config::TILE_SIZE as f32 {
                 arrived = true;
                 break;
             }
@@ -244,8 +244,8 @@ fn describe_vehicle_small_block_state(game: &Game, units: &[u32]) -> Vec<String>
             let e = game.state.entities.get(id)?;
             Some(format!(
                 "#{id}: pos=({:.1},{:.1}) facing={:.3} phase={:?} path_len={} next={:?} goal={:?}",
-                e.pos_x,
-                e.pos_y,
+                e.pos_x(),
+                e.pos_y(),
                 e.facing(),
                 e.move_phase(),
                 e.movement.as_ref().map(|m| m.path.len()).unwrap_or(0),
@@ -327,13 +327,13 @@ fn direct_reverse_order_scenario_faces_unit_east_and_orders_goal_behind() {
             .entities
             .get(unit_id)
             .expect("scenario unit should exist");
-        let goal_delta_x = entity.pos_x - setup.goal.0;
+        let goal_delta_x = entity.pos_x() - setup.goal.0;
         assert!(
             (goal_delta_x - config::TILE_SIZE as f32 * 15.0).abs() <= 0.001,
             "{unit} should receive a goal 15 tiles behind, delta {goal_delta_x:.2}"
         );
         assert!(
-            (entity.pos_y - setup.goal.1).abs() <= 0.001,
+            (entity.pos_y() - setup.goal.1).abs() <= 0.001,
             "{unit} goal should be directly behind on the same y axis"
         );
         assert!(
@@ -428,7 +428,8 @@ fn replay_142_vehicle_lock_scenario_clears_without_slow_overlap() {
             .entities
             .get(command_car_id)
             .expect("Command Car should survive");
-        let separation = (scout.pos_x - command_car.pos_x).hypot(scout.pos_y - command_car.pos_y);
+        let separation =
+            (scout.pos_x() - command_car.pos_x()).det_hypot(scout.pos_y() - command_car.pos_y());
         if separation <= 35.0 {
             saw_close_spacing = true;
         } else if saw_close_spacing && separation >= 40.0 && clear_tick.is_none() {
@@ -710,7 +711,7 @@ fn tank_trap_friendly_reroute_wall_uses_neutral_blockers() {
         .iter()
         .find(|entity| entity.kind == EntityKind::TankTrap)
         .expect("scenario should spawn Tank Traps");
-    let (tx, ty) = setup.game.state.map.tile_of(trap.pos_x, trap.pos_y);
+    let (tx, ty) = setup.game.state.map.tile_of(trap.pos_x(), trap.pos_y());
     assert!(
         !occ.passable_for_kind(tx as i32, ty as i32, EntityKind::Tank),
         "neutral Tank Traps should remain physical vehicle-body blockers"
@@ -751,7 +752,7 @@ fn tank_trap_enemy_reroute_scenario_closes_sparse_vehicle_gaps() {
         .entities
         .iter()
         .filter(|entity| entity.owner == 0 && entity.kind == EntityKind::TankTrap)
-        .map(|entity| setup.game.state.map.tile_of(entity.pos_x, entity.pos_y))
+        .map(|entity| setup.game.state.map.tile_of(entity.pos_x(), entity.pos_y()))
         .collect();
     enemy_trap_tiles.sort_unstable();
     let (tx, ty) = enemy_trap_tiles
@@ -791,7 +792,7 @@ fn tank_trap_infantry_move_orders_cross_enemy_wall_without_auto_attacks() {
             .iter()
             .find(|entity| entity.owner == 0 && entity.kind == EntityKind::TankTrap)
             .expect("neutral trap should exist")
-            .pos_x;
+            .pos_x();
         game.enqueue(
             setup.player_id,
             SimCommand::Move {
@@ -813,7 +814,7 @@ fn tank_trap_infantry_move_orders_cross_enemy_wall_without_auto_attacks() {
                 .state
                 .entities
                 .get(unit_id)
-                .is_some_and(|entity| entity.pos_x > wall_x + config::TILE_SIZE as f32)
+                .is_some_and(|entity| entity.pos_x() > wall_x + config::TILE_SIZE as f32)
             {
                 break;
             }
@@ -825,7 +826,7 @@ fn tank_trap_infantry_move_orders_cross_enemy_wall_without_auto_attacks() {
             .get(unit_id)
             .expect("unit should survive");
         assert!(
-            entity.pos_x > wall_x + config::TILE_SIZE as f32,
+            entity.pos_x() > wall_x + config::TILE_SIZE as f32,
             "{unit} should cross the enemy Tank Trap wall on a normal move order"
         );
         assert_eq!(entity.target_id(), None);
@@ -938,8 +939,8 @@ fn vehicle_corner_wall_scenario_matches_authored_layout() {
         .expect("lead tank should exist");
     let lead_x = wall_left_x as f32 * ts - ts;
     let lead_y = (wall_top_y as f32 + 7.5) * ts;
-    assert!((lead.pos_x - lead_x).abs() <= 0.001);
-    assert!((lead.pos_y - lead_y).abs() <= 0.001);
+    assert!((lead.pos_x() - lead_x).abs() <= 0.001);
+    assert!((lead.pos_y() - lead_y).abs() <= 0.001);
     assert!((setup.goal.0 - ((wall_right_x + 1) as f32 * ts + ts * 0.5)).abs() <= 0.001);
     assert!((setup.goal.1 - lead_y).abs() <= 0.001);
 
@@ -960,8 +961,8 @@ fn vehicle_corner_wall_scenario_matches_authored_layout() {
             .get(*unit_id)
             .expect("scenario tank should exist");
         assert_eq!(entity.kind, EntityKind::Tank);
-        assert!((entity.pos_x - expected_x).abs() <= 0.001);
-        assert!((entity.pos_y - expected_y).abs() <= 0.001);
+        assert!((entity.pos_x() - expected_x).abs() <= 0.001);
+        assert!((entity.pos_y() - expected_y).abs() <= 0.001);
         assert!((entity.facing() - north).abs() <= 0.001);
     }
 }
@@ -1007,13 +1008,13 @@ fn replay_238_rifleman_rounds_corner_and_reaches_goal() {
         .entities
         .get(rifleman)
         .expect("Rifleman should remain present");
-    let dx = entity.pos_x - setup.goal.0;
-    let dy = entity.pos_y - setup.goal.1;
+    let dx = entity.pos_x() - setup.goal.0;
+    let dy = entity.pos_y() - setup.goal.1;
     assert!(
-        (dx * dx + dy * dy).sqrt() <= 0.001,
+        (dx * dx + dy * dy).det_sqrt() <= 0.001,
         "Rifleman should reach the exact goal after rounding the rock corner, got ({:.3}, {:.3})",
-        entity.pos_x,
-        entity.pos_y
+        entity.pos_x(),
+        entity.pos_y()
     );
     assert!(entity.path_is_empty());
     assert!(matches!(entity.order(), Order::Idle));
@@ -1057,7 +1058,7 @@ fn factory_zero_gap_perpendicular_scenario_matches_authored_layout() {
             "{unit} should start visually zero-gap against factory east side, got {gap:.4}px"
         );
         assert!(
-            (unit_entity.pos_y - (rect.min_y + rect.max_y) * 0.5).abs() <= 0.001,
+            (unit_entity.pos_y() - (rect.min_y + rect.max_y) * 0.5).abs() <= 0.001,
             "{unit} should be centered along the factory side"
         );
         assert!(
@@ -1065,11 +1066,11 @@ fn factory_zero_gap_perpendicular_scenario_matches_authored_layout() {
             "{unit} should begin with its hull north/south"
         );
         assert!(
-            (setup.goal.0 - unit_entity.pos_x - config::TILE_SIZE as f32 * 10.0).abs() <= 0.001,
+            (setup.goal.0 - unit_entity.pos_x() - config::TILE_SIZE as f32 * 10.0).abs() <= 0.001,
             "{unit} move goal should be ten tiles east"
         );
         assert!(
-            (setup.goal.1 - unit_entity.pos_y).abs() <= 0.001,
+            (setup.goal.1 - unit_entity.pos_y()).abs() <= 0.001,
             "{unit} move goal should be perpendicular to the hull on the same y axis"
         );
     }
@@ -1120,7 +1121,7 @@ fn assert_vehicle_small_block_baseline_setup(
                 "{vehicle} should begin facing north, facing {:.4}",
                 entity.facing()
             );
-            (entity.pos_x, entity.pos_y)
+            (entity.pos_x(), entity.pos_y())
         })
         .collect();
     vehicle_positions.sort_by(|a, b| a.0.total_cmp(&b.0));
@@ -1131,7 +1132,7 @@ fn assert_vehicle_small_block_baseline_setup(
         .entities
         .iter()
         .filter(|e| e.owner == 1 && Some(e.kind) == blocker)
-        .map(|e| (e.pos_x, e.pos_y))
+        .map(|e| (e.pos_x(), e.pos_y()))
         .collect();
     blocker_positions.sort_by(|a, b| a.0.total_cmp(&b.0));
 

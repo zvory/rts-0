@@ -1,3 +1,4 @@
+use rts_rules::math::GameplayMath as _;
 use std::collections::HashMap;
 
 use crate::config;
@@ -84,9 +85,9 @@ fn tick_windup(
         let target = entities.get(target)?;
         Some((
             attacker.owner,
-            attacker.pos_x,
-            attacker.pos_y,
-            (target.pos_y - attacker.pos_y).atan2(target.pos_x - attacker.pos_x),
+            attacker.pos_x(),
+            attacker.pos_y(),
+            (target.pos_y() - attacker.pos_y()).det_atan2(target.pos_x() - attacker.pos_x()),
         ))
     }) else {
         cancel_windup(entities, id);
@@ -140,7 +141,7 @@ fn tick_windup(
 
     let (impact_x, impact_y) = entities
         .get(target)
-        .map(|target| (target.pos_x, target.pos_y))
+        .map(|target| (target.pos_x(), target.pos_y()))
         .unwrap_or((ax, ay));
     shots.schedule(owner, id, target, (ax, ay), (impact_x, impact_y), tick);
     if let Some(attacker) = entities.get_mut(id) {

@@ -40,7 +40,10 @@ pub(super) fn legacy_snapshot_entities(game: &Game, player: u32, fogged: bool) -
         if fogged
             && !own
             && !e.kind.is_node()
-            && !game.state.fog.is_visible_world(player, e.pos_x, e.pos_y)
+            && !game
+                .state
+                .fog
+                .is_visible_world(player, e.pos_x(), e.pos_y())
         {
             continue;
         }
@@ -55,8 +58,8 @@ fn legacy_view_of(game: &Game, e: &Entity, viewer: u32, fogged: bool) -> EntityV
         e.id,
         e.owner,
         crate::protocol::kind_to_wire(e.kind),
-        e.pos_x,
-        e.pos_y,
+        e.pos_x(),
+        e.pos_y(),
         e.hp,
         e.max_hp,
         e.state_str(),
@@ -78,7 +81,7 @@ fn legacy_view_of(game: &Game, e: &Entity, viewer: u32, fogged: bool) -> EntityV
                     || game
                         .state
                         .fog
-                        .is_visible_world(viewer, target.pos_x, target.pos_y)
+                        .is_visible_world(viewer, target.pos_x(), target.pos_y())
             })
             .unwrap_or(false)
     } else {
@@ -175,8 +178,8 @@ fn legacy_view_of(game: &Game, e: &Entity, viewer: u32, fogged: bool) -> EntityV
                 if target_visible {
                     v.order_plan.push(OrderPlanMarker {
                         kind: "attack".to_string(),
-                        x: target.pos_x,
-                        y: target.pos_y,
+                        x: target.pos_x(),
+                        y: target.pos_y(),
                         building_kind: None,
                     });
                 }
@@ -293,7 +296,7 @@ pub(super) fn smoke_command_fixture() -> (Game, u32, (f32, f32), (f32, f32)) {
 
 pub(super) fn entity_distance_to(game: &Game, id: u32, point: (f32, f32)) -> f32 {
     let entity = game.state.entities.get(id).expect("entity should exist");
-    let dx = entity.pos_x - point.0;
-    let dy = entity.pos_y - point.1;
-    (dx * dx + dy * dy).sqrt()
+    let dx = entity.pos_x() - point.0;
+    let dy = entity.pos_y() - point.1;
+    (dx * dx + dy * dy).det_sqrt()
 }

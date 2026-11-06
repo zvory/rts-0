@@ -1,4 +1,5 @@
 use crate::game::entity::{EntityKind, EntityStore};
+use rts_rules::math::GameplayMath as _;
 
 pub(super) fn heading(
     entities: &EntityStore,
@@ -27,13 +28,13 @@ pub(super) fn heading(
         .iter()
         .filter_map(|id| entities.get(*id))
         .fold((0.0_f64, 0.0_f64), |(x, y), e| {
-            (x + e.pos_x as f64, y + e.pos_y as f64)
+            (x + e.pos_x() as f64, y + e.pos_y() as f64)
         });
     let dx = x as f64 - sx / tanks.len() as f64;
     let dy = y as f64 - sy / tanks.len() as f64;
-    if dx.hypot(dy) < 0.001 {
+    if dx.det_hypot(dy) < 0.001 {
         return None;
     }
-    let facing = dy.atan2(dx) as f32;
+    let facing = dy.det_atan2(dx) as f32;
     Some((tanks, facing))
 }

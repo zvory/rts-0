@@ -28,6 +28,7 @@ use crate::game::teams::TeamRelations;
 use crate::game::PlayerState;
 use crate::protocol::{Event, NoticeSeverity};
 use crate::rules;
+use rts_rules::math::GameplayMath as _;
 use std::collections::BTreeMap;
 
 use self::attack::{direct_panzerfaust_shot_spent, panzerfaust_attack_cycle_active};
@@ -347,7 +348,7 @@ fn ready_for_next_order(
             let delta = facing - e.facing();
             !e.queued_orders().is_empty()
                 && e.path_is_empty()
-                && delta.sin().atan2(delta.cos()).abs() < 0.0001
+                && delta.det_sin().det_atan2(delta.det_cos()).abs() < 0.0001
         }
         Order::Idle | Order::HoldPosition => !e.queued_orders().is_empty() && e.path_is_empty(),
         Order::Move(_) | Order::AttackMove(_) => {
@@ -598,7 +599,7 @@ fn setup_anti_tank_gun_intent_valid(entities: &EntityStore, id: u32, x: f32, y: 
     {
         return false;
     }
-    let facing = (y - e.pos_y).atan2(x - e.pos_x);
+    let facing = (y - e.pos_y()).det_atan2(x - e.pos_x());
     facing.is_finite()
 }
 
@@ -676,7 +677,7 @@ fn deconstruct_intent_valid(
         return false;
     }
     teams.same_team_or_same_owner(owner, target.owner)
-        || rules::projection::team_visible_world(owner, target.pos_x, target.pos_y, fog, teams)
+        || rules::projection::team_visible_world(owner, target.pos_x(), target.pos_y(), fog, teams)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1420,8 +1421,7 @@ mod tests {
             let unit = entities.get_mut(at).expect("at gun should exist");
             unit.set_order(Order::move_to(150.0, 100.0));
             unit.mark_move_phase(MovePhase::Arrived);
-            unit.pos_x = 150.0;
-            unit.pos_y = 100.0;
+            unit.set_position(150.0, 100.0);
             unit.append_queued_order(OrderIntent::setup_anti_tank_guns(150.0, 140.0));
             unit.append_queued_order(OrderIntent::attack_move_to(240.0, 100.0));
         }
@@ -1453,8 +1453,8 @@ mod tests {
         let angle = config::ARTILLERY_FIELD_OF_FIRE_RAD;
         let distance = config::TILE_SIZE as f32 * 30.0;
         let target = (
-            pos.0 + angle.cos() * distance,
-            pos.1 + angle.sin() * distance,
+            pos.0 + angle.det_cos() * distance,
+            pos.1 + angle.det_sin() * distance,
         );
         let artillery = entities
             .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)

@@ -19,8 +19,8 @@ pub(super) fn attack_reveal_for(attacker: Option<&Entity>) -> Option<AttackRevea
     Some(AttackReveal {
         owner: attacker.owner,
         kind: protocol::kind_to_wire(attacker.kind).to_string(),
-        x: attacker.pos_x,
-        y: attacker.pos_y,
+        x: attacker.pos_x(),
+        y: attacker.pos_y(),
         facing: Some(attacker.facing()),
         weapon_facing: attacker.weapon_facing(),
         setup_state,

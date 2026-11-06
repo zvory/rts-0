@@ -1,5 +1,6 @@
 //! Copied from Rush staging, intentionally owned independently by Pressure.
 //! Cohorts assemble on a timed front before receiving a shared attack route.
+use rts_rules::math::GameplayMath as _;
 use std::cmp::Reverse;
 use std::collections::{BTreeMap, BTreeSet, BinaryHeap, VecDeque};
 
@@ -574,7 +575,7 @@ fn shortest_route(map: &AiMap, home: Point, target: Point) -> Option<Vec<Point>>
 }
 
 fn distance(a: Point, b: Point) -> f32 {
-    (a.0 - b.0).hypot(a.1 - b.1)
+    (a.0 - b.0).det_hypot(a.1 - b.1)
 }
 
 #[cfg(test)]

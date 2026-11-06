@@ -7,6 +7,7 @@ use crate::game::services::occupancy::Occupancy;
 use crate::game::services::world_query;
 use crate::game::teams::TeamRelations;
 use crate::game::PlayerState;
+use rts_rules::math::GameplayMath as _;
 
 mod pump_jack;
 
@@ -86,7 +87,7 @@ fn gather_to_node(
 ) {
     let node_pos = match entities.get(node) {
         Some(n) if direct_gather_node_mineable(n.kind) && n.remaining().unwrap_or(0) > 0 => {
-            (n.pos_x, n.pos_y)
+            (n.pos_x(), n.pos_y())
         }
         _ => {
             idle_gatherer(entities, id);
@@ -94,7 +95,7 @@ fn gather_to_node(
         }
     };
     let (wx, wy) = match entities.get(id) {
-        Some(e) => (e.pos_x, e.pos_y),
+        Some(e) => (e.pos_x(), e.pos_y()),
         None => return,
     };
     let owner = match entities.get(id) {
@@ -109,7 +110,7 @@ fn gather_to_node(
         _ => return,
     };
 
-    if dist2(wx, wy, node_pos.0, node_pos.1).sqrt() <= interact {
+    if dist2(wx, wy, node_pos.0, node_pos.1).det_sqrt() <= interact {
         if !world_query::resource_has_completed_mining_anchor_for_player(entities, owner, node) {
             wait_gatherer_for_anchor(entities, id, node_pos, wx, wy);
             return;
@@ -118,7 +119,7 @@ fn gather_to_node(
             && entities.resource_extractor_for_node(node).is_none();
         if let Some(e) = entities.get_mut(id) {
             e.clear_path();
-            e.set_facing((node_pos.1 - wy).atan2(node_pos.0 - wx));
+            e.set_facing((node_pos.1 - wy).det_atan2(node_pos.0 - wx));
             if can_mine {
                 // Gather is terminal once harvesting begins: drop any later queued
                 // handoff orders so the gatherer stays on the node.
@@ -154,7 +155,7 @@ fn wait_gatherer_for_anchor(
     if let Some(e) = entities.get_mut(id) {
         e.clear_path();
         e.set_target_id(None);
-        e.set_facing((node_pos.1 - worker_y).atan2(node_pos.0 - worker_x));
+        e.set_facing((node_pos.1 - worker_y).det_atan2(node_pos.0 - worker_x));
         e.mark_gather_phase(GatherPhase::WaitingForAnchor);
     }
 }
@@ -182,7 +183,7 @@ fn closest_unoccupied_same_resource_node(
 ) -> Option<u32> {
     let (owner, target_kind, nx, ny) = match (entities.get(worker), entities.get(node)) {
         (Some(worker), Some(target)) if target.is_node() => {
-            (worker.owner, target.kind, target.pos_x, target.pos_y)
+            (worker.owner, target.kind, target.pos_x(), target.pos_y())
         }
         _ => return None,
     };
@@ -205,7 +206,7 @@ fn closest_unoccupied_same_resource_node(
                 && entities.resource_extractor_for_node(candidate.id).is_none()
         })
         .filter_map(|candidate| {
-            let d2 = dist2(nx, ny, candidate.pos_x, candidate.pos_y);
+            let d2 = dist2(nx, ny, candidate.pos_x(), candidate.pos_y());
             (d2 <= range2).then_some((candidate.id, d2))
         })
         .collect();
@@ -222,12 +223,12 @@ fn move_gatherer_to_nearby_open_grass(
     id: u32,
     node: u32,
 ) {
-    let Some((owner, wx, wy)) = entities.get(id).map(|e| (e.owner, e.pos_x, e.pos_y)) else {
+    let Some((owner, wx, wy)) = entities.get(id).map(|e| (e.owner, e.pos_x(), e.pos_y())) else {
         return;
     };
     let anchor = entities
         .get(node)
-        .map(|e| (e.pos_x, e.pos_y))
+        .map(|e| (e.pos_x(), e.pos_y()))
         .unwrap_or((wx, wy));
     let Some(goal) = nearest_open_non_resource_passable_tile(map, entities, occ, anchor) else {
         idle_gatherer(entities, id);
@@ -250,7 +251,7 @@ fn nearest_open_non_resource_passable_tile(
     let resource_tiles: Vec<(u32, u32)> = entities
         .iter()
         .filter(|e| e.is_node() && e.remaining().unwrap_or(0) > 0)
-        .map(|e| map.tile_of(e.pos_x, e.pos_y))
+        .map(|e| map.tile_of(e.pos_x(), e.pos_y()))
         .collect();
 
     let mut best: Option<((f32, f32), i32, f32)> = None;
@@ -301,8 +302,10 @@ fn gather_harvesting(
         None => return,
     };
     if !world_query::resource_has_completed_mining_anchor_for_player(entities, owner, node) {
-        let node_pos = entities.get(node).map(|node| (node.pos_x, node.pos_y));
-        let worker_pos = entities.get(id).map(|worker| (worker.pos_x, worker.pos_y));
+        let node_pos = entities.get(node).map(|node| (node.pos_x(), node.pos_y()));
+        let worker_pos = entities
+            .get(id)
+            .map(|worker| (worker.pos_x(), worker.pos_y()));
         match (node_pos, worker_pos) {
             (Some(node_pos), Some((worker_x, worker_y))) => {
                 wait_gatherer_for_anchor(entities, id, node_pos, worker_x, worker_y);

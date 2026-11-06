@@ -119,8 +119,8 @@ mod tests {
                 .min_by_key(|entity| entity.id);
             if let Some(worker) = first_worker {
                 first_worker_id = Some(worker.id);
-                closest =
-                    closest.min((worker.x - route_waypoint.0).hypot(worker.y - route_waypoint.1));
+                closest = closest
+                    .min((worker.x - route_waypoint.0).det_hypot(worker.y - route_waypoint.1));
             }
         }
 
@@ -166,7 +166,7 @@ mod tests {
             "the depot should produce all four workers"
         );
         for worker in workers {
-            let distance = (worker.x - RALLY.0).hypot(worker.y - RALLY.1);
+            let distance = (worker.x - RALLY.0).det_hypot(worker.y - RALLY.1);
             assert!(
                 distance <= 64.0,
                 "worker {} remained {distance:.1}px from the rally cluster",

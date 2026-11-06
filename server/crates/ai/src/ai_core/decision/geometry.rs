@@ -1,9 +1,10 @@
 use super::*;
+use rts_rules::math::GameplayMath as _;
 
 pub(super) fn normalized_direction(from: (f32, f32), to: (f32, f32)) -> Option<(f32, f32)> {
     let dx = to.0 - from.0;
     let dy = to.1 - from.1;
-    let len = (dx * dx + dy * dy).sqrt();
+    let len = (dx * dx + dy * dy).det_sqrt();
     if len <= f32::EPSILON || !len.is_finite() {
         return None;
     }

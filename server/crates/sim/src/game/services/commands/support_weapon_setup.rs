@@ -1,6 +1,7 @@
 use crate::config;
 use crate::game::entity::{Entity, EntityStore, OrderIntent};
 use crate::rules::is_anti_tank_gun;
+use rts_rules::math::GameplayMath as _;
 
 const CONVERGENCE_END_TILES: f32 = 14.0;
 const PARALLEL_DISTANCE_TILES: f32 = 20.0;
@@ -47,15 +48,15 @@ pub(super) fn target_groups(
     let centroid_y = guns.iter().map(|(_, _, y)| y).sum::<f32>() / guns.len() as f32;
     let dx = raw_x - centroid_x;
     let dy = raw_y - centroid_y;
-    let distance = dx.hypot(dy);
+    let distance = dx.det_hypot(dy);
     let tile_size = config::TILE_SIZE as f32;
     if distance <= CONVERGENCE_END_TILES * tile_size {
         return vec![literal_group(units, raw_x, raw_y)];
     }
 
-    let forward = dy.atan2(dx);
-    let right_x = -forward.sin();
-    let right_y = forward.cos();
+    let forward = dy.det_atan2(dx);
+    let right_x = -forward.det_sin();
+    let right_y = forward.det_cos();
     guns.sort_by(|left, right| {
         let left_projection = left.1 * right_x + left.2 * right_y;
         let right_projection = right.1 * right_x + right.2 * right_y;
@@ -76,7 +77,7 @@ pub(super) fn target_groups(
     let ray_length = FACING_RAY_TILES * tile_size;
     let mut groups = Vec::with_capacity(guns.len() + 1);
     for (index, (id, x, y)) in guns.iter().copied().enumerate() {
-        let literal_facing = (raw_y - y).atan2(raw_x - x);
+        let literal_facing = (raw_y - y).det_atan2(raw_x - x);
         let parallel_facing = lerp_angle(literal_facing, forward, convergence);
         let rank = if guns.len() == 1 {
             0.0
@@ -86,8 +87,8 @@ pub(super) fn target_groups(
         let facing = parallel_facing + rank * FULL_FAN_HALF_ANGLE * fan;
         groups.push(SetupTargetGroup {
             units: vec![id],
-            x: x + facing.cos() * ray_length,
-            y: y + facing.sin() * ray_length,
+            x: x + facing.det_cos() * ray_length,
+            y: y + facing.det_sin() * ray_length,
         });
     }
 
@@ -103,7 +104,7 @@ pub(super) fn target_groups(
 }
 
 fn setup_origin(entity: &Entity, queued: bool) -> (f32, f32) {
-    let mut origin = (entity.pos_x, entity.pos_y);
+    let mut origin = (entity.pos_x(), entity.pos_y());
     if !queued {
         return origin;
     }
@@ -140,6 +141,6 @@ fn smoothstep(value: f32) -> f32 {
 }
 
 fn lerp_angle(from: f32, to: f32, amount: f32) -> f32 {
-    let delta = (to - from).sin().atan2((to - from).cos());
+    let delta = (to - from).det_sin().det_atan2((to - from).det_cos());
     from + delta * amount
 }

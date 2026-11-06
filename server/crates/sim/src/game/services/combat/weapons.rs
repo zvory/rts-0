@@ -5,6 +5,7 @@ use crate::game::entity::{
 use crate::game::entrenchment_combat;
 use crate::game::services::movement::{angle_delta, rotate_toward};
 use crate::rules::combat as combat_rules;
+use rts_rules::math::GameplayMath as _;
 
 use super::projection::tank_effective_range_tiles;
 use super::{
@@ -228,7 +229,7 @@ pub(super) fn can_fire_while_moving(e: &Entity, methamphetamines_researched: boo
 
 pub(super) fn breakthrough_moving_fire_active(e: &Entity) -> bool {
     let (dx, dy) = e.movement_delta();
-    e.breakthrough_ticks() > 0 && dx.mul_add(dx, dy * dy) > f32::EPSILON
+    e.breakthrough_ticks() > 0 && dx.det_mul_add(dx, dy * dy) > f32::EPSILON
 }
 
 pub(super) fn moving_attack_cooldown(e: &Entity, cooldown: u32) -> u32 {

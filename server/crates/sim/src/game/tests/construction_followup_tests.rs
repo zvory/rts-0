@@ -71,13 +71,13 @@ fn move_command(worker: u32, x: f32, queued: bool) -> Command {
 fn construction_followup_latest_click_replaces_queue_and_walks_after_completion() {
     let (mut game, worker, site) = fixture();
     let entity = game.state.entities.get(worker).unwrap();
-    let before = (entity.pos_x, entity.pos_y);
+    let before = (entity.pos_x(), entity.pos_y());
     game.enqueue(1, move_command(worker, 640.0, false));
     game.enqueue(1, move_command(worker, 704.0, true));
     game.enqueue(1, move_command(worker, 768.0, false));
     game.tick();
     let entity = game.state.entities.get(worker).unwrap();
-    assert_eq!((entity.pos_x, entity.pos_y), before);
+    assert_eq!((entity.pos_x(), entity.pos_y()), before);
     assert_eq!(
         entity.build_phase(),
         Some(BuildPhase::Constructing { site })
@@ -109,7 +109,7 @@ fn construction_followup_latest_click_replaces_queue_and_walks_after_completion(
         game.tick();
     }
     let after = game.state.entities.get(worker).unwrap();
-    assert!((after.pos_x - 768.0).abs() < 32.0 && (after.pos_y - 320.0).abs() < 32.0);
+    assert!((after.pos_x() - 768.0).abs() < 32.0 && (after.pos_y() - 320.0).abs() < 32.0);
 }
 
 #[test]

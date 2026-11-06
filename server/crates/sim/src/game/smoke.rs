@@ -3,6 +3,7 @@ use crate::game::entity::{Entity, EntityStore};
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::teams::TeamRelations;
+use rts_rules::math::Coord;
 use serde::{Deserialize, Serialize};
 
 pub(crate) const MAX_ACTIVE_SMOKE_CLOUDS: usize = 256;
@@ -10,8 +11,8 @@ pub(crate) const MAX_ACTIVE_SMOKE_CLOUDS: usize = 256;
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub(crate) struct SmokeCloud {
     pub(crate) id: u32,
-    pub(crate) x: f32,
-    pub(crate) y: f32,
+    pub(crate) x: Coord,
+    pub(crate) y: Coord,
     pub(crate) radius_tiles: f32,
     pub(crate) spawned_tick: u32,
     pub(crate) expires_tick: u32,
@@ -26,10 +27,7 @@ impl SmokeCloud {
         if !x.is_finite() || !y.is_finite() {
             return false;
         }
-        let dx = x - self.x;
-        let dy = y - self.y;
-        let radius = self.radius_px();
-        dx * dx + dy * dy <= radius * radius
+        Coord::within_radius((self.x, self.y), (x, y), self.radius_px())
     }
 
     pub(crate) fn expires_in(self, tick: u32) -> u16 {
@@ -43,8 +41,8 @@ impl SmokeCloud {
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub(crate) struct PendingSmokeCloud {
-    pub(crate) x: f32,
-    pub(crate) y: f32,
+    pub(crate) x: Coord,
+    pub(crate) y: Coord,
     pub(crate) radius_tiles: f32,
     pub(crate) duration_ticks: u32,
     pub(crate) due_tick: u32,
@@ -92,8 +90,8 @@ impl SmokeCloudStore {
         self.next_id = self.next_id.wrapping_add(1).max(1);
         self.clouds.push(SmokeCloud {
             id,
-            x,
-            y,
+            x: Coord::from_world(x),
+            y: Coord::from_world(y),
             radius_tiles,
             spawned_tick: tick,
             expires_tick: tick.saturating_add(duration_ticks),
@@ -116,8 +114,8 @@ impl SmokeCloudStore {
             return false;
         }
         self.pending.push(PendingSmokeCloud {
-            x,
-            y,
+            x: Coord::from_world(x),
+            y: Coord::from_world(y),
             radius_tiles,
             duration_ticks,
             due_tick,
@@ -131,8 +129,8 @@ impl SmokeCloudStore {
         for cloud in pending {
             if cloud.due_tick <= tick {
                 self.spawn(
-                    cloud.x,
-                    cloud.y,
+                    cloud.x.to_world(),
+                    cloud.y.to_world(),
                     cloud.radius_tiles,
                     cloud.duration_ticks,
                     tick,
@@ -165,8 +163,8 @@ impl SmokeCloudStore {
     /// infantry rather than needing their centers to overlap.
     pub(crate) fn units_have_melee_visibility(&self, first: &Entity, second: &Entity) -> bool {
         Self::units_within_melee_visibility_range(first, second)
-            && self.point_inside(first.pos_x, first.pos_y)
-            && self.point_inside(second.pos_x, second.pos_y)
+            && self.point_inside(first.pos_x(), first.pos_y())
+            && self.point_inside(second.pos_x(), second.pos_y())
     }
 
     pub(crate) fn units_within_melee_visibility_range(first: &Entity, second: &Entity) -> bool {
@@ -178,8 +176,8 @@ impl SmokeCloudStore {
         {
             return false;
         }
-        let dx = second.pos_x - first.pos_x;
-        let dy = second.pos_y - first.pos_y;
+        let dx = second.pos_x() - first.pos_x();
+        let dy = second.pos_y() - first.pos_y();
         let range = first.radius()
             + second.radius()
             + config::SMOKE_MELEE_VISIBILITY_RANGE_TILES * config::TILE_SIZE as f32;
@@ -220,8 +218,8 @@ impl SmokeCloudStore {
     ) -> bool {
         let radius_tiles = cloud.radius_tiles.ceil().max(0.0) as i32;
         let ts = config::TILE_SIZE as f32;
-        let cx = (cloud.x / ts).floor() as i32;
-        let cy = (cloud.y / ts).floor() as i32;
+        let cx = (cloud.x.to_world() / ts).floor() as i32;
+        let cy = (cloud.y.to_world() / ts).floor() as i32;
         for dy in -radius_tiles..=radius_tiles {
             for dx in -radius_tiles..=radius_tiles {
                 let tx = cx + dx;
@@ -242,7 +240,7 @@ impl SmokeCloudStore {
         entities.iter().any(|entity| {
             teams.same_team_or_same_owner(player, entity.owner)
                 && !entity.is_node()
-                && cloud.contains_point(entity.pos_x, entity.pos_y)
+                && cloud.contains_point(entity.pos_x(), entity.pos_y())
         })
     }
 
@@ -264,7 +262,8 @@ fn segment_intersects_cloud(start: (f32, f32), end: (f32, f32), cloud: SmokeClou
     if len2 <= f32::EPSILON {
         return cloud.contains_point(start.0, start.1);
     }
-    let t = (((cloud.x - start.0) * dx + (cloud.y - start.1) * dy) / len2).clamp(0.0, 1.0);
+    let t = (((cloud.x.to_world() - start.0) * dx + (cloud.y.to_world() - start.1) * dy) / len2)
+        .clamp(0.0, 1.0);
     let closest = (start.0 + dx * t, start.1 + dy * t);
     cloud.contains_point(closest.0, closest.1)
 }
@@ -286,8 +285,8 @@ mod tests {
     fn segment_intersection_detects_smoke_disc() {
         let cloud = SmokeCloud {
             id: 1,
-            x: 64.0,
-            y: 64.0,
+            x: Coord::from_world(64.0),
+            y: Coord::from_world(64.0),
             radius_tiles: 1.0,
             spawned_tick: 1,
             expires_tick: 10,

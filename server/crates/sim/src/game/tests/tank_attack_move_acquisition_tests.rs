@@ -51,7 +51,7 @@ fn charged_attack_moving_tank_checks_range_before_starting_to_move() {
     game.tick();
 
     let unit = game.state.entities.get(tank).expect("tank should survive");
-    assert_eq!((unit.pos_x, unit.pos_y), tank_pos);
+    assert_eq!((unit.pos_x(), unit.pos_y()), tank_pos);
     assert_eq!(unit.target_id(), Some(enemy));
     assert!(
         unit.path_is_empty(),
@@ -103,7 +103,7 @@ fn paused_attack_move_reacquires_a_new_target_during_reload() {
     let unit = game.state.entities.get(tank).expect("tank should survive");
     assert_eq!(unit.target_id(), Some(replacement));
     assert!(unit.path_is_empty(), "tank should not resume its route");
-    assert_eq!((unit.pos_x, unit.pos_y), (100.0, 100.0));
+    assert_eq!((unit.pos_x(), unit.pos_y()), (100.0, 100.0));
 }
 
 #[test]
@@ -170,7 +170,7 @@ fn tank_plus_applies_to_existing_and_future_owned_tanks() {
     game.tick();
     let upgraded = game.state.entities.get(tank).unwrap();
     assert!(
-        (upgraded.pos_x - 502.2).abs() < 0.001,
+        (upgraded.pos_x() - 502.2).abs() < 0.001,
         "top speed is 2.2 px/tick"
     );
     assert_eq!(

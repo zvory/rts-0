@@ -312,7 +312,7 @@ fn deployed_anti_tank_gun_fires_at_mortars_but_prioritizes_tanks() {
         };
         let target = entities.get(expected).expect("target should exist");
         let before_hp = target.hp;
-        let aim = (target.pos_y - 100.0).atan2(target.pos_x - 100.0);
+        let aim = (target.pos_y() - 100.0).det_atan2(target.pos_x() - 100.0);
         let at = entities.get_mut(gun).expect("AT gun should exist");
         at.set_weapon_setup(WeaponSetup::Deployed);
         at.set_emplacement_facing(Some(0.0));

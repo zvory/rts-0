@@ -1,3 +1,4 @@
+use rts_rules::math::{Coord, GameplayMath as _};
 use std::collections::HashMap;
 
 use crate::config;
@@ -18,8 +19,8 @@ struct ArtilleryShell {
     owner: u32,
     #[serde(default)]
     attacker: u32,
-    x: f32,
-    y: f32,
+    x: Coord,
+    y: Coord,
     impact_tick: u32,
 }
 
@@ -40,8 +41,8 @@ impl ArtilleryShellStore {
         self.shells.push(ArtilleryShell {
             owner,
             attacker,
-            x,
-            y,
+            x: Coord::from_world(x),
+            y: Coord::from_world(y),
             impact_tick: tick.saturating_add(config::ARTILLERY_SHELL_DELAY_TICKS),
         });
     }
@@ -61,7 +62,7 @@ impl ArtilleryShellStore {
         let due = std::mem::take(&mut self.shells);
         for shell in due {
             if shell.impact_tick <= tick {
-                on_impact(shell.x, shell.y);
+                on_impact(shell.x.to_world(), shell.y.to_world());
                 resolve_shell(map, entities, teams, fog, events, &shell, tick);
             } else {
                 pending.push(shell);
@@ -80,7 +81,14 @@ fn resolve_shell(
     shell: &ArtilleryShell,
     tick: u32,
 ) {
-    emit_impact(events, teams, fog, shell.owner, shell.x, shell.y);
+    emit_impact(
+        events,
+        teams,
+        fog,
+        shell.owner,
+        shell.x.to_world(),
+        shell.y.to_world(),
+    );
 
     let outer_radius = config::ARTILLERY_OUTER_RADIUS_TILES * config::TILE_SIZE as f32;
     let inner_radius = config::ARTILLERY_INNER_RADIUS_TILES * config::TILE_SIZE as f32;
@@ -97,7 +105,7 @@ fn resolve_shell(
         {
             continue;
         }
-        let d2 = impact_distance2_to_target(shell.x, shell.y, target);
+        let d2 = impact_distance2_to_target(shell.x.to_world(), shell.y.to_world(), target);
         if d2 <= outer2 {
             hits.push((id, d2));
         }
@@ -111,7 +119,7 @@ fn resolve_shell(
             target,
             artillery_damage(target.kind, d2, inner2, outer2),
         );
-        let damage = map.damage_after_reduction_tile(target.pos_x, target.pos_y, damage);
+        let damage = map.damage_after_reduction_tile(target.pos_x(), target.pos_y(), damage);
         if damage == 0 {
             continue;
         }
@@ -122,14 +130,14 @@ fn resolve_shell(
                     damage,
                     shell.owner,
                     shell.attacker,
-                    (shell.x, shell.y),
+                    (shell.x.to_world(), shell.y.to_world()),
                     tick,
                 )
             } else {
                 target.apply_damage(damage, None)
             };
             if damaged {
-                damaged_owner = Some((target.owner, target.pos_x, target.pos_y));
+                damaged_owner = Some((target.owner, target.pos_x(), target.pos_y()));
             }
         }
         if let Some((victim_owner, x, y)) = damaged_owner {
@@ -147,12 +155,12 @@ fn artillery_damage(victim_kind: EntityKind, d2: f32, inner2: f32, outer2: f32) 
     if d2 > outer2 {
         return 0;
     }
-    let inner = inner2.sqrt();
-    let outer = outer2.sqrt();
+    let inner = inner2.det_sqrt();
+    let outer = outer2.det_sqrt();
     if outer <= inner {
         return 0;
     }
-    let d = d2.sqrt();
+    let d = d2.det_sqrt();
     let t = ((d - inner) / (outer - inner)).clamp(0.0, 1.0);
     let base = (config::ARTILLERY_INNER_DAMAGE as f32
         + (config::ARTILLERY_OUTER_MIN_DAMAGE as f32 - config::ARTILLERY_INNER_DAMAGE as f32) * t)
@@ -170,24 +178,24 @@ fn impact_distance2_to_target(x: f32, y: f32, target: &Entity) -> f32 {
     if let Some(rect) = building_rect_for_entity_center(target) {
         return point_rect_distance2(x, y, rect);
     }
-    let dx = x - target.pos_x;
-    let dy = y - target.pos_y;
+    let dx = x - target.pos_x();
+    let dy = y - target.pos_y();
     dx * dx + dy * dy
 }
 
 fn building_rect_for_entity_center(e: &Entity) -> Option<RectBody> {
     let stats = config::building_stats(e.kind)?;
-    if !e.pos_x.is_finite() || !e.pos_y.is_finite() || stats.foot_w == 0 || stats.foot_h == 0 {
+    if !e.pos_x().is_finite() || !e.pos_y().is_finite() || stats.foot_w == 0 || stats.foot_h == 0 {
         return None;
     }
     let ts = config::TILE_SIZE as f32;
     let half_w = stats.foot_w as f32 * ts * 0.5;
     let half_h = stats.foot_h as f32 * ts * 0.5;
     Some(RectBody {
-        min_x: e.pos_x - half_w,
-        min_y: e.pos_y - half_h,
-        max_x: e.pos_x + half_w,
-        max_y: e.pos_y + half_h,
+        min_x: e.pos_x() - half_w,
+        min_y: e.pos_y() - half_h,
+        max_x: e.pos_x() + half_w,
+        max_y: e.pos_y() + half_h,
     })
 }
 
@@ -296,15 +304,20 @@ mod tests {
         let outer = config::ARTILLERY_OUTER_RADIUS_TILES * config::TILE_SIZE as f32;
 
         assert_eq!(
-            artillery_damage(EntityKind::Rifleman, 0.0, inner.powi(2), outer.powi(2)),
+            artillery_damage(
+                EntityKind::Rifleman,
+                0.0,
+                inner.det_powi(2),
+                outer.det_powi(2)
+            ),
             75
         );
         assert_eq!(
             artillery_damage(
                 EntityKind::Rifleman,
-                outer.powi(2),
-                inner.powi(2),
-                outer.powi(2)
+                outer.det_powi(2),
+                inner.det_powi(2),
+                outer.det_powi(2)
             ),
             20
         );
@@ -325,8 +338,8 @@ mod tests {
         let shell = ArtilleryShell {
             owner: 1,
             attacker: 1,
-            x: 160.0,
-            y: 160.0,
+            x: Coord::from_world(160.0),
+            y: Coord::from_world(160.0),
             impact_tick: 0,
         };
 
@@ -337,9 +350,9 @@ mod tests {
         let outer = config::ARTILLERY_OUTER_RADIUS_TILES * config::TILE_SIZE as f32;
         let expected_base = artillery_damage(
             EntityKind::Rifleman,
-            64.0_f32.powi(2),
-            inner.powi(2),
-            outer.powi(2),
+            64.0_f32.det_powi(2),
+            inner.det_powi(2),
+            outer.det_powi(2),
         );
         let expected_damage =
             combat::area_damage_after_entrenchment(EntityKind::Rifleman, expected_base, true);

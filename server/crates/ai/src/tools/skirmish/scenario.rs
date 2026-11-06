@@ -6,6 +6,7 @@
 //! sideways to vary the approach angle. Seeds add a few pixels of deterministic jitter so mirror
 //! fights are not decided by exact symmetry.
 
+use rts_rules::math::GameplayMath as _;
 use rts_sim::rng::PortableRng;
 use std::collections::BTreeSet;
 
@@ -189,7 +190,7 @@ pub(crate) struct PlacementInput {
 pub(crate) fn place_squads(scenario: &Scenario, input: &PlacementInput) -> Placement {
     let (cx, cy) = input.candidate_base;
     let (ox, oy) = input.opponent_base;
-    let axis_len = (ox - cx).hypot(oy - cy).max(1.0);
+    let axis_len = (ox - cx).det_hypot(oy - cy).max(1.0);
     let axis = ((ox - cx) / axis_len, (oy - cy) / axis_len);
     let side = (-axis.1, axis.0);
     let tile = input.tile_px;
@@ -256,7 +257,7 @@ fn free_tile(
             }
             let cx = (candidate.0 as f32 + 0.5) * tile;
             let cy = (candidate.1 as f32 + 0.5) * tile;
-            let distance = (cx - point.0).hypot(cy - point.1);
+            let distance = (cx - point.0).det_hypot(cy - point.1);
             if distance < best_distance {
                 best = candidate;
                 best_distance = distance;
@@ -279,7 +280,7 @@ fn formation_offsets(formation: Formation, count: usize, tile: f32) -> Vec<(f32,
             .map(|i| (centred(i, count, FORMATION_SPACING_TILES * tile), 0.0))
             .collect(),
         Formation::Clump => {
-            let columns = (count as f32).sqrt().ceil().max(1.0) as usize;
+            let columns = (count as f32).det_sqrt().ceil().max(1.0) as usize;
             let rows = count.div_ceil(columns);
             (0..count)
                 .map(|i| {

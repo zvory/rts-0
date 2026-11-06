@@ -178,7 +178,8 @@ fn spawn_moving_rifleman(game: &mut Game, start: (f32, f32)) -> u32 {
 
 fn assert_moved_distance(game: &Game, id: u32, start: (f32, f32), expected: f32, label: &str) {
     let entity = game.state.entities.get(id).expect("spawned rifleman");
-    let moved = ((entity.pos_x - start.0).powi(2) + (entity.pos_y - start.1).powi(2)).sqrt();
+    let moved = ((entity.pos_x() - start.0).det_powi(2) + (entity.pos_y() - start.1).det_powi(2))
+        .det_sqrt();
     assert!(
         (moved - expected).abs() <= 0.001,
         "{label} moved {moved}px; expected {expected}px"

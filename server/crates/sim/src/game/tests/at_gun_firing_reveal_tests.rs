@@ -10,7 +10,7 @@ fn deploy_anti_tank_gun_toward(game: &mut Game, id: u32, target: (f32, f32)) {
         .entities
         .get_mut(id)
         .expect("anti-tank gun should exist");
-    let facing = (target.1 - gun.pos_y).atan2(target.0 - gun.pos_x);
+    let facing = (target.1 - gun.pos_y()).det_atan2(target.0 - gun.pos_x());
     gun.set_weapon_setup(WeaponSetup::Deployed);
     gun.set_emplacement_facing(Some(facing));
     gun.set_facing(facing);
@@ -100,7 +100,7 @@ fn hidden_enemy_tank_fixture() -> (Game, u32, u32) {
         .spawn_unit(2, EntityKind::Tank, enemy_pos.0, enemy_pos.1)
         .expect("enemy tank should spawn");
     if let Some(enemy) = game.state.entities.get_mut(enemy_tank) {
-        let facing = (target_pos.1 - enemy.pos_y).atan2(target_pos.0 - enemy.pos_x);
+        let facing = (target_pos.1 - enemy.pos_y()).det_atan2(target_pos.0 - enemy.pos_x());
         enemy.set_facing(facing);
         enemy.set_weapon_facing(facing);
     }
@@ -220,8 +220,8 @@ fn anti_tank_gun_firing_from_fog_projects_as_actionable_snapshot_entity() {
         .entities
         .get(enemy_at)
         .expect("firing AT gun should still exist");
-    let tile_x = (enemy.pos_x / config::TILE_SIZE as f32).floor() as usize;
-    let tile_y = (enemy.pos_y / config::TILE_SIZE as f32).floor() as usize;
+    let tile_x = (enemy.pos_x() / config::TILE_SIZE as f32).floor() as usize;
+    let tile_y = (enemy.pos_y() / config::TILE_SIZE as f32).floor() as usize;
     let tile = tile_y * game.state.map.width as usize + tile_x;
     assert_eq!(
         snapshot.visible_tiles[tile], 0,
@@ -344,7 +344,8 @@ fn shooting_tank_trap_does_not_reveal_hidden_attacker() {
         .spawn_unit(2, EntityKind::Tank, shooter_pos.0, shooter_pos.1)
         .expect("enemy tank should spawn");
     if let Some(shooter_entity) = game.state.entities.get_mut(shooter) {
-        let facing = (trap_pos.1 - shooter_entity.pos_y).atan2(trap_pos.0 - shooter_entity.pos_x);
+        let facing =
+            (trap_pos.1 - shooter_entity.pos_y()).det_atan2(trap_pos.0 - shooter_entity.pos_x());
         shooter_entity.set_facing(facing);
         shooter_entity.set_weapon_facing(facing);
         shooter_entity.set_order(Order::attack(trap));

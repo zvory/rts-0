@@ -233,7 +233,7 @@ impl Fog {
                 continue;
             }
             if smokes
-                .map(|smokes| smokes.point_inside(e.pos_x, e.pos_y))
+                .map(|smokes| smokes.point_inside(e.pos_x(), e.pos_y()))
                 .unwrap_or(false)
             {
                 continue;
@@ -366,7 +366,7 @@ impl Fog {
             if plane.kind != EntityKind::ScoutPlane
                 || plane.owner == 0
                 || plane.hp == 0
-                || smokes.point_inside(plane.pos_x, plane.pos_y)
+                || smokes.point_inside(plane.pos_x(), plane.pos_y())
             {
                 continue;
             }
@@ -382,8 +382,8 @@ impl Fog {
                     grid,
                     width,
                     height,
-                    plane.pos_x,
-                    plane.pos_y,
+                    plane.pos_x(),
+                    plane.pos_y(),
                     plane.sight_tiles(),
                     &los,
                 );
@@ -520,12 +520,12 @@ fn stamp_sight(
     map: &Map,
     los: &LineOfSight<'_>,
 ) {
-    let sight_tiles = sight_tiles_at_elevation(map, e.pos_x, e.pos_y, e.sight_tiles());
+    let sight_tiles = sight_tiles_at_elevation(map, e.pos_x(), e.pos_y(), e.sight_tiles());
     if e.is_building() {
         stamp_building_sight(grid, width, height, e, map, sight_tiles, los);
         return;
     }
-    stamp_sight_at(grid, width, height, e.pos_x, e.pos_y, sight_tiles, los);
+    stamp_sight_at(grid, width, height, e.pos_x(), e.pos_y(), sight_tiles, los);
 }
 
 fn sight_tiles_at_elevation(map: &Map, x: f32, y: f32, base_sight_tiles: u32) -> u32 {

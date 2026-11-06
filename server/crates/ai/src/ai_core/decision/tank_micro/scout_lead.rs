@@ -75,7 +75,8 @@ pub(super) fn lead_scouts(
         let sum = headings
             .iter()
             .fold((0.0, 0.0), |acc, h| (acc.0 + h.0, acc.1 + h.1));
-        if (sum.0 * sum.0 + sum.1 * sum.1).sqrt() < SCOUT_LEAD_AGREEMENT * headings.len() as f32 {
+        if (sum.0 * sum.0 + sum.1 * sum.1).det_sqrt() < SCOUT_LEAD_AGREEMENT * headings.len() as f32
+        {
             continue;
         }
         let Some(direction) = normalized_direction((0.0, 0.0), sum) else {

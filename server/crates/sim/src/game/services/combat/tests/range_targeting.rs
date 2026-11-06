@@ -206,7 +206,7 @@ fn out_of_range_direct_attacks_create_and_refresh_pursuit_paths() {
         );
 
         if let Some(target) = entities.get_mut(target_id) {
-            target.set_position(100.0 + range_px * 0.5, target.pos_y);
+            target.set_position(100.0 + range_px * 0.5, target.pos_y());
         }
         run_combat_tick_on_map(
             &mut entities,
@@ -224,7 +224,7 @@ fn out_of_range_direct_attacks_create_and_refresh_pursuit_paths() {
         );
 
         if let Some(target) = entities.get_mut(target_id) {
-            target.set_position(target_x, target.pos_y);
+            target.set_position(target_x, target.pos_y());
         }
         run_combat_tick_on_map(
             &mut entities,

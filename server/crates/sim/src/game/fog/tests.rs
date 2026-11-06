@@ -375,7 +375,8 @@ fn scout_plane_sight_does_not_gain_an_elevation_bonus() {
 /// Deliberately evaluates every eligible ray, including cells already visible. Keep this
 /// independent reference when optimizing the additive sight-stamping path.
 fn reference_stamp_sight(grid: &mut [bool], entity: &Entity, map: &Map, los: &LineOfSight<'_>) {
-    let radius = sight_tiles_at_elevation(map, entity.pos_x, entity.pos_y, entity.sight_tiles());
+    let radius =
+        sight_tiles_at_elevation(map, entity.pos_x(), entity.pos_y(), entity.sight_tiles());
     if radius == 0 {
         return;
     }
@@ -386,7 +387,7 @@ fn reference_stamp_sight(grid: &mut [bool], entity: &Entity, map: &Map, los: &Li
             .map(|(x, y)| map.tile_center(x, y))
             .collect::<Vec<_>>()
     } else {
-        vec![(entity.pos_x, entity.pos_y)]
+        vec![(entity.pos_x(), entity.pos_y())]
     };
     for origin in origins {
         let origin_tile = map.tile_of(origin.0, origin.1);

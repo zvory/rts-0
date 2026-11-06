@@ -1,3 +1,4 @@
+use rts_rules::math::GameplayMath as _;
 use std::collections::{BTreeSet, VecDeque};
 
 use super::reachability::tile_passable_for_kind;
@@ -206,7 +207,7 @@ fn component_score(
 fn distance_score(a: (f32, f32), b: (f32, f32)) -> u32 {
     let dx = a.0 - b.0;
     let dy = a.1 - b.1;
-    (dx.mul_add(dx, dy * dy).max(0.0).min(u32::MAX as f32)) as u32
+    (dx.det_mul_add(dx, dy * dy).max(0.0).min(u32::MAX as f32)) as u32
 }
 
 fn window_index(tx: i32, ty: i32, min_tx: i32, min_ty: i32, width: u32) -> usize {

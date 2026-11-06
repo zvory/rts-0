@@ -288,7 +288,7 @@ fn queued_manual_mortar_fire_promotes_to_wait_for_weapon_cooldown() {
     let (mut game, mortar, target_pos) = manual_fire_fixture();
     if let Some(mortar_entity) = game.state.entities.get_mut(mortar) {
         mortar_entity.set_attack_cd(2);
-        mortar_entity.set_order(Order::move_to(mortar_entity.pos_x, mortar_entity.pos_y));
+        mortar_entity.set_order(Order::move_to(mortar_entity.pos_x(), mortar_entity.pos_y()));
         mortar_entity.mark_move_phase(MovePhase::Arrived);
         mortar_entity.append_queued_order(OrderIntent::ability(
             ability::AbilityKind::MortarFire,

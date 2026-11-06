@@ -23,17 +23,17 @@ fn uses_rotation_clear_exit_and_escapes_wall() {
             .find(|entity| entity.owner == 1 && entity.kind == unit && entity.hp > 0)
             .unwrap_or_else(|| panic!("{unit} should be produced on the first tick"));
         assert_ne!(
-            (spawned.pos_x, spawned.pos_y),
+            (spawned.pos_x(), spawned.pos_y()),
             trapped_spawn,
             "{unit} must not use the replay's wall-hemmed spawn point"
         );
         assert!(
-            spawned.pos_y >= rotation_clear_spawn.1,
+            spawned.pos_y() >= rotation_clear_spawn.1,
             "{unit} should spawn at least one full row below the wall for a full turn, got ({:.1}, {:.1})",
-            spawned.pos_x,
-            spawned.pos_y,
+            spawned.pos_x(),
+            spawned.pos_y(),
         );
-        let expected_facing = (rally.1 - spawned.pos_y).atan2(rally.0 - spawned.pos_x);
+        let expected_facing = (rally.1 - spawned.pos_y()).det_atan2(rally.0 - spawned.pos_x());
         let facing_delta = (spawned.facing() - expected_facing + std::f32::consts::PI)
             .rem_euclid(std::f32::consts::TAU)
             - std::f32::consts::PI;
@@ -41,9 +41,9 @@ fn uses_rotation_clear_exit_and_escapes_wall() {
             facing_delta.abs() <= 0.001,
             "{unit} should spawn facing its rally point"
         );
-        let start = (spawned.pos_x, spawned.pos_y);
+        let start = (spawned.pos_x(), spawned.pos_y());
         let rally_delta = (rally.0 - start.0, rally.1 - start.1);
-        let rally_distance = (rally_delta.0.powi(2) + rally_delta.1.powi(2)).sqrt();
+        let rally_distance = (rally_delta.0.det_powi(2) + rally_delta.1.det_powi(2)).det_sqrt();
         let rally_direction = (
             rally_delta.0 / rally_distance,
             rally_delta.1 / rally_distance,
@@ -68,14 +68,14 @@ fn uses_rotation_clear_exit_and_escapes_wall() {
                     &game.state.map,
                     &occupancy,
                     unit,
-                    moved.pos_x,
-                    moved.pos_y,
+                    moved.pos_x(),
+                    moved.pos_y(),
                     moved.facing(),
                 ),
                 "{unit} should not clip the factory or terrain wall while escaping"
             );
-            progress_px = (moved.pos_x - start.0) * rally_direction.0
-                + (moved.pos_y - start.1) * rally_direction.1;
+            progress_px = (moved.pos_x() - start.0) * rally_direction.0
+                + (moved.pos_y() - start.1) * rally_direction.1;
             if progress_px >= escape_distance_px {
                 escaped = true;
                 break;

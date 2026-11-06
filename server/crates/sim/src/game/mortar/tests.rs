@@ -68,30 +68,34 @@ fn half_turn_completes_in_two_hundred_ms() {
 }
 
 #[test]
-fn legacy_mortar_shell_checkpoint_defaults_to_already_launched() {
+fn fixed_mortar_shell_checkpoint_defaults_to_already_launched() {
     let store: MortarShellStore = serde_json::from_value(serde_json::json!({
         "shells": [{
             "owner": 1,
             "attacker": 7,
-            "x": 320.0,
-            "y": 352.0,
+            "x": 1310720,
+            "y": 1441792,
             "impact_tick": 99
         }]
     }))
-    .expect("legacy mortar-shell checkpoint should remain readable");
+    .expect("fixed mortar-shell checkpoint should restore");
 
     let shell = store.shells.first().expect("restored shell");
     assert!(shell.launched);
     assert!(!shell.rocket);
     assert_eq!(
-        (shell.from_x, shell.from_y, shell.launch_tick),
+        (
+            shell.from_x.to_world(),
+            shell.from_y.to_world(),
+            shell.launch_tick
+        ),
         (0.0, 0.0, 0)
     );
 }
 
 #[test]
 fn rocket_damage_preserves_unit_damage_but_is_reduced_against_buildings() {
-    let inner2 = (config::ROCKET_BARRAGE_INNER_RADIUS_TILES * config::TILE_SIZE as f32).powi(2);
+    let inner2 = (config::ROCKET_BARRAGE_INNER_RADIUS_TILES * config::TILE_SIZE as f32).det_powi(2);
     let inner = shell_damage(true, 0.0, inner2, false);
     let outer = shell_damage(true, inner2 + 1.0, inner2, false);
     let direct = shell_damage(true, 0.0, inner2, true);
@@ -170,10 +174,12 @@ fn rocket_blast_bands_apply_damage_and_armor_at_exact_boundaries() {
             let shell = MortarShell {
                 owner: 1,
                 attacker: 0,
-                x: 160.0,
-                y: 160.0 + distance_tiles * config::TILE_SIZE as f32,
-                from_x: 100.0,
-                from_y: 100.0,
+                x: rts_rules::math::Coord::from_world(160.0),
+                y: rts_rules::math::Coord::from_world(
+                    160.0 + distance_tiles * config::TILE_SIZE as f32,
+                ),
+                from_x: rts_rules::math::Coord::from_world(100.0),
+                from_y: rts_rules::math::Coord::from_world(100.0),
                 launch_tick: 0,
                 impact_tick: 0,
                 launched: true,

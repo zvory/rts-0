@@ -25,7 +25,7 @@ fn point_tanks_rotate_at_normal_rate_without_translation() {
     for (id, x) in [(a, 500.0), (b, 700.0)] {
         let tank = entities.get(id).unwrap();
         assert!((tank.facing() - desired).abs() < 0.0001);
-        assert_eq!((tank.pos_x, tank.pos_y), (x, 500.0));
+        assert_eq!((tank.pos_x(), tank.pos_y()), (x, 500.0));
         assert!(matches!(tank.order(), Order::Point { .. }));
     }
 }

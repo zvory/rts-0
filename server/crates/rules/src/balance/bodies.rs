@@ -1,5 +1,6 @@
 //! Vehicle and support-weapon body dimensions mirrored for collision/render previews.
 
+use crate::math::GameplayMath as _;
 use crate::EntityKind;
 
 pub const TANK_BODY_LENGTH_PX: f32 = 50.4;
@@ -61,7 +62,7 @@ pub fn unit_placement_radius(kind: EntityKind) -> f32 {
     oriented_half_diagonal.map_or_else(
         || super::unit_stats(kind).map_or(0.0, |stats| stats.radius),
         |(length, width, clearance)| {
-            ((length * 0.5).powi(2) + (width * 0.5).powi(2)).sqrt() + clearance
+            ((length * 0.5).det_powi(2) + (width * 0.5).det_powi(2)).det_sqrt() + clearance
         },
     )
 }

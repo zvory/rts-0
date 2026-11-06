@@ -23,6 +23,7 @@ use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
 use crate::rules::projection;
 use crate::rules::terrain::{self, TerrainKind};
+use rts_rules::math::GameplayMath as _;
 
 // --- Ownership scans --------------------------------------------------------
 
@@ -118,7 +119,7 @@ fn resource_has_completed_mining_anchor(
     if !resource.is_node() || resource.remaining().unwrap_or(0) == 0 {
         return false;
     }
-    nearest_completed_mining_anchor(entities, resource.pos_x, resource.pos_y, accepts_owner)
+    nearest_completed_mining_anchor(entities, resource.pos_x(), resource.pos_y(), accepts_owner)
         .map(|(_, dist2)| {
             let range_px = config::MINING_ANCHOR_RANGE_TILES * config::TILE_SIZE as f32;
             dist2 <= range_px * range_px + 0.01
@@ -151,8 +152,8 @@ fn nearest_completed_mining_anchor(
                 && e.hp > 0
         })
         .map(|e| {
-            let dx = e.pos_x - x;
-            let dy = e.pos_y - y;
+            let dx = e.pos_x() - x;
+            let dy = e.pos_y() - y;
             (e.id, dx * dx + dy * dy)
         })
         .min_by(|a, b| a.1.total_cmp(&b.1).then_with(|| a.0.cmp(&b.0)))
@@ -283,7 +284,7 @@ pub(crate) fn unit_explicit_attack_target_valid(
         return false;
     };
     let target_team_visible =
-        projection::team_visible_world(attacker_owner, target.pos_x, target.pos_y, fog, teams);
+        projection::team_visible_world(attacker_owner, target.pos_x(), target.pos_y(), fog, teams);
     crate::rules::target::default_weapon_can_target(attacker.kind, target.kind)
         && explicit_attack_target_inside_fixed_arc(attacker, target)
         && is_explicit_attack_targetable(target, teams, attacker_owner, attacker_id)
@@ -297,7 +298,7 @@ pub(crate) fn unit_explicit_attack_target_valid(
         && target_team_visible
         && smokes.is_none_or(|smokes| {
             smokes.units_have_melee_visibility(attacker, target)
-                || !smokes.point_inside(target.pos_x, target.pos_y)
+                || !smokes.point_inside(target.pos_x(), target.pos_y())
         })
 }
 
@@ -317,8 +318,8 @@ pub(crate) fn unit_clear_obstacle_area_target(
         .iter()
         .filter(|target| target.hp > 0 && target.is_neutral_obstacle())
         .filter_map(|target| {
-            let dx = target.pos_x - objective.center_x;
-            let dy = target.pos_y - objective.center_y;
+            let dx = target.pos_x() - objective.center_x;
+            let dy = target.pos_y() - objective.center_y;
             let objective_distance_sq = dx * dx + dy * dy;
             (objective_distance_sq <= radius_sq
                 && unit_explicit_attack_target_valid(query, attacker_id, target.id))
@@ -326,9 +327,9 @@ pub(crate) fn unit_clear_obstacle_area_target(
                 target.id,
                 target.id != objective.anchor,
                 objective_distance_sq,
-                (target.pos_x - attacker.pos_x).mul_add(
-                    target.pos_x - attacker.pos_x,
-                    (target.pos_y - attacker.pos_y) * (target.pos_y - attacker.pos_y),
+                (target.pos_x() - attacker.pos_x()).det_mul_add(
+                    target.pos_x() - attacker.pos_x(),
+                    (target.pos_y() - attacker.pos_y()) * (target.pos_y() - attacker.pos_y()),
                 ),
             ))
         })
@@ -354,7 +355,8 @@ fn explicit_attack_target_inside_fixed_arc(attacker: &Entity, target: &Entity) -
     else {
         return true;
     };
-    let target_angle = (target.pos_y - attacker.pos_y).atan2(target.pos_x - attacker.pos_x);
+    let target_angle =
+        (target.pos_y() - attacker.pos_y()).det_atan2(target.pos_x() - attacker.pos_x());
     if !target_angle.is_finite() {
         return false;
     }
@@ -446,8 +448,8 @@ fn nearest_matching_enemy_in_range(
         if !effective_radius.is_finite() {
             continue;
         }
-        let dx = entity.pos_x - px;
-        let dy = entity.pos_y - py;
+        let dx = entity.pos_x() - px;
+        let dy = entity.pos_y() - py;
         let d2 = dx * dx + dy * dy;
         let r2 = effective_radius * effective_radius;
         if d2 <= r2

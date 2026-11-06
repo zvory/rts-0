@@ -97,7 +97,7 @@ pub(super) fn planner_facts(
                 return None;
             }
             let mut facts = planner::UnitFacts::new(id);
-            facts.pos = planner::Point::new(e.pos_x, e.pos_y);
+            facts.pos = planner::Point::new(e.pos_x(), e.pos_y());
             let committed_barrage = unit_has_committed_barrage(entities, id);
             facts.can_replace_active =
                 unit_can_accept_player_command(entities, player, id) && !committed_barrage;

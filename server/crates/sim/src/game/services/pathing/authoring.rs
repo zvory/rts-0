@@ -6,6 +6,7 @@
 
 use crate::game::entity::{uses_oriented_vehicle_body, EntityKind, EntityStore};
 use crate::{config, rules::terrain};
+use rts_rules::math::GameplayMath as _;
 
 use super::{Map, Occupancy, PathRequest, PathingRequestOutcome, PathingService, RouteShape};
 
@@ -164,7 +165,7 @@ fn not_analyzed(reason: &'static str) -> StaticRouteResult {
 fn distance(from: (f32, f32), to: (f32, f32)) -> f64 {
     let dx = f64::from(to.0 - from.0);
     let dy = f64::from(to.1 - from.1);
-    (dx * dx + dy * dy).sqrt()
+    (dx * dx + dy * dy).det_sqrt()
 }
 
 fn estimate_segment_ticks(

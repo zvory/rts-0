@@ -6,6 +6,7 @@
 //! attack/move/hold orders, and runs on the canonical decision cadence, so a win in the harness is a
 //! win a live match can reproduce.
 
+use rts_rules::math::GameplayMath as _;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
@@ -361,15 +362,15 @@ fn centroid(units: &[&AiEntitySummary]) -> (f32, f32) {
 }
 
 fn distance(a: &AiEntitySummary, b: &AiEntitySummary) -> f32 {
-    (a.x - b.x).hypot(a.y - b.y)
+    (a.x - b.x).det_hypot(a.y - b.y)
 }
 
 fn distance_to(a: &AiEntitySummary, point: (f32, f32)) -> f32 {
-    (a.x - point.0).hypot(a.y - point.1)
+    (a.x - point.0).det_hypot(a.y - point.1)
 }
 
 fn distance_between(a: (f32, f32), b: (f32, f32)) -> f32 {
-    (a.0 - b.0).hypot(a.1 - b.1)
+    (a.0 - b.0).det_hypot(a.1 - b.1)
 }
 
 /// Collects per-unit orders and merges identical ones into group orders.

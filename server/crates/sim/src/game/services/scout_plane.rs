@@ -2,6 +2,7 @@ use crate::config;
 use crate::game::ability::{self, AbilityKind};
 use crate::game::entity::{EntityKind, EntityStore, ScoutPlaneState};
 use crate::game::map::Map;
+use rts_rules::math::GameplayMath as _;
 
 const TWO_PI: f32 = std::f32::consts::PI * 2.0;
 const ORBIT_PHASE_EPS: f32 = 0.001;
@@ -30,7 +31,7 @@ pub(crate) fn launch_ability(
                 && source.hp > 0
                 && !source.under_construction()
         })
-        .map(|source| (source.pos_x, source.pos_y, source.kind))
+        .map(|source| (source.pos_x(), source.pos_y(), source.kind))
     else {
         return Err(ScoutPlaneLaunchError::InvalidLaunch);
     };
@@ -156,7 +157,7 @@ fn scout_plane_runtime_snapshot(
     }
     let state = plane.scout_plane_state()?;
     let center = clamp_world_point(map, state.orbit_center.0, state.orbit_center.1)
-        .unwrap_or((plane.pos_x, plane.pos_y));
+        .unwrap_or((plane.pos_x(), plane.pos_y()));
     let phase = if state.orbit_phase.is_finite() {
         normalize_angle(state.orbit_phase)
     } else {
@@ -164,8 +165,8 @@ fn scout_plane_runtime_snapshot(
     };
     Some(ScoutPlaneRuntimeSnapshot {
         flight: ScoutPlaneSnapshot {
-            x: plane.pos_x,
-            y: plane.pos_y,
+            x: plane.pos_x(),
+            y: plane.pos_y(),
             center,
             phase,
             orbiting: state.orbiting,
@@ -204,14 +205,14 @@ fn advance_one(
     if !orbiting {
         let dx = center.0 - x;
         let dy = center.1 - y;
-        let dist = (dx * dx + dy * dy).sqrt();
+        let dist = (dx * dx + dy * dy).det_sqrt();
         if dist.is_finite() && dist > orbit_radius {
             let travel = budget.min(dist - orbit_radius);
             if travel > 0.0 {
                 let inv = 1.0 / dist;
                 x = (x + dx * inv * travel).clamp(0.0, world_max_x);
                 y = (y + dy * inv * travel).clamp(0.0, world_max_y);
-                facing = Some(dy.atan2(dx));
+                facing = Some(dy.det_atan2(dx));
                 budget = (budget - travel).max(0.0);
             }
             orbiting = dist - travel <= orbit_radius + ORBIT_PHASE_EPS;
@@ -228,26 +229,26 @@ fn advance_one(
 
     if orbiting {
         let ring = (
-            center.0 + phase.cos() * orbit_radius,
-            center.1 + phase.sin() * orbit_radius,
+            center.0 + phase.det_cos() * orbit_radius,
+            center.1 + phase.det_sin() * orbit_radius,
         );
         let dx = ring.0 - x;
         let dy = ring.1 - y;
-        let dist = (dx * dx + dy * dy).sqrt();
+        let dist = (dx * dx + dy * dy).det_sqrt();
         if dist.is_finite() && dist > ORBIT_PHASE_EPS {
             let travel = budget.min(dist);
             if travel > 0.0 {
                 let inv = 1.0 / dist;
                 x = (x + dx * inv * travel).clamp(0.0, world_max_x);
                 y = (y + dy * inv * travel).clamp(0.0, world_max_y);
-                facing = Some(dy.atan2(dx));
+                facing = Some(dy.det_atan2(dx));
                 budget = (budget - travel).max(0.0);
             }
         }
         if budget > 0.0 {
             phase = normalize_angle(phase + budget / orbit_radius);
-            x = (center.0 + phase.cos() * orbit_radius).clamp(0.0, world_max_x);
-            y = (center.1 + phase.sin() * orbit_radius).clamp(0.0, world_max_y);
+            x = (center.0 + phase.det_cos() * orbit_radius).clamp(0.0, world_max_x);
+            y = (center.1 + phase.det_sin() * orbit_radius).clamp(0.0, world_max_y);
             facing = Some(normalize_angle(phase + std::f32::consts::FRAC_PI_2));
         }
     }
@@ -280,7 +281,7 @@ fn normalize_angle(angle: f32) -> f32 {
 }
 
 fn phase_from_center(point: (f32, f32), center: (f32, f32)) -> f32 {
-    normalize_angle((point.1 - center.1).atan2(point.0 - center.0))
+    normalize_angle((point.1 - center.1).det_atan2(point.0 - center.0))
 }
 
 #[cfg(test)]

@@ -113,7 +113,7 @@ fn arrived_pump_jack_waits_for_150_steel_then_completes_in_10_seconds() {
         .expect("friendly blocker should spawn");
     let blocker_before = entities
         .get(blocker)
-        .map(|entity| (entity.pos_x, entity.pos_y))
+        .map(|entity| (entity.pos_x(), entity.pos_y()))
         .expect("friendly blocker should exist");
     let mut players = vec![player_state(1)];
     players[0].set_resources(149, 0);
@@ -147,7 +147,7 @@ fn arrived_pump_jack_waits_for_150_steel_then_completes_in_10_seconds() {
     assert_ne!(
         entities
             .get(blocker)
-            .map(|entity| (entity.pos_x, entity.pos_y)),
+            .map(|entity| (entity.pos_x(), entity.pos_y())),
         Some(blocker_before),
         "the friendly blocker should move once construction can actually start"
     );
@@ -258,7 +258,7 @@ fn arrived_pump_jack_does_not_eject_any_units_when_enemy_blocks_site() {
         .map(|id| {
             entities
                 .get(id)
-                .map(|entity| (entity.pos_x, entity.pos_y))
+                .map(|entity| (entity.pos_x(), entity.pos_y()))
                 .expect("blocker should exist")
         })
         .collect();
@@ -273,7 +273,7 @@ fn arrived_pump_jack_does_not_eject_any_units_when_enemy_blocks_site() {
     for (index, id) in [enemy, friendly].into_iter().enumerate() {
         let entity = entities.get(id).expect("blocker should survive");
         assert_eq!(
-            (entity.pos_x, entity.pos_y),
+            (entity.pos_x(), entity.pos_y()),
             before[index],
             "no unit should be displaced while an enemy still blocks construction"
         );
@@ -462,7 +462,7 @@ fn eject_helper_uses_standable_center_of_workers_current_tile() {
     eject_worker_from_static_overlap(&map, &mut entities, worker);
 
     let worker = entities.get(worker).expect("worker should survive");
-    assert_eq!((worker.pos_x, worker.pos_y), expected);
+    assert_eq!((worker.pos_x(), worker.pos_y()), expected);
 }
 
 #[test]
@@ -482,7 +482,7 @@ fn eject_helper_searches_beyond_eight_tiles() {
 
     let worker = entities.get(worker).expect("worker should survive");
     assert_eq!(
-        (worker.pos_x, worker.pos_y),
+        (worker.pos_x(), worker.pos_y()),
         map.tile_center(destination_tile.0, destination_tile.1),
         "ejection must not strand a worker behind an arbitrary eight-tile search limit"
     );

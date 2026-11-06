@@ -541,7 +541,7 @@ Top-level shape:
   "compatibility": {
     "createdBy": "server|replay|lab|debug",
     "serverBuildSha": "...",
-    "simSchemaVersion": 5,
+    "simSchemaVersion": 6,
     "rulesVersion": 1,
     "protocolVersion": 1,
     "requiredFeatures": [],
@@ -785,6 +785,51 @@ two full-army commands in 900 ticks and could not exercise death or path-request
 new counters and serial timings as a measured regression baseline until repeated reference-machine
 runs establish a replacement headroom gate. Keep simulation, projection, compaction, encoding, and
 driver work on the same serial lane, and do not hide driver cost outside the measured round trip.
+
+#### 3.1.4 Deterministic arithmetic and physical positions
+
+Simulation schema **6** breaks numerical compatibility with schema 5 and earlier. Entity centers,
+ability projectile centers, world ability objects, smoke, trenches, mortar/artillery shell launch
+and impact points, and Panzerfaust shot positions use `rts_rules::math::Coord`: a signed **i32
+Q19.12** (4096 substeps per world unit, 131072 per 32-unit tile). Its world range is
+−524288 through 524287.999755859375, providing 32× positive headroom beyond a future 512 × 512
+map's 16384-unit extent. Storage width is independent of intermediate width: conversion scales in
+f64 before rounding; circular area-effect distances widen differences to i64 and products/sums to
+i128 so even opposite full-i32 endpoints cannot overflow. No position is stored as an i64.
+
+Physical position writes round to nearest substep, ties away from zero, on spawn, movement,
+collision, pulls, teleports, projectile steps, and effect creation. Entity setters reject nonfinite
+or unrepresentable coordinates atomically; optional entity constructors reject them. Trusted
+geometry conversion saturates at i32 bounds (NaN maps to zero) rather than wrapping; command/map
+admission still validates finite world bounds. Static landing probes quantize their candidates
+before checking body legality, and movement deltas describe the stored result. Circular smoke and
+trench inclusion uses grid-rounded query points/radii and widened integer squared distances.
+
+Transient steering, oriented-shape geometry, speed/radius rules, and angles retain strict IEEE-754
+f32 arithmetic to preserve existing gameplay formulas. Immutable command intent, paths, remembered
+observations, and presentation metadata may retain world-coordinate floats; they are not accumulated
+physical centers. Conversion back to transient/wire f32 rounds nearest-even; at the future map edge
+the f32 ULP is 1/512 world unit, so not every stored substep is expressible through that projection.
+Ordinary arithmetic must use Rust's strict default without fast-math, implicit FMA contraction, or
+flush-to-zero settings. `rts_rules::math::GameplayMath` supplies explicit `det_*` operations for
+trigonometry, angles, roots, hypot, powers, and explicit FMA through exact-pinned `libm` 0.2.16 with
+`force-soft-floats`; this disables target-specific/intrinsic implementations even if Cargo feature
+unification enables `arch`. Integer powers have a specified multiplication order. Angles remain
+radians with the existing wrap conventions, including deterministic atan2 quadrants and signed zero.
+Changing these algorithms, precision, or operation ordering requires a simulation-version bump.
+`scripts/check-crate-boundaries.mjs` rejects platform math calls in rules/sim/AI and direct libm
+calls outside the facade. Numerical vectors cover rounding, axes/quadrants, roots, planned map
+bounds, projection error, and full-domain widened distance arithmetic.
+
+Checkpoint coordinates above are raw signed substep integers. Imports validate the numerical
+compatibility header before decoding positions, so old checkpoints/replays fail closed even when
+the caller supplies the same build label. Schema 3 replay containers continue to embed this
+versioned checkpoint; strict build matching remains in force. Old recordings, including replay
+495, require their original simulation executable: the new math does **not** promise historical
+trajectories or final scores. Current checked-in Lab setups and diagnostic start fixtures are
+explicitly reauthored on the new grid; this is not a general old-replay migration. Wire snapshots
+still send fractional world coordinates, and the client's existing interpolation remains smooth.
+RNG replacement, replay checksums, and platform replay parity tests are outside this change.
 
 ### 3.2 Concurrency model
 - One tokio task per **room** owns its `Game` and runs the tick loop (`tokio::time::interval`). Room registry handles carry per-room identity tokens; registry disposal removes only the matching identity and signals that room task to shut down.

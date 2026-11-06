@@ -1,6 +1,7 @@
 use super::defense::main_steel_cluster_center;
 use super::geometry::{building_center, dist2, normalized_direction, tile_center};
 use super::*;
+use rts_rules::math::GameplayMath as _;
 
 use crate::ai_core::observation::{
     AiBuildIntent, AiEconomy, AiEntityState, AiEntitySummary, AiMapSummary, AiObservation,
@@ -193,24 +194,24 @@ fn base_site_resources(first_id: u32, site: (u32, u32), map_size: u32) -> Vec<Ai
     let ts = config::TILE_SIZE as f32;
     let (hx, hy) = (site.0 as f32 + 0.5, site.1 as f32 + 0.5);
     let map_center = map_size as f32 * 0.5;
-    let base_angle = (map_center - hy).atan2(map_center - hx);
-    let (perp_x, perp_y) = (-base_angle.sin(), base_angle.cos());
+    let base_angle = (map_center - hy).det_atan2(map_center - hx);
+    let (perp_x, perp_y) = (-base_angle.det_sin(), base_angle.det_cos());
     let mut resources = Vec::new();
     let mut steel_index = 0;
     for (side, field_patches) in [
         (1.0, config::STEEL_PATCHES_PER_BASE.div_ceil(2)),
         (-1.0, config::STEEL_PATCHES_PER_BASE / 2),
     ] {
-        let block_cx = hx + side * config::STEEL_BLOCK_DIST_TILES * base_angle.cos();
-        let block_cy = hy + side * config::STEEL_BLOCK_DIST_TILES * base_angle.sin();
+        let block_cx = hx + side * config::STEEL_BLOCK_DIST_TILES * base_angle.det_cos();
+        let block_cy = hy + side * config::STEEL_BLOCK_DIST_TILES * base_angle.det_sin();
         let row_center = field_patches.div_ceil(6).saturating_sub(1) as f32 / 2.0;
         for i in 0..field_patches {
             let (off_x, off_y) = ((i % 6) as f32 - 2.5, (i / 6) as f32 - row_center);
             resources.push(resource(
                 first_id + steel_index,
                 EntityKind::Steel,
-                (block_cx + off_x * perp_x + off_y * base_angle.cos()) * ts,
-                (block_cy + off_x * perp_y + off_y * base_angle.sin()) * ts,
+                (block_cx + off_x * perp_x + off_y * base_angle.det_cos()) * ts,
+                (block_cy + off_x * perp_y + off_y * base_angle.det_sin()) * ts,
             ));
             steel_index += 1;
         }
@@ -544,7 +545,7 @@ fn expansion_search_skips_occupied_natural_and_chooses_next_resource_site() {
     let next_center = building_center(next, EntityKind::ResourceDepot, obs.map.tile_size).unwrap();
     assert!(
         dist2(center.0, center.1, next_center.0, next_center.1)
-            > (10.0 * obs.map.tile_size as f32).powi(2)
+            > (10.0 * obs.map.tile_size as f32).det_powi(2)
     );
 }
 
@@ -716,7 +717,7 @@ fn assert_classic_three_separate_bases(under_pressure: bool) {
                 for other in &depots[i + 1..] {
                     assert!(
                         dist2(depot.x, depot.y, other.x, other.y)
-                            > (10.0 * obs.map.tile_size as f32).powi(2),
+                            > (10.0 * obs.map.tile_size as f32).det_powi(2),
                         "player {player_id}, tick {tick}: duplicate base location"
                     );
                 }

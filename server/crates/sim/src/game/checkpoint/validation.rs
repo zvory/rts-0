@@ -196,7 +196,7 @@ fn validate_entity(
         });
     }
     entities::validate_ownership(entity)?;
-    if !in_world(entity.pos_x, entity.pos_y, world) {
+    if !in_world(entity.pos_x(), entity.pos_y(), world) {
         return Err(CheckpointPayloadError::InvalidValue {
             field: "entities.position",
         });

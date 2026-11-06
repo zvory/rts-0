@@ -76,7 +76,7 @@ impl Game {
         let vertical_gap = tile_size * 1.5;
         let fan_angle = 10.0_f32.to_radians();
         let gun_offset = tile_size * 7.0;
-        let convergence = (tank_x - vertical_gap / fan_angle.tan(), center.1);
+        let convergence = (tank_x - vertical_gap / fan_angle.det_tan(), center.1);
         let mut entities = EntityStore::new();
         spawn_enemy_scout_spotter(
             &mut entities,
@@ -89,7 +89,7 @@ impl Game {
             (0.0, 0.0),
             (vertical_gap, fan_angle),
         ] {
-            let forward = (facing.cos(), facing.sin());
+            let forward = (facing.det_cos(), facing.det_sin());
             let tank_pos = (tank_x, center.1 + y_offset);
             let gun_pos = (
                 tank_pos.0 + forward.0 * gun_offset,
@@ -221,10 +221,10 @@ mod tests {
             .find(|entity| entity.owner == 2 && entity.kind == EntityKind::AntiTankGun)
             .expect("scenario Anti-Tank Gun should exist");
 
-        assert!(gun.pos_x > tank.pos_x);
-        assert!((gun.pos_y - tank.pos_y).abs() <= 0.001);
-        assert!(setup.goal.0 < tank.pos_x - config::TILE_SIZE as f32 * 3.0);
-        assert!((setup.goal.1 - tank.pos_y).abs() <= 0.001);
+        assert!(gun.pos_x() > tank.pos_x());
+        assert!((gun.pos_y() - tank.pos_y()).abs() <= 0.001);
+        assert!(setup.goal.0 < tank.pos_x() - config::TILE_SIZE as f32 * 3.0);
+        assert!((setup.goal.1 - tank.pos_y()).abs() <= 0.001);
         assert_eq!(setup.issue_after_ticks, config::TICK_HZ * 10);
         assert_tanks_take_front_ap_damage_before_orders(setup);
     }
@@ -257,9 +257,9 @@ mod tests {
             .entities
             .iter()
             .filter(|entity| entity.owner == 2 && entity.kind == EntityKind::AntiTankGun)
-            .map(|gun| gun.pos_x)
+            .map(|gun| gun.pos_x())
             .fold(f32::INFINITY, f32::min);
-        assert!(spotter.pos_x < leftmost_gun_x);
+        assert!(spotter.pos_x() < leftmost_gun_x);
         assert!(WeaponKind::ALL
             .into_iter()
             .all(|weapon| spotter.weapon_cooldown(weapon) == TANK_WEAPON_DELAY_TICKS));
@@ -295,9 +295,9 @@ mod tests {
                 .entities
                 .get(*tank_id)
                 .expect("commanded Tank should exist");
-            let to_goal = (*x - tank.pos_x, *y - tank.pos_y);
+            let to_goal = (*x - tank.pos_x(), *y - tank.pos_y());
             assert!(
-                to_goal.0 * tank.facing().cos() + to_goal.1 * tank.facing().sin() < 0.0,
+                to_goal.0 * tank.facing().det_cos() + to_goal.1 * tank.facing().det_sin() < 0.0,
                 "the grouped move destination should begin behind every Tank"
             );
         }
@@ -306,7 +306,7 @@ mod tests {
             .sight_tiles as f32
             * config::TILE_SIZE as f32;
         assert!(
-            (*x - spotter.pos_x).hypot(*y - spotter.pos_y) <= sight,
+            (*x - spotter.pos_x()).det_hypot(*y - spotter.pos_y()) <= sight,
             "the spotter should see the grouped retreat destination"
         );
         assert_tanks_take_front_ap_damage_before_orders(setup);
@@ -397,7 +397,7 @@ mod tests {
             let source = tank
                 .last_damage_pos()
                 .expect("front Anti-Tank Gun should damage every inspection Tank");
-            let source_angle = (source.1 - tank.pos_y).atan2(source.0 - tank.pos_x);
+            let source_angle = (source.1 - tank.pos_y()).det_atan2(source.0 - tank.pos_x());
             assert!(
                 crate::game::services::movement::angle_delta(tank.facing(), source_angle).abs()
                     <= std::f32::consts::FRAC_PI_4,

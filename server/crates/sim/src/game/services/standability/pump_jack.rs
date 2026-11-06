@@ -11,14 +11,14 @@ pub(super) fn live_oil_node_centers_in_rect<'a>(
         .filter_map(|entity| {
             (entity.kind == EntityKind::Oil
                 && entity.remaining().unwrap_or(0) > 0
-                && point_inside_rect((entity.pos_x, entity.pos_y), rect))
+                && point_inside_rect((entity.pos_x(), entity.pos_y()), rect))
             .then_some(entity.id)
         })
         .collect()
 }
 
 pub(super) fn oil_node_center_in_rect(entity: &Entity, rect: RectBody) -> bool {
-    entity.kind == EntityKind::Oil && point_inside_rect((entity.pos_x, entity.pos_y), rect)
+    entity.kind == EntityKind::Oil && point_inside_rect((entity.pos_x(), entity.pos_y()), rect)
 }
 
 pub(super) fn oil_node_has_pump_jack(map: &Map, entities: &EntityStore, oil_id: u32) -> bool {
@@ -29,7 +29,7 @@ pub(super) fn oil_node_has_pump_jack(map: &Map, entities: &EntityStore, oil_id: 
         entity.kind == EntityKind::PumpJack
             && entity.hp > 0
             && building_rect_for_entity(map, entity)
-                .is_some_and(|rect| point_inside_rect((oil.pos_x, oil.pos_y), rect))
+                .is_some_and(|rect| point_inside_rect((oil.pos_x(), oil.pos_y()), rect))
     })
 }
 

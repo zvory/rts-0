@@ -156,10 +156,10 @@ mod tests {
 
     fn position(game: &Game, id: u32) -> (f32, f32) {
         let entity = game.state.entities.get(id).expect("replay actor");
-        (entity.pos_x, entity.pos_y)
+        (entity.pos_x(), entity.pos_y())
     }
 
     fn distance(a: (f32, f32), b: (f32, f32)) -> f32 {
-        (b.0 - a.0).hypot(b.1 - a.1)
+        (b.0 - a.0).det_hypot(b.1 - a.1)
     }
 }

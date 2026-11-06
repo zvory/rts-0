@@ -1,3 +1,4 @@
+use rts_rules::math::{Coord, GameplayMath as _};
 use std::collections::BTreeSet;
 
 use crate::game::ability::AbilityKind;
@@ -53,8 +54,8 @@ pub(crate) struct AbilityProjectile {
     pub(crate) origin: (f32, f32),
     pub(crate) endpoint: (f32, f32),
     pub(crate) return_target: AbilityProjectileReturnTarget,
-    pub(crate) x: f32,
-    pub(crate) y: f32,
+    pub(crate) x: Coord,
+    pub(crate) y: Coord,
     pub(crate) leg: AbilityProjectileLeg,
     pub(crate) speed_px_per_tick: f32,
     pub(crate) width_px: f32,
@@ -88,8 +89,8 @@ impl AbilityProjectile {
             origin: spec.origin,
             endpoint: spec.endpoint,
             return_target: spec.return_target,
-            x: spec.origin.0,
-            y: spec.origin.1,
+            x: Coord::from_world(spec.origin.0),
+            y: Coord::from_world(spec.origin.1),
             leg: AbilityProjectileLeg::Outbound,
             speed_px_per_tick: spec.speed_px_per_tick,
             width_px: spec.width_px,
@@ -147,11 +148,12 @@ impl AbilityProjectile {
         let Some(target) = self.target_point(entities) else {
             return false;
         };
-        let start = (self.x, self.y);
-        let (next, reached_target, traveled) = step_toward(start, target, self.speed_px_per_tick);
-        self.x = next.0;
-        self.y = next.1;
-        self.distance_traveled += traveled;
+        let start = (self.x.to_world(), self.y.to_world());
+        let (next, reached_target, _) = step_toward(start, target, self.speed_px_per_tick);
+        self.x = Coord::from_world(next.0);
+        self.y = Coord::from_world(next.1);
+        let next = (self.x.to_world(), self.y.to_world());
+        self.distance_traveled += (next.0 - start.0).det_hypot(next.1 - start.1);
         if self.leg == AbilityProjectileLeg::Outbound {
             self.ticks_out = self.ticks_out.saturating_add(1);
         }
@@ -189,7 +191,7 @@ impl AbilityProjectile {
                 AbilityProjectileReturnTarget::Entity { id } => entities
                     .get(id)
                     .filter(|entity| entity.hp > 0)
-                    .map(|entity| (entity.pos_x, entity.pos_y)),
+                    .map(|entity| (entity.pos_x(), entity.pos_y())),
             },
         }
     }
@@ -217,13 +219,13 @@ fn projectile_spec_valid(spec: &AbilityProjectileSpec) -> bool {
 }
 
 fn point_valid((x, y): (f32, f32)) -> bool {
-    x.is_finite() && y.is_finite()
+    Coord::try_from_world(x).is_some() && Coord::try_from_world(y).is_some()
 }
 
 fn step_toward(start: (f32, f32), target: (f32, f32), speed: f32) -> ((f32, f32), bool, f32) {
     let dx = target.0 - start.0;
     let dy = target.1 - start.1;
-    let distance = (dx * dx + dy * dy).sqrt();
+    let distance = (dx * dx + dy * dy).det_sqrt();
     if distance <= PROJECTILE_EPSILON {
         return (target, true, 0.0);
     }
@@ -260,8 +262,8 @@ fn apply_projectile_hits(
         {
             continue;
         }
-        let nearest = nearest_point_on_segment(start, end, (target.pos_x, target.pos_y));
-        let hit_distance = distance((target.pos_x, target.pos_y), nearest);
+        let nearest = nearest_point_on_segment(start, end, (target.pos_x(), target.pos_y()));
+        let hit_distance = distance((target.pos_x(), target.pos_y()), nearest);
         if hit_distance <= target.radius() + projectile.width_px {
             hits.push((id, distance(start, nearest)));
         }
@@ -271,7 +273,7 @@ fn apply_projectile_hits(
         projectile.hits_for_current_leg().insert(id);
         if let Some(target) = entities.get_mut(id) {
             let damage =
-                map.damage_after_reduction_tile(target.pos_x, target.pos_y, projectile.damage);
+                map.damage_after_reduction_tile(target.pos_x(), target.pos_y(), projectile.damage);
             target.apply_damage_from_entity(
                 damage,
                 projectile.owner,
@@ -295,7 +297,7 @@ fn nearest_point_on_segment(start: (f32, f32), end: (f32, f32), point: (f32, f32
 }
 
 fn distance(a: (f32, f32), b: (f32, f32)) -> f32 {
-    ((b.0 - a.0).powi(2) + (b.1 - a.1).powi(2)).sqrt()
+    ((b.0 - a.0).det_powi(2) + (b.1 - a.1).det_powi(2)).det_sqrt()
 }
 
 #[cfg(test)]
@@ -364,14 +366,14 @@ mod tests {
             .world_objects()
             .find(|object| object.id.get() == projectile_id)
             .expect("projectile visual object");
-        assert_eq!((object.x, object.y), (192.0, 128.0));
+        assert_eq!((object.x.to_world(), object.y.to_world()), (192.0, 128.0));
 
         tick_runtime(&mut runtime, &mut entities, 2);
         let object = runtime
             .world_objects()
             .find(|object| object.id.get() == projectile_id)
             .expect("projectile visual object");
-        assert_eq!((object.x, object.y), (256.0, 128.0));
+        assert_eq!((object.x.to_world(), object.y.to_world()), (256.0, 128.0));
         assert_eq!(
             object.payload,
             AbilityObjectPayload::LineProjectile {
@@ -408,8 +410,7 @@ mod tests {
 
         tick_runtime(&mut runtime, &mut entities, 1);
         if let Some(caster) = entities.get_mut(caster) {
-            caster.pos_x = 192.0;
-            caster.pos_y = 256.0;
+            caster.set_position(192.0, 256.0);
         }
         tick_runtime(&mut runtime, &mut entities, 2);
 
@@ -417,7 +418,7 @@ mod tests {
             .world_objects()
             .next()
             .expect("projectile visual object");
-        assert!(object.y > 128.0);
+        assert!(object.y.to_world() > 128.0);
     }
 
     #[test]
@@ -506,7 +507,7 @@ mod tests {
             .world_objects()
             .find(|object| object.id.get() == projectile_id)
             .expect("projectile visual object");
-        assert_eq!((object.x, object.y), (192.0, 128.0));
+        assert_eq!((object.x.to_world(), object.y.to_world()), (192.0, 128.0));
         assert_eq!(
             object.payload,
             AbilityObjectPayload::LineProjectile {

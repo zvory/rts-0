@@ -2,6 +2,7 @@ use crate::config;
 use crate::game::entity::{AttackPhase, Entity, EntityKind, EntityStore, PanzerfaustState};
 use crate::game::entrenchment_combat;
 use crate::game::services::world_query;
+use rts_rules::math::GameplayMath as _;
 
 use super::acquisition::{combat_mode_with_moving_fire, resolve_target_for_weapon, CombatMode};
 use super::projection::combat_target_distance_sq;
@@ -85,7 +86,7 @@ fn handle_loaded_combat(
     };
     let Some((tx, ty, target_owner)) = entities
         .get(target)
-        .map(|target| (target.pos_x, target.pos_y, target.owner))
+        .map(|target| (target.pos_x(), target.pos_y(), target.owner))
     else {
         return false;
     };
@@ -97,7 +98,7 @@ fn handle_loaded_combat(
 
     let distance = entities
         .get(target)
-        .map(|target| combat_target_distance_sq(map, (px, py), target).sqrt())
+        .map(|target| combat_target_distance_sq(map, (px, py), target).det_sqrt())
         .unwrap_or(f32::INFINITY);
     let commanded_direct_target = mode == CombatMode::Ordered
         && entities
@@ -110,7 +111,7 @@ fn handle_loaded_combat(
             attacker.set_path_goal(None);
         }
     }
-    let target_angle = (ty - py).atan2(tx - px);
+    let target_angle = (ty - py).det_atan2(tx - px);
     let fire_context =
         PanzerfaustFireContext::new(map, entities, blockers, teams, &los, fog, smokes);
     let clear_shot = panzerfaust_target_fireable(&fire_context, id, owner, target);
@@ -163,8 +164,8 @@ fn panzerfaust_combat_context(
     let acquire_px = range_px;
     Some((
         attacker.owner,
-        attacker.pos_x,
-        attacker.pos_y,
+        attacker.pos_x(),
+        attacker.pos_y(),
         range_px,
         acquire_px,
         mode,
@@ -282,12 +283,12 @@ fn panzerfaust_target_in_range(
     let range_px = panzerfaust_range_tiles(attacker) * config::TILE_SIZE as f32
         + attacker.radius()
         + RANGE_SLACK;
-    if combat_target_distance_sq(map, (attacker.pos_x, attacker.pos_y), target)
+    if combat_target_distance_sq(map, (attacker.pos_x(), attacker.pos_y()), target)
         > range_px * range_px
     {
         return false;
     }
-    map.contains_world_point(target.pos_x, target.pos_y)
+    map.contains_world_point(target.pos_x(), target.pos_y())
 }
 
 pub(super) struct PanzerfaustFireContext<'a, 'los> {
@@ -341,7 +342,7 @@ fn panzerfaust_target_fireable(
         context.smokes,
         attacker_id,
         owner,
-        (attacker.pos_x, attacker.pos_y),
+        (attacker.pos_x(), attacker.pos_y()),
         target_id,
         DirectFireLegality::IntendedTarget,
     )

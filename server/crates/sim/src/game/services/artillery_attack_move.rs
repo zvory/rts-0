@@ -13,6 +13,7 @@ use crate::game::teams::TeamRelations;
 use crate::game::upgrade::UpgradeKind;
 use crate::game::PlayerState;
 use crate::protocol::Event;
+use rts_rules::math::GameplayMath as _;
 use std::collections::HashMap;
 
 const NO_TARGET_GRACE_TICKS: u16 = config::TICK_HZ as u16;
@@ -57,7 +58,7 @@ pub(crate) fn run(
         let Some((owner, position, setup, move_goal)) = entities.get(id).map(|entity| {
             (
                 entity.owner,
-                (entity.pos_x, entity.pos_y),
+                (entity.pos_x(), entity.pos_y()),
                 entity.weapon_setup(),
                 entity.move_intent(),
             )
@@ -87,7 +88,7 @@ pub(crate) fn run(
             continue;
         };
 
-        let target_angle = (target.y - position.1).atan2(target.x - position.0);
+        let target_angle = (target.y - position.1).det_atan2(target.x - position.0);
         let already_inside_field = entities
             .get(id)
             .is_some_and(|entity| target_inside_current_field(entity, target_angle));
@@ -136,15 +137,15 @@ fn candidates(
             && world_query::is_automatic_attack_targetable(target, teams, owner, artillery_id)
             && crate::rules::projection::team_visible_world(
                 owner,
-                target.pos_x,
-                target.pos_y,
+                target.pos_x(),
+                target.pos_y(),
                 fog,
                 teams,
             )
             && !crate::rules::projection::entity_hidden_by_concealment_from_team(
                 owner, target, map, fog, teams,
             )
-            && !smokes.point_inside(target.pos_x, target.pos_y)
+            && !smokes.point_inside(target.pos_x(), target.pos_y())
     };
     let dispersion_px = dispersion_tiles * config::TILE_SIZE as f32;
     let mut unit_candidates = Vec::new();
@@ -156,7 +157,8 @@ fn candidates(
         if !visible_enemy(target) {
             continue;
         }
-        let distance_sq = (target.pos_x - origin.0).powi(2) + (target.pos_y - origin.1).powi(2);
+        let distance_sq =
+            (target.pos_x() - origin.0).det_powi(2) + (target.pos_y() - origin.1).det_powi(2);
         if !distance_sq.is_finite()
             || distance_sq < min_range_px * min_range_px
             || distance_sq > max_range_px * max_range_px
@@ -164,20 +166,20 @@ fn candidates(
             continue;
         }
         let value_in_dispersion = spatial
-            .ids_in_circle_bbox(target.pos_x, target.pos_y, dispersion_px)
+            .ids_in_circle_bbox(target.pos_x(), target.pos_y(), dispersion_px)
             .filter_map(|covered_id| entities.get(covered_id))
             .filter(|covered| {
                 visible_enemy(covered)
-                    && (covered.pos_x - target.pos_x).powi(2)
-                        + (covered.pos_y - target.pos_y).powi(2)
+                    && (covered.pos_x() - target.pos_x()).det_powi(2)
+                        + (covered.pos_y() - target.pos_y()).det_powi(2)
                         <= dispersion_px * dispersion_px
             })
             .map(entity_value)
             .sum();
         let candidate = Candidate {
             id: target.id,
-            x: target.pos_x,
-            y: target.pos_y,
+            x: target.pos_x(),
+            y: target.pos_y(),
             target_priority: artillery_target_priority(target),
             value_in_dispersion,
             distance_sq,
@@ -222,7 +224,7 @@ fn choose_for_setup(
         .filter(|candidate| {
             target_inside_current_field(
                 artillery,
-                (candidate.y - artillery.pos_y).atan2(candidate.x - artillery.pos_x),
+                (candidate.y - artillery.pos_y()).det_atan2(candidate.x - artillery.pos_x()),
             )
         })
         .collect();

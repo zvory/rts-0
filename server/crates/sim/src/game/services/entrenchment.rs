@@ -3,6 +3,7 @@
 //! This service owns unit-facing trench lifecycle state. The neutral trench terrain itself lives
 //! in [`crate::game::trench::TrenchStore`].
 
+use rts_rules::math::{Coord, GameplayMath as _};
 use std::collections::BTreeMap;
 
 use crate::config;
@@ -70,7 +71,7 @@ pub(crate) fn entrenchment_system(
         ) {
             if let Some(e) = entities.get_mut(id) {
                 if let Some((x, y)) = candidate.slot {
-                    let old_position = (e.pos_x, e.pos_y);
+                    let old_position = (e.pos_x(), e.pos_y());
                     e.set_position(x, y);
                     indexes.entities.relocate(id, old_position, (x, y));
                 }
@@ -87,14 +88,14 @@ pub(crate) fn entrenchment_system(
         let can_create = can_create_trench(map, has_entrenchment, &snapshot);
         let should_dig = can_create
             && stationary_for_digging(pre_collision_position, &snapshot)
-            && !standing_in_trench(&indexes.trenches, snapshot.pos_x, snapshot.pos_y);
+            && !standing_in_trench(&indexes.trenches, snapshot.pos_x(), snapshot.pos_y());
         if should_dig {
             let completed = entities.get_mut(id).is_some_and(|e| {
                 set_active_trench_occupation_tracked(e, &mut occupied_trench_counts, None);
                 increment_entrenchment_dig(e) >= config::ENTRENCHMENT_DIG_IN_TICKS
             });
             if completed {
-                let created = trenches.create(map, snapshot.pos_x, snapshot.pos_y);
+                let created = trenches.create(map, snapshot.pos_x(), snapshot.pos_y());
                 if let (Some(created), Some(trench)) = (created, trenches.all().last().copied()) {
                     if trench.id == created {
                         indexes.trenches.insert(trench);
@@ -122,7 +123,7 @@ fn occupation_candidate(
     entity: &Entity,
 ) -> Option<OccupationCandidate> {
     if !eligible_living_infantry(entity)
-        || !map.world_point_allows_entrenchment(entity.pos_x, entity.pos_y)
+        || !map.world_point_allows_entrenchment(entity.pos_x(), entity.pos_y())
         || !stopped_for_occupation(pre_collision_position, entity)
     {
         return None;
@@ -133,7 +134,7 @@ fn occupation_candidate(
 fn can_create_trench(map: &Map, has_entrenchment: &dyn Fn(u32) -> bool, entity: &Entity) -> bool {
     eligible_living_infantry(entity)
         && has_entrenchment(entity.owner)
-        && map.world_point_allows_entrenchment(entity.pos_x, entity.pos_y)
+        && map.world_point_allows_entrenchment(entity.pos_x(), entity.pos_y())
 }
 
 fn eligible_living_infantry(entity: &Entity) -> bool {
@@ -176,7 +177,7 @@ fn holds_ground(entity: &Entity) -> bool {
 
 fn movement_delta_distance(entity: &Entity) -> f32 {
     let (dx, dy) = entity.movement_delta();
-    (dx * dx + dy * dy).sqrt()
+    (dx * dx + dy * dy).det_sqrt()
 }
 
 fn forced_movement_delta_distance(
@@ -186,7 +187,7 @@ fn forced_movement_delta_distance(
     let Some((before_x, before_y)) = pre_collision_position(entity.id) else {
         return 0.0;
     };
-    distance((before_x, before_y), (entity.pos_x, entity.pos_y))
+    distance((before_x, before_y), (entity.pos_x(), entity.pos_y()))
 }
 
 fn best_occupation_candidate(
@@ -231,8 +232,8 @@ fn best_occupation_candidate(
 }
 
 fn occupation_search_distance_sq(trench: Trench, entity: &Entity) -> Option<f32> {
-    let dx = entity.pos_x - trench.x;
-    let dy = entity.pos_y - trench.y;
+    let dx = entity.pos_x() - trench.x.to_world();
+    let dy = entity.pos_y() - trench.y.to_world();
     let dist_sq = dx * dx + dy * dy;
     if !dist_sq.is_finite() {
         return None;
@@ -244,7 +245,7 @@ fn occupation_search_distance_sq(trench: Trench, entity: &Entity) -> Option<f32>
 fn standing_in_trench(trenches: &TrenchSpatialIndex, x: f32, y: f32) -> bool {
     trenches
         .containing_candidates(x, y)
-        .any(|trench| trench_contains_point(trench, x, y))
+        .any(|trench| trench.contains_point(x, y))
 }
 
 fn slot_candidate(
@@ -255,7 +256,7 @@ fn slot_candidate(
     entity: &Entity,
     trench: Trench,
 ) -> Option<Option<(f32, f32)>> {
-    if trench_contains_point(trench, entity.pos_x, entity.pos_y)
+    if trench.contains_point(entity.pos_x(), entity.pos_y())
         && slot_position_legal(
             map,
             entities,
@@ -263,7 +264,7 @@ fn slot_candidate(
             entity_index,
             entity,
             trench,
-            (entity.pos_x, entity.pos_y),
+            (entity.pos_x(), entity.pos_y()),
         )
     {
         return Some(None);
@@ -272,14 +273,14 @@ fn slot_candidate(
     slot_positions(entity, trench)
         .into_iter()
         .filter(|candidate| {
-            distance((entity.pos_x, entity.pos_y), *candidate) <= SLOT_MAX_CORRECTION_PX
+            distance((entity.pos_x(), entity.pos_y()), *candidate) <= SLOT_MAX_CORRECTION_PX
         })
         .filter(|candidate| {
             slot_position_legal(map, entities, occ, entity_index, entity, trench, *candidate)
         })
         .min_by(|a, b| {
-            distance_sq((entity.pos_x, entity.pos_y), *a)
-                .total_cmp(&distance_sq((entity.pos_x, entity.pos_y), *b))
+            distance_sq((entity.pos_x(), entity.pos_y()), *a)
+                .total_cmp(&distance_sq((entity.pos_x(), entity.pos_y()), *b))
                 .then_with(|| a.0.total_cmp(&b.0))
                 .then_with(|| a.1.total_cmp(&b.1))
         })
@@ -288,20 +289,23 @@ fn slot_candidate(
 
 fn slot_positions(entity: &Entity, trench: Trench) -> Vec<(f32, f32)> {
     let mut candidates = Vec::new();
-    let from_center = (entity.pos_x - trench.x, entity.pos_y - trench.y);
-    let dist = (from_center.0 * from_center.0 + from_center.1 * from_center.1).sqrt();
+    let from_center = (
+        entity.pos_x() - trench.x.to_world(),
+        entity.pos_y() - trench.y.to_world(),
+    );
+    let dist = (from_center.0 * from_center.0 + from_center.1 * from_center.1).det_sqrt();
     if dist.is_finite() && dist > 0.001 {
         let target_dist = trench_radius_px(trench) * 0.55;
         let step = (dist - target_dist).clamp(0.0, SLOT_MAX_CORRECTION_PX);
         candidates.push((
-            entity.pos_x - from_center.0 / dist * step,
-            entity.pos_y - from_center.1 / dist * step,
+            entity.pos_x() - from_center.0 / dist * step,
+            entity.pos_y() - from_center.1 / dist * step,
         ));
     }
 
-    candidates.push((trench.x, trench.y));
+    candidates.push((trench.x.to_world(), trench.y.to_world()));
     let base_angle = if dist.is_finite() && dist > 0.001 {
-        from_center.1.atan2(from_center.0)
+        from_center.1.det_atan2(from_center.0)
     } else {
         (entity.id as f32 * 0.618_034).rem_euclid(std::f32::consts::TAU)
     };
@@ -320,12 +324,21 @@ fn slot_positions(entity: &Entity, trench: Trench) -> Vec<(f32, f32)> {
         ] {
             let angle = base_angle + offset;
             candidates.push((
-                trench.x + angle.cos() * radius,
-                trench.y + angle.sin() * radius,
+                trench.x.to_world() + angle.det_cos() * radius,
+                trench.y.to_world() + angle.det_sin() * radius,
             ));
         }
     }
+    // Legality, ranking, and the spatial index must see the center that set_position stores.
     candidates
+        .into_iter()
+        .filter_map(|(x, y)| {
+            Some((
+                Coord::try_from_world(x)?.to_world(),
+                Coord::try_from_world(y)?.to_world(),
+            ))
+        })
+        .collect()
 }
 
 fn slot_position_legal(
@@ -337,7 +350,7 @@ fn slot_position_legal(
     trench: Trench,
     candidate: (f32, f32),
 ) -> bool {
-    if !trench_contains_point(trench, candidate.0, candidate.1) {
+    if !trench.contains_point(candidate.0, candidate.1) {
         return false;
     }
     if !standability::unit_static_standable_with_facing(
@@ -350,12 +363,13 @@ fn slot_position_legal(
     ) {
         return false;
     }
-    if distance_sq((entity.pos_x, entity.pos_y), candidate) > STATIONARY_EPS_PX * STATIONARY_EPS_PX
+    if distance_sq((entity.pos_x(), entity.pos_y()), candidate)
+        > STATIONARY_EPS_PX * STATIONARY_EPS_PX
         && !standability::unit_static_segment_standable(
             map,
             occ,
             entity.kind,
-            (entity.pos_x, entity.pos_y),
+            (entity.pos_x(), entity.pos_y()),
             candidate,
         )
     {
@@ -510,18 +524,8 @@ fn trench_radius_px(trench: Trench) -> f32 {
     trench.radius_tiles * config::TILE_SIZE as f32
 }
 
-fn trench_contains_point(trench: Trench, x: f32, y: f32) -> bool {
-    if !x.is_finite() || !y.is_finite() {
-        return false;
-    }
-    let dx = x - trench.x;
-    let dy = y - trench.y;
-    let radius = trench_radius_px(trench);
-    dx * dx + dy * dy <= radius * radius
-}
-
 fn distance(a: (f32, f32), b: (f32, f32)) -> f32 {
-    distance_sq(a, b).sqrt()
+    distance_sq(a, b).det_sqrt()
 }
 
 fn distance_sq(a: (f32, f32), b: (f32, f32)) -> f32 {

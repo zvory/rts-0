@@ -132,7 +132,7 @@ pub(super) fn select_rifle_escorts(
     defensive_riflemen.sort_unstable();
     defensive_riflemen.truncate(CONTAINMENT_HOME_RIFLE_RESERVE);
     let radius2 =
-        (CONTAINMENT_ESCORT_SELECTION_RADIUS_TILES * observation.map.tile_size as f32).powi(2);
+        (CONTAINMENT_ESCORT_SELECTION_RADIUS_TILES * observation.map.tile_size as f32).det_powi(2);
     let mut riflemen: Vec<u32> = observation
         .owned
         .iter()
@@ -292,7 +292,7 @@ pub(super) fn formation_vehicles_in_position(
     formation: &ContainmentFormation,
     tolerance_tiles: f32,
 ) -> bool {
-    let tolerance2 = (tolerance_tiles * observation.map.tile_size as f32).powi(2);
+    let tolerance2 = (tolerance_tiles * observation.map.tile_size as f32).det_powi(2);
     let in_position = |(id, point): &(u32, (f32, f32))| {
         observation
             .owned
@@ -408,7 +408,7 @@ pub(super) fn retain_nearby_rifle_escorts(
     riflemen: &mut BTreeSet<u32>,
     anchor: (f32, f32),
 ) {
-    let radius2 = (CONTAINMENT_RIFLE_COHESION_TILES * observation.map.tile_size as f32).powi(2);
+    let radius2 = (CONTAINMENT_RIFLE_COHESION_TILES * observation.map.tile_size as f32).det_powi(2);
     riflemen.retain(|id| {
         observation.owned.iter().any(|unit| {
             unit.id == *id && unit.hp > 0 && dist2(unit.x, unit.y, anchor.0, anchor.1) <= radius2
@@ -421,7 +421,7 @@ pub(super) fn nearby_rifle_escort_count(
     riflemen: &[u32],
     anchor: (f32, f32),
 ) -> usize {
-    let radius2 = (CONTAINMENT_RIFLE_COHESION_TILES * observation.map.tile_size as f32).powi(2);
+    let radius2 = (CONTAINMENT_RIFLE_COHESION_TILES * observation.map.tile_size as f32).det_powi(2);
     observation
         .owned
         .iter()
@@ -481,7 +481,7 @@ fn short_march_waypoint(
     step_tiles: f32,
 ) -> (f32, f32) {
     let max_step = step_tiles * map.tile_size as f32;
-    let distance = dist2(from.0, from.1, destination.0, destination.1).sqrt();
+    let distance = dist2(from.0, from.1, destination.0, destination.1).det_sqrt();
     if distance <= max_step || distance <= f32::EPSILON {
         return clamp_to_map(destination, map);
     }
@@ -605,7 +605,7 @@ pub(super) fn formation_core_is_grouped(
         .collect();
     let tile_size = observation.map.tile_size as f32;
     let scout_close = by_id.get(&formation.scout.0).is_some_and(|scout| {
-        dist2(scout.x, scout.y, tank_center.0, tank_center.1) <= (4.0 * tile_size).powi(2)
+        dist2(scout.x, scout.y, tank_center.0, tank_center.1) <= (4.0 * tile_size).det_powi(2)
     });
     let nearby_riflemen = formation
         .riflemen
@@ -613,7 +613,7 @@ pub(super) fn formation_core_is_grouped(
         .filter(|(id, _)| {
             by_id.get(id).is_some_and(|rifleman| {
                 dist2(rifleman.x, rifleman.y, tank_center.0, tank_center.1)
-                    <= (CONTAINMENT_RIFLE_COHESION_TILES * tile_size).powi(2)
+                    <= (CONTAINMENT_RIFLE_COHESION_TILES * tile_size).det_powi(2)
             })
         })
         .count();
@@ -645,7 +645,7 @@ pub(super) fn formation_vehicle_core_is_grouped(
         .find(|unit| unit.id == formation.scout.0)
         .is_some_and(|scout| {
             dist2(scout.x, scout.y, tank_center.0, tank_center.1)
-                <= (4.0 * observation.map.tile_size as f32).powi(2)
+                <= (4.0 * observation.map.tile_size as f32).det_powi(2)
         })
 }
 

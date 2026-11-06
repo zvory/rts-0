@@ -34,8 +34,8 @@ fn deployed_anti_tank_gun_does_not_auto_acquire_targets_hidden_by_fog() {
     assert!(
         !fog.is_visible_world(
             1,
-            entities.get(tank_id).expect("tank should exist").pos_x,
-            entities.get(tank_id).expect("tank should exist").pos_y,
+            entities.get(tank_id).expect("tank should exist").pos_x(),
+            entities.get(tank_id).expect("tank should exist").pos_y(),
         ),
         "test setup requires the tank to be outside the Anti-Tank Gun owner's sight"
     );
@@ -108,11 +108,11 @@ fn deployed_anti_tank_gun_auto_acquires_target_visible_to_teammate() {
     fog.recompute(&[1, 2, 3], &entities, &map);
     let tank = entities.get(tank_id).expect("tank should exist");
     assert!(
-        !fog.is_visible_world(1, tank.pos_x, tank.pos_y),
+        !fog.is_visible_world(1, tank.pos_x(), tank.pos_y()),
         "test setup requires the target to be outside the attacker's own sight"
     );
     assert!(
-        fog.is_visible_world(2, tank.pos_x, tank.pos_y),
+        fog.is_visible_world(2, tank.pos_x(), tank.pos_y()),
         "test setup requires the allied spotter to see the target"
     );
     let enemy_hp = tank.hp;

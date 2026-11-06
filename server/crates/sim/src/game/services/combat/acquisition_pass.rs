@@ -3,6 +3,7 @@ use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
+use rts_rules::math::GameplayMath as _;
 
 use super::acquisition::{resolve_target, CombatMode};
 use super::shot_blocker_index::ShotBlockerIndex;
@@ -275,7 +276,7 @@ fn retained_target(
 
     let target_id = attacker.target_id()?;
     let target = entities.get(target_id)?;
-    let target_angle = (target.pos_y - py).atan2(target.pos_x - px);
+    let target_angle = (target.pos_y() - py).det_atan2(target.pos_x() - px);
     if !auto_retention_target_inside_field_of_fire(attacker, target_angle) {
         // A retained automatic target must not prevent acquisition of a new target that is still
         // inside the gun's fixed deployed field.

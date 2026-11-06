@@ -2,6 +2,7 @@ use crate::game::entity::EntityKind;
 use crate::rules;
 use crate::rules::economy::ResourceCost;
 pub use crate::rules::faction::{AbilityKind, AbilityQueuePolicy, AbilityTargetMode};
+use rts_rules::math::GameplayMath as _;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AbilityEffectHook {
@@ -123,7 +124,9 @@ pub fn effect_hook(kind: AbilityKind) -> AbilityEffectHook {
 
 /// Rocket racks follow the hull; ten degrees of launch leeway on either side.
 pub(crate) fn barrage_facing_ready(facing: f32, bearing: f32) -> bool {
-    let error = (bearing - facing).sin().atan2((bearing - facing).cos());
+    let error = (bearing - facing)
+        .det_sin()
+        .det_atan2((bearing - facing).det_cos());
     error.abs() <= 10.0_f32.to_radians()
 }
 
