@@ -1,4 +1,5 @@
 //! Forward construction rush authored only against the fog-filtered strategy SDK.
+use rts_rules::math::GameplayMath as _;
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::sdk::{
@@ -118,7 +119,7 @@ impl AiStrategy for RushStrategy {
         let Some(worker) = frame.owned().iter().find(|e| e.kind == EntityKind::Worker) else {
             return;
         };
-        let distance = (worker.position.0 - target.0).hypot(worker.position.1 - target.1);
+        let distance = (worker.position.0 - target.0).det_hypot(worker.position.1 - target.1);
         if distance < (ENGINEER_MIN_DISTANCE_TILES + 1.0) * size {
             // Correct a pathing detour before the next decision could enter the forbidden radius.
             if let Ok(group) = UnitGroup::new([worker.id]) {
@@ -214,7 +215,7 @@ fn forward_site(
     let stats = rts_rules::balance::building_stats(kind)?;
     let dx = target.0 - worker.position.0;
     let dy = target.1 - worker.position.1;
-    let length = dx.hypot(dy).max(1.0);
+    let length = dx.det_hypot(dy).max(1.0);
     let bearing = (dx / length, dy / length);
     let tile_x = (worker.position.0 / size) as i32;
     let tile_y = (worker.position.1 / size) as i32;
@@ -238,7 +239,7 @@ fn forward_site(
                 continue;
             }
             let desired = (bearing.0 * size * 4.0, bearing.1 * size * 4.0);
-            let score = (offset.0 - desired.0).powi(2) + (offset.1 - desired.1).powi(2);
+            let score = (offset.0 - desired.0).det_powi(2) + (offset.1 - desired.1).det_powi(2);
             candidates.push((score, x, y));
         }
     }
@@ -259,7 +260,7 @@ fn standoff_destination(
     target: (f32, f32),
 ) -> Option<(f32, f32)> {
     let size = frame.map().tile_size as f32;
-    let angle = (position.1 - target.1).atan2(position.0 - target.0);
+    let angle = (position.1 - target.1).det_atan2(position.0 - target.0);
     let radius = ENGINEER_STANDOFF_TILES * size;
     let queries = WorldQueries::new(frame);
     // Prefer the current bearing, falling back along the same standoff circle if its tile is blocked.
@@ -267,8 +268,8 @@ fn standoff_destination(
         let step = ((offset + 1) / 2) as f32 * std::f32::consts::PI / 16.0;
         let direction = angle + if offset % 2 == 0 { step } else { -step };
         let point = (
-            target.0 + direction.cos() * radius,
-            target.1 + direction.sin() * radius,
+            target.0 + direction.det_cos() * radius,
+            target.1 + direction.det_sin() * radius,
         );
         let Some(world) = queries.world_point(point.0, point.1) else {
             continue;
@@ -308,7 +309,7 @@ fn safe_construction_site(
     let bottom = top + stats.foot_h as f32 * size;
     let closest = (target.0.clamp(left, right), target.1.clamp(top, bottom));
     let radius = ENGINEER_STANDOFF_TILES * size;
-    if (closest.0 - target.0).hypot(closest.1 - target.1) < radius {
+    if (closest.0 - target.0).det_hypot(closest.1 - target.1) < radius {
         return false;
     }
     // A segment between two safe endpoints can still cut across the enemy's exclusion circle.
@@ -321,7 +322,7 @@ fn safe_construction_site(
     } else {
         0.0
     };
-    (position.0 + segment.0 * along - target.0).hypot(position.1 + segment.1 * along - target.1)
+    (position.0 + segment.0 * along - target.0).det_hypot(position.1 + segment.1 * along - target.1)
         >= (ENGINEER_MIN_DISTANCE_TILES + 1.0) * size
 }
 

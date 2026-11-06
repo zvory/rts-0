@@ -18,6 +18,7 @@ use crate::game::services::occupancy::{building_footprint, Occupancy};
 use crate::game::services::standability;
 use crate::game::Game;
 use crate::rules;
+use rts_rules::math::GameplayMath as _;
 
 /// Maximum residual overlap (world px) tolerated between two non-anchored mobile units after
 /// a tick. The iterative resolver converges to within numerical noise on flat ground; this
@@ -73,13 +74,16 @@ impl Game {
         // ------------------------------------------------------------------
         for e in self.state.entities.iter() {
             assert!(
-                e.pos_x.is_finite() && e.pos_y.is_finite(),
+                e.pos_x().is_finite() && e.pos_y().is_finite(),
                 "invariant: tick {} entity has non-finite position; {}",
                 self.state.tick,
                 entity_context(&self.state.map, e)
             );
             assert!(
-                e.pos_x >= 0.0 && e.pos_x < world_max_x && e.pos_y >= 0.0 && e.pos_y < world_max_y,
+                e.pos_x() >= 0.0
+                    && e.pos_x() < world_max_x
+                    && e.pos_y() >= 0.0
+                    && e.pos_y() < world_max_y,
                 "invariant: tick {} entity position out of world bounds [0, {:.2})x[0, {:.2}); {}",
                 self.state.tick,
                 world_max_x,
@@ -168,8 +172,8 @@ impl Game {
             .collect();
         for node in self.state.entities.iter().filter(|e| e.is_node()) {
             let body = CircleBody {
-                x: node.pos_x,
-                y: node.pos_y,
+                x: node.pos_x(),
+                y: node.pos_y(),
                 radius: node.radius(),
             };
             for &(building_id, building_kind, rect) in &building_rects {
@@ -227,8 +231,8 @@ impl Game {
                     &self.state.map,
                     &occ,
                     e.kind,
-                    e.pos_x,
-                    e.pos_y,
+                    e.pos_x(),
+                    e.pos_y(),
                     e.facing()
                 ),
                 "invariant: tick {} unit body is not static-standable; {}",
@@ -375,8 +379,8 @@ impl Game {
                     entity_context(&self.state.map, b),
                     location_context(
                         &self.state.map,
-                        (a.pos_x + b.pos_x) * 0.5,
-                        (a.pos_y + b.pos_y) * 0.5
+                        (a.pos_x() + b.pos_x()) * 0.5,
+                        (a.pos_y() + b.pos_y()) * 0.5
                     )
                 );
             }
@@ -491,7 +495,7 @@ fn entity_context(map: &Map, e: &Entity) -> String {
         e.hp,
         e.max_hp,
         e.state_str(),
-        location_context(map, e.pos_x, e.pos_y),
+        location_context(map, e.pos_x(), e.pos_y()),
         e.radius(),
         e.order(),
         e.target_id(),
@@ -585,7 +589,7 @@ fn unit_body_rect_overlap_depth(body: UnitBody, rect: RectBody) -> f32 {
         UnitBody::OrientedCapsule(capsule) => {
             let (start, end) =
                 capsule_endpoints(capsule.x, capsule.y, capsule.half_segment, capsule.facing);
-            (capsule.radius - segment_rect_distance_sq(start, end, rect).sqrt()).max(0.0)
+            (capsule.radius - segment_rect_distance_sq(start, end, rect).det_sqrt()).max(0.0)
         }
         UnitBody::OrientedBox(oriented) => oriented_box_rect_overlap_depth(oriented, rect),
     }
@@ -596,7 +600,7 @@ fn circle_rect_overlap_depth(circle: CircleBody, rect: RectBody) -> f32 {
     let nearest_y = circle.y.clamp(rect.min_y, rect.max_y);
     let dx = circle.x - nearest_x;
     let dy = circle.y - nearest_y;
-    (circle.radius - (dx * dx + dy * dy).sqrt()).max(0.0)
+    (circle.radius - (dx * dx + dy * dy).det_sqrt()).max(0.0)
 }
 
 fn oriented_box_rect_overlap_depth(
@@ -611,7 +615,7 @@ fn oriented_box_rect_overlap_depth(
         (rect.max_x - rect.min_x) * 0.5,
         (rect.max_y - rect.min_y) * 0.5,
     );
-    let forward = (body.facing.cos(), body.facing.sin());
+    let forward = (body.facing.det_cos(), body.facing.det_sin());
     let side = (-forward.1, forward.0);
     let delta = (rect_center.0 - body.x, rect_center.1 - body.y);
     let axes = [forward, side, (1.0, 0.0), (0.0, 1.0)];
@@ -694,7 +698,7 @@ fn point_segment_distance_sq(point: (f32, f32), start: (f32, f32), end: (f32, f3
 }
 
 fn capsule_endpoints(x: f32, y: f32, half_segment: f32, facing: f32) -> ((f32, f32), (f32, f32)) {
-    let forward = (facing.cos(), facing.sin());
+    let forward = (facing.det_cos(), facing.det_sin());
     (
         (x - forward.0 * half_segment, y - forward.1 * half_segment),
         (x + forward.0 * half_segment, y + forward.1 * half_segment),
@@ -710,7 +714,7 @@ fn circle_rect_collision_context(map: &Map, circle: CircleBody, rect: RectBody) 
     let nearest_y = circle.y.clamp(rect.min_y, rect.max_y);
     let dx = circle.x - nearest_x;
     let dy = circle.y - nearest_y;
-    let distance = (dx * dx + dy * dy).sqrt();
+    let distance = (dx * dx + dy * dy).det_sqrt();
     let overlap = circle.radius - distance;
     format!(
         "circle_center={} circle_radius={:.2} nearest_rect_point={} overlap_depth={:.2}px",

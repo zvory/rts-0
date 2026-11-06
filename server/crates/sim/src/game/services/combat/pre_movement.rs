@@ -45,7 +45,7 @@ pub(in crate::game) fn hold_charged_attack_move_tanks(
             let range_px = effective_attack_profile(e).range_tiles * config::TILE_SIZE as f32
                 + e.radius()
                 + RANGE_SLACK;
-            (e.owner, e.pos_x, e.pos_y, range_px)
+            (e.owner, e.pos_x(), e.pos_y(), range_px)
         }) else {
             continue;
         };

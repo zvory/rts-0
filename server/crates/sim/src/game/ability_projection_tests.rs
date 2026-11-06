@@ -213,7 +213,7 @@ fn owner_entity_abilities_project_active_return_affordance() {
         .state
         .entities
         .get(caster)
-        .map(|entity| (entity.pos_x, entity.pos_y))
+        .map(|entity| (entity.pos_x(), entity.pos_y()))
         .expect("caster should exist");
     let marker_id = game
         .spawn_ability_world_object_for_test(ability_object_spec(1, caster, x, y))
@@ -257,7 +257,7 @@ fn recast_return_execution_accepts_active_marker() {
         .state
         .entities
         .get(caster)
-        .map(|entity| (entity.pos_x + 96.0, entity.pos_y))
+        .map(|entity| (entity.pos_x() + 96.0, entity.pos_y()))
         .expect("caster should exist");
     let marker_id = game
         .spawn_ability_world_object_for_test(ability_object_spec(1, caster, x, y))
@@ -293,7 +293,7 @@ fn recast_return_execution_rejects_missing_too_early_and_stale_state() {
         .state
         .entities
         .get(caster)
-        .map(|entity| (entity.pos_x + 96.0, entity.pos_y))
+        .map(|entity| (entity.pos_x() + 96.0, entity.pos_y()))
         .expect("caster should exist");
     let marker_id = game
         .spawn_ability_world_object_for_test(ability_object_spec(1, caster, x, y))

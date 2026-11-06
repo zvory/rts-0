@@ -28,8 +28,8 @@ pub(super) fn combat_target_distance_sq(map: &Map, attacker: (f32, f32), target:
         let dy = attacker.1 - closest_y;
         return dx * dx + dy * dy;
     }
-    let dx = attacker.0 - target.pos_x;
-    let dy = attacker.1 - target.pos_y;
+    let dx = attacker.0 - target.pos_x();
+    let dy = attacker.1 - target.pos_y();
     let distance_sq = dx * dx + dy * dy;
     if distance_sq.is_finite() {
         distance_sq
@@ -58,10 +58,10 @@ fn shot_blocker_bounds(map: &Map, entity: &Entity) -> Option<ShotBlockerBounds> 
     if entity.kind == EntityKind::Tank {
         let radius = unit_body_for_entity(entity)?.bounding_radius();
         return Some(ShotBlockerBounds {
-            min_x: entity.pos_x - radius,
-            min_y: entity.pos_y - radius,
-            max_x: entity.pos_x + radius,
-            max_y: entity.pos_y + radius,
+            min_x: entity.pos_x() - radius,
+            min_y: entity.pos_y() - radius,
+            max_x: entity.pos_x() + radius,
+            max_y: entity.pos_y() + radius,
         });
     }
     if entity.is_building() && blocks_line_of_sight(entity.kind) {
@@ -103,7 +103,7 @@ pub(super) fn resolve_shot_victim(
     ay: f32,
 ) -> Option<u32> {
     let victim = entities.get(intended_victim)?;
-    let end = (victim.pos_x, victim.pos_y);
+    let end = (victim.pos_x(), victim.pos_y());
     if !ax.is_finite() || !ay.is_finite() || !end.0.is_finite() || !end.1.is_finite() {
         return Some(intended_victim);
     }
@@ -201,7 +201,7 @@ pub(super) fn shot_hits_intended_target(
     let Some(target) = entities.get(intended_victim) else {
         return false;
     };
-    let end = (target.pos_x, target.pos_y);
+    let end = (target.pos_x(), target.pos_y());
     if friendly_hard_blocker_between_except(
         map,
         entities,

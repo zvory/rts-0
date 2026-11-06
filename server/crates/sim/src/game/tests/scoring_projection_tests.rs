@@ -608,8 +608,8 @@ fn death_vision_lingers_as_normal_vision_for_five_seconds() {
         .find(|e| e.id == enemy)
         .expect("moving enemy should still be visible during lingering death vision");
     assert!(!moving_linger.vision_only);
-    assert!((moving_linger.x - moved_enemy.pos_x).abs() < 0.001);
-    assert!((moving_linger.y - moved_enemy.pos_y).abs() < 0.001);
+    assert!((moving_linger.x - moved_enemy.pos_x()).abs() < 0.001);
+    assert!((moving_linger.y - moved_enemy.pos_y()).abs() < 0.001);
 
     while game.tick_count() <= config::TICK_HZ * 5 {
         game.tick();

@@ -9,10 +9,10 @@ fn visible_target_x_outside_weapon_range(entities: &EntityStore, attacker_id: u3
         .expect("moving-fire attacker should exist for range setup");
     let profile = effective_attack_profile(attacker);
     let range_px = profile.range_tiles * config::TILE_SIZE as f32 + attacker.radius() + RANGE_SLACK;
-    let target_x = attacker.pos_x + range_px + config::TILE_SIZE as f32;
+    let target_x = attacker.pos_x() + range_px + config::TILE_SIZE as f32;
     let sight_px = attacker.sight_tiles() as f32 * config::TILE_SIZE as f32;
     assert!(
-        target_x - attacker.pos_x < sight_px,
+        target_x - attacker.pos_x() < sight_px,
         "{:?} fixture needs a visible target outside weapon range",
         attacker.kind
     );
@@ -300,7 +300,7 @@ fn direct_tank_attack_inside_stationary_range_does_not_create_a_pursuit_path() {
     );
 
     let tank = entities.get(tank_id).expect("tank should exist");
-    assert_eq!((tank.pos_x, tank.pos_y), (100.0, 100.0));
+    assert_eq!((tank.pos_x(), tank.pos_y()), (100.0, 100.0));
     assert!(tank.path_is_empty());
     assert!(tank.path_goal().is_none());
     assert_eq!(tank.target_id(), None);

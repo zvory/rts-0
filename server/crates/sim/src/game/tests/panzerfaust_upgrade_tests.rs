@@ -270,7 +270,7 @@ fn explicit_attack_pursues_an_out_of_range_panzerfaust_target() {
         .state
         .entities
         .get(rifleman)
-        .map(|entity| (entity.pos_x, entity.pos_y))
+        .map(|entity| (entity.pos_x(), entity.pos_y()))
         .expect("rifleman");
 
     let mut launches = 0;
@@ -281,7 +281,7 @@ fn explicit_attack_pursues_an_out_of_range_panzerfaust_target() {
         .state
         .entities
         .get(rifleman)
-        .map(|entity| (entity.pos_x, entity.pos_y))
+        .map(|entity| (entity.pos_x(), entity.pos_y()))
         .expect("rifleman");
     assert_eq!(launches, 0);
     assert_eq!(
@@ -304,6 +304,6 @@ fn explicit_attack_pursues_an_out_of_range_panzerfaust_target() {
         }
     }
     let attacker = game.state.entities.get(rifleman).expect("rifleman");
-    assert_ne!((attacker.pos_x, attacker.pos_y), start);
+    assert_ne!((attacker.pos_x(), attacker.pos_y()), start);
     assert_eq!(launches, 1);
 }

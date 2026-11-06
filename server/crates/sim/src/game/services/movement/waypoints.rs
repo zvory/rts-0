@@ -15,6 +15,7 @@ use crate::game::services::standability::unit_static_segment_standable;
 use crate::game::upgrade::UpgradeKind;
 use crate::game::PlayerState;
 use crate::rules::terrain::{movement_speed_multiplier, TerrainKind};
+use rts_rules::math::GameplayMath as _;
 
 use super::car_drive::{
     barrage_maneuver_target, barrage_pose_ready, plan_barrage_maneuver, plan_scout_car_motion,
@@ -107,8 +108,8 @@ pub(super) fn advance_moving_units(
                 e.breakthrough_ticks(),
                 e.recent_smoke_ticks(),
                 has_meth,
-                e.pos_x,
-                e.pos_y,
+                e.pos_x(),
+                e.pos_y(),
                 !uses_oriented_vehicle_body(e.kind)
                     && matches!(
                         e.order(),
@@ -278,7 +279,7 @@ pub(super) fn advance_moving_units(
                 let Some((wx, wy)) = next else { break };
                 let dx = wx - x;
                 let dy = wy - y;
-                let dist = (dx * dx + dy * dy).sqrt();
+                let dist = (dx * dx + dy * dy).det_sqrt();
 
                 if path_len > 1 {
                     // Intermediate waypoint: infantry and workers follow the route corridor only
@@ -400,8 +401,8 @@ pub(super) fn advance_moving_units(
                     // walking heading; collision cleanup later must not turn stationary crews.
                     let step_dx = x - step_start.0;
                     let step_dy = y - step_start.1;
-                    if step_dx.hypot(step_dy) > 0.01 {
-                        let facing = step_dy.atan2(step_dx);
+                    if step_dx.det_hypot(step_dy) > 0.01 {
+                        let facing = step_dy.det_atan2(step_dx);
                         if facing.is_finite() {
                             new_facing = Some(facing);
                         }
@@ -473,16 +474,16 @@ pub(super) fn advance_moving_units(
                     continue;
                 }
                 if let Some(nb) = entities.get(bid) {
-                    let dx = x - nb.pos_x;
-                    let dy = y - nb.pos_y;
-                    let d = (dx * dx + dy * dy).sqrt();
+                    let dx = x - nb.pos_x();
+                    let dy = y - nb.pos_y();
+                    let d = (dx * dx + dy * dy).det_sqrt();
                     if d > 1e-4 {
                         rx += dx / d;
                         ry += dy / d;
                     }
                 }
             }
-            let rlen = (rx * rx + ry * ry).sqrt();
+            let rlen = (rx * rx + ry * ry).det_sqrt();
             if rlen > 1e-4 {
                 (rx / rlen, ry / rlen)
             } else {
@@ -494,6 +495,7 @@ pub(super) fn advance_moving_units(
             let next_x = x.clamp(0.0, map.world_width_px() - 0.01);
             let next_y = y.clamp(0.0, map.world_height_px() - 0.01);
             e.set_position(next_x, next_y);
+            let (next_x, next_y) = (e.pos_x(), e.pos_y());
             e.set_movement_delta(next_x - orig_x, next_y - orig_y);
             let moved_by_path = distance_between((orig_x, orig_y), (next_x, next_y)) > 0.01;
             let rotated_by_path = new_facing
@@ -564,7 +566,7 @@ pub(super) fn advance_moving_units(
                     } else {
                         e.mark_move_phase(MovePhase::AwaitingPath);
                     }
-                    let (px, py) = (e.pos_x, e.pos_y);
+                    let (px, py) = (e.pos_x(), e.pos_y());
                     e.reset_stuck(px, py);
                     continue;
                 }
@@ -621,7 +623,7 @@ pub(super) fn advance_moving_units(
                     if let Some((gx, gy)) = e.path_goal() {
                         let dx = x - gx;
                         let dy = y - gy;
-                        let dist_to_goal = (dx * dx + dy * dy).sqrt();
+                        let dist_to_goal = (dx * dx + dy * dy).det_sqrt();
                         if dist_to_goal <= config::TOLERANT_ARRIVAL_RADIUS_PX
                             && unit_static_segment_standable(map, occ, e.kind, (x, y), (gx, gy))
                         {
@@ -662,7 +664,7 @@ pub(super) fn advance_moving_units(
                     let far_from_goal = e.path_goal().is_some_and(|(gx, gy)| {
                         let dx = x - gx;
                         let dy = y - gy;
-                        (dx * dx + dy * dy).sqrt() > config::TOLERANT_ARRIVAL_RADIUS_PX
+                        (dx * dx + dy * dy).det_sqrt() > config::TOLERANT_ARRIVAL_RADIUS_PX
                     });
                     let sidestep_cooldown = e
                         .movement
@@ -714,8 +716,8 @@ fn breakthrough_speed_multiplier(
             {
                 return false;
             }
-            let dx = car.pos_x - x;
-            let dy = car.pos_y - y;
+            let dx = car.pos_x() - x;
+            let dy = car.pos_y() - y;
             dx * dx + dy * dy <= radius2
         });
     if has_owned_command_car {
@@ -741,20 +743,20 @@ fn inject_scout_car_reverse_recovery(e: &mut Entity, map: &Map, occ: &Occupancy)
     let Some((gx, gy)) = movement.path_goal else {
         return;
     };
-    let dx_goal = e.pos_x - gx;
-    let dy_goal = e.pos_y - gy;
-    if (dx_goal * dx_goal + dy_goal * dy_goal).sqrt() <= config::TOLERANT_ARRIVAL_RADIUS_PX {
+    let dx_goal = e.pos_x() - gx;
+    let dy_goal = e.pos_y() - gy;
+    if (dx_goal * dx_goal + dy_goal * dy_goal).det_sqrt() <= config::TOLERANT_ARRIVAL_RADIUS_PX {
         return;
     }
     let facing = e.facing();
-    if !e.pos_x.is_finite() || !e.pos_y.is_finite() || !facing.is_finite() {
+    if !e.pos_x().is_finite() || !e.pos_y().is_finite() || !facing.is_finite() {
         return;
     }
-    if !unit_static_standable(occ, map, e.kind, e.pos_x, e.pos_y, facing) {
+    if !unit_static_standable(occ, map, e.kind, e.pos_x(), e.pos_y(), facing) {
         return;
     }
 
-    let forward = (facing.cos(), facing.sin());
+    let forward = (facing.det_cos(), facing.det_sin());
     if !forward.0.is_finite() || !forward.1.is_finite() {
         return;
     }
@@ -766,14 +768,15 @@ fn inject_scout_car_reverse_recovery(e: &mut Entity, map: &Map, occ: &Occupancy)
     let mut distance = min_distance;
     while distance <= max_distance + 0.001 {
         let candidate = (
-            e.pos_x - forward.0 * distance,
-            e.pos_y - forward.1 * distance,
+            e.pos_x() - forward.0 * distance,
+            e.pos_y() - forward.1 * distance,
         );
         if recovery_candidate_is_legal(e, map, occ, candidate) {
             e.push_waypoint(candidate);
+            let position = (e.pos_x(), e.pos_y());
             if let Some(m) = e.movement.as_mut() {
                 m.stuck_ticks = 0;
-                m.last_progress_pos = (e.pos_x, e.pos_y);
+                m.last_progress_pos = position;
                 m.static_blocked_ticks = 0;
                 m.scout_car_reverse_waypoint = Some(candidate);
                 m.scout_car_recovery_cooldown = config::SCOUT_CAR_RECOVERY_COOLDOWN_TICKS;
@@ -806,7 +809,7 @@ fn recovery_candidate_is_legal(
             map,
             occ,
             e.kind,
-            (e.pos_x, e.pos_y),
+            (e.pos_x(), e.pos_y()),
             candidate,
         )
 }
@@ -834,7 +837,10 @@ fn pivot_vehicle_rotation_unjam_candidate(
         return None;
     }
 
-    let forward = (probe.original_facing.cos(), probe.original_facing.sin());
+    let forward = (
+        probe.original_facing.det_cos(),
+        probe.original_facing.det_sin(),
+    );
     if !forward.0.is_finite() || !forward.1.is_finite() {
         return None;
     }
@@ -897,7 +903,7 @@ fn pivot_vehicle_rotation_unjam_candidate(
 fn normalized_dir(from: (f32, f32), to: (f32, f32)) -> Option<(f32, f32)> {
     let dx = to.0 - from.0;
     let dy = to.1 - from.1;
-    let dist = (dx * dx + dy * dy).sqrt();
+    let dist = (dx * dx + dy * dy).det_sqrt();
     (dist.is_finite() && dist > 1.0e-4).then_some((dx / dist, dy / dist))
 }
 

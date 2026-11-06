@@ -49,7 +49,7 @@ pub(super) fn try_fire(
     }
     let (owner, start, is_unit, miss_chance) = (
         source.owner,
-        (source.pos_x, source.pos_y),
+        (source.pos_x(), source.pos_y()),
         source.is_unit(),
         weapons::moving_fire_miss_chance(source),
     );
@@ -59,7 +59,7 @@ pub(super) fn try_fire(
     if victim.hp == 0 || !victim.is_targetable() {
         return false;
     }
-    let end = (victim.pos_x, victim.pos_y);
+    let end = (victim.pos_x(), victim.pos_y());
     if let Some(episode) = fog.team_firing_reveal_only_source(owner, end, teams) {
         if !entities.get_mut(attacker).is_some_and(|source| {
             source.weapon_firing_reveal_reaction_ready(

@@ -1,3 +1,4 @@
+use rts_rules::math::Coord;
 use std::collections::BTreeMap;
 
 use crate::config;
@@ -17,6 +18,7 @@ use super::{
 };
 
 mod helpers;
+mod position;
 mod production;
 mod production_repeat;
 mod rally;
@@ -29,7 +31,7 @@ const BUILDING_START_HP_DENOMINATOR: u32 = 10;
 
 /// A single simulation entity: unit, building, or resource node.
 ///
-/// All positional state is in world pixels (`pos_x`/`pos_y` are the entity center).
+/// Physical center coordinates use 32-bit fixed point; `pos_x()`/`pos_y()` project world pixels.
 /// State that only applies to a subset of kinds lives in typed optional groups, keeping
 /// the store homogeneous while making kind-specific state explicit.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -41,9 +43,9 @@ pub struct Entity {
     /// Entity kind.
     pub kind: EntityKind,
 
-    /// Center position in world pixels.
-    pub pos_x: f32,
-    pub pos_y: f32,
+    /// Physical center in raw Q19.12 substeps (world pixels at the read/write API).
+    pos_x: Coord,
+    pos_y: Coord,
 
     pub hp: u32,
     /// Full health ceiling. Construction earns current HP over time; damage never lowers this value.
@@ -86,8 +88,8 @@ impl Entity {
             id: 0,
             owner,
             kind,
-            pos_x: x,
-            pos_y: y,
+            pos_x: Coord::try_from_world(x)?,
+            pos_y: Coord::try_from_world(y)?,
             hp: s.hp,
             max_hp: s.hp,
             invulnerable: false,
@@ -133,8 +135,8 @@ impl Entity {
                 owner
             },
             kind,
-            pos_x: x,
-            pos_y: y,
+            pos_x: Coord::try_from_world(x)?,
+            pos_y: Coord::try_from_world(y)?,
             hp: if finished {
                 s.hp
             } else {
@@ -188,8 +190,8 @@ impl Entity {
             id: 0,
             owner: NEUTRAL,
             kind,
-            pos_x: x,
-            pos_y: y,
+            pos_x: Coord::try_from_world(x)?,
+            pos_y: Coord::try_from_world(y)?,
             hp: 1,
             max_hp: 1,
             invulnerable: false,
@@ -766,11 +768,6 @@ impl Entity {
         self.ability_charge_recharge_ticks.get(&ability).copied()
     }
 
-    pub fn set_position(&mut self, x: f32, y: f32) {
-        self.pos_x = x;
-        self.pos_y = y;
-    }
-
     pub(in crate::game) fn scout_plane_state(&self) -> Option<&ScoutPlaneState> {
         self.scout_plane.as_ref()
     }
@@ -790,7 +787,7 @@ impl Entity {
 
     pub(in crate::game) fn ensure_scout_plane_state(&mut self) {
         if self.kind == EntityKind::ScoutPlane && self.scout_plane.is_none() {
-            self.scout_plane = Some(ScoutPlaneState::launched_at(self.pos_x, self.pos_y));
+            self.scout_plane = Some(ScoutPlaneState::launched_at(self.pos_x(), self.pos_y()));
         }
     }
 

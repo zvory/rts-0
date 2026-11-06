@@ -1,5 +1,6 @@
 use super::geometry::{clamp_to_map, dist2, normalized_direction, tile_center};
 use super::*;
+use rts_rules::math::GameplayMath as _;
 
 pub(super) mod approach;
 mod catch_up;
@@ -588,7 +589,7 @@ fn update_enemy_main_state(
         return;
     }
     let tile_size = observation.map.tile_size as f32;
-    let main_radius2 = (8.0 * tile_size).powi(2);
+    let main_radius2 = (8.0 * tile_size).det_powi(2);
     let visible_main = observation
         .visible_enemies
         .iter()
@@ -602,7 +603,7 @@ fn update_enemy_main_state(
     if memory.enemy_main_resource_depot.is_none() {
         return;
     }
-    let confirmation_radius2 = (14.0 * tile_size).powi(2);
+    let confirmation_radius2 = (14.0 * tile_size).det_powi(2);
     let force_confirms_site = observation
         .owned
         .iter()
@@ -669,7 +670,7 @@ fn update_enemy_natural_state(
         .filter(|unit| scouts.contains(&unit.id))
         .any(|unit| {
             dist2(unit.x, unit.y, natural.0, natural.1)
-                <= (scout_confirmation_tiles * tile_size).powi(2)
+                <= (scout_confirmation_tiles * tile_size).det_powi(2)
         });
     if scout_confirms_site {
         memory.enemy_natural_destroyed = true;
@@ -895,7 +896,7 @@ fn tank_can_fire_at_visible_target(
         return false;
     };
     dist2(tank.x, tank.y, target.x, target.y)
-        <= (range_tiles * observation.map.tile_size as f32).powi(2)
+        <= (range_tiles * observation.map.tile_size as f32).det_powi(2)
 }
 
 fn target_is_in_shared_tank_range(
@@ -986,7 +987,7 @@ fn rifle_sector_target(
     let perpendicular = (-direction.1, direction.0);
     let tile_size = observation.map.tile_size as f32;
     if dist2(rifle.x, rifle.y, screen_point.0, screen_point.1)
-        > (RIFLE_THREAT_LEASH_TILES * tile_size).powi(2)
+        > (RIFLE_THREAT_LEASH_TILES * tile_size).det_powi(2)
     {
         return None;
     }
@@ -1266,7 +1267,7 @@ const PUSH_OUTNUMBERED_RADIUS_TILES: f32 = 16.0;
 
 /// Whether more enemy Tanks than the push has are in sight around it.
 fn push_outnumbered(observation: &AiObservation, tanks: &[u32]) -> bool {
-    let radius2 = (PUSH_OUTNUMBERED_RADIUS_TILES * observation.map.tile_size as f32).powi(2);
+    let radius2 = (PUSH_OUTNUMBERED_RADIUS_TILES * observation.map.tile_size as f32).det_powi(2);
     let positions: Vec<(f32, f32)> = observation
         .owned
         .iter()

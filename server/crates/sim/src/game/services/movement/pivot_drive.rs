@@ -4,6 +4,7 @@ use crate::game::map::Map;
 use crate::game::services::geometry::unit_body_for_entity;
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
+use rts_rules::math::GameplayMath as _;
 
 use super::standability::{footing_profile, footing_resistance, FootingProfile};
 use super::traffic::{
@@ -53,7 +54,7 @@ pub(super) fn vehicle_traffic_adjustment(
         };
     }
 
-    let forward = (facing.cos(), facing.sin());
+    let forward = (facing.det_cos(), facing.det_sin());
     let side = (-forward.1, forward.0);
     let follow_forward = entities
         .get(id)
@@ -81,8 +82,8 @@ pub(super) fn vehicle_traffic_adjustment(
             continue;
         }
 
-        let dx = neighbor.pos_x - x;
-        let dy = neighbor.pos_y - y;
+        let dx = neighbor.pos_x() - x;
+        let dy = neighbor.pos_y() - y;
         // Similar-heading traffic yields only from the trailing vehicle to avoid reciprocal stops.
         if let (Some(ego_forward), Some(neighbor_forward)) = (
             follow_forward,
@@ -94,7 +95,7 @@ pub(super) fn vehicle_traffic_adjustment(
                     ego_forward.0 + neighbor_forward.0,
                     ego_forward.1 + neighbor_forward.1,
                 );
-                let shared_len = (shared.0 * shared.0 + shared.1 * shared.1).sqrt();
+                let shared_len = (shared.0 * shared.0 + shared.1 * shared.1).det_sqrt();
                 if shared_len > 1.0e-4 {
                     let neighbor_ahead = (dx * shared.0 + dy * shared.1) / shared_len;
                     if neighbor_ahead <= VEHICLE_FOLLOW_LONGITUDINAL_DEADBAND_PX {
@@ -132,7 +133,7 @@ pub(super) fn vehicle_traffic_adjustment(
         } else {
             -lateral.signum()
         };
-        side_pressure += side_sign * closeness * resistance.sqrt();
+        side_pressure += side_sign * closeness * resistance.det_sqrt();
     }
 
     let turn_bias = if side_pressure.abs() <= 1.0e-4 {
@@ -150,7 +151,7 @@ fn forward_traffic_heading(entity: &Entity, facing: f32) -> Option<(f32, f32)> {
     if !uses_oriented_vehicle_body(entity.kind) || entity.path_is_empty() || !facing.is_finite() {
         return None;
     }
-    let forward = (facing.cos(), facing.sin());
+    let forward = (facing.det_cos(), facing.det_sin());
     if matches!(
         entity.kind,
         EntityKind::ScoutCar | EntityKind::CommandCar | EntityKind::RocketLauncher
@@ -163,12 +164,12 @@ fn forward_traffic_heading(entity: &Entity, facing: f32) -> Option<(f32, f32)> {
         return (!reversing).then_some(forward);
     }
     let next = entity.next_waypoint()?;
-    let to_next = (next.0 - entity.pos_x, next.1 - entity.pos_y);
+    let to_next = (next.0 - entity.pos_x(), next.1 - entity.pos_y());
     let forward_progress = to_next.0 * forward.0 + to_next.1 * forward.1;
     if forward_progress > 0.0 {
         return Some(forward);
     }
-    let distance = to_next.0.hypot(to_next.1);
+    let distance = to_next.0.det_hypot(to_next.1);
     (super::armor_reaction::locked_source_facing(entity).is_some()
         && distance.is_finite()
         && distance > 1.0e-4)
@@ -189,13 +190,13 @@ pub(super) fn pivot_drive_intent(
     let (desired_x, desired_y) = pivot_drive_desired_path_point(map, occ, e, x, y)?;
     let dx = desired_x - x;
     let dy = desired_y - y;
-    let dist = (dx * dx + dy * dy).sqrt();
+    let dist = (dx * dx + dy * dy).det_sqrt();
     if !dist.is_finite() || dist <= 1.0e-4 {
         return None;
     }
 
     let profile = pivot_drive_profile(e.kind);
-    let travel_facing = dy.atan2(dx);
+    let travel_facing = dy.det_atan2(dx);
     let normal_desired_facing =
         if pivot_drive_desired_point_is_final_waypoint(e, (desired_x, desired_y))
             && dist <= profile.reverse_goal_distance_px
@@ -272,7 +273,7 @@ pub(super) fn close_nudge_hull_axis_motion(
     if !body_facing.is_finite() {
         return (path_dir, budget);
     }
-    let (fx, fy) = (body_facing.cos(), body_facing.sin());
+    let (fx, fy) = (body_facing.det_cos(), body_facing.det_sin());
     if !fx.is_finite() || !fy.is_finite() {
         return (path_dir, budget);
     }
@@ -290,7 +291,7 @@ pub(super) fn close_nudge_hull_axis_motion(
 pub(super) fn distance_between(from: (f32, f32), to: (f32, f32)) -> f32 {
     let dx = to.0 - from.0;
     let dy = to.1 - from.1;
-    (dx * dx + dy * dy).sqrt()
+    (dx * dx + dy * dy).det_sqrt()
 }
 
 pub(super) fn pivot_drive_desired_path_point(

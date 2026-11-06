@@ -1,6 +1,7 @@
 use super::*;
 use crate::game::{Game, ObserverView, PlayerInit};
 use crate::rules::death_ground_decal_class;
+use rts_rules::math::GameplayMath as _;
 
 fn one_player_game() -> Game {
     Game::new(
@@ -155,10 +156,13 @@ fn diagonal_motion_does_not_settle_at_the_checkpoint_quantum() {
     game.state
         .ground_decals
         .update_tank_trails(&game.state.entities, &game.state.map, 1);
-    let diagonal_step = 2.0_f32 / 2.0_f32.sqrt();
+    let diagonal_step = 2.0_f32 / 2.0_f32.det_sqrt();
     for tick in 2..=10 {
         let entity = game.state.entities.get_mut(tank).unwrap();
-        entity.set_position(entity.pos_x + diagonal_step, entity.pos_y + diagonal_step);
+        entity.set_position(
+            entity.pos_x() + diagonal_step,
+            entity.pos_y() + diagonal_step,
+        );
         entity.set_movement_delta(diagonal_step, diagonal_step);
         game.state.ground_decals.begin_tick(tick);
         game.state
@@ -259,8 +263,8 @@ fn game_checkpoint_round_trip_preserves_marks_and_discovery_revisions() {
         .ground_decals
         .create_death(
             source.kind,
-            source.pos_x,
-            source.pos_y,
+            source.pos_x(),
+            source.pos_y(),
             source.owner,
             Some(source.facing()),
             source.weapon_facing(),

@@ -1,5 +1,6 @@
 use crate::config;
 use crate::game::entity::EntityKind;
+use rts_rules::math::GameplayMath as _;
 
 pub(super) const PIVOT_VEHICLE_BODY_TURN_RATE_RAD_PER_TICK: f32 = 0.035;
 pub(super) const TANK_BODY_TURN_RATE_RAD_PER_TICK: f32 =
@@ -47,7 +48,7 @@ impl PivotDriveProfile {
     }
 
     pub(super) fn close_nudge_allows_translation(self, path_forward_dot: f32) -> bool {
-        path_forward_dot.abs() >= self.full_speed_angle_rad.cos()
+        path_forward_dot.abs() >= self.full_speed_angle_rad.det_cos()
     }
 }
 

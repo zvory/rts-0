@@ -120,7 +120,7 @@ pub(super) fn linearity_score(tiles: &[AiTile]) -> i32 {
     }
     let trace = xx + yy;
     let determinant = xx * yy - xy * xy;
-    let root = (trace * trace - 4.0 * determinant).max(0.0).sqrt();
+    let root = (trace * trace - 4.0 * determinant).max(0.0).det_sqrt();
     let major = (trace + root) / 2.0;
     let minor = (trace - root) / 2.0;
     if major <= 0.0 {

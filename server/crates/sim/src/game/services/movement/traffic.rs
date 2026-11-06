@@ -1,5 +1,6 @@
 use crate::config;
 use crate::game::entity::{uses_oriented_vehicle_body, Entity, EntityKind};
+use rts_rules::math::GameplayMath as _;
 
 use super::pivot_drive::{angle_delta, VEHICLE_REVERSE_GOAL_DISTANCE_PX};
 
@@ -15,13 +16,13 @@ pub(super) fn car_will_start_reverse_to_final_waypoint(entity: &Entity, facing: 
     let Some(next) = entity.next_waypoint() else {
         return false;
     };
-    let dx = next.0 - entity.pos_x;
-    let dy = next.1 - entity.pos_y;
-    let dist = (dx * dx + dy * dy).sqrt();
+    let dx = next.0 - entity.pos_x();
+    let dy = next.1 - entity.pos_y();
+    let dist = (dx * dx + dy * dy).det_sqrt();
     if !dist.is_finite() || dist <= 1.0e-4 || dist > VEHICLE_REVERSE_GOAL_DISTANCE_PX {
         return false;
     }
-    let desired = dy.atan2(dx);
+    let desired = dy.det_atan2(dx);
     angle_delta(facing, desired).abs() > VEHICLE_REVERSE_MIN_BEHIND_ANGLE_RAD
 }
 

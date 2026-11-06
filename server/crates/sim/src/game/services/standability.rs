@@ -1,3 +1,4 @@
+use rts_rules::math::GameplayMath as _;
 use std::collections::BTreeSet;
 
 use crate::config;
@@ -46,6 +47,13 @@ pub(crate) fn unit_static_standable_with_facing(
     y: f32,
     facing: f32,
 ) -> bool {
+    let (Some(x), Some(y)) = (
+        rts_rules::math::Coord::try_from_world(x),
+        rts_rules::math::Coord::try_from_world(y),
+    ) else {
+        return false;
+    };
+    let (x, y) = (x.to_world(), y.to_world());
     let Some(body) = unit_body_with_facing(kind, x, y, facing) else {
         return false;
     };
@@ -94,7 +102,7 @@ pub(crate) fn unit_static_segment_standable(
 
     let dx = to.0 - from.0;
     let dy = to.1 - from.1;
-    let distance = (dx * dx + dy * dy).sqrt();
+    let distance = (dx * dx + dy * dy).det_sqrt();
     let step_px = config::TILE_SIZE as f32 / 4.0;
     let steps = (distance / step_px).ceil().max(1.0) as u32;
 
@@ -463,8 +471,8 @@ fn body_tile_range(body: UnitBody) -> impl Iterator<Item = (i32, i32)> {
 
 fn entity_circle_body(e: &Entity) -> CircleBody {
     CircleBody {
-        x: e.pos_x,
-        y: e.pos_y,
+        x: e.pos_x(),
+        y: e.pos_y(),
         radius: e.radius(),
     }
 }
@@ -479,7 +487,7 @@ fn segment_body_facing(kind: EntityKind, from: (f32, f32), to: (f32, f32)) -> f3
     if !dist2.is_finite() || dist2 <= 1.0e-4 {
         0.0
     } else {
-        dy.atan2(dx)
+        dy.det_atan2(dx)
     }
 }
 

@@ -71,7 +71,7 @@ mod tests {
             .entities
             .get(scout_id)
             .expect("scenario scout car should exist");
-        let start = (scout.pos_x, scout.pos_y);
+        let start = (scout.pos_x(), scout.pos_y());
 
         assert_eq!(setup.issue_after_ticks, config::TICK_HZ * 5);
         assert!(
@@ -119,7 +119,7 @@ mod tests {
             .state
             .entities
             .get(scout_id)
-            .map(|scout| (scout.pos_x, scout.pos_y))
+            .map(|scout| (scout.pos_x(), scout.pos_y()))
             .expect("scenario scout car should exist");
         let command = setup.command();
         let mut game = setup.game;
@@ -135,11 +135,11 @@ mod tests {
             .get(scout_id)
             .expect("scenario scout car should remain alive");
         assert!(
-            scout.pos_x < start.0 - config::TILE_SIZE as f32,
+            scout.pos_x() < start.0 - config::TILE_SIZE as f32,
             "scout car should make westward progress toward the goal"
         );
         assert!(
-            scout.pos_y > start.1 + config::TILE_SIZE as f32,
+            scout.pos_y() > start.1 + config::TILE_SIZE as f32,
             "scout car should turn south instead of reversing along a cardinal west leg"
         );
     }

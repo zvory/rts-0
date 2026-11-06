@@ -101,7 +101,7 @@ fn attack_move_retargets_building_to_new_defender_during_cooldown() {
 
     // A retreating defender must not drag the attack-move away from its objective.
     let enemy = entities.get_mut(defender).expect("defender");
-    enemy.set_position(enemy.pos_x, 600.0);
+    enemy.set_position(enemy.pos_x(), 600.0);
     entities
         .get_mut(attacker)
         .expect("rifleman")

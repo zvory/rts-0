@@ -396,8 +396,8 @@ impl Game {
             .map(|e| ResourceNode {
                 id: e.id,
                 kind: crate::protocol::kind_to_wire(e.kind).to_string(),
-                x: e.pos_x,
-                y: e.pos_y,
+                x: e.pos_x(),
+                y: e.pos_y(),
             })
             .collect();
         let map = MapInfo {
@@ -528,10 +528,10 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
 
     let dx = map.world_width_px() * 0.5 - hx;
     let dy = map.world_height_px() * 0.5 - hy;
-    let base_angle = dy.atan2(dx);
+    let base_angle = dy.det_atan2(dx);
 
-    let inward_x = base_angle.cos();
-    let inward_y = base_angle.sin();
+    let inward_x = base_angle.det_cos();
+    let inward_y = base_angle.det_sin();
     let lateral_x = -inward_y;
     let lateral_y = inward_x;
 
@@ -559,7 +559,7 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
             let off_y = (row - row_center) * row_spacing;
             let px = block_cx + off_x * inward_x + off_y * lateral_x;
             let py = block_cy + off_x * inward_y + off_y * lateral_y;
-            let dist_tiles = ((px - hx).powi(2) + (py - hy).powi(2)).sqrt() / ts;
+            let dist_tiles = ((px - hx).det_powi(2) + (py - hy).det_powi(2)).det_sqrt() / ts;
             debug_assert!(
                 (config::START_RESOURCE_MIN_DIST_TILES..=config::START_RESOURCE_MAX_DIST_TILES)
                     .contains(&dist_tiles),
@@ -597,7 +597,7 @@ fn spawn_base_resources(entities: &mut EntityStore, map: &Map, tile: (u32, u32))
             &blocked_pump_jack_tiles,
         );
         oil_tiles.insert(tile);
-        let dist_tiles = ((px - hx).powi(2) + (py - hy).powi(2)).sqrt() / ts;
+        let dist_tiles = ((px - hx).det_powi(2) + (py - hy).det_powi(2)).det_sqrt() / ts;
         debug_assert!(
             (config::START_RESOURCE_MIN_DIST_TILES..=config::START_RESOURCE_MAX_DIST_TILES)
                 .contains(&dist_tiles),
@@ -649,7 +649,7 @@ pub(in crate::game) fn starting_protection_radius_tiles(players: &[PlayerInit]) 
                 let distance = f64::from(distance_tiles_x10) / 10.0;
                 let lateral_extent =
                     f64::from(spacing_tiles_x10) * f64::from(group.count.saturating_sub(1)) / 20.0;
-                Some(distance.hypot(lateral_extent))
+                Some(distance.det_hypot(lateral_extent))
             }
             StartingFormation::Center | StartingFormation::ResourcePatches => None,
         })
@@ -670,8 +670,8 @@ fn spawn_player_start(
     let (stx, sty) = start;
     let (hx, hy) = map.tile_center(stx, sty);
     let ts = config::TILE_SIZE as f32;
-    let defensive_angle = (defensive_target.1 - hy).atan2(defensive_target.0 - hx);
-    let defensive_forward = (defensive_angle.cos(), defensive_angle.sin());
+    let defensive_angle = (defensive_target.1 - hy).det_atan2(defensive_target.0 - hx);
+    let defensive_forward = (defensive_angle.det_cos(), defensive_angle.det_sin());
     let defensive_lateral = (-defensive_forward.1, defensive_forward.0);
 
     for group in loadout.starting_entities {
@@ -684,7 +684,7 @@ fn spawn_player_start(
                 StartingFormation::Ring { radius_tiles_x10 } => {
                     let ring_r = ts * (radius_tiles_x10 as f32 / 10.0);
                     let ang = std::f32::consts::TAU * (i as f32) / (group.count.max(1) as f32);
-                    (hx + ring_r * ang.cos(), hy + ring_r * ang.sin())
+                    (hx + ring_r * ang.det_cos(), hy + ring_r * ang.det_sin())
                 }
                 StartingFormation::DefensiveLine {
                     distance_tiles_x10,

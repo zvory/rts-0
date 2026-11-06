@@ -1,3 +1,4 @@
+use rts_rules::math::GameplayMath as _;
 use std::collections::BTreeSet;
 
 use super::{standability, Occupancy};
@@ -367,6 +368,6 @@ pub(super) fn formation_goal_facing(unit: &FormationUnit, center: (f32, f32)) ->
     if !dist2.is_finite() || dist2 <= 1.0e-4 {
         0.0
     } else {
-        dy.atan2(dx)
+        dy.det_atan2(dx)
     }
 }

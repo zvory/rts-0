@@ -1,4 +1,5 @@
 use super::*;
+use rts_rules::math::GameplayMath as _;
 
 #[test]
 fn visible_tank_trap_authorizes_clear_area_without_memory() {
@@ -85,7 +86,7 @@ fn remembered_hidden_tank_trap_clear_uses_a_real_approach_goal() {
         "approach goal must not occupy the blocked Tank Trap tile"
     );
     assert!(
-        (goal.0 - trap_pos.0).hypot(goal.1 - trap_pos.1)
+        (goal.0 - trap_pos.0).det_hypot(goal.1 - trap_pos.1)
             <= 3.0 * crate::config::TILE_SIZE as f32 + 0.01,
         "approach goal must bring the complete four-tile objective radius into sight"
     );

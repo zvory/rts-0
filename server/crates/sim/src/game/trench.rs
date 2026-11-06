@@ -1,3 +1,4 @@
+use rts_rules::math::Coord;
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::config;
@@ -11,8 +12,8 @@ pub(crate) const MAX_TRENCHES: usize = 4096;
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub(crate) struct Trench {
     pub(crate) id: u32,
-    pub(crate) x: f32,
-    pub(crate) y: f32,
+    pub(crate) x: Coord,
+    pub(crate) y: Coord,
     pub(crate) radius_tiles: f32,
 }
 
@@ -25,17 +26,14 @@ impl Trench {
         if !x.is_finite() || !y.is_finite() {
             return false;
         }
-        let dx = x - self.x;
-        let dy = y - self.y;
-        let radius = self.radius_px();
-        dx * dx + dy * dy <= radius * radius
+        Coord::within_radius((self.x, self.y), (x, y), self.radius_px())
     }
 
     fn to_view(self) -> TrenchView {
         TrenchView {
             id: self.id,
-            x: self.x,
-            y: self.y,
+            x: self.x.to_world(),
+            y: self.y.to_world(),
             radius_tiles: self.radius_tiles,
         }
     }
@@ -88,8 +86,8 @@ impl TrenchStore {
         self.next_id = self.next_id.wrapping_add(1).max(1);
         self.trenches.push(Trench {
             id,
-            x,
-            y,
+            x: Coord::from_world(x),
+            y: Coord::from_world(y),
             radius_tiles,
         });
         Some(id)
@@ -144,13 +142,13 @@ impl TrenchStore {
 }
 
 fn trench_visible_to_player(trench: Trench, player: u32, fog: &Fog) -> bool {
-    if fog.is_visible_world(player, trench.x, trench.y) {
+    if fog.is_visible_world(player, trench.x.to_world(), trench.y.to_world()) {
         return true;
     }
     let radius_tiles = trench.radius_tiles.ceil().max(0.0) as i32;
     let ts = config::TILE_SIZE as f32;
-    let cx = (trench.x / ts).floor() as i32;
-    let cy = (trench.y / ts).floor() as i32;
+    let cx = (trench.x.to_world() / ts).floor() as i32;
+    let cy = (trench.y.to_world() / ts).floor() as i32;
     for dy in -radius_tiles..=radius_tiles {
         for dx in -radius_tiles..=radius_tiles {
             let tx = cx + dx;

@@ -1191,8 +1191,7 @@ fn snapshot_keeps_smoke_visible_to_owner_with_unit_inside() {
     let (mut game, _observer, friendly, _enemy, smoke_pos) = smoke_projection_fixture();
 
     if let Some(unit) = game.state.entities.get_mut(friendly) {
-        unit.pos_x = smoke_pos.0;
-        unit.pos_y = smoke_pos.1;
+        unit.set_position(smoke_pos.0, smoke_pos.1);
     }
     game.rebuild_final_spatial();
     let ids: Vec<u32> = game.state.players.iter().map(|p| p.id).collect();

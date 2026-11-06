@@ -385,7 +385,7 @@ fn debug_line_strip_markers(
 ) -> Vec<ObserverMapAnalysisPrimitive> {
     let dx = end.0 - start.0;
     let dy = end.1 - start.1;
-    let len = (dx * dx + dy * dy).sqrt();
+    let len = (dx * dx + dy * dy).det_sqrt();
     if !len.is_finite() || len <= f32::EPSILON {
         return Vec::new();
     }

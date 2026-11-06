@@ -3,6 +3,7 @@ use crate::game::entity::{uses_oriented_vehicle_body, Entity, EntityKind, Entity
 use crate::game::map::Map;
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
+use rts_rules::math::GameplayMath as _;
 
 use super::standability::{
     footing_profile, footing_resistance, unit_static_standable, FootingProfile,
@@ -26,7 +27,7 @@ pub(super) fn steering_path_dir(e: &Entity, x: f32, y: f32, fallback: (f32, f32)
         .find(|(px, py)| {
             let dx = *px - x;
             let dy = *py - y;
-            (dx * dx + dy * dy).sqrt() >= STEERING_LOOKAHEAD_PX
+            (dx * dx + dy * dy).det_sqrt() >= STEERING_LOOKAHEAD_PX
         })
         .or_else(|| path.last().copied())
     else {
@@ -34,7 +35,7 @@ pub(super) fn steering_path_dir(e: &Entity, x: f32, y: f32, fallback: (f32, f32)
     };
     let dx = tx - x;
     let dy = ty - y;
-    let d = (dx * dx + dy * dy).sqrt();
+    let d = (dx * dx + dy * dy).det_sqrt();
     if d <= 1e-4 || !d.is_finite() {
         fallback
     } else {
@@ -63,7 +64,7 @@ pub(super) fn steered_candidate(
     let nx = x + steer_dir.0 * budget;
     let ny = y + steer_dir.1 * budget;
     let facing = if uses_oriented_vehicle_body(kind) {
-        path_dir.1.atan2(path_dir.0)
+        path_dir.1.det_atan2(path_dir.0)
     } else {
         0.0
     };
@@ -97,8 +98,8 @@ pub(super) fn local_steering_dir(
                     FootingProfile::Ghost | FootingProfile::Soft
                 )
                 && {
-                    let dx = x - neighbor.pos_x;
-                    let dy = y - neighbor.pos_y;
+                    let dx = x - neighbor.pos_x();
+                    let dy = y - neighbor.pos_y();
                     dx * dx + dy * dy <= STEERING_RADIUS_PX * STEERING_RADIUS_PX
                 }
         })
@@ -112,8 +113,8 @@ pub(super) fn local_steering_dir(
         let Some(neighbor) = entities.get(neighbor_id) else {
             continue;
         };
-        let dx = x - neighbor.pos_x;
-        let dy = y - neighbor.pos_y;
+        let dx = x - neighbor.pos_x();
+        let dy = y - neighbor.pos_y();
         let d2 = dx * dx + dy * dy;
         let (away_x, away_y, d) = if d2 <= 1e-4 {
             if id < neighbor_id {
@@ -122,7 +123,7 @@ pub(super) fn local_steering_dir(
                 (path_dir.1, -path_dir.0, 0.0)
             }
         } else {
-            let d = d2.sqrt();
+            let d = d2.det_sqrt();
             (dx / d, dy / d, d)
         };
 
@@ -133,15 +134,15 @@ pub(super) fn local_steering_dir(
         } else {
             1.0
         };
-        let footing_weight = footing_resistance(footing_profile(neighbor)).sqrt();
+        let footing_weight = footing_resistance(footing_profile(neighbor)).det_sqrt();
         let weight = proximity * proximity * overlap_boost * footing_weight;
         sep_x += away_x * weight;
         sep_y += away_y * weight;
     }
 
     let trap_bias = tank_trap_steering_bias(entities, spatial, id, x, y, path_dir);
-    let sep_len = (sep_x * sep_x + sep_y * sep_y).sqrt();
-    let trap_bias_len = (trap_bias.0 * trap_bias.0 + trap_bias.1 * trap_bias.1).sqrt();
+    let sep_len = (sep_x * sep_x + sep_y * sep_y).det_sqrt();
+    let trap_bias_len = (trap_bias.0 * trap_bias.0 + trap_bias.1 * trap_bias.1).det_sqrt();
     if sep_len <= 1e-4 && trap_bias_len <= 1e-4 {
         return path_dir;
     }
@@ -159,7 +160,7 @@ pub(super) fn local_steering_dir(
     }
     desired_x += trap_bias.0 * TANK_TRAP_STEERING_STRENGTH;
     desired_y += trap_bias.1 * TANK_TRAP_STEERING_STRENGTH;
-    let desired_len = (desired_x * desired_x + desired_y * desired_y).sqrt();
+    let desired_len = (desired_x * desired_x + desired_y * desired_y).det_sqrt();
     if desired_len <= 1e-4 {
         path_dir
     } else {
@@ -197,15 +198,15 @@ fn tank_trap_steering_bias(
         let Some(trap) = entities.get(trap_id) else {
             continue;
         };
-        let rel_x = x - trap.pos_x;
-        let rel_y = y - trap.pos_y;
+        let rel_x = x - trap.pos_x();
+        let rel_y = y - trap.pos_y();
         let d2 = rel_x * rel_x + rel_y * rel_y;
         if !d2.is_finite() || d2 > TANK_TRAP_STEERING_RADIUS_PX * TANK_TRAP_STEERING_RADIUS_PX {
             continue;
         }
-        let d = d2.sqrt();
+        let d = d2.det_sqrt();
 
-        let along = (trap.pos_x - x) * path_dir.0 + (trap.pos_y - y) * path_dir.1;
+        let along = (trap.pos_x() - x) * path_dir.0 + (trap.pos_y() - y) * path_dir.1;
         let forward = ((along + config::TILE_SIZE as f32 * 0.5)
             / (TANK_TRAP_STEERING_RADIUS_PX + config::TILE_SIZE as f32 * 0.5))
             .clamp(0.0, 1.0);
@@ -228,7 +229,7 @@ fn tank_trap_steering_bias(
         bias_y += perp.1 * side * weight;
     }
 
-    let bias_len = (bias_x * bias_x + bias_y * bias_y).sqrt();
+    let bias_len = (bias_x * bias_x + bias_y * bias_y).det_sqrt();
     if bias_len <= 1e-4 {
         (0.0, 0.0)
     } else {
@@ -254,14 +255,14 @@ pub(super) fn inject_sidestep(
     let (hx, hy) = if let Some((wx, wy)) = e.next_waypoint() {
         let dx = wx - x;
         let dy = wy - y;
-        let d = (dx * dx + dy * dy).sqrt();
+        let d = (dx * dx + dy * dy).det_sqrt();
         if d > 1e-4 {
             (dx / d, dy / d)
         } else {
-            (e.facing().cos(), e.facing().sin())
+            (e.facing().det_cos(), e.facing().det_sin())
         }
     } else {
-        (e.facing().cos(), e.facing().sin())
+        (e.facing().det_cos(), e.facing().det_sin())
     };
 
     // Use repulsion direction if meaningful; otherwise fall back to id-parity perpendicular.
@@ -277,7 +278,7 @@ pub(super) fn inject_sidestep(
     // explores different directions rather than always re-entering the same blocked spot.
     let seed = entity_id.wrapping_add(tick);
     let jitter_angle = ((seed % 5) as f32 - 2.0) * (std::f32::consts::PI / 12.0); // ±30°
-    let (cos_j, sin_j) = (jitter_angle.cos(), jitter_angle.sin());
+    let (cos_j, sin_j) = (jitter_angle.det_cos(), jitter_angle.det_sin());
     let (px, py) = (bx * cos_j - by * sin_j, bx * sin_j + by * cos_j);
 
     // Distance jitter: 0.5×–0.75× of SIDESTEP_DISTANCE_PX (half the original average).

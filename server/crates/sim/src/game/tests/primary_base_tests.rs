@@ -22,14 +22,14 @@ fn starting_base_id(game: &Game, player_id: u32, kind: EntityKind) -> u32 {
         .state
         .map
         .tile_center(player.start_tile.0, player.start_tile.1);
-    let max_dist_sq = (config::TILE_SIZE as f32 * 0.5).powi(2);
+    let max_dist_sq = (config::TILE_SIZE as f32 * 0.5).det_powi(2);
     game.state
         .entities
         .iter()
         .find(|entity| {
             entity.owner == player_id && entity.kind == kind && {
-                let dx = entity.pos_x - start_x;
-                let dy = entity.pos_y - start_y;
+                let dx = entity.pos_x() - start_x;
+                let dy = entity.pos_y() - start_y;
                 dx * dx + dy * dy <= max_dist_sq
             }
         })

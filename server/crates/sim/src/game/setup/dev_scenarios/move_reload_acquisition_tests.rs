@@ -43,7 +43,7 @@ fn reloading_plain_move_acquires_and_tracks_an_in_range_gun_without_stopping() {
         .entities
         .get(target_id)
         .expect("scenario Anti-Tank Gun should survive");
-    let distance = (target.pos_x - attacker.pos_x).hypot(target.pos_y - attacker.pos_y);
+    let distance = (target.pos_x() - attacker.pos_x()).det_hypot(target.pos_y() - attacker.pos_y());
     let moving_range = cannon.range_tiles * config::TILE_SIZE as f32 + attacker.radius();
     assert!(
         distance < moving_range,
@@ -58,7 +58,7 @@ fn reloading_plain_move_acquires_and_tracks_an_in_range_gun_without_stopping() {
     );
     assert!(!attacker.path_is_empty(), "plain Move must keep travelling");
 
-    let before_reissue = (attacker.pos_x, attacker.pos_y);
+    let before_reissue = (attacker.pos_x(), attacker.pos_y());
     game.enqueue(
         setup.player_id,
         SimCommand::Move {
@@ -81,7 +81,7 @@ fn reloading_plain_move_acquires_and_tracks_an_in_range_gun_without_stopping() {
     );
     assert!(attacker.weapon_cooldown(WeaponKind::TankCannon) > 0);
     assert_ne!(
-        (attacker.pos_x, attacker.pos_y),
+        (attacker.pos_x(), attacker.pos_y()),
         before_reissue,
         "reacquisition must not stop an ordinary Move"
     );

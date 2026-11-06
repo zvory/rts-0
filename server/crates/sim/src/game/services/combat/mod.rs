@@ -3,6 +3,7 @@
 //! This module owns in-range target acquisition, weapon facing/setup, damage, and combat
 //! events for a tick. It depends on read-only rules and derived spatial/LOS helpers.
 
+use rts_rules::math::GameplayMath as _;
 use std::collections::HashMap;
 
 use crate::config;
@@ -232,8 +233,8 @@ pub(in crate::game) fn combat_system(
             let acquire_px = range_px;
             (
                 e.owner,
-                e.pos_x,
-                e.pos_y,
+                e.pos_x(),
+                e.pos_y(),
                 min_range_px,
                 range_px,
                 acquire_px,
@@ -317,8 +318,8 @@ pub(in crate::game) fn combat_system(
         // Distance to chosen target.
         let (tx, ty, t_owner, neutral_obstacle, target_distance_sq) = match entities.get(tid) {
             Some(t) => (
-                t.pos_x,
-                t.pos_y,
+                t.pos_x(),
+                t.pos_y(),
                 t.owner,
                 t.is_neutral_obstacle(),
                 combat_target_distance_sq(map, (px, py), t),
@@ -331,7 +332,7 @@ pub(in crate::game) fn combat_system(
         {
             continue; // Auto-acquisition stays hostile/obstacle-only; self-attacks are ordered.
         }
-        let dist = target_distance_sq.sqrt();
+        let dist = target_distance_sq.det_sqrt();
         let clear_area_priority_target = entities.get(id).is_some_and(|entity| {
             entity
                 .order()
@@ -339,11 +340,11 @@ pub(in crate::game) fn combat_system(
                 .is_some_and(|objective| {
                     neutral_obstacle
                         && entities.get(tid).is_some_and(|target| {
-                            let dx = target.pos_x - objective.center_x;
-                            let dy = target.pos_y - objective.center_y;
+                            let dx = target.pos_x() - objective.center_x;
+                            let dy = target.pos_y() - objective.center_y;
                             let radius = config::TANK_TRAP_CLUSTER_ATTACK_RADIUS_TILES
                                 * config::TILE_SIZE as f32;
-                            dx.mul_add(dx, dy * dy) <= radius * radius
+                            dx.det_mul_add(dx, dy * dy) <= radius * radius
                         })
                 })
         });
@@ -370,7 +371,7 @@ pub(in crate::game) fn combat_system(
                 e.set_path_goal(None);
             }
         }
-        let target_angle = (ty - py).atan2(tx - px);
+        let target_angle = (ty - py).det_atan2(tx - px);
         let holds_commanded_movement_path = entities
             .get(id)
             .map(|e| moving_fire_move_order_holds_path(e, can_move_fire))

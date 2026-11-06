@@ -1,4 +1,5 @@
 use super::*;
+use rts_rules::math::GameplayMath as _;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) struct DefendedBuildingSite {
@@ -247,7 +248,7 @@ fn defensive_intercept_point(
     if contact_ahead <= 0.0 {
         return clamp_to_map(contact, observation.map);
     }
-    let contact_distance = dist2(support.0, support.1, contact.0, contact.1).sqrt();
+    let contact_distance = dist2(support.0, support.1, contact.0, contact.1).det_sqrt();
     let forward_distance = (1.5 * observation.map.tile_size as f32).min(contact_distance * 0.5);
     clamp_to_map(
         (
@@ -259,7 +260,7 @@ fn defensive_intercept_point(
 }
 
 fn defense_sector(center: (f32, f32), point: (f32, f32)) -> u8 {
-    let angle = (point.1 - center.1).atan2(point.0 - center.0);
+    let angle = (point.1 - center.1).det_atan2(point.0 - center.0);
     (((angle + std::f32::consts::PI) * 8.0 / std::f32::consts::TAU).floor() as i32).rem_euclid(8)
         as u8
 }

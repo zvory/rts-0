@@ -9,6 +9,7 @@
 //! dynamically by the simulation (a separate occupancy grid in `systems`/`pathfinding`),
 //! not baked into the map.
 
+use rts_rules::math::GameplayMath as _;
 use std::collections::HashMap;
 
 use super::MapOverlayTiles;
@@ -298,7 +299,7 @@ impl Map {
         y: f32,
         direction: (f32, f32),
     ) -> f32 {
-        let length = direction.0.hypot(direction.1);
+        let length = direction.0.det_hypot(direction.1);
         if !length.is_finite() || length <= f32::EPSILON {
             return 1.0;
         }

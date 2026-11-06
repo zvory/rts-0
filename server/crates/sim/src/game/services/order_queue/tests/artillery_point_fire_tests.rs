@@ -1,4 +1,5 @@
 use super::*;
+use rts_rules::math::GameplayMath as _;
 
 #[test]
 fn failed_artillery_reposition_drops_its_terminal_fire_intent() {
@@ -51,7 +52,7 @@ fn close_edge_artillery_target_gets_an_in_range_staging_point() {
     )
     .expect("an in-map firing position should exist");
 
-    let distance = (staging.0 - target.0).hypot(staging.1 - target.1);
+    let distance = (staging.0 - target.0).det_hypot(staging.1 - target.1);
     let min_range = config::ARTILLERY_MIN_RANGE_TILES as f32 * config::TILE_SIZE as f32;
     let max_range = config::ARTILLERY_MAX_RANGE_TILES as f32 * config::TILE_SIZE as f32;
     assert!(distance >= min_range && distance <= max_range);
@@ -90,8 +91,8 @@ fn queued_artillery_blanket_fire_outside_arc_redeploys_on_promotion() {
     let angle = config::ARTILLERY_FIELD_OF_FIRE_RAD;
     let distance = config::TILE_SIZE as f32 * 30.0;
     let target = (
-        pos.0 + angle.cos() * distance,
-        pos.1 + angle.sin() * distance,
+        pos.0 + angle.det_cos() * distance,
+        pos.1 + angle.det_sin() * distance,
     );
     let artillery = entities
         .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)

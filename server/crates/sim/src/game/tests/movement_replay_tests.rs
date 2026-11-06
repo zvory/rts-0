@@ -368,8 +368,8 @@ fn tank_move_command_preserves_exact_goal_and_repeats_deterministically() {
         .get(tank_b)
         .expect("tank B should exist");
     assert_eq!(
-        (a.pos_x, a.pos_y, a.facing()),
-        (b.pos_x, b.pos_y, b.facing())
+        (a.pos_x(), a.pos_y(), a.facing()),
+        (b.pos_x(), b.pos_y(), b.facing())
     );
     assert_eq!(a.path_goal(), b.path_goal());
     assert_eq!(
@@ -1005,7 +1005,7 @@ fn wall_chokepoint_dev_scenario_matches_authored_layout() {
             .get(*unit)
             .expect("scenario unit exists");
         assert_eq!(entity.kind, EntityKind::ScoutCar);
-        assert!((entity.pos_y - start_y).abs() < 0.1);
+        assert!((entity.pos_y() - start_y).abs() < 0.1);
         assert!((entity.facing() - north).abs() < 0.001);
     }
 

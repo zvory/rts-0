@@ -9,6 +9,7 @@ use crate::game::services::geometry::{
 };
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::standability as static_standability;
+use rts_rules::math::GameplayMath as _;
 
 use super::pivot_drive::distance_between;
 use super::vehicle_profiles::{
@@ -46,7 +47,7 @@ pub(super) fn route_accepts_waypoint(
 
     let facing = e.facing();
     if uses_oriented_vehicle_body(e.kind) && facing.is_finite() {
-        let forward = (facing.cos(), facing.sin());
+        let forward = (facing.det_cos(), facing.det_sin());
         let to_waypoint = (waypoint.0 - current.0, waypoint.1 - current.1);
         if forward.0.is_finite()
             && forward.1.is_finite()
@@ -191,7 +192,7 @@ pub(super) fn lateral_error(delta: (f32, f32), segment_dir: (f32, f32)) -> f32 {
 pub(super) fn unit_direction(from: (f32, f32), to: (f32, f32)) -> Option<(f32, f32)> {
     let dx = to.0 - from.0;
     let dy = to.1 - from.1;
-    let len = (dx * dx + dy * dy).sqrt();
+    let len = (dx * dx + dy * dy).det_sqrt();
     if !len.is_finite() || len <= 1.0e-4 {
         return None;
     }
@@ -204,7 +205,7 @@ fn point_at_distance(from: (f32, f32), to: (f32, f32), distance: f32) -> Option<
     }
     let dx = to.0 - from.0;
     let dy = to.1 - from.1;
-    let segment_len = (dx * dx + dy * dy).sqrt();
+    let segment_len = (dx * dx + dy * dy).det_sqrt();
     if !segment_len.is_finite() || segment_len < distance {
         return None;
     }
@@ -259,7 +260,7 @@ fn clear_car_direct_goal_route(
     if !distance.is_finite() || distance <= ARRIVE_EPS {
         return false;
     }
-    let facing = route_dir.1.atan2(route_dir.0);
+    let facing = route_dir.1.det_atan2(route_dir.0);
     if !facing.is_finite() {
         return false;
     }

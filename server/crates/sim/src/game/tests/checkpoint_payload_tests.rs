@@ -104,7 +104,7 @@ fn checkpoint_payload_rejects_invalid_panzerfaust_shot_state() {
     ));
 
     let out_of_world_impact = mutate_payload(&text, |value| {
-        value["panzerfaustShots"]["shots"][0]["impact_x"] = serde_json::json!(-1.0);
+        value["panzerfaustShots"]["shots"][0]["impact_x"] = serde_json::json!(-4096);
     });
     assert!(matches!(
         Game::restore_checkpoint_payload_text_for_test(
@@ -139,7 +139,7 @@ fn checkpoint_payload_rejects_invalid_tank_armor_reaction_lock() {
         .state
         .entities
         .get(attacker)
-        .map(|attacker| (attacker.pos_x, attacker.pos_y))
+        .map(|attacker| (attacker.pos_x(), attacker.pos_y()))
         .expect("attacker should exist");
     let reaction_tick = game.tick_count();
     game.state
@@ -150,7 +150,7 @@ fn checkpoint_payload_rejects_invalid_tank_armor_reaction_lock() {
     let text = checkpoint_payload_text_for(&game, "invalid armor reaction lock fixture");
 
     let out_of_world_source = mutate_payload(&text, |value| {
-        tank_armor_reaction_lock_mut(value, tank)["source_x"] = serde_json::json!(-1.0);
+        tank_armor_reaction_lock_mut(value, tank)["source_x"] = serde_json::json!(-4096);
     });
     assert!(matches!(
         Game::restore_checkpoint_payload_text_for_test(
@@ -311,7 +311,7 @@ fn checkpoint_payload_rejects_corrupt_oversized_and_unsupported_text() {
     ));
 
     let legacy_sim_schema = mutate_payload(&text, |value| {
-        value["compatibility"]["simSchemaVersion"] = serde_json::json!(1);
+        value["compatibility"]["simSchemaVersion"] = serde_json::json!(5);
     });
     assert!(matches!(
         Game::restore_checkpoint_payload_text_for_test(
@@ -384,7 +384,7 @@ fn checkpoint_payload_rejects_invalid_coordinates_and_queue_caps() {
     let text = checkpoint_payload_text_for(&game, "invalid coordinate payload fixture");
 
     let out_of_bounds = mutate_payload(&text, |value| {
-        value["entities"]["entities"][0]["pos_x"] = serde_json::json!(-1.0);
+        value["entities"]["entities"][0]["pos_x"] = serde_json::json!(-4096);
     });
     assert!(matches!(
         Game::restore_checkpoint_payload_text_for_test(
@@ -583,4 +583,25 @@ fn tick_until_panzerfaust_launch(game: &mut Game) {
         }
     }
     panic!("test setup should reach Panzerfaust launch before checkpointing");
+}
+
+#[test]
+fn old_float_simulation_header_is_rejected_before_position_decode() {
+    let game = Game::new_for_replay(&human_vs_ai_players(), 0x5150_2002);
+    let text = checkpoint_payload_text_for(&game, "old numerical version");
+    let legacy = mutate_payload(&text, |value| {
+        value["compatibility"]["simSchemaVersion"] = serde_json::json!(5);
+        // The build label is unchanged; old float positions must never be read as substeps.
+        value["entities"]["entities"][0]["pos_x"] = serde_json::json!(100.25);
+    });
+    assert!(matches!(
+        Game::restore_checkpoint_payload_text_for_test(
+            &legacy,
+            game.state.map.clone(),
+            game.map_metadata().clone(),
+        ),
+        Err(CheckpointPayloadError::InvalidValue {
+            field: "compatibility.simSchemaVersion"
+        })
+    ));
 }

@@ -194,7 +194,8 @@ fn rotation_clear_spawn_uses_nearby_units_exact_oriented_bodies() {
     let nearby_radius = unit_body_for_entity(entities.get(nearby_id).expect("nearby tank"))
         .expect("nearby body")
         .bounding_radius();
-    let center_distance = ((nearby.0 - spawn.0).powi(2) + (nearby.1 - spawn.1).powi(2)).sqrt();
+    let center_distance =
+        ((nearby.0 - spawn.0).det_powi(2) + (nearby.1 - spawn.1).det_powi(2)).det_sqrt();
     assert!(
         center_distance < spawn_radius + nearby_radius,
         "test geometry must overlap the conservative bounding circles"

@@ -16,6 +16,7 @@ use crate::game::services::spatial::SpatialIndex;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::upgrade::UpgradeKind;
 use crate::game::PlayerState;
+use rts_rules::math::GameplayMath as _;
 
 mod armor_reaction;
 mod car_drive;
@@ -107,7 +108,7 @@ pub(crate) fn movement_system_with_context(
     for id in entities.ids() {
         let in_smoke = entities
             .get(id)
-            .is_some_and(|e| e.is_unit() && smokes.point_inside(e.pos_x, e.pos_y));
+            .is_some_and(|e| e.is_unit() && smokes.point_inside(e.pos_x(), e.pos_y()));
         if in_smoke {
             if let Some(e) = entities.get_mut(id) {
                 e.mark_in_smoke_for_breakthrough(config::BREAKTHROUGH_RECENT_SMOKE_TICKS);
@@ -180,7 +181,7 @@ fn apply_magic_anchor_stationary_pull(
                 return None;
             }
             let speed = config::unit_stats(e.kind)?.speed;
-            Some((e.kind, e.pos_x, e.pos_y, e.facing(), speed, resistance))
+            Some((e.kind, e.pos_x(), e.pos_y(), e.facing(), speed, resistance))
         }) else {
             continue;
         };
@@ -188,7 +189,7 @@ fn apply_magic_anchor_stationary_pull(
             continue;
         };
         let pull_px =
-            speed * MAGIC_ANCHOR_STATIONARY_PULL_PER_TICK_SCALE * strength / resistance.sqrt();
+            speed * MAGIC_ANCHOR_STATIONARY_PULL_PER_TICK_SCALE * strength / resistance.det_sqrt();
         if pull_px <= 0.0 || !pull_px.is_finite() {
             continue;
         }
@@ -199,6 +200,7 @@ fn apply_magic_anchor_stationary_pull(
         }
         if let Some(e) = entities.get_mut(id) {
             e.set_position(next_x, next_y);
+            let (next_x, next_y) = (e.pos_x(), e.pos_y());
             e.set_movement_delta(next_x - x, next_y - y);
         }
     }

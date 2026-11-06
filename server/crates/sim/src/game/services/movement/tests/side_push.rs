@@ -92,7 +92,11 @@ fn infantry_side_push_respects_wall_clearance() {
     for id in [mover, blocker] {
         let e = entities.get(id).unwrap();
         assert!(standability::unit_static_standable(
-            &map, &occ, e.kind, e.pos_x, e.pos_y
+            &map,
+            &occ,
+            e.kind,
+            e.pos_x(),
+            e.pos_y()
         ));
     }
     assert!(body_overlap_depth(&entities, mover, blocker) <= COLLISION_EPS_PX);

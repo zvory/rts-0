@@ -59,7 +59,7 @@ pub(super) fn eject_friendly_units_from_site(
     for unit in ejecting {
         let Some((kind, facing, x, y)) = entities
             .get(unit)
-            .map(|entity| (entity.kind, entity.facing(), entity.pos_x, entity.pos_y))
+            .map(|entity| (entity.kind, entity.facing(), entity.pos_x(), entity.pos_y()))
         else {
             ignored_units.remove(&unit);
             continue;

@@ -29,7 +29,7 @@ fn occupation_search_skips_nearest_trench_without_legal_slot() {
     let blocking_slots = slot_positions(&snapshot, nearest_trench)
         .into_iter()
         .filter(|candidate| {
-            distance((snapshot.pos_x, snapshot.pos_y), *candidate) <= SLOT_MAX_CORRECTION_PX
+            distance((snapshot.pos_x(), snapshot.pos_y()), *candidate) <= SLOT_MAX_CORRECTION_PX
         })
         .collect::<Vec<_>>();
     assert!(
@@ -71,7 +71,9 @@ fn occupation_search_queries_only_local_trench_cells() {
     for ty in (2..94).step_by(8) {
         for tx in (2..94).step_by(8) {
             let position = map.tile_center(tx, ty);
-            if distance_sq(center, position) > (search_radius + config::TILE_SIZE as f32).powi(2) {
+            if distance_sq(center, position)
+                > (search_radius + config::TILE_SIZE as f32).det_powi(2)
+            {
                 trenches
                     .create(&map, position.0, position.1)
                     .expect("distant trench should seed");

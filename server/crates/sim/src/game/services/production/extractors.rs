@@ -182,8 +182,8 @@ pub(super) fn target(
         .iter()
         .filter(|node| node.kind == node_kind && node.remaining().unwrap_or(0) > 0)
         .filter_map(|node| {
-            let dx = node.pos_x - producer.pos_x;
-            let dy = node.pos_y - producer.pos_y;
+            let dx = node.pos_x() - producer.pos_x();
+            let dy = node.pos_y() - producer.pos_y();
             let dist2 = dx * dx + dy * dy;
             if dist2 > range2 + 0.01
                 || entities.node_slot_holder(node.id).is_some()
@@ -191,7 +191,7 @@ pub(super) fn target(
             {
                 None
             } else {
-                Some((node.id, dist2, node.pos_x, node.pos_y))
+                Some((node.id, dist2, node.pos_x(), node.pos_y()))
             }
         })
         .min_by(|a, b| a.1.total_cmp(&b.1).then_with(|| a.0.cmp(&b.0)))

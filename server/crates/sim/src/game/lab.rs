@@ -1,5 +1,6 @@
 //! Authoritative validated Lab mutation and repair API at the `Game` seam.
 
+use rts_rules::math::GameplayMath as _;
 use std::collections::HashSet;
 
 use serde::{Deserialize, Serialize};
@@ -1183,9 +1184,9 @@ fn placement_blockers(
             .unwrap_or(tile_size / 2.0)
     };
     for entity in entities.iter().filter(|entity| entity.hp > 0) {
-        let dx = entity.pos_x - x;
-        let dy = entity.pos_y - y;
-        if dx * dx + dy * dy >= (candidate_radius + entity.radius()).powi(2) {
+        let dx = entity.pos_x() - x;
+        let dy = entity.pos_y() - y;
+        if dx * dx + dy * dy >= (candidate_radius + entity.radius()).det_powi(2) {
             continue;
         }
         let blocker = if entity.is_building() || entity.is_node() {

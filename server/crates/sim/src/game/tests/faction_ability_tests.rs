@@ -108,7 +108,7 @@ fn smoke_plus_doubles_scout_car_smoke_radius_and_duration() {
         .state
         .entities
         .get(scout)
-        .map(|entity| (entity.pos_x, entity.pos_y))
+        .map(|entity| (entity.pos_x(), entity.pos_y()))
         .expect("scout should exist");
 
     game.enqueue(
@@ -453,9 +453,9 @@ fn breakthrough_uses_configured_plain_and_smoke_speed_multipliers() {
     for _ in 0..10 {
         game.tick();
     }
-    let plain_dx = game.state.entities.get(plain).expect("plain").pos_x - plain_pos.0;
-    let smoke_dx = game.state.entities.get(smoked).expect("smoked").pos_x - smoke_pos.0;
-    let baseline_dx = game.state.entities.get(baseline).expect("baseline").pos_x - baseline_pos.0;
+    let plain_dx = game.state.entities.get(plain).expect("plain").pos_x() - plain_pos.0;
+    let smoke_dx = game.state.entities.get(smoked).expect("smoked").pos_x() - smoke_pos.0;
+    let baseline_dx = game.state.entities.get(baseline).expect("baseline").pos_x() - baseline_pos.0;
     assert!(
         (plain_dx / baseline_dx - crate::config::BREAKTHROUGH_BASE_SPEED_MULTIPLIER).abs() < 0.001,
         "plain Breakthrough should use its configured multiplier ({plain_dx} / {baseline_dx})"
@@ -522,15 +522,15 @@ fn command_car_passive_aura_uses_configured_speed_and_has_no_smoke_bonus() {
         game.tick();
     }
 
-    let near_dx = game.state.entities.get(near).expect("nearby rifle").pos_x - near_pos.0;
+    let near_dx = game.state.entities.get(near).expect("nearby rifle").pos_x() - near_pos.0;
     let smoky_near_dx = game
         .state
         .entities
         .get(smoky_near)
         .expect("nearby smoky rifle")
-        .pos_x
+        .pos_x()
         - smoky_near_pos.0;
-    let far_dx = game.state.entities.get(far).expect("far rifle").pos_x - far_pos.0;
+    let far_dx = game.state.entities.get(far).expect("far rifle").pos_x() - far_pos.0;
     assert!(
         near_dx > far_dx,
         "the nearby permanent aura should increase movement ({near_dx} <= {far_dx})"

@@ -94,7 +94,7 @@ fn depot_completes_steel_mine_on_nearest_in_range_patch() {
         .iter()
         .find(|entity| entity.kind == EntityKind::SteelMine)
         .expect("steel mine should be produced");
-    assert_eq!((mine.pos_x, mine.pos_y), near);
+    assert_eq!((mine.pos_x(), mine.pos_y()), near);
 }
 
 #[test]
@@ -128,7 +128,7 @@ fn depot_extractor_scaffold_matches_front_queue_progress() {
         .find(|entity| entity.kind == EntityKind::SteelMine)
         .expect("visible extractor scaffold");
     assert!(mine.under_construction());
-    assert_eq!((mine.pos_x, mine.pos_y), patch);
+    assert_eq!((mine.pos_x(), mine.pos_y()), patch);
     assert_eq!(mine.construction_producer_id(), Some(depot));
     assert_eq!(
         mine.build_progress_fraction(),
@@ -237,7 +237,7 @@ fn depot_builds_free_steel_and_oil_extractors_concurrently() {
         .entities
         .iter()
         .find(|entity| entity.kind == EntityKind::PumpJack)
-        .map(|entity| (entity.id, entity.pos_x, entity.pos_y))
+        .map(|entity| (entity.id, entity.pos_x(), entity.pos_y()))
         .unwrap();
     let worker = game
         .state

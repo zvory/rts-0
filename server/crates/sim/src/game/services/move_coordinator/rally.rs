@@ -9,6 +9,7 @@ use crate::game::map::Map;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
 use crate::rules::projection;
+use rts_rules::math::GameplayMath as _;
 
 /// Resolve a produced unit's rally location to the closest reachable, unoccupied,
 /// body-standable tile. The producer retains the original rally coordinate; this is only the new
@@ -35,7 +36,7 @@ pub(super) fn nearest_free_goal(
     let formation_unit = formation::FormationUnit {
         id: unit_id,
         kind: unit.kind,
-        pos: (unit.pos_x, unit.pos_y),
+        pos: (unit.pos_x(), unit.pos_y()),
     };
     let occupied_unit_bodies =
         occupied_and_reserved_bodies(entities, teams, player, unit_id, fog, smokes);
@@ -81,7 +82,7 @@ pub(super) fn nearest_free_goal(
                     continue;
                 }
 
-                let distance_sq = (point.0 - rally.0).powi(2) + (point.1 - rally.1).powi(2);
+                let distance_sq = (point.0 - rally.0).det_powi(2) + (point.1 - rally.1).det_powi(2);
                 if !distance_sq.is_finite() {
                     continue;
                 }
@@ -142,7 +143,7 @@ fn occupied_and_reserved_bodies(
         let other_unit = formation::FormationUnit {
             id: other.id,
             kind: other.kind,
-            pos: (other.pos_x, other.pos_y),
+            pos: (other.pos_x(), other.pos_y()),
         };
         let facing = formation::formation_goal_facing(&other_unit, goal);
         if let Some(body) = unit_body_with_facing(other.kind, goal.0, goal.1, facing) {
@@ -179,7 +180,7 @@ fn nearest_unsearched_tile_distance_sq(
     let tile_size = config::TILE_SIZE as f32;
     let mut lower_bound_sq = f32::INFINITY;
     let mut consider_axis_distance = |tile_center: f32, rally_coordinate: f32| {
-        lower_bound_sq = lower_bound_sq.min((tile_center - rally_coordinate).powi(2));
+        lower_bound_sq = lower_bound_sq.min((tile_center - rally_coordinate).det_powi(2));
     };
 
     if min_x > 0 {

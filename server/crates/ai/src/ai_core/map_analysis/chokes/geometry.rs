@@ -1,5 +1,6 @@
 use super::super::{tile_distance2, AiTile, AiTileBounds};
 use super::nearest_tile_to;
+use rts_rules::math::GameplayMath as _;
 
 pub(super) fn choke_line_geometry(
     tiles: &[AiTile],
@@ -38,7 +39,7 @@ fn projected_choke_line_geometry(
 ) -> Option<(AiTile, AiTile, u16)> {
     let dx = approach_b_tile.x as f32 - approach_a_tile.x as f32;
     let dy = approach_b_tile.y as f32 - approach_a_tile.y as f32;
-    let len = (dx * dx + dy * dy).sqrt();
+    let len = (dx * dx + dy * dy).det_sqrt();
     if !len.is_finite() || len <= f32::EPSILON {
         return None;
     }

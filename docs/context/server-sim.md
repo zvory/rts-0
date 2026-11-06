@@ -11,6 +11,7 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
   migration, or archcheck work
 - §3.1.3 `GameCheckpointV1` embeddable payload contract; read before public checkpoint DTO,
   replay start-state, lab scenario, match-start artifact, or debug-document checkpoint work
+- §3.1.4 Deterministic arithmetic; fixed-point grid and replay compatibility
 - §3.2 Concurrency model; the room task is the sole `Game` owner
 - §3.3 Rules layer
 - §3.5 Command planning and queued order semantics

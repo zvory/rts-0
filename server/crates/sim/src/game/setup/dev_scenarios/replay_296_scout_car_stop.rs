@@ -90,7 +90,7 @@ mod tests {
             .iter()
             .map(|id| {
                 let entity = setup.game.state.entities.get(*id).expect("Scout Car");
-                (entity.pos_x, entity.pos_y)
+                (entity.pos_x(), entity.pos_y())
             })
             .collect::<Vec<_>>();
         for _ in 0..30 {
@@ -113,7 +113,7 @@ mod tests {
                     .iter()
                     .find(|entity| entity.id == *id)
                     .expect("Scout Car snapshot");
-                (entity.x - start[index].0).hypot(entity.y - start[index].1)
+                (entity.x - start[index].0).det_hypot(entity.y - start[index].1)
             })
             .collect::<Vec<_>>();
         assert!(

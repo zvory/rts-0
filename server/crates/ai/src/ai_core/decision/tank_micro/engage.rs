@@ -84,14 +84,14 @@ fn foes(observation: &AiObservation, micro: &TankMicro) -> BTreeMap<u32, Foe> {
 }
 
 fn tiles_between(a: (f32, f32), b: (f32, f32), tile_size: f32) -> f32 {
-    dist2(a.0, a.1, b.0, b.1).sqrt() / tile_size
+    dist2(a.0, a.1, b.0, b.1).det_sqrt() / tile_size
 }
 
 /// The angle in degrees between a hull heading and the direction toward `toward` from `from`.
 fn off_heading(heading: (f32, f32), from: (f32, f32), toward: (f32, f32)) -> Option<f32> {
     let dir = normalized_direction(from, toward)?;
     let dot = (heading.0 * dir.0 + heading.1 * dir.1).clamp(-1.0, 1.0);
-    Some(dot.acos().to_degrees())
+    Some(dot.det_acos().to_degrees())
 }
 
 /// One of our shells' damage on `foe` from `from`, by the armor it hits.
@@ -584,7 +584,7 @@ fn post_toward(
     ts: f32,
 ) -> Option<(f32, f32)> {
     let dir = normalized_direction(target, from)?;
-    let (sin, cos) = degrees.to_radians().sin_cos();
+    let (sin, cos) = degrees.to_radians().det_sin_cos();
     let turned = (dir.0 * cos - dir.1 * sin, dir.0 * sin + dir.1 * cos);
     Some((
         target.0 + turned.0 * tiles * ts,

@@ -9,6 +9,7 @@ use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
 use crate::rules::combat as combat_rules;
 use crate::rules::target as target_rules;
+use rts_rules::math::GameplayMath as _;
 
 use super::priority::{AttackPriorityContext, TargetCandidate};
 use super::projection::max_building_combat_extent_px;
@@ -197,7 +198,7 @@ pub(super) fn resolve_target_for_weapon(
         if !target_filter(candidate.id)
             || !auto_retention_target_inside_field_of_fire(
                 attacker,
-                (candidate.pos_y - py).atan2(candidate.pos_x - px),
+                (candidate.pos_y - py).det_atan2(candidate.pos_x - px),
             )
         {
             continue;
@@ -271,8 +272,8 @@ fn target_candidates(
         candidates.push(TargetCandidate {
             id,
             owner: target.owner,
-            pos_x: target.pos_x,
-            pos_y: target.pos_y,
+            pos_x: target.pos_x(),
+            pos_y: target.pos_y(),
             distance_sq: legality.distance_sq,
             facts: target_rules::target_facts(target.kind),
             in_weapon_range: legality.in_weapon_range,

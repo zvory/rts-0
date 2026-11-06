@@ -14,6 +14,7 @@
 //! builder goes as soon as the Depot will be paid for by the time it can arrive, rather than once
 //! its cost is banked.
 
+use rts_rules::math::GameplayMath as _;
 use std::collections::BTreeMap;
 
 use super::geometry::{building_center, dist2, squared};
@@ -144,7 +145,7 @@ fn worker_speed() -> f32 {
 /// Ticks a worker at `from` needs at least to reach `to`: the straight line, so never more than its
 /// real walk.
 fn walk_ticks(from: (f32, f32), to: (f32, f32)) -> u32 {
-    (dist2(from.0, from.1, to.0, to.1).sqrt() / worker_speed()).ceil() as u32
+    (dist2(from.0, from.1, to.0, to.1).det_sqrt() / worker_speed()).ceil() as u32
 }
 
 fn depot_center(observation: &AiObservation, site: (u32, u32)) -> Option<(f32, f32)> {

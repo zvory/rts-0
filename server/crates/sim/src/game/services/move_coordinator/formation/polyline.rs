@@ -15,7 +15,7 @@ pub(in crate::game) fn slots(
     for segment in points.windows(2) {
         let dx = segment[1].0 - segment[0].0;
         let dy = segment[1].1 - segment[0].1;
-        let length = (dx * dx + dy * dy).sqrt();
+        let length = (dx * dx + dy * dy).det_sqrt();
         cumulative.push(cumulative.last().copied().unwrap_or(0.0) + length);
     }
     let total = cumulative.last().copied().unwrap_or(0.0);
@@ -94,7 +94,7 @@ fn point_and_tangent_at_distance(
     let end = points[segment_index + 1];
     let dx = end.0 - start.0;
     let dy = end.1 - start.1;
-    let length = (dx * dx + dy * dy).sqrt();
+    let length = (dx * dx + dy * dy).det_sqrt();
     if length <= f32::EPSILON {
         return (start, (1.0, 0.0));
     }

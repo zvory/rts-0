@@ -1,6 +1,7 @@
 use crate::config;
 use crate::game::entity::{Entity, EntityStore, Order, WeaponSetup};
 use crate::game::map::Map;
+use rts_rules::math::GameplayMath as _;
 
 #[derive(Clone, Copy)]
 pub(crate) struct ArtilleryPointFireTarget {
@@ -158,11 +159,11 @@ fn artillery_point_fire_target_from_context(
             if !point_inside_playable_map(map.world_width_px(), map.world_height_px(), x, y) {
                 return None;
             }
-            let facing = (y - context.origin_y).atan2(x - context.origin_x);
+            let facing = (y - context.origin_y).det_atan2(x - context.origin_x);
             if !facing.is_finite() {
                 return None;
             }
-            let distance = (x - context.origin_x).hypot(y - context.origin_y);
+            let distance = (x - context.origin_x).det_hypot(y - context.origin_y);
             (
                 LockedArtilleryFireTarget { x, y, facing },
                 distance.is_finite() && distance >= min_px && distance <= max_px,
@@ -226,7 +227,7 @@ fn stored_artillery_fire_target(
     if distance2 + slack < min2 || distance2 > max2 + slack {
         return None;
     }
-    let facing = dy.atan2(dx);
+    let facing = dy.det_atan2(dx);
     if !facing.is_finite() {
         return None;
     }
@@ -292,8 +293,8 @@ fn artillery_point_fire_queue_terminal(e: &Entity) -> bool {
 
 fn current_artillery_target_context(e: &Entity) -> ArtilleryTargetContext {
     ArtilleryTargetContext {
-        origin_x: e.pos_x,
-        origin_y: e.pos_y,
+        origin_x: e.pos_x(),
+        origin_y: e.pos_y(),
         setup_facing: artillery_point_fire_field_center(e),
     }
 }
@@ -319,7 +320,7 @@ fn queued_artillery_target_context(e: &Entity) -> ArtilleryTargetContext {
                 }
             }
             crate::game::entity::OrderIntent::SetupAntiTankGuns(point) => {
-                let facing = (point.y - context.origin_y).atan2(point.x - context.origin_x);
+                let facing = (point.y - context.origin_y).det_atan2(point.x - context.origin_x);
                 if facing.is_finite() {
                     context.setup_facing = Some(facing);
                 }

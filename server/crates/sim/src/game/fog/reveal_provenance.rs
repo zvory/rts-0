@@ -49,11 +49,11 @@ impl Fog {
             let Some(entity) = store.get(source.entity_id()) else {
                 continue;
             };
-            if entity.hp == 0 || smokes.point_inside(entity.pos_x, entity.pos_y) {
+            if entity.hp == 0 || smokes.point_inside(entity.pos_x(), entity.pos_y()) {
                 continue;
             }
             let Some(tile) =
-                super::world_tile_index(self.width, self.height, entity.pos_x, entity.pos_y)
+                super::world_tile_index(self.width, self.height, entity.pos_x(), entity.pos_y())
             else {
                 continue;
             };
@@ -73,7 +73,8 @@ impl Fog {
             };
             visibility.revealed_tile = Some(tile);
             visibility.reveal_only = terrain_reveal_only
-                || (map.world_point_is_concealed(entity.pos_x, entity.pos_y) && !close_detected);
+                || (map.world_point_is_concealed(entity.pos_x(), entity.pos_y())
+                    && !close_detected);
             visibility.terrain_reveal_only = terrain_reveal_only;
         }
 
@@ -83,13 +84,13 @@ impl Fog {
             let Some(entity) = store.get(source.entity_id()) else {
                 continue;
             };
-            if entity.hp == 0 || smokes.point_inside(entity.pos_x, entity.pos_y) {
+            if entity.hp == 0 || smokes.point_inside(entity.pos_x(), entity.pos_y()) {
                 continue;
             }
             let Some(grid) = self.grids.get_mut(&source.viewer()) else {
                 continue;
             };
-            stamp_point(grid, width, height, entity.pos_x, entity.pos_y);
+            stamp_point(grid, width, height, entity.pos_x(), entity.pos_y());
         }
     }
 

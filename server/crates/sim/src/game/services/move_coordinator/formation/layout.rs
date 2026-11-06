@@ -1,6 +1,7 @@
 use super::{FormationUnit, VEHICLE_BODY_FORMATION_GAP_TILES};
 use crate::game::entity::uses_oriented_vehicle_body;
 use crate::game::map::Map;
+use rts_rules::math::GameplayMath as _;
 
 /// Build one compact translated layout. Wide selections fold into ordered columns and tall
 /// selections fold into ordered rows, preserving the strongest positional relationship without
@@ -83,8 +84,8 @@ fn compact_grid_dimensions(
 ) -> (usize, usize) {
     // Larger vehicle bodies need a slightly wider blob so they do not form deep same-lane queues
     // while converging through ordinary traffic chokepoints.
-    let long_side =
-        (unit_count as f32).sqrt().ceil() as usize + usize::from(has_vehicle && unit_count >= 6);
+    let long_side = (unit_count as f32).det_sqrt().ceil() as usize
+        + usize::from(has_vehicle && unit_count >= 6);
     let short_side = unit_count.div_ceil(long_side);
     let columns = if width >= height {
         long_side

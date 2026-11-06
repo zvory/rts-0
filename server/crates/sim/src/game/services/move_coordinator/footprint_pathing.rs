@@ -70,7 +70,7 @@ impl MoveCoordinator<'_> {
         id: u32,
     ) -> Option<FootprintRouting> {
         let entity = entities.get(id)?;
-        let start_tile = self.map.tile_of(entity.pos_x, entity.pos_y);
+        let start_tile = self.map.tile_of(entity.pos_x(), entity.pos_y());
         let static_fingerprint = self.occ.static_fingerprint_for_kind(entity.kind);
         let current = footprint_routing(entity)?;
         let routing = if current.static_fingerprint == Some(static_fingerprint)
@@ -152,7 +152,7 @@ impl MoveCoordinator<'_> {
         let request_start = self.diagnostics.as_ref().map(|_| Instant::now());
         let (unit_kind, sx, sy) = match entities.get(id) {
             Some(e) if e.is_unit() => {
-                let (sx, sy) = self.map.tile_of(e.pos_x, e.pos_y);
+                let (sx, sy) = self.map.tile_of(e.pos_x(), e.pos_y());
                 (e.kind, sx, sy)
             }
             _ => return PathAttempt::Failed,
@@ -242,12 +242,12 @@ fn current_staging_goal(
     footprint: &BTreeSet<(u32, u32)>,
 ) -> Option<(f32, f32)> {
     let worker = entities.get(id)?;
-    let tile = map.tile_of(worker.pos_x, worker.pos_y);
+    let tile = map.tile_of(worker.pos_x(), worker.pos_y());
     if footprint.contains(&tile) {
         return None;
     }
     let &(tile_x, tile_y) = footprint.iter().min()?;
-    let goal = (worker.pos_x, worker.pos_y);
+    let goal = (worker.pos_x(), worker.pos_y());
     build_staging_goal_in_range(map, kind, tile_x, tile_y, goal).then_some(goal)
 }
 
@@ -261,7 +261,7 @@ pub(super) fn build_staging_goal_in_range(
     let (cx, cy) = footprint_center(map, kind, tile_x, tile_y);
     let dx = goal.0 - cx;
     let dy = goal.1 - cy;
-    dx * dx + dy * dy <= interact_range_for_kind(kind).powi(2)
+    dx * dx + dy * dy <= interact_range_for_kind(kind).det_powi(2)
 }
 
 /// Pick a walk target outside a build footprint.
@@ -299,7 +299,7 @@ fn build_staging_goals(
     if footprint.is_empty() {
         return Vec::new();
     }
-    let worker_tile = map.tile_of(worker.pos_x, worker.pos_y);
+    let worker_tile = map.tile_of(worker.pos_x(), worker.pos_y());
     let worker_start = map.tile_center(worker_tile.0, worker_tile.1);
     let footprint_set: BTreeSet<(u32, u32)> = footprint.iter().copied().collect();
     let min_x = tile_x as i32;

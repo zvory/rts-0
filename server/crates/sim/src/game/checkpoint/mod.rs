@@ -45,9 +45,9 @@ struct PlayerCheckpointRef<'a, T> {
 
 const CHECKPOINT_SCHEMA: &str = "rts.gameCheckpoint";
 const CHECKPOINT_VERSION: u32 = rts_contract::GAME_CHECKPOINT_CURRENT_VERSION;
-// Construction funding, tank-trail ownership, and concealment detection are authoritative state.
+// Version 6 stores physical positions as Q19.12 and uses pinned portable gameplay math.
 // Keep older payloads outside this boundary instead of silently guessing missing fields.
-const SIM_SCHEMA_VERSION: u32 = 5;
+const SIM_SCHEMA_VERSION: u32 = 6;
 const RULES_VERSION: u32 = 1;
 const PROTOCOL_VERSION: u32 = 1;
 const RNG_ALGORITHM: &str = "rts-small-rng-0.8-draws-v1";
@@ -233,6 +233,13 @@ impl GameCheckpointV1 {
                 max: MAX_PAYLOAD_BYTES,
             });
         }
+        #[derive(Deserialize)]
+        struct Header {
+            compatibility: CheckpointCompatibilityV1,
+        }
+        let header: Header = serde_json::from_str(text)
+            .map_err(|err| CheckpointPayloadError::MalformedJson(err.to_string()))?;
+        header.compatibility.validate()?;
         serde_json::from_str(text)
             .map_err(|err| CheckpointPayloadError::MalformedJson(err.to_string()))
     }

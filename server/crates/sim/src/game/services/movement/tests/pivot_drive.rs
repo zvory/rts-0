@@ -32,7 +32,7 @@ fn anti_tank_gun_body_uses_pivot_drive_turning_along_path() {
     );
     assert!((e.facing() - ANTI_TANK_GUN_BODY_TURN_RATE_RAD_PER_TICK).abs() <= 0.0001);
     assert!(
-        moved_distance((sx, sy), (e.pos_x, e.pos_y)) < 0.01,
+        moved_distance((sx, sy), (e.pos_x(), e.pos_y())) < 0.01,
         "anti-tank gun should pivot before driving when the target is far off its facing"
     );
 }

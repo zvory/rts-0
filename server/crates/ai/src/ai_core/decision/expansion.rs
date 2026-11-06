@@ -1,3 +1,4 @@
+use rts_rules::math::GameplayMath as _;
 use std::cmp::Ordering;
 
 use super::geometry::{
@@ -626,7 +627,7 @@ pub(super) fn has_jeff_river_expansion_site(observation: &AiObservation) -> bool
     }) || observation.owned.iter().any(|entity| {
         entity.kind == EntityKind::ResourceDepot
             && dist2(entity.x, entity.y, expected_center.0, expected_center.1)
-                <= (0.5 * tile_size).powi(2)
+                <= (0.5 * tile_size).det_powi(2)
     }) || uses_jeff_river_layout(observation)
 }
 
@@ -742,7 +743,7 @@ pub(super) fn estimated_expansion_center_tile(
         map_center_tiles.0 - resource_tile.0,
         map_center_tiles.1 - resource_tile.1,
     );
-    let len = (dir.0 * dir.0 + dir.1 * dir.1).sqrt();
+    let len = (dir.0 * dir.0 + dir.1 * dir.1).det_sqrt();
     if len <= f32::EPSILON {
         return None;
     }
