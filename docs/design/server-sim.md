@@ -225,6 +225,9 @@ impl Game {
 
     pub fn tick_count(&self) -> u32;
 
+    /// Versioned committed-state fingerprint for final replay verification (not a per-tick API).
+    pub fn replay_end_state_hash(&self) -> Result<String, String>;
+
     /// Authoritative commands applied so far, stamped with the tick that applied them.
     pub fn command_log(&self) -> &[CommandLogEntry];
 
@@ -274,6 +277,48 @@ callers that need to reconcile UI selection. Snapshot-only projections, transien
 projectile runtime state, active commands, production queues, rally plans, cooldowns, and command
 logs are not part of the setup format. Legacy `kind:"labScenario"` setup JSON is rejected before it
 can mutate a lab room.
+
+Replay end-state verification uses optional `endStateHash: { algorithm, digest }` and an ordered
+`eliminations: [{ tick, playerId }]` list in schema-3 artifacts. `ReplayStartComposition` records
+room-authored administrative removals on give-up/disconnect; playback applies them after that tick's
+systems (or at the start boundary for tick-zero removals), before keyframes and verification. The
+final hash is captured after the same removal, so a surrender does not create a false divergence.
+`ReplayArtifactV1::verify_end_state` requires the exact final tick and returns verified/mismatched,
+absent (older artifacts are unverified), or an unsupported-algorithm/error result. Replay sessions
+check once on reaching the end through playback or seeking, log status and cost, and show a warning
+on mismatches or unavailable algorithms. Seeking backward re-arms verification. A mismatch signals
+divergence; it does not distinguish nondeterminism from build/rules/platform drift or corruption.
+
+The algorithm `rts-end-state-json-sha256-v1` hashes its ASCII identifier followed immediately by
+compact serde_json serialization of the explicit ordered projection in
+`game/checkpoint/fingerprint.rs`. SHA-256 is streamed through a 64 KiB buffer. Struct fields have
+fixed serialization order; entity ids and unordered fog/memory collections are sorted by their
+checkpoint adapters. Numbers use serde_json's locale-independent decimal representation, not
+native-endian memory, pointer addresses, Rust `Hash`, or debug text. Valid simulation floats are
+finite and their exact round-trip values participate without rounding/tolerance. Arrays retain
+semantic order. Changes to projection/serialization semantics require a new algorithm identifier.
+The map uses its existing canonical materialized binding; map content is immutable during live play.
+The projection includes all committed authoritative owners (players/private economy/scores/upgrades,
+entities/orders, fog/memories, active abilities/projectiles, decals/trails, world combat signals,
+construction state, RNG seed/draw count and an eight-draw non-consuming future-output probe).
+Command history, unapplied pending commands, build SHA, room/session state and rebuildable derived
+caches are excluded. Pending input has not affected the final committed state and is not replayed.
+When adding a `GameState` field, update this projection alongside the ownership/checkpoint registry.
+This is a fingerprint, not a saved final checkpoint; playback must reconstruct the state to compare.
+
+Hashing runs once at artifact finalization and once per completed playback traversal, never every
+minute or tick. It borrows large entity/projectile/decal stores, copies only ordered fog/memory
+adapters and a sorted entity-reference index, and does not clone/serialize the command history or
+validate/rebuild an entire checkpoint. Cost depends on final-state size, not duration. The ignored
+release test `end_state_hash_cost` measures 2,000 total entities on the four-player 166×166 map plus a 200,000-command history.
+A local release run (100 hashes, four players, 2,000 entities, 200,000 historical commands)
+measured 8.5 ms median, 11.0 ms p95, and 18.0 ms maximum. This is a finalization-only synchronous
+cost below one 33.3 ms tick on that machine, not a production-hardware latency guarantee; unusually
+large decal/projectile state can cost more. Runtime logs expose `hash_us` for capture and verification. The simulation now pins its RNG stream across native and WASM (see §3.1.3); the future-output
+probe additionally detects accidental generator drift even when seed/draw counters agree. Hash
+portability still does not promise that every floating-point simulation path will remain identical
+across builds/platforms: exact differences must be reported, not rounded away. A fixed three-tick
+full-state fingerprint runs natively and under WASM alongside the RNG known answers.
 
 #### 3.1.1 `Game` State Ownership Registry
 

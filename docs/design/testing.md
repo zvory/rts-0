@@ -522,7 +522,8 @@ changed-file mapping selects the skipped behavior.
 The server-build job also runs the `rng_portability` integration fixture under
 `wasm-bindgen-test-runner` on wasm32. This is a narrow exception to the native nextest policy:
 nextest cannot execute the WASM test runner. Native nextest and WASM assert identical fixed
-Xoshiro/seed-expansion/sampling/shuffle answers to catch target-dependent RNG drift.
+Xoshiro/seed-expansion/sampling/shuffle answers and a three-tick full-state fingerprint to catch
+target-dependent RNG or end-state serialization drift.
 
 
 The canonical required PR check context is `./tests/run-all.sh` in the `Main test gate` workflow.

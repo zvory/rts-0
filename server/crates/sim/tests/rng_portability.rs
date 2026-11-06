@@ -120,3 +120,28 @@ fn sampling_known_answers() {
     assert_eq!(tickets, [75, 74, 59, 30]);
     assert_eq!(starts, [1, 0, 4, 5, 6, 7, 2, 3]);
 }
+
+/// Full committed-state projection, including floats, unordered-store adapters, map and RNG.
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen_test::wasm_bindgen_test)]
+#[cfg_attr(not(target_arch = "wasm32"), test)]
+fn end_state_fingerprint_matches_native_and_wasm() {
+    use rts_sim::game::{Game, PlayerInit};
+    let mut game = Game::new(
+        &[PlayerInit {
+            id: 1,
+            team_id: 1,
+            faction_id: rts_protocol::DEFAULT_FACTION_ID.to_string(),
+            name: "Hash fixture".into(),
+            color: "#ffffff".into(),
+            is_ai: false,
+        }],
+        42,
+    );
+    for _ in 0..3 {
+        game.tick();
+    }
+    assert_eq!(
+        game.replay_end_state_hash().unwrap(),
+        "0ae0d4f6f671c83ae7ca6c5a437cbadd23690f174e792d2bd734b9889f8ea6d1"
+    );
+}

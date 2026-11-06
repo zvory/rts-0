@@ -10,3 +10,5 @@ mod lifecycle;
 mod live;
 mod lobby;
 mod replay;
+
+mod replay_integrity;

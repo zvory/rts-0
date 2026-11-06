@@ -374,6 +374,9 @@ impl RoomTask {
         };
 
         crate::log_debug!(room = %self.room, player_id, "player gave up");
+        if let Some(start) = self.replay_start.as_mut() {
+            start.record_elimination(&game, seat_id);
+        }
         game.eliminate(seat_id);
         let alive = game.alive_players();
         let alive_teams = game.alive_team_ids();

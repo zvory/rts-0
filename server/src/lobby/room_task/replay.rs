@@ -225,7 +225,7 @@ impl RoomTask {
         self.send_observer_analysis_to(watcher_id);
         let result = match &self.phase {
             Phase::ReplayViewer(session) if !session.has_remaining_ticks() => {
-                Some(session.result_message())
+                Some(session.result_messages())
             }
             _ => None,
         };
@@ -234,18 +234,20 @@ impl RoomTask {
         }
     }
 
-    fn send_replay_result_to(&mut self, watcher_id: u32, result: &ServerMessage) {
-        if self.outcome_sent.contains(&watcher_id) {
-            return;
-        }
+    fn send_replay_result_to(&mut self, watcher_id: u32, result: &[ServerMessage]) {
         let Some(player) = self.players.get(&watcher_id) else {
             return;
         };
-        send_or_log(&self.room, watcher_id, &player.msg_tx, result.clone());
-        self.outcome_sent.insert(watcher_id);
+        ReplaySession::send_result_messages(
+            &self.room,
+            watcher_id,
+            &player.msg_tx,
+            result,
+            self.outcome_sent.insert(watcher_id),
+        );
     }
 
-    fn send_replay_result_to_all(&mut self, result: &ServerMessage) {
+    fn send_replay_result_to_all(&mut self, result: &[ServerMessage]) {
         for watcher_id in self.order.clone() {
             self.send_replay_result_to(watcher_id, result);
         }
@@ -419,7 +421,7 @@ impl RoomTask {
             context.tick_start,
         );
         if !replay_was_ended && !session.has_remaining_ticks() {
-            self.send_replay_result_to_all(&session.result_message());
+            self.send_replay_result_to_all(&session.result_messages());
         }
         self.phase = Phase::ReplayViewer(session);
     }
@@ -696,6 +698,9 @@ impl RoomTask {
                 }
                 if !session.is_seeking() {
                     self.send_replay_resource_history(&session, self.order.clone(), true);
+                    if !session.has_remaining_ticks() {
+                        self.send_replay_result_to_all(&session.result_messages());
+                    }
                 }
             }
             Err(err) => {
@@ -722,7 +727,7 @@ impl RoomTask {
 
     pub(super) fn transition_to_replay_viewer(&mut self, mut session: ReplaySession) {
         let initial_chat = session.take_chat_through_current_tick();
-        let initial_result = (!session.has_remaining_ticks()).then(|| session.result_message());
+        let initial_result = (!session.has_remaining_ticks()).then(|| session.result_messages());
         self.phase = Phase::ReplayViewer(Box::new(session));
         self.reset_after_live_match_for_room_phase();
         let recipients = self.order.clone();

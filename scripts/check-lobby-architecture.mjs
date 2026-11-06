@@ -51,7 +51,9 @@ const roomTaskChildLineBudgets = new Map(Object.entries({
 // Chat and durable ground-decal repair are separate room-owned concerns with bounded modules.
 // Replay result delivery reuses the existing gameOver contract at the playback boundary; account
 // for those focused additions.
-const roomTaskTotalLineBudget = 6780;
+// Give-up and disconnect each record the authoritative removal before applying it; hash and
+// verification work stays outside the room actor in the replay runtime.
+const roomTaskTotalLineBudget = 6790;
 
 const lobbyRustFiles = listRustFiles(lobbySrc);
 
