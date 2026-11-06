@@ -1900,7 +1900,9 @@ the total item count for a queue.
 `steelValue` and `oilValue` are aggregate row values (`count * configured cost`), not per-unit
 costs. `unitsLost` is the authoritative unit-death count by kind. `buildingsLost` is the
 authoritative building-death count by kind and is omitted when empty; zero-cost resource extractors
-still appear with zero aggregate value. `resourcesLost` is the spent steel/oil value of units and
+still appear with zero aggregate value. Pump Jack losses always have zero steel/oil value, including
+manually built Pump Jacks, because loss history does not track construction origin.
+`resourcesLost` uses the same loss valuation (excluding Pump Jack costs) for units and
 buildings that died; it does not include current spending, cancelled production, refunds,
 harvesting, or stockpile deltas.
 `resources` is authoritative mined income: `lifetime` counts all worker/golem harvest and Pump Jack
