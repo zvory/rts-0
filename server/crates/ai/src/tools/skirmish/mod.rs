@@ -10,6 +10,7 @@
 //! `evaluate` mode scores one controller on a scenario suite; `--sweep N` random-searches the
 //! squad planner's parameters on the `train` suite and re-checks the leaders on `holdout`.
 
+use rts_sim::rng::PortableRng;
 mod fight;
 mod report;
 mod scenario;
@@ -20,7 +21,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process;
 
-use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
 use rayon::prelude::*;
@@ -396,7 +396,7 @@ struct SweepReport {
 /// Random search over planner parameters: rank on `train`, re-check the leaders on `holdout`,
 /// then write a full evaluation (with loss replays) for the train champion.
 fn run_sweep(config: &CliConfig, trials: u32) -> Result<(), String> {
-    let mut rng = SmallRng::seed_from_u64(config.sweep_seed);
+    let mut rng = PortableRng::seed_from_u64(config.sweep_seed);
     let mut candidates: Vec<(String, RifleSquadParams)> = vec![
         ("naive".to_string(), RifleSquadParams::naive()),
         ("micro".to_string(), RifleSquadParams::micro()),
@@ -522,7 +522,7 @@ fn run_sweep(config: &CliConfig, trials: u32) -> Result<(), String> {
 }
 
 /// `base` with one to three settings replaced by random draws.
-fn mutated_params(base: RifleSquadParams, rng: &mut SmallRng) -> RifleSquadParams {
+fn mutated_params(base: RifleSquadParams, rng: &mut PortableRng) -> RifleSquadParams {
     let donor = random_params(rng);
     let mut keys = RifleSquadParams::KEYS.to_vec();
     keys.shuffle(rng);
@@ -533,8 +533,8 @@ fn mutated_params(base: RifleSquadParams, rng: &mut SmallRng) -> RifleSquadParam
     params
 }
 
-fn random_params(rng: &mut SmallRng) -> RifleSquadParams {
-    let pick = |rng: &mut SmallRng, values: &[f32]| *values.choose(rng).unwrap_or(&0.0);
+fn random_params(rng: &mut PortableRng) -> RifleSquadParams {
+    let pick = |rng: &mut PortableRng, values: &[f32]| *values.choose(rng).unwrap_or(&0.0);
     RifleSquadParams {
         focus: *[
             FocusMode::Weakest,

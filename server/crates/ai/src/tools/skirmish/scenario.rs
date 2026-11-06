@@ -6,9 +6,9 @@
 //! sideways to vary the approach angle. Seeds add a few pixels of deterministic jitter so mirror
 //! fights are not decided by exact symmetry.
 
+use rts_sim::rng::PortableRng;
 use std::collections::BTreeSet;
 
-use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 use serde::Serialize;
 
@@ -204,7 +204,7 @@ pub(crate) fn place_squads(scenario: &Scenario, input: &PlacementInput) -> Place
         center.0 + axis.0 * half_gap + side.0 * lateral,
         center.1 + axis.1 * half_gap + side.1 * lateral,
     );
-    let mut rng = SmallRng::seed_from_u64(u64::from(input.seed) ^ fnv(scenario.id.as_bytes()));
+    let mut rng = PortableRng::seed_from_u64(u64::from(input.seed) ^ fnv(scenario.id.as_bytes()));
     let tiles_wide = (input.world_px.0 / tile).floor().max(1.0) as i32;
     let tiles_high = (input.world_px.1 / tile).floor().max(1.0) as i32;
     let mut taken: BTreeSet<(i32, i32)> = BTreeSet::new();

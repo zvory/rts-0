@@ -1,7 +1,8 @@
 use super::*;
 use crate::game::entity::EntityKind;
+use crate::rng::PortableRng;
 use crate::rules::combat::{weapon_profile, WeaponKind};
-use rand::{rngs::SmallRng, SeedableRng};
+use rand::SeedableRng;
 
 #[test]
 fn direct_and_ray_weapons_share_reveal_attribution_alert_and_reload_effects() {
@@ -30,7 +31,7 @@ fn direct_and_ray_weapons_share_reveal_attribution_alert_and_reload_effects() {
         let spatial = SpatialIndex::build(&entities, 16, 16);
         let blockers = ShotBlockerIndex::build(&map, &entities);
         let smokes = SmokeCloudStore::new();
-        let mut rng = SmallRng::seed_from_u64(1);
+        let mut rng = PortableRng::seed_from_u64(1);
         let mut events = HashMap::from([(1, vec![]), (2, vec![]), (3, vec![]), (4, vec![])]);
         let mut reveals = vec![];
         let weapon = weapon_profile(weapon).unwrap();

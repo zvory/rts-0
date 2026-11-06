@@ -1,4 +1,5 @@
 use super::*;
+use crate::rng::PortableRng;
 
 #[test]
 fn tank_he_preserves_primary_and_splashes_once_with_direct_trench_reduction() {
@@ -42,7 +43,7 @@ fn tank_he_preserves_primary_and_splashes_once_with_direct_trench_reduction() {
                 let teams = default_team_relations();
                 let fog = visible_fog(&map, &entities);
                 let mut events = HashMap::from([(1, Vec::new()), (2, Vec::new()), (3, Vec::new())]);
-                let mut rng = SmallRng::seed_from_u64(0);
+                let mut rng = PortableRng::seed_from_u64(0);
                 let blockers = ShotBlockerIndex::build(&map, &entities);
                 let weapon =
                     combat_rules::weapon_profile(combat_rules::WeaponKind::TankCannon).unwrap();

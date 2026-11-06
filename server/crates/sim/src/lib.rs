@@ -7,6 +7,7 @@
 pub mod game;
 pub mod perf;
 pub mod protocol;
+pub mod rng;
 
 mod command_budget;
 pub(crate) mod config;

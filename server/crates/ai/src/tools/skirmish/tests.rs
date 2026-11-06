@@ -1,3 +1,4 @@
+use rts_sim::rng::PortableRng;
 use std::collections::BTreeSet;
 
 use super::fight::{run_fight, ControllerSpec, FightOutcome, FightSpec, ReplayPolicy};
@@ -71,7 +72,7 @@ fn bad_arguments_are_rejected() {
 #[test]
 fn mutation_changes_at_most_three_settings_of_the_base() {
     let base = RifleSquadParams::micro();
-    let mut rng = SmallRng::seed_from_u64(9);
+    let mut rng = PortableRng::seed_from_u64(9);
     for _ in 0..64 {
         let mutated = mutated_params(base, &mut rng);
         let changed = RifleSquadParams::KEYS
