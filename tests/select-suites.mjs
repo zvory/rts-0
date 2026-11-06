@@ -527,7 +527,11 @@ function verifyNextestPolicy(failures) {
           failures.push(`${file}:${index + 1} mentions retired ${label}`);
         }
       }
-      if (plainCargoTest.test(line)) {
+      // nextest cannot execute wasm-bindgen's Node runner. Keep this exception scoped
+      // to the cross-target RNG fixture; native Rust suites still require nextest.
+      const wasmRngFixture = file === ".github/workflows/main-tests.yml"
+        && line.trim() === `run: ${cargoTest} --manifest-path server/Cargo.toml -p rts-sim --target wasm32-unknown-unknown --test rng_portability --locked`;
+      if (plainCargoTest.test(line) && !wasmRngFixture) {
         failures.push(`${file}:${index + 1} mentions built-in Rust test command outside doctest guidance`);
       }
     });
