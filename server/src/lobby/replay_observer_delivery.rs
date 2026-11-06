@@ -33,7 +33,7 @@ impl RoomTask {
         recipient_ids: impl IntoIterator<Item = u32>,
         replace: bool,
     ) {
-        if session.artifact.players.len() != 2 {
+        if !(2..=4).contains(&session.artifact.players.len()) {
             return;
         }
         let samples = if replace {
@@ -43,7 +43,7 @@ impl RoomTask {
                 .resource_history
                 .samples
                 .last()
-                .copied()
+                .cloned()
                 .into_iter()
                 .collect()
         };

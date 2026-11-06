@@ -1,3 +1,4 @@
+// replayResourceHistory also carries players[] with id, lifetimeSteel/lifetimeOil and absolute steel/oil, aliveSteel/aliveOil, lostSteel/lostOil, unitSteel/unitOil values for up to four players.
 // replayResourceHistory samples carry signed steel/oil collection and aliveSteel/aliveOil lifetime-minus-loss advantages, lostSteel/lostOil destroyed-value differences, and unitSteel/unitOil current-army-value differences.
 // Wire protocol — JavaScript mirror of `server/crates/protocol/src/lib.rs`.
 // See docs/design/protocol.md.
@@ -323,7 +324,8 @@ export const cmd = Object.freeze({
     withQueued({ c: CMD.DECONSTRUCT, units, target }, queued),
   setupAntiTankGuns: (units, x, y, queued = false) =>
     withQueued({ c: CMD.SETUP_ANTI_TANK_GUNS, units, x, y }, queued),
-  pointTanks: (units, x, y) => ({ c: CMD.POINT_TANKS, units, x, y }),
+  pointTanks: (units, x, y, queued = false) =>
+    withQueued({ c: CMD.POINT_TANKS, units, x, y }, queued),
   tearDownAntiTankGuns: (units) => ({ c: CMD.TEAR_DOWN_ANTI_TANK_GUNS, units }),
   charge: (units) => ({ c: CMD.CHARGE, units }),
   useAbility: (ability, units, x = null, y = null, queued = false) => {

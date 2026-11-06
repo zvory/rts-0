@@ -188,6 +188,8 @@ pub enum Command {
         units: Vec<u32>,
         x: f32,
         y: f32,
+        #[serde(default, skip_serializing_if = "is_false")]
+        queued: bool,
     },
     Stop {
         units: Vec<u32>,

@@ -274,14 +274,16 @@ fn observer_analysis_reports_authoritative_inventory_production_and_losses() {
     assert!(player_two
         .buildings_lost
         .iter()
-        .any(|row| row.kind == "pump_jack" && row.count == 1 && row.oil_value == 0));
+        .any(|row| row.kind == "pump_jack"
+            && row.count == 1
+            && row.steel_value == 0
+            && row.oil_value == 0));
     assert!(player_two
         .buildings_lost
         .iter()
         .any(|row| row.kind == "depot" && row.count == 1 && row.steel_value > 0));
-    let expected_steel = economy_rules::cost(EntityKind::Worker).0
-        + economy_rules::cost(EntityKind::Depot).0
-        + economy_rules::cost(EntityKind::PumpJack).0;
+    let expected_steel =
+        economy_rules::cost(EntityKind::Worker).0 + economy_rules::cost(EntityKind::Depot).0;
     let expected_oil =
         economy_rules::cost(EntityKind::Worker).1 + economy_rules::cost(EntityKind::Depot).1;
     assert_eq!(player_two.resources_lost.steel, expected_steel);

@@ -67,3 +67,14 @@
   font-size: 11px;
   font-weight: 900;
 }
+
+.replay-resource-history-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 11px;
+}
+
+.replay-resource-player-chart svg {
+  background: rgba(0, 0, 0, 0.12);
+}

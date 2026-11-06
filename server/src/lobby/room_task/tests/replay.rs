@@ -452,13 +452,13 @@ fn replay_metric_history_tracks_current_unit_value() {
     let mut game = replay_test_game(&replay_test_players(2), 0x5150_2202);
     let mut history = ReplayResourceHistory::default();
     history.record(&game);
-    let before = *history.samples.last().unwrap();
+    let before = history.samples.last().unwrap().clone();
     let tank = spawn_replay_test_entity(&mut game, 1, EntityKind::Tank, tile_center(8, 8));
     for _ in 0..30 {
         game.tick();
     }
     history.record(&game);
-    let after = *history.samples.last().unwrap();
+    let after = history.samples.last().unwrap().clone();
     assert!(after.unit_steel > before.unit_steel);
     assert!(after.unit_oil > before.unit_oil);
     let analysis = game.observer_analysis();
@@ -1422,4 +1422,72 @@ fn replay_membership_notices_are_immediate_and_not_repeated() {
             assert!(existing.reliable_rx.try_recv().is_err());
         }
     }
+}
+
+#[test]
+fn replay_metric_history_tracks_four_players_and_rewinds() {
+    use crate::lobby::replay_resource_history::ReplayResourceHistory;
+
+    let mut players = replay_test_players(4);
+    for player in &mut players {
+        player.team_id = if player.id <= 2 { 1 } else { 2 };
+    }
+    let mut game = Game::new(&players, 0x5150_2204);
+    let mut history = ReplayResourceHistory::default();
+    history.record(&game);
+    let before = history.samples[0].clone();
+    spawn_replay_test_entity(&mut game, 4, EntityKind::Tank, tile_center(8, 8));
+    for _ in 0..240 {
+        game.tick();
+        history.record(&game);
+    }
+    let after = history.samples.last().unwrap();
+    assert_eq!(
+        after.players.iter().map(|row| row.id).collect::<Vec<_>>(),
+        vec![1, 2, 3, 4]
+    );
+    assert!(after.players[3].unit_steel > before.players[3].unit_steel);
+    let baseline = &history.samples[0];
+    for player in &game.observer_analysis().players {
+        let row = after
+            .players
+            .iter()
+            .find(|row| row.id == player.id)
+            .unwrap();
+        let prior = baseline
+            .players
+            .iter()
+            .find(|row| row.id == player.id)
+            .unwrap();
+        assert_eq!(
+            row.lifetime_steel,
+            i64::from(player.resources.lifetime.steel)
+        );
+        assert_eq!(row.steel, row.lifetime_steel - prior.lifetime_steel);
+        assert_eq!(
+            row.alive_steel,
+            row.lifetime_steel - i64::from(player.resources_lost.steel)
+        );
+        assert_eq!(
+            row.unit_steel,
+            player
+                .units
+                .iter()
+                .map(|unit| i64::from(unit.steel_value))
+                .sum::<i64>()
+        );
+    }
+    history.truncate(120);
+    assert_eq!(history.samples.last().unwrap().tick, 120);
+    assert!(history
+        .samples
+        .iter()
+        .all(|sample| sample.players.len() == 4));
+    let wire = serde_json::to_value(crate::protocol::ServerMessage::ReplayResourceHistory {
+        replace: true,
+        samples: history.samples,
+    })
+    .unwrap();
+    assert_eq!(wire["samples"][0]["players"][3]["id"], 4);
+    assert!(wire["samples"][0]["players"][3]["aliveSteel"].is_i64());
 }

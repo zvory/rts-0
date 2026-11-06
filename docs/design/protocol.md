@@ -61,10 +61,11 @@ but the server assigns lobby/start colors and the client keeps a fallback/render
 cross-surface guard intentionally lives with the protocol parity smoke test until a structured
 lobby/config dump replaces the source scrape.
 
-`pointTanks { units, x, y }` is an immediate tank-only command. The server validates the unit
+`pointTanks { units, x, y, queued? }` is a tank-only command; `queued` defaults to false. The server validates the unit
 list and computes one heading from the eligible tanks’ centroid to the world point. It clears
-active/queued orders and holds the hulls at that heading using normal turn speed. A click at
-the centroid is a no-op. It has no queued form, research requirement, cost, or cooldown.
+active/queued orders for immediate issue, or appends a bounded queued heading when `queued` is true.
+Hulls use normal turn speed; following orders wait for alignment. A click at the centroid is a no-op.
+It has no research requirement, cost, or cooldown.
 
 ### 2.1 Client → Server (`ClientMessage`)
 
@@ -390,7 +391,7 @@ transport/browser/prediction/render behavior, not as gameplay authority.
 | `matchCountdown` | `countdownId: u32`, `durationMs: u32`, `words: string[]` — reliable pre-match countdown sent to every lobby participant after the host starts and before `start`. Active human clients begin warming their renderer when they become ready, then acknowledge this exact nonzero countdown generation with `matchLoadReady` once warmup completes. During this interval the server keeps the room in lobby setup, disables `canStart`, freezes lobby edits, and rejects new joins. At expiry it sends `start` only if every active human acknowledged; otherwise it returns the room to editable lobby state and broadcasts `<name> failed to load the game.` Spectators and AI do not block launch. |
 | `start`    | `Game start payload` (see 2.3). |
 | `snapshot` | `Per-player snapshot` (see 2.4). |
-| `replayResourceHistory` | `replace: bool`, `samples: [{ tick: u32, steel: i64, oil: i64, aliveSteel: i64, aliveOil: i64, lostSteel: i64, lostOil: i64, unitSteel: i64, unitOil: i64 }]` — reliable replay-only collection, alive-resource, destroyed-value, and current-army-value comparison timeline for 1v1 viewers. A full replacement is sent on join and after seek; one sample is appended per replay second (`steel`/`oil`: trailing 8-second collection advantage; `aliveSteel`/`aliveOil`: lifetime mined minus destroyed value, `lostSteel`/`lostOil`: cumulative destroyed unit and building value; `unitSteel`/`unitOil`: summed current unit value; all fields are first player minus second in ascending player-id order) during ordinary playback. Samples span from replay start through the current tick and are not subject to the latest-only observer-analysis lane. |
+| `replayResourceHistory` | `replace: bool`, `samples: [{ tick: u32, steel: i64, oil: i64, aliveSteel: i64, aliveOil: i64, lostSteel: i64, lostOil: i64, unitSteel: i64, unitOil: i64, players: [{ id: u32, lifetimeSteel: i64, lifetimeOil: i64, steel: i64, oil: i64, aliveSteel: i64, aliveOil: i64, lostSteel: i64, lostOil: i64, unitSteel: i64, unitOil: i64 }] }]` — reliable replay-only collection, alive-resource, destroyed-value, and current-army-value comparison timeline for two to four players. The `players` series contains absolute individual values, including lifetime mined totals; collection is the trailing eight-second income (zero until a window baseline exists). A full replacement is sent on join and after seek; one sample is appended per replay second (`steel`/`oil`: trailing 8-second collection advantage; `aliveSteel`/`aliveOil`: lifetime mined minus destroyed value, `lostSteel`/`lostOil`: cumulative destroyed unit and building value; `unitSteel`/`unitOil`: summed current unit value; top-level metric fields are first player minus second in ascending player-id order) during ordinary playback. Samples span from replay start through the current tick and are not subject to the latest-only observer-analysis lane. |
 | `groundDecals` | `requestId: u32`, `revision: u32`, `decals: GroundDecalView[]`, `tankTrails: TankTrailView[]` — reliable fog/observer-scoped delta response. `requestId` echoes the request so stale pre-seek or pre-view-change responses cannot enter the current cache. A trail row carries an immutable chunk `id` and sparse `[xQuarterPx, yQuarterPx, headingI16]` poses; these wire units remain stable even though historical poses are deliberately coarsened before projection. The server discloses a historical chunk when its indexed swept bounds first intersect current team vision. As an explicit best-effort-cosmetic exception to positional fog secrecy, the client may therefore hold nearby hidden tread geometry from that bounded chunk; no live entity or command state is included. It reconstructs and permanently rasterizes the approximate swept left/right tread footprint only inside individual currently visible map tiles. Ordinary decal rows carry `id`, `decalClass`, `sourceKind`, `x`, `y`, `owner`, `seed`, and optional `facing`, `weaponFacing`, or `radiusTiles`. |
 | `roomTimeState` | `Room-controlled time state` (see 2.6). |
 | `roomTimeSeekStarted` | `controllerId: u32`, `fromTick: u32`, `targetTick: u32` — reliable broadcast to every replay viewer immediately before an accepted shared replay seek resets timeline-derived presentation and begins incremental fast-forward. Rejected and rate-limited seeks do not emit it. |
@@ -1016,6 +1017,7 @@ snapshot `orderPlan` is the only authoritative queued-plan contract and stale lo
 reconcile to it. Each compact stage is `[kind, x, y]`, where `kind` uses the `orderStage` compact
 code table above. Build stages append a fourth `buildingKind` kind code, forming
 `[kind, x, y, buildingKind]`; other stages retain three fields.
+Tank Point stores a heading rather than a destination and is omitted from these positional markers.
 Stages carry safe world points only, never target ids; hidden attack target stages may be omitted
 rather than leaking enemy positions through fog. Production building rally points are exposed
 separately through `rally` and `rallyPlan` and are not part of `orderPlan`. `rallyPlan` is appended
@@ -1900,7 +1902,9 @@ the total item count for a queue.
 `steelValue` and `oilValue` are aggregate row values (`count * configured cost`), not per-unit
 costs. `unitsLost` is the authoritative unit-death count by kind. `buildingsLost` is the
 authoritative building-death count by kind and is omitted when empty; zero-cost resource extractors
-still appear with zero aggregate value. `resourcesLost` is the spent steel/oil value of units and
+still appear with zero aggregate value. Pump Jack losses always have zero steel/oil value, including
+manually built Pump Jacks, because loss history does not track construction origin.
+`resourcesLost` uses the same loss valuation (excluding Pump Jack costs) for units and
 buildings that died; it does not include current spending, cancelled production, refunds,
 harvesting, or stockpile deltas.
 `resources` is authoritative mined income: `lifetime` counts all worker/golem harvest and Pump Jack

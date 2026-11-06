@@ -584,8 +584,11 @@ Map policy:
   or silently accepting a nearby map.
 
 Concealment applies to units, not buildings or doodads. Sight rays traverse at most four
-concealment tiles, excluding the origin and including the target, while weapon line of fire remains
-unrestricted by concealment. This lets a unit at a forest edge retain normal outward vision while
+concealment tiles, excluding the origin and including the target. Direct-fire rays use the same
+four-tile depth into cover and stop when leaving concealment entered along the ray: a visible unit
+inside a forest can be shot, but units and buildings beyond it cannot, even with a plane, ally, or
+side spotter revealing them. The origin tile is ignored so units at the forest edge can fire outward.
+Mortars retain indirect fire and do not require a clear direct-fire ray. This lets a unit at a forest edge retain normal outward vision while
 limiting vision through a forest interior. Owners and allies always receive their units. Enemy
 projection, auto-acquisition, explicit attack validation, and retained targets reject a concealed
 unit unless a hostile unit is within two tiles measured between body edges, or that unit has fired.
@@ -1348,11 +1351,14 @@ spatial indexes across later mutations.
 
 Tank Point (`SimCommand::PointTanks`) filters to living owned tanks after ordinary command
 admission, then calculates a shared heading from their centroid to the clicked world point.
-It replaces active and queued orders with checkpoint-serialized `Order::Point { facing }`.
+Immediate issue replaces active and queued orders with checkpoint-serialized `Order::Point { facing }`.
+Shift issue appends checkpoint-serialized `OrderIntent::Point { facing }` within the ordinary queue
+limit, preserving the active order and earlier intents. The shared heading is resolved at issue time.
 Movement pivots in place at the ordinary tank hull turn rate, checking static standability
 at every step; blocked hulls wait for clearance. The stance holds ground, allows automatic
 turret fire, and suppresses automatic armor-reaction hull turns until another order replaces it.
-It is immediate even with Shift; a target at the centroid leaves existing orders unchanged.
+Following queued orders wait until the hull reaches the requested heading; Point holds indefinitely
+when no follow-up exists. A target at the centroid leaves existing orders unchanged.
 
 
 Rocket Truck barrage orders require the target to be within the existing 10–44 tile
@@ -1894,8 +1900,8 @@ auto-acquisition, snapshot projection, and direct fire share the same range pred
 auto-acquisition and firing otherwise use the smoke-aware LOS query; explicit attack orders remain
 stationary behind terrain, smoke, or entity blockers and cannot fire until the shot is clear. Direct-fire shot
 projection also checks hard entity blockers: tanks and non-Tank-Trap building footprints intercept
-shots, while Tank Traps do not. Future forest visibility/cover rules should extend the terrain rules
-and this service instead of adding ad hoc checks to fog or combat.
+shots, while Tank Traps do not. Forest direct-fire blocking also applies to secondary weapons,
+Panzerfaust launch checks, and machine-gun burst endpoints through the shared LOS service.
 
 `Game` samples raw live fog per player every second simulation tick (15 Hz). Command validation,
 combat targeting, event visibility, building-memory refreshes, and snapshots all consume the same

@@ -161,6 +161,22 @@ where
         {
             continue;
         }
+        // Try the public landmark itself before optimizing nearby resource distances.
+        // Rush inherits this policy when it hands over to Pressure.
+        let kind = EntityKind::ResourceDepot;
+        let ts = observation.map.tile_size.max(1) as f32;
+        let center_tile = (
+            (base.site.position.0 / ts).floor() as u32,
+            (base.site.position.1 / ts).floor() as u32,
+        );
+        if let Some(tile) = geometry::footprint_top_left_for_center(center_tile, kind) {
+            if expansion::expansion_site_candidate(observation, kind, tile.0, tile.1, &cluster)
+                .is_some()
+                && placeable(kind, tile.0, tile.1)
+            {
+                return Some(tile);
+            }
+        }
         if let Some(tile) = expansion::generic_expansion_depot_site(
             observation,
             policy,

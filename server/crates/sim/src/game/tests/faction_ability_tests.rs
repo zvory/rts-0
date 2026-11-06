@@ -546,13 +546,14 @@ fn command_car_passive_aura_uses_configured_speed_and_has_no_smoke_bonus() {
 }
 
 #[test]
-fn rocket_truck_training_requires_research_and_existing_completed_owned_vehicle_works() {
+fn rocket_truck_training_requires_research_but_not_vehicle_works() {
     for (researched, factory_state, allowed) in [
+        (false, "missing", false),
         (false, "complete", false),
-        (true, "missing", false),
-        (true, "unfinished", false),
-        (true, "enemy", false),
-        (true, "destroyed", false),
+        (true, "missing", true),
+        (true, "unfinished", true),
+        (true, "enemy", true),
+        (true, "destroyed", true),
         (true, "complete", true),
     ] {
         let players = [PlayerInit {
