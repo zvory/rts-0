@@ -62,6 +62,8 @@ pub(in crate::ai_core::decision) struct NaturalMemory {
     pub(in crate::ai_core::decision) support: BTreeMap<u32, u32>,
     /// Supporters home defense holds, and since when (`postreturn`).
     away: BTreeMap<u32, u32>,
+    /// Each supporter's post (`natseat`).
+    seats: BTreeMap<u32, (i32, i32)>,
 }
 
 impl NaturalMemory {
@@ -134,6 +136,7 @@ pub(in crate::ai_core::decision) fn support(
     else {
         memory.jeff_v1_1.natural.support.clear();
         memory.jeff_v1_1.natural.away.clear();
+        memory.jeff_v1_1.natural.seats.clear();
         return;
     };
     let main = tile_center(observation.own_start_tile, observation.map.tile_size);
@@ -250,6 +253,7 @@ pub(in crate::ai_core::decision) fn support(
         }
     }
     let previous = std::mem::take(&mut memory.jeff_v1_1.natural.support);
+    let previous_seats = std::mem::take(&mut memory.jeff_v1_1.natural.seats);
     memory.jeff_v1_1.natural.away = away;
     if members.is_empty() {
         return;
@@ -286,9 +290,21 @@ pub(in crate::ai_core::decision) fn support(
         })
     };
     members.sort_by(|a, b| lateral(a).total_cmp(&lateral(b)).then(a.cmp(b)));
+    let seated: Vec<(u32, (f32, f32))> = if super::off("natseat") {
+        members.iter().copied().zip(posts).collect()
+    } else {
+        stable_seats(&members, &posts, &by_id, &previous_seats, ts)
+    };
+    for (id, post) in &seated {
+        memory
+            .jeff_v1_1
+            .natural
+            .seats
+            .insert(*id, (post.0.round() as i32, post.1.round() as i32));
+    }
     let charging = memory.jeff_v1_1.charge.riflemen.clone();
     let mut sent = Vec::new();
-    for (id, post) in members.iter().zip(posts) {
+    for (id, post) in seated.iter().map(|(id, post)| (id, *post)) {
         let last = previous.get(id).copied().unwrap_or(0);
         memory.jeff_v1_1.natural.support.insert(*id, last);
         let Some(unit) = by_id.get(id) else {
@@ -319,5 +335,139 @@ pub(in crate::ai_core::decision) fn support(
     }
     if !sent.is_empty() {
         intents.push(AiIntent::Assemble { units: sent });
+    }
+}
+
+/// A supporter whose last post moved no further than this keeps it (`natseat`).
+const KEEP_SEAT_TILES: f32 = 1.5;
+
+/// Each supporter's post (`natseat`): its last one where a post still stands near it, else the post
+/// it stands on, and the rest left to right. Dealt left to right afresh every decision, the posts
+/// went round the line as the Riflemen walked: in eight traces against Rush AI 60-70% of the
+/// support's orders sent a Rifleman to another post than its last, and the line never dug in.
+fn stable_seats(
+    members: &[u32],
+    posts: &[(f32, f32)],
+    by_id: &BTreeMap<u32, &AiEntitySummary>,
+    previous: &BTreeMap<u32, (i32, i32)>,
+    ts: f32,
+) -> Vec<(u32, (f32, f32))> {
+    let mut open: Vec<Option<(f32, f32)>> = posts.iter().copied().map(Some).collect();
+    let mut seated: Vec<(u32, (f32, f32))> = Vec::new();
+    let claim = |open: &mut Vec<Option<(f32, f32)>>, from: (f32, f32), within: f32| {
+        let best = open
+            .iter()
+            .enumerate()
+            .filter_map(|(index, post)| post.map(|post| (index, post)))
+            .filter(|(_, post)| dist2(post.0, post.1, from.0, from.1) <= squared(within * ts))
+            .min_by(|a, b| {
+                dist2(a.1 .0, a.1 .1, from.0, from.1)
+                    .total_cmp(&dist2(b.1 .0, b.1 .1, from.0, from.1))
+                    .then(a.0.cmp(&b.0))
+            })?;
+        open[best.0] = None;
+        Some(best.1)
+    };
+    let mut left: Vec<u32> = Vec::new();
+    for id in members {
+        let kept = previous
+            .get(id)
+            .and_then(|at| claim(&mut open, (at.0 as f32, at.1 as f32), KEEP_SEAT_TILES));
+        match kept {
+            Some(post) => seated.push((*id, post)),
+            None => left.push(*id),
+        }
+    }
+    let mut rest: Vec<u32> = Vec::new();
+    for id in left {
+        let on = by_id
+            .get(&id)
+            .and_then(|unit| claim(&mut open, (unit.x, unit.y), ON_POST_TILES));
+        match on {
+            Some(post) => seated.push((id, post)),
+            None => rest.push(id),
+        }
+    }
+    // `members` is already left to right, and so are the posts within each rank.
+    for (id, post) in rest.into_iter().zip(open.into_iter().flatten()) {
+        seated.push((id, post));
+    }
+    seated
+}
+
+/// Extra room kept between Jeff's units and the natural's Depot footprint (`siteclear`).
+const SITE_CLEAR_TILES: f32 = 1.0;
+
+/// Moves Jeff's own units off the natural's Depot footprint while an Engineer is on its way to build
+/// it (`siteclear`): the order fails with a unit standing there. On Classic against Rush AI the third
+/// scouts' rear Rifleman waited on a waypoint in the middle of the site and home defense rallied 12
+/// Riflemen onto its edge; the 6:56 order failed and the natural never stood.
+pub(in crate::ai_core::decision) fn clear_site(
+    (actions, observation, _map_analysis, intents): opening_rush::LiveStep<'_, '_, '_, '_>,
+    memory: &AiDecisionMemory,
+    profile_id: &str,
+) {
+    if !is_jeff_v1_1(profile_id) || super::off("siteclear") {
+        return;
+    }
+    let Some(site) = memory.expansion_security.site else {
+        return;
+    };
+    if !memory.expansion_security.attempting() {
+        return;
+    }
+    let Some(stats) = config::building_stats(EntityKind::ResourceDepot) else {
+        return;
+    };
+    let ts = observation.map.tile_size as f32;
+    let rect = (
+        site.0 as f32 * ts,
+        site.1 as f32 * ts,
+        site.0.saturating_add(stats.foot_w) as f32 * ts,
+        site.1.saturating_add(stats.foot_h) as f32 * ts,
+    );
+    let inside = |x: f32, y: f32| x >= rect.0 && x <= rect.2 && y >= rect.1 && y <= rect.3;
+    if observation
+        .owned
+        .iter()
+        .any(|unit| unit.kind == EntityKind::ResourceDepot && unit.hp > 0 && inside(unit.x, unit.y))
+    {
+        return;
+    }
+    let mut moved = Vec::new();
+    for unit in observation
+        .owned
+        .iter()
+        .filter(|unit| unit.kind.is_unit() && unit.kind != EntityKind::Worker && unit.hp > 0)
+    {
+        let room = rts_rules::balance::unit_placement_radius(unit.kind) + SITE_CLEAR_TILES * ts;
+        let grown = (rect.0 - room, rect.1 - room, rect.2 + room, rect.3 + room);
+        if unit.x <= grown.0 || unit.x >= grown.2 || unit.y <= grown.1 || unit.y >= grown.3 {
+            continue;
+        }
+        // Out over the nearest edge, a quarter tile past the room kept.
+        let step = 0.25 * ts;
+        let exits = [
+            (unit.x - grown.0, (grown.0 - step, unit.y)),
+            (grown.2 - unit.x, (grown.2 + step, unit.y)),
+            (unit.y - grown.1, (unit.x, grown.1 - step)),
+            (grown.3 - unit.y, (unit.x, grown.3 + step)),
+        ];
+        let Some((_, out)) = exits
+            .iter()
+            .map(|(gap, point)| (*gap, clamp_to_map(*point, observation.map)))
+            .filter(|(_, point)| {
+                point.0 <= grown.0 || point.0 >= grown.2 || point.1 <= grown.1 || point.1 >= grown.3
+            })
+            .min_by(|a, b| a.0.total_cmp(&b.0))
+        else {
+            continue;
+        };
+        if let Some(units) = actions::move_units(actions, [unit.id], out.0, out.1) {
+            moved.extend(units);
+        }
+    }
+    if !moved.is_empty() {
+        intents.push(AiIntent::Move { units: moved });
     }
 }

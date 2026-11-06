@@ -77,6 +77,11 @@ impl ExpansionSecurity {
         self.retry_builder = None;
     }
 
+    /// Whether an Engineer is on its way to build the natural's Depot.
+    pub(super) fn attempting(&self) -> bool {
+        self.build_attempt_tick.is_some()
+    }
+
     pub(super) fn retry_builder(&self) -> Option<u32> {
         self.retry_builder
     }

@@ -1749,6 +1749,10 @@ where
     let live = (&mut actions, observation, map_analysis, &mut intents);
     jeff_v1_1::meth_strike::strike(live, memory, profile.id);
     actions.mark("methstrike");
+    // Last of all, so no other order this decision keeps a unit on the natural's footprint.
+    let live = (&mut actions, observation, map_analysis, &mut intents);
+    jeff_v1_1::natural::clear_site(live, memory, profile.id);
+    actions.mark("siteclear");
 
     actions.mark("rest");
     let trace = build_manager_trace(TraceInput {
