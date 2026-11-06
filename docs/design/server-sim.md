@@ -555,9 +555,10 @@ after any draw. Combat call order is unchanged: conditional miss checks and MG s
 consume the same stream in system/entity iteration order. Sampling is pinned to `rand =0.8.6`:
 f32 standard draws use the upper 24 bits of a u32, MG spread uses its inclusive f32 uniform
 sampler, and start-location Fisher-Yates shuffle uses its u32 index sampler (map sizes fit u32).
-Seeded AI/profile selection and tools also use `PortableRng`; profile indexing explicitly samples
-u32 rather than platform-sized usize. Changes to expansion, sampling, or draw order require a new
-algorithm identifier and compatibility review. Fixed answer tests run natively and under WASM.
+Seeded AI/profile selection and tools also use `PortableRng`; random live-profile indexing retains
+its existing usize sampler to preserve AI behavior and is outside the cross-target contract.
+Changes to expansion, sampling, or draw order require a new algorithm identifier and compatibility
+review. Fixed answer tests run natively and under WASM.
 
 The former `rts-small-rng-0.8-draws-v1` descriptor is rejected by the existing incompatible-algorithm
 error, because its stream was target-dependent. The checkpoint JSON shape/version is unchanged;
