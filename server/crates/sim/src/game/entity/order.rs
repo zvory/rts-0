@@ -176,6 +176,10 @@ impl Order {
 /// progress, or target latch state.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum OrderIntent {
+    /// Shared tank heading resolved at command issue; completes once the hull is aligned.
+    Point {
+        facing: f32,
+    },
     Move(PointIntent),
     AttackMove(PointIntent),
     ClearObstacleArea(ClearObstacleAreaIntent),

@@ -324,7 +324,8 @@ export const cmd = Object.freeze({
     withQueued({ c: CMD.DECONSTRUCT, units, target }, queued),
   setupAntiTankGuns: (units, x, y, queued = false) =>
     withQueued({ c: CMD.SETUP_ANTI_TANK_GUNS, units, x, y }, queued),
-  pointTanks: (units, x, y) => ({ c: CMD.POINT_TANKS, units, x, y }),
+  pointTanks: (units, x, y, queued = false) =>
+    withQueued({ c: CMD.POINT_TANKS, units, x, y }, queued),
   tearDownAntiTankGuns: (units) => ({ c: CMD.TEAR_DOWN_ANTI_TANK_GUNS, units }),
   charge: (units) => ({ c: CMD.CHARGE, units }),
   useAbility: (ability, units, x = null, y = null, queued = false) => {

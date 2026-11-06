@@ -53,3 +53,31 @@ fn queued_attack_promotes_owned_targets() {
     );
     assert!(unit.queued_orders().is_empty());
 }
+
+#[test]
+fn stationary_attack_that_cannot_fire_promotes_next_queued_order() {
+    let map = flat_map(32);
+    let mut entities = EntityStore::new();
+    let attacker = entities
+        .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
+        .expect("rifleman should spawn");
+    let target = entities
+        .spawn_unit(2, EntityKind::Rifleman, 700.0, 100.0)
+        .expect("target should spawn");
+    {
+        let unit = entities.get_mut(attacker).expect("attacker should exist");
+        unit.set_order(Order::attack(target));
+        unit.set_target_id(Some(target));
+        unit.append_queued_order(OrderIntent::move_to(220.0, 100.0));
+    }
+    let players = vec![player_state(1), player_state(2)];
+
+    promote_with_players(&map, &mut entities, &players);
+
+    let unit = entities.get(attacker).expect("attacker should exist");
+    assert!(
+        matches!(unit.order(), Order::Move(_)),
+        "a stationary attack that cannot fire should not stall the queued move forever"
+    );
+    assert!(unit.queued_orders().is_empty());
+}

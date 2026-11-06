@@ -450,13 +450,32 @@ pub(in crate::game) fn apply_commands(
                     command_admission
                 );
             }
-            SimCommand::PointTanks { units, x, y } => {
+            SimCommand::PointTanks {
+                units,
+                x,
+                y,
+                queued,
+            } => {
                 let Some(units) =
                     validate_command_units(entities, events, player, units, command_admission)
                 else {
                     continue;
                 };
-                tank_point::apply(entities, player, &units, x, y);
+                let Some((units, facing)) = tank_point::heading(entities, player, &units, x, y)
+                else {
+                    continue;
+                };
+                let request = planner::OrderRequest {
+                    units: units.clone(),
+                    mode: issue_mode(queued),
+                    order: planner::RequestedOrder::Point { facing },
+                };
+                apply_planned!(
+                    player,
+                    admission_facts!(player, &faction_id, command_admission, units, None),
+                    &request,
+                    command_admission
+                );
             }
             SimCommand::SetupAntiTankGuns {
                 units,
@@ -884,6 +903,14 @@ mod planned_actions {
                         if immediate_unit_can_replace(entities, player, unit) {
                             clear_obstacle_area = Some((anchor, (center.x, center.y)));
                             clear_obstacle_area_units.push(unit);
+                        }
+                    }
+                    planner::OrderIntent::Point { facing } => {
+                        if immediate_unit_can_replace(entities, player, unit) {
+                            if let Some(e) = entities.get_mut(unit) {
+                                e.hold_position();
+                                e.set_order(Order::Point { facing });
+                            }
                         }
                     }
                     planner::OrderIntent::HoldPosition => {

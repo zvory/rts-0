@@ -1373,8 +1373,8 @@ export class Minimap {
     if (commandTarget === "pointTanks") {
       const tanks = sel.filter((e) => ownOwner(this.state, e.owner, this.controlPolicy) && e.kind === KIND.TANK);
       if (tanks.length > 0) {
-        this.commandInteraction.issueCommand(cmd.pointTanks(tanks.map((e) => e.id), wx, wy));
-        this._addCommandFeedback("move", wx, wy, false);
+        this.commandInteraction.issueCommand(cmd.pointTanks(tanks.map((e) => e.id), wx, wy, queued));
+        this._addCommandFeedback("move", wx, wy, queued);
       }
       return;
     }

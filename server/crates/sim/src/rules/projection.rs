@@ -658,6 +658,7 @@ fn intent_plan_marker(
     smokes: Option<&SmokeCloudStore>,
 ) -> Option<OrderPlanMarker> {
     match intent {
+        OrderIntent::Point { .. } => None,
         OrderIntent::Move(point) => point_marker("move", point.x, point.y),
         OrderIntent::AttackMove(point) => point_marker("attackMove", point.x, point.y),
         OrderIntent::ClearObstacleArea(intent) => {
