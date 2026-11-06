@@ -284,7 +284,7 @@ export const ABILITIES = Object.freeze({
     targetMode: "worldPoint",
     rangeTiles: ROCKET_BARRAGE_MAX_RANGE_TILES,
     minRangeTiles: ROCKET_BARRAGE_MIN_RANGE_TILES,
-    cooldownTicks: TICK_HZ * 60,
+    cooldownTicks: TICK_HZ * 30,
     charges: 1,
     cost: Object.freeze({ steel: 0, oil: 150 }),
     radiusTiles: 6,
