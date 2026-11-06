@@ -563,10 +563,18 @@ fn stamp_building_sight(
                 if tx < 0 || ty < 0 || tx as u32 >= width || ty as u32 >= height {
                     continue;
                 }
+                let index = (ty as u32 * width + tx as u32) as usize;
+                // Sight stamping only adds to this union. An earlier footprint/source already
+                // proved visible cells, so another ray cannot change their final value.
+                if grid.get(index).copied().unwrap_or(false) {
+                    continue;
+                }
                 if !los.tile_visible_from_world(origin, (tx as u32, ty as u32)) {
                     continue;
                 }
-                grid[(ty as u32 * width + tx as u32) as usize] = true;
+                if let Some(visible) = grid.get_mut(index) {
+                    *visible = true;
+                }
             }
         }
     }
@@ -599,10 +607,16 @@ fn stamp_sight_at(
             if tx < 0 || ty < 0 || tx as u32 >= width || ty as u32 >= height {
                 continue;
             }
+            let index = (ty as u32 * width + tx as u32) as usize;
+            if grid.get(index).copied().unwrap_or(false) {
+                continue;
+            }
             if !los.tile_visible_from_world((x, y), (tx as u32, ty as u32)) {
                 continue;
             }
-            grid[(ty as u32 * width + tx as u32) as usize] = true;
+            if let Some(visible) = grid.get_mut(index) {
+                *visible = true;
+            }
         }
     }
 }
