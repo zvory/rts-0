@@ -181,27 +181,32 @@ impl AiDecisionMemory {
         own: &crate::sdk::AiLosses,
         enemies: &BTreeMap<u32, crate::sdk::AiLosses>,
     ) {
-        let fighters = |losses: &crate::sdk::AiLosses| {
+        fn fighters(losses: &crate::sdk::AiLosses) -> u32 {
             losses
                 .units
                 .iter()
                 .filter(|(kind, _)| **kind != EntityKind::Worker)
                 .map(|(_, count)| *count)
                 .fold(0u32, u32::saturating_add)
-        };
-        self.jeff_v1_1.deaths = fighters(own);
-        self.jeff_v1_1.kills = enemies.values().map(fighters).fold(0u32, u32::saturating_add);
+        }
         // Every unit's cost, Oil counted twice (`tradeexpand`).
-        let value = |losses: &crate::sdk::AiLosses| {
+        fn value(losses: &crate::sdk::AiLosses) -> u32 {
             losses
                 .units
                 .iter()
                 .map(|(kind, count)| {
                     let (steel, oil) = rts_rules::economy::cost(*kind);
-                    steel.saturating_add(oil.saturating_mul(2)).saturating_mul(*count)
+                    steel
+                        .saturating_add(oil.saturating_mul(2))
+                        .saturating_mul(*count)
                 })
                 .fold(0u32, u32::saturating_add)
-        };
+        }
+        self.jeff_v1_1.deaths = fighters(own);
+        self.jeff_v1_1.kills = enemies
+            .values()
+            .map(fighters)
+            .fold(0u32, u32::saturating_add);
         self.jeff_v1_1.value_lost = value(own);
         self.jeff_v1_1.value_killed = enemies.values().map(value).fold(0u32, u32::saturating_add);
     }

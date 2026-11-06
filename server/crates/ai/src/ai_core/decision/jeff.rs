@@ -469,8 +469,12 @@ pub(super) fn live_spend_plan(
                 prepaid: jeff_v1_1::research_ahead(profile.id, facts, memory),
                 opening: facts.v1_1_opening,
                 no_guns: jeff_v1_1::no_guns(profile.id),
-                rifle_opening: jeff_v1_1::rifle_opening(profile.id)
-                    .then(|| (jeff_v1_1::natural_rifles(), jeff_v1_1::home_riflemen(observation))),
+                rifle_opening: jeff_v1_1::rifle_opening(profile.id).then(|| {
+                    (
+                        jeff_v1_1::natural_rifles(),
+                        jeff_v1_1::home_riflemen(observation),
+                    )
+                }),
             },
         )
     })
@@ -568,8 +572,7 @@ pub(super) fn cap_opening_guns(
 ) {
     // Jeff's AI V1.1 keeps building guns for its gun posts (`jeff_v1_1::gun_cap`).
     if runs_live_jeff(profile_id)
-        && (!is_jeff_v1_1(profile_id)
-            || (jeff_v1_1::off("guncap") && jeff_v1_1::off("mgline")))
+        && (!is_jeff_v1_1(profile_id) || (jeff_v1_1::off("guncap") && jeff_v1_1::off("mgline")))
         && facts.unit_count(EntityKind::Tank) > 0
     {
         for (kind, max) in max_counts {

@@ -83,9 +83,7 @@ pub(in crate::ai_core::decision) fn keep_out_of_reach(
             .collect();
         let support = tanks
             .iter()
-            .filter(|other| {
-                dist2(other.x, other.y, tank.x, tank.y) <= squared(SUPPORT_TILES * ts)
-            })
+            .filter(|other| dist2(other.x, other.y, tank.x, tank.y) <= squared(SUPPORT_TILES * ts))
             .count();
         let fired = memory
             .jeff_v1_1

@@ -551,9 +551,11 @@ fn project_entity(entity: &SdkEntity) -> AiEntitySummary {
         latched_node: entity.latched_resource,
         target_id: entity.target,
         free_for_combat: snapshot_free_for_combat(state, entity.target),
-        research: entity
-            .production
-            .and_then(|production| production.current_upgrade.map(|upgrade| (upgrade, production.progress.unwrap_or(0.0)))),
+        research: entity.production.and_then(|production| {
+            production
+                .current_upgrade
+                .map(|upgrade| (upgrade, production.progress.unwrap_or(0.0)))
+        }),
     }
 }
 

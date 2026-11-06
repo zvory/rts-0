@@ -54,7 +54,9 @@ pub(in crate::ai_core::decision) fn contest_current(
     tick: u32,
 ) -> bool {
     match contested_tick {
-        Some(seen) if profile_id.is_some_and(active) => tick.saturating_sub(seen) <= CONTEST_MEMORY_TICKS,
+        Some(seen) if profile_id.is_some_and(active) => {
+            tick.saturating_sub(seen) <= CONTEST_MEMORY_TICKS
+        }
         Some(seen) => seen == tick,
         None => false,
     }
@@ -73,20 +75,25 @@ pub(in crate::ai_core::decision) fn order(
         .iter()
         .filter(|enemy| enemy.hp > 0 && is_fighter(enemy.kind) && enemy.kind != EntityKind::Tank)
         .filter(|enemy| dist2(enemy.x, enemy.y, spot.0, spot.1) <= squared(AREA_TILES * ts))
-        .min_by(|a, b| {
-            dist2(a.x, a.y, tank.x, tank.y).total_cmp(&dist2(b.x, b.y, tank.x, tank.y))
-        });
+        .min_by(|a, b| dist2(a.x, a.y, tank.x, tank.y).total_cmp(&dist2(b.x, b.y, tank.x, tank.y)));
     let toward = |from: (f32, f32), to: (f32, f32), tiles: f32| {
         let (dx, dy) = (to.0 - from.0, to.1 - from.1);
         let len = (dx * dx + dy * dy).sqrt().max(1.0);
-        (from.0 + dx / len * tiles * ts, from.1 + dy / len * tiles * ts)
+        (
+            from.0 + dx / len * tiles * ts,
+            from.1 + dy / len * tiles * ts,
+        )
     };
     let point = match nearest {
         Some(enemy) => {
             let distance = dist2(enemy.x, enemy.y, tank.x, tank.y).sqrt() / ts;
             if distance < BACK_OFF_TILES {
                 // Straight away from it.
-                toward((tank.x, tank.y), (2.0 * tank.x - enemy.x, 2.0 * tank.y - enemy.y), BACK_STEP_TILES)
+                toward(
+                    (tank.x, tank.y),
+                    (2.0 * tank.x - enemy.x, 2.0 * tank.y - enemy.y),
+                    BACK_STEP_TILES,
+                )
             } else if distance <= HOLD_MAX_TILES {
                 if last == Some(SiegeOrder::Hold) {
                     return None;
@@ -110,7 +117,8 @@ pub(in crate::ai_core::decision) fn order(
     };
     let key = (point.0.round() as i32, point.1.round() as i32);
     if let Some(SiegeOrder::Move(prev)) = last {
-        let shifted = dist2(prev.0 as f32, prev.1 as f32, point.0, point.1) > squared(REISSUE_TILES * ts);
+        let shifted =
+            dist2(prev.0 as f32, prev.1 as f32, point.0, point.1) > squared(REISSUE_TILES * ts);
         if !shifted && tank.state != AiEntityState::Idle {
             return None;
         }

@@ -245,6 +245,29 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/ai/src/ai_core/decision/jeff_v1_1.rs",
   // Its base lines (V1.1 only) find each base by its Depot and extractors.
   "server/crates/ai/src/ai_core/decision/jeff_v1_1/base_line.rs",
+  // Jeff's AI V1.1's own modules (its push, Tank stations, raids, natural and third bases,
+  // opening strike and infantry duties) name current-roster units, buildings and upgrades;
+  // profile/catalog layers still own faction admission.
+  "server/crates/ai/src/ai_core/decision/jeff_v1_1/breakout.rs",
+  "server/crates/ai/src/ai_core/decision/jeff_v1_1/charge.rs",
+  "server/crates/ai/src/ai_core/decision/jeff_v1_1/deny.rs",
+  "server/crates/ai/src/ai_core/decision/jeff_v1_1/front_line.rs",
+  "server/crates/ai/src/ai_core/decision/jeff_v1_1/home_guard.rs",
+  "server/crates/ai/src/ai_core/decision/jeff_v1_1/hunt.rs",
+  "server/crates/ai/src/ai_core/decision/jeff_v1_1/meth_strike.rs",
+  "server/crates/ai/src/ai_core/decision/jeff_v1_1/natclear.rs",
+  "server/crates/ai/src/ai_core/decision/jeff_v1_1/natsiege.rs",
+  "server/crates/ai/src/ai_core/decision/jeff_v1_1/natural.rs",
+  "server/crates/ai/src/ai_core/decision/jeff_v1_1/push.rs",
+  "server/crates/ai/src/ai_core/decision/jeff_v1_1/resume.rs",
+  "server/crates/ai/src/ai_core/decision/jeff_v1_1/reveal.rs",
+  "server/crates/ai/src/ai_core/decision/jeff_v1_1/rovers.rs",
+  "server/crates/ai/src/ai_core/decision/jeff_v1_1/scout.rs",
+  "server/crates/ai/src/ai_core/decision/jeff_v1_1/smoke_cover.rs",
+  "server/crates/ai/src/ai_core/decision/jeff_v1_1/stations.rs",
+  "server/crates/ai/src/ai_core/decision/jeff_v1_1/strike.rs",
+  "server/crates/ai/src/ai_core/decision/jeff_v1_1/tank_raid.rs",
+  "server/crates/ai/src/ai_core/decision/jeff_v1_1/third_base.rs",
   // Unit priority and cap adjustments moved verbatim out of the approved decision orchestrator.
   "server/crates/ai/src/ai_core/decision/unit_mix.rs",
   // Jeff's Kriegsia-only expansion screen and upgrade policy are focused modules beneath the
@@ -263,6 +286,8 @@ const approvedCurrentFactionFiles = new Set([
   // decision orchestrator; faction admission and roster ownership remain elsewhere.
   "server/crates/ai/src/ai_core/decision/memory.rs",
   "server/crates/ai/src/ai_core/decision/mod.rs",
+  // Steps of the decision moved verbatim out of mod.rs (production, tech, home staging, last orders).
+  "server/crates/ai/src/ai_core/decision/steps.rs",
   "server/crates/ai/src/ai_core/decision/production.rs",
   // Pressure owns its Kriegsia Depot expansion and standing Tank production policy.
   "server/crates/ai/src/ai_core/decision/pressure_economy.rs",

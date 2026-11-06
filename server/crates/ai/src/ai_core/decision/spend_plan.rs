@@ -534,7 +534,9 @@ enum Ready {
     AfterFactory(u32),
     /// When the Factory is done: its build after it is charged, or the tick it is done if already
     /// under way.
-    FactoryBuilt { factory_done: Option<u32> },
+    FactoryBuilt {
+        factory_done: Option<u32>,
+    },
     /// Ticks after the first Scout Car is charged, or the Factory when no car is planned.
     AfterScoutCar(u32),
     /// Ticks after both the Factory is charged and the natural's order goes out.
@@ -783,7 +785,11 @@ fn v1_1_steps(
     // after the Factory's first Scout Car otherwise). Behind the Factory it waits for its cost
     // banked.
     let natural = if planned_natural {
-        let wait = if natural_pending { 0 } else { input.natural_wait };
+        let wait = if natural_pending {
+            0
+        } else {
+            input.natural_wait
+        };
         Some(Step {
             kind: StepKind::Natural,
             banked: !natural_pending && factory_planned,
@@ -848,13 +854,12 @@ fn v1_1_steps(
             && entity.production_kind == Some(EntityKind::ScoutCar)
             && entity.production_queue_len.unwrap_or(0) > 0
     });
-    let car = (facts.unit_count(EntityKind::ScoutCar) == 0 && !car_queued && !unlocked).then_some(
-        Step {
+    let car =
+        (facts.unit_count(EntityKind::ScoutCar) == 0 && !car_queued && !unlocked).then_some(Step {
             kind: StepKind::ScoutCar,
             banked: false,
             ready: Ready::FactoryBuilt { factory_done },
-        },
-    );
+        });
     let complex = observation
         .owned
         .iter()
@@ -928,7 +933,9 @@ fn off_plan_spent(intents: &[AiIntent]) -> u32 {
         .map(|intent| match intent {
             // Jeff's AI V1.1's first Scout Car is a step (`ecafter`); V1.0's comes after its Tanks,
             // when the plan no longer binds.
-            AiIntent::Train { kind } if !matches!(kind, EntityKind::Tank | EntityKind::ScoutCar) => {
+            AiIntent::Train { kind }
+                if !matches!(kind, EntityKind::Tank | EntityKind::ScoutCar) =>
+            {
                 rts_rules::economy::cost(*kind).0
             }
             AiIntent::Build { kind }
@@ -1023,8 +1030,9 @@ fn lay_out(
                         + walk,
                 )
             }
-            Ready::EngineeringComplexBuilt => ec_charge
-                .map(|charge| charge + build_ticks(EntityKind::EngineeringComplex)),
+            Ready::EngineeringComplexBuilt => {
+                ec_charge.map(|charge| charge + build_ticks(EntityKind::EngineeringComplex))
+            }
             Ready::FactoryAndUnlock {
                 factory_done,
                 unlock_done,

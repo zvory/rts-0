@@ -291,8 +291,8 @@ pub(super) fn issue_frontal_wave(
     // Jeff's AI V1.1's resting Tanks park in front of their bases (`tankline`), and its guns hold
     // the lines there (`mgline`), until the push takes them; staged, the Tanks waited 22-28 tiles
     // out in front of the natural.
-    let spread = is_jeff_v1_1(profile.id)
-        && (!jeff_v1_1::off("tankline") || !jeff_v1_1::off("mgline"));
+    let spread =
+        is_jeff_v1_1(profile.id) && (!jeff_v1_1::off("tankline") || !jeff_v1_1::off("mgline"));
     // Its Tanks wait for the push at its stations (`stations`).
     let stationed = |id: &u32| {
         jeff_v1_1::stations::active(profile.id)
@@ -434,8 +434,10 @@ pub(super) fn sync_containment_recovery(
             .iter()
             .filter(|unit| unit.kind == EntityKind::ScoutCar && unit.is_complete && unit.hp > 0)
             .filter(|unit| !memory.trap_breach.is_reserved(unit.id))
-            .filter(|unit| !memory.third_pressure.is_reserved(unit.id)
-                && !memory.jeff_v1_1.tank_raid.holds(unit.id))
+            .filter(|unit| {
+                !memory.third_pressure.is_reserved(unit.id)
+                    && !memory.jeff_v1_1.tank_raid.holds(unit.id)
+            })
             .map(|unit| unit.id)
             .min();
         // Jeff's AI V1.1 sends one of the push's Riflemen ahead instead, or with none left

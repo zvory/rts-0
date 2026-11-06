@@ -33,7 +33,10 @@ pub(in crate::ai_core::decision) fn support_size(profile_id: &str) -> usize {
     }
 }
 /// How many Riflemen the natural's line wants now: its size while the line stands, else none.
-pub(in crate::ai_core::decision) fn support_wanted(memory: &AiDecisionMemory, profile_id: &str) -> usize {
+pub(in crate::ai_core::decision) fn support_wanted(
+    memory: &AiDecisionMemory,
+    profile_id: &str,
+) -> usize {
     let active = is_jeff_v1_1(profile_id)
         && !super::off("natsupport")
         && memory.expansion_security.site.is_some()
@@ -132,10 +135,9 @@ pub(in crate::ai_core::decision) fn support(
         && !super::off("natsupport")
         && !memory.expansion_security.riflemen.is_empty()
         && !(memory.jeff_v1_1.natclear.active() && !super::off("natclear"));
-    let Some(center) = site
-        .filter(|_| active)
-        .and_then(|site| building_center(site, EntityKind::ResourceDepot, observation.map.tile_size))
-    else {
+    let Some(center) = site.filter(|_| active).and_then(|site| {
+        building_center(site, EntityKind::ResourceDepot, observation.map.tile_size)
+    }) else {
         memory.jeff_v1_1.natural.support.clear();
         memory.jeff_v1_1.natural.away.clear();
         memory.jeff_v1_1.natural.seats.clear();
@@ -171,10 +173,14 @@ pub(in crate::ai_core::decision) fn support(
     let named = |unit: &AiEntitySummary| {
         !split
             || unit.kind != EntityKind::Rifleman
-            || memory.jeff_v1_1.stations.rifle_post(unit.id) == Some(super::stations::RiflePost::Natural)
+            || memory.jeff_v1_1.stations.rifle_post(unit.id)
+                == Some(super::stations::RiflePost::Natural)
     };
-    let by_id: BTreeMap<u32, &AiEntitySummary> =
-        observation.owned.iter().map(|unit| (unit.id, unit)).collect();
+    let by_id: BTreeMap<u32, &AiEntitySummary> = observation
+        .owned
+        .iter()
+        .map(|unit| (unit.id, unit))
+        .collect();
     // Under `mghome` the guns go only once the natural's Depot stands: sent to a line in front of
     // an empty site, they walked out ahead of it and died there or on the way.
     let guns_go = super::off("mghome")
@@ -278,7 +284,12 @@ pub(in crate::ai_core::decision) fn support(
                     observation.map,
                 );
                 if ahead <= 2.0
-                    || defense::defensive_position_is_open(observation, map_analysis, point.0, point.1)
+                    || defense::defensive_position_is_open(
+                        observation,
+                        map_analysis,
+                        point.0,
+                        point.1,
+                    )
                 {
                     break point;
                 }
@@ -340,7 +351,9 @@ pub(in crate::ai_core::decision) fn support(
                         .total_cmp(&dist2(b.x, b.y, unit.x, unit.y))
                         .then(a.id.cmp(&b.id))
                 })
-                .filter(|enemy| dist2(enemy.x, enemy.y, unit.x, unit.y) <= squared(FIGHT_TILES * ts));
+                .filter(|enemy| {
+                    dist2(enemy.x, enemy.y, unit.x, unit.y) <= squared(FIGHT_TILES * ts)
+                });
             if let Some(enemy) = nearest.filter(|_| idle_under_fire) {
                 if actions::attack_move_units(actions, [*id], enemy.x, enemy.y).is_some() {
                     memory.jeff_v1_1.natural.support.insert(*id, tick);

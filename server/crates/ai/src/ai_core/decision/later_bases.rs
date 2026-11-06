@@ -73,6 +73,8 @@ pub(super) struct LaterBases {
     /// not that the site is bad, so a site is only rejected after repeated drops.
     site_failures: BTreeMap<(u32, u32), u8>,
     rejected_sites: BTreeSet<(u32, u32)>,
+    /// When each site was ruled out. V1.1's `siteretry` lets a site back in after a while.
+    rejected_at: BTreeMap<(u32, u32), u32>,
     /// No new site is taken before this tick, after a failed or destroyed base.
     retry_after_tick: u32,
     /// Whether a Depot has stood on the guarded site, so its disappearance is a loss.
@@ -161,6 +163,15 @@ where
     };
     let enemy = (enemy_base.x, enemy_base.y);
     let tick = observation.tick;
+    if v1_1 && jeff_v1_1::third_base::site_retry() {
+        let state = &mut memory.later_bases;
+        let rejected_at = &state.rejected_at;
+        state.rejected_sites.retain(|site| {
+            rejected_at.get(site).is_none_or(|at| {
+                tick.saturating_sub(*at) < jeff_v1_1::third_base::SITE_REJECT_TICKS
+            })
+        });
+    }
 
     refresh_guard_site(observation, memory, tick);
 
@@ -560,8 +571,8 @@ fn refresh_guard_site(observation: &AiObservation, memory: &mut AiDecisionMemory
     } else if state.guard_site_built {
         // The Depot was destroyed while still covered. The base is due again, but not at once:
         // whatever killed it is probably still there, and a second loss rules the site out.
-        if note_site_failure(state, guard_site) || state.v1_1 {
-            state.rejected_sites.insert(guard_site);
+        if note_site_failure(state, guard_site) || rejects_first_failure(state) {
+            reject_site(state, guard_site, tick);
         }
         state.retry_after_tick = tick.saturating_add(retry_ticks(state));
         state.guard_site_built = false;
@@ -657,11 +668,22 @@ fn retry_ticks(state: &LaterBases) -> u32 {
     }
 }
 
+/// V1.1 rules a site out on its first failure, unless `siteretry` counts failures as V1.0 does.
+fn rejects_first_failure(state: &LaterBases) -> bool {
+    state.v1_1 && !jeff_v1_1::third_base::site_retry()
+}
+
+fn reject_site(state: &mut LaterBases, site: (u32, u32), tick: u32) {
+    state.rejected_sites.insert(site);
+    state.rejected_at.insert(site, tick);
+}
+
 /// Give up on a site for now: release the guards and wait out the cooldown. A rejected site is
-/// never chosen again; V1.1 rejects every site it gives up, and tries the next.
+/// never chosen again (V1.1 with `siteretry`: not for `SITE_REJECT_TICKS`); V1.1 without it
+/// rejects every site it gives up, and tries the next.
 fn abandon_site(state: &mut LaterBases, site: (u32, u32), tick: u32, reject: bool) {
-    if reject || state.v1_1 {
-        state.rejected_sites.insert(site);
+    if reject || rejects_first_failure(state) {
+        reject_site(state, site, tick);
     }
     state.retry_after_tick = tick.saturating_add(retry_ticks(state));
     state.site = None;
@@ -767,7 +789,10 @@ fn note_low_steel(observation: &AiObservation, state: &mut LaterBases) {
         .filter(|node| node.kind == EntityKind::Steel)
     {
         let at = (node.x.round() as i32, node.y.round() as i32);
-        let entry = state.steel_start.entry(node.id).or_insert((node.remaining, at));
+        let entry = state
+            .steel_start
+            .entry(node.id)
+            .or_insert((node.remaining, at));
         entry.0 = entry.0.max(node.remaining);
     }
     for depot in observation

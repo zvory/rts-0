@@ -242,7 +242,8 @@ fn clear_points(
     let mut points: Vec<(f32, f32)> = Vec::new();
     for point in wanted {
         let point = clamp_to_map(point, observation.map);
-        let Some(cleared) = defense::clear_mobile_defensive_position(observation, map_analysis, point)
+        let Some(cleared) =
+            defense::clear_mobile_defensive_position(observation, map_analysis, point)
         else {
             continue;
         };
@@ -338,12 +339,21 @@ fn halfway(
     // `wayhalf`: halfway between the main and a base past it along the ground way there.
     if let Some(analysis) = map_analysis.filter(|_| (a.main || b.main) && !super::off("wayhalf")) {
         let (main, other) = if a.main { (a, b) } else { (b, a) };
-        return way_halfway(observation, map_analysis, analysis, main.center, other.center);
+        return way_halfway(
+            observation,
+            map_analysis,
+            analysis,
+            main.center,
+            other.center,
+        );
     }
     if dist2(a.center.0, a.center.1, b.center.0, b.center.1) > squared(2.0 * cover) {
         return None;
     }
-    let mid = ((a.center.0 + b.center.0) * 0.5, (a.center.1 + b.center.1) * 0.5);
+    let mid = (
+        (a.center.0 + b.center.0) * 0.5,
+        (a.center.1 + b.center.1) * 0.5,
+    );
     let point = *clear_points(observation, map_analysis, vec![mid]).first()?;
     let reach = squared(cover * 1.1);
     if dist2(point.0, point.1, a.center.0, a.center.1) > reach
@@ -502,8 +512,9 @@ pub(in crate::ai_core::decision) fn station(
 
     // The bases and the threats each has seen.
     let bases = bases(observation);
-    memo.threats
-        .retain(|depot, (_, seen)| tick.saturating_sub(*seen) < THREAT_TICKS && bases.iter().any(|base| base.depot == *depot));
+    memo.threats.retain(|depot, (_, seen)| {
+        tick.saturating_sub(*seen) < THREAT_TICKS && bases.iter().any(|base| base.depot == *depot)
+    });
     for base in &bases {
         let value = threat_at(observation, base);
         if value == 0 {
@@ -542,7 +553,11 @@ pub(in crate::ai_core::decision) fn station(
         .or_else(|| enemy_start.and_then(|start| normalized_direction(home, start)))
         .unwrap_or((1.0, 0.0));
     let mut stations: Vec<Station> = Vec::new();
-    let lines = super::base_line::base_lines(observation, map_analysis, &memory.jeff_v1_1.base_lines.contacts);
+    let lines = super::base_line::base_lines(
+        observation,
+        map_analysis,
+        &memory.jeff_v1_1.base_lines.contacts,
+    );
     // `mainfront`: the main's Tanks stand behind the main's line, which faces where the enemy walks
     // in, so its infantry stands in front of them; the home post faced the straight line to the
     // enemy start and put them out in front of the infantry.
@@ -552,7 +567,11 @@ pub(in crate::ai_core::decision) fn station(
     if let Some(main) = main {
         let (center, facing) = match main_line {
             Some(index) => (
-                lines[index].tank_points(1, ts).first().copied().unwrap_or(main_center),
+                lines[index]
+                    .tank_points(1, ts)
+                    .first()
+                    .copied()
+                    .unwrap_or(main_center),
                 lines[index].facing(),
             ),
             None => (main_center, main_facing),
@@ -589,7 +608,8 @@ pub(in crate::ai_core::decision) fn station(
             station.floor = station.floor.max(floor);
             continue;
         }
-        let remote = 1.0 + dist2(point.0, point.1, main_center.0, main_center.1).sqrt() / (REMOTE_TILES * ts);
+        let remote = 1.0
+            + dist2(point.0, point.1, main_center.0, main_center.1).sqrt() / (REMOTE_TILES * ts);
         stations.push(Station {
             anchor: base.depot,
             bases: vec![base.depot],
@@ -669,7 +689,10 @@ pub(in crate::ai_core::decision) fn station(
                 }
             })
             .collect();
-        for (index, extra) in super::base_line::shares(&weights, left).into_iter().enumerate() {
+        for (index, extra) in super::base_line::shares(&weights, left)
+            .into_iter()
+            .enumerate()
+        {
             quota[index] += extra;
         }
         // A station left with fewer than a group gives its Tanks to the others.
@@ -794,11 +817,7 @@ pub(in crate::ai_core::decision) fn station(
         .map(|(index, station)| {
             format!(
                 "{}:{}/{}w{:.0}f{}",
-                station.anchor,
-                counts[index],
-                quotas[index],
-                station.weight,
-                station.floor
+                station.anchor, counts[index], quotas[index], station.weight, station.floor
             )
         })
         .collect();
@@ -896,8 +915,7 @@ pub(in crate::ai_core::decision) fn place_riflemen(
         bases
             .iter()
             .find(|base| {
-                dist2(base.at.0, base.at.1, center.0, center.1)
-                    <= squared(NATURAL_DEPOT_TILES * ts)
+                dist2(base.at.0, base.at.1, center.0, center.1) <= squared(NATURAL_DEPOT_TILES * ts)
             })
             .map(|base| base.depot)
     });
@@ -945,7 +963,12 @@ pub(in crate::ai_core::decision) fn place_riflemen(
     let mut counts: BTreeMap<RiflePost, usize> = BTreeMap::new();
     let mut posts: BTreeMap<u32, RiflePost> = BTreeMap::new();
     for unit in &pool {
-        let Some(post) = memory.jeff_v1_1.stations.rifles.get(&unit.id).map(|place| place.post)
+        let Some(post) = memory
+            .jeff_v1_1
+            .stations
+            .rifles
+            .get(&unit.id)
+            .map(|place| place.post)
         else {
             continue;
         };
@@ -958,7 +981,12 @@ pub(in crate::ai_core::decision) fn place_riflemen(
             posts.insert(unit.id, post);
         }
     }
-    let base_at = |depot: u32| bases.iter().find(|base| base.depot == depot).map(|base| base.at);
+    let base_at = |depot: u32| {
+        bases
+            .iter()
+            .find(|base| base.depot == depot)
+            .map(|base| base.at)
+    };
     for (post, wanted) in &quota {
         let at = match post {
             RiflePost::Natural => natural_center,
@@ -968,8 +996,10 @@ pub(in crate::ai_core::decision) fn place_riflemen(
         let Some(at) = at else {
             continue;
         };
-        let mut free: Vec<&&AiEntitySummary> =
-            pool.iter().filter(|unit| !posts.contains_key(&unit.id)).collect();
+        let mut free: Vec<&&AiEntitySummary> = pool
+            .iter()
+            .filter(|unit| !posts.contains_key(&unit.id))
+            .collect();
         free.sort_by(|a, b| {
             dist2(a.x, a.y, at.0, at.1)
                 .total_cmp(&dist2(b.x, b.y, at.0, at.1))

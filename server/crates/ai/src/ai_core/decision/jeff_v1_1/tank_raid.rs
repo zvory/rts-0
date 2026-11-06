@@ -168,8 +168,11 @@ pub(in crate::ai_core::decision) fn raid(
     };
     let tick = observation.tick;
     let ts = observation.map.tile_size as f32;
-    let by_id: BTreeMap<u32, &AiEntitySummary> =
-        observation.owned.iter().map(|unit| (unit.id, unit)).collect();
+    let by_id: BTreeMap<u32, &AiEntitySummary> = observation
+        .owned
+        .iter()
+        .map(|unit| (unit.id, unit))
+        .collect();
     let alive = |id: &u32| by_id.get(id).is_some_and(|unit| unit.hp > 0);
     {
         let state = &mut memory.jeff_v1_1.tank_raid;
@@ -257,7 +260,14 @@ pub(in crate::ai_core::decision) fn raid(
     match phase {
         Phase::Out => {
             let Some(target) = memory.jeff_v1_1.tank_raid.target.map(point) else {
-                go_home(&mut memory.jeff_v1_1.tank_raid, analysis, observation, center, home, away);
+                go_home(
+                    &mut memory.jeff_v1_1.tank_raid,
+                    analysis,
+                    observation,
+                    center,
+                    home,
+                    away,
+                );
                 return;
             };
             if dist2(center.0, center.1, target.0, target.1) <= squared(HIT_TILES * ts) {
@@ -272,7 +282,9 @@ pub(in crate::ai_core::decision) fn raid(
                         .filter(|at| {
                             dist2(at.0, at.1, target.0, target.1) > squared(DEFENCE_TILES * ts)
                         })
-                        .map(|at| super::push::threat_near(observation, memory, at, ROUTE_THREAT_TILES))
+                        .map(|at| {
+                            super::push::threat_near(observation, memory, at, ROUTE_THREAT_TILES)
+                        })
                         .fold(0.0, f32::max)
                 };
                 if ahead_threat > strength * ROUTE_SHARE {
@@ -295,13 +307,20 @@ pub(in crate::ai_core::decision) fn raid(
             }
         }
         Phase::Hit => {
-            let target = memory.jeff_v1_1.tank_raid.target.map(point).unwrap_or(center);
+            let target = memory
+                .jeff_v1_1
+                .tank_raid
+                .target
+                .map(point)
+                .unwrap_or(center);
             let in_sight = site_in_sight(observation, memory, target, ts);
             if visible_depot(observation, target, ts).is_none() && in_sight {
                 // The Depot is down, or was never there: its extractors decay on their own. On to the
                 // next base while healthy and unseen, else home.
                 let next = (!super::off("raidchain") && health >= SET_OUT_HP && danger == 0.0)
-                    .then(|| choose_target(observation, analysis, memory, center, enemy_main, strength))
+                    .then(|| {
+                        choose_target(observation, analysis, memory, center, enemy_main, strength)
+                    })
                     .flatten();
                 let state = &mut memory.jeff_v1_1.tank_raid;
                 if let Some(target) = state.target {
@@ -336,7 +355,15 @@ pub(in crate::ai_core::decision) fn raid(
     let running = memory.jeff_v1_1.tank_raid.phase == Some(Phase::Home);
     let scout = memory.jeff_v1_1.tank_raid.scout;
     let mut smoked = memory.jeff_v1_1.tank_raid.smoked;
-    super::smoke_cover::cover(actions, observation, memory, scout, &tank_ids, running, &mut smoked);
+    super::smoke_cover::cover(
+        actions,
+        observation,
+        memory,
+        scout,
+        &tank_ids,
+        running,
+        &mut smoked,
+    );
     memory.jeff_v1_1.tank_raid.smoked = smoked;
     order(actions, observation, memory, intents, &tank_ids, center, ts);
 }
@@ -397,20 +424,16 @@ fn danger_near(observation: &AiObservation, tanks: &[&AiEntitySummary]) -> f32 {
         .iter()
         .filter(|enemy| enemy.hp > 0 && enemy.kind.is_unit() && enemy.kind != EntityKind::Worker)
         .filter(|enemy| {
-            tanks.iter().any(|tank| {
-                dist2(tank.x, tank.y, enemy.x, enemy.y) <= squared(DANGER_TILES * ts)
-            })
+            tanks
+                .iter()
+                .any(|tank| dist2(tank.x, tank.y, enemy.x, enemy.y) <= squared(DANGER_TILES * ts))
         })
         .map(|enemy| super::push::unit_value(enemy.kind) as f32)
         .sum()
 }
 
 /// The enemy buildings standing within `HIT_TILES` of `at`, the Depot first, then extractors.
-fn buildings_at<'o>(
-    observation: &'o AiObservation,
-    at: (f32, f32),
-    ts: f32,
-) -> Vec<&'o AiEntitySummary> {
+fn buildings_at(observation: &AiObservation, at: (f32, f32), ts: f32) -> Vec<&AiEntitySummary> {
     let mut found: Vec<&AiEntitySummary> = observation
         .visible_enemies
         .iter()
@@ -534,6 +557,9 @@ fn launch(
     state.ordered = 0;
 }
 
+/// A raid target and the way there, in stored tiles.
+type RaidPlan = ((f32, f32), Vec<(i32, i32)>);
+
 /// The best base to raid from `from` and the way there (see the module docs).
 fn choose_target(
     observation: &AiObservation,
@@ -542,14 +568,20 @@ fn choose_target(
     from: (f32, f32),
     enemy_main: (f32, f32),
     strength: f32,
-) -> Option<((f32, f32), Vec<(i32, i32)>)> {
+) -> Option<RaidPlan> {
     let ts = observation.map.tile_size as f32;
     let found: Vec<((f32, f32), f32)> = super::push::known_depots(observation, memory, enemy_main)
         .into_iter()
         .map(|at| (at, 1.0))
         .collect();
-    let hot: Vec<(f32, f32)> = memory.jeff_v1_1.tank_raid.hot.keys().map(|at| point(*at)).collect();
-    let mut best: Option<(f32, (f32, f32), Vec<(i32, i32)>)> = None;
+    let hot: Vec<(f32, f32)> = memory
+        .jeff_v1_1
+        .tank_raid
+        .hot
+        .keys()
+        .map(|at| point(*at))
+        .collect();
+    let mut best: Option<(f32, RaidPlan)> = None;
     for (at, worth) in found {
         if hot
             .iter()
@@ -576,16 +608,25 @@ fn choose_target(
         };
         let length = route
             .windows(2)
-            .map(|pair| dist2(pair[0].0 as f32, pair[0].1 as f32, pair[1].0 as f32, pair[1].1 as f32).sqrt())
+            .map(|pair| {
+                dist2(
+                    pair[0].0 as f32,
+                    pair[0].1 as f32,
+                    pair[1].0 as f32,
+                    pair[1].1 as f32,
+                )
+                .sqrt()
+            })
             .sum::<f32>()
             / ts;
-        let score = worth / (1.0 + defence / strength.max(1.0) + 0.5 * response / strength.max(1.0))
+        let score = worth
+            / (1.0 + defence / strength.max(1.0) + 0.5 * response / strength.max(1.0))
             / (1.0 + length / TRAVEL_TILES);
-        if best.as_ref().is_none_or(|(top, _, _)| score > *top) {
-            best = Some((score, at, route));
+        if best.as_ref().is_none_or(|(top, _)| score > *top) {
+            best = Some((score, (at, route)));
         }
     }
-    best.map(|(_, at, route)| (at, route))
+    best.map(|(_, plan)| plan)
 }
 
 /// The way from `from` to `to` past the least remembered enemy strength: straight, or around
@@ -668,7 +709,10 @@ fn go_home(
             let way = normalized_direction((0.0, 0.0), (off.0 + toward.0, off.1 + toward.1))
                 .unwrap_or(off);
             Some(clamp_to_map(
-                (from.0 + way.0 * BREAK_TILES * ts, from.1 + way.1 * BREAK_TILES * ts),
+                (
+                    from.0 + way.0 * BREAK_TILES * ts,
+                    from.1 + way.1 * BREAK_TILES * ts,
+                ),
                 observation.map,
             ))
         })
@@ -677,7 +721,7 @@ fn go_home(
     state.parked_since = None;
     state.route = std::iter::once(start)
         .filter(|at| *at != from)
-        .chain(analysis.compact_group_route(start, home, 4).into_iter())
+        .chain(analysis.compact_group_route(start, home, 4))
         .step_by(3)
         .chain(std::iter::once(home))
         .map(stored)
@@ -735,14 +779,19 @@ fn order(
                     .map(|at| point(*at))
                     .unwrap_or(next);
                 let ahead = normalized_direction(center, lead).unwrap_or((0.0, 0.0));
-                let shy = observation.owned.iter().find(|unit| unit.id == scout).is_some_and(|car| {
-                    observation.visible_enemies.iter().any(|enemy| {
-                        enemy.hp > 0
-                            && enemy.kind.is_unit()
-                            && enemy.kind != EntityKind::Worker
-                            && dist2(enemy.x, enemy.y, car.x, car.y) <= squared(SCOUT_SHY_TILES * ts)
-                    })
-                });
+                let shy = observation
+                    .owned
+                    .iter()
+                    .find(|unit| unit.id == scout)
+                    .is_some_and(|car| {
+                        observation.visible_enemies.iter().any(|enemy| {
+                            enemy.hp > 0
+                                && enemy.kind.is_unit()
+                                && enemy.kind != EntityKind::Worker
+                                && dist2(enemy.x, enemy.y, car.x, car.y)
+                                    <= squared(SCOUT_SHY_TILES * ts)
+                        })
+                    });
                 let spot = if shy {
                     center
                 } else if phase == Phase::Out {
@@ -795,7 +844,11 @@ fn shell_depot(
         return;
     };
     state.depot_seen = true;
-    let standoff = if scout.is_some() { RANGED_STANDOFF_TILES } else { SIGHT_STANDOFF_TILES };
+    let standoff = if scout.is_some() {
+        RANGED_STANDOFF_TILES
+    } else {
+        SIGHT_STANDOFF_TILES
+    };
     let back = normalized_direction((depot.x, depot.y), center).unwrap_or((1.0, 0.0));
     let across = (-back.1, back.0);
     let n = tanks.len();
@@ -817,7 +870,11 @@ fn shell_depot(
         .iter()
         .filter(|unit| tanks.contains(&unit.id))
         .collect();
-    party.sort_by(|a, b| lateral(a.x, a.y).total_cmp(&lateral(b.x, b.y)).then(a.id.cmp(&b.id)));
+    party.sort_by(|a, b| {
+        lateral(a.x, a.y)
+            .total_cmp(&lateral(b.x, b.y))
+            .then(a.id.cmp(&b.id))
+    });
     slots.sort_by(|a, b| lateral(a.0, a.1).total_cmp(&lateral(b.0, b.1)));
     let parked = party
         .iter()
@@ -859,7 +916,12 @@ fn shell_depot(
 }
 
 /// Whether a party Tank stands within its sight of `at`, or its Scout Car within the car's.
-fn site_in_sight(observation: &AiObservation, memory: &AiDecisionMemory, at: (f32, f32), ts: f32) -> bool {
+fn site_in_sight(
+    observation: &AiObservation,
+    memory: &AiDecisionMemory,
+    at: (f32, f32),
+    ts: f32,
+) -> bool {
     observation
         .owned
         .iter()

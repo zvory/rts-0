@@ -264,7 +264,7 @@ fn baseline_metadata(profile_id: &str) -> (&'static str, &'static str, Vec<&'sta
             ],
         ),
         JEFFS_AI_V1_1_ID => (
-            "Jeff's AI V1.1",
+            "Jeff's AI",
             "Jeff's AI V1.0 plus early Methamphetamines and the V1.1 infantry, gun-line and Tank-discipline changes.",
             [JEFF_V1_0_MODULES, JEFF_V1_1_MODULES].concat(),
         ),
@@ -381,7 +381,7 @@ mod tests {
             serde_json::json!([
                 {"profileId": "rush_ai", "weight": 1},
                 {"profileId": "pressure_ai", "weight": 1},
-                {"profileId": "jeffs_ai", "weight": 1},
+                {"profileId": "jeffs_ai_v1_1", "weight": 1},
             ])
         );
     }

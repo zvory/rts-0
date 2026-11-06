@@ -34,7 +34,11 @@ pub(in crate::ai_core::decision) struct TankPauseMemory {
 
 impl TankPauseMemory {
     pub(in crate::ai_core::decision) fn trace(&self) -> String {
-        format!("tankpause paused={} stops={}", self.paused.len(), self.stops)
+        format!(
+            "tankpause paused={} stops={}",
+            self.paused.len(),
+            self.stops
+        )
     }
 }
 
@@ -71,7 +75,9 @@ pub(in crate::ai_core::decision) fn pace(
     pause.paused.retain(|id, (until, _)| {
         tick <= until.saturating_add(config::TICK_HZ) && tanks.iter().any(|tank| tank.id == *id)
     });
-    pause.catching_up.retain(|id, until| *until > tick && tanks.iter().any(|tank| tank.id == *id));
+    pause
+        .catching_up
+        .retain(|id, until| *until > tick && tanks.iter().any(|tank| tank.id == *id));
     if tanks.is_empty() {
         return;
     }

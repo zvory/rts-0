@@ -3,7 +3,7 @@ use rand::{Rng, SeedableRng};
 use rts_sim::rng::PortableRng;
 use serde::Serialize;
 
-use crate::ai_core::profiles::{JEFFS_AI_ID, PRESSURE_AI_ID};
+use crate::ai_core::profiles::{JEFFS_AI_V1_1_ID, PRESSURE_AI_ID};
 use crate::rush::RUSH_AI_ID;
 
 pub(crate) const AI_2_3_ID: &str = "ai_2_3";
@@ -35,7 +35,7 @@ pub(crate) const COMPOSITIONS: &[AiComposition] = &[AiComposition {
             weight: 1,
         },
         WeightedProfile {
-            profile_id: JEFFS_AI_ID,
+            profile_id: JEFFS_AI_V1_1_ID,
             weight: 1,
         },
     ],
@@ -103,7 +103,7 @@ mod tests {
         assert_eq!(composition.total_weight(), Some(3));
         assert_eq!(composition.at_ticket(0), Some(RUSH_AI_ID));
         assert_eq!(composition.at_ticket(1), Some(PRESSURE_AI_ID));
-        assert_eq!(composition.at_ticket(2), Some(JEFFS_AI_ID));
+        assert_eq!(composition.at_ticket(2), Some(JEFFS_AI_V1_1_ID));
         assert_eq!(composition.at_ticket(3), None);
         let selected = (0..128)
             .flat_map(|seed| {
@@ -116,7 +116,7 @@ mod tests {
             .collect::<BTreeSet<_>>();
         assert_eq!(
             selected,
-            BTreeSet::from([RUSH_AI_ID, PRESSURE_AI_ID, JEFFS_AI_ID])
+            BTreeSet::from([RUSH_AI_ID, PRESSURE_AI_ID, JEFFS_AI_V1_1_ID])
         );
     }
 

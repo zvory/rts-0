@@ -127,7 +127,11 @@ pub(in crate::ai_core::decision) fn way(
     if !is_jeff_v1_1(profile_id) || super::off("southroute") {
         return None;
     }
-    let west = match (observation.map.width, observation.map.height, observation.own_start_tile) {
+    let west = match (
+        observation.map.width,
+        observation.map.height,
+        observation.own_start_tile,
+    ) {
         (166, 166, (8, 47)) => true,
         (166, 166, (157, 47)) => false,
         _ => return None,
@@ -139,7 +143,11 @@ pub(in crate::ai_core::decision) fn way(
             .iter()
             .enumerate()
             .map(|(leg, &(x, y))| {
-                let (x, y) = if guard && leg == GUARD_LEG { GUARD_WEST } else { (x, y) };
+                let (x, y) = if guard && leg == GUARD_LEG {
+                    GUARD_WEST
+                } else {
+                    (x, y)
+                };
                 let x = if west { x } else { 166.0 - x };
                 (x * ts, y * ts)
             })
@@ -176,13 +184,20 @@ pub(in crate::ai_core::decision) fn guard_orders(
     if !memory.jeff_v1_1.south.guarding || super::off("thirdguard") {
         return false;
     }
-    let Some(way) = memory.profile_id().and_then(|profile| way(profile, observation)) else {
+    let Some(way) = memory
+        .profile_id()
+        .and_then(|profile| way(profile, observation))
+    else {
         return false;
     };
     let ts = observation.map.tile_size as f32;
     let center = way[GUARD_LEG];
     // The enemy side: east of the west third, west of the east one.
-    let ahead = if center.0 < observation.map.width as f32 * ts / 2.0 { 1.0 } else { -1.0 };
+    let ahead = if center.0 < observation.map.width as f32 * ts / 2.0 {
+        1.0
+    } else {
+        -1.0
+    };
     let mut units: Vec<&AiEntitySummary> = observation
         .owned
         .iter()
@@ -226,13 +241,22 @@ pub(in crate::ai_core::decision) fn guard_orders(
 /// `noschoneraid`: no Tank raid where the push takes the southern way: the raid goes the direct
 /// way, and its three Tanks stuck in the V at 10:00 for the rest of the game while the third base
 /// fell.
-pub(in crate::ai_core::decision) fn skips_raid(profile_id: &str, observation: &AiObservation) -> bool {
+pub(in crate::ai_core::decision) fn skips_raid(
+    profile_id: &str,
+    observation: &AiObservation,
+) -> bool {
     !super::off("noschoneraid") && way(profile_id, observation).is_some()
 }
 
 /// Whether the launched push is marching the way (not past it, not striking home).
-pub(in crate::ai_core::decision) fn marching(observation: &AiObservation, memory: &AiDecisionMemory) -> bool {
-    let Some(way) = memory.profile_id().and_then(|profile| way(profile, observation)) else {
+pub(in crate::ai_core::decision) fn marching(
+    observation: &AiObservation,
+    memory: &AiDecisionMemory,
+) -> bool {
+    let Some(way) = memory
+        .profile_id()
+        .and_then(|profile| way(profile, observation))
+    else {
         return false;
     };
     memory.containment.wave_launched
@@ -242,14 +266,18 @@ pub(in crate::ai_core::decision) fn marching(observation: &AiObservation, memory
 }
 
 /// Whether V1.1 leaves the trap breach off here.
-pub(in crate::ai_core::decision) fn skips_breach(profile_id: &str, observation: &AiObservation) -> bool {
+pub(in crate::ai_core::decision) fn skips_breach(
+    profile_id: &str,
+    observation: &AiObservation,
+) -> bool {
     way(profile_id, observation).is_some()
 }
 
 fn nearest_leg(way: &[(f32, f32)], at: (f32, f32)) -> usize {
     (0..way.len())
         .min_by(|a, b| {
-            dist2(way[*a].0, way[*a].1, at.0, at.1).total_cmp(&dist2(way[*b].0, way[*b].1, at.0, at.1))
+            dist2(way[*a].0, way[*a].1, at.0, at.1)
+                .total_cmp(&dist2(way[*b].0, way[*b].1, at.0, at.1))
         })
         .unwrap_or(0)
 }
@@ -277,7 +305,10 @@ const RETURN_HOLD_TICKS: u32 = config::TICK_HZ * 30;
 /// re-form at home. Re-forming, the Tanks nearest home were picked and gathered on their midpoint,
 /// out on the central plateau between the corridor and the main, where 18 stood from 10:46 to the
 /// end. Holding beside the third base, it stays there. `false` off the way, for the usual fall-back.
-pub(in crate::ai_core::decision) fn hold_way(observation: &AiObservation, memory: &mut AiDecisionMemory) -> bool {
+pub(in crate::ai_core::decision) fn hold_way(
+    observation: &AiObservation,
+    memory: &mut AiDecisionMemory,
+) -> bool {
     let Some(profile) = memory.profile_id() else {
         return false;
     };
@@ -347,7 +378,11 @@ pub(in crate::ai_core::decision) fn push_waypoint(
     let enemy_tanks = super::push::peak_enemy_tanks(memory).max(memory.recent_enemy_tanks());
     let strong = tanks.len() >= MARCH_TANKS
         && tanks.len() as f32 >= enemy_tanks as f32 * MARCH_LEAD
-        && memory.jeff_v1_1.south.hold_until.is_none_or(|until| observation.tick >= until);
+        && memory
+            .jeff_v1_1
+            .south
+            .hold_until
+            .is_none_or(|until| observation.tick >= until);
     let south = &mut memory.jeff_v1_1.south;
     // `southhold`: outweighed out on the way, the push walks it back to the third base.
     while south.returning {
@@ -363,7 +398,13 @@ pub(in crate::ai_core::decision) fn push_waypoint(
         let reached = dist2(center.0, center.1, at.0, at.1) <= squared(ARRIVED_TILES * ts)
             || near as f32 >= tanks.len() as f32 * ARRIVED_SHARE;
         if !reached {
-            south.last_step = format!("t{} back to {} from ({:.0},{:.0})", observation.tick, south.leg - 1, center.0 / ts, center.1 / ts);
+            south.last_step = format!(
+                "t{} back to {} from ({:.0},{:.0})",
+                observation.tick,
+                south.leg - 1,
+                center.0 / ts,
+                center.1 / ts
+            );
             return Some(at);
         }
         south.leg -= 1;
@@ -377,11 +418,23 @@ pub(in crate::ai_core::decision) fn push_waypoint(
         let reached = dist2(center.0, center.1, at.0, at.1) <= squared(ARRIVED_TILES * ts)
             || near as f32 >= tanks.len() as f32 * ARRIVED_SHARE;
         if !reached {
-            south.last_step = format!("t{} to {} from ({:.0},{:.0})", observation.tick, south.leg, center.0 / ts, center.1 / ts);
+            south.last_step = format!(
+                "t{} to {} from ({:.0},{:.0})",
+                observation.tick,
+                south.leg,
+                center.0 / ts,
+                center.1 / ts
+            );
             return Some(at);
         }
         if south.leg == GUARD_LEG && !strong {
-            south.last_step = format!("t{} guarding at {} ({} Tanks, enemy {})", observation.tick, south.leg, tanks.len(), enemy_tanks);
+            south.last_step = format!(
+                "t{} guarding at {} ({} Tanks, enemy {})",
+                observation.tick,
+                south.leg,
+                tanks.len(),
+                enemy_tanks
+            );
             south.guarding = true;
             return Some(at);
         }
@@ -422,7 +475,10 @@ pub(in crate::ai_core::decision) fn convoy_waypoint(
     push: (f32, f32),
     fresh: bool,
 ) -> (f32, f32) {
-    let Some(way) = memory.profile_id().and_then(|profile| way(profile, observation)) else {
+    let Some(way) = memory
+        .profile_id()
+        .and_then(|profile| way(profile, observation))
+    else {
         return push;
     };
     let ts = observation.map.tile_size as f32;
@@ -454,7 +510,9 @@ pub(in crate::ai_core::decision) fn convoy_member_waypoint(
     if super::off("convoyway") {
         return None;
     }
-    let way = memory.profile_id().and_then(|profile| way(profile, observation))?;
+    let way = memory
+        .profile_id()
+        .and_then(|profile| way(profile, observation))?;
     let ts = observation.map.tile_size as f32;
     let push_leg = memory.jeff_v1_1.south.leg.min(way.len());
     let mut leg = nearest_leg(&way, at);

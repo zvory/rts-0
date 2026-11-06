@@ -102,9 +102,13 @@ pub(in crate::ai_core::decision) fn guard(
         return;
     }
     // The main's base-line Tank posts, or posts straight out toward the enemy main.
-    let line = super::base_line::base_lines(observation, map_analysis, &memory.jeff_v1_1.base_lines.contacts)
-        .into_iter()
-        .find(|line| line.main);
+    let line = super::base_line::base_lines(
+        observation,
+        map_analysis,
+        &memory.jeff_v1_1.base_lines.contacts,
+    )
+    .into_iter()
+    .find(|line| line.main);
     let wanted_points = match &line {
         Some(line) => line.tank_points(picked.len(), ts),
         None => {
@@ -129,7 +133,8 @@ pub(in crate::ai_core::decision) fn guard(
         .into_iter()
         .map(|point| {
             let point = clamp_to_map(point, observation.map);
-            defense::clear_mobile_defensive_position(observation, map_analysis, point).unwrap_or(point)
+            defense::clear_mobile_defensive_position(observation, map_analysis, point)
+                .unwrap_or(point)
         })
         .collect();
     // Guards to posts, nearest first.

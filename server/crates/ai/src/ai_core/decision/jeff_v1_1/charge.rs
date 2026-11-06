@@ -79,9 +79,9 @@ pub(in crate::ai_core::decision) fn charge_tanks(
         .collect();
     let shelling = |tank: &AiEntitySummary| {
         near_depot((tank.x, tank.y), LEASH_TILES)
-            && defenders.iter().any(|unit| {
-                dist2(unit.x, unit.y, tank.x, tank.y) <= squared(SHELL_TILES * ts)
-            })
+            && defenders
+                .iter()
+                .any(|unit| dist2(unit.x, unit.y, tank.x, tank.y) <= squared(SHELL_TILES * ts))
     };
     // Keep the current target while it is in sight and in reach of the base, else the shelling Tank
     // nearest a Depot.
@@ -129,7 +129,8 @@ pub(in crate::ai_core::decision) fn charge_tanks(
     let enough = chargers.len() >= RIFLES_PER_TANK * group.max(1)
         && escort as f32 <= chargers.len() as f32 * ESCORT_SHARE;
     // A charge under way keeps going while it still outnumbers the Tanks.
-    let going = previous == Some(target.id) && chargers.len() >= RIFLES_PER_TANK.div_ceil(2) * group;
+    let going =
+        previous == Some(target.id) && chargers.len() >= RIFLES_PER_TANK.div_ceil(2) * group;
     if !enough && !going {
         memory.jeff_v1_1.charge = ChargeMemory::default();
         return;

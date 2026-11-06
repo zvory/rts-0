@@ -55,10 +55,17 @@ impl DenyMemory {
 }
 
 /// Notes a Depot the raid killed at `at`.
-pub(in crate::ai_core::decision) fn note_kill(memory: &mut AiDecisionMemory, at: (f32, f32), tick: u32) {
+pub(in crate::ai_core::decision) fn note_kill(
+    memory: &mut AiDecisionMemory,
+    at: (f32, f32),
+    tick: u32,
+) {
     if memory.profile_id().is_some_and(is_jeff_v1_1) && !super::off("deny") {
         let state = &mut memory.jeff_v1_1.deny;
-        state.site = Some(((at.0.round() as i32, at.1.round() as i32), tick + WATCH_TICKS));
+        state.site = Some((
+            (at.0.round() as i32, at.1.round() as i32),
+            tick + WATCH_TICKS,
+        ));
         state.ordered = 0;
     }
 }
@@ -95,7 +102,10 @@ pub(in crate::ai_core::decision) fn watch(
         .iter()
         .filter(|unit| memory.jeff_v1_1.deny.holds(unit.id))
         .collect();
-    let strength: f32 = squad.iter().map(|unit| super::push::unit_value(unit.kind) as f32).sum();
+    let strength: f32 = squad
+        .iter()
+        .map(|unit| super::push::unit_value(unit.kind) as f32)
+        .sum();
     // Only the Riflemen out of the bases weigh the enemy: those still at home are the bases'
     // defence's to answer, and an enemy Tank near the main turned every squad back at once.
     let depots: Vec<(f32, f32)> = observation
@@ -117,9 +127,8 @@ pub(in crate::ai_core::decision) fn watch(
         .iter()
         .filter(|enemy| enemy.hp > 0 && enemy.kind.is_unit() && enemy.kind != EntityKind::Worker)
         .filter(|enemy| {
-            out.iter().any(|unit| {
-                dist2(unit.x, unit.y, enemy.x, enemy.y) <= squared(DANGER_TILES * ts)
-            })
+            out.iter()
+                .any(|unit| dist2(unit.x, unit.y, enemy.x, enemy.y) <= squared(DANGER_TILES * ts))
         })
         .map(|enemy| super::push::unit_value(enemy.kind) as f32)
         .sum();
@@ -172,7 +181,9 @@ pub(in crate::ai_core::decision) fn watch(
         .visible_enemies
         .iter()
         .filter(|enemy| enemy.hp > 0)
-        .filter(|enemy| enemy.kind == EntityKind::Worker || (enemy.kind.is_building() && !enemy.is_complete))
+        .filter(|enemy| {
+            enemy.kind == EntityKind::Worker || (enemy.kind.is_building() && !enemy.is_complete)
+        })
         .filter(|enemy| dist2(enemy.x, enemy.y, site.0, site.1) <= squared(WATCH_TILES * ts))
         .min_by(|a, b| {
             let rank = |e: &AiEntitySummary| u8::from(e.kind != EntityKind::Worker);
@@ -191,7 +202,10 @@ pub(in crate::ai_core::decision) fn watch(
     let main = tile_center(observation.own_start_tile, observation.map.tile_size);
     let back = normalized_direction(site, main).unwrap_or((0.0, 0.0));
     let post = clamp_to_map(
-        (site.0 + back.0 * POST_TILES * ts, site.1 + back.1 * POST_TILES * ts),
+        (
+            site.0 + back.0 * POST_TILES * ts,
+            site.1 + back.1 * POST_TILES * ts,
+        ),
         observation.map,
     );
     let away: Vec<u32> = ids
@@ -232,12 +246,23 @@ fn ride_with_raid(
 ) {
     let tick = observation.tick;
     let ts = observation.map.tile_size as f32;
-    let alive = |id: &u32| observation.owned.iter().any(|unit| unit.id == *id && unit.hp > 0);
+    let alive = |id: &u32| {
+        observation
+            .owned
+            .iter()
+            .any(|unit| unit.id == *id && unit.hp > 0)
+    };
     memory.jeff_v1_1.deny.squad.retain(|id| alive(id));
     let tanks: Vec<&AiEntitySummary> = observation
         .owned
         .iter()
-        .filter(|unit| memory.jeff_v1_1.tank_raid.tank_ids().any(|id| id == unit.id))
+        .filter(|unit| {
+            memory
+                .jeff_v1_1
+                .tank_raid
+                .tank_ids()
+                .any(|id| id == unit.id)
+        })
         .collect();
     if !memory.jeff_v1_1.tank_raid.going() || tanks.is_empty() {
         let ids: Vec<u32> = memory.jeff_v1_1.deny.squad.iter().copied().collect();
@@ -261,7 +286,9 @@ fn ride_with_raid(
             .iter()
             .filter(|unit| unit.kind == EntityKind::Rifleman && unit.is_complete && unit.hp > 0)
             .filter(|unit| {
-                !held.contains(&unit.id) && !reserved.contains(&unit.id) && !excluded(memory, unit.id)
+                !held.contains(&unit.id)
+                    && !reserved.contains(&unit.id)
+                    && !excluded(memory, unit.id)
             })
             .filter(|unit| dist2(unit.x, unit.y, centre.0, centre.1) <= squared(HOME_TILES * ts))
             .collect();
@@ -282,7 +309,10 @@ fn ride_with_raid(
     let home = tile_center(observation.own_start_tile, observation.map.tile_size);
     let back = normalized_direction(centre, home).unwrap_or((0.0, 0.0));
     let spot = clamp_to_map(
-        (centre.0 + back.0 * RIDE_BACK_TILES * ts, centre.1 + back.1 * RIDE_BACK_TILES * ts),
+        (
+            centre.0 + back.0 * RIDE_BACK_TILES * ts,
+            centre.1 + back.1 * RIDE_BACK_TILES * ts,
+        ),
         observation.map,
     );
     let ids: Vec<u32> = state.squad.iter().copied().collect();

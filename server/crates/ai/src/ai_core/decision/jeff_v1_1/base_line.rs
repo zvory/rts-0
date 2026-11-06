@@ -167,7 +167,14 @@ impl BaseLine {
 
     /// Points across the line `back` behind its front, `spacing` apart from its centre out (shifted
     /// half a step by `offset`), in ranks `rank_back` apart.
-    fn ranks(&self, count: usize, back: f32, spacing: f32, rank_back: f32, offset: f32) -> Vec<(f32, f32)> {
+    fn ranks(
+        &self,
+        count: usize,
+        back: f32,
+        spacing: f32,
+        rank_back: f32,
+        offset: f32,
+    ) -> Vec<(f32, f32)> {
         let half = (self.lateral.1 - self.lateral.0) * 0.5;
         let per_rank = ((half / spacing).floor() as usize) * 2 + 1;
         (0..count)
@@ -241,7 +248,11 @@ impl BaseLine {
     }
 
     /// Where the `count` Tanks stand: `TANK_BACK_TILES` behind the line, from its centre out.
-    pub(in crate::ai_core::decision) fn tank_points(&self, count: usize, ts: f32) -> Vec<(f32, f32)> {
+    pub(in crate::ai_core::decision) fn tank_points(
+        &self,
+        count: usize,
+        ts: f32,
+    ) -> Vec<(f32, f32)> {
         let spacing = TANK_SPACING_TILES * ts;
         self.ranks(count, TANK_BACK_TILES * ts, spacing, spacing, 0.0)
     }
@@ -397,13 +408,16 @@ fn base_lines_with(
 
 /// `route_axis` turned toward where attacks have come from, in `AXIS_STEP_DEGREES` steps.
 fn turned(route_axis: (f32, f32), contact: &BaseContact) -> (f32, f32) {
-    let weight =
-        CONTACT_WEIGHT * contact.count.min(CONTACTS_FOR_FULL_WEIGHT) as f32 / CONTACTS_FOR_FULL_WEIGHT as f32;
+    let weight = CONTACT_WEIGHT * contact.count.min(CONTACTS_FOR_FULL_WEIGHT) as f32
+        / CONTACTS_FOR_FULL_WEIGHT as f32;
     let toward = (
         contact.direction.0 as f32 / 1000.0,
         contact.direction.1 as f32 / 1000.0,
     );
-    let sum = (route_axis.0 + toward.0 * weight, route_axis.1 + toward.1 * weight);
+    let sum = (
+        route_axis.0 + toward.0 * weight,
+        route_axis.1 + toward.1 * weight,
+    );
     if sum.0.hypot(sum.1) < 1e-3 {
         return route_axis;
     }
@@ -428,7 +442,10 @@ fn note_contact(memory: &mut LineMemory, depot: u32, origin: (f32, f32), at: (f3
         (sum.0 / length * 1000.0).round() as i32,
         (sum.1 / length * 1000.0).round() as i32,
     );
-    contact.count = contact.count.saturating_add(1).min(CONTACTS_FOR_FULL_WEIGHT);
+    contact.count = contact
+        .count
+        .saturating_add(1)
+        .min(CONTACTS_FOR_FULL_WEIGHT);
 }
 
 /// The nearest living enemy: its player id and start, in world pixels.
@@ -529,15 +546,16 @@ pub(in crate::ai_core::decision) fn allocate(
     }
     rest.sort_by_key(|(id, _, _)| *id);
     for (id, at, _) in rest {
-        let best = (0..lines.len())
-            .filter(|index| weights[*index] > 0)
-            .min_by(|a, b| {
-                let short = |index: usize| shares[index] as i64 - counts[index] as i64;
-                short(*b).cmp(&short(*a)).then(
-                    dist2(at.0, at.1, lines[*a].origin.0, lines[*a].origin.1)
-                        .total_cmp(&dist2(at.0, at.1, lines[*b].origin.0, lines[*b].origin.1)),
-                )
-            });
+        let best =
+            (0..lines.len())
+                .filter(|index| weights[*index] > 0)
+                .min_by(|a, b| {
+                    let short = |index: usize| shares[index] as i64 - counts[index] as i64;
+                    short(*b).cmp(&short(*a)).then(
+                        dist2(at.0, at.1, lines[*a].origin.0, lines[*a].origin.1)
+                            .total_cmp(&dist2(at.0, at.1, lines[*b].origin.0, lines[*b].origin.1)),
+                    )
+                });
         if let Some(index) = best {
             counts[index] += 1;
             placed.push((*id, index));
@@ -562,7 +580,11 @@ pub(in crate::ai_core::decision) fn stage_main(
     guns: bool,
 ) -> Option<Vec<u32>> {
     let ts = observation.map.tile_size as f32;
-    let lines = base_lines(observation, map_analysis, &memory.jeff_v1_1.base_lines.contacts);
+    let lines = base_lines(
+        observation,
+        map_analysis,
+        &memory.jeff_v1_1.base_lines.contacts,
+    );
     let line = lines.iter().find(|line| line.main)?;
     let members: Vec<&AiEntitySummary> = observation
         .owned
@@ -580,7 +602,9 @@ pub(in crate::ai_core::decision) fn stage_main(
         };
         let on = dist2(unit.x, unit.y, point.0, point.1) <= squared(ON_POST_TILES * ts);
         let sent = if on {
-            (!guns).then(|| actions::hold_position_units(actions, [id])).flatten()
+            (!guns)
+                .then(|| actions::hold_position_units(actions, [id]))
+                .flatten()
         } else {
             actions::attack_move_units(actions, [id], point.0, point.1)
         };
@@ -726,7 +750,11 @@ pub(in crate::ai_core::decision) fn hold(
     }
     let ts = observation.map.tile_size as f32;
     let tick = observation.tick;
-    let lines = base_lines(observation, map_analysis, &memory.jeff_v1_1.base_lines.contacts);
+    let lines = base_lines(
+        observation,
+        map_analysis,
+        &memory.jeff_v1_1.base_lines.contacts,
+    );
     if lines.is_empty() {
         memory.jeff_v1_1.base_lines.posts.clear();
         return;
@@ -738,8 +766,14 @@ pub(in crate::ai_core::decision) fn hold(
     let free = |unit: &AiEntitySummary| !held.contains(&unit.id);
     let mobile = |unit: &AiEntitySummary| free(unit) && !guns_only;
     let classes = [
-        (Class::Rifle, line_units(observation, memory, EntityKind::Rifleman, mobile)),
-        (Class::Faust, line_units(observation, memory, EntityKind::Panzerfaust, mobile)),
+        (
+            Class::Rifle,
+            line_units(observation, memory, EntityKind::Rifleman, mobile),
+        ),
+        (
+            Class::Faust,
+            line_units(observation, memory, EntityKind::Panzerfaust, mobile),
+        ),
         (
             Class::Gun,
             line_units(observation, memory, EntityKind::MachineGunner, |unit| {
@@ -802,7 +836,9 @@ pub(in crate::ai_core::decision) fn hold(
         .map(|index| match besieged {
             Some(besieged) if besieged == index => lines[index].exposure.max(1),
             Some(_) => 0,
-            None if by_exposure[..groups.min(lines.len())].contains(&index) => lines[index].exposure,
+            None if by_exposure[..groups.min(lines.len())].contains(&index) => {
+                lines[index].exposure
+            }
             None => 0,
         })
         .collect();
@@ -934,7 +970,12 @@ fn sound_alarm(
         let Some((threat, at)) = line.contact(observation) else {
             continue;
         };
-        note_contact(&mut memory.jeff_v1_1.base_lines, line.depot, line.origin, at);
+        note_contact(
+            &mut memory.jeff_v1_1.base_lines,
+            line.depot,
+            line.origin,
+            at,
+        );
         let mobile = |of: usize| -> Vec<u32> {
             seated
                 .iter()
@@ -952,8 +993,12 @@ fn sound_alarm(
             let mut others: Vec<usize> = (0..lines.len()).filter(|other| *other != index).collect();
             others.sort_by(|a, b| {
                 let (a, b) = (&lines[*a].origin, &lines[*b].origin);
-                dist2(a.0, a.1, line.origin.0, line.origin.1)
-                    .total_cmp(&dist2(b.0, b.1, line.origin.0, line.origin.1))
+                dist2(a.0, a.1, line.origin.0, line.origin.1).total_cmp(&dist2(
+                    b.0,
+                    b.1,
+                    line.origin.0,
+                    line.origin.1,
+                ))
             });
             if let Some(nearest) = others.first() {
                 for id in mobile(*nearest) {
@@ -1111,7 +1156,9 @@ fn hold_spread(
     // One group: split three to a base, they died parked 2-3 at a time to Pressure AI's groups of
     // 4-9 Tanks (Crossroads, 17 lost for 9 on Jeff's half; V1.1's one staged group lost 8 for 32).
     let groups = usize::from(!tanks.is_empty());
-    let mut by_exposure: Vec<usize> = (0..lines.len()).filter(|index| !lines[*index].main).collect();
+    let mut by_exposure: Vec<usize> = (0..lines.len())
+        .filter(|index| !lines[*index].main)
+        .collect();
     by_exposure.sort_by_key(|index| (std::cmp::Reverse(lines[*index].exposure), *index));
     let besieged = lines
         .iter()
@@ -1144,7 +1191,13 @@ fn hold_spread(
     ] {
         let entries: Vec<(u32, (f32, f32), Option<u32>)> = units
             .iter()
-            .map(|unit| (unit.id, (unit.x, unit.y), previous.get(&unit.id).map(|post| post.depot)))
+            .map(|unit| {
+                (
+                    unit.id,
+                    (unit.x, unit.y),
+                    previous.get(&unit.id).map(|post| post.depot),
+                )
+            })
             .collect();
         let on_post: BTreeSet<u32> = units
             .iter()
@@ -1194,11 +1247,17 @@ fn hold_spread(
         };
         let depot = lines[index].depot;
         let at = (point.0.round() as i32, point.1.round() as i32);
-        let same = memory.jeff_v1_1.base_lines.posts.get(&id).copied().filter(|post| {
-            post.depot == depot
-                && dist2(post.at.0 as f32, post.at.1 as f32, point.0, point.1)
-                    <= squared(SAME_POST_TILES * ts)
-        });
+        let same = memory
+            .jeff_v1_1
+            .base_lines
+            .posts
+            .get(&id)
+            .copied()
+            .filter(|post| {
+                post.depot == depot
+                    && dist2(post.at.0 as f32, post.at.1 as f32, point.0, point.1)
+                        <= squared(SAME_POST_TILES * ts)
+            });
         let mut post = LinePost {
             depot,
             at,

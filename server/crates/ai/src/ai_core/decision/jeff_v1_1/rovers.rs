@@ -170,7 +170,10 @@ pub(in crate::ai_core::decision) fn roam(
                 raiders.iter().map(|enemy| enemy.x).sum::<f32>() / n,
                 raiders.iter().map(|enemy| enemy.y).sum::<f32>() / n,
             );
-            let enemy_tanks = raiders.iter().filter(|enemy| enemy.kind == EntityKind::Tank).count();
+            let enemy_tanks = raiders
+                .iter()
+                .filter(|enemy| enemy.kind == EntityKind::Tank)
+                .count();
             let support = jeff_tanks
                 .iter()
                 .filter(|tank| {
@@ -178,7 +181,10 @@ pub(in crate::ai_core::decision) fn roam(
                 })
                 .count();
             let takes = enemy_tanks <= support || enemy_tanks * RIFLES_PER_TANK <= rovers.len();
-            let value: u32 = raiders.iter().map(|enemy| super::push::unit_value(enemy.kind)).sum();
+            let value: u32 = raiders
+                .iter()
+                .map(|enemy| super::push::unit_value(enemy.kind))
+                .sum();
             takes.then_some((value, centre))
         })
         .max_by(|a, b| a.0.cmp(&b.0))
@@ -225,7 +231,10 @@ pub(in crate::ai_core::decision) fn roam(
             else {
                 return;
             };
-            (main.0 + axis.0 * STATION_OUT_TILES * ts, main.1 + axis.1 * STATION_OUT_TILES * ts)
+            (
+                main.0 + axis.0 * STATION_OUT_TILES * ts,
+                main.1 + axis.1 * STATION_OUT_TILES * ts,
+            )
         } else {
             let n = outer.len() as f32 + 1.0;
             let middle = (

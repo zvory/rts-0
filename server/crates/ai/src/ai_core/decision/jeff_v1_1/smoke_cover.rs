@@ -44,8 +44,12 @@ pub(in crate::ai_core::decision) fn cover(
         return;
     }
     let ts = observation.map.tile_size as f32;
-    let Some(car) = scout.and_then(|id| observation.owned.iter().find(|unit| unit.id == id && unit.hp > 0))
-    else {
+    let Some(car) = scout.and_then(|id| {
+        observation
+            .owned
+            .iter()
+            .find(|unit| unit.id == id && unit.hp > 0)
+    }) else {
         return;
     };
     if !ready(observation, car.id) {
@@ -65,7 +69,8 @@ pub(in crate::ai_core::decision) fn cover(
             .iter()
             .any(|cloud| dist2(cloud.x, cloud.y, at.0, at.1) <= squared(COVERED_TILES * ts))
     };
-    let in_range = |at: (f32, f32)| dist2(car.x, car.y, at.0, at.1) <= squared(SMOKE_RANGE_TILES * ts);
+    let in_range =
+        |at: (f32, f32)| dist2(car.x, car.y, at.0, at.1) <= squared(SMOKE_RANGE_TILES * ts);
     let enemy_tanks: Vec<&AiEntitySummary> = observation
         .visible_enemies
         .iter()
@@ -108,7 +113,9 @@ pub(in crate::ai_core::decision) fn cover(
         let (rear, chaser) = ours
             .iter()
             .flat_map(|unit| chasers.iter().map(move |enemy| (*unit, **enemy)))
-            .min_by(|(a, x), (b, y)| dist2(a.x, a.y, x.x, x.y).total_cmp(&dist2(b.x, b.y, y.x, y.y)))?;
+            .min_by(|(a, x), (b, y)| {
+                dist2(a.x, a.y, x.x, x.y).total_cmp(&dist2(b.x, b.y, y.x, y.y))
+            })?;
         let mid = ((rear.x + chaser.x) * 0.5, (rear.y + chaser.y) * 0.5);
         (in_range(mid) && !covered(mid)).then_some(mid)
     });

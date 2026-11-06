@@ -276,8 +276,9 @@ where
                     && candidate.oil_in_range >= config::OIL_PATCHES_PER_BASE as usize
             });
         if full {
-            return (expansion_site_is_separate(observation, tile) && placeable(kind, tile.0, tile.1))
-                .then_some(tile);
+            return (expansion_site_is_separate(observation, tile)
+                && placeable(kind, tile.0, tile.1))
+            .then_some(tile);
         }
     }
     if uses_current_jeffs_ai_policy(profile_id) {
@@ -1117,12 +1118,14 @@ mod tests {
             let start = game.start_payload();
             for player in [1, 2] {
                 let snapshot = game.snapshot_for(player);
-                let obs = AiObservation::from_snapshot_with_alive(&start, &snapshot, player, [], None)
-                    .unwrap();
+                let obs =
+                    AiObservation::from_snapshot_with_alive(&start, &snapshot, player, [], None)
+                        .unwrap();
                 let occupied = occupied_tiles_from_snapshot(&start.map, &snapshot);
                 let place = |x: u32, y: u32| {
-                    footprint_placeable_from_snapshot(&start.map, &snapshot, player, kind, x, y, &occupied)
-                        && !super::super::jeff::resource_body_blocks_site(&obs, kind, x, y)
+                    footprint_placeable_from_snapshot(
+                        &start.map, &snapshot, player, kind, x, y, &occupied,
+                    ) && !super::super::jeff::resource_body_blocks_site(&obs, kind, x, y)
                 };
                 let resources = expansion_candidate_resources(&obs);
                 let tile = match (name, obs.own_start_tile) {
@@ -1132,9 +1135,8 @@ mod tests {
                         .map_or((0, 0), |instruction| instruction.tile),
                 };
                 let full = |x: u32, y: u32| {
-                    expansion_site_candidate(&obs, kind, x, y, &resources).map(|candidate| {
-                        (candidate.steel_in_range, candidate.oil_in_range)
-                    })
+                    expansion_site_candidate(&obs, kind, x, y, &resources)
+                        .map(|candidate| (candidate.steel_in_range, candidate.oil_in_range))
                 };
                 println!(
                     "{name} player {player} start {:?}: instructed {:?} placeable {} resources {:?}",
@@ -1148,15 +1150,22 @@ mod tests {
                 for dy in -5i32..=5 {
                     for dx in -5i32..=5 {
                         let (x, y) = ((tile.0 as i32 + dx) as u32, (tile.1 as i32 + dy) as u32);
-                        let Some((steel, oil)) = full(x, y) else { continue };
+                        let Some((steel, oil)) = full(x, y) else {
+                            continue;
+                        };
                         if steel < config::STEEL_PATCHES_PER_BASE as usize
                             || oil < config::OIL_PATCHES_PER_BASE as usize
                             || !place(x, y)
                         {
                             continue;
                         }
-                        let center = (x as f32 + stats.foot_w as f32 * 0.5, y as f32 + stats.foot_h as f32 * 0.5);
-                        let shift = ((center.0 - old_center.0).powi(2) + (center.1 - old_center.1).powi(2)).sqrt();
+                        let center = (
+                            x as f32 + stats.foot_w as f32 * 0.5,
+                            y as f32 + stats.foot_h as f32 * 0.5,
+                        );
+                        let shift = ((center.0 - old_center.0).powi(2)
+                            + (center.1 - old_center.1).powi(2))
+                        .sqrt();
                         good.push((shift, (x, y), steel, oil));
                     }
                 }

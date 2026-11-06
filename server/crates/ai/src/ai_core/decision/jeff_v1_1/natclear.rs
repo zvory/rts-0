@@ -195,7 +195,9 @@ pub(in crate::ai_core::decision) fn plan(
         .expansion_security
         .site
         .filter(|_| due)
-        .and_then(|site| building_center(site, EntityKind::ResourceDepot, observation.map.tile_size))
+        .and_then(|site| {
+            building_center(site, EntityKind::ResourceDepot, observation.map.tile_size)
+        })
     else {
         memory.jeff_v1_1.natclear.why = "not_due";
         return BTreeSet::new();
@@ -218,7 +220,8 @@ pub(in crate::ai_core::decision) fn plan(
         dist2(x, y, px, py) <= squared(ROUTE_TILES * ts)
             && dist2(x, y, main.0, main.1) >= squared(ROUTE_FROM_MAIN_TILES * ts)
     };
-    let in_play = |x: f32, y: f32| near(x, y, CLEAR_TILES) || (flag("ncroute", true) && on_route(x, y));
+    let in_play =
+        |x: f32, y: f32| near(x, y, CLEAR_TILES) || (flag("ncroute", true) && on_route(x, y));
     let targets: Vec<&AiEntitySummary> = observation
         .visible_enemies
         .iter()
@@ -229,9 +232,17 @@ pub(in crate::ai_core::decision) fn plan(
         memory.jeff_v1_1.natclear.why = "clear";
         return BTreeSet::new();
     }
-    let need = (targets.iter().map(|enemy| need_for(enemy.kind)).sum::<f32>().ceil() as usize)
+    let need = (targets
+        .iter()
+        .map(|enemy| need_for(enemy.kind))
+        .sum::<f32>()
+        .ceil() as usize)
         .max(MIN_GROUP);
-    let ideal = (targets.iter().map(|enemy| ideal_for(enemy.kind)).sum::<f32>().ceil() as usize)
+    let ideal = (targets
+        .iter()
+        .map(|enemy| ideal_for(enemy.kind))
+        .sum::<f32>()
+        .ceil() as usize)
         .max(need);
     let n = targets.len() as f32;
     let aim = (
@@ -317,15 +328,24 @@ pub(in crate::ai_core::decision) fn plan(
             && !memory.jeff_v1_1.base_lines.posted(unit.id)
             && !memory.jeff_v1_1.stations.posted_out(unit.id)
     };
-    let by_id: BTreeMap<u32, &AiEntitySummary> =
-        observation.owned.iter().map(|unit| (unit.id, unit)).collect();
+    let by_id: BTreeMap<u32, &AiEntitySummary> = observation
+        .owned
+        .iter()
+        .map(|unit| (unit.id, unit))
+        .collect();
     // The members still free (with `ncguards=1` the natural's guards first), then the free Riflemen
     // at the main nearest the block, up to the most the enemy is worth, always leaving `HOME_KEEP`
     // free at the main.
     let mut members: BTreeSet<u32> = previous
         .members
         .iter()
-        .chain(memory.expansion_security.riflemen.iter().filter(|_| flag("ncguards", false)))
+        .chain(
+            memory
+                .expansion_security
+                .riflemen
+                .iter()
+                .filter(|_| flag("ncguards", false)),
+        )
         .copied()
         .filter(|id| by_id.get(id).is_some_and(|unit| free(unit)))
         .collect();
@@ -348,8 +368,12 @@ pub(in crate::ai_core::decision) fn plan(
         members.insert(unit.id);
     }
     let members = members;
-    let mut charge: BTreeSet<u32> =
-        previous.charge.iter().copied().filter(|id| members.contains(id)).collect();
+    let mut charge: BTreeSet<u32> = previous
+        .charge
+        .iter()
+        .copied()
+        .filter(|id| members.contains(id))
+        .collect();
     // A charge left with under half of what the enemy still needs falls back to gather.
     if charge.len() * 2 < need {
         charge.clear();
@@ -357,7 +381,11 @@ pub(in crate::ai_core::decision) fn plan(
     // The block's slots for the members not charging, left to right across the approach.
     let across = (-facing.1, facing.0);
     let lateral = |x: f32, y: f32| (x - front.0) * across.0 + (y - front.1) * across.1;
-    let mut gatherers: Vec<u32> = members.iter().copied().filter(|id| !charge.contains(id)).collect();
+    let mut gatherers: Vec<u32> = members
+        .iter()
+        .copied()
+        .filter(|id| !charge.contains(id))
+        .collect();
     gatherers.sort_by(|a, b| {
         let at = |id: &u32| by_id.get(id).map_or(0.0, |unit| lateral(unit.x, unit.y));
         at(a).total_cmp(&at(b)).then(a.cmp(b))
@@ -378,7 +406,12 @@ pub(in crate::ai_core::decision) fn plan(
                     observation.map,
                 );
                 if back >= row as f32 * ts + 4.0 * ts
-                    || defense::defensive_position_is_open(observation, map_analysis, point.0, point.1)
+                    || defense::defensive_position_is_open(
+                        observation,
+                        map_analysis,
+                        point.0,
+                        point.1,
+                    )
                 {
                     break point;
                 }
@@ -393,22 +426,36 @@ pub(in crate::ai_core::decision) fn plan(
         .iter()
         .copied()
         .filter(|id| {
-            by_id.get(id).zip(slot_of.get(id)).is_some_and(|(unit, slot)| {
-                dist2(unit.x, unit.y, slot.0, slot.1) <= squared(GATHERED_TILES * ts)
-            })
+            by_id
+                .get(id)
+                .zip(slot_of.get(id))
+                .is_some_and(|(unit, slot)| {
+                    dist2(unit.x, unit.y, slot.0, slot.1) <= squared(GATHERED_TILES * ts)
+                })
         })
         .collect();
     // Members still walking that will be there within `WAIT_TICKS`: the charge waits for them once it
     // has the fewest, and no longer for any.
     let speed = config::unit_stats(EntityKind::Rifleman).map_or(1.6, |stats| stats.speed)
-        * if observation.upgrades.contains(&UpgradeKind::Methamphetamines) { METH_SPEED } else { 1.0 };
+        * if observation
+            .upgrades
+            .contains(&UpgradeKind::Methamphetamines)
+        {
+            METH_SPEED
+        } else {
+            1.0
+        };
     let coming = gatherers
         .iter()
         .filter(|id| !gathered.contains(id))
         .filter(|id| {
-            by_id.get(id).zip(slot_of.get(id)).is_some_and(|(unit, slot)| {
-                dist2(unit.x, unit.y, slot.0, slot.1).sqrt() / speed.max(0.1) <= WAIT_TICKS as f32
-            })
+            by_id
+                .get(id)
+                .zip(slot_of.get(id))
+                .is_some_and(|(unit, slot)| {
+                    dist2(unit.x, unit.y, slot.0, slot.1).sqrt() / speed.max(0.1)
+                        <= WAIT_TICKS as f32
+                })
         })
         .count();
     let tick = observation.tick;

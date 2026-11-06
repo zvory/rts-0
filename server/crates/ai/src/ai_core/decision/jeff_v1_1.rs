@@ -11,20 +11,20 @@ pub(super) mod charge;
 pub(super) mod deny;
 pub(super) mod front_line;
 pub(super) mod home_guard;
-pub(super) mod meth_strike;
 pub(super) mod hunt;
+pub(super) mod meth_strike;
 pub(super) mod natclear;
+pub(super) mod natsiege;
 pub(super) mod natural;
 pub(super) mod push;
 pub(super) mod resume;
-pub(super) mod stations;
 pub(super) mod reveal;
 pub(super) mod rovers;
 pub(super) mod scout;
-pub(super) mod smoke_cover;
 pub(super) mod screen;
+pub(super) mod smoke_cover;
 pub(super) mod south_route;
-pub(super) mod natsiege;
+pub(super) mod stations;
 pub(super) mod strike;
 pub(super) mod tank_pause;
 pub(super) mod tank_raid;
@@ -331,7 +331,10 @@ pub(super) fn reserve_tank_steel(
     if !is_jeff_v1_1(profile_id) || building_kind != EntityKind::Barracks || off("tankreserve") {
         return;
     }
-    if !facts.completed_upgrades().contains(&UpgradeKind::TankUnlock) {
+    if !facts
+        .completed_upgrades()
+        .contains(&UpgradeKind::TankUnlock)
+    {
         return;
     }
     let (steel, oil) = rts_rules::economy::cost(EntityKind::Tank);
@@ -555,13 +558,19 @@ pub(super) fn riflemen_first(
     if rifle_opening(profile_id)
         && !off("tcrifles")
         && facts.building_count(EntityKind::TrainingCentre) > 0
-        && !observation.upgrades.contains(&UpgradeKind::Methamphetamines)
+        && !observation
+            .upgrades
+            .contains(&UpgradeKind::Methamphetamines)
     {
         priorities.retain(|unit| *unit != EntityKind::Rifleman);
         priorities.insert(0, EntityKind::Rifleman);
         return Some(riflemen + facts.building_count(EntityKind::Barracks).max(1));
     }
-    if !off("opening4") && !observation.upgrades.contains(&UpgradeKind::Methamphetamines) {
+    if !off("opening4")
+        && !observation
+            .upgrades
+            .contains(&UpgradeKind::Methamphetamines)
+    {
         priorities.retain(|unit| *unit != EntityKind::Rifleman);
         if facts.building_count(EntityKind::TrainingCentre) == 0
             || fresh >= OPENING_RIFLES
@@ -616,7 +625,8 @@ pub(super) fn rifle_opening(profile_id: &str) -> bool {
 /// Pressure AI: 0-9-31 with 8 draws ahead, against 0-21-19 with 2 at 14; it took the natural
 /// earlier (The River 2:30, was 3:31), and against Rush AI went 1-7-32 (was 0-4-36).
 pub(super) fn natural_rifles() -> usize {
-    crate::ai_core::profiles::jeff_v1_1_param("natrifles").map_or(NATURAL_RIFLES, |value| value as usize)
+    crate::ai_core::profiles::jeff_v1_1_param("natrifles")
+        .map_or(NATURAL_RIFLES, |value| value as usize)
 }
 const NATURAL_RIFLES: usize = 10;
 
@@ -634,7 +644,8 @@ const THIRD_BASE_RIFLES: usize = 12;
 /// Jeff's Classic natural kept it contested from 2:23 on; the order never went out, so no Factory
 /// and no Tank came to clear them, and 1,250 Steel sat banked at 3:20.
 pub(super) fn rifle_factory_free(profile_id: &str, tick: u32) -> bool {
-    let wait = crate::ai_core::profiles::jeff_v1_1_param("factorywait").map_or(180.0, |s| s.max(0.0));
+    let wait =
+        crate::ai_core::profiles::jeff_v1_1_param("factorywait").map_or(180.0, |s| s.max(0.0));
     rifle_opening(profile_id) && !off("facwait") && tick >= (wait * config::TICK_HZ as f32) as u32
 }
 
@@ -646,7 +657,11 @@ pub(super) fn refit_natural(profile_id: &str, observation: &AiObservation) -> Op
     if !is_jeff_v1_1(profile_id) || off("depot4") {
         return None;
     }
-    match (observation.map.width, observation.map.height, observation.own_start_tile) {
+    match (
+        observation.map.width,
+        observation.map.height,
+        observation.own_start_tile,
+    ) {
         (166, 166, (8, 47)) => Some((21, 24)),
         (166, 166, (157, 47)) => Some((141, 24)),
         (126, 126, (9, 9)) => Some((15, 30)),
@@ -714,7 +729,9 @@ pub(super) fn rifle_barracks_target(
         .filter(|unit| unit.kind == EntityKind::Barracks && unit.hp > 0)
         .all(|unit| unit.is_complete && unit.production_queue_len.unwrap_or(0) > 0);
     let more = third_base::banked(observation, memory) && all_busy;
-    target.max(OPENING_BARRACKS).max(barracks + usize::from(more))
+    target
+        .max(OPENING_BARRACKS)
+        .max(barracks + usize::from(more))
 }
 const OPENING_BARRACKS: usize = 2;
 
@@ -779,7 +796,11 @@ pub(super) fn rifles_past_first_tank(
 /// still for 10 s: for 10 s after each foundation went down Jeff held its cost back a second time
 /// (the Training Centre's 100 Steel from 0:28 to 0:38 against Pressure AI on Classic, with the
 /// Barracks idle). An order whose foundation stands owes nothing more.
-pub(super) fn committed_steel(profile_id: &str, observation: &AiObservation, facts: &AiFacts) -> u32 {
+pub(super) fn committed_steel(
+    profile_id: &str,
+    observation: &AiObservation,
+    facts: &AiFacts,
+) -> u32 {
     if !is_jeff_v1_1(profile_id) || off("committed") {
         return facts.committed_steel;
     }
@@ -903,9 +924,9 @@ pub(super) fn fast_third_ready(observation: &AiObservation, profile_id: &str) ->
         .iter()
         .filter(|unit| unit.kind == EntityKind::MachineGunner && unit.is_complete && unit.hp > 0)
         .filter(|unit| {
-            naturals
-                .iter()
-                .any(|depot| dist2(unit.x, unit.y, depot.0, depot.1) <= squared(NATURAL_GUN_TILES * ts))
+            naturals.iter().any(|depot| {
+                dist2(unit.x, unit.y, depot.0, depot.1) <= squared(NATURAL_GUN_TILES * ts)
+            })
         })
         .count()
         >= FAST_THIRD_GUNS
@@ -946,7 +967,10 @@ pub(super) fn rifle_line(
     if facts.unit_count(EntityKind::Panzerfaust) < fausts
         && !priorities.contains(&EntityKind::Panzerfaust)
     {
-        match priorities.iter().position(|unit| *unit == EntityKind::Rifleman) {
+        match priorities
+            .iter()
+            .position(|unit| *unit == EntityKind::Rifleman)
+        {
             Some(index) => priorities.insert(index, EntityKind::Panzerfaust),
             None => priorities.push(EntityKind::Panzerfaust),
         }

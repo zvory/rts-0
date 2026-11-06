@@ -234,7 +234,8 @@ pub(in crate::ai_core::decision) fn forced_due(
 ) -> bool {
     v1_1(memory)
         && !super::off("forcepush")
-        && forced_slot(observation.tick).is_some_and(|slot| slot >= memory.jeff_v1_1.push.forced_waves)
+        && forced_slot(observation.tick)
+            .is_some_and(|slot| slot >= memory.jeff_v1_1.push.forced_waves)
 }
 
 /// Uses up the current slot: the push left on it, or was already out during it. `forced` says
@@ -287,16 +288,29 @@ pub(in crate::ai_core::decision) fn note_enemy_army(
     let ts = observation.map.tile_size as f32;
     let push = &mut memory.jeff_v1_1.push;
     let mut seen = BTreeSet::new();
-    for enemy in observation.visible_enemies.iter().filter(|enemy| enemy.hp > 0) {
+    for enemy in observation
+        .visible_enemies
+        .iter()
+        .filter(|enemy| enemy.hp > 0)
+    {
         seen.insert(enemy.id);
         let at = stored((enemy.x, enemy.y));
         if is_fighter(enemy.kind) {
             let value = unit_value(enemy.kind);
             let kind = enemy.kind;
-            push.enemies.insert(enemy.id, Sighting { tick, kind, value, at });
+            push.enemies.insert(
+                enemy.id,
+                Sighting {
+                    tick,
+                    kind,
+                    value,
+                    at,
+                },
+            );
         } else if enemy.kind.is_building() {
             let kind = enemy.kind;
-            push.buildings.insert(enemy.id, BuildingSighting { kind, at });
+            push.buildings
+                .insert(enemy.id, BuildingSighting { kind, at });
         }
     }
     let in_sight = |at: (i32, i32)| {
@@ -335,7 +349,12 @@ pub(in crate::ai_core::decision) fn remembered_tanks(memory: &AiDecisionMemory) 
 }
 
 /// Remembered enemy strength within `radius_tiles` of `at`, each fighter fading with age.
-fn threat_at(observation: &AiObservation, push: &PushMemory, at: (f32, f32), radius_tiles: f32) -> f32 {
+fn threat_at(
+    observation: &AiObservation,
+    push: &PushMemory,
+    at: (f32, f32),
+    radius_tiles: f32,
+) -> f32 {
     let ts = observation.map.tile_size as f32;
     push.enemies
         .values()
@@ -545,7 +564,12 @@ fn note_strike(observation: &AiObservation, memory: &mut AiDecisionMemory, ours:
 /// when its centre lies within `ANSWER_TILES` of the base and it and those fighters together at
 /// least match the force: it strikes the force, the base calling with the largest shortfall first,
 /// and takes up its anchor or raid again once the force is gone (`STRIKE_MEMORY_TICKS` unseen).
-fn answer_base(observation: &AiObservation, memory: &mut AiDecisionMemory, ours: f32, units: &[u32]) {
+fn answer_base(
+    observation: &AiObservation,
+    memory: &mut AiDecisionMemory,
+    ours: f32,
+    units: &[u32],
+) {
     memory.jeff_v1_1.push.call.clear();
     if super::off("pushstation") {
         return;
@@ -597,7 +621,10 @@ fn answer_base(observation: &AiObservation, memory: &mut AiDecisionMemory, ours:
             .iter()
             .filter(|enemy| is_fighter(enemy.kind) && enemy.hp > 0 && near(enemy.x, enemy.y))
             .collect();
-        let value: f32 = force.iter().map(|enemy| unit_value(enemy.kind) as f32).sum();
+        let value: f32 = force
+            .iter()
+            .map(|enemy| unit_value(enemy.kind) as f32)
+            .sum();
         if force.is_empty() || value < unit_value(EntityKind::Tank) as f32 {
             continue;
         }
@@ -625,7 +652,10 @@ fn answer_base(observation: &AiObservation, memory: &mut AiDecisionMemory, ours:
         if heaviest.as_ref().is_none_or(|(best, _)| value > *best) {
             heaviest = Some((
                 value,
-                format!("{} v{:.0} l{:.0} o{:.0} {verdict}", depot.id, value, local, ours),
+                format!(
+                    "{} v{:.0} l{:.0} o{:.0} {verdict}",
+                    depot.id, value, local, ours
+                ),
             ));
         }
         if verdict != "answer" {
@@ -663,9 +693,8 @@ fn candidates(
 ) -> Vec<Candidate> {
     let ts = observation.map.tile_size as f32;
     let tick = observation.tick;
-    let near = |a: (f32, f32), b: (f32, f32), tiles: f32| {
-        dist2(a.0, a.1, b.0, b.1) <= squared(tiles * ts)
-    };
+    let near =
+        |a: (f32, f32), b: (f32, f32), tiles: f32| dist2(a.0, a.1, b.0, b.1) <= squared(tiles * ts);
     let buildings: Vec<(EntityKind, (f32, f32))> = push
         .buildings
         .values()
@@ -701,7 +730,10 @@ fn candidates(
             });
         }
     }
-    if !found.iter().any(|base| near(base.at, enemy_main, BASE_TILES)) {
+    if !found
+        .iter()
+        .any(|base| near(base.at, enemy_main, BASE_TILES))
+    {
         found.push(Candidate {
             at: enemy_main,
             worth: MAIN_WORTH,
@@ -751,11 +783,16 @@ pub(in crate::ai_core::decision) fn scout_points(
     enemy_main: (f32, f32),
 ) -> Vec<(f32, f32)> {
     let ts = observation.map.tile_size as f32;
-    candidates(observation, analysis, &mut memory.jeff_v1_1.push, enemy_main)
-        .into_iter()
-        .map(|candidate| candidate.at)
-        .filter(|at| dist2(at.0, at.1, enemy_main.0, enemy_main.1) > squared(BASE_TILES * ts))
-        .collect()
+    candidates(
+        observation,
+        analysis,
+        &mut memory.jeff_v1_1.push,
+        enemy_main,
+    )
+    .into_iter()
+    .map(|candidate| candidate.at)
+    .filter(|at| dist2(at.0, at.1, enemy_main.0, enemy_main.1) > squared(BASE_TILES * ts))
+    .collect()
 }
 
 /// The enemy bases and likely base sites a raid might hit, with their worth: the enemy main left out.
@@ -766,14 +803,18 @@ pub(in crate::ai_core::decision) fn raid_candidates(
     enemy_main: (f32, f32),
 ) -> Vec<((f32, f32), f32)> {
     let ts = observation.map.tile_size as f32;
-    candidates(observation, analysis, &mut memory.jeff_v1_1.push, enemy_main)
-        .into_iter()
-        .filter(|candidate| {
-            dist2(candidate.at.0, candidate.at.1, enemy_main.0, enemy_main.1)
-                > squared(BASE_TILES * ts)
-        })
-        .map(|candidate| (candidate.at, candidate.worth))
-        .collect()
+    candidates(
+        observation,
+        analysis,
+        &mut memory.jeff_v1_1.push,
+        enemy_main,
+    )
+    .into_iter()
+    .filter(|candidate| {
+        dist2(candidate.at.0, candidate.at.1, enemy_main.0, enemy_main.1) > squared(BASE_TILES * ts)
+    })
+    .map(|candidate| (candidate.at, candidate.worth))
+    .collect()
 }
 
 /// The enemy Depots seen and not since seen gone, the enemy main's left out.
@@ -796,7 +837,8 @@ pub(in crate::ai_core::decision) fn known_depots(
 
 /// The nearest living enemy's start.
 pub(in crate::ai_core::decision) fn enemy_main(observation: &AiObservation) -> Option<(f32, f32)> {
-    enemy_player(observation).map(|player| tile_center(player.start_tile, observation.map.tile_size))
+    enemy_player(observation)
+        .map(|player| tile_center(player.start_tile, observation.map.tile_size))
 }
 
 /// Remembered enemy strength within `radius_tiles` of `at`.
@@ -928,7 +970,12 @@ pub(in crate::ai_core::decision) fn objective(
     let center = super::super::frontal::group_center(observation, &tanks)?;
     // `goin`: far ahead, the push drives into the nearest known enemy base instead of holding short.
     memory.jeff_v1_1.push.going_in = false;
-    let enemy_tanks = memory.jeff_v1_1.push.peak_tanks.0.max(memory.recent_enemy_tanks());
+    let enemy_tanks = memory
+        .jeff_v1_1
+        .push
+        .peak_tanks
+        .0
+        .max(memory.recent_enemy_tanks());
     if !super::off("goin")
         && ours >= enemy_army(observation, memory) * GOIN_RATIO
         && tanks.len() as f32 >= enemy_tanks as f32 * GOIN_RATIO
@@ -976,7 +1023,8 @@ pub(in crate::ai_core::decision) fn objective(
     }
     memory.approach.force(None);
     let front = front_value(observation, &units);
-    let ahead = ours >= route_army(observation, map_analysis, memory) * ADVANCE_RATIO && ours >= front;
+    let ahead =
+        ours >= route_army(observation, map_analysis, memory) * ADVANCE_RATIO && ours >= front;
     let push = &mut memory.jeff_v1_1.push;
     let at = target(push.anchor);
     let reached = dist2(center.0, center.1, at.0, at.1) <= squared(ANCHOR_REACHED_TILES * ts);
@@ -1125,7 +1173,8 @@ pub(in crate::ai_core::decision) fn convoy(
     let launched = memory.containment.wave_launched && !memory.containment.recovery_active;
     let tanks: Vec<u32> = memory.containment.active_tanks.iter().copied().collect();
     let center = super::super::frontal::group_center(observation, &tanks);
-    let Some(center) = center.filter(|_| launched && v1_1(memory) && !super::off("tankgroup")) else {
+    let Some(center) = center.filter(|_| launched && v1_1(memory) && !super::off("tankgroup"))
+    else {
         memory.jeff_v1_1.push.convoy.clear();
         return Default::default();
     };
@@ -1192,8 +1241,13 @@ pub(in crate::ai_core::decision) fn convoy(
         .iter()
         .filter(|unit| members.contains(&unit.id))
         .filter_map(|unit| {
-            super::south_route::convoy_member_waypoint(observation, memory, (unit.x, unit.y), center)
-                .map(|target| (unit.id, target))
+            super::south_route::convoy_member_waypoint(
+                observation,
+                memory,
+                (unit.x, unit.y),
+                center,
+            )
+            .map(|target| (unit.id, target))
         })
         .collect();
     if due && !own_way.is_empty() {
@@ -1217,7 +1271,13 @@ pub(in crate::ai_core::decision) fn legs_min_tanks(
     memory: &AiDecisionMemory,
     default: usize,
 ) -> usize {
-    if v1_1(memory) && memory.jeff_v1_1.push.target.is_some_and(|target| target.side.is_some()) {
+    if v1_1(memory)
+        && memory
+            .jeff_v1_1
+            .push
+            .target
+            .is_some_and(|target| target.side.is_some())
+    {
         2
     } else {
         default
@@ -1240,9 +1300,8 @@ fn anchors(
 ) -> Vec<(f32, f32)> {
     let ts = observation.map.tile_size as f32;
     let enemy = enemy_player(observation);
-    let route = enemy.and_then(|enemy| {
-        map_analysis.and_then(|analysis| analysis.base_route_tiles(enemy.id))
-    });
+    let route = enemy
+        .and_then(|enemy| map_analysis.and_then(|analysis| analysis.base_route_tiles(enemy.id)));
     let chokes: Vec<(f32, f32)> = map_analysis
         .map(|analysis| {
             analysis
@@ -1276,9 +1335,7 @@ fn anchors(
                 .filter(|choke| {
                     dist2(choke.0, choke.1, at.0, at.1) <= squared(CHOKE_SNAP_TILES * ts)
                 })
-                .min_by(|a, b| {
-                    dist2(a.0, a.1, at.0, at.1).total_cmp(&dist2(b.0, b.1, at.0, at.1))
-                })
+                .min_by(|a, b| dist2(a.0, a.1, at.0, at.1).total_cmp(&dist2(b.0, b.1, at.0, at.1)))
                 .copied()
                 .unwrap_or(at)
         })
@@ -1305,17 +1362,10 @@ pub(in crate::ai_core::decision) fn trace_line(
         .filter(|building| building.kind == EntityKind::ResourceDepot)
         .count();
     Some(format!(
-        "v1_1_push launched={launched} tanks={} ids={:?} scout={:?} {} convoy={} goin={} enemy_army={:.0} riflemen={} forced={}/{} ours={:.0} route_army={:.0} target={:?} anchor={} short={} strike={:?} rally={:?} enemy_depots_known={bases} enemies_known={} hot={} {}",
+        // The trace keeps 256 characters a line: the aim comes before the unit ids.
+        "v1_1_push launched={launched} tanks={} enemy_army={:.0} ours={:.0} route_army={:.0} target={:?} anchor={} short={} strike={:?} rally={:?} riflemen={} hot={} ids={:?} scout={:?} {} convoy={} goin={} forced={}/{} enemy_depots_known={bases} enemies_known={} {}",
         memory.containment.active_tanks.len(),
-        memory.containment.active_tanks,
-        memory.containment.active_scout,
-        super::south_route::trace(memory),
-        push.convoy.len(),
-        push.going_in,
         enemy_army(observation, memory),
-        memory.containment.active_riflemen.len(),
-        push.forced,
-        push.forced_waves,
         push_army(observation, &units, 0),
         route_army(observation, map_analysis, memory),
         push.target.map(|target| (target.at, target.side)),
@@ -1323,8 +1373,16 @@ pub(in crate::ai_core::decision) fn trace_line(
         push.short,
         push.strike.map(|(at, _)| at),
         push.rally,
-        push.enemies.len(),
+        memory.containment.active_riflemen.len(),
         push.hot.len(),
+        memory.containment.active_tanks,
+        memory.containment.active_scout,
+        super::south_route::trace(memory),
+        push.convoy.len(),
+        push.going_in,
+        push.forced,
+        push.forced_waves,
+        push.enemies.len(),
         memory.jeff_v1_1.tank_pause.trace(),
     ))
 }

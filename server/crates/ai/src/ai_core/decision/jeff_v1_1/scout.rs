@@ -54,8 +54,7 @@ impl ScoutMemory {
         self.visited
             .iter()
             .filter(|(place, _)| {
-                dist2(place.0 as f32, place.1 as f32, at.0, at.1)
-                    <= squared(SAME_PLACE_TILES * ts)
+                dist2(place.0 as f32, place.1 as f32, at.0, at.1) <= squared(SAME_PLACE_TILES * ts)
             })
             .map(|(_, tick)| *tick)
             .max()
@@ -100,7 +99,13 @@ pub(in crate::ai_core::decision) fn scout(
         .iter()
         .filter(usable)
         .find(|unit| Some(unit.id) == current)
-        .or_else(|| observation.owned.iter().filter(usable).min_by_key(|unit| unit.id))
+        .or_else(|| {
+            observation
+                .owned
+                .iter()
+                .filter(usable)
+                .min_by_key(|unit| unit.id)
+        })
         .cloned();
     memory.jeff_v1_1.scout.unit = scout.as_ref().map(|unit| unit.id);
     let Some(unit) = scout else {
@@ -152,7 +157,10 @@ pub(in crate::ai_core::decision) fn scout(
             FLEE_BACK_TILES
         };
         let back = clamp_to_map(
-            (at.0 + away.0 * back_tiles * ts, at.1 + away.1 * back_tiles * ts),
+            (
+                at.0 + away.0 * back_tiles * ts,
+                at.1 + away.1 * back_tiles * ts,
+            ),
             observation.map,
         );
         if state.fleeing_until <= tick {
@@ -166,7 +174,11 @@ pub(in crate::ai_core::decision) fn scout(
     if tick < state.fleeing_until {
         return;
     }
-    let arrived_tiles = if safe { VANTAGE_TILES + 2.0 } else { ARRIVED_TILES };
+    let arrived_tiles = if safe {
+        VANTAGE_TILES + 2.0
+    } else {
+        ARRIVED_TILES
+    };
     if let Some(target) = state.target {
         if dist2(at.0, at.1, target.0 as f32, target.1 as f32) <= squared(arrived_tiles * ts) {
             state.visited.insert(target, tick);
@@ -220,13 +232,20 @@ pub(in crate::ai_core::decision) fn scout(
     // `scoutsafe`: to a vantage point short of the place, by the safest way.
     let toward = normalized_direction(target, at).unwrap_or((0.0, 0.0));
     let vantage = clamp_to_map(
-        (target.0 + toward.0 * VANTAGE_TILES * ts, target.1 + toward.1 * VANTAGE_TILES * ts),
+        (
+            target.0 + toward.0 * VANTAGE_TILES * ts,
+            target.1 + toward.1 * VANTAGE_TILES * ts,
+        ),
         observation.map,
     );
-    let vantage = analysis.open_ground_near(at, vantage, 1, 3).unwrap_or(vantage);
+    let vantage = analysis
+        .open_ground_near(at, vantage, 1, 3)
+        .unwrap_or(vantage);
     let way = safe_way(observation, analysis, memory, at, vantage);
     for (index, leg) in way.iter().enumerate() {
-        if let Some(units) = actions::move_units_with_queue(actions, [unit.id], leg.0, leg.1, index > 0) {
+        if let Some(units) =
+            actions::move_units_with_queue(actions, [unit.id], leg.0, leg.1, index > 0)
+        {
             intents.push(AiIntent::Move { units });
         }
     }

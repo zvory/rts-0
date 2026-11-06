@@ -15,9 +15,8 @@ pub(super) fn queue_upgrade_if_available(
     // both: with its Factory up before the natural and the natural's site held by the enemy, the
     // rule held Tank Unlock back all game (Rush AI on The River: Engineering Complex done at 3:00,
     // 1,931 Steel and 640 Oil banked at 5:00, no Tank).
-    let pays_for_both = memory.profile_id().is_some_and(is_jeff_v1_1)
-        && !jeff_v1_1::off("upgradebank")
-        && {
+    let pays_for_both =
+        memory.profile_id().is_some_and(is_jeff_v1_1) && !jeff_v1_1::off("upgradebank") && {
             let (depot_steel, depot_oil) = rts_rules::economy::cost(EntityKind::ResourceDepot);
             actions.budget().steel() >= depot_steel.saturating_add(definition.cost_steel)
                 && actions.budget().oil() >= depot_oil.saturating_add(definition.cost_oil)

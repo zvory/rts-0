@@ -542,41 +542,79 @@ pub(crate) fn is_live_jeff(id: &str) -> bool {
     matches!(id, JEFFS_AI_ID | JEFFS_AI_V1_1_ID)
 }
 
-/// Local ablation testing only: whether `JEFF_V11_OFF` names `feature`, or `JEFF_V11_ONLY` is set
-/// and does not name it.
+/// The V1.1 features Jeff's AI plays with: the set behind its best 120 on beta bee2b6c
+/// (2026-11-06; vs Pressure AI 25-4-11, vs Rush AI 28-0-12). Every other V1.1 switch stays off.
+const JEFF_V1_1_FEATURES: &str = "meth,earlyrifles,factoryfirst,natforward,natsupport,tankcharge,\
+surplus,committed,tankraid,scout,smokecover,raidcar,raidwindow,deny,tankplus,base3,tug,tug2,mghome,\
+push,rifleline,opening4,methstrike,scoutsafe,upgradebank,nomg,riflenat,depot4,facwait,tcrifles,\
+nearnat,keephome,tankgroup,strikebig,goin,wideline,southroute,natsiege,marchorders,marchstrike,\
+thirdguard,noschoneraid,southhold,keepspotter,natclear,resume,spareworker,keepguards,raidodds,\
+ncskipguards,sitewalk,stations,pushstation,wayhalf,riflestations,natseat,siteclear,openfight,\
+breakout,mainfront,rebuild,ncbreak,siteretry,mirror";
+/// The Tank line's numbers Jeff's AI plays with (`jeff_v1_1::front_line`).
+const JEFF_V1_1_LINE: &str = "shape=2,spacing=8";
+
+/// Whether a V1.1 feature is off: not in `JEFF_V1_1_FEATURES`. Local ablation testing may replace
+/// that set with `JEFF_V11_ONLY` and turn features off with `JEFF_V11_OFF`. Unit tests check each
+/// feature on its own, so under test every feature is on unless those variables say otherwise.
 pub(crate) fn jeff_v1_1_feature_off(feature: &str) -> bool {
     type Lists = (Vec<String>, Option<Vec<String>>);
     static LISTS: std::sync::OnceLock<Lists> = std::sync::OnceLock::new();
     let (off, only) = LISTS.get_or_init(|| {
-        let list = |name: &str| {
-            std::env::var(name)
+        let split = |value: &str| value.split(',').map(str::to_string).collect::<Vec<_>>();
+        (
+            std::env::var("JEFF_V11_OFF")
                 .ok()
-                .map(|value| value.split(',').map(str::to_string).collect::<Vec<_>>())
-        };
-        (list("JEFF_V11_OFF").unwrap_or_default(), list("JEFF_V11_ONLY"))
+                .map(|value| split(&value))
+                .unwrap_or_default(),
+            std::env::var("JEFF_V11_ONLY")
+                .ok()
+                .or_else(|| (!cfg!(test)).then(|| JEFF_V1_1_FEATURES.to_string()))
+                .map(|value| split(&value)),
+        )
     });
+    #[cfg(test)]
+    if TEST_FEATURES_OFF.with(|off| off.borrow().contains(&feature)) {
+        return true;
+    }
     off.iter().any(|name| name == feature)
-        || only.as_ref().is_some_and(|only| !only.iter().any(|name| name == feature))
+        || only
+            .as_ref()
+            .is_some_and(|only| !only.iter().any(|name| name == feature))
 }
 
-/// Local testing only: `JEFF_V11_LINE=shape=2,spacing=8,reserve=2,cover=2` sets the Tank line's
-/// numbers (`jeff_v1_1::front_line`).
+#[cfg(test)]
+thread_local! {
+    static TEST_FEATURES_OFF: std::cell::RefCell<Vec<&'static str>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Runs `check` with the named V1.1 features off on this thread (unit tests only).
+#[cfg(test)]
+pub(crate) fn with_jeff_v1_1_features_off<R>(
+    features: &[&'static str],
+    check: impl FnOnce() -> R,
+) -> R {
+    TEST_FEATURES_OFF.with(|off| off.borrow_mut().extend_from_slice(features));
+    let result = check();
+    TEST_FEATURES_OFF.with(|off| off.borrow_mut().clear());
+    result
+}
+
+/// The Tank line's numbers (`JEFF_V1_1_LINE`; local testing may set `JEFF_V11_LINE`, e.g.
+/// `shape=2,spacing=8,reserve=2,cover=2`).
 pub(crate) fn jeff_v1_1_param(name: &str) -> Option<f32> {
     static PARAMS: std::sync::OnceLock<Vec<(String, f32)>> = std::sync::OnceLock::new();
     PARAMS
         .get_or_init(|| {
             std::env::var("JEFF_V11_LINE")
-                .ok()
-                .map(|value| {
-                    value
-                        .split(',')
-                        .filter_map(|pair| {
-                            let (key, value) = pair.split_once('=')?;
-                            Some((key.trim().to_string(), value.trim().parse().ok()?))
-                        })
-                        .collect()
+                .unwrap_or_else(|_| JEFF_V1_1_LINE.to_string())
+                .split(',')
+                .filter_map(|pair| {
+                    let (key, value) = pair.split_once('=')?;
+                    Some((key.trim().to_string(), value.trim().parse().ok()?))
                 })
-                .unwrap_or_default()
+                .collect()
         })
         .iter()
         .find(|(key, _)| key == name)

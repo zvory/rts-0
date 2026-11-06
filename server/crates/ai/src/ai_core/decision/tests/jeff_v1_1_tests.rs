@@ -76,7 +76,8 @@ fn v1_1_trains_guns_from_its_oldest_barracks_and_no_guns_from_the_others() {
 
 #[test]
 fn v1_1_builds_guns_for_the_home_pocket_each_bases_line_and_a_home_reserve() {
-    // HQ and natural up, five guns out: six home, four at the natural and four held home.
+    // HQ and natural up, five guns out: six home and two at the natural (`mgline` off: its spread
+    // layout replaces these posts).
     let mut owned = vec![
         building(1, EntityKind::ResourceDepot, Some(0)),
         building(2, EntityKind::ResourceDepot, Some(0)),
@@ -85,8 +86,13 @@ fn v1_1_builds_guns_for_the_home_pocket_each_bases_line_and_a_home_reserve() {
     let obs = observation(economy(), owned);
     let facts = AiFacts::from_observation(&obs);
     let mut caps = vec![(EntityKind::MachineGunner, 6)];
-    gun_cap(&JEFFS_AI_V1_1, &facts, (None, false, 0), &[], &mut caps);
-    assert_eq!(caps, vec![(EntityKind::MachineGunner, 14)]);
+    crate::ai_core::profiles::with_jeff_v1_1_features_off(&["mgline"], || {
+        gun_cap(&JEFFS_AI_V1_1, &facts, (None, false, 0), &[], &mut caps)
+    });
+    assert_eq!(
+        caps,
+        vec![(EntityKind::MachineGunner, 8), (EntityKind::Panzerfaust, 0)]
+    );
     let mut caps = vec![(EntityKind::MachineGunner, 6)];
     gun_cap(&JEFFS_AI, &facts, (None, false, 0), &[], &mut caps);
     assert_eq!(caps, vec![(EntityKind::MachineGunner, 6)]);
@@ -105,7 +111,10 @@ fn v1_1_keeps_two_riflemen_for_every_tank_and_four_at_home() {
     );
     assert_eq!(priorities, vec![EntityKind::Tank, EntityKind::Rifleman]);
     let mut priorities = vec![EntityKind::Tank];
-    assert_eq!(rifle_line(JEFFS_AI_ID, &facts, (false, 0), &mut priorities), None);
+    assert_eq!(
+        rifle_line(JEFFS_AI_ID, &facts, (false, 0), &mut priorities),
+        None
+    );
     assert_eq!(priorities, vec![EntityKind::Tank]);
 }
 
@@ -207,12 +216,14 @@ fn v1_1_splits_line_units_by_exposure_without_walking_units_off_a_base() {
 }
 
 #[test]
-fn v1_1_posts_riflemen_on_the_line_and_leaves_fighting_ones_alone() {
+fn v1_1_leaves_the_main_to_its_home_pocket() {
+    // Only the bases past the main hold a line: with the main alone, its Riflemen keep V1.0's home
+    // pocket and none is posted.
     let ts = config::TILE_SIZE as f32;
     let riflemen = (20..23)
         .map(|id| combat_at(id, EntityKind::Rifleman, 6.5 * ts, 6.5 * ts))
         .collect();
-    let mut obs = base_line_observation(riflemen);
+    let obs = base_line_observation(riflemen);
     let facts = AiFacts::from_observation(&obs);
     let mut memory = AiDecisionMemory::for_profile(&JEFFS_AI_V1_1);
     let held = BTreeSet::new();
@@ -220,47 +231,7 @@ fn v1_1_posts_riflemen_on_the_line_and_leaves_fighting_ones_alone() {
     let mut intents = Vec::new();
     let live = (&mut actions, &obs, None, &mut intents);
     base_line::hold(live, &mut memory, &JEFFS_AI_V1_1, &[], &held);
-    let posted: Vec<(Vec<u32>, (f32, f32))> = actions
-        .into_commands()
-        .into_iter()
-        .filter_map(|command| match command {
-            Command::AttackMove { units, x, y, .. } => Some((units, line_coordinates((x, y)))),
-            _ => None,
-        })
-        .collect();
-    assert_eq!(posted.len(), 3, "{posted:?}");
-    let forward = 5.0 * std::f32::consts::FRAC_1_SQRT_2 + 2.0;
-    for (_, (ahead, _)) in &posted {
-        assert!((ahead - forward).abs() < 1.5, "{posted:?}");
-    }
-    assert_eq!(
-        intents,
-        vec![AiIntent::Assemble {
-            units: vec![20, 21, 22]
-        }]
-    );
-    // Walking to their posts, they are not sent again; V1.0 posts none of its Riflemen here.
-    obs.tick += 30;
-    for unit in &mut obs.owned {
-        if unit.kind == EntityKind::Rifleman {
-            unit.state = AiEntityState::Move;
-        }
-    }
-    for profile in [&JEFFS_AI_V1_1, &JEFFS_AI] {
-        let mut actions = AiActionContext::new(&facts, SpendBudget::new(1000, 1000, 20, 80));
-        let mut intents = Vec::new();
-        let live = (&mut actions, &obs, None, &mut intents);
-        base_line::hold(live, &mut memory, profile, &[], &held);
-        assert!(actions.into_commands().is_empty());
-    }
-    // An enemy in sight nearby: the Riflemen fight where they stand.
-    obs.tick += 600;
-    let mut raider = combat_at(90, EntityKind::Rifleman, 9.5 * ts, 6.5 * ts);
-    raider.owner = 2;
-    obs.visible_enemies.push(raider);
-    let mut actions = AiActionContext::new(&facts, SpendBudget::new(1000, 1000, 20, 80));
-    let mut intents = Vec::new();
-    let live = (&mut actions, &obs, None, &mut intents);
-    base_line::hold(live, &mut memory, &JEFFS_AI_V1_1, &[], &held);
     assert!(actions.into_commands().is_empty());
+    assert!(intents.is_empty());
+    assert!((20..23).all(|id| !memory.jeff_v1_1.base_lines.posted(id)));
 }

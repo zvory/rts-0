@@ -183,7 +183,9 @@ pub(in crate::ai_core::decision) fn strike(
     };
     let main = tile_center(observation.own_start_tile, observation.map.tile_size);
     let enemy_main = tile_center(enemy.start_tile, observation.map.tile_size);
-    if memory.jeff_v1_1.meth_strike.phase == Phase::Idle && memory.opening_rush.out_squad().is_some() {
+    if memory.jeff_v1_1.meth_strike.phase == Phase::Idle
+        && memory.opening_rush.out_squad().is_some()
+    {
         let starters = memory.opening_rush.hand_over();
         let state = &mut memory.jeff_v1_1.meth_strike;
         for id in starters {
@@ -196,12 +198,10 @@ pub(in crate::ai_core::decision) fn strike(
     // while it rushes, so they hold where it leaves the fight.
     let wide = !super::off("wideswing");
     if wide && memory.jeff_v1_1.meth_strike.phase == Phase::Rush {
-        let from = center(
-            observation
-                .owned
-                .iter()
-                .filter(|unit| memory.jeff_v1_1.meth_strike.squad.contains(&unit.id) && unit.hp > 0),
-        );
+        let from =
+            center(observation.owned.iter().filter(|unit| {
+                memory.jeff_v1_1.meth_strike.squad.contains(&unit.id) && unit.hp > 0
+            }));
         let (side, flank) = swing_points(observation, map_analysis, memory, from, main, enemy_main);
         let natural = enemy_natural(observation, enemy_main);
         let state = &mut memory.jeff_v1_1.meth_strike;
@@ -270,11 +270,13 @@ pub(in crate::ai_core::decision) fn strike(
                     }
                     return;
                 }
-            } else if let Some(target) =
-                near.iter().min_by(|a, b| a.hp.cmp(&b.hp).then(a.id.cmp(&b.id)))
+            } else if let Some(target) = near
+                .iter()
+                .min_by(|a, b| a.hp.cmp(&b.hp).then(a.id.cmp(&b.id)))
             {
                 state.fought = true;
-                if let Some(units) = actions::attack_units(actions, ids.iter().copied(), target.id) {
+                if let Some(units) = actions::attack_units(actions, ids.iter().copied(), target.id)
+                {
                     intents.push(AiIntent::Attack { units });
                 }
                 for id in &ids {
@@ -290,16 +292,36 @@ pub(in crate::ai_core::decision) fn strike(
                     state.sent.insert(*id, None);
                 }
             } else {
-                send(actions, intents, observation, map_analysis, state, &squad, &[enemy_main]);
+                send(
+                    actions,
+                    intents,
+                    observation,
+                    map_analysis,
+                    state,
+                    &squad,
+                    &[enemy_main],
+                );
                 return;
             }
-            sneak(actions, intents, observation, map_analysis, state, &squad, side, flank, enemy_main);
+            sneak(
+                actions,
+                intents,
+                observation,
+                map_analysis,
+                state,
+                &squad,
+                side,
+                flank,
+                enemy_main,
+            );
         }
         Phase::Sneak => {
             // `openfight`: before Meth a Rifleman cannot shoot on the move, so the sneak stops and
             // fights what comes near instead of walking on past it. On Classic two wounded Pressure
             // Riflemen that stepped back out of the fight shot the sneaking squad for 20 s.
-            let meth = observation.upgrades.contains(&UpgradeKind::Methamphetamines);
+            let meth = observation
+                .upgrades
+                .contains(&UpgradeKind::Methamphetamines);
             if !super::off("openfight") && !meth {
                 let near: Vec<&AiEntitySummary> = fighters
                     .iter()
@@ -319,9 +341,28 @@ pub(in crate::ai_core::decision) fn strike(
                 }
             }
             state.holding.clear();
-            sneak(actions, intents, observation, map_analysis, state, &squad, side, flank, enemy_main);
+            sneak(
+                actions,
+                intents,
+                observation,
+                map_analysis,
+                state,
+                &squad,
+                side,
+                flank,
+                enemy_main,
+            );
         }
-        Phase::Raid => raid(actions, observation, intents, state, &squad, &fighters, enemy_main, flank),
+        Phase::Raid => raid(
+            actions,
+            observation,
+            intents,
+            state,
+            &squad,
+            &fighters,
+            enemy_main,
+            flank,
+        ),
         Phase::Natural => to_natural(actions, observation, intents, state, &squad, &fighters),
     }
 }
@@ -339,7 +380,8 @@ fn fight(
     let tick = observation.tick;
     let ts = observation.map.tile_size as f32;
     let weapon = rts_rules::combat::default_weapon_profile(EntityKind::Rifleman);
-    let radius = rts_rules::defs::unit_def(EntityKind::Rifleman).map_or(9.0, |def| def.stats.radius);
+    let radius =
+        rts_rules::defs::unit_def(EntityKind::Rifleman).map_or(9.0, |def| def.stats.radius);
     let reach = weapon.map_or(5.0, |w| w.range_tiles) * ts + radius + SIM_RANGE_SLACK_PX;
     let damage = weapon.map_or(5, |w| w.dmg).max(1);
     let mid = center(squad.iter().copied());
@@ -382,7 +424,12 @@ fn fight(
         }) else {
             continue;
         };
-        let to = away((threat.x, threat.y), (unit.x, unit.y), PULL_TILES * ts, observation);
+        let to = away(
+            (threat.x, threat.y),
+            (unit.x, unit.y),
+            PULL_TILES * ts,
+            observation,
+        );
         if let Some(units) = actions::move_units(actions, [unit.id], to.0, to.1) {
             intents.push(AiIntent::Assemble { units });
         }
@@ -413,7 +460,10 @@ fn fight(
             .map(|enemy| dist2(unit.x, unit.y, enemy.x, enemy.y).sqrt())
             .fold(f32::INFINITY, f32::min)
     };
-    let last = fighters.iter().map(|unit| gap(unit)).fold(0.0_f32, f32::max);
+    let last = fighters
+        .iter()
+        .map(|unit| gap(unit))
+        .fold(0.0_f32, f32::max);
     let regrouping = !anyone_in_reach && tick.saturating_sub(since) < REGROUP_TICKS;
     // Riflemen with fewer enemies in reach choose first; shots stop going to an enemy once those
     // already aimed at it cover its HP.
@@ -442,10 +492,14 @@ fn fight(
             state.aim.remove(&unit.id);
             continue;
         }
-        let open = |enemy: &&&AiEntitySummary| committed.get(&enemy.id).copied().unwrap_or(0) < enemy.hp;
+        let open =
+            |enemy: &&&AiEntitySummary| committed.get(&enemy.id).copied().unwrap_or(0) < enemy.hp;
         let target = if options.is_empty() {
             // Nothing in reach: on to the top enemy not walking away, or stand.
-            ranked.iter().find(|enemy| !leaving.contains(&enemy.id)).copied()
+            ranked
+                .iter()
+                .find(|enemy| !leaving.contains(&enemy.id))
+                .copied()
         } else {
             ranked
                 .iter()
@@ -605,7 +659,9 @@ fn raid(
     let targets: Vec<&AiEntitySummary> = observation
         .visible_enemies
         .iter()
-        .filter(|enemy| enemy.hp > 0 && matches!(enemy.kind, EntityKind::SteelMine | EntityKind::PumpJack))
+        .filter(|enemy| {
+            enemy.hp > 0 && matches!(enemy.kind, EntityKind::SteelMine | EntityKind::PumpJack)
+        })
         .filter(|enemy| {
             depots
                 .iter()
@@ -670,7 +726,11 @@ fn raid(
         state.why = "bare";
         return;
     }
-    let next = if state.passed_flank { enemy_main } else { flank };
+    let next = if state.passed_flank {
+        enemy_main
+    } else {
+        flank
+    };
     if let Some(units) = actions::move_units(actions, ids, next.0, next.1) {
         intents.push(AiIntent::Assemble { units });
     }
@@ -706,7 +766,10 @@ fn sneak_points(
     let offset = (natural.0 - main.0) * across.0 + (natural.1 - main.1) * across.1;
     let at = |base: (f32, f32), sign: f32, tiles: f32| {
         clamp_to_map(
-            (base.0 + across.0 * sign * tiles * ts, base.1 + across.1 * sign * tiles * ts),
+            (
+                base.0 + across.0 * sign * tiles * ts,
+                base.1 + across.1 * sign * tiles * ts,
+            ),
             observation.map,
         )
     };
@@ -715,7 +778,12 @@ fn sneak_points(
     } else {
         let threat = |sign: f32| {
             super::push::threat_near(observation, memory, at(natural, sign, SIDE_TILES), 12.0)
-                + super::push::threat_near(observation, memory, at(enemy_main, sign, FLANK_TILES), 12.0)
+                + super::push::threat_near(
+                    observation,
+                    memory,
+                    at(enemy_main, sign, FLANK_TILES),
+                    12.0,
+                )
         };
         if threat(1.0) <= threat(-1.0) {
             1.0
@@ -728,7 +796,10 @@ fn sneak_points(
             .and_then(|analysis| analysis.open_ground_near(main, point, 2, 4))
             .unwrap_or(point)
     };
-    (snap(at(natural, sign, SIDE_TILES)), snap(at(enemy_main, sign, FLANK_TILES)))
+    (
+        snap(at(natural, sign, SIDE_TILES)),
+        snap(at(enemy_main, sign, FLANK_TILES)),
+    )
 }
 
 /// Group route points about `PATH_STRIDE_TILES` apart from `from` to `to`, or `to` alone without a
@@ -951,9 +1022,17 @@ fn center<'a>(units: impl Iterator<Item = &'a AiEntitySummary>) -> (f32, f32) {
 }
 
 /// The point `length` from `from`, straight away from `threat`.
-fn away(threat: (f32, f32), from: (f32, f32), length: f32, observation: &AiObservation) -> (f32, f32) {
+fn away(
+    threat: (f32, f32),
+    from: (f32, f32),
+    length: f32,
+    observation: &AiObservation,
+) -> (f32, f32) {
     let dir = normalized_direction(threat, from).unwrap_or((0.0, 1.0));
-    clamp_to_map((from.0 + dir.0 * length, from.1 + dir.1 * length), observation.map)
+    clamp_to_map(
+        (from.0 + dir.0 * length, from.1 + dir.1 * length),
+        observation.map,
+    )
 }
 
 fn stored((x, y): (f32, f32)) -> (i32, i32) {

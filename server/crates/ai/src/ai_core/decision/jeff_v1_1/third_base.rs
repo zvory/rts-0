@@ -10,6 +10,10 @@
 //! - **Safer sites**: a site on the enemy's route to the main costs `ROUTE_PENALTY_SCALE` times as
 //!   much head start as V1.0's.
 //! - **Quick retry**: a failed site is ruled out and the next one tried after `RETRY_TICKS`.
+//! - **Site retry** (`siteretry`): a site is ruled out only after V1.0's `MAX_SITE_FAILURES`, and
+//!   for `SITE_REJECT_TICKS`, not for good. On Crossroads vs Pressure AI the escort to the best
+//!   third, 20 tiles short of it, lost 2 of 10 Riflemen to a passing wave at 5:20; the site was
+//!   never tried again and the later tries went to far sites, where the builder died.
 
 use super::*;
 use crate::ai_core::decision::geometry::dist2;
@@ -21,6 +25,13 @@ pub(in crate::ai_core::decision) const BANK_STEEL: u32 = 600;
 const BANK_TICKS: u32 = config::TICK_HZ * 30;
 pub(in crate::ai_core::decision) const ROUTE_PENALTY_SCALE: i32 = 2;
 pub(in crate::ai_core::decision) const RETRY_TICKS: u32 = config::TICK_HZ * 20;
+/// `siteretry`: how long a ruled-out site stays out.
+pub(in crate::ai_core::decision) const SITE_REJECT_TICKS: u32 = config::TICK_HZ * 120;
+
+/// `siteretry`: whether V1.1 counts a site's failures and lets a ruled-out site back in.
+pub(in crate::ai_core::decision) fn site_retry() -> bool {
+    !super::off("siteretry")
+}
 /// The escort's posts stand this far in front of the site and this far apart across it.
 const ESCORT_POST_TILES: f32 = 5.0;
 const ESCORT_SPACING_TILES: f32 = 1.75;

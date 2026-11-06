@@ -152,7 +152,11 @@ pub(super) fn issue_expansion_containment_wave(
                     tanks.len(),
                     pledged,
                     required_tanks,
-                    if forced { 0 } else { push_keep_home(observation, memory) },
+                    if forced {
+                        0
+                    } else {
+                        push_keep_home(observation, memory)
+                    },
                 )?
             } else {
                 required_tanks
@@ -201,7 +205,11 @@ pub(super) fn issue_expansion_containment_wave(
                 pushing + newcomers.len(),
                 pledged,
                 required_tanks,
-                if forced { 0 } else { push_keep_home(observation, memory) },
+                if forced {
+                    0
+                } else {
+                    push_keep_home(observation, memory)
+                },
             )
             .unwrap_or(pushing);
             if wanted > pushing {
@@ -397,7 +405,12 @@ pub(super) fn issue_expansion_containment_wave(
         && !(!memory.enemy_main_destroyed && jeff_v1_1::south_route::hold_way(observation, memory));
     if !memory.enemy_main_destroyed && outnumbered {
         // Jeff's AI V1.1's Scout Car smokes for the falling-back Tanks.
-        jeff_v1_1::smoke_cover::note_retreat(memory, &tanks, scouts.first().copied(), observation.tick);
+        jeff_v1_1::smoke_cover::note_retreat(
+            memory,
+            &tanks,
+            scouts.first().copied(),
+            observation.tick,
+        );
         if push_uses_available_armor {
             memory
                 .approach
@@ -438,7 +451,13 @@ pub(super) fn issue_expansion_containment_wave(
             if jeff_v1_1::south_route::returning(memory) {
                 actions::move_units(actions, tanks.iter().copied(), waypoint.0, waypoint.1);
                 actions::move_units(actions, infantry.iter().copied(), waypoint.0, waypoint.1);
-            } else if !jeff_v1_1::south_route::guard_orders(actions, observation, memory, &tanks, &infantry) {
+            } else if !jeff_v1_1::south_route::guard_orders(
+                actions,
+                observation,
+                memory,
+                &tanks,
+                &infantry,
+            ) {
                 jeff_v1_1::south_route::order_push(actions, &tanks, &infantry, waypoint);
             }
         }
@@ -612,15 +631,17 @@ pub(super) fn issue_expansion_containment_wave(
         column: jeff_v1_1::screen::column(memory),
         ..match legs.map(|orders| orders.phase) {
             Some(super::approach::PushPhase::Travel) => MarchShape::TRAVEL,
-            _ if push_uses_available_armor => match jeff_v1_1::push::wide_ranks(memory, tanks.len()) {
-                // Jeff's AI V1.1 (`wideline`) closes in wide.
-                Some((rank_width, spacing)) => MarchShape {
-                    rank_width,
-                    tank_spacing_tiles: spacing,
-                    ..MarchShape::TIGHT
-                },
-                None => MarchShape::TIGHT,
-            },
+            _ if push_uses_available_armor => {
+                match jeff_v1_1::push::wide_ranks(memory, tanks.len()) {
+                    // Jeff's AI V1.1 (`wideline`) closes in wide.
+                    Some((rank_width, spacing)) => MarchShape {
+                        rank_width,
+                        tank_spacing_tiles: spacing,
+                        ..MarchShape::TIGHT
+                    },
+                    None => MarchShape::TIGHT,
+                }
+            }
             _ => MarchShape::LEGACY,
         }
     };
@@ -855,7 +876,12 @@ pub(super) fn issue_expansion_containment_wave(
                 );
             }
             let screen_points = if shape.column {
-                jeff_v1_1::screen::column_points(tank_anchor, objective, observation.map, riflemen.len())
+                jeff_v1_1::screen::column_points(
+                    tank_anchor,
+                    objective,
+                    observation.map,
+                    riflemen.len(),
+                )
             } else if shape.rifle_spread {
                 jeff_v1_1::screen::points(tank_anchor, objective, observation.map, riflemen.len())
             } else {

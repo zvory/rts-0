@@ -219,7 +219,11 @@ fn factory_up_and_both_banked(observation: &AiObservation, facts: &AiFacts) -> b
 
 /// The guns out or in training, and how many of them are queued. Under Jeff's AI V1.1's `nomg`
 /// two Riflemen past the opening's (`NOMG_RIFLE_BASE`) count as one gun.
-pub(super) fn guns_out(observation: &AiObservation, facts: &AiFacts, no_guns: bool) -> (usize, usize) {
+pub(super) fn guns_out(
+    observation: &AiObservation,
+    facts: &AiFacts,
+    no_guns: bool,
+) -> (usize, usize) {
     let kind = if no_guns {
         EntityKind::Rifleman
     } else {
@@ -570,8 +574,9 @@ pub(super) fn prepare<F: FnMut(EntityKind, u32, u32) -> bool>(
     // The route picket and raid sealers are held by the home line.
     candidates.retain(|id| !memory.route_line.reserved().any(|reserved| reserved == *id));
     candidates.retain(|id| !memory.rush_reserved(*id));
-    candidates.retain(|id| !memory.third_pressure.is_reserved(*id)
-                && !memory.jeff_v1_1.tank_raid.holds(*id));
+    candidates.retain(|id| {
+        !memory.third_pressure.is_reserved(*id) && !memory.jeff_v1_1.tank_raid.holds(*id)
+    });
     candidates.retain(|id| !memory.raid_defense.is_sentry(*id));
     if let Some(center) = building_center(
         memory.expansion_security.site.unwrap(),
@@ -1217,8 +1222,10 @@ pub(super) fn natural_clearers(
         .filter(|unit| unit.kind == EntityKind::Tank && unit.is_complete && unit.hp > 0)
         .filter(|unit| !memory.trap_breach.is_reserved(unit.id))
         .filter(|unit| !memory.rush_reserved(unit.id))
-        .filter(|unit| !memory.third_pressure.is_reserved(unit.id)
-                && !memory.jeff_v1_1.tank_raid.holds(unit.id))
+        .filter(|unit| {
+            !memory.third_pressure.is_reserved(unit.id)
+                && !memory.jeff_v1_1.tank_raid.holds(unit.id)
+        })
         .filter(|unit| !route_line.contains(&unit.id))
         .filter(|unit| !memory.later_bases.guards.contains(&unit.id))
         .filter(|unit| !(launched_push && push.active_tanks.contains(&unit.id)))

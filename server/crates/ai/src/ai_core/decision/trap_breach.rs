@@ -281,8 +281,12 @@ pub(super) fn plan_live(
             .iter()
             .any(|unit| unit.id == *id && unit.hp > 0)
     };
-    breach.tanks.retain(|id| owned_ok(id) && !raiding.contains(id));
-    breach.posts.retain(|id, _| owned_ok(id) && !raiding.contains(id));
+    breach
+        .tanks
+        .retain(|id| owned_ok(id) && !raiding.contains(id));
+    breach
+        .posts
+        .retain(|id, _| owned_ok(id) && !raiding.contains(id));
     if breach.phase == Phase::Done {
         // A line still across the route (one an opponent built, or one left standing) starts a
         // new breach, a while after one stopped for want of a safe trap.

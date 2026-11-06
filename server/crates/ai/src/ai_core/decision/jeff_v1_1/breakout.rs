@@ -211,11 +211,24 @@ fn run(
         Contain {
             center: if members.is_empty() { anchor } else { center },
             value: members.iter().map(|(_, value, _)| *value).sum(),
-            tanks: members.iter().filter(|(kind, _, _)| *kind == EntityKind::Tank).count(),
+            tanks: members
+                .iter()
+                .filter(|(kind, _, _)| *kind == EntityKind::Tank)
+                .count(),
         }
     };
-    state.tanks.retain(|id| observation.owned.iter().any(|unit| unit.id == *id && unit.hp > 0));
-    state.infantry.retain(|id| observation.owned.iter().any(|unit| unit.id == *id && unit.hp > 0));
+    state.tanks.retain(|id| {
+        observation
+            .owned
+            .iter()
+            .any(|unit| unit.id == *id && unit.hp > 0)
+    });
+    state.infantry.retain(|id| {
+        observation
+            .owned
+            .iter()
+            .any(|unit| unit.id == *id && unit.hp > 0)
+    });
 
     if state.phase == Phase::Idle {
         if tick < state.cooldown_until {
@@ -271,7 +284,8 @@ fn run(
             .filter(|unit| unit.kind == EntityKind::Tank && stationed.contains(&unit.id))
             .filter(|unit| usable(unit))
             .filter(|unit| {
-                dist2(unit.x, unit.y, contain.center.0, contain.center.1) <= squared(REACH_TILES * ts)
+                dist2(unit.x, unit.y, contain.center.0, contain.center.1)
+                    <= squared(REACH_TILES * ts)
             })
             .collect();
         let mut infantry: Vec<&AiEntitySummary> = observation
@@ -318,7 +332,8 @@ fn run(
         // Infantry goes in front, always: Tank-only sorties lost whole groups to Panzerfausts (the
         // contain's remembered part often showed none), 3-5 Tanks at a time on Crossroads.
         let screened = infantry.len() >= MIN_INFANTRY;
-        if (value as f32) < ODDS * contain.value as f32 || tanks.len() <= contain.tanks || !screened {
+        if (value as f32) < ODDS * contain.value as f32 || tanks.len() <= contain.tanks || !screened
+        {
             return BTreeSet::new();
         }
         // Gather on the way from the main, `GATHER_TILES` short of the contain.
@@ -354,7 +369,8 @@ fn run(
         .iter()
         .filter(|(_, _, at)| dist2(at.0, at.1, target.0, target.1) <= squared(LOST_TILES * ts))
         .min_by(|a, b| {
-            dist2(a.2 .0, a.2 .1, target.0, target.1).total_cmp(&dist2(b.2 .0, b.2 .1, target.0, target.1))
+            dist2(a.2 .0, a.2 .1, target.0, target.1)
+                .total_cmp(&dist2(b.2 .0, b.2 .1, target.0, target.1))
         })
         .map(|(_, _, at)| group_at(*at));
     let members: Vec<&AiEntitySummary> = observation
@@ -376,10 +392,16 @@ fn run(
     // guns could not hurt went home.
     let anti_tank_near = observation.visible_enemies.iter().any(|enemy| {
         enemy.hp > 0
-            && matches!(enemy.kind, EntityKind::Panzerfaust | EntityKind::AntiTankGun)
+            && matches!(
+                enemy.kind,
+                EntityKind::Panzerfaust | EntityKind::AntiTankGun
+            )
             && dist2(enemy.x, enemy.y, mid.0, mid.1) <= squared(FIGHT_TILES * ts)
     });
-    let screen_gone = !state.infantry.iter().any(|id| members.iter().any(|unit| unit.id == *id))
+    let screen_gone = !state
+        .infantry
+        .iter()
+        .any(|id| members.iter().any(|unit| unit.id == *id))
         && (super::off("baregun") || anti_tank_near);
     let why = if members.is_empty() || state.tanks.is_empty() {
         Some("lost")
@@ -387,9 +409,10 @@ fn run(
         Some("bare")
     } else if follow.is_none() {
         Some("gone")
-    } else if follow.as_ref().is_some_and(|c| {
-        from_depots(c.center) > LEASH_TILES || !ours_side(c.center)
-    }) {
+    } else if follow
+        .as_ref()
+        .is_some_and(|c| from_depots(c.center) > LEASH_TILES || !ours_side(c.center))
+    {
         Some("leash")
     } else if theirs > 0 && (ours as f32) < ABORT_ODDS * theirs as f32 {
         Some("odds")
@@ -426,14 +449,34 @@ fn run(
         .collect();
 
     if state.phase == Phase::Gather {
-        let rifle_slots = line(gather, facing, side, rifles.len(), RIFLE_SPACING_TILES, RIFLE_ROW, ts);
+        let rifle_slots = line(
+            gather,
+            facing,
+            side,
+            rifles.len(),
+            RIFLE_SPACING_TILES,
+            RIFLE_ROW,
+            ts,
+        );
         let tank_back = (
             gather.0 - facing.0 * TANK_BACK_TILES * ts,
             gather.1 - facing.1 * TANK_BACK_TILES * ts,
         );
-        let tank_slots = line(tank_back, facing, side, tanks.len(), TANK_SPACING_TILES, 5, ts);
+        let tank_slots = line(
+            tank_back,
+            facing,
+            side,
+            tanks.len(),
+            TANK_SPACING_TILES,
+            5,
+            ts,
+        );
         let mut gathered = 0;
-        for (unit, slot) in rifles.iter().zip(&rifle_slots).chain(tanks.iter().zip(&tank_slots)) {
+        for (unit, slot) in rifles
+            .iter()
+            .zip(&rifle_slots)
+            .chain(tanks.iter().zip(&tank_slots))
+        {
             let slot = clear(observation, map_analysis, (unit.x, unit.y), *slot);
             if dist2(unit.x, unit.y, slot.0, slot.1) <= squared(GATHERED_TILES * ts) {
                 gathered += 1;
@@ -442,7 +485,10 @@ fn run(
         }
         let enemy_close = theirs > 0;
         let share = gathered as f32 / members.len().max(1) as f32;
-        if share >= GATHERED_SHARE || enemy_close || tick.saturating_sub(state.since) >= GATHER_MAX_TICKS {
+        if share >= GATHERED_SHARE
+            || enemy_close
+            || tick.saturating_sub(state.since) >= GATHER_MAX_TICKS
+        {
             state.phase = Phase::Attack;
             state.ordered.clear();
         }
@@ -456,7 +502,10 @@ fn run(
             let front = center(rifles.iter().copied());
             let back = normalized_direction(front, target).unwrap_or(facing);
             clamp_to_map(
-                (front.0 - back.0 * FOLLOW_TILES * ts, front.1 - back.1 * FOLLOW_TILES * ts),
+                (
+                    front.0 - back.0 * FOLLOW_TILES * ts,
+                    front.1 - back.1 * FOLLOW_TILES * ts,
+                ),
                 observation.map,
             )
         };

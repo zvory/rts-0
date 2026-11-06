@@ -101,7 +101,7 @@ pub(in crate::ai_core::decision) fn hunt_panzerfausts(
         .collect();
     let state = &mut memory.jeff_v1_1.hunt;
     for quarry in &quarries {
-        let mut on_it = state
+        let on_it = state
             .hunters
             .values()
             .filter(|(target, _)| *target == quarry.id)
@@ -109,21 +109,18 @@ pub(in crate::ai_core::decision) fn hunt_panzerfausts(
         let mut nearest: Vec<&&AiEntitySummary> = free
             .iter()
             .filter(|unit| !state.hunters.contains_key(&unit.id))
-            .filter(|unit| {
-                dist2(unit.x, unit.y, quarry.x, quarry.y) <= squared(HUNT_TILES * ts)
-            })
+            .filter(|unit| dist2(unit.x, unit.y, quarry.x, quarry.y) <= squared(HUNT_TILES * ts))
             .collect();
         nearest.sort_by(|a, b| {
             dist2(a.x, a.y, quarry.x, quarry.y)
                 .total_cmp(&dist2(b.x, b.y, quarry.x, quarry.y))
                 .then(a.id.cmp(&b.id))
         });
-        for unit in nearest {
-            if on_it >= HUNTERS_PER_FAUST {
-                break;
-            }
+        for unit in nearest
+            .into_iter()
+            .take(HUNTERS_PER_FAUST.saturating_sub(on_it))
+        {
             state.hunters.insert(unit.id, (quarry.id, 0));
-            on_it += 1;
         }
     }
     let due: Vec<(u32, u32)> = state

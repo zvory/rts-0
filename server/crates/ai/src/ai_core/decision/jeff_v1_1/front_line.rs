@@ -195,8 +195,11 @@ pub(in crate::ai_core::decision) fn hold(
     let Some(enemy_main) = super::push::enemy_main(observation) else {
         return;
     };
-    let by_id: BTreeMap<u32, &AiEntitySummary> =
-        observation.owned.iter().map(|unit| (unit.id, unit)).collect();
+    let by_id: BTreeMap<u32, &AiEntitySummary> = observation
+        .owned
+        .iter()
+        .map(|unit| (unit.id, unit))
+        .collect();
     // Losses since the last decision.
     {
         let state = &mut memory.jeff_v1_1.front_line;
@@ -209,7 +212,9 @@ pub(in crate::ai_core::decision) fn hold(
         if lost > 0 {
             state.losses.push((tick, lost));
         }
-        state.losses.retain(|(at, _)| tick.saturating_sub(*at) <= LOSS_TICKS);
+        state
+            .losses
+            .retain(|(at, _)| tick.saturating_sub(*at) <= LOSS_TICKS);
     }
     let main = tile_center(observation.own_start_tile, observation.map.tile_size);
     let reserved = memory.squad_reserved();
@@ -249,7 +254,11 @@ pub(in crate::ai_core::decision) fn hold(
             .then(a.id.cmp(&b.id))
     });
     // With the roaming force (`rovers`) the Riflemen are its, not the line's.
-    let max_rifles = if super::rovers::active(memory) { 0 } else { MAX_RIFLES };
+    let max_rifles = if super::rovers::active(memory) {
+        0
+    } else {
+        MAX_RIFLES
+    };
     let riflemen: Vec<&AiEntitySummary> = riflemen
         .into_iter()
         .skip(HOME_RIFLES)
@@ -285,7 +294,9 @@ pub(in crate::ai_core::decision) fn hold(
     let sites: Vec<(f32, f32)> = [memory.expansion_security.site, memory.later_bases.site()]
         .into_iter()
         .flatten()
-        .filter_map(|site| building_center(site, EntityKind::ResourceDepot, observation.map.tile_size))
+        .filter_map(|site| {
+            building_center(site, EntityKind::ResourceDepot, observation.map.tile_size)
+        })
         .collect();
     anchors.extend(
         observation
@@ -326,7 +337,9 @@ pub(in crate::ai_core::decision) fn hold(
         let enemy_near: f32 = observation
             .visible_enemies
             .iter()
-            .filter(|enemy| enemy.hp > 0 && enemy.kind.is_unit() && enemy.kind != EntityKind::Worker)
+            .filter(|enemy| {
+                enemy.hp > 0 && enemy.kind.is_unit() && enemy.kind != EntityKind::Worker
+            })
             .filter(|enemy| {
                 dist2(enemy.x, enemy.y, centre.0, centre.1) <= squared(NEAR_LINE_TILES * ts)
             })
@@ -336,7 +349,11 @@ pub(in crate::ai_core::decision) fn hold(
         let on_post = state
             .members
             .keys()
-            .filter(|id| by_id.get(id).is_some_and(|unit| unit.state != AiEntityState::Move))
+            .filter(|id| {
+                by_id
+                    .get(id)
+                    .is_some_and(|unit| unit.state != AiEntityState::Move)
+            })
             .count();
         let settled = !state.members.is_empty()
             && on_post as f32 >= state.members.len() as f32 * SETTLED_SHARE;
@@ -367,7 +384,8 @@ pub(in crate::ai_core::decision) fn hold(
         }
         if tick.saturating_sub(state.last_step) >= STEP_TICKS {
             if lost >= strength * FALL_LOSS_SHARE || enemy_near >= strength * FALL_RATIO {
-                state.back = (state.back as f32 + STEP_TILES * 10.0).min(MAX_BACK_TILES * 10.0) as u32;
+                state.back =
+                    (state.back as f32 + STEP_TILES * 10.0).min(MAX_BACK_TILES * 10.0) as u32;
                 state.last_step = tick;
                 state.losses.clear();
             } else if settled
@@ -415,7 +433,10 @@ pub(in crate::ai_core::decision) fn hold(
         0.0
     };
     let centre = clamp_to_map(
-        (centre.0 + across.0 * lean * ts, centre.1 + across.1 * lean * ts),
+        (
+            centre.0 + across.0 * lean * ts,
+            centre.1 + across.1 * lean * ts,
+        ),
         observation.map,
     );
     let params = LineParams::read();
@@ -481,18 +502,29 @@ pub(in crate::ai_core::decision) fn hold(
                         field.iter().map(|a| lateral(*a)).sum::<f32>() / field.len() as f32
                     };
                     let threat = super::push::threat_near(observation, memory, at, 25.0);
-                    Base { at, front, side, threat, contact: 0.0 }
+                    Base {
+                        at,
+                        front,
+                        side,
+                        threat,
+                        contact: 0.0,
+                    }
                 })
                 .collect();
             if bases.len() > 1 {
                 // The main has V1.0's pocket and home Tank.
-                bases.retain(|base| dist2(base.at.0, base.at.1, main.0, main.1) > squared(8.0 * ts));
+                bases
+                    .retain(|base| dist2(base.at.0, base.at.1, main.0, main.1) > squared(8.0 * ts));
             }
             let back = memory.jeff_v1_1.front_line.back as f32 / 10.0;
             let segment_of = |base: &Base| {
                 (
-                    main.0 + axis.0 * (base.front + (AHEAD_TILES - back) * ts) + across.0 * base.side,
-                    main.1 + axis.1 * (base.front + (AHEAD_TILES - back) * ts) + across.1 * base.side,
+                    main.0
+                        + axis.0 * (base.front + (AHEAD_TILES - back) * ts)
+                        + across.0 * base.side,
+                    main.1
+                        + axis.1 * (base.front + (AHEAD_TILES - back) * ts)
+                        + across.1 * base.side,
                 )
             };
             // Grouped (`linegroups`): enemy fighters in sight at a base now weigh before the threat
@@ -507,7 +539,8 @@ pub(in crate::ai_core::decision) fn hold(
                             enemy.hp > 0 && enemy.kind.is_unit() && enemy.kind != EntityKind::Worker
                         })
                         .filter(|enemy| {
-                            dist2(enemy.x, enemy.y, base.at.0, base.at.1) <= squared(ROLL_TILES * ts)
+                            dist2(enemy.x, enemy.y, base.at.0, base.at.1)
+                                <= squared(ROLL_TILES * ts)
                                 || dist2(enemy.x, enemy.y, segment.0, segment.1)
                                     <= squared(ROLL_TILES * ts)
                         })
@@ -525,8 +558,11 @@ pub(in crate::ai_core::decision) fn hold(
             let per_base = if groups { GROUP_TANKS } else { 2 };
             let covered = bases.len().min((tanks.len() / per_base).max(1));
             bases.truncate(covered);
-            let share_of = |total: usize, index: usize| total / covered + usize::from(index < total % covered);
-            let mut tank_counts: Vec<usize> = (0..covered).map(|index| share_of(tanks.len(), index)).collect();
+            let share_of =
+                |total: usize, index: usize| total / covered + usize::from(index < total % covered);
+            let mut tank_counts: Vec<usize> = (0..covered)
+                .map(|index| share_of(tanks.len(), index))
+                .collect();
             // Support rolls in: the base in contact takes Tanks from the others until it has
             // `ROLL_MATCH` of the enemy strength there.
             if groups && covered > 1 && bases[0].contact > 0.0 {
@@ -540,7 +576,11 @@ pub(in crate::ai_core::decision) fn hold(
                     *count = rest / others + usize::from(index - 1 < rest % others);
                 }
             }
-            let tank_spacing = if groups { GROUP_SPACING_TILES } else { params.spacing };
+            let tank_spacing = if groups {
+                GROUP_SPACING_TILES
+            } else {
+                params.spacing
+            };
             let mut left_tanks: Vec<&AiEntitySummary> = tanks.clone();
             let mut left_rifles: Vec<&AiEntitySummary> = riflemen.clone();
             for (index, base) in bases.iter().enumerate() {
@@ -548,7 +588,12 @@ pub(in crate::ai_core::decision) fn hold(
                 let segment = segment_of(base);
                 for (pool, count, spacing, ahead) in [
                     (&mut left_tanks, tank_counts[index], tank_spacing, 0.0),
-                    (&mut left_rifles, share(riflemen.len()), RIFLE_SPACING_TILES, RIFLE_AHEAD_TILES),
+                    (
+                        &mut left_rifles,
+                        share(riflemen.len()),
+                        RIFLE_SPACING_TILES,
+                        RIFLE_AHEAD_TILES,
+                    ),
                 ] {
                     pool.sort_by(|a, b| {
                         dist2(a.x, a.y, segment.0, segment.1)
@@ -556,7 +601,10 @@ pub(in crate::ai_core::decision) fn hold(
                             .then(a.id.cmp(&b.id))
                     });
                     let mine: Vec<&AiEntitySummary> = pool.drain(..count.min(pool.len())).collect();
-                    let at = (segment.0 + axis.0 * ahead * ts, segment.1 + axis.1 * ahead * ts);
+                    let at = (
+                        segment.0 + axis.0 * ahead * ts,
+                        segment.1 + axis.1 * ahead * ts,
+                    );
                     let slots = posts(observation, map_analysis, at, axis, mine.len(), spacing);
                     assignments.extend(seat(&mine, &slots, across));
                 }
@@ -564,8 +612,14 @@ pub(in crate::ai_core::decision) fn hold(
         }
         Shape::Axis | Shape::Fit => {
             // One line; stretched, it spans the bases near the front.
-            let span = front.iter().map(|at| lateral(**at)).fold(f32::MIN, f32::max)
-                - front.iter().map(|at| lateral(**at)).fold(f32::MAX, f32::min);
+            let span = front
+                .iter()
+                .map(|at| lateral(**at))
+                .fold(f32::MIN, f32::max)
+                - front
+                    .iter()
+                    .map(|at| lateral(**at))
+                    .fold(f32::MAX, f32::min);
             let spacing = if params.shape == Shape::Fit && tanks.len() > 1 {
                 ((span / ts + FIT_MARGIN_TILES) / (tanks.len() - 1) as f32)
                     .clamp(params.spacing, MAX_FIT_SPACING_TILES)
@@ -576,7 +630,14 @@ pub(in crate::ai_core::decision) fn hold(
                 centre.0 + direction.0 * RIFLE_AHEAD_TILES * ts,
                 centre.1 + direction.1 * RIFLE_AHEAD_TILES * ts,
             );
-            let tank_posts = posts(observation, map_analysis, centre, direction, tanks.len(), spacing);
+            let tank_posts = posts(
+                observation,
+                map_analysis,
+                centre,
+                direction,
+                tanks.len(),
+                spacing,
+            );
             let rifle_posts = posts(
                 observation,
                 map_analysis,
@@ -593,7 +654,10 @@ pub(in crate::ai_core::decision) fn hold(
     if !reserve.is_empty() {
         let behind = |at: (f32, f32)| {
             clamp_to_map(
-                (at.0 - axis.0 * RESERVE_BACK_TILES * ts, at.1 - axis.1 * RESERVE_BACK_TILES * ts),
+                (
+                    at.0 - axis.0 * RESERVE_BACK_TILES * ts,
+                    at.1 - axis.1 * RESERVE_BACK_TILES * ts,
+                ),
                 observation.map,
             )
         };
@@ -609,7 +673,14 @@ pub(in crate::ai_core::decision) fn hold(
                     })
             })
             .unwrap_or(centre);
-        let slots = posts(observation, map_analysis, behind(anchor), axis, reserve.len(), RESERVE_SPACING_TILES);
+        let slots = posts(
+            observation,
+            map_analysis,
+            behind(anchor),
+            axis,
+            reserve.len(),
+            RESERVE_SPACING_TILES,
+        );
         assignments.extend(seat(&reserve, &slots, across));
     }
     let charging = memory.jeff_v1_1.charge.riflemen.clone();
@@ -722,8 +793,12 @@ impl LineParams {
 
 /// Whether the line has the Tanks to cover the next base: `cover` (`JEFF_V11_LINE`, testing) for
 /// each base past the main once it is taken. Without it, or without the line, any time.
-pub(in crate::ai_core::decision) fn covers_next_base(memory: &AiDecisionMemory, depots: usize) -> bool {
-    let cover = crate::ai_core::profiles::jeff_v1_1_param("cover").map_or(0, |value| value as usize);
+pub(in crate::ai_core::decision) fn covers_next_base(
+    memory: &AiDecisionMemory,
+    depots: usize,
+) -> bool {
+    let cover =
+        crate::ai_core::profiles::jeff_v1_1_param("cover").map_or(0, |value| value as usize);
     !active(memory) || cover == 0 || memory.jeff_v1_1.front_line.tanks >= cover * depots
 }
 
@@ -752,7 +827,12 @@ fn posts(
                     observation.map,
                 );
                 if back >= 6.0
-                    || defense::defensive_position_is_open(observation, map_analysis, point.0, point.1)
+                    || defense::defensive_position_is_open(
+                        observation,
+                        map_analysis,
+                        point.0,
+                        point.1,
+                    )
                 {
                     break point;
                 }
@@ -770,7 +850,11 @@ fn seat<'u>(
 ) -> Vec<(&'u AiEntitySummary, (f32, f32))> {
     let lateral = |x: f32, y: f32| x * across.0 + y * across.1;
     let mut units = units.to_vec();
-    units.sort_by(|a, b| lateral(a.x, a.y).total_cmp(&lateral(b.x, b.y)).then(a.id.cmp(&b.id)));
+    units.sort_by(|a, b| {
+        lateral(a.x, a.y)
+            .total_cmp(&lateral(b.x, b.y))
+            .then(a.id.cmp(&b.id))
+    });
     let mut posts = posts.to_vec();
     posts.sort_by(|a, b| lateral(a.0, a.1).total_cmp(&lateral(b.0, b.1)));
     units.into_iter().zip(posts).collect()
@@ -785,7 +869,9 @@ fn attack_value(observation: &AiObservation, depot: Option<(f32, f32)>, ts: f32)
         .visible_enemies
         .iter()
         .filter(|enemy| enemy.hp > 0 && enemy.kind.is_unit() && enemy.kind != EntityKind::Worker)
-        .filter(|enemy| dist2(enemy.x, enemy.y, depot.0, depot.1) <= squared(BASE_ATTACK_TILES * ts))
+        .filter(|enemy| {
+            dist2(enemy.x, enemy.y, depot.0, depot.1) <= squared(BASE_ATTACK_TILES * ts)
+        })
         .map(|enemy| super::push::unit_value(enemy.kind) as f32)
         .sum()
 }
