@@ -87,11 +87,42 @@ pub(in crate::ai_core::decision) struct StationMemory {
     /// Per base Depot: the heaviest enemy force seen near it lately (value) and when.
     threats: BTreeMap<u32, (u32, u32)>,
     summary: String,
+    /// `riflestations`: where each free Rifleman stands this decision.
+    rifles: BTreeMap<u32, RiflePlace>,
+    rifle_summary: String,
+}
+
+/// `riflestations`: where a free Rifleman stands.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub(in crate::ai_core::decision) enum RiflePost {
+    /// The home pocket at the main (`jeff::stage_home_riflemen`).
+    Main,
+    /// The natural's line (`natural::support`).
+    Natural,
+    /// The line in front of the mines of the base with this Depot.
+    Base(u32),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct RiflePlace {
+    post: RiflePost,
+    at: (i32, i32),
+    ordered: u32,
 }
 
 impl StationMemory {
     pub(in crate::ai_core::decision) fn trace(&self) -> String {
-        format!("v1_1_stations {}", self.summary)
+        format!("v1_1_stations {}{}", self.summary, self.rifle_summary)
+    }
+
+    /// `riflestations`: the post the Rifle split gave this Rifleman.
+    pub(in crate::ai_core::decision) fn rifle_post(&self, id: u32) -> Option<RiflePost> {
+        self.rifles.get(&id).map(|place| place.post)
+    }
+
+    /// `riflestations`: whether this Rifleman holds a base past the natural.
+    pub(in crate::ai_core::decision) fn posted_out(&self, id: u32) -> bool {
+        matches!(self.rifle_post(id), Some(RiflePost::Base(_)))
     }
 }
 
@@ -116,6 +147,8 @@ struct Station {
     remote: f32,
     weight: f32,
     floor: usize,
+    /// Whether it covers the main.
+    main: bool,
 }
 
 /// Each finished Depot, its extractors, and whether it is the main.
@@ -294,6 +327,11 @@ fn halfway(
 ) -> Option<(f32, f32)> {
     let ts = observation.map.tile_size as f32;
     let cover = COVER_TILES * ts;
+    // `wayhalf`: halfway between the main and a base past it along the ground way there.
+    if let Some(analysis) = map_analysis.filter(|_| (a.main || b.main) && !super::off("wayhalf")) {
+        let (main, other) = if a.main { (a, b) } else { (b, a) };
+        return way_halfway(observation, map_analysis, analysis, main.center, other.center);
+    }
     if dist2(a.center.0, a.center.1, b.center.0, b.center.1) > squared(2.0 * cover) {
         return None;
     }
@@ -322,6 +360,75 @@ fn halfway(
         }
     }
     Some(point)
+}
+
+/// `wayhalf`: the open point halfway along the ground way from the main's station to `other`,
+/// when each half is at most `COVER_TILES * WAY_SLACK` long. The straight-line halfway point and
+/// its checks never held on Crossroads, whose natural lies 39 tiles from the main around the water
+/// walls: 3-5 Tanks waited at one of the two while the natural fell with 1-4 Tanks out.
+///
+/// The point is found by walking back from `other` downhill on the ground distances from Jeff's
+/// start, so it lies on the way there, until the walk reaches halfway between the two stations'
+/// ground distances.
+fn way_halfway(
+    observation: &AiObservation,
+    map_analysis: Option<&AiMapAnalysis>,
+    analysis: &AiMapAnalysis,
+    main: (f32, f32),
+    other: (f32, f32),
+) -> Option<(f32, f32)> {
+    let ts = observation.map.tile_size as f32;
+    let slack = COVER_TILES * WAY_SLACK;
+    let at_main = ground(observation, analysis, main)?;
+    let at_other = ground(observation, analysis, other)?;
+    let half = (at_other - at_main) * 0.5;
+    if half <= 0.0 || half > slack {
+        return None;
+    }
+    let target = at_main + half;
+    let walk = |tile: (i32, i32)| {
+        (tile.0 >= 0
+            && tile.1 >= 0
+            && (tile.0 as u32) < observation.map.width
+            && (tile.1 as u32) < observation.map.height)
+            .then(|| {
+                analysis.ground_distance_from_start(
+                    observation.player_id,
+                    (tile.0 as u32, tile.1 as u32),
+                )
+            })
+            .flatten()
+    };
+    let mut tile = ((other.0 / ts).floor() as i32, (other.1 / ts).floor() as i32);
+    let mut here = walk(tile)?;
+    let mut steps = 0;
+    while here > target {
+        steps += 1;
+        if steps > 512 {
+            return None;
+        }
+        let mut best: Option<(f32, (i32, i32))> = None;
+        for dy in -1..=1 {
+            for dx in -1..=1 {
+                if dx == 0 && dy == 0 {
+                    continue;
+                }
+                let next = (tile.0 + dx, tile.1 + dy);
+                if let Some(distance) = walk(next).filter(|distance| *distance < here) {
+                    if best.is_none_or(|(lowest, _)| distance < lowest) {
+                        best = Some((distance, next));
+                    }
+                }
+            }
+        }
+        let (distance, next) = best?;
+        here = distance;
+        tile = next;
+    }
+    let raw = ((tile.0 as f32 + 0.5) * ts, (tile.1 as f32 + 0.5) * ts);
+    let point = *clear_points(observation, map_analysis, vec![raw]).first()?;
+    let at = ground(observation, analysis, point)?;
+    (at - at_main <= slack && at_other - at <= slack).then_some(point)
 }
 
 /// Places V1.1's free Tanks at its stations and sends them there (see the module docs).
@@ -437,6 +544,7 @@ pub(in crate::ai_core::decision) fn station(
             remote: 1.0,
             weight: main.extractors.len() as f32 + MAIN_WEIGHT,
             floor: floor_of(main.depot),
+            main: true,
         });
     }
     let lines = super::base_line::base_lines(observation, map_analysis, &memory.jeff_v1_1.base_lines.contacts);
@@ -470,6 +578,7 @@ pub(in crate::ai_core::decision) fn station(
             remote,
             weight: mines * remote,
             floor,
+            main: false,
         });
     }
     if stations.is_empty() {
@@ -509,6 +618,7 @@ pub(in crate::ai_core::decision) fn station(
         a.remote = a.remote.max(b.remote);
         a.weight += b.weight;
         a.floor = a.floor.max(b.floor);
+        a.main |= b.main;
     }
 
     // Which stations hold Tanks, and how many each: threats first, then by weight.
@@ -680,6 +790,259 @@ pub(in crate::ai_core::decision) fn station(
     memory.jeff_v1_1.stations = memo;
     if !sent.is_empty() {
         // Clears the live adapter's cached staging, so a Tank staged before gets the order.
+        intents.push(AiIntent::Assemble { units: sent });
+    }
+}
+
+/// `riflestations`: the main keeps at least this many free Riflemen...
+const MAIN_MIN_RIFLES: usize = 8;
+/// ... and bases past the natural hold them only this many or more together.
+const RIFLE_GROUP: usize = 3;
+/// A Rifleman with a visible enemy unit this close fights where it stands.
+const RIFLE_FIGHTING_TILES: f32 = 8.0;
+/// A Depot this close to the natural site is the natural's.
+const NATURAL_DEPOT_TILES: f32 = 2.0;
+
+/// Whether Jeff's AI V1.1 splits its free Riflemen over its bases (`riflestations`).
+pub(in crate::ai_core::decision) fn rifles_on(profile_id: &str) -> bool {
+    is_jeff_v1_1(profile_id) && !super::off("riflestations")
+}
+
+/// `riflestations`: the free Riflemen in one split over the bases, in the same terms as the Tank
+/// stations. `postreturn` held a supporter's place at the natural while home defense had it, and
+/// the main ran short (Classic, 3-5 wins fewer in two 20-game sets). Here a Rifleman home defense
+/// or anything else holds is simply out of the split, and is placed again with the rest once free.
+///
+/// - **Natural**: its line (`natural::support`) gets the Riflemen it wants first, its usual size,
+///   nearest it first.
+/// - **Main**: keeps `THREAT_SHARE` of the heaviest enemy force seen at it in the last
+///   `THREAT_TICKS` (the Tank stations' memory), in Riflemen, and never fewer than
+///   `MAIN_MIN_RIFLES`. It holds them in the home pocket, with every Rifleman left over.
+/// - **Bases past the natural**: the rest, at most one base per `RIFLE_GROUP`, by the Tank
+///   stations' weight (extractors, more the further from the main), each on the line in front of
+///   its mines (`base_line`).
+///
+/// A Rifleman keeps its post while that post is short; the others fill the posts nearest first.
+/// `held`: units other systems ordered or keep this decision.
+pub(in crate::ai_core::decision) fn place_riflemen(
+    (actions, observation, map_analysis, intents): opening_rush::LiveStep<'_, '_, '_, '_>,
+    memory: &mut AiDecisionMemory,
+    profile_id: &str,
+    held: &BTreeSet<u32>,
+) {
+    if !rifles_on(profile_id) {
+        memory.jeff_v1_1.stations.rifles.clear();
+        memory.jeff_v1_1.stations.rifle_summary.clear();
+        return;
+    }
+    let ts = observation.map.tile_size as f32;
+    let tick = observation.tick;
+    let reserved = memory.squad_reserved();
+    let picket = memory.route_line.picket();
+    let pool: Vec<&AiEntitySummary> = observation
+        .owned
+        .iter()
+        .filter(|unit| unit.kind == EntityKind::Rifleman && unit.is_complete && unit.hp > 0)
+        .filter(|unit| {
+            !held.contains(&unit.id)
+                && !reserved.contains(&unit.id)
+                && !memory.containment.active_riflemen.contains(&unit.id)
+                && !memory.expansion_security.riflemen.contains(&unit.id)
+                && !memory.jeff_v1_1.natclear.holds(unit.id)
+                && !memory.stays_out_of_home_defense(unit.id)
+                && !memory.later_bases.guards.contains(&unit.id)
+                && !memory.jeff_v1_1.deny.holds(unit.id)
+                && !memory.rush_reserved(unit.id)
+                && picket != Some(unit.id)
+                && !memory.jeff_v1_1.charge.riflemen.contains(&unit.id)
+                && !memory.jeff_v1_1.hunt.hunters.contains_key(&unit.id)
+                && !memory.jeff_v1_1.strike.party.contains(&unit.id)
+                && !super::south_route::push_spotter(memory, unit.id)
+        })
+        .collect();
+    let bases = bases(observation);
+    let home = tile_center(observation.own_start_tile, observation.map.tile_size);
+    let main = bases.iter().find(|base| base.main);
+    let main_at = main.map_or(home, |base| base.at);
+    let natural_center = memory.expansion_security.site.and_then(|site| {
+        crate::ai_core::decision::geometry::building_center(
+            site,
+            EntityKind::ResourceDepot,
+            observation.map.tile_size,
+        )
+    });
+    let natural_depot = natural_center.and_then(|center| {
+        bases
+            .iter()
+            .find(|base| {
+                dist2(base.at.0, base.at.1, center.0, center.1)
+                    <= squared(NATURAL_DEPOT_TILES * ts)
+            })
+            .map(|base| base.depot)
+    });
+    let main_threat = main
+        .and_then(|base| memory.jeff_v1_1.stations.threats.get(&base.depot))
+        .map_or(0, |(value, _)| *value);
+    let rifle_value = super::push::unit_value(EntityKind::Rifleman).max(1) as f32;
+    let main_need =
+        MAIN_MIN_RIFLES.max((THREAT_SHARE * main_threat as f32 / rifle_value).ceil() as usize);
+    let n = pool.len();
+    let natural_quota = super::natural::support_wanted(memory, profile_id).min(n);
+    let main_floor = main_need.min(n - natural_quota);
+    let left = n - natural_quota - main_floor;
+    // Bases past the natural, by weight.
+    let mut outer: Vec<(u32, f32)> = bases
+        .iter()
+        .filter(|base| {
+            !base.main && Some(base.depot) != natural_depot && !base.extractors.is_empty()
+        })
+        .map(|base| {
+            let remote = 1.0
+                + dist2(base.at.0, base.at.1, main_at.0, main_at.1).sqrt() / (REMOTE_TILES * ts);
+            (base.depot, base.extractors.len() as f32 * remote)
+        })
+        .collect();
+    outer.sort_by(|a, b| b.1.total_cmp(&a.1).then(a.0.cmp(&b.0)));
+    outer.truncate(left / RIFLE_GROUP);
+    let outer_quotas = loop {
+        let weights: Vec<usize> = outer
+            .iter()
+            .map(|(_, weight)| (weight * 10.0).round().max(1.0) as usize)
+            .collect();
+        let quotas = super::base_line::shares(&weights, left);
+        if outer.len() <= 1 || quotas.iter().all(|quota| *quota >= RIFLE_GROUP) {
+            break quotas;
+        }
+        outer.pop();
+    };
+    let mut quota: BTreeMap<RiflePost, usize> = BTreeMap::new();
+    quota.insert(RiflePost::Natural, natural_quota);
+    for ((depot, _), share) in outer.iter().zip(&outer_quotas) {
+        quota.insert(RiflePost::Base(*depot), *share);
+    }
+    // Keepers first, then each post fills from the nearest Riflemen left.
+    let mut counts: BTreeMap<RiflePost, usize> = BTreeMap::new();
+    let mut posts: BTreeMap<u32, RiflePost> = BTreeMap::new();
+    for unit in &pool {
+        let Some(post) = memory.jeff_v1_1.stations.rifles.get(&unit.id).map(|place| place.post)
+        else {
+            continue;
+        };
+        if post == RiflePost::Main {
+            continue;
+        }
+        let count = counts.entry(post).or_insert(0);
+        if *count < quota.get(&post).copied().unwrap_or(0) {
+            *count += 1;
+            posts.insert(unit.id, post);
+        }
+    }
+    let base_at = |depot: u32| bases.iter().find(|base| base.depot == depot).map(|base| base.at);
+    for (post, wanted) in &quota {
+        let at = match post {
+            RiflePost::Natural => natural_center,
+            RiflePost::Base(depot) => base_at(*depot),
+            RiflePost::Main => None,
+        };
+        let Some(at) = at else {
+            continue;
+        };
+        let mut free: Vec<&&AiEntitySummary> =
+            pool.iter().filter(|unit| !posts.contains_key(&unit.id)).collect();
+        free.sort_by(|a, b| {
+            dist2(a.x, a.y, at.0, at.1)
+                .total_cmp(&dist2(b.x, b.y, at.0, at.1))
+                .then(a.id.cmp(&b.id))
+        });
+        let have = counts.get(post).copied().unwrap_or(0);
+        for unit in free.into_iter().take(wanted.saturating_sub(have)) {
+            posts.insert(unit.id, *post);
+        }
+    }
+    for unit in &pool {
+        posts.entry(unit.id).or_insert(RiflePost::Main);
+    }
+
+    // Orders for the bases past the natural: the line in front of each one's mines.
+    let lines = super::base_line::base_lines(
+        observation,
+        map_analysis,
+        &memory.jeff_v1_1.base_lines.contacts,
+    );
+    let previous = std::mem::take(&mut memory.jeff_v1_1.stations.rifles);
+    let mut places: BTreeMap<u32, RiflePlace> = BTreeMap::new();
+    let mut sent = Vec::new();
+    let fighting = |unit: &AiEntitySummary| {
+        observation.visible_enemies.iter().any(|enemy| {
+            enemy.hp > 0
+                && enemy.kind.is_unit()
+                && enemy.kind != EntityKind::Worker
+                && dist2(enemy.x, enemy.y, unit.x, unit.y) <= squared(RIFLE_FIGHTING_TILES * ts)
+        })
+    };
+    let mut parts = Vec::new();
+    for (depot, _) in &outer {
+        let members: Vec<&AiEntitySummary> = pool
+            .iter()
+            .filter(|unit| posts.get(&unit.id) == Some(&RiflePost::Base(*depot)))
+            .copied()
+            .collect();
+        parts.push(format!("{depot}:{}", members.len()));
+        let Some(line) = lines.iter().find(|line| line.depot == *depot) else {
+            continue;
+        };
+        if members.is_empty() {
+            continue;
+        }
+        let wanted = line.rifle_points(members.len(), SPARE_POINTS, ts);
+        let points = clear_points(observation, map_analysis, wanted);
+        let points = &points[..points.len().min(members.len())];
+        for (id, point) in seat(&members, points, ts) {
+            let Some(unit) = members.iter().find(|unit| unit.id == id) else {
+                continue;
+            };
+            let at = (point.0.round() as i32, point.1.round() as i32);
+            let same = previous.get(&id).filter(|place| {
+                place.post == RiflePost::Base(*depot)
+                    && dist2(place.at.0 as f32, place.at.1 as f32, point.0, point.1)
+                        <= squared(SAME_POST_TILES * ts)
+            });
+            let mut place = RiflePlace {
+                post: RiflePost::Base(*depot),
+                at,
+                ordered: same.map_or(0, |place| place.ordered),
+            };
+            let on = dist2(unit.x, unit.y, point.0, point.1) <= squared(ON_POST_TILES * ts);
+            let since = same.map(|place| tick.saturating_sub(place.ordered));
+            let waiting = since.is_some_and(|since| {
+                since < MIN_REORDER_TICKS
+                    || (since < REORDER_TICKS && unit.state != AiEntityState::Idle)
+            });
+            if !on && !waiting && !fighting(unit) {
+                if let Some(units) = actions::attack_move_units(actions, [id], point.0, point.1) {
+                    sent.extend(units);
+                    place.ordered = tick;
+                }
+            }
+            places.insert(id, place);
+        }
+    }
+    for (id, post) in &posts {
+        places.entry(*id).or_insert(RiflePlace {
+            post: *post,
+            at: (0, 0),
+            ordered: 0,
+        });
+    }
+    let count = |post: RiflePost| places.values().filter(|place| place.post == post).count();
+    memory.jeff_v1_1.stations.rifle_summary = format!(
+        " rifles n={n} main={}/{main_floor} nat={}/{natural_quota} [{}]",
+        count(RiflePost::Main),
+        count(RiflePost::Natural),
+        parts.join(" ")
+    );
+    memory.jeff_v1_1.stations.rifles = places;
+    if !sent.is_empty() {
         intents.push(AiIntent::Assemble { units: sent });
     }
 }

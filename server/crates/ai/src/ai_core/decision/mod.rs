@@ -1409,6 +1409,9 @@ where
         // Jeff's AI V1.1 sends some of the main's guns and Riflemen to hold its natural.
         let live = (&mut actions, observation, map_analysis, &mut intents);
         let held = &(&local_defense_assigned | &route_line_reserved) | &push_units;
+        // Jeff's AI V1.1 splits its free Riflemen over its bases first (`riflestations`).
+        jeff_v1_1::stations::place_riflemen(live, memory, profile.id, &held);
+        let live = (&mut actions, observation, map_analysis, &mut intents);
         jeff_v1_1::natural::support(
             live,
             memory,

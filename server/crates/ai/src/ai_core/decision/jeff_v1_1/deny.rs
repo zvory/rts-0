@@ -216,6 +216,7 @@ fn excluded(memory: &AiDecisionMemory, id: u32) -> bool {
         || memory.jeff_v1_1.natural.holds(id)
         || memory.jeff_v1_1.front_line.holds(id)
         || memory.jeff_v1_1.base_lines.posted(id)
+        || memory.jeff_v1_1.stations.posted_out(id)
         || memory.jeff_v1_1.charge.riflemen.contains(&id)
         || memory.rush_reserved(id)
 }

@@ -25,11 +25,24 @@ const RANK_BACK_TILES: f32 = 2.0;
 
 /// How many units support the natural: `SUPPORT`, or under the Rifleman opening (`riflenat`) all of
 /// its holders but the two guards.
-fn support_size(profile_id: &str) -> usize {
+pub(in crate::ai_core::decision) fn support_size(profile_id: &str) -> usize {
     if super::rifle_opening(profile_id) {
         super::natural_rifles().saturating_sub(2)
     } else {
         SUPPORT
+    }
+}
+/// How many Riflemen the natural's line wants now: its size while the line stands, else none.
+pub(in crate::ai_core::decision) fn support_wanted(memory: &AiDecisionMemory, profile_id: &str) -> usize {
+    let active = is_jeff_v1_1(profile_id)
+        && !super::off("natsupport")
+        && memory.expansion_security.site.is_some()
+        && !memory.expansion_security.riflemen.is_empty()
+        && !(memory.jeff_v1_1.natclear.active() && !super::off("natclear"));
+    if active {
+        support_size(profile_id)
+    } else {
+        0
     }
 }
 /// A unit this close to its post holds there.
@@ -145,6 +158,15 @@ pub(in crate::ai_core::decision) fn support(
             && !memory.rush_reserved(unit.id)
             && !memory.later_bases.guards.contains(&unit.id)
             && !memory.jeff_v1_1.base_lines.posted(unit.id)
+            && !memory.jeff_v1_1.stations.posted_out(unit.id)
+    };
+    // Under `riflestations` the Rifle split (`stations::place_riflemen`) names the natural's
+    // Riflemen: its own, wherever they stand, and no others.
+    let split = super::stations::rifles_on(profile_id);
+    let named = |unit: &AiEntitySummary| {
+        !split
+            || unit.kind != EntityKind::Rifleman
+            || memory.jeff_v1_1.stations.rifle_post(unit.id) == Some(super::stations::RiflePost::Natural)
     };
     let by_id: BTreeMap<u32, &AiEntitySummary> =
         observation.owned.iter().map(|unit| (unit.id, unit)).collect();
@@ -160,7 +182,7 @@ pub(in crate::ai_core::decision) fn support(
     // Under `mgline` the guns hold the spread lines in front of the bases (`base_line`) instead.
     let guns_go = guns_go && super::off("mgline");
     let free = |unit: &AiEntitySummary| {
-        free(unit) && (guns_go || unit.kind != EntityKind::MachineGunner)
+        free(unit) && named(unit) && (guns_go || unit.kind != EntityKind::MachineGunner)
     };
     // Keep the support it has while each is still free.
     // Under `postreturn` a supporter home defense took keeps its post for up to `AWAY_TICKS`, and
@@ -214,7 +236,7 @@ pub(in crate::ai_core::decision) fn support(
         .owned
         .iter()
         .filter(|unit| unit.kind == EntityKind::Rifleman && free(unit))
-        .filter(|unit| dist2(unit.x, unit.y, main.0, main.1) <= squared(HOME_TILES * ts))
+        .filter(|unit| split || dist2(unit.x, unit.y, main.0, main.1) <= squared(HOME_TILES * ts))
         .map(|unit| unit.id)
         .collect();
     riflemen.sort_by(|a, b| to_natural(a).total_cmp(&to_natural(b)).then(a.cmp(b)));

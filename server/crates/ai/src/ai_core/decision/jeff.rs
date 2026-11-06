@@ -187,6 +187,7 @@ pub(super) fn stage_home_riflemen(
                     && !route_line_reserved.contains(&unit.id)
                     // Jeff's AI V1.1's base lines hold a few Riflemen past the main.
                     && !memory.jeff_v1_1.base_lines.posted(unit.id)
+                    && !memory.jeff_v1_1.stations.posted_out(unit.id)
                     && !memory.jeff_v1_1.natural.holds(unit.id)
                     && !memory.jeff_v1_1.front_line.holds(unit.id)
                     && !memory.jeff_v1_1.deny.holds(unit.id)

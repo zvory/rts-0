@@ -309,6 +309,7 @@ pub(in crate::ai_core::decision) fn plan(
             && !memory.stays_out_of_home_defense(unit.id)
             && !memory.later_bases.guards.contains(&unit.id)
             && !memory.jeff_v1_1.base_lines.posted(unit.id)
+            && !memory.jeff_v1_1.stations.posted_out(unit.id)
     };
     let by_id: BTreeMap<u32, &AiEntitySummary> =
         observation.owned.iter().map(|unit| (unit.id, unit)).collect();
