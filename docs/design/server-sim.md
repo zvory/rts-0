@@ -1351,11 +1351,14 @@ spatial indexes across later mutations.
 
 Tank Point (`SimCommand::PointTanks`) filters to living owned tanks after ordinary command
 admission, then calculates a shared heading from their centroid to the clicked world point.
-It replaces active and queued orders with checkpoint-serialized `Order::Point { facing }`.
+Immediate issue replaces active and queued orders with checkpoint-serialized `Order::Point { facing }`.
+Shift issue appends checkpoint-serialized `OrderIntent::Point { facing }` within the ordinary queue
+limit, preserving the active order and earlier intents. The shared heading is resolved at issue time.
 Movement pivots in place at the ordinary tank hull turn rate, checking static standability
 at every step; blocked hulls wait for clearance. The stance holds ground, allows automatic
 turret fire, and suppresses automatic armor-reaction hull turns until another order replaces it.
-It is immediate even with Shift; a target at the centroid leaves existing orders unchanged.
+Following queued orders wait until the hull reaches the requested heading; Point holds indefinitely
+when no follow-up exists. A target at the centroid leaves existing orders unchanged.
 
 
 Rocket Truck barrage orders require the target to be within the existing 10–44 tile

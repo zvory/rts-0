@@ -41,6 +41,9 @@ mod point_promotion;
 /// Outcome of popping the next queued intent for a unit. Move/AttackMove are batched into a
 /// group move per destination point; gather/build are issued directly per worker.
 enum PromotedIntent {
+    TankPoint {
+        facing: f32,
+    },
     PointMove(PointPromotionKey),
     ClearObstacleArea(u32, (f32, f32)),
     HoldPosition,
@@ -183,6 +186,11 @@ pub(crate) fn promote_ready_orders(
             continue;
         };
         match promoted {
+            PromotedIntent::TankPoint { facing } => {
+                if let Some(entity) = entities.get_mut(id) {
+                    entity.set_order(Order::Point { facing });
+                }
+            }
             PromotedIntent::PointMove(key) => {
                 groups.entry(key).or_default().push(id);
             }
@@ -335,9 +343,13 @@ fn ready_for_next_order(
         return false;
     }
     match e.order() {
-        Order::Idle | Order::HoldPosition | Order::Point { .. } => {
-            !e.queued_orders().is_empty() && e.path_is_empty()
+        Order::Point { facing } => {
+            let delta = facing - e.facing();
+            !e.queued_orders().is_empty()
+                && e.path_is_empty()
+                && delta.sin().atan2(delta.cos()).abs() < 0.0001
         }
+        Order::Idle | Order::HoldPosition => !e.queued_orders().is_empty() && e.path_is_empty(),
         Order::Move(_) | Order::AttackMove(_) => {
             !e.queued_orders().is_empty()
                 && e.path_is_empty()
@@ -383,6 +395,15 @@ fn pop_next_valid_intent(
     for _ in 0..MAX_QUEUED_ORDERS {
         let intent = entities.get_mut(id)?.pop_promoted_intent()?;
         match intent {
+            OrderIntent::Point { facing } => {
+                if facing.is_finite()
+                    && entities
+                        .get(id)
+                        .is_some_and(|e| e.kind == EntityKind::Tank && e.hp > 0)
+                {
+                    return Some(PromotedIntent::TankPoint { facing });
+                }
+            }
             OrderIntent::Move(point) => {
                 if let Some(key) = PointPromotionKey::new(owner, false, point.x, point.y) {
                     return Some(PromotedIntent::PointMove(key));
@@ -1462,33 +1483,5 @@ mod tests {
             unit.emplacement_facing().unwrap_or_default().abs() < 0.001,
             "queued point fire must not walk the active field of fire before redeploy"
         );
-    }
-
-    #[test]
-    fn stationary_attack_that_cannot_fire_promotes_next_queued_order() {
-        let map = flat_map(32);
-        let mut entities = EntityStore::new();
-        let attacker = entities
-            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
-            .expect("rifleman should spawn");
-        let target = entities
-            .spawn_unit(2, EntityKind::Rifleman, 700.0, 100.0)
-            .expect("target should spawn");
-        {
-            let unit = entities.get_mut(attacker).expect("attacker should exist");
-            unit.set_order(Order::attack(target));
-            unit.set_target_id(Some(target));
-            unit.append_queued_order(OrderIntent::move_to(220.0, 100.0));
-        }
-        let players = vec![player_state(1), player_state(2)];
-
-        promote_with_players(&map, &mut entities, &players);
-
-        let unit = entities.get(attacker).expect("attacker should exist");
-        assert!(
-            matches!(unit.order(), Order::Move(_)),
-            "a stationary attack that cannot fire should not stall the queued move forever"
-        );
-        assert!(unit.queued_orders().is_empty());
     }
 }

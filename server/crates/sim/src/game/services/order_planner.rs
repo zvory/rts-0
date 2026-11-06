@@ -57,6 +57,7 @@ pub struct UnitFacts {
     pub can_attack_move: bool,
     pub can_attack: bool,
     pub can_hold_position: bool,
+    pub can_point: bool,
     pub can_gather: bool,
     pub can_build: bool,
     pub can_setup_anti_tank_gun: bool,
@@ -78,6 +79,7 @@ impl UnitFacts {
             can_attack_move: true,
             can_attack: false,
             can_hold_position: false,
+            can_point: false,
             can_gather: false,
             can_build: false,
             can_setup_anti_tank_gun: false,
@@ -132,6 +134,9 @@ pub enum AbilityTarget {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum RequestedOrder {
+    Point {
+        facing: f32,
+    },
     Move {
         to: Point,
     },
@@ -200,6 +205,9 @@ impl Default for PlannerConfig {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum OrderIntent {
+    Point {
+        facing: f32,
+    },
     Move(Point),
     AttackMove(Point),
     ClearObstacleArea {
@@ -349,6 +357,13 @@ pub fn plan_order(
         } if target_point.valid() => {
             plan_deconstruct(config, request.mode, &ordered_facts, target, target_point)
         }
+        RequestedOrder::Point { facing } if facing.is_finite() => plan_filtered_units(
+            config,
+            request.mode,
+            &ordered_facts,
+            |u| u.can_point,
+            OrderIntent::Point { facing },
+        ),
         RequestedOrder::SetupAntiTankGuns { face_toward } if face_toward.valid() => {
             plan_filtered_units(
                 config,

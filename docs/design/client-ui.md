@@ -2203,7 +2203,8 @@ Existing mortar/artillery commands retain priority in mixed selections that shar
 Point is available without research and uses the normal targeted-command click/cancel flow on
 both battlefield and minimap. Only selected controllable tanks are sent in `pointTanks`.
 The cursor selects one shared heading from the tanks’ center, keeping their hulls parallel.
-Point immediately stops previous movement and holds that heading; Shift does not queue it.
+Point immediately stops previous movement and holds that heading; Shift appends it to the order
+queue on both battlefield and minimap. Following queued orders wait until the hull finishes turning.
 While Point is armed, a live ground arrow runs from the arithmetic mean of selected, living,
 controllable tank positions to the cursor. A center dot remains for a zero-length direction.
 The preview follows current camera projection and minimap targeting, and clears on cancellation

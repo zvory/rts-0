@@ -37,6 +37,15 @@ mod tests {
     }
 
     #[test]
+    fn queued_point_tanks_round_trips_through_sim_adapter() {
+        let value =
+            serde_json::json!({"c":"pointTanks","units":[1],"x":300.0,"y":400.0,"queued":true});
+        let wire: Command = serde_json::from_value(value.clone()).unwrap();
+        let sim = rts_sim::game::command::SimCommand::from_protocol(wire);
+        assert_eq!(serde_json::to_value(sim.to_protocol()).unwrap(), value);
+    }
+
+    #[test]
     fn reexported_kind_wire_adapter_round_trips_every_domain_kind() {
         for kind in EntityKind::ALL {
             let wire = kind_to_wire(kind);
