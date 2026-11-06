@@ -54,8 +54,8 @@ impl Game {
                         .iter()
                         .map(|upgrade| upgrade.to_protocol_str().to_string())
                         .collect(),
-                    units_lost: unit_loss_rows(&player.score.units_lost_by_kind),
-                    buildings_lost: kind_count_rows(&player.score.buildings_lost_by_kind),
+                    units_lost: loss_rows(&player.score.units_lost_by_kind),
+                    buildings_lost: loss_rows(&player.score.buildings_lost_by_kind),
                     resources_lost: resources_lost(
                         &player.score.units_lost_by_kind,
                         &player.score.buildings_lost_by_kind,
@@ -121,18 +121,35 @@ impl Game {
     }
 }
 
-fn unit_loss_rows(counts: &BTreeMap<EntityKind, u32>) -> Vec<ObserverAnalysisKindCount> {
-    kind_count_rows(counts)
+// Loss history stores counts by kind, not whether an extractor was paid for.
+// Keep Pump Jacks visible without assigning automatic construction a resource loss.
+fn loss_cost(kind: EntityKind) -> (u32, u32) {
+    if kind == EntityKind::PumpJack {
+        (0, 0)
+    } else {
+        economy_rules::cost(kind)
+    }
+}
+
+fn loss_rows(counts: &BTreeMap<EntityKind, u32>) -> Vec<ObserverAnalysisKindCount> {
+    kind_count_rows_with_cost(counts, loss_cost)
 }
 
 fn kind_count_rows(counts: &BTreeMap<EntityKind, u32>) -> Vec<ObserverAnalysisKindCount> {
+    kind_count_rows_with_cost(counts, economy_rules::cost)
+}
+
+fn kind_count_rows_with_cost(
+    counts: &BTreeMap<EntityKind, u32>,
+    cost: impl Fn(EntityKind) -> (u32, u32),
+) -> Vec<ObserverAnalysisKindCount> {
     counts
         .iter()
         .filter_map(|(&kind, &count)| {
             if count == 0 {
                 return None;
             }
-            let (steel, oil) = economy_rules::cost(kind);
+            let (steel, oil) = cost(kind);
             Some(ObserverAnalysisKindCount {
                 kind: crate::protocol::kind_to_wire(kind).to_string(),
                 count,
@@ -150,7 +167,7 @@ fn resources_lost(
     let mut total_steel = 0u32;
     let mut total_oil = 0u32;
     for (&kind, &count) in unit_counts.iter().chain(building_counts) {
-        let (steel, oil) = economy_rules::cost(kind);
+        let (steel, oil) = loss_cost(kind);
         total_steel = total_steel.saturating_add(steel.saturating_mul(count));
         total_oil = total_oil.saturating_add(oil.saturating_mul(count));
     }
