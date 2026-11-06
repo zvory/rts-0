@@ -134,7 +134,7 @@ jobs:
         if: needs.changed-files.outputs.run_server_build == 'true'
         run: scripts/build-sim-wasm.sh
 
-      - name: Verify portable RNG known answers in WASM
+      - name: Verify portable RNG and end-state hashes in WASM
         if: needs.changed-files.outputs.run_server_build == 'true'
         env:
           CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUNNER: wasm-bindgen-test-runner

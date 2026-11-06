@@ -312,11 +312,13 @@ adapters and a sorted entity-reference index, and does not clone/serialize the c
 validate/rebuild an entire checkpoint. Cost depends on final-state size, not duration. The ignored
 release test `end_state_hash_cost` measures 2,000 total entities on the four-player 166×166 map plus a 200,000-command history.
 A local release run (100 hashes, four players, 2,000 entities, 200,000 historical commands)
-measured 8.9 ms median, 9.3 ms p95, and 9.4 ms maximum. This is a finalization-only synchronous
+measured 8.5 ms median, 11.0 ms p95, and 18.0 ms maximum. This is a finalization-only synchronous
 cost below one 33.3 ms tick on that machine, not a production-hardware latency guarantee; unusually
-large decal/projectile state can cost more. Runtime logs expose `hash_us` for capture and verification. SHA portability does not imply simulation
-portability: `SmallRng` is explicitly platform-dependent, and floating-point simulation can diverge;
-the RNG probe helps detect generator drift even when seed/draw counters agree.
+large decal/projectile state can cost more. Runtime logs expose `hash_us` for capture and verification. The simulation now pins its RNG stream across native and WASM (see §3.1.3); the future-output
+probe additionally detects accidental generator drift even when seed/draw counters agree. Hash
+portability still does not promise that every floating-point simulation path will remain identical
+across builds/platforms: exact differences must be reported, not rounded away. A fixed three-tick
+full-state fingerprint runs natively and under WASM alongside the RNG known answers.
 
 #### 3.1.1 `Game` State Ownership Registry
 

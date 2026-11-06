@@ -56,8 +56,8 @@ impl Serialize for EndState<'_> {
         );
         field!("worldCombatPosition", state.world_combat_position);
         field!("rng", RngDescriptorV1::from_rng(&state.rng));
-        // SmallRng is platform-dependent. Probe its future output without consuming live draws,
-        // so equal seed/draw counters alone cannot mask different generator implementations.
+        // Probe future output without consuming live draws, so equal seed/draw counters alone
+        // cannot mask accidental generator changes despite the pinned portable RNG contract.
         let mut rng = state.rng.clone();
         let probe: Vec<u32> = (0..8).map(|_| rng.next_u32()).collect();
         field!("rngProbe", probe);
