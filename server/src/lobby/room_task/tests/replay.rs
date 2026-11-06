@@ -1442,24 +1442,52 @@ fn replay_metric_history_tracks_four_players_and_rewinds() {
         history.record(&game);
     }
     let after = history.samples.last().unwrap();
-    assert_eq!(after.players.iter().map(|row| row.id).collect::<Vec<_>>(), vec![1, 2, 3, 4]);
+    assert_eq!(
+        after.players.iter().map(|row| row.id).collect::<Vec<_>>(),
+        vec![1, 2, 3, 4]
+    );
     assert!(after.players[3].unit_steel > before.players[3].unit_steel);
     let baseline = &history.samples[0];
     for player in &game.observer_analysis().players {
-        let row = after.players.iter().find(|row| row.id == player.id).unwrap();
-        let prior = baseline.players.iter().find(|row| row.id == player.id).unwrap();
-        assert_eq!(row.lifetime_steel, i64::from(player.resources.lifetime.steel));
+        let row = after
+            .players
+            .iter()
+            .find(|row| row.id == player.id)
+            .unwrap();
+        let prior = baseline
+            .players
+            .iter()
+            .find(|row| row.id == player.id)
+            .unwrap();
+        assert_eq!(
+            row.lifetime_steel,
+            i64::from(player.resources.lifetime.steel)
+        );
         assert_eq!(row.steel, row.lifetime_steel - prior.lifetime_steel);
-        assert_eq!(row.alive_steel, row.lifetime_steel - i64::from(player.resources_lost.steel));
-        assert_eq!(row.unit_steel, player.units.iter().map(|unit| i64::from(unit.steel_value)).sum::<i64>());
+        assert_eq!(
+            row.alive_steel,
+            row.lifetime_steel - i64::from(player.resources_lost.steel)
+        );
+        assert_eq!(
+            row.unit_steel,
+            player
+                .units
+                .iter()
+                .map(|unit| i64::from(unit.steel_value))
+                .sum::<i64>()
+        );
     }
     history.truncate(120);
     assert_eq!(history.samples.last().unwrap().tick, 120);
-    assert!(history.samples.iter().all(|sample| sample.players.len() == 4));
+    assert!(history
+        .samples
+        .iter()
+        .all(|sample| sample.players.len() == 4));
     let wire = serde_json::to_value(crate::protocol::ServerMessage::ReplayResourceHistory {
         replace: true,
         samples: history.samples,
-    }).unwrap();
+    })
+    .unwrap();
     assert_eq!(wire["samples"][0]["players"][3]["id"], 4);
     assert!(wire["samples"][0]["players"][3]["aliveSteel"].is_i64());
 }
