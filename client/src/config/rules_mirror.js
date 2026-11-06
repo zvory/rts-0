@@ -157,7 +157,7 @@ export const STATS = Object.freeze({
     upgradeRequiresText: "Requires research in Engineering Complex" },
   [KIND.ROCKET_LAUNCHER]: { armored: false, label: "Rocket Truck", icon: "RT", size: 21.6, sight: 8, body: ROCKET_LAUNCHER_BODY,
     rangeTiles: 0, minRangeTiles: 10,
-    cost: { steel: 225, oil: 100 }, supply: 6, buildTicks: TICK_HZ * 20,
+    cost: { steel: 225, oil: 100 }, supply: 3, buildTicks: TICK_HZ * 20,
     requires: [KIND.STEELWORKS], upgradeRequires: UPGRADE.ROCKETS,
     upgradeRequiresText: "Requires Rockets research in Engineering Complex",
     description: "Mobile rocket artillery. Stop and manually fire a 16-rocket Barrage over a wide area." },
