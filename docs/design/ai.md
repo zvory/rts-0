@@ -312,7 +312,10 @@ are independent of Rush.
 
 Pressure expands up to five Resource Depots. It uses the SDK's player-relative ranked base sites,
 skips unreachable sites, original player starts, and sites with known owned/allied/enemy or remembered Depot evidence,
-and searches legal footprints covering the selected cluster's available resources. Unknown
+and first tries a Resource Depot centered on the selected site's public map landmark. If that
+footprint is blocked or otherwise invalid, it uses the existing nearby footprint search covering
+the cluster's available resources. Rush inherits this center-first policy after its Pressure
+handoff. Unknown
 occupancy remains unknown; ordinary authoritative placement validates each build. Blocked or
 exhausted sites yield to the next usable ranked site. A map with no usable site does not halt Tank
 production while saving for an impossible expansion.
