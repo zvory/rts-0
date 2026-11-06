@@ -427,7 +427,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
 - Mortar Teams have no setup or teardown timing. They use `MORTAR_MIN_RANGE_TILES = 5`,
   `MORTAR_RANGE_TILES = 17`, and `MORTAR_FIELD_OF_FIRE_RAD = 360 degrees total`,
   `MORTAR_FIRE_COOLDOWN_TICKS = 180` (6s between shells),
-  `MORTAR_MANUAL_SHELL_DELAY_TICKS = 26` (~0.87s manual travel),
+  `MORTAR_MANUAL_SHELL_DELAY_TICKS = 32` (~1.07s manual travel),
   `MORTAR_OUTER_RADIUS_TILES = 2.0`,
   `MORTAR_INNER_RADIUS_TILES = 0.5`,
   `MORTAR_OUTER_DAMAGE = 40`, and `MORTAR_INNER_DAMAGE = 100`.
