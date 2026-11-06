@@ -1,6 +1,6 @@
+use crate::rng::PortableRng;
 use std::collections::HashSet;
 
-use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
 
@@ -17,7 +17,7 @@ pub(super) fn assign_start_locations(
     }
     if groups.is_empty() && all_singleton_teams(players) {
         let mut shuffled = locations.to_vec();
-        let mut rng = SmallRng::seed_from_u64(seed as u64);
+        let mut rng = PortableRng::seed_from_u64(seed as u64);
         shuffled.shuffle(&mut rng);
         shuffled.truncate(players.len());
         return Ok(shuffled);

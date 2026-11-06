@@ -491,7 +491,8 @@ mod tests {
     use crate::game::fog::Fog;
     use crate::game::map::Map;
     use crate::protocol::terrain;
-    use rand::rngs::SmallRng;
+
+    use crate::rng::PortableRng;
     use rand::SeedableRng;
 
     fn flat_map(size: u32) -> Map {
@@ -567,7 +568,7 @@ mod tests {
             &fog,
             &BuildingMemory::default(),
             &mut pathing,
-            &mut SmallRng::seed_from_u64(0),
+            &mut PortableRng::seed_from_u64(0),
             &mut lingering_sight,
             &mut firing_reveals,
             &mut smokes,

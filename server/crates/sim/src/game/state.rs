@@ -1,6 +1,7 @@
+use crate::rng::PortableRng;
 use std::collections::BTreeSet;
 
-use rand::{rngs::SmallRng, Error as RngError, RngCore, SeedableRng};
+use rand::{Error as RngError, RngCore, SeedableRng};
 
 use super::{
     ability_runtime::AbilityRuntime, anti_tank_gun_memory::AntiTankGunMemory,
@@ -48,7 +49,7 @@ pub(in crate::game) struct GameState {
 pub(in crate::game) struct TrackedRng {
     seed: u64,
     draws_consumed: u64,
-    inner: SmallRng,
+    inner: PortableRng,
 }
 
 impl TrackedRng {
@@ -60,7 +61,7 @@ impl TrackedRng {
         let mut rng = Self {
             seed,
             draws_consumed: 0,
-            inner: SmallRng::seed_from_u64(seed),
+            inner: PortableRng::seed_from_u64(seed),
         };
         for _ in 0..draws_consumed {
             let _ = rng.next_u32();
@@ -153,5 +154,33 @@ impl GameState {
 
     pub(in crate::game) fn player_ids(&self) -> Vec<u32> {
         self.players.iter().map(|player| player.id).collect()
+    }
+}
+
+#[cfg(test)]
+mod rng_tests {
+    use super::*;
+
+    #[test]
+    fn tracked_stream_restores_after_mixed_draws_and_partial_byte_fills() {
+        for seed in [0, 1, u32::MAX] {
+            let mut rng = TrackedRng::seed_from_match_seed(seed);
+            let mut reference = PortableRng::seed_from_u64(u64::from(seed));
+            assert_eq!(rng.next_u32(), reference.next_u32());
+            let lo = reference.next_u32() as u64;
+            let hi = reference.next_u32() as u64;
+            assert_eq!(rng.next_u64(), lo | (hi << 32));
+            let mut bytes = [0; 7];
+            rng.fill_bytes(&mut bytes);
+            let first = reference.next_u32().to_le_bytes();
+            let second = reference.next_u32().to_le_bytes();
+            assert_eq!(&bytes[..4], &first);
+            assert_eq!(&bytes[4..], &second[..3]);
+            assert_eq!(rng.draws_consumed(), 5);
+            let mut restored = TrackedRng::from_seed_and_draws(rng.seed(), rng.draws_consumed());
+            for _ in 0..100 {
+                assert_eq!(rng.next_u64(), restored.next_u64());
+            }
+        }
     }
 }

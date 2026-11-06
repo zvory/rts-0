@@ -3,6 +3,7 @@ use crate::game::entity::{EntityKind, EntityStore};
 use crate::game::services::occupancy::footprint_center;
 use crate::game::teams::TeamRelations;
 use crate::protocol::terrain;
+use crate::rng::PortableRng;
 
 fn open_map(size: u32) -> Map {
     Map {
@@ -410,10 +411,10 @@ fn reference_stamp_sight(grid: &mut [bool], entity: &Entity, map: &Map, los: &Li
 
 #[test]
 fn overlapping_sight_matches_all_rays_reference_with_terrain_buildings_and_smoke() {
-    use rand::{rngs::SmallRng, Rng, SeedableRng};
+    use rand::{Rng, SeedableRng};
 
     for seed in 0..12 {
-        let mut rng = SmallRng::seed_from_u64(seed);
+        let mut rng = PortableRng::seed_from_u64(seed);
         let mut map = open_map(32);
         map.elevation = (0..map.width * map.height)
             .map(|_| rng.gen_range(0..10))

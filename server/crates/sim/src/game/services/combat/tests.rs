@@ -11,8 +11,9 @@ use crate::game::teams::TeamRelations;
 use crate::game::upgrade::UpgradeKind;
 use crate::game::{PlayerState, ScoreState};
 use crate::protocol::{terrain, NoticeSeverity};
+use crate::rng::PortableRng;
 use crate::rules::combat as combat_rules;
-use rand::{rngs::SmallRng, SeedableRng};
+use rand::SeedableRng;
 mod accuracy;
 mod anti_tank_acquisition;
 mod anti_tank_behavior;
@@ -214,7 +215,7 @@ fn run_combat_tick_on_map_with_seed_smokes_and_tick(
         .map(|player_id| (*player_id, Vec::new()))
         .collect();
 
-    let mut rng = SmallRng::seed_from_u64(rng_seed);
+    let mut rng = PortableRng::seed_from_u64(rng_seed);
     let mut panzerfaust_shots = crate::game::panzerfaust_shot::PanzerfaustShotStore::default();
     let mut firing_reveals = Vec::new();
     let methamphetamines_researched = |owner| {
@@ -296,7 +297,7 @@ fn apply_test_damage_with_teams(
         .expect("test attacker should have a default weapon profile");
     let map = Map::generate(2, 0x00C0_FFEE);
     let fog = Fog::new(map.width, map.height);
-    let mut rng = SmallRng::seed_from_u64(0);
+    let mut rng = PortableRng::seed_from_u64(0);
     let blockers = ShotBlockerIndex::build(&map, entities);
     apply_damage(
         &map,
@@ -1248,7 +1249,7 @@ fn attack_move_resumes_original_destination_after_target_is_gone() {
     let mut events = HashMap::from([(1, Vec::new())]);
     let mut firing_reveals = Vec::new();
 
-    let mut rng = SmallRng::seed_from_u64(0);
+    let mut rng = PortableRng::seed_from_u64(0);
     let methamphetamines_researched = |_owner| false;
     combat_system(
         &map,

@@ -498,6 +498,18 @@ fn checkpoint_payload_rejects_inconsistent_metadata_rng_and_supply() {
     let game = Game::new_for_replay(&human_vs_ai_players(), 0x5150_2005);
     let text = checkpoint_payload_text_for(&game, "inconsistent metadata payload fixture");
 
+    let legacy_rng = mutate_payload(&text, |value| {
+        value["rng"]["algorithm"] = serde_json::json!("rts-small-rng-0.8-draws-v1");
+    });
+    assert!(matches!(
+        Game::restore_checkpoint_payload_text_for_test(
+            &legacy_rng,
+            game.state.map.clone(),
+            game.map_metadata().clone(),
+        ),
+        Err(CheckpointPayloadError::IncompatibleRngAlgorithm { .. })
+    ));
+
     let mismatched_rng_seed = mutate_payload(&text, |value| {
         value["rng"]["seed"] = serde_json::json!(123);
     });

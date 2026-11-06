@@ -1,4 +1,5 @@
 use super::*;
+use crate::rng::PortableRng;
 
 #[allow(clippy::too_many_arguments)]
 fn apply_test_damage_with_weapon(
@@ -17,7 +18,7 @@ fn apply_test_damage_with_weapon(
 ) {
     let map = Map::generate(2, 0x00C0_FFEE);
     let fog = Fog::new(map.width, map.height);
-    let mut rng = SmallRng::seed_from_u64(0);
+    let mut rng = PortableRng::seed_from_u64(0);
     let blockers = ShotBlockerIndex::build(&map, entities);
     apply_damage(
         &map,
