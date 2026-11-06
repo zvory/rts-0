@@ -595,8 +595,8 @@ touch release and suppress the synthesized compatibility click. The overlay owns
 and is read-only. The Army Value tab is client-side and viewport-specific, excludes economy workers
 (Engineer and Golem), and counts only combat units. Production, Research, Units, Resources, Alive
 Resources, Losses, and Resources Lost render the latest server-authored `observerAnalysis`
-payload. For exactly two players, Resources also samples each player's server-authored lifetime
-mined totals once per second, derives a trailing 8-second collection difference, and renders
+payload. For two to four players, Resources also samples each player's server-authored lifetime
+mined totals once per second and derives trailing 8-second collection values. Three- and four-player matches render one color-coded line per player with a name legend and a shared numeric Y scale for each resource, including negative alive values. Exactly two players retain the advantage view, which renders
 divergent steel and oil area charts. The first player leads above the
 center line and the second leads below it. Each resource uses a symmetric minimum Y extent equal
 to one fully extracting base over that window (144 Steel or 36 Oil). Backward replay seeks
