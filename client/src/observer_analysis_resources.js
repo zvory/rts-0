@@ -43,6 +43,10 @@ export class ResourceCollectionHistory {
         const value = entry?.[field];
         sample[field] = Number.isSafeInteger(value) ? value : null;
       }
+      sample.players = (Array.isArray(entry.players) ? entry.players : [])
+        .filter((player) => Number.isSafeInteger(player?.id) && player.id > 0
+          && HISTORY_FIELDS.every((field) => Number.isSafeInteger(player[field])))
+        .map((player) => ({ ...player }));
       this.samples.push(sample);
     }
     this.revision += 1;
@@ -51,51 +55,45 @@ export class ResourceCollectionHistory {
   record(analysis) {
     const tick = Math.max(0, Math.trunc(Number(analysis?.tick) || 0));
     const players = Array.isArray(analysis?.players) ? analysis.players : [];
-    if (players.length !== 2) {
+    if (players.length < 2 || players.length > 4) {
+      if (this.samples.length) this.revision += 1;
       this.samples = [];
       return;
     }
 
     const ids = players.map((player) => player.id).sort((a, b) => a - b);
-    const last = this.samples[this.samples.length - 1];
-    if (last && (last.playerIds?.[0] !== ids[0] || last.playerIds?.[1] !== ids[1])) {
+    const last = this.samples.at(-1);
+    if (last && (last.playerIds?.length !== ids.length
+      || ids.some((id, index) => last.playerIds[index] !== id))) {
       this.samples = [];
     } else if (last && tick < last.tick) {
       this.samples = this.samples.filter((sample) => sample.tick <= tick);
+      this.revision += 1;
     }
-
-    const current = this.samples[this.samples.length - 1];
+    const current = this.samples.at(-1);
     if (current && tick - current.tick < SAMPLE_INTERVAL_TICKS) return;
-    const byId = new Map(players.map((player) => [player.id, player]));
-    const first = byId.get(ids[0]);
-    const second = byId.get(ids[1]);
-    if (!first || !second) return;
-
-    const cumulativeSteel = (first.resources?.lifetime?.steel || 0) - (second.resources?.lifetime?.steel || 0);
-    const cumulativeOil = (first.resources?.lifetime?.oil || 0) - (second.resources?.lifetime?.oil || 0);
     const targetTick = tick - COLLECTION_WINDOW_TICKS;
-    let baseline = null;
-    for (let index = this.samples.length - 1; index >= 0; index -= 1) {
-      if (this.samples[index].tick <= targetTick) {
-        baseline = this.samples[index];
-        break;
-      }
-    }
+    const baseline = this.samples.findLast((sample) => sample.tick <= targetTick);
     const hasWindowBaseline = baseline && targetTick - baseline.tick <= SAMPLE_INTERVAL_TICKS;
-    this.samples.push({
-      tick,
-      playerIds: ids,
-      cumulativeSteel,
-      cumulativeOil,
-      lostSteel: (first.resourcesLost?.steel || 0) - (second.resourcesLost?.steel || 0),
-      lostOil: (first.resourcesLost?.oil || 0) - (second.resourcesLost?.oil || 0),
-      unitSteel: unitValue(first, "steelValue") - unitValue(second, "steelValue"),
-      unitOil: unitValue(first, "oilValue") - unitValue(second, "oilValue"),
-      aliveSteel: cumulativeSteel - (first.resourcesLost?.steel || 0) + (second.resourcesLost?.steel || 0),
-      aliveOil: cumulativeOil - (first.resourcesLost?.oil || 0) + (second.resourcesLost?.oil || 0),
-      steel: hasWindowBaseline ? cumulativeSteel - baseline.cumulativeSteel : 0,
-      oil: hasWindowBaseline ? cumulativeOil - baseline.cumulativeOil : 0,
+    const series = [...players].sort((a, b) => a.id - b.id).map((player) => {
+      const lifetimeSteel = player.resources?.lifetime?.steel || 0;
+      const lifetimeOil = player.resources?.lifetime?.oil || 0;
+      const prior = hasWindowBaseline && baseline.players.find((row) => row.id === player.id);
+      const lostSteel = player.resourcesLost?.steel || 0;
+      const lostOil = player.resourcesLost?.oil || 0;
+      return {
+        id: player.id, lifetimeSteel, lifetimeOil, lostSteel, lostOil,
+        aliveSteel: lifetimeSteel - lostSteel,
+        aliveOil: lifetimeOil - lostOil,
+        unitSteel: unitValue(player, "steelValue"),
+        unitOil: unitValue(player, "oilValue"),
+        steel: prior ? lifetimeSteel - prior.lifetimeSteel : 0,
+        oil: prior ? lifetimeOil - prior.lifetimeOil : 0,
+      };
     });
+    const sample = { tick, playerIds: ids, players: series };
+    for (const field of HISTORY_FIELDS) sample[field] = series[0][field] - series[1][field];
+    this.samples.push(sample);
     this.revision += 1;
   }
 }
@@ -252,8 +250,20 @@ export function renderMetricAdvantage({ rows, samples, currentTick, metric = "co
   const section = document.createElement("section");
   section.className = "replay-resource-advantage";
 
+  if (rows.length >= 1 && rows.length <= 4
+    && (rows.length !== 2 || samples.some((sample) => sample.players?.length > 2))) {
+    for (const [index, resource] of ["steel", "oil"].entries()) {
+      section.appendChild(renderPlayerHistoryChart({
+        rows, samples, currentTick, resource, field: descriptor.fields[index],
+        metric: metricLabel,
+        minExtent: descriptor.minExtent ? RESOURCE_ADVANTAGE_MIN_EXTENT[resource] : 0,
+      }));
+    }
+    return section;
+  }
+
   if (rows.length !== 2) {
-    section.appendChild(renderEmptyMetric(`${metricLabel} graphs are shown for 1v1 replays.`));
+    section.appendChild(renderEmptyMetric(`${metricLabel} graphs track two to four players.`));
     return section;
   }
 
@@ -274,6 +284,73 @@ export function renderMetricAdvantage({ rows, samples, currentTick, metric = "co
     }));
   }
   return section;
+}
+
+function renderPlayerHistoryChart({ rows, samples, currentTick, resource, field, metric, minExtent }) {
+  const figure = document.createElement("figure");
+  figure.className = "replay-resource-advantage-chart replay-resource-player-chart";
+  const caption = document.createElement("figcaption");
+  caption.className = "replay-resource-advantage-chart-heading";
+  const label = resource === "steel" ? "Steel" : "Oil";
+  caption.innerHTML = `${resourceIconHtml(resource)}<span>${label}</span>`;
+  figure.appendChild(caption);
+  // Require matching player ids; roster order and observer vision may change independently.
+  const timeline = samples.filter((sample) => rows.every((row) =>
+    sample.players?.some((player) => player.id === row.id && Number.isSafeInteger(player[field]))));
+  if (timeline.length < 2) {
+    figure.appendChild(renderEmptyMetric(`Play to build its ${metric} timeline.`));
+    return figure;
+  }
+  const width = 420;
+  const height = 110;
+  const plotLeft = 45;
+  const values = timeline.flatMap((sample) => rows.map((row) =>
+    sample.players.find((player) => player.id === row.id)[field]));
+  const lower = Math.min(0, ...values);
+  const upper = Math.max(1, minExtent || 0, ...values);
+  const y = (value) => 5 + (upper - value) / (upper - lower) * (height - 10);
+  const lastTick = Math.max(1, timeline.at(-1).tick, Number(currentTick) || 0);
+  const svg = svgElement("svg", {
+    viewBox: `0 0 ${width} ${height + 18}`,
+    role: "img",
+    "aria-label": `${label} ${metric} by player over game time. ${rows.map((row) => row.name).join(", ")}.`,
+  });
+  svg.appendChild(svgElement("path", {
+    d: `M ${plotLeft},${y(0)} H ${width}`,
+    class: "replay-resource-advantage-zero",
+  }));
+  appendTimeLabel(svg, plotLeft - 4, 12, String(upper), "end");
+  appendTimeLabel(svg, plotLeft - 4, height, String(lower), "end");
+  for (const row of rows) {
+    const points = timeline.map((sample) => {
+      const value = sample.players.find((player) => player.id === row.id)[field];
+      return `${(plotLeft + sample.tick / lastTick * (width - plotLeft)).toFixed(1)},${y(value).toFixed(1)}`;
+    });
+    svg.appendChild(svgElement("path", {
+      d: `M ${points.join(" L ")}`, fill: "none", stroke: safeCssColor(row.color),
+      "stroke-width": 2, "data-player-id": row.id,
+    }));
+  }
+  for (const fraction of [0, 0.5, 1]) {
+    appendTimeLabel(svg, plotLeft + fraction * (width - plotLeft), height + 13,
+      formatReplayTick(lastTick * fraction), fraction === 0 ? "start" : fraction === 1 ? "end" : "middle");
+  }
+  figure.appendChild(svg);
+  const legend = document.createElement("div");
+  legend.className = "replay-resource-history-legend";
+  for (const row of rows) {
+    const entry = document.createElement("span");
+    entry.className = "replay-resources-player";
+    const swatch = document.createElement("span");
+    swatch.className = "replay-analysis-player-swatch";
+    swatch.setAttribute("style", `background:${safeCssColor(row.color)};`);
+    const name = document.createElement("span");
+    name.textContent = row.name;
+    entry.append(swatch, name);
+    legend.appendChild(entry);
+  }
+  figure.appendChild(legend);
+  return figure;
 }
 
 function renderAdvantageChart({ resource, label, rows, samples, currentTick, metric, field, minExtent, serial }) {

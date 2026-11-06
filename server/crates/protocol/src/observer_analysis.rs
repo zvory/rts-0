@@ -71,10 +71,28 @@ pub struct ObserverAnalysisResourceTotals {
 }
 
 /// A complete replay collection timeline or one new, one-second sample.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ReplayResourceSample {
+    pub players: Vec<ReplayPlayerResourceSample>,
     pub tick: u32,
+    pub steel: i64,
+    pub oil: i64,
+    pub alive_steel: i64,
+    pub alive_oil: i64,
+    pub lost_steel: i64,
+    pub lost_oil: i64,
+    pub unit_steel: i64,
+    pub unit_oil: i64,
+}
+
+/// Absolute per-player values; collection is measured over the trailing eight seconds.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ReplayPlayerResourceSample {
+    pub id: u32,
+    pub lifetime_steel: i64,
+    pub lifetime_oil: i64,
     pub steel: i64,
     pub oil: i64,
     pub alive_steel: i64,
@@ -322,6 +340,7 @@ mod tests {
         let msg = ServerMessage::ReplayResourceHistory {
             replace: true,
             samples: vec![ReplayResourceSample {
+                players: vec![],
                 tick: 30,
                 steel: 12,
                 oil: -4,
