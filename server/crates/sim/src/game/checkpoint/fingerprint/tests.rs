@@ -21,12 +21,13 @@ fn end_state_hash_covers_hidden_state_and_ignores_unapplied_input_and_history() 
     let baseline = game.replay_end_state_hash().unwrap();
     let mut copy = game.clone_for_replay_keyframe();
     assert_eq!(baseline, copy.replay_end_state_hash().unwrap());
-    copy.state.players[0].oil += 1;
+    let player = &mut copy.state.players[0];
+    player.set_resources(player.steel, player.oil + 1);
     assert_ne!(baseline, copy.replay_end_state_hash().unwrap());
     let mut copy = game.clone_for_replay_keyframe();
     let id = copy.state.entities.ids()[0];
     let entity = copy.state.entities.get_mut(id).unwrap();
-    entity.pos_x = f32::from_bits(entity.pos_x.to_bits() + 1);
+    entity.set_position(f32::from_bits(entity.pos_x.to_bits() + 1), entity.pos_y);
     assert_ne!(
         baseline,
         copy.replay_end_state_hash().unwrap(),
