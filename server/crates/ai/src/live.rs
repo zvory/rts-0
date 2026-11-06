@@ -87,7 +87,7 @@ pub fn is_player_live_profile_id(profile_id: &str) -> bool {
 }
 
 pub fn random_live_profile_id(rng: &mut impl Rng) -> &'static str {
-    LIVE_PROFILE_IDS[rng.gen_range(0..LIVE_PROFILE_IDS.len())]
+    LIVE_PROFILE_IDS[rng.gen_range(0..LIVE_PROFILE_IDS.len() as u32) as usize]
 }
 
 pub fn resolve_live_profile_id_for_match(profile_id: &str) -> &'static str {
@@ -1376,7 +1376,7 @@ mod tests {
 
     #[test]
     fn random_live_profile_selection_uses_the_full_internal_pool() {
-        let mut rng = rand::rngs::SmallRng::seed_from_u64(0xA1);
+        let mut rng = rts_sim::rng::PortableRng::seed_from_u64(0xA1);
         let mut selected = BTreeSet::new();
         for _ in 0..32 {
             selected.insert(random_live_profile_id(&mut rng));

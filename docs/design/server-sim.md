@@ -514,7 +514,7 @@ Top-level shape:
   "seed": 1234,
   "tick": 900,
   "rng": {
-    "algorithm": "rts-small-rng-0.8-draws-v1",
+    "algorithm": "rts-xoshiro256pp-pcg32-rand086-draws-v1",
     "seed": 1234,
     "drawsConsumed": 0
   },
@@ -540,12 +540,30 @@ Top-level shape:
 }
 ```
 
-The `rng` field is a deterministic draw-stream descriptor, not a raw serde dump of `SmallRng`.
-`drawsConsumed` counts draws from `seed` under the named algorithm. Import reconstructs the stream
-by seeding and advancing, or rejects the payload if the running binary cannot prove the same
-algorithm. Re-seeding from `seed` alone is invalid once any random draw has occurred. If a later
-runtime replaces `SmallRng`, it must either provide a migrator from this descriptor or bump the
-checkpoint version and reject old payloads with a compatibility error.
+The `rng` field is a deterministic draw-stream descriptor. The portable algorithm is
+`Xoshiro256PlusPlus` from exactly `rand_xoshiro 0.6.0` on all targets, including wasm32.
+`PortableRng` expands the u64 seed with eight PCG32 words (multiply by 6364136223846793005,
+add 11634580027462260723, then XSH-RR output after advancing), writes them little-endian,
+and interprets the resulting bytes as four little-endian u64 Xoshiro state words. This preserves
+the former 64-bit `SmallRng` initialization, rather than Xoshiro's different SplitMix64 initializer.
+Each u32 draw advances Xoshiro once and takes its upper 32 bits.
+
+`TrackedRng` counts these u32 transitions in `drawsConsumed`. Its u64 draws consume two u32
+transitions, low word first; byte fills consume little-endian u32 words and discard unused tail
+bytes. Import reseeds and advances exactly that many transitions. Re-seeding alone is invalid
+after any draw. Combat call order is unchanged: conditional miss checks and MG spread draws
+consume the same stream in system/entity iteration order. Sampling is pinned to `rand =0.8.6`:
+f32 standard draws use the upper 24 bits of a u32, MG spread uses its inclusive f32 uniform
+sampler, and start-location Fisher-Yates shuffle uses its u32 index sampler (map sizes fit u32).
+Seeded AI/profile selection and tools also use `PortableRng`; profile indexing explicitly samples
+u32 rather than platform-sized usize. Changes to expansion, sampling, or draw order require a new
+algorithm identifier and compatibility review. Fixed answer tests run natively and under WASM.
+
+The former `rts-small-rng-0.8-draws-v1` descriptor is rejected by the existing incompatible-algorithm
+error, because its stream was target-dependent. The checkpoint JSON shape/version is unchanged;
+algorithm compatibility is checked separately. Bundled setup checkpoints are relabeled because
+their 64-bit stream is preserved. Old external checkpoints/replays carrying the old descriptor
+must be regenerated; command-only legacy replays use the portable stream from now on.
 
 `commandLog` carries replay/API/crash continuity history. Normal checkpoint import installs the
 log as metadata and must not replay it to reconstruct state. `commandLogMetadata` records the

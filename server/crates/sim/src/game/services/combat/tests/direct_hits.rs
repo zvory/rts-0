@@ -1,4 +1,5 @@
 use super::*;
+use crate::rng::PortableRng;
 
 #[test]
 fn direct_weapons_only_damage_the_resolved_victim() {
@@ -37,7 +38,7 @@ fn direct_weapons_only_damage_the_resolved_victim() {
                 let teams = default_team_relations();
                 let fog = visible_fog(&map, &entities);
                 let mut events = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
-                let mut rng = SmallRng::seed_from_u64(0);
+                let mut rng = PortableRng::seed_from_u64(0);
                 let blockers = ShotBlockerIndex::build(&map, &entities);
                 apply_damage(
                     &map,

@@ -1,5 +1,6 @@
 //! Weighted, once-per-match choices among concrete AI behaviors.
-use rand::{rngs::SmallRng, Rng, SeedableRng};
+use rand::{Rng, SeedableRng};
+use rts_sim::rng::PortableRng;
 use serde::Serialize;
 
 use crate::ai_core::profiles::{JEFFS_AI_ID, PRESSURE_AI_ID};
@@ -68,7 +69,7 @@ impl AiComposition {
     pub(crate) fn select(&self, match_seed: u32, player: u32) -> Option<&'static str> {
         // Independent from simulation RNG and from controller iteration order.
         let seed = ((u64::from(match_seed) << 32) | u64::from(player)) ^ 0xa122_5e1e_c710_0001;
-        let mut rng = SmallRng::seed_from_u64(seed);
+        let mut rng = PortableRng::seed_from_u64(seed);
         self.at_ticket(rng.gen_range(0..self.total_weight()?))
     }
 }

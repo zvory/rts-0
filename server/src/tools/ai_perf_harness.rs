@@ -5,6 +5,8 @@
 //! summaries include simulation and fanout work without requiring browser clients.
 #![allow(dead_code)]
 
+use rts_sim::rng::PortableRng;
+
 use std::collections::{BTreeMap, HashMap};
 use std::process;
 use std::time::{Duration, Instant};
@@ -12,7 +14,7 @@ use std::time::{Duration, Instant};
 use crate::lobby::compact_snapshot_for_wire;
 use crate::protocol::{default_snapshot_codec, encode_snapshot_frame, Event, SnapshotFrame};
 use crate::structured_log::SNAPSHOT_SINGLE_SEGMENT_BUDGET_BYTES;
-use rand::rngs::SmallRng;
+
 use rand::SeedableRng;
 use rts_ai::{AiAlivePolicy, AiController, CanonicalAiTickDriver};
 use rts_sim::game::{Game, PlayerInit};
@@ -448,7 +450,7 @@ fn snapshot_frame_len(frame: &SnapshotFrame) -> usize {
 }
 
 fn live_ai_controllers(players: &[PlayerInit], seed: u32) -> Vec<AiController> {
-    let mut rng = SmallRng::seed_from_u64((seed as u64) ^ 0xA17E_5EED);
+    let mut rng = PortableRng::seed_from_u64((seed as u64) ^ 0xA17E_5EED);
     players
         .iter()
         .filter(|player| player.is_ai)

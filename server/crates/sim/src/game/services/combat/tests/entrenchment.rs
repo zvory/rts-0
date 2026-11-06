@@ -1,4 +1,5 @@
 use super::*;
+use crate::rng::PortableRng;
 use crate::rules::terrain::TerrainKind;
 
 #[test]
@@ -13,7 +14,7 @@ fn authored_damage_reduction_tile_reduces_direct_weapon_damage_by_a_quarter() {
     let teams = TeamRelations::from_player_teams([(1, 1), (2, 2)]);
     let fog = visible_fog(&map, &entities);
     let mut events = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
-    let mut rng = SmallRng::seed_from_u64(0);
+    let mut rng = PortableRng::seed_from_u64(0);
     let blockers = ShotBlockerIndex::build(&map, &entities);
     let weapon = entities
         .get(attacker)

@@ -1,4 +1,5 @@
 use super::*;
+use crate::rng::PortableRng;
 
 #[test]
 fn replay_419_scout_cars_hit_barracks_at_acquired_edge_range() {
@@ -35,7 +36,7 @@ fn replay_419_scout_cars_hit_barracks_at_acquired_edge_range() {
             &LineOfSight::new(&map),
             &fog,
             &SmokeCloudStore::new(),
-            &mut SmallRng::seed_from_u64(1),
+            &mut PortableRng::seed_from_u64(1),
             &mut events,
             &mut vec![],
             attacker,
