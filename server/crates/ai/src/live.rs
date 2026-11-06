@@ -87,7 +87,7 @@ pub fn is_player_live_profile_id(profile_id: &str) -> bool {
 }
 
 pub fn random_live_profile_id(rng: &mut impl Rng) -> &'static str {
-    LIVE_PROFILE_IDS[rng.gen_range(0..LIVE_PROFILE_IDS.len())]
+    LIVE_PROFILE_IDS[rng.gen_range(0..LIVE_PROFILE_IDS.len() as u64) as usize]
 }
 
 pub fn resolve_live_profile_id_for_match(profile_id: &str) -> &'static str {

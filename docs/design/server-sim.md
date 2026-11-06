@@ -555,8 +555,8 @@ after any draw. Combat call order is unchanged: conditional miss checks and MG s
 consume the same stream in system/entity iteration order. Sampling is pinned to `rand =0.8.6`:
 f32 standard draws use the upper 24 bits of a u32, MG spread uses its inclusive f32 uniform
 sampler, and start-location Fisher-Yates shuffle uses its u32 index sampler (map sizes fit u32).
-Seeded AI/profile selection and tools also use `PortableRng`; random live-profile indexing retains
-its existing usize sampler to preserve AI behavior and is outside the cross-target contract.
+Seeded AI/profile selection and tools also use `PortableRng`; random live-profile indexing uses
+a fixed u64 sampler, preserving historical 64-bit selections and draw consumption on all targets.
 Changes to expansion, sampling, or draw order require a new algorithm identifier and compatibility
 review. Fixed answer tests run natively and under WASM.
 
