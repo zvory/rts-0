@@ -415,9 +415,16 @@ impl AiController {
             context.retreat_commands
         };
         let tick = context.snapshot.tick;
-        if self.custom_strategy.is_none() && self.behavior_profile_id != RUSH_AI_ID {
-            self.static_map_context.get_or_analyze(context.start);
-        }
+        let static_map_context =
+            if self.custom_strategy.is_none() && self.behavior_profile_id != RUSH_AI_ID {
+                Some(
+                    self.static_map_context
+                        .get_or_analyze(context.start)
+                        .clone(),
+                )
+            } else {
+                None
+            };
         if !tick
             .wrapping_add(self.player)
             .is_multiple_of(DECISION_INTERVAL)
@@ -447,11 +454,14 @@ impl AiController {
         };
 
         let frame = frame.with_losses(&context.known_losses);
-        let frame = frame.with_base_sites(
+        // The start payload cannot change during this invocation. Reuse one validated context
+        // rather than rehashing its terrain, overlays, starts, and resources for each consumer.
+        let static_map_context = static_map_context.unwrap_or_else(|| {
             self.static_map_context
                 .get_or_analyze(context.start)
-                .base_sites(),
-        );
+                .clone()
+        });
+        let frame = frame.with_base_sites(static_map_context.base_sites());
 
         #[cfg(test)]
         {
@@ -528,10 +538,7 @@ impl AiController {
         let failed_builds = &self.pending_builds;
         let world_queries = WorldQueries::new(&frame);
         let build_site_exclusions = failed_builds.known_build_site_exclusions(&world_queries);
-        let map_analysis = self
-            .static_map_context
-            .get_or_analyze(context.start)
-            .analysis();
+        let map_analysis = static_map_context.analysis();
         self.last_debug_map_layers =
             observer_debug_map_layers_for_profile(&observation, map_analysis, profile);
         let decision = decide_profile_with_analysis(
@@ -823,7 +830,7 @@ mod tests {
     use rts_sim::game::PlayerInit;
     use rts_sim::protocol::{terrain, MapInfo, PlayerStart, ResourceNode};
 
-    fn cache_test_start_payload() -> StartPayload {
+    pub(super) fn cache_test_start_payload() -> StartPayload {
         StartPayload {
             player_id: 1,
             spectator: false,
@@ -1180,59 +1187,6 @@ mod tests {
     }
 
     #[test]
-    fn live_controller_caches_static_map_analysis_by_start_identity() {
-        let mut ai = AiController::new(1);
-        let start = cache_test_start_payload();
-
-        let first_sites = ai
-            .static_map_context
-            .get_or_analyze(&start)
-            .base_sites()
-            .to_vec();
-        assert_eq!(first_sites.len(), start.players.len());
-        let first_key = ai.static_map_context.get_or_analyze(&start).key();
-        let second_key = ai.static_map_context.get_or_analyze(&start).key();
-        assert_eq!(second_key, first_key);
-        assert_eq!(
-            ai.static_map_context.current().map(|context| context.key()),
-            Some(first_key)
-        );
-
-        let mut no_resources = start.clone();
-        no_resources.map.resources.clear();
-        let empty_sites = ai
-            .static_map_context
-            .get_or_analyze(&no_resources)
-            .base_sites();
-        assert_eq!(empty_sites.len(), 1);
-        assert!(empty_sites[0].resource_ids.is_empty());
-
-        let mut moved_start = start.clone();
-        moved_start.players[0].start_tile_x = 2;
-        let moved_key = ai.static_map_context.get_or_analyze(&moved_start).key();
-
-        assert_ne!(moved_key, first_key);
-        assert_ne!(
-            ai.static_map_context.current().unwrap().base_sites(),
-            first_sites
-        );
-        assert_eq!(
-            ai.static_map_context.current().map(|context| context.key()),
-            Some(moved_key)
-        );
-
-        let mut edited_terrain = moved_start.clone();
-        edited_terrain.map.terrain[0] = terrain::ROCK;
-        let edited_key = ai.static_map_context.get_or_analyze(&edited_terrain).key();
-
-        assert_ne!(edited_key, moved_key);
-        assert_eq!(
-            ai.static_map_context.current().map(|context| context.key()),
-            Some(edited_key)
-        );
-    }
-
-    #[test]
     fn live_decision_trace_snapshot_is_bounded() {
         let long_line = "x".repeat(LIVE_DECISION_TRACE_MAX_LINE_CHARS + 8);
         let lines = std::iter::once(long_line)
@@ -1491,3 +1445,7 @@ mod composition_tests;
 #[cfg(test)]
 #[path = "live/losses_tests.rs"]
 mod losses_tests;
+
+#[cfg(test)]
+#[path = "live/map_context_tests.rs"]
+mod map_context_tests;
