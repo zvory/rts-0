@@ -245,7 +245,7 @@ fn random_side(player_id: u32, tick: u32, failed_pushes: u32) -> Approach {
 }
 
 fn rotate(vector: (f32, f32), degrees: f32) -> (f32, f32) {
-    let (sin, cos) = degrees.to_radians().sin_cos();
+    let (sin, cos) = degrees.to_radians().det_sin_cos();
     (
         vector.0 * cos - vector.1 * sin,
         vector.0 * sin + vector.1 * cos,
@@ -556,7 +556,7 @@ pub(super) fn leg_orders(
     }
     if state.phase == PushPhase::Travel {
         if let Some(center) = tanks_center {
-            let distance = dist2(center.0, center.1, legs.staging.0, legs.staging.1).sqrt();
+            let distance = dist2(center.0, center.1, legs.staging.0, legs.staging.1).det_sqrt();
             let closer = state
                 .closest_to_staging
                 .is_none_or(|best| distance < best as f32 - PROGRESS_TILES * ts);
@@ -611,8 +611,8 @@ pub(super) fn leg_orders(
 /// Whether a push at `center` is already inside the staging distance of `objective`, close to the
 /// staging point's bearing.
 fn past_staging(center: (f32, f32), objective: (f32, f32), staging: (f32, f32), ts: f32) -> bool {
-    let staging_distance = dist2(staging.0, staging.1, objective.0, objective.1).sqrt();
-    if dist2(center.0, center.1, objective.0, objective.1).sqrt() > staging_distance - ts {
+    let staging_distance = dist2(staging.0, staging.1, objective.0, objective.1).det_sqrt();
+    if dist2(center.0, center.1, objective.0, objective.1).det_sqrt() > staging_distance - ts {
         return false;
     }
     let (Some(to_center), Some(to_staging)) = (
@@ -622,7 +622,7 @@ fn past_staging(center: (f32, f32), objective: (f32, f32), staging: (f32, f32), 
         return false;
     };
     to_center.0 * to_staging.0 + to_center.1 * to_staging.1
-        >= PAST_STAGING_DEGREES.to_radians().cos()
+        >= PAST_STAGING_DEGREES.to_radians().det_cos()
 }
 
 #[cfg(test)]

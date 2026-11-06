@@ -24,6 +24,8 @@ use super::{setup, Game, MapMetadata, PlayerStartingLoadout};
 mod anti_tank_gun_memory;
 mod conversion;
 mod error;
+mod fingerprint;
+pub(in crate::game) use fingerprint::END_STATE_HASH_ALGORITHM;
 mod metadata;
 mod player_dto;
 mod validation;
@@ -45,12 +47,12 @@ struct PlayerCheckpointRef<'a, T> {
 
 const CHECKPOINT_SCHEMA: &str = "rts.gameCheckpoint";
 const CHECKPOINT_VERSION: u32 = rts_contract::GAME_CHECKPOINT_CURRENT_VERSION;
-// Construction funding, tank-trail ownership, and concealment detection are authoritative state.
+// Version 6 stores physical positions as Q19.12 and uses pinned portable gameplay math.
 // Keep older payloads outside this boundary instead of silently guessing missing fields.
-const SIM_SCHEMA_VERSION: u32 = 5;
+const SIM_SCHEMA_VERSION: u32 = 6;
 const RULES_VERSION: u32 = 1;
 const PROTOCOL_VERSION: u32 = 1;
-const RNG_ALGORITHM: &str = "rts-small-rng-0.8-draws-v1";
+const RNG_ALGORITHM: &str = "rts-xoshiro256pp-pcg32-rand086-draws-v1";
 const MAX_PAYLOAD_BYTES: usize = 4 * 1024 * 1024;
 const MAX_RNG_DRAWS_CONSUMED: u64 = 10_000_000;
 const MAX_PLAYERS: usize = 8;
@@ -233,6 +235,13 @@ impl GameCheckpointV1 {
                 max: MAX_PAYLOAD_BYTES,
             });
         }
+        #[derive(Deserialize)]
+        struct Header {
+            compatibility: CheckpointCompatibilityV1,
+        }
+        let header: Header = serde_json::from_str(text)
+            .map_err(|err| CheckpointPayloadError::MalformedJson(err.to_string()))?;
+        header.compatibility.validate()?;
         serde_json::from_str(text)
             .map_err(|err| CheckpointPayloadError::MalformedJson(err.to_string()))
     }

@@ -1,6 +1,7 @@
 use crate::config;
 use crate::game::entity::{EntityStore, MovePhase, Order};
 use crate::game::map::Map;
+use rts_rules::math::GameplayMath as _;
 
 use super::{formation, formation_units, MoveCoordinator};
 
@@ -53,7 +54,7 @@ fn approach_center(
     );
     let dx = centroid.0 - center.0;
     let dy = centroid.1 - center.1;
-    let distance = dx.hypot(dy);
+    let distance = dx.det_hypot(dy);
     let (nx, ny) = if distance.is_finite() && distance > 0.001 {
         (dx / distance, dy / distance)
     } else {

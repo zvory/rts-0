@@ -44,21 +44,21 @@ fn rifleman_move_completes_around_preview_tree_trunk() {
             &map,
             &occupancy,
             EntityKind::Rifleman,
-            unit.pos_x,
-            unit.pos_y,
+            unit.pos_x(),
+            unit.pos_y(),
         ));
         assert!(
-            !matches!(unit.order(), Order::Idle) || unit.pos_x > trunk.0,
+            !matches!(unit.order(), Order::Idle) || unit.pos_x() > trunk.0,
             "tick {tick}: move false-arrived at ({:.2},{:.2})",
-            unit.pos_x,
-            unit.pos_y,
+            unit.pos_x(),
+            unit.pos_y(),
         );
     }
 
     let unit = entities.get(rifleman).expect("rifleman survives");
-    let goal_error = moved_distance((unit.pos_x, unit.pos_y), normalized_goal);
+    let goal_error = moved_distance((unit.pos_x(), unit.pos_y()), normalized_goal);
     assert!(goal_error <= 1.0, "goal error {goal_error:.2}px");
-    assert!(unit.pos_x > trunk.0, "rifleman never crossed the trunk");
+    assert!(unit.pos_x() > trunk.0, "rifleman never crossed the trunk");
 }
 
 #[test]
@@ -116,7 +116,11 @@ fn rifleman_recovery_step_near_shoreline_trees_makes_progress() {
         movement_system(&map, &mut entities, &[], &occupancy, &spatial, tick);
         let unit = entities.get(rifleman).unwrap();
         assert!(standability::unit_static_standable(
-            &map, &occupancy, unit.kind, unit.pos_x, unit.pos_y,
+            &map,
+            &occupancy,
+            unit.kind,
+            unit.pos_x(),
+            unit.pos_y(),
         ));
     }
     let distance = moved_distance(pos(&entities, rifleman), recovery);

@@ -1,4 +1,5 @@
 use super::*;
+use rts_rules::math::GameplayMath as _;
 
 #[test]
 fn supplemental_rifles_reserve_distinct_spaced_posts_outside_the_opening_pocket() {
@@ -259,7 +260,7 @@ fn first_machine_gunner_reserves_a_flank_slot_in_two_unit_formation() {
     let reserved =
         main_steel_defensive_line_assignments(&observation, &[20], enemy_base, 6.0, 4.5, 2)
             .expect("reserved flank assignment")[0];
-    let offset_tiles = dist2(centered.x, centered.y, reserved.x, reserved.y).sqrt()
+    let offset_tiles = dist2(centered.x, centered.y, reserved.x, reserved.y).det_sqrt()
         / observation.map.tile_size as f32;
 
     assert!((offset_tiles - 2.25).abs() < 0.001);
@@ -294,7 +295,7 @@ fn home_rifle_coverage_uses_wide_fixed_columns_and_deeper_second_rank() {
             assignments[1].x,
             assignments[1].y
         )
-        .sqrt()
+        .det_sqrt()
             / tile_size
             - HOME_RIFLE_RANK_DEPTH_TILES)
             .abs()
@@ -307,7 +308,7 @@ fn home_rifle_coverage_uses_wide_fixed_columns_and_deeper_second_rank() {
             assignments[2].x,
             assignments[2].y
         )
-        .sqrt()
+        .det_sqrt()
             / tile_size
             - HOME_RIFLE_LATERAL_SPACING_TILES)
             .abs()
@@ -594,7 +595,7 @@ fn four_gun_line_keeps_the_pocket_posts_and_adds_a_wing_on_each_side() {
         // An attacker standing off the centre guns at Machine Gunner range is in every dug-in
         // gun's reach.
         let (forward, lateral) = frame(post);
-        assert!((14.0 - forward).hypot(lateral) <= 7.1);
+        assert!((14.0 - forward).det_hypot(lateral) <= 7.1);
     }
 }
 
@@ -1047,7 +1048,7 @@ fn unspotted_defending_tank_closes_to_its_own_sight_before_holding() {
         _ => None,
     });
     let (x, y) = park.unwrap_or_else(|| panic!("tank should close in: {commands:?}"));
-    let distance = dist2(x, y, 20.5 * ts, 5.5 * ts).sqrt() / ts;
+    let distance = dist2(x, y, 20.5 * ts, 5.5 * ts).det_sqrt() / ts;
     assert!((distance - 9.0).abs() < 0.01, "parked {distance} tiles out");
 }
 

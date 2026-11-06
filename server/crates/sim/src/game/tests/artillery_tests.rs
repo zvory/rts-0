@@ -98,7 +98,7 @@ fn artillery_attack_move_uses_team_vision_and_preserves_the_route() {
 
     let fired_target = fired_target.expect("attack-moving artillery should set up and fire");
     assert!(
-        (fired_target.0 - target_pos.0).hypot(fired_target.1 - target_pos.1)
+        (fired_target.0 - target_pos.0).det_hypot(fired_target.1 - target_pos.1)
             <= config::ARTILLERY_MIN_FIRE_RADIUS_TILES * config::TILE_SIZE as f32,
         "automatic artillery should use the narrowest available dispersion"
     );
@@ -488,7 +488,7 @@ fn artillery_attack_move_tears_down_and_resumes_after_targets_disappear() {
     assert!(!artillery_entity.path_is_empty());
     assert!(matches!(artillery_entity.order(), Order::AttackMove(_)));
 
-    let stopped_x = artillery_entity.pos_x;
+    let stopped_x = artillery_entity.pos_x();
     for _ in 0..=(config::ARTILLERY_SETUP_TICKS as u32 + 8) {
         game.tick();
     }
@@ -497,7 +497,7 @@ fn artillery_attack_move_tears_down_and_resumes_after_targets_disappear() {
             .entities
             .get(artillery)
             .expect("artillery exists")
-            .pos_x
+            .pos_x()
             > stopped_x,
         "the packed artillery should continue toward its attack-move destination"
     );
@@ -1020,14 +1020,14 @@ fn artillery_point_fire_inside_minimum_range_repositions_and_fires_at_clicked_po
         .get(artillery)
         .expect("artillery exists");
     assert!(
-        (entity.pos_x - pos.0).hypot(entity.pos_y - pos.1) > 1.0,
+        (entity.pos_x() - pos.0).det_hypot(entity.pos_y() - pos.1) > 1.0,
         "artillery should move out of its minimum range before setting up"
     );
     assert!(
         fired,
         "artillery should eventually fire at the clicked point; pos=({}, {}), order={:?}, setup={:?}, queued={:?}",
-        entity.pos_x,
-        entity.pos_y,
+        entity.pos_x(),
+        entity.pos_y(),
         entity.order(),
         entity.weapon_setup(),
         entity.queued_orders(),
@@ -1090,7 +1090,7 @@ fn artillery_point_fire_beyond_maximum_range_moves_sets_up_and_fires_at_clicked_
         .entities
         .get(artillery)
         .expect("artillery exists");
-    let distance_to_target = (entity.pos_x - target.0).hypot(entity.pos_y - target.1);
+    let distance_to_target = (entity.pos_x() - target.0).det_hypot(entity.pos_y() - target.1);
     let min_range = config::ARTILLERY_MIN_RANGE_TILES as f32 * config::TILE_SIZE as f32;
     let max_range = config::ARTILLERY_MAX_RANGE_TILES as f32 * config::TILE_SIZE as f32;
     assert!(distance_to_target >= min_range && distance_to_target <= max_range);
@@ -1142,7 +1142,9 @@ fn artillery_shell_outside_building_uses_footprint_distance_falloff() {
     let half_w = stats.foot_w as f32 * ts * 0.5;
     let inner = config::ARTILLERY_INNER_RADIUS_TILES * ts;
     let outer = config::ARTILLERY_OUTER_RADIUS_TILES * ts;
-    let gap = inner + (outer - inner) * 0.5;
+    // Avoid a half-integer damage rounding tie; this test checks footprint falloff,
+    // not compatibility with the old floating impact-coordinate representation.
+    let gap = inner + (outer - inner) * 0.4;
     let before = game.state.entities.get(depot).expect("depot exists").hp;
 
     resolve_test_artillery_shell(&mut game, 160.0 + half_w + gap, 160.0);
@@ -1233,7 +1235,7 @@ fn deploy_artillery_toward(game: &mut Game, artillery: u32, target: (f32, f32)) 
         .entities
         .get_mut(artillery)
         .expect("artillery should exist");
-    let facing = (target.1 - entity.pos_y).atan2(target.0 - entity.pos_x);
+    let facing = (target.1 - entity.pos_y()).det_atan2(target.0 - entity.pos_x());
     entity.set_weapon_setup(WeaponSetup::Deployed);
     entity.set_emplacement_facing(Some(facing));
     entity.set_desired_weapon_facing(facing);

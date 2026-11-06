@@ -27,7 +27,7 @@ pub(super) fn direct_fire_legal(
         smokes,
         attacker,
         attacker_entity.owner,
-        (attacker_entity.pos_x, attacker_entity.pos_y),
+        (attacker_entity.pos_x(), attacker_entity.pos_y()),
         target,
         legality,
     )
@@ -104,7 +104,7 @@ fn secondary_weapon_activation_legal(
         smokes,
         attacker,
         attacker_entity.owner,
-        (attacker_entity.pos_x, attacker_entity.pos_y),
+        (attacker_entity.pos_x(), attacker_entity.pos_y()),
         target,
         constraints,
     )

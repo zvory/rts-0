@@ -1,5 +1,6 @@
 use super::envelope::LocalDefenseContact;
 use super::*;
+use rts_rules::math::GameplayMath as _;
 
 pub(super) const SEARCH_TICKS: u32 = config::TICK_HZ * 2;
 const REACQUIRE_TILES: f32 = 1.5;
@@ -432,7 +433,7 @@ fn clear_line_of_fire(
     let Some(direction) = normalized_direction(from, to) else {
         return true;
     };
-    let tiles = dist2(from.0, from.1, to.0, to.1).sqrt() / observation.map.tile_size as f32;
+    let tiles = dist2(from.0, from.1, to.0, to.1).det_sqrt() / observation.map.tile_size as f32;
     defensive_firing_lane_is_clear(observation, map_analysis, from, direction, tiles)
 }
 
@@ -449,14 +450,14 @@ fn tank_park_point(
     let point_at = |angle: f32| {
         clamp_to_map(
             (
-                target.0 + angle.cos() * park_tiles * ts,
-                target.1 + angle.sin() * park_tiles * ts,
+                target.0 + angle.det_cos() * park_tiles * ts,
+                target.1 + angle.det_sin() * park_tiles * ts,
             ),
             observation.map,
         )
     };
     let direct = normalized_direction(target, tank).unwrap_or((0.0, 1.0));
-    let base = direct.1.atan2(direct.0);
+    let base = direct.1.det_atan2(direct.0);
     // Fan out from the direct approach, alternating sides, in 22.5 degree steps.
     let mut best = None;
     for step in 0..=8 {

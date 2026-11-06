@@ -328,8 +328,8 @@ fn starting_riflemen_form_an_outward_facing_defensive_line() {
         let start = game.state.map.starts[index];
         let depot = game.state.map.tile_center(start.0, start.1);
         let target = defensive_target_for_player(&game.state.map, &players, index, start);
-        let angle = (target.1 - depot.1).atan2(target.0 - depot.0);
-        let forward = (angle.cos(), angle.sin());
+        let angle = (target.1 - depot.1).det_atan2(target.0 - depot.0);
+        let forward = (angle.det_cos(), angle.det_sin());
         let lateral = (-forward.1, forward.0);
         let mut lateral_offsets = game
             .state
@@ -337,7 +337,7 @@ fn starting_riflemen_form_an_outward_facing_defensive_line() {
             .iter()
             .filter(|entity| entity.owner == player.id && entity.kind == EntityKind::Rifleman)
             .map(|entity| {
-                let offset = (entity.pos_x - depot.0, entity.pos_y - depot.1);
+                let offset = (entity.pos_x() - depot.0, entity.pos_y() - depot.1);
                 let forward_distance = offset.0 * forward.0 + offset.1 * forward.1;
                 assert!((forward_distance - 4.0 * tile_size).abs() < 0.01);
                 assert!((entity.facing() - angle).abs() < 0.001);
@@ -465,8 +465,8 @@ fn default_spawns_resources_for_every_base_site_with_one_player() {
         );
         assert!(game.state.entities.iter().any(|node| {
             node.kind == EntityKind::Steel
-                && (node.pos_x - mine.pos_x).abs() <= 0.001
-                && (node.pos_y - mine.pos_y).abs() <= 0.001
+                && (node.pos_x() - mine.pos_x()).abs() <= 0.001
+                && (node.pos_y() - mine.pos_y()).abs() <= 0.001
         }));
     }
     let pump_jack = game
@@ -483,8 +483,8 @@ fn default_spawns_resources_for_every_base_site_with_one_player() {
     );
     assert!(game.state.entities.iter().any(|node| {
         node.kind == EntityKind::Oil
-            && (node.pos_x - pump_jack.pos_x).abs() <= 0.001
-            && (node.pos_y - pump_jack.pos_y).abs() <= 0.001
+            && (node.pos_x() - pump_jack.pos_x()).abs() <= 0.001
+            && (node.pos_y() - pump_jack.pos_y()).abs() <= 0.001
     }));
 
     assert_eq!(
@@ -552,7 +552,7 @@ fn authored_tank_trap_doodads_spawn_completed_neutral_entities() {
     let trap_id = trap.id;
 
     assert_eq!(trap.owner, 0);
-    assert_eq!((trap.pos_x, trap.pos_y), (x, y));
+    assert_eq!((trap.pos_x(), trap.pos_y()), (x, y));
     assert!(!trap.under_construction());
     assert!(
         game.start_payload().map.doodads.is_empty(),
@@ -648,7 +648,7 @@ fn base_resources_flank_the_centreline_and_put_oil_outward() {
     let center = map.world_width_px() * 0.5;
     let dir_x = center - hx;
     let dir_y = center - hy;
-    let len = (dir_x * dir_x + dir_y * dir_y).sqrt();
+    let len = (dir_x * dir_x + dir_y * dir_y).det_sqrt();
     assert!(len > f32::EPSILON);
     let dir_x = dir_x / len;
     let dir_y = dir_y / len;
@@ -664,7 +664,7 @@ fn base_resources_flank_the_centreline_and_put_oil_outward() {
         .iter()
         .filter(|entity| entity.kind == EntityKind::Steel)
     {
-        let projection = (steel.pos_x - hx) * lateral_x + (steel.pos_y - hy) * lateral_y;
+        let projection = (steel.pos_x() - hx) * lateral_x + (steel.pos_y() - hy) * lateral_y;
         if projection > config::TILE_SIZE as f32 {
             right_of_centreline += 1;
         } else if projection < -(config::TILE_SIZE as f32) {
@@ -681,7 +681,7 @@ fn base_resources_flank_the_centreline_and_put_oil_outward() {
         .iter()
         .filter(|entity| entity.kind == EntityKind::Oil)
     {
-        let inward_projection = (oil.pos_x - hx) * dir_x + (oil.pos_y - hy) * dir_y;
+        let inward_projection = (oil.pos_x() - hx) * dir_x + (oil.pos_y() - hy) * dir_y;
         assert!(
             inward_projection < -(config::TILE_SIZE as f32),
             "oil patch must be behind the base, away from map centre"
@@ -705,8 +705,8 @@ fn bundled_base_sites_fit_resource_depot_between_resource_patches() {
             .unwrap();
             for node in resources.iter().filter(|node| node.kind.is_node()) {
                 let body = services::geometry::CircleBody {
-                    x: node.pos_x,
-                    y: node.pos_y,
+                    x: node.pos_x(),
+                    y: node.pos_y(),
                     radius: node.radius(),
                 };
                 assert!(
@@ -733,7 +733,7 @@ fn bundled_oil_patches_have_buildable_pump_jack_sites() {
             .iter()
             .filter(|entity| entity.kind == EntityKind::Oil)
         {
-            let (tile_x, tile_y) = map.tile_of(oil.pos_x, oil.pos_y);
+            let (tile_x, tile_y) = map.tile_of(oil.pos_x(), oil.pos_y());
             assert!(
                 services::standability::building_site_clear(
                     &map,

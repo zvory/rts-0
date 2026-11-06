@@ -12,8 +12,8 @@ fn deployed_anti_tank_gun_tracks_target_inside_fixed_arc_before_firing() {
         .spawn_unit(
             2,
             EntityKind::Tank,
-            100.0 + target_angle.cos() * target_distance,
-            100.0 + target_angle.sin() * target_distance,
+            100.0 + target_angle.det_cos() * target_distance,
+            100.0 + target_angle.det_sin() * target_distance,
         )
         .expect("enemy tank should spawn");
     let enemy_hp = entities.get(enemy_id).expect("enemy should exist").hp;

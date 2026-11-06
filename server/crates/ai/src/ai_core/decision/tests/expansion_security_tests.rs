@@ -1,5 +1,6 @@
 use super::*;
 use crate::ai_core::profiles::{JEFFS_AI, JEFFS_AI_PRE_EARLY_NATURAL, JEFFS_AI_PRE_TANK_MICRO};
+use rts_rules::math::GameplayMath as _;
 
 pub(super) fn security_observation() -> AiObservation {
     let ts = config::TILE_SIZE as f32;
@@ -294,7 +295,7 @@ fn expansion_security_requires_arrival_and_uncontested_dwell() {
     let points = expansion_security::positions(&obs, None, &memory.expansion_security, false);
     assert_eq!(points.len(), 2);
     assert!(
-        geometry::dist2(points[0].0, points[0].1, points[1].0, points[1].1).sqrt()
+        geometry::dist2(points[0].0, points[0].1, points[1].0, points[1].1).det_sqrt()
             >= 2.75 * config::TILE_SIZE as f32
     );
     let step = |obs: &AiObservation, memory: &mut AiDecisionMemory| {
@@ -318,7 +319,7 @@ fn expansion_security_requires_arrival_and_uncontested_dwell() {
         let unit = obs.owned.iter().find(|unit| unit.id == *id).unwrap();
         let site = memory.expansion_security.site.unwrap();
         let center = building_center(site, EntityKind::ResourceDepot, obs.map.tile_size).unwrap();
-        geometry::dist2(unit.x, unit.y, center.0, center.1).sqrt()
+        geometry::dist2(unit.x, unit.y, center.0, center.1).det_sqrt()
             < geometry::dist2(
                 config::TILE_SIZE as f32 * 8.5,
                 config::TILE_SIZE as f32 * 8.5,
@@ -735,7 +736,7 @@ fn expansion_security_has_spaced_reachable_posts_on_river_and_crossroads() {
                 );
             }
             assert!(
-                geometry::dist2(points[0].0, points[0].1, points[1].0, points[1].1).sqrt()
+                geometry::dist2(points[0].0, points[0].1, points[1].0, points[1].1).det_sqrt()
                     >= 2.75 * obs.map.tile_size as f32
             );
         }
@@ -1095,7 +1096,7 @@ fn expansion_security_live_opening_reaches_second_base() {
                         unit.y,
                         unit.state,
                         center.map(|center| {
-                            geometry::dist2(unit.x, unit.y, center.0, center.1).sqrt()
+                            geometry::dist2(unit.x, unit.y, center.0, center.1).det_sqrt()
                                 / obs.map.tile_size as f32
                         }),
                     ))

@@ -40,7 +40,12 @@ fn grant_ordinary_sight_near(game: &mut Game, owner: u32, target: u32) {
         .expect("sight target should exist");
     game.state
         .entities
-        .spawn_unit(owner, EntityKind::ScoutPlane, target.pos_x, target.pos_y)
+        .spawn_unit(
+            owner,
+            EntityKind::ScoutPlane,
+            target.pos_x(),
+            target.pos_y(),
+        )
         .expect("vision scout plane should spawn");
     refresh_visibility_for_test(game);
 }

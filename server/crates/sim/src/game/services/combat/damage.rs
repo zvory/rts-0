@@ -73,7 +73,7 @@ pub(super) fn apply_damage(
     let shot_victim = shot_victim?;
     let shot_victim_pos = entities
         .get(shot_victim)
-        .map(|e| (e.pos_x, e.pos_y))
+        .map(|e| (e.pos_x(), e.pos_y()))
         .unwrap_or((vx, vy));
     let victim = entities.get(shot_victim);
     let victim_kind = victim.map(|e| e.kind);
@@ -170,7 +170,7 @@ pub(super) fn apply_direct_hit(
     tick: u32,
 ) -> Option<ShotOutcome> {
     let target = entities.get(victim)?;
-    let pos = (target.pos_x, target.pos_y);
+    let pos = (target.pos_x(), target.pos_y());
     let outcome = ShotOutcome {
         victim_owner: target.owner,
         reveals_attacker: projection_rules::shot_reveals_attacker(target.kind),
@@ -244,8 +244,8 @@ fn apply_tank_he_splash(
         let Some(target) = entities.get(id) else {
             continue;
         };
-        let dx = target.pos_x - impact.0;
-        let dy = target.pos_y - impact.1;
+        let dx = target.pos_x() - impact.0;
+        let dy = target.pos_y() - impact.1;
         if (target.owner == 0 && !target.is_neutral_obstacle())
             || target.hp == 0
             || !target.is_targetable()
@@ -260,9 +260,9 @@ fn apply_tank_he_splash(
             Some(TerrainKind::Open),
         );
         let damage = entrenchment_combat::reduce_direct_damage(target, damage);
-        let damage = map.damage_after_reduction_tile(target.pos_x, target.pos_y, damage);
+        let damage = map.damage_after_reduction_tile(target.pos_x(), target.pos_y(), damage);
         let victim_owner = target.owner;
-        let pos = (target.pos_x, target.pos_y);
+        let pos = (target.pos_x(), target.pos_y());
         let damaged = entities.get_mut(id).is_some_and(|target| {
             if teams.is_enemy_owner(owner, target.owner) {
                 target.apply_damage_from_entity(damage, owner, attacker, source, tick)

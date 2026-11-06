@@ -87,7 +87,7 @@ fn replay_keyframe_clone_preserves_ability_runtime_state() {
         .find(|object| object.id.get() == projectile_id)
         .expect("cloned projectile visual should still exist after ticking");
     assert!(
-        projectile_object.x > 128.0,
+        projectile_object.x.to_world() > 128.0,
         "cloned keyframe projectile should continue advancing after replay restore"
     );
 }

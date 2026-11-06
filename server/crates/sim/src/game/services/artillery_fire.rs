@@ -13,6 +13,7 @@ use crate::game::upgrade::UpgradeKind;
 use crate::game::PlayerState;
 use crate::protocol::{self, AttackReveal, Event, NoticeSeverity};
 use crate::rules::combat::WeaponKind;
+use rts_rules::math::GameplayMath as _;
 use std::collections::HashMap;
 
 #[allow(clippy::too_many_arguments)]
@@ -93,8 +94,8 @@ pub(in crate::game) fn try_fire_artillery(
     let reveal = entities.get(unit).map(|attacker| AttackReveal {
         owner: attacker.owner,
         kind: protocol::kind_to_wire(attacker.kind).to_string(),
-        x: attacker.pos_x,
-        y: attacker.pos_y,
+        x: attacker.pos_x(),
+        y: attacker.pos_y(),
         facing: Some(attacker.facing()),
         weapon_facing: attacker.weapon_facing(),
         setup_state: Some(attacker.weapon_setup().to_protocol_str().to_string()),
@@ -207,10 +208,10 @@ fn offset_inside_circle(center: WorldPoint, radius_px: f32, seed: u32) -> WorldP
         return center;
     }
     let angle = unit_float(seed) * std::f32::consts::TAU;
-    let radial = unit_float(mix32(seed ^ 0xA5A5_5A5A)).sqrt() * radius_px;
+    let radial = unit_float(mix32(seed ^ 0xA5A5_5A5A)).det_sqrt() * radius_px;
     (
-        center.0 + angle.cos() * radial,
-        center.1 + angle.sin() * radial,
+        center.0 + angle.det_cos() * radial,
+        center.1 + angle.det_sin() * radial,
     )
 }
 

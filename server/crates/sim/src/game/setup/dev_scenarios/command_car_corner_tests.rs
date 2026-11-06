@@ -47,7 +47,7 @@ fn matches_reduced_reproduction_layout() {
             .iter()
             .find(|entity| entity.kind == kind)
             .unwrap_or_else(|| panic!("scenario should include {kind}"));
-        assert_eq!((building.pos_x, building.pos_y), expected_pos);
+        assert_eq!((building.pos_x(), building.pos_y()), expected_pos);
     }
     let command_car = setup
         .game
@@ -56,7 +56,7 @@ fn matches_reduced_reproduction_layout() {
         .get(setup.units[0])
         .expect("scenario Command Car should exist");
     assert_eq!(command_car.kind, EntityKind::CommandCar);
-    assert_eq!((command_car.pos_x, command_car.pos_y), (3507.0, 3664.0));
+    assert_eq!((command_car.pos_x(), command_car.pos_y()), (3507.0, 3664.0));
     assert!((command_car.facing() - 2.823_079_3).abs() <= 0.000_001);
     assert_units_do_not_intersect_buildings(&setup.game);
 }
@@ -84,11 +84,11 @@ fn west_southwest_variant_targets_ten_left_four_down_and_escapes_corner() {
         .expect("scenario Command Car should exist");
     assert_eq!(
         setup.goal.0,
-        command_car.pos_x - config::TILE_SIZE as f32 * 10.0
+        command_car.pos_x() - config::TILE_SIZE as f32 * 10.0
     );
     assert_eq!(
         setup.goal.1,
-        command_car.pos_y + config::TILE_SIZE as f32 * 4.0
+        command_car.pos_y() + config::TILE_SIZE as f32 * 4.0
     );
     assert_escapes_corner(setup);
 }

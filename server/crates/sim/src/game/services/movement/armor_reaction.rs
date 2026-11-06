@@ -1,4 +1,5 @@
 use crate::game::entity::{AttackPhase, Entity, EntityKind, EntityStore, MovePhase, Order};
+use rts_rules::math::GameplayMath as _;
 
 use super::pivot_drive::{angle_delta, rotate_toward, vehicle_body_turn_rate};
 
@@ -31,8 +32,8 @@ pub(super) fn turn_stationary_tanks_toward_locked_ap_source<F>(
                     (
                         tank.owner,
                         tank.kind,
-                        tank.pos_x,
-                        tank.pos_y,
+                        tank.pos_x(),
+                        tank.pos_y(),
                         tank.facing(),
                         desired,
                     )
@@ -82,9 +83,9 @@ fn tank_can_react(tank: &Entity) -> bool {
 
 pub(super) fn locked_source_facing(tank: &Entity) -> Option<f32> {
     let lock = tank.combat.as_ref()?.tank_armor_reaction_lock?;
-    let dx = lock.source_x - tank.pos_x;
-    let dy = lock.source_y - tank.pos_y;
-    (dx.is_finite() && dy.is_finite() && dx.hypot(dy) > f32::EPSILON).then(|| dy.atan2(dx))
+    let dx = lock.source_x - tank.pos_x();
+    let dy = lock.source_y - tank.pos_y();
+    (dx.is_finite() && dy.is_finite() && dx.det_hypot(dy) > f32::EPSILON).then(|| dy.det_atan2(dx))
 }
 
 #[cfg(test)]
@@ -115,8 +116,8 @@ mod tests {
         let first_source_angle = 75.0_f32.to_radians();
         tank.lock_tank_armor_reaction_source(
             (
-                300.0 + first_source_angle.cos() * 100.0,
-                300.0 + first_source_angle.sin() * 100.0,
+                300.0 + first_source_angle.det_cos() * 100.0,
+                300.0 + first_source_angle.det_sin() * 100.0,
             ),
             10,
         );
@@ -154,8 +155,8 @@ mod tests {
             tank.set_facing(0.0);
             tank.lock_tank_armor_reaction_source(
                 (
-                    300.0 + source_angle.cos() * 100.0,
-                    300.0 + source_angle.sin() * 100.0,
+                    300.0 + source_angle.det_cos() * 100.0,
+                    300.0 + source_angle.det_sin() * 100.0,
                 ),
                 10,
             );
@@ -255,7 +256,7 @@ mod tests {
         let tank = entities.get_mut(tank_id).expect("tank should exist");
         tank.set_facing(101.0_f32.to_radians());
         tank.lock_tank_armor_reaction_source((0.0, 300.0), 10);
-        let before = (tank.pos_x, tank.pos_y, tank.facing());
+        let before = (tank.pos_x(), tank.pos_y(), tank.facing());
 
         let mut checked_legality = false;
         turn_stationary_tanks_toward_locked_ap_source(&mut entities, 11, |owner, kind, x, y, _| {
@@ -266,6 +267,6 @@ mod tests {
 
         let tank = entities.get(tank_id).expect("tank should exist");
         assert!(checked_legality);
-        assert_eq!((tank.pos_x, tank.pos_y, tank.facing()), before);
+        assert_eq!((tank.pos_x(), tank.pos_y(), tank.facing()), before);
     }
 }

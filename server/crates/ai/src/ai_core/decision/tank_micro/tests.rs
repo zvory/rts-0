@@ -1,4 +1,5 @@
 use super::*;
+use rts_rules::math::GameplayMath as _;
 
 const TS: f32 = 32.0;
 
@@ -263,7 +264,7 @@ fn a_tank_hit_from_fog_backs_out_with_its_neighbour_keeping_its_front_forward() 
         let (x, ty) = targets[0];
         // Away from the enemy start (to the east), at most 3 tiles so the hull reverses.
         assert!(x < 60.0, "tank {tank} backs west, got {x}");
-        let hop = ((60.0 - x).powi(2) + (y - ty).powi(2)).sqrt();
+        let hop = ((60.0 - x).det_powi(2) + (y - ty).det_powi(2)).det_sqrt();
         assert!(hop <= 3.0, "tank {tank} hop {hop} tiles");
     }
     assert_eq!(micro.ghosts.len(), 1, "the unseen shooter is estimated");
@@ -562,7 +563,7 @@ fn a_second_tank_comes_up_to_make_a_duel_two_on_one() {
     let posts = move_targets(&extra, 2);
     assert_eq!(posts.len(), 1, "{extra:?}");
     let (x, y) = posts[0];
-    let range = ((x - 52.0).powi(2) + (y - 50.0).powi(2)).sqrt();
+    let range = ((x - 52.0).det_powi(2) + (y - 50.0).det_powi(2)).det_sqrt();
     assert!(range <= 13.9, "fires from within reach: {range} tiles");
     assert!(x < 52.0 && y > 50.0, "on its own side: ({x}, {y})");
 }

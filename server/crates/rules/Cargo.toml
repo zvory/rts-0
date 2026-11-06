@@ -6,3 +6,6 @@ description = "Gameplay domain vocabulary, balance data, and pure rules for Bewe
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
+
+# Pin the portable algorithms: changing libm changes simulation trajectories.
+libm = { version = "=0.2.16", default-features = false, features = ["force-soft-floats"] }

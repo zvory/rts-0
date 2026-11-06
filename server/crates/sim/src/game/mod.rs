@@ -8,6 +8,7 @@
 //! separately via [`Game::snapshot_for`], fog-filtered so a player only ever sees neutral /
 //! enemy entities on tiles they currently see.
 
+use rts_rules::math::GameplayMath as _;
 pub(crate) mod ability;
 pub(crate) mod ability_projectile;
 mod ability_projection;
@@ -398,10 +399,10 @@ impl Game {
             let Some((ax, ay)) = entity.last_damage_pos() else {
                 continue;
             };
-            let (vx, vy) = (entity.pos_x, entity.pos_y);
+            let (vx, vy) = (entity.pos_x(), entity.pos_y());
             let dx = vx - ax;
             let dy = vy - ay;
-            let dist = (dx * dx + dy * dy).sqrt();
+            let dist = (dx * dx + dy * dy).det_sqrt();
             let (ux, uy) = if dist > f32::EPSILON && dist.is_finite() {
                 (dx / dist, dy / dist)
             } else {
@@ -478,7 +479,7 @@ impl Game {
             primary_base_kind(entity.kind)
                 && entity.hp > 0
                 && !entity.under_construction()
-                && primary_base_distance_sq(entity.pos_x, entity.pos_y, start_x, start_y)
+                && primary_base_distance_sq(entity.pos_x(), entity.pos_y(), start_x, start_y)
                     <= max_dist_sq
         })
     }

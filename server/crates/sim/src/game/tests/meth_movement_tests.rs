@@ -54,13 +54,13 @@ fn meth_movement_fixture(kind: EntityKind) -> (Game, u32, (f32, f32)) {
 
 fn entity_pos(game: &Game, id: u32) -> (f32, f32) {
     let entity = game.state.entities.get(id).expect("entity should exist");
-    (entity.pos_x, entity.pos_y)
+    (entity.pos_x(), entity.pos_y())
 }
 
 fn moved_distance(from: (f32, f32), to: (f32, f32)) -> f32 {
     let dx = to.0 - from.0;
     let dy = to.1 - from.1;
-    (dx * dx + dy * dy).sqrt()
+    (dx * dx + dy * dy).det_sqrt()
 }
 
 fn next_moving_step(game: &mut Game, id: u32) -> f32 {

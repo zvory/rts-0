@@ -140,10 +140,10 @@ fn attack_move_machine_gunner_tears_down_after_no_target_grace() {
         entities.get(mg_id).expect("mg should exist").weapon_setup(),
         WeaponSetup::Packed
     );
-    let before_move = entities.get(mg_id).expect("mg should exist").pos_x;
+    let before_move = entities.get(mg_id).expect("mg should exist").pos_x();
     run_movement_tick_on_map(&mut entities, &map, 0);
     assert!(
-        entities.get(mg_id).expect("mg should exist").pos_x > before_move,
+        entities.get(mg_id).expect("mg should exist").pos_x() > before_move,
         "packed machine gunner should continue the still-active attack-move"
     );
 }
@@ -201,13 +201,13 @@ fn attack_move_deployed_anti_tank_gun_tears_down_after_no_target_grace() {
     let before_move = entities
         .get(at_id)
         .expect("anti-tank gun should exist")
-        .pos_x;
+        .pos_x();
     run_movement_tick_on_map(&mut entities, &map, 0);
     assert!(
         entities
             .get(at_id)
             .expect("anti-tank gun should exist")
-            .pos_x
+            .pos_x()
             > before_move,
         "packed anti-tank gun should continue the still-active attack-move"
     );

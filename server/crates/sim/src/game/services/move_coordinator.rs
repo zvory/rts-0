@@ -13,6 +13,7 @@
 //! - repath throttling,
 //! - spawn-point search around buildings.
 
+use rts_rules::math::GameplayMath as _;
 use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
 
@@ -93,7 +94,7 @@ fn formation_units(
             (entity.is_unit() && entity.owner == player).then_some(formation::FormationUnit {
                 id,
                 kind: entity.kind,
-                pos: (entity.pos_x, entity.pos_y),
+                pos: (entity.pos_x(), entity.pos_y()),
             })
         })
         .collect()
@@ -310,7 +311,7 @@ impl<'a> MoveCoordinator<'a> {
                         self.map,
                         self.occ,
                         e.kind,
-                        (e.pos_x, e.pos_y),
+                        (e.pos_x(), e.pos_y()),
                         goal,
                     )
             });
@@ -348,7 +349,7 @@ impl<'a> MoveCoordinator<'a> {
             e.mark_move_phase(MovePhase::AwaitingPath);
             e.reset_gather_state();
             begin_weapon_teardown_for_ground_order(e, attack_move);
-            let (px, py) = (e.pos_x, e.pos_y);
+            let (px, py) = (e.pos_x(), e.pos_y());
             e.reset_stuck(px, py);
         }
     }
@@ -417,7 +418,7 @@ impl<'a> MoveCoordinator<'a> {
             entity.mark_move_phase(MovePhase::AwaitingPath);
             entity.reset_gather_state();
             begin_weapon_teardown_for_ground_order(entity, attack_move);
-            let (x, y) = (entity.pos_x, entity.pos_y);
+            let (x, y) = (entity.pos_x(), entity.pos_y());
             entity.reset_stuck(x, y);
         }
     }
@@ -473,7 +474,7 @@ impl<'a> MoveCoordinator<'a> {
         unit.mark_move_phase(MovePhase::AwaitingPath);
         unit.reset_gather_state();
         begin_weapon_teardown_for_ground_order(unit, attack_move);
-        let (px, py) = (unit.pos_x, unit.pos_y);
+        let (px, py) = (unit.pos_x(), unit.pos_y());
         unit.reset_stuck(px, py);
     }
 
@@ -503,7 +504,7 @@ impl<'a> MoveCoordinator<'a> {
             e.replace_active_order(Order::attack(target));
             e.set_target_id(Some(target));
             e.reset_gather_state();
-            let (px, py) = (e.pos_x, e.pos_y);
+            let (px, py) = (e.pos_x(), e.pos_y());
             e.reset_stuck(px, py);
         }
     }
@@ -524,7 +525,7 @@ impl<'a> MoveCoordinator<'a> {
             e.replace_active_order(order);
             e.set_target_id(Some(target));
             e.reset_gather_state();
-            let (px, py) = (e.pos_x, e.pos_y);
+            let (px, py) = (e.pos_x(), e.pos_y());
             e.reset_stuck(px, py);
         }
     }
@@ -532,7 +533,7 @@ impl<'a> MoveCoordinator<'a> {
     /// Issue a gather order. Sets the order and requests an initial path (budget permitting).
     pub fn order_gather(&mut self, entities: &mut EntityStore, id: u32, node: u32) {
         let (nx, ny) = match entities.get(node) {
-            Some(n) => (n.pos_x, n.pos_y),
+            Some(n) => (n.pos_x(), n.pos_y()),
             None => return,
         };
         entities.release_miner(id);
@@ -541,7 +542,7 @@ impl<'a> MoveCoordinator<'a> {
             e.set_target_id(Some(node));
             e.set_path_goal(Some((nx, ny)));
             e.clear_worker_carry();
-            let (px, py) = (e.pos_x, e.pos_y);
+            let (px, py) = (e.pos_x(), e.pos_y());
             e.reset_stuck(px, py);
         }
         self.request_path(entities, id, (nx, ny), false, PathingRequestSource::Gather);
@@ -564,7 +565,7 @@ impl<'a> MoveCoordinator<'a> {
             e.set_path_goal(Some(staging));
             e.reset_gather_state();
             e.begin_weapon_teardown_for_movement();
-            let (px, py) = (e.pos_x, e.pos_y);
+            let (px, py) = (e.pos_x(), e.pos_y());
             e.reset_stuck(px, py);
         }
         self.request_path(entities, id, staging, true, PathingRequestSource::Ability);
@@ -585,7 +586,7 @@ impl<'a> MoveCoordinator<'a> {
         if let Some(e) = entities.get_mut(id) {
             e.replace_active_order(Order::build(kind, tile_x, tile_y));
             e.reset_gather_state();
-            let (px, py) = (e.pos_x, e.pos_y);
+            let (px, py) = (e.pos_x(), e.pos_y());
             e.reset_stuck(px, py);
         }
         match self.plan_footprint_interaction_path(
@@ -611,8 +612,8 @@ impl<'a> MoveCoordinator<'a> {
     pub fn order_deconstruct(&mut self, entities: &mut EntityStore, id: u32, target: u32) -> bool {
         let (target_x, target_y, tile_x, tile_y) = match entities.get(target) {
             Some(t) if t.kind == EntityKind::TankTrap => {
-                let (tile_x, tile_y) = self.map.tile_of(t.pos_x, t.pos_y);
-                (t.pos_x, t.pos_y, tile_x, tile_y)
+                let (tile_x, tile_y) = self.map.tile_of(t.pos_x(), t.pos_y());
+                (t.pos_x(), t.pos_y(), tile_x, tile_y)
             }
             _ => return false,
         };
@@ -622,7 +623,7 @@ impl<'a> MoveCoordinator<'a> {
             e.set_target_id(Some(target));
             e.set_path_goal(Some((target_x, target_y)));
             e.reset_gather_state();
-            let (px, py) = (e.pos_x, e.pos_y);
+            let (px, py) = (e.pos_x(), e.pos_y());
             e.reset_stuck(px, py);
         }
         match self.plan_footprint_interaction_path(
@@ -688,7 +689,7 @@ impl<'a> MoveCoordinator<'a> {
                     let target = order.intent.target;
                     let target_tile = entities.get(target).and_then(|entity| {
                         (entity.kind == EntityKind::TankTrap)
-                            .then(|| self.map.tile_of(entity.pos_x, entity.pos_y))
+                            .then(|| self.map.tile_of(entity.pos_x(), entity.pos_y()))
                     });
                     let attempt = target_tile.map_or(PathAttempt::Failed, |(tile_x, tile_y)| {
                         self.plan_footprint_interaction_path(
@@ -749,7 +750,7 @@ impl<'a> MoveCoordinator<'a> {
         let Some(attacker) = entities.get(id) else {
             return false;
         };
-        let attacker_pos = (attacker.pos_x, attacker.pos_y);
+        let attacker_pos = (attacker.pos_x(), attacker.pos_y());
         let Some(target) = entities.get(target) else {
             return false;
         };
@@ -772,7 +773,7 @@ impl<'a> MoveCoordinator<'a> {
         if let Some(entity) = entities.get_mut(id) {
             entity.begin_weapon_teardown_for_movement();
             entity.mark_attack_phase(AttackPhase::Pursuing);
-            let (px, py) = (entity.pos_x, entity.pos_y);
+            let (px, py) = (entity.pos_x(), entity.pos_y());
             entity.reset_stuck(px, py);
         }
         self.request_path(
@@ -855,7 +856,9 @@ impl<'a> MoveCoordinator<'a> {
                     ) {
                         continue;
                     }
-                    let score = rally.map_or(0.0, |(rx, ry)| (cx - rx).powi(2) + (cy - ry).powi(2));
+                    let score = rally.map_or(0.0, |(rx, ry)| {
+                        (cx - rx).det_powi(2) + (cy - ry).det_powi(2)
+                    });
                     if ring_best.is_none_or(|(best_score, _)| score < best_score) {
                         ring_best = Some((score, (cx, cy)));
                     }
@@ -912,7 +915,7 @@ impl<'a> MoveCoordinator<'a> {
 
         let dx = rally.0 - spawn.0;
         let dy = rally.1 - spawn.1;
-        let facing = dy.atan2(dx);
+        let facing = dy.det_atan2(dx);
         if !facing.is_finite()
             || !standability::unit_static_standable_with_facing(
                 self.map,
@@ -956,16 +959,17 @@ impl<'a> MoveCoordinator<'a> {
         }
         let ((sx, sy), kind, start_pos) = match entities.get(id) {
             Some(e) => (
-                self.map.tile_of(e.pos_x, e.pos_y),
+                self.map.tile_of(e.pos_x(), e.pos_y()),
                 e.kind,
-                (e.pos_x, e.pos_y),
+                (e.pos_x(), e.pos_y()),
             ),
             None => return false,
         };
         let (gx, gy) = self.map.tile_of(goal.0, goal.1);
         if sx == gx && sy == gy && source != PathingRequestSource::DirectAttack {
-            let center_dist =
-                ((goal.0 - start_pos.0).powi(2) + (goal.1 - start_pos.1).powi(2)).sqrt();
+            let center_dist = ((goal.0 - start_pos.0).det_powi(2)
+                + (goal.1 - start_pos.1).det_powi(2))
+            .det_sqrt();
             let same_tile_vehicle_nudge = uses_oriented_vehicle_body(kind)
                 && center_dist.is_finite()
                 && center_dist > EXACT_GOAL_ARRIVAL_EPS_PX;
@@ -1207,7 +1211,7 @@ fn direct_attack_staging_goal(
     }
     let dx = attacker.0 - target.0;
     let dy = attacker.1 - target.1;
-    let distance = dx.hypot(dy);
+    let distance = dx.det_hypot(dy);
     if distance >= min_range_px && distance <= max_range_px {
         return None;
     }
@@ -1298,7 +1302,7 @@ fn unit_body_rect_gap(body: UnitBody, rect: RectBody) -> f32 {
             let nearest_y = circle.y.clamp(rect.min_y, rect.max_y);
             let dx = circle.x - nearest_x;
             let dy = circle.y - nearest_y;
-            ((dx * dx + dy * dy).sqrt() - circle.radius).max(0.0)
+            ((dx * dx + dy * dy).det_sqrt() - circle.radius).max(0.0)
         }
         UnitBody::OrientedCapsule(_) | UnitBody::OrientedBox(_) => {
             let aabb = body.aabb();
@@ -1316,7 +1320,7 @@ fn unit_body_rect_gap(body: UnitBody, rect: RectBody) -> f32 {
             } else {
                 0.0
             };
-            (dx * dx + dy * dy).sqrt()
+            (dx * dx + dy * dy).det_sqrt()
         }
     }
 }

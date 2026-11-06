@@ -298,22 +298,22 @@ fn visibility_combat_checkpoint_preserves_smoke_ability_shells_and_combat_state(
             .entities
             .get(mortar)
             .expect("mortar should exist")
-            .pos_x,
+            .pos_x(),
         baseline
             .state
             .entities
             .get(mortar)
             .expect("mortar should exist")
-            .pos_y,
-        target.pos_x,
-        target.pos_y,
+            .pos_y(),
+        target.pos_x(),
+        target.pos_y(),
         baseline.tick_count(),
     );
     baseline.state.artillery_shells.schedule(
         1,
         artillery,
-        target.pos_x,
-        target.pos_y,
+        target.pos_x(),
+        target.pos_y(),
         baseline.tick_count(),
     );
     repair_after_authoritative_test_spawn(&mut baseline);
@@ -506,7 +506,7 @@ fn visibility_combat_checkpoint_preserves_lab_god_mode_and_observer_analysis() {
 fn seed_ability_runtime(game: &mut Game, hero: u32) {
     let hero_pos = {
         let hero = game.state.entities.get(hero).expect("hero should exist");
-        (hero.pos_x, hero.pos_y)
+        (hero.pos_x(), hero.pos_y())
     };
     game.state
         .ability_runtime
@@ -667,7 +667,7 @@ fn assert_owner_payload_privacy(game: &Game, label: &str) {
 fn spawn_runtime_return_marker_for_id_check(game: &mut Game, hero: u32) -> u32 {
     let hero_pos = {
         let hero = game.state.entities.get(hero).expect("hero should exist");
-        (hero.pos_x, hero.pos_y)
+        (hero.pos_x(), hero.pos_y())
     };
     game.state
         .ability_runtime

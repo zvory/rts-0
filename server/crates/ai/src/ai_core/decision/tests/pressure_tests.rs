@@ -1,5 +1,6 @@
 use super::*;
 use crate::ai_core::profiles::PRESSURE;
+use rts_rules::math::GameplayMath as _;
 
 #[test]
 fn pressure_stops_legacy_rifleman_orders_only_after_panzerfaust_research_completes() {
@@ -571,7 +572,7 @@ fn pressure_ranked_sites_skip_occupied_or_exhausted_clusters_and_original_starts
     for site in &mut sites {
         let (dx, dy) = (site.position.0 - 9.5 * ts, site.position.1 - 9.5 * ts);
         site.ground_distances_from_starts
-            .insert(1, (dx * dx + dy * dy).sqrt());
+            .insert(1, (dx * dx + dy * dy).det_sqrt());
     }
     let mut snapshot = game.snapshot_for(1);
     snapshot.entities.clear();

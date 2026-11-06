@@ -121,8 +121,8 @@ fn trench_contains_point(trench: crate::game::trench::Trench, x: f32, y: f32) ->
     if !x.is_finite() || !y.is_finite() {
         return false;
     }
-    let dx = x - trench.x;
-    let dy = y - trench.y;
+    let dx = x - trench.x.to_world();
+    let dy = y - trench.y.to_world();
     let radius = trench.radius_tiles * config::TILE_SIZE as f32;
     dx * dx + dy * dy <= radius * radius
 }
@@ -385,7 +385,7 @@ fn collision_shove_cancels_dig_in_progress() {
         .get(rifleman)
         .expect("rifleman should exist");
     assert!(
-        (unit.pos_x - pos.0).abs() > 0.1 || (unit.pos_y - pos.1).abs() > 0.1,
+        (unit.pos_x() - pos.0).abs() > 0.1 || (unit.pos_y() - pos.1).abs() > 0.1,
         "collision fixture should shove the digging unit"
     );
     assert_eq!(entrenchment_dig_ticks(unit), 0);
@@ -501,7 +501,7 @@ fn adjacent_tile_center_infantry_slots_into_existing_trench() {
         "eligible infantry stopped on the neighboring tile center should enter the trench"
     );
     assert!(
-        trench_contains_point(game.state.trenches.all()[0], unit.pos_x, unit.pos_y),
+        trench_contains_point(game.state.trenches.all()[0], unit.pos_x(), unit.pos_y()),
         "slotting should move the unit inside the trench footprint"
     );
 }
@@ -850,8 +850,8 @@ fn occupied_trenches_reject_second_eligible_occupant() {
                 .iter()
                 .find(|view| view.id == trench)
                 .expect("trench should still exist"),
-            second_entity.pos_x,
-            second_entity.pos_y
+            second_entity.pos_x(),
+            second_entity.pos_y()
         ),
         "second occupant should remain outside the already occupied trench footprint"
     );
@@ -919,7 +919,7 @@ fn slotting_rejects_positions_blocked_by_tank_traps() {
         .expect("rifleman should exist");
     assert_eq!(active_trench_occupation(unit), None);
     assert!(
-        (unit.pos_x - start.0).abs() < 0.1 && (unit.pos_y - start.1).abs() < 0.1,
+        (unit.pos_x() - start.0).abs() < 0.1 && (unit.pos_y() - start.1).abs() < 0.1,
         "blocked slotting should not move the unit through a Tank Trap"
     );
 }
@@ -996,7 +996,7 @@ fn entrenched_infantry_moves_on_first_tick_of_departure() {
             if kind == EntityKind::MachineGunner {
                 unit.set_weapon_setup(crate::game::entity::WeaponSetup::Deployed);
             }
-            let before = (unit.pos_x, unit.pos_y);
+            let before = (unit.pos_x(), unit.pos_y());
             let command = if attack_move {
                 SimCommand::AttackMove {
                     units: vec![id],
@@ -1016,7 +1016,7 @@ fn entrenched_infantry_moves_on_first_tick_of_departure() {
             game.tick();
             let unit = game.state.entities.get(id).expect("infantry");
             assert_ne!(
-                (unit.pos_x, unit.pos_y),
+                (unit.pos_x(), unit.pos_y()),
                 before,
                 "{kind:?}, attack_move={attack_move}"
             );
@@ -1093,7 +1093,7 @@ fn entrenched_machine_gunner_attack_preserves_deployment_until_pursuit() {
             game.tick();
             let unit = game.state.entities.get(id).expect("machine gunner");
             assert_ne!(
-                (unit.pos_x, unit.pos_y),
+                (unit.pos_x(), unit.pos_y()),
                 start,
                 "pursuit must move without pack-up delay"
             );

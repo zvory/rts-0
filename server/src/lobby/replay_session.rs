@@ -1,3 +1,5 @@
+mod integrity;
+
 use super::reconstruction::contain_reconstruction;
 use super::replay_resource_history::ReplayResourceHistory;
 use super::replay_validation;
@@ -69,6 +71,7 @@ pub(super) struct ReplaySession {
     last_seek_at: Option<StdInstant>,
     next_seek_id: u32,
     active_seek: Option<ActiveReplaySeek>,
+    end_state_verification: Option<Result<Option<bool>, String>>,
 }
 
 pub(super) struct ReplayKeyframe {
@@ -125,13 +128,14 @@ impl ReplaySession {
         Self::validate_artifact_static_limits(&artifact)?;
         let duration_ticks = artifact.duration_ticks;
         let build_start = StdInstant::now();
-        let game = Box::new(Self::build_game_for_build(
+        let mut game = Box::new(Self::build_game_for_build(
             &artifact,
             crate::build_info::build_id(),
             true,
         )?);
         let start_tick = game.tick_count();
         Self::validate_artifact_timeline(&artifact, start_tick)?;
+        artifact.apply_eliminations_at_current_tick(&mut game);
         let keyframes = vec![ReplayKeyframe {
             tick: start_tick,
             game: Box::new(game.clone_for_replay_keyframe()),
@@ -159,8 +163,10 @@ impl ReplaySession {
             last_seek_at: None,
             next_seek_id: 0,
             active_seek: None,
+            end_state_verification: None,
         };
         session.resource_history.record(&session.game);
+        session.verify_end_state_if_due();
         Ok(session)
     }
 
@@ -218,6 +224,7 @@ impl ReplaySession {
                 artifact.duration_ticks, start_tick
             ));
         }
+        Self::validate_eliminations(artifact, start_tick)?;
         let seen_players: HashSet<u32> = artifact.players.iter().map(|player| player.id).collect();
         let mut previous_tick = 0;
         for (index, entry) in artifact.command_log.iter().enumerate() {
@@ -388,16 +395,6 @@ impl ReplaySession {
         self.current_tick() < self.duration_ticks
     }
 
-    pub(super) fn result_message(&self) -> ServerMessage {
-        ServerMessage::GameOver {
-            winner_id: self.artifact.winner_id,
-            winner_team_id: self.artifact.winner_team_id,
-            conclusion: self.artifact.conclusion.clone(),
-            you: "draw".to_string(),
-            scores: self.artifact.final_scores.clone(),
-        }
-    }
-
     pub(super) fn current_tick(&self) -> u32 {
         self.game.tick_count()
     }
@@ -476,7 +473,10 @@ impl ReplaySession {
         perf: Option<&mut rts_sim::perf::TickPerf>,
     ) -> HashMap<u32, Vec<Event>> {
         let events = self.game.tick_with_perf(perf).into_iter().collect();
+        self.artifact
+            .apply_eliminations_at_current_tick(&mut self.game);
         self.resource_history.record(&self.game);
+        self.verify_end_state_if_due();
         events
     }
 
@@ -541,6 +541,8 @@ impl ReplaySession {
 
         *self.game = game;
         self.next_command = next_command;
+        self.end_state_verification = None;
+        self.verify_end_state_if_due();
         self.resource_history.truncate(keyframe_tick);
         // A seek presents the target state without replaying its earlier transient chat. Position
         // the independent chat cursor at the target immediately; rewinding before an entry still
@@ -771,6 +773,8 @@ impl ReplaySession {
                 candidate.next_command += 1;
             }
             candidate.game.tick();
+            self.artifact
+                .apply_eliminations_at_current_tick(&mut candidate.game);
             let current_tick = candidate.game.tick_count();
             if current_tick != 0
                 && current_tick.is_multiple_of(Self::KEYFRAME_INTERVAL_TICKS)
@@ -805,7 +809,7 @@ mod tests {
     use rts_rules::faction::EMPTY_FIXTURE_FACTION_ID;
     use rts_sim::game::PlayerInit;
 
-    fn replay_test_players(count: usize) -> Vec<PlayerInit> {
+    pub(super) fn replay_test_players(count: usize) -> Vec<PlayerInit> {
         (1..=count as u32)
             .map(|id| PlayerInit {
                 id,
@@ -820,7 +824,7 @@ mod tests {
             .collect()
     }
 
-    fn replay_test_game(players: &[PlayerInit], seed: u32) -> Game {
+    pub(super) fn replay_test_game(players: &[PlayerInit], seed: u32) -> Game {
         let metadata = Map::metadata_for_name("Chokes").unwrap();
         let start_players: Vec<_> = players
             .iter()
@@ -835,7 +839,10 @@ mod tests {
         Game::new_with_random_ai_profiles_and_map_metadata(players, seed, map, metadata)
     }
 
-    fn replay_test_artifact(players: &[PlayerInit], ticks: u32) -> (Game, ReplayArtifactV1) {
+    pub(super) fn replay_test_artifact(
+        players: &[PlayerInit],
+        ticks: u32,
+    ) -> (Game, ReplayArtifactV1) {
         let seed = 0x5150_2202;
         let mut game = replay_test_game(players, seed);
         let replay_start = rts_sim::game::replay::ReplayStartComposition::capture(

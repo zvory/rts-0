@@ -223,8 +223,8 @@ mod tests {
             .iter()
             .filter(|entity| entity.kind == EntityKind::Rifleman)
             .all(|rifleman| {
-                let dx = warrior.pos_x - rifleman.pos_x;
-                let dy = warrior.pos_y - rifleman.pos_y;
+                let dx = warrior.pos_x() - rifleman.pos_x();
+                let dy = warrior.pos_y() - rifleman.pos_y();
                 dx * dx + dy * dy
                     > conservative_entrenched_range_px * conservative_entrenched_range_px
             }));

@@ -4,6 +4,7 @@ use crate::game::map::Map;
 use crate::game::services::geometry::{unit_body_for_entity, unit_body_overlap, UnitBody};
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
+use rts_rules::math::GameplayMath as _;
 
 use super::standability::{
     footing_profile, footing_resistance, unit_static_standable, FootingProfile,
@@ -84,7 +85,7 @@ pub(crate) fn resolve_collisions(
                 _ => continue,
             };
             let (ax_idx, ay_idx) = match entities.get(a) {
-                Some(e) => (e.pos_x, e.pos_y),
+                Some(e) => (e.pos_x(), e.pos_y()),
                 None => continue,
             };
 
@@ -114,8 +115,8 @@ pub(crate) fn resolve_collisions(
                                 e.kind,
                                 profile,
                                 e.facing(),
-                                e.pos_x,
-                                e.pos_y,
+                                e.pos_x(),
+                                e.pos_y(),
                                 e.path_is_empty(),
                                 body,
                             )
@@ -133,8 +134,8 @@ pub(crate) fn resolve_collisions(
                                 e.kind,
                                 footing_profile(e),
                                 e.facing(),
-                                e.pos_x,
-                                e.pos_y,
+                                e.pos_x(),
+                                e.pos_y(),
                                 e.path_is_empty(),
                                 body,
                             )
@@ -304,7 +305,7 @@ fn lateral_offset_one_way(
         return None;
     }
 
-    let forward = (pusher.facing.cos(), pusher.facing.sin());
+    let forward = (pusher.facing.det_cos(), pusher.facing.det_sin());
     let side = (-forward.1, forward.0);
     if !forward.0.is_finite() || !forward.1.is_finite() {
         return None;
@@ -370,7 +371,7 @@ fn collision_axis_and_depth(
         if d2 < 1.0e-4 {
             return Some((1.0, 0.0, min_d));
         }
-        let d = d2.sqrt();
+        let d = d2.det_sqrt();
         return Some((dx / d, dy / d, min_d - d));
     }
 

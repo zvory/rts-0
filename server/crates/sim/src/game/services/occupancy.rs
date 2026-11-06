@@ -1,3 +1,4 @@
+use rts_rules::math::GameplayMath as _;
 use std::collections::VecDeque;
 use std::sync::Arc;
 
@@ -50,8 +51,8 @@ impl<'a> Occupancy<'a> {
                         (
                             entity.id,
                             entity.kind,
-                            entity.pos_x.to_bits(),
-                            entity.pos_y.to_bits(),
+                            entity.pos_x().to_bits(),
+                            entity.pos_y().to_bits(),
                         )
                     })
                     .collect(),
@@ -224,7 +225,7 @@ impl Occupancy<'_> {
 
         let dx = to.0 - from.0;
         let dy = to.1 - from.1;
-        let distance = (dx * dx + dy * dy).sqrt();
+        let distance = (dx * dx + dy * dy).det_sqrt();
         if !distance.is_finite() {
             return 0;
         }
@@ -737,7 +738,7 @@ pub(crate) fn building_footprint(map: &Map, e: &Entity) -> Vec<(u32, u32)> {
     let Some(s) = config::building_stats(e.kind) else {
         return Vec::new();
     };
-    let (cx, cy) = map.tile_of(e.pos_x, e.pos_y);
+    let (cx, cy) = map.tile_of(e.pos_x(), e.pos_y());
     let mut out = Vec::with_capacity((s.foot_w * s.foot_h) as usize);
     // Offsets so the footprint is centered on the building's tile.
     let ox = s.foot_w as i32 / 2;

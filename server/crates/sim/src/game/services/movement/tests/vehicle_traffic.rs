@@ -119,8 +119,8 @@ fn first_reverse_tick_keeps_existing_reciprocal_traffic_response() {
             &mut entities,
             id,
             (
-                x - 2.0 * config::TILE_SIZE as f32 * facing.cos(),
-                pos_y - 2.0 * config::TILE_SIZE as f32 * facing.sin(),
+                x - 2.0 * config::TILE_SIZE as f32 * facing.det_cos(),
+                pos_y - 2.0 * config::TILE_SIZE as f32 * facing.det_sin(),
             ),
         );
     }
@@ -226,7 +226,7 @@ fn tank_under_fire_reverses_toward_a_far_goal_behind() {
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 11);
 
     let entity = entities.get(tank).expect("tank should exist");
-    assert!(entity.pos_x < start.0, "tank should immediately reverse");
+    assert!(entity.pos_x() < start.0, "tank should immediately reverse");
     assert!(
         angle_delta(0.0, entity.facing()).abs() <= 0.001,
         "tank should keep its front toward the damage source"
@@ -250,7 +250,7 @@ fn tank_armor_reaction_reverse_choice_has_an_inclusive_eighty_degree_pivot_cap()
         set_path_direct(&mut entities, tank, vec![goal]);
         let occ = Occupancy::build(&map, &entities);
         let entity = entities.get(tank).expect("tank should exist");
-        let intent = pivot_drive_intent(&map, &occ, entity, entity.pos_x, entity.pos_y)
+        let intent = pivot_drive_intent(&map, &occ, entity, entity.pos_x(), entity.pos_y())
             .expect("tank should have drive intent");
         let chose_reverse = angle_delta(intent.desired_facing, std::f32::consts::PI).abs() <= 0.001;
 
@@ -278,7 +278,7 @@ fn tank_armor_reaction_over_cap_forward_choice_preserves_normal_close_goal_rever
     set_path_direct(&mut entities, tank, vec![goal]);
     let occ = Occupancy::build(&map, &entities);
     let entity = entities.get(tank).expect("tank should exist");
-    let intent = pivot_drive_intent(&map, &occ, entity, entity.pos_x, entity.pos_y)
+    let intent = pivot_drive_intent(&map, &occ, entity, entity.pos_x(), entity.pos_y())
         .expect("tank should have drive intent");
 
     assert!(
@@ -305,6 +305,6 @@ fn expired_under_fire_preference_restores_normal_far_goal_pivot() {
     );
 
     let entity = entities.get(tank).expect("tank should exist");
-    assert!(moved_distance(start, (entity.pos_x, entity.pos_y)) <= 0.01);
+    assert!(moved_distance(start, (entity.pos_x(), entity.pos_y())) <= 0.01);
     assert!(entity.facing().abs() > 0.0, "tank should resume its pivot");
 }

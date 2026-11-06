@@ -1,6 +1,7 @@
 use super::*;
 use crate::ai_core::observation::{AiAbilitySummary, AiEconomy};
 use crate::ai_core::profiles::JEFFS_AI;
+use rts_rules::math::GameplayMath as _;
 
 fn target_test_entity(id: u32, kind: EntityKind, x: f32, y: f32) -> AiEntitySummary {
     AiEntitySummary {
@@ -156,8 +157,8 @@ fn containment_uses_stationary_tank_range_and_forward_scout_vision() {
     let objective = (2_000.0, 1_000.0);
     let (tank, scout) = containment_points((200.0, 1_000.0), objective, map, policy).unwrap();
 
-    let tank_distance = dist2(objective.0, objective.1, tank.0, tank.1).sqrt() / 32.0;
-    let scout_distance = dist2(scout.0, scout.1, tank.0, tank.1).sqrt() / 32.0;
+    let tank_distance = dist2(objective.0, objective.1, tank.0, tank.1).det_sqrt() / 32.0;
+    let scout_distance = dist2(scout.0, scout.1, tank.0, tank.1).det_sqrt() / 32.0;
     assert!((tank_distance - 13.5).abs() < 0.001);
     assert!((scout_distance - 2.0).abs() < 0.001);
     assert!(scout.0 < objective.0);

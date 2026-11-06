@@ -1,4 +1,5 @@
 use super::*;
+use rts_rules::math::GameplayMath as _;
 
 const TS: f32 = 32.0;
 
@@ -131,7 +132,7 @@ fn a_line_on_the_enemys_half_is_worked_with_volleys_kept_out_of_known_reach() {
     assert!(fire.len() >= SHOOTERS_TO_FIRE, "{fire:?}");
     for post in &fire {
         assert!(reach(post) >= 14.5, "volley post {post:?} in reach");
-        assert!(dist2(post.0, post.1, trap.0, trap.1).sqrt() / TS <= FIRE_TILES + 0.1);
+        assert!(dist2(post.0, post.1, trap.0, trap.1).det_sqrt() / TS <= FIRE_TILES + 0.1);
     }
     // Closer to the wall than any post can be both in range and out of reach: no volley.
     let hugging: Vec<(f32, f32)> = (0..7)

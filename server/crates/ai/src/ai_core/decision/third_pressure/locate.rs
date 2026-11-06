@@ -428,7 +428,7 @@ pub(super) fn survey_point(
     let look = look.min(15.0);
     let dir = normalized_direction(depot, staging).unwrap_or((0.0, 1.0));
     let turned = |angle: f32| {
-        let (sin, cos) = angle.sin_cos();
+        let (sin, cos) = angle.det_sin_cos();
         (dir.0 * cos - dir.1 * sin, dir.0 * sin + dir.1 * cos)
     };
     let mut passable_point = None;

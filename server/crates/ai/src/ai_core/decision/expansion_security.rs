@@ -1,5 +1,6 @@
 use super::geometry::{building_center, dist2, normalized_direction, squared, tile_center};
 use super::*;
+use rts_rules::math::GameplayMath as _;
 
 const HOME_RIFLES: usize = 4;
 const PARTY_SIZE: usize = 2;
@@ -333,7 +334,9 @@ pub(super) fn secure_wait_ticks(
                 .owned
                 .iter()
                 .find(|unit| unit.id == *id)
-                .map(|unit| (dist2(unit.x, unit.y, post.0, post.1).sqrt() / speed).ceil() as u32)
+                .map(|unit| {
+                    (dist2(unit.x, unit.y, post.0, post.1).det_sqrt() / speed).ceil() as u32
+                })
         })
         .collect::<Option<Vec<_>>>()
         .map(|walks| walks.into_iter().max().unwrap_or(0) + SECURE_TICKS)
@@ -732,7 +735,7 @@ pub(super) fn clear_reserved_footprint(
         // and leave the blocker parked inside the footprint indefinitely.
         let direction = normalized_direction(center, (unit.x, unit.y)).unwrap_or((0.0, 1.0));
         let half_diagonal =
-            ((stats.foot_w * stats.foot_w + stats.foot_h * stats.foot_h) as f32).sqrt() * 0.5;
+            ((stats.foot_w * stats.foot_w + stats.foot_h * stats.foot_h) as f32).det_sqrt() * 0.5;
         let clearance =
             half_diagonal * ts + rts_rules::balance::unit_placement_radius(unit.kind) + 0.5 * ts;
         actions::move_units(

@@ -96,8 +96,8 @@ pub(in crate::game::services) fn tree_detour_between(
         for index in 0..CANDIDATES_PER_TREE {
             let angle = std::f32::consts::TAU * index as f32 / CANDIDATES_PER_TREE as f32;
             let point = (
-                x + angle.cos() * candidate_radius,
-                y + angle.sin() * candidate_radius,
+                x + angle.det_cos() * candidate_radius,
+                y + angle.det_sin() * candidate_radius,
             );
             if standability::unit_static_standable(map, occupancy, kind, point.0, point.1) {
                 nodes.push(point);
@@ -164,7 +164,7 @@ fn shortest_visible_route(
             }
             let dx = nodes[next].0 - nodes[current].0;
             let dy = nodes[next].1 - nodes[current].1;
-            let candidate = distances[current] + (dx * dx + dy * dy).sqrt();
+            let candidate = distances[current] + (dx * dx + dy * dy).det_sqrt();
             if candidate < distances[next] {
                 distances[next] = candidate;
                 previous[next] = Some(current);

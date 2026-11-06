@@ -5,12 +5,13 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
 ## Read first
 - [docs/design/architecture.md](../design/architecture.md) — tick and networking model
 - [docs/design/server-sim.md](../design/server-sim.md) — Rust server and `Game` API
-- §3.1 `game::Game` public API; this is the seam and should stay stable
+- §3.1 `game::Game` public API and replay end-state fingerprint/verification contract; this is the seam and should stay stable
 - §3.1.1 `Game` state ownership registry; update this when `GameState`/`DerivedState` fields change
 - §3.1.2 Ownership guardrails and readiness audit; read before state-owner, checkpoint, replay/lab
   migration, or archcheck work
 - §3.1.3 `GameCheckpointV1` embeddable payload contract; read before public checkpoint DTO,
   replay start-state, lab scenario, match-start artifact, or debug-document checkpoint work
+- §3.1.4 Deterministic arithmetic; fixed-point grid and replay compatibility
 - §3.2 Concurrency model; the room task is the sole `Game` owner
 - §3.3 Rules layer
 - §3.5 Command planning and queued order semantics

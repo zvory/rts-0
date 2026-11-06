@@ -22,14 +22,14 @@ fn infantry_face_actual_avoidance_step_around_deployed_gunner() {
         movement_system(&map, &mut entities, &mut [], &occ, &spatial, 1);
 
         let unit = entities.get(mover).unwrap();
-        let dx = unit.pos_x - start.0;
-        let dy = unit.pos_y - start.1;
+        let dx = unit.pos_x() - start.0;
+        let dy = unit.pos_y() - start.1;
         assert!(
             dx > 0.0 && dy < -0.01,
             "{kind:?} must still avoid the braced crew: delta=({dx},{dy})"
         );
         assert!(
-            angle_delta(unit.facing(), dy.atan2(dx)).abs() < 0.0001,
+            angle_delta(unit.facing(), dy.det_atan2(dx)).abs() < 0.0001,
             "{kind:?} faces the actual step rather than the eastward waypoint"
         );
     }
@@ -53,7 +53,7 @@ fn infantry_arrival_snap_preserves_last_walking_heading() {
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 1);
 
     let unit = entities.get(mover).unwrap();
-    assert_eq!((unit.pos_x, unit.pos_y), goal);
+    assert_eq!((unit.pos_x(), unit.pos_y()), goal);
     assert!(unit.path_is_empty());
     assert_eq!(
         unit.facing(),
@@ -86,7 +86,11 @@ fn blocked_infantry_keep_last_walking_heading() {
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 1);
 
     let unit = entities.get(mover).unwrap();
-    assert_eq!((unit.pos_x, unit.pos_y), start);
+    let quantized_start = (
+        rts_rules::math::Coord::from_world(start.0).to_world(),
+        rts_rules::math::Coord::from_world(start.1).to_world(),
+    );
+    assert_eq!((unit.pos_x(), unit.pos_y()), quantized_start);
     assert_eq!(
         unit.facing(),
         heading,

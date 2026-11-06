@@ -1,3 +1,4 @@
+use rts_rules::math::GameplayMath as _;
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 
@@ -213,7 +214,7 @@ impl AiMapAnalysis {
         let mut previous = from;
         let mut total = 0.0;
         for point in route {
-            let length = (point.0 - previous.0).hypot(point.1 - previous.1) / tile_size;
+            let length = (point.0 - previous.0).det_hypot(point.1 - previous.1) / tile_size;
             let (x, y) = (point.0 / tile_size, point.1 / tile_size);
             let on_road = x >= 0.0
                 && y >= 0.0
@@ -234,7 +235,7 @@ impl AiMapAnalysis {
     /// tile).
     pub(crate) fn line_is_open(&self, from: (f32, f32), to: (f32, f32)) -> bool {
         let ts = self.tile_size.max(1) as f32;
-        let steps = ((to.0 - from.0).hypot(to.1 - from.1) / (0.25 * ts))
+        let steps = ((to.0 - from.0).det_hypot(to.1 - from.1) / (0.25 * ts))
             .ceil()
             .max(1.0) as usize;
         (0..=steps).all(|i| {
@@ -273,7 +274,7 @@ impl AiMapAnalysis {
         while next < route.len() && ticks < MAX_WALK_TICKS {
             let target = route[next];
             let (dx, dy) = (target.0 - at.0, target.1 - at.1);
-            let length = dx.hypot(dy);
+            let length = dx.det_hypot(dy);
             if length <= f32::EPSILON {
                 next += 1;
                 continue;
@@ -307,7 +308,7 @@ impl AiMapAnalysis {
             while budget > 0.0 && next < route.len() {
                 let target = route[next];
                 let (dx, dy) = (target.0 - at.0, target.1 - at.1);
-                let length = dx.hypot(dy);
+                let length = dx.det_hypot(dy);
                 if length <= budget {
                     at = target;
                     budget -= length;

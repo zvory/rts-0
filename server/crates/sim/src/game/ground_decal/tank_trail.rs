@@ -1,3 +1,4 @@
+use rts_rules::math::GameplayMath as _;
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
@@ -154,10 +155,10 @@ impl TankTrailStore {
             .iter()
             .filter(|entity| leaves_tank_treads(entity.kind) && entity.hp > 0)
             .filter_map(|entity| {
-                TankTrailPose::from_world(entity.pos_x, entity.pos_y, entity.facing(), map).map(
+                TankTrailPose::from_world(entity.pos_x(), entity.pos_y(), entity.facing(), map).map(
                     |pose| {
                         let (dx, dy) = entity.movement_delta();
-                        let moved_this_tick = dx.hypot(dy) > 0.05;
+                        let moved_this_tick = dx.det_hypot(dy) > 0.05;
                         (entity.id, entity.owner, pose, moved_this_tick)
                     },
                 )
@@ -450,7 +451,7 @@ fn pose_valid(pose: TankTrailPose, map: &Map) -> bool {
 }
 
 fn sample_needed(a: TankTrailPose, b: TankTrailPose) -> bool {
-    (b.x() - a.x()).hypot(b.y() - a.y()) >= SAMPLE_TRAVEL_PX
+    (b.x() - a.x()).det_hypot(b.y() - a.y()) >= SAMPLE_TRAVEL_PX
         || shortest_angle_delta(a.heading(), b.heading()).abs() >= SAMPLE_TURN_RAD
 }
 
@@ -478,7 +479,7 @@ fn center_span(poses: &[TankTrailPose]) -> f32 {
 }
 
 fn normalize_angle(angle: f32) -> f32 {
-    angle.sin().atan2(angle.cos())
+    angle.det_sin().det_atan2(angle.det_cos())
 }
 
 #[cfg(test)]

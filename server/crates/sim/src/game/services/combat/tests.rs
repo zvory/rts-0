@@ -11,8 +11,9 @@ use crate::game::teams::TeamRelations;
 use crate::game::upgrade::UpgradeKind;
 use crate::game::{PlayerState, ScoreState};
 use crate::protocol::{terrain, NoticeSeverity};
+use crate::rng::PortableRng;
 use crate::rules::combat as combat_rules;
-use rand::{rngs::SmallRng, SeedableRng};
+use rand::SeedableRng;
 mod accuracy;
 mod anti_tank_acquisition;
 mod anti_tank_behavior;
@@ -83,8 +84,8 @@ fn resolve_test_target(
         &smokes,
         attacker_id,
         attacker.owner,
-        attacker.pos_x,
-        attacker.pos_y,
+        attacker.pos_x(),
+        attacker.pos_y(),
         acquire_px,
         combat_mode(attacker),
     )
@@ -111,8 +112,8 @@ fn resolve_tank_test_target(
         &smokes,
         tank_id,
         tank.owner,
-        tank.pos_x,
-        tank.pos_y,
+        tank.pos_x(),
+        tank.pos_y(),
         192.0,
         combat_mode(tank),
     )
@@ -214,7 +215,7 @@ fn run_combat_tick_on_map_with_seed_smokes_and_tick(
         .map(|player_id| (*player_id, Vec::new()))
         .collect();
 
-    let mut rng = SmallRng::seed_from_u64(rng_seed);
+    let mut rng = PortableRng::seed_from_u64(rng_seed);
     let mut panzerfaust_shots = crate::game::panzerfaust_shot::PanzerfaustShotStore::default();
     let mut firing_reveals = Vec::new();
     let methamphetamines_researched = |owner| {
@@ -296,7 +297,7 @@ fn apply_test_damage_with_teams(
         .expect("test attacker should have a default weapon profile");
     let map = Map::generate(2, 0x00C0_FFEE);
     let fog = Fog::new(map.width, map.height);
-    let mut rng = SmallRng::seed_from_u64(0);
+    let mut rng = PortableRng::seed_from_u64(0);
     let blockers = ShotBlockerIndex::build(&map, entities);
     apply_damage(
         &map,
@@ -339,8 +340,8 @@ fn idle_army_units_auto_acquire_targets() {
         &smokes,
         self_id,
         attacker.owner,
-        attacker.pos_x,
-        attacker.pos_y,
+        attacker.pos_x(),
+        attacker.pos_y(),
         128.0,
         combat_mode(attacker),
     );
@@ -396,8 +397,8 @@ fn allied_riflemen_do_not_auto_acquire_each_other() {
         &smokes,
         self_id,
         attacker.owner,
-        attacker.pos_x,
-        attacker.pos_y,
+        attacker.pos_x(),
+        attacker.pos_y(),
         128.0,
         combat_mode(attacker),
     );
@@ -499,8 +500,8 @@ fn attack_move_ignores_allies_and_acquires_enemies() {
         &smokes,
         attacker,
         attacker_entity.owner,
-        attacker_entity.pos_x,
-        attacker_entity.pos_y,
+        attacker_entity.pos_x(),
+        attacker_entity.pos_y(),
         128.0,
         combat_mode(attacker_entity),
     );
@@ -539,8 +540,8 @@ fn ordered_attackers_do_not_retain_allied_targets() {
         &smokes,
         attacker,
         attacker_entity.owner,
-        attacker_entity.pos_x,
-        attacker_entity.pos_y,
+        attacker_entity.pos_x(),
+        attacker_entity.pos_y(),
         128.0,
         combat_mode(attacker_entity),
     );
@@ -656,8 +657,8 @@ fn acquisition_against_buildings_ignores_allied_buildings() {
         &smokes,
         attacker,
         attacker_entity.owner,
-        attacker_entity.pos_x,
-        attacker_entity.pos_y,
+        attacker_entity.pos_x(),
+        attacker_entity.pos_y(),
         192.0,
         combat_mode(attacker_entity),
     );
@@ -697,8 +698,8 @@ fn anti_tank_gun_tank_preference_ignores_allied_tanks() {
         &smokes,
         anti_tank_gun,
         attacker.owner,
-        attacker.pos_x,
-        attacker.pos_y,
+        attacker.pos_x(),
+        attacker.pos_y(),
         192.0,
         combat_mode(attacker),
     );
@@ -906,8 +907,8 @@ fn stone_blocks_attack_move_auto_acquisition() {
         &smokes,
         self_id,
         attacker.owner,
-        attacker.pos_x,
-        attacker.pos_y,
+        attacker.pos_x(),
+        attacker.pos_y(),
         128.0,
         combat_mode(attacker),
     );
@@ -989,8 +990,8 @@ fn smoke_blocks_attack_move_auto_acquisition() {
         &smokes,
         self_id,
         attacker.owner,
-        attacker.pos_x,
-        attacker.pos_y,
+        attacker.pos_x(),
+        attacker.pos_y(),
         256.0,
         combat_mode(attacker),
     );
@@ -1248,7 +1249,7 @@ fn attack_move_resumes_original_destination_after_target_is_gone() {
     let mut events = HashMap::from([(1, Vec::new())]);
     let mut firing_reveals = Vec::new();
 
-    let mut rng = SmallRng::seed_from_u64(0);
+    let mut rng = PortableRng::seed_from_u64(0);
     let methamphetamines_researched = |_owner| false;
     combat_system(
         &map,
@@ -1395,8 +1396,8 @@ fn shoot_while_moving_units_keep_existing_valid_target() {
             &smokes,
             attacker_id,
             attacker.owner,
-            attacker.pos_x,
-            attacker.pos_y,
+            attacker.pos_x(),
+            attacker.pos_y(),
             192.0,
             combat_mode(attacker),
         );
@@ -1449,8 +1450,8 @@ fn shoot_while_moving_units_reacquire_when_existing_target_is_dead() {
             &smokes,
             attacker_id,
             attacker.owner,
-            attacker.pos_x,
-            attacker.pos_y,
+            attacker.pos_x(),
+            attacker.pos_y(),
             192.0,
             combat_mode(attacker),
         );
@@ -1577,8 +1578,8 @@ fn idle_workers_do_not_auto_acquire_targets() {
         &smokes,
         worker_id,
         worker.owner,
-        worker.pos_x,
-        worker.pos_y,
+        worker.pos_x(),
+        worker.pos_y(),
         128.0,
         combat_mode(worker),
     );
@@ -1636,7 +1637,7 @@ fn direct_hits_record_damage_signal_on_victim() {
         .last_damage_pos()
         .expect("victim should record attacker position");
     assert!(
-        pos.0 < worker.pos_x,
+        pos.0 < worker.pos_x(),
         "recorded attacker position should be on the attacker's side"
     );
     assert!(
@@ -1940,7 +1941,7 @@ fn machine_gunner_tears_down_before_moving() {
     let mg_id = entities
         .spawn_unit(1, EntityKind::MachineGunner, 100.0, 100.0)
         .expect("machine gunner should spawn");
-    let start_x = entities.get(mg_id).expect("mg should exist").pos_x;
+    let start_x = entities.get(mg_id).expect("mg should exist").pos_x();
 
     {
         let mg = entities.get_mut(mg_id).expect("mg should exist");
@@ -1953,7 +1954,10 @@ fn machine_gunner_tears_down_before_moving() {
     }
 
     run_movement_tick(&mut entities);
-    assert_eq!(entities.get(mg_id).expect("mg should exist").pos_x, start_x);
+    assert_eq!(
+        entities.get(mg_id).expect("mg should exist").pos_x(),
+        start_x
+    );
 
     for _ in 0..config::MACHINE_GUNNER_SETUP_TICKS {
         run_combat_tick(&mut entities);
@@ -1965,7 +1969,7 @@ fn machine_gunner_tears_down_before_moving() {
 
     run_movement_tick(&mut entities);
     assert!(
-        entities.get(mg_id).expect("mg should exist").pos_x > start_x,
+        entities.get(mg_id).expect("mg should exist").pos_x() > start_x,
         "machine gunner should move after teardown completes"
     );
 }
@@ -2847,8 +2851,8 @@ fn attack_move_prefers_clear_target_over_target_behind_friendly_tank() {
         &smokes,
         attacker,
         attacker_entity.owner,
-        attacker_entity.pos_x,
-        attacker_entity.pos_y,
+        attacker_entity.pos_x(),
+        attacker_entity.pos_y(),
         128.0,
         combat_mode(attacker_entity),
     );

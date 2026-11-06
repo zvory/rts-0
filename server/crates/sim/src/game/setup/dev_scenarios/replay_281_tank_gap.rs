@@ -27,11 +27,6 @@ const EXACT_ACTORS: [u32; 6] = [
     REAR_TANK,
 ];
 const EXACT_COMMAND_UNITS: [u32; 7] = [COMMAND_CAR, 219, LEAD_TANK, 250, REAR_TANK, 271, 284];
-#[cfg(test)]
-const GOLDEN_ACTORS: [u32; 5] = [174, 177, COMMAND_CAR, LEAD_TANK, REAR_TANK];
-#[cfg(test)]
-const GOLDEN_LAST_TICK: u32 = 13_620;
-
 impl Game {
     pub fn new_replay_281_tank_gap_scenario(
         scenario_case: Option<&str>,
@@ -137,20 +132,20 @@ fn restore_replay_clock_and_trenches(game: &mut Game) {
         vec![
             Trench {
                 id: 6,
-                x: 1232.0,
-                y: 816.0,
+                x: rts_rules::math::Coord::from_world(1232.0),
+                y: rts_rules::math::Coord::from_world(816.0),
                 radius_tiles,
             },
             Trench {
                 id: 8,
-                x: 1232.0,
-                y: 848.0,
+                x: rts_rules::math::Coord::from_world(1232.0),
+                y: rts_rules::math::Coord::from_world(848.0),
                 radius_tiles,
             },
             Trench {
                 id: 38,
-                x: 1232.0,
-                y: 912.0,
+                x: rts_rules::math::Coord::from_world(1232.0),
+                y: rts_rules::math::Coord::from_world(912.0),
                 radius_tiles,
             },
         ],
@@ -160,29 +155,8 @@ fn restore_replay_clock_and_trenches(game: &mut Game) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde::Deserialize;
-
-    #[derive(Debug, Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    struct GoldenTick {
-        tick: u32,
-        entities: Vec<GoldenEntity>,
-    }
-
-    #[derive(Debug, Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    struct GoldenEntity {
-        id: u32,
-        x: f32,
-        y: f32,
-        hp: u32,
-        state: String,
-        target_id: Option<u32>,
-        stuck_ticks: Option<u16>,
-    }
-
     #[test]
-    fn recorded_checkpoint_matches_current_balance_until_tank_reacquisition() {
+    fn fixed_checkpoint_keeps_lead_tank_engaged() {
         let mut setup = scenario(CASE_TICK_PERFECT);
         assert_eq!(setup.game.tick_count(), REPLAY_PRE_COMMAND_TICK);
         assert_eq!(setup.issue_after_ticks, REPLAY_PRE_COMMAND_TICK);
@@ -202,90 +176,11 @@ mod tests {
             vec![6, 8, 38]
         );
         setup.game.enqueue(setup.player_id, setup.command());
-        // Replay the recorded checkpoint with current balance. The trace was refreshed for
-        // independently traversing commander MG (including its changed shot/RNG cadence).
-        // The movement regression must still keep the lead Tank engaged instead of resuming its route.
-        let golden: Vec<GoldenTick> =
-            serde_json::from_str(include_str!("fixtures/replay_281_ticks_13537_13620.json"))
-                .expect("valid replay-281 golden trace");
-        assert_eq!(
-            golden.len(),
-            (GOLDEN_LAST_TICK - REPLAY_PRE_COMMAND_TICK) as usize,
-            "golden trace must cover every tick through {GOLDEN_LAST_TICK}"
-        );
-
-        for (offset, expected_tick) in golden.into_iter().enumerate() {
-            let expected_tick_number = REPLAY_PRE_COMMAND_TICK + offset as u32 + 1;
-            assert_eq!(
-                expected_tick.tick, expected_tick_number,
-                "golden trace ticks must be consecutive"
-            );
-            let mut expected_ids = expected_tick
-                .entities
-                .iter()
-                .map(|entity| entity.id)
-                .collect::<Vec<_>>();
-            expected_ids.sort_unstable();
-            assert_eq!(
-                expected_ids, GOLDEN_ACTORS,
-                "golden tick {} must cover every surviving replay actor",
-                expected_tick.tick
-            );
-            if expected_tick.tick == 13_610 {
-                break;
-            }
+        // This authored start originates in an old replay. The versioned fixed-point
+        // simulation intentionally has no bitwise trajectory contract with that recording.
+        // Keep the gameplay regression: the lead tank stops to engage instead of routing on.
+        while setup.game.tick_count() < 13_609 {
             setup.game.tick();
-            let snapshot = setup.game.snapshot_full_for_with_options(
-                SOUPMAN,
-                SnapshotOptions {
-                    include_movement_paths: true,
-                    movement_paths_for_all_projected: true,
-                },
-            );
-            assert_eq!(snapshot.tick, expected_tick.tick);
-            for expected in expected_tick.entities {
-                let actual = snapshot
-                    .entities
-                    .iter()
-                    .find(|entity| entity.id == expected.id)
-                    .unwrap_or_else(|| panic!("missing replay actor {}", expected.id));
-                assert_eq!(
-                    actual.x.to_bits(),
-                    expected.x.to_bits(),
-                    "tick {} entity {} x",
-                    snapshot.tick,
-                    expected.id
-                );
-                assert_eq!(
-                    actual.y.to_bits(),
-                    expected.y.to_bits(),
-                    "tick {} entity {} y",
-                    snapshot.tick,
-                    expected.id
-                );
-                assert_eq!(
-                    actual.hp, expected.hp,
-                    "tick {} entity {} hp",
-                    snapshot.tick, expected.id
-                );
-                assert_eq!(
-                    actual.state, expected.state,
-                    "tick {} entity {} state",
-                    snapshot.tick, expected.id
-                );
-                assert_eq!(
-                    actual.target_id, expected.target_id,
-                    "tick {} entity {} target",
-                    snapshot.tick, expected.id
-                );
-                assert_eq!(
-                    actual.debug_path.as_ref().map(|path| path.stuck_ticks),
-                    expected.stuck_ticks,
-                    "tick {} entity {} stuck ticks",
-                    snapshot.tick,
-                    expected.id
-                );
-            }
         }
         assert_eq!(setup.game.tick_count(), 13_609);
         let lead_position = setup
@@ -293,7 +188,7 @@ mod tests {
             .state
             .entities
             .get(LEAD_TANK)
-            .map(|lead| (lead.pos_x, lead.pos_y))
+            .map(|lead| (lead.pos_x(), lead.pos_y()))
             .expect("lead Tank at replay divergence");
         setup.game.tick();
         let lead = setup
@@ -303,7 +198,7 @@ mod tests {
             .get(LEAD_TANK)
             .expect("lead Tank after replay divergence");
         assert_eq!(setup.game.tick_count(), 13_610);
-        assert_eq!((lead.pos_x, lead.pos_y), lead_position);
+        assert_eq!((lead.pos_x(), lead.pos_y()), lead_position);
         assert_eq!(lead.target_id(), Some(177));
         assert!(lead.path_is_empty());
     }
@@ -354,7 +249,11 @@ mod tests {
             let rear = setup.game.state.entities.get(REAR_TANK).expect("rear Tank");
             if rear_slowed_at.is_none()
                 && rear.movement.as_ref().is_some_and(|movement| {
-                    movement.last_move_delta.0.hypot(movement.last_move_delta.1) < 1.0
+                    movement
+                        .last_move_delta
+                        .0
+                        .det_hypot(movement.last_move_delta.1)
+                        < 1.0
                 })
             {
                 rear_slowed_at = Some(tick);
@@ -381,6 +280,6 @@ mod tests {
         }
         let lead = setup.game.state.entities.get(LEAD_TANK).expect("lead Tank");
         let rear = setup.game.state.entities.get(REAR_TANK).expect("rear Tank");
-        (lead.pos_x, rear.pos_x)
+        (lead.pos_x(), rear.pos_x())
     }
 }

@@ -100,8 +100,8 @@ mod tests {
             .expect("scenario scout car should exist");
         let tile_size = config::TILE_SIZE as f32;
         let start_tile = (
-            (scout.pos_x / tile_size).floor() as u32,
-            (scout.pos_y / tile_size).floor() as u32,
+            (scout.pos_x() / tile_size).floor() as u32,
+            (scout.pos_y() / tile_size).floor() as u32,
         );
         let goal_tile = (
             (setup.goal.0 / tile_size).floor() as u32,
@@ -193,10 +193,10 @@ mod tests {
             .get(scout_id)
             .expect("scenario scout car should remain");
         assert!(
-            (scout.pos_x - goal.0).abs() <= 0.001 && (scout.pos_y - goal.1).abs() <= 0.001,
+            (scout.pos_x() - goal.0).abs() <= 0.001 && (scout.pos_y() - goal.1).abs() <= 0.001,
             "scout car should finish at the exact goal by tick {arrival_tick}, got ({:.3}, {:.3})",
-            scout.pos_x,
-            scout.pos_y
+            scout.pos_x(),
+            scout.pos_y()
         );
     }
 }

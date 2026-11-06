@@ -104,7 +104,7 @@ pub fn is_player_live_profile_id(profile_id: &str) -> bool {
 }
 
 pub fn random_live_profile_id(rng: &mut impl Rng) -> &'static str {
-    RANDOM_LIVE_PROFILE_IDS[rng.gen_range(0..RANDOM_LIVE_PROFILE_IDS.len())]
+    RANDOM_LIVE_PROFILE_IDS[rng.gen_range(0..RANDOM_LIVE_PROFILE_IDS.len() as u64) as usize]
 }
 
 pub fn resolve_live_profile_id_for_match(profile_id: &str) -> &'static str {
@@ -1430,8 +1430,38 @@ mod tests {
     }
 
     #[test]
+    #[cfg(target_pointer_width = "64")]
+    fn random_live_profile_selection_preserves_historical_native_stream() {
+        use rand::{rngs::SmallRng, RngCore};
+        use rts_sim::rng::PortableRng;
+
+        // At this boundary, switching to u32 sampling changes both the selected
+        // bucket and rejection sampling's stream consumption.
+        let boundary = (u64::MAX / LIVE_PROFILE_IDS.len() as u64) + 1;
+        let mut historical = rand::rngs::mock::StepRng::new(boundary, boundary.wrapping_neg());
+        let mut candidate = historical.clone();
+        let expected = LIVE_PROFILE_IDS[historical.gen_range(0..LIVE_PROFILE_IDS.len())];
+        assert_eq!(random_live_profile_id(&mut candidate), expected);
+        assert_eq!(candidate.next_u64(), historical.next_u64());
+
+        for seed in 0..128 {
+            let mut historical = SmallRng::seed_from_u64(seed);
+            let mut portable = PortableRng::seed_from_u64(seed);
+            for _ in 0..32 {
+                let expected = LIVE_PROFILE_IDS[historical.gen_range(0..LIVE_PROFILE_IDS.len())];
+                assert_eq!(
+                    random_live_profile_id(&mut portable),
+                    expected,
+                    "seed {seed}"
+                );
+                assert_eq!(portable.next_u64(), historical.next_u64(), "seed {seed}");
+            }
+        }
+    }
+
+    #[test]
     fn random_live_profile_selection_uses_the_full_internal_pool() {
-        let mut rng = rand::rngs::SmallRng::seed_from_u64(0xA1);
+        let mut rng = rts_sim::rng::PortableRng::seed_from_u64(0xA1);
         let mut selected = BTreeSet::new();
         for _ in 0..32 {
             selected.insert(random_live_profile_id(&mut rng));

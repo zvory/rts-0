@@ -39,8 +39,8 @@ pub(crate) fn death_system(
         .map(|e| DeadEntity {
             id: e.id,
             owner: e.owner,
-            x: e.pos_x,
-            y: e.pos_y,
+            x: e.pos_x(),
+            y: e.pos_y(),
             sight_tiles: e.sight_tiles(),
             kind: e.kind,
             facing: e.facing(),
@@ -206,7 +206,7 @@ pub(crate) fn death_system(
     let depleted: Vec<(u32, f32, f32, EntityKind)> = entities
         .iter()
         .filter(|e| e.is_node() && e.remaining().unwrap_or(0) == 0)
-        .map(|e| (e.id, e.pos_x, e.pos_y, e.kind))
+        .map(|e| (e.id, e.pos_x(), e.pos_y(), e.kind))
         .collect();
     for (id, x, y, kind) in depleted {
         let pids: Vec<u32> = events.keys().copied().collect();

@@ -1,4 +1,5 @@
 use super::*;
+use crate::rng::PortableRng;
 
 #[allow(clippy::too_many_arguments)]
 fn apply_test_damage_with_seed(
@@ -20,7 +21,7 @@ fn apply_test_damage_with_seed(
         .expect("attacker should have a default weapon profile");
     let map = Map::generate(2, 0x00C0_FFEE);
     let fog = Fog::new(map.width, map.height);
-    let mut rng = SmallRng::seed_from_u64(rng_seed);
+    let mut rng = PortableRng::seed_from_u64(rng_seed);
     let blockers = ShotBlockerIndex::build(&map, entities);
     apply_damage(
         &map,

@@ -11,7 +11,7 @@ impl MoveCoordinator<'_> {
         let request_start = self.diagnostics.as_ref().map(|_| Instant::now());
         let entity = entities.get(id)?;
         let kind = entity.kind;
-        let start = (entity.pos_x, entity.pos_y);
+        let start = (entity.pos_x(), entity.pos_y());
         let start_tile = self.map.tile_of(start.0, start.1);
         let goal_tile = self.map.tile_of(goal.0, goal.1);
         if start_tile != goal_tile

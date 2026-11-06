@@ -5,6 +5,7 @@ use crate::game::entity::{EntityKind, EntityStore, MovePhase};
 use crate::game::map::Map;
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::standability;
+use rts_rules::math::GameplayMath as _;
 
 pub(crate) fn clamped_world_ability_vector(
     from_x: f32,
@@ -15,7 +16,7 @@ pub(crate) fn clamped_world_ability_vector(
 ) -> Option<(f32, f32)> {
     let dx = target_x - from_x;
     let dy = target_y - from_y;
-    let distance = (dx * dx + dy * dy).sqrt();
+    let distance = (dx * dx + dy * dy).det_sqrt();
     if !distance.is_finite() {
         return None;
     }
@@ -36,8 +37,13 @@ pub(crate) fn ekat_dash_destination(
     range_tiles: Option<u32>,
 ) -> Option<(f32, f32)> {
     let caster_entity = entities.get(caster)?;
-    let destination =
-        clamped_world_ability_vector(caster_entity.pos_x, caster_entity.pos_y, x, y, range_tiles)?;
+    let destination = clamped_world_ability_vector(
+        caster_entity.pos_x(),
+        caster_entity.pos_y(),
+        x,
+        y,
+        range_tiles,
+    )?;
     let occ = Occupancy::build(map, entities);
     standability::unit_static_standable(map, &occ, EntityKind::Ekat, destination.0, destination.1)
         .then_some(destination)
@@ -78,7 +84,7 @@ pub(crate) fn ekat_line_projectile_spec(
     range_tiles: Option<u32>,
     tick: u32,
 ) -> Option<AbilityProjectileSpec> {
-    let (from_x, from_y) = entities.get(caster).map(|e| (e.pos_x, e.pos_y))?;
+    let (from_x, from_y) = entities.get(caster).map(|e| (e.pos_x(), e.pos_y()))?;
     ekat_line_projectile_spec_from_origin(
         player,
         caster,

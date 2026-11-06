@@ -1,3 +1,4 @@
+use rts_rules::math::GameplayMath as _;
 use std::collections::BTreeSet;
 
 use crate::config;
@@ -30,7 +31,7 @@ where
                 continue;
             }
 
-            let score = (cx - x).powi(2) + (cy - y).powi(2);
+            let score = (cx - x).det_powi(2) + (cy - y).det_powi(2);
             let replace = match best {
                 Some((best_score, best_tx, best_ty, _, _)) => {
                     score < best_score - 0.001
@@ -81,7 +82,8 @@ pub(crate) fn nearest_oil_patch_tile_center(
 
             let ts = config::TILE_SIZE as f32;
             let dist_tiles =
-                ((center_x - anchor_x).powi(2) + (center_y - anchor_y).powi(2)).sqrt() / ts;
+                ((center_x - anchor_x).det_powi(2) + (center_y - anchor_y).det_powi(2)).det_sqrt()
+                    / ts;
             (config::START_RESOURCE_MIN_DIST_TILES..=config::START_RESOURCE_MAX_DIST_TILES)
                 .contains(&dist_tiles)
         };
@@ -101,7 +103,7 @@ pub(crate) fn occupied_resource_tiles(
     entities
         .iter()
         .filter(|entity| entity.kind == kind && entity.is_node())
-        .map(|entity| map.tile_of(entity.pos_x, entity.pos_y))
+        .map(|entity| map.tile_of(entity.pos_x(), entity.pos_y()))
         .collect()
 }
 
@@ -142,17 +144,19 @@ pub(crate) fn resource_blocked_building_tiles(
         if Some(entity.kind) == excluded_resource_kind {
             continue;
         }
-        if !entity.pos_x.is_finite() || !entity.pos_y.is_finite() {
+        if !entity.pos_x().is_finite() || !entity.pos_y().is_finite() {
             continue;
         }
         let radius = entity.radius();
-        let min_tx = (((entity.pos_x - radius) / ts).floor() as i32 - foot_w).clamp(0, max_x_tile);
-        let min_ty = (((entity.pos_y - radius) / ts).floor() as i32 - foot_h).clamp(0, max_y_tile);
-        let max_tx = (((entity.pos_x + radius) / ts).floor() as i32).clamp(0, max_x_tile);
-        let max_ty = (((entity.pos_y + radius) / ts).floor() as i32).clamp(0, max_y_tile);
+        let min_tx =
+            (((entity.pos_x() - radius) / ts).floor() as i32 - foot_w).clamp(0, max_x_tile);
+        let min_ty =
+            (((entity.pos_y() - radius) / ts).floor() as i32 - foot_h).clamp(0, max_y_tile);
+        let max_tx = (((entity.pos_x() + radius) / ts).floor() as i32).clamp(0, max_x_tile);
+        let max_ty = (((entity.pos_y() + radius) / ts).floor() as i32).clamp(0, max_y_tile);
         let circle = CircleBody {
-            x: entity.pos_x,
-            y: entity.pos_y,
+            x: entity.pos_x(),
+            y: entity.pos_y(),
             radius,
         };
 

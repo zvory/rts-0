@@ -35,12 +35,12 @@ fn gather_command_accepts_live_steel_without_nearby_completed_mining_anchor() {
         .find(|e| e.owner == 1 && e.kind == EntityKind::ResourceDepot)
         .expect("starting Resource Depot");
     let world = game.state.map.world_width_px();
-    let far_x = if resource_depot.pos_x < world * 0.5 {
+    let far_x = if resource_depot.pos_x() < world * 0.5 {
         world - config::TILE_SIZE as f32 * 0.5
     } else {
         config::TILE_SIZE as f32 * 0.5
     };
-    let far_y = if resource_depot.pos_y < world * 0.5 {
+    let far_y = if resource_depot.pos_y() < world * 0.5 {
         world - config::TILE_SIZE as f32 * 0.5
     } else {
         config::TILE_SIZE as f32 * 0.5
@@ -104,13 +104,12 @@ fn gather_command_to_occupied_patch_redirects_without_stealing_slot() {
         .state
         .entities
         .get(node)
-        .map(|e| (e.pos_x, e.pos_y))
+        .map(|e| (e.pos_x(), e.pos_y()))
         .expect("node position");
 
     {
         let holder_entity = game.state.entities.get_mut(holder).expect("holder worker");
-        holder_entity.pos_x = node_x;
-        holder_entity.pos_y = node_y;
+        holder_entity.set_position(node_x, node_y);
         holder_entity.set_order(Order::gather(node));
         holder_entity.mark_gather_phase(GatherPhase::Harvesting);
     }
@@ -188,7 +187,7 @@ fn same_tile_gather_outside_interaction_range_keeps_approaching() {
         .state
         .entities
         .get(node)
-        .map(|e| (e.pos_x, e.pos_y))
+        .map(|e| (e.pos_x(), e.pos_y()))
         .expect("node position");
     let node_tile = game.state.map.tile_of(node_x, node_y);
     let tile_origin = (
@@ -211,9 +210,9 @@ fn same_tile_gather_outside_interaction_range_keeps_approaching() {
         let node_entity = game.state.entities.get(node).expect("resource node");
         worker_entity.radius() + node_entity.radius() + config::TILE_SIZE as f32 * 0.1
     };
-    let initial_distance = ((engineered_worker.0 - engineered_node.0).powi(2)
-        + (engineered_worker.1 - engineered_node.1).powi(2))
-    .sqrt();
+    let initial_distance = ((engineered_worker.0 - engineered_node.0).det_powi(2)
+        + (engineered_worker.1 - engineered_node.1).det_powi(2))
+    .det_sqrt();
     assert_eq!(
         game.state
             .map
@@ -279,14 +278,13 @@ fn worker_already_touching_resource_body_starts_harvesting() {
         .state
         .entities
         .get(node)
-        .map(|e| (e.pos_x, e.pos_y))
+        .map(|e| (e.pos_x(), e.pos_y()))
         .expect("node position");
     let worker_radius = game.state.entities.get(worker).expect("worker").radius();
     let node_radius = game.state.entities.get(node).expect("node").radius();
     {
         let worker_entity = game.state.entities.get_mut(worker).expect("worker");
-        worker_entity.pos_x = node_x + worker_radius + node_radius - 1.0;
-        worker_entity.pos_y = node_y;
+        worker_entity.set_position(node_x + worker_radius + node_radius - 1.0, node_y);
     }
 
     set_internal_gather_order(&mut game, worker, node);
@@ -324,7 +322,7 @@ fn active_mining_waits_and_resumes_when_nearby_resource_depot_is_rebuilt() {
         .state
         .entities
         .get(worker)
-        .map(|e| (e.pos_x, e.pos_y))
+        .map(|e| (e.pos_x(), e.pos_y()))
         .expect("worker position");
     let mut node = game
         .state
@@ -332,8 +330,8 @@ fn active_mining_waits_and_resumes_when_nearby_resource_depot_is_rebuilt() {
         .iter()
         .filter(|e| e.is_node())
         .min_by(|a, b| {
-            let da = (a.pos_x - worker_x).powi(2) + (a.pos_y - worker_y).powi(2);
-            let db = (b.pos_x - worker_x).powi(2) + (b.pos_y - worker_y).powi(2);
+            let da = (a.pos_x() - worker_x).det_powi(2) + (a.pos_y() - worker_y).det_powi(2);
+            let db = (b.pos_x() - worker_x).det_powi(2) + (b.pos_y() - worker_y).det_powi(2);
             da.total_cmp(&db).then_with(|| a.id.cmp(&b.id))
         })
         .map(|e| e.id)
@@ -372,7 +370,7 @@ fn active_mining_waits_and_resumes_when_nearby_resource_depot_is_rebuilt() {
         .entities
         .iter()
         .find(|e| e.owner == 1 && e.kind == EntityKind::ResourceDepot)
-        .map(|e| (e.id, (e.pos_x, e.pos_y)))
+        .map(|e| (e.id, (e.pos_x(), e.pos_y())))
         .expect("starting Resource Depot");
     game.state.entities.remove(resource_depot);
     let steel_before = game.state.players.iter().find(|p| p.id == 1).unwrap().steel;
@@ -511,9 +509,9 @@ fn spawn_resource_distances_are_fair_and_symmetric() {
                 if e.owner != 0 || (!e.is_node()) {
                     continue;
                 }
-                let d_x = e.pos_x - resource_depot.pos_x;
-                let d_y = e.pos_y - resource_depot.pos_y;
-                let dist_tiles = (d_x * d_x + d_y * d_y).sqrt() / config::TILE_SIZE as f32;
+                let d_x = e.pos_x() - resource_depot.pos_x();
+                let d_y = e.pos_y() - resource_depot.pos_y();
+                let dist_tiles = (d_x * d_x + d_y * d_y).det_sqrt() / config::TILE_SIZE as f32;
 
                 // Only consider nodes that belong to this player's start cluster.
                 if dist_tiles <= config::START_RESOURCE_MAX_DIST_TILES + 1.0 {
@@ -596,15 +594,15 @@ fn generated_oil_nodes_spawn_at_tile_centers() {
                 .filter(|entity| entity.kind == EntityKind::Oil)
             {
                 oil_count += 1;
-                let (tile_x, tile_y) = game.state.map.tile_of(oil.pos_x, oil.pos_y);
+                let (tile_x, tile_y) = game.state.map.tile_of(oil.pos_x(), oil.pos_y());
                 let (center_x, center_y) = game.state.map.tile_center(tile_x, tile_y);
                 assert!(
-                    (oil.pos_x - center_x).abs() < 0.001
-                        && (oil.pos_y - center_y).abs() < 0.001,
+                    (oil.pos_x() - center_x).abs() < 0.001
+                        && (oil.pos_y() - center_y).abs() < 0.001,
                     "oil node {} should be centered on tile ({tile_x}, {tile_y}), got ({:.3}, {:.3}) vs center ({:.3}, {:.3})",
                     oil.id,
-                    oil.pos_x,
-                    oil.pos_y,
+                    oil.pos_x(),
+                    oil.pos_y(),
                     center_x,
                     center_y
                 );

@@ -1,3 +1,4 @@
+use rts_rules::math::GameplayMath as _;
 use std::collections::HashMap;
 
 use rand::Rng;
@@ -71,9 +72,9 @@ pub(super) fn fire_tank_coax_system(
             snapshot,
             weapon_profile,
         );
-        let target_angle = target
-            .and_then(|tid| entities.get(tid))
-            .map(|target| (target.pos_y - snapshot.pos_y).atan2(target.pos_x - snapshot.pos_x));
+        let target_angle = target.and_then(|tid| entities.get(tid)).map(|target| {
+            (target.pos_y() - snapshot.pos_y).det_atan2(target.pos_x() - snapshot.pos_x)
+        });
         let Some(tank) = entities.get_mut(id) else {
             continue;
         };
@@ -125,8 +126,8 @@ fn tank_coax_snapshot(
     }
     Some(TankCoaxSnapshot {
         owner: tank.owner,
-        pos_x: tank.pos_x,
-        pos_y: tank.pos_y,
+        pos_x: tank.pos_x(),
+        pos_y: tank.pos_y(),
         range_px,
         explicit_neutral_obstacle_target: tank.order().attack_target(),
         clear_obstacle_area: tank
@@ -188,11 +189,11 @@ fn tank_coax_target_candidates(
             && snapshot
                 .clear_obstacle_area
                 .is_some_and(|(_, center_x, center_y)| {
-                    let dx = target.pos_x - center_x;
-                    let dy = target.pos_y - center_y;
+                    let dx = target.pos_x() - center_x;
+                    let dy = target.pos_y() - center_y;
                     let radius =
                         config::TANK_TRAP_CLUSTER_ATTACK_RADIUS_TILES * config::TILE_SIZE as f32;
-                    dx.mul_add(dx, dy * dy) <= radius * radius
+                    dx.det_mul_add(dx, dy * dy) <= radius * radius
                 });
         if target.is_neutral_obstacle()
             && snapshot.explicit_neutral_obstacle_target != Some(target.id)
@@ -238,8 +239,8 @@ fn tank_coax_target_candidates(
         candidates.push(TargetCandidate {
             id,
             owner: target.owner,
-            pos_x: target.pos_x,
-            pos_y: target.pos_y,
+            pos_x: target.pos_x(),
+            pos_y: target.pos_y(),
             distance_sq,
             facts: target_rules::target_facts(target.kind),
             in_weapon_range: true,

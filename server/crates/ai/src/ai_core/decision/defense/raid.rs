@@ -26,6 +26,7 @@ use super::super::opening_rush::{
 };
 use super::envelope::defended_building_sites;
 use super::*;
+use rts_rules::math::GameplayMath as _;
 
 /// Enemy fighters this close to a Jeff building, extractor or Engineer are a raid.
 const WATCH_TILES: f32 = 16.0;
@@ -228,7 +229,7 @@ fn tile(observation: &AiObservation) -> f32 {
 }
 
 fn distance(a: (f32, f32), b: (f32, f32)) -> f32 {
-    dist2(a.0, a.1, b.0, b.1).sqrt()
+    dist2(a.0, a.1, b.0, b.1).det_sqrt()
 }
 
 /// Centre-to-centre distance at which `kind` fires, as in the simulation.
@@ -311,7 +312,7 @@ impl Defended {
             .points
             .iter()
             .map(|p| dist2(p.0, p.1, point.0, point.1));
-        sites.chain(points).fold(f32::INFINITY, f32::min).sqrt()
+        sites.chain(points).fold(f32::INFINITY, f32::min).det_sqrt()
     }
 }
 
@@ -562,7 +563,7 @@ pub(in crate::ai_core::decision) fn respond(
                 return false;
             };
             to_raid.0 * to_enemy.0 + to_raid.1 * to_enemy.1
-                < FRONT_HALF_ANGLE_DEGREES.to_radians().cos()
+                < FRONT_HALF_ANGLE_DEGREES.to_radians().det_cos()
         });
     let mut queue: Vec<&AiEntitySummary> = candidates
         .iter()
@@ -1108,15 +1109,15 @@ fn sentry_posts(
     let Some(axis) = normalized_direction(home, enemy_base) else {
         return Vec::new();
     };
-    let base_angle = axis.1.atan2(axis.0);
+    let base_angle = axis.1.det_atan2(axis.0);
     [1.0_f32, -1.0]
         .into_iter()
         .map(|side| {
             let angle = base_angle + side * SENTRY_ANGLE_DEGREES.to_radians();
             let desired = clamp_to_map(
                 (
-                    home.0 + angle.cos() * SENTRY_TILES * ts,
-                    home.1 + angle.sin() * SENTRY_TILES * ts,
+                    home.0 + angle.det_cos() * SENTRY_TILES * ts,
+                    home.1 + angle.det_sin() * SENTRY_TILES * ts,
                 ),
                 observation.map,
             );

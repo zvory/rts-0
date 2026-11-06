@@ -13,6 +13,7 @@
 use super::geometry::{dist2, squared};
 use super::opening_rush::LiveStep;
 use super::*;
+use rts_rules::math::GameplayMath as _;
 
 mod posts;
 use posts::*;
@@ -1067,9 +1068,9 @@ fn pick_target(
                 }
                 let margin = enemy_tanks
                     .iter()
-                    .map(|e| dist2(e.0, e.1, p.0, p.1).sqrt() / ts)
+                    .map(|e| dist2(e.0, e.1, p.0, p.1).det_sqrt() / ts)
                     .fold(40.0f32, f32::min);
-                let away = dist2(group.0, group.1, p.0, p.1).sqrt() / ts;
+                let away = dist2(group.0, group.1, p.0, p.1).det_sqrt() / ts;
                 Some((id, margin - TARGET_DISTANCE_WEIGHT * away))
             })
             .max_by(|a, b| a.1.total_cmp(&b.1).then_with(|| b.0.cmp(&a.0)))
@@ -1185,7 +1186,7 @@ fn drop_stuck_tanks(observation: &AiObservation, breach: &mut TrapBreach) {
             breach.progress.remove(&tank.id);
             continue;
         };
-        let tiles = (dist2(tank.x, tank.y, post.0, post.1).sqrt() / ts) as u32;
+        let tiles = (dist2(tank.x, tank.y, post.0, post.1).det_sqrt() / ts) as u32;
         if tiles as f32 <= IN_POSITION_TILES + 1.0 {
             breach.progress.remove(&tank.id);
             continue;

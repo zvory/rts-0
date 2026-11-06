@@ -116,8 +116,8 @@ pub(super) fn resource_node(entities: &EntityStore, pump_id: u32) -> Option<u32>
             node.kind == node_kind && node.is_node() && node.remaining().unwrap_or(0) > 0
         })
         .find(|node| {
-            (node.pos_x - pump.pos_x).abs() <= POINT_IN_RECT_EPS_PX
-                && (node.pos_y - pump.pos_y).abs() <= POINT_IN_RECT_EPS_PX
+            (node.pos_x() - pump.pos_x()).abs() <= POINT_IN_RECT_EPS_PX
+                && (node.pos_y() - pump.pos_y()).abs() <= POINT_IN_RECT_EPS_PX
         })
         .map(|node| node.id)
 }

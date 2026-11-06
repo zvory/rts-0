@@ -122,7 +122,7 @@ pub(super) fn maybe_issue_isolation_smoke(
         .find(|enemy| enemy.id == *focus_target)?;
     let center = group_center(observation, tanks).unwrap_or((focus.x, focus.y));
     let tile_size = observation.map.tile_size as f32;
-    let local_target_radius2 = (CONTAINMENT_LOCAL_SMOKE_TARGET_TILES * tile_size).powi(2);
+    let local_target_radius2 = (CONTAINMENT_LOCAL_SMOKE_TARGET_TILES * tile_size).det_powi(2);
     let mut smoke_candidates = observation
         .visible_enemies
         .iter()
@@ -219,11 +219,12 @@ pub(super) fn maybe_issue_isolation_smoke(
         .into_iter()
         .map(|point| clamp_to_map(point, observation.map))
         .filter(|point| {
-            (singleton_suppression || dist2(focus.x, focus.y, point.0, point.1) > clearance.powi(2))
+            (singleton_suppression
+                || dist2(focus.x, focus.y, point.0, point.1) > clearance.det_powi(2))
                 && !observation.smokes.iter().any(|cloud| {
                     let combined =
                         (cloud.radius_tiles + CONTAINMENT_SMOKE_SAFETY_TILES) * tile_size;
-                    dist2(cloud.x, cloud.y, point.0, point.1) <= combined.powi(2)
+                    dist2(cloud.x, cloud.y, point.0, point.1) <= combined.det_powi(2)
                 })
                 && (singleton_suppression
                     || tanks.iter().all(|tank_id| {
@@ -236,7 +237,7 @@ pub(super) fn maybe_issue_isolation_smoke(
                                     *point,
                                     (tank.x, tank.y),
                                     (focus.x, focus.y),
-                                ) > clearance.powi(2)
+                                ) > clearance.det_powi(2)
                             })
                     }))
         })
@@ -251,7 +252,7 @@ pub(super) fn maybe_issue_isolation_smoke(
     });
     let smoke_point = aim_points.first().copied()?;
     if dist2(scout_entity.x, scout_entity.y, smoke_point.0, smoke_point.1)
-        > (CONTAINMENT_SMOKE_RANGE_TILES * tile_size).powi(2)
+        > (CONTAINMENT_SMOKE_RANGE_TILES * tile_size).det_powi(2)
     {
         return bounded_scout_smoke_launch_point(
             observation,
@@ -401,7 +402,7 @@ fn bounded_scout_smoke_launch_point(
         observation.map,
     );
     (dist2(launch_point.0, launch_point.1, smoke_point.0, smoke_point.1)
-        <= (CONTAINMENT_SMOKE_RANGE_TILES * tile_size).powi(2))
+        <= (CONTAINMENT_SMOKE_RANGE_TILES * tile_size).det_powi(2))
     .then_some(launch_point)
 }
 

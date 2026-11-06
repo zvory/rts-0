@@ -16,8 +16,8 @@ pub(super) fn spawn(
         .filter(|entity| entity.kind.is_resource_extractor())
         .map(|entity| {
             (
-                (entity.pos_x / tile_size) as u32,
-                (entity.pos_y / tile_size) as u32,
+                (entity.pos_x() / tile_size) as u32,
+                (entity.pos_y() / tile_size) as u32,
             )
         })
         .collect();
@@ -45,9 +45,9 @@ pub(super) fn spawn(
             .filter_map(|id| entities.get(*id))
             .filter(|entity| entity.kind == node_kind && entity.remaining().unwrap_or(0) > 0)
             .map(|entity| {
-                let dx = entity.pos_x - home_x;
-                let dy = entity.pos_y - home_y;
-                (entity.id, dx * dx + dy * dy, entity.pos_x, entity.pos_y)
+                let dx = entity.pos_x() - home_x;
+                let dy = entity.pos_y() - home_y;
+                (entity.id, dx * dx + dy * dy, entity.pos_x(), entity.pos_y())
             })
             .collect::<Vec<_>>();
         nodes.sort_by(|a, b| a.1.total_cmp(&b.1).then_with(|| a.0.cmp(&b.0)));
@@ -152,8 +152,8 @@ mod tests {
             .iter()
             .find(|entity| entity.owner == 7 && entity.kind == extractor_kind)
             .expect("starting resource extractor");
-        assert_eq!((mine.pos_x, mine.pos_y), (320.0, 320.0));
-        assert_ne!((mine.pos_x, mine.pos_y), (32.0, 32.0));
+        assert_eq!((mine.pos_x(), mine.pos_y()), (320.0, 320.0));
+        assert_ne!((mine.pos_x(), mine.pos_y()), (32.0, 32.0));
         assert!(entities.contains(unrelated));
     }
 }

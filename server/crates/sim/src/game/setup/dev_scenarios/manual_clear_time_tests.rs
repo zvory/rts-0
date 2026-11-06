@@ -27,8 +27,8 @@ fn describe_state(game: &Game, units: &[u32]) -> Vec<String> {
             let e = game.state.entities.get(id)?;
             Some(format!(
                 "#{id}: pos=({:.1},{:.1}) facing={:.3} phase={:?} path_len={} next={:?} goal={:?}",
-                e.pos_x,
-                e.pos_y,
+                e.pos_x(),
+                e.pos_y(),
                 e.facing(),
                 e.move_phase(),
                 e.movement.as_ref().map(|m| m.path.len()).unwrap_or(0),

@@ -53,7 +53,7 @@ fn entering_harvesting_clears_pending_queued_orders() {
         .expect("steel node should spawn");
     let (nx, ny) = entities
         .get(node)
-        .map(|n| (n.pos_x, n.pos_y))
+        .map(|n| (n.pos_x(), n.pos_y()))
         .expect("node pos");
     let worker = entities
         .spawn_unit(1, EntityKind::Worker, nx, ny)
@@ -574,7 +574,7 @@ fn occupied_resource_arrival_redirects_to_nearest_same_resource_node() {
         .expect("nearby oil node should spawn");
     let (nx, ny) = entities
         .get(occupied)
-        .map(|n| (n.pos_x, n.pos_y))
+        .map(|n| (n.pos_x(), n.pos_y()))
         .expect("node pos");
     let holder = entities
         .spawn_unit(1, EntityKind::Worker, nx, ny)
@@ -637,7 +637,7 @@ fn occupied_resource_without_free_neighbor_moves_worker_to_open_grass_and_stops_
         .expect("occupied steel node should spawn");
     let (nx, ny) = entities
         .get(occupied)
-        .map(|n| (n.pos_x, n.pos_y))
+        .map(|n| (n.pos_x(), n.pos_y()))
         .expect("node pos");
     let holder = entities
         .spawn_unit(1, EntityKind::Worker, nx, ny)

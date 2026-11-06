@@ -22,6 +22,7 @@
 
 use super::geometry::{clamp_to_map, dist2, normalized_direction, squared};
 use super::*;
+use rts_rules::math::GameplayMath as _;
 
 mod engage;
 mod scout_lead;
@@ -654,15 +655,15 @@ pub(super) fn clip_path(
 ) -> Clip {
     if let Some(index) = danger_zone(zones, vision, from) {
         let zone = zones[index];
-        let now = dist2(from.0, from.1, zone.center.0, zone.center.1).sqrt();
-        let then = dist2(to.0, to.1, zone.center.0, zone.center.1).sqrt();
+        let now = dist2(from.0, from.1, zone.center.0, zone.center.1).det_sqrt();
+        let then = dist2(to.0, to.1, zone.center.0, zone.center.1).det_sqrt();
         return if then < now - 0.5 * tile_size {
             Clip::Stand { zone: index }
         } else {
             Clip::Clear
         };
     }
-    let length = dist2(from.0, from.1, to.0, to.1).sqrt();
+    let length = dist2(from.0, from.1, to.0, to.1).det_sqrt();
     if length < 1.0 {
         return Clip::Clear;
     }
@@ -745,7 +746,7 @@ fn reverse_hop(
     let away = normalized_direction(threat, from)?;
     let tile_size = observation.map.tile_size as f32;
     for degrees in [0.0_f32, 25.0, -25.0, 50.0, -50.0] {
-        let (sin, cos) = degrees.to_radians().sin_cos();
+        let (sin, cos) = degrees.to_radians().det_sin_cos();
         let direction = (away.0 * cos - away.1 * sin, away.0 * sin + away.1 * cos);
         for tiles in [REVERSE_HOP_TILES, REVERSE_HOP_TILES * 0.6] {
             let point = clamp_to_map(
@@ -923,7 +924,7 @@ fn react_to_hits(
             .visible_enemies
             .iter()
             .filter(|enemy| is_anti_armor(enemy.kind) && enemy.hp > 0)
-            .map(|enemy| dist2(enemy.x, enemy.y, center.0, center.1).sqrt() / tile_size)
+            .map(|enemy| dist2(enemy.x, enemy.y, center.0, center.1).det_sqrt() / tile_size)
             .fold(f32::MAX, f32::min);
         let escapable = nearest_shooter_tiles >= ESCAPE_FROM_TILES;
         let friend_count = tanks

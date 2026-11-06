@@ -124,7 +124,7 @@ impl PrivateDetailProjection<'_> {
 pub fn entity_visible_to(viewer: u32, entity: &Entity, fog: &Fog) -> bool {
     (entity.owner != 0 && entity.owner == viewer)
         || entity.is_node()
-        || fog.is_visible_world(viewer, entity.pos_x, entity.pos_y)
+        || fog.is_visible_world(viewer, entity.pos_x(), entity.pos_y())
 }
 
 pub fn entity_visible_to_with_smoke(
@@ -135,7 +135,7 @@ pub fn entity_visible_to_with_smoke(
 ) -> bool {
     if entity.owner != viewer
         && !entity.is_node()
-        && smokes.point_inside(entity.pos_x, entity.pos_y)
+        && smokes.point_inside(entity.pos_x(), entity.pos_y())
     {
         return false;
     }
@@ -154,7 +154,7 @@ pub(crate) fn entity_visible_to_with_smoke_melee(
     if entity_visible_to_with_smoke(viewer, entity, fog, smokes) {
         return true;
     }
-    if !fog.is_visible_world(viewer, entity.pos_x, entity.pos_y) {
+    if !fog.is_visible_world(viewer, entity.pos_x(), entity.pos_y()) {
         return false;
     }
     entities.iter().any(|spotter| {
@@ -207,8 +207,8 @@ pub fn project_entity(
         entity.id,
         entity.owner,
         protocol::kind_to_wire(entity.kind),
-        entity.pos_x,
-        entity.pos_y,
+        entity.pos_x(),
+        entity.pos_y(),
         entity.hp,
         entity.max_hp,
         entity.state_str(),
@@ -223,7 +223,7 @@ pub fn project_entity(
         && entity.is_unit()
         && context
             .map
-            .is_some_and(|map| map.world_point_is_concealed(entity.pos_x, entity.pos_y))
+            .is_some_and(|map| map.world_point_is_concealed(entity.pos_x(), entity.pos_y()))
         && !context.teams.is_some_and(|teams| {
             context.private_detail_projection.has_concealment_detection(
                 viewer,
@@ -300,7 +300,7 @@ pub fn project_entity(
                         )
                     })
                     .unwrap_or_else(|| {
-                        actionable_fog.is_visible_world(viewer, target.pos_x, target.pos_y)
+                        actionable_fog.is_visible_world(viewer, target.pos_x(), target.pos_y())
                     }))
     };
     let target_visible = entity
@@ -578,7 +578,7 @@ fn order_plan(
     smokes: Option<&SmokeCloudStore>,
 ) -> Vec<OrderPlanMarker> {
     let mut plan = Vec::new();
-    let mut stage_position = (entity.pos_x, entity.pos_y);
+    let mut stage_position = (entity.pos_x(), entity.pos_y());
     if let Some(marker) = active_order_plan_marker(entity, entities, viewer, fog, smokes) {
         stage_position = (marker.x, marker.y);
         plan.push(marker);
@@ -704,18 +704,18 @@ fn target_marker(
     smokes: Option<&SmokeCloudStore>,
 ) -> Option<OrderPlanMarker> {
     let target = entities.get(target)?;
-    let visible = fog.is_visible_world(viewer, target.pos_x, target.pos_y)
+    let visible = fog.is_visible_world(viewer, target.pos_x(), target.pos_y())
         && !smokes
-            .map(|smokes| smokes.point_inside(target.pos_x, target.pos_y))
+            .map(|smokes| smokes.point_inside(target.pos_x(), target.pos_y()))
             .unwrap_or(false);
     visible
-        .then(|| point_marker(kind, target.pos_x, target.pos_y))
+        .then(|| point_marker(kind, target.pos_x(), target.pos_y()))
         .flatten()
 }
 
 fn entity_point_marker(kind: &str, id: u32, entities: &EntityStore) -> Option<OrderPlanMarker> {
     let entity = entities.get(id)?;
-    point_marker(kind, entity.pos_x, entity.pos_y)
+    point_marker(kind, entity.pos_x(), entity.pos_y())
 }
 
 fn build_marker(kind: EntityKind, tile_x: u32, tile_y: u32) -> Option<OrderPlanMarker> {

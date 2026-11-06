@@ -3,6 +3,7 @@ use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
+use rts_rules::math::GameplayMath as _;
 
 use super::projection::combat_target_distance_sq;
 
@@ -43,13 +44,13 @@ pub(super) fn secondary_weapon_target_passes_activation(
     let Some(target_entity) = entities.get(target) else {
         return false;
     };
-    let dx = target_entity.pos_x - start.0;
-    let dy = target_entity.pos_y - start.1;
+    let dx = target_entity.pos_x() - start.0;
+    let dy = target_entity.pos_y() - start.1;
     let distance_sq = combat_target_distance_sq(map, start, target_entity);
     if !distance_sq.is_finite() || distance_sq > constraints.range_px * constraints.range_px {
         return false;
     }
-    let target_angle = dy.atan2(dx);
+    let target_angle = dy.det_atan2(dx);
     if !target_angle.is_finite()
         || angle_delta(constraints.facing_rad, target_angle).abs() > constraints.half_arc_rad
     {

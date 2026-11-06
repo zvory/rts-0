@@ -1,3 +1,4 @@
+use rts_rules::math::GameplayMath as _;
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
@@ -12,18 +13,18 @@ const TRACK_HALF_WIDTH_PX: f32 = 16.0;
 const TURN_CONTACT_RADIUS_PX: f32 = 29.0;
 
 pub(super) fn contact_motion(a: TankTrailPose, b: TankTrailPose) -> f32 {
-    let travel = (b.x() - a.x()).hypot(b.y() - a.y());
+    let travel = (b.x() - a.x()).det_hypot(b.y() - a.y());
     travel + shortest_angle_delta(a.heading(), b.heading()).abs() * TURN_CONTACT_RADIUS_PX
 }
 
 pub(super) fn shortest_angle_delta(from: f32, to: f32) -> f32 {
     let delta = to - from;
-    delta.sin().atan2(delta.cos())
+    delta.det_sin().det_atan2(delta.det_cos())
 }
 
 fn world_pose_bounds(x: f32, y: f32, heading: f32) -> (f32, f32, f32, f32) {
-    let cos = heading.cos().abs();
-    let sin = heading.sin().abs();
+    let cos = heading.det_cos().abs();
+    let sin = heading.det_sin().abs();
     let extent_x = TRACK_HALF_LENGTH_PX * cos + TRACK_HALF_WIDTH_PX * sin;
     let extent_y = TRACK_HALF_LENGTH_PX * sin + TRACK_HALF_WIDTH_PX * cos;
     (x - extent_x, y - extent_y, x + extent_x, y + extent_y)

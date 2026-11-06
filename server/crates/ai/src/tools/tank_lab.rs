@@ -19,6 +19,7 @@
 //!        [--map "1v1 No Terrain"] [--ticks 4500] [--scenarios parked_line,siege,attackers]
 //!        [--sizes 3v2,4v3,5v3,6v4,3v3] [--replays <dir>] [--trace] [--smoke-plus]
 
+use rts_rules::math::GameplayMath as _;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use std::process;
@@ -92,7 +93,7 @@ impl AiStrategy for ScriptedTanks {
                 let (x, y) = unit.position;
                 let dx = self.face.0 - x;
                 let dy = self.face.1 - y;
-                let length = (dx * dx + dy * dy).sqrt().max(1.0);
+                let length = (dx * dx + dy * dy).det_sqrt().max(1.0);
                 if let Ok(one) = UnitGroup::new([unit.id]) {
                     let _ = actions.move_group(
                         &one,
@@ -208,7 +209,7 @@ fn run_fight(fight: &Fight<'_>) -> Result<Outcome, String> {
         .map_err(|err| format!("{err:?}"))?;
     }
     let (dx, dy) = (enemy.0 - home.0, enemy.1 - home.1);
-    let length = (dx * dx + dy * dy).sqrt().max(1.0);
+    let length = (dx * dx + dy * dy).det_sqrt().max(1.0);
     let u = (dx / length, dy / length);
     let perp = (-u.1, u.0);
     let at = |origin: (f32, f32), along: f32, side: f32| {

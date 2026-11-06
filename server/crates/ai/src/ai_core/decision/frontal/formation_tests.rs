@@ -1,6 +1,7 @@
 use super::*;
 use crate::ai_core::observation::AiEconomy;
 use crate::ai_core::profiles::{JEFFS_AI, JEFFS_AI_BETA};
+use rts_rules::math::GameplayMath as _;
 
 fn test_entity(id: u32, kind: EntityKind, x: f32, y: f32) -> AiEntitySummary {
     AiEntitySummary {
@@ -173,7 +174,7 @@ fn containment_waits_for_tanks_scout_and_rifle_screen_to_assemble() {
     assert!(memory.containment.wave_launched);
     let waypoint = stored_waypoint(&memory).expect("short first march waypoint");
     let tank_center = group_center(&observation, &[1, 2]).unwrap();
-    let step_tiles = dist2(tank_center.0, tank_center.1, waypoint.0, waypoint.1).sqrt()
+    let step_tiles = dist2(tank_center.0, tank_center.1, waypoint.0, waypoint.1).det_sqrt()
         / observation.map.tile_size as f32;
     assert!(step_tiles <= CONTAINMENT_MARCH_STEP_TILES + 0.05);
     assert!(launch_commands
@@ -442,7 +443,7 @@ fn containment_does_not_advance_past_a_slow_rifle_screen() {
         second_waypoint.0,
         second_waypoint.1,
     )
-    .sqrt()
+    .det_sqrt()
         / observation.map.tile_size as f32;
     assert!(step_tiles <= CONTAINMENT_MARCH_STEP_TILES + 0.05);
 }

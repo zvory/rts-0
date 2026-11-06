@@ -7,6 +7,7 @@ use crate::ai_core::profiles::{
     JEFFS_AI_PRE_HELD_SITE_ID, JEFFS_AI_PRE_SAFE_BASES_ID, JEFFS_AI_PRE_SPEND_PLAN_ID,
     JEFFS_AI_PRE_THIRD_PRESSURE_ID,
 };
+use rts_rules::math::GameplayMath as _;
 use rts_sim::game::command::SimCommand as Command;
 use targets::{enemy_bases, off_route_tiles, OPEN_OFF_ROUTE_TILES};
 
@@ -884,12 +885,12 @@ fn while_the_push_forms_the_party_waits_midway_on_its_way() {
         })
         .expect("the party moves to meet the push");
     let rally = (
-        own.0 + 8.0 * ts() / 2f32.sqrt(),
-        own.1 + 8.0 * ts() / 2f32.sqrt(),
+        own.0 + 8.0 * ts() / 2f32.det_sqrt(),
+        own.1 + 8.0 * ts() / 2f32.det_sqrt(),
     );
     let along = distance(rally, (x, y)) / distance(rally, enemy);
     assert!((0.29..=0.71).contains(&along), "{along}");
-    let off_line = ((x - rally.0) - (y - rally.1)).abs() / 2f32.sqrt();
+    let off_line = ((x - rally.0) - (y - rally.1)).abs() / 2f32.det_sqrt();
     assert!(off_line < 1.0 * ts(), "{off_line}");
 }
 

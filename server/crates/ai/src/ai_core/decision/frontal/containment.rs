@@ -538,7 +538,7 @@ pub(super) fn issue_expansion_containment_wave(
             {
                 return Some(AiIntent::Attack { units: tanks });
             }
-            let distance = dist2(center.0, center.1, objective.0, objective.1).sqrt();
+            let distance = dist2(center.0, center.1, objective.0, objective.1).det_sqrt();
             let checked = memory.containment.watchdog_checked.replace(tick);
             let mark = memory
                 .containment
@@ -928,7 +928,7 @@ pub(super) fn issue_expansion_containment_wave(
             let center_arrived = shape.advance_on_center
                 && group_center(observation, &tanks).is_some_and(|center| {
                     dist2(center.0, center.1, current_waypoint.0, current_waypoint.1)
-                        <= (shape.arrival_tiles * tile_size).powi(2)
+                        <= (shape.arrival_tiles * tile_size).det_powi(2)
                 });
             // The live Jeff moves on once most of its Tanks are at the waypoint, whatever the
             // Scout Car does: three Tanks sat on a reached waypoint for 3,000 ticks while their Scout
