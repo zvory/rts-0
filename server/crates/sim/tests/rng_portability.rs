@@ -142,6 +142,6 @@ fn end_state_fingerprint_matches_native_and_wasm() {
     }
     assert_eq!(
         game.replay_end_state_hash().unwrap(),
-        "0ae0d4f6f671c83ae7ca6c5a437cbadd23690f174e792d2bd734b9889f8ea6d1"
+        "cbcfce3876750356c88f5a731ce8f2fbc784f18411de4bf15d0c02020a772779"
     );
 }

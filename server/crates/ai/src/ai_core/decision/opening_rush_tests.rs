@@ -25,6 +25,7 @@ fn enemy(id: u32, kind: EntityKind, tiles_away: f32, hp: u32) -> AiEntitySummary
         latched_node: None,
         target_id: None,
         free_for_combat: true,
+        research: None,
     }
 }
 

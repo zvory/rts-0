@@ -10,7 +10,7 @@ use super::profiles::{
     JEFFS_AI_PRE_FAST_NATURAL_ID, JEFFS_AI_PRE_GUARD_HANDOFF_ID, JEFFS_AI_PRE_HELD_SITE_ID,
     JEFFS_AI_PRE_OPENING_RUSH_ID, JEFFS_AI_PRE_RIFLE_COVERAGE_ID, JEFFS_AI_PRE_SAFE_BASES_ID,
     JEFFS_AI_PRE_SPEND_PLAN_ID, JEFFS_AI_PRE_TANK_CATCHUP_ID, JEFFS_AI_PRE_TANK_MICRO_ID,
-    JEFFS_AI_PRE_THIRD_PRESSURE_ID,
+    JEFFS_AI_PRE_THIRD_PRESSURE_ID, JEFFS_AI_V1_1_ID,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -181,6 +181,41 @@ pub(crate) fn validate_profile_identity(identity: &AiProfileIdentity) -> Result<
     Ok(())
 }
 
+const JEFF_V1_0_MODULES: &[&str] = &[
+    "economy_manager",
+    "single_engineer_two_pump_opening",
+    "two_machine_gunner_opening",
+    "half_health_machine_gunner_replacement",
+    "immediate_tank_tech",
+    "vehicle_works_before_tank_production_research",
+    "two_tanks_before_scout",
+    "tank_scout_vision_wave",
+    "stationary_tank_expansion_containment",
+    "armored_contact_range_hold",
+    "minimum_two_tank_reform",
+    "three_tank_failed_push_recovery",
+    "failed_push_home_regroup",
+    "shallow_flank_approach",
+    "threat_first_targeting",
+    "third_tank_home_anchor",
+    "stationary_home_tank_range_anchor",
+    "line_of_sight_checked_home_armor_positions",
+    "machine_gunner_forward_shield",
+    "gun_works_after_home_tank",
+    "immediate_anti_tank_setup",
+    "layered_home_anti_tank_defense",
+    "post_natural_main_advance",
+    "endgame_search_and_destroy_sweep",
+    "two_base_full_saturation",
+    "post_timing_expansion",
+    "earlier_second_vehicle_works",
+    "surplus_steel_riflemen",
+    "surplus_second_barracks",
+];
+
+/// What Jeff's AI V1.1 adds to V1.0.
+const JEFF_V1_1_MODULES: &[&str] = &["v1_1_lineage"];
+
 fn baseline_metadata(profile_id: &str) -> (&'static str, &'static str, Vec<&'static str>) {
     match profile_id {
         AI_2_1_ID => (
@@ -228,6 +263,11 @@ fn baseline_metadata(profile_id: &str) -> (&'static str, &'static str, Vec<&'sta
                 "anti_tank_emplacements",
             ],
         ),
+        JEFFS_AI_V1_1_ID => (
+            "Jeff's AI",
+            "Jeff's AI V1.0 plus early Methamphetamines and the V1.1 infantry, gun-line and Tank-discipline changes.",
+            [JEFF_V1_0_MODULES, JEFF_V1_1_MODULES].concat(),
+        ),
         JEFFS_AI_ID
         | JEFFS_AI_BETA_ID
         | JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID
@@ -242,39 +282,9 @@ fn baseline_metadata(profile_id: &str) -> (&'static str, &'static str, Vec<&'sta
         | JEFFS_AI_PRE_EARLY_NATURAL_ID
         | JEFFS_AI_PRE_FAST_NATURAL_ID
         | JEFFS_AI_PRE_SPEND_PLAN_ID => (
-            "Jeff's AI",
+            "Jeff's AI V1.0",
             "Fast-Tank containment profile with a two-Tank opening wave, a reserved home Tank and spread Machine Gunner screen, deployed Anti-Tank Guns, and a post-natural advance on the enemy main.",
-            vec![
-                "economy_manager",
-                "single_engineer_two_pump_opening",
-                "two_machine_gunner_opening",
-                "half_health_machine_gunner_replacement",
-                "immediate_tank_tech",
-                "vehicle_works_before_tank_production_research",
-                "two_tanks_before_scout",
-                "tank_scout_vision_wave",
-                "stationary_tank_expansion_containment",
-                "armored_contact_range_hold",
-                "minimum_two_tank_reform",
-                "three_tank_failed_push_recovery",
-                "failed_push_home_regroup",
-                "shallow_flank_approach",
-                "threat_first_targeting",
-                "third_tank_home_anchor",
-                "stationary_home_tank_range_anchor",
-                "line_of_sight_checked_home_armor_positions",
-                "machine_gunner_forward_shield",
-                "gun_works_after_home_tank",
-                "immediate_anti_tank_setup",
-                "layered_home_anti_tank_defense",
-                "post_natural_main_advance",
-                "endgame_search_and_destroy_sweep",
-                "two_base_full_saturation",
-                "post_timing_expansion",
-                "earlier_second_vehicle_works",
-                "surplus_steel_riflemen",
-                "surplus_second_barracks",
-            ],
+            JEFF_V1_0_MODULES.to_vec(),
         ),
         _ => (
             "AI Profile",
@@ -371,7 +381,7 @@ mod tests {
             serde_json::json!([
                 {"profileId": "rush_ai", "weight": 1},
                 {"profileId": "pressure_ai", "weight": 1},
-                {"profileId": "jeffs_ai", "weight": 1},
+                {"profileId": "jeffs_ai_v1_1", "weight": 1},
             ])
         );
     }
@@ -380,6 +390,6 @@ mod tests {
     fn jeff_profile_fingerprint_uses_stable_canonical_data() {
         let identity = profile_identity_by_id(JEFFS_AI_ID).expect("Jeff profile identity");
 
-        assert_eq!(identity.fingerprint, "fnv1a64:1c3479610b62784a");
+        assert_eq!(identity.fingerprint, "fnv1a64:e5999d1cb1839bc1");
     }
 }

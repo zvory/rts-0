@@ -206,7 +206,7 @@ fn stage(obs: &AiObservation, memory: &mut AiDecisionMemory, profile_id: &str) -
 fn a_passing_enemy_the_live_jeffs_guards_and_tanks_beat_does_not_hold_the_natural() {
     let ts = config::TILE_SIZE as f32;
     let (mut obs, mut memory) = natural_held_by(EntityKind::Rifleman, &[]);
-    let points = expansion_security::positions(&obs, None, &memory.expansion_security);
+    let points = expansion_security::positions(&obs, None, &memory.expansion_security, false);
     for (id, point) in memory
         .expansion_security
         .riflemen

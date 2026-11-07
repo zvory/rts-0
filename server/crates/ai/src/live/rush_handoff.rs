@@ -1,6 +1,5 @@
 //! One-time Rush opening handoff to the ordinary Pressure controller.
 use super::*;
-use rts_rules::math::GameplayMath as _;
 
 const RUSH_STEEL_LOSS_LIMIT: u32 = 1_000;
 

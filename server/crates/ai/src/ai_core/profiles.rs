@@ -19,7 +19,7 @@ pub(crate) use self::jeffs_ai::{
     JEFFS_AI_PRE_RIFLE_COVERAGE_ID, JEFFS_AI_PRE_SAFE_BASES, JEFFS_AI_PRE_SAFE_BASES_ID,
     JEFFS_AI_PRE_SPEND_PLAN, JEFFS_AI_PRE_SPEND_PLAN_ID, JEFFS_AI_PRE_TANK_CATCHUP,
     JEFFS_AI_PRE_TANK_CATCHUP_ID, JEFFS_AI_PRE_TANK_MICRO, JEFFS_AI_PRE_TANK_MICRO_ID,
-    JEFFS_AI_PRE_THIRD_PRESSURE, JEFFS_AI_PRE_THIRD_PRESSURE_ID,
+    JEFFS_AI_PRE_THIRD_PRESSURE, JEFFS_AI_PRE_THIRD_PRESSURE_ID, JEFFS_AI_V1_1, JEFFS_AI_V1_1_ID,
 };
 pub(crate) use self::jeffs_ai_chat_start::{JEFFS_AI_CHAT_START, JEFFS_AI_CHAT_START_ID};
 pub(crate) use self::turtle::AI_TURTLE;
@@ -438,6 +438,9 @@ pub(crate) fn profile_by_id(id: &str) -> Option<&'static AiProfile> {
     if id == JEFFS_AI_BETA_ID {
         return Some(&JEFFS_AI_BETA);
     }
+    if id == JEFFS_AI_V1_1_ID {
+        return Some(&JEFFS_AI_V1_1);
+    }
     if id == JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID {
         return Some(&JEFFS_AI_PRE_DEFENSE_ENVELOPE);
     }
@@ -486,6 +489,7 @@ pub(crate) fn is_jeffs_ai_profile(id: &str) -> bool {
     matches!(
         id,
         JEFFS_AI_ID
+            | JEFFS_AI_V1_1_ID
             | JEFFS_AI_BETA_ID
             | JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID
             | JEFFS_AI_PRE_RIFLE_COVERAGE_ID
@@ -509,6 +513,7 @@ pub(crate) fn uses_current_jeffs_ai_policy(id: &str) -> bool {
     matches!(
         id,
         JEFFS_AI_ID
+            | JEFFS_AI_V1_1_ID
             | JEFFS_AI_PRE_TANK_CATCHUP_ID
             | JEFFS_AI_PRE_OPENING_RUSH_ID
             | JEFFS_AI_PRE_TANK_MICRO_ID
@@ -526,7 +531,99 @@ pub(crate) fn uses_current_jeffs_ai_policy(id: &str) -> bool {
 /// change under test branches on `JEFFS_AI_ID` alone, so the freeze plays exactly as the live Jeff
 /// did just before it. When a new freeze is taken, it replaces the old one here.
 pub(crate) fn runs_live_jeff(id: &str) -> bool {
-    matches!(id, JEFFS_AI_ID | JEFFS_AI_PRE_SPEND_PLAN_ID)
+    matches!(
+        id,
+        JEFFS_AI_ID | JEFFS_AI_V1_1_ID | JEFFS_AI_PRE_SPEND_PLAN_ID
+    )
+}
+
+/// The live Jeff bots, Jeff's AI V1.0 (`jeffs_ai`) and V1.1: what only the live Jeff did, both do.
+pub(crate) fn is_live_jeff(id: &str) -> bool {
+    matches!(id, JEFFS_AI_ID | JEFFS_AI_V1_1_ID)
+}
+
+/// The V1.1 features Jeff's AI plays with: the set behind its best 120 on beta bee2b6c
+/// (2026-11-06; vs Pressure AI 25-4-11, vs Rush AI 28-0-12). Every other V1.1 switch stays off.
+const JEFF_V1_1_FEATURES: &str = "meth,earlyrifles,factoryfirst,natforward,natsupport,tankcharge,\
+surplus,committed,tankraid,scout,smokecover,raidcar,raidwindow,deny,tankplus,base3,tug,tug2,mghome,\
+push,rifleline,opening4,methstrike,scoutsafe,upgradebank,nomg,riflenat,depot4,facwait,tcrifles,\
+nearnat,keephome,tankgroup,strikebig,goin,wideline,southroute,natsiege,marchorders,marchstrike,\
+thirdguard,noschoneraid,southhold,keepspotter,natclear,resume,spareworker,keepguards,raidodds,\
+ncskipguards,sitewalk,stations,pushstation,wayhalf,riflestations,natseat,siteclear,openfight,\
+breakout,mainfront,rebuild,ncbreak,siteretry,mirror";
+/// The Tank line's numbers Jeff's AI plays with (`jeff_v1_1::front_line`).
+const JEFF_V1_1_LINE: &str = "shape=2,spacing=8";
+
+/// Whether a V1.1 feature is off: not in `JEFF_V1_1_FEATURES`. Local ablation testing may replace
+/// that set with `JEFF_V11_ONLY` and turn features off with `JEFF_V11_OFF`. Unit tests check each
+/// feature on its own, so under test every feature is on unless those variables say otherwise.
+pub(crate) fn jeff_v1_1_feature_off(feature: &str) -> bool {
+    type Lists = (Vec<String>, Option<Vec<String>>);
+    static LISTS: std::sync::OnceLock<Lists> = std::sync::OnceLock::new();
+    let (off, only) = LISTS.get_or_init(|| {
+        let split = |value: &str| value.split(',').map(str::to_string).collect::<Vec<_>>();
+        (
+            std::env::var("JEFF_V11_OFF")
+                .ok()
+                .map(|value| split(&value))
+                .unwrap_or_default(),
+            std::env::var("JEFF_V11_ONLY")
+                .ok()
+                .or_else(|| (!cfg!(test)).then(|| JEFF_V1_1_FEATURES.to_string()))
+                .map(|value| split(&value)),
+        )
+    });
+    #[cfg(test)]
+    if TEST_FEATURES_OFF.with(|off| off.borrow().contains(&feature)) {
+        return true;
+    }
+    off.iter().any(|name| name == feature)
+        || only
+            .as_ref()
+            .is_some_and(|only| !only.iter().any(|name| name == feature))
+}
+
+#[cfg(test)]
+thread_local! {
+    static TEST_FEATURES_OFF: std::cell::RefCell<Vec<&'static str>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Runs `check` with the named V1.1 features off on this thread (unit tests only).
+#[cfg(test)]
+pub(crate) fn with_jeff_v1_1_features_off<R>(
+    features: &[&'static str],
+    check: impl FnOnce() -> R,
+) -> R {
+    TEST_FEATURES_OFF.with(|off| off.borrow_mut().extend_from_slice(features));
+    let result = check();
+    TEST_FEATURES_OFF.with(|off| off.borrow_mut().clear());
+    result
+}
+
+/// The Tank line's numbers (`JEFF_V1_1_LINE`; local testing may set `JEFF_V11_LINE`, e.g.
+/// `shape=2,spacing=8,reserve=2,cover=2`).
+pub(crate) fn jeff_v1_1_param(name: &str) -> Option<f32> {
+    static PARAMS: std::sync::OnceLock<Vec<(String, f32)>> = std::sync::OnceLock::new();
+    PARAMS
+        .get_or_init(|| {
+            std::env::var("JEFF_V11_LINE")
+                .unwrap_or_else(|_| JEFF_V1_1_LINE.to_string())
+                .split(',')
+                .filter_map(|pair| {
+                    let (key, value) = pair.split_once('=')?;
+                    Some((key.trim().to_string(), value.trim().parse().ok()?))
+                })
+                .collect()
+        })
+        .iter()
+        .find(|(key, _)| key == name)
+        .map(|(_, value)| *value)
+}
+
+/// Jeff's AI V1.1 alone: every change V1.1 makes over V1.0 branches here.
+pub(crate) fn is_jeff_v1_1(id: &str) -> bool {
+    id == JEFFS_AI_V1_1_ID
 }
 
 #[cfg(test)]

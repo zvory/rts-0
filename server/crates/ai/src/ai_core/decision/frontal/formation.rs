@@ -20,6 +20,10 @@ pub(super) struct MarchShape {
     /// Whether a waypoint is reached once the Tanks' centre is within `arrival_tiles` of it,
     /// whether or not every Tank has found its slot.
     pub(super) advance_on_center: bool,
+    /// Whether the rifle screen is Jeff's AI V1.1's spread one.
+    pub(super) rifle_spread: bool,
+    /// Whether Jeff's AI V1.1 marches Riflemen first, then the Scout Car, then the Tanks.
+    pub(super) column: bool,
 }
 
 impl MarchShape {
@@ -34,6 +38,8 @@ impl MarchShape {
         ranked: false,
         rank_width: TANK_FORMATION_RANK_WIDTH,
         advance_on_center: false,
+        rifle_spread: false,
+        column: false,
     };
     /// The current Jeff forming up, reforming and closing in: as tight, but a push of more than six
     /// Tanks is formed in ranks and is that much deeper. Held to one rank of depth, a large push
@@ -58,6 +64,8 @@ impl MarchShape {
         ranked: true,
         rank_width: 4,
         advance_on_center: true,
+        rifle_spread: false,
+        column: false,
     };
 }
 
@@ -131,8 +139,13 @@ pub(super) fn select_rifle_escorts(
         .collect::<Vec<_>>();
     defensive_riflemen.sort_unstable();
     defensive_riflemen.truncate(CONTAINMENT_HOME_RIFLE_RESERVE);
-    let radius2 =
-        (CONTAINMENT_ESCORT_SELECTION_RADIUS_TILES * observation.map.tile_size as f32).det_powi(2);
+    // A forced wave (`forcepush`) takes every free Rifleman, wherever it stands.
+    let forced = jeff_v1_1::push::forced_due(observation, memory);
+    let radius2 = if forced {
+        f32::INFINITY
+    } else {
+        (CONTAINMENT_ESCORT_SELECTION_RADIUS_TILES * observation.map.tile_size as f32).det_powi(2)
+    };
     let mut riflemen: Vec<u32> = observation
         .owned
         .iter()
@@ -148,14 +161,27 @@ pub(super) fn select_rifle_escorts(
                     .reserved()
                     .any(|reserved| reserved == unit.id)
                 && !memory.third_pressure.is_reserved(unit.id)
+                && !memory.jeff_v1_1.deny.holds(unit.id)
+                && !memory.jeff_v1_1.tank_raid.holds(unit.id)
                 && dist2(unit.x, unit.y, anchor.0, anchor.1) <= radius2
         })
         .map(|unit| unit.id)
         .collect();
-    let escort_count = riflemen
-        .len()
-        .div_ceil(2)
-        .clamp(MIN_CONTAINMENT_RIFLE_ESCORTS, MAX_CONTAINMENT_RIFLE_ESCORTS);
+    // Jeff's AI V1.1 screens its Tanks against Panzerfausts with two Riflemen for every Tank.
+    let escort_count = if forced {
+        riflemen.len().min(jeff_v1_1::MAX_PUSH_RIFLES)
+    } else if memory.profile_id().is_some_and(is_jeff_v1_1) && !jeff_v1_1::off("escort") {
+        let line = jeff_v1_1::RIFLES_PER_TANK * memory.containment.active_tanks.len();
+        riflemen
+            .len()
+            .min(line)
+            .clamp(MIN_CONTAINMENT_RIFLE_ESCORTS, jeff_v1_1::MAX_PUSH_RIFLES)
+    } else {
+        riflemen
+            .len()
+            .div_ceil(2)
+            .clamp(MIN_CONTAINMENT_RIFLE_ESCORTS, MAX_CONTAINMENT_RIFLE_ESCORTS)
+    };
     riflemen.sort_by(|left, right| {
         let left_distance = by_id.get(left).map_or(f32::INFINITY, |unit| {
             dist2(unit.x, unit.y, anchor.0, anchor.1)
@@ -208,15 +234,19 @@ pub(super) fn rifle_screen_points(
     let spacing = RIFLE_SCREEN_SPACING_TILES * map.tile_size as f32;
     (0..count)
         .map(|index| {
-            let (rank_index, rank_count, rank_back) = if index < RIFLE_SCREEN_FIRST_RANK {
-                (index, count.min(RIFLE_SCREEN_FIRST_RANK), 0.0)
+            let (rank_index, rank_count, rank) = if index < RIFLE_SCREEN_FIRST_RANK {
+                (index, count.min(RIFLE_SCREEN_FIRST_RANK), 0)
             } else {
+                let behind = index - RIFLE_SCREEN_FIRST_RANK;
+                let start = behind / RIFLE_SCREEN_LATER_RANK * RIFLE_SCREEN_LATER_RANK;
                 (
-                    index - RIFLE_SCREEN_FIRST_RANK,
-                    count - RIFLE_SCREEN_FIRST_RANK,
-                    RIFLE_SCREEN_SECOND_RANK_BACK_TILES * map.tile_size as f32,
+                    behind - start,
+                    (count - RIFLE_SCREEN_FIRST_RANK - start).min(RIFLE_SCREEN_LATER_RANK),
+                    behind / RIFLE_SCREEN_LATER_RANK + 1,
                 )
             };
+            let rank_back =
+                RIFLE_SCREEN_SECOND_RANK_BACK_TILES * rank as f32 * map.tile_size as f32;
             let center_index = (rank_count.saturating_sub(1)) as f32 / 2.0;
             let offset = (rank_index as f32 - center_index) * spacing;
             clamp_to_map(
@@ -270,14 +300,24 @@ pub(super) fn containment_formation(
         shape.tank_spacing_tiles,
         shape.rank_width,
     );
-    let scout_point = scout_trailing_point(
-        tank_center,
-        own_base,
-        objective,
-        observation.map,
-        policy.scout_trailing_tiles,
-    )?;
-    let rifle_points = rifle_screen_points(tank_center, objective, observation.map, riflemen.len());
+    let scout_point = if shape.column {
+        jeff_v1_1::screen::column_scout(tank_center, objective, observation.map)?
+    } else {
+        scout_trailing_point(
+            tank_center,
+            own_base,
+            objective,
+            observation.map,
+            policy.scout_trailing_tiles,
+        )?
+    };
+    let rifle_points = if shape.column {
+        jeff_v1_1::screen::column_points(tank_center, objective, observation.map, riflemen.len())
+    } else if shape.rifle_spread {
+        jeff_v1_1::screen::points(tank_center, objective, observation.map, riflemen.len())
+    } else {
+        rifle_screen_points(tank_center, objective, observation.map, riflemen.len())
+    };
     let riflemen = riflemen.iter().copied().zip(rifle_points).collect();
     Some(ContainmentFormation {
         tanks,
@@ -403,12 +443,14 @@ pub(super) fn stored_waypoint(memory: &AiDecisionMemory) -> Option<(f32, f32)> {
         .map(|(x, y)| (x as f32, y as f32))
 }
 
+/// Keeps the push's Riflemen within `radius_tiles` of `anchor`, the Tanks' centre.
 pub(super) fn retain_nearby_rifle_escorts(
     observation: &AiObservation,
     riflemen: &mut BTreeSet<u32>,
     anchor: (f32, f32),
+    radius_tiles: f32,
 ) {
-    let radius2 = (CONTAINMENT_RIFLE_COHESION_TILES * observation.map.tile_size as f32).det_powi(2);
+    let radius2 = (radius_tiles * observation.map.tile_size as f32).det_powi(2);
     riflemen.retain(|id| {
         observation.owned.iter().any(|unit| {
             unit.id == *id && unit.hp > 0 && dist2(unit.x, unit.y, anchor.0, anchor.1) <= radius2

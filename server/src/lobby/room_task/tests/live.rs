@@ -266,7 +266,7 @@ fn player_lobby_launches_jeffs_ai_as_a_supported_opponent() {
         task.ai_players.first().map(|ai| ai.profile_id),
         Some("jeffs_ai")
     );
-    assert_eq!(ai_slot_names(&task), vec!["Jeff's AI"]);
+    assert_eq!(ai_slot_names(&task), vec!["Jeff's AI V1.0"]);
 
     task.start_match();
 

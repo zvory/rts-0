@@ -64,6 +64,7 @@ fn los_test_observation(blocker: EntityKind) -> AiObservation {
             latched_node: None,
             target_id: None,
             free_for_combat: false,
+            research: None,
         }],
         resources: Vec::new(),
         visible_allies: Vec::new(),
@@ -212,6 +213,7 @@ fn infantry_at_home_defends_a_forward_building_under_attack() {
             latched_node: None,
             target_id: None,
             free_for_combat: true,
+            research: None,
         });
     }
     observation.visible_enemies.push(AiEntitySummary {
@@ -228,6 +230,7 @@ fn infantry_at_home_defends_a_forward_building_under_attack() {
         latched_node: None,
         target_id: Some(10),
         free_for_combat: true,
+        research: None,
     });
 
     assert_eq!(local_defense_target(&observation), Some(30));
@@ -793,6 +796,7 @@ fn planned_factory_is_part_of_the_local_defense_envelope() {
         latched_node: None,
         target_id: None,
         free_for_combat: true,
+        research: None,
     });
 
     assert_eq!(
@@ -829,6 +833,7 @@ fn incomplete_factory_is_part_of_the_local_defense_envelope() {
         latched_node: None,
         target_id: None,
         free_for_combat: false,
+        research: None,
     });
     let stats = config::building_stats(EntityKind::Factory).expect("Factory stats");
     observation.visible_enemies.push(AiEntitySummary {
@@ -845,6 +850,7 @@ fn incomplete_factory_is_part_of_the_local_defense_envelope() {
         latched_node: None,
         target_id: None,
         free_for_combat: true,
+        research: None,
     });
 
     assert_eq!(
@@ -883,6 +889,7 @@ fn standing_rifle_formation_ignores_extractors() {
         latched_node: None,
         target_id: None,
         free_for_combat: false,
+        research: None,
     });
 
     assert_eq!(defensive_formation_sites(&observation).len(), 1);
@@ -941,6 +948,7 @@ fn strongest_local_sector_wins_over_a_lone_flanker() {
             latched_node: None,
             target_id: None,
             free_for_combat: true,
+            research: None,
         });
     }
 
@@ -986,6 +994,7 @@ fn combat_unit(id: u32, kind: EntityKind, x: f32, y: f32) -> AiEntitySummary {
         latched_node: None,
         target_id: None,
         free_for_combat: true,
+        research: None,
     }
 }
 
@@ -1075,6 +1084,7 @@ fn defending_tank_does_not_park_behind_a_building() {
         x: 14.5 * ts,
         y: 5.5 * ts,
         free_for_combat: false,
+        research: None,
         ..combat_unit(11, EntityKind::Rifleman, 0.0, 0.0)
     });
     observation

@@ -46,6 +46,7 @@ pub(in crate::ai_core::decision) fn respond_to_local_incident(
             local_defenders,
             map_analysis,
             true,
+            super::raid::front_direction(profile_id, observation, map_analysis),
         ) {
             memory.clear_defensive_incident();
             return (!units.is_empty()).then_some(units);

@@ -4,6 +4,7 @@ pub(super) fn uses_home_rifle_coverage(profile_id: &str) -> bool {
     matches!(
         profile_id,
         JEFFS_AI_ID
+            | JEFFS_AI_V1_1_ID
             | JEFFS_AI_BETA_ID
             | JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID
             | JEFFS_AI_PRE_TANK_CATCHUP_ID
@@ -23,6 +24,7 @@ pub(super) fn uses_current_jeff_defense(profile_id: &str) -> bool {
     matches!(
         profile_id,
         JEFFS_AI_ID
+            | JEFFS_AI_V1_1_ID
             | JEFFS_AI_BETA_ID
             | JEFFS_AI_PRE_TANK_CATCHUP_ID
             | JEFFS_AI_PRE_OPENING_RUSH_ID
@@ -161,7 +163,8 @@ pub(super) fn site_depth(
 }
 
 /// Jeff's home Riflemen while no raid is being answered: the current Jeff's defensive pocket, or
-/// a frozen profile's coverage or screen. `assigned`: units home defense already ordered, and units
+/// a frozen profile's coverage or screen. V1.1's Riflemen on its outer base lines stay there
+/// (`jeff_v1_1::base_line`). `assigned`: units home defense already ordered, and units
 /// the route line holds.
 pub(super) fn stage_home_riflemen(
     (actions, observation, map_analysis, intents): opening_rush::LiveStep<'_, '_, '_, '_>,
@@ -182,6 +185,14 @@ pub(super) fn stage_home_riflemen(
                     && !memory.containment.active_riflemen.contains(&unit.id)
                     && !memory.expansion_security.riflemen.contains(&unit.id)
                     && !route_line_reserved.contains(&unit.id)
+                    // Jeff's AI V1.1's base lines hold a few Riflemen past the main.
+                    && !memory.jeff_v1_1.base_lines.posted(unit.id)
+                    && !memory.jeff_v1_1.stations.posted_out(unit.id)
+                    && !memory.jeff_v1_1.natural.holds(unit.id)
+                    && !memory.jeff_v1_1.front_line.holds(unit.id)
+                    && !memory.jeff_v1_1.deny.holds(unit.id)
+                    && !memory.jeff_v1_1.rovers.holds(unit.id)
+                    && !super::jeff_v1_1::south_route::push_spotter(memory, unit.id)
             })
             .map(|unit| unit.id)
             .collect()
@@ -206,6 +217,22 @@ pub(super) fn stage_home_riflemen(
                 .total_cmp(&geometry::dist2(right.x, right.y, own_base.0, own_base.1))
         })
         .map(|entity| entity.id);
+    // Jeff's AI V1.1 (`mainfront`): on the main's line, in front of the stationed Tanks.
+    if is_jeff_v1_1(profile.id) && !jeff_v1_1::off("mainfront") {
+        if let Some(units) = jeff_v1_1::base_line::stage_main(
+            actions,
+            observation,
+            map_analysis,
+            memory,
+            &riflemen,
+            false,
+        ) {
+            if !units.is_empty() {
+                intents.push(AiIntent::Stage { units });
+            }
+            return;
+        }
+    }
     if let Some(enemy_base) = facts.nearest_public_enemy_base {
         let staged = if uses_current_jeff_defense(profile.id) {
             stage_home_defensive_pocket_riflemen(
@@ -257,6 +284,10 @@ pub(super) fn gather_resting_tanks(
     memory: &mut AiDecisionMemory,
     mut excluded: BTreeSet<u32>,
 ) -> Vec<u32> {
+    // Jeff's AI V1.1's resting Tanks stand behind its base lines (`jeff_v1_1::base_line`).
+    if memory.profile_id().is_some_and(is_jeff_v1_1) && !jeff_v1_1::off("linetanks") {
+        return Vec::new();
+    }
     excluded.extend(memory.home_defensive_tank);
     excluded.extend(memory.later_bases.guards.iter().copied());
     excluded.extend(memory.route_line.picket());
@@ -400,7 +431,7 @@ pub(super) fn live_spend_plan(
     natural_pending: bool,
     secured: bool,
 ) -> Option<spend_plan::SpendPlan> {
-    (profile.id == JEFFS_AI_ID).then(|| {
+    is_live_jeff(profile.id).then(|| {
         let site = memory.expansion_security.site;
         let natural_builder = site
             .and_then(|site| {
@@ -435,6 +466,15 @@ pub(super) fn live_spend_plan(
                     expansion_security::secure_wait_ticks(observation, map_analysis, memory)
                         .unwrap_or(config::TICK_HZ * 30)
                 },
+                prepaid: jeff_v1_1::research_ahead(profile.id, facts, memory),
+                opening: facts.v1_1_opening,
+                no_guns: jeff_v1_1::no_guns(profile.id),
+                rifle_opening: jeff_v1_1::rifle_opening(profile.id).then(|| {
+                    (
+                        jeff_v1_1::natural_rifles(),
+                        jeff_v1_1::home_riflemen(observation),
+                    )
+                }),
             },
         )
     })
@@ -463,7 +503,7 @@ pub(super) fn engineers(
         target_workers
     };
     let workers = facts.worker_count
-        + if profile_id == JEFFS_AI_ID {
+        + if is_live_jeff(profile_id) {
             observation
                 .owned
                 .iter()
@@ -501,7 +541,7 @@ pub(super) fn security_rifle_target(
         // used to be bought with the Steel the builder's walk left spare, and a builder sent ahead
         // of its money leaves none: 1v1 No Terrain s2p2 met its 2:24 raid with four guns and fell.
         let gun_target =
-            if profile.id == JEFFS_AI_ID && facts.building_count(EntityKind::ResourceDepot) >= 2 {
+            if is_live_jeff(profile.id) && facts.building_count(EntityKind::ResourceDepot) >= 2 {
                 profile
                     .defensive_machine_gunners
                     .map_or(expansion_security::OPENING_GUNS, |policy| {
@@ -512,7 +552,7 @@ pub(super) fn security_rifle_target(
             };
         let guns_first = runs_live_jeff(profile.id)
             && facts.unit_count(EntityKind::Tank) == 0
-            && !expansion_security::opening_guns_ordered(observation, facts, gun_target);
+            && !expansion_security::guns_ordered(observation, facts, profile.id, gun_target);
         let at = priorities
             .iter()
             .position(|unit| *unit == EntityKind::MachineGunner)
@@ -530,7 +570,11 @@ pub(super) fn cap_opening_guns(
     facts: &AiFacts,
     max_counts: &mut [(EntityKind, usize)],
 ) {
-    if runs_live_jeff(profile_id) && facts.unit_count(EntityKind::Tank) > 0 {
+    // Jeff's AI V1.1 keeps building guns for its gun posts (`jeff_v1_1::gun_cap`).
+    if runs_live_jeff(profile_id)
+        && (!is_jeff_v1_1(profile_id) || (jeff_v1_1::off("guncap") && jeff_v1_1::off("mgline")))
+        && facts.unit_count(EntityKind::Tank) > 0
+    {
         for (kind, max) in max_counts {
             if *kind == EntityKind::MachineGunner {
                 *max = (*max).min(expansion_security::OPENING_GUNS);
@@ -559,5 +603,26 @@ pub(super) fn cap_routine_riflemen(
             Some((_, max)) => *max = (*max).min(cap),
             None => max_counts.push((EntityKind::Rifleman, cap)),
         }
+    }
+}
+
+/// On Crossroads Jeff stops turning surplus Steel into Riflemen at this many. It fielded 30-40,
+/// most of them idle, while Oil held it to 2-4 Tanks and it never took a third base.
+const CROSSROADS_MAX_SURPLUS_RIFLEMEN: usize = 24;
+
+/// The most surplus-Steel units of `unit` to train. On Crossroads Jeff is short of Oil, not Steel:
+/// past a home garrison, more Riflemen only spend the Steel the third base and Factory rebuilds need.
+pub(super) fn surplus_cap(
+    profile_id: &str,
+    unit: EntityKind,
+    observation: &AiObservation,
+) -> usize {
+    if uses_current_jeffs_ai_policy(profile_id)
+        && unit == EntityKind::Rifleman
+        && defense::crossroads_wall_aware_approach_direction(observation).is_some()
+    {
+        CROSSROADS_MAX_SURPLUS_RIFLEMEN
+    } else {
+        usize::MAX
     }
 }

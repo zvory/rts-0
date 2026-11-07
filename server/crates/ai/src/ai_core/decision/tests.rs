@@ -13,6 +13,7 @@ use rts_sim::game::command::SimCommand as Command;
 mod economy_manager_tests;
 mod expansion_security_tests;
 mod fast_natural_tests;
+mod jeff_v1_1_tests;
 mod natural_site_tests;
 mod pressure_tests;
 mod spend_plan_tests;
@@ -38,6 +39,7 @@ fn worker_at(id: u32, state: AiEntityState, x: f32, y: f32) -> AiEntitySummary {
         latched_node: None,
         target_id: None,
         free_for_combat: false,
+        research: None,
     }
 }
 
@@ -85,6 +87,7 @@ fn building_at(
         latched_node: None,
         target_id: None,
         free_for_combat: false,
+        research: None,
     }
 }
 
@@ -107,6 +110,7 @@ fn combat_at(id: u32, kind: EntityKind, x: f32, y: f32) -> AiEntitySummary {
         latched_node: None,
         target_id: None,
         free_for_combat: true,
+        research: None,
     }
 }
 

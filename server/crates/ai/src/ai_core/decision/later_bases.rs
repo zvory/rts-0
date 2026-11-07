@@ -73,6 +73,8 @@ pub(super) struct LaterBases {
     /// not that the site is bad, so a site is only rejected after repeated drops.
     site_failures: BTreeMap<(u32, u32), u8>,
     rejected_sites: BTreeSet<(u32, u32)>,
+    /// When each site was ruled out. V1.1's `siteretry` lets a site back in after a while.
+    rejected_at: BTreeMap<(u32, u32), u32>,
     /// No new site is taken before this tick, after a failed or destroyed base.
     retry_after_tick: u32,
     /// Whether a Depot has stood on the guarded site, so its disappearance is a loss.
@@ -86,6 +88,10 @@ pub(super) struct LaterBases {
     /// The Depot currently being covered (a site being taken or a Depot that just finished).
     guard_site: Option<(u32, u32)>,
     guard_release_tick: Option<u32>,
+    /// Jeff's AI V1.1 takes bases by escort and bank (`jeff_v1_1::third_base`).
+    v1_1: bool,
+    /// V1.1: each Steel node's fullest reading and where it lies.
+    steel_start: BTreeMap<u32, (u32, (i32, i32))>,
 }
 
 /// What the rest of the decision needs from this cycle.
@@ -99,6 +105,11 @@ pub(super) struct LaterBaseStatus {
 }
 
 impl LaterBases {
+    /// The site of the base being taken, if any.
+    pub(super) fn site(&self) -> Option<(u32, u32)> {
+        self.site
+    }
+
     /// Whether a new base's site is in hand.
     pub(super) fn planning(&self) -> bool {
         self.site.is_some()
@@ -138,6 +149,12 @@ where
         return status;
     }
     note_dry_wells(observation, &mut memory.later_bases);
+    let v1_1 = is_jeff_v1_1(profile.id) && !jeff_v1_1::off("base3");
+    memory.later_bases.v1_1 = v1_1;
+    if v1_1 && !jeff_v1_1::off("steelunlock") {
+        note_low_steel(observation, &mut memory.later_bases);
+    }
+    jeff_v1_1::third_base::note_bank(observation, memory, profile.id);
     let Some(expansion) = profile.expansion else {
         return status;
     };
@@ -146,12 +163,28 @@ where
     };
     let enemy = (enemy_base.x, enemy_base.y);
     let tick = observation.tick;
+    if v1_1 && jeff_v1_1::third_base::site_retry() {
+        let state = &mut memory.later_bases;
+        let rejected_at = &state.rejected_at;
+        state.rejected_sites.retain(|site| {
+            rejected_at.get(site).is_none_or(|at| {
+                tick.saturating_sub(*at) < jeff_v1_1::third_base::SITE_REJECT_TICKS
+            })
+        });
+    }
 
     refresh_guard_site(observation, memory, tick);
 
     let depots = facts.building_count(EntityKind::ResourceDepot);
     let natural_done = facts.complete_building_count(EntityKind::ResourceDepot) >= 2;
-    let base_due = natural_done && depots < memory.later_bases.target_bases();
+    // Jeff's AI V1.1 takes another base whenever its army and bank allow (`nowellgate`), rather
+    // than base 4 and later only as a well of an older base runs dry, which kept a fixed count of
+    // bases rather than as many as it could hold. Gated, ahead on the trade (`tradeexpand`) still
+    // takes base 4 without waiting for a dry well.
+    let ungated = memory.profile_id().is_some_and(is_jeff_v1_1) && !jeff_v1_1::off("nowellgate");
+    let extra_base = usize::from(jeff_v1_1::trading_ahead(memory));
+    let base_due =
+        natural_done && (ungated || depots < memory.later_bases.target_bases() + extra_base);
 
     if base_due && memory.later_bases.site.is_none() && tick >= memory.later_bases.retry_after_tick
     {
@@ -169,15 +202,57 @@ where
             } else {
                 REQUIRED_TOTAL_TANKS
             };
-        let ready = total_tanks >= required_total_tanks
-            // The two guards leave, so the home reserve must still be there after they go.
-            && free_tanks.len()
-                >= REQUIRED_FREE_TANKS.max(GUARD_TANKS + memory.home_tank_reserve())
-            && main_tank_ids(observation, memory).len() >= memory.home_tank_reserve()
+        // Jeff's AI V1.1 ahead on the trade needs fewer Tanks (`tradeexpand`).
+        let required_total_tanks = jeff_v1_1::expansion_tanks(memory, required_total_tanks);
+        let home = geometry::tile_center(observation.own_start_tile, observation.map.tile_size);
+        let escort_ready =
+            v1_1 && jeff_v1_1::third_base::escort(observation, memory, home).is_some();
+        // The Rifleman opening (`riflenat`): a Tank and its Riflemen escort are all a later base
+        // waits for, its Depot kept from the Riflemen like `depotsave`'s.
+        let rifle_opening = jeff_v1_1::rifle_opening(profile.id);
+        let save = !jeff_v1_1::off("depotsave") || rifle_opening;
+        let army_ready = if v1_1 && save {
+            // V1.1 saves the Depot's cost below (`depotsave`): an escort is all base 3 waits for.
+            escort_ready
+        } else if v1_1 {
+            (total_tanks >= required_total_tanks
+                || if jeff_v1_1::off("base3bank") {
+                    jeff_v1_1::third_base::banked(observation, memory)
+                } else {
+                    jeff_v1_1::third_base::base_banked(observation, memory)
+                })
+                && escort_ready
+        } else {
+            total_tanks >= required_total_tanks
+                // The two guards leave, so the home reserve must still be there after they go.
+                && free_tanks.len()
+                    >= REQUIRED_FREE_TANKS.max(GUARD_TANKS + memory.home_tank_reserve())
+                && main_tank_ids(observation, memory).len() >= memory.home_tank_reserve()
+        };
+        // Jeff's AI V1.1 (`fastnat`) takes its third base without Tanks once the natural's gun line
+        // holds, as soupman did against Pressure AI (3:50-4:16, guns going over as it went up);
+        // V1.1 waited for five Tanks and placed it at 5:21-6:36.
+        let army_ready = army_ready
+            || (v1_1
+                && depots == 2
+                && escort_ready
+                && jeff_v1_1::fast_third_ready(observation, profile.id));
+        let ready = army_ready
+            && jeff_v1_1::front_line::covers_next_base(memory, depots)
             && defense::local_defense_contact(observation).is_none()
             && observation.economy.steel >= steel
             && observation.economy.oil >= oil
             && !factory_due;
+        // V1.1 keeps the Depot's cost aside once an escort is free and the bases are quiet, so
+        // Tanks and Barracks do not spend it first: on The River V1.1 held two bases all game with
+        // under 250 Steel in the bank while Pressure AI took five.
+        // Ungated, a next base is always due: its Oil is kept back only once the army is ready
+        // for it, or it would sit out of the Tanks' reach all game.
+        if escort_ready && !ready && (!ungated || army_ready) {
+            let quiet = defense::local_defense_contact(observation).is_none() && !factory_due;
+            let steel_kept = if save && quiet { steel } else { 0 };
+            actions.holdback_resources(steel_kept, oil);
+        }
         if ready {
             let resources = expansion::expansion_candidate_resources(observation);
             let rejected = memory.later_bases.rejected_sites.clone();
@@ -190,7 +265,14 @@ where
                 EntityKind::ResourceDepot,
                 &resources,
                 &mut |kind, x, y| !site_is_rejected(&rejected, (x, y)) && placeable(kind, x, y),
-                |tile| route_exposure_penalty(observation, route, tile),
+                |tile| {
+                    let scale = if v1_1 {
+                        jeff_v1_1::third_base::ROUTE_PENALTY_SCALE
+                    } else {
+                        1
+                    };
+                    route_exposure_penalty(observation, route, tile) * scale
+                },
             );
             let site_center = site.and_then(|site| {
                 building_center(site, EntityKind::ResourceDepot, observation.map.tile_size)
@@ -229,7 +311,13 @@ where
             return status;
         }
     }
-    let slots = guard_post_slots(observation, map_analysis, site_center, enemy);
+    // V1.1's infantry escort stands in a line, one post each.
+    let escort = memory.later_bases.guards.len();
+    let slots = if escort > GUARD_TANKS {
+        jeff_v1_1::third_base::escort_posts(observation, map_analysis, site_center, enemy, escort)
+    } else {
+        guard_post_slots(observation, map_analysis, site_center, enemy)
+    };
     status.guard_posts = memory
         .later_bases
         .guards
@@ -387,6 +475,14 @@ pub(super) fn recall_tanks_to_main(
     claimed: &BTreeSet<u32>,
     keep_out: Option<u32>,
 ) -> Vec<u32> {
+    // Jeff's AI V1.1's base lines split its resting Tanks over its bases.
+    if memory.later_bases.v1_1 && !jeff_v1_1::off("linetanks") {
+        return Vec::new();
+    }
+    // Its stations hold the bases' Tanks, the main's among them (`stations`).
+    if jeff_v1_1::stations::on(memory) {
+        return Vec::new();
+    }
     let at_main = main_tank_ids(observation, memory);
     let short = memory.home_tank_reserve().saturating_sub(at_main.len());
     if short == 0 {
@@ -395,6 +491,9 @@ pub(super) fn recall_tanks_to_main(
     let hq = geometry::tile_center(observation.own_start_tile, observation.map.tile_size);
     // They go to the home post, where the home Tanks stand, rather than to the HQ.
     let home = memory.home_post.map_or(hq, |post| post.center());
+    // Jeff's AI V1.1's line and home guard Tanks hold their posts (`tug`): called home, they
+    // drove between the two every decision.
+    let tug = memory.profile_id().is_some_and(is_jeff_v1_1) && !jeff_v1_1::off("tug");
     let mut away: Vec<&AiEntitySummary> = free_tank_ids(observation, memory)
         .into_iter()
         .filter(|id| {
@@ -402,6 +501,9 @@ pub(super) fn recall_tanks_to_main(
                 && !memory.later_bases.guards.contains(id)
                 && Some(*id) != keep_out
                 && !claimed.contains(id)
+                && !(tug
+                    && (memory.jeff_v1_1.front_line.holds(*id)
+                        || memory.jeff_v1_1.home_guard.holds(*id)))
         })
         .filter_map(|id| observation.owned.iter().find(|unit| unit.id == id))
         .filter(|unit| unit.is_complete && unit.hp > 0 && unit.state == AiEntityState::Idle)
@@ -432,6 +534,7 @@ fn free_tank_ids(observation: &AiObservation, memory: &AiDecisionMemory) -> Vec<
                 // The trap breach's Tanks hold their concave; they are not called home.
                 && !memory.trap_breach.is_reserved(unit.id)
                 && !memory.third_pressure.is_reserved(unit.id)
+                && !memory.jeff_v1_1.tank_raid.holds(unit.id)
         })
         .map(|unit| unit.id)
         .collect()
@@ -468,10 +571,10 @@ fn refresh_guard_site(observation: &AiObservation, memory: &mut AiDecisionMemory
     } else if state.guard_site_built {
         // The Depot was destroyed while still covered. The base is due again, but not at once:
         // whatever killed it is probably still there, and a second loss rules the site out.
-        if note_site_failure(state, guard_site) {
-            state.rejected_sites.insert(guard_site);
+        if note_site_failure(state, guard_site) || rejects_first_failure(state) {
+            reject_site(state, guard_site, tick);
         }
-        state.retry_after_tick = tick.saturating_add(SITE_RETRY_COOLDOWN_TICKS);
+        state.retry_after_tick = tick.saturating_add(retry_ticks(state));
         state.guard_site_built = false;
     }
     if state.site.is_none()
@@ -556,13 +659,33 @@ pub(super) fn issue_guard_orders(
     ordered
 }
 
-/// Give up on a site for now: release the guards and wait out the cooldown. A rejected site is
-/// never chosen again.
-fn abandon_site(state: &mut LaterBases, site: (u32, u32), tick: u32, reject: bool) {
-    if reject {
-        state.rejected_sites.insert(site);
+/// How long after a failed or lost base the next is taken: V1.1 tries the next site sooner.
+fn retry_ticks(state: &LaterBases) -> u32 {
+    if state.v1_1 {
+        jeff_v1_1::third_base::RETRY_TICKS
+    } else {
+        SITE_RETRY_COOLDOWN_TICKS
     }
-    state.retry_after_tick = tick.saturating_add(SITE_RETRY_COOLDOWN_TICKS);
+}
+
+/// V1.1 rules a site out on its first failure, unless `siteretry` counts failures as V1.0 does.
+fn rejects_first_failure(state: &LaterBases) -> bool {
+    state.v1_1 && !jeff_v1_1::third_base::site_retry()
+}
+
+fn reject_site(state: &mut LaterBases, site: (u32, u32), tick: u32) {
+    state.rejected_sites.insert(site);
+    state.rejected_at.insert(site, tick);
+}
+
+/// Give up on a site for now: release the guards and wait out the cooldown. A rejected site is
+/// never chosen again (V1.1 with `siteretry`: not for `SITE_REJECT_TICKS`); V1.1 without it
+/// rejects every site it gives up, and tries the next.
+fn abandon_site(state: &mut LaterBases, site: (u32, u32), tick: u32, reject: bool) {
+    if reject || rejects_first_failure(state) {
+        reject_site(state, site, tick);
+    }
+    state.retry_after_tick = tick.saturating_add(retry_ticks(state));
     state.site = None;
     state.guard_site = None;
     state.guard_site_built = false;
@@ -574,10 +697,12 @@ fn abandon_site(state: &mut LaterBases, site: (u32, u32), tick: u32, reject: boo
 
 /// Drop guards that died or became the home Tank; true when one died.
 fn drop_lost_guards(observation: &AiObservation, memory: &mut AiDecisionMemory) -> bool {
+    // V1.1's escort may be infantry.
+    let any_kind = memory.later_bases.v1_1;
     let alive: BTreeSet<u32> = observation
         .owned
         .iter()
-        .filter(|unit| unit.kind == EntityKind::Tank && unit.hp > 0)
+        .filter(|unit| (unit.kind == EntityKind::Tank || any_kind) && unit.hp > 0)
         .map(|unit| unit.id)
         .collect();
     let home_tank = memory.home_defensive_tank;
@@ -592,6 +717,11 @@ fn drop_lost_guards(observation: &AiObservation, memory: &mut AiDecisionMemory) 
 /// Pick the two Tanks nearest the site that neither the push nor home defense is using. Guards are
 /// chosen once per site: losses are not replaced, because that would send Tanks in one at a time.
 fn select_guards(observation: &AiObservation, memory: &mut AiDecisionMemory, site: (f32, f32)) {
+    if memory.later_bases.v1_1 {
+        let escort = jeff_v1_1::third_base::escort(observation, memory, site);
+        memory.later_bases.guards = escort.unwrap_or_default();
+        return;
+    }
     let home_tank = memory.home_defensive_tank;
     let mut candidates: Vec<&AiEntitySummary> = observation
         .owned
@@ -646,6 +776,48 @@ fn guard_post_slots(
         slots.push(chosen.unwrap_or(site));
     }
     slots
+}
+
+/// Jeff's AI V1.1: a base with half its Steel mined unlocks one more base, as a dry oil well does.
+/// The main's first Steel Mine ran dry at 6:57 in every one of eight games against Pressure AI,
+/// with no base yet taken to replace it; Pressure stood on five by then.
+fn note_low_steel(observation: &AiObservation, state: &mut LaterBases) {
+    let ts = observation.map.tile_size as f32;
+    for node in observation
+        .resources
+        .iter()
+        .filter(|node| node.kind == EntityKind::Steel)
+    {
+        let at = (node.x.round() as i32, node.y.round() as i32);
+        let entry = state
+            .steel_start
+            .entry(node.id)
+            .or_insert((node.remaining, at));
+        entry.0 = entry.0.max(node.remaining);
+    }
+    for depot in observation
+        .owned
+        .iter()
+        .filter(|unit| unit.kind == EntityKind::ResourceDepot && unit.is_complete && unit.hp > 0)
+    {
+        let (mut start, mut left) = (0_u64, 0_u64);
+        for (id, (full, at)) in &state.steel_start {
+            if dist2(at.0 as f32, at.1 as f32, depot.x, depot.y)
+                > squared(BASE_MINING_RANGE_TILES * ts)
+            {
+                continue;
+            }
+            start += u64::from(*full);
+            left += observation
+                .resources
+                .iter()
+                .find(|node| node.id == *id)
+                .map_or(0, |node| u64::from(node.remaining));
+        }
+        if start > 0 && left * 2 < start {
+            state.unlocking_depots.insert(depot.id);
+        }
+    }
 }
 
 /// Record live readings of the wells under Jeff's Pump Jacks, and mark a base the first time one

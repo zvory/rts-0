@@ -21,6 +21,7 @@ fn worker(id: u32, state: AiEntityState) -> AiEntitySummary {
         latched_node: None,
         target_id: None,
         free_for_combat: false,
+        research: None,
     }
 }
 
@@ -59,6 +60,7 @@ fn combat_unit(id: u32, kind: EntityKind) -> AiEntitySummary {
         latched_node: None,
         target_id: None,
         free_for_combat: true,
+        research: None,
     }
 }
 
@@ -86,6 +88,7 @@ fn building_at(
         latched_node: None,
         target_id: None,
         free_for_combat: false,
+        research: None,
     }
 }
 

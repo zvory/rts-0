@@ -86,6 +86,12 @@ pub(super) fn issue_expansion_containment_wave(
     // On Crossroads the push walks out along the enemy's own road; small pushes died there to
     // AI 2.1's larger Tank groups, while Tanks held inside the exit traded 1 for 5.
     let crossroads = defense::crossroads_wall_aware_approach_direction(observation).is_some();
+    // Jeff's AI V1.1 (`forcepush`) sends a wave every 2 minutes from 4:30 with whatever is ready:
+    // one Tank is enough, none stay home, and no gate holds it back.
+    let forced = jeff_v1_1::push::forced_due(observation, memory);
+    if !assembling {
+        jeff_v1_1::push::note_forced_slot(observation, memory, None);
+    }
     if assembling {
         let required_tanks = if memory.containment.recovery_active {
             containment_repush_tank_count(policy, memory.containment.repush_count)
@@ -94,7 +100,9 @@ pub(super) fn issue_expansion_containment_wave(
         };
         // The Crossroads push also grows to keep its lead over the enemy Tanks seen recently;
         // with a fixed size it could never show that lead and stayed home at 21 Tanks against 5.
-        let required_tanks = if crossroads {
+        let required_tanks = if forced {
+            1
+        } else if crossroads {
             required_tanks
                 .max(CROSSROADS_PUSH_MIN_TANKS)
                 .max(memory.recent_enemy_tanks() + CROSSROADS_PUSH_TANK_LEAD)
@@ -123,6 +131,7 @@ pub(super) fn issue_expansion_containment_wave(
                 .chain(memory.later_bases.guards.iter().copied())
                 .chain(stuck.iter().copied())
                 .chain(memory.third_pressure.reserved())
+                .chain(memory.jeff_v1_1.tank_raid.units())
                 .collect();
             let mut tanks = actions::select_ready_combat_units_excluding(
                 &observation.owned,
@@ -132,6 +141,8 @@ pub(super) fn issue_expansion_containment_wave(
             let mut scouts =
                 actions::select_ready_combat_units(&observation.owned, &[EntityKind::ScoutCar]);
             scouts.retain(|scout| !memory.third_pressure.is_reserved(*scout));
+            scouts.retain(|scout| !memory.jeff_v1_1.tank_raid.holds(*scout));
+            scouts.retain(|scout| memory.jeff_v1_1.scout.unit != Some(*scout));
             if !memory.containment.wave_launched {
                 tanks.retain(|tank| plan.ready_units.contains(tank));
                 scouts.retain(|scout| plan.ready_units.contains(scout));
@@ -141,13 +152,21 @@ pub(super) fn issue_expansion_containment_wave(
                     tanks.len(),
                     pledged,
                     required_tanks,
-                    push_keep_home(observation, memory),
+                    if forced {
+                        0
+                    } else {
+                        push_keep_home(observation, memory)
+                    },
                 )?
             } else {
                 required_tanks
             };
             select_nearest_units(observation, &mut tanks, rally, push_size);
             select_nearest_units(observation, &mut scouts, rally, 1);
+            // Jeff's AI V1.1 sends a Rifleman ahead when it has no Scout Car.
+            if scouts.is_empty() {
+                scouts.extend(jeff_v1_1::push::spotter(observation, memory, rally));
+            }
             if tanks.len() != push_size || scouts.is_empty() {
                 return None;
             }
@@ -155,6 +174,7 @@ pub(super) fn issue_expansion_containment_wave(
             memory.containment.active_scout = scouts.first().copied();
             memory.containment.active_riflemen = select_rifle_escorts(observation, memory, rally)
                 .into_iter()
+                .filter(|rifleman| Some(*rifleman) != memory.containment.active_scout)
                 .collect();
             reset_containment_route(memory);
             memory.containment.last_formation_command_tick = None;
@@ -171,6 +191,7 @@ pub(super) fn issue_expansion_containment_wave(
                 .collect();
             exclusions.extend(memory.containment.active_tanks.iter().copied());
             exclusions.extend(memory.third_pressure.reserved());
+            exclusions.extend(memory.jeff_v1_1.tank_raid.units());
             let mut newcomers = actions::select_ready_combat_units_excluding(
                 &observation.owned,
                 &[EntityKind::Tank],
@@ -184,7 +205,11 @@ pub(super) fn issue_expansion_containment_wave(
                 pushing + newcomers.len(),
                 pledged,
                 required_tanks,
-                push_keep_home(observation, memory),
+                if forced {
+                    0
+                } else {
+                    push_keep_home(observation, memory)
+                },
             )
             .unwrap_or(pushing);
             if wanted > pushing {
@@ -210,13 +235,27 @@ pub(super) fn issue_expansion_containment_wave(
             memory.containment.active_riflemen =
                 select_rifle_escorts(observation, memory, formation_center)
                     .into_iter()
+                    .filter(|rifleman| *rifleman != scout)
                     .collect();
         }
         let riflemen: Vec<u32> = memory.containment.active_riflemen.iter().copied().collect();
-        let assembly_shape = if push_uses_available_armor {
-            MarchShape::TIGHT
-        } else {
-            MarchShape::LEGACY
+        let assembly_shape = MarchShape {
+            rifle_spread: jeff_v1_1::screen::spread(memory),
+            column: jeff_v1_1::screen::column(memory),
+            ..if push_uses_available_armor {
+                MarchShape::TIGHT
+            } else {
+                MarchShape::LEGACY
+            }
+        };
+        // Jeff's AI V1.1 (`wideline`) forms its fighting ranks wide.
+        let assembly_shape = match jeff_v1_1::push::wide_ranks(memory, tanks.len()) {
+            Some((rank_width, spacing)) if push_uses_available_armor => MarchShape {
+                rank_width,
+                tank_spacing_tiles: spacing,
+                ..assembly_shape
+            },
+            _ => assembly_shape,
         };
         let formation = containment_formation(
             observation,
@@ -249,12 +288,15 @@ pub(super) fn issue_expansion_containment_wave(
             assembly_shape,
         );
         let nearby_rifles = nearby_rifle_escort_count(observation, &riflemen, formation_center);
+        // Jeff's AI V1.1 weighs whole armies instead of Tank counts, and strikes a gathering wave.
+        let v1_1_launch = jeff_v1_1::push::launch_ready(observation, map_analysis, memory, joining);
         // The live Jeff also launches once most of its Tanks have gathered, a while after the hard
         // timeout: one Tank held behind a building, or the Scout Car elsewhere, kept a 24-Tank push
         // waiting at home for the rest of the game.
         let most_gathered = live_jeff
             && assembly_elapsed >= ASSEMBLY_GATHERED_TICKS
-            && tanks.len() + joining >= memory.recent_enemy_tanks() + GATHERED_LEAD_TANKS
+            && (v1_1_launch.is_some()
+                || tanks.len() + joining >= memory.recent_enemy_tanks() + GATHERED_LEAD_TANKS)
             && {
                 let gathered = observation
                     .owned
@@ -272,7 +314,8 @@ pub(super) fn issue_expansion_containment_wave(
                 && core_grouped
                 && nearby_rifles >= MIN_CONTAINMENT_RIFLE_ESCORTS)
             || (assembly_hard_timed_out && vehicle_core_grouped)
-            || most_gathered;
+            || most_gathered
+            || (v1_1_launch.is_some() && memory.jeff_v1_1.push.striking());
         let river_opening_guard = !memory.containment.wave_launched
             && expansion::has_jeff_river_expansion_site(observation)
             && river_opening_guard_active(observation, &tanks, assembly_started, memory);
@@ -284,7 +327,10 @@ pub(super) fn issue_expansion_containment_wave(
         } else {
             0
         };
-        let launch_outnumbered = memory.recent_enemy_tanks() + lead_needed > tanks.len() + joining;
+        let launch_outnumbered = match v1_1_launch {
+            Some(ready) => !ready,
+            None => memory.recent_enemy_tanks() + lead_needed > tanks.len() + joining,
+        };
         // Nor while enemy Tanks shelling a base outnumber the home Tanks near them.
         let home_outgunned = push_uses_available_armor && memory.home_outgunned;
         // The live Jeff's push waits while enemies hold its natural before the Depot is up: its
@@ -292,11 +338,18 @@ pub(super) fn issue_expansion_containment_wave(
         // own was held, and died there.
         let natural_held =
             live_jeff && super::super::expansion_security::natural_held(observation, memory);
-        let assembly_ready = assembled
-            && !river_opening_guard
-            && !launch_outnumbered
-            && !home_outgunned
-            && !natural_held;
+        // A forced wave leaves once gathered or after the hard assembly timeout, which gives
+        // Riflemen called from across the base time to join, only waiting while enemy Tanks shell a
+        // base.
+        let assembly_ready = if forced {
+            (assembled || assembly_hard_timed_out) && !home_outgunned
+        } else {
+            assembled
+                && !river_opening_guard
+                && !launch_outnumbered
+                && !home_outgunned
+                && !natural_held
+        };
         if !assembly_ready {
             if formation_command_due(memory, observation.tick) {
                 issue_containment_formation(actions, observation, &formation, false);
@@ -316,11 +369,19 @@ pub(super) fn issue_expansion_containment_wave(
         }
         memory.containment.launch_tanks = tanks.len();
         memory.containment.recovery_active = false;
+        jeff_v1_1::push::note_forced_slot(
+            observation,
+            memory,
+            Some(forced && v1_1_launch != Some(true)),
+        );
         memory.approach.start_push();
         memory.containment.stationary_since = None;
         reset_containment_route(memory);
         memory.containment.last_formation_command_tick = None;
         memory.containment.assembly_started_tick = None;
+        // Jeff's AI V1.1 (`southroute`) picks up Schone Tage's southern way where the push stands.
+        let center = group_center(observation, &tanks);
+        jeff_v1_1::south_route::start(observation, memory, center);
     }
 
     let tanks: Vec<u32> = memory.containment.active_tanks.iter().copied().collect();
@@ -336,7 +397,20 @@ pub(super) fn issue_expansion_containment_wave(
 
     // Outnumbered in Tanks out in the field: fall back to the regroup point and rebuild one Tank
     // larger, instead of losing the push a Tank at a time.
-    if !memory.enemy_main_destroyed && push_outnumbered(observation, &tanks) {
+    let outnumbered = jeff_v1_1::push::outweighed(observation, memory)
+        .unwrap_or_else(|| push_outnumbered(observation, &tanks));
+    // Jeff's AI V1.1 (`southhold`) on Schone Tage's southern way stays together and walks back to
+    // its third base instead.
+    let outnumbered = outnumbered
+        && !(!memory.enemy_main_destroyed && jeff_v1_1::south_route::hold_way(observation, memory));
+    if !memory.enemy_main_destroyed && outnumbered {
+        // Jeff's AI V1.1's Scout Car smokes for the falling-back Tanks.
+        jeff_v1_1::smoke_cover::note_retreat(
+            memory,
+            &tanks,
+            scouts.first().copied(),
+            observation.tick,
+        );
         if push_uses_available_armor {
             memory
                 .approach
@@ -344,11 +418,50 @@ pub(super) fn issue_expansion_containment_wave(
         }
         begin_containment_recovery(memory);
         let rally = containment_regroup_point(own_base, enemy_base, observation.map)?;
+        // Jeff's AI V1.1 (`southroute`) falls back a waypoint along Schone Tage's southern way: the
+        // straight way home runs into the V.
+        let rally = group_center(observation, &tanks)
+            .and_then(|center| jeff_v1_1::south_route::back_waypoint(observation, memory, center))
+            .unwrap_or(rally);
+        let mut infantry = scouts;
+        infantry.extend(riflemen);
+        if !jeff_v1_1::south_route::order_fall_back(actions, memory, &tanks, &infantry, rally) {
+            let mut units = tanks.clone();
+            units.extend(infantry.iter().copied());
+            actions::move_units(actions, units, rally.0, rally.1);
+        }
         let mut units = tanks;
-        units.extend(scouts);
-        units.extend(riflemen);
-        actions::move_units(actions, units.iter().copied(), rally.0, rally.1);
+        units.extend(infantry);
         return Some(AiIntent::Assemble { units });
+    }
+    // Jeff's AI V1.1 (`southroute`) marches Schone Tage's southern way waypoint by waypoint before
+    // its usual targeting, all its push together.
+    let tank_positions: Vec<(f32, f32)> = observation
+        .owned
+        .iter()
+        .filter(|unit| tanks.contains(&unit.id) && unit.hp > 0)
+        .map(|unit| (unit.x, unit.y))
+        .collect();
+    if let Some(waypoint) = group_center(observation, &tanks).and_then(|center| {
+        jeff_v1_1::south_route::push_waypoint(observation, memory, center, &tank_positions)
+    }) {
+        if jeff_v1_1::south_route::order_due(memory, observation.tick) {
+            let mut infantry = scouts.clone();
+            infantry.extend(riflemen.iter().copied());
+            if jeff_v1_1::south_route::returning(memory) {
+                actions::move_units(actions, tanks.iter().copied(), waypoint.0, waypoint.1);
+                actions::move_units(actions, infantry.iter().copied(), waypoint.0, waypoint.1);
+            } else if !jeff_v1_1::south_route::guard_orders(
+                actions,
+                observation,
+                memory,
+                &tanks,
+                &infantry,
+            ) {
+                jeff_v1_1::south_route::order_push(actions, &tanks, &infantry, waypoint);
+            }
+        }
+        return Some(AiIntent::Attack { units: tanks });
     }
 
     // A natural mined out is no objective: the nearest steel left can be far off, or the current
@@ -370,11 +483,37 @@ pub(super) fn issue_expansion_containment_wave(
             observation.map,
             memory.endgame_search_waypoint,
         )
-    } else if memory.enemy_natural_destroyed {
-        (enemy_base.x, enemy_base.y)
     } else {
-        natural_objective
+        let fallback = if memory.enemy_natural_destroyed {
+            (enemy_base.x, enemy_base.y)
+        } else {
+            natural_objective
+        };
+        // Jeff's AI V1.1 raids the enemy's softest base, or rolls its line forward anchor by anchor.
+        jeff_v1_1::push::objective(
+            observation,
+            map_analysis,
+            memory,
+            own_base,
+            (enemy_base.x, enemy_base.y),
+            fallback,
+            policy.tank_standoff_tiles,
+        )
+        .unwrap_or(fallback)
     };
+    let holding_short = jeff_v1_1::push::holding_short(memory);
+    // Jeff's AI V1.1 (`goin`), far ahead, attack-moves into the nearest known enemy base with all of
+    // its push instead of holding outside it: against Pressure AI a 34-Tank push stood off its
+    // natural to the tick cap with 7 enemy Tanks left.
+    if !endgame_search_active && jeff_v1_1::push::going_in(memory) {
+        // Its own order clock, as the southern way's: the shared formation clock is reset by others.
+        if jeff_v1_1::south_route::order_due(memory, observation.tick) {
+            let mut infantry = scouts.clone();
+            infantry.extend(riflemen.iter().copied());
+            jeff_v1_1::south_route::order_push(actions, &tanks, &infantry, objective);
+        }
+        return Some(AiIntent::Attack { units: tanks });
+    }
     let (tank_point, legacy_scout_point) = if endgame_search_active {
         let scout_point = scout_forward_from_tanks(
             objective,
@@ -404,7 +543,11 @@ pub(super) fn issue_expansion_containment_wave(
     // straight at the objective and is left to that order for a while. The two-Tank opening, which
     // marches as one rank, is left alone: on Schone Tage it waited out the trap line behind its own
     // exit, and sent at the enemy it drove into the traps.
-    if live_jeff && !endgame_search_active && tanks.len() >= super::approach::MIN_TANKS_FOR_LEGS {
+    if live_jeff
+        && !endgame_search_active
+        && !holding_short
+        && tanks.len() >= super::approach::MIN_TANKS_FOR_LEGS
+    {
         if let Some(center) = group_center(observation, &tanks) {
             let tick = observation.tick;
             if memory
@@ -451,7 +594,8 @@ pub(super) fn issue_expansion_containment_wave(
     // and its two Tanks decide a duel by where they stand when they meet the enemy's.
     let legs = if push_uses_available_armor
         && !endgame_search_active
-        && tanks.len() >= super::approach::MIN_TANKS_FOR_LEGS
+        && tanks.len()
+            >= jeff_v1_1::push::legs_min_tanks(memory, super::approach::MIN_TANKS_FOR_LEGS)
     {
         containment_regroup_point(own_base, enemy_base, observation.map).map(|rally| {
             let legs = super::approach::push_legs(
@@ -482,10 +626,24 @@ pub(super) fn issue_expansion_containment_wave(
         Some(orders) => (orders.destination, orders.face_from, orders.face_to),
         None => (tank_point, own_base, objective),
     };
-    let shape = match legs.map(|orders| orders.phase) {
-        Some(super::approach::PushPhase::Travel) => MarchShape::TRAVEL,
-        _ if push_uses_available_armor => MarchShape::TIGHT,
-        _ => MarchShape::LEGACY,
+    let shape = MarchShape {
+        rifle_spread: jeff_v1_1::screen::spread(memory),
+        column: jeff_v1_1::screen::column(memory),
+        ..match legs.map(|orders| orders.phase) {
+            Some(super::approach::PushPhase::Travel) => MarchShape::TRAVEL,
+            _ if push_uses_available_armor => {
+                match jeff_v1_1::push::wide_ranks(memory, tanks.len()) {
+                    // Jeff's AI V1.1 (`wideline`) closes in wide.
+                    Some((rank_width, spacing)) => MarchShape {
+                        rank_width,
+                        tank_spacing_tiles: spacing,
+                        ..MarchShape::TIGHT
+                    },
+                    None => MarchShape::TIGHT,
+                }
+            }
+            _ => MarchShape::LEGACY,
+        }
     };
     let toward_objective = normalized_direction(face_from, face_to)?;
     let tank_assignments = if tight_formation {
@@ -692,6 +850,8 @@ pub(super) fn issue_expansion_containment_wave(
 
             let scout_point = if let Some(smoke_launch_point) = smoke_reposition {
                 smoke_launch_point
+            } else if shape.column {
+                jeff_v1_1::screen::column_scout(tank_anchor, objective, observation.map)?
             } else if stationary_range_ready && tanks_in_position {
                 if tight_formation {
                     scout_forward_from_tanks(
@@ -715,8 +875,18 @@ pub(super) fn issue_expansion_containment_wave(
                     scout_point.1,
                 );
             }
-            let screen_points =
-                rifle_screen_points(tank_anchor, objective, observation.map, riflemen.len());
+            let screen_points = if shape.column {
+                jeff_v1_1::screen::column_points(
+                    tank_anchor,
+                    objective,
+                    observation.map,
+                    riflemen.len(),
+                )
+            } else if shape.rifle_spread {
+                jeff_v1_1::screen::points(tank_anchor, objective, observation.map, riflemen.len())
+            } else {
+                rifle_screen_points(tank_anchor, objective, observation.map, riflemen.len())
+            };
             for (rifleman, screen_point) in riflemen.iter().zip(screen_points) {
                 if let Some(target) = rifle_sector_target(
                     observation,
@@ -761,10 +931,19 @@ pub(super) fn issue_expansion_containment_wave(
                     });
             if waypoint_timed_out {
                 let tank_center = group_center(observation, &tanks).unwrap_or(current_waypoint);
+                // Jeff's AI V1.1's column (`column`) stands its Riflemen up to 12 tiles ahead of
+                // the front Tanks: held to 7 tiles of the Tanks' centre, a push that left with 19
+                // Riflemen kept 2 four seconds later.
+                let radius = if shape.column {
+                    jeff_v1_1::screen::COLUMN_KEEP_TILES
+                } else {
+                    CONTAINMENT_RIFLE_COHESION_TILES
+                };
                 retain_nearby_rifle_escorts(
                     observation,
                     &mut memory.containment.active_riflemen,
                     tank_center,
+                    radius,
                 );
             }
             // The current Jeff's Tanks and Scout Car lead: the next waypoint is ordered once they
@@ -810,10 +989,21 @@ pub(super) fn issue_expansion_containment_wave(
                 memory.containment.waypoint_started_tick = None;
                 waypoint = None;
             } else {
-                if formation_command_due(memory, observation.tick) {
+                let reissued = formation_command_due(memory, observation.tick);
+                if reissued {
                     issue_containment_formation(actions, observation, &formation, true);
                     note_formation_command(memory, observation.tick);
                 }
+                // Jeff's AI V1.1 (`tankpause`) stops Tanks that reach the back of its Riflemen.
+                jeff_v1_1::tank_pause::pace(
+                    actions,
+                    observation,
+                    memory,
+                    &formation.tanks,
+                    &riflemen,
+                    normalized_direction(current_waypoint, face_to).unwrap_or(toward_objective),
+                    reissued,
+                );
                 return Some(AiIntent::Attack {
                     units: formation.unit_ids(),
                 });
@@ -888,6 +1078,15 @@ pub(super) fn issue_expansion_containment_wave(
             )?;
             issue_containment_formation(actions, observation, &formation, true);
             note_formation_command(memory, observation.tick);
+            jeff_v1_1::tank_pause::pace(
+                actions,
+                observation,
+                memory,
+                &formation.tanks,
+                &riflemen,
+                normalized_direction(next, face_to).unwrap_or(toward_objective),
+                true,
+            );
             return Some(AiIntent::Attack {
                 units: formation.unit_ids(),
             });

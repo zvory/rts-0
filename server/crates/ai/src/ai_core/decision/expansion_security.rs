@@ -78,8 +78,29 @@ impl ExpansionSecurity {
         self.retry_builder = None;
     }
 
+    /// Whether an Engineer is on its way to build the natural's Depot.
+    pub(super) fn attempting(&self) -> bool {
+        self.build_attempt_tick.is_some()
+    }
+
     pub(super) fn retry_builder(&self) -> Option<u32> {
         self.retry_builder
+    }
+
+    /// One trace line of the natural's state (local debugging).
+    pub(super) fn trace(&self) -> String {
+        format!(
+            "natural site={:?} guards={:?} secure_since={:?} near_since={:?} attempt={:?} next={} rejected={:?} failures={:?} contested={:?}",
+            self.site,
+            self.riflemen,
+            self.secure_since,
+            self.near_since,
+            self.build_attempt_tick,
+            self.next_attempt_tick,
+            self.rejected_sites,
+            self.site_failures,
+            self.contested_tick
+        )
     }
 }
 
@@ -120,15 +141,119 @@ pub(super) fn expansion_is_next(
 /// The reserve then holds the Factory back until the Depot is ordered. A Factory or Tank already out
 /// keeps the natural due. The live Jeff holds six guns; the natural waits only for the first four.
 fn early_natural_due(observation: &AiObservation, facts: &AiFacts, profile: &AiProfile) -> bool {
-    if facts.building_count(EntityKind::Factory) > 0 || facts.unit_count(EntityKind::Tank) > 0 {
-        return true;
-    }
     let guns = profile
         .defensive_machine_gunners
         .map_or(0, |policy| policy.target_count)
         .min(OPENING_GUNS);
+    // Jeff's AI V1.1's Rifleman opening (`riflenat`): the natural once Methamphetamines is in and
+    // `natural_rifles` Riflemen stand at home to take and hold it.
+    if jeff_v1_1::rifle_opening(profile.id) {
+        return facts
+            .completed_upgrades()
+            .contains(&UpgradeKind::Methamphetamines)
+            && jeff_v1_1::home_riflemen(observation) >= jeff_v1_1::natural_rifles();
+    }
+    // Jeff's AI V1.1 (`fastnat`) takes its natural once Methamphetamines is under way and its four
+    // opening guns are ordered, without waiting for the Engineering Complex: soupman took his at
+    // 1:16-1:27 against Pressure AI, V1.1 at 2:21-2:57. Before the guns, Rush AI's first Riflemen
+    // shot the main down at 2:19 with one gun out, while the natural stood.
+    if is_jeff_v1_1(profile.id) && !jeff_v1_1::off("fastnat") {
+        return meth_started(observation, facts)
+            && guns_ordered(observation, facts, profile.id, OPENING_GUNS);
+    }
+    // Jeff's AI V1.1 (`ecafter`): its Engineering Complex follows the Factory, so it makes nothing
+    // due. Dominating the early fights takes the natural with the opening guns; otherwise the
+    // natural follows the Factory's first Scout Car.
+    match facts.v1_1_opening {
+        Some(OpeningOrder::NaturalFirst) => {
+            return facts.building_count(EntityKind::Factory) > 0
+                || facts.unit_count(EntityKind::Tank) > 0
+                || guns_ordered(observation, facts, profile.id, guns);
+        }
+        Some(OpeningOrder::FactoryFirst) => {
+            return facts.unit_count(EntityKind::Tank) > 0
+                || facts.v1_1_car_ordered
+                || first_scout_car_ordered(observation, facts)
+                || factory_up_and_both_banked(observation, facts);
+        }
+        Some(OpeningOrder::Undecided) => return false,
+        None => {}
+    }
+    if facts.building_count(EntityKind::Factory) > 0 || facts.unit_count(EntityKind::Tank) > 0 {
+        return true;
+    }
     facts.building_count(EntityKind::EngineeringComplex) > 0
-        && opening_guns_ordered(observation, facts, guns)
+        && guns_ordered(observation, facts, profile.id, guns)
+}
+
+/// Whether Methamphetamines is researched or being researched.
+fn meth_started(observation: &AiObservation, facts: &AiFacts) -> bool {
+    facts
+        .completed_upgrades()
+        .contains(&UpgradeKind::Methamphetamines)
+        || observation.owned.iter().any(|unit| {
+            unit.research
+                .is_some_and(|(upgrade, _)| upgrade == UpgradeKind::Methamphetamines)
+        })
+}
+
+/// Whether a Scout Car is out or in training.
+pub(super) fn first_scout_car_ordered(observation: &AiObservation, facts: &AiFacts) -> bool {
+    facts.unit_count(EntityKind::ScoutCar) > 0
+        || observation.owned.iter().any(|unit| {
+            unit.kind == EntityKind::Factory
+                && unit.production_kind == Some(EntityKind::ScoutCar)
+                && unit.production_queue_len.unwrap_or(0) > 0
+        })
+}
+
+/// A finished Factory with both the natural's Depot and a Scout Car paid for in the bank: the
+/// natural no longer waits for a car that is not coming.
+fn factory_up_and_both_banked(observation: &AiObservation, facts: &AiFacts) -> bool {
+    let (depot_steel, depot_oil) = rts_rules::economy::cost(EntityKind::ResourceDepot);
+    let (car_steel, car_oil) = rts_rules::economy::cost(EntityKind::ScoutCar);
+    facts.complete_building_count(EntityKind::Factory) > 0
+        && observation.economy.steel >= depot_steel + car_steel
+        && observation.economy.oil >= depot_oil + car_oil
+}
+
+/// The guns out or in training, and how many of them are queued. Under Jeff's AI V1.1's `nomg`
+/// two Riflemen past the opening's (`NOMG_RIFLE_BASE`) count as one gun.
+pub(super) fn guns_out(
+    observation: &AiObservation,
+    facts: &AiFacts,
+    no_guns: bool,
+) -> (usize, usize) {
+    let kind = if no_guns {
+        EntityKind::Rifleman
+    } else {
+        EntityKind::MachineGunner
+    };
+    let queued: usize = observation
+        .owned
+        .iter()
+        .filter(|unit| unit.kind == EntityKind::Barracks && unit.production_kind == Some(kind))
+        .map(|unit| unit.production_queue_len.unwrap_or(0))
+        .sum();
+    let out = facts.unit_count(kind) + queued;
+    if no_guns {
+        (
+            out.saturating_sub(jeff_v1_1::NOMG_RIFLE_BASE) / jeff_v1_1::RIFLES_PER_GUN,
+            queued.div_ceil(jeff_v1_1::RIFLES_PER_GUN),
+        )
+    } else {
+        (out, queued)
+    }
+}
+
+/// `opening_guns_ordered`, counting the Riflemen that stand in for guns under `nomg`.
+pub(super) fn guns_ordered(
+    observation: &AiObservation,
+    facts: &AiFacts,
+    profile_id: &str,
+    guns: usize,
+) -> bool {
+    guns_out(observation, facts, jeff_v1_1::no_guns(profile_id)).0 >= guns
 }
 
 /// Whether `guns` Machine Gunners are out or in training.
@@ -195,7 +320,12 @@ pub(super) fn secure_wait_ticks(
     memory: &AiDecisionMemory,
 ) -> Option<u32> {
     let guards = &memory.expansion_security.riflemen;
-    let posts = positions(observation, analysis, &memory.expansion_security);
+    let posts = positions(
+        observation,
+        analysis,
+        &memory.expansion_security,
+        jeff_v1_1::natural::forward(memory),
+    );
     if guards.len() < PARTY_SIZE || posts.len() < guards.len() {
         return None;
     }
@@ -293,6 +423,7 @@ pub(super) fn reserve_expansion(
         .reserve_since
         .get_or_insert(observation.tick);
     observation.tick.saturating_sub(since) < EXPANSION_RESERVE_LIMIT_TICKS
+        || jeff_v1_1::rebuild_reserve(profile.id, observation.tick)
 }
 
 pub(super) fn predicts_natural_from_opening(observation: &AiObservation) -> bool {
@@ -376,7 +507,8 @@ pub(super) fn prepare<F: FnMut(EntityKind, u32, u32) -> bool>(
             && !depot_order_pending(observation, site)
             && (site_blocked_by_owned_building(observation, site)
                 || (security_wait_complete
-                    && !placeable(EntityKind::ResourceDepot, site.0, site.1)))
+                    && !placeable(EntityKind::ResourceDepot, site.0, site.1)
+                    && !jeff_v1_1::natural::own_units_on_site(profile.id, observation, site)))
     });
     if site_became_blocked {
         let security = &mut memory.expansion_security;
@@ -441,8 +573,10 @@ pub(super) fn prepare<F: FnMut(EntityKind, u32, u32) -> bool>(
     let mut candidates = rifles.get(home_rifles..).unwrap_or(&[]).to_vec();
     // The route picket and raid sealers are held by the home line.
     candidates.retain(|id| !memory.route_line.reserved().any(|reserved| reserved == *id));
-    candidates.retain(|id| !memory.opening_rush.is_reserved(*id));
-    candidates.retain(|id| !memory.third_pressure.is_reserved(*id));
+    candidates.retain(|id| !memory.rush_reserved(*id));
+    candidates.retain(|id| {
+        !memory.third_pressure.is_reserved(*id) && !memory.jeff_v1_1.tank_raid.holds(*id)
+    });
     candidates.retain(|id| !memory.raid_defense.is_sentry(*id));
     if let Some(center) = building_center(
         memory.expansion_security.site.unwrap(),
@@ -662,6 +796,7 @@ pub(super) fn positions(
     observation: &AiObservation,
     analysis: Option<&AiMapAnalysis>,
     security: &ExpansionSecurity,
+    forward: bool,
 ) -> Vec<(f32, f32)> {
     let Some(site) = security.site else {
         return Vec::new();
@@ -683,7 +818,12 @@ pub(super) fn positions(
         .or_else(|| normalized_direction(center, target))
         .or_else(|| normalized_direction(home, center))
         .unwrap_or((1.0, 0.0));
-    let forward_tiles = 4.5;
+    // Jeff's AI V1.1's guards stand past the natural's extractors.
+    let forward_tiles = if forward {
+        jeff_v1_1::natural::GUARD_FORWARD_TILES
+    } else {
+        4.5
+    };
     let ts = observation.map.tile_size as f32;
     let Some(depot) = config::building_stats(EntityKind::ResourceDepot) else {
         return Vec::new();
@@ -816,6 +956,7 @@ pub(super) fn surplus_tank_for_forward_base(
                 && !memory.containment.opening_tanks.contains(&unit.id)
                 && !memory.later_bases.guards.contains(&unit.id)
                 && !memory.third_pressure.is_reserved(unit.id)
+                && !memory.jeff_v1_1.tank_raid.holds(unit.id)
         })
         .min_by_key(|unit| unit.id)
         .map(|unit| unit.id)
@@ -831,14 +972,20 @@ pub(super) fn update_and_stage(
     profile_id: &str,
 ) -> bool {
     let live_jeff = runs_live_jeff(profile_id);
+    let forward = jeff_v1_1::natural::forward(memory);
     // On Doppelganger raid defense pulled the first guards back from a six-Rifleman wave, and the
     // next decision this sent them to their posts again, into it. Both died without a kill.
+    // Jeff's AI V1.1's clearing group (`natclear`) keeps the guards it took: sent to their posts
+    // alone past Rush AI's guns on the way to Classic's natural, 14 died one at a time.
     let held: Vec<u32> = memory
         .expansion_security
         .riflemen
         .iter()
         .copied()
-        .filter(|id| live_jeff && left_to_home_defense(observation, memory, *id))
+        .filter(|id| {
+            (live_jeff && left_to_home_defense(observation, memory, *id))
+                || memory.jeff_v1_1.natclear.holds(*id)
+        })
         .collect();
     let security = &mut memory.expansion_security;
     let Some(site) = security.site else {
@@ -848,7 +995,7 @@ pub(super) fn update_and_stage(
     else {
         return false;
     };
-    let points = positions(observation, analysis, security);
+    let points = positions(observation, analysis, security, forward);
     let ts = observation.map.tile_size as f32;
     let contested = observation.visible_enemies.iter().any(|enemy| {
         enemy.hp > 0
@@ -1051,9 +1198,14 @@ pub(super) fn natural_clearers(
         .filter(|unit| unit.kind == EntityKind::ResourceDepot && unit.hp > 0)
         .count();
     let security = &memory.expansion_security;
+    // Jeff's AI V1.1 (`natsiege`) keeps clearing for a while after the enemies drop out of sight.
     let held = security.site.is_some()
         && depots < 2
-        && security.contested_tick == Some(observation.tick)
+        && jeff_v1_1::natsiege::contest_current(
+            memory.profile_id(),
+            security.contested_tick,
+            observation.tick,
+        )
         && !security.contest_armor;
     let point = security.contest_point.filter(|_| held);
     let Some(point) = point else {
@@ -1069,8 +1221,11 @@ pub(super) fn natural_clearers(
         .iter()
         .filter(|unit| unit.kind == EntityKind::Tank && unit.is_complete && unit.hp > 0)
         .filter(|unit| !memory.trap_breach.is_reserved(unit.id))
-        .filter(|unit| !memory.opening_rush.is_reserved(unit.id))
-        .filter(|unit| !memory.third_pressure.is_reserved(unit.id))
+        .filter(|unit| !memory.rush_reserved(unit.id))
+        .filter(|unit| {
+            !memory.third_pressure.is_reserved(unit.id)
+                && !memory.jeff_v1_1.tank_raid.holds(unit.id)
+        })
         .filter(|unit| !route_line.contains(&unit.id))
         .filter(|unit| !memory.later_bases.guards.contains(&unit.id))
         .filter(|unit| !(launched_push && push.active_tanks.contains(&unit.id)))

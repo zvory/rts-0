@@ -34,6 +34,7 @@ fn unit(id: u32, owner: u32, kind: EntityKind, tiles: (f32, f32)) -> AiEntitySum
         latched_node: None,
         target_id: None,
         free_for_combat: true,
+        research: None,
     }
 }
 

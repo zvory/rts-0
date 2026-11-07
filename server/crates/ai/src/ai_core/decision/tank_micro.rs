@@ -25,11 +25,13 @@ use super::*;
 use rts_rules::math::GameplayMath as _;
 
 mod engage;
+mod natural_clear;
 mod scout_lead;
 mod smoke_assault;
 #[cfg(test)]
 mod tests;
 
+use natural_clear::clear_natural;
 use scout_lead::lead_scouts;
 pub(crate) use smoke_assault::SmokeAssault;
 
@@ -57,10 +59,33 @@ pub(super) fn finish(
         memory.tank_micro.natural_clear =
             super::expansion_security::natural_clearers(observation, memory)
                 .map(|(tanks, point)| (tanks, stored(point)));
+        memory.tank_micro.natural_siege = super::jeff_v1_1::natsiege::active(decision.profile_id);
+        // V1.1's line Tanks come under the governor with `linemicro`: exempt, they drove into
+        // parked Tanks' reach to their posts and to the base in contact (against Pressure AI 0.70
+        // enemy Tanks killed per Tank lost, V1.0 1.54).
+        let line_exempt = crate::ai_core::profiles::jeff_v1_1_feature_off("linemicro");
+        // V1.1's push marching Schone Tage's southern way (`southroute`), and the convoy following
+        // it, go on past remembered parked Tanks: the memory of a pile at Jeff's road gap, never
+        // looked at again from home, held a re-formed 11-Tank push at home for two minutes.
+        let marching: Vec<u32> = if super::jeff_v1_1::south_route::marching(observation, memory) {
+            memory
+                .containment
+                .active_tanks
+                .iter()
+                .copied()
+                .chain(memory.jeff_v1_1.push.convoy_units())
+                .collect()
+        } else {
+            Vec::new()
+        };
         let exempt: BTreeSet<u32> = memory
             .trap_breach
             .reserved()
             .chain(memory.third_pressure.reserved())
+            .chain(memory.jeff_v1_1.tank_raid.units())
+            .chain(memory.jeff_v1_1.front_line.units().filter(|_| line_exempt))
+            .chain(memory.jeff_v1_1.home_guard.units())
+            .chain(marching)
             .collect();
         decision.trace.notes = govern(
             observation,
@@ -197,6 +222,10 @@ pub(crate) struct TankMicro {
     /// Tanks sent to clear enemy infantry off the natural, and where; and where each was sent.
     natural_clear: Option<(Vec<u32>, (i32, i32))>,
     natural_clear_sent: BTreeMap<u32, (i32, i32)>,
+    /// Jeff's AI V1.1 (`natsiege`): the clearing Tanks siege from out of the infantry's reach, and
+    /// the order each last got.
+    natural_siege: bool,
+    siege_orders: BTreeMap<u32, super::jeff_v1_1::natsiege::SiegeOrder>,
     /// Where unseen fire proved the enemy sees, until when.
     assumed_vision: Vec<((i32, i32), u32)>,
     /// Jeff's production buildings, and the sites enemy Tanks destroyed them on.
@@ -210,48 +239,6 @@ pub(super) struct Zone {
     pub(super) radius: f32,
     pub(super) tank: Option<u32>,
 }
-
-/// Tanks sent to clear enemy infantry off the natural attack-move onto them. The order goes out once
-/// per spot, and again to a Tank found standing idle short of it.
-fn clear_natural(
-    micro: &mut TankMicro,
-    tanks: &BTreeMap<u32, &AiEntitySummary>,
-    claimed: &BTreeSet<u32>,
-    extra: &mut Vec<Command>,
-    tile_size: f32,
-) -> BTreeSet<u32> {
-    let mut clearing = BTreeSet::new();
-    let Some((ids, point)) = micro.natural_clear.clone() else {
-        micro.natural_clear_sent.clear();
-        return clearing;
-    };
-    micro.natural_clear_sent.retain(|id, _| ids.contains(id));
-    let at = world(point);
-    for id in ids {
-        if claimed.contains(&id) {
-            continue;
-        }
-        let Some(tank) = tanks.get(&id) else {
-            continue;
-        };
-        clearing.insert(id);
-        let short_and_idle = tank.state == AiEntityState::Idle
-            && dist2(tank.x, tank.y, at.0, at.1) > squared(NATURAL_CLEAR_ARRIVED_TILES * tile_size);
-        if micro.natural_clear_sent.get(&id) != Some(&point) || short_and_idle {
-            extra.push(Command::AttackMove {
-                units: vec![id],
-                x: at.0,
-                y: at.1,
-                queued: false,
-            });
-            micro.natural_clear_sent.insert(id, point);
-        }
-    }
-    clearing
-}
-
-/// A Tank clearing the natural this close to the enemy it was sent at has arrived.
-const NATURAL_CLEAR_ARRIVED_TILES: f32 = 3.0;
 
 pub(super) fn world(pos: (i32, i32)) -> (f32, f32) {
     (pos.0 as f32, pos.1 as f32)
@@ -1220,7 +1207,7 @@ pub(super) fn govern(
     );
     claimed.extend(joined.iter().copied());
     pinned.retain(|id| !joined.contains(id));
-    let clearing = clear_natural(micro, &tanks, &claimed, &mut extra, tile_size);
+    let clearing = clear_natural(micro, &tanks, &claimed, &mut extra, tile_size, observation);
     claimed.extend(clearing.iter().copied());
     pinned.retain(|id| !clearing.contains(id));
     let led = lead_scouts(

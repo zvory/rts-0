@@ -20,6 +20,9 @@ pub(crate) struct AiActionContext<'a> {
     reservations: AiReservations,
     emitted: Vec<AiActionRequest>,
     command_trace: Vec<String>,
+    /// Whether `mark` tags the command trace (Jeff's AI V1.1), and the trace lines tagged so far.
+    marking: bool,
+    marked: usize,
 }
 
 impl<'a> AiActionContext<'a> {
@@ -30,7 +33,27 @@ impl<'a> AiActionContext<'a> {
             reservations: AiReservations::default(),
             emitted: Vec::new(),
             command_trace: Vec::new(),
+            marking: false,
+            marked: 0,
         }
+    }
+
+    /// Lets `mark` tag the command trace.
+    pub(crate) fn set_marking(&mut self, on: bool) {
+        self.marking = on;
+    }
+
+    /// Tags every command traced since the last mark with the system that issued it, for the
+    /// decision trace only.
+    pub(crate) fn mark(&mut self, source: &str) {
+        if !self.marking {
+            return;
+        }
+        for line in &mut self.command_trace[self.marked..] {
+            line.push_str(" src=");
+            line.push_str(source);
+        }
+        self.marked = self.command_trace.len();
     }
 
     pub(crate) fn budget(&self) -> &SpendBudget {

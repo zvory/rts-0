@@ -290,8 +290,9 @@ fn spare_home_riflemen(observation: &AiObservation, memory: &AiDecisionMemory) -
         .filter(|unit| {
             !memory.containment.active_riflemen.contains(&unit.id)
                 && !memory.expansion_security.riflemen.contains(&unit.id)
-                && !memory.opening_rush.is_reserved(unit.id)
+                && !memory.rush_reserved(unit.id)
                 && !memory.third_pressure.is_reserved(unit.id)
+                && !memory.jeff_v1_1.tank_raid.holds(unit.id)
         })
         .map(|unit| unit.id)
         .collect();

@@ -27,11 +27,13 @@ fn end_state_hash_covers_hidden_state_and_ignores_unapplied_input_and_history() 
     let mut copy = game.clone_for_replay_keyframe();
     let id = copy.state.entities.ids()[0];
     let entity = copy.state.entities.get_mut(id).unwrap();
-    entity.set_position(f32::from_bits(entity.pos_x.to_bits() + 1), entity.pos_y);
+    // Positions are fixed point: the smallest move is one substep.
+    let step = 1.0 / rts_rules::math::Coord::SCALE as f32;
+    entity.set_position(entity.pos_x() + step, entity.pos_y());
     assert_ne!(
         baseline,
         copy.replay_end_state_hash().unwrap(),
-        "one float ULP must not be rounded away"
+        "one position substep must not be rounded away"
     );
     let _ = game.state.rng.next_u32();
     assert_ne!(baseline, game.replay_end_state_hash().unwrap());

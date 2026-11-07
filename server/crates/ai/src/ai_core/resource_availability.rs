@@ -349,6 +349,7 @@ mod tests {
             latched_node: None,
             target_id: None,
             free_for_combat: false,
+            research: None,
         }
     }
 

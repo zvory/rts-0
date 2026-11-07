@@ -522,7 +522,7 @@ pub(super) fn forest_tiles_on_sight_line(
     Some(forest)
 }
 
-fn clear_machine_gunner_position(
+pub(in crate::ai_core::decision) fn clear_machine_gunner_position(
     observation: &AiObservation,
     map_analysis: Option<&AiMapAnalysis>,
     desired: (f32, f32),

@@ -93,6 +93,7 @@ fn summary(id: u32, owner: u32, kind: EntityKind, at: (f32, f32), hp: u32) -> Ai
         latched_node: None,
         target_id: None,
         free_for_combat: true,
+        research: None,
     }
 }
 
