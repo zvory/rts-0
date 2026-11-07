@@ -7,6 +7,7 @@
 
 use super::*;
 use crate::ai_core::decision::geometry::{dist2, squared};
+use rts_rules::math::GameplayMath as _;
 
 /// Enemy fighters this close (Tanks, which hit from 14 tiles once parked, this close) send the
 /// scout back this far, and it holds there this long.
@@ -150,7 +151,7 @@ pub(in crate::ai_core::decision) fn scout(
                 .iter()
                 .map(|enemy| {
                     keep_off(enemy.kind) + SAFE_MARGIN_TILES
-                        - dist2(enemy.x, enemy.y, at.0, at.1).sqrt() / ts
+                        - dist2(enemy.x, enemy.y, at.0, at.1).det_sqrt() / ts
                 })
                 .fold(SAFE_MARGIN_TILES, f32::max)
         } else {
@@ -263,7 +264,7 @@ fn safe_way(
     to: (f32, f32),
 ) -> Vec<(f32, f32)> {
     let ts = observation.map.tile_size as f32;
-    let distance = dist2(from.0, from.1, to.0, to.1).sqrt();
+    let distance = dist2(from.0, from.1, to.0, to.1).det_sqrt();
     let mut options = vec![analysis.compact_group_route(from, to, 4)];
     if let Some(direction) = normalized_direction(from, to) {
         let across = (-direction.1, direction.0);

@@ -26,6 +26,7 @@ use super::push::unit_value;
 use super::stations::RiflePost;
 use super::*;
 use crate::ai_core::decision::geometry::{clamp_to_map, dist2, squared, tile_center};
+use rts_rules::math::GameplayMath as _;
 
 /// Enemy fighters seen this recently count.
 const FRESH_TICKS: u32 = config::TICK_HZ * 20;
@@ -185,7 +186,7 @@ fn run(
     let from_depots = |at: (f32, f32)| {
         depots
             .iter()
-            .map(|depot| dist2(at.0, at.1, depot.0, depot.1).sqrt() / ts)
+            .map(|depot| dist2(at.0, at.1, depot.0, depot.1).det_sqrt() / ts)
             .fold(f32::INFINITY, f32::min)
     };
     let ours_side = |at: (f32, f32)| {

@@ -11,6 +11,7 @@
 
 use super::*;
 use crate::ai_core::decision::geometry::dist2;
+use rts_rules::math::GameplayMath as _;
 
 /// How long a Tank stops each time it reaches the back of the Riflemen.
 const PAUSE_TICKS: u32 = config::TICK_HZ / 2;
@@ -90,7 +91,7 @@ pub(in crate::ai_core::decision) fn pace(
         .owned
         .iter()
         .filter(|unit| unit.hp > 0 && riflemen.contains(&unit.id))
-        .filter(|unit| dist2(unit.x, unit.y, center.0, center.1) <= (NEAR_TILES * ts).powi(2))
+        .filter(|unit| dist2(unit.x, unit.y, center.0, center.1) <= (NEAR_TILES * ts).det_powi(2))
         .map(|unit| along(unit.x, unit.y))
         .min_by(f32::total_cmp);
     let mut stop = Vec::new();

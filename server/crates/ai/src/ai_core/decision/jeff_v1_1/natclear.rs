@@ -40,6 +40,7 @@
 
 use super::*;
 use crate::ai_core::decision::geometry::{building_center, dist2, squared, tile_center};
+use rts_rules::math::GameplayMath as _;
 
 /// Enemies this close to the natural site are cleared...
 const CLEAR_TILES: f32 = 15.0;
@@ -252,7 +253,7 @@ pub(in crate::ai_core::decision) fn plan(
     let nearest_target = |x: f32, y: f32| {
         targets
             .iter()
-            .map(|enemy| dist2(enemy.x, enemy.y, x, y).sqrt())
+            .map(|enemy| dist2(enemy.x, enemy.y, x, y).det_sqrt())
             .fold(f32::MAX, f32::min)
     };
     // The block's front centre: the nearest open point to the enemy's centre, on the way from the
@@ -260,7 +261,7 @@ pub(in crate::ai_core::decision) fn plan(
     // open point on the way farthest from them. `facing`: from the block towards the enemy.
     let toward_main = normalized_direction(aim, main).unwrap_or((0.0, 0.0));
     let ideal_front = {
-        let span = dist2(aim.0, aim.1, main.0, main.1).sqrt();
+        let span = dist2(aim.0, aim.1, main.0, main.1).det_sqrt();
         let mut out = 0.0;
         let mut safest: Option<((f32, f32), f32)> = None;
         loop {
@@ -453,7 +454,7 @@ pub(in crate::ai_core::decision) fn plan(
                 .get(id)
                 .zip(slot_of.get(id))
                 .is_some_and(|(unit, slot)| {
-                    dist2(unit.x, unit.y, slot.0, slot.1).sqrt() / speed.max(0.1)
+                    dist2(unit.x, unit.y, slot.0, slot.1).det_sqrt() / speed.max(0.1)
                         <= WAIT_TICKS as f32
                 })
         })

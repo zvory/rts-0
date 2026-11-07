@@ -13,6 +13,7 @@
 
 use super::*;
 use crate::ai_core::decision::geometry::{dist2, squared};
+use rts_rules::math::GameplayMath as _;
 
 fn is_fighter(kind: EntityKind) -> bool {
     kind.is_unit() && !matches!(kind, EntityKind::Worker | EntityKind::Golem)
@@ -78,7 +79,7 @@ pub(in crate::ai_core::decision) fn order(
         .min_by(|a, b| dist2(a.x, a.y, tank.x, tank.y).total_cmp(&dist2(b.x, b.y, tank.x, tank.y)));
     let toward = |from: (f32, f32), to: (f32, f32), tiles: f32| {
         let (dx, dy) = (to.0 - from.0, to.1 - from.1);
-        let len = (dx * dx + dy * dy).sqrt().max(1.0);
+        let len = (dx * dx + dy * dy).det_sqrt().max(1.0);
         (
             from.0 + dx / len * tiles * ts,
             from.1 + dy / len * tiles * ts,
@@ -86,7 +87,7 @@ pub(in crate::ai_core::decision) fn order(
     };
     let point = match nearest {
         Some(enemy) => {
-            let distance = dist2(enemy.x, enemy.y, tank.x, tank.y).sqrt() / ts;
+            let distance = dist2(enemy.x, enemy.y, tank.x, tank.y).det_sqrt() / ts;
             if distance < BACK_OFF_TILES {
                 // Straight away from it.
                 toward(

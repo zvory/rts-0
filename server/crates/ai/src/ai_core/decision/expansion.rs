@@ -1163,9 +1163,9 @@ mod tests {
                             x as f32 + stats.foot_w as f32 * 0.5,
                             y as f32 + stats.foot_h as f32 * 0.5,
                         );
-                        let shift = ((center.0 - old_center.0).powi(2)
-                            + (center.1 - old_center.1).powi(2))
-                        .sqrt();
+                        let shift = ((center.0 - old_center.0).det_powi(2)
+                            + (center.1 - old_center.1).det_powi(2))
+                        .det_sqrt();
                         good.push((shift, (x, y), steel, oil));
                     }
                 }
@@ -1237,9 +1237,9 @@ mod tests {
                 let ct = ((center.0 / ts) as u32, (center.1 / ts) as u32);
                 let own = analysis.ground_distance_from_start(player, ct);
                 let enemy = analysis.ground_distance_from_start(3 - player, ct);
-                let straight = ((ct.0 as f32 - obs.own_start_tile.0 as f32).powi(2)
-                    + (ct.1 as f32 - obs.own_start_tile.1 as f32).powi(2))
-                .sqrt();
+                let straight = ((ct.0 as f32 - obs.own_start_tile.0 as f32).det_powi(2)
+                    + (ct.1 as f32 - obs.own_start_tile.1 as f32).det_powi(2))
+                .det_sqrt();
                 println!(
                     "  {:?} steel {} oil {} straight {:.0} walk own {:?} enemy {:?} score {:?} far+on-route {}",
                     candidate.tile,

@@ -28,6 +28,7 @@ use super::*;
 use crate::ai_core::decision::frontal::approach::{self, Approach};
 use crate::ai_core::decision::geometry::{dist2, squared};
 use crate::ai_core::observation::AiPlayerSummary;
+use rts_rules::math::GameplayMath as _;
 
 /// A remembered enemy fighter counts fully when just seen and fades to nothing over this long.
 const ARMY_FADE_TICKS: u32 = config::TICK_HZ * 90;
@@ -911,7 +912,7 @@ fn raid_target(
         } else {
             (None, direct)
         };
-        let travel = dist2(center.0, center.1, candidate.at.0, candidate.at.1).sqrt() / ts;
+        let travel = dist2(center.0, center.1, candidate.at.0, candidate.at.1).det_sqrt() / ts;
         let score = candidate.worth / (1.0 + defence + 0.5 * path) / (1.0 + travel / TRAVEL_TILES);
         scored.push(RaidTarget {
             at: key,

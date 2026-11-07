@@ -27,6 +27,7 @@
 use super::push::unit_value;
 use super::*;
 use crate::ai_core::decision::geometry::{dist2, squared};
+use rts_rules::math::GameplayMath as _;
 
 /// Extractors this close to a Depot belong to its base.
 const MINE_TILES: f32 = 12.0;
@@ -418,12 +419,12 @@ fn turned(route_axis: (f32, f32), contact: &BaseContact) -> (f32, f32) {
         route_axis.0 + toward.0 * weight,
         route_axis.1 + toward.1 * weight,
     );
-    if sum.0.hypot(sum.1) < 1e-3 {
+    if sum.0.det_hypot(sum.1) < 1e-3 {
         return route_axis;
     }
     let step = AXIS_STEP_DEGREES.to_radians();
-    let angle = (sum.1.atan2(sum.0) / step).round() * step;
-    (angle.cos(), angle.sin())
+    let angle = (sum.1.det_atan2(sum.0) / step).round() * step;
+    (angle.det_cos(), angle.det_sin())
 }
 
 /// Notes an attack on base `depot` from `at`.
@@ -437,7 +438,7 @@ fn note_contact(memory: &mut LineMemory, depot: u32, origin: (f32, f32), at: (f3
         contact.direction.0 as f32 / 1000.0 * count + toward.0,
         contact.direction.1 as f32 / 1000.0 * count + toward.1,
     );
-    let length = sum.0.hypot(sum.1).max(1e-3);
+    let length = sum.0.det_hypot(sum.1).max(1e-3);
     contact.direction = (
         (sum.0 / length * 1000.0).round() as i32,
         (sum.1 / length * 1000.0).round() as i32,
@@ -480,8 +481,8 @@ fn threat_axis(
             .filter_map(|sample| {
                 let angle = sample as f32 * std::f32::consts::TAU / AXIS_SAMPLES as f32;
                 let point = (
-                    origin.0 + angle.cos() * AXIS_RING_TILES * ts,
-                    origin.1 + angle.sin() * AXIS_RING_TILES * ts,
+                    origin.0 + angle.det_cos() * AXIS_RING_TILES * ts,
+                    origin.1 + angle.det_sin() * AXIS_RING_TILES * ts,
                 );
                 if point.0 < 0.0 || point.1 < 0.0 {
                     return None;

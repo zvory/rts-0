@@ -23,6 +23,7 @@ use crate::selfplay::pending_build::PendingBuildTracker;
 use crate::selfplay::player_view::PlayerView;
 use rand::Rng;
 use rts_protocol::{ObserverMapAnalysisDiagnostics, ObserverMapAnalysisLayer};
+use rts_rules::math::GameplayMath as _;
 use rts_sim::game::command::SimCommand;
 use rts_sim::game::entity::EntityKind;
 use rts_sim::game::Game;
@@ -748,7 +749,7 @@ impl AiController {
             .filter(|unit| self.active_attack_units.contains_key(&unit.id))
             .filter(|unit| {
                 !observation.visible_enemies.iter().any(|enemy| {
-                    enemy.kind.is_unit() && (enemy.x - unit.x).hypot(enemy.y - unit.y) <= reach
+                    enemy.kind.is_unit() && (enemy.x - unit.x).det_hypot(enemy.y - unit.y) <= reach
                 })
             })
             .map(|unit| unit.id)

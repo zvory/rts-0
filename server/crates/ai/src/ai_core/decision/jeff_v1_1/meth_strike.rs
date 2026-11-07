@@ -27,6 +27,7 @@
 
 use super::*;
 use crate::ai_core::decision::geometry::{dist2, squared, tile_center};
+use rts_rules::math::GameplayMath as _;
 
 /// The path keeps a group route point about this often.
 const PATH_STRIDE_TILES: f32 = 10.0;
@@ -457,7 +458,7 @@ fn fight(
     let since = *state.contact_since.get_or_insert(tick);
     let gap = |unit: &AiEntitySummary| {
         near.iter()
-            .map(|enemy| dist2(unit.x, unit.y, enemy.x, enemy.y).sqrt())
+            .map(|enemy| dist2(unit.x, unit.y, enemy.x, enemy.y).det_sqrt())
             .fold(f32::INFINITY, f32::min)
     };
     let last = fighters
@@ -955,7 +956,7 @@ fn swing_points(
             .iter()
             .map(|at| super::push::threat_near(observation, memory, *at, SIDE_THREAT_TILES))
             .sum();
-        dist2(a.0, a.1, b.0, b.1).sqrt() / ts + threat * THREAT_TILES_PER_VALUE
+        dist2(a.0, a.1, b.0, b.1).det_sqrt() / ts + threat * THREAT_TILES_PER_VALUE
     };
     // The edge, `EDGE_TILES` in, every `EDGE_STEP_TILES`.
     let step = EDGE_STEP_TILES * ts;

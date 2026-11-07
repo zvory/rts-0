@@ -3,6 +3,7 @@
 //! This is Jeff's own copy of the policy. Rush and Pressure use their own copy,
 //! `crate::sdk::pullback`, which adds an SDK adapter: changes there do not reach Jeff, and changes
 //! here do not reach them.
+use rts_rules::math::GameplayMath as _;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Distances are tiles; duration is simulation ticks. Zero HP disables new pull-backs.
@@ -87,7 +88,8 @@ impl PullbackMemory {
                     continue;
                 }
                 let distance = |enemy: &PullbackUnit| {
-                    (unit.position.0 - enemy.position.0).hypot(unit.position.1 - enemy.position.1)
+                    (unit.position.0 - enemy.position.0)
+                        .det_hypot(unit.position.1 - enemy.position.1)
                 };
                 let Some(threat) = enemies
                     .iter()
@@ -99,7 +101,7 @@ impl PullbackMemory {
                     unit.position.0 - threat.position.0,
                     unit.position.1 - threat.position.1,
                 );
-                let len = dx.hypot(dy);
+                let len = dx.det_hypot(dy);
                 if len <= f32::EPSILON {
                     (dx, dy) = (1.0, 0.0);
                 } else {

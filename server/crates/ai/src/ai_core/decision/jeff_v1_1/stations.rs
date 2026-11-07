@@ -30,6 +30,7 @@
 
 use super::*;
 use crate::ai_core::decision::geometry::{clamp_to_map, dist2, squared, tile_center};
+use rts_rules::math::GameplayMath as _;
 
 /// A base whose station lies this close to another's shares it.
 const COVER_TILES: f32 = 20.0;
@@ -609,7 +610,8 @@ pub(in crate::ai_core::decision) fn station(
             continue;
         }
         let remote = 1.0
-            + dist2(point.0, point.1, main_center.0, main_center.1).sqrt() / (REMOTE_TILES * ts);
+            + dist2(point.0, point.1, main_center.0, main_center.1).det_sqrt()
+                / (REMOTE_TILES * ts);
         stations.push(Station {
             anchor: base.depot,
             bases: vec![base.depot],
@@ -937,7 +939,8 @@ pub(in crate::ai_core::decision) fn place_riflemen(
         })
         .map(|base| {
             let remote = 1.0
-                + dist2(base.at.0, base.at.1, main_at.0, main_at.1).sqrt() / (REMOTE_TILES * ts);
+                + dist2(base.at.0, base.at.1, main_at.0, main_at.1).det_sqrt()
+                    / (REMOTE_TILES * ts);
             (base.depot, base.extractors.len() as f32 * remote)
         })
         .collect();
