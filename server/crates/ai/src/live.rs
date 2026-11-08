@@ -57,8 +57,9 @@ pub const LIVE_PROFILE_IDS: [&str; 7] = [
     PRESSURE_AI_ID,
 ];
 
-/// The pool random picks draw from: every live profile but Jeff's AI V1.0, which is chosen only by
-/// name. Jeff's AI V1.1 holds V1.0's old place, so the random stream is unchanged.
+/// The pool random picks draw from: every live profile but Jeff's AI V1.0, which is internal-only
+/// (offline tools and observer-only sessions). Jeff's AI V1.1 holds V1.0's old place, so the random
+/// stream is unchanged.
 const RANDOM_LIVE_PROFILE_IDS: [&str; 6] = [
     AI_2_3_ID,
     AI_2_1_ID,
@@ -101,7 +102,7 @@ pub fn live_profile_label(profile_id: &str) -> &'static str {
 pub fn is_player_live_profile_id(profile_id: &str) -> bool {
     matches!(
         profile_id,
-        AI_2_3_ID | JEFFS_AI_ID | JEFFS_AI_V1_1_ID | RUSH_AI_ID | PRESSURE_AI_ID
+        AI_2_3_ID | JEFFS_AI_V1_1_ID | RUSH_AI_ID | PRESSURE_AI_ID
     )
 }
 

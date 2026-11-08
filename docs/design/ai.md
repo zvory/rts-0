@@ -10,11 +10,10 @@ When several seats use the same profile, their lobby names receive deterministic
 
 ### Canonical profiles
 
-The player-facing lobby supports five AI profile IDs:
+The player-facing lobby supports four AI profile IDs:
 
 - ai_2_3 — AI 2.3, the default weighted composition: equal thirds Rush AI, Pressure AI, and Jeff's AI (one-third probability each).
 - jeffs_ai_v1_1 — Jeff's AI (V1.1): Jeff's AI V1.0 plus the V1.1 changes, played with the feature set fixed in `JEFF_V1_1_FEATURES` (profiles.rs). On a symmetric map it decides in one frame, as if on the start it won more from (`live/mirror.rs`), so both starts play the same way.
-- jeffs_ai — Jeff's AI V1.0, the server-authoritative port of the locally evaluated V3 champion policy; chosen only by name.
 - rush_ai — Rush AI, an immediate infantry attack with forward construction.
 - pressure_ai — Pressure AI, the AI 2.1 economy and technology with independent forward staging and a value-based response.
 
@@ -24,7 +23,7 @@ replaces it with `ai_2_3` whenever a room has an active human player. The replac
 again at the authoritative match-start seam, so stale or crafted clients cannot put Turtle into a
 human match.
 
-The convenience inputs ai and default resolve to ai_2_3. The lobby exposes AI 2.3, Jeff's AI, Jeff's AI V1.0, Rush AI, and Pressure AI. AI 2.1 remains a concrete internal profile (`ai_2_1`) for offline tools and
+The convenience inputs ai and default resolve to ai_2_3. The lobby exposes AI 2.3, Jeff's AI, Rush AI, and Pressure AI. Jeff's AI V1.0 (`jeffs_ai`, the server-authoritative port of the locally evaluated V3 champion policy and the baseline V1.1 is measured against) is internal-only like AI 2.1. AI 2.1 remains a concrete internal profile (`ai_2_1`) for offline tools and
 observer-only sessions, but is hidden and rejected as a direct selection in human player lobbies.
 Unsupported or internal IDs fall back to AI 2.3 when adding a seat and are ignored when changing a
 seat; stale internal seats are normalized to AI 2.3 when humans join and again at match start.
