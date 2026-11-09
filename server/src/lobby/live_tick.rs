@@ -91,6 +91,7 @@ impl LiveTickDriver<'_> {
         let tick_start = StdInstant::now();
         let mut perf = rts_sim::perf::TickPerf::maybe_new();
         let alive_before_tick = self.outcome_alive_players(&game);
+        self.critical_events.seed_initial_buildings(&game);
 
         let tick_result = self.tick_game(&mut game, perf.as_mut());
         let per_player_events: HashMap<u32, Vec<Event>> = match tick_result {

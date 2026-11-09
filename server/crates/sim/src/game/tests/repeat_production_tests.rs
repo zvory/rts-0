@@ -722,12 +722,18 @@ fn critical_events_track_lost_prerequisites_and_recovery_without_duplicates() {
             .unwrap()
             .set_repeat_production(Some(EntityKind::AntiTankGun), true);
     }
+    assert!(game.critical_event_state()[0]
+        .completed_buildings
+        .contains(&EntityKind::EngineeringComplex));
     assert!(game.critical_event_state()[0].blocked_production.is_empty());
     game.state
         .entities
         .get_mut(engineering)
         .unwrap()
         .apply_damage(u32::MAX, None);
+    assert!(!game.critical_event_state()[0]
+        .completed_buildings
+        .contains(&EntityKind::EngineeringComplex));
     assert_eq!(
         game.critical_event_state()[0].blocked_production,
         vec![(EntityKind::AntiTankGun, EntityKind::EngineeringComplex)]
