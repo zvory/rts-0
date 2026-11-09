@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use super::{connection::send_or_log, room_task::RoomPlayer};
 use crate::protocol::{ChatChannel, ChatScope, ServerMessage};
@@ -9,6 +9,8 @@ const WARNING_COOLDOWN_TICKS: u32 = 30 * rts_rules::balance::TICK_HZ;
 #[derive(Default)]
 pub(super) struct CriticalEventTracker {
     last_warning: HashMap<u32, u32>,
+    previously_completed: HashSet<(u32, EntityKind)>,
+    seeded: bool,
 }
 
 enum Notification {
@@ -16,6 +18,22 @@ enum Notification {
 }
 
 impl CriticalEventTracker {
+    pub(super) fn seed_initial_buildings(&mut self, game: &Game) {
+        if self.seeded {
+            return;
+        }
+        // A live replay branch can start with completed buildings under attack.
+        for state in game.critical_event_state() {
+            self.remember_completed(state.player_id, state.completed_buildings);
+        }
+        self.seeded = true;
+    }
+
+    fn remember_completed(&mut self, player: u32, buildings: Vec<EntityKind>) {
+        self.previously_completed
+            .extend(buildings.into_iter().map(|kind| (player, kind)));
+    }
+
     fn warning_allowed(&mut self, player: u32, tick: u32) -> bool {
         let last = self.last_warning.entry(player);
         match last {
@@ -34,12 +52,16 @@ impl CriticalEventTracker {
 
     fn observe(&mut self, tick: u32, states: Vec<PlayerCriticalEventState>) -> Vec<Notification> {
         let mut notifications = Vec::new();
-        for state in states {
+        for mut state in states {
+            self.remember_completed(state.player_id, state.completed_buildings);
+            state
+                .blocked_production
+                .retain(|&(_, kind)| self.previously_completed.contains(&(state.player_id, kind)));
             if !state.blocked_production.is_empty() && self.warning_allowed(state.player_id, tick) {
                 let mut prerequisites: Vec<_> = state
                     .blocked_production
-                    .iter()
-                    .map(|&(_, prerequisite)| prerequisite_name(prerequisite))
+                    .into_iter()
+                    .map(|(_, kind)| prerequisite_name(kind))
                     .collect();
                 prerequisites.sort_unstable();
                 prerequisites.dedup();
@@ -129,6 +151,7 @@ mod tests {
             player_id: 1,
             supply_used: 300,
             supply_cap: 300,
+            completed_buildings: vec![],
             blocked_production: vec![
                 (EntityKind::AntiTankGun, EntityKind::EngineeringComplex),
                 (EntityKind::CommandCar, EntityKind::EngineeringComplex),
@@ -136,9 +159,52 @@ mod tests {
         }
     }
 
+    fn completed(player_id: u32, kinds: &[EntityKind]) -> PlayerCriticalEventState {
+        PlayerCriticalEventState {
+            player_id,
+            completed_buildings: kinds.to_vec(),
+            blocked_production: vec![],
+            ..state()
+        }
+    }
+
+    #[test]
+    fn critical_events_require_prior_completion_by_the_same_player() {
+        let mut tracker = CriticalEventTracker::default();
+        let engineering = EntityKind::EngineeringComplex;
+        assert!(tracker.observe(1, vec![state()]).is_empty());
+        assert!(tracker
+            .observe(2, vec![state(), completed(2, &[engineering])])
+            .is_empty());
+        assert!(tracker.observe(3, vec![state()]).is_empty());
+        assert!(tracker
+            .observe(4, vec![completed(1, &[engineering])])
+            .is_empty());
+
+        let mut current = state();
+        current
+            .blocked_production
+            .push((EntityKind::MachineGunner, EntityKind::TrainingCentre));
+        let notifications = tracker.observe(5, vec![current]);
+        assert!(matches!(
+            notifications.as_slice(),
+            [Notification::Private { recipient: 1, text }] if text == "Rebuild Engineering Complex!"
+        ));
+        assert!(tracker
+            .observe(WARNING_COOLDOWN_TICKS + 5, vec![completed(1, &[])])
+            .is_empty());
+    }
+
     #[test]
     fn critical_events_cooldowns_are_independent_and_exact() {
         let mut tracker = CriticalEventTracker::default();
+        let engineering = EntityKind::EngineeringComplex;
+        assert!(tracker
+            .observe(
+                0,
+                vec![completed(1, &[engineering]), completed(2, &[engineering])]
+            )
+            .is_empty());
         let initial = tracker.observe(1, vec![state()]);
         assert_eq!(initial.len(), 1);
         assert!(
@@ -192,7 +258,9 @@ mod tests {
         ] {
             let mut current = state();
             current.blocked_production = vec![(unit, prerequisite)];
-            let notifications = CriticalEventTracker::default().observe(1, vec![current]);
+            let mut tracker = CriticalEventTracker::default();
+            tracker.observe(0, vec![completed(1, &[prerequisite])]);
+            let notifications = tracker.observe(1, vec![current]);
             assert_eq!(notifications.len(), 1);
             assert!(
                 matches!(&notifications[0], Notification::Private { text, .. }
@@ -205,7 +273,19 @@ mod tests {
             (EntityKind::RocketLauncher, EntityKind::Factory),
             (EntityKind::MachineGunner, EntityKind::TrainingCentre),
         ]);
-        let notifications = CriticalEventTracker::default().observe(1, vec![current]);
+        let mut tracker = CriticalEventTracker::default();
+        tracker.observe(
+            0,
+            vec![completed(
+                1,
+                &[
+                    EntityKind::EngineeringComplex,
+                    EntityKind::Factory,
+                    EntityKind::TrainingCentre,
+                ],
+            )],
+        );
+        let notifications = tracker.observe(1, vec![current]);
         assert_eq!(notifications.len(), 1);
         assert!(
             matches!(&notifications[0], Notification::Private { text, .. }
