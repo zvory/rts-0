@@ -5,7 +5,6 @@ export const MAX_LOBBY_TEAMS = 4;
 export const AI_PROFILES = Object.freeze([
   { id: "ai_2_3", label: "AI 2.3" },
   { id: "jeffs_ai_v1_1", label: "Jeff's AI" },
-  { id: "jeffs_ai", label: "Jeff's AI V1.0" },
   { id: "rush_ai", label: "Rush AI" },
   { id: "pressure_ai", label: "Pressure AI" },
 ]);
