@@ -1149,6 +1149,12 @@ field.
 from `start.map.resources`; clients keep last-known `remaining` locally. The server sends
 `remaining` updates only for resource nodes currently visible to that recipient (dev full-world
 watch rooms receive all resource updates).
+Every live node on a currently visible tile is included in `resourceDeltas` on every snapshot.
+Depleted nodes are removed from the simulation. If a known node's tile is currently visible in
+`visibleTiles` but its id is absent from `resourceDeltas`, clients clear its remembered remaining
+amount to zero. This repairs depletion missed under fog without revealing hidden mining;
+`exploredTiles` alone never clears a resource. Empty or omitted visibility grids do not establish
+visible absence.
 
 `SmokeCloud`: `{ id: u32, x: f32, y: f32, radiusTiles: f32, expiresIn: u16 }`. Smoke clouds are
 neutral world effects, not entities. `radiusTiles` and `expiresIn` reflect the cast-time smoke
