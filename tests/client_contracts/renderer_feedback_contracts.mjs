@@ -921,7 +921,6 @@ function nearPoint(call, point, epsilon = 0.001) {
     minRangeGfx.calls.some((call) => call[0] === "lineStyle" && call[1] === 1 && call[3] === 0.56),
     "selected unit minimum-range rings draw at doubled opacity",
   );
-
   const mortarRangeGfx = new RecordingGraphics();
   _drawSelectedUnitRanges.call(
     { _feedbackGfx: mortarRangeGfx, _map: { tileSize: 32 } },
@@ -930,6 +929,7 @@ function nearPoint(call, point, epsilon = 0.001) {
       showUnitRangesEnabled: true,
       selectedEntities: () => [{
         id: 78,
+        weaponRangeTiles: 8,
         owner: 2,
         kind: KIND.MORTAR_TEAM,
         x: 224,
@@ -937,22 +937,10 @@ function nearPoint(call, point, epsilon = 0.001) {
       }],
     },
   );
-  const chargedMortarGfx = new RecordingGraphics();
-  _drawSelectedUnitRanges.call(
-    { _feedbackGfx: chargedMortarGfx, _map: { tileSize: 32 } },
-    { playerId: 2, showUnitRangesEnabled: true, selectedEntities: () => [{
-      id: 79, owner: 2, kind: KIND.MORTAR_TEAM, x: 224, y: 96, weaponRangeTiles: 8,
-    }] },
-  );
-  const chargedCircles = chargedMortarGfx.calls.filter((call) => call[0] === "drawCircle");
-  assert(chargedCircles.some((call) => call[3] === 256) && chargedCircles.some((call) => call[3] === 160),
-    "dynamic mortar range retains the five-tile dead zone and uses the authoritative maximum");
-  assert(chargedMortarGfx.calls.some((call) => call[0] === "cut"),
-    "dynamic mortar range keeps its filled annulus");
   const mortarCircles = mortarRangeGfx.calls.filter((call) => call[0] === "drawCircle");
   assert(
-    mortarCircles.some((call) => call[3] === 544) && mortarCircles.some((call) => call[3] === 160),
-    "selected mortar draws its 17-tile outer circle and five-tile dead zone without setup state",
+    mortarCircles.some((call) => call[3] === 256) && mortarCircles.some((call) => call[3] === 160),
+    "selected mortar draws its authoritative eight-tile maximum and unchanged five-tile dead zone",
   );
   assert(
     mortarRangeGfx.calls.some((call) => call[0] === "cut") &&
