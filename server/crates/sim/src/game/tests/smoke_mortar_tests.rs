@@ -441,7 +441,11 @@ fn manual_mortar_fire_impacts_without_toast_notice() {
             .iter()
             .all(|event| !matches!(event, Event::MortarImpact { .. }))));
         assert_eq!(
-            game.state.entities.get(target).expect("target should survive until impact").hp,
+            game.state
+                .entities
+                .get(target)
+                .expect("target should survive until impact")
+                .hp,
             hp_before_impact,
             "mortar damage must wait for the full 47-tick flight"
         );
