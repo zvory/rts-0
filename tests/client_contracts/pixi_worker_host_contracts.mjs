@@ -114,6 +114,20 @@ async function queueAndLifecycleContracts() {
     "worker teardown is idempotent and removes listeners, worker, and transferred canvas once");
 }
 
+async function independentTankRecoilContracts() {
+  const { adapter, worker, assembler } = createFixture();
+  const frame = assemble(assembler, 1);
+  const tankFrame = { ...frame, layers: { ...frame.layers,
+    groundUnit: [{ type: "entity", id: 5, kind: "tank" }] } };
+  const submission = adapter.render(tankFrame);
+  const pose = worker.frameMessages()[0].payload.frame.pixiCompatibility.poses.find((entry) => entry.id === 5);
+  assert(pose.recoil === 0.7 && pose.coaxRecoil === 0.4,
+    "worker transfer snapshots independent cannon and machine gun recoil in the same frame");
+  worker.present(tankFrame);
+  await submission.settled;
+  adapter.destroy();
+}
+
 async function generationAndFatalContracts() {
   const fixture = createFixture();
   const { adapter, worker, root, assembler } = fixture;
@@ -447,7 +461,8 @@ function createFixture({ surface = "match", gpuShadowTiming = false } = {}) {
   };
   const incidents = [];
   const adapter = new PixiWorkerPresentationAdapter(root, canvas, worker, {
-    state: () => ({ resources: {}, _curById: new Map(), _prevById: new Map() }),
+    state: () => ({ resources: {}, _curById: new Map(), _prevById: new Map(),
+      weaponRecoil: (id, kind, now, weaponKind) => weaponKind === "tank_coax" ? 0.4 : 0.7 }),
     staticMap: () => assembler.staticMap,
     renderIncident: (incident) => incidents.push(incident),
   }, { surface, gpuShadowTiming });
@@ -517,6 +532,7 @@ async function assertRejects(promise, message) {
 
 try {
   await queueAndLifecycleContracts();
+  await independentTankRecoilContracts();
   await generationAndFatalContracts();
   await decalResetContracts();
   await editorFatalContracts();

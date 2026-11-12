@@ -327,7 +327,7 @@ fn deploy_artillery_toward(game: &mut Game, artillery: u32, target: (f32, f32)) 
         .entities
         .get_mut(artillery)
         .expect("artillery should exist");
-    let facing = (target.1 - entity.pos_y).atan2(target.0 - entity.pos_x);
+    let facing = (target.1 - entity.pos_y()).det_atan2(target.0 - entity.pos_x());
     entity.set_weapon_setup(WeaponSetup::Deployed);
     entity.set_emplacement_facing(Some(facing));
     entity.set_desired_weapon_facing(facing);

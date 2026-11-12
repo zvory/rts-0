@@ -1,5 +1,6 @@
 import { assert } from "./assertions.mjs";
-import { createWorkerPresentationState } from "../../client/src/renderer/worker_rehydration.js";
+import { KIND, WEAPON_KIND } from "../../client/src/protocol.js";
+import { compatibilityState, createWorkerPresentationState } from "../../client/src/renderer/worker_rehydration.js";
 
 const state = createWorkerPresentationState();
 state.reset(1);
@@ -57,3 +58,9 @@ function frame(frameId, revision) {
     layers: { persistentGroundMark: [] },
   };
 }
+
+const recoilState = compatibilityState({ poses: [{ id: 5, recoil: 0.7, coaxRecoil: 0.4 }] });
+assert(recoilState.weaponRecoil(5, KIND.TANK, 0) === 0.7,
+  "worker retains cannon recoil alongside machine gun recoil");
+assert(recoilState.weaponRecoil(5, KIND.TANK, 0, WEAPON_KIND.TANK_COAX) === 0.4,
+  "worker retains the independent machine gun sample");

@@ -196,8 +196,8 @@ fn memory_entry_for_visible_enemy(
     facing.is_finite().then_some(AntiTankGunMemoryEntry {
         id: entity.id,
         owner: entity.owner,
-        x: entity.pos_x,
-        y: entity.pos_y,
+        x: entity.pos_x(),
+        y: entity.pos_y(),
         facing,
         observed_tick,
     })

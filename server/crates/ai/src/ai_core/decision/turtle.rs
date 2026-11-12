@@ -3,6 +3,7 @@ use super::geometry::{clamp_to_map, dist2, normalized_direction, squared, tile_c
 use super::*;
 use crate::ai_core::map_analysis::{AiBaseChoke, AiMapAnalysis};
 use crate::ai_core::profiles::TurtleDefensePolicy;
+use rts_rules::math::GameplayMath as _;
 
 mod debug;
 pub(super) use debug::turtle_observer_debug_layers;
@@ -935,7 +936,7 @@ fn choke_line_normal_toward_inside(
 ) -> Option<(f32, f32)> {
     let dx = choke.endpoint_b_world.0 - choke.endpoint_a_world.0;
     let dy = choke.endpoint_b_world.1 - choke.endpoint_a_world.1;
-    let len = (dx * dx + dy * dy).sqrt();
+    let len = (dx * dx + dy * dy).det_sqrt();
     if len <= f32::EPSILON || !len.is_finite() {
         return normalized_direction(choke.enemy_approach_world, own_start_world)
             .or_else(|| normalized_direction(choke.center_world, own_start_world))
@@ -1091,7 +1092,7 @@ fn choke_segment_len(choke: AiBaseChoke) -> f32 {
         choke.endpoint_b_world.0,
         choke.endpoint_b_world.1,
     )
-    .sqrt()
+    .det_sqrt()
 }
 
 fn choke_route_slot_bias(observation: &AiObservation, choke: AiBaseChoke) -> Option<(f32, f32)> {

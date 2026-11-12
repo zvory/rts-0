@@ -3,7 +3,7 @@ use crate::{kinds, states};
 
 #[test]
 fn compact_entity_trims_trailing_optional_nulls() {
-    let snapshot = Snapshot {
+    let mut snapshot = Snapshot {
         tick: 1,
         ground_decal_revision: 0,
         ground_decal_delta: None,
@@ -43,6 +43,11 @@ fn compact_entity_trims_trailing_optional_nulls() {
     assert_eq!(entity.len(), 8);
     assert!(value.get("r").is_none());
     assert!(value.get("ev").is_none());
+    snapshot.entities[0].commander_facing = Some(-1.25);
+    let value: serde_json::Value =
+        serde_json::from_str(&serialize_compact_snapshot(&snapshot).unwrap()).unwrap();
+    assert_eq!(value["e"][0].as_array().unwrap().len(), 45);
+    assert_eq!(value["e"][0][44], -1.25);
 }
 
 #[test]

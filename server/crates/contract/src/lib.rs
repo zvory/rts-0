@@ -891,6 +891,9 @@ pub struct EntityView {
     pub facing: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub weapon_facing: Option<f32>,
+    /// Independent Tank commander machine-gun orientation.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub commander_facing: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub weapon_range_tiles: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -997,6 +1000,7 @@ impl EntityView {
             rocket_rack_count: None,
             facing: None,
             weapon_facing: None,
+            commander_facing: None,
             weapon_range_tiles: None,
             panzerfaust_loaded: None,
             panzerfaust_windup_progress: None,

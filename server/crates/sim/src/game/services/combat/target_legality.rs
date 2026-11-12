@@ -57,7 +57,7 @@ pub(super) fn direct_fire_target_legal(
     {
         return false;
     }
-    let end = (target_entity.pos_x, target_entity.pos_y);
+    let end = (target_entity.pos_x(), target_entity.pos_y());
     let Some(smoke_melee_visibility) = target_visible_for_fire(
         map,
         teams,
@@ -199,7 +199,7 @@ pub(super) fn auto_target_has_legal_shot(
     start: (f32, f32),
     target: &Entity,
 ) -> bool {
-    let end = (target.pos_x, target.pos_y);
+    let end = (target.pos_x(), target.pos_y());
     let Some(smoke_melee_visibility) =
         target_visible_for_fire(map, teams, fog, smokes, owner, attacker, target, start)
     else {
@@ -227,8 +227,8 @@ fn target_visible_for_fire(
         owner, target, map, fog, teams,
     ) || !crate::rules::projection::team_visible_world(
         owner,
-        target.pos_x,
-        target.pos_y,
+        target.pos_x(),
+        target.pos_y(),
         fog,
         teams,
     ) {
@@ -237,7 +237,7 @@ fn target_visible_for_fire(
     let smoke_melee_visibility = smokes.units_have_melee_visibility(attacker, target);
     if !smoke_melee_visibility
         && (smokes.point_inside(start.0, start.1)
-            || smokes.point_inside(target.pos_x, target.pos_y))
+            || smokes.point_inside(target.pos_x(), target.pos_y()))
     {
         return None;
     }

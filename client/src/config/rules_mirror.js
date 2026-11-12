@@ -53,7 +53,7 @@ export const ARTILLERY_MIN_RANGE_TILES = 10;
 export const ARTILLERY_MAX_RANGE_TILES = 35;
 export const ARTILLERY_FIELD_OF_FIRE_RAD = 30 * Math.PI / 180;
 export const ANTI_TANK_GUN_SETUP_TICKS = 120;
-export const ANTI_TANK_GUN_TEARDOWN_TICKS = 40;
+export const ANTI_TANK_GUN_TEARDOWN_TICKS = 30;
 export const ARTILLERY_SETUP_TICKS = TICK_HZ * 6;
 export const ARTILLERY_SHELL_DELAY_TICKS = TICK_HZ * 5;
 export const ARTILLERY_OUTER_RADIUS_TILES = 2;
@@ -157,8 +157,8 @@ export const STATS = Object.freeze({
     upgradeRequiresText: "Requires research in Engineering Complex" },
   [KIND.ROCKET_LAUNCHER]: { armored: false, label: "Rocket Truck", icon: "RT", size: 21.6, sight: 8, body: ROCKET_LAUNCHER_BODY,
     rangeTiles: 0, minRangeTiles: 10,
-    cost: { steel: 225, oil: 100 }, supply: 6, buildTicks: TICK_HZ * 20,
-    requires: [KIND.STEELWORKS, KIND.FACTORY], upgradeRequires: UPGRADE.ROCKETS,
+    cost: { steel: 225, oil: 100 }, supply: 3, buildTicks: TICK_HZ * 20,
+    requires: [KIND.STEELWORKS], upgradeRequires: UPGRADE.ROCKETS,
     upgradeRequiresText: "Requires Rockets research in Engineering Complex",
     description: "Mobile rocket artillery. Stop and manually fire a 16-rocket Barrage over a wide area." },
   [KIND.SCOUT_CAR]: { armored: false, label: "Scout Car", icon: "SC", size: 14.4, sight: 15, body: SCOUT_CAR_BODY,
@@ -284,7 +284,7 @@ export const ABILITIES = Object.freeze({
     targetMode: "worldPoint",
     rangeTiles: ROCKET_BARRAGE_MAX_RANGE_TILES,
     minRangeTiles: ROCKET_BARRAGE_MIN_RANGE_TILES,
-    cooldownTicks: TICK_HZ * 60,
+    cooldownTicks: TICK_HZ * 30,
     charges: 1,
     cost: Object.freeze({ steel: 0, oil: 150 }),
     radiusTiles: 6,
@@ -519,7 +519,7 @@ export const UPGRADES = Object.freeze({
     icon: "RKT+",
     cost: Object.freeze({ steel: 75, oil: 125 }),
     researchTicks: ROCKETS_RESEARCH_TICKS,
-    description: "Unlock Rocket Truck training at the Gun Works with a completed Vehicle Works",
+    description: "Unlock Rocket Truck training at the Gun Works",
     researchedAt: KIND.ENGINEERING_COMPLEX,
   }),
 });

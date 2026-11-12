@@ -1,5 +1,6 @@
 //! Pure combat rules: classification predicates and damage formula.
 
+use crate::math::GameplayMath as _;
 pub const MG_HALF_SPREAD_RAD: f32 = std::f32::consts::PI / 18.0;
 pub const MG_BURST_BULLETS: usize = 3;
 // Each ray contributes 60% of profile damage, up 20% from the original 50%.
@@ -564,7 +565,7 @@ pub fn classify_armor_facing(
     victim_pos: (f32, f32),
     attacker_pos: (f32, f32),
 ) -> ArmorFacing {
-    let attacker_angle = (attacker_pos.1 - victim_pos.1).atan2(attacker_pos.0 - victim_pos.0);
+    let attacker_angle = (attacker_pos.1 - victim_pos.1).det_atan2(attacker_pos.0 - victim_pos.0);
     let angle_error = normalized_angle_delta(attacker_angle, victim_facing).abs();
     if angle_error <= FRONT_ARC_RAD {
         ArmorFacing::Front

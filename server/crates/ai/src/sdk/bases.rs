@@ -1,5 +1,6 @@
 //! Static base geography and fog-respecting evidence, independent of strategy policy.
 use super::{AiFrame, EntityKind, WorldQueries};
+use rts_rules::math::GameplayMath as _;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum AiBaseSiteId {
@@ -155,5 +156,5 @@ fn associated_site(frame: &AiFrame, position: (f32, f32)) -> Option<AiBaseSiteId
 }
 
 fn distance2(a: (f32, f32), b: (f32, f32)) -> f32 {
-    (a.0 - b.0).powi(2) + (a.1 - b.1).powi(2)
+    (a.0 - b.0).det_powi(2) + (a.1 - b.1).det_powi(2)
 }

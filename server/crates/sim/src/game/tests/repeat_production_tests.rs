@@ -5,6 +5,8 @@ use crate::game::services::occupancy::footprint_center;
 use crate::game::upgrade::UpgradeKind;
 use crate::rules;
 
+mod manual_spending;
+
 fn players() -> [PlayerInit; 2] {
     [
         PlayerInit {
@@ -92,7 +94,7 @@ fn depot_completes_steel_mine_on_nearest_in_range_patch() {
         .iter()
         .find(|entity| entity.kind == EntityKind::SteelMine)
         .expect("steel mine should be produced");
-    assert_eq!((mine.pos_x, mine.pos_y), near);
+    assert_eq!((mine.pos_x(), mine.pos_y()), near);
 }
 
 #[test]
@@ -126,7 +128,7 @@ fn depot_extractor_scaffold_matches_front_queue_progress() {
         .find(|entity| entity.kind == EntityKind::SteelMine)
         .expect("visible extractor scaffold");
     assert!(mine.under_construction());
-    assert_eq!((mine.pos_x, mine.pos_y), patch);
+    assert_eq!((mine.pos_x(), mine.pos_y()), patch);
     assert_eq!(mine.construction_producer_id(), Some(depot));
     assert_eq!(
         mine.build_progress_fraction(),
@@ -235,7 +237,7 @@ fn depot_builds_free_steel_and_oil_extractors_concurrently() {
         .entities
         .iter()
         .find(|entity| entity.kind == EntityKind::PumpJack)
-        .map(|entity| (entity.id, entity.pos_x, entity.pos_y))
+        .map(|entity| (entity.id, entity.pos_x(), entity.pos_y()))
         .unwrap();
     let worker = game
         .state
@@ -720,12 +722,18 @@ fn critical_events_track_lost_prerequisites_and_recovery_without_duplicates() {
             .unwrap()
             .set_repeat_production(Some(EntityKind::AntiTankGun), true);
     }
+    assert!(game.critical_event_state()[0]
+        .completed_buildings
+        .contains(&EntityKind::EngineeringComplex));
     assert!(game.critical_event_state()[0].blocked_production.is_empty());
     game.state
         .entities
         .get_mut(engineering)
         .unwrap()
         .apply_damage(u32::MAX, None);
+    assert!(!game.critical_event_state()[0]
+        .completed_buildings
+        .contains(&EntityKind::EngineeringComplex));
     assert_eq!(
         game.critical_event_state()[0].blocked_production,
         vec![(EntityKind::AntiTankGun, EntityKind::EngineeringComplex)]

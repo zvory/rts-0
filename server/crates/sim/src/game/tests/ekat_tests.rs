@@ -334,8 +334,8 @@ fn ekat_dash_moves_up_to_five_tiles_leaves_return_marker_and_starts_cooldown() {
     game.tick();
 
     let hero_entity = game.state.entities.get(hero).expect("hero exists");
-    assert!((hero_entity.pos_x - target.0).abs() < f32::EPSILON);
-    assert!((hero_entity.pos_y - target.1).abs() < f32::EPSILON);
+    assert!((hero_entity.pos_x() - target.0).abs() < f32::EPSILON);
+    assert!((hero_entity.pos_y() - target.1).abs() < f32::EPSILON);
     assert_eq!(
         hero_entity.ability_cooldown_ticks(ability::AbilityKind::EkatTeleport),
         config::EKAT_TELEPORT_COOLDOWN_TICKS.saturating_sub(1)
@@ -345,8 +345,8 @@ fn ekat_dash_moves_up_to_five_tiles_leaves_return_marker_and_starts_cooldown() {
         .ability_runtime
         .active_return_marker(1, hero, ability::AbilityKind::EkatTeleport, None, 1)
         .expect("dash should leave a return marker");
-    assert!((marker.x - pos.0).abs() < f32::EPSILON);
-    assert!((marker.y - pos.1).abs() < f32::EPSILON);
+    assert!((marker.x.to_world() - pos.0).abs() < f32::EPSILON);
+    assert!((marker.y.to_world() - pos.1).abs() < f32::EPSILON);
     assert_eq!(
         marker.expires_in(game.current_tick()),
         Some(config::EKAT_RETURN_MARKER_DURATION_TICKS as u16)
@@ -370,8 +370,8 @@ fn ekat_dash_far_target_clamps_to_max_range_without_staging_move() {
     game.tick();
 
     let hero_entity = game.state.entities.get(hero).expect("hero exists");
-    assert!((hero_entity.pos_x - expected_x).abs() < 0.001);
-    assert!((hero_entity.pos_y - pos.1).abs() < 0.001);
+    assert!((hero_entity.pos_x() - expected_x).abs() < 0.001);
+    assert!((hero_entity.pos_y() - pos.1).abs() < 0.001);
     assert!(
         matches!(hero_entity.order(), Order::Idle),
         "out-of-range Dash should resolve immediately instead of staging a movement order"
@@ -469,7 +469,7 @@ fn ekat_dash_rejects_invalid_landing_without_marker_or_cooldown() {
     game.tick();
 
     let hero_entity = game.state.entities.get(hero).expect("hero exists");
-    assert!((hero_entity.pos_x - pos.0).abs() < f32::EPSILON);
+    assert!((hero_entity.pos_x() - pos.0).abs() < f32::EPSILON);
     assert_eq!(
         hero_entity.ability_cooldown_ticks(ability::AbilityKind::EkatTeleport),
         0
@@ -494,7 +494,7 @@ fn ekat_return_cannot_happen_in_same_tick_as_dash() {
     game.tick();
 
     let hero_entity = game.state.entities.get(hero).expect("hero exists");
-    assert!((hero_entity.pos_x - target.0).abs() < f32::EPSILON);
+    assert!((hero_entity.pos_x() - target.0).abs() < f32::EPSILON);
     assert!(active_return_marker_id(&game, hero).is_some());
 }
 
@@ -517,8 +517,8 @@ fn ekat_return_recasts_to_marker_and_consumes_it_after_delay() {
     game.tick();
 
     let hero_entity = game.state.entities.get(hero).expect("hero exists");
-    assert!((hero_entity.pos_x - pos.0).abs() < f32::EPSILON);
-    assert!((hero_entity.pos_y - pos.1).abs() < f32::EPSILON);
+    assert!((hero_entity.pos_x() - pos.0).abs() < f32::EPSILON);
+    assert!((hero_entity.pos_y() - pos.1).abs() < f32::EPSILON);
     assert!(active_return_marker_id(&game, hero).is_none());
 }
 
@@ -543,7 +543,7 @@ fn ekat_return_fails_after_marker_expires() {
     game.tick();
 
     let hero_entity = game.state.entities.get(hero).expect("hero exists");
-    assert!((hero_entity.pos_x - target.0).abs() < f32::EPSILON);
+    assert!((hero_entity.pos_x() - target.0).abs() < f32::EPSILON);
     assert!(active_return_marker_id(&game, hero).is_none());
 }
 
@@ -568,7 +568,7 @@ fn ekat_return_fails_when_marker_destination_is_blocked() {
     game.tick();
 
     let hero_entity = game.state.entities.get(hero).expect("hero exists");
-    assert!((hero_entity.pos_x - target.0).abs() < f32::EPSILON);
+    assert!((hero_entity.pos_x() - target.0).abs() < f32::EPSILON);
     assert_eq!(active_return_marker_id(&game, hero), Some(marker_id));
 }
 
@@ -653,7 +653,7 @@ fn ekat_magic_anchor_places_single_visible_ten_second_object() {
             game.current_tick(),
         )
         .expect("anchor should remain active");
-    assert!((anchor.x - first_target.0).abs() < f32::EPSILON);
+    assert!((anchor.x.to_world() - first_target.0).abs() < f32::EPSILON);
     assert_eq!(
         anchor.expires_in(game.current_tick()),
         Some(config::EKAT_MAGIC_ANCHOR_DURATION_TICKS as u16)
@@ -885,7 +885,7 @@ fn ekat_anchor_move_delta(destination_tiles_from_start: f32) -> f32 {
     game.tick();
 
     let hero_entity = game.state.entities.get(hero).expect("hero exists");
-    (hero_entity.pos_x - start.0).abs()
+    (hero_entity.pos_x() - start.0).abs()
 }
 
 #[test]
@@ -1014,7 +1014,7 @@ fn ekat_line_shot_spawns_moving_projectile_and_starts_cooldown_without_immediate
         ability_runtime::AbilityWorldObjectKind::LineProjectile
     );
     assert!(
-        projectile.x > pos.0 && projectile.x < target.0,
+        projectile.x.to_world() > pos.0 && projectile.x.to_world() < target.0,
         "projectile should move out from Ekat instead of applying instant full-line damage"
     );
     assert_eq!(
@@ -1153,7 +1153,7 @@ fn ekat_anchor_line_projectiles_have_independent_hit_dedupe_and_return_to_ekat()
     assert!(
         line_projectiles(&game)
             .iter()
-            .any(|projectile| projectile.y > hero_pos.1),
+            .any(|projectile| projectile.y.to_world() > hero_pos.1),
         "returning anchor and hero projectiles should steer toward Ekat's current position"
     );
 }
@@ -1193,9 +1193,9 @@ fn ekat_anchor_origin_projectile_clamps_from_anchor_and_stays_fog_filtered() {
         .find(|projectile| projectile.source_object_id == Some(anchor_id))
         .expect("anchor projectile exists");
     let max_range = config::EKAT_LINE_SHOT_RANGE_TILES as f32 * config::TILE_SIZE as f32;
-    let endpoint_distance = ((anchor_projectile.endpoint.0 - anchor_pos.0).powi(2)
-        + (anchor_projectile.endpoint.1 - anchor_pos.1).powi(2))
-    .sqrt();
+    let endpoint_distance = ((anchor_projectile.endpoint.0 - anchor_pos.0).det_powi(2)
+        + (anchor_projectile.endpoint.1 - anchor_pos.1).det_powi(2))
+    .det_sqrt();
     assert!(
         endpoint_distance <= max_range + 0.01,
         "anchor-origin projectile should clamp endpoint from the anchor origin"
@@ -1352,7 +1352,7 @@ fn ekat_line_shot_return_tracks_ekats_current_position_after_dash() {
         .find(|object| object.ability == ability::AbilityKind::EkatLineShot)
         .expect("line shot should still be returning");
     assert!(
-        projectile.y > pos.1,
+        projectile.y.to_world() > pos.1,
         "returning projectile should bend toward Ekat's dashed position"
     );
 }

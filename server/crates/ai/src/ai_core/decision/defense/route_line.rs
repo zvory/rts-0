@@ -16,6 +16,7 @@
 //!   defense owns that fight.
 
 use super::*;
+use rts_rules::math::GameplayMath as _;
 
 /// The picket stands where the enemy's route first comes within this range of the main.
 const PICKET_ROUTE_TILES: f32 = 26.0;
@@ -245,7 +246,7 @@ fn update_alert(
             group.iter().map(|enemy| enemy.y).sum::<f32>() / group.len() as f32,
         );
         let distance_tenths =
-            (dist2(centroid.0, centroid.1, anchor.0, anchor.1).sqrt() / ts * 10.0) as u32;
+            (dist2(centroid.0, centroid.1, anchor.0, anchor.1).det_sqrt() / ts * 10.0) as u32;
         let closing = state.track.is_some_and(|(seen, previous)| {
             tick.saturating_sub(seen) <= ALERT_TRACK_WINDOW_TICKS
                 && distance_tenths + ALERT_CLOSING_TENTHS <= previous
@@ -289,8 +290,9 @@ fn spare_home_riflemen(observation: &AiObservation, memory: &AiDecisionMemory) -
         .filter(|unit| {
             !memory.containment.active_riflemen.contains(&unit.id)
                 && !memory.expansion_security.riflemen.contains(&unit.id)
-                && !memory.opening_rush.is_reserved(unit.id)
+                && !memory.rush_reserved(unit.id)
                 && !memory.third_pressure.is_reserved(unit.id)
+                && !memory.jeff_v1_1.tank_raid.holds(unit.id)
         })
         .map(|unit| unit.id)
         .collect();

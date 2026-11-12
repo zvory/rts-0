@@ -4,7 +4,7 @@ use super::super::activation::{
 use super::super::target_legality::{direct_fire_target_legal, DirectFireLegality};
 use super::*;
 
-fn direct_fire_legal(
+pub(super) fn direct_fire_legal(
     map: &Map,
     entities: &EntityStore,
     smokes: &SmokeCloudStore,
@@ -27,7 +27,7 @@ fn direct_fire_legal(
         smokes,
         attacker,
         attacker_entity.owner,
-        (attacker_entity.pos_x, attacker_entity.pos_y),
+        (attacker_entity.pos_x(), attacker_entity.pos_y()),
         target,
         legality,
     )
@@ -104,7 +104,7 @@ fn secondary_weapon_activation_legal(
         smokes,
         attacker,
         attacker_entity.owner,
-        (attacker_entity.pos_x, attacker_entity.pos_y),
+        (attacker_entity.pos_x(), attacker_entity.pos_y()),
         target,
         constraints,
     )

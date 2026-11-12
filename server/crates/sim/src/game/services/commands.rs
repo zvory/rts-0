@@ -432,7 +432,7 @@ pub(in crate::game) fn apply_commands(
                     deconstruct_target_valid(entities, &teams, fog, smokes, player, &units, target);
                 let target_point = entities
                     .get(target)
-                    .map(|target| planner::Point::new(target.pos_x, target.pos_y))
+                    .map(|target| planner::Point::new(target.pos_x(), target.pos_y()))
                     .unwrap_or_else(|| planner::Point::new(0.0, 0.0));
                 let request = planner::OrderRequest {
                     units: units.clone(),
@@ -450,13 +450,32 @@ pub(in crate::game) fn apply_commands(
                     command_admission
                 );
             }
-            SimCommand::PointTanks { units, x, y } => {
+            SimCommand::PointTanks {
+                units,
+                x,
+                y,
+                queued,
+            } => {
                 let Some(units) =
                     validate_command_units(entities, events, player, units, command_admission)
                 else {
                     continue;
                 };
-                tank_point::apply(entities, player, &units, x, y);
+                let Some((units, facing)) = tank_point::heading(entities, player, &units, x, y)
+                else {
+                    continue;
+                };
+                let request = planner::OrderRequest {
+                    units: units.clone(),
+                    mode: issue_mode(queued),
+                    order: planner::RequestedOrder::Point { facing },
+                };
+                apply_planned!(
+                    player,
+                    admission_facts!(player, &faction_id, command_admission, units, None),
+                    &request,
+                    command_admission
+                );
             }
             SimCommand::SetupAntiTankGuns {
                 units,
@@ -886,6 +905,14 @@ mod planned_actions {
                             clear_obstacle_area_units.push(unit);
                         }
                     }
+                    planner::OrderIntent::Point { facing } => {
+                        if immediate_unit_can_replace(entities, player, unit) {
+                            if let Some(e) = entities.get_mut(unit) {
+                                e.hold_position();
+                                e.set_order(Order::Point { facing });
+                            }
+                        }
+                    }
                     planner::OrderIntent::HoldPosition => {
                         if immediate_unit_can_replace(entities, player, unit) {
                             entities.release_miner(unit);
@@ -1242,11 +1269,15 @@ fn clear_obstacle_area_center(
         if !entity.is_neutral_obstacle() || entity.hp == 0 || entity.under_construction() {
             return None;
         }
-        let currently_actionable =
-            rules::projection::team_visible_world(player, entity.pos_x, entity.pos_y, fog, teams)
-                && !smokes.point_inside(entity.pos_x, entity.pos_y);
+        let currently_actionable = rules::projection::team_visible_world(
+            player,
+            entity.pos_x(),
+            entity.pos_y(),
+            fog,
+            teams,
+        ) && !smokes.point_inside(entity.pos_x(), entity.pos_y());
         if currently_actionable {
-            return Some((entity.pos_x, entity.pos_y));
+            return Some((entity.pos_x(), entity.pos_y()));
         }
     }
     building_memory.get(player, target).and_then(|memory| {
@@ -1297,34 +1328,34 @@ fn tank_trap_cluster_targets(
     }
     if !rules::projection::team_visible_world(
         player,
-        anchor_entity.pos_x,
-        anchor_entity.pos_y,
+        anchor_entity.pos_x(),
+        anchor_entity.pos_y(),
         fog,
         teams,
-    ) || smokes.point_inside(anchor_entity.pos_x, anchor_entity.pos_y)
+    ) || smokes.point_inside(anchor_entity.pos_x(), anchor_entity.pos_y())
     {
         return Vec::new();
     }
 
-    let center = (anchor_entity.pos_x, anchor_entity.pos_y);
+    let center = (anchor_entity.pos_x(), anchor_entity.pos_y());
     let radius = config::TANK_TRAP_CLUSTER_ATTACK_RADIUS_TILES * config::TILE_SIZE as f32;
     let radius_sq = radius * radius;
     let mut targets: Vec<(u32, f32)> = entities
         .iter()
         .filter(|entity| entity.hp > 0 && entity.is_neutral_obstacle())
         .filter_map(|entity| {
-            let dx = entity.pos_x - center.0;
-            let dy = entity.pos_y - center.1;
+            let dx = entity.pos_x() - center.0;
+            let dy = entity.pos_y() - center.1;
             let distance_sq = dx * dx + dy * dy;
             (distance_sq <= radius_sq
                 && rules::projection::team_visible_world(
                     player,
-                    entity.pos_x,
-                    entity.pos_y,
+                    entity.pos_x(),
+                    entity.pos_y(),
                     fog,
                     teams,
                 )
-                && !smokes.point_inside(entity.pos_x, entity.pos_y))
+                && !smokes.point_inside(entity.pos_x(), entity.pos_y()))
             .then_some((entity.id, distance_sq))
         })
         .collect();
@@ -1372,8 +1403,13 @@ fn deconstruct_unit_can_target(
         return false;
     }
     teams.same_team_or_same_owner(player, target.owner)
-        || (rules::projection::team_visible_world(player, target.pos_x, target.pos_y, fog, teams)
-            && !smokes.point_inside(target.pos_x, target.pos_y))
+        || (rules::projection::team_visible_world(
+            player,
+            target.pos_x(),
+            target.pos_y(),
+            fog,
+            teams,
+        ) && !smokes.point_inside(target.pos_x(), target.pos_y()))
 }
 
 fn gather_unit_can_use_node(

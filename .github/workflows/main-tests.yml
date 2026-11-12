@@ -134,6 +134,12 @@ jobs:
         if: needs.changed-files.outputs.run_server_build == 'true'
         run: scripts/build-sim-wasm.sh
 
+      - name: Verify portable RNG and end-state hashes in WASM
+        if: needs.changed-files.outputs.run_server_build == 'true'
+        env:
+          CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUNNER: wasm-bindgen-test-runner
+        run: cargo test --manifest-path server/Cargo.toml -p rts-sim --target wasm32-unknown-unknown --test rng_portability --locked
+
       - name: Upload server binary
         if: needs.changed-files.outputs.run_server_build == 'true'
         uses: actions/upload-artifact@v4

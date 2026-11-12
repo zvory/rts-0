@@ -246,6 +246,15 @@ const JEFFS_AI_SIX_GUNS: AiProfile = AiProfile {
 
 pub(crate) static JEFFS_AI: AiProfile = JEFFS_AI_SIX_GUNS;
 
+/// Jeff's AI V1.1: a separate lobby bot grown from the live Jeff (V1.0, `jeffs_ai`). It runs every
+/// live-Jeff behavior, and its own changes branch on `is_jeff_v1_1`, so V1.0 plays as before.
+pub(crate) const JEFFS_AI_V1_1_ID: &str = "jeffs_ai_v1_1";
+
+pub(crate) static JEFFS_AI_V1_1: AiProfile = AiProfile {
+    id: JEFFS_AI_V1_1_ID,
+    ..JEFFS_AI_SIX_GUNS
+};
+
 /// The live Jeff from before the Tank micro under its own id: the same policy, and the Tank
 /// micro only branches on the live id.
 pub(crate) static JEFFS_AI_PRE_TANK_MICRO: AiProfile = AiProfile {

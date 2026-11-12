@@ -1,6 +1,7 @@
 use super::*;
 use crate::ai_core::observation::AiEconomy;
 use crate::ai_core::profiles::JEFFS_AI;
+use rts_rules::math::GameplayMath as _;
 
 #[test]
 fn failed_pushes_go_straight_then_a_random_side_then_the_other_side_then_straight_again() {
@@ -242,6 +243,7 @@ fn a_push_in_ranks_is_as_cohesive_as_its_ranks_allow() {
                 latched_node: None,
                 target_id: None,
                 free_for_combat: true,
+                research: None,
             }
         })
         .collect();
@@ -363,11 +365,11 @@ fn side_lanes_come_at_the_enemy_natural_well_off_the_direct_approach() {
                     sides_found += 1;
                     let (swing, attack) = (world(side.swing), world(side.attack));
                     let from_target =
-                        |p: (f32, f32)| dist2(p.0, p.1, objective.0, objective.1).sqrt() / ts;
+                        |p: (f32, f32)| dist2(p.0, p.1, objective.0, objective.1).det_sqrt() / ts;
                     let dir = normalized_direction(objective, attack).unwrap();
                     let degrees = (dir.0 * direct_dir.0 + dir.1 * direct_dir.1)
                         .clamp(-1.0, 1.0)
-                        .acos()
+                        .det_acos()
                         .to_degrees();
                     println!(
                         "  {label}: swing {:?} ({:.1}t) attack {:?} ({:.1}t) {:.0} deg off direct",

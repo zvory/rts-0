@@ -288,7 +288,7 @@ fn terrain_only_lab_map_draft_restarts_a_fresh_test() {
             .entities
             .iter()
             .filter(|entity| entity.owner == 1 && entity.kind == EntityKind::Worker)
-            .all(|worker| (worker.pos_x, worker.pos_y) != (worker_x, worker_y)),
+            .all(|worker| (worker.pos_x(), worker.pos_y()) != (worker_x, worker_y)),
         "a fresh test must not retain the moved worker from the previous run"
     );
 }
@@ -450,8 +450,8 @@ fn lab_spawn_rejects_nodes_invalid_owners_bad_positions_and_occupied_sites() {
         game.apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
             owner: 1,
             kind: EntityKind::Rifleman,
-            x: worker.pos_x,
-            y: worker.pos_y,
+            x: worker.pos_x(),
+            y: worker.pos_y(),
             completed: true,
         })),
         Err(LabError::Placement { .. })
@@ -468,8 +468,8 @@ fn lab_spawn_rejects_nodes_invalid_owners_bad_positions_and_occupied_sites() {
         game.apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
             owner: 1,
             kind: EntityKind::Depot,
-            x: resource_depot.pos_x,
-            y: resource_depot.pos_y,
+            x: resource_depot.pos_x(),
+            y: resource_depot.pos_y(),
             completed: true,
         })),
         Err(LabError::Placement { .. })
@@ -501,7 +501,7 @@ fn lab_move_entity_validates_collision_and_repairs_position() {
     }))
     .expect("move should be accepted");
     let moved = game.state.entities.get(entity_id).expect("moved entity");
-    assert_eq!((moved.pos_x, moved.pos_y), (move_x, move_y));
+    assert_eq!((moved.pos_x(), moved.pos_y()), (move_x, move_y));
 
     let resource_depot = game
         .state
@@ -513,8 +513,8 @@ fn lab_move_entity_validates_collision_and_repairs_position() {
     assert!(matches!(
         game.apply_lab_op(LabOp::MoveEntity(LabMoveEntity {
             entity_id,
-            x: resource_depot.pos_x,
-            y: resource_depot.pos_y,
+            x: resource_depot.pos_x(),
+            y: resource_depot.pos_y(),
         })),
         Err(LabError::Placement { .. })
     ));
@@ -610,8 +610,8 @@ fn lab_bulk_spawn_failure_preserves_state_and_reports_index_with_suggestions() {
         LabSpawnEntity {
             owner: 1,
             kind: EntityKind::Rifleman,
-            x: city.pos_x,
-            y: city.pos_y,
+            x: city.pos_x(),
+            y: city.pos_y(),
             completed: true,
         },
     ];
@@ -690,11 +690,17 @@ fn lab_bulk_moves_validate_simultaneously_and_reject_conflicts_atomically() {
     ])
     .expect("simultaneous swap should succeed");
     assert_eq!(
-        game.state.entities.get(ids[0]).map(|e| (e.pos_x, e.pos_y)),
+        game.state
+            .entities
+            .get(ids[0])
+            .map(|e| (e.pos_x(), e.pos_y())),
         Some((bx, by))
     );
     assert_eq!(
-        game.state.entities.get(ids[1]).map(|e| (e.pos_x, e.pos_y)),
+        game.state
+            .entities
+            .get(ids[1])
+            .map(|e| (e.pos_x(), e.pos_y())),
         Some((ax, ay))
     );
 
@@ -719,20 +725,26 @@ fn lab_bulk_moves_validate_simultaneously_and_reject_conflicts_atomically() {
         })
     ));
     assert_eq!(
-        game.state.entities.get(ids[0]).map(|e| (e.pos_x, e.pos_y)),
+        game.state
+            .entities
+            .get(ids[0])
+            .map(|e| (e.pos_x(), e.pos_y())),
         before
             .state
             .entities
             .get(ids[0])
-            .map(|e| (e.pos_x, e.pos_y))
+            .map(|e| (e.pos_x(), e.pos_y()))
     );
     assert_eq!(
-        game.state.entities.get(ids[1]).map(|e| (e.pos_x, e.pos_y)),
+        game.state
+            .entities
+            .get(ids[1])
+            .map(|e| (e.pos_x(), e.pos_y())),
         before
             .state
             .entities
             .get(ids[1])
-            .map(|e| (e.pos_x, e.pos_y))
+            .map(|e| (e.pos_x(), e.pos_y()))
     );
 }
 
@@ -1029,7 +1041,7 @@ fn lab_checkpoint_setup_round_trips_exact_state_with_id_map() {
         panic!("unexpected outcome");
     };
     let setup_target = tile_center(&game, 40, 32);
-    let setup_facing = (setup_target.1 - y).atan2(setup_target.0 - x);
+    let setup_facing = (setup_target.1 - y).det_atan2(setup_target.0 - x);
     let gun_weapon_facing = setup_facing + 0.125;
     {
         let gun = game.state.entities.get_mut(gun_id).expect("spawned gun");

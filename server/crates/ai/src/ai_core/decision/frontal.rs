@@ -1,5 +1,6 @@
 use super::geometry::{clamp_to_map, dist2, normalized_direction, tile_center};
 use super::*;
+use rts_rules::math::GameplayMath as _;
 
 pub(super) mod approach;
 mod catch_up;
@@ -44,6 +45,8 @@ const RIFLE_SCREEN_FORWARD_TILES: f32 = 2.0;
 const RIFLE_SCREEN_SPACING_TILES: f32 = 2.0;
 const RIFLE_SCREEN_SECOND_RANK_BACK_TILES: f32 = 1.5;
 const RIFLE_SCREEN_FIRST_RANK: usize = 4;
+/// Ranks behind the first hold up to this many Riflemen each, a further rank-depth back every time.
+const RIFLE_SCREEN_LATER_RANK: usize = 6;
 const MAX_CONTAINMENT_RIFLE_ESCORTS: usize = 6;
 const MIN_CONTAINMENT_RIFLE_ESCORTS: usize = 2;
 const CONTAINMENT_HOME_RIFLE_RESERVE: usize = 4;
@@ -233,7 +236,10 @@ pub(super) fn issue_frontal_wave(
                 return Some(intent);
             }
         } else if profile.id != JEFFS_AI_BETA_ID
-            && (plan.should_attack() || relaxed_start || containment_active)
+            && (plan.should_attack()
+                || relaxed_start
+                || containment_active
+                || jeff_v1_1::push::forced_due(observation, memory))
         {
             let orders_start = actions.emitted_len();
             let intent = issue_expansion_containment_wave(
@@ -280,6 +286,32 @@ pub(super) fn issue_frontal_wave(
     }
 
     if !plan.should_stage() && !(hold_for_push && !plan.ready_units.is_empty()) {
+        return None;
+    }
+    // Jeff's AI V1.1's resting Tanks park in front of their bases (`tankline`), and its guns hold
+    // the lines there (`mgline`), until the push takes them; staged, the Tanks waited 22-28 tiles
+    // out in front of the natural.
+    let spread =
+        is_jeff_v1_1(profile.id) && (!jeff_v1_1::off("tankline") || !jeff_v1_1::off("mgline"));
+    // Its Tanks wait for the push at its stations (`stations`).
+    let stationed = |id: &u32| {
+        jeff_v1_1::stations::active(profile.id)
+            && observation
+                .owned
+                .iter()
+                .any(|unit| unit.id == *id && unit.kind == EntityKind::Tank)
+    };
+    let plan = &FrontalWavePlan {
+        ready_units: plan
+            .ready_units
+            .iter()
+            .copied()
+            .filter(|id| !(spread && memory.jeff_v1_1.base_lines.posted(*id)))
+            .filter(|id| !stationed(id))
+            .collect(),
+        ..plan.clone()
+    };
+    if plan.ready_units.is_empty() {
         return None;
     }
 
@@ -402,10 +434,30 @@ pub(super) fn sync_containment_recovery(
             .iter()
             .filter(|unit| unit.kind == EntityKind::ScoutCar && unit.is_complete && unit.hp > 0)
             .filter(|unit| !memory.trap_breach.is_reserved(unit.id))
-            .filter(|unit| !memory.third_pressure.is_reserved(unit.id))
+            .filter(|unit| {
+                !memory.third_pressure.is_reserved(unit.id)
+                    && !memory.jeff_v1_1.tank_raid.holds(unit.id)
+            })
             .map(|unit| unit.id)
             .min();
-        if let Some(scout) = replacement {
+        // Jeff's AI V1.1 sends one of the push's Riflemen ahead instead, or with none left
+        // (`keepspotter`) the free Rifleman nearest the push: a 15-Tank push on Schone Tage's
+        // corridor whose spotter fell with no escorts left broke up at 10:46 to form again, and
+        // never left again.
+        let rifle_spotter = || {
+            let escort = memory.containment.active_riflemen.iter().copied().min();
+            let tanks: Vec<u32> = memory.containment.active_tanks.iter().copied().collect();
+            let nearest = || {
+                group_center(observation, &tanks)
+                    .and_then(|center| jeff_v1_1::push::spotter(observation, memory, center))
+                    .filter(|_| !jeff_v1_1::off("keepspotter"))
+            };
+            escort
+                .or_else(nearest)
+                .filter(|_| is_jeff_v1_1(profile.id) && !jeff_v1_1::off("push"))
+        };
+        if let Some(scout) = replacement.or_else(rifle_spotter) {
+            memory.containment.active_riflemen.remove(&scout);
             memory.containment.active_scout = Some(scout);
             scout_intact = true;
         }
@@ -588,7 +640,7 @@ fn update_enemy_main_state(
         return;
     }
     let tile_size = observation.map.tile_size as f32;
-    let main_radius2 = (8.0 * tile_size).powi(2);
+    let main_radius2 = (8.0 * tile_size).det_powi(2);
     let visible_main = observation
         .visible_enemies
         .iter()
@@ -602,7 +654,7 @@ fn update_enemy_main_state(
     if memory.enemy_main_resource_depot.is_none() {
         return;
     }
-    let confirmation_radius2 = (14.0 * tile_size).powi(2);
+    let confirmation_radius2 = (14.0 * tile_size).det_powi(2);
     let force_confirms_site = observation
         .owned
         .iter()
@@ -669,7 +721,7 @@ fn update_enemy_natural_state(
         .filter(|unit| scouts.contains(&unit.id))
         .any(|unit| {
             dist2(unit.x, unit.y, natural.0, natural.1)
-                <= (scout_confirmation_tiles * tile_size).powi(2)
+                <= (scout_confirmation_tiles * tile_size).det_powi(2)
         });
     if scout_confirms_site {
         memory.enemy_natural_destroyed = true;
@@ -895,7 +947,7 @@ fn tank_can_fire_at_visible_target(
         return false;
     };
     dist2(tank.x, tank.y, target.x, target.y)
-        <= (range_tiles * observation.map.tile_size as f32).powi(2)
+        <= (range_tiles * observation.map.tile_size as f32).det_powi(2)
 }
 
 fn target_is_in_shared_tank_range(
@@ -986,7 +1038,7 @@ fn rifle_sector_target(
     let perpendicular = (-direction.1, direction.0);
     let tile_size = observation.map.tile_size as f32;
     if dist2(rifle.x, rifle.y, screen_point.0, screen_point.1)
-        > (RIFLE_THREAT_LEASH_TILES * tile_size).powi(2)
+        > (RIFLE_THREAT_LEASH_TILES * tile_size).det_powi(2)
     {
         return None;
     }
@@ -1209,7 +1261,7 @@ fn outbound_wave_target_priority(kind: EntityKind) -> u8 {
     }
 }
 
-fn group_center(observation: &AiObservation, unit_ids: &[u32]) -> Option<(f32, f32)> {
+pub(super) fn group_center(observation: &AiObservation, unit_ids: &[u32]) -> Option<(f32, f32)> {
     let (sum_x, sum_y, count) = observation
         .owned
         .iter()
@@ -1249,24 +1301,32 @@ fn push_home_tank_count(
 }
 
 /// Ready Tanks the push leaves at home: the home reserve, less the home Tank already kept there.
-fn push_keep_home(observation: &AiObservation, memory: &AiDecisionMemory) -> usize {
+pub(super) fn push_keep_home(observation: &AiObservation, memory: &AiDecisionMemory) -> usize {
     let home_tank_alive = memory.home_defensive_tank.is_some_and(|id| {
         observation
             .owned
             .iter()
             .any(|unit| unit.id == id && unit.hp > 0)
     });
-    memory
-        .home_tank_reserve()
-        .saturating_sub(usize::from(home_tank_alive))
+    // Jeff's AI V1.1 keeps at most two: its base lines hold the bases, and against Pressure AI the
+    // whole reserve (up to five) stayed behind while the push never had the Tanks to leave.
+    let reserve = if memory.profile_id().is_some_and(is_jeff_v1_1) && !jeff_v1_1::off("keephome") {
+        memory.home_tank_reserve().min(V1_1_HOME_TANKS)
+    } else {
+        memory.home_tank_reserve()
+    };
+    reserve.saturating_sub(usize::from(home_tank_alive))
 }
+
+/// The most Tanks Jeff's AI V1.1's push leaves at home, the home Tank included.
+const V1_1_HOME_TANKS: usize = 2;
 
 /// Enemy Tanks this close to any push Tank count toward the push being outnumbered.
 const PUSH_OUTNUMBERED_RADIUS_TILES: f32 = 16.0;
 
 /// Whether more enemy Tanks than the push has are in sight around it.
 fn push_outnumbered(observation: &AiObservation, tanks: &[u32]) -> bool {
-    let radius2 = (PUSH_OUTNUMBERED_RADIUS_TILES * observation.map.tile_size as f32).powi(2);
+    let radius2 = (PUSH_OUTNUMBERED_RADIUS_TILES * observation.map.tile_size as f32).det_powi(2);
     let positions: Vec<(f32, f32)> = observation
         .owned
         .iter()

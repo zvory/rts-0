@@ -22,7 +22,14 @@ pub(super) fn advance(map: &Map, entities: &mut EntityStore, occ: &Occupancy) {
             facing,
             vehicle_body_turn_rate(tank.kind) * tank.tank_turn_multiplier(),
         );
-        if standability::unit_static_standable(occ, map, tank.kind, tank.pos_x, tank.pos_y, next) {
+        if standability::unit_static_standable(
+            occ,
+            map,
+            tank.kind,
+            tank.pos_x(),
+            tank.pos_y(),
+            next,
+        ) {
             tank.set_facing(next);
         }
     }

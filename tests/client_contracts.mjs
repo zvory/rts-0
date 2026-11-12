@@ -114,6 +114,7 @@ await import("./client_contracts/control_group_camera_contracts.mjs");
 await import("./client_contracts/smoke_plus_preview_contracts.mjs");
 await import("./client_contracts/scout_plane_input_contracts.mjs");
 await import("./client_contracts/weapon_feedback_contracts.mjs");
+await import("./client_contracts/tank_machine_gun_recoil_contracts.mjs");
 await import("./client_contracts/command_composer_contracts.mjs");
 await import("./client_contracts/camera_fog_contracts.mjs");
 await import("./client_contracts/camera_projection_contracts.mjs");

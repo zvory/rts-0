@@ -1,3 +1,4 @@
+// replayResourceHistory also carries players[] with id, lifetimeSteel/lifetimeOil and absolute steel/oil, aliveSteel/aliveOil, lostSteel/lostOil, unitSteel/unitOil values for up to four players.
 // replayResourceHistory samples carry signed steel/oil collection and aliveSteel/aliveOil lifetime-minus-loss advantages, lostSteel/lostOil destroyed-value differences, and unitSteel/unitOil current-army-value differences.
 //! Server-shell adapter for the extracted protocol crate.
 //!
@@ -33,6 +34,15 @@ mod tests {
             serde_json::to_value(sim.to_protocol()).unwrap(),
             serde_json::json!({"c":"pointTanks","units":[1,2],"x":300.0,"y":400.0})
         );
+    }
+
+    #[test]
+    fn queued_point_tanks_round_trips_through_sim_adapter() {
+        let value =
+            serde_json::json!({"c":"pointTanks","units":[1],"x":300.0,"y":400.0,"queued":true});
+        let wire: Command = serde_json::from_value(value.clone()).unwrap();
+        let sim = rts_sim::game::command::SimCommand::from_protocol(wire);
+        assert_eq!(serde_json::to_value(sim.to_protocol()).unwrap(), value);
     }
 
     #[test]

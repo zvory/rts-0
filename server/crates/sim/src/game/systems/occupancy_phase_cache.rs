@@ -22,8 +22,8 @@ impl OccupancyTopology {
                 .map(|entity| OccupancyTopologyEntry {
                     id: entity.id,
                     kind: entity.kind,
-                    pos_x_bits: entity.pos_x.to_bits(),
-                    pos_y_bits: entity.pos_y.to_bits(),
+                    pos_x_bits: entity.pos_x().to_bits(),
+                    pos_y_bits: entity.pos_y().to_bits(),
                 })
                 .collect(),
         )

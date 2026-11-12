@@ -12,7 +12,9 @@ export function abilityButtonDescriptor({
   const readyCount = recastActive ? affordance.recastReadyIds.length : affordance.readyIds.length;
   const commandableCount = recastActive
     ? affordance.recastReadyIds.length
-    : affordance.queueAdmissibleIds.length;
+    : definition.queuePolicy === "waitUntilReady"
+      ? affordance.queueAdmissibleIds.length
+      : affordance.readyIds.length;
   const showReadyCount = readyCount < affordance.carrierIds.length;
   const showChargeCount = definition.ability !== ABILITY.BARRAGE &&
     definition.charges != null && affordance.remainingUsesTotal != null;

@@ -168,7 +168,7 @@ mod tests {
             .entities
             .get(tank_id)
             .expect("scenario Tank should exist")
-            .pos_x;
+            .pos_x();
         assert!(matches!(setup.command(), SimCommand::Move { .. }));
 
         for _ in 0..setup.issue_after_ticks {
@@ -199,7 +199,7 @@ mod tests {
                 max_turn_after_hit = max_turn_after_hit
                     .max(crate::game::services::movement::angle_delta(0.0, tank.facing()).abs());
             }
-            max_x = max_x.max(tank.pos_x);
+            max_x = max_x.max(tank.pos_x());
         }
 
         assert!(setup.game.state.entities.get(tank_id).is_some());

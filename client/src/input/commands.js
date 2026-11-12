@@ -86,8 +86,8 @@ export function _issueTargetedCommand(p, ev = {}) {
     const tanks = this.state.selectedEntities().filter((e) =>
       ownOwner(this.state, e.owner, this.controlPolicy) && e.kind === KIND.TANK);
     if (tanks.length > 0) {
-      this.commandInteraction.issueCommand(cmd.pointTanks(tanks.map((e) => e.id), world.x, world.y));
-      this._addCommandFeedback("move", world.x, world.y, false);
+      this.commandInteraction.issueCommand(cmd.pointTanks(tanks.map((e) => e.id), world.x, world.y, !!ev.shiftKey));
+      this._addCommandFeedback("move", world.x, world.y, !!ev.shiftKey);
     }
     return true;
   }

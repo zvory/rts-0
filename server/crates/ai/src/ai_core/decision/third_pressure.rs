@@ -26,6 +26,7 @@ use super::opening_rush::{estimate_trade, fighter, LiveStep};
 use super::*;
 use locate::{begin_locate, field_target, locate, retarget, sight};
 use merge::{begin_merge, merge};
+use rts_rules::math::GameplayMath as _;
 use scout::{begin_scout, keep_watch, scout_clear, scout_trip};
 use targets::{mines_from, off_route_tiles, target_site};
 use timing::{departure, EARLIEST_SCOUT_TICK};
@@ -407,7 +408,8 @@ fn launch_ready(
         .iter()
         .filter(|unit| unit.kind == EntityKind::ResourceDepot && unit.is_complete && unit.hp > 0)
         .count();
-    if bases >= 3 || memory.later_bases.planning() {
+    // Jeff's AI V1.1 denies the enemy's expansions whatever its own base count (`v1_1_denial`).
+    if (bases >= 3 || memory.later_bases.planning()) && !v1_1_denial(memory) {
         return None;
     }
     if memory.home_outgunned || defense::local_defense_contact(observation).is_some() {
@@ -475,8 +477,21 @@ fn party_tanks(observation: &AiObservation, memory: &AiDecisionMemory) -> Option
     if party.len() < PARTY_TANKS {
         return None;
     }
+    if v1_1_denial(memory) {
+        // V1.1's base lines, Panzerfausts and converging Tanks hold its bases: the party goes while
+        // one free Tank stays.
+        return (army.len() > PARTY_TANKS).then_some(party);
+    }
     let main_left = at_main.iter().filter(|id| !party.contains(id)).count();
     (main_left >= memory.home_tank_reserve()).then_some(party)
+}
+
+/// Jeff's AI V1.1 sends its party at the enemy's newest base however many bases it holds itself, and
+/// with one free Tank left home rather than the whole reserve. Against Pressure AI, which stood on
+/// five bases by 8:00, V1.0's scouts found the third's Depot and then waited all game for two Tanks
+/// the reserve never freed: Jeff killed one enemy Depot in eight games.
+fn v1_1_denial(memory: &AiDecisionMemory) -> bool {
+    memory.profile_id().is_some_and(is_jeff_v1_1) && !jeff_v1_1::off("denial")
 }
 
 /// `count` Riflemen nobody else holds, besides `besides`, and never the home pocket's: its posts
@@ -495,6 +510,7 @@ fn party_riflemen(
         .reserved()
         .chain(memory.route_line.reserved())
         .chain(memory.opening_rush.reserved())
+        .chain(memory.jeff_v1_1.meth_strike.units())
         .chain(memory.trap_breach.reserved())
         .collect();
     let mut free: Vec<&AiEntitySummary> = observation
@@ -1163,15 +1179,15 @@ fn post_near(
     taken: &[(f32, f32)],
 ) -> Option<(f32, f32)> {
     let ts = tile(observation);
-    let wanted_angle = facing.1.atan2(facing.0);
+    let wanted_angle = facing.1.det_atan2(facing.0);
     for radius in radii {
         let best = (0..48)
             .map(|step| step as f32 * std::f32::consts::TAU / 48.0)
             .map(|angle| {
                 let point = clamp_to_map(
                     (
-                        site.0 + angle.cos() * radius * ts,
-                        site.1 + angle.sin() * radius * ts,
+                        site.0 + angle.det_cos() * radius * ts,
+                        site.1 + angle.det_sin() * radius * ts,
                     ),
                     observation.map,
                 );
@@ -1391,7 +1407,7 @@ fn tile(observation: &AiObservation) -> f32 {
 }
 
 fn distance(a: (f32, f32), b: (f32, f32)) -> f32 {
-    dist2(a.0, a.1, b.0, b.1).sqrt()
+    dist2(a.0, a.1, b.0, b.1).det_sqrt()
 }
 
 fn rounded(point: (f32, f32)) -> (i32, i32) {

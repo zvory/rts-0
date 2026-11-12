@@ -1,8 +1,15 @@
-use crate::game::entity::{EntityKind, EntityStore, Order};
+use crate::game::entity::{EntityKind, EntityStore};
+use rts_rules::math::GameplayMath as _;
 
-pub(super) fn apply(entities: &mut EntityStore, player: u32, units: &[u32], x: f32, y: f32) {
+pub(super) fn heading(
+    entities: &EntityStore,
+    player: u32,
+    units: &[u32],
+    x: f32,
+    y: f32,
+) -> Option<(Vec<u32>, f32)> {
     if !x.is_finite() || !y.is_finite() {
-        return;
+        return None;
     }
     let mut tanks: Vec<_> = units
         .iter()
@@ -15,24 +22,19 @@ pub(super) fn apply(entities: &mut EntityStore, player: u32, units: &[u32], x: f
         .collect();
     tanks.sort_unstable();
     if tanks.is_empty() {
-        return;
+        return None;
     }
     let (sx, sy) = tanks
         .iter()
         .filter_map(|id| entities.get(*id))
         .fold((0.0_f64, 0.0_f64), |(x, y), e| {
-            (x + e.pos_x as f64, y + e.pos_y as f64)
+            (x + e.pos_x() as f64, y + e.pos_y() as f64)
         });
     let dx = x as f64 - sx / tanks.len() as f64;
     let dy = y as f64 - sy / tanks.len() as f64;
-    if dx.hypot(dy) < 0.001 {
-        return;
+    if dx.det_hypot(dy) < 0.001 {
+        return None;
     }
-    let facing = dy.atan2(dx) as f32;
-    for id in tanks {
-        if let Some(tank) = entities.get_mut(id) {
-            tank.hold_position();
-            tank.set_order(Order::Point { facing });
-        }
-    }
+    let facing = dy.det_atan2(dx) as f32;
+    Some((tanks, facing))
 }

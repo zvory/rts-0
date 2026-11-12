@@ -3,6 +3,7 @@
 //! This records stable terrain, region, choke, start, and resource facts for later route analysis
 //! without feeding them into command decisions yet.
 
+use rts_rules::math::GameplayMath as _;
 use std::collections::VecDeque;
 
 use crate::config;
@@ -13,6 +14,8 @@ use rts_sim::protocol::{kinds, MapInfo, PlayerStart, ResourceNode, StartPayload}
 
 mod base_sites;
 mod chokes;
+mod context;
+pub(crate) use context::AiStaticMapContextCache;
 mod overlays;
 mod regions;
 mod routes;
@@ -239,69 +242,6 @@ pub(crate) struct AiMapAnalysisDebugSnapshot {
     pub(crate) resource_clusters: Vec<AiResourceCluster>,
 }
 
-#[derive(Clone, Debug)]
-pub(crate) struct AiStaticMapContext {
-    key: AiMapAnalysisKey,
-    analysis: AiMapAnalysis,
-    diagnostics: ObserverMapAnalysisDiagnostics,
-    base_sites: Vec<crate::sdk::AiBaseSite>,
-}
-
-impl AiStaticMapContext {
-    fn analyze_with_key(start: &StartPayload, key: AiMapAnalysisKey) -> Self {
-        let analysis = AiMapAnalysis::analyze_with_key(start, key);
-        let diagnostics = analysis.debug_overlay();
-        let base_sites = analysis.sdk_base_sites();
-        Self {
-            key,
-            analysis,
-            diagnostics,
-            base_sites,
-        }
-    }
-
-    pub(crate) fn base_sites(&self) -> &[crate::sdk::AiBaseSite] {
-        &self.base_sites
-    }
-
-    pub(crate) fn key(&self) -> AiMapAnalysisKey {
-        self.key
-    }
-
-    pub(crate) fn analysis(&self) -> &AiMapAnalysis {
-        &self.analysis
-    }
-
-    pub(crate) fn diagnostics(&self) -> &ObserverMapAnalysisDiagnostics {
-        &self.diagnostics
-    }
-}
-
-#[derive(Clone, Debug, Default)]
-pub(crate) struct AiStaticMapContextCache {
-    context: Option<AiStaticMapContext>,
-}
-
-impl AiStaticMapContextCache {
-    pub(crate) fn get_or_analyze(&mut self, start: &StartPayload) -> &AiStaticMapContext {
-        let key = AiMapAnalysisKey::from_start(start);
-        let refresh = self
-            .context
-            .as_ref()
-            .map(|context| context.key() != key)
-            .unwrap_or(true);
-        if refresh {
-            self.context = None;
-        }
-        self.context
-            .get_or_insert_with(|| AiStaticMapContext::analyze_with_key(start, key))
-    }
-
-    pub(crate) fn current(&self) -> Option<&AiStaticMapContext> {
-        self.context.as_ref()
-    }
-}
-
 struct AiMapTileLookups<'a> {
     width: u32,
     height: u32,
@@ -463,6 +403,14 @@ impl AiMapAnalysis {
     pub(crate) fn region_id_at(&self, tile: AiTile) -> Option<u32> {
         tile_index(self.width, self.height, tile.x, tile.y)
             .and_then(|idx| self.region_by_tile.get(idx).copied().flatten())
+    }
+
+    pub(crate) fn resource_clusters(&self) -> &[AiResourceCluster] {
+        &self.resource_clusters
+    }
+
+    pub(crate) fn chokes(&self) -> &[AiMapChoke] {
+        &self.chokes
     }
 
     pub(crate) fn tile_is_passable(&self, x: u32, y: u32) -> bool {
@@ -775,7 +723,7 @@ fn generated_line_strip_markers(
 ) -> Vec<ObserverMapAnalysisPrimitive> {
     let dx = end.0 - start.0;
     let dy = end.1 - start.1;
-    let len = (dx * dx + dy * dy).sqrt();
+    let len = (dx * dx + dy * dy).det_sqrt();
     if !len.is_finite() || len <= f32::EPSILON {
         return Vec::new();
     }
@@ -1347,7 +1295,7 @@ fn distance2_to_tile_center(map: &MapInfo, tile: AiTile, resource: &ResourcePoin
     let tile_size = map.tile_size as f32;
     let x = tile.x as f32 * tile_size + tile_size * 0.5;
     let y = tile.y as f32 * tile_size + tile_size * 0.5;
-    (x - resource.x).powi(2) + (y - resource.y).powi(2)
+    (x - resource.x).det_powi(2) + (y - resource.y).det_powi(2)
 }
 
 pub(super) fn tile_distance2(a: AiTile, b: AiTile) -> u32 {
@@ -1409,7 +1357,7 @@ fn choke_line_world_endpoints(
     let mut end = tile_center_world(choke.endpoint_b_tile, tile_size);
     let dx = end.0 - start.0;
     let dy = end.1 - start.1;
-    let len = (dx * dx + dy * dy).sqrt();
+    let len = (dx * dx + dy * dy).det_sqrt();
     if len.is_finite() && len > f32::EPSILON {
         let ux = dx / len;
         let uy = dy / len;

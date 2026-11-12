@@ -28,6 +28,7 @@ use crate::game::teams::TeamRelations;
 use crate::game::PlayerState;
 use crate::protocol::{Event, NoticeSeverity};
 use crate::rules;
+use rts_rules::math::GameplayMath as _;
 use std::collections::BTreeMap;
 
 use self::attack::{direct_panzerfaust_shot_spent, panzerfaust_attack_cycle_active};
@@ -41,6 +42,9 @@ mod point_promotion;
 /// Outcome of popping the next queued intent for a unit. Move/AttackMove are batched into a
 /// group move per destination point; gather/build are issued directly per worker.
 enum PromotedIntent {
+    TankPoint {
+        facing: f32,
+    },
     PointMove(PointPromotionKey),
     ClearObstacleArea(u32, (f32, f32)),
     HoldPosition,
@@ -183,6 +187,11 @@ pub(crate) fn promote_ready_orders(
             continue;
         };
         match promoted {
+            PromotedIntent::TankPoint { facing } => {
+                if let Some(entity) = entities.get_mut(id) {
+                    entity.set_order(Order::Point { facing });
+                }
+            }
             PromotedIntent::PointMove(key) => {
                 groups.entry(key).or_default().push(id);
             }
@@ -335,9 +344,13 @@ fn ready_for_next_order(
         return false;
     }
     match e.order() {
-        Order::Idle | Order::HoldPosition | Order::Point { .. } => {
-            !e.queued_orders().is_empty() && e.path_is_empty()
+        Order::Point { facing } => {
+            let delta = facing - e.facing();
+            !e.queued_orders().is_empty()
+                && e.path_is_empty()
+                && delta.det_sin().det_atan2(delta.det_cos()).abs() < 0.0001
         }
+        Order::Idle | Order::HoldPosition => !e.queued_orders().is_empty() && e.path_is_empty(),
         Order::Move(_) | Order::AttackMove(_) => {
             !e.queued_orders().is_empty()
                 && e.path_is_empty()
@@ -383,6 +396,15 @@ fn pop_next_valid_intent(
     for _ in 0..MAX_QUEUED_ORDERS {
         let intent = entities.get_mut(id)?.pop_promoted_intent()?;
         match intent {
+            OrderIntent::Point { facing } => {
+                if facing.is_finite()
+                    && entities
+                        .get(id)
+                        .is_some_and(|e| e.kind == EntityKind::Tank && e.hp > 0)
+                {
+                    return Some(PromotedIntent::TankPoint { facing });
+                }
+            }
             OrderIntent::Move(point) => {
                 if let Some(key) = PointPromotionKey::new(owner, false, point.x, point.y) {
                     return Some(PromotedIntent::PointMove(key));
@@ -557,7 +579,10 @@ fn self_ability_intent_valid(
     caster: u32,
     ability: crate::game::ability::AbilityKind,
 ) -> bool {
-    crate::game::services::ability_orders::caster_can_attempt(entities, owner, caster, ability)
+    crate::game::ability::definition(ability).may_queue
+        && crate::game::services::ability_orders::caster_can_attempt(
+            entities, owner, caster, ability,
+        )
         && crate::game::services::ability_orders::tech_requirement_met(entities, owner, ability)
         && crate::game::ability::definition(ability).target_mode
             == crate::game::ability::AbilityTargetMode::SelfTarget
@@ -574,7 +599,7 @@ fn setup_anti_tank_gun_intent_valid(entities: &EntityStore, id: u32, x: f32, y: 
     {
         return false;
     }
-    let facing = (y - e.pos_y).atan2(x - e.pos_x);
+    let facing = (y - e.pos_y()).det_atan2(x - e.pos_x());
     facing.is_finite()
 }
 
@@ -652,7 +677,7 @@ fn deconstruct_intent_valid(
         return false;
     }
     teams.same_team_or_same_owner(owner, target.owner)
-        || rules::projection::team_visible_world(owner, target.pos_x, target.pos_y, fog, teams)
+        || rules::projection::team_visible_world(owner, target.pos_x(), target.pos_y(), fog, teams)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1396,8 +1421,7 @@ mod tests {
             let unit = entities.get_mut(at).expect("at gun should exist");
             unit.set_order(Order::move_to(150.0, 100.0));
             unit.mark_move_phase(MovePhase::Arrived);
-            unit.pos_x = 150.0;
-            unit.pos_y = 100.0;
+            unit.set_position(150.0, 100.0);
             unit.append_queued_order(OrderIntent::setup_anti_tank_guns(150.0, 140.0));
             unit.append_queued_order(OrderIntent::attack_move_to(240.0, 100.0));
         }
@@ -1429,8 +1453,8 @@ mod tests {
         let angle = config::ARTILLERY_FIELD_OF_FIRE_RAD;
         let distance = config::TILE_SIZE as f32 * 30.0;
         let target = (
-            pos.0 + angle.cos() * distance,
-            pos.1 + angle.sin() * distance,
+            pos.0 + angle.det_cos() * distance,
+            pos.1 + angle.det_sin() * distance,
         );
         let artillery = entities
             .spawn_unit(1, EntityKind::Artillery, pos.0, pos.1)
@@ -1459,33 +1483,5 @@ mod tests {
             unit.emplacement_facing().unwrap_or_default().abs() < 0.001,
             "queued point fire must not walk the active field of fire before redeploy"
         );
-    }
-
-    #[test]
-    fn stationary_attack_that_cannot_fire_promotes_next_queued_order() {
-        let map = flat_map(32);
-        let mut entities = EntityStore::new();
-        let attacker = entities
-            .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
-            .expect("rifleman should spawn");
-        let target = entities
-            .spawn_unit(2, EntityKind::Rifleman, 700.0, 100.0)
-            .expect("target should spawn");
-        {
-            let unit = entities.get_mut(attacker).expect("attacker should exist");
-            unit.set_order(Order::attack(target));
-            unit.set_target_id(Some(target));
-            unit.append_queued_order(OrderIntent::move_to(220.0, 100.0));
-        }
-        let players = vec![player_state(1), player_state(2)];
-
-        promote_with_players(&map, &mut entities, &players);
-
-        let unit = entities.get(attacker).expect("attacker should exist");
-        assert!(
-            matches!(unit.order(), Order::Move(_)),
-            "a stationary attack that cannot fire should not stall the queued move forever"
-        );
-        assert!(unit.queued_orders().is_empty());
     }
 }

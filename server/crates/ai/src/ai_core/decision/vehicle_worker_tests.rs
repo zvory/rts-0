@@ -1,4 +1,5 @@
 use super::*;
+use rts_rules::math::GameplayMath as _;
 
 use crate::ai_core::observation::{
     AiEconomy, AiEntityState, AiEntitySummary, AiMapSummary, AiPlayerSummary, AiResourceSummary,
@@ -20,6 +21,7 @@ fn worker(id: u32, state: AiEntityState) -> AiEntitySummary {
         latched_node: None,
         target_id: None,
         free_for_combat: false,
+        research: None,
     }
 }
 
@@ -58,6 +60,7 @@ fn combat_unit(id: u32, kind: EntityKind) -> AiEntitySummary {
         latched_node: None,
         target_id: None,
         free_for_combat: true,
+        research: None,
     }
 }
 
@@ -85,6 +88,7 @@ fn building_at(
         latched_node: None,
         target_id: None,
         free_for_combat: false,
+        research: None,
     }
 }
 
@@ -413,8 +417,10 @@ fn jeff_clears_machine_gunner_when_issuing_vehicle_works_build() {
         _ => None,
     });
     let destination = destination.expect("Machine Gunner move alongside Factory build");
-    let moved_tiles =
-        ((destination.0 - 0.5 * ts).powi(2) + (destination.1 - 0.5 * ts).powi(2)).sqrt() / ts;
+    let moved_tiles = ((destination.0 - 0.5 * ts).det_powi(2)
+        + (destination.1 - 0.5 * ts).det_powi(2))
+    .det_sqrt()
+        / ts;
     assert!((moved_tiles - 4.0).abs() < 0.001);
 }
 

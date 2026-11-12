@@ -69,6 +69,22 @@ pub(super) fn protect_depot_in_transit(
     }
 }
 
+/// Pressure's own copy of the secured-site check: its ranked site must still be clear of known
+/// Depots and placeable. The current Jeff's branch in `expansion.rs` is his alone.
+pub(super) fn checked_site<F>(
+    observation: &AiObservation,
+    site: Option<(u32, u32)>,
+    placeable: &mut F,
+) -> Option<(u32, u32)>
+where
+    F: FnMut(EntityKind, u32, u32) -> bool,
+{
+    let site = site?;
+    (expansion::expansion_site_is_separate(observation, site)
+        && placeable(EntityKind::ResourceDepot, site.0, site.1))
+    .then_some(site)
+}
+
 pub(super) fn plan_site<F>(
     observation: &AiObservation,
     profile: &AiProfile,
@@ -144,6 +160,22 @@ where
             .any(|resource| resource.kind == EntityKind::Steel)
         {
             continue;
+        }
+        // Try the public landmark itself before optimizing nearby resource distances.
+        // Rush inherits this policy when it hands over to Pressure.
+        let kind = EntityKind::ResourceDepot;
+        let ts = observation.map.tile_size.max(1) as f32;
+        let center_tile = (
+            (base.site.position.0 / ts).floor() as u32,
+            (base.site.position.1 / ts).floor() as u32,
+        );
+        if let Some(tile) = geometry::footprint_top_left_for_center(center_tile, kind) {
+            if expansion::expansion_site_candidate(observation, kind, tile.0, tile.1, &cluster)
+                .is_some()
+                && placeable(kind, tile.0, tile.1)
+            {
+                return Some(tile);
+            }
         }
         if let Some(tile) = expansion::generic_expansion_depot_site(
             observation,

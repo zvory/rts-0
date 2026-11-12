@@ -1,3 +1,4 @@
+use rts_rules::math::GameplayMath as _;
 use std::collections::BTreeMap;
 
 use super::*;
@@ -493,7 +494,7 @@ pub(super) fn forest_tiles_on_sight_line(
     to: (f32, f32),
 ) -> Option<u32> {
     let tile = observation.map.tile_size.max(1) as f32;
-    let samples = ((to.0 - from.0).hypot(to.1 - from.1) / tile * 4.0)
+    let samples = ((to.0 - from.0).det_hypot(to.1 - from.1) / tile * 4.0)
         .ceil()
         .max(1.0) as usize;
     let origin = world_tile(observation.map, from.0, from.1);
@@ -521,7 +522,7 @@ pub(super) fn forest_tiles_on_sight_line(
     Some(forest)
 }
 
-fn clear_machine_gunner_position(
+pub(in crate::ai_core::decision) fn clear_machine_gunner_position(
     observation: &AiObservation,
     map_analysis: Option<&AiMapAnalysis>,
     desired: (f32, f32),

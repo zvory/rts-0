@@ -595,8 +595,8 @@ touch release and suppress the synthesized compatibility click. The overlay owns
 and is read-only. The Army Value tab is client-side and viewport-specific, excludes economy workers
 (Engineer and Golem), and counts only combat units. Production, Research, Units, Resources, Alive
 Resources, Losses, and Resources Lost render the latest server-authored `observerAnalysis`
-payload. For exactly two players, Resources also samples each player's server-authored lifetime
-mined totals once per second, derives a trailing 8-second collection difference, and renders
+payload. For two to four players, Resources also samples each player's server-authored lifetime
+mined totals once per second and derives trailing 8-second collection values. Three- and four-player matches render one color-coded line per player with a name legend and a shared numeric Y scale for each resource, including negative alive values. Exactly two players retain the advantage view, which renders
 divergent steel and oil area charts. The first player leads above the
 center line and the second leads below it. Each resource uses a symmetric minimum Y extent equal
 to one fully extracting base over that window (144 Steel or 36 Oil). Backward replay seeks
@@ -2155,11 +2155,14 @@ a decisive conclusion, a smaller line below the headline names who gave up, was 
 all their buildings, or lost their primary base. The score table
 includes a Team column, highlights every row matching `winnerTeamId`, and falls back to `winnerId`
 for singleton FFA compatibility.
-For spectator starts without command-surface permission, `match.js` hides the command card and
-give-up action, computes local fog from the server-filtered union snapshot, and keeps the ordinary
-renderer/minimap/HUD pointed at snapshots with `playerResources`. Lab operators are the exception:
-their projection remains spectator-shaped, but `LabControlPolicy.canUseCommandSurface(state)` keeps
-the selected-unit panel and real command card visible while prediction stays disabled and issue-as
+For spectator starts without command-surface permission, `match.js` keeps the selected-unit panel
+visible for passive inspection while hiding the command card and give-up action. Click selects a
+unit or building, drag selects multiple units, and Shift adds to or removes from the selection.
+Single-entity details include units killed and current production or research progress. Read-only
+Lab viewers share this inspection panel. The client computes local fog from the server-filtered
+union snapshot and keeps the ordinary renderer/minimap/HUD pointed at snapshots with
+`playerResources`. Lab operators also retain a real command card through
+`LabControlPolicy.canUseCommandSurface(state)` while prediction stays disabled and issue-as
 remains the command authority. Spectators still receive admitted notice toasts and minimap alert
 pings, but the match-owned notice presenter suppresses notice audio so observers do not hear player
 callouts. Repeated under-attack events in one match-scoped incident are admitted once across toast,
@@ -2200,7 +2203,8 @@ Existing mortar/artillery commands retain priority in mixed selections that shar
 Point is available without research and uses the normal targeted-command click/cancel flow on
 both battlefield and minimap. Only selected controllable tanks are sent in `pointTanks`.
 The cursor selects one shared heading from the tanks’ center, keeping their hulls parallel.
-Point immediately stops previous movement and holds that heading; Shift does not queue it.
+Point immediately stops previous movement and holds that heading; Shift appends it to the order
+queue on both battlefield and minimap. Following queued orders wait until the hull finishes turning.
 While Point is armed, a live ground arrow runs from the arithmetic mean of selected, living,
 controllable tank positions to the cursor. A center dot remains for a zero-length direction.
 The preview follows current camera projection and minimap targeting, and clears on cancellation
@@ -2575,7 +2579,9 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   fixed neutral metal, and its 90% brightness/saturation target is applied at runtime rather than
   baked into owner-specific palette frames.
   Attack `weaponKind` selects feedback scale and rig muzzle origin; TankCoax uses a small
-  machine-gun flash/tracer/tail from the authored coax muzzle anchor and no Tank recoil, while
+  machine-gun flash/tracer/tail from the authored coax muzzle anchor and the Scout Car’s 160 ms
+  gun recoil along commander facing. Its independent recoil channel preserves overlapping cannon
+  recoil without kicking the hull or cannon on machine-gun shots, while
   TankCannon or default Tank attacks use a direct tracer from the main muzzle anchor plus the
   tank rig's half-scale artillery-style muzzle flare.
   Direct-shot `miss` events draw a tiny `Miss!` Pixi text toast above and to the right of the

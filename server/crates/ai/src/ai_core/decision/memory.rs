@@ -117,6 +117,8 @@ pub(crate) struct AiDecisionMemory {
     pub(super) raid_defense: super::defense::RaidDefense,
     /// The live Jeff's spend plan's timings of unfinished buildings and Tank Unlock.
     pub(super) spend_plan: super::spend_plan::SpendPlanMemory,
+    /// Jeff's AI V1.1's own state.
+    pub(super) jeff_v1_1: super::jeff_v1_1::V1_1Memory,
     profile_id: Option<&'static str>,
     attack_first_size: Option<usize>,
     next_attack_size: usize,
@@ -171,6 +173,44 @@ pub(crate) struct AiDecisionMemory {
 }
 
 impl AiDecisionMemory {
+    /// Records the fighters each side has lost so far, from the host's loss counts: Jeff's own, and
+    /// the enemy's as Jeff saw them die. Engineers are left out: this is the fights' trade, which
+    /// Jeff's AI V1.1's opening reads (`ecafter`).
+    pub(crate) fn note_losses(
+        &mut self,
+        own: &crate::sdk::AiLosses,
+        enemies: &BTreeMap<u32, crate::sdk::AiLosses>,
+    ) {
+        fn fighters(losses: &crate::sdk::AiLosses) -> u32 {
+            losses
+                .units
+                .iter()
+                .filter(|(kind, _)| **kind != EntityKind::Worker)
+                .map(|(_, count)| *count)
+                .fold(0u32, u32::saturating_add)
+        }
+        // Every unit's cost, Oil counted twice (`tradeexpand`).
+        fn value(losses: &crate::sdk::AiLosses) -> u32 {
+            losses
+                .units
+                .iter()
+                .map(|(kind, count)| {
+                    let (steel, oil) = rts_rules::economy::cost(*kind);
+                    steel
+                        .saturating_add(oil.saturating_mul(2))
+                        .saturating_mul(*count)
+                })
+                .fold(0u32, u32::saturating_add)
+        }
+        self.jeff_v1_1.deaths = fighters(own);
+        self.jeff_v1_1.kills = enemies
+            .values()
+            .map(fighters)
+            .fold(0u32, u32::saturating_add);
+        self.jeff_v1_1.value_lost = value(own);
+        self.jeff_v1_1.value_killed = enemies.values().map(value).fold(0u32, u32::saturating_add);
+    }
+
     /// Pressure must retry interrupted research on a replacement producer. Other profiles retain
     /// their existing research bookkeeping and policy.
     pub(super) fn note_research_producer(&mut self, upgrade: UpgradeKind, producer: u32) {
@@ -209,6 +249,7 @@ impl AiDecisionMemory {
             third_pressure: Default::default(),
             raid_defense: Default::default(),
             spend_plan: Default::default(),
+            jeff_v1_1: Default::default(),
             profile_id: Some(profile.id),
             attack_first_size: Some(profile.attack.first_attack_size),
             next_attack_size: profile.attack.first_attack_size,
@@ -512,19 +553,40 @@ impl AiDecisionMemory {
     }
 
     /// Units the route line, the opening rush, the trap breach and the third-base party own.
+    /// The profile this memory belongs to.
+    pub(super) fn profile_id(&self) -> Option<&'static str> {
+        self.profile_id
+    }
+
     pub(super) fn squad_reserved(&self) -> BTreeSet<u32> {
         self.route_line
             .reserved()
             .chain(self.opening_rush.reserved())
             .chain(self.trap_breach.reserved())
             .chain(self.third_pressure.reserved())
+            .chain(self.jeff_v1_1.tank_raid.units())
+            .chain(self.jeff_v1_1.deny.units())
+            .chain(self.jeff_v1_1.meth_strike.units())
             .collect()
+    }
+
+    /// Whether the opening rush or Jeff's AI V1.1's Meth strike owns the unit.
+    pub(super) fn rush_reserved(&self, id: u32) -> bool {
+        self.opening_rush.is_reserved(id) || self.jeff_v1_1.meth_strike.holds(id)
     }
 
     /// Whether the trap breach (its concave is the defense where it stands) or the third-base
     /// party (it is away) owns the unit, so it never runs home to defend.
     pub(super) fn stays_out_of_home_defense(&self, id: u32) -> bool {
-        self.trap_breach.is_reserved(id) || self.third_pressure.is_reserved(id)
+        self.trap_breach.is_reserved(id)
+            || self.third_pressure.is_reserved(id)
+            || self.jeff_v1_1.tank_raid.holds(id)
+            || self.jeff_v1_1.deny.holds(id)
+            || self.jeff_v1_1.meth_strike.holds(id)
+            || self.jeff_v1_1.scout.unit == Some(id)
+            || self.jeff_v1_1.natclear.holds(id)
+            || self.jeff_v1_1.breakout.holds(id)
+            || self.jeff_v1_1.push.convoy_holds(id)
     }
 
     /// How many Tanks Jeff keeps home, the home Tank included: three for every four Tanks in the
@@ -688,6 +750,7 @@ impl AiDecisionMemory {
             .filter(|entity| entity.kind == EntityKind::Tank)
             .filter(|entity| !self.trap_breach.is_reserved(entity.id))
             .filter(|entity| !self.third_pressure.is_reserved(entity.id))
+            .filter(|entity| !self.jeff_v1_1.tank_raid.holds(entity.id))
             .filter(|entity| !push_tanks.contains(&entity.id))
             .filter(|entity| {
                 self.home_defensive_tank_assigned_once

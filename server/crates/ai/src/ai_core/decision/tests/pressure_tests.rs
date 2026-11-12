@@ -1,5 +1,6 @@
 use super::*;
 use crate::ai_core::profiles::PRESSURE;
+use rts_rules::math::GameplayMath as _;
 
 #[test]
 fn pressure_stops_legacy_rifleman_orders_only_after_panzerfaust_research_completes() {
@@ -571,41 +572,56 @@ fn pressure_ranked_sites_skip_occupied_or_exhausted_clusters_and_original_starts
     for site in &mut sites {
         let (dx, dy) = (site.position.0 - 9.5 * ts, site.position.1 - 9.5 * ts);
         site.ground_distances_from_starts
-            .insert(1, (dx * dx + dy * dy).sqrt());
+            .insert(1, (dx * dx + dy * dy).det_sqrt());
     }
     let mut snapshot = game.snapshot_for(1);
     snapshot.entities.clear();
-    let choose =
-        |snapshot: &rts_sim::protocol::Snapshot, blocked_near: bool, exhausted_near: bool| {
-            let frame = AiFrame::from_host(&start, snapshot, 1, [], Some(&[1, 2]))
+    let choose = |snapshot: &rts_sim::protocol::Snapshot,
+                  blocked_near: bool,
+                  exhausted_near: bool,
+                  blocked_center: bool| {
+        let frame = AiFrame::from_host(&start, snapshot, 1, [], Some(&[1, 2]))
+            .unwrap()
+            .with_base_sites(&sites);
+        let mut obs = AiObservation::from_frame(&frame).unwrap();
+        if exhausted_near {
+            obs.resources
+                .iter_mut()
+                .find(|r| r.id == 1000)
                 .unwrap()
-                .with_base_sites(&sites);
-            let mut obs = AiObservation::from_frame(&frame).unwrap();
-            if exhausted_near {
-                obs.resources
-                    .iter_mut()
-                    .find(|r| r.id == 1000)
-                    .unwrap()
-                    .remaining = 0;
-            }
-            let mut plan = expansion::ExpansionPlan {
-                policy: PRESSURE.production_expansion,
-                should_save: true,
-                blocks_tech_path: false,
-                blockers: vec![],
-            };
-            pressure_economy::plan_site(
-                &obs,
-                &PRESSURE,
-                Some(&WorldQueries::new(&frame)),
-                &mut plan,
-                &mut |_, x, _| !blocked_near || x > 35,
-            )
+                .remaining = 0;
+        }
+        let mut plan = expansion::ExpansionPlan {
+            policy: PRESSURE.production_expansion,
+            should_save: true,
+            blocks_tech_path: false,
+            blockers: vec![],
         };
-    let near = choose(&snapshot, false, false).unwrap();
-    assert!(near.0 < 35);
-    assert!(choose(&snapshot, true, false).unwrap().0 > 35);
-    assert!(choose(&snapshot, false, true).unwrap().0 > 35);
+        pressure_economy::plan_site(
+            &obs,
+            &PRESSURE,
+            Some(&WorldQueries::new(&frame)),
+            &mut plan,
+            &mut |_, x, y| (!blocked_near || x > 35) && (!blocked_center || (x, y) != (18, 28)),
+        )
+    };
+    let near = choose(&snapshot, false, false, false).unwrap();
+    assert_eq!(
+        near,
+        (18, 28),
+        "Depot should be centered on the map landmark"
+    );
+    let fallback = choose(&snapshot, false, false, true).unwrap();
+    assert_ne!(
+        fallback, near,
+        "Blocked center must use the existing search"
+    );
+    assert!(
+        fallback.0 < 35,
+        "Fallback should still use the same ranked base"
+    );
+    assert!(choose(&snapshot, true, false, false).unwrap().0 > 35);
+    assert!(choose(&snapshot, false, true, false).unwrap().0 > 35);
     snapshot.entities.push(EntityView::new(
         100,
         2,
@@ -616,7 +632,7 @@ fn pressure_ranked_sites_skip_occupied_or_exhausted_clusters_and_original_starts
         180,
         "idle",
     ));
-    assert!(choose(&snapshot, false, false).unwrap().0 > 35);
+    assert!(choose(&snapshot, false, false, false).unwrap().0 > 35);
     snapshot.entities.push(EntityView::new(
         101,
         1,
@@ -627,7 +643,7 @@ fn pressure_ranked_sites_skip_occupied_or_exhausted_clusters_and_original_starts
         180,
         "idle",
     ));
-    assert!(choose(&snapshot, false, false).is_none());
+    assert!(choose(&snapshot, false, false, false).is_none());
 }
 
 #[test]

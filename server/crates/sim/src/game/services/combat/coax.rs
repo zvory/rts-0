@@ -1,3 +1,4 @@
+use rts_rules::math::GameplayMath as _;
 use std::collections::HashMap;
 
 use rand::Rng;
@@ -24,14 +25,11 @@ use super::target_legality::DirectFireLegality;
 use super::weapons::moving_attack_cooldown;
 use super::RANGE_SLACK;
 
-const TANK_COAX_HALF_ARC_RAD: f32 = std::f32::consts::PI / 18.0;
-
 #[derive(Clone, Copy)]
 struct TankCoaxSnapshot {
     owner: u32,
     pos_x: f32,
     pos_y: f32,
-    weapon_facing: f32,
     range_px: f32,
     explicit_neutral_obstacle_target: Option<u32>,
     clear_obstacle_area: Option<(u32, f32, f32)>,
@@ -58,15 +56,10 @@ pub(super) fn fire_tank_coax_system(
         return;
     };
     for id in combat_order.iter().copied() {
-        let ready =
-            matches!(entities.get(id), Some(e) if e.weapon_cooldown(weapon_profile.id) == 0);
-        if !ready {
-            continue;
-        }
         let Some(snapshot) = tank_coax_snapshot(entities, id, weapon_profile) else {
             continue;
         };
-        let Some(tid) = resolve_tank_coax_target(
+        let target = resolve_tank_coax_target(
             map,
             entities,
             blockers,
@@ -78,9 +71,18 @@ pub(super) fn fire_tank_coax_system(
             id,
             snapshot,
             weapon_profile,
-        ) else {
+        );
+        let target_angle = target.and_then(|tid| entities.get(tid)).map(|target| {
+            (target.pos_y() - snapshot.pos_y).det_atan2(target.pos_x() - snapshot.pos_x)
+        });
+        let Some(tank) = entities.get_mut(id) else {
             continue;
         };
+        let aligned = super::weapons::rotate_tank_commander_weapon(tank, target, target_angle);
+        if !aligned || tank.weapon_cooldown(weapon_profile.id) != 0 {
+            continue;
+        }
+        let Some(tid) = target else { continue };
         let cooldown = entities
             .get(id)
             .map(|e| moving_attack_cooldown(e, weapon_profile.cooldown))
@@ -117,7 +119,6 @@ fn tank_coax_snapshot(
     if tank.kind != EntityKind::Tank || tank.hp == 0 || !tank.can_attack() {
         return None;
     }
-    let weapon_facing = tank.weapon_facing().filter(|facing| facing.is_finite())?;
     let range_px =
         weapon_profile.range_tiles * config::TILE_SIZE as f32 + tank.radius() + RANGE_SLACK;
     if !range_px.is_finite() {
@@ -125,9 +126,8 @@ fn tank_coax_snapshot(
     }
     Some(TankCoaxSnapshot {
         owner: tank.owner,
-        pos_x: tank.pos_x,
-        pos_y: tank.pos_y,
-        weapon_facing,
+        pos_x: tank.pos_x(),
+        pos_y: tank.pos_y(),
         range_px,
         explicit_neutral_obstacle_target: tank.order().attack_target(),
         clear_obstacle_area: tank
@@ -189,11 +189,11 @@ fn tank_coax_target_candidates(
             && snapshot
                 .clear_obstacle_area
                 .is_some_and(|(_, center_x, center_y)| {
-                    let dx = target.pos_x - center_x;
-                    let dy = target.pos_y - center_y;
+                    let dx = target.pos_x() - center_x;
+                    let dy = target.pos_y() - center_y;
                     let radius =
                         config::TANK_TRAP_CLUSTER_ATTACK_RADIUS_TILES * config::TILE_SIZE as f32;
-                    dx.mul_add(dx, dy * dy) <= radius * radius
+                    dx.det_mul_add(dx, dy * dy) <= radius * radius
                 });
         if target.is_neutral_obstacle()
             && snapshot.explicit_neutral_obstacle_target != Some(target.id)
@@ -228,8 +228,8 @@ fn tank_coax_target_candidates(
             (snapshot.pos_x, snapshot.pos_y),
             target.id,
             SecondaryWeaponActivationConstraints {
-                facing_rad: snapshot.weapon_facing,
-                half_arc_rad: TANK_COAX_HALF_ARC_RAD,
+                facing_rad: 0.0,
+                half_arc_rad: std::f32::consts::PI,
                 range_px: effective_weapon_range_px,
                 direct_fire_legality: DirectFireLegality::IntendedTarget,
             },
@@ -239,8 +239,8 @@ fn tank_coax_target_candidates(
         candidates.push(TargetCandidate {
             id,
             owner: target.owner,
-            pos_x: target.pos_x,
-            pos_y: target.pos_y,
+            pos_x: target.pos_x(),
+            pos_y: target.pos_y(),
             distance_sq,
             facts: target_rules::target_facts(target.kind),
             in_weapon_range: true,

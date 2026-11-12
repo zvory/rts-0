@@ -44,23 +44,25 @@ impl Fog {
             entity.owner != 0
                 && entity.hp > 0
                 && entity.is_unit()
-                && map.world_point_is_concealed(entity.pos_x, entity.pos_y)
-                && !smokes.point_inside(entity.pos_x, entity.pos_y)
+                && map.world_point_is_concealed(entity.pos_x(), entity.pos_y())
+                && !smokes.point_inside(entity.pos_x(), entity.pos_y())
         }) {
             let query_radius = target.radius() + max_unit_radius + close_gap_px;
-            for spotter_id in spatial.ids_in_circle_bbox(target.pos_x, target.pos_y, query_radius) {
+            for spotter_id in
+                spatial.ids_in_circle_bbox(target.pos_x(), target.pos_y(), query_radius)
+            {
                 let Some(spotter) = entities.get(spotter_id) else {
                     continue;
                 };
                 if spotter.hp == 0
                     || !spotter.is_unit()
                     || !teams.is_enemy_owner(spotter.owner, target.owner)
-                    || smokes.point_inside(spotter.pos_x, spotter.pos_y)
+                    || smokes.point_inside(spotter.pos_x(), spotter.pos_y())
                 {
                     continue;
                 }
-                let dx = target.pos_x - spotter.pos_x;
-                let dy = target.pos_y - spotter.pos_y;
+                let dx = target.pos_x() - spotter.pos_x();
+                let dy = target.pos_y() - spotter.pos_y();
                 let range = target.radius() + spotter.radius() + close_gap_px;
                 if !dx.is_finite()
                     || !dy.is_finite()
@@ -97,12 +99,12 @@ impl Fog {
                 };
                 if entity.hp == 0
                     || !entity.is_unit()
-                    || !map.world_point_is_concealed(entity.pos_x, entity.pos_y)
-                    || smokes.point_inside(entity.pos_x, entity.pos_y)
+                    || !map.world_point_is_concealed(entity.pos_x(), entity.pos_y())
+                    || smokes.point_inside(entity.pos_x(), entity.pos_y())
                 {
                     continue;
                 }
-                stamp_point(grid, width, height, entity.pos_x, entity.pos_y);
+                stamp_point(grid, width, height, entity.pos_x(), entity.pos_y());
             }
         }
     }

@@ -1,3 +1,4 @@
+use rts_rules::math::GameplayMath as _;
 use std::collections::HashMap;
 
 use crate::config;
@@ -69,7 +70,7 @@ pub(crate) fn order_or_launch_world_ability(
         if !caster_can_attempt(entities, player, caster, ability)
             || !world_ability_current_facing_ready(entities, caster, ability, x, y)
         {
-            let Some((sx, sy)) = entities.get(caster).map(|e| (e.pos_x, e.pos_y)) else {
+            let Some((sx, sy)) = entities.get(caster).map(|e| (e.pos_x(), e.pos_y())) else {
                 return AbilityOrderResult::Skipped;
             };
             if let Some(e) = entities.get_mut(caster) {
@@ -170,7 +171,8 @@ pub(crate) fn launch_world_ability(
 
     match (definition.effect_hook, ability) {
         (AbilityEffectHook::DelayedWorld, AbilityKind::MortarFire) => {
-            let Some((from_x, from_y)) = entities.get(caster).map(|e| (e.pos_x, e.pos_y)) else {
+            let Some((from_x, from_y)) = entities.get(caster).map(|e| (e.pos_x(), e.pos_y()))
+            else {
                 return false;
             };
             let Some(e) = entities.get_mut(caster) else {
@@ -190,7 +192,8 @@ pub(crate) fn launch_world_ability(
             true
         }
         (AbilityEffectHook::DelayedWorld, AbilityKind::Barrage) => {
-            let Some((from_x, from_y)) = entities.get(caster).map(|e| (e.pos_x, e.pos_y)) else {
+            let Some((from_x, from_y)) = entities.get(caster).map(|e| (e.pos_x(), e.pos_y()))
+            else {
                 return false;
             };
             let Some(e) = entities.get_mut(caster) else {
@@ -215,7 +218,7 @@ pub(crate) fn launch_world_ability(
             true
         }
         (AbilityEffectHook::DelayedWorld, AbilityKind::Smoke) => {
-            let Some(caster_pos) = entities.get(caster).map(|e| (e.pos_x, e.pos_y)) else {
+            let Some(caster_pos) = entities.get(caster).map(|e| (e.pos_x(), e.pos_y())) else {
                 return false;
             };
             let delay_ticks =
@@ -274,7 +277,7 @@ pub(crate) fn launch_world_ability(
             true
         }
         (AbilityEffectHook::DashReturn, AbilityKind::EkatTeleport) => {
-            let Some((origin_x, origin_y)) = entities.get(caster).map(|e| (e.pos_x, e.pos_y))
+            let Some((origin_x, origin_y)) = entities.get(caster).map(|e| (e.pos_x(), e.pos_y()))
             else {
                 return false;
             };
@@ -345,7 +348,7 @@ pub(crate) fn launch_world_ability(
                         player,
                         caster,
                         Some(anchor.id.get()),
-                        (anchor.x, anchor.y),
+                        (anchor.x.to_world(), anchor.y.to_world()),
                         (x, y),
                         definition.range_tiles,
                         tick,
@@ -458,7 +461,7 @@ pub(crate) fn launch_self_ability(
     }
     match (definition.effect_hook, ability) {
         (AbilityEffectHook::OwnedAreaStatus, AbilityKind::Breakthrough) => {
-            let Some((caster_x, caster_y)) = entities.get(caster).map(|e| (e.pos_x, e.pos_y))
+            let Some((caster_x, caster_y)) = entities.get(caster).map(|e| (e.pos_x(), e.pos_y()))
             else {
                 return false;
             };
@@ -475,7 +478,7 @@ pub(crate) fn launch_self_ability(
                 {
                     continue;
                 }
-                if dist2(caster_x, caster_y, unit.pos_x, unit.pos_y) > radius2 {
+                if dist2(caster_x, caster_y, unit.pos_x(), unit.pos_y()) > radius2 {
                     continue;
                 }
                 if let Some(unit) = entities.get_mut(id) {
@@ -489,7 +492,7 @@ pub(crate) fn launch_self_ability(
             true
         }
         (AbilityEffectHook::ConsumeGolem, AbilityKind::EkatConsumeGolem) => {
-            let Some((caster_x, caster_y)) = entities.get(caster).map(|e| (e.pos_x, e.pos_y))
+            let Some((caster_x, caster_y)) = entities.get(caster).map(|e| (e.pos_x(), e.pos_y()))
             else {
                 return false;
             };
@@ -535,9 +538,14 @@ fn nearest_owned_golem_for_consume(
             candidate.owner == player
                 && candidate.kind == EntityKind::Golem
                 && candidate.hp > 0
-                && dist2(x, y, candidate.pos_x, candidate.pos_y) <= range2
+                && dist2(x, y, candidate.pos_x(), candidate.pos_y()) <= range2
         })
-        .map(|candidate| (candidate.id, dist2(x, y, candidate.pos_x, candidate.pos_y)))
+        .map(|candidate| {
+            (
+                candidate.id,
+                dist2(x, y, candidate.pos_x(), candidate.pos_y()),
+            )
+        })
         .min_by(|a, b| a.1.total_cmp(&b.1).then_with(|| a.0.cmp(&b.0)))
         .map(|(id, _)| id)
 }
@@ -560,7 +568,7 @@ fn smoke_launch_delay_ticks(
     if range_px <= f32::EPSILON {
         return 0;
     }
-    let distance = dist2(caster_x, caster_y, x, y).sqrt();
+    let distance = dist2(caster_x, caster_y, x, y).det_sqrt();
     if !distance.is_finite() || distance <= f32::EPSILON {
         return 0;
     }
@@ -710,7 +718,7 @@ pub(crate) fn world_ability_facing_ready(
     ) {
         return false;
     }
-    let target_angle = (y - e.pos_y).atan2(x - e.pos_x);
+    let target_angle = (y - e.pos_y()).det_atan2(x - e.pos_x());
     if ability == AbilityKind::Barrage {
         return ability::barrage_facing_ready(e.facing(), target_angle);
     }
@@ -737,7 +745,7 @@ pub(crate) fn world_ability_current_facing_ready(
     ) {
         return false;
     }
-    let target_angle = (y - e.pos_y).atan2(x - e.pos_x);
+    let target_angle = (y - e.pos_y()).det_atan2(x - e.pos_x());
     if ability == AbilityKind::Barrage {
         return ability::barrage_facing_ready(e.facing(), target_angle);
     }
@@ -845,11 +853,20 @@ fn recast_return_candidate(
         if tick < earliest_return_tick {
             continue;
         }
-        if !hero_abilities::ekat_return_destination_valid(map, entities, caster, marker.x, marker.y)
-        {
+        if !hero_abilities::ekat_return_destination_valid(
+            map,
+            entities,
+            caster,
+            marker.x.to_world(),
+            marker.y.to_world(),
+        ) {
             continue;
         }
-        return Some((caster, marker.id.get(), (marker.x, marker.y)));
+        return Some((
+            caster,
+            marker.id.get(),
+            (marker.x.to_world(), marker.y.to_world()),
+        ));
     }
     None
 }
@@ -874,7 +891,7 @@ pub(crate) fn caster_in_range(
     }
     let range_px = range_tiles as f32 * config::TILE_SIZE as f32;
     let min_range_px = definition.min_range_tiles.unwrap_or(0) as f32 * config::TILE_SIZE as f32;
-    let distance_sq = dist2(e.pos_x, e.pos_y, x, y);
+    let distance_sq = dist2(e.pos_x(), e.pos_y(), x, y);
     distance_sq >= min_range_px * min_range_px && distance_sq <= range_px * range_px
 }
 
@@ -891,9 +908,9 @@ pub(crate) fn staging_point(
     let range_tiles = definition.range_tiles?;
     let range_px = range_tiles as f32 * config::TILE_SIZE as f32;
     let min_range_px = definition.min_range_tiles.unwrap_or(0) as f32 * config::TILE_SIZE as f32;
-    let dx = caster.pos_x - x;
-    let dy = caster.pos_y - y;
-    let len = (dx * dx + dy * dy).sqrt();
+    let dx = caster.pos_x() - x;
+    let dy = caster.pos_y() - y;
+    let len = (dx * dx + dy * dy).det_sqrt();
     if !len.is_finite() {
         return None;
     }
@@ -918,13 +935,13 @@ pub(crate) fn staging_point(
     } else {
         let center_dx = map.world_width_px() * 0.5 - x;
         let center_dy = map.world_height_px() * 0.5 - y;
-        let center_len = center_dx.hypot(center_dy);
+        let center_len = center_dx.det_hypot(center_dy);
         if center_len > f32::EPSILON {
             (center_dx / center_len, center_dy / center_len)
         } else {
             let facing = caster.facing();
             if facing.is_finite() {
-                (facing.cos(), facing.sin())
+                (facing.det_cos(), facing.det_sin())
             } else {
                 (1.0, 0.0)
             }
@@ -952,7 +969,7 @@ pub(crate) fn staging_point(
         (-1.0, -1.0),
     ];
     candidate_directions.into_iter().find_map(|(dir_x, dir_y)| {
-        let dir_len = dir_x.hypot(dir_y);
+        let dir_len = dir_x.det_hypot(dir_y);
         if !dir_len.is_finite() || dir_len <= f32::EPSILON {
             return None;
         }
@@ -962,7 +979,7 @@ pub(crate) fn staging_point(
             return None;
         }
         let (sx, sy) = SmokeCloudStore::clamp_point_to_map(map, sx, sy)?;
-        let distance = (sx - x).hypot(sy - y);
+        let distance = (sx - x).det_hypot(sy - y);
         (distance.is_finite() && distance >= min_range_px && distance <= range_px)
             .then_some((sx, sy))
     })

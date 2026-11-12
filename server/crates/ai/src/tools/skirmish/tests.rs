@@ -1,3 +1,5 @@
+use rts_rules::math::GameplayMath as _;
+use rts_sim::rng::PortableRng;
 use std::collections::BTreeSet;
 
 use super::fight::{run_fight, ControllerSpec, FightOutcome, FightSpec, ReplayPolicy};
@@ -71,7 +73,7 @@ fn bad_arguments_are_rejected() {
 #[test]
 fn mutation_changes_at_most_three_settings_of_the_base() {
     let base = RifleSquadParams::micro();
-    let mut rng = SmallRng::seed_from_u64(9);
+    let mut rng = PortableRng::seed_from_u64(9);
     for _ in 0..64 {
         let mutated = mutated_params(base, &mut rng);
         let changed = RifleSquadParams::KEYS
@@ -132,10 +134,10 @@ fn placement_puts_each_squad_on_its_own_side_of_the_gap() {
             )
         };
         let (ours, theirs) = (centre(&placement.candidate), centre(&placement.opponent));
-        let to_base = |p: (f32, f32)| (p.0 - 816.0).hypot(p.1 - 816.0);
+        let to_base = |p: (f32, f32)| (p.0 - 816.0).det_hypot(p.1 - 816.0);
         assert!(to_base(ours) < to_base(theirs), "{}", scenario.id);
-        let gap = (ours.0 - theirs.0).hypot(ours.1 - theirs.1) / 32.0;
-        let expected = scenario.gap_tiles.hypot(scenario.lateral_tiles);
+        let gap = (ours.0 - theirs.0).det_hypot(ours.1 - theirs.1) / 32.0;
+        let expected = scenario.gap_tiles.det_hypot(scenario.lateral_tiles);
         assert!(
             (gap - expected).abs() < 1.5,
             "{}: tile snapping keeps the gap near nominal, {gap} vs {expected}",

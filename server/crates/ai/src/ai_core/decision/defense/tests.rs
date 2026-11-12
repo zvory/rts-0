@@ -1,4 +1,5 @@
 use super::*;
+use rts_rules::math::GameplayMath as _;
 
 #[test]
 fn supplemental_rifles_reserve_distinct_spaced_posts_outside_the_opening_pocket() {
@@ -63,6 +64,7 @@ fn los_test_observation(blocker: EntityKind) -> AiObservation {
             latched_node: None,
             target_id: None,
             free_for_combat: false,
+            research: None,
         }],
         resources: Vec::new(),
         visible_allies: Vec::new(),
@@ -211,6 +213,7 @@ fn infantry_at_home_defends_a_forward_building_under_attack() {
             latched_node: None,
             target_id: None,
             free_for_combat: true,
+            research: None,
         });
     }
     observation.visible_enemies.push(AiEntitySummary {
@@ -227,6 +230,7 @@ fn infantry_at_home_defends_a_forward_building_under_attack() {
         latched_node: None,
         target_id: Some(10),
         free_for_combat: true,
+        research: None,
     });
 
     assert_eq!(local_defense_target(&observation), Some(30));
@@ -256,7 +260,7 @@ fn first_machine_gunner_reserves_a_flank_slot_in_two_unit_formation() {
     let reserved =
         main_steel_defensive_line_assignments(&observation, &[20], enemy_base, 6.0, 4.5, 2)
             .expect("reserved flank assignment")[0];
-    let offset_tiles = dist2(centered.x, centered.y, reserved.x, reserved.y).sqrt()
+    let offset_tiles = dist2(centered.x, centered.y, reserved.x, reserved.y).det_sqrt()
         / observation.map.tile_size as f32;
 
     assert!((offset_tiles - 2.25).abs() < 0.001);
@@ -291,7 +295,7 @@ fn home_rifle_coverage_uses_wide_fixed_columns_and_deeper_second_rank() {
             assignments[1].x,
             assignments[1].y
         )
-        .sqrt()
+        .det_sqrt()
             / tile_size
             - HOME_RIFLE_RANK_DEPTH_TILES)
             .abs()
@@ -304,7 +308,7 @@ fn home_rifle_coverage_uses_wide_fixed_columns_and_deeper_second_rank() {
             assignments[2].x,
             assignments[2].y
         )
-        .sqrt()
+        .det_sqrt()
             / tile_size
             - HOME_RIFLE_LATERAL_SPACING_TILES)
             .abs()
@@ -591,7 +595,7 @@ fn four_gun_line_keeps_the_pocket_posts_and_adds_a_wing_on_each_side() {
         // An attacker standing off the centre guns at Machine Gunner range is in every dug-in
         // gun's reach.
         let (forward, lateral) = frame(post);
-        assert!((14.0 - forward).hypot(lateral) <= 7.1);
+        assert!((14.0 - forward).det_hypot(lateral) <= 7.1);
     }
 }
 
@@ -792,6 +796,7 @@ fn planned_factory_is_part_of_the_local_defense_envelope() {
         latched_node: None,
         target_id: None,
         free_for_combat: true,
+        research: None,
     });
 
     assert_eq!(
@@ -828,6 +833,7 @@ fn incomplete_factory_is_part_of_the_local_defense_envelope() {
         latched_node: None,
         target_id: None,
         free_for_combat: false,
+        research: None,
     });
     let stats = config::building_stats(EntityKind::Factory).expect("Factory stats");
     observation.visible_enemies.push(AiEntitySummary {
@@ -844,6 +850,7 @@ fn incomplete_factory_is_part_of_the_local_defense_envelope() {
         latched_node: None,
         target_id: None,
         free_for_combat: true,
+        research: None,
     });
 
     assert_eq!(
@@ -882,6 +889,7 @@ fn standing_rifle_formation_ignores_extractors() {
         latched_node: None,
         target_id: None,
         free_for_combat: false,
+        research: None,
     });
 
     assert_eq!(defensive_formation_sites(&observation).len(), 1);
@@ -940,6 +948,7 @@ fn strongest_local_sector_wins_over_a_lone_flanker() {
             latched_node: None,
             target_id: None,
             free_for_combat: true,
+            research: None,
         });
     }
 
@@ -985,6 +994,7 @@ fn combat_unit(id: u32, kind: EntityKind, x: f32, y: f32) -> AiEntitySummary {
         latched_node: None,
         target_id: None,
         free_for_combat: true,
+        research: None,
     }
 }
 
@@ -1038,7 +1048,7 @@ fn unspotted_defending_tank_closes_to_its_own_sight_before_holding() {
         _ => None,
     });
     let (x, y) = park.unwrap_or_else(|| panic!("tank should close in: {commands:?}"));
-    let distance = dist2(x, y, 20.5 * ts, 5.5 * ts).sqrt() / ts;
+    let distance = dist2(x, y, 20.5 * ts, 5.5 * ts).det_sqrt() / ts;
     assert!((distance - 9.0).abs() < 0.01, "parked {distance} tiles out");
 }
 
@@ -1074,6 +1084,7 @@ fn defending_tank_does_not_park_behind_a_building() {
         x: 14.5 * ts,
         y: 5.5 * ts,
         free_for_combat: false,
+        research: None,
         ..combat_unit(11, EntityKind::Rifleman, 0.0, 0.0)
     });
     observation

@@ -3,6 +3,7 @@ use crate::game::ability::AbilityKind;
 use crate::game::entity::{
     supports_manual_emplacement, Entity, EntityKind, EntityStore, Order, WeaponSetup,
 };
+use rts_rules::math::GameplayMath as _;
 
 pub(crate) mod targeting;
 
@@ -52,7 +53,7 @@ pub(crate) fn execute_anti_tank_gun_setup(
     {
         return false;
     }
-    let facing = (y - e.pos_y).atan2(x - e.pos_x);
+    let facing = (y - e.pos_y()).det_atan2(x - e.pos_x());
     if !facing.is_finite() {
         return false;
     }
@@ -76,7 +77,7 @@ pub(crate) fn execute_anti_tank_gun_setup(
         e.set_weapon_setup(WeaponSetup::TearingDownToRedeploy { ticks });
     }
     e.reset_gather_state();
-    let (px, py) = (e.pos_x, e.pos_y);
+    let (px, py) = (e.pos_x(), e.pos_y());
     e.reset_stuck(px, py);
     true
 }
@@ -108,7 +109,7 @@ pub(crate) fn start_artillery_fire_command_order(
     e.clear_orders();
     e.set_path_goal(None);
     e.reset_gather_state();
-    let (px, py) = (e.pos_x, e.pos_y);
+    let (px, py) = (e.pos_x(), e.pos_y());
     e.reset_stuck(px, py);
     start_artillery_fire_from_target(e, target, mode, radius_tiles)
 }

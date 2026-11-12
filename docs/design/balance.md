@@ -21,7 +21,7 @@ Default attack range, damage, cooldown, weapon class, and weapon-policy metadata
 `server/crates/rules/src/combat.rs` weapon profiles; current profile values mirror the defs records
 so legacy `attack_profile(kind)` and `weapon_class(kind)` callers remain behavior-compatible.
 All repeating unit attack cooldowns are at least doubled from the original cadence, including melee,
-tank coax, mortar/artillery fire, Rocket Truck barrage reload, and Ekat Line Shot. Damage,
+tank coax, mortar/artillery fire, and Ekat Line Shot. Rocket Truck barrage reload is 30 seconds. Damage,
 first-shot readiness, windups, projectile travel, and barrage unload duration are unchanged.
 The disposable Panzerfaust rocket has no repeat cooldown; its rifle follows the doubled cadence.
 Mortar Fire has a further 50% cooldown increase to 180 ticks (6 seconds).
@@ -44,7 +44,9 @@ in 45 ticks (1.5 seconds) instead of 90 ticks. Movement still resets the range r
 attack cooldowns, and damage are unchanged. Existing research hotkeys are preserved.
 
 Tanks also have a live secondary `tank_coax` profile owned by combat rules: 6-tile range, 4 small-arms
-damage, 12-tick cooldown, no Tank armor-facing multiplier, and single-target direct fire.
+damage, 12-tick cooldown, no Tank armor-facing multiplier, and single-target direct fire. The
+commander roof MG acquires and aims independently through 360 degrees, including while moving.
+Its right-offset mount follows the main turret; `tank_coax` remains its internal weapon id.
 Tank HE: cannon shots aimed at infantry (Workers, Golems, Warriors,
 Riflemen, Panzerfausts, and Machine Gunners) retain the normal immediate 60-damage direct hit.
 On a successful resolved infantry hit, every other eligible entity within 1.4 tiles of the
@@ -332,9 +334,9 @@ its source for three seconds. Hits during that window neither redirect the hull 
 after it expires, the next qualifying hit may establish a new lock. Active movement paths and zero
 oil prevent this response, while Hold Position explicitly allows it. Riflemen take full incoming
 damage while moving. Riflemen upgraded with Methamphetamines gain permanent moving fire, keep
-advancing while firing with normal accuracy, move at tank speed, and use a 16-tick rifle cooldown.
+advancing while firing with normal accuracy, move at tank speed, and use a 24-tick rifle cooldown.
 Panzerfausts upgraded with Methamphetamines receive the normal Rifleman moving fire, tank-speed
-movement, and 25% faster rifle attacks plus the Panzerfaust windup boost. Machine Gunners upgraded with
+movement, and the same 24-tick rifle cooldown plus the Panzerfaust windup boost. Machine Gunners upgraded with
 Methamphetamines move at unupgraded Rifleman speed and use half-length setup/teardown timers; other
 mobile combat units still hold position once a target is in weapon range. Scout cars also fire while
 moving using an independent rear machine-gun facing. They are unarmored light vehicles and do not
@@ -373,10 +375,10 @@ nearer Mortar Team; an explicit Attack order may select the mortar instead. Tank
 immediate-threat override for targets already in relevant range: Anti-Tank Guns are first, then
 other anti-armor threats, armored obstacles, support weapons, and only then ordinary soft targets.
 The rules-owned `TargetFacts` surface records the current target-policy facts for every
-`EntityKind`, including the Tank coax infantry-priority group. The live coax policy ranks Riflemen
-and Machine Gunners first, economy workers (`Worker` and `Golem`) second, and fallback legal
-targets such as vehicles, buildings, support weapons, and field obstacles last; resource nodes are
-not legal coax targets.
+`EntityKind`, including the Tank coax infantry-priority group. The commander MG ranks Panzerfausts first, Anti-Tank Guns second, combat infantry
+(Warrior, Rifleman, Machine Gunner) third, Mortar Teams fourth, and
+Scout Cars fifth. All remaining legal targets use the default weapon group/material order,
+then distance/id ties; resource nodes are not legal MG targets.
 Default weapons perform a full acquisition pass when ready and targetless, immediately after each
 shot to prepare the next engagement during reload, or when the prepared target is no longer
 fireable on the ready tick. Tanks additionally rerank automatic targets every five ticks, staggered
@@ -391,8 +393,8 @@ only for moving-fire units and keeps following its commanded path. Both movement
 the same committed-target rule. Except for the Tank's five-tick rerank, a
 still-fireable prepared target receives the next shot even if a higher-priority threat appeared
 during reload. The post-shot pass may then select that higher-priority threat for the following
-cycle. Tank coax fire has no independent retained
-target slot, so its acquisition pass runs only when the coax cooldown is ready. This cadence is
+cycle. Tank commander MG acquisition and rotation run every tick, including during reload.
+Its secondary target is independent of the cannon target and never requests movement. This cadence is
 limited to default attacks; future grenades, satchels, or demolition attacks need separate attack
 profiles and explicit activation/autocast policy instead of being folded into default targeting.
 
@@ -420,12 +422,12 @@ profiles and explicit activation/autocast policy instead of being folded into de
 - `MACHINE_GUNNER_SETUP_TICKS = 30` (~1s setup or teardown for support weapons), halved to
   `METHAMPHETAMINES_MACHINE_GUNNER_SETUP_TICKS = 15` after Methamphetamines research.
 - Anti-Tank Guns use `ANTI_TANK_GUN_SETUP_TICKS = 120` (4s) and
-  `ANTI_TANK_GUN_TEARDOWN_TICKS = 40` (~1.33s). The client mirrors these ticks for
+  `ANTI_TANK_GUN_TEARDOWN_TICKS = 30` (1s). The client mirrors these ticks for
   matching world and minimap trail animation.
 - Mortar Teams have no setup or teardown timing. They use `MORTAR_MIN_RANGE_TILES = 5`,
   `MORTAR_RANGE_TILES = 17`, and `MORTAR_FIELD_OF_FIRE_RAD = 360 degrees total`,
   `MORTAR_FIRE_COOLDOWN_TICKS = 180` (6s between shells),
-  `MORTAR_MANUAL_SHELL_DELAY_TICKS = 26` (~0.87s manual travel),
+  `MORTAR_MANUAL_SHELL_DELAY_TICKS = 32` (~1.07s manual travel),
   `MORTAR_OUTER_RADIUS_TILES = 2.0`,
   `MORTAR_INNER_RADIUS_TILES = 0.5`,
   `MORTAR_OUTER_DAMAGE = 40`, and `MORTAR_INNER_DAMAGE = 100`.
@@ -449,7 +451,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   `ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK = 0.070` to track targets inside that cone;
   targets outside the cone are ignored until teardown and redeployment. While packed and mobile, an
   Anti-Tank Gun moves at 1.7556 px/tick and turns its body at
-  `ANTI_TANK_GUN_BODY_TURN_RATE_DEGREES_PER_SECOND = 70`; sharp heading changes still reduce throttle
+  `ANTI_TANK_GUN_BODY_TURN_RATE_DEGREES_PER_SECOND = 110`; sharp heading changes still reduce throttle
   until the gun pivots in place.
 - Panzerfaust units carry a one-shot 5-tile loaded weapon that targets only visible
   Scout Cars, Tanks, and Command Cars with
@@ -515,8 +517,9 @@ profiles and explicit activation/autocast policy instead of being folded into de
   so five Tanks fill the budget. A Command Car still uses 4 production supply.
 - **Methamphetamines** (Training Centre research): costs 100 steel / 100 oil and takes 600 ticks
   (~20s). Once complete, all current and future Riflemen for that player gain permanent moving rifle fire,
-  1.25x movement speed (matching tank speed at 2.0 px/tick), no extra movement miss chance, and 50%
-  faster attacks (32 tick cooldown becomes 16). It also increases that
+  1.25x movement speed (matching tank speed at 2.0 px/tick), no extra movement miss chance, and a
+  shared Rifleman/Panzerfaust rifle cooldown of 24 ticks instead of 32 (25% shorter cooldown, or
+  33⅓% more shots per second). It also increases that
   player's Machine Gunners from 1.28 px/tick to unupgraded Rifleman speed (1.6 px/tick) and halves
   their setup and teardown timers from 30 ticks to 15. Panzerfausts also use the reduced
   12-tick Panzerfaust windup.
@@ -551,7 +554,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   independently. The former AT Guns slot before it remains empty so all other research hotkeys retain
   their established positions. Once complete, that player can train Artillery from Gun Works.
 - **Rockets** (Engineering Complex research, protocol id `rockets`): costs 75 steel / 125 oil and
-  takes 750 ticks (~25s). Once complete, that player can train Rocket Trucks from Gun Works while they own a completed Vehicle Works.
+  takes 750 ticks (~25s). Once complete, that player can train Rocket Trucks from Gun Works. No Vehicle Works is required.
 - **Tank Production** (Engineering Complex research, protocol id `tank_unlock`): costs 150 steel /
   100 oil and takes 600 ticks (~20s). Once complete, that player can train Tanks from Vehicle
   Works. Scout Cars remain immediately trainable from Vehicle Works; Command Cars require only a
@@ -704,10 +707,10 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | mortar_team     | 75  | 40 outer / 100 inner AOE | 5-17 | 180 | 1.6 | 10 | 100 | 40 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
 | anti_tank_gun         | 45  | 100 deployed; cannot target infantry | 20 deployed | 144 | 1.7556 | 9    | 150 | 40  | 3   | 440 (~15s); cannot fire while packed or transitioning; requires a completed owned Gun Works (`steelworks` kind) and past ownership of a completed Engineering Complex; no research required (temporary hack; remove later) |
 | artillery       | 200 | 75 AP inner / 75-20 outer AOE | 10-35 artillery fire | 180 | 1.6 | 7 | 150 | 50 | 4 | 600 (~20s); requires Gun Works (`steelworks` kind) and Artillery (`artillery_unlock`) researched in Engineering Complex; rendered at 75% of its prior size with a matching 75%-of-Tank gameplay footprint; 2/3-tile inner and 2-tile outer blast radii; soft target with no armor damage reduction |
-| rocket_launcher (Rocket Truck) | 150 | 16 rockets, each 21 outer / 53 inner AOE; a rocket whose impact point intersects a target deals 70 armor-piercing damage instead; all resulting damage is reduced to 25% against buildings | 10-44 Barrage | 1800-tick (~60s) cooldown from activation | 2.0 | 8 | 225 | 100 | 6 | 600 (~20s); requires Gun Works (`steelworks` kind), a completed owned Vehicle Works (`factory` kind), and Rockets (`rockets`) researched in Engineering Complex; vehicle movement; must stop to launch; one manual command unloads exactly 16 rockets over 120 ticks (~4s) into a 6-tile scatter radius and then stops; its team-tinted rack carries 16 rounds, empties one slot per launch, and refills at cooldown completion; the PNG and collision footprint are enlarged by 20% (48×26.4 px body, 1.2 px clearance, 21.6 px selection radius); Barrage accepts in-range world points without requiring current vision; first barrage is free and later barrages cost 150 oil |
+| rocket_launcher (Rocket Truck) | 150 | 16 rockets, each dealing 70 armor-piercing damage within 0.5 tile, 53 non-piercing damage beyond 0.5 through 1 tile, and 21 non-piercing damage beyond 1 through 2 tiles, measured from impact to target centre; all resulting damage is reduced to 25% against buildings | 10-44 Barrage | 900-tick (~30s) cooldown from activation | 2.0 | 8 | 225 | 100 | 3 | 600 (~20s); requires Gun Works (`steelworks` kind) and Rockets (`rockets`) researched in Engineering Complex; vehicle movement; must stop to launch; one manual command unloads exactly 16 rockets over 120 ticks (~4s) into a 6-tile scatter radius and then stops; its team-tinted rack carries 16 rounds, empties one slot per launch, and refills at cooldown completion; the PNG and collision footprint are enlarged by 20% (48×26.4 px body, 1.2 px clearance, 21.6 px selection radius); Barrage accepts in-range world points without requiring current vision; first barrage is free and later barrages cost 150 oil |
 | scout_car       | 100 | 6   | 7     | 12  | 2.35  | 15    | 125 | 60  | 3   | 480 (~16s) |
 | scout_plane     | 40  | 0   | 0     | 0  | 2.6   | 19    | 0   | 0   | 0   | 0; instant sorties are free from a Command Car; uses the C slot after research; unlimited independent active sorties; non-combat recon with 2-tile orbit radius and a 30-second total lifetime from launch, including transit, followed by despawn; 30-second carrier-local cooldown, no ground collision reservation, and 48x34 px client render body |
-| tank            | 292 | 60 cannon; 4 coax | 5 moving / 14 fully stationary cannon; 6 coax | 144 cannon; 12 coax | 2.0   | 9     | 350 | 145 | 5   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in Engineering Complex; coax is a secondary small-arms weapon that fires through the current turret arc |
+| tank            | 292 | 60 cannon; 4 coax | 5 moving / 14 fully stationary cannon; 6 coax | 144 cannon; 12 coax | 2.0   | 9     | 350 | 145 | 5   | 750 (~25s); requires Vehicle Works (`factory` kind) and Tank Production (`tank_unlock`) researched in Engineering Complex; coax is a secondary small-arms weapon that aims independently in all directions |
 | command_car     | 150 | 0   | 0     | 0  | 2.35  | 8     | 150 | 85  | 4   | 450 (~15s); trained at Vehicle Works (`factory` kind) and requires a completed Engineering Complex, but no Tank Production research; no weapon; Scout Car-style movement with a smaller jeep-sized body |
 | ekat       | 150 | 0   | 0     | 0  | 1.6   | 12    | 0   | 0   | 0   | 0; Ekat faction hero; no default attack; no passive regeneration; consumes nearby Golems for recovery |
 
@@ -728,7 +731,7 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 | training_centre            | Training Centre    | 120 | 1     | 100 steel + 25 oil | 3x2  | 560       | shared prerequisite before either advanced path; unlocks machine_gunner training at barracks and researches Methamphetamines, Panzerfausts, and Entrenchment; requires a Resource Depot and Barracks |
 | engineering_complex           | Engineering Complex        | 98 | 1     | 100 steel + 100 oil | 3x3  | 450       | research-only building for Artillery, Rockets, Tank Production, Tank Plus, Smoke Plus, and Scout Plane; its first command-card slot remains empty to preserve existing research hotkeys; requires a Resource Depot and Training Centre |
 | factory                    | Vehicle Works      | 120 | 1     | 125 steel + 125 oil | 3x3  | 749       | Mobile Warfare path building; trains scout_car immediately, command_car after a completed Engineering Complex, and tank after Tank Production research; requires a Resource Depot and Training Centre |
-| steelworks                 | Gun Works          | 120 | 1     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team immediately, Anti-Tank Guns after ever owning a completed Engineering Complex (temporary hack), Artillery after Artillery research, and Rocket Trucks after Rockets research while owning a completed Vehicle Works; requires a Resource Depot and Training Centre |
+| steelworks                 | Gun Works          | 120 | 1     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team immediately, Anti-Tank Guns after ever owning a completed Engineering Complex (temporary hack), Artillery after Artillery research, and Rocket Trucks after Rockets research; requires a Resource Depot and Training Centre |
 | tank_trap                  | Tank Trap          | 72 | 0     | 20 steel + 0 oil | 1x1  | 150       | engineer-built vehicle obstacle available from the worker build card after a completed Training Centre; A-clicking a visible or remembered completed trap creates a four-tile clear-area Attack Move objective whose actionable traps outrank ordinary enemies; workers deconstruct completed traps in 75 ticks and refund the cost to the deconstructing player; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, no fog reveal, not an elimination building |
 | steel_mine                 | Steel Mine         | 37  | 1     | 0 | 1x1  | 720       | free permanent Resource Depot background job on in-range Steel patches; mines 2 steel per 40 ticks; unarmored, immobile, no trains, no supply, and no weapon |
 | pump_jack                  | Pump Jack          | 56  | 1     | 150 steel | 1x1  | 300      | manual Engineer construction; also a free 1080-tick permanent Resource Depot background job on in-range Oil patches; mines 2 oil per 40 ticks; unarmored, immobile, no trains, no supply, no weapon, and does not block shots or line of sight |

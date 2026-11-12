@@ -25,11 +25,23 @@ impl Default for AutoBuildSettings {
 }
 
 impl PlayerState {
-    pub(in crate::game) fn can_auto_build(&self, cost: ResourceCost) -> bool {
+    pub(in crate::game) fn can_auto_build(
+        &self,
+        cost: ResourceCost,
+        pending: ResourceCost,
+    ) -> bool {
         self.is_ai
             || (!self.auto_build.paused
-                && reserve_allows_spend(self.steel, cost.steel, self.auto_build.reserve_steel)
-                && reserve_allows_spend(self.oil, cost.oil, self.auto_build.reserve_oil))
+                && reserve_allows_spend(
+                    self.steel,
+                    cost.steel,
+                    self.auto_build.reserve_steel.max(pending.steel),
+                )
+                && reserve_allows_spend(
+                    self.oil,
+                    cost.oil,
+                    self.auto_build.reserve_oil.max(pending.oil),
+                ))
     }
 }
 

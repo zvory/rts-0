@@ -1,11 +1,12 @@
 use crate::config;
 use crate::game::entity::EntityKind;
+use rts_rules::math::GameplayMath as _;
 
 pub(super) const PIVOT_VEHICLE_BODY_TURN_RATE_RAD_PER_TICK: f32 = 0.035;
 pub(super) const TANK_BODY_TURN_RATE_RAD_PER_TICK: f32 =
     PIVOT_VEHICLE_BODY_TURN_RATE_RAD_PER_TICK * 1.25;
 pub(super) const ANTI_TANK_GUN_BODY_TURN_RATE_RAD_PER_TICK: f32 =
-    70.0_f32.to_radians() / config::TICK_HZ as f32;
+    110.0_f32.to_radians() / config::TICK_HZ as f32;
 pub(super) const PIVOT_VEHICLE_LOOKAHEAD_PX: f32 = config::TILE_SIZE as f32 * 5.0;
 pub(super) const VEHICLE_REVERSE_GOAL_DISTANCE_PX: f32 = config::TILE_SIZE as f32 * 3.0;
 
@@ -47,7 +48,7 @@ impl PivotDriveProfile {
     }
 
     pub(super) fn close_nudge_allows_translation(self, path_forward_dot: f32) -> bool {
-        path_forward_dot.abs() >= self.full_speed_angle_rad.cos()
+        path_forward_dot.abs() >= self.full_speed_angle_rad.det_cos()
     }
 }
 

@@ -63,16 +63,25 @@ pub(super) fn effective_unit_priorities_for_fast_tank_timing(
     let Some(timing) = profile.fast_tank_timing else {
         return unit_priorities.to_vec();
     };
+    // Jeff's AI V1.1 (`ecafter`): its Factory comes before the Engineering Complex and so before
+    // Tank Unlock, and its first unit is a Scout Car while no car is out and Tanks cannot be trained.
+    let first_car = facts.v1_1_opening.is_some()
+        && facts.unit_count(EntityKind::ScoutCar) == 0
+        && !facts
+            .completed_upgrades()
+            .contains(&UpgradeKind::TankUnlock);
     let mut priorities: Vec<EntityKind> = unit_priorities
         .iter()
         .copied()
         .filter(|unit| {
             *unit != EntityKind::ScoutCar
+                || first_car
                 || facts.unit_count(EntityKind::Tank) >= timing.tanks_before_scout_car
         })
         .collect();
-    if facts.unit_count(EntityKind::Tank) >= timing.tanks_before_scout_car
-        && facts.unit_count(EntityKind::ScoutCar) < timing.scout_car_target
+    if first_car
+        || (facts.unit_count(EntityKind::Tank) >= timing.tanks_before_scout_car
+            && facts.unit_count(EntityKind::ScoutCar) < timing.scout_car_target)
     {
         priorities.sort_by_key(|unit| (*unit != EntityKind::ScoutCar) as u8);
     }

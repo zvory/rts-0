@@ -7,6 +7,7 @@ pub struct PlayerCriticalEventState {
     pub player_id: u32,
     pub supply_used: u32,
     pub supply_cap: u32,
+    pub completed_buildings: Vec<EntityKind>,
     pub blocked_production: Vec<(EntityKind, EntityKind)>,
 }
 
@@ -57,6 +58,7 @@ impl Game {
                     player_id: player.id,
                     supply_used: player.supply_used,
                     supply_cap: crate::config::PLAYER_SUPPLY_CAP,
+                    completed_buildings: completed,
                     blocked_production,
                 }
             })

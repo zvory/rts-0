@@ -9,13 +9,48 @@ use serde::{Deserialize, Serialize};
 use super::replay_artifact::REPLAY_ARTIFACT_SCHEMA_VERSION_V3;
 pub use super::replay_artifact::{
     is_supported_replay_artifact_schema, ChatLogEntry, CommandLogEntry, ReplayArtifactV1,
-    ReplayStartComposition, ReplayValidationError, REPLAY_ARTIFACT_CURRENT_SCHEMA_VERSION,
+    ReplayElimination, ReplayEndStateHash, ReplayStartComposition, ReplayValidationError,
+    REPLAY_ARTIFACT_CURRENT_SCHEMA_VERSION,
 };
 use super::{Game, Map, MapMetadata, PlayerInit, PlayerStartingLoadout};
 use crate::game::command::SimCommand;
 use crate::protocol::{Event, ReplayStartMetadata, Snapshot};
 
 impl ReplayArtifactV1 {
+    /// None means this older artifact predates end-state verification.
+    pub fn verify_end_state(&self, game: &Game) -> Result<Option<bool>, String> {
+        if game.tick_count() != self.duration_ticks {
+            return Err("replay end-state verification requires the final tick".to_string());
+        }
+        let Some(expected) = &self.end_state_hash else {
+            return Ok(None);
+        };
+        if expected.algorithm != super::checkpoint::END_STATE_HASH_ALGORITHM {
+            return Err(format!(
+                "unsupported replay end-state hash algorithm {}",
+                expected.algorithm
+            ));
+        }
+        let actual = game.replay_end_state_hash()?;
+        if actual != expected.digest {
+            tracing::warn!(expected = %expected.digest, %actual, tick = game.tick_count(),
+                recorded_build = %self.server_build_sha, "replay end-state hash mismatch");
+        }
+        Ok(Some(actual == expected.digest))
+    }
+
+    /// Called once at each post-tick boundary, before taking a replay keyframe or verifying.
+    pub fn apply_eliminations_at_current_tick(&self, game: &mut Game) {
+        let tick = game.tick_count();
+        let first = self.eliminations.partition_point(|entry| entry.tick < tick);
+        for entry in self.eliminations[first..]
+            .iter()
+            .take_while(|entry| entry.tick == tick)
+        {
+            game.eliminate(entry.player_id);
+        }
+    }
+
     pub fn start_metadata(&self) -> ReplayStartMetadata {
         ReplayStartMetadata {
             artifact_schema_version: self.artifact_schema_version,

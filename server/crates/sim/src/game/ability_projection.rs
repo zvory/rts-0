@@ -13,7 +13,9 @@ pub(in crate::game) fn ability_object_views_for(
     game.state
         .ability_runtime
         .world_objects()
-        .filter(|object| !fogged || fog.is_visible_world(player, object.x, object.y))
+        .filter(|object| {
+            !fogged || fog.is_visible_world(player, object.x.to_world(), object.y.to_world())
+        })
         .map(|object| {
             let owner_visible = object.owner == player
                 || owner_visible_players.contains(&object.owner)
@@ -24,7 +26,7 @@ pub(in crate::game) fn ability_object_views_for(
                     .entities
                     .get(object.caster_id)
                     .is_some_and(|caster| {
-                        !fogged || fog.is_visible_world(player, caster.pos_x, caster.pos_y)
+                        !fogged || fog.is_visible_world(player, caster.pos_x(), caster.pos_y())
                     }) {
                 Some(object.caster_id)
             } else {
@@ -35,8 +37,8 @@ pub(in crate::game) fn ability_object_views_for(
                 owner: object.owner,
                 ability: object.ability.to_protocol_str().to_string(),
                 kind: ability_object_kind_to_protocol(object.kind).to_string(),
-                x: object.x,
-                y: object.y,
+                x: object.x.to_world(),
+                y: object.y.to_world(),
                 expires_in: object.expires_in(game.state.tick),
                 source_caster_id,
                 owner_state: owner_visible

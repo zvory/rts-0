@@ -61,10 +61,11 @@ but the server assigns lobby/start colors and the client keeps a fallback/render
 cross-surface guard intentionally lives with the protocol parity smoke test until a structured
 lobby/config dump replaces the source scrape.
 
-`pointTanks { units, x, y }` is an immediate tank-only command. The server validates the unit
+`pointTanks { units, x, y, queued? }` is a tank-only command; `queued` defaults to false. The server validates the unit
 list and computes one heading from the eligible tanks’ centroid to the world point. It clears
-active/queued orders and holds the hulls at that heading using normal turn speed. A click at
-the centroid is a no-op. It has no queued form, research requirement, cost, or cooldown.
+active/queued orders for immediate issue, or appends a bounded queued heading when `queued` is true.
+Hulls use normal turn speed; following orders wait for alignment. A click at the centroid is a no-op.
+It has no research requirement, cost, or cooldown.
 
 ### 2.1 Client → Server (`ClientMessage`)
 
@@ -78,8 +79,8 @@ the centroid is a no-op. It has no queued form, research requirement, cost, or c
 | `setTeamPreset` | `preset: string` | Deprecated compatibility command. The server ignores it; lobby teams are host-managed slots. |
 | `setTeam` | `id: u32`, `teamId: u32` | Host assigns an active human or AI lobby seat to team `1..=4` (lobby phase only, host-only). Unknown ids, spectators, team id `0`, and team ids outside the supported range are ignored. |
 | `setFaction` | `factionId: string` | Active human players select their own playable lobby faction (lobby phase only). Unknown ids, fixture ids, spectators, countdown, and in-game requests are ignored. The normal client only exposes this during the beta UI rollout. |
-| `addAi`    | `teamId?: u32`, `aiProfileId?: string` | Host adds a computer opponent to the room (lobby phase only, host-only). When `teamId` is provided it must be in `1..=4`; otherwise the server assigns the first empty team slot. Player lobbies support `ai_2_3`, `jeffs_ai`, `rush_ai`, and `pressure_ai`; omitted, unknown, or internal-only IDs default to `ai_2_3`. Observer-only internal sessions may also request `ai_2_1` and `ai_turtle`. |
-| `setAiProfile` | `id: u32`, `aiProfileId: string` | Host selects a supported profile for an existing AI lobby seat (lobby phase only, host-only). Player lobbies support `ai_2_3`, `jeffs_ai`, `rush_ai`, and `pressure_ai`; unknown AI ids and unsupported or internal-only profile ids are ignored. Observer-only internal sessions may also select `ai_2_1` and `ai_turtle`. Any internal profile is replaced with `ai_2_3` if a human takes an active seat and again at match start. |
+| `addAi`    | `teamId?: u32`, `aiProfileId?: string` | Host adds a computer opponent to the room (lobby phase only, host-only). When `teamId` is provided it must be in `1..=4`; otherwise the server assigns the first empty team slot. Player lobbies support `ai_2_3`, `jeffs_ai_v1_1` (Jeff's AI), `rush_ai`, and `pressure_ai`; omitted, unknown, or internal-only IDs default to `ai_2_3`. Observer-only internal sessions may also request `ai_2_1`, `jeffs_ai` (Jeff's AI V1.0), and `ai_turtle`. |
+| `setAiProfile` | `id: u32`, `aiProfileId: string` | Host selects a supported profile for an existing AI lobby seat (lobby phase only, host-only). Player lobbies support `ai_2_3`, `jeffs_ai_v1_1` (Jeff's AI), `rush_ai`, and `pressure_ai`; unknown AI ids and unsupported or internal-only profile ids are ignored. Observer-only internal sessions may also select `ai_2_1`, `jeffs_ai`, and `ai_turtle`. Any internal profile is replaced with `ai_2_3` if a human takes an active seat and again at match start. |
 | `removeAi` | `id: u32` | Host removes a previously-added AI opponent by id (lobby phase only, host-only). |
 | `setSpectator` | `spectator: bool`, `id?: u32` | Switch between active player and spectator role while still in the lobby. When `id` is omitted, the sender switches their own role. The host may include another connected human player's id to move that lobby player into or out of spectators; non-host targeted requests, AI ids, and unknown ids are ignored. Ignored after the match starts; switching to active player is ignored if the active seats are full. |
 | `chatSend` | `channel: "all" or "team"`, `text: string` | Send room chat. The server collapses whitespace, drops empty text, caps it at 200 Unicode scalar values, and admits at most five messages per sender in a rolling ten-second window. Lobby and branch-staging chat is always all-chat and ephemeral. Live match all-chat reaches every connected player and spectator; team chat reaches only active human connections on the sender's authoritative team. Spectators are forced to all-chat. Replay viewers cannot send chat. |
@@ -132,7 +133,7 @@ the transport envelope only and is intentionally absent from replay/simulation c
 | `build`      | `units: u32[]`, `building: string`, `tileX: u32`, `tileY: u32`, `queued?: bool` | Selected workers construct a building at a tile. The server allocates one compatible worker per build click, first walks that worker to a nearby point outside the requested footprint, then starts construction once it is in range. `building` ∈ worker-buildable building kinds. Steel Mines and Pump Jacks are excluded because Resource Depots create them through `train`. When `queued` is true, store future build intent instead of replacing the active order. |
 | `train`      | `building: u32`, `unit: string` | Queue one manual production item. Most items are units; a Resource Depot also accepts `steel_mine` and `pump_jack`. A paid front extractor item immediately creates an under-construction scaffold on the nearest deterministic live, unoccupied matching resource patch within that producer's mining range. Its public `buildProgress` equals the depot item's `prodProgress`, and completing the queue item completes that same scaffold. An extractor waits unpaid at zero progress while no eligible patch exists. Other legal manual requests may wait for Steel, Oil, or supply. Later FIFO items do not prepay. |
 | `adjustProductionRepeat` | `buildings: u32[]`, `unit: string`, `delta: -1\|1` | Atomically adjust a production item across selected compatible producers. `+1` enables it on one producer that does not already repeat it, preferring the producer with the fewest standing repeat items; `-1` removes it from one producer that repeats it, preferring the producer with the most standing repeat items so another automatic order survives when possible. Stable opposite entity-id tie-breaks make repeated additions followed by removals reversible. When a producer's ordinary queue is empty, it silently retries the ordered list's current eligible entry. Entries missing a completed building or upgrade prerequisite stay enabled but are skipped until unlocked; resource, supply, pause, and reserve failures wait without skipping the selected eligible entry. A repeated Steel Mine or Pump Jack creates no queue item and spends nothing while every matching patch in that producer's range is occupied; destroying an extractor makes the repeat eligible again. Each successful automatic enqueue advances to the next enabled item. Any production cancel clears the affected producer's whole repeat list. |
-| `setAutoBuildSettings` | `paused: bool`, `reserveSteel: u32`, `reserveOil: u32` | Replace the issuing player's authoritative Auto-Build policy. New players start unpaused with both resource floors at 0. The server clamps each reserve to 0–9,950. While paused, standing repeat orders do not enqueue new units. Otherwise, for each resource an automatic item actually spends, the resulting stockpile must stay at or above that resource's floor. A zero-cost resource does not gate the item, so Worker Auto-Build can run below the Oil floor without spending Oil. Already-queued and manual production remain ordinary FIFO work and are unaffected. |
+| `setAutoBuildSettings` | `paused: bool`, `reserveSteel: u32`, `reserveOil: u32` | Replace the issuing player's authoritative Auto-Build policy. New players start unpaused with both resource floors at 0. The server clamps each reserve to 0–9,950. While paused, standing repeat orders do not enqueue new units. Otherwise, for each resource an automatic item actually spends, the resulting stockpile must stay at or above that resource's floor. A zero-cost resource does not gate the item, so Worker Auto-Build can run below the Oil floor without spending Oil. For human players, automatic admission also preserves the combined unpaid cost of ready manual production/research fronts and valid construction purchases whose worker has arrived; the effective floor is the greater of that pending budget and the configured floor per resource. Travelling workers and future queue entries do not contribute. Already-paid production keeps progressing, and manual purchases may spend normally. |
 | `research`   | `building: u32`, `upgrade: string` | Queue a permanent player upgrade at a tech building, including a valid Training Centre or Engineering Complex that is still under construction. Research queued during construction remains unpaid and at zero progress until the building completes. A legal manual request may also wait unpaid at zero progress until its cost is available. A prerequisite must either be complete or already appear earlier in the same building's authoritative FIFO research queue. Current Kriegsia upgrade ids: `methamphetamines`, `panzerfausts`, and `entrenchment` at the Training Centre; `artillery_unlock` (Artillery), `ballistic_tables` (Artillery Fire Control), `tank_unlock`, `tank_plus` (Tank Plus), `smoke_plus`, `scout_plane_unlock` (Scout Plane), and `rockets` (Rockets) at the Engineering Complex (`engineering_complex`). `panzerfausts` unlocks Panzerfaust training at the Barracks without changing Riflemen. Anti-Tank Guns need no research and are trainable from a completed Gun Works after having owned a completed Engineering Complex. TEMPORARY HACK (TODO: remove when tech requirements are revisited): `anti_tank_gun_unlock` is automatically granted as a permanent ownership-history marker in existing `upgrades` rows, survives loss of the complex, and remains non-researchable. `artillery_unlock` independently unlocks Artillery training; `ballistic_tables` requires `artillery_unlock` and reduces the Artillery Fire minimum radius from 6 tiles to 3; `tank_unlock` unlocks Tank training. `smoke_plus` doubles Scout Car Smoke radius and duration. `scout_plane_unlock` unlocks the Resource Depot and Command Car Scout Plane ability. `rockets` costs 75 steel and 125 oil, takes 25 seconds, and unlocks Rocket Truck production at Gun Works. |
 | `cancel`     | `building: u32`, `construction?: bool` | With `construction: true`, cancel an owned unfinished building for a full construction-cost refund; an extractor scaffold instead cancels and refunds its owning Resource Depot item. Otherwise cancel the latest item in a completed building's production queue; cancelling its active extractor item also removes the linked scaffold. The explicit construction scope prevents a delayed scaffold action from cancelling production after the building completes. Attached builders return to ordinary order handling when a construction site is canceled. |
 | `stop`       | `units: u32[]` | Clear orders and return selected units to ordinary idle behavior. |
@@ -390,7 +391,7 @@ transport/browser/prediction/render behavior, not as gameplay authority.
 | `matchCountdown` | `countdownId: u32`, `durationMs: u32`, `words: string[]` — reliable pre-match countdown sent to every lobby participant after the host starts and before `start`. Active human clients begin warming their renderer when they become ready, then acknowledge this exact nonzero countdown generation with `matchLoadReady` once warmup completes. During this interval the server keeps the room in lobby setup, disables `canStart`, freezes lobby edits, and rejects new joins. At expiry it sends `start` only if every active human acknowledged; otherwise it returns the room to editable lobby state and broadcasts `<name> failed to load the game.` Spectators and AI do not block launch. |
 | `start`    | `Game start payload` (see 2.3). |
 | `snapshot` | `Per-player snapshot` (see 2.4). |
-| `replayResourceHistory` | `replace: bool`, `samples: [{ tick: u32, steel: i64, oil: i64, aliveSteel: i64, aliveOil: i64, lostSteel: i64, lostOil: i64, unitSteel: i64, unitOil: i64 }]` — reliable replay-only collection, alive-resource, destroyed-value, and current-army-value comparison timeline for 1v1 viewers. A full replacement is sent on join and after seek; one sample is appended per replay second (`steel`/`oil`: trailing 8-second collection advantage; `aliveSteel`/`aliveOil`: lifetime mined minus destroyed value, `lostSteel`/`lostOil`: cumulative destroyed unit and building value; `unitSteel`/`unitOil`: summed current unit value; all fields are first player minus second in ascending player-id order) during ordinary playback. Samples span from replay start through the current tick and are not subject to the latest-only observer-analysis lane. |
+| `replayResourceHistory` | `replace: bool`, `samples: [{ tick: u32, steel: i64, oil: i64, aliveSteel: i64, aliveOil: i64, lostSteel: i64, lostOil: i64, unitSteel: i64, unitOil: i64, players: [{ id: u32, lifetimeSteel: i64, lifetimeOil: i64, steel: i64, oil: i64, aliveSteel: i64, aliveOil: i64, lostSteel: i64, lostOil: i64, unitSteel: i64, unitOil: i64 }] }]` — reliable replay-only collection, alive-resource, destroyed-value, and current-army-value comparison timeline for two to four players. The `players` series contains absolute individual values, including lifetime mined totals; collection is the trailing eight-second income (zero until a window baseline exists). A full replacement is sent on join and after seek; one sample is appended per replay second (`steel`/`oil`: trailing 8-second collection advantage; `aliveSteel`/`aliveOil`: lifetime mined minus destroyed value, `lostSteel`/`lostOil`: cumulative destroyed unit and building value; `unitSteel`/`unitOil`: summed current unit value; top-level metric fields are first player minus second in ascending player-id order) during ordinary playback. Samples span from replay start through the current tick and are not subject to the latest-only observer-analysis lane. |
 | `groundDecals` | `requestId: u32`, `revision: u32`, `decals: GroundDecalView[]`, `tankTrails: TankTrailView[]` — reliable fog/observer-scoped delta response. `requestId` echoes the request so stale pre-seek or pre-view-change responses cannot enter the current cache. A trail row carries an immutable chunk `id` and sparse `[xQuarterPx, yQuarterPx, headingI16]` poses; these wire units remain stable even though historical poses are deliberately coarsened before projection. The server discloses a historical chunk when its indexed swept bounds first intersect current team vision. As an explicit best-effort-cosmetic exception to positional fog secrecy, the client may therefore hold nearby hidden tread geometry from that bounded chunk; no live entity or command state is included. It reconstructs and permanently rasterizes the approximate swept left/right tread footprint only inside individual currently visible map tiles. Ordinary decal rows carry `id`, `decalClass`, `sourceKind`, `x`, `y`, `owner`, `seed`, and optional `facing`, `weaponFacing`, or `radiusTiles`. |
 | `roomTimeState` | `Room-controlled time state` (see 2.6). |
 | `roomTimeSeekStarted` | `controllerId: u32`, `fromTick: u32`, `targetTick: u32` — reliable broadcast to every replay viewer immediately before an accepted shared replay seek resets timeline-derived presentation and begins incremental fast-forward. Rejected and rate-limited seeks do not emit it. |
@@ -412,8 +413,10 @@ Game-generated critical alerts reuse `chat` with `senderId: 0`, `senderName: "Ga
 `channel: "all"`. Lost auto-production prerequisite warnings are delivered only
 to the owning active seat, never teammates or spectators, as `Rebuild Engineering Complex!`
 (or the other missing prerequisites' display names), with a 30-second simulation-time cooldown
-per seat. Multiple blocked units produce one reminder listing each missing prerequisite once.
-Persistent blocked conditions may remind after the cooldown. Supply-cap warnings are disabled.
+per seat. A prerequisite qualifies only if the seat previously had a completed building of that
+kind in the live session and active auto-production is currently blocked by its absence. Multiple
+blocked units produce one reminder listing each qualifying prerequisite once. Persistent blocked
+conditions may remind after the cooldown. Supply-cap warnings are disabled.
 The client displays these alerts as bare text without channel or sender prefixes, with a subtle
 size pulse (disabled for reduced-motion preferences). These private economy warnings are excluded
 from replay chat and contain no positional information.
@@ -804,6 +807,12 @@ legacy Scout Plane queue presence, construction progress, gatherer latched node,
 status, per-unit enemy-unit kill totals, and safe combat tracers. `unitsKilled` is present on units
 only, starts at zero, increments when that unit deals the final hostile damage to another unit, and
 does not count destroyed buildings or friendly fire.
+Tank `commanderFacing` is the independent roof MG world angle. It is included only for a visible,
+non-vision-only Tank when its secondary target is visible to the recipient (or absent); owners and
+omniscient observers receive it directly. It never carries a secondary target id.
+When the secondary target is absent, its aim follows the cannon and also requires the cannon's
+target-direction visibility gate.
+
 Combat `targetId` and `weaponFacing` for allied units are sent whenever an attack-capable entity has
 a visible acquired target, including autonomous acquisition while its explicit order state remains
 idle. They are omitted when the target is not visible in the recipient's team-current actionable
@@ -942,7 +951,7 @@ adds an explicit application compression envelope.
       visionOnly?, debugPath?, rallyPlan?, prodUpgrade?, buildActive?, deconstructProgress?,
       weaponRangeTiles?, occupiedTrenchId?, scoutPlane?, prodScoutPlaneQueued?,
       panzerfaustLoaded?, prodRepeatKinds?, prodWaiting?, breakthroughAuraTicks?, extractorActive?,
-      prodUpgradeQueue?, panzerfaustWindupProgress?
+      prodUpgradeQueue?, panzerfaustWindupProgress?, unitsKilled?, rocketRackCount?, commanderFacing?
     ]
   ],
   "r": [[id, remaining]],         // omitted when empty
@@ -1010,6 +1019,7 @@ snapshot `orderPlan` is the only authoritative queued-plan contract and stale lo
 reconcile to it. Each compact stage is `[kind, x, y]`, where `kind` uses the `orderStage` compact
 code table above. Build stages append a fourth `buildingKind` kind code, forming
 `[kind, x, y, buildingKind]`; other stages retain three fields.
+Tank Point stores a heading rather than a destination and is omitted from these positional markers.
 Stages carry safe world points only, never target ids; hidden attack target stages may be omitted
 rather than leaking enemy positions through fog. Production building rally points are exposed
 separately through `rally` and `rallyPlan` and are not part of `orderPlan`. `rallyPlan` is appended
@@ -1157,6 +1167,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   state: string,                 // "idle","move","attack","gather","build","train","construct","dead"
   facing?: f32,                  // radians, for unit body/hull orientation (optional)
   weaponFacing?: f32,            // radians, for independent weapon/barrel orientation (optional)
+  commanderFacing?: f32,         // Tank roof MG world angle; compact entity slot 44
   // production buildings:
   prodKind?: string,             // unit currently being produced
   prodUpgrade?: string,          // upgrade currently being researched
@@ -1893,7 +1904,9 @@ the total item count for a queue.
 `steelValue` and `oilValue` are aggregate row values (`count * configured cost`), not per-unit
 costs. `unitsLost` is the authoritative unit-death count by kind. `buildingsLost` is the
 authoritative building-death count by kind and is omitted when empty; zero-cost resource extractors
-still appear with zero aggregate value. `resourcesLost` is the spent steel/oil value of units and
+still appear with zero aggregate value. Pump Jack losses always have zero steel/oil value, including
+manually built Pump Jacks, because loss history does not track construction origin.
+`resourcesLost` uses the same loss valuation (excluding Pump Jack costs) for units and
 buildings that died; it does not include current spending, cancelled production, refunds,
 harvesting, or stockpile deltas.
 `resources` is authoritative mined income: `lifetime` counts all worker/golem harvest and Pump Jack

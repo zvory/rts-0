@@ -39,7 +39,7 @@ impl TrenchSpatialIndex {
         self.max_search_radius_px = self
             .max_search_radius_px
             .max(radius_px + SLOT_EXTRA_RADIUS_PX);
-        let Some(cell) = self.cell_for(trench.x, trench.y) else {
+        let Some(cell) = self.cell_for(trench.x.to_world(), trench.y.to_world()) else {
             return;
         };
         self.cells[cell].push(trench);
@@ -49,7 +49,7 @@ impl TrenchSpatialIndex {
         &self,
         entity: &Entity,
     ) -> impl Iterator<Item = Trench> + '_ {
-        self.trenches_near(entity.pos_x, entity.pos_y, self.max_search_radius_px)
+        self.trenches_near(entity.pos_x(), entity.pos_y(), self.max_search_radius_px)
     }
 
     pub(super) fn containing_candidates(
@@ -124,7 +124,7 @@ impl EntrenchmentEntityIndex {
             max_building_reach_px: 0.0,
         };
         for entity in entities.iter() {
-            index.insert(entity.id, entity.pos_x, entity.pos_y);
+            index.insert(entity.id, entity.pos_x(), entity.pos_y());
             if entity.hp > 0 && entity.is_unit() {
                 index.max_unit_radius_px = index
                     .max_unit_radius_px
@@ -135,11 +135,11 @@ impl EntrenchmentEntityIndex {
                     index
                         .max_building_reach_px
                         .max(building_rect_for_entity(map, entity).map_or(0.0, |rect| {
-                            (rect.min_x - entity.pos_x)
+                            (rect.min_x - entity.pos_x())
                                 .abs()
-                                .max((rect.max_x - entity.pos_x).abs())
-                                .max((rect.min_y - entity.pos_y).abs())
-                                .max((rect.max_y - entity.pos_y).abs())
+                                .max((rect.max_x - entity.pos_x()).abs())
+                                .max((rect.min_y - entity.pos_y()).abs())
+                                .max((rect.max_y - entity.pos_y()).abs())
                         }));
             }
         }

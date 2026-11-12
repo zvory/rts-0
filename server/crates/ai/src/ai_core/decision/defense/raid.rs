@@ -26,6 +26,7 @@ use super::super::opening_rush::{
 };
 use super::envelope::defended_building_sites;
 use super::*;
+use rts_rules::math::GameplayMath as _;
 
 /// Enemy fighters this close to a Jeff building, extractor or Engineer are a raid.
 const WATCH_TILES: f32 = 16.0;
@@ -228,7 +229,7 @@ fn tile(observation: &AiObservation) -> f32 {
 }
 
 fn distance(a: (f32, f32), b: (f32, f32)) -> f32 {
-    dist2(a.0, a.1, b.0, b.1).sqrt()
+    dist2(a.0, a.1, b.0, b.1).det_sqrt()
 }
 
 /// Centre-to-centre distance at which `kind` fires, as in the simulation.
@@ -311,7 +312,7 @@ impl Defended {
             .points
             .iter()
             .map(|p| dist2(p.0, p.1, point.0, point.1));
-        sites.chain(points).fold(f32::INFINITY, f32::min).sqrt()
+        sites.chain(points).fold(f32::INFINITY, f32::min).det_sqrt()
     }
 }
 
@@ -452,7 +453,8 @@ fn raid_at_the_line(
 
 /// The live Jeff's answer to a raid (see the module docs). `local_defenders` are the units home
 /// defense may use this decision. `resend`: a member sent to gather that has turned away from the
-/// point is sent again, not only one gone idle.
+/// point is sent again, not only one gone idle. `front`: where the base's line faces, when it is not
+/// the straight line to the enemy start (Jeff's AI V1.1, `front_direction`).
 pub(in crate::ai_core::decision) fn respond(
     actions: &mut AiActionContext<'_>,
     observation: &AiObservation,
@@ -460,6 +462,7 @@ pub(in crate::ai_core::decision) fn respond(
     local_defenders: &[u32],
     map_analysis: Option<&AiMapAnalysis>,
     resend: bool,
+    front: Option<(f32, f32)>,
 ) -> RaidAnswer {
     let ts = tile(observation);
     let tick = observation.tick;
@@ -555,12 +558,12 @@ pub(in crate::ai_core::decision) fn respond(
         && enemy_start(observation).is_none_or(|enemy| {
             let (Some(to_raid), Some(to_enemy)) = (
                 normalized_direction(home, raid.center),
-                normalized_direction(home, enemy),
+                front.or_else(|| normalized_direction(home, enemy)),
             ) else {
                 return false;
             };
             to_raid.0 * to_enemy.0 + to_raid.1 * to_enemy.1
-                < FRONT_HALF_ANGLE_DEGREES.to_radians().cos()
+                < FRONT_HALF_ANGLE_DEGREES.to_radians().det_cos()
         });
     let mut queue: Vec<&AiEntitySummary> = candidates
         .iter()
@@ -898,6 +901,26 @@ fn line_anchor(
     )
 }
 
+/// Jeff's AI V1.1 measures a flank raid from where its line faces, the side the enemy's ground route
+/// enters the base, rather than from the straight line to the enemy start: Crossroads' water walls
+/// send every attack in about 100 degrees off that line, so V1.0 called all of them flank raids and
+/// walked its guns and trenches out to meet them.
+pub(in crate::ai_core::decision) fn front_direction(
+    profile_id: &str,
+    observation: &AiObservation,
+    map_analysis: Option<&AiMapAnalysis>,
+) -> Option<(f32, f32)> {
+    if !is_jeff_v1_1(profile_id) || super::super::jeff_v1_1::off("front") {
+        return None;
+    }
+    let home = tile_center(observation.own_start_tile, observation.map.tile_size);
+    super::pocket::crossroads_wall_aware_direction_for_observation(observation).or_else(|| {
+        map_analysis
+            .and_then(|analysis| analysis.base_route_entry(observation.player_id))
+            .and_then(|entry| normalized_direction(home, entry))
+    })
+}
+
 /// The nearest living enemy's start, in world pixels.
 fn enemy_start(observation: &AiObservation) -> Option<(f32, f32)> {
     let own_team = observation
@@ -1086,15 +1109,15 @@ fn sentry_posts(
     let Some(axis) = normalized_direction(home, enemy_base) else {
         return Vec::new();
     };
-    let base_angle = axis.1.atan2(axis.0);
+    let base_angle = axis.1.det_atan2(axis.0);
     [1.0_f32, -1.0]
         .into_iter()
         .map(|side| {
             let angle = base_angle + side * SENTRY_ANGLE_DEGREES.to_radians();
             let desired = clamp_to_map(
                 (
-                    home.0 + angle.cos() * SENTRY_TILES * ts,
-                    home.1 + angle.sin() * SENTRY_TILES * ts,
+                    home.0 + angle.det_cos() * SENTRY_TILES * ts,
+                    home.1 + angle.det_sin() * SENTRY_TILES * ts,
                 ),
                 observation.map,
             );
@@ -1268,8 +1291,9 @@ pub(in crate::ai_core::decision) fn rifle_answer(
             matches!(unit.kind, EntityKind::Rifleman | EntityKind::MachineGunner)
                 && unit.is_complete
                 && unit.hp > 0
-                && !memory.opening_rush.is_reserved(unit.id)
+                && !memory.rush_reserved(unit.id)
                 && !memory.third_pressure.is_reserved(unit.id)
+                && !memory.jeff_v1_1.tank_raid.holds(unit.id)
                 && !memory.containment.active_riflemen.contains(&unit.id)
         })
         .count();

@@ -51,9 +51,10 @@ new code should prefer the owning crate directly when that does not make local c
 ### 3.1 `game::Game` public API (seam between `game` and `lobby`/`main`)
 The `lobby`/networking layer interacts with the simulation ONLY through this surface.
 `Game::critical_event_state() -> Vec<PlayerCriticalEventState>` exposes read-only per-seat
-supply used/cap and deduplicated blocked auto-production `(unit, prerequisite)` pairs.
-The room owns chat routing and
-30-second simulation-time warning cooldowns; notification state is session-only, outside checkpoints.
+supply used/cap, completed living building kinds, and deduplicated blocked auto-production
+`(unit, prerequisite)` pairs. The room tracks which building kinds each seat previously completed
+and owns chat routing and 30-second simulation-time warning cooldowns. Notification state belongs
+to the live session and stays outside checkpoints.
 Completed living buildings satisfy prerequisites; destroyed or unfinished buildings do not.
 `game-core` implementer: provide exactly these. `server-shell` implementer: call only these.
 The server shell may also serve non-simulation HTTP routes such as `/wiki`, `/wiki/`, and
@@ -81,7 +82,7 @@ impl Game {
     /// Pump Jack footprint would collide with non-oil resources while preserving Resource Depot
     /// resource-distance bounds. Schema-v5 doodads are catalog-validated and id-canonicalized.
     /// Tree species share a 4.5px authoritative circular trunk. Vehicles use exact trunk
-    /// standability; infantry use finite path cost plus best-effort local steering with pass-through.
+    /// standability; infantry use finite tree path cost with pass-through, without tree-avoidance steering.
     /// Wildflowers remain presentation-only. Lab-restored oil nodes are normalized to passable tile centers and
     /// keep one free tile between oil patches.
     /// AI players are spawned as normal match participants; external AI orchestration owns any
@@ -225,6 +226,9 @@ impl Game {
 
     pub fn tick_count(&self) -> u32;
 
+    /// Versioned committed-state fingerprint for final replay verification (not a per-tick API).
+    pub fn replay_end_state_hash(&self) -> Result<String, String>;
+
     /// Authoritative commands applied so far, stamped with the tick that applied them.
     pub fn command_log(&self) -> &[CommandLogEntry];
 
@@ -275,6 +279,48 @@ projectile runtime state, active commands, production queues, rally plans, coold
 logs are not part of the setup format. Legacy `kind:"labScenario"` setup JSON is rejected before it
 can mutate a lab room.
 
+Replay end-state verification uses optional `endStateHash: { algorithm, digest }` and an ordered
+`eliminations: [{ tick, playerId }]` list in schema-3 artifacts. `ReplayStartComposition` records
+room-authored administrative removals on give-up/disconnect; playback applies them after that tick's
+systems (or at the start boundary for tick-zero removals), before keyframes and verification. The
+final hash is captured after the same removal, so a surrender does not create a false divergence.
+`ReplayArtifactV1::verify_end_state` requires the exact final tick and returns verified/mismatched,
+absent (older artifacts are unverified), or an unsupported-algorithm/error result. Replay sessions
+check once on reaching the end through playback or seeking, log status and cost, and show a warning
+on mismatches or unavailable algorithms. Seeking backward re-arms verification. A mismatch signals
+divergence; it does not distinguish nondeterminism from build/rules/platform drift or corruption.
+
+The algorithm `rts-end-state-json-sha256-v1` hashes its ASCII identifier followed immediately by
+compact serde_json serialization of the explicit ordered projection in
+`game/checkpoint/fingerprint.rs`. SHA-256 is streamed through a 64 KiB buffer. Struct fields have
+fixed serialization order; entity ids and unordered fog/memory collections are sorted by their
+checkpoint adapters. Numbers use serde_json's locale-independent decimal representation, not
+native-endian memory, pointer addresses, Rust `Hash`, or debug text. Valid simulation floats are
+finite and their exact round-trip values participate without rounding/tolerance. Arrays retain
+semantic order. Changes to projection/serialization semantics require a new algorithm identifier.
+The map uses its existing canonical materialized binding; map content is immutable during live play.
+The projection includes all committed authoritative owners (players/private economy/scores/upgrades,
+entities/orders, fog/memories, active abilities/projectiles, decals/trails, world combat signals,
+construction state, RNG seed/draw count and an eight-draw non-consuming future-output probe).
+Command history, unapplied pending commands, build SHA, room/session state and rebuildable derived
+caches are excluded. Pending input has not affected the final committed state and is not replayed.
+When adding a `GameState` field, update this projection alongside the ownership/checkpoint registry.
+This is a fingerprint, not a saved final checkpoint; playback must reconstruct the state to compare.
+
+Hashing runs once at artifact finalization and once per completed playback traversal, never every
+minute or tick. It borrows large entity/projectile/decal stores, copies only ordered fog/memory
+adapters and a sorted entity-reference index, and does not clone/serialize the command history or
+validate/rebuild an entire checkpoint. Cost depends on final-state size, not duration. The ignored
+release test `end_state_hash_cost` measures 2,000 total entities on the four-player 166×166 map plus a 200,000-command history.
+A local release run (100 hashes, four players, 2,000 entities, 200,000 historical commands)
+measured 8.5 ms median, 11.0 ms p95, and 18.0 ms maximum. This is a finalization-only synchronous
+cost below one 33.3 ms tick on that machine, not a production-hardware latency guarantee; unusually
+large decal/projectile state can cost more. Runtime logs expose `hash_us` for capture and verification. The simulation now pins its RNG stream across native and WASM (see §3.1.3); the future-output
+probe additionally detects accidental generator drift even when seed/draw counters agree. Hash
+portability still does not promise that every floating-point simulation path will remain identical
+across builds/platforms: exact differences must be reported, not rounded away. A fixed three-tick
+full-state fingerprint runs natively and under WASM alongside the RNG known answers.
+
 #### 3.1.1 `Game` State Ownership Registry
 
 `Game` is a private ownership tree with only two top-level state roots:
@@ -305,7 +351,7 @@ architecture failures.
 | Field | Category | Checkpoint policy | Evidence and notes |
 | --- | --- | --- | --- |
 | `map` | `authoritative/serialized` | Internal cold checkpoints serialize the full live `Map` value. Public `GameCheckpointV1` payloads do not embed a map body; they carry `mapBinding` facts and import only with the exact container-supplied `Map`. See §3.1.3. | `Game::new_inner_with_map` stores the generated or supplied map; `systems::run_tick`, pathing, fog, placement, resource setup, and `start_payload` all read it. Runtime ownership and external artifact composition are intentionally separate contracts. |
-| `entities` | `authoritative/serialized` | Serialize the full `EntityStore`, including stable entity ids, allocator/high-water state, HP, orders, queues, movement state, selected waypoints, path goals, weapon cooldowns, ability charges and charge-recharge timers, episode-keyed firing-reveal reaction gates, combat state (including the materialized `tank_plus` owner-research flag, refreshed before movement and after production each tick so new and existing Tanks share modifiers), per-unit kill totals and last-damaging entity attribution, production/build progress, rally plans, Scout Plane source-car/orbit/remaining-lifetime state, resource reservations, extractor fractional unsupported-decay damage (serialized with extractor harvest progress), body/weapon/setup facing, and entity flags. | `systems::run_tick` mutates the store every tick; snapshots, score, survival, command validation, replay determinism tests, and the Phase 0.5 comparator all treat entity state as semantic authority. Chosen movement paths and aerial orbit state live on entities, not in `pathing`. Scout Plane entities are excluded from standard fog sight stamping and contribute independent team aerial vision through the dedicated smoke-only pass. |
+| `entities` | `authoritative/serialized` | Serialize the full `EntityStore`, including stable entity ids, allocator/high-water state, HP, orders, queues, movement state, selected waypoints, path goals, weapon cooldowns, ability charges and charge-recharge timers, episode-keyed firing-reveal reaction gates, combat state (including the materialized `tank_plus` owner-research flag, refreshed before movement and after production each tick so new and existing Tanks share modifiers), per-unit kill totals and last-damaging entity attribution, production/build progress, rally plans, Scout Plane source-car/orbit/remaining-lifetime state, resource reservations, extractor fractional unsupported-decay damage (serialized with extractor harvest progress), body/weapon/setup facing, Tank commander MG facing and secondary target id, and entity flags. | `systems::run_tick` mutates the store every tick; snapshots, score, survival, command validation, replay determinism tests, and the Phase 0.5 comparator all treat entity state as semantic authority. Chosen movement paths and aerial orbit state live on entities, not in `pathing`. Scout Plane entities are excluded from standard fog sight stamping and contribute independent team aerial vision through the dedicated smoke-only pass. |
 | `fog` | `authoritative/serialized` | Serialize the latest 15 Hz actionable visibility sample and its bounded per-viewer firing-reveal provenance map. | `recompute_live_fog` separately records whether each sampled entity needs its firing reveal for targeting and whether the stamped terrain tile lacked ordinary sight. Combat consumes the first fact; snapshot `visibleTiles` removes only terrain-reveal-only stamps. Phase 0.5 compares per-player actionable tiles as semantic state. |
 | `building_memory` | `authoritative/serialized` | Serialize remembered building entries and cleared-observation ticks per player. | `BuildingMemory::refresh` records last-seen enemy building state, while match setup seeds entity-backed neutral buildings authored into the map for every player. Hidden destroyed entries are removed only after the footprint is scouted again; that clear tick prevents older positive memory from another selected player from resurrecting the building in union observer projections. Spectator/player snapshots project remembered buildings while fogged. |
 | `anti_tank_gun_memory` | `authoritative/serialized` | Serialize last-observed deployed enemy Anti-Tank Gun position, facing, owner, and observation tick per player. | `AntiTankGunMemory::refresh` records ordinary team sight and actionable firing reveals, retains stale records through hidden movement/teardown/destruction, and clears them only when that player's team observes the gun changed or the remembered position empty; observer snapshots select the requested players' stores. |
@@ -496,7 +542,7 @@ Top-level shape:
   "compatibility": {
     "createdBy": "server|replay|lab|debug",
     "serverBuildSha": "...",
-    "simSchemaVersion": 5,
+    "simSchemaVersion": 6,
     "rulesVersion": 1,
     "protocolVersion": 1,
     "requiredFeatures": [],
@@ -514,7 +560,7 @@ Top-level shape:
   "seed": 1234,
   "tick": 900,
   "rng": {
-    "algorithm": "rts-small-rng-0.8-draws-v1",
+    "algorithm": "rts-xoshiro256pp-pcg32-rand086-draws-v1",
     "seed": 1234,
     "drawsConsumed": 0
   },
@@ -540,12 +586,31 @@ Top-level shape:
 }
 ```
 
-The `rng` field is a deterministic draw-stream descriptor, not a raw serde dump of `SmallRng`.
-`drawsConsumed` counts draws from `seed` under the named algorithm. Import reconstructs the stream
-by seeding and advancing, or rejects the payload if the running binary cannot prove the same
-algorithm. Re-seeding from `seed` alone is invalid once any random draw has occurred. If a later
-runtime replaces `SmallRng`, it must either provide a migrator from this descriptor or bump the
-checkpoint version and reject old payloads with a compatibility error.
+The `rng` field is a deterministic draw-stream descriptor. The portable algorithm is
+`Xoshiro256PlusPlus` from exactly `rand_xoshiro 0.6.0` on all targets, including wasm32.
+`PortableRng` expands the u64 seed with eight PCG32 words (multiply by 6364136223846793005,
+add 11634580027462260723, then XSH-RR output after advancing), writes them little-endian,
+and interprets the resulting bytes as four little-endian u64 Xoshiro state words. This preserves
+the former 64-bit `SmallRng` initialization, rather than Xoshiro's different SplitMix64 initializer.
+Each u32 draw advances Xoshiro once and takes its upper 32 bits.
+
+`TrackedRng` counts these u32 transitions in `drawsConsumed`. Its u64 draws consume two u32
+transitions, low word first; byte fills consume little-endian u32 words and discard unused tail
+bytes. Import reseeds and advances exactly that many transitions. Re-seeding alone is invalid
+after any draw. Combat call order is unchanged: conditional miss checks and MG spread draws
+consume the same stream in system/entity iteration order. Sampling is pinned to `rand =0.8.6`:
+f32 standard draws use the upper 24 bits of a u32, MG spread uses its inclusive f32 uniform
+sampler, and start-location Fisher-Yates shuffle uses its u32 index sampler (map sizes fit u32).
+Seeded AI/profile selection and tools also use `PortableRng`; random live-profile indexing uses
+a fixed u64 sampler, preserving historical 64-bit selections and draw consumption on all targets.
+Changes to expansion, sampling, or draw order require a new algorithm identifier and compatibility
+review. Fixed answer tests run natively and under WASM.
+
+The former `rts-small-rng-0.8-draws-v1` descriptor is rejected by the existing incompatible-algorithm
+error, because its stream was target-dependent. The checkpoint JSON shape/version is unchanged;
+algorithm compatibility is checked separately. Bundled setup checkpoints are relabeled because
+their 64-bit stream is preserved. Old external checkpoints/replays carrying the old descriptor
+must be regenerated; command-only legacy replays use the portable stream from now on.
 
 `commandLog` carries replay/API/crash continuity history. Normal checkpoint import installs the
 log as metadata and must not replay it to reconstruct state. `commandLogMetadata` records the
@@ -563,7 +628,7 @@ Map policy:
   required forest array are rejected rather than migrated.
 - `GameState.map` remains authoritative runtime state because systems read terrain, selected starts,
   permanent base sites, six sparse gameplay-overlay tile sets, vehicle tree-trunk collision, and
-  infantry tree path-cost/local-steering data on every tick, while start/export
+  infantry tree path-cost data on every tick, while start/export
   boundaries read all static doodads. Internal cold checkpoints may still clone the full `Map` while
   they are private test machinery.
 - `GameCheckpointV1` never embeds map JSON, terrain bytes, starts, base-site bodies, or doodad bodies. It
@@ -584,8 +649,11 @@ Map policy:
   or silently accepting a nearby map.
 
 Concealment applies to units, not buildings or doodads. Sight rays traverse at most four
-concealment tiles, excluding the origin and including the target, while weapon line of fire remains
-unrestricted by concealment. This lets a unit at a forest edge retain normal outward vision while
+concealment tiles, excluding the origin and including the target. Direct-fire rays use the same
+four-tile depth into cover and stop when leaving concealment entered along the ray: a visible unit
+inside a forest can be shot, but units and buildings beyond it cannot, even with a plane, ally, or
+side spotter revealing them. The origin tile is ignored so units at the forest edge can fire outward.
+Mortars retain indirect fire and do not require a clear direct-fire ray. This lets a unit at a forest edge retain normal outward vision while
 limiting vision through a forest interior. Owners and allies always receive their units. Enemy
 projection, auto-acquisition, explicit attack validation, and retained targets reject a concealed
 unit unless a hostile unit is within two tiles measured between body edges, or that unit has fired.
@@ -718,6 +786,51 @@ two full-army commands in 900 ticks and could not exercise death or path-request
 new counters and serial timings as a measured regression baseline until repeated reference-machine
 runs establish a replacement headroom gate. Keep simulation, projection, compaction, encoding, and
 driver work on the same serial lane, and do not hide driver cost outside the measured round trip.
+
+#### 3.1.4 Deterministic arithmetic and physical positions
+
+Simulation schema **6** breaks numerical compatibility with schema 5 and earlier. Entity centers,
+ability projectile centers, world ability objects, smoke, trenches, mortar/artillery shell launch
+and impact points, and Panzerfaust shot positions use `rts_rules::math::Coord`: a signed **i32
+Q19.12** (4096 substeps per world unit, 131072 per 32-unit tile). Its world range is
+−524288 through 524287.999755859375, providing 32× positive headroom beyond a future 512 × 512
+map's 16384-unit extent. Storage width is independent of intermediate width: conversion scales in
+f64 before rounding; circular area-effect distances widen differences to i64 and products/sums to
+i128 so even opposite full-i32 endpoints cannot overflow. No position is stored as an i64.
+
+Physical position writes round to nearest substep, ties away from zero, on spawn, movement,
+collision, pulls, teleports, projectile steps, and effect creation. Entity setters reject nonfinite
+or unrepresentable coordinates atomically; optional entity constructors reject them. Trusted
+geometry conversion saturates at i32 bounds (NaN maps to zero) rather than wrapping; command/map
+admission still validates finite world bounds. Static landing probes quantize their candidates
+before checking body legality, and movement deltas describe the stored result. Circular smoke and
+trench inclusion uses grid-rounded query points/radii and widened integer squared distances.
+
+Transient steering, oriented-shape geometry, speed/radius rules, and angles retain strict IEEE-754
+f32 arithmetic to preserve existing gameplay formulas. Immutable command intent, paths, remembered
+observations, and presentation metadata may retain world-coordinate floats; they are not accumulated
+physical centers. Conversion back to transient/wire f32 rounds nearest-even; at the future map edge
+the f32 ULP is 1/512 world unit, so not every stored substep is expressible through that projection.
+Ordinary arithmetic must use Rust's strict default without fast-math, implicit FMA contraction, or
+flush-to-zero settings. `rts_rules::math::GameplayMath` supplies explicit `det_*` operations for
+trigonometry, angles, roots, hypot, powers, and explicit FMA through exact-pinned `libm` 0.2.16 with
+`force-soft-floats`; this disables target-specific/intrinsic implementations even if Cargo feature
+unification enables `arch`. Integer powers have a specified multiplication order. Angles remain
+radians with the existing wrap conventions, including deterministic atan2 quadrants and signed zero.
+Changing these algorithms, precision, or operation ordering requires a simulation-version bump.
+`scripts/check-crate-boundaries.mjs` rejects platform math calls in rules/sim/AI and direct libm
+calls outside the facade. Numerical vectors cover rounding, axes/quadrants, roots, planned map
+bounds, projection error, and full-domain widened distance arithmetic.
+
+Checkpoint coordinates above are raw signed substep integers. Imports validate the numerical
+compatibility header before decoding positions, so old checkpoints/replays fail closed even when
+the caller supplies the same build label. Schema 3 replay containers continue to embed this
+versioned checkpoint; strict build matching remains in force. Old recordings, including replay
+495, require their original simulation executable: the new math does **not** promise historical
+trajectories or final scores. Current checked-in Lab setups and diagnostic start fixtures are
+explicitly reauthored on the new grid; this is not a general old-replay migration. Wire snapshots
+still send fractional world coordinates, and the client's existing interpolation remains smooth.
+RNG replacement, replay checksums, and platform replay parity tests are outside this change.
 
 ### 3.2 Concurrency model
 - One tokio task per **room** owns its `Game` and runs the tick loop (`tokio::time::interval`). Room registry handles carry per-room identity tokens; registry disposal removes only the matching identity and signals that room task to shut down.
@@ -1046,8 +1159,24 @@ pays immediately when the queue is empty and its cost (plus unit supply) is avai
 is stored unpaid at zero progress and retries each production tick. Entries appended behind existing
 work never prepay. An unpaid unit reserves neither resources nor supply, cancellation and producer
 death refund only paid entries, and owner/team projections expose `prodWaiting` so clients do not
-extrapolate false progress. Production buildings are visited in stable entity-id order, before
-construction, when multiple waiting purchases compete for the same newly available resources.
+extrapolate false progress. Human manual front entries attempt payment in stable entity-id order
+before any standing repeat admission, still before construction payment. AI producers retain their
+per-producer repeat/payment order.
+
+Human Auto-Build protects the combined Steel/Oil cost of remaining unpaid manual front entries on
+living, completed producers and active worker build purchases already in interaction range at a
+currently valid site. Construction is checked after movement, including first arrival; travelling
+workers, queued build intents, blocked/invalid placements, and resuming existing scaffolds protect
+nothing. Friendly unit blockers that a Pump Jack can eject do not prevent its purchase being ready.
+Only fronts ready at the production phase boundary participate; items behind existing work and
+research on unfinished buildings do not. The budget is transient, derived from live orders every
+tick, and disappears when commitments are paid, cancelled, invalidated, or their issuers die.
+For each resource an automatic item spends, its post-purchase stockpile must remain at or above
+the greater of this pending budget and the configured menu floor. A zero-cost resource never gates
+that item. Manual purchases may spend normally, and supply reservation rules are unchanged.
+Already-paid automatic items continue normal progress. No additional client UI or wire state is
+introduced.
+
 Research may be queued on an unfinished valid research building; those entries remain unpaid and
 inert until the building completes, then enter the same front-entry payment and progress path.
 Standing repeat production deliberately does not use unpaid entries: it continues retrying while the
@@ -1332,11 +1461,14 @@ spatial indexes across later mutations.
 
 Tank Point (`SimCommand::PointTanks`) filters to living owned tanks after ordinary command
 admission, then calculates a shared heading from their centroid to the clicked world point.
-It replaces active and queued orders with checkpoint-serialized `Order::Point { facing }`.
+Immediate issue replaces active and queued orders with checkpoint-serialized `Order::Point { facing }`.
+Shift issue appends checkpoint-serialized `OrderIntent::Point { facing }` within the ordinary queue
+limit, preserving the active order and earlier intents. The shared heading is resolved at issue time.
 Movement pivots in place at the ordinary tank hull turn rate, checking static standability
 at every step; blocked hulls wait for clearance. The stance holds ground, allows automatic
 turret fire, and suppresses automatic armor-reaction hull turns until another order replaces it.
-It is immediate even with Shift; a target at the centroid leaves existing orders unchanged.
+Following queued orders wait until the hull reaches the requested heading; Point holds indefinitely
+when no follow-up exists. A target at the centroid leaves existing orders unchanged.
 
 
 Rocket Truck barrage orders require the target to be within the existing 10–44 tile
@@ -1609,16 +1741,17 @@ General rules:
   tie-breaks. Auto-acquisition only ranks candidates already inside current weapon range. Explicit
   `Attack` orders keep their commanded target while it remains hostile and visible without moving
   toward it. The
-  `tank_coax_machine_gun` policy is used by the Tank secondary-fire pass; it ranks Rifleman and
-  Machine Gunner targets first, Worker and Golem targets second, and all other legal non-resource
-  fallbacks last, then uses distance/id ties without Tank cannon threat ordering. The ranker does
+  `tank_coax_machine_gun` policy is used by the Tank secondary-fire pass; it ranks Panzerfausts, Anti-Tank Guns,
+  combat infantry (Warrior, Rifleman, Machine Gunner), Mortar Teams, then Scout Cars.
+  Remaining legal targets follow default weapon group/material order and distance/id ties. The ranker does
   not decide fog, smoke, line-of-sight, blocker, ownership, or acquisition-radius legality.
   Tanks run the coax pass after their normal cannon aim/fire/relax work for the tick. The pass reads
-  the current authoritative turret facing, accepts only targets within a 10-degree half arc and the
-  6-tile coax range, uses intended-target direct-fire legality so enemy hard blockers can reject a
+  independent checkpointed commander MG facing and target state, acquires targets in all directions
+  within the 6-tile MG range, uses intended-target direct-fire legality so enemy hard blockers can reject a
   behind-them infantry target, and never rotates the turret, changes the cannon target slot, clears
-  paths, or requests chase movement. It skips candidate construction while the coax weapon is on
-  cooldown. Same-tick Tank cannon/coax events are emitted cannon first, then coax.
+  paths, or requests chase movement. It checks the coax weapon
+  cooldown only for firing; acquisition and independent rotation run every tick, using the Scout
+  Car turn rate and fire tolerance. Idle aim relaxes toward the main turret. Same-tick Tank cannon/coax events are emitted cannon first, then coax.
   The first successful enemy Tank cannon, Anti-Tank Gun, or Panzerfaust hit on a surviving Tank
   establishes a three-second hull-facing preference toward its source. Later qualifying hits
   refresh that under-fire window without redirecting the preference, preventing rapid threat
@@ -1877,8 +2010,8 @@ auto-acquisition, snapshot projection, and direct fire share the same range pred
 auto-acquisition and firing otherwise use the smoke-aware LOS query; explicit attack orders remain
 stationary behind terrain, smoke, or entity blockers and cannot fire until the shot is clear. Direct-fire shot
 projection also checks hard entity blockers: tanks and non-Tank-Trap building footprints intercept
-shots, while Tank Traps do not. Future forest visibility/cover rules should extend the terrain rules
-and this service instead of adding ad hoc checks to fog or combat.
+shots, while Tank Traps do not. Forest direct-fire blocking also applies to secondary weapons,
+Panzerfaust launch checks, and machine-gun burst endpoints through the shared LOS service.
 
 `Game` samples raw live fog per player every second simulation tick (15 Hz). Command validation,
 combat targeting, event visibility, building-memory refreshes, and snapshots all consume the same

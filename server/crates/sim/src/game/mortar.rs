@@ -1,3 +1,4 @@
+use rts_rules::math::{Coord, GameplayMath as _};
 #[path = "mortar_launch.rs"]
 mod launch;
 use launch::emit_launch;
@@ -14,7 +15,6 @@ use crate::game::firing_reveal::{
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::dist2;
-use crate::game::services::geometry::{unit_body_contains_point, unit_body_for_entity};
 use crate::game::teams::TeamRelations;
 use crate::protocol::{self, AttackReveal, Event};
 use crate::rules::combat;
@@ -30,12 +30,12 @@ pub(crate) const TURN_RATE_RAD_PER_TICK: f32 = std::f32::consts::PI / HALF_TURN_
 struct MortarShell {
     owner: u32,
     attacker: u32,
-    x: f32,
-    y: f32,
+    x: Coord,
+    y: Coord,
     #[serde(default)]
-    from_x: f32,
+    from_x: Coord,
     #[serde(default)]
-    from_y: f32,
+    from_y: Coord,
     #[serde(default)]
     launch_tick: u32,
     impact_tick: u32,
@@ -122,10 +122,10 @@ impl MortarShellStore {
         self.shells.push(MortarShell {
             owner,
             attacker,
-            x,
-            y,
-            from_x,
-            from_y,
+            x: Coord::from_world(x),
+            y: Coord::from_world(y),
+            from_x: Coord::from_world(from_x),
+            from_y: Coord::from_world(from_y),
             launch_tick: tick,
             impact_tick: tick.saturating_add(delay_ticks),
             launched: true,
@@ -173,21 +173,21 @@ impl MortarShellStore {
             seed ^= seed << 5;
             let angle = (seed as f32 / u32::MAX as f32) * std::f32::consts::TAU;
             seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
-            let radius = (seed as f32 / u32::MAX as f32).sqrt()
+            let radius = (seed as f32 / u32::MAX as f32).det_sqrt()
                 * config::ROCKET_BARRAGE_SCATTER_RADIUS_TILES
                 * config::TILE_SIZE as f32;
             let launch_tick = tick.saturating_add(launch_offset);
             let flight_ticks = config::TICK_HZ + (index % 5) * 3;
             let (rack_x, rack_y) = config::rocket_rack_slot(index);
-            let launch_x = from_x + rack_x * facing.cos() - rack_y * facing.sin();
-            let launch_y = from_y + rack_x * facing.sin() + rack_y * facing.cos();
+            let launch_x = from_x + rack_x * facing.det_cos() - rack_y * facing.det_sin();
+            let launch_y = from_y + rack_x * facing.det_sin() + rack_y * facing.det_cos();
             self.shells.push(MortarShell {
                 owner,
                 attacker,
-                x: center_x + angle.cos() * radius,
-                y: center_y + angle.sin() * radius,
-                from_x: launch_x,
-                from_y: launch_y,
+                x: Coord::from_world(center_x + angle.det_cos() * radius),
+                y: Coord::from_world(center_y + angle.det_sin() * radius),
+                from_x: Coord::from_world(launch_x),
+                from_y: Coord::from_world(launch_y),
                 launch_tick,
                 impact_tick: launch_tick.saturating_add(flight_ticks),
                 launched: false,
@@ -215,11 +215,17 @@ impl MortarShellStore {
             if !shell.rocket && shell.launch_tick == tick {
                 for (&pid, player_events) in events.iter_mut() {
                     if !teams.same_team_or_same_owner(pid, shell.owner)
-                        && projection::team_visible_world(pid, shell.x, shell.y, fog, teams)
+                        && projection::team_visible_world(
+                            pid,
+                            shell.x.to_world(),
+                            shell.y.to_world(),
+                            fog,
+                            teams,
+                        )
                     {
                         player_events.push(Event::MortarWarning {
-                            x: shell.x,
-                            y: shell.y,
+                            x: shell.x.to_world(),
+                            y: shell.y.to_world(),
                             radius_tiles: config::MORTAR_OUTER_RADIUS_TILES,
                             delay_ticks: shell.impact_tick.saturating_sub(tick),
                         });
@@ -242,10 +248,10 @@ impl MortarShellStore {
                     teams,
                     shell.owner,
                     shell.attacker,
-                    shell.from_x,
-                    shell.from_y,
-                    shell.x,
-                    shell.y,
+                    shell.from_x.to_world(),
+                    shell.from_y.to_world(),
+                    shell.x.to_world(),
+                    shell.y.to_world(),
                     delay_ticks,
                     shell.rocket,
                 );
@@ -263,7 +269,7 @@ impl MortarShellStore {
                 shell.launched = true;
             }
             if shell.launched && shell.impact_tick <= tick {
-                on_impact(shell.x, shell.y);
+                on_impact(shell.x.to_world(), shell.y.to_world());
                 resolve(
                     MortarResolutionContext {
                         entities,
@@ -295,6 +301,7 @@ struct MortarResolutionContext<'a> {
 }
 
 fn resolve(context: MortarResolutionContext<'_>, shell: &MortarShell) {
+    let (x, y) = (shell.x.to_world(), shell.y.to_world());
     let MortarResolutionContext {
         entities,
         teams,
@@ -304,8 +311,18 @@ fn resolve(context: MortarResolutionContext<'_>, shell: &MortarShell) {
         firing_reveals,
         tick,
     } = context;
-    let outer_radius = config::MORTAR_OUTER_RADIUS_TILES * config::TILE_SIZE as f32;
-    let inner_radius = config::MORTAR_INNER_RADIUS_TILES * config::TILE_SIZE as f32;
+    let outer_radius = if shell.rocket {
+        config::ROCKET_BARRAGE_OUTER_RADIUS_TILES
+    } else {
+        config::MORTAR_OUTER_RADIUS_TILES
+    } * config::TILE_SIZE as f32;
+    let inner_radius = if shell.rocket {
+        config::ROCKET_BARRAGE_INNER_RADIUS_TILES
+    } else {
+        config::MORTAR_INNER_RADIUS_TILES
+    } * config::TILE_SIZE as f32;
+    let ap_radius2 =
+        (config::ROCKET_BARRAGE_AP_RADIUS_TILES * config::TILE_SIZE as f32).det_powi(2);
     let outer2 = outer_radius * outer_radius;
     let inner2 = inner_radius * inner_radius;
     let mut hits = Vec::new();
@@ -319,32 +336,32 @@ fn resolve(context: MortarResolutionContext<'_>, shell: &MortarShell) {
         {
             continue;
         }
-        let d2 = dist2(shell.x, shell.y, target.pos_x, target.pos_y);
-        let direct_hit = shell.rocket && impact_point_hits_target(shell.x, shell.y, target);
-        if direct_hit || d2 <= outer2 {
-            let base = shell_damage(shell.rocket, d2, inner2, direct_hit);
+        let d2 = dist2(x, y, target.pos_x(), target.pos_y());
+        let piercing_hit = shell.rocket && d2 <= ap_radius2;
+        if d2 <= outer2 {
+            let base = shell_damage(shell.rocket, d2, inner2, piercing_hit);
             hits.push((
                 id,
                 base,
-                direct_hit,
+                piercing_hit,
                 target.owner,
-                target.pos_x,
-                target.pos_y,
+                target.pos_x(),
+                target.pos_y(),
             ));
         }
     }
     hits.sort_by_key(|(id, _, _, _, _, _)| *id);
     let reveal = mortar_reveal_for(entities.get(shell.attacker), shell.owner);
     let mut reveal_recipients = Vec::new();
-    for (id, base, direct_hit, victim_owner, tx, ty) in hits {
+    for (id, base, piercing_hit, victim_owner, tx, ty) in hits {
         let effective = entities
             .get(id)
             .map(|target| {
                 let damage = entrenchment_combat::reduce_area_damage(
                     target,
-                    shell_effective_damage(target.kind, shell.rocket, base, direct_hit),
+                    shell_effective_damage(target.kind, shell.rocket, base, piercing_hit),
                 );
-                map.damage_after_reduction_tile(target.pos_x, target.pos_y, damage)
+                map.damage_after_reduction_tile(target.pos_x(), target.pos_y(), damage)
             })
             .unwrap_or(0);
         if effective == 0 {
@@ -356,7 +373,7 @@ fn resolve(context: MortarResolutionContext<'_>, shell: &MortarShell) {
                     effective,
                     shell.owner,
                     shell.attacker,
-                    (shell.x, shell.y),
+                    (x, y),
                     tick,
                 )
             } else {
@@ -392,8 +409,8 @@ fn resolve(context: MortarResolutionContext<'_>, shell: &MortarShell) {
         shell.attacker,
         reveal.as_ref(),
         &reveal_recipients,
-        shell.x,
-        shell.y,
+        x,
+        y,
         shell.rocket,
     );
 }
@@ -406,8 +423,8 @@ fn mortar_reveal_for(attacker: Option<&Entity>, owner: u32) -> Option<AttackReve
     Some(AttackReveal {
         owner: attacker.owner,
         kind: protocol::kind_to_wire(attacker.kind).to_string(),
-        x: attacker.pos_x,
-        y: attacker.pos_y,
+        x: attacker.pos_x(),
+        y: attacker.pos_y(),
         facing: Some(attacker.facing()),
         weapon_facing: attacker.weapon_facing(),
         setup_state: None,
@@ -423,7 +440,7 @@ fn mortar_damage(victim_kind: EntityKind, base: u32) -> u32 {
     )
 }
 
-fn shell_damage(rocket: bool, d2: f32, inner2: f32, direct_hit: bool) -> u32 {
+fn shell_damage(rocket: bool, d2: f32, inner2: f32, piercing_hit: bool) -> u32 {
     if !rocket {
         return if d2 <= inner2 {
             config::MORTAR_INNER_DAMAGE
@@ -431,7 +448,7 @@ fn shell_damage(rocket: bool, d2: f32, inner2: f32, direct_hit: bool) -> u32 {
             config::MORTAR_OUTER_DAMAGE
         };
     }
-    if direct_hit {
+    if piercing_hit {
         config::ROCKET_BARRAGE_DIRECT_DAMAGE
     } else if d2 <= inner2 {
         config::ROCKET_BARRAGE_INNER_DAMAGE
@@ -444,9 +461,9 @@ fn shell_effective_damage(
     victim_kind: EntityKind,
     rocket: bool,
     base: u32,
-    direct_hit: bool,
+    piercing_hit: bool,
 ) -> u32 {
-    let damage = if rocket && direct_hit {
+    let damage = if rocket && piercing_hit {
         base
     } else {
         mortar_damage(victim_kind, base)
@@ -456,15 +473,6 @@ fn shell_effective_damage(
     } else {
         damage
     }
-}
-
-fn impact_point_hits_target(x: f32, y: f32, target: &Entity) -> bool {
-    if let Some(stats) = config::building_stats(target.kind) {
-        let half_w = stats.foot_w as f32 * config::TILE_SIZE as f32 * 0.5;
-        let half_h = stats.foot_h as f32 * config::TILE_SIZE as f32 * 0.5;
-        return (x - target.pos_x).abs() <= half_w && (y - target.pos_y).abs() <= half_h;
-    }
-    unit_body_for_entity(target).is_some_and(|body| unit_body_contains_point(body, x, y))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -493,7 +501,11 @@ fn emit_impact(
             from: reveal_to_recipient.then_some(attacker),
             x,
             y,
-            radius_tiles: config::MORTAR_OUTER_RADIUS_TILES,
+            radius_tiles: if rocket {
+                config::ROCKET_BARRAGE_OUTER_RADIUS_TILES
+            } else {
+                config::MORTAR_OUTER_RADIUS_TILES
+            },
             reveal: reveal_to_recipient.then(|| reveal.cloned()).flatten(),
             rocket,
         });

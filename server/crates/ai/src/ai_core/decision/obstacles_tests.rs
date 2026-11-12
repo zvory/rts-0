@@ -1,5 +1,6 @@
 use super::*;
 use crate::ai_core::profiles::JEFFS_AI;
+use rts_rules::math::GameplayMath as _;
 use rts_sim::game::command::SimCommand;
 
 fn unit(id: u32, owner: u32, kind: EntityKind, tile: (f32, f32)) -> AiEntitySummary {
@@ -17,6 +18,7 @@ fn unit(id: u32, owner: u32, kind: EntityKind, tile: (f32, f32)) -> AiEntitySumm
         latched_node: None,
         target_id: None,
         free_for_combat: true,
+        research: None,
     }
 }
 
@@ -124,7 +126,7 @@ fn home_tanks_clear_a_trap_on_the_mains_way_out_while_the_base_is_quiet() {
         .min_by(|left, right| {
             let from_hq = |tile: &&crate::ai_core::map_analysis::AiTile| {
                 let point = tile_center((tile.x, tile.y), 32);
-                (dist2(point.0, point.1, hq.0, hq.1).sqrt() / 32.0 - 10.0).abs()
+                (dist2(point.0, point.1, hq.0, hq.1).det_sqrt() / 32.0 - 10.0).abs()
             };
             from_hq(left).total_cmp(&from_hq(right))
         })

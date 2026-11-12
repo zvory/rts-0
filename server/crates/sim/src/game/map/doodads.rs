@@ -3,8 +3,7 @@ use crate::config;
 use crate::protocol::{validate_map_doodads, MapDoodad};
 
 /// Every visual tree species shares this authoritative circular trunk footprint. Vehicles treat
-/// it as hard geometry. Infantry use it for local steering but may pass through when dense trees
-/// leave no usable gap.
+/// it as hard geometry. Infantry may pass through, with a finite route cost for tree tiles.
 pub(crate) const TREE_TRUNK_RADIUS_PX: f32 = 4.5;
 
 pub(crate) fn is_tree(doodad: &MapDoodad) -> bool {

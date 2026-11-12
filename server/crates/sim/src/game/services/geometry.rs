@@ -2,6 +2,7 @@ use crate::config;
 use crate::game::entity::{uses_oriented_vehicle_body, Entity, EntityKind};
 use crate::game::map::Map;
 use crate::game::services::occupancy::building_footprint;
+use rts_rules::math::GameplayMath as _;
 
 const DEFAULT_FACING_RAD: f32 = 0.0;
 const CIRCLE_COLLISION_EPS_PX: f32 = 0.001;
@@ -68,7 +69,7 @@ impl UnitBody {
             UnitBody::Circle(body) => body.radius,
             UnitBody::OrientedCapsule(body) => body.half_segment + body.radius,
             UnitBody::OrientedBox(body) => {
-                (body.half_len * body.half_len + body.half_width * body.half_width).sqrt()
+                (body.half_len * body.half_len + body.half_width * body.half_width).det_sqrt()
             }
         }
     }
@@ -108,7 +109,7 @@ impl UnitBody {
 
 impl OrientedBoxBody {
     fn forward_axis(self) -> (f32, f32) {
-        (self.facing.cos(), self.facing.sin())
+        (self.facing.det_cos(), self.facing.det_sin())
     }
 
     fn side_axis(self) -> (f32, f32) {
@@ -119,7 +120,7 @@ impl OrientedBoxBody {
 
 impl OrientedCapsuleBody {
     fn forward_axis(self) -> (f32, f32) {
-        (self.facing.cos(), self.facing.sin())
+        (self.facing.det_cos(), self.facing.det_sin())
     }
 
     fn side_axis(self) -> (f32, f32) {
@@ -147,32 +148,7 @@ pub(crate) fn unit_body(kind: EntityKind, x: f32, y: f32) -> Option<UnitBody> {
 }
 
 pub(crate) fn unit_body_for_entity(e: &Entity) -> Option<UnitBody> {
-    unit_body_with_facing(e.kind, e.pos_x, e.pos_y, e.facing())
-}
-
-pub(crate) fn unit_body_contains_point(body: UnitBody, x: f32, y: f32) -> bool {
-    if !x.is_finite() || !y.is_finite() {
-        return false;
-    }
-    match body {
-        UnitBody::Circle(circle) => {
-            let dx = x - circle.x;
-            let dy = y - circle.y;
-            dx * dx + dy * dy <= circle.radius * circle.radius
-        }
-        UnitBody::OrientedCapsule(capsule) => {
-            let (start, end) = capsule.endpoints();
-            point_segment_distance_sq((x, y), start, end) <= capsule.radius * capsule.radius
-        }
-        UnitBody::OrientedBox(rect) => {
-            let dx = x - rect.x;
-            let dy = y - rect.y;
-            let (forward_x, forward_y) = rect.forward_axis();
-            let (side_x, side_y) = rect.side_axis();
-            (dx * forward_x + dy * forward_y).abs() <= rect.half_len
-                && (dx * side_x + dy * side_y).abs() <= rect.half_width
-        }
-    }
+    unit_body_with_facing(e.kind, e.pos_x(), e.pos_y(), e.facing())
 }
 
 pub(crate) fn unit_body_with_facing(
@@ -306,7 +282,7 @@ pub(crate) fn building_rect_for_footprint(
 
 pub(crate) fn building_rect_for_entity(map: &Map, e: &Entity) -> Option<RectBody> {
     config::building_stats(e.kind)?;
-    if !e.pos_x.is_finite() || !e.pos_y.is_finite() {
+    if !e.pos_x().is_finite() || !e.pos_y().is_finite() {
         return None;
     }
 
@@ -346,7 +322,7 @@ pub(crate) fn closest_combat_target_point(
         .then(|| building_rect_for_entity(map, target))
         .flatten()
     else {
-        return (target.pos_x, target.pos_y);
+        return (target.pos_x(), target.pos_y());
     };
     let clamped = (
         attacker.0.clamp(rect.min_x, rect.max_x),
@@ -651,7 +627,7 @@ fn circle_circle_overlap(a: CircleBody, b: CircleBody) -> Option<BodyOverlap> {
         });
     }
 
-    let d = d2.sqrt();
+    let d = d2.det_sqrt();
     Some(BodyOverlap {
         normal_x: dx / d,
         normal_y: dy / d,
@@ -677,7 +653,7 @@ fn capsule_circle_overlap(capsule: OrientedCapsuleBody, circle: CircleBody) -> O
             depth: min_d,
         });
     }
-    let d = d2.sqrt();
+    let d = d2.det_sqrt();
     Some(BodyOverlap {
         normal_x: dx / d,
         normal_y: dy / d,
@@ -704,7 +680,7 @@ fn circle_oriented_box_overlap(circle: CircleBody, body: OrientedBoxBody) -> Opt
         if d2 + 0.000001 >= circle.radius * circle.radius {
             return None;
         }
-        let d = d2.sqrt();
+        let d = d2.det_sqrt();
         return Some(BodyOverlap {
             normal_x: -from_box_x / d,
             normal_y: -from_box_y / d,
@@ -750,7 +726,7 @@ fn capsule_capsule_overlap(a: OrientedCapsuleBody, b: OrientedCapsuleBody) -> Op
             depth: min_d,
         });
     }
-    let d = d2.sqrt();
+    let d = d2.det_sqrt();
     Some(BodyOverlap {
         normal_x: dx / d,
         normal_y: dy / d,
@@ -864,7 +840,7 @@ fn segment_intersects_circle(
     if discriminant < 0.0 {
         return None;
     }
-    let sqrt = discriminant.sqrt();
+    let sqrt = discriminant.det_sqrt();
     let t1 = (-b - sqrt) / (2.0 * a);
     let t2 = (-b + sqrt) / (2.0 * a);
     [t1, t2]
@@ -1128,7 +1104,7 @@ fn normalized(v: (f32, f32)) -> Option<(f32, f32)> {
     if len_sq <= 1.0e-4 {
         return None;
     }
-    let len = len_sq.sqrt();
+    let len = len_sq.det_sqrt();
     Some((v.0 / len, v.1 / len))
 }
 

@@ -20,7 +20,7 @@ pub(in crate::game::services::movement) fn barrage_maneuver_target(
         .min_range_tiles
         .unwrap_or(0) as f32
         * config::TILE_SIZE as f32;
-    let distance = distance_between((e.pos_x, e.pos_y), target);
+    let distance = distance_between((e.pos_x(), e.pos_y()), target);
     ((distance >= min && distance <= range)
         || (e.path_is_empty()
             && matches!(
@@ -37,10 +37,13 @@ pub(in crate::game::services::movement) fn barrage_pose_ready(
     let definition = ability::definition(AbilityKind::Barrage);
     let range = definition.range_tiles.unwrap_or(0) as f32 * config::TILE_SIZE as f32;
     let min = definition.min_range_tiles.unwrap_or(0) as f32 * config::TILE_SIZE as f32;
-    let distance = distance_between((e.pos_x, e.pos_y), target);
+    let distance = distance_between((e.pos_x(), e.pos_y()), target);
     distance >= min
         && distance <= range
-        && ability::barrage_facing_ready(e.facing(), (target.1 - e.pos_y).atan2(target.0 - e.pos_x))
+        && ability::barrage_facing_ready(
+            e.facing(),
+            (target.1 - e.pos_y()).det_atan2(target.0 - e.pos_x()),
+        )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -81,7 +84,7 @@ pub(in crate::game::services::movement) fn plan_barrage_maneuver(
                 continue;
             };
             let distance = distance_between(candidate.pos, target);
-            let bearing = (target.1 - candidate.pos.1).atan2(target.0 - candidate.pos.0);
+            let bearing = (target.1 - candidate.pos.1).det_atan2(target.0 - candidate.pos.0);
             let range_error = (distance - range).max(0.0) + (min - distance).max(0.0);
             let score = angle_delta(candidate.facing, bearing).abs() * profile.min_turn_radius_px
                 + range_error * 2.0

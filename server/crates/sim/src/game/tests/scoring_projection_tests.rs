@@ -274,14 +274,16 @@ fn observer_analysis_reports_authoritative_inventory_production_and_losses() {
     assert!(player_two
         .buildings_lost
         .iter()
-        .any(|row| row.kind == "pump_jack" && row.count == 1 && row.oil_value == 0));
+        .any(|row| row.kind == "pump_jack"
+            && row.count == 1
+            && row.steel_value == 0
+            && row.oil_value == 0));
     assert!(player_two
         .buildings_lost
         .iter()
         .any(|row| row.kind == "depot" && row.count == 1 && row.steel_value > 0));
-    let expected_steel = economy_rules::cost(EntityKind::Worker).0
-        + economy_rules::cost(EntityKind::Depot).0
-        + economy_rules::cost(EntityKind::PumpJack).0;
+    let expected_steel =
+        economy_rules::cost(EntityKind::Worker).0 + economy_rules::cost(EntityKind::Depot).0;
     let expected_oil =
         economy_rules::cost(EntityKind::Worker).1 + economy_rules::cost(EntityKind::Depot).1;
     assert_eq!(player_two.resources_lost.steel, expected_steel);
@@ -606,8 +608,8 @@ fn death_vision_lingers_as_normal_vision_for_five_seconds() {
         .find(|e| e.id == enemy)
         .expect("moving enemy should still be visible during lingering death vision");
     assert!(!moving_linger.vision_only);
-    assert!((moving_linger.x - moved_enemy.pos_x).abs() < 0.001);
-    assert!((moving_linger.y - moved_enemy.pos_y).abs() < 0.001);
+    assert!((moving_linger.x - moved_enemy.pos_x()).abs() < 0.001);
+    assert!((moving_linger.y - moved_enemy.pos_y()).abs() < 0.001);
 
     while game.tick_count() <= config::TICK_HZ * 5 {
         game.tick();

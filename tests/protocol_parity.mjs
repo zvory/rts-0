@@ -337,7 +337,7 @@ assert(
   "compact snapshot scalar schema must match JS decoder",
 );
 assert(
-  protocolContract.compactSlotSchemas.entity.at(-1).name === "rocketRackCount",
+  protocolContract.compactSlotSchemas.entity.at(-1).name === "commanderFacing",
   "compact entity slot schema must include the latest appended field",
 );
 assert(
@@ -774,3 +774,5 @@ assert(
 console.log("✅ protocol_parity.mjs: Rust protocol contract dump matches JS mirror");
 
 assert(JSON.stringify(cmd.pointTanks([1, 2], 300, 400)) === JSON.stringify({ c: "pointTanks", units: [1, 2], x: 300, y: 400 }), "Point command preserves one group target");
+
+assert(JSON.stringify(cmd.pointTanks([1], 300, 400, true)) === JSON.stringify({ c: "pointTanks", units: [1], x: 300, y: 400, queued: true }), "Point command supports queueing");

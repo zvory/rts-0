@@ -434,7 +434,7 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
     AI_PROFILES.length === 4 &&
       AI_PROFILES[0].id === "ai_2_3" &&
       AI_PROFILES[0].label === "AI 2.3" &&
-      AI_PROFILES[1].id === "jeffs_ai" &&
+      AI_PROFILES[1].id === "jeffs_ai_v1_1" &&
       AI_PROFILES[1].label === "Jeff's AI" &&
       AI_PROFILES[2].id === "rush_ai" &&
       AI_PROFILES[2].label === "Rush AI" &&

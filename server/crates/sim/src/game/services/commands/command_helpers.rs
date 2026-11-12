@@ -33,7 +33,7 @@ pub(super) fn choose_smoke_caster(
         let Some(e) = entities.get(*id) else {
             continue;
         };
-        let d2 = dist2(e.pos_x, e.pos_y, x, y);
+        let d2 = dist2(e.pos_x(), e.pos_y(), x, y);
         if closest.is_none_or(|(_, best)| d2 < best) {
             closest = Some((*id, d2));
         }

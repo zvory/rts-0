@@ -18,7 +18,7 @@ pub(super) fn stamp_visibility(
             entity.owner != 0
                 && entity.hp > 0
                 && entity.is_unit()
-                && smokes.point_inside(entity.pos_x, entity.pos_y)
+                && smokes.point_inside(entity.pos_x(), entity.pos_y())
         })
         .collect::<Vec<_>>();
     for (index, first) in concealed_units.iter().enumerate() {
@@ -45,7 +45,7 @@ fn stamp_entity_tile(
     let Some(grid) = grids.get_mut(&owner) else {
         return;
     };
-    let (tx, ty) = map.tile_of(entity.pos_x, entity.pos_y);
+    let (tx, ty) = map.tile_of(entity.pos_x(), entity.pos_y());
     if tx >= width || ty >= height {
         return;
     }

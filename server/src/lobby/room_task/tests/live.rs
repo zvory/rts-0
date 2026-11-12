@@ -261,17 +261,49 @@ fn player_lobby_launches_jeffs_ai_as_a_supported_opponent() {
     task.host_id = Some(host_id);
     add_test_room_player(&mut task, host_id, true);
 
-    task.on_add_ai(host_id, Some(2), Some("jeffs_ai".to_string()));
+    task.on_add_ai(host_id, Some(2), Some("jeffs_ai_v1_1".to_string()));
     assert_eq!(
         task.ai_players.first().map(|ai| ai.profile_id),
-        Some("jeffs_ai")
+        Some("jeffs_ai_v1_1")
     );
     assert_eq!(ai_slot_names(&task), vec!["Jeff's AI"]);
 
     task.start_match();
 
     assert_eq!(task.ai_controllers.len(), 1);
-    assert_eq!(task.ai_controllers[0].profile_id(), "jeffs_ai");
+    assert_eq!(task.ai_controllers[0].profile_id(), "jeffs_ai_v1_1");
+}
+
+#[test]
+fn player_lobby_cannot_select_jeffs_ai_v1_0() {
+    let mut task = RoomTask::new(
+        "live-jeffs-ai-v1-0-retired-test".to_string(),
+        RoomMode::Normal,
+        None,
+        false,
+        DrainHandle::default(),
+    );
+    let host_id = next_player_id();
+    task.host_id = Some(host_id);
+    add_test_room_player(&mut task, host_id, true);
+
+    task.on_add_ai(host_id, Some(2), Some("jeffs_ai".to_string()));
+    assert_eq!(
+        task.ai_players.first().map(|ai| ai.profile_id),
+        Some("ai_2_3")
+    );
+
+    let ai_id = task.ai_players[0].id;
+    task.on_set_ai_profile(host_id, ai_id, "jeffs_ai".to_string());
+    assert_eq!(
+        task.ai_players.first().map(|ai| ai.profile_id),
+        Some("ai_2_3")
+    );
+
+    task.start_match();
+
+    assert_eq!(task.ai_controllers.len(), 1);
+    assert_eq!(task.ai_controllers[0].profile_id(), "ai_2_3");
 }
 
 #[test]

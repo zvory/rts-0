@@ -5,6 +5,7 @@ use crate::game::services::geometry::{unit_body_for_entity, unit_body_with_facin
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::standability as static_standability;
+use rts_rules::math::GameplayMath as _;
 
 use super::pivot_drive::{
     angle_delta, distance_between, normalize_angle, vehicle_traffic_adjustment,
@@ -296,7 +297,7 @@ fn scout_car_candidate(
     }
     let moved = (last_pos.0 - current.0, last_pos.1 - current.1);
     let travel_dir = unit_direction((0.0, 0.0), moved).unwrap_or_else(|| {
-        let f = (last_facing.cos(), last_facing.sin());
+        let f = (last_facing.det_cos(), last_facing.det_sin());
         if primitive.travel_sign < 0.0 {
             (-f.0, -f.1)
         } else {
@@ -325,7 +326,7 @@ fn scout_car_outward_displacement_candidate(
         return None;
     }
     let base_clearance = static_clearance_px(profile, map, occ, e.kind, current, e.facing());
-    let forward = (e.facing().cos(), e.facing().sin());
+    let forward = (e.facing().det_cos(), e.facing().det_sin());
     let side = (-forward.1, forward.0);
     let distance = budget.min(config::TILE_SIZE as f32 * 0.25);
     let mut best = None;
@@ -372,7 +373,7 @@ fn sample_primitive(
     }
     let travel_distance = travel_distance * primitive.travel_sign;
     if primitive.curvature.abs() <= 1.0e-5 {
-        let forward = (facing.cos(), facing.sin());
+        let forward = (facing.det_cos(), facing.det_sin());
         return Some((
             (
                 current.0 + forward.0 * travel_distance,
@@ -383,10 +384,10 @@ fn sample_primitive(
     }
 
     let yaw = primitive.curvature * travel_distance;
-    let local_x = yaw.sin() / primitive.curvature;
-    let local_y = (1.0 - yaw.cos()) / primitive.curvature;
-    let cos = facing.cos();
-    let sin = facing.sin();
+    let local_x = yaw.det_sin() / primitive.curvature;
+    let local_y = (1.0 - yaw.det_cos()) / primitive.curvature;
+    let cos = facing.det_cos();
+    let sin = facing.det_sin();
     Some((
         (
             current.0 + cos * local_x - sin * local_y,
@@ -426,7 +427,7 @@ fn score_candidate(
     } else {
         candidate.facing
     };
-    let route_heading = route.route_dir.1.atan2(route.route_dir.0);
+    let route_heading = route.route_dir.1.det_atan2(route.route_dir.0);
     let current_heading = if candidate.primitive.travel_sign < 0.0 {
         normalize_angle(current_facing + std::f32::consts::PI)
     } else {
@@ -498,7 +499,7 @@ fn traffic_penalty(
         let neighbor_radius = unit_body_for_entity(neighbor)
             .map(|body| body.bounding_radius())
             .unwrap_or_else(|| neighbor.radius());
-        let clearance = distance_between(candidate.pos, (neighbor.pos_x, neighbor.pos_y))
+        let clearance = distance_between(candidate.pos, (neighbor.pos_x(), neighbor.pos_y()))
             - candidate_radius
             - neighbor_radius;
         if clearance < config::TILE_SIZE as f32 * 0.5 {
@@ -519,7 +520,7 @@ fn scout_car_front_is_blocked(
     if probe_distance <= 0.0 || !e.facing().is_finite() {
         return false;
     }
-    let forward = (e.facing().cos(), e.facing().sin());
+    let forward = (e.facing().det_cos(), e.facing().det_sin());
     let probe = (
         current.0 + forward.0 * probe_distance,
         current.1 + forward.1 * probe_distance,
@@ -629,7 +630,7 @@ fn scout_car_reverse_waypoint(e: &Entity, x: f32, y: f32) -> Option<(f32, f32)> 
 
     let dx = next.0 - x;
     let dy = next.1 - y;
-    let dist = (dx * dx + dy * dy).sqrt();
+    let dist = (dx * dx + dy * dy).det_sqrt();
     if !dist.is_finite() || dist <= 1.0e-4 {
         return None;
     }
@@ -648,11 +649,11 @@ fn waypoint_is_behind(facing: f32, waypoint: (f32, f32), current: (f32, f32)) ->
     }
     let dx = waypoint.0 - current.0;
     let dy = waypoint.1 - current.1;
-    let dist = (dx * dx + dy * dy).sqrt();
+    let dist = (dx * dx + dy * dy).det_sqrt();
     if !dist.is_finite() || dist <= 1.0e-4 {
         return false;
     }
-    let forward_desired = dy.atan2(dx);
+    let forward_desired = dy.det_atan2(dx);
     angle_delta(facing, forward_desired).abs()
         > car_motion_profile(EntityKind::ScoutCar)
             .map(|profile| profile.reverse_min_behind_angle_rad)
@@ -667,7 +668,7 @@ fn step_can_reach_waypoint(delta: (f32, f32), step_dir: (f32, f32), budget: f32)
     if !budget.is_finite() || budget < 0.0 {
         return false;
     }
-    let dist = (delta.0 * delta.0 + delta.1 * delta.1).sqrt();
+    let dist = (delta.0 * delta.0 + delta.1 * delta.1).det_sqrt();
     if !dist.is_finite() || dist > budget {
         return false;
     }
@@ -680,7 +681,7 @@ fn unit_direction_for_facing(facing: f32) -> Option<(f32, f32)> {
     if !facing.is_finite() {
         return None;
     }
-    Some((facing.cos(), facing.sin()))
+    Some((facing.det_cos(), facing.det_sin()))
 }
 
 #[cfg(test)]

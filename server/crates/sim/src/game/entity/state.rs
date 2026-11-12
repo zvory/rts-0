@@ -223,6 +223,11 @@ pub struct CombatState {
     pub weapon_facing: f32,
     /// Target weapon/barrel facing in radians. Useful for projection/debugging and future arcs.
     pub desired_weapon_facing: f32,
+    /// Independent commander MG orientation and acquisition target; checkpointed with combat.
+    #[serde(default)]
+    pub commander_facing: f32,
+    #[serde(default)]
+    pub commander_target_id: Option<u32>,
     /// Fixed center of a manually emplaced anti-tank gun's field of fire.
     pub emplacement_facing: Option<f32>,
     /// Pending facing to apply when a TearingDownToRedeploy phase completes.
@@ -256,6 +261,8 @@ impl Default for CombatState {
             setup: WeaponSetup::Packed,
             weapon_facing: 0.0,
             desired_weapon_facing: 0.0,
+            commander_facing: 0.0,
+            commander_target_id: None,
             emplacement_facing: None,
             pending_redeploy_facing: None,
             autocast_enabled: true,

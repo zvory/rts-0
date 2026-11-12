@@ -750,7 +750,7 @@ export class Match {
   applySpectatorUi() {
     const commandSurfaceHidden = this.replayViewer ||
       !(this.controlPolicy?.canUseCommandSurface?.(this.state) ?? !this.state?.spectator);
-    if (dom.selectionArea) dom.selectionArea.hidden = !this.replayViewer && commandSurfaceHidden;
+    if (dom.selectionArea) dom.selectionArea.hidden = false;
     if (dom.commandCard) dom.commandCard.hidden = commandSurfaceHidden;
     this.closeGiveUpConfirm();
   }

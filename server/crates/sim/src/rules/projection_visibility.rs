@@ -71,7 +71,7 @@ pub(crate) fn entity_hidden_by_concealment_from_players(
     fog: &Fog,
     teams: &TeamRelations,
 ) -> bool {
-    if !entity.is_unit() || !map.world_point_is_concealed(entity.pos_x, entity.pos_y) {
+    if !entity.is_unit() || !map.world_point_is_concealed(entity.pos_x(), entity.pos_y()) {
         return false;
     }
     !viewers.into_iter().any(|viewer| {

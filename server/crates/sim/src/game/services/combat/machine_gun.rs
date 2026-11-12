@@ -1,4 +1,5 @@
 //! First-hit MG geometry and fog-safe ray presentation; impact effects belong to `damage`.
+use rts_rules::math::GameplayMath as _;
 use std::collections::{BTreeMap, HashMap};
 
 use rand::Rng;
@@ -144,13 +145,13 @@ pub(super) fn fire(
     let Some(source) = entities.get(attacker) else {
         return Vec::new();
     };
-    let (owner, start) = (source.owner, (source.pos_x, source.pos_y));
+    let (owner, start) = (source.owner, (source.pos_x(), source.pos_y()));
     let Some(target) = entities.get(intended) else {
         return Vec::new();
     };
     // Match acquisition distance: a building surface can be in range while its center is not.
     let aim = closest_combat_target_point(map, start, target);
-    let angle = (aim.1 - start.1).atan2(aim.0 - start.0);
+    let angle = (aim.1 - start.1).det_atan2(aim.0 - start.0);
     if !range.is_finite() || range <= 0.0 {
         return Vec::new();
     }
@@ -173,8 +174,8 @@ pub(super) fn fire(
             los,
             start,
             (
-                start.0 + direction.cos() * range,
-                start.1 + direction.sin() * range,
+                start.0 + direction.det_cos() * range,
+                start.1 + direction.det_sin() * range,
             ),
         );
         let hit = first_hit(
@@ -247,8 +248,8 @@ pub(super) fn fire(
             // visible space. Withholding only its id would disclose that body's position.
             if let Some(v) = entities.get(victim) {
                 let visible = teams.same_team_or_same_owner(*viewer, v.owner)
-                    || (projection::team_visible_world(*viewer, v.pos_x, v.pos_y, fog, teams)
-                        && !smokes.point_inside(v.pos_x, v.pos_y)
+                    || (projection::team_visible_world(*viewer, v.pos_x(), v.pos_y(), fog, teams)
+                        && !smokes.point_inside(v.pos_x(), v.pos_y())
                         && !projection::entity_hidden_by_concealment_from_team(
                             *viewer, v, map, fog, teams,
                         ));

@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { KIND, SETUP, STATE } from "../client/src/protocol.js";
+import { KIND, SETUP, STATE, WEAPON_KIND } from "../client/src/protocol.js";
 import { _rigRenderContextFor } from "../client/src/renderer/units.js";
 import { _sweep } from "../client/src/renderer/layers.js";
 import {
@@ -93,7 +93,7 @@ test("animation sampler applies game-state bindings without Pixi", () => {
   };
   const context = createRigRenderContext(entity, {
     now: fixedNow,
-    state: { playerId: 1, weaponRecoil: () => 0.5 },
+    state: { playerId: 1, weaponRecoil: (id, kind, now, weaponKind) => weaponKind === WEAPON_KIND.TANK_COAX ? 0 : 0.5 },
     colorByOwner: new Map([[1, 0x336699]]),
     vehicleMotion: { activity: 0.75 },
   });
@@ -190,31 +190,31 @@ test("tank rig exposes transformed main and coax muzzle anchors", () => {
     state: STATE.IDLE,
     facing: 0,
     weaponFacing: Math.PI / 2,
+    commanderFacing: 0,
   };
 
   const mainMuzzle = transformedRigAnchorPoint(definition, entity, "muzzle", { now: fixedNow });
   const coaxMuzzle = transformedRigAnchorPoint(definition, entity, "coaxMuzzle", { now: fixedNow });
 
-  assert.ok(mainMuzzle, "tank main muzzle anchor should resolve");
   assert.ok(coaxMuzzle, "tank coax muzzle anchor should resolve");
   assert.ok(Math.abs(mainMuzzle.x - 100) < 0.001);
   assert.ok(Math.abs(mainMuzzle.y - 133.2) < 0.001);
-  assert.ok(Math.abs(coaxMuzzle.x - 105.55) < 0.001);
-  assert.ok(Math.abs(coaxMuzzle.y - 116.6) < 0.001);
+  assert.ok(Math.abs(coaxMuzzle.x - 106.1384) < 0.001);
+  assert.ok(Math.abs(coaxMuzzle.y - 100) < 0.001);
 
   const recoilingMainMuzzle = transformedRigAnchorPoint(definition, entity, "muzzle", {
     now: fixedNow,
-    state: { weaponRecoil: () => 0.5 },
+    state: { weaponRecoil: (id, kind, now, weaponKind) => weaponKind === WEAPON_KIND.TANK_COAX ? 0 : 0.5 },
   });
   const recoilingCoaxMuzzle = transformedRigAnchorPoint(definition, entity, "coaxMuzzle", {
     now: fixedNow,
-    state: { weaponRecoil: () => 0.5 },
+    state: { weaponRecoil: (id, kind, now, weaponKind) => weaponKind === WEAPON_KIND.TANK_COAX ? 0 : 0.5 },
   });
 
   assert.ok(Math.abs(recoilingMainMuzzle.x - 100) < 0.001);
   assert.ok(Math.abs(recoilingMainMuzzle.y - 124.875) < 0.001);
-  assert.ok(Math.abs(recoilingCoaxMuzzle.x - 105.55) < 0.001);
-  assert.ok(Math.abs(recoilingCoaxMuzzle.y - 112.775) < 0.001);
+  assert.ok(Math.abs(recoilingCoaxMuzzle.x - 106.1384) < 0.001);
+  assert.ok(Math.abs(recoilingCoaxMuzzle.y - 96.175) < 0.001);
 });
 
 test("tank rig adds a half-scale artillery-style muzzle flare on cannon recoil", () => {

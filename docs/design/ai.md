@@ -13,7 +13,7 @@ When several seats use the same profile, their lobby names receive deterministic
 The player-facing lobby supports four AI profile IDs:
 
 - ai_2_3 — AI 2.3, the default weighted composition: equal thirds Rush AI, Pressure AI, and Jeff's AI (one-third probability each).
-- jeffs_ai — Jeff's AI, the server-authoritative port of the locally evaluated V3 champion policy.
+- jeffs_ai_v1_1 — Jeff's AI (V1.1): Jeff's AI V1.0 plus the V1.1 changes, played with the feature set fixed in `JEFF_V1_1_FEATURES` (profiles.rs). On a symmetric map it decides in one frame, as if on the start it won more from (`live/mirror.rs`), so both starts play the same way.
 - rush_ai — Rush AI, an immediate infantry attack with forward construction.
 - pressure_ai — Pressure AI, the AI 2.1 economy and technology with independent forward staging and a value-based response.
 
@@ -23,7 +23,7 @@ replaces it with `ai_2_3` whenever a room has an active human player. The replac
 again at the authoritative match-start seam, so stale or crafted clients cannot put Turtle into a
 human match.
 
-The convenience inputs ai and default resolve to ai_2_3. The lobby exposes AI 2.3, Jeff's AI, Rush AI, and Pressure AI. AI 2.1 remains a concrete internal profile (`ai_2_1`) for offline tools and
+The convenience inputs ai and default resolve to ai_2_3. The lobby exposes AI 2.3, Jeff's AI, Rush AI, and Pressure AI. Jeff's AI V1.0 (`jeffs_ai`, the server-authoritative port of the locally evaluated V3 champion policy and the baseline V1.1 is measured against) is internal-only like AI 2.1. AI 2.1 remains a concrete internal profile (`ai_2_1`) for offline tools and
 observer-only sessions, but is hidden and rejected as a direct selection in human player lobbies.
 Unsupported or internal IDs fall back to AI 2.3 when adding a seat and are ignored when changing a
 seat; stale internal seats are normalized to AI 2.3 when humans join and again at match start.
@@ -312,7 +312,10 @@ are independent of Rush.
 
 Pressure expands up to five Resource Depots. It uses the SDK's player-relative ranked base sites,
 skips unreachable sites, original player starts, and sites with known owned/allied/enemy or remembered Depot evidence,
-and searches legal footprints covering the selected cluster's available resources. Unknown
+and first tries a Resource Depot centered on the selected site's public map landmark. If that
+footprint is blocked or otherwise invalid, it uses the existing nearby footprint search covering
+the cluster's available resources. Rush inherits this center-first policy after its Pressure
+handoff. Unknown
 occupancy remains unknown; ordinary authoritative placement validates each build. Blocked or
 exhausted sites yield to the next usable ranked site. A map with no usable site does not halt Tank
 production while saving for an impossible expansion.
@@ -618,7 +621,8 @@ The repository term **120 game test** means `scripts/120-game-test.mjs`. It requ
 the current AI 2.3, pre-change Jeff, and post-change Jeff in that order. The runner builds ai-arena,
 runs all three pairings on The River, Schone Tage, Classic, and Crossroads with five side-swapped seeds,
 caps parallel work, resumes completed seed jobs when an output directory is reused, and writes
-Markdown, JSON, and CSV summaries.
+Markdown, JSON, and CSV summaries. Post-change Jeff's 80 games run first, so the new build's results
+arrive soonest; the 40 AI vs pre-change Jeff games run last.
 
     node scripts/120-game-test.mjs ai_2_3 jeffs_ai_pre_defense_envelope jeffs_ai
 

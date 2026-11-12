@@ -1,3 +1,4 @@
+use rts_rules::math::GameplayMath as _;
 use std::collections::{BTreeSet, HashMap};
 
 use crate::config;
@@ -31,26 +32,7 @@ pub(crate) fn construction_system(
 ) {
     let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
     // ----- Arrival pass: workers that have reached and may be waiting at their target -----
-    let arrivals: Vec<(u32, EntityKind, u32, u32, BuildPhase)> = entities
-        .iter()
-        .filter_map(|e| {
-            if e.hp == 0 || !e.is_unit() {
-                return None;
-            }
-            let phase = e.build_phase()?;
-            if !matches!(phase, BuildPhase::ToSite | BuildPhase::WaitingAtSite) {
-                return None;
-            }
-            let (kind, tx, ty) = e.order().build_intent_tile()?;
-            let (cx, cy) = footprint_center(map, kind, tx, ty);
-            let arrive = interact_range_for_kind(kind);
-            if dist2(e.pos_x, e.pos_y, cx, cy).sqrt() <= arrive {
-                Some((e.id, kind, tx, ty, phase))
-            } else {
-                None
-            }
-        })
-        .collect();
+    let arrivals = arrived_build_orders(map, entities);
 
     for (worker, kind, tx, ty, phase) in arrivals {
         let owner = match entities.get(worker) {
@@ -238,7 +220,7 @@ pub(crate) fn construction_system(
                     continue;
                 }
             };
-            let completion = (b.owner, b.kind, b.pos_x, b.pos_y);
+            let completion = (b.owner, b.kind, b.pos_x(), b.pos_y());
             let completed = b.advance_construction().unwrap_or(false);
             active_construction_sites.insert(site);
             completed.then_some(completion)
@@ -350,7 +332,7 @@ pub(crate) fn deconstruction_system(entities: &mut EntityStore, players: &mut [P
                 return Some((e.id, None));
             };
             let arrive = interact_range_for_kind(EntityKind::TankTrap);
-            if dist2(e.pos_x, e.pos_y, tx, ty).sqrt() <= arrive {
+            if dist2(e.pos_x(), e.pos_y(), tx, ty).det_sqrt() <= arrive {
                 Some((e.id, Some(target)))
             } else {
                 None
@@ -425,7 +407,7 @@ pub(crate) fn deconstruction_system(entities: &mut EntityStore, players: &mut [P
 fn live_completed_tank_trap_position(entities: &EntityStore, target: u32) -> Option<(f32, f32)> {
     let trap = entities.get(target)?;
     (trap.kind == EntityKind::TankTrap && trap.hp > 0 && !trap.under_construction())
-        .then_some((trap.pos_x, trap.pos_y))
+        .then_some((trap.pos_x(), trap.pos_y()))
 }
 
 /// Return the matching unfinished scaffold only while it has no active builder.
@@ -444,8 +426,8 @@ pub(crate) fn unattended_site_for_build_intent(
             && entity.under_construction()
             && entity.construction_producer_id().is_none()
             && active_builder_for_site(entities, entity.id).is_none()
-            && (entity.pos_x - cx).abs() <= 0.01
-            && (entity.pos_y - cy).abs() <= 0.01)
+            && (entity.pos_x() - cx).abs() <= 0.01
+            && (entity.pos_y() - cy).abs() <= 0.01)
             .then_some(entity.id)
     })
 }
@@ -461,7 +443,7 @@ pub(crate) fn unattended_site_for_build_intent(
 /// infrequent, and an arbitrary local radius can strand a released worker in a dense base.
 fn eject_worker_from_static_overlap(map: &Map, entities: &mut EntityStore, worker: u32) {
     let (wx, wy, wkind) = match entities.get(worker) {
-        Some(w) => (w.pos_x, w.pos_y, w.kind),
+        Some(w) => (w.pos_x(), w.pos_y(), w.kind),
         None => return,
     };
 
@@ -487,6 +469,87 @@ fn eject_worker_from_static_overlap(map: &Map, entities: &mut EntityStore, worke
     if let (Some(w), Some(((x, y), _))) = (entities.get_mut(worker), destination) {
         w.set_position(x, y);
     }
+}
+
+/// Purchases that can start at a valid site now, regardless of current affordability.
+/// Travelling workers and queued build intents do not protect a budget.
+pub(crate) fn pending_spending(
+    map: &Map,
+    entities: &EntityStore,
+    players: &[PlayerState],
+) -> std::collections::HashMap<u32, rules::economy::ResourceCost> {
+    let mut pending = std::collections::HashMap::new();
+    if players.iter().all(|player| player.is_ai) {
+        return pending;
+    }
+    let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
+    for (worker, kind, tx, ty, _) in arrived_build_orders(map, entities) {
+        let Some(builder) = entities.get(worker) else {
+            continue;
+        };
+        let Some(player) = players
+            .iter()
+            .find(|player| player.id == builder.owner && !player.is_ai)
+        else {
+            continue;
+        };
+        if unattended_site_for_build_intent(map, entities, player.id, kind, tx, ty).is_some()
+            || config::building_stats(kind).is_none()
+            || !rules::economy::build_requirement_met_for_faction(
+                &player.faction_id,
+                kind,
+                &crate::game::services::world_query::completed_building_kinds(entities, player.id),
+            )
+        {
+            continue;
+        }
+        let status = standability::building_site_status_for_build_intent(
+            map, entities, kind, tx, ty, worker,
+        );
+        let clearable_pump_jack = kind == EntityKind::PumpJack
+            && status == standability::BuildSiteStatus::BlockedByUnit
+            && pump_jack::all_site_unit_blockers_are_friendly(
+                entities, &teams, player.id, worker, tx, ty,
+            );
+        if status != standability::BuildSiteStatus::Clear && !clearable_pump_jack {
+            continue;
+        }
+        let cost = rules::economy::resource_cost(kind);
+        let total = pending
+            .entry(player.id)
+            .or_insert(rules::economy::ResourceCost::new(0, 0));
+        *total = rules::economy::ResourceCost::new(
+            total.steel.saturating_add(cost.steel),
+            total.oil.saturating_add(cost.oil),
+        );
+    }
+    pending
+}
+
+fn arrived_build_orders(
+    map: &Map,
+    entities: &EntityStore,
+) -> Vec<(u32, EntityKind, u32, u32, BuildPhase)> {
+    entities
+        .iter()
+        .filter_map(|e| {
+            if e.hp == 0 || !e.is_unit() {
+                return None;
+            }
+            let phase = e.build_phase()?;
+            if !matches!(phase, BuildPhase::ToSite | BuildPhase::WaitingAtSite) {
+                return None;
+            }
+            let (kind, tx, ty) = e.order().build_intent_tile()?;
+            let (cx, cy) = footprint_center(map, kind, tx, ty);
+            let arrive = interact_range_for_kind(kind);
+            if dist2(e.pos_x(), e.pos_y(), cx, cy).det_sqrt() <= arrive {
+                Some((e.id, kind, tx, ty, phase))
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -550,8 +613,8 @@ mod tests {
                 &map,
                 &occupancy,
                 worker_entity.kind,
-                worker_entity.pos_x,
-                worker_entity.pos_y,
+                worker_entity.pos_x(),
+                worker_entity.pos_y(),
             ),
             "builder should be ejected to an attackable position outside the scaffold"
         );
@@ -665,8 +728,8 @@ mod tests {
                 &map,
                 &occ_before,
                 EntityKind::Worker,
-                entities.get(worker).unwrap().pos_x,
-                entities.get(worker).unwrap().pos_y,
+                entities.get(worker).unwrap().pos_x(),
+                entities.get(worker).unwrap().pos_y(),
             ),
             "test setup must reproduce a body-overlap before the eject helper runs"
         );
@@ -676,14 +739,14 @@ mod tests {
         let occ_after = Occupancy::build(&map, &entities);
         let w = entities.get(worker).expect("worker should survive");
         assert!(
-            standability::unit_static_standable(&map, &occ_after, w.kind, w.pos_x, w.pos_y),
+            standability::unit_static_standable(&map, &occ_after, w.kind, w.pos_x(), w.pos_y()),
             "eject helper must leave the worker in a body-standable position (pos=({:.1},{:.1}))",
-            w.pos_x,
-            w.pos_y,
+            w.pos_x(),
+            w.pos_y(),
         );
         // Sanity: it should have moved by at least a fraction of a tile.
-        let dx = (w.pos_x - (rect_a.max_x - 0.5)).abs();
-        let dy = (w.pos_y - ay).abs();
+        let dx = (w.pos_x() - (rect_a.max_x - 0.5)).abs();
+        let dy = (w.pos_y() - ay).abs();
         assert!(
             dx + dy > ts * 0.25,
             "worker should have moved to escape the overlap"
@@ -954,8 +1017,8 @@ mod tests {
                     &map,
                     &occ,
                     worker.kind,
-                    worker.pos_x,
-                    worker.pos_y,
+                    worker.pos_x(),
+                    worker.pos_y(),
                 ),
                 "released builders must be ejected from completed building footprint overlap"
             );

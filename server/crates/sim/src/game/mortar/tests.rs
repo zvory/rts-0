@@ -68,30 +68,34 @@ fn half_turn_completes_in_two_hundred_ms() {
 }
 
 #[test]
-fn legacy_mortar_shell_checkpoint_defaults_to_already_launched() {
+fn fixed_mortar_shell_checkpoint_defaults_to_already_launched() {
     let store: MortarShellStore = serde_json::from_value(serde_json::json!({
         "shells": [{
             "owner": 1,
             "attacker": 7,
-            "x": 320.0,
-            "y": 352.0,
+            "x": 1310720,
+            "y": 1441792,
             "impact_tick": 99
         }]
     }))
-    .expect("legacy mortar-shell checkpoint should remain readable");
+    .expect("fixed mortar-shell checkpoint should restore");
 
     let shell = store.shells.first().expect("restored shell");
     assert!(shell.launched);
     assert!(!shell.rocket);
     assert_eq!(
-        (shell.from_x, shell.from_y, shell.launch_tick),
+        (
+            shell.from_x.to_world(),
+            shell.from_y.to_world(),
+            shell.launch_tick
+        ),
         (0.0, 0.0, 0)
     );
 }
 
 #[test]
 fn rocket_damage_preserves_unit_damage_but_is_reduced_against_buildings() {
-    let inner2 = (config::MORTAR_INNER_RADIUS_TILES * config::TILE_SIZE as f32).powi(2);
+    let inner2 = (config::ROCKET_BARRAGE_INNER_RADIUS_TILES * config::TILE_SIZE as f32).det_powi(2);
     let inner = shell_damage(true, 0.0, inner2, false);
     let outer = shell_damage(true, inner2 + 1.0, inner2, false);
     let direct = shell_damage(true, 0.0, inner2, true);
@@ -128,7 +132,7 @@ fn rocket_damage_preserves_unit_damage_but_is_reduced_against_buildings() {
     assert_eq!(
         shell_effective_damage(EntityKind::ResourceDepot, true, direct, true),
         18,
-        "direct-hit armor penetration is preserved before the building penalty"
+        "central-blast armor penetration is preserved before the building penalty"
     );
     assert_eq!(
         shell_effective_damage(EntityKind::ResourceDepot, true, inner, false),
@@ -138,19 +142,73 @@ fn rocket_damage_preserves_unit_damage_but_is_reduced_against_buildings() {
 }
 
 #[test]
-fn rocket_impact_point_uses_the_target_body_for_direct_hits() {
-    let mut entities = EntityStore::new();
-    let tank_id = entities
-        .spawn_unit(2, EntityKind::Tank, 160.0, 160.0)
-        .expect("tank should spawn");
-    let tank = entities.get(tank_id).expect("tank should exist");
-
-    // The tank's authoritative body extends farther fore/aft than its legacy circular radius.
-    // A rocket landing on that visible nose must still count as a direct hit.
-    let body_end = 160.0 + config::TANK_BODY_LENGTH_PX * 0.5 + config::TANK_BODY_CLEARANCE_PX;
-    assert!(body_end - 0.1 > 160.0 + tank.radius());
-    assert!(impact_point_hits_target(body_end - 0.1, 160.0, tank));
-    assert!(!impact_point_hits_target(body_end + 0.1, 160.0, tank));
+fn rocket_blast_bands_apply_damage_and_armor_at_exact_boundaries() {
+    let map = open_map(20);
+    for (distance_tiles, base, armored) in [
+        (0.0, 70, 70),
+        (0.5, 70, 70),
+        (0.501, 53, 13),
+        (1.0, 53, 13),
+        (1.001, 21, 5),
+        (2.0, 21, 5),
+        (2.001, 0, 0),
+    ] {
+        for kind in [
+            EntityKind::Tank,
+            EntityKind::Artillery,
+            EntityKind::ResourceDepot,
+        ] {
+            let mut entities = EntityStore::new();
+            let victim = if config::building_stats(kind).is_some() {
+                entities
+                    .spawn_building(2, kind, 160.0, 160.0, true)
+                    .unwrap()
+            } else {
+                entities.spawn_unit(2, kind, 160.0, 160.0).unwrap()
+            };
+            let before = entities.get(victim).unwrap().hp;
+            let teams = TeamRelations::from_player_teams([(1, 1), (2, 2)]);
+            let fog = visible_team_fog(&map, &entities);
+            let mut events = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
+            let mut firing_reveals = Vec::new();
+            let shell = MortarShell {
+                owner: 1,
+                attacker: 0,
+                x: rts_rules::math::Coord::from_world(160.0),
+                y: rts_rules::math::Coord::from_world(
+                    160.0 + distance_tiles * config::TILE_SIZE as f32,
+                ),
+                from_x: rts_rules::math::Coord::from_world(100.0),
+                from_y: rts_rules::math::Coord::from_world(100.0),
+                launch_tick: 0,
+                impact_tick: 0,
+                launched: true,
+                rocket: true,
+            };
+            resolve(
+                MortarResolutionContext {
+                    entities: &mut entities,
+                    teams: &teams,
+                    fog: &fog,
+                    map: &map,
+                    events: &mut events,
+                    firing_reveals: &mut firing_reveals,
+                    tick: 10,
+                },
+                &shell,
+            );
+            let expected_damage = match kind {
+                EntityKind::Tank => armored,
+                EntityKind::ResourceDepot => config::rocket_barrage_building_damage(armored),
+                _ => base,
+            };
+            assert_eq!(
+                before - entities.get(victim).unwrap().hp,
+                expected_damage,
+                "kind={kind:?}, distance={distance_tiles}"
+            );
+        }
+    }
 }
 
 #[test]

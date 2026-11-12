@@ -1,3 +1,4 @@
+use rts_rules::math::GameplayMath as _;
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::ai_core::facts::{AiFacts, ProductionBuildingFact};
@@ -19,6 +20,9 @@ pub(crate) struct AiActionContext<'a> {
     reservations: AiReservations,
     emitted: Vec<AiActionRequest>,
     command_trace: Vec<String>,
+    /// Whether `mark` tags the command trace (Jeff's AI V1.1), and the trace lines tagged so far.
+    marking: bool,
+    marked: usize,
 }
 
 impl<'a> AiActionContext<'a> {
@@ -29,7 +33,27 @@ impl<'a> AiActionContext<'a> {
             reservations: AiReservations::default(),
             emitted: Vec::new(),
             command_trace: Vec::new(),
+            marking: false,
+            marked: 0,
         }
+    }
+
+    /// Lets `mark` tag the command trace.
+    pub(crate) fn set_marking(&mut self, on: bool) {
+        self.marking = on;
+    }
+
+    /// Tags every command traced since the last mark with the system that issued it, for the
+    /// decision trace only.
+    pub(crate) fn mark(&mut self, source: &str) {
+        if !self.marking {
+            return;
+        }
+        for line in &mut self.command_trace[self.marked..] {
+            line.push_str(" src=");
+            line.push_str(source);
+        }
+        self.marked = self.command_trace.len();
     }
 
     pub(crate) fn budget(&self) -> &SpendBudget {
@@ -249,7 +273,7 @@ fn command_trace_label(command: &Command) -> String {
             format!("research building={} upgrade={:?}", building, upgrade)
         }
         Command::Cancel { building, .. } => format!("cancel building={}", building),
-        Command::PointTanks { units, x, y } => {
+        Command::PointTanks { units, x, y, .. } => {
             format!("pointTanks units={} x={x} y={y}", id_list(units))
         }
         Command::Stop { units } => format!("stop units={}", id_list(units)),
@@ -1044,7 +1068,7 @@ fn dist2(ax: f32, ay: f32, bx: f32, by: f32) -> f32 {
 fn point_toward(from: (f32, f32), to: (f32, f32), distance: f32) -> (f32, f32) {
     let dx = to.0 - from.0;
     let dy = to.1 - from.1;
-    let len = (dx * dx + dy * dy).sqrt();
+    let len = (dx * dx + dy * dy).det_sqrt();
     if len <= f32::EPSILON {
         return from;
     }

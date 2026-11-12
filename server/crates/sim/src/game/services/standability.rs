@@ -1,3 +1,4 @@
+use rts_rules::math::GameplayMath as _;
 use std::collections::BTreeSet;
 
 use crate::config;
@@ -24,6 +25,14 @@ use placement_policy::{build_placement_policy, BuildPlacementPolicy};
 #[allow(dead_code)]
 const BUILD_SITE_SPATIAL_PADDING_TILES: i32 = 8;
 
+fn stored_position(x: f32, y: f32) -> Option<(f32, f32)> {
+    use rts_rules::math::Coord;
+    Some((
+        Coord::try_from_world(x)?.to_world(),
+        Coord::try_from_world(y)?.to_world(),
+    ))
+}
+
 pub(crate) fn unit_static_standable(
     map: &Map,
     occ: &Occupancy,
@@ -46,6 +55,9 @@ pub(crate) fn unit_static_standable_with_facing(
     y: f32,
     facing: f32,
 ) -> bool {
+    let Some((x, y)) = stored_position(x, y) else {
+        return false;
+    };
     let Some(body) = unit_body_with_facing(kind, x, y, facing) else {
         return false;
     };
@@ -94,7 +106,7 @@ pub(crate) fn unit_static_segment_standable(
 
     let dx = to.0 - from.0;
     let dy = to.1 - from.1;
-    let distance = (dx * dx + dy * dy).sqrt();
+    let distance = (dx * dx + dy * dy).det_sqrt();
     let step_px = config::TILE_SIZE as f32 / 4.0;
     let steps = (distance / step_px).ceil().max(1.0) as u32;
 
@@ -118,6 +130,9 @@ pub(crate) fn unit_spawn_standable(
     x: f32,
     y: f32,
 ) -> bool {
+    let Some((x, y)) = stored_position(x, y) else {
+        return false;
+    };
     let Some(body) = unit_body(kind, x, y) else {
         return false;
     };
@@ -223,6 +238,9 @@ pub(crate) fn unit_position_clear_of_building_footprint(
     tile_x: u32,
     tile_y: u32,
 ) -> bool {
+    let Some((x, y)) = stored_position(x, y) else {
+        return false;
+    };
     let Some(site_rect) = building_rect_for_footprint(building, tile_x, tile_y) else {
         return false;
     };
@@ -463,8 +481,8 @@ fn body_tile_range(body: UnitBody) -> impl Iterator<Item = (i32, i32)> {
 
 fn entity_circle_body(e: &Entity) -> CircleBody {
     CircleBody {
-        x: e.pos_x,
-        y: e.pos_y,
+        x: e.pos_x(),
+        y: e.pos_y(),
         radius: e.radius(),
     }
 }
@@ -479,7 +497,7 @@ fn segment_body_facing(kind: EntityKind, from: (f32, f32), to: (f32, f32)) -> f3
     if !dist2.is_finite() || dist2 <= 1.0e-4 {
         0.0
     } else {
-        dy.atan2(dx)
+        dy.det_atan2(dx)
     }
 }
 
@@ -641,6 +659,32 @@ mod tests {
             EntityKind::Worker,
             160.0,
             160.0,
+        ));
+    }
+
+    #[test]
+    fn placement_checks_use_the_stored_position_for_unit_contacts() {
+        let map = flat_map(12);
+        let mut entities = EntityStore::new();
+        let kind = EntityKind::Worker;
+        entities.spawn_unit(1, kind, 160.0, 160.0).unwrap();
+        let occ = Occupancy::build(&map, &entities);
+        let radius = config::unit_stats(kind).unwrap().radius;
+        // The float candidate clears the neighbor, but its stored center touches it.
+        let x = 160.0 + radius * 2.0 + 0.25 / rts_rules::math::Coord::SCALE as f32;
+        assert!(!unit_spawn_standable(&map, &occ, &entities, kind, x, 160.0));
+        assert!(!unit_position_clear_of_building_footprint(
+            &map,
+            &occ,
+            &entities,
+            &BTreeSet::new(),
+            kind,
+            0.0,
+            x,
+            160.0,
+            EntityKind::Depot,
+            8,
+            8,
         ));
     }
 

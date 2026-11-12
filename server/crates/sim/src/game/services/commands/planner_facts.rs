@@ -50,6 +50,7 @@ pub(super) fn entity_order_intent_from_planner(
     intent: planner::OrderIntent,
 ) -> Option<OrderIntent> {
     match intent {
+        planner::OrderIntent::Point { facing } => Some(OrderIntent::Point { facing }),
         planner::OrderIntent::Move(point) => Some(OrderIntent::move_to(point.x, point.y)),
         planner::OrderIntent::AttackMove(point) => {
             Some(OrderIntent::attack_move_to(point.x, point.y))
@@ -96,7 +97,7 @@ pub(super) fn planner_facts(
                 return None;
             }
             let mut facts = planner::UnitFacts::new(id);
-            facts.pos = planner::Point::new(e.pos_x, e.pos_y);
+            facts.pos = planner::Point::new(e.pos_x(), e.pos_y());
             let committed_barrage = unit_has_committed_barrage(entities, id);
             facts.can_replace_active =
                 unit_can_accept_player_command(entities, player, id) && !committed_barrage;
@@ -115,9 +116,7 @@ pub(super) fn planner_facts(
             });
             facts.active_build = matches!(e.order(), Order::Build(_) | Order::Deconstruct(_));
             facts.activity = match e.order() {
-                Order::Idle | Order::HoldPosition | Order::Point { .. } => {
-                    planner::UnitActivity::Idle
-                }
+                Order::Idle | Order::HoldPosition => planner::UnitActivity::Idle,
                 Order::Move(_) | Order::AttackMove(_) | Order::Ability(_) => {
                     planner::UnitActivity::Moving
                 }
@@ -125,6 +124,7 @@ pub(super) fn planner_facts(
             };
             facts.can_attack_move = e.kind != EntityKind::ScoutPlane;
             facts.can_attack = e.can_attack();
+            facts.can_point = e.kind == EntityKind::Tank && e.hp > 0;
             facts.can_hold_position = (unit_can_accept_ground_command(entities, player, id)
                 || facts.can_replace_queued)
                 && !committed_barrage;

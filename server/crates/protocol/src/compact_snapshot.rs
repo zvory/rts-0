@@ -786,6 +786,9 @@ impl Serialize for CompactEntity<'_> {
             len = 44;
         }
 
+        if entity.commander_facing.is_some() {
+            len = 45;
+        }
         let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&entity.id)?;
         seq.serialize_element(&entity.owner)?;
@@ -932,6 +935,9 @@ impl Serialize for CompactEntity<'_> {
         }
         if len > 43 {
             seq.serialize_element(&entity.rocket_rack_count)?;
+        }
+        if len > 44 {
+            seq.serialize_element(&entity.commander_facing)?;
         }
         seq.end()
     }

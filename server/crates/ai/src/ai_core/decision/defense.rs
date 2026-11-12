@@ -26,15 +26,15 @@ pub(super) use self::line::{
     main_steel_defensive_line_assignments, main_steel_line_center, stage_defensive_line_at,
     stage_main_steel_defensive_line,
 };
+pub(super) use self::pocket::{
+    clear_machine_gunner_position, stage_defensive_pocket_machine_gunners,
+    stage_home_defensive_pocket_riflemen, HOME_POCKET_RIFLEMEN,
+};
 #[cfg(test)]
 use self::pocket::{
     defensive_pocket_basis, defensive_pocket_machine_gunner_assignments,
     forest_tiles_on_sight_line, home_defensive_pocket_rifle_assignments, pocket_rifle_assignments,
     six_pocket_machine_gunner_assignments, wide_pocket_machine_gunner_assignments,
-};
-pub(super) use self::pocket::{
-    stage_defensive_pocket_machine_gunners, stage_home_defensive_pocket_riflemen,
-    HOME_POCKET_RIFLEMEN,
 };
 pub(super) use self::route_line::{plan_route_line_live, RouteLine};
 
@@ -724,7 +724,7 @@ fn primary_weighted_approach_slot(
     (approach_index, local_slot)
 }
 
-fn clear_mobile_defensive_position(
+pub(in crate::ai_core::decision) fn clear_mobile_defensive_position(
     observation: &AiObservation,
     map_analysis: Option<&AiMapAnalysis>,
     desired: (f32, f32),

@@ -545,7 +545,7 @@ fn validate_command(
         }
         Command::Move { units, x, y, .. }
         | Command::AttackMove { units, x, y, .. }
-        | Command::PointTanks { units, x, y }
+        | Command::PointTanks { units, x, y, .. }
         | Command::SetupAntiTankGuns { units, x, y, .. } => {
             validate_unit_list(units, unit_cap, "command.units", state)?;
             validate_finite_point(*x, *y, "command")?;

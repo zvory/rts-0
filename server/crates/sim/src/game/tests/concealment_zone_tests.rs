@@ -222,8 +222,8 @@ fn smoke_suppresses_concealment_close_detection() {
     game.state
         .smokes
         .spawn(
-            target_entity.pos_x,
-            target_entity.pos_y,
+            target_entity.pos_x(),
+            target_entity.pos_y(),
             1.0,
             config::TICK_HZ,
             game.tick_count(),
@@ -247,7 +247,7 @@ fn concealment_hides_enemies_on_visible_ground_but_not_their_own_team() {
         assert!(
             game.state
                 .fog
-                .is_visible_world(1, entity.pos_x, entity.pos_y),
+                .is_visible_world(1, entity.pos_x(), entity.pos_y()),
             "the ground tile should be ordinarily visible to the scout team"
         );
         assert!(
@@ -432,10 +432,10 @@ fn vehicle_moves_normally_outside_no_vehicle_tiles() {
     }
     let scout_entity = game.state.entities.get(scout).expect("scout car");
     assert!(
-        scout_entity.pos_x > start.0,
+        scout_entity.pos_x() > start.0,
         "a no-vehicle region must not freeze vehicles elsewhere on the map: pos=({}, {}), facing={}, order={:?}, path_empty={}, next_waypoint={:?}, path_goal={:?}, last_repath_tick={}",
-        scout_entity.pos_x,
-        scout_entity.pos_y,
+        scout_entity.pos_x(),
+        scout_entity.pos_y(),
         scout_entity.facing(),
         scout_entity.order(),
         scout_entity.path_is_empty(),

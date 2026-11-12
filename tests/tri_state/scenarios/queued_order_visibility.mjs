@@ -18,7 +18,8 @@ export default scenario("queued_order_visibility", {
     selectOwn("worker", 0),
     issue("move", { x: 3392, y: 3216 }),
     issue("attackMove", { x: 3488, y: 3280, queued: true }),
-    waitForSnapshot({ minTickDelta: 360 }),
+    // 360 ticks need 12 seconds at 30 Hz, before browser/CI scheduling overhead.
+    waitForSnapshot({ minTickDelta: 360, timeoutMs: 25000 }),
     capture("after-queued-orders"),
     assertOrderPlansMatch({ unit: "worker" }),
   ],

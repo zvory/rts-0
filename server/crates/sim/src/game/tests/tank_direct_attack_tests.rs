@@ -92,7 +92,7 @@ fn direct_tank_attack_waits_for_range_then_fires_without_moving() {
     );
     for _ in 0..100 {
         let unit = game.state.entities.get(tank).unwrap();
-        assert_eq!((unit.pos_x, unit.pos_y), (500.0, 500.0));
+        assert_eq!((unit.pos_x(), unit.pos_y()), (500.0, 500.0));
         assert!(unit.path_is_empty());
         assert_eq!(unit.order().attack_target(), Some(target));
         game.tick();
@@ -127,7 +127,7 @@ fn direct_tank_attack_pursues_when_target_leaves_stationary_range() {
     let unit = game.state.entities.get(tank).unwrap();
     assert_eq!(unit.order().attack_target(), Some(target));
     assert!(
-        unit.pos_x > 500.0,
+        unit.pos_x() > 500.0,
         "target beyond maximum range must still be pursued"
     );
 }

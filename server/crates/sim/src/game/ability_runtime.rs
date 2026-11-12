@@ -7,6 +7,7 @@ use crate::game::entity::EntityStore;
 use crate::game::map::Map;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::teams::TeamRelations;
+use rts_rules::math::{Coord, GameplayMath as _};
 use serde::{Deserialize, Serialize};
 
 pub(in crate::game) const MAX_ACTIVE_ABILITY_OBJECTS: usize = 512;
@@ -83,8 +84,8 @@ pub(crate) struct AbilityWorldObject {
     pub(crate) caster_id: u32,
     pub(crate) ability: AbilityKind,
     pub(in crate::game) kind: AbilityWorldObjectKind,
-    pub(crate) x: f32,
-    pub(crate) y: f32,
+    pub(crate) x: Coord,
+    pub(crate) y: Coord,
     pub(in crate::game) created_tick: u32,
     pub(in crate::game) expires_tick: u32,
     pub(crate) payload: AbilityObjectPayload,
@@ -219,8 +220,8 @@ impl AbilityRuntime {
             caster_id: spec.caster_id,
             ability: spec.ability,
             kind: spec.kind,
-            x: spec.x,
-            y: spec.y,
+            x: Coord::from_world(spec.x),
+            y: Coord::from_world(spec.y),
             created_tick: spec.created_tick,
             expires_tick: spec.expires_tick,
             payload: spec.payload,
@@ -375,7 +376,7 @@ impl AbilityRuntime {
         if !x.is_finite() || !y.is_finite() {
             return 1.0;
         }
-        let move_len = (move_dir.0 * move_dir.0 + move_dir.1 * move_dir.1).sqrt();
+        let move_len = (move_dir.0 * move_dir.0 + move_dir.1 * move_dir.1).det_sqrt();
         if move_len <= 0.0001 {
             return 1.0;
         }
@@ -393,9 +394,9 @@ impl AbilityRuntime {
                 if radius <= 0.0 || !radius.is_finite() {
                     return None;
                 }
-                let dx = object.x - x;
-                let dy = object.y - y;
-                let dist = (dx * dx + dy * dy).sqrt();
+                let dx = object.x.to_world() - x;
+                let dy = object.y.to_world() - y;
+                let dist = (dx * dx + dy * dy).det_sqrt();
                 if dist > radius || dist <= 0.0001 {
                     return None;
                 }
@@ -436,9 +437,9 @@ impl AbilityRuntime {
                 if radius <= 0.0 || !radius.is_finite() {
                     return None;
                 }
-                let dx = object.x - x;
-                let dy = object.y - y;
-                let dist = (dx * dx + dy * dy).sqrt();
+                let dx = object.x.to_world() - x;
+                let dy = object.y.to_world() - y;
+                let dist = (dx * dx + dy * dy).det_sqrt();
                 if dist > radius || dist <= 0.0001 {
                     return None;
                 }

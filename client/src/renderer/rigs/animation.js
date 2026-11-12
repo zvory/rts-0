@@ -1,5 +1,5 @@
 import { HARVEST_TICKS, STATS, TICK_HZ } from "../../config.js";
-import { ABILITY, KIND, SETUP, STATE } from "../../protocol.js";
+import { ABILITY, KIND, SETUP, STATE, WEAPON_KIND } from "../../protocol.js";
 import { angleLerp, clamp01, hexToInt, polar, recoilVector, smoothstep01, tankBodyVisual, weaponRecoilOffset } from "../shared.js";
 import { normalizedPartSet } from "./part_selection.js";
 
@@ -54,6 +54,10 @@ export function createRigRenderContext(entity, {
     ? state.weaponRecoilKind(entity.id)
     : undefined;
   const recoilPx = weaponRecoilOffset(entity.kind, recoilProgress);
+  const commanderFacing = finite(entity.commanderFacing, weaponFacing);
+  const commanderRecoil = entity.kind === KIND.TANK
+    ? weaponRecoilOffset(KIND.SCOUT_CAR, state.weaponRecoil?.(entity.id, entity.kind, now, WEAPON_KIND.TANK_COAX) ?? 0)
+    : 0;
   const setup = setupVisual ?? defaultSetupVisual(entity);
   const deploy = clamp01(setup.prongFactor);
   const weaponVisualFacing = visualWeaponFacing(entity.kind, facing, weaponFacing, deploy);
@@ -99,6 +103,12 @@ export function createRigRenderContext(entity, {
     visualScale: entity.kind === KIND.ARTILLERY ? ARTILLERY_VISUAL_SCALE : 1,
     mapTileSize: finite(map?.tileSize, 32),
     facing,
+    commanderFacing,
+    // Positive local Y is the turret's right when its barrel points north.
+    commanderMountX: -Math.sin(weaponFacing) * 5
+      - Math.cos(commanderFacing) * commanderRecoil,
+    commanderMountY: Math.cos(weaponFacing) * 5
+      - Math.sin(commanderFacing) * commanderRecoil,
     weaponFacing,
     weaponFacingCos: Math.cos(weaponFacing),
     weaponFacingSin: Math.sin(weaponFacing),

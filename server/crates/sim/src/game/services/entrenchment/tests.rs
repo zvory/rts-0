@@ -13,6 +13,22 @@ fn flat_map(size: u32) -> Map {
 }
 
 #[test]
+fn slot_candidates_and_boundary_queries_use_the_physical_grid() {
+    let map = flat_map(32);
+    let mut trenches = TrenchStore::new();
+    trenches.create(&map, 320.0, 320.0).unwrap();
+    let trench = trenches.all()[0];
+    let entity = Entity::new_unit(1, EntityKind::Rifleman, 344.0, 327.0).unwrap();
+    for (x, y) in slot_positions(&entity, trench) {
+        let stored = Entity::new_unit(1, EntityKind::Rifleman, x, y).unwrap();
+        assert_eq!((stored.pos_x(), stored.pos_y()), (x, y));
+    }
+    let edge = trench.x.to_world() + trench_radius_px(trench);
+    // A point just outside the float circle rounds onto the inclusive physical boundary.
+    assert!(trench.contains_point(edge + 0.25 / Coord::SCALE as f32, trench.y.to_world(),));
+}
+
+#[test]
 fn occupation_search_skips_nearest_trench_without_legal_slot() {
     let map = flat_map(32);
     let mut trenches = TrenchStore::new();
@@ -29,7 +45,7 @@ fn occupation_search_skips_nearest_trench_without_legal_slot() {
     let blocking_slots = slot_positions(&snapshot, nearest_trench)
         .into_iter()
         .filter(|candidate| {
-            distance((snapshot.pos_x, snapshot.pos_y), *candidate) <= SLOT_MAX_CORRECTION_PX
+            distance((snapshot.pos_x(), snapshot.pos_y()), *candidate) <= SLOT_MAX_CORRECTION_PX
         })
         .collect::<Vec<_>>();
     assert!(
@@ -71,7 +87,9 @@ fn occupation_search_queries_only_local_trench_cells() {
     for ty in (2..94).step_by(8) {
         for tx in (2..94).step_by(8) {
             let position = map.tile_center(tx, ty);
-            if distance_sq(center, position) > (search_radius + config::TILE_SIZE as f32).powi(2) {
+            if distance_sq(center, position)
+                > (search_radius + config::TILE_SIZE as f32).det_powi(2)
+            {
                 trenches
                     .create(&map, position.0, position.1)
                     .expect("distant trench should seed");

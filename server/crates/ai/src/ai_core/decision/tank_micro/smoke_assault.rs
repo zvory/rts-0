@@ -306,7 +306,7 @@ fn plan(
                 .iter()
                 .map(|(_, g)| dist2(g.0, g.1, p.0, p.1))
                 .fold(f32::MAX, f32::min)
-                .sqrt()
+                .det_sqrt()
                 / ts
         };
         let candidates: Vec<&AiEntitySummary> = tanks
@@ -572,7 +572,7 @@ fn run(
         Phase::Prepare => {
             let start_gap = |tank: &AiEntitySummary, slot: &Slot| {
                 let start = world(slot.start);
-                dist2(tank.x, tank.y, start.0, start.1).sqrt() / ts
+                dist2(tank.x, tank.y, start.0, start.1).det_sqrt() / ts
             };
             let lined: BTreeSet<u32> = members
                 .iter()
@@ -589,7 +589,7 @@ fn run(
                     let wait = offset_point(anchor, u, SCOUT_WAIT_TILES, 0.0, ts);
                     format!(
                         "{:.1} tiles from its wait point, smoke ready {}",
-                        dist2(scout.x, scout.y, wait.0, wait.1).sqrt() / ts,
+                        dist2(scout.x, scout.y, wait.0, wait.1).det_sqrt() / ts,
                         smoke_ready(observation, scout.id)
                     )
                 });

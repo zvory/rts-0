@@ -5,19 +5,20 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::ai_core::actions::{
     self, AiActionContext, BuildPlacementRequest, SpendBudget, TrainUnitsRequest,
 };
-use crate::ai_core::facts::{AiFacts, EnemyBaseFact};
+use crate::ai_core::facts::{AiFacts, EnemyBaseFact, OpeningOrder};
 use crate::ai_core::map_analysis::AiMapAnalysis;
 use crate::ai_core::observation::{
     AiEntityState, AiEntitySummary, AiMapSummary, AiObservation, AiResourceSummary,
 };
 use crate::ai_core::profiles::{
-    is_jeffs_ai_profile, runs_live_jeff, uses_current_jeffs_ai_policy, AiProfile, AttackPolicy,
-    BarracksCurve, ExpansionContainmentPolicy, ExpansionPolicy, ProductionPolicy, ResourcePolicy,
-    TechTransitionPolicy, WorkerPolicy, JEFFS_AI_BETA_ID, JEFFS_AI_ID,
-    JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID, JEFFS_AI_PRE_EARLY_NATURAL_ID, JEFFS_AI_PRE_FAST_NATURAL_ID,
-    JEFFS_AI_PRE_GUARD_HANDOFF_ID, JEFFS_AI_PRE_HELD_SITE_ID, JEFFS_AI_PRE_OPENING_RUSH_ID,
-    JEFFS_AI_PRE_RIFLE_COVERAGE_ID, JEFFS_AI_PRE_SAFE_BASES_ID, JEFFS_AI_PRE_SPEND_PLAN_ID,
-    JEFFS_AI_PRE_TANK_CATCHUP_ID, JEFFS_AI_PRE_TANK_MICRO_ID, JEFFS_AI_PRE_THIRD_PRESSURE_ID,
+    is_jeff_v1_1, is_jeffs_ai_profile, is_live_jeff, runs_live_jeff, uses_current_jeffs_ai_policy,
+    AiProfile, AttackPolicy, BarracksCurve, ExpansionContainmentPolicy, ExpansionPolicy,
+    ProductionPolicy, ResourcePolicy, TechTransitionPolicy, WorkerPolicy, JEFFS_AI_BETA_ID,
+    JEFFS_AI_ID, JEFFS_AI_PRE_DEFENSE_ENVELOPE_ID, JEFFS_AI_PRE_EARLY_NATURAL_ID,
+    JEFFS_AI_PRE_FAST_NATURAL_ID, JEFFS_AI_PRE_GUARD_HANDOFF_ID, JEFFS_AI_PRE_HELD_SITE_ID,
+    JEFFS_AI_PRE_OPENING_RUSH_ID, JEFFS_AI_PRE_RIFLE_COVERAGE_ID, JEFFS_AI_PRE_SAFE_BASES_ID,
+    JEFFS_AI_PRE_SPEND_PLAN_ID, JEFFS_AI_PRE_TANK_CATCHUP_ID, JEFFS_AI_PRE_TANK_MICRO_ID,
+    JEFFS_AI_PRE_THIRD_PRESSURE_ID, JEFFS_AI_V1_1_ID,
 };
 use crate::ai_shared;
 use crate::config;
@@ -35,6 +36,7 @@ mod frontal;
 mod geometry;
 mod home_armor;
 mod jeff;
+mod jeff_v1_1;
 mod later_bases;
 mod memory;
 mod obstacles;
@@ -44,6 +46,7 @@ mod pressure_economy;
 mod production;
 mod resources;
 mod spend_plan;
+mod steps;
 mod tank_micro;
 mod third_pressure;
 mod trace;
@@ -213,13 +216,16 @@ where
     memory
         .pending_upgrades
         .retain(|upgrade| !observation.upgrades.contains(upgrade));
-    if profile.id == JEFFS_AI_ID {
+    if is_live_jeff(profile.id) {
         let unlock_pending = memory.pending_upgrades.contains(&UpgradeKind::TankUnlock);
         memory.spend_plan.observe(observation, unlock_pending);
     }
 
     memory.sync_pressure_research(observation);
-    let facts = AiFacts::from_observation(observation);
+    let mut facts = AiFacts::from_observation(observation);
+    facts.v1_1_opening = jeff_v1_1::opening_order(profile.id, observation, &facts, memory);
+    facts.v1_1_car_ordered = memory.jeff_v1_1.car_ordered;
+    let facts = facts;
     memory.sync_home_defensive_tank(observation, profile);
     if uses_current_jeffs_ai_policy(profile.id) {
         memory.note_enemy_tanks(observation);
@@ -231,10 +237,11 @@ where
         observation.economy.oil,
         observation.economy.supply_used,
         observation.economy.supply_cap,
-        facts.committed_steel,
+        jeff_v1_1::committed_steel(profile.id, observation, &facts),
     );
     let start_budget = budget;
     let mut actions = AiActionContext::new(&facts, budget);
+    actions.set_marking(is_jeff_v1_1(profile.id));
     let mut intents = Vec::new();
     pressure_economy::protect_depot_in_transit(observation, profile, &mut actions);
     if profile.id == crate::ai_core::profiles::PRESSURE_AI_ID {
@@ -303,6 +310,16 @@ where
             });
         }
     }
+    // Jeff's AI V1.1 also finishes the other buildings it left unfinished (`resume`).
+    if let Some(kind) = jeff_v1_1::resume::resume(
+        &mut actions,
+        observation,
+        memory,
+        profile.id,
+        &builder_pools,
+    ) {
+        intents.push(AiIntent::ResumeConstruction { kind });
+    }
     let save_for_required_tech_building =
         should_save_for_required_tech_building(&facts, required_tech_path, production_policy);
     let delay_opening_barracks = profile.fast_tank_timing.is_some_and(|timing| {
@@ -339,6 +356,7 @@ where
     } else {
         Vec::new()
     };
+    actions.mark("prep");
     let expansion_secured = expansion_security::update_and_stage(
         observation,
         map_analysis,
@@ -346,6 +364,7 @@ where
         &mut actions,
         profile.id,
     );
+    actions.mark("natguards");
     let reserve_expansion =
         expansion_security::reserve_expansion(observation, &facts, profile, memory);
     let pressure_site = pressure_economy::plan_site(
@@ -450,8 +469,14 @@ where
     // natural the Factory ordered at 2:24 went down near 3:00, and Tank Unlock came at 3:08.
     let live_natural_pending = runs_live_jeff(profile.id) && natural_pending;
     let hold_tech_for_expansion = save_for_unplanned_expansion && !live_natural_pending;
+    // Jeff's AI V1.1 (`ecafter`), Factory first: from its first Scout Car the Engineering Complex
+    // goes ahead of the natural's money, until the natural's order is out.
+    let complex_first = jeff_v1_1::complex_alongside_natural(&facts)
+        && facts.building_count(EntityKind::EngineeringComplex) == 0
+        && !natural_pending;
     if (reserve_expansion || natural_pending)
         && planned_in_intents(&intents, EntityKind::ResourceDepot) == 0
+        && !complex_first
     {
         let (steel, oil) = rts_rules::economy::cost(EntityKind::ResourceDepot);
         // The budget already leaves out a pending order's Steel (the facts' committed Steel), so the
@@ -460,6 +485,9 @@ where
         let steel = if live_natural_pending { 0 } else { steel };
         actions.holdback_resources(steel, oil);
     }
+    jeff_v1_1::push::note_enemy_army(observation, memory);
+    let live = (&mut actions, &facts, &mut *memory, &mut intents);
+    jeff_v1_1::early_research(live, profile.id, spend_plan.as_ref());
     // Jeff's bases beyond the natural. A second Factory that is due takes priority this decision.
     let factory_due = uses_current_jeffs_ai_policy(profile.id)
         && should_build_extra_factory(
@@ -480,24 +508,32 @@ where
         &mut expansion_placeable,
     );
     intents.extend(later_base.intents.iter().cloned());
+    actions.mark("early");
 
     // The live Jeff's starting Riflemen march on the enemy until a fallback sends them home.
     let live = (&mut actions, observation, map_analysis, &mut intents);
     opening_rush::plan_live(profile.id, &facts, memory, live);
+    actions.mark("opening");
     // Jeff's picket on the enemy's route and warned sealing of the home line, and the live Jeff's
     // breach of Schone Tage's trap V. Their units are reserved from every other system.
     let live = (&mut actions, observation, map_analysis, &mut intents);
     defense::plan_route_line_live(profile.id, memory, live);
+    actions.mark("route");
     let live = (&mut actions, observation, map_analysis, &mut intents);
     trap_breach::plan_live(profile.id, memory, live);
+    actions.mark("breach");
     let live = (&mut actions, observation, map_analysis, &mut intents);
     third_pressure::plan_live(profile.id, memory, live);
+    actions.mark("third");
     let route_line_reserved = memory.squad_reserved();
 
     let economy_plan = economy_manager_output.plan.clone();
     let save_worker_training_for_tech = defer_economy_for_panic;
     let (target_workers, workers) =
         jeff::engineers(observation, &facts, profile.id, economy_plan.target_workers);
+    // Jeff's AI V1.1 keeps a spare Engineer while Steel piles up (`spareworker`).
+    let target_workers =
+        jeff_v1_1::resume::spare_engineer(profile.id, observation, workers, target_workers);
     let should_train_workers = economy_manager_output.proposes(EconomyProposal::TrainWorker)
         || (!defer_economy_for_panic && workers < target_workers);
     if should_train_workers {
@@ -523,104 +559,47 @@ where
         queue_profile_upgrades(&mut actions, &facts, memory, &mut intents, profile);
     }
 
-    for kind in required_tech_path {
-        if *kind == EntityKind::Barracks && delay_opening_barracks {
-            continue;
-        }
-        if turtle_should_delay_tech_for_entrenchment(profile, memory, &facts, *kind) {
-            continue;
-        }
-        if expansion_blocks_tech_path || hold_tech_for_expansion {
-            continue;
-        }
-        if facts.building_count(*kind) + planned_in_intents(&intents, *kind) > 0 {
-            continue;
-        }
-        if let Some(build_action) = try_build_production(
-            observation,
-            &facts,
-            &mut actions,
-            &production_builders,
+    // The Rifleman opening's natural is ordered or standing (`riflenat` waits for it with the
+    // Factory).
+    let natural_ordered_or_up =
+        natural_pending || facts.building_count(EntityKind::ResourceDepot) >= 2;
+    // ... until the Factory stops waiting for it (`facwait`).
+    let rifle_factory_free = jeff_v1_1::rifle_factory_free(profile.id, observation.tick);
+    let banked = jeff_v1_1::third_base::banked(observation, memory);
+    steps::build_tech(
+        (&mut actions, observation, map_analysis, &mut intents),
+        memory,
+        steps::TechInput {
+            facts: &facts,
             profile,
-            *kind,
+            required_tech_path,
+            production_builders: &production_builders,
+            production_policy,
+            spend_plan: spend_plan.as_ref(),
+            defensive_panic,
+            target_steel_workers: economy_plan.target_steel_workers,
+            delay_opening_barracks,
+            expansion_blocks_tech_path,
+            hold_tech_for_expansion,
+            save_for_unplanned_expansion,
+            natural_ordered_or_up,
+            rifle_factory_free,
+            banked,
             build_search,
-            (map_analysis, &memory.tank_micro),
-            &mut placeable,
-        ) {
-            if *kind == EntityKind::Factory {
-                if let Some(enemy_base) = facts.nearest_public_enemy_base {
-                    let defensive_machine_gunners =
-                        defensive_machine_gunner_units_for_build_clearance(observation, profile);
-                    if let Some(units) = relocate_machine_gunners_from_factory_site(
-                        observation,
-                        &mut actions,
-                        (build_action.tile_x, build_action.tile_y),
-                        &defensive_machine_gunners,
-                        enemy_base,
-                    ) {
-                        // Clearing a construction footprint is a tactical move, not a new
-                        // staging assignment. The live adapter suppresses repeated staging
-                        // commands for units that are already in position.
-                        intents.push(AiIntent::Move { units });
-                    }
-                }
-            }
-            intents.push(AiIntent::Build { kind: *kind });
-        }
-    }
-
-    let target_barracks = if defensive_panic.active {
-        defensive_panic_barracks_target(defensive_panic)
-    } else {
-        active_barracks_curve(profile).target(
-            observation.economy.steel,
-            facts.worker_count,
-            economy_plan.target_steel_workers,
-        )
-    };
-    let target_barracks = turtle_barracks_target(profile, &facts, target_barracks);
-    let surplus_barracks_enabled = profile.surplus_steel_production.is_some_and(|policy| {
-        let (barracks_steel, _) = rts_rules::economy::cost(EntityKind::Barracks);
-        actions.budget().steel() >= policy.reserve.saturating_add(barracks_steel)
-    });
-    if (production_uses_building(production_policy, EntityKind::Barracks)
-        || surplus_barracks_enabled)
-        && !delay_opening_barracks
-        && facts.building_count(EntityKind::Barracks)
-            + planned_in_intents(&intents, EntityKind::Barracks)
-            < target_barracks
-        && !expansion_blocks_tech_path
-        && !save_for_unplanned_expansion
-        && planned_in_intents(&intents, EntityKind::Barracks) == 0
-        && (facts.building_count(EntityKind::Barracks) == 0
-            || spend_plan.as_ref().is_none_or(|plan| {
-                plan.affords_off_plan(&intents, rts_rules::economy::cost(EntityKind::Barracks).0)
-            }))
-        && try_build_production(
-            observation,
-            &facts,
-            &mut actions,
-            &production_builders,
-            profile,
-            EntityKind::Barracks,
-            build_search,
-            (map_analysis, &memory.tank_micro),
-            &mut placeable,
-        )
-        .is_some()
-    {
-        intents.push(AiIntent::Build {
-            kind: EntityKind::Barracks,
-        });
-    }
+        },
+        &mut placeable,
+    );
 
     let first_factory_needed = production_uses_building(production_policy, EntityKind::Factory)
         && facts.building_count(EntityKind::Factory)
             + planned_in_intents(&intents, EntityKind::Factory)
             < profile.buildings.factory_target
-        && !expansion_blocks_tech_path
-        && !hold_tech_for_expansion
-        && planned_in_intents(&intents, EntityKind::Factory) == 0;
+        && (!(expansion_blocks_tech_path || hold_tech_for_expansion)
+            || jeff_v1_1::factory_alongside_natural(profile.id, &facts)
+            || rifle_factory_free)
+        && planned_in_intents(&intents, EntityKind::Factory) == 0
+        && facts.v1_1_opening != Some(OpeningOrder::Undecided)
+        && !(jeff_v1_1::rifle_opening(profile.id) && !natural_ordered_or_up && !rifle_factory_free);
     if first_factory_needed {
         if let Some(build_action) = try_build_production(
             observation,
@@ -739,12 +718,17 @@ where
         && !expansion_blocks_tech_path
         && !save_for_unplanned_expansion
         && planned_in_intents(&intents, EntityKind::Factory) == 0
-        && should_build_extra_factory(
+        && (should_build_extra_factory(
             observation,
             &facts,
             profile,
             planned_in_intents(&intents, EntityKind::Factory),
-        )
+        ) || jeff_v1_1::third_base::extra_factory(
+            profile.id,
+            banked,
+            observation,
+            facts.building_count(EntityKind::Factory),
+        ) || jeff_v1_1::factory_for_float(profile.id, observation, &facts))
         && try_build_production(
             observation,
             &facts,
@@ -786,6 +770,8 @@ where
         queue_profile_upgrades(&mut actions, &facts, memory, &mut intents, profile);
     }
     queue_fast_tank_optional_upgrades(&mut actions, &facts, memory, &mut intents, profile);
+    let research = (&mut actions, &facts, &mut *memory, &mut intents);
+    let tanks_wait_for_tank_plus = jeff_v1_1::tank_plus_first(research, observation, profile.id);
     let effective_unit_priorities = effective_unit_priorities_for_upgrades(
         profile,
         production_policy.unit_priorities,
@@ -814,7 +800,7 @@ where
         // finish normally. Keep the legacy home Machine Gunners and Tank production policy.
         effective_unit_priorities.retain(|unit| *unit != EntityKind::Rifleman);
     }
-    if memory.pressure_economy.tank_repeat_enabled() {
+    if memory.pressure_economy.tank_repeat_enabled() || tanks_wait_for_tank_plus {
         effective_unit_priorities.retain(|unit| *unit != EntityKind::Tank);
     }
     let security_rifle_target = jeff::security_rifle_target(
@@ -829,7 +815,8 @@ where
         .lead_with_emergency_riflemen(&mut effective_unit_priorities);
     if let Some(policy) = profile.surplus_steel_production {
         let (unit_steel, _) = rts_rules::economy::cost(policy.unit);
-        if actions.budget().steel() >= policy.reserve.saturating_add(unit_steel)
+        let reserve = jeff_v1_1::surplus_reserve(profile.id, policy.reserve);
+        if actions.budget().steel() >= reserve.saturating_add(unit_steel)
             && !effective_unit_priorities.contains(&policy.unit)
         {
             effective_unit_priorities.push(policy.unit);
@@ -858,10 +845,49 @@ where
         memory,
         &mut effective_unit_priorities,
     );
-    let production_unit_counts =
-        unit_counts_for_priorities(observation, &facts, profile, &effective_unit_priorities);
+    let fausts = jeff_v1_1::faust_target(profile.id, &facts, memory, banked);
+    let early_rifles = jeff_v1_1::riflemen_first(
+        profile.id,
+        observation,
+        &facts,
+        memory,
+        &mut effective_unit_priorities,
+    );
+    let rifle_line = jeff_v1_1::rifle_line(
+        profile.id,
+        &facts,
+        (banked, fausts),
+        &mut effective_unit_priorities,
+    );
     let mut production_max_counts = production_max_counts(profile, observation, map_analysis);
     jeff::cap_opening_guns(profile.id, &facts, &mut production_max_counts);
+    let v1_1_plan = spend_plan.as_ref();
+    jeff_v1_1::gun_cap(
+        profile,
+        &facts,
+        (v1_1_plan, banked, fausts),
+        &intents,
+        &mut production_max_counts,
+    );
+    // Jeff's AI V1.1 (`nomg`) trains two Riflemen for every gun, before the counts are taken so the
+    // Riflemen are counted.
+    let rifle_guns = jeff_v1_1::guns_to_riflemen(
+        profile.id,
+        &mut effective_unit_priorities,
+        &production_max_counts,
+    );
+    // The Rifleman opening's Barracks always train Riflemen, the Steel allowing (`riflenat`), from
+    // the Training Centre's placing (`opening4` keeps them back until then).
+    let rifle_opening = jeff_v1_1::rifle_opening(profile.id);
+    if rifle_opening
+        && facts.building_count(EntityKind::TrainingCentre) > 0
+        && (facts.building_count(EntityKind::Barracks) >= 2 || !jeff_v1_1::off("tcrifles"))
+        && !effective_unit_priorities.contains(&EntityKind::Rifleman)
+    {
+        effective_unit_priorities.push(EntityKind::Rifleman);
+    }
+    let production_unit_counts =
+        unit_counts_for_priorities(observation, &facts, profile, &effective_unit_priorities);
     let emergency_rifle_target = emergency_rifle_target.and_then(|_| {
         memory
             .opening_rush
@@ -871,121 +897,38 @@ where
     // While the live Jeff's natural order is out, the Steel it leaves spare goes to tech, Engineers
     // and guns, not Riflemen; nothing at all could be bought during the walk before. On Chokes,
     // where Steel is short, two Riflemen bought then held Tank Unlock back from 2:45 to 3:02.
-    if live_natural_pending {
+    // Under `nomg` the Riflemen hold the guns' place, and guns were bought during the walk.
+    // The Rifleman opening's Riflemen are paid for in its spend plan, the walk included.
+    if live_natural_pending && !rifle_guns.is_some_and(|guns| guns > 0) && !rifle_opening {
         effective_unit_priorities.retain(|unit| *unit != EntityKind::Rifleman);
     }
     let emergency_rifle_target = emergency_rifle_target.filter(|_| !live_natural_pending);
-    for building_kind in production_building_order(&effective_unit_priorities) {
-        let buildings = facts.production_buildings(building_kind);
-        if buildings.is_empty() {
-            continue;
-        }
-        let key_tech_unit = production_policy
-            .save_for_first_tech_unit
-            .unwrap_or(EntityKind::Worker);
-        let security_recruits =
-            security_rifle_target.filter(|_| building_kind == EntityKind::Barracks);
-        let emergency_recruits =
-            emergency_rifle_target.filter(|_| building_kind == EntityKind::Barracks);
-        let save_for_tech = security_recruits.is_none()
-            && emergency_recruits.is_none()
-            && (save_for_unplanned_expansion
-                || (save_for_first_tech_unit
-                    && !planned_train_in_intents(&intents, key_tech_unit))
-                || save_for_required_tech_building)
-            && !rts_rules::economy::trainable_units(building_kind).contains(&key_tech_unit)
-            && !can_train_pre_tank_defensive_machine_gunner(profile, &facts, building_kind);
-        let mut building_max_counts = production_max_counts.clone();
-        if let Some(policy) = profile
-            .surplus_steel_production
-            .filter(|policy| producer_for_unit(policy.unit) == Some(building_kind))
-        {
-            let current = production_unit_counts
-                .iter()
-                .find_map(|(kind, count)| (*kind == policy.unit).then_some(*count))
-                .unwrap_or(0);
-            let (unit_steel, _) = rts_rules::economy::cost(policy.unit);
-            let affordable_above_reserve = if unit_steel == 0 {
-                0
-            } else {
-                actions.budget().steel().saturating_sub(policy.reserve) as usize
-                    / unit_steel as usize
-            };
-            // On Crossroads Jeff is short of Oil, not Steel: past a home garrison, more Riflemen
-            // only spend the Steel the third base and Factory rebuilds need.
-            let surplus_cap = if uses_current_jeffs_ai_policy(profile.id)
-                && policy.unit == EntityKind::Rifleman
-                && defense::crossroads_wall_aware_approach_direction(observation).is_some()
-            {
-                CROSSROADS_MAX_SURPLUS_RIFLEMEN
-            } else {
-                usize::MAX
-            };
-            building_max_counts.retain(|(kind, _)| *kind != policy.unit);
-            building_max_counts.push((
-                policy.unit,
-                current
-                    .saturating_add(affordable_above_reserve)
-                    .min(surplus_cap)
-                    .max(security_recruits.unwrap_or(0)),
-            ));
-        }
-        if let Some(target) = emergency_recruits {
-            opening_rush::raise_rifle_cap(&mut building_max_counts, target);
-        }
-        jeff::cap_routine_riflemen(
-            spend_plan.as_ref(),
-            building_kind == EntityKind::Barracks
-                && !defensive_panic.active
-                && emergency_recruits.is_none(),
-            &intents,
-            &production_unit_counts,
-            &mut building_max_counts,
-        );
-        let home_holds_tank_reserve = !uses_current_jeffs_ai_policy(profile.id)
-            || later_bases::main_tank_ids(observation, memory).len() >= memory.home_tank_reserve();
-        let production_rally = is_jeffs_ai_profile(profile.id)
-            .then(|| jeffs_production_rally(observation, &facts))
-            .flatten();
-        let rifleman_rally = uses_home_rifle_coverage(profile.id)
-            .then(|| jeffs_rifleman_home_rally(observation, &facts))
-            .flatten();
-        let trained_units = actions::train_units_with_rally_for_unit(
-            &mut actions,
-            TrainUnitsRequest {
-                buildings,
-                unit_priorities: &effective_unit_priorities,
-                completed_building_kinds: facts.complete_building_kinds(),
-                completed_upgrades: facts.completed_upgrades(),
-                max_queue_depth: production_policy.queue_depth,
-                save_for_tech,
-                current_counts: &production_unit_counts,
-                max_counts: &building_max_counts,
-                balance_unit_priorities: production_policy.balance_unit_priorities,
-            },
-            |unit| {
-                // While a new base is being taken, fresh Tanks and Riflemen join its guards, but
-                // Tanks only once the main holds its reserve.
-                if let Some((x, y)) = later_base.rally.filter(|_| {
-                    unit == EntityKind::Rifleman
-                        || (unit == EntityKind::Tank && home_holds_tank_reserve)
-                }) {
-                    return Some((x, y, RallyKind::AttackMove));
-                }
-                if unit == EntityKind::Rifleman {
-                    rifleman_rally
-                        .map(|(x, y)| (x, y, RallyKind::Move))
-                        .or_else(|| production_rally.map(|(x, y)| (x, y, RallyKind::AttackMove)))
-                } else {
-                    production_rally.map(|(x, y)| (x, y, RallyKind::AttackMove))
-                }
-            },
-        );
-        for trained in trained_units {
-            memory.note_turtle_train(profile, trained.unit);
-            intents.push(AiIntent::Train { kind: trained.unit });
-        }
-    }
+    steps::train_units(
+        &mut actions,
+        observation,
+        memory,
+        &mut intents,
+        steps::TrainInput {
+            facts: &facts,
+            profile,
+            production_policy: &production_policy,
+            effective_unit_priorities: &effective_unit_priorities,
+            production_unit_counts: &production_unit_counts,
+            production_max_counts: &production_max_counts,
+            spend_plan: spend_plan.as_ref(),
+            security_rifle_target,
+            emergency_rifle_target,
+            early_rifles,
+            rifle_line,
+            rifle_guns,
+            rifle_opening,
+            panic: defensive_panic.active,
+            save_for_unplanned_expansion,
+            save_for_first_tech_unit,
+            save_for_required_tech_building,
+            later_base_rally: later_base.rally,
+        },
+    );
 
     let defensive_machine_gunners = defensive_machine_gunner_units(observation, profile);
     let defensive_machine_gunner_units: BTreeSet<u32> =
@@ -1008,9 +951,27 @@ where
     frontal_exclusions.extend(expansion_footprint_blockers.iter().copied());
     // New-base guards stay out of the push until the base is covered.
     frontal_exclusions.extend(memory.later_bases.guards.iter().copied());
+    frontal_exclusions.extend(memory.jeff_v1_1.natural.support.keys().copied());
+    frontal_exclusions.extend(memory.jeff_v1_1.natclear.units());
+    frontal_exclusions.extend(memory.jeff_v1_1.breakout.units());
+    frontal_exclusions.extend(memory.jeff_v1_1.front_line.units());
+    frontal_exclusions.extend(memory.jeff_v1_1.home_guard.units());
+    frontal_exclusions.extend(memory.jeff_v1_1.rovers.units());
     frontal_exclusions.extend(route_line_reserved.iter().copied());
     // Raid responders, sentries and units stepping out of reach are home defense's.
     frontal_exclusions.extend(memory.raid_defense.reserved());
+    // Jeff's AI V1.1 (`tankgroup`) sends its spare Tanks to the launched push together.
+    let keep_home = frontal::push_keep_home(observation, memory);
+    actions.mark("production");
+    let convoy = jeff_v1_1::push::convoy(
+        &mut actions,
+        observation,
+        memory,
+        &frontal_exclusions,
+        keep_home,
+    );
+    actions.mark("convoy");
+    frontal_exclusions.extend(convoy);
     let frontal_wave = plan_frontal_wave(
         observation,
         attack_policy,
@@ -1031,8 +992,13 @@ where
     }
     local_ready_units.retain(|id| !expansion_footprint_blockers.contains(id));
     local_ready_units.retain(|id| !push_units.contains(id));
-    local_ready_units.retain(|id| !memory.opening_rush.is_reserved(*id));
-    local_ready_units.retain(|id| !memory.third_pressure.is_reserved(*id));
+    local_ready_units.retain(|id| !memory.rush_reserved(*id));
+    local_ready_units.retain(|id| !memory.jeff_v1_1.front_line.holds(*id));
+    local_ready_units.retain(|id| !memory.jeff_v1_1.home_guard.holds(*id));
+    local_ready_units.retain(|id| !memory.jeff_v1_1.deny.holds(*id));
+    local_ready_units.retain(|id| {
+        !memory.third_pressure.is_reserved(*id) && !memory.jeff_v1_1.tank_raid.holds(*id)
+    });
     if profile.home_anti_tank.is_some() {
         local_ready_units.retain(|id| {
             Some(*id) != memory.home_defensive_tank
@@ -1072,6 +1038,25 @@ where
         let mut jeff_layered_home_defense = local_target.is_some()
             && is_jeffs_ai_profile(profile.id)
             && profile.home_anti_tank.is_some();
+        // Jeff's AI V1.1 clears enemy infantry off the natural with massed Riflemen (`natclear`).
+        // The group picks before home defense, which then leaves its Riflemen be
+        // (`stays_out_of_home_defense`), as does every system below.
+        actions.mark("production");
+        let live = (&mut actions, observation, map_analysis, &mut intents);
+        let clearing_held = &route_line_reserved | &push_units;
+        let clear_first = jeff_v1_1::natclear::flag("ncfirst", true);
+        if clear_first {
+            let clearing = jeff_v1_1::natclear::plan(live, memory, profile.id, &clearing_held);
+            local_defense_assigned.extend(clearing);
+        }
+        actions.mark("natclear");
+        // Jeff's AI V1.1 goes out at a contain outside its bases (`breakout`), lending station Tanks
+        // and home infantry; home defense and every system below leave them be.
+        let live = (&mut actions, observation, map_analysis, &mut intents);
+        let sortie_held = &(&clearing_held | &local_defense_assigned) | &frontal_exclusions;
+        let sortie = jeff_v1_1::breakout::plan(live, memory, profile.id, &sortie_held);
+        local_defense_assigned.extend(sortie);
+        actions.mark("breakout");
         let mut local_defenders = local_ready_units.clone();
         local_defenders.extend(defensive_machine_gunners.iter().copied());
         if new_jeff_defense {
@@ -1096,10 +1081,15 @@ where
         // The picket holds its trench on the route; it never runs back to answer a raid.
         local_defenders.retain(|id| Some(*id) != memory.route_line.picket());
         local_defenders.retain(|id| !push_units.contains(id));
-        local_defenders.retain(|id| !memory.opening_rush.is_reserved(*id));
+        local_defenders.retain(|id| !memory.rush_reserved(*id));
         local_defenders.retain(|id| !memory.stays_out_of_home_defense(*id));
+        let natural_guards = jeff_v1_1::natural_guards_kept(profile.id, observation, memory);
+        local_defenders.retain(|id| !natural_guards.contains(id));
         local_defenders.sort_unstable();
         local_defenders.dedup();
+        jeff_v1_1::keep_guns_on_posts(profile.id, observation, &mut local_defenders);
+        jeff_v1_1::guns_hold(profile.id, observation, &mut local_defenders);
+        actions.mark("eco");
         if new_jeff_defense {
             if let Some(units) = defense::respond_to_local_incident(
                 &mut actions,
@@ -1129,12 +1119,17 @@ where
                 }
             }
             if runs_live_jeff(profile.id) {
-                let held: BTreeSet<u32> = push_units.union(&route_line_reserved).copied().collect();
+                let held: BTreeSet<u32> = push_units
+                    .union(&route_line_reserved)
+                    .chain(natural_guards.iter())
+                    .copied()
+                    .collect();
                 let enemy_base = facts.nearest_public_enemy_base.map(|base| (base.x, base.y));
                 let live = (&mut actions, observation, map_analysis, &mut intents);
                 let assigned = &mut local_defense_assigned;
                 defense::plan_home_infantry(live, memory, enemy_base, &held, assigned);
             }
+            actions.mark("localdef");
         } else if jeff_layered_home_defense {
             let local_targets: Vec<u32> = defense::local_defense_targets(observation)
                 .into_iter()
@@ -1178,88 +1173,88 @@ where
         // one crowded firing position.
         handled_local_defense |= jeff_layered_home_defense;
 
+        // `ncfirst=0` (testing): the clearing group picks after home defense instead.
+        if !clear_first {
+            actions.mark("localdef2");
+            let live = (&mut actions, observation, map_analysis, &mut intents);
+            let held = &(&local_defense_assigned | &route_line_reserved) | &push_units;
+            let clearing = jeff_v1_1::natclear::plan(live, memory, profile.id, &held);
+            local_defense_assigned.extend(clearing);
+            actions.mark("natclear");
+        }
+        // Jeff's AI V1.1 sends some of the main's guns and Riflemen to hold its natural.
+        let live = (&mut actions, observation, map_analysis, &mut intents);
+        let held = &(&local_defense_assigned | &route_line_reserved) | &push_units;
+        // Jeff's AI V1.1 splits its free Riflemen over its bases first (`riflestations`).
+        jeff_v1_1::stations::place_riflemen(live, memory, profile.id, &held);
+        let live = (&mut actions, observation, map_analysis, &mut intents);
+        jeff_v1_1::natural::support(
+            live,
+            memory,
+            profile.id,
+            &defensive_machine_gunners,
+            &held,
+            &local_defense_assigned,
+        );
+        actions.mark("natural");
+        // Jeff's AI V1.1 keeps Tanks parked in front of its main, and holds a Tank line in front of
+        // its bases and the ones it is taking. Tanks the home defense took stay with it a while.
+        jeff_v1_1::front_line::note_yielded(observation, memory, &local_defense_assigned);
+        // The forward base's Tank is staged there below (`tug`): taken too, it got both orders
+        // every decision.
+        let tug = is_jeff_v1_1(profile.id) && !jeff_v1_1::off("tug");
+        let mut tank_held = held.clone();
+        if tug {
+            tank_held.extend(forward_defensive_tank);
+        }
+        let live = (&mut actions, observation, map_analysis, &mut intents);
+        jeff_v1_1::home_guard::guard(live, memory, &tank_held);
+        actions.mark("guard");
+        let live = (&mut actions, observation, map_analysis, &mut intents);
+        jeff_v1_1::front_line::hold(live, memory, &tank_held);
+        actions.mark("line");
         let defensive_machine_gunners_available: Vec<u32> = defensive_machine_gunners
             .iter()
             .copied()
             .filter(|id| !local_defense_assigned.contains(id))
+            .filter(|id| !memory.jeff_v1_1.natural.holds(*id))
+            // Jeff's AI V1.1's guns on the spread lines (`mgline`) are the lines', not the pocket's.
+            .filter(|id| {
+                !(is_jeff_v1_1(profile.id)
+                    && !jeff_v1_1::off("mgline")
+                    && memory.jeff_v1_1.base_lines.posted(*id))
+            })
             .collect();
         let turtle_defense_active = profile.turtle_defense.is_some();
 
-        if !handled_local_defense
-            && is_jeffs_ai_profile(profile.id)
-            && profile.home_anti_tank.is_some()
-        {
-            let live = (&mut actions, observation, map_analysis, &mut intents);
-            let assigned = (&local_defense_assigned, &route_line_reserved);
-            jeff::stage_home_riflemen(live, memory, profile, &facts, assigned);
-        }
-
-        if !handled_local_defense && turtle_defense_active {
-            if let Some(policy) = profile.turtle_defense {
-                if let Some(units) = stage_turtle_choke_defense(
-                    &mut actions,
-                    observation,
-                    map_analysis,
-                    policy,
-                    &local_defense_assigned,
-                ) {
-                    intents.push(AiIntent::Stage { units });
-                }
-            }
-        }
-
-        if !handled_local_defense
-            && !turtle_defense_active
-            && !defensive_machine_gunners_available.is_empty()
-        {
-            if let Some(enemy_base) = facts.nearest_public_enemy_base {
-                let staged = if uses_current_jeff_defense(profile.id) {
-                    stage_defensive_pocket_machine_gunners(
-                        &mut actions,
-                        observation,
-                        map_analysis,
-                        &defensive_machine_gunners_available,
-                        enemy_base,
-                        profile
-                            .defensive_machine_gunners
-                            .map_or(0, |policy| policy.target_count),
-                    )
-                } else if memory.home_defensive_tank.is_some() {
-                    let distance = profile
-                        .defensive_machine_gunners
-                        .map(|policy| policy.perimeter_distance_tiles)
-                        .unwrap_or(6.0)
-                        + profile
-                            .home_anti_tank
-                            .map(|policy| policy.machine_gunner_screen_tiles)
-                            .unwrap_or(0.0);
-                    stage_home_machine_gunner_screen(
-                        &mut actions,
-                        observation,
-                        map_analysis,
-                        &defensive_machine_gunners_available,
-                        enemy_base,
-                        distance,
-                        profile
-                            .home_anti_tank
-                            .map(|policy| policy.lateral_spacing_tiles)
-                            .unwrap_or(4.5),
-                    )
-                } else {
-                    stage_defensive_machine_gunner_perimeter(
-                        &mut actions,
-                        observation,
-                        map_analysis,
-                        profile,
-                        &defensive_machine_gunners_available,
-                        enemy_base,
-                    )
-                };
-                if let Some(units) = staged {
-                    intents.push(AiIntent::Stage { units });
-                }
-            }
-        }
+        let live = (&mut actions, observation, map_analysis, &mut intents);
+        let assigned = (&local_defense_assigned, &route_line_reserved);
+        let guns = defensive_machine_gunners_available.as_slice();
+        steps::stage_home_defense(
+            live,
+            memory,
+            profile,
+            &facts,
+            handled_local_defense,
+            assigned,
+            guns,
+        );
+        actions.mark("homestage");
+        let live = (&mut actions, observation, map_analysis, &mut intents);
+        let held = &(&local_defense_assigned | &route_line_reserved) | &push_units;
+        jeff_v1_1::strike::strike_gathering_wave(live, memory, profile.id, &held);
+        actions.mark("strike");
+        let live = (&mut actions, observation, map_analysis, &mut intents);
+        jeff_v1_1::scout::scout(live, memory, profile.id, &held);
+        actions.mark("scout");
+        let live = (&mut actions, observation, map_analysis, &mut intents);
+        let held = &held | &memory.jeff_v1_1.natural.support.keys().copied().collect();
+        jeff_v1_1::base_line::hold(live, memory, profile, &defensive_machine_gunners, &held);
+        actions.mark("baseline");
+        // Jeff's AI V1.1's free Riflemen roam between its bases and run at raids on them.
+        let live = (&mut actions, observation, map_analysis, &mut intents);
+        jeff_v1_1::rovers::roam(live, memory, &held);
+        actions.mark("rovers");
 
         // The current Jeff's home Tank waits behind the home post once that has moved off the
         // main's line; it sat beside the HQ all game while the natural was shelled.
@@ -1295,14 +1290,24 @@ where
             }
         }
 
+        actions.mark("hometank");
         if let Some((tank_id, position)) = forward_defensive_tank.zip(forward_tank_position) {
-            if let Some(units) =
-                stage_defensive_tank_at(&mut actions, observation, tank_id, position)
-            {
-                intents.push(AiIntent::Stage { units });
+            // Jeff's AI V1.1's forward Tank answers the home defense first, as the home Tank does
+            // (`tug`): restaged after it, it took both orders every decision.
+            let defending = is_jeff_v1_1(profile.id)
+                && !jeff_v1_1::off("tug")
+                && (local_defense_assigned.contains(&tank_id)
+                    || memory.trap_breach.is_reserved(tank_id));
+            if !defending {
+                if let Some(units) =
+                    stage_defensive_tank_at(&mut actions, observation, tank_id, position)
+                {
+                    intents.push(AiIntent::Stage { units });
+                }
             }
         }
 
+        actions.mark("fwdtank");
         let guard_units = later_bases::issue_guard_orders(
             &mut actions,
             observation,
@@ -1313,6 +1318,7 @@ where
         if !guard_units.is_empty() {
             intents.push(AiIntent::Move { units: guard_units });
         }
+        actions.mark("laterguard");
         if uses_current_jeffs_ai_policy(profile.id) {
             let returning = later_bases::recall_tanks_to_main(
                 &mut actions,
@@ -1335,6 +1341,7 @@ where
             }
         }
 
+        actions.mark("recallmain");
         let containment_needs_control = profile.id != JEFFS_AI_BETA_ID
             && profile.expansion_containment.is_some()
             && frontal::containment_wave_needs_control(memory);
@@ -1402,20 +1409,26 @@ where
             }
         }
 
-        // Last: the current Jeff's resting Tanks with no other orders gather on the home post, so
-        // none sits idle in a corner of the main or out on the map.
-        if uses_current_jeffs_ai_policy(profile.id) {
-            let mut excluded: BTreeSet<u32> = local_defense_assigned.clone();
-            excluded.extend(forward_defensive_tank);
-            excluded.extend(route_line_reserved.iter().copied());
-            excluded.extend(expansion_footprint_blockers.iter().copied());
-            let gathered = jeff::gather_resting_tanks(&mut actions, observation, memory, excluded);
-            if !gathered.is_empty() {
-                intents.push(AiIntent::Move { units: gathered });
-            }
-        }
+        actions.mark("frontal");
+        let live = (&mut actions, observation, map_analysis, &mut intents);
+        let held = (&route_line_reserved, &local_defense_assigned);
+        let blockers = (
+            forward_defensive_tank,
+            expansion_footprint_blockers.as_slice(),
+        );
+        steps::late_orders(live, memory, profile, held, blockers);
     }
+    // Jeff's AI V1.1's Meth strike runs every decision, the first ones included: with only the
+    // starters out, none of the combat systems above runs.
+    let live = (&mut actions, observation, map_analysis, &mut intents);
+    jeff_v1_1::meth_strike::strike(live, memory, profile.id);
+    actions.mark("methstrike");
+    // Last of all, so no other order this decision keeps a unit on the natural's footprint.
+    let live = (&mut actions, observation, map_analysis, &mut intents);
+    jeff_v1_1::natural::clear_site(live, memory, profile.id);
+    actions.mark("siteclear");
 
+    actions.mark("rest");
     let trace = build_manager_trace(TraceInput {
         observation,
         profile,
@@ -1447,8 +1460,14 @@ where
         commands: actions.into_commands(),
         trace,
     };
-    decision.trace.plan = spend_plan.as_ref().map(|plan| plan.trace_line(observation));
-    tank_micro::finish(&mut decision, observation, map_analysis, memory);
+    steps::finish_trace(
+        &mut decision,
+        observation,
+        map_analysis,
+        memory,
+        profile,
+        spend_plan.as_ref(),
+    );
     decision
 }
 
@@ -1456,7 +1475,3 @@ where
 mod tests;
 #[cfg(test)]
 mod vehicle_worker_tests;
-
-/// On Crossroads Jeff stops turning surplus Steel into Riflemen at this many. It fielded 30-40,
-/// most of them idle, while Oil held it to 2-4 Tanks and it never took a third base.
-const CROSSROADS_MAX_SURPLUS_RIFLEMEN: usize = 24;

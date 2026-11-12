@@ -5,6 +5,7 @@ use crate::game::entity::{
 use crate::game::entrenchment_combat;
 use crate::game::services::movement::{angle_delta, rotate_toward};
 use crate::rules::combat as combat_rules;
+use rts_rules::math::GameplayMath as _;
 
 use super::projection::tank_effective_range_tiles;
 use super::{
@@ -52,6 +53,29 @@ pub(super) fn rotate_vehicle_weapon_for_combat(e: &mut Entity, target_angle: f32
         e.set_weapon_facing(rotated);
     }
     angle_delta(rotated, target_angle).abs() <= TANK_TURRET_FIRE_TOLERANCE_RAD
+}
+
+pub(super) fn rotate_tank_commander_weapon(
+    tank: &mut Entity,
+    target: Option<u32>,
+    target_angle: Option<f32>,
+) -> bool {
+    let turret_facing = tank.weapon_facing().unwrap_or(tank.facing());
+    let Some(combat) = tank.combat.as_mut() else {
+        return false;
+    };
+    combat.commander_target_id = target;
+    let desired = target_angle.unwrap_or(turret_facing);
+    if !desired.is_finite() {
+        return false;
+    }
+    let current = if combat.commander_facing.is_finite() {
+        combat.commander_facing
+    } else {
+        turret_facing
+    };
+    combat.commander_facing = rotate_toward(current, desired, TANK_TURRET_TURN_RATE_RAD_PER_TICK);
+    angle_delta(combat.commander_facing, desired).abs() <= TANK_TURRET_FIRE_TOLERANCE_RAD
 }
 
 pub(super) fn relax_vehicle_weapon_toward_body(e: &mut Entity) {
@@ -205,7 +229,7 @@ pub(super) fn can_fire_while_moving(e: &Entity, methamphetamines_researched: boo
 
 pub(super) fn breakthrough_moving_fire_active(e: &Entity) -> bool {
     let (dx, dy) = e.movement_delta();
-    e.breakthrough_ticks() > 0 && dx.mul_add(dx, dy * dy) > f32::EPSILON
+    e.breakthrough_ticks() > 0 && dx.det_mul_add(dx, dy * dy) > f32::EPSILON
 }
 
 pub(super) fn moving_attack_cooldown(e: &Entity, cooldown: u32) -> u32 {

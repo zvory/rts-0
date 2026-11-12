@@ -69,8 +69,8 @@ fn scout_plane_launches_from_caster_without_a_resource_depot() {
         .expect("launch succeeds");
     let plane_entity = entities.get(plane).expect("plane exists");
     assert_eq!(plane_entity.owner, 1);
-    assert_eq!(plane_entity.pos_x, 320.0);
-    assert_eq!(plane_entity.pos_y, 448.0);
+    assert_eq!(plane_entity.pos_x(), 320.0);
+    assert_eq!(plane_entity.pos_y(), 448.0);
 
     let state = plane_state(&entities, plane);
     assert_eq!(state.source_command_car, Some(source_command_car));

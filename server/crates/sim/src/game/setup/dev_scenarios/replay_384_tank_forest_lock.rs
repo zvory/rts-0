@@ -87,7 +87,7 @@ impl Game {
 mod tests {
     use super::*;
     #[test]
-    fn replay_384_isolated_tank_matches_recorded_approach_and_failed_escape_orders() {
+    fn replay_384_isolated_tank_preserves_approach_and_escape_behavior() {
         let mut setup =
             Game::new_replay_384_tank_forest_lock_scenario(EntityKind::Tank, 1, 0).unwrap();
         let expected: Vec<serde_json::Value> =
@@ -108,15 +108,19 @@ mod tests {
             }
             let tank = setup.game.state.entities.get(TANK).unwrap();
             assert_eq!((tank.hp, tank.max_hp, tank.units_killed()), (292, 292, 2));
-            let actual = (tank.pos_x, tank.pos_y);
+            let actual = (tank.pos_x(), tank.pos_y());
             let expected = (
                 frame["x"].as_f64().unwrap() as f32,
                 frame["y"].as_f64().unwrap() as f32,
             );
-            assert_eq!(actual, expected, "position at tick {tick}");
-            assert_eq!(
-                tank.facing(),
-                frame["facing"].as_f64().unwrap() as f32,
+            // Historical float positions are a behavioral reference, not current sim goldens.
+            // This short authored approach may move by subpixels after the math-version break.
+            assert!(
+                (actual.0 - expected.0).abs() < 0.1 && (actual.1 - expected.1).abs() < 0.1,
+                "approach at tick {tick}: {actual:?} vs historical {expected:?}"
+            );
+            assert!(
+                (tank.facing() - frame["facing"].as_f64().unwrap() as f32).abs() < 0.001,
                 "facing at tick {tick}"
             );
         }

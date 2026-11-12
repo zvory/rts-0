@@ -5,12 +5,13 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
 ## Read first
 - [docs/design/architecture.md](../design/architecture.md) — tick and networking model
 - [docs/design/server-sim.md](../design/server-sim.md) — Rust server and `Game` API
-- §3.1 `game::Game` public API; this is the seam and should stay stable
+- §3.1 `game::Game` public API and replay end-state fingerprint/verification contract; the seam, keep it stable
 - §3.1.1 `Game` state ownership registry; update this when `GameState`/`DerivedState` fields change
 - §3.1.2 Ownership guardrails and readiness audit; read before state-owner, checkpoint, replay/lab
   migration, or archcheck work
 - §3.1.3 `GameCheckpointV1` embeddable payload contract; read before public checkpoint DTO,
   replay start-state, lab scenario, match-start artifact, or debug-document checkpoint work
+- §3.1.4 Deterministic arithmetic; fixed-point grid and replay compatibility
 - §3.2 Concurrency model; the room task is the sole `Game` owner
 - §3.3 Rules layer
 - §3.5 Command planning and queued order semantics
@@ -40,7 +41,7 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
 - `server/src/lobby/launch.rs`, `live_tick.rs`, `replay_session.rs`, `replay_branch.rs`,
   `connection.rs`, `dev_replay.rs`, and `crash_replay.rs` — launch, live/replay/branch execution,
   delivery, dev replay loading, and panic artifacts.
-- `server/src/main.rs` — room registry, HTTP/WebSocket wiring, and deployment drain coordination.
+- `server/src/main.rs` — room registry, HTTP/WebSocket wiring, and deploy drain.
 - Guardrails: `scripts/check-lobby-architecture.mjs`, `scripts/check-crate-boundaries.mjs`, and
   `cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture` enforce
   lobby, crate, sim role, state-tree, and registry boundaries.
@@ -57,19 +58,19 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
   mutation?
 - Does new durable state live under `GameState`, rebuildable cache/search state under
   `DerivedState`, and the registry classify it with a concrete checkpoint policy and evidence row?
-- Can mutation go through an existing entity/player helper rather than direct field writes?
+- Can mutation use an existing entity/player helper instead of direct field writes?
 - Did this add a new service-to-service import edge? Command/order edges need an exact allowlist
   entry and role-matrix justification.
-- Did this increase a ratcheted file-size or public-export budget?
+- Did this grow a ratcheted file-size or public-export budget?
 
 ## Failed sim architecture checks
-Prefer reducing coupling or moving logic behind an existing helper/API. For intentional growth:
+Prefer less coupling or logic behind an existing helper/API. For intentional growth:
 
 ```bash
 cargo run --manifest-path server/Cargo.toml -p rts-archcheck -- check-sim-architecture --bless --reason "short reason"
 ```
 
-Avoid broad allowlist additions unless this change or a tracked follow-up explains the cleanup path.
+Avoid broad allowlist additions unless the change or a tracked follow-up explains the cleanup.
 
 Registry failures are not ratchets: update §3.1.1 and move the owner under `GameState` or
 `DerivedState`, or document it as room/session/test-only outside `Game`.

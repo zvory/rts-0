@@ -14,6 +14,7 @@
 //! builder goes as soon as the Depot will be paid for by the time it can arrive, rather than once
 //! its cost is banked.
 
+use rts_rules::math::GameplayMath as _;
 use std::collections::BTreeMap;
 
 use super::geometry::{building_center, dist2, squared};
@@ -144,7 +145,7 @@ fn worker_speed() -> f32 {
 /// Ticks a worker at `from` needs at least to reach `to`: the straight line, so never more than its
 /// real walk.
 fn walk_ticks(from: (f32, f32), to: (f32, f32)) -> u32 {
-    (dist2(from.0, from.1, to.0, to.1).sqrt() / worker_speed()).ceil() as u32
+    (dist2(from.0, from.1, to.0, to.1).det_sqrt() / worker_speed()).ceil() as u32
 }
 
 fn depot_center(observation: &AiObservation, site: (u32, u32)) -> Option<(f32, f32)> {
@@ -334,14 +335,39 @@ fn forecast_for(
     forecast
 }
 
+/// An opening gun's step: two Riflemen under Jeff's AI V1.1's `nomg`.
+fn gun_step(no_guns: bool) -> StepKind {
+    if no_guns {
+        StepKind::RiflePair
+    } else {
+        StepKind::Gun
+    }
+}
+
+/// How long an opening gun's step holds the Barracks: two Riflemen under `nomg`.
+fn gun_train_ticks(no_guns: bool) -> u32 {
+    if no_guns {
+        config::unit_stats(EntityKind::Rifleman).map_or(300, |stats| stats.build_ticks) * 2
+    } else {
+        config::unit_stats(EntityKind::MachineGunner).map_or(400, |stats| stats.build_ticks)
+    }
+}
+
 /// One costly step of the opening.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum StepKind {
     /// An opening gun still to order before the natural is due.
     Gun,
+    /// Jeff's AI V1.1's two Riflemen for an opening gun (`nomg`), or toward the natural's holders
+    /// (`riflenat`).
+    RiflePair,
+    /// The Rifleman opening's second Barracks (`riflenat`).
+    Barracks,
     EngineeringComplex,
     Natural,
     Factory,
+    /// Jeff's AI V1.1's first Scout Car, the Factory's first unit (`ecafter`).
+    ScoutCar,
     TankUnlock,
     Tank,
 }
@@ -350,11 +376,17 @@ impl StepKind {
     fn cost(self) -> (u32, u32) {
         match self {
             StepKind::Gun => rts_rules::economy::cost(EntityKind::MachineGunner),
+            StepKind::Barracks => rts_rules::economy::cost(EntityKind::Barracks),
+            StepKind::RiflePair => {
+                let (steel, oil) = rts_rules::economy::cost(EntityKind::Rifleman);
+                (steel * 2, oil * 2)
+            }
             StepKind::EngineeringComplex => {
                 rts_rules::economy::cost(EntityKind::EngineeringComplex)
             }
             StepKind::Natural => rts_rules::economy::cost(EntityKind::ResourceDepot),
             StepKind::Factory => rts_rules::economy::cost(EntityKind::Factory),
+            StepKind::ScoutCar => rts_rules::economy::cost(EntityKind::ScoutCar),
             StepKind::TankUnlock => {
                 let definition = upgrade::definition(UpgradeKind::TankUnlock);
                 (definition.cost_steel, definition.cost_oil)
@@ -366,9 +398,12 @@ impl StepKind {
     fn label(self) -> &'static str {
         match self {
             StepKind::Gun => "gun",
+            StepKind::RiflePair => "rifles",
+            StepKind::Barracks => "rax",
             StepKind::EngineeringComplex => "ec",
             StepKind::Natural => "natural",
             StepKind::Factory => "factory",
+            StepKind::ScoutCar => "car",
             StepKind::TankUnlock => "unlock",
             StepKind::Tank => "tank",
         }
@@ -385,6 +420,16 @@ pub(super) struct PlanInput {
     pub(super) natural_builder: Option<u32>,
     /// Ticks the natural's order still waits for its guards to secure the site.
     pub(super) natural_wait: u32,
+    /// Steel and Oil already promised ahead of every step (Jeff's AI V1.1's opening research).
+    pub(super) prepaid: (u32, u32),
+    /// Jeff's AI V1.1's opening order (`ecafter`): the Engineering Complex after the Factory, and
+    /// the natural before or after the Factory and its first Scout Car.
+    pub(super) opening: Option<OpeningOrder>,
+    /// Jeff's AI V1.1 trains two Riflemen for every gun (`nomg`).
+    pub(super) no_guns: bool,
+    /// Jeff's AI V1.1's Rifleman opening (`riflenat`): the Riflemen at home the natural waits for,
+    /// and those at home now (in training included).
+    pub(super) rifle_opening: Option<(usize, usize)>,
 }
 
 /// The opening's steps with the tick each is charged, laid out from now.
@@ -487,6 +532,17 @@ enum Ready {
     AfterNaturalOrder(u32),
     /// Ticks after the Factory is charged.
     AfterFactory(u32),
+    /// When the Factory is done: its build after it is charged, or the tick it is done if already
+    /// under way.
+    FactoryBuilt {
+        factory_done: Option<u32>,
+    },
+    /// Ticks after the first Scout Car is charged, or the Factory when no car is planned.
+    AfterScoutCar(u32),
+    /// Ticks after both the Factory is charged and the natural's order goes out.
+    AfterFactoryAndNatural(u32),
+    /// When the Engineering Complex is done, its build after it is charged.
+    EngineeringComplexBuilt,
     /// When both the Factory and Tank Unlock are done: `(Factory build, Unlock research)` after
     /// each is charged, or the tick each is done if already under way.
     FactoryAndUnlock {
@@ -503,6 +559,9 @@ fn steps(
     input: PlanInput,
     natural_walk: Option<u32>,
 ) -> Vec<Step> {
+    if let Some(opening) = input.opening {
+        return v1_1_steps(observation, facts, memory, input, natural_walk, opening);
+    }
     let now = observation.tick;
     let mut steps = Vec::new();
     let natural_pending = input.natural_site.is_some_and(|site| {
@@ -535,22 +594,12 @@ fn steps(
                 ready: Ready::At(now + FACTORY_WALK_TICKS),
             });
         }
-        let queued: usize = observation
-            .owned
-            .iter()
-            .filter(|unit| {
-                unit.kind == EntityKind::Barracks
-                    && unit.production_kind == Some(EntityKind::MachineGunner)
-            })
-            .map(|unit| unit.production_queue_len.unwrap_or(0))
-            .sum();
-        let guns = (facts.unit_count(EntityKind::MachineGunner) + queued)
-            .min(expansion_security::OPENING_GUNS);
-        let train =
-            config::unit_stats(EntityKind::MachineGunner).map_or(400, |stats| stats.build_ticks);
+        let (guns, queued) = expansion_security::guns_out(observation, facts, input.no_guns);
+        let guns = guns.min(expansion_security::OPENING_GUNS);
+        let train = gun_train_ticks(input.no_guns);
         for index in guns..expansion_security::OPENING_GUNS {
             steps.push(Step {
-                kind: StepKind::Gun,
+                kind: gun_step(input.no_guns),
                 banked: false,
                 ready: if index == guns {
                     // A gun in training holds the Barracks about half its time more.
@@ -655,12 +704,238 @@ fn steps(
     steps
 }
 
+/// Jeff's AI V1.1's opening steps still ahead (`ecafter`): the opening guns, then the natural and
+/// the Factory with its first Scout Car (the natural first with `NaturalFirst`, after the car
+/// otherwise), the Engineering Complex once both are out, Tank Unlock once it stands, and the
+/// first Tank.
+fn v1_1_steps(
+    observation: &AiObservation,
+    facts: &AiFacts,
+    memory: &SpendPlanMemory,
+    input: PlanInput,
+    natural_walk: Option<u32>,
+    opening: OpeningOrder,
+) -> Vec<Step> {
+    let now = observation.tick;
+    let mut steps = Vec::new();
+    let natural_pending = input.natural_site.is_some_and(|site| {
+        observation.pending_builds.iter().any(|intent| {
+            intent.kind == EntityKind::ResourceDepot && (intent.tile_x, intent.tile_y) == site
+        })
+    });
+    let planned_natural = (input.natural_due || natural_pending) && natural_walk.is_some();
+    let factory_planned = facts.building_count(EntityKind::Factory) > 0;
+    let natural_left = facts.building_count(EntityKind::ResourceDepot) < 2;
+    let factory = observation
+        .owned
+        .iter()
+        .find(|entity| entity.kind == EntityKind::Factory && entity.hp > 0);
+    let factory_ticks = build_ticks(EntityKind::Factory);
+    let factory_done = match factory {
+        Some(factory) if factory.is_complete => Some(now),
+        Some(factory) => Some(memory.finished_at(factory.id, now, factory_ticks)),
+        None => None,
+    };
+    // The Rifleman opening (`riflenat`): its second Barracks from the Training Centre's placing.
+    if input.rifle_opening.is_some()
+        && facts.building_count(EntityKind::Barracks) < 2
+        && facts.building_count(EntityKind::TrainingCentre) > 0
+    {
+        steps.push(Step {
+            kind: StepKind::Barracks,
+            banked: false,
+            ready: Ready::At(now),
+        });
+    }
+    // The opening guns, while neither the natural nor the Factory is out.
+    let in_opening = !factory_planned && !planned_natural && natural_left;
+    if let Some((wanted, home)) = input.rifle_opening.filter(|_| in_opening) {
+        // The Rifleman opening: Riflemen in pairs, one from each Barracks, until the natural's
+        // holders stand at home.
+        let train = config::unit_stats(EntityKind::Rifleman).map_or(300, |stats| stats.build_ticks);
+        for index in 0..wanted.saturating_sub(home).div_ceil(2) {
+            steps.push(Step {
+                kind: StepKind::RiflePair,
+                banked: false,
+                ready: if index == 0 {
+                    Ready::At(now)
+                } else {
+                    Ready::AfterGun(train)
+                },
+            });
+        }
+    } else if in_opening {
+        let (guns, queued) = expansion_security::guns_out(observation, facts, input.no_guns);
+        let guns = guns.min(expansion_security::OPENING_GUNS);
+        let train = gun_train_ticks(input.no_guns);
+        for index in guns..expansion_security::OPENING_GUNS {
+            steps.push(Step {
+                kind: gun_step(input.no_guns),
+                banked: false,
+                ready: if index == guns {
+                    Ready::At(now + if queued > 0 { train / 2 } else { 0 })
+                } else {
+                    Ready::AfterGun(train)
+                },
+            });
+        }
+    }
+    let natural_first = opening == OpeningOrder::NaturalFirst;
+    // The natural: due or ordered, or still ahead (with the opening guns when it comes first,
+    // after the Factory's first Scout Car otherwise). Behind the Factory it waits for its cost
+    // banked.
+    let natural = if planned_natural {
+        let wait = if natural_pending {
+            0
+        } else {
+            input.natural_wait
+        };
+        Some(Step {
+            kind: StepKind::Natural,
+            banked: !natural_pending && factory_planned,
+            ready: Ready::At(now + wait + natural_walk.unwrap_or(0)),
+        })
+    } else if natural_left && !natural_pending {
+        let walk = natural_walk.unwrap_or(ASSUMED_NATURAL_WALK_TICKS);
+        Some(Step {
+            kind: StepKind::Natural,
+            banked: !natural_first,
+            ready: if natural_first {
+                Ready::AfterOpening(walk)
+            } else {
+                Ready::AfterScoutCar(walk)
+            },
+        })
+    } else {
+        None
+    };
+    let factory_step = factory.is_none().then(|| {
+        let pending = observation
+            .pending_builds
+            .iter()
+            .find(|intent| intent.kind == EntityKind::Factory);
+        let ready = match pending {
+            Some(intent) => {
+                let arrival = observation
+                    .owned
+                    .iter()
+                    .find(|unit| unit.id == intent.worker_id)
+                    .zip(building_center(
+                        (intent.tile_x, intent.tile_y),
+                        EntityKind::Factory,
+                        observation.map.tile_size,
+                    ))
+                    .map_or(FACTORY_WALK_TICKS, |(worker, center)| {
+                        walk_ticks((worker.x, worker.y), center)
+                    });
+                Ready::At(now + arrival)
+            }
+            // Natural first: the Factory waits for the natural's order, as V1.0's does.
+            None if natural_first && natural.is_some() && !natural_pending => {
+                let second_engineer = if facts.worker_count < 2 {
+                    config::unit_stats(EntityKind::Worker).map_or(150, |stats| stats.build_ticks)
+                } else {
+                    0
+                };
+                Ready::AfterNaturalOrder(FACTORY_WALK_TICKS + second_engineer)
+            }
+            None if in_opening => Ready::AfterOpening(FACTORY_WALK_TICKS),
+            None => Ready::At(now + FACTORY_WALK_TICKS),
+        };
+        Step {
+            kind: StepKind::Factory,
+            ready,
+            banked: false,
+        }
+    });
+    let unlocked = observation.upgrades.contains(&UpgradeKind::TankUnlock);
+    let car_queued = observation.owned.iter().any(|entity| {
+        entity.kind == EntityKind::Factory
+            && entity.production_kind == Some(EntityKind::ScoutCar)
+            && entity.production_queue_len.unwrap_or(0) > 0
+    });
+    let car =
+        (facts.unit_count(EntityKind::ScoutCar) == 0 && !car_queued && !unlocked).then_some(Step {
+            kind: StepKind::ScoutCar,
+            banked: false,
+            ready: Ready::FactoryBuilt { factory_done },
+        });
+    let complex = observation
+        .owned
+        .iter()
+        .find(|entity| entity.kind == EntityKind::EngineeringComplex && entity.hp > 0);
+    // The Engineering Complex: after the Factory and the natural's order with the natural first;
+    // otherwise from the Factory's first Scout Car, ahead of the natural's money.
+    let complex_step = (facts.building_count(EntityKind::EngineeringComplex) == 0).then(|| Step {
+        kind: StepKind::EngineeringComplex,
+        banked: false,
+        // The Rifleman opening's comes after the first Scout Car too.
+        ready: if natural_first && input.rifle_opening.is_none() {
+            Ready::AfterFactoryAndNatural(FACTORY_WALK_TICKS)
+        } else {
+            Ready::AfterScoutCar(FACTORY_WALK_TICKS)
+        },
+    });
+    if natural_first {
+        steps.extend(natural);
+        steps.extend(factory_step);
+        steps.extend(car);
+        steps.extend(complex_step);
+    } else {
+        steps.extend(factory_step);
+        steps.extend(car);
+        steps.extend(complex_step);
+        steps.extend(natural);
+    }
+    let unlock_research = config::TICK_HZ * 20;
+    let unlock_done = if unlocked {
+        Some(now)
+    } else {
+        memory
+            .unlock_ordered
+            .map(|ordered| (ordered + unlock_research).max(now))
+    };
+    if !unlocked && memory.unlock_ordered.is_none() {
+        let complex_ticks = build_ticks(EntityKind::EngineeringComplex);
+        steps.push(Step {
+            kind: StepKind::TankUnlock,
+            banked: false,
+            ready: match complex {
+                Some(complex) if complex.is_complete => Ready::At(now),
+                Some(complex) => Ready::At(memory.finished_at(complex.id, now, complex_ticks)),
+                None => Ready::EngineeringComplexBuilt,
+            },
+        });
+    }
+    let tank_out = facts.unit_count(EntityKind::Tank) > 0
+        || observation.owned.iter().any(|entity| {
+            entity.kind == EntityKind::Factory
+                && entity.production_kind == Some(EntityKind::Tank)
+                && entity.production_queue_len.unwrap_or(0) > 0
+        });
+    if !tank_out {
+        steps.push(Step {
+            kind: StepKind::Tank,
+            banked: false,
+            ready: Ready::FactoryAndUnlock {
+                factory_done,
+                unlock_done,
+            },
+        });
+    }
+    steps
+}
+
 /// Steel this decision has spent on orders that are not steps.
 fn off_plan_spent(intents: &[AiIntent]) -> u32 {
     intents
         .iter()
         .map(|intent| match intent {
-            AiIntent::Train { kind } if *kind != EntityKind::Tank => {
+            // Jeff's AI V1.1's first Scout Car is a step (`ecafter`); V1.0's comes after its Tanks,
+            // when the plan no longer binds.
+            AiIntent::Train { kind }
+                if !matches!(kind, EntityKind::Tank | EntityKind::ScoutCar) =>
+            {
                 rts_rules::economy::cost(*kind).0
             }
             AiIntent::Build { kind }
@@ -722,6 +997,7 @@ fn lay_out(
     let mut gun_charge: Option<u32> = None;
     let mut ec_charge: Option<u32> = None;
     let mut factory_charge = None;
+    let mut car_charge: Option<u32> = None;
     let mut unlock_charge = None;
     let mut blocked = false;
     for step in steps {
@@ -739,6 +1015,24 @@ fn lay_out(
                 .map(|charge: u32| charge.saturating_sub(natural_walk.unwrap_or(0)).max(now) + walk)
                 .or(Some(now + walk)),
             Ready::AfterFactory(delay) => factory_charge.map(|charge: u32| charge + delay),
+            Ready::FactoryBuilt { factory_done } => {
+                factory_done.or(factory_charge.map(|charge: u32| charge + factory_ticks))
+            }
+            Ready::AfterScoutCar(walk) => Some(car_charge.or(factory_charge).unwrap_or(now) + walk),
+            Ready::AfterFactoryAndNatural(walk) => {
+                let natural_order = natural_charge
+                    .map(|charge: u32| charge.saturating_sub(natural_walk.unwrap_or(0)));
+                Some(
+                    factory_charge
+                        .unwrap_or(now)
+                        .max(natural_order.unwrap_or(now))
+                        .max(now)
+                        + walk,
+                )
+            }
+            Ready::EngineeringComplexBuilt => {
+                ec_charge.map(|charge| charge + build_ticks(EntityKind::EngineeringComplex))
+            }
             Ready::FactoryAndUnlock {
                 factory_done,
                 unlock_done,
@@ -779,7 +1073,7 @@ fn lay_out(
         spent = (spent.0 + cost_steel as f32, spent.1 + cost_oil as f32);
         out.push((step.kind, Some(tick)));
         match step.kind {
-            StepKind::Gun => gun_charge = Some(tick),
+            StepKind::Gun | StepKind::RiflePair => gun_charge = Some(tick),
             StepKind::EngineeringComplex => ec_charge = Some(tick),
             StepKind::Natural => {
                 natural_charge = Some(tick);
@@ -808,8 +1102,9 @@ fn lay_out(
                 }
             }
             StepKind::Factory => factory_charge = Some(tick),
+            StepKind::ScoutCar => car_charge = Some(tick),
             StepKind::TankUnlock => unlock_charge = Some(tick),
-            StepKind::Tank => {}
+            StepKind::Tank | StepKind::Barracks => {}
         }
     }
     (out, forecast)
@@ -840,7 +1135,7 @@ pub(super) fn plan(
         &steps,
         &base,
         natural_walk,
-        (0, 0),
+        input.prepaid,
     );
     // Slack: the most Steel spent now that moves no step.
     let moves_a_step = |steel: u32| {
@@ -851,7 +1146,7 @@ pub(super) fn plan(
             &steps,
             &base,
             natural_walk,
-            (steel, 0),
+            (steel + input.prepaid.0, input.prepaid.1),
         );
         with.iter()
             .zip(&laid)
@@ -890,6 +1185,10 @@ pub(super) fn plan(
                 let cautious = forecast_for(observation, memory, &known, DISPATCH_INCOME_SHARE);
                 let (steel, oil) = cautious.mined_within(walk);
                 let (owed_steel, owed_oil) = off_plan_orders(observation, input, &steps);
+                let (owed_steel, owed_oil) = (
+                    owed_steel + input.prepaid.0 as f32,
+                    owed_oil + input.prepaid.1 as f32,
+                );
                 let (cost_steel, cost_oil) = StepKind::Natural.cost();
                 observation.economy.steel as f32 + steel - owed_steel >= cost_steel as f32
                     && observation.economy.oil as f32 + oil - owed_oil >= cost_oil as f32
@@ -901,8 +1200,12 @@ pub(super) fn plan(
             intent.kind == EntityKind::ResourceDepot && (intent.tile_x, intent.tile_y) == site
         })
     });
+    // The Rifleman opening's Riflemen spend the slack from the start (`riflenat`).
     let gates = steps.iter().any(|step| step.kind == StepKind::Tank)
-        && (input.natural_due || natural_pending || facts.building_count(EntityKind::Factory) > 0);
+        && (input.natural_due
+            || natural_pending
+            || facts.building_count(EntityKind::Factory) > 0
+            || input.rifle_opening.is_some());
     SpendPlan {
         steps: laid,
         natural_funded_on_arrival,

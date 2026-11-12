@@ -37,20 +37,20 @@ mod vehicle_traffic;
 fn dist(entities: &EntityStore, a: u32, b: u32) -> f32 {
     let ea = entities.get(a).unwrap();
     let eb = entities.get(b).unwrap();
-    let dx = ea.pos_x - eb.pos_x;
-    let dy = ea.pos_y - eb.pos_y;
-    (dx * dx + dy * dy).sqrt()
+    let dx = ea.pos_x() - eb.pos_x();
+    let dy = ea.pos_y() - eb.pos_y();
+    (dx * dx + dy * dy).det_sqrt()
 }
 
 fn pos(entities: &EntityStore, id: u32) -> (f32, f32) {
     let e = entities.get(id).unwrap();
-    (e.pos_x, e.pos_y)
+    (e.pos_x(), e.pos_y())
 }
 
 fn moved_distance(from: (f32, f32), to: (f32, f32)) -> f32 {
     let dx = to.0 - from.0;
     let dy = to.1 - from.1;
-    (dx * dx + dy * dy).sqrt()
+    (dx * dx + dy * dy).det_sqrt()
 }
 
 fn body_overlap_depth(entities: &EntityStore, a: u32, b: u32) -> f32 {
@@ -282,7 +282,8 @@ fn measure_scout_car_fixture(
             consecutive_no_progress = 0;
         }
 
-        let clearance = scout_car_static_clearance_px(map, &occ, (e.pos_x, e.pos_y), e.facing());
+        let clearance =
+            scout_car_static_clearance_px(map, &occ, (e.pos_x(), e.pos_y()), e.facing());
         if clearance < 0.0 {
             accepted_static_illegal_pose = true;
         } else {
@@ -512,7 +513,14 @@ fn tank_standable_at_entity_facing(
     id: u32,
 ) -> bool {
     let e = entities.get(id).expect("tank should exist");
-    standability::unit_static_standable_with_facing(map, occ, e.kind, e.pos_x, e.pos_y, e.facing())
+    standability::unit_static_standable_with_facing(
+        map,
+        occ,
+        e.kind,
+        e.pos_x(),
+        e.pos_y(),
+        e.facing(),
+    )
 }
 
 /// Two riflemen spawned right on top of each other are pushed apart to non-overlap by
@@ -866,8 +874,8 @@ fn harvesting_worker_is_fully_exempt_from_collision() {
         .spawn_unit(2, EntityKind::Tank, tank_x, tank_y)
         .unwrap();
     let worker_before = (
-        entities.get(worker).unwrap().pos_x,
-        entities.get(worker).unwrap().pos_y,
+        entities.get(worker).unwrap().pos_x(),
+        entities.get(worker).unwrap().pos_y(),
     );
 
     let occ = Occupancy::build(&map, &entities);
@@ -875,12 +883,12 @@ fn harvesting_worker_is_fully_exempt_from_collision() {
     resolve_collisions(&mut entities, &spatial, &map, &occ);
 
     let worker_after = (
-        entities.get(worker).unwrap().pos_x,
-        entities.get(worker).unwrap().pos_y,
+        entities.get(worker).unwrap().pos_x(),
+        entities.get(worker).unwrap().pos_y(),
     );
     let tank_after = (
-        entities.get(tank).unwrap().pos_x,
-        entities.get(tank).unwrap().pos_y,
+        entities.get(tank).unwrap().pos_x(),
+        entities.get(tank).unwrap().pos_y(),
     );
     assert_eq!(
         worker_before, worker_after,
@@ -1099,9 +1107,9 @@ fn clustered_units_make_progress_to_distant_goal() {
 
     for &id in &ids {
         let e = entities.get(id).unwrap();
-        let dx_start = e.pos_x - sx;
-        let dy_start = e.pos_y - sy;
-        let dist_from_start = (dx_start * dx_start + dy_start * dy_start).sqrt();
+        let dx_start = e.pos_x() - sx;
+        let dy_start = e.pos_y() - sy;
+        let dist_from_start = (dx_start * dx_start + dy_start * dy_start).det_sqrt();
         // The deadlock symptom is units barely moving from their spawn point.
         // Any unit stuck within 2 tiles of start after 600 ticks has deadlocked.
         // With the fix applied, all units disperse and move well beyond that radius.
@@ -1159,7 +1167,7 @@ fn tank_routes_around_diagonal_pinch_between_offset_factories() {
         resolve_collisions(&mut entities, &spatial, &map, &occ);
 
         let e = entities.get(tank).expect("tank should still exist");
-        let now = (e.pos_x, e.pos_y);
+        let now = (e.pos_x(), e.pos_y());
         let moved = moved_distance(last_pos, now);
         if moved <= 0.01 && !e.path_is_empty() {
             stuck_ticks += 1;
@@ -1180,15 +1188,15 @@ fn tank_routes_around_diagonal_pinch_between_offset_factories() {
     }
 
     let e = entities.get(tank).expect("tank should still exist");
-    let dx = e.pos_x - goal.0;
-    let dy = e.pos_y - goal.1;
-    let dist_to_goal = (dx * dx + dy * dy).sqrt();
+    let dx = e.pos_x() - goal.0;
+    let dy = e.pos_y() - goal.1;
+    let dist_to_goal = (dx * dx + dy * dy).det_sqrt();
     assert!(
         dist_to_goal <= config::TOLERANT_ARRIVAL_RADIUS_PX,
         "tank failed to route around the diagonal pinch; ended {:.1}px from goal at ({:.1}, {:.1})",
         dist_to_goal,
-        e.pos_x,
-        e.pos_y
+        e.pos_x(),
+        e.pos_y()
     );
 }
 
@@ -1222,26 +1230,26 @@ fn tank_moves_through_long_two_tile_wide_corridor() {
                 &map,
                 &occ,
                 EntityKind::Tank,
-                e.pos_x,
-                e.pos_y,
+                e.pos_x(),
+                e.pos_y(),
                 e.facing()
             ),
             "tank body became illegal at tick {tick}: ({:.1}, {:.1})",
-            e.pos_x,
-            e.pos_y
+            e.pos_x(),
+            e.pos_y()
         );
     }
 
     let e = entities.get(tank).expect("tank should still exist");
-    let dx = e.pos_x - goal.0;
-    let dy = e.pos_y - goal.1;
-    let dist_to_goal = (dx * dx + dy * dy).sqrt();
+    let dx = e.pos_x() - goal.0;
+    let dy = e.pos_y() - goal.1;
+    let dist_to_goal = (dx * dx + dy * dy).det_sqrt();
     assert!(
         dist_to_goal <= config::TILE_SIZE as f32,
         "tank did not traverse the long 2-tile corridor; ended {:.1}px from goal at ({:.1}, {:.1})",
         dist_to_goal,
-        e.pos_x,
-        e.pos_y
+        e.pos_x(),
+        e.pos_y()
     );
 }
 
@@ -1634,7 +1642,7 @@ fn wall_chokepoint_units_clear_exit(
     units.iter().all(|&id| {
         entities
             .get(id)
-            .is_some_and(|e| e.pos_y + radius < exit_clear_y)
+            .is_some_and(|e| e.pos_y() + radius < exit_clear_y)
     })
 }
 
@@ -1691,7 +1699,7 @@ fn unit_clears_wall_chokepoint_exit(
     let radius = config::unit_stats(unit).expect("unit stats").radius;
     entities
         .get(id)
-        .is_some_and(|e| e.pos_y + radius < exit_clear_y)
+        .is_some_and(|e| e.pos_y() + radius < exit_clear_y)
 }
 
 fn describe_units(entities: &EntityStore, units: &[u32]) -> Vec<String> {
@@ -1702,8 +1710,8 @@ fn describe_units(entities: &EntityStore, units: &[u32]) -> Vec<String> {
             let movement = e.movement.as_ref();
             Some(format!(
                 "#{id}: pos=({:.1},{:.1}) facing={:.3} phase={:?} path_len={} next={:?} goal={:?} stuck={} blocked={} recovery_cd={}",
-                e.pos_x,
-                e.pos_y,
+                e.pos_x(),
+                e.pos_y(),
                 e.facing(),
                 e.move_phase(),
                 movement.map(|m| m.path.len()).unwrap_or(0),
@@ -1790,7 +1798,7 @@ fn units_clear_tunnel_exit(
     units.iter().all(|&id| {
         entities
             .get(id)
-            .is_some_and(|e| e.pos_y + radius < exit_clear_y)
+            .is_some_and(|e| e.pos_y() + radius < exit_clear_y)
     })
 }
 
@@ -1803,7 +1811,7 @@ fn unit_clears_tunnel_exit(
     let radius = config::unit_stats(unit).expect("unit stats").radius;
     entities
         .get(id)
-        .is_some_and(|e| e.pos_y + radius < exit_clear_y)
+        .is_some_and(|e| e.pos_y() + radius < exit_clear_y)
 }
 
 fn measure_snaking_corridor_unit_clear_times(
@@ -1821,8 +1829,8 @@ fn measure_snaking_corridor_unit_clear_times(
             &map,
             &occ,
             unit,
-            e.pos_x,
-            e.pos_y,
+            e.pos_x(),
+            e.pos_y(),
             e.facing()
         ));
     }
@@ -1887,8 +1895,8 @@ fn measure_snaking_corridor_clear_time(
             &map,
             &occ,
             unit,
-            e.pos_x,
-            e.pos_y,
+            e.pos_x(),
+            e.pos_y(),
             e.facing()
         ));
     }
@@ -1941,8 +1949,8 @@ fn describe_snaking_corridor_state(entities: &EntityStore, units: &[u32]) -> Vec
             let e = entities.get(id)?;
             Some(format!(
                 "#{id}: pos=({:.1},{:.1}) facing={:.3} phase={:?} path_len={} next={:?} goal={:?}",
-                e.pos_x,
-                e.pos_y,
+                e.pos_x(),
+                e.pos_y(),
                 e.facing(),
                 e.move_phase(),
                 e.movement.as_ref().map(|m| m.path.len()).unwrap_or(0),
@@ -2701,7 +2709,7 @@ fn scout_car_route_lookahead_skips_lateral_waypoint_when_next_segment_reachable(
     );
     assert_eq!(e.next_waypoint(), Some(goal));
     assert!(
-        e.pos_x > start.0,
+        e.pos_x() > start.0,
         "scout car should drive down the reachable route after consuming the waypoint"
     );
 }
@@ -2739,7 +2747,7 @@ fn infantry_skips_lateral_waypoint_when_next_segment_reachable() {
     );
     assert_eq!(e.next_waypoint(), Some(goal));
     assert!(
-        e.pos_x > start.0,
+        e.pos_x() > start.0,
         "rifleman should move along the reachable route after consuming the waypoint"
     );
 }
@@ -2777,7 +2785,7 @@ fn worker_skips_lateral_waypoint_when_next_segment_reachable() {
     );
     assert_eq!(e.next_waypoint(), Some(goal));
     assert!(
-        e.pos_x > start.0 && e.pos_y < start.1,
+        e.pos_x() > start.0 && e.pos_y() < start.1,
         "worker should move along the reachable route after consuming the waypoint"
     );
 }
@@ -3205,8 +3213,8 @@ fn steering_neighbor_cap_position() -> (f32, f32) {
                 } else {
                     EntityKind::Rifleman
                 },
-                sx + angle.cos() * d,
-                sy + angle.sin() * d,
+                sx + angle.det_cos() * d,
+                sy + angle.det_sin() * d,
             )
             .expect("neighbor spawn");
         if i % 3 == 0 {
@@ -3248,13 +3256,13 @@ fn movement_rejects_tank_body_clipping_building_corner() {
         .expect("building spawn");
     let rect = building_rect_for_footprint(EntityKind::Depot, 10, 10).expect("depot rect");
 
-    let corner_offset = (tank_body_half_len() + 0.5) / 2.0_f32.sqrt();
+    let corner_offset = (tank_body_half_len() + 0.5) / 2.0_f32.det_sqrt();
     let start = (rect.max_x + corner_offset, rect.min_y - corner_offset);
     let goal = (rect.max_x, rect.min_y);
     let tank = entities
         .spawn_unit(1, EntityKind::Tank, start.0, start.1)
         .expect("tank spawn");
-    let desired = (goal.1 - start.1).atan2(goal.0 - start.0);
+    let desired = (goal.1 - start.1).det_atan2(goal.0 - start.0);
     if let Some(e) = entities.get_mut(tank) {
         e.set_facing(desired);
     }
@@ -3284,7 +3292,7 @@ fn movement_rejects_tank_body_clipping_building_corner() {
 
     let e = entities.get(tank).expect("tank should exist");
     assert!(
-        moved_distance(start, (e.pos_x, e.pos_y)) <= 0.01,
+        moved_distance(start, (e.pos_x(), e.pos_y())) <= 0.01,
         "tank body must not step into the building corner"
     );
 }
@@ -3299,10 +3307,10 @@ fn wall_slide_uses_unit_body_clearance() {
         .expect("building spawn");
     let rect = building_rect_for_footprint(EntityKind::Depot, 10, 10).expect("depot rect");
 
-    let future_extent_x = tank_body_half_len() * TANK_BODY_TURN_RATE_RAD_PER_TICK.cos()
-        + tank_body_half_width() * TANK_BODY_TURN_RATE_RAD_PER_TICK.sin();
-    let future_extent_y = tank_body_half_len() * TANK_BODY_TURN_RATE_RAD_PER_TICK.sin()
-        + tank_body_half_width() * TANK_BODY_TURN_RATE_RAD_PER_TICK.cos();
+    let future_extent_x = tank_body_half_len() * TANK_BODY_TURN_RATE_RAD_PER_TICK.det_cos()
+        + tank_body_half_width() * TANK_BODY_TURN_RATE_RAD_PER_TICK.det_sin();
+    let future_extent_y = tank_body_half_len() * TANK_BODY_TURN_RATE_RAD_PER_TICK.det_sin()
+        + tank_body_half_width() * TANK_BODY_TURN_RATE_RAD_PER_TICK.det_cos();
     let start = (
         rect.min_x - future_extent_x - 0.2,
         rect.min_y - future_extent_y + 0.2,
@@ -3322,11 +3330,11 @@ fn wall_slide_uses_unit_body_clearance() {
 
     let e = entities.get(tank).expect("tank should exist");
     assert!(
-        (e.pos_x - start.0).abs() <= 0.01,
+        (e.pos_x() - start.0).abs() <= 0.01,
         "x-only slide would clip the building body and must be rejected"
     );
     assert!(
-        e.pos_y > start.1,
+        e.pos_y() > start.1,
         "body-legal y-only slide should still make progress"
     );
     assert!(tank_standable_at_entity_facing(&map, &occ, &entities, tank));
@@ -3439,7 +3447,7 @@ fn tank_body_locomotion_suppresses_illegal_rotation_when_blocked() {
 
     let e = entities.get(tank).expect("tank should exist");
     assert!(
-        moved_distance(start, (e.pos_x, e.pos_y)) <= 0.01,
+        moved_distance(start, (e.pos_x(), e.pos_y())) <= 0.01,
         "blocked tank must not take an illegal body step"
     );
     assert!(
@@ -3549,10 +3557,10 @@ fn tank_body_locomotion_backs_out_when_rotation_corner_is_blocked() {
 
     let e = entities.get(tank).expect("tank should exist");
     assert!(
-        e.pos_x < start.0 - 1.0,
+        e.pos_x() < start.0 - 1.0,
         "front-corner rotation blockage should make the tank back out along its hull, start x {:.2}, got {:.2}",
         start.0,
-        e.pos_x
+        e.pos_x()
     );
     assert!(
         e.facing() > initial_facing && e.facing() <= next_facing + 0.0001,
@@ -3609,7 +3617,7 @@ fn scout_car_locomotion_suppresses_illegal_rotation_when_blocked() {
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let e = entities.get(scout).expect("scout car should exist");
-    let moved = moved_distance(start, (e.pos_x, e.pos_y));
+    let moved = moved_distance(start, (e.pos_x(), e.pos_y()));
     assert!(
         moved > 0.01 || (e.facing() - initial_facing).abs() <= 0.001,
         "scout car may rotate only when translation keeps the capsule legal"
@@ -3623,8 +3631,8 @@ fn scout_car_locomotion_suppresses_illegal_rotation_when_blocked() {
         &map,
         &occ,
         EntityKind::ScoutCar,
-        e.pos_x,
-        e.pos_y,
+        e.pos_x(),
+        e.pos_y(),
         e.facing()
     ));
 }
@@ -3697,11 +3705,11 @@ fn scout_car_former_front_blocked_fixture_keeps_original_goal() {
 
     let e = entities.get(scout).expect("scout car should exist");
     assert!(
-        moved_distance(start, (e.pos_x, e.pos_y)) > 4.0,
+        moved_distance(start, (e.pos_x(), e.pos_y())) > 4.0,
         "scout car should make direct progress without reverse recovery, start {:?}, got ({:.2}, {:.2})",
         start,
-        e.pos_x,
-        e.pos_y
+        e.pos_x(),
+        e.pos_y()
     );
     let occ = Occupancy::build(&map, &entities);
     assert!(
@@ -3709,8 +3717,8 @@ fn scout_car_former_front_blocked_fixture_keeps_original_goal() {
             &map,
             &occ,
             EntityKind::ScoutCar,
-            e.pos_x,
-            e.pos_y,
+            e.pos_x(),
+            e.pos_y(),
             e.facing()
         ),
         "direct progress should keep the scout car body legal"
@@ -3736,7 +3744,7 @@ fn scout_car_traffic_throttle_can_trigger_reverse_recovery() {
     }
     if let Some(e) = entities.get_mut(blocker) {
         e.set_facing(0.0);
-        e.pos_x = sx + 0.0001;
+        e.set_position(sx + 1.0 / rts_rules::math::Coord::SCALE as f32, e.pos_y());
     }
     set_path_direct(&mut entities, scout, vec![goal]);
     if let Some(e) = entities.get_mut(scout) {
@@ -3797,10 +3805,10 @@ fn scout_car_resumes_original_path_after_reverse_recovery() {
 
     let e = entities.get(scout).expect("scout car should exist");
     assert!(
-        moved_distance((e.pos_x, e.pos_y), goal) < moved_distance(start, goal),
+        moved_distance((e.pos_x(), e.pos_y()), goal) < moved_distance(start, goal),
         "after reversing out, scout car should resume toward the original goal; pos=({:.2},{:.2})",
-        e.pos_x,
-        e.pos_y
+        e.pos_x(),
+        e.pos_y()
     );
     assert!(
         e.path_is_empty() || e.path_goal() == Some(goal),
@@ -3817,7 +3825,7 @@ fn scout_car_reverse_recovery_is_deterministic() {
         }
         let e = entities.get(scout).expect("scout car should exist");
         (
-            (e.pos_x, e.pos_y),
+            (e.pos_x(), e.pos_y()),
             e.facing(),
             e.movement
                 .as_ref()
@@ -3862,7 +3870,7 @@ fn scout_car_consumes_lateral_intermediate_waypoint_inside_car_radius() {
     );
     assert_eq!(e.next_waypoint(), Some(goal));
     assert!(
-        e.pos_x > sx,
+        e.pos_x() > sx,
         "after consuming the lateral waypoint, scout car should continue down the route corridor"
     );
 }
@@ -3892,7 +3900,7 @@ fn scout_car_lateral_final_goal_settles_inside_final_tolerance() {
         "lateral final goal inside scout-car tolerance should settle without oscillation"
     );
     assert!(
-        moved_distance((e.pos_x, e.pos_y), goal) <= config::SCOUT_CAR_FINAL_GOAL_TOLERANCE_PX,
+        moved_distance((e.pos_x(), e.pos_y()), goal) <= config::SCOUT_CAR_FINAL_GOAL_TOLERANCE_PX,
         "settled scout car should remain inside final tolerance"
     );
 }
@@ -3944,7 +3952,7 @@ fn scout_car_turns_by_curvature_while_moving() {
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let e = entities.get(scout).expect("scout car should exist");
-    let moved = moved_distance((sx, sy), (e.pos_x, e.pos_y));
+    let moved = moved_distance((sx, sy), (e.pos_x(), e.pos_y()));
     let max_turn = config::unit_stats(EntityKind::ScoutCar)
         .expect("scout stats")
         .speed
@@ -3956,7 +3964,7 @@ fn scout_car_turns_by_curvature_while_moving() {
         e.facing()
     );
     assert!(
-        e.pos_x > sx,
+        e.pos_x() > sx,
         "scout car should advance along its facing instead of sliding straight north"
     );
 }
@@ -3983,16 +3991,16 @@ fn scout_car_does_not_pivot_in_place_for_far_goal_behind() {
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let e = entities.get(scout).expect("scout car should exist");
-    let moved = moved_distance((sx, sy), (e.pos_x, e.pos_y));
+    let moved = moved_distance((sx, sy), (e.pos_x(), e.pos_y()));
     assert!(
         moved > 0.01,
         "far behind goal should make the scout car drive through a turn, not pivot"
     );
     assert!(
-        e.pos_x > sx,
+        e.pos_x() > sx,
         "far behind goal should start as a forward turning arc instead of backing up; start x {:.2}, got {:.2}",
         sx,
-        e.pos_x
+        e.pos_x()
     );
     assert!(
         e.movement
@@ -4027,7 +4035,7 @@ fn scout_car_symmetric_far_behind_turn_is_deterministic() {
         run_scout_car_movement_tick(&map, &mut entities, 0);
 
         let e = entities.get(scout).expect("scout car should exist");
-        ((e.pos_x, e.pos_y), e.facing())
+        ((e.pos_x(), e.pos_y()), e.facing())
     }
 
     let first = run_once();
@@ -4074,10 +4082,10 @@ fn scout_car_far_behind_click_after_forward_motion_does_not_backtrack_first() {
 
     let e = entities.get(scout).expect("scout car should exist");
     assert!(
-        e.pos_x > before_click.0,
+        e.pos_x() > before_click.0,
         "clicking far behind a moving scout car should begin with a forward turn, before x {:.2}, got {:.2}",
         before_click.0,
-        e.pos_x
+        e.pos_x()
     );
     assert!(
         e.movement
@@ -4126,8 +4134,8 @@ fn scout_car_close_reverse_keeps_waypoint_latched_until_arrival() {
     assert!(
         e.path_is_empty() && matches!(e.order(), Order::Idle),
         "latched reverse should still arrive cleanly; pos=({:.2},{:.2}) goal=({:.2},{:.2}) facing={:.3}",
-        e.pos_x,
-        e.pos_y,
+        e.pos_x(),
+        e.pos_y(),
         goal.0,
         goal.1,
         e.facing()
@@ -4165,14 +4173,15 @@ fn scout_car_reversing_to_nearby_offset_goal_arrives() {
     assert!(
         e.path_is_empty() && matches!(e.order(), Order::Idle),
         "reverse steering should settle at the final waypoint instead of jiggling near it; pos=({:.2},{:.2}) goal=({:.2},{:.2}) facing={:.3}",
-        e.pos_x,
-        e.pos_y,
+        e.pos_x(),
+        e.pos_y(),
         goal.0,
         goal.1,
         e.facing()
     );
     assert!(
-        moved_distance((e.pos_x, e.pos_y), goal) <= config::VEHICLE_WAYPOINT_ACCEPTANCE_RADIUS_PX,
+        moved_distance((e.pos_x(), e.pos_y()), goal)
+            <= config::VEHICLE_WAYPOINT_ACCEPTANCE_RADIUS_PX,
         "straight reverse should settle within scout-car acceptance without reverse turning"
     );
 }
@@ -4276,7 +4285,7 @@ fn tank_pauses_when_body_badly_misaligned() {
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let e = entities.get(tank).expect("tank should exist");
-    let moved = moved_distance((sx, sy), (e.pos_x, e.pos_y));
+    let moved = moved_distance((sx, sy), (e.pos_x(), e.pos_y()));
     assert!(
         moved <= 0.01,
         "badly misaligned tank should pivot in place, moved {moved:.4}px"
@@ -4308,9 +4317,9 @@ fn tank_reverses_to_nearby_goal_behind() {
 
     let e = entities.get(tank).expect("tank should exist");
     assert!(
-        e.pos_x < sx,
+        e.pos_x() < sx,
         "near behind goal should make the tank reverse, start x {sx:.2}, got {:.2}",
-        e.pos_x
+        e.pos_x()
     );
     assert!(
         angle_delta(0.0, e.facing()).abs() <= 0.001,
@@ -4341,7 +4350,7 @@ fn tank_still_pivots_for_far_goal_behind() {
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let e = entities.get(tank).expect("tank should exist");
-    let moved = moved_distance((sx, sy), (e.pos_x, e.pos_y));
+    let moved = moved_distance((sx, sy), (e.pos_x(), e.pos_y()));
     assert!(
         moved <= 0.01,
         "far behind goal should pivot before driving, moved {moved:.4}px"
@@ -4373,7 +4382,7 @@ fn tank_does_not_reverse_for_behind_intermediate_waypoint() {
     movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
 
     let e = entities.get(tank).expect("tank should exist");
-    let moved = moved_distance((sx, sy), (e.pos_x, e.pos_y));
+    let moved = moved_distance((sx, sy), (e.pos_x(), e.pos_y()));
     assert!(
         moved <= 0.01,
         "behind intermediate waypoint should make the tank pivot before moving, moved {moved:.4}px"
@@ -4412,9 +4421,9 @@ fn tank_reverse_correction_uses_short_angle_across_wrap() {
         e.facing()
     );
     assert!(
-        e.pos_x > sx,
+        e.pos_x() > sx,
         "near behind wrapped goal should reverse toward positive x, got {:.2} from start {sx:.2}",
-        e.pos_x
+        e.pos_x()
     );
 }
 
@@ -4552,7 +4561,7 @@ fn intermediate_waypoint_consumed_by_radius() {
     );
     // Position must not have snapped to the intermediate center.
     assert!(
-        (e.pos_x - iwx).abs() > 1.0,
+        (e.pos_x() - iwx).abs() > 1.0,
         "unit position must not snap to intermediate waypoint"
     );
 }
@@ -4589,9 +4598,9 @@ fn two_units_sharing_waypoint_do_not_wedge() {
 
     for &id in &[a, b] {
         let e = entities.get(id).unwrap();
-        let dx = e.pos_x - gx;
-        let dy = e.pos_y - gy;
-        let d = (dx * dx + dy * dy).sqrt();
+        let dx = e.pos_x() - gx;
+        let dy = e.pos_y() - gy;
+        let d = (dx * dx + dy * dy).det_sqrt();
         assert!(
             d <= config::TILE_SIZE as f32 * 2.0,
             "unit {} wedged — {:.1}px from goal after 100 ticks",
@@ -4627,9 +4636,9 @@ fn final_waypoint_still_requires_close_arrival() {
         e.path_is_empty(),
         "path must be empty after arrival at final waypoint"
     );
-    let dx = e.pos_x - gx;
-    let dy = e.pos_y - gy;
-    let dist = (dx * dx + dy * dy).sqrt();
+    let dx = e.pos_x() - gx;
+    let dy = e.pos_y() - gy;
+    let dist = (dx * dx + dy * dy).det_sqrt();
     // Must be within ARRIVE_EPS OR tolerant arrival radius (stuck near goal).
     assert!(
         dist <= config::TOLERANT_ARRIVAL_RADIUS_PX,
@@ -4746,9 +4755,9 @@ fn unit_pressed_against_building_wall_reaches_goal() {
     }
 
     let e = entities.get(unit).unwrap();
-    let dx = e.pos_x - gx;
-    let dy = e.pos_y - gy;
-    let dist_to_goal = (dx * dx + dy * dy).sqrt();
+    let dx = e.pos_x() - gx;
+    let dy = e.pos_y() - gy;
+    let dist_to_goal = (dx * dx + dy * dy).det_sqrt();
     assert!(
         dist_to_goal <= config::TILE_SIZE as f32,
         "unit froze against building corner — {:.1}px from goal after 150 ticks",

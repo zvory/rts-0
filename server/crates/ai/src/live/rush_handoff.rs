@@ -51,7 +51,7 @@ impl AiController {
                 .collect();
             barracks.sort_by(|a, b| {
                 let distance =
-                    |e: &rts_sim::protocol::EntityView| (e.x - target.0).hypot(e.y - target.1);
+                    |e: &rts_sim::protocol::EntityView| (e.x - target.0).det_hypot(e.y - target.1);
                 distance(a)
                     .total_cmp(&distance(b))
                     .then_with(|| a.id.cmp(&b.id))

@@ -121,8 +121,8 @@ fn command_car_scout_plane_ability_launches_from_caster_without_a_resource_depot
         .find(|entity| entity.kind == EntityKind::ScoutPlane)
         .expect("Scout Plane should spawn");
     assert_eq!(plane.owner, 1);
-    assert_eq!(plane.pos_x, 128.0);
-    assert_eq!(plane.pos_y, 128.0);
+    assert_eq!(plane.pos_x(), 128.0);
+    assert_eq!(plane.pos_y(), 128.0);
     let state = plane.scout_plane_state().expect("plane state");
     assert_eq!(state.source_command_car, Some(command_car));
     assert_eq!(state.orbit_center, (592.0, 592.0));

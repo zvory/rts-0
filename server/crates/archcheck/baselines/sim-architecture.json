@@ -1,5 +1,5 @@
 {
-  "reason": "Remove Industrial Center and debt helpers while retaining the ordinary research command service",
+  "reason": "Extract existing manual front payment into production/manual.rs so human purchases run before repeat admission; construction exposes read-only ready-purchase facts to systems.rs. No new state owner or service dependency.",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -39,7 +39,7 @@
     },
     {
       "path": "auto_build.rs",
-      "lines": 38
+      "lines": 50
     },
     {
       "path": "building_memory.rs",
@@ -603,7 +603,7 @@
     },
     {
       "path": "services/commands/tests/production.rs",
-      "lines": 740
+      "lines": 858
     },
     {
       "path": "services/commands/tests/production_repeat.rs",
@@ -631,7 +631,7 @@
     },
     {
       "path": "services/construction.rs",
-      "lines": 1089
+      "lines": 1197
     },
     {
       "path": "services/construction/build_wait_tests.rs",
@@ -895,7 +895,7 @@
     },
     {
       "path": "services/production.rs",
-      "lines": 979
+      "lines": 856
     },
     {
       "path": "services/production/extractors.rs",
@@ -1095,7 +1095,7 @@
     },
     {
       "path": "systems.rs",
-      "lines": 586
+      "lines": 610
     },
     {
       "path": "systems/occupancy_phase_cache.rs",
@@ -1215,7 +1215,7 @@
     },
     {
       "path": "tests/repeat_production_tests.rs",
-      "lines": 665
+      "lines": 784
     },
     {
       "path": "tests/replay_artifact_tests.rs",
@@ -1276,6 +1276,14 @@
     {
       "path": "services/commands/research.rs",
       "lines": 85
+    },
+    {
+      "path": "services/production/manual.rs",
+      "lines": 120
+    },
+    {
+      "path": "tests/repeat_production_tests/manual_spending.rs",
+      "lines": 272
     }
   ],
   "service_edges": [
@@ -1757,7 +1765,7 @@
       "source": "production",
       "target": "move_coordinator",
       "path": "services/production.rs",
-      "line": 5
+      "line": 6
     },
     {
       "source": "standability",
@@ -1870,7 +1878,7 @@
     },
     {
       "path": "services/construction.rs",
-      "line": 329,
+      "line": 319,
       "name": "deconstruction_system"
     },
     {
@@ -1910,18 +1918,28 @@
     },
     {
       "path": "services/production.rs",
-      "line": 20,
+      "line": 23,
       "name": "production_system"
     },
     {
       "path": "systems.rs",
-      "line": 135,
+      "line": 136,
       "name": "run_tick"
     },
     {
       "path": "services/commands/research.rs",
       "line": 3,
       "name": "enqueue"
+    },
+    {
+      "path": "services/production/manual.rs",
+      "line": 6,
+      "name": "pay_and_protect"
+    },
+    {
+      "path": "services/production/manual.rs",
+      "line": 59,
+      "name": "pay_front"
     }
   ],
   "player_state_usages": [
@@ -2082,8 +2100,13 @@
     },
     {
       "path": "services/construction.rs",
-      "line": 329,
+      "line": 319,
       "code": "pub(crate) fn deconstruction_system(entities: &mut EntityStore, players: &mut [PlayerState]) {"
+    },
+    {
+      "path": "services/construction.rs",
+      "line": 478,
+      "code": "players: &[PlayerState],"
     },
     {
       "path": "services/death.rs",
@@ -2157,18 +2180,8 @@
     },
     {
       "path": "services/production.rs",
-      "line": 363,
-      "code": "players: &[PlayerState],"
-    },
-    {
-      "path": "services/production.rs",
-      "line": 23,
+      "line": 26,
       "code": "players: &mut [PlayerState],"
-    },
-    {
-      "path": "services/production.rs",
-      "line": 355,
-      "code": "pub(crate) fn sync_all_owned_upgrade_effects(entities: &mut EntityStore, players: &[PlayerState]) {"
     },
     {
       "path": "services/supply.rs",
@@ -2202,13 +2215,23 @@
     },
     {
       "path": "systems.rs",
-      "line": 138,
+      "line": 139,
       "code": "players: &mut [PlayerState],"
     },
     {
       "path": "services/commands/research.rs",
       "line": 5,
       "code": "players: &mut [PlayerState],"
+    },
+    {
+      "path": "services/production/manual.rs",
+      "line": 8,
+      "code": "players: &mut [PlayerState],"
+    },
+    {
+      "path": "services/production/manual.rs",
+      "line": 59,
+      "code": "pub(super) fn pay_front(entities: &mut EntityStore, players: &mut [PlayerState], id: u32) {"
     }
   ],
   "player_state_field_writes": [
@@ -2496,7 +2519,7 @@
     },
     {
       "path": "replay_artifact.rs",
-      "count": 9
+      "count": 12
     },
     {
       "path": "resource_placement.rs",
@@ -2520,7 +2543,7 @@
     },
     {
       "path": "services/construction.rs",
-      "count": 3
+      "count": 4
     },
     {
       "path": "services/death.rs",
@@ -2600,7 +2623,7 @@
     },
     {
       "path": "services/production.rs",
-      "count": 4
+      "count": 1
     },
     {
       "path": "services/scout_plane.rs",

@@ -78,7 +78,7 @@ fn first_barrage_is_free_and_unloads_sixteen_rockets() {
     assert_eq!(config::ROCKET_BARRAGE_UNLOAD_TICKS, config::TICK_HZ * 4);
     assert_eq!(
         config::ROCKET_BARRAGE_RELOAD_TICKS,
-        config::TICK_HZ as u16 * 60
+        config::TICK_HZ as u16 * 30
     );
     assert_eq!(config::ROCKET_BARRAGE_DIRECT_DAMAGE, 70);
     assert_eq!(config::ROCKET_BARRAGE_INNER_DAMAGE, 53);
@@ -111,7 +111,7 @@ fn first_barrage_is_free_and_unloads_sixteen_rockets() {
         .iter()
         .filter_map(|event| match event {
             Event::MortarLaunch { to_x, to_y, .. } => {
-                Some(dist2(*to_x, *to_y, target.0, target.1).sqrt())
+                Some(dist2(*to_x, *to_y, target.0, target.1).det_sqrt())
             }
             _ => None,
         })
@@ -143,7 +143,7 @@ fn hidden_rocket_truck_is_revealed_by_launch_without_hitting_an_enemy() {
         .state
         .entities
         .get(launcher)
-        .map(|entity| (entity.pos_x, entity.pos_y))
+        .map(|entity| (entity.pos_x(), entity.pos_y()))
         .unwrap();
     assert!(!game.state.fog.is_visible_world(2, pos.0, pos.1));
     order_barrage(&mut game, launcher, target);
@@ -219,7 +219,7 @@ fn queued_move_behind_turning_barrage_waits_for_the_unload() {
         .state
         .entities
         .get(launcher)
-        .map(|entity| (entity.pos_x, entity.pos_y))
+        .map(|entity| (entity.pos_x(), entity.pos_y()))
         .unwrap();
     let entity = game.state.entities.get_mut(launcher).unwrap();
     entity.set_facing(std::f32::consts::PI);
@@ -258,7 +258,7 @@ fn queued_move_behind_turning_barrage_waits_for_the_unload() {
         .state
         .entities
         .get(launcher)
-        .map(|e| (e.pos_x, e.pos_y))
+        .map(|e| (e.pos_x(), e.pos_y()))
         .unwrap();
     assert_ne!(
         firing_position, start,
@@ -269,7 +269,7 @@ fn queued_move_behind_turning_barrage_waits_for_the_unload() {
             .state
             .entities
             .get(launcher)
-            .map(|entity| (entity.pos_x, entity.pos_y))
+            .map(|entity| (entity.pos_x(), entity.pos_y()))
             .unwrap();
         assert_eq!(
             position, firing_position,
@@ -286,7 +286,7 @@ fn barrage_launches_do_not_leak_hidden_impact_points_to_enemies() {
         .state
         .entities
         .get(launcher)
-        .map(|entity| (entity.pos_x, entity.pos_y))
+        .map(|entity| (entity.pos_x(), entity.pos_y()))
         .unwrap();
     game.state
         .entities
@@ -387,7 +387,7 @@ fn barrage_commitment_rejects_movement_until_the_final_rocket_launches() {
         .state
         .entities
         .get(launcher)
-        .map(|entity| (entity.pos_x, entity.pos_y))
+        .map(|entity| (entity.pos_x(), entity.pos_y()))
         .unwrap();
     order_barrage(&mut game, launcher, target);
     game.tick();
@@ -406,7 +406,7 @@ fn barrage_commitment_rejects_movement_until_the_final_rocket_launches() {
         game.state
             .entities
             .get(launcher)
-            .map(|entity| (entity.pos_x, entity.pos_y))
+            .map(|entity| (entity.pos_x(), entity.pos_y()))
             .unwrap(),
         start,
         "an immediate move interrupted the committed unload"
@@ -427,7 +427,7 @@ fn barrage_commitment_rejects_movement_until_the_final_rocket_launches() {
             .state
             .entities
             .get(launcher)
-            .map(|entity| (entity.pos_x, entity.pos_y))
+            .map(|entity| (entity.pos_x(), entity.pos_y()))
             .unwrap();
         assert_eq!(
             position, start,
@@ -440,7 +440,7 @@ fn barrage_commitment_rejects_movement_until_the_final_rocket_launches() {
         .state
         .entities
         .get(launcher)
-        .map(|entity| (entity.pos_x, entity.pos_y))
+        .map(|entity| (entity.pos_x(), entity.pos_y()))
         .unwrap();
     assert_ne!(
         position, start,
@@ -636,7 +636,7 @@ fn visible_rack_count_matches_each_launch_and_origins_are_distinct_rear_slots() 
         .state
         .entities
         .get(launcher)
-        .map(|e| (e.pos_x, e.pos_y))
+        .map(|e| (e.pos_x(), e.pos_y()))
         .unwrap();
     assert_eq!(config::rocket_rack_count(0), 16);
     order_barrage(&mut game, launcher, target);
@@ -694,7 +694,7 @@ fn rack_projection_is_public_only_when_truck_is_visible() {
         .state
         .entities
         .get(launcher)
-        .map(|e| (e.pos_x, e.pos_y))
+        .map(|e| (e.pos_x(), e.pos_y()))
         .unwrap();
     game.state
         .entities
@@ -732,13 +732,13 @@ fn barrage_drives_to_a_valid_firing_pose_from_multiple_bearings_and_ranges() {
                     .state
                     .entities
                     .get(launcher)
-                    .map(|e| (e.pos_x, e.pos_y, e.facing()))
+                    .map(|e| (e.pos_x(), e.pos_y(), e.facing()))
                     .unwrap();
                 let events = game.tick();
                 let after = game.state.entities.get(launcher).unwrap();
                 if after.facing() != prior.2 {
                     assert!(
-                        (after.pos_x - prior.0).hypot(after.pos_y - prior.1) > 0.01,
+                        (after.pos_x() - prior.0).det_hypot(after.pos_y() - prior.1) > 0.01,
                         "truck pivoted in place"
                     );
                 }
@@ -749,7 +749,7 @@ fn barrage_drives_to_a_valid_firing_pose_from_multiple_bearings_and_ranges() {
                             .any(|event| matches!(event, Event::MortarLaunch { rocket: true, .. }))
                 }) {
                     let e = game.state.entities.get(launcher).unwrap();
-                    let bearing = (target.1 - e.pos_y).atan2(target.0 - e.pos_x);
+                    let bearing = (target.1 - e.pos_y()).det_atan2(target.0 - e.pos_x());
                     assert!(
                         ability::barrage_facing_ready(e.facing(), bearing),
                         "fired outside ten degrees"
@@ -763,7 +763,7 @@ fn barrage_drives_to_a_valid_firing_pose_from_multiple_bearings_and_ranges() {
                         target.1
                     ));
                     if degrees.abs() > 10.0 {
-                        assert_ne!((e.pos_x, e.pos_y), start);
+                        assert_ne!((e.pos_x(), e.pos_y()), start);
                     }
                     fired = true;
                     break;
@@ -806,7 +806,7 @@ fn barrage_positioning_respects_uphill_movement_penalty() {
         order_barrage(&mut game, launcher, target);
         game.tick();
         let e = game.state.entities.get(launcher).unwrap();
-        (e.pos_x - start.0).hypot(e.pos_y - start.1)
+        (e.pos_x() - start.0).det_hypot(e.pos_y() - start.1)
     };
     let flat = first_step(false);
     let uphill = first_step(true);

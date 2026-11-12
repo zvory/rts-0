@@ -3,7 +3,7 @@ use super::*;
 fn segment_crosses_slow_movement(map: &Map, from: (f32, f32), to: (f32, f32)) -> bool {
     let dx = to.0 - from.0;
     let dy = to.1 - from.1;
-    let steps = (dx.hypot(dy) / (config::TILE_SIZE as f32 / 4.0))
+    let steps = (dx.det_hypot(dy) / (config::TILE_SIZE as f32 / 4.0))
         .ceil()
         .max(1.0) as u32;
     (0..=steps).any(|index| {

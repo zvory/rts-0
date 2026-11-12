@@ -29,6 +29,7 @@ import {
   RESOURCE_COLLECTION_WINDOW_SECONDS,
   ResourceCollectionHistory,
   collectionAdvantageAreaPoints,
+  renderMetricAdvantage,
 } from "../../client/src/observer_analysis_resources.js";
 import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
 
@@ -124,7 +125,7 @@ import { textWithin } from "./dom_text.mjs";
     "resource collection history truncates future samples on backward replay seeks",
   );
   history.record({ tick: 60, players: [{ id: 1, resources: { last5s: {} } }] });
-  assert(history.samples.length === 0, "resource collection history stays disabled outside 1v1s");
+  assert(history.samples.length === 0, "resource collection history stays disabled below two players");
 
   const replayHistory = new ResourceCollectionHistory();
   replayHistory.applyReplaySamples({ replace: true, samples: [
@@ -145,6 +146,58 @@ import { textWithin } from "./dom_text.mjs";
     replayHistory.samples.length === 2 && replayHistory.samples.at(-1).steel === 8,
     "replay resource history replaces future samples after a backward seek",
   );
+}
+
+{
+  const history = new ResourceCollectionHistory();
+  const analysis = (tick) => ({ tick, players: [4, 2, 1, 3].map((id) => ({
+    id,
+    resources: { lifetime: { steel: id * tick, oil: id * tick / 2 } },
+    resourcesLost: { steel: id * 100, oil: id * 10 },
+    units: [{ steelValue: id * 50, oilValue: id * 20 }],
+  })) });
+  history.record(analysis(0));
+  history.record(analysis(240));
+  const latest = history.samples.at(-1);
+  assert(latest.players.map((row) => row.id).join() === "1,2,3,4",
+    "four-player histories use stable player ids regardless of incoming roster order");
+  for (const row of latest.players) {
+    assert(row.steel === row.id * 240 && row.oil === row.id * 120
+      && row.aliveSteel === row.id * 140 && row.lostSteel === row.id * 100
+      && row.unitSteel === row.id * 50 && row.unitOil === row.id * 20,
+    "every player retains independent collection, alive, lost, and current army values");
+  }
+  const replay = new ResourceCollectionHistory();
+  replay.applyReplaySamples({ replace: true, samples: history.samples });
+  assert(replay.samples.at(-1).players[3].steel === 960,
+    "reliable replay history preserves all four individual series");
+  withFakeOverlayDocument(() => {
+    const rows = [1, 2, 3, 4].map((id) => ({ id, name: `Player ${id}`, color: `#${id}${id}${id}` }));
+    for (const metric of ["collection", "alive", "lost", "units"]) {
+      for (const count of [3, 4]) {
+        const chart = renderMetricAdvantage({ rows: rows.slice(0, count), samples: replay.samples, currentTick: 300, metric });
+        const paths = findFakes(chart, (el) => el.getAttribute("data-player-id"));
+        assert(paths.length === count * 2 && paths.every((path) => !/NaN|undefined/.test(path.getAttribute("d"))),
+          `${metric} charts draw a steel and oil line for every player in ${count}-player games`);
+        const axes = findFakes(chart, (el) => el.getAttribute("class") === "replay-resource-advantage-axis");
+        assert(axes.length === 2 && axes.every((axis) => axis.getAttribute("d").startsWith("M 371,")),
+          "multiplayer graphs keep their numeric axes on the right");
+        assert(findFakes(chart, (el) => el.classList.contains("replay-resource-history-legend")).length === 2,
+          "each resource chart includes its player color legend");
+      }
+    }
+  });
+  replay.applyReplaySamples({ replace: true, samples: [history.samples[0]] });
+  assert(replay.samples.length === 1 && replay.samples[0].players.length === 4,
+    "four-player backward replay seeks discard future values");
+  history.record(analysis(120));
+  assert(history.samples.at(-1).tick === 120 && history.samples.length === 2,
+    "live four-player history truncates and resamples after rewinding");
+  const changed = analysis(150);
+  changed.players[0].id = 5;
+  history.record(changed);
+  assert(history.samples.length === 1 && history.samples[0].players.some((row) => row.id === 5),
+    "changing any roster member resets history instead of mixing player identities");
 }
 
 {
@@ -862,7 +915,14 @@ import { textWithin } from "./dom_text.mjs";
     assert(findFakes(aliveCharts[0], (el) => el.getAttribute("aria-label")?.includes("alive resources advantage")).length === 1,
       "alive chart describes the alive-resource comparison");
     const aliveOutline = findFakes(aliveCharts[0], (el) => el.getAttribute("class") === "replay-resource-advantage-outline")[0];
-    assert(aliveOutline.getAttribute("d").includes("87.0"), "alive chart plots negative alive advantage below zero despite positive collection advantage");
+    assert(Number(aliveOutline.getAttribute("d").split(" L ").at(-1).split(",")[1]) > 46, "alive chart plots negative alive advantage below zero despite positive collection advantage");
+    assert(findFakes(aliveCharts[0], (el) => el.getAttribute("class") === "replay-resource-advantage-axis").length === 1,
+      "comparison chart includes a right-side Y axis");
+    const graphNames = findFakes(aliveCharts[0], (el) => el.getAttribute("class") === "replay-resource-advantage-player-label");
+    assert(graphNames.length === 2 && Number(graphNames[0].getAttribute("y")) < 46 && Number(graphNames[1].getAttribute("y")) > 46,
+      "player names sit above and below the zero line inside the left edge of each graph");
+    assert(textWithin(aliveCharts[0]).includes("+500") && textWithin(aliveCharts[0]).includes("−500"),
+      "comparison chart labels its rounded symmetric numeric extent");
     overlay.applyReplayResourceHistory({ replace: true, samples: [
       { tick: 0, steel: 0, oil: 0, aliveSteel: 0, aliveOil: 0 },
     ] });

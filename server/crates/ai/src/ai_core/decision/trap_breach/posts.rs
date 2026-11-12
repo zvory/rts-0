@@ -45,7 +45,7 @@ pub(super) fn fan(
     angles
         .iter()
         .map(|angle| {
-            let (sin, cos) = angle.to_radians().sin_cos();
+            let (sin, cos) = angle.to_radians().det_sin_cos();
             let dir = (back.0 * cos - back.1 * sin, back.0 * sin + back.1 * cos);
             (trap.0 + dir.0 * depth * ts, trap.1 + dir.1 * depth * ts)
         })
@@ -116,7 +116,7 @@ pub(super) fn clearance_of(a: (f32, f32), b: (f32, f32), enemies: &[(f32, f32)],
             } else {
                 0.0
             };
-            dist2(a.0 + dx * along, a.1 + dy * along, e.0, e.1).sqrt() / ts
+            dist2(a.0 + dx * along, a.1 + dy * along, e.0, e.1).det_sqrt() / ts
         })
         .fold(40.0f32, f32::min)
 }
@@ -150,7 +150,7 @@ pub(super) fn fire_posts(
     let clearance = |p: &(f32, f32)| {
         enemy_tanks
             .iter()
-            .map(|e| dist2(e.0, e.1, p.0, p.1).sqrt() / ts)
+            .map(|e| dist2(e.0, e.1, p.0, p.1).det_sqrt() / ts)
             .fold(40.0f32, f32::min)
     };
     let angles: Vec<f32> = (-9..=9).map(|k| k as f32 * 10.0).collect();
@@ -203,8 +203,8 @@ pub(super) fn safe_posts(
         for step in 0..18 {
             let angle = step as f32 * std::f32::consts::TAU / 18.0;
             let p = (
-                trap.0 + angle.cos() * radius * ts,
-                trap.1 + angle.sin() * radius * ts,
+                trap.0 + angle.det_cos() * radius * ts,
+                trap.1 + angle.det_sin() * radius * ts,
             );
             if crosses_traps(p, jeff_side, standing, ts)
                 || standing

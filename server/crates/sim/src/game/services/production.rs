@@ -12,6 +12,7 @@ use crate::game::PlayerState;
 use crate::rules;
 
 mod extractors;
+mod manual;
 mod repeat;
 
 /// Advance each building's front production item; on completion spawn the unit adjacent to the
@@ -28,7 +29,9 @@ pub(crate) fn production_system(
     smokes: &SmokeCloudStore,
     _events: &mut std::collections::HashMap<u32, Vec<crate::protocol::Event>>,
     tick: u32,
+    mut pending_spending: std::collections::HashMap<u32, rules::economy::ResourceCost>,
 ) {
+    manual::pay_and_protect(entities, players, &mut pending_spending);
     let mut completed_buildings_by_owner = None;
     for id in entities.ids() {
         let active_producer = entities.get(id).is_some_and(|producer| {
@@ -108,7 +111,13 @@ pub(crate) fn production_system(
                 let cost = rules::economy::resource_cost(unit);
                 let supply = rules::economy::supply_cost(unit);
                 let supply_available = player.can_reserve_supply(supply);
-                let auto_build_allowed = player.can_auto_build(cost);
+                let auto_build_allowed = player.can_auto_build(
+                    cost,
+                    pending_spending
+                        .get(&owner)
+                        .copied()
+                        .unwrap_or(rules::economy::ResourceCost::new(0, 0)),
+                );
                 if supply_available && auto_build_allowed && player.spend_cost(cost) {
                     if player.reserve_supply(supply) {
                         let queued = entities.get_mut(id).is_some_and(|producer| {
@@ -133,64 +142,14 @@ pub(crate) fn production_system(
                 }
             }
         }
-        if let Some((owner, research)) =
-            entities
-                .get(id)
-                .filter(|_| active_producer)
-                .and_then(|building| {
-                    building
-                        .research_queue()
-                        .first()
-                        .filter(|item| !item.paid)
-                        .map(|item| (building.owner, item.upgrade))
-                })
+        if active_producer
+            && entities.get(id).is_some_and(|building| {
+                players
+                    .iter()
+                    .any(|player| player.id == building.owner && player.is_ai)
+            })
         {
-            let definition = upgrade::definition(research);
-            let cost =
-                rules::economy::ResourceCost::new(definition.cost_steel, definition.cost_oil);
-            if let Some(player) = players.iter_mut().find(|player| player.id == owner) {
-                if player.spend_cost(cost)
-                    && !entities
-                        .get_mut(id)
-                        .is_some_and(|building| building.mark_front_research_paid())
-                {
-                    player.refund_cost(cost);
-                }
-            }
-        }
-        if let Some((owner, unit)) =
-            entities
-                .get(id)
-                .filter(|_| active_producer)
-                .and_then(|building| {
-                    building
-                        .prod_queue()
-                        .first()
-                        .filter(|item| !item.paid)
-                        .map(|item| (building.owner, item.unit))
-                })
-        {
-            if unit.is_resource_extractor() && extractors::target(entities, id, unit).is_none() {
-                continue;
-            }
-            let cost = rules::economy::resource_cost(unit);
-            let supply = rules::economy::supply_cost(unit);
-            if let Some(player) = players.iter_mut().find(|player| player.id == owner) {
-                let supply_available = player.can_reserve_supply(supply);
-                if supply_available && player.spend_cost(cost) {
-                    if player.reserve_supply(supply) {
-                        if !entities
-                            .get_mut(id)
-                            .is_some_and(|building| building.mark_front_production_paid())
-                        {
-                            player.refund_cost(cost);
-                            player.release_supply(supply);
-                        }
-                    } else {
-                        player.refund_cost(cost);
-                    }
-                }
-            }
+            manual::pay_front(entities, players, id);
         }
         let completed_research = {
             match entities.get_mut(id) {
@@ -337,6 +296,7 @@ mod tests {
     use crate::game::services::standability;
     use crate::game::{map::Map, ScoreState};
     use crate::protocol::terrain;
+    use rts_rules::math::GameplayMath as _;
 
     mod rally;
     mod repeat_locking;
@@ -463,7 +423,7 @@ mod tests {
         let map = flat_map(40);
         let mut entities = EntityStore::new();
         let factory = spawn_factory(&map, &mut entities, 10, 10);
-        let factory_x = entities.get(factory).expect("factory").pos_x;
+        let factory_x = entities.get(factory).expect("factory").pos_x();
         // Rally far to the +x side of the factory.
         let rally = map.tile_center(30, 11);
         entities
@@ -487,14 +447,14 @@ mod tests {
         let spawned = entities.get(tank.0).expect("spawned tank");
         assert_angle_close(
             spawned.facing(),
-            (rally.1 - spawned.pos_y).atan2(rally.0 - spawned.pos_x),
+            (rally.1 - spawned.pos_y()).det_atan2(rally.0 - spawned.pos_x()),
         );
         assert!(
             matches!(spawned.order(), Order::AttackMove(_)),
             "spawned non-worker should default to attack-moving to the rally point"
         );
         let goal = spawned.path_goal().expect("rally move should set a goal");
-        let dist = ((goal.0 - rally.0).powi(2) + (goal.1 - rally.1).powi(2)).sqrt();
+        let dist = ((goal.0 - rally.0).det_powi(2) + (goal.1 - rally.1).det_powi(2)).det_sqrt();
         assert!(
             dist <= crate::config::TILE_SIZE as f32 * 4.0,
             "rally move goal should be near the rally point, was {dist} px away"
@@ -607,6 +567,7 @@ mod tests {
             &smokes,
             &mut events,
             1,
+            HashMap::new(),
         );
         coordinator.process_awaiting_paths(&mut entities);
 
@@ -629,7 +590,7 @@ mod tests {
         spawn_factory(&map, &mut entities, 4, 4);
         let spawn = map.tile_center(5, 3);
         let rally = map.tile_center(5, 10);
-        let desired_facing = (rally.1 - spawn.1).atan2(rally.0 - spawn.0);
+        let desired_facing = (rally.1 - spawn.1).det_atan2(rally.0 - spawn.0);
         let occ = Occupancy::build(&map, &entities);
         let mut pathing = PathingService::new(8_192, 256);
         pathing.advance_tick(1);
@@ -720,8 +681,8 @@ mod tests {
                     &map,
                     &occ,
                     EntityKind::AntiTankGun,
-                    anti_tank_gun.pos_x,
-                    anti_tank_gun.pos_y,
+                    anti_tank_gun.pos_x(),
+                    anti_tank_gun.pos_y(),
                     facing,
                 ),
                 "anti-tank gun spawn should remain legal at facing {facing:.3}"
@@ -834,6 +795,7 @@ mod tests {
             &smokes,
             &mut events,
             1,
+            HashMap::new(),
         );
     }
 
@@ -881,7 +843,7 @@ mod tests {
         entities
             .iter()
             .filter(|e| e.owner == owner && e.kind == EntityKind::Tank && e.hp > 0)
-            .map(|e| (e.id, e.pos_x, e.pos_y))
+            .map(|e| (e.id, e.pos_x(), e.pos_y()))
             .collect()
     }
 

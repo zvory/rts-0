@@ -105,6 +105,15 @@ for (const pkg of metadata.packages) {
   }
   for (const file of rustFiles(path.join(root, "src"))) {
     const text = readFileSync(file, "utf8");
+    if (["rts-rules", "rts-sim", "rts-ai"].includes(pkg.name)) {
+      const platformMath = /(?:\.\s*|\bf(?:32|64)::)(sqrt|sin|cos|tan|asin|acos|atan|atan2|hypot|powf|powi|exp|ln|log|log2|log10|exp2|cbrt|sin_cos|mul_add)\s*\(/;
+      if (platformMath.test(text)) {
+        failures.push(`${path.relative(repoRoot, file)} uses platform gameplay math; use rts-rules::math::GameplayMath`);
+      }
+      if (text.includes("libm::") && path.relative(root, file) !== "src/math.rs") {
+        failures.push(`${path.relative(repoRoot, file)} bypasses the versioned gameplay math facade`);
+      }
+    }
     const match = text.match(serverOnlyImportPattern);
     if (match) {
       failures.push(`${pkg.name} imports server-only API ${match[1]} in ${path.relative(repoRoot, file)}`);

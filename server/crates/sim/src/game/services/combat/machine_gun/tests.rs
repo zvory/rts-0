@@ -1,6 +1,7 @@
 use super::*;
 use crate::game::firing_reveal::FiringRevealSource;
-use rand::{rngs::SmallRng, SeedableRng};
+use crate::rng::PortableRng;
+use rand::SeedableRng;
 fn open_map(size: u32) -> Map {
     Map {
         width: size,
@@ -33,7 +34,7 @@ fn cone_geometry_has_expected_single_target_and_dense_coverage() {
         .spawn_unit(2, EntityKind::Rifleman, 313.0, 318.0)
         .unwrap();
     let teams = TeamRelations::from_player_teams([(1, 1), (2, 2), (3, 3)]);
-    let mut rng = SmallRng::seed_from_u64(721);
+    let mut rng = PortableRng::seed_from_u64(721);
     let (mut single, mut dense) = (0, 0);
     for _ in 0..30000 {
         for ray in 0..rules::MG_BURST_BULLETS {
@@ -42,7 +43,10 @@ fn cone_geometry_has_expected_single_target_and_dense_coverage() {
             } else {
                 rng.gen_range(-rules::MG_HALF_SPREAD_RAD..=rules::MG_HALF_SPREAD_RAD)
             };
-            let end = (100.0 + angle.cos() * 214.0, 300.0 + angle.sin() * 214.0);
+            let end = (
+                100.0 + angle.det_cos() * 214.0,
+                300.0 + angle.det_sin() * 214.0,
+            );
             let single_hit = first_hit(
                 &map,
                 &entities,
@@ -139,7 +143,7 @@ fn burst_damages_front_only_and_emits_fixed_rays_without_hidden_viewer_data() {
         &LineOfSight::new(&map),
         &fog,
         &SmokeCloudStore::new(),
-        &mut SmallRng::seed_from_u64(1),
+        &mut PortableRng::seed_from_u64(1),
         &mut events,
         &mut reveals,
         attacker,
@@ -188,7 +192,7 @@ fn scout_car_burst_cannot_one_shot_completed_resource_buildings() {
             &LineOfSight::new(&map),
             &fog,
             &SmokeCloudStore::new(),
-            &mut SmallRng::seed_from_u64(1),
+            &mut PortableRng::seed_from_u64(1),
             &mut events,
             &mut vec![],
             attacker,
@@ -266,7 +270,7 @@ fn hidden_incidental_victims_do_not_disclose_impact_positions() {
             &LineOfSight::with_smoke(&map, &smokes),
             &fog,
             &smokes,
-            &mut SmallRng::seed_from_u64(1),
+            &mut PortableRng::seed_from_u64(1),
             &mut events,
             &mut vec![],
             attacker,
@@ -346,7 +350,7 @@ fn shooting_traps_does_not_disclose_a_concealed_shooter() {
         &LineOfSight::new(&map),
         &fog,
         &SmokeCloudStore::new(),
-        &mut SmallRng::seed_from_u64(1),
+        &mut PortableRng::seed_from_u64(1),
         &mut events,
         &mut reveals,
         attacker,

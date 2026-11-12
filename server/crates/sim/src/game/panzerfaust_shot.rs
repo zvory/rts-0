@@ -1,3 +1,4 @@
+use rts_rules::math::Coord;
 use std::collections::HashMap;
 
 use crate::config;
@@ -17,10 +18,10 @@ struct PanzerfaustShot {
     owner: u32,
     attacker: u32,
     target: u32,
-    source_x: f32,
-    source_y: f32,
-    impact_x: f32,
-    impact_y: f32,
+    source_x: Coord,
+    source_y: Coord,
+    impact_x: Coord,
+    impact_y: Coord,
     impact_tick: u32,
 }
 
@@ -43,10 +44,10 @@ impl PanzerfaustShotStore {
                 shot.owner,
                 shot.attacker,
                 shot.target,
-                shot.source_x,
-                shot.source_y,
-                shot.impact_x,
-                shot.impact_y,
+                shot.source_x.to_world(),
+                shot.source_y.to_world(),
+                shot.impact_x.to_world(),
+                shot.impact_y.to_world(),
                 shot.impact_tick,
             )
         })
@@ -75,10 +76,10 @@ impl PanzerfaustShotStore {
             owner,
             attacker,
             target,
-            source_x: source.0,
-            source_y: source.1,
-            impact_x: impact.0,
-            impact_y: impact.1,
+            source_x: Coord::from_world(source.0),
+            source_y: Coord::from_world(source.1),
+            impact_x: Coord::from_world(impact.0),
+            impact_y: Coord::from_world(impact.1),
             impact_tick: tick.saturating_add(config::PANZERFAUST_TRAVEL_TICKS),
         });
     }
@@ -127,7 +128,7 @@ fn resolve(
         {
             return None;
         }
-        Some((target.owner, target.kind, (target.pos_x, target.pos_y)))
+        Some((target.owner, target.kind, (target.pos_x(), target.pos_y())))
     });
     let visual_impact = damage_result
         .and_then(|(_, _, pos)| {
@@ -135,7 +136,7 @@ fn resolve(
                 && !smokes.point_inside(pos.0, pos.1))
             .then_some(pos)
         })
-        .unwrap_or((shot.impact_x, shot.impact_y));
+        .unwrap_or((shot.impact_x.to_world(), shot.impact_y.to_world()));
     emit_impact(events, fog, smokes, teams, shot.owner, visual_impact);
 
     if let Some((victim_owner, victim_kind, victim_pos)) = damage_result {
@@ -144,7 +145,7 @@ fn resolve(
                 .is_some_and(combat::weapon_triggers_tank_armor_reaction);
         let damage = combat::panzerfaust_loaded_shot_damage(victim_kind, Some(TerrainKind::Open));
         let damage = map.damage_after_reduction_tile(victim_pos.0, victim_pos.1, damage);
-        let source_pos = (shot.source_x, shot.source_y);
+        let source_pos = (shot.source_x.to_world(), shot.source_y.to_world());
         let enemy_hit = teams.is_enemy_owner(shot.owner, victim_owner);
         let damaged = entities.get_mut(shot.target).is_some_and(|target| {
             let damaged = if enemy_hit {

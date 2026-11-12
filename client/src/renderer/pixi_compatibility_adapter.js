@@ -1,4 +1,4 @@
-import { isResource } from "../protocol.js";
+import { KIND, WEAPON_KIND, isResource } from "../protocol.js";
 import { PRESENTATION_OUTCOME, immediatePresentationSubmission } from "../presentation/submission.js";
 import { copyGridSnapshotInto } from "../presentation/grid_snapshot.js";
 import { createRendererProjectionQueries } from "../presentation/projection_record.js";
@@ -406,7 +406,8 @@ function buildStateFacade(frame, entities, rememberedBuildings, trenches, feedba
     tick: frame.diagnosticsContext.sourceTick,
     _curById: legacy.currentById,
     _prevById: legacy.previousById,
-    weaponRecoil: (id) => legacy.recoilById.get(id) ?? 0,
+    weaponRecoil: (id, kind, now, weaponKind) =>
+      (weaponKind === WEAPON_KIND.TANK_COAX ? legacy.coaxRecoilById : legacy.recoilById).get(id) ?? 0,
     weaponRecoilPhase: (id) => legacy.recoilPhaseById.get(id) ?? 0,
     weaponRecoilKind: (id) => legacy.recoilKindById.get(id),
     isFeedbackOwner: feedback.isFeedbackOwner,
@@ -420,6 +421,7 @@ function snapshotLegacyState(state, entities, now, profiler) {
   const currentById = new Map();
   const previousById = new Map();
   const recoilById = new Map();
+  const coaxRecoilById = new Map();
   const recoilPhaseById = new Map();
   const recoilKindById = new Map();
   for (const entity of entities) {
@@ -430,6 +432,9 @@ function snapshotLegacyState(state, entities, now, profiler) {
       if (typeof state?.weaponRecoil === "function") {
         recoil = finiteNumber(state.weaponRecoil(entity.id, entity.kind, now), 0);
         recoilById.set(entity.id, recoil);
+        if (entity.kind === KIND.TANK) {
+          coaxRecoilById.set(entity.id, finiteNumber(state.weaponRecoil(entity.id, entity.kind, now, WEAPON_KIND.TANK_COAX), 0));
+        }
       }
       if (typeof state?.weaponRecoilPhase === "function") {
         recoilPhaseById.set(entity.id, finiteNumber(state.weaponRecoilPhase(entity.id, entity.kind, now), 0));
@@ -447,6 +452,7 @@ function snapshotLegacyState(state, entities, now, profiler) {
     currentById,
     previousById,
     recoilById,
+    coaxRecoilById,
     recoilPhaseById,
     recoilKindById,
   };
@@ -456,12 +462,14 @@ function materializeLegacySnapshot(record) {
   const currentById = new Map();
   const previousById = new Map();
   const recoilById = new Map();
+  const coaxRecoilById = new Map();
   const recoilPhaseById = new Map();
   const recoilKindById = new Map();
   for (const pose of record?.poses || []) {
     copyPose(currentById, pose.id, pose.current);
     copyPose(previousById, pose.id, pose.previous);
     if (Number.isFinite(pose.recoil)) recoilById.set(pose.id, pose.recoil);
+    if (Number.isFinite(pose.coaxRecoil)) coaxRecoilById.set(pose.id, pose.coaxRecoil);
     if (Number.isFinite(pose.recoilPhase)) recoilPhaseById.set(pose.id, pose.recoilPhase);
     if (pose.recoilKind) recoilKindById.set(pose.id, pose.recoilKind);
   }
@@ -470,6 +478,7 @@ function materializeLegacySnapshot(record) {
     currentById,
     previousById,
     recoilById,
+    coaxRecoilById,
     recoilPhaseById,
     recoilKindById,
   };

@@ -13,6 +13,7 @@
 use super::geometry::{dist2, squared};
 use super::opening_rush::LiveStep;
 use super::*;
+use rts_rules::math::GameplayMath as _;
 
 mod posts;
 use posts::*;
@@ -232,7 +233,10 @@ pub(super) fn plan_live(
     memory: &mut AiDecisionMemory,
     (actions, observation, map_analysis, intents): LiveStep<'_, '_, '_, '_>,
 ) {
-    if !uses_trap_breach(profile_id) {
+    // Jeff's AI V1.1 (`southroute`) goes round Schone Tage's V instead of shooting it down.
+    if !uses_trap_breach(profile_id)
+        || super::jeff_v1_1::south_route::skips_breach(profile_id, observation)
+    {
         return;
     }
     memory.trap_breach.notes.clear();
@@ -261,6 +265,14 @@ pub(super) fn plan_live(
     let zones = super::tank_micro::zones(observation, &memory.tank_micro);
     let home_tank = memory.home_defensive_tank;
     let guards: BTreeSet<u32> = memory.later_bases.guards.iter().copied().collect();
+    // Jeff's AI V1.1's Tank raid keeps its Tanks (`tug2`): taken by both, they drove between the
+    // raid and the breach.
+    let raiding: BTreeSet<u32> =
+        if memory.profile_id().is_some_and(is_jeff_v1_1) && !jeff_v1_1::off("tug2") {
+            memory.jeff_v1_1.tank_raid.tank_ids().collect()
+        } else {
+            BTreeSet::new()
+        };
     let home_attacked = defense::local_defense_contact(observation).is_some();
     let breach = &mut memory.trap_breach;
     let owned_ok = |id: &u32| {
@@ -269,8 +281,12 @@ pub(super) fn plan_live(
             .iter()
             .any(|unit| unit.id == *id && unit.hp > 0)
     };
-    breach.tanks.retain(|id| owned_ok(id));
-    breach.posts.retain(|id, _| owned_ok(id));
+    breach
+        .tanks
+        .retain(|id| owned_ok(id) && !raiding.contains(id));
+    breach
+        .posts
+        .retain(|id, _| owned_ok(id) && !raiding.contains(id));
     if breach.phase == Phase::Done {
         // A line still across the route (one an opponent built, or one left standing) starts a
         // new breach, a while after one stopped for want of a safe trap.
@@ -292,7 +308,7 @@ pub(super) fn plan_live(
         .iter()
         .filter(|unit| unit.kind == EntityKind::Tank && unit.is_complete && unit.hp > 0)
         .filter(|unit| Some(unit.id) != home_tank && !guards.contains(&unit.id))
-        .filter(|unit| !breach.tanks.contains(&unit.id))
+        .filter(|unit| !breach.tanks.contains(&unit.id) && !raiding.contains(&unit.id))
         .filter(|unit| {
             breach
                 .dropped
@@ -1056,9 +1072,9 @@ fn pick_target(
                 }
                 let margin = enemy_tanks
                     .iter()
-                    .map(|e| dist2(e.0, e.1, p.0, p.1).sqrt() / ts)
+                    .map(|e| dist2(e.0, e.1, p.0, p.1).det_sqrt() / ts)
                     .fold(40.0f32, f32::min);
-                let away = dist2(group.0, group.1, p.0, p.1).sqrt() / ts;
+                let away = dist2(group.0, group.1, p.0, p.1).det_sqrt() / ts;
                 Some((id, margin - TARGET_DISTANCE_WEIGHT * away))
             })
             .max_by(|a, b| a.1.total_cmp(&b.1).then_with(|| b.0.cmp(&a.0)))
@@ -1174,7 +1190,7 @@ fn drop_stuck_tanks(observation: &AiObservation, breach: &mut TrapBreach) {
             breach.progress.remove(&tank.id);
             continue;
         };
-        let tiles = (dist2(tank.x, tank.y, post.0, post.1).sqrt() / ts) as u32;
+        let tiles = (dist2(tank.x, tank.y, post.0, post.1).det_sqrt() / ts) as u32;
         if tiles as f32 <= IN_POSITION_TILES + 1.0 {
             breach.progress.remove(&tank.id);
             continue;

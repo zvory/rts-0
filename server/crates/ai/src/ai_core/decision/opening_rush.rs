@@ -38,6 +38,7 @@ use crate::ai_core::map_analysis::AiTile;
 use crate::ai_core::squad_micro::{
     plan_rifle_squad, RifleSquadParams, SquadMicroMemory, SquadOrder,
 };
+use rts_rules::math::GameplayMath as _;
 
 /// The middle of the map: the squad is as close to the enemy base as to its own. Against AI 2.1 the
 /// two opening groups always come into sight before this (they meet at 46-49% of the route).
@@ -66,6 +67,8 @@ const START_TICK_LIMIT: u32 = 90;
 /// Distance between march waypoints along the base route.
 const WAYPOINT_STRIDE_TILES: usize = 8;
 const WAYPOINT_REACHED_TILES: f32 = 4.0;
+/// Jeff's AI V1.1's one-path march (`fastmarch`) takes every this-many-th waypoint.
+const FAST_PATH_STRIDE: usize = 3;
 /// Enemies this close to any squad member are the fight the squad is in.
 const ENGAGE_RADIUS_TILES: f32 = 14.0;
 /// No player can have Entrenchment sooner: Barracks, then a Training Centre (560 ticks), then 600
@@ -181,6 +184,8 @@ pub(in crate::ai_core::decision) struct OpeningRush {
     emergency_rifle_target: Option<usize>,
     /// The withdrawing squad was last sent at a raid on Jeff's base rather than around it.
     withdraw_attacking: bool,
+    /// Jeff's AI V1.1 (`fastmarch`): the squad was sent down the rest of the march as one path.
+    fast_path: bool,
 }
 
 impl OpeningRush {
@@ -214,6 +219,22 @@ impl OpeningRush {
     /// Whether the enemy's opening attack slipped past the squad toward Jeff's base.
     pub(in crate::ai_core::decision) fn missed_contact(&self) -> bool {
         self.missed_contact
+    }
+
+    /// The squad while it marches or denies (Jeff's AI V1.1's Meth strike takes it in).
+    pub(in crate::ai_core::decision) fn out_squad(&self) -> Option<&BTreeSet<u32>> {
+        matches!(self.phase, RushPhase::March | RushPhase::Deny).then_some(&self.squad)
+    }
+
+    /// Ends the rush and hands its squad over.
+    pub(in crate::ai_core::decision) fn hand_over(&mut self) -> BTreeSet<u32> {
+        self.phase = RushPhase::Done;
+        std::mem::take(&mut self.squad)
+    }
+
+    /// Whether an enemy Rifleman or gun has been seen moving at Meth speed.
+    pub(in crate::ai_core::decision) fn enemy_meth_seen(&self) -> bool {
+        self.enemy_meth_seen
     }
 
     /// While the enemy's opening attack is loose, Riflemen lead `priorities` until Jeff has the
@@ -316,6 +337,7 @@ pub(super) fn plan(
     live_jeff: bool,
 ) -> RushDecision {
     let mut decision = RushDecision::default();
+    let fast = memory.profile_id().is_some_and(is_jeff_v1_1) && !jeff_v1_1::off("fastmarch");
     // Squad members dug in by now, read before the rush state is borrowed.
     let dug_in: BTreeSet<u32> = memory
         .opening_rush
@@ -499,6 +521,36 @@ pub(super) fn plan(
     let Some(&objective) = rush.waypoints.get(rush.next_waypoint) else {
         return decision;
     };
+    // Jeff's AI V1.1 (`fastmarch`): with nothing near, the squad walks the rest of the march as one
+    // queued path along the route, every `FAST_PATH_STRIDE`th waypoint, instead of being stepped on
+    // from waypoint to waypoint; the planner takes over at contact.
+    if fast && near.is_empty() {
+        if !rush.fast_path {
+            let ids: Vec<u32> = rush.squad.iter().copied().collect();
+            let legs: Vec<(i32, i32)> = rush.waypoints[rush.next_waypoint..]
+                .iter()
+                .copied()
+                .step_by(FAST_PATH_STRIDE)
+                .chain(rush.waypoints.last().copied())
+                .collect();
+            let mut legs = legs;
+            legs.dedup();
+            for (index, leg) in legs.iter().enumerate() {
+                if let Some(units) = actions::move_units_with_queue(
+                    actions,
+                    ids.iter().copied(),
+                    leg.0 as f32,
+                    leg.1 as f32,
+                    index > 0,
+                ) {
+                    decision.moved.extend(units);
+                }
+            }
+            rush.fast_path = true;
+        }
+        return decision;
+    }
+    rush.fast_path = false;
     // The planner fights every enemy it is shown, so it sees only the ones near the squad; enemies
     // spotted by home units elsewhere are not this squad's fight.
     let mut local = observation.clone();
@@ -994,8 +1046,8 @@ fn trade(
 
 pub(super) fn fighter(unit: &AiEntitySummary, meth: bool, entrenched: bool) -> Option<Fighter> {
     let weapon = rts_rules::combat::default_weapon_profile(unit.kind)?;
-    let cooldown = if meth && matches!(unit.kind, EntityKind::Rifleman) {
-        rts_rules::balance::METHAMPHETAMINES_RIFLEMAN_ATTACK_COOLDOWN_TICKS
+    let cooldown = if meth && rts_rules::is_rifle_infantry(unit.kind) {
+        rts_rules::balance::METHAMPHETAMINES_RIFLE_ATTACK_COOLDOWN_TICKS
     } else {
         weapon.cooldown
     };
@@ -1217,7 +1269,7 @@ fn centroid(units: &[&AiEntitySummary]) -> (f32, f32) {
 }
 
 fn distance(a: (f32, f32), b: (f32, f32)) -> f32 {
-    (a.0 - b.0).hypot(a.1 - b.1)
+    (a.0 - b.0).det_hypot(a.1 - b.1)
 }
 
 #[cfg(test)]

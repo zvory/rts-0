@@ -206,6 +206,9 @@ impl RoomTask {
             Phase::InGame(game) => {
                 // Remove their army so the match can still resolve to a winner.
                 if let Some(seat_id) = removed_live_seat_id {
+                    if let Some(start) = self.replay_start.as_mut() {
+                        start.record_elimination(game, seat_id);
+                    }
                     game.eliminate(seat_id);
                 }
                 self.branch_live_seat_by_connection.remove(&player_id);

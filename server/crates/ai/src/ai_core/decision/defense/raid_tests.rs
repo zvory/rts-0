@@ -25,6 +25,7 @@ fn entity(id: u32, owner: u32, kind: EntityKind, tiles: (f32, f32)) -> AiEntityS
         latched_node: None,
         target_id: None,
         free_for_combat: true,
+        research: None,
     }
 }
 
@@ -78,7 +79,15 @@ fn respond_with(
 ) -> (Option<Vec<u32>>, Vec<Command>) {
     let facts = AiFacts::from_observation(observation);
     let mut actions = AiActionContext::new(&facts, SpendBudget::new(1000, 1000, 20, 80));
-    let answer = match respond(&mut actions, observation, memory, defenders, None, resend) {
+    let answer = match respond(
+        &mut actions,
+        observation,
+        memory,
+        defenders,
+        None,
+        resend,
+        None,
+    ) {
         RaidAnswer::NotARaid => None,
         RaidAnswer::Handled(units) => Some(units),
     };

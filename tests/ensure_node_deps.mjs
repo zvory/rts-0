@@ -71,6 +71,24 @@ function installCount() {
 }
 
 fs.mkdirSync(fakeBin, { recursive: true });
+// Inspect the staging directory at the publication boundary, before the real rename.
+const realMv = execFileSync("which", ["mv"], { encoding: "utf8" }).trim();
+const fakeMv = path.join(fakeBin, "mv");
+fs.writeFileSync(fakeMv, `#!/usr/bin/env node
+const fs = require("node:fs");
+const path = require("node:path");
+const { spawnSync } = require("node:child_process");
+const args = process.argv.slice(2);
+if (path.basename(args[0]).startsWith(".tmp-") && !fs.existsSync(path.join(args[0], ".ready"))) {
+  console.error("dependency cache must be ready before publication");
+  process.exit(1);
+}
+const result = spawnSync(${JSON.stringify(realMv)}, args, { stdio: "inherit" });
+if (result.error) throw result.error;
+process.exit(result.status ?? 1);
+`);
+fs.chmodSync(fakeMv, 0o755);
+
 const fakeNpm = path.join(fakeBin, "npm");
 fs.writeFileSync(fakeNpm, `#!/usr/bin/env node
 const fs = require("node:fs");
@@ -94,7 +112,11 @@ try {
   writeManifest(second, dependencies);
   fs.mkdirSync(path.join(first, "node_modules", "local-only"), { recursive: true });
 
-  await Promise.all([runHelperAsync(first), runHelperAsync(second)]);
+  // Keep the fixture alive until every child exits, including when one fails.
+  const installs = await Promise.allSettled([runHelperAsync(first), runHelperAsync(second)]);
+  for (const install of installs) {
+    if (install.status === "rejected") throw install.reason;
+  }
   assert.equal(fs.lstatSync(path.join(first, "node_modules")).isSymbolicLink(), true);
   assert.equal(fs.existsSync(path.join(first, "node_modules", "pngjs")), true);
   assert.equal(installCount(), 1, "concurrent worktrees install the shared lockfile once");

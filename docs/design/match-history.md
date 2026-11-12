@@ -283,3 +283,11 @@ existing JSONB blob is unaffected.
   spectator-only until that contract exists.
 - **Crash-safety**: if matches start dropping due to DB outages, add a small bounded
   in-memory outbox in `Db`. Not worth it today.
+
+Replay artifacts also carry an optional versioned `endStateHash` (SHA-256 of committed authoritative
+state) and tick-timed administrative `eliminations` for give-up/disconnect. The final state is hashed
+after cleanup; playback reproduces cleanup before comparing at the exact final tick. Old schema-3
+artifacts without a hash remain playable and are explicitly logged as unverified. Divergence or an
+unsupported hash algorithm warns viewers and logs the verification result; it does not block replay
+launch or substitute recorded state for reconstructed state. See [server simulation](server-sim.md)
+for the projection, ordering, exclusions, and performance contract.
