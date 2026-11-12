@@ -84,6 +84,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "state_selection.js": "model",
   "state_queries.js": "model",
   "state_ground_decals.js": "model",
+  "state_resource_memory.js": "model",
   "state_visual_effects.js": "model",
   "weapon_recoil_cycle.js": "model",
   "apm_tracker.js": "model",

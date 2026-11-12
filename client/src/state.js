@@ -15,6 +15,7 @@ import {
 } from "./prediction_frame.js";
 import { MOVEMENT_PATH_DIAGNOSTICS, isBuilding, isResource, isUnit } from "./protocol.js";
 import { admitControlGroupIds } from "./state_control_groups.js";
+import { clearObservedEmptyResources } from "./state_resource_memory.js";
 import { GroundDecalBuffer } from "./state_ground_decals.js";
 import { autoBuild as ab } from "./state_auto_build.js";
 import { pruneSelection } from "./state_selection.js";
@@ -301,6 +302,7 @@ export class GameState extends VisualEffectBackedState {
     const visibleTiles = Array.isArray(msg.visibleTiles) || msg.visibleTiles instanceof Uint8Array
       ? msg.visibleTiles
       : [];
+    clearObservedEmptyResources(this.map, msg.resourceDeltas || [], visibleTiles);
     const wireEntities = (msg.entities || [])
       .filter((e) => !isResource(e.kind))
       .map((e) => markActionableFiringReveal(e, this.map, visibleTiles, this.playerId));
