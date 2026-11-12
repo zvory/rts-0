@@ -268,6 +268,9 @@ pub fn project_entity(
             view.weapon_range_tiles = Some(tank_weapon_range_tiles(entity, stats.range_tiles));
         }
     }
+    if entity.kind == EntityKind::MortarTeam && owner_or_ally {
+        view.weapon_range_tiles = Some(entity.mortar_range_tiles());
+    }
     project_panzerfaust_state(entity, &mut view);
     if entity.kind == EntityKind::RocketLauncher {
         view.rocket_rack_count = Some(config::rocket_rack_count(

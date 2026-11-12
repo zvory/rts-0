@@ -501,10 +501,12 @@ fn mortar_fire_replaces_active_move_order() {
         !matches!(mortar_entity.order(), Order::Move(_)),
         "manual Mortar Fire should replace the active move immediately"
     );
-    assert!(
-        mortar_entity.ability_cooldown_ticks(AbilityKind::MortarFire) > 0,
-        "manual Mortar Fire should launch immediately and start cooldown"
+    assert_eq!(
+        mortar_entity.ability_cooldown_ticks(AbilityKind::MortarFire),
+        0,
+        "moving Mortar Fire must wait for range before consuming its cooldown"
     );
+    assert!(matches!(mortar_entity.order(), Order::Ability(_)));
     assert!(
         mortar_entity.path_is_empty(),
         "replacing movement should stop the current path"

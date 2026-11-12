@@ -246,7 +246,7 @@ pub const UNITS: &[UnitDef] = &[
             dmg: balance::MORTAR_OUTER_DAMAGE,
             range_tiles: balance::MORTAR_RANGE_TILES as f32,
             cooldown: balance::MORTAR_FIRE_COOLDOWN_TICKS,
-            speed: 1.6,
+            speed: 1.44,
             sight_tiles: 10,
             cost_steel: 100,
             cost_oil: 40,

@@ -921,7 +921,6 @@ function nearPoint(call, point, epsilon = 0.001) {
     minRangeGfx.calls.some((call) => call[0] === "lineStyle" && call[1] === 1 && call[3] === 0.56),
     "selected unit minimum-range rings draw at doubled opacity",
   );
-
   const mortarRangeGfx = new RecordingGraphics();
   _drawSelectedUnitRanges.call(
     { _feedbackGfx: mortarRangeGfx, _map: { tileSize: 32 } },
@@ -930,6 +929,7 @@ function nearPoint(call, point, epsilon = 0.001) {
       showUnitRangesEnabled: true,
       selectedEntities: () => [{
         id: 78,
+        weaponRangeTiles: 8,
         owner: 2,
         kind: KIND.MORTAR_TEAM,
         x: 224,
@@ -939,8 +939,8 @@ function nearPoint(call, point, epsilon = 0.001) {
   );
   const mortarCircles = mortarRangeGfx.calls.filter((call) => call[0] === "drawCircle");
   assert(
-    mortarCircles.some((call) => call[3] === 544) && mortarCircles.some((call) => call[3] === 160),
-    "selected mortar draws its 17-tile outer circle and five-tile dead zone without setup state",
+    mortarCircles.some((call) => call[3] === 256) && mortarCircles.some((call) => call[3] === 160),
+    "selected mortar draws its authoritative eight-tile maximum and unchanged five-tile dead zone",
   );
   assert(
     mortarRangeGfx.calls.some((call) => call[0] === "cut") &&

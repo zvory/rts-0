@@ -355,6 +355,15 @@ fn manual_mortar_fire_impacts_without_toast_notice() {
         .entities
         .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
         .expect("mortar should spawn");
+    // This fixture starts with a settled mortar; this test covers shell behavior.
+    game.state
+        .entities
+        .get_mut(mortar)
+        .expect("mortar")
+        .combat
+        .as_mut()
+        .expect("combat")
+        .mortar_stationary_range_ticks = config::MORTAR_STATIONARY_RANGE_RAMP_TICKS;
     game.state
         .entities
         .get_mut(mortar)
@@ -489,6 +498,15 @@ fn manual_mortar_fire_impacts_after_shooter_dies_before_impact() {
         .entities
         .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
         .expect("mortar should spawn");
+    // This fixture starts with a settled mortar; this test covers shell behavior.
+    game.state
+        .entities
+        .get_mut(mortar)
+        .expect("mortar")
+        .combat
+        .as_mut()
+        .expect("combat")
+        .mortar_stationary_range_ticks = config::MORTAR_STATIONARY_RANGE_RAMP_TICKS;
     game.state
         .entities
         .get_mut(mortar)
@@ -611,6 +629,15 @@ fn manual_mortar_fire_turns_briefly_before_launching() {
         .entities
         .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
         .expect("mortar should spawn");
+    // This fixture starts with a settled mortar; this test covers shell behavior.
+    game.state
+        .entities
+        .get_mut(mortar)
+        .expect("mortar")
+        .combat
+        .as_mut()
+        .expect("combat")
+        .mortar_stationary_range_ticks = config::MORTAR_STATIONARY_RANGE_RAMP_TICKS;
     if let Some(mortar_entity) = game.state.entities.get_mut(mortar) {
         mortar_entity.set_facing(0.0);
         mortar_entity.set_weapon_facing(0.0);
@@ -735,6 +762,15 @@ fn manual_mortar_fire_damages_friendly_units_at_enemy_rate() {
         .entities
         .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
         .expect("mortar should spawn");
+    // This fixture starts with a settled mortar; this test covers shell behavior.
+    game.state
+        .entities
+        .get_mut(mortar)
+        .expect("mortar")
+        .combat
+        .as_mut()
+        .expect("combat")
+        .mortar_stationary_range_ticks = config::MORTAR_STATIONARY_RANGE_RAMP_TICKS;
     if let Some(mortar_entity) = game.state.entities.get_mut(mortar) {
         mortar_entity.set_weapon_setup(WeaponSetup::Deployed);
     }
@@ -822,6 +858,15 @@ fn manual_mortar_fire_has_no_armor_piercing_in_either_splash_radius() {
         .entities
         .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
         .expect("mortar should spawn");
+    // This fixture starts with a settled mortar; this test covers shell behavior.
+    game.state
+        .entities
+        .get_mut(mortar)
+        .expect("mortar")
+        .combat
+        .as_mut()
+        .expect("combat")
+        .mortar_stationary_range_ticks = config::MORTAR_STATIONARY_RANGE_RAMP_TICKS;
     if let Some(mortar_entity) = game.state.entities.get_mut(mortar) {
         mortar_entity.set_weapon_setup(WeaponSetup::Deployed);
     }
@@ -976,6 +1021,15 @@ fn manual_mortar_fire_damages_allied_units_without_kill_credit() {
         .entities
         .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
         .expect("mortar should spawn");
+    // This fixture starts with a settled mortar; this test covers shell behavior.
+    game.state
+        .entities
+        .get_mut(mortar)
+        .expect("mortar")
+        .combat
+        .as_mut()
+        .expect("combat")
+        .mortar_stationary_range_ticks = config::MORTAR_STATIONARY_RANGE_RAMP_TICKS;
     if let Some(mortar_entity) = game.state.entities.get_mut(mortar) {
         mortar_entity.set_weapon_setup(WeaponSetup::Deployed);
     }
@@ -1065,6 +1119,15 @@ fn manual_mortar_fire_damages_friendly_buildings() {
         .entities
         .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
         .expect("mortar should spawn");
+    // This fixture starts with a settled mortar; this test covers shell behavior.
+    game.state
+        .entities
+        .get_mut(mortar)
+        .expect("mortar")
+        .combat
+        .as_mut()
+        .expect("combat")
+        .mortar_stationary_range_ticks = config::MORTAR_STATIONARY_RANGE_RAMP_TICKS;
     if let Some(mortar_entity) = game.state.entities.get_mut(mortar) {
         mortar_entity.set_weapon_setup(WeaponSetup::Deployed);
     }

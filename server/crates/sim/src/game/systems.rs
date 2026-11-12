@@ -253,6 +253,7 @@ pub(crate) fn run_tick(
             ability_runtime,
         );
     });
+    crate::game::mortar::tick_stationary_ranges(entities);
     coordinator.begin_pathing_diagnostics("promote_queued_orders", entities);
     crate::perf::timed(perf.as_deref_mut(), "promote_queued_orders", || {
         services::order_queue::promote_ready_orders(

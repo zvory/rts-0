@@ -395,6 +395,10 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/game/lab/scenario.rs",
   "server/crates/sim/src/game/mod.rs",
   "server/crates/sim/src/game/mortar.rs",
+  // Mortar-specific stationary range charge and its authoritative translation reset; faction
+  // availability and carrier admission remain catalog-owned.
+  "server/crates/sim/src/game/mortar_range.rs",
+  "server/crates/sim/src/game/entity/entity/position.rs",
   // Delayed Panzerfaust resolution and its inline regression test cover the current Tank target.
   "server/crates/sim/src/game/panzerfaust_shot.rs",
   "server/crates/sim/src/game/player_state.rs",
