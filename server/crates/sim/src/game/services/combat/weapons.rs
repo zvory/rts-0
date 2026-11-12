@@ -291,9 +291,6 @@ pub(super) fn effective_attack_profile(e: &Entity) -> EffectiveAttackProfile {
         dmg: base.dmg,
         cooldown: base.cooldown,
     };
-    if e.kind == EntityKind::MortarTeam {
-        profile.range_tiles = e.mortar_range_tiles();
-    }
     if e.kind != EntityKind::AntiTankGun {
         return profile;
     }

@@ -1058,7 +1058,7 @@ visible without selection or owner-private ability affordances. Owner snapshots 
 Command Car's `breakthrough`
 ability cooldown and, while the caster's aura is active, its caster-only `expiresIn` through
 `abilities`.
-`weaponRangeTiles` is present for owner/allied Tank and Mortar Team views and carries the current authoritative
+`weaponRangeTiles` is present for owner/allied Tank views and carries the current authoritative
 default-weapon range, including the stationary range ramp. Enemy views omit it; static unit catalog
 range remains the fallback for render-only range overlays.
 `occupiedTrenchId` is present while a visible eligible infantry unit is actively stopped in a
@@ -1194,7 +1194,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   latchedNode?: u32,             // node id the Worker/Golem is currently harvesting (attached mining)
   // combat feedback:
   targetId?: u32,                // current attack target, for drawing tracers
-  weaponRangeTiles?: f32,        // owner/allied Tanks and Mortar Teams only; current authoritative weapon range
+  weaponRangeTiles?: f32,        // owner/allied Tanks only; current authoritative weapon range
   occupiedTrenchId?: u32,        // visible eligible infantry only while actively stopped in a trench
   rocketRackCount?: u8,           // 0–16 physical rounds; visible Rocket Trucks only
   panzerfaustLoaded?: bool,       // Panzerfaust units only; false after disposable launch
