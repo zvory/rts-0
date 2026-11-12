@@ -722,8 +722,7 @@ pub(crate) fn world_ability_facing_ready(
     if ability == AbilityKind::Barrage {
         return ability::barrage_facing_ready(e.facing(), target_angle);
     }
-    let facing_ready = rotate_mortar_for_fire(e, target_angle);
-    facing_ready && crate::game::mortar::point_in_current_range(e, x, y)
+    rotate_mortar_for_fire(e, target_angle)
 }
 
 pub(crate) fn world_ability_current_facing_ready(
@@ -751,7 +750,6 @@ pub(crate) fn world_ability_current_facing_ready(
         return ability::barrage_facing_ready(e.facing(), target_angle);
     }
     mortar_current_facing_ready(e, target_angle)
-        && crate::game::mortar::point_in_current_range(e, x, y)
 }
 
 pub(crate) fn tech_requirement_met(

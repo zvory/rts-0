@@ -315,10 +315,7 @@ function dynamicUnitRangeProfile(e, tileSize) {
     e?.weaponMinRangeTiles,
     e?.firingMinRangeTiles,
     e?.attackMinRangeTiles,
-  ), tileSize) ?? (e?.kind === KIND.MORTAR_TEAM ? MORTAR_MIN_RANGE_TILES * tileSize : 0));
-  if (e?.kind === KIND.MORTAR_TEAM && maxRadius > minRadius) {
-    return { kind: "fieldOfFire", minRadius, maxRadius, arc: MORTAR_FIELD_OF_FIRE_RAD, facing: 0 };
-  }
+  ), tileSize) ?? 0);
   const arc = firstFinite(source?.arcRad, source?.arc, e?.weaponArcRad, e?.firingArcRad, e?.attackArcRad);
   // Dynamic range metadata may refine availability or radii, but an AT gun's arc remains fixed to
   // its emplacement. Never let a backend-provided tracking angle rotate that field of fire.

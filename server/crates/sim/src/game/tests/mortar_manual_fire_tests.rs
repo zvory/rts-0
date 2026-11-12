@@ -30,11 +30,6 @@ fn manual_fire_fixture() -> (Game, u32, (f32, f32)) {
         .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
         .expect("mortar should spawn");
     if let Some(mortar_entity) = game.state.entities.get_mut(mortar) {
-        mortar_entity
-            .combat
-            .as_mut()
-            .expect("combat state")
-            .mortar_stationary_range_ticks = config::MORTAR_STATIONARY_RANGE_RAMP_TICKS;
         mortar_entity.set_facing(0.0);
         mortar_entity.set_weapon_facing(0.0);
     }
@@ -390,84 +385,15 @@ fn queued_manual_mortar_fire_commands_fire_finite_shots_across_reload_cycles() {
 }
 
 #[test]
-fn mortar_range_grows_from_zero_and_resets_on_movement_without_changing_dead_zone() {
+fn manual_mortar_fire_has_full_range_immediately_after_moving() {
     let (mut game, mortar, _) = manual_fire_fixture();
     let entity = game.state.entities.get_mut(mortar).expect("mortar");
-    entity
-        .combat
-        .as_mut()
-        .expect("combat")
-        .mortar_stationary_range_ticks = 0;
-    let origin = (entity.pos_x(), entity.pos_y());
-    assert_eq!(entity.mortar_range_tiles(), 0.0);
-    assert_eq!(
-        config::unit_stats(EntityKind::MortarTeam)
-            .expect("stats")
-            .speed,
-        1.44
-    );
-    for tick in 1..=45 {
-        game.tick();
-        let entity = game.state.entities.get(mortar).expect("mortar");
-        let range = entity.mortar_range_tiles();
-        assert!((range - 17.0 * tick as f32 / 45.0).abs() < 0.0001);
-        assert!(!crate::game::mortar::point_in_current_range(
-            entity,
-            origin.0 + 4.99 * config::TILE_SIZE as f32,
-            origin.1
-        ));
-    }
-    let entity = game.state.entities.get_mut(mortar).expect("mortar");
-    entity.set_facing(1.0);
-    assert_eq!(
-        entity.mortar_range_tiles(),
-        17.0,
-        "aiming does not reset range"
-    );
-    entity.set_position(origin.0 + 1.0, origin.1);
-    assert_eq!(entity.mortar_range_tiles(), 0.0);
-    game.tick();
-    assert_eq!(
-        game.state
-            .entities
-            .get(mortar)
-            .expect("mortar")
-            .mortar_range_tiles(),
-        0.0
-    );
-    game.tick();
-    assert!(
-        (game
-            .state
-            .entities
-            .get(mortar)
-            .expect("mortar")
-            .mortar_range_tiles()
-            - 17.0 / 45.0)
-            .abs()
-            < 0.0001
-    );
-}
-
-#[test]
-fn manual_mortar_fire_waits_in_place_for_expanding_range() {
-    let (mut game, mortar, target) = manual_fire_fixture();
-    let entity = game.state.entities.get_mut(mortar).expect("mortar");
-    entity
-        .combat
-        .as_mut()
-        .expect("combat")
-        .mortar_stationary_range_ticks = 0;
-    let origin = (entity.pos_x(), entity.pos_y());
+    let origin = (entity.pos_x() + 1.0, entity.pos_y());
+    entity.set_position(origin.0, origin.1);
+    let target = (origin.0 + 16.5 * config::TILE_SIZE as f32, origin.1);
     enqueue_manual_mortar_fire(&mut game, mortar, target);
-    // The target is six tiles away: 16 ticks reach 6.044 tiles.
-    for tick in 1..=16 {
-        let events = game.tick();
-        assert_eq!(
-            mortar_launch_count(&events, 1, mortar),
-            usize::from(tick == 16)
-        );
-        let entity = game.state.entities.get(mortar).expect("mortar");
-        assert_eq!((entity.pos_x(), entity.pos_y()), origin);
-    }
+    let events = game.tick();
+    assert_eq!(mortar_launch_count(&events, 1, mortar), 1);
+    let entity = game.state.entities.get(mortar).expect("mortar");
+    assert_eq!((entity.pos_x(), entity.pos_y()), origin);
 }

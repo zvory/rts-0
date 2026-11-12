@@ -352,41 +352,6 @@ fn tank_weapon_range_tiles_are_owner_only() {
 }
 
 #[test]
-fn mortar_weapon_range_tiles_are_owner_only() {
-    let mut entities = EntityStore::new();
-    let tank_id = entities
-        .spawn_unit(1, EntityKind::MortarTeam, 120.0, 100.0)
-        .expect("tank should spawn");
-    entities
-        .spawn_unit(2, EntityKind::Rifleman, 100.0, 100.0)
-        .expect("enemy spotter should spawn");
-    {
-        let tank = entities.get_mut(tank_id).expect("tank should exist");
-        if let Some(combat) = tank.combat.as_mut() {
-            combat.mortar_stationary_range_ticks = config::MORTAR_STATIONARY_RANGE_RAMP_TICKS;
-        }
-    }
-    let map = Map {
-        width: 64,
-        height: 64,
-        terrain: vec![terrain::GRASS; 64 * 64],
-        starts: vec![(1, 1)],
-        ..Default::default()
-    };
-    let mut fog = Fog::new(map.width, map.height);
-    fog.recompute(&[1, 2], &entities, &map);
-    let tank = entities.get(tank_id).expect("tank should exist");
-
-    let owner_view = project_for_test(1, tank, &fog, true, &entities, None, false)
-        .expect("owner should see tank");
-    assert_eq!(owner_view.weapon_range_tiles, Some(17.0));
-
-    let enemy_view = project_for_test(2, tank, &fog, true, &entities, None, false)
-        .expect("enemy should see nearby tank");
-    assert_eq!(enemy_view.weapon_range_tiles, None);
-}
-
-#[test]
 fn breakthrough_caster_status_is_visible_without_owner_ability_details() {
     let mut entities = EntityStore::new();
     let command_car_id = entities
