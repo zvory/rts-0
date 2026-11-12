@@ -11,6 +11,7 @@ pub const ANTI_TANK_GUN_TEARDOWN_TICKS: u16 = 30;
 pub const TANK_HE_RADIUS_TILES: f32 = 1.4;
 pub const TANK_HE_SPLASH_DAMAGE: u32 = 30;
 
+pub const MORTAR_STATIONARY_RANGE_RAMP_TICKS: u16 = (TICK_HZ * 3 / 2) as u16;
 pub const MORTAR_RANGE_TILES: u32 = 17;
 pub const MORTAR_MIN_RANGE_TILES: u32 = 5;
 pub const MORTAR_FIELD_OF_FIRE_RAD: f32 = std::f32::consts::TAU;

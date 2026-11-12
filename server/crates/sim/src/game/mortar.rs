@@ -22,6 +22,10 @@ use crate::rules::projection;
 use crate::rules::terrain::TerrainKind;
 use serde::{Deserialize, Serialize};
 
+#[path = "mortar_range.rs"]
+mod range;
+pub(crate) use range::{point_in_current_range, tick_stationary_ranges};
+
 pub(crate) const FIRE_TOLERANCE_RAD: f32 = 15.0_f32.to_radians();
 pub(crate) const HALF_TURN_TICKS: u32 = config::TICK_HZ / 5;
 pub(crate) const TURN_RATE_RAD_PER_TICK: f32 = std::f32::consts::PI / HALF_TURN_TICKS as f32;

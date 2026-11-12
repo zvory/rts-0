@@ -424,7 +424,12 @@ profiles and explicit activation/autocast policy instead of being folded into de
 - Anti-Tank Guns use `ANTI_TANK_GUN_SETUP_TICKS = 120` (4s) and
   `ANTI_TANK_GUN_TEARDOWN_TICKS = 30` (1s). The client mirrors these ticks for
   matching world and minimap trail animation.
-- Mortar Teams have no setup or teardown timing. They use `MORTAR_MIN_RANGE_TILES = 5`,
+- Mortar Teams have no setup or teardown lock. Their maximum firing range starts at zero,
+  resets to zero on translation (including collision displacement), and grows linearly to 17 tiles
+  over 45 stationary ticks (1.5 seconds). Turning to aim does not reset the ramp. Minimum range
+  remains 5 tiles, so no shot is possible until the growing maximum reaches it. Point-fire orders
+  approach using the full 17-tile range and then wait for the current range to reach their target.
+  Base movement speed is 1.44 px/tick (10% below 1.6). They use `MORTAR_MIN_RANGE_TILES = 5`,
   `MORTAR_RANGE_TILES = 17`, and `MORTAR_FIELD_OF_FIRE_RAD = 360 degrees total`,
   `MORTAR_FIRE_COOLDOWN_TICKS = 180` (6s between shells),
   `MORTAR_MANUAL_SHELL_DELAY_TICKS = 32` (~1.07s manual travel),
@@ -704,7 +709,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | rifleman        | 45  | 5   | 5     | 32 | 1.6   | 11    | 35  | 0   | 1   | 300 (~10s) |
 | panzerfaust     | 45  | 5 rifle / 100 launcher | 5 | 32 rifle / one lifetime launcher | 1.6 | 11 | 55 | 10 | 1 | 300 (~10s); requires completed Panzerfausts research |
 | machine_gunner  | 55  | 4   | 6.1   | 12  | 1.28  | 11    | 75  | 10  | 2   | 400 (~13s) |
-| mortar_team     | 75  | 40 outer / 100 inner AOE | 5-17 | 180 | 1.6 | 10 | 100 | 40 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
+| mortar_team     | 75  | 40 outer / 100 inner AOE | 5 minimum / 0-17 maximum after stopping | 180 | 1.44 | 10 | 100 | 40 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
 | anti_tank_gun         | 45  | 100 deployed; cannot target infantry | 20 deployed | 144 | 1.7556 | 9    | 150 | 40  | 3   | 440 (~15s); cannot fire while packed or transitioning; requires a completed owned Gun Works (`steelworks` kind) and past ownership of a completed Engineering Complex; no research required (temporary hack; remove later) |
 | artillery       | 200 | 75 AP inner / 75-20 outer AOE | 10-35 artillery fire | 180 | 1.6 | 7 | 150 | 50 | 4 | 600 (~20s); requires Gun Works (`steelworks` kind) and Artillery (`artillery_unlock`) researched in Engineering Complex; rendered at 75% of its prior size with a matching 75%-of-Tank gameplay footprint; 2/3-tile inner and 2-tile outer blast radii; soft target with no armor damage reduction |
 | rocket_launcher (Rocket Truck) | 150 | 16 rockets, each dealing 70 armor-piercing damage within 0.5 tile, 53 non-piercing damage beyond 0.5 through 1 tile, and 21 non-piercing damage beyond 1 through 2 tiles, measured from impact to target centre; all resulting damage is reduced to 25% against buildings | 10-44 Barrage | 900-tick (~30s) cooldown from activation | 2.0 | 8 | 225 | 100 | 3 | 600 (~20s); requires Gun Works (`steelworks` kind) and Rockets (`rockets`) researched in Engineering Complex; vehicle movement; must stop to launch; one manual command unloads exactly 16 rockets over 120 ticks (~4s) into a 6-tile scatter radius and then stops; its team-tinted rack carries 16 rounds, empties one slot per launch, and refills at cooldown completion; the PNG and collision footprint are enlarged by 20% (48×26.4 px body, 1.2 px clearance, 21.6 px selection radius); Barrage accepts in-range world points without requiring current vision; first barrage is free and later barrages cost 150 oil |

@@ -937,6 +937,18 @@ function nearPoint(call, point, epsilon = 0.001) {
       }],
     },
   );
+  const chargedMortarGfx = new RecordingGraphics();
+  _drawSelectedUnitRanges.call(
+    { _feedbackGfx: chargedMortarGfx, _map: { tileSize: 32 } },
+    { playerId: 2, showUnitRangesEnabled: true, selectedEntities: () => [{
+      id: 79, owner: 2, kind: KIND.MORTAR_TEAM, x: 224, y: 96, weaponRangeTiles: 8,
+    }] },
+  );
+  const chargedCircles = chargedMortarGfx.calls.filter((call) => call[0] === "drawCircle");
+  assert(chargedCircles.some((call) => call[3] === 256) && chargedCircles.some((call) => call[3] === 160),
+    "dynamic mortar range retains the five-tile dead zone and uses the authoritative maximum");
+  assert(chargedMortarGfx.calls.some((call) => call[0] === "cut"),
+    "dynamic mortar range keeps its filled annulus");
   const mortarCircles = mortarRangeGfx.calls.filter((call) => call[0] === "drawCircle");
   assert(
     mortarCircles.some((call) => call[3] === 544) && mortarCircles.some((call) => call[3] === 160),

@@ -490,6 +490,15 @@ fn manual_mortar_launch_and_impact_markers_are_visible_to_allies() {
         .entities
         .spawn_unit(1, EntityKind::MortarTeam, mortar_pos.0, mortar_pos.1)
         .expect("mortar should spawn");
+    // This fixture starts with a settled mortar; this test covers shell behavior.
+    game.state
+        .entities
+        .get_mut(mortar)
+        .expect("mortar")
+        .combat
+        .as_mut()
+        .expect("combat")
+        .mortar_stationary_range_ticks = config::MORTAR_STATIONARY_RANGE_RAMP_TICKS;
     game.state
         .entities
         .get_mut(mortar)

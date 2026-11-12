@@ -234,6 +234,11 @@ pub struct CombatState {
     pub pending_redeploy_facing: Option<f32>,
     /// Whether this support weapon may acquire and fire at targets without a point-fire command.
     pub autocast_enabled: bool,
+    /// Mortar range charge, reset by any authoritative position change.
+    #[serde(default)]
+    pub mortar_stationary_range_ticks: u16,
+    #[serde(default)]
+    pub mortar_range_reset_this_tick: bool,
     /// Ticks this tank has spent still enough to extend its weapon range.
     pub tank_stationary_range_ticks: u16,
     /// Materialized owner research; refreshed each tick, including newly spawned tanks.
@@ -266,6 +271,8 @@ impl Default for CombatState {
             emplacement_facing: None,
             pending_redeploy_facing: None,
             autocast_enabled: true,
+            mortar_stationary_range_ticks: 0,
+            mortar_range_reset_this_tick: false,
             tank_stationary_range_ticks: 0,
             tank_plus: false,
             tank_stationary_range_reset_this_tick: false,
