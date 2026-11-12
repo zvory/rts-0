@@ -65,7 +65,9 @@ pub(crate) fn death_system(
         .collect();
 
     for dead_entity in &dead {
-        if config::unit_stats(dead_entity.kind).is_none() {
+        if config::unit_stats(dead_entity.kind).is_none()
+            && config::building_stats(dead_entity.kind).is_none()
+        {
             continue;
         }
         let Some((killer_owner, killer_entity)) = dead_entity
@@ -77,7 +79,7 @@ pub(crate) fn death_system(
         };
         if let Some(killer) = entities.get_mut(killer_entity) {
             if killer.owner == killer_owner && killer.is_unit() {
-                killer.record_unit_killed();
+                killer.record_kill();
             }
         }
     }

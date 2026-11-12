@@ -57,7 +57,7 @@ pub struct Entity {
     /// Entity id that most recently dealt hostile damage. Used for per-unit kill attribution.
     #[serde(default)]
     last_damage_entity: Option<u32>,
-    /// Enemy units this entity has killed over its lifetime.
+    /// Enemy units and buildings this entity has killed over its lifetime.
     #[serde(default)]
     units_killed: u32,
     /// Tick on which this entity was most recently damaged by a direct hit, plus the attacker's
@@ -985,7 +985,7 @@ impl Entity {
         self.units_killed
     }
 
-    pub(in crate::game) fn record_unit_killed(&mut self) {
+    pub(in crate::game) fn record_kill(&mut self) {
         self.units_killed = self.units_killed.saturating_add(1);
     }
 

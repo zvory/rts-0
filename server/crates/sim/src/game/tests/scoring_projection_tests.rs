@@ -106,8 +106,8 @@ fn scores_record_kills_and_losses_on_death() {
             .get(attacker_unit)
             .expect("attacker unit should survive")
             .units_killed(),
-        1,
-        "only the destroyed unit increments the attacking unit's counter"
+        2,
+        "both the destroyed unit and building increment the attacking unit's counter"
     );
 }
 
