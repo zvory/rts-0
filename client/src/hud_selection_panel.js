@@ -411,7 +411,7 @@ export class HudSelectionPanel {
       ? `<span class="sel-entity-id">Entity ID: ${e.id}</span>`
       : "";
     const unitsKilledHtml = Number.isFinite(Number(e.unitsKilled))
-      ? `<div class="sel-stat sel-unit-kills">Units killed: ` +
+      ? `<div class="sel-stat sel-unit-kills">Kills: ` +
         `${Math.max(0, Math.floor(Number(e.unitsKilled)))}${entityIdHtml}</div>`
       : "";
 

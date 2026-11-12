@@ -804,9 +804,11 @@ Allied
 non-resource entities visible through team current fog expose full read-only
 inspection details: hp/state/facing/setup state, production or research kind/progress/queue length,
 legacy Scout Plane queue presence, construction progress, gatherer latched node, active Breakthrough
-status, per-unit enemy-unit kill totals, and safe combat tracers. `unitsKilled` is present on units
-only, starts at zero, increments when that unit deals the final hostile damage to another unit, and
-does not count destroyed buildings or friendly fire.
+status, per-unit enemy unit and building kill totals, and safe combat tracers. `unitsKilled` is present on units
+only, starts at zero, increments when that unit deals the final hostile damage to another unit or a building,
+and does not count friendly fire or resource nodes. The selection panel labels this total “Kills”;
+the existing `unitsKilled` field carries the combined total. Player score rows still track
+`unitsKilled` and `buildingsKilled` separately.
 Tank `commanderFacing` is the independent roof MG world angle. It is included only for a visible,
 non-vision-only Tank when its secondary target is visible to the recipient (or absent); owners and
 omniscient observers receive it directly. It never carries a secondary target id.
