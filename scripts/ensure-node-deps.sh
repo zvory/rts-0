@@ -62,6 +62,7 @@ fail() {
 [ -f "$package_lock" ] || fail "missing $package_lock"
 command -v node >/dev/null 2>&1 || fail "node is not installed"
 command -v npm >/dev/null 2>&1 || fail "npm is not installed"
+command -v python3 >/dev/null 2>&1 || fail "python3 is required for dependency cache locking"
 [[ "$wait_seconds" =~ ^[0-9]+$ ]] || fail "RTS_NODE_DEPS_WAIT_SECONDS must be a non-negative integer"
 
 [ -n "$cache_base" ] || fail "refusing unsafe cache directory: <empty>"
@@ -91,22 +92,8 @@ NODE
 cache_dir="$cache_base/$lock_hash"
 cache_node_modules="$cache_dir/node_modules"
 ready_file="$cache_dir/.ready"
-lock_dir="$cache_dir.lock"
-lock_owner_file="$lock_dir/owner"
 temporary_dir=""
 install_log=""
-owns_lock=0
-lock_token="$$-${RANDOM:-0}"
-ownerless_observations=0
-
-release_lock() {
-  if [ "$owns_lock" = "1" ] && [ -d "$lock_dir" ] &&
-     [ "$(cat "$lock_owner_file" 2>/dev/null || true)" = "$lock_token" ]; then
-    rm -f "$lock_owner_file"
-    rmdir "$lock_dir" 2>/dev/null || true
-  fi
-  owns_lock=0
-}
 
 cleanup() {
   if [ -n "$temporary_dir" ] && [ -d "$temporary_dir" ]; then
@@ -115,7 +102,6 @@ cleanup() {
   if [ -n "$install_log" ] && [ -f "$install_log" ]; then
     rm -f "$install_log"
   fi
-  release_lock
 }
 trap cleanup EXIT
 
@@ -150,57 +136,42 @@ esac
 cache_dir="$cache_base/$lock_hash"
 cache_node_modules="$cache_dir/node_modules"
 ready_file="$cache_dir/.ready"
-lock_dir="$cache_dir.lock"
-lock_owner_file="$lock_dir/owner"
-
-reclaim_dead_lock() {
-  local owner owner_pid quarantine
-  owner="$(cat "$lock_owner_file" 2>/dev/null || true)"
-  owner_pid="${owner%%-*}"
-  if [[ "$owner_pid" =~ ^[0-9]+$ ]]; then
-    ownerless_observations=0
-    kill -0 "$owner_pid" 2>/dev/null && return 1
-  else
-    ownerless_observations=$((ownerless_observations + 1))
-    # mkdir publishes the lock just before its owner file is written. Give a live
-    # installer one polling interval to finish that tiny handoff before reclaiming.
-    [ "$ownerless_observations" -ge 2 ] || return 1
-  fi
-
-  quarantine="$lock_dir.stale-$lock_token"
-  if mv "$lock_dir" "$quarantine" 2>/dev/null; then
-    if [ "$(cat "$quarantine/owner" 2>/dev/null || true)" = "$owner" ]; then
-      info "reclaiming dependency cache lock left by process ${owner_pid:-unknown}"
-      rm -rf "$quarantine"
-      return 0
-    fi
-    # The owner changed between inspection and quarantine. Restore it when possible;
-    # otherwise leave the new owner intact and discard only the quarantined directory.
-    mv "$quarantine" "$lock_dir" 2>/dev/null || rm -rf "$quarantine"
-  fi
-  return 1
-}
-
+# A persistent inode and an OS advisory lock replace PID files and stale-lock
+# guessing. Never unlink the lock file: waiters must all lock the same inode.
+# Re-exec under the lock, inheriting its descriptor through bash and npm so a
+# killed wrapper cannot release the lock while its installer is still running.
 if ! declared_dependencies_present; then
-  deadline=$((SECONDS + wait_seconds))
-  while true; do
-    if mkdir "$lock_dir" 2>/dev/null; then
-      owns_lock=1
-      printf '%s\n' "$lock_token" >"$lock_owner_file"
-      break
-    fi
-    if declared_dependencies_present; then
-      break
-    fi
-    if [ "$SECONDS" -ge "$deadline" ]; then
-      fail "timed out waiting for dependency cache lock $lock_dir"
-    fi
-    reclaim_dead_lock || true
-    info "waiting for dependency cache lock $lock_dir"
-    sleep 1
-  done
+  if [ "${RTS_NODE_DEPS_LOCKED_CACHE:-}" != "$cache_dir" ]; then
+    helper_path="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+    exec python3 - "$cache_dir.install.lock" "$wait_seconds" "$cache_dir" \
+      "$helper_path" "$repo_root" "$cache_base" "$quiet" <<'PYLOCK'
+import fcntl
+import os
+import sys
+import time
 
-  if [ "$owns_lock" = "1" ] && ! declared_dependencies_present; then
+lock_path, wait_seconds, cache_dir, helper, repo_root, cache_base, quiet = sys.argv[1:]
+fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+deadline = time.monotonic() + int(wait_seconds)
+while True:
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        break
+    except BlockingIOError:
+        if time.monotonic() >= deadline:
+            sys.exit(f"ensure-node-deps: timed out waiting for dependency cache lock {lock_path}")
+        time.sleep(min(0.05, max(0, deadline - time.monotonic())))
+os.set_inheritable(fd, True)
+os.environ["RTS_NODE_DEPS_LOCKED_CACHE"] = cache_dir
+args = ["bash", helper, "--repo", repo_root, "--cache-dir", cache_base]
+if quiet == "1":
+    args.append("--quiet")
+os.execvp(args[0], args)
+PYLOCK
+  fi
+
+  # Recheck after acquiring the lock: another installer may have just published.
+  if ! declared_dependencies_present; then
     temporary_dir="$cache_base/.tmp-$lock_hash-$$"
     rm -rf "$temporary_dir"
     mkdir -p "$temporary_dir"
@@ -219,11 +190,6 @@ if ! declared_dependencies_present; then
     rm -rf "$cache_dir"
     mv "$temporary_dir" "$cache_dir"
     temporary_dir=""
-    release_lock
-  elif [ "$owns_lock" = "1" ]; then
-    # Another worktree may publish the cache just before this process acquires
-    # the released lock. Never leave that no-longer-needed lock behind.
-    release_lock
   fi
 fi
 

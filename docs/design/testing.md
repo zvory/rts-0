@@ -360,7 +360,14 @@ canary runs own a private server; the browser shard passes its existing loopback
   stages up to 1,800 characters in the ignored Git-common-dir outbox with
   `node scripts/patch-note-outbox.mjs stage --change "<change>"`. Root npm dependencies are
   prepared by `scripts/ensure-node-deps.sh`, which atomically installs each package/lockfile pair
-  once under the shared cache and links the active worktree's `node_modules` to it. The canonical
+  once under the shared cache and links the active worktree's `node_modules` to it. Node, npm,
+  and Python 3 are required; Python's standard-library `fcntl.flock` provides the same kernel-owned
+  exclusive lock on macOS and Linux. The persistent `.install.lock` file is never unlinked;
+  the inherited descriptor keeps the lock held through npm, including if its wrapper is killed.
+  There are no PID files, ownerless grace periods, or stale-lock deletion. Installs publish their
+  ready marker and directory together only after npm succeeds. `node tests/ensure_node_deps.mjs`
+  uses explicit installer barriers to cover contention, timeout, reuse, incomplete-cache repair,
+  failed-install retry, and wrapper death while npm is still running. The canonical
   test runner uses that helper, so npm-backed repository tools do not depend on another worktree
   having run tests first. Supplying both `--before` and
   `--after` composes equal-sized PNG files or Interact preview URLs into a labeled four-second

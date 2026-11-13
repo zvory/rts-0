@@ -41,19 +41,36 @@ function runHelper(worktree) {
   });
 }
 
-function runHelperAsync(worktree) {
-  return new Promise((resolve, reject) => {
-    execFile("bash", [helper, "--repo", worktree, "--cache-dir", cacheRoot, "--quiet"], {
+const children = new Set();
+function startHelper(worktree, extraEnv = {}) {
+  let child;
+  const result = new Promise((resolve, reject) => {
+    child = execFile("bash", [helper, "--repo", worktree, "--cache-dir", cacheRoot, "--quiet"], {
       encoding: "utf8",
       env: {
         ...process.env,
         PATH: `${fakeBin}:${process.env.PATH}`,
         RTS_FAKE_NPM_COUNTER: installCounter,
-        RTS_FAKE_NPM_DELAY_MS: "200",
-        RTS_NODE_DEPS_WAIT_SECONDS: "5",
+        RTS_NODE_DEPS_WAIT_SECONDS: "10",
+        ...extraEnv,
       },
-    }, (error, stdout, stderr) => error ? reject(Object.assign(error, { stdout, stderr })) : resolve(stdout));
+    }, (error, stdout, stderr) => {
+      children.delete(child);
+      error ? reject(Object.assign(error, { stdout, stderr })) : resolve(stdout);
+    });
+    children.add(child);
   });
+  // Some cases deliberately kill a child before awaiting its result.
+  result.catch(() => {});
+  return { child, result };
+}
+
+async function waitForFile(filename) {
+  const deadline = Date.now() + 10000;
+  while (!fs.existsSync(filename)) {
+    assert(Date.now() < deadline, `timed out waiting for ${filename}`);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
 }
 
 function cacheEntry(worktree) {
@@ -71,32 +88,18 @@ function installCount() {
 }
 
 fs.mkdirSync(fakeBin, { recursive: true });
-// Inspect the staging directory at the publication boundary, before the real rename.
-const realMv = execFileSync("which", ["mv"], { encoding: "utf8" }).trim();
-const fakeMv = path.join(fakeBin, "mv");
-fs.writeFileSync(fakeMv, `#!/usr/bin/env node
-const fs = require("node:fs");
-const path = require("node:path");
-const { spawnSync } = require("node:child_process");
-const args = process.argv.slice(2);
-if (path.basename(args[0]).startsWith(".tmp-") && !fs.existsSync(path.join(args[0], ".ready"))) {
-  console.error("dependency cache must be ready before publication");
-  process.exit(1);
-}
-const result = spawnSync(${JSON.stringify(realMv)}, args, { stdio: "inherit" });
-if (result.error) throw result.error;
-process.exit(result.status ?? 1);
-`);
-fs.chmodSync(fakeMv, 0o755);
-
 const fakeNpm = path.join(fakeBin, "npm");
 fs.writeFileSync(fakeNpm, `#!/usr/bin/env node
 const fs = require("node:fs");
 const path = require("node:path");
 if (process.argv[2] !== "ci") process.exit(2);
 fs.appendFileSync(process.env.RTS_FAKE_NPM_COUNTER, "ci\\n");
-const delay = Number(process.env.RTS_FAKE_NPM_DELAY_MS || 0);
-if (delay) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, delay);
+const gate = process.env.RTS_FAKE_NPM_GATE;
+if (gate) {
+  fs.writeFileSync(gate + ".started", String(process.pid));
+  while (!fs.existsSync(gate)) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+}
+if (process.env.RTS_FAKE_NPM_FAIL === "1") process.exit(1);
 const manifest = JSON.parse(fs.readFileSync("package.json", "utf8"));
 for (const name of Object.keys(manifest.devDependencies || {})) {
   fs.mkdirSync(path.join("node_modules", ...name.split("/")), { recursive: true });
@@ -112,11 +115,22 @@ try {
   writeManifest(second, dependencies);
   fs.mkdirSync(path.join(first, "node_modules", "local-only"), { recursive: true });
 
-  // Keep the fixture alive until every child exits, including when one fails.
-  const installs = await Promise.allSettled([runHelperAsync(first), runHelperAsync(second)]);
+  // Hold the first install at a known boundary, rather than hoping two starts
+  // overlap during an arbitrary 200 ms sleep on a busy CI runner.
+  const gate = path.join(fixtureRoot, "first-install");
+  const firstInstall = startHelper(first, { RTS_FAKE_NPM_GATE: gate });
+  await waitForFile(`${gate}.started`);
+  assert.equal(fs.existsSync(cacheEntry(first)), false, "in-progress install is not published");
+  const timeout = startHelper(second, { RTS_NODE_DEPS_WAIT_SECONDS: "0" });
+  await assert.rejects(timeout.result, /timed out waiting for dependency cache lock/);
+  assert.equal(installCount(), 1, "a contender must not enter the live install");
+  const secondInstall = startHelper(second);
+  fs.writeFileSync(gate, "release");
+  const installs = await Promise.allSettled([firstInstall.result, secondInstall.result]);
   for (const install of installs) {
     if (install.status === "rejected") throw install.reason;
   }
+  fs.rmSync(`${gate}.started`);
   assert.equal(fs.lstatSync(path.join(first, "node_modules")).isSymbolicLink(), true);
   assert.equal(fs.existsSync(path.join(first, "node_modules", "pngjs")), true);
   assert.equal(installCount(), 1, "concurrent worktrees install the shared lockfile once");
@@ -131,19 +145,42 @@ try {
   assert.equal(fs.existsSync(path.join(second, "node_modules", "pngjs")), true);
   assert.equal(installCount(), 2, "a cache missing a declared dependency is rebuilt");
 
+  const previousCache = fs.realpathSync(path.join(second, "node_modules"));
   writeManifest(second, { ...dependencies, "new-package": "1.0.0" });
-  const staleLock = `${cacheEntry(second)}.lock`;
-  fs.mkdirSync(staleLock, { recursive: true });
-  fs.writeFileSync(path.join(staleLock, "owner"), "99999999-dead\n");
   runHelper(second);
+  assert.notEqual(fs.realpathSync(path.join(second, "node_modules")), previousCache);
   assert.equal(fs.existsSync(path.join(second, "node_modules", "new-package")), true);
-  assert.equal(installCount(), 3, "a dead installer lock is reclaimed for the new cache entry");
+  assert.equal(installCount(), 3, "a changed lockfile gets a separate cache and relinks the worktree");
 
-  writeManifest(second, { ...dependencies, "ownerless-lock-package": "1.0.0" });
-  fs.mkdirSync(`${cacheEntry(second)}.lock`, { recursive: true });
-  runHelper(second);
-  assert.equal(fs.existsSync(path.join(second, "node_modules", "ownerless-lock-package")), true);
-  assert.equal(installCount(), 4, "an interrupted lock handoff without an owner is reclaimed");
+  // The kernel releases an abandoned lock; no PID files, ownerless grace
+  // periods, or stale-directory reclamation can steal it from a live process.
+  const interrupted = path.join(fixtureRoot, "interrupted");
+  writeManifest(interrupted, { "interrupted-package": "1.0.0" });
+  const interruptedGate = path.join(fixtureRoot, "interrupted-install");
+  const interruptedInstall = startHelper(interrupted, { RTS_FAKE_NPM_GATE: interruptedGate });
+  await waitForFile(`${interruptedGate}.started`);
+  const npmPid = Number(fs.readFileSync(`${interruptedGate}.started`, "utf8"));
+  interruptedInstall.child.kill("SIGKILL");
+  await assert.rejects(interruptedInstall.result);
+  // npm outlives its killed wrapper and must keep the lock until it exits.
+  const orphanContender = startHelper(interrupted, { RTS_NODE_DEPS_WAIT_SECONDS: "1" });
+  try {
+    await assert.rejects(orphanContender.result, /timed out waiting for dependency cache lock/);
+  } finally {
+    process.kill(npmPid, "SIGKILL");
+    fs.rmSync(`${interruptedGate}.started`);
+  }
+  runHelper(interrupted);
+  assert.equal(fs.existsSync(path.join(interrupted, "node_modules", "interrupted-package")), true);
+  assert.equal(installCount(), 5, "killed install is retried once after its processes exit");
+
+  const failed = path.join(fixtureRoot, "failed");
+  writeManifest(failed, { "retry-package": "1.0.0" });
+  await assert.rejects(startHelper(failed, { RTS_FAKE_NPM_FAIL: "1" }).result, /npm ci failed/);
+  assert.equal(fs.existsSync(cacheEntry(failed)), false, "failed install is never published");
+  runHelper(failed);
+  assert.equal(fs.existsSync(path.join(failed, "node_modules", "retry-package")), true);
+  assert.equal(installCount(), 7, "failed install releases the lock for a successful retry");
 
   const unsafe = path.join(fixtureRoot, "unsafe");
   writeManifest(unsafe, dependencies);
@@ -176,7 +213,17 @@ exec bash "$2" --repo "$3" --cache-dir "$4" --quiet
     },
   });
 } finally {
+  // Kill gated installers as well as wrappers if an assertion fails mid-scenario.
+  for (const name of ["first-install", "interrupted-install"]) {
+    const started = path.join(fixtureRoot, `${name}.started`);
+    if (fs.existsSync(started)) {
+      try { process.kill(Number(fs.readFileSync(started, "utf8")), "SIGKILL"); }
+      catch (error) { if (error.code !== "ESRCH") throw error; }
+    }
+  }
+  for (const child of children) child.kill("SIGKILL");
+  while (children.size) await new Promise((resolve) => setTimeout(resolve, 10));
   fs.rmSync(fixtureRoot, { recursive: true, force: true });
 }
 
-console.log("ensure_node_deps: shared install, reuse, completeness, and relinking passed");
+console.log("ensure_node_deps: shared install, contention, crash recovery, failure retry, and relinking passed");
