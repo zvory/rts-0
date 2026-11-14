@@ -760,7 +760,7 @@ for (const [kind, upgrade] of [
     builds.map((slot) => slot.intent.building),
     [KIND.RESOURCE_DEPOT, KIND.PORTAL],
   );
-  assert.equal(builds[0].label, "Town");
+  assert.equal(builds[0].label, "Nexus");
   assert.equal(builds[0].commandId, "cultivators.build." + KIND.RESOURCE_DEPOT);
   assert.equal(builds[1].label, "Portal");
   assert.equal(builds[1].commandId, "cultivators.build." + KIND.PORTAL);
@@ -769,7 +769,7 @@ for (const [kind, upgrade] of [
 {
   const { statsForFaction } = await import("../client/src/config.js");
   const { selectionBudgetGridModel } = await import("../client/src/hud_selection_panel.js");
-  assert.equal(statsForFaction(KIND.RESOURCE_DEPOT, "cultivators").label, "Town");
+  assert.equal(statsForFaction(KIND.RESOURCE_DEPOT, "cultivators").label, "Nexus");
   assert.equal(statsForFaction(KIND.WORKER, "cultivators").label, "Serf");
   assert.equal(statsForFaction(KIND.WORKER, "kriegsia").label, "Engineer");
   const training = buildCommandCardDescriptors({
@@ -784,7 +784,7 @@ for (const [kind, upgrade] of [
     { id: 11, owner: 2, kind: KIND.RESOURCE_DEPOT },
   ], null, [{ id: 1, factionId: "cultivators" }, { id: 2, factionId: "kriegsia" }]);
   assert.deepEqual(model.pages.flatMap((page) => page.blocks).map((block) => block.label),
-    ["Town", "Resource Depot"]);
+    ["Nexus", "Resource Depot"]);
 }
 
 for (const researched of [false, true]) {

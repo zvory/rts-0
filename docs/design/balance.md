@@ -218,8 +218,8 @@ playable catalogs, explicit fixture catalogs, and future catalog data, but
 branch, self-play, dev, match-history, and post-match paths. Fixture-only and
 reserved/future ids must not inherit Kriegsia economy behavior or appear in product selectors just
 because their catalog rows are dumpable.
-The playable `cultivators` catalog reuses Resource Depot (displayed as Town), Worker (displayed as Serf),
-Steel Mine and Oil Pumpjack, with Town and Portal available for Serf construction. Its
+The playable `cultivators` catalog reuses Resource Depot (displayed as Nexus), Worker (displayed as Serf),
+Steel Mine and Oil Pumpjack, with Nexus and Portal available for Serf construction. Its
 `cultivators.standard` loadout matches Kriegsia's starting economy and omits Riflemen.
 Cultivator Serfs can also construct the faction-specific Portal for 150 Steel: it has a 3x3
 footprint, 123 HP, one tile of sight, a five-second construction time, no prerequisite, and no

@@ -186,11 +186,11 @@ export function commandCardAbilitiesForFaction(factionId) {
 }
 
 // Presentation aliases preserve the shared simulation and renderer identity.
-const TOWN_STATS = Object.freeze({ ...STATS[KIND.RESOURCE_DEPOT], label: "Town" });
+const NEXUS_STATS = Object.freeze({ ...STATS[KIND.RESOURCE_DEPOT], label: "Nexus" });
 const SERF_STATS = Object.freeze({ ...STATS[KIND.WORKER], label: "Serf" });
 export function statsForFaction(kind, factionId) {
   if (factionId === CULTIVATORS_FACTION_ID) {
-    if (kind === KIND.RESOURCE_DEPOT) return TOWN_STATS;
+    if (kind === KIND.RESOURCE_DEPOT) return NEXUS_STATS;
     if (kind === KIND.WORKER) return SERF_STATS;
   }
   return STATS[kind];
