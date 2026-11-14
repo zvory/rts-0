@@ -159,7 +159,7 @@ pub(super) fn advance_moving_units(
                     }
                     * terrain_speed_multiplier
                     * map.slow_movement_multiplier_at(x, y)
-                    * if super::barbed_wire::affected(kind)
+                    * if rts_rules::barbed_wire_affects(kind)
                         && wire_tiles
                             .get(&map.tile_of(x, y))
                             .is_some_and(|id| entities.get(*id).is_some_and(|wire| wire.hp > 0))

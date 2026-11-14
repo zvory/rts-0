@@ -369,3 +369,18 @@ mod tests {
         assert!(blocks_line_of_sight(EntityKind::Depot));
     }
 }
+
+/// Infantry and carried mortar crews hurt and slow down on barbed wire.
+pub fn barbed_wire_affects(kind: EntityKind) -> bool {
+    matches!(
+        kind,
+        EntityKind::Worker
+            | EntityKind::Golem
+            | EntityKind::Warrior
+            | EntityKind::Rifleman
+            | EntityKind::Panzerfaust
+            | EntityKind::MachineGunner
+            | EntityKind::Ekat
+            | EntityKind::MortarTeam
+    )
+}

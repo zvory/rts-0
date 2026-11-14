@@ -3,20 +3,6 @@ use crate::game::entity::{EntityKind, EntityStore};
 use crate::game::map::Map;
 use std::collections::BTreeMap;
 
-pub(super) fn affected(kind: EntityKind) -> bool {
-    matches!(
-        kind,
-        EntityKind::Worker
-            | EntityKind::Golem
-            | EntityKind::Warrior
-            | EntityKind::Rifleman
-            | EntityKind::Panzerfaust
-            | EntityKind::MachineGunner
-            | EntityKind::Ekat
-            | EntityKind::MortarTeam
-    )
-}
-
 pub(super) fn tiles(map: &Map, entities: &EntityStore) -> BTreeMap<(u32, u32), u32> {
     entities
         .iter()
@@ -61,7 +47,7 @@ pub(super) fn apply_entries(
         let Some(&wire_id) = wire.get(&current) else {
             continue;
         };
-        let hurts = affected(unit.kind);
+        let hurts = rts_rules::barbed_wire_affects(unit.kind);
         let Some(segment) = entities.get_mut(wire_id).filter(|e| e.hp > 0) else {
             continue;
         };

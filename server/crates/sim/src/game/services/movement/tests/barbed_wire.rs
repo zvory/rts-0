@@ -133,7 +133,7 @@ fn barbed_wire_slows_only_infantry_and_mortars_and_is_walkable() {
         let spatial = SpatialIndex::build(&bare, map.width, map.height);
         movement_system(&map, &mut bare, &[], &occ, &spatial, 1);
         let expected = (bare.get(other).unwrap().pos_x() - 176.0)
-            * if super::super::barbed_wire::affected(kind) {
+            * if rts_rules::barbed_wire_affects(kind) {
                 0.7
             } else {
                 1.0
