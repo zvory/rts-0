@@ -561,7 +561,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   completed Engineering Complex and do not require Tank Production.
 - **Smoke Plus** (Engineering Complex research, protocol id `smoke_plus`): costs 150 steel / 150 oil and
   takes 600 ticks (~20s). Once complete, future Scout Car Smoke casts by that player use a 4-tile
-  cloud radius and last 10 seconds instead of the base 2-tile radius and 5-second duration.
+  cloud radius and last 10 seconds instead of the base 2.25-tile radius and 5-second duration.
 - **Scout Plane** (Engineering Complex research, protocol id `scout_plane_unlock`): costs 100 steel /
   200 oil and takes 600 ticks (~20s). Once complete, Command Cars owned by that
   player can use their C-slot Scout Plane ability for free.
@@ -602,7 +602,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   cooldown, so both stored charges can be cast back-to-back. Spending the first charge starts a
   sequential recharge queue: one missing charge returns after 15 seconds, and a second missing
   charge returns after another 15 seconds. Target range: 14 tiles from the caster. Launch delay: up
-  to 100 ms at max range, scaling down for closer targets. Cloud radius: 2 tiles. Cloud duration:
+  to 100 ms at max range, scaling down for closer targets. Cloud radius: 2.25 tiles. Cloud duration:
   5 seconds. After Smoke Plus research, future casts by that player use a 4-tile
   radius and 10-second duration.
   Expected role: an offensive tool for closing on long-range defenses; push a scout car forward,

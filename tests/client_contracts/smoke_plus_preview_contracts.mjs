@@ -4,7 +4,7 @@
 import { assert } from "./assertions.mjs";
 import {
   ABILITIES,
-  SMOKE_CLOUD_RADIUS_TILES,
+  SMOKE_PLUS_CLOUD_RADIUS_TILES,
 } from "../../client/src/config.js";
 import {
   ABILITY,
@@ -44,7 +44,8 @@ import { Input } from "../../client/src/input/index.js";
   const upgradedRadiusTiles = ABILITIES[ABILITY.SMOKE].upgradedRadiusTiles;
   assert(
     smokeInput.clientIntent.abilityTargetPreview?.radiusPx === upgradedRadiusTiles * 32 &&
-      upgradedRadiusTiles === SMOKE_CLOUD_RADIUS_TILES * 2,
+      upgradedRadiusTiles === SMOKE_PLUS_CLOUD_RADIUS_TILES &&
+      upgradedRadiusTiles === 4,
     "Smoke Plus targeting preview uses the command owner's upgraded cloud radius",
   );
   assert(
