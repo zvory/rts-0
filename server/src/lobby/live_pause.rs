@@ -1,11 +1,13 @@
 use std::collections::HashMap;
+use std::time::Duration;
 
 use tokio::time::Instant as TokioInstant;
 
-use super::room_task::helpers::{
-    match_countdown_duration, LIVE_PAUSE_LIMIT, MATCH_COUNTDOWN_WORDS,
-};
+use super::room_task::helpers::{LIVE_PAUSE_LIMIT, MATCH_COUNTDOWN_WORDS};
 use crate::protocol::{LivePauseState, LiveResumeCountdown};
+
+const HOTKEY_SETUP_DURATION: Duration = Duration::from_secs(10);
+const RESUME_DURATION: Duration = Duration::from_secs(13);
 
 #[derive(Default)]
 pub(super) struct LivePauseControl {
@@ -18,9 +20,10 @@ pub(super) struct LivePauseControl {
 impl LivePauseControl {
     pub(super) fn state_for(&self, actor_id: Option<u32>) -> LivePauseState {
         let resume_countdown = self.resume_deadline.map(|deadline| {
-            let duration = match_countdown_duration();
+            let duration = RESUME_DURATION;
             LiveResumeCountdown {
                 duration_ms: duration.as_millis() as u32,
+                setup_duration_ms: HOTKEY_SETUP_DURATION.as_millis() as u32,
                 remaining_ms: deadline
                     .saturating_duration_since(TokioInstant::now())
                     .as_millis()
@@ -60,7 +63,7 @@ impl LivePauseControl {
         if !self.paused || self.resume_deadline.is_some() {
             return false;
         }
-        self.resume_deadline = Some(TokioInstant::now() + match_countdown_duration());
+        self.resume_deadline = Some(TokioInstant::now() + RESUME_DURATION);
         true
     }
 

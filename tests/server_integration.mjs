@@ -124,12 +124,16 @@ const { ok } = assertions;
   ));
   ok(resumeStates.every((state) =>
     state.canUnpause !== true &&
-    state.resumeCountdown.durationMs === 3000 &&
+    state.resumeCountdown.durationMs === 13000 &&
+    state.resumeCountdown.setupDurationMs === 10000 &&
     state.resumeCountdown.words.join(" ") === "Drei! Zwei! Eins!"),
-  "LIVE PAUSE: every recipient receives the synchronized three-second resume countdown");
+  "LIVE PAUSE: every recipient receives the synchronized hotkey setup and three-second resume countdown");
   await sleep(1000);
   ok(A.lastSnapshot?.tick === frozenTick,
      `LIVE PAUSE: simulation remains frozen during countdown (tick ${frozenTick})`);
+  await sleep(10000);
+  ok(A.lastSnapshot?.tick === frozenTick,
+     "LIVE PAUSE: simulation stays frozen after setup and into the final countdown");
   const resumedStates = await Promise.all([A, B, C].map((client) =>
     client.waitFor((m) => m.t === "livePauseState" && m.paused === false,
       4000, `${client.tag} resumed state`)

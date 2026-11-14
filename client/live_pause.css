@@ -43,3 +43,15 @@
 .live-resume-countdown.match-countdown {
   inset: 0;
 }
+
+/* Selection and local control-group shortcuts remain available during setup. */
+.live-pause-overlay.hotkey-setup-active {
+  pointer-events: none;
+  background: transparent;
+}
+
+.live-resume-countdown.hotkey-setup-countdown {
+  padding: 24px;
+  font-size: clamp(28px, 5vw, 72px);
+  line-height: 1.2;
+}

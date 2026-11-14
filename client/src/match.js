@@ -47,7 +47,7 @@ import { createControlPolicyProjection } from "./control_policy_projection.js";
 import { CAMERA, INTERP_DELAY_MS, SNAPSHOT_MS } from "./config.js";
 import { EVENT, KIND, S } from "./protocol.js";
 import { dom, isTextEntry } from "./bootstrap.js";
-import { COMMAND_BUDGET_OVERFLOW_NOTICE, commandWithinBudget } from "./command_budget.js";
+import { createMatchCommandIssuer } from "./match_command_issuer.js";
 
 import { MatchCombatAudio, worldCombatBedAllowed } from "./match_combat_audio.js";
 import { MatchNoticePresenter } from "./match_notice_presenter.js";
@@ -234,33 +234,7 @@ export class Match {
       getPredictionReportFields: () => this.predictionReportFields(),
       getRenderWorkerDiagnostics: () => this.renderer?.diagnostics?.() || {},
     });
-    this.commandIssuer = {
-      issueCommand: (command, options = {}) => {
-        if (this.labControlPolicy?.kind === "lab") {
-          return this.labControlPolicy.issueCommand(command, {
-            state: this.state,
-            toast: this.toast,
-          });
-        }
-        const budget = commandWithinBudget(this.state, command);
-        if (!budget.ok) {
-          this.toast?.(COMMAND_BUDGET_OVERFLOW_NOTICE);
-          return { clientSeq: null, sent: false, predicted: false, blocked: "commandBudget", budget };
-        }
-        const predictionOptions = this.predictionVisualsPaused()
-          ? { ...options, predictMovement: false }
-          : options;
-        const issued = this.prediction.issueCommand(command, predictionOptions);
-        if (issued?.sent) {
-          this.apmTracker.recordAction(this.state?.tick);
-          const issuedAt = this.frameProfiler?.now?.() ?? performance.now();
-          this.health.noteCommandIssued(issuedAt);
-          this.frameProfiler?.recordDiagnosticCounter?.("commands.issued");
-        }
-        this.applyPredictionDisplayOverlay(this.prediction.predictionDisplayOverlay());
-        return issued;
-      },
-    };
+    this.commandIssuer = createMatchCommandIssuer(this);
     this.pointerLockDiagnosticShown = false;
     this.desktopCursorAutoLockEnabled = false;
     this.desktopCursorAutoLockTimer = null;

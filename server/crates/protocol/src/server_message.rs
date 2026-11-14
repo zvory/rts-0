@@ -4,6 +4,8 @@ use super::*;
 #[serde(rename_all = "camelCase")]
 pub struct LiveResumeCountdown {
     pub duration_ms: u32,
+    #[serde(default)]
+    pub setup_duration_ms: u32,
     pub remaining_ms: u32,
     pub words: Vec<String>,
 }
