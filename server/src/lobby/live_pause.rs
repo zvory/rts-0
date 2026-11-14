@@ -3,9 +3,7 @@ use std::time::Duration;
 
 use tokio::time::Instant as TokioInstant;
 
-use super::room_task::helpers::{
-    LIVE_PAUSE_LIMIT, MATCH_COUNTDOWN_WORDS,
-};
+use super::room_task::helpers::{LIVE_PAUSE_LIMIT, MATCH_COUNTDOWN_WORDS};
 use crate::protocol::{LivePauseState, LiveResumeCountdown};
 
 const HOTKEY_SETUP_DURATION: Duration = Duration::from_secs(10);
