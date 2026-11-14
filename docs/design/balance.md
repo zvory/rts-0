@@ -47,7 +47,7 @@ Tanks also have a live secondary `tank_coax` profile owned by combat rules: 6-ti
 damage, 12-tick cooldown, no Tank armor-facing multiplier, and single-target direct fire. The
 commander roof MG acquires and aims independently through 360 degrees, including while moving.
 Its right-offset mount follows the main turret; `tank_coax` remains its internal weapon id.
-Tank HE: cannon shots aimed at infantry (Workers, Golems, Warriors,
+Tank HE: cannon shots aimed at infantry (Workers, Golems, Disciples,
 Riflemen, Panzerfausts, and Machine Gunners) retain the normal immediate 60-damage direct hit.
 On a successful resolved infantry hit, every other eligible entity within 1.4 tiles of the
 impact takes 30 base splash damage, including friendlies, using mortar armor scaling but
@@ -220,11 +220,11 @@ reserved/future ids must not inherit Kriegsia economy behavior or appear in prod
 because their catalog rows are dumpable.
 The playable `cultivators` catalog reuses Resource Depot (displayed as Nexus), Worker (displayed as Serf),
 Steel Mine and Oil Pumpjack, with Nexus and Portal available for Serf construction. Its
-`cultivators.standard` loadout matches Kriegsia's starting economy and omits Riflemen.
+`cultivators.standard` loadout matches Kriegsia's starting economy and replaces the starting Riflemen with one completed Disciple.
 Cultivator Serfs can also construct the faction-specific Portal for 150 Steel: it has a 3x3
 footprint, 123 HP, one tile of sight, a five-second construction time, no prerequisite, and no
-research. A completed Portal trains the Cultivator Warrior for 100 Steel and 2 Supply in 300 ticks.
-The Warrior is a 135-HP, 13.5-pixel-radius ground melee unit moving at 1.6 pixels per tick. Its
+research. A completed Portal trains the Cultivator Disciple for 100 Steel and 2 Supply in 300 ticks.
+The Disciple is a 135-HP, 13.5-pixel-radius ground melee unit moving at 1.6 pixels per tick. Its
 23-damage sword has 0.5-tile reach, a 64-tick cooldown, and 50% armor penetration. See
 [Cultivators specification](cultivators.md).
 
@@ -368,7 +368,7 @@ on the approach, but currently actionable traps inside that objective preempt or
 Hidden traps remain ineligible until revealed, while vehicle pathfinding continues routing around
 the obstacles. Anti-armor default weapons
 prefer anti-armor threats and armored units over ordinary soft units. Anti-Tank Guns cannot
-auto-acquire or accept direct Attack orders against infantry: Workers, Golems, Warriors,
+auto-acquire or accept direct Attack orders against infantry: Workers, Golems, Disciples,
 Riflemen, Panzerfausts, and Machine Gunners. Crewed support weapons, including Mortar Teams,
 remain legal targets and take full damage. AT Guns automatically prefer a fireable Tank over a
 nearer Mortar Team; an explicit Attack order may select the mortar instead. Tanks keep a narrower
@@ -376,7 +376,7 @@ immediate-threat override for targets already in relevant range: Anti-Tank Guns 
 other anti-armor threats, armored obstacles, support weapons, and only then ordinary soft targets.
 The rules-owned `TargetFacts` surface records the current target-policy facts for every
 `EntityKind`, including the Tank coax infantry-priority group. The commander MG ranks Panzerfausts first, Anti-Tank Guns second, combat infantry
-(Warrior, Rifleman, Machine Gunner) third, Mortar Teams fourth, and
+(Disciple, Rifleman, Machine Gunner) third, Mortar Teams fourth, and
 Scout Cars fifth. All remaining legal targets use the default weapon group/material order,
 then distance/id ties; resource nodes are not legal MG targets.
 Default weapons perform a full acquisition pass when ready and targetless, immediately after each
@@ -445,7 +445,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   remains unrestricted even when the selected impact point would hit same-team units or buildings.
 - anti-tank guns fire only while deployed, with `ANTI_TANK_GUN_DEPLOYED_RANGE_TILES = 20` and
   `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD = 40 degrees total`; packed, setting-up, and tearing-down guns
-  cannot fire. AT guns cannot target infantry-sized units (Workers, Golems, Warriors, Riflemen,
+  cannot fire. AT guns cannot target infantry-sized units (Workers, Golems, Disciples, Riflemen,
   Panzerfausts, or Machine Gunners), either automatically or through direct Attack orders.
   Crewed support weapons, vehicles, Ekat, and buildings remain legal targets. A deployed gun's setup cone remains fixed while its body and barrel turn together at
   `ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK = 0.070` to track targets inside that cone;
@@ -724,7 +724,7 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 
 | kind                       | player-facing name | hp  | sight | cost | foot | buildTicks | notes |
 |----------------------------|--------------------|-----|-------|-----|------|-----------|-------|
-| resource_depot                | Resource Depot        | 180 | 1     | 450 steel + 100 oil | 4x4  | 150       | trains workers and permanently auto-builds free Steel Mines and Pump Jacks concurrently; no supply; players start with one free |
+| resource_depot                | Resource Depot        | 180 | 1     | 600 steel + 135 oil | 4x4  | 150       | trains workers and permanently auto-builds free Steel Mines and Pump Jacks concurrently; no supply; players start with one free |
 | zamok                      | Zamok              | 360 | 1     | 0   | 3x3  | 0         | Ekat start building; no supply; trains Golem; no research in first playable slice |
 | depot                      | Supply Depot       | 65 | 1     | 100 | 2x2  | 300       | disabled in the current experiment (not buildable and no command-card button); retained for replay and fixture compatibility; no supply |
 | barracks                   | Barracks           | 98 | 1     | 150 | 3x2  | 200       | trains rifleman, machine_gunner, and panzerfaust; Machine Gunner requires a completed Training Centre and Panzerfaust requires completed Panzerfausts research; requires a Resource Depot |

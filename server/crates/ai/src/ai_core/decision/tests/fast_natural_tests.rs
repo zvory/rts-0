@@ -77,9 +77,9 @@ fn with_the_natural_ordered_the_live_jeff_trains_a_second_engineer_who_builds_th
         // The bounded reserve is running.
         decide(&obs, profile, &mut memory);
         order_out(&mut obs, site);
-        // The Depot's 450/100 is set aside, with a Factory (125/125) and an Engineer (50) to spare.
-        obs.economy.steel = 450 + 200;
-        obs.economy.oil = 100 + 140;
+        // The Depot's 600/135 is set aside, with a Factory (125/125) and an Engineer (50) to spare.
+        obs.economy.steel = 600 + 200;
+        obs.economy.oil = 135 + 140;
         let decision = decide(&obs, profile, &mut memory);
         assert_eq!(
             trains(&decision, EntityKind::Worker),
@@ -120,10 +120,10 @@ fn a_pending_natural_order_holds_back_only_its_oil_for_the_live_jeff() {
             .extend((10..16).map(|id| combat_at(id, EntityKind::Rifleman, 14.0 * ts, 14.0 * ts)));
         decide(&obs, profile, &mut memory);
         order_out(&mut obs, site);
-        // The second Engineer (50) and a fifth gun (75/10) fit beside the order's 450/100, but not
+        // The second Engineer (50) and a fifth gun (75/10) fit beside the order's 600/135, but not
         // beside it held twice.
-        obs.economy.steel = 450 + 50 + 80;
-        obs.economy.oil = 100 + 20;
+        obs.economy.steel = 600 + 50 + 80;
+        obs.economy.oil = 135 + 20;
         let decision = decide(&obs, profile, &mut memory);
         assert_eq!(
             trains(&decision, EntityKind::MachineGunner),
@@ -197,8 +197,8 @@ fn the_live_jeffs_fifth_and_sixth_guns_come_only_before_its_first_tank() {
         // Four guns and six Riflemen home, and Steel above the natural's reserve.
         obs.owned
             .extend((10..16).map(|id| combat_at(id, EntityKind::Rifleman, 14.0 * ts, 14.0 * ts)));
-        obs.economy.steel = 450 + 120;
-        obs.economy.oil = 100 + 30;
+        obs.economy.steel = 600 + 120;
+        obs.economy.oil = 135 + 30;
         let decision = decide(&obs, profile, &mut memory);
         assert_eq!(
             trains(&decision, EntityKind::MachineGunner),
@@ -224,8 +224,8 @@ fn the_live_jeff_trains_no_second_engineer_once_its_factory_is_out() {
     obs.owned.push(building(8, EntityKind::Factory, Some(0)));
     decide(&obs, &JEFFS_AI, &mut memory);
     order_out(&mut obs, site);
-    obs.economy.steel = 450 + 200;
-    obs.economy.oil = 100 + 140;
+    obs.economy.steel = 600 + 200;
+    obs.economy.oil = 135 + 140;
     assert!(!trains(
         &decide(&obs, &JEFFS_AI, &mut memory),
         EntityKind::Worker
@@ -238,8 +238,8 @@ fn while_the_natural_order_is_out_the_live_jeff_trains_no_riflemen() {
     decide(&obs, &JEFFS_AI, &mut memory);
     order_out(&mut obs, site);
     // No Rifleman home, so the natural's recruits want six; the order leaves Steel to spare.
-    obs.economy.steel = 450 + 50 + 120;
-    obs.economy.oil = 100 + 20;
+    obs.economy.steel = 600 + 50 + 120;
+    obs.economy.oil = 135 + 20;
     let decision = decide(&obs, &JEFFS_AI, &mut memory);
     assert!(!trains(&decision, EntityKind::Rifleman));
     assert!(trains(&decision, EntityKind::MachineGunner));

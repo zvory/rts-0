@@ -1015,7 +1015,7 @@ pub fn dev_scenario_unit_label(unit: EntityKind) -> &'static str {
         EntityKind::ScoutCar => "scout car",
         EntityKind::Tank => "tank",
         EntityKind::CommandCar => "command car",
-        EntityKind::Warrior => "warrior",
+        EntityKind::Warrior => "disciple",
         _ => "unit",
     }
 }

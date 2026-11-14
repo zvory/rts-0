@@ -81,8 +81,8 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
     "client mirrors the server Tank Trap cluster attack radius",
   );
   assert(
-    STATS[KIND.RESOURCE_DEPOT].cost.steel === 450 &&
-      STATS[KIND.RESOURCE_DEPOT].cost.oil === 100 &&
+    STATS[KIND.RESOURCE_DEPOT].cost.steel === 600 &&
+      STATS[KIND.RESOURCE_DEPOT].cost.oil === 135 &&
       STATS[KIND.RESOURCE_DEPOT].buildTicks === TICK_HZ * 5,
     "Resource Depot cost and build time mirror server",
   );
