@@ -26,10 +26,10 @@ fn the_natural_is_only_ordered_with_its_full_cost_banked_and_a_quiet_route() {
     let ready = |obs: &AiObservation| {
         expansion_security::natural_attempt_ready(obs, None, &memory, true, true)
     };
-    obs.economy.steel = 450;
-    obs.economy.oil = 99;
+    obs.economy.steel = 600;
+    obs.economy.oil = 134;
     assert!(!ready(&obs), "one Oil short");
-    obs.economy.oil = 100;
+    obs.economy.oil = 135;
     assert!(ready(&obs));
     assert!(
         !expansion_security::natural_attempt_ready(&obs, None, &memory, false, true),
@@ -101,7 +101,7 @@ fn a_pending_natural_order_keeps_its_oil_from_the_next_tank() {
         .unwrap();
     factory.production_kind = None;
     factory.production_queue_len = Some(0);
-    // Enough for a Tank (425/175), but not once the Depot's 450/100 is set aside.
+    // Enough for a Tank (350/145), but not once the Depot's 600/135 is set aside.
     obs.economy.steel = 700;
     obs.economy.oil = 250;
     let tank = AiIntent::Train {
@@ -256,8 +256,8 @@ fn a_passing_enemy_the_live_jeffs_guards_and_tanks_beat_does_not_hold_the_natura
 fn the_live_jeff_sends_the_builder_past_enemies_on_a_site_it_holds() {
     let ts = config::TILE_SIZE as f32;
     let (mut obs, memory, site) = secured_natural();
-    obs.economy.steel = 450;
-    obs.economy.oil = 100;
+    obs.economy.steel = 600;
+    obs.economy.oil = 135;
     let center = building_center(site, EntityKind::ResourceDepot, obs.map.tile_size).unwrap();
     let mut raider = combat_at(900, EntityKind::Rifleman, center.0 + 3.0 * ts, center.1);
     raider.owner = 2;
