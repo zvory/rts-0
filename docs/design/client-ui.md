@@ -1994,7 +1994,8 @@ fail closed in command-card data, so future factions do not inherit Kriegsia bui
 or ability buttons before their catalog is intentionally exposed. The client mirror is a checked
 projection, not lifecycle admission: beta and local normal lobbies expose a faction selector for
 human seats with Kriegsia and Cultivators options; Ekat is omitted. Cultivators uses the shared
-Resource Depot art and rules with the faction-specific Nexus label in selection and build UI.
+Resource Depot and Worker art and rules with the faction-specific Nexus and Serf labels in
+selection, build, and production UI.
 Its dedicated Portal build card routes the `portal` kind to a black-and-blue animated vortex with
 counter-rotating rings and deterministic particles; the full effect remains dormant on construction scaffolds. Mainline and replay lobbies hide the selector, fixture-only ids remain test harness
 data, public AI controls do not expose a faction selector, and local prediction remains disabled

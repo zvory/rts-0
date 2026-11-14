@@ -648,7 +648,7 @@ for every active start player, lobby seat and replay branch seat, and replay art
 AI, self-play and dev contexts. Explicit `kriegsia`, `ekat` and `cultivators` requests follow
 playable lifecycle policy; the `phase2_empty_fixture` test fixture and unknown ids remain restricted. Cultivators uses the
 `cultivators.standard` loadout; Nexus is a faction-specific presentation name for
-`resource_depot`, while Portal uses the dedicated `portal` entity kind (compact kind code 28).
+`resource_depot`, and Serf is the presentation name for `worker`, while Portal uses the dedicated `portal` entity kind (compact kind code 28).
 Cultivator Warriors use the dedicated `warrior` entity kind (compact kind code 29); their generic
 attack events carry the `warrior_sword` weapon hint (compact weapon-kind code 12).
 

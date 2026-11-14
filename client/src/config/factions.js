@@ -187,7 +187,11 @@ export function commandCardAbilitiesForFaction(factionId) {
 
 // Presentation aliases preserve the shared simulation and renderer identity.
 const NEXUS_STATS = Object.freeze({ ...STATS[KIND.RESOURCE_DEPOT], label: "Nexus" });
+const SERF_STATS = Object.freeze({ ...STATS[KIND.WORKER], label: "Serf" });
 export function statsForFaction(kind, factionId) {
-  return factionId === CULTIVATORS_FACTION_ID && kind === KIND.RESOURCE_DEPOT
-    ? NEXUS_STATS : STATS[kind];
+  if (factionId === CULTIVATORS_FACTION_ID) {
+    if (kind === KIND.RESOURCE_DEPOT) return NEXUS_STATS;
+    if (kind === KIND.WORKER) return SERF_STATS;
+  }
+  return STATS[kind];
 }

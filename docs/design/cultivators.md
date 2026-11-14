@@ -3,17 +3,17 @@
 ## Approved brief and rules (Phases 0 and 1)
 
 The user requested implementation by reusing the Resource Depot and Engineer, with the
-Cultivators depot named **Nexus** and the Engineer restricted to constructing Nexus buildings.
+Cultivators depot named **Nexus** and its worker named **Serf**. Serfs construct Nexus and Portal buildings.
 This is catalog reuse, with no new entity kinds, art, combat, abilities, or numerical balance.
 The existing global `ResourceDepot`, `Worker`, `SteelMine`, and `PumpJack` identities remain.
 
 Nexus inherits every Resource Depot stat, cost (450 Steel, 100 Oil), five-second construction,
 footprint, fog, damage, cancellation, repair, placement, production, and mining rule. It trains
-Engineers and automatically creates free Steel Mines and Oil Pumpjacks using the existing jobs.
-Engineers inherit all Worker stats, cost, training time, movement, construction and presentation;
+Serfs and automatically creates free Steel Mines and Oil Pumpjacks using the existing jobs.
+Serfs inherit all Worker stats, cost, training time, movement, construction and presentation;
 the faction build catalog permits only Nexus. Existing hotkeys and audio are reused.
 
-The standard start contains one completed Nexus, one Engineer, one completed Disciple, six Steel
+The standard start contains one completed Nexus, one Serf, one completed Disciple, six Steel
 Mines, one Oil Pumpjack, 25 Steel and zero Oil, matching Kriegsia's economy without its starting Riflemen. Resource-patch
 placement uses the existing loadout logic. The Disciple starts in the defensive line near the Nexus.
 No research is available. Losing the Nexus interrupts its economy in exactly the same way as losing a Resource Depot. Expansion has
@@ -34,14 +34,14 @@ invested in a vulnerable structure before it can produce a front-line military u
 counter it through ordinary scouting and building destruction; losing it cancels access to new
 Disciple production but has no additional special effect.
 
-Cultivator Engineers build the Portal through the normal Build command. It costs 150 Steel and
+Cultivator Serfs build the Portal through the normal Build command. It costs 150 Steel and
 zero Oil, occupies a 3x3 footprint, and takes five seconds to construct, matching the Cultivator
 Nexus. The last timing detail interprets the request's repeated "Portal" reference as the existing
 Nexus; it is intentionally isolated here for easy tuning. The Portal has the Barracks baseline of
 165 HP, armored building status, one tile of sight, normal building collision and terrain
 placement, ordinary construction cancellation/refund, repair, fog memory, minimap, damage, and
 death behavior. It provides and consumes no supply, has no weapon, has no prerequisite beyond a
-Cultivator Engineer, and has no build limit. It supports ordinary Disciple production and rally
+Cultivator Serf, and has no build limit. It supports ordinary Disciple production and rally
 orders, but exposes no research, aura, storage, or other economy action. Cultivator AI support
 remains deferred.
 
