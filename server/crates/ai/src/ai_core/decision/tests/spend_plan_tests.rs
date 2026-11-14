@@ -130,16 +130,16 @@ fn the_naturals_builder_goes_once_the_depot_is_paid_for_by_its_arrival() {
         no_guns: false,
         rifle_opening: None,
     };
-    // 300 Steel and 80 Oil banked: the Depot (450/100) is 150/20 short. The 31-tile walk takes
+    // 450 Steel and 115 Oil banked: the Depot (600/135) is 150/20 short. The 31-tile walk takes
     // about 16 s, in which six mines and a Pump Jack bring in about 140 Steel and 23 Oil: short at
     // full income, and shorter on the cautious forecast.
-    let obs = main_base(300, 80);
+    let obs = main_base(450, 115);
     let mut memory = SpendPlanMemory::default();
     memory.observe(&obs, false);
     let facts = AiFacts::from_observation(&obs);
     assert!(!plan(&obs, &facts, &memory, input).natural_funded_on_arrival);
-    // With 360 banked the walk covers the rest: the builder goes now.
-    let obs = main_base(360, 80);
+    // With 510 Steel banked the walk covers the rest: the builder goes now.
+    let obs = main_base(510, 115);
     let laid = plan(&obs, &facts, &memory, input);
     assert!(laid.natural_funded_on_arrival);
     // The Depot is charged when the builder arrives, then the Factory once its order went out.
@@ -156,7 +156,7 @@ fn the_naturals_builder_goes_once_the_depot_is_paid_for_by_its_arrival() {
 fn the_live_jeff_orders_its_natural_ahead_of_the_money_and_the_freeze_waits_for_it() {
     for profile in [&JEFFS_AI, &JEFFS_AI_PRE_SPEND_PLAN] {
         let live = profile.id == JEFFS_AI_ID;
-        let mut obs = main_base(400, 95);
+        let mut obs = main_base(550, 130);
         obs.owned.extend(
             (20..24).map(|id| combat_at(id, EntityKind::MachineGunner, 10.0 * ts(), 10.0 * ts())),
         );
@@ -206,7 +206,7 @@ fn the_live_jeff_orders_its_natural_ahead_of_the_money_and_the_freeze_waits_for_
             obs.tick += config::TICK_HZ * 2;
             seen |= ordered(&decide(&obs, profile, &mut memory));
         }
-        // 400/95 banked, the Depot 450/100: the live Jeff sends the builder now, the freeze waits
+        // 550/130 banked, the Depot 600/135: the live Jeff sends the builder now, the freeze waits
         // until it is banked.
         assert_eq!(seen, live, "{}", profile.id);
     }
@@ -268,7 +268,7 @@ fn with_a_factory_up_the_natural_waits_for_its_cost_banked() {
         rifle_opening: None,
     };
     let mut memory = SpendPlanMemory::default();
-    for (steel, oil, funded) in [(420, 120, false), (450, 100, true)] {
+    for (steel, oil, funded) in [(599, 135, false), (600, 134, false), (600, 135, true)] {
         let mut obs = main_base(steel, oil);
         obs.owned.push(building(6, EntityKind::Factory, Some(0)));
         memory.observe(&obs, false);
