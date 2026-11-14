@@ -59,6 +59,15 @@ assert(
   "live resume countdown rejects non-finite timing fields",
 );
 
+assert(
+  liveResumeCountdownFromWire({ durationMs: 13000, remainingMs: 12500, setupDurationMs: 10000, words: ["Drei!", "Zwei!", "Eins!"] })?.setupDurationMs === 10000,
+  "live resume countdown preserves authoritative setup duration",
+);
+assert(
+  liveResumeCountdownFromWire({ durationMs: 13000, remainingMs: 12500, setupDurationMs: 13000, words: ["Drei!"] }) === null,
+  "live resume setup must leave time for the final countdown",
+);
+
 // ---------------------------------------------------------------------------
 // Protocol
 // ---------------------------------------------------------------------------

@@ -106,16 +106,20 @@ export class LivePauseOverlay {
     this.button.disabled = !this.state.canUnpause;
   }
 
-  startCountdown({ durationMs, remainingMs, words }) {
-    const wordMs = Math.max(250, durationMs / words.length);
+  startCountdown({ durationMs, remainingMs, setupDurationMs = 0, words }) {
+    const wordMs = Math.max(250, (durationMs - setupDurationMs) / words.length);
     const elapsedMs = Math.max(0, durationMs - remainingMs);
-    const startIndex = Math.min(words.length - 1, Math.floor(elapsedMs / wordMs));
-    const showWord = (index) => {
-      if (this.countdown.hidden) return;
-      this.countdown.textContent = words[index];
+    const pulse = (text, setup) => {
+      this.el.classList.toggle("hotkey-setup-active", setup);
+      this.countdown.textContent = text;
+      this.countdown.classList.toggle("hotkey-setup-countdown", setup);
       this.countdown.classList.remove("pulse");
       void this.countdown.offsetWidth;
       this.countdown.classList.add("pulse");
+    };
+    const showWord = (index) => {
+      if (this.countdown.hidden) return;
+      pulse(words[index], false);
       const soundId = COUNTDOWN_SOUND_IDS.length === words.length
         ? COUNTDOWN_SOUND_IDS[index]
         : null;
@@ -127,11 +131,22 @@ export class LivePauseOverlay {
         });
       }
     };
+    const schedule = (at, callback) => {
+      if (at > elapsedMs) {
+        this.countdownTimers.push(globalThis.setTimeout(callback, at - elapsedMs));
+      }
+    };
     this.countdown.hidden = false;
-    showWord(startIndex);
-    for (let index = startIndex + 1; index < words.length; index += 1) {
-      const delay = Math.max(0, index * wordMs - elapsedMs);
-      this.countdownTimers.push(globalThis.setTimeout(() => showWord(index), delay));
+    if (elapsedMs < setupDurationMs) {
+      pulse(`Set up your hotkey groups ${Math.ceil((setupDurationMs - elapsedMs) / 1000)}`, true);
+      for (let at = 1000; at < setupDurationMs; at += 1000) {
+        schedule(at, () => pulse(`Set up your hotkey groups ${Math.ceil((setupDurationMs - at) / 1000)}`, true));
+      }
+    } else {
+      showWord(Math.min(words.length - 1, Math.floor((elapsedMs - setupDurationMs) / wordMs)));
+    }
+    for (let index = 0; index < words.length; index += 1) {
+      schedule(setupDurationMs + index * wordMs, () => showWord(index));
     }
   }
 
@@ -140,6 +155,8 @@ export class LivePauseOverlay {
     this.countdownTimers = [];
     this.countdown.hidden = true;
     this.countdown.textContent = "";
+    this.el.classList.remove("hotkey-setup-active");
+    this.countdown.classList.remove("hotkey-setup-countdown");
   }
 
   destroy() {

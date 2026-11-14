@@ -139,6 +139,7 @@ src/
   match_combat_audio.js # Match-owned combat sound routing and machine-gunner sound cleanup
   match_notice_presenter.js # Match-owned existing-notice fanout and under-attack incident admission
   match_room_time.js # authoritative room-time presentation clock and combat-audio synchronization
+  match_command_issuer.js # gameplay command gate, budget, prediction, and issue metrics
   match_live_pause.js # live pause state actions and prediction visual suspension
   match_net_reporter.js # Match ping cadence and client net-report upload collaborator
   match_settings_context.js # Match settings action/tab context builder
@@ -1370,7 +1371,10 @@ under `#game-screen` for reliable
 `livePauseState` messages; the overlay resolves `pausedBy` through the match roster, exposes direct
 Game-settings and Hotkeys-tab actions, and raises only `#game-menu` above its screen blocker while
 paused. Resume remains visible only when the server grants `canUnpause`, and the overlay is
-destroyed with the match. Once resume is accepted, the pause actions give way to the same large,
+destroyed with the match. Once resume is accepted, a ten-second pulsing center prompt counts down
+“Set up your hotkey groups 10” through “Set up your hotkey groups 1”. The overlay passes pointer
+input through for selection and local control-group assignment; `Match.commandIssuer` blocks gameplay
+commands while live-paused, including rally changes. After setup, the prompt gives way to the same large,
 spoken `Drei! Zwei! Eins!` presentation used before match start. The client begins at the
 server-reported remaining phase for a mid-countdown attach, while authoritative simulation stays
 paused until the server's final unpaused state.

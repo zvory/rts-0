@@ -1447,6 +1447,7 @@ own remaining-count value plus pause/unpause authority:
   canUnpause?: bool,
   resumeCountdown?: {
     durationMs: u32,
+    setupDurationMs: u32,
     remainingMs: u32,
     words: string[]
   }
@@ -1455,10 +1456,11 @@ own remaining-count value plus pause/unpause authority:
 Each active seat and live spectator connection has three successful pause starts per match. The
 server decrements the count only when a request changes the room from unpaused to paused; any
 pause-capable live recipient can request a resume. An accepted resume starts a server-owned
+13-second sequence: ten seconds of hotkey-group setup followed by the
 three-second `Drei! Zwei! Eins!` countdown and leaves `paused: true` until its deadline. During the
 countdown `canUnpause` is false, and `resumeCountdown` carries the full duration, recipient-time
-remaining duration, and display words so late live spectators enter at the current word rather
-than restarting it. The server broadcasts a final `paused: false` state when simulation resumes.
+remaining duration, the setup duration (`setupDurationMs: 10000`), and final countdown display words
+so late live spectators enter at the current phase rather than restarting it. The server broadcasts a final `paused: false` state when simulation resumes.
 While live
 pause is active the room task skips the live simulation tick branch, so AI thinking, command-ack
 consumption, `Game::tick`, live snapshot fanout, and defeat checks do not advance, while reliable
