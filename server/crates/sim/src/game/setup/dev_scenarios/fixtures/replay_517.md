@@ -10,7 +10,7 @@ The reported first-mortar lock is **not reproduced** by this artifact. Re-simula
 recorded commit matches the recorded final-state hash exactly, after applying the recorded
 elimination at tick 4750. Mortar Team 265 spawns at `(1456, 1072)` on tick 4126, moves on tick
 4127, and follows all six Move commands at ticks 4162, 4167, 4173, 4178, 4184 and 4189. It is
-at `(1625.406005859375, 1029.0118408203125)` on tick 4225. The Mortar Fire ability on tick 4226
+at `(1608.841064453125, 1038.71875)` on tick 4225. The Mortar Fire ability on tick 4226
 then deliberately ends its movement. Another Move at tick 4425 starts movement again. Its only
 multi-tick stationary active order is an explicit Attack at ticks 4701–4730, away from the
 producer. There are no failed escape orders at the Gun Works in this replay.
