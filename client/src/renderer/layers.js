@@ -21,6 +21,7 @@ export const LAYERS = [
   "forestUnitOutlines",
   "smokes",
   "hpBars",
+  "cooldownClocks",
   "fog",
   "concealmentUnitOutlines",
   "visualSampleLabels",

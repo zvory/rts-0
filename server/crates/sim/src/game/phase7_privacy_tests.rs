@@ -311,7 +311,21 @@ fn allied_snapshot_exposes_read_only_details_but_not_private_controls() {
     assert_eq!(mortar_view.setup_state, None);
     assert_eq!(mortar_view.target_id, None);
     assert_eq!(mortar_view.weapon_facing, None);
-    assert!(mortar_view.abilities.is_empty());
+    assert_eq!(
+        mortar_view.abilities,
+        vec![crate::protocol::AbilityCooldownView {
+            ability: crate::protocol::abilities::MORTAR_FIRE.to_string(),
+            cooldown_left: 0,
+            remaining_uses: None,
+            autocast_enabled: None,
+            active_object_id: None,
+            available_tick: None,
+            lockout_until_tick: None,
+            expires_in: None,
+            charge_recharge_left: None,
+        }]
+    );
+    assert!(mortar_view.order_plan.is_empty());
     assert!(snapshot
         .upgrades
         .iter()

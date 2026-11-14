@@ -1028,7 +1028,7 @@ separately through `rally` and `rallyPlan` and are not part of `orderPlan`. `ral
 after `debugPath` in compact snapshots to preserve older optional slot positions; it follows the
 same owner-private projection policy, is capped at four stages, and uses the same `[kind, x, y]`
 compact stage encoding with `move` and `attackMove` stages.
-The `abilities` slot is owner-only and capped at 8 entries. Each compact ability cooldown is
+The `abilities` slot is owner-only except for the team-visible Mortar Fire cooldown, and capped at 8 entries. Teammates receive only that mortar timer, with no order plans or other private ability fields; enemy player projections receive no timers. Selected-team and privileged full-world observer projections follow their explicit private-detail scope. The client draws a translucent command-card-style clock above cooling-down mortars and removes it at readiness. Each compact ability cooldown is
 `[ability, cooldownLeft, remainingUses?, autocastEnabled?, activeObjectId?, availableTick?, lockoutUntilTick?, expiresIn?, chargeRechargeLeft?]`,
 where `ability` uses the `ability` compact code table above. `charge` is legacy and currently has
 no eligible carriers, cooldown, or runtime status.
@@ -1216,7 +1216,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
     { kind: "move"|"attackMove"|"holdPosition"|"attack"|"gather"|"build"|"deconstruct"|"smoke"|"mortarFire"|"pointFire"|"blanketFire"|"breakthrough"|"scoutPlane"|"dismissScoutPlane"|"ekatTeleport"|"ekatLineShot"|"ekatMagicAnchor"|"ekatConsumeGolem"|"barrage"|"setupAntiTankGuns", x: f32, y: f32, buildingKind?: string }
   ],
   chargeCooldownLeft?: u16,      // legacy; no longer projected by current server
-  abilities?: [                  // owner-only ability affordance/cooldown data
+  abilities?: [                  // owner ability data; Mortar Fire cooldown also shared with teammates
     { ability: "smoke"|"mortarFire"|"pointFire"|"blanketFire"|"breakthrough"|"scoutPlane"|"dismissScoutPlane"|"ekatTeleport"|"ekatLineShot"|"ekatMagicAnchor"|"ekatConsumeGolem"|"barrage",
       cooldownLeft: u16, remainingUses?: u16, autocastEnabled?: bool,
       activeObjectId?: u32, availableTick?: u32, lockoutUntilTick?: u32, expiresIn?: u16 }
