@@ -13,10 +13,10 @@ Engineers and automatically creates free Steel Mines and Oil Pumpjacks using the
 Engineers inherit all Worker stats, cost, training time, movement, construction and presentation;
 the faction build catalog permits only Nexus. Existing hotkeys and audio are reused.
 
-The standard start contains one completed Nexus, one Engineer, six Steel Mines, one Oil Pumpjack,
-25 Steel and zero Oil, matching Kriegsia's economy without its starting Riflemen. Resource-patch
-placement uses the existing loadout logic. No research or combat units are available. Losing the
-Nexus interrupts its economy in exactly the same way as losing a Resource Depot. Expansion has
+The standard start contains one completed Nexus, one Engineer, one completed Disciple, six Steel
+Mines, one Oil Pumpjack, 25 Steel and zero Oil, matching Kriegsia's economy without its starting Riflemen. Resource-patch
+placement uses the existing loadout logic. The Disciple starts in the defensive line near the Nexus.
+No research is available. Losing the Nexus interrupts its economy in exactly the same way as losing a Resource Depot. Expansion has
 the same cost and vulnerability; this slice provides an economy to develop the faction further.
 
 Normal human lobby selection and recorded replay lifecycle admit Cultivators. Existing AI
@@ -29,10 +29,10 @@ buildings are deferred to future user-directed work.
 ### Approved brief and rules (Phases 0 and 1)
 
 The **Portal** is the Cultivators' first dedicated production building and its name is final. It
-trains the faction's Warrior from grid slot 1 (`Q`). Its immediate player tradeoff is 150 Steel
+trains the faction's Disciple from grid slot 1 (`Q`). Its immediate player tradeoff is 150 Steel
 invested in a vulnerable structure before it can produce a front-line military unit. Opponents
 counter it through ordinary scouting and building destruction; losing it cancels access to new
-Warrior production but has no additional special effect.
+Disciple production but has no additional special effect.
 
 Cultivator Engineers build the Portal through the normal Build command. It costs 150 Steel and
 zero Oil, occupies a 3x3 footprint, and takes five seconds to construct, matching the Cultivator
@@ -41,14 +41,14 @@ Nexus; it is intentionally isolated here for easy tuning. The Portal has the Bar
 165 HP, armored building status, one tile of sight, normal building collision and terrain
 placement, ordinary construction cancellation/refund, repair, fog memory, minimap, damage, and
 death behavior. It provides and consumes no supply, has no weapon, has no prerequisite beyond a
-Cultivator Engineer, and has no build limit. It supports ordinary Warrior production and rally
+Cultivator Engineer, and has no build limit. It supports ordinary Disciple production and rally
 orders, but exposes no research, aura, storage, or other economy action. Cultivator AI support
 remains deferred.
 
-### Warrior brief and rules (Phases 0 and 1)
+### Disciple brief and rules (Phases 0 and 1)
 
-The **Warrior** is a tanky Cultivator melee bruiser trained from a completed Portal. Its command-card
-description is: "Durable melee infantry with a short sword reach and 50% armor penetration. Slow
+The **Disciple** (internal entity id `warrior`) is a tanky Cultivator melee bruiser trained from a completed
+Portal. Its command-card description is: "Durable melee infantry with a short sword reach and 50% armor penetration. Slow
 attacks deal heavy damage." It costs 100 Steel and zero Oil, consumes 2 Supply, and takes 300 ticks
 (about 10 seconds) to train with no prerequisite. It has 135 HP, Small armor classification,
 11-tile sight, a 13.5 px collision/selection/render radius, and ordinary ground movement at 1.6

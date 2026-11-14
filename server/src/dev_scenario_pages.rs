@@ -345,12 +345,12 @@ mod tests {
         assert!(html.contains("/dev/scenarios?id=tank_coax_inspection&unit=tank&count=1"));
         assert!(html.contains("Attack-Move Reload Acquisition"));
         assert!(html.contains("/dev/scenarios?id=attack_move_reload_acquisition&unit=tank&count=1"));
-        assert!(html.contains("Warrior Combat Scenarios"));
+        assert!(html.contains("Disciple Combat Scenarios"));
         assert!(html.contains("<option value=\"\">default</option>"));
         assert!(html.contains("<option value=\"entrenched_riflemen\">entrenched Riflemen</option>"));
-        assert!(html.contains("<option value=\"warrior\" data-case=\"\">warrior</option>"));
+        assert!(html.contains("<option value=\"warrior\" data-case=\"\">disciple</option>"));
         assert!(html.contains(
-            "<option value=\"warrior\" data-case=\"entrenched_riflemen\">warrior</option>"
+            "<option value=\"warrior\" data-case=\"entrenched_riflemen\">disciple</option>"
         ));
     }
 }

@@ -270,10 +270,19 @@ pub const EKAT_LOADOUT: FactionLoadout = FactionLoadout {
     opening_upgrades: &[],
 };
 
-// Reuse the standard economy without the starting combat units.
+// Reuse the standard economy with one starting Cultivator Disciple.
 const CULTIVATORS_START_ENTITIES: &[StartingEntityGroup] = &[
     CURRENT_STANDARD_START_ENTITIES[0],
     CURRENT_STANDARD_START_ENTITIES[1],
+    StartingEntityGroup {
+        kind: EntityKind::Warrior,
+        count: 1,
+        formation: StartingFormation::DefensiveLine {
+            distance_tiles_x10: 40,
+            spacing_tiles_x10: 10,
+        },
+        completed: true,
+    },
     CURRENT_STANDARD_START_ENTITIES[3],
     CURRENT_STANDARD_START_ENTITIES[4],
 ];
@@ -1302,7 +1311,7 @@ mod tests {
             .loadout
             .starting_entities
             .iter()
-            .all(|group| group.kind == EntityKind::Worker || catalog.allows_building(group.kind)));
+            .all(|group| catalog.allows_unit(group.kind) || catalog.allows_building(group.kind)));
         assert!(catalog.upgrades.is_empty());
         assert!(catalog.abilities.is_empty());
     }
