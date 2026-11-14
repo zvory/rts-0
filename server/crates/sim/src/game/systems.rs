@@ -427,14 +427,28 @@ pub(crate) fn run_tick(
                 .map(|entity| (entity.id, (entity.pos_x(), entity.pos_y())))
                 .collect::<HashMap<_, _>>()
         });
-    crate::perf::timed(perf.as_deref_mut(), "collision", || {
+    let wire_deaths = crate::perf::timed(perf.as_deref_mut(), "collision", || {
         services::movement::resolve_collisions(
             entities,
             &pre_collision.spatial,
             map,
             &pre_collision.occupancy,
-        );
+        )
     });
+    if wire_deaths {
+        services::death::death_system(
+            map,
+            entities,
+            fog,
+            smokes,
+            &teams,
+            players,
+            lingering_sight,
+            ground_decals,
+            events,
+            tick,
+        );
+    }
 
     crate::perf::timed(perf.as_deref_mut(), "entrenchment", || {
         let entrenchment_researched = |owner| {

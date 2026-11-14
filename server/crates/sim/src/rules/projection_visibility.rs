@@ -151,7 +151,7 @@ pub fn attack_event_visible_to_team(
 
 /// Whether a direct shot exposes its attacker through transient and actionable firing reveals.
 pub(crate) fn shot_reveals_attacker(victim_kind: EntityKind) -> bool {
-    victim_kind != EntityKind::TankTrap
+    !matches!(victim_kind, EntityKind::TankTrap | EntityKind::BarbedWire)
 }
 
 pub fn event_visible_to_with_smoke(

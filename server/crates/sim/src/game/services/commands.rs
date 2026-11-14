@@ -1266,7 +1266,7 @@ fn clear_obstacle_area_center(
     target: u32,
 ) -> Option<(f32, f32)> {
     if let Some(entity) = entities.get(target) {
-        if !entity.is_neutral_obstacle() || entity.hp == 0 || entity.under_construction() {
+        if entity.kind != EntityKind::TankTrap || entity.hp == 0 || entity.under_construction() {
             return None;
         }
         let currently_actionable = rules::projection::team_visible_world(
@@ -1323,7 +1323,7 @@ fn tank_trap_cluster_targets(
     let Some(anchor_entity) = entities.get(anchor).filter(|entity| entity.hp > 0) else {
         return Vec::new();
     };
-    if !anchor_entity.is_neutral_obstacle() {
+    if anchor_entity.kind != EntityKind::TankTrap {
         return vec![anchor];
     }
     if !rules::projection::team_visible_world(
@@ -1342,7 +1342,7 @@ fn tank_trap_cluster_targets(
     let radius_sq = radius * radius;
     let mut targets: Vec<(u32, f32)> = entities
         .iter()
-        .filter(|entity| entity.hp > 0 && entity.is_neutral_obstacle())
+        .filter(|entity| entity.hp > 0 && entity.kind == EntityKind::TankTrap)
         .filter_map(|entity| {
             let dx = entity.pos_x() - center.0;
             let dy = entity.pos_y() - center.1;

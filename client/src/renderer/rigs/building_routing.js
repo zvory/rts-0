@@ -9,6 +9,7 @@ import { KIND } from "../../protocol.js";
 import { compileSvgRig } from "./svg_importer.js";
 import {
   BARRACKS_BUILDING_SVG,
+  BARBED_WIRE_BUILDING_SVG,
   RESOURCE_DEPOT_BUILDING_SVG,
   DEPOT_BUILDING_SVG,
   FACTORY_BUILDING_SVG,
@@ -19,6 +20,7 @@ import {
 } from "./building_svg.js";
 
 const BUILDING_RIG_SOURCES = Object.freeze([
+  [KIND.BARBED_WIRE, BARBED_WIRE_BUILDING_SVG],
   [KIND.RESOURCE_DEPOT,       RESOURCE_DEPOT_BUILDING_SVG],
   [KIND.ZAMOK,             ZAMOK_BUILDING_SVG],
   [KIND.DEPOT,             DEPOT_BUILDING_SVG],

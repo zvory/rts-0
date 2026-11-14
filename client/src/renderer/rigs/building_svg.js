@@ -200,3 +200,17 @@ export const STEELWORKS_BUILDING_SVG = `<svg viewBox="-48 -48 96 96" data-rts-ri
   <circle id="anchor.selection" cx="0" cy="0" r="1" fill="#000000" />
   <circle id="anchor.hp" cx="0" cy="-48" r="1" fill="#000000" />
 </svg>`;
+
+
+// Placeholder steel coils and wooden stakes; one tile, no team paint after completion.
+export const BARBED_WIRE_BUILDING_SVG = `<svg viewBox="-16 -16 32 32" data-rts-rig-kind="barbed_wire" data-rts-rig-version="1" data-rts-origin="center">
+  <rect id="part.post.left" x="-14" y="-12" width="3" height="24" fill="#64523c" stroke="#302b25" stroke-width="1" />
+  <rect id="part.post.right" x="11" y="-12" width="3" height="24" fill="#64523c" stroke="#302b25" stroke-width="1" />
+  <ellipse id="part.coil.left" cx="-8" cy="0" rx="7" ry="11" fill="none" stroke="#a8afb1" stroke-width="1.5" />
+  <ellipse id="part.coil.middle" cx="0" cy="0" rx="7" ry="11" fill="none" stroke="#879395" stroke-width="1.5" />
+  <ellipse id="part.coil.right" cx="8" cy="0" rx="7" ry="11" fill="none" stroke="#b3b9b8" stroke-width="1.5" />
+  <path id="part.strands" d="M -16 -5 L 16 5 M -16 5 L 16 -5 M -9 -9 L -5 -3 M -9 -3 L -5 -9 M 5 3 L 9 9 M 5 9 L 9 3" fill="none" stroke="#d2d3c9" stroke-width="1.2" />
+  <circle id="anchor.origin" cx="0" cy="0" r="1" fill="#000000" />
+  <circle id="anchor.selection" cx="0" cy="0" r="1" fill="#000000" />
+  <circle id="anchor.hp" cx="0" cy="-16" r="1" fill="#000000" />
+</svg>`;

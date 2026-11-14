@@ -35,7 +35,7 @@ pub(crate) fn death_system(
 ) {
     let dead: Vec<DeadEntity> = entities
         .iter()
-        .filter(|e| e.is_targetable() && e.hp == 0)
+        .filter(|e| (e.is_targetable() || e.kind == EntityKind::BarbedWire) && e.hp == 0)
         .map(|e| DeadEntity {
             id: e.id,
             owner: e.owner,

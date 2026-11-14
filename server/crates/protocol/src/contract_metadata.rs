@@ -86,6 +86,7 @@ pub mod kinds {
     pub const FACTORY: &str = "factory";
     pub const STEELWORKS: &str = "steelworks";
     pub const TANK_TRAP: &str = "tank_trap";
+    pub const BARBED_WIRE: &str = "barbed_wire";
     pub const STEEL_MINE: &str = "steel_mine";
     pub const PUMP_JACK: &str = "pump_jack";
     pub const STEEL: &str = "steel";
@@ -397,6 +398,7 @@ const KIND_CODES: &[(&str, u8)] = &[
     (kinds::EKAT, 19),
     (kinds::ZAMOK, 20),
     (kinds::TANK_TRAP, 21),
+    (kinds::BARBED_WIRE, 30),
     (kinds::STEEL_MINE, 26),
     (kinds::PUMP_JACK, 23),
 ];
@@ -723,6 +725,7 @@ fn kind_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("FACTORY", kinds::FACTORY),
         ("STEELWORKS", kinds::STEELWORKS),
         ("TANK_TRAP", kinds::TANK_TRAP),
+        ("BARBED_WIRE", kinds::BARBED_WIRE),
         ("STEEL_MINE", kinds::STEEL_MINE),
         ("PUMP_JACK", kinds::PUMP_JACK),
         ("STEEL", kinds::STEEL),

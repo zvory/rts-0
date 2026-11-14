@@ -40,7 +40,15 @@ export function tankTrapLineTiles(start, end) {
   return tiles;
 }
 
-export function buildTankTrapLineSites({ start, end, isValid }) {
+export function buildTankTrapLineSites({ start, end, isValid, building = KIND.TANK_TRAP }) {
+  if (building === KIND.BARBED_WIRE) {
+    let blocked = false;
+    return barbedWireLineTiles(start, end).map((tile) => {
+      const placement = normalizePlacementResult(isValid?.(tile.tileX, tile.tileY) ?? true);
+      blocked ||= !placement.valid;
+      return { ...tile, valid: !blocked, blockedBy: placement.blockedBy };
+    });
+  }
   const validFn = typeof isValid === "function" ? isValid : () => true;
   let previousValid = null;
   let gap = null;
@@ -91,7 +99,11 @@ export function validTankTrapLineSites(sites) {
 
 export function tankTrapBuildCommands(workerIds, sites, building = KIND.TANK_TRAP) {
   const workers = Array.isArray(workerIds) ? workerIds.filter((id) => Number.isInteger(id)) : [];
-  const validSites = validTankTrapLineSites(sites);
+  const lineSites = Array.isArray(sites) ? sites : [];
+  const blockedIndex = lineSites.findIndex((site) => !site.valid);
+  const validSites = building === KIND.BARBED_WIRE
+    ? lineSites.slice(0, blockedIndex < 0 ? lineSites.length : blockedIndex)
+    : validTankTrapLineSites(sites);
   if (workers.length === 0 || validSites.length === 0) return [];
 
   const commands = [];
@@ -126,4 +138,27 @@ function skippableTankTrapBlocker(blockedBy) {
 
 function finiteTile(value) {
   return Number.isInteger(value) ? value : null;
+}
+
+
+export function barbedWireLineTiles(start, end) {
+  const values = [start?.tileX, start?.tileY, end?.tileX, end?.tileY];
+  if (!values.every(Number.isInteger)) return [];
+  let [x, y, x1, y1] = values;
+  const dx = Math.abs(x1 - x), dy = Math.abs(y1 - y);
+  const sx = Math.sign(x1 - x), sy = Math.sign(y1 - y);
+  let error = dx - dy;
+  const tiles = [{ tileX: x, tileY: y }];
+  while (x !== x1 || y !== y1) {
+    const twice = error * 2;
+    if (twice > -dy) {
+      error -= dy; x += sx;
+      tiles.push({ tileX: x, tileY: y });
+    }
+    if (twice < dx) {
+      error += dx; y += sy;
+      tiles.push({ tileX: x, tileY: y });
+    }
+  }
+  return tiles;
 }

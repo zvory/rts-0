@@ -59,11 +59,11 @@ impl Game {
                     by_key.id, e.id
                 );
             }
-            if e.kind == EntityKind::TankTrap {
+            if matches!(e.kind, EntityKind::TankTrap | EntityKind::BarbedWire) {
                 assert_eq!(
                     e.under_construction(),
                     e.owner != NEUTRAL,
-                    "invariant: Tank Trap ownership does not match construction state; {}",
+                    "invariant: field obstacle ownership does not match construction state; {}",
                     entity_context(&self.state.map, e)
                 );
             }

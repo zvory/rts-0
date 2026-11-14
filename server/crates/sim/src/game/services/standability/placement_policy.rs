@@ -9,7 +9,7 @@ pub(super) enum BuildPlacementPolicy {
 
 pub(super) fn build_placement_policy(building: EntityKind) -> BuildPlacementPolicy {
     match building {
-        EntityKind::TankTrap => BuildPlacementPolicy::VehicleBodyOnly,
+        EntityKind::TankTrap | EntityKind::BarbedWire => BuildPlacementPolicy::VehicleBodyOnly,
         EntityKind::PumpJack => BuildPlacementPolicy::PumpJackOilOnly,
         _ => BuildPlacementPolicy::AllGround,
     }

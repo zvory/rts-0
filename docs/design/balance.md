@@ -776,3 +776,8 @@ and allied complexes do not grant it; the producing Gun Works must still exist a
 The marker uses existing upgrade snapshot/checkpoint persistence. **TODO: remove this hack** when
 tech requirements are revisited, including the marker grant and server/client/AI exceptions.
 Other units retain their current prerequisites.
+
+Barbed Wire: Engineer-built, completed Training Centre required; 5 steel, 120 ticks per 1×1
+segment, 2 crossing HP, no sight/supply or blocking. Untargetable and immune to weapon damage.
+Any ground unit entry consumes one HP; infantry and mortar teams additionally take 10 direct HP
+damage and move at 70% speed on a live completed segment. See [rules](barbed-wire.md).

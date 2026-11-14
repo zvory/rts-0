@@ -17,6 +17,7 @@ use super::{
     WeaponSetup, WorkerState, MAX_QUEUED_ORDERS, NEUTRAL,
 };
 
+mod field_obstacles;
 mod helpers;
 mod position;
 mod production;
@@ -129,7 +130,7 @@ impl Entity {
         let s = config::building_stats(kind)?;
         Some(Entity {
             id: 0,
-            owner: if finished && kind == EntityKind::TankTrap {
+            owner: if finished && matches!(kind, EntityKind::TankTrap | EntityKind::BarbedWire) {
                 NEUTRAL
             } else {
                 owner
@@ -1007,7 +1008,7 @@ impl Entity {
         amount: u32,
         attribution: Option<(u32, (f32, f32), u32)>,
     ) -> bool {
-        if self.hp == 0 || amount == 0 || self.invulnerable {
+        if self.hp == 0 || amount == 0 || self.invulnerable || self.kind == EntityKind::BarbedWire {
             return false;
         }
         self.hp = self.hp.saturating_sub(amount);
@@ -1041,6 +1042,9 @@ impl Entity {
     }
 
     pub fn restore_hp(&mut self, amount: u32) -> bool {
+        if self.kind == EntityKind::BarbedWire {
+            return false;
+        }
         if self.hp == 0 || amount == 0 || self.hp >= self.max_hp {
             return false;
         }
@@ -1210,21 +1214,6 @@ impl Entity {
         Some(true)
     }
 
-    /// Completed neutral field obstacles can be attacked and damaged without belonging to a
-    /// player. Resource nodes remain neutral but are not obstacles.
-    pub fn is_neutral_obstacle(&self) -> bool {
-        self.owner == NEUTRAL && self.kind == EntityKind::TankTrap && !self.under_construction()
-    }
-
-    pub(in crate::game) fn neutralize_completed_tank_trap(&mut self) -> bool {
-        let completed_tank_trap = self.kind == EntityKind::TankTrap && !self.under_construction();
-        let changed_owner = completed_tank_trap && self.owner != NEUTRAL;
-        if completed_tank_trap {
-            self.owner = NEUTRAL;
-        }
-        changed_owner
-    }
-
     pub fn set_construction_progress(&mut self, progress: u32) -> bool {
         if self.hp == 0 {
             return false;
@@ -1301,6 +1290,9 @@ impl Entity {
     /// Whether this building can be attacked / can take damage and die. Resource nodes are
     /// indestructible (they only deplete).
     pub fn is_targetable(&self) -> bool {
+        if self.kind == EntityKind::BarbedWire {
+            return false;
+        }
         !self.is_node() && self.kind != EntityKind::ScoutPlane
     }
 
