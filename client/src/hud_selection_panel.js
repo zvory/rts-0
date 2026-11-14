@@ -362,7 +362,8 @@ export class HudSelectionPanel {
 
   /** Build the detail node for a single selected entity. */
   _singleSelectionNode(e) {
-    const st = statsForFaction(e.kind, this.state.players?.find?.((p) => p.id === e.owner)?.factionId) || {};
+    const factionId = this.state.players?.find?.((p) => p.id === e.owner)?.factionId;
+    const st = statsForFaction(e.kind, factionId) || {};
     const node = document.createElement("div");
     node.className = "sel-single";
 
@@ -376,7 +377,7 @@ export class HudSelectionPanel {
     if (queue > 0) {
       const pct = Math.round((e.prodProgress ?? 0) * 100);
       const kindLabel = (e.prodUpgrade && UPGRADES[e.prodUpgrade]?.label) ||
-        (e.prodKind && STATS[e.prodKind] && STATS[e.prodKind].label) ||
+        (e.prodKind && statsForFaction(e.prodKind, factionId)?.label) ||
         e.prodKind ||
         "";
       const queued = queue > 1 ? ` (+${queue - 1})` : "";

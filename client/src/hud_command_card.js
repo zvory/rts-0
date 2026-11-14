@@ -410,7 +410,7 @@ export function buildTrainCard(ctx, building, { underConstruction = false } = {}
 
   const slots = new Array(9).fill(null);
   for (const unit of trains) {
-    const st = STATS[unit];
+    const st = statsForFaction(unit, commandFactionId(ctx));
     if (!st) continue;
     const slot = firstOpenCommandSlot(slots, trainSlotForUnit(building.kind, unit, trains), cancelSlot);
     if (slot < 0) continue;

@@ -218,10 +218,10 @@ playable catalogs, explicit fixture catalogs, and future catalog data, but
 branch, self-play, dev, match-history, and post-match paths. Fixture-only and
 reserved/future ids must not inherit Kriegsia economy behavior or appear in product selectors just
 because their catalog rows are dumpable.
-The playable `cultivators` catalog reuses Resource Depot (displayed as Nexus), Engineer,
-Steel Mine and Oil Pumpjack, with only Nexus available for Engineer construction. Its
+The playable `cultivators` catalog reuses Resource Depot (displayed as Town), Worker (displayed as Serf),
+Steel Mine and Oil Pumpjack, with Town and Portal available for Serf construction. Its
 `cultivators.standard` loadout matches Kriegsia's starting economy and omits Riflemen.
-Cultivator Engineers can also construct the faction-specific Portal for 150 Steel: it has a 3x3
+Cultivator Serfs can also construct the faction-specific Portal for 150 Steel: it has a 3x3
 footprint, 123 HP, one tile of sight, a five-second construction time, no prerequisite, and no
 research. A completed Portal trains the Cultivator Warrior for 100 Steel and 2 Supply in 300 ticks.
 The Warrior is a 135-HP, 13.5-pixel-radius ground melee unit moving at 1.6 pixels per tick. Its
