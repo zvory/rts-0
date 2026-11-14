@@ -64,9 +64,9 @@ export const ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES = 1;
 export const ARTILLERY_AMMO_COST = Object.freeze({ steel: 0, oil: 0 });
 export const SMOKE_ABILITY_RANGE_TILES = 14;
 export const SMOKE_LAUNCH_MAX_DELAY_MS = 100;
-export const SMOKE_CLOUD_RADIUS_TILES = 2;
+export const SMOKE_CLOUD_RADIUS_TILES = 2.25;
 export const SMOKE_CLOUD_DURATION_TICKS = TICK_HZ * 5;
-export const SMOKE_PLUS_CLOUD_RADIUS_TILES = SMOKE_CLOUD_RADIUS_TILES * 2;
+export const SMOKE_PLUS_CLOUD_RADIUS_TILES = 4;
 export const SMOKE_PLUS_CLOUD_DURATION_TICKS = SMOKE_CLOUD_DURATION_TICKS * 2;
 export const SMOKE_ABILITY_COOLDOWN_TICKS = 0;
 export const SCOUT_CAR_SMOKE_CHARGES = 2;
@@ -501,7 +501,7 @@ export const UPGRADES = Object.freeze({
     icon: "SMK+",
     cost: Object.freeze({ steel: 150, oil: 150 }),
     researchTicks: SMOKE_PLUS_RESEARCH_TICKS,
-    description: "Double Scout Car Smoke radius and duration",
+    description: "Increase Scout Car Smoke radius to 4 tiles and double duration",
     researchedAt: KIND.ENGINEERING_COMPLEX,
   }),
   [UPGRADE.SCOUT_PLANE_UNLOCK]: Object.freeze({
