@@ -96,7 +96,7 @@ export function _drawBuilding(e, colorByOwner, state) {
       }],
       alpha: bodyAlpha,
     });
-  } else if (!usePngRig || !pngAtlas?.omitFootprintShadow) {
+  } else if (e.kind !== KIND.PORTAL && (!usePngRig || !pngAtlas?.omitFootprintShadow)) {
     // Legacy and loading fallbacks retain a footprint shadow. A loaded raster
     // may provide a silhouette-derived shadow or intentionally omit one.
     const shadowKey = `${e.x}|${e.y}|${w}|${h}`;
@@ -155,7 +155,7 @@ export function _drawBuilding(e, colorByOwner, state) {
       if (g.rtsStaticRedraw !== false) g.rtsStaticRenderKey = bodyKey;
     } else if (e.kind === KIND.PORTAL) {
       if (g.rtsStaticRedraw !== false) {
-        drawPortalFrame(g, e.x, e.y, w, h, tint, bodyAlpha);
+        drawPortalFrame(g, e.x, e.y, w, bodyAlpha);
         g.rtsStaticRenderKey = bodyKey;
       }
     } else if (g.rtsStaticRedraw !== false) {
@@ -234,33 +234,11 @@ export function _drawBuilding(e, colorByOwner, state) {
   this._queueLabel(e, e.x, y0 + 14, queueDepth, bodyAlpha);
 }
 
-function drawPortalFrame(g, cx, cy, width, height, tint, alpha) {
-  const halfW = width / 2;
-  const halfH = height / 2;
-  gfxStroke(g, 2.5, 0x07101c, 0.98 * alpha);
-  gfxFill(g, 0x080b13, 0.96 * alpha);
-  gfxRect(g, cx - halfW, cy - halfH, width, height);
-  gfxNoFill(g);
-
+function drawPortalFrame(g, cx, cy, width, alpha) {
   gfxStroke(g, 2, 0x173f70, 0.9 * alpha);
   gfxFill(g, 0x0b1628, 0.98 * alpha);
   gfxCircle(g, cx, cy, width * 0.42);
   gfxNoFill(g);
-
-  for (let corner = 0; corner < 4; corner += 1) {
-    const sx = corner % 2 === 0 ? -1 : 1;
-    const sy = corner < 2 ? -1 : 1;
-    gfxStrokeLine(
-      g,
-      cx + sx * halfW * 0.86,
-      cy + sy * halfH * 0.86,
-      cx + sx * halfW * 0.58,
-      cy + sy * halfH * 0.58,
-      3,
-      tint,
-      0.72 * alpha,
-    );
-  }
 }
 
 function drawPortalVortex(e, width, height) {
