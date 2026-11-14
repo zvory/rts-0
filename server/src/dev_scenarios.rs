@@ -8,6 +8,7 @@ mod replay_281_tank_gap;
 mod replay_296_scout_car_stop;
 mod replay_303_scout_car_forest_lock;
 mod replay_384_tank_forest_lock;
+mod replay_517_mortar_water_exit;
 mod scout_car_lake_reverse_l_path;
 mod scout_car_open_ground_l_path;
 mod tank_retreat;
@@ -59,7 +60,6 @@ const DYNAMIC_CONSTRUCTION_PATH_BLOCK_LAUNCHES: [DevScenarioLaunch; 3] = [
         case: Some(DYNAMIC_CONSTRUCTION_PATH_BLOCK_CASE_MAJOR_ANGLE),
     },
 ];
-
 const SCOUT_CAR_SNAKING_CORRIDOR_LAUNCHES: [DevScenarioLaunch; 12] = [
     DevScenarioLaunch {
         id: "scout_car_snaking_corridor",
@@ -792,6 +792,7 @@ const DEV_SCENARIOS: &[DevScenarioSpec] = &[
     replay_296_scout_car_stop::REPLAY_296_SCOUT_CAR_STOP_SPEC,
     replay_303_scout_car_forest_lock::REPLAY_303_SCOUT_CAR_FOREST_LOCK_SPEC,
     replay_384_tank_forest_lock::REPLAY_384_TANK_FOREST_LOCK_SPEC,
+    replay_517_mortar_water_exit::REPLAY_517_MORTAR_WATER_EXIT_SPEC,
     DevScenarioSpec {
         id: "scout_car_wall_chokepoint",
         title: "Vehicle Wall Chokepoint",
@@ -1030,7 +1031,6 @@ pub fn dev_scenario_blocker_label(blocker: Option<EntityKind>) -> &'static str {
         Some(_) => "unsupported",
     }
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;

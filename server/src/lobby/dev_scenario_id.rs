@@ -12,6 +12,7 @@ pub(in crate::lobby) enum DevScenarioId {
     Replay296ScoutCarStop,
     Replay303ScoutCarForestLock,
     Replay384TankForestLock,
+    Replay517MortarWaterExit,
     ScoutCarWallChokepoint,
     VehicleCornerWall,
     VehicleSmallBlockBaseline,
@@ -47,6 +48,7 @@ impl DevScenarioId {
             "replay_281_tank_gap" => Some(Self::Replay281TankGap),
             "replay_296_scout_car_stop" => Some(Self::Replay296ScoutCarStop),
             "replay_303_scout_car_forest_lock" => Some(Self::Replay303ScoutCarForestLock),
+            "replay_517_mortar_water_exit" => Some(Self::Replay517MortarWaterExit),
             "replay_384_tank_forest_lock" => Some(Self::Replay384TankForestLock),
             "scout_car_wall_chokepoint" => Some(Self::ScoutCarWallChokepoint),
             "vehicle_corner_wall" => Some(Self::VehicleCornerWall),
@@ -86,6 +88,7 @@ impl DevScenarioId {
             Self::Replay281TankGap => "replay_281_tank_gap",
             Self::Replay296ScoutCarStop => "replay_296_scout_car_stop",
             Self::Replay303ScoutCarForestLock => "replay_303_scout_car_forest_lock",
+            Self::Replay517MortarWaterExit => "replay_517_mortar_water_exit",
             Self::Replay384TankForestLock => "replay_384_tank_forest_lock",
             Self::ScoutCarWallChokepoint => "scout_car_wall_chokepoint",
             Self::VehicleCornerWall => "vehicle_corner_wall",
@@ -115,6 +118,12 @@ impl DevScenarioId {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn replay_517_id_round_trips() {
+        let id = DevScenarioId::from_room_id("replay_517_mortar_water_exit").unwrap();
+        assert_eq!(id.room_id(), "replay_517_mortar_water_exit");
+    }
 
     #[test]
     fn replay_281_id_round_trips() {

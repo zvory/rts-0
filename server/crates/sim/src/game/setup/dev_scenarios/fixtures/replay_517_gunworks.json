@@ -1,0 +1,48 @@
+[
+  {
+    "id": 243,
+    "owner": 4,
+    "kind": "Steelworks",
+    "pos_x": 5701632,
+    "pos_y": 4390912,
+    "hp": 120,
+    "max_hp": 120,
+    "invulnerable": false,
+    "last_damage_owner": null,
+    "last_damage_entity": null,
+    "units_killed": 0,
+    "last_damage_tick": null,
+    "last_damage_pos": null,
+    "movement": null,
+    "combat": null,
+    "production": {
+      "queue": [
+        {
+          "unit": "MortarTeam",
+          "progress": 459,
+          "total": 460,
+          "paid": true
+        }
+      ],
+      "research_queue": [],
+      "repeat_units": [],
+      "repeat_unit_cursor": 0,
+      "rally_point": {
+        "kind": "Move",
+        "point": {
+          "x": 1583.7242,
+          "y": 1066.8828
+        }
+      },
+      "rally_queue": []
+    },
+    "construction": null,
+    "worker": null,
+    "resource_node": null,
+    "resource_extractor": null,
+    "ability_cooldowns": {},
+    "ability_lockouts_until_tick": {},
+    "ability_uses_remaining": {},
+    "ability_charge_recharge_ticks": {}
+  }
+]
