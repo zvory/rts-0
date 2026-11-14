@@ -14,6 +14,7 @@ use crate::protocol::terrain;
 
 mod abilities;
 mod artillery_point_fire_queue;
+mod barbed_wire;
 mod build;
 mod command_budget;
 mod construction_cancel;

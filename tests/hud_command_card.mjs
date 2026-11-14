@@ -148,6 +148,8 @@ function buttonSlots(card) {
   assert.equal(buildCard.slots[2].hotkey, "E");
   assert.equal(buildCard.slots[7].commandId, kriegsiaCommandId("build", KIND.TANK_TRAP));
   assert.equal(buildCard.slots[7].label, "Tank Trap");
+  assert.equal(buildCard.slots[6].commandId, kriegsiaCommandId("build", KIND.BARBED_WIRE));
+  assert.equal(buildCard.slots[6].label, "Barbed Wire");
   assert.equal(buildCard.slots[7].hotkey, "X");
   assert.equal(
     buildCard.slots.some((slot) => slot?.commandId === kriegsiaCommandId("build", KIND.PUMP_JACK)),
@@ -726,6 +728,7 @@ for (const [kind, upgrade] of [
     KIND.FACTORY,
     KIND.STEELWORKS,
     KIND.TANK_TRAP,
+    KIND.BARBED_WIRE,
   ]);
   for (const entry of catalog) {
     assert.equal(duplicateCommandIdsForCard(entry.card).length, 0, `${entry.id} has duplicate command ids`);

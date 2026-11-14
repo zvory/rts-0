@@ -317,6 +317,7 @@ pub fn default_weapon_kind(kind: EntityKind) -> Option<WeaponKind> {
         | EntityKind::Factory
         | EntityKind::Steelworks
         | EntityKind::TankTrap
+        | EntityKind::BarbedWire
         | EntityKind::SteelMine
         | EntityKind::PumpJack
         | EntityKind::Steel
@@ -391,7 +392,7 @@ pub fn weapon_class(kind: EntityKind) -> WeaponClass {
 pub fn target_threat_role(kind: EntityKind) -> TargetThreatRole {
     if is_ap(kind) {
         TargetThreatRole::AntiArmorThreat
-    } else if kind == EntityKind::TankTrap {
+    } else if matches!(kind, EntityKind::TankTrap | EntityKind::BarbedWire) {
         TargetThreatRole::FieldObstacle
     } else if matches!(
         kind,
@@ -804,6 +805,7 @@ mod tests {
             (EntityKind::Factory, None),
             (EntityKind::Steelworks, None),
             (EntityKind::TankTrap, None),
+            (EntityKind::BarbedWire, None),
             (EntityKind::SteelMine, None),
             (EntityKind::PumpJack, None),
             (EntityKind::Steel, None),

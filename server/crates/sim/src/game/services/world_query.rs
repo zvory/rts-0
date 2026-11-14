@@ -68,7 +68,10 @@ fn survival_building_kind(kind: EntityKind) -> bool {
     kind.is_building()
         && !matches!(
             kind,
-            EntityKind::TankTrap | EntityKind::SteelMine | EntityKind::PumpJack
+            EntityKind::TankTrap
+                | EntityKind::BarbedWire
+                | EntityKind::SteelMine
+                | EntityKind::PumpJack
         )
 }
 
@@ -517,16 +520,19 @@ mod tests {
     }
 
     #[test]
-    fn survival_buildings_exclude_tank_traps_without_hiding_generic_buildings() {
+    fn survival_buildings_exclude_field_obstacles_without_hiding_generic_buildings() {
         let mut s = EntityStore::default();
-        s.spawn_building(1, EntityKind::TankTrap, 100.0, 100.0, true)
-            .unwrap();
+        for kind in [EntityKind::TankTrap, EntityKind::BarbedWire] {
+            for finished in [false, true] {
+                s.spawn_building(1, kind, 100.0, 100.0, finished).unwrap();
+            }
+        }
         s.spawn_building(1, EntityKind::PumpJack, 132.0, 100.0, true)
             .unwrap();
         s.spawn_building(1, EntityKind::Depot, 164.0, 100.0, true)
             .unwrap();
 
-        assert_eq!(owned_buildings(&s, 1).count(), 2);
+        assert_eq!(owned_buildings(&s, 1).count(), 4);
         assert_eq!(
             owned_survival_buildings(&s, 1)
                 .map(|entity| entity.kind)

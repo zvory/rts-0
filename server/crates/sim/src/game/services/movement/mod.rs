@@ -19,6 +19,7 @@ use crate::game::PlayerState;
 use rts_rules::math::GameplayMath as _;
 
 mod armor_reaction;
+mod barbed_wire;
 mod car_drive;
 mod collision;
 mod pivot_drive;
@@ -44,7 +45,16 @@ pub(super) const STEERING_MAX_NEIGHBORS: usize = 16;
 const MAGIC_ANCHOR_STATIONARY_PULL_PER_TICK_SCALE: f32 =
     config::EKAT_MAGIC_ANCHOR_PULL_TOWARD_MULTIPLIER - 1.0;
 
-pub(crate) use collision::resolve_collisions;
+pub(crate) fn resolve_collisions(
+    entities: &mut EntityStore,
+    spatial: &SpatialIndex,
+    map: &Map,
+    occ: &Occupancy,
+) -> bool {
+    let before = barbed_wire::positions(map, entities);
+    collision::resolve_collisions(entities, spatial, map, occ);
+    barbed_wire::apply_entries(map, entities, &before)
+}
 pub(crate) use pivot_drive::{angle_delta, rotate_toward};
 pub(crate) use standability::is_collision_anchored;
 #[cfg(test)]
@@ -88,6 +98,7 @@ pub(crate) fn movement_system_with_context(
     smokes: &SmokeCloudStore,
     ability_runtime: &AbilityRuntime,
 ) {
+    let wire_positions = barbed_wire::positions(map, entities);
     for id in entities.ids() {
         if let Some(e) = entities.get_mut(id) {
             e.reset_movement_delta();
@@ -126,6 +137,7 @@ pub(crate) fn movement_system_with_context(
     );
     waypoints::advance_moving_units(map, entities, players, occ, spatial, tick, ability_runtime);
     apply_magic_anchor_stationary_pull(map, entities, occ, tick, ability_runtime);
+    barbed_wire::apply_entries(map, entities, &wire_positions);
     for id in entities.ids() {
         if let Some(e) = entities.get_mut(id) {
             e.tick_breakthrough_status();

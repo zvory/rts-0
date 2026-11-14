@@ -84,6 +84,6 @@ export const WORKER_BUILD_CARD_SLOTS = Object.freeze([
   KIND.TRAINING_CENTRE,
   null,
   null,
-  null,
+  KIND.BARBED_WIRE,
   KIND.TANK_TRAP,
 ]);

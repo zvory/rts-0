@@ -220,7 +220,7 @@ function placementEntityBounds(entity, tileSize) {
 
 export function placementPolicyForBuilding(kind) {
   return Object.freeze({
-    unitOverlap: kind === KIND.TANK_TRAP ? "infantryAllowed" : "none",
+    unitOverlap: [KIND.TANK_TRAP, KIND.BARBED_WIRE].includes(kind) ? "infantryAllowed" : "none",
     resourceOverlap: kind === KIND.PUMP_JACK ? "oilCenterRequired" : "none",
   });
 }
@@ -348,7 +348,7 @@ export function _refreshPlacement() {
     intent?.updatePlacement?.(tileX, tileY, false);
     return;
   }
-  if (this._placementDrag && place.building === KIND.TANK_TRAP) {
+  if (this._placementDrag && [KIND.TANK_TRAP, KIND.BARBED_WIRE].includes(place.building)) {
     const chosenWorker = this._selectedWorkerIds()[0];
     const allowed = chosenWorker === undefined ? new Set() : new Set([chosenWorker]);
     const blockerAt = createFootprintPlacementBlockerQuery(
@@ -358,6 +358,7 @@ export function _refreshPlacement() {
       placementPolicyForBuilding(place.building),
     );
     const lineSites = buildTankTrapLineSites({
+      building: place.building,
       start: this._placementDrag,
       end: { tileX, tileY },
       isValid: (siteX, siteY) => {
@@ -373,7 +374,7 @@ export function _refreshPlacement() {
   }
 
   const valid = this._footprintValid(tileX, tileY, footW, footH, map, place.building);
-  const lineSites = place.building === KIND.TANK_TRAP ? [{ tileX, tileY, valid }] : undefined;
+  const lineSites = [KIND.TANK_TRAP, KIND.BARBED_WIRE].includes(place.building) ? [{ tileX, tileY, valid }] : undefined;
   intent?.updatePlacement?.(tileX, tileY, valid, lineSites ? { lineSites } : {});
 }
 
@@ -406,7 +407,7 @@ export function _confirmPlacement(ev = {}) {
     intent?.endPlacement?.();
     return;
   }
-  if (place.building === KIND.TANK_TRAP && Array.isArray(place.lineSites)) {
+  if ([KIND.TANK_TRAP, KIND.BARBED_WIRE].includes(place.building) && Array.isArray(place.lineSites)) {
     this._confirmTankTrapLinePlacement(place, workers, ev);
     return;
   }
@@ -421,7 +422,7 @@ export function _confirmPlacement(ev = {}) {
 
 export function _beginTankTrapPlacementDrag() {
   const place = clientIntent(this)?.placement;
-  if (!place || place.building !== KIND.TANK_TRAP) return false;
+  if (!place || ![KIND.TANK_TRAP, KIND.BARBED_WIRE].includes(place.building)) return false;
   this._placementDrag = { tileX: place.tileX, tileY: place.tileY };
   this._refreshPlacement();
   return true;

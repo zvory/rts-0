@@ -213,6 +213,10 @@ export const STATS = Object.freeze({
     cost: { steel: 150, oil: 100 }, buildTicks: 599,
     trains: [KIND.MORTAR_TEAM, KIND.ANTI_TANK_GUN, KIND.ARTILLERY, KIND.ROCKET_LAUNCHER],
     requires: [KIND.RESOURCE_DEPOT, KIND.TRAINING_CENTRE] },
+  [KIND.BARBED_WIRE]: { label: "Barbed Wire", icon: "BW", footW: 1, footH: 1, sight: 0,
+    cost: { steel: 5, oil: 0 }, buildTicks: TICK_HZ * 4, trains: [],
+    requires: KIND.TRAINING_CENTRE, requiresText: "Requires Training Centre",
+    description: "Slows infantry and mortar teams by 30% and deals 10 damage on entry, including allies. Disappears after two ground-unit crossings. Immune to weapons." },
   [KIND.TANK_TRAP]: { label: "Tank Trap", icon: "TT", footW: 1, footH: 1, sight: 0,
     cost: { steel: 20, oil: 0 }, buildTicks: TICK_HZ * 5, trains: [],
     requires: KIND.TRAINING_CENTRE,
@@ -543,6 +547,7 @@ export const WORKER_BUILDABLE = Object.freeze([
   KIND.FACTORY,
   KIND.STEELWORKS,
   KIND.TANK_TRAP,
+  KIND.BARBED_WIRE,
 ]);
 
 export const FIXTURE_FACTION_ID = "phase2_empty_fixture";

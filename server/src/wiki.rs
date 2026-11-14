@@ -498,6 +498,7 @@ fn kind_label(kind: EntityKind) -> String {
         EntityKind::Factory => "Vehicle Works",
         EntityKind::Steelworks => "Gun Works",
         EntityKind::TankTrap => "Tank Trap",
+        EntityKind::BarbedWire => "Barbed Wire",
         EntityKind::SteelMine => "Steel Mine",
         EntityKind::PumpJack => "Pump Jack",
         EntityKind::Steel => "Steel",

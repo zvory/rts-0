@@ -464,8 +464,8 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
       WORKER_BUILDABLE.includes(KIND.PUMP_JACK) &&
       WORKER_BUILD_CARD_SLOTS[1] === KIND.PUMP_JACK &&
       WORKER_BUILD_CARD_SLOTS[2] === KIND.BARRACKS &&
-      WORKER_BUILD_CARD_SLOTS.filter(Boolean).join(",") === WORKER_BUILDABLE.filter((kind) =>
-        ![KIND.ENGINEERING_COMPLEX, KIND.STEELWORKS, KIND.FACTORY].includes(kind)).join(","),
+      WORKER_BUILD_CARD_SLOTS.filter(Boolean).sort().join(",") === WORKER_BUILDABLE.filter((kind) =>
+        ![KIND.ENGINEERING_COMPLEX, KIND.STEELWORKS, KIND.FACTORY].includes(kind)).sort().join(","),
     "Pump Jack returns to the Engineer W slot while Supply Depot stays unavailable",
   );
   const playerId = 1;

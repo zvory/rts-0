@@ -2132,3 +2132,7 @@ then rounded once to the nearest whole point before existing protection rounding
 with a minimum of 1 damage per hit victim. Building
 aim uses the nearest footprint surface, matching acquisition and stopping distance. See the balance prototype section and compact
 version-57 attack ray contract for tuning and per-viewer projection.
+
+Barbed Wire entry effects live inside the movement service. Phase-local tile positions
+cover waypoint/anchor motion and collision displacement without new durable state. Collision
+entries that exhaust wire or kill infantry run death cleanup again before final snapshots.

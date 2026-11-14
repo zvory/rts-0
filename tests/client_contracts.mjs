@@ -107,6 +107,7 @@ await import("./client_contracts/firing_reveal_contracts.mjs");
 await import("./client_contracts/firing_reveal_renderer_contracts.mjs");
 await import("./client_contracts/pump_jack_input_contracts.mjs");
 await import("./client_contracts/tank_trap_placement_index_contracts.mjs");
+await import("./client_contracts/barbed_wire_contracts.mjs");
 await import("./client_contracts/auto_build_contracts.mjs");
 await import("./client_contracts/state_input_contracts.mjs");
 await import("./client_contracts/resource_vision_contracts.mjs");

@@ -808,7 +808,8 @@ impl Game {
         }
         if entity.is_neutral_obstacle() {
             return Err(LabError::InvalidCommand {
-                reason: "completed Tank Traps are neutral and cannot be reassigned".to_string(),
+                reason: "completed field obstacles are neutral and cannot be reassigned"
+                    .to_string(),
             });
         }
 

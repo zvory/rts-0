@@ -319,6 +319,7 @@ const DEFAULT_BUILDINGS: &[EntityKind] = &[
     EntityKind::EngineeringComplex,
     EntityKind::Steelworks,
     EntityKind::TankTrap,
+    EntityKind::BarbedWire,
     EntityKind::SteelMine,
     EntityKind::PumpJack,
 ];
@@ -332,6 +333,7 @@ const DEFAULT_WORKER_BUILDABLES: &[EntityKind] = &[
     EntityKind::Factory,
     EntityKind::Steelworks,
     EntityKind::TankTrap,
+    EntityKind::BarbedWire,
 ];
 
 const ARTILLERY_ABILITY_CARRIERS: &[EntityKind] = &[EntityKind::Artillery];

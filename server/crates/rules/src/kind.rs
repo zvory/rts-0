@@ -30,6 +30,7 @@ pub enum EntityKind {
     Factory,
     Steelworks,
     TankTrap,
+    BarbedWire,
     SteelMine,
     PumpJack,
     Steel,
@@ -37,7 +38,7 @@ pub enum EntityKind {
 }
 
 impl EntityKind {
-    pub const ALL: [EntityKind; 29] = [
+    pub const ALL: [EntityKind; 30] = [
         EntityKind::Worker,
         EntityKind::Golem,
         EntityKind::Warrior,
@@ -63,6 +64,7 @@ impl EntityKind {
         EntityKind::Factory,
         EntityKind::Steelworks,
         EntityKind::TankTrap,
+        EntityKind::BarbedWire,
         EntityKind::SteelMine,
         EntityKind::PumpJack,
         EntityKind::Steel,
@@ -120,6 +122,7 @@ impl EntityKind {
             EntityKind::Factory => "factory",
             EntityKind::Steelworks => "steelworks",
             EntityKind::TankTrap => "tank_trap",
+            EntityKind::BarbedWire => "barbed_wire",
             EntityKind::SteelMine => "steel_mine",
             EntityKind::PumpJack => "pump_jack",
             EntityKind::Steel => "steel",
@@ -158,6 +161,7 @@ impl FromStr for EntityKind {
             "factory" => Ok(EntityKind::Factory),
             "steelworks" => Ok(EntityKind::Steelworks),
             "tank_trap" => Ok(EntityKind::TankTrap),
+            "barbed_wire" => Ok(EntityKind::BarbedWire),
             "steel_mine" => Ok(EntityKind::SteelMine),
             "pump_jack" => Ok(EntityKind::PumpJack),
             "steel" => Ok(EntityKind::Steel),
@@ -222,7 +226,10 @@ pub fn movement_body_class(kind: EntityKind) -> MovementBodyClass {
 pub fn static_blocker_class(kind: EntityKind) -> StaticBlockerClass {
     if kind == EntityKind::TankTrap {
         StaticBlockerClass::VehicleBodyOnly
-    } else if matches!(kind, EntityKind::SteelMine | EntityKind::PumpJack) {
+    } else if matches!(
+        kind,
+        EntityKind::BarbedWire | EntityKind::SteelMine | EntityKind::PumpJack
+    ) {
         StaticBlockerClass::None
     } else if kind.is_building() {
         StaticBlockerClass::AllGround
@@ -235,7 +242,10 @@ pub fn blocks_line_of_sight(kind: EntityKind) -> bool {
     kind.is_building()
         && !matches!(
             kind,
-            EntityKind::TankTrap | EntityKind::SteelMine | EntityKind::PumpJack
+            EntityKind::TankTrap
+                | EntityKind::BarbedWire
+                | EntityKind::SteelMine
+                | EntityKind::PumpJack
         )
 }
 
@@ -278,6 +288,7 @@ pub fn death_ground_decal_class(kind: EntityKind) -> Option<&'static str> {
         | EntityKind::AntiTankGun
         | EntityKind::Artillery => Some("scorch"),
         EntityKind::RocketLauncher => Some("scorch"),
+        EntityKind::BarbedWire => None,
         kind if kind.is_building() => Some("buildingScorch"),
         _ => None,
     }
@@ -357,4 +368,19 @@ mod tests {
         assert!(!blocks_line_of_sight(EntityKind::PumpJack));
         assert!(blocks_line_of_sight(EntityKind::Depot));
     }
+}
+
+/// Infantry and carried mortar crews hurt and slow down on barbed wire.
+pub fn barbed_wire_affects(kind: EntityKind) -> bool {
+    matches!(
+        kind,
+        EntityKind::Worker
+            | EntityKind::Golem
+            | EntityKind::Warrior
+            | EntityKind::Rifleman
+            | EntityKind::Panzerfaust
+            | EntityKind::MachineGunner
+            | EntityKind::Ekat
+            | EntityKind::MortarTeam
+    )
 }

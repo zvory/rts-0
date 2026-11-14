@@ -593,6 +593,25 @@ pub const BUILDINGS: &[BuildingDef] = &[
         build_requires: TRAINING_CENTRE_REQUIRED,
     },
     BuildingDef {
+        kind: EntityKind::BarbedWire,
+        stats: balance::BuildingStats {
+            hp: 2,
+            sight_tiles: 0,
+            cost_steel: 5,
+            cost_oil: 0,
+            foot_w: 1,
+            foot_h: 1,
+            build_ticks: balance::TICK_HZ * 4,
+            dmg: 0,
+            range_tiles: 0.0,
+            cooldown: 0,
+        },
+        armor_class: ArmorClass::Small,
+        weapon: WeaponClass::None,
+        trains: &[],
+        build_requires: TRAINING_CENTRE_REQUIRED,
+    },
+    BuildingDef {
         kind: EntityKind::SteelMine,
         stats: balance::BuildingStats {
             hp: 37,
@@ -746,6 +765,7 @@ mod tests {
                 EntityKind::EngineeringComplex,
                 EntityKind::Steelworks,
                 EntityKind::TankTrap,
+                EntityKind::BarbedWire,
                 EntityKind::SteelMine,
                 EntityKind::PumpJack,
             ]
@@ -864,7 +884,7 @@ mod tests {
     #[test]
     fn non_obstacle_buildings_grant_only_local_sight() {
         for building in BUILDINGS {
-            if building.kind == EntityKind::TankTrap {
+            if matches!(building.kind, EntityKind::TankTrap | EntityKind::BarbedWire) {
                 continue;
             }
             assert_eq!(

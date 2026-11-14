@@ -49,8 +49,8 @@ Lifecycle status is explicit and separate from catalog existence:
 
 ## Current Entity Identity
 
-Runtime identity is still global `EntityKind`. The current roster has 29 global kinds: 15 units,
-12 buildings, and 2 resource nodes. Server rules own the stable ids in
+Runtime identity is still global `EntityKind`. The current roster has 30 global kinds: 15 units,
+13 buildings, and 2 resource nodes. Server rules own the stable ids in
 `server/crates/rules/src/kind.rs`; protocol mirrors expose the same string ids in
 `server/crates/protocol/src/lib.rs` and `client/src/protocol.js`.
 
@@ -59,7 +59,7 @@ The current production catalog is in `server/crates/rules/src/defs.rs`:
 - Units: Worker, Golem, Warrior, Rifleman, Panzerfaust, Machine Gunner, Anti-Tank Gun, Mortar Team,
   Artillery, Rocket Truck, Scout Car, Scout Plane, Tank, Command Car, and Ekat.
 - Buildings: Resource Depot, Zamok, Depot, Barracks, Training Centre, Engineering Complex, Factory, Gun
-  Works, Tank Trap, Steel Mine, and Pump Jack. Tank Trap construction is server-authoritative after
+  Works, Tank Trap, Barbed Wire, Steel Mine, and Pump Jack. Tank Trap construction is server-authoritative after
   Training Centre eligibility and is exposed through the mirrored worker build menu; Resource
   Depots place Steel Mines and Pump Jacks directly on nearby matching resource patches.
 - Resource nodes: Steel and Oil.
@@ -116,7 +116,7 @@ APIs.
 Workers can place Resource Depot and Supply Depot immediately, and can place Pump Jacks contextually on
 live oil patches with no tech requirement. Barracks requires a completed Resource Depot; Training
 Centre requires a completed Resource Depot and Barracks; Engineering Complex, Factory, and Gun Works require a
-completed Resource Depot and Training Centre; Tank Trap requires a completed Training Centre. Resource
+completed Resource Depot and Training Centre; Tank Trap and Barbed Wire require a completed Training Centre. Resource
 Depot trains Workers. Barracks trains Riflemen immediately and Machine
 Gunners after the Training Centre requirement is met. Factory trains Scout Cars immediately,
 Command Cars once an Engineering Complex is complete, and Tanks after Tank Production research. Gun Works

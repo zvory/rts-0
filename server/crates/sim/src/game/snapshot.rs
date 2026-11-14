@@ -322,7 +322,7 @@ impl Game {
                 // Owners know their building is gone even when another selected player's
                 // older enemy memory outlives current sight of its footprint. Tank Trap
                 // ownership expires on completion, so its stale scaffold owner proves nothing.
-                if entry.kind != EntityKind::TankTrap
+                if !matches!(entry.kind, EntityKind::TankTrap | EntityKind::BarbedWire)
                     && memory_players.contains(&entry.owner)
                     && self.state.entities.get(entry.id).is_none()
                 {
