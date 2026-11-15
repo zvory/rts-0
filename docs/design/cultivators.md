@@ -4,7 +4,9 @@
 
 The user requested implementation by reusing the Resource Depot and Engineer, with the
 Cultivators depot named **Nexus** and its worker named **Serf**. Serfs construct Nexus and Portal buildings.
-This is catalog reuse, with no new entity kinds, art, combat, abilities, or numerical balance.
+This is catalog reuse, with no new entity kinds, combat, abilities, or numerical balance.
+The Nexus now has approved lotus-roof sect headquarters art, with natural wood/stone and
+player-tinted roofs; its shared simulation identity is unchanged.
 The existing global `ResourceDepot`, `Worker`, `SteelMine`, and `PumpJack` identities remain.
 
 Nexus inherits every Resource Depot stat, cost (450 Steel, 100 Oil), five-second construction,
@@ -21,8 +23,7 @@ the same cost and vulnerability; this slice provides an economy to develop the f
 
 Normal human lobby selection and recorded replay lifecycle admit Cultivators. Existing AI
 profiles retain their assigned factions; no new Cultivators AI is defined. Prediction continues
-to use its existing supported-faction checks. Unique art, audio, combat roster and further
-buildings are deferred to future user-directed work.
+to use its existing supported-faction checks. Further art, audio, combat roster and buildings are deferred to future user-directed work.
 
 ## Portal production building
 

@@ -11,6 +11,7 @@ import { Renderer } from "../../client/src/renderer/index.js";
 import {
   createBuildingPngRigAtlases,
   createBuildingPngRigDefinitions,
+  buildingPngRigKey,
 } from "../../client/src/renderer/rigs/building_png.js";
 import {
   createRigRenderContext,
@@ -88,8 +89,8 @@ for (const sprite of depotAtlas.sprites) {
   }
 }
 
-strictAssert.equal(definitions.size, expectedFootprints.size);
-strictAssert.equal(atlases.size, expectedFootprints.size);
+strictAssert.equal(definitions.size, expectedFootprints.size + 1);
+strictAssert.equal(atlases.size, expectedFootprints.size + 1);
 for (const excludedKind of [KIND.DEPOT, KIND.TANK_TRAP]) {
   strictAssert.equal(definitions.has(excludedKind), false);
   strictAssert.equal(atlases.has(excludedKind), false);
@@ -190,6 +191,25 @@ for (const [kind, footprint] of expectedFootprints) {
     width: atlas.grid.width,
     height: atlas.grid.height,
   });
+}
+
+const nexusKey = buildingPngRigKey(KIND.RESOURCE_DEPOT, "cultivators");
+const nexusAtlas = atlases.get(nexusKey);
+strictAssert.equal(buildingPngRigKey(KIND.RESOURCE_DEPOT, "kriegsia"), KIND.RESOURCE_DEPOT);
+strictAssert.equal(buildingPngRigKey(KIND.RESOURCE_DEPOT, null), KIND.RESOURCE_DEPOT);
+strictAssert.equal(buildingPngRigKey(KIND.BARRACKS, "cultivators"), KIND.BARRACKS);
+strictAssert.equal(nexusAtlas.unit, KIND.RESOURCE_DEPOT);
+strictAssert.deepEqual(nexusAtlas.routes.shadow, []);
+strictAssert.equal(nexusAtlas.omitFootprintShadow, true, "Nexus never draws the placeholder dark rectangle");
+strictAssert.notEqual(definitions.get(nexusKey).id, definitions.get(KIND.RESOURCE_DEPOT).id);
+const nexusPixels = PNG.sync.read(fs.readFileSync(path.join(repoRoot, "client", nexusAtlas.image.split("?")[0])));
+strictAssert.equal(nexusPixels.width, nexusAtlas.grid.width);
+strictAssert.equal(nexusPixels.height, nexusAtlas.grid.height);
+strictAssert.equal(pngAtlasCanRenderRoute(definitions.get(nexusKey), nexusAtlas, { parts: nexusAtlas.routes.body }), true);
+for (const sprite of nexusAtlas.sprites) {
+  const bounds = alphaBounds(nexusPixels, sprite.frame);
+  strictAssert.ok(bounds.minX > 0 && bounds.minY > 0 && bounds.maxX < 384 && bounds.maxY < 384,
+    "Nexus layers have fully transparent borders after chroma keying");
 }
 
 const extractorCycleMs = (HARVEST_TICKS / TICK_HZ) * 1000;
@@ -378,6 +398,26 @@ try {
     renderer._pools.buildingShadows.get(steelMine.id)?.visible === false,
     "loaded extractor component art suppresses the temporary fallback shadow",
   );
+  const nexus = { ...steelMine, id: 508, kind: KIND.RESOURCE_DEPOT, factionId: "cultivators" };
+  renderer._buildingPngRigAtlasTextures.set(nexusKey, PIXI.Texture.from("nexus-test-texture"));
+  renderer._buildingPngRigAtlasTextures.set(KIND.RESOURCE_DEPOT, PIXI.Texture.from("depot-test-texture"));
+  renderer._drawBuilding(nexus, colorByOwner, state);
+  const nexusBody = renderer._liveRigPools.buildingRigs.get(nexus.id);
+  assert(nexusBody.atlas === nexusAtlas, "Cultivator owner selects the Nexus atlas");
+  assert(nexusBody.parts.size === 2, "Nexus has no industrial depot emblem");
+  assert(nexusBody.parts.get("sprite.tint").display.tint === 0xc85050, "Nexus uses runtime player tint");
+  assert(!renderer._pools.buildingShadows.get(nexus.id)?.visible, "Nexus omits rectangular footprint shadow");
+  nexus.factionId = "kriegsia";
+  renderer._drawBuilding(nexus, colorByOwner, state);
+  const depotBody = renderer._liveRigPools.buildingRigs.get(nexus.id);
+  assert(depotBody.atlas === depotAtlas && nexusBody._destroyed,
+    "owner faction changes replace the Nexus with unchanged Kriegsia depot art");
+  nexus.factionId = "cultivators";
+  renderer._buildingPngRigAtlasTextures.delete(nexusKey);
+  renderer._drawBuilding(nexus, colorByOwner, state);
+  assert(typeof renderer._liveRigPools.buildingRigs.get(nexus.id)?.matches === "function",
+    "missing Nexus texture retains the existing SVG fallback");
+
 } finally {
   renderer?.destroy();
   restorePixi();
