@@ -374,6 +374,7 @@ function entityRecord(entity, {
     owner,
     relationship: relationshipForOwner(owner, context),
     teamColor: context.colors[owner] || "#9aa0a8",
+    factionId: context.factions[owner] || null,
     selected: !!selected,
     visualBounds: entityVisualBounds(stat, tileSizePx),
     anchors: {
@@ -427,17 +428,20 @@ function entitySemanticHeight(stat, tileSizePx) {
 
 function buildViewerContext({ players, playerId, spectator }) {
   const teams = {};
+  const factions = {};
   const colors = { 0: "#9aa0a8" };
   for (const player of players || []) {
     const id = Number(player?.id);
     if (!Number.isInteger(id) || id <= 0) continue;
     teams[id] = Number(player?.teamId) || 0;
+    factions[id] = typeof player?.factionId === "string" ? player.factionId : null;
     colors[id] = /^#[0-9a-fA-F]{6}$/.test(player?.color || "") ? player.color : "#9aa0a8";
   }
   return {
     playerId: Number.isInteger(Number(playerId)) ? Number(playerId) : null,
     spectator: !!spectator,
     teams,
+    factions,
     colors,
   };
 }

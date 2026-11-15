@@ -62,6 +62,7 @@ export function preparedPresentationEntityRecord(prepared, derived) {
   record.owner = derived.owner;
   record.relationship = derived.relationship;
   record.teamColor = derived.teamColor;
+  record.factionId = derived.factionId;
   record.selected = derived.selected;
   record.visualBounds = freezeDerived(derived.visualBounds);
   record.anchors = freezeDerived(derived.anchors);
