@@ -412,6 +412,9 @@ SVG unit art workflow:
   architecture tests rather than static design previews.
 
 Raster rig workflow:
+- Three Dao Pavilion uses the approved circular-shrine PNG on its 3x3 footprint, with fixed-color
+  timber/stone/scrolls and a team-tinted canopy/finial. `scripts/art/pavilion-pipeline.mjs` rebuilds
+  the square two-frame atlas from its magenta source without changing the image aspect ratio.
 - Barbed wire uses the selected tangled-barrier PNG in a single fixed-color building part,
   retaining neutral steel/wood colors, the one-tile footprint and native footprint shadow.
   `scripts/art/barbed-wire-pipeline.mjs` rebuilds its chroma-keyed runtime texture from the

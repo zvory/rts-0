@@ -524,7 +524,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
             cost_steel: 100,
             cost_oil: 25,
             foot_w: 3,
-            foot_h: 2,
+            foot_h: 3,
             build_ticks: 560,
             dmg: 0,
             range_tiles: 0.0,

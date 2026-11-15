@@ -26,6 +26,7 @@ import { installFakePixi } from "./pixi_fakes.mjs";
 
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const expectedFootprints = new Map([
+  [KIND.THREE_DAO_PAVILION, [3, 3]],
   [KIND.BARBED_WIRE, [1, 1]],
   [KIND.RESOURCE_DEPOT, [4, 4]],
   [KIND.BARRACKS, [3, 2]],
@@ -163,7 +164,7 @@ for (const [kind, footprint] of expectedFootprints) {
         && sprite.frame.y + sprite.frame.h <= atlas.grid.height,
       `${kind}.${sprite.id} frame fits grid`,
     );
-    const expectedVisualScale = kind === KIND.RESOURCE_DEPOT
+    const expectedVisualScale = kind === KIND.RESOURCE_DEPOT || kind === KIND.THREE_DAO_PAVILION
       ? 1.1
       : kind === KIND.STEEL_MINE
         ? 1.35
@@ -195,6 +196,22 @@ for (const [kind, footprint] of expectedFootprints) {
     height: atlas.grid.height,
   });
 }
+
+const pavilionAtlas = atlases.get(KIND.THREE_DAO_PAVILION);
+strictAssert.equal(pavilionAtlas.omitFootprintShadow, true);
+for (const sprite of pavilionAtlas.sprites) {
+  strictAssert.equal(sprite.frame.pixelsPerUnitX, sprite.frame.pixelsPerUnitY,
+    "Pavilion preserves source proportions instead of squashing the square art");
+}
+const pavilionPixels = PNG.sync.read(fs.readFileSync(path.join(repoRoot, "client", pavilionAtlas.image.split("?")[0])));
+for (const sprite of pavilionAtlas.sprites) {
+  const bounds = alphaBounds(pavilionPixels, sprite.frame);
+  strictAssert.ok(bounds.minX > 0 && bounds.minY > 0 && bounds.maxX < 384 && bounds.maxY < 384,
+    "Pavilion layers have transparent borders after chroma keying");
+}
+const pavilionTint = pavilionAtlas.sprites.find((sprite) => sprite.id === "sprite.tint").frame;
+strictAssert.ok(alphaBounds(pavilionPixels, pavilionTint).maxY <= Math.ceil(384 * 0.46),
+  "Pavilion team paint stays above the natural scrolls and stone dais");
 
 const nexusKey = buildingPngRigKey(KIND.RESOURCE_DEPOT, "cultivators");
 const nexusAtlas = atlases.get(nexusKey);

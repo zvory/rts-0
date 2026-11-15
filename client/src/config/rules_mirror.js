@@ -183,7 +183,7 @@ export const STATS = Object.freeze({
   [KIND.PORTAL]: { label: "Portal", icon: "PRT", footW: 3, footH: 3, sight: 1,
     cost: { steel: 150, oil: 0 }, buildTicks: TICK_HZ * 5, trains: [KIND.WARRIOR],
     description: "A supernatural gateway that trains Cultivator Disciples." },
-  [KIND.THREE_DAO_PAVILION]: { label: "Three Dao Pavilion", icon: "DAO", footW: 3, footH: 2, sight: 1,
+  [KIND.THREE_DAO_PAVILION]: { label: "Three Dao Pavilion", icon: "DAO", footW: 3, footH: 3, sight: 1,
     cost: { steel: 100, oil: 25 }, buildTicks: 560, trains: [],
     researches: [UPGRADE.DAO_OF_LIGHTNESS, UPGRADE.DAO_OF_BARRIERS, UPGRADE.DAO_OF_HEAVINESS],
     requires: [KIND.RESOURCE_DEPOT, KIND.PORTAL],

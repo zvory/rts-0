@@ -79,22 +79,25 @@ production/channeling states are deferred until units are specified.
 
 ### Approved brief and rules (Phases 0 and 1)
 
-The user authorized the **Three Dao Pavilion**, SVG placeholder art, and three research
+The user authorized the **Three Dao Pavilion** and three research
 options that currently have no gameplay effects. This is a Cultivator-only technology building
 constructed by Serfs, available in normal games and Lab. Its investment competes with Portal
 production; opponents can scout and destroy it through ordinary building combat.
 
 Reuse the Training Centre baseline: 100 Steel, 25 Oil, 560 ticks construction, 120 HP,
-armored, 3x2 footprint, one tile sight, no weapon, no supply, and no production or rally.
+armored, one tile sight, no weapon, no supply, and no production or rally. The approved
+circular pavilion uses a 3x3 placement and collision footprint.
 Require a completed Nexus and Portal. Use the next Serf build-card slot (A), with ordinary
 placement, collision, fog memory, repair, construction cancellation/refund, damage and death.
-There is no build limit. Placeholder art is a team-tinted pavilion with three scripture scrolls.
+There is no build limit. Approved PNG art is a circular stone study dais with three scripture
+scrolls and a three-lobed canopy. The canopy and finial receive team tint; timber, stone, and
+parchment retain natural colors. The square atlas preserves the generated proportions.
 
 Research Dao of Lightness, Dao of Barriers, and Dao of Heaviness from slots Q/W/E. Each
 costs 200 Steel and 100 Oil and takes 600 ticks (20 seconds, matching Methamphetamines).
 Use existing player-wide permanent research and queue rules, including duplicate rejection,
 cancellation/refund and loss of unfinished research on destruction. All three can be completed;
 completed research survives building destruction. Descriptions explicitly say the prototype
-has no gameplay effect. No Disciple specialization, abilities, stat changes, new AI behavior,
-or final art is part of this slice. Existing checkpoint/replay and owner-only upgrade projection
+has no gameplay effect. No Disciple specialization, abilities, stat changes, or new AI behavior
+is part of this slice. Existing checkpoint/replay and owner-only upgrade projection
 carry the new stable ids through the generic research system.

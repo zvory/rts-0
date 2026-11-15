@@ -787,7 +787,8 @@ damage and move at 70% speed on a live completed segment. See [rules](barbed-wir
 
 Cultivator Serfs can construct the Three Dao Pavilion after a completed Nexus and Portal.
 It inherits the Training Centre baseline: 100 Steel, 25 Oil, 560 ticks construction,
-120 HP, armored, 3x2 footprint, one tile sight, no weapon, no supply or production.
+120 HP, armored, one tile sight, no weapon, no supply or production. Its approved
+art uses a 3x3 placement and collision footprint.
 Its three independent, permanent researches (Dao of Lightness, Dao of Barriers, and
 Dao of Heaviness) each cost 200 Steel and 100 Oil and take 600 ticks (20 seconds).
 All three currently have no gameplay effect. Existing research queue, cancellation,
