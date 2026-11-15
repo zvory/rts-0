@@ -761,12 +761,15 @@ for (const [kind, upgrade] of [
   const builds = card.slots.filter((slot) => slot?.action === "build");
   assert.deepEqual(
     builds.map((slot) => slot.intent.building),
-    [KIND.RESOURCE_DEPOT, KIND.PORTAL],
+    [KIND.RESOURCE_DEPOT, KIND.PORTAL, KIND.THREE_DAO_PAVILION],
   );
   assert.equal(builds[0].label, "Nexus");
   assert.equal(builds[0].commandId, "cultivators.build." + KIND.RESOURCE_DEPOT);
   assert.equal(builds[1].label, "Portal");
   assert.equal(builds[1].commandId, "cultivators.build." + KIND.PORTAL);
+  assert.equal(builds[2].label, "Three Dao Pavilion");
+  assert.equal(builds[2].commandId, "cultivators.build." + KIND.THREE_DAO_PAVILION);
+  assert.equal(builds[2].hotkey, "A");
 }
 
 {

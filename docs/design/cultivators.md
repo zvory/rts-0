@@ -86,7 +86,7 @@ production; opponents can scout and destroy it through ordinary building combat.
 
 Reuse the Training Centre baseline: 100 Steel, 25 Oil, 560 ticks construction, 120 HP,
 armored, 3x2 footprint, one tile sight, no weapon, no supply, and no production or rally.
-Require a completed Nexus and Portal. Use the next Serf build-card slot (R), with ordinary
+Require a completed Nexus and Portal. Use the next Serf build-card slot (A), with ordinary
 placement, collision, fog memory, repair, construction cancellation/refund, damage and death.
 There is no build limit. Placeholder art is a team-tinted pavilion with three scripture scrolls.
 
