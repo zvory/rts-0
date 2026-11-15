@@ -1177,7 +1177,8 @@ that item. Manual purchases may spend normally, and supply reservation rules are
 Already-paid automatic items continue normal progress. No additional client UI or wire state is
 introduced.
 
-Research may be queued on an unfinished valid research building; those entries remain unpaid and
+Research queue state is allocated from the union of faction research catalogs, so faction-specific
+research buildings support the same queue lifecycle. Command admission still checks the owner's faction catalog. Research may be queued on an unfinished valid research building; those entries remain unpaid and
 inert until the building completes, then enter the same front-entry payment and progress path.
 Standing repeat production deliberately does not use unpaid entries: it continues retrying while the
 ordinary queue is empty and inserts a normal paid item only after cost and supply succeed.

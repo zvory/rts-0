@@ -219,7 +219,7 @@ branch, self-play, dev, match-history, and post-match paths. Fixture-only and
 reserved/future ids must not inherit Kriegsia economy behavior or appear in product selectors just
 because their catalog rows are dumpable.
 The playable `cultivators` catalog reuses Resource Depot (displayed as Nexus), Worker (displayed as Serf),
-Steel Mine and Oil Pumpjack, with Nexus and Portal available for Serf construction. Its
+Steel Mine and Oil Pumpjack, with Nexus, Portal, and Three Dao Pavilion available for Serf construction. Its
 `cultivators.standard` loadout matches Kriegsia's starting economy and replaces the starting Riflemen with one completed Disciple.
 Cultivator Serfs can also construct the faction-specific Portal for 150 Steel: it has a 3x3
 footprint, 123 HP, one tile of sight, a five-second construction time, no prerequisite, and no
@@ -781,3 +781,14 @@ Barbed Wire: Engineer-built, completed Training Centre required; 5 steel, 120 ti
 segment, 2 crossing HP, no sight/supply or blocking. Untargetable and immune to weapon damage.
 Any ground unit entry consumes one HP; infantry and mortar teams additionally take 10 direct HP
 damage and move at 70% speed on a live completed segment. See [rules](barbed-wire.md).
+
+### Three Dao Pavilion prototype
+
+Cultivator Serfs can construct the Three Dao Pavilion after a completed Nexus and Portal.
+It inherits the Training Centre baseline: 100 Steel, 25 Oil, 560 ticks construction,
+120 HP, armored, 3x2 footprint, one tile sight, no weapon, no supply or production.
+Its three independent, permanent researches (Dao of Lightness, Dao of Barriers, and
+Dao of Heaviness) each cost 200 Steel and 100 Oil and take 600 ticks (20 seconds).
+All three currently have no gameplay effect. Existing research queue, cancellation,
+refund, completion, and destruction rules apply; completed research persists.
+See [Cultivators](cultivators.md#three-dao-pavilion-prototype) for the approved brief.

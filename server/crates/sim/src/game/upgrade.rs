@@ -15,9 +15,16 @@ pub struct UpgradeDefinition {
 pub const ALL: &[UpgradeKind] = UpgradeKind::ALL;
 
 pub fn researchable_upgrades(building: EntityKind) -> Vec<UpgradeKind> {
-    crate::rules::faction::CURRENT_CATALOG
-        .researchable_upgrade_kinds(building)
-        .collect()
+    // Entity state must cover every faction; command admission remains faction-gated.
+    let mut upgrades = Vec::new();
+    for catalog in crate::rules::faction::CATALOGS {
+        for kind in catalog.researchable_upgrade_kinds(building) {
+            if !upgrades.contains(&kind) {
+                upgrades.push(kind);
+            }
+        }
+    }
+    upgrades
 }
 
 pub fn definition(kind: UpgradeKind) -> UpgradeDefinition {
@@ -103,6 +110,16 @@ pub fn definition(kind: UpgradeKind) -> UpgradeDefinition {
             cost_oil: crate::config::SCOUT_PLANE_UNLOCK_COST_OIL,
             research_ticks: crate::config::SCOUT_PLANE_UNLOCK_RESEARCH_TICKS,
         },
+        UpgradeKind::DaoOfLightness | UpgradeKind::DaoOfBarriers | UpgradeKind::DaoOfHeaviness => {
+            UpgradeDefinition {
+                kind,
+                researched_at: catalog.researched_at,
+                requires_upgrade: None,
+                cost_steel: crate::config::DAO_COST_STEEL,
+                cost_oil: crate::config::DAO_COST_OIL,
+                research_ticks: crate::config::DAO_RESEARCH_TICKS,
+            }
+        }
         UpgradeKind::Rockets => UpgradeDefinition {
             kind,
             researched_at: catalog.researched_at,
@@ -148,6 +165,14 @@ mod tests {
                 UpgradeKind::ScoutPlaneUnlock,
                 UpgradeKind::Rockets,
                 UpgradeKind::TankPlus,
+            ]
+        );
+        assert_eq!(
+            researchable_upgrades(EntityKind::ThreeDaoPavilion),
+            vec![
+                UpgradeKind::DaoOfLightness,
+                UpgradeKind::DaoOfBarriers,
+                UpgradeKind::DaoOfHeaviness
             ]
         );
         assert!(ALL.contains(&UpgradeKind::ArtilleryUnlock));

@@ -73,3 +73,27 @@ standard translucent scaffold treatment; completion activates the full animation
 kept to small frame accents so the blue vortex remains visually stable across players. Damaged,
 destroyed, and selection states reuse global building presentation. Bespoke Portal audio and
 production/channeling states are deferred until units are specified.
+
+## Three Dao Pavilion prototype
+
+### Approved brief and rules (Phases 0 and 1)
+
+The user authorized the **Three Dao Pavilion**, SVG placeholder art, and three research
+options that currently have no gameplay effects. This is a Cultivator-only technology building
+constructed by Serfs, available in normal games and Lab. Its investment competes with Portal
+production; opponents can scout and destroy it through ordinary building combat.
+
+Reuse the Training Centre baseline: 100 Steel, 25 Oil, 560 ticks construction, 120 HP,
+armored, 3x2 footprint, one tile sight, no weapon, no supply, and no production or rally.
+Require a completed Nexus and Portal. Use the next Serf build-card slot (R), with ordinary
+placement, collision, fog memory, repair, construction cancellation/refund, damage and death.
+There is no build limit. Placeholder art is a team-tinted pavilion with three scripture scrolls.
+
+Research Dao of Lightness, Dao of Barriers, and Dao of Heaviness from slots Q/W/E. Each
+costs 200 Steel and 100 Oil and takes 600 ticks (20 seconds, matching Methamphetamines).
+Use existing player-wide permanent research and queue rules, including duplicate rejection,
+cancellation/refund and loss of unfinished research on destruction. All three can be completed;
+completed research survives building destruction. Descriptions explicitly say the prototype
+has no gameplay effect. No Disciple specialization, abilities, stat changes, new AI behavior,
+or final art is part of this slice. Existing checkpoint/replay and owner-only upgrade projection
+carry the new stable ids through the generic research system.

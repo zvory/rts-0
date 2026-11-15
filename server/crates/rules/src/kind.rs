@@ -22,6 +22,7 @@ pub enum EntityKind {
     Ekat,
     ResourceDepot,
     Portal,
+    ThreeDaoPavilion,
     Zamok,
     Depot,
     Barracks,
@@ -38,7 +39,7 @@ pub enum EntityKind {
 }
 
 impl EntityKind {
-    pub const ALL: [EntityKind; 30] = [
+    pub const ALL: [EntityKind; 31] = [
         EntityKind::Worker,
         EntityKind::Golem,
         EntityKind::Warrior,
@@ -56,6 +57,7 @@ impl EntityKind {
         EntityKind::Ekat,
         EntityKind::ResourceDepot,
         EntityKind::Portal,
+        EntityKind::ThreeDaoPavilion,
         EntityKind::Zamok,
         EntityKind::Depot,
         EntityKind::Barracks,
@@ -114,6 +116,7 @@ impl EntityKind {
             EntityKind::Ekat => "ekat",
             EntityKind::ResourceDepot => "resource_depot",
             EntityKind::Portal => "portal",
+            EntityKind::ThreeDaoPavilion => "three_dao_pavilion",
             EntityKind::Zamok => "zamok",
             EntityKind::Depot => "depot",
             EntityKind::Barracks => "barracks",
@@ -153,6 +156,7 @@ impl FromStr for EntityKind {
             "ekat" => Ok(EntityKind::Ekat),
             "resource_depot" => Ok(EntityKind::ResourceDepot),
             "portal" => Ok(EntityKind::Portal),
+            "three_dao_pavilion" => Ok(EntityKind::ThreeDaoPavilion),
             "zamok" => Ok(EntityKind::Zamok),
             "depot" => Ok(EntityKind::Depot),
             "barracks" => Ok(EntityKind::Barracks),

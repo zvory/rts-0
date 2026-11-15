@@ -184,6 +184,7 @@ export const KIND = Object.freeze({
   EKAT: "ekat",
   RESOURCE_DEPOT: "resource_depot",
   PORTAL: "portal",
+  THREE_DAO_PAVILION: "three_dao_pavilion",
   ZAMOK: "zamok",
   DEPOT: "depot",
   BARRACKS: "barracks",
@@ -218,6 +219,7 @@ export const UNIT_KINDS = Object.freeze([
 export const BUILDING_KINDS = Object.freeze([
   KIND.RESOURCE_DEPOT,
   KIND.PORTAL,
+  KIND.THREE_DAO_PAVILION,
   KIND.ZAMOK,
   KIND.DEPOT,
   KIND.BARRACKS,
@@ -369,6 +371,7 @@ export const KIND_CODE = Object.freeze({
   [KIND.SCOUT_PLANE]: 25,
   [KIND.RESOURCE_DEPOT]: 6,
   [KIND.PORTAL]: 28,
+  [KIND.THREE_DAO_PAVILION]: 31,
   [KIND.WARRIOR]: 29,
   [KIND.DEPOT]: 7,
   [KIND.BARRACKS]: 8,
@@ -416,6 +419,9 @@ export const UPGRADE = Object.freeze({
   TANK_PLUS: "tank_plus",
   SMOKE_PLUS: "smoke_plus",
   SCOUT_PLANE_UNLOCK: "scout_plane_unlock",
+  DAO_OF_LIGHTNESS: "dao_of_lightness",
+  DAO_OF_BARRIERS: "dao_of_barriers",
+  DAO_OF_HEAVINESS: "dao_of_heaviness",
   ROCKETS: "rockets",
 });
 
@@ -430,6 +436,9 @@ export const UPGRADE_CODE = Object.freeze({
   [UPGRADE.TANK_PLUS]: 13,
   [UPGRADE.SMOKE_PLUS]: 9,
   [UPGRADE.SCOUT_PLANE_UNLOCK]: 11,
+  [UPGRADE.DAO_OF_LIGHTNESS]: 14,
+  [UPGRADE.DAO_OF_BARRIERS]: 15,
+  [UPGRADE.DAO_OF_HEAVINESS]: 16,
   [UPGRADE.ROCKETS]: 12,
 });
 

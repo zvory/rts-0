@@ -8,6 +8,7 @@ Use when tuning costs, supply, sight, sizes, unit/building stats, or any number 
   - Client mirror boundary inventory
   - §5.1 Target theme and MVP combat loop
   - §5.2 Current implementation constants
+  - Three Dao Pavilion prototype
 
 ## Code map
 - `server/crates/rules/src/defs.rs` — authoritative unit/building stat records

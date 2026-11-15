@@ -214,3 +214,23 @@ export const BARBED_WIRE_BUILDING_SVG = `<svg viewBox="-16 -16 32 32" data-rts-r
   <circle id="anchor.selection" cx="0" cy="0" r="1" fill="#000000" />
   <circle id="anchor.hp" cx="0" cy="-16" r="1" fill="#000000" />
 </svg>`;
+
+// Three Dao Pavilion prototype — 3×2, jade roof and three scripture scrolls.
+export const THREE_DAO_PAVILION_BUILDING_SVG = `<svg viewBox="-48 -32 96 64" data-rts-rig-kind="three_dao_pavilion" data-rts-rig-version="1" data-rts-origin="center">
+  <rect id="part.foundation" x="-47" y="-31" width="94" height="62" fill="#817a68" stroke="#292b27" stroke-width="2" />
+  <rect id="part.hall" x="-36" y="-18" width="72" height="43" fill="#e5dcc1" stroke="#534338" stroke-width="2" />
+  <polygon id="part.roof" points="-46,-10 -34,-21 -25,-30 25,-30 34,-21 46,-10" fill="#6d89b8" data-rts-tint="team" stroke="#293c39" stroke-width="2" />
+  <line id="part.ridge" x1="-25" y1="-28" x2="25" y2="-28" stroke="#d9c592" stroke-width="3" />
+  <rect id="part.pillar.left" x="-35" y="-9" width="5" height="34" fill="#754a3b" />
+  <rect id="part.pillar.right" x="30" y="-9" width="5" height="34" fill="#754a3b" />
+  <rect id="part.scroll.lightness" x="-25" y="-3" width="12" height="20" fill="#e9dfb5" stroke="#7c6446" stroke-width="2" />
+  <polyline id="part.glyph.lightness" points="-23,10 -19,2 -15,10" fill="none" stroke="#3f7977" stroke-width="2" />
+  <rect id="part.scroll.barriers" x="-6" y="-3" width="12" height="20" fill="#e9dfb5" stroke="#7c6446" stroke-width="2" />
+  <rect id="part.glyph.barriers" x="-3" y="2" width="6" height="8" fill="none" stroke="#6d598e" stroke-width="2" />
+  <rect id="part.scroll.heaviness" x="13" y="-3" width="12" height="20" fill="#e9dfb5" stroke="#7c6446" stroke-width="2" />
+  <polygon id="part.glyph.heaviness" points="15,10 19,2 23,10" fill="#9c603b" />
+  <rect id="part.steps" x="-16" y="24" width="32" height="6" fill="#b3a88e" stroke="#534338" stroke-width="1" />
+  <circle id="anchor.origin" cx="0" cy="0" r="1" fill="#000000" />
+  <circle id="anchor.selection" cx="0" cy="0" r="1" fill="#000000" />
+  <circle id="anchor.hp" cx="0" cy="-32" r="1" fill="#000000" />
+</svg>`;

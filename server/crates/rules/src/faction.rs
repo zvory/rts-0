@@ -29,6 +29,9 @@ pub enum UpgradeKind {
     SmokePlus,
     ScoutPlaneUnlock,
     Rockets,
+    DaoOfLightness,
+    DaoOfBarriers,
+    DaoOfHeaviness,
 }
 
 impl UpgradeKind {
@@ -44,6 +47,9 @@ impl UpgradeKind {
         Self::SmokePlus,
         Self::ScoutPlaneUnlock,
         Self::Rockets,
+        Self::DaoOfLightness,
+        Self::DaoOfBarriers,
+        Self::DaoOfHeaviness,
     ];
 
     pub const fn stable_id(self) -> &'static str {
@@ -59,6 +65,9 @@ impl UpgradeKind {
             Self::SmokePlus => "smoke_plus",
             Self::ScoutPlaneUnlock => "scout_plane_unlock",
             Self::Rockets => "rockets",
+            Self::DaoOfLightness => "dao_of_lightness",
+            Self::DaoOfBarriers => "dao_of_barriers",
+            Self::DaoOfHeaviness => "dao_of_heaviness",
         }
     }
 
@@ -741,6 +750,21 @@ pub const EKAT_CATALOG: FactionCatalog = FactionCatalog {
     production_anchors: &[EntityKind::Zamok],
 };
 
+const CULTIVATORS_UPGRADES: [UpgradeCatalogEntry; 3] = [
+    UpgradeCatalogEntry {
+        kind: UpgradeKind::DaoOfLightness,
+        researched_at: EntityKind::ThreeDaoPavilion,
+    },
+    UpgradeCatalogEntry {
+        kind: UpgradeKind::DaoOfBarriers,
+        researched_at: EntityKind::ThreeDaoPavilion,
+    },
+    UpgradeCatalogEntry {
+        kind: UpgradeKind::DaoOfHeaviness,
+        researched_at: EntityKind::ThreeDaoPavilion,
+    },
+];
+
 pub const CULTIVATORS_CATALOG: FactionCatalog = FactionCatalog {
     id: CULTIVATORS_FACTION_ID,
     loadout: CULTIVATORS_LOADOUT,
@@ -748,11 +772,16 @@ pub const CULTIVATORS_CATALOG: FactionCatalog = FactionCatalog {
     buildings: &[
         EntityKind::ResourceDepot,
         EntityKind::Portal,
+        EntityKind::ThreeDaoPavilion,
         EntityKind::SteelMine,
         EntityKind::PumpJack,
     ],
-    buildables: &[EntityKind::ResourceDepot, EntityKind::Portal],
-    upgrades: &[],
+    buildables: &[
+        EntityKind::ResourceDepot,
+        EntityKind::Portal,
+        EntityKind::ThreeDaoPavilion,
+    ],
+    upgrades: &CULTIVATORS_UPGRADES,
     abilities: &[],
     builders: &[EntityKind::Worker],
     gatherers: &[],
@@ -1030,6 +1059,9 @@ pub fn upgrade_definition(kind: UpgradeKind) -> UpgradeCatalogEntry {
         UpgradeKind::ArtilleryUnlock => artillery_unlock,
         UpgradeKind::ScoutPlaneUnlock => scout_plane_unlock,
         UpgradeKind::Rockets => rockets,
+        UpgradeKind::DaoOfLightness => CULTIVATORS_UPGRADES[0],
+        UpgradeKind::DaoOfBarriers => CULTIVATORS_UPGRADES[1],
+        UpgradeKind::DaoOfHeaviness => CULTIVATORS_UPGRADES[2],
     }
 }
 
@@ -1294,7 +1326,11 @@ mod tests {
         assert_eq!(catalog.units, &[EntityKind::Worker, EntityKind::Warrior]);
         assert_eq!(
             catalog.buildables,
-            &[EntityKind::ResourceDepot, EntityKind::Portal]
+            &[
+                EntityKind::ResourceDepot,
+                EntityKind::Portal,
+                EntityKind::ThreeDaoPavilion
+            ]
         );
         assert_eq!(
             catalog.trainable_units(EntityKind::ResourceDepot),
@@ -1314,7 +1350,7 @@ mod tests {
             .starting_entities
             .iter()
             .all(|group| catalog.allows_unit(group.kind) || catalog.allows_building(group.kind)));
-        assert!(catalog.upgrades.is_empty());
+        assert_eq!(catalog.upgrades, &CULTIVATORS_UPGRADES);
         assert!(catalog.abilities.is_empty());
     }
 

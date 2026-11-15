@@ -547,6 +547,21 @@ fn print_client_constants(indent: &str) {
 
 fn print_upgrades(indent: &str) {
     println!("{indent}  \"upgrades\": {{");
+    for kind in [
+        faction::UpgradeKind::DaoOfLightness,
+        faction::UpgradeKind::DaoOfBarriers,
+        faction::UpgradeKind::DaoOfHeaviness,
+    ] {
+        print_upgrade(
+            indent,
+            kind.stable_id(),
+            balance::DAO_COST_STEEL,
+            balance::DAO_COST_OIL,
+            balance::DAO_RESEARCH_TICKS,
+            None,
+            true,
+        );
+    }
     print_upgrade(
         indent,
         faction::METHAMPHETAMINES_UPGRADE,
