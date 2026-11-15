@@ -47,11 +47,12 @@ pub(super) fn apply_entries(
         let Some(&wire_id) = wire.get(&current) else {
             continue;
         };
-        let hurts = rts_rules::barbed_wire_affects(unit.kind);
+        let crossing_kind = unit.kind;
+        let hurts = rts_rules::barbed_wire_affects(crossing_kind);
         let Some(segment) = entities.get_mut(wire_id).filter(|e| e.hp > 0) else {
             continue;
         };
-        segment.consume_wire_crossing();
+        segment.consume_wire_crossing(crossing_kind);
         killed |= segment.hp == 0;
         if hurts {
             if let Some(unit) = entities.get_mut(id) {

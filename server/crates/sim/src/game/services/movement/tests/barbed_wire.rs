@@ -3,7 +3,7 @@ use super::*;
 
 #[test]
 fn barbed_wire_two_mixed_crossings_and_reentry() {
-    for first in [EntityKind::Worker, EntityKind::Tank, EntityKind::MortarTeam] {
+    for first in [EntityKind::Worker, EntityKind::MortarTeam] {
         for second in [
             EntityKind::Rifleman,
             EntityKind::Tank,
@@ -144,5 +144,57 @@ fn barbed_wire_slows_only_infantry_and_mortars_and_is_walkable() {
             "{kind}: {moved} vs {expected}"
         );
         assert_eq!(entities.get(wire).unwrap().hp, 2);
+    }
+}
+
+#[test]
+fn tank_crushes_fresh_or_used_wire_on_first_entry_without_damage() {
+    for owner in [1, 2] {
+        for used in [false, true] {
+            let map = flat_map(2);
+            let mut entities = EntityStore::new();
+            let wire = entities
+                .spawn_building(1, EntityKind::BarbedWire, 176.0, 176.0, true)
+                .unwrap();
+            if used {
+                entities
+                    .get_mut(wire)
+                    .unwrap()
+                    .consume_wire_crossing(EntityKind::Worker);
+            }
+            let tank = entities
+                .spawn_unit(owner, EntityKind::Tank, 144.0, 176.0)
+                .unwrap();
+            let hp = entities.get(tank).unwrap().hp;
+            let before = positions(&map, &entities);
+            entities.get_mut(tank).unwrap().set_position(176.0, 176.0);
+            assert!(
+                apply_entries(&map, &mut entities, &before),
+                "crushing requests immediate death cleanup"
+            );
+            assert_eq!(
+                entities.get(wire).unwrap().hp,
+                0,
+                "a tank exhausts the entire segment on entry"
+            );
+            assert_eq!(
+                entities.get(tank).unwrap().hp,
+                hp,
+                "wire cannot hurt the tank"
+            );
+
+            let worker = entities
+                .spawn_unit(owner, EntityKind::Worker, 144.0, 176.0)
+                .unwrap();
+            let worker_hp = entities.get(worker).unwrap().hp;
+            let before = positions(&map, &entities);
+            entities.get_mut(worker).unwrap().set_position(176.0, 176.0);
+            apply_entries(&map, &mut entities, &before);
+            assert_eq!(
+                entities.get(worker).unwrap().hp,
+                worker_hp,
+                "crushed wire is inactive before cleanup"
+            );
+        }
     }
 }

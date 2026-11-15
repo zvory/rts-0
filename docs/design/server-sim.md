@@ -2136,3 +2136,4 @@ version-57 attack ray contract for tuning and per-viewer projection.
 Barbed Wire entry effects live inside the movement service. Phase-local tile positions
 cover waypoint/anchor motion and collision displacement without new durable state. Collision
 entries that exhaust wire or kill infantry run death cleanup again before final snapshots.
+Tank tile entry exhausts the entire wire segment immediately, without damage or slowdown to the tank.
