@@ -633,7 +633,7 @@ fn planner_backed_valid_queued_commands_emit_queue_full_notices() {
         "each valid queued command that only fails the queue cap should notify"
     );
     for id in [mover, attacker, gatherer, builder] {
-        assert_eq!(entities.get(id).unwrap().queued_orders().len(), 8);
+        assert_eq!(entities.get(id).unwrap().queued_orders().len(), MAX_QUEUED_ORDERS);
     }
 }
 

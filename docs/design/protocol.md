@@ -146,7 +146,7 @@ Manual build, train, and research commands are the explicit affordability except
 above: they retain bounded authoritative intent and wait before spending or progressing. Attack
 target ids are separately validated by explicit attack-target rules.
 For appendable unit commands, omitted `queued` is equivalent to `false`. Unit order queues are
-capped at 8 intents per unit. Queued intents are lightweight future intent only; active `Order`
+capped at 32 future intents per unit. Queued intents are lightweight future intent only; active `Order`
 remains the per-tick execution state. Non-queued unit orders replace the active order and clear
 future unit intents; `stop` and non-queued `holdPosition` clear both active and queued unit orders.
 Queued `holdPosition` is terminal, so later queued unit orders are not appended after it.

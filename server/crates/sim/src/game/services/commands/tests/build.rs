@@ -777,7 +777,7 @@ fn repeated_invalid_queued_builds_stay_bounded() {
     let worker = entities
         .spawn_unit(1, EntityKind::Worker, 100.0, 100.0)
         .expect("worker should spawn");
-    let pending = (0..32)
+    let pending = (0..=MAX_QUEUED_ORDERS)
         .map(|_| {
             (
                 1,
@@ -800,7 +800,40 @@ fn repeated_invalid_queued_builds_stay_bounded() {
             .expect("worker should exist")
             .queued_orders()
             .len(),
-        8,
+        MAX_QUEUED_ORDERS,
         "queued build intents should enforce the per-unit queue cap even when invalid"
     );
+}
+
+#[test]
+fn worker_can_queue_32_defenses_but_rejects_the_33rd() {
+    for building in [EntityKind::TankTrap, EntityKind::BarbedWire] {
+        let map = flat_map(64);
+        let mut entities = EntityStore::new();
+        let worker = entities
+            .spawn_unit(1, EntityKind::Worker, 100.0, 100.0)
+            .expect("worker should spawn");
+        let pending = (0..=32)
+            .map(|i| {
+                (
+                    1,
+                    SimCommand::Build {
+                        units: vec![worker],
+                        building,
+                        tile_x: i + 2,
+                        tile_y: 10,
+                        queued: true,
+                    },
+                )
+            })
+            .collect();
+
+        apply(&map, &mut entities, pending);
+
+        let queue = entities.get(worker).unwrap().queued_orders();
+        assert_eq!(queue.len(), 32, "{building:?} queue must cap at 32");
+        for (i, intent) in queue.iter().enumerate() {
+            assert_eq!(*intent, OrderIntent::build(building, i as u32 + 2, 10));
+        }
+    }
 }

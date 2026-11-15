@@ -723,7 +723,7 @@ Validation model and bounds:
   command-log entries when a replay container explicitly allows command history, 256 total active
   plus pending smoke clouds, 4,096 trenches, 512 ability runtime world objects/projectiles, 4,096
   scheduled mortar shells, 4,096 scheduled artillery shells, 4,096 scheduled Panzerfaust shots, 32
-  completed upgrades per player, and 8 queued orders per entity.
+  completed upgrades per player, and 32 queued orders per entity.
 - Numeric validation rejects non-finite coordinates/facing values, out-of-map world positions,
   invalid tile coordinates, overflowing footprint math, negative or overflowing timers after JSON
   conversion, supply/resources above configured caps unless a documented lab/debug adapter allows
@@ -1867,7 +1867,7 @@ General rules:
   max HP and any missing current HP. Prebuilt starting buildings begin at full HP.
 - Omitted `queued` means immediate. Ordinary immediate unit orders replace active state and clear
   future intents. `stop` always clears both active and queued unit orders.
-- Queueable commands append future unit-local intents. Unit queues are capped at 8 intents today;
+- Queueable commands append future unit-local intents. Unit queues are capped at 32 future intents;
   a valid append rejected only because the queue is full should emit a player notice.
 - Invalid commands are no-ops except where a notice is explicitly useful. Stale queued stages are
   skipped at promotion time rather than retried forever.

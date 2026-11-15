@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use super::EntityKind;
 
 /// Maximum number of queued command intents stored on one mobile unit.
-pub const MAX_QUEUED_ORDERS: usize = 8;
+pub const MAX_QUEUED_ORDERS: usize = 32;
 /// Number of simulation ticks a waiting build order may tolerate a relevant unit blocker.
 pub(super) const BUILD_UNIT_BLOCK_GRACE_TICKS: u32 = config::TICK_HZ * 3;
 

@@ -59,12 +59,12 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   useful points. Lab/replay artifact validation rejects malformed point counts and non-finite
   coordinates before enqueue. Resolved queued formations store only per-unit point intents, so a
   long stroke cannot multiply durable queue state.
-- **Queued order caps** (`entity/order.rs` `MAX_QUEUED_ORDERS = 8`): each mobile unit stores at most
-  eight future intents. Queued command application still validates the raw cap and dedupes first, and
+- **Queued order caps** (`entity/order.rs` `MAX_QUEUED_ORDERS = 32`): each mobile unit stores at most
+  32 future intents. Queued command application still validates the raw cap and dedupes first, and
   queued promotion drains invalid stale intents instead of retrying them forever.
-  Phase 6 kept this cap at eight because no playtest evidence in the repo justified a larger
-  command buffer; mixed ability/setup replay coverage now guards the current cap and command-log
-  shapes.
+  The cap allows longer worker construction queues, including Tank Traps and Barbed Wire; the
+  active order is separate. Defense queue boundary and mixed ability/setup replay coverage guard
+  the cap and command-log shapes.
 - **Production queue caps** (`entity/state.rs` `MAX_PRODUCTION_QUEUE = 8`): each production
   building stores at most eight explicit unit entries and eight research entries. Manual entries
   may be unpaid, so this authority-side limit prevents free command spam from growing durable
