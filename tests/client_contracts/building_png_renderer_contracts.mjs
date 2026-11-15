@@ -25,6 +25,7 @@ import { installFakePixi } from "./pixi_fakes.mjs";
 
 const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const expectedFootprints = new Map([
+  [KIND.BARBED_WIRE, [1, 1]],
   [KIND.RESOURCE_DEPOT, [4, 4]],
   [KIND.BARRACKS, [3, 2]],
   [KIND.TRAINING_CENTRE, [3, 2]],
@@ -106,11 +107,13 @@ for (const [kind, footprint] of expectedFootprints) {
   );
   const hasSilhouetteShadow = silhouetteShadowKinds.has(kind);
   const hasEmblem = emblemKinds.has(kind);
-  const componentBodyParts = kind === KIND.STEEL_MINE
-    ? ["part.jackhammer"]
-    : kind === KIND.PUMP_JACK
-      ? ["part.frame", "part.beam"]
-      : null;
+  const componentBodyParts = kind === KIND.BARBED_WIRE
+    ? ["part.base"]
+    : kind === KIND.STEEL_MINE
+      ? ["part.jackhammer"]
+      : kind === KIND.PUMP_JACK
+        ? ["part.frame", "part.beam"]
+        : null;
   const expectedBodyParts = componentBodyParts
     ?? ["part.base", "part.tint", ...(hasEmblem ? ["part.emblem"] : [])];
   const expectedShadowParts = hasSilhouetteShadow ? ["part.shadow"] : [];

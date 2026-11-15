@@ -412,6 +412,10 @@ SVG unit art workflow:
   architecture tests rather than static design previews.
 
 Raster rig workflow:
+- Barbed wire uses the selected tangled-barrier PNG in a single fixed-color building part,
+  retaining neutral steel/wood colors, the one-tile footprint and native footprint shadow.
+  `scripts/art/barbed-wire-pipeline.mjs` rebuilds its chroma-keyed runtime texture from the
+  checked-in magenta source; the building SVG remains its standard loading fallback.
 - PNG-backed units are defined by `renderer/rigs/raster_rig_definitions.js`, frame-strip metadata,
   or `renderer/rigs/*_png_atlas.js`, then routed through `png_routing.js`, `png_runtime.js`, and the
   shared rig animation sampler. Raster-native metadata owns anchors, animation bindings, semantic

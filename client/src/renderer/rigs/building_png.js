@@ -66,6 +66,15 @@ const PUMP_JACK_COMPONENT_RIG = Object.freeze({
 
 // Supply Depots and Tank Traps intentionally stay off this visual pass.
 const BUILDING_PNG_SPECS = Object.freeze([
+  buildingSpec(KIND.BARBED_WIRE, 256, 256,
+    "/assets/rigs/barbed-wire-tangled/barbed-wire.png?v=tangled-01",
+    {
+      silhouetteShadow: false,
+      componentRig: {
+        parts: [{ id: "part.base", drawOrder: 10, column: 0, originX: 128, originY: 128 }],
+        animations: [],
+      },
+    }),
   // The footprint already scales the artwork; preserve the original transparent-padding ratio.
   buildingSpec(KIND.RESOURCE_DEPOT, 384, 384,
     "/assets/rigs/resource-depot-worksite-preview/resource_depot-atlas.png?v=oil-silo-foundry-worksite-preview-08",
