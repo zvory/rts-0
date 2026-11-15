@@ -1,0 +1,13 @@
+{
+  "id": "cultivator-nexus-lotus-01",
+  "mode": "built-in-imagegen-plus-deterministic-raster-assembly",
+  "source": "nexus-source.png",
+  "atlas": "nexus-atlas.png",
+  "generator": "scripts/art/nexus-pipeline.mjs",
+  "frameSize": [384, 384],
+  "frames": ["fixed", "teamPaint"],
+  "factionId": "cultivators",
+  "kind": "resource_depot",
+  "visualScale": 1.1,
+  "omitFootprintShadow": true
+}

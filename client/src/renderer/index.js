@@ -483,7 +483,7 @@ export class Renderer {
           if (this._destroyed) return;
           console.warn(`RTS building PNG atlas disabled for ${kind}: ${err?.message || err}`);
           throw err;
-        }), { kind, source: "buildingPngAtlas", required: false });
+        }), { kind: atlas.unit, source: "buildingPngAtlas", required: false });
     }
   }
 

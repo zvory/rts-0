@@ -1,4 +1,4 @@
-import { STATS } from "../../config.js";
+import { CULTIVATORS_FACTION_ID, STATS } from "../../config.js";
 import { KIND } from "../../protocol.js";
 import { RIG_SCHEMA_VERSION, validateRigDefinition } from "./schema.js";
 
@@ -21,9 +21,11 @@ function buildingSpec(kind, frameWidth, frameHeight, image, {
   visualScale = 1,
   componentRig = null,
   omitFootprintShadow = false,
+  factionId = null,
 } = {}) {
   return Object.freeze({
     kind,
+    factionId,
     frameWidth,
     frameHeight,
     image,
@@ -98,6 +100,21 @@ const BUILDING_PNG_SPECS = Object.freeze([
     { silhouetteShadow: false, componentRig: PUMP_JACK_COMPONENT_RIG, omitFootprintShadow: true }),
 ]);
 
+const NEXUS_PNG_SPEC = buildingSpec(KIND.RESOURCE_DEPOT, 384, 384,
+  "/assets/rigs/cultivator-nexus/nexus-atlas.png?v=lotus-01",
+  {
+    factionId: CULTIVATORS_FACTION_ID,
+    silhouetteShadow: false,
+    omitFootprintShadow: true,
+    visualScale: 1.1,
+  });
+
+export function buildingPngRigKey(kind, factionId) {
+  return kind === KIND.RESOURCE_DEPOT && factionId === CULTIVATORS_FACTION_ID
+    ? `${kind}.${CULTIVATORS_FACTION_ID}`
+    : kind;
+}
+
 function deepFreeze(value) {
   if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
   Object.freeze(value);
@@ -149,7 +166,7 @@ function definition(spec) {
   if (emblem) parts.push(part("part.emblem", 12, "team"));
   if (silhouetteShadow) parts.push(part("part.shadow", 0, "fixed", 0.3));
   const validation = validateRigDefinition({
-    id: `${kind}.building-raster`,
+    id: `${buildingPngRigKey(kind, spec.factionId)}.building-raster`,
     kind,
     schemaVersion: RIG_SCHEMA_VERSION,
     parts,
@@ -279,6 +296,7 @@ function atlas(spec) {
     enabled: true,
     unit: kind,
     image,
+    omitFootprintShadow,
     viewBox: {
       x: -worldWidth / 2,
       y: -worldHeight / 2,
@@ -301,9 +319,10 @@ function atlas(spec) {
 
 const BUILDING_PNG_DEFINITIONS = new Map();
 const BUILDING_PNG_ATLASES = new Map();
-for (const spec of BUILDING_PNG_SPECS) {
-  BUILDING_PNG_DEFINITIONS.set(spec.kind, definition(spec));
-  BUILDING_PNG_ATLASES.set(spec.kind, atlas(spec));
+for (const spec of [...BUILDING_PNG_SPECS, NEXUS_PNG_SPEC]) {
+  const key = buildingPngRigKey(spec.kind, spec.factionId);
+  BUILDING_PNG_DEFINITIONS.set(key, definition(spec));
+  BUILDING_PNG_ATLASES.set(key, atlas(spec));
 }
 
 export function createBuildingPngRigDefinitions() {

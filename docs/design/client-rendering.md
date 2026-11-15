@@ -413,6 +413,18 @@ The renderer contract decodes the PNG and checks all four alpha edges of every l
 runtime sprite transform against the original 96-pixel footprint ratios. The SVG fallback is
 scaled once from its authored 96×96 geometry to 128×128.
 
+Cultivator-owned Resource Depots select the dedicated lotus Nexus PNG through the presented
+entity's `factionId`, derived from public owner metadata before the renderer boundary. Both prepared
+and ordinary entity snapshots carry that field, including remembered buildings. Building rig maps
+key this variant as `resource_depot.cultivators`; texture readiness still identifies the underlying
+`resource_depot` kind. Missing or other faction ids retain the normal depot. The Nexus uses the same
+4×4 footprint and 1.1 padding compensation with fixed wood/stone and multiplicatively tinted
+roof paint. Its two-frame atlas intentionally omits both a silhouette shadow and the fallback
+rectangular footprint shadow; no industrial emblem is overlaid. `omitFootprintShadow` is preserved
+for ordinary as well as component building atlases. The approved source and deterministic chroma
+key/paint-mask generator live in `client/assets/rigs/cultivator-nexus/` and
+`scripts/art/nexus-pipeline.mjs`.
+
 ### Rocket Truck raster preview
 
 The Rocket Truck uses the selected PNG with team-light multiplication and a 20% larger

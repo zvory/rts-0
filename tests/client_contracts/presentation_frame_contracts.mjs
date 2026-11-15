@@ -146,7 +146,7 @@ const frame = assembler.assemble({
   groundDecals: [{ id: 7, kind: "rifleman", x: 12, y: 12, seed: 4 }],
   selectionIds: new Set([1]),
   players: [
-    { id: 1, teamId: 1, color: "#123456" },
+    { id: 1, teamId: 1, color: "#123456", factionId: "cultivators" },
     { id: 2, teamId: 2, color: "#654321" },
   ],
   playerId: 1,
@@ -173,7 +173,7 @@ const preparedFrame = new PresentationFrameAssembler({
   fog: { visibleGrid, exploredGrid, visibleRevision: 4, exploredRevision: 7 },
   selectionIds: new Set([1]),
   players: [
-    { id: 1, teamId: 1, color: "#123456" },
+    { id: 1, teamId: 1, color: "#123456", factionId: "cultivators" },
     { id: 2, teamId: 2, color: "#654321" },
   ],
   playerId: 1,
@@ -229,6 +229,7 @@ assert(frame.layers.screenOverlay[0]?.type === "marquee", "screen marquee crosse
 assert(frame.layers.fogGatedWorld[0].selected === true, "visual selected state is resolved before the backend boundary");
 assert(frame.layers.fogGatedWorld[0].relationship === "own", "viewer relationship is resolved before the backend boundary");
 assert(frame.layers.fogGatedWorld[0].teamColor === "#123456", "team color is resolved before the backend boundary");
+assert(frame.layers.fogGatedWorld[0].factionId === "cultivators", "owner faction reaches the worker for faction-specific artwork");
 assert(frame.layers.fogGatedWorld[0].anchors.hp.heightPx === 10, "presentation anchors use semantic mirrored size");
 assert(frame.layers.fogGatedWorld[0].commanderFacing === -1.2, "independent MG aim survives the worker presentation handoff");
 assert(frame.layers.fogGatedWorld[0].extractorActive === false, "extractor status crosses the presentation boundary");

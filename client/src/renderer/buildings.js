@@ -11,6 +11,7 @@ import {
 import { buildingRigDefinitionFor } from "./rigs/building_routing.js";
 import {
   buildingPngRigAtlasFor,
+  buildingPngRigKey,
   buildingPngRigDefinitionFor,
 } from "./rigs/building_png.js";
 import { isConstructionScaffold } from "./entity_state.js";
@@ -70,15 +71,16 @@ export function _drawBuilding(e, colorByOwner, state) {
   const svgDefinition = e.kind === KIND.TANK_TRAP
     ? null
     : buildingRigDefinitionFor(this._buildingRigDefinitions, e.kind);
+  const pngKey = buildingPngRigKey(e.kind, e.factionId);
   const pngDefinition = e.kind === KIND.TANK_TRAP
     ? null
-    : buildingPngRigDefinitionFor(this._buildingPngRigDefinitions, e.kind);
+    : buildingPngRigDefinitionFor(this._buildingPngRigDefinitions, pngKey);
   const pngAtlas = e.kind === KIND.TANK_TRAP
     ? null
-    : buildingPngRigAtlasFor(this._buildingPngRigAtlasesByKind, e.kind);
+    : buildingPngRigAtlasFor(this._buildingPngRigAtlasesByKind, pngKey);
   const pngAtlasTexture = e.kind === KIND.TANK_TRAP
     ? null
-    : this._buildingPngRigAtlasTextures?.get?.(e.kind) ?? null;
+    : this._buildingPngRigAtlasTextures?.get?.(pngKey) ?? null;
   const usePngRig = !!(pngDefinition && pngAtlas && pngAtlasTexture);
   const definition = usePngRig ? pngDefinition : svgDefinition;
 
