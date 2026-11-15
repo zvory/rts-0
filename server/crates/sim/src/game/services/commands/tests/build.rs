@@ -810,6 +810,10 @@ fn worker_can_queue_32_defenses_but_rejects_the_33rd() {
     for building in [EntityKind::TankTrap, EntityKind::BarbedWire] {
         let map = flat_map(64);
         let mut entities = EntityStore::new();
+        let (tx, ty) = footprint_center(&map, EntityKind::TrainingCentre, 3, 3);
+        entities
+            .spawn_building(1, EntityKind::TrainingCentre, tx, ty, true)
+            .expect("completed Training Centre should spawn");
         let worker = entities
             .spawn_unit(1, EntityKind::Worker, 100.0, 100.0)
             .expect("worker should spawn");

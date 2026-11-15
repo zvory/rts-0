@@ -153,7 +153,7 @@ fn queued_move_appends_until_cap_and_normal_move_clears_queue() {
         .spawn_unit(1, EntityKind::Rifleman, 100.0, 100.0)
         .expect("rifleman should spawn");
 
-    let queued_moves = (0..10)
+    let queued_moves = (0..=MAX_QUEUED_ORDERS)
         .map(|i| {
             (
                 1,
@@ -171,8 +171,8 @@ fn queued_move_appends_until_cap_and_normal_move_clears_queue() {
     let entity = entities.get(unit).expect("unit should exist");
     assert_eq!(
         entity.queued_orders().len(),
-        8,
-        "unit queue should enforce the phase-0 cap"
+        MAX_QUEUED_ORDERS,
+        "unit queue should enforce the cap"
     );
     assert!(
         matches!(entity.order(), Order::Idle),
