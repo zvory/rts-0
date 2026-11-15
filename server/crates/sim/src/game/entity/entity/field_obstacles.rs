@@ -3,11 +3,11 @@ use super::{Entity, EntityKind, NEUTRAL};
 impl Entity {
     /// Wire durability counts crossings; tanks crush a segment in one entry.
     /// Weapons and healing cannot alter wire durability.
-    pub(in crate::game) fn consume_wire_crossing(&mut self, crossing_kind: EntityKind) -> bool {
+    pub(in crate::game) fn consume_wire_crossing(&mut self, crushed: bool) -> bool {
         if self.kind != EntityKind::BarbedWire || self.hp == 0 || self.under_construction() {
             return false;
         }
-        self.hp = if crossing_kind == EntityKind::Tank {
+        self.hp = if crushed {
             0
         } else {
             self.hp.saturating_sub(1)

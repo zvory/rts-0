@@ -22,10 +22,7 @@ fn barbed_wire_two_mixed_crossings_and_reentry() {
             entities.get_mut(a).unwrap().set_position(176.0, 176.0);
             apply_entries(&map, &mut entities, &before);
             assert_eq!(entities.get(wire).unwrap().hp, 1);
-            assert_eq!(
-                entities.get(a).unwrap().hp,
-                initial_a - if first == EntityKind::Tank { 0 } else { 10 }
-            );
+            assert_eq!(entities.get(a).unwrap().hp, initial_a - 10);
             let before = positions(&map, &entities);
             apply_entries(&map, &mut entities, &before);
             assert_eq!(
@@ -157,10 +154,7 @@ fn tank_crushes_fresh_or_used_wire_on_first_entry_without_damage() {
                 .spawn_building(1, EntityKind::BarbedWire, 176.0, 176.0, true)
                 .unwrap();
             if used {
-                entities
-                    .get_mut(wire)
-                    .unwrap()
-                    .consume_wire_crossing(EntityKind::Worker);
+                entities.get_mut(wire).unwrap().consume_wire_crossing(false);
             }
             let tank = entities
                 .spawn_unit(owner, EntityKind::Tank, 144.0, 176.0)
