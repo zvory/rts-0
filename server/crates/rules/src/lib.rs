@@ -16,8 +16,9 @@ mod kind;
 
 pub use kind::{
     artillery_ground_decal_source_kind, barbed_wire_affects, blocks_line_of_sight,
-    death_ground_decal_class, fires_while_moving, is_anti_tank_gun, is_rifle_infantry,
-    leaves_tank_treads, mortar_ground_decal_source_kind, movement_body_class, static_blocker_class,
-    supports_manual_emplacement, uses_car_movement_semantics, uses_oriented_vehicle_body,
-    uses_pivot_vehicle_movement, EntityKind, MovementBodyClass, StaticBlockerClass,
+    crushes_barbed_wire, death_ground_decal_class, fires_while_moving, is_anti_tank_gun,
+    is_rifle_infantry, leaves_tank_treads, mortar_ground_decal_source_kind, movement_body_class,
+    static_blocker_class, supports_manual_emplacement, uses_car_movement_semantics,
+    uses_oriented_vehicle_body, uses_pivot_vehicle_movement, EntityKind, MovementBodyClass,
+    StaticBlockerClass,
 };

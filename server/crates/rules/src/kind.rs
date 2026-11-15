@@ -388,3 +388,8 @@ pub fn barbed_wire_affects(kind: EntityKind) -> bool {
             | EntityKind::MortarTeam
     )
 }
+
+/// Tanks crush a completed barbed-wire segment in one crossing.
+pub fn crushes_barbed_wire(kind: EntityKind) -> bool {
+    kind == EntityKind::Tank
+}

@@ -779,7 +779,8 @@ Other units retain their current prerequisites.
 
 Barbed Wire: Engineer-built, completed Training Centre required; 5 steel, 120 ticks per 1×1
 segment, 2 crossing HP, no sight/supply or blocking. Untargetable and immune to weapon damage.
-Any ground unit entry consumes one HP; infantry and mortar teams additionally take 10 direct HP
+Tank entry immediately destroys the segment; other ground unit entries consume one HP.
+Infantry and mortar teams additionally take 10 direct HP
 damage and move at 70% speed on a live completed segment. See [rules](barbed-wire.md).
 
 ### Three Dao Pavilion prototype
