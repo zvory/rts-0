@@ -40,3 +40,8 @@ pub const SCOUT_PLANE_UNLOCK_RESEARCH_TICKS: u32 = TICK_HZ * 20;
 pub const ROCKETS_COST_STEEL: u32 = 75;
 pub const ROCKETS_COST_OIL: u32 = 125;
 pub const ROCKETS_RESEARCH_TICKS: u32 = TICK_HZ * 25;
+
+// Placeholder Dao research: completion has no combat or ability effect.
+pub const DAO_COST_STEEL: u32 = 200;
+pub const DAO_COST_OIL: u32 = 100;
+pub const DAO_RESEARCH_TICKS: u32 = METHAMPHETAMINES_RESEARCH_TICKS;

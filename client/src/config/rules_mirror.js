@@ -85,6 +85,7 @@ export const PANZERFAUST_WINDUP_TICKS = TICK_HZ / 2;
 export const PANZERFAUST_TRAVEL_TICKS = TICK_HZ / 2;
 export const METHAMPHETAMINES_PANZERFAUST_WINDUP_TICKS = 12;
 export const METHAMPHETAMINES_RESEARCH_TICKS = TICK_HZ * 20;
+export const DAO_RESEARCH_TICKS = METHAMPHETAMINES_RESEARCH_TICKS;
 export const PANZERFAUSTS_RESEARCH_TICKS = TICK_HZ * 20;
 export const ENTRENCHMENT_RESEARCH_TICKS = TICK_HZ * 20;
 export const ENTRENCHMENT_DIG_IN_TICKS = TICK_HZ * 3;
@@ -182,6 +183,11 @@ export const STATS = Object.freeze({
   [KIND.PORTAL]: { label: "Portal", icon: "PRT", footW: 3, footH: 3, sight: 1,
     cost: { steel: 150, oil: 0 }, buildTicks: TICK_HZ * 5, trains: [KIND.WARRIOR],
     description: "A supernatural gateway that trains Cultivator Disciples." },
+  [KIND.THREE_DAO_PAVILION]: { label: "Three Dao Pavilion", icon: "DAO", footW: 3, footH: 2, sight: 1,
+    cost: { steel: 100, oil: 25 }, buildTicks: 560, trains: [],
+    researches: [UPGRADE.DAO_OF_LIGHTNESS, UPGRADE.DAO_OF_BARRIERS, UPGRADE.DAO_OF_HEAVINESS],
+    requires: [KIND.RESOURCE_DEPOT, KIND.PORTAL],
+    description: "A repository of the three Dao. Prototype research currently has no gameplay effect." },
   [KIND.ZAMOK]: { label: "Zamok", icon: "ZK", footW: 3, footH: 3, sight: 1,
     cost: { steel: 0, oil: 0 }, buildTicks: 0, trains: [KIND.GOLEM] },
   [KIND.DEPOT]: { label: "Supply Depot", icon: "SD", footW: 2, footH: 2, sight: 1,
@@ -432,6 +438,24 @@ export const ABILITIES = Object.freeze({
 });
 
 export const UPGRADES = Object.freeze({
+  [UPGRADE.DAO_OF_HEAVINESS]: Object.freeze({
+    upgrade: UPGRADE.DAO_OF_HEAVINESS, label: "Dao of Heaviness", icon: "HVY",
+    cost: Object.freeze({ steel: 200, oil: 100 }), researchTicks: DAO_RESEARCH_TICKS,
+    description: "Study the Dao of Heaviness. Prototype: no gameplay effect yet.",
+    researchedAt: KIND.THREE_DAO_PAVILION,
+  }),
+  [UPGRADE.DAO_OF_BARRIERS]: Object.freeze({
+    upgrade: UPGRADE.DAO_OF_BARRIERS, label: "Dao of Barriers", icon: "BAR",
+    cost: Object.freeze({ steel: 200, oil: 100 }), researchTicks: DAO_RESEARCH_TICKS,
+    description: "Study the Dao of Barriers. Prototype: no gameplay effect yet.",
+    researchedAt: KIND.THREE_DAO_PAVILION,
+  }),
+  [UPGRADE.DAO_OF_LIGHTNESS]: Object.freeze({
+    upgrade: UPGRADE.DAO_OF_LIGHTNESS, label: "Dao of Lightness", icon: "LGT",
+    cost: Object.freeze({ steel: 200, oil: 100 }), researchTicks: DAO_RESEARCH_TICKS,
+    description: "Study the Dao of Lightness. Prototype: no gameplay effect yet.",
+    researchedAt: KIND.THREE_DAO_PAVILION,
+  }),
   [UPGRADE.METHAMPHETAMINES]: Object.freeze({
     upgrade: UPGRADE.METHAMPHETAMINES,
     label: "Methamphetamines",

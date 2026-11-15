@@ -490,6 +490,7 @@ fn kind_label(kind: EntityKind) -> String {
         EntityKind::Ekat => "Ekat",
         EntityKind::ResourceDepot => "Resource Depot",
         EntityKind::Portal => "Portal",
+        EntityKind::ThreeDaoPavilion => "Three Dao Pavilion",
         EntityKind::Zamok => "Zamok",
         EntityKind::Depot => "Supply Depot",
         EntityKind::Barracks => "Barracks",

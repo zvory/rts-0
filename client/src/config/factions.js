@@ -10,7 +10,7 @@ import {
 import { WORKER_BUILD_CARD_SLOTS } from "./presentation.js";
 
 const CULTIVATORS_WORKER_BUILD_CARD_SLOTS = Object.freeze([
-  KIND.RESOURCE_DEPOT, KIND.PUMP_JACK, KIND.PORTAL, null, null, null, null, null,
+  KIND.RESOURCE_DEPOT, KIND.PUMP_JACK, KIND.PORTAL, KIND.THREE_DAO_PAVILION, null, null, null, null,
 ]);
 
 function freezeCatalog(catalog) {
@@ -128,13 +128,15 @@ export const FACTION_CATALOGS = Object.freeze({
     id: CULTIVATORS_FACTION_ID,
     loadoutId: "cultivators.standard",
     units: [KIND.WORKER, KIND.WARRIOR],
-    buildings: [KIND.RESOURCE_DEPOT, KIND.PORTAL, KIND.STEEL_MINE, KIND.PUMP_JACK],
-    buildables: [KIND.RESOURCE_DEPOT, KIND.PORTAL],
+    buildings: [KIND.RESOURCE_DEPOT, KIND.PORTAL, KIND.THREE_DAO_PAVILION, KIND.STEEL_MINE, KIND.PUMP_JACK],
+    buildables: [KIND.RESOURCE_DEPOT, KIND.PORTAL, KIND.THREE_DAO_PAVILION],
     trainables: {
       [KIND.RESOURCE_DEPOT]: [KIND.WORKER, KIND.STEEL_MINE, KIND.PUMP_JACK],
       [KIND.PORTAL]: [KIND.WARRIOR],
     },
-    research: {},
+    research: {
+      [KIND.THREE_DAO_PAVILION]: [UPGRADE.DAO_OF_LIGHTNESS, UPGRADE.DAO_OF_BARRIERS, UPGRADE.DAO_OF_HEAVINESS],
+    },
     abilities: [],
   }),
 });

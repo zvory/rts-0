@@ -1033,6 +1033,16 @@ withFakeHudDocument(({ FakeElement }) => {
   assert(portalCard.slots[0].label === "Disciple" && portalCard.slots[0].hotkey === "Q" && portalCard.slots[0].enabled, "Cultivator Portal trains an affordable Disciple from hotkey Q");
   assert(portalCard.slots[0].cost.steel === 100 && STATS[KIND.WARRIOR].supply === 2, "Disciple train descriptor exposes its 100-Steel and 2-Supply cost");
 
+  const pavilion = { ...portal, id: 23, kind: KIND.THREE_DAO_PAVILION };
+  const pavilionCard = buildCommandCardDescriptors(commandCardCtx({ selection: [pavilion], entities: [pavilion], factionId: "cultivators", resources: { steel: 600, oil: 300 } }));
+  for (const [index, label] of ["Dao of Lightness", "Dao of Barriers", "Dao of Heaviness"].entries()) {
+    const slot = pavilionCard.slots[index];
+    assert(slot.label === label && slot.enabled, "Pavilion exposes all three affordable Dao researches");
+    assert(slot.hotkey === ["Q", "W", "E"][index], "Dao research uses Q/W/E");
+    assert(slot.cost.steel === 200 && slot.cost.oil === 100, "Each Dao costs 200 Steel and 100 Oil");
+    assert(slot.tooltipUpgrade === [UPGRADE.DAO_OF_LIGHTNESS, UPGRADE.DAO_OF_BARRIERS, UPGRADE.DAO_OF_HEAVINESS][index], "Dao tooltip resolves the matching research description");
+  }
+
   producingBarracks.prodRepeatKinds = [KIND.RIFLEMAN, KIND.MACHINE_GUNNER];
   const repeatingTrainCard = buildCommandCardDescriptors(commandCardCtx({
     selection: [barracks, producingBarracks],

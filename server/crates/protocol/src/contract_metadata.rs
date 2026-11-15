@@ -78,6 +78,7 @@ pub mod kinds {
     pub const EKAT: &str = "ekat";
     pub const RESOURCE_DEPOT: &str = "resource_depot";
     pub const PORTAL: &str = "portal";
+    pub const THREE_DAO_PAVILION: &str = "three_dao_pavilion";
     pub const ZAMOK: &str = "zamok";
     pub const DEPOT: &str = "depot";
     pub const BARRACKS: &str = "barracks";
@@ -162,6 +163,9 @@ pub mod upgrades {
     pub const TANK_PLUS: &str = "tank_plus";
     pub const SMOKE_PLUS: &str = "smoke_plus";
     pub const SCOUT_PLANE_UNLOCK: &str = "scout_plane_unlock";
+    pub const DAO_OF_LIGHTNESS: &str = "dao_of_lightness";
+    pub const DAO_OF_BARRIERS: &str = "dao_of_barriers";
+    pub const DAO_OF_HEAVINESS: &str = "dao_of_heaviness";
     pub const ROCKETS: &str = "rockets";
     pub const ALL: &[&str] = &[
         METHAMPHETAMINES,
@@ -174,6 +178,9 @@ pub mod upgrades {
         TANK_PLUS,
         SMOKE_PLUS,
         SCOUT_PLANE_UNLOCK,
+        DAO_OF_LIGHTNESS,
+        DAO_OF_BARRIERS,
+        DAO_OF_HEAVINESS,
         ROCKETS,
     ];
 }
@@ -386,6 +393,7 @@ const KIND_CODES: &[(&str, u8)] = &[
     (kinds::SCOUT_PLANE, 25),
     (kinds::RESOURCE_DEPOT, 6),
     (kinds::PORTAL, 28),
+    (kinds::THREE_DAO_PAVILION, 31),
     (kinds::DEPOT, 7),
     (kinds::BARRACKS, 8),
     (kinds::TRAINING_CENTRE, 9),
@@ -496,6 +504,9 @@ const UPGRADE_CODES: &[(&str, u8)] = &[
     (upgrades::TANK_PLUS, 13),
     (upgrades::SMOKE_PLUS, 9),
     (upgrades::SCOUT_PLANE_UNLOCK, 11),
+    (upgrades::DAO_OF_LIGHTNESS, 14),
+    (upgrades::DAO_OF_BARRIERS, 15),
+    (upgrades::DAO_OF_HEAVINESS, 16),
     (upgrades::ROCKETS, 12),
 ];
 
@@ -717,6 +728,7 @@ fn kind_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("EKAT", kinds::EKAT),
         ("RESOURCE_DEPOT", kinds::RESOURCE_DEPOT),
         ("PORTAL", kinds::PORTAL),
+        ("THREE_DAO_PAVILION", kinds::THREE_DAO_PAVILION),
         ("ZAMOK", kinds::ZAMOK),
         ("DEPOT", kinds::DEPOT),
         ("BARRACKS", kinds::BARRACKS),
@@ -807,6 +819,9 @@ fn upgrade_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("TANK_PLUS", upgrades::TANK_PLUS),
         ("SMOKE_PLUS", upgrades::SMOKE_PLUS),
         ("SCOUT_PLANE_UNLOCK", upgrades::SCOUT_PLANE_UNLOCK),
+        ("DAO_OF_LIGHTNESS", upgrades::DAO_OF_LIGHTNESS),
+        ("DAO_OF_BARRIERS", upgrades::DAO_OF_BARRIERS),
+        ("DAO_OF_HEAVINESS", upgrades::DAO_OF_HEAVINESS),
         ("ROCKETS", upgrades::ROCKETS),
     ])
 }
