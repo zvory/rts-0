@@ -198,7 +198,7 @@ impl Default for PlannerConfig {
     fn default() -> Self {
         PlannerConfig {
             max_units_per_command: 256,
-            max_queue_len: 8,
+            max_queue_len: 32,
         }
     }
 }

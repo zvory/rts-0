@@ -131,7 +131,7 @@ fn queued_point_tanks_preserves_active_order_and_queue_and_respects_capacity() {
     let saved = serde_json::to_string(tank.queued_orders()).unwrap();
     let restored: Vec<OrderIntent> = serde_json::from_str(&saved).unwrap();
     assert_eq!(restored, tank.queued_orders());
-    for _ in 0..20 {
+    for _ in 0..=MAX_QUEUED_ORDERS {
         apply(&map, &mut entities, vec![(1, command.clone())]);
     }
     assert_eq!(

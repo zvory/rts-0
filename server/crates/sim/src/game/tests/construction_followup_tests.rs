@@ -1,6 +1,6 @@
 use super::fixtures::*;
 use super::*;
-use crate::game::entity::BuildPhase;
+use crate::game::entity::{BuildPhase, MAX_QUEUED_ORDERS};
 
 fn fixture() -> (Game, u32, u32) {
     let mut game = empty_flat_game(&[PlayerInit {
@@ -307,8 +307,8 @@ fn queued_build_prerequisite_destroyed_before_promotion_is_skipped() {
 #[test]
 fn construction_followup_hold_replaces_full_queue_and_shift_still_appends() {
     let (mut game, worker, site) = fixture();
-    for index in 0..8 {
-        game.enqueue(1, move_command(worker, 640.0 + index as f32 * 32.0, true));
+    for index in 0..MAX_QUEUED_ORDERS {
+        game.enqueue(1, move_command(worker, 640.0 + index as f32, true));
     }
     game.tick();
     assert_eq!(
@@ -318,7 +318,7 @@ fn construction_followup_hold_replaces_full_queue_and_shift_still_appends() {
             .unwrap()
             .queued_orders()
             .len(),
-        8
+        MAX_QUEUED_ORDERS
     );
     game.enqueue(
         1,
