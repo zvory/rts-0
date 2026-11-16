@@ -196,11 +196,7 @@ export function _hpBarSlot(id, poolName = "hpBars") {
     container.rtsBackground = new PIXI.Graphics();
     container.rtsFill = new PIXI.Graphics();
     container.rtsTicks = new PIXI.Graphics();
-    container.rtsInsight = new PIXI.Graphics();
-    container.rtsDao = new PIXI.Graphics();
-    container.rtsRadiance = new PIXI.Graphics();
-    container.addChild(container.rtsRadiance);
-    container.addChild(container.rtsBackground, container.rtsFill, container.rtsTicks, container.rtsInsight, container.rtsDao);
+    container.addChild(container.rtsBackground, container.rtsFill, container.rtsTicks);
     pool.set(id, container);
     this.layers[poolName].addChild(container);
     this._recordRenderDiagnostic?.(`renderer.pixi.displayObject.created.${poolName}`);
@@ -306,6 +302,22 @@ export function _hpBar(g, e, status = null, ownerColor = null) {
   }
   g.rtsFill.tint = color;
   g.rtsFill.scale.set(frac, 1);
+  // Most health bars never need Dao overlays. Allocate them only for Disciples,
+  // retaining the same child order so their radiance stays behind the HP bar.
+  if (e.kind !== KIND.WARRIOR) {
+    if (g.rtsInsight) {
+      g.rtsInsight.visible = g.rtsDao.visible = g.rtsRadiance.visible = false;
+    }
+    return;
+  }
+  if (!g.rtsInsight) {
+    g.rtsInsight = new PIXI.Graphics();
+    g.rtsDao = new PIXI.Graphics();
+    g.rtsRadiance = new PIXI.Graphics();
+    g.addChildAt(g.rtsRadiance, 0);
+    g.addChild(g.rtsInsight, g.rtsDao);
+  }
+  g.rtsInsight.visible = g.rtsDao.visible = g.rtsRadiance.visible = true;
   const radiance = g.rtsRadiance;
   radiance.clear();
   if (e.daoReady || e.daoAdvanceTicks > 0) {
