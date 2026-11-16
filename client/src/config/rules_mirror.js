@@ -188,7 +188,7 @@ export const STATS = Object.freeze({
     cost: { steel: 100, oil: 25 }, buildTicks: 560, trains: [],
     researches: [UPGRADE.DAO_OF_LIGHTNESS, UPGRADE.DAO_OF_BARRIERS, UPGRADE.DAO_OF_HEAVINESS],
     requires: [KIND.RESOURCE_DEPOT, KIND.PORTAL],
-    description: "A repository of the three Dao. Prototype research currently has no gameplay effect." },
+    description: "Research Lightness, War, and Reality to unlock Disciple evolutions at 60 insight." },
   [KIND.ZAMOK]: { label: "Zamok", icon: "ZK", footW: 3, footH: 3, sight: 1,
     cost: { steel: 0, oil: 0 }, buildTicks: 0, trains: [KIND.GOLEM] },
   [KIND.DEPOT]: { label: "Supply Depot", icon: "SD", footW: 2, footH: 2, sight: 1,
@@ -246,6 +246,25 @@ export const STATS = Object.freeze({
 });
 
 export const ABILITIES = Object.freeze({
+  [ABILITY.EVOLVE_LIGHTNESS]: Object.freeze({
+    ability: ABILITY.EVOLVE_LIGHTNESS, label: "Dao of Lightness", icon: "Z", hotkey: "Z",
+    title: "Evolve permanently into Dao of Lightness at 60 insight", carriers: Object.freeze([KIND.WARRIOR]),
+    targetMode: "self", cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 0 }),
+    upgradeRequirement: UPGRADE.DAO_OF_LIGHTNESS, queued: false, queuePolicy: "notQueueable",
+  }),
+  [ABILITY.EVOLVE_WAR]: Object.freeze({
+    ability: ABILITY.EVOLVE_WAR, label: "Dao of War", icon: "X", hotkey: "X",
+    title: "Evolve permanently into Dao of War at 60 insight", carriers: Object.freeze([KIND.WARRIOR]),
+    targetMode: "self", cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 0 }),
+    upgradeRequirement: UPGRADE.DAO_OF_HEAVINESS, queued: false, queuePolicy: "notQueueable",
+  }),
+  [ABILITY.EVOLVE_REALITY]: Object.freeze({
+    ability: ABILITY.EVOLVE_REALITY, label: "Dao of Reality", icon: "C", hotkey: "C",
+    title: "Evolve permanently into Dao of Reality at 60 insight", carriers: Object.freeze([KIND.WARRIOR]),
+    targetMode: "self", cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 0 }),
+    upgradeRequirement: UPGRADE.DAO_OF_BARRIERS, queued: false, queuePolicy: "notQueueable",
+  }),
+
   [ABILITY.SMOKE]: Object.freeze({
     ability: ABILITY.SMOKE,
     label: "Smoke",
@@ -378,7 +397,7 @@ export const ABILITIES = Object.freeze({
     icon: "DSH",
     hotkey: "D",
     title: "Dash up to 5 tiles, then recast to return",
-    carriers: Object.freeze([KIND.EKAT]),
+    carriers: Object.freeze([KIND.EKAT, KIND.WARRIOR]),
     targetMode: "worldPoint",
     rangeTiles: EKAT_TELEPORT_RANGE_TILES,
     cooldownTicks: EKAT_TELEPORT_COOLDOWN_TICKS,
@@ -409,7 +428,7 @@ export const ABILITIES = Object.freeze({
     icon: "ANC",
     hotkey: "C",
     title: "Place a 10-second pull field",
-    carriers: Object.freeze([KIND.EKAT]),
+    carriers: Object.freeze([KIND.EKAT, KIND.WARRIOR]),
     targetMode: "worldPoint",
     rangeTiles: EKAT_MAGIC_ANCHOR_RANGE_TILES,
     cooldownTicks: 0,
@@ -440,21 +459,21 @@ export const ABILITIES = Object.freeze({
 
 export const UPGRADES = Object.freeze({
   [UPGRADE.DAO_OF_HEAVINESS]: Object.freeze({
-    upgrade: UPGRADE.DAO_OF_HEAVINESS, label: "Dao of Heaviness", icon: "HVY",
+    upgrade: UPGRADE.DAO_OF_HEAVINESS, label: "Dao of War", icon: "HVY",
     cost: Object.freeze({ steel: 200, oil: 100 }), researchTicks: DAO_RESEARCH_TICKS,
-    description: "Study the Dao of Heaviness. Prototype: no gameplay effect yet.",
+    description: "Study the Dao of War. Unlocks the corresponding Disciple evolution at 60 insight.",
     researchedAt: KIND.THREE_DAO_PAVILION,
   }),
   [UPGRADE.DAO_OF_BARRIERS]: Object.freeze({
-    upgrade: UPGRADE.DAO_OF_BARRIERS, label: "Dao of Barriers", icon: "BAR",
+    upgrade: UPGRADE.DAO_OF_BARRIERS, label: "Dao of Reality", icon: "BAR",
     cost: Object.freeze({ steel: 200, oil: 100 }), researchTicks: DAO_RESEARCH_TICKS,
-    description: "Study the Dao of Barriers. Prototype: no gameplay effect yet.",
+    description: "Study the Dao of Reality. Unlocks the corresponding Disciple evolution at 60 insight.",
     researchedAt: KIND.THREE_DAO_PAVILION,
   }),
   [UPGRADE.DAO_OF_LIGHTNESS]: Object.freeze({
     upgrade: UPGRADE.DAO_OF_LIGHTNESS, label: "Dao of Lightness", icon: "LGT",
     cost: Object.freeze({ steel: 200, oil: 100 }), researchTicks: DAO_RESEARCH_TICKS,
-    description: "Study the Dao of Lightness. Prototype: no gameplay effect yet.",
+    description: "Study the Dao of Lightness. Unlocks the corresponding Disciple evolution at 60 insight.",
     researchedAt: KIND.THREE_DAO_PAVILION,
   }),
   [UPGRADE.METHAMPHETAMINES]: Object.freeze({

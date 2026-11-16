@@ -56,3 +56,15 @@ fn rocket_rack_count_preserves_empty_and_loaded_values_in_slot_43() {
         );
     }
 }
+
+#[test]
+fn disciple_insight_and_dao_append_without_changing_existing_slots() {
+    let mut unit = EntityView::new(1, 1, "warrior", 320.0, 320.0, 155, 155, "idle");
+    unit.insight = Some(60);
+    unit.dao = Some("war".into());
+    let value = serde_json::to_value(CompactEntity(&unit)).unwrap();
+    assert_eq!(value.as_array().unwrap().len(), 47);
+    assert_eq!(value[45], 60);
+    assert_eq!(value[46], "war");
+    assert!(value[44].is_null());
+}

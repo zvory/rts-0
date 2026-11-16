@@ -121,6 +121,10 @@ pub mod abilities {
     pub const EKAT_MAGIC_ANCHOR: &str = "ekatMagicAnchor";
     pub const EKAT_CONSUME_GOLEM: &str = "ekatConsumeGolem";
     pub const BARRAGE: &str = "barrage";
+    pub const EVOLVE_LIGHTNESS: &str = "evolveLightness";
+    pub const EVOLVE_WAR: &str = "evolveWar";
+    pub const EVOLVE_REALITY: &str = "evolveReality";
+
     pub const ALL: &[&str] = &[
         CHARGE,
         SMOKE,
@@ -135,6 +139,9 @@ pub mod abilities {
         EKAT_MAGIC_ANCHOR,
         EKAT_CONSUME_GOLEM,
         BARRAGE,
+        EVOLVE_LIGHTNESS,
+        EVOLVE_WAR,
+        EVOLVE_REALITY,
     ];
 }
 
@@ -212,7 +219,7 @@ pub mod notices {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 57;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 58;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -469,6 +476,9 @@ const ORDER_STAGE_CODES: &[(&str, u8)] = &[
     (abilities::SCOUT_PLANE, 19),
     ("holdPosition", 20),
     (abilities::BARRAGE, 21),
+    (abilities::EVOLVE_LIGHTNESS, 22),
+    (abilities::EVOLVE_WAR, 23),
+    (abilities::EVOLVE_REALITY, 24),
 ];
 
 const ABILITY_CODES: &[(&str, u8)] = &[
@@ -485,6 +495,9 @@ const ABILITY_CODES: &[(&str, u8)] = &[
     (abilities::DISMISS_SCOUT_PLANE, 11),
     (abilities::SCOUT_PLANE, 12),
     (abilities::BARRAGE, 13),
+    (abilities::EVOLVE_LIGHTNESS, 14),
+    (abilities::EVOLVE_WAR, 15),
+    (abilities::EVOLVE_REALITY, 16),
 ];
 
 const ABILITY_OBJECT_KIND_CODES: &[(&str, u8)] = &[
@@ -789,6 +802,9 @@ fn ability_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("EKAT_MAGIC_ANCHOR", abilities::EKAT_MAGIC_ANCHOR),
         ("EKAT_CONSUME_GOLEM", abilities::EKAT_CONSUME_GOLEM),
         ("BARRAGE", abilities::BARRAGE),
+        ("EVOLVE_LIGHTNESS", abilities::EVOLVE_LIGHTNESS),
+        ("EVOLVE_WAR", abilities::EVOLVE_WAR),
+        ("EVOLVE_REALITY", abilities::EVOLVE_REALITY),
     ])
 }
 
@@ -876,6 +892,9 @@ fn order_stage_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("EKAT_MAGIC_ANCHOR", abilities::EKAT_MAGIC_ANCHOR),
         ("EKAT_CONSUME_GOLEM", abilities::EKAT_CONSUME_GOLEM),
         ("BARRAGE", abilities::BARRAGE),
+        ("EVOLVE_LIGHTNESS", abilities::EVOLVE_LIGHTNESS),
+        ("EVOLVE_WAR", abilities::EVOLVE_WAR),
+        ("EVOLVE_REALITY", abilities::EVOLVE_REALITY),
         ("SETUP_ANTI_TANK_GUNS", "setupAntiTankGuns"),
     ])
 }
@@ -979,6 +998,8 @@ fn compact_slot_schemas() -> CompactSlotSchemas {
             optional_field(42, "unitsKilled"),
             optional_field(43, "rocketRackCount"),
             optional_field(44, "commanderFacing"),
+            optional_field(45, "insight"),
+            optional_field(46, "dao"),
         ],
         event: event_slot_schemas(),
         trench: vec![

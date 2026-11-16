@@ -795,8 +795,16 @@ Cultivator Serfs can construct the Three Dao Pavilion after a completed Nexus an
 It inherits the Training Centre baseline: 100 Steel, 25 Oil, 560 ticks construction,
 120 HP, armored, one tile sight, no weapon, no supply or production. Its approved
 art uses a 3x3 placement and collision footprint.
-Its three independent, permanent researches (Dao of Lightness, Dao of Barriers, and
-Dao of Heaviness) each cost 200 Steel and 100 Oil and take 600 ticks (20 seconds).
-All three currently have no gameplay effect. Existing research queue, cancellation,
+Its three independent, permanent researches (Dao of Lightness, Dao of War, and
+Dao of Reality) each cost 200 Steel and 100 Oil and take 600 ticks (20 seconds).
+Each unlocks its corresponding evolution for Disciples with 60 insight. Existing research queue, cancellation,
 refund, completion, and destruction rules apply; completed research persists.
 See [Cultivators](cultivators.md#three-dao-pavilion-prototype) for the approved brief.
+
+### Disciple insight and Dao specializations
+
+See [Dao evolution playtest](dao-insight.md). Entity-owned `insight` and `dao` persist
+through checkpoints. Visible Disciple snapshots append `insight` (compact slot 45) and
+`dao` (slot 46: lightness/war/reality). Evolution abilities are self-targeted, nonqueueable,
+research-gated codes 14–16 and order stages 22–24. Internal research ids remain
+`dao_of_lightness`, `dao_of_heaviness` (War), `dao_of_barriers` (Reality).

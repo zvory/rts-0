@@ -700,6 +700,15 @@ for (const [kind, upgrade] of [
     "engineering-complex-artillery",
     "ekat-unit",
     "ekat-zamok-train",
+    "cultivators-disciple-base",
+    "cultivators-disciple-lightness",
+    "cultivators-disciple-war",
+    "cultivators-disciple-reality",
+    "cultivators-worker",
+    "cultivators-build",
+    "cultivators-producer-resource_depot",
+    "cultivators-producer-portal",
+    "cultivators-producer-three_dao_pavilion",
   ]);
   assert(
     catalog.some((entry) =>
@@ -846,4 +855,35 @@ for (const researched of [false, true]) {
   const withoutWorks = buildCommandCardDescriptors({ ...context,
     upgrades: [UPGRADE.ANTI_TANK_GUN_UNLOCK], playerHasCompleteKind: () => false });
   assert.equal(atSlot(withoutWorks).enabled, false);
+}
+
+// Insight-gated Disciple evolution occupies the bottom row and swaps to Dao abilities.
+{
+  const context = {
+    playerId: 1, factionId: "cultivators",
+    resources: { steel: 1000, oil: 1000 },
+    upgrades: [UPGRADE.DAO_OF_LIGHTNESS, UPGRADE.DAO_OF_HEAVINESS, UPGRADE.DAO_OF_BARRIERS],
+    playerHasCompleteKind: () => true, groupCooldownClocks: () => [],
+  };
+  const unit = { id: 50, owner: 1, kind: KIND.WARRIOR, insight: 59 };
+  const cardFor = (entity, extra = {}) => buildCommandCardDescriptors({ ...context, ...extra, selection: [entity] });
+  let card = cardFor(unit);
+  assert.deepEqual(card.slots.slice(6).map((s) => s.ability), [ABILITY.EVOLVE_LIGHTNESS, ABILITY.EVOLVE_WAR, ABILITY.EVOLVE_REALITY]);
+  assert(card.slots.slice(6).every((s) => !s.enabled));
+  card = cardFor({ ...unit, insight: 60 });
+  assert(card.slots.slice(6).every((s) => s.enabled));
+  assert.deepEqual(card.slots.slice(6).map((s) => s.hotkey), ["Z", "X", "C"]);
+  assert(cardFor({ ...unit, insight: 60 }, { upgrades: [] }).slots.slice(6).every((s) => !s.enabled));
+  const light = cardFor({ ...unit, insight: 60, dao: "lightness" });
+  assert(light.slots.some((s) => s?.ability === ABILITY.EKAT_TELEPORT));
+  assert(!light.slots.some((s) => s?.ability === ABILITY.EKAT_MAGIC_ANCHOR || s?.ability?.startsWith("evolve")));
+  const reality = cardFor({ ...unit, insight: 60, dao: "reality" });
+  assert(reality.slots.some((s) => s?.ability === ABILITY.EKAT_MAGIC_ANCHOR));
+  assert(!reality.slots.some((s) => s?.ability === ABILITY.EKAT_TELEPORT));
+}
+
+{
+  const { PRESENTATION_ENTITY_FIELDS } = await import("../client/src/presentation/entity_snapshot.js");
+  assert(PRESENTATION_ENTITY_FIELDS.includes("insight"));
+  assert(PRESENTATION_ENTITY_FIELDS.includes("dao"));
 }

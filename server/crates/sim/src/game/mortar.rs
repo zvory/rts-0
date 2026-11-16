@@ -353,10 +353,9 @@ fn resolve(context: MortarResolutionContext<'_>, shell: &MortarShell) {
         let effective = entities
             .get(id)
             .map(|target| {
-                let damage = entrenchment_combat::reduce_area_damage(
-                    target,
-                    shell_effective_damage(target.kind, shell.rocket, base, piercing_hit),
-                );
+                let base = shell_effective_damage(target.kind, shell.rocket, base, piercing_hit);
+                let damage = target.dao_damage_after_armor(base, u8::from(piercing_hit) as f32);
+                let damage = entrenchment_combat::reduce_area_damage(target, damage);
                 map.damage_after_reduction_tile(target.pos_x(), target.pos_y(), damage)
             })
             .unwrap_or(0);

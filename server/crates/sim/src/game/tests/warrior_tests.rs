@@ -201,3 +201,186 @@ fn pavilion_prerequisites_and_research_are_faction_gated() {
         ));
     }
 }
+
+#[test]
+fn disciple_evolution_requires_insight_research_ownership_and_is_permanent() {
+    use crate::game::ability::AbilityKind;
+    use crate::game::upgrade::UpgradeKind;
+    for (ability, upgrade, hp) in [
+        (
+            AbilityKind::EvolveLightness,
+            UpgradeKind::DaoOfLightness,
+            135,
+        ),
+        (AbilityKind::EvolveWar, UpgradeKind::DaoOfHeaviness, 155),
+        (AbilityKind::EvolveReality, UpgradeKind::DaoOfBarriers, 135),
+    ] {
+        let mut game = empty_flat_game(&[
+            cultivator_player(),
+            PlayerInit {
+                id: 2,
+                team_id: 2,
+                ..cultivator_player()
+            },
+        ]);
+        let unit = game
+            .state
+            .entities
+            .spawn_unit(1, EntityKind::Warrior, 400.0, 400.0)
+            .unwrap();
+        let command = Command::UseAbility {
+            ability,
+            units: vec![unit, unit],
+            x: None,
+            y: None,
+            queued: false,
+        };
+        game.enqueue(1, command.clone());
+        game.tick();
+        assert_eq!(game.state.entities.get(unit).unwrap().dao, None);
+        game.state.entities.get_mut(unit).unwrap().insight = 60;
+        game.enqueue(1, command.clone());
+        game.tick();
+        assert_eq!(
+            game.state.entities.get(unit).unwrap().dao,
+            None,
+            "research is required"
+        );
+        game.state.players[0].upgrades.insert(upgrade);
+        game.state.entities.get_mut(unit).unwrap().insight = 59;
+        game.enqueue(1, command.clone());
+        game.tick();
+        assert_eq!(
+            game.state.entities.get(unit).unwrap().dao,
+            None,
+            "60 insight is required"
+        );
+        game.state.entities.get_mut(unit).unwrap().insight = 60;
+        game.enqueue(2, command.clone());
+        game.tick();
+        assert_eq!(
+            game.state.entities.get(unit).unwrap().dao,
+            None,
+            "ownership is required"
+        );
+        game.enqueue(1, command.clone());
+        game.tick();
+        let evolved = game.state.entities.get(unit).unwrap();
+        assert_eq!(evolved.dao, Some(upgrade));
+        assert_eq!((evolved.hp, evolved.max_hp), (hp, hp));
+        game.enqueue(1, command);
+        game.tick();
+        assert_eq!(
+            game.state.entities.get(unit).unwrap().max_hp,
+            hp,
+            "no repeated HP grants"
+        );
+        let payload = game.checkpoint_payload_text_for_test().unwrap();
+        assert!(payload.contains("\"insight\":60"));
+        let restored = Game::restore_checkpoint_payload_text_for_test(
+            &payload,
+            game.state.map.clone(),
+            game.state.map_metadata.clone(),
+        )
+        .unwrap();
+        assert_eq!(
+            restored.state.entities.get(unit).unwrap().dao,
+            Some(upgrade)
+        );
+    }
+}
+
+#[test]
+fn disciple_dao_gates_blink_return_and_magic_anchor() {
+    use crate::game::ability::AbilityKind;
+    use crate::game::upgrade::UpgradeKind;
+    let mut game = empty_flat_game(&[cultivator_player()]);
+    let unit = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Warrior, 400.0, 400.0)
+        .unwrap();
+    let cast = |ability| Command::UseAbility {
+        ability,
+        units: vec![unit],
+        x: Some(480.0),
+        y: Some(400.0),
+        queued: false,
+    };
+    game.enqueue(1, cast(AbilityKind::EkatTeleport));
+    game.tick();
+    game.enqueue(1, cast(AbilityKind::EkatMagicAnchor));
+    game.tick();
+    assert_eq!(game.state.entities.get(unit).unwrap().pos_x(), 400.0);
+    assert_eq!(game.state.ability_runtime.world_objects().count(), 0);
+    game.state.entities.get_mut(unit).unwrap().insight = 60;
+    game.state.players[0]
+        .upgrades
+        .insert(UpgradeKind::DaoOfLightness);
+    game.enqueue(1, cast(AbilityKind::EvolveLightness));
+    game.tick();
+    game.enqueue(1, cast(AbilityKind::EkatTeleport));
+    game.tick();
+    assert_eq!(game.state.entities.get(unit).unwrap().pos_x(), 480.0);
+    game.enqueue(
+        1,
+        Command::RecastAbility {
+            ability: AbilityKind::EkatTeleport,
+            units: vec![unit],
+            target_object_id: None,
+            queued: false,
+        },
+    );
+    game.tick();
+    assert_eq!(game.state.entities.get(unit).unwrap().pos_x(), 400.0);
+    assert_eq!(game.state.ability_runtime.world_objects().count(), 0);
+    game.enqueue(1, cast(AbilityKind::EkatMagicAnchor));
+    game.tick();
+    assert_eq!(game.state.ability_runtime.world_objects().count(), 0);
+
+    let support = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Warrior, 600.0, 400.0)
+        .unwrap();
+    game.state.entities.get_mut(support).unwrap().insight = 60;
+    game.state.players[0]
+        .upgrades
+        .insert(UpgradeKind::DaoOfBarriers);
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability: AbilityKind::EvolveReality,
+            units: vec![support],
+            x: None,
+            y: None,
+            queued: false,
+        },
+    );
+    game.tick();
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability: AbilityKind::EkatMagicAnchor,
+            units: vec![support],
+            x: Some(640.0),
+            y: Some(400.0),
+            queued: false,
+        },
+    );
+    game.tick();
+    assert_eq!(game.state.ability_runtime.world_objects().count(), 1);
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability: AbilityKind::EkatTeleport,
+            units: vec![support],
+            x: Some(640.0),
+            y: Some(400.0),
+            queued: false,
+        },
+    );
+    game.tick();
+    // The Anchor can pull its own caster slightly; a forbidden blink must not cross 40px.
+    assert!((game.state.entities.get(support).unwrap().pos_x() - 600.0).abs() < 2.0);
+}

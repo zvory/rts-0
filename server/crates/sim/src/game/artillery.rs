@@ -117,7 +117,10 @@ fn resolve_shell(
         };
         let damage = entrenchment_combat::reduce_area_damage(
             target,
-            artillery_damage(target.kind, d2, inner2, outer2),
+            target.dao_damage_after_armor(
+                artillery_damage(target.kind, d2, inner2, outer2),
+                if d2 <= inner2 { 1.0 } else { 0.0 },
+            ),
         );
         let damage = map.damage_after_reduction_tile(target.pos_x(), target.pos_y(), damage);
         if damage == 0 {

@@ -252,6 +252,17 @@ pub fn project_entity(
                 .unwrap_or_else(|| entity_visible_to(viewer, entity, actionable_fog)));
     view.vision_only = vision_only;
 
+    if entity.kind == EntityKind::Warrior {
+        view.insight = Some(entity.insight);
+        view.dao = entity.dao.map(|dao| {
+            match dao {
+                crate::game::upgrade::UpgradeKind::DaoOfLightness => "lightness",
+                crate::game::upgrade::UpgradeKind::DaoOfHeaviness => "war",
+                _ => "reality",
+            }
+            .to_string()
+        });
+    }
     if entity.is_unit() {
         view.units_killed = Some(entity.units_killed());
     }
@@ -480,7 +491,11 @@ pub fn project_entity(
                 view.abilities.push(AbilityCooldownView {
                     ability: kind.to_protocol_str().to_string(),
                     cooldown_left: 0,
-                    remaining_uses: entity.ability_uses_remaining(kind),
+                    remaining_uses: if entity.dao_ability_available(kind) {
+                        entity.ability_uses_remaining(kind)
+                    } else {
+                        Some(0)
+                    },
                     autocast_enabled: None,
                     active_object_id: active_return_object_id(&context, entity, kind),
                     available_tick: return_available_tick(&context, entity, kind),

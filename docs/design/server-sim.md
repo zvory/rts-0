@@ -2138,3 +2138,11 @@ Barbed Wire entry effects live inside the movement service. Phase-local tile pos
 cover waypoint/anchor motion and collision displacement without new durable state. Collision
 entries that exhaust wire or kill infantry run death cleanup again before final snapshots.
 Tank tile entry exhausts the entire wire segment immediately, without damage or slowdown to the tank.
+
+### Disciple insight and Dao specializations
+
+See [Dao evolution playtest](dao-insight.md). Entity-owned `insight` and `dao` persist
+through checkpoints. Visible Disciple snapshots append `insight` (compact slot 45) and
+`dao` (slot 46: lightness/war/reality). Evolution abilities are self-targeted, nonqueueable,
+research-gated codes 14–16 and order stages 22–24. Internal research ids remain
+`dao_of_lightness`, `dao_of_heaviness` (War), `dao_of_barriers` (Reality).

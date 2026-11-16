@@ -460,6 +460,9 @@ pub(crate) fn launch_self_ability(
         return false;
     }
     match (definition.effect_hook, ability) {
+        (AbilityEffectHook::Evolve, _) => entities
+            .get_mut(caster)
+            .is_some_and(|e| e.evolve_dao(ability)),
         (AbilityEffectHook::OwnedAreaStatus, AbilityKind::Breakthrough) => {
             let Some((caster_x, caster_y)) = entities.get(caster).map(|e| (e.pos_x(), e.pos_y()))
             else {
@@ -675,6 +678,7 @@ fn base_eligible(e: &crate::game::entity::Entity, player: u32, ability: AbilityK
         && e.hp > 0
         && !e.under_construction()
         && ability::carried_by(ability, e.kind)
+        && e.dao_ability_available(ability)
         && (ability == AbilityKind::Barrage || e.ability_uses_remaining(ability).unwrap_or(1) > 0)
 }
 

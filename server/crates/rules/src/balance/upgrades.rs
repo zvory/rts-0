@@ -41,7 +41,14 @@ pub const ROCKETS_COST_STEEL: u32 = 75;
 pub const ROCKETS_COST_OIL: u32 = 125;
 pub const ROCKETS_RESEARCH_TICKS: u32 = TICK_HZ * 25;
 
-// Placeholder Dao research: completion has no combat or ability effect.
+// Research unlocks one-time, insight-gated Disciple evolution.
 pub const DAO_COST_STEEL: u32 = 200;
 pub const DAO_COST_OIL: u32 = 100;
 pub const DAO_RESEARCH_TICKS: u32 = METHAMPHETAMINES_RESEARCH_TICKS;
+
+pub const DISCIPLE_INSIGHT_REQUIRED: u32 = 60;
+pub const DAO_WAR_HP_BONUS: u32 = 20;
+pub const DAO_WAR_DAMAGE_MULTIPLIER: f32 = 1.5;
+pub const DAO_WAR_ARMOR_REDUCTION: f32 = 0.5;
+pub const DAO_LIGHTNESS_ATTACK_RATE: f32 = 1.5;
+pub const DAO_REALITY_SPEED_MULTIPLIER: f32 = 1.1;

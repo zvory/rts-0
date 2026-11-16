@@ -38,7 +38,8 @@ export function abilityActiveObjectId(entity, ability) {
 }
 
 export function abilityUnitReady(entity, definition) {
-  return abilityCooldownLeft(entity, definition.ability) === 0 &&
+  return (!definition.ability.startsWith("evolve") || (!entity.dao && entity.insight >= 60)) &&
+    abilityCooldownLeft(entity, definition.ability) === 0 &&
     (definition.ability === "barrage" || abilityRemainingUses(entity, definition.ability) !== 0) &&
     !abilityLockoutActive(entity, definition.ability);
 }
