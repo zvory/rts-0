@@ -1,3 +1,4 @@
+import { frameStripMovementVisual } from "../frame_strip_movement.js";
 import { KIND } from "../../protocol.js";
 import { createLiveFrameStrips } from "./frame_strip_routing.js";
 import { createLivePngRigAtlases } from "./png_routing.js";
@@ -12,6 +13,7 @@ import { supportWeaponSetupVisual } from "../support_weapon_setup_visual.js";
 export function createMinimapAnimation() {
   const strips = createLiveFrameStrips(), atlases = createLivePngRigAtlases();
   const definitions = createLiveRigDefinitions();
+  const motion = new Map();
   const records = new Map(), layers = new Map(), stages = new Map();
   const sprites = new Map([...atlases].map(([kind, atlas]) => {
     // Declared blank atlas cells contain no pixels. Exclude them before preparing images or
@@ -26,7 +28,9 @@ export function createMinimapAnimation() {
     beginFrame(entities, nextState, nextNow) {
       state = nextState; now = nextNow; layers.clear();
       const ids = new Set(entities.map(entity => entity.id));
-      for (const id of records.keys()) if (!ids.has(id)) records.delete(id);
+      for (const cache of [records, motion]) {
+        for (const id of cache.keys()) if (!ids.has(id)) cache.delete(id);
+      }
     },
     parts(kind) {
       const strip = strips.get(keyFor(kind));
@@ -47,6 +51,7 @@ export function createMinimapAnimation() {
       const context = createRigRenderContext(entity, { state, now, setupVisual });
       let result;
       if (strip) {
+        context.frameStripMoving = frameStripMovementVisual(entity, state, motion, now).moving;
         const frame = frameStripFrameIndex(strip, entity, context);
         const rotation = frameStripVisualFacing(strip, entity, context, frame);
         const offset = frameStripSpriteOffset(strip, frame);
@@ -92,6 +97,6 @@ export function createMinimapAnimation() {
       layers.set(entity.id, result);
       return result;
     },
-    destroy() { records.clear(); layers.clear(); stages.clear(); },
+    destroy() { motion.clear(); records.clear(); layers.clear(); stages.clear(); },
   };
 }
