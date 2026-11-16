@@ -1,5 +1,6 @@
 class FakeGraphics {
   constructor() {
+    this.pivot = { set: (x = 0, y = x) => { this.pivotX = x; this.pivotY = y; } };
     this.position = { set: (x = 0, y = 0) => { this.x = x; this.y = y; } };
     this.scale = { set: (x = 1, y = x) => { this.scaleX = x; this.scaleY = y; } };
   }
