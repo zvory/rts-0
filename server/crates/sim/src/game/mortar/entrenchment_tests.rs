@@ -30,7 +30,7 @@ fn mark_entrenched(entities: &mut EntityStore, id: u32) {
 }
 
 #[test]
-fn mortar_outer_area_damage_is_reduced_against_entrenched_infantry() {
+fn mortar_falloff_damage_is_reduced_against_entrenched_infantry() {
     let map = open_map(20);
     let mut entities = EntityStore::new();
     let attacker = entities
@@ -74,7 +74,7 @@ fn mortar_outer_area_damage_is_reduced_against_entrenched_infantry() {
     let after = entities.get(victim).expect("victim should survive").hp;
     assert_eq!(
         before - after,
-        30,
-        "entrenched infantry should take 75% of outer mortar splash"
+        33,
+        "entrenched infantry should take 75% of the 44 damage at 0.75 tiles"
     );
 }

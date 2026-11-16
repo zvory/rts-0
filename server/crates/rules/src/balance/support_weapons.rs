@@ -16,9 +16,28 @@ pub const MORTAR_MIN_RANGE_TILES: u32 = 5;
 pub const MORTAR_FIELD_OF_FIRE_RAD: f32 = std::f32::consts::TAU;
 pub const MORTAR_MANUAL_SHELL_DELAY_TICKS: u32 = 47;
 pub const MORTAR_OUTER_RADIUS_TILES: f32 = 2.0;
+/// Cosmetic blast-core radius only; damage has no inner band.
 pub const MORTAR_INNER_RADIUS_TILES: f32 = 0.5;
-pub const MORTAR_OUTER_DAMAGE: u32 = 40;
+/// Damage at the outer radius, before armor and protection modifiers.
+pub const MORTAR_OUTER_DAMAGE: u32 = 10;
+/// Peak damage at the impact point.
 pub const MORTAR_INNER_DAMAGE: u32 = 100;
+
+/// Rounded inverse-square splash, measured from impact to target center in tiles.
+/// The endpoint ratio fixes the curvature: 100 / (1 + 2.25 * distance_tiles^2).
+/// Round base damage once before the existing armor/entrenchment/terrain pipeline.
+pub fn mortar_damage_at_distance_squared(distance_squared_tiles: f32) -> u32 {
+    let outer_squared = MORTAR_OUTER_RADIUS_TILES * MORTAR_OUTER_RADIUS_TILES;
+    if !distance_squared_tiles.is_finite()
+        || distance_squared_tiles < 0.0
+        || distance_squared_tiles > outer_squared
+    {
+        return 0;
+    }
+    let curvature = MORTAR_INNER_DAMAGE as f32 / MORTAR_OUTER_DAMAGE as f32 - 1.0;
+    (MORTAR_INNER_DAMAGE as f32 / (1.0 + curvature * (distance_squared_tiles / outer_squared)))
+        .round() as u32
+}
 
 pub const ANTI_TANK_GUN_DEPLOYED_RANGE_TILES: u32 = 20;
 pub const ANTI_TANK_GUN_FIELD_OF_FIRE_RAD: f32 = 40.0_f32 * std::f32::consts::PI / 180.0;
@@ -69,6 +88,38 @@ pub const fn support_weapon_teardown_ticks(kind: EntityKind) -> Option<u16> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn mortar_inverse_square_has_requested_endpoints_and_no_inner_plateau() {
+        for (distance, expected) in [
+            (0.0, 100),
+            (0.25, 88),
+            (0.5, 64),
+            (0.75, 44),
+            (1.0, 31),
+            (1.25, 22),
+            (1.5, 16),
+            (1.75, 13),
+            (2.0, 10),
+            (2.001, 0),
+        ] {
+            assert_eq!(
+                mortar_damage_at_distance_squared(distance * distance),
+                expected,
+                "distance={distance} tiles"
+            );
+        }
+        let mut previous = MORTAR_INNER_DAMAGE;
+        for step in 0..=2000 {
+            let distance = step as f32 / 1000.0;
+            let damage = mortar_damage_at_distance_squared(distance * distance);
+            assert!((MORTAR_OUTER_DAMAGE..=previous).contains(&damage));
+            previous = damage;
+        }
+        for invalid in [-1.0, f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            assert_eq!(mortar_damage_at_distance_squared(invalid), 0);
+        }
+    }
 
     #[test]
     fn support_weapon_transition_timing_is_kind_specific() {
