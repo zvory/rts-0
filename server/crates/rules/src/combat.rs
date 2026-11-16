@@ -143,7 +143,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
     },
     WeaponProfile {
         id: WeaponKind::WarriorSword,
-        range_tiles: 0.5,
+        range_tiles: 0.75,
         dmg: 23,
         cooldown: 64,
         weapon_class: WeaponClass::SmallArms,

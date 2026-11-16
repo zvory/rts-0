@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 6] = [
+pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 7] = [
     AbilityCatalogEntry {
         kind: AbilityKind::EvolveLightness,
         label: "Dao of Lightness",
@@ -78,5 +78,12 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 6] = [
         cost: ResourceCost::new(0, 0), tech_requirement: None, upgrade_requirement: None,
         queue_policy: AbilityQueuePolicy::QueueSkipIfNotReady, autocast: false, command_card: true,
         protocol_code: 17, order_stage_code: 25,
+    },
+    AbilityCatalogEntry {
+        kind: AbilityKind::ThrowSword, label: "Throw Sword", icon: "⚔", hotkey: Some("E"),
+        title: "Throw a spinning sword out and back; deals 40 damage outbound and 80 on return",
+        carriers: &[EntityKind::Warrior], target_mode: AbilityTargetMode::WorldPoint,
+        protocol_code: 18, order_stage_code: 26,
+        ..EKAT_ABILITIES[1]
     },
 ];

@@ -2,7 +2,7 @@
 
 Phase 0/1 briefs and rules (completed before implementation): each path is a permanent
 specialization of the existing Disciple, retaining its entity identity, orders, cost,
-supply (2), sight, size, melee range and ordinary ground pathing. No additional
+supply (2), sight, size, and ordinary ground pathing. All Disciples share a 0.75-tile melee reach (increased from 0.5 by 0.25 tiles to better cover the extended sword animation). No additional
 training source or build time. A Dao button assigns its path to every selected, owned, unevolved Disciple, even before
 research or insight are ready. Selecting another path replaces the pending choice. This
 entity-owned intent is independent of orders: moving, attacking, Stop, and queued orders
@@ -57,3 +57,12 @@ Kriegsia with no Dao research. Setup imports that change player metadata resend
 authoritative start payloads to every viewer so faction/team rosters and command cards
 refresh together with the restored simulation. Imports with unchanged rosters retain
 the existing match and snapshot sequence. Mixed-faction Lab support is outside this change.
+
+War Disciples gain **Throw Sword** (E): a world-point aimed spinning sword using
+Line Shot's six-tile range, 0.6-tile width, eight pixels per tick travel, free cost,
+and 20-second cooldown. Each enemy targetable can be hit once per leg: 40 damage
+outbound and 80 returning, with the existing terrain and Shield reductions. The sword
+tracks its living caster on return and expires on caster death or the shared projectile
+lifetime limit. Other Dao paths and unevolved Disciples cannot cast it. Its separate
+`throwSword` identity uses the existing fog-filtered line-projectile projection; no caster
+lookup is needed to display the generated sword sprite. Ekat's Line Shot is unchanged.

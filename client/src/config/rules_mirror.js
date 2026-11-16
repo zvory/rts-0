@@ -5,6 +5,22 @@
 import { ABILITY, KIND, UPGRADE } from "../protocol.js";
 import { TICK_HZ } from "./timing.js";
 
+// Carrier identity includes permanent Dao specialization, independently of cooldown/readiness.
+export function abilityCarriedByEntity(definition, entity) {
+  if (!definition?.carriers?.includes(entity.kind)) return false;
+  if (entity.kind !== KIND.WARRIOR) return true;
+  switch (definition.ability) {
+    case ABILITY.EVOLVE_LIGHTNESS:
+    case ABILITY.EVOLVE_WAR:
+    case ABILITY.EVOLVE_MAGIC: return !entity.dao;
+    case ABILITY.THROW_SWORD: return entity.dao === "war";
+    case ABILITY.EKAT_TELEPORT: return entity.dao === "lightness";
+    case ABILITY.EKAT_MAGIC_ANCHOR:
+    case ABILITY.DISCIPLE_SHIELD: return entity.dao === "magic";
+    default: return true;
+  }
+}
+
 // Mirrors server/src/config.rs *_BODY_* values. Server collision is authoritative;
 // the client uses these only for art, selection, and advisory placement previews.
 export const TANK_BODY = Object.freeze({
@@ -140,7 +156,7 @@ export const STATS = Object.freeze({
     upgradeRequires: UPGRADE.PANZERFAUSTS,
     description: `Rifle infantry carrying one disposable ${PANZERFAUST_RANGE_TILES}-tile anti-vehicle shot. After launching it, the unit keeps fighting as ordinary rifle infantry.` },
   [KIND.WARRIOR]: { armored: false, label: "Disciple", icon: "DI", size: 13.5, sight: 11,
-    rangeTiles: 0.5, cost: { steel: 100, oil: 0 }, supply: 2, buildTicks: 300,
+    rangeTiles: 0.75, cost: { steel: 100, oil: 0 }, supply: 2, buildTicks: 300,
     description: "Durable melee infantry with a short sword reach and 50% armor penetration. Slow attacks deal heavy damage." },
   [KIND.MACHINE_GUNNER]: { armored: false, label: "Machine Gunner", icon: "MG", size: 10, sight: 11,
     rangeTiles: 6.1, cost: { steel: 75, oil: 10 }, supply: 2, buildTicks: 400, requires: KIND.TRAINING_CENTRE },
@@ -410,6 +426,23 @@ export const ABILITIES = Object.freeze({
     rangeTiles: EKAT_TELEPORT_RANGE_TILES,
     cooldownTicks: EKAT_TELEPORT_COOLDOWN_TICKS,
     cost: Object.freeze({ steel: 0, oil: 0 }),
+    queued: true,
+    queuePolicy: "skipIfNotReady",
+  }),
+  [ABILITY.THROW_SWORD]: Object.freeze({
+    ability: ABILITY.THROW_SWORD,
+    label: "Throw Sword",
+    icon: "⚔",
+    hotkey: "E",
+    title: "Throw a spinning sword out and back; deals 40 damage outbound and 80 on return",
+    carriers: Object.freeze([KIND.WARRIOR]),
+    targetMode: "worldPoint",
+    rangeTiles: EKAT_LINE_SHOT_RANGE_TILES,
+    cooldownTicks: EKAT_LINE_SHOT_COOLDOWN_TICKS,
+    cost: Object.freeze({ steel: 0, oil: 0 }),
+    radiusTiles: EKAT_LINE_SHOT_WIDTH_TILES * 0.5,
+    speedPxPerTick: EKAT_LINE_SHOT_SPEED_PX_PER_TICK,
+    damage: EKAT_LINE_SHOT_DAMAGE,
     queued: true,
     queuePolicy: "skipIfNotReady",
   }),

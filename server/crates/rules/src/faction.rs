@@ -107,6 +107,7 @@ pub enum AbilityKind {
     EvolveWar,
     EvolveMagic,
     DiscipleShield,
+    ThrowSword,
 }
 
 impl AbilityKind {
@@ -128,6 +129,7 @@ impl AbilityKind {
         Self::EvolveWar,
         Self::EvolveMagic,
         Self::DiscipleShield,
+        Self::ThrowSword,
     ];
 
     pub const fn stable_id(self) -> &'static str {
@@ -149,6 +151,7 @@ impl AbilityKind {
             Self::EvolveWar => "evolveWar",
             Self::EvolveMagic => "evolveMagic",
             Self::DiscipleShield => "discipleShield",
+            Self::ThrowSword => "throwSword",
         }
     }
 
@@ -1048,6 +1051,7 @@ pub fn ability_definition(kind: AbilityKind) -> AbilityCatalogEntry {
         AbilityKind::EvolveWar => CULTIVATOR_ABILITIES[1],
         AbilityKind::EvolveMagic => CULTIVATOR_ABILITIES[2],
         AbilityKind::DiscipleShield => CULTIVATOR_ABILITIES[5],
+        AbilityKind::ThrowSword => CULTIVATOR_ABILITIES[6],
     }
 }
 

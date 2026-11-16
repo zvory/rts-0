@@ -89,6 +89,7 @@ pub(in crate::game) fn planner_code(kind: AbilityKind) -> u16 {
         AbilityKind::EvolveWar => 14,
         AbilityKind::EvolveMagic => 15,
         AbilityKind::DiscipleShield => 16,
+        AbilityKind::ThrowSword => 17,
     }
 }
 
@@ -111,6 +112,7 @@ pub(in crate::game) fn from_planner_code(code: u16) -> Option<AbilityKind> {
         14 => Some(AbilityKind::EvolveWar),
         15 => Some(AbilityKind::EvolveMagic),
         16 => Some(AbilityKind::DiscipleShield),
+        17 => Some(AbilityKind::ThrowSword),
 
         _ => None,
     }
@@ -130,7 +132,7 @@ pub fn effect_hook(kind: AbilityKind) -> AbilityEffectHook {
         AbilityKind::ScoutPlane => AbilityEffectHook::ScoutPlane,
         AbilityKind::DismissScoutPlane => AbilityEffectHook::ReservedNoop,
         AbilityKind::EkatTeleport => AbilityEffectHook::DashReturn,
-        AbilityKind::EkatLineShot => AbilityEffectHook::LineProjectile,
+        AbilityKind::EkatLineShot | AbilityKind::ThrowSword => AbilityEffectHook::LineProjectile,
         AbilityKind::EkatMagicAnchor => AbilityEffectHook::MagicAnchor,
         AbilityKind::DiscipleShield => AbilityEffectHook::Shield,
         AbilityKind::EkatConsumeGolem => AbilityEffectHook::ConsumeGolem,

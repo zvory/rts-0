@@ -239,6 +239,7 @@ fn world_ability_can_execute_without_interrupt(ability: AbilityKind) -> bool {
         AbilityKind::Smoke
             | AbilityKind::EkatTeleport
             | AbilityKind::EkatLineShot
+            | AbilityKind::ThrowSword
             | AbilityKind::EkatMagicAnchor
     )
 }
@@ -250,6 +251,7 @@ fn world_ability_may_interrupt_active_order(ability: AbilityKind) -> bool {
             | AbilityKind::Barrage
             | AbilityKind::EkatTeleport
             | AbilityKind::EkatLineShot
+            | AbilityKind::ThrowSword
             | AbilityKind::EkatMagicAnchor
     )
 }

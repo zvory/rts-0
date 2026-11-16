@@ -711,6 +711,13 @@ fn print_ability_effects(indent: &str) {
         balance::EKAT_LINE_SHOT_DAMAGE,
     );
     println!(
+        "{indent}    \"{}\": {{\"radiusTiles\":{},\"speedPxPerTick\":{},\"damage\":{}}},",
+        faction::AbilityKind::ThrowSword.stable_id(),
+        json_f32(balance::EKAT_LINE_SHOT_WIDTH_TILES * 0.5),
+        json_f32(balance::EKAT_LINE_SHOT_SPEED_PX_PER_TICK),
+        balance::EKAT_LINE_SHOT_DAMAGE,
+    );
+    println!(
         "{indent}    \"{}\": {{\"radiusTiles\":{},\"durationTicks\":{},\"pullAwayMultiplier\":{},\"pullTowardMultiplier\":{}}},",
         faction::EKAT_MAGIC_ANCHOR_ABILITY,
         json_f32(balance::EKAT_MAGIC_ANCHOR_RADIUS_TILES),

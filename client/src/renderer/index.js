@@ -1,4 +1,5 @@
 import { drawTankPointPreview } from "./tank_point_preview.js";
+import { ThrowSwordVisuals } from "./throw_sword_visuals.js";
 import { RocketTruckVisuals } from "./rocket_truck_visuals.js";
 import { gfxNoFill, gfxRect, gfxReset, gfxFill, gfxStroke } from "./native_graphics.js";
 // Renderer — PixiJS scene graph + per-frame drawing. See docs/design/client-ui.md §4.1 / §4.2.
@@ -288,6 +289,10 @@ export class Renderer {
     this._abilityObjectGfx = new PIXI.Graphics();
     this.layers.smokes.addChild(this._abilityObjectGfx);
     this._lineProjectileTrails = new Map();
+    this._throwSwordVisuals = new ThrowSwordVisuals({
+      pixi: PIXI, layer: this.layers.smokes,
+      trackAsset: (id, promise, metadata) => this._trackVisualAsset(id, promise, metadata),
+    });
     this._placementGfx = new PIXI.Graphics();
     this.layers.placement.addChild(this._placementGfx);
     this._labRulerOverlay = new LabRulerOverlay({
@@ -1330,6 +1335,7 @@ export class Renderer {
     // Long-lived single Graphics.
     this._fogGfx.destroy();
     this._rocketTruckVisuals?.destroy();
+    this._throwSwordVisuals?.destroy();
     this._feedbackGfx.destroy();
     this._observerMapAnalysisGfx.destroy();
     this._observerMapAnalysisHitLayer.destroy({ children: true });

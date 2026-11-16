@@ -125,6 +125,7 @@ pub mod abilities {
     pub const EVOLVE_WAR: &str = "evolveWar";
     pub const EVOLVE_MAGIC: &str = "evolveMagic";
     pub const DISCIPLE_SHIELD: &str = "discipleShield";
+    pub const THROW_SWORD: &str = "throwSword";
 
     pub const ALL: &[&str] = &[
         CHARGE,
@@ -144,6 +145,7 @@ pub mod abilities {
         EVOLVE_WAR,
         EVOLVE_MAGIC,
         DISCIPLE_SHIELD,
+        THROW_SWORD,
     ];
 }
 
@@ -483,6 +485,7 @@ const ORDER_STAGE_CODES: &[(&str, u8)] = &[
     (abilities::EVOLVE_WAR, 23),
     (abilities::EVOLVE_MAGIC, 24),
     (abilities::DISCIPLE_SHIELD, 25),
+    (abilities::THROW_SWORD, 26),
 ];
 
 const ABILITY_CODES: &[(&str, u8)] = &[
@@ -503,6 +506,7 @@ const ABILITY_CODES: &[(&str, u8)] = &[
     (abilities::EVOLVE_WAR, 15),
     (abilities::EVOLVE_MAGIC, 16),
     (abilities::DISCIPLE_SHIELD, 17),
+    (abilities::THROW_SWORD, 18),
 ];
 
 const ABILITY_OBJECT_KIND_CODES: &[(&str, u8)] = &[
@@ -812,6 +816,7 @@ fn ability_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("EVOLVE_WAR", abilities::EVOLVE_WAR),
         ("EVOLVE_MAGIC", abilities::EVOLVE_MAGIC),
         ("DISCIPLE_SHIELD", abilities::DISCIPLE_SHIELD),
+        ("THROW_SWORD", abilities::THROW_SWORD),
     ])
 }
 
@@ -904,6 +909,7 @@ fn order_stage_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("EVOLVE_WAR", abilities::EVOLVE_WAR),
         ("EVOLVE_MAGIC", abilities::EVOLVE_MAGIC),
         ("DISCIPLE_SHIELD", abilities::DISCIPLE_SHIELD),
+        ("THROW_SWORD", abilities::THROW_SWORD),
         ("SETUP_ANTI_TANK_GUNS", "setupAntiTankGuns"),
     ])
 }
