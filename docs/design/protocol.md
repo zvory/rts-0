@@ -898,7 +898,7 @@ MessagePack compact binary snapshot frames are the live WebSocket snapshot path.
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
 `messagepack-compact`, codec version 1, compact snapshot version 59. The client also accepts compact
-snapshot versions 51 through 57: version 52 only appends a kind code, version 53 appends the
+snapshot versions 51 through 58: version 52 only appends a kind code, version 53 appends the
 optional `unitsKilled` entity slot, version 54 appends an optional `rocket` style bit to mortar
 launch/impact event records, and version 55 adds the `artilleryIncoming` event code, so the older
 record layouts remain safe to decode. Version 56 appends optional entity slot 43,
@@ -935,7 +935,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 58,
+  "v": 59,
   "gr": groundDecalRevision, // omitted when zero
   "gd": [afterRevision, [    // omitted when this tick has no discovered/created revision
     [id, decalClass, sourceKindCode, x, y, owner, seed, facing, weaponFacing, radiusTiles]

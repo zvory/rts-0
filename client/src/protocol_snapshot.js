@@ -26,9 +26,9 @@ import { decodeCompactEvent } from "./protocol_snapshot_events.js";
 import { decodeCompactTrenches } from "./protocol_snapshot_trenches.js";
 
 export function decodeCompactSnapshot(raw) {
-  // Versions 51-57 remain safe to decode: subsequent versions only append optional
+  // Versions 51-58 remain safe to decode: subsequent versions only append optional
   // fields and codes, preserving all existing event and entity record layouts.
-  if (raw.v !== COMPACT_SNAPSHOT_VERSION && raw.v !== 57 && raw.v !== 56 && raw.v !== 55 && raw.v !== 54 && raw.v !== 53 && raw.v !== 52 && raw.v !== 51) {
+  if (raw.v !== COMPACT_SNAPSHOT_VERSION && raw.v !== 58 && raw.v !== 57 && raw.v !== 56 && raw.v !== 55 && raw.v !== 54 && raw.v !== 53 && raw.v !== 52 && raw.v !== 51) {
     throw new Error(`unsupported compact snapshot version: ${raw.v}`);
   }
 
