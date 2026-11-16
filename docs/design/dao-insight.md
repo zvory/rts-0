@@ -58,7 +58,7 @@ authoritative start payloads to every viewer so faction/team rosters and command
 refresh together with the restored simulation. Imports with unchanged rosters retain
 the existing match and snapshot sequence. Mixed-faction Lab support is outside this change.
 
-War Disciples gain **Throw Sword** (X): a world-point aimed spinning sword using
+War Disciples gain **Throw Sword** (E): a world-point aimed spinning sword using
 Line Shot's six-tile range, 0.6-tile width, eight pixels per tick travel, free cost,
 and 20-second cooldown. Each enemy targetable can be hit once per leg: 40 damage
 outbound and 80 returning, with the existing terrain and Shield reductions. The sword

@@ -433,7 +433,7 @@ export const ABILITIES = Object.freeze({
     ability: ABILITY.THROW_SWORD,
     label: "Throw Sword",
     icon: "⚔",
-    hotkey: "X",
+    hotkey: "E",
     title: "Throw a spinning sword out and back; deals 40 damage outbound and 80 on return",
     carriers: Object.freeze([KIND.WARRIOR]),
     targetMode: "worldPoint",

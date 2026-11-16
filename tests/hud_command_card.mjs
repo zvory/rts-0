@@ -913,6 +913,10 @@ for (const researched of [false, true]) {
       assert.equal(slot.countBadge, "1/2");
     }
   }
+  const sword = card.slots.find((slot) => slot?.ability === ABILITY.THROW_SWORD);
+  assert(sword.enabled);
+  assert.equal(sword.hotkey, "E");
+  assert.deepEqual(sword.intent.readyIds, [3]);
   const changed = buildCommandCardDescriptors({ ...context,
     selection: selection.map((e) => e.id === 1 ? { ...e, chosenDao: "lightness" } : e) });
   assert.notEqual(changed.signature, card.signature);

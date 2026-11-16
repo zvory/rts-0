@@ -80,7 +80,7 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 7] = [
         protocol_code: 17, order_stage_code: 25,
     },
     AbilityCatalogEntry {
-        kind: AbilityKind::ThrowSword, label: "Throw Sword", icon: "⚔", hotkey: Some("X"),
+        kind: AbilityKind::ThrowSword, label: "Throw Sword", icon: "⚔", hotkey: Some("E"),
         title: "Throw a spinning sword out and back; deals 40 damage outbound and 80 on return",
         carriers: &[EntityKind::Warrior], target_mode: AbilityTargetMode::WorldPoint,
         protocol_code: 18, order_stage_code: 26,
