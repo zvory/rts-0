@@ -1284,7 +1284,7 @@ mod tests {
         assert_eq!(charge.cooldown_ticks, 0);
 
         let teleport = EKAT_CATALOG.ability(AbilityKind::EkatTeleport).unwrap();
-        assert_eq!(teleport.carriers, &[EntityKind::Ekat]);
+        assert_eq!(teleport.carriers, &[EntityKind::Ekat, EntityKind::Warrior]);
         assert_eq!(
             teleport.range_tiles,
             Some(balance::EKAT_TELEPORT_RANGE_TILES)
@@ -1298,7 +1298,7 @@ mod tests {
         );
 
         let anchor = EKAT_CATALOG.ability(AbilityKind::EkatMagicAnchor).unwrap();
-        assert_eq!(anchor.carriers, &[EntityKind::Ekat]);
+        assert_eq!(anchor.carriers, &[EntityKind::Ekat, EntityKind::Warrior]);
         assert_eq!(
             anchor.range_tiles,
             Some(balance::EKAT_MAGIC_ANCHOR_RANGE_TILES)
@@ -1366,7 +1366,16 @@ mod tests {
             .iter()
             .all(|group| catalog.allows_unit(group.kind) || catalog.allows_building(group.kind)));
         assert_eq!(catalog.upgrades, &CULTIVATORS_UPGRADES);
-        assert!(catalog.abilities.is_empty());
+        assert_eq!(catalog.abilities, &CULTIVATOR_ABILITIES);
+        for ability in [
+            AbilityKind::EvolveLightness,
+            AbilityKind::EvolveWar,
+            AbilityKind::EvolveReality,
+            AbilityKind::EkatTeleport,
+            AbilityKind::EkatMagicAnchor,
+        ] {
+            assert!(catalog.allows_ability(ability, EntityKind::Warrior));
+        }
     }
 
     #[test]
