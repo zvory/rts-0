@@ -53,7 +53,8 @@ const roomTaskChildLineBudgets = new Map(Object.entries({
 // for those focused additions.
 // Give-up and disconnect each record the authoritative removal before applying it; hash and
 // verification work stays outside the room actor in the replay runtime.
-const roomTaskTotalLineBudget = 6790;
+// Compare imported rosters before refreshing Lab viewers; unchanged rosters retain their session.
+const roomTaskTotalLineBudget = 6796;
 
 const lobbyRustFiles = listRustFiles(lobbySrc);
 

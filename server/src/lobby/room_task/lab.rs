@@ -915,6 +915,9 @@ impl RoomTask {
             return;
         }
 
+        let prior_roster = matches!(&op, LabClientOp::ImportScenario { .. })
+            .then(|| self.live_game().map(Game::player_inits))
+            .flatten();
         let mut refresh_snapshot_after_result = false;
         let result = match op {
             LabClientOp::SetVision { vision } => {
@@ -952,7 +955,9 @@ impl RoomTask {
             self.send_lab_result_to(player_id, result);
             if imported_setup {
                 self.ground_decal_request_times.clear();
-                self.send_lab_start_payloads_to_all(true);
+                if prior_roster != self.live_game().map(Game::player_inits) {
+                    self.send_lab_start_payloads_to_all(true);
+                }
             }
             if refresh_snapshot
                 && self.session_policy().clock.room_time_source() == Some(RoomTimeSource::Lab)

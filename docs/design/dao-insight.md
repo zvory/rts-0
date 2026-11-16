@@ -41,6 +41,7 @@ All visible viewers see the field; owner/privileged viewers receive its remainin
 
 Lab commands continue to use the selected owner’s faction and research. A Disciple
 spawned for a Kriegsia player can move but cannot evolve; the Dao preview’s P2 is
-Kriegsia with no Dao research. Setup imports now resend authoritative start payloads
-to every viewer so faction/team rosters and command cards refresh together with the
-restored simulation. Mixed-faction Lab support is outside this change.
+Kriegsia with no Dao research. Setup imports that change player metadata resend
+authoritative start payloads to every viewer so faction/team rosters and command cards
+refresh together with the restored simulation. Imports with unchanged rosters retain
+the existing match and snapshot sequence. Mixed-faction Lab support is outside this change.

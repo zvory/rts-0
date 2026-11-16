@@ -1016,7 +1016,7 @@ fn lab_timeline_resets_on_scenario_import() {
         99,
         43,
         LabClientOp::ImportScenario {
-            scenario: Box::new(scenario),
+            scenario: Box::new(scenario.clone()),
         },
     );
     let messages: Vec<_> = std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
@@ -1072,6 +1072,27 @@ fn lab_timeline_resets_on_scenario_import() {
             .operation_log
             .len(),
         3
+    );
+
+    let mut changed_roster = scenario;
+    let crate::protocol::LabScenarioPayload::Checkpoint(setup) = &mut changed_roster;
+    let mut checkpoint: serde_json::Value =
+        serde_json::from_str(&setup.checkpoint_payload).unwrap();
+    checkpoint["players"][0]["name"] = serde_json::json!("Restored player");
+    setup.checkpoint_payload = serde_json::to_string(&checkpoint).unwrap();
+    task.on_lab_request(
+        99,
+        44,
+        LabClientOp::ImportScenario {
+            scenario: Box::new(changed_roster),
+        },
+    );
+    let messages: Vec<_> = std::iter::from_fn(|| writer.reliable_rx.try_recv().ok()).collect();
+    let result_index = messages.iter().position(|msg| matches!(msg, ServerMessage::LabResult(result) if result.ok && result.request_id == 44)).expect("successful import result");
+    let start_index = messages.iter().position(|msg| matches!(msg, ServerMessage::Start(payload) if payload.players.iter().any(|p| p.name == "Restored player"))).expect("changed roster refreshes client start metadata");
+    assert!(
+        result_index < start_index,
+        "resolve the import request before rebuilding the viewer"
     );
 }
 
