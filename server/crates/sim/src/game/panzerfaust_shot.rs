@@ -144,6 +144,9 @@ fn resolve(
             combat::weapon_profile(combat::WeaponKind::PanzerfaustLoadedShot)
                 .is_some_and(combat::weapon_triggers_tank_armor_reaction);
         let damage = combat::panzerfaust_loaded_shot_damage(victim_kind, Some(TerrainKind::Open));
+        let damage = entities.get(shot.target).map_or(damage, |target| {
+            target.dao_damage_after_armor(damage, config::PANZERFAUST_ARMOR_PENETRATION)
+        });
         let damage = map.damage_after_reduction_tile(victim_pos.0, victim_pos.1, damage);
         let source_pos = (shot.source_x.to_world(), shot.source_y.to_world());
         let enemy_hit = teams.is_enemy_owner(shot.owner, victim_owner);

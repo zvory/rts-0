@@ -72,3 +72,57 @@ fn warrior_sword_applies_fifty_percent_armor_penetration() {
 
     assert_eq!(entities.get(tank).map(|unit| unit.hp), Some(278));
 }
+
+#[test]
+fn disciple_insight_counts_actual_hp_loss_and_caps_at_sixty() {
+    let mut entities = EntityStore::new();
+    let unit = entities
+        .spawn_unit(1, EntityKind::Warrior, 100.0, 100.0)
+        .unwrap();
+    let target = entities
+        .spawn_unit(2, EntityKind::Rifleman, 125.0, 100.0)
+        .unwrap();
+    entities.get_mut(target).unwrap().set_spawn_health(7);
+    entities
+        .get_mut(unit)
+        .unwrap()
+        .set_order(Order::attack(target));
+    run_combat_tick(&mut entities);
+    assert_eq!(
+        entities.get(unit).unwrap().insight,
+        7,
+        "overkill does not grant insight"
+    );
+    entities.get_mut(unit).unwrap().insight = 59;
+    entities
+        .get_mut(unit)
+        .unwrap()
+        .set_weapon_cooldown(combat_rules::WeaponKind::WarriorSword, 0);
+    entities.get_mut(target).unwrap().set_spawn_health(45);
+    run_combat_tick(&mut entities);
+    assert_eq!(entities.get(unit).unwrap().insight, 60);
+}
+
+#[test]
+fn war_armor_uses_weapon_penetration_and_lightness_changes_attack_rate() {
+    use crate::game::upgrade::UpgradeKind;
+    let mut unit =
+        crate::game::entity::Entity::new_unit(1, EntityKind::Warrior, 100.0, 100.0).unwrap();
+    unit.dao = Some(UpgradeKind::DaoOfHeaviness);
+    assert_eq!(unit.dao_damage_after_armor(100, 0.0), 50);
+    assert_eq!(unit.dao_damage_after_armor(100, 0.5), 75);
+    assert_eq!(unit.dao_damage_after_armor(100, 1.0), 100);
+    let war = effective_attack_profile(&unit);
+    assert_eq!(war.dmg, 35);
+    unit.dao = Some(UpgradeKind::DaoOfLightness);
+    let light = effective_attack_profile(&unit);
+    assert_eq!(light.cooldown, 43);
+    assert_eq!(
+        unit.movement_speed(),
+        crate::config::unit_stats(EntityKind::ScoutCar)
+            .unwrap()
+            .speed
+    );
+    unit.dao = Some(UpgradeKind::DaoOfBarriers);
+    assert!((unit.movement_speed() - 1.76).abs() < 0.001);
+}

@@ -196,6 +196,23 @@ fn validate_entity(
         });
     }
     entities::validate_ownership(entity)?;
+    if entity.insight > config::DISCIPLE_INSIGHT_REQUIRED
+        || (entity.kind != crate::game::entity::EntityKind::Warrior
+            && (entity.insight != 0 || entity.dao.is_some()))
+        || entity.dao.is_some_and(|dao| {
+            !matches!(
+                dao,
+                crate::game::upgrade::UpgradeKind::DaoOfLightness
+                    | crate::game::upgrade::UpgradeKind::DaoOfHeaviness
+                    | crate::game::upgrade::UpgradeKind::DaoOfBarriers
+            )
+        })
+        || (entity.dao.is_some() && entity.insight != config::DISCIPLE_INSIGHT_REQUIRED)
+    {
+        return Err(CheckpointPayloadError::InvalidValue {
+            field: "entities.dao",
+        });
+    }
     if !in_world(entity.pos_x(), entity.pos_y(), world) {
         return Err(CheckpointPayloadError::InvalidValue {
             field: "entities.position",

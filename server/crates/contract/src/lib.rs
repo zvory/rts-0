@@ -882,6 +882,10 @@ pub struct EntityView {
     /// Enemy units killed by this unit. Omitted for buildings and resource nodes.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub units_killed: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub insight: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dao: Option<String>,
 
     /// Visible physical rounds on a Rocket Truck rack, including zero while reloading.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -997,6 +1001,8 @@ impl EntityView {
             max_hp,
             state: state.to_string(),
             units_killed: None,
+            insight: None,
+            dao: None,
             rocket_rack_count: None,
             facing: None,
             weapon_facing: None,

@@ -323,7 +323,7 @@ function decodeCompactPlayerResource(record, index) {
 }
 
 function decodeCompactEntity(record, index) {
-  const fields = readArray(record, `entity ${index}`, 45);
+  const fields = readArray(record, `entity ${index}`, 47);
   if (fields.length < 8) throw new Error(`entity ${index} is too short`);
   const entity = {
     id: readU32(fields[0], "entity.id"),
@@ -373,6 +373,8 @@ function decodeCompactEntity(record, index) {
   assignOptional(entity, "unitsKilled", fields, 42, readU32);
   assignOptional(entity, "rocketRackCount", fields, 43, readU32);
   assignOptional(entity, "commanderFacing", fields, 44, readNumber);
+  assignOptional(entity, "insight", fields, 45, readU32);
+  assignOptional(entity, "dao", fields, 46, readString);
   return entity;
 }
 

@@ -695,3 +695,18 @@ function ekatCard() {
 }
 
 assert.equal(createClassicPreset(buildHotkeyCommandCatalog(buildCommandCardContextCatalog())).bindings["unit.pointTanks"], "KeyO");
+
+{
+  const profiles = service();
+  const card = buildCommandCardDescriptors({
+    playerId: 1, factionId: "cultivators",
+    selection: [{ id: 600, owner: 1, kind: KIND.WARRIOR, insight: 60 }],
+    resources: { steel: 1000, oil: 1000 },
+    upgrades: [UPGRADE.DAO_OF_LIGHTNESS, UPGRADE.DAO_OF_HEAVINESS, UPGRADE.DAO_OF_BARRIERS],
+    groupCooldownClocks: () => [], playerHasCompleteKind: () => true,
+  });
+  const classic = profiles.presets.find((p) => p.id === HOTKEY_PRESET_CLASSIC);
+  assert.deepEqual(profiles.resolveCard(card, classic).slots.slice(6).map((s) => s.hotkey), ["L", "W", "R"]);
+  const grid = profiles.presets.find((p) => p.id === HOTKEY_PRESET_GRID);
+  assert.deepEqual(profiles.resolveCard(card, grid).slots.slice(6).map((s) => s.hotkey), ["Z", "X", "C"]);
+}

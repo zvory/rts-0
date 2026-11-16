@@ -2808,3 +2808,12 @@ When that launch produces an all-AI live match, the score screen retains the liv
 through automatic post-match replay playback and renders it as an Observation ID. The id is the
 handoff key for replay recovery and server lag-log inspection; it is not a player identity or a
 new gameplay control.
+
+### Disciple insight presentation
+
+Disciple insight and Dao fields pass through the detached presentation entity snapshot
+to the Pixi worker. A blue-on-red insight bar appears below HP; evolved paths use centered,
+black-outlined yellow chevrons, a neon-red sword rotated 90 degrees and lengthened 20%,
+or a green pentagram. The selected unit shows
+exact insight and Dao. Evolution occupies grid Z/X/C; classic L/W/R. See
+[Dao evolution rules](dao-insight.md).

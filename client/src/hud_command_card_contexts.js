@@ -1,5 +1,5 @@
-import { EKAT_FACTION_ID } from "./config.js";
-import { ABILITY, KIND } from "./protocol.js";
+import { CULTIVATORS_FACTION_ID, EKAT_FACTION_ID } from "./config.js";
+import { ABILITY, KIND, UPGRADE } from "./protocol.js";
 
 /** Representative rendered Ekat cards for hotkey-profile validation. */
 export function buildEkatCommandCardContextSamples(buildCard) {
@@ -30,5 +30,30 @@ export function buildEkatCommandCardContextSamples(buildCard) {
   return [
     { id: "ekat-unit", card: buildCard(ctx([ekat])) },
     { id: "ekat-zamok-train", card: buildCard(ctx([zamok])) },
+  ];
+}
+
+/** Cultivator commands must be registered for both preset and custom hotkey profiles. */
+export function buildCultivatorCommandCardContextSamples(buildCard) {
+  const disciple = { id: 20, owner: 1, kind: KIND.WARRIOR, insight: 60 };
+  const worker = { id: 21, owner: 1, kind: KIND.WORKER };
+  const ctx = (selection) => ({
+    playerId: 1, factionId: CULTIVATORS_FACTION_ID, selection,
+    entities: selection, resources: { steel: 1000, oil: 1000 },
+    upgrades: [UPGRADE.DAO_OF_LIGHTNESS, UPGRADE.DAO_OF_HEAVINESS, UPGRADE.DAO_OF_BARRIERS],
+    groupCooldownClocks: () => [], playerHasCompleteKind: () => true,
+  });
+  const unitCards = [null, "lightness", "war", "reality"].map((dao) => ({
+    id: `cultivators-disciple-${dao || "base"}`,
+    card: buildCard(ctx([{ ...disciple, dao }])),
+  }));
+  return [
+    ...unitCards,
+    { id: "cultivators-worker", card: buildCard(ctx([worker])) },
+    { id: "cultivators-build", card: buildCard({ ...ctx([worker]), commandCardMode: "workerBuild" }) },
+    ...[KIND.RESOURCE_DEPOT, KIND.PORTAL, KIND.THREE_DAO_PAVILION].map((kind, i) => ({
+      id: `cultivators-producer-${kind}`,
+      card: buildCard({ ...ctx([{ id: 22 + i, owner: 1, kind }]), upgrades: [] }),
+    })),
   ];
 }

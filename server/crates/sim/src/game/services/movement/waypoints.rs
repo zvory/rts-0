@@ -150,7 +150,7 @@ pub(super) fn advance_moving_units(
         };
         let mut speed = config::unit_stats(kind)
             .map(|s| {
-                s.speed
+                entities.get(id).map_or(s.speed, |e| e.movement_speed())
                     * speed_multiplier
                     * if tank_plus {
                         config::TANK_PLUS_SPEED_MULTIPLIER
