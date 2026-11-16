@@ -1,3 +1,4 @@
+import { createMinimapAnimation } from "../../client/src/renderer/rigs/minimap_animation.js";
 import { assert } from "./assertions.mjs";
 import { KIND, SETUP, STATE, WEAPON_KIND } from "../../client/src/protocol.js";
 import {
@@ -413,4 +414,40 @@ function frameStripMovementFor(entity, previous, current, motion = new Map(), ti
       tick,
     },
   );
+}
+
+// Move orders can remain active while a disciple waits in a crowd. Its minimap
+// pose follows displacement, including movement during attack pursuit.
+{
+  const animation = createMinimapAnimation();
+  const disciple = { id: 6, kind: KIND.WARRIOR, x: 100, y: 100,
+    state: STATE.MOVE, facing: 0.4, weaponFacing: 1.2 };
+  const state = { tick: 1, _prevById: new Map([[6, { x: 100, y: 100 }]]),
+    _curById: new Map([[6, { x: 100, y: 100 }]]) };
+  const sample = now => {
+    animation.beginFrame([disciple], state, now);
+    return animation.layers(disciple)[0];
+  };
+  for (const now of [0, 125, 300, 1000]) {
+    assert(sample(now).part === "frame:0", "stationary disciple with move order holds minimap idle pose");
+  }
+  state.tick++;
+  state._curById.set(6, { x: 104, y: 100 }); disciple.x = 104;
+  assert(sample(1100).part !== "frame:0", "moving disciple walks on minimap");
+  assert(sample(2000).part === "frame:0", "stale movement sample cannot animate forever");
+  disciple.state = STATE.ATTACK;
+  state.tick++; state._prevById.set(6, { x: 104, y: 100 });
+  state._curById.set(6, { x: 108, y: 100 }); disciple.x = 108;
+  assert(sample(2100).part !== "frame:0", "disciple pursuit walks on minimap");
+  state.tick++; state._prevById.set(6, { x: 108, y: 100 });
+  assert(sample(3000).part === "frame:0", "stopped pursuit returns to idle on minimap");
+  state.weaponRecoil = () => 1;
+  state.weaponRecoilPhase = () => 0.2;
+  state.weaponRecoilKind = () => WEAPON_KIND.WARRIOR_SWORD;
+  assert(sample(3100).part === "frame:5", "stationary disciple still shows its sword attack");
+  animation.beginFrame([], state, 3200);
+  delete state.weaponRecoil; delete state.weaponRecoilPhase; delete state.weaponRecoilKind;
+  disciple.state = STATE.MOVE;
+  assert(sample(3300).part === "frame:0", "returning disciple does not inherit removed motion");
+  animation.destroy();
 }
