@@ -94,6 +94,86 @@ fn fixed_mortar_shell_checkpoint_defaults_to_already_launched() {
 }
 
 #[test]
+fn mortar_falloff_resolves_distance_armor_entrenchment_and_friendly_fire() {
+    let map = open_map(20);
+    let teams = TeamRelations::from_player_teams([(1, 1), (2, 2)]);
+    for (distance_tiles, base) in [
+        (0.0, 100),
+        (0.25, 88),
+        (0.5, 64),
+        (0.75, 44),
+        (1.0, 31),
+        (1.25, 22),
+        (1.5, 16),
+        (2.0, 10),
+        (2.001, 0),
+    ] {
+        for (kind, entrenched) in [
+            (EntityKind::Artillery, false),
+            (EntityKind::Tank, false),
+            (EntityKind::Rifleman, false),
+            (EntityKind::MachineGunner, false),
+            (EntityKind::Rifleman, true),
+            (EntityKind::MachineGunner, true),
+        ] {
+            for owner in [1, 2] {
+                let mut entities = EntityStore::new();
+                let victim = entities.spawn_unit(owner, kind, 160.0, 160.0).unwrap();
+                if entrenched {
+                    entities
+                        .get_mut(victim)
+                        .unwrap()
+                        .movement
+                        .as_mut()
+                        .unwrap()
+                        .occupied_trench_id = Some(1);
+                }
+                let before = entities.get(victim).unwrap().hp;
+                let fog = visible_team_fog(&map, &entities);
+                let mut events = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
+                let mut firing_reveals = Vec::new();
+                let shell = MortarShell {
+                    owner: 1,
+                    attacker: 0,
+                    x: Coord::from_world(160.0),
+                    y: Coord::from_world(160.0 + distance_tiles * config::TILE_SIZE as f32),
+                    from_x: Coord::from_world(100.0),
+                    from_y: Coord::from_world(100.0),
+                    launch_tick: 0,
+                    impact_tick: 0,
+                    launched: true,
+                    rocket: false,
+                };
+                resolve(
+                    MortarResolutionContext {
+                        entities: &mut entities,
+                        teams: &teams,
+                        fog: &fog,
+                        map: &map,
+                        events: &mut events,
+                        firing_reveals: &mut firing_reveals,
+                        tick: 10,
+                    },
+                    &shell,
+                );
+                let damage = if kind == EntityKind::Tank {
+                    base / 4
+                } else if entrenched {
+                    (base as f32 * 0.75).round() as u32
+                } else {
+                    base
+                };
+                assert_eq!(
+                    entities.get(victim).unwrap().hp,
+                    before.saturating_sub(damage),
+                    "distance={distance_tiles}, kind={kind:?}, entrenched={entrenched}, owner={owner}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn rocket_damage_preserves_unit_damage_but_is_reduced_against_buildings() {
     let inner2 = (config::ROCKET_BARRAGE_INNER_RADIUS_TILES * config::TILE_SIZE as f32).det_powi(2);
     let inner = shell_damage(true, 0.0, inner2, false);

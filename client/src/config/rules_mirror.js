@@ -76,6 +76,7 @@ export const MORTAR_RANGE_TILES = 17;
 export const MORTAR_MIN_RANGE_TILES = 5;
 export const MORTAR_FIELD_OF_FIRE_RAD = Math.PI * 2;
 export const MORTAR_OUTER_RADIUS_TILES = 2;
+// Cosmetic blast-core size; server damage now falls off continuously.
 export const MORTAR_INNER_RADIUS_TILES = 0.5;
 export const MORTAR_FIRE_COOLDOWN_TICKS = TICK_HZ * 6;
 export const PANZERFAUST_RANGE_TILES = 5;

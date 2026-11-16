@@ -943,8 +943,8 @@ fn manual_mortar_fire_has_no_armor_piercing_in_either_splash_radius() {
     );
     assert_eq!(
         armored_outer_hp_before - armored_outer_hp_after,
-        config::MORTAR_OUTER_DAMAGE / 4,
-        "outer mortar splash should receive the standard non-piercing armor reduction"
+        5,
+        "22 base damage at 1.25 tiles should receive the standard non-piercing armor reduction"
     );
     assert_eq!(
         armored_outside_hp_before, armored_outside_hp_after,

@@ -316,11 +316,7 @@ fn resolve(context: MortarResolutionContext<'_>, shell: &MortarShell) {
     } else {
         config::MORTAR_OUTER_RADIUS_TILES
     } * config::TILE_SIZE as f32;
-    let inner_radius = if shell.rocket {
-        config::ROCKET_BARRAGE_INNER_RADIUS_TILES
-    } else {
-        config::MORTAR_INNER_RADIUS_TILES
-    } * config::TILE_SIZE as f32;
+    let inner_radius = config::ROCKET_BARRAGE_INNER_RADIUS_TILES * config::TILE_SIZE as f32;
     let ap_radius2 =
         (config::ROCKET_BARRAGE_AP_RADIUS_TILES * config::TILE_SIZE as f32).det_powi(2);
     let outer2 = outer_radius * outer_radius;
@@ -442,11 +438,8 @@ fn mortar_damage(victim_kind: EntityKind, base: u32) -> u32 {
 
 fn shell_damage(rocket: bool, d2: f32, inner2: f32, piercing_hit: bool) -> u32 {
     if !rocket {
-        return if d2 <= inner2 {
-            config::MORTAR_INNER_DAMAGE
-        } else {
-            config::MORTAR_OUTER_DAMAGE
-        };
+        let tile_size = config::TILE_SIZE as f32;
+        return config::mortar_damage_at_distance_squared(d2 / (tile_size * tile_size));
     }
     if piercing_hit {
         config::ROCKET_BARRAGE_DIRECT_DAMAGE
