@@ -312,18 +312,13 @@ function decodeCompactPlayerResource(record, index) {
     supplyUsed: readU32(fields[3], "playerResource.supplyUsed"),
     supplyCap: readU32(fields[4], "playerResource.supplyCap"),
     apm: readU32(fields[5], "playerResource.apm"),
-    upgrades: readOptionalArray(fields[6], `playerResource ${index}.upgrades`, 32).map(
-      (code, upgradeIndex) => readCode(
-        code,
-        UPGRADE_BY_CODE,
-        `playerResource.${index}.upgrade.${upgradeIndex}`,
-      ),
-    ),
+    upgrades: readOptionalArray(fields[6], `playerResource ${index}.upgrades`, 32)
+      .map((code, i) => readCode(code, UPGRADE_BY_CODE, `playerResource.${index}.upgrade.${i}`)),
   };
 }
 
 function decodeCompactEntity(record, index) {
-  const fields = readArray(record, `entity ${index}`, 47);
+  const fields = readArray(record, `entity ${index}`, 49);
   if (fields.length < 8) throw new Error(`entity ${index} is too short`);
   const entity = {
     id: readU32(fields[0], "entity.id"),
@@ -375,6 +370,8 @@ function decodeCompactEntity(record, index) {
   assignOptional(entity, "commanderFacing", fields, 44, readNumber);
   assignOptional(entity, "insight", fields, 45, readU32);
   assignOptional(entity, "dao", fields, 46, readString);
+  assignOptional(entity, "daoReady", fields, 47, readBool);
+  assignOptional(entity, "daoAdvanceTicks", fields, 48, readU32);
   return entity;
 }
 

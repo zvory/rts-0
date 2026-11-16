@@ -200,7 +200,17 @@ impl AbilityRuntime {
         }
     }
 
-    fn allocate_id(&mut self) -> AbilityRuntimeObjectId {
+    pub(in crate::game) fn valid_external_object_id(&self, id: u32) -> bool {
+        id > 0
+            && id < self.next_id
+            && self.world_objects.get(id).is_none()
+            && !self
+                .instances
+                .iter()
+                .any(|instance| instance.id.get() == id)
+    }
+
+    pub(in crate::game) fn allocate_id(&mut self) -> AbilityRuntimeObjectId {
         let id = AbilityRuntimeObjectId(self.next_id);
         self.next_id = self.next_id.wrapping_add(1).max(1);
         id

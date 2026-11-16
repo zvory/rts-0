@@ -1,5 +1,5 @@
 {
-  "reason": "Extract existing manual front payment into production/manual.rs so human purchases run before repeat admission; construction exposes read-only ready-purchase facts to systems.rs. No new state owner or service dependency.",
+  "reason": "Dao Shield adds a world-point dispatch in ability_orders.rs; keep all other architecture ratchets unchanged.",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -391,7 +391,7 @@
     },
     {
       "path": "services/ability_orders.rs",
-      "lines": 936
+      "lines": 1048
     },
     {
       "path": "services/artillery_attack_move.rs",

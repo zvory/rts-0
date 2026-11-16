@@ -110,6 +110,71 @@ impl EntityStore {
         self.map.get_mut(&id)
     }
 
+    pub(in crate::game) fn can_place_shield(&self, caster: u32) -> bool {
+        self.get(caster).is_some_and(|e| e.shield.is_some())
+            || self.map.values().filter(|e| e.shield.is_some()).count()
+                < crate::game::ability_runtime::MAX_ACTIVE_ABILITY_OBJECTS
+    }
+
+    /// Consume shared shield pools before applying hostile damage. Stable caster order
+    /// makes overlapping shields deterministic; each point is absorbed only once.
+    pub(in crate::game) fn shielded_damage(
+        &mut self,
+        victim: u32,
+        attacker_owner: u32,
+        mut damage: u32,
+        teams: &crate::game::teams::TeamRelations,
+    ) -> u32 {
+        let Some(target) = self.get(victim) else {
+            return damage;
+        };
+        if !target.is_unit()
+            || target.hp == 0
+            || target.invulnerable()
+            || !teams.is_enemy_owner(attacker_owner, target.owner)
+        {
+            return damage;
+        }
+        let (owner, x, y) = (target.owner, target.pos_x(), target.pos_y());
+        let radius =
+            crate::config::EKAT_MAGIC_ANCHOR_RADIUS_TILES * crate::config::TILE_SIZE as f32;
+        let mut shields: Vec<_> = self
+            .map
+            .values()
+            .filter(|e| e.shield.is_some())
+            .map(|e| e.id)
+            .collect();
+        shields.sort_unstable();
+        for id in shields {
+            let Some(caster) = self.get_mut(id) else {
+                continue;
+            };
+            if caster.hp == 0
+                || (caster.owner != owner && !teams.same_team_player(owner, caster.owner))
+            {
+                continue;
+            }
+            let Some(shield) = caster.shield.as_mut() else {
+                continue;
+            };
+            let dx = x - shield.x.to_world();
+            let dy = y - shield.y.to_world();
+            if dx * dx + dy * dy > radius * radius {
+                continue;
+            }
+            let absorbed = damage.min(shield.remaining);
+            shield.remaining -= absorbed;
+            damage -= absorbed;
+            if shield.remaining == 0 {
+                caster.shield = None;
+            }
+            if damage == 0 {
+                break;
+            }
+        }
+        damage
+    }
+
     /// Whether an entity with this id still exists.
     pub fn contains(&self, id: u32) -> bool {
         self.map.contains_key(&id)

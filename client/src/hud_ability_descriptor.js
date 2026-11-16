@@ -47,6 +47,8 @@ export function abilityButtonDescriptor({
     cost: affordance.cost,
     cls: [
       active ? "active" : "",
+      definition.ability.startsWith("evolve") ? "dao-choice" : "",
+      definition.ability.startsWith("evolve") && affordance.unlocked && commandableCount > 0 && affordance.affordable ? "dao-ready" : "",
       affordance.autocastEnabledIds.length > 0 ? "autocast-enabled" : "",
     ].filter(Boolean).join(" "),
     onUnavailableIntent: { type: "playNotEnough", cost: affordance.cost },

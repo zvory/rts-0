@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 5] = [
+pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 6] = [
     AbilityCatalogEntry {
         kind: AbilityKind::EvolveLightness,
         label: "Dao of Lightness",
@@ -68,5 +68,15 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 5] = [
         order_stage_code: 24,
     },
     EKAT_ABILITIES[0],
-    EKAT_ABILITIES[2],
+    AbilityCatalogEntry { label: "Anchor", ..EKAT_ABILITIES[2] },
+    AbilityCatalogEntry {
+        kind: AbilityKind::DiscipleShield, label: "Shield", icon: "SHD", hotkey: Some("X"),
+        title: "Place a shield that absorbs 300 enemy damage to allied units; lasts until depleted or replaced",
+        carriers: &[EntityKind::Warrior], target_mode: AbilityTargetMode::WorldPoint,
+        range_tiles: Some(balance::EKAT_MAGIC_ANCHOR_RANGE_TILES), min_range_tiles: None,
+        cooldown_ticks: balance::DISCIPLE_SHIELD_COOLDOWN_TICKS, charges: None, charge_recharge_ticks: None,
+        cost: ResourceCost::new(0, 0), tech_requirement: None, upgrade_requirement: None,
+        queue_policy: AbilityQueuePolicy::QueueSkipIfNotReady, autocast: false, command_card: true,
+        protocol_code: 17, order_stage_code: 25,
+    },
 ];

@@ -246,6 +246,14 @@ export const STATS = Object.freeze({
 });
 
 export const ABILITIES = Object.freeze({
+  [ABILITY.DISCIPLE_SHIELD]: Object.freeze({
+    ability: ABILITY.DISCIPLE_SHIELD, label: "Shield", icon: "SHD", hotkey: "X",
+    title: "Place a shield that absorbs 300 enemy damage to allied units; lasts until depleted or replaced",
+    carriers: Object.freeze([KIND.WARRIOR]), targetMode: "worldPoint",
+    rangeTiles: EKAT_MAGIC_ANCHOR_RANGE_TILES, radiusTiles: EKAT_MAGIC_ANCHOR_RADIUS_TILES,
+    cooldownTicks: 300, cost: Object.freeze({ steel: 0, oil: 0 }),
+    queued: true, queuePolicy: "skipIfNotReady",
+  }),
   [ABILITY.EVOLVE_LIGHTNESS]: Object.freeze({
     ability: ABILITY.EVOLVE_LIGHTNESS, label: "Dao of Lightness", icon: "Z", hotkey: "Z",
     title: "Evolve permanently into Dao of Lightness at 60 insight", carriers: Object.freeze([KIND.WARRIOR]),
@@ -424,7 +432,7 @@ export const ABILITIES = Object.freeze({
   }),
   [ABILITY.EKAT_MAGIC_ANCHOR]: Object.freeze({
     ability: ABILITY.EKAT_MAGIC_ANCHOR,
-    label: "Magic Anchor",
+    label: "Anchor",
     icon: "ANC",
     hotkey: "C",
     title: "Place a 10-second pull field",

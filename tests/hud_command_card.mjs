@@ -869,16 +869,17 @@ for (const researched of [false, true]) {
   const cardFor = (entity, extra = {}) => buildCommandCardDescriptors({ ...context, ...extra, selection: [entity] });
   let card = cardFor(unit);
   assert.deepEqual(card.slots.slice(6).map((s) => s.ability), [ABILITY.EVOLVE_LIGHTNESS, ABILITY.EVOLVE_WAR, ABILITY.EVOLVE_REALITY]);
-  assert(card.slots.slice(6).every((s) => !s.enabled));
+  assert(card.slots.slice(6).every((s) => !s.enabled && !s.cls.includes("dao-ready")));
   card = cardFor({ ...unit, insight: 60 });
-  assert(card.slots.slice(6).every((s) => s.enabled));
+  assert(card.slots.slice(6).every((s) => s.enabled && s.cls.includes("dao-ready")));
   assert.deepEqual(card.slots.slice(6).map((s) => s.hotkey), ["Z", "X", "C"]);
   assert(cardFor({ ...unit, insight: 60 }, { upgrades: [] }).slots.slice(6).every((s) => !s.enabled));
   const light = cardFor({ ...unit, insight: 60, dao: "lightness" });
   assert(light.slots.some((s) => s?.ability === ABILITY.EKAT_TELEPORT));
   assert(!light.slots.some((s) => s?.ability === ABILITY.EKAT_MAGIC_ANCHOR || s?.ability?.startsWith("evolve")));
   const reality = cardFor({ ...unit, insight: 60, dao: "reality" });
-  assert(reality.slots.some((s) => s?.ability === ABILITY.EKAT_MAGIC_ANCHOR));
+  assert(reality.slots.some((s) => s?.ability === ABILITY.EKAT_MAGIC_ANCHOR && s.label === "Anchor"));
+  assert(reality.slots.some((s) => s?.ability === ABILITY.DISCIPLE_SHIELD && s.enabled));
   assert(!reality.slots.some((s) => s?.ability === ABILITY.EKAT_TELEPORT));
 }
 

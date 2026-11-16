@@ -474,6 +474,7 @@ export function buildTrainCard(ctx, building, { underConstruction = false } = {}
       enabled: availability !== "locked",
       unaffordable: availability === "unaffordable",
       title: researchDisabledReason(ctx, upgrade, resources, isOwn),
+      cls: upgrade.startsWith("dao_of_") ? `dao-choice${availability === "ready" ? " dao-ready" : ""}` : "",
       tooltipUpgrade: upgrade,
       repeatable: false,
       onUnavailableIntent: { type: "playNotEnough", cost: def.cost },
@@ -513,7 +514,7 @@ export function selectedAbilityAffordances(ctx, selection) {
         && (e.kind !== KIND.WARRIOR || (
           definition.ability.startsWith("evolve") ? !e.dao :
           definition.ability === ABILITY.EKAT_TELEPORT ? e.dao === "lightness" :
-          definition.ability === ABILITY.EKAT_MAGIC_ANCHOR ? e.dao === "reality" : true)));
+          (definition.ability === ABILITY.EKAT_MAGIC_ANCHOR || definition.ability === ABILITY.DISCIPLE_SHIELD) ? e.dao === "reality" : true)));
       if (carriers.length === 0) return null;
       const unlocked = abilityUnlocked(ctx, definition);
       const cost = abilityCostForCarriers(definition, carriers);

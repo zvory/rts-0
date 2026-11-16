@@ -948,10 +948,12 @@ impl RoomTask {
         };
         if let Some(result) = result {
             let refresh_snapshot = refresh_snapshot_after_result && result.ok;
-            if refresh_snapshot && result.op == "importScenario" {
-                self.ground_decal_request_times.clear();
-            }
+            let imported_setup = refresh_snapshot && result.op == "importScenario";
             self.send_lab_result_to(player_id, result);
+            if imported_setup {
+                self.ground_decal_request_times.clear();
+                self.send_lab_start_payloads_to_all(true);
+            }
             if refresh_snapshot
                 && self.session_policy().clock.room_time_source() == Some(RoomTimeSource::Lab)
             {
@@ -959,7 +961,6 @@ impl RoomTask {
             }
         }
     }
-
     fn apply_lab_vision(
         &mut self,
         operator_id: u32,

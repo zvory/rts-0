@@ -18,6 +18,7 @@ use super::{
 };
 
 mod dao;
+pub(crate) use dao::DiscipleShield;
 mod field_obstacles;
 mod helpers;
 mod position;
@@ -53,6 +54,10 @@ pub struct Entity {
     pub insight: u32,
     #[serde(default)]
     pub dao: Option<crate::game::upgrade::UpgradeKind>,
+    #[serde(default)]
+    pub dao_advance_ticks: u16,
+    #[serde(default)]
+    pub(crate) shield: Option<DiscipleShield>,
     pub hp: u32,
     /// Full health ceiling. Construction earns current HP over time; damage never lowers this value.
     pub max_hp: u32,
@@ -104,6 +109,8 @@ impl Entity {
             units_killed: 0,
             insight: 0,
             dao: None,
+            dao_advance_ticks: 0,
+            shield: None,
             last_damage_tick: None,
             last_damage_pos: None,
             movement: Some(MovementState::default()),
@@ -157,6 +164,8 @@ impl Entity {
             units_killed: 0,
             insight: 0,
             dao: None,
+            dao_advance_ticks: 0,
+            shield: None,
             last_damage_tick: None,
             last_damage_pos: None,
             movement: None,
@@ -210,6 +219,8 @@ impl Entity {
             units_killed: 0,
             insight: 0,
             dao: None,
+            dao_advance_ticks: 0,
+            shield: None,
             last_damage_tick: None,
             last_damage_pos: None,
             movement: None,
@@ -732,6 +743,7 @@ impl Entity {
     }
 
     pub fn tick_ability_cooldowns(&mut self) {
+        self.dao_advance_ticks = self.dao_advance_ticks.saturating_sub(1);
         self.ability_cooldowns.retain(|_, ticks| {
             *ticks = ticks.saturating_sub(1);
             *ticks > 0
@@ -991,14 +1003,6 @@ impl Entity {
     #[cfg(test)]
     pub(in crate::game) fn set_last_damage_entity_for_test(&mut self, entity: Option<u32>) {
         self.last_damage_entity = entity;
-    }
-
-    pub fn invulnerable(&self) -> bool {
-        self.invulnerable
-    }
-
-    pub fn set_invulnerable(&mut self, invulnerable: bool) {
-        self.invulnerable = invulnerable;
     }
 
     pub(in crate::game) fn set_spawn_health(&mut self, hp: u32) {

@@ -2817,3 +2817,5 @@ black-outlined yellow chevrons, a neon-red sword rotated 90 degrees and lengthen
 or a green pentagram. The selected unit shows
 exact insight and Dao. Evolution occupies grid Z/X/C; classic L/W/R. See
 [Dao evolution rules](dao-insight.md).
+
+Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md).

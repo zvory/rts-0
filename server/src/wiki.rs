@@ -1245,7 +1245,7 @@ mod tests {
         assert!(body.contains("<td>Tank</td>"));
         assert!(body.contains("<td>kriegsia</td>"));
         assert!(body.contains("<td>Smoke</td>"));
-        assert!(body.contains("<td>Magic Anchor</td>"));
+        assert!(body.contains("<td>Anchor</td>"));
     }
 
     #[test]

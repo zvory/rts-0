@@ -198,6 +198,8 @@ export function _hpBarSlot(id, poolName = "hpBars") {
     container.rtsTicks = new PIXI.Graphics();
     container.rtsInsight = new PIXI.Graphics();
     container.rtsDao = new PIXI.Graphics();
+    container.rtsRadiance = new PIXI.Graphics();
+    container.addChild(container.rtsRadiance);
     container.addChild(container.rtsBackground, container.rtsFill, container.rtsTicks, container.rtsInsight, container.rtsDao);
     pool.set(id, container);
     this.layers[poolName].addChild(container);
@@ -304,6 +306,25 @@ export function _hpBar(g, e, status = null, ownerColor = null) {
   }
   g.rtsFill.tint = color;
   g.rtsFill.scale.set(frac, 1);
+  const radiance = g.rtsRadiance;
+  radiance.clear();
+  if (e.daoReady || e.daoAdvanceTicks > 0) {
+    const pulse = 0.5 + 0.5 * Math.sin((this._renderClock?.now?.() ?? performance.now()) / 210);
+    const advancing = e.daoAdvanceTicks > 0;
+    const radius = advancing ? 64 * (1 - 0.45 * (e.daoAdvanceTicks / 15)) : 29 + pulse * 3;
+    const alpha = advancing ? Math.min(1, e.daoAdvanceTicks / 5) : 0.6 + pulse * 0.4;
+    const cy = e.y - topY;
+    for (let i = 4; i > 0; i--) {
+      radiance.circle(0, cy, radius + i * 2).stroke({color: 0xffdc70, width: 5, alpha: alpha * 0.045});
+    }
+    radiance.circle(0, cy, radius).stroke({color: 0xffec9a, width: 2, alpha: alpha * 0.85});
+    for (let i = 0; i < 12; i++) {
+      const angle = i * Math.PI / 6;
+      radiance.moveTo(Math.cos(angle) * (radius + 3), cy + Math.sin(angle) * (radius + 3))
+        .lineTo(Math.cos(angle) * (radius + 7 + pulse * 3), cy + Math.sin(angle) * (radius + 7 + pulse * 3))
+        .stroke({color: 0xffe79a, width: 1.5, alpha: alpha * 0.55});
+    }
+  }
   const insightKey = `${e.insight ?? ""}|${e.dao ?? ""}|${halfW}`;
   if (g.rtsInsightKey !== insightKey) {
     g.rtsInsightKey = insightKey;
@@ -311,8 +332,10 @@ export function _hpBar(g, e, status = null, ownerColor = null) {
     const icon = g.rtsDao;
     bar.clear(); icon.clear();
     if (e.kind === KIND.WARRIOR) {
-      bar.rect(-halfW - 1, 6, barW + 2, 5).fill(0x8b2028);
-      bar.rect(-halfW, 7, barW * clamp01((e.insight || 0) / 60), 3).fill(0x368dff);
+      if (Number.isFinite(e.insight)) {
+        bar.rect(-halfW - 1, 6, barW + 2, 5).fill(0x8b2028);
+        bar.rect(-halfW, 7, barW * clamp01(e.insight / 60), 3).fill(0x368dff);
+      }
       const x = 0, y = (stat.size || 9) + 8;
       icon.pivot.set(x, y);
       icon.position.set(x, y);

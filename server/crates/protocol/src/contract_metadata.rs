@@ -124,6 +124,7 @@ pub mod abilities {
     pub const EVOLVE_LIGHTNESS: &str = "evolveLightness";
     pub const EVOLVE_WAR: &str = "evolveWar";
     pub const EVOLVE_REALITY: &str = "evolveReality";
+    pub const DISCIPLE_SHIELD: &str = "discipleShield";
 
     pub const ALL: &[&str] = &[
         CHARGE,
@@ -142,6 +143,7 @@ pub mod abilities {
         EVOLVE_LIGHTNESS,
         EVOLVE_WAR,
         EVOLVE_REALITY,
+        DISCIPLE_SHIELD,
     ];
 }
 
@@ -150,6 +152,7 @@ pub mod ability_object_kinds {
     pub const RETURN_MARKER: &str = "returnMarker";
     pub const MAGIC_ANCHOR: &str = "magicAnchor";
     pub const LINE_PROJECTILE: &str = "lineProjectile";
+    pub const SHIELD: &str = "shield";
 }
 
 /// Lobby room kinds surfaced in WebSocket lobby state and HTTP lobby-browser rows.
@@ -479,6 +482,7 @@ const ORDER_STAGE_CODES: &[(&str, u8)] = &[
     (abilities::EVOLVE_LIGHTNESS, 22),
     (abilities::EVOLVE_WAR, 23),
     (abilities::EVOLVE_REALITY, 24),
+    (abilities::DISCIPLE_SHIELD, 25),
 ];
 
 const ABILITY_CODES: &[(&str, u8)] = &[
@@ -498,12 +502,14 @@ const ABILITY_CODES: &[(&str, u8)] = &[
     (abilities::EVOLVE_LIGHTNESS, 14),
     (abilities::EVOLVE_WAR, 15),
     (abilities::EVOLVE_REALITY, 16),
+    (abilities::DISCIPLE_SHIELD, 17),
 ];
 
 const ABILITY_OBJECT_KIND_CODES: &[(&str, u8)] = &[
     (ability_object_kinds::RETURN_MARKER, 1),
     (ability_object_kinds::MAGIC_ANCHOR, 2),
     (ability_object_kinds::LINE_PROJECTILE, 3),
+    (ability_object_kinds::SHIELD, 4),
 ];
 
 const UPGRADE_CODES: &[(&str, u8)] = &[
@@ -805,6 +811,7 @@ fn ability_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("EVOLVE_LIGHTNESS", abilities::EVOLVE_LIGHTNESS),
         ("EVOLVE_WAR", abilities::EVOLVE_WAR),
         ("EVOLVE_REALITY", abilities::EVOLVE_REALITY),
+        ("DISCIPLE_SHIELD", abilities::DISCIPLE_SHIELD),
     ])
 }
 
@@ -813,6 +820,7 @@ fn ability_object_kind_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("RETURN_MARKER", ability_object_kinds::RETURN_MARKER),
         ("MAGIC_ANCHOR", ability_object_kinds::MAGIC_ANCHOR),
         ("LINE_PROJECTILE", ability_object_kinds::LINE_PROJECTILE),
+        ("SHIELD", ability_object_kinds::SHIELD),
     ])
 }
 
@@ -895,6 +903,7 @@ fn order_stage_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("EVOLVE_LIGHTNESS", abilities::EVOLVE_LIGHTNESS),
         ("EVOLVE_WAR", abilities::EVOLVE_WAR),
         ("EVOLVE_REALITY", abilities::EVOLVE_REALITY),
+        ("DISCIPLE_SHIELD", abilities::DISCIPLE_SHIELD),
         ("SETUP_ANTI_TANK_GUNS", "setupAntiTankGuns"),
     ])
 }
@@ -1000,6 +1009,8 @@ fn compact_slot_schemas() -> CompactSlotSchemas {
             optional_field(44, "commanderFacing"),
             optional_field(45, "insight"),
             optional_field(46, "dao"),
+            optional_field(47, "daoReady"),
+            optional_field(48, "daoAdvanceTicks"),
         ],
         event: event_slot_schemas(),
         trench: vec![

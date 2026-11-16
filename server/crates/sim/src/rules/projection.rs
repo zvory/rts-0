@@ -253,7 +253,10 @@ pub fn project_entity(
     view.vision_only = vision_only;
 
     if entity.kind == EntityKind::Warrior {
-        view.insight = Some(entity.insight);
+        view.insight = owner_or_ally.then_some(entity.insight);
+        view.dao_ready =
+            Some(entity.dao.is_none() && entity.insight >= config::DISCIPLE_INSIGHT_REQUIRED);
+        view.dao_advance_ticks = (entity.dao_advance_ticks > 0).then_some(entity.dao_advance_ticks);
         view.dao = entity.dao.map(|dao| {
             match dao {
                 crate::game::upgrade::UpgradeKind::DaoOfLightness => "lightness",

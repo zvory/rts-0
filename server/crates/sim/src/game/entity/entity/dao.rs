@@ -1,7 +1,35 @@
 use super::*;
 use crate::game::upgrade::UpgradeKind;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct DiscipleShield {
+    pub id: u32,
+    pub x: Coord,
+    pub y: Coord,
+    pub remaining: u32,
+}
+
 impl Entity {
+    pub(in crate::game) fn place_shield(
+        &mut self,
+        id: u32,
+        x: f32,
+        y: f32,
+        cooldown: u16,
+        preserve_order: bool,
+    ) {
+        self.shield = Some(DiscipleShield {
+            id,
+            x: Coord::from_world(x),
+            y: Coord::from_world(y),
+            remaining: config::DISCIPLE_SHIELD_CAPACITY,
+        });
+        self.start_ability_cooldown(AbilityKind::DiscipleShield, cooldown);
+        if !preserve_order {
+            self.clear_active_order();
+        }
+    }
+
     pub(crate) fn units_killed(&self) -> u32 {
         self.units_killed
     }
@@ -19,7 +47,9 @@ impl Entity {
                 self.dao.is_none() && self.insight >= config::DISCIPLE_INSIGHT_REQUIRED
             }
             AbilityKind::EkatTeleport => self.dao == Some(UpgradeKind::DaoOfLightness),
-            AbilityKind::EkatMagicAnchor => self.dao == Some(UpgradeKind::DaoOfBarriers),
+            AbilityKind::DiscipleShield | AbilityKind::EkatMagicAnchor => {
+                self.dao == Some(UpgradeKind::DaoOfBarriers)
+            }
             _ => true,
         }
     }
@@ -34,6 +64,7 @@ impl Entity {
             AbilityKind::EvolveReality => UpgradeKind::DaoOfBarriers,
             _ => return false,
         });
+        self.dao_advance_ticks = 15;
         if self.dao == Some(UpgradeKind::DaoOfHeaviness) {
             self.max_hp = self.max_hp.saturating_add(config::DAO_WAR_HP_BONUS);
             self.hp = self

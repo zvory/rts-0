@@ -795,6 +795,12 @@ impl Serialize for CompactEntity<'_> {
         if entity.dao.is_some() {
             len = 47;
         }
+        if entity.dao_ready.is_some() {
+            len = 48;
+        }
+        if entity.dao_advance_ticks.is_some() {
+            len = 49;
+        }
         let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&entity.id)?;
         seq.serialize_element(&entity.owner)?;
@@ -950,6 +956,12 @@ impl Serialize for CompactEntity<'_> {
         }
         if len > 46 {
             seq.serialize_element(&entity.dao)?;
+        }
+        if len > 47 {
+            seq.serialize_element(&entity.dao_ready)?;
+        }
+        if len > 48 {
+            seq.serialize_element(&entity.dao_advance_ticks)?;
         }
         seq.end()
     }

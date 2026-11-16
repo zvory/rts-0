@@ -106,6 +106,7 @@ pub enum AbilityKind {
     EvolveLightness,
     EvolveWar,
     EvolveReality,
+    DiscipleShield,
 }
 
 impl AbilityKind {
@@ -126,6 +127,7 @@ impl AbilityKind {
         Self::EvolveLightness,
         Self::EvolveWar,
         Self::EvolveReality,
+        Self::DiscipleShield,
     ];
 
     pub const fn stable_id(self) -> &'static str {
@@ -146,6 +148,7 @@ impl AbilityKind {
             Self::EvolveLightness => "evolveLightness",
             Self::EvolveWar => "evolveWar",
             Self::EvolveReality => "evolveReality",
+            Self::DiscipleShield => "discipleShield",
         }
     }
 
@@ -671,7 +674,7 @@ const EKAT_ABILITIES: [AbilityCatalogEntry; 4] = [
     },
     AbilityCatalogEntry {
         kind: AbilityKind::EkatMagicAnchor,
-        label: "Magic Anchor",
+        label: "Anchor",
         icon: "ANC",
         hotkey: Some("C"),
         title: "Place a 10-second pull field",
@@ -1044,6 +1047,7 @@ pub fn ability_definition(kind: AbilityKind) -> AbilityCatalogEntry {
         AbilityKind::EvolveLightness => CULTIVATOR_ABILITIES[0],
         AbilityKind::EvolveWar => CULTIVATOR_ABILITIES[1],
         AbilityKind::EvolveReality => CULTIVATOR_ABILITIES[2],
+        AbilityKind::DiscipleShield => CULTIVATOR_ABILITIES[5],
     }
 }
 
