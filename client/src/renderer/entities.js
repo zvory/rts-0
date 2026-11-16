@@ -183,7 +183,7 @@ export function _drawAboveFogHp(e, state, ownerColor = null) {
     && e.hp < e.maxHp;
   if (e?.aboveFogReveal !== true && e?.visionOnly !== true) return;
   if (!hasHealth) return;
-  if (!damaged && !state?.showHealthBarsAlwaysEnabled) return;
+  if (!damaged && !state?.showHealthBarsAlwaysEnabled && e.kind !== KIND.WARRIOR) return;
   const g = this._hpBarSlot(e.id, "aboveFogHpBars");
   this._hpBar(g, e, null, ownerColor);
 }
