@@ -1375,6 +1375,7 @@ mod tests {
             AbilityKind::EvolveLightness,
             AbilityKind::EvolveWar,
             AbilityKind::EvolveReality,
+            AbilityKind::DiscipleShield,
             AbilityKind::EkatTeleport,
             AbilityKind::EkatMagicAnchor,
         ] {
