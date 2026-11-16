@@ -349,6 +349,48 @@ pub(crate) fn closest_combat_target_point(
         .unwrap_or(clamped)
 }
 
+/// Melee pursuit uses vehicle contact geometry; ranged weapons keep center targeting.
+/// Circle-bodied targets retain their existing range semantics.
+pub(crate) fn primary_combat_target_point(
+    map: &Map,
+    attacker_kind: EntityKind,
+    attacker: (f32, f32),
+    target: &Entity,
+) -> (f32, f32) {
+    if matches!(
+        attacker_kind,
+        EntityKind::Worker | EntityKind::Golem | EntityKind::Warrior
+    ) {
+        match unit_body_for_entity(target) {
+            Some(UnitBody::OrientedBox(body)) => {
+                let (fx, fy) = body.forward_axis();
+                let (sx, sy) = body.side_axis();
+                let dx = attacker.0 - body.x;
+                let dy = attacker.1 - body.y;
+                let x = (dx * fx + dy * fy).clamp(-body.half_len, body.half_len);
+                let y = (dx * sx + dy * sy).clamp(-body.half_width, body.half_width);
+                return (body.x + fx * x + sx * y, body.y + fy * x + sy * y);
+            }
+            Some(UnitBody::OrientedCapsule(body)) => {
+                let (start, end) = body.endpoints();
+                let center = closest_point_on_segment(attacker, start, end);
+                let dx = attacker.0 - center.0;
+                let dy = attacker.1 - center.1;
+                let distance = dx.det_hypot(dy);
+                if distance <= body.radius {
+                    return attacker;
+                }
+                return (
+                    center.0 + dx / distance * body.radius,
+                    center.1 + dy / distance * body.radius,
+                );
+            }
+            _ => {}
+        }
+    }
+    closest_combat_target_point(map, attacker, target)
+}
+
 pub(crate) fn circle_intersects_rect(circle: CircleBody, rect: RectBody) -> bool {
     if !valid_circle(circle) || !valid_rect(rect) {
         return false;

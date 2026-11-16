@@ -126,3 +126,120 @@ fn war_armor_uses_weapon_penetration_and_lightness_changes_attack_rate() {
     unit.dao = Some(UpgradeKind::DaoOfBarriers);
     assert!((unit.movement_speed() - 1.76).abs() < 0.001);
 }
+
+#[test]
+fn disciple_attacks_vehicle_hulls_without_pushing_them() {
+    for target_kind in [
+        EntityKind::Tank,
+        EntityKind::ScoutCar,
+        EntityKind::Artillery,
+    ] {
+        for angle in [0.0_f32, std::f32::consts::FRAC_PI_2, 0.73] {
+            for attack_move in [false, true] {
+                let map = open_map(32);
+                let mut entities = EntityStore::new();
+                let target_pos = (400.0, 400.0);
+                let target = entities
+                    .spawn_unit(2, target_kind, target_pos.0, target_pos.1)
+                    .unwrap();
+                entities.get_mut(target).unwrap().set_facing(angle);
+                // Isolate pursuit and collision from the defender's return fire.
+                entities
+                    .get_mut(target)
+                    .unwrap()
+                    .set_order(Order::HoldPosition);
+                for weapon in combat_rules::WeaponKind::ALL {
+                    entities
+                        .get_mut(target)
+                        .unwrap()
+                        .set_weapon_cooldown(weapon, 10_000);
+                }
+                let disciple = entities
+                    .spawn_unit(1, EntityKind::Warrior, 260.0, 400.0)
+                    .unwrap();
+                entities
+                    .get_mut(disciple)
+                    .unwrap()
+                    .set_order(if attack_move {
+                        Order::attack_move_to(540.0, 400.0)
+                    } else {
+                        Order::attack(target)
+                    });
+                if attack_move {
+                    let attacker = entities.get_mut(disciple).unwrap();
+                    attacker.set_path(vec![(540.0, 400.0)]);
+                    attacker.set_path_goal(Some((540.0, 400.0)));
+                }
+                let hp_before = entities.get(target).unwrap().hp;
+                let mut max_displacement = 0.0_f32;
+                for tick in 0..180 {
+                    run_movement_tick_on_map(&mut entities, &map, tick);
+                    run_combat_tick_on_map(
+                        &mut entities,
+                        &[player_state(1, false), player_state(2, false)],
+                        &map,
+                    );
+                    let occ = Occupancy::build(&map, &entities);
+                    let spatial = SpatialIndex::build(&entities, map.width, map.height);
+                    crate::game::services::movement::resolve_collisions(
+                        &mut entities,
+                        &spatial,
+                        &map,
+                        &occ,
+                    );
+                    let defender = entities.get(target).unwrap();
+                    max_displacement = max_displacement.max(
+                        (defender.pos_x() - target_pos.0)
+                            .det_hypot(defender.pos_y() - target_pos.1),
+                    );
+                }
+                assert!(entities.get(target).unwrap().hp < hp_before, "disciple must reach and damage {target_kind:?}, angle={angle}, attack_move={attack_move}");
+                assert!(max_displacement < 1.0, "disciple pushed {target_kind:?} by {max_displacement}px, angle={angle}, attack_move={attack_move}");
+            }
+        }
+    }
+}
+
+#[test]
+fn disciple_vehicle_range_is_bounded_by_hull_surface() {
+    let map = open_map(32);
+    for attacker_kind in [
+        EntityKind::Warrior,
+        EntityKind::Worker,
+        EntityKind::Golem,
+        EntityKind::Rifleman,
+    ] {
+        for in_range in [true, false] {
+            let mut entities = EntityStore::new();
+            let target = entities
+                .spawn_unit(2, EntityKind::Tank, 400.0, 400.0)
+                .unwrap();
+            let stats = config::unit_stats(attacker_kind).unwrap();
+            let range = stats.range_tiles * config::TILE_SIZE as f32 + stats.radius + RANGE_SLACK;
+            let extent = if attacker_kind == EntityKind::Rifleman {
+                0.0
+            } else {
+                config::TANK_BODY_LENGTH_PX * 0.5 + config::TANK_BODY_CLEARANCE_PX
+            };
+            let distance = range + extent + if in_range { -0.5 } else { 0.5 };
+            let attacker = entities
+                .spawn_unit(1, attacker_kind, 400.0 - distance, 400.0)
+                .unwrap();
+            entities
+                .get_mut(attacker)
+                .unwrap()
+                .set_order(Order::attack(target));
+            let hp_before = entities.get(target).unwrap().hp;
+            run_combat_tick_on_map(
+                &mut entities,
+                &[player_state(1, false), player_state(2, false)],
+                &map,
+            );
+            assert_eq!(
+                entities.get(target).unwrap().hp < hp_before,
+                in_range,
+                "range boundary for {attacker_kind:?}"
+            );
+        }
+    }
+}

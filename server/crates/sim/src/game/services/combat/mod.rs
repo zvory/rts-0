@@ -44,7 +44,7 @@ use acquisition::{combat_mode, resolve_target as resolve_target_for_test};
 use acquisition::{combat_mode_with_moving_fire, CombatMode};
 #[cfg(test)]
 use damage::apply_damage;
-use projection::combat_target_distance_sq;
+use projection::primary_target_distance_sq;
 use shot_blocker_index::ShotBlockerIndex;
 use target_legality::{direct_fire_target_legal, DirectFireLegality};
 use weapons::{
@@ -187,6 +187,7 @@ pub(in crate::game) fn combat_system(
         }
         // Determine this attacker's combat parameters.
         let (
+            kind,
             owner,
             px,
             py,
@@ -232,6 +233,7 @@ pub(in crate::game) fn combat_system(
             // order is separately allowed to create a target-relative pursuit path below.
             let acquire_px = range_px;
             (
+                e.kind,
                 e.owner,
                 e.pos_x(),
                 e.pos_y(),
@@ -322,7 +324,7 @@ pub(in crate::game) fn combat_system(
                 t.pos_y(),
                 t.owner,
                 t.is_neutral_obstacle(),
-                combat_target_distance_sq(map, (px, py), t),
+                primary_target_distance_sq(map, kind, (px, py), t),
             ),
             None => continue,
         };
