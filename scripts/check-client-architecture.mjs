@@ -272,7 +272,8 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   "protocol.js": 45366,
   // Protocol cleanup split compact snapshot decoding behind protocol.js.
   // Entrenchment Phase 3 adds the occupiedTrenchId slot; Panzerfaust reserves compact events.
-  "protocol_snapshot.js": 24192,
+  // Append team-private chosenDao (slot 49) and accept compact v60.
+  "protocol_snapshot.js": 24261,
   // Lab MVP Phase 5 lets command descriptors ask the injected policy which owner is controllable.
   // Point adds a tank hotkey catalog sample and delegates its descriptor to hud_unit_commands.
   "hud_command_card.js": 29598,

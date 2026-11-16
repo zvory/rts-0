@@ -2815,7 +2815,10 @@ Disciple insight and Dao fields pass through the detached presentation entity sn
 to the Pixi worker. A blue-on-red insight bar appears below HP; evolved paths use centered,
 black-outlined yellow chevrons, a neon-red sword rotated 90 degrees and lengthened 20%,
 or a green pentagram. The selected unit shows
-exact insight and Dao. Evolution occupies grid Z/X/C; classic L/W/R. See
+exact insight and Dao. Evolution choices occupy grid Z/X/C; classic L/W/C. Buttons remain actionable before
+research or insight, assign all selected unevolved Disciples, and show the pending path
+with an active highlight and assigned/eligible count. A new choice replaces the old one;
+unit details and tooltips show the chosen Dao and remaining requirements. See
 [Dao evolution rules](dao-insight.md).
 
 Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md).

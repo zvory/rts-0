@@ -86,7 +86,7 @@ fn cultivator_pavilion_research_spends_resources_completes_and_leaves_disciple_u
     let before = game.state.entities.get(disciple).unwrap().clone();
     let daos = [
         UpgradeKind::DaoOfLightness,
-        UpgradeKind::DaoOfBarriers,
+        UpgradeKind::DaoOfMagic,
         UpgradeKind::DaoOfHeaviness,
     ];
     for dao in daos {
@@ -181,7 +181,7 @@ fn pavilion_prerequisites_and_research_are_faction_gated() {
     ));
     for dao in [
         UpgradeKind::DaoOfLightness,
-        UpgradeKind::DaoOfBarriers,
+        UpgradeKind::DaoOfMagic,
         UpgradeKind::DaoOfHeaviness,
     ] {
         assert!(economy::can_research_for_faction(
@@ -213,7 +213,7 @@ fn disciple_evolution_requires_insight_research_ownership_and_is_permanent() {
             135,
         ),
         (AbilityKind::EvolveWar, UpgradeKind::DaoOfHeaviness, 155),
-        (AbilityKind::EvolveReality, UpgradeKind::DaoOfBarriers, 135),
+        (AbilityKind::EvolveMagic, UpgradeKind::DaoOfMagic, 135),
     ] {
         let mut game = empty_flat_game(&[
             cultivator_player(),
@@ -256,6 +256,7 @@ fn disciple_evolution_requires_insight_research_ownership_and_is_permanent() {
             "60 insight is required"
         );
         game.state.entities.get_mut(unit).unwrap().insight = 60;
+        game.state.entities.get_mut(unit).unwrap().chosen_dao = None;
         game.enqueue(2, command.clone());
         game.tick();
         assert_eq!(
@@ -346,11 +347,11 @@ fn disciple_dao_gates_blink_return_and_magic_anchor() {
     game.state.entities.get_mut(support).unwrap().insight = 60;
     game.state.players[0]
         .upgrades
-        .insert(UpgradeKind::DaoOfBarriers);
+        .insert(UpgradeKind::DaoOfMagic);
     game.enqueue(
         1,
         Command::UseAbility {
-            ability: AbilityKind::EvolveReality,
+            ability: AbilityKind::EvolveMagic,
             units: vec![support],
             x: None,
             y: None,
@@ -418,7 +419,7 @@ fn disciple_shield_shared_pool_overflow_teams_and_checkpoint() {
     game.state.entities.get_mut(caster).unwrap().insight = 60;
     game.state.players[0]
         .upgrades
-        .insert(UpgradeKind::DaoOfBarriers);
+        .insert(UpgradeKind::DaoOfMagic);
     let cast = |ability| Command::UseAbility {
         ability,
         units: vec![caster],
@@ -429,7 +430,7 @@ fn disciple_shield_shared_pool_overflow_teams_and_checkpoint() {
     game.enqueue(1, cast(AbilityKind::DiscipleShield));
     game.tick();
     assert!(game.state.entities.get(caster).unwrap().shield.is_none());
-    game.enqueue(1, cast(AbilityKind::EvolveReality));
+    game.enqueue(1, cast(AbilityKind::EvolveMagic));
     game.tick();
     game.enqueue(1, cast(AbilityKind::DiscipleShield));
     game.tick();
@@ -535,6 +536,7 @@ fn disciple_insight_is_team_private_but_readiness_and_advance_are_public() {
         .unwrap();
     game.tick();
     game.state.entities.get_mut(unit).unwrap().insight = 60;
+    game.state.entities.get_mut(unit).unwrap().chosen_dao = Some(UpgradeKind::DaoOfMagic);
     game.state
         .fog
         .recompute(&[1, 2, 3], &game.state.entities, &game.state.map);
@@ -555,6 +557,7 @@ fn disciple_insight_is_team_private_but_readiness_and_advance_are_public() {
                 )
             });
         assert_eq!(view.insight, insight);
+        assert_eq!(view.chosen_dao.as_deref(), insight.map(|_| "magic"));
         assert_eq!(view.dao_ready, Some(true));
     }
     game.state.players[0]
@@ -610,7 +613,7 @@ fn disciple_shield_does_not_identify_a_smoke_hidden_caster() {
     let shield_id = game.state.ability_runtime.allocate_id().get();
     let unit = game.state.entities.get_mut(caster).unwrap();
     unit.insight = 60;
-    unit.dao = Some(UpgradeKind::DaoOfBarriers);
+    unit.dao = Some(UpgradeKind::DaoOfMagic);
     unit.place_shield(shield_id, 480.0, 400.0, 300, true);
     game.state
         .fog
@@ -652,4 +655,212 @@ fn disciple_shield_does_not_identify_a_smoke_hidden_caster() {
             .source_caster_id,
         Some(caster)
     );
+}
+
+#[test]
+fn disciple_pending_dao_replaces_for_selection_survives_checkpoint_and_waits_for_research() {
+    use crate::game::ability::AbilityKind;
+    use crate::game::upgrade::UpgradeKind;
+    let mut game = empty_flat_game(&[
+        cultivator_player(),
+        PlayerInit {
+            id: 2,
+            team_id: 2,
+            ..cultivator_player()
+        },
+    ]);
+    let first = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Warrior, 400.0, 400.0)
+        .unwrap();
+    let second = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Warrior, 460.0, 400.0)
+        .unwrap();
+    let foreign = game
+        .state
+        .entities
+        .spawn_unit(2, EntityKind::Warrior, 900.0, 900.0)
+        .unwrap();
+    let untouched = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Warrior, 520.0, 400.0)
+        .unwrap();
+    let cast = |ability| Command::UseAbility {
+        ability,
+        units: vec![first, second, first, foreign, u32::MAX],
+        x: None,
+        y: None,
+        queued: false,
+    };
+    game.enqueue(
+        1,
+        Command::Move {
+            units: vec![first, second],
+            x: 650.0,
+            y: 400.0,
+            queued: false,
+        },
+    );
+    game.enqueue(1, cast(AbilityKind::EvolveWar));
+    game.tick();
+    for id in [first, second] {
+        let entity = game.state.entities.get(id).unwrap();
+        assert_eq!(entity.chosen_dao, Some(UpgradeKind::DaoOfHeaviness));
+        assert!(
+            matches!(entity.order(), Order::Move(_)),
+            "choosing a Dao preserves movement"
+        );
+        assert_eq!(entity.dao, None);
+    }
+    assert_eq!(game.state.entities.get(foreign).unwrap().chosen_dao, None);
+    assert_eq!(game.state.entities.get(untouched).unwrap().chosen_dao, None);
+    game.enqueue(1, cast(AbilityKind::EvolveMagic));
+    game.tick();
+    let hash = game.replay_end_state_hash().unwrap();
+    let payload = game.checkpoint_payload_text_for_test().unwrap();
+    let mut game = Game::restore_checkpoint_payload_text_for_test(
+        &payload,
+        game.state.map.clone(),
+        game.state.map_metadata.clone(),
+    )
+    .unwrap();
+    assert_eq!(game.replay_end_state_hash().unwrap(), hash);
+    for id in [first, second] {
+        assert_eq!(
+            game.state.entities.get(id).unwrap().chosen_dao,
+            Some(UpgradeKind::DaoOfMagic)
+        );
+    }
+    game.state.entities.get_mut(first).unwrap().insight = 60;
+    game.tick();
+    assert_eq!(
+        game.state.entities.get(first).unwrap().dao,
+        None,
+        "insight alone does not evolve"
+    );
+    let pavilion = game
+        .state
+        .entities
+        .spawn_building(1, EntityKind::ThreeDaoPavilion, 300.0, 300.0, true)
+        .unwrap();
+    game.state.players[0].set_resources(200, 100);
+    game.enqueue(
+        1,
+        Command::Research {
+            building: pavilion,
+            upgrade: UpgradeKind::DaoOfMagic,
+        },
+    );
+    game.tick();
+    game.state
+        .entities
+        .get_mut(pavilion)
+        .unwrap()
+        .research_queue_mut()
+        .unwrap()[0]
+        .progress = 599;
+    game.tick();
+    assert_eq!(
+        game.state.entities.get(first).unwrap().dao,
+        Some(UpgradeKind::DaoOfMagic),
+        "research completion evolves in the same tick"
+    );
+    assert_eq!(game.state.entities.get(first).unwrap().chosen_dao, None);
+    assert_eq!(
+        game.state.entities.get(second).unwrap().dao,
+        None,
+        "research alone does not evolve"
+    );
+    game.state.entities.get_mut(second).unwrap().insight = 60;
+    game.tick();
+    assert_eq!(
+        game.state.entities.get(second).unwrap().dao,
+        Some(UpgradeKind::DaoOfMagic),
+        "insight triggers without another click"
+    );
+    assert_eq!(
+        game.state.entities.get(untouched).unwrap().dao,
+        None,
+        "research never assigns an unselected Disciple"
+    );
+    game.enqueue(1, cast(AbilityKind::EvolveWar));
+    game.state.players[0]
+        .upgrades
+        .insert(UpgradeKind::DaoOfHeaviness);
+    game.tick();
+    assert_eq!(
+        game.state.entities.get(first).unwrap().dao,
+        Some(UpgradeKind::DaoOfMagic),
+        "evolved path is permanent"
+    );
+}
+
+#[test]
+fn dead_disciple_cannot_advance_pending_war_and_regain_hp() {
+    use crate::game::ability::AbilityKind;
+    use crate::game::upgrade::UpgradeKind;
+    let mut game = empty_flat_game(&[cultivator_player()]);
+    let unit = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Warrior, 400.0, 400.0)
+        .unwrap();
+    let entity = game.state.entities.get_mut(unit).unwrap();
+    assert!(entity.choose_dao(AbilityKind::EvolveWar));
+    entity.insight = 60;
+    entity.apply_damage(u32::MAX, None);
+    entity.advance_chosen_dao(|_| true);
+    assert_eq!(entity.hp, 0);
+    assert_eq!(entity.dao, None);
+    game.state.players[0]
+        .upgrades
+        .insert(UpgradeKind::DaoOfHeaviness);
+    game.tick();
+    assert!(game.state.entities.get(unit).is_none());
+}
+
+#[test]
+fn disciple_pending_dao_advances_on_combat_insight_without_interrupting_attack() {
+    use crate::game::ability::AbilityKind;
+    use crate::game::upgrade::UpgradeKind;
+    let mut game = empty_flat_game(&[
+        cultivator_player(),
+        PlayerInit {
+            id: 2,
+            team_id: 2,
+            ..cultivator_player()
+        },
+    ]);
+    let unit = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Warrior, 400.0, 400.0)
+        .unwrap();
+    let target = game
+        .state
+        .entities
+        .spawn_unit(2, EntityKind::Warrior, 425.0, 400.0)
+        .unwrap();
+    let entity = game.state.entities.get_mut(unit).unwrap();
+    entity.insight = 59;
+    entity.choose_dao(AbilityKind::EvolveWar);
+    entity.set_order(Order::attack(target));
+    game.state.players[0]
+        .upgrades
+        .insert(UpgradeKind::DaoOfHeaviness);
+    for _ in 0..60 {
+        game.tick();
+        if game.state.entities.get(unit).unwrap().insight == 60 {
+            break;
+        }
+    }
+    let entity = game.state.entities.get(unit).unwrap();
+    assert_eq!(entity.insight, 60);
+    assert_eq!(entity.dao, Some(UpgradeKind::DaoOfHeaviness));
+    assert!(matches!(entity.order(), Order::Attack(_)));
+    assert!(game.state.entities.get(target).unwrap().hp < 135);
 }

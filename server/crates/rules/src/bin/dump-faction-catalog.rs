@@ -549,7 +549,7 @@ fn print_upgrades(indent: &str) {
     println!("{indent}  \"upgrades\": {{");
     for kind in [
         faction::UpgradeKind::DaoOfLightness,
-        faction::UpgradeKind::DaoOfBarriers,
+        faction::UpgradeKind::DaoOfMagic,
         faction::UpgradeKind::DaoOfHeaviness,
     ] {
         print_upgrade(

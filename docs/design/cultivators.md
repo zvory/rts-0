@@ -93,7 +93,7 @@ There is no build limit. Approved PNG art is a circular stone study dais with th
 scrolls and a three-lobed canopy. The canopy and finial receive team tint; timber, stone, and
 parchment retain natural colors. The square atlas preserves the generated proportions.
 
-Research Dao of Lightness, Dao of Reality, and Dao of War from slots Q/W/E. Each
+Research Dao of Lightness, Dao of Magic, and Dao of War from slots Q/W/E. Each
 costs 200 Steel and 100 Oil and takes 600 ticks (20 seconds, matching Methamphetamines).
 Use existing player-wide permanent research and queue rules, including duplicate rejection,
 cancellation/refund and loss of unfinished research on destruction. All three can be completed;

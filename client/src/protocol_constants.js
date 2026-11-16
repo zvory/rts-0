@@ -309,7 +309,7 @@ export const ABILITY = Object.freeze({
   BARRAGE: "barrage",
   EVOLVE_LIGHTNESS: "evolveLightness",
   EVOLVE_WAR: "evolveWar",
-  EVOLVE_REALITY: "evolveReality",
+  EVOLVE_MAGIC: "evolveMagic",
   DISCIPLE_SHIELD: "discipleShield",
 
 });
@@ -350,7 +350,7 @@ export const MOVEMENT_PATH_DIAGNOSTICS = Object.freeze({
 // --- Compact snapshot wire schema (must match protocol.rs) ---
 export const PREDICTION_PROTOCOL_VERSION = 1;
 export const DEFAULT_FACTION_ID = "kriegsia";
-export const COMPACT_SNAPSHOT_VERSION = 59;
+export const COMPACT_SNAPSHOT_VERSION = 60;
 export const MAX_COMPACT_GROUND_DECALS = 64;
 export const SNAPSHOT_CODEC_VERSION = 1;
 export const SNAPSHOT_CODEC = Object.freeze({
@@ -426,7 +426,7 @@ export const UPGRADE = Object.freeze({
   SMOKE_PLUS: "smoke_plus",
   SCOUT_PLANE_UNLOCK: "scout_plane_unlock",
   DAO_OF_LIGHTNESS: "dao_of_lightness",
-  DAO_OF_BARRIERS: "dao_of_barriers",
+  DAO_OF_MAGIC: "dao_of_magic",
   DAO_OF_HEAVINESS: "dao_of_heaviness",
   ROCKETS: "rockets",
 });
@@ -443,7 +443,7 @@ export const UPGRADE_CODE = Object.freeze({
   [UPGRADE.SMOKE_PLUS]: 9,
   [UPGRADE.SCOUT_PLANE_UNLOCK]: 11,
   [UPGRADE.DAO_OF_LIGHTNESS]: 14,
-  [UPGRADE.DAO_OF_BARRIERS]: 15,
+  [UPGRADE.DAO_OF_MAGIC]: 15,
   [UPGRADE.DAO_OF_HEAVINESS]: 16,
   [UPGRADE.ROCKETS]: 12,
 });
@@ -504,7 +504,7 @@ export const ORDER_STAGE = Object.freeze({
   BARRAGE: "barrage",
   EVOLVE_LIGHTNESS: "evolveLightness",
   EVOLVE_WAR: "evolveWar",
-  EVOLVE_REALITY: "evolveReality",
+  EVOLVE_MAGIC: "evolveMagic",
   DISCIPLE_SHIELD: "discipleShield",
 
   SETUP_ANTI_TANK_GUNS: "setupAntiTankGuns",
@@ -534,7 +534,7 @@ export const ORDER_STAGE_CODE = Object.freeze({
   [ORDER_STAGE.BARRAGE]: 21,
   [ORDER_STAGE.EVOLVE_LIGHTNESS]: 22,
   [ORDER_STAGE.EVOLVE_WAR]: 23,
-  [ORDER_STAGE.EVOLVE_REALITY]: 24,
+  [ORDER_STAGE.EVOLVE_MAGIC]: 24,
   [ORDER_STAGE.DISCIPLE_SHIELD]: 25,
 
 });
@@ -555,7 +555,7 @@ export const ABILITY_CODE = Object.freeze({
   [ABILITY.BARRAGE]: 13,
   [ABILITY.EVOLVE_LIGHTNESS]: 14,
   [ABILITY.EVOLVE_WAR]: 15,
-  [ABILITY.EVOLVE_REALITY]: 16,
+  [ABILITY.EVOLVE_MAGIC]: 16,
   [ABILITY.DISCIPLE_SHIELD]: 17,
 
 });

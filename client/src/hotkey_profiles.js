@@ -21,7 +21,7 @@ const DEFAULT_EXPORT_BUILD = "unknown";
 const CLASSIC_DIRECT_BINDINGS = Object.freeze({
   [factionCommandId("cultivators", "ability", ABILITY.EVOLVE_LIGHTNESS)]: "KeyL",
   [factionCommandId("cultivators", "ability", ABILITY.EVOLVE_WAR)]: "KeyW",
-  [factionCommandId("cultivators", "ability", ABILITY.EVOLVE_REALITY)]: "KeyR",
+  [factionCommandId("cultivators", "ability", ABILITY.EVOLVE_MAGIC)]: "KeyC",
 
   "unit.move": "KeyM",
   "unit.attack": "KeyA",

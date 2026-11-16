@@ -77,3 +77,14 @@ fn disciple_insight_and_dao_append_without_changing_existing_slots() {
     assert_eq!(public[47], false);
     assert_eq!(public[48], 15);
 }
+
+#[test]
+fn chosen_dao_appends_private_intent_with_null_placeholders() {
+    let mut unit = EntityView::new(1, 1, "warrior", 320.0, 320.0, 135, 135, "idle");
+    unit.chosen_dao = Some("magic".into());
+    let value = serde_json::to_value(CompactEntity(&unit)).unwrap();
+    assert_eq!(value.as_array().unwrap().len(), 50);
+    assert!(value[48].is_null());
+    assert_eq!(value[49], "magic");
+    assert_eq!(serde_json::to_value(&unit).unwrap()["chosenDao"], "magic");
+}

@@ -1459,6 +1459,25 @@ fn use_ability(
 
     let ability = request.ability;
     let definition = ability::definition(ability);
+    if definition.effect_hook == AbilityEffectHook::Evolve {
+        let Some(owner) = players.iter().find(|candidate| candidate.id == player) else {
+            return;
+        };
+        for unit in dedupe_cap_units(request.units, request.max_units_per_command) {
+            if !ability_orders::caster_allowed_by_faction(entities, &faction_id, unit, ability) {
+                continue;
+            }
+            if let Some(entity) = entities
+                .get_mut(unit)
+                .filter(|entity| entity.owner == player)
+            {
+                if entity.choose_dao(ability) {
+                    entity.advance_chosen_dao(|choice| owner.has_upgrade(choice));
+                }
+            }
+        }
+        return;
+    }
     if request.queued && !definition.may_queue {
         return;
     }

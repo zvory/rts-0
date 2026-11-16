@@ -54,6 +54,8 @@ pub struct Entity {
     pub insight: u32,
     #[serde(default)]
     pub dao: Option<crate::game::upgrade::UpgradeKind>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chosen_dao: Option<crate::game::upgrade::UpgradeKind>,
     #[serde(default)]
     pub dao_advance_ticks: u16,
     #[serde(default)]
@@ -109,6 +111,7 @@ impl Entity {
             units_killed: 0,
             insight: 0,
             dao: None,
+            chosen_dao: None,
             dao_advance_ticks: 0,
             shield: None,
             last_damage_tick: None,
@@ -164,6 +167,7 @@ impl Entity {
             units_killed: 0,
             insight: 0,
             dao: None,
+            chosen_dao: None,
             dao_advance_ticks: 0,
             shield: None,
             last_damage_tick: None,
@@ -219,6 +223,7 @@ impl Entity {
             units_killed: 0,
             insight: 0,
             dao: None,
+            chosen_dao: None,
             dao_advance_ticks: 0,
             shield: None,
             last_damage_tick: None,
@@ -985,19 +990,11 @@ impl Entity {
         rules::combat::default_weapon_kind(self.kind)
     }
 
-    pub fn last_damage_owner(&self) -> Option<u32> {
-        self.last_damage_owner
-    }
-
     pub fn set_last_damage_owner(&mut self, owner: Option<u32>) {
         self.last_damage_owner = owner;
         if owner.is_none() {
             self.last_damage_entity = None;
         }
-    }
-
-    pub(in crate::game) fn last_damage_entity(&self) -> Option<u32> {
-        self.last_damage_entity
     }
 
     #[cfg(test)]

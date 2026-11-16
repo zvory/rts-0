@@ -350,7 +350,7 @@ export function _hpBar(g, e, status = null, ownerColor = null) {
         hilt().stroke({ color: 0x000000, width: 5 });
         hilt().stroke({ color: 0xff1645, width: 2.5 });
         icon.circle(x,y+8,2).fill(0xff1645).stroke({ color: 0x000000, width: 1 });
-      } else if (e.dao === "reality") {
+      } else if (e.dao === "magic") {
         const points = Array.from({length:5}, (_,i) => { const a = Math.PI/2 + i * Math.PI*4/5; return [x+Math.cos(a)*9,y+Math.sin(a)*9]; }).flat();
         icon.circle(x,y,10).stroke({color:0x000000,width:4});
         icon.poly(points).stroke({color:0x000000,width:4});

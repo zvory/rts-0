@@ -40,10 +40,10 @@ export function buildCultivatorCommandCardContextSamples(buildCard) {
   const ctx = (selection) => ({
     playerId: 1, factionId: CULTIVATORS_FACTION_ID, selection,
     entities: selection, resources: { steel: 1000, oil: 1000 },
-    upgrades: [UPGRADE.DAO_OF_LIGHTNESS, UPGRADE.DAO_OF_HEAVINESS, UPGRADE.DAO_OF_BARRIERS],
+    upgrades: [UPGRADE.DAO_OF_LIGHTNESS, UPGRADE.DAO_OF_HEAVINESS, UPGRADE.DAO_OF_MAGIC],
     groupCooldownClocks: () => [], playerHasCompleteKind: () => true,
   });
-  const unitCards = [null, "lightness", "war", "reality"].map((dao) => ({
+  const unitCards = [null, "lightness", "war", "magic"].map((dao) => ({
     id: `cultivators-disciple-${dao || "base"}`,
     card: buildCard(ctx([{ ...disciple, dao }])),
   }));

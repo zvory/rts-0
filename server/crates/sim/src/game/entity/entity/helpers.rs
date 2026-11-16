@@ -20,6 +20,14 @@ pub(super) fn construction_hp_for_progress(max_hp: u32, progress: u32, total: u3
 }
 
 impl super::Entity {
+    pub fn last_damage_owner(&self) -> Option<u32> {
+        self.last_damage_owner
+    }
+
+    pub(in crate::game) fn last_damage_entity(&self) -> Option<u32> {
+        self.last_damage_entity
+    }
+
     pub fn invulnerable(&self) -> bool {
         self.invulnerable
     }
