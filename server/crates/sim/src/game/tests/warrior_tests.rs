@@ -587,3 +587,69 @@ fn disciple_insight_is_team_private_but_readiness_and_advance_are_public() {
     }
     assert_eq!(game.state.entities.get(unit).unwrap().dao_advance_ticks, 0);
 }
+
+#[test]
+fn disciple_shield_does_not_identify_a_smoke_hidden_caster() {
+    use crate::game::upgrade::UpgradeKind;
+    let enemy = PlayerInit {
+        id: 2,
+        team_id: 2,
+        ..cultivator_player()
+    };
+    let mut game = empty_flat_game(&[cultivator_player(), enemy]);
+    let caster = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Warrior, 400.0, 400.0)
+        .unwrap();
+    game.state
+        .entities
+        .spawn_unit(2, EntityKind::Worker, 520.0, 400.0)
+        .unwrap();
+    game.tick();
+    let shield_id = game.state.ability_runtime.allocate_id().get();
+    let unit = game.state.entities.get_mut(caster).unwrap();
+    unit.insight = 60;
+    unit.dao = Some(UpgradeKind::DaoOfBarriers);
+    unit.place_shield(shield_id, 480.0, 400.0, 300, true);
+    game.state
+        .fog
+        .recompute(&[1, 2], &game.state.entities, &game.state.map);
+    game.state
+        .smokes
+        .spawn(400.0, 400.0, 0.75, 100, game.state.tick)
+        .unwrap();
+
+    // The caster's tile is visible, but smoke excludes its entity from the enemy snapshot.
+    assert!(game.state.fog.is_visible_world(2, 400.0, 400.0));
+    let enemy_view = game.snapshot_for(2);
+    assert!(!enemy_view.entities.iter().any(|e| e.id == caster));
+    let shield = enemy_view
+        .ability_objects
+        .iter()
+        .find(|o| o.id == shield_id)
+        .unwrap();
+    assert_eq!(shield.source_caster_id, None);
+    assert_eq!(shield.owner_state, None);
+    for snapshot in [game.snapshot_for(1), game.snapshot_full_for(2)] {
+        let shield = snapshot
+            .ability_objects
+            .iter()
+            .find(|o| o.id == shield_id)
+            .unwrap();
+        assert_eq!(shield.source_caster_id, Some(caster));
+        assert_eq!(shield.owner_state.as_ref().unwrap().hp, Some(300));
+    }
+    game.state.smokes = crate::game::smoke::SmokeCloudStore::new();
+    let visible = game.snapshot_for(2);
+    assert!(visible.entities.iter().any(|e| e.id == caster));
+    assert_eq!(
+        visible
+            .ability_objects
+            .iter()
+            .find(|o| o.id == shield_id)
+            .unwrap()
+            .source_caster_id,
+        Some(caster)
+    );
+}
