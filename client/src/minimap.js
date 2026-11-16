@@ -11,8 +11,7 @@ import {
   isUnit,
 } from "./protocol.js";
 import {
-  ABILITIES,
-  abilityCarriedByEntity,
+  ABILITIES, abilityCarriedByEntity,
   COLORS,
   MINIMAP_FOG_EXPLORED_ALPHA,
   MINIMAP_FOG_UNEXPLORED_ALPHA,
