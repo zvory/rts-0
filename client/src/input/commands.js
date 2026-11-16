@@ -695,6 +695,7 @@ export function _refreshAbilityTargetPreview() {
     artilleryLocks,
     rangeOrigins: carrierOrigins,
     pathOrigins: target.ability === ABILITY.EKAT_LINE_SHOT
+      || target.ability === ABILITY.THROW_SWORD
       || target.ability === ABILITY.SCOUT_PLANE
       ? carrierOrigins.concat(anchorOrigins)
       : [],

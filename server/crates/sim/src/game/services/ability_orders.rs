@@ -325,8 +325,11 @@ pub(crate) fn launch_world_ability(
             );
             true
         }
-        (AbilityEffectHook::LineProjectile, AbilityKind::EkatLineShot) => {
-            let Some(hero_projectile_spec) = hero_abilities::ekat_line_projectile_spec(
+        (
+            AbilityEffectHook::LineProjectile,
+            AbilityKind::EkatLineShot | AbilityKind::ThrowSword,
+        ) => {
+            let Some(mut hero_projectile_spec) = hero_abilities::ekat_line_projectile_spec(
                 entities,
                 player,
                 caster,
@@ -337,6 +340,7 @@ pub(crate) fn launch_world_ability(
             ) else {
                 return false;
             };
+            hero_projectile_spec.ability = ability;
             let target_x = hero_projectile_spec.endpoint.0;
             let target_y = hero_projectile_spec.endpoint.1;
             let mut projectile_specs = vec![hero_projectile_spec];
@@ -374,7 +378,11 @@ pub(crate) fn launch_world_ability(
             notice_positioned(
                 events,
                 player,
-                "Line Shot",
+                if ability == AbilityKind::ThrowSword {
+                    "Throw Sword"
+                } else {
+                    "Line Shot"
+                },
                 crate::protocol::NoticeSeverity::Info,
                 target_x,
                 target_y,
@@ -449,7 +457,7 @@ pub(crate) fn launch_world_ability(
 fn ability_clamps_world_target(ability: AbilityKind) -> bool {
     matches!(
         ability,
-        AbilityKind::EkatTeleport | AbilityKind::EkatLineShot
+        AbilityKind::EkatTeleport | AbilityKind::EkatLineShot | AbilityKind::ThrowSword
     )
 }
 

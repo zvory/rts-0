@@ -516,6 +516,7 @@ export function selectedAbilityAffordances(ctx, selection) {
         isOwn(ctx, e) && e.kind !== KIND.SCOUT_PLANE && definition.carriers.includes(e.kind)
         && (e.kind !== KIND.WARRIOR || (
           definition.ability.startsWith("evolve") ? !e.dao :
+          definition.ability === ABILITY.THROW_SWORD ? e.dao === "war" :
           definition.ability === ABILITY.EKAT_TELEPORT ? e.dao === "lightness" :
           (definition.ability === ABILITY.EKAT_MAGIC_ANCHOR || definition.ability === ABILITY.DISCIPLE_SHIELD) ? e.dao === "magic" : true)));
       if (carriers.length === 0) return null;

@@ -864,3 +864,78 @@ fn disciple_pending_dao_advances_on_combat_insight_without_interrupting_attack()
     assert!(matches!(entity.order(), Order::Attack(_)));
     assert!(game.state.entities.get(target).unwrap().hp < 135);
 }
+
+#[test]
+fn war_throw_sword_is_dao_gated_and_hits_harder_on_return_after_checkpoint() {
+    use crate::game::ability::AbilityKind;
+    use crate::game::upgrade::UpgradeKind;
+    let mut game = empty_flat_game(&[cultivator_player(), human_vs_ai_players()[1].clone()]);
+    let caster = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Warrior, 400.0, 400.0)
+        .unwrap();
+    let victim = game
+        .state
+        .entities
+        .spawn_building(2, EntityKind::ResourceDepot, 560.0, 400.0, true)
+        .unwrap();
+    let cast = Command::UseAbility {
+        ability: AbilityKind::ThrowSword,
+        units: vec![caster],
+        x: Some(1000.0),
+        y: Some(400.0),
+        queued: false,
+    };
+    for dao in [
+        None,
+        Some(UpgradeKind::DaoOfLightness),
+        Some(UpgradeKind::DaoOfMagic),
+    ] {
+        game.state.entities.get_mut(caster).unwrap().dao = dao;
+        game.enqueue(1, cast.clone());
+        game.tick();
+        assert_eq!(game.state.ability_runtime.world_objects().count(), 0);
+    }
+    game.state.entities.get_mut(caster).unwrap().insight = 60;
+    game.state.entities.get_mut(caster).unwrap().dao = Some(UpgradeKind::DaoOfHeaviness);
+    game.enqueue(1, cast);
+    game.tick();
+    let object = game.state.ability_runtime.world_objects().next().unwrap();
+    assert_eq!(object.ability, AbilityKind::ThrowSword);
+    assert_eq!(
+        game.state
+            .entities
+            .get(caster)
+            .unwrap()
+            .ability_cooldown_ticks(AbilityKind::ThrowSword),
+        config::EKAT_LINE_SHOT_COOLDOWN_TICKS - 1
+    );
+    for _ in 0..22 {
+        game.tick();
+    }
+    assert_eq!(
+        game.state.entities.get(victim).unwrap().hp,
+        140,
+        "exactly one 40 damage outbound hit"
+    );
+    // A round trip through a checkpoint retains the projectile identity, leg and hit sets.
+    let checkpoint = game.checkpoint_payload_text_for_test().unwrap();
+    let mut restored = Game::restore_checkpoint_payload_text_for_test(
+        &checkpoint,
+        game.state.map.clone(),
+        game.state.map_metadata.clone(),
+    )
+    .unwrap();
+    for _ in 0..30 {
+        game.tick();
+        restored.tick();
+    }
+    assert_eq!(
+        game.state.entities.get(victim).unwrap().hp,
+        60,
+        "exactly one 80 damage return hit"
+    );
+    assert_eq!(restored.state.entities.get(victim).unwrap().hp, 60);
+    assert_eq!(game.state.ability_runtime.world_objects().count(), 0);
+}

@@ -311,6 +311,7 @@ export const ABILITY = Object.freeze({
   EVOLVE_WAR: "evolveWar",
   EVOLVE_MAGIC: "evolveMagic",
   DISCIPLE_SHIELD: "discipleShield",
+  THROW_SWORD: "throwSword",
 
 });
 
@@ -506,6 +507,7 @@ export const ORDER_STAGE = Object.freeze({
   EVOLVE_WAR: "evolveWar",
   EVOLVE_MAGIC: "evolveMagic",
   DISCIPLE_SHIELD: "discipleShield",
+  THROW_SWORD: "throwSword",
 
   SETUP_ANTI_TANK_GUNS: "setupAntiTankGuns",
 });
@@ -536,6 +538,7 @@ export const ORDER_STAGE_CODE = Object.freeze({
   [ORDER_STAGE.EVOLVE_WAR]: 23,
   [ORDER_STAGE.EVOLVE_MAGIC]: 24,
   [ORDER_STAGE.DISCIPLE_SHIELD]: 25,
+  [ORDER_STAGE.THROW_SWORD]: 26,
 
 });
 
@@ -557,6 +560,7 @@ export const ABILITY_CODE = Object.freeze({
   [ABILITY.EVOLVE_WAR]: 15,
   [ABILITY.EVOLVE_MAGIC]: 16,
   [ABILITY.DISCIPLE_SHIELD]: 17,
+  [ABILITY.THROW_SWORD]: 18,
 
 });
 

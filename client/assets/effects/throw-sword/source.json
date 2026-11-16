@@ -1,0 +1,10 @@
+{
+  "tool": "built-in image_gen",
+  "reference": "client/assets/rigs/warrior-placeholder-pass-01/generated/warrior-runtime-strip.png",
+  "prompt": "Use the existing Disciple attack strip as reference. Create one isolated curved silver dao sword matching its rightmost attack frame: dark steel spine, bright silver edge, brass guard, brown wrapped handle. Top-down painted game sprite, horizontal handle left and tip right, centered with transparent padding. No person, hands, motion trails, glow, circle, text, or background. True alpha; rotate programmatically.",
+  "runtime": "sword.png",
+  "generatedSize": [
+    2172,
+    724
+  ]
+}

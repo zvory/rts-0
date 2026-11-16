@@ -250,6 +250,13 @@ fn apply_projectile_hits(
     if projectile.damage == 0 {
         return;
     }
+    let base_damage = if projectile.ability == AbilityKind::ThrowSword
+        && projectile.leg == AbilityProjectileLeg::Return
+    {
+        projectile.damage.saturating_mul(2)
+    } else {
+        projectile.damage
+    };
     let mut hits = Vec::new();
     for id in spatial.all_ids() {
         let Some(target) = entities.get(id) else {
@@ -272,7 +279,7 @@ fn apply_projectile_hits(
     for (id, _) in hits {
         projectile.hits_for_current_leg().insert(id);
         let damage = entities.get(id).map_or(0, |target| {
-            map.damage_after_reduction_tile(target.pos_x(), target.pos_y(), projectile.damage)
+            map.damage_after_reduction_tile(target.pos_x(), target.pos_y(), base_damage)
         });
         let damage = entities.shielded_damage(id, projectile.owner, damage, teams);
         if let Some(target) = entities.get_mut(id) {

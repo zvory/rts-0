@@ -491,6 +491,7 @@ export function _drawAbilityTargetPreview(view) {
 
 export function _drawAbilityObjects(state) {
   const objects = state?.abilityObjects;
+  this._throwSwordVisuals?.update(objects, this._renderClock?.now?.() ?? performance.now());
   if (!Array.isArray(objects) || objects.length === 0) {
     if (this._lineProjectileTrails) this._lineProjectileTrails.clear();
     return;
@@ -519,7 +520,7 @@ export function _drawAbilityObjects(state) {
     } else if (object.kind === ABILITY_OBJECT_KIND.LINE_PROJECTILE) {
       const r = Math.max(5, object.ownerState?.radius || ts * 0.18);
       activeLineProjectileIds.add(object.id);
-      drawLineProjectile(g, object, r, this._lineProjectileTrails);
+      if (object.ability !== ABILITY.THROW_SWORD) drawLineProjectile(g, object, r, this._lineProjectileTrails);
     }
   }
 
