@@ -54,7 +54,7 @@ pub struct Entity {
     pub insight: u32,
     #[serde(default)]
     pub dao: Option<crate::game::upgrade::UpgradeKind>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub chosen_dao: Option<crate::game::upgrade::UpgradeKind>,
     #[serde(default)]
     pub dao_advance_ticks: u16,
