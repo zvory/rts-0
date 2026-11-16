@@ -67,4 +67,13 @@ fn disciple_insight_and_dao_append_without_changing_existing_slots() {
     assert_eq!(value[45], 60);
     assert_eq!(value[46], "war");
     assert!(value[44].is_null());
+    unit.insight = None;
+    unit.dao_ready = Some(false);
+    unit.dao_advance_ticks = Some(15);
+    let public = serde_json::to_value(CompactEntity(&unit)).unwrap();
+    assert_eq!(public.as_array().unwrap().len(), 49);
+    assert!(public[45].is_null());
+    assert_eq!(public[46], "war");
+    assert_eq!(public[47], false);
+    assert_eq!(public[48], 15);
 }
