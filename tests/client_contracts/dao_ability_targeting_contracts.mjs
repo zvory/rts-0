@@ -1,6 +1,7 @@
 import { assert, assertDeepEqual } from "./assertions.mjs";
 import { ABILITY, KIND } from "../../client/src/protocol.js";
 import { Input } from "../../client/src/input/index.js";
+import { Minimap } from "../../client/src/minimap.js";
 import { ClientIntent } from "../../client/src/client_intent.js";
 import { groupCooldownClocks } from "../../client/src/hud.js";
 import { selectedAbilityAffordances } from "../../client/src/hud_command_card.js";
@@ -36,6 +37,15 @@ swordInput._addCommandFeedback = () => {};
 swordInput._issueTargetedCommand(swordInput.mouse);
 assertDeepEqual(swordCommands[0].units, [101],
   "Throw Sword commands include the same eligible carriers as the preview");
+const swordMinimap = Object.create(Minimap.prototype);
+swordMinimap.state = swordInput.state;
+swordMinimap._intent = () => swordInput.clientIntent;
+swordMinimap.commandInteraction = swordInput.commandInteraction;
+swordMinimap._addCommandFeedback = () => {};
+swordMinimap._issueOrder(500, 220, true);
+assertDeepEqual(swordCommands[1].units, [101],
+  "Minimap Throw Sword commands exclude other Dao paths and enemy Disciples");
+assert(swordCommands[1].queued, "Minimap Throw Sword retains queued targeting");
 const swordAffordance = selectedAbilityAffordances({
   playerId: 1, factionId: "cultivators", groupCooldownClocks,
 }, swordSelection)

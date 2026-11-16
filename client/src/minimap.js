@@ -12,6 +12,7 @@ import {
 } from "./protocol.js";
 import {
   ABILITIES,
+  abilityCarriedByEntity,
   COLORS,
   MINIMAP_FOG_EXPLORED_ALPHA,
   MINIMAP_FOG_UNEXPLORED_ALPHA,
@@ -1428,7 +1429,7 @@ export class Minimap {
       const carriers = definition?.carriers;
       const abilityUnits = Array.isArray(carriers)
         ? sel
-            .filter((e) => ownOwner(this.state, e.owner, this.controlPolicy) && carriers.includes(e.kind))
+            .filter((e) => ownOwner(this.state, e.owner, this.controlPolicy) && abilityCarriedByEntity(definition, e))
             .map((e) => e.id)
         : landUnitIds;
       if (abilityUnits.length === 0) return;
