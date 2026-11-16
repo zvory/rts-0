@@ -50,6 +50,9 @@ export function createDaoCorona(pixi = globalThis.PIXI) {
         this.coronaFilter = new pixi.Filter({
           glProgram: pixi.GlProgram.from({ vertex: VERTEX, fragment: FRAGMENT, name: "dao-tight-corona" }),
           resources: { coronaUniforms: this.coronaUniforms },
+          // The shader maps the entire filter quad to a centered corona. Cropping
+          // that quad at the viewport edge would recenter and squash the glow.
+          clipToViewport: false,
         });
         this.coronaFilter.padding = 0;
         this.filters = [this.coronaFilter];

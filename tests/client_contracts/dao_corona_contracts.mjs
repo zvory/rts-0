@@ -29,6 +29,7 @@ assert.equal(corona.blendMode, "add");
 assert.equal(corona.coronaUniforms.uniforms.uTime, 1.2);
 assert.deepEqual(corona.bounds, [-32, -12, 64, 64]);
 const filter = corona.coronaFilter;
+assert.equal(filter.clipToViewport, false, "offscreen clipping must not remap the procedural corona's coordinates");
 corona.update({ daoAdvanceTicks: 15 }, 20, 1300);
 const initialWidth = corona.bounds[2];
 const initialStrength = corona.coronaUniforms.uniforms.uStrength;
