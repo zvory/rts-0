@@ -56,9 +56,7 @@ impl Entity {
     pub(crate) fn movement_speed(&self) -> f32 {
         let base = config::unit_stats(self.kind).map_or(0.0, |s| s.speed);
         match self.dao {
-            Some(UpgradeKind::DaoOfLightness) => {
-                config::unit_stats(EntityKind::ScoutCar).map_or(base, |s| s.speed)
-            }
+            Some(UpgradeKind::DaoOfLightness) => config::dao_lightness_speed(),
             Some(UpgradeKind::DaoOfBarriers) => base * config::DAO_REALITY_SPEED_MULTIPLIER,
             _ => base,
         }
