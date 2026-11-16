@@ -75,6 +75,7 @@ const BUILDING_PNG_SPECS = Object.freeze([
     "/assets/rigs/barbed-wire-tangled/barbed-wire.png?v=tangled-01",
     {
       silhouetteShadow: false,
+      omitFootprintShadow: true,
       componentRig: {
         parts: [{ id: "part.base", drawOrder: 10, column: 0, originX: 128, originY: 128 }],
         animations: [],
