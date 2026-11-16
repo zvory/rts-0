@@ -112,6 +112,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   "UPGRADES",
   "WORKER_BUILDABLE",
   "WORKER_BUILD_CARD_SLOTS",
+  "abilityCarriedByEntity",
   "commandCardAbilitiesForFaction",
   "doodadSizeVariation",
   "factionCatalog",
