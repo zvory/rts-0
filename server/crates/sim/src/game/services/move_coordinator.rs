@@ -26,7 +26,7 @@ use crate::game::entity::{
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::geometry::{
-    building_rect_for_entity, circle_intersects_rect, closest_combat_target_point, tile_rect,
+    building_rect_for_entity, circle_intersects_rect, primary_combat_target_point, tile_rect,
     unit_bodies_intersect, unit_body, unit_body_for_entity, unit_body_with_facing, CircleBody,
     RectBody, UnitBody,
 };
@@ -754,7 +754,8 @@ impl<'a> MoveCoordinator<'a> {
         let Some(target) = entities.get(target) else {
             return false;
         };
-        let target_point = closest_combat_target_point(self.map, attacker_pos, target);
+        let target_point =
+            primary_combat_target_point(self.map, attacker.kind, attacker_pos, target);
         let Some(goal) = direct_attack_staging_goal(
             self.map,
             attacker_pos,

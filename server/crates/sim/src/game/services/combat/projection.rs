@@ -38,6 +38,28 @@ pub(super) fn combat_target_distance_sq(map: &Map, attacker: (f32, f32), target:
     }
 }
 
+/// Primary melee weapons measure vehicle range to the same hull used by collision and pursuit.
+pub(super) fn primary_target_distance_sq(
+    map: &Map,
+    kind: EntityKind,
+    start: (f32, f32),
+    target: &Entity,
+) -> f32 {
+    if target.is_building() {
+        return combat_target_distance_sq(map, start, target);
+    }
+    let point =
+        crate::game::services::geometry::primary_combat_target_point(map, kind, start, target);
+    let dx = start.0 - point.0;
+    let dy = start.1 - point.1;
+    let distance_sq = dx * dx + dy * dy;
+    if distance_sq.is_finite() {
+        distance_sq
+    } else {
+        f32::INFINITY
+    }
+}
+
 /// Conservative spatial-query padding for buildings whose edge is inside range but center is not.
 pub(super) fn max_building_combat_extent_px() -> f32 {
     let half_tile = config::TILE_SIZE as f32 * 0.5;

@@ -2,7 +2,7 @@ use crate::game::entity::{Entity, EntityKind, EntityStore};
 use crate::rules::terrain::{self, TerrainKind};
 
 use super::projection::{
-    combat_target_distance_sq, friendly_hard_blocker_between, shot_hits_intended_target,
+    friendly_hard_blocker_between, primary_target_distance_sq, shot_hits_intended_target,
 };
 use super::shot_blocker_index::ShotBlockerIndex;
 use super::{Fog, LineOfSight, Map, SmokeCloudStore, TeamRelations};
@@ -127,7 +127,7 @@ pub(super) fn auto_target_candidate(
     let concealment = terrain::concealment_modifier(target.kind, TerrainKind::Open).max(0.0);
     let effective_acquire_px = acquire_px * concealment;
     let effective_weapon_range_px = weapon_range_px * concealment;
-    let distance_sq = combat_target_distance_sq(map, start, target);
+    let distance_sq = primary_target_distance_sq(map, attacker.kind, start, target);
     if !distance_sq.is_finite()
         || !effective_acquire_px.is_finite()
         || distance_sq > effective_acquire_px * effective_acquire_px
