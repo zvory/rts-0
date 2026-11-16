@@ -5,6 +5,22 @@
 import { ABILITY, KIND, UPGRADE } from "../protocol.js";
 import { TICK_HZ } from "./timing.js";
 
+// Carrier identity includes permanent Dao specialization, independently of cooldown/readiness.
+export function abilityCarriedByEntity(definition, entity) {
+  if (!definition?.carriers?.includes(entity.kind)) return false;
+  if (entity.kind !== KIND.WARRIOR) return true;
+  switch (definition.ability) {
+    case ABILITY.EVOLVE_LIGHTNESS:
+    case ABILITY.EVOLVE_WAR:
+    case ABILITY.EVOLVE_MAGIC: return !entity.dao;
+    case ABILITY.THROW_SWORD: return entity.dao === "war";
+    case ABILITY.EKAT_TELEPORT: return entity.dao === "lightness";
+    case ABILITY.EKAT_MAGIC_ANCHOR:
+    case ABILITY.DISCIPLE_SHIELD: return entity.dao === "magic";
+    default: return true;
+  }
+}
+
 // Mirrors server/src/config.rs *_BODY_* values. Server collision is authoritative;
 // the client uses these only for art, selection, and advisory placement previews.
 export const TANK_BODY = Object.freeze({

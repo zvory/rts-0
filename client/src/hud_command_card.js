@@ -1,6 +1,7 @@
 import { ABILITY, DEFAULT_FACTION_ID, KIND, SETUP, UPGRADE, isBuilding, isUnit } from "./protocol.js";
 import {
   STATS,
+  abilityCarriedByEntity,
   statsForFaction,
   UPGRADES,
   commandCardAbilitiesForFaction,
@@ -513,12 +514,7 @@ export function selectedAbilityAffordances(ctx, selection) {
   return commandCardAbilitiesForFaction(commandFactionId(ctx))
     .map((definition) => {
       const carriers = (selection || []).filter((e) =>
-        isOwn(ctx, e) && e.kind !== KIND.SCOUT_PLANE && definition.carriers.includes(e.kind)
-        && (e.kind !== KIND.WARRIOR || (
-          definition.ability.startsWith("evolve") ? !e.dao :
-          definition.ability === ABILITY.THROW_SWORD ? e.dao === "war" :
-          definition.ability === ABILITY.EKAT_TELEPORT ? e.dao === "lightness" :
-          (definition.ability === ABILITY.EKAT_MAGIC_ANCHOR || definition.ability === ABILITY.DISCIPLE_SHIELD) ? e.dao === "magic" : true)));
+        isOwn(ctx, e) && e.kind !== KIND.SCOUT_PLANE && abilityCarriedByEntity(definition, e));
       if (carriers.length === 0) return null;
       const unlocked = abilityUnlocked(ctx, definition);
       const evolution = definition.ability.startsWith("evolve");

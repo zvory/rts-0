@@ -31,6 +31,7 @@ export {
 
 export {
   ABILITIES,
+  abilityCarriedByEntity,
   ANTI_TANK_GUN_BODY,
   ANTI_TANK_GUN_DEPLOYED_RANGE_TILES,
   ANTI_TANK_GUN_FIELD_OF_FIRE_RAD,

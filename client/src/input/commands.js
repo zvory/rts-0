@@ -11,6 +11,7 @@ import {
 } from "../protocol.js";
 import {
   ABILITIES,
+  abilityCarriedByEntity,
   MINING_ANCHOR_RANGE_TILES,
   SCOUT_PLANE_SPEED_PX_PER_TICK,
   STATS,
@@ -114,7 +115,7 @@ export function _issueTargetedCommand(p, ev = {}) {
     const units = Array.isArray(carriers)
       ? this.state
           .selectedEntities()
-          .filter((e) => ownOwner(this.state, e.owner, this.controlPolicy) && carriers.includes(e.kind))
+          .filter((e) => ownOwner(this.state, e.owner, this.controlPolicy) && abilityCarriedByEntity(definition, e))
           .map((e) => e.id)
       : ownUnits;
     if (units.length === 0) return true;
@@ -584,7 +585,7 @@ export function _refreshAbilityTargetPreview() {
   }
   const carriers = this.state
     .selectedEntities()
-    .filter((e) => ownOwner(this.state, e.owner, this.controlPolicy) && definition.carriers.includes(e.kind))
+    .filter((e) => ownOwner(this.state, e.owner, this.controlPolicy) && abilityCarriedByEntity(definition, e))
     .map((e) => plannedEntityForIntent(intent, e));
   if (carriers.length === 0) {
     intent?.updateAbilityTargetPreview?.(null);
