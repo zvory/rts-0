@@ -445,9 +445,12 @@ function frameStripMovementFor(entity, previous, current, motion = new Map(), ti
   state.weaponRecoilPhase = () => 0.2;
   state.weaponRecoilKind = () => WEAPON_KIND.WARRIOR_SWORD;
   assert(sample(3100).part === "frame:5", "stationary disciple still shows its sword attack");
-  animation.beginFrame([], state, 3200);
   delete state.weaponRecoil; delete state.weaponRecoilPhase; delete state.weaponRecoilKind;
   disciple.state = STATE.MOVE;
-  assert(sample(3300).part === "frame:0", "returning disciple does not inherit removed motion");
+  state.tick++; state._curById.set(6, { x: 112, y: 100 }); disciple.x = 112;
+  assert(sample(3200).part !== "frame:0", "disciple is walking before removal");
+  animation.beginFrame([], state, 3210);
+  state.tick++; state._prevById.set(6, { x: 112, y: 100 });
+  assert(sample(3220).part === "frame:0", "returning disciple does not inherit removed motion within the movement hold");
   animation.destroy();
 }
