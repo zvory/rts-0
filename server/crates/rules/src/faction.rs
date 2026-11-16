@@ -30,7 +30,7 @@ pub enum UpgradeKind {
     ScoutPlaneUnlock,
     Rockets,
     DaoOfLightness,
-    DaoOfBarriers,
+    DaoOfMagic,
     DaoOfHeaviness,
 }
 
@@ -48,7 +48,7 @@ impl UpgradeKind {
         Self::ScoutPlaneUnlock,
         Self::Rockets,
         Self::DaoOfLightness,
-        Self::DaoOfBarriers,
+        Self::DaoOfMagic,
         Self::DaoOfHeaviness,
     ];
 
@@ -66,7 +66,7 @@ impl UpgradeKind {
             Self::ScoutPlaneUnlock => "scout_plane_unlock",
             Self::Rockets => "rockets",
             Self::DaoOfLightness => "dao_of_lightness",
-            Self::DaoOfBarriers => "dao_of_barriers",
+            Self::DaoOfMagic => "dao_of_magic",
             Self::DaoOfHeaviness => "dao_of_heaviness",
         }
     }
@@ -105,7 +105,7 @@ pub enum AbilityKind {
     Barrage,
     EvolveLightness,
     EvolveWar,
-    EvolveReality,
+    EvolveMagic,
     DiscipleShield,
 }
 
@@ -126,7 +126,7 @@ impl AbilityKind {
         Self::Barrage,
         Self::EvolveLightness,
         Self::EvolveWar,
-        Self::EvolveReality,
+        Self::EvolveMagic,
         Self::DiscipleShield,
     ];
 
@@ -147,7 +147,7 @@ impl AbilityKind {
             Self::Barrage => "barrage",
             Self::EvolveLightness => "evolveLightness",
             Self::EvolveWar => "evolveWar",
-            Self::EvolveReality => "evolveReality",
+            Self::EvolveMagic => "evolveMagic",
             Self::DiscipleShield => "discipleShield",
         }
     }
@@ -768,7 +768,7 @@ const CULTIVATORS_UPGRADES: [UpgradeCatalogEntry; 3] = [
         researched_at: EntityKind::ThreeDaoPavilion,
     },
     UpgradeCatalogEntry {
-        kind: UpgradeKind::DaoOfBarriers,
+        kind: UpgradeKind::DaoOfMagic,
         researched_at: EntityKind::ThreeDaoPavilion,
     },
     UpgradeCatalogEntry {
@@ -1046,7 +1046,7 @@ pub fn ability_definition(kind: AbilityKind) -> AbilityCatalogEntry {
         AbilityKind::Barrage => barrage,
         AbilityKind::EvolveLightness => CULTIVATOR_ABILITIES[0],
         AbilityKind::EvolveWar => CULTIVATOR_ABILITIES[1],
-        AbilityKind::EvolveReality => CULTIVATOR_ABILITIES[2],
+        AbilityKind::EvolveMagic => CULTIVATOR_ABILITIES[2],
         AbilityKind::DiscipleShield => CULTIVATOR_ABILITIES[5],
     }
 }
@@ -1079,7 +1079,7 @@ pub fn upgrade_definition(kind: UpgradeKind) -> UpgradeCatalogEntry {
         UpgradeKind::ScoutPlaneUnlock => scout_plane_unlock,
         UpgradeKind::Rockets => rockets,
         UpgradeKind::DaoOfLightness => CULTIVATORS_UPGRADES[0],
-        UpgradeKind::DaoOfBarriers => CULTIVATORS_UPGRADES[1],
+        UpgradeKind::DaoOfMagic => CULTIVATORS_UPGRADES[1],
         UpgradeKind::DaoOfHeaviness => CULTIVATORS_UPGRADES[2],
     }
 }
@@ -1374,7 +1374,7 @@ mod tests {
         for ability in [
             AbilityKind::EvolveLightness,
             AbilityKind::EvolveWar,
-            AbilityKind::EvolveReality,
+            AbilityKind::EvolveMagic,
             AbilityKind::DiscipleShield,
             AbilityKind::EkatTeleport,
             AbilityKind::EkatMagicAnchor,

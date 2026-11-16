@@ -257,11 +257,19 @@ pub fn project_entity(
         view.dao_ready =
             Some(entity.dao.is_none() && entity.insight >= config::DISCIPLE_INSIGHT_REQUIRED);
         view.dao_advance_ticks = (entity.dao_advance_ticks > 0).then_some(entity.dao_advance_ticks);
+        view.chosen_dao = entity.chosen_dao.filter(|_| owner_or_ally).map(|dao| {
+            match dao {
+                crate::game::upgrade::UpgradeKind::DaoOfLightness => "lightness",
+                crate::game::upgrade::UpgradeKind::DaoOfHeaviness => "war",
+                _ => "magic",
+            }
+            .to_string()
+        });
         view.dao = entity.dao.map(|dao| {
             match dao {
                 crate::game::upgrade::UpgradeKind::DaoOfLightness => "lightness",
                 crate::game::upgrade::UpgradeKind::DaoOfHeaviness => "war",
-                _ => "reality",
+                _ => "magic",
             }
             .to_string()
         });

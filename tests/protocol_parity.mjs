@@ -337,7 +337,7 @@ assert(
   "compact snapshot scalar schema must match JS decoder",
 );
 assert(
-  protocolContract.compactSlotSchemas.entity.at(-1).name === "daoAdvanceTicks",
+  protocolContract.compactSlotSchemas.entity.at(-1).name === "chosenDao",
   "compact entity slot schema must include the latest appended field",
 );
 assert(
@@ -776,3 +776,11 @@ console.log("✅ protocol_parity.mjs: Rust protocol contract dump matches JS mir
 assert(JSON.stringify(cmd.pointTanks([1, 2], 300, 400)) === JSON.stringify({ c: "pointTanks", units: [1, 2], x: 300, y: 400 }), "Point command preserves one group target");
 
 assert(JSON.stringify(cmd.pointTanks([1], 300, 400, true)) === JSON.stringify({ c: "pointTanks", units: [1], x: 300, y: 400, queued: true }), "Point command supports queueing");
+
+const pendingDaoRecord = [44, 1, 29, 320, 320, 135, 135, 1];
+while (pendingDaoRecord.length < 50) pendingDaoRecord.push(null);
+pendingDaoRecord[45] = 15;
+pendingDaoRecord[49] = "magic";
+const pendingDaoSnapshot = decodeServerMessage({ t: "snapshot", v: COMPACT_SNAPSHOT_VERSION,
+  s: [1, 0, 0, 2, 10], e: [pendingDaoRecord], n: [0, 0, 0, 0, 0] });
+assert(pendingDaoSnapshot.entities[0].chosenDao === "magic", "compact private Dao intent decodes at slot 49");

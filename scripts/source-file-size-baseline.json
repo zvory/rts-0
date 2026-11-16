@@ -30,8 +30,8 @@
     },
     {
       "path": "server/crates/sim/src/game/services/commands.rs",
-      "lines": 2092,
-      "reason": "Tank Trap cluster admission captures a fog-safe authoritative target set and applies per-unit weapon legality through the shared planner; keep ratcheting by extracting cohesive targeted-command admission and execution."
+      "lines": 2111,
+      "reason": "Dao choice admission runs before ordinary ability research and queue gates so pending evolution can be replaced without changing combat orders; it reuses bounded unit admission and faction checks. Keep ratcheting by extracting cohesive targeted-command admission and execution."
     },
     {
       "path": "server/crates/sim/src/game/services/move_coordinator.rs",

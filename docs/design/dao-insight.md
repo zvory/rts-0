@@ -3,9 +3,18 @@
 Phase 0/1 briefs and rules (completed before implementation): each path is a permanent
 specialization of the existing Disciple, retaining its entity identity, orders, cost,
 supply (2), sight, size, melee range and ordinary ground pathing. No additional
-training source or build time. Evolution is immediate and free after 60 actual hostile
+training source or build time. A Dao button assigns its path to every selected, owned, unevolved Disciple, even before
+research or insight are ready. Selecting another path replaces the pending choice. This
+entity-owned intent is independent of orders: moving, attacking, Stop, and queued orders
+do not cancel it. No automatic research purchase, Portal default, or army-wide promotion
+is added. Evolution is immediate and free once the chosen research is complete and the unit has 60 actual hostile
 HP damage dealt, capped at 60; misses, friendly fire, invulnerability and overkill grant
 no extra insight. One evolution per unit. Player research persists after Pavilion loss.
+The choice clears on evolution; evolved units cannot change paths. Pending choices persist
+through checkpoints and are visible only to teammates and privileged observers. The command
+card highlights chosen paths with an assigned/eligible count; tooltips show missing research
+and insight, and unit details show the pending path. Automatic evolution runs after combat,
+research production, and ability runtime each tick, skipping dead units.
 All three existing Pavilion research slots retain 200 steel / 100 oil / 20 seconds,
 serial research queue and existing prerequisite/faction gates.
 
@@ -15,7 +24,7 @@ serial research queue and existing prerequisite/faction gates.
 - War: armored melee damage dealer; 1.5 damage, +20 current/max HP, 50% armor
   reduction using the existing penetration mechanic (full AP bypasses it), keeps the Disciple's existing
   50% armor penetration. A centered neon-red sword with black outline identifies it, rotated 90 degrees and lengthened 20%. Classic W; grid X.
-- Reality: battlefield support; 1.1 base movement speed, existing Ekat pull field (renamed Anchor) and a new Shield, a centered green pentagram with black outline identifies it. Classic R; grid C. Bespoke rigs and audio remain deferred for this prototype.
+- Magic: battlefield support; 1.1 base movement speed, existing Ekat pull field (renamed Anchor) and a new Shield, a centered green pentagram with black outline identifies it. Classic C; grid C. Bespoke rigs and audio remain deferred for this prototype.
 
 Each path has a separate researched unlock. No automatic AI evolution in this pass;
 AI can encounter and damage evolved units. Insight uses a blue fill over red background
@@ -31,7 +40,7 @@ Labels split after “Dao of”. Visible enemies
 see the unit radiance, with ordinary fog filtering. Realm advancement projects a 15-tick
 (half-second) expanding gold corona reaching about one tile, independently of insight privacy.
 
-Reality Disciples can place Shield within five tiles: a shimmering circle with the same
+Magic Disciples can place Shield within five tiles: a shimmering circle with the same
 three-tile radius as Anchor, covering allied units (including the caster). One shared pool
 absorbs 300 hostile damage after normal armor/terrain reductions; overflow damages the
 unit, and depletion removes the field immediately. Friendly fire, environmental damage,

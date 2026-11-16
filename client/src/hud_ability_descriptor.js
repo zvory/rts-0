@@ -8,13 +8,16 @@ export function abilityButtonDescriptor({
   active,
 }) {
   const definition = affordance.definition;
+  const evolution = definition.ability.startsWith("evolve");
   const recastActive = affordance.recastTargetObjectId != null;
   const readyCount = recastActive ? affordance.recastReadyIds.length : affordance.readyIds.length;
-  const commandableCount = recastActive
+  const commandableCount = evolution ? affordance.carrierIds.length : recastActive
     ? affordance.recastReadyIds.length
     : definition.queuePolicy === "waitUntilReady"
       ? affordance.queueAdmissibleIds.length
       : affordance.readyIds.length;
+  const chosenCount = evolution && affordance.chosenIds.length
+    ? `${affordance.chosenIds.length}/${affordance.carrierIds.length}` : "";
   const showReadyCount = readyCount < affordance.carrierIds.length;
   const showChargeCount = definition.ability !== ABILITY.BARRAGE &&
     definition.charges != null && affordance.remainingUsesTotal != null;
@@ -38,9 +41,9 @@ export function abilityButtonDescriptor({
         `<span class="cmd-tooltip-desc">${disabledReason}</span>`
       : "",
     ability: definition.ability,
-    enabled: affordance.unlocked && commandableCount > 0 && affordance.affordable,
+    enabled: (evolution || affordance.unlocked) && commandableCount > 0 && affordance.affordable,
     unaffordable: affordance.unlocked && commandableCount > 0 && !affordance.affordable,
-    countBadge: showChargeCount
+    countBadge: evolution ? chosenCount : showChargeCount
       ? `${affordance.remainingUsesTotal}`
       : (showReadyCount ? `${readyCount}` : ""),
     cooldownClocks: affordance.cooldownClocks,
@@ -48,7 +51,7 @@ export function abilityButtonDescriptor({
     cls: [
       active ? "active" : "",
       definition.ability.startsWith("evolve") ? "dao-choice" : "",
-      definition.ability.startsWith("evolve") && affordance.unlocked && commandableCount > 0 && affordance.affordable ? "dao-ready" : "",
+      definition.ability.startsWith("evolve") && affordance.unlocked && readyCount > 0 && affordance.affordable ? "dao-ready" : "",
       affordance.autocastEnabledIds.length > 0 ? "autocast-enabled" : "",
     ].filter(Boolean).join(" "),
     onUnavailableIntent: { type: "playNotEnough", cost: affordance.cost },

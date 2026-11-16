@@ -110,7 +110,7 @@ pub fn definition(kind: UpgradeKind) -> UpgradeDefinition {
             cost_oil: crate::config::SCOUT_PLANE_UNLOCK_COST_OIL,
             research_ticks: crate::config::SCOUT_PLANE_UNLOCK_RESEARCH_TICKS,
         },
-        UpgradeKind::DaoOfLightness | UpgradeKind::DaoOfBarriers | UpgradeKind::DaoOfHeaviness => {
+        UpgradeKind::DaoOfLightness | UpgradeKind::DaoOfMagic | UpgradeKind::DaoOfHeaviness => {
             UpgradeDefinition {
                 kind,
                 researched_at: catalog.researched_at,
@@ -171,7 +171,7 @@ mod tests {
             researchable_upgrades(EntityKind::ThreeDaoPavilion),
             vec![
                 UpgradeKind::DaoOfLightness,
-                UpgradeKind::DaoOfBarriers,
+                UpgradeKind::DaoOfMagic,
                 UpgradeKind::DaoOfHeaviness
             ]
         );

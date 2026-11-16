@@ -97,4 +97,4 @@ mod tests {
 
 // MG prototype: Attack.shotOrigin (compact v57, slot 6) fixes the ray origin; toPos fixes its endpoint.
 
-// Disciple EntityView insight/dao/daoReady/daoAdvanceTicks are re-exported from rts-contract (slots 45–48).
+// Disciple EntityView insight/dao/daoReady/daoAdvanceTicks/chosenDao are re-exported from rts-contract (slots 45–49).

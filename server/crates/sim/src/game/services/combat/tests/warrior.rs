@@ -123,6 +123,6 @@ fn war_armor_uses_weapon_penetration_and_lightness_changes_attack_rate() {
             .unwrap()
             .speed
     );
-    unit.dao = Some(UpgradeKind::DaoOfBarriers);
+    unit.dao = Some(UpgradeKind::DaoOfMagic);
     assert!((unit.movement_speed() - 1.76).abs() < 0.001);
 }

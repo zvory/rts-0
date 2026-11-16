@@ -17,6 +17,7 @@ import {
   abilityRemainingUses,
   abilityUnitQueueAdmissible,
   abilityUnitReady,
+  intentAbilityIds,
 } from "./hud_ability_affordance.js";
 import {
   attackDescriptor,
@@ -310,6 +311,7 @@ export function buildUnitCard(ctx, selection) {
       `${affordance.definition.ability}:${affordance.unlocked ? 1 : 0}:${affordance.affordable ? 1 : 0}:` +
       `${affordance.depletedCount}:` +
       `${affordance.remainingUsesTotal ?? ""}:` +
+      `${affordance.chosenIds.join(".")}:` +
       `${affordance.readyIds.join(".")}:` +
       `${affordance.queueAdmissibleIds.join(".")}:` +
       `${affordance.autocastEnabledIds.join(".")}:` +
@@ -373,7 +375,8 @@ function abilityDescriptor(ctx, factionId, affordance) {
     commandId: factionCommandId(factionId, "ability", definition.ability),
     disabledReason,
     readyIds: recastActive ? affordance.recastReadyIds : intentAbilityIds(definition, affordance),
-    active: abilityTargetActive(ctx.commandTarget, definition.ability),
+    active: abilityTargetActive(ctx.commandTarget, definition.ability)
+      || affordance.chosenIds.length > 0,
   });
 }
 
@@ -514,9 +517,12 @@ export function selectedAbilityAffordances(ctx, selection) {
         && (e.kind !== KIND.WARRIOR || (
           definition.ability.startsWith("evolve") ? !e.dao :
           definition.ability === ABILITY.EKAT_TELEPORT ? e.dao === "lightness" :
-          (definition.ability === ABILITY.EKAT_MAGIC_ANCHOR || definition.ability === ABILITY.DISCIPLE_SHIELD) ? e.dao === "reality" : true)));
+          (definition.ability === ABILITY.EKAT_MAGIC_ANCHOR || definition.ability === ABILITY.DISCIPLE_SHIELD) ? e.dao === "magic" : true)));
       if (carriers.length === 0) return null;
       const unlocked = abilityUnlocked(ctx, definition);
+      const evolution = definition.ability.startsWith("evolve");
+      const path = evolution ? definition.ability.slice(6).toLowerCase() : null;
+      const chosenIds = evolution ? carriers.filter((e) => e.chosenDao === path).map((e) => e.id) : [];
       const cost = abilityCostForCarriers(definition, carriers);
       const hasFreeBarrage = definition.ability === ABILITY.BARRAGE && carriers.some(
         (e) => (abilityRemainingUses(e, definition.ability) ?? 0) > 0,
@@ -545,6 +551,7 @@ export function selectedAbilityAffordances(ctx, selection) {
         .map((e) => e.id);
       return {
         definition,
+        chosenIds,
         cost,
         unlocked,
         affordable: canAfford,
@@ -566,50 +573,6 @@ export function selectedAbilityAffordances(ctx, selection) {
       };
     })
     .filter(Boolean);
-}
-
-function intentReadyIds(definition, affordance) {
-  if (definition.targetMode !== "self" || affordance.readyUnits.length <= 1) {
-    return affordance.readyIds;
-  }
-  const center = averagePosition(affordance.readyUnits);
-  let best = affordance.readyUnits[0];
-  let bestDist = distanceSqToCenter(best, center);
-  for (const unit of affordance.readyUnits.slice(1)) {
-    const dist = distanceSqToCenter(unit, center);
-    if (dist < bestDist || (dist === bestDist && unit.id < best.id)) {
-      best = unit;
-      bestDist = dist;
-    }
-  }
-  return [best.id];
-}
-
-function intentAbilityIds(definition, affordance) {
-  if (definition.queuePolicy === "waitUntilReady") {
-    return affordance.queueAdmissibleIds;
-  }
-  return intentReadyIds(definition, affordance);
-}
-
-function averagePosition(units) {
-  let x = 0;
-  let y = 0;
-  let count = 0;
-  for (const unit of units) {
-    if (!Number.isFinite(unit.x) || !Number.isFinite(unit.y)) continue;
-    x += unit.x;
-    y += unit.y;
-    count++;
-  }
-  return count > 0 ? { x: x / count, y: y / count } : null;
-}
-
-function distanceSqToCenter(unit, center) {
-  if (!center || !Number.isFinite(unit.x) || !Number.isFinite(unit.y)) return 0;
-  const dx = unit.x - center.x;
-  const dy = unit.y - center.y;
-  return dx * dx + dy * dy;
 }
 
 function isOwn(ctx, e) {
@@ -739,6 +702,16 @@ function availableResearchesOf(ctx, kind) {
 }
 
 function abilityDisabledReason(ctx, affordance) {
+  if (affordance.definition.ability.startsWith("evolve")) {
+    const chosen = affordance.chosenIds.length;
+    const waiting = [];
+    if (!affordance.unlocked) waiting.push(`${affordance.definition.label} research`);
+    if (affordance.readyIds.length < affordance.carrierIds.length) waiting.push("60 insight");
+    return `${chosen ? `Chosen for ${chosen}/${affordance.carrierIds.length}. ` : ""}`
+      + `Choose ${affordance.definition.label} for all selected Disciples. `
+      + (waiting.length ? `Automatically evolves when ready; waiting for ${waiting.join(" and ")}. ` : "Evolves immediately. ")
+      + "Choose another path to replace it before evolution.";
+  }
   if (!affordance.unlocked) {
     const missingUpgrade = affordance.definition?.upgradeRequirement;
     if (missingUpgrade && !(ctx.upgrades || []).includes(missingUpgrade)) {

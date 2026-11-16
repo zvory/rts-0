@@ -87,7 +87,7 @@ pub(in crate::game) fn planner_code(kind: AbilityKind) -> u16 {
         AbilityKind::Barrage => 12,
         AbilityKind::EvolveLightness => 13,
         AbilityKind::EvolveWar => 14,
-        AbilityKind::EvolveReality => 15,
+        AbilityKind::EvolveMagic => 15,
         AbilityKind::DiscipleShield => 16,
     }
 }
@@ -109,7 +109,7 @@ pub(in crate::game) fn from_planner_code(code: u16) -> Option<AbilityKind> {
         12 => Some(AbilityKind::Barrage),
         13 => Some(AbilityKind::EvolveLightness),
         14 => Some(AbilityKind::EvolveWar),
-        15 => Some(AbilityKind::EvolveReality),
+        15 => Some(AbilityKind::EvolveMagic),
         16 => Some(AbilityKind::DiscipleShield),
 
         _ => None,
@@ -118,7 +118,7 @@ pub(in crate::game) fn from_planner_code(code: u16) -> Option<AbilityKind> {
 
 pub fn effect_hook(kind: AbilityKind) -> AbilityEffectHook {
     match kind {
-        AbilityKind::EvolveLightness | AbilityKind::EvolveWar | AbilityKind::EvolveReality => {
+        AbilityKind::EvolveLightness | AbilityKind::EvolveWar | AbilityKind::EvolveMagic => {
             AbilityEffectHook::Evolve
         }
         AbilityKind::Charge => AbilityEffectHook::LegacyNoop,

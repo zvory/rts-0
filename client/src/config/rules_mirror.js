@@ -186,9 +186,9 @@ export const STATS = Object.freeze({
     description: "A supernatural gateway that trains Cultivator Disciples." },
   [KIND.THREE_DAO_PAVILION]: { label: "Three Dao Pavilion", icon: "DAO", footW: 3, footH: 3, sight: 1,
     cost: { steel: 100, oil: 25 }, buildTicks: 560, trains: [],
-    researches: [UPGRADE.DAO_OF_LIGHTNESS, UPGRADE.DAO_OF_BARRIERS, UPGRADE.DAO_OF_HEAVINESS],
+    researches: [UPGRADE.DAO_OF_LIGHTNESS, UPGRADE.DAO_OF_MAGIC, UPGRADE.DAO_OF_HEAVINESS],
     requires: [KIND.RESOURCE_DEPOT, KIND.PORTAL],
-    description: "Research Lightness, War, and Reality to unlock Disciple evolutions at 60 insight." },
+    description: "Research Lightness, War, and Magic to unlock Disciple evolutions at 60 insight." },
   [KIND.ZAMOK]: { label: "Zamok", icon: "ZK", footW: 3, footH: 3, sight: 1,
     cost: { steel: 0, oil: 0 }, buildTicks: 0, trains: [KIND.GOLEM] },
   [KIND.DEPOT]: { label: "Supply Depot", icon: "SD", footW: 2, footH: 2, sight: 1,
@@ -256,21 +256,21 @@ export const ABILITIES = Object.freeze({
   }),
   [ABILITY.EVOLVE_LIGHTNESS]: Object.freeze({
     ability: ABILITY.EVOLVE_LIGHTNESS, label: "Dao of Lightness", icon: "Z", hotkey: "Z",
-    title: "Evolve permanently into Dao of Lightness at 60 insight", carriers: Object.freeze([KIND.WARRIOR]),
+    title: "Choose Dao of Lightness; evolves automatically when research and 60 insight are ready", carriers: Object.freeze([KIND.WARRIOR]),
     targetMode: "self", cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 0 }),
     upgradeRequirement: UPGRADE.DAO_OF_LIGHTNESS, queued: false, queuePolicy: "notQueueable",
   }),
   [ABILITY.EVOLVE_WAR]: Object.freeze({
     ability: ABILITY.EVOLVE_WAR, label: "Dao of War", icon: "X", hotkey: "X",
-    title: "Evolve permanently into Dao of War at 60 insight", carriers: Object.freeze([KIND.WARRIOR]),
+    title: "Choose Dao of War; evolves automatically when research and 60 insight are ready", carriers: Object.freeze([KIND.WARRIOR]),
     targetMode: "self", cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 0 }),
     upgradeRequirement: UPGRADE.DAO_OF_HEAVINESS, queued: false, queuePolicy: "notQueueable",
   }),
-  [ABILITY.EVOLVE_REALITY]: Object.freeze({
-    ability: ABILITY.EVOLVE_REALITY, label: "Dao of Reality", icon: "C", hotkey: "C",
-    title: "Evolve permanently into Dao of Reality at 60 insight", carriers: Object.freeze([KIND.WARRIOR]),
+  [ABILITY.EVOLVE_MAGIC]: Object.freeze({
+    ability: ABILITY.EVOLVE_MAGIC, label: "Dao of Magic", icon: "C", hotkey: "C",
+    title: "Choose Dao of Magic; evolves automatically when research and 60 insight are ready", carriers: Object.freeze([KIND.WARRIOR]),
     targetMode: "self", cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 0 }),
-    upgradeRequirement: UPGRADE.DAO_OF_BARRIERS, queued: false, queuePolicy: "notQueueable",
+    upgradeRequirement: UPGRADE.DAO_OF_MAGIC, queued: false, queuePolicy: "notQueueable",
   }),
 
   [ABILITY.SMOKE]: Object.freeze({
@@ -472,10 +472,10 @@ export const UPGRADES = Object.freeze({
     description: "Study the Dao of War. Unlocks the corresponding Disciple evolution at 60 insight.",
     researchedAt: KIND.THREE_DAO_PAVILION,
   }),
-  [UPGRADE.DAO_OF_BARRIERS]: Object.freeze({
-    upgrade: UPGRADE.DAO_OF_BARRIERS, label: "Dao of Reality", icon: "BAR",
+  [UPGRADE.DAO_OF_MAGIC]: Object.freeze({
+    upgrade: UPGRADE.DAO_OF_MAGIC, label: "Dao of Magic", icon: "MAG",
     cost: Object.freeze({ steel: 200, oil: 100 }), researchTicks: DAO_RESEARCH_TICKS,
-    description: "Study the Dao of Reality. Unlocks the corresponding Disciple evolution at 60 insight.",
+    description: "Study the Dao of Magic. Unlocks the corresponding Disciple evolution at 60 insight.",
     researchedAt: KIND.THREE_DAO_PAVILION,
   }),
   [UPGRADE.DAO_OF_LIGHTNESS]: Object.freeze({

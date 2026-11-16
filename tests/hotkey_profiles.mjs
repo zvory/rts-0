@@ -702,11 +702,11 @@ assert.equal(createClassicPreset(buildHotkeyCommandCatalog(buildCommandCardConte
     playerId: 1, factionId: "cultivators",
     selection: [{ id: 600, owner: 1, kind: KIND.WARRIOR, insight: 60 }],
     resources: { steel: 1000, oil: 1000 },
-    upgrades: [UPGRADE.DAO_OF_LIGHTNESS, UPGRADE.DAO_OF_HEAVINESS, UPGRADE.DAO_OF_BARRIERS],
+    upgrades: [UPGRADE.DAO_OF_LIGHTNESS, UPGRADE.DAO_OF_HEAVINESS, UPGRADE.DAO_OF_MAGIC],
     groupCooldownClocks: () => [], playerHasCompleteKind: () => true,
   });
   const classic = profiles.presets.find((p) => p.id === HOTKEY_PRESET_CLASSIC);
-  assert.deepEqual(profiles.resolveCard(card, classic).slots.slice(6).map((s) => s.hotkey), ["L", "W", "R"]);
+  assert.deepEqual(profiles.resolveCard(card, classic).slots.slice(6).map((s) => s.hotkey), ["L", "W", "C"]);
   const grid = profiles.presets.find((p) => p.id === HOTKEY_PRESET_GRID);
   assert.deepEqual(profiles.resolveCard(card, grid).slots.slice(6).map((s) => s.hotkey), ["Z", "X", "C"]);
 }

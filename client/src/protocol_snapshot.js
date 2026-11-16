@@ -28,7 +28,7 @@ import { decodeCompactTrenches } from "./protocol_snapshot_trenches.js";
 export function decodeCompactSnapshot(raw) {
   // Versions 51-58 remain safe to decode: subsequent versions only append optional
   // fields and codes, preserving all existing event and entity record layouts.
-  if (raw.v !== COMPACT_SNAPSHOT_VERSION && raw.v !== 58 && raw.v !== 57 && raw.v !== 56 && raw.v !== 55 && raw.v !== 54 && raw.v !== 53 && raw.v !== 52 && raw.v !== 51) {
+  if (raw.v !== COMPACT_SNAPSHOT_VERSION && raw.v !== 59 && raw.v !== 58 && raw.v !== 57 && raw.v !== 56 && raw.v !== 55 && raw.v !== 54 && raw.v !== 53 && raw.v !== 52 && raw.v !== 51) {
     throw new Error(`unsupported compact snapshot version: ${raw.v}`);
   }
 
@@ -318,7 +318,7 @@ function decodeCompactPlayerResource(record, index) {
 }
 
 function decodeCompactEntity(record, index) {
-  const fields = readArray(record, `entity ${index}`, 49);
+  const fields = readArray(record, `entity ${index}`, 50);
   if (fields.length < 8) throw new Error(`entity ${index} is too short`);
   const entity = {
     id: readU32(fields[0], "entity.id"),
@@ -372,6 +372,7 @@ function decodeCompactEntity(record, index) {
   assignOptional(entity, "dao", fields, 46, readString);
   assignOptional(entity, "daoReady", fields, 47, readBool);
   assignOptional(entity, "daoAdvanceTicks", fields, 48, readU32);
+  assignOptional(entity, "chosenDao", fields, 49, readString);
   return entity;
 }
 

@@ -43,15 +43,45 @@ impl Entity {
             return true;
         }
         match ability {
-            AbilityKind::EvolveLightness | AbilityKind::EvolveWar | AbilityKind::EvolveReality => {
+            AbilityKind::EvolveLightness | AbilityKind::EvolveWar | AbilityKind::EvolveMagic => {
                 self.dao.is_none() && self.insight >= config::DISCIPLE_INSIGHT_REQUIRED
             }
             AbilityKind::EkatTeleport => self.dao == Some(UpgradeKind::DaoOfLightness),
             AbilityKind::DiscipleShield | AbilityKind::EkatMagicAnchor => {
-                self.dao == Some(UpgradeKind::DaoOfBarriers)
+                self.dao == Some(UpgradeKind::DaoOfMagic)
             }
             _ => true,
         }
+    }
+
+    /// Persistent intent is independent of combat/movement orders and can be replaced.
+    pub(in crate::game) fn choose_dao(&mut self, ability: AbilityKind) -> bool {
+        if self.kind != EntityKind::Warrior || self.hp == 0 || self.dao.is_some() {
+            return false;
+        }
+        self.chosen_dao = Some(match ability {
+            AbilityKind::EvolveLightness => UpgradeKind::DaoOfLightness,
+            AbilityKind::EvolveWar => UpgradeKind::DaoOfHeaviness,
+            AbilityKind::EvolveMagic => UpgradeKind::DaoOfMagic,
+            _ => return false,
+        });
+        true
+    }
+
+    pub(in crate::game) fn advance_chosen_dao(&mut self, researched: impl Fn(UpgradeKind) -> bool) {
+        let Some(choice) = self.chosen_dao else {
+            return;
+        };
+        if self.hp == 0 || !researched(choice) {
+            return;
+        }
+        let ability = match choice {
+            UpgradeKind::DaoOfLightness => AbilityKind::EvolveLightness,
+            UpgradeKind::DaoOfHeaviness => AbilityKind::EvolveWar,
+            UpgradeKind::DaoOfMagic => AbilityKind::EvolveMagic,
+            _ => return,
+        };
+        self.evolve_dao(ability);
     }
 
     pub(crate) fn evolve_dao(&mut self, ability: AbilityKind) -> bool {
@@ -61,9 +91,10 @@ impl Entity {
         self.dao = Some(match ability {
             AbilityKind::EvolveLightness => UpgradeKind::DaoOfLightness,
             AbilityKind::EvolveWar => UpgradeKind::DaoOfHeaviness,
-            AbilityKind::EvolveReality => UpgradeKind::DaoOfBarriers,
+            AbilityKind::EvolveMagic => UpgradeKind::DaoOfMagic,
             _ => return false,
         });
+        self.chosen_dao = None;
         self.dao_advance_ticks = 15;
         if self.dao == Some(UpgradeKind::DaoOfHeaviness) {
             self.max_hp = self.max_hp.saturating_add(config::DAO_WAR_HP_BONUS);
@@ -88,7 +119,7 @@ impl Entity {
         let base = config::unit_stats(self.kind).map_or(0.0, |s| s.speed);
         match self.dao {
             Some(UpgradeKind::DaoOfLightness) => config::dao_lightness_speed(),
-            Some(UpgradeKind::DaoOfBarriers) => base * config::DAO_REALITY_SPEED_MULTIPLIER,
+            Some(UpgradeKind::DaoOfMagic) => base * config::DAO_MAGIC_SPEED_MULTIPLIER,
             _ => base,
         }
     }

@@ -199,7 +199,7 @@ fn validate_entity(
     if entity.dao_advance_ticks > 15
         || (entity.dao_advance_ticks > 0 && entity.dao.is_none())
         || entity.shield.as_ref().is_some_and(|shield| {
-            entity.dao != Some(crate::game::upgrade::UpgradeKind::DaoOfBarriers)
+            entity.dao != Some(crate::game::upgrade::UpgradeKind::DaoOfMagic)
                 || shield.id == 0
                 || shield.remaining == 0
                 || shield.remaining > config::DISCIPLE_SHIELD_CAPACITY
@@ -210,6 +210,20 @@ fn validate_entity(
             field: "entities.daoEffects",
         });
     }
+    if entity.chosen_dao.is_some_and(|choice| {
+        entity.kind != crate::game::entity::EntityKind::Warrior
+            || entity.dao.is_some()
+            || !matches!(
+                choice,
+                crate::game::upgrade::UpgradeKind::DaoOfLightness
+                    | crate::game::upgrade::UpgradeKind::DaoOfHeaviness
+                    | crate::game::upgrade::UpgradeKind::DaoOfMagic
+            )
+    }) {
+        return Err(CheckpointPayloadError::InvalidValue {
+            field: "entities.chosenDao",
+        });
+    }
     if entity.insight > config::DISCIPLE_INSIGHT_REQUIRED
         || (entity.kind != crate::game::entity::EntityKind::Warrior
             && (entity.insight != 0 || entity.dao.is_some()))
@@ -218,7 +232,7 @@ fn validate_entity(
                 dao,
                 crate::game::upgrade::UpgradeKind::DaoOfLightness
                     | crate::game::upgrade::UpgradeKind::DaoOfHeaviness
-                    | crate::game::upgrade::UpgradeKind::DaoOfBarriers
+                    | crate::game::upgrade::UpgradeKind::DaoOfMagic
             )
         })
         || (entity.dao.is_some() && entity.insight != config::DISCIPLE_INSIGHT_REQUIRED)

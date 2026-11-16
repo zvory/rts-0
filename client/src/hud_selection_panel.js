@@ -427,7 +427,7 @@ export class HudSelectionPanel {
     node.innerHTML =
       `<div class="sel-name">${st.label || e.kind}</div>` +
       hpHtml +
-      (e.kind === KIND.WARRIOR && Number.isFinite(e.insight) ? `<div class="sel-stat">Insight: ${e.insight ?? 0} / 60${e.dao ? ` · Dao of ${e.dao[0].toUpperCase() + e.dao.slice(1)}` : ""}</div>` : "") +
+      (e.kind === KIND.WARRIOR && Number.isFinite(e.insight) ? `<div class="sel-stat">Insight: ${e.insight ?? 0} / 60${e.dao ? ` · Dao of ${e.dao[0].toUpperCase() + e.dao.slice(1)}` : e.chosenDao ? ` · Following ${e.chosenDao[0].toUpperCase() + e.chosenDao.slice(1)}` : ""}</div>` : "") +
       (unitsKilledHtml || (entityIdHtml ? `<div class="sel-stat">${entityIdHtml}</div>` : "")) +
       (e.dao === "war" ? `<div class="sel-stat">Armor: 50% · reduced by armor piercing</div>` : armorHtml) +
       resourceRemainingHtml +
@@ -493,7 +493,7 @@ function selectionDetailSignature(entity, state = null) {
     sigValue(entity.label),
     sigValue(entity.hp),
     sigValue(entity.maxHp),
-    sigValue(entity.unitsKilled), sigValue(entity.insight), sigValue(entity.dao),
+    sigValue(entity.unitsKilled), sigValue(entity.insight), sigValue(entity.dao), sigValue(entity.chosenDao),
     sigValue(entity.occupiedTrenchId),
     entrenchment ? `${entrenchment.label}:${entrenchment.value}` : "",
     resource ? `${resource.kind}:${formatResourceRemaining(resource.remaining)}` : "",

@@ -156,7 +156,7 @@ try {
   assert(barsDrawn === 6, "full-health Disciples retain insight overlays both below and above fog");
 
   const discipleBar = makeBar();
-  for (const dao of [null, "lightness", "war", "reality"]) {
+  for (const dao of [null, "lightness", "war", "magic"]) {
     _hpBar.call({ _map: { tileSize: 32 } }, discipleBar, { ...disciple, dao });
     const rects = discipleBar.rtsInsight.calls.filter((call) => call[0] === "drawRect");
     assert(rects.at(-1)[3] === (rects.at(-2)[3] - 2) / 2,
@@ -171,7 +171,7 @@ try {
   _hpBar.call({ _map: { tileSize: 32 } }, discipleBar, { ...disciple, kind: KIND.RIFLEMAN });
   assert(!discipleBar.rtsInsight.visible && !discipleBar.rtsDao.visible && !discipleBar.rtsRadiance.visible,
     "reused bars hide Disciple overlays when the entity kind changes");
-  _hpBar.call({ _map: { tileSize: 32 } }, discipleBar, { ...disciple, dao: "reality" });
+  _hpBar.call({ _map: { tileSize: 32 } }, discipleBar, { ...disciple, dao: "magic" });
   assert(discipleBar.children.length === 6 && discipleBar.rtsInsight.visible && discipleBar.rtsDao.visible,
     "returning Disciples reuse and reveal their existing overlays");
 } finally {

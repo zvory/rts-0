@@ -123,7 +123,7 @@ pub mod abilities {
     pub const BARRAGE: &str = "barrage";
     pub const EVOLVE_LIGHTNESS: &str = "evolveLightness";
     pub const EVOLVE_WAR: &str = "evolveWar";
-    pub const EVOLVE_REALITY: &str = "evolveReality";
+    pub const EVOLVE_MAGIC: &str = "evolveMagic";
     pub const DISCIPLE_SHIELD: &str = "discipleShield";
 
     pub const ALL: &[&str] = &[
@@ -142,7 +142,7 @@ pub mod abilities {
         BARRAGE,
         EVOLVE_LIGHTNESS,
         EVOLVE_WAR,
-        EVOLVE_REALITY,
+        EVOLVE_MAGIC,
         DISCIPLE_SHIELD,
     ];
 }
@@ -174,7 +174,7 @@ pub mod upgrades {
     pub const SMOKE_PLUS: &str = "smoke_plus";
     pub const SCOUT_PLANE_UNLOCK: &str = "scout_plane_unlock";
     pub const DAO_OF_LIGHTNESS: &str = "dao_of_lightness";
-    pub const DAO_OF_BARRIERS: &str = "dao_of_barriers";
+    pub const DAO_OF_MAGIC: &str = "dao_of_magic";
     pub const DAO_OF_HEAVINESS: &str = "dao_of_heaviness";
     pub const ROCKETS: &str = "rockets";
     pub const ALL: &[&str] = &[
@@ -189,7 +189,7 @@ pub mod upgrades {
         SMOKE_PLUS,
         SCOUT_PLANE_UNLOCK,
         DAO_OF_LIGHTNESS,
-        DAO_OF_BARRIERS,
+        DAO_OF_MAGIC,
         DAO_OF_HEAVINESS,
         ROCKETS,
     ];
@@ -222,7 +222,7 @@ pub mod notices {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 59;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 60;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -481,7 +481,7 @@ const ORDER_STAGE_CODES: &[(&str, u8)] = &[
     (abilities::BARRAGE, 21),
     (abilities::EVOLVE_LIGHTNESS, 22),
     (abilities::EVOLVE_WAR, 23),
-    (abilities::EVOLVE_REALITY, 24),
+    (abilities::EVOLVE_MAGIC, 24),
     (abilities::DISCIPLE_SHIELD, 25),
 ];
 
@@ -501,7 +501,7 @@ const ABILITY_CODES: &[(&str, u8)] = &[
     (abilities::BARRAGE, 13),
     (abilities::EVOLVE_LIGHTNESS, 14),
     (abilities::EVOLVE_WAR, 15),
-    (abilities::EVOLVE_REALITY, 16),
+    (abilities::EVOLVE_MAGIC, 16),
     (abilities::DISCIPLE_SHIELD, 17),
 ];
 
@@ -524,7 +524,7 @@ const UPGRADE_CODES: &[(&str, u8)] = &[
     (upgrades::SMOKE_PLUS, 9),
     (upgrades::SCOUT_PLANE_UNLOCK, 11),
     (upgrades::DAO_OF_LIGHTNESS, 14),
-    (upgrades::DAO_OF_BARRIERS, 15),
+    (upgrades::DAO_OF_MAGIC, 15),
     (upgrades::DAO_OF_HEAVINESS, 16),
     (upgrades::ROCKETS, 12),
 ];
@@ -810,7 +810,7 @@ fn ability_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("BARRAGE", abilities::BARRAGE),
         ("EVOLVE_LIGHTNESS", abilities::EVOLVE_LIGHTNESS),
         ("EVOLVE_WAR", abilities::EVOLVE_WAR),
-        ("EVOLVE_REALITY", abilities::EVOLVE_REALITY),
+        ("EVOLVE_MAGIC", abilities::EVOLVE_MAGIC),
         ("DISCIPLE_SHIELD", abilities::DISCIPLE_SHIELD),
     ])
 }
@@ -844,7 +844,7 @@ fn upgrade_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("SMOKE_PLUS", upgrades::SMOKE_PLUS),
         ("SCOUT_PLANE_UNLOCK", upgrades::SCOUT_PLANE_UNLOCK),
         ("DAO_OF_LIGHTNESS", upgrades::DAO_OF_LIGHTNESS),
-        ("DAO_OF_BARRIERS", upgrades::DAO_OF_BARRIERS),
+        ("DAO_OF_MAGIC", upgrades::DAO_OF_MAGIC),
         ("DAO_OF_HEAVINESS", upgrades::DAO_OF_HEAVINESS),
         ("ROCKETS", upgrades::ROCKETS),
     ])
@@ -902,7 +902,7 @@ fn order_stage_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("BARRAGE", abilities::BARRAGE),
         ("EVOLVE_LIGHTNESS", abilities::EVOLVE_LIGHTNESS),
         ("EVOLVE_WAR", abilities::EVOLVE_WAR),
-        ("EVOLVE_REALITY", abilities::EVOLVE_REALITY),
+        ("EVOLVE_MAGIC", abilities::EVOLVE_MAGIC),
         ("DISCIPLE_SHIELD", abilities::DISCIPLE_SHIELD),
         ("SETUP_ANTI_TANK_GUNS", "setupAntiTankGuns"),
     ])
@@ -1011,6 +1011,7 @@ fn compact_slot_schemas() -> CompactSlotSchemas {
             optional_field(46, "dao"),
             optional_field(47, "daoReady"),
             optional_field(48, "daoAdvanceTicks"),
+            optional_field(49, "chosenDao"),
         ],
         event: event_slot_schemas(),
         trench: vec![

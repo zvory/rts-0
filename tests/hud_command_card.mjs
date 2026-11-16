@@ -703,7 +703,7 @@ for (const [kind, upgrade] of [
     "cultivators-disciple-base",
     "cultivators-disciple-lightness",
     "cultivators-disciple-war",
-    "cultivators-disciple-reality",
+    "cultivators-disciple-magic",
     "cultivators-worker",
     "cultivators-build",
     "cultivators-producer-resource_depot",
@@ -862,29 +862,58 @@ for (const researched of [false, true]) {
   const context = {
     playerId: 1, factionId: "cultivators",
     resources: { steel: 1000, oil: 1000 },
-    upgrades: [UPGRADE.DAO_OF_LIGHTNESS, UPGRADE.DAO_OF_HEAVINESS, UPGRADE.DAO_OF_BARRIERS],
+    upgrades: [UPGRADE.DAO_OF_LIGHTNESS, UPGRADE.DAO_OF_HEAVINESS, UPGRADE.DAO_OF_MAGIC],
     playerHasCompleteKind: () => true, groupCooldownClocks: () => [],
   };
   const unit = { id: 50, owner: 1, kind: KIND.WARRIOR, insight: 59 };
   const cardFor = (entity, extra = {}) => buildCommandCardDescriptors({ ...context, ...extra, selection: [entity] });
   let card = cardFor(unit);
-  assert.deepEqual(card.slots.slice(6).map((s) => s.ability), [ABILITY.EVOLVE_LIGHTNESS, ABILITY.EVOLVE_WAR, ABILITY.EVOLVE_REALITY]);
-  assert(card.slots.slice(6).every((s) => !s.enabled && !s.cls.includes("dao-ready")));
+  assert.deepEqual(card.slots.slice(6).map((s) => s.ability), [ABILITY.EVOLVE_LIGHTNESS, ABILITY.EVOLVE_WAR, ABILITY.EVOLVE_MAGIC]);
+  assert(card.slots.slice(6).every((s) => s.enabled && !s.cls.includes("dao-ready")));
   card = cardFor({ ...unit, insight: 60 });
   assert(card.slots.slice(6).every((s) => s.enabled && s.cls.includes("dao-ready")));
   assert.deepEqual(card.slots.slice(6).map((s) => s.hotkey), ["Z", "X", "C"]);
-  assert(cardFor({ ...unit, insight: 60 }, { upgrades: [] }).slots.slice(6).every((s) => !s.enabled));
+  assert(cardFor({ ...unit, insight: 60 }, { upgrades: [] }).slots.slice(6).every((s) => s.enabled));
   const light = cardFor({ ...unit, insight: 60, dao: "lightness" });
   assert(light.slots.some((s) => s?.ability === ABILITY.EKAT_TELEPORT));
   assert(!light.slots.some((s) => s?.ability === ABILITY.EKAT_MAGIC_ANCHOR || s?.ability?.startsWith("evolve")));
-  const reality = cardFor({ ...unit, insight: 60, dao: "reality" });
-  assert(reality.slots.some((s) => s?.ability === ABILITY.EKAT_MAGIC_ANCHOR && s.label === "Anchor"));
-  assert(reality.slots.some((s) => s?.ability === ABILITY.DISCIPLE_SHIELD && s.enabled));
-  assert(!reality.slots.some((s) => s?.ability === ABILITY.EKAT_TELEPORT));
+  const magic = cardFor({ ...unit, insight: 60, dao: "magic" });
+  assert(magic.slots.some((s) => s?.ability === ABILITY.EKAT_MAGIC_ANCHOR && s.label === "Anchor"));
+  assert(magic.slots.some((s) => s?.ability === ABILITY.DISCIPLE_SHIELD && s.enabled));
+  assert(!magic.slots.some((s) => s?.ability === ABILITY.EKAT_TELEPORT));
 }
 
 {
   const { PRESENTATION_ENTITY_FIELDS } = await import("../client/src/presentation/entity_snapshot.js");
   assert(PRESENTATION_ENTITY_FIELDS.includes("insight"));
   assert(PRESENTATION_ENTITY_FIELDS.includes("dao"));
+}
+
+// Dao choices remain actionable before research and cover every eligible selected unit.
+{
+  const selection = [
+    { id: 1, owner: 1, kind: KIND.WARRIOR, insight: 0, chosenDao: "war" },
+    { id: 2, owner: 1, kind: KIND.WARRIOR, insight: 60, chosenDao: "magic" },
+    { id: 3, owner: 1, kind: KIND.WARRIOR, insight: 60, dao: "war" },
+    { id: 4, owner: 2, kind: KIND.WARRIOR, insight: 0 },
+    { id: 5, owner: 1, kind: KIND.WORKER },
+  ];
+  const context = { playerId: 1, factionId: "cultivators", selection, upgrades: [],
+    resources: { steel: 0, oil: 0 }, playerHasCompleteKind: () => false,
+    groupCooldownClocks: () => [] };
+  const card = buildCommandCardDescriptors(context);
+  for (const ability of [ABILITY.EVOLVE_LIGHTNESS, ABILITY.EVOLVE_WAR, ABILITY.EVOLVE_MAGIC]) {
+    const slot = card.slots.find((slot) => slot?.ability === ability);
+    assert(slot.enabled);
+    assert.deepEqual(slot.intent.readyIds, [1, 2]);
+    assert(slot.title.includes("research") && slot.title.includes("60 insight"));
+    assert(!slot.cls.includes("dao-ready"));
+    if (ability !== ABILITY.EVOLVE_LIGHTNESS) {
+      assert(slot.cls.includes("active"));
+      assert.equal(slot.countBadge, "1/2");
+    }
+  }
+  const changed = buildCommandCardDescriptors({ ...context,
+    selection: selection.map((e) => e.id === 1 ? { ...e, chosenDao: "lightness" } : e) });
+  assert.notEqual(changed.signature, card.signature);
 }
