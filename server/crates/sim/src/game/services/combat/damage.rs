@@ -175,6 +175,7 @@ pub(super) fn apply_direct_hit(
         victim_owner: target.owner,
         reveals_attacker: projection_rules::shot_reveals_attacker(target.kind),
     };
+    let before_hp = target.hp;
     let damage = combat_rules::effective_damage_with_facing_for_weapon(
         weapon,
         target.kind,
@@ -184,6 +185,7 @@ pub(super) fn apply_direct_hit(
         pos,
         source,
     );
+    let damage = target.dao_damage_after_armor(damage, weapon.armor_penetration);
     let damage = entrenchment_combat::reduce_direct_damage(target, damage);
     let damage = map
         .damage_after_reduction_tile(pos.0, pos.1, damage)
@@ -196,6 +198,19 @@ pub(super) fn apply_direct_hit(
             target.apply_damage(damage, None)
         }
     });
+    if damaged && hostile {
+        let actual = entities
+            .get(victim)
+            .map_or(0, |target| before_hp.saturating_sub(target.hp));
+        if let Some(source) = entities.get_mut(attacker) {
+            if source.kind == crate::game::entity::EntityKind::Warrior {
+                source.insight = source
+                    .insight
+                    .saturating_add(actual)
+                    .min(crate::config::DISCIPLE_INSIGHT_REQUIRED);
+            }
+        }
+    }
     if damaged {
         if hostile && combat_rules::weapon_triggers_tank_armor_reaction(weapon) {
             if let Some(target) = entities.get_mut(victim) {
@@ -259,6 +274,7 @@ fn apply_tank_he_splash(
             crate::config::TANK_HE_SPLASH_DAMAGE,
             Some(TerrainKind::Open),
         );
+        let damage = target.dao_damage_after_armor(damage, 0.0);
         let damage = entrenchment_combat::reduce_direct_damage(target, damage);
         let damage = map.damage_after_reduction_tile(target.pos_x(), target.pos_y(), damage);
         let victim_owner = target.owner;

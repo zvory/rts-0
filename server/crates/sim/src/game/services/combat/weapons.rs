@@ -291,6 +291,13 @@ pub(super) fn effective_attack_profile(e: &Entity) -> EffectiveAttackProfile {
         dmg: base.dmg,
         cooldown: base.cooldown,
     };
+    if e.dao == Some(crate::game::upgrade::UpgradeKind::DaoOfLightness) {
+        profile.cooldown =
+            ((profile.cooldown as f32) / config::DAO_LIGHTNESS_ATTACK_RATE).round() as u32;
+    }
+    if e.dao == Some(crate::game::upgrade::UpgradeKind::DaoOfHeaviness) {
+        profile.dmg = ((profile.dmg as f32) * config::DAO_WAR_DAMAGE_MULTIPLIER).round() as u32;
+    }
     if e.kind != EntityKind::AntiTankGun {
         return profile;
     }

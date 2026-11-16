@@ -19,6 +19,10 @@ const DEFAULT_EXPORT_BUILD = "unknown";
 // familiar action keys here, including the mnemonic conflict resolutions for
 // commands that can share a card.
 const CLASSIC_DIRECT_BINDINGS = Object.freeze({
+  [factionCommandId("cultivators", "ability", ABILITY.EVOLVE_LIGHTNESS)]: "KeyL",
+  [factionCommandId("cultivators", "ability", ABILITY.EVOLVE_WAR)]: "KeyW",
+  [factionCommandId("cultivators", "ability", ABILITY.EVOLVE_REALITY)]: "KeyR",
+
   "unit.move": "KeyM",
   "unit.attack": "KeyA",
   "unit.holdPosition": "KeyH",

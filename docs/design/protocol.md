@@ -897,8 +897,8 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 57. The client also accepts compact
-snapshot versions 51 through 55: version 52 only appends a kind code, version 53 appends the
+`messagepack-compact`, codec version 1, compact snapshot version 58. The client also accepts compact
+snapshot versions 51 through 57: version 52 only appends a kind code, version 53 appends the
 optional `unitsKilled` entity slot, version 54 appends an optional `rocket` style bit to mortar
 launch/impact event records, and version 55 adds the `artilleryIncoming` event code, so the older
 record layouts remain safe to decode. Version 56 appends optional entity slot 43,
@@ -935,7 +935,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 57,
+  "v": 58,
   "gr": groundDecalRevision, // omitted when zero
   "gd": [afterRevision, [    // omitted when this tick has no discovered/created revision
     [id, decalClass, sourceKindCode, x, y, owner, seed, facing, weaponFacing, radiusTiles]
@@ -953,7 +953,7 @@ adds an explicit application compression envelope.
       visionOnly?, debugPath?, rallyPlan?, prodUpgrade?, buildActive?, deconstructProgress?,
       weaponRangeTiles?, occupiedTrenchId?, scoutPlane?, prodScoutPlaneQueued?,
       panzerfaustLoaded?, prodRepeatKinds?, prodWaiting?, breakthroughAuraTicks?, extractorActive?,
-      prodUpgradeQueue?, panzerfaustWindupProgress?, unitsKilled?, rocketRackCount?, commanderFacing?
+      prodUpgradeQueue?, panzerfaustWindupProgress?, unitsKilled?, rocketRackCount?, commanderFacing?, insight?, dao?
     ]
   ],
   "r": [[id, remaining]],         // omitted when empty
@@ -979,8 +979,8 @@ Compact numeric codes:
 | `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `resource_depot`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `engineering_complex`, 18 `command_car`, 19 `ekat`, 20 `zamok`, 21 `tank_trap`, 30 `barbed_wire`, 22 `golem`, 23 `pump_jack`, 24 `panzerfaust`, 25 `scout_plane`, 26 `steel_mine`, 27 `rocket_launcher`, 28 `portal`, 29 `warrior`, 31 `three_dao_pavilion` |
 | `state` | 1 `idle`, 2 `move`, 3 `attack`, 4 `gather`, 5 `build`, 6 `train`, 7 `construct`, 8 `dead` |
 | `setupState` | 1 `packed`, 2 `setting_up`, 3 `deployed`, 4 `tearing_down` |
-| `orderStage` | 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, 5 `build`, 6 `smoke`, 7 `setupAntiTankGuns`, 8 `charge`, 9 `mortarFire`, 10 `pointFire`, 11 `breakthrough`, 12 `ekatTeleport`, 13 `ekatLineShot`, 14 `ekatMagicAnchor`, 15 `deconstruct`, 16 `ekatConsumeGolem`, 17 `blanketFire`, 18 `dismissScoutPlane`, 19 `scoutPlane`, 20 `holdPosition`, 21 `barrage` |
-| `ability` | 1 `charge`, 2 `smoke`, 3 `mortarFire`, 4 `pointFire`, 5 `breakthrough`, 6 `ekatTeleport`, 7 `ekatLineShot`, 8 `ekatMagicAnchor`, 9 `ekatConsumeGolem`, 10 `blanketFire`, 11 `dismissScoutPlane`, 12 `scoutPlane`, 13 `barrage` |
+| `orderStage` | 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, 5 `build`, 6 `smoke`, 7 `setupAntiTankGuns`, 8 `charge`, 9 `mortarFire`, 10 `pointFire`, 11 `breakthrough`, 12 `ekatTeleport`, 13 `ekatLineShot`, 14 `ekatMagicAnchor`, 15 `deconstruct`, 16 `ekatConsumeGolem`, 17 `blanketFire`, 18 `dismissScoutPlane`, 19 `scoutPlane`, 20 `holdPosition`, 21 `barrage`, 22 `evolveLightness`, 23 `evolveWar`, 24 `evolveReality` |
+| `ability` | 1 `charge`, 2 `smoke`, 3 `mortarFire`, 4 `pointFire`, 5 `breakthrough`, 6 `ekatTeleport`, 7 `ekatLineShot`, 8 `ekatMagicAnchor`, 9 `ekatConsumeGolem`, 10 `blanketFire`, 11 `dismissScoutPlane`, 12 `scoutPlane`, 13 `barrage`, 14 `evolveLightness`, 15 `evolveWar`, 16 `evolveReality` |
 | `abilityObject.kind` | 1 `returnMarker`, 2 `magicAnchor`, 3 `lineProjectile` |
 | `upgrade` | 1 `methamphetamines`, 2 `anti_tank_gun_unlock`, 3 `tank_unlock`, 4 `artillery_unlock`, 7 `ballistic_tables`, 8 `entrenchment`, 9 `smoke_plus`, 10 `panzerfausts`, 11 `scout_plane_unlock`, 12 `rockets`, 13 `tank_plus`, 14 `dao_of_lightness`, 15 `dao_of_barriers`, 16 `dao_of_heaviness` |
 | `weaponKind` | 1 `worker_tools`, 2 `golem_fists`, 3 `rifleman_rifle`, 4 `machine_gunner_mg`, 5 `scout_car_mg`, 6 `anti_tank_gun`, 7 `panzerfaust_loaded_shot`, 8 `mortar_team_mortar`, 9 `artillery_gun`, 10 `tank_cannon`, 11 `tank_coax`, 12 `warrior_sword` |
@@ -1175,6 +1175,8 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   state: string,                 // "idle","move","attack","gather","build","train","construct","dead"
   facing?: f32,                  // radians, for unit body/hull orientation (optional)
   weaponFacing?: f32,            // radians, for independent weapon/barrel orientation (optional)
+  insight?: u32,                 // Disciple 0..60, compact slot 45
+  dao?: "lightness"|"war"|"reality", // evolved Disciple, compact slot 46
   commanderFacing?: f32,         // Tank roof MG world angle; compact entity slot 44
   // production buildings:
   prodKind?: string,             // unit currently being produced
@@ -1973,6 +1975,14 @@ durability. No new event or command fields; Rust kind adapters use the shared ru
 Cultivators can construct `three_dao_pavilion` (compact kind code 31) and research
 `dao_of_lightness`, `dao_of_barriers`, and `dao_of_heaviness` (upgrade codes 14–16).
 The existing build/research commands, research queues, completed-upgrade lists, and
-owner-only projection rules apply. These upgrades currently have no gameplay effect.
-No new snapshot fields or abilities are introduced. Rust protocol and sim adapters
-and the client protocol facade continue to re-export their authoritative vocabulary.
+owner-only projection rules apply. These upgrades unlock the corresponding Disciple
+evolutions described below. Rust protocol and sim adapters and the client protocol facade
+continue to re-export their authoritative vocabulary.
+
+### Disciple insight and Dao specializations
+
+See [Dao evolution playtest](dao-insight.md). Entity-owned `insight` and `dao` persist
+through checkpoints. Visible Disciple snapshots append `insight` (compact slot 45) and
+`dao` (slot 46: lightness/war/reality). Evolution abilities are self-targeted, nonqueueable,
+research-gated codes 14–16 and order stages 22–24. Internal research ids remain
+`dao_of_lightness`, `dao_of_heaviness` (War), `dao_of_barriers` (Reality).

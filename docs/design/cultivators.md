@@ -80,7 +80,7 @@ production/channeling states are deferred until units are specified.
 ### Approved brief and rules (Phases 0 and 1)
 
 The user authorized the **Three Dao Pavilion** and three research
-options that currently have no gameplay effects. This is a Cultivator-only technology building
+options that unlock permanent Disciple specializations at 60 insight. This is a Cultivator-only technology building
 constructed by Serfs, available in normal games and Lab. Its investment competes with Portal
 production; opponents can scout and destroy it through ordinary building combat.
 
@@ -93,11 +93,12 @@ There is no build limit. Approved PNG art is a circular stone study dais with th
 scrolls and a three-lobed canopy. The canopy and finial receive team tint; timber, stone, and
 parchment retain natural colors. The square atlas preserves the generated proportions.
 
-Research Dao of Lightness, Dao of Barriers, and Dao of Heaviness from slots Q/W/E. Each
+Research Dao of Lightness, Dao of Reality, and Dao of War from slots Q/W/E. Each
 costs 200 Steel and 100 Oil and takes 600 ticks (20 seconds, matching Methamphetamines).
 Use existing player-wide permanent research and queue rules, including duplicate rejection,
 cancellation/refund and loss of unfinished research on destruction. All three can be completed;
-completed research survives building destruction. Descriptions explicitly say the prototype
-has no gameplay effect. No Disciple specialization, abilities, stat changes, or new AI behavior
-is part of this slice. Existing checkpoint/replay and owner-only upgrade projection
-carry the new stable ids through the generic research system.
+completed research survives building destruction. Each research unlocks the matching
+Disciple evolution. See [Disciple insight and Dao evolution](dao-insight.md) for stats,
+abilities, insight credit, icons, and hotkeys. Existing checkpoint/replay and owner-only
+upgrade projection carry the stable ids through the generic research system.
+Automatic AI evolution remains deferred.

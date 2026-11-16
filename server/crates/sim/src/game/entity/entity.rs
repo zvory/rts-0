@@ -17,6 +17,7 @@ use super::{
     WeaponSetup, WorkerState, MAX_QUEUED_ORDERS, NEUTRAL,
 };
 
+mod dao;
 mod field_obstacles;
 mod helpers;
 mod position;
@@ -48,6 +49,10 @@ pub struct Entity {
     pos_x: Coord,
     pos_y: Coord,
 
+    #[serde(default)]
+    pub insight: u32,
+    #[serde(default)]
+    pub dao: Option<crate::game::upgrade::UpgradeKind>,
     pub hp: u32,
     /// Full health ceiling. Construction earns current HP over time; damage never lowers this value.
     pub max_hp: u32,
@@ -97,6 +102,8 @@ impl Entity {
             last_damage_owner: None,
             last_damage_entity: None,
             units_killed: 0,
+            insight: 0,
+            dao: None,
             last_damage_tick: None,
             last_damage_pos: None,
             movement: Some(MovementState::default()),
@@ -148,6 +155,8 @@ impl Entity {
             last_damage_owner: None,
             last_damage_entity: None,
             units_killed: 0,
+            insight: 0,
+            dao: None,
             last_damage_tick: None,
             last_damage_pos: None,
             movement: None,
@@ -199,6 +208,8 @@ impl Entity {
             last_damage_owner: None,
             last_damage_entity: None,
             units_killed: 0,
+            insight: 0,
+            dao: None,
             last_damage_tick: None,
             last_damage_pos: None,
             movement: None,
@@ -980,14 +991,6 @@ impl Entity {
     #[cfg(test)]
     pub(in crate::game) fn set_last_damage_entity_for_test(&mut self, entity: Option<u32>) {
         self.last_damage_entity = entity;
-    }
-
-    pub(crate) fn units_killed(&self) -> u32 {
-        self.units_killed
-    }
-
-    pub(in crate::game) fn record_kill(&mut self) {
-        self.units_killed = self.units_killed.saturating_add(1);
     }
 
     pub fn invulnerable(&self) -> bool {

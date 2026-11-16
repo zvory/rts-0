@@ -192,7 +192,7 @@ fn apply_magic_anchor_stationary_pull(
             if resistance <= 0.0 {
                 return None;
             }
-            let speed = config::unit_stats(e.kind)?.speed;
+            let speed = e.movement_speed();
             Some((e.kind, e.pos_x(), e.pos_y(), e.facing(), speed, resistance))
         }) else {
             continue;

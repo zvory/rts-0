@@ -377,3 +377,5 @@ export const cmd = Object.freeze({
 });
 
 // MG prototype: Attack.shotOrigin (compact v57, slot 6) fixes the ray origin; toPos fixes its endpoint.
+
+// Disciple EntityView: insight (0..60), dao (lightness/war/reality); compact slots 45/46.

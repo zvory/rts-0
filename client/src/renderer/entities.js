@@ -142,7 +142,7 @@ export function _drawSelectionAndHp(e, selection, state, ownerColor = null) {
   const selected = selection.has(e.id);
   const hasHealth = !isResource(e.kind) && Number.isFinite(e.maxHp) && e.maxHp > 0;
   const damaged = hasHealth && Number.isFinite(e.hp) && e.hp < e.maxHp;
-  const alwaysShow = !!state?.showHealthBarsAlwaysEnabled;
+  const alwaysShow = !!state?.showHealthBarsAlwaysEnabled || e.kind === KIND.WARRIOR;
   const progressStatus = buildingProgressStatus(e);
 
   if (selected) {
@@ -183,7 +183,7 @@ export function _drawAboveFogHp(e, state, ownerColor = null) {
     && e.hp < e.maxHp;
   if (e?.aboveFogReveal !== true && e?.visionOnly !== true) return;
   if (!hasHealth) return;
-  if (!damaged && !state?.showHealthBarsAlwaysEnabled) return;
+  if (!damaged && !state?.showHealthBarsAlwaysEnabled && e.kind !== KIND.WARRIOR) return;
   const g = this._hpBarSlot(e.id, "aboveFogHpBars");
   this._hpBar(g, e, null, ownerColor);
 }
@@ -196,7 +196,9 @@ export function _hpBarSlot(id, poolName = "hpBars") {
     container.rtsBackground = new PIXI.Graphics();
     container.rtsFill = new PIXI.Graphics();
     container.rtsTicks = new PIXI.Graphics();
-    container.addChild(container.rtsBackground, container.rtsFill, container.rtsTicks);
+    container.rtsInsight = new PIXI.Graphics();
+    container.rtsDao = new PIXI.Graphics();
+    container.addChild(container.rtsBackground, container.rtsFill, container.rtsTicks, container.rtsInsight, container.rtsDao);
     pool.set(id, container);
     this.layers[poolName].addChild(container);
     this._recordRenderDiagnostic?.(`renderer.pixi.displayObject.created.${poolName}`);
@@ -302,6 +304,43 @@ export function _hpBar(g, e, status = null, ownerColor = null) {
   }
   g.rtsFill.tint = color;
   g.rtsFill.scale.set(frac, 1);
+  const insightKey = `${e.insight ?? ""}|${e.dao ?? ""}|${halfW}`;
+  if (g.rtsInsightKey !== insightKey) {
+    g.rtsInsightKey = insightKey;
+    const bar = g.rtsInsight;
+    const icon = g.rtsDao;
+    bar.clear(); icon.clear();
+    if (e.kind === KIND.WARRIOR) {
+      bar.rect(-halfW - 1, 6, barW + 2, 5).fill(0x8b2028);
+      bar.rect(-halfW, 7, barW * clamp01((e.insight || 0) / 60), 3).fill(0x368dff);
+      const x = 0, y = (stat.size || 9) + 8;
+      icon.pivot.set(x, y);
+      icon.position.set(x, y);
+      icon.rotation = e.dao === "war" ? Math.PI / 2 : 0;
+      icon.scale.set(1, e.dao === "war" ? 1.2 : 1);
+      if (e.dao === "lightness") {
+        for (const dx of [-4, 3]) {
+          const path = () => icon.moveTo(x + dx + 3, y - 5).lineTo(x + dx - 2, y).lineTo(x + dx + 3, y + 5);
+          path().stroke({ color: 0x000000, width: 5 });
+          path().stroke({ color: 0xffd633, width: 2.5 });
+        }
+      } else if (e.dao === "war") {
+        icon.poly([x-2,y+1,x-3,y-5,x,y-10,x+3,y-5,x+2,y+1])
+          .fill(0xff1645).stroke({ color: 0x000000, width: 1.5 });
+        icon.moveTo(x,y-7).lineTo(x,y-1).stroke({ color: 0xffacb8, width: 1 });
+        const hilt = () => icon.moveTo(x-5,y+2).lineTo(x+5,y+2).moveTo(x,y+2).lineTo(x,y+8);
+        hilt().stroke({ color: 0x000000, width: 5 });
+        hilt().stroke({ color: 0xff1645, width: 2.5 });
+        icon.circle(x,y+8,2).fill(0xff1645).stroke({ color: 0x000000, width: 1 });
+      } else if (e.dao === "reality") {
+        const points = Array.from({length:5}, (_,i) => { const a = Math.PI/2 + i * Math.PI*4/5; return [x+Math.cos(a)*9,y+Math.sin(a)*9]; }).flat();
+        icon.circle(x,y,10).stroke({color:0x000000,width:4});
+        icon.poly(points).stroke({color:0x000000,width:4});
+        icon.circle(x,y,10).stroke({color:0x36ef72,width:1.5});
+        icon.poly(points).stroke({color:0x36ef72,width:1.7});
+      }
+    }
+  }
 }
 
 export function _queueLabel(e, cx, cy, count, bodyAlpha) {

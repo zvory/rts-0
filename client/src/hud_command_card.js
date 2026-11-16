@@ -44,7 +44,7 @@ import {
   trainSlotForUnit,
 } from "./hud_train_card_helpers.js";
 import { workerCommandSlots } from "./hud_worker_commands.js";
-import { buildEkatCommandCardContextSamples } from "./hud_command_card_contexts.js";
+import { buildCultivatorCommandCardContextSamples, buildEkatCommandCardContextSamples } from "./hud_command_card_contexts.js";
 
 // Command-card hotkeys follow the keyboard grid (3 columns):
 //   Q W E
@@ -195,6 +195,7 @@ export function buildCommandCardContextCatalog() {
       })),
     },
     ...buildEkatCommandCardContextSamples(buildCommandCardDescriptors),
+    ...buildCultivatorCommandCardContextSamples(buildCommandCardDescriptors),
   ];
 }
 
@@ -508,7 +509,11 @@ export function selectedAbilityAffordances(ctx, selection) {
   return commandCardAbilitiesForFaction(commandFactionId(ctx))
     .map((definition) => {
       const carriers = (selection || []).filter((e) =>
-        isOwn(ctx, e) && e.kind !== KIND.SCOUT_PLANE && definition.carriers.includes(e.kind));
+        isOwn(ctx, e) && e.kind !== KIND.SCOUT_PLANE && definition.carriers.includes(e.kind)
+        && (e.kind !== KIND.WARRIOR || (
+          definition.ability.startsWith("evolve") ? !e.dao :
+          definition.ability === ABILITY.EKAT_TELEPORT ? e.dao === "lightness" :
+          definition.ability === ABILITY.EKAT_MAGIC_ANCHOR ? e.dao === "reality" : true)));
       if (carriers.length === 0) return null;
       const unlocked = abilityUnlocked(ctx, definition);
       const cost = abilityCostForCarriers(definition, carriers);

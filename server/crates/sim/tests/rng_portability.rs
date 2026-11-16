@@ -140,8 +140,9 @@ fn end_state_fingerprint_matches_native_and_wasm() {
     for _ in 0..3 {
         game.tick();
     }
+    // Entity insight/Dao fields are part of committed state, including default values.
     assert_eq!(
         game.replay_end_state_hash().unwrap(),
-        "90e0718c05eb30dd6968ec52a456841d9c2f77f4cf57e636563807b038f74d2d"
+        "973143629eb4883cbeef9bfb5932b7972521293ae601f8262864516cb8475642"
     );
 }

@@ -103,6 +103,9 @@ pub enum AbilityKind {
     EkatMagicAnchor,
     EkatConsumeGolem,
     Barrage,
+    EvolveLightness,
+    EvolveWar,
+    EvolveReality,
 }
 
 impl AbilityKind {
@@ -120,6 +123,9 @@ impl AbilityKind {
         Self::EkatMagicAnchor,
         Self::EkatConsumeGolem,
         Self::Barrage,
+        Self::EvolveLightness,
+        Self::EvolveWar,
+        Self::EvolveReality,
     ];
 
     pub const fn stable_id(self) -> &'static str {
@@ -137,6 +143,9 @@ impl AbilityKind {
             Self::EkatMagicAnchor => "ekatMagicAnchor",
             Self::EkatConsumeGolem => "ekatConsumeGolem",
             Self::Barrage => "barrage",
+            Self::EvolveLightness => "evolveLightness",
+            Self::EvolveWar => "evolveWar",
+            Self::EvolveReality => "evolveReality",
         }
     }
 
@@ -622,7 +631,7 @@ const EKAT_ABILITIES: [AbilityCatalogEntry; 4] = [
         icon: "DSH",
         hotkey: Some("D"),
         title: "Dash up to 5 tiles, then recast to return",
-        carriers: &[EntityKind::Ekat],
+        carriers: &[EntityKind::Ekat, EntityKind::Warrior],
         target_mode: AbilityTargetMode::WorldPoint,
         range_tiles: Some(balance::EKAT_TELEPORT_RANGE_TILES),
         min_range_tiles: None,
@@ -666,7 +675,7 @@ const EKAT_ABILITIES: [AbilityCatalogEntry; 4] = [
         icon: "ANC",
         hotkey: Some("C"),
         title: "Place a 10-second pull field",
-        carriers: &[EntityKind::Ekat],
+        carriers: &[EntityKind::Ekat, EntityKind::Warrior],
         target_mode: AbilityTargetMode::WorldPoint,
         range_tiles: Some(balance::EKAT_MAGIC_ANCHOR_RANGE_TILES),
         min_range_tiles: None,
@@ -765,6 +774,9 @@ const CULTIVATORS_UPGRADES: [UpgradeCatalogEntry; 3] = [
     },
 ];
 
+mod dao;
+use dao::CULTIVATOR_ABILITIES;
+
 pub const CULTIVATORS_CATALOG: FactionCatalog = FactionCatalog {
     id: CULTIVATORS_FACTION_ID,
     loadout: CULTIVATORS_LOADOUT,
@@ -782,7 +794,7 @@ pub const CULTIVATORS_CATALOG: FactionCatalog = FactionCatalog {
         EntityKind::ThreeDaoPavilion,
     ],
     upgrades: &CULTIVATORS_UPGRADES,
-    abilities: &[],
+    abilities: &CULTIVATOR_ABILITIES,
     builders: &[EntityKind::Worker],
     gatherers: &[],
     production_anchors: &[EntityKind::ResourceDepot, EntityKind::Portal],
@@ -1029,6 +1041,9 @@ pub fn ability_definition(kind: AbilityKind) -> AbilityCatalogEntry {
         AbilityKind::EkatMagicAnchor => ekat_magic_anchor,
         AbilityKind::EkatConsumeGolem => ekat_consume_golem,
         AbilityKind::Barrage => barrage,
+        AbilityKind::EvolveLightness => CULTIVATOR_ABILITIES[0],
+        AbilityKind::EvolveWar => CULTIVATOR_ABILITIES[1],
+        AbilityKind::EvolveReality => CULTIVATOR_ABILITIES[2],
     }
 }
 
@@ -1269,7 +1284,7 @@ mod tests {
         assert_eq!(charge.cooldown_ticks, 0);
 
         let teleport = EKAT_CATALOG.ability(AbilityKind::EkatTeleport).unwrap();
-        assert_eq!(teleport.carriers, &[EntityKind::Ekat]);
+        assert_eq!(teleport.carriers, &[EntityKind::Ekat, EntityKind::Warrior]);
         assert_eq!(
             teleport.range_tiles,
             Some(balance::EKAT_TELEPORT_RANGE_TILES)
@@ -1283,7 +1298,7 @@ mod tests {
         );
 
         let anchor = EKAT_CATALOG.ability(AbilityKind::EkatMagicAnchor).unwrap();
-        assert_eq!(anchor.carriers, &[EntityKind::Ekat]);
+        assert_eq!(anchor.carriers, &[EntityKind::Ekat, EntityKind::Warrior]);
         assert_eq!(
             anchor.range_tiles,
             Some(balance::EKAT_MAGIC_ANCHOR_RANGE_TILES)
@@ -1351,7 +1366,16 @@ mod tests {
             .iter()
             .all(|group| catalog.allows_unit(group.kind) || catalog.allows_building(group.kind)));
         assert_eq!(catalog.upgrades, &CULTIVATORS_UPGRADES);
-        assert!(catalog.abilities.is_empty());
+        assert_eq!(catalog.abilities, &CULTIVATOR_ABILITIES);
+        for ability in [
+            AbilityKind::EvolveLightness,
+            AbilityKind::EvolveWar,
+            AbilityKind::EvolveReality,
+            AbilityKind::EkatTeleport,
+            AbilityKind::EkatMagicAnchor,
+        ] {
+            assert!(catalog.allows_ability(ability, EntityKind::Warrior));
+        }
     }
 
     #[test]

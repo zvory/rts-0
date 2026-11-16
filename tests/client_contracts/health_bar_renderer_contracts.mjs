@@ -3,6 +3,7 @@ import {
   _drawAboveFogHp,
   _drawSelectionAndHp,
   _hpBar,
+  _hpBarSlot,
 } from "../../client/src/renderer/entities.js";
 import { buildingProgressStatus } from "../../client/src/renderer/entity_state.js";
 import { assert } from "./assertions.mjs";
@@ -21,11 +22,11 @@ try {
     "construction status bars follow authoritative build progress instead of scaffold HP",
   );
   const makeBar = () => {
-    const bar = new PIXI.Container();
-    bar.rtsBackground = new PIXI.Graphics();
-    bar.rtsFill = new PIXI.Graphics();
-    bar.rtsTicks = new PIXI.Graphics();
-    return bar;
+    return _hpBarSlot.call({
+      _pools: { hpBars: new Map() },
+      _seen: { hpBars: new Set() },
+      layers: { hpBars: new PIXI.Container() },
+    }, 1);
   };
   const bar = makeBar();
   _hpBar.call({ _map: { tileSize: 32 } }, bar, {
@@ -143,6 +144,26 @@ try {
     aboveFogReveal: true,
   }, { showHealthBarsAlwaysEnabled: true });
   assert(barsDrawn === 4, "above-fog rendering keeps extractor building HP visible");
+
+  const disciple = {
+    id: 14, kind: KIND.WARRIOR, owner: 1, x: 100, y: 120,
+    hp: 135, maxHp: 135, insight: 30, aboveFogReveal: true,
+  };
+  _drawSelectionAndHp.call(renderer, disciple, new Set(), {});
+  _drawAboveFogHp.call(renderer, disciple, {});
+  assert(barsDrawn === 6, "full-health Disciples retain insight overlays both below and above fog");
+
+  const discipleBar = makeBar();
+  for (const dao of [null, "lightness", "war", "reality"]) {
+    _hpBar.call({ _map: { tileSize: 32 } }, discipleBar, { ...disciple, dao });
+    const rects = discipleBar.rtsInsight.calls.filter((call) => call[0] === "drawRect");
+    assert(rects.at(-1)[3] === (rects.at(-2)[3] - 2) / 2,
+      "30 insight fills half the Disciple insight bar");
+    assert(discipleBar.rtsDao.rotation === (dao === "war" ? Math.PI / 2 : 0),
+      "Dao icon rotation resets when the authoritative specialization changes");
+    assert(discipleBar.rtsDao.scaleY === (dao === "war" ? 1.2 : 1),
+      "only the War icon receives the sword length multiplier");
+  }
 } finally {
   restorePixi();
 }
