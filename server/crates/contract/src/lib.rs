@@ -885,6 +885,10 @@ pub struct EntityView {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub insight: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dao_ready: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dao_advance_ticks: Option<u16>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dao: Option<String>,
 
     /// Visible physical rounds on a Rocket Truck rack, including zero while reloading.
@@ -1002,6 +1006,8 @@ impl EntityView {
             state: state.to_string(),
             units_killed: None,
             insight: None,
+            dao_ready: None,
+            dao_advance_ticks: None,
             dao: None,
             rocket_rack_count: None,
             facing: None,

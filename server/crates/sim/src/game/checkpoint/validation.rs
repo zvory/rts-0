@@ -196,6 +196,20 @@ fn validate_entity(
         });
     }
     entities::validate_ownership(entity)?;
+    if entity.dao_advance_ticks > 15
+        || (entity.dao_advance_ticks > 0 && entity.dao.is_none())
+        || entity.shield.as_ref().is_some_and(|shield| {
+            entity.dao != Some(crate::game::upgrade::UpgradeKind::DaoOfBarriers)
+                || shield.id == 0
+                || shield.remaining == 0
+                || shield.remaining > config::DISCIPLE_SHIELD_CAPACITY
+                || !in_world(shield.x.to_world(), shield.y.to_world(), world)
+        })
+    {
+        return Err(CheckpointPayloadError::InvalidValue {
+            field: "entities.daoEffects",
+        });
+    }
     if entity.insight > config::DISCIPLE_INSIGHT_REQUIRED
         || (entity.kind != crate::game::entity::EntityKind::Warrior
             && (entity.insight != 0 || entity.dao.is_some()))

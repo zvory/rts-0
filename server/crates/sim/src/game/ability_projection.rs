@@ -45,6 +45,49 @@ pub(in crate::game) fn ability_object_views_for(
                     .then(|| ability_object_owner_state_to_protocol(object.payload)),
             }
         })
+        .chain(game.state.entities.iter().filter_map(|caster| {
+            let shield = caster.shield.as_ref()?;
+            if caster.hp == 0
+                || shield.remaining == 0
+                || (fogged
+                    && !fog.is_visible_world(player, shield.x.to_world(), shield.y.to_world()))
+            {
+                return None;
+            }
+            let owner_visible = caster.owner == player
+                || owner_visible_players.contains(&caster.owner)
+                || omniscient;
+            Some(crate::protocol::AbilityObjectView {
+                id: shield.id,
+                owner: caster.owner,
+                ability: crate::game::ability::AbilityKind::DiscipleShield
+                    .to_protocol_str()
+                    .into(),
+                kind: crate::protocol::ability_object_kinds::SHIELD.into(),
+                x: shield.x.to_world(),
+                y: shield.y.to_world(),
+                expires_in: None,
+                source_caster_id: (owner_visible
+                    || !fogged
+                    || fog.is_visible_world(player, caster.pos_x(), caster.pos_y()))
+                .then_some(caster.id),
+                owner_state: owner_visible.then_some(
+                    crate::protocol::AbilityObjectOwnerStateView {
+                        hp: Some(
+                            shield
+                                .remaining
+                                .min(crate::config::DISCIPLE_SHIELD_CAPACITY)
+                                as u16,
+                        ),
+                        radius: Some(
+                            crate::config::EKAT_MAGIC_ANCHOR_RADIUS_TILES
+                                * crate::config::TILE_SIZE as f32,
+                        ),
+                        ..Default::default()
+                    },
+                ),
+            })
+        }))
         .collect()
 }
 

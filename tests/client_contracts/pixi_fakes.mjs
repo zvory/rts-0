@@ -101,6 +101,11 @@ export function installFakePixi() {
       }
       return children[0];
     }
+    addChildAt(child, index) {
+      this.children.splice(index, 0, child);
+      child.parent = this;
+      return child;
+    }
     removeChild(child) {
       this.children = this.children.filter((item) => item !== child);
       child.parent = null;

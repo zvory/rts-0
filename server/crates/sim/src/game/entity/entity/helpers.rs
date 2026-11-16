@@ -18,3 +18,12 @@ pub(super) fn construction_hp_for_progress(max_hp: u32, progress: u32, total: u3
         .unwrap_or(remaining_hp as u64) as u32;
     start_hp.saturating_add(gained_hp).min(max_hp)
 }
+
+impl super::Entity {
+    pub fn invulnerable(&self) -> bool {
+        self.invulnerable
+    }
+    pub fn set_invulnerable(&mut self, invulnerable: bool) {
+        self.invulnerable = invulnerable;
+    }
+}

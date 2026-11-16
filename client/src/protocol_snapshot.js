@@ -26,9 +26,9 @@ import { decodeCompactEvent } from "./protocol_snapshot_events.js";
 import { decodeCompactTrenches } from "./protocol_snapshot_trenches.js";
 
 export function decodeCompactSnapshot(raw) {
-  // Versions 51-57 remain safe to decode: subsequent versions only append optional
+  // Versions 51-58 remain safe to decode: subsequent versions only append optional
   // fields and codes, preserving all existing event and entity record layouts.
-  if (raw.v !== COMPACT_SNAPSHOT_VERSION && raw.v !== 57 && raw.v !== 56 && raw.v !== 55 && raw.v !== 54 && raw.v !== 53 && raw.v !== 52 && raw.v !== 51) {
+  if (raw.v !== COMPACT_SNAPSHOT_VERSION && raw.v !== 58 && raw.v !== 57 && raw.v !== 56 && raw.v !== 55 && raw.v !== 54 && raw.v !== 53 && raw.v !== 52 && raw.v !== 51) {
     throw new Error(`unsupported compact snapshot version: ${raw.v}`);
   }
 
@@ -312,18 +312,13 @@ function decodeCompactPlayerResource(record, index) {
     supplyUsed: readU32(fields[3], "playerResource.supplyUsed"),
     supplyCap: readU32(fields[4], "playerResource.supplyCap"),
     apm: readU32(fields[5], "playerResource.apm"),
-    upgrades: readOptionalArray(fields[6], `playerResource ${index}.upgrades`, 32).map(
-      (code, upgradeIndex) => readCode(
-        code,
-        UPGRADE_BY_CODE,
-        `playerResource.${index}.upgrade.${upgradeIndex}`,
-      ),
-    ),
+    upgrades: readOptionalArray(fields[6], `playerResource ${index}.upgrades`, 32)
+      .map((code, i) => readCode(code, UPGRADE_BY_CODE, `playerResource.${index}.upgrade.${i}`)),
   };
 }
 
 function decodeCompactEntity(record, index) {
-  const fields = readArray(record, `entity ${index}`, 47);
+  const fields = readArray(record, `entity ${index}`, 49);
   if (fields.length < 8) throw new Error(`entity ${index} is too short`);
   const entity = {
     id: readU32(fields[0], "entity.id"),
@@ -375,6 +370,8 @@ function decodeCompactEntity(record, index) {
   assignOptional(entity, "commanderFacing", fields, 44, readNumber);
   assignOptional(entity, "insight", fields, 45, readU32);
   assignOptional(entity, "dao", fields, 46, readString);
+  assignOptional(entity, "daoReady", fields, 47, readBool);
+  assignOptional(entity, "daoAdvanceTicks", fields, 48, readU32);
   return entity;
 }
 

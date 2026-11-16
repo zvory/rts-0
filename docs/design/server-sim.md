@@ -2146,3 +2146,5 @@ through checkpoints. Visible Disciple snapshots append `insight` (compact slot 4
 `dao` (slot 46: lightness/war/reality). Evolution abilities are self-targeted, nonqueueable,
 research-gated codes 14–16 and order stages 22–24. Internal research ids remain
 `dao_of_lightness`, `dao_of_heaviness` (War), `dao_of_barriers` (Reality).
+
+Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md).

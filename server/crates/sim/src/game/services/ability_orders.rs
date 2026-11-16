@@ -381,6 +381,25 @@ pub(crate) fn launch_world_ability(
             );
             true
         }
+        (AbilityEffectHook::Shield, AbilityKind::DiscipleShield) => {
+            if !entities.can_place_shield(caster) {
+                return false;
+            }
+            let Some((x, y)) = SmokeCloudStore::clamp_point_to_map(map, x, y) else {
+                return false;
+            };
+            let Some(caster) = entities.get_mut(caster) else {
+                return false;
+            };
+            caster.place_shield(
+                ability_runtime.allocate_id().get(),
+                x,
+                y,
+                definition.cooldown_ticks,
+                preserve_active_order,
+            );
+            true
+        }
         (AbilityEffectHook::MagicAnchor, AbilityKind::EkatMagicAnchor) => {
             let Some((anchor_x, anchor_y)) = SmokeCloudStore::clamp_point_to_map(map, x, y) else {
                 return false;
@@ -416,7 +435,7 @@ pub(crate) fn launch_world_ability(
             notice_positioned(
                 events,
                 player,
-                "Magic Anchor",
+                "Anchor",
                 crate::protocol::NoticeSeverity::Info,
                 anchor_x,
                 anchor_y,

@@ -280,6 +280,7 @@ export const ABILITY_OBJECT_KIND = Object.freeze({
   RETURN_MARKER: "returnMarker",
   MAGIC_ANCHOR: "magicAnchor",
   LINE_PROJECTILE: "lineProjectile",
+  SHIELD: "shield",
 });
 
 export const NOTICE_SEVERITY = Object.freeze({
@@ -309,6 +310,7 @@ export const ABILITY = Object.freeze({
   EVOLVE_LIGHTNESS: "evolveLightness",
   EVOLVE_WAR: "evolveWar",
   EVOLVE_REALITY: "evolveReality",
+  DISCIPLE_SHIELD: "discipleShield",
 
 });
 
@@ -348,7 +350,7 @@ export const MOVEMENT_PATH_DIAGNOSTICS = Object.freeze({
 // --- Compact snapshot wire schema (must match protocol.rs) ---
 export const PREDICTION_PROTOCOL_VERSION = 1;
 export const DEFAULT_FACTION_ID = "kriegsia";
-export const COMPACT_SNAPSHOT_VERSION = 58;
+export const COMPACT_SNAPSHOT_VERSION = 59;
 export const MAX_COMPACT_GROUND_DECALS = 64;
 export const SNAPSHOT_CODEC_VERSION = 1;
 export const SNAPSHOT_CODEC = Object.freeze({
@@ -503,6 +505,7 @@ export const ORDER_STAGE = Object.freeze({
   EVOLVE_LIGHTNESS: "evolveLightness",
   EVOLVE_WAR: "evolveWar",
   EVOLVE_REALITY: "evolveReality",
+  DISCIPLE_SHIELD: "discipleShield",
 
   SETUP_ANTI_TANK_GUNS: "setupAntiTankGuns",
 });
@@ -532,6 +535,7 @@ export const ORDER_STAGE_CODE = Object.freeze({
   [ORDER_STAGE.EVOLVE_LIGHTNESS]: 22,
   [ORDER_STAGE.EVOLVE_WAR]: 23,
   [ORDER_STAGE.EVOLVE_REALITY]: 24,
+  [ORDER_STAGE.DISCIPLE_SHIELD]: 25,
 
 });
 
@@ -552,6 +556,7 @@ export const ABILITY_CODE = Object.freeze({
   [ABILITY.EVOLVE_LIGHTNESS]: 14,
   [ABILITY.EVOLVE_WAR]: 15,
   [ABILITY.EVOLVE_REALITY]: 16,
+  [ABILITY.DISCIPLE_SHIELD]: 17,
 
 });
 
@@ -559,6 +564,7 @@ export const ABILITY_OBJECT_KIND_CODE = Object.freeze({
   [ABILITY_OBJECT_KIND.RETURN_MARKER]: 1,
   [ABILITY_OBJECT_KIND.MAGIC_ANCHOR]: 2,
   [ABILITY_OBJECT_KIND.LINE_PROJECTILE]: 3,
+  [ABILITY_OBJECT_KIND.SHIELD]: 4,
 });
 
 export const NOTICE_SEVERITY_CODE = Object.freeze({

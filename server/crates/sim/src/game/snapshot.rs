@@ -216,6 +216,17 @@ impl Game {
             omniscient,
         );
         ability_objects.sort_by_key(|object| object.id);
+        // Tile visibility alone does not reveal casters hidden by smoke or concealment.
+        // Reuse the authoritative entity projection for every ability-object reference.
+        if fogged {
+            for object in &mut ability_objects {
+                object.source_caster_id = object.source_caster_id.filter(|id| {
+                    entities
+                        .binary_search_by_key(id, |entity| entity.id)
+                        .is_ok()
+                });
+            }
+        }
         let trenches = self
             .state
             .trenches

@@ -384,3 +384,272 @@ fn disciple_dao_gates_blink_return_and_magic_anchor() {
     // The Anchor can pull its own caster slightly; a forbidden blink must not cross 40px.
     assert!((game.state.entities.get(support).unwrap().pos_x() - 600.0).abs() < 2.0);
 }
+
+#[test]
+fn disciple_shield_shared_pool_overflow_teams_and_checkpoint() {
+    use crate::game::ability::AbilityKind;
+    use crate::game::teams::TeamRelations;
+    use crate::game::upgrade::UpgradeKind;
+    let enemy = PlayerInit {
+        id: 2,
+        team_id: 2,
+        ..cultivator_player()
+    };
+    let ally = PlayerInit {
+        id: 3,
+        ..cultivator_player()
+    };
+    let mut game = empty_flat_game(&[cultivator_player(), enemy, ally]);
+    let caster = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Warrior, 400.0, 400.0)
+        .unwrap();
+    let friend = game
+        .state
+        .entities
+        .spawn_unit(3, EntityKind::Rifleman, 480.0, 400.0)
+        .unwrap();
+    let outside = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, 700.0, 400.0)
+        .unwrap();
+    game.state.entities.get_mut(caster).unwrap().insight = 60;
+    game.state.players[0]
+        .upgrades
+        .insert(UpgradeKind::DaoOfBarriers);
+    let cast = |ability| Command::UseAbility {
+        ability,
+        units: vec![caster],
+        x: Some(480.0),
+        y: Some(400.0),
+        queued: false,
+    };
+    game.enqueue(1, cast(AbilityKind::DiscipleShield));
+    game.tick();
+    assert!(game.state.entities.get(caster).unwrap().shield.is_none());
+    game.enqueue(1, cast(AbilityKind::EvolveReality));
+    game.tick();
+    game.enqueue(1, cast(AbilityKind::DiscipleShield));
+    game.tick();
+    assert_eq!(
+        game.state
+            .entities
+            .get(caster)
+            .unwrap()
+            .shield
+            .as_ref()
+            .unwrap()
+            .remaining,
+        300
+    );
+    let foe = game
+        .state
+        .entities
+        .spawn_unit(2, EntityKind::Rifleman, 480.0, 400.0)
+        .unwrap();
+    let teams = TeamRelations::from_player_teams([(1, 1), (2, 2), (3, 1)]);
+    assert_eq!(
+        game.state.entities.shielded_damage(outside, 2, 50, &teams),
+        50
+    );
+    assert_eq!(game.state.entities.shielded_damage(foe, 1, 50, &teams), 50);
+    assert_eq!(
+        game.state.entities.shielded_damage(friend, 1, 50, &teams),
+        50
+    );
+    assert_eq!(
+        game.state.entities.shielded_damage(friend, 2, 120, &teams),
+        0
+    );
+    assert_eq!(
+        game.state.entities.shielded_damage(caster, 2, 80, &teams),
+        0
+    );
+    let payload = game.checkpoint_payload_text_for_test().unwrap();
+    let mut restored = Game::restore_checkpoint_payload_text_for_test(
+        &payload,
+        game.state.map.clone(),
+        game.state.map_metadata.clone(),
+    )
+    .unwrap();
+    assert_eq!(
+        restored
+            .state
+            .entities
+            .shielded_damage(friend, 2, 150, &teams),
+        50
+    );
+    assert!(restored
+        .state
+        .entities
+        .get(caster)
+        .unwrap()
+        .shield
+        .is_none());
+    assert_eq!(
+        restored
+            .state
+            .entities
+            .shielded_damage(friend, 2, 20, &teams),
+        20
+    );
+    game.state
+        .entities
+        .get_mut(caster)
+        .unwrap()
+        .apply_damage(u32::MAX, None);
+    assert_eq!(
+        game.state.entities.shielded_damage(friend, 2, 50, &teams),
+        50
+    );
+}
+
+#[test]
+fn disciple_insight_is_team_private_but_readiness_and_advance_are_public() {
+    use crate::game::ability::AbilityKind;
+    use crate::game::upgrade::UpgradeKind;
+    let enemy = PlayerInit {
+        id: 2,
+        team_id: 2,
+        ..cultivator_player()
+    };
+    let ally = PlayerInit {
+        id: 3,
+        ..cultivator_player()
+    };
+    let mut game = empty_flat_game(&[cultivator_player(), enemy, ally]);
+    let unit = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Warrior, 400.0, 400.0)
+        .unwrap();
+    game.state
+        .entities
+        .spawn_unit(2, EntityKind::Worker, 450.0, 400.0)
+        .unwrap();
+    game.state
+        .entities
+        .spawn_unit(3, EntityKind::Worker, 480.0, 400.0)
+        .unwrap();
+    game.tick();
+    game.state.entities.get_mut(unit).unwrap().insight = 60;
+    game.state
+        .fog
+        .recompute(&[1, 2, 3], &game.state.entities, &game.state.map);
+    for (viewer, insight) in [(1, Some(60)), (2, None), (3, Some(60))] {
+        let snapshot = game.snapshot_for(viewer);
+        let view = snapshot
+            .entities
+            .iter()
+            .find(|e| e.id == unit)
+            .unwrap_or_else(|| {
+                panic!(
+                    "missing disciple for viewer {viewer}; players {:?}",
+                    game.state
+                        .players
+                        .iter()
+                        .map(|p| (p.id, p.team_id))
+                        .collect::<Vec<_>>()
+                )
+            });
+        assert_eq!(view.insight, insight);
+        assert_eq!(view.dao_ready, Some(true));
+    }
+    game.state.players[0]
+        .upgrades
+        .insert(UpgradeKind::DaoOfLightness);
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability: AbilityKind::EvolveLightness,
+            units: vec![unit],
+            x: None,
+            y: None,
+            queued: false,
+        },
+    );
+    game.tick();
+    let enemy_view = game
+        .snapshot_for(2)
+        .entities
+        .into_iter()
+        .find(|e| e.id == unit)
+        .unwrap();
+    assert_eq!(enemy_view.insight, None);
+    assert_eq!(enemy_view.dao_ready, Some(false));
+    assert!(enemy_view
+        .dao_advance_ticks
+        .is_some_and(|n| n > 0 && n <= 15));
+    for _ in 0..15 {
+        game.tick();
+    }
+    assert_eq!(game.state.entities.get(unit).unwrap().dao_advance_ticks, 0);
+}
+
+#[test]
+fn disciple_shield_does_not_identify_a_smoke_hidden_caster() {
+    use crate::game::upgrade::UpgradeKind;
+    let enemy = PlayerInit {
+        id: 2,
+        team_id: 2,
+        ..cultivator_player()
+    };
+    let mut game = empty_flat_game(&[cultivator_player(), enemy]);
+    let caster = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Warrior, 400.0, 400.0)
+        .unwrap();
+    game.state
+        .entities
+        .spawn_unit(2, EntityKind::Worker, 520.0, 400.0)
+        .unwrap();
+    game.tick();
+    let shield_id = game.state.ability_runtime.allocate_id().get();
+    let unit = game.state.entities.get_mut(caster).unwrap();
+    unit.insight = 60;
+    unit.dao = Some(UpgradeKind::DaoOfBarriers);
+    unit.place_shield(shield_id, 480.0, 400.0, 300, true);
+    game.state
+        .fog
+        .recompute(&[1, 2], &game.state.entities, &game.state.map);
+    game.state
+        .smokes
+        .spawn(400.0, 400.0, 0.75, 100, game.state.tick)
+        .unwrap();
+
+    // The caster's tile is visible, but smoke excludes its entity from the enemy snapshot.
+    assert!(game.state.fog.is_visible_world(2, 400.0, 400.0));
+    let enemy_view = game.snapshot_for(2);
+    assert!(!enemy_view.entities.iter().any(|e| e.id == caster));
+    let shield = enemy_view
+        .ability_objects
+        .iter()
+        .find(|o| o.id == shield_id)
+        .unwrap();
+    assert_eq!(shield.source_caster_id, None);
+    assert_eq!(shield.owner_state, None);
+    for snapshot in [game.snapshot_for(1), game.snapshot_full_for(2)] {
+        let shield = snapshot
+            .ability_objects
+            .iter()
+            .find(|o| o.id == shield_id)
+            .unwrap();
+        assert_eq!(shield.source_caster_id, Some(caster));
+        assert_eq!(shield.owner_state.as_ref().unwrap().hp, Some(300));
+    }
+    game.state.smokes = crate::game::smoke::SmokeCloudStore::new();
+    let visible = game.snapshot_for(2);
+    assert!(visible.entities.iter().any(|e| e.id == caster));
+    assert_eq!(
+        visible
+            .ability_objects
+            .iter()
+            .find(|o| o.id == shield_id)
+            .unwrap()
+            .source_caster_id,
+        Some(caster)
+    );
+}

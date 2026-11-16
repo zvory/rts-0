@@ -271,9 +271,11 @@ fn apply_projectile_hits(
     hits.sort_by(|a, b| a.1.total_cmp(&b.1).then_with(|| a.0.cmp(&b.0)));
     for (id, _) in hits {
         projectile.hits_for_current_leg().insert(id);
+        let damage = entities.get(id).map_or(0, |target| {
+            map.damage_after_reduction_tile(target.pos_x(), target.pos_y(), projectile.damage)
+        });
+        let damage = entities.shielded_damage(id, projectile.owner, damage, teams);
         if let Some(target) = entities.get_mut(id) {
-            let damage =
-                map.damage_after_reduction_tile(target.pos_x(), target.pos_y(), projectile.damage);
             target.apply_damage_from_entity(
                 damage,
                 projectile.owner,

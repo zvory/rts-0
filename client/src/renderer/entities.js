@@ -196,9 +196,7 @@ export function _hpBarSlot(id, poolName = "hpBars") {
     container.rtsBackground = new PIXI.Graphics();
     container.rtsFill = new PIXI.Graphics();
     container.rtsTicks = new PIXI.Graphics();
-    container.rtsInsight = new PIXI.Graphics();
-    container.rtsDao = new PIXI.Graphics();
-    container.addChild(container.rtsBackground, container.rtsFill, container.rtsTicks, container.rtsInsight, container.rtsDao);
+    container.addChild(container.rtsBackground, container.rtsFill, container.rtsTicks);
     pool.set(id, container);
     this.layers[poolName].addChild(container);
     this._recordRenderDiagnostic?.(`renderer.pixi.displayObject.created.${poolName}`);
@@ -304,6 +302,41 @@ export function _hpBar(g, e, status = null, ownerColor = null) {
   }
   g.rtsFill.tint = color;
   g.rtsFill.scale.set(frac, 1);
+  // Most health bars never need Dao overlays. Allocate them only for Disciples,
+  // retaining the same child order so their radiance stays behind the HP bar.
+  if (e.kind !== KIND.WARRIOR) {
+    if (g.rtsInsight) {
+      g.rtsInsight.visible = g.rtsDao.visible = g.rtsRadiance.visible = false;
+    }
+    return;
+  }
+  if (!g.rtsInsight) {
+    g.rtsInsight = new PIXI.Graphics();
+    g.rtsDao = new PIXI.Graphics();
+    g.rtsRadiance = new PIXI.Graphics();
+    g.addChildAt(g.rtsRadiance, 0);
+    g.addChild(g.rtsInsight, g.rtsDao);
+  }
+  g.rtsInsight.visible = g.rtsDao.visible = g.rtsRadiance.visible = true;
+  const radiance = g.rtsRadiance;
+  radiance.clear();
+  if (e.daoReady || e.daoAdvanceTicks > 0) {
+    const pulse = 0.5 + 0.5 * Math.sin((this._renderClock?.now?.() ?? performance.now()) / 210);
+    const advancing = e.daoAdvanceTicks > 0;
+    const radius = advancing ? 64 * (1 - 0.45 * (e.daoAdvanceTicks / 15)) : 29 + pulse * 3;
+    const alpha = advancing ? Math.min(1, e.daoAdvanceTicks / 5) : 0.6 + pulse * 0.4;
+    const cy = e.y - topY;
+    for (let i = 4; i > 0; i--) {
+      radiance.circle(0, cy, radius + i * 2).stroke({color: 0xffdc70, width: 5, alpha: alpha * 0.045});
+    }
+    radiance.circle(0, cy, radius).stroke({color: 0xffec9a, width: 2, alpha: alpha * 0.85});
+    for (let i = 0; i < 12; i++) {
+      const angle = i * Math.PI / 6;
+      radiance.moveTo(Math.cos(angle) * (radius + 3), cy + Math.sin(angle) * (radius + 3))
+        .lineTo(Math.cos(angle) * (radius + 7 + pulse * 3), cy + Math.sin(angle) * (radius + 7 + pulse * 3))
+        .stroke({color: 0xffe79a, width: 1.5, alpha: alpha * 0.55});
+    }
+  }
   const insightKey = `${e.insight ?? ""}|${e.dao ?? ""}|${halfW}`;
   if (g.rtsInsightKey !== insightKey) {
     g.rtsInsightKey = insightKey;
@@ -311,8 +344,10 @@ export function _hpBar(g, e, status = null, ownerColor = null) {
     const icon = g.rtsDao;
     bar.clear(); icon.clear();
     if (e.kind === KIND.WARRIOR) {
-      bar.rect(-halfW - 1, 6, barW + 2, 5).fill(0x8b2028);
-      bar.rect(-halfW, 7, barW * clamp01((e.insight || 0) / 60), 3).fill(0x368dff);
+      if (Number.isFinite(e.insight)) {
+        bar.rect(-halfW - 1, 6, barW + 2, 5).fill(0x8b2028);
+        bar.rect(-halfW, 7, barW * clamp01(e.insight / 60), 3).fill(0x368dff);
+      }
       const x = 0, y = (stat.size || 9) + 8;
       icon.pivot.set(x, y);
       icon.position.set(x, y);

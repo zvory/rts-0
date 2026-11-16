@@ -80,6 +80,9 @@ function checkpointPayload(scenario) {
 }
 
 async function importScenario(client, requestId, scenario, oldMortarId) {
+  const payload = JSON.parse(scenario.checkpointPayload);
+  for (const player of payload.players) player.name = `Restored P${player.id}`;
+  scenario = { ...scenario, checkpointPayload: JSON.stringify(payload) };
   const importStartMessageIndex = client.msgs.length;
   const result = await labRequest(
     client,
@@ -87,6 +90,11 @@ async function importScenario(client, requestId, scenario, oldMortarId) {
     { op: "importScenario", scenario },
     "import mortar scenario",
   );
+  const start = client.msgs.slice(importStartMessageIndex).find((msg) => msg.t === "start") ||
+    await client.waitFor((msg) => msg.t === "start" && msg.players?.some((p) => p.name === "Restored P1"), 3_000, "refreshed Lab roster");
+  requireCondition(payload.players.every((player) => start.players.some((p) =>
+    p.id === player.id && p.name === player.name && p.factionId === player.factionId)),
+  "setup import refreshes authoritative player names and factions before snapshots");
   const remap = result.outcome?.entityIdMap || [];
   const entry = remap.find((item) => item.oldId === oldMortarId);
   requireCondition(Number.isInteger(entry?.newId), "scenario import remaps mortar entity id");

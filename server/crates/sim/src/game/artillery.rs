@@ -123,6 +123,7 @@ fn resolve_shell(
             ),
         );
         let damage = map.damage_after_reduction_tile(target.pos_x(), target.pos_y(), damage);
+        let damage = entities.shielded_damage(id, shell.owner, damage, teams);
         if damage == 0 {
             continue;
         }

@@ -39,6 +39,8 @@ try {
   }, null, 0x4878c8);
   assert(bar.rtsFill.tint === 0x4878c8, "health bar fill uses the owning player's color");
   assert(bar.rtsFill.scaleX === 0.5, "health bar fill retains authoritative HP fraction");
+  assert(bar.children.length === 3 && !bar.rtsInsight,
+    "ordinary health bars allocate no Disciple overlay graphics");
   assert(
     bar.rtsTicks.calls.filter((call) => call[0] === "drawRect").length === 2,
     "40 HP health bar rounds to three whole 15 HP segments",
@@ -164,6 +166,14 @@ try {
     assert(discipleBar.rtsDao.scaleY === (dao === "war" ? 1.2 : 1),
       "only the War icon receives the sword length multiplier");
   }
+  assert(discipleBar.children.length === 6 && discipleBar.children[0] === discipleBar.rtsRadiance,
+    "Disciple overlays are allocated once with radiance behind the health bar");
+  _hpBar.call({ _map: { tileSize: 32 } }, discipleBar, { ...disciple, kind: KIND.RIFLEMAN });
+  assert(!discipleBar.rtsInsight.visible && !discipleBar.rtsDao.visible && !discipleBar.rtsRadiance.visible,
+    "reused bars hide Disciple overlays when the entity kind changes");
+  _hpBar.call({ _map: { tileSize: 32 } }, discipleBar, { ...disciple, dao: "reality" });
+  assert(discipleBar.children.length === 6 && discipleBar.rtsInsight.visible && discipleBar.rtsDao.visible,
+    "returning Disciples reuse and reveal their existing overlays");
 } finally {
   restorePixi();
 }

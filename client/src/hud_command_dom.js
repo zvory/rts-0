@@ -139,7 +139,7 @@ export function createCommandButton(opts) {
     autobuildHtml +
     `<span class="cmd-icon${opts.unitIconMarkup ? " has-unit-render-icon" : ""}">` +
       `${opts.unitIconMarkup || opts.icon || ""}</span>` +
-    `<span class="cmd-label">${opts.label || ""}</span>` +
+    `<span class="cmd-label">${String(opts.label || "").replace(/^Dao of /, "Dao of<br>")}</span>` +
     (opts.hotkey ? `<span class="cmd-hotkey">${opts.hotkey}</span>` : "") +
     cooldownHtml +
     (opts.countBadge ? `<span class="cmd-ready-count">${opts.countBadge}</span>` : "") +

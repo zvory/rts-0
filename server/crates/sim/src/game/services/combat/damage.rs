@@ -191,6 +191,7 @@ pub(super) fn apply_direct_hit(
         .damage_after_reduction_tile(pos.0, pos.1, damage)
         .max(minimum_damage);
     let hostile = teams.is_enemy_owner(owner, outcome.victim_owner);
+    let damage = entities.shielded_damage(victim, owner, damage, teams);
     let damaged = entities.get_mut(victim).is_some_and(|target| {
         if hostile {
             target.apply_damage_from_entity(damage, owner, attacker, source, tick)
@@ -279,6 +280,7 @@ fn apply_tank_he_splash(
         let damage = map.damage_after_reduction_tile(target.pos_x(), target.pos_y(), damage);
         let victim_owner = target.owner;
         let pos = (target.pos_x(), target.pos_y());
+        let damage = entities.shielded_damage(id, owner, damage, teams);
         let damaged = entities.get_mut(id).is_some_and(|target| {
             if teams.is_enemy_owner(owner, target.owner) {
                 target.apply_damage_from_entity(damage, owner, attacker, source, tick)

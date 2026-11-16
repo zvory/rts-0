@@ -342,6 +342,22 @@ impl GameCheckpointV1 {
             self.command_log.len(),
             MAX_COMMAND_LOG_ENTRIES,
         )?;
+        let mut shield_ids = std::collections::BTreeSet::new();
+        for shield in self
+            .entities
+            .entities
+            .iter()
+            .filter_map(|e| e.shield.as_ref())
+        {
+            if !shield_ids.insert(shield.id)
+                || !self.ability_runtime.valid_external_object_id(shield.id)
+            {
+                return Err(CheckpointPayloadError::InvalidValue {
+                    field: "entities.shield.id",
+                });
+            }
+        }
+        validate_count("shields", shield_ids.len(), MAX_ACTIVE_ABILITY_OBJECTS)?;
         validate_count("smokes", self.smokes.checkpoint_len(), MAX_SMOKE_CLOUDS)?;
         validate_count("trenches", self.trenches.checkpoint_len(), MAX_TRENCHES)?;
         validate_count(

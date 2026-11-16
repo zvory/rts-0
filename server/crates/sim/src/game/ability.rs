@@ -14,6 +14,7 @@ pub enum AbilityEffectHook {
     DashReturn,
     LineProjectile,
     MagicAnchor,
+    Shield,
     ConsumeGolem,
     ScoutPlane,
     Evolve,
@@ -87,6 +88,7 @@ pub(in crate::game) fn planner_code(kind: AbilityKind) -> u16 {
         AbilityKind::EvolveLightness => 13,
         AbilityKind::EvolveWar => 14,
         AbilityKind::EvolveReality => 15,
+        AbilityKind::DiscipleShield => 16,
     }
 }
 
@@ -108,6 +110,7 @@ pub(in crate::game) fn from_planner_code(code: u16) -> Option<AbilityKind> {
         13 => Some(AbilityKind::EvolveLightness),
         14 => Some(AbilityKind::EvolveWar),
         15 => Some(AbilityKind::EvolveReality),
+        16 => Some(AbilityKind::DiscipleShield),
 
         _ => None,
     }
@@ -129,6 +132,7 @@ pub fn effect_hook(kind: AbilityKind) -> AbilityEffectHook {
         AbilityKind::EkatTeleport => AbilityEffectHook::DashReturn,
         AbilityKind::EkatLineShot => AbilityEffectHook::LineProjectile,
         AbilityKind::EkatMagicAnchor => AbilityEffectHook::MagicAnchor,
+        AbilityKind::DiscipleShield => AbilityEffectHook::Shield,
         AbilityKind::EkatConsumeGolem => AbilityEffectHook::ConsumeGolem,
     }
 }
