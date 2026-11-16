@@ -24,9 +24,12 @@ keep the full insight bar. No new targeting or hidden-position information is ex
 State is checkpointed with the entity and snapshots use appended compact slots.
 
 Readiness radiance pulses around actionable Dao research/evolution buttons and around a
-Disciple at maximum insight before evolution. Labels split after “Dao of”. Visible enemies
+Disciple at maximum insight before evolution. Unit readiness uses the approved Tight
+Corona shader: a warm, softly blooming, animated corona centered about 13.6 world pixels
+from the unit (roughly half the previous ray effect radius), with no geometric rays.
+Labels split after “Dao of”. Visible enemies
 see the unit radiance, with ordinary fog filtering. Realm advancement projects a 15-tick
-(half-second) expanding gold burst reaching about two tiles, independently of insight privacy.
+(half-second) expanding gold corona reaching about one tile, independently of insight privacy.
 
 Reality Disciples can place Shield within five tiles: a shimmering circle with the same
 three-tile radius as Anchor, covering allied units (including the caster). One shared pool

@@ -1,3 +1,4 @@
+import { createDaoCorona } from "./dao_corona.js";
 import { gfxNoFill, gfxEllipse, gfxPoly, gfxRect, gfxReset, gfxFill, gfxStroke } from "./native_graphics.js";
 import {
   COLORS,
@@ -313,30 +314,12 @@ export function _hpBar(g, e, status = null, ownerColor = null) {
   if (!g.rtsInsight) {
     g.rtsInsight = new PIXI.Graphics();
     g.rtsDao = new PIXI.Graphics();
-    g.rtsRadiance = new PIXI.Graphics();
+    g.rtsRadiance = createDaoCorona();
     g.addChildAt(g.rtsRadiance, 0);
     g.addChild(g.rtsInsight, g.rtsDao);
   }
   g.rtsInsight.visible = g.rtsDao.visible = g.rtsRadiance.visible = true;
-  const radiance = g.rtsRadiance;
-  radiance.clear();
-  if (e.daoReady || e.daoAdvanceTicks > 0) {
-    const pulse = 0.5 + 0.5 * Math.sin((this._renderClock?.now?.() ?? performance.now()) / 210);
-    const advancing = e.daoAdvanceTicks > 0;
-    const radius = advancing ? 64 * (1 - 0.45 * (e.daoAdvanceTicks / 15)) : 29 + pulse * 3;
-    const alpha = advancing ? Math.min(1, e.daoAdvanceTicks / 5) : 0.6 + pulse * 0.4;
-    const cy = e.y - topY;
-    for (let i = 4; i > 0; i--) {
-      radiance.circle(0, cy, radius + i * 2).stroke({color: 0xffdc70, width: 5, alpha: alpha * 0.045});
-    }
-    radiance.circle(0, cy, radius).stroke({color: 0xffec9a, width: 2, alpha: alpha * 0.85});
-    for (let i = 0; i < 12; i++) {
-      const angle = i * Math.PI / 6;
-      radiance.moveTo(Math.cos(angle) * (radius + 3), cy + Math.sin(angle) * (radius + 3))
-        .lineTo(Math.cos(angle) * (radius + 7 + pulse * 3), cy + Math.sin(angle) * (radius + 7 + pulse * 3))
-        .stroke({color: 0xffe79a, width: 1.5, alpha: alpha * 0.55});
-    }
-  }
+  g.rtsRadiance.update(e, e.y - topY, this._renderClock?.now?.() ?? performance.now());
   const insightKey = `${e.insight ?? ""}|${e.dao ?? ""}|${halfW}`;
   if (g.rtsInsightKey !== insightKey) {
     g.rtsInsightKey = insightKey;
