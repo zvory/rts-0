@@ -235,7 +235,8 @@ fn disciple_evolution_requires_insight_research_ownership_and_is_permanent() {
             y: None,
             queued: false,
         };
-        game.state.entities.get_mut(unit).unwrap().hp = 1;
+        let entity = game.state.entities.get_mut(unit).unwrap();
+        entity.apply_damage(entity.hp - 1, None);
         game.enqueue(1, command.clone());
         game.tick();
         assert_eq!(game.state.entities.get(unit).unwrap().dao, None);
@@ -271,7 +272,8 @@ fn disciple_evolution_requires_insight_research_ownership_and_is_permanent() {
         let evolved = game.state.entities.get(unit).unwrap();
         assert_eq!(evolved.dao, Some(upgrade));
         assert_eq!((evolved.hp, evolved.max_hp), (hp, hp));
-        game.state.entities.get_mut(unit).unwrap().hp = 1;
+        let entity = game.state.entities.get_mut(unit).unwrap();
+        entity.apply_damage(entity.hp - 1, None);
         game.enqueue(1, command);
         game.tick();
         assert_eq!(
