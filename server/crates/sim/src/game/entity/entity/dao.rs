@@ -86,7 +86,8 @@ impl Entity {
     }
 
     pub(crate) fn evolve_dao(&mut self, ability: AbilityKind) -> bool {
-        if self.kind != EntityKind::Warrior || !self.dao_ability_available(ability) {
+        if self.kind != EntityKind::Warrior || self.hp == 0 || !self.dao_ability_available(ability)
+        {
             return false;
         }
         self.dao = Some(match ability {
@@ -99,11 +100,8 @@ impl Entity {
         self.dao_advance_ticks = 15;
         if self.dao == Some(UpgradeKind::DaoOfHeaviness) {
             self.max_hp = self.max_hp.saturating_add(config::DAO_WAR_HP_BONUS);
-            self.hp = self
-                .hp
-                .saturating_add(config::DAO_WAR_HP_BONUS)
-                .min(self.max_hp);
         }
+        self.hp = self.max_hp;
         true
     }
 
