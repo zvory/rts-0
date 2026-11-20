@@ -11,6 +11,9 @@ impl Game {
         seed: u32,
     ) -> Result<DevScenarioSetup, String> {
         match scenario_id {
+            "replay_517_mortar_water_exit" => {
+                Self::new_replay_517_mortar_water_exit_scenario(unit, unit_count, seed)
+            }
             "replay_384_tank_forest_lock" => {
                 Self::new_replay_384_tank_forest_lock_scenario(unit, unit_count, seed)
             }

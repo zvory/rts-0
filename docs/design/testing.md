@@ -191,6 +191,12 @@ __dev_scenario__:<scenario_id>:unit=<unit>:count=<count>[:blocker=<unit|none>][:
 
 Current scenario ids:
 
+- `replay_517_mortar_water_exit` — Alex’s first Mortar Team from Soupman vs Alex on
+  Classic. One Gun Works completes its real production beside the original shoreline; six
+  recorded move orders follow. The complete source replay matches its recorded final-state hash
+  and the mortar exits successfully. This is a comparison fixture, not a reproduced lock or a
+  gameplay fix. See [investigation and provenance](../../server/crates/sim/src/game/setup/dev_scenarios/fixtures/replay_517.md).
+
 - `replay_384_tank_forest_lock` — Alex’s full-health, two-kill Tank 245 from
   beta replay 384. One tank, the original local road/forest and 30 recorded
   per-tank orders reproduce the approach and 26 failed escape attempts. See
