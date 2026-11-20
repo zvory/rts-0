@@ -9,7 +9,9 @@ entity-owned intent is independent of orders: moving, attacking, Stop, and queue
 do not cancel it. No automatic research purchase, Portal default, or army-wide promotion
 is added. Evolution is immediate and free once the chosen research is complete and the unit has 60 actual hostile
 HP damage dealt, capped at 60; misses, friendly fire, invulnerability and overkill grant
-no extra insight. One evolution per unit. Player research persists after Pavilion loss.
+no extra insight. Successful advancement fully restores HP to the evolved unit’s maximum,
+after applying any path-specific maximum-HP bonus. Choosing a pending path or repeating
+an evolution request does not heal; dead units cannot advance. One evolution per unit. Player research persists after Pavilion loss.
 The choice clears on evolution; evolved units cannot change paths. Pending choices persist
 through checkpoints and are visible only to teammates and privileged observers. The command
 card highlights chosen paths with an assigned/eligible count; tooltips show missing research
@@ -21,7 +23,7 @@ serial research queue and existing prerequisite/faction gates.
 - Lightness: mobile skirmisher; scout-car base speed, 1.5 attacks per original attack
   interval (cooldown divided by 1.5), existing Ekat Dash with optional return unchanged.
   A centered yellow left-facing double chevron with black outline identifies it. Classic evolution key L; grid Z.
-- War: armored melee damage dealer; 1.5 damage, +20 current/max HP, 50% armor
+- War: armored melee damage dealer; 1.5 damage, +20 maximum HP, 50% armor
   reduction using the existing penetration mechanic (full AP bypasses it), keeps the Disciple's existing
   50% armor penetration. A centered neon-red sword with black outline identifies it, rotated 90 degrees and lengthened 20%. Classic W; grid X.
 - Magic: battlefield support; 1.1 base movement speed, existing Ekat pull field (renamed Anchor) and a new Shield, a centered green pentagram with black outline identifies it. Classic C; grid C. Bespoke rigs and audio remain deferred for this prototype.

@@ -235,9 +235,11 @@ fn disciple_evolution_requires_insight_research_ownership_and_is_permanent() {
             y: None,
             queued: false,
         };
+        game.state.entities.get_mut(unit).unwrap().hp = 1;
         game.enqueue(1, command.clone());
         game.tick();
         assert_eq!(game.state.entities.get(unit).unwrap().dao, None);
+        assert_eq!(game.state.entities.get(unit).unwrap().hp, 1);
         game.state.entities.get_mut(unit).unwrap().insight = 60;
         game.enqueue(1, command.clone());
         game.tick();
@@ -269,12 +271,18 @@ fn disciple_evolution_requires_insight_research_ownership_and_is_permanent() {
         let evolved = game.state.entities.get(unit).unwrap();
         assert_eq!(evolved.dao, Some(upgrade));
         assert_eq!((evolved.hp, evolved.max_hp), (hp, hp));
+        game.state.entities.get_mut(unit).unwrap().hp = 1;
         game.enqueue(1, command);
         game.tick();
         assert_eq!(
             game.state.entities.get(unit).unwrap().max_hp,
             hp,
             "no repeated HP grants"
+        );
+        assert_eq!(
+            game.state.entities.get(unit).unwrap().hp,
+            1,
+            "evolved units cannot heal by choosing a Dao again"
         );
         let payload = game.checkpoint_payload_text_for_test().unwrap();
         assert!(payload.contains("\"insight\":60"));
