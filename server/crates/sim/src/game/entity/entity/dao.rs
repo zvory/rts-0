@@ -86,7 +86,8 @@ impl Entity {
     }
 
     pub(crate) fn evolve_dao(&mut self, ability: AbilityKind) -> bool {
-        if self.kind != EntityKind::Warrior || self.hp == 0 || !self.dao_ability_available(ability) {
+        if self.kind != EntityKind::Warrior || self.hp == 0 || !self.dao_ability_available(ability)
+        {
             return false;
         }
         self.dao = Some(match ability {
