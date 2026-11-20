@@ -318,6 +318,7 @@ export class Renderer {
       trenchOccupantLips: new Map(),
       selectionRings: new Map(),
       hpBars: new Map(),
+      cooldownClocks: new Map(),
       shotRevealShadows: new Map(),
       shotReveals: new Map(),
       aboveFogHpBars: new Map(),

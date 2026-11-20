@@ -437,7 +437,7 @@ function readOrderPlanMarker(record, label) {
   };
 }
 
-/** Decode owner-only ability cooldown affordances into `entity.abilities`. */
+/** Decode owner ability affordances (Mortar Fire timers are also team-visible) into `entity.abilities`. */
 function assignAbilities(target, fields, index) {
   if (index >= fields.length || fields[index] == null) return;
   const cooldowns = readArray(fields[index], "entity.abilities", MAX_COMPACT_ABILITIES);
