@@ -121,6 +121,9 @@ impl Serialize for CompactSnapshot<'_> {
                 .map(CompactEntity)
                 .collect::<Vec<_>>(),
         )?;
+        if snapshot.resource_reset {
+            map.serialize_entry("rr", &true)?;
+        }
         if !snapshot.resource_deltas.is_empty() {
             map.serialize_entry(
                 "r",

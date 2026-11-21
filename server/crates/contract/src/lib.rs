@@ -593,6 +593,9 @@ pub struct Snapshot {
     pub entities: Vec<EntityView>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub resource_deltas: Vec<ResourceDelta>,
+    /// Complete authoritative resource projection; transport may encode subsequent changes only.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub resource_reset: bool,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub smokes: Vec<SmokeCloudView>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

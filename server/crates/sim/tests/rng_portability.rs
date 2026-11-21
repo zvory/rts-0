@@ -140,9 +140,9 @@ fn end_state_fingerprint_matches_native_and_wasm() {
     for _ in 0..3 {
         game.tick();
     }
-    // Entity insight/Dao, advancement and Shield fields are committed state, including defaults.
+    // Fingerprint v2 includes checkpointed resource knowledge as well as entity and RNG state.
     assert_eq!(
         game.replay_end_state_hash().unwrap(),
-        "9677a9d59d8d97f05c91ed5b0707ca9de60e71a3a7a7db1572a84a3f6e7dd007"
+        "929f10407832a42f414b0407dde24c375564f634bee9931f7db6eb2b420b69b3"
     );
 }

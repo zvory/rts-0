@@ -23,6 +23,7 @@ fn compact_entity_trims_trailing_optional_nulls() {
             40,
             states::IDLE,
         )],
+        resource_reset: true,
         resource_deltas: Vec::new(),
         smokes: Vec::new(),
         ability_objects: Vec::new(),
@@ -41,6 +42,7 @@ fn compact_entity_trims_trailing_optional_nulls() {
     let value: serde_json::Value = serde_json::from_str(&compact).unwrap();
     let entity = value["e"][0].as_array().unwrap();
     assert_eq!(entity.len(), 8);
+    assert_eq!(value["rr"], true);
     assert!(value.get("r").is_none());
     assert!(value.get("ev").is_none());
     snapshot.entities[0].commander_facing = Some(-1.25);
@@ -63,6 +65,7 @@ fn compact_json_snapshot_codec_remains_available_for_local_baselines() {
         supply_cap: 0,
         auto_build: None,
         entities: Vec::new(),
+        resource_reset: false,
         resource_deltas: Vec::new(),
         smokes: Vec::new(),
         ability_objects: Vec::new(),
@@ -119,6 +122,7 @@ fn compact_snapshot_carries_bounded_ground_decal_delta() {
         supply_cap: 0,
         auto_build: None,
         entities: Vec::new(),
+        resource_reset: false,
         resource_deltas: Vec::new(),
         smokes: Vec::new(),
         ability_objects: Vec::new(),

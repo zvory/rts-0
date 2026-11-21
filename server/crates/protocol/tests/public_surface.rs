@@ -196,7 +196,7 @@ fn stable_rust_public_surface_compiles() {
     assert_eq!(PREDICTION_PROTOCOL_VERSION, 1);
     assert_eq!(DEFAULT_FACTION_ID, "kriegsia");
     assert_eq!(GAME_CHECKPOINT_CURRENT_VERSION, 2);
-    assert_eq!(COMPACT_SNAPSHOT_VERSION, 60);
+    assert_eq!(COMPACT_SNAPSHOT_VERSION, 61);
     assert_eq!(SNAPSHOT_CODEC_VERSION, 1);
     assert_eq!(COMPACT_UNKNOWN_CODE, 255);
     assert_eq!(LAB_REPLAY_ARTIFACT_SCHEMA, "rts.labReplay");
@@ -280,6 +280,7 @@ fn compact_snapshot_encodes_appended_entity_state() {
         supply_cap: 0,
         auto_build: None,
         entities: vec![plane, command_car, pump_jack, panzerfaust],
+        resource_reset: false,
         resource_deltas: Vec::new(),
         smokes: Vec::new(),
         ability_objects: Vec::new(),

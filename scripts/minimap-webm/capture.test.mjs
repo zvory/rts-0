@@ -98,3 +98,28 @@ test('production samples preserve full entities and inter-frame presentation dat
   assert.deepEqual(rows[2].snapshot.events,[]);
   assert.deepEqual(rows[2].snapshot.resourceDeltas,[]);
 });
+
+test('resource replacement is consumed once across held recording frames',()=>{
+  const sampler=new ReplaySampler(20,10),rows=[];
+  sampler.push({tick:0,entities:[],resourceReset:true,resourceDeltas:[{id:5,remaining:100}]},r=>rows.push(r));
+  sampler.push({tick:20,entities:[],resourceDeltas:[{id:5,remaining:90}]},r=>rows.push(r));
+  assert.equal(rows[0].snapshot.resourceReset,true);
+  assert.deepEqual(rows[0].snapshot.resourceDeltas,[{id:5,remaining:100}]);
+  assert.equal(rows[1].snapshot.resourceReset,false,'holding the baseline must not clear its quantities');
+  assert.deepEqual(rows[1].snapshot.resourceDeltas,[]);
+  assert.equal(rows[2].snapshot.resourceReset,false);
+  assert.deepEqual(rows[2].snapshot.resourceDeltas,[{id:5,remaining:90}]);
+});
+
+test('inter-frame resource replacement discards earlier perspective updates',()=>{
+  const sampler=new ReplaySampler(20,10),rows=[];
+  sampler.push({tick:0,entities:[]},r=>rows.push(r));
+  sampler.push({tick:5,entities:[],resourceDeltas:[{id:5,remaining:100}]},r=>rows.push(r));
+  sampler.push({tick:6,entities:[],resourceReset:true,resourceDeltas:[]},r=>rows.push(r));
+  sampler.push({tick:7,entities:[],resourceDeltas:[{id:6,remaining:90}]},r=>rows.push(r));
+  sampler.push({tick:20,entities:[]},r=>rows.push(r));
+  assert.equal(rows[1].snapshot.resourceReset,true,'replacement survives later non-reset snapshots');
+  assert.deepEqual(rows[1].snapshot.resourceDeltas,[{id:6,remaining:90}]);
+  assert.equal(rows[2].snapshot.resourceReset,false);
+  assert.deepEqual(rows[2].snapshot.resourceDeltas,[]);
+});

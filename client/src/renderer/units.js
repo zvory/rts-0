@@ -20,7 +20,7 @@ import {
 import { renderFrameStripUnit } from "./rigs/frame_strip_runtime.js";
 import { renderPngUnitRig } from "./rigs/png_runtime.js";
 import { renderLiveUnitRig } from "./rigs/runtime.js";
-import { hasProjectedUnitShadow } from "./unified_gpu_shadows.js";
+import { hasProjectedUnitShadow, shadowSunModel } from "./unified_gpu_shadows.js";
 import {
   angleDelta,
   clamp01,
@@ -128,7 +128,19 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
     }
     rememberRigRenderContext(this, e, pools, renderContext);
     const drawPlan = frameStripDrawPlanFor(routePlan);
-    if (drawPlan.shadowRoute && !projectedShadow) {
+    if (drawPlan.shadowRoute && !projectedShadow && frameStrip.shadowHeightTiles) {
+      // A flat airborne sprite casts the same silhouette, translated away from the sun.
+      const sun = shadowSunModel(this._map?.sun);
+      const distance = frameStrip.shadowHeightTiles * (this._map?.tileSize || 32) / sun.slope;
+      renderFrameStripUnit(this, e, frameStrip, frameStripTexture, {
+        poolName: drawPlan.shadowRoute.poolName,
+        layerName: drawPlan.shadowRoute.layerName,
+        alpha: pools.alpha,
+        renderContext,
+        silhouetteShadow: true,
+        shadowOffset: { x: -sun.directionX * distance, y: -sun.directionY * distance },
+      });
+    } else if (drawPlan.shadowRoute && !projectedShadow) {
       const sampledAnimation = sampleRigAnimationInto(
         animationStageFor(definition, drawPlan.sampledParts),
         e,

@@ -682,9 +682,9 @@ fn replay_vision_selection_sends_snapshot_without_waiting_for_tick() {
     let all_player_ids = players.iter().map(|player| player.id).collect::<Vec<_>>();
     let all_pending = replay.game().snapshot_for_spectator(&all_player_ids);
     let player_one_expected = replay.game().snapshot_for_spectator(&[players[0].id]);
-    assert!(
-        all_pending.resource_deltas.len() > player_one_expected.resource_deltas.len(),
-        "test setup should make all-player replay vision wider than one-player vision"
+    assert_ne!(
+        all_pending.visible_tiles, player_one_expected.visible_tiles,
+        "all-player fog should be wider than one-player fog"
     );
     task.players
         .get(&100)
@@ -705,6 +705,11 @@ fn replay_vision_selection_sends_snapshot_without_waiting_for_tick() {
         .take()
         .expect("vision selection should enqueue an immediate replay snapshot");
     assert_eq!(snapshot.tick, player_one_expected.tick);
+    assert!(snapshot.resource_reset);
+    assert_eq!(
+        snapshot.resource_deltas,
+        player_one_expected.resource_deltas
+    );
     assert_eq!(snapshot.visible_tiles, player_one_expected.visible_tiles);
     assert_eq!(
         snapshot

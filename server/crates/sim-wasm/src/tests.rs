@@ -83,6 +83,7 @@ fn snapshot() -> Snapshot {
         supply_cap: 10,
         auto_build: None,
         entities: vec![owned, hidden_shape, neutral_tank_trap],
+        resource_reset: false,
         resource_deltas: Vec::new(),
         smokes: Vec::new(),
         ability_objects: Vec::new(),

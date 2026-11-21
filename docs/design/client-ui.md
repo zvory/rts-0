@@ -133,7 +133,7 @@ src/
   map_editor_viewport.js # detached editor-presentation assembly plus editor-only pointer/keyboard input
   map_editor_presentation.js # cloneable terrain/overlay/camera record consumed by the Pixi owner
   map_editor_elevation_controls.js # elevation palette and tool arming
-  map_editor_sun_controls.js # optional map sun sliders plus preview/commit behavior
+  map_editor_sun_controls.js # always-enabled map sun sliders plus preview/commit behavior
   match.js        # Match lifecycle, module dependency wiring, render loop, transient events
   match_startup_inbox.js # semantic buffering while asynchronous Match construction completes
   match_combat_audio.js # Match-owned combat sound routing and machine-gunner sound cleanup
@@ -265,6 +265,12 @@ planned-order feedback. Promise-returning Lab issue-as commands stay non-optimis
 planned order. The controller owns browser-local `clientSeq` allocation and
 passes the sequenced envelope to `Net.command(cmd, clientSeq)`. Replay viewers, spectators, and
 dev-watch passive viewers keep prediction disabled and do not allocate gameplay command sequence ids.
+Resource quantities are server-owned last-known knowledge. `GameState` stores only the delivered
+projection for display, replaces it on `resourceReset`, and otherwise applies changed quantities.
+Neither visibility nor death effects infer depletion; seeks wait for a replacement snapshot instead
+of restoring initial amounts. Observer changes replace resource knowledge in the same snapshot as
+fog and remembered buildings. See `protocol.md` for checkpoint and transport semantics.
+
 `GameState.applySnapshot` remains authoritative. The partial WASM predictor returns a sparse
 `PredictionFrame` whose entity patches may identify an existing locally owned entity and claim only
 predicted position and an optional explicit motion presentation. Body facing remains authoritative
@@ -1039,7 +1045,7 @@ import/export. The editor
 accepts authored-map JSON up to 8 MiB and only materialized authored maps containing terrain;
 agent-authored recipes remain a
 `scripts/map-author.mjs build` CLI input and are not a Map Editor document type. Import normalization
-preserves authored elevation and sun conditions. Any map can enable live Direction, Height, and
+preserves authored elevation and sun conditions. Every map has live Direction, Height, and
 Color temperature controls in Map settings. Flat maps use those conditions for atmosphere and
 directional unit shadows; varied elevation additionally lights and shadows the terrain. Dragging
 the controls rebuilds the editor's worker-owned terrain
@@ -1050,8 +1056,9 @@ dragged, a temporary map-centred arrow points toward the sun source and labels t
 equations to author direction, height, and a presentation warmth derived from solar elevation in one
 undoable change; dragging it previews the same sun-source guide. Releasing a control removes the
 guide and commits one authored-map change. Texture painting and Elevation are separate palette categories. Elevation uses synchronized
-slider and numeric level controls from 0–9 with Brush, Box, Erase, and the active symmetry; the first nonzero elevation edit initializes default sun conditions
-so the draft remains valid. Import normalization preserves authored terrain
+slider and numeric level controls from 0–9 with Brush, Box, Erase, and the active symmetry. New and imported maps without sun conditions use the shared 14:00
+Stalingrad summer default. Sunlight cannot be removed; authored direction, height, and warmth remain
+editable. Import normalization preserves authored terrain
 verbatim, including impassable terrain in a protected base footprint, so
 the advisory and authoritative checks can report the author's actual input. Interactive rock/water
 painting is still rejected in protected footprints, and moving or adding a location makes its
@@ -2500,15 +2507,14 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   preference key resets legacy opt-outs once so existing players also receive the enabled default;
   subsequent opt-outs persist. Matches without an explicit preference also default on. When disabled, the render
   worker skips every per-unit model projection and units retain their lightweight native rig
-  shadows. When enabled on maps with authored elevation and sun, simple presentation-only box
+  shadows. When enabled on any map, simple presentation-only box
   models for supported units rotate with each unit and project along the authored sun vector into
   one GPU coverage layer. Their cuboid faces are a retained instanced mesh: each frame streams one
   compact transform record per model box instead of rebuilding Pixi Graphics polygons. The R8
   coverage target is limited to the current camera window at half-world-pixel resolution, snapped
   outward with a two-texel linear-filter gutter; it does not scale with total map area. The terrain
   shader remaps world receivers into that window and composites the mask with its separate
-  static-height ray march. Flat maps retain native unit shadows and allocate no active
-  projected-shadow draw.
+  static-height ray march. Flat maps also project detailed unit shadows using their authored sun or the shared default.
   Entrenched units retain their player-color tint while scaling down. Occupied trenches add
   shadow and lip overlays around live units; empty trenches retain only the base decal.
   Pixi places tree canopies and unit bodies in one sortable world-Y layer: smaller/northern Y values

@@ -1115,7 +1115,7 @@ mod tests {
     }
 
     #[test]
-    fn replay_viewer_snapshot_hides_resource_outside_union_fog() {
+    fn replay_viewer_resource_knowledge_starts_from_public_layout_with_scoped_fog() {
         let players = replay_test_players(2);
         let (_live, artifact) = replay_test_artifact(&players, 0);
         let replay = ReplaySession::new(artifact).unwrap();
@@ -1126,9 +1126,18 @@ mod tests {
             .snapshot_for_spectator(&replay.active_player_ids());
 
         assert!(
-            full.resource_deltas.len() > union.resource_deltas.len(),
-            "default replay spectator fog should not expose every resource node"
+            union
+                .visible_tiles
+                .iter()
+                .filter(|&&tile| tile != 0)
+                .count()
+                < full.visible_tiles.len()
         );
+        assert_eq!(
+            full.resource_deltas, union.resource_deltas,
+            "initial public quantities are known while hidden subsequent changes remain private"
+        );
+        assert!(union.resource_reset);
     }
 
     #[test]

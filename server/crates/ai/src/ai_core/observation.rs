@@ -661,6 +661,7 @@ mod tests {
             supply_cap: 10,
             auto_build: None,
             entities: Vec::new(),
+            resource_reset: false,
             resource_deltas: Vec::new(),
             smokes: Vec::new(),
             ability_objects: Vec::new(),

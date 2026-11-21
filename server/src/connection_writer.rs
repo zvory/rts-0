@@ -42,6 +42,9 @@ async fn run(
             match reliable_rx.try_recv() {
                 Ok(msg) => {
                     writer_stats.note_reliable_for_snapshot(snapshot_waiting, &snapshots);
+                    if matches!(msg, ServerMessage::Start(_)) {
+                        writer_stats.reset_resource_baseline();
+                    }
                     let command_receipt = matches!(msg, ServerMessage::CommandReceipt { .. });
                     let (keep_writing, _) = send_server_message(player_id, sink, msg).await;
                     if !keep_writing {
@@ -108,7 +111,8 @@ async fn run(
                 match maybe_msg {
                     Some(msg) => {
                         writer_stats.note_reliable_message(snapshots.has_pending());
-                        let command_receipt = matches!(msg, ServerMessage::CommandReceipt { .. });
+                        if matches!(msg, ServerMessage::Start(_)) { writer_stats.reset_resource_baseline(); }
+                    let command_receipt = matches!(msg, ServerMessage::CommandReceipt { .. });
                         let (keep_writing, _) = send_server_message(player_id, sink, msg).await;
                         if !keep_writing {
                             break 'write_loop;

@@ -304,6 +304,7 @@ pub(super) fn replay_transition_test_snapshot(tick: u32) -> Snapshot {
         supply_cap: 10,
         auto_build: None,
         entities: Vec::new(),
+        resource_reset: false,
         resource_deltas: Vec::new(),
         smokes: Vec::new(),
         trenches: Vec::new(),

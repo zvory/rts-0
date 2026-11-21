@@ -87,3 +87,10 @@ export const WORKER_BUILD_CARD_SLOTS = Object.freeze([
   KIND.BARBED_WIRE,
   KIND.TANK_TRAP,
 ]);
+
+// 14:00 local solar time, 23 Aug 1942, steppe west of Stalingrad.
+export const DEFAULT_MAP_SUN = Object.freeze({
+  azimuthDegrees: 224,
+  elevationDegrees: 45,
+  warmth: 23,
+});
