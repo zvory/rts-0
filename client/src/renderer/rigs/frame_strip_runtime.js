@@ -22,7 +22,8 @@ export function renderFrameStripUnit(renderer, entity, strip, texture, options =
       entity.kind,
       strip,
       texture,
-      renderer._rigPixiFactory ?? createDefaultFrameStripPixiFactory()
+      renderer._rigPixiFactory ?? createDefaultFrameStripPixiFactory(),
+      options.silhouetteShadow === true,
     );
     renderer._recordRenderDiagnostic?.(`renderer.frameStrip.instance.created.${options.poolName}`);
     renderer._recordRenderDiagnostic?.("renderer.pixi.displayObject.created.frameStripContainer");
@@ -37,6 +38,7 @@ export function renderFrameStripUnit(renderer, entity, strip, texture, options =
   if (!instance.container.parent && layer) layer.addChild(instance.container);
   instance.update(entity, renderContext, {
     alpha: options.alpha,
+    shadowOffset: options.shadowOffset,
     diagnostics: (label, amount = 1) => renderer._recordRenderDiagnostic?.(label, amount),
   });
   return instance;
@@ -175,11 +177,12 @@ function createDefaultFrameStripPixiFactory(pixi = globalThis.PIXI) {
     createRectangle: (x, y, width, height) => new pixi.Rectangle(x, y, width, height),
     createTexture: (source, rectangle) => new pixi.Texture({ source, frame: rectangle }),
     createSprite: (spriteTexture) => new pixi.Sprite(spriteTexture),
+    createShadowBlur: () => new pixi.BlurFilter({ strength: 2, quality: 4, resolution: 2 }),
   };
 }
 
 class FrameStripUnitInstance {
-  constructor(kind, strip, texture, pixiFactory) {
+  constructor(kind, strip, texture, pixiFactory, silhouetteShadow = false) {
     this.kind = kind;
     this.strip = strip;
     this.texture = texture;
@@ -188,6 +191,11 @@ class FrameStripUnitInstance {
     this.frameTextures = [];
     this._frameIndex = -1;
     this._destroyed = false;
+    this.silhouetteShadow = silhouetteShadow;
+    if (silhouetteShadow) {
+      this.shadowBlur = pixiFactory.createShadowBlur();
+      this.container.filters = [this.shadowBlur];
+    }
 
     const frameWidth = Math.max(1, finite(strip.frameWidth, 1));
     const frameHeight = Math.max(1, finite(strip.frameHeight, 1));
@@ -211,8 +219,11 @@ class FrameStripUnitInstance {
   update(entity, renderContext = {}, options = {}) {
     if (this._destroyed) return;
     this.container.visible = true;
-    this.container.alpha = renderContext.shotRevealAlpha ?? options.alpha ?? 1;
-    setPoint(this.container.position, finite(entity.x, 0), finite(entity.y, 0));
+    this.container.alpha = (renderContext.shotRevealAlpha ?? options.alpha ?? 1)
+      * (this.silhouetteShadow ? 0.25 : 1);
+    setPoint(this.container.position,
+      finite(entity.x, 0) + finite(options.shadowOffset?.x, 0),
+      finite(entity.y, 0) + finite(options.shadowOffset?.y, 0));
     applyWorldYDepth(this.container, entity);
     const scale = rigContainerScale(renderContext);
     setPoint(this.container.scale, scale, scale);
@@ -228,7 +239,7 @@ class FrameStripUnitInstance {
     const spriteOffset = frameStripSpriteOffset(this.strip, frameIndex);
     setPoint(this.sprite.position, spriteOffset.x, spriteOffset.y);
     this.sprite.alpha = 1;
-    this.sprite.tint = tintForSlot(this.strip.tintSlot, renderContext);
+    this.sprite.tint = this.silhouetteShadow ? 0x000000 : tintForSlot(this.strip.tintSlot, renderContext);
     this.sprite.visible = true;
     options.diagnostics?.("renderer.frameStrip.redraw.completed");
   }
@@ -236,6 +247,7 @@ class FrameStripUnitInstance {
   destroy() {
     if (this._destroyed) return;
     this._destroyed = true;
+    this.shadowBlur?.destroy?.();
     this.container.parent?.removeChild?.(this.container);
     this.sprite?.destroy?.({ texture: false, textureSource: false });
     for (const texture of this.frameTextures) texture?.destroy?.(false);
