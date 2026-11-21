@@ -88,7 +88,6 @@ export class LobbyRosterView {
     spectatorOnly = false,
     playerCount,
     maxPlayers,
-    betaFactionSelect = false,
     onAddAi,
     onRemoveAi,
     onSetAiProfile,
@@ -115,7 +114,6 @@ export class LobbyRosterView {
           countdownActive,
           playerCount,
           maxPlayers,
-          betaFactionSelect,
           onAddAi,
           onRemoveAi,
           onSetAiProfile,
@@ -148,7 +146,6 @@ export class LobbyRosterView {
     countdownActive,
     playerCount,
     maxPlayers,
-    betaFactionSelect,
     onAddAi,
     onRemoveAi,
     onSetAiProfile,
@@ -221,7 +218,6 @@ export class LobbyRosterView {
         hostId,
         isHost,
         countdownActive,
-        betaFactionSelect,
         onRemoveAi,
         onSetAiProfile,
         onSetFaction,
@@ -244,7 +240,6 @@ export class LobbyRosterView {
     hostId,
     isHost,
     countdownActive,
-    betaFactionSelect,
     onRemoveAi,
     onSetAiProfile,
     onSetFaction,
@@ -284,14 +279,12 @@ export class LobbyRosterView {
       tags.appendChild(tag("host", "Host"));
     }
     nameLine.appendChild(tags);
-    if (betaFactionSelect) {
-      nameLine.appendChild(this._buildFactionControl({
-        player,
-        myId,
-        countdownActive,
-        onSetFaction,
-      }));
-    }
+    nameLine.appendChild(this._buildFactionControl({
+      player,
+      myId,
+      countdownActive,
+      onSetFaction,
+    }));
     body.appendChild(nameLine);
 
     const controls = document.createElement("div");
