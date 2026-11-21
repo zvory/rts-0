@@ -177,15 +177,20 @@ impl<'a> LineOfSight<'a> {
                 t_max_y += t_delta_y;
             } else {
                 // Corner neighbors block opaque terrain, but do not count as forest traversed.
+                let mut next = (tx + step_x, ty + step_y);
                 for tile in [(tx + step_x, ty), (tx, ty + step_y)] {
                     match self.trace_step(tile, target, allow_opaque_target) {
                         RaycastStep::Clear => {}
-                        RaycastStep::ReachedTarget => return true,
+                        RaycastStep::ReachedTarget => {
+                            // An endpoint on a grid corner can belong to a side tile.
+                            // Apply the same forest policy as any other target below.
+                            next = tile;
+                            break;
+                        }
                         RaycastStep::Blocked => return false,
                     }
                 }
-                tx += step_x;
-                ty += step_y;
+                (tx, ty) = next;
                 t_max_x += t_delta_x;
                 t_max_y += t_delta_y;
             }
@@ -442,6 +447,34 @@ mod tests {
         assert!(!los.tile_visible_from_world(start, (8, 4)));
         map.concealment_tiles = (1..=6).map(|x| (x, 4)).collect();
         assert!(!LineOfSight::new(&map).clear_between_world_points(start, map.tile_center(7, 4)));
+    }
+
+    #[test]
+    fn grid_corner_targets_obey_forest_exit_and_depth_limits() {
+        // Mixed-sign diagonals end in a side neighbor rather than the next diagonal tile.
+        for transpose in [false, true] {
+            let tile = |x, y| if transpose { (y, x) } else { (x, y) };
+            let mut map = flat_map(10);
+            let start = tile(7, 1);
+            let end = tile(3, 6);
+            let origin = map.tile_center(start.0, start.1);
+            let target = (
+                (end.0 * config::TILE_SIZE) as f32,
+                (end.1 * config::TILE_SIZE) as f32,
+            );
+            map.concealment_tiles = (0..4).map(|i| tile(6 - i, 2 + i)).collect();
+            map.concealment_tiles.sort_unstable();
+            assert!(!LineOfSight::new(&map).clear_between_world_points(origin, target));
+
+            map.concealment_tiles.push(start);
+            map.concealment_tiles.sort_unstable();
+            assert!(LineOfSight::new(&map).clear_between_world_points(origin, target));
+
+            map.concealment_tiles = (0..4).map(|i| tile(6 - i, 2 + i)).collect();
+            map.concealment_tiles.push(end);
+            map.concealment_tiles.sort_unstable();
+            assert!(!LineOfSight::new(&map).clear_between_world_points(origin, target));
+        }
     }
 
     #[test]
