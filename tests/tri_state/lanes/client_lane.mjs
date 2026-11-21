@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import puppeteer from "puppeteer-core";
 import { summarizeSnapshot, ownEntityByKind } from "../diffs.mjs";
+import { snapshotTimeoutMs } from "../snapshot_wait.mjs";
 
 const DEFAULT_URL = process.env.RTS_URL || "http://127.0.0.1:8081/";
 const DEFAULT_CHROME = process.env.CHROME ||
@@ -335,7 +336,7 @@ export class ClientLane {
     return issued;
   }
 
-  async waitForSnapshot({ minTickDelta = 1, timeoutMs = 10000, startTick = null } = {}) {
+  async waitForSnapshot({ minTickDelta = 1, timeoutMs = snapshotTimeoutMs(minTickDelta), startTick = null } = {}) {
     // Callers issuing a one-shot step must retain the pre-command baseline: its
     // snapshot may already have arrived by the time this wait begins.
     startTick ??= await this.page.evaluate(() => window.__rts.match.state._cur?.tick ?? -1);
