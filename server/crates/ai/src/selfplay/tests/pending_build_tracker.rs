@@ -74,6 +74,7 @@ fn pending_tracker_snapshot(tick: u32, worker_x: f32, worker_y: f32) -> Snapshot
             40,
             states::BUILD,
         )],
+        resource_reset: false,
         resource_deltas: Vec::new(),
         smokes: Vec::new(),
         ability_objects: Vec::new(),

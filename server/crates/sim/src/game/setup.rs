@@ -390,14 +390,16 @@ impl Game {
         let overlays = self.state.map.protocol_overlay_tiles();
         let resources = self
             .state
-            .entities
+            .resource_memory
+            .nodes
             .iter()
-            .filter(|e| e.kind.is_node())
-            .map(|e| ResourceNode {
-                id: e.id,
-                kind: crate::protocol::kind_to_wire(e.kind).to_string(),
-                x: e.pos_x(),
-                y: e.pos_y(),
+            .filter_map(|(&id, node)| {
+                Some(ResourceNode {
+                    id,
+                    kind: crate::protocol::kind_to_wire(node.kind?).to_string(),
+                    x: node.x,
+                    y: node.y,
+                })
             })
             .collect();
         let map = MapInfo {

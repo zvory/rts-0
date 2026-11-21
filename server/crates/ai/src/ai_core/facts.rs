@@ -436,6 +436,7 @@ mod tests {
                 resource_view(4, EntityKind::Steel, hx, hy + out_of_range, 100),
                 resource_view(5, EntityKind::Steel, hx, hy - in_range, 0),
             ],
+            resource_reset: false,
             resource_deltas: Vec::new(),
             smokes: Vec::new(),
             ability_objects: Vec::new(),

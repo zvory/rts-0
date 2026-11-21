@@ -7,7 +7,7 @@ use sha2::{Digest, Sha256};
 
 use super::*;
 
-pub(in crate::game) const END_STATE_HASH_ALGORITHM: &str = "rts-end-state-json-sha256-v1";
+pub(in crate::game) const END_STATE_HASH_ALGORITHM: &str = "rts-end-state-json-sha256-v2";
 
 impl Game {
     /// Fingerprint committed simulation state, excluding unapplied input and historical commands.
@@ -76,6 +76,7 @@ impl Serialize for EndState<'_> {
             "antiTankGunMemory",
             AntiTankGunMemoryV1::from_memory(&state.anti_tank_gun_memory)
         );
+        field!("resourceMemory", state.resource_memory);
         field!("lingeringSight", state.lingering_sight);
         field!("firingReveals", state.firing_reveals);
         field!("smokes", state.smokes);

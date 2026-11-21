@@ -598,12 +598,15 @@ const decodedAck = decodeServerMessage({
   t: "snapshot",
   v: COMPACT_SNAPSHOT_VERSION,
   s: [12, 75, 0, 4, 10],
+  rr: true,
+  r: [[200, 0]],
   e: [],
   ma: [[91, 2, 320, 352, 0.75, 10]],
   pr: [[1, 325, 80, 7, 14, 42, [1]]],
   ao: [[70, 1, 6, 1, 384, 416, 90, 7, [45, null, null, null, null, null]]],
   n: [1, 2, 0, 3, 4, PREDICTION_PROTOCOL_VERSION, 7, 12],
 });
+assert(decodedAck.resourceReset === true && decodedAck.resourceDeltas[0].remaining === 0, "compact authoritative resource replacement decodes");
 assert(decodedAck.netStatus.predictionVersion === PREDICTION_PROTOCOL_VERSION, "compact predictionVersion decodes");
 assert(decodedAck.netStatus.lastSimConsumedClientSeq === 7, "compact consumed client seq decodes");
 assert(decodedAck.netStatus.lastSimConsumedClientTick === 12, "compact consumed client tick decodes");

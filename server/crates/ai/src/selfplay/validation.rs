@@ -127,6 +127,7 @@ mod tests {
             supply_cap: config::PLAYER_SUPPLY_CAP,
             auto_build: None,
             entities: vec![EntityView::new(1, 1, kinds::WORKER, x, y, 40, 40, "idle")],
+            resource_reset: false,
             resource_deltas: Vec::new(),
             smokes: Vec::new(),
             ability_objects: Vec::new(),

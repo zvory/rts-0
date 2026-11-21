@@ -42,6 +42,7 @@ mod pathfinding;
 mod player_state;
 pub mod replay;
 mod replay_artifact;
+mod resource_memory;
 mod resource_placement;
 #[cfg(test)]
 mod resource_placement_tests;
@@ -64,8 +65,8 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use crate::config;
 use crate::protocol::{
     AutoBuildSettingsSnapshot, Event, GroundDecalDelta, GroundDecalView, MapInfo,
-    PlayerResourceSnapshot, PlayerScore, PlayerStart, RememberedBuildingView, ResourceDelta,
-    ResourceNode, Snapshot, StartPayload, TankTrailView, DEFAULT_FACTION_ID,
+    PlayerResourceSnapshot, PlayerScore, PlayerStart, RememberedBuildingView, ResourceNode,
+    Snapshot, StartPayload, TankTrailView, DEFAULT_FACTION_ID,
     MAX_GROUND_DECALS_PER_SNAPSHOT_DELTA,
 };
 use crate::rules::{economy as economy_rules, projection};
@@ -647,6 +648,20 @@ impl Game {
     }
 
     pub(in crate::game) fn refresh_fog_memories(&mut self, player_ids: &[u32]) {
+        self.state.resource_memory.seed(&self.state.entities);
+        for &player in player_ids {
+            let mut viewers = self.living_team_player_ids_for_vision(player);
+            if viewers.is_empty() {
+                viewers.push(player);
+            }
+            self.state.resource_memory.refresh_for_player(
+                player,
+                &viewers,
+                &self.state.entities,
+                &self.state.fog,
+                self.state.tick,
+            );
+        }
         self.refresh_building_memory(player_ids);
         self.refresh_anti_tank_gun_memory(player_ids);
         self.refresh_trench_memory(player_ids);

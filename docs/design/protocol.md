@@ -736,7 +736,8 @@ transport decode:
   supplyUsed: u32, supplyCap: u32,
   autoBuild?: {paused: bool, reserveSteel: u32, reserveOil: u32}, // projected player's authoritative policy
   entities: Entity[],            // your non-resource entities (always) + entities visible to living-team current/firing/death vision
-  resourceDeltas?: ResourceDelta[], // visible resource remaining updates; omitted when empty
+  resourceReset?: bool, // replace resource projection before applying rows; compact rr
+  resourceDeltas?: ResourceDelta[], // authoritative knowledge changes; omitted when empty
   smokes?: SmokeCloud[],         // active smoke clouds visible to this recipient; omitted when empty
   abilityObjects?: AbilityObject[], // active ability world objects visible to this recipient; omitted when empty
   trenches?: Trench[],           // neutral trench terrain visible to this recipient; omitted when empty
@@ -897,7 +898,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 60. The client also accepts compact
+`messagepack-compact`, codec version 1, compact snapshot version 61. The client also accepts compact
 snapshot versions 51 through 59: version 52 only appends a kind code, version 53 appends the
 optional `unitsKilled` entity slot, version 54 appends an optional `rocket` style bit to mortar
 launch/impact event records, and version 55 adds the `artilleryIncoming` event code, so the older
@@ -935,7 +936,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 60,
+  "v": 61,
   "gr": groundDecalRevision, // omitted when zero
   "gd": [afterRevision, [    // omitted when this tick has no discovered/created revision
     [id, decalClass, sourceKindCode, x, y, owner, seed, facing, weaponFacing, radiusTiles]
@@ -1145,16 +1146,26 @@ ticks remain internal; the wire continues to carry only positive `RememberedBuil
 keeps one-player replay vision isolated to that player's memory without adding a memory-source wire
 field.
 
-`ResourceDelta`: `{ id: u32, remaining: u32 }`. Resource node positions/kinds are static and come
-from `start.map.resources`; clients keep last-known `remaining` locally. The server sends
-`remaining` updates only for resource nodes currently visible to that recipient (dev full-world
-watch rooms receive all resource updates).
-Every live node on a currently visible tile is included in `resourceDeltas` on every snapshot.
-Depleted nodes are removed from the simulation. If a known node's tile is currently visible in
-`visibleTiles` but its id is absent from `resourceDeltas`, clients clear its remembered remaining
-amount to zero. This repairs depletion missed under fog without revealing hidden mining;
-`exploredTiles` alone never clears a resource. Empty or omitted visibility grids do not establish
-visible absence.
+`ResourceDelta`: `{ id: u32, remaining: u32 }`. Static positions/kinds come from
+`start.map.resources`; last-observed amounts and explicit zero/depletion records are owned by the
+simulation, per player, and included in checkpoints and replay keyframes. Resource memory retains
+static kinds and positions after depletion so mid-match start payloads still describe every remembered
+patch, including patches absent from the current world. Public initial amounts
+are seeded once at match start. Each tick updates only resources on that player's living-team
+visible tiles, including visible absence after depletion. Hidden mining never updates that player's
+knowledge. A selected-player union takes the newest observation per resource; ties prefer the lower
+remaining amount. Omniscient projection reads current quantities without changing player memories.
+
+Internal snapshots contain the complete selected resource projection with `resourceReset: true`.
+The connection writer sends a complete replacement baseline on first delivery, match start, replay
+seek, and perspective change (`resourceReset: true`, compact `rr: true`), then diffs each complete
+projection against the last snapshot taken for delivery. Ordinary snapshots omit unchanged resource
+rows and the reset flag. Latest-only pending snapshots remain complete, so coalescing cannot lose a
+resource change or a replacement baseline. Replacement epochs are connection-local transport state,
+not simulation knowledge. The reset flag, resource rows, fog, and building views share one snapshot.
+Clients clear their resource display on replacement and apply the supplied rows; they never infer
+resource depletion from missing deltas, death effects, visibility, or the initial map. Seeking and
+changing observer selection cannot carry knowledge from another time or perspective.
 
 `SmokeCloud`: `{ id: u32, x: f32, y: f32, radiusTiles: f32, expiresIn: u16 }`. Smoke clouds are
 neutral world effects, not entities. `radiusTiles` and `expiresIn` reflect the cast-time smoke

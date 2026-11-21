@@ -15,7 +15,6 @@ import {
 } from "./prediction_frame.js";
 import { MOVEMENT_PATH_DIAGNOSTICS, isBuilding, isResource, isUnit } from "./protocol.js";
 import { admitControlGroupIds } from "./state_control_groups.js";
-import { clearObservedEmptyResources } from "./state_resource_memory.js";
 import { GroundDecalBuffer } from "./state_ground_decals.js";
 import { autoBuild as ab } from "./state_auto_build.js";
 import { pruneSelection } from "./state_selection.js";
@@ -87,7 +86,7 @@ export class GameState extends VisualEffectBackedState {
     this.map = {
       ...startInfo.map,
       resources: (startInfo.map?.resources || []).map((node, index) =>
-        normalizeResource(node, index),
+        ({ ...normalizeResource(node, index), remaining: 0 }),
       ),
     };
     /** @type {Map<number, object>} id -> resource node state. */
@@ -188,7 +187,7 @@ export class GameState extends VisualEffectBackedState {
   /** Clear timeline-derived state before an authoritative replay seek begins streaming again. */
   resetForReplaySeek() {
     const initialResources = (this.startInfo?.map?.resources || []).map((node, index) =>
-      normalizeResource(node, index),
+      ({ ...normalizeResource(node, index), remaining: 0 }),
     );
     this.map = { ...this.map, resources: initialResources };
     this.resourceById = new Map();
@@ -201,7 +200,7 @@ export class GameState extends VisualEffectBackedState {
     if (!map || !Array.isArray(map.terrain) || !Array.isArray(players)) return false;
     this.map = {
       ...map,
-      resources: (map.resources || []).map((node, index) => normalizeResource(node, index)),
+      resources: (map.resources || []).map((node, index) => ({ ...normalizeResource(node, index), remaining: 0 })),
     };
     this.players = players.map((player) => normalizePlayer(player));
     this.startInfo = { ...this.startInfo, tick, map, players };
@@ -297,12 +296,15 @@ export class GameState extends VisualEffectBackedState {
     // snapshot-time entity lookup can observe a stale production identity or completed build.
     this.predictionProgressById.clear();
     const events = msg.events || [];
+    if (msg.resourceReset === true) {
+      for (const node of this.map.resources) node.remaining = 0;
+    }
     this._applyResourceDeltas(msg.resourceDeltas || []);
-    this._applyResourceDeaths(events);
+
     const visibleTiles = Array.isArray(msg.visibleTiles) || msg.visibleTiles instanceof Uint8Array
       ? msg.visibleTiles
       : [];
-    clearObservedEmptyResources(this.map, msg.resourceDeltas || [], visibleTiles);
+
     const wireEntities = (msg.entities || [])
       .filter((e) => !isResource(e.kind))
       .map((e) => markActionableFiringReveal(e, this.map, visibleTiles, this.playerId));
@@ -631,14 +633,6 @@ export class GameState extends VisualEffectBackedState {
       const node = this.resourceById.get(delta.id);
       if (!node || typeof delta.remaining !== "number") continue;
       node.remaining = delta.remaining;
-    }
-  }
-
-  _applyResourceDeaths(events) {
-    for (const ev of events) {
-      if (!ev || ev.e !== "death" || typeof ev.id !== "number") continue;
-      const node = this.resourceById.get(ev.id);
-      if (node) node.remaining = 0;
     }
   }
 

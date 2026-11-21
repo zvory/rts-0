@@ -13,6 +13,7 @@ fn rocket_mortar_impact_keeps_optional_placeholders_before_style_bit() {
         supply_cap: 0,
         auto_build: None,
         entities: Vec::new(),
+        resource_reset: false,
         resource_deltas: Vec::new(),
         smokes: Vec::new(),
         ability_objects: Vec::new(),

@@ -144,6 +144,8 @@ struct GameCheckpointV1 {
     fog: FogStateV1,
     building_memory: BuildingMemoryV1,
     #[serde(default)]
+    resource_memory: Option<super::resource_memory::ResourceMemory>,
+    #[serde(default)]
     anti_tank_gun_memory: AntiTankGunMemoryV1,
     lingering_sight: Vec<LingeringSightSource>,
     firing_reveals: Vec<FiringRevealSource>,
@@ -199,6 +201,7 @@ impl GameCheckpointV1 {
             command_log_metadata: CommandLogMetadataV1::from_command_log(&state.command_log),
             fog: FogStateV1::from_fog(&state.fog),
             building_memory: BuildingMemoryV1::from_memory(&state.building_memory),
+            resource_memory: Some(state.resource_memory.clone()),
             anti_tank_gun_memory: AntiTankGunMemoryV1::from_memory(&state.anti_tank_gun_memory),
             lingering_sight: state.lingering_sight.clone(),
             firing_reveals: state.firing_reveals.clone(),
@@ -257,12 +260,17 @@ impl GameCheckpointV1 {
         });
         self.validate_against(&map, &map_metadata)?;
         let entities = self.entities.into_store();
+        // Legacy launch checkpoints are safe to seed at tick zero; historical nonzero
+        // checkpoints cannot reconstruct knowledge from the current hidden world.
+        let mut resource_memory = self.resource_memory.unwrap_or_default();
+        resource_memory.seed(&entities);
         let panzerfaust_shots = self.panzerfaust_shots;
         Ok(GameState {
             map,
             entities,
             fog: self.fog.into_fog(),
             building_memory: self.building_memory.into_memory(),
+            resource_memory,
             anti_tank_gun_memory: self.anti_tank_gun_memory.into_memory(),
             players: serde_convert(&self.players)?,
             pending: self.pending_commands,
@@ -405,6 +413,14 @@ impl GameCheckpointV1 {
             &self.entities.entities,
             &entity_ids,
             &self.fog,
+        )?;
+        validate_resource_memory(
+            self.resource_memory.as_ref(),
+            &player_ids,
+            map,
+            self.tick,
+            &self.entities.entities,
+            self.entities.next_id,
         )?;
         validate_building_memory(&self.building_memory, &player_ids, self.tick)?;
         validate_anti_tank_gun_memory(&self.anti_tank_gun_memory, &player_ids, map, self.tick)?;

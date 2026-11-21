@@ -265,6 +265,12 @@ planned-order feedback. Promise-returning Lab issue-as commands stay non-optimis
 planned order. The controller owns browser-local `clientSeq` allocation and
 passes the sequenced envelope to `Net.command(cmd, clientSeq)`. Replay viewers, spectators, and
 dev-watch passive viewers keep prediction disabled and do not allocate gameplay command sequence ids.
+Resource quantities are server-owned last-known knowledge. `GameState` stores only the delivered
+projection for display, replaces it on `resourceReset`, and otherwise applies changed quantities.
+Neither visibility nor death effects infer depletion; seeks wait for a replacement snapshot instead
+of restoring initial amounts. Observer changes replace resource knowledge in the same snapshot as
+fog and remembered buildings. See `protocol.md` for checkpoint and transport semantics.
+
 `GameState.applySnapshot` remains authoritative. The partial WASM predictor returns a sparse
 `PredictionFrame` whose entity patches may identify an existing locally owned entity and claim only
 predicted position and an optional explicit motion presentation. Body facing remains authoritative

@@ -208,7 +208,7 @@ impl match_history_writes::MatchHistoryWriter for RecordingMatchHistoryWriter {
     }
 }
 
-fn test_snapshot(tick: u32, resource_deltas: Vec<ResourceDelta>) -> Snapshot {
+pub(super) fn test_snapshot(tick: u32, resource_deltas: Vec<ResourceDelta>) -> Snapshot {
     Snapshot {
         tick,
         ground_decal_revision: 0,
@@ -229,6 +229,7 @@ fn test_snapshot(tick: u32, resource_deltas: Vec<ResourceDelta>) -> Snapshot {
             40,
             "idle",
         )],
+        resource_reset: false,
         resource_deltas,
         smokes: Vec::new(),
         trenches: Vec::new(),
@@ -1236,6 +1237,7 @@ fn wire_compaction_removes_resource_entities_but_keeps_deltas() {
             EntityView::new(2, 0, kinds::STEEL, 30.0, 40.0, 1, 1, "idle"),
             EntityView::new(3, 0, kinds::OIL, 50.0, 60.0, 1, 1, "idle"),
         ],
+        resource_reset: false,
         resource_deltas: vec![ResourceDelta {
             id: 2,
             remaining: 1498,
@@ -1268,7 +1270,7 @@ fn wire_compaction_removes_resource_entities_but_keeps_deltas() {
 }
 
 #[test]
-fn wire_compaction_converts_visible_resource_death_to_zero_delta() {
+fn wire_compaction_does_not_rewrite_authoritative_resource_knowledge_from_events() {
     let mut snapshot = Snapshot {
         tick: 10,
         ground_decal_revision: 0,
@@ -1291,7 +1293,11 @@ fn wire_compaction_converts_visible_resource_death_to_zero_delta() {
         )],
         smokes: Vec::new(),
         trenches: Vec::new(),
-        resource_deltas: Vec::new(),
+        resource_reset: false,
+        resource_deltas: vec![ResourceDelta {
+            id: 200,
+            remaining: 12,
+        }],
         ability_objects: Vec::new(),
         visible_tiles: Vec::new(),
         explored_tiles: Vec::new(),
@@ -1314,7 +1320,7 @@ fn wire_compaction_converts_visible_resource_death_to_zero_delta() {
         snapshot.resource_deltas,
         vec![ResourceDelta {
             id: 200,
-            remaining: 0,
+            remaining: 12,
         }]
     );
 }

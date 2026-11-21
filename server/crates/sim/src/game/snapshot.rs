@@ -99,7 +99,10 @@ impl Game {
         };
 
         let mut entities = Vec::new();
-        let mut resource_deltas = Vec::new();
+        let resource_deltas =
+            self.state
+                .resource_memory
+                .project(memory_players, !fogged, &self.state.entities);
         // Use the spatial index for interest filtering instead of a full entity scan.
         for id in self.final_spatial().all_ids() {
             let e = match self.state.entities.get(id) {
@@ -109,14 +112,6 @@ impl Game {
             let target = e
                 .target_id()
                 .and_then(|target| self.state.entities.get(target));
-            if e.is_node() && (!fogged || fog.is_visible_world(player, e.pos_x(), e.pos_y())) {
-                if let Some(remaining) = e.remaining() {
-                    resource_deltas.push(ResourceDelta {
-                        id: e.id,
-                        remaining,
-                    });
-                }
-            }
             if let Some(view) = projection::project_entity(
                 player,
                 e,
@@ -147,7 +142,7 @@ impl Game {
         }
         // Deterministic order (stable for tests / replays).
         entities.sort_by_key(|v| v.id);
-        resource_deltas.sort_by_key(|d| d.id);
+
         let remembered_buildings = if fogged {
             self.remembered_building_views_for(player, memory_players, fog, &teams)
         } else {
@@ -277,6 +272,7 @@ impl Game {
                 reserve_oil: player.auto_build.reserve_oil,
             }),
             entities,
+            resource_reset: true,
             resource_deltas,
             smokes,
             ability_objects,
