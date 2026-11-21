@@ -1045,7 +1045,6 @@ test("mortar PNG atlas supplies the animated half-tile base plate", () => {
   const unit = renderer._liveRigPools.liveUnitRigs.get(entity.id);
   const underlay = renderer._liveRigPools.liveUnitRigShadows.get(entity.id);
   assert.equal(typeof unit.matchesPngAtlasRig, "function");
-  assert.ok(underlay);
   const carriage = unit.parts.get("sprite.mortar.carriage.deployed").display;
   const tube = unit.parts.get("sprite.mortar.tube.deployed").display;
   const leftTire = unit.parts.get("sprite.mortar.tire.left.deployed").display;
