@@ -1,5 +1,8 @@
 //! Authoritative last-observed resource quantities, including durable depletion records.
-use super::{entity::EntityStore, fog::Fog};
+use super::{
+    entity::{EntityKind, EntityStore},
+    fog::Fog,
+};
 use crate::protocol::ResourceDelta;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -13,6 +16,9 @@ pub(in crate::game) struct ResourceMemory {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(in crate::game) struct ResourceKnowledge {
+    // Older checkpoints can recover this from a still-live node during restore.
+    #[serde(default)]
+    pub(in crate::game) kind: Option<EntityKind>,
     pub(in crate::game) x: f32,
     pub(in crate::game) y: f32,
     pub(in crate::game) initial_remaining: u32,
@@ -29,14 +35,17 @@ pub(in crate::game) struct ResourceObservation {
 impl ResourceMemory {
     pub(in crate::game) fn seed(&mut self, entities: &EntityStore) {
         for entity in entities.iter().filter(|e| e.is_node()) {
-            self.nodes
+            let node = self
+                .nodes
                 .entry(entity.id)
                 .or_insert_with(|| ResourceKnowledge {
+                    kind: Some(entity.kind),
                     x: entity.pos_x(),
                     y: entity.pos_y(),
                     initial_remaining: entity.remaining().unwrap_or(0),
                     observations: BTreeMap::new(),
                 });
+            node.kind.get_or_insert(entity.kind);
         }
     }
 

@@ -58,6 +58,16 @@ fn resource_knowledge_survives_hidden_depletion_checkpoint_and_observer_switches
             "hidden depletion stays unknown"
         );
         assert_eq!(remaining(&game.snapshot_for(2), node), 0);
+        let late_start = game.start_payload();
+        let static_node = late_start
+            .map
+            .resources
+            .iter()
+            .find(|row| row.id == node)
+            .expect("late join retains the static identity of a depleted patch");
+        assert_eq!(static_node.kind, crate::protocol::kind_to_wire(kind));
+        assert_eq!((static_node.x, static_node.y), near);
+
         for view in [
             ObserverView::Omniscient,
             ObserverView::Players(vec![1, 2]),
@@ -73,12 +83,33 @@ fn resource_knowledge_survives_hidden_depletion_checkpoint_and_observer_switches
             initial,
             "viewing other knowledge cannot mutate player one's memory"
         );
+        let mut missing_kind: serde_json::Value =
+            serde_json::from_str(&game.checkpoint_payload_text_for_test().unwrap()).unwrap();
+        missing_kind["resourceMemory"]["nodes"][node.to_string()]
+            .as_object_mut()
+            .unwrap()
+            .remove("kind");
+        assert!(
+            Game::restore_checkpoint_payload_text_for_test(
+                &missing_kind.to_string(),
+                game.state.map.clone(),
+                game.map_metadata().clone(),
+            )
+            .is_err(),
+            "depleted resource kinds cannot be reconstructed from live entities"
+        );
         let restored = Game::restore_checkpoint_payload_text_for_test(
             &game.checkpoint_payload_text_for_test().unwrap(),
             game.state.map.clone(),
             game.map_metadata().clone(),
         )
         .unwrap();
+        assert!(restored
+            .start_payload()
+            .map
+            .resources
+            .iter()
+            .any(|row| row.id == node));
         assert_eq!(
             game.snapshot_for(1).resource_deltas,
             restored.snapshot_for(1).resource_deltas
@@ -186,4 +217,41 @@ fn resource_knowledge_storage_is_bounded_by_patches_and_players() {
         .nodes
         .values()
         .all(|node| node.observations.len() <= ids.len()));
+}
+
+#[test]
+fn resource_knowledge_restores_legacy_live_kinds_and_rejects_unrecoverable_kinds() {
+    let game = Game::new_for_replay(&players(), 42);
+    let mut payload: serde_json::Value =
+        serde_json::from_str(&game.checkpoint_payload_text_for_test().unwrap()).unwrap();
+    for node in payload["resourceMemory"]["nodes"]
+        .as_object_mut()
+        .unwrap()
+        .values_mut()
+    {
+        node.as_object_mut().unwrap().remove("kind");
+    }
+    let restored = Game::restore_checkpoint_payload_text_for_test(
+        &payload.to_string(),
+        game.state.map.clone(),
+        game.map_metadata().clone(),
+    )
+    .unwrap();
+    assert_eq!(
+        serde_json::to_value(game.start_payload().map.resources).unwrap(),
+        serde_json::to_value(restored.start_payload().map.resources).unwrap()
+    );
+    let node = payload["resourceMemory"]["nodes"]
+        .as_object_mut()
+        .unwrap()
+        .values_mut()
+        .next()
+        .unwrap();
+    node["kind"] = serde_json::to_value(EntityKind::Worker).unwrap();
+    assert!(Game::restore_checkpoint_payload_text_for_test(
+        &payload.to_string(),
+        game.state.map.clone(),
+        game.map_metadata().clone(),
+    )
+    .is_err());
 }

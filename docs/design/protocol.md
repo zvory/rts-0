@@ -1148,7 +1148,9 @@ field.
 
 `ResourceDelta`: `{ id: u32, remaining: u32 }`. Static positions/kinds come from
 `start.map.resources`; last-observed amounts and explicit zero/depletion records are owned by the
-simulation, per player, and included in checkpoints and replay keyframes. Public initial amounts
+simulation, per player, and included in checkpoints and replay keyframes. Resource memory retains
+static kinds and positions after depletion so mid-match start payloads still describe every remembered
+patch, including patches absent from the current world. Public initial amounts
 are seeded once at match start. Each tick updates only resources on that player's living-team
 visible tiles, including visible absence after depletion. Hidden mining never updates that player's
 knowledge. A selected-player union takes the newest observation per resource; ties prefer the lower

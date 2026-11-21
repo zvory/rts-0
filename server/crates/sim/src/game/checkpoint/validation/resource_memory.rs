@@ -31,7 +31,8 @@ pub(in crate::game::checkpoint) fn validate(
                 id: entity.id,
             });
         };
-        if node.x != entity.pos_x()
+        if node.kind.is_some_and(|kind| kind != entity.kind)
+            || node.x != entity.pos_x()
             || node.y != entity.pos_y()
             || entity
                 .remaining()
@@ -43,7 +44,15 @@ pub(in crate::game::checkpoint) fn validate(
         }
     }
     for (&id, node) in &memory.nodes {
-        if id == 0
+        // Missing legacy kinds are recoverable only while the resource still exists.
+        if node.kind.map_or_else(
+            || {
+                !entities
+                    .iter()
+                    .any(|entity| entity.id == id && entity.is_node())
+            },
+            |kind| !kind.is_node(),
+        ) || id == 0
             || id >= next_id
             || !node.x.is_finite()
             || !node.y.is_finite()
