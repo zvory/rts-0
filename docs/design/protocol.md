@@ -642,7 +642,7 @@ simulation/replay/test-helper boundaries default to singleton FFA: the player's 
 Current live server payloads always emit explicit nonzero `teamId` values for active players.
 The canonical default faction id is `kriegsia`; `ekat` remains an internally supported playable
 catalog id but is hidden from the normal lobby selector. `cultivators` is a playable economy-first
-catalog, selectable alongside Kriegsia in beta/local human lobbies. Start payloads emit `factionId`
+catalog, selectable alongside Kriegsia in normal human lobbies on every deployment. Start payloads emit `factionId`
 for every active start player, lobby seat and replay branch seat, and replay artifacts store
 `faction_id` for every player. Missing faction requests default to `kriegsia` in normal lobby,
 AI, self-play and dev contexts. Explicit `kriegsia`, `ekat` and `cultivators` requests follow

@@ -16,7 +16,6 @@ import {
   LOBBY_BROWSER_REFRESH_INTERVAL_MS,
   MAX_LOBBY_TEAMS,
   Lobby,
-  betaFactionSelectEnabledForLocation,
   countdownSoundId,
   lobbyBrowserAutoRefreshEligible,
   shouldAcceptSpectatorDrop,
@@ -295,15 +294,7 @@ import { textWithin } from "./dom_text.mjs";
   assertDeepEqual(
     LOBBY_SELECTABLE_FACTIONS,
     [{ id: "kriegsia", label: "Kriegsia" }, { id: "cultivators", label: "Cultivators" }],
-    "beta lobby faction selector exposes Kriegsia and Cultivators",
-  );
-  assert(
-    betaFactionSelectEnabledForLocation({ hostname: "rts-0-zvorygin-beta.fly.dev", pathname: "/" }) &&
-      betaFactionSelectEnabledForLocation({ hostname: "localhost", pathname: "/" }) &&
-      betaFactionSelectEnabledForLocation({ hostname: "[::1]", pathname: "/" }) &&
-      !betaFactionSelectEnabledForLocation({ hostname: "alphabetagames.example", pathname: "/" }) &&
-      !betaFactionSelectEnabledForLocation({ hostname: "rts.example", pathname: "/beta-preview" }),
-    "faction selector is enabled only on the beta deployment and local hosts",
+    "normal lobby faction selector exposes Kriegsia and Cultivators",
   );
   assertDeepEqual(
     AI_PROFILES,
@@ -462,8 +453,8 @@ import { textWithin } from "./dom_text.mjs";
       !profileSelectors[0].children.some((option) => option.value === "jeffs_ai"),
       "host lobby no longer offers Jeff's AI V1.0",
     );
-    assert(!findFakes(root, (el) => String(el.className).includes("player-faction")).length,
-      "non-beta lobby seats do not render faction controls");
+    assert(findFakes(root, (el) => String(el.className).includes("player-faction-select")).length === 1,
+      "normal lobby seats render the local human faction selector without an environment flag");
     assert(!findFakes(root, (el) => String(el.className).includes("lobby-seat-meta")).length,
       "lobby seats omit redundant human and AI profile metadata");
     assert(!findFakes(root, (el) => String(el.className).includes("team-row-count")).length,
@@ -474,9 +465,9 @@ import { textWithin } from "./dom_text.mjs";
       "host lobby exposes the locally developed Jeff's AI profile",
     );
 
-    const betaRoot = document.createElement("div");
-    const betaView = new LobbyRosterView(betaRoot);
-    betaView.render({
+    const factionRoot = document.createElement("div");
+    const factionView = new LobbyRosterView(factionRoot);
+    factionView.render({
       players: [
         { id: 1, name: "Host", color: "#0072b2", ready: false, teamId: 1, factionId: "kriegsia" },
         { id: 2, name: "Guest", color: "#d55e00", ready: false, teamId: 2, factionId: "ekat" },
@@ -485,12 +476,11 @@ import { textWithin } from "./dom_text.mjs";
       hostId: 1,
       isHost: true,
       countdownActive: false,
-      betaFactionSelect: true,
       playerCount: 2,
       maxPlayers: 4,
     });
     const factionSelectors = findFakes(
-      betaRoot,
+      factionRoot,
       (el) => el.tagName === "SELECT" && String(el.className).includes("player-faction-select"),
     );
     assert(
@@ -499,12 +489,12 @@ import { textWithin } from "./dom_text.mjs";
         factionSelectors[0].children[0].value === "kriegsia" &&
         factionSelectors[0].children[0].textContent === "Kriegsia" &&
         factionSelectors[0].children[1].value === "cultivators",
-      "beta lobby offers Kriegsia and Cultivators and hides Ekat",
+      "normal lobby offers Kriegsia and Cultivators and hides Ekat",
     );
     assert(
       !factionSelectors[0].disabled &&
         findFakes(
-          betaRoot,
+          factionRoot,
           (el) => String(el.className).includes("player-faction-label") && el.textContent === "Ekat",
         ).length === 1,
       "the local human can operate their selector while a hidden Ekat seat remains accurately labeled",
@@ -521,7 +511,6 @@ import { textWithin } from "./dom_text.mjs";
       hostId: 1,
       isHost: false,
       countdownActive: false,
-      betaFactionSelect: true,
       playerCount: 1,
       maxPlayers: 4,
       onSetFaction: (factionId) => selectedFactions.push(factionId),

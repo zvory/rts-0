@@ -1999,13 +1999,13 @@ faction catalog use the local player's faction id as the command-id prefix.
 descriptors with the Rust catalog dump for every client-exposed faction. Unknown valid faction ids
 fail closed in command-card data, so future factions do not inherit Kriegsia build, train, research,
 or ability buttons before their catalog is intentionally exposed. The client mirror is a checked
-projection, not lifecycle admission: beta and local normal lobbies expose a faction selector for
+projection, not lifecycle admission: normal lobbies on every deployment expose a faction selector for
 human seats with Kriegsia and Cultivators options; Ekat is omitted. Cultivators uses the shared
 Resource Depot and Worker rules with the faction-specific Nexus and Serf labels in
 selection, build, and production UI. Its Nexus uses dedicated white-lotus sect architecture with
 team-tinted roofs; the Serf retains shared Worker art. Other factions retain Resource Depot art.
 Its dedicated Portal build card routes the `portal` kind to a black-and-blue animated vortex with
-counter-rotating rings and deterministic particles; the full effect remains dormant on construction scaffolds. Mainline and replay lobbies hide the selector, fixture-only ids remain test harness
+counter-rotating rings and deterministic particles; the full effect remains dormant on construction scaffolds. Replay lobbies hide the selector, fixture-only ids remain test harness
 data, public AI controls do not expose a faction selector, and local prediction remains disabled
 for unsupported local faction ids such as the current Ekat slice.
 Generation is not required as long as the parity check remains a required gate comparing every
