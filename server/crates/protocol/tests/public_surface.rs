@@ -280,6 +280,7 @@ fn compact_snapshot_encodes_appended_entity_state() {
         supply_cap: 0,
         auto_build: None,
         entities: vec![plane, command_car, pump_jack, panzerfaust],
+        resource_reset: false,
         resource_deltas: Vec::new(),
         smokes: Vec::new(),
         ability_objects: Vec::new(),

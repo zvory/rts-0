@@ -6,6 +6,8 @@ use crate::protocol::terrain;
 
 #[path = "snapshot_owner_memory_tests.rs"]
 mod owner_knowledge;
+#[path = "resource_memory_tests.rs"]
+mod resource_knowledge;
 
 fn players() -> [PlayerInit; 2] {
     [

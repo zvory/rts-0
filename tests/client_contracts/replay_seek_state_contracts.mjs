@@ -1,5 +1,4 @@
 import { assert } from "./assertions.mjs";
-import { RESOURCE_AMOUNTS } from "../../client/src/config.js";
 import { KIND } from "../../client/src/protocol.js";
 import { GameState } from "../../client/src/state.js";
 
@@ -48,8 +47,8 @@ assert(
   "replay seek reset clears interpolation and authoritative snapshot state",
 );
 assert(
-  state.resourceById.get(200).remaining === RESOURCE_AMOUNTS[KIND.STEEL],
-  "replay seek reset restores mutable resource nodes to the replay baseline",
+  state.resourceById.get(200).remaining === 0,
+  "replay seek reset waits for authoritative resource knowledge instead of restoring full patches",
 );
 assert(
   state.trenches.length === 0 && state.visualEffects.muzzleFlashes.length === 0 &&

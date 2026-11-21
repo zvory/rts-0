@@ -21,6 +21,8 @@ use super::{
 mod ability_charges;
 mod anti_tank_gun_memory;
 mod building_memory;
+mod resource_memory;
+pub(super) use resource_memory::validate as validate_resource_memory;
 mod entities;
 #[cfg(test)]
 mod entities_tests;

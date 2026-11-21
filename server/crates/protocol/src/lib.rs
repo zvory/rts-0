@@ -1142,6 +1142,7 @@ mod tests {
                 reserve_oil: 150,
             }),
             entities: vec![worker, gunner, center],
+            resource_reset: false,
             resource_deltas: vec![ResourceDelta {
                 id: 200,
                 remaining: 1498,

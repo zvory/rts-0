@@ -171,8 +171,8 @@ function buttonByLabel(card, label) {
   assert(state.map.width === 4, "GameState.map");
   assert(state.map.resources.length === 2, "GameState keeps start payload resources");
   assert(state.resourceById.get(200).kind === KIND.STEEL, "GameState indexes resources by id");
-  assert(state.resourceById.get(200).remaining === RESOURCE_AMOUNTS[KIND.STEEL], "steel defaults to full known amount");
-  assert(state.resourceById.get(201).remaining === RESOURCE_AMOUNTS[KIND.OIL], "oil defaults to full known amount");
+  assert(state.resourceById.get(200).remaining === 0, "steel waits for server knowledge");
+  assert(state.resourceById.get(201).remaining === 0, "oil waits for server knowledge");
   assert(Array.isArray(state.players), "GameState.players");
   assert(state.playerById(1)?.teamId === 1, "GameState defaults missing teamId to singleton FFA");
   assert(state.teamIdForPlayer(2) === 7, "GameState.teamIdForPlayer returns explicit team");
@@ -250,7 +250,8 @@ function buttonByLabel(card, label) {
     supplyUsed: 2,
     supplyCap: 10,
     entities: [{ id: 1, owner: 1, kind: "worker", x: 10, y: 20, hp: 40, maxHp: 40, state: "idle" }],
-    resourceDeltas: [{ id: 200, remaining: 1498 }],
+    resourceReset: true,
+    resourceDeltas: [{ id: 200, remaining: 1498 }, { id: 201, remaining: RESOURCE_AMOUNTS[KIND.OIL] }],
     trenches: [{ id: 300, x: 96, y: 128, radiusTiles: 0.375 }],
     events: [],
   });
@@ -268,10 +269,11 @@ function buttonByLabel(card, label) {
     supplyUsed: 2,
     supplyCap: 10,
     entities: [{ id: 1, owner: 1, kind: "worker", x: 15, y: 25, hp: 40, maxHp: 40, state: "idle" }],
+    resourceDeltas: [{ id: 200, remaining: 0 }],
     events: [{ e: "death", id: 200, x: 64, y: 96, kind: KIND.STEEL }],
   });
   assert(state.prevRecvTime !== null, "prevRecvTime set after two snapshots");
-  assert(state.resourceById.get(200).remaining === 0, "visible resource death tombstones known resource");
+  assert(state.resourceById.get(200).remaining === 0, "authoritative zero quantity tombstones known resource");
   assert(state.entityById(200) === undefined, "depleted resources are not exposed as local entities");
   assert(state.entityById(201).remaining === RESOURCE_AMOUNTS[KIND.OIL], "untouched resources keep their last-known amount");
   const artilleryState = new GameState({ ...start, map: { ...start.map, resources: [] } });
