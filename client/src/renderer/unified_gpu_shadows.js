@@ -10,6 +10,8 @@ const PROXIES = Object.freeze({
   [KIND.WARRIOR]: [{ length: 15, width: 12, height: 16 }, { length: 7, width: 7, height: 22, forward: 0.8 }],
   [KIND.SCOUT_CAR]: [{ length: 44, width: 25, height: 22 }],
   [KIND.TANK]: [{ length: 55, width: 34, height: 33 }],
+  // One prism matching the visible PNG envelope; height is a presentation estimate.
+  [KIND.ROCKET_LAUNCHER]: [{ length: 58, width: 24, height: 24 }],
 });
 
 const CANDIDATE_KINDS = new Set([

@@ -133,7 +133,7 @@ assert.equal(Math.min(...barrelYs), 116, "elevated barrel shadow starts at its b
 assert.equal(Math.max(...barrelYs), 124, "elevated barrel shadow ends at its top-height projection");
 assert(Math.min(...barrelYs) > 100, "analytic projection leaves lit space beneath an elevated barrel");
 
-for (const kind of [KIND.RIFLEMAN, KIND.MACHINE_GUNNER, KIND.SCOUT_CAR, KIND.TANK]) {
+for (const kind of [KIND.RIFLEMAN, KIND.MACHINE_GUNNER, KIND.SCOUT_CAR, KIND.TANK, KIND.ROCKET_LAUNCHER]) {
   assert.equal(hasProjectedUnitShadow(kind), true, `${kind} uses the projected GPU shadow path`);
 }
 for (const kind of [KIND.PANZERFAUST, KIND.ANTI_TANK_GUN, KIND.MORTAR_TEAM, KIND.ARTILLERY, KIND.COMMAND_CAR]) {
