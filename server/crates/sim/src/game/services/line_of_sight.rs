@@ -458,10 +458,8 @@ mod tests {
             let start = tile(7, 1);
             let end = tile(3, 6);
             let origin = map.tile_center(start.0, start.1);
-            let target = (
-                (end.0 * config::TILE_SIZE) as f32,
-                (end.1 * config::TILE_SIZE) as f32,
-            );
+            let tile_size = config::TILE_SIZE as f32;
+            let target = (end.0 as f32 * tile_size, end.1 as f32 * tile_size);
             map.concealment_tiles = (0..4).map(|i| tile(6 - i, 2 + i)).collect();
             map.concealment_tiles.sort_unstable();
             assert!(!LineOfSight::new(&map).clear_between_world_points(origin, target));
