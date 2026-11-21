@@ -86,3 +86,34 @@ fn forest_allows_fire_into_visible_cover() {
         ));
     }
 }
+
+#[test]
+fn rifleman_inside_forest_fires_outward_with_automatic_and_ordered_targets() {
+    for order in ["idle", "hold", "attack_move", "attack"] {
+        let mut map = open_map(16);
+        map.concealment_tiles = vec![(2, 4), (3, 4)];
+        let mut entities = EntityStore::new();
+        let start = map.tile_center(2, 4);
+        let end = map.tile_center(5, 4);
+        let attacker = entities
+            .spawn_unit(1, EntityKind::Rifleman, start.0, start.1)
+            .unwrap();
+        let target = entities
+            .spawn_unit(2, EntityKind::Worker, end.0, end.1)
+            .unwrap();
+        entities.get_mut(attacker).unwrap().set_order(match order {
+            "hold" => Order::HoldPosition,
+            "attack_move" => Order::attack_move_to(end.0, end.1),
+            "attack" => Order::attack(target),
+            _ => Order::Idle,
+        });
+        let events = run_combat_tick_on_map(
+            &mut entities,
+            &[player_state(1, false), player_state(2, false)],
+            &map,
+        );
+        assert!(events.values().flatten().any(
+            |event| matches!(event, Event::Attack { from, to, .. } if *from == attacker && *to == target)
+        ), "rifleman should fire out of forest with {order}");
+    }
+}

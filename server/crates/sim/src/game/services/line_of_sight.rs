@@ -1,9 +1,10 @@
 //! Line-of-sight queries over map terrain plus optional dynamic blockers.
 //!
-//! Stone blocks both vision and ranged attacks. Forest permits shots into visible cover but
-//! blocks shots beyond it, independently of shared team vision. Fog can also supply current
-//! building-footprint blockers, while smoke supplies dynamic cloud blockers. This service owns the tile raycast so
-//! fog, combat, and future terrain features share one interpretation of "can see/shoot through".
+//! Stone blocks both vision and ranged attacks. Shots may leave their starting forest or
+//! enter visible cover, but cannot cross another forest completely.
+//! Fog can also supply current building-footprint blockers, while smoke supplies dynamic
+//! cloud blockers. This service owns the tile raycast so fog, combat, and future terrain
+//! features share one interpretation of "can see/shoot through".
 
 use crate::config;
 use crate::game::map::Map;
@@ -77,8 +78,8 @@ impl<'a> LineOfSight<'a> {
 
     /// True when no opaque terrain lies on the segment between two world-pixel points.
     /// The origin tile is ignored; the target tile is treated as blocking if it is opaque.
-    /// Forest allows up to the normal sight depth into cover, but no shot may exit cover
-    /// entered along the ray. Shared vision cannot bypass this weapon-local check.
+    /// Forest allows up to the normal sight depth into cover. A shot can leave its starting
+    /// forest, but cannot exit forest entered from open ground, even with shared vision.
     pub(crate) fn clear_between_world_points(&self, from: (f32, f32), to: (f32, f32)) -> bool {
         self.raycast_clear(from, to, false, false, true)
     }
@@ -153,7 +154,9 @@ impl<'a> LineOfSight<'a> {
         let step_y = axis_step(dy);
         let mut t_max_x = first_boundary_t(x0, tx, dx, step_x);
         let mut t_max_y = first_boundary_t(y0, ty, dy, step_y);
-        let mut concealment_tiles = 0;
+        let mut concealment_tiles = 0u32;
+        let mut was_in_forest = self.map.is_concealment_tile(start.0, start.1);
+        let mut entered_forest_from_open = false;
         let t_delta_x = if step_x == 0 {
             f32::INFINITY
         } else {
@@ -169,76 +172,46 @@ impl<'a> LineOfSight<'a> {
             if t_max_x < t_max_y {
                 tx += step_x;
                 t_max_x += t_delta_x;
-                match self.trace_step(
-                    (tx, ty),
-                    target,
-                    allow_opaque_target,
-                    block_forest_exit,
-                    &mut concealment_tiles,
-                    true,
-                ) {
-                    RaycastStep::Clear => {}
-                    RaycastStep::ReachedTarget => return true,
-                    RaycastStep::Blocked => return false,
-                }
             } else if t_max_y < t_max_x {
                 ty += step_y;
                 t_max_y += t_delta_y;
-                match self.trace_step(
-                    (tx, ty),
-                    target,
-                    allow_opaque_target,
-                    block_forest_exit,
-                    &mut concealment_tiles,
-                    true,
-                ) {
-                    RaycastStep::Clear => {}
-                    RaycastStep::ReachedTarget => return true,
-                    RaycastStep::Blocked => return false,
-                }
             } else {
-                let next_tx = tx + step_x;
-                let next_ty = ty + step_y;
-                match self.trace_step(
-                    (next_tx, ty),
-                    target,
-                    allow_opaque_target,
-                    block_forest_exit,
-                    &mut concealment_tiles,
-                    false,
-                ) {
-                    RaycastStep::Clear => {}
-                    RaycastStep::ReachedTarget => return true,
-                    RaycastStep::Blocked => return false,
+                // Corner neighbors block opaque terrain, but do not count as forest traversed.
+                let mut next = (tx + step_x, ty + step_y);
+                for tile in [(tx + step_x, ty), (tx, ty + step_y)] {
+                    match self.trace_step(tile, target, allow_opaque_target) {
+                        RaycastStep::Clear => {}
+                        RaycastStep::ReachedTarget => {
+                            // An endpoint on a grid corner can belong to a side tile.
+                            // Apply the same forest policy as any other target below.
+                            next = tile;
+                            break;
+                        }
+                        RaycastStep::Blocked => return false,
+                    }
                 }
-                match self.trace_step(
-                    (tx, next_ty),
-                    target,
-                    allow_opaque_target,
-                    block_forest_exit,
-                    &mut concealment_tiles,
-                    false,
-                ) {
-                    RaycastStep::Clear => {}
-                    RaycastStep::ReachedTarget => return true,
-                    RaycastStep::Blocked => return false,
-                }
-                tx = next_tx;
-                ty = next_ty;
-                match self.trace_step(
-                    (tx, ty),
-                    target,
-                    allow_opaque_target,
-                    block_forest_exit,
-                    &mut concealment_tiles,
-                    true,
-                ) {
-                    RaycastStep::Clear => {}
-                    RaycastStep::ReachedTarget => return true,
-                    RaycastStep::Blocked => return false,
-                }
+                (tx, ty) = next;
                 t_max_x += t_delta_x;
                 t_max_y += t_delta_y;
+            }
+
+            let step = self.trace_step((tx, ty), target, allow_opaque_target);
+            if step == RaycastStep::Blocked {
+                return false;
+            }
+            let in_forest = self.map.is_concealment_tile(tx as u32, ty as u32);
+            if in_forest {
+                entered_forest_from_open |= !was_in_forest;
+                concealment_tiles = concealment_tiles.saturating_add(1);
+                if concealment_tiles > terrain::CONCEALMENT_SIGHT_DEPTH_TILES {
+                    return false;
+                }
+            } else if block_forest_exit && entered_forest_from_open {
+                return false;
+            }
+            was_in_forest = in_forest;
+            if step == RaycastStep::ReachedTarget {
+                return true;
             }
         }
 
@@ -250,27 +223,11 @@ impl<'a> LineOfSight<'a> {
         tile: (i32, i32),
         target: (u32, u32),
         allow_opaque_target: bool,
-        block_forest_exit: bool,
-        concealment_tiles: &mut u32,
-        count_concealment: bool,
     ) -> RaycastStep {
         if !self.map.in_bounds(tile.0, tile.1) {
             return RaycastStep::Blocked;
         }
         let current = (tile.0 as u32, tile.1 as u32);
-        if count_concealment && self.map.is_concealment_tile(current.0, current.1) {
-            *concealment_tiles = concealment_tiles.saturating_add(1);
-            if *concealment_tiles > terrain::CONCEALMENT_SIGHT_DEPTH_TILES {
-                return RaycastStep::Blocked;
-            }
-        }
-        if block_forest_exit
-            && count_concealment
-            && *concealment_tiles > 0
-            && !self.map.is_concealment_tile(current.0, current.1)
-        {
-            return RaycastStep::Blocked;
-        }
         if current == target {
             if allow_opaque_target || !self.tile_blocks(current) {
                 RaycastStep::ReachedTarget
@@ -438,6 +395,84 @@ mod tests {
             ));
         }
         assert!(los.clear_between_world_points(map.tile_center(2, 3), map.tile_center(6, 3)));
+    }
+
+    #[test]
+    fn shots_can_leave_starting_forest_but_cannot_cross_a_later_forest() {
+        for (dx, dy) in [(1, 0), (0, 1), (1, 1)] {
+            for reverse in [false, true] {
+                let tile = |x| {
+                    let x = if reverse { 10 - x } else { x };
+                    (if dx == 0 { 4 } else { x }, if dy == 0 { 4 } else { x })
+                };
+                let mut map = flat_map(12);
+                map.concealment_tiles = [1, 2, 4, 5].into_iter().map(tile).collect();
+                map.concealment_tiles.sort_unstable();
+                let los = LineOfSight::new(&map);
+                for (from, to, allowed) in [
+                    (0, 2, true),  // Open -> forest.
+                    (1, 3, true),  // Starting forest -> open.
+                    (1, 5, true),  // Starting forest -> open -> another forest.
+                    (0, 3, false), // Open -> forest -> open.
+                    (1, 6, false), // Starting forest -> open -> another forest -> open.
+                ] {
+                    let start = tile(from);
+                    let end = tile(to);
+                    assert_eq!(
+                        los.clear_between_world_points(
+                            map.tile_center(start.0, start.1),
+                            map.tile_center(end.0, end.1),
+                        ),
+                        allowed,
+                        "from={start:?} to={end:?} direction=({dx},{dy}) reverse={reverse}"
+                    );
+                    // Forest exit restrictions apply to shots, not ordinary vision.
+                    assert!(los.tile_visible_from_world(map.tile_center(start.0, start.1), end));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn leaving_starting_forest_preserves_total_four_tile_depth_limit() {
+        let mut map = flat_map(12);
+        map.concealment_tiles = [1, 2, 3, 6, 7, 8].into_iter().map(|x| (x, 4)).collect();
+        let los = LineOfSight::new(&map);
+        let start = map.tile_center(1, 4);
+        for target in [5, 7] {
+            assert!(los.clear_between_world_points(start, map.tile_center(target, 4)));
+            assert!(los.tile_visible_from_world(start, (target, 4)));
+        }
+        assert!(!los.clear_between_world_points(start, map.tile_center(8, 4)));
+        assert!(!los.tile_visible_from_world(start, (8, 4)));
+        map.concealment_tiles = (1..=6).map(|x| (x, 4)).collect();
+        assert!(!LineOfSight::new(&map).clear_between_world_points(start, map.tile_center(7, 4)));
+    }
+
+    #[test]
+    fn grid_corner_targets_obey_forest_exit_and_depth_limits() {
+        // Mixed-sign diagonals end in a side neighbor rather than the next diagonal tile.
+        for transpose in [false, true] {
+            let tile = |x, y| if transpose { (y, x) } else { (x, y) };
+            let mut map = flat_map(10);
+            let start = tile(7, 1);
+            let end = tile(3, 6);
+            let origin = map.tile_center(start.0, start.1);
+            let tile_size = config::TILE_SIZE as f32;
+            let target = (end.0 as f32 * tile_size, end.1 as f32 * tile_size);
+            map.concealment_tiles = (0..4).map(|i| tile(6 - i, 2 + i)).collect();
+            map.concealment_tiles.sort_unstable();
+            assert!(!LineOfSight::new(&map).clear_between_world_points(origin, target));
+
+            map.concealment_tiles.push(start);
+            map.concealment_tiles.sort_unstable();
+            assert!(LineOfSight::new(&map).clear_between_world_points(origin, target));
+
+            map.concealment_tiles = (0..4).map(|i| tile(6 - i, 2 + i)).collect();
+            map.concealment_tiles.push(end);
+            map.concealment_tiles.sort_unstable();
+            assert!(!LineOfSight::new(&map).clear_between_world_points(origin, target));
+        }
     }
 
     #[test]
