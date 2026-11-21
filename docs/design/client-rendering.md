@@ -310,6 +310,14 @@ of angular rasterization error; sub-texel blockers can soften rather than wideni
 pre-elevation render path; flat maps that opt into sunlight skip terrain relief while retaining the
 authored atmosphere and unit-shadow direction.
 
+Scout Plane shadows use the aircraft frame strip's alpha silhouette as a flat plane three tiles
+above the ground. They retain the sprite's scale and facing, offset away from the shared sun by
+`3 * tileSize / tan(sunElevation)`, with 25% black opacity and a soft blur. They replace the native
+ellipse on the normal unit-shadow layer independently of the detailed 3D unit-shadow preference;
+maps without authored sunlight use the shared default sun (north, 45°). This is a presentation-only
+height and does not alter simulation flight or sight. The silhouette translates over terrain without
+height-field deformation; each retained instance releases its blur filter during teardown.
+
 Default-enabled detailed unit shadows keep their existing presentation models, but static and dynamic work
 now share the exact authored azimuth and elevation; there is no unit-only 30-degree clamp. The
 worker uploads the boxes as one retained instanced mesh. Each dynamic vertex starts at bilinearly

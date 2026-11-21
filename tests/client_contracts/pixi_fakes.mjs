@@ -274,6 +274,7 @@ export function installFakePixi() {
     Rectangle: FakeRectangle,
     Sprite: FakeSprite,
     Filter: FakeFilter,
+    BlurFilter: FakeFilter,
     GlProgram: FakeGlProgram,
     UniformGroup: FakeUniformGroup,
     SCALE_MODES: { NEAREST: "nearest" },

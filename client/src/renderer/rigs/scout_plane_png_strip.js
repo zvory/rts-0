@@ -24,6 +24,7 @@ export const SCOUT_PLANE_PNG_FRAME_STRIP = deepFreeze({
   },
   fps: 12,
   worldScale: 0.065,
+  shadowHeightTiles: 3,
   tintSlot: "team-light",
   targetColorAdjustment: PRODUCTION_RASTER_COLOR_TARGET,
   source: {
