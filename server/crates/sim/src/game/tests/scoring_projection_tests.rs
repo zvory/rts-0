@@ -825,7 +825,6 @@ fn allied_death_vision_allows_teammate_attacks_and_auto_acquisition() {
 #[test]
 fn known_losses_count_only_witnessed_deaths_and_survive_checkpoint() {
     let mut game = Game::new(&human_vs_ai_players(), 0x0515_C0DE);
-    // A clean open map and one observer sight source make visibility unambiguous.
     game.state.entities = EntityStore::new();
     game.state.resource_memory = Default::default();
     game.state.map.terrain.fill(crate::protocol::terrain::GRASS);
