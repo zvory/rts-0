@@ -1229,7 +1229,11 @@ mod tests {
         assert!((mortar.bounding_radius() - 15.6).abs() < 0.0001);
         assert!((gun.bounding_radius() - 13.0).abs() < 0.0001);
         assert!((config::unit_placement_radius(EntityKind::MortarTeam) - 21.6).abs() < 0.0001);
-        let obstacle = CircleBody { x: 128.0, y: 100.0, radius: 13.0 };
+        let obstacle = CircleBody {
+            x: 128.0,
+            y: 100.0,
+            radius: 13.0,
+        };
         assert!(unit_body_intersects_circle(mortar, obstacle));
         assert!(!unit_body_intersects_circle(gun, obstacle));
     }
