@@ -10,7 +10,7 @@ export function configureMatchDisplayPreferences(match, options = {}) {
   match.onProjectedUnitShadowToggle = () => toggleProjectedUnitShadows(match);
   match.state.showUnitRangesEnabled = options.unitRangesEnabled !== false;
   match.state.showHealthBarsAlwaysEnabled = !!options.healthBarsAlwaysEnabled;
-  match.state.showProjectedUnitShadowsEnabled = options.projectedUnitShadowsEnabled === true;
+  match.state.showProjectedUnitShadowsEnabled = options.projectedUnitShadowsEnabled !== false;
 }
 
 export function applyMatchUnitRanges(match, enabled) {

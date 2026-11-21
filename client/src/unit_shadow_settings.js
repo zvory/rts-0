@@ -1,4 +1,5 @@
-const PROJECTED_UNIT_SHADOWS_STORAGE_KEY = "rts.unitShadows.projected";
+// Reset legacy opt-outs once so every player receives the enabled default.
+const PROJECTED_UNIT_SHADOWS_STORAGE_KEY = "rts.unitShadows.projected.v2";
 
 export function readProjectedUnitShadowsEnabled(storage = undefined) {
   try {

@@ -274,6 +274,9 @@ function hotkeyService() {
     writeAlwaysShowHealthBarsEnabled(false, storage);
     assert(!readAlwaysShowHealthBarsEnabled(storage), "always-show health bars clears its override when disabled");
     assert(readProjectedUnitShadowsEnabled(storage), "detailed unit shadows default on");
+    values.set("rts.unitShadows.projected", "0");
+    assert(readProjectedUnitShadowsEnabled(storage), "legacy shadow opt-outs reset to the enabled default");
+    values.delete("rts.unitShadows.projected");
     writeProjectedUnitShadowsEnabled(false, storage);
     assert(!readProjectedUnitShadowsEnabled(storage), "detailed unit shadows persist explicit opt-out");
     writeProjectedUnitShadowsEnabled(true, storage);
@@ -298,6 +301,8 @@ function hotkeyService() {
       syncSettingsToggleUi() { synced += 1; },
       toggleUnitRangeOverlays() {},
     };
+    configureMatchDisplayPreferences(match);
+    assert(state.showProjectedUnitShadowsEnabled, "match display preferences default detailed shadows on");
     configureMatchDisplayPreferences(match, {
       unitRangesEnabled: false,
       healthBarsAlwaysEnabled: true,
@@ -306,7 +311,7 @@ function hotkeyService() {
     });
     assert(!state.showUnitRangesEnabled, "match display preferences initialize unit ranges");
     assert(state.showHealthBarsAlwaysEnabled, "match display preferences initialize health bars");
-    assert(!state.showProjectedUnitShadowsEnabled, "match display preferences default detailed shadows off");
+    assert(!state.showProjectedUnitShadowsEnabled, "match display preferences honor an explicit detailed-shadow opt-out");
 
     match.onHealthBarToggle();
     assert(!state.showHealthBarsAlwaysEnabled, "match health-bar toggle updates display state");
