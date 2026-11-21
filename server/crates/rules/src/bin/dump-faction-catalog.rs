@@ -267,6 +267,13 @@ fn print_client_config(indent: &str) {
     );
     println!(
         "{indent}    \"{}\": {{\"length\":{},\"width\":{},\"clearance\":{}}},",
+        EntityKind::MortarTeam.stable_id(),
+        json_f32(balance::MORTAR_BODY_LENGTH_PX),
+        json_f32(balance::MORTAR_BODY_WIDTH_PX),
+        json_f32(balance::MORTAR_BODY_CLEARANCE_PX),
+    );
+    println!(
+        "{indent}    \"{}\": {{\"length\":{},\"width\":{},\"clearance\":{}}},",
         EntityKind::Artillery.stable_id(),
         json_f32(balance::ARTILLERY_BODY_LENGTH_PX),
         json_f32(balance::ARTILLERY_BODY_WIDTH_PX),

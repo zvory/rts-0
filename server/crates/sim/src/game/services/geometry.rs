@@ -225,7 +225,12 @@ pub(crate) fn unit_body_with_facing(
 
 fn vehicle_body_dimensions(kind: EntityKind) -> (f32, f32, f32) {
     match kind {
-        EntityKind::AntiTankGun | EntityKind::MortarTeam => (
+        EntityKind::MortarTeam => (
+            config::MORTAR_BODY_LENGTH_PX,
+            config::MORTAR_BODY_WIDTH_PX,
+            config::MORTAR_BODY_CLEARANCE_PX,
+        ),
+        EntityKind::AntiTankGun => (
             config::ANTI_TANK_GUN_BODY_LENGTH_PX,
             config::ANTI_TANK_GUN_BODY_WIDTH_PX,
             config::ANTI_TANK_GUN_BODY_CLEARANCE_PX,
@@ -1214,6 +1219,20 @@ fn valid_segment(start: (f32, f32), end: (f32, f32)) -> bool {
 mod tests {
     use super::*;
     use crate::game::services::occupancy::footprint_center;
+
+    #[test]
+    fn enlarged_mortar_collision_and_placement_leave_anti_tank_gun_unchanged() {
+        let mortar = unit_body_with_facing(EntityKind::MortarTeam, 100.0, 100.0, 0.0)
+            .expect("mortar collision body");
+        let gun = unit_body_with_facing(EntityKind::AntiTankGun, 100.0, 100.0, 0.0)
+            .expect("anti-tank collision body");
+        assert!((mortar.bounding_radius() - 15.6).abs() < 0.0001);
+        assert!((gun.bounding_radius() - 13.0).abs() < 0.0001);
+        assert!((config::unit_placement_radius(EntityKind::MortarTeam) - 21.6).abs() < 0.0001);
+        let obstacle = CircleBody { x: 128.0, y: 100.0, radius: 13.0 };
+        assert!(unit_body_intersects_circle(mortar, obstacle));
+        assert!(!unit_body_intersects_circle(gun, obstacle));
+    }
 
     #[test]
     fn tank_body_intersects_building_even_when_center_tile_is_clear() {

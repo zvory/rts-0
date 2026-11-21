@@ -28,7 +28,10 @@ pub(super) fn car_will_start_reverse_to_final_waypoint(entity: &Entity, facing: 
 
 pub(super) fn vehicle_body_half_width_with_clearance(kind: EntityKind) -> f32 {
     match kind {
-        EntityKind::AntiTankGun | EntityKind::MortarTeam => {
+        EntityKind::MortarTeam => {
+            config::MORTAR_BODY_WIDTH_PX * 0.5 + config::MORTAR_BODY_CLEARANCE_PX
+        }
+        EntityKind::AntiTankGun => {
             config::ANTI_TANK_GUN_BODY_WIDTH_PX * 0.5 + config::ANTI_TANK_GUN_BODY_CLEARANCE_PX
         }
         EntityKind::Artillery => {

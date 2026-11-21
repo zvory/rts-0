@@ -82,30 +82,30 @@ function sprite(id, animationPart, sourceParts, drawOrder, frame, options = {}) 
 }
 
 const ASSEMBLED_REFERENCE_FRAME = Object.freeze({
-  x: 37,
-  y: 82,
-  w: 306,
-  h: 196,
+  x: 24,
+  y: 78,
+  w: 334,
+  h: 210,
 });
 
 const CARRIAGE_FRAME = Object.freeze({
-  x: 435,
-  y: 82,
-  w: 207,
-  h: 196,
-  originX: 175.5,
-  originY: 97.75,
+  x: 431,
+  y: 79,
+  w: 225,
+  h: 207,
+  originX: 179.5,
+  originY: 104.5,
   pixelsPerUnitX: PPU / 2,
   pixelsPerUnitY: PPU / 2,
 });
 
 const TUBE_FRAME = Object.freeze({
-  x: 806,
-  y: 146,
-  w: 246,
-  h: 66,
-  originX: 65.5,
-  originY: 33,
+  x: 804,
+  y: 142,
+  w: 257,
+  h: 83,
+  originX: 67.5,
+  originY: 41.5,
   pixelsPerUnitX: PPU / 2,
   pixelsPerUnitY: PPU / 2,
 });
@@ -136,27 +136,27 @@ function carriageCropFrame(x, y, w, h) {
   });
 }
 
-const LEFT_TIRE_FRAME = carriageCropFrame(536, 82, 73, 26);
-const RIGHT_TIRE_FRAME = carriageCropFrame(536, 236, 73, 28);
+const LEFT_TIRE_FRAME = carriageCropFrame(568, 80, 87, 35);
+const RIGHT_TIRE_FRAME = carriageCropFrame(568, 247, 87, 38);
 
 export const MORTAR_TEAM_PNG_RIG_ATLAS = deepFreeze({
   enabled: true,
   unit: "mortar_team",
-  image: "/assets/rigs/mortar-png-pass-04/generated/mortar-m2-wheeled-baseplate-pass-04-alpha.png?v=m2-wheeled-baseplate-pass04-halfres-rgba8",
+  image: "/assets/rigs/mortar-bulky-white/generated/mortar-bulky-white-atlas.png?v=bulky-white-20pct-v1",
   iconVisibleBounds: {
-    x: 37,
-    y: 82,
-    w: 306,
-    h: 196,
+    x: 24,
+    y: 78,
+    w: 334,
+    h: 210,
   },
   grid: {
     profile: "four-component-cells",
     width: 1150,
     height: 362,
-    sourceSheet: "client/assets/rigs/mortar-png-pass-04/generated/mortar-m2-wheeled-baseplate-pass-04-alpha.png",
-    generatedSource: "client/assets/rigs/mortar-png-pass-01/generated/mortar-m2-wheeled-pass-01-source.png",
+    sourceSheet: "client/assets/rigs/mortar-bulky-white/generated/mortar-bulky-white-atlas.png",
+    generatedSource: "client/assets/rigs/mortar-bulky-white/generated/mortar-bulky-white-source.png",
     basePlateGeneratedSource: "client/assets/rigs/mortar-png-pass-04/generated/mortar-baseplate-source-v3.png",
-    imageVersion: "m2-wheeled-baseplate-pass04-halfres-rgba8",
+    imageVersion: "bulky-white-20pct-v1",
     cells: [
       "reference.assembled",
       "sprite.carriage",

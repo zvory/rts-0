@@ -6,6 +6,7 @@ import { normalizedPartSet } from "./part_selection.js";
 const RIG_CONTEXT_READY = Symbol("rtsRigContextReady");
 const RIG_ANIMATION_STAGE = Symbol("rtsRigAnimationStage");
 const ARTILLERY_VISUAL_SCALE = 0.75;
+const MORTAR_VISUAL_SCALE = 1.2;
 const OCCUPIED_TRENCH_UNIT_SCALE = 0.85;
 const HARVEST_CYCLE_MS = (HARVEST_TICKS / TICK_HZ) * 1000;
 const PUMP_JACK_CYCLE_MS = HARVEST_CYCLE_MS * 3;
@@ -100,7 +101,9 @@ export function createRigRenderContext(entity, {
     shotRevealAlpha: clamp01(shotRevealAlpha),
     visibility,
     occupiedTrench: Boolean(occupiedTrench),
-    visualScale: entity.kind === KIND.ARTILLERY ? ARTILLERY_VISUAL_SCALE : 1,
+    visualScale: entity.kind === KIND.ARTILLERY
+      ? ARTILLERY_VISUAL_SCALE
+      : entity.kind === KIND.MORTAR_TEAM ? MORTAR_VISUAL_SCALE : 1,
     mapTileSize: finite(map?.tileSize, 32),
     facing,
     commanderFacing,

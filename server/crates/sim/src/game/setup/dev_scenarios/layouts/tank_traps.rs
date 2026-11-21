@@ -287,7 +287,8 @@ pub(in crate::game::setup::dev_scenarios) fn spawn_tank_trap_line_workers(
 
 fn vehicle_line_start_gap(unit: EntityKind) -> f32 {
     match unit {
-        EntityKind::AntiTankGun | EntityKind::MortarTeam => config::ANTI_TANK_GUN_BODY_LENGTH_PX,
+        EntityKind::MortarTeam => config::MORTAR_BODY_LENGTH_PX,
+        EntityKind::AntiTankGun => config::ANTI_TANK_GUN_BODY_LENGTH_PX,
         EntityKind::Artillery => config::ARTILLERY_BODY_LENGTH_PX,
         EntityKind::ScoutCar => config::SCOUT_CAR_BODY_LENGTH_PX,
         EntityKind::Tank => config::TANK_BODY_LENGTH_PX,

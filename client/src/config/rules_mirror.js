@@ -33,6 +33,11 @@ export const ANTI_TANK_GUN_BODY = Object.freeze({
   width: 24.0,
   clearance: 1.0,
 });
+export const MORTAR_BODY = Object.freeze({
+  length: 50.4,
+  width: 28.8,
+  clearance: 1.2,
+});
 export const ARTILLERY_BODY = Object.freeze({
   length: 37.800003,
   width: 21.599998,
@@ -163,7 +168,7 @@ export const STATS = Object.freeze({
   [KIND.ANTI_TANK_GUN]: { armored: false, label: "Anti-Tank Gun", icon: "ATG", size: 20, sight: 9, body: ANTI_TANK_GUN_BODY,
     rangeTiles: ANTI_TANK_GUN_DEPLOYED_RANGE_TILES, cost: { steel: 150, oil: 40 }, supply: 3, buildTicks: 440,
     requires: [KIND.STEELWORKS, KIND.ENGINEERING_COMPLEX] },
-  [KIND.MORTAR_TEAM]: { armored: false, label: "Mortar Team", icon: "MT", size: 18, sight: 10,
+  [KIND.MORTAR_TEAM]: { armored: false, label: "Mortar Team", icon: "MT", size: 21.6, sight: 10,
     rangeTiles: MORTAR_RANGE_TILES, minRangeTiles: MORTAR_MIN_RANGE_TILES,
     cost: { steel: 100, oil: 40 }, supply: 3, buildTicks: 460,
     requires: KIND.STEELWORKS,
