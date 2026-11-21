@@ -526,6 +526,12 @@ changed-file mapping selects the skipped behavior.
 
 ## 12. PR CI contract
 
+Tri-state snapshot waits share a tick-aware default deadline in both remote and browser lanes:
+max(10 seconds, twice the requested tick duration at `TICK_HZ` plus 1 second). A 360-tick
+wait therefore gets 25 seconds at 30 Hz, covering normal-speed simulation and CI scheduling
+slack. Explicit scenario deadlines remain exact. The harness self-test covers both lanes,
+long waits, and explicit overrides; long scenarios do not need individual timeout patches.
+
 The server-build job also runs the `rng_portability` integration fixture under
 `wasm-bindgen-test-runner` on wasm32. This is a narrow exception to the native nextest policy:
 nextest cannot execute the WASM test runner. Native nextest and WASM assert identical fixed

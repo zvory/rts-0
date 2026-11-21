@@ -7,9 +7,40 @@ import { ArtifactWriter } from "./artifacts.mjs";
 import { forceFailure, scenario, selectOwn } from "./dsl.mjs";
 import { executeStep } from "./run.mjs";
 import { ClientLane } from "./lanes/client_lane.mjs";
+import { RemoteLane } from "./lanes/remote_lane.mjs";
+import { snapshotTimeoutMs } from "./snapshot_wait.mjs";
 import { WasmLocalLane } from "./lanes/local_lane.mjs";
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "rts-tri-state-test-"));
+
+// Check the actual deadlines each lane forwards without sleeping or opening a browser.
+// Long waits must cover normal 30 Hz simulation time; explicit deadlines stay exact.
+for (const { minTickDelta, timeoutMs, expected } of [
+  { minTickDelta: 0, expected: 10000 },
+  { minTickDelta: 1, expected: 10000 },
+  { minTickDelta: 360, expected: 25000 },
+  { minTickDelta: 720, expected: 49000 },
+  { minTickDelta: 360, timeoutMs: 1500, expected: 1500 },
+]) {
+  const options = { minTickDelta, ...(timeoutMs == null ? {} : { timeoutMs }) };
+  const remote = new RemoteLane({ scenario: {}, room: "wait-budget", artifacts: {} });
+  remote.lastSnapshot = { tick: 100 };
+  remote.waitFor = async (test, budget) => {
+    assert.equal(budget, expected);
+    assert.equal(test({ t: "snapshot", tick: 100 + minTickDelta - 1 }), false);
+    assert.equal(test({ t: "snapshot", tick: 100 + minTickDelta }), true);
+  };
+  await remote.waitForSnapshot(options);
+
+  const client = new ClientLane({ scenario: { network: {} }, room: "wait-budget", artifacts: {} });
+  client.page = {
+    evaluate: async () => 100,
+    waitForFunction: async (_test, { timeout }) => assert.equal(timeout, expected),
+  };
+  client.summary = async () => ({});
+  await client.waitForSnapshot(options);
+}
+assert.equal(snapshotTimeoutMs(), 10000);
 
 {
   const s = scenario("unit_contract", {

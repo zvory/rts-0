@@ -1,5 +1,6 @@
 import { decodeServerMessage, parseServerFrame } from "../../../client/src/protocol.js";
 import { summarizeSnapshot, ownEntityByKind } from "../diffs.mjs";
+import { snapshotTimeoutMs } from "../snapshot_wait.mjs";
 
 const DEFAULT_WS = process.env.RTS_WS || "ws://127.0.0.1:8081/ws";
 
@@ -146,7 +147,7 @@ export class RemoteLane {
     return entity;
   }
 
-  async waitForSnapshot({ minTickDelta = 1, timeoutMs = 10000 } = {}) {
+  async waitForSnapshot({ minTickDelta = 1, timeoutMs = snapshotTimeoutMs(minTickDelta) } = {}) {
     const startTick = this.lastSnapshot?.tick ?? -1;
     return this.waitFor(
       (message) => message.t === "snapshot" && message.tick >= startTick + minTickDelta,
