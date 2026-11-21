@@ -2496,7 +2496,9 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   remain visible across camera scales and display resolutions; every seventh existing divider uses
   a heavier 1.5-world-pixel mark to identify approximately 105 HP without adding another mark.
   Construction and deconstruction keep their existing status colors on the shared bar layer.
-  Detailed Unit Shadows are a default-enabled Game setting with a persistent opt-out. When disabled, the render
+  Detailed Unit Shadows are a default-enabled Game setting with a persistent opt-out. The v2
+  preference key resets legacy opt-outs once so existing players also receive the enabled default;
+  subsequent opt-outs persist. Matches without an explicit preference also default on. When disabled, the render
   worker skips every per-unit model projection and units retain their lightweight native rig
   shadows. When enabled on maps with authored elevation and sun, simple presentation-only box
   models for supported units rotate with each unit and project along the authored sun vector into
