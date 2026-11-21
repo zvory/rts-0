@@ -14,6 +14,7 @@ import {
 import { expandSymmetricPoints } from "../client/src/map_authoring/symmetry.js";
 import { MAP_AUTHORING_LAYER } from "../client/src/map_authoring/layers.js";
 import { MapEditorSession, moveSymmetricDraftLocation, mapEditorRectTiles, MAP_EDITOR_SYMMETRY, symmetricTerrainTiles } from "../client/src/map_editor_session.js";
+import { DEFAULT_MAP_SUN } from "../client/src/config.js";
 import { TERRAIN } from "../client/src/protocol.js";
 
 const repoRoot = new URL("../", import.meta.url);
@@ -95,8 +96,8 @@ const importedProtected = new MapEditorSession({ storage: null });
 importedProtected.loadAuthoredMap(protectedMap);
 assert.deepEqual(
   importedProtected.exportMap(),
-  protectedMap,
-  "materialized recipe output preserves impassable protected terrain through authored-map import",
+  { ...protectedMap, sun: DEFAULT_MAP_SUN },
+  "materialized recipe output adds default sunlight and preserves impassable protected terrain through authored-map import",
 );
 assert(validateMap(protectedMap).warnings.some((warning) => warning.includes("protected area")));
 
@@ -382,8 +383,8 @@ assert.deepEqual(boundedResources.baseSites, [{ x: 8, y: 8, steelPatches: 36, oi
   "recipe resource counts use the authored-map canonical bounds");
 const generatedMapSession = new MapEditorSession({ storage: null });
 generatedMapSession.loadAuthoredMap(boundedResources);
-assert.deepEqual(generatedMapSession.exportMap(), boundedResources,
-  "canonical recipe output is byte-for-byte stable as a materialized map import");
+assert.deepEqual(generatedMapSession.exportMap(), { ...boundedResources, sun: DEFAULT_MAP_SUN },
+  "canonical recipe output gains default sunlight and otherwise stays stable on import");
 assert.throws(
   () => buildMapFromRecipe({
     width: 32,
