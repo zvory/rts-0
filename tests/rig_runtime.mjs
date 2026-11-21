@@ -1051,6 +1051,11 @@ test("mortar PNG atlas supplies the animated half-tile base plate", () => {
   const leftTire = unit.parts.get("sprite.mortar.tire.left.deployed").display;
   const rightTire = unit.parts.get("sprite.mortar.tire.right.deployed").display;
   const basePlate = unit.parts.get("sprite.mortar.basePlate.deployed").display;
+  for (const root of [unit.container, underlay.container]) {
+    assert.deepEqual([root.scaleX, root.scaleY], [1.2, 1.2], "mortar art and shadow share the enlarged scale");
+  }
+  const muzzle = transformedRigAnchorPoint(definition, "muzzle", entity, createRigRenderContext(entity));
+  assert.ok(Math.abs(muzzle.x - entity.x - 13.32 * 1.2) < 0.001, "mortar shot origin follows enlarged art");
   for (const display of [carriage, tube, leftTire, rightTire]) {
     assert.equal(display.visible, true);
     assert.equal(display.alpha, 1);
