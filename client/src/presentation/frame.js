@@ -5,7 +5,7 @@ import {
   preparedPresentationEntityRecord,
 } from "./entity_snapshot.js";
 import { createRendererProjectionRecord } from "./projection_record.js";
-import { DOODAD_TYPE_IDS } from "../config.js";
+import { DEFAULT_MAP_SUN, DOODAD_TYPE_IDS } from "../config.js";
 
 export const PRESENTATION_FRAME_VERSION = 2;
 export const STATIC_MAP_PRESENTATION_VERSION = 5;
@@ -315,13 +315,13 @@ function normalizeStaticTiles(records, { width, height }) {
 }
 
 function normalizeMapSun(value) {
-  if (!value || typeof value !== "object") return null;
+  if (!value || typeof value !== "object") return DEFAULT_MAP_SUN;
   const azimuthDegrees = Number(value.azimuthDegrees);
   const elevationDegrees = Number(value.elevationDegrees);
   const warmth = Number(value.warmth);
-  if (!Number.isInteger(azimuthDegrees) || azimuthDegrees < 0 || azimuthDegrees > 359) return null;
-  if (!Number.isInteger(elevationDegrees) || elevationDegrees < 1 || elevationDegrees > 89) return null;
-  if (!Number.isInteger(warmth) || warmth < 0 || warmth > 100) return null;
+  if (!Number.isInteger(azimuthDegrees) || azimuthDegrees < 0 || azimuthDegrees > 359) return DEFAULT_MAP_SUN;
+  if (!Number.isInteger(elevationDegrees) || elevationDegrees < 1 || elevationDegrees > 89) return DEFAULT_MAP_SUN;
+  if (!Number.isInteger(warmth) || warmth < 0 || warmth > 100) return DEFAULT_MAP_SUN;
   return Object.freeze({ azimuthDegrees, elevationDegrees, warmth });
 }
 

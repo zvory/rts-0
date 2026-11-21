@@ -1,4 +1,3 @@
-import { MAP_EDITOR_DEFAULT_SUN } from "./map_editor_session.js";
 import {
   boundedStalingradTime,
   formatStalingradTime,
@@ -10,13 +9,6 @@ import {
 export function createMapEditorSunSettings(session, viewport) {
   const section = group("Sun & atmosphere");
   const sun = session.draft.sun;
-  if (!sun) {
-    section.append(
-      readout("Add directional sunlight to this map. Flat maps can use sunlight and projected unit shadows without elevation relief."),
-      actionButton("Enable sunlight", () => enableMapEditorSun(session)),
-    );
-    return section;
-  }
   const stalingradTime = stalingradTimeFromSun(sun);
   section.append(
     stalingradTimeField(stalingradTime, (value) => {
@@ -50,24 +42,7 @@ export function createMapEditorSunSettings(session, viewport) {
     readout("Direction uses compass degrees: 0° north, 90° east, 180° south, 270° west. Drag it to show the sun-source arrow on the map."),
     readout("Drag any control to preview lighting, shadow direction, and atmosphere live. Changes are saved in the map and can be undone."),
   );
-  if (!hasElevationRelief(session.draft)) {
-    section.appendChild(actionButton("Remove sunlight", () => disableMapEditorSun(session)));
-  }
   return section;
-}
-
-export function enableMapEditorSun(session) {
-  return session.mutate("Enabled sunlight", (draft) => { draft.sun = { ...MAP_EDITOR_DEFAULT_SUN }; });
-}
-
-export function disableMapEditorSun(session) {
-  if (hasElevationRelief(session.draft)) return false;
-  return session.mutate("Disabled sunlight", (draft) => { draft.sun = null; });
-}
-
-function hasElevationRelief(draft) {
-  const levels = draft?.elevation?.flatMap((row) => [...row]) || [];
-  return levels.length > 0 && levels.some((level) => level !== levels[0]);
 }
 
 export function previewMapEditorSunField(session, viewport, fieldName, value) {
@@ -202,13 +177,4 @@ function readout(text) {
   node.dataset.state = "ok";
   node.textContent = text;
   return node;
-}
-
-function actionButton(label, onClick) {
-  const control = document.createElement("button");
-  control.type = "button";
-  control.className = "map-editor-button";
-  control.textContent = label;
-  control.addEventListener("click", onClick);
-  return control;
 }

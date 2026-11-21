@@ -4,8 +4,6 @@ import { createMapEditorPresentation } from "../../client/src/map_editor_present
 import {
   commitMapEditorStalingradTime,
   commitMapEditorSunField,
-  disableMapEditorSun,
-  enableMapEditorSun,
   previewMapEditorStalingradTime,
   previewMapEditorSunDirectionField,
   previewMapEditorSunField,
@@ -27,6 +25,7 @@ import { TERRAIN } from "../../client/src/protocol.js";
 import {
   authoredMapFromMaterialized,
   MapEditorSession,
+  MAP_EDITOR_DEFAULT_SUN,
 } from "../../client/src/map_editor_session.js";
 
 const elevation = Array.from({ length: 16 * 16 }, (_, index) => index < 16 * 8 ? 1 : 4);
@@ -123,14 +122,17 @@ assert.equal(session.draft.sun.azimuthDegrees, 315, "sun settings participate in
 
 const flatSession = new MapEditorSession({ storage: null });
 flatSession.initializeBlank({ size: 16, playerCount: 2 });
-assert.equal(enableMapEditorSun(flatSession), true, "flat maps can opt into authored sunlight");
-assert.deepEqual(flatSession.draft.sun, {
-  azimuthDegrees: 315, elevationDegrees: 35, warmth: 25,
-});
-assert.equal(flatSession.exportMap().elevation, undefined, "flat sunlight does not force an elevation payload");
-assert.deepEqual(flatSession.exportMap().sun, flatSession.draft.sun, "flat authored sunlight survives export");
-assert.equal(disableMapEditorSun(flatSession), true, "flat authored sunlight can be removed");
-assert.equal(flatSession.draft.sun, null);
+assert.deepEqual(flatSession.draft.sun, stalingradSunAtTime(14),
+  "blank maps always start with the shared 2 p.m. Stalingrad sun");
+assert.deepEqual(MAP_EDITOR_DEFAULT_SUN, stalingradSunAtTime(14));
+assert.equal(flatSession.exportMap().elevation, undefined, "flat sunlight does not force elevation");
+assert.deepEqual(flatSession.exportMap().sun, flatSession.draft.sun);
+const legacyMap = flatSession.exportMap();
+delete legacyMap.sun;
+flatSession.loadAuthoredMap(legacyMap);
+assert.deepEqual(flatSession.draft.sun, MAP_EDITOR_DEFAULT_SUN, "legacy maps acquire the default sun");
+flatSession.mutate("Attempt to remove sunlight", (draft) => { draft.sun = null; });
+assert.deepEqual(flatSession.draft.sun, MAP_EDITOR_DEFAULT_SUN, "null cannot disable map sunlight");
 
 flatSession.beginElevationStroke("Raised ridge");
 assert.deepEqual(flatSession.paintElevationTiles([{ x: NaN, y: 3 }, { x: 2, y: Infinity }], 4), [],
@@ -139,13 +141,10 @@ assert.deepEqual(flatSession.paintElevationTiles([{ x: 2, y: 3 }], 4), [{ x: 2, 
 assert.equal(flatSession.commitElevationStroke(), true);
 assert.equal(flatSession.materialized().elevation[3 * 16 + 2], 4,
   "elevation painting materializes the selected height level");
-assert.deepEqual(flatSession.draft.sun, {
-  azimuthDegrees: 315, elevationDegrees: 35, warmth: 25,
-}, "the first relief edit initializes valid sunlight");
-assert.equal(disableMapEditorSun(flatSession), false, "relief maps retain their required sunlight");
+assert.deepEqual(flatSession.draft.sun, MAP_EDITOR_DEFAULT_SUN, "relief retains sunlight");
 flatSession.undo();
 assert.equal(flatSession.draft.elevation.length, 0, "elevation strokes participate in undo history");
-assert.equal(flatSession.draft.sun, null, "undo restores the pre-relief sunlight state atomically");
+assert.deepEqual(flatSession.draft.sun, MAP_EDITOR_DEFAULT_SUN, "undo retains sunlight");
 
 let builtMap = null;
 const worker = { terrainRevision: 0, renderer: {
