@@ -650,9 +650,10 @@ Map policy:
 
 Concealment applies to units, not buildings or doodads. Sight rays traverse at most four
 concealment tiles, excluding the origin and including the target. Direct-fire rays use the same
-four-tile depth into cover and stop when leaving concealment entered along the ray: a visible unit
-inside a forest can be shot, but units and buildings beyond it cannot, even with a plane, ally, or
-side spotter revealing them. The origin tile is ignored so units at the forest edge can fire outward.
+four-tile total depth into cover, excluding the origin tile. A shot may leave the forest it starts
+in and enter another forest, but cannot leave any forest it enters from open ground. Thus firing
+out of cover or into visible cover is allowed, while firing through an intervening forest at units
+or buildings beyond it is blocked, even with a plane, ally, or side spotter revealing them.
 Mortars retain indirect fire and do not require a clear direct-fire ray. This lets a unit at a forest edge retain normal outward vision while
 limiting vision through a forest interior. Owners and allies always receive their units. Enemy
 projection, auto-acquisition, explicit attack validation, and retained targets reject a concealed
