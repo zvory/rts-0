@@ -8,10 +8,11 @@ export class ReplaySampler {
     this.last = null;
     this.events = [];
     this.resourceDeltas = [];
+    this.resourceReset = false;
   }
 
   push(snapshot, write) {
-    const { visibleTiles, exploredTiles, events, resourceDeltas, ...rest } = snapshot;
+    const { visibleTiles, exploredTiles, events, resourceDeltas, resourceReset, ...rest } = snapshot;
     const sample = { visibleTiles, exploredTiles, snapshot: rest };
     const emit = state => {
       write({
@@ -21,15 +22,21 @@ export class ReplaySampler {
           exploredBits: packTiles(state.exploredTiles),
         } : {}),
         snapshot: { ...state.snapshot, tick: this.nextTick,
-          events: this.events.map(entry => entry.event), resourceDeltas: this.resourceDeltas },
+          events: this.events.map(entry => entry.event), resourceReset: this.resourceReset,
+          resourceDeltas: this.resourceDeltas },
         timedEvents: this.events,
       });
       this.events = [];
       this.resourceDeltas = [];
+      this.resourceReset = false;
       this.nextTick += this.stepTicks;
     };
     while (this.nextTick < snapshot.tick && this.nextTick <= this.durationTicks) emit(this.last || sample);
     for (const event of events || []) this.events.push({ tick: snapshot.tick, event });
+    if (resourceReset === true) {
+      this.resourceDeltas = [];
+      this.resourceReset = true;
+    }
     this.resourceDeltas.push(...(resourceDeltas || []));
     if (this.nextTick === snapshot.tick && this.nextTick <= this.durationTicks) emit(sample);
     this.last = sample;
