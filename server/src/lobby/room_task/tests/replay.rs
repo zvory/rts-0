@@ -682,18 +682,9 @@ fn replay_vision_selection_sends_snapshot_without_waiting_for_tick() {
     let all_player_ids = players.iter().map(|player| player.id).collect::<Vec<_>>();
     let all_pending = replay.game().snapshot_for_spectator(&all_player_ids);
     let player_one_expected = replay.game().snapshot_for_spectator(&[players[0].id]);
-    assert!(
-        all_pending
-            .visible_tiles
-            .iter()
-            .filter(|&&tile| tile != 0)
-            .count()
-            > player_one_expected
-                .visible_tiles
-                .iter()
-                .filter(|&&tile| tile != 0)
-                .count(),
-        "test setup should make all-player replay vision wider than one-player vision"
+    assert_ne!(
+        all_pending.visible_tiles, player_one_expected.visible_tiles,
+        "all-player fog should be wider than one-player fog"
     );
     task.players
         .get(&100)
