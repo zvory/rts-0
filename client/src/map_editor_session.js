@@ -1,3 +1,4 @@
+import { DEFAULT_MAP_SUN } from "./config.js";
 import { PASSABLE, TERRAIN } from "./protocol.js";
 import {
   createMapEditorDoodadRecords,
@@ -57,11 +58,7 @@ export const MAP_EDITOR_MAIN_CLEARANCE_TILES = 7;
 export const MAP_EDITOR_BASE_SITE_CLEARANCE_TILES = 4;
 export const MAP_EDITOR_SYMMETRY = MAP_AUTHORING_SYMMETRY;
 export const MAP_EDITOR_MAP_VERSION = CURRENT_AUTHORED_MAP_VERSION;
-export const MAP_EDITOR_DEFAULT_SUN = Object.freeze({
-  azimuthDegrees: 315,
-  elevationDegrees: 35,
-  warmth: 25,
-});
+export const MAP_EDITOR_DEFAULT_SUN = DEFAULT_MAP_SUN;
 
 const TERRAIN_TO_CHAR = Object.freeze({
   [TERRAIN.GRASS]: ".",
@@ -623,10 +620,8 @@ export class MapEditorSession {
     draft.terrain = composeTerrainRows(draft);
     delete draft.ground;
     delete draft.features;
-    // Keep legacy flat authored maps byte-shape compatible. Elevation stays optional, while a sun
-    // record independently opts any map into directional lighting and atmosphere.
+    // Flat elevation stays optional; every exported map carries effective sunlight.
     if (!draft.elevation.length) delete draft.elevation;
-    if (!draft.sun) delete draft.sun;
     return draft;
   }
 
@@ -959,10 +954,6 @@ function normalizeDraft(draft) {
       || draft.elevation.some((row) => typeof row !== "string" || !/^[0-9]+$/.test(row) || [...row].length !== width)))) {
     throw new Error("Map elevation rows must be empty or match its width and height using digits 0-9.");
   }
-  const elevationValues = draft.elevation.flatMap((row) => [...row]);
-  const hasRelief = elevationValues.length > 0
-    && elevationValues.some((level) => level !== elevationValues[0]);
-  if (hasRelief && !draft.sun) throw new Error("Maps with varying elevation must specify sun conditions.");
   draft.sun = normalizeMapSun(draft.sun);
   const dimensions = { width, height };
   draft.width = width;
@@ -1257,7 +1248,7 @@ function sameDoodadSet(left, right) {
 }
 function sameFlatArray(left, right) { return Array.isArray(left) && Array.isArray(right) && left.length === right.length && left.every((value, index) => value === right[index]); }
 function normalizeMapSun(value) {
-  if (value == null) return null;
+  if (value == null) return { ...DEFAULT_MAP_SUN };
   const sun = {
     azimuthDegrees: Number(value.azimuthDegrees),
     elevationDegrees: Number(value.elevationDegrees),

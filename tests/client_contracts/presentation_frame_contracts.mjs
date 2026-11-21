@@ -315,8 +315,18 @@ assert(gridSnapshotValue(oldStaticMap.terrain, 0) === 0, "reset does not mutate 
 
 const rematchAssembler = new PresentationFrameAssembler({ map: { width: 1, height: 1, tileSize: 16, terrain: [0] } });
 assert(rematchAssembler.staticMap !== assembler.staticMap, "a rematch owns a fresh static presentation object");
-assert(rematchAssembler.staticMap.sun === null && gridSnapshotValue(rematchAssembler.staticMap.elevation, 0) === 0,
-  "legacy flat maps normalize to zero elevation with no sun conditions");
+assert(rematchAssembler.staticMap.sun?.azimuthDegrees === 224
+  && rematchAssembler.staticMap.sun?.elevationDegrees === 45
+  && rematchAssembler.staticMap.sun?.warmth === 23
+  && gridSnapshotValue(rematchAssembler.staticMap.elevation, 0) === 0,
+  "legacy flat maps normalize to zero elevation and the default summer afternoon sun");
+for (const sun of [null, false, { azimuthDegrees: -1 }, { elevationDegrees: 0 }]) {
+  const fallback = new PresentationFrameAssembler({
+    map: { width: 1, height: 1, tileSize: 16, terrain: [0], sun },
+  });
+  assert(JSON.stringify(fallback.staticMap.sun) === JSON.stringify(rematchAssembler.staticMap.sun),
+    "explicit null and malformed map sun cannot disable sunlight");
+}
 assertThrows(() => detachedRecord({ value: new Uint8Array([1]) }), "ordinary records reject typed-array views");
 assertThrows(() => createGridSnapshot({ revision: 0, width: 2, height: 2, source: [1] }), "grid snapshots reject short sources");
 

@@ -296,7 +296,10 @@ Frame submission/completion never copy and sort histories just to publish an unr
 published getter returns current counters and ages; teardown replaces an owned getter with a detached
 final record so global diagnostics cannot retain the destroyed host or overwrite a replacement match.
 
-The immutable static-map DTO also carries optional authored sun conditions. Any authored sun applies
+The immutable static-map DTO always carries effective sun conditions. Missing, null, or invalid map
+sun uses the shared client default: 14:00 local solar time on 23 Aug 1942 west of Stalingrad
+(azimuth 224°, elevation 45°, warmth 23). Authored conditions override that default; maps cannot
+disable sunlight. Effective sun applies
 the world warmth tint and directional projected unit shadows. When elevation varies,
 the terrain builder computes smooth height-field relief, while the detailed-shadow layer builds one
 map-space directional horizon cache in `setMap`. For each light ray it carries the maximum
@@ -306,9 +309,9 @@ not a viewport-pixel ray march. The cache has four samples per tile regardless o
 camera, or map-world pixel size and never rebuilds during entity/camera frames. Linear sampling on
 the non-dominant axis follows the authored light ray with at most one cache texel (one quarter tile)
 of angular rasterization error; sub-texel blockers can soften rather than widening with distance.
-`warmth` applies a matching static world tint. Flat maps without authored sunlight preserve the
-pre-elevation render path; flat maps that opt into sunlight skip terrain relief while retaining the
-authored atmosphere and unit-shadow direction.
+`warmth` applies a matching static world tint. Flat maps skip terrain relief while retaining
+atmosphere and directional unit shadows. Players may disable detailed unit shadows, retaining
+lightweight native unit shadows and sunlight.
 
 Default-enabled detailed unit shadows keep their existing presentation models, but static and dynamic work
 now share the exact authored azimuth and elevation; there is no unit-only 30-degree clamp. The
