@@ -691,9 +691,9 @@ profiles and explicit activation/autocast policy instead of being folded into de
   oil rate, and deplete the underlying oil node. When that final load empties the patch, its Pump
   Jack disappears with it and the permanent Depot job moves to the next eligible patch.
 - Unsupported extractors: completed Steel Mines and Pump Jacks without a living, completed
-  friendly Resource Depot or Zamok within the existing 11-tile mining-anchor range lose 5% of
-  maximum HP per second (`EXTRACTOR_DECAY_TICKS = 600`). A full-health extractor dies after
-  exactly 20 seconds without support; damaged extractors die sooner. Allied bases count.
+  friendly Resource Depot or Zamok within the existing 11-tile mining-anchor range lose 4% of
+  maximum HP per second (`EXTRACTOR_DECAY_TICKS = 750`). A full-health extractor dies after
+  exactly 25 seconds without support; damaged extractors die sooner. Allied bases count.
   Restoring support stops decay and clears fractional damage without healing lost HP.
   Extractors under construction do not decay. Decay uses ordinary unattributed damage/death
   handling; the underlying resource patch remains available.

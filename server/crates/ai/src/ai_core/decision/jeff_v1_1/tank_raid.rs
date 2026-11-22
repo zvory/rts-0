@@ -13,7 +13,7 @@
 //!   to the side, whichever passes the least remembered enemy strength; a route past more than
 //!   `ROUTE_SHARE` of the party's is not taken. It moves, not attack-moves, so it is not drawn into
 //!   the fights it goes around, and looks again as it goes.
-//! - **Depots only**: a Depot's extractors decay to nothing within 20 s of it (#1707), so a raid
+//! - **Depots only**: a Depot's extractors decay to nothing within 25 s of it (#1707), so a raid
 //!   goes only for Depots it has seen (the scout finds them; 7 of 27 raids on likely sites found
 //!   none), parks `SIGHT_STANDOFF_TILES` from it (`RANGED_STANDOFF_TILES` with its Scout Car to see
 //!   for it), and once parked `RAMP_TICKS`, when a Tank reaches 14 tiles, shells it: 180 HP, one
