@@ -159,6 +159,7 @@ export function reconcileGrassLayer(renderer, requestedTechnique = 0) {
 }
 
 export function updateTerrainMaterials(renderer, nowMs) {
+  renderer._shorelineLayer?.update(nowMs);
   renderer._waterLayer?.update(nowMs);
   renderer._grassLayer?.update(nowMs);
 }
