@@ -1,6 +1,7 @@
 // tests/protocol_parity.mjs
 // Guard compact wire vocabularies against Rust encoder / JS decoder drift.
 
+import { MAX_COMPACT_ORDER_PLAN } from "../client/src/protocol_constants.js";
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
@@ -292,6 +293,9 @@ assertSameCodes(
   protocolContract.compactCodes.resourceKind,
   { [KIND.STEEL]: KIND_CODE[KIND.STEEL], [KIND.OIL]: KIND_CODE[KIND.OIL] },
 );
+const serverOrderSource = fs.readFileSync(path.join(repoRoot, "server/crates/sim/src/game/entity/order.rs"), "utf8");
+const serverOrderQueueLimit = Number(serverOrderSource.match(/pub const MAX_QUEUED_ORDERS: usize = (\d+);/)?.[1]);
+assert(MAX_COMPACT_ORDER_PLAN === serverOrderQueueLimit + 1, "compact order plan bound must cover the server active stage plus queue");
 assert(protocolContract.compactSnapshotVersion === COMPACT_SNAPSHOT_VERSION, "compact snapshot version must match Rust");
 assert(
   protocolContract.maxGroundDecalsPerSnapshotDelta === MAX_COMPACT_GROUND_DECALS,

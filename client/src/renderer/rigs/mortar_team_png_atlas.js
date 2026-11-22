@@ -110,19 +110,6 @@ const TUBE_FRAME = Object.freeze({
   pixelsPerUnitY: PPU / 2,
 });
 
-// The generated base plate is postprocessed to a tight 64px square and
-// deliberately mapped to 16 world pixels: exactly half of one 32px tile.
-const BASE_PLATE_FRAME = Object.freeze({
-  x: 1086,
-  y: 0,
-  w: 64,
-  h: 64,
-  originX: 32,
-  originY: 32,
-  pixelsPerUnitX: 4,
-  pixelsPerUnitY: 4,
-});
-
 function carriageCropFrame(x, y, w, h) {
   return Object.freeze({
     x,
@@ -155,31 +142,20 @@ export const MORTAR_TEAM_PNG_RIG_ATLAS = deepFreeze({
     height: 362,
     sourceSheet: "client/assets/rigs/mortar-bulky-white/generated/mortar-bulky-white-atlas.png",
     generatedSource: "client/assets/rigs/mortar-bulky-white/generated/mortar-bulky-white-source.png",
-    basePlateGeneratedSource: "client/assets/rigs/mortar-png-pass-04/generated/mortar-baseplate-source-v3.png",
     imageVersion: "bulky-white-20pct-v1",
     cells: [
       "reference.assembled",
       "sprite.carriage",
       "sprite.tube",
-      "sprite.basePlate",
     ],
     components: {
       assembledReference: ASSEMBLED_REFERENCE_FRAME,
       carriage: CARRIAGE_FRAME,
       tube: TUBE_FRAME,
-      basePlate: BASE_PLATE_FRAME,
     },
   },
   frames: {},
   sprites: [
-    sprite(
-      "sprite.mortar.basePlate.deployed",
-      mortarPart("basePlate", "deployed"),
-      [mortarPart("basePlate", "deployed")],
-      19,
-      BASE_PLATE_FRAME,
-      { tintSlot: "team", positionOffsetX: -20 }
-    ),
     sprite(
       "sprite.mortar.carriage.packed",
       mortarPart("axle", "packed"),

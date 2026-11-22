@@ -11,7 +11,7 @@ const TIMEOUT_SCALE = Number.isFinite(timeoutScaleParsed) && timeoutScaleParsed 
   ? timeoutScaleParsed
   : 1;
 
-function scaledTimeoutMs(timeoutMs) {
+export function scaledTimeoutMs(timeoutMs) {
   return Math.ceil(timeoutMs * TIMEOUT_SCALE);
 }
 

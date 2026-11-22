@@ -1012,7 +1012,7 @@ compatibility internals.
 Compact entity records are positional arrays. Optional fields keep the semantic order above and
 trailing missing optional fields are omitted; interior missing optional fields are encoded as
 `null`. The `rally` slot is itself a two-element `[x, y]` array (or `null`).
-The `orderPlan` slot is an owner-private array capped at 9 entries: exact-owner in normal and
+The `orderPlan` slot is an owner-private array capped at 33 entries (one active stage plus 32 queued orders): exact-owner in normal and
 selected observer projections, and per-entity-owner in full-world diagnostic projections. It contains
 the current active stage first, followed by queued unit stages in execution order. Artillery Fire
 stages carry the server-stored clicked center; the

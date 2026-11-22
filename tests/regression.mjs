@@ -4,6 +4,7 @@
 //  - a join rejected mid-match must NOT wedge the socket (can still join another room)
 // Usage: start the server, then `node tests/regression.mjs`.
 import { decodeServerMessage, parseServerFrame } from "../client/src/protocol.js";
+import { scaledTimeoutMs } from "./team_harness.mjs";
 
 const URL = process.env.RTS_WS || "ws://127.0.0.1:8081/ws";
 let failures = 0;
@@ -27,7 +28,7 @@ class Client {
   closed(t = 3000) {
     if (this.ws.readyState === WebSocket.CLOSED) return Promise.resolve();
     return new Promise((resolve) => {
-      const to = setTimeout(resolve, t);
+      const to = setTimeout(resolve, scaledTimeoutMs(t));
       this.ws.onclose = () => { clearTimeout(to); resolve(); };
     });
   }
@@ -36,13 +37,13 @@ class Client {
   waitFor(test, t = 5000, label = "msg") {
     const hit = this.msgs.find(test); if (hit) return Promise.resolve(hit);
     return new Promise((resolve, reject) => {
-      const to = setTimeout(() => reject(new Error("timeout: " + label)), t);
+      const to = setTimeout(() => reject(new Error("timeout: " + label)), scaledTimeoutMs(t));
       this.waiters.push({ test, resolve: (m) => { clearTimeout(to); resolve(m); } });
     });
   }
   waitNext(test, t = 5000, label = "msg") {
     return new Promise((resolve, reject) => {
-      const to = setTimeout(() => reject(new Error("timeout: " + label)), t);
+      const to = setTimeout(() => reject(new Error("timeout: " + label)), scaledTimeoutMs(t));
       this.waiters.push({ test, resolve: (m) => { clearTimeout(to); resolve(m); } });
     });
   }
@@ -107,7 +108,13 @@ async function soloStart(room) {
     const tickBefore = c.lastSnapshot.tick;
     const after = await c.waitFor((m) => m.t === "snapshot" && m.tick > tickBefore + 5, 3000, "post-unsequenced command snapshots");
     const resourceDepotAfter = after.entities.find((e) => e.id === resourceDepot.id);
-    ok(after.steel === snap.steel && !resourceDepotAfter?.prodKind && !resourceDepotAfter?.prodQueue,
+    // Automatic extractors earn steel while we wait; check production and worker identity
+    // rather than requiring an unchanged wallet across asynchronous snapshots.
+    const workerIds = (snapshot) => snapshot.entities
+      .filter((entity) => entity.owner === c.playerId && entity.kind === "worker")
+      .map((entity) => entity.id).sort((a, b) => a - b);
+    ok(after.steel >= snap.steel && !resourceDepotAfter?.prodKind && !resourceDepotAfter?.prodQueue &&
+       JSON.stringify(workerIds(after)) === JSON.stringify(workerIds(snap)),
        `COMMAND SEQ: unsequenced train was ignored (steel=${after.steel}, prod=${resourceDepotAfter?.prodKind || "none"})`);
     c.command({ c: "train", building: resourceDepot.id, unit: "worker" });
     const executed = await c.waitFor(

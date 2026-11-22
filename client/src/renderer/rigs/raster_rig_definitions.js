@@ -207,12 +207,6 @@ const MORTAR_ANIMATIONS = [
   ...bindingsFor(MORTAR_TUBES, [...WEAPON_MOTION, ["weaponRecoilX", "transform.x"], ["weaponRecoilY", "transform.y"]]),
   ...bindingsFor(MORTAR_PACKED, [["setupVisual", "alpha", -1, 1]]),
   ...bindingsFor(MORTAR_DEPLOYED, [["setupVisual", "alpha"]]),
-  ...bindingsFor(["part.mortar.basePlate.deployed"], [
-    ["weaponVisualFacing", "transform.rotation"],
-    ["setupVisual", "geometry.scaleX", 1, -1],
-    ["setupVisual", "geometry.scaleY", 1, -1],
-    ["setupVisual", "alpha"],
-  ]),
 ];
 const MORTAR_TEAM_DEFINITION = definition({
   id: "mortar-team.raster",

@@ -454,12 +454,8 @@ Raster rig workflow:
   4.2-inch-inspired wheeled mortar sheet: assembled reference, team-tinted carriage/frame and
   tube/barrel assembly, plus fixed-color tire overlays. The carriage sprite follows the
   raster-native carriage recoil binding while the separate tube sprite follows the stronger weapon recoil
-  binding. The deployed Mortar Team also uses an image-generated square base-plate PNG in the unit
-  atlas. Its white-painted source receives the owning player's runtime team tint. The keyed and
-  tightly cropped 128px source is postprocessed to exactly 16x16 world pixels (half a tile), draws
-  below the carriage with its center offset 20 world pixels rearward, scales from zero to full size
-  with setup progress, and shrinks during teardown; raster-native metadata supplies its animation
-  bindings. See
+  binding. Packed, deploying, and deployed states use only the carriage, tires, and tube;
+  the retired square base plate is no longer rendered. See
   [raster-unit-art-handoff.md](raster-unit-art-handoff.md) for the asset-authority boundary,
   production inventory, and validation contract.
 - Keep generated PNG sources, the production derivative, prompt, and manifest together under each
