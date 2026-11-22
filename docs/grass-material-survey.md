@@ -13,9 +13,10 @@ production-ready renderer architectures.
 | `grass-survey-4` | Dry meadow with taller blades and seed heads | Warm natural variation and slower-looking long stalks | Changes the biome/palette more substantially |
 | `grass-survey-5` | Mixed tuft carpet, coherent gusts, broad moving shade | Layered local motion and large-scale field movement | Most complex treatment; shade is decorative, not weather simulation |
 
-The first direction to refine is **3**, using some of **5**'s broad gust variation with restrained
-contrast. Keep the shorter carpet in roadsides and busy base areas; use taller clumps selectively.
-Seed heads suit occasional dry patches rather than a uniform map-wide meadow.
+The selected direction is **5**, with a requested refinement: continuous grass coverage rather than
+isolated tufts over exposed ground. The follow-up profiles below retain its gust/shade direction
+while changing how dense blade detail is represented. These intentional visual changes are not
+pixel-parity optimizations of profile 5.
 
 ## Reproduction
 
@@ -48,3 +49,52 @@ prototype is intended for rapid visual evaluation, not a performance recommendat
 
 The prototypes use original procedural shader code; the references inform the techniques rather
 than being drop-in engine ports.
+
+
+## Continuous coverage follow-up
+
+| Profile | Technique | Runtime texture reads | RGBA8 base-level texel storage |
+| --- | --- | --- | --- |
+| `grass-survey-6` | Dense baked short-blade weave, warped and relit by a wind/shade field | 2 | 320 KiB |
+| `grass-survey-7` | Two differently oriented samples of a taller weave, with different wind distortion | 3 | 320 KiB |
+| `grass-survey-8` | Eight cached dense blade-tip poses, smoothly blended under the wind/shade field | 3 | 2.06 MiB |
+
+Memory figures exclude shared mesh geometry, driver overhead and upload staging.
+Overlapping source strokes fill every texture cell. Density is paid during one-time source-art
+baking, rather than by adding runtime blade objects or repeated neighbor searches per fragment.
+All three update the material every presented frame; the atlas interpolates between authored
+poses instead of lowering presentation cadence. Profiles 6/7 move the sampled weave as a surface;
+profile 8 keeps source roots anchored while its baked tips bend. The latter is the preferred next
+candidate for natural-looking movement; the simple weave is the lower-memory alternative.
+These remain Lab studies with the original grass lighting/transition integration limitations.
+
+Reproduce using the same scene above and profiles 6, 7 or 8. Visual-clock phase is independent per
+session. The new cloud field is a baked, repeatable low-frequency field with the same broad moving
+shade direction, rather than an exact copy of profile 5's procedural cloud noise.
+
+### Measured material GPU cost
+
+Run `node scripts/grass-material-benchmark.mjs <output.json>` with the pinned repository Node
+dependencies and Chrome. This is an isolated material microbenchmark using the real material class
+in the pinned Pixi WebGL worker: a 64×64 all-grass map fills a 1100×720 viewport, with the same
+geometry and 100% grass coverage for every profile. It does not replace the canonical fixed-roster
+renderer benchmark and does not measure simulation, units, water, complete game frames, or FPS.
+
+The sample below was taken on 2026-11-22 with an Apple M5 Pro via ANGLE Metal. There are three
+rotated rounds per technique/resolution, 16 warmups and 96 accepted asynchronous GPU timer queries
+per round. No GPU disjoint or incomplete sample sets were accepted. The table reports the median
+of each round's **mean** GPU time; p95 columns are the median round p95. The raw result retains all
+rounds and construction times in [the evidence JSON](evidence/grass-carpet-gpu-2026-11-22.json).
+
+| Profile | 1100×720 mean / p95 (ms) | 2200×1440 mean / p95 (ms) | Median one-time construction (ms) |
+| --- | --- | --- | --- |
+| 5 | 2.592 / 5.460 | 5.012 / 6.903 | 0.2 |
+| 6 | 0.723 / 3.227 | 1.263 / 4.538 | 5.0 |
+| 7 | 0.803 / 3.073 | 1.229 / 4.269 | 5.0 |
+| 8 | 1.018 / 3.756 | 1.181 / 4.522 | 36.8 |
+
+The recorded GPU has scheduling noise and long tails; these are local measurements, not a universal
+speedup or minimum-hardware guarantee. The texture approaches reduce shader work in this test,
+while memory, a one-time texture bake/upload, and hardware-dependent texture bandwidth are the
+tradeoffs. Construction time excludes first GPU upload/compilation; those occur during warmup.
+The atlas's extra construction cost can be moved into an offline art pipeline if it is adopted.

@@ -148,6 +148,9 @@ const GRASS_SURVEY_PROFILES = Object.freeze([
   [3, "Painterly grass clumps", "Dense grouped grass clumps with coordinated swaying highlights."],
   [4, "Dry meadow", "Warm meadow grass and seed heads moving in a slower breeze."],
   [5, "Gusts and cloud shadows", "A textured grass carpet with broad gust fronts and passing shade."],
+  [6, "Continuous short weave", "A dense pre-baked grass weave with wind distortion and passing shade."],
+  [7, "Cross-woven carpet", "Two interleaved dense grass textures with layered wind motion and passing shade."],
+  [8, "Cached blade animation", "A dense eight-frame blade atlas animated beneath gusts and passing shade."],
 ].map(([grassTechnique, label, description]) => Object.freeze({
   id: `grass-survey-${grassTechnique}`,
   label,
