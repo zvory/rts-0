@@ -10,6 +10,14 @@
 
 /* Dao choices keep the path name readable and advertise actionable advances. */
 .cmd-btn.dao-choice .cmd-label { white-space: normal; line-height: 1.05; overflow: visible; }
+/* Pending choices remain clickable so players can choose a path ahead of research. */
+.cmd-btn.dao-awaiting-research .cmd-icon,
+.cmd-btn.dao-awaiting-research .cmd-label,
+.cmd-btn.dao-awaiting-research .cmd-hotkey,
+.cmd-btn.dao-awaiting-research .cmd-cost {
+  opacity: 0.38;
+  filter: grayscale(1);
+}
 .cmd-btn.dao-ready { animation: dao-radiance 1.3s ease-in-out infinite; border-color: #ffe59a; }
 @keyframes dao-radiance {
   0%, 100% { box-shadow: 0 0 4px 1px #ffdc7080, inset 0 0 7px #ffdc7020; }
