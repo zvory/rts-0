@@ -832,7 +832,9 @@ See [Cultivators](cultivators.md#three-dao-pavilion-prototype) for the approved 
 See [Dao evolution playtest](dao-insight.md). Entity-owned `insight` and `dao` persist
 through checkpoints. Visible Disciple snapshots append `insight` (compact slot 45) and
 `dao` (slot 46: lightness/war/magic). Evolution buttons set replaceable, entity-owned `chosenDao` intent (team-private compact slot 49), independent of orders. Codes 14–16 and order stages 22–24 retain their positions.
-Evolution automatically occurs once 60 insight is ready, without research or a Pavilion. Research ids are
+Evolution automatically occurs once 60 insight is ready, without research or a Pavilion.
+Evolution clears all insight and doubles the cap to 120. Evolved Disciples continue earning
+insight from actual hostile HP damage; reaching 120 has no effect and enables no further evolution. Research ids are
 `dao_of_lightness`, `dao_of_heaviness` (War), `dao_of_magic` (Magic).
 
 Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md). Lightness uses the base Disciple’s 0.75-tile sword reach, retaining 23 damage, 50% penetration, 43-tick cooldown, moving attacks, 2.7025 px/tick movement, and Dash. Its five-tile automatic engagement closes to melee reach. Magic uses a five-tile orb primary, retaining 23 damage, 50% penetration, and 64-tick cooldown, and stops to fire. Base/War are unchanged. `DAO_RANGED_RANGE_TILES` is mirrored in client config and range overlays.

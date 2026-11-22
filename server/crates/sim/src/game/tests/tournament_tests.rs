@@ -164,7 +164,8 @@ fn tournament_four_enter_ten_seconds_one_random_upgrade_rally_and_checkpoint() {
             )
         ));
         assert_eq!(e.hp, e.max_hp);
-        assert_eq!(e.insight, config::DISCIPLE_INSIGHT_REQUIRED);
+        assert_eq!(e.insight, 0);
+        assert_eq!(e.insight_cap(), 120);
         assert!(
             matches!(e.order(), Order::AttackMove(_)),
             "combat winners inherit rally orders"
