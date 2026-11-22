@@ -382,22 +382,6 @@ pub(in crate::game) fn combat_system(
                     .and_then(|entity| entity.order().attack_target())
                     == Some(tid));
         let target_in_weapon_range = dist >= min_range_px && dist <= range_px;
-        // A direct tank order can wait for its stationary range instead of spending that
-        // range by starting a chase. Fire eligibility still uses the current ramped range.
-        let wait_for_stationary_range = commanded_direct_target
-            && entities.get(id).is_some_and(|e| {
-                e.kind == EntityKind::Tank
-                    && dist
-                        <= projection::TANK_STATIONARY_RANGE_MAX_TILES * config::TILE_SIZE as f32
-                            + e.radius()
-                            + RANGE_SLACK
-            });
-        if commanded_direct_target && (target_in_weapon_range || wait_for_stationary_range) {
-            if let Some(e) = entities.get_mut(id) {
-                e.clear_path();
-                e.set_path_goal(None);
-            }
-        }
         let target_angle = (ty - py).det_atan2(tx - px);
         let holds_commanded_movement_path = entities
             .get(id)
@@ -434,6 +418,26 @@ pub(in crate::game) fn combat_system(
                 DirectFireLegality::AutoAcquire,
             )
         };
+        // A direct tank order can wait for its stationary range instead of spending that
+        // range by starting a chase. Fire eligibility still uses the current ramped range.
+        let wait_for_stationary_range = clear_shot
+            && commanded_direct_target
+            && entities.get(id).is_some_and(|e| {
+                e.kind == EntityKind::Tank
+                    && dist
+                        <= projection::TANK_STATIONARY_RANGE_MAX_TILES * config::TILE_SIZE as f32
+                            + e.radius()
+                            + RANGE_SLACK
+            });
+        if commanded_direct_target
+            && clear_shot
+            && (target_in_weapon_range || wait_for_stationary_range)
+        {
+            if let Some(e) = entities.get_mut(id) {
+                e.clear_path();
+                e.set_path_goal(None);
+            }
+        }
         let mut fired = false;
 
         if target_in_weapon_range && clear_shot {
@@ -491,7 +495,22 @@ pub(in crate::game) fn combat_system(
                 }
             }
             if (commanded_direct_target || auto_pursuit) && !wait_for_stationary_range {
-                coordinator.request_direct_attack_path(entities, id, tid, min_range_px, range_px);
+                // A blocked tank must close for a clear shot even inside its range annulus.
+                // Pursue the target until normal fire eligibility can stop the approach.
+                let pursuit_range_px = if !clear_shot
+                    && entities.get(id).is_some_and(|e| e.kind == EntityKind::Tank)
+                {
+                    0.0
+                } else {
+                    range_px
+                };
+                coordinator.request_direct_attack_path(
+                    entities,
+                    id,
+                    tid,
+                    min_range_px,
+                    pursuit_range_px,
+                );
             }
         }
         if fired {

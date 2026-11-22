@@ -117,3 +117,71 @@ fn rifleman_inside_forest_fires_outward_with_automatic_and_ordered_targets() {
         ), "rifleman should fire out of forest with {order}");
     }
 }
+
+#[test]
+fn ordered_tank_pursues_through_blocked_range_instead_of_waiting() {
+    // Cover both current weapon range and the outer stationary-range wait band,
+    // with and without an existing approach route.
+    for target_tile in [6, 14] {
+        for has_path in [false, true] {
+            for smoke in [false, true] {
+                let mut map = open_map(24);
+                map.concealment_tiles = vec![(4, 4)];
+                let start = map.tile_center(2, 4);
+                let end = map.tile_center(target_tile, 4);
+                let mut entities = EntityStore::new();
+                let tank = entities
+                    .spawn_unit(1, EntityKind::Tank, start.0, start.1)
+                    .unwrap();
+                let target = entities
+                    .spawn_unit(2, EntityKind::Tank, end.0, end.1)
+                    .unwrap();
+                let spotter = map.tile_center(target_tile, 7);
+                entities
+                    .spawn_unit(1, EntityKind::Worker, spotter.0, spotter.1)
+                    .unwrap();
+                let unit = entities.get_mut(tank).unwrap();
+                unit.set_order(Order::attack(target));
+                if has_path {
+                    unit.set_path(vec![end]);
+                    unit.set_path_goal(Some(end));
+                }
+                let mut smokes = SmokeCloudStore::new();
+                if smoke {
+                    smokes.spawn(start.0, start.1, 1.0, 100, 0).unwrap();
+                }
+                let hp = entities.get(target).unwrap().hp;
+                let events = run_combat_tick_on_map_with_seed_and_smokes(
+                    &mut entities,
+                    &[player_state(1, false), player_state(2, false)],
+                    &map,
+                    0,
+                    &smokes,
+                );
+                let unit = entities.get(tank).unwrap();
+                assert!(!unit.path_is_empty(), "blocked tank must have an approach: target={target_tile}, path={has_path}, smoke={smoke}");
+                assert!(
+                    matches!(unit.order(), Order::Attack(order) if order.execution.phase == AttackPhase::Pursuing)
+                );
+                assert_eq!(unit.order().attack_target(), Some(target));
+                assert_eq!(entities.get(target).unwrap().hp, hp);
+                assert!(!events
+                    .values()
+                    .flatten()
+                    .any(|event| matches!(event, Event::Attack { from, .. } if *from == tank)));
+
+                // Clearing the obstruction restores both normal firing and the outer
+                // stationary-range wait, without leaving the pursuit path active.
+                map.concealment_tiles.clear();
+                run_combat_tick_on_map(
+                    &mut entities,
+                    &[player_state(1, false), player_state(2, false)],
+                    &map,
+                );
+                let unit = entities.get(tank).unwrap();
+                assert!(unit.path_is_empty());
+                assert_eq!(unit.path_goal(), None);
+            }
+        }
+    }
+}
