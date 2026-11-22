@@ -1030,12 +1030,10 @@ withFakeHudDocument(({ FakeElement }) => {
 
   const portal = { id: 22, owner: 1, kind: KIND.PORTAL, buildProgress: null, state: STATE.IDLE, prodQueue: 0 };
   const portalCard = buildCommandCardDescriptors(commandCardCtx({ selection: [portal], entities: [portal], factionId: "cultivators", resources: { steel: 75, oil: 0 } }));
-  assert(portalCard.slots[0].label === "Novice" && portalCard.slots[0].hotkey === "Q" && portalCard.slots[0].enabled, "Cultivator Portal trains an affordable Novice from hotkey Q");
+  assert(portalCard.slots[0].label === "Novice" && portalCard.slots[0].hotkey === "Q" && portalCard.slots[0].enabled && !portalCard.slots[0].unaffordable, "Cultivator Portal trains an affordable Novice from hotkey Q");
   assert(portalCard.slots[0].cost.steel === 75 && STATS[KIND.WARRIOR].supply === 2, "Novice train descriptor exposes its 75-Steel and 2-Supply cost");
-  assert(!portalCard.slots[0].unaffordable, "Novice training is affordable at exactly 75 Steel");
   const unaffordablePortalCard = buildCommandCardDescriptors(commandCardCtx({ selection: [portal], entities: [portal], factionId: "cultivators", resources: { steel: 74, oil: 0 } }));
   assert(unaffordablePortalCard.slots[0].unaffordable, "Novice training waits for resources below 75 Steel");
-
   const pavilion = { ...portal, id: 23, kind: KIND.THREE_DAO_PAVILION };
   const pavilionCard = buildCommandCardDescriptors(commandCardCtx({ selection: [pavilion], entities: [pavilion], factionId: "cultivators", resources: { steel: 600, oil: 300 } }));
   for (const [index, label] of ["Dao of Lightness", "Dao of Magic", "Dao of War"].entries()) {
