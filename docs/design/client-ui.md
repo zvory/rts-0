@@ -2690,13 +2690,16 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   clock drives animation in matches and the Map Editor, and asset readiness
   includes the shader and textures. Shore distance supplies stepped visual depth without
   changing authoritative terrain.
-- The Lab-only `grass-survey-1` through `grass-survey-8` profiles pass a bounded
+- The Lab-only `grass-survey-1` through `grass-survey-11` profiles pass a bounded
   `grassTechnique` material selector through the worker compatibility adapter. These experimental
   meshes cover GRASS tiles only, live beneath decals/units/fog, use the visual capture clock,
   and release GPU resources on map replacement, profile removal, and renderer destruction.
   Profiles 6–8 bake continuous blade coverage into repeatable textures at map load, then animate
   a short weave, two interleaved weaves, or an eight-frame tip animation atlas with gust/shade fields.
   Density does not add per-frame blade objects or fragment neighbor searches.
+  Profiles 9–11 instead retain profile 5 blade/gust/shade parameters and sample one static,
+  low-frequency ground texture beneath those blades: mottled turf, brushed turf, or earth/moss.
+  These ground textures contain no blade carpet or time-varying grain.
   Normal matches do not allocate them. Their partly opaque ground treatment is a material study,
   not finished relief/shadow integration or a measured performance improvement.
 - Local lab visual profiles may pass renderer-only static samples to `Renderer.render`. Static

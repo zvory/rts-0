@@ -13,10 +13,10 @@ production-ready renderer architectures.
 | `grass-survey-4` | Dry meadow with taller blades and seed heads | Warm natural variation and slower-looking long stalks | Changes the biome/palette more substantially |
 | `grass-survey-5` | Mixed tuft carpet, coherent gusts, broad moving shade | Layered local motion and large-scale field movement | Most complex treatment; shade is decorative, not weather simulation |
 
-The selected direction is **5**, with a requested refinement: continuous grass coverage rather than
-isolated tufts over exposed ground. The follow-up profiles below retain its gust/shade direction
-while changing how dense blade detail is represented. These intentional visual changes are not
-pixel-parity optimizations of profile 5.
+The selected direction is **5**. After comparing the dense carpet studies (6–8), the current
+refinement keeps profile 5's distinct blades and enriches the static ground underneath them.
+Avoiding a fine moving carpet is a visual/video-compression preference, not a measured claim about
+YouTube's delivery pipeline. These are intentional visual studies, not pixel-parity optimizations.
 
 ## Reproduction
 
@@ -64,8 +64,8 @@ Overlapping source strokes fill every texture cell. Density is paid during one-t
 baking, rather than by adding runtime blade objects or repeated neighbor searches per fragment.
 All three update the material every presented frame; the atlas interpolates between authored
 poses instead of lowering presentation cadence. Profiles 6/7 move the sampled weave as a surface;
-profile 8 keeps source roots anchored while its baked tips bend. The latter is the preferred next
-candidate for natural-looking movement; the simple weave is the lower-memory alternative.
+profile 8 keeps source roots anchored while its baked tips bend. These are archived alternatives;
+the current direction returns to profile 5 with textured ground, as described below.
 These remain Lab studies with the original grass lighting/transition integration limitations.
 
 Reproduce using the same scene above and profiles 6, 7 or 8. Visual-clock phase is independent per
@@ -98,3 +98,35 @@ speedup or minimum-hardware guarantee. The texture approaches reduce shader work
 while memory, a one-time texture bake/upload, and hardware-dependent texture bandwidth are the
 tradeoffs. Construction time excludes first GPU upload/compilation; those occur during warmup.
 The atlas's extra construction cost can be moved into an offline art pipeline if it is adopted.
+
+
+## Textured ground beneath the original blades
+
+Profiles 9–11 retain profile 5's blade placement, count, root shadows, height, bending, gusts and
+moving cloud-shade parameters. Only the ground color source changes. Each variant bakes one
+256×256 RGBA ground texture covering a repeatable 512×512-world-pixel region, then samples it
+beneath the existing blades. There is no dense blade carpet, animated ground grain, or per-frame
+CPU ground generation. Each adds 256 KiB of base-level texels and a ground texture lookup; this
+study does not establish a new whole-frame performance result.
+
+| Profile | Ground treatment | Intent |
+| --- | --- | --- |
+| `grass-survey-9` | Olive/sage mottling with sparse irregular paint chips | Subtle visual breakup between tufts |
+| `grass-survey-10` | Flattened-turf brush marks over broad green variation | More visible surface texture while preserving blade silhouettes |
+| `grass-survey-11` | Muted earth/moss patches and coarse soil marks | Warmer, more weathered ground |
+
+The ground marks are static and subdued rather than numerous high-contrast moving strands.
+All existing Lab-only lighting/relief and shoreline-integration caveats still apply. Reproduce
+these clips using the same Classic seed, unit arrangement, camera and capture settings above.
+Profile 5 is recaptured as a reference; the independently started sessions have different visual
+clock phases, so compare material character rather than exact wind position.
+
+### Compression preview method
+
+Each six-second Interact source MP4 is also re-encoded at its native 1100×720, 30 FPS using
+`ffmpeg -i source.mp4 -c:v libx264 -preset slow -b:v 1200k -maxrate 1200k -bufsize 2400k
+-pix_fmt yuv420p -an compressed.mp4`. Paired preview WebMs show the high-quality source on the
+left and this constrained-bitrate H.264 result on the right. The WebM comparison itself uses a
+high-quality VP9 encode to preserve the visible differences. These are codec stress previews,
+not a reproduction, upload, or guarantee of YouTube's processing. Native source WebMs are retained
+separately so the texture can also be reviewed without the stress encode.
