@@ -186,7 +186,11 @@ export function commandCardAbilitiesForFaction(factionId) {
   return factionCatalog(factionId)
     .abilities
     .map((ability) => factionId === CULTIVATORS_FACTION_ID && ability === ABILITY.EKAT_TELEPORT
-      ? { ...ABILITIES[ability], rangeTiles: DAO_LIGHTNESS_DASH_RANGE_TILES }
+      ? {
+        ...ABILITIES[ability],
+        rangeTiles: DAO_LIGHTNESS_DASH_RANGE_TILES,
+        title: `Dash up to ${DAO_LIGHTNESS_DASH_RANGE_TILES} tiles, then recast to return`,
+      }
       : ABILITIES[ability])
     .filter((entry) => entry && entry.commandCard !== false);
 }
