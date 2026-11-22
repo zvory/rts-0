@@ -185,6 +185,30 @@ fn disciple_engagement_does_not_finish_queued_attack_move_at_approach_goal() {
 }
 
 #[test]
+fn disciple_queued_order_advances_at_original_goal_even_with_a_target() {
+    let (mut game, attacker, target) = fixture(EntityKind::Warrior, 32.0);
+    game.enqueue(
+        1,
+        Command::AttackMove {
+            units: vec![attacker],
+            x: 500.0,
+            y: 500.0,
+            queued: false,
+        },
+    );
+    game.tick();
+    let unit = game.state.entities.get_mut(attacker).unwrap();
+    assert_eq!(unit.target_id(), Some(target));
+    assert_eq!(unit.move_phase(), Some(MovePhase::Arrived));
+    assert_eq!(unit.path_goal(), unit.move_intent());
+    unit.append_queued_order(OrderIntent::move_to(900.0, 900.0));
+    game.tick();
+    let unit = game.state.entities.get(attacker).unwrap();
+    assert!(matches!(unit.order(), Order::Move(_)));
+    assert!(unit.queued_orders().is_empty());
+}
+
+#[test]
 fn engagement_range_defaults_to_current_attack_range_for_every_other_kind() {
     for kind in EntityKind::ALL {
         for range in [0.0, 0.5, 5.0, 14.0, 35.0] {

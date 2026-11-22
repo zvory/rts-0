@@ -355,9 +355,8 @@ fn ready_for_next_order(
             // A Disciple's temporary melee approach may arrive before its attack-move goal.
             let melee_engagement = e.kind == EntityKind::Warrior
                 && matches!(e.order(), Order::AttackMove(_))
-                && (e.target_id().is_some()
-                    || e.path_goal()
-                        .is_some_and(|goal| Some(goal) != e.move_intent()));
+                && e.path_goal()
+                    .is_some_and(|goal| Some(goal) != e.move_intent());
             !melee_engagement
                 && !e.queued_orders().is_empty()
                 && e.path_is_empty()
