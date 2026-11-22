@@ -121,12 +121,15 @@ fn rifleman_inside_forest_fires_outward_with_automatic_and_ordered_targets() {
 #[test]
 fn ordered_tank_pursues_through_blocked_range_instead_of_waiting() {
     // Cover both current weapon range and the outer stationary-range wait band,
-    // with and without an existing approach route.
+    // with and without an existing approach route. Exercise forest and smoke
+    // independently so neither obstruction can mask a regression in the other.
     for target_tile in [6, 14] {
         for has_path in [false, true] {
-            for smoke in [false, true] {
+            for (forest, smoke) in [(true, false), (false, true), (true, true)] {
                 let mut map = open_map(24);
-                map.concealment_tiles = vec![(4, 4)];
+                if forest {
+                    map.concealment_tiles = vec![(4, 4)];
+                }
                 let start = map.tile_center(2, 4);
                 let end = map.tile_center(target_tile, 4);
                 let mut entities = EntityStore::new();
@@ -159,7 +162,7 @@ fn ordered_tank_pursues_through_blocked_range_instead_of_waiting() {
                     &smokes,
                 );
                 let unit = entities.get(tank).unwrap();
-                assert!(!unit.path_is_empty(), "blocked tank must have an approach: target={target_tile}, path={has_path}, smoke={smoke}");
+                assert!(!unit.path_is_empty(), "blocked tank must have an approach: target={target_tile}, path={has_path}, forest={forest}, smoke={smoke}");
                 assert!(
                     matches!(unit.order(), Order::Attack(order) if order.execution.phase == AttackPhase::Pursuing)
                 );
@@ -173,7 +176,7 @@ fn ordered_tank_pursues_through_blocked_range_instead_of_waiting() {
                 // Clearing the obstruction restores both normal firing and the outer
                 // stationary-range wait, without leaving the pursuit path active.
                 map.concealment_tiles.clear();
-                run_combat_tick_on_map(
+                let events = run_combat_tick_on_map(
                     &mut entities,
                     &[player_state(1, false), player_state(2, false)],
                     &map,
@@ -181,6 +184,14 @@ fn ordered_tank_pursues_through_blocked_range_instead_of_waiting() {
                 let unit = entities.get(tank).unwrap();
                 assert!(unit.path_is_empty());
                 assert_eq!(unit.path_goal(), None);
+                let fired = events.values().flatten().any(
+                    |event| matches!(event, Event::Attack { from, to, .. } if *from == tank && *to == target),
+                );
+                assert_eq!(
+                    fired,
+                    target_tile == 6,
+                    "clear close targets should be fired on; distant targets must wait for the range ramp"
+                );
             }
         }
     }
