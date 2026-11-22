@@ -56,6 +56,9 @@ pub const DAO_LIGHTNESS_SPEED_MULTIPLIER: f32 = 1.38;
 pub const DISCIPLE_INSIGHT_REQUIRED: u32 = 60;
 pub const DISCIPLE_EVOLVED_INSIGHT_CAP: u32 = DISCIPLE_INSIGHT_REQUIRED * 2;
 pub const DAO_WAR_SPEED_MULTIPLIER: f32 = 1.05;
+/// Evolved paths retain their combat buffs independently of Novice base stats.
+pub const DAO_HP_BONUS: u32 = 23;
+pub const DAO_ATTACK_DAMAGE: u32 = 25;
 pub const DAO_WAR_HP_BONUS: u32 = 24;
 pub const DAO_WAR_DAMAGE_MULTIPLIER: f32 = 1.5;
 pub const DAO_WAR_ARMOR_REDUCTION: f32 = 0.5;

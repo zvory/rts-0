@@ -148,6 +148,7 @@ impl Entity {
             movement.tournament_target = None;
         }
         self.dao_advance_ticks = 15;
+        self.max_hp = self.max_hp.saturating_add(config::DAO_HP_BONUS);
         if self.dao == Some(UpgradeKind::DaoOfHeaviness) {
             self.max_hp = self.max_hp.saturating_add(config::DAO_WAR_HP_BONUS);
         }

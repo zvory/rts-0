@@ -19,7 +19,7 @@ fn warrior_sword_two_shots_rifleman_without_secondary_damage() {
         .set_order(Order::HoldPosition);
 
     let mut all_events = run_combat_tick(&mut entities);
-    assert_eq!(entities.get(rifleman).map(|unit| unit.hp), Some(20));
+    assert_eq!(entities.get(rifleman).map(|unit| unit.hp), Some(22));
 
     for _ in 0..combat_rules::attack_profile(EntityKind::Warrior).cooldown {
         let tick_events = run_combat_tick(&mut entities);
@@ -70,7 +70,7 @@ fn warrior_sword_applies_fifty_percent_armor_penetration() {
 
     run_combat_tick(&mut entities);
 
-    assert_eq!(entities.get(tank).map(|unit| unit.hp), Some(276));
+    assert_eq!(entities.get(tank).map(|unit| unit.hp), Some(278));
 }
 
 #[test]
@@ -350,7 +350,7 @@ fn dao_profiles_keep_lightness_melee_and_magic_ranged() {
                 0.75
             }
         );
-        assert_eq!(profile.dmg, if dao.is_some() { 38 } else { 25 });
+        assert_eq!(profile.dmg, if dao.is_some() { 38 } else { 23 });
         assert_eq!(profile.cooldown, 64);
         assert!(!can_fire_while_moving(&unit, false));
     }

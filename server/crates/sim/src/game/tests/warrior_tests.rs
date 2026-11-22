@@ -32,7 +32,7 @@ fn cultivator_portal_trains_warrior_and_reserves_two_supply() {
     );
     game.tick();
 
-    assert_eq!(game.state.players[0].steel, 0);
+    assert_eq!(game.state.players[0].steel, 25);
     assert_eq!(game.state.players[0].supply_used, 2);
     assert_eq!(
         game.state
@@ -55,7 +55,7 @@ fn cultivator_portal_trains_warrior_and_reserves_two_supply() {
         .iter()
         .find(|entity| entity.owner == 1 && entity.kind == EntityKind::Warrior)
         .expect("Portal should produce a Warrior");
-    assert_eq!((warrior.hp, warrior.max_hp), (138, 138));
+    assert_eq!((warrior.hp, warrior.max_hp), (115, 115));
     assert_eq!(warrior.radius(), 13.5);
     assert_eq!(warrior.movement_speed(), 2.4);
 }
@@ -946,7 +946,7 @@ fn disciple_pending_dao_advances_on_combat_insight_without_interrupting_attack()
     assert_eq!(entity.insight, 0);
     assert_eq!(entity.dao, Some(UpgradeKind::DaoOfHeaviness));
     assert!(matches!(entity.order(), Order::Attack(_)));
-    assert!(game.state.entities.get(target).unwrap().hp < 138);
+    assert!(game.state.entities.get(target).unwrap().hp < 115);
 }
 
 #[test]

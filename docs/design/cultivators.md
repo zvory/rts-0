@@ -50,13 +50,13 @@ remains deferred.
 
 The **Disciple** (internal entity id `warrior`) is a tanky Cultivator melee bruiser trained from a completed
 Portal. Its command-card description is: "Durable melee infantry with a short sword reach and 50% armor penetration. Slow
-attacks deal heavy damage." It costs 100 Steel and zero Oil, consumes 2 Supply, and takes 300 ticks
-(about 10 seconds) to train with no prerequisite. It has 138 HP, Small armor classification,
+attacks deal heavy damage." It costs 75 Steel and zero Oil, consumes 2 Supply, and takes 300 ticks
+(about 10 seconds) to train with no prerequisite. It has 115 HP, Small armor classification,
 11-tile sight, a 13.5 px collision/selection/render radius, and ordinary ground movement at 2.4
-px/tick. These values give it about 3.07 times Rifleman HP, 50% more speed, and 1.5 times the radius.
+px/tick. These values give it about 2.56 times Rifleman HP, 50% more speed, and 1.5 times the radius.
 
-Its sword has 0.75-tile reach beyond collision radii, deals 25 base damage, attacks every 64 ticks,
-and applies 50% armor penetration. The 25 damage makes two successful hits lethal to a 45-HP
+Its sword has 0.75-tile reach beyond collision radii, deals 23 base damage, attacks every 64 ticks,
+and applies 50% armor penetration. The 23 damage makes two successful hits lethal to a 45-HP
 Rifleman; the 64-tick cooldown interprets "half Rifleman attack speed" as half as many attacks per
 second. Idle and Attack Move use a separate five-tile engagement range (with normal attacker
 radius/range slack) to acquire and approach visible legal enemies. The sword still requires melee

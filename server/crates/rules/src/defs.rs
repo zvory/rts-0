@@ -139,13 +139,13 @@ pub const UNITS: &[UnitDef] = &[
     UnitDef {
         kind: EntityKind::Warrior,
         stats: balance::UnitStats {
-            hp: 138,
-            dmg: 25,
+            hp: 115,
+            dmg: 23,
             range_tiles: 0.75,
             cooldown: 64,
             speed: 2.4,
             sight_tiles: 11,
-            cost_steel: 100,
+            cost_steel: 75,
             cost_oil: 0,
             supply: 2,
             build_ticks: 300,

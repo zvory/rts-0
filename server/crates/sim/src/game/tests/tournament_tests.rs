@@ -457,8 +457,8 @@ fn tournament_portal_rally_trains_and_feeds_four_disciples_automatically() {
         .iter()
         .any(|e| e.kind == EntityKind::Warrior));
     assert_eq!(
-        game.state.players[0].steel, 600,
-        "only the four Portal training costs are paid"
+        game.state.players[0].steel, 700,
+        "only the four 75-Steel Portal training costs are paid"
     );
     for _ in 0..300 {
         game.tick();
