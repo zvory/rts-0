@@ -1,3 +1,4 @@
+import { reconcileShorelineLayer, destroyShorelineLayer } from "./shoreline.js";
 import { reconcileGrassLayer, destroyGrassLayer, updateTerrainMaterials } from "./grass.js";
 import { drawTankPointPreview } from "./tank_point_preview.js";
 import { ThrowSwordVisuals } from "./throw_sword_visuals.js";
@@ -633,7 +634,7 @@ export class Renderer {
     visualSamples = null,
     visualUnitOverrides = null,
     visualFrameStripOverrides = null,
-    visualGrassTechnique = 0,
+    visualGrassTechnique = 0, visualShorelineTechnique = 0,
     observerMapAnalysis = null,
     feedbackView: preparedFeedbackView = null,
     reconciledGroundDecals = null,
@@ -641,16 +642,15 @@ export class Renderer {
   } = {}) {
     this._beginRenderFrame();
     reconcileGrassLayer(this, visualGrassTechnique);
+    reconcileShorelineLayer(this, visualShorelineTechnique);
     this._profiler = profiler || null;
     const time = (label, fn) => profiler ? profiler.time(label, fn) : fn();
     // Drive the world container from the camera (single transform for all layers).
     this.world.position.set(-camera.x * camera.zoom, -camera.y * camera.zoom);
     this.world.scale.set(camera.zoom);
     time("renderer.doodads", () => this._doodads?.updateVisibility(camera));
-
     // Begin a fresh reconciliation pass.
     for (const key of Object.keys(this._seen)) this._seen[key].clear();
-
     let entities = [];
     let regularEntities = [];
     let shotReveals = [];
@@ -1370,6 +1370,7 @@ export class Renderer {
     this._gpuShadowTimer = null;
     this._doodads?.destroy();
     this._doodads = null;
+    destroyShorelineLayer(this);
     destroyGrassLayer(this, { releaseLighting: true });
     this._waterLayer?.destroy();
     this._waterLayer = null;
@@ -1385,7 +1386,6 @@ export class Renderer {
     this.app.destroy({ removeView: true }, { children: true, texture: true, textureSource: true });
   }
 }
-
 function destroyRendererTextureMap(map) {
   if (!map) return;
   for (const texture of map.values()) destroyRendererOwnedTexture(texture);

@@ -165,6 +165,15 @@ const GRASS_SURVEY_PROFILES = Object.freeze([
 
 const VISUAL_PROFILE_ENTRIES = Object.freeze([
   ...GRASS_SURVEY_PROFILES,
+  ...[
+    [1, "Autotiled sandy bank", "Neighbor-selected edge and corner masks with sand and pebbles."],
+    [2, "Muddy material splat", "Noisy alpha masks feather soil and stones into land and water."],
+    [3, "Distance-field swash", "A sandy wet/dry bank with animated shore-following wavelets."],
+  ].map(([shorelineTechnique, label, description]) => Object.freeze({
+    id: `shoreline-study-${shorelineTechnique}`, label, description, shorelineTechnique,
+    terrainPreviewReveal: true,
+    initialCamera: cameraSnapshot(2750, 1900, 1.5),
+  })),
   Object.freeze({
     id: "trench-variants-1",
     label: "Trench variants 1",
