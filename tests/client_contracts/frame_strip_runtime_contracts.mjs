@@ -17,7 +17,7 @@ import { sampleWeaponRecoilCycle } from "../../client/src/weapon_recoil_cycle.js
 
 // Sample the real sword clock: the Yari clip must finish in 400 ms even though
 // sword feedback remains active for 720 ms. Minimap and worker use this same context.
-const war = { id: 91, kind: KIND.WARRIOR, dao: "war", state: STATE.ATTACK,
+const war = { id: 91, kind: KIND.WAR_ADEPT, dao: "war", state: STATE.ATTACK,
   x: 100, y: 100, facing: 0, weaponFacing: 0 };
 const warMinimap = createMinimapAnimation();
 for (const [elapsed, expectedFrame, expectedStep] of [
@@ -487,7 +487,7 @@ function frameStripMovementFor(entity, previous, current, motion = new Map(), ti
 // order state. Displacement must keep the main renderer and minimap walking and
 // facing travel instead of snapping to an old weapon bearing.
 {
-  const entity = { id: 101, kind: KIND.WARRIOR, dao: "war", state: STATE.MOVE,
+  const entity = { id: 101, kind: KIND.WAR_ADEPT, dao: "war", state: STATE.MOVE,
     x: 100, y: 100, facing: Math.PI / 2, weaponFacing: 0 };
   const motion = new Map();
   const animation = createMinimapAnimation();

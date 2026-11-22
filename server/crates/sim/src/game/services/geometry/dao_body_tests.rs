@@ -11,7 +11,7 @@ fn war_smaller_body_controls_collision() {
         .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
         .unwrap();
     let unit = entities.get_mut(war).unwrap();
-    unit.dao = Some(crate::game::upgrade::UpgradeKind::DaoOfHeaviness);
+    unit.set_disciple_kind_for_test(EntityKind::WarAdept);
     assert!((unit.radius() - 9.45).abs() < 0.001);
     let body = unit_body_for_entity(unit).unwrap();
     assert!((body.bounding_radius() - unit.radius()).abs() < 0.001);
@@ -20,7 +20,10 @@ fn war_smaller_body_controls_collision() {
         unit_body_for_entity(entities.get(other).unwrap()).unwrap()
     )
     .is_none());
-    entities.get_mut(war).unwrap().dao = None;
+    entities
+        .get_mut(war)
+        .unwrap()
+        .set_disciple_kind_for_test(EntityKind::Warrior);
     assert!(unit_body_overlap(
         unit_body_for_entity(entities.get(war).unwrap()).unwrap(),
         unit_body_for_entity(entities.get(other).unwrap()).unwrap()

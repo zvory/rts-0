@@ -79,7 +79,7 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 7] = [
         hotkey: Some("X"),
         title:
             "Place a shield that absorbs 300 enemy damage to allied units; lasts up to 15 seconds",
-        carriers: &[EntityKind::Warrior],
+        carriers: &[EntityKind::MagicAdept],
         target_mode: AbilityTargetMode::WorldPoint,
         range_tiles: Some(balance::EKAT_MAGIC_ANCHOR_RANGE_TILES),
         min_range_tiles: None,
@@ -101,7 +101,7 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 7] = [
         icon: "⚔",
         hotkey: Some("E"),
         title: "Throw a spinning sword out and back; deals 40 damage outbound and 80 on return",
-        carriers: &[EntityKind::Warrior],
+        carriers: &[EntityKind::WarAdept],
         target_mode: AbilityTargetMode::WorldPoint,
         protocol_code: 18,
         order_stage_code: 26,

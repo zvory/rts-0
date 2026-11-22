@@ -11,12 +11,15 @@ pub(crate) struct DiscipleShield {
 }
 
 impl Entity {
-    pub(super) fn dao_body_scale(&self) -> f32 {
-        if self.kind == EntityKind::Warrior && self.dao == Some(UpgradeKind::DaoOfHeaviness) {
-            config::DAO_WAR_BODY_SCALE
-        } else {
-            1.0
-        }
+    pub(crate) fn dao(&self) -> Option<UpgradeKind> {
+        self.kind.dao()
+    }
+
+    // Isolated fixtures may switch identity without simulating insight or healing.
+    #[cfg(test)]
+    pub(in crate::game) fn set_disciple_kind_for_test(&mut self, kind: EntityKind) {
+        assert!(self.kind.is_disciple() && kind.is_disciple());
+        self.kind = kind;
     }
 
     pub(in crate::game) fn expire_shield(&mut self, tick: u32) {
@@ -52,7 +55,7 @@ impl Entity {
     }
 
     pub(crate) fn insight_cap(&self) -> u32 {
-        if self.dao.is_some() {
+        if self.dao().is_some() {
             config::DISCIPLE_EVOLVED_INSIGHT_CAP
         } else {
             config::DISCIPLE_INSIGHT_REQUIRED
@@ -61,7 +64,7 @@ impl Entity {
 
     /// Credit actual hostile HP loss after protection/overkill, at half rate for buildings.
     pub(in crate::game) fn gain_insight(&mut self, damage: u32, target_is_building: bool) {
-        if self.kind == EntityKind::Warrior {
+        if self.kind.is_disciple() {
             let damage = if target_is_building {
                 damage / 2
             } else {
@@ -80,17 +83,17 @@ impl Entity {
     }
 
     pub(crate) fn dao_ability_available(&self, ability: AbilityKind) -> bool {
-        if self.kind != EntityKind::Warrior {
+        if !self.kind.is_disciple() {
             return true;
         }
         match ability {
             AbilityKind::EvolveLightness | AbilityKind::EvolveWar | AbilityKind::EvolveMagic => {
-                self.dao.is_none() && self.insight >= config::DISCIPLE_INSIGHT_REQUIRED
+                self.dao().is_none() && self.insight >= config::DISCIPLE_INSIGHT_REQUIRED
             }
-            AbilityKind::ThrowSword => self.dao == Some(UpgradeKind::DaoOfHeaviness),
-            AbilityKind::EkatTeleport => self.dao == Some(UpgradeKind::DaoOfLightness),
+            AbilityKind::ThrowSword => self.dao() == Some(UpgradeKind::DaoOfHeaviness),
+            AbilityKind::EkatTeleport => self.dao() == Some(UpgradeKind::DaoOfLightness),
             AbilityKind::DiscipleShield | AbilityKind::EkatMagicAnchor => {
-                self.dao == Some(UpgradeKind::DaoOfMagic)
+                self.dao() == Some(UpgradeKind::DaoOfMagic)
             }
             _ => true,
         }
@@ -98,7 +101,7 @@ impl Entity {
 
     /// Persistent intent is independent of combat/movement orders and can be replaced.
     pub(in crate::game) fn choose_dao(&mut self, ability: AbilityKind) -> bool {
-        if self.kind != EntityKind::Warrior || self.hp == 0 || self.dao.is_some() {
+        if self.kind != EntityKind::Warrior || self.hp == 0 {
             return false;
         }
         self.chosen_dao = Some(match ability {
@@ -132,12 +135,12 @@ impl Entity {
             return false;
         }
         let attack_cd = self.attack_cd();
-        self.dao = Some(match ability {
-            AbilityKind::EvolveLightness => UpgradeKind::DaoOfLightness,
-            AbilityKind::EvolveWar => UpgradeKind::DaoOfHeaviness,
-            AbilityKind::EvolveMagic => UpgradeKind::DaoOfMagic,
+        self.kind = match ability {
+            AbilityKind::EvolveLightness => EntityKind::LightnessAdept,
+            AbilityKind::EvolveWar => EntityKind::WarAdept,
+            AbilityKind::EvolveMagic => EntityKind::MagicAdept,
             _ => return false,
-        });
+        };
         // Evolution changes the primary weapon without granting a free extra shot.
         self.set_attack_cd(attack_cd);
         self.chosen_dao = None;
@@ -148,15 +151,13 @@ impl Entity {
             movement.tournament_target = None;
         }
         self.dao_advance_ticks = 15;
-        if self.dao == Some(UpgradeKind::DaoOfHeaviness) {
-            self.max_hp = self.max_hp.saturating_add(config::DAO_WAR_HP_BONUS);
-        }
+        self.max_hp = config::unit_stats(self.kind).map_or(self.max_hp, |stats| stats.hp);
         self.hp = self.max_hp;
         true
     }
 
     pub(crate) fn dao_damage_after_armor(&self, damage: u32, penetration: f32) -> u32 {
-        if self.dao != Some(UpgradeKind::DaoOfHeaviness) {
+        if self.dao() != Some(UpgradeKind::DaoOfHeaviness) {
             return damage;
         }
         ((damage as f32)
@@ -165,12 +166,6 @@ impl Entity {
     }
 
     pub(crate) fn movement_speed(&self) -> f32 {
-        let base = config::unit_stats(self.kind).map_or(0.0, |s| s.speed);
-        match self.dao {
-            Some(UpgradeKind::DaoOfLightness) => config::dao_lightness_speed(),
-            Some(UpgradeKind::DaoOfHeaviness) => base * config::DAO_WAR_SPEED_MULTIPLIER,
-            Some(UpgradeKind::DaoOfMagic) => base * config::DAO_MAGIC_SPEED_MULTIPLIER,
-            _ => base,
-        }
+        config::unit_stats(self.kind).map_or(0.0, |s| s.speed)
     }
 }

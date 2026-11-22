@@ -49,7 +49,7 @@ const CHECKPOINT_SCHEMA: &str = "rts.gameCheckpoint";
 const CHECKPOINT_VERSION: u32 = rts_contract::GAME_CHECKPOINT_CURRENT_VERSION;
 // Version 6 stores physical positions as Q19.12 and uses pinned portable gameplay math.
 // Keep older payloads outside this boundary instead of silently guessing missing fields.
-const SIM_SCHEMA_VERSION: u32 = 6;
+const SIM_SCHEMA_VERSION: u32 = 7;
 const RULES_VERSION: u32 = 1;
 const PROTOCOL_VERSION: u32 = 1;
 const RNG_ALGORITHM: &str = "rts-xoshiro256pp-pcg32-rand086-draws-v1";

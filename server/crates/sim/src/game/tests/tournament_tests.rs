@@ -142,23 +142,19 @@ fn tournament_four_enter_five_seconds_one_random_upgrade_rally_and_checkpoint() 
         game.tick();
         restored.tick();
     }
-    assert!(!game
-        .state
-        .entities
-        .iter()
-        .any(|e| e.kind == EntityKind::Warrior));
+    assert!(!game.state.entities.iter().any(|e| e.kind.is_disciple()));
     game.tick();
     restored.tick();
     let winners: Vec<_> = game
         .state
         .entities
         .iter()
-        .filter(|e| e.kind == EntityKind::Warrior)
+        .filter(|e| e.kind.is_disciple())
         .collect();
     assert_eq!(winners.len(), 1, "one winner emerges at five seconds");
     for e in winners {
         assert!(matches!(
-            e.dao,
+            e.dao(),
             Some(
                 UpgradeKind::DaoOfLightness | UpgradeKind::DaoOfHeaviness | UpgradeKind::DaoOfMagic
             )
@@ -214,7 +210,11 @@ fn tournament_partial_capacity_rejects_specialists_enemies_and_cancels_entry() {
         .entities
         .spawn_unit(1, EntityKind::Warrior, 560.0, 650.0)
         .unwrap();
-    game.state.entities.get_mut(specialist).unwrap().dao = Some(UpgradeKind::DaoOfMagic);
+    game.state
+        .entities
+        .get_mut(specialist)
+        .unwrap()
+        .set_disciple_kind_for_test(EntityKind::MagicAdept);
     let enemy = game
         .state
         .entities
@@ -364,7 +364,7 @@ fn tournament_blocked_exits_keep_winners_until_legal_spawn_is_available() {
         game.state
             .entities
             .iter()
-            .filter(|e| e.kind == EntityKind::Warrior)
+            .filter(|e| e.kind.is_disciple())
             .count(),
         1
     );
@@ -451,11 +451,7 @@ fn tournament_portal_rally_trains_and_feeds_four_disciples_automatically() {
         4,
         "Portal graduates enter automatically without individual commands"
     );
-    assert!(!game
-        .state
-        .entities
-        .iter()
-        .any(|e| e.kind == EntityKind::Warrior));
+    assert!(!game.state.entities.iter().any(|e| e.kind.is_disciple()));
     assert_eq!(
         game.state.players[0].steel, 600,
         "only the four Portal training costs are paid"
@@ -467,10 +463,10 @@ fn tournament_portal_rally_trains_and_feeds_four_disciples_automatically() {
         .state
         .entities
         .iter()
-        .filter(|e| e.kind == EntityKind::Warrior)
+        .filter(|e| e.kind.is_disciple())
         .collect();
     assert_eq!(winners.len(), 1);
-    assert!(winners[0].dao.is_some());
+    assert!(winners[0].dao().is_some());
 }
 
 #[test]
@@ -504,7 +500,7 @@ fn tournament_busy_arrivals_wait_and_enter_the_next_intake() {
         game.state
             .entities
             .iter()
-            .filter(|e| e.kind == EntityKind::Warrior && e.dao.is_some())
+            .filter(|e| e.kind.is_disciple() && e.dao().is_some())
             .count(),
         1
     );
@@ -661,7 +657,7 @@ fn tournament_evolution_during_approach_clears_entry_without_stopping_movement()
     )
     .expect("an evolved entrant must remain checkpointable at the end of the tick");
     let unit = game.state.entities.get(disciple).unwrap();
-    assert_eq!(unit.dao, Some(UpgradeKind::DaoOfLightness));
+    assert_eq!(unit.dao(), Some(UpgradeKind::DaoOfLightness));
     assert_eq!(unit.movement.as_ref().unwrap().tournament_target, None);
     assert!(matches!(unit.order(), Order::Move(_)));
     game.tick();

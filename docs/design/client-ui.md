@@ -1596,7 +1596,7 @@ omits illegal build commands for those sites, and resumes on the far side; vehic
   `commandIssuer.issueCommand`. HUD selected-unit strip cells support direct selection refinement:
   left-click selects only that unit, Shift-click removes it from the selection, and Ctrl/Meta-click
   or control context-click filters the current selection to that unit kind. Base Novices and each
-  evolved Dao (War, Magic, Lightness) count as separate types for this filtering and world
+  evolved Dao (War, Magic, Lightness) have distinct authoritative unit kinds for this filtering and world
   Ctrl/Meta-click or double-click selection; a base Novice’s chosen future Dao does not split its
   type until evolution. This keeps base Novice Dao choices accessible without evolved abilities
   occupying their command-card slots. Unit command-card

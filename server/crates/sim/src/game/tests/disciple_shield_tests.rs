@@ -1,7 +1,6 @@
 use super::fixtures::*;
 use super::*;
 use crate::game::ability::AbilityKind;
-use crate::game::upgrade::UpgradeKind;
 
 fn setup() -> (Game, u32) {
     let player = PlayerInit {
@@ -23,7 +22,11 @@ fn setup() -> (Game, u32) {
         .entities
         .spawn_unit(1, EntityKind::Warrior, 400.0, 400.0)
         .unwrap();
-    game.state.entities.get_mut(caster).unwrap().dao = Some(UpgradeKind::DaoOfMagic);
+    game.state
+        .entities
+        .get_mut(caster)
+        .unwrap()
+        .set_disciple_kind_for_test(EntityKind::MagicAdept);
     game.state.entities.get_mut(caster).unwrap().insight = config::DISCIPLE_INSIGHT_REQUIRED;
     (game, caster)
 }

@@ -172,6 +172,9 @@ export const KIND = Object.freeze({
   RIFLEMAN: "rifleman",
   PANZERFAUST: "panzerfaust",
   WARRIOR: "warrior",
+  LIGHTNESS_ADEPT: "lightness_adept",
+  WAR_ADEPT: "war_adept",
+  MAGIC_ADEPT: "magic_adept",
   MACHINE_GUNNER: "machine_gunner",
   ANTI_TANK_GUN: "anti_tank_gun",
   MORTAR_TEAM: "mortar_team",
@@ -208,6 +211,9 @@ export const UNIT_KINDS = Object.freeze([
   KIND.RIFLEMAN,
   KIND.PANZERFAUST,
   KIND.WARRIOR,
+  KIND.LIGHTNESS_ADEPT,
+  KIND.WAR_ADEPT,
+  KIND.MAGIC_ADEPT,
   KIND.MACHINE_GUNNER,
   KIND.ANTI_TANK_GUN,
   KIND.MORTAR_TEAM,
@@ -391,6 +397,9 @@ export const KIND_CODE = Object.freeze({
   [KIND.PROVEN_GROUNDS]: 33,
   [KIND.SHOP]: 34,
   [KIND.WARRIOR]: 29,
+  [KIND.LIGHTNESS_ADEPT]: 35,
+  [KIND.WAR_ADEPT]: 36,
+  [KIND.MAGIC_ADEPT]: 37,
   [KIND.DEPOT]: 7,
   [KIND.BARRACKS]: 8,
   [KIND.TRAINING_CENTRE]: 9,
@@ -620,4 +629,17 @@ function reverseCodes(table) {
   const out = {};
   for (const [name, code] of Object.entries(table)) out[code] = name;
   return out;
+}
+
+export function daoForKind(kind) {
+  switch (kind) {
+    case KIND.LIGHTNESS_ADEPT: return "lightness";
+    case KIND.WAR_ADEPT: return "war";
+    case KIND.MAGIC_ADEPT: return "magic";
+    default: return null;
+  }
+}
+
+export function isDiscipleKind(kind) {
+  return kind === KIND.WARRIOR || daoForKind(kind) !== null;
 }

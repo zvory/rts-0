@@ -499,7 +499,7 @@ await withFakeDocument(async () => {
   );
   assertDeepEqual(
     labSpawnUnitKindsForFaction("cultivators"),
-    [KIND.WORKER, KIND.WARRIOR],
+    [KIND.WORKER, KIND.WARRIOR, KIND.LIGHTNESS_ADEPT, KIND.WAR_ADEPT, KIND.MAGIC_ADEPT],
     "LabPanel and Interact expose the Cultivator Warrior spawn kind",
   );
   assertDeepEqual(
@@ -1045,9 +1045,10 @@ await withFakeDocument(async () => {
   assert(buttonByText("Novice"), "Cultivator palette includes the base Novice");
   for (const dao of ["lightness", "war", "magic"]) {
     buttonByText(`${dao[0].toUpperCase() + dao.slice(1)} Adept`).listeners.click();
-    assert(armedTool.payload.dao === dao, "Adept selection retains its Dao");
+    const kind = ({ lightness: KIND.LIGHTNESS_ADEPT, war: KIND.WAR_ADEPT, magic: KIND.MAGIC_ADEPT })[dao];
+    assert(armedTool.payload.kind === kind, "Adept selection uses its authoritative kind");
     armedCallbacks.onWorldClick({ tool: { ...armedTool }, x: 128, y: 160 });
-    assert(sent.at(-1).op.dao === dao && sent.at(-1).op.factionId === "cultivators" && sent.at(-1).op.owner === 2,
+    assert(sent.at(-1).op.kind === kind && sent.at(-1).op.factionId === "cultivators" && sent.at(-1).op.owner === 2,
       "P2 Cultivator spawn transmits faction and specialization to the authority");
     resolveLastLabResult({ outcome: { entityId: 90 } });
   }

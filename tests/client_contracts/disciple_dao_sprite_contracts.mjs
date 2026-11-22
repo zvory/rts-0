@@ -14,21 +14,21 @@ import { selectionProxyForEntity } from "../../client/src/input/selection_projec
 import { selectionBudgetGridModel } from "../../client/src/hud_selection_panel.js";
 
 import { entityAttackRangeTiles, DAO_WAR_RANGE_TILES, DAO_WAR_BODY_SCALE, entityBodyRadius } from "../../client/src/config.js";
-assert.equal(entityAttackRangeTiles({ kind: KIND.WARRIOR, dao: "war" }), DAO_WAR_RANGE_TILES);
+assert.equal(entityAttackRangeTiles({ kind: KIND.WAR_ADEPT, dao: "war" }), DAO_WAR_RANGE_TILES);
 assert.equal(DAO_WAR_RANGE_TILES, 1.75);
-assert.equal(entityBodyRadius({ kind: KIND.WARRIOR, dao: "war" }), 13.5 * DAO_WAR_BODY_SCALE);
+assert.equal(entityBodyRadius({ kind: KIND.WAR_ADEPT, dao: "war" }), 13.5 * DAO_WAR_BODY_SCALE);
 assert.equal(entityBodyRadius({ kind: KIND.WARRIOR }), 13.5);
-const bodySubject = { id: 75, kind: KIND.WARRIOR, dao: "war", x: 100, y: 100 };
+const bodySubject = { id: 75, kind: KIND.WAR_ADEPT, dao: "war", x: 100, y: 100 };
 assert.equal(circularBodyRadius(bodySubject), 13.5 * DAO_WAR_BODY_SCALE);
 assert.equal(pointHitsBodyCircle(bodySubject, 110, 100, 0), false);
-assert.equal(pointHitsBodyCircle({ ...bodySubject, dao: undefined }, 110, 100, 0), true);
+assert.equal(pointHitsBodyCircle({ ...bodySubject, kind: KIND.WARRIOR, dao: undefined }, 110, 100, 0), true);
 assert.equal(selectionProxyForEntity(bodySubject).footprint.radiusPx, 13.5 * DAO_WAR_BODY_SCALE);
 const formationPoints = [{ x: 300, y: 300 }, { x: 364, y: 300 }];
 const formationUnits = Array.from({ length: 3 }, (_, index) =>
   ({ ...bodySubject, id: index + 1, y: 100 + index * 40 }));
 assert.ok(buildFormationLinePreview(formationPoints, formationUnits).slots.every(slot => slot.y === 300));
 assert.ok(buildFormationLinePreview(formationPoints, formationUnits.map(unit =>
-  ({ ...unit, dao: undefined }))).slots.some(slot => slot.y !== 300));
+  ({ ...unit, kind: KIND.WARRIOR, dao: undefined }))).slots.some(slot => slot.y !== 300));
 const rustUpgrades = fs.readFileSync(new URL("../../server/crates/rules/src/balance/upgrades.rs", import.meta.url), "utf8");
 for (const [name, value] of [["DAO_WAR_BODY_SCALE", DAO_WAR_BODY_SCALE], ["DAO_WAR_RANGE_TILES", DAO_WAR_RANGE_TILES]]) {
   assert.equal(Number(rustUpgrades.match(new RegExp(`pub const ${name}: f32 = ([0-9.]+);`))[1]), value);
@@ -38,7 +38,7 @@ assert.ok(Math.abs(WAR_PNG_FRAME_STRIP.worldScale - 0.56) < 1e-8);
 assert.equal(entityAttackRangeTiles({ kind: KIND.WARRIOR }), 0.75);
 const strips = createLiveFrameStrips();
 for (const dao of [undefined]) {
-  const entity = { kind: KIND.WARRIOR, dao };
+  const entity = { kind: ({ lightness: KIND.LIGHTNESS_ADEPT, war: KIND.WAR_ADEPT, magic: KIND.MAGIC_ADEPT })[dao] || KIND.WARRIOR, dao };
   assert.equal(liveFrameStripFor(strips, liveFrameStripKeyForEntity(entity)), WARRIOR_PNG_FRAME_STRIP);
   assert.match(liveUnitIconMarkupFor(entity.kind, { dao }), /warrior-runtime-strip/);
 }
@@ -48,7 +48,7 @@ for (const [dao, strip, weaponKind] of [
   ["magic", MAGIC_PNG_FRAME_STRIP, "disciple_orb"],
   ["war", WAR_PNG_FRAME_STRIP, "warrior_sword"],
 ]) {
-  const entity = { id: 90, kind: KIND.WARRIOR, dao, state: STATE.MOVE,
+  const entity = { id: 90, kind: ({ lightness: KIND.LIGHTNESS_ADEPT, war: KIND.WAR_ADEPT, magic: KIND.MAGIC_ADEPT })[dao] || KIND.WARRIOR, dao, state: STATE.MOVE,
     x: 10, y: 10, facing: 0.3, weaponFacing: 1.2 };
   assert.equal(liveFrameStripFor(strips, liveFrameStripKeyForEntity(entity)), strip);
   const png = PNG.sync.read(fs.readFileSync(new URL(`../../${strip.source.runtimeStrip}`, import.meta.url)));
@@ -77,15 +77,15 @@ for (const [dao, strip, weaponKind] of [
   assert.equal(frameStripFrameIndex(strip, { ...entity, state: STATE.IDLE },
     { ...context, frameStripMoving: false }), 0);
   assert.match(liveUnitIconMarkupFor(entity.kind, { dao }), new RegExp(dao === "lightness" ? "lightness-melee-b-runtime-strip" : dao === "war" ? "war-yari-runtime-strip" : "magic-runtime-strip"));
-  assert.match(liveUnitIconMarkupFor(entity.kind, { minimapPart: `dao-${dao}:frame:2` }),
+  assert.match(liveUnitIconMarkupFor(entity.kind, { minimapPart: `frame:2` }),
     new RegExp(dao === "lightness" ? "lightness-melee-b-runtime-strip" : dao === "war" ? "war-yari-runtime-strip" : "magic-runtime-strip"));
   minimap.beginFrame([entity], {}, 600);
-  assert.match(minimap.layers(entity)[0].part, new RegExp(`^dao-${dao}:frame:`));
-  assert.ok(minimap.parts(KIND.WARRIOR).includes(`dao-${dao}:frame:${strip.frameCount - 1}`));
+  assert.match(minimap.layers(entity)[0].part, /^frame:/);
+  assert.ok(minimap.parts(entity.kind).includes(`frame:${strip.frameCount - 1}`));
   assert.equal(selectionBudgetGridModel([entity]).blocks[0].dao, dao);
 }
 // The step is presentation-only, bounded, and returns exactly to the authoritative pivot.
-const warEntity = { id: 91, kind: KIND.WARRIOR, dao: "war", x: 100, y: 100, facing: Math.PI / 2 };
+const warEntity = { id: 91, kind: KIND.WAR_ADEPT, dao: "war", x: 100, y: 100, facing: Math.PI / 2 };
 const unchanged = structuredClone(warEntity);
 for (const [phase, expected] of [[0, 0], [0.2, -2.88], [0.5, 16], [0.7, 16], [1, 0]]) {
   const context = { recoilProgress: 1, recoilPhase: phase * WAR_PNG_FRAME_STRIP.firingFrameHoldPhase,

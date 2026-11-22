@@ -16,10 +16,13 @@ mod tests {
     use super::*;
     use rts_rules::faction::{AbilityKind, UpgradeKind};
 
-    const PROTOCOL_KIND_IDS: [&str; 34] = [
+    const PROTOCOL_KIND_IDS: [&str; 37] = [
         kinds::WORKER,
         kinds::GOLEM,
         kinds::WARRIOR,
+        kinds::LIGHTNESS_ADEPT,
+        kinds::WAR_ADEPT,
+        kinds::MAGIC_ADEPT,
         kinds::RIFLEMAN,
         kinds::PANZERFAUST,
         kinds::MACHINE_GUNNER,
@@ -122,3 +125,6 @@ mod tests {
         );
     }
 }
+
+// Novice warrior (29) evolves into distinct kinds lightness_adept (35), war_adept (36),
+// or magic_adept (37). EntityView.dao is derived presentation metadata, not engine identity.

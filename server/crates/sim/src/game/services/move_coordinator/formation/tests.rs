@@ -851,15 +851,16 @@ fn formation_goal_accepts_side_on_tank_tile_center_near_building() {
 
 #[test]
 fn war_polyline_uses_evolved_radius_for_rank_count() {
-    use crate::game::upgrade::UpgradeKind;
-
     let mut entities = EntityStore::new();
     let ids = (0..3)
         .map(|index| {
             let id = entities
                 .spawn_unit(1, EntityKind::Warrior, 100.0, 100.0 + index as f32 * 40.0)
                 .unwrap();
-            entities.get_mut(id).unwrap().dao = Some(UpgradeKind::DaoOfHeaviness);
+            entities
+                .get_mut(id)
+                .unwrap()
+                .set_disciple_kind_for_test(EntityKind::WarAdept);
             id
         })
         .collect::<Vec<_>>();
@@ -873,7 +874,10 @@ fn war_polyline_uses_evolved_radius_for_rank_count() {
     );
 
     for id in &ids {
-        entities.get_mut(*id).unwrap().dao = None;
+        entities
+            .get_mut(*id)
+            .unwrap()
+            .set_disciple_kind_for_test(EntityKind::Warrior);
     }
     let units = super::super::formation_units(&entities, 1, &ids);
     let slots = polyline_slots(&units, &points);

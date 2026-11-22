@@ -353,7 +353,7 @@ fn ready_for_next_order(
         Order::Idle | Order::HoldPosition => !e.queued_orders().is_empty() && e.path_is_empty(),
         Order::Move(_) | Order::AttackMove(_) => {
             // A Disciple's temporary melee approach may arrive before its attack-move goal.
-            let melee_engagement = e.kind == EntityKind::Warrior
+            let melee_engagement = e.kind.is_disciple()
                 && matches!(e.order(), Order::AttackMove(_))
                 && e.path_goal()
                     .is_some_and(|goal| Some(goal) != e.move_intent());

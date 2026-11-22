@@ -44,7 +44,13 @@ fn send(
         .entities
         .spawn_unit(owner, kind, 560.0, 624.0)
         .unwrap();
-    game.state.entities.get_mut(unit).unwrap().dao = dao;
+    if let Some(dao) = dao {
+        game.state
+            .entities
+            .get_mut(unit)
+            .unwrap()
+            .set_disciple_kind_for_test(EntityKind::evolved_disciple(dao).unwrap());
+    }
     let b = game.state.entities.get(building).unwrap();
     game.enqueue(
         owner,
@@ -181,20 +187,16 @@ fn paid_dao_training_mixed_queue_exact_duration_supply_rally_checkpoint_and_canc
         game.tick();
         restored.tick();
     }
-    assert!(!game
-        .state
-        .entities
-        .iter()
-        .any(|e| e.kind == EntityKind::Warrior));
+    assert!(!game.state.entities.iter().any(|e| e.kind.is_disciple()));
     game.tick();
     restored.tick();
     let output = game
         .state
         .entities
         .iter()
-        .find(|e| e.kind == EntityKind::Warrior)
+        .find(|e| e.kind.is_disciple())
         .unwrap();
-    assert_eq!(output.dao, Some(UpgradeKind::DaoOfLightness));
+    assert_eq!(output.dao(), Some(UpgradeKind::DaoOfLightness));
     assert_eq!(output.insight, 0);
     assert_eq!(output.insight_cap(), 120);
     assert_eq!(output.hp, output.max_hp);
@@ -230,14 +232,14 @@ fn paid_dao_training_mixed_queue_exact_duration_supply_rally_checkpoint_and_canc
         game.state
             .entities
             .iter()
-            .any(|e| e.dao == Some(UpgradeKind::DaoOfHeaviness) && e.max_hp == war_hp),
+            .any(|e| e.dao() == Some(UpgradeKind::DaoOfHeaviness) && e.max_hp == war_hp),
         "expected War output; production={:?}; units={:?}",
         game.state.entities.get(grounds).unwrap().prod_queue(),
         game.state
             .entities
             .iter()
-            .filter(|e| e.kind == EntityKind::Warrior)
-            .map(|e| (e.id, e.dao, e.hp, e.max_hp, e.pos_x(), e.pos_y()))
+            .filter(|e| e.kind.is_disciple())
+            .map(|e| (e.id, e.dao(), e.hp, e.max_hp, e.pos_x(), e.pos_y()))
             .collect::<Vec<_>>()
     );
     assert!(plans(&game, grounds).is_empty());
@@ -287,7 +289,7 @@ fn paid_dao_training_destroyed_building_loses_trainee_without_refund_and_hides_p
         .state
         .entities
         .iter()
-        .any(|e| e.owner == 1 && e.kind == EntityKind::Warrior));
+        .any(|e| e.owner == 1 && e.kind.is_disciple()));
 }
 
 #[test]
@@ -324,7 +326,7 @@ fn paid_dao_training_blocked_exit_holds_completed_trainee_and_reservation() {
         game.state
             .entities
             .iter()
-            .filter(|e| e.dao == Some(UpgradeKind::DaoOfMagic))
+            .filter(|e| e.dao() == Some(UpgradeKind::DaoOfMagic))
             .count(),
         1
     );
@@ -366,9 +368,9 @@ fn paid_dao_training_queue_is_bounded_and_portal_rally_supplies_the_input() {
         .state
         .entities
         .iter()
-        .find(|e| e.dao.is_some())
+        .find(|e| e.dao().is_some())
         .unwrap();
-    assert_eq!(output.dao, Some(UpgradeKind::DaoOfMagic));
+    assert_eq!(output.dao(), Some(UpgradeKind::DaoOfMagic));
     assert_eq!(game.state.players[0].oil, 200);
     assert_eq!(
         plans(&game, grounds).len(),
@@ -379,5 +381,5 @@ fn paid_dao_training_queue_is_bounded_and_portal_rally_supplies_the_input() {
         .state
         .entities
         .iter()
-        .any(|e| e.kind == EntityKind::Warrior && e.dao.is_none()));
+        .any(|e| e.kind.is_disciple() && e.dao().is_none()));
 }

@@ -64,6 +64,9 @@ pub mod kinds {
     pub const WORKER: &str = "worker";
     pub const GOLEM: &str = "golem";
     pub const WARRIOR: &str = "warrior";
+    pub const LIGHTNESS_ADEPT: &str = "lightness_adept";
+    pub const WAR_ADEPT: &str = "war_adept";
+    pub const MAGIC_ADEPT: &str = "magic_adept";
     pub const RIFLEMAN: &str = "rifleman";
     pub const PANZERFAUST: &str = "panzerfaust";
     pub const MACHINE_GUNNER: &str = "machine_gunner";
@@ -398,6 +401,9 @@ const KIND_CODES: &[(&str, u8)] = &[
     (kinds::WORKER, 1),
     (kinds::GOLEM, 22),
     (kinds::WARRIOR, 29),
+    (kinds::LIGHTNESS_ADEPT, 35),
+    (kinds::WAR_ADEPT, 36),
+    (kinds::MAGIC_ADEPT, 37),
     (kinds::RIFLEMAN, 2),
     (kinds::PANZERFAUST, 24),
     (kinds::MACHINE_GUNNER, 3),
@@ -747,6 +753,9 @@ fn kind_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("WORKER", kinds::WORKER),
         ("GOLEM", kinds::GOLEM),
         ("WARRIOR", kinds::WARRIOR),
+        ("LIGHTNESS_ADEPT", kinds::LIGHTNESS_ADEPT),
+        ("WAR_ADEPT", kinds::WAR_ADEPT),
+        ("MAGIC_ADEPT", kinds::MAGIC_ADEPT),
         ("RIFLEMAN", kinds::RIFLEMAN),
         ("PANZERFAUST", kinds::PANZERFAUST),
         ("MACHINE_GUNNER", kinds::MACHINE_GUNNER),

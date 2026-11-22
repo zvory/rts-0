@@ -29,7 +29,7 @@ pub const TANK_ARMOR_REACTION_MAX_PIVOT_RAD: f32 = std::f32::consts::PI * 4.0 / 
 /// Disciples alone can acquire a target beyond their weapon's reach and approach it.
 pub fn engagement_range_tiles(kind: EntityKind, attack_range_tiles: f32) -> f32 {
     match kind {
-        EntityKind::Warrior => {
+        kind if kind.is_disciple() => {
             crate::balance::DISCIPLE_ENGAGEMENT_RANGE_TILES.max(attack_range_tiles)
         }
         _ => attack_range_tiles,
@@ -332,7 +332,10 @@ pub fn default_weapon_kind(kind: EntityKind) -> Option<WeaponKind> {
     match kind {
         EntityKind::Worker => Some(WeaponKind::WorkerTools),
         EntityKind::Golem => Some(WeaponKind::GolemFists),
-        EntityKind::Warrior => Some(WeaponKind::WarriorSword),
+        EntityKind::Warrior | EntityKind::LightnessAdept | EntityKind::WarAdept => {
+            Some(WeaponKind::WarriorSword)
+        }
+        EntityKind::MagicAdept => Some(WeaponKind::DiscipleOrb),
         EntityKind::Rifleman | EntityKind::Panzerfaust => Some(WeaponKind::RiflemanRifle),
         EntityKind::MachineGunner => Some(WeaponKind::MachineGunnerMg),
         EntityKind::AntiTankGun => Some(WeaponKind::AntiTankGun),
@@ -366,17 +369,6 @@ pub fn default_weapon_kind(kind: EntityKind) -> Option<WeaponKind> {
     }
 }
 
-/// Resolve the primary weapon after permanent Disciple specialization.
-pub fn resolved_weapon_kind(
-    kind: EntityKind,
-    dao: Option<crate::faction::UpgradeKind>,
-) -> Option<WeaponKind> {
-    if kind == EntityKind::Warrior && dao == Some(crate::faction::UpgradeKind::DaoOfMagic) {
-        return Some(WeaponKind::DiscipleOrb);
-    }
-    default_weapon_kind(kind)
-}
-
 pub fn default_weapon_profile(kind: EntityKind) -> Option<&'static WeaponProfile> {
     default_weapon_kind(kind).and_then(weapon_profile)
 }
@@ -393,6 +385,15 @@ pub fn default_target_priority_policy(kind: EntityKind) -> TargetPriorityPolicyI
 
 /// Returns the attack profile for the given kind, or zeroes if non-combatant.
 pub fn attack_profile(kind: EntityKind) -> AttackProfile {
+    if kind.is_disciple() {
+        return crate::balance::unit_stats(kind).map_or(AttackProfile::NONE, |stats| {
+            AttackProfile {
+                range_tiles: stats.range_tiles,
+                dmg: stats.dmg,
+                cooldown: stats.cooldown,
+            }
+        });
+    }
     default_weapon_profile(kind)
         .map(WeaponProfile::attack_profile)
         .unwrap_or(AttackProfile::NONE)
@@ -837,6 +838,9 @@ mod tests {
             (EntityKind::Worker, Some(WeaponKind::WorkerTools)),
             (EntityKind::Golem, Some(WeaponKind::GolemFists)),
             (EntityKind::Warrior, Some(WeaponKind::WarriorSword)),
+            (EntityKind::LightnessAdept, Some(WeaponKind::WarriorSword)),
+            (EntityKind::WarAdept, Some(WeaponKind::WarriorSword)),
+            (EntityKind::MagicAdept, Some(WeaponKind::DiscipleOrb)),
             (EntityKind::Rifleman, Some(WeaponKind::RiflemanRifle)),
             (EntityKind::Panzerfaust, Some(WeaponKind::RiflemanRifle)),
             (EntityKind::MachineGunner, Some(WeaponKind::MachineGunnerMg)),
@@ -898,11 +902,14 @@ mod tests {
             assert_eq!(weapon_class(kind), expected_class, "{kind} weapon class");
 
             if let Some(profile) = default_weapon_profile(kind) {
-                assert_eq!(
-                    profile.attack_profile(),
-                    expected_profile,
-                    "{kind} profile attack values"
-                );
+                // Adepts share weapon mechanics but resolve attack values from their unit definition.
+                if kind.dao().is_none() {
+                    assert_eq!(
+                        profile.attack_profile(),
+                        expected_profile,
+                        "{kind} profile attack values"
+                    );
+                }
                 assert_eq!(
                     profile.weapon_class, expected_class,
                     "{kind} profile weapon class"

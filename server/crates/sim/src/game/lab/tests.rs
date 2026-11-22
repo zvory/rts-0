@@ -1158,7 +1158,7 @@ fn lab_cultivator_spawns_set_owner_faction_and_initialize_each_dao() {
             panic!("spawn outcome")
         };
         let entity = game.state.entities.get(entity_id).expect("spawned entity");
-        assert_eq!(entity.dao, Some(upgrade));
+        assert_eq!(entity.dao(), Some(upgrade));
         assert_eq!(entity.hp, entity.max_hp);
         assert_eq!(entity.dao_advance_ticks, 0);
         assert_eq!(
@@ -1274,7 +1274,7 @@ fn lab_p2_base_novice_can_evolve_after_cultivator_spawn() {
     .unwrap();
     game.tick();
     assert_eq!(
-        game.state.entities.get(entity_id).unwrap().dao,
+        game.state.entities.get(entity_id).unwrap().dao(),
         Some(UpgradeKind::DaoOfMagic)
     );
 }

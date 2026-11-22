@@ -324,6 +324,9 @@ fn is_combat_unit(kind: EntityKind) -> bool {
         | EntityKind::Ekat => true,
         EntityKind::Worker
         | EntityKind::Warrior
+        | EntityKind::LightnessAdept
+        | EntityKind::WarAdept
+        | EntityKind::MagicAdept
         | EntityKind::ScoutPlane
         | EntityKind::Golem
         | EntityKind::ResourceDepot
