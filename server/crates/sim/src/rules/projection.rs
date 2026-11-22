@@ -378,6 +378,14 @@ pub fn project_entity(
         view.setup_facing = entity.emplacement_facing();
     }
 
+    if entity.kind == EntityKind::ProvenGrounds && owner_or_ally {
+        view.dao_training_queue = entity.production.as_ref().map(|p| {
+            p.dao_training_queue
+                .iter()
+                .map(|dao| dao.to_protocol_str().to_string())
+                .collect()
+        });
+    }
     if entity.kind == EntityKind::TournamentGrounds && owner_or_ally {
         view.tournament_entrants = entity.production.as_ref().map(|p| p.tournament_entrants);
     }

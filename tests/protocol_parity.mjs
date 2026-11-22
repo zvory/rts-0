@@ -341,7 +341,7 @@ assert(
   "compact snapshot scalar schema must match JS decoder",
 );
 assert(
-  protocolContract.compactSlotSchemas.entity.at(-1).name === "chosenDao",
+  protocolContract.compactSlotSchemas.entity.at(-1).name === "daoTrainingQueue",
   "compact entity slot schema must include the latest appended field",
 );
 assert(
@@ -801,3 +801,13 @@ assert(tournamentSnapshot.entities[0].kind === KIND.TOURNAMENT_GROUNDS,
   "Tournament Grounds compact kind round trips");
 assert(tournamentSnapshot.entities[0].tournamentEntrants === 3,
   "compact tournament entrant count decodes at slot 50");
+
+const paidTrainingRecord = [...tournamentRecord];
+paidTrainingRecord[2] = KIND_CODE[KIND.PROVEN_GROUNDS];
+paidTrainingRecord[50] = null;
+paidTrainingRecord[51] = [UPGRADE.DAO_OF_MAGIC, UPGRADE.DAO_OF_HEAVINESS];
+const paidTrainingSnapshot = decodeServerMessage({t: "snapshot", v: COMPACT_SNAPSHOT_VERSION,
+  s: [1, 0, 0, 2, 10], e: [paidTrainingRecord], n: [0, 0, 0, 0, 0]});
+assert(paidTrainingSnapshot.entities[0].kind === KIND.PROVEN_GROUNDS, "Proven Grounds kind roundtrips");
+assert(paidTrainingSnapshot.entities[0].daoTrainingQueue.join(",") === "dao_of_magic,dao_of_heaviness",
+  "paid training plans decode at slot 51");

@@ -35,6 +35,8 @@ const SERVICE_ROLES: &[(&str, ServiceRole)] = &[
     ("combat", ServiceRole::TickSystem),
     ("commands", ServiceRole::CommandAdapter),
     ("construction", ServiceRole::TickSystem),
+    // Entity-only executor for researched, one-for-one Disciple training plans.
+    ("dao_training", ServiceRole::MutationHelper),
     ("death", ServiceRole::TickSystem),
     ("economy", ServiceRole::TickSystem),
     ("entrenchment", ServiceRole::TickSystem),
@@ -139,6 +141,7 @@ const ALLOWED_SERVICE_IMPORTS: &[(&str, &[&str])] = &[
             "spatial",
             "standability",
             "tournament",
+            "dao_training",
             "world_query",
         ],
     ),
@@ -196,10 +199,11 @@ const ALLOWED_SERVICE_IMPORTS: &[(&str, &[&str])] = &[
             "scout_plane",
             "standability",
             "tournament",
+            "dao_training",
         ],
     ),
     ("standability", &["geometry", "occupancy", "spatial"]),
-    ("tournament", &["move_coordinator"]),
+    ("tournament", &["move_coordinator", "dao_training"]),
     ("world_query", &["spatial"]),
 ];
 

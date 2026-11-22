@@ -80,6 +80,7 @@ pub mod kinds {
     pub const PORTAL: &str = "portal";
     pub const THREE_DAO_PAVILION: &str = "three_dao_pavilion";
     pub const TOURNAMENT_GROUNDS: &str = "tournament_grounds";
+    pub const PROVEN_GROUNDS: &str = "proven_grounds";
     pub const ZAMOK: &str = "zamok";
     pub const DEPOT: &str = "depot";
     pub const BARRACKS: &str = "barracks";
@@ -227,7 +228,7 @@ pub mod notices {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 62;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 63;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -410,6 +411,7 @@ const KIND_CODES: &[(&str, u8)] = &[
     (kinds::PORTAL, 28),
     (kinds::THREE_DAO_PAVILION, 31),
     (kinds::TOURNAMENT_GROUNDS, 32),
+    (kinds::PROVEN_GROUNDS, 33),
     (kinds::DEPOT, 7),
     (kinds::BARRACKS, 8),
     (kinds::TRAINING_CENTRE, 9),
@@ -759,6 +761,7 @@ fn kind_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("PORTAL", kinds::PORTAL),
         ("THREE_DAO_PAVILION", kinds::THREE_DAO_PAVILION),
         ("TOURNAMENT_GROUNDS", kinds::TOURNAMENT_GROUNDS),
+        ("PROVEN_GROUNDS", kinds::PROVEN_GROUNDS),
         ("ZAMOK", kinds::ZAMOK),
         ("DEPOT", kinds::DEPOT),
         ("BARRACKS", kinds::BARRACKS),
@@ -1027,6 +1030,8 @@ fn compact_slot_schemas() -> CompactSlotSchemas {
             optional_field(47, "daoReady"),
             optional_field(48, "daoAdvanceTicks"),
             optional_field(49, "chosenDao"),
+            optional_field(50, "tournamentEntrants"),
+            optional_field(51, "daoTrainingQueue"),
         ],
         event: event_slot_schemas(),
         trench: vec![

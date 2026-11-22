@@ -16,11 +16,12 @@ Use when adding, removing, or changing any field on a client↔server message, s
   - §2.7 Observer analysis state
   - Three Dao Pavilion prototype vocabulary
   - Tournament Grounds
+- Proven Grounds
 - [docs/projection-audit-checklist.md](../projection-audit-checklist.md) — checklist for new
   projection-affecting snapshot fields, events, or observer modes
 
 ## Code map
-- `server/crates/protocol/src/{client_message,server_message,lib}.rs` — authoritative Rust wire
+- `server/crates/protocol/src/{client_message,server_message,lib}.rs` — Rust wire
   DTOs
 - `server/crates/contract/src/lib.rs` — shared semantic DTOs re-exported by protocol
 - `server/src/protocol.rs` — server-shell adapter for typed kind conversion and legacy imports

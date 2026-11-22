@@ -89,3 +89,17 @@ fn chosen_dao_appends_private_intent_with_null_placeholders() {
     assert_eq!(value[49], "magic");
     assert_eq!(serde_json::to_value(&unit).unwrap()["chosenDao"], "magic");
 }
+
+#[test]
+fn dao_training_appends_private_plans_without_shifting_existing_slots() {
+    let mut building = EntityView::new(1, 1, "proven_grounds", 320.0, 320.0, 120, 120, "idle");
+    building.dao_training_queue = Some(vec!["dao_of_magic".into(), "dao_of_heaviness".into()]);
+    let value = serde_json::to_value(CompactEntity(&building)).unwrap();
+    assert_eq!(value.as_array().unwrap().len(), 52);
+    assert_eq!(value[2], 33);
+    assert!(value[50].is_null());
+    assert_eq!(
+        value[51],
+        serde_json::json!(["dao_of_magic", "dao_of_heaviness"])
+    );
+}

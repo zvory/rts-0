@@ -20,8 +20,8 @@
     },
     {
       "path": "server/crates/archcheck/src/lib.rs",
-      "lines": 2477,
-      "reason": "Tournament Grounds classifies its narrow admission/winner executor and three exact service edges, including the explicit coordinator query exception; no broad role-matrix relaxation."
+      "lines": 2481,
+      "reason": "Proven Grounds registers its entity-only training executor and three precise service edges beside the existing Tournament Grounds executor; player/resource mutation stays in existing adapters and no broad mutation baseline is expanded."
     },
     {
       "path": "server/crates/sim/src/game/services/combat/tests.rs",

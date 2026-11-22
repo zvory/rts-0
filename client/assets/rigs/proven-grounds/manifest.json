@@ -1,0 +1,13 @@
+{
+  "id": "cultivator-proven-grounds-01",
+  "mode": "built-in-imagegen-plus-deterministic-raster-assembly",
+  "source": "proven-source.png",
+  "atlas": "proven-atlas.png",
+  "generator": "scripts/art/proven-pipeline.mjs",
+  "frameSize": [384, 384],
+  "frames": ["fixed", "teamPaint"],
+  "factionId": "cultivators",
+  "kind": "proven_grounds",
+  "visualScale": 1.1,
+  "omitFootprintShadow": true
+}

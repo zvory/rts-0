@@ -43,7 +43,7 @@ export class MapEditorWorkerRenderer {
     this.renderer.updateStaticDoodadVisibility(record.camera);
     const workerUpdateMs = performance.now() - updateStartedAt;
     const presentStartedAt = performance.now();
-    this.renderer.present();
+    this.renderer.present(record.visualTimeMs);
     this.lastTiming = Object.freeze({
       workerUpdateMs,
       workerPresentMs: performance.now() - presentStartedAt,

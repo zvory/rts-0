@@ -12,6 +12,7 @@ pub(crate) mod artillery_fire;
 pub mod combat;
 pub mod commands;
 pub mod construction;
+pub(in crate::game) mod dao_training;
 pub mod death;
 pub mod economy;
 pub mod entrenchment;

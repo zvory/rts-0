@@ -377,7 +377,16 @@ export class HudSelectionPanel {
 
     let prodHtml = "";
     const queue = e.prodQueue ?? 0;
-    if (e.kind === KIND.TOURNAMENT_GROUNDS && typeof e.tournamentEntrants === "number") {
+    if (e.kind === KIND.PROVEN_GROUNDS && Array.isArray(e.daoTrainingQueue)) {
+      const active = e.prodKind ? e.daoTrainingQueue[0] : null;
+      const waiting = e.daoTrainingQueue.slice(active ? 1 : 0);
+      const label = active ? `Training ${UPGRADES[active]?.label ?? "Dao"} · 10 seconds`
+        : e.daoTrainingQueue.length ? "Waiting for a base Disciple and 100 oil" : "Queue Dao training, then send base Disciples inside";
+      const plans = waiting.slice(0, 4).map((dao) => UPGRADES[dao]?.label ?? "Dao").join(" → ") +
+        (waiting.length > 4 ? ` (+${waiting.length - 4})` : "");
+      prodHtml = `<div class="sel-prod-label">${label}</div><div class="sel-prod-bar"><div class="sel-prod-fill" style="width:${Math.round((e.prodProgress ?? 0) * 100)}%"></div></div>` +
+        (plans ? `<div class="sel-prod-label">Queue: ${plans}</div>` : "");
+    } else if (e.kind === KIND.TOURNAMENT_GROUNDS && typeof e.tournamentEntrants === "number") {
       const running = !!e.prodKind;
       const pct = Math.round((running ? (e.prodProgress ?? 0) : e.tournamentEntrants / 4) * 100);
       const label = running ? "Tournament · 10 seconds · 1 random Dao winner" : `Disciples inside: ${e.tournamentEntrants} / 4`;
@@ -509,6 +518,7 @@ function selectionDetailSignature(entity, state = null) {
     sigValue(entity.prodQueue),
     sigValue(entity.prodKind),
     sigValue(entity.tournamentEntrants),
+    (entity.daoTrainingQueue ?? []).join(","),
     sigValue(entity.prodUpgrade),
     productionPct,
     entity.prodWaiting ? 1 : 0,

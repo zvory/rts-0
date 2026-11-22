@@ -97,11 +97,11 @@ impl Entity {
         true
     }
 
-    pub(in crate::game) fn advance_chosen_dao(&mut self, researched: impl Fn(UpgradeKind) -> bool) {
+    pub(in crate::game) fn advance_chosen_dao(&mut self) {
         let Some(choice) = self.chosen_dao else {
             return;
         };
-        if self.hp == 0 || !researched(choice) {
+        if self.hp == 0 {
             return;
         }
         let ability = match choice {

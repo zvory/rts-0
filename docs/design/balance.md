@@ -823,7 +823,7 @@ baseline; runtime pricing applies ½×, 1×, or 2× to costs and duration. Compl
 researches and paid active Dao researches across all owned pavilions reserve tiers.
 Unpaid entries select their tier when payment starts; a paid entry keeps its duration
 and refund value even if another research is cancelled or its pavilion destroyed.
-Each unlocks its corresponding evolution for Disciples with 60 insight. Existing research queue, cancellation,
+Each unlocks its corresponding paid Disciple training at the Proven Grounds. Existing research queue, cancellation,
 refund, completion, and destruction rules apply; completed research persists.
 See [Cultivators](cultivators.md#three-dao-pavilion-prototype) for the approved brief.
 
@@ -832,7 +832,7 @@ See [Cultivators](cultivators.md#three-dao-pavilion-prototype) for the approved 
 See [Dao evolution playtest](dao-insight.md). Entity-owned `insight` and `dao` persist
 through checkpoints. Visible Disciple snapshots append `insight` (compact slot 45) and
 `dao` (slot 46: lightness/war/magic). Evolution buttons set replaceable, entity-owned `chosenDao` intent (team-private compact slot 49), independent of orders. Codes 14–16 and order stages 22–24 retain their positions.
-Evolution automatically occurs once the matching research and 60 insight are ready.
+Evolution automatically occurs once 60 insight is ready, without research or a Pavilion.
 Evolution clears all insight and doubles the cap to 120. Evolved Disciples continue earning
 insight from actual hostile HP damage; reaching 120 has no effect and enables no further evolution. Research ids are
 `dao_of_lightness`, `dao_of_heaviness` (War), `dao_of_magic` (Magic).
@@ -849,3 +849,15 @@ See [Tournament Grounds rules](tournament-grounds.md).
 
 Portal first-stage rallies to the exact owned completed Grounds center automatically issue
 entry movement to newly trained base Disciples. Busy grounds retain waiting entry intents.
+
+### Proven Grounds
+
+Cultivator Engineers construct `proven_grounds` after a completed Portal: 100 steel, zero oil,
+200-tick construction, 3×3 tiles, 120 HP, armored, one-tile sight, no weapon or supply.
+Select the building to queue a mix of researched Dao training plans (maximum 64). Right-click
+base Disciples inside or rally a Portal there. Each admission consumes one base Disciple and
+100 oil, preserving its two supply as a paid replacement reservation. One full-health chosen
+Dao specialist emerges after 300 ticks (10 seconds), using legal exits and the full rally plan.
+Blocked exits retry; destruction loses the trainee and oil. Unpaid plans can be canceled; active
+training cannot. Combat-earned 60-insight evolution requires no research.
+See [Proven Grounds brief and rules](proven-grounds.md) for details and deferred audio/AI work.
