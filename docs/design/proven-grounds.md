@@ -58,7 +58,7 @@ prototype baseline, explicitly recorded here rather than blocking the authorized
 - [ ] Focused validation and PR gate passed; PR merged.
 
 Local review: Interact Lab compared blue/orange gates alongside the Pavilion, selected the training
-card with queued War/Magic plans, admitted one base Disciple, and observed a 155-HP War output
+card with queued War/Magic plans, admitted one base Disciple, and observed a War output
 at its rally point. Checkpoint, queue cap, affordability, blocked exits, destruction, fog and
 Portal intake are covered by `dao_training_tests`; research-free evolution by `warrior_tests`.
 The training executor mutates entities only; existing command/admission adapters own research
