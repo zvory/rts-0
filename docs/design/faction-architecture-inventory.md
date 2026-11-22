@@ -58,7 +58,7 @@ The current production catalog is in `server/crates/rules/src/defs.rs`:
 
 - Units: Worker, Golem, Warrior, Rifleman, Panzerfaust, Machine Gunner, Anti-Tank Gun, Mortar Team,
   Artillery, Rocket Truck, Scout Car, Scout Plane, Tank, Command Car, and Ekat.
-- Buildings: Resource Depot, Portal, Three Dao Pavilion, Tournament Grounds, Proven Grounds, Zamok,
+- Buildings: Resource Depot, Portal, Three Dao Pavilion, Tournament Grounds, Proven Grounds, Shop, Zamok,
   Depot, Barracks, Training Centre, Engineering Complex, Factory, Gun
   Works, Tank Trap, Barbed Wire, Steel Mine, and Pump Jack. Tank Trap construction is server-authoritative after
   Training Centre eligibility and is exposed through the mirrored worker build menu; Resource
