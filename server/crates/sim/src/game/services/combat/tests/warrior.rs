@@ -240,3 +240,195 @@ fn disciple_vehicle_range_is_bounded_by_hull_surface() {
         }
     }
 }
+
+#[test]
+fn ranged_dao_profiles_replace_sword_without_changing_damage_or_penetration() {
+    use crate::game::upgrade::UpgradeKind;
+    for (dao, weapon, cooldown) in [
+        (
+            UpgradeKind::DaoOfLightness,
+            combat_rules::WeaponKind::DiscipleArrow,
+            43,
+        ),
+        (
+            UpgradeKind::DaoOfMagic,
+            combat_rules::WeaponKind::DiscipleOrb,
+            64,
+        ),
+    ] {
+        let mut entities = EntityStore::new();
+        let disciple = entities
+            .spawn_unit(1, EntityKind::Warrior, 100.0, 100.0)
+            .unwrap();
+        let target = entities
+            .spawn_unit(2, EntityKind::Tank, 220.0, 100.0)
+            .unwrap();
+        let unit = entities.get_mut(disciple).unwrap();
+        unit.dao = Some(dao);
+        unit.set_order(Order::attack(target));
+        let profile = effective_attack_profile(unit);
+        assert_eq!(profile.range_tiles, 5.0);
+        assert_eq!(
+            combat_rules::engagement_range_tiles(unit.kind, profile.range_tiles),
+            5.0
+        );
+        assert_eq!(profile.dmg, 23);
+        assert_eq!(profile.cooldown, cooldown);
+        assert_eq!(profile.weapon.unwrap().id, weapon);
+        assert_eq!(profile.weapon.unwrap().armor_penetration, 0.5);
+        let events = run_combat_tick(&mut entities);
+        assert_eq!(entities.get(target).unwrap().hp, 278);
+        assert_eq!(entities.get(disciple).unwrap().attack_cd(), cooldown);
+        assert_eq!(
+            entities
+                .get(disciple)
+                .unwrap()
+                .weapon_cooldown(combat_rules::WeaponKind::WarriorSword),
+            0
+        );
+        assert_eq!(events.get(&1).unwrap().iter().filter(|event| matches!(event,
+            Event::Attack {from, weapon_kind: Some(kind), ..} if *from == disciple && kind == weapon.stable_id()
+        )).count(), 1);
+        // The resolved ranged cooldown is ticked by the compatibility helper as well.
+        run_combat_tick(&mut entities);
+        assert_eq!(entities.get(target).unwrap().hp, 278);
+        assert_eq!(entities.get(disciple).unwrap().attack_cd(), cooldown - 1);
+    }
+    let mut unit =
+        crate::game::entity::Entity::new_unit(1, EntityKind::Warrior, 100.0, 100.0).unwrap();
+    for dao in [None, Some(UpgradeKind::DaoOfHeaviness)] {
+        unit.dao = dao;
+        let profile = effective_attack_profile(&unit);
+        assert_eq!(
+            profile.weapon.unwrap().id,
+            combat_rules::WeaponKind::WarriorSword
+        );
+        assert_eq!(profile.range_tiles, 0.75);
+        assert_eq!(profile.dmg, if dao.is_some() { 35 } else { 23 });
+        assert_eq!(profile.cooldown, 64);
+        assert!(!can_fire_while_moving(&unit, false));
+    }
+}
+
+#[test]
+fn lightness_fires_during_move_and_magic_keeps_normal_stop_to_fire_policy() {
+    use crate::game::upgrade::UpgradeKind;
+    for dao in [UpgradeKind::DaoOfLightness, UpgradeKind::DaoOfMagic] {
+        let mut entities = EntityStore::new();
+        let disciple = entities
+            .spawn_unit(1, EntityKind::Warrior, 100.0, 100.0)
+            .unwrap();
+        let target = entities
+            .spawn_unit(2, EntityKind::Rifleman, 220.0, 100.0)
+            .unwrap();
+        let goal = (400.0, 100.0);
+        let unit = entities.get_mut(disciple).unwrap();
+        unit.dao = Some(dao);
+        unit.set_order(Order::move_to(goal.0, goal.1));
+        unit.set_path(vec![goal]);
+        unit.set_path_goal(Some(goal));
+        unit.mark_move_phase(MovePhase::Moving);
+        unit.set_movement_delta(2.0, 0.0);
+        run_combat_tick(&mut entities);
+        assert_eq!(
+            entities.get(target).unwrap().hp,
+            if dao == UpgradeKind::DaoOfLightness {
+                22
+            } else {
+                45
+            }
+        );
+        let unit = entities.get_mut(disciple).unwrap();
+        assert!(!unit.path_is_empty());
+        assert_eq!(unit.path_goal(), Some(goal));
+        if dao == UpgradeKind::DaoOfMagic {
+            unit.set_order(Order::attack_move_to(goal.0, goal.1));
+            run_combat_tick(&mut entities);
+            assert_eq!(entities.get(target).unwrap().hp, 22);
+            assert!(entities.get(disciple).unwrap().path_is_empty());
+        }
+    }
+}
+
+#[test]
+fn ranged_dao_vehicle_range_uses_center_and_never_acquires_beyond_attack_range() {
+    use crate::game::upgrade::UpgradeKind;
+    let map = open_map(32);
+    for dao in [UpgradeKind::DaoOfLightness, UpgradeKind::DaoOfMagic] {
+        for inside in [true, false] {
+            let mut entities = EntityStore::new();
+            let disciple = entities
+                .spawn_unit(1, EntityKind::Warrior, 400.0, 400.0)
+                .unwrap();
+            let range = 5.0 * config::TILE_SIZE as f32
+                + entities.get(disciple).unwrap().radius()
+                + RANGE_SLACK;
+            let target = entities
+                .spawn_unit(
+                    2,
+                    EntityKind::Tank,
+                    400.0 + range + if inside { -0.5 } else { 0.5 },
+                    400.0,
+                )
+                .unwrap();
+            entities.get_mut(disciple).unwrap().dao = Some(dao);
+            let hp = entities.get(target).unwrap().hp;
+            run_combat_tick_on_map(
+                &mut entities,
+                &[player_state(1, false), player_state(2, false)],
+                &map,
+            );
+            assert_eq!(entities.get(target).unwrap().hp < hp, inside);
+            let unit = entities.get(disciple).unwrap();
+            if !inside {
+                assert_eq!(unit.target_id(), None);
+                assert!(unit.path_is_empty());
+                assert_eq!(unit.path_goal(), None);
+            }
+        }
+    }
+}
+
+#[test]
+fn ranged_dao_evolution_preserves_in_progress_reload_and_center_pursuit() {
+    use crate::game::ability::AbilityKind;
+    let map = open_map(32);
+    for (ability, weapon) in [
+        (
+            AbilityKind::EvolveLightness,
+            combat_rules::WeaponKind::DiscipleArrow,
+        ),
+        (
+            AbilityKind::EvolveMagic,
+            combat_rules::WeaponKind::DiscipleOrb,
+        ),
+    ] {
+        let mut unit =
+            crate::game::entity::Entity::new_unit(1, EntityKind::Warrior, 100.0, 100.0).unwrap();
+        unit.insight = 60;
+        unit.set_attack_cd(19);
+        assert!(unit.evolve_dao(ability));
+        assert_eq!(unit.attack_cd(), 19);
+        assert_eq!(unit.weapon_cooldown(weapon), 19);
+        let tank =
+            crate::game::entity::Entity::new_unit(2, EntityKind::Tank, 400.0, 100.0).unwrap();
+        assert_eq!(
+            crate::game::services::geometry::primary_combat_target_point(
+                &map,
+                unit.default_weapon_kind().unwrap(),
+                (100.0, 100.0),
+                &tank
+            ),
+            (400.0, 100.0)
+        );
+        assert!(
+            crate::game::services::geometry::primary_combat_target_point(
+                &map,
+                combat_rules::WeaponKind::WarriorSword,
+                (100.0, 100.0),
+                &tank
+            )
+            .0 < 400.0
+        );
+    }
+}
