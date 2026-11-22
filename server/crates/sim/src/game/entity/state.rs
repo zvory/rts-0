@@ -200,6 +200,9 @@ pub(in crate::game) struct TankArmorReactionLock {
 /// Weapon and active target state. Present on combat-capable entities.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CombatState {
+    /// Last Methamphetamines Rifleman shot; independent of orders and reload state.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(in crate::game) rifle_post_shot_tick: Option<u32>,
     /// Ticks until each weapon may attack again (missing or 0 = ready).
     pub weapon_cooldowns: BTreeMap<WeaponKind, u32>,
     /// Blanket Fire shots since the current blanket order began.
@@ -253,6 +256,7 @@ pub struct CombatState {
 impl Default for CombatState {
     fn default() -> Self {
         CombatState {
+            rifle_post_shot_tick: None,
             weapon_cooldowns: BTreeMap::new(),
             artillery_blanket_shots_fired: 0,
             target_id: None,

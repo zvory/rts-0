@@ -333,8 +333,9 @@ path, turret aim, or stationary range. The first Tank cannon, Anti-Tank Gun, or 
 its source for three seconds. Hits during that window neither redirect the hull nor extend the lock;
 after it expires, the next qualifying hit may establish a new lock. Active movement paths and zero
 oil prevent this response, while Hold Position explicitly allows it. Riflemen take full incoming
-damage while moving. Riflemen upgraded with Methamphetamines gain permanent moving fire, keep
-advancing while firing with normal accuracy, move at tank speed, and use a 24-tick rifle cooldown.
+damage while moving. Riflemen upgraded with Methamphetamines gain permanent moving fire, pause path movement after each shot for 150 ms rounded up to five simulation ticks
+(~167 ms), retain their movement orders, fire with normal accuracy, move at tank speed,
+and use a 24-tick rifle cooldown. This pause applies to Riflemen only.
 Panzerfausts upgraded with Methamphetamines receive the normal Rifleman moving fire, tank-speed
 movement, and the same 24-tick rifle cooldown plus the Panzerfaust windup boost. Machine Gunners upgraded with
 Methamphetamines move at unupgraded Rifleman speed and use half-length setup/teardown timers; other
