@@ -142,7 +142,23 @@ const SCOUT_PLANE_FW189_FRAME_STRIP_OVERRIDES_1 = Object.freeze([
   }),
 ]);
 
+const GRASS_SURVEY_PROFILES = Object.freeze([
+  [1, "Wind-swept pixel carpet", "Fine grass texture with coherent waves of wind-driven light."],
+  [2, "Swaying blade tufts", "Sparse grass blade silhouettes bending together in the wind."],
+  [3, "Painterly grass clumps", "Dense grouped grass clumps with coordinated swaying highlights."],
+  [4, "Dry meadow", "Warm meadow grass and seed heads moving in a slower breeze."],
+  [5, "Gusts and cloud shadows", "A textured grass carpet with broad gust fronts and passing shade."],
+].map(([grassTechnique, label, description]) => Object.freeze({
+  id: `grass-survey-${grassTechnique}`,
+  label,
+  description,
+  grassTechnique,
+  terrainPreviewReveal: true,
+  initialCamera: cameraSnapshot(2050, 1930, 1.5),
+})));
+
 const VISUAL_PROFILE_ENTRIES = Object.freeze([
+  ...GRASS_SURVEY_PROFILES,
   Object.freeze({
     id: "trench-variants-1",
     label: "Trench variants 1",

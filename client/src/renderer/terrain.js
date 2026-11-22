@@ -490,6 +490,9 @@ export function buildStaticMap(map, {
   paintTerrainSurface(ctx, this._map, textureTileSize, { bakeLongShadows });
   this.world.tint = worldSunTint(this._map.sun);
 
+  this._grassSurveyLayer?.destroy();
+  this._grassSurveyLayer = null;
+  this._grassSurveyTechnique = 0;
   this._waterLayer?.destroy();
   this._waterLayer = null;
   const layer = this.layers.terrain;
