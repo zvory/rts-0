@@ -1,3 +1,4 @@
+import { destroyShorelineLayer } from "./shoreline.js";
 import { reconcileGrassLayer, destroyGrassLayer } from "./grass.js";
 import { terrainLightingPixels } from "./terrain_lighting.js";
 import { WaterLayer } from "./water.js";
@@ -497,6 +498,7 @@ export function buildStaticMap(map, {
   this._grassLightingField = paintTerrainSurface(ctx, this._map, textureTileSize, { bakeLongShadows, captureLighting: true });
   this.world.tint = worldSunTint(this._map.sun);
 
+  destroyShorelineLayer(this);
   destroyGrassLayer(this);
   this._waterLayer?.destroy();
   this._waterLayer = null;
@@ -568,6 +570,7 @@ export function updateStaticTerrainTiles(changes) {
     }
   }
   if (dirty.size) {
+    destroyShorelineLayer(this);
     this._terrainSprite.texture.source.update();
     if (waterChanged) rebuildWaterLayer(this, map);
     if (grassChanged || hasRelief) {
