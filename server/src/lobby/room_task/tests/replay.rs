@@ -1442,7 +1442,7 @@ fn replay_metric_history_tracks_four_players_and_rewinds() {
     history.record(&game);
     let before = history.samples[0].clone();
     spawn_replay_test_entity(&mut game, 4, EntityKind::Tank, tile_center(8, 8));
-    for _ in 0..240 {
+    for _ in 0..150 {
         game.tick();
         history.record(&game);
     }

@@ -1,6 +1,7 @@
 .replay-analysis-overlay[data-selected-tab="units"],
 .replay-analysis-overlay[data-selected-tab="resources"],
-.replay-analysis-overlay[data-selected-tab="alive-resources"] {
+.replay-analysis-overlay[data-selected-tab="alive-resources"],
+.replay-analysis-overlay[data-selected-tab="resources-lost"] {
   width: min(500px, calc(100vw - 24px));
 }
 
