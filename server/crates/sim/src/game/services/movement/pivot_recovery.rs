@@ -83,8 +83,14 @@ pub(super) fn advance(
     };
     let pos = (e.pos_x(), e.pos_y());
     let distance = distance_between(pos, recovery.goal);
+    // Collision separation can move the hull off the committed corridor. Replan
+    // from that pose rather than steering sideways back toward the old goal.
+    let lateral = (recovery.goal.0 - pos.0) * -recovery.facing.det_sin()
+        + (recovery.goal.1 - pos.1) * recovery.facing.det_cos();
     if recovery.ticks_left == 0
         || !distance.is_finite()
+        || !lateral.is_finite()
+        || lateral.abs() > 0.01
         || !speed.is_finite()
         || speed <= 0.0
         || angle_delta(e.facing(), recovery.facing).abs() > 0.001

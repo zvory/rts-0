@@ -244,6 +244,34 @@ fn committed_escape_stops_when_another_unit_enters_its_corridor() {
 }
 
 #[test]
+fn committed_escape_cancels_after_lateral_collision_displacement() {
+    let map = flat_map(1);
+    let mut entities = EntityStore::new();
+    let id = entities
+        .spawn_unit(1, EntityKind::Tank, 500.0, 500.0)
+        .unwrap();
+    let e = entities.get_mut(id).unwrap();
+    e.set_facing(0.0);
+    e.movement.as_mut().unwrap().pivot_recovery = Some(crate::game::entity::PivotRecovery {
+        goal: (508.0, 500.0),
+        facing: 0.0,
+        ticks_left: 30,
+    });
+    // Model the displacement applied by collision separation between movement ticks.
+    e.set_position(500.0, 503.0);
+    let occ = Occupancy::build(&map, &EntityStore::new());
+    assert!(!super::super::pivot_recovery::advance(
+        e,
+        &map,
+        &occ,
+        2.0,
+        &[]
+    ));
+    assert_eq!((e.pos_x(), e.pos_y()), (500.0, 503.0));
+    assert!(e.movement.as_ref().unwrap().pivot_recovery.is_none());
+}
+
+#[test]
 fn long_route_from_recorded_water_pose_uses_committed_escape_and_resumes() {
     let map = Map::load("Crossroads", 2, 2967932699).unwrap();
     let recorded: Entity =
