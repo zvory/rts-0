@@ -1,4 +1,4 @@
-//! Jeff's AI V1.1 keeps a raided base down. A Depot's extractors decay to nothing within 20 s of it
+//! Jeff's AI V1.1 keeps a raided base down. A Depot's extractors decay to nothing within 25 s of it
 //! (#1707), but against Pressure AI the raid's dead Depots stood again 29-63 s later, the base
 //! then mined again once its extractors were rebuilt. Riflemen do full damage to an Engineer (40
 //! HP, eight hits) and to a foundation going up, and cost 35 Steel.
