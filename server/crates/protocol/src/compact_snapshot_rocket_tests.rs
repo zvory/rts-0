@@ -32,6 +32,7 @@ fn rocket_mortar_impact_keeps_optional_placeholders_before_style_bit() {
         }],
         upgrades: Vec::new(),
         player_resources: Vec::new(),
+        player_factions: Vec::new(),
         net_status: SnapshotNetStatus::default(),
     };
 

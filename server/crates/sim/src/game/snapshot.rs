@@ -308,6 +308,15 @@ impl Game {
             })
             .unwrap_or_default(),
             player_resources,
+            player_factions: self
+                .state
+                .players
+                .iter()
+                .map(|player| crate::protocol::PlayerFactionSnapshot {
+                    id: player.id,
+                    faction_id: player.faction_id.clone(),
+                })
+                .collect(),
             net_status: crate::protocol::SnapshotNetStatus::default(),
         }
     }

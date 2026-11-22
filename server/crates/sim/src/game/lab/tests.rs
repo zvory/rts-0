@@ -342,6 +342,8 @@ fn lab_spawn_unit_repairs_supply_and_snapshot_fog() {
             x: enemy_x,
             y: enemy_y,
             completed: true,
+            dao: None,
+            faction_id: None,
         }))
         .expect("enemy building should spawn");
     let LabOpOutcome::Spawned {
@@ -368,6 +370,8 @@ fn lab_spawn_unit_repairs_supply_and_snapshot_fog() {
             x: scout_x,
             y: scout_y,
             completed: true,
+            dao: None,
+            faction_id: None,
         }))
         .expect("scout should spawn");
     let LabOpOutcome::Spawned { entity_id } = spawned else {
@@ -397,6 +401,8 @@ fn lab_spawn_building_keeps_intrinsic_supply_cap() {
         x,
         y,
         completed: true,
+        dao: None,
+        faction_id: None,
     }))
     .expect("depot should spawn");
 
@@ -415,6 +421,8 @@ fn lab_spawn_rejects_nodes_invalid_owners_bad_positions_and_occupied_sites() {
             x,
             y,
             completed: true,
+            dao: None,
+            faction_id: None,
         })),
         Err(LabError::InvalidKind { .. })
     ));
@@ -425,6 +433,8 @@ fn lab_spawn_rejects_nodes_invalid_owners_bad_positions_and_occupied_sites() {
             x,
             y,
             completed: true,
+            dao: None,
+            faction_id: None,
         })),
         Err(LabError::InvalidOwner { owner: 999 })
     ));
@@ -435,6 +445,8 @@ fn lab_spawn_rejects_nodes_invalid_owners_bad_positions_and_occupied_sites() {
             x: f32::NAN,
             y,
             completed: true,
+            dao: None,
+            faction_id: None,
         })),
         Err(LabError::Placement { .. })
     ));
@@ -453,6 +465,8 @@ fn lab_spawn_rejects_nodes_invalid_owners_bad_positions_and_occupied_sites() {
             x: worker.pos_x(),
             y: worker.pos_y(),
             completed: true,
+            dao: None,
+            faction_id: None,
         })),
         Err(LabError::Placement { .. })
     ));
@@ -471,6 +485,8 @@ fn lab_spawn_rejects_nodes_invalid_owners_bad_positions_and_occupied_sites() {
             x: resource_depot.pos_x(),
             y: resource_depot.pos_y(),
             completed: true,
+            dao: None,
+            faction_id: None,
         })),
         Err(LabError::Placement { .. })
     ));
@@ -487,6 +503,8 @@ fn lab_move_entity_validates_collision_and_repairs_position() {
             x,
             y,
             completed: true,
+            dao: None,
+            faction_id: None,
         }))
         .expect("rifleman should spawn")
     else {
@@ -537,6 +555,8 @@ fn lab_bulk_spawn_accepts_400_rejects_401_and_is_atomic() {
                 x,
                 y,
                 completed: true,
+                dao: None,
+                faction_id: None,
             }
         })
         .collect::<Vec<_>>();
@@ -606,6 +626,8 @@ fn lab_bulk_spawn_failure_preserves_state_and_reports_index_with_suggestions() {
             x,
             y,
             completed: true,
+            dao: None,
+            faction_id: None,
         },
         LabSpawnEntity {
             owner: 1,
@@ -613,6 +635,8 @@ fn lab_bulk_spawn_failure_preserves_state_and_reports_index_with_suggestions() {
             x: city.pos_x(),
             y: city.pos_y(),
             completed: true,
+            dao: None,
+            faction_id: None,
         },
     ];
     let first = game
@@ -642,6 +666,8 @@ fn lab_bulk_spawn_failure_preserves_state_and_reports_index_with_suggestions() {
         x: suggestion.0,
         y: suggestion.1,
         completed: true,
+        dao: None,
+        faction_id: None,
     }])
     .expect("authoritative suggestion should be accepted");
 }
@@ -659,6 +685,8 @@ fn lab_bulk_moves_validate_simultaneously_and_reject_conflicts_atomically() {
                 x: ax,
                 y: ay,
                 completed: true,
+                dao: None,
+                faction_id: None,
             },
             LabSpawnEntity {
                 owner: 1,
@@ -666,6 +694,8 @@ fn lab_bulk_moves_validate_simultaneously_and_reject_conflicts_atomically() {
                 x: bx,
                 y: by,
                 completed: true,
+                dao: None,
+                faction_id: None,
             },
         ])
         .expect("pair should spawn");
@@ -803,6 +833,8 @@ fn lab_set_owner_and_delete_repair_supply_and_references() {
             x,
             y,
             completed: true,
+            dao: None,
+            faction_id: None,
         }))
         .expect("tank should spawn")
     else {
@@ -842,6 +874,8 @@ fn lab_cannot_reassign_completed_neutral_tank_trap() {
             x,
             y,
             completed: true,
+            dao: None,
+            faction_id: None,
         }))
         .expect("Tank Trap should spawn")
     else {
@@ -879,6 +913,8 @@ fn lab_owner_change_preserves_unit_panzerfaust_state() {
             x: loaded_x,
             y: loaded_y,
             completed: true,
+            dao: None,
+            faction_id: None,
         }))
         .expect("Panzerfaust should spawn")
     else {
@@ -895,6 +931,8 @@ fn lab_owner_change_preserves_unit_panzerfaust_state() {
             x: unloaded_x,
             y: unloaded_y,
             completed: true,
+            dao: None,
+            faction_id: None,
         }))
         .expect("Rifleman should spawn")
     else {
@@ -1016,6 +1054,8 @@ fn lab_checkpoint_setup_round_trips_exact_state_with_id_map() {
             x,
             y,
             completed: true,
+            dao: None,
+            faction_id: None,
         }))
         .expect("tank should spawn")
     else {
@@ -1035,6 +1075,8 @@ fn lab_checkpoint_setup_round_trips_exact_state_with_id_map() {
             x,
             y,
             completed: true,
+            dao: None,
+            faction_id: None,
         }))
         .expect("anti-tank gun should spawn")
     else {
@@ -1089,4 +1131,150 @@ fn lab_checkpoint_setup_round_trips_exact_state_with_id_map() {
         gun_weapon_facing,
     );
     restored.tick();
+}
+
+#[test]
+fn lab_cultivator_spawns_set_owner_faction_and_initialize_each_dao() {
+    use crate::protocol::LabSpawnDao;
+    for (dao, upgrade) in [
+        (LabSpawnDao::Lightness, UpgradeKind::DaoOfLightness),
+        (LabSpawnDao::War, UpgradeKind::DaoOfHeaviness),
+        (LabSpawnDao::Magic, UpgradeKind::DaoOfMagic),
+    ] {
+        let mut game = new_game();
+        let (x, y) = free_unit_position(&game, EntityKind::Warrior);
+        let outcome = game
+            .apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
+                owner: 2,
+                kind: EntityKind::Warrior,
+                x,
+                y,
+                completed: true,
+                dao: Some(dao),
+                faction_id: Some("cultivators"),
+            }))
+            .expect("specialized spawn");
+        let LabOpOutcome::Spawned { entity_id } = outcome else {
+            panic!("spawn outcome")
+        };
+        let entity = game.state.entities.get(entity_id).expect("spawned entity");
+        assert_eq!(entity.dao, Some(upgrade));
+        assert_eq!(entity.hp, entity.max_hp);
+        assert_eq!(entity.dao_advance_ticks, 0);
+        assert_eq!(
+            game.player_inits()
+                .iter()
+                .find(|p| p.id == 2)
+                .unwrap()
+                .faction_id,
+            "cultivators"
+        );
+        assert_eq!(
+            game.snapshot_full_for(2)
+                .player_factions
+                .iter()
+                .find(|p| p.id == 2)
+                .unwrap()
+                .faction_id,
+            "cultivators"
+        );
+        // Seat identity is public even while viewing only the opposing team's private state.
+        let snapshot = game.snapshot_for_observer(&crate::game::ObserverView::Players(vec![1]));
+        assert!(snapshot.player_resources.iter().all(|p| p.id == 1));
+        assert_eq!(
+            snapshot
+                .player_factions
+                .iter()
+                .find(|p| p.id == 2)
+                .unwrap()
+                .faction_id,
+            "cultivators"
+        );
+        assert_eq!(
+            game.snapshot_for(1)
+                .player_factions
+                .iter()
+                .find(|p| p.id == 2)
+                .unwrap()
+                .faction_id,
+            "cultivators"
+        );
+    }
+}
+
+#[test]
+fn lab_invalid_dao_or_faction_spawn_is_atomic() {
+    let mut game = new_game();
+    let (x, y) = free_unit_position(&game, EntityKind::Worker);
+    let count = game.state.entities.iter().count();
+    for (kind, dao, faction_id) in [
+        (
+            EntityKind::Worker,
+            Some(crate::protocol::LabSpawnDao::War),
+            Some("cultivators"),
+        ),
+        (EntityKind::Rifleman, None, Some("cultivators")),
+        (EntityKind::Worker, None, Some("missing")),
+    ] {
+        assert!(game
+            .apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
+                owner: 2,
+                kind,
+                x,
+                y,
+                completed: true,
+                dao,
+                faction_id,
+            }))
+            .is_err());
+        assert_eq!(game.state.entities.iter().count(), count);
+        assert_eq!(
+            game.player_inits()
+                .iter()
+                .find(|p| p.id == 2)
+                .unwrap()
+                .faction_id,
+            "kriegsia"
+        );
+    }
+}
+
+#[test]
+fn lab_p2_base_novice_can_evolve_after_cultivator_spawn() {
+    let mut game = new_game();
+    let (x, y) = free_unit_position(&game, EntityKind::Warrior);
+    let LabOpOutcome::Spawned { entity_id } = game
+        .apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
+            owner: 2,
+            kind: EntityKind::Warrior,
+            x,
+            y,
+            completed: true,
+            dao: None,
+            faction_id: Some("cultivators"),
+        }))
+        .unwrap()
+    else {
+        panic!("spawn outcome")
+    };
+    game.state.entities.get_mut(entity_id).unwrap().insight = config::DISCIPLE_INSIGHT_REQUIRED;
+    game.issue_lab_command_as(
+        2,
+        Command::UseAbility {
+            ability: "evolveMagic".to_string(),
+            units: vec![entity_id],
+            x: None,
+            y: None,
+            queued: false,
+        },
+        LabCommandOptions {
+            ignore_command_limits: true,
+        },
+    )
+    .unwrap();
+    game.tick();
+    assert_eq!(
+        game.state.entities.get(entity_id).unwrap().dao,
+        Some(UpgradeKind::DaoOfMagic)
+    );
 }

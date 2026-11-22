@@ -225,6 +225,8 @@ pub(crate) fn run_fight(spec: &FightSpec<'_>) -> Result<FightResult, String> {
             x,
             y,
             completed: true,
+            dao: None,
+            faction_id: None,
         })
     })
     .collect();

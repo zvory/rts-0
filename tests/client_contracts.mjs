@@ -88,6 +88,7 @@ await import("./client_contracts/gpu_timer_query_contracts.mjs");
 await import("./client_contracts/match_perf_benchmark_contracts.mjs");
 await import("./client_contracts/lab_scenario_authoring_contracts.mjs");
 await import("./client_contracts/lab_contracts.mjs");
+await import("./client_contracts/lab_faction_contracts.mjs");
 await import("./interact_driver_contracts.mjs");
 await import("./interact_cli_contracts.mjs");
 await import("./interact_tailnet_preview_contracts.mjs");

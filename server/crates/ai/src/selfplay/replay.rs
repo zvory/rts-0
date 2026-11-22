@@ -1303,6 +1303,7 @@ mod tests {
             events: Vec::new(),
             upgrades: Vec::new(),
             player_resources: Vec::new(),
+            player_factions: Vec::new(),
             net_status: SnapshotNetStatus::default(),
         }
     }

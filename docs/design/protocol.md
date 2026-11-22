@@ -747,6 +747,7 @@ transport decode:
   rememberedAntiTankGuns?: {id, owner, x, y, facing, observedTick}[], // stale deployed enemy AT-gun arcs for projected players
   events: Event[],               // transient things to surface (see 2.5)
   upgrades?: string[],           // completed permanent upgrades for this recipient
+  playerFactions?: {id, factionId}[], // public seat identities, independent of vision selection
   playerResources?: {id, steel, oil, supplyUsed, supplyCap, apm, upgrades?}[], // projected players; observer modes only; upgrades are that real owner's completed research
   netStatus: {                // per-recipient server-side health for the current match
     serverLagMs: u16,         // how late this room started the tick vs its scheduled time
@@ -967,6 +968,7 @@ adds an explicit application compression envelope.
   "mb": [[id, owner, kind, x, y, [[tileX, tileY], ...], observedTick]], // rememberedBuildings; omitted when empty
   "ma": [[id, owner, x, y, facing, observedTick]], // rememberedAntiTankGuns; omitted when empty
   "ev": [EventRecord],            // omitted when empty
+  "pf": [[id, factionId]],         // public seat identities; omitted when empty
   "pr": [[id, steel, oil, supplyUsed, supplyCap, apm, [upgradeCode...]]], // projected observer playerResources; omitted when empty
   "n": [serverLagMs, tickMs, flags, slowTickCount, headOfLineCount,
         predictionVersion?, lastSimConsumedClientSeq?, lastSimConsumedClientTick?]
@@ -2058,6 +2060,20 @@ Dao research owned by a Cultivator player is accepted; stale, wrong-owner, non-D
 requests are no-ops. `cancel` removes the latest unpaid plan, preserving active training.
 Move-to-center and Portal rally use the existing tournament admission convention for both grounds.
 Entity production state checkpoints the training plans and the active paid production item.
+
+Lab unit spawning accepts an optional `dao` (`lightness`, `war`, or `magic`) on
+`spawnEntity` and each `spawnEntities` entry. Only the Novice (`warrior`) kind accepts
+it; other kinds are rejected before mutation. The authoritative spawn uses normal
+Dao evolution to initialize specialization stats, with its entrance animation already
+complete. Omission spawns a base unit. Lab timeline and replay operations retain this
+field, and setup checkpoints retain the resulting entity specialization.
+
+Spawn entries also accept `factionId` from the faction catalog. A successful spawn sets
+the target player's faction; the kind must belong to that catalog. Invalid placement
+or invalid faction/kind combinations leave the player unchanged. Faction is a seat-level
+identity, so changing it affects all that player's entities. Snapshots carry public `playerFactions` rows (`{id, factionId}`, compact `pf`: `[[id, factionId], ...]`)
+independently of private resource projection. The client refreshes player identity from these
+authoritative rows, including unselected seats after Lab rewind and replay seek.
 
 ## Cultivator Shop
 

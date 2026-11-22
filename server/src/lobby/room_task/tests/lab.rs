@@ -519,6 +519,8 @@ fn spawn_lab_entity(
             x: position.0,
             y: position.1,
             completed: true,
+            dao: None,
+            faction_id: None,
         },
     );
     let result = lab_results(writer).pop().expect("spawn result");

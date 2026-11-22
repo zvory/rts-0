@@ -146,6 +146,8 @@ fn spawn(game: &mut Game, owner: u32, kind: EntityKind, point: (f32, f32)) -> Re
         x: point.0,
         y: point.1,
         completed: true,
+        dao: None,
+        faction_id: None,
     }))
     .map(|_| ())
     .map_err(|err| format!("spawn {kind:?} at {point:?}: {err:?}"))

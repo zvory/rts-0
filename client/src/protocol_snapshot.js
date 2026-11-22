@@ -77,6 +77,11 @@ export function decodeCompactSnapshot(raw) {
       MAX_COMPACT_REMEMBERED_ANTI_TANK_GUNS,
     ).map(decodeCompactRememberedAntiTankGun),
     events: readOptionalArray(raw.ev, "events", MAX_COMPACT_EVENTS).map(decodeCompactEvent),
+    playerFactions: readOptionalArray(raw.pf, "playerFactions", 32).map((row) => {
+      const fields = readArray(row, "playerFaction", 2);
+      if (fields.length !== 2) throw new Error("playerFaction field count mismatch");
+      return { id: readU32(fields[0], "playerFaction.id"), factionId: readString(fields[1], "playerFaction.factionId") };
+    }),
     playerResources: readOptionalArray(raw.pr, "playerResources", 32).map(
       decodeCompactPlayerResource,
     ),

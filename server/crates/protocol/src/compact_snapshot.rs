@@ -196,6 +196,16 @@ impl Serialize for CompactSnapshot<'_> {
                 &snapshot.events.iter().map(CompactEvent).collect::<Vec<_>>(),
             )?;
         }
+        if !snapshot.player_factions.is_empty() {
+            map.serialize_entry(
+                "pf",
+                &snapshot
+                    .player_factions
+                    .iter()
+                    .map(|p| (p.id, &p.faction_id))
+                    .collect::<Vec<_>>(),
+            )?;
+        }
         if !snapshot.player_resources.is_empty() {
             map.serialize_entry(
                 "pr",

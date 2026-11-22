@@ -9,6 +9,7 @@ import {
   labSpawnBuildingKindsForFaction,
   labSpawnFactionOptions,
   labSpawnUnitKindsForFaction,
+  labSpawnUnitOptionsForFaction,
 } from "./lab_spawn_catalog.js";
 import {
   applyInteractSelection,
@@ -181,6 +182,7 @@ export class InteractBridge {
       id: faction.id,
       label: faction.label,
       units: labSpawnUnitKindsForFaction(faction.id),
+      unitOptions: labSpawnUnitOptionsForFaction(faction.id),
       buildings: labSpawnBuildingKindsForFaction(faction.id),
       upgrades: factionUpgrades(faction.id),
     }));
@@ -204,6 +206,8 @@ export class InteractBridge {
       x: finiteNumber(spec?.x, `spawn.spawns[${index}].x`),
       y: finiteNumber(spec?.y, `spawn.spawns[${index}].y`),
       completed: spec?.completed !== false,
+      ...(spec?.factionId ? { factionId: safeKind(spec.factionId, "spawn.factionId") } : {}),
+      ...(spec?.dao ? { dao: safeKind(spec.dao, "spawn.dao") } : {}),
     }));
     const result = await this.mutate(
       () => labClient.spawnEntities(spawns),

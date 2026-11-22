@@ -43,17 +43,17 @@ pub use rts_contract::{
     DiagnosticCapabilities, EntityView, Event, GroundDecalDelta, GroundDecalView, InitialCamera,
     LabStartMetadata, LabStartRole, LabVisionMode, MapInfo, MapTile, MatchControlCapabilities,
     MovementPathDiagnosticScope, NoticeSeverity, ObserverViewSelection, OrderPlanMarker,
-    PlayerResourceSnapshot, PlayerScore, PlayerStart, RememberedAntiTankGunView,
-    RememberedBuildingView, ReplayStartMetadata, ResourceDelta, ResourceNode, RoomCapabilities,
-    RoomTimeCapabilities, RoomTimeSeekState, RoomTimeState, ScoutPlaneStateView, SmokeCloudView,
-    Snapshot, SnapshotNetStatus, StartPayload, TankTrailView, TeamId, TrenchView,
-    VisibilityCapabilities, DEFAULT_FACTION_ID, GAME_CHECKPOINT_CURRENT_VERSION,
-    MAP_DOODAD_TYPE_IDS, MAP_TILE_SIZE_PX, MAX_GROUND_DECALS_PER_SNAPSHOT_DELTA,
+    PlayerFactionSnapshot, PlayerResourceSnapshot, PlayerScore, PlayerStart,
+    RememberedAntiTankGunView, RememberedBuildingView, ReplayStartMetadata, ResourceDelta,
+    ResourceNode, RoomCapabilities, RoomTimeCapabilities, RoomTimeSeekState, RoomTimeState,
+    ScoutPlaneStateView, SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload, TankTrailView,
+    TeamId, TrenchView, VisibilityCapabilities, DEFAULT_FACTION_ID,
+    GAME_CHECKPOINT_CURRENT_VERSION, MAP_DOODAD_TYPE_IDS, MAP_TILE_SIZE_PX,
+    MAX_GROUND_DECALS_PER_SNAPSHOT_DELTA,
 };
 pub use server_message::{
     LivePauseState, LiveResumeCountdown, MatchConclusion, MatchConclusionReason, ServerMessage,
 };
-
 /// A gameplay command. Validated when applied, not when received.
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(tag = "c", rename_all = "camelCase", rename_all_fields = "camelCase")]
@@ -211,9 +211,7 @@ pub enum Command {
         queued: bool,
     },
 }
-
 pub type VisionSelectionRequest = ObserverViewSelection;
-
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(tag = "op", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum LabClientOp {
@@ -235,6 +233,10 @@ pub enum LabClientOp {
         y: f32,
         #[serde(default)]
         completed: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        dao: Option<LabSpawnDao>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        faction_id: Option<String>,
     },
     SpawnEntities {
         spawns: Vec<LabSpawnEntitySpec>,
@@ -281,7 +283,13 @@ pub enum LabClientOp {
         ignore_command_limits: bool,
     },
 }
-
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum LabSpawnDao {
+    Lightness,
+    War,
+    Magic,
+}
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LabSpawnEntitySpec {
@@ -291,8 +299,11 @@ pub struct LabSpawnEntitySpec {
     pub y: f32,
     #[serde(default)]
     pub completed: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dao: Option<LabSpawnDao>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub faction_id: Option<String>,
 }
-
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(
     tag = "operation",
@@ -327,13 +338,10 @@ pub enum LabUpdateSpec {
         enabled: bool,
     },
 }
-
 fn default_true() -> bool {
     true
 }
-
 // Server -> Client
-
 /// A lobby map catalog row. `name` is the stable selector key; `description` is display text;
 /// `min_players`/`max_players` describe authored active-player layout bounds.
 #[derive(Debug, Clone, Serialize)]
@@ -1272,6 +1280,7 @@ mod tests {
             ],
             upgrades: vec![upgrades::ARTILLERY_UNLOCK.to_string()],
             player_resources: Vec::new(),
+            player_factions: Vec::new(),
             net_status: SnapshotNetStatus {
                 server_lag_ms: 4,
                 tick_ms: 17,

@@ -35,6 +35,10 @@ fn compact_entity_trims_trailing_optional_nulls() {
         events: Vec::new(),
         upgrades: Vec::new(),
         player_resources: Vec::new(),
+        player_factions: vec![crate::PlayerFactionSnapshot {
+            id: 2,
+            faction_id: "cultivators".to_string(),
+        }],
         net_status: SnapshotNetStatus::default(),
     };
 
@@ -43,6 +47,11 @@ fn compact_entity_trims_trailing_optional_nulls() {
     let entity = value["e"][0].as_array().unwrap();
     assert_eq!(entity.len(), 8);
     assert_eq!(value["rr"], true);
+    assert_eq!(value["pf"], serde_json::json!([[2, "cultivators"]]));
+    assert!(
+        value.get("pr").is_none(),
+        "public factions do not require private resource rows"
+    );
     assert!(value.get("r").is_none());
     assert!(value.get("ev").is_none());
     snapshot.entities[0].commander_facing = Some(-1.25);
@@ -77,6 +86,7 @@ fn compact_json_snapshot_codec_remains_available_for_local_baselines() {
         events: Vec::new(),
         upgrades: Vec::new(),
         player_resources: Vec::new(),
+        player_factions: Vec::new(),
         net_status: SnapshotNetStatus::default(),
     };
     let frame = crate::encode_snapshot_frame(&snapshot, crate::SnapshotCodec::CompactJson)
@@ -134,6 +144,7 @@ fn compact_snapshot_carries_bounded_ground_decal_delta() {
         events: Vec::new(),
         upgrades: Vec::new(),
         player_resources: Vec::new(),
+        player_factions: Vec::new(),
         net_status: SnapshotNetStatus::default(),
     };
     let value = compact_snapshot_value(&snapshot).unwrap();

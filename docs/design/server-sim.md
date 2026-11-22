@@ -2217,3 +2217,16 @@ See [Proving Grounds brief and rules](proven-grounds.md) for details and deferre
 Empty Proving Grounds training-plan vectors are omitted from checkpoint serialization, preserving
 existing replay fingerprints for games that never use this building; nonempty plans remain semantic
 authority and survive checkpoint restore. Native/WASM RNG portability tests pin this boundary.
+
+Lab unit spawning accepts an optional `dao` (`lightness`, `war`, or `magic`) on
+`spawnEntity` and each `spawnEntities` entry. Only the Novice (`warrior`) kind accepts
+it; other kinds are rejected before mutation. The authoritative spawn uses normal
+Dao evolution to initialize specialization stats, with its entrance animation already
+complete. Omission spawns a base unit. Lab timeline and replay operations retain this
+field, and setup checkpoints retain the resulting entity specialization.
+
+`LabSpawnEntity.faction_id` optionally sets the owner's catalog identity on successful
+spawn. It is validated against the unit/building catalog before mutation and retained
+by timeline/replay operations. Public snapshot `playerFactions` rows include every seat independently of private resource
+projection, so rendering, HUD and command admission share authoritative faction identity
+even when observing another team.

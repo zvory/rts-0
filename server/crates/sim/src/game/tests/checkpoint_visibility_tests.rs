@@ -453,6 +453,8 @@ fn visibility_combat_checkpoint_preserves_lab_god_mode_and_observer_analysis() {
             x: unit_pos.0,
             y: unit_pos.1,
             completed: true,
+            dao: None,
+            faction_id: None,
         }))
         .expect("lab spawn should succeed")
     else {

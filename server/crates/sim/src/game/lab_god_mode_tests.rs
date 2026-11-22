@@ -90,6 +90,8 @@ fn lab_god_mode_makes_player_units_and_buildings_ignore_damage() {
             x: unit_x,
             y: unit_y,
             completed: true,
+            dao: None,
+            faction_id: None,
         }))
         .expect("rifleman should spawn")
     else {
@@ -112,6 +114,8 @@ fn lab_god_mode_makes_player_units_and_buildings_ignore_damage() {
             x: building_x,
             y: building_y,
             completed: true,
+            dao: None,
+            faction_id: None,
         }))
         .expect("depot should spawn")
     else {
@@ -159,6 +163,8 @@ fn lab_god_mode_follows_unit_owner_changes() {
             x,
             y,
             completed: true,
+            dao: None,
+            faction_id: None,
         }))
         .expect("tank should spawn")
     else {
