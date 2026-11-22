@@ -65,18 +65,17 @@ for (const insight of [0, 60]) {
       resources: { steel: 0, oil: 0 }, upgrades, groupCooldownClocks,
       playerHasCompleteKind: () => true,
     });
-    for (const [ability, upgrade] of [
+    for (const [ability] of [
       [ABILITY.EVOLVE_LIGHTNESS, UPGRADE.DAO_OF_LIGHTNESS],
       [ABILITY.EVOLVE_WAR, UPGRADE.DAO_OF_HEAVINESS],
       [ABILITY.EVOLVE_MAGIC, UPGRADE.DAO_OF_MAGIC],
     ]) {
       const slot = card.slots.find((entry) => entry?.ability === ability);
-      const researched = upgrades.includes(upgrade);
       assert(slot.enabled, "Dao choices remain queueable before research and insight are ready");
-      assert(slot.cls.includes("dao-awaiting-research") === !researched,
-        "Each Dao choice is grayed only until its own research completes");
-      assert(slot.cls.split(" ").includes("dao-ready") === (researched && insight >= 60),
-        "Dao radiance requires both completed research and sufficient insight");
+      assert(!slot.cls.includes("dao-awaiting-research"),
+        "Combat Dao choices never require research");
+      assert(slot.cls.split(" ").includes("dao-ready") === (insight >= 60),
+        "Dao radiance requires sufficient insight alone");
       assertDeepEqual(slot.intent.readyIds, [disciple.id], "Pending Dao choice retains its selected carrier");
       if (ability === ABILITY.EVOLVE_WAR) {
         assert(slot.countBadge === "1/1", "Pending chosen path retains its selection badge");

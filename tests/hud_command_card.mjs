@@ -711,6 +711,7 @@ for (const [kind, upgrade] of [
     "cultivators-producer-portal",
     "cultivators-producer-three_dao_pavilion",
     "cultivators-producer-tournament_grounds",
+    "cultivators-producer-proven_grounds",
   ]);
   assert(
     catalog.some((entry) =>
@@ -772,7 +773,7 @@ for (const [kind, upgrade] of [
   const builds = card.slots.filter((slot) => slot?.action === "build");
   assert.deepEqual(
     builds.map((slot) => slot.intent.building),
-    [KIND.RESOURCE_DEPOT, KIND.PORTAL, KIND.THREE_DAO_PAVILION, KIND.TOURNAMENT_GROUNDS],
+    [KIND.RESOURCE_DEPOT, KIND.PORTAL, KIND.THREE_DAO_PAVILION, KIND.TOURNAMENT_GROUNDS, KIND.PROVEN_GROUNDS],
   );
   assert.equal(builds[0].label, "Nexus");
   assert.equal(builds[0].commandId, "cultivators.build." + KIND.RESOURCE_DEPOT);
@@ -910,8 +911,8 @@ for (const researched of [false, true]) {
     const slot = card.slots.find((slot) => slot?.ability === ability);
     assert(slot.enabled);
     assert.deepEqual(slot.intent.readyIds, [1, 2]);
-    assert(slot.title.includes("research") && slot.title.includes("60 insight"));
-    assert(!slot.cls.includes("dao-ready"));
+    assert(slot.title.includes("60 insight"));
+    assert(slot.cls.includes("dao-ready"));
     if (ability !== ABILITY.EVOLVE_LIGHTNESS) {
       assert(slot.cls.includes("active"));
       assert.equal(slot.countBadge, "1/2");
@@ -961,4 +962,25 @@ for (const researched of [false, true]) {
   assert.deepEqual(slot(after).cost, { steel: 100, oil: 200 });
   assert.equal(slot(after).researchDefinition.researchTicks, 600);
   assert.notEqual(before.signature, after.signature);
+}
+
+// Paid training queues plans even while poor; research and queue capacity are the gates.
+{
+  const building = { id: 42, owner: 1, kind: KIND.PROVEN_GROUNDS,
+    daoTrainingQueue: [UPGRADE.DAO_OF_MAGIC, UPGRADE.DAO_OF_HEAVINESS], prodKind: KIND.WARRIOR };
+  const ctx = { playerId: 1, factionId: "cultivators", selection: [building], entities: [building],
+    resources: { steel: 0, oil: 0 }, upgrades: [UPGRADE.DAO_OF_MAGIC], groupCooldownClocks: () => [] };
+  const card = buildCommandCardDescriptors(ctx);
+  assert.equal(card.slots[0].enabled, false);
+  assert.equal(card.slots[1].enabled, false);
+  assert.equal(card.slots[2].enabled, true);
+  assert.equal(card.slots[2].countBadge, "1");
+  assert.equal(card.slots[2].hotkey, "E");
+  assert.deepEqual(card.slots[2].cost, { steel: 0, oil: 100 });
+  assert.deepEqual(card.slots[2].intent, { type: "research", upgrade: UPGRADE.DAO_OF_MAGIC, buildingId: 42 });
+  assert.equal(card.slots[8].enabled, true);
+  building.daoTrainingQueue = [UPGRADE.DAO_OF_MAGIC];
+  assert.equal(buildCommandCardDescriptors(ctx).slots[8], null, "active trainee cannot be canceled");
+  building.daoTrainingQueue = Array(64).fill(UPGRADE.DAO_OF_MAGIC);
+  assert.equal(buildCommandCardDescriptors(ctx).slots[2].enabled, false);
 }

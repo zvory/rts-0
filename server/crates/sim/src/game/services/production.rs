@@ -237,6 +237,7 @@ pub(crate) fn production_system(
                 .and_then(|rally| coordinator.rally_spawn_facing(entities, unit, (sx, sy), rally));
             if let Some(spawned) = entities.spawn_unit(owner, unit, sx, sy) {
                 tournament::upgrade_winner(entities, id, spawned);
+                super::dao_training::upgrade_trainee(entities, id, spawned);
                 if let Some(facing) = spawn_facing {
                     if let Some(e) = entities.get_mut(spawned) {
                         e.set_facing(facing);

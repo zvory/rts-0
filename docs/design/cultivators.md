@@ -106,7 +106,8 @@ See [balance](balance.md#three-dao-pavilion-prototype) for payment and refund ru
 Use existing player-wide permanent research and queue rules, including duplicate rejection,
 cancellation/refund and loss of unfinished research on destruction. All three can be completed;
 completed research survives building destruction. Each research unlocks the matching
-Disciple evolution. See [Disciple insight and Dao evolution](dao-insight.md) for stats,
+paid Disciple training at the [Proven Grounds](proven-grounds.md). Combat-earned evolution at
+60 insight requires neither research nor a Pavilion. See [Disciple insight and Dao evolution](dao-insight.md) for stats,
 abilities, insight credit, icons, and hotkeys. Existing checkpoint/replay and owner-only
 upgrade projection carry the stable ids through the generic research system.
 Automatic AI evolution remains deferred.

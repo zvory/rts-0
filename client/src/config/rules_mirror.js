@@ -158,6 +158,10 @@ export const SCOUT_PLANE_ABILITY_COOLDOWN_TICKS = TICK_HZ * 30;
 // Per-kind UI / render info. `size` is the render radius (units) or half-extent hint.
 // `sight` (tiles) drives the local fog overlay. `rangeTiles` mirrors weapon range for visuals.
 // `cost`/`supply` drive the command card.
+export const DAO_TRAINING_COST_OIL = 100;
+export const DAO_TRAINING_TICKS = TICK_HZ * 10;
+export const MAX_DAO_TRAINING_QUEUE = 64;
+
 export const STATS = Object.freeze({
   [KIND.WORKER]: { armored: false, label: "Engineer", icon: "EN", size: 9, sight: 10,
     rangeTiles: 1, cost: { steel: 50, oil: 0 }, supply: 1, buildTicks: 150 },
@@ -214,6 +218,9 @@ export const STATS = Object.freeze({
   [KIND.PORTAL]: { label: "Portal", icon: "PRT", footW: 3, footH: 3, sight: 1,
     cost: { steel: 150, oil: 0 }, buildTicks: TICK_HZ * 5, trains: [KIND.WARRIOR],
     description: "A supernatural gateway that trains Cultivator Disciples." },
+  [KIND.PROVEN_GROUNDS]: { label: "Proven Grounds", icon: "PG", footW: 3, footH: 3, sight: 1,
+    cost: { steel: 100, oil: 0 }, buildTicks: 200, trains: [], requires: [KIND.PORTAL],
+    description: "Send base Disciples inside for researched Dao training. Queue any mix of Lightness, War and Magic; each costs 100 oil and takes 10 seconds. Supports a rally point." },
   [KIND.TOURNAMENT_GROUNDS]: { label: "Tournament Grounds", icon: "TG", footW: 4, footH: 4, sight: 1,
     cost: { steel: 100, oil: 0 }, buildTicks: 200, trains: [], requires: [KIND.PORTAL],
     description: "Right-click four base Disciples inside, or rally a Portal here. A free ten-second tournament produces one winner with a random Dao specialization. Supports a rally point." },
@@ -221,7 +228,7 @@ export const STATS = Object.freeze({
     cost: { steel: 100, oil: 25 }, buildTicks: 560, trains: [],
     researches: [UPGRADE.DAO_OF_LIGHTNESS, UPGRADE.DAO_OF_MAGIC, UPGRADE.DAO_OF_HEAVINESS],
     requires: [KIND.RESOURCE_DEPOT, KIND.PORTAL],
-    description: "Research Lightness, War, and Magic to unlock Disciple evolutions at 60 insight." },
+    description: "Research Lightness, War, and Magic to unlock paid training at the Proven Grounds." },
   [KIND.ZAMOK]: { label: "Zamok", icon: "ZK", footW: 3, footH: 3, sight: 1,
     cost: { steel: 0, oil: 0 }, buildTicks: 0, trains: [KIND.GOLEM] },
   [KIND.DEPOT]: { label: "Supply Depot", icon: "SD", footW: 2, footH: 2, sight: 1,
@@ -289,21 +296,21 @@ export const ABILITIES = Object.freeze({
   }),
   [ABILITY.EVOLVE_LIGHTNESS]: Object.freeze({
     ability: ABILITY.EVOLVE_LIGHTNESS, label: "Dao of Lightness", icon: "Z", hotkey: "Z",
-    title: "Choose Dao of Lightness; evolves automatically when research and 60 insight are ready", carriers: Object.freeze([KIND.WARRIOR]),
+    title: "Choose Dao of Lightness; evolves automatically at 60 insight; no research required", carriers: Object.freeze([KIND.WARRIOR]),
     targetMode: "self", cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 0 }),
-    upgradeRequirement: UPGRADE.DAO_OF_LIGHTNESS, queued: false, queuePolicy: "notQueueable",
+    upgradeRequirement: null, queued: false, queuePolicy: "notQueueable",
   }),
   [ABILITY.EVOLVE_WAR]: Object.freeze({
     ability: ABILITY.EVOLVE_WAR, label: "Dao of War", icon: "X", hotkey: "X",
-    title: "Choose Dao of War; evolves automatically when research and 60 insight are ready", carriers: Object.freeze([KIND.WARRIOR]),
+    title: "Choose Dao of War; evolves automatically at 60 insight; no research required", carriers: Object.freeze([KIND.WARRIOR]),
     targetMode: "self", cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 0 }),
-    upgradeRequirement: UPGRADE.DAO_OF_HEAVINESS, queued: false, queuePolicy: "notQueueable",
+    upgradeRequirement: null, queued: false, queuePolicy: "notQueueable",
   }),
   [ABILITY.EVOLVE_MAGIC]: Object.freeze({
     ability: ABILITY.EVOLVE_MAGIC, label: "Dao of Magic", icon: "C", hotkey: "C",
-    title: "Choose Dao of Magic; evolves automatically when research and 60 insight are ready", carriers: Object.freeze([KIND.WARRIOR]),
+    title: "Choose Dao of Magic; evolves automatically at 60 insight; no research required", carriers: Object.freeze([KIND.WARRIOR]),
     targetMode: "self", cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 0 }),
-    upgradeRequirement: UPGRADE.DAO_OF_MAGIC, queued: false, queuePolicy: "notQueueable",
+    upgradeRequirement: null, queued: false, queuePolicy: "notQueueable",
   }),
 
   [ABILITY.SMOKE]: Object.freeze({
@@ -519,19 +526,19 @@ export const UPGRADES = Object.freeze({
   [UPGRADE.DAO_OF_HEAVINESS]: Object.freeze({
     upgrade: UPGRADE.DAO_OF_HEAVINESS, label: "Dao of War", icon: "HVY",
     cost: Object.freeze({ steel: 100, oil: 200 }), researchTicks: DAO_RESEARCH_TICKS,
-    description: "Study the Dao of War. Unlocks the corresponding Disciple evolution at 60 insight.",
+    description: "Study the Dao of War. Unlocks the corresponding paid Disciple training at the Proven Grounds.",
     researchedAt: KIND.THREE_DAO_PAVILION,
   }),
   [UPGRADE.DAO_OF_MAGIC]: Object.freeze({
     upgrade: UPGRADE.DAO_OF_MAGIC, label: "Dao of Magic", icon: "MAG",
     cost: Object.freeze({ steel: 100, oil: 200 }), researchTicks: DAO_RESEARCH_TICKS,
-    description: "Study the Dao of Magic. Unlocks the corresponding Disciple evolution at 60 insight.",
+    description: "Study the Dao of Magic. Unlocks the corresponding paid Disciple training at the Proven Grounds.",
     researchedAt: KIND.THREE_DAO_PAVILION,
   }),
   [UPGRADE.DAO_OF_LIGHTNESS]: Object.freeze({
     upgrade: UPGRADE.DAO_OF_LIGHTNESS, label: "Dao of Lightness", icon: "LGT",
     cost: Object.freeze({ steel: 100, oil: 200 }), researchTicks: DAO_RESEARCH_TICKS,
-    description: "Study the Dao of Lightness. Unlocks the corresponding Disciple evolution at 60 insight.",
+    description: "Study the Dao of Lightness. Unlocks the corresponding paid Disciple training at the Proven Grounds.",
     researchedAt: KIND.THREE_DAO_PAVILION,
   }),
   [UPGRADE.METHAMPHETAMINES]: Object.freeze({
@@ -632,7 +639,7 @@ export const UPGRADES = Object.freeze({
 
 // A building that trains units — the only buildings that accept a rally point.
 export const isProducerBuilding = (kind) =>
-  kind === KIND.TOURNAMENT_GROUNDS || (Array.isArray(STATS[kind]?.trains) && STATS[kind].trains.length > 0);
+  kind === KIND.TOURNAMENT_GROUNDS || kind === KIND.PROVEN_GROUNDS || (Array.isArray(STATS[kind]?.trains) && STATS[kind].trains.length > 0);
 
 export const RESOURCE_AMOUNTS = Object.freeze({
   [KIND.STEEL]: 625,

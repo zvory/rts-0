@@ -204,7 +204,7 @@ fn pavilion_prerequisites_and_research_are_faction_gated() {
 }
 
 #[test]
-fn disciple_evolution_requires_insight_research_ownership_and_is_permanent() {
+fn disciple_evolution_requires_insight_ownership_but_no_research_and_is_permanent() {
     use crate::game::ability::AbilityKind;
     use crate::game::upgrade::UpgradeKind;
     for (ability, upgrade, hp, speed) in [
@@ -248,15 +248,6 @@ fn disciple_evolution_requires_insight_research_ownership_and_is_permanent() {
         game.tick();
         assert_eq!(game.state.entities.get(unit).unwrap().dao, None);
         assert_eq!(game.state.entities.get(unit).unwrap().hp, 1);
-        game.state.entities.get_mut(unit).unwrap().insight = 60;
-        game.enqueue(1, command.clone());
-        game.tick();
-        assert_eq!(
-            game.state.entities.get(unit).unwrap().dao,
-            None,
-            "research is required"
-        );
-        game.state.players[0].upgrades.insert(upgrade);
         game.state.entities.get_mut(unit).unwrap().insight = 59;
         game.enqueue(1, command.clone());
         game.tick();
@@ -759,7 +750,7 @@ fn disciple_shield_does_not_identify_a_smoke_hidden_caster() {
 }
 
 #[test]
-fn disciple_pending_dao_replaces_for_selection_survives_checkpoint_and_waits_for_research() {
+fn disciple_pending_dao_replaces_for_selection_survives_checkpoint_and_waits_for_insight() {
     use crate::game::ability::AbilityKind;
     use crate::game::upgrade::UpgradeKind;
     let mut game = empty_flat_game(&[
@@ -840,36 +831,10 @@ fn disciple_pending_dao_replaces_for_selection_survives_checkpoint_and_waits_for
     game.tick();
     assert_eq!(
         game.state.entities.get(first).unwrap().dao,
-        None,
-        "insight alone does not evolve"
-    );
-    let pavilion = game
-        .state
-        .entities
-        .spawn_building(1, EntityKind::ThreeDaoPavilion, 300.0, 300.0, true)
-        .unwrap();
-    game.state.players[0].set_resources(200, 100);
-    game.enqueue(
-        1,
-        Command::Research {
-            building: pavilion,
-            upgrade: UpgradeKind::DaoOfMagic,
-        },
-    );
-    game.tick();
-    game.state
-        .entities
-        .get_mut(pavilion)
-        .unwrap()
-        .research_queue_mut()
-        .unwrap()[0]
-        .progress = 599;
-    game.tick();
-    assert_eq!(
-        game.state.entities.get(first).unwrap().dao,
         Some(UpgradeKind::DaoOfMagic),
-        "research completion evolves in the same tick"
+        "combat insight evolves the pending path without any Pavilion or research"
     );
+    assert!(game.state.players[0].upgrades.is_empty());
     assert_eq!(game.state.entities.get(first).unwrap().chosen_dao, None);
     assert_eq!(
         game.state.entities.get(second).unwrap().dao,
@@ -914,7 +879,7 @@ fn dead_disciple_cannot_advance_pending_war_and_regain_hp() {
     assert!(entity.choose_dao(AbilityKind::EvolveWar));
     entity.insight = 60;
     entity.apply_damage(u32::MAX, None);
-    entity.advance_chosen_dao(|_| true);
+    entity.advance_chosen_dao();
     assert_eq!(entity.hp, 0);
     assert_eq!(entity.dao, None);
     game.state.players[0]

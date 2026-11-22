@@ -9,6 +9,17 @@ pub(super) fn enqueue(
     building: u32,
     upgrade: upgrade::UpgradeKind,
 ) {
+    if entities
+        .get(building)
+        .is_some_and(|e| e.kind == EntityKind::ProvenGrounds)
+    {
+        let unlocked = faction_id == rules::faction::CULTIVATORS_FACTION_ID
+            && players
+                .iter()
+                .any(|p| p.id == player && p.has_upgrade(upgrade));
+        crate::game::services::dao_training::enqueue(entities, player, building, upgrade, unlocked);
+        return;
+    }
     let definition = upgrade::definition(upgrade);
     let Some(building_kind) = entities.get(building).map(|b| b.kind) else {
         notice(events, player, "Cannot research that here");

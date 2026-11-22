@@ -181,6 +181,7 @@ impl Entity {
             production: if rules::economy::trainable_units(kind).is_empty()
                 && crate::game::upgrade::researchable_upgrades(kind).is_empty()
                 && kind != EntityKind::TournamentGrounds
+                && kind != EntityKind::ProvenGrounds
             {
                 None
             } else {

@@ -1467,7 +1467,7 @@ fn use_ability(
     let ability = request.ability;
     let definition = ability::definition(ability);
     if definition.effect_hook == AbilityEffectHook::Evolve {
-        let Some(owner) = players.iter().find(|candidate| candidate.id == player) else {
+        let Some(_owner) = players.iter().find(|candidate| candidate.id == player) else {
             return;
         };
         for unit in dedupe_cap_units(request.units, request.max_units_per_command) {
@@ -1479,7 +1479,7 @@ fn use_ability(
                 .filter(|entity| entity.owner == player)
             {
                 if entity.choose_dao(ability) {
-                    entity.advance_chosen_dao(|choice| owner.has_upgrade(choice));
+                    entity.advance_chosen_dao();
                 }
             }
         }

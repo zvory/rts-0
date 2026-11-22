@@ -330,6 +330,7 @@ fn is_combat_unit(kind: EntityKind) -> bool {
         | EntityKind::Portal
         | EntityKind::ThreeDaoPavilion
         | EntityKind::TournamentGrounds
+        | EntityKind::ProvenGrounds
         | EntityKind::Zamok
         | EntityKind::Depot
         | EntityKind::Barracks
