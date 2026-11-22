@@ -5,6 +5,9 @@ use crate::EntityKind;
 
 use super::TILE_SIZE;
 
+/// Disciples may approach visible enemies within this range without extending sword reach.
+pub const DISCIPLE_ENGAGEMENT_RANGE_TILES: f32 = 5.0;
+
 /// A contextual clear-area order prioritizes completed Tank Traps inside this objective radius.
 pub const TANK_TRAP_CLUSTER_ATTACK_RADIUS_TILES: f32 = 4.0;
 

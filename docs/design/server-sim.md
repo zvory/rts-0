@@ -1490,7 +1490,7 @@ and barrel turn together to track an in-cone target before firing, while the set
 remains fixed. Targets outside the cone do not cause rotation and require teardown and redeployment
 before the gun can engage them.
 
-Automatic acquisition considers only legal enemy candidates inside the attacker's current weapon range, then applies the existing target-priority ranking. Range to buildings is measured from the attacker's center to the closest point on the authoritative building footprint; melee attacks (Worker tools, Golem fists, and Disciple swords) measure range to the authoritative oriented vehicle body, including clearance, for vehicle targets. Other unit-target range remains center-to-center. Melee pursuit uses the same closest hull point so an attacker stops outside collision instead of repeatedly pushing toward a vehicle center. Building acquisition broadphase queries include the maximum building half-extent so a footprint inside range is discoverable even when its indexed center is not. Explicit Attack orders may target the issuing player's own units or buildings, but not allied teammate entities, and retain their commanded target while it remains legal and visible. A direct attack pursues that target to the current weapon range band, using the closest footprint-boundary point for buildings and the closest hull point for melee attacks on vehicles, stops to fire, and repaths if the same target moves out of range. Tanks instead hold position when the commanded target is within their maximum stationary cannon range (including the usual attacker radius and range slack), allowing the range ramp to reach it; they still fire only inside the current range and pursue if the target leaves the maximum stationary range. A direct attack never switches targets while the commanded target remains valid. Opportunistic moving-fire acquisition for a plain Move uses the same in-range boundary. Attack Move may pause for an in-range engagement and resumes only its original player-issued destination afterward. While retaining a building target, Attack Move rechecks for visible enemy combat units in weapon range each tick and switches to a legal shot on one when available, even during weapon cooldown. This does not change the movement destination, pursue retreating defenders, or override explicit Attack orders.
+Automatic acquisition defaults to legal enemy candidates inside the attacker's current weapon range, then applies the existing target-priority ranking. Range to buildings is measured from the attacker's center to the closest point on the authoritative building footprint; melee attacks (Worker tools, Golem fists, and Disciple swords) measure range to the authoritative oriented vehicle body, including clearance, for vehicle targets. Other unit-target range remains center-to-center. Melee pursuit uses the same closest hull point so an attacker stops outside collision instead of repeatedly pushing toward a vehicle center. Building acquisition broadphase queries include the maximum building half-extent so a footprint inside range is discoverable even when its indexed center is not. Explicit Attack orders may target the issuing player's own units or buildings, but not allied teammate entities, and retain their commanded target while it remains legal and visible. A direct attack pursues that target to the current weapon range band, using the closest footprint-boundary point for buildings and the closest hull point for melee attacks on vehicles, stops to fire, and repaths if the same target moves out of range. Tanks instead hold position when the commanded target is within their maximum stationary cannon range (including the usual attacker radius and range slack), allowing the range ramp to reach it; they still fire only inside the current range and pursue if the target leaves the maximum stationary range. A direct attack never switches targets while the commanded target remains valid. Opportunistic moving-fire acquisition for a plain Move uses the same in-range boundary. Attack Move may pause for an in-range engagement and resumes only its original player-issued destination afterward. While retaining a building target, Attack Move rechecks for visible enemy combat units in weapon range each tick and switches to a legal shot on one when available, even during weapon cooldown. This does not change the movement destination or override explicit Attack orders. Disciples are the sole automatic-pursuit exception: aggressive Idle/Attack Move uses a five-tile engagement range, approaches to sword reach, and can switch from a building to a visible combat defender within that engagement range. Other kinds remain weapon-range-only.
 
 After the 50 Steel / 100 Oil, 20-second Scout Plane research completes at the Engineering Complex, Resource Depots and Command Cars activate Scout Plane on the C grid slot. A Resource Depot sortie costs 38 Steel / 56 Oil; a Command Car sortie costs 63 Steel / 94 Oil. Activation launches immediately from a selected ready carrier and starts that carrier's 30-second cooldown. Sorties are independent: any number may coexist and each contributes its own team aerial vision. Activation does not replace or clear a selected Command Car's active or queued orders. The plane has a 30-second total lifetime from launch: transit consumes that lifetime, it orbits only for any time remaining after arrival, and it despawns when the timer expires even if it never reaches the target. Scout Planes have no fuel reserve, Oil upkeep, selected-plane retargeting, return leg, or dismissal commands.
 
@@ -1715,7 +1715,8 @@ General rules:
   Attack Move exclude neutral obstacles from autonomous acquisition; direct Attack and an active
   ClearObstacleArea objective can still target them. Infantry Move steering treats Tank Traps as passable but applies a small local avoidance
   bias when open space exists; vehicles remain hard-blocked by Tank Traps. Attack-move target
-  acquisition considers only currently fireable targets inside weapon range. Setup weapons that
+  acquisition defaults to currently fireable targets inside weapon range; Disciples use the
+  separate engagement policy below. Setup weapons that
   stopped to engage during an unfinished attack-move keep their
   emplacement for a one-second no-target grace period; if the attack-move order still exists after
   that grace, they tear down and continue toward the original attack-move destination.
@@ -1723,11 +1724,19 @@ General rules:
   `MovePhase::AwaitingPath`, `Moving`, or `PathFailed`. Their auto-acquisition is opportunistic:
   it may retain, aim at, expose, and fire on targets that are currently inside weapon range and
   pass hostile, visibility, smoke, terrain line-of-sight, and blocker checks, but it must not
-  request enemy-directed paths or replacements for `path_goal`. `AttackMove` follows the same
+  request enemy-directed paths or replacements for `path_goal`. `AttackMove` normally follows the same
   in-range acquisition boundary: once a non-moving-fire unit reaches a fireable enemy, it clears
   its movement path and stops to engage; after combat clears before arrival, it resumes the original
   player-issued destination. Moving-fire units keep advancing along that destination while firing.
-  Direct `Attack` and idle behavior are stationary as well.
+  Disciples alone use a five-tile engagement range (plus the usual attacker radius and range
+  slack) under aggressive Idle/Attack Move orders, independently of their 0.75-tile sword range.
+  They retain and approach visible legal targets during cooldown as well as when ready, using
+  the existing target-relative melee path and hull/footprint stopping rules. Target death, loss
+  of visibility/legality, or separation beyond engagement range cancels the approach; Attack Move
+  resumes its original destination and Idle stops. Hold Position, Point, actively entrenched
+  orders, and plain Move keep weapon-range-only behavior. Temporary melee approach arrival must
+  not promote queued Attack Move orders. All other kinds default engagement range to their
+  current attack range, including dynamic range bonuses.
 - Direct combat applies damage immediately, but its complete stable entity-id turn order reverses
   on alternating ticks. Every entity pair therefore swaps same-tick firing precedence instead of
   permanently favoring the older, lower-id entity; replay behavior remains deterministic.
@@ -1741,9 +1750,9 @@ General rules:
   ranker selects one named `rules::combat::TargetPriorityPolicyId` and applies that policy's
   declarative terms: default-weapon fit, Tank cannon immediate-threat order, vehicle Tank Trap route
   obstruction, shoot-while-moving target retention, target-group preference, and nearest/id
-  tie-breaks. Auto-acquisition only ranks candidates already inside current weapon range. Explicit
-  `Attack` orders keep their commanded target while it remains hostile and visible without moving
-  toward it. The
+  tie-breaks. Auto-acquisition only ranks candidates inside the current engagement range, which
+  defaults to weapon range. Explicit `Attack` orders keep their commanded target while it remains
+  legal and visible and use the direct-attack pursuit policy above. The
   `tank_coax_machine_gun` policy is used by the Tank secondary-fire pass; it ranks Panzerfausts, Anti-Tank Guns,
   combat infantry (Warrior, Rifleman, Machine Gunner), Mortar Teams, then Scout Cars.
   Remaining legal targets follow default weapon group/material order and distance/id ties. The ranker does

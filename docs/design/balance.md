@@ -228,7 +228,13 @@ The Disciple is a 135-HP, 13.5-pixel-radius ground melee unit moving at 1.84 pix
 All Disciple movement profiles receive a 15% speed increase,
 including Lightness (2.7025 pixels per tick) and Magic (2.024 pixels per tick); War retains
 the base Disciple speed. Its
-23-damage sword has 0.75-tile reach, a 64-tick cooldown, and 50% armor penetration. See
+23-damage sword has 0.75-tile reach, a 64-tick cooldown, and 50% armor penetration.
+Disciples have a separate five-tile engagement range for Idle and Attack Move: they approach
+visible legal enemies to sword reach, then resume their original Attack Move destination when
+the target dies, becomes hidden/illegal, or leaves engagement range. Hold Position and Point
+do not approach, and plain Move keeps its route. Other units default engagement range to their
+current attack range, preserving existing behavior. The engagement override is server-only
+(`DISCIPLE_ENGAGEMENT_RANGE_TILES`); client attack-range metadata is unchanged. See
 [Cultivators specification](cultivators.md).
 
 

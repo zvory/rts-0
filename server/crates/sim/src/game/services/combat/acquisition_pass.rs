@@ -77,6 +77,7 @@ pub(super) fn select(
     if let Some(target) = clear_obstacle_area_target(map, entities, teams, fog, smokes, id, owner) {
         return Some(target);
     }
+    let auto_pursuit = mode == CombatMode::Aggressive && acquire_px > range_px;
     let ready = entities
         .get(id)
         .is_some_and(|entity| entity.weapon_cooldown(weapon) == 0);
@@ -96,6 +97,7 @@ pub(super) fn select(
             _ => false,
         }
     });
+    let reload_scan_order = reload_scan_order || auto_pursuit;
     if tank_periodic_reacquisition_due(entities, id, mode, tick) {
         return acquire(
             map,
@@ -130,11 +132,11 @@ pub(super) fn select(
         acquire_px,
         mode,
         range_px,
-        ready,
+        ready && !auto_pursuit,
         &|_| true,
     );
     // Ground attack-move must not stay locked onto a building when defenders arrive.
-    // Keep the movement order intact and only consider combat units we can shoot now.
+    // Keep movement intent intact; only melee engagement may approach a defender outside reach.
     // Explicit Attack orders retain their commanded target, including outside range.
     let attack_move_on_building = entities.get(id).is_some_and(|attacker| {
         matches!(attacker.order(), Order::AttackMove(_))
@@ -157,7 +159,11 @@ pub(super) fn select(
             px,
             py,
             acquire_px,
-            CombatMode::Opportunistic,
+            if auto_pursuit {
+                CombatMode::Aggressive
+            } else {
+                CombatMode::Opportunistic
+            },
             can_move_fire,
             &|target| {
                 entities.get(target).is_some_and(|entity| {

@@ -58,7 +58,13 @@ px/tick. These values give it three times Rifleman HP, 15% more speed, and 1.5 t
 Its sword has 0.75-tile reach beyond collision radii, deals 23 base damage, attacks every 64 ticks,
 and applies 50% armor penetration. The 23 damage makes two successful hits lethal to a 45-HP
 Rifleman; the 64-tick cooldown interprets "half Rifleman attack speed" as half as many attacks per
-second. The sword uses general-purpose SmallArms target preference but has no projectile, tracer,
+second. Idle and Attack Move use a separate five-tile engagement range (with normal attacker
+radius/range slack) to acquire and approach visible legal enemies. The sword still requires melee
+reach to deal damage. Attack Move preserves its original destination and resumes it after the
+target dies, becomes hidden/illegal, or leaves engagement range; Idle stops its approach. Hold
+Position and Point stay in place, and plain Move keeps its route. Other unit kinds default
+engagement range to their current attack range.
+The sword uses general-purpose SmallArms target preference but has no projectile, tracer,
 muzzle flash or area damage. It holds position while attacking and otherwise uses
 the ordinary attack, attack-move, hold, rally, fog, blocker, damage, and death rules.
 
