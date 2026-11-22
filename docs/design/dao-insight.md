@@ -9,7 +9,7 @@ entity-owned intent is independent of orders: moving, attacking, Stop, and queue
 do not cancel it. No automatic research purchase, Portal default, or army-wide promotion
 is added. Evolution is immediate and free once the unit has 60 insight, capped at 60; misses, friendly fire, invulnerability and overkill grant
 no extra insight. Actual hostile unit HP loss grants one insight per damage; building HP loss grants half, rounded down per hit, for both ordinary attacks and ability projectiles. Advancement clears all existing insight. Successful advancement fully restores HP to the evolved unit’s maximum,
-after applying any path-specific maximum-HP bonus. Base, Lightness, and Magic have 115 maximum HP; War has 135. Base moves at 2.0 px/tick; War and Magic move at 2.1 px/tick. Choosing a pending path or repeating
+after applying any path-specific maximum-HP bonus. Novices have 115 maximum HP; evolution adds 23 HP for all paths, so Lightness and Magic have 138 and War has 162. Base moves at 2.4 px/tick; War and Magic move at 2.52 px/tick. Choosing a pending path or repeating
 an evolution request does not heal; dead units cannot advance. One evolution per unit. Player research persists after Pavilion loss.
 The choice clears on evolution; evolved units cannot change paths. Pending choices persist
 through checkpoints and are visible only to teammates and privileged observers. The command
@@ -20,13 +20,13 @@ Pavilion research now unlocks paid one-for-one training in the [Proving Grounds]
 with the existing shared research price tiers, serial queue and prerequisite/faction gates.
 Combat-earned evolution requires neither research nor a Pavilion.
 
-- Lightness: mobile melee skirmisher; 1.15 times scout-car base speed (2.7025 px/tick), 1.5 attacks per original attack
+- Lightness: mobile melee skirmisher; 1.38 times scout-car base speed (3.243 px/tick), 1.5 attacks per original attack
   interval (cooldown divided by 1.5), existing Ekat Dash with optional return unchanged.
-  Uses a sword at the base Disciple’s 0.75-tile reach, dealing the same 23 damage with 50% armor penetration and a 43-tick cooldown. Plain Move keeps its destination while striking legal targets within melee reach; automatic Idle/Attack Move retains five-tile acquisition and closes to sword reach. Speed and Ekat Dash with optional return are unchanged. The old archer source and strip are preserved for reuse. Selected candidate B uses a thin katana and a single shoulder scarf: resting close to the back at idle, trailing while running, and following four melee swing poses. Classic evolution key L; grid Z.
-- War: armored melee damage dealer; 1.05 times base movement speed (2.1 px/tick), 1.5 damage, +20 maximum HP, 50% armor
+  Uses a sword at the base Disciple’s 0.75-tile reach, dealing 25 damage with 50% armor penetration and a 43-tick cooldown. Plain Move keeps its destination while striking legal targets within melee reach; automatic Idle/Attack Move retains five-tile acquisition and closes to sword reach. Speed and Ekat Dash with optional return are unchanged. The old archer source and strip are preserved for reuse. Selected candidate B uses a thin katana and a single shoulder scarf: resting close to the back at idle, trailing while running, and following four melee swing poses. Classic evolution key L; grid Z.
+- War: armored melee damage dealer; 1.05 times base movement speed (2.52 px/tick), 1.5 times the 25-damage Adept attack (38 after rounding), +24 maximum HP beyond the shared evolution bonus, 50% armor
   reduction using the existing penetration mechanic (full AP bypasses it), keeps the Disciple's existing
-  50% armor penetration. Uses the approved larger armored candidate B Yari silhouette, with idle, two walking poses and four thrust poses. Its sprite scale is 0.56, halfway from the former 0.8 toward the base Disciple’s 0.32. The collision/interaction circle shrinks by the same 30%, from 13.5 to 9.45 world pixels. Its 1.75-tile weapon range plus that radius and four-pixel range slack matches the smaller spear. Vehicle hulls and building footprints retain their existing contact geometry. The 400 ms attack clip anticipates, drives, extends and recovers, with a smooth 11.2-world-pixel presentation-only forward step; collision, authoritative position and damage timing do not move with the artwork. Classic W; grid X.
-- Magic: battlefield support; 1.05 times base movement speed (2.1 px/tick), shared Ekat pull field (renamed Anchor), with doubled inward pull (0.70 movement-speed idle drag and up to 1.70x movement toward its center; radial falloff and weight resistance still apply) and a new Shield, uses the approved Magic C hooded spellcaster, with arms swept backward and flowing mantle while running. Its five-tile orbs deal the same 23 damage with 50% armor penetration and 64-tick cooldown. It stops to fire normally and has no secondary sword. Classic C; grid C. All three Dao silhouettes replace their legacy glyphs; insight, readiness and advancement overlays remain. Bespoke audio remains deferred.
+  50% armor penetration. Uses the approved larger armored candidate B Yari silhouette, with idle, two walking poses and four thrust poses. Its sprite scale is 0.56, halfway from the former 0.8 toward the base Disciple’s 0.32. The collision/interaction circle uses 70% of the shared 26-pixel body radius, giving War an 18.2-pixel radius. Its 1.75-tile weapon range plus that radius and four-pixel range slack matches the smaller spear. Vehicle hulls and building footprints retain their existing contact geometry. The 400 ms attack clip anticipates, drives, extends and recovers, with a smooth 11.2-world-pixel presentation-only forward step; collision, authoritative position and damage timing do not move with the artwork. Classic W; grid X.
+- Magic: battlefield support; 1.05 times base movement speed (2.52 px/tick), shared Ekat pull field (renamed Anchor), with doubled inward pull (0.70 movement-speed idle drag and up to 1.70x movement toward its center; radial falloff and weight resistance still apply) and a new Shield, uses the approved Magic C hooded spellcaster, with arms swept backward and flowing mantle while running. Its five-tile orbs deal 25 damage with 50% armor penetration and 64-tick cooldown. It stops to fire normally and has no secondary sword. Classic C; grid C. All three Dao silhouettes replace their legacy glyphs; insight, readiness and advancement overlays remain. Bespoke audio remains deferred.
 
 Each paid training path has a separate researched unlock; combat-earned evolution is unrestricted. No automatic AI evolution in this pass;
 AI can encounter and damage evolved units. Insight uses a blue fill over red background
@@ -65,8 +65,8 @@ the existing match and snapshot sequence. Mixed-faction Lab support is outside t
 
 War Disciples gain **Throw Sword** (E): a world-point aimed spinning sword using
 Line Shot's six-tile range, 0.6-tile width, eight pixels per tick travel, free cost,
-and 20-second cooldown. Each enemy targetable can be hit once per leg: 40 damage
-outbound and 80 returning, with the existing terrain and Shield reductions. The sword
+and 20-second cooldown. Each enemy targetable can be hit once per leg: 44 damage
+outbound and 88 returning, with the existing terrain and Shield reductions. The sword
 tracks its living caster on return and expires on caster death or the shared projectile
 lifetime limit. Other Dao paths and unevolved Disciples cannot cast it. Its separate
 `throwSword` identity uses the existing fog-filtered line-projectile projection; no caster

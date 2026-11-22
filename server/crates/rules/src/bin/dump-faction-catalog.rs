@@ -722,7 +722,7 @@ fn print_ability_effects(indent: &str) {
         faction::AbilityKind::ThrowSword.stable_id(),
         json_f32(balance::EKAT_LINE_SHOT_WIDTH_TILES * 0.5),
         json_f32(balance::EKAT_LINE_SHOT_SPEED_PX_PER_TICK),
-        balance::EKAT_LINE_SHOT_DAMAGE,
+        balance::THROW_SWORD_DAMAGE,
     );
     println!(
         "{indent}    \"{}\": {{\"radiusTiles\":{},\"durationTicks\":{},\"pullAwayMultiplier\":{},\"pullTowardMultiplier\":{}}},",

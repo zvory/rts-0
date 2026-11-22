@@ -297,6 +297,9 @@ pub(super) fn effective_attack_profile(e: &Entity) -> EffectiveAttackProfile {
         dmg: base.dmg,
         cooldown: base.cooldown,
     };
+    if e.kind == EntityKind::Warrior && e.dao.is_some() {
+        profile.dmg = config::DAO_ATTACK_DAMAGE;
+    }
     if e.dao == Some(crate::game::upgrade::UpgradeKind::DaoOfLightness) {
         profile.cooldown =
             ((profile.cooldown as f32) / config::DAO_LIGHTNESS_ATTACK_RATE).round() as u32;

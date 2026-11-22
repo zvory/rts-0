@@ -153,6 +153,7 @@ export const EKAT_LINE_SHOT_RANGE_TILES = 6;
 export const EKAT_LINE_SHOT_WIDTH_TILES = 0.6;
 export const EKAT_LINE_SHOT_SPEED_PX_PER_TICK = 8;
 export const EKAT_LINE_SHOT_DAMAGE = 40;
+const THROW_SWORD_DAMAGE = 44;
 export const EKAT_LINE_SHOT_COOLDOWN_TICKS = TICK_HZ * 20;
 export const EKAT_MAGIC_ANCHOR_RANGE_TILES = 5;
 export const EKAT_MAGIC_ANCHOR_DURATION_TICKS = TICK_HZ * 10;
@@ -185,7 +186,7 @@ export const STATS = Object.freeze({
     upgradeRequires: UPGRADE.PANZERFAUSTS,
     description: `Rifle infantry carrying one disposable ${PANZERFAUST_RANGE_TILES}-tile anti-vehicle shot. After launching it, the unit keeps fighting as ordinary rifle infantry.` },
   [KIND.WARRIOR]: { armored: false, label: "Novice", icon: "NV", size: 26, sight: 11,
-    rangeTiles: 0.75, cost: { steel: 100, oil: 0 }, supply: 2, buildTicks: 300,
+    rangeTiles: 0.75, cost: { steel: 75, oil: 0 }, supply: 2, buildTicks: 300,
     description: "Durable melee infantry with a short sword reach and 50% armor penetration. Slow attacks deal heavy damage." },
   [KIND.MACHINE_GUNNER]: { armored: false, label: "Machine Gunner", icon: "MG", size: 10, sight: 11,
     rangeTiles: 6.1, cost: { steel: 75, oil: 10 }, supply: 2, buildTicks: 400, requires: KIND.TRAINING_CENTRE },
@@ -472,7 +473,7 @@ export const ABILITIES = Object.freeze({
     label: "Throw Sword",
     icon: "⚔",
     hotkey: "E",
-    title: "Throw a spinning sword out and back; deals 40 damage outbound and 80 on return",
+    title: "Throw a spinning sword out and back; deals 44 damage outbound and 88 on return",
     carriers: Object.freeze([KIND.WARRIOR]),
     targetMode: "worldPoint",
     rangeTiles: EKAT_LINE_SHOT_RANGE_TILES,
@@ -480,7 +481,7 @@ export const ABILITIES = Object.freeze({
     cost: Object.freeze({ steel: 0, oil: 0 }),
     radiusTiles: EKAT_LINE_SHOT_WIDTH_TILES * 0.5,
     speedPxPerTick: EKAT_LINE_SHOT_SPEED_PX_PER_TICK,
-    damage: EKAT_LINE_SHOT_DAMAGE,
+    damage: THROW_SWORD_DAMAGE,
     queued: true,
     queuePolicy: "skipIfNotReady",
   }),

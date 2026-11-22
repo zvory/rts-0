@@ -341,6 +341,9 @@ pub(crate) fn launch_world_ability(
                 return false;
             };
             hero_projectile_spec.ability = ability;
+            if ability == AbilityKind::ThrowSword {
+                hero_projectile_spec.damage = config::THROW_SWORD_DAMAGE;
+            }
             let target_x = hero_projectile_spec.endpoint.0;
             let target_y = hero_projectile_spec.endpoint.1;
             let mut projectile_specs = vec![hero_projectile_spec];

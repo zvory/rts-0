@@ -106,7 +106,7 @@ fn disciple_insight_counts_actual_hp_loss_resets_on_evolution_and_doubles_cap() 
         .unwrap()
         .evolve_dao(crate::game::ability::AbilityKind::EvolveWar));
     assert_eq!(entities.get(unit).unwrap().insight, 0);
-    for expected in [35, 70, 105, 120, 120] {
+    for expected in [38, 76, 114, 120, 120] {
         entities
             .get_mut(unit)
             .unwrap()
@@ -128,14 +128,14 @@ fn war_armor_uses_weapon_penetration_and_lightness_changes_attack_rate() {
     use crate::game::upgrade::UpgradeKind;
     let mut unit =
         crate::game::entity::Entity::new_unit(1, EntityKind::Warrior, 100.0, 100.0).unwrap();
-    assert!((unit.movement_speed() - 2.0).abs() < 0.001);
+    assert!((unit.movement_speed() - 2.4).abs() < 0.001);
     unit.dao = Some(UpgradeKind::DaoOfHeaviness);
-    assert!((unit.movement_speed() - 2.1).abs() < 0.001);
+    assert!((unit.movement_speed() - 2.52).abs() < 0.001);
     assert_eq!(unit.dao_damage_after_armor(100, 0.0), 50);
     assert_eq!(unit.dao_damage_after_armor(100, 0.5), 75);
     assert_eq!(unit.dao_damage_after_armor(100, 1.0), 100);
     let war = effective_attack_profile(&unit);
-    assert_eq!(war.dmg, 35);
+    assert_eq!(war.dmg, 38);
     assert_eq!(war.range_tiles, config::DAO_WAR_RANGE_TILES);
     unit.dao = Some(UpgradeKind::DaoOfLightness);
     let light = effective_attack_profile(&unit);
@@ -147,9 +147,9 @@ fn war_armor_uses_weapon_penetration_and_lightness_changes_attack_rate() {
     );
     assert!(can_fire_while_moving(&unit, false));
     assert!(unit.dao_ability_available(crate::game::ability::AbilityKind::EkatTeleport));
-    assert!((unit.movement_speed() - 2.7025).abs() < 0.001);
+    assert!((unit.movement_speed() - 3.243).abs() < 0.001);
     unit.dao = Some(UpgradeKind::DaoOfMagic);
-    assert!((unit.movement_speed() - 2.1).abs() < 0.001);
+    assert!((unit.movement_speed() - 2.52).abs() < 0.001);
 }
 
 #[test]
@@ -307,12 +307,12 @@ fn dao_profiles_keep_lightness_melee_and_magic_ranged() {
             combat_rules::engagement_range_tiles(unit.kind, profile.range_tiles),
             5.0
         );
-        assert_eq!(profile.dmg, 23);
+        assert_eq!(profile.dmg, 25);
         assert_eq!(profile.cooldown, cooldown);
         assert_eq!(profile.weapon.unwrap().id, weapon);
         assert_eq!(profile.weapon.unwrap().armor_penetration, 0.5);
         let events = run_combat_tick(&mut entities);
-        assert_eq!(entities.get(target).unwrap().hp, 278);
+        assert_eq!(entities.get(target).unwrap().hp, 276);
         assert_eq!(entities.get(disciple).unwrap().attack_cd(), cooldown);
         assert_eq!(
             entities
@@ -330,7 +330,7 @@ fn dao_profiles_keep_lightness_melee_and_magic_ranged() {
         )).count(), 1);
         // The resolved primary cooldown is ticked by the compatibility helper as well.
         run_combat_tick(&mut entities);
-        assert_eq!(entities.get(target).unwrap().hp, 278);
+        assert_eq!(entities.get(target).unwrap().hp, 276);
         assert_eq!(entities.get(disciple).unwrap().attack_cd(), cooldown - 1);
     }
     let mut unit =
@@ -350,7 +350,7 @@ fn dao_profiles_keep_lightness_melee_and_magic_ranged() {
                 0.75
             }
         );
-        assert_eq!(profile.dmg, if dao.is_some() { 35 } else { 23 });
+        assert_eq!(profile.dmg, if dao.is_some() { 38 } else { 23 });
         assert_eq!(profile.cooldown, 64);
         assert!(!can_fire_while_moving(&unit, false));
     }
@@ -379,7 +379,7 @@ fn lightness_fires_during_move_and_magic_keeps_normal_stop_to_fire_policy() {
         assert_eq!(
             entities.get(target).unwrap().hp,
             if dao == UpgradeKind::DaoOfLightness {
-                22
+                20
             } else {
                 45
             }
@@ -390,7 +390,7 @@ fn lightness_fires_during_move_and_magic_keeps_normal_stop_to_fire_policy() {
         if dao == UpgradeKind::DaoOfMagic {
             unit.set_order(Order::attack_move_to(goal.0, goal.1));
             run_combat_tick(&mut entities);
-            assert_eq!(entities.get(target).unwrap().hp, 22);
+            assert_eq!(entities.get(target).unwrap().hp, 20);
             assert!(entities.get(disciple).unwrap().path_is_empty());
         }
     }
@@ -538,7 +538,7 @@ fn lightness_moving_sword_cannot_hit_at_former_arrow_range() {
         let events = run_combat_tick(&mut entities);
         assert_eq!(
             entities.get(target).unwrap().hp,
-            if distance < 30.0 { 22 } else { 45 }
+            if distance < 30.0 { 20 } else { 45 }
         );
         assert_eq!(
             entities.get(disciple).unwrap().path_goal(),

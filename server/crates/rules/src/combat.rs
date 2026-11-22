@@ -171,7 +171,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
     WeaponProfile {
         id: WeaponKind::DiscipleArrow,
         range_tiles: crate::balance::DAO_RANGED_RANGE_TILES,
-        dmg: 23,
+        dmg: 25,
         cooldown: 64,
         weapon_class: WeaponClass::SmallArms,
         armor_penetration: 0.5,
@@ -181,7 +181,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
     WeaponProfile {
         id: WeaponKind::DiscipleOrb,
         range_tiles: crate::balance::DAO_RANGED_RANGE_TILES,
-        dmg: 23,
+        dmg: 25,
         cooldown: 64,
         weapon_class: WeaponClass::SmallArms,
         armor_penetration: 0.5,

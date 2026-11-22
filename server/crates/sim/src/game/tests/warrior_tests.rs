@@ -32,7 +32,7 @@ fn cultivator_portal_trains_warrior_and_reserves_two_supply() {
     );
     game.tick();
 
-    assert_eq!(game.state.players[0].steel, 0);
+    assert_eq!(game.state.players[0].steel, 25);
     assert_eq!(game.state.players[0].supply_used, 2);
     assert_eq!(
         game.state
@@ -57,7 +57,7 @@ fn cultivator_portal_trains_warrior_and_reserves_two_supply() {
         .expect("Portal should produce a Warrior");
     assert_eq!((warrior.hp, warrior.max_hp), (115, 115));
     assert_eq!(warrior.radius(), 26.0);
-    assert_eq!(warrior.movement_speed(), 2.0);
+    assert_eq!(warrior.movement_speed(), 2.4);
 }
 
 #[test]
@@ -211,16 +211,16 @@ fn disciple_evolution_requires_insight_ownership_but_no_research_and_is_permanen
         (
             AbilityKind::EvolveLightness,
             UpgradeKind::DaoOfLightness,
-            115,
-            2.7025,
+            138,
+            3.243,
         ),
         (
             AbilityKind::EvolveWar,
             UpgradeKind::DaoOfHeaviness,
-            135,
-            2.1,
+            162,
+            2.52,
         ),
-        (AbilityKind::EvolveMagic, UpgradeKind::DaoOfMagic, 115, 2.1),
+        (AbilityKind::EvolveMagic, UpgradeKind::DaoOfMagic, 138, 2.52),
     ] {
         let mut game = empty_flat_game(&[
             cultivator_player(),
@@ -485,7 +485,8 @@ fn disciple_dao_gates_blink_return_and_magic_anchor() {
     );
     game.tick();
     // The Anchor can pull its own caster slightly; a forbidden blink must not cross 40px.
-    assert!((game.state.entities.get(support).unwrap().pos_x() - 600.0).abs() < 2.0);
+    let support = game.state.entities.get(support).unwrap();
+    assert!((support.pos_x() - 600.0).abs() < 2.0 * support.movement_speed());
 }
 
 #[test]
@@ -1038,12 +1039,12 @@ fn war_throw_sword_is_dao_gated_and_hits_harder_on_return_after_checkpoint() {
     }
     assert_eq!(
         game.state.entities.get(victim).unwrap().hp,
-        140,
-        "exactly one 40 damage outbound hit"
+        136,
+        "exactly one 44 damage outbound hit"
     );
     assert_eq!(
         game.state.entities.get(caster).unwrap().insight,
-        27,
+        29,
         "projectile insight halves building HP loss, excluding overkill and invulnerability"
     );
     // A round trip through a checkpoint retains the projectile identity, leg and hit sets.
@@ -1060,12 +1061,12 @@ fn war_throw_sword_is_dao_gated_and_hits_harder_on_return_after_checkpoint() {
     }
     assert_eq!(
         game.state.entities.get(victim).unwrap().hp,
-        60,
-        "exactly one 80 damage return hit"
+        48,
+        "exactly one 88 damage return hit"
     );
-    assert_eq!(restored.state.entities.get(victim).unwrap().hp, 60);
-    assert_eq!(game.state.entities.get(caster).unwrap().insight, 67);
-    assert_eq!(restored.state.entities.get(caster).unwrap().insight, 67);
+    assert_eq!(restored.state.entities.get(victim).unwrap().hp, 48);
+    assert_eq!(game.state.entities.get(caster).unwrap().insight, 73);
+    assert_eq!(restored.state.entities.get(caster).unwrap().insight, 73);
     assert_eq!(game.state.ability_runtime.world_objects().count(), 0);
 }
 
