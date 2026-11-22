@@ -1671,7 +1671,7 @@ export class Renderer {
   resize(w,h,dpr)
   buildStaticMap(map)                    // draw terrain once into a cached layer
   render(stateFacade, cameraFacade, fogFacade, alpha, options?) // Pixi-private engine seam
-  present()                              // one synchronous app.render(); increments on success
+  present(nowMs = visualNow())            // update water clock; one synchronous app.render(); increments on success
   captureReadiness({subjectIds?, subjectKinds?}) // bounded visual asset/error state for Interact capture
   app                                    // the PIXI.Application (for ticker/stage if needed)
   // Pixi implementation used by PixiPresentationAdapter's screenOverlay reconciliation:
@@ -2676,7 +2676,8 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
 - Pond water (`renderer/water.js`) ports Jess Hammer’s MIT-licensed generated shader and
   painted textures from `client/assets/water/pixel-water/`; that directory records provenance,
   binding changes, palette adaptation, and noise regeneration. Its water-only mesh remains
-  beneath world objects and fog; the submitted visual clock drives animation and asset readiness
+  beneath world objects and fog and receives the world sunlight warmth tint. The submitted visual
+  clock drives animation in matches and the Map Editor, and asset readiness
   includes the shader and textures. Shore distance supplies stepped visual depth without
   changing authoritative terrain.
 - Local lab visual profiles may pass renderer-only static samples to `Renderer.render`. Static

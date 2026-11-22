@@ -422,8 +422,9 @@ export class Renderer {
     this.setRenderClock(renderClock);
   }
 
-  present() {
+  present(nowMs = this.visualNow()) {
     if (this._destroyed) throw new Error("Cannot present a destroyed Pixi renderer.");
+    this._waterLayer?.update(nowMs);
     if (this._gpuShadowTimer) {
       this._gpuShadowTimer.measure("renderer.present.total", () => this.app.render());
       this._gpuShadowTimer.poll();
@@ -642,7 +643,6 @@ export class Renderer {
     // Drive the world container from the camera (single transform for all layers).
     this.world.position.set(-camera.x * camera.zoom, -camera.y * camera.zoom);
     this.world.scale.set(camera.zoom);
-    this._waterLayer?.update(this.visualNow());
     time("renderer.doodads", () => this._doodads?.updateVisibility(camera));
 
     // Begin a fresh reconciliation pass.

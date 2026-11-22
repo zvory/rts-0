@@ -8,6 +8,7 @@ in vec2 vWorld;
 out vec4 finalColor;
 uniform float uTime;
 uniform vec2 uMapSize;
+uniform vec3 uTint;
 uniform sampler2D uShore;
 
 const float CausticTextureScale = .0009;
@@ -461,7 +462,7 @@ void main() {
 
 
 // Output:0
-	finalColor.rgb = vec3(n_out136p0.xyz);
+	finalColor.rgb = vec3(n_out136p0.xyz) * uTint;
 	finalColor.a = 1.0;
 
 

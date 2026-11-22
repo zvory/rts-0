@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import { WaterLayer, shoreDistances } from "../../client/src/renderer/water.js";
 import { installFakePixi } from "./pixi_fakes.mjs";
+import { Renderer } from "../../client/src/renderer/index.js";
+import { buildStaticMap, updateStaticTerrainTiles } from "../../client/src/renderer/terrain.js";
+import { MapEditorWorkerRenderer } from "../../client/src/renderer/map_editor_worker_renderer.js";
+import { createMapEditorPresentation } from "../../client/src/map_editor_presentation.js";
 
 const map = { width: 5, height: 5, tileSize: 32, terrain: Array.from({ length: 25 }, (_, i) =>
   i % 5 === 0 || i % 5 === 4 || i < 5 || i >= 20 ? 0 : 2) };
@@ -35,6 +39,43 @@ try {
   assert.equal(parent.children.length, 0);
   assert(water.geometry.destroyed && water.shader.destroyed && water.texture.destroyed);
   assert(water.textures.every((texture) => texture.destroyed), "teardown releases every water texture");
+
+  const renderer = {
+    world: new PIXI.Container(),
+    layers: { terrain: new PIXI.Container(), feedback: new PIXI.Container() },
+    app: { render() {} },
+    _renderFrameCount: 0,
+    visualNow: () => 6000,
+    present: Renderer.prototype.present,
+    updateStaticDoodadVisibility() {},
+  };
+  buildStaticMap.call(renderer, { ...map, sun: { warmth: 100 } });
+  const initialWater = renderer._waterLayer;
+  await initialWater.ready;
+  const tint = initialWater.uniforms.uniforms.uTint.value;
+  assert.deepEqual([...tint], [...new Float32Array([1, 208 / 255, 138 / 255])],
+    "water receives the same warmth tint as the surrounding terrain");
+  const initialRequests = requests;
+  updateStaticTerrainTiles.call(renderer, [{ x: 0, y: 0, code: 1 }, { x: 1, y: 1, code: 2 }]);
+  assert.equal(renderer._waterLayer, initialWater, "land edits and unchanged water reuse the loaded layer");
+  assert.equal(requests, initialRequests, "land edits do not reload water assets");
+  renderer.present();
+  assert.equal(initialWater.uniforms.uniforms.uTime, 6, "match presentations use the renderer visual clock");
+  const editor = new MapEditorWorkerRenderer(renderer);
+  editor.present(createMapEditorPresentation({
+    frameId: 1, visualTimeMs: 2400, camera: { x: 0, y: 0, zoom: 1 },
+  }));
+  assert.equal(initialWater.uniforms.uniforms.uTime, 2.4, "editor presentations animate using their submitted clock");
+  updateStaticTerrainTiles.call(renderer, [{ x: 1, y: 1, code: 0 }]);
+  assert(initialWater.destroyed, "removing water releases the old layer");
+  assert.notEqual(renderer._waterLayer, initialWater, "shoreline edits rebuild the water mesh and distance field");
+  await renderer._waterLayer.ready;
+  updateStaticTerrainTiles.call(renderer, [{ x: 0, y: 0, code: 2 }]);
+  await renderer._waterLayer.ready;
+  assert.equal(renderer._waterLayer.geometry.options.attributes.aPosition.buffer.length, 9 * 12,
+    "adding water restores a tile's mesh geometry");
+  renderer._waterLayer.destroy();
+  renderer._terrainSprite.destroy(true);
 
   const pending = [];
   globalThis.fetch = () => new Promise((resolve) => pending.push(resolve));

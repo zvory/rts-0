@@ -56,7 +56,7 @@ export function shoreDistances(map) {
 
 /** Direct MIT-licensed jess::codes pixel-water port with shore-derived depth inputs. */
 export class WaterLayer {
-  constructor(pixi, layer, map) {
+  constructor(pixi, layer, map, tint = 0xffffff) {
     this.destroyed = false;
     this.textures = [];
     this.ready = Promise.resolve(true);
@@ -81,6 +81,10 @@ export class WaterLayer {
     this.uniforms = new pixi.UniformGroup({
       uTime: { value: 0, type: "f32" },
       uMapSize: { value: new Float32Array([map.width * ts, map.height * ts]), type: "vec2<f32>" },
+      // Custom mesh shaders do not inherit the sprite pipeline's world tint.
+      uTint: { value: new Float32Array([
+        ((tint >> 16) & 255) / 255, ((tint >> 8) & 255) / 255, (tint & 255) / 255,
+      ]), type: "vec3<f32>" },
     });
     this.geometry = new pixi.Geometry({
       attributes: { aPosition: { buffer: new Float32Array(positions), format: "float32x2" } },
