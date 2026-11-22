@@ -66,7 +66,12 @@ pub(in crate::game) fn ability_object_views_for(
                 kind: crate::protocol::ability_object_kinds::SHIELD.into(),
                 x: shield.x.to_world(),
                 y: shield.y.to_world(),
-                expires_in: None,
+                expires_in: Some(
+                    shield
+                        .expires_tick
+                        .saturating_sub(game.state.tick)
+                        .min(u16::MAX as u32) as u16,
+                ),
                 source_caster_id: (owner_visible
                     || !fogged
                     || fog.is_visible_world(player, caster.pos_x(), caster.pos_y()))

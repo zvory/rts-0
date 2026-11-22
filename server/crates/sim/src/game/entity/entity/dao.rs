@@ -7,15 +7,27 @@ pub(crate) struct DiscipleShield {
     pub x: Coord,
     pub y: Coord,
     pub remaining: u32,
+    pub expires_tick: u32,
 }
 
 impl Entity {
+    pub(in crate::game) fn expire_shield(&mut self, tick: u32) {
+        if self
+            .shield
+            .as_ref()
+            .is_some_and(|shield| shield.expires_tick <= tick)
+        {
+            self.shield = None;
+        }
+    }
+
     pub(in crate::game) fn place_shield(
         &mut self,
         id: u32,
         x: f32,
         y: f32,
         cooldown: u16,
+        expires_tick: u32,
         preserve_order: bool,
     ) {
         self.shield = Some(DiscipleShield {
@@ -23,6 +35,7 @@ impl Entity {
             x: Coord::from_world(x),
             y: Coord::from_world(y),
             remaining: config::DISCIPLE_SHIELD_CAPACITY,
+            expires_tick,
         });
         self.start_ability_cooldown(AbilityKind::DiscipleShield, cooldown);
         if !preserve_order {

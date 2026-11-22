@@ -147,12 +147,14 @@ pub(super) fn planner_facts(
                     && ability.tech_ready
                     && has_unreserved_ability_use(e, ability.kind)
                 {
+                    let (preserve_order, interrupt_order) =
+                        world_ability_order_policy(ability.kind);
                     facts.abilities.push(planner::AbilityFacts {
                         ability: ability.id,
                         ready_at_issue,
                         queue_admissible_at_issue,
                         can_execute_without_interrupt: ability.target.is_some_and(|(x, y)| {
-                            world_ability_can_execute_without_interrupt(ability.kind)
+                            preserve_order
                                 && ability_orders::caster_in_range(
                                     ability.map,
                                     entities,
@@ -169,9 +171,7 @@ pub(super) fn planner_facts(
                                     y,
                                 )
                         }),
-                        can_interrupt_active_order: world_ability_may_interrupt_active_order(
-                            ability.kind,
-                        ),
+                        can_interrupt_active_order: interrupt_order,
                     });
                 }
             }
@@ -233,25 +233,27 @@ pub(super) struct AbilityFactInput<'a> {
     pub(super) map: &'a Map,
 }
 
-fn world_ability_can_execute_without_interrupt(ability: AbilityKind) -> bool {
-    matches!(
-        ability,
-        AbilityKind::Smoke
-            | AbilityKind::EkatTeleport
-            | AbilityKind::EkatLineShot
-            | AbilityKind::ThrowSword
-            | AbilityKind::EkatMagicAnchor
-    )
-}
-
-fn world_ability_may_interrupt_active_order(ability: AbilityKind) -> bool {
-    matches!(
-        ability,
-        AbilityKind::MortarFire
-            | AbilityKind::Barrage
-            | AbilityKind::EkatTeleport
-            | AbilityKind::EkatLineShot
-            | AbilityKind::ThrowSword
-            | AbilityKind::EkatMagicAnchor
-    )
+// Exhaustive: adding an ability requires an explicit movement-policy decision.
+// (can execute in range while preserving orders, can replace a busy order)
+fn world_ability_order_policy(ability: AbilityKind) -> (bool, bool) {
+    match ability {
+        AbilityKind::Smoke => (true, false),
+        AbilityKind::MortarFire | AbilityKind::Barrage => (false, true),
+        AbilityKind::EkatTeleport
+        | AbilityKind::EkatLineShot
+        | AbilityKind::ThrowSword
+        | AbilityKind::EkatMagicAnchor
+        | AbilityKind::DiscipleShield => (true, true),
+        // Self-targeted abilities or abilities with dedicated command dispatch.
+        AbilityKind::Charge
+        | AbilityKind::PointFire
+        | AbilityKind::BlanketFire
+        | AbilityKind::Breakthrough
+        | AbilityKind::ScoutPlane
+        | AbilityKind::DismissScoutPlane
+        | AbilityKind::EkatConsumeGolem
+        | AbilityKind::EvolveLightness
+        | AbilityKind::EvolveWar
+        | AbilityKind::EvolveMagic => (false, false),
+    }
 }
