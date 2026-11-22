@@ -114,7 +114,7 @@ fn tournament_admits_at_each_side_and_corner_of_the_four_tile_footprint() {
 }
 
 #[test]
-fn tournament_four_enter_ten_seconds_one_random_upgrade_rally_and_checkpoint() {
+fn tournament_four_enter_five_seconds_one_random_upgrade_rally_and_checkpoint() {
     let mut game = empty_flat_game(&[player(1)]);
     let grounds = arena(&mut game);
     game.state.players[0].set_resources(0, 0);
@@ -138,7 +138,7 @@ fn tournament_four_enter_ten_seconds_one_random_upgrade_rally_and_checkpoint() {
     )
     .unwrap();
     let progress = game.state.entities.get(grounds).unwrap().prod_queue()[0].progress;
-    for _ in progress..299 {
+    for _ in progress..149 {
         game.tick();
         restored.tick();
     }
@@ -155,7 +155,7 @@ fn tournament_four_enter_ten_seconds_one_random_upgrade_rally_and_checkpoint() {
         .iter()
         .filter(|e| e.kind == EntityKind::Warrior)
         .collect();
-    assert_eq!(winners.len(), 1, "one winner emerges at ten seconds");
+    assert_eq!(winners.len(), 1, "one winner emerges at five seconds");
     for e in winners {
         assert!(matches!(
             e.dao,

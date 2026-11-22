@@ -6,8 +6,8 @@ User authorized implementation and supplied the fantasy, input/output, footprint
 rally behavior and art direction. Tournament Grounds is the initial player-facing name. Cultivator
 Engineers build an arena that trades four ordinary Disciples for one randomly specialized
 Disciple. The opportunity cost is three army bodies and the risk of losing entrants when the
-building is destroyed. Opponents can punish the ten-second conversion window or destroy the arena.
-Description: “Send four base Disciples inside to begin a free ten-second tournament. One winner
+building is destroyed. Opponents can punish the five-second conversion window or destroy the arena.
+Description: “Send four base Disciples inside to begin a free five-second tournament. One winner
 emerges with a random Dao specialization. Supports a rally point.”
 
 ## Phase 1: rules and balance — complete
@@ -18,7 +18,7 @@ emerges with a random Dao specialization. Supports a rally point.”
   cancellation/refund, damage, fog memory and destruction behavior.
 - Right-click own completed Grounds with base Disciples (Warrior kind, no Dao). Entrants walk to
   the perimeter and are consumed on arrival. Other units and enemy/allied disciples are rejected.
-- Capacity four. The fourth entrant starts 300 ticks (ten seconds), with no resource charge,
+- Capacity four. The fourth entrant starts 150 ticks (five seconds), with no resource charge,
   research prerequisite or additional command. While running it stages further entrants outside for the next tournament.
 - One full-health Disciple emerges, drawing Lightness, War or Magic with
   equal probability from the simulation RNG. Existing first Dao evolution rules apply, including

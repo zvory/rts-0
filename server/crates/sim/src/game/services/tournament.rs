@@ -8,7 +8,7 @@ use crate::game::PlayerState;
 use rand::Rng;
 
 pub(crate) const CAPACITY: u8 = 4;
-pub(crate) const DURATION: u32 = 300;
+pub(crate) const DURATION: u32 = 150;
 
 /// A contextual move onto the exact center of an owned, complete arena means enter.
 /// Ordinary move commands and replay command recording retain their existing wire vocabulary.
