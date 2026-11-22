@@ -1595,7 +1595,11 @@ omits illegal build commands for those sites, and resumes on the far side; vehic
   methods, while gameplay command emission continues to flow through
   `commandIssuer.issueCommand`. HUD selected-unit strip cells support direct selection refinement:
   left-click selects only that unit, Shift-click removes it from the selection, and Ctrl/Meta-click
-  or control context-click filters the current selection to that unit kind. Unit command-card
+  or control context-click filters the current selection to that unit kind. Base Novices and each
+  evolved Dao (War, Magic, Lightness) count as separate types for this filtering and world
+  Ctrl/Meta-click or double-click selection; a base Novice’s chosen future Dao does not split its
+  type until evolution. This keeps base Novice Dao choices accessible without evolved abilities
+  occupying their command-card slots. Unit command-card
   descriptors include Stop on S and Hold Position on W; Command Car selections also expose
   Breakthrough on E. In lab rooms, injected lab control policy owns selection, inspection, and
   single-owner issue-as routing without changing the client player id. `PredictionController` owns

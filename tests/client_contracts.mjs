@@ -116,6 +116,7 @@ await import("./client_contracts/tank_trap_placement_index_contracts.mjs");
 await import("./client_contracts/barbed_wire_contracts.mjs");
 await import("./client_contracts/auto_build_contracts.mjs");
 await import("./client_contracts/state_input_contracts.mjs");
+await import("./client_contracts/dao_selection_contracts.mjs");
 await import("./client_contracts/dao_ability_targeting_contracts.mjs");
 await import("./client_contracts/resource_vision_contracts.mjs");
 await import("./client_contracts/client_intent_order_queue_contracts.mjs");
