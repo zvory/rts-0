@@ -123,6 +123,7 @@ import {
 } from "./units.js";
 import { UnifiedGpuShadowLayer } from "./unified_gpu_shadows.js";
 import { AsyncGpuTimerQueries } from "./gpu_timer_queries.js";
+import { DiscipleProjectileVisuals } from "./disciple_projectiles.js";
 
 const RENDER_ERROR_LOG_INTERVAL_MS = 5000;
 const MISSING_TEXTURE_SIZE_PX = 26;
@@ -279,6 +280,10 @@ export class Renderer {
     this.layers.feedback.addChild(this._observerMapAnalysisTooltip);
     this._feedbackGfx = new PIXI.Graphics();
     this.layers.feedback.addChild(this._feedbackGfx);
+    this._discipleProjectiles = new DiscipleProjectileVisuals({
+      pixi: PIXI, layer: this.layers.feedback,
+      trackAsset: (id, promise, metadata) => this._trackVisualAsset(id, promise, metadata),
+    });
     this._rocketTruckVisuals = new RocketTruckVisuals({
       pixi: PIXI, unitLayer: this.layers.units, projectileLayer: this.layers.feedback,
       trackAsset: (id, promise, metadata) => this._trackVisualAsset(id, promise, metadata),
@@ -1336,6 +1341,7 @@ export class Renderer {
     this._fogGfx.destroy();
     this._rocketTruckVisuals?.destroy();
     this._throwSwordVisuals?.destroy();
+    this._discipleProjectiles?.destroy();
     this._feedbackGfx.destroy();
     this._observerMapAnalysisGfx.destroy();
     this._observerMapAnalysisHitLayer.destroy({ children: true });

@@ -3,11 +3,11 @@ import { PRODUCTION_RASTER_COLOR_TARGET } from "./color_adjustment.js";
 export const LIGHTNESS_FRAME_STRIP_KEY = "warrior:lightness";
 export const MAGIC_FRAME_STRIP_KEY = "warrior:magic";
 
-function discipleStrip(dao, frameCount, firingFrames, iconVisibleBounds, weaponKind) {
+function discipleStrip(image, frameCount, firingFrames, iconVisibleBounds, weaponKind) {
   return Object.freeze({
     enabled: true,
     unit: "warrior",
-    image: `/assets/rigs/disciple-dao/generated/${dao}-runtime-strip.png?v=dao-ranged-1`,
+    image,
     imageVersion: "dao-ranged-1",
     frameWidth: 256,
     frameHeight: 256,
@@ -29,12 +29,13 @@ function discipleStrip(dao, frameCount, firingFrames, iconVisibleBounds, weaponK
     bakedColorAdjustment: Object.freeze({ brightness: 100, saturation: 100, hue: 100 }),
     targetColorAdjustment: PRODUCTION_RASTER_COLOR_TARGET,
     source: Object.freeze({
-      runtimeStrip: `client/assets/rigs/disciple-dao/generated/${dao}-runtime-strip.png`,
+      generator: "scripts/art/disciple-dao-pipeline.mjs",
+      runtimeStrip: "client" + image.split("?")[0],
     }),
   });
 }
 
-export const LIGHTNESS_PNG_FRAME_STRIP = discipleStrip("lightness", 9, [5, 6, 7, 8],
-  { x: 49, y: 71, w: 159, h: 126 }, "disciple_arrow");
-export const MAGIC_PNG_FRAME_STRIP = discipleStrip("magic", 8, [4, 5, 6, 7],
-  { x: 59, y: 66, w: 133, h: 118 }, "disciple_orb");
+export const LIGHTNESS_PNG_FRAME_STRIP = discipleStrip("/assets/rigs/disciple-dao/generated/lightness-runtime-strip.png?v=dao-ranged-1", 8, [4, 5, 6, 7],
+  { x: 49, y: 74, w: 159, h: 120 }, "disciple_arrow");
+export const MAGIC_PNG_FRAME_STRIP = discipleStrip("/assets/rigs/disciple-dao/generated/magic-runtime-strip.png?v=dao-ranged-1", 8, [4, 5, 6, 7],
+  { x: 63, y: 80, w: 128, h: 113 }, "disciple_orb");

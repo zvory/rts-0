@@ -7,6 +7,7 @@ import {
   MORTAR_MIN_RANGE_TILES,
   MORTAR_RANGE_TILES,
   STATS,
+  entityAttackRangeTiles,
 } from "../config.js";
 import { KIND, SETUP, isUnit } from "../protocol.js";
 import { feedbackOwner } from "./feedback_ownership.js";
@@ -371,7 +372,7 @@ function staticUnitRangeProfile(e, tileSize) {
   }
 
   const stat = STATS[e.kind] || {};
-  const rangeTiles = stat.rangeTiles || 0;
+  const rangeTiles = entityAttackRangeTiles(e);
   const maxRadius = rangeTiles * tileSize;
   if (!(maxRadius > 0)) return null;
   const minRadius = Math.max(0, (stat.minRangeTiles || 0) * tileSize);

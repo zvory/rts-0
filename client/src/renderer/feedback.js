@@ -23,7 +23,6 @@ import {
   ORDER_STAGE,
   SETUP,
   STATE,
-  WEAPON_KIND,
   isBuilding,
   isResource,
   isUnit,
@@ -40,11 +39,6 @@ import {
 } from "./artillery_fire_preview.js";
 import { MAGIC_ANCHOR_COLOR, drawMagicAnchor } from "./magic_anchor_effect.js";
 import { feedbackOwner } from "./feedback_ownership.js";
-import {
-  attackFeedbackKindForWeapon,
-  attackFeedbackOriginForWeapon,
-} from "./attack_feedback_origin.js";
-import { muzzleFeedbackStyle } from "./weapon_feedback_style.js";
 import { drawLabToolPreview } from "./lab_tool_preview.js";
 import { drawBreakthroughAura } from "./breakthrough_aura.js";
 import {
@@ -1219,78 +1213,7 @@ export function _drawResourceMiningPreview(view) {
   dashedLine(g, p.resourceX, p.resourceY, anchorEndpoint.x, anchorEndpoint.y, 14, 9, 2.5, 0xd64d45, 0.9);
 }
 
-export function _drawMuzzleFlashes(state) {
-  const g = this._feedbackGfx;
-  if (!state || typeof state.liveMuzzleFlashes !== "function") return;
-  const now = rendererVisualNow(this);
-  const flashes = state.liveMuzzleFlashes(now);
-  if (!flashes.length) return;
-
-  for (const f of flashes) {
-    const attacker = state.entityById(f.from);
-    if (!attacker) continue;
-    const target = state.entityById(f.to);
-    const targetPos = f.shotOrigin ? f.targetPos : (target || f.targetPos);
-
-    const age = now - f.createdAt;
-    if (age < 0) continue;
-    const t = clamp01(age / 240);
-    const fade = 1 - t;
-
-    const feedbackKind = attackFeedbackKindForWeapon(attacker.kind, f.weaponKind);
-    const style = muzzleFeedbackStyle(feedbackKind, f.weaponKind);
-    const baseR = style.flashRadius;
-    if (baseR <= 0) continue;
-
-    const stat = STATS[feedbackKind] || STATS[attacker.kind] || {};
-    const origin = attackFeedbackOriginForWeapon({
-      definitionsByKind: this._liveRigDefinitionsByKind,
-      attacker,
-      weaponKind: f.weaponKind,
-      targetPos,
-      state,
-      now,
-      map: this._map,
-      stat,
-    });
-    const mx = origin.x;
-    const my = origin.y;
-
-    if (targetPos && f.shotOrigin) {
-      const sx = f.shotOrigin[0], sy = f.shotOrigin[1];
-      const dx = targetPos.x - sx, dy = targetPos.y - sy;
-      const distance = Math.hypot(dx, dy);
-      const head = Math.min(distance, age * 2.7);
-      const tail = Math.max(12, head - 7.5);
-      if (distance > 0 && head > tail && age * 2.7 < distance + 7.5) {
-        gfxStrokeLine(g, sx + dx * tail / distance, sy + dy * tail / distance,
-          sx + dx * head / distance, sy + dy * head / distance, 1.1, 0xffd84a, 0.98);
-      }
-    } else if (targetPos) {
-      gfxStrokeLine(g, mx, my, targetPos.x, targetPos.y,
-        style.tracerWidth, style.tracerColor, style.tracerAlpha * fade);
-      if (style.tracerCoreWidth > 0) {
-        gfxStrokeLine(g, mx, my, targetPos.x, targetPos.y,
-          style.tracerCoreWidth, style.tracerCoreColor, style.tracerCoreAlpha * fade);
-      }
-
-    }
-
-    const rigOwnsTankCannonFlash = attacker.kind === KIND.TANK && f.weaponKind !== WEAPON_KIND.TANK_COAX;
-    const suppressCircularFlash = feedbackKind === KIND.RIFLEMAN;
-    if (!rigOwnsTankCannonFlash && !suppressCircularFlash) {
-      // Flash: bright core that scales up slightly then fades.
-      const r = baseR * (0.7 + 0.45 * t);
-      gfxStroke(g, 0);
-      gfxFill(g, 0xfff2a8, 0.85 * fade);
-      gfxCircle(g, mx, my, r);
-      gfxNoFill(g);
-      gfxFill(g, 0xffd84a, 0.55 * fade);
-      gfxCircle(g, mx, my, r * 0.55);
-      gfxNoFill(g);
-    }
-  }
-}
+export { _drawMuzzleFlashes } from "./muzzle_feedback.js";
 
 export function drawSelectionBox(rect) {
   const g = this._dragGfx;

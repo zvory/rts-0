@@ -2825,13 +2825,12 @@ new gameplay control.
 ### Disciple insight presentation
 
 Disciple insight and Dao fields pass through the detached presentation entity snapshot
-to the Pixi worker. A blue-on-red insight bar appears below HP; evolved paths use centered,
-black-outlined yellow chevrons, a neon-red sword rotated 90 degrees and lengthened 20%,
-or a green pentagram. The selected unit shows
+to the Pixi worker. A blue-on-red insight bar appears below HP; evolved paths use
+Dao-specific Lightness A archer and Magic C hooded spellcaster frame strips. Magic runs with arms swept back and its mantle trailing; their old chevrons/pentagram are removed. War retains the neon-red sword rotated 90 degrees and lengthened 20% and its original sword strip. The selected unit shows
 exact insight and Dao. Evolution choices occupy grid Z/X/C; classic L/W/C. Buttons remain actionable before
 research or insight, assign all selected unevolved Disciples, and show the pending path
 with an active highlight and assigned/eligible count. A new choice replaces the old one;
 unit details and tooltips show the chosen Dao and remaining requirements. See
 [Dao evolution rules](dao-insight.md).
 
-Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md).
+Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md). The entity-aware frame-strip key also selects HUD/minimap portraits. Actual attack events drive four-frame 400 ms cycles, including weapon aim during Lightness movement. `disciple_projectiles.js` draws an arrow texture from a reusable pool and fixed-cost shimmering orb geometry in the feedback batch. There are no per-orb emitters, filters or particle histories. Projectile endpoints are captured from authorized event/snapshot positions, persist for at most 600 ms, and launch at the 100 ms release pose. Unit range overlays mirror the five-tile ranged Dao range.

@@ -650,7 +650,7 @@ playable lifecycle policy; the `phase2_empty_fixture` test fixture and unknown i
 `cultivators.standard` loadout; Nexus is a faction-specific presentation name for
 `resource_depot`, and Serf is the presentation name for `worker`, while Portal uses the dedicated `portal` entity kind (compact kind code 28).
 Cultivator Warriors use the dedicated `warrior` entity kind (compact kind code 29); their generic
-attack events carry the `warrior_sword` weapon hint (compact weapon-kind code 12).
+base/War attack events carry `warrior_sword` (compact weapon-kind code 12). Lightness arrows use `disciple_arrow` (13), and Magic orbs use `disciple_orb` (14), through the same fog-filtered attack event and immediate authoritative damage timing.
 
 Protocol vocabulary is not lifecycle admission: adding a string constant, compact code, or payload
 field does not make a faction playable. Fixture-only, reserved/future, and historical-only ids must
@@ -984,7 +984,7 @@ Compact numeric codes:
 | `ability` | 1 `charge`, 2 `smoke`, 3 `mortarFire`, 4 `pointFire`, 5 `breakthrough`, 6 `ekatTeleport`, 7 `ekatLineShot`, 8 `ekatMagicAnchor`, 9 `ekatConsumeGolem`, 10 `blanketFire`, 11 `dismissScoutPlane`, 12 `scoutPlane`, 13 `barrage`, 14 `evolveLightness`, 15 `evolveWar`, 16 `evolveMagic`, 17 `discipleShield`, 18 `throwSword` |
 | `abilityObject.kind` | 1 `returnMarker`, 2 `magicAnchor`, 3 `lineProjectile`, 4 `shield` |
 | `upgrade` | 1 `methamphetamines`, 2 `anti_tank_gun_unlock`, 3 `tank_unlock`, 4 `artillery_unlock`, 7 `ballistic_tables`, 8 `entrenchment`, 9 `smoke_plus`, 10 `panzerfausts`, 11 `scout_plane_unlock`, 12 `rockets`, 13 `tank_plus`, 14 `dao_of_lightness`, 15 `dao_of_magic`, 16 `dao_of_heaviness` |
-| `weaponKind` | 1 `worker_tools`, 2 `golem_fists`, 3 `rifleman_rifle`, 4 `machine_gunner_mg`, 5 `scout_car_mg`, 6 `anti_tank_gun`, 7 `panzerfaust_loaded_shot`, 8 `mortar_team_mortar`, 9 `artillery_gun`, 10 `tank_cannon`, 11 `tank_coax`, 12 `warrior_sword` |
+| `weaponKind` | 1 `worker_tools`, 2 `golem_fists`, 3 `rifleman_rifle`, 4 `machine_gunner_mg`, 5 `scout_car_mg`, 6 `anti_tank_gun`, 7 `panzerfaust_loaded_shot`, 8 `mortar_team_mortar`, 9 `artillery_gun`, 10 `tank_cannon`, 11 `tank_coax`, 12 `warrior_sword`, 13 `disciple_arrow`, 14 `disciple_orb` |
 | `notice.severity` | 1 `info`, 2 `warn`, 3 `alert` |
 | `EventRecord` | `[1, from, to]` attack, `[1, from, to, reveal?, toPos?]` legacy attack with optional shooter reveal and target position, `[1, from, to, revealOrNull, toPosOrNull, weaponKind]` attack with compact weapon hint, `[2, id, x, y, kind]` death, `[3, id, kind]` build, `[4, msg]` notice, `[4, msg, severity]` position-free notice with severity, `[4, msg, severity, x, y]` positioned notice, `[5, [fromX, fromY], [toX, toY], delayTicks]` smoke launch, `[6, x, y, radiusTiles]` mortar impact/marker, `[6, x, y, radiusTiles, from?, reveal?]` mortar impact with optional shooter reveal, `[7, from, [x, y], radiusTiles, delayTicks]` artillery target marker, `[8, x, y, radiusTiles]` artillery impact, `[9, from, [fromX, fromY], [toX, toY], radiusTiles, delayTicks]` mortar launch, `[11, owner, x, y, facing]` global artillery firing minimap marker, `[12, from, [fromX, fromY], [toX, toY], delayTicks]` Panzerfaust launch, `[13, x, y]` Panzerfaust impact, `[15, to]` missed direct shot (14 removed with conversion) |
 
@@ -1261,7 +1261,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
 { e: "attack", from: u32, to: u32,
   reveal?: { owner: u32, kind: string, x: f32, y: f32, facing?: f32, weaponFacing?: f32, setupState?: string },
   toPos?: [f32, f32],
-  weaponKind?: "worker_tools"|"golem_fists"|"warrior_sword"|"rifleman_rifle"|"machine_gunner_mg"|"scout_car_mg"|"anti_tank_gun"|"panzerfaust_loaded_shot"|"mortar_team_mortar"|"artillery_gun"|"tank_cannon"|"tank_coax" } // feedback hint; unknown/missing hints fall back to attacker kind
+  weaponKind?: "worker_tools"|"golem_fists"|"warrior_sword"|"disciple_arrow"|"disciple_orb"|"rifleman_rifle"|"machine_gunner_mg"|"scout_car_mg"|"anti_tank_gun"|"panzerfaust_loaded_shot"|"mortar_team_mortar"|"artillery_gun"|"tank_cannon"|"tank_coax" } // feedback hint; unknown/missing hints fall back to attacker kind
 { e: "miss", to: u32 }                          // direct shot missed the target; no position
 { e: "death",  id: u32, x: f32, y: f32, kind } // for death poofs
 { e: "build",  id: u32, kind: string }         // building completed
