@@ -21,6 +21,7 @@ async function workerMain() {
     await app.init({ canvas, width:1100, height:720, preference:"webgl", antialias:false, autoStart:false });
     const gl = app.renderer.gl;
     const timer = new AsyncGpuTimerQueries(gl);
+    if (!timer.supported) throw new Error("Material benchmark requires EXT_disjoint_timer_query_webgl2.");
     const debug = gl.getExtension("WEBGL_debug_renderer_info");
     const result = { methodology:"Isolated grass-only full-screen Pixi worker mesh; 3 rotated rounds, 96 GPU samples each after 16 warmups. No simulation, units, water or frame-rate claim.",
       viewport:[1100,720], gpu:debug ? gl.getParameter(debug.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER),
@@ -40,7 +41,9 @@ async function workerMain() {
               sample(index) { layer.update(index*1000/60); app.render(); },
               yieldTask:()=>new Promise(resolve=>setTimeout(resolve,8)) });
             const group=summary.groups[0];
-            if (!group || group.samples<80 || summary.disjoint) throw new Error(`Incomplete GPU sample set: ${JSON.stringify(summary)}`);
+            if (!group || group.samples!==96 || summary.pending || summary.dropped || summary.disjoint) {
+              throw new Error(`Incomplete GPU sample set: ${JSON.stringify(summary)}`);
+            }
             result.rows.push({ technique,dpr,round,bakeMs,textureBytes:layer.material?.textureBytes || 0,...group });
             layer.destroy();
           }
