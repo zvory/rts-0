@@ -369,6 +369,9 @@ impl WeaponSetup {
 /// Production queue state. Present only on buildings that can train units.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ProductionState {
+    /// FIFO paid-training plans; the front remains here while a trainee is inside.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub(crate) dao_training_queue: Vec<crate::game::upgrade::UpgradeKind>,
     #[serde(default)]
     pub(crate) tournament_entrants: u8,
     #[serde(default)]

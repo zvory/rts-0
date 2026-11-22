@@ -898,8 +898,8 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 62. The client also accepts compact
-snapshot versions 51 through 59: version 52 only appends a kind code, version 53 appends the
+`messagepack-compact`, codec version 1, compact snapshot version 63. The client also accepts compact
+snapshot versions 51 through 62: version 52 only appends a kind code, version 53 appends the
 optional `unitsKilled` entity slot, version 54 appends an optional `rocket` style bit to mortar
 launch/impact event records, and version 55 adds the `artilleryIncoming` event code, so the older
 record layouts remain safe to decode. Version 56 appends optional entity slot 43,
@@ -936,7 +936,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 62,
+  "v": 63,
   "gr": groundDecalRevision, // omitted when zero
   "gd": [afterRevision, [    // omitted when this tick has no discovered/created revision
     [id, decalClass, sourceKindCode, x, y, owner, seed, facing, weaponFacing, radiusTiles]
@@ -954,7 +954,7 @@ adds an explicit application compression envelope.
       visionOnly?, debugPath?, rallyPlan?, prodUpgrade?, buildActive?, deconstructProgress?,
       weaponRangeTiles?, occupiedTrenchId?, scoutPlane?, prodScoutPlaneQueued?,
       panzerfaustLoaded?, prodRepeatKinds?, prodWaiting?, breakthroughAuraTicks?, extractorActive?,
-      prodUpgradeQueue?, panzerfaustWindupProgress?, unitsKilled?, rocketRackCount?, commanderFacing?, insight?, dao?, daoReady?, daoAdvanceTicks?, chosenDao?
+      prodUpgradeQueue?, panzerfaustWindupProgress?, unitsKilled?, rocketRackCount?, commanderFacing?, insight?, dao?, daoReady?, daoAdvanceTicks?, chosenDao?, tournamentEntrants?, daoTrainingQueue?
     ]
   ],
   "r": [[id, remaining]],         // omitted when empty
@@ -977,7 +977,7 @@ Compact numeric codes:
 
 | Vocabulary | Codes |
 |------------|-------|
-| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `resource_depot`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `engineering_complex`, 18 `command_car`, 19 `ekat`, 20 `zamok`, 21 `tank_trap`, 30 `barbed_wire`, 22 `golem`, 23 `pump_jack`, 24 `panzerfaust`, 25 `scout_plane`, 26 `steel_mine`, 27 `rocket_launcher`, 28 `portal`, 29 `warrior`, 31 `three_dao_pavilion`, 32 `tournament_grounds` |
+| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `resource_depot`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `engineering_complex`, 18 `command_car`, 19 `ekat`, 20 `zamok`, 21 `tank_trap`, 30 `barbed_wire`, 22 `golem`, 23 `pump_jack`, 24 `panzerfaust`, 25 `scout_plane`, 26 `steel_mine`, 27 `rocket_launcher`, 28 `portal`, 29 `warrior`, 31 `three_dao_pavilion`, 32 `tournament_grounds`, 33 `proven_grounds` |
 | `state` | 1 `idle`, 2 `move`, 3 `attack`, 4 `gather`, 5 `build`, 6 `train`, 7 `construct`, 8 `dead` |
 | `setupState` | 1 `packed`, 2 `setting_up`, 3 `deployed`, 4 `tearing_down` |
 | `orderStage` | 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, 5 `build`, 6 `smoke`, 7 `setupAntiTankGuns`, 8 `charge`, 9 `mortarFire`, 10 `pointFire`, 11 `breakthrough`, 12 `ekatTeleport`, 13 `ekatLineShot`, 14 `ekatMagicAnchor`, 15 `deconstruct`, 16 `ekatConsumeGolem`, 17 `blanketFire`, 18 `dismissScoutPlane`, 19 `scoutPlane`, 20 `holdPosition`, 21 `barrage`, 22 `evolveLightness`, 23 `evolveWar`, 24 `evolveMagic`, 25 `discipleShield`, 26 `throwSword` |
@@ -2004,7 +2004,7 @@ See [Dao evolution playtest](dao-insight.md). Entity-owned `insight` and `dao` p
 through checkpoints. Disciple snapshots append team-private `insight` (compact slot 45), public
 `dao` (slot 46: lightness/war/magic), `daoReady` (47), and optional
 `daoAdvanceTicks` (48, 1–15). Ordinary fog filtering applies to all public fields. Evolution buttons set replaceable, entity-owned `chosenDao` intent (team-private compact slot 49), independent of orders. Codes 14–16 and order stages 22–24 retain their positions.
-Evolution automatically occurs once the matching research and 60 insight are ready. Research ids are
+Evolution automatically occurs once 60 insight is ready, without research or a Pavilion. Research ids are
 `dao_of_lightness`, `dao_of_heaviness` (War), `dao_of_magic` (Magic).
 
 Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md).
@@ -2033,3 +2033,26 @@ See [Tournament Grounds](tournament-grounds.md).
 
 Portal first-stage rallies to the exact owned completed Grounds center automatically issue
 entry movement to newly trained base Disciples. Busy grounds retain waiting entry intents.
+
+### Proven Grounds
+
+Cultivator Engineers construct `proven_grounds` after a completed Portal: 100 steel, zero oil,
+200-tick construction, 3×3 tiles, 120 HP, armored, one-tile sight, no weapon or supply.
+Select the building to queue a mix of researched Dao training plans (maximum 64). Right-click
+base Disciples inside or rally a Portal there. Each admission consumes one base Disciple and
+100 oil, preserving its two supply as a paid replacement reservation. One full-health chosen
+Dao specialist emerges after 300 ticks (10 seconds), using legal exits and the full rally plan.
+Blocked exits retry; destruction loses the trainee and oil. Unpaid plans can be canceled; active
+training cannot. Combat-earned 60-insight evolution requires no research.
+See [Proven Grounds brief and rules](proven-grounds.md) for details and deferred audio/AI work.
+
+`proven_grounds` uses kind code 33. Compact v63 appends entity slot 51
+`daoTrainingQueue?: string[]`, a team-private bounded FIFO of Dao upgrade ids, including the
+active trainee as its front entry. Omitted for enemy/vision-only views. `prodKind`/`prodProgress`
+remain public when visible; queue contents never appear in building memory.
+The existing `research {building, upgrade}` command enqueues a paid-training plan when targeting
+an owned completed Proven Grounds; it researches normally at other structures. Only completed
+Dao research owned by a Cultivator player is accepted; stale, wrong-owner, non-Dao and full-queue
+requests are no-ops. `cancel` removes the latest unpaid plan, preserving active training.
+Move-to-center and Portal rally use the existing tournament admission convention for both grounds.
+Entity production state checkpoints the training plans and the active paid production item.

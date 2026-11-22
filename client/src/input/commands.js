@@ -234,7 +234,7 @@ function normalRightClickAction(input, p) {
     };
   }
 
-  if (target?.kind === KIND.TOURNAMENT_GROUNDS && ownOwner(input.state, target.owner, input.controlPolicy)
+  if ([KIND.TOURNAMENT_GROUNDS, KIND.PROVEN_GROUNDS].includes(target?.kind) && ownOwner(input.state, target.owner, input.controlPolicy)
       && !Number.isFinite(target.buildProgress)) {
     const entrants = ownUnits.filter((id) => {
       const unit = input.state.entityById(id);
@@ -1113,7 +1113,7 @@ function cancelActiveLabTool(input, reason) {
 }
 
 function tournamentRallyPoint(input, target, fallback) {
-  return target?.kind === KIND.TOURNAMENT_GROUNDS
+  return [KIND.TOURNAMENT_GROUNDS, KIND.PROVEN_GROUNDS].includes(target?.kind)
     && ownOwner(input.state, target.owner, input.controlPolicy)
     && !Number.isFinite(target.buildProgress) ? target : fallback;
 }

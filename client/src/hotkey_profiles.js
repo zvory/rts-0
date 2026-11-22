@@ -19,6 +19,9 @@ const DEFAULT_EXPORT_BUILD = "unknown";
 // familiar action keys here, including the mnemonic conflict resolutions for
 // commands that can share a card.
 const CLASSIC_DIRECT_BINDINGS = Object.freeze({
+  "cultivators.dao-training.dao_of_lightness": "KeyL",
+  "cultivators.dao-training.dao_of_heaviness": "KeyW",
+  "cultivators.dao-training.dao_of_magic": "KeyC",
   [factionCommandId("cultivators", "ability", ABILITY.EVOLVE_LIGHTNESS)]: "KeyL",
   [factionCommandId("cultivators", "ability", ABILITY.EVOLVE_WAR)]: "KeyW",
   [factionCommandId("cultivators", "ability", ABILITY.EVOLVE_MAGIC)]: "KeyC",

@@ -51,7 +51,7 @@ export function buildCultivatorCommandCardContextSamples(buildCard) {
     ...unitCards,
     { id: "cultivators-worker", card: buildCard(ctx([worker])) },
     { id: "cultivators-build", card: buildCard({ ...ctx([worker]), commandCardMode: "workerBuild" }) },
-    ...[KIND.RESOURCE_DEPOT, KIND.PORTAL, KIND.THREE_DAO_PAVILION, KIND.TOURNAMENT_GROUNDS].map((kind, i) => ({
+    ...[KIND.RESOURCE_DEPOT, KIND.PORTAL, KIND.THREE_DAO_PAVILION, KIND.TOURNAMENT_GROUNDS, KIND.PROVEN_GROUNDS].map((kind, i) => ({
       id: `cultivators-producer-${kind}`,
       card: buildCard({ ...ctx([{ id: 22 + i, owner: 1, kind }]), upgrades: [] }),
     })),

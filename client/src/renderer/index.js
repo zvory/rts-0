@@ -422,8 +422,9 @@ export class Renderer {
     this.setRenderClock(renderClock);
   }
 
-  present() {
+  present(nowMs = this.visualNow()) {
     if (this._destroyed) throw new Error("Cannot present a destroyed Pixi renderer.");
+    this._waterLayer?.update(nowMs);
     if (this._gpuShadowTimer) {
       this._gpuShadowTimer.measure("renderer.present.total", () => this.app.render());
       this._gpuShadowTimer.poll();
@@ -1367,6 +1368,8 @@ export class Renderer {
     this._doodads?.destroy();
     this._doodads = null;
 
+    this._waterLayer?.destroy();
+    this._waterLayer = null;
     // Cached terrain sprite + its generated texture.
     if (this._terrainSprite) {
       this._terrainSprite.destroy(true);

@@ -68,6 +68,9 @@ const PUMP_JACK_COMPONENT_RIG = Object.freeze({
 
 // Supply Depots and Tank Traps intentionally stay off this visual pass.
 const BUILDING_PNG_SPECS = Object.freeze([
+  buildingSpec(KIND.PROVEN_GROUNDS, 384, 384,
+    "/assets/rigs/proven-grounds/proven-atlas.png?v=training-gate-01",
+    { silhouetteShadow: false, omitFootprintShadow: true, visualScale: 1.1 }),
   buildingSpec(KIND.TOURNAMENT_GROUNDS, 384, 384,
     "/assets/rigs/tournament-grounds/tournament-atlas.png?v=tournament-bowl-02",
     { silhouetteShadow: false, omitFootprintShadow: true, visualScale: 1.1 }),
