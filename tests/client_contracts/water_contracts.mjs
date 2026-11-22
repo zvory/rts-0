@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { WaterLayer, shoreDistances } from "../../client/src/renderer/water.js";
+import { WaterLayer, shoreDistances, waterSunTint } from "../../client/src/renderer/water.js";
 import { installFakePixi } from "./pixi_fakes.mjs";
 import { Renderer } from "../../client/src/renderer/index.js";
 import { buildStaticMap, updateStaticTerrainTiles } from "../../client/src/renderer/terrain.js";
@@ -14,6 +14,9 @@ assert.equal(sample(0, 0), 0, "land has zero shore distance");
 assert(sample(20, 20) > sample(8, 20), "interior water is deeper than the shoreline");
 assert.equal(shoreDistances({ width: 1, height: 1, tileSize: 32, terrain: [2] }).pixels[0], 255,
   "water without a land boundary saturates at the depth range");
+
+assert.deepEqual([...waterSunTint(0xfff3e2)], [1, 1, 1],
+  "Classic's review lighting preserves the selected option C colors exactly");
 
 const restorePixi = installFakePixi();
 const priorFetch = globalThis.fetch;
@@ -53,8 +56,8 @@ try {
   const initialWater = renderer._waterLayer;
   await initialWater.ready;
   const tint = initialWater.uniforms.uniforms.uTint.value;
-  assert.deepEqual([...tint], [...new Float32Array([1, 208 / 255, 138 / 255])],
-    "water receives the same warmth tint as the surrounding terrain");
+  assert.deepEqual([...tint], [...new Float32Array([1, 208 / 243, 138 / 226])],
+    "water follows map warmth relative to the approved Classic palette");
   const initialRequests = requests;
   updateStaticTerrainTiles.call(renderer, [{ x: 0, y: 0, code: 1 }, { x: 1, y: 1, code: 2 }]);
   assert.equal(renderer._waterLayer, initialWater, "land edits and unchanged water reuse the loaded layer");

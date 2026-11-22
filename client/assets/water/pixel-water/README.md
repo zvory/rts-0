@@ -16,7 +16,8 @@ MIT license is included in `LICENSE-jess-hammer.txt`.
   mask. The caustic texture scale is reduced to 0.0009 for this map’s world units. Foam and
   highlight colors use the selected darker green-brown pond palette, with a subtle sediment
   tint at the banks; the source layer blending, thresholds, fade, and quantization remain.
-  The final color receives the same map sunlight warmth tint as the terrain sprite.
+  The final color follows map sunlight warmth, calibrated against Classic’s warmth=25
+  reference lighting to preserve the selected option C colors there.
 - `movement.png`, `fade.png`, `specular-a.png`, `specular-b.png`, `foam.png`: baked FastNoiseLite
   OpenSimplex2S/FBm inputs using the frequencies, seeds and fractal settings in upstream
   `WaterMaterial.tres`. Seamless wrapping is baked by blending offset samples; this is an

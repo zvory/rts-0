@@ -3,6 +3,14 @@ import { loadWorkerSafeTexture, createWorkerSafeCanvas } from "./raster_primitiv
 
 const SHORE_RANGE = 128;
 const SAMPLES_PER_TILE = 8;
+
+// These colors were approved under Classic's warmth=25 lighting. Calibrate the
+// material there, while allowing other authored sun settings to warm/cool it.
+export function waterSunTint(tint) {
+  return new Float32Array([
+    ((tint >> 16) & 255) / 255, ((tint >> 8) & 255) / 243, (tint & 255) / 226,
+  ]);
+}
 const VERTEX = `#version 300 es
 precision highp float;
 in vec2 aPosition;
@@ -82,9 +90,7 @@ export class WaterLayer {
       uTime: { value: 0, type: "f32" },
       uMapSize: { value: new Float32Array([map.width * ts, map.height * ts]), type: "vec2<f32>" },
       // Custom mesh shaders do not inherit the sprite pipeline's world tint.
-      uTint: { value: new Float32Array([
-        ((tint >> 16) & 255) / 255, ((tint >> 8) & 255) / 255, (tint & 255) / 255,
-      ]), type: "vec3<f32>" },
+      uTint: { value: waterSunTint(tint), type: "vec3<f32>" },
     });
     this.geometry = new pixi.Geometry({
       attributes: { aPosition: { buffer: new Float32Array(positions), format: "float32x2" } },
