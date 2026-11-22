@@ -162,15 +162,11 @@ try {
     const lastClear = iconCalls.findLastIndex((call) => call[0] === "clear");
     const iconDrawing = iconCalls.slice(lastClear + 1).filter((call) =>
       ["drawPolygon", "drawCircle", "moveTo", "lineTo"].includes(call[0]));
-    assert(dao === "war" ? iconDrawing.length > 0 : iconDrawing.length === 0,
-      "only War retains its sword icon; Lightness and Magic have no legacy glyph");
+    assert(iconDrawing.length === 0, "Dao silhouettes replace all legacy glyphs");
     const rects = discipleBar.rtsInsight.calls.filter((call) => call[0] === "drawRect");
     assert(rects.at(-1)[3] === (rects.at(-2)[3] - 2) / 2,
       "30 insight fills half the Disciple insight bar");
-    assert(discipleBar.rtsDao.rotation === (dao === "war" ? Math.PI / 2 : 0),
-      "Dao icon rotation resets when the authoritative specialization changes");
-    assert(discipleBar.rtsDao.scaleY === (dao === "war" ? 1.2 : 1),
-      "only the War icon receives the sword length multiplier");
+
   }
   assert(discipleBar.children.length === 6 && discipleBar.children[0] === discipleBar.rtsRadiance,
     "Disciple overlays are allocated once with radiance behind the health bar");

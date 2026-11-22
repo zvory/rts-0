@@ -116,6 +116,7 @@ fn war_armor_uses_weapon_penetration_and_lightness_changes_attack_rate() {
     assert_eq!(unit.dao_damage_after_armor(100, 1.0), 100);
     let war = effective_attack_profile(&unit);
     assert_eq!(war.dmg, 35);
+    assert_eq!(war.range_tiles, config::DAO_WAR_RANGE_TILES);
     unit.dao = Some(UpgradeKind::DaoOfLightness);
     let light = effective_attack_profile(&unit);
     assert_eq!(light.cooldown, 43);
@@ -321,7 +322,14 @@ fn dao_profiles_keep_lightness_melee_and_magic_ranged() {
             profile.weapon.unwrap().id,
             combat_rules::WeaponKind::WarriorSword
         );
-        assert_eq!(profile.range_tiles, 0.75);
+        assert_eq!(
+            profile.range_tiles,
+            if dao.is_some() {
+                config::DAO_WAR_RANGE_TILES
+            } else {
+                0.75
+            }
+        );
         assert_eq!(profile.dmg, if dao.is_some() { 35 } else { 23 });
         assert_eq!(profile.cooldown, 64);
         assert!(!can_fire_while_moving(&unit, false));

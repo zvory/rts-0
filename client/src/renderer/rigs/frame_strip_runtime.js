@@ -159,7 +159,7 @@ export function frameStripWorldScale(strip, entity, renderContext = null) {
   return baseScale;
 }
 
-export function frameStripSpriteOffset(strip, frameIndex) {
+export function frameStripSpriteOffset(strip, frameIndex, renderContext = {}) {
   const defaultForwardPx = finite(strip?.originForwardPx, 0);
   const windupFrames = validFrameList(strip, strip?.windupFrames);
   const forwardPx = windupFrames.includes(frameIndex)
@@ -168,7 +168,20 @@ export function frameStripSpriteOffset(strip, frameIndex) {
   const lateralPx = finite(strip?.originLateralPx, 0);
   const firingFrames = validFrameList(strip, strip?.firingFrames);
   const recoilPx = firingFrames.includes(frameIndex) ? Math.max(0, finite(strip?.firingRecoilPx, 0)) : 0;
-  return { x: forwardPx - recoilPx, y: lateralPx };
+  // The overhead attack art faces local +Y. Move the whole pose through anticipation,
+  // drive, extension and recovery without changing the authoritative entity position.
+  let lunge = 0;
+  if (strip?.firingLungePx > 0 && firingFrames.includes(frameIndex) && renderContext.recoilProgress > 0) {
+    const phase = clamp01(finite(renderContext.recoilPhase, 0));
+    let start, end, from, to;
+    if (phase < 0.2) { start = 0; end = 0.2; from = 0; to = -0.18; }
+    else if (phase < 0.5) { start = 0.2; end = 0.5; from = -0.18; to = 1; }
+    else if (phase < 0.7) { start = 0.5; end = 0.7; from = 1; to = 1; }
+    else { start = 0.7; end = 1; from = 1; to = 0; }
+    const t = (phase - start) / (end - start);
+    lunge = (from + (to - from) * t * t * (3 - 2 * t)) * Math.max(0, finite(strip?.firingLungePx, 0));
+  }
+  return { x: forwardPx - recoilPx, y: lateralPx + lunge };
 }
 
 function createDefaultFrameStripPixiFactory(pixi = globalThis.PIXI) {
@@ -236,7 +249,7 @@ class FrameStripUnitInstance {
 
     const worldScale = frameStripWorldScale(this.strip, entity, renderContext);
     setPoint(this.sprite.scale, worldScale, worldScale);
-    const spriteOffset = frameStripSpriteOffset(this.strip, frameIndex);
+    const spriteOffset = frameStripSpriteOffset(this.strip, frameIndex, renderContext);
     setPoint(this.sprite.position, spriteOffset.x, spriteOffset.y);
     this.sprite.alpha = 1;
     this.sprite.tint = this.silhouetteShadow ? 0x000000 : tintForSlot(this.strip.tintSlot, renderContext);
