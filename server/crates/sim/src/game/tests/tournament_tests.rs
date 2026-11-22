@@ -469,3 +469,107 @@ fn tournament_busy_arrivals_wait_and_enter_the_next_intake() {
         1
     );
 }
+
+#[test]
+fn tournament_staged_disciple_retries_when_the_perimeter_clears() {
+    let mut game = empty_flat_game(&[player(1)]);
+    let grounds = arena(&mut game);
+    let mut blockers = Vec::new();
+    for ty in 0..5 {
+        for tx in 0..5 {
+            if tx != 0 && tx != 4 && ty != 0 && ty != 4 {
+                continue;
+            }
+            blockers.push(
+                game.state
+                    .entities
+                    .spawn_unit(
+                        1,
+                        EntityKind::Worker,
+                        592.0 + tx as f32 * 32.0,
+                        592.0 + ty as f32 * 32.0,
+                    )
+                    .unwrap(),
+            );
+        }
+    }
+    let disciple = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Warrior, 400.0, 656.0)
+        .unwrap();
+    game.enqueue(
+        1,
+        Command::Move {
+            units: vec![disciple],
+            x: 656.0,
+            y: 656.0,
+            queued: false,
+        },
+    );
+    for _ in 0..180 {
+        game.tick();
+    }
+    assert!(game.state.entities.get(disciple).is_some());
+    assert_eq!(entrants(&game, grounds), 0);
+    for id in blockers {
+        game.state.entities.remove(id);
+    }
+    for _ in 0..300 {
+        game.tick();
+    }
+    assert!(
+        game.state.entities.get(disciple).is_none(),
+        "staged entrants retry after temporary crowding clears"
+    );
+    assert_eq!(entrants(&game, grounds), 1);
+}
+
+#[test]
+fn tournament_entry_intent_survives_a_fully_blocked_approach() {
+    let mut game = empty_flat_game(&[player(1)]);
+    let grounds = arena(&mut game);
+    game.state.map.terrain.fill(crate::protocol::terrain::WATER);
+    // Leave the entrant on legal ground, beyond the arena's six-ring spawn search.
+    game.state.map.terrain[(20 * game.state.map.width + 9) as usize] =
+        crate::protocol::terrain::GRASS;
+    let disciple = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Warrior, 304.0, 656.0)
+        .unwrap();
+    game.enqueue(
+        1,
+        Command::Move {
+            units: vec![disciple],
+            x: 656.0,
+            y: 656.0,
+            queued: false,
+        },
+    );
+    game.tick();
+    assert_eq!(
+        game.state
+            .entities
+            .get(disciple)
+            .unwrap()
+            .movement
+            .as_ref()
+            .unwrap()
+            .tournament_target,
+        Some(grounds)
+    );
+    let payload = game.checkpoint_payload_text_for_test().unwrap();
+    Game::restore_checkpoint_payload_text_for_test(
+        &payload,
+        game.state.map.clone(),
+        game.state.map_metadata.clone(),
+    )
+    .unwrap();
+    game.state.map.terrain.fill(crate::protocol::terrain::GRASS);
+    for _ in 0..300 {
+        game.tick();
+    }
+    assert!(game.state.entities.get(disciple).is_none());
+    assert_eq!(entrants(&game, grounds), 1);
+}

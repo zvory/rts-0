@@ -40,15 +40,14 @@ pub(super) fn order_entry(
             continue;
         };
         let approach = (unit.pos_x(), unit.pos_y());
-        let Some(point) =
-            coordinator.find_spawn_point(entities, target, EntityKind::Warrior, Some(approach))
-        else {
-            continue;
-        };
+        let point =
+            coordinator.find_spawn_point(entities, target, EntityKind::Warrior, Some(approach));
         if let Some(e) = entities.get_mut(*id) {
             e.clear_orders();
-            e.replace_active_order(crate::game::entity::Order::move_to(point.0, point.1));
-            e.set_path_goal(Some(point));
+            if let Some(point) = point {
+                e.replace_active_order(crate::game::entity::Order::move_to(point.0, point.1));
+            }
+            e.set_path_goal(point);
             e.reset_stuck(approach.0, approach.1);
             if let Some(m) = e.movement.as_mut() {
                 m.tournament_target = Some(target);
@@ -62,6 +61,7 @@ pub(in crate::game) fn advance(
     entities: &mut EntityStore,
     players: &mut [PlayerState],
     rng: &mut impl Rng,
+    coordinator: &MoveCoordinator<'_>,
 ) {
     for id in entities.ids() {
         let Some((owner, target, x, y, eligible)) = entities.get(id).and_then(|e| {
@@ -100,6 +100,12 @@ pub(in crate::game) fn advance(
         let dx = ((x - building.pos_x()).abs() - half).max(0.0);
         let dy = ((y - building.pos_y()).abs() - half).max(0.0);
         if dx * dx + dy * dy > 24.0 * 24.0 {
+            // Spawn search may stage outside the admission radius when the perimeter is
+            // crowded. Reconsider an exhausted approach after those blockers move away;
+            // retain entry intent even when no legal staging point currently exists.
+            if entities.get(id).is_some_and(|e| e.path_is_empty()) {
+                order_entry(entities, coordinator, owner, &[id], target);
+            }
             continue;
         }
         entities.remove(id);
