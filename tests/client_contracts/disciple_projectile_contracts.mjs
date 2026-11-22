@@ -5,6 +5,7 @@ import { weaponRecoilDurationMs } from "../../client/src/weapon_recoil_cycle.js"
 import { entityAttackRangeTiles } from "../../client/src/config.js";
 import { DiscipleProjectileVisuals, sampleDiscipleFlight, DISCIPLE_PROJECTILE_LIMIT } from "../../client/src/renderer/disciple_projectiles.js";
 import { RecordingGraphics } from "./pixi_fakes.mjs";
+import { liveFrameStripKeyForEntity } from "../../client/src/renderer/rigs/frame_strip_routing.js";
 
 const shooter = { id: 1, kind: KIND.WARRIOR, owner: 1, x: 10, y: 20 };
 const target = { id: 2, kind: KIND.RIFLEMAN, x: 170, y: 20 };
@@ -27,10 +28,17 @@ for (const weaponKind of [WEAPON_KIND.DISCIPLE_ARROW, WEAPON_KIND.DISCIPLE_ORB])
   const hidden = new VisualEffectBuffers();
   hidden.applySnapshotEvents([{ e: EVENT.ATTACK, from: 1, to: 99, weaponKind }], 0, () => null);
   assert.equal(sampleDiscipleFlight(hidden.muzzleFlashes[0], 120), null, "no guessed endpoints for absent entities");
-  hidden.applyAttackReveals([{ e: EVENT.ATTACK, from: 1, to: 99, weaponKind,
-    reveal: { owner: 2, kind: KIND.WARRIOR, x: 50, y: 60 } }], 0);
-  assert.equal(hidden.shotRevealsById.get(1).dao, weaponKind === WEAPON_KIND.DISCIPLE_ARROW ? "lightness" : "magic",
-    "firing reveals retain the specialized silhouette using the authorized weapon hint");
+}
+for (const [kind, dao] of [[KIND.WARRIOR, undefined], [KIND.LIGHTNESS_ADEPT, "lightness"],
+  [KIND.WAR_ADEPT, "war"], [KIND.MAGIC_ADEPT, "magic"]]) {
+  for (const weaponKind of [undefined, WEAPON_KIND.WARRIOR_SWORD, WEAPON_KIND.DISCIPLE_ORB]) {
+    const hidden = new VisualEffectBuffers();
+    hidden.applyAttackReveals([{ e: EVENT.ATTACK, from: 1, to: 99, weaponKind,
+      reveal: { owner: 2, kind, x: 50, y: 60 } }], 0);
+    const reveal = hidden.shotRevealsById.get(1);
+    assert.equal(reveal.dao, dao, "revealed kind determines Dao independently of the shot's weapon");
+    assert.equal(liveFrameStripKeyForEntity(reveal), kind, "firing reveal retains its specialized sprite route");
+  }
 }
 assert.equal(entityAttackRangeTiles({ kind: KIND.LIGHTNESS_ADEPT, dao: "lightness" }), 0.75);
 assert.equal(entityAttackRangeTiles({ kind: KIND.MAGIC_ADEPT, dao: "magic" }), 5);
