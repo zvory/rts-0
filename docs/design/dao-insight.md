@@ -2,14 +2,14 @@
 
 Phase 0/1 briefs and rules (completed before implementation): each path is a permanent
 specialization of the existing Disciple, retaining its entity identity, orders, cost,
-supply (2), sight, size, and ordinary ground pathing. Base, War, and Lightness Disciples use 0.75-tile sword reach and five-tile automatic engagement with melee pursuit. Magic replaces its sword with a five-tile ranged primary; its engagement range equals that five-tile attack range. No additional
+supply (2), sight, size, and ordinary ground pathing. Base and Lightness Disciples use 0.75-tile sword reach; War uses 2.75-tile spear reach. All three retain five-tile automatic engagement with melee pursuit. Magic replaces its sword with a five-tile ranged primary; its engagement range equals that five-tile attack range. No additional
 training source or build time. A Dao button assigns its path to every selected, owned, unevolved Disciple, even before
 insight is ready. Selecting another path replaces the pending choice. This
 entity-owned intent is independent of orders: moving, attacking, Stop, and queued orders
 do not cancel it. No automatic research purchase, Portal default, or army-wide promotion
 is added. Evolution is immediate and free once the unit has 60 actual hostile
 HP damage dealt, capped at 60; misses, friendly fire, invulnerability and overkill grant
-no extra insight. Successful advancement fully restores HP to the evolved unit’s maximum,
+no extra insight. Advancement clears all existing insight. Successful advancement fully restores HP to the evolved unit’s maximum,
 after applying any path-specific maximum-HP bonus. Base, Lightness, and Magic have 115 maximum HP; War has 135. Base moves at 2.0 px/tick; War and Magic move at 2.1 px/tick. Choosing a pending path or repeating
 an evolution request does not heal; dead units cannot advance. One evolution per unit. Player research persists after Pavilion loss.
 The choice clears on evolution; evolved units cannot change paths. Pending choices persist
@@ -17,7 +17,7 @@ through checkpoints and are visible only to teammates and privileged observers. 
 card highlights chosen paths with an assigned/eligible count; tooltips show missing
 insight, and unit details show the pending path. Automatic evolution runs after combat,
 research production, and ability runtime each tick, skipping dead units.
-Pavilion research now unlocks paid one-for-one training in the [Proven Grounds](proven-grounds.md),
+Pavilion research now unlocks paid one-for-one training in the [Proving Grounds](proven-grounds.md),
 with the existing shared research price tiers, serial queue and prerequisite/faction gates.
 Combat-earned evolution requires neither research nor a Pavilion.
 
@@ -26,13 +26,15 @@ Combat-earned evolution requires neither research nor a Pavilion.
   Uses a sword at the base Disciple’s 0.75-tile reach, dealing the same 23 damage with 50% armor penetration and a 43-tick cooldown. Plain Move keeps its destination while striking legal targets within melee reach; automatic Idle/Attack Move retains five-tile acquisition and closes to sword reach. Speed and Ekat Dash with optional return are unchanged. The old archer source and strip are preserved for reuse. Selected candidate B uses a thin katana and a single shoulder scarf: resting close to the back at idle, trailing while running, and following four melee swing poses. Classic evolution key L; grid Z.
 - War: armored melee damage dealer; 1.05 times base movement speed (2.1 px/tick), 1.5 damage, +20 maximum HP, 50% armor
   reduction using the existing penetration mechanic (full AP bypasses it), keeps the Disciple's existing
-  50% armor penetration. A centered neon-red sword with black outline identifies it, rotated 90 degrees and lengthened 20%. Classic W; grid X.
-- Magic: battlefield support; 1.05 times base movement speed (2.1 px/tick), shared Ekat pull field (renamed Anchor), with doubled inward pull (0.70 movement-speed idle drag and up to 1.70x movement toward its center; radial falloff and weight resistance still apply) and a new Shield, uses the approved Magic C hooded spellcaster, with arms swept backward and flowing mantle while running. Its five-tile orbs deal the same 23 damage with 50% armor penetration and 64-tick cooldown. It stops to fire normally and has no secondary sword. Classic C; grid C. War keeps its existing sword art and red sword icon. Lightness chevrons and the Magic pentagram are removed; insight, readiness and advancement overlays remain. Bespoke audio remains deferred.
+  50% armor penetration. Uses the approved larger armored candidate B Yari silhouette, with idle, two walking poses and four thrust poses. Its 2.75-tile weapon range plus the normal attacker radius and four-pixel range slack puts the roughly 95-pixel ready tip near an infantry target’s edge. Vehicle hulls and building footprints retain their existing contact geometry. The 400 ms attack clip anticipates, drives, extends and recovers, with a smooth 16-world-pixel presentation-only forward step; collision, authoritative position and damage timing do not move with the artwork. Classic W; grid X.
+- Magic: battlefield support; 1.05 times base movement speed (2.1 px/tick), shared Ekat pull field (renamed Anchor), with doubled inward pull (0.70 movement-speed idle drag and up to 1.70x movement toward its center; radial falloff and weight resistance still apply) and a new Shield, uses the approved Magic C hooded spellcaster, with arms swept backward and flowing mantle while running. Its five-tile orbs deal the same 23 damage with 50% armor penetration and 64-tick cooldown. It stops to fire normally and has no secondary sword. Classic C; grid C. All three Dao silhouettes replace their legacy glyphs; insight, readiness and advancement overlays remain. Bespoke audio remains deferred.
 
 Each paid training path has a separate researched unlock; combat-earned evolution is unrestricted. No automatic AI evolution in this pass;
 AI can encounter and damage evolved units. Insight uses a blue fill over red background
 under the HP bar and exact insight appears in selected-unit details for teammates and privileged observers only. Enemy snapshots omit exact insight. Evolved units
-keep the full insight bar. No new targeting or hidden-position information is exposed.
+reset to zero insight and have a doubled cap of 120. They continue earning insight from
+actual hostile HP damage; reaching 120 has no effect or further advancement. Their bars
+and selected-unit details use the new cap. Tournament winners follow the same rules. No new targeting or hidden-position information is exposed.
 State is checkpointed with the entity and snapshots use appended compact slots.
 
 Readiness radiance pulses around actionable Dao research/evolution buttons and around a

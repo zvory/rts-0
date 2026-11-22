@@ -1,6 +1,7 @@
 import { PRODUCTION_RASTER_COLOR_TARGET } from "./color_adjustment.js";
 
 export const LIGHTNESS_FRAME_STRIP_KEY = "warrior:lightness";
+export const WAR_FRAME_STRIP_KEY = "warrior:war";
 export const MAGIC_FRAME_STRIP_KEY = "warrior:magic";
 
 function discipleStrip(image, frameCount, firingFrames, iconVisibleBounds, weaponKind, imageVersion = "dao-ranged-1") {
@@ -41,3 +42,14 @@ export const LIGHTNESS_PNG_FRAME_STRIP = discipleStrip("/assets/rigs/disciple-da
   { x: 75, y: 93, w: 131, h: 120 }, "warrior_sword", "melee-b-wind-2");
 export const MAGIC_PNG_FRAME_STRIP = discipleStrip("/assets/rigs/disciple-dao/generated/magic-runtime-strip.png?v=dao-ranged-1", 8, [4, 5, 6, 7],
   { x: 63, y: 80, w: 128, h: 113 }, "disciple_orb");
+
+// Armored Yari B with a longer reach and an event-driven forward step.
+export const WAR_PNG_FRAME_STRIP = Object.freeze({
+  ...discipleStrip("/assets/rigs/disciple-dao/generated/war-yari-runtime-strip.png?v=yari-lunge-1", 7, [3, 4, 5, 6],
+    { x: 92, y: 107, w: 74, h: 143 }, "warrior_sword", "yari-lunge-1"),
+  movementFrames: Object.freeze([1, 2]),
+  worldScale: 0.8,
+  // Sword feedback lasts 720 ms; finish this authored clip after 400 ms.
+  firingFrameHoldPhase: 400 / 720,
+  firingLungePx: 16,
+});

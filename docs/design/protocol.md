@@ -1191,7 +1191,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   state: string,                 // "idle","move","attack","gather","build","train","construct","dead"
   facing?: f32,                  // radians, for unit body/hull orientation (optional)
   weaponFacing?: f32,            // radians, for independent weapon/barrel orientation (optional)
-  insight?: u32,                 // team-private Disciple 0..60, compact slot 45
+  insight?: u32,                 // team-private Disciple 0..60 before evolution, 0..120 after, compact slot 45
   dao?: "lightness"|"war"|"magic", // evolved Disciple, compact slot 46
   daoReady?: bool,               // public maximum-insight readiness, slot 47
   daoAdvanceTicks?: u16,         // public realm burst, 1..15 ticks, slot 48
@@ -2004,7 +2004,9 @@ See [Dao evolution playtest](dao-insight.md). Entity-owned `insight` and `dao` p
 through checkpoints. Disciple snapshots append team-private `insight` (compact slot 45), public
 `dao` (slot 46: lightness/war/magic), `daoReady` (47), and optional
 `daoAdvanceTicks` (48, 1–15). Ordinary fog filtering applies to all public fields. Evolution buttons set replaceable, entity-owned `chosenDao` intent (team-private compact slot 49), independent of orders. Codes 14–16 and order stages 22–24 retain their positions.
-Evolution automatically occurs once 60 insight is ready, without research or a Pavilion. Research ids are
+Evolution automatically occurs once 60 insight is ready, without research or a Pavilion.
+Evolution clears all insight and doubles the cap to 120. Evolved Disciples continue earning
+insight from actual hostile HP damage; reaching 120 has no effect and enables no further evolution. Research ids are
 `dao_of_lightness`, `dao_of_heaviness` (War), `dao_of_magic` (Magic).
 
 Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md).
@@ -2034,7 +2036,7 @@ See [Tournament Grounds](tournament-grounds.md).
 Portal first-stage rallies to the exact owned completed Grounds center automatically issue
 entry movement to newly trained base Disciples. Busy grounds retain waiting entry intents.
 
-### Proven Grounds
+### Proving Grounds
 
 Cultivator Engineers construct `proven_grounds` after a completed Portal: 100 steel, zero oil,
 200-tick construction, 3×3 tiles, 120 HP, armored, one-tile sight, no weapon or supply.
@@ -2044,14 +2046,14 @@ base Disciples inside or rally a Portal there. Each admission consumes one base 
 Dao specialist emerges after 300 ticks (10 seconds), using legal exits and the full rally plan.
 Blocked exits retry; destruction loses the trainee and oil. Unpaid plans can be canceled; active
 training cannot. Combat-earned 60-insight evolution requires no research.
-See [Proven Grounds brief and rules](proven-grounds.md) for details and deferred audio/AI work.
+See [Proving Grounds brief and rules](proven-grounds.md) for details and deferred audio/AI work.
 
 `proven_grounds` uses kind code 33. Compact v63 appends entity slot 51
 `daoTrainingQueue?: string[]`, a team-private bounded FIFO of Dao upgrade ids, including the
 active trainee as its front entry. Omitted for enemy/vision-only views. `prodKind`/`prodProgress`
 remain public when visible; queue contents never appear in building memory.
 The existing `research {building, upgrade}` command enqueues a paid-training plan when targeting
-an owned completed Proven Grounds; it researches normally at other structures. Only completed
+an owned completed Proving Grounds; it researches normally at other structures. Only completed
 Dao research owned by a Cultivator player is accepted; stale, wrong-owner, non-Dao and full-queue
 requests are no-ops. `cancel` removes the latest unpaid plan, preserving active training.
 Move-to-center and Portal rally use the existing tournament admission convention for both grounds.

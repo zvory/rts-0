@@ -1889,6 +1889,16 @@ export const SOUND_MANIFEST
 export function noticeSoundId(msg)
 ```
 
+Disciple attack events use dedicated cues in `match_combat_audio.js`: Dao of Magic's
+`disciple_orb` weapon plays the orb launch, and Dao of Lightness's spear plays the spear thrust.
+Base and Dao of War sword attacks use the soft stab against infantry; tanks, scout/command cars,
+scout planes, mortar teams, anti-tank guns, artillery, and rocket trucks use the metallic strike.
+This is presentation material selection, independent of the balance `armored` flag. A missing
+target uses the soft stab without looking up hidden information. Explicit orb/sword weapon hints
+take precedence over the attacker's Magic evolution state; events without a weapon hint use its
+current Dao. The normal spatial combat buses, deduplication, pitch variation, and voice cap apply.
+Asset provenance, audition selections, and decoded levels are in `docs/sound/DISCIPLE_ATTACKS.json`.
+
 `match_notice_presenter.js`
 ```js
 export class MatchNoticePresenter {
@@ -2837,11 +2847,12 @@ new gameplay control.
 
 Disciple insight and Dao fields pass through the detached presentation entity snapshot
 to the Pixi worker. A blue-on-red insight bar appears below HP; evolved paths use
-the candidate B thin-katana strip for melee Lightness, and the Dao-specific Magic C hooded spellcaster strip. Original Lightness A archer assets remain preserved for reuse. Magic runs with arms swept back and its mantle trailing; their old chevrons/pentagram are removed. War retains the neon-red sword rotated 90 degrees and lengthened 20% and its original sword strip. The selected unit shows
-exact insight and Dao. Evolution choices occupy grid Z/X/C; classic L/W/C. Buttons remain actionable before
+the candidate B thin-katana strip for melee Lightness, and the Dao-specific Magic C hooded spellcaster strip. Original Lightness A archer assets remain preserved for reuse. Magic runs with arms swept back and its mantle trailing; their old chevrons/pentagram are removed. War uses the larger armored candidate B Yari strip (idle, two walking poses, four thrust poses); its legacy red sword glyph is removed. The selected unit shows
+exact insight and Dao, with a cap of 60 before evolution and 120 afterward. Evolution
+resets insight to zero; reaching the evolved cap has no effect. Evolution choices occupy grid Z/X/C; classic L/W/C. Buttons remain actionable before
 research or insight, assign all selected unevolved Disciples, and show the pending path
 with an active highlight and assigned/eligible count. A new choice replaces the old one;
 unit details and tooltips show the chosen Dao and remaining requirements. See
 [Dao evolution rules](dao-insight.md).
 
-Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md). The entity-aware frame-strip key also selects HUD/minimap portraits. Actual attack events drive Magic’s four-frame 400 ms cycle and Lightness’s four-pose katana swing, including sword aim during Lightness movement. `disciple_projectiles.js` draws an arrow texture at three times its native aspect-ratio thickness, tinted with the firing owner’s assigned color using the owner id captured with the attack event, from a reusable pool and fixed-cost shimmering orb geometry in the feedback batch. There are no per-orb emitters, filters or particle histories. Projectile endpoints are captured from authorized event/snapshot positions, persist for at most 600 ms, and launch at the 100 ms release pose. Unit range overlays show 0.75-tile reach for Lightness and five-tile range for Magic.
+Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md). The entity-aware frame-strip key also selects HUD/minimap portraits. Actual attack events drive Magic’s four-frame 400 ms cycle, Lightness’s four-pose katana swing, and War’s four-pose spear lunge, including weapon aim during movement. War’s `firingLungePx:16` adds a smooth local-forward presentation offset through anticipation, drive, extension and recovery. The worker sprite/shadow and minimap sample the same offset; authoritative position, collision and immediate damage timing remain unchanged. `disciple_projectiles.js` draws an arrow texture at three times its native aspect-ratio thickness, tinted with the firing owner’s assigned color using the owner id captured with the attack event, from a reusable pool and fixed-cost shimmering orb geometry in the feedback batch. There are no per-orb emitters, filters or particle histories. Projectile endpoints are captured from authorized event/snapshot positions, persist for at most 600 ms, and launch at the 100 ms release pose. Unit range overlays show 0.75-tile reach for Lightness, 2.75 tiles for War, and five tiles for Magic.

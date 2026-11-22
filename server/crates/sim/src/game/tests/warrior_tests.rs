@@ -269,6 +269,8 @@ fn disciple_evolution_requires_insight_ownership_but_no_research_and_is_permanen
         game.tick();
         let evolved = game.state.entities.get(unit).unwrap();
         assert_eq!(evolved.dao, Some(upgrade));
+        assert_eq!(evolved.insight, 0);
+        assert_eq!(evolved.insight_cap(), 120);
         assert_eq!((evolved.hp, evolved.max_hp), (hp, hp));
         assert!((evolved.movement_speed() - speed).abs() < 0.0001);
         let entity = game.state.entities.get_mut(unit).unwrap();
@@ -286,7 +288,7 @@ fn disciple_evolution_requires_insight_ownership_but_no_research_and_is_permanen
             "evolved units cannot heal by choosing a Dao again"
         );
         let payload = game.checkpoint_payload_text_for_test().unwrap();
-        assert!(payload.contains("\"insight\":60"));
+        assert_eq!(game.state.entities.get(unit).unwrap().insight, 0);
         let restored = Game::restore_checkpoint_payload_text_for_test(
             &payload,
             game.state.map.clone(),
@@ -297,6 +299,21 @@ fn disciple_evolution_requires_insight_ownership_but_no_research_and_is_permanen
             restored.state.entities.get(unit).unwrap().dao,
             Some(upgrade)
         );
+        for insight in [0, 61, 120, 121] {
+            game.state.entities.get_mut(unit).unwrap().insight = insight;
+            let payload = game.checkpoint_payload_text_for_test();
+            if insight > 120 {
+                assert!(payload.is_err(), "over-cap insight must be rejected");
+                continue;
+            }
+            let restored = Game::restore_checkpoint_payload_text_for_test(
+                &payload.unwrap(),
+                game.state.map.clone(),
+                game.state.map_metadata.clone(),
+            )
+            .unwrap();
+            assert_eq!(restored.state.entities.get(unit).unwrap().insight, insight);
+        }
     }
 }
 
@@ -920,12 +937,12 @@ fn disciple_pending_dao_advances_on_combat_insight_without_interrupting_attack()
         .insert(UpgradeKind::DaoOfHeaviness);
     for _ in 0..60 {
         game.tick();
-        if game.state.entities.get(unit).unwrap().insight == 60 {
+        if game.state.entities.get(unit).unwrap().dao.is_some() {
             break;
         }
     }
     let entity = game.state.entities.get(unit).unwrap();
-    assert_eq!(entity.insight, 60);
+    assert_eq!(entity.insight, 0);
     assert_eq!(entity.dao, Some(UpgradeKind::DaoOfHeaviness));
     assert!(matches!(entity.order(), Order::Attack(_)));
     assert!(game.state.entities.get(target).unwrap().hp < 115);
@@ -971,8 +988,33 @@ fn war_throw_sword_is_dao_gated_and_hits_harder_on_return_after_checkpoint() {
         game.tick();
         assert_eq!(game.state.ability_runtime.world_objects().count(), 0);
     }
-    game.state.entities.get_mut(caster).unwrap().insight = 60;
+    game.state.entities.get_mut(caster).unwrap().insight = 0;
     game.state.entities.get_mut(caster).unwrap().dao = Some(UpgradeKind::DaoOfHeaviness);
+    let fragile = game
+        .state
+        .entities
+        .spawn_unit(2, EntityKind::Rifleman, 440.0, 400.0)
+        .unwrap();
+    game.state
+        .entities
+        .get_mut(fragile)
+        .unwrap()
+        .set_spawn_health(7);
+    let protected = game
+        .state
+        .entities
+        .spawn_unit(2, EntityKind::Rifleman, 460.0, 400.0)
+        .unwrap();
+    game.state
+        .entities
+        .get_mut(protected)
+        .unwrap()
+        .set_invulnerable(true);
+    for id in [fragile, protected] {
+        let target = game.state.entities.get_mut(id).unwrap();
+        target.set_attack_cd(1000);
+        target.replace_active_order(Order::HoldPosition);
+    }
     game.enqueue(1, cast);
     game.tick();
     // Throw Sword clears the active order. Keep ordinary melee out of this projectile test.
@@ -999,6 +1041,11 @@ fn war_throw_sword_is_dao_gated_and_hits_harder_on_return_after_checkpoint() {
         140,
         "exactly one 40 damage outbound hit"
     );
+    assert_eq!(
+        game.state.entities.get(caster).unwrap().insight,
+        47,
+        "projectile insight counts actual HP loss, excluding overkill and invulnerability"
+    );
     // A round trip through a checkpoint retains the projectile identity, leg and hit sets.
     let checkpoint = game.checkpoint_payload_text_for_test().unwrap();
     let mut restored = Game::restore_checkpoint_payload_text_for_test(
@@ -1017,6 +1064,8 @@ fn war_throw_sword_is_dao_gated_and_hits_harder_on_return_after_checkpoint() {
         "exactly one 80 damage return hit"
     );
     assert_eq!(restored.state.entities.get(victim).unwrap().hp, 60);
+    assert_eq!(game.state.entities.get(caster).unwrap().insight, 120);
+    assert_eq!(restored.state.entities.get(caster).unwrap().insight, 120);
     assert_eq!(game.state.ability_runtime.world_objects().count(), 0);
 }
 

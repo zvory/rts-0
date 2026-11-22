@@ -74,7 +74,7 @@ fn warrior_sword_applies_fifty_percent_armor_penetration() {
 }
 
 #[test]
-fn disciple_insight_counts_actual_hp_loss_and_caps_at_sixty() {
+fn disciple_insight_counts_actual_hp_loss_resets_on_evolution_and_doubles_cap() {
     let mut entities = EntityStore::new();
     let unit = entities
         .spawn_unit(1, EntityKind::Warrior, 100.0, 100.0)
@@ -101,6 +101,26 @@ fn disciple_insight_counts_actual_hp_loss_and_caps_at_sixty() {
     entities.get_mut(target).unwrap().set_spawn_health(45);
     run_combat_tick(&mut entities);
     assert_eq!(entities.get(unit).unwrap().insight, 60);
+    assert!(entities
+        .get_mut(unit)
+        .unwrap()
+        .evolve_dao(crate::game::ability::AbilityKind::EvolveWar));
+    assert_eq!(entities.get(unit).unwrap().insight, 0);
+    for expected in [35, 70, 105, 120, 120] {
+        entities
+            .get_mut(unit)
+            .unwrap()
+            .set_weapon_cooldown(combat_rules::WeaponKind::WarriorSword, 0);
+        entities.get_mut(target).unwrap().set_spawn_health(45);
+        run_combat_tick(&mut entities);
+        let evolved = entities.get(unit).unwrap();
+        assert_eq!(evolved.insight, expected);
+        assert_eq!(
+            evolved.dao,
+            Some(crate::game::upgrade::UpgradeKind::DaoOfHeaviness)
+        );
+        assert!(!evolved.dao_ability_available(crate::game::ability::AbilityKind::EvolveWar));
+    }
 }
 
 #[test]
@@ -116,6 +136,7 @@ fn war_armor_uses_weapon_penetration_and_lightness_changes_attack_rate() {
     assert_eq!(unit.dao_damage_after_armor(100, 1.0), 100);
     let war = effective_attack_profile(&unit);
     assert_eq!(war.dmg, 35);
+    assert_eq!(war.range_tiles, config::DAO_WAR_RANGE_TILES);
     unit.dao = Some(UpgradeKind::DaoOfLightness);
     let light = effective_attack_profile(&unit);
     assert_eq!(light.cooldown, 43);
@@ -321,7 +342,14 @@ fn dao_profiles_keep_lightness_melee_and_magic_ranged() {
             profile.weapon.unwrap().id,
             combat_rules::WeaponKind::WarriorSword
         );
-        assert_eq!(profile.range_tiles, 0.75);
+        assert_eq!(
+            profile.range_tiles,
+            if dao.is_some() {
+                config::DAO_WAR_RANGE_TILES
+            } else {
+                0.75
+            }
+        );
         assert_eq!(profile.dmg, if dao.is_some() { 35 } else { 23 });
         assert_eq!(profile.cooldown, 64);
         assert!(!can_fire_while_moving(&unit, false));

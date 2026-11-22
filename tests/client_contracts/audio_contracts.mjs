@@ -532,6 +532,69 @@ assert(
 // Combat audio
 // ---------------------------------------------------------------------------
 {
+  const plays = [];
+  const attacker = { id: 11, kind: KIND.WARRIOR, owner: 1, x: 120, y: 180 };
+  const target = { id: 12, kind: KIND.RIFLEMAN, owner: 2, x: 150, y: 180 };
+  const entities = new Map([[11, attacker], [12, target]]);
+  const combatAudio = new MatchCombatAudio({
+    state: { playerId: 1, entityById: (id) => entities.get(id) || null },
+    audio: {
+      pickVariant: (ids) => ids[0],
+      play(id, opts) { plays.push({ id, opts }); return true; },
+      stopByKey() {},
+    },
+  });
+  const attack = (weaponKind = WEAPON_KIND.WARRIOR_SWORD) => {
+    combatAudio.playAttackSound({ e: EVENT.ATTACK, from: 11, to: 12, weaponKind });
+    return plays.at(-1);
+  };
+  for (const dao of [undefined, "war"]) {
+    attacker.dao = dao;
+    for (const kind of [KIND.RIFLEMAN, KIND.WORKER, KIND.WARRIOR, KIND.MACHINE_GUNNER, KIND.PANZERFAUST, KIND.EKAT]) {
+      target.kind = kind;
+      assert(attack().id === "combat_disciple_sword_stab_01", `${dao || "base"} Disciple stabs ${kind} without metallic impact`);
+    }
+    for (const kind of [KIND.TANK, KIND.SCOUT_CAR, KIND.MORTAR_TEAM, KIND.COMMAND_CAR, KIND.ANTI_TANK_GUN, KIND.ARTILLERY, KIND.ROCKET_LAUNCHER, KIND.SCOUT_PLANE]) {
+      target.kind = kind;
+      assert(attack().id === "combat_disciple_sword_strike_01", `${dao || "base"} Disciple uses metallic sword hit on ${kind}`);
+    }
+  }
+  for (const kind of [KIND.RIFLEMAN, KIND.TANK, KIND.MORTAR_TEAM]) {
+    target.kind = kind;
+    attacker.dao = "lightness";
+    assert(attack().id === "combat_disciple_spear_01", `Lightness spear cue is independent of ${kind} target material`);
+    attacker.dao = "magic";
+    assert(attack(WEAPON_KIND.DISCIPLE_ORB).id === "combat_disciple_orb_01", `Magic orb cue is independent of ${kind} target material`);
+    combatAudio.playAttackSound({ e: EVENT.ATTACK, from: 11, to: 12 });
+    assert(plays.at(-1).id === "combat_disciple_orb_01", "attacker Dao selects orb when the event omits its weapon hint");
+  }
+  attacker.dao = undefined;
+  assert(attack(WEAPON_KIND.DISCIPLE_ORB).id === "combat_disciple_orb_01", "explicit orb weapon hint wins over a stale pre-evolution snapshot");
+  attacker.dao = "magic";
+  target.kind = KIND.RIFLEMAN;
+  assert(attack().id === "combat_disciple_sword_stab_01", "explicit sword hint keeps a pre-evolution attack from becoming an orb");
+  attacker.dao = undefined;
+  entities.delete(12);
+  const missingTarget = attack();
+  assert(missingTarget.id === "combat_disciple_sword_stab_01", "missing or fog-filtered target uses the non-metallic default without hidden information");
+  assert(missingTarget.opts.x === 120 && missingTarget.opts.y === 180, "Disciple attack sound originates at the visible attacker");
+  assert(missingTarget.opts.category === "combat_self", "own Disciple uses the self combat bus");
+  attacker.owner = 2;
+  assert(attack().opts.category === "combat_other", "enemy Disciple uses the other combat bus");
+  const before = plays.length;
+  combatAudio.playAttackSound({ e: EVENT.ATTACK, from: 11, to: 11, weaponKind: WEAPON_KIND.WARRIOR_SWORD });
+  assert(plays.length === before, "self-target feedback does not play a Disciple attack");
+  entities.clear();
+  combatAudio.playAttackSound({ e: EVENT.ATTACK, from: 11, to: 12, weaponKind: WEAPON_KIND.DISCIPLE_ORB });
+  assert(plays.length === before, "attack with no visible emitter or target stays silent");
+  for (const id of ["combat_disciple_orb_01", "combat_disciple_spear_01", "combat_disciple_sword_stab_01", "combat_disciple_sword_strike_01"]) {
+    assert(SOUND_MANIFEST.some((entry) => entry.id === id && entry.category === "combat_other"), `${id} is available for decoding in the sound manifest`);
+  }
+  assert(combatAudio.missingCombatSoundKinds.size === 0, "Disciple cues never fall back to rifle sounds");
+  combatAudio.destroy();
+}
+
+{
   assert(
     machineGunnerHasAudibleTarget({
       kind: KIND.MACHINE_GUNNER,
@@ -591,8 +654,8 @@ assert(
     "Warrior attack feedback resolves to its sword instead of a ranged weapon",
   );
   assert(
-    !attackKindHasCombatSound(KIND.WARRIOR, WEAPON_KIND.WARRIOR_SWORD),
-    "placeholder Warrior sword attacks stay silent instead of reusing rifle audio",
+    attackKindHasCombatSound(KIND.WARRIOR, WEAPON_KIND.WARRIOR_SWORD),
+    "Disciple sword attacks now play their dedicated combat cues",
   );
   assert(
     panzerfaustFeedbackSoundId(EVENT.PANZERFAUST_LAUNCH) === PANZERFAUST_LAUNCH_SOUND_ID,

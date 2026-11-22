@@ -57,6 +57,10 @@ git worktree add /tmp/rts-worktrees/<task> -b zvorygin/<task> origin/main
   `scripts/wait-pr.sh <pr>`. Completion means the PR merged and its head is reachable from
   `origin/main`, or a reported blocker identifies the exact failed check, conflict, API failure, or
   human decision needed.
+- Let `scripts/wait-pr.sh` exclusively own routine PR polling. Do not add separate GitHub polling
+  or repetitive pending-status updates. If monitoring must continue while the main agent handles
+  other work, delegate the waiter to a sub-agent with minimal context rather than the full
+  conversation history. Report only completion, an actionable failure, or a user-requested status.
 - See `docs/pr-first-workflow.md` for recovery, serial phases, PR audits, and exceptional workflows.
 
 ## Focused commands

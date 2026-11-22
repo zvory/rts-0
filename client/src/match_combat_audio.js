@@ -1,6 +1,7 @@
 import {
   attackFeedbackKind,
   attackKindHasCombatSound,
+  discipleAttackSoundId,
   machineGunnerHasAudibleTarget,
   machineGunSoundKey,
   panzerfaustFeedbackDedupKey,
@@ -38,6 +39,11 @@ export function worldCombatBedAllowed(active, livePauseState, roomTimeState) {
 }
 
 const COMBAT_SOUNDS = Object.freeze({
+  [KIND.WARRIOR]: {
+    ids: ["combat_disciple_sword_stab_01"],
+    priority: 2,
+    gain: 0.5 * COMBAT_GAIN_SCALE,
+  },
   [KIND.TANK]: {
     ids: ["combat_tank_01"],
     priority: 4,
@@ -177,7 +183,9 @@ export class MatchCombatAudio {
         console.warn(`audio: missing combat sound mapping for ${feedbackKind}, using rifle`);
       }
     }
-    const id = this.audio.pickVariant(spec.ids);
+    const id = feedbackKind === KIND.WARRIOR
+      ? discipleAttackSoundId(from, to, ev.weaponKind)
+      : this.audio.pickVariant(spec.ids);
     if (!id) return;
     const category = from && audioSelfOwner(this.state, from.owner, this.controlPolicy) ? "combat_self" : "combat_other";
     const key =

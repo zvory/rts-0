@@ -43,6 +43,21 @@ impl Entity {
         }
     }
 
+    pub(crate) fn insight_cap(&self) -> u32 {
+        if self.dao.is_some() {
+            config::DISCIPLE_EVOLVED_INSIGHT_CAP
+        } else {
+            config::DISCIPLE_INSIGHT_REQUIRED
+        }
+    }
+
+    /// Credit actual hostile HP loss after all damage protection and overkill.
+    pub(in crate::game) fn gain_insight(&mut self, damage: u32) {
+        if self.kind == EntityKind::Warrior {
+            self.insight = self.insight.saturating_add(damage).min(self.insight_cap());
+        }
+    }
+
     pub(crate) fn units_killed(&self) -> u32 {
         self.units_killed
     }
@@ -113,6 +128,7 @@ impl Entity {
         // Evolution changes the primary weapon without granting a free extra shot.
         self.set_attack_cd(attack_cd);
         self.chosen_dao = None;
+        self.insight = 0;
         // Specialists cannot enter tournaments. Keep their movement order, but drop admission
         // intent immediately so evolution late in the tick leaves checkpoint-valid state.
         if let Some(movement) = self.movement.as_mut() {
