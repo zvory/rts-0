@@ -48,6 +48,7 @@ fn request_tile_path_reports_cache_and_complexity_diagnostics() {
         start: (1, 1),
         goal: (8, 8),
         radius_tiles: 0,
+        initial_direction: None,
         route_shape: RouteShape::Normal,
         budget: None,
     };
@@ -79,6 +80,7 @@ fn cloning_pathing_service_does_not_copy_ephemeral_search_capacity() {
         start: (2, 2),
         goal: (55, 55),
         radius_tiles: 0,
+        initial_direction: None,
         route_shape: RouteShape::Normal,
         budget: None,
     };
@@ -106,6 +108,7 @@ fn budget_exhausted_partial_path_is_cached_only_for_the_same_budget() {
         start: (2, 2),
         goal: (55, 55),
         radius_tiles: 0,
+        initial_direction: None,
         route_shape: RouteShape::Normal,
         budget: Some(1),
     };
@@ -142,6 +145,7 @@ fn exact_direct_segment_bypasses_astar() {
         start: (3, 4),
         goal: (25, 19),
         radius_tiles: config::unit_radius_tiles(EntityKind::Rifleman),
+        initial_direction: None,
         route_shape: RouteShape::Normal,
         budget: None,
     };
@@ -169,6 +173,7 @@ fn infantry_direct_segment_crossing_slow_tiles_uses_astar_detour() {
         start: (2, 8),
         goal: (11, 8),
         radius_tiles: config::unit_radius_tiles(EntityKind::Rifleman),
+        initial_direction: None,
         route_shape: RouteShape::Normal,
         budget: None,
     };
@@ -199,6 +204,7 @@ fn infantry_uses_slow_tiles_when_open_detour_is_longer_and_caches_route() {
         start: (2, 8),
         goal: (11, 8),
         radius_tiles: config::unit_radius_tiles(EntityKind::Rifleman),
+        initial_direction: None,
         route_shape: RouteShape::Normal,
         budget: None,
     };
@@ -227,6 +233,7 @@ fn blocked_direct_segment_falls_back_to_full_astar() {
         start: (5, 10),
         goal: (24, 10),
         radius_tiles: config::unit_radius_tiles(EntityKind::Rifleman),
+        initial_direction: None,
         route_shape: RouteShape::Normal,
         budget: None,
     };
@@ -255,6 +262,7 @@ fn direct_segment_result_is_not_reused_for_unsafe_offsets_in_the_same_tiles() {
         start: (5, 10),
         goal: (24, 10),
         radius_tiles: config::unit_radius_tiles(EntityKind::Rifleman),
+        initial_direction: None,
         route_shape: RouteShape::Normal,
         budget: None,
     };
@@ -290,6 +298,7 @@ fn pathing_permission_defers_cache_hits_and_misses() {
         start: (3, 4),
         goal: (25, 19),
         radius_tiles: 0,
+        initial_direction: None,
         route_shape: RouteShape::Normal,
         budget: None,
     };
@@ -331,6 +340,7 @@ fn completed_no_route_result_is_reused_without_another_search() {
         start: (3, 4),
         goal: (25, 19),
         radius_tiles: 0,
+        initial_direction: None,
         route_shape: RouteShape::Normal,
         budget: None,
     };
@@ -363,6 +373,7 @@ fn legacy_routes_do_not_detour_to_offset_roads() {
         start: (2, 9),
         goal: (16, 9),
         radius_tiles: config::unit_radius_tiles(EntityKind::Rifleman),
+        initial_direction: None,
         route_shape: RouteShape::Normal,
         budget: None,
     };
@@ -372,4 +383,84 @@ fn legacy_routes_do_not_detour_to_offset_roads() {
 
     assert_eq!(diagnostics.cache_status, PathCacheStatus::Miss);
     assert!(path.iter().all(|&(_, ty)| ty == 9), "route was {path:?}");
+}
+
+#[test]
+fn pivot_route_entrance_prefers_hull_heading_and_caches_headings_separately() {
+    let map = map_with_rock_wall(18, 8, 6, 10);
+    let entities = EntityStore::new();
+    let occ = Occupancy::build(&map, &entities);
+    let mut service = PathingService::new(8192, 256);
+    // Symmetric north/south detours around a vertical wall.
+    let mut req = PathRequest {
+        kind: EntityKind::Tank,
+        start: (5, 8),
+        goal: (11, 8),
+        radius_tiles: 0,
+        initial_direction: Some(3),
+        route_shape: RouteShape::VehicleClearance,
+        budget: None,
+    };
+    let (north, north_diag) =
+        resolved(service.request_tile_path_with_diagnostics(&map, &occ, req.clone(), true));
+    req.initial_direction = Some(2);
+    let (south, south_diag) =
+        resolved(service.request_tile_path_with_diagnostics(&map, &occ, req.clone(), true));
+    assert!(
+        north.first().is_some_and(|p| p.1 < 8),
+        "north-facing entrance: {north:?}"
+    );
+    assert!(
+        south.first().is_some_and(|p| p.1 > 8),
+        "south-facing entrance: {south:?}"
+    );
+    assert_eq!(north_diag.cache_status, PathCacheStatus::Miss);
+    assert_eq!(south_diag.cache_status, PathCacheStatus::Miss);
+    let (cached, diag) =
+        resolved(service.request_tile_path_with_diagnostics(&map, &occ, req, true));
+    assert_eq!(diag.cache_status, PathCacheStatus::Hit);
+    assert_eq!(cached, south);
+}
+
+#[test]
+fn initial_heading_preference_keeps_required_backward_route_legal() {
+    let map = flat_test_map(18);
+    let entities = EntityStore::new();
+    let occ = Occupancy::build(&map, &entities);
+    let mut service = PathingService::new(8192, 256);
+    let req = PathRequest {
+        kind: EntityKind::Tank,
+        start: (10, 8),
+        goal: (4, 8),
+        radius_tiles: 0,
+        initial_direction: Some(0),
+        route_shape: RouteShape::VehicleClearance,
+        budget: None,
+    };
+    let route = service.request_tile_path(&map, &occ, req);
+    assert_eq!(route.last(), Some(&(4, 8)));
+    assert!(route.first().is_some_and(|p| p.0 < 10));
+}
+
+#[test]
+fn first_diagonal_elbow_prefers_forward_half_of_l_step() {
+    let map = flat_test_map(18);
+    let entities = EntityStore::new();
+    let occ = Occupancy::build(&map, &entities);
+    let mut service = PathingService::new(8192, 256);
+    let req = PathRequest {
+        kind: EntityKind::Tank,
+        start: (10, 8),
+        goal: (7, 11),
+        radius_tiles: 0,
+        initial_direction: Some(2),
+        route_shape: RouteShape::VehicleClearance,
+        budget: None,
+    };
+    let route = service.request(&map, &occ, req);
+    assert_eq!(
+        route.last(),
+        Some(&map.tile_center(10, 9)),
+        "start down instead of sideways: {route:?}"
+    );
 }

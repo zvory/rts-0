@@ -4364,7 +4364,7 @@ fn tank_still_pivots_for_far_goal_behind() {
 }
 
 #[test]
-fn tank_does_not_reverse_for_behind_intermediate_waypoint() {
+fn tank_reverses_for_nearby_behind_intermediate_waypoint() {
     let map = flat_map(1);
     let mut entities = EntityStore::new();
     let (sx, sy) = map.tile_center(20, 20);
@@ -4385,12 +4385,12 @@ fn tank_does_not_reverse_for_behind_intermediate_waypoint() {
     let e = entities.get(tank).expect("tank should exist");
     let moved = moved_distance((sx, sy), (e.pos_x(), e.pos_y()));
     assert!(
-        moved <= 0.01,
-        "behind intermediate waypoint should make the tank pivot before moving, moved {moved:.4}px"
+        moved > 0.01 && e.pos_x() < sx,
+        "nearby behind intermediate waypoint should reverse without a turnaround, moved {moved:.4}px"
     );
     assert!(
-        e.facing().abs() > 0.0 && e.facing().abs() <= TANK_BODY_TURN_RATE_RAD_PER_TICK + 0.0001,
-        "tank should rotate toward the behind waypoint instead of staying in reverse-facing gear, facing {:.4}",
+        e.facing().abs() <= 0.0001,
+        "tank should preserve its hull heading while reversing, facing {:.4}",
         e.facing()
     );
 }
@@ -4857,3 +4857,6 @@ fn head_on_in_one_tile_corridor_does_not_deadlock() {
         ra + rb
     );
 }
+
+#[path = "route_recovery_tests.rs"]
+mod route_recovery_tests;

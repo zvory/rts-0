@@ -178,17 +178,37 @@ pub(super) fn advance_moving_units(
                     }
             })
             .unwrap_or(0.0);
-        if let Some((wx, wy)) = movement_target {
-            speed *= map.elevation_movement_multiplier_at(x, y, (wx - x, wy - y));
-            speed *= ability_runtime.magic_anchor_movement_multiplier(x, y, (wx - x, wy - y), tick);
-        }
-        if speed <= 0.0 {
-            continue;
-        }
+        let directional_speed = |(wx, wy): (f32, f32)| {
+            speed
+                * map.elevation_movement_multiplier_at(x, y, (wx - x, wy - y))
+                * ability_runtime.magic_anchor_movement_multiplier(x, y, (wx - x, wy - y), tick)
+        };
 
         let uses_vehicle_movement = uses_oriented_vehicle_body(kind);
         let is_pivot_vehicle = uses_pivot_vehicle_movement(kind);
         let is_car = uses_car_movement_semantics(kind);
+        if let Some(recovery) = entities
+            .get(id)
+            .filter(|_| is_pivot_vehicle)
+            .and_then(|e| e.movement.as_ref()?.pivot_recovery)
+        {
+            // Recovery may retreat opposite the route: directional modifiers must follow
+            // the committed escape, including elevation and Magic Anchor pull.
+            let recovery_speed = directional_speed(recovery.goal);
+            let neighbors = entities
+                .get(id)
+                .map(|e| super::pivot_recovery::neighbors(entities, spatial, e))
+                .unwrap_or_default();
+            if entities.get_mut(id).is_some_and(|e| {
+                super::pivot_recovery::advance(e, map, occ, recovery_speed, &neighbors)
+            }) {
+                continue;
+            }
+        }
+        speed = movement_target.map_or(speed, directional_speed);
+        if speed <= 0.0 {
+            continue;
+        }
         let orig_x = x;
         let orig_y = y;
         let mut budget = speed;
@@ -197,6 +217,7 @@ pub(super) fn advance_moving_units(
         let mut body_facing = original_facing;
         let mut scout_car_reverse_waypoint = None;
         let mut static_blocked_this_tick = false;
+        let mut yielding_to_traffic = false;
         if is_pivot_vehicle {
             if let Some(e) = entities.get(id) {
                 if let Some(mut intent) = pivot_drive_intent(map, occ, e, x, y) {
@@ -209,6 +230,7 @@ pub(super) fn advance_moving_units(
                         y,
                         intent.traffic_facing,
                     );
+                    yielding_to_traffic = traffic.throttle_scale < 0.999;
                     intent.desired_facing =
                         normalize_angle(intent.desired_facing + traffic.turn_bias);
                     if intent.desired_facing.is_finite() {
@@ -463,7 +485,31 @@ pub(super) fn advance_moving_units(
                                 y = uy;
                                 static_blocked_this_tick = false;
                             } else {
+                                // Retreat/advance first, keeping the current hull angle. The
+                                // escape need not make the proposed turn legal on its first step.
+                                let neighbors = entities
+                                    .get(id)
+                                    .map(|e| super::pivot_recovery::neighbors(entities, spatial, e))
+                                    .unwrap_or_default();
+                                if let Some(e) = entities.get_mut(id) {
+                                    if !yielding_to_traffic
+                                        && e.movement.as_ref().is_some_and(|m| {
+                                            m.stuck_ticks >= config::STUCK_ARRIVAL_TICKS
+                                        })
+                                    {
+                                        super::pivot_recovery::begin(
+                                            e,
+                                            map,
+                                            occ,
+                                            (x, y),
+                                            facing,
+                                            speed,
+                                            &neighbors,
+                                        );
+                                    }
+                                }
                                 new_facing = None;
+                                static_blocked_this_tick = true;
                             }
                         } else {
                             new_facing = None;
@@ -569,6 +615,12 @@ pub(super) fn advance_moving_units(
                     .as_ref()
                     .map(|m| m.static_blocked_ticks)
                     .unwrap_or(0);
+                if e.movement
+                    .as_ref()
+                    .is_some_and(|m| m.pivot_recovery.is_some())
+                {
+                    continue;
+                }
                 if static_blocked_ticks >= config::STATIC_BLOCKED_REPATH_TICKS
                     && matches!(
                         e.order(),

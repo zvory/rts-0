@@ -292,7 +292,7 @@ impl Entity {
             m.path.clear();
             m.path_goal = None;
             m.last_move_delta = (0.0, 0.0);
-            m.scout_car_reverse_waypoint = None;
+            m.clear_vehicle_recovery();
             m.entrenchment_dig_ticks = 0;
             // Keep occupation until combat decides whether an Attack order needs pursuit.
             if !matches!(m.order, Order::Attack(_)) {
@@ -372,7 +372,7 @@ impl Entity {
             m.last_progress_pos = (pos_x, pos_y);
             m.sidestep_cooldown = 0;
             m.scout_car_recovery_cooldown = 0;
-            m.scout_car_reverse_waypoint = None;
+            m.clear_vehicle_recovery();
             m.static_blocked_ticks = 0;
         }
     }
@@ -580,7 +580,7 @@ impl Entity {
     pub fn set_path(&mut self, path: Vec<(f32, f32)>) {
         if let Some(m) = self.movement.as_mut() {
             m.path = path;
-            m.scout_car_reverse_waypoint = None;
+            m.clear_vehicle_recovery();
             if m.path.is_empty() {
                 m.last_move_delta = (0.0, 0.0);
             }
@@ -590,7 +590,7 @@ impl Entity {
     pub fn clear_path(&mut self) {
         if let Some(m) = self.movement.as_mut() {
             m.path.clear();
-            m.scout_car_reverse_waypoint = None;
+            m.clear_vehicle_recovery();
             m.last_move_delta = (0.0, 0.0);
         }
     }
@@ -602,7 +602,7 @@ impl Entity {
     pub fn pop_waypoint(&mut self) {
         if let Some(m) = self.movement.as_mut() {
             m.path.pop();
-            m.scout_car_reverse_waypoint = None;
+            m.clear_vehicle_recovery();
         }
     }
 
@@ -611,7 +611,7 @@ impl Entity {
     pub fn push_waypoint(&mut self, wp: (f32, f32)) {
         if let Some(m) = self.movement.as_mut() {
             m.path.push(wp);
-            m.scout_car_reverse_waypoint = None;
+            m.clear_vehicle_recovery();
         }
     }
 
@@ -1421,7 +1421,7 @@ impl Entity {
             m.path.clear();
             m.path_goal = None;
             m.last_move_delta = (0.0, 0.0);
-            m.scout_car_reverse_waypoint = None;
+            m.clear_vehicle_recovery();
         }
         self.set_target_id(None);
         self.reset_artillery_blanket_sequence();

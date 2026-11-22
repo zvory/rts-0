@@ -40,7 +40,7 @@ export function selectionBudgetGridModel(entities, overflow = null, players = []
   const blocks = (entities || []).map((entity, sourceIndex) => {
     const weight = commandWeight(entity?.kind);
     const shape = selectionBudgetBlockShape(weight);
-    const st = statsForFaction(entity?.kind, players.find?.((p) => p.id === entity?.owner)?.factionId) || {};
+    const st = statsForFaction(entity?.kind, players.find?.((p) => p.id === entity?.owner)?.factionId, entity?.dao) || {};
     return {
       id: entity?.id,
       kind: entity?.kind,
@@ -366,7 +366,7 @@ export class HudSelectionPanel {
   /** Build the detail node for a single selected entity. */
   _singleSelectionNode(e) {
     const factionId = this.state.players?.find?.((p) => p.id === e.owner)?.factionId;
-    const st = statsForFaction(e.kind, factionId) || {};
+    const st = statsForFaction(e.kind, factionId, e.dao) || {};
     const node = document.createElement("div");
     node.className = "sel-single";
 
@@ -381,7 +381,7 @@ export class HudSelectionPanel {
       const active = e.prodKind ? e.daoTrainingQueue[0] : null;
       const waiting = e.daoTrainingQueue.slice(active ? 1 : 0);
       const label = active ? `Training ${UPGRADES[active]?.label ?? "Dao"} · 10 seconds`
-        : e.daoTrainingQueue.length ? "Waiting for a base Disciple and 100 oil" : "Queue Dao training, then send base Disciples inside";
+        : e.daoTrainingQueue.length ? "Waiting for a base Novice and 100 oil" : "Queue Dao training, then send base Novices inside";
       const plans = waiting.slice(0, 4).map((dao) => UPGRADES[dao]?.label ?? "Dao").join(" → ") +
         (waiting.length > 4 ? ` (+${waiting.length - 4})` : "");
       prodHtml = `<div class="sel-prod-label">${label}</div><div class="sel-prod-bar"><div class="sel-prod-fill" style="width:${Math.round((e.prodProgress ?? 0) * 100)}%"></div></div>` +
@@ -389,7 +389,7 @@ export class HudSelectionPanel {
     } else if (e.kind === KIND.TOURNAMENT_GROUNDS && typeof e.tournamentEntrants === "number") {
       const running = !!e.prodKind;
       const pct = Math.round((running ? (e.prodProgress ?? 0) : e.tournamentEntrants / 4) * 100);
-      const label = running ? "Tournament · 10 seconds · 1 random Dao winner" : `Disciples inside: ${e.tournamentEntrants} / 4`;
+      const label = running ? "Tournament · 10 seconds · 1 random Dao winner" : `Novices inside: ${e.tournamentEntrants} / 4`;
       prodHtml = `<div class="sel-prod-label">${label}</div><div class="sel-prod-bar">` +
         `<div class="sel-prod-fill" style="width:${pct}%"></div></div>`;
     } else if (queue > 0) {
@@ -459,7 +459,7 @@ export class HudSelectionPanel {
     node.setAttribute("data-selection-kind", String(entity.kind || ""));
     node.setAttribute(
       "aria-label",
-      `Selected ${entity.label || statsForFaction(entity.kind, this.state.players?.find?.((p) => p.id === entity.owner)?.factionId)?.label || entity.kind || "entity"}`,
+      `Selected ${entity.label || statsForFaction(entity.kind, this.state.players?.find?.((p) => p.id === entity.owner)?.factionId, entity.dao)?.label || entity.kind || "entity"}`,
     );
     return node;
   }

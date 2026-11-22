@@ -14,6 +14,32 @@ import {
 } from "../../client/src/hud.js";
 import { KIND } from "../../client/src/protocol.js";
 import { HudSelectionPanel } from "../../client/src/hud_selection_panel.js";
+import { buildControlGroupSummaries } from "../../client/src/hud_control_groups.js";
+
+withFakeHudDocument(({ FakeElement }) => {
+  const players = [{ id: 1, factionId: "cultivators" }];
+  for (const [dao, label] of [[null, "Novice"], ["lightness", "Lightness Adept"],
+    ["war", "War Adept"], ["magic", "Magic Adept"]]) {
+    const entity = { id: 1, owner: 1, kind: KIND.WARRIOR, dao };
+    const state = {
+      players,
+      controlGroups: [[1]],
+      controlGroupEntities: () => [entity],
+    };
+    const selectionPanel = new HudSelectionPanel(new FakeElement("section"), state, null, () => "");
+    const node = selectionPanel._singleSelectionNode(entity);
+    assert(node.innerHTML.includes(`<div class="sel-name">${label}</div>`),
+      `single selection names ${label}`);
+    selectionPanel._selectionEntityNode(node, entity);
+    assert(node.getAttribute("aria-label") === `Selected ${label}`,
+      `selection accessibility names ${label}`);
+    assert(selectionBudgetGridModel([entity], null, players).blocks[0].label === label,
+      `multi-selection names ${label}`);
+    assert(buildControlGroupSummaries(state)[0].label === label,
+      `control-group summary names ${label}`);
+    selectionPanel.destroy();
+  }
+});
 
 withFakeHudDocument(({ FakeElement }) => {
   const panel = new FakeElement("section");

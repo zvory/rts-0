@@ -23,6 +23,7 @@ mod barbed_wire;
 mod car_drive;
 mod collision;
 mod pivot_drive;
+mod pivot_recovery;
 mod standability;
 mod steering;
 mod tank_point;
