@@ -7,23 +7,24 @@ use super::room_task::helpers::{LIVE_PAUSE_LIMIT, MATCH_COUNTDOWN_WORDS};
 use crate::protocol::{LivePauseState, LiveResumeCountdown};
 
 const HOTKEY_SETUP_DURATION: Duration = Duration::from_secs(10);
-const RESUME_DURATION: Duration = Duration::from_secs(13);
+const RESUME_DURATION: Duration = Duration::from_secs(3);
 
 #[derive(Default)]
 pub(super) struct LivePauseControl {
     paused: bool,
     paused_by: Option<u32>,
     resume_deadline: Option<TokioInstant>,
+    setup_duration: Duration,
     counts: HashMap<u32, u8>,
 }
 
 impl LivePauseControl {
     pub(super) fn state_for(&self, actor_id: Option<u32>) -> LivePauseState {
         let resume_countdown = self.resume_deadline.map(|deadline| {
-            let duration = RESUME_DURATION;
+            let duration = self.setup_duration + RESUME_DURATION;
             LiveResumeCountdown {
                 duration_ms: duration.as_millis() as u32,
-                setup_duration_ms: HOTKEY_SETUP_DURATION.as_millis() as u32,
+                setup_duration_ms: self.setup_duration.as_millis() as u32,
                 remaining_ms: deadline
                     .saturating_duration_since(TokioInstant::now())
                     .as_millis()
@@ -63,8 +64,17 @@ impl LivePauseControl {
         if !self.paused || self.resume_deadline.is_some() {
             return false;
         }
+        self.setup_duration = Duration::ZERO;
         self.resume_deadline = Some(TokioInstant::now() + RESUME_DURATION);
         true
+    }
+
+    /// Initial replay takeover needs time to rebuild local control groups, without spending a pause.
+    pub(super) fn start_replay_setup(&mut self) {
+        self.paused = true;
+        self.paused_by = None;
+        self.setup_duration = HOTKEY_SETUP_DURATION;
+        self.resume_deadline = Some(TokioInstant::now() + HOTKEY_SETUP_DURATION + RESUME_DURATION);
     }
 
     pub(super) fn finish_resume_if_due(&mut self) -> bool {
