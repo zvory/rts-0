@@ -118,8 +118,12 @@ export class Match {
     const startupInbox = createMatchStartupInbox(net, diagnostics);
     let match = null;
     let renderer = null;
-    let rendererPreparation = options.rendererPreparation || null;
+    let rendererPreparation = null;
     try {
+      // Own the entire async startup window, including countdown preparation/disposal.
+      if (options.rendererPreparation) {
+        rendererPreparation = await options.rendererPreparation;
+      }
       if (!rendererPreparation) {
         rendererPreparation = await prepareRenderer(dom.viewport, backendBundle);
       }

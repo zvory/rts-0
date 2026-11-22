@@ -2,7 +2,6 @@ import { S } from "./protocol.js";
 
 const MAX_COMMAND_RECEIPTS = 64;
 const LATEST_TYPES = Object.freeze([
-  S.SNAPSHOT,
   S.ROOM_TIME_STATE,
   S.LIVE_PAUSE_STATE,
   S.OBSERVER_ANALYSIS,
@@ -12,12 +11,26 @@ const LATEST_TYPES = Object.freeze([
 export function createMatchStartupInbox(net, diagnostics = null) {
   const latest = new Map();
   const receipts = [];
+  let snapshot = null;
+  let resourceReset = false;
+  const resourceDeltas = new Map();
   const replayResourceHistory = [];
   let reportedReceiptDrop = false;
   const handlers = new Map();
 
-  for (const type of [...LATEST_TYPES, S.COMMAND_RECEIPT, S.REPLAY_RESOURCE_HISTORY]) {
+  for (const type of [...LATEST_TYPES, S.SNAPSHOT, S.COMMAND_RECEIPT, S.REPLAY_RESOURCE_HISTORY]) {
     const handler = (message) => {
+      if (type === S.SNAPSHOT) {
+        // Entity/fog lanes are complete views; resources are a replacement plus patches.
+        // Coalesce by id rather than retaining traffic proportional to loading time.
+        if (message.resourceReset === true) {
+          resourceDeltas.clear();
+          resourceReset = true;
+        }
+        for (const row of message.resourceDeltas || []) resourceDeltas.set(row.id, row);
+        snapshot = message;
+        return;
+      }
       if (type === S.REPLAY_RESOURCE_HISTORY) {
         if (message.replace) replayResourceHistory.length = 0;
         replayResourceHistory.push(message);
@@ -48,9 +61,22 @@ export function createMatchStartupInbox(net, diagnostics = null) {
       applyLatest(latest, S.ROOM_TIME_STATE, match.onRoomTimeState);
       applyLatest(latest, S.LIVE_PAUSE_STATE, match.onLivePauseState);
       for (const message of receipts) match.onCommandReceipt(message);
-      applyLatest(latest, S.SNAPSHOT, match.onSnapshot);
+      if (snapshot) {
+        match.onSnapshot({
+          ...snapshot,
+          resourceReset,
+          resourceDeltas: [...resourceDeltas.values()],
+        });
+      }
       applyLatest(latest, S.OBSERVER_ANALYSIS, match.onObserverAnalysis);
       for (const message of replayResourceHistory) match.onReplayResourceHistory(message);
+      // A handoff is consumable once: replaying a reset later could erase newer knowledge.
+      latest.clear();
+      receipts.length = 0;
+      replayResourceHistory.length = 0;
+      snapshot = null;
+      resourceReset = false;
+      resourceDeltas.clear();
     },
   };
 }

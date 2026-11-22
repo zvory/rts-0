@@ -30,6 +30,16 @@ use a separate diagnostic/full-world policy.
 - For `playerResources`, expose rows only for the real player ids selected by the observer view;
   full-world/all-player views expose all active rows.
 
+## Delivery and startup
+
+- Classify each snapshot field as a complete view, an incremental patch, or a transient event.
+  Every coalescing boundary must preserve its semantics; a complete internal server snapshot does
+  not imply the encoded client snapshot is complete. Resource patches/reset markers must survive
+  asynchronous renderer startup and be consumed once with the latest entity/fog view.
+- Test sequential delivery against coalesced delivery, including empty updates, explicit zero,
+  a second replacement, and a replacement with no rows. Test the actual App startup path while
+  renderer preparation is unresolved, rather than only applying snapshots directly to `GameState`.
+
 ## Events
 
 - Decide whether the event is owner-only, team-visible, selected-player-union, full-world, or global
