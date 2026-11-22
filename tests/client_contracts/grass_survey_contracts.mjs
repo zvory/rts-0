@@ -7,7 +7,7 @@ assert.equal(resolveVisualProfileLaunch(null).profile, null);
 const ordinary = {};
 reconcileGrassSurvey(ordinary, 0);
 assert.equal(ordinary._grassSurveyLayer, null);
-for (let i = 1; i <= 5; i++) {
+for (let i = 1; i <= 8; i++) {
   const profile = getVisualProfile(`grass-survey-${i}`);
   assert.equal(profile.grassTechnique, i);
   assert.equal(profile.terrainPreviewReveal, true);
@@ -40,3 +40,28 @@ try {
   globalThis.PIXI = priorPixi;
 }
 console.log("grass survey contracts passed");
+
+// Texture-based density is a map-load cost: animation reuses both textures and frees them on exit.
+const priorCanvas = globalThis.OffscreenCanvas;
+try {
+  const context = { save() {}, restore() {}, beginPath() {}, rect() {}, clip() {},
+    fillRect() {}, moveTo() {}, quadraticCurveTo() {}, stroke() {}, putImageData() {},
+    createImageData(w,h) { return { data:new Uint8ClampedArray(w*h*4) }; } };
+  globalThis.OffscreenCanvas = class { constructor(w,h) { this.width=w; this.height=h; } getContext() { return context; } };
+  const { createGrassCarpetMaterial } = await import("../../client/src/renderer/grass_carpet.js");
+  for (const technique of [6,7,8]) {
+    const sources = [], freed = [];
+    const material = createGrassCarpetMaterial({ Texture: { from(canvas) {
+      const texture = { source:{}, destroy(deep) { freed.push(deep); } };
+      sources.push({ width:canvas.width, height:canvas.height, texture });
+      return texture;
+    } } },technique);
+    assert.equal(sources.length,2);
+    assert.equal(sources[0].height, technique===8 ? 2048 : 256);
+    assert.equal(material.textureBytes, sources.reduce((total,s) => total+s.width*s.height*4,0));
+    assert.equal(sources[0].texture.source.addressMode,"repeat");
+    assert.equal(sources[1].texture.source.scaleMode,"linear");
+    material.destroy();
+    assert.deepEqual(freed,[true,true]);
+  }
+} finally { globalThis.OffscreenCanvas = priorCanvas; }

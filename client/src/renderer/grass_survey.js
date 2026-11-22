@@ -1,3 +1,4 @@
+import { createGrassCarpetMaterial } from "./grass_carpet.js";
 import { TERRAIN } from "../protocol.js";
 
 const VERTEX = `#version 300 es
@@ -99,7 +100,11 @@ export class GrassSurveyLayer {
       uTint: { value: new Float32Array([((tint >> 16) & 255)/255, ((tint >> 8) & 255)/243, (tint & 255)/226]), type: "vec3<f32>" },
     });
     this.geometry = new pixi.Geometry({ attributes: { aPosition: { buffer: new Float32Array(positions), format: "float32x2" } } });
-    this.shader = pixi.Shader.from({ gl: { vertex: VERTEX, fragment: FRAGMENT, name: "lab-grass-survey" }, resources: { grassUniforms: this.uniforms } });
+    this.material = technique >= 6 ? createGrassCarpetMaterial(pixi, technique) : null;
+    this.shader = pixi.Shader.from({
+      gl: { vertex: VERTEX, fragment: this.material?.fragment || FRAGMENT, name: "lab-grass-survey" },
+      resources: { grassUniforms: this.uniforms, ...this.material?.resources },
+    });
     this.mesh = new pixi.Mesh({ geometry: this.geometry, shader: this.shader });
     layer.addChild(this.mesh);
   }
@@ -109,6 +114,7 @@ export class GrassSurveyLayer {
     this.mesh?.destroy();
     this.geometry?.destroy(true);
     this.shader?.destroy();
+    this.material?.destroy();
   }
 }
 
@@ -122,7 +128,7 @@ export function reconcileGrassSurvey(renderer, technique) {
   if (renderer._grassSurveyTechnique !== technique) {
     destroyGrassSurvey(renderer);
     renderer._grassSurveyTechnique = technique;
-    if (Number.isInteger(technique) && technique >= 1 && technique <= 5 && renderer._map) {
+    if (Number.isInteger(technique) && technique >= 1 && technique <= 8 && renderer._map) {
       renderer._grassSurveyLayer = new GrassSurveyLayer(PIXI, renderer.layers.terrain, renderer._map, technique, renderer.world.tint);
     }
   }
