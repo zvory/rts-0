@@ -303,6 +303,7 @@ pub(super) fn effective_attack_profile(e: &Entity) -> EffectiveAttackProfile {
     }
     if e.dao == Some(crate::game::upgrade::UpgradeKind::DaoOfHeaviness) {
         profile.dmg = ((profile.dmg as f32) * config::DAO_WAR_DAMAGE_MULTIPLIER).round() as u32;
+        profile.range_tiles = config::DAO_WAR_RANGE_TILES;
     }
     if e.kind != EntityKind::AntiTankGun {
         return profile;
