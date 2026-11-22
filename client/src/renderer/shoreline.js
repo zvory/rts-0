@@ -5,6 +5,7 @@ import { SHORELINE_TILES_FRAGMENT } from "./shoreline_tiles.js";
 import { SHORELINE_SPLAT_FRAGMENT } from "./shoreline_splat.js";
 import { SHORELINE_SWASH_FRAGMENT } from "./shoreline_swash.js";
 
+export const DEFAULT_SHORELINE_TECHNIQUE = 3;
 const SAMPLES = 8;
 const RANGE = 128;
 const FRAGMENTS = [null, SHORELINE_TILES_FRAGMENT, SHORELINE_SPLAT_FRAGMENT, SHORELINE_SWASH_FRAGMENT];
@@ -74,9 +75,14 @@ export function shorelineField(map) {
  return {width,height,pixels};
 }
 
-class ShorelineLayer {
+export class ShorelineLayer {
  constructor(pixi,layer,map,tint,technique) {
-  const field=shorelineField(map), canvas=createWorkerSafeCanvas(field.width,field.height);
+  // Uniform maps have no bank: skip the field, GPU texture, and draw call entirely.
+  const water=map.terrain.some(code=>code===TERRAIN.WATER);
+  const land=map.terrain.some(code=>code!==TERRAIN.WATER);
+  if(!water||(!land&&technique!==1)) return;
+  const field=shorelineField(map);
+  const canvas=createWorkerSafeCanvas(field.width,field.height);
   const ctx=canvas.getContext("2d"), image=ctx.createImageData(field.width,field.height);
   image.data.set(field.pixels); ctx.putImageData(image,0,0);
   this.texture=pixi.Texture.from(canvas); this.texture.source.scaleMode="linear";
@@ -91,10 +97,16 @@ class ShorelineLayer {
    resources:{shorelineUniforms:this.uniforms,uShore:this.texture.source}});
   this.mesh=new pixi.Mesh({geometry:this.geometry,shader:this.shader}); layer.addChild(this.mesh);
  }
- update(nowMs) { this.uniforms.uniforms.uTime=nowMs/1000; }
+ update(nowMs) {
+  if(!this.mesh) return;
+  this.uniforms.uniforms.uTime=nowMs/1000;
+  // Async water asset completion must never cover the shoreline, including in the editor.
+  const layer=this.mesh.parent;
+  if(layer&&layer.children[layer.children.length-1]!==this.mesh) layer.setChildIndex(this.mesh,layer.children.length-1);
+ }
  destroy() {
-  this.mesh.parent?.removeChild(this.mesh); this.mesh.destroy();
-  this.geometry.destroy(true); this.shader.destroy(); this.texture.destroy(true);
+  this.mesh?.parent?.removeChild(this.mesh); this.mesh?.destroy();
+  this.geometry?.destroy(true); this.shader?.destroy(); this.texture?.destroy(true);
  }
 }
 
@@ -103,16 +115,13 @@ export function destroyShorelineLayer(renderer) {
  renderer._shorelineMap=null; renderer._shorelineTechnique=0;
 }
 
-// Explicit Lab profiles only. Ordinary matches retain the selected grass/water artwork.
+// Animated swash is the shared match/editor default; Lab profiles may compare alternatives.
 export function reconcileShorelineLayer(renderer,requested=0) {
- const technique=Number.isInteger(requested)&&requested>=1&&requested<=3 ? requested : 0;
- if(!renderer._map||!technique) { if(renderer._shorelineLayer) destroyShorelineLayer(renderer); return; }
+ const technique=Number.isInteger(requested)&&requested>=1&&requested<=3 ? requested : DEFAULT_SHORELINE_TECHNIQUE;
+ if(!renderer._map) { if(renderer._shorelineLayer) destroyShorelineLayer(renderer); return; }
  if(renderer._shorelineTechnique!==technique||renderer._shorelineMap!==renderer._map) {
   destroyShorelineLayer(renderer);
   renderer._shorelineLayer=new ShorelineLayer(PIXI,renderer.layers.terrain,renderer._map,renderer.world.tint,technique);
   renderer._shorelineMap=renderer._map; renderer._shorelineTechnique=technique;
  }
- // Water textures finish loading asynchronously; the bank always composites last.
- const layer=renderer.layers.terrain,mesh=renderer._shorelineLayer.mesh;
- if(layer.children[layer.children.length-1]!==mesh) layer.setChildIndex(mesh,layer.children.length-1);
 }
