@@ -320,12 +320,8 @@ const TEST_WORKER_OVERRIDES = Object.freeze([
     "mortar PNG tire overlays remain fixed-color above the team-tinted carriage",
   );
   assert(
-    basePlateSprite?.tintSlot === "team" &&
-      basePlateSprite.drawOrder < carriageSprite?.drawOrder &&
-      basePlateSprite.positionOffsetX === -20 &&
-      basePlateSprite.frame?.w / basePlateSprite.frame?.pixelsPerUnitX === 16 &&
-      basePlateSprite.frame?.h / basePlateSprite.frame?.pixelsPerUnitY === 16,
-    "mortar PNG base plate is team-tinted, half a tile wide, rearward, and draws below the carriage",
+    basePlateSprite === undefined,
+    "mortar PNG atlas omits the retired deployed base plate",
   );
   const definitions = createLiveRigDefinitions();
   const definition = liveRigDefinitionFor(definitions, KIND.MORTAR_TEAM);
@@ -336,10 +332,10 @@ const TEST_WORKER_OVERRIDES = Object.freeze([
   const shadowCoverage = pngAtlasRouteCoverage(definition, atlas, shadowRoute);
   assert(unitCoverage.missingParts.length === 0, "mortar PNG atlas covers every unit-route part");
   assert(
-    unitCoverage.coveredParts.includes("part.mortar.basePlate.deployed") &&
+    !unitCoverage.coveredParts.includes("part.mortar.basePlate.deployed") &&
       unitCoverage.coveredParts.includes("part.mortar.body.packed") &&
       unitCoverage.coveredParts.includes("part.mortar.tube.packed"),
-    "mortar PNG atlas replaces the base plate, carriage/body, and tube SVG parts",
+    "mortar PNG atlas covers carriage/body and tube parts without a base plate",
   );
   assert(
     shadowCoverage.coveredParts.length === 0 &&
