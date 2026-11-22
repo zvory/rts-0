@@ -68,7 +68,8 @@ pub fn building_stats(kind: EntityKind) -> Option<BuildingStats> {
     defs::building_def(kind).map(|d| d.stats)
 }
 
-/// Lightness deliberately shares the Scout Car's base movement speed.
+/// Lightness uses the Scout Car baseline with the universal Disciple speed buff.
 pub fn dao_lightness_speed() -> f32 {
-    unit_stats(EntityKind::ScoutCar).map_or(0.0, |stats| stats.speed)
+    unit_stats(EntityKind::ScoutCar)
+        .map_or(0.0, |stats| stats.speed * super::DISCIPLE_SPEED_MULTIPLIER)
 }

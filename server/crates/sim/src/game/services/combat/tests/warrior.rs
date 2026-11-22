@@ -108,7 +108,9 @@ fn war_armor_uses_weapon_penetration_and_lightness_changes_attack_rate() {
     use crate::game::upgrade::UpgradeKind;
     let mut unit =
         crate::game::entity::Entity::new_unit(1, EntityKind::Warrior, 100.0, 100.0).unwrap();
+    assert!((unit.movement_speed() - 1.84).abs() < 0.001);
     unit.dao = Some(UpgradeKind::DaoOfHeaviness);
+    assert!((unit.movement_speed() - 1.84).abs() < 0.001);
     assert_eq!(unit.dao_damage_after_armor(100, 0.0), 50);
     assert_eq!(unit.dao_damage_after_armor(100, 0.5), 75);
     assert_eq!(unit.dao_damage_after_armor(100, 1.0), 100);
@@ -117,14 +119,9 @@ fn war_armor_uses_weapon_penetration_and_lightness_changes_attack_rate() {
     unit.dao = Some(UpgradeKind::DaoOfLightness);
     let light = effective_attack_profile(&unit);
     assert_eq!(light.cooldown, 43);
-    assert_eq!(
-        unit.movement_speed(),
-        crate::config::unit_stats(EntityKind::ScoutCar)
-            .unwrap()
-            .speed
-    );
+    assert!((unit.movement_speed() - 2.7025).abs() < 0.001);
     unit.dao = Some(UpgradeKind::DaoOfMagic);
-    assert!((unit.movement_speed() - 1.76).abs() < 0.001);
+    assert!((unit.movement_speed() - 2.024).abs() < 0.001);
 }
 
 #[test]
