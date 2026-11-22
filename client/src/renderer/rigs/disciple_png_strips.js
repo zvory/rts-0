@@ -49,5 +49,7 @@ export const WAR_PNG_FRAME_STRIP = Object.freeze({
     { x: 92, y: 107, w: 74, h: 143 }, "warrior_sword", "yari-lunge-1"),
   movementFrames: Object.freeze([1, 2]),
   worldScale: 0.8,
+  // Sword feedback lasts 720 ms; finish this authored clip after 400 ms.
+  firingFrameHoldPhase: 400 / 720,
   firingLungePx: 16,
 });

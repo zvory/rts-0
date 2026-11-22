@@ -172,7 +172,8 @@ export function frameStripSpriteOffset(strip, frameIndex, renderContext = {}) {
   // drive, extension and recovery without changing the authoritative entity position.
   let lunge = 0;
   if (strip?.firingLungePx > 0 && firingFrames.includes(frameIndex) && renderContext.recoilProgress > 0) {
-    const phase = clamp01(finite(renderContext.recoilPhase, 0));
+    const holdPhase = finite(strip?.firingFrameHoldPhase, 0);
+    const phase = clamp01(finite(renderContext.recoilPhase, 0) / (holdPhase > 0 && holdPhase < 1 ? holdPhase : 1));
     let start, end, from, to;
     if (phase < 0.2) { start = 0; end = 0.2; from = 0; to = -0.18; }
     else if (phase < 0.5) { start = 0.2; end = 0.5; from = -0.18; to = 1; }

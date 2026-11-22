@@ -42,7 +42,8 @@ for (const [dao, strip, weaponKind] of [
   assert.equal(frameStripFrameIndex(strip, entity, { ...context, recoilProgress: 1, recoilPhase: 0,
     recoilWeaponKind: "disciple_arrow" }), gait);
   for (const [index, phase] of [0, 0.25, 0.5, 0.75].entries()) {
-    const shot = { ...context, recoilWeaponKind: weaponKind, recoilProgress: 0.9, recoilPhase: phase };
+    const shot = { ...context, recoilWeaponKind: weaponKind, recoilProgress: 0.9,
+      recoilPhase: phase * (strip.firingFrameHoldPhase || 1) };
     const frame = frameStripFrameIndex(strip, entity, shot);
     assert.equal(frame, strip.firingFrames[Math.min(index, strip.firingFrames.length - 1)]);
     assert.equal(frameStripVisualFacing(strip, entity, shot, frame), entity.weaponFacing + strip.firingFacingOffset);
@@ -62,7 +63,8 @@ for (const [dao, strip, weaponKind] of [
 const warEntity = { id: 91, kind: KIND.WARRIOR, dao: "war", x: 100, y: 100, facing: Math.PI / 2 };
 const unchanged = structuredClone(warEntity);
 for (const [phase, expected] of [[0, 0], [0.2, -2.88], [0.5, 16], [0.7, 16], [1, 0]]) {
-  const context = { recoilProgress: 1, recoilPhase: phase, recoilWeaponKind: "warrior_sword" };
+  const context = { recoilProgress: 1, recoilPhase: phase * WAR_PNG_FRAME_STRIP.firingFrameHoldPhase,
+    recoilWeaponKind: "warrior_sword" };
   const frame = frameStripFrameIndex(WAR_PNG_FRAME_STRIP, warEntity, context);
   const offset = frameStripSpriteOffset(WAR_PNG_FRAME_STRIP, frame, context);
   assert.ok(Math.abs(offset.y - expected) < 1e-8);
