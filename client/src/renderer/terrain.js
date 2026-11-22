@@ -1,3 +1,5 @@
+import { reconcileGrassLayer, destroyGrassLayer } from "./grass.js";
+import { terrainLightingPixels } from "./terrain_lighting.js";
 import { WaterLayer } from "./water.js";
 import { COLORS } from "../config.js";
 import { TERRAIN } from "../protocol.js";
@@ -132,13 +134,17 @@ function drawElevationRelief(ctx, map, tilePixels, sun) {
   ctx.putImageData(image, 0, 0);
 }
 
-function paintTerrainSurface(ctx, map, tilePixels, { bakeLongShadows = true } = {}) {
+function paintTerrainSurface(ctx, map, tilePixels, { bakeLongShadows = true, captureLighting = false } = {}) {
   for (let ty = 0; ty < map.height; ty++) {
     for (let tx = 0; tx < map.width; tx++) drawTerrainTile(ctx, map, tx, ty, tilePixels);
   }
-  if (!hasElevationRelief(map) || !map.sun) return;
+  if (!hasElevationRelief(map) || !map.sun) return null;
+  const before = captureLighting ? ctx.getImageData(0, 0, map.width * tilePixels, map.height * tilePixels) : null;
   drawElevationRelief(ctx, map, tilePixels, map.sun);
   if (bakeLongShadows) drawLongTerrainShadows(ctx, map, tilePixels, map.sun);
+  if (!before) return null;
+  const after = ctx.getImageData(0, 0, map.width * tilePixels, map.height * tilePixels);
+  return terrainLightingPixels(before.data, after.data, map.width * tilePixels, map.height * tilePixels);
 }
 
 function hasElevationRelief(map) {
@@ -487,12 +493,11 @@ export function buildStaticMap(map, {
   this._terrainCanvas = canvas;
   this._terrainContext = ctx;
   this._terrainTextureTileSize = textureTileSize;
-  paintTerrainSurface(ctx, this._map, textureTileSize, { bakeLongShadows });
+  this._terrainBakeLongShadows = bakeLongShadows;
+  this._grassLightingField = paintTerrainSurface(ctx, this._map, textureTileSize, { bakeLongShadows, captureLighting: true });
   this.world.tint = worldSunTint(this._map.sun);
 
-  this._grassSurveyLayer?.destroy();
-  this._grassSurveyLayer = null;
-  this._grassSurveyTechnique = 0;
+  destroyGrassLayer(this);
   this._waterLayer?.destroy();
   this._waterLayer = null;
   const layer = this.layers.terrain;
@@ -510,6 +515,7 @@ export function buildStaticMap(map, {
     layer.addChild(this._terrainSprite);
   }
   rebuildWaterLayer(this, this._map);
+  reconcileGrassLayer(this);
   if (!preserveMapLayers) {
     this._initGroundDecalsForMap?.(map);
     this._initTrenchesForMap?.(map);
@@ -533,12 +539,14 @@ export function updateStaticTerrainTiles(changes) {
   if (!map || !ctx || !textureTileSize || !this._terrainSprite || !Array.isArray(changes)) return 0;
   const dirty = new Set();
   let waterChanged = false;
+  let grassChanged = false;
   for (const change of changes) {
     const x = Math.trunc(Number(change?.x));
     const y = Math.trunc(Number(change?.y));
     const code = Number(change?.code);
     if (x < 0 || y < 0 || x >= map.width || y >= map.height || !Number.isInteger(code)) continue;
     const index = y * map.width + x;
+    grassChanged ||= (map.terrain[index] === TERRAIN.GRASS) !== (code === TERRAIN.GRASS);
     waterChanged ||= (map.terrain[index] === TERRAIN.WATER) !== (code === TERRAIN.WATER);
     map.terrain[index] = code;
     dirty.add(`${x},${y}`);
@@ -550,7 +558,9 @@ export function updateStaticTerrainTiles(changes) {
   const hasRelief = hasElevationRelief(map);
   if (hasRelief && dirty.size) {
     // This path is editor-only in practice; repainting avoids stacking the alpha-free relief pass.
-    paintTerrainSurface(ctx, map, textureTileSize);
+    this._grassLightingField = paintTerrainSurface(ctx, map, textureTileSize, {
+      bakeLongShadows: this._terrainBakeLongShadows, captureLighting: true,
+    });
   } else {
     for (const key of dirty) {
       const [x, y] = key.split(",").map(Number);
@@ -560,6 +570,11 @@ export function updateStaticTerrainTiles(changes) {
   if (dirty.size) {
     this._terrainSprite.texture.source.update();
     if (waterChanged) rebuildWaterLayer(this, map);
+    if (grassChanged || hasRelief) {
+      const technique = this._grassTechnique;
+      destroyGrassLayer(this);
+      reconcileGrassLayer(this, technique);
+    }
   }
   return dirty.size;
 }

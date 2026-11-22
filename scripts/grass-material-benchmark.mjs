@@ -11,7 +11,7 @@ const output = path.resolve(process.argv[2] || path.join(root, "target/grass-mat
 async function workerMain() {
   try {
     const env = await import("/client/src/renderer/worker_environment.js");
-    const { GrassSurveyLayer } = await import("/client/src/renderer/grass_survey.js");
+    const { GrassLayer } = await import("/client/src/renderer/grass.js");
     const { AsyncGpuTimerQueries, runRafIndependentGpuSamples } = await import("/client/src/renderer/gpu_timer_queries.js");
     const canvas = new OffscreenCanvas(1100,720);
     env.installPixiWorkerEnvironment(canvas, { widthCssPx: 1100, heightCssPx: 720 });
@@ -35,7 +35,7 @@ async function workerMain() {
           const order=[5,6,7,8];
           for (const technique of [...order.slice(round),...order.slice(0,round)]) {
             const started=performance.now();
-            const layer = new GrassSurveyLayer(pixi,app.stage,map,technique,0xfff3e2);
+            const layer = new GrassLayer(pixi,app.stage,map,technique,0xfff3e2);
             const bakeMs=performance.now()-started;
             const summary=await runRafIndependentGpuSamples({ timer, label:`grass.${technique}`, count:96, warmup:16,
               sample(index) { layer.update(index*1000/60); app.render(); },

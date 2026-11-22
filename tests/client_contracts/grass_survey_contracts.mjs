@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { getVisualProfile, resolveVisualProfileLaunch } from "../../client/src/visual_profiles.js";
-import { reconcileGrassSurvey, destroyGrassSurvey } from "../../client/src/renderer/grass_survey.js";
+import { reconcileGrassLayer, destroyGrassLayer, updateTerrainMaterials } from "../../client/src/renderer/grass.js";
 
-// Normal matches never allocate a grass prototype or reveal terrain through profile resolution.
+// Normal matches do not resolve a Lab profile or reveal terrain. Grass defaults independently.
 assert.equal(resolveVisualProfileLaunch(null).profile, null);
 const ordinary = {};
-reconcileGrassSurvey(ordinary, 0);
-assert.equal(ordinary._grassSurveyLayer, null);
+reconcileGrassLayer(ordinary, 0);
+assert.equal(ordinary._grassLayer, null);
 for (let i = 1; i <= 11; i++) {
   const profile = getVisualProfile(`grass-survey-${i}`);
   assert.equal(profile.grassTechnique, i);
@@ -26,15 +26,16 @@ try {
   };
   const layer = { addChild(mesh) { mesh.parent = this; }, removeChild(mesh) { mesh.parent = null; } };
   const renderer = { _map: { width: 2, height: 1, tileSize: 32, terrain: [0, 2] }, layers: { terrain: layer }, world: { tint: 0xffffff }, visualNow: () => 1234 };
-  reconcileGrassSurvey(renderer, 3);
+  reconcileGrassLayer(renderer, 3);
+  updateTerrainMaterials(renderer, 1234);
   assert.equal(attributes.aPosition.buffer.length, 12, "only one grass tile produces geometry");
-  assert.equal(renderer._grassSurveyLayer.uniforms.uniforms.uTime, 1.234);
-  const active = renderer._grassSurveyLayer;
-  reconcileGrassSurvey(renderer, 3);
-  assert.equal(renderer._grassSurveyLayer, active, "ordinary frames reuse geometry");
-  reconcileGrassSurvey(renderer, 0);
+  assert.equal(renderer._grassLayer.uniforms.uniforms.uTime, 1.234);
+  const active = renderer._grassLayer;
+  reconcileGrassLayer(renderer, 3);
+  assert.equal(renderer._grassLayer, active, "ordinary frames reuse geometry");
+  destroyGrassLayer(renderer);
   assert.deepEqual(destroyed, ["mesh", "geometry", "shader"]);
-  destroyGrassSurvey(renderer);
+  destroyGrassLayer(renderer);
   assert.equal(destroyed.length, 3, "teardown is idempotent");
 } finally {
   globalThis.PIXI = priorPixi;
@@ -86,3 +87,42 @@ try {
   assert.notDeepEqual(fields[0],fields[1]);
   assert.notDeepEqual(fields[1],fields[2]);
 } finally { globalThis.OffscreenCanvas = priorCanvas; }
+
+// Every ordinary match and editor map starts with the selected material, without a Lab profile.
+const { installFakePixi } = await import("./pixi_fakes.mjs");
+const restore = installFakePixi();
+try {
+  const renderer={ _map:{ width:2,height:1,tileSize:32,terrain:[0,2] },
+    world:{ tint:0xfff3e2 },layers:{ terrain:new PIXI.Container() } };
+  reconcileGrassLayer(renderer,0);
+  assert.equal(renderer._grassTechnique,9);
+  assert.equal(renderer._grassLayer.uniforms.uniforms.uStyle.value,9);
+  const active=renderer._grassLayer;
+  reconcileGrassLayer(renderer,9);
+  assert.equal(renderer._grassLayer,active,"Lab 9 and the normal default share the selected material");
+  updateTerrainMaterials(renderer,2500);
+  assert.equal(active.uniforms.uniforms.uTime,2.5,"the presentation clock animates editor and match grass alike");
+  destroyGrassLayer(renderer);
+  assert.equal(active.mesh.destroyed,true);
+  assert.equal(renderer.layers.terrain.children.length,0);
+  const { buildStaticMap, updateStaticTerrainTiles } = await import("../../client/src/renderer/terrain.js");
+  buildStaticMap.call(renderer,{ width:2,height:1,tileSize:32,terrain:[0,0] });
+  assert.equal(renderer._grassTechnique,9,"map construction initializes grass before any match frame");
+  const editorGrass=renderer._grassLayer;
+  assert.equal(editorGrass.geometry.options.attributes.aPosition.buffer.length,24);
+  updateStaticTerrainTiles.call(renderer,[{x:1,y:0,code:1}]);
+  assert.equal(editorGrass.mesh.destroyed,true,"editor repaint frees the prior grass geometry");
+  assert.equal(renderer._grassLayer.geometry.options.attributes.aPosition.buffer.length,12,
+    "painted non-grass tiles lose the animated material immediately");
+  const replaced=renderer._grassLayer;
+  buildStaticMap.call(renderer,{ width:2,height:1,tileSize:32,terrain:[1,1] });
+  assert.equal(replaced.mesh.destroyed,true,"map replacement frees the selected material");
+  assert.equal(renderer._grassLayer.mesh,undefined,"a non-grass map allocates no mesh");
+  renderer._grassLightingField = { pixels: new Uint8Array(4) };
+  destroyGrassLayer(renderer, { releaseLighting: true });
+  assert.equal(renderer._grassLightingField,null,"final destruction releases the cached CPU lighting field");
+} finally { restore(); }
+
+const { terrainLightingPixels } = await import("../../client/src/renderer/terrain_lighting.js");
+assert.deepEqual([...terrainLightingPixels(new Uint8Array([100,80,40,255]),new Uint8Array([50,80,60,255]),1,1).pixels],
+ [64,128,192,255],"cached terrain shade/neutral/highlight survive on the new grass");

@@ -1,4 +1,4 @@
-import { reconcileGrassSurvey, destroyGrassSurvey } from "./grass_survey.js";
+import { reconcileGrassLayer, destroyGrassLayer, updateTerrainMaterials } from "./grass.js";
 import { drawTankPointPreview } from "./tank_point_preview.js";
 import { ThrowSwordVisuals } from "./throw_sword_visuals.js";
 import { RocketTruckVisuals } from "./rocket_truck_visuals.js";
@@ -425,7 +425,7 @@ export class Renderer {
 
   present(nowMs = this.visualNow()) {
     if (this._destroyed) throw new Error("Cannot present a destroyed Pixi renderer.");
-    this._waterLayer?.update(nowMs);
+    updateTerrainMaterials(this, nowMs);
     if (this._gpuShadowTimer) {
       this._gpuShadowTimer.measure("renderer.present.total", () => this.app.render());
       this._gpuShadowTimer.poll();
@@ -640,7 +640,7 @@ export class Renderer {
     onGroundDecalsStaged = null,
   } = {}) {
     this._beginRenderFrame();
-    reconcileGrassSurvey(this, visualGrassTechnique);
+    reconcileGrassLayer(this, visualGrassTechnique);
     this._profiler = profiler || null;
     const time = (label, fn) => profiler ? profiler.time(label, fn) : fn();
     // Drive the world container from the camera (single transform for all layers).
@@ -1370,7 +1370,7 @@ export class Renderer {
     this._gpuShadowTimer = null;
     this._doodads?.destroy();
     this._doodads = null;
-    destroyGrassSurvey(this);
+    destroyGrassLayer(this, { releaseLighting: true });
     this._waterLayer?.destroy();
     this._waterLayer = null;
     // Cached terrain sprite + its generated texture.
