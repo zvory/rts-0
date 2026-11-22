@@ -281,7 +281,7 @@ export const STATS = Object.freeze({
 export const ABILITIES = Object.freeze({
   [ABILITY.DISCIPLE_SHIELD]: Object.freeze({
     ability: ABILITY.DISCIPLE_SHIELD, label: "Shield", icon: "SHD", hotkey: "X",
-    title: "Place a shield that absorbs 300 enemy damage to allied units; lasts until depleted or replaced",
+    title: "Place a shield that absorbs 300 enemy damage to allied units; lasts up to 15 seconds",
     carriers: Object.freeze([KIND.WARRIOR]), targetMode: "worldPoint",
     rangeTiles: EKAT_MAGIC_ANCHOR_RANGE_TILES, radiusTiles: EKAT_MAGIC_ANCHOR_RADIUS_TILES,
     cooldownTicks: 300, cost: Object.freeze({ steel: 0, oil: 0 }),

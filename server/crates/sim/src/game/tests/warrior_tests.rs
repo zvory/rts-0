@@ -700,7 +700,14 @@ fn disciple_shield_does_not_identify_a_smoke_hidden_caster() {
     let unit = game.state.entities.get_mut(caster).unwrap();
     unit.insight = 60;
     unit.dao = Some(UpgradeKind::DaoOfMagic);
-    unit.place_shield(shield_id, 480.0, 400.0, 300, true);
+    unit.place_shield(
+        shield_id,
+        480.0,
+        400.0,
+        300,
+        config::DISCIPLE_SHIELD_DURATION_TICKS,
+        true,
+    );
     game.state
         .fog
         .recompute(&[1, 2], &game.state.entities, &game.state.map);

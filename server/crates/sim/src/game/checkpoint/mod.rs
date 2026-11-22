@@ -357,7 +357,10 @@ impl GameCheckpointV1 {
             .iter()
             .filter_map(|e| e.shield.as_ref())
         {
-            if !shield_ids.insert(shield.id)
+            if shield.expires_tick <= self.tick
+                || shield.expires_tick.saturating_sub(self.tick)
+                    > crate::config::DISCIPLE_SHIELD_DURATION_TICKS
+                || !shield_ids.insert(shield.id)
                 || !self.ability_runtime.valid_external_object_id(shield.id)
             {
                 return Err(CheckpointPayloadError::InvalidValue {

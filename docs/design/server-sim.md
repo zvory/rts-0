@@ -1938,7 +1938,9 @@ Allocation rules:
   world-targeted ability cannot execute noninterruptingly, the immediate order may replace the
   chosen idle caster's active order with an ability movement order. Abilities may also explicitly
   allow interrupting a moving caster; manual Mortar Fire uses that path so a non-queued fire order
-  stops the mortar's current movement and clears future queued intents.
+  stops the mortar's current movement and clears future queued intents. Movement policy is an
+  exhaustive ability match: every new ability must choose its behavior explicitly. Shield casts
+  preserve orders in range and replace active orders to approach out-of-range targets.
 - Support-weapon setup is queueable for selected Anti-Tank Guns and Artillery. Both store a point
   meaning "face toward this world point from wherever the weapon is when the setup stage promotes."
   Mortar Teams are not setup-capable: setup and teardown commands ignore them, and they retain no

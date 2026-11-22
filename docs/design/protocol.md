@@ -2009,7 +2009,7 @@ Evolution automatically occurs once the matching research and 60 insight are rea
 
 Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md).
 Shield uses ability `discipleShield` (code 17, order stage 25), world-point target,
-ability-object kind `shield` (code 4). It has no natural expiry; `ownerState.hp` carries
+ability-object kind `shield` (code 4). It expires after 15 seconds, projected through `expiresIn`; `ownerState.hp` carries
 the remaining 300-point pool to authorized owner/observer projections only. The radius
 is three tiles for every viewer. Field visibility is gated at its center, independently
 of its caster; `sourceCasterId` is omitted when that caster is hidden.
