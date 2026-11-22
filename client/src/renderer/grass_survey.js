@@ -1,3 +1,4 @@
+import { createGrassGroundMaterial } from "./grass_ground.js";
 import { createGrassCarpetMaterial } from "./grass_carpet.js";
 import { TERRAIN } from "../protocol.js";
 
@@ -12,13 +13,14 @@ void main(){
  vWorld=aPosition;
  gl_Position=vec4((uProjectionMatrix*uWorldTransformMatrix*uTransformMatrix*vec3(aPosition,1.)).xy,0.,1.);
 }`;
-const FRAGMENT = `#version 300 es
+function grassFragment(groundTexture = false) { return `#version 300 es
 precision highp float;
 in vec2 vWorld;
 out vec4 finalColor;
 uniform float uTime;
 uniform float uStyle;
 uniform vec3 uTint;
+${groundTexture ? "uniform sampler2D uGround;" : ""}
 float hash(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
 float noise(vec2 p){
  vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f);
@@ -38,7 +40,7 @@ void main(){
  float gust=sin(dot(p,vec2(.022,.013))-uTime*1.7+noise(p/180.)*3.);
  vec3 dark=vec3(.225,.276,.135), light=vec3(.43,.47,.25);
  if(uStyle==4.){ dark=vec3(.30,.29,.16); light=vec3(.55,.51,.29); }
- vec3 color=mix(dark,light,variation*.8+grain*.2);
+ vec3 color=${groundTexture ? "texture(uGround,fract(p/512.)).rgb" : "mix(dark,light,variation*.8+grain*.2)"};
  if(uStyle==1.){
    float fleck=step(.70,grain)*step(.38,hash(floor(p/vec2(2.,5.))));
    color+=vec3(.065,.08,.025)*fleck;
@@ -72,7 +74,7 @@ void main(){
        color=mix(color,vec3(.70,.63,.39),seed*.85);
      }
    }
-   if(uStyle==5.){
+   if(uStyle==5. || uStyle>=9.){
      float cloud=smoothstep(.36,.68,noise(p/250.+vec2(-uTime*.028,uTime*.009)));
      color*=mix(.80,1.09,cloud);
      color+=vec3(.03,.04,.012)*smoothstep(.2,.95,gust);
@@ -81,7 +83,7 @@ void main(){
  // Pixi's normal blend mode expects premultiplied color, including for custom meshes.
  const float opacity=.90;
  finalColor=vec4(color*uTint*opacity,opacity);
-}`;
+}`; }
 
 /** Lab-only material sketches, deliberately independent of authoritative map/simulation state. */
 export class GrassSurveyLayer {
@@ -100,9 +102,11 @@ export class GrassSurveyLayer {
       uTint: { value: new Float32Array([((tint >> 16) & 255)/255, ((tint >> 8) & 255)/243, (tint & 255)/226]), type: "vec3<f32>" },
     });
     this.geometry = new pixi.Geometry({ attributes: { aPosition: { buffer: new Float32Array(positions), format: "float32x2" } } });
-    this.material = technique >= 6 ? createGrassCarpetMaterial(pixi, technique) : null;
+    this.material = technique >= 9
+      ? createGrassGroundMaterial(pixi, technique)
+      : technique >= 6 ? createGrassCarpetMaterial(pixi, technique) : null;
     this.shader = pixi.Shader.from({
-      gl: { vertex: VERTEX, fragment: this.material?.fragment || FRAGMENT, name: "lab-grass-survey" },
+      gl: { vertex: VERTEX, fragment: this.material?.fragment || grassFragment(technique >= 9), name: "lab-grass-survey" },
       resources: { grassUniforms: this.uniforms, ...this.material?.resources },
     });
     this.mesh = new pixi.Mesh({ geometry: this.geometry, shader: this.shader });
@@ -128,7 +132,7 @@ export function reconcileGrassSurvey(renderer, technique) {
   if (renderer._grassSurveyTechnique !== technique) {
     destroyGrassSurvey(renderer);
     renderer._grassSurveyTechnique = technique;
-    if (Number.isInteger(technique) && technique >= 1 && technique <= 8 && renderer._map) {
+    if (Number.isInteger(technique) && technique >= 1 && technique <= 11 && renderer._map) {
       renderer._grassSurveyLayer = new GrassSurveyLayer(PIXI, renderer.layers.terrain, renderer._map, technique, renderer.world.tint);
     }
   }
