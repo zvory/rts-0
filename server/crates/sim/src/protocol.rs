@@ -16,7 +16,7 @@ mod tests {
     use super::*;
     use rts_rules::faction::{AbilityKind, UpgradeKind};
 
-    const PROTOCOL_KIND_IDS: [&str; 31] = [
+    const PROTOCOL_KIND_IDS: [&str; 32] = [
         kinds::WORKER,
         kinds::GOLEM,
         kinds::WARRIOR,
@@ -35,6 +35,7 @@ mod tests {
         kinds::RESOURCE_DEPOT,
         kinds::PORTAL,
         kinds::THREE_DAO_PAVILION,
+        kinds::TOURNAMENT_GROUNDS,
         kinds::ZAMOK,
         kinds::DEPOT,
         kinds::BARRACKS,
