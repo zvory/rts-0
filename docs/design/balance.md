@@ -225,9 +225,9 @@ Cultivator Serfs can also construct the faction-specific Portal for 150 Steel: i
 footprint, 123 HP, one tile of sight, a five-second construction time, no prerequisite, and no
 research. A completed Portal trains the Cultivator Disciple for 100 Steel and 2 Supply in 300 ticks.
 The Disciple is a 115-HP, 13.5-pixel-radius ground melee unit moving at 2.0 pixels per tick.
-Lightness independently uses 1.15 times Scout Car speed (2.7025 pixels per tick); Magic uses
-1.1 times base Disciple speed (2.2 pixels per tick). War retains the base Disciple speed
-and gains 20 maximum HP (135 total); Lightness and Magic retain 115 maximum HP. Its
+Lightness independently uses 1.15 times Scout Car speed (2.7025 pixels per tick). War and Magic
+use 1.05 times base Disciple speed (2.1 pixels per tick). War gains 20 maximum HP (135 total);
+Lightness and Magic retain 115 maximum HP. Its
 23-damage sword has 0.75-tile reach, a 64-tick cooldown, and 50% armor penetration.
 Disciples have a separate five-tile engagement range for Idle and Attack Move: they approach
 visible legal enemies to sword reach, then resume their original Attack Move destination when

@@ -218,9 +218,9 @@ fn disciple_evolution_requires_insight_research_ownership_and_is_permanent() {
             AbilityKind::EvolveWar,
             UpgradeKind::DaoOfHeaviness,
             135,
-            2.0,
+            2.1,
         ),
-        (AbilityKind::EvolveMagic, UpgradeKind::DaoOfMagic, 115, 2.2),
+        (AbilityKind::EvolveMagic, UpgradeKind::DaoOfMagic, 115, 2.1),
     ] {
         let mut game = empty_flat_game(&[
             cultivator_player(),

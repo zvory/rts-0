@@ -110,7 +110,7 @@ fn war_armor_uses_weapon_penetration_and_lightness_changes_attack_rate() {
         crate::game::entity::Entity::new_unit(1, EntityKind::Warrior, 100.0, 100.0).unwrap();
     assert!((unit.movement_speed() - 2.0).abs() < 0.001);
     unit.dao = Some(UpgradeKind::DaoOfHeaviness);
-    assert!((unit.movement_speed() - 2.0).abs() < 0.001);
+    assert!((unit.movement_speed() - 2.1).abs() < 0.001);
     assert_eq!(unit.dao_damage_after_armor(100, 0.0), 50);
     assert_eq!(unit.dao_damage_after_armor(100, 0.5), 75);
     assert_eq!(unit.dao_damage_after_armor(100, 1.0), 100);
@@ -129,7 +129,7 @@ fn war_armor_uses_weapon_penetration_and_lightness_changes_attack_rate() {
     assert!(unit.dao_ability_available(crate::game::ability::AbilityKind::EkatTeleport));
     assert!((unit.movement_speed() - 2.7025).abs() < 0.001);
     unit.dao = Some(UpgradeKind::DaoOfMagic);
-    assert!((unit.movement_speed() - 2.2).abs() < 0.001);
+    assert!((unit.movement_speed() - 2.1).abs() < 0.001);
 }
 
 #[test]
