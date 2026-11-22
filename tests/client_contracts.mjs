@@ -35,6 +35,7 @@ await import("./client_contracts/rifleman_png_strip_contracts.mjs");
 await import("./client_contracts/launch_url_contracts.mjs");
 await import("./client_contracts/health_bar_renderer_contracts.mjs");
 await import("./client_contracts/dao_corona_contracts.mjs");
+await import("./client_contracts/disciple_shield_contracts.mjs");
 await import("./client_contracts/renderer_contracts.mjs");
 await import("./client_contracts/scout_plane_shadow_contracts.mjs");
 await import("./client_contracts/projected_unit_shadow_contracts.mjs");

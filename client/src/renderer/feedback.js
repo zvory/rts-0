@@ -38,6 +38,7 @@ import {
   isArtilleryFirePreview,
 } from "./artillery_fire_preview.js";
 import { MAGIC_ANCHOR_COLOR, drawMagicAnchor } from "./magic_anchor_effect.js";
+import { drawDiscipleShield } from "./disciple_shield_effect.js";
 import { feedbackOwner } from "./feedback_ownership.js";
 import { drawLabToolPreview } from "./lab_tool_preview.js";
 import { drawBreakthroughAura } from "./breakthrough_aura.js";
@@ -502,15 +503,7 @@ export function _drawAbilityObjects(state) {
     } else if (object.kind === ABILITY_OBJECT_KIND.MAGIC_ANCHOR) {
       drawMagicAnchor(g, object, Math.max(10, object.ownerState?.radius || ts * 0.38));
     } else if (object.kind === ABILITY_OBJECT_KIND.SHIELD) {
-      const radius = ts * 3;
-      const phase = (this._renderClock?.now?.() ?? performance.now()) / 350;
-      const pulse = 0.5 + Math.sin(phase) * 0.5;
-      gfxFill(g, 0x7eeaff, 0.055 + pulse * 0.035);
-      gfxStroke(g, 5, 0x6eeaff, 0.12 + pulse * 0.08);
-      gfxEllipse(g, object.x, object.y, radius, radius);
-      gfxNoFill(g);
-      gfxStroke(g, 1.5, 0xc4f8ff, 0.6 + pulse * 0.25);
-      gfxEllipse(g, object.x, object.y, radius - 3, radius - 3);
+      drawDiscipleShield(g, object, ts * 3, this._renderClock?.now?.() ?? performance.now());
     } else if (object.kind === ABILITY_OBJECT_KIND.LINE_PROJECTILE) {
       const r = Math.max(5, object.ownerState?.radius || ts * 0.18);
       activeLineProjectileIds.add(object.id);

@@ -2508,6 +2508,9 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   remain visible across camera scales and display resolutions; every seventh existing divider uses
   a heavier 1.5-world-pixel mark to identify approximately 105 HP without adding another mark.
   Construction and deconstruction keep their existing status colors on the shared bar layer.
+  Dao of Magic shields have rotating cyan rim ribbons and glints, plus an always-visible cyan
+  absorption bar above the field when the authoritative view includes team-private shield HP.
+  The bar fills against the ability's 300-damage capacity; views without that HP omit the bar.
   Detailed Unit Shadows are a default-enabled Game setting with a persistent opt-out. The v2
   preference key resets legacy opt-outs once so existing players also receive the enabled default;
   subsequent opt-outs persist. Matches without an explicit preference also default on. When disabled, the render
