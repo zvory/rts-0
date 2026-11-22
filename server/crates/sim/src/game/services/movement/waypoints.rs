@@ -55,6 +55,7 @@ pub(super) fn advance_moving_units(
     spatial: &SpatialIndex,
     tick: u32,
     ability_runtime: &AbilityRuntime,
+    teams: &crate::game::teams::TeamRelations,
 ) {
     let wire_tiles = super::barbed_wire::tiles(map, entities);
     for id in entities.ids() {
@@ -179,9 +180,11 @@ pub(super) fn advance_moving_units(
             })
             .unwrap_or(0.0);
         let directional_speed = |(wx, wy): (f32, f32)| {
+            let direction = (wx - x, wy - y);
             speed
-                * map.elevation_movement_multiplier_at(x, y, (wx - x, wy - y))
-                * ability_runtime.magic_anchor_movement_multiplier(x, y, (wx - x, wy - y), tick)
+                * map.elevation_movement_multiplier_at(x, y, direction)
+                * ability_runtime
+                    .magic_anchor_movement_multiplier(owner, teams, x, y, direction, tick)
         };
 
         let uses_vehicle_movement = uses_oriented_vehicle_body(kind);
@@ -264,8 +267,9 @@ pub(super) fn advance_moving_units(
                         target,
                         |direction| {
                             map.elevation_movement_multiplier_at(x, y, direction)
-                                * ability_runtime
-                                    .magic_anchor_movement_multiplier(x, y, direction, tick)
+                                * ability_runtime.magic_anchor_movement_multiplier(
+                                    owner, teams, x, y, direction, tick,
+                                )
                         },
                     )
                 } else {

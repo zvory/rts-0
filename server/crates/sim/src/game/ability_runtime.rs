@@ -378,6 +378,8 @@ impl AbilityRuntime {
 
     pub(crate) fn magic_anchor_movement_multiplier(
         &self,
+        owner: u32,
+        teams: &TeamRelations,
         x: f32,
         y: f32,
         move_dir: (f32, f32),
@@ -394,6 +396,7 @@ impl AbilityRuntime {
         self.world_objects()
             .filter(|object| {
                 object.kind == AbilityWorldObjectKind::MagicAnchor
+                    && teams.is_enemy_owner(object.owner, owner)
                     && object.active_at(tick)
                     && matches!(object.payload, AbilityObjectPayload::MagicAnchor { .. })
             })
@@ -427,6 +430,8 @@ impl AbilityRuntime {
 
     pub(crate) fn magic_anchor_stationary_pull(
         &self,
+        owner: u32,
+        teams: &TeamRelations,
         x: f32,
         y: f32,
         tick: u32,
@@ -437,6 +442,7 @@ impl AbilityRuntime {
         self.world_objects()
             .filter(|object| {
                 object.kind == AbilityWorldObjectKind::MagicAnchor
+                    && teams.is_enemy_owner(object.owner, owner)
                     && object.active_at(tick)
                     && matches!(object.payload, AbilityObjectPayload::MagicAnchor { .. })
             })
