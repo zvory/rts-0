@@ -36,6 +36,7 @@ pub(super) fn nearest_free_goal(
     let formation_unit = formation::FormationUnit {
         id: unit_id,
         kind: unit.kind,
+        radius: unit.radius(),
         pos: (unit.pos_x(), unit.pos_y()),
     };
     let occupied_unit_bodies =
@@ -143,6 +144,7 @@ fn occupied_and_reserved_bodies(
         let other_unit = formation::FormationUnit {
             id: other.id,
             kind: other.kind,
+            radius: other.radius(),
             pos: (other.pos_x(), other.pos_y()),
         };
         let facing = formation::formation_goal_facing(&other_unit, goal);

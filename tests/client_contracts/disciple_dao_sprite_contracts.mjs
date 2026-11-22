@@ -9,6 +9,7 @@ import { frameStripFrameIndex, frameStripVisualFacing, frameStripSpriteOffset } 
 import { liveUnitIconMarkupFor } from "../../client/src/renderer/rigs/unit_icon_sources.js";
 import { createMinimapAnimation } from "../../client/src/renderer/rigs/minimap_animation.js";
 import { circularBodyRadius, pointHitsBodyCircle } from "../../client/src/input/placement.js";
+import { buildFormationLinePreview } from "../../client/src/input/formation_line.js";
 import { selectionProxyForEntity } from "../../client/src/input/selection_projection.js";
 import { selectionBudgetGridModel } from "../../client/src/hud_selection_panel.js";
 
@@ -22,6 +23,12 @@ assert.equal(circularBodyRadius(bodySubject), 13.5 * DAO_WAR_BODY_SCALE);
 assert.equal(pointHitsBodyCircle(bodySubject, 110, 100, 0), false);
 assert.equal(pointHitsBodyCircle({ ...bodySubject, dao: undefined }, 110, 100, 0), true);
 assert.equal(selectionProxyForEntity(bodySubject).footprint.radiusPx, 13.5 * DAO_WAR_BODY_SCALE);
+const formationPoints = [{ x: 300, y: 300 }, { x: 364, y: 300 }];
+const formationUnits = Array.from({ length: 3 }, (_, index) =>
+  ({ ...bodySubject, id: index + 1, y: 100 + index * 40 }));
+assert.ok(buildFormationLinePreview(formationPoints, formationUnits).slots.every(slot => slot.y === 300));
+assert.ok(buildFormationLinePreview(formationPoints, formationUnits.map(unit =>
+  ({ ...unit, dao: undefined }))).slots.some(slot => slot.y !== 300));
 const rustUpgrades = fs.readFileSync(new URL("../../server/crates/rules/src/balance/upgrades.rs", import.meta.url), "utf8");
 for (const [name, value] of [["DAO_WAR_BODY_SCALE", DAO_WAR_BODY_SCALE], ["DAO_WAR_RANGE_TILES", DAO_WAR_RANGE_TILES]]) {
   assert.equal(Number(rustUpgrades.match(new RegExp(`pub const ${name}: f32 = ([0-9.]+);`))[1]), value);

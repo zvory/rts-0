@@ -21,6 +21,7 @@ fn formation_unit_kind(id: u32, kind: EntityKind, map: &Map, tile: (u32, u32)) -
     FormationUnit {
         id,
         kind,
+        radius: config::unit_stats(kind).unwrap().radius,
         pos: map.tile_center(tile.0, tile.1),
     }
 }
@@ -338,6 +339,7 @@ fn horizontal_line_repeated_moves_stay_a_compact_blob() {
         .map(|(unit, point)| FormationUnit {
             id: unit.id,
             kind: unit.kind,
+            radius: unit.radius,
             pos: *point,
         })
         .collect::<Vec<_>>();
@@ -348,6 +350,7 @@ fn horizontal_line_repeated_moves_stay_a_compact_blob() {
         .map(|(unit, point)| FormationUnit {
             id: unit.id,
             kind: unit.kind,
+            radius: unit.radius,
             pos: *point,
         })
         .collect::<Vec<_>>();
@@ -381,6 +384,7 @@ fn vertical_line_repeated_moves_stay_a_compact_blob() {
         .map(|(unit, point)| FormationUnit {
             id: unit.id,
             kind: unit.kind,
+            radius: unit.radius,
             pos: *point,
         })
         .collect::<Vec<_>>();
@@ -391,6 +395,7 @@ fn vertical_line_repeated_moves_stay_a_compact_blob() {
         .map(|(unit, point)| FormationUnit {
             id: unit.id,
             kind: unit.kind,
+            radius: unit.radius,
             pos: *point,
         })
         .collect::<Vec<_>>();
@@ -841,5 +846,39 @@ fn formation_goal_accepts_side_on_tank_tile_center_near_building() {
             facing,
         ),
         "assigned formation goal must be body-standable"
+    );
+}
+
+#[test]
+fn war_polyline_uses_evolved_radius_for_rank_count() {
+    use crate::game::upgrade::UpgradeKind;
+
+    let mut entities = EntityStore::new();
+    let ids = (0..3)
+        .map(|index| {
+            let id = entities
+                .spawn_unit(1, EntityKind::Warrior, 100.0, 100.0 + index as f32 * 40.0)
+                .unwrap();
+            entities.get_mut(id).unwrap().dao = Some(UpgradeKind::DaoOfHeaviness);
+            id
+        })
+        .collect::<Vec<_>>();
+    let points = [(300.0, 300.0), (364.0, 300.0)];
+    let units = super::super::formation_units(&entities, 1, &ids);
+    let slots = polyline_slots(&units, &points);
+    assert_eq!(slots.len(), 3);
+    assert!(
+        slots.iter().all(|(_, point)| point.1 == 300.0),
+        "three smaller War bodies fit in one rank on a 64px stroke"
+    );
+
+    for id in &ids {
+        entities.get_mut(*id).unwrap().dao = None;
+    }
+    let units = super::super::formation_units(&entities, 1, &ids);
+    let slots = polyline_slots(&units, &points);
+    assert!(
+        slots.iter().any(|(_, point)| point.1 != 300.0),
+        "base Disciples still need two ranks on the same stroke"
     );
 }

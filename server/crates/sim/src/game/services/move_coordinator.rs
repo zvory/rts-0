@@ -94,6 +94,7 @@ fn formation_units(
             (entity.is_unit() && entity.owner == player).then_some(formation::FormationUnit {
                 id,
                 kind: entity.kind,
+                radius: entity.radius(),
                 pos: (entity.pos_x(), entity.pos_y()),
             })
         })
