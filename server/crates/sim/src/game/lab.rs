@@ -17,6 +17,7 @@ use crate::rules;
 
 mod checkpoint_scenario;
 mod map_draft;
+mod spawn;
 
 pub use checkpoint_scenario::{
     LabCheckpointScenarioMap, LabCheckpointScenarioMapData, LabCheckpointScenarioMetadata,
@@ -56,6 +57,8 @@ pub struct LabSpawnEntity {
     pub x: f32,
     pub y: f32,
     pub completed: bool,
+    pub dao: Option<crate::protocol::LabSpawnDao>,
+    pub faction_id: Option<&'static str>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -698,6 +701,8 @@ impl Game {
                     x,
                     y,
                     completed: true,
+                    dao: None,
+                    faction_id: None,
                 };
                 if scratch_entities.spawn_unit(owner, kind, x, y).is_none() {
                     return Err(invalid_kind(kind, "planUnitSpawns"));
@@ -719,31 +724,6 @@ impl Game {
         Ok(LabOpOutcome::ScenarioRestored(LabScenarioRestore {
             entity_id_map,
         }))
-    }
-
-    fn lab_spawn_entity(&mut self, input: LabSpawnEntity) -> Result<LabOpOutcome, LabError> {
-        self.validate_owner(input.owner)?;
-        let id = if input.kind.is_unit() {
-            self.validate_unit_position(&self.state.entities, input.kind, input.x, input.y)?;
-            self.state
-                .entities
-                .spawn_unit(input.owner, input.kind, input.x, input.y)
-                .ok_or_else(|| invalid_kind(input.kind, "spawnEntity"))?
-        } else if input.kind.is_building() {
-            let (_, _, x, y) = self.validate_building_position(
-                &self.state.entities,
-                input.kind,
-                input.x,
-                input.y,
-            )?;
-            self.state
-                .entities
-                .spawn_building(input.owner, input.kind, x, y, input.completed)
-                .ok_or_else(|| invalid_kind(input.kind, "spawnEntity"))?
-        } else {
-            return Err(invalid_kind(input.kind, "spawnEntity"));
-        };
-        Ok(LabOpOutcome::Spawned { entity_id: id })
     }
 
     fn lab_delete_entity(&mut self, entity_id: u32) -> Result<LabOpOutcome, LabError> {

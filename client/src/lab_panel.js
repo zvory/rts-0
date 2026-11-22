@@ -6,6 +6,7 @@ import {
   labSpawnBuildingKindsForFaction,
   labSpawnFactionOptions,
   labSpawnUnitKindsForFaction,
+  labSpawnUnitOptionsForFaction,
 } from "./lab_spawn_catalog.js";
 import { labToolDetailText } from "./lab_tool_detail.js";
 import { createLabScenarioAuthoringState, slugifyLabScenario } from "./lab_scenario_authoring.js";
@@ -688,15 +689,16 @@ export class LabPanel {
   spawnPaletteGrid(unitKinds) {
     const grid = document.createElement("div");
     grid.className = "lab-spawn-palette";
-    for (const kind of unitKinds) {
-      const stats = STATS[kind] || {};
-      const button = this.button(stats.label || kind, () => this.armSpawnPaletteTool(kind), {
+    for (const { kind, dao, label } of labSpawnUnitOptionsForFaction(this.spawnPalette.factionId)) {
+      const active = this.activeLabTool()?.payload;
+      const button = this.button(label, () => this.armSpawnPaletteTool(kind, dao), {
         className: "lab-btn lab-spawn-option",
-        title: `Spawn ${stats.label || kind}`,
+        title: `Spawn ${label}`,
         dataset: {
           kind,
-          selected: kind === this.spawnPalette.kind ? "true" : "false",
-          active: this.spawnToolActive(kind) ? "true" : "false",
+          dao: dao || "",
+          selected: kind === this.spawnPalette.kind && (dao || null) === (this.spawnPalette.dao || null) ? "true" : "false",
+          active: this.spawnToolActive(kind) && (active?.dao || null) === (dao || null) ? "true" : "false",
         },
       });
       grid.appendChild(button);
@@ -725,25 +727,27 @@ export class LabPanel {
 
   spawnPaletteReadout(unitKinds) {
     if (unitKinds.length > 0) {
-      return this.readout(`${factionLabel(this.spawnPalette.factionId)} units`);
+      return this.readout(`${factionLabel(this.spawnPalette.factionId)} units — spawning sets P${this.targetPlayer()}’s faction`);
     }
     return this.readout("No unit catalog entries");
   }
 
   buildingSpawnPaletteReadout(buildingKinds) {
     if (buildingKinds.length > 0) {
-      return this.readout(`${factionLabel(this.buildingSpawnPalette.factionId, labBuildingSpawnFactionOptions())} buildings`);
+      return this.readout(`${factionLabel(this.buildingSpawnPalette.factionId, labBuildingSpawnFactionOptions())} buildings — spawning sets P${this.targetPlayer()}’s faction`);
     }
     return this.readout("No building catalog entries");
   }
 
-  armSpawnPaletteTool(kind = this.spawnPalette.kind) {
+  armSpawnPaletteTool(kind = this.spawnPalette.kind, dao = null) {
     this.captureSpawnPaletteFields();
     if (!kind) return null;
     this.spawnPalette.kind = kind;
+    this.spawnPalette.dao = dao;
     const payload = {
       owner: this.targetPlayer(),
       factionId: this.spawnPalette.factionId,
+      ...(dao ? { dao } : {}),
       kind,
       completed: true,
     };
@@ -770,7 +774,7 @@ export class LabPanel {
       {
         kind: "spawnEntity",
         payload: { ...payload },
-        label: `Spawn ${KIND_LABELS[kind] || kind}`,
+        label: `Spawn ${statsForFaction(kind, payload.factionId, payload.dao)?.label || KIND_LABELS[kind] || kind}`,
         keepArmedOnWorldClick: true,
         paintOnDrag: true,
       },
@@ -785,6 +789,8 @@ export class LabPanel {
     if (!Number.isFinite(event?.x) || !Number.isFinite(event?.y)) return Promise.resolve(null);
     return this.labClient.spawnEntity({
       kind: payload.kind,
+      factionId: payload.factionId,
+      ...(payload.dao ? { dao: payload.dao } : {}),
       owner: Number(payload.owner),
       x: event.x,
       y: event.y,
@@ -1281,6 +1287,7 @@ export {
   labSpawnBuildingKindsForFaction,
   labSpawnFactionOptions,
   labSpawnUnitKindsForFaction,
+  labSpawnUnitOptionsForFaction,
 };
 
 function factionLabel(factionId, options = labSpawnFactionOptions()) {

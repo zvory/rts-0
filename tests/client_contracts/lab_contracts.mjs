@@ -1,8 +1,6 @@
 // tests/client_contracts/lab_contracts.mjs
 // Domain contract assertions imported by ../client_contracts.mjs.
-
 import fs from "node:fs";
-
 import {
   assert,
   assertDeepEqual,
@@ -48,9 +46,7 @@ import {
   researchableUpgradesForFaction,
   STATS,
 } from "../../client/src/config.js";
-
 import { textWithin } from "./dom_text.mjs";
-
 // Lab client and panel
 // ---------------------------------------------------------------------------
 {
@@ -62,7 +58,6 @@ import { textWithin } from "./dom_text.mjs";
     "lab replay artifact constants are available through the stable protocol mirror",
   );
 }
-
 {
   const styles = fs.readFileSync(new URL("../../client/styles.css", import.meta.url), "utf8");
   assert(
@@ -1042,6 +1037,18 @@ await withFakeDocument(async () => {
   panel.fields.get("spawn-faction").value = "ekat";
   panel.fields.get("spawn-faction").listeners.change();
   assert(panel.spawnPalette.kind === KIND.EKAT, "LabPanel faction selection updates the unit palette deterministically");
+  panel.fields.get("spawn-faction").value = "cultivators";
+  panel.fields.get("spawn-faction").listeners.change();
+  assert(buttonByText("Serf"), "Cultivator palette uses the faction worker label");
+  assert(buttonByText("Novice"), "Cultivator palette includes the base Novice");
+  for (const dao of ["lightness", "war", "magic"]) {
+    buttonByText(`${dao[0].toUpperCase() + dao.slice(1)} Adept`).listeners.click();
+    assert(armedTool.payload.dao === dao, "Adept selection retains its Dao");
+    armedCallbacks.onWorldClick({ tool: { ...armedTool }, x: 128, y: 160 });
+    assert(sent.at(-1).op.dao === dao && sent.at(-1).op.factionId === "cultivators" && sent.at(-1).op.owner === 2,
+      "P2 Cultivator spawn transmits faction and specialization to the authority");
+    resolveLastLabResult({ outcome: { entityId: 90 } });
+  }
   panel.armBuildingSpawnPaletteTool(KIND.RESOURCE_DEPOT);
   assert(armedTool?.kind === "spawnEntity", "LabPanel building palette arms the spawn lab tool through Match");
   assert(armedTool?.paintOnDrag === true, "LabPanel building palette enables persistent drag painting");

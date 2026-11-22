@@ -145,6 +145,8 @@ fn valid_artifact() -> LabReplayArtifactV1 {
                     x: 64.0,
                     y: 96.0,
                     completed: true,
+                    dao: None,
+                    faction_id: None,
                 },
             },
             LabReplayOperationEntry {
@@ -579,6 +581,8 @@ fn plural_lab_replay_operations_round_trip_and_legacy_singular_remains_readable(
                     x: 100.0,
                     y: 100.0,
                     completed: true,
+                    dao: None,
+                    faction_id: None,
                 }],
             },
         },
@@ -640,6 +644,8 @@ fn plural_lab_replay_operations_enforce_400_item_limit() {
                 x: 100.0,
                 y: 100.0,
                 completed: true,
+                dao: None,
+                faction_id: None,
             })
             .collect(),
     };

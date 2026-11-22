@@ -214,6 +214,7 @@ impl Serialize for CompactSnapshot<'_> {
                                 .iter()
                                 .map(|upgrade| upgrade_code(upgrade))
                                 .collect::<Vec<_>>(),
+                            &p.faction_id,
                         )
                     })
                     .collect::<Vec<_>>(),

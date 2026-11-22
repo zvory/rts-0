@@ -23,6 +23,8 @@ pub(super) fn lab_op_to_replay_operation(op: &LabOp) -> Option<LabReplayOperatio
                     x: input.x,
                     y: input.y,
                     completed: input.completed,
+                    dao: input.dao,
+                    faction_id: input.faction_id.map(str::to_string),
                 })
                 .collect(),
         }),
@@ -39,6 +41,8 @@ pub(super) fn lab_op_to_replay_operation(op: &LabOp) -> Option<LabReplayOperatio
                 x: input.x,
                 y: input.y,
                 completed: input.completed,
+                dao: input.dao,
+                faction_id: input.faction_id.map(str::to_string),
             }],
         }),
         LabOp::DeleteEntity { entity_id } => Some(LabReplayOperation::DeleteEntities {
@@ -128,6 +132,8 @@ pub(super) fn lab_replay_operation_to_entry_kind(
                             x: spawn.x,
                             y: spawn.y,
                             completed: spawn.completed,
+                            dao: spawn.dao,
+                            faction_id: spawn.faction_id.as_deref().map(resolve_spawn_faction).transpose()?,
                         })
                     })
                     .collect::<Result<Vec<_>, String>>()?,
@@ -154,6 +160,8 @@ pub(super) fn lab_replay_operation_to_entry_kind(
             x,
             y,
             completed,
+            dao,
+            faction_id,
         } => {
             let kind = EntityKind::from_str(kind).map_err(|_| "unknown entity kind".to_string())?;
             Ok(LabTimelineEntryKind::LabOperation {
@@ -164,6 +172,8 @@ pub(super) fn lab_replay_operation_to_entry_kind(
                     x: *x,
                     y: *y,
                     completed: *completed,
+                    dao: *dao,
+                    faction_id: faction_id.as_deref().map(resolve_spawn_faction).transpose()?,
                 }),
             })
         }
@@ -280,4 +290,10 @@ fn update_from_protocol(update: &LabUpdateSpec) -> Result<LabUpdate, String> {
             enabled: *enabled,
         },
     })
+}
+
+pub(super) fn resolve_spawn_faction(id: &str) -> Result<&'static str, String> {
+    rts_rules::faction::catalog_for(id)
+        .map(|catalog| catalog.id)
+        .ok_or_else(|| "unknown spawn faction".to_string())
 }

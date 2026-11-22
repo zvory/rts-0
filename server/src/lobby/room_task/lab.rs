@@ -204,6 +204,8 @@ fn lab_client_op_to_game_op(op: LabClientOp) -> Result<LabOp, (String, Option<u3
             x,
             y,
             completed,
+            dao,
+            faction_id,
         } => {
             let kind = EntityKind::from_str(&kind)
                 .map_err(|_| ("unknown entity kind".to_string(), None))?;
@@ -213,6 +215,8 @@ fn lab_client_op_to_game_op(op: LabClientOp) -> Result<LabOp, (String, Option<u3
                 x,
                 y,
                 completed,
+                dao,
+                faction_id: faction_id.as_deref().map(super::super::lab_replay_operations::resolve_spawn_faction).transpose().map_err(|error| (error, None))?,
             }))
         }
         LabClientOp::SpawnEntities { spawns } => Ok(LabOp::SpawnEntities(
@@ -229,6 +233,8 @@ fn lab_client_op_to_game_op(op: LabClientOp) -> Result<LabOp, (String, Option<u3
                         x: spawn.x,
                         y: spawn.y,
                         completed: spawn.completed,
+                        dao: spawn.dao,
+                        faction_id: spawn.faction_id.as_deref().map(super::super::lab_replay_operations::resolve_spawn_faction).transpose().map_err(|error| (error, u32::try_from(index).ok()))?,
                     })
                 })
                 .collect::<Result<Vec<_>, (String, Option<u32>)>>()?,

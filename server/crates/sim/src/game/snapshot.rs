@@ -420,6 +420,7 @@ impl Game {
             })
             .map(|player| PlayerResourceSnapshot {
                 id: player.id,
+                faction_id: player.faction_id.clone(),
                 steel: player.steel,
                 oil: player.oil,
                 supply_used: player.supply_used,

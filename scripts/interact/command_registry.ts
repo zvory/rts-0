@@ -84,7 +84,7 @@ const COMMAND_RECORDS = Object.freeze({
     defaults: ["categories=all categories"], bounds: ["0-8 unique requested categories"],
     example: { sessionId: "<lab-session-id>", categories: ["players", "units", "commands"] },
   }),
-  spawn: descriptor("Atomically spawn one bounded batch and optionally assign aliases.", "{sessionId:string,spawns:[{owner:u32,kind:token,x:number,y:number,completed?:boolean,alias?:alias}],details?:boolean}", {
+  spawn: descriptor("Atomically spawn one bounded batch and optionally assign aliases.", "{sessionId:string,spawns:[{owner:u32,kind:token,x:number,y:number,completed?:boolean,factionId?:token,dao?:lightness|war|magic,alias?:alias}],details?:boolean}", {
     variants: ["details=false returns counts and at most 12 alias/id rows", "details=true returns every decorated entity and raw authoritative outcome"],
     sceneMutation: true,
     defaults: ["completed=true", "alias=none", "details=false"], bounds: ["1-400 spawns", "400 aliases per session", "alias [A-Za-z][A-Za-z0-9_-]{0,31}", "12 default response details"],

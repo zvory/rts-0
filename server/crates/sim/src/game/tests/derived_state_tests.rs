@@ -786,6 +786,8 @@ fn lab_world_mutation_clears_rebuildable_pathing_cache() {
             x: spawn_pos.0,
             y: spawn_pos.1,
             completed: true,
+            dao: None,
+            faction_id: None,
         }))
         .expect("scout car should spawn")
     else {

@@ -99,6 +99,10 @@ pub enum LabReplayOperation {
         y: f32,
         #[serde(default)]
         completed: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        dao: Option<crate::LabSpawnDao>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        faction_id: Option<String>,
     },
     DeleteEntity {
         entity_id: u32,

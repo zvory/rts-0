@@ -427,6 +427,8 @@ fn try_spawn(
         x,
         y,
         completed,
+        dao: None,
+        faction_id: None,
     })) {
         Ok(LabOpOutcome::Spawned { entity_id }) => Ok(Some(entity_id)),
         Err(LabError::Placement { .. }) => Ok(None),
@@ -506,6 +508,8 @@ fn spawn(
             x,
             y,
             completed,
+            dao: None,
+            faction_id: None,
         }),
     )? {
         LabOpOutcome::Spawned { entity_id } => Ok(entity_id),

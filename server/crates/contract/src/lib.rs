@@ -784,6 +784,7 @@ fn is_zero_u32(value: &u32) -> bool {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PlayerResourceSnapshot {
     pub id: u32,
+    pub faction_id: String,
     pub steel: u32,
     pub oil: u32,
     pub supply_used: u32,

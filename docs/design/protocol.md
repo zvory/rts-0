@@ -2058,3 +2058,17 @@ Dao research owned by a Cultivator player is accepted; stale, wrong-owner, non-D
 requests are no-ops. `cancel` removes the latest unpaid plan, preserving active training.
 Move-to-center and Portal rally use the existing tournament admission convention for both grounds.
 Entity production state checkpoints the training plans and the active paid production item.
+
+Lab unit spawning accepts an optional `dao` (`lightness`, `war`, or `magic`) on
+`spawnEntity` and each `spawnEntities` entry. Only the Novice (`warrior`) kind accepts
+it; other kinds are rejected before mutation. The authoritative spawn uses normal
+Dao evolution to initialize specialization stats, with its entrance animation already
+complete. Omission spawns a base unit. Lab timeline and replay operations retain this
+field, and setup checkpoints retain the resulting entity specialization.
+
+Spawn entries also accept `factionId` from the faction catalog. A successful spawn sets
+the target player's faction; the kind must belong to that catalog. Invalid placement
+or invalid faction/kind combinations leave the player unchanged. Faction is a seat-level
+identity, so changing it affects all that player's entities. Observer `playerResources`
+rows carry `factionId` (compact `pr` slot 7, after upgrades); the client refreshes player
+identity from these authoritative rows, including after Lab rewind and replay seek.

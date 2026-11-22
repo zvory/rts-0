@@ -303,7 +303,7 @@ function decodeCompactNetStatus(record) {
 }
 
 function decodeCompactPlayerResource(record, index) {
-  const fields = readArray(record, `playerResource ${index}`, 7);
+  const fields = readArray(record, `playerResource ${index}`, 8);
   if (fields.length < 6) throw new Error(`playerResource ${index} is too short`);
   return {
     id: readU32(fields[0], "playerResource.id"),
@@ -312,6 +312,7 @@ function decodeCompactPlayerResource(record, index) {
     supplyUsed: readU32(fields[3], "playerResource.supplyUsed"),
     supplyCap: readU32(fields[4], "playerResource.supplyCap"),
     apm: readU32(fields[5], "playerResource.apm"),
+    factionId: fields[7] == null ? undefined : readString(fields[7], "factionId"),
     upgrades: readOptionalArray(fields[6], `playerResource ${index}.upgrades`, 32)
       .map((code, i) => readCode(code, UPGRADE_BY_CODE, `playerResource.${index}.upgrade.${i}`)),
   };

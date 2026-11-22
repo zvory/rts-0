@@ -164,6 +164,8 @@ fn scripted_spawn_is_recorded_once_seekable_and_portable() {
         x: 10.0 * 32.0,
         y: 10.0 * 32.0,
         completed: true,
+        dao: None,
+        faction_id: None,
     };
     task.lab_driver = Some(LabScenarioDriver::scripted_for_test(
         0,
@@ -243,6 +245,8 @@ fn scripted_spawn_replaces_retained_future_entry_after_earlier_seek() {
                 x: 10.0 * 32.0,
                 y: 10.0 * 32.0,
                 completed: true,
+                dao: None,
+                faction_id: None,
             }]),
         },
     ));
@@ -316,6 +320,8 @@ fn scripted_action_batch_rebases_before_crossing_timeline_cap() {
             x,
             y: 10.0 * 32.0,
             completed: true,
+            dao: None,
+            faction_id: None,
         }]),
     };
     task.lab_driver = Some(LabScenarioDriver::scripted_actions_for_test(

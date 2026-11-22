@@ -4,7 +4,6 @@ use rts_rules::balance::TILE_SIZE;
 use rts_sim::game::lab::{LabOp, LabOpOutcome, LabSpawnEntity};
 use rts_sim::game::{Game, PlayerInit};
 use std::time::Instant as StdInstant;
-
 fn tile_center(tile_x: u32, tile_y: u32) -> (f32, f32) {
     let tile_size = TILE_SIZE as f32;
     (
@@ -12,7 +11,6 @@ fn tile_center(tile_x: u32, tile_y: u32) -> (f32, f32) {
         (tile_y as f32 + 0.5) * tile_size,
     )
 }
-
 fn spawn_replay_test_entity(
     game: &mut Game,
     owner: u32,
@@ -26,6 +24,8 @@ fn spawn_replay_test_entity(
             x: position.0,
             y: position.1,
             completed: true,
+            dao: None,
+            faction_id: None,
         }))
         .expect("test entity spawn should succeed")
     {
@@ -33,7 +33,6 @@ fn spawn_replay_test_entity(
         outcome => panic!("unexpected spawn outcome: {outcome:?}"),
     }
 }
-
 fn delete_replay_test_entity(game: &mut Game, entity_id: u32) {
     match game
         .apply_lab_op(LabOp::DeleteEntity { entity_id })
@@ -43,7 +42,6 @@ fn delete_replay_test_entity(game: &mut Game, entity_id: u32) {
         outcome => panic!("unexpected delete outcome: {outcome:?}"),
     }
 }
-
 fn spawn_hidden_replay_depot_and_scout_position(
     game: &mut Game,
     viewers: [u32; 2],
@@ -64,11 +62,12 @@ fn spawn_hidden_replay_depot_and_scout_position(
                     x: depot_pos.0,
                     y: depot_pos.1,
                     completed: true,
+                    dao: None,
+                    faction_id: None,
                 }))
             else {
                 continue;
             };
-
             for offset_y in -2_i32..=2 {
                 for offset_x in -2_i32..=2 {
                     if offset_x == 0 && offset_y == 0 {
@@ -91,6 +90,8 @@ fn spawn_hidden_replay_depot_and_scout_position(
                             x: scout_pos.0,
                             y: scout_pos.1,
                             completed: true,
+                            dao: None,
+                            faction_id: None,
                         }))
                     else {
                         continue;
@@ -104,7 +105,6 @@ fn spawn_hidden_replay_depot_and_scout_position(
     }
     panic!("default replay map should contain a hidden depot position with a scout approach");
 }
-
 fn replay_game_with_split_building_memory(players: &[PlayerInit]) -> (Game, u32) {
     let mut game = replay_test_game(players, 0x5150_5505);
     let viewers = [players[0].id, players[1].id];

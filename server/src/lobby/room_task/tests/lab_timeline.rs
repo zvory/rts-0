@@ -175,6 +175,8 @@ fn lab_seek_rebuilds_world_and_resends_authoritative_reset_state() {
             x: spawn_position.0,
             y: spawn_position.1,
             completed: true,
+            dao: None,
+            faction_id: None,
         },
     );
     let spawn_result = lab_results(&mut operator_writer)

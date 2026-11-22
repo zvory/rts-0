@@ -4,7 +4,7 @@
 
 import { PLAYABLE_FACTIONS } from "./lobby_view.js";
 import { KIND } from "./protocol.js";
-import { factionCatalog, STATS } from "./config.js";
+import { CULTIVATORS_FACTION_ID, factionCatalog, STATS, statsForFaction } from "./config.js";
 
 const ABILITY_ONLY_UNIT_KINDS = Object.freeze(new Set([KIND.SCOUT_PLANE]));
 
@@ -24,4 +24,16 @@ export function labBuildingSpawnFactionOptions() {
 
 export function labSpawnBuildingKindsForFaction(factionId) {
   return factionCatalog(factionId).buildings.filter((kind) => STATS[kind]);
+}
+
+export function labSpawnUnitOptionsForFaction(factionId) {
+  return labSpawnUnitKindsForFaction(factionId).flatMap((kind) => {
+    const options = [{ kind, dao: null, label: statsForFaction(kind, factionId).label }];
+    if (factionId === CULTIVATORS_FACTION_ID && kind === KIND.WARRIOR) {
+      for (const dao of ["lightness", "war", "magic"]) {
+        options.push({ kind, dao, label: statsForFaction(kind, factionId, dao).label });
+      }
+    }
+    return options;
+  });
 }

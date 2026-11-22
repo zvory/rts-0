@@ -275,7 +275,8 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   // Append team-private chosenDao (slot 49) and accept compact v60.
   // Tournament Grounds appends its team-private entrant count and accepts compact v61.
   // Proven Grounds adds bounded team-private training plans at slot 51.
-  "protocol_snapshot.js": 24500,
+  // Dynamic Lab seat faction adds one validated player-resource field.
+  "protocol_snapshot.js": 24550,
   // Lab MVP Phase 5 lets command descriptors ask the injected policy which owner is controllable.
   // Point adds a tank hotkey catalog sample and delegates its descriptor to hud_unit_commands.
   // Proven Grounds dispatches its descriptors to the separate training card module.

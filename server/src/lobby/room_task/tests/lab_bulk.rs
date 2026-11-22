@@ -32,6 +32,8 @@ fn lab_plural_mutation_is_one_logged_operation_with_structured_failure_details()
                     x: first.0,
                     y: first.1,
                     completed: true,
+                    dao: None,
+                    faction_id: None,
                 },
                 crate::protocol::LabSpawnEntitySpec {
                     owner: LAB_PLAYER_TWO_ID,
@@ -39,6 +41,8 @@ fn lab_plural_mutation_is_one_logged_operation_with_structured_failure_details()
                     x: second.0,
                     y: second.1,
                     completed: true,
+                    dao: None,
+                    faction_id: None,
                 },
             ],
         },
@@ -107,6 +111,8 @@ fn lab_plural_mutation_is_one_logged_operation_with_structured_failure_details()
                 x: first.0,
                 y: first.1,
                 completed: true,
+                dao: None,
+                faction_id: None,
             }],
         },
     );

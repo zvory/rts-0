@@ -543,3 +543,7 @@ tests/run-all.sh --only-browser-scenarios=smoke
 RTS_INTERACT_LAB_RECORDING_CANARY_MS=60000 node tests/interact_cli_smoke.mjs
 node tests/interact_driver_smoke.mjs
 ```
+
+Lab spawn entries optionally accept `factionId` (sets the target seat faction) and
+`dao` (`lightness`, `war`, `magic`, Novice only). Catalog `unitOptions` exposes the
+same base and specialized unit choices as the human palette.

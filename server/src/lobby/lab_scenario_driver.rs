@@ -470,6 +470,8 @@ mod tests {
                 x: 320.0,
                 y: 320.0,
                 completed: true,
+                dao: None,
+                faction_id: None,
             }]),
         };
         let replay_op = lab_op_to_replay_operation(match &action {

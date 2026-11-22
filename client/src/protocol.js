@@ -385,3 +385,5 @@ export const cmd = Object.freeze({
 
 // Proving Grounds: kind code 33; v63 slot 51 is team-private daoTrainingQueue (<=64 Dao ids).
 // research(building, upgrade) queues paid training at Proving Grounds; cancel removes unpaid tail plans.
+
+// Lab spawnEntity/spawnEntities entries accept optional dao: lightness | war | magic (Novice only).
