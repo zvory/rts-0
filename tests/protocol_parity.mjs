@@ -808,6 +808,6 @@ paidTrainingRecord[50] = null;
 paidTrainingRecord[51] = [UPGRADE.DAO_OF_MAGIC, UPGRADE.DAO_OF_HEAVINESS];
 const paidTrainingSnapshot = decodeServerMessage({t: "snapshot", v: COMPACT_SNAPSHOT_VERSION,
   s: [1, 0, 0, 2, 10], e: [paidTrainingRecord], n: [0, 0, 0, 0, 0]});
-assert(paidTrainingSnapshot.entities[0].kind === KIND.PROVEN_GROUNDS, "Proven Grounds kind roundtrips");
+assert(paidTrainingSnapshot.entities[0].kind === KIND.PROVEN_GROUNDS, "Proving Grounds kind roundtrips");
 assert(paidTrainingSnapshot.entities[0].daoTrainingQueue.join(",") === "dao_of_magic,dao_of_heaviness",
   "paid training plans decode at slot 51");
