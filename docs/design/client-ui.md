@@ -2633,7 +2633,11 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   procedural neutral steel hedgehogs. Under construction → translucent with a single HP-layer status bar whose
   fill reflects authoritative `buildProgress` (including Resource Depot-linked extractor progress)
   rather than the scaffold's independently damageable current HP;
-  production → small top-edge progress bar. Tank Trap deconstruction uses that same HP-layer status
+  production → small top-edge progress bar. Completed Tournament Grounds waiting for entrants
+  show four admission slots immediately below the health-bar position, filling one per disciple;
+  the slots are replaced by the ordinary production bar when the tournament starts. Entrant
+  slots render only when the recipient's snapshot includes `tournamentEntrants`.
+  Tank Trap deconstruction uses that same HP-layer status
   bar and drains from full to empty via `deconstructProgress`. Tank Traps render as neutral steel I-beam
   hedgehogs with deterministic per-id rotation. Owned scaffolds may locally extrapolate
   `buildProgress` only while the latest authoritative snapshot marks them `buildActive`; the display

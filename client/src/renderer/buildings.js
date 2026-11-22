@@ -206,7 +206,7 @@ export function _drawBuilding(e, colorByOwner, state) {
     && e.extractorActive === false
     && !underConstruction;
   if (hasProductionProgress || extractorInactive) {
-    const overlayKey = `${e.x}|${y0}|${w}|${progress ?? ""}|${extractorInactive}`;
+    const overlayKey = `${e.x}|${y0}|${w}|${progress ?? ""}|${tournamentFilling}|${extractorInactive}`;
     const overlay = this._staticSlot?.(
       "buildingOverlays",
       e.id,
@@ -216,14 +216,21 @@ export function _drawBuilding(e, colorByOwner, state) {
     if (overlay.rtsStaticRedraw !== false) {
       if (hasProductionProgress) {
         // Unit production progress bar along the roof line.
-        const bw = w * 0.78;
+        const bw = tournamentFilling ? Math.min(w * 0.9, 56) : w * 0.78;
         const bx = e.x - bw / 2;
-        const by = y0 + 6;
+        const by = tournamentFilling ? y0 : y0 + 6;
         gfxFill(overlay, COLORS.hpBack, 0.9);
         gfxRect(overlay, bx, by, bw, 5);
         gfxNoFill(overlay);
         gfxFill(overlay, COLORS.hpGood);
         gfxRect(overlay, bx, by, bw * clamp01(progress), 5);
+        if (tournamentFilling) {
+          // Four discrete admission slots, immediately below the health bar.
+          gfxFill(overlay, COLORS.hpBack, 0.95);
+          for (let slot = 1; slot < 4; slot += 1) {
+            gfxRect(overlay, bx + bw * slot / 4 - 1, by, 2, 5);
+          }
+        }
         gfxNoFill(overlay);
       }
       if (extractorInactive) {
