@@ -15,6 +15,7 @@ Use when adding, removing, or changing any field on a client↔server message, s
   - §2.6 Replay playback state and vision
   - §2.7 Observer analysis state
   - Three Dao Pavilion prototype vocabulary
+  - Tournament Grounds
 - [docs/projection-audit-checklist.md](../projection-audit-checklist.md) — checklist for new
   projection-affecting snapshot fields, events, or observer modes
 

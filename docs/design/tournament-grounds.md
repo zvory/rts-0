@@ -4,11 +4,11 @@
 
 User authorized implementation and supplied the fantasy, input/output, footprint, cost, prerequisite,
 rally behavior and art direction. Tournament Grounds is the initial player-facing name. Cultivator
-Engineers build an arena that trades eight ordinary Disciples for three randomly specialized
-Disciples. The opportunity cost is five army bodies and the risk of losing entrants when the
+Engineers build an arena that trades four ordinary Disciples for one randomly specialized
+Disciple. The opportunity cost is three army bodies and the risk of losing entrants when the
 building is destroyed. Opponents can punish the ten-second conversion window or destroy the arena.
-Description: “Send eight base Disciples inside to begin a free ten-second tournament. Three winners
-emerge with random Dao specializations. Supports a rally point.”
+Description: “Send four base Disciples inside to begin a free ten-second tournament. One winner
+emerges with a random Dao specialization. Supports a rally point.”
 
 ## Phase 1: rules and balance — complete
 
@@ -18,12 +18,12 @@ emerge with random Dao specializations. Supports a rally point.”
   cancellation/refund, damage, fog memory and destruction behavior.
 - Right-click own completed Grounds with base Disciples (Warrior kind, no Dao). Entrants walk to
   the perimeter and are consumed on arrival. Other units and enemy/allied disciples are rejected.
-- Capacity eight. The eighth entrant starts 300 ticks (ten seconds), with no resource charge,
-  research prerequisite or additional command. While running it rejects further entrants.
-- Three full-health Disciples emerge, each independently drawing Lightness, War or Magic with
+- Capacity four. The fourth entrant starts 300 ticks (ten seconds), with no resource charge,
+  research prerequisite or additional command. While running it stages further entrants outside for the next tournament.
+- One full-health Disciple emerges, drawing Lightness, War or Magic with
   equal probability from the simulation RNG. Existing first Dao evolution rules apply, including
-  War HP. Winners carry the existing evolved-Disciple 60-insight invariant. Duplicates are possible.
-- Entrants immediately release supply. Winners use normal two supply each; their six supply are
+  War HP. Winners carry the existing evolved-Disciple 60-insight invariant.
+- Entrants immediately release supply. The winner uses normal two supply; its two supply are
   reserved when the tournament starts, preventing other production from claiming their slots.
 - Spawn through normal legal building exits and follow the full rally plan. Blocked exits retain
   pending winners for retry. Destruction loses entrants/pending winners and releases reservations.
@@ -42,9 +42,14 @@ emerge with random Dao specializations. Supports a rally point.”
 - [x] Rules/catalog/client/protocol mirrors and design references updated.
 - [x] Admission, timing, output, random-specialization eligibility, rally, blocked exits, interruption/destruction,
   supply, fog and checkpoint behavior tested.
-- [x] In-game Lab inspection completed, including blue/orange art, seven entrants, running timer and three outputs.
+- [x] In-game Lab inspection completed, including blue/orange art, three entrants, running timer and one output.
 - [ ] Focused checks and authoritative PR gate passed; PR merged.
 
-Local review used the Interact Lab scene with two team-colored grounds and eight Disciples.
+Initial art review used two team-colored grounds. Final Interact review trained four Disciples
+at a Cultivator Portal rallied into the grounds and confirmed one upgraded winner at its rally point.
 The normal-command Game tests additionally cover Cultivator rally orders and checkpoint restore
 both during a tournament and after winners spawn. Bespoke audio and AI strategy remain deferred.
+
+Portal rally: right-click owned completed Grounds while a Portal is selected. The client snaps
+the rally point to the arena center. Newly trained base Disciples use normal legal perimeter
+approaches and enter automatically; additional arrivals wait through a running tournament.

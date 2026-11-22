@@ -790,10 +790,10 @@ assert(pendingDaoSnapshot.entities[0].chosenDao === "magic", "compact private Da
 
 const tournamentRecord = [...pendingDaoRecord];
 tournamentRecord[2] = KIND_CODE[KIND.TOURNAMENT_GROUNDS];
-tournamentRecord[50] = 7;
+tournamentRecord[50] = 3;
 const tournamentSnapshot = decodeServerMessage({t: "snapshot", v: COMPACT_SNAPSHOT_VERSION,
   s: [1, 0, 0, 2, 10], e: [tournamentRecord], n: [0, 0, 0, 0, 0]});
 assert(tournamentSnapshot.entities[0].kind === KIND.TOURNAMENT_GROUNDS,
   "Tournament Grounds compact kind round trips");
-assert(tournamentSnapshot.entities[0].tournamentEntrants === 7,
+assert(tournamentSnapshot.entities[0].tournamentEntrants === 3,
   "compact tournament entrant count decodes at slot 50");

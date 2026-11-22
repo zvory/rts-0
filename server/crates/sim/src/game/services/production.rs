@@ -34,21 +34,7 @@ pub(crate) fn production_system(
 ) {
     manual::pay_and_protect(entities, players, &mut pending_spending);
     let mut completed_buildings_by_owner = None;
-    let producers: Vec<_> = entities
-        .ids()
-        .into_iter()
-        .flat_map(|id| {
-            let ready_tournament = entities.get(id).is_some_and(|e| {
-                e.kind == EntityKind::TournamentGrounds
-                    && e.prod_queue()
-                        .first()
-                        .is_some_and(|p| p.progress >= p.total.saturating_sub(1))
-            });
-            // Once the ten-second front item completes, all three winners can leave this tick.
-            std::iter::repeat_n(id, if ready_tournament { 3 } else { 1 })
-        })
-        .collect();
-    for id in producers {
+    for id in entities.ids() {
         let active_producer = entities.get(id).is_some_and(|producer| {
             producer.hp > 0 && producer.is_building() && !producer.under_construction()
         });
@@ -266,6 +252,24 @@ pub(crate) fn production_system(
                 // to attack-move for combat units, but Engineers and faction gatherers keep move
                 // rally behavior.
                 if let Some(first) = rally_plan.first().copied() {
+                    if unit == EntityKind::Warrior
+                        && entities
+                            .get(id)
+                            .is_some_and(|e| e.kind == EntityKind::Portal)
+                    {
+                        if let Some(target) =
+                            tournament::entry_target(entities, owner, first.point.x, first.point.y)
+                        {
+                            tournament::order_entry(
+                                entities,
+                                coordinator,
+                                owner,
+                                &[spawned],
+                                target,
+                            );
+                            continue;
+                        }
+                    }
                     coordinator.order_rally_move(
                         entities,
                         owner,

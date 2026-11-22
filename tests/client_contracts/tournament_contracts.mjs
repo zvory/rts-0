@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { _onRightClick } from "../../client/src/input/commands.js";
+import { _onRightClick, _issueTargetedCommand } from "../../client/src/input/commands.js";
 import { KIND } from "../../client/src/protocol.js";
 import { isProducerBuilding } from "../../client/src/config.js";
 
@@ -23,4 +23,18 @@ _onRightClick.call(input, {x: 100, y: 100});
 assert.deepEqual(commands, [{c: "move", units: [1], x: 500, y: 500}],
   "right-click sends only base Disciples to the exact building center");
 assert.equal(isProducerBuilding(KIND.TOURNAMENT_GROUNDS), true, "Grounds accepts rally input");
+commands.length = 0;
+input._selectedOwnUnitIds = () => [];
+input._selectedProducerBuildingIds = () => [20];
+_onRightClick.call(input, {x: 100, y: 100});
+assert.equal(commands[0].c, "setRally");
+assert.equal(commands[0].building, 20);
+assert.equal(commands[0].x, grounds.x, "Portal rally snaps to Grounds center instead of clicked ground");
+assert.equal(commands[0].y, grounds.y);
+commands.length = 0;
+input.clientIntent = {commandTarget: "move"};
+_issueTargetedCommand.call(input, {x: 100, y: 100});
+assert.equal(commands[0].c, "setRally");
+assert.equal(commands[0].x, grounds.x, "command-card rally also targets Grounds center");
+assert.equal(commands[0].y, grounds.y);
 console.log("tournament_contracts: ok");

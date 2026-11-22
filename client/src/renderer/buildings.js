@@ -200,7 +200,7 @@ export function _drawBuilding(e, colorByOwner, state) {
 
   const tournamentFilling = e.kind === KIND.TOURNAMENT_GROUNDS && !underConstruction && !e.prodKind
     && typeof e.tournamentEntrants === "number";
-  const progress = tournamentFilling ? e.tournamentEntrants / 8 : e.prodProgress;
+  const progress = tournamentFilling ? e.tournamentEntrants / 4 : e.prodProgress;
   const hasProductionProgress = tournamentFilling || (typeof progress === "number" && progress > 0);
   const extractorInactive = (e.kind === KIND.STEEL_MINE || e.kind === KIND.PUMP_JACK)
     && e.extractorActive === false

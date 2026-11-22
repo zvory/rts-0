@@ -51,11 +51,11 @@ pub(super) fn validate_tournament_state(entity: &Entity) -> Result<(), Checkpoin
     }
     if let Some(p) = entity.production.as_ref() {
         let invalid = if entity.kind == EntityKind::TournamentGrounds {
-            p.tournament_entrants > 8
-                || p.tournament_winners.len() > 3
+            p.tournament_entrants > 4
+                || p.tournament_winners.len() > 1
                 || p.queue.len() != p.tournament_winners.len()
-                || (p.tournament_winners.is_empty() && p.tournament_entrants == 8)
-                || (!p.tournament_winners.is_empty() && p.tournament_entrants != 8)
+                || (p.tournament_winners.is_empty() && p.tournament_entrants == 4)
+                || (!p.tournament_winners.is_empty() && p.tournament_entrants != 4)
                 || p.queue
                     .iter()
                     .any(|item| item.unit != EntityKind::Warrior || !item.paid)

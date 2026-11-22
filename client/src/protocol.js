@@ -380,5 +380,5 @@ export const cmd = Object.freeze({
 
 // Disciple EntityView slots 45–49: team-private insight/chosenDao; public dao, daoReady and daoAdvanceTicks.
 
-// Tournament Grounds: kind code 32; compact v62 slot 50 is team-private tournamentEntrants (0–8).
+// Tournament Grounds: kind code 32; compact v62 slot 50 is team-private tournamentEntrants (0–4).
 // Existing production/rally fields carry its ten-second batch and pending winners.

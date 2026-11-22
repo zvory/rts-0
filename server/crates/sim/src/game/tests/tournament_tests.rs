@@ -75,7 +75,7 @@ fn wait_running(game: &mut Game, grounds: u32) {
 }
 
 #[test]
-fn tournament_eight_enter_ten_seconds_three_random_upgrades_rally_and_checkpoint() {
+fn tournament_four_enter_ten_seconds_one_random_upgrade_rally_and_checkpoint() {
     let mut game = empty_flat_game(&[player(1)]);
     let grounds = arena(&mut game);
     game.state.players[0].set_resources(0, 0);
@@ -84,12 +84,12 @@ fn tournament_eight_enter_ten_seconds_three_random_upgrades_rally_and_checkpoint
         .get_mut(grounds)
         .unwrap()
         .set_rally_point(Some(RallyIntent::new(RallyKind::Move, 950.0, 656.0)));
-    let sent = send(&mut game, grounds, 8);
+    let sent = send(&mut game, grounds, 4);
     wait_running(&mut game, grounds);
     assert!(sent.iter().all(|id| game.state.entities.get(*id).is_none()));
     assert_eq!(
-        game.state.players[0].supply_used, 6,
-        "all three winners reserve supply"
+        game.state.players[0].supply_used, 2,
+        "the winner reserves supply"
     );
     let payload = game.checkpoint_payload_text_for_test().unwrap();
     let mut restored = Game::restore_checkpoint_payload_text_for_test(
@@ -116,11 +116,7 @@ fn tournament_eight_enter_ten_seconds_three_random_upgrades_rally_and_checkpoint
         .iter()
         .filter(|e| e.kind == EntityKind::Warrior)
         .collect();
-    assert_eq!(
-        winners.len(),
-        3,
-        "all winners emerge together at ten seconds"
-    );
+    assert_eq!(winners.len(), 1, "one winner emerges at ten seconds");
     for e in winners {
         assert!(matches!(
             e.dao,
@@ -161,11 +157,11 @@ fn tournament_partial_capacity_rejects_specialists_enemies_and_cancels_entry() {
         .spawn_building(2, EntityKind::Portal, 1808.0, 1808.0, true)
         .unwrap();
     let grounds = arena(&mut game);
-    send(&mut game, grounds, 7);
+    send(&mut game, grounds, 3);
     for _ in 0..400 {
         game.tick();
     }
-    assert_eq!(entrants(&game, grounds), 7);
+    assert_eq!(entrants(&game, grounds), 3);
     assert!(game
         .state
         .entities
@@ -216,7 +212,7 @@ fn tournament_partial_capacity_rejects_specialists_enemies_and_cancels_entry() {
         },
     );
     game.tick();
-    assert_eq!(entrants(&game, grounds), 7);
+    assert_eq!(entrants(&game, grounds), 3);
     assert!(game.state.entities.get(specialist).is_some());
     assert!(game.state.entities.get(enemy).is_some());
     assert_eq!(
@@ -236,7 +232,7 @@ fn tournament_partial_capacity_rejects_specialists_enemies_and_cancels_entry() {
 fn tournament_destroyed_batch_never_mints_refunds_and_cannot_be_cancelled() {
     let mut game = empty_flat_game(&[player(1)]);
     let grounds = arena(&mut game);
-    send(&mut game, grounds, 8);
+    send(&mut game, grounds, 4);
     wait_running(&mut game, grounds);
     game.state.players[0].set_resources(0, 0);
     game.enqueue(
@@ -249,7 +245,7 @@ fn tournament_destroyed_batch_never_mints_refunds_and_cannot_be_cancelled() {
     game.tick();
     assert_eq!(
         game.state.entities.get(grounds).unwrap().prod_queue().len(),
-        3
+        1
     );
     game.state
         .entities
@@ -311,7 +307,7 @@ fn tournament_counts_are_team_private_and_hidden_buildings_stay_hidden() {
 fn tournament_blocked_exits_keep_winners_until_legal_spawn_is_available() {
     let mut game = empty_flat_game(&[player(1)]);
     let grounds = arena(&mut game);
-    send(&mut game, grounds, 8);
+    send(&mut game, grounds, 4);
     wait_running(&mut game, grounds);
     game.state.map.terrain.fill(crate::protocol::terrain::WATER);
     for _ in 0..310 {
@@ -319,9 +315,9 @@ fn tournament_blocked_exits_keep_winners_until_legal_spawn_is_available() {
     }
     assert_eq!(
         game.state.entities.get(grounds).unwrap().prod_queue().len(),
-        3
+        1
     );
-    assert_eq!(game.state.players[0].supply_used, 6);
+    assert_eq!(game.state.players[0].supply_used, 2);
     game.state.map.terrain.fill(crate::protocol::terrain::GRASS);
     game.tick();
     assert_eq!(
@@ -330,7 +326,7 @@ fn tournament_blocked_exits_keep_winners_until_legal_spawn_is_available() {
             .iter()
             .filter(|e| e.kind == EntityKind::Warrior)
             .count(),
-        3
+        1
     );
     assert_eq!(entrants(&game, grounds), 0);
 }
@@ -365,5 +361,111 @@ fn tournament_rules_require_portal_and_only_cultivator_engineers_can_build() {
             stats.foot_h
         ),
         (100, 0, 200, 3, 3)
+    );
+}
+
+#[test]
+fn tournament_portal_rally_trains_and_feeds_four_disciples_automatically() {
+    let mut game = empty_flat_game(&[player(1)]);
+    let grounds = arena(&mut game);
+    let portal = game
+        .state
+        .entities
+        .spawn_building(1, EntityKind::Portal, 400.0, 656.0, true)
+        .unwrap();
+    game.state.players[0].set_resources(1000, 0);
+    game.enqueue(
+        1,
+        Command::SetRally {
+            building: portal,
+            x: 656.0,
+            y: 656.0,
+            kind: RallyKind::Move,
+            queued: false,
+        },
+    );
+    for _ in 0..4 {
+        game.enqueue(
+            1,
+            Command::Train {
+                building: portal,
+                unit: EntityKind::Warrior,
+            },
+        );
+    }
+    for _ in 0..1500 {
+        game.tick();
+        if !game
+            .state
+            .entities
+            .get(grounds)
+            .unwrap()
+            .prod_queue()
+            .is_empty()
+        {
+            break;
+        }
+    }
+    assert_eq!(
+        entrants(&game, grounds),
+        4,
+        "Portal graduates enter automatically without individual commands"
+    );
+    assert!(!game
+        .state
+        .entities
+        .iter()
+        .any(|e| e.kind == EntityKind::Warrior));
+    assert_eq!(
+        game.state.players[0].steel, 600,
+        "only the four Portal training costs are paid"
+    );
+    for _ in 0..300 {
+        game.tick();
+    }
+    let winners: Vec<_> = game
+        .state
+        .entities
+        .iter()
+        .filter(|e| e.kind == EntityKind::Warrior)
+        .collect();
+    assert_eq!(winners.len(), 1);
+    assert!(winners[0].dao.is_some());
+}
+
+#[test]
+fn tournament_busy_arrivals_wait_and_enter_the_next_intake() {
+    let mut game = empty_flat_game(&[player(1)]);
+    let grounds = arena(&mut game);
+    send(&mut game, grounds, 4);
+    wait_running(&mut game, grounds);
+    let waiting = send(&mut game, grounds, 1)[0];
+    for _ in 0..100 {
+        game.tick();
+    }
+    assert!(game.state.entities.get(waiting).is_some());
+    assert_eq!(
+        game.state
+            .entities
+            .get(waiting)
+            .unwrap()
+            .movement
+            .as_ref()
+            .unwrap()
+            .tournament_target,
+        Some(grounds)
+    );
+    for _ in 0..300 {
+        game.tick();
+    }
+    assert!(game.state.entities.get(waiting).is_none());
+    assert_eq!(entrants(&game, grounds), 1);
+    assert_eq!(
+        game.state
+            .entities
+            .iter()
+            .filter(|e| e.kind == EntityKind::Warrior && e.dao.is_some())
+            .count(),
+        1
     );
 }

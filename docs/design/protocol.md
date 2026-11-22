@@ -2023,10 +2023,13 @@ is restricted to Dao of War. Checkpoints retain the shared projectile leg and pe
 ### Tournament Grounds
 
 `tournament_grounds` appends entity-kind compact code 32. Optional team-private
-`tournamentEntrants` (0–8) appends entity slot 50 in compact version 62. Ordinary
+`tournamentEntrants` (0–4) appends entity slot 50 in compact version 62. Ordinary
 `prodKind`, `prodProgress`, `prodQueue` and rally fields represent the ten-second batch
 and pending winners. Visible opponents see progress but no entrant count.
 A normal unqueued `move` to the exact owned completed building center means enter for
 base Disciples only; the client resolves right-clicks to that center. Entry intent is
 entity-owned, cancels on replacement/stop/hold, and records through existing replay commands.
 See [Tournament Grounds](tournament-grounds.md).
+
+Portal first-stage rallies to the exact owned completed Grounds center automatically issue
+entry movement to newly trained base Disciples. Busy grounds retain waiting entry intents.

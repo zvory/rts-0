@@ -2165,8 +2165,11 @@ Dao presentation and support Shield follow [Disciple insight and Dao evolution](
 The tournament service admits own base Disciples at the arena perimeter before movement.
 Entry targets live in MovementState; entrant counts and RNG-selected winners live in
 ProductionState and checkpoint with the entity store. Ordinary paid production items hold
-300 ticks for the first winner and zero ticks for the other two, reserving six supply.
+300 ticks for the winner, reserving two supply.
 Production emits all available winners together using existing legal exit and rally logic;
 blocked exits retain the queue. Cancellation is rejected; death releases supply without
 refunding the free winners. No public Game API or room state changes.
 See [Tournament Grounds](tournament-grounds.md).
+
+Portal first-stage rallies to the exact owned completed Grounds center automatically issue
+entry movement to newly trained base Disciples. Busy grounds retain waiting entry intents.

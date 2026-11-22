@@ -207,7 +207,7 @@ export const STATS = Object.freeze({
     description: "A supernatural gateway that trains Cultivator Disciples." },
   [KIND.TOURNAMENT_GROUNDS]: { label: "Tournament Grounds", icon: "TG", footW: 3, footH: 3, sight: 1,
     cost: { steel: 100, oil: 0 }, buildTicks: 200, trains: [], requires: [KIND.PORTAL],
-    description: "Right-click eight base Disciples inside. A free ten-second tournament produces three winners with random Dao specializations. Supports a rally point." },
+    description: "Right-click four base Disciples inside, or rally a Portal here. A free ten-second tournament produces one winner with a random Dao specialization. Supports a rally point." },
   [KIND.THREE_DAO_PAVILION]: { label: "Three Dao Pavilion", icon: "DAO", footW: 3, footH: 3, sight: 1,
     cost: { steel: 100, oil: 25 }, buildTicks: 560, trains: [],
     researches: [UPGRADE.DAO_OF_LIGHTNESS, UPGRADE.DAO_OF_MAGIC, UPGRADE.DAO_OF_HEAVINESS],

@@ -7,7 +7,7 @@ use crate::game::upgrade::UpgradeKind;
 use crate::game::PlayerState;
 use rand::Rng;
 
-pub(crate) const CAPACITY: u8 = 8;
+pub(crate) const CAPACITY: u8 = 4;
 pub(crate) const DURATION: u32 = 300;
 
 /// A contextual move onto the exact center of an owned, complete arena means enter.
@@ -91,9 +91,8 @@ pub(in crate::game) fn advance(
             continue;
         };
         if !p.queue.is_empty() || p.tournament_entrants >= CAPACITY {
-            if let Some(e) = entities.get_mut(id) {
-                e.clear_orders();
-            }
+            // Portal rallies keep their entry intent while this tournament is running.
+            // Units stage outside and enter automatically when the next intake opens.
             continue;
         }
         // Rectangle distance, not center distance: corner approaches must reach the perimeter too.
@@ -110,25 +109,21 @@ pub(in crate::game) fn advance(
         if let Some(p) = entities.get_mut(target).and_then(|e| e.production.as_mut()) {
             p.tournament_entrants = p.tournament_entrants.saturating_add(1);
             if p.tournament_entrants == CAPACITY {
-                p.tournament_winners = (0..3)
-                    .map(|_| match rng.gen_range(0..3) {
-                        0 => UpgradeKind::DaoOfLightness,
-                        1 => UpgradeKind::DaoOfHeaviness,
-                        _ => UpgradeKind::DaoOfMagic,
-                    })
-                    .collect();
-                for index in 0..3 {
-                    p.queue.push(ProdItem {
-                        unit: EntityKind::Warrior,
-                        progress: 0,
-                        total: if index == 0 { DURATION } else { 0 },
-                        paid: true,
-                    });
-                }
+                p.tournament_winners = vec![match rng.gen_range(0..3) {
+                    0 => UpgradeKind::DaoOfLightness,
+                    1 => UpgradeKind::DaoOfHeaviness,
+                    _ => UpgradeKind::DaoOfMagic,
+                }];
+                p.queue.push(ProdItem {
+                    unit: EntityKind::Warrior,
+                    progress: 0,
+                    total: DURATION,
+                    paid: true,
+                });
                 if let Some(player) = players.iter_mut().find(|p| p.id == owner) {
-                    // Eight consumed Disciples already freed sixteen supply. Winner reservations
+                    // Four consumed Disciples free eight supply. The winner reservation
                     // persist in paid production items and are rebuilt by the supply system.
-                    player.reserve_supply(6);
+                    player.reserve_supply(2);
                 }
             }
         }
