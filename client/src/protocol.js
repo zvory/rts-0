@@ -381,7 +381,7 @@ export const cmd = Object.freeze({
 // Disciple EntityView slots 45–49: team-private insight/chosenDao; public dao, daoReady and daoAdvanceTicks.
 
 // Tournament Grounds: kind code 32; compact v62 slot 50 is team-private tournamentEntrants (0–4).
-// Existing production/rally fields carry its ten-second batch and pending winners.
+// Existing production/rally fields carry its five-second batch and pending winners.
 
 // Proving Grounds: kind code 33; v63 slot 51 is team-private daoTrainingQueue (<=64 Dao ids).
 // research(building, upgrade) queues paid training at Proving Grounds; cancel removes unpaid tail plans.

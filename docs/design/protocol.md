@@ -2028,7 +2028,7 @@ is restricted to Dao of War. Checkpoints retain the shared projectile leg and pe
 
 `tournament_grounds` appends entity-kind compact code 32. Optional team-private
 `tournamentEntrants` (0–4) appends entity slot 50 in compact version 62. Ordinary
-`prodKind`, `prodProgress`, `prodQueue` and rally fields represent the ten-second batch
+`prodKind`, `prodProgress`, `prodQueue` and rally fields represent the five-second batch
 and pending winners. Visible opponents see progress but no entrant count.
 A normal unqueued `move` to the exact owned completed building center means enter for
 base Disciples only; the client resolves right-clicks to that center. Entry intent is
