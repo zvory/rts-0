@@ -642,6 +642,7 @@ export class Renderer {
     // Drive the world container from the camera (single transform for all layers).
     this.world.position.set(-camera.x * camera.zoom, -camera.y * camera.zoom);
     this.world.scale.set(camera.zoom);
+    this._waterLayer?.update(this.visualNow());
     time("renderer.doodads", () => this._doodads?.updateVisibility(camera));
 
     // Begin a fresh reconciliation pass.
@@ -1367,6 +1368,8 @@ export class Renderer {
     this._doodads?.destroy();
     this._doodads = null;
 
+    this._waterLayer?.destroy();
+    this._waterLayer = null;
     // Cached terrain sprite + its generated texture.
     if (this._terrainSprite) {
       this._terrainSprite.destroy(true);
