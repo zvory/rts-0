@@ -169,7 +169,20 @@ impl RoomTask {
             participants: &self.match_participants,
         });
         self.mark_match_started_for_drain();
+        let tick_budget = self.current_tick_interval();
+        super::super::replay_branch::send_branch_setup_snapshots(
+            &self.room,
+            &mut self.players,
+            &self.order,
+            &self.observer_views,
+            &self.branch_live_seat_by_connection,
+            projection_policy,
+            tick_budget,
+            &mut self.slow_tick_count,
+            &game,
+        );
         self.phase = Phase::InGame(Box::new(game));
+        self.live_pause.start_replay_setup();
         self.broadcast_live_pause_state();
     }
 

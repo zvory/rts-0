@@ -196,3 +196,45 @@ impl BranchStagingState {
             .collect()
     }
 }
+
+/// Publish the frozen, fog-filtered takeover state before control-group setup begins.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn send_branch_setup_snapshots(
+    room: &str,
+    players: &mut HashMap<u32, super::room_task::RoomPlayer>,
+    order: &[u32],
+    observer_views: &HashMap<u32, rts_sim::game::ObserverView>,
+    seats: &HashMap<u32, u32>,
+    projection_policy: super::projection::ProjectionPolicy,
+    tick_budget: std::time::Duration,
+    slow_tick_count: &mut u32,
+    game: &Game,
+) {
+    use super::projection::{observer_view_or_all, RecipientRole};
+    use super::snapshot_fanout::{SnapshotFanout, SnapshotFanoutPayload};
+    SnapshotFanout::new(
+        room,
+        std::time::Duration::ZERO,
+        tick_budget,
+        std::time::Instant::now(),
+        slow_tick_count,
+        None,
+    )
+    .send_to_recipients(players, order.iter().copied(), |id, player| {
+        let projection = if player.spectator {
+            projection_policy
+                .observer_snapshot_for(observer_view_or_all(observer_views.get(&id), game), false)
+        } else {
+            projection_policy.live_snapshot_for(
+                RecipientRole::ActivePlayer,
+                id,
+                seats.get(&id).copied(),
+                &[],
+            )
+        };
+        Some(SnapshotFanoutPayload::new(
+            projection.snapshot_with_events(game, &Default::default(), &[]),
+            player.spectator,
+        ))
+    });
+}

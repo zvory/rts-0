@@ -25,7 +25,8 @@ export const WARRIOR_PNG_FRAME_STRIP = deepFreeze({
   worldScale: 0.32,
   facingOffset: -Math.PI / 2,
   firingFacingOffset: 0,
-  originForwardPx: 13,
+  // Idle torso sits 22 source pixels left of the cell midpoint.
+  originForwardPx: 22 * 0.32,
   firingRecoilPx: 0,
   tintSlot: "team-light",
   bakedColorAdjustment: { brightness: 100, saturation: 100, hue: 100 },

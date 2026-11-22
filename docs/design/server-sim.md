@@ -899,6 +899,9 @@ RNG replacement, replay checksums, and platform replay parity tests are outside 
   An accepted unpause starts a room-owned three-second synchronized resume countdown; the room
   remains paused through its deadline, broadcasts the remaining countdown phase to every live
   recipient, and resumes simulation only after the final word.
+  Initial replay-branch launch publishes a frozen, fog-filtered snapshot and starts ten seconds
+  of control-group setup followed by the three-second countdown without consuming a pause charge.
+  Later unpauses in that branch use the ordinary three-second countdown without setup.
   `prepare_live_match_launch`, live-match teardown/replay transition, and empty-room reset all
   clear pause counters, countdown deadline, and paused state.
 - Normal live rooms reject active mid-match joins but accept `join { spectator: true }` as a

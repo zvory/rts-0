@@ -502,8 +502,8 @@ fn live_pause_authorizes_players_and_spectators_and_tracks_limit() {
     let countdown = resume_state
         .resume_countdown
         .expect("accepted unpause carries a resume countdown");
-    assert_eq!(countdown.duration_ms, 13_000);
-    assert_eq!(countdown.setup_duration_ms, 10_000);
+    assert_eq!(countdown.duration_ms, 3_000);
+    assert_eq!(countdown.setup_duration_ms, 0);
     assert_eq!(countdown.words, ["Drei!", "Zwei!", "Eins!"]);
     assert!(countdown.remaining_ms <= countdown.duration_ms);
     assert!(!resume_state.can_unpause);
