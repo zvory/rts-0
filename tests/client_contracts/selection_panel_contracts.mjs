@@ -367,6 +367,7 @@ withFakeHudDocument(({ FakeElement }) => {
   selectionPanel.render();
   assert(text(panel).includes("Insight: 60 / 60"), "base Disciple details show the 60 insight cap");
   disciple.dao = "magic";
+  disciple.kind = KIND.MAGIC_ADEPT;
   disciple.insight = 0;
   selectionPanel.render();
   assert(text(panel).includes("Insight: 0 / 120"), "evolution refreshes insight and the doubled cap");

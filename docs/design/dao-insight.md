@@ -95,3 +95,6 @@ mutable Dao identity in the engine. Pending `chosenDao` remains base-only privat
 The new compact kind codes are 35 (Lightness), 36 (War), and 37 (Magic); slots are unchanged.
 Selection uses authoritative kind directly. Saves/replays from the old shared-kind representation
 are not migrated under the repository's latest-version-only policy.
+
+Bundled Lab setups declare simulation schema 7. Their existing non-Disciple entity states are
+unchanged; catalog restoration checks validate every refreshed checkpoint with the current engine.
