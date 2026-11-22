@@ -36,13 +36,16 @@ void main() {
     +4*int(shoreWater(origin+vec2(uTileSize,uTileSize)))
     +8*int(shoreWater(origin+vec2(0,uTileSize)));
   float d=cornerTileDistance(local,mask)*uTileSize;
-  if (abs(d)>29.) { finalColor=vec4(0); return; }
+  // Uniform neighbors have no transition artwork. End both sides of the
+  // transition before a mixed cell reaches their shared +/-half-tile boundary.
+  float support=min(14.,uTileSize*.4375);
+  if (abs(d)>=support) { finalColor=vec4(0); return; }
 
   // Tile art is stable in world space; moving surf never crawls across the bank.
   float grain=shoreHash(floor(p/2.));
   float broad=shoreNoise(p/27.);
-  float sandEdge=-17.+(shoreNoise(p/11.)-.5)*5.;
-  float bank=smoothstep(sandEdge-3.,sandEdge+2.,d);
+  float sandEdge=-support*.72+(shoreNoise(p/11.)-.5)*support*.10;
+  float bank=smoothstep(sandEdge-support*.14,sandEdge+support*.14,d);
   float underwater=smoothstep(1.,12.,d);
   vec3 dry=mix(vec3(.40,.355,.245),vec3(.60,.53,.365),broad*.65+grain*.35);
   vec3 wet=mix(vec3(.245,.235,.17),vec3(.34,.31,.225),grain*.7+broad*.3);
@@ -62,7 +65,7 @@ void main() {
   float lip=2.5+sin(phase)*2.;
   float foam=(1.-smoothstep(.6,2.,abs(d-lip)))*smoothstep(.32,.65,shoreNoise(p/8.+uTime*.035));
   color=mix(color,vec3(.67,.68,.54),foam*.52);
-  float alpha=bank*(1.-smoothstep(10.,22.,d));
+  float alpha=bank*(1.-smoothstep(support*.50,support*.86,d));
   finalColor=vec4(color*uTint*alpha,alpha);
 }
 `;
