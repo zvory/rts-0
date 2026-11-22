@@ -697,44 +697,19 @@ assert(
     }),
     "compact snapshot enforces the ground decal delta bound",
   );
-  assertThrows(
-    () =>
-      decodeServerMessage({
-        t: "snapshot",
-        v: COMPACT_SNAPSHOT_VERSION,
-        s: [1, 0, 0, 0, 0],
-        e: [[
-          1,
-          1,
-          KIND_CODE[KIND.WORKER],
-          0,
-          0,
-          1,
-          1,
-          STATE_CODE[STATE.IDLE],
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          null,
-          Array.from({ length: MAX_COMPACT_ORDER_PLAN + 1 }, () => [ORDER_STAGE_CODE[ORDER_STAGE.MOVE], 32, 64]),
-        ]],
-      }),
-    "compact snapshot enforces order plan bounds",
-  );
   const fullPlanEntity = [1, 1, KIND_CODE[KIND.WORKER], 0, 0, 1, 1, STATE_CODE[STATE.IDLE]];
   while (fullPlanEntity.length < 21) fullPlanEntity.push(null);
-  fullPlanEntity.push(Array.from({ length: 33 }, (_, index) => [ORDER_STAGE_CODE[ORDER_STAGE.MOVE], index * 32, 64]));
-  const fullPlan = decodeServerMessage({ t: "snapshot", v: COMPACT_SNAPSHOT_VERSION, s: [1, 0, 0, 0, 0], n: [0, 0, 0, 0, 0], e: [fullPlanEntity] });
+  const fullPlanMarkers = Array.from({ length: 33 }, (_, index) => [ORDER_STAGE_CODE[ORDER_STAGE.MOVE], index * 32, 64]);
+  fullPlanEntity.push(fullPlanMarkers);
+  const fullPlanSnapshot = { t: "snapshot", v: COMPACT_SNAPSHOT_VERSION, s: [1, 0, 0, 0, 0], n: [0, 0, 0, 0, 0], e: [fullPlanEntity] };
+  const fullPlan = decodeServerMessage(fullPlanSnapshot);
   assert(fullPlan.entities[0].orderPlan.length === 33, "compact snapshot accepts active stage plus all 32 queued orders");
+  assert(MAX_COMPACT_ORDER_PLAN === fullPlanMarkers.length, "order plan fixture reaches the decoder limit");
+  fullPlanMarkers.push([ORDER_STAGE_CODE[ORDER_STAGE.MOVE], 32, 64]);
+  assertThrows(
+    () => decodeServerMessage(fullPlanSnapshot),
+    "compact snapshot enforces order plan bounds on an otherwise valid snapshot",
+  );
   assert(SNAPSHOT_CODEC.COMPACT_JSON === "compact-json", "client keeps compact JSON baseline codec name");
   assert(
     SNAPSHOT_CODEC.MESSAGEPACK_COMPACT === "messagepack-compact",
