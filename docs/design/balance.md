@@ -224,10 +224,10 @@ Steel Mine and Oil Pumpjack, with Nexus, Portal, and Three Dao Pavilion availabl
 Cultivator Serfs can also construct the faction-specific Portal for 150 Steel: it has a 3x3
 footprint, 123 HP, one tile of sight, a five-second construction time, no prerequisite, and no
 research. A completed Portal trains the Cultivator Disciple for 100 Steel and 2 Supply in 300 ticks.
-The Disciple is a 135-HP, 13.5-pixel-radius ground melee unit moving at 1.84 pixels per tick.
-All Disciple movement profiles receive a 15% speed increase,
-including Lightness (2.7025 pixels per tick) and Magic (2.024 pixels per tick); War retains
-the base Disciple speed. Its
+The Disciple is a 115-HP, 13.5-pixel-radius ground melee unit moving at 2.0 pixels per tick.
+Lightness independently uses 1.15 times Scout Car speed (2.7025 pixels per tick); Magic uses
+1.1 times base Disciple speed (2.2 pixels per tick). War retains the base Disciple speed
+and gains 20 maximum HP (135 total); Lightness and Magic retain 115 maximum HP. Its
 23-damage sword has 0.75-tile reach, a 64-tick cooldown, and 50% armor penetration.
 Disciples have a separate five-tile engagement range for Idle and Attack Move: they approach
 visible legal enemies to sword reach, then resume their original Attack Move destination when
@@ -725,7 +725,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 |-----------------|-----|-----|-------|----|-------|-------|-----|-----|-----|-----------|
 | worker          | 40  | 4   | 1     | 48 | 2.0   | 10    | 50  | 0   | 1   | 150 (5s) |
 | golem           | 160 | 16  | 1     | 48 | 2.0   | 10    | 0   | 0   | 4   | 396 (~13.2s); provisional free Ekat worker-like economy body trained at Zamok; mines at 4x worker load; can be consumed by Ekat for full heal |
-| warrior         | 135 | 23  | 0.75   | 64 | 1.6   | 11    | 100 | 0   | 2   | 300 (~10s); Cultivator Portal-trained melee bruiser; 50% armor penetration; no projectile or tracer |
+| warrior         | 115 | 23  | 0.75   | 64 | 2.0   | 11    | 100 | 0   | 2   | 300 (~10s); Cultivator Portal-trained melee bruiser; 50% armor penetration; no projectile or tracer |
 | rifleman        | 45  | 5   | 5     | 32 | 1.6   | 11    | 35  | 0   | 1   | 300 (~10s) |
 | panzerfaust     | 45  | 5 rifle / 100 launcher | 5 | 32 rifle / one lifetime launcher | 1.6 | 11 | 55 | 10 | 1 | 300 (~10s); requires completed Panzerfausts research |
 | machine_gunner  | 55  | 4   | 6.1   | 12  | 1.28  | 11    | 75  | 10  | 2   | 400 (~13s) |

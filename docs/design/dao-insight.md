@@ -10,7 +10,7 @@ do not cancel it. No automatic research purchase, Portal default, or army-wide p
 is added. Evolution is immediate and free once the chosen research is complete and the unit has 60 actual hostile
 HP damage dealt, capped at 60; misses, friendly fire, invulnerability and overkill grant
 no extra insight. Successful advancement fully restores HP to the evolved unit’s maximum,
-after applying any path-specific maximum-HP bonus. Choosing a pending path or repeating
+after applying any path-specific maximum-HP bonus. Base, Lightness, and Magic have 115 maximum HP; War has 135. Base and War move at 2.0 px/tick. Choosing a pending path or repeating
 an evolution request does not heal; dead units cannot advance. One evolution per unit. Player research persists after Pavilion loss.
 The choice clears on evolution; evolved units cannot change paths. Pending choices persist
 through checkpoints and are visible only to teammates and privileged observers. The command
@@ -26,7 +26,7 @@ serial research queue and existing prerequisite/faction gates.
 - War: armored melee damage dealer; 1.5 damage, +20 maximum HP, 50% armor
   reduction using the existing penetration mechanic (full AP bypasses it), keeps the Disciple's existing
   50% armor penetration. A centered neon-red sword with black outline identifies it, rotated 90 degrees and lengthened 20%. Classic W; grid X.
-- Magic: battlefield support; 1.1 times the buffed base movement speed (2.024 px/tick), shared Ekat pull field (renamed Anchor), with doubled inward pull (0.70 movement-speed idle drag and up to 1.70x movement toward its center; radial falloff and weight resistance still apply) and a new Shield, uses the approved Magic C hooded spellcaster, with arms swept backward and flowing mantle while running. Its five-tile orbs deal the same 23 damage with 50% armor penetration and 64-tick cooldown. It stops to fire normally and has no secondary sword. Classic C; grid C. War keeps its existing sword art and red sword icon. Lightness chevrons and the Magic pentagram are removed; insight, readiness and advancement overlays remain. Bespoke audio remains deferred.
+- Magic: battlefield support; 1.1 times base movement speed (2.2 px/tick), shared Ekat pull field (renamed Anchor), with doubled inward pull (0.70 movement-speed idle drag and up to 1.70x movement toward its center; radial falloff and weight resistance still apply) and a new Shield, uses the approved Magic C hooded spellcaster, with arms swept backward and flowing mantle while running. Its five-tile orbs deal the same 23 damage with 50% armor penetration and 64-tick cooldown. It stops to fire normally and has no secondary sword. Classic C; grid C. War keeps its existing sword art and red sword icon. Lightness chevrons and the Magic pentagram are removed; insight, readiness and advancement overlays remain. Bespoke audio remains deferred.
 
 Each path has a separate researched unlock. No automatic AI evolution in this pass;
 AI can encounter and damage evolved units. Insight uses a blue fill over red background
