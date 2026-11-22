@@ -885,6 +885,11 @@ fn war_throw_sword_is_dao_gated_and_hits_harder_on_return_after_checkpoint() {
         .entities
         .spawn_unit(1, EntityKind::Warrior, 400.0, 400.0)
         .unwrap();
+    game.state
+        .entities
+        .get_mut(caster)
+        .unwrap()
+        .replace_active_order(Order::HoldPosition);
     let victim = game
         .state
         .entities
@@ -911,6 +916,12 @@ fn war_throw_sword_is_dao_gated_and_hits_harder_on_return_after_checkpoint() {
     game.state.entities.get_mut(caster).unwrap().dao = Some(UpgradeKind::DaoOfHeaviness);
     game.enqueue(1, cast);
     game.tick();
+    // Throw Sword clears the active order. Keep ordinary melee out of this projectile test.
+    game.state
+        .entities
+        .get_mut(caster)
+        .unwrap()
+        .replace_active_order(Order::HoldPosition);
     let object = game.state.ability_runtime.world_objects().next().unwrap();
     assert_eq!(object.ability, AbilityKind::ThrowSword);
     assert_eq!(
