@@ -2193,3 +2193,7 @@ Dao specialist emerges after 300 ticks (10 seconds), using legal exits and the f
 Blocked exits retry; destruction loses the trainee and oil. Unpaid plans can be canceled; active
 training cannot. Combat-earned 60-insight evolution requires no research.
 See [Proven Grounds brief and rules](proven-grounds.md) for details and deferred audio/AI work.
+
+Empty Proven Grounds training-plan vectors are omitted from checkpoint serialization, preserving
+existing replay fingerprints for games that never use this building; nonempty plans remain semantic
+authority and survive checkpoint restore. Native/WASM RNG portability tests pin this boundary.
