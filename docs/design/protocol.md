@@ -1479,11 +1479,14 @@ own remaining-count value plus pause/unpause authority:
 Each active seat and live spectator connection has three successful pause starts per match. The
 server decrements the count only when a request changes the room from unpaused to paused; any
 pause-capable live recipient can request a resume. An accepted resume starts a server-owned
-13-second sequence: ten seconds of hotkey-group setup followed by the
 three-second `Drei! Zwei! Eins!` countdown and leaves `paused: true` until its deadline. During the
 countdown `canUnpause` is false, and `resumeCountdown` carries the full duration, recipient-time
-remaining duration, the setup duration (`setupDurationMs: 10000`), and final countdown display words
+remaining duration, the setup duration (`setupDurationMs: 0` for ordinary live unpause), and final countdown display words
 so late live spectators enter at the current phase rather than restarting it. The server broadcasts a final `paused: false` state when simulation resumes.
+Initial replay-branch launch instead starts a 13-second sequence after `start` and a frozen,
+fog-filtered snapshot: ten seconds of hotkey-group setup (`setupDurationMs: 10000`) followed by
+the three-second countdown. This automatic setup does not consume a pause charge; later unpauses
+in that branch use the ordinary three-second countdown.
 While live
 pause is active the room task skips the live simulation tick branch, so AI thinking, command-ack
 consumption, `Game::tick`, live snapshot fanout, and defeat checks do not advance, while reliable

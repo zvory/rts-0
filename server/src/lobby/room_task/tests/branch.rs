@@ -502,6 +502,47 @@ fn branch_launch_countdown_promotes_to_live_start_payloads() {
         .expect("branch active seat should receive start payload");
     assert_eq!(start_b.player_id, players[1].id);
     assert!(!start_b.spectator);
+    let setup = starts_b
+        .iter()
+        .find_map(|msg| match msg {
+            ServerMessage::LivePauseState(state) => Some(state),
+            _ => None,
+        })
+        .expect("branch setup state");
+    assert!(setup.paused);
+    assert_eq!(setup.paused_by, None);
+    assert_eq!(setup.pauses_remaining, Some(3));
+    let countdown = setup
+        .resume_countdown
+        .as_ref()
+        .expect("replay setup countdown");
+    assert_eq!(countdown.duration_ms, 13_000);
+    assert_eq!(countdown.setup_duration_ms, 10_000);
+    let frozen = writer_b.snapshots.take().expect("frozen setup snapshot");
+    assert_eq!(frozen.tick, 3);
+    assert!(!frozen.entities.is_empty());
+    task.on_tick(TokioInstant::now());
+    let Phase::InGame(game) = &task.phase else {
+        panic!("branch must stay live")
+    };
+    assert_eq!(
+        game.tick_count(),
+        3,
+        "setup must not advance the replay state"
+    );
+    task.live_pause.force_resume_due();
+    task.on_tick(TokioInstant::now());
+    task.on_pause_game(101);
+    task.on_unpause_game(101);
+    let resumed = std::iter::from_fn(|| writer_b.reliable_rx.try_recv().ok())
+        .filter_map(|msg| match msg {
+            ServerMessage::LivePauseState(state) => state.resume_countdown,
+            _ => None,
+        })
+        .last()
+        .expect("later branch unpause countdown");
+    assert_eq!(resumed.duration_ms, 3_000);
+    assert_eq!(resumed.setup_duration_ms, 0);
     assert!(start_b.prediction_build_id.is_some());
     assert_eq!(start_b.prediction_version, PREDICTION_PROTOCOL_VERSION);
     assert!(start_b.replay.is_none());
@@ -603,6 +644,7 @@ fn branch_live_commands_and_snapshots_use_mapped_original_seats() {
     assert_eq!(task.pending_client_command_acks.len(), 1);
     assert_eq!(task.pending_client_command_acks[0].connection_id, 100);
     assert_eq!(task.pending_client_command_acks[0].client_seq, 1);
+    task.live_pause.force_resume_due();
     task.on_tick(TokioInstant::now());
 
     let snapshot_a = writer_a.snapshots.take().expect("claimed A snapshot");
@@ -720,6 +762,7 @@ fn branch_live_give_up_resolves_by_original_seat_and_skips_public_history() {
     staging.claim(101, players[1].id).unwrap();
     task.phase = Phase::BranchStaging(Box::new(staging));
     task.start_branch_live();
+    task.live_pause.force_resume_due();
     task.on_tick(TokioInstant::now());
 
     assert!(!task.should_persist_match_history());
