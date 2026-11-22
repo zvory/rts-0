@@ -22,8 +22,8 @@ const LAUNCHES: [DevScenarioLaunch; 2] = [
 
 pub(super) const SPEC: DevScenarioSpec = DevScenarioSpec {
     id: "warrior_portal_duel",
-    title: "Disciple Combat Scenarios",
-    description: "Inspect either a full Portal production duel or a Disciple attack-move that begins beyond the enhanced range of two already-entrenched Riflemen.",
+    title: "Novice Combat Scenarios",
+    description: "Inspect either a full Portal production duel or a Novice attack-move that begins beyond the enhanced range of two already-entrenched Riflemen.",
     launches: &LAUNCHES,
 };
 

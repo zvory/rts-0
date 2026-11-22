@@ -829,6 +829,11 @@ See [Cultivators](cultivators.md#three-dao-pavilion-prototype) for the approved 
 
 ### Disciple insight and Dao specializations
 
+Player-facing ranks are **Novice** for the base `warrior` and **Lightness Adept**,
+**War Adept**, or **Magic Adept** for its permanent Dao specialization. These are
+presentation names; internal warrior/Disciple identifiers and Dao values stay unchanged.
+
+
 See [Dao evolution playtest](dao-insight.md). Entity-owned `insight` and `dao` persist
 through checkpoints. Visible Disciple snapshots append `insight` (compact slot 45) and
 `dao` (slot 46: lightness/war/magic). Evolution buttons set replaceable, entity-owned `chosenDao` intent (team-private compact slot 49), independent of orders. Codes 14–16 and order stages 22–24 retain their positions.

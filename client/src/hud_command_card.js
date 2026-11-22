@@ -714,7 +714,7 @@ function abilityDisabledReason(ctx, affordance) {
     if (!affordance.unlocked) waiting.push(`${affordance.definition.label} research`);
     if (affordance.readyIds.length < affordance.carrierIds.length) waiting.push("60 insight");
     return `${chosen ? `Chosen for ${chosen}/${affordance.carrierIds.length}. ` : ""}`
-      + `Choose ${affordance.definition.label} for all selected Disciples. `
+      + `Choose ${affordance.definition.label} for all selected Novices. `
       + (waiting.length ? `Automatically evolves when ready; waiting for ${waiting.join(" and ")}. ` : "Evolves immediately. ")
       + "Choose another path to replace it before evolution.";
   }
