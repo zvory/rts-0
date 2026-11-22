@@ -6,6 +6,8 @@ import {
   ENTRENCHMENT_DIRECT_DAMAGE_REDUCTION,
   ENTRENCHMENT_RANGE_BONUS_TILES,
   STATS,
+  DISCIPLE_INSIGHT_REQUIRED,
+  DISCIPLE_EVOLVED_INSIGHT_CAP,
   statsForFaction,
   TICK_HZ,
   UPGRADES,
@@ -443,7 +445,7 @@ export class HudSelectionPanel {
     node.innerHTML =
       `<div class="sel-name">${st.label || e.kind}</div>` +
       hpHtml +
-      (e.kind === KIND.WARRIOR && Number.isFinite(e.insight) ? `<div class="sel-stat">Insight: ${e.insight ?? 0} / 60${e.dao ? ` · Dao of ${e.dao[0].toUpperCase() + e.dao.slice(1)}` : e.chosenDao ? ` · Following ${e.chosenDao[0].toUpperCase() + e.chosenDao.slice(1)}` : ""}</div>` : "") +
+      (e.kind === KIND.WARRIOR && Number.isFinite(e.insight) ? `<div class="sel-stat">Insight: ${e.insight ?? 0} / ${e.dao ? DISCIPLE_EVOLVED_INSIGHT_CAP : DISCIPLE_INSIGHT_REQUIRED}${e.dao ? ` · Dao of ${e.dao[0].toUpperCase() + e.dao.slice(1)}` : e.chosenDao ? ` · Following ${e.chosenDao[0].toUpperCase() + e.chosenDao.slice(1)}` : ""}</div>` : "") +
       (unitsKilledHtml || (entityIdHtml ? `<div class="sel-stat">${entityIdHtml}</div>` : "")) +
       (e.dao === "war" ? `<div class="sel-stat">Armor: 50% · reduced by armor piercing</div>` : armorHtml) +
       resourceRemainingHtml +

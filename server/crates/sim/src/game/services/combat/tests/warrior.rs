@@ -74,7 +74,7 @@ fn warrior_sword_applies_fifty_percent_armor_penetration() {
 }
 
 #[test]
-fn disciple_insight_counts_actual_hp_loss_and_caps_at_sixty() {
+fn disciple_insight_counts_actual_hp_loss_resets_on_evolution_and_doubles_cap() {
     let mut entities = EntityStore::new();
     let unit = entities
         .spawn_unit(1, EntityKind::Warrior, 100.0, 100.0)
@@ -101,6 +101,26 @@ fn disciple_insight_counts_actual_hp_loss_and_caps_at_sixty() {
     entities.get_mut(target).unwrap().set_spawn_health(45);
     run_combat_tick(&mut entities);
     assert_eq!(entities.get(unit).unwrap().insight, 60);
+    assert!(entities
+        .get_mut(unit)
+        .unwrap()
+        .evolve_dao(crate::game::ability::AbilityKind::EvolveWar));
+    assert_eq!(entities.get(unit).unwrap().insight, 0);
+    for expected in [35, 70, 105, 120, 120] {
+        entities
+            .get_mut(unit)
+            .unwrap()
+            .set_weapon_cooldown(combat_rules::WeaponKind::WarriorSword, 0);
+        entities.get_mut(target).unwrap().set_spawn_health(45);
+        run_combat_tick(&mut entities);
+        let evolved = entities.get(unit).unwrap();
+        assert_eq!(evolved.insight, expected);
+        assert_eq!(
+            evolved.dao,
+            Some(crate::game::upgrade::UpgradeKind::DaoOfHeaviness)
+        );
+        assert!(!evolved.dao_ability_available(crate::game::ability::AbilityKind::EvolveWar));
+    }
 }
 
 #[test]

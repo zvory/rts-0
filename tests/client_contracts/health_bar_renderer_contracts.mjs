@@ -164,9 +164,8 @@ try {
       ["drawPolygon", "drawCircle", "moveTo", "lineTo"].includes(call[0]));
     assert(iconDrawing.length === 0, "Dao silhouettes replace all legacy glyphs");
     const rects = discipleBar.rtsInsight.calls.filter((call) => call[0] === "drawRect");
-    assert(rects.at(-1)[3] === (rects.at(-2)[3] - 2) / 2,
-      "30 insight fills half the Disciple insight bar");
-
+    assert(rects.at(-1)[3] === (rects.at(-2)[3] - 2) / (dao ? 4 : 2),
+      "30 insight fills half the base cap or one quarter of the evolved cap");
   }
   assert(discipleBar.children.length === 6 && discipleBar.children[0] === discipleBar.rtsRadiance,
     "Disciple overlays are allocated once with radiance behind the health bar");
