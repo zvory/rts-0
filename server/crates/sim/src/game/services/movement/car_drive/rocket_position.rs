@@ -14,8 +14,7 @@ pub(in crate::game::services::movement) fn barrage_maneuver_target(
         return None;
     }
     let target = (order.intent.x, order.intent.y);
-    let range =
-        ability::definition(AbilityKind::Barrage).range_tiles? * config::TILE_SIZE as f32;
+    let range = ability::definition(AbilityKind::Barrage).range_tiles? * config::TILE_SIZE as f32;
     let min = ability::definition(AbilityKind::Barrage)
         .min_range_tiles
         .unwrap_or(0) as f32

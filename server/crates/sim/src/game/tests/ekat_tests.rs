@@ -678,17 +678,27 @@ fn ekat_magic_anchor_places_single_visible_ten_second_object() {
 fn magic_anchor_cast_range_preserves_half_tile_boundary() {
     let mut game = empty_flat_game(&[ekat_player()]);
     let pos = game.state.map.tile_center(10, 10);
-    let hero = game.state.entities
+    let hero = game
+        .state
+        .entities
         .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
         .expect("hero should spawn");
     let target = (pos.0 + 240.0, pos.1);
     assert!(services::ability_orders::caster_in_range(
-        &game.state.map, &game.state.entities, hero,
-        ability::AbilityKind::EkatMagicAnchor, target.0, target.1,
+        &game.state.map,
+        &game.state.entities,
+        hero,
+        ability::AbilityKind::EkatMagicAnchor,
+        target.0,
+        target.1,
     ));
     assert!(!services::ability_orders::caster_in_range(
-        &game.state.map, &game.state.entities, hero,
-        ability::AbilityKind::EkatMagicAnchor, target.0 + 1.0, target.1,
+        &game.state.map,
+        &game.state.entities,
+        hero,
+        ability::AbilityKind::EkatMagicAnchor,
+        target.0 + 1.0,
+        target.1,
     ));
     enqueue_ekat_anchor(&mut game, hero, target);
     game.tick();
