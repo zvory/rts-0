@@ -277,6 +277,15 @@ export function installFakePixi() {
     BlurFilter: FakeFilter,
     GlProgram: FakeGlProgram,
     UniformGroup: FakeUniformGroup,
+    Geometry: class {
+      constructor(options) { this.options = options; }
+      destroy() { this.destroyed = true; }
+    },
+    Shader: { from(options) { return { options, destroy() { this.destroyed = true; } }; } },
+    Mesh: class {
+      constructor(options) { Object.assign(this, options); }
+      destroy() { this.destroyed = true; }
+    },
     SCALE_MODES: { NEAREST: "nearest" },
     TextureStyle: { defaultOptions: {} },
   };
@@ -315,6 +324,7 @@ function fakeCanvasContext(canvas) {
     strokeRect() {},
     drawImage() {},
     putImageData() {},
+    createImageData: (width, height) => ({ data: new Uint8ClampedArray(width * height * 4) }),
     getImageData: (_x, _y, width = canvas.width, height = canvas.height) => ({
       data: new Uint8ClampedArray(width * height * 4),
     }),

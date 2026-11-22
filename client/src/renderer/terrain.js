@@ -1,4 +1,6 @@
+import { WaterLayer } from "./water.js";
 import { COLORS } from "../config.js";
+import { TERRAIN } from "../protocol.js";
 import { hash2 } from "./shared.js";
 import { createWorkerSafeCanvas } from "./raster_primitives.js";
 import {
@@ -51,7 +53,7 @@ export function drawTerrainTile(ctx, map, tx, ty, textureTileSize) {
   const variant = terrainVariantPalette(code);
   if (variant) {
     drawTerrainVariantDetails(ctx, variant, tx, ty, x, y, textureTileSize);
-  } else {
+  } else if (code !== TERRAIN.WATER) {
     const blocks = textureTileSize >= 4 ? 4 : 2;
     const block = textureTileSize / blocks;
     for (let by = 0; by < blocks; by++) {
@@ -488,6 +490,8 @@ export function buildStaticMap(map, {
   paintTerrainSurface(ctx, this._map, textureTileSize, { bakeLongShadows });
   this.world.tint = worldSunTint(this._map.sun);
 
+  this._waterLayer?.destroy();
+  this._waterLayer = null;
   const layer = this.layers.terrain;
   if (reusable) {
     this._terrainSprite.texture.source.update();
@@ -502,6 +506,7 @@ export function buildStaticMap(map, {
     this._terrainSprite.scale.set(ts / textureTileSize);
     layer.addChild(this._terrainSprite);
   }
+  rebuildWaterLayer(this, this._map);
   if (!preserveMapLayers) {
     this._initGroundDecalsForMap?.(map);
     this._initTrenchesForMap?.(map);
@@ -524,12 +529,15 @@ export function updateStaticTerrainTiles(changes) {
   const textureTileSize = this._terrainTextureTileSize;
   if (!map || !ctx || !textureTileSize || !this._terrainSprite || !Array.isArray(changes)) return 0;
   const dirty = new Set();
+  let waterChanged = false;
   for (const change of changes) {
     const x = Math.trunc(Number(change?.x));
     const y = Math.trunc(Number(change?.y));
     const code = Number(change?.code);
     if (x < 0 || y < 0 || x >= map.width || y >= map.height || !Number.isInteger(code)) continue;
-    map.terrain[y * map.width + x] = code;
+    const index = y * map.width + x;
+    waterChanged ||= (map.terrain[index] === TERRAIN.WATER) !== (code === TERRAIN.WATER);
+    map.terrain[index] = code;
     dirty.add(`${x},${y}`);
     dirty.add(`${x - 1},${y}`);
     dirty.add(`${x + 1},${y}`);
@@ -546,6 +554,15 @@ export function updateStaticTerrainTiles(changes) {
       drawTerrainTile(ctx, map, x, y, textureTileSize);
     }
   }
-  if (dirty.size) this._terrainSprite.texture.source.update();
+  if (dirty.size) {
+    this._terrainSprite.texture.source.update();
+    if (waterChanged) rebuildWaterLayer(this, map);
+  }
   return dirty.size;
+}
+
+function rebuildWaterLayer(renderer, map) {
+  renderer._waterLayer?.destroy();
+  renderer._waterLayer = new WaterLayer(PIXI, renderer.layers.terrain, map, renderer.world.tint);
+  renderer._trackVisualAsset?.("pixel-water", renderer._waterLayer.ready);
 }
