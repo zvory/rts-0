@@ -369,14 +369,8 @@ pub fn resolved_weapon_kind(
     kind: EntityKind,
     dao: Option<crate::faction::UpgradeKind>,
 ) -> Option<WeaponKind> {
-    if kind == EntityKind::Warrior {
-        match dao {
-            Some(crate::faction::UpgradeKind::DaoOfLightness) => {
-                return Some(WeaponKind::DiscipleArrow)
-            }
-            Some(crate::faction::UpgradeKind::DaoOfMagic) => return Some(WeaponKind::DiscipleOrb),
-            _ => {}
-        }
+    if kind == EntityKind::Warrior && dao == Some(crate::faction::UpgradeKind::DaoOfMagic) {
+        return Some(WeaponKind::DiscipleOrb);
     }
     default_weapon_kind(kind)
 }

@@ -119,6 +119,13 @@ fn war_armor_uses_weapon_penetration_and_lightness_changes_attack_rate() {
     unit.dao = Some(UpgradeKind::DaoOfLightness);
     let light = effective_attack_profile(&unit);
     assert_eq!(light.cooldown, 43);
+    assert_eq!(light.range_tiles, 0.75);
+    assert_eq!(
+        light.weapon.unwrap().id,
+        combat_rules::WeaponKind::WarriorSword
+    );
+    assert!(can_fire_while_moving(&unit, false));
+    assert!(unit.dao_ability_available(crate::game::ability::AbilityKind::EkatTeleport));
     assert!((unit.movement_speed() - 2.7025).abs() < 0.001);
     unit.dao = Some(UpgradeKind::DaoOfMagic);
     assert!((unit.movement_speed() - 2.024).abs() < 0.001);
@@ -242,12 +249,12 @@ fn disciple_vehicle_range_is_bounded_by_hull_surface() {
 }
 
 #[test]
-fn ranged_dao_profiles_replace_sword_without_changing_damage_or_penetration() {
+fn dao_profiles_keep_lightness_melee_and_magic_ranged() {
     use crate::game::upgrade::UpgradeKind;
     for (dao, weapon, cooldown) in [
         (
             UpgradeKind::DaoOfLightness,
-            combat_rules::WeaponKind::DiscipleArrow,
+            combat_rules::WeaponKind::WarriorSword,
             43,
         ),
         (
@@ -261,13 +268,20 @@ fn ranged_dao_profiles_replace_sword_without_changing_damage_or_penetration() {
             .spawn_unit(1, EntityKind::Warrior, 100.0, 100.0)
             .unwrap();
         let target = entities
-            .spawn_unit(2, EntityKind::Tank, 220.0, 100.0)
+            .spawn_unit(2, EntityKind::Tank, 130.0, 100.0)
             .unwrap();
         let unit = entities.get_mut(disciple).unwrap();
         unit.dao = Some(dao);
         unit.set_order(Order::attack(target));
         let profile = effective_attack_profile(unit);
-        assert_eq!(profile.range_tiles, 5.0);
+        assert_eq!(
+            profile.range_tiles,
+            if dao == UpgradeKind::DaoOfLightness {
+                0.75
+            } else {
+                5.0
+            }
+        );
         assert_eq!(
             combat_rules::engagement_range_tiles(unit.kind, profile.range_tiles),
             5.0
@@ -284,12 +298,16 @@ fn ranged_dao_profiles_replace_sword_without_changing_damage_or_penetration() {
                 .get(disciple)
                 .unwrap()
                 .weapon_cooldown(combat_rules::WeaponKind::WarriorSword),
-            0
+            if dao == UpgradeKind::DaoOfLightness {
+                cooldown
+            } else {
+                0
+            }
         );
         assert_eq!(events.get(&1).unwrap().iter().filter(|event| matches!(event,
             Event::Attack {from, weapon_kind: Some(kind), ..} if *from == disciple && kind == weapon.stable_id()
         )).count(), 1);
-        // The resolved ranged cooldown is ticked by the compatibility helper as well.
+        // The resolved primary cooldown is ticked by the compatibility helper as well.
         run_combat_tick(&mut entities);
         assert_eq!(entities.get(target).unwrap().hp, 278);
         assert_eq!(entities.get(disciple).unwrap().attack_cd(), cooldown - 1);
@@ -319,7 +337,7 @@ fn lightness_fires_during_move_and_magic_keeps_normal_stop_to_fire_policy() {
             .spawn_unit(1, EntityKind::Warrior, 100.0, 100.0)
             .unwrap();
         let target = entities
-            .spawn_unit(2, EntityKind::Rifleman, 220.0, 100.0)
+            .spawn_unit(2, EntityKind::Rifleman, 120.0, 100.0)
             .unwrap();
         let goal = (400.0, 100.0);
         let unit = entities.get_mut(disciple).unwrap();
@@ -351,10 +369,10 @@ fn lightness_fires_during_move_and_magic_keeps_normal_stop_to_fire_policy() {
 }
 
 #[test]
-fn ranged_dao_vehicle_range_uses_center_and_never_acquires_beyond_attack_range() {
+fn magic_vehicle_range_uses_center_and_never_acquires_beyond_attack_range() {
     use crate::game::upgrade::UpgradeKind;
     let map = open_map(32);
-    for dao in [UpgradeKind::DaoOfLightness, UpgradeKind::DaoOfMagic] {
+    for dao in [UpgradeKind::DaoOfMagic] {
         for inside in [true, false] {
             let mut entities = EntityStore::new();
             let disciple = entities
@@ -390,13 +408,13 @@ fn ranged_dao_vehicle_range_uses_center_and_never_acquires_beyond_attack_range()
 }
 
 #[test]
-fn ranged_dao_evolution_preserves_in_progress_reload_and_center_pursuit() {
+fn dao_evolution_preserves_reload_and_uses_matching_pursuit_geometry() {
     use crate::game::ability::AbilityKind;
     let map = open_map(32);
     for (ability, weapon) in [
         (
             AbilityKind::EvolveLightness,
-            combat_rules::WeaponKind::DiscipleArrow,
+            combat_rules::WeaponKind::WarriorSword,
         ),
         (
             AbilityKind::EvolveMagic,
@@ -412,15 +430,14 @@ fn ranged_dao_evolution_preserves_in_progress_reload_and_center_pursuit() {
         assert_eq!(unit.weapon_cooldown(weapon), 19);
         let tank =
             crate::game::entity::Entity::new_unit(2, EntityKind::Tank, 400.0, 100.0).unwrap();
-        assert_eq!(
-            crate::game::services::geometry::primary_combat_target_point(
-                &map,
-                unit.default_weapon_kind().unwrap(),
-                (100.0, 100.0),
-                &tank
-            ),
-            (400.0, 100.0)
+        let point = crate::game::services::geometry::primary_combat_target_point(
+            &map,
+            unit.default_weapon_kind().unwrap(),
+            (100.0, 100.0),
+            &tank,
         );
+        assert_eq!(point.0 < 400.0, ability == AbilityKind::EvolveLightness);
+        assert_eq!(point.1, 100.0);
         assert!(
             crate::game::services::geometry::primary_combat_target_point(
                 &map,
@@ -469,5 +486,39 @@ fn ranged_evolution_cancels_lost_idle_approach_but_preserves_explicit_move() {
             assert_eq!(unit.path_goal(), explicit_move.then_some(goal));
             assert_eq!(unit.target_id(), None);
         }
+    }
+}
+
+#[test]
+fn lightness_moving_sword_cannot_hit_at_former_arrow_range() {
+    use crate::game::upgrade::UpgradeKind;
+    for distance in [20.0, 120.0] {
+        let mut entities = EntityStore::new();
+        let disciple = entities
+            .spawn_unit(1, EntityKind::Warrior, 100.0, 100.0)
+            .unwrap();
+        let target = entities
+            .spawn_unit(2, EntityKind::Rifleman, 100.0 + distance, 100.0)
+            .unwrap();
+        let unit = entities.get_mut(disciple).unwrap();
+        unit.dao = Some(UpgradeKind::DaoOfLightness);
+        unit.set_order(Order::move_to(400.0, 100.0));
+        unit.set_path(vec![(400.0, 100.0)]);
+        unit.set_path_goal(Some((400.0, 100.0)));
+        unit.mark_move_phase(MovePhase::Moving);
+        unit.set_movement_delta(2.0, 0.0);
+        let events = run_combat_tick(&mut entities);
+        assert_eq!(
+            entities.get(target).unwrap().hp,
+            if distance < 30.0 { 22 } else { 45 }
+        );
+        assert_eq!(
+            entities.get(disciple).unwrap().path_goal(),
+            Some((400.0, 100.0))
+        );
+        assert!(events.values().flatten().all(|event| !matches!(event,
+            Event::Attack { from, weapon_kind: Some(kind), .. }
+            if *from == disciple && kind == combat_rules::WeaponKind::DiscipleArrow.stable_id()
+        )));
     }
 }

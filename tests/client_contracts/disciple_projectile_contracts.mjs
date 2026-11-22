@@ -32,7 +32,7 @@ for (const weaponKind of [WEAPON_KIND.DISCIPLE_ARROW, WEAPON_KIND.DISCIPLE_ORB])
   assert.equal(hidden.shotRevealsById.get(1).dao, weaponKind === WEAPON_KIND.DISCIPLE_ARROW ? "lightness" : "magic",
     "firing reveals retain the specialized silhouette using the authorized weapon hint");
 }
-assert.equal(entityAttackRangeTiles({ kind: KIND.WARRIOR, dao: "lightness" }), 5);
+assert.equal(entityAttackRangeTiles({ kind: KIND.WARRIOR, dao: "lightness" }), 0.75);
 assert.equal(entityAttackRangeTiles({ kind: KIND.WARRIOR, dao: "magic" }), 5);
 assert.equal(entityAttackRangeTiles({ kind: KIND.WARRIOR, dao: "war" }), 0.75);
 assert.equal(entityAttackRangeTiles({ kind: KIND.WARRIOR }), 0.75);

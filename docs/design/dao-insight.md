@@ -2,7 +2,7 @@
 
 Phase 0/1 briefs and rules (completed before implementation): each path is a permanent
 specialization of the existing Disciple, retaining its entity identity, orders, cost,
-supply (2), sight, size, and ordinary ground pathing. Base and War Disciples retain 0.75-tile sword reach. Lightness and Magic replace their sword with a five-tile ranged primary; their engagement range equals that five-tile attack range. No additional
+supply (2), sight, size, and ordinary ground pathing. Base, War, and Lightness Disciples use 0.75-tile sword reach and five-tile automatic engagement with melee pursuit. Magic replaces its sword with a five-tile ranged primary; its engagement range equals that five-tile attack range. No additional
 training source or build time. A Dao button assigns its path to every selected, owned, unevolved Disciple, even before
 research or insight are ready. Selecting another path replaces the pending choice. This
 entity-owned intent is independent of orders: moving, attacking, Stop, and queued orders
@@ -20,9 +20,9 @@ research production, and ability runtime each tick, skipping dead units.
 All three existing Pavilion research slots retain 200 steel / 100 oil / 20 seconds,
 serial research queue and existing prerequisite/faction gates.
 
-- Lightness: mobile skirmisher; 1.15 times scout-car base speed (2.7025 px/tick), 1.5 attacks per original attack
+- Lightness: mobile melee skirmisher; 1.15 times scout-car base speed (2.7025 px/tick), 1.5 attacks per original attack
   interval (cooldown divided by 1.5), existing Ekat Dash with optional return unchanged.
-  Uses the approved Lightness A white-robed archer, oversized bow, quiver and streaming headband. Its five-tile arrows deal the same 23 damage with 50% armor penetration, retaining the 43-tick cooldown. Plain Move keeps its destination while firing at legal in-range targets. No secondary sword. Classic evolution key L; grid Z.
+  Uses a sword at the base Disciple’s 0.75-tile reach, dealing the same 23 damage with 50% armor penetration and a 43-tick cooldown. Plain Move keeps its destination while striking legal targets within melee reach; automatic Idle/Attack Move retains five-tile acquisition and closes to sword reach. Speed and Ekat Dash with optional return are unchanged. The old archer source and strip are preserved for reuse. Selected candidate B uses a thin katana and a single shoulder scarf: resting close to the back at idle, trailing while running, and following four melee swing poses. Classic evolution key L; grid Z.
 - War: armored melee damage dealer; 1.5 damage, +20 maximum HP, 50% armor
   reduction using the existing penetration mechanic (full AP bypasses it), keeps the Disciple's existing
   50% armor penetration. A centered neon-red sword with black outline identifies it, rotated 90 degrees and lengthened 20%. Classic W; grid X.
@@ -69,4 +69,4 @@ lifetime limit. Other Dao paths and unevolved Disciples cannot cast it. Its sepa
 `throwSword` identity uses the existing fog-filtered line-projectile projection; no caster
 lookup is needed to display the generated sword sprite. Ekat's Line Shot is unchanged.
 
-Lightness and Magic use shot-triggered draw/windup, release, follow-through and recovery frames over 400 ms. Projectile presentation starts at the release frame (100 ms); the existing immediate authoritative damage timing is unchanged. Arrows use one shared generated texture and a bounded reusable sprite pool. Orbs are about seven world pixels across, with a small halo and one shimmering cross drawn into the shared feedback graphics batch: no emitter, per-orb display objects, blur, filters or retained particles. Both consume only authorized attack endpoints and expire within 600 ms. Changing specialization preserves remaining reload and clears obsolete automatic melee pursuit without canceling explicit Move orders.
+Magic uses shot-triggered windup, release, follow-through and recovery frames over 400 ms. Lightness uses four event-triggered melee swing poses from candidate B. Projectile presentation starts at the release frame (100 ms); the existing immediate authoritative damage timing is unchanged. Arrows use one shared generated texture and a bounded reusable sprite pool. Orbs are about seven world pixels across, with a small halo and one shimmering cross drawn into the shared feedback graphics batch: no emitter, per-orb display objects, blur, filters or retained particles. Retained arrow presentation support and Magic orbs consume only authorized attack endpoints and expire within 600 ms. Changing specialization preserves remaining reload and clears obsolete automatic melee pursuit without canceling explicit Move orders.

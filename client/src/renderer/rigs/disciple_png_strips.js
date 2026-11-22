@@ -3,12 +3,12 @@ import { PRODUCTION_RASTER_COLOR_TARGET } from "./color_adjustment.js";
 export const LIGHTNESS_FRAME_STRIP_KEY = "warrior:lightness";
 export const MAGIC_FRAME_STRIP_KEY = "warrior:magic";
 
-function discipleStrip(image, frameCount, firingFrames, iconVisibleBounds, weaponKind) {
+function discipleStrip(image, frameCount, firingFrames, iconVisibleBounds, weaponKind, imageVersion = "dao-ranged-1") {
   return Object.freeze({
     enabled: true,
     unit: "warrior",
     image,
-    imageVersion: "dao-ranged-1",
+    imageVersion,
     frameWidth: 256,
     frameHeight: 256,
     frameCount,
@@ -35,7 +35,9 @@ function discipleStrip(image, frameCount, firingFrames, iconVisibleBounds, weapo
   });
 }
 
-export const LIGHTNESS_PNG_FRAME_STRIP = discipleStrip("/assets/rigs/disciple-dao/generated/lightness-runtime-strip.png?v=dao-ranged-1", 8, [4, 5, 6, 7],
-  { x: 49, y: 74, w: 159, h: 120 }, "disciple_arrow");
+// Candidate B: scarf rests at idle, streams while running, and follows the sword swing.
+// Original archer source and runtime strips are preserved for future reuse.
+export const LIGHTNESS_PNG_FRAME_STRIP = discipleStrip("/assets/rigs/disciple-dao/generated/lightness-melee-b-runtime-strip.png?v=melee-b-wind-2", 8, [4, 5, 6, 7],
+  { x: 75, y: 93, w: 131, h: 120 }, "warrior_sword", "melee-b-wind-2");
 export const MAGIC_PNG_FRAME_STRIP = discipleStrip("/assets/rigs/disciple-dao/generated/magic-runtime-strip.png?v=dao-ranged-1", 8, [4, 5, 6, 7],
   { x: 63, y: 80, w: 128, h: 113 }, "disciple_orb");

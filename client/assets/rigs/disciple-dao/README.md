@@ -1,6 +1,6 @@
 # Disciple Dao art
 
-Approved art generated with the built-in imagegen tool, using the original
+Original approved ranged art generated with the built-in imagegen tool, using the original
 `warrior-placeholder-pass-01/generated/warrior-source.png` Disciple as camera,
 identity and painted-style reference. Every source uses a magenta matte and
 white/grayscale cloth for runtime team tinting.
@@ -31,3 +31,21 @@ pixels long. The orb is fixed-cost geometry rather than another bitmap or emitte
 
 Damage and shot timing remain server-authoritative. The four-frame attack art is
 shot-triggered, not an idle loop; visual projectile release follows at 100 ms.
+
+## Melee Lightness revision
+
+Lightness now uses the base Disciple’s 0.75-tile sword weapon with moving attacks,
+existing speed, and Dash. The current archer source files and generated strip above
+are preserved unchanged; `archive/lightness-archer/` also contains an explicit copy
+for reuse. Runtime uses the selected candidate B katana strip, generated from
+`source/lightness-melee-b-motion.png`: idle, three running poses, and four attack poses. Magic remains unchanged.
+
+`source/lightness-melee-candidates/` contains three built-in imagegen concepts and
+the exact prompt set. These are design candidates, not animation strips:
+A (twin streamers/open guard), B (single scarf/diagonal blade),
+and C (compact two-handed guard). Candidate B is selected. Its standing scarf rests against the back; running poses stream it behind. The exact animation prompt is in `source/lightness-melee-b-prompt.txt`.
+
+The running poses now use `source/lightness-melee-b-windy-run.png`, with a longer
+wind-whipped scarf sweeping through three distinct curves. Standing and attack frames
+remain byte-identical to the initial candidate B pass. The run prompt is preserved in
+`source/lightness-melee-b-windy-run-prompt.txt`.

@@ -79,14 +79,15 @@ function frame(source, scale, pivot) {
   return output;
 }
 
-function gridFrames(name, rows, scale) {
+function gridFrames(name, rows, scale, crownYFraction = null, columns = 4) {
   const image = key(read(path.join(rig, "source", name)));
   const frames = [];
-  for (let row = 0; row < rows; row++) for (let col = 0; col < 4; col++) {
-    const x = Math.round(col * image.width / 4), y = Math.round(row * image.height / rows);
-    const cell = crop(image, x, y, Math.round((col + 1) * image.width / 4) - x, Math.round((row + 1) * image.height / rows) - y);
+  for (let row = 0; row < rows; row++) for (let col = 0; col < columns; col++) {
+    const x = Math.round(col * image.width / columns), y = Math.round(row * image.height / rows);
+    const cell = crop(image, x, y, Math.round((col + 1) * image.width / columns) - x, Math.round((row + 1) * image.height / rows) - y);
     // The head leads low in the arms-back running poses; the idle crown sits higher.
-    const cy = rows === 2 && row === 0 && col > 0 ? cell.height * 0.60 : cell.height * 0.44;
+    const cy = crownYFraction != null ? cell.height * crownYFraction
+      : rows === 2 && row === 0 && col > 0 ? cell.height * 0.60 : cell.height * 0.44;
     const pivot = hairPivot(cell, cell.width * 0.5, cy, cell.width * 0.16);
     frames.push(frame(cell, scale, pivot));
   }
@@ -119,6 +120,11 @@ for (let i = 0; i < 4; i++) {
   lightness.push(frame(cell, 0.70, hairPivot(cell, crowns[i] - xs[i], 83, 30)));
 }
 strip("lightness", [...lightness, ...gridFrames("lightness-attack.png", 1, 0.34)]);
+const meleeLightness = gridFrames("lightness-melee-b-motion.png", 2, 0.40, 0.38);
+// Preserve standing and attack pixels; only the three running poses get the windier scarf.
+const windyRun = gridFrames("lightness-melee-b-windy-run.png", 1, 0.27, 0.60, 3);
+meleeLightness.splice(1, 3, ...windyRun);
+strip("lightness-melee-b", meleeLightness);
 strip("magic", gridFrames("magic-motion.png", 2, 0.37));
 const arrowDir = path.join(root, "client/assets/effects/disciple-arrow");
 const arrow = key(read(path.join(arrowDir, "arrow-source.png")));
