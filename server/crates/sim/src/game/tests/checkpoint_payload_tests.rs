@@ -617,3 +617,31 @@ fn old_float_simulation_header_is_rejected_before_position_decode() {
         })
     ));
 }
+
+#[test]
+fn checkpoint_round_trip_preserves_committed_pivot_escape() {
+    let mut baseline = Game::new_for_replay(&human_vs_ai_players(), 0x530_0001);
+    let pos = baseline.state.map.tile_center(20, 20);
+    let id = baseline
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Tank, pos.0, pos.1)
+        .unwrap();
+    let e = baseline.state.entities.get_mut(id).unwrap();
+    e.set_order(Order::move_to(pos.0 + 150.0, pos.1));
+    e.set_path(vec![(pos.0 + 150.0, pos.1)]);
+    e.movement.as_mut().unwrap().pivot_recovery = Some(crate::game::entity::PivotRecovery {
+        goal: (pos.0 - 8.0, pos.1),
+        facing: e.facing(),
+        ticks_left: 50,
+    });
+    baseline.tick();
+    let mut restored =
+        restore_checkpoint_and_assert_equivalent(&baseline, "committed tank recovery");
+    tick_pair_for(
+        &mut baseline,
+        &mut restored,
+        10,
+        "committed tank recovery continuation",
+    );
+}

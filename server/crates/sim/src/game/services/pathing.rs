@@ -19,7 +19,9 @@ use std::collections::HashMap;
 mod authoring;
 mod graph;
 mod passability;
+mod route_entrance;
 mod route_finalize;
+use route_entrance::expand_vehicle_diagonal_steps_to_l_waypoints;
 mod tree_detours;
 pub(in crate::game) use authoring::StaticRouteAnalyzer;
 use graph::PathGraph;
@@ -45,6 +47,8 @@ pub(crate) struct PathRequest {
     pub goal: (i32, i32),
     /// Unit radius in tiles for clearance. `0` means point-sized (current behavior).
     pub radius_tiles: u32,
+    /// Quantized hull heading for the initial turn cost; absent for non-pivot/static queries.
+    pub initial_direction: Option<u8>,
     /// Optional route-shaping cost model. Keep normal for interaction paths where exact tile
     /// progression matters more than visual smoothness.
     pub route_shape: RouteShape,
@@ -149,59 +153,6 @@ impl PathingService {
 
     pub(in crate::game) fn config(&self) -> (usize, usize) {
         (self.default_budget, self.cache_cap)
-    }
-}
-
-fn expand_vehicle_diagonal_steps_to_l_waypoints<P: Passability>(
-    start: (i32, i32),
-    tile_path: &[(i32, i32)],
-    pass: &P,
-) -> Vec<(i32, i32)> {
-    let mut expanded = Vec::with_capacity(tile_path.len() * 2);
-    let mut prev = start;
-
-    for &next in tile_path {
-        let dx = next.0 - prev.0;
-        let dy = next.1 - prev.1;
-        if dx.abs() == 1 && dy.abs() == 1 {
-            if let Some(elbow) = choose_vehicle_l_elbow(prev, next, pass) {
-                if expanded.last().copied() != Some(elbow) {
-                    expanded.push(elbow);
-                }
-            }
-        }
-        if expanded.last().copied() != Some(next) {
-            expanded.push(next);
-        }
-        prev = next;
-    }
-
-    expanded
-}
-
-fn choose_vehicle_l_elbow<P: Passability>(
-    prev: (i32, i32),
-    next: (i32, i32),
-    pass: &P,
-) -> Option<(i32, i32)> {
-    let horizontal_first = (next.0, prev.1);
-    let vertical_first = (prev.0, next.1);
-    let horizontal_ok = pass.passable(horizontal_first.0, horizontal_first.1);
-    let vertical_ok = pass.passable(vertical_first.0, vertical_first.1);
-
-    match (horizontal_ok, vertical_ok) {
-        (true, true) => {
-            let horizontal_cost = pass.movement_cost(horizontal_first.0, horizontal_first.1, 10);
-            let vertical_cost = pass.movement_cost(vertical_first.0, vertical_first.1, 10);
-            if horizontal_cost <= vertical_cost {
-                Some(horizontal_first)
-            } else {
-                Some(vertical_first)
-            }
-        }
-        (true, false) => Some(horizontal_first),
-        (false, true) => Some(vertical_first),
-        (false, false) => None,
     }
 }
 
@@ -378,6 +329,7 @@ mod tests {
             start,
             goal,
             radius_tiles,
+            initial_direction: None,
             route_shape: RouteShape::Normal,
             budget: None,
         };
@@ -405,6 +357,7 @@ mod tests {
                 start,
                 goal,
                 radius_tiles,
+                initial_direction: None,
                 route_shape,
                 budget: None,
             },
@@ -571,6 +524,7 @@ mod tests {
                 start: *start,
                 goal: *goal,
                 radius_tiles: 0,
+                initial_direction: None,
                 route_shape: RouteShape::Normal,
                 budget: None,
             };
@@ -586,6 +540,7 @@ mod tests {
             start: (1, 1),
             goal: (5, 5),
             radius_tiles: 0,
+            initial_direction: None,
             route_shape: RouteShape::Normal,
             budget: None,
         };
@@ -635,6 +590,7 @@ mod tests {
                 start,
                 goal,
                 radius_tiles: 0,
+                initial_direction: None,
                 route_shape: RouteShape::Normal,
                 budget: Some(0),
             },
@@ -650,6 +606,7 @@ mod tests {
                 start,
                 goal,
                 radius_tiles: 0,
+                initial_direction: None,
                 route_shape: RouteShape::Normal,
                 budget: None,
             },
@@ -830,6 +787,7 @@ mod tests {
                     start,
                     goal,
                     radius_tiles: 0,
+                    initial_direction: None,
                     route_shape,
                     budget: None,
                 },
@@ -874,6 +832,7 @@ mod tests {
                     start,
                     goal,
                     radius_tiles,
+                    initial_direction: None,
                     route_shape,
                     budget: None,
                 },
@@ -911,6 +870,7 @@ mod tests {
             start,
             goal,
             radius_tiles: config::unit_radius_tiles(EntityKind::ScoutCar),
+            initial_direction: None,
             route_shape: RouteShape::Normal,
             budget: None,
         };
@@ -961,6 +921,7 @@ mod tests {
                 start,
                 goal,
                 radius_tiles: config::unit_radius_tiles(EntityKind::Rifleman),
+                initial_direction: None,
                 route_shape: RouteShape::Normal,
                 budget: None,
             },
@@ -979,6 +940,7 @@ mod tests {
                 start,
                 goal,
                 radius_tiles: config::unit_radius_tiles(EntityKind::Tank),
+                initial_direction: None,
                 route_shape: RouteShape::Normal,
                 budget: None,
             },
@@ -1012,6 +974,7 @@ mod tests {
                 start,
                 goal,
                 radius_tiles: config::unit_radius_tiles(EntityKind::Tank),
+                initial_direction: None,
                 route_shape: RouteShape::Normal,
                 budget: None,
             },
@@ -1036,6 +999,7 @@ mod tests {
             start,
             goal,
             radius_tiles: config::unit_radius_tiles(EntityKind::Worker),
+            initial_direction: None,
             route_shape: RouteShape::Normal,
             budget: None,
         };
@@ -1044,6 +1008,7 @@ mod tests {
             start,
             goal,
             radius_tiles: config::unit_radius_tiles(EntityKind::Tank),
+            initial_direction: None,
             route_shape: RouteShape::Normal,
             budget: None,
         };
@@ -1120,6 +1085,7 @@ mod tests {
                 start,
                 goal,
                 radius_tiles: config::unit_radius_tiles(EntityKind::Tank),
+                initial_direction: None,
                 route_shape: RouteShape::Normal,
                 budget: None,
             },
@@ -1165,6 +1131,7 @@ mod tests {
                 start,
                 goal,
                 radius_tiles: config::unit_radius_tiles(EntityKind::Rifleman),
+                initial_direction: None,
                 route_shape: RouteShape::Normal,
                 budget: None,
             },
@@ -1183,6 +1150,7 @@ mod tests {
                     start,
                     goal,
                     radius_tiles: config::unit_radius_tiles(kind),
+                    initial_direction: None,
                     route_shape: RouteShape::Normal,
                     budget: None,
                 },
@@ -1224,6 +1192,7 @@ mod tests {
                     start,
                     goal,
                     radius_tiles: config::unit_radius_tiles(kind),
+                    initial_direction: None,
                     route_shape: RouteShape::Normal,
                     budget: None,
                 },
@@ -1253,6 +1222,7 @@ mod tests {
                 start,
                 goal,
                 radius_tiles: 0,
+                initial_direction: None,
                 route_shape: RouteShape::PreferFewerTurns,
                 budget: Some(0),
             },
@@ -1268,6 +1238,7 @@ mod tests {
                 start,
                 goal,
                 radius_tiles: 0,
+                initial_direction: None,
                 route_shape: RouteShape::PreferFewerTurns,
                 budget: None,
             },
@@ -1558,6 +1529,7 @@ mod tests {
                 start,
                 goal,
                 radius_tiles,
+                initial_direction: None,
                 route_shape: RouteShape::Normal,
                 budget: None,
             },
@@ -1598,6 +1570,7 @@ mod tests {
                     start,
                     goal,
                     radius_tiles: config::unit_radius_tiles(kind),
+                    initial_direction: None,
                     route_shape: RouteShape::Normal,
                     budget: None,
                 },
@@ -1610,6 +1583,7 @@ mod tests {
                     start,
                     goal,
                     radius_tiles: config::unit_radius_tiles(kind),
+                    initial_direction: None,
                     route_shape: RouteShape::VehicleClearance,
                     budget: None,
                 },
@@ -1645,6 +1619,7 @@ mod tests {
                 start,
                 goal,
                 radius_tiles: config::unit_radius_tiles(EntityKind::ScoutCar),
+                initial_direction: None,
                 route_shape: RouteShape::VehicleClearance,
                 budget: None,
             },
@@ -1670,6 +1645,7 @@ mod tests {
                 start,
                 goal,
                 radius_tiles: config::unit_radius_tiles(EntityKind::ScoutCar),
+                initial_direction: None,
                 route_shape: RouteShape::VehicleClearance,
                 budget: None,
             },
@@ -1723,6 +1699,7 @@ mod tests {
                 start,
                 goal,
                 radius_tiles,
+                initial_direction: None,
                 route_shape: RouteShape::Normal,
                 budget: None,
             },
@@ -1761,6 +1738,7 @@ mod tests {
                 start,
                 goal,
                 radius_tiles,
+                initial_direction: None,
                 route_shape: RouteShape::Normal,
                 budget: None,
             },
@@ -1784,6 +1762,7 @@ mod tests {
             start: (4, 4),
             goal: (20, 20),
             radius_tiles: 0,
+            initial_direction: None,
             route_shape: RouteShape::VehicleClearance,
             budget: None,
         };

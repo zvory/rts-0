@@ -48,6 +48,7 @@ fn rebuildable_cache_does_not_change_tick_path_scheduling() {
                 start: (start.0 as i32, start.1 as i32),
                 goal: (goal.0 as i32, goal.1 as i32),
                 radius_tiles: config::unit_radius_tiles(EntityKind::Rifleman),
+                initial_direction: None,
                 route_shape: RouteShape::Normal,
                 budget: None,
             },

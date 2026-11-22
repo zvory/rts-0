@@ -461,6 +461,9 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/game/services/movement/vehicle_route.rs",
   "server/crates/sim/src/game/services/movement/standability.rs",
   "server/crates/sim/src/game/services/movement/waypoints.rs",
+  // Committed pivot recovery preserves the existing Tank stationary-range reset on movement;
+  // route/body eligibility remains shared pivot-vehicle policy, not faction admission.
+  "server/crates/sim/src/game/services/movement/pivot_recovery.rs",
   // Setup and artillery command execution is still global-kind based.
   "server/crates/sim/src/game/services/order_execution.rs",
   "server/crates/sim/src/game/services/order_queue.rs",
@@ -616,6 +619,7 @@ const approvedSpecialCaseBudgets = new Map([
   // Tank Trap deconstruction adds worker-only command validation and trap target admission.
   ["server/crates/sim/src/game/services/commands.rs", 259],
   ["server/crates/sim/src/game/services/pathing/graph.rs", 2],
+  ["server/crates/sim/src/game/services/movement/pivot_recovery.rs", 1],
   ["server/crates/sim/src/game/invariants.rs", 13],
   ["server/crates/sim/src/game/map_authoring.rs", 2],
   ["server/crates/sim/src/game/services/pathing/route_finalize.rs", 1],

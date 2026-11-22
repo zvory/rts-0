@@ -1,5 +1,5 @@
 {
-  "reason": "Tournament entry/winner executor with admission, blocked-approach, and evolution/checkpoint regression coverage; exact helper edges and entity-owned state only; unrelated ratchets retained.",
+  "reason": "Committed pivot-vehicle recovery uses the existing geometry service to check the complete escape corridor against nearby unit bodies; exact new helper edge only, unrelated ratchets retained.",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -1594,6 +1594,12 @@
       "target": "geometry",
       "path": "services/movement/waypoints.rs",
       "line": 10
+    },
+    {
+      "source": "movement",
+      "target": "geometry",
+      "path": "services/movement/pivot_recovery.rs",
+      "line": 9
     },
     {
       "source": "movement",

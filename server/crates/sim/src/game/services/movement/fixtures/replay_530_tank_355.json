@@ -1,0 +1,151 @@
+{
+  "id": 355,
+  "owner": 8,
+  "kind": "Tank",
+  "pos_x": 12494543,
+  "pos_y": 10203621,
+  "insight": 0,
+  "dao": null,
+  "dao_advance_ticks": 0,
+  "shield": null,
+  "hp": 290,
+  "max_hp": 292,
+  "invulnerable": false,
+  "last_damage_owner": 7,
+  "last_damage_entity": 265,
+  "units_killed": 2,
+  "last_damage_tick": 14089,
+  "last_damage_pos": [
+    2736.0,
+    1584.0
+  ],
+  "movement": {
+    "tournament_target": null,
+    "facing": 1.7817972,
+    "order": {
+      "Move": {
+        "intent": {
+          "x": 2960.0,
+          "y": 2832.0
+        },
+        "execution": {
+          "phase": "Moving"
+        }
+      }
+    },
+    "queued_orders": [],
+    "path": [
+      [
+        2960.0,
+        2832.0
+      ],
+      [
+        2960.0,
+        2800.0
+      ],
+      [
+        2960.0,
+        2768.0
+      ],
+      [
+        2960.0,
+        2736.0
+      ],
+      [
+        2960.0,
+        2704.0
+      ],
+      [
+        2960.0,
+        2672.0
+      ],
+      [
+        2960.0,
+        2640.0
+      ],
+      [
+        2960.0,
+        2608.0
+      ],
+      [
+        2960.0,
+        2576.0
+      ],
+      [
+        2960.0,
+        2544.0
+      ],
+      [
+        2992.0,
+        2544.0
+      ],
+      [
+        2992.0,
+        2512.0
+      ],
+      [
+        3024.0,
+        2512.0
+      ],
+      [
+        3024.0,
+        2480.0
+      ]
+    ],
+    "last_repath_tick": 14999,
+    "path_goal": [
+      2960.0,
+      2832.0
+    ],
+    "stuck_ticks": 2,
+    "last_progress_pos": [
+      3050.4255,
+      2491.1184
+    ],
+    "last_move_delta": [
+      0.0,
+      0.0
+    ],
+    "sidestep_cooldown": 0,
+    "scout_car_recovery_cooldown": 0,
+    "scout_car_reverse_waypoint": null,
+    "static_blocked_ticks": 2,
+    "breakthrough_ticks": 0,
+    "breakthrough_aura_ticks": 0,
+    "recent_smoke_ticks": 0,
+    "barrage_unload_ticks": 0,
+    "entrenchment_dig_ticks": 0,
+    "occupied_trench_id": null
+  },
+  "combat": {
+    "weapon_cooldowns": {
+      "TankCannon": 83
+    },
+    "artillery_blanket_shots_fired": 0,
+    "target_id": null,
+    "firing_reveal_reaction_gates": {},
+    "attack_move_no_target_ticks": 0,
+    "setup": "Packed",
+    "weapon_facing": 1.7817972,
+    "desired_weapon_facing": 1.7817972,
+    "commander_facing": 1.7817972,
+    "commander_target_id": null,
+    "emplacement_facing": null,
+    "pending_redeploy_facing": null,
+    "autocast_enabled": true,
+    "tank_stationary_range_ticks": 90,
+    "tank_plus": false,
+    "tank_stationary_range_reset_this_tick": false,
+    "tank_armor_reaction_lock": null,
+    "panzerfaust": null
+  },
+  "production": null,
+  "construction": null,
+  "worker": null,
+  "resource_node": null,
+  "resource_extractor": null,
+  "ability_cooldowns": {},
+  "ability_lockouts_until_tick": {},
+  "ability_uses_remaining": {},
+  "ability_charge_recharge_ticks": {}
+}

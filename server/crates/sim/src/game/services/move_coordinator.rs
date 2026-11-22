@@ -1052,6 +1052,10 @@ impl<'a> MoveCoordinator<'a> {
             start: (sx as i32, sy as i32),
             goal: (gx as i32, gy as i32),
             radius_tiles,
+            initial_direction: entities
+                .get(id)
+                .filter(|e| crate::game::entity::uses_pivot_vehicle_movement(e.kind))
+                .and_then(|e| crate::game::pathfinding::direction_for_facing(e.facing())),
             route_shape,
             budget: None,
         };

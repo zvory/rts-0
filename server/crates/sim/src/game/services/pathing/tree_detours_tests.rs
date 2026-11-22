@@ -29,6 +29,7 @@ fn rifleman_tile_path_routes_around_tree_trunk_tile() {
             start: (3, 5),
             goal: (7, 5),
             radius_tiles: 0,
+            initial_direction: None,
             route_shape: RouteShape::Normal,
             budget: None,
         },

@@ -47,9 +47,9 @@ pub(in crate::game) use state::ScoutPlaneState;
 pub(crate) use state::MAX_PRODUCTION_QUEUE;
 #[allow(unused_imports)]
 pub use state::{
-    CarryState, CombatState, ConstructionState, MovementState, PanzerfaustState, ProdItem,
-    ProductionState, ResearchItem, ResourceExtractorState, ResourceNodeState, WeaponSetup,
-    WorkerState,
+    CarryState, CombatState, ConstructionState, MovementState, PanzerfaustState, PivotRecovery,
+    ProdItem, ProductionState, ResearchItem, ResourceExtractorState, ResourceNodeState,
+    WeaponSetup, WorkerState,
 };
 pub use store::EntityStore;
 

@@ -166,6 +166,19 @@ pub(super) fn find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch<P
     turn_penalty: u32,
     scratch: &mut SearchScratch,
 ) -> (Vec<(i32, i32)>, usize, bool) {
+    find_path_with_initial_direction(pass, start, goal, max_expanded, turn_penalty, None, scratch)
+}
+
+/// Score the entrance turn as well as bends within the route. Heading is part of the query/cache.
+pub(super) fn find_path_with_initial_direction<P: Passability>(
+    pass: &P,
+    start: (i32, i32),
+    goal: (i32, i32),
+    max_expanded: usize,
+    turn_penalty: u32,
+    initial_direction: Option<u8>,
+    scratch: &mut SearchScratch,
+) -> (Vec<(i32, i32)>, usize, bool) {
     scratch.begin(pass.dimensions(), start, turn_penalty > 0);
     let (sx, sy) = start;
     let (gx, gy) = goal;
@@ -232,7 +245,10 @@ pub(super) fn find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch<P
             };
 
             let dir = dir as u8;
-            let turn_cost = if turn_penalty > 0 && cur.dir != NO_INCOMING_DIR && cur.dir != dir {
+            let turn_cost = if cur.dir == NO_INCOMING_DIR {
+                initial_direction
+                    .map_or(0, |initial| initial_turn_steps(initial, dir) * turn_penalty)
+            } else if turn_penalty > 0 && cur.dir != dir {
                 turn_penalty
             } else {
                 0
@@ -316,3 +332,25 @@ fn nearest_passable<P: Passability>(pass: &P, tx: i32, ty: i32) -> Option<(i32, 
 /// excluding the start tile.
 #[cfg(test)]
 mod phase1_tests;
+
+/// Directions follow NEIGHBORS, rather than compass order.
+fn initial_turn_steps(from: u8, to: u8) -> u32 {
+    const SECTORS: [u8; 8] = [0, 4, 2, 6, 1, 7, 3, 5];
+    match (SECTORS.get(from as usize), SECTORS.get(to as usize)) {
+        (Some(a), Some(b)) => {
+            let delta = a.abs_diff(*b);
+            u32::from(delta.min(8 - delta))
+        }
+        _ => 0,
+    }
+}
+
+pub(in crate::game) fn direction_for_facing(facing: f32) -> Option<u8> {
+    if !facing.is_finite() {
+        return None;
+    }
+    const DIRECTIONS: [u8; 8] = [0, 4, 2, 6, 1, 7, 3, 5];
+    let sector =
+        (facing.rem_euclid(std::f32::consts::TAU) / std::f32::consts::FRAC_PI_4 + 0.5) as usize % 8;
+    DIRECTIONS.get(sector).copied()
+}
