@@ -187,7 +187,6 @@ pub(in crate::game) fn combat_system(
         }
         // Determine this attacker's combat parameters.
         let (
-            kind,
             owner,
             px,
             py,
@@ -240,7 +239,6 @@ pub(in crate::game) fn combat_system(
                 range_px
             };
             (
-                e.kind,
                 e.owner,
                 e.pos_x(),
                 e.pos_y(),
@@ -292,7 +290,11 @@ pub(in crate::game) fn combat_system(
                         | Order::Point { .. }
                         | Order::HoldPosition
                 ) {
-                    if auto_pursuit {
+                    // Ranged evolution can leave an earlier sword approach behind.
+                    // Idle has no commanded route to preserve after its target is lost.
+                    if auto_pursuit
+                        || (e.kind == EntityKind::Warrior && matches!(e.order(), Order::Idle))
+                    {
                         if matches!(e.order(), Order::Idle) {
                             e.clear_path();
                             e.set_path_goal(None);
@@ -347,7 +349,7 @@ pub(in crate::game) fn combat_system(
                 t.pos_y(),
                 t.owner,
                 t.is_neutral_obstacle(),
-                primary_target_distance_sq(map, kind, (px, py), t),
+                primary_target_distance_sq(map, weapon_profile.id, (px, py), t),
             ),
             None => continue,
         };

@@ -5,6 +5,15 @@
 import { ABILITY, KIND, UPGRADE } from "../protocol.js";
 import { TICK_HZ } from "./timing.js";
 
+export const DAO_RANGED_RANGE_TILES = 5;
+
+export function entityAttackRangeTiles(entity) {
+  if (entity?.kind === KIND.WARRIOR && (entity.dao === "lightness" || entity.dao === "magic")) {
+    return DAO_RANGED_RANGE_TILES;
+  }
+  return STATS[entity?.kind]?.rangeTiles || 0;
+}
+
 // Carrier identity includes permanent Dao specialization, independently of cooldown/readiness.
 export function abilityCarriedByEntity(definition, entity) {
   if (!definition?.carriers?.includes(entity.kind)) return false;

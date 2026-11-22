@@ -5,6 +5,7 @@ import { sampleWeaponRecoilCycle } from "./weapon_recoil_cycle.js";
 const SHOT_REVEAL_MS = 1500;
 const MISS_TOAST_MS = 760;
 const WEAPON_KINDS = new Set(Object.values(WEAPON_KIND));
+const DISCIPLE_PROJECTILE_KINDS = new Set([WEAPON_KIND.DISCIPLE_ARROW, WEAPON_KIND.DISCIPLE_ORB]);
 
 export class VisualEffectBuffers {
   constructor() {
@@ -70,11 +71,15 @@ export class VisualEffectBuffers {
     for (const ev of events) {
       if (ev && ev.e === EVENT.ATTACK && typeof ev.from === "number" && typeof ev.to === "number") {
         const targetPos = eventTargetPos(ev);
+        const daoShot = DISCIPLE_PROJECTILE_KINDS.has(ev.weaponKind);
+        const daoShooter = daoShot && typeof entityById === "function" ? entityById(ev.from) : null;
+        const daoTarget = daoShot && !targetPos && typeof entityById === "function" ? entityById(ev.to) : null;
         if (ev.from !== ev.to && ev.weaponKind !== WEAPON_KIND.WARRIOR_SWORD) {
           this.muzzleFlashes.push({
             from: ev.from,
             to: ev.to,
-            targetPos,
+            targetPos: targetPos || (daoTarget ? { x: daoTarget.x, y: daoTarget.y } : null),
+            daoOrigin: daoShooter ? { x: daoShooter.x, y: daoShooter.y } : null,
             weaponKind: normalizedWeaponKind(ev.weaponKind),
             shotOrigin: ev.shotOrigin,
             createdAt: now + (ev.shotOrigin ? (burstIndices.get(ev.from) || 0) * 20 : 0),
@@ -360,7 +365,8 @@ export class VisualEffectBuffers {
 
   liveMuzzleFlashes(now) {
     const ttlMs = 240;
-    this.muzzleFlashes = this.muzzleFlashes.filter((f) => now - f.createdAt <= ttlMs);
+    this.muzzleFlashes = this.muzzleFlashes.filter((f) => now - f.createdAt <=
+      (DISCIPLE_PROJECTILE_KINDS.has(f.weaponKind) ? 600 : ttlMs));
     return this.muzzleFlashes;
   }
 
@@ -429,6 +435,8 @@ export class VisualEffectBuffers {
       id: ev.from,
       owner: typeof r.owner === "number" ? r.owner : 0,
       kind: r.kind,
+      dao: ev.weaponKind === WEAPON_KIND.DISCIPLE_ARROW ? "lightness"
+        : ev.weaponKind === WEAPON_KIND.DISCIPLE_ORB ? "magic" : undefined,
       x: r.x,
       y: r.y,
       hp: 1,

@@ -223,6 +223,8 @@ fn requires_weapon_setup(kind: EntityKind) -> bool {
 
 pub(super) fn can_fire_while_moving(e: &Entity, methamphetamines_researched: bool) -> bool {
     crate::game::entity::fires_while_moving(e.kind)
+        || (e.kind == EntityKind::Warrior
+            && e.dao == Some(crate::game::upgrade::UpgradeKind::DaoOfLightness))
         || (crate::rules::is_rifle_infantry(e.kind) && methamphetamines_researched)
         || breakthrough_moving_fire_active(e)
 }
@@ -275,8 +277,12 @@ pub(super) struct EffectiveAttackProfile {
 }
 
 pub(super) fn effective_attack_profile(e: &Entity) -> EffectiveAttackProfile {
-    let weapon = combat_rules::default_weapon_profile(e.kind);
-    let base = combat_rules::attack_profile(e.kind);
+    let weapon = e
+        .default_weapon_kind()
+        .and_then(combat_rules::weapon_profile);
+    let base = weapon
+        .map(|weapon| weapon.attack_profile())
+        .unwrap_or(combat_rules::AttackProfile::NONE);
     let mut profile = EffectiveAttackProfile {
         weapon,
         min_range_tiles: if e.kind == EntityKind::MortarTeam {

@@ -754,8 +754,10 @@ impl<'a> MoveCoordinator<'a> {
         let Some(target) = entities.get(target) else {
             return false;
         };
-        let target_point =
-            primary_combat_target_point(self.map, attacker.kind, attacker_pos, target);
+        let Some(weapon) = attacker.default_weapon_kind() else {
+            return false;
+        };
+        let target_point = primary_combat_target_point(self.map, weapon, attacker_pos, target);
         let Some(goal) = direct_attack_staging_goal(
             self.map,
             attacker_pos,

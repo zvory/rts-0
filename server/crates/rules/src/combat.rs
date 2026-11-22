@@ -57,6 +57,8 @@ pub enum WeaponKind {
     WorkerTools,
     GolemFists,
     WarriorSword,
+    DiscipleArrow,
+    DiscipleOrb,
     RiflemanRifle,
     MachineGunnerMg,
     ScoutCarMg,
@@ -70,10 +72,12 @@ pub enum WeaponKind {
 }
 
 impl WeaponKind {
-    pub const ALL: [WeaponKind; 12] = [
+    pub const ALL: [WeaponKind; 14] = [
         WeaponKind::WorkerTools,
         WeaponKind::GolemFists,
         WeaponKind::WarriorSword,
+        WeaponKind::DiscipleArrow,
+        WeaponKind::DiscipleOrb,
         WeaponKind::RiflemanRifle,
         WeaponKind::MachineGunnerMg,
         WeaponKind::ScoutCarMg,
@@ -90,6 +94,8 @@ impl WeaponKind {
             WeaponKind::WorkerTools => "worker_tools",
             WeaponKind::GolemFists => "golem_fists",
             WeaponKind::WarriorSword => "warrior_sword",
+            WeaponKind::DiscipleArrow => "disciple_arrow",
+            WeaponKind::DiscipleOrb => "disciple_orb",
             WeaponKind::RiflemanRifle => "rifleman_rifle",
             WeaponKind::MachineGunnerMg => "machine_gunner_mg",
             WeaponKind::ScoutCarMg => "scout_car_mg",
@@ -155,6 +161,26 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
     WeaponProfile {
         id: WeaponKind::WarriorSword,
         range_tiles: 0.75,
+        dmg: 23,
+        cooldown: 64,
+        weapon_class: WeaponClass::SmallArms,
+        armor_penetration: 0.5,
+        infantry_target_policy: InfantryTargetPolicy::None,
+        facing_damage_policy: FacingDamagePolicy::None,
+    },
+    WeaponProfile {
+        id: WeaponKind::DiscipleArrow,
+        range_tiles: crate::balance::DAO_RANGED_RANGE_TILES,
+        dmg: 23,
+        cooldown: 64,
+        weapon_class: WeaponClass::SmallArms,
+        armor_penetration: 0.5,
+        infantry_target_policy: InfantryTargetPolicy::None,
+        facing_damage_policy: FacingDamagePolicy::None,
+    },
+    WeaponProfile {
+        id: WeaponKind::DiscipleOrb,
+        range_tiles: crate::balance::DAO_RANGED_RANGE_TILES,
         dmg: 23,
         cooldown: 64,
         weapon_class: WeaponClass::SmallArms,
@@ -335,6 +361,23 @@ pub fn default_weapon_kind(kind: EntityKind) -> Option<WeaponKind> {
         | EntityKind::Steel
         | EntityKind::Oil => None,
     }
+}
+
+/// Resolve the primary weapon after permanent Disciple specialization.
+pub fn resolved_weapon_kind(
+    kind: EntityKind,
+    dao: Option<crate::faction::UpgradeKind>,
+) -> Option<WeaponKind> {
+    if kind == EntityKind::Warrior {
+        match dao {
+            Some(crate::faction::UpgradeKind::DaoOfLightness) => {
+                return Some(WeaponKind::DiscipleArrow)
+            }
+            Some(crate::faction::UpgradeKind::DaoOfMagic) => return Some(WeaponKind::DiscipleOrb),
+            _ => {}
+        }
+    }
+    default_weapon_kind(kind)
 }
 
 pub fn default_weapon_profile(kind: EntityKind) -> Option<&'static WeaponProfile> {
@@ -762,6 +805,8 @@ mod tests {
             (WeaponKind::WorkerTools, "worker_tools"),
             (WeaponKind::GolemFists, "golem_fists"),
             (WeaponKind::WarriorSword, "warrior_sword"),
+            (WeaponKind::DiscipleArrow, "disciple_arrow"),
+            (WeaponKind::DiscipleOrb, "disciple_orb"),
             (WeaponKind::RiflemanRifle, "rifleman_rifle"),
             (WeaponKind::MachineGunnerMg, "machine_gunner_mg"),
             (WeaponKind::ScoutCarMg, "scout_car_mg"),
