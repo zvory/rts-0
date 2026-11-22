@@ -1,3 +1,4 @@
+import { reconcileGrassSurvey, destroyGrassSurvey } from "./grass_survey.js";
 import { drawTankPointPreview } from "./tank_point_preview.js";
 import { ThrowSwordVisuals } from "./throw_sword_visuals.js";
 import { RocketTruckVisuals } from "./rocket_truck_visuals.js";
@@ -632,12 +633,14 @@ export class Renderer {
     visualSamples = null,
     visualUnitOverrides = null,
     visualFrameStripOverrides = null,
+    visualGrassTechnique = 0,
     observerMapAnalysis = null,
     feedbackView: preparedFeedbackView = null,
     reconciledGroundDecals = null,
     onGroundDecalsStaged = null,
   } = {}) {
     this._beginRenderFrame();
+    reconcileGrassSurvey(this, visualGrassTechnique);
     this._profiler = profiler || null;
     const time = (label, fn) => profiler ? profiler.time(label, fn) : fn();
     // Drive the world container from the camera (single transform for all layers).
@@ -1367,7 +1370,7 @@ export class Renderer {
     this._gpuShadowTimer = null;
     this._doodads?.destroy();
     this._doodads = null;
-
+    destroyGrassSurvey(this);
     this._waterLayer?.destroy();
     this._waterLayer = null;
     // Cached terrain sprite + its generated texture.
@@ -1376,7 +1379,6 @@ export class Renderer {
       this._terrainSprite = null;
     }
     this._setupVisuals.clear();
-
     // Detach the canvas from the DOM, then destroy the app + WebGL context.
     const view = this.app.canvas;
     if (view && view.parentNode) view.parentNode.removeChild(view);
