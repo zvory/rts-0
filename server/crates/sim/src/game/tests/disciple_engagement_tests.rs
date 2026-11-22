@@ -340,7 +340,8 @@ fn war_spear_approaches_then_stops_at_ready_tip_reach() {
         let victim = game.state.entities.get(target).unwrap();
         if victim.hp < 40 {
             let spear = game.state.entities.get(attacker).unwrap();
-            let distance = (victim.pos_x() - spear.pos_x()).hypot(victim.pos_y() - spear.pos_y());
+            let distance =
+                (victim.pos_x() - spear.pos_x()).det_hypot(victim.pos_y() - spear.pos_y());
             assert!(
                 (96.0..=107.0).contains(&distance),
                 "spear stand-off: {distance}"
