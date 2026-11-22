@@ -12,6 +12,34 @@ import { MACHINE_GUNNER_PNG_FRAME_STRIP } from "../../client/src/renderer/rigs/m
 import { RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP } from "../../client/src/renderer/rigs/rifleman_panzerfaust_png_strip.js";
 import { RIFLEMAN_PNG_FRAME_STRIP } from "../../client/src/renderer/rigs/rifleman_png_strip.js";
 import { WARRIOR_PNG_FRAME_STRIP } from "../../client/src/renderer/rigs/warrior_png_strip.js";
+import { WAR_PNG_FRAME_STRIP } from "../../client/src/renderer/rigs/disciple_png_strips.js";
+import { sampleWeaponRecoilCycle } from "../../client/src/weapon_recoil_cycle.js";
+
+// Sample the real sword clock: the Yari clip must finish in 400 ms even though
+// sword feedback remains active for 720 ms. Minimap and worker use this same context.
+const war = { id: 91, kind: KIND.WARRIOR, dao: "war", state: STATE.ATTACK,
+  x: 100, y: 100, facing: 0, weaponFacing: 0 };
+const warMinimap = createMinimapAnimation();
+for (const [elapsed, expectedFrame, expectedStep] of [
+  [0, 3, 0], [80, 3, -2.88], [200, 5, 16], [280, 5, 16], [400, 0, 0], [600, 0, 0],
+]) {
+  const cycle = sampleWeaponRecoilCycle(KIND.WARRIOR, elapsed, WEAPON_KIND.WARRIOR_SWORD);
+  const context = { recoilProgress: cycle.progress, recoilPhase: cycle.phase,
+    recoilWeaponKind: WEAPON_KIND.WARRIOR_SWORD };
+  const frame = frameStripFrameIndex(WAR_PNG_FRAME_STRIP, war, context);
+  assert(frame === expectedFrame, `Yari frame at ${elapsed} ms`);
+  const offset = frameStripSpriteOffset(WAR_PNG_FRAME_STRIP, frame, context);
+  assert(Math.abs(offset.y - expectedStep) < 1e-8, `Yari step at ${elapsed} ms`);
+  warMinimap.beginFrame([war], {
+    weaponRecoil: () => cycle.progress, weaponRecoilPhase: () => cycle.phase,
+    weaponRecoilKind: () => WEAPON_KIND.WARRIOR_SWORD,
+  }, elapsed);
+  const layer = warMinimap.layers(war)[0];
+  const normalizedStep = expectedStep / WAR_PNG_FRAME_STRIP.worldScale / (143 * 1.05);
+  assert(Math.abs(layer.x - normalizedStep) < 1e-8 && Math.abs(layer.y) < 1e-8,
+    `Yari minimap step matches the worker at ${elapsed} ms`);
+}
+warMinimap.destroy();
 
 assert(WARRIOR_PNG_FRAME_STRIP.frameCount === 6, "Warrior placeholder exposes six consistent atlas cells");
 assert(

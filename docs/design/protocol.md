@@ -2036,7 +2036,7 @@ See [Tournament Grounds](tournament-grounds.md).
 Portal first-stage rallies to the exact owned completed Grounds center automatically issue
 entry movement to newly trained base Disciples. Busy grounds retain waiting entry intents.
 
-### Proven Grounds
+### Proving Grounds
 
 Cultivator Engineers construct `proven_grounds` after a completed Portal: 100 steel, zero oil,
 200-tick construction, 3×3 tiles, 120 HP, armored, one-tile sight, no weapon or supply.
@@ -2046,14 +2046,14 @@ base Disciples inside or rally a Portal there. Each admission consumes one base 
 Dao specialist emerges after 300 ticks (10 seconds), using legal exits and the full rally plan.
 Blocked exits retry; destruction loses the trainee and oil. Unpaid plans can be canceled; active
 training cannot. Combat-earned 60-insight evolution requires no research.
-See [Proven Grounds brief and rules](proven-grounds.md) for details and deferred audio/AI work.
+See [Proving Grounds brief and rules](proven-grounds.md) for details and deferred audio/AI work.
 
 `proven_grounds` uses kind code 33. Compact v63 appends entity slot 51
 `daoTrainingQueue?: string[]`, a team-private bounded FIFO of Dao upgrade ids, including the
 active trainee as its front entry. Omitted for enemy/vision-only views. `prodKind`/`prodProgress`
 remain public when visible; queue contents never appear in building memory.
 The existing `research {building, upgrade}` command enqueues a paid-training plan when targeting
-an owned completed Proven Grounds; it researches normally at other structures. Only completed
+an owned completed Proving Grounds; it researches normally at other structures. Only completed
 Dao research owned by a Cultivator player is accepted; stale, wrong-owner, non-Dao and full-queue
 requests are no-ops. `cancel` removes the latest unpaid plan, preserving active training.
 Move-to-center and Portal rally use the existing tournament admission convention for both grounds.

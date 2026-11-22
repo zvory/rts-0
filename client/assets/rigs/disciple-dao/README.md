@@ -49,3 +49,17 @@ The running poses now use `source/lightness-melee-b-windy-run.png`, with a longe
 wind-whipped scarf sweeping through three distinct curves. Standing and attack frames
 remain byte-identical to the initial candidate B pass. The run prompt is preserved in
 `source/lightness-melee-b-windy-run-prompt.txt`.
+
+## Armored War Yari
+
+War uses approved candidate B: broad angular eastern armor and a straight Yari spear.
+`source/war-yari-motion.png` supplies idle and two walking poses; only its first three
+cells are consumed. `source/war-yari-lunge.png` supplies anticipation, drive, full
+extension and recovery. The built-in imagegen lunge prompt is preserved beside the sources.
+The deterministic pipeline packs seven 256-pixel cells in `generated/war-yari-runtime-strip.png`,
+normalizes crown pivots at the approved body scale, and leaves room for the full spear.
+Runtime scale 0.8 keeps the body larger than the other Disciples. Shot events drive
+four attack frames over 400 ms, with a smooth 16-world-pixel local-forward visual step.
+War alone has 2.75-tile weapon reach, matching the approximately 95-world-pixel ready tip
+once ordinary body radius/combat slack and typical target size are accounted for.
+The step never changes simulation coordinates, collision or damage timing.

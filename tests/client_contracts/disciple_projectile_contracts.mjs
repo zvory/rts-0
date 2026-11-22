@@ -34,7 +34,7 @@ for (const weaponKind of [WEAPON_KIND.DISCIPLE_ARROW, WEAPON_KIND.DISCIPLE_ORB])
 }
 assert.equal(entityAttackRangeTiles({ kind: KIND.WARRIOR, dao: "lightness" }), 0.75);
 assert.equal(entityAttackRangeTiles({ kind: KIND.WARRIOR, dao: "magic" }), 5);
-assert.equal(entityAttackRangeTiles({ kind: KIND.WARRIOR, dao: "war" }), 0.75);
+assert.equal(entityAttackRangeTiles({ kind: KIND.WARRIOR, dao: "war" }), 2.75);
 assert.equal(entityAttackRangeTiles({ kind: KIND.WARRIOR }), 0.75);
 
 let allocations = 0, destroyed = 0, textureDestroyed = 0;

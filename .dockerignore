@@ -101,4 +101,5 @@ client/assets/rigs/**/*.*
 !client/assets/rigs/disciple-dao/generated/lightness-runtime-strip.png
 !client/assets/rigs/disciple-dao/generated/lightness-melee-b-runtime-strip.png
 !client/assets/rigs/disciple-dao/generated/magic-runtime-strip.png
+!client/assets/rigs/disciple-dao/generated/war-yari-runtime-strip.png
 client/assets/effects/disciple-arrow/arrow-source.png
