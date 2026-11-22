@@ -632,7 +632,7 @@ fn ekat_magic_anchor_places_single_visible_ten_second_object() {
     let players = [ekat_player()];
     let mut game = empty_flat_game(&players);
     let pos = game.state.map.tile_center(10, 10);
-    let first_target = game.state.map.tile_center(13, 10);
+    let first_target = game.state.map.tile_center(20, 10);
     let second_target = game.state.map.tile_center(14, 10);
     let hero = game
         .state
@@ -679,7 +679,7 @@ fn ekat_magic_anchor_rejects_out_of_range_or_locked_placement() {
     let players = [ekat_player()];
     let mut game = empty_flat_game(&players);
     let pos = game.state.map.tile_center(10, 10);
-    let far_target = game.state.map.tile_center(40, 10);
+    let far_target = game.state.map.tile_center(21, 10);
     let hero = game
         .state
         .entities
@@ -784,8 +784,8 @@ fn ekat_magic_anchor_is_not_attackable_by_enemy_weapons() {
 
 #[test]
 fn ekat_magic_anchor_pull_field_slows_away_and_boosts_toward_movement() {
-    let away_delta = ekat_anchor_move_delta(-6.0);
-    let toward_delta = ekat_anchor_move_delta(14.0);
+    let away_delta = ekat_anchor_move_delta(-6.0, 2, 2, true);
+    let toward_delta = ekat_anchor_move_delta(14.0, 2, 2, true);
 
     assert!(
         away_delta < config::unit_stats(EntityKind::Ekat).unwrap().speed,
@@ -856,10 +856,33 @@ fn ekat_magic_anchor_pulls_stationary_units_with_weight_resistance() {
     );
 }
 
-fn ekat_anchor_move_delta(destination_tiles_from_start: f32) -> f32 {
-    let players = [ekat_player()];
+#[test]
+fn ekat_magic_anchor_leaves_owned_and_teammate_movement_unaffected() {
+    for (owner, team) in [(1, 1), (2, 1)] {
+        // Zero tests stationary pull; the other cases move away and toward the anchor.
+        for destination in [0.0, -6.0, 14.0] {
+            let baseline = ekat_anchor_move_delta(destination, owner, team, false);
+            let anchored = ekat_anchor_move_delta(destination, owner, team, true);
+            assert_eq!(
+                anchored, baseline,
+                "owner={owner}, team={team}, destination={destination}"
+            );
+        }
+    }
+}
+
+fn ekat_anchor_move_delta(
+    destination_tiles_from_start: f32,
+    owner: u32,
+    team: u32,
+    anchored: bool,
+) -> f32 {
+    let mut other = kriegsia_enemy();
+    other.team_id = team;
+    let players = [ekat_player(), other];
     let mut game = empty_flat_game(&players);
     let start = game.state.map.tile_center(10, 10);
+    let caster_pos = game.state.map.tile_center(6, 10);
     let anchor_target = game.state.map.tile_center(12, 10);
     let destination = (
         start.0 + destination_tiles_from_start * config::TILE_SIZE as f32,
@@ -868,24 +891,38 @@ fn ekat_anchor_move_delta(destination_tiles_from_start: f32) -> f32 {
     let hero = game
         .state
         .entities
-        .spawn_unit(1, EntityKind::Ekat, start.0, start.1)
+        .spawn_unit(1, EntityKind::Ekat, caster_pos.0, caster_pos.1)
         .expect("hero should spawn");
+    let subject = game
+        .state
+        .entities
+        .spawn_unit(owner, EntityKind::Ekat, start.0, start.1)
+        .expect("subject should spawn");
 
-    enqueue_ekat_anchor(&mut game, hero, anchor_target);
+    if anchored {
+        enqueue_ekat_anchor(&mut game, hero, anchor_target);
+    }
     game.tick();
-    game.enqueue(
-        1,
-        Command::Move {
-            units: vec![hero],
-            x: destination.0,
-            y: destination.1,
-            queued: false,
-        },
-    );
+    if destination_tiles_from_start != 0.0 {
+        game.enqueue(
+            owner,
+            Command::Move {
+                units: vec![subject],
+                x: destination.0,
+                y: destination.1,
+                queued: false,
+            },
+        );
+    }
+    let before = game
+        .state
+        .entities
+        .get(subject)
+        .expect("subject exists")
+        .pos_x();
     game.tick();
-
-    let hero_entity = game.state.entities.get(hero).expect("hero exists");
-    (hero_entity.pos_x() - start.0).abs()
+    let subject_entity = game.state.entities.get(subject).expect("subject exists");
+    (subject_entity.pos_x() - before).abs()
 }
 
 #[test]

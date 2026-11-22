@@ -136,8 +136,20 @@ pub(crate) fn movement_system_with_context(
             standability::unit_static_standable(occ, map, kind, x, y, facing)
         },
     );
-    waypoints::advance_moving_units(map, entities, players, occ, spatial, tick, ability_runtime);
-    apply_magic_anchor_stationary_pull(map, entities, occ, tick, ability_runtime);
+    let teams = crate::game::teams::TeamRelations::from_player_teams(
+        players.iter().map(|player| (player.id, player.team_id)),
+    );
+    waypoints::advance_moving_units(
+        map,
+        entities,
+        players,
+        occ,
+        spatial,
+        tick,
+        ability_runtime,
+        &teams,
+    );
+    apply_magic_anchor_stationary_pull(map, entities, occ, tick, ability_runtime, &teams);
     barbed_wire::apply_entries(map, entities, &wire_positions);
     for id in entities.ids() {
         if let Some(e) = entities.get_mut(id) {
@@ -181,11 +193,12 @@ fn apply_magic_anchor_stationary_pull(
     occ: &Occupancy,
     tick: u32,
     ability_runtime: &AbilityRuntime,
+    teams: &crate::game::teams::TeamRelations,
 ) {
     let world_max_x = map.world_width_px() - 0.01;
     let world_max_y = map.world_height_px() - 0.01;
     for id in entities.ids() {
-        let Some((kind, x, y, facing, speed, resistance)) = entities.get(id).and_then(|e| {
+        let Some((kind, owner, x, y, facing, speed, resistance)) = entities.get(id).and_then(|e| {
             if !e.is_unit() || e.kind == EntityKind::ScoutPlane || !e.path_is_empty() {
                 return None;
             }
@@ -195,11 +208,21 @@ fn apply_magic_anchor_stationary_pull(
                 return None;
             }
             let speed = e.movement_speed();
-            Some((e.kind, e.pos_x(), e.pos_y(), e.facing(), speed, resistance))
+            Some((
+                e.kind,
+                e.owner,
+                e.pos_x(),
+                e.pos_y(),
+                e.facing(),
+                speed,
+                resistance,
+            ))
         }) else {
             continue;
         };
-        let Some((dir, strength)) = ability_runtime.magic_anchor_stationary_pull(x, y, tick) else {
+        let Some((dir, strength)) =
+            ability_runtime.magic_anchor_stationary_pull(owner, teams, x, y, tick)
+        else {
             continue;
         };
         let pull_px =
