@@ -2077,11 +2077,7 @@ fn order_cancel(
             ps.release_supply(rules::economy::supply_cost(item.unit));
         }
         cancel::Cancelled::Upgrade(item) if item.paid => {
-            let definition = upgrade::definition(item.upgrade);
-            ps.refund_cost(rules::economy::ResourceCost::new(
-                definition.cost_steel,
-                definition.cost_oil,
-            ));
+            ps.refund_cost(upgrade::paid_cost(&item));
         }
         _ => {}
     }

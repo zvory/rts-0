@@ -64,7 +64,7 @@ fn cultivator_pavilion_research_spends_resources_completes_and_leaves_disciple_u
     use crate::game::upgrade::{self, UpgradeKind};
 
     let mut game = empty_flat_game(&[cultivator_player()]);
-    game.state.players[0].set_resources(600, 300);
+    game.state.players[0].set_resources(350, 700);
     let pavilion_pos = game.state.map.tile_center(12, 12);
     let pavilion = game
         .state
@@ -120,7 +120,7 @@ fn cultivator_pavilion_research_spends_resources_completes_and_leaves_disciple_u
         assert_eq!(upgrade::definition(dao).research_ticks, 600);
     }
     // The shared queue pays each item when it becomes active.
-    for _ in 0..1800 {
+    for _ in 0..2100 {
         game.tick();
     }
     assert_eq!(
@@ -1045,4 +1045,148 @@ fn war_throw_sword_is_dao_gated_and_hits_harder_on_return_after_checkpoint() {
     );
     assert_eq!(restored.state.entities.get(victim).unwrap().hp, 60);
     assert_eq!(game.state.ability_runtime.world_objects().count(), 0);
+}
+
+#[test]
+fn dao_parallel_research_reserves_tiers_and_refunds_committed_costs() {
+    use crate::game::upgrade::UpgradeKind;
+    let mut game = empty_flat_game(&[cultivator_player()]);
+    game.state.players[0].set_resources(1000, 1000);
+    let daos = [
+        UpgradeKind::DaoOfMagic,
+        UpgradeKind::DaoOfHeaviness,
+        UpgradeKind::DaoOfLightness,
+    ];
+    let mut buildings = Vec::new();
+    for (index, dao) in daos.into_iter().enumerate() {
+        let (x, y) = game.state.map.tile_center(8 + index as u32 * 5, 12);
+        let id = game
+            .state
+            .entities
+            .spawn_building(1, EntityKind::ThreeDaoPavilion, x, y, true)
+            .unwrap();
+        buildings.push(id);
+        game.enqueue(
+            1,
+            Command::Research {
+                building: id,
+                upgrade: dao,
+            },
+        );
+    }
+    game.tick();
+    assert_eq!(
+        (game.state.players[0].steel, game.state.players[0].oil),
+        (650, 300)
+    );
+    for (id, total) in buildings.iter().zip([300, 600, 1200]) {
+        assert_eq!(
+            game.state.entities.get(*id).unwrap().research_queue()[0].total,
+            total
+        );
+    }
+    // Removing the cheap research must not lower the refunds for the other paid tiers.
+    game.enqueue(
+        1,
+        Command::Cancel {
+            building: buildings[0],
+            construction: false,
+        },
+    );
+    game.tick();
+    assert_eq!(
+        (game.state.players[0].steel, game.state.players[0].oil),
+        (700, 400)
+    );
+    game.state
+        .entities
+        .get_mut(buildings[2])
+        .unwrap()
+        .apply_damage(u32::MAX, None);
+    game.tick();
+    assert_eq!(
+        (game.state.players[0].steel, game.state.players[0].oil),
+        (900, 800)
+    );
+    game.enqueue(
+        1,
+        Command::Cancel {
+            building: buildings[1],
+            construction: false,
+        },
+    );
+    game.tick();
+    assert_eq!(
+        (game.state.players[0].steel, game.state.players[0].oil),
+        (1000, 1000)
+    );
+}
+
+#[test]
+fn dao_waiting_research_reprices_when_payment_starts() {
+    use crate::game::upgrade::UpgradeKind;
+
+    let mut game = empty_flat_game(&[cultivator_player()]);
+    game.state.players[0].set_resources(0, 0);
+    let mut buildings = Vec::new();
+    for (index, dao) in [UpgradeKind::DaoOfMagic, UpgradeKind::DaoOfLightness]
+        .into_iter()
+        .enumerate()
+    {
+        let (x, y) = game.state.map.tile_center(8 + index as u32 * 5, 12);
+        let id = game
+            .state
+            .entities
+            .spawn_building(1, EntityKind::ThreeDaoPavilion, x, y, true)
+            .unwrap();
+        buildings.push(id);
+        game.enqueue(
+            1,
+            Command::Research {
+                building: id,
+                upgrade: dao,
+            },
+        );
+    }
+    game.tick();
+    for id in &buildings {
+        let item = &game.state.entities.get(*id).unwrap().research_queue()[0];
+        assert!(!item.paid);
+        assert_eq!((item.total, item.progress), (300, 0));
+    }
+
+    game.state.players[0].set_resources(50, 100);
+    game.tick();
+    assert!(
+        game.state
+            .entities
+            .get(buildings[0])
+            .unwrap()
+            .research_queue()[0]
+            .paid
+    );
+    let waiting = &game
+        .state
+        .entities
+        .get(buildings[1])
+        .unwrap()
+        .research_queue()[0];
+    assert!(!waiting.paid);
+    assert_eq!(waiting.progress, 0);
+
+    // The second queue was admitted at the cheap tier, but must pay the current tier.
+    game.state.players[0].set_resources(100, 200);
+    game.tick();
+    let started = &game
+        .state
+        .entities
+        .get(buildings[1])
+        .unwrap()
+        .research_queue()[0];
+    assert!(started.paid);
+    assert_eq!((started.total, started.progress), (600, 1));
+    assert_eq!(
+        (game.state.players[0].steel, game.state.players[0].oil),
+        (0, 0)
+    );
 }

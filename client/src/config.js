@@ -126,6 +126,7 @@ export {
   TANK_BODY,
   TANK_UNLOCK_RESEARCH_TICKS,
   UPGRADES,
+  researchDefinition,
   WORKER_BUILDABLE,
   isProducerBuilding,
 } from "./config/rules_mirror.js";

@@ -121,6 +121,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   "entityAttackRangeTiles",
   "factionCatalog",
   "isProducerBuilding",
+  "researchDefinition",
   "researchableUpgradesForFaction",
   "statsForFaction",
   "trainableUnitsForFaction",
