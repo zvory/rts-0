@@ -1,6 +1,6 @@
 //! Combat service.
 //!
-//! This module owns in-range target acquisition, weapon facing/setup, damage, and combat
+//! This module owns target acquisition and approach, weapon facing/setup, damage, and combat
 //! events for a tick. It depends on read-only rules and derived spatial/LOS helpers.
 
 use rts_rules::math::GameplayMath as _;
@@ -229,9 +229,16 @@ pub(in crate::game) fn combat_system(
             let range_px = range_tiles * config::TILE_SIZE as f32 + e.radius() + RANGE_SLACK;
             let min_range_px = profile.min_range_tiles * config::TILE_SIZE as f32;
             let mode = combat_mode_with_moving_fire(e, can_move_fire);
-            // Automatic acquisition remains weapon-range-only. A player-issued direct Attack
-            // order is separately allowed to create a target-relative pursuit path below.
-            let acquire_px = range_px;
+            // Only aggressive orders may use an engagement range beyond weapon reach.
+            // Hold/Point and plain Move keep their existing in-range behavior.
+            let acquire_px = if mode == CombatMode::Aggressive {
+                crate::rules::combat::engagement_range_tiles(e.kind, range_tiles)
+                    * config::TILE_SIZE as f32
+                    + e.radius()
+                    + RANGE_SLACK
+            } else {
+                range_px
+            };
             (
                 e.kind,
                 e.owner,
@@ -250,6 +257,8 @@ pub(in crate::game) fn combat_system(
         if dmg == 0 {
             continue;
         }
+
+        let auto_pursuit = mode == CombatMode::Aggressive && acquire_px > range_px;
 
         // Resolve / acquire a target id based on the current order semantics.
         let target = acquisition_pass::select(
@@ -283,6 +292,20 @@ pub(in crate::game) fn combat_system(
                         | Order::Point { .. }
                         | Order::HoldPosition
                 ) {
+                    if auto_pursuit {
+                        if matches!(e.order(), Order::Idle) {
+                            e.clear_path();
+                            e.set_path_goal(None);
+                        } else if e
+                            .path_goal()
+                            .is_some_and(|goal| Some(goal) != e.move_intent())
+                        {
+                            // Cancel the temporary approach even if repathing is throttled.
+                            e.clear_path();
+                            e.set_path_goal(e.move_intent());
+                            e.mark_move_phase(crate::game::entity::MovePhase::AwaitingPath);
+                        }
+                    }
                     e.set_target_id(None);
                     e.mark_attack_phase(AttackPhase::Waiting);
                     begin_idle_deployed_weapon_setup(e);
@@ -456,11 +479,16 @@ pub(in crate::game) fn combat_system(
                 cd_reset,
                 tick,
             );
-        } else if mode == CombatMode::Ordered || clear_area_priority_target {
+        } else if mode == CombatMode::Ordered || clear_area_priority_target || auto_pursuit {
             if let Some(e) = entities.get_mut(id) {
                 e.mark_attack_phase(AttackPhase::Waiting);
             }
-            if commanded_direct_target && !wait_for_stationary_range {
+            if auto_pursuit {
+                if let Some(e) = entities.get_mut(id) {
+                    e.set_target_id(Some(tid));
+                }
+            }
+            if (commanded_direct_target || auto_pursuit) && !wait_for_stationary_range {
                 coordinator.request_direct_attack_path(entities, id, tid, min_range_px, range_px);
             }
         }

@@ -23,6 +23,7 @@ mod construction_followup_tests;
 mod deferred_producer_order_tests;
 mod derived_state_tests;
 mod determinism_tests;
+mod disciple_engagement_tests;
 mod ekat_tests;
 mod faction_ability_tests;
 mod fixtures;

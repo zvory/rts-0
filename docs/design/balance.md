@@ -225,7 +225,13 @@ Cultivator Serfs can also construct the faction-specific Portal for 150 Steel: i
 footprint, 123 HP, one tile of sight, a five-second construction time, no prerequisite, and no
 research. A completed Portal trains the Cultivator Disciple for 100 Steel and 2 Supply in 300 ticks.
 The Disciple is a 135-HP, 13.5-pixel-radius ground melee unit moving at 1.6 pixels per tick. Its
-23-damage sword has 0.5-tile reach, a 64-tick cooldown, and 50% armor penetration. See
+23-damage sword has 0.75-tile reach, a 64-tick cooldown, and 50% armor penetration.
+Disciples have a separate five-tile engagement range for Idle and Attack Move: they approach
+visible legal enemies to sword reach, then resume their original Attack Move destination when
+the target dies, becomes hidden/illegal, or leaves engagement range. Hold Position and Point
+do not approach, and plain Move keeps its route. Other units default engagement range to their
+current attack range, preserving existing behavior. The engagement override is server-only
+(`DISCIPLE_ENGAGEMENT_RANGE_TILES`); client attack-range metadata is unchanged. See
 [Cultivators specification](cultivators.md).
 
 
