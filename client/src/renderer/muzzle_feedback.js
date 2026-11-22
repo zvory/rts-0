@@ -6,12 +6,12 @@ import { attackFeedbackKindForWeapon, attackFeedbackOriginForWeapon } from "./at
 import { muzzleFeedbackStyle } from "./weapon_feedback_style.js";
 import { isDiscipleProjectile } from "./disciple_projectiles.js";
 
-export function _drawMuzzleFlashes(state) {
+export function _drawMuzzleFlashes(state, colorByOwner) {
   const g = this._feedbackGfx;
   if (!state || typeof state.liveMuzzleFlashes !== "function") return;
   const now = rendererVisualNow(this);
   const flashes = state.liveMuzzleFlashes(now);
-  this._discipleProjectiles?.update(flashes, now, g);
+  this._discipleProjectiles?.update(flashes, now, g, colorByOwner);
   if (!flashes.length) return;
 
   for (const f of flashes) {
