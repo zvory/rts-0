@@ -3,6 +3,7 @@ import { gfxNoFill, gfxEllipse, gfxPoly, gfxRect, gfxReset, gfxFill, gfxStroke }
 import {
   COLORS,
   STATS,
+  entityBodyRadius,
   DISCIPLE_INSIGHT_REQUIRED,
   DISCIPLE_EVOLVED_INSIGHT_CAP,
   PLAYER_PALETTE,
@@ -245,7 +246,7 @@ export function _ringRadius(e) {
     const body = tankBodyVisual(stat);
     return { rx: body.halfLen + 7, ry: body.halfWidth + 7, cy: 2 };
   }
-  const r = (stat.size || 9) + 6;
+  const r = (entityBodyRadius(e) || 9) + 6;
   return { rx: r, ry: r * 0.68, cy: r * 0.36 };
 }
 
@@ -267,7 +268,7 @@ export function _hpBar(g, e, status = null, ownerColor = null) {
       halfW = body.halfLen * 0.8;
       topY = e.y - body.shadowRadius - 8;
     } else {
-      const r = stat.size || 9;
+      const r = entityBodyRadius(e) || 9;
       halfW = Math.max(10, r);
       topY = e.y - r - 8;
     }

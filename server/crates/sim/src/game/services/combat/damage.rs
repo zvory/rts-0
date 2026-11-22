@@ -176,6 +176,7 @@ pub(super) fn apply_direct_hit(
         reveals_attacker: projection_rules::shot_reveals_attacker(target.kind),
     };
     let before_hp = target.hp;
+    let target_is_building = target.is_building();
     let damage = combat_rules::effective_damage_with_facing_for_weapon(
         weapon,
         target.kind,
@@ -204,7 +205,7 @@ pub(super) fn apply_direct_hit(
             .get(victim)
             .map_or(0, |target| before_hp.saturating_sub(target.hp));
         if let Some(source) = entities.get_mut(attacker) {
-            source.gain_insight(actual);
+            source.gain_insight(actual, target_is_building);
         }
     }
     if damaged {

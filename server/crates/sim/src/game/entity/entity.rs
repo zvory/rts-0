@@ -1346,7 +1346,7 @@ impl Entity {
     /// The collision/interaction radius in world pixels.
     pub fn radius(&self) -> f32 {
         if let Some(s) = config::unit_stats(self.kind) {
-            s.radius
+            s.radius * self.dao_body_scale()
         } else if self.is_building() {
             // Footprint half-extent (approx) for range/interaction checks.
             let Some(s) = config::building_stats(self.kind) else {

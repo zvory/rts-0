@@ -1,5 +1,5 @@
 import { cmd, PASSABLE, isUnit, isBuilding, isResource, KIND } from "../protocol.js";
-import { STATS, TANK_BODY } from "../config.js";
+import { STATS, TANK_BODY, entityBodyRadius } from "../config.js";
 import { DEFAULT_TILE_SIZE } from "./constants.js";
 import { buildTankTrapLineSites, tankTrapBuildCommands } from "./tank_trap_line.js";
 
@@ -485,7 +485,7 @@ export function bodyCircleIntersectsRect(e, minX, minY, maxX, maxY, pad) {
 export function circularBodyRadius(e) {
   const body = STATS[e.kind]?.body;
   if (body) return body.width * 0.5 + (body.clearance || 0);
-  return STATS[e.kind]?.size || 0;
+  return entityBodyRadius(e);
 }
 
 export function vehicleBody(e, pad) {

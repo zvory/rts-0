@@ -282,6 +282,7 @@ fn apply_projectile_hits(
             map.damage_after_reduction_tile(target.pos_x(), target.pos_y(), base_damage)
         });
         let damage = entities.shielded_damage(id, projectile.owner, damage, teams);
+        let target_is_building = entities.get(id).is_some_and(|target| target.is_building());
         let actual = if let Some(target) = entities.get_mut(id) {
             let before_hp = target.hp;
             target.apply_damage_from_entity(
@@ -296,7 +297,7 @@ fn apply_projectile_hits(
             0
         };
         if let Some(caster) = entities.get_mut(projectile.caster_id) {
-            caster.gain_insight(actual);
+            caster.gain_insight(actual, target_is_building);
         }
     }
 }

@@ -21,7 +21,7 @@ const war = { id: 91, kind: KIND.WARRIOR, dao: "war", state: STATE.ATTACK,
   x: 100, y: 100, facing: 0, weaponFacing: 0 };
 const warMinimap = createMinimapAnimation();
 for (const [elapsed, expectedFrame, expectedStep] of [
-  [0, 3, 0], [80, 3, -2.88], [200, 5, 16], [280, 5, 16], [400, 0, 0], [600, 0, 0],
+  [0, 3, 0], [80, 3, -2.016], [200, 5, 11.2], [280, 5, 11.2], [400, 0, 0], [600, 0, 0],
 ]) {
   const cycle = sampleWeaponRecoilCycle(KIND.WARRIOR, elapsed, WEAPON_KIND.WARRIOR_SWORD);
   const context = { recoilProgress: cycle.progress, recoilPhase: cycle.phase,
