@@ -435,7 +435,7 @@ fn manual_mortar_fire_impacts_without_toast_notice() {
         .expect("target should still exist")
         .hp;
 
-    for _ in 0..46 {
+    for _ in 0..config::MORTAR_MANUAL_SHELL_DELAY_TICKS - 1 {
         let events = game.tick();
         assert!(events.iter().all(|(_, events)| events
             .iter()
@@ -447,7 +447,7 @@ fn manual_mortar_fire_impacts_without_toast_notice() {
                 .expect("target should survive until impact")
                 .hp,
             hp_before_impact,
-            "mortar damage must wait for the full 47-tick flight"
+            "mortar damage must wait for the full shell flight"
         );
     }
     let impact_events = game.tick();

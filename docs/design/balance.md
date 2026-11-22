@@ -442,7 +442,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
 - Mortar Teams move at 1.6 px/tick and have no setup, teardown, or stationary range-ramp timing. They use `MORTAR_MIN_RANGE_TILES = 5`,
   `MORTAR_RANGE_TILES = 17`, and `MORTAR_FIELD_OF_FIRE_RAD = 360 degrees total`,
   `MORTAR_FIRE_COOLDOWN_TICKS = 180` (6s between shells),
-  `MORTAR_MANUAL_SHELL_DELAY_TICKS = 47` (~1.57s manual travel, increased by 0.5s),
+  `MORTAR_MANUAL_SHELL_DELAY_TICKS = 53` (~1.77s manual travel, increased by 0.2s from 47 ticks),
   `MORTAR_OUTER_RADIUS_TILES = 2.0`,
   `MORTAR_OUTER_DAMAGE = 10`, and `MORTAR_INNER_DAMAGE = 100` (peak at impact).
   Base splash damage uses rounded inverse-square falloff, `100 / (1 + 2.25 * r²)`,
