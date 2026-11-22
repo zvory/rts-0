@@ -117,25 +117,25 @@ const NOVICE_DEF: UnitDef = UnitDef {
 };
 
 const SCOUT_CAR_DEF: UnitDef = UnitDef {
-        kind: EntityKind::ScoutCar,
-        stats: balance::UnitStats {
-            hp: 100,
-            dmg: 6,
-            range_tiles: 7.0,
-            cooldown: 12,
-            speed: 2.35,
-            sight_tiles: 15,
-            cost_steel: 125,
-            cost_oil: 60,
-            supply: 3,
-            build_ticks: 480,
-            radius: 9.6,
-        },
-        armor_class: ArmorClass::Small,
-        weapon: WeaponClass::SmallArms,
-        trained_at: Some(EntityKind::Factory),
-        train_requirement: TechRequirement::All(&[]),
-    };
+    kind: EntityKind::ScoutCar,
+    stats: balance::UnitStats {
+        hp: 100,
+        dmg: 6,
+        range_tiles: 7.0,
+        cooldown: 12,
+        speed: 2.35,
+        sight_tiles: 15,
+        cost_steel: 125,
+        cost_oil: 60,
+        supply: 3,
+        build_ticks: 480,
+        radius: 9.6,
+    },
+    armor_class: ArmorClass::Small,
+    weapon: WeaponClass::SmallArms,
+    trained_at: Some(EntityKind::Factory),
+    train_requirement: TechRequirement::All(&[]),
+};
 
 pub const UNITS: &[UnitDef] = &[
     UnitDef {
@@ -182,7 +182,8 @@ pub const UNITS: &[UnitDef] = &[
     UnitDef {
         kind: EntityKind::LightnessAdept,
         stats: balance::UnitStats {
-            cooldown: (NOVICE_DEF.stats.cooldown as f32 / balance::DAO_LIGHTNESS_ATTACK_RATE + 0.5) as u32,
+            cooldown: (NOVICE_DEF.stats.cooldown as f32 / balance::DAO_LIGHTNESS_ATTACK_RATE + 0.5)
+                as u32,
             speed: SCOUT_CAR_DEF.stats.speed * balance::DAO_LIGHTNESS_SPEED_MULTIPLIER,
             ..NOVICE_DEF.stats
         },
