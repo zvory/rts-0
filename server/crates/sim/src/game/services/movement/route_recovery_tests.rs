@@ -2,6 +2,50 @@ use super::*;
 use crate::game::entity::Entity;
 
 #[test]
+fn committed_escape_uses_its_travel_direction_for_slope_speed() {
+    let mut map = flat_map(1);
+    map.elevation.fill(1);
+    let low = map.index(19, 20);
+    let high = map.index(21, 20);
+    map.elevation[low] = 0;
+    map.elevation[high] = 2;
+    let start = map.tile_center(20, 20);
+    for sign in [-1.0, 1.0] {
+        let mut entities = EntityStore::new();
+        let id = entities
+            .spawn_unit(1, EntityKind::Tank, start.0, start.1)
+            .unwrap();
+        let e = entities.get_mut(id).unwrap();
+        e.set_facing(0.0);
+        // The retained route points opposite the committed escape.
+        let route_goal = (start.0 - sign * 100.0, start.1);
+        e.replace_active_order(Order::move_to(route_goal.0, route_goal.1));
+        e.set_path(vec![route_goal]);
+        e.movement.as_mut().unwrap().pivot_recovery = Some(crate::game::entity::PivotRecovery {
+            goal: (start.0 + sign * config::TILE_SIZE as f32, start.1),
+            facing: 0.0,
+            ticks_left: 30,
+        });
+        let expected_speed = e.movement_speed()
+            * map.elevation_movement_multiplier_at(
+                start.0,
+                start.1,
+                (sign * config::TILE_SIZE as f32, 0.0),
+            );
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
+        movement_system(&map, &mut entities, &mut [], &occ, &spatial, 0);
+        let e = entities.get(id).unwrap();
+        assert!(
+            ((e.pos_x() - start.0) * sign - expected_speed).abs() < 0.001,
+            "escape direction {sign}: moved {} instead of {expected_speed}",
+            (e.pos_x() - start.0) * sign
+        );
+        assert_eq!(e.pos_y(), start.1);
+    }
+}
+
+#[test]
 fn replay_530_tank_355_escapes_water_without_other_units_or_sideways_motion() {
     let map = Map::load("Crossroads", 2, 2967932699).expect("recorded map");
     let mut entities = EntityStore::new();

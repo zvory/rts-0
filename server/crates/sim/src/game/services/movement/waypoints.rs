@@ -178,34 +178,36 @@ pub(super) fn advance_moving_units(
                     }
             })
             .unwrap_or(0.0);
-        if let Some((wx, wy)) = movement_target {
-            speed *= map.elevation_movement_multiplier_at(x, y, (wx - x, wy - y));
-            speed *= ability_runtime.magic_anchor_movement_multiplier(x, y, (wx - x, wy - y), tick);
-        }
-        if speed <= 0.0 {
-            continue;
-        }
+        let directional_speed = |(wx, wy): (f32, f32)| {
+            speed
+                * map.elevation_movement_multiplier_at(x, y, (wx - x, wy - y))
+                * ability_runtime.magic_anchor_movement_multiplier(x, y, (wx - x, wy - y), tick)
+        };
 
         let uses_vehicle_movement = uses_oriented_vehicle_body(kind);
         let is_pivot_vehicle = uses_pivot_vehicle_movement(kind);
         let is_car = uses_car_movement_semantics(kind);
-        if is_pivot_vehicle
-            && entities.get(id).is_some_and(|e| {
-                e.movement
-                    .as_ref()
-                    .is_some_and(|m| m.pivot_recovery.is_some())
-            })
+        if let Some(recovery) = entities
+            .get(id)
+            .filter(|_| is_pivot_vehicle)
+            .and_then(|e| e.movement.as_ref()?.pivot_recovery)
         {
+            // Recovery may retreat opposite the route: directional modifiers must follow
+            // the committed escape, including elevation and Magic Anchor pull.
+            let recovery_speed = directional_speed(recovery.goal);
             let neighbors = entities
                 .get(id)
                 .map(|e| super::pivot_recovery::neighbors(entities, spatial, e))
                 .unwrap_or_default();
-            if entities
-                .get_mut(id)
-                .is_some_and(|e| super::pivot_recovery::advance(e, map, occ, speed, &neighbors))
-            {
+            if entities.get_mut(id).is_some_and(|e| {
+                super::pivot_recovery::advance(e, map, occ, recovery_speed, &neighbors)
+            }) {
                 continue;
             }
+        }
+        speed = movement_target.map_or(speed, directional_speed);
+        if speed <= 0.0 {
+            continue;
         }
         let orig_x = x;
         let orig_y = y;
