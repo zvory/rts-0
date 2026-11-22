@@ -141,10 +141,10 @@ fn end_state_fingerprint_matches_native_and_wasm() {
         game.tick();
     }
     // Fingerprint v2 includes checkpointed resource knowledge and entity-owned tournament
-    // entry/production and optional committed pivot-recovery fields, as well as the
+    // entry/production, optional committed pivot-recovery, and Novice Charge duration fields, as well as the
     // remaining entity and RNG state. Native and WASM must share this known answer.
     assert_eq!(
         game.replay_end_state_hash().unwrap(),
-        "0ce4442d68375138edec8eb1d4d2f2b070c4227c5e98984486ff95925076f081"
+        "8b80cda2e05a4c3cc662fc7749419058f30c4d3acaf4cd71804005a9bc5610d0"
     );
 }
