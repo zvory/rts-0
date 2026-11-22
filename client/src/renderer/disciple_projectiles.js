@@ -49,7 +49,7 @@ export class DiscipleProjectileVisuals {
       }), { kind: KIND.WARRIOR, source: "discipleArrow" });
   }
 
-  update(flashes, now, graphics) {
+  update(flashes, now, graphics, colorByOwner = null) {
     if (this.destroyed) return;
     let arrows = 0;
     let flights = 0;
@@ -67,10 +67,12 @@ export class DiscipleProjectileVisuals {
         sprite = new this.pixi.Sprite(this.texture);
         sprite.anchor.set(0.5);
         sprite.width = 22;
-        sprite.height = 22 * this.texture.height / this.texture.width;
+        // Widen across the shaft while preserving its length and flight timing.
+        sprite.height = 22 * this.texture.height / this.texture.width * 3;
         this.layer.addChild(sprite);
         this.sprites.push(sprite);
       }
+      sprite.tint = colorByOwner?.get(flash.daoOwner) ?? 0xffffff;
       sprite.visible = true;
       sprite.position.set(flight.x, flight.y);
       sprite.rotation = flight.angle;

@@ -79,6 +79,7 @@ export class VisualEffectBuffers {
             from: ev.from,
             to: ev.to,
             targetPos: targetPos || (daoTarget ? { x: daoTarget.x, y: daoTarget.y } : null),
+            daoOwner: daoShooter?.owner ?? null,
             daoOrigin: daoShooter ? { x: daoShooter.x, y: daoShooter.y } : null,
             weaponKind: normalizedWeaponKind(ev.weaponKind),
             shotOrigin: ev.shotOrigin,

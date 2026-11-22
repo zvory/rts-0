@@ -870,7 +870,7 @@ export class Renderer {
       this._drawSafely("debugPathOverlay", () => this._drawDebugPathOverlay(feedbackView, regularEntities));
       this._drawSafely("rallyPoints", () => this._drawRallyPoints(feedbackView));
       this._drawSafely("resourceMiningPreview", () => this._drawResourceMiningPreview(feedbackView));
-      this._drawSafely("muzzleFlashes", () => this._drawMuzzleFlashes(feedbackView));
+      this._drawSafely("muzzleFlashes", () => this._drawMuzzleFlashes(feedbackView, colorByOwner));
       this._drawSafely("missToasts", () => this._drawMissToasts(feedbackView));
     });
     time("renderer.placement", () => {
