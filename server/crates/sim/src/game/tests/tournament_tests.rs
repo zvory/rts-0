@@ -17,7 +17,7 @@ fn player(id: u32) -> PlayerInit {
 fn arena(game: &mut Game) -> u32 {
     game.state
         .entities
-        .spawn_building(1, EntityKind::TournamentGrounds, 656.0, 656.0, true)
+        .spawn_building(1, EntityKind::TournamentGrounds, 640.0, 640.0, true)
         .unwrap()
 }
 
@@ -26,7 +26,7 @@ fn send(game: &mut Game, grounds: u32, count: usize) -> Vec<u32> {
         .map(|i| {
             game.state
                 .entities
-                .spawn_unit(1, EntityKind::Warrior, 580.0, 600.0 + i as f32 * 28.0)
+                .spawn_unit(1, EntityKind::Warrior, 560.0, 600.0 + i as f32 * 28.0)
                 .unwrap()
         })
         .collect();
@@ -75,6 +75,45 @@ fn wait_running(game: &mut Game, grounds: u32) {
 }
 
 #[test]
+fn tournament_admits_at_each_side_and_corner_of_the_four_tile_footprint() {
+    // The arena spans [576, 704] on each axis. Tile centers just outside
+    // its sides and corners are legal approach points within admission range.
+    for (x, y) in [
+        (560.0, 640.0),
+        (720.0, 640.0),
+        (640.0, 560.0),
+        (640.0, 720.0),
+        (560.0, 560.0),
+        (560.0, 720.0),
+        (720.0, 560.0),
+        (720.0, 720.0),
+    ] {
+        let mut game = empty_flat_game(&[player(1)]);
+        let grounds = arena(&mut game);
+        let unit = game
+            .state
+            .entities
+            .spawn_unit(1, EntityKind::Warrior, x, y)
+            .unwrap();
+        game.enqueue(
+            1,
+            Command::Move {
+                units: vec![unit],
+                x: 640.0,
+                y: 640.0,
+                queued: false,
+            },
+        );
+        game.tick();
+        assert!(
+            game.state.entities.get(unit).is_none(),
+            "entrant at ({x}, {y}) must be admitted at the perimeter"
+        );
+        assert_eq!(entrants(&game, grounds), 1);
+    }
+}
+
+#[test]
 fn tournament_four_enter_ten_seconds_one_random_upgrade_rally_and_checkpoint() {
     let mut game = empty_flat_game(&[player(1)]);
     let grounds = arena(&mut game);
@@ -83,7 +122,7 @@ fn tournament_four_enter_ten_seconds_one_random_upgrade_rally_and_checkpoint() {
         .entities
         .get_mut(grounds)
         .unwrap()
-        .set_rally_point(Some(RallyIntent::new(RallyKind::Move, 950.0, 656.0)));
+        .set_rally_point(Some(RallyIntent::new(RallyKind::Move, 950.0, 640.0)));
     let sent = send(&mut game, grounds, 4);
     wait_running(&mut game, grounds);
     assert!(sent.iter().all(|id| game.state.entities.get(*id).is_none()));
@@ -172,21 +211,21 @@ fn tournament_partial_capacity_rejects_specialists_enemies_and_cancels_entry() {
     let specialist = game
         .state
         .entities
-        .spawn_unit(1, EntityKind::Warrior, 590.0, 650.0)
+        .spawn_unit(1, EntityKind::Warrior, 560.0, 650.0)
         .unwrap();
     game.state.entities.get_mut(specialist).unwrap().dao = Some(UpgradeKind::DaoOfMagic);
     let enemy = game
         .state
         .entities
-        .spawn_unit(2, EntityKind::Warrior, 590.0, 690.0)
+        .spawn_unit(2, EntityKind::Warrior, 560.0, 690.0)
         .unwrap();
     for (owner, id) in [(1, specialist), (2, enemy)] {
         game.enqueue(
             owner,
             Command::Move {
                 units: vec![id],
-                x: 656.0,
-                y: 656.0,
+                x: 640.0,
+                y: 640.0,
                 queued: false,
             },
         );
@@ -200,8 +239,8 @@ fn tournament_partial_capacity_rejects_specialists_enemies_and_cancels_entry() {
         1,
         Command::Move {
             units: vec![cancelled],
-            x: 656.0,
-            y: 656.0,
+            x: 640.0,
+            y: 640.0,
             queued: false,
         },
     );
@@ -287,7 +326,7 @@ fn tournament_counts_are_team_private_and_hidden_buildings_stay_hidden() {
         .any(|e| e.id == grounds));
     game.state
         .entities
-        .spawn_unit(2, EntityKind::Warrior, 760.0, 656.0)
+        .spawn_unit(2, EntityKind::Warrior, 760.0, 640.0)
         .unwrap();
     for _ in 0..12 {
         game.tick();
@@ -360,7 +399,7 @@ fn tournament_rules_require_portal_and_only_cultivator_engineers_can_build() {
             stats.foot_w,
             stats.foot_h
         ),
-        (100, 0, 200, 3, 3)
+        (100, 0, 200, 4, 4)
     );
 }
 
@@ -378,8 +417,8 @@ fn tournament_portal_rally_trains_and_feeds_four_disciples_automatically() {
         1,
         Command::SetRally {
             building: portal,
-            x: 656.0,
-            y: 656.0,
+            x: 640.0,
+            y: 640.0,
             kind: RallyKind::Move,
             queued: false,
         },
@@ -475,9 +514,9 @@ fn tournament_staged_disciple_retries_when_the_perimeter_clears() {
     let mut game = empty_flat_game(&[player(1)]);
     let grounds = arena(&mut game);
     let mut blockers = Vec::new();
-    for ty in 0..5 {
-        for tx in 0..5 {
-            if tx != 0 && tx != 4 && ty != 0 && ty != 4 {
+    for ty in 0..6 {
+        for tx in 0..6 {
+            if tx != 0 && tx != 5 && ty != 0 && ty != 5 {
                 continue;
             }
             blockers.push(
@@ -486,8 +525,8 @@ fn tournament_staged_disciple_retries_when_the_perimeter_clears() {
                     .spawn_unit(
                         1,
                         EntityKind::Worker,
-                        592.0 + tx as f32 * 32.0,
-                        592.0 + ty as f32 * 32.0,
+                        560.0 + tx as f32 * 32.0,
+                        560.0 + ty as f32 * 32.0,
                     )
                     .unwrap(),
             );
@@ -496,14 +535,14 @@ fn tournament_staged_disciple_retries_when_the_perimeter_clears() {
     let disciple = game
         .state
         .entities
-        .spawn_unit(1, EntityKind::Warrior, 400.0, 656.0)
+        .spawn_unit(1, EntityKind::Warrior, 400.0, 640.0)
         .unwrap();
     game.enqueue(
         1,
         Command::Move {
             units: vec![disciple],
-            x: 656.0,
-            y: 656.0,
+            x: 640.0,
+            y: 640.0,
             queued: false,
         },
     );
@@ -542,8 +581,8 @@ fn tournament_entry_intent_survives_a_fully_blocked_approach() {
         1,
         Command::Move {
             units: vec![disciple],
-            x: 656.0,
-            y: 656.0,
+            x: 640.0,
+            y: 640.0,
             queued: false,
         },
     );
@@ -583,7 +622,7 @@ fn tournament_evolution_during_approach_clears_entry_without_stopping_movement()
     let disciple = game
         .state
         .entities
-        .spawn_unit(1, EntityKind::Warrior, 304.0, 656.0)
+        .spawn_unit(1, EntityKind::Warrior, 304.0, 640.0)
         .unwrap();
     let unit = game.state.entities.get_mut(disciple).unwrap();
     unit.insight = config::DISCIPLE_INSIGHT_REQUIRED;
@@ -592,8 +631,8 @@ fn tournament_evolution_during_approach_clears_entry_without_stopping_movement()
         1,
         Command::Move {
             units: vec![disciple],
-            x: 656.0,
-            y: 656.0,
+            x: 640.0,
+            y: 640.0,
             queued: false,
         },
     );
