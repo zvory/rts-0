@@ -1308,6 +1308,29 @@ function buttonByLabel(card, label) {
     "kind-only Anti-Tank Gun selection helper calls should keep legacy all Anti-Tank Gun behavior",
   );
 
+  const novices = [
+    { id: 51, dao: null },
+    { id: 52, chosenDao: "war" },
+    { id: 53, dao: "war" },
+    { id: 54, dao: "war" },
+    { id: 55, dao: "magic" },
+    { id: 56, dao: "lightness" },
+  ].map((unit, i) => ({ owner: 1, kind: KIND.WARRIOR, x: 100 + i * 20, y: 100, ...unit }));
+  input.state = {
+    playerId: 1,
+    entitiesInterpolated: () => novices,
+    setSelection(ids) { this.selection = new Set(ids); },
+  };
+  publishSelectionTestScene(input);
+  for (const [index, expected] of [[0, "51,52"], [1, "52,51"], [2, "53,54"], [4, "55"], [5, "56"]]) {
+    const novice = novices[index];
+    input._commitClickSelection({ x: novice.x, y: novice.y }, false, true);
+    assert(
+      [...input.state.selection].join(",") === expected,
+      "world same-type selection separates base Novices and each evolved Dao, ignoring chosen future Dao",
+    );
+  }
+
   assert(input._controlGroupSlotFromKey({ code: "Digit1" }) === 0, "Digit1 maps to control group slot 0");
   assert(input._controlGroupSlotFromKey({ code: "Digit0" }) === 9, "Digit0 maps to control group slot 9");
   assert(input._controlGroupSlotFromKey({ code: "Numpad5" }) === 4, "Numpad5 maps to control group slot 4");

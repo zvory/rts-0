@@ -335,7 +335,9 @@ export class HudSelectionPanel {
         ? this.state.selectedEntities()
         : [];
       this.state.setSelection(
-        sel.filter((e) => e.kind === entity.kind).map((e) => e.id),
+        sel.filter((e) => e.kind === entity.kind && (
+          entity.kind !== KIND.WARRIOR || (e.dao || null) === (entity.dao || null)
+        )).map((e) => e.id),
         { controlPolicy: this.controlPolicy },
       );
       return;

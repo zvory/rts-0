@@ -634,6 +634,12 @@ withFakeHudDocument(({ FakeElement }) => {
       { id: 2101, owner: 1, kind: KIND.WORKER },
       { id: 2102, owner: 1, kind: KIND.RIFLEMAN },
       { id: 2103, owner: 1, kind: KIND.TANK },
+      { id: 2104, owner: 1, kind: KIND.WARRIOR, dao: null },
+      { id: 2105, owner: 1, kind: KIND.WARRIOR, chosenDao: "war" },
+      { id: 2106, owner: 1, kind: KIND.WARRIOR, dao: "war" },
+      { id: 2107, owner: 1, kind: KIND.WARRIOR, dao: "war" },
+      { id: 2108, owner: 1, kind: KIND.WARRIOR, dao: "magic" },
+      { id: 2109, owner: 1, kind: KIND.WARRIOR, dao: "lightness" },
     ];
     const byId = new Map(selectedEntities.map((entity) => [entity.id, entity]));
     let selectedIds = selectedEntities.map((entity) => entity.id);
@@ -666,7 +672,7 @@ withFakeHudDocument(({ FakeElement }) => {
     };
 
     clickBlock(2100, { shiftKey: true });
-    assert(selectedIds.join(",") === "2101,2102,2103", "HUD selection panel shift-click removes that unit");
+    assert(selectedIds.join(",") === "2101,2102,2103,2104,2105,2106,2107,2108,2109", "HUD selection panel shift-click removes that unit");
 
     selectedIds = selectedEntities.map((entity) => entity.id);
     clickBlock(2102);
@@ -683,6 +689,14 @@ withFakeHudDocument(({ FakeElement }) => {
       preventDefault() {},
     });
     assert(selectedIds.join(",") === "2103", "HUD selection panel control context-click filters selection to that unit kind");
+
+    for (const modifiers of [{ ctrlKey: true }, { metaKey: true }]) {
+      for (const [id, expected] of [[2104, "2104,2105"], [2106, "2106,2107"], [2108, "2108"], [2109, "2109"]]) {
+        selectedIds = selectedEntities.map((entity) => entity.id);
+        clickBlock(id, modifiers);
+        assert(selectedIds.join(",") === expected, "HUD same-type selection separates base Novices and each evolved Dao");
+      }
+    }
 
     hud.destroy();
     assert(!panel.listeners.click && !panel.listeners.contextmenu, "HUD selection panel listeners are removed on destroy");
