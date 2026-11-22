@@ -5,11 +5,13 @@
 import { ABILITY, KIND, UPGRADE } from "../protocol.js";
 import { TICK_HZ } from "./timing.js";
 
+export const DAO_WAR_RANGE_TILES = 2.75;
 export const DAO_RANGED_RANGE_TILES = 5;
 export const DISCIPLE_INSIGHT_REQUIRED = 60;
 export const DISCIPLE_EVOLVED_INSIGHT_CAP = DISCIPLE_INSIGHT_REQUIRED * 2;
 
 export function entityAttackRangeTiles(entity) {
+  if (entity?.kind === KIND.WARRIOR && entity.dao === "war") return DAO_WAR_RANGE_TILES;
   if (entity?.kind === KIND.WARRIOR && entity.dao === "magic") {
     return DAO_RANGED_RANGE_TILES;
   }
@@ -223,7 +225,7 @@ export const STATS = Object.freeze({
   [KIND.SHOP]: { label: "Shop", icon: "SH", footW: 3, footH: 4, sight: 1,
     cost: { steel: 200, oil: 200 }, buildTicks: TICK_HZ * 40, trains: [],
     description: "A sturdy gourd-shaped shop. No goods or services are available yet." },
-  [KIND.PROVEN_GROUNDS]: { label: "Proven Grounds", icon: "PG", footW: 3, footH: 3, sight: 1,
+  [KIND.PROVEN_GROUNDS]: { label: "Proving Grounds", icon: "PG", footW: 3, footH: 3, sight: 1,
     cost: { steel: 100, oil: 0 }, buildTicks: 200, trains: [], requires: [KIND.PORTAL],
     description: "Send base Disciples inside for researched Dao training. Queue any mix of Lightness, War and Magic; each costs 100 oil and takes 10 seconds. Supports a rally point." },
   [KIND.TOURNAMENT_GROUNDS]: { label: "Tournament Grounds", icon: "TG", footW: 4, footH: 4, sight: 1,
@@ -233,7 +235,7 @@ export const STATS = Object.freeze({
     cost: { steel: 100, oil: 25 }, buildTicks: 560, trains: [],
     researches: [UPGRADE.DAO_OF_LIGHTNESS, UPGRADE.DAO_OF_MAGIC, UPGRADE.DAO_OF_HEAVINESS],
     requires: [KIND.RESOURCE_DEPOT, KIND.PORTAL],
-    description: "Research Lightness, War, and Magic to unlock paid training at the Proven Grounds." },
+    description: "Research Lightness, War, and Magic to unlock paid training at the Proving Grounds." },
   [KIND.ZAMOK]: { label: "Zamok", icon: "ZK", footW: 3, footH: 3, sight: 1,
     cost: { steel: 0, oil: 0 }, buildTicks: 0, trains: [KIND.GOLEM] },
   [KIND.DEPOT]: { label: "Supply Depot", icon: "SD", footW: 2, footH: 2, sight: 1,
@@ -531,19 +533,19 @@ export const UPGRADES = Object.freeze({
   [UPGRADE.DAO_OF_HEAVINESS]: Object.freeze({
     upgrade: UPGRADE.DAO_OF_HEAVINESS, label: "Dao of War", icon: "HVY",
     cost: Object.freeze({ steel: 100, oil: 200 }), researchTicks: DAO_RESEARCH_TICKS,
-    description: "Study the Dao of War. Unlocks the corresponding paid Disciple training at the Proven Grounds.",
+    description: "Study the Dao of War. Unlocks the corresponding paid Disciple training at the Proving Grounds.",
     researchedAt: KIND.THREE_DAO_PAVILION,
   }),
   [UPGRADE.DAO_OF_MAGIC]: Object.freeze({
     upgrade: UPGRADE.DAO_OF_MAGIC, label: "Dao of Magic", icon: "MAG",
     cost: Object.freeze({ steel: 100, oil: 200 }), researchTicks: DAO_RESEARCH_TICKS,
-    description: "Study the Dao of Magic. Unlocks the corresponding paid Disciple training at the Proven Grounds.",
+    description: "Study the Dao of Magic. Unlocks the corresponding paid Disciple training at the Proving Grounds.",
     researchedAt: KIND.THREE_DAO_PAVILION,
   }),
   [UPGRADE.DAO_OF_LIGHTNESS]: Object.freeze({
     upgrade: UPGRADE.DAO_OF_LIGHTNESS, label: "Dao of Lightness", icon: "LGT",
     cost: Object.freeze({ steel: 100, oil: 200 }), researchTicks: DAO_RESEARCH_TICKS,
-    description: "Study the Dao of Lightness. Unlocks the corresponding paid Disciple training at the Proven Grounds.",
+    description: "Study the Dao of Lightness. Unlocks the corresponding paid Disciple training at the Proving Grounds.",
     researchedAt: KIND.THREE_DAO_PAVILION,
   }),
   [UPGRADE.METHAMPHETAMINES]: Object.freeze({

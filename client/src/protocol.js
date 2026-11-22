@@ -383,7 +383,7 @@ export const cmd = Object.freeze({
 // Tournament Grounds: kind code 32; compact v62 slot 50 is team-private tournamentEntrants (0–4).
 // Existing production/rally fields carry its ten-second batch and pending winners.
 
-// Proven Grounds: kind code 33; v63 slot 51 is team-private daoTrainingQueue (<=64 Dao ids).
-// research(building, upgrade) queues paid training at Proven Grounds; cancel removes unpaid tail plans.
+// Proving Grounds: kind code 33; v63 slot 51 is team-private daoTrainingQueue (<=64 Dao ids).
+// research(building, upgrade) queues paid training at Proving Grounds; cancel removes unpaid tail plans.
 
 // Cultivator Shop: wire kind shop, compact kind code 34; no additional snapshot fields.

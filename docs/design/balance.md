@@ -823,7 +823,7 @@ baseline; runtime pricing applies ½×, 1×, or 2× to costs and duration. Compl
 researches and paid active Dao researches across all owned pavilions reserve tiers.
 Unpaid entries select their tier when payment starts; a paid entry keeps its duration
 and refund value even if another research is cancelled or its pavilion destroyed.
-Each unlocks its corresponding paid Disciple training at the Proven Grounds. Existing research queue, cancellation,
+Each unlocks its corresponding paid Disciple training at the Proving Grounds. Existing research queue, cancellation,
 refund, completion, and destruction rules apply; completed research persists.
 See [Cultivators](cultivators.md#three-dao-pavilion-prototype) for the approved brief.
 
@@ -837,7 +837,7 @@ Evolution clears all insight and doubles the cap to 120. Evolved Disciples conti
 insight from actual hostile HP damage; reaching 120 has no effect and enables no further evolution. Research ids are
 `dao_of_lightness`, `dao_of_heaviness` (War), `dao_of_magic` (Magic).
 
-Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md). Lightness uses the base Disciple’s 0.75-tile sword reach, retaining 23 damage, 50% penetration, 43-tick cooldown, moving attacks, 2.7025 px/tick movement, and Dash. Its five-tile automatic engagement closes to melee reach. Magic uses a five-tile orb primary, retaining 23 damage, 50% penetration, and 64-tick cooldown, and stops to fire. Base/War are unchanged. `DAO_RANGED_RANGE_TILES` is mirrored in client config and range overlays.
+Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md). Lightness uses the base Disciple’s 0.75-tile sword reach, retaining 23 damage, 50% penetration, 43-tick cooldown, moving attacks, 2.7025 px/tick movement, and Dash. Its five-tile automatic engagement closes to melee reach. Magic uses a five-tile orb primary, retaining 23 damage, 50% penetration, and 64-tick cooldown, and stops to fire. Base is unchanged. War uses 2.75-tile spear reach (`DAO_WAR_RANGE_TILES`), retaining its damage, cooldown, armor and HP bonuses. With the normal attacker radius and combat slack, this places its approximately 95-world-pixel ready tip near typical infantry contact; the visual lunge extends 16 pixels into the target. `DAO_WAR_RANGE_TILES` and `DAO_RANGED_RANGE_TILES` are mirrored in client config and range overlays.
 
 ### Tournament Grounds
 
@@ -850,7 +850,7 @@ See [Tournament Grounds rules](tournament-grounds.md).
 Portal first-stage rallies to the exact owned completed Grounds center automatically issue
 entry movement to newly trained base Disciples. Busy grounds retain waiting entry intents.
 
-### Proven Grounds
+### Proving Grounds
 
 Cultivator Engineers construct `proven_grounds` after a completed Portal: 100 steel, zero oil,
 200-tick construction, 3×3 tiles, 120 HP, armored, one-tile sight, no weapon or supply.
@@ -860,7 +860,7 @@ base Disciples inside or rally a Portal there. Each admission consumes one base 
 Dao specialist emerges after 300 ticks (10 seconds), using legal exits and the full rally plan.
 Blocked exits retry; destruction loses the trainee and oil. Unpaid plans can be canceled; active
 training cannot. Combat-earned 60-insight evolution requires no research.
-See [Proven Grounds brief and rules](proven-grounds.md) for details and deferred audio/AI work.
+See [Proving Grounds brief and rules](proven-grounds.md) for details and deferred audio/AI work.
 
 ## Cultivator Shop
 

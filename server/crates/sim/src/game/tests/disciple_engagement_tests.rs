@@ -321,3 +321,41 @@ fn disciple_queued_order_waits_until_original_goal_after_target_dies() {
     assert!(unit.queued_orders().is_empty());
     assert!(unit.pos_x() > 800.0 && unit.pos_y() > 800.0);
 }
+
+#[test]
+fn war_spear_approaches_then_stops_at_ready_tip_reach() {
+    // Start outside spear reach but inside automatic engagement. Ordinary infantry
+    // retains center targeting; the ready tip is about 95 px from the crown.
+    let (mut game, attacker, target) = fixture(EntityKind::Warrior, 160.0);
+    game.state.entities.get_mut(attacker).unwrap().dao =
+        Some(crate::game::upgrade::UpgradeKind::DaoOfHeaviness);
+    game.state
+        .entities
+        .get_mut(target)
+        .unwrap()
+        .set_order(Order::HoldPosition);
+    let mut struck = false;
+    for _ in 0..150 {
+        game.tick();
+        let victim = game.state.entities.get(target).unwrap();
+        if victim.hp < 40 {
+            let spear = game.state.entities.get(attacker).unwrap();
+            let distance =
+                (victim.pos_x() - spear.pos_x()).det_hypot(victim.pos_y() - spear.pos_y());
+            assert!(
+                (96.0..=107.0).contains(&distance),
+                "spear stand-off: {distance}"
+            );
+            let stopped = (spear.pos_x(), spear.pos_y());
+            for _ in 0..10 {
+                game.tick();
+            }
+            let spear = game.state.entities.get(attacker).unwrap();
+            assert!((spear.pos_x() - stopped.0).abs() < 0.01);
+            assert!((spear.pos_y() - stopped.1).abs() < 0.01);
+            struck = true;
+            break;
+        }
+    }
+    assert!(struck, "War must approach and strike from spear reach");
+}
