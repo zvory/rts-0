@@ -96,9 +96,13 @@ pub(in crate::game) fn advance(
             continue;
         }
         // Rectangle distance, not center distance: corner approaches must reach the perimeter too.
-        let half = config::TILE_SIZE as f32 * 1.5;
-        let dx = ((x - building.pos_x()).abs() - half).max(0.0);
-        let dy = ((y - building.pos_y()).abs() - half).max(0.0);
+        let Some(stats) = config::building_stats(building.kind) else {
+            continue;
+        };
+        let half_w = config::TILE_SIZE as f32 * stats.foot_w as f32 * 0.5;
+        let half_h = config::TILE_SIZE as f32 * stats.foot_h as f32 * 0.5;
+        let dx = ((x - building.pos_x()).abs() - half_w).max(0.0);
+        let dy = ((y - building.pos_y()).abs() - half_h).max(0.0);
         if dx * dx + dy * dy > 24.0 * 24.0 {
             // Spawn search may stage outside the admission radius when the perimeter is
             // crowded. Reconsider an exhausted approach after those blockers move away;

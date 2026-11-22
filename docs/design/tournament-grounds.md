@@ -13,7 +13,7 @@ emerges with a random Dao specialization. Supports a rally point.”
 ## Phase 1: rules and balance — complete
 
 - Cultivators only; Engineer build card; 100 steel, zero oil; completed Portal prerequisite.
-- 3×3 tiles, ordinary solid building placement/pathing; 200 ticks construction (6.67 seconds).
+- 4×4 tiles, ordinary solid building placement/pathing; 200 ticks construction (6.67 seconds).
 - 120 HP, armored, one-tile sight, no attack, no supply provided/used; ordinary construction,
   cancellation/refund, damage, fog memory and destruction behavior.
 - Right-click own completed Grounds with base Disciples (Warrior kind, no Dao). Entrants walk to

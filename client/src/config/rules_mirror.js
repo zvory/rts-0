@@ -214,7 +214,7 @@ export const STATS = Object.freeze({
   [KIND.PORTAL]: { label: "Portal", icon: "PRT", footW: 3, footH: 3, sight: 1,
     cost: { steel: 150, oil: 0 }, buildTicks: TICK_HZ * 5, trains: [KIND.WARRIOR],
     description: "A supernatural gateway that trains Cultivator Disciples." },
-  [KIND.TOURNAMENT_GROUNDS]: { label: "Tournament Grounds", icon: "TG", footW: 3, footH: 3, sight: 1,
+  [KIND.TOURNAMENT_GROUNDS]: { label: "Tournament Grounds", icon: "TG", footW: 4, footH: 4, sight: 1,
     cost: { steel: 100, oil: 0 }, buildTicks: 200, trains: [], requires: [KIND.PORTAL],
     description: "Right-click four base Disciples inside, or rally a Portal here. A free ten-second tournament produces one winner with a random Dao specialization. Supports a rally point." },
   [KIND.THREE_DAO_PAVILION]: { label: "Three Dao Pavilion", icon: "DAO", footW: 3, footH: 3, sight: 1,

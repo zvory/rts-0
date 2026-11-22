@@ -69,7 +69,7 @@ const PUMP_JACK_COMPONENT_RIG = Object.freeze({
 // Supply Depots and Tank Traps intentionally stay off this visual pass.
 const BUILDING_PNG_SPECS = Object.freeze([
   buildingSpec(KIND.TOURNAMENT_GROUNDS, 384, 384,
-    "/assets/rigs/tournament-grounds/tournament-atlas.png?v=tournament-01",
+    "/assets/rigs/tournament-grounds/tournament-atlas.png?v=tournament-bowl-02",
     { silhouetteShadow: false, omitFootprintShadow: true, visualScale: 1.1 }),
   buildingSpec(KIND.THREE_DAO_PAVILION, 384, 384,
     "/assets/rigs/three-dao-pavilion/pavilion-atlas.png?v=triad-01",

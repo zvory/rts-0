@@ -58,14 +58,14 @@ try {
     const calls = rects();
     assert.equal(calls.length, 5, "admission bar has background, fill, and three dividers");
     assert.equal(calls[1][3], 56 * count / 4, "one quarter fills per admitted disciple");
-    assert.equal(calls[0][2], 452, "admission bar sits below the health bar at y=444");
+    assert.equal(calls[0][2], 436, "admission bar sits below the 4×4 building health bar at y=428");
   }
   // Equal fractions must still redraw when switching between segmented and continuous bars.
   renderer._drawBuilding({ ...building, tournamentEntrants: 1 }, colors, state);
   renderer._drawBuilding({ ...building, tournamentEntrants: 4, prodKind: KIND.WARRIOR,
     prodProgress: 0.25 }, colors, state);
   assert.equal(rects().length, 2, "running tournament replaces slots with ordinary production bar");
-  assert.equal(rects()[0][2], 458, "running tournament uses ordinary production position");
+  assert.equal(rects()[0][2], 442, "running tournament uses ordinary production position");
   for (const entity of [
     { ...building, id: 11 },
     { ...building, id: 12, tournamentEntrants: 2, buildProgress: 0.5 },

@@ -830,7 +830,7 @@ Dao presentation and support Shield follow [Disciple insight and Dao evolution](
 
 ### Tournament Grounds
 
-Cultivator Engineer building: 100 steel, no oil, completed Portal prerequisite, 3×3,
+Cultivator Engineer building: 100 steel, no oil, completed Portal prerequisite, 4×4,
 120 HP armored, sight 1, 200-tick construction. Four base Disciples are consumed
 for a free 300-tick tournament producing one full-health Disciple
 rolling an existing first Dao specialization uniformly. Two supply reserve the winner.
