@@ -224,8 +224,11 @@ Steel Mine and Oil Pumpjack, with Nexus, Portal, and Three Dao Pavilion availabl
 Cultivator Serfs can also construct the faction-specific Portal for 150 Steel: it has a 3x3
 footprint, 123 HP, one tile of sight, a five-second construction time, no prerequisite, and no
 research. A completed Portal trains the Cultivator Disciple for 100 Steel and 2 Supply in 300 ticks.
-The Disciple is a 135-HP, 13.5-pixel-radius ground melee unit moving at 1.6 pixels per tick. Its
-23-damage sword has 0.5-tile reach, a 64-tick cooldown, and 50% armor penetration. See
+The Disciple is a 135-HP, 13.5-pixel-radius ground melee unit moving at 1.84 pixels per tick.
+All Disciple movement profiles receive a 15% speed increase,
+including Lightness (2.7025 pixels per tick) and Magic (2.024 pixels per tick); War retains
+the base Disciple speed. Its
+23-damage sword has 0.75-tile reach, a 64-tick cooldown, and 50% armor penetration. See
 [Cultivators specification](cultivators.md).
 
 
