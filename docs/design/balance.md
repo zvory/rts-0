@@ -813,7 +813,14 @@ It inherits the Training Centre baseline: 100 Steel, 25 Oil, 560 ticks construct
 120 HP, armored, one tile sight, no weapon, no supply or production. Its approved
 art uses a 3x3 placement and collision footprint.
 Its three independent, permanent researches (Dao of Lightness, Dao of War, and
-Dao of Magic) each cost 200 Steel and 100 Oil and take 600 ticks (20 seconds).
+Dao of Magic) share a player-wide escalating price, in any order: the first costs
+50 Steel / 100 Oil and takes 300 ticks (10 seconds), the second costs 100 Steel /
+200 Oil and takes 600 ticks (20 seconds), and the third costs 200 Steel / 400 Oil
+and takes 1200 ticks (40 seconds). The rules/client catalog retains the second-tier
+baseline; runtime pricing applies ½×, 1×, or 2× to costs and duration. Completed
+researches and paid active Dao researches across all owned pavilions reserve tiers.
+Unpaid entries select their tier when payment starts; a paid entry keeps its duration
+and refund value even if another research is cancelled or its pavilion destroyed.
 Each unlocks its corresponding evolution for Disciples with 60 insight. Existing research queue, cancellation,
 refund, completion, and destruction rules apply; completed research persists.
 See [Cultivators](cultivators.md#three-dao-pavilion-prototype) for the approved brief.

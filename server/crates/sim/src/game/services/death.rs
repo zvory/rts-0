@@ -59,7 +59,7 @@ pub(crate) fn death_system(
                 .research_queue()
                 .iter()
                 .filter(|item| item.paid)
-                .map(|item| item.upgrade)
+                .map(crate::game::upgrade::paid_cost)
                 .collect(),
         })
         .collect();
@@ -129,11 +129,7 @@ pub(crate) fn death_system(
                 }
             }
             for queued_upgrade in dead.queued_upgrades {
-                let definition = crate::game::upgrade::definition(queued_upgrade);
-                player.refund_cost(economy::ResourceCost::new(
-                    definition.cost_steel,
-                    definition.cost_oil,
-                ));
+                player.refund_cost(queued_upgrade);
             }
         }
         entities.release_miner(dead.id);
@@ -296,7 +292,7 @@ struct DeadEntity {
     construction_producer: Option<u32>,
     extractor_producer: Option<u32>,
     queued_units: Vec<EntityKind>,
-    queued_upgrades: Vec<crate::game::upgrade::UpgradeKind>,
+    queued_upgrades: Vec<economy::ResourceCost>,
 }
 
 fn record_score_death(

@@ -9,6 +9,7 @@ import {
 } from "../client/src/hud_command_card.js";
 import { createLabControlPolicy } from "../client/src/lab_control_policy.js";
 import {
+  researchDefinition,
   EKAT_FACTION_ID,
   FIXTURE_FACTION_ID,
   WORKER_BUILDABLE,
@@ -923,4 +924,22 @@ for (const researched of [false, true]) {
   const changed = buildCommandCardDescriptors({ ...context,
     selection: selection.map((e) => e.id === 1 ? { ...e, chosenDao: "lightness" } : e) });
   assert.notEqual(changed.signature, card.signature);
+}
+
+// Dao order is chosen by the player; completed and paid active researches reserve tiers.
+{
+  const dao = UPGRADE.DAO_OF_MAGIC;
+  const pavilion = { id: 900, owner: 1, kind: KIND.THREE_DAO_PAVILION,
+    prodUpgrade: UPGRADE.DAO_OF_LIGHTNESS };
+  for (const [upgrades, entities, cost, ticks] of [
+    [[], [], 50, 300],
+    [[UPGRADE.DAO_OF_HEAVINESS], [], 100, 600],
+    [[UPGRADE.DAO_OF_HEAVINESS], [pavilion], 200, 1200],
+    [[], [{ ...pavilion, prodWaiting: true }], 50, 300],
+    [[], [{ ...pavilion, owner: 2 }], 50, 300],
+  ]) {
+    const def = researchDefinition(dao, upgrades, entities, 1);
+    assert.deepEqual(def.cost, { steel: cost, oil: cost * 2 });
+    assert.equal(def.researchTicks, ticks);
+  }
 }

@@ -555,7 +555,7 @@ export class HUD {
       tooltipHtml: descriptor.tooltipKind
         ? this._kindTooltipHtml(descriptor.tooltipKind)
         : descriptor.tooltipUpgrade
-          ? this._upgradeTooltipHtml(descriptor.tooltipUpgrade)
+          ? this._upgradeTooltipHtml(descriptor.tooltipUpgrade, descriptor.researchDefinition)
           : descriptor.tooltipHtml,
       cls: descriptor.cls,
       countBadge: descriptor.countBadge,
@@ -924,8 +924,8 @@ export class HUD {
     );
   }
 
-  _upgradeTooltipHtml(upgrade) {
-    const def = UPGRADES[upgrade];
+  _upgradeTooltipHtml(upgrade, definition = null) {
+    const def = definition || UPGRADES[upgrade];
     if (!def) return "";
     const cost = def.cost || {};
     const seconds = Math.max(0, (def.researchTicks || 0) / TICK_HZ);

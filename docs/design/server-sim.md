@@ -1163,7 +1163,10 @@ work never prepay. An unpaid unit reserves neither resources nor supply, cancell
 death refund only paid entries, and owner/team projections expose `prodWaiting` so clients do not
 extrapolate false progress. Human manual front entries attempt payment in stable entity-id order
 before any standing repeat admission, still before construction payment. AI producers retain their
-per-producer repeat/payment order.
+per-producer repeat/payment order. Dao research selects a player-wide tier at payment from
+completed plus paid active Dao researches, including other pavilions. Its committed `total`
+duration identifies the paid tier for cancellation/death refunds; unpaid entries reprice at
+activation. See [balance](balance.md#three-dao-pavilion-prototype) for tier costs and times.
 
 Human Auto-Build protects the combined Steel/Oil cost of remaining unpaid manual front entries on
 living, completed producers and active worker build purchases already in interaction range at a

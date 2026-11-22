@@ -518,19 +518,19 @@ export const ABILITIES = Object.freeze({
 export const UPGRADES = Object.freeze({
   [UPGRADE.DAO_OF_HEAVINESS]: Object.freeze({
     upgrade: UPGRADE.DAO_OF_HEAVINESS, label: "Dao of War", icon: "HVY",
-    cost: Object.freeze({ steel: 200, oil: 100 }), researchTicks: DAO_RESEARCH_TICKS,
+    cost: Object.freeze({ steel: 100, oil: 200 }), researchTicks: DAO_RESEARCH_TICKS,
     description: "Study the Dao of War. Unlocks the corresponding Disciple evolution at 60 insight.",
     researchedAt: KIND.THREE_DAO_PAVILION,
   }),
   [UPGRADE.DAO_OF_MAGIC]: Object.freeze({
     upgrade: UPGRADE.DAO_OF_MAGIC, label: "Dao of Magic", icon: "MAG",
-    cost: Object.freeze({ steel: 200, oil: 100 }), researchTicks: DAO_RESEARCH_TICKS,
+    cost: Object.freeze({ steel: 100, oil: 200 }), researchTicks: DAO_RESEARCH_TICKS,
     description: "Study the Dao of Magic. Unlocks the corresponding Disciple evolution at 60 insight.",
     researchedAt: KIND.THREE_DAO_PAVILION,
   }),
   [UPGRADE.DAO_OF_LIGHTNESS]: Object.freeze({
     upgrade: UPGRADE.DAO_OF_LIGHTNESS, label: "Dao of Lightness", icon: "LGT",
-    cost: Object.freeze({ steel: 200, oil: 100 }), researchTicks: DAO_RESEARCH_TICKS,
+    cost: Object.freeze({ steel: 100, oil: 200 }), researchTicks: DAO_RESEARCH_TICKS,
     description: "Study the Dao of Lightness. Unlocks the corresponding Disciple evolution at 60 insight.",
     researchedAt: KIND.THREE_DAO_PAVILION,
   }),
@@ -655,3 +655,17 @@ export const WORKER_BUILDABLE = Object.freeze([
 export const FIXTURE_FACTION_ID = "phase2_empty_fixture";
 export const EKAT_FACTION_ID = "ekat";
 export const CULTIVATORS_FACTION_ID = "cultivators";
+
+// Dao research tier is shared across a player's completed and paid active researches.
+export function researchDefinition(upgrade, upgrades = [], entities = [], owner = null) {
+  const def = UPGRADES[upgrade];
+  if (!def || def.researchedAt !== KIND.THREE_DAO_PAVILION) return def;
+  const isDao = (id) => UPGRADES[id]?.researchedAt === KIND.THREE_DAO_PAVILION;
+  const active = entities.filter((entity) => entity.owner === owner &&
+    entity.kind === KIND.THREE_DAO_PAVILION && entity.prodUpgrade && !entity.prodWaiting)
+    .map((entity) => entity.prodUpgrade);
+  const count = new Set([...upgrades, ...active].filter(isDao)).size;
+  const multiplier = 2 ** Math.min(count, 2) / 2;
+  return { ...def, cost: { steel: def.cost.steel * multiplier, oil: def.cost.oil * multiplier },
+    researchTicks: def.researchTicks * multiplier };
+}

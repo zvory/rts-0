@@ -38,7 +38,9 @@ pub(super) fn pay_and_protect(
             .first()
             .filter(|item| !item.paid)
             .map(|item| {
-                let definition = upgrade::definition(item.upgrade);
+                let definition = players.iter().find(|player| player.id == building.owner)
+                    .map(|player| upgrade::next_definition(item.upgrade, player, entities))
+                    .unwrap_or_else(|| upgrade::definition(item.upgrade));
                 ResourceCost::new(definition.cost_steel, definition.cost_oil)
             })
             .unwrap_or(ResourceCost::new(0, 0));
@@ -85,13 +87,13 @@ pub(super) fn pay_front(entities: &mut EntityStore, players: &mut [PlayerState],
                     .map(|item| (building.owner, item.upgrade))
             })
     {
-        let definition = upgrade::definition(research);
-        let cost = rules::economy::ResourceCost::new(definition.cost_steel, definition.cost_oil);
         if let Some(player) = players.iter_mut().find(|player| player.id == owner) {
+            let definition = upgrade::next_definition(research, player, entities);
+            let cost = rules::economy::ResourceCost::new(definition.cost_steel, definition.cost_oil);
             if player.spend_cost(cost)
                 && !entities
                     .get_mut(id)
-                    .is_some_and(|building| building.mark_front_research_paid())
+                    .is_some_and(|building| building.mark_front_research_paid(definition.research_ticks))
             {
                 player.refund_cost(cost);
             }

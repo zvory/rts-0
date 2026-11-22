@@ -44,8 +44,8 @@ pub const ROCKETS_COST_OIL: u32 = 125;
 pub const ROCKETS_RESEARCH_TICKS: u32 = TICK_HZ * 25;
 
 // Research unlocks one-time, insight-gated Disciple evolution.
-pub const DAO_COST_STEEL: u32 = 200;
-pub const DAO_COST_OIL: u32 = 100;
+pub const DAO_COST_STEEL: u32 = 100;
+pub const DAO_COST_OIL: u32 = 200;
 pub const DAO_RESEARCH_TICKS: u32 = METHAMPHETAMINES_RESEARCH_TICKS;
 
 /// Applied to every Disciple movement profile, including Lightness’s Scout Car baseline.
@@ -60,3 +60,10 @@ pub const DAO_MAGIC_SPEED_MULTIPLIER: f32 = 1.1;
 
 pub const DISCIPLE_SHIELD_CAPACITY: u32 = 300;
 pub const DISCIPLE_SHIELD_COOLDOWN_TICKS: u16 = (TICK_HZ * 10) as u16;
+
+/// Completed and paid active Dao researches reserve player-wide price tiers.
+pub fn dao_research_tier(reserved: usize) -> (u32, u32, u32) {
+    let multiplier = 1u32 << reserved.min(2);
+    (DAO_COST_STEEL / 2 * multiplier, DAO_COST_OIL / 2 * multiplier,
+     DAO_RESEARCH_TICKS / 2 * multiplier)
+}

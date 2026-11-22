@@ -54,6 +54,7 @@ pub(super) fn enqueue(
         notice(events, player, "Requirement not met");
         return;
     }
+    let definition = upgrade::next_definition(upgrade, ps, entities);
     let cost = rules::economy::ResourceCost::new(definition.cost_steel, definition.cost_oil);
     let (queue_empty, building_complete) = entities.get(building).map_or((false, false), |b| {
         (b.research_queue().is_empty(), !b.under_construction())
