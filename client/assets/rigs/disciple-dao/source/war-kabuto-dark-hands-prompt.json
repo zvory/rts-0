@@ -1,0 +1,5 @@
+{
+  "generator": "Built-in image_gen tool",
+  "reference": "war-kabuto-pale-hands-v2.png",
+  "prompt": "Use case: precise-object-edit. Edit ONLY the two bare pale HANDS on EVERY character in this exact seven-frame RTS sprite contact sheet: cover BOTH hands completely in matte near-black charcoal armored gloves, matching the existing dark forearm bracers. All palms, knuckles, fingers and thumbs must be dark charcoal, with restrained gray highlights and clearly readable grip on the spear. No white, cream, exposed pale skin or bright glove panels on any hand in any of the seven poses. Preserve absolutely everything else as faithfully unchanged as possible: white split-crest kabuto helmet, white layered shoulder armor, dark forearms/torso, dark spear shaft and dark gunmetal spear blade, pose, proportions, pixel scale, framing, spear length, strict overhead camera, outline and painted shading. Same exact 4 columns by 2 rows, top idle/walk1/walk2/empty, bottom four attack poses. Same flat pure #ff00ff magenta background. No text, grid, shadows, effects or new ornaments. This is a tiny localized material-color correction to hands only; no redesign."
+}

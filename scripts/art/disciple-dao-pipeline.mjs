@@ -126,22 +126,21 @@ const windyRun = gridFrames("lightness-melee-b-windy-run.png", 1, 0.27, 0.60, 3)
 meleeLightness.splice(1, 3, ...windyRun);
 strip("lightness-melee-b", meleeLightness);
 strip("magic", gridFrames("magic-motion.png", 2, 0.37));
-// Approved Yari B: preserve idle and walking, append the four-pose stepping thrust.
-// Pack at half the approved source scale; runtime doubles scale to retain body/reach
-// while keeping the seven-cell strip inside the 2048-pixel deployment texture bound.
-const warMotion = key(read(path.join(rig, "source/war-yari-motion.png")));
+// Kabuto candidate B: white team-tinted helmet and charcoal body armor.
+// Explicit helmet centers replace dark-hair detection; the crown is now white.
+// Preserve the approved body's scale while leaving room for the full yari.
+const warSheet = key(read(path.join(rig, "source/war-kabuto-motion.png")));
 const war = [];
-for (let col = 0; col < 3; col++) {
-  const x = Math.round(col * warMotion.width / 5), next = Math.round((col + 1) * warMotion.width / 5);
-  const cell = crop(warMotion, x, 0, next - x, warMotion.height);
-  war.push(frame(cell, 0.25, hairPivot(cell, cell.width * 0.5, cell.height * 0.25, cell.width * 0.12)));
-}
-const warAttack = key(read(path.join(rig, "source/war-yari-lunge.png")));
-const warCrowns = [[210, 114], [208, 140], [246, 174], [244, 120]];
-for (let col = 0; col < 4; col++) {
-  const x = Math.round(col * warAttack.width / 4), next = Math.round((col + 1) * warAttack.width / 4);
-  const cell = crop(warAttack, x, 0, next - x, warAttack.height);
-  war.push(frame(cell, 0.25, hairPivot(cell, ...warCrowns[col], 55)));
+const warCells = [
+  [0, 0, 222, 86], [1, 0, 224, 89], [2, 0, 213, 88],
+  [0, 1, 222, 81], [1, 1, 223, 96], [2, 1, 213, 125], [3, 1, 222, 81],
+];
+for (const [col, row, crownX, crownY] of warCells) {
+  const x = Math.round(col * warSheet.width / 4), y = Math.round(row * warSheet.height / 2);
+  const cell = crop(warSheet, x, y,
+    Math.round((col + 1) * warSheet.width / 4) - x,
+    Math.round((row + 1) * warSheet.height / 2) - y);
+  war.push(frame(cell, 0.31, [crownX, crownY]));
 }
 strip("war-yari", war);
 const arrowDir = path.join(root, "client/assets/effects/disciple-arrow");
