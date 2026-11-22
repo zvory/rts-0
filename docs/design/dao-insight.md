@@ -17,7 +17,7 @@ through checkpoints and are visible only to teammates and privileged observers. 
 card highlights chosen paths with an assigned/eligible count; tooltips show missing
 insight, and unit details show the pending path. Automatic evolution runs after combat,
 research production, and ability runtime each tick, skipping dead units.
-Pavilion research now unlocks paid one-for-one training in the [Proven Grounds](proven-grounds.md),
+Pavilion research now unlocks paid one-for-one training in the [Proving Grounds](proven-grounds.md),
 with the existing shared research price tiers, serial queue and prerequisite/faction gates.
 Combat-earned evolution requires neither research nor a Pavilion.
 

@@ -1,3 +1,4 @@
+import { drawTrainingLightning } from "./training_lightning.js";
 import { gfxNoFill, gfxCircle, gfxRect, gfxStrokeLine, gfxFill, gfxStroke } from "./native_graphics.js";
 import {
   COLORS,
@@ -196,6 +197,12 @@ export function _drawBuilding(e, colorByOwner, state) {
 
   if (e.kind === KIND.PORTAL && !underConstruction) {
     drawPortalVortex.call(this, e, w, h);
+  }
+
+  if (e.kind === KIND.PROVEN_GROUNDS && !underConstruction && e.prodKind) {
+    const effect = this._slot("buildingEffects", e.id);
+    effect.position.set(0, 0);
+    drawTrainingLightning(effect, e, w, rendererVisualNow(this));
   }
 
   const tournamentFilling = e.kind === KIND.TOURNAMENT_GROUNDS && !underConstruction && !e.prodKind

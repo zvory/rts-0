@@ -1,12 +1,12 @@
-# Proven Grounds
+# Proving Grounds
 
 ## Phase 0: building brief — complete
 
-The user explicitly requested implementation of the Proven Grounds and unrestricted combat-earned
+The user explicitly requested implementation of the Proving Grounds and unrestricted combat-earned
 Dao evolution. This brief records that direction before implementation. Cultivator Engineers
 construct a dedicated training hall: base Disciples enter, and emerge as a chosen researched Dao
 specialist. This trades oil and vulnerable training time for combat-earned insight. Opponents can
-attack the building or its waiting disciples. The name is Proven Grounds, as requested.
+attack the building or its waiting disciples. The display name is Proving Grounds; the internal `proven_grounds` kind is unchanged.
 
 UI description: “Send base Disciples inside for researched Dao training. Queue any mix of
 Lightness, War and Magic; each costs 100 oil and takes 10 seconds. Supports a rally point.”
@@ -16,6 +16,10 @@ Unique silhouette: a tall open horseshoe training gate around a small stepped ex
 with two unequal-height upright pillars joined by a suspended horizontal beam. Avoid the
 Nexus lotus, Pavilion's three roofs, and Tournament Grounds' circular bowl. Same stone, timber,
 white team-paint and isometric camera as existing faction art.
+
+Occupied presentation: while a trainee is inside, a blue-white ball of lightning pulses in the
+gate opening, with crawling spherical arcs and intermittent outward forks. Empty,
+unfinished and fog-remembered buildings show no lightning. Uses existing public production state.
 
 ## Phase 1: rules and balance — complete
 
