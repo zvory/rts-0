@@ -358,13 +358,15 @@ pub(crate) fn closest_combat_target_point(
 /// Circle-bodied targets retain their existing range semantics.
 pub(crate) fn primary_combat_target_point(
     map: &Map,
-    attacker_kind: EntityKind,
+    weapon: crate::rules::combat::WeaponKind,
     attacker: (f32, f32),
     target: &Entity,
 ) -> (f32, f32) {
     if matches!(
-        attacker_kind,
-        EntityKind::Worker | EntityKind::Golem | EntityKind::Warrior
+        weapon,
+        crate::rules::combat::WeaponKind::WorkerTools
+            | crate::rules::combat::WeaponKind::GolemFists
+            | crate::rules::combat::WeaponKind::WarriorSword
     ) {
         match unit_body_for_entity(target) {
             Some(UnitBody::OrientedBox(body)) => {

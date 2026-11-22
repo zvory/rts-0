@@ -74,6 +74,7 @@ await import("./client_contracts/observation_contracts.mjs");
 await import("./client_contracts/protocol_contracts.mjs");
 await import("./client_contracts/panzerfaust_client_contracts.mjs");
 await import("./client_contracts/warrior_client_contracts.mjs");
+await import("./client_contracts/disciple_dao_sprite_contracts.mjs");
 await import("./client_contracts/native_graphics_contracts.mjs");
 await import("./client_contracts/lobby_contracts.mjs");
 await import("./client_contracts/chat_overlay_contracts.mjs");
@@ -143,3 +144,4 @@ await import("./rectangular_map_asset_contracts.mjs");
 console.log("✅ client_contracts.mjs: all contract assertions passed");
 
 await import("./client_contracts/tournament_contracts.mjs");
+await import("./client_contracts/disciple_projectile_contracts.mjs");

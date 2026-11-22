@@ -13,6 +13,34 @@ import {
   selectionBudgetGridModel,
 } from "../../client/src/hud.js";
 import { KIND } from "../../client/src/protocol.js";
+import { HudSelectionPanel } from "../../client/src/hud_selection_panel.js";
+
+withFakeHudDocument(({ FakeElement }) => {
+  const panel = new FakeElement("section");
+  const selected = [
+    { id: 1, owner: 1, kind: KIND.WARRIOR },
+    { id: 2, owner: 1, kind: KIND.WARRIOR },
+  ];
+  const portraits = [];
+  const selectionPanel = new HudSelectionPanel(panel, {
+    players: [], selectedEntities: () => selected,
+  }, null, (kind, { dao }) => {
+    portraits.push(dao);
+    return `<span>${dao || "sword"}</span>`;
+  });
+  selectionPanel.render();
+  selectionPanel.render();
+  assert(portraits.length === 2, "unchanged multi-selection reuses its portraits");
+  selected[0].dao = "lightness";
+  selectionPanel.render();
+  assert(portraits.length === 4 && portraits[2] === "lightness",
+    "evolution refreshes the selected group's portraits without reselection");
+  selected[1].dao = "magic";
+  selectionPanel.render();
+  assert(portraits.length === 6 && portraits[5] === "magic",
+    "each selected Disciple's Dao participates in portrait cache invalidation");
+  selectionPanel.destroy();
+});
 
 // ---------------------------------------------------------------------------
 // HUD selection budget grid

@@ -2,7 +2,7 @@
 
 Phase 0/1 briefs and rules (completed before implementation): each path is a permanent
 specialization of the existing Disciple, retaining its entity identity, orders, cost,
-supply (2), sight, size, and ordinary ground pathing. All Disciples share a 0.75-tile melee reach (increased from 0.5 by 0.25 tiles to better cover the extended sword animation). No additional
+supply (2), sight, size, and ordinary ground pathing. Base and War Disciples retain 0.75-tile sword reach. Lightness and Magic replace their sword with a five-tile ranged primary; their engagement range equals that five-tile attack range. No additional
 training source or build time. A Dao button assigns its path to every selected, owned, unevolved Disciple, even before
 research or insight are ready. Selecting another path replaces the pending choice. This
 entity-owned intent is independent of orders: moving, attacking, Stop, and queued orders
@@ -22,11 +22,11 @@ serial research queue and existing prerequisite/faction gates.
 
 - Lightness: mobile skirmisher; 1.15 times scout-car base speed (2.7025 px/tick), 1.5 attacks per original attack
   interval (cooldown divided by 1.5), existing Ekat Dash with optional return unchanged.
-  A centered yellow left-facing double chevron with black outline identifies it. Classic evolution key L; grid Z.
+  Uses the approved Lightness A white-robed archer, oversized bow, quiver and streaming headband. Its five-tile arrows deal the same 23 damage with 50% armor penetration, retaining the 43-tick cooldown. Plain Move keeps its destination while firing at legal in-range targets. No secondary sword. Classic evolution key L; grid Z.
 - War: armored melee damage dealer; 1.5 damage, +20 maximum HP, 50% armor
   reduction using the existing penetration mechanic (full AP bypasses it), keeps the Disciple's existing
   50% armor penetration. A centered neon-red sword with black outline identifies it, rotated 90 degrees and lengthened 20%. Classic W; grid X.
-- Magic: battlefield support; 1.1 times the buffed base movement speed (2.024 px/tick), shared Ekat pull field (renamed Anchor), with doubled inward pull (0.70 movement-speed idle drag and up to 1.70x movement toward its center; radial falloff and weight resistance still apply) and a new Shield, a centered green pentagram with black outline identifies it. Classic C; grid C. Bespoke rigs and audio remain deferred for this prototype.
+- Magic: battlefield support; 1.1 times the buffed base movement speed (2.024 px/tick), shared Ekat pull field (renamed Anchor), with doubled inward pull (0.70 movement-speed idle drag and up to 1.70x movement toward its center; radial falloff and weight resistance still apply) and a new Shield, uses the approved Magic C hooded spellcaster, with arms swept backward and flowing mantle while running. Its five-tile orbs deal the same 23 damage with 50% armor penetration and 64-tick cooldown. It stops to fire normally and has no secondary sword. Classic C; grid C. War keeps its existing sword art and red sword icon. Lightness chevrons and the Magic pentagram are removed; insight, readiness and advancement overlays remain. Bespoke audio remains deferred.
 
 Each path has a separate researched unlock. No automatic AI evolution in this pass;
 AI can encounter and damage evolved units. Insight uses a blue fill over red background
@@ -68,3 +68,5 @@ tracks its living caster on return and expires on caster death or the shared pro
 lifetime limit. Other Dao paths and unevolved Disciples cannot cast it. Its separate
 `throwSword` identity uses the existing fog-filtered line-projectile projection; no caster
 lookup is needed to display the generated sword sprite. Ekat's Line Shot is unchanged.
+
+Lightness and Magic use shot-triggered draw/windup, release, follow-through and recovery frames over 400 ms. Projectile presentation starts at the release frame (100 ms); the existing immediate authoritative damage timing is unchanged. Arrows use one shared generated texture and a bounded reusable sprite pool. Orbs are about seven world pixels across, with a small halo and one shimmering cross drawn into the shared feedback graphics batch: no emitter, per-orb display objects, blur, filters or retained particles. Both consume only authorized attack endpoints and expire within 600 ms. Changing specialization preserves remaining reload and clears obsolete automatic melee pursuit without canceling explicit Move orders.

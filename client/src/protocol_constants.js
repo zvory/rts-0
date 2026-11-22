@@ -330,6 +330,8 @@ export const WEAPON_KIND = Object.freeze({
   TANK_CANNON: "tank_cannon",
   TANK_COAX: "tank_coax",
   WARRIOR_SWORD: "warrior_sword",
+  DISCIPLE_ARROW: "disciple_arrow",
+  DISCIPLE_ORB: "disciple_orb",
 });
 
 export const VISION_SELECTION = Object.freeze({
@@ -465,6 +467,8 @@ export const WEAPON_KIND_CODE = Object.freeze({
   [WEAPON_KIND.TANK_CANNON]: 10,
   [WEAPON_KIND.TANK_COAX]: 11,
   [WEAPON_KIND.WARRIOR_SWORD]: 12,
+  [WEAPON_KIND.DISCIPLE_ARROW]: 13,
+  [WEAPON_KIND.DISCIPLE_ORB]: 14,
 });
 
 export const EVENT_CODE = Object.freeze({
@@ -597,7 +601,8 @@ export const MAX_COMPACT_SMOKES = 1024;
 export const MAX_COMPACT_ABILITY_OBJECTS = 1024;
 export const MAX_COMPACT_TRENCHES = 20000;
 export const MAX_COMPACT_EVENTS = 5000;
-export const MAX_COMPACT_ORDER_PLAN = 9;
+// One active stage plus the server's 32 queued unit orders.
+export const MAX_COMPACT_ORDER_PLAN = 33;
 export const MAX_COMPACT_ABILITIES = 8;
 export const MAX_COMPACT_DEBUG_WAYPOINTS = 128;
 export const MAX_COMPACT_VISIBLE_TILES = 65536;

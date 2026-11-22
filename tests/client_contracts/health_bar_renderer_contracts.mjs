@@ -158,6 +158,12 @@ try {
   const discipleBar = makeBar();
   for (const dao of [null, "lightness", "war", "magic"]) {
     _hpBar.call({ _map: { tileSize: 32 } }, discipleBar, { ...disciple, dao });
+    const iconCalls = discipleBar.rtsDao.calls;
+    const lastClear = iconCalls.findLastIndex((call) => call[0] === "clear");
+    const iconDrawing = iconCalls.slice(lastClear + 1).filter((call) =>
+      ["drawPolygon", "drawCircle", "moveTo", "lineTo"].includes(call[0]));
+    assert(dao === "war" ? iconDrawing.length > 0 : iconDrawing.length === 0,
+      "only War retains its sword icon; Lightness and Magic have no legacy glyph");
     const rects = discipleBar.rtsInsight.calls.filter((call) => call[0] === "drawRect");
     assert(rects.at(-1)[3] === (rects.at(-2)[3] - 2) / 2,
       "30 insight fills half the Disciple insight bar");

@@ -90,12 +90,15 @@ impl Entity {
         {
             return false;
         }
+        let attack_cd = self.attack_cd();
         self.dao = Some(match ability {
             AbilityKind::EvolveLightness => UpgradeKind::DaoOfLightness,
             AbilityKind::EvolveWar => UpgradeKind::DaoOfHeaviness,
             AbilityKind::EvolveMagic => UpgradeKind::DaoOfMagic,
             _ => return false,
         });
+        // Evolution changes the primary weapon without granting a free extra shot.
+        self.set_attack_cd(attack_cd);
         self.chosen_dao = None;
         self.dao_advance_ticks = 15;
         if self.dao == Some(UpgradeKind::DaoOfHeaviness) {

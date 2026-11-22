@@ -454,12 +454,8 @@ Raster rig workflow:
   4.2-inch-inspired wheeled mortar sheet: assembled reference, team-tinted carriage/frame and
   tube/barrel assembly, plus fixed-color tire overlays. The carriage sprite follows the
   raster-native carriage recoil binding while the separate tube sprite follows the stronger weapon recoil
-  binding. The deployed Mortar Team also uses an image-generated square base-plate PNG in the unit
-  atlas. Its white-painted source receives the owning player's runtime team tint. The keyed and
-  tightly cropped 128px source is postprocessed to exactly 16x16 world pixels (half a tile), draws
-  below the carriage with its center offset 20 world pixels rearward, scales from zero to full size
-  with setup progress, and shrinks during teardown; raster-native metadata supplies its animation
-  bindings. See
+  binding. Packed, deploying, and deployed states use only the carriage, tires, and tube;
+  the retired square base plate is no longer rendered. See
   [raster-unit-art-handoff.md](raster-unit-art-handoff.md) for the asset-authority boundary,
   production inventory, and validation contract.
 - Keep generated PNG sources, the production derivative, prompt, and manifest together under each
@@ -2829,13 +2825,12 @@ new gameplay control.
 ### Disciple insight presentation
 
 Disciple insight and Dao fields pass through the detached presentation entity snapshot
-to the Pixi worker. A blue-on-red insight bar appears below HP; evolved paths use centered,
-black-outlined yellow chevrons, a neon-red sword rotated 90 degrees and lengthened 20%,
-or a green pentagram. The selected unit shows
+to the Pixi worker. A blue-on-red insight bar appears below HP; evolved paths use
+Dao-specific Lightness A archer and Magic C hooded spellcaster frame strips. Magic runs with arms swept back and its mantle trailing; their old chevrons/pentagram are removed. War retains the neon-red sword rotated 90 degrees and lengthened 20% and its original sword strip. The selected unit shows
 exact insight and Dao. Evolution choices occupy grid Z/X/C; classic L/W/C. Buttons remain actionable before
 research or insight, assign all selected unevolved Disciples, and show the pending path
 with an active highlight and assigned/eligible count. A new choice replaces the old one;
 unit details and tooltips show the chosen Dao and remaining requirements. See
 [Dao evolution rules](dao-insight.md).
 
-Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md).
+Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md). The entity-aware frame-strip key also selects HUD/minimap portraits. Actual attack events drive four-frame 400 ms cycles, including weapon aim during Lightness movement. `disciple_projectiles.js` draws an arrow texture from a reusable pool and fixed-cost shimmering orb geometry in the feedback batch. There are no per-orb emitters, filters or particle histories. Projectile endpoints are captured from authorized event/snapshot positions, persist for at most 600 ms, and launch at the 100 ms release pose. Unit range overlays mirror the five-tile ranged Dao range.

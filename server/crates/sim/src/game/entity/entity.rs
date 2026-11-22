@@ -988,8 +988,8 @@ impl Entity {
         }
     }
 
-    fn default_weapon_kind(&self) -> Option<rules::combat::WeaponKind> {
-        rules::combat::default_weapon_kind(self.kind)
+    pub(crate) fn default_weapon_kind(&self) -> Option<rules::combat::WeaponKind> {
+        rules::combat::resolved_weapon_kind(self.kind, self.dao)
     }
 
     pub fn set_last_damage_owner(&mut self, owner: Option<u32>) {

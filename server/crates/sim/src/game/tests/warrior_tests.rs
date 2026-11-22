@@ -907,7 +907,10 @@ fn war_throw_sword_is_dao_gated_and_hits_harder_on_return_after_checkpoint() {
         Some(UpgradeKind::DaoOfLightness),
         Some(UpgradeKind::DaoOfMagic),
     ] {
-        game.state.entities.get_mut(caster).unwrap().dao = dao;
+        let unit = game.state.entities.get_mut(caster).unwrap();
+        unit.dao = dao;
+        // Isolate ability gating from the new ordinary ranged attacks.
+        unit.set_attack_cd(1000);
         game.enqueue(1, cast.clone());
         game.tick();
         assert_eq!(game.state.ability_runtime.world_objects().count(), 0);

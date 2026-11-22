@@ -826,7 +826,7 @@ through checkpoints. Visible Disciple snapshots append `insight` (compact slot 4
 Evolution automatically occurs once the matching research and 60 insight are ready. Research ids are
 `dao_of_lightness`, `dao_of_heaviness` (War), `dao_of_magic` (Magic).
 
-Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md).
+Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md). Lightness and Magic replace melee with five-tile primary weapons (and five-tile engagement), retaining 23 damage and 50% penetration. Lightness retains 43-tick cooldown and fires while moving; Magic retains 64-tick cooldown and stops to fire. Base/War are unchanged. `DAO_RANGED_RANGE_TILES` is mirrored in client config and range overlays.
 
 ### Tournament Grounds
 

@@ -203,6 +203,8 @@ pub mod weapons {
     pub const WORKER_TOOLS: &str = "worker_tools";
     pub const GOLEM_FISTS: &str = "golem_fists";
     pub const WARRIOR_SWORD: &str = "warrior_sword";
+    pub const DISCIPLE_ARROW: &str = "disciple_arrow";
+    pub const DISCIPLE_ORB: &str = "disciple_orb";
     pub const RIFLEMAN_RIFLE: &str = "rifleman_rifle";
     pub const MACHINE_GUNNER_MG: &str = "machine_gunner_mg";
     pub const SCOUT_CAR_MG: &str = "scout_car_mg";
@@ -539,6 +541,8 @@ const WEAPON_KIND_CODES: &[(&str, u8)] = &[
     (weapons::WORKER_TOOLS, 1),
     (weapons::GOLEM_FISTS, 2),
     (weapons::WARRIOR_SWORD, 12),
+    (weapons::DISCIPLE_ARROW, 13),
+    (weapons::DISCIPLE_ORB, 14),
     (weapons::RIFLEMAN_RIFLE, 3),
     (weapons::MACHINE_GUNNER_MG, 4),
     (weapons::SCOUT_CAR_MG, 5),
@@ -863,6 +867,8 @@ fn weapon_kind_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("WORKER_TOOLS", weapons::WORKER_TOOLS),
         ("GOLEM_FISTS", weapons::GOLEM_FISTS),
         ("WARRIOR_SWORD", weapons::WARRIOR_SWORD),
+        ("DISCIPLE_ARROW", weapons::DISCIPLE_ARROW),
+        ("DISCIPLE_ORB", weapons::DISCIPLE_ORB),
         ("RIFLEMAN_RIFLE", weapons::RIFLEMAN_RIFLE),
         ("MACHINE_GUNNER_MG", weapons::MACHINE_GUNNER_MG),
         ("SCOUT_CAR_MG", weapons::SCOUT_CAR_MG),
