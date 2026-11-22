@@ -123,23 +123,7 @@ pub(super) fn lab_replay_operation_to_entry_kind(
             op: LabOp::SpawnEntities(
                 spawns
                     .iter()
-                    .map(|spawn| {
-                        let kind = EntityKind::from_str(&spawn.kind)
-                            .map_err(|_| "unknown entity kind".to_string())?;
-                        Ok(LabSpawnEntity {
-                            owner: spawn.owner,
-                            kind,
-                            x: spawn.x,
-                            y: spawn.y,
-                            completed: spawn.completed,
-                            dao: spawn.dao,
-                            faction_id: spawn
-                                .faction_id
-                                .as_deref()
-                                .map(resolve_spawn_faction)
-                                .transpose()?,
-                        })
-                    })
+                    .map(lab_spawn_from_protocol)
                     .collect::<Result<Vec<_>, String>>()?,
             ),
         }),
@@ -303,4 +287,24 @@ pub(super) fn resolve_spawn_faction(id: &str) -> Result<&'static str, String> {
     rts_rules::faction::catalog_for(id)
         .map(|catalog| catalog.id)
         .ok_or_else(|| "unknown spawn faction".to_string())
+}
+
+/// Shared spawn decoding for live Lab batches and portable replay operations.
+pub(super) fn lab_spawn_from_protocol(
+    spawn: &LabSpawnEntitySpec,
+) -> Result<LabSpawnEntity, String> {
+    let kind = EntityKind::from_str(&spawn.kind).map_err(|_| "unknown entity kind".to_string())?;
+    Ok(LabSpawnEntity {
+        owner: spawn.owner,
+        kind,
+        x: spawn.x,
+        y: spawn.y,
+        completed: spawn.completed,
+        dao: spawn.dao,
+        faction_id: spawn
+            .faction_id
+            .as_deref()
+            .map(resolve_spawn_faction)
+            .transpose()?,
+    })
 }
