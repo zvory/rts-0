@@ -51,6 +51,13 @@ impl Entity {
         }
     }
 
+    /// Credit actual hostile HP loss after all damage protection and overkill.
+    pub(in crate::game) fn gain_insight(&mut self, damage: u32) {
+        if self.kind == EntityKind::Warrior {
+            self.insight = self.insight.saturating_add(damage).min(self.insight_cap());
+        }
+    }
+
     pub(crate) fn units_killed(&self) -> u32 {
         self.units_killed
     }

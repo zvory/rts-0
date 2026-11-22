@@ -204,12 +204,7 @@ pub(super) fn apply_direct_hit(
             .get(victim)
             .map_or(0, |target| before_hp.saturating_sub(target.hp));
         if let Some(source) = entities.get_mut(attacker) {
-            if source.kind == crate::game::entity::EntityKind::Warrior {
-                source.insight = source
-                    .insight
-                    .saturating_add(actual)
-                    .min(source.insight_cap());
-            }
+            source.gain_insight(actual);
         }
     }
     if damaged {
