@@ -16,6 +16,7 @@ export function createMatchStartupInbox(net, diagnostics = null) {
   const resourceDeltas = new Map();
   const replayResourceHistory = [];
   let reportedReceiptDrop = false;
+  let pauseStateReceivedAt = 0;
   const handlers = new Map();
 
   for (const type of [...LATEST_TYPES, S.SNAPSHOT, S.COMMAND_RECEIPT, S.REPLAY_RESOURCE_HISTORY]) {
@@ -38,6 +39,7 @@ export function createMatchStartupInbox(net, diagnostics = null) {
       }
       if (type !== S.COMMAND_RECEIPT) {
         latest.set(type, message);
+        if (type === S.LIVE_PAUSE_STATE) pauseStateReceivedAt = performance.now();
         return;
       }
       if (receipts.length >= MAX_COMMAND_RECEIPTS) {
@@ -59,6 +61,18 @@ export function createMatchStartupInbox(net, diagnostics = null) {
     },
     flush(match) {
       applyLatest(latest, S.ROOM_TIME_STATE, match.onRoomTimeState);
+      const pauseState = latest.get(S.LIVE_PAUSE_STATE);
+      if (pauseState?.resumeCountdown) {
+        // Renderer startup must not restart the server-owned setup/countdown clock.
+        latest.set(S.LIVE_PAUSE_STATE, {
+          ...pauseState,
+          resumeCountdown: {
+            ...pauseState.resumeCountdown,
+            remainingMs: Math.max(1, pauseState.resumeCountdown.remainingMs -
+              Math.max(0, performance.now() - pauseStateReceivedAt)),
+          },
+        });
+      }
       applyLatest(latest, S.LIVE_PAUSE_STATE, match.onLivePauseState);
       for (const message of receipts) match.onCommandReceipt(message);
       if (snapshot) {

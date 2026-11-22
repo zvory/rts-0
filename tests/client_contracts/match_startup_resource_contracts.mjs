@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
+import { mock } from "node:test";
 import { GameState } from "../../client/src/state.js";
-import { S } from "../../client/src/protocol.js";
+import { S, liveResumeCountdownFromWire } from "../../client/src/protocol.js";
 import { createMatchStartupInbox } from "../../client/src/match_startup_inbox.js";
 
 function connection() {
@@ -16,6 +17,45 @@ function connection() {
     },
     listenerCount() { return [...handlers.values()].reduce((n, set) => n + set.size, 0); },
   };
+}
+
+// Replay takeover countdowns can arrive while the renderer is still starting.
+{
+  let now = 100;
+  const clock = mock.method(performance, "now", () => now);
+  try {
+    const net = connection();
+    const inbox = createMatchStartupInbox(net);
+    const state = {
+      paused: true,
+      resumeCountdown: {
+        durationMs: 13000, setupDurationMs: 10000, remainingMs: 13000,
+        words: ["Drei!", "Zwei!", "Eins!"],
+      },
+    };
+    net.emit(S.LIVE_PAUSE_STATE, state);
+    now += 10500;
+    let delivered;
+    const match = { onLivePauseState(message) { delivered = message; } };
+    inbox.flush(match);
+    assert.equal(delivered.resumeCountdown.remainingMs, 2500,
+      "slow startup joins the final countdown instead of restarting hotkey setup");
+    assert.equal(state.resumeCountdown.remainingMs, 13000, "buffering preserves the received payload");
+
+    net.emit(S.LIVE_PAUSE_STATE, state);
+    now += 20000;
+    inbox.flush(match);
+    assert.equal(delivered.resumeCountdown.remainingMs, 1,
+      "expired countdown stays valid and paused until the server resumes");
+    assert.ok(liveResumeCountdownFromWire(delivered.resumeCountdown));
+    net.emit(S.LIVE_PAUSE_STATE, { paused: false });
+    inbox.flush(match);
+    assert.equal(delivered.paused, false, "authoritative resume supersedes the buffered countdown");
+    inbox.stop();
+    assert.equal(net.listenerCount(), 0);
+  } finally {
+    clock.mock.restore();
+  }
 }
 
 const start = {
