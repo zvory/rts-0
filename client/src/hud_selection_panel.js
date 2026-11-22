@@ -578,6 +578,7 @@ function selectionBudgetEntitySignature(entity, state = null) {
   return [
     sigValue(entity.id),
     sigValue(entity.kind),
+    sigValue(entity.dao),
     sigValue(entity.label),
     sigValue(entity.owner),
     sigValue(ownerColor),
