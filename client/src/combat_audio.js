@@ -5,6 +5,23 @@ export const PANZERFAUST_IMPACT_SOUND_ID = "combat_panzerfaust_impact_01";
 
 const PANZERFAUST_SOUND_BUCKET_PX = 192;
 
+// Presentation material, not the armored balance flag: mortars and scout cars
+// still need the metallic sword hit even though they are unarmored.
+const METALLIC_SWORD_TARGETS = new Set([
+  KIND.TANK, KIND.SCOUT_CAR, KIND.COMMAND_CAR, KIND.SCOUT_PLANE,
+  KIND.MORTAR_TEAM, KIND.ANTI_TANK_GUN, KIND.ARTILLERY, KIND.ROCKET_LAUNCHER,
+]);
+
+export function discipleAttackSoundId(attacker, target, weaponKind) {
+  if (weaponKind === WEAPON_KIND.DISCIPLE_ORB || (!weaponKind && attacker?.dao === "magic")) {
+    return "combat_disciple_orb_01";
+  }
+  if (attacker?.dao === "lightness") return "combat_disciple_spear_01";
+  return METALLIC_SWORD_TARGETS.has(target?.kind)
+    ? "combat_disciple_sword_strike_01"
+    : "combat_disciple_sword_stab_01";
+}
+
 const DEFAULT_WEAPON_KIND_BY_ATTACKER_KIND = Object.freeze({
   [KIND.WORKER]: WEAPON_KIND.WORKER_TOOLS,
   [KIND.GOLEM]: WEAPON_KIND.GOLEM_FISTS,
@@ -26,6 +43,7 @@ const ATTACK_FEEDBACK_KIND_BY_WEAPON = Object.freeze({
   [WEAPON_KIND.MACHINE_GUNNER_MG]: KIND.MACHINE_GUNNER,
   [WEAPON_KIND.PANZERFAUST_LOADED_SHOT]: KIND.RIFLEMAN,
   [WEAPON_KIND.WARRIOR_SWORD]: KIND.WARRIOR,
+  [WEAPON_KIND.DISCIPLE_ORB]: KIND.WARRIOR,
   [WEAPON_KIND.SCOUT_CAR_MG]: KIND.SCOUT_CAR,
   [WEAPON_KIND.ANTI_TANK_GUN]: KIND.ANTI_TANK_GUN,
   [WEAPON_KIND.MORTAR_TEAM_MORTAR]: KIND.MORTAR_TEAM,
@@ -62,7 +80,7 @@ export function attackFeedbackKind(kind, weaponKind) {
 }
 
 export function attackKindHasCombatSound(kind, weaponKind) {
-  if (weaponKind === WEAPON_KIND.PANZERFAUST_LOADED_SHOT || weaponKind === WEAPON_KIND.WARRIOR_SWORD) return false;
+  if (weaponKind === WEAPON_KIND.PANZERFAUST_LOADED_SHOT) return false;
   const feedbackKind = attackFeedbackKind(kind, weaponKind);
   return feedbackKind !== KIND.WORKER;
 }

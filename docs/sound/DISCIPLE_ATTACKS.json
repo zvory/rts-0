@@ -1,0 +1,46 @@
+{
+  "source": "https://api.elevenlabs.io/v1/sound-generation",
+  "provider": "ElevenLabs",
+  "model_id": "eleven_text_to_sound_v2",
+  "generated_on": "2026-11-22",
+  "license": "Account plan and commercial rights unverified; user-authorized pre-alpha integration.",
+  "processing": "Measured static gain toward -16 LUFS, constrained to -2 dBTP before encoding; 44.1 kHz mono MP3 at 128 kbps. Short transient cues remain below the loudness target when peak-limited. No trimming or limiting; content and dynamics preserved.",
+  "assets": [
+    {
+      "file": "client/assets/sound/combat/combat_disciple_orb_01.mp3",
+      "audition_file": "05-magic-orb.mp3",
+      "role": "Dao of Magic orb",
+      "source_sha256": "54c9bf988758e76ba736bf3e11202f5cc7262ca494e1c0335a1dc759024e992d",
+      "production_sha256": "4febfdcc9b921e3f89b005e4ec979d160a4b5ed233569a16923f181722b09bae",
+      "decoded_lufs": "-24.62",
+      "decoded_true_peak_dbtp": "-2.44"
+    },
+    {
+      "file": "client/assets/sound/combat/combat_disciple_spear_01.mp3",
+      "audition_file": "01-spear-thrust.mp3",
+      "role": "Dao of Lightness spear",
+      "source_sha256": "c611ba2c5b66751f7a9406602734f39b78126aedd4eb8699b52a72f482c21dfa",
+      "production_sha256": "a8c0503905374e6d604a282202a53f7b44fbc6f231cf99298d36cdd2adfc2bc6",
+      "decoded_lufs": "-20.10",
+      "decoded_true_peak_dbtp": "-2.25"
+    },
+    {
+      "file": "client/assets/sound/combat/combat_disciple_sword_stab_01.mp3",
+      "audition_file": "06-sword-stab.mp3",
+      "role": "Base / Dao of War vs infantry",
+      "source_sha256": "53d7f108321cb3cf284f585ecb7e87f64cadd4739518ef3eedf35c2967173ea4",
+      "production_sha256": "52c637fb5aa541c3960e75f09ae17358906923fc46a4d3c2fe3955557dd4e62c",
+      "decoded_lufs": "-23.53",
+      "decoded_true_peak_dbtp": "-2.28"
+    },
+    {
+      "file": "client/assets/sound/combat/combat_disciple_sword_strike_01.mp3",
+      "audition_file": "04-sword-strike.mp3",
+      "role": "Base / Dao of War vs vehicles and emplacements",
+      "source_sha256": "3bd09336a34616b28628469e681516f1efbc2c91ba91916fa9f35de1bb55f415",
+      "production_sha256": "a009d00b67edaadffc36c0f2ccaadc7149af863c0d427e7910beb6ccbecc8592",
+      "decoded_lufs": "-18.85",
+      "decoded_true_peak_dbtp": "-2.09"
+    }
+  ]
+}

@@ -3,6 +3,10 @@
  * IDs are stable seams referenced by app, input, HUD, match, and lobby modules.
  */
 export const SOUND_MANIFEST = Object.freeze([
+  { id: "combat_disciple_orb_01", url: "/assets/sound/combat/combat_disciple_orb_01.mp3", category: "combat_other" },
+  { id: "combat_disciple_spear_01", url: "/assets/sound/combat/combat_disciple_spear_01.mp3", category: "combat_other" },
+  { id: "combat_disciple_sword_stab_01", url: "/assets/sound/combat/combat_disciple_sword_stab_01.mp3", category: "combat_other" },
+  { id: "combat_disciple_sword_strike_01", url: "/assets/sound/combat/combat_disciple_sword_strike_01.mp3", category: "combat_other" },
   { id: "notice_under_attack", url: "/assets/sound/alert/alert_under_attack_01.mp3", category: "alert" },
   { id: "notice_supply", url: "/assets/sound/alert/alert_supply_low_01.mp3", category: "alert" },
   { id: "notice_steel", url: "/assets/sound/alert/alert_steel_low_01.mp3", category: "alert" },
