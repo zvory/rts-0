@@ -26,7 +26,7 @@ fn send(game: &mut Game, grounds: u32, count: usize) -> Vec<u32> {
         .map(|i| {
             game.state
                 .entities
-                .spawn_unit(1, EntityKind::Warrior, 560.0, 600.0 + i as f32 * 28.0)
+                .spawn_unit(1, EntityKind::Warrior, 544.0, 560.0 + i as f32 * 56.0)
                 .unwrap()
         })
         .collect();
@@ -76,17 +76,17 @@ fn wait_running(game: &mut Game, grounds: u32) {
 
 #[test]
 fn tournament_admits_at_each_side_and_corner_of_the_four_tile_footprint() {
-    // The arena spans [576, 704] on each axis. Tile centers just outside
-    // its sides and corners are legal approach points within admission range.
+    // The arena spans [576, 704] on each axis. Tile centers two rings outside
+    // its sides and corners must leave space for the enlarged body.
     for (x, y) in [
-        (560.0, 640.0),
-        (720.0, 640.0),
-        (640.0, 560.0),
-        (640.0, 720.0),
-        (560.0, 560.0),
-        (560.0, 720.0),
-        (720.0, 560.0),
-        (720.0, 720.0),
+        (528.0, 640.0),
+        (752.0, 640.0),
+        (640.0, 528.0),
+        (640.0, 752.0),
+        (528.0, 528.0),
+        (528.0, 752.0),
+        (752.0, 528.0),
+        (752.0, 752.0),
     ] {
         let mut game = empty_flat_game(&[player(1)]);
         let grounds = arena(&mut game);
@@ -208,7 +208,7 @@ fn tournament_partial_capacity_rejects_specialists_enemies_and_cancels_entry() {
     let specialist = game
         .state
         .entities
-        .spawn_unit(1, EntityKind::Warrior, 560.0, 650.0)
+        .spawn_unit(1, EntityKind::Warrior, 544.0, 650.0)
         .unwrap();
     game.state
         .entities
@@ -218,7 +218,7 @@ fn tournament_partial_capacity_rejects_specialists_enemies_and_cancels_entry() {
     let enemy = game
         .state
         .entities
-        .spawn_unit(2, EntityKind::Warrior, 560.0, 690.0)
+        .spawn_unit(2, EntityKind::Warrior, 544.0, 710.0)
         .unwrap();
     for (owner, id) in [(1, specialist), (2, enemy)] {
         game.enqueue(
@@ -511,9 +511,9 @@ fn tournament_staged_disciple_retries_when_the_perimeter_clears() {
     let mut game = empty_flat_game(&[player(1)]);
     let grounds = arena(&mut game);
     let mut blockers = Vec::new();
-    for ty in 0..6 {
-        for tx in 0..6 {
-            if tx != 0 && tx != 5 && ty != 0 && ty != 5 {
+    for ty in 0..8 {
+        for tx in 0..8 {
+            if (2..6).contains(&tx) && (2..6).contains(&ty) {
                 continue;
             }
             blockers.push(
@@ -522,8 +522,8 @@ fn tournament_staged_disciple_retries_when_the_perimeter_clears() {
                     .spawn_unit(
                         1,
                         EntityKind::Worker,
-                        560.0 + tx as f32 * 32.0,
-                        560.0 + ty as f32 * 32.0,
+                        528.0 + tx as f32 * 32.0,
+                        528.0 + ty as f32 * 32.0,
                     )
                     .unwrap(),
             );
@@ -567,8 +567,12 @@ fn tournament_entry_intent_survives_a_fully_blocked_approach() {
     let grounds = arena(&mut game);
     game.state.map.terrain.fill(crate::protocol::terrain::WATER);
     // Leave the entrant on legal ground, beyond the arena's six-ring spawn search.
-    game.state.map.terrain[(20 * game.state.map.width + 9) as usize] =
-        crate::protocol::terrain::GRASS;
+    for ty in 19..=21 {
+        for tx in 8..=10 {
+            game.state.map.terrain[(ty * game.state.map.width + tx) as usize] =
+                crate::protocol::terrain::GRASS;
+        }
+    }
     let disciple = game
         .state
         .entities

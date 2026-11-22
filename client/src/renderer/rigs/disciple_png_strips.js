@@ -27,6 +27,8 @@ function discipleStrip(image, frameCount, firingFrames, iconVisibleBounds, weapo
     facingOffset: -Math.PI / 2,
     firingFacingOffset: -Math.PI / 2,
     originForwardPx: 0,
+    // Center the torso, rather than the transparent atlas cell, on the entity.
+    originLateralPx: -4,
     firingRecoilPx: 0,
     tintSlot: "team-light",
     bakedColorAdjustment: Object.freeze({ brightness: 100, saturation: 100, hue: 100 }),
@@ -51,6 +53,8 @@ export const WAR_PNG_FRAME_STRIP = Object.freeze({
     { x: 92, y: 107, w: 74, h: 143 }, "warrior_sword", "kabuto-dark-hands-3"),
   movementFrames: Object.freeze([1, 2]),
   worldScale: 0.8 * DAO_WAR_BODY_SCALE,
+  // The Yari torso is centered near source y=146, not the cell midpoint (128).
+  originLateralPx: -18 * 0.8 * DAO_WAR_BODY_SCALE,
   // Sword feedback lasts 720 ms; finish this authored clip after 400 ms.
   firingFrameHoldPhase: 400 / 720,
   firingLungePx: 16 * DAO_WAR_BODY_SCALE,

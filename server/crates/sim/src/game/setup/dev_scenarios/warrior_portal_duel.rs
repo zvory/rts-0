@@ -99,7 +99,7 @@ impl Game {
     fn new_warrior_entrenched_riflemen_scenario(seed: u32) -> Result<DevScenarioSetup, String> {
         let mut map = flat_dev_map(2);
         let center = (map.width / 2, map.height / 2);
-        let warrior_tile = (center.0 - 5, center.1);
+        let warrior_tile = (center.0 - 6, center.1);
         let rifleman_tile = (center.0 + 2, center.1);
         if let Some(slot) = map.starts.get_mut(0) {
             *slot = warrior_tile;

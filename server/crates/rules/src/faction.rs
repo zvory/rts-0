@@ -302,7 +302,7 @@ const CULTIVATORS_START_ENTITIES: &[StartingEntityGroup] = &[
         kind: EntityKind::Warrior,
         count: 1,
         formation: StartingFormation::DefensiveLine {
-            distance_tiles_x10: 40,
+            distance_tiles_x10: 50,
             spacing_tiles_x10: 10,
         },
         completed: true,

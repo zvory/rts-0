@@ -42,7 +42,7 @@ fn send(
     let unit = game
         .state
         .entities
-        .spawn_unit(owner, kind, 560.0, 624.0)
+        .spawn_unit(owner, kind, 544.0, 624.0)
         .unwrap();
     if let Some(dao) = dao {
         game.state

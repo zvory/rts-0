@@ -16,14 +16,14 @@ import { selectionBudgetGridModel } from "../../client/src/hud_selection_panel.j
 import { entityAttackRangeTiles, DAO_WAR_RANGE_TILES, DAO_WAR_BODY_SCALE, entityBodyRadius } from "../../client/src/config.js";
 assert.equal(entityAttackRangeTiles({ kind: KIND.WAR_ADEPT, dao: "war" }), DAO_WAR_RANGE_TILES);
 assert.equal(DAO_WAR_RANGE_TILES, 1.75);
-assert.equal(entityBodyRadius({ kind: KIND.WAR_ADEPT, dao: "war" }), 13.5 * DAO_WAR_BODY_SCALE);
-assert.equal(entityBodyRadius({ kind: KIND.WARRIOR }), 13.5);
+assert.equal(entityBodyRadius({ kind: KIND.WAR_ADEPT, dao: "war" }), 26 * DAO_WAR_BODY_SCALE);
+assert.equal(entityBodyRadius({ kind: KIND.WARRIOR }), 26);
 const bodySubject = { id: 75, kind: KIND.WAR_ADEPT, dao: "war", x: 100, y: 100 };
-assert.equal(circularBodyRadius(bodySubject), 13.5 * DAO_WAR_BODY_SCALE);
-assert.equal(pointHitsBodyCircle(bodySubject, 110, 100, 0), false);
-assert.equal(pointHitsBodyCircle({ ...bodySubject, kind: KIND.WARRIOR, dao: undefined }, 110, 100, 0), true);
-assert.equal(selectionProxyForEntity(bodySubject).footprint.radiusPx, 13.5 * DAO_WAR_BODY_SCALE);
-const formationPoints = [{ x: 300, y: 300 }, { x: 364, y: 300 }];
+assert.equal(circularBodyRadius(bodySubject), 26 * DAO_WAR_BODY_SCALE);
+assert.equal(pointHitsBodyCircle(bodySubject, 120, 100, 0), false);
+assert.equal(pointHitsBodyCircle({ ...bodySubject, kind: KIND.WARRIOR, dao: undefined }, 120, 100, 0), true);
+assert.equal(selectionProxyForEntity(bodySubject).footprint.radiusPx, 26 * DAO_WAR_BODY_SCALE);
+const formationPoints = [{ x: 300, y: 300 }, { x: 400, y: 300 }];
 const formationUnits = Array.from({ length: 3 }, (_, index) =>
   ({ ...bodySubject, id: index + 1, y: 100 + index * 40 }));
 assert.ok(buildFormationLinePreview(formationPoints, formationUnits).slots.every(slot => slot.y === 300));
@@ -84,6 +84,30 @@ for (const [dao, strip, weaponKind] of [
   assert.ok(minimap.parts(entity.kind).includes(`frame:${strip.frameCount - 1}`));
   assert.equal(selectionBudgetGridModel([entity]).blocks[0].dao, dao);
 }
+// Authored torso centers and shoulder edges must stay inside the same circle used
+// by placement, formation spacing, and click selection, at every facing.
+for (const [dao, strip, cx, cy, halfWidth, halfDepth] of [
+  [undefined, WARRIOR_PNG_FRAME_STRIP, 58, 80, 48, 32],
+  ["lightness", LIGHTNESS_PNG_FRAME_STRIP, 128, 140, 48, 40],
+  ["magic", MAGIC_PNG_FRAME_STRIP, 128, 140, 64, 52],
+  ["war", WAR_PNG_FRAME_STRIP, 128, 146, 32, 28],
+]) {
+  const subject = { ...bodySubject, kind: ({ lightness: KIND.LIGHTNESS_ADEPT, war: KIND.WAR_ADEPT, magic: KIND.MAGIC_ADEPT })[dao] || KIND.WARRIOR, dao };
+  const offset = frameStripSpriteOffset(strip, 0);
+  for (let facing = 0; facing < Math.PI * 2; facing += Math.PI / 4) {
+    const angle = frameStripVisualFacing(strip, { ...subject, facing }, {}, 0);
+    for (const [x, y] of [[cx, cy], [cx - halfWidth, cy], [cx + halfWidth, cy],
+      [cx, cy - halfDepth], [cx, cy + halfDepth]]) {
+      const lx = (x - strip.frameWidth / 2) * strip.worldScale + offset.x;
+      const ly = (y - strip.frameHeight / 2) * strip.worldScale + offset.y;
+      const wx = subject.x + lx * Math.cos(angle) - ly * Math.sin(angle);
+      const wy = subject.y + lx * Math.sin(angle) + ly * Math.cos(angle);
+      assert.ok(pointHitsBodyCircle(subject, wx, wy, 0), `${dao || "novice"} torso at ${facing}`);
+      assert.ok(Math.hypot(wx - subject.x, wy - subject.y) <=
+        selectionProxyForEntity(subject).footprint.radiusPx);
+    }
+  }
+}
 // The step is presentation-only, bounded, and returns exactly to the authoritative pivot.
 const warEntity = { id: 91, kind: KIND.WAR_ADEPT, dao: "war", x: 100, y: 100, facing: Math.PI / 2 };
 const unchanged = structuredClone(warEntity);
@@ -92,10 +116,10 @@ for (const [phase, expected] of [[0, 0], [0.2, -2.88], [0.5, 16], [0.7, 16], [1,
     recoilWeaponKind: "warrior_sword" };
   const frame = frameStripFrameIndex(WAR_PNG_FRAME_STRIP, warEntity, context);
   const offset = frameStripSpriteOffset(WAR_PNG_FRAME_STRIP, frame, context);
-  assert.ok(Math.abs(offset.y - expected * DAO_WAR_BODY_SCALE) < 1e-8);
+  assert.ok(Math.abs(offset.y - (WAR_PNG_FRAME_STRIP.originLateralPx + expected * DAO_WAR_BODY_SCALE)) < 1e-8);
 }
-assert.equal(frameStripSpriteOffset(WAR_PNG_FRAME_STRIP, 5).y, 0);
-assert.equal(frameStripSpriteOffset(WAR_PNG_FRAME_STRIP, 0, { recoilProgress: 1, recoilPhase: 0.5 }).y, 0);
+assert.equal(frameStripSpriteOffset(WAR_PNG_FRAME_STRIP, 5).y, WAR_PNG_FRAME_STRIP.originLateralPx);
+assert.equal(frameStripSpriteOffset(WAR_PNG_FRAME_STRIP, 0, { recoilProgress: 1, recoilPhase: 0.5 }).y, WAR_PNG_FRAME_STRIP.originLateralPx);
 assert.deepEqual(warEntity, unchanged);
 minimap.destroy();
 console.log("disciple_dao_sprite_contracts: ok");

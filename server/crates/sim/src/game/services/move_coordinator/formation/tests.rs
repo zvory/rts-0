@@ -864,13 +864,13 @@ fn war_polyline_uses_evolved_radius_for_rank_count() {
             id
         })
         .collect::<Vec<_>>();
-    let points = [(300.0, 300.0), (364.0, 300.0)];
+    let points = [(300.0, 300.0), (400.0, 300.0)];
     let units = super::super::formation_units(&entities, 1, &ids);
     let slots = polyline_slots(&units, &points);
     assert_eq!(slots.len(), 3);
     assert!(
         slots.iter().all(|(_, point)| point.1 == 300.0),
-        "three smaller War bodies fit in one rank on a 64px stroke"
+        "three smaller War bodies fit in one rank on a 100px stroke"
     );
 
     for id in &ids {

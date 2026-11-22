@@ -325,7 +325,7 @@ fn disciple_queued_order_waits_until_original_goal_after_target_dies() {
 #[test]
 fn war_spear_approaches_then_stops_at_ready_tip_reach() {
     // Start outside spear reach but inside automatic engagement. Ordinary infantry
-    // retains center targeting; the smaller ready tip is about 66.5 px from the crown.
+    // retains center targeting; reach includes the enlarged War body radius.
     let (mut game, attacker, target) = fixture(EntityKind::Warrior, 160.0);
     game.state
         .entities
@@ -346,7 +346,7 @@ fn war_spear_approaches_then_stops_at_ready_tip_reach() {
             let distance =
                 (victim.pos_x() - spear.pos_x()).det_hypot(victim.pos_y() - spear.pos_y());
             assert!(
-                (66.0..=70.0).contains(&distance),
+                (76.0..=80.0).contains(&distance),
                 "spear stand-off: {distance}"
             );
             let stopped = (spear.pos_x(), spear.pos_y());

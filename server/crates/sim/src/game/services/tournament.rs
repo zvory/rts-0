@@ -109,7 +109,12 @@ pub(in crate::game) fn advance(
         let half_h = config::TILE_SIZE as f32 * stats.foot_h as f32 * 0.5;
         let dx = ((x - building.pos_x()).abs() - half_w).max(0.0);
         let dy = ((y - building.pos_y()).abs() - half_h).max(0.0);
-        if dx * dx + dy * dy > 24.0 * 24.0 {
+        // Entry targets are tile centers from the body-clear spawn search. Allow
+        // one tile diagonal beyond the body so a legal side or corner staging
+        // point is reachable without intersecting the building footprint.
+        let admission_distance = config::unit_placement_radius(EntityKind::Warrior)
+            + config::TILE_SIZE as f32 * std::f32::consts::SQRT_2;
+        if dx * dx + dy * dy > admission_distance * admission_distance {
             // Spawn search may stage outside the admission radius when the perimeter is
             // crowded. Reconsider an exhausted approach after those blockers move away;
             // retain entry intent even when no legal staging point currently exists.

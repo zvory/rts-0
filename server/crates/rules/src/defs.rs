@@ -108,7 +108,7 @@ const NOVICE_DEF: UnitDef = UnitDef {
         cost_oil: 0,
         supply: 2,
         build_ticks: 300,
-        radius: 13.5,
+        radius: 26.0,
     },
     armor_class: ArmorClass::Small,
     weapon: WeaponClass::SmallArms,
