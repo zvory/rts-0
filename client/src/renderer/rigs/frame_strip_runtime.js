@@ -309,7 +309,7 @@ function frameStripUsesMovementFrames(strip, entity, renderContext = null) {
 }
 
 function frameStripEntityIsMoving(entity, renderContext = null) {
-  if (entity?.state !== STATE.MOVE && entity?.state !== STATE.ATTACK) return false;
+  if (entity?.state !== STATE.MOVE && entity?.state !== STATE.ATTACK && entity?.state !== STATE.IDLE) return false;
   if (typeof renderContext?.frameStripMoving === "boolean") return renderContext.frameStripMoving;
   if (Number.isFinite(renderContext?.frameStripMovementActivity)) {
     return renderContext.frameStripMovementActivity > 0.01;

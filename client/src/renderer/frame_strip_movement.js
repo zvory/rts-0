@@ -7,13 +7,14 @@ export function frameStripMovementVisual(e, state, motion, now) {
   const previousMotion = motion?.get?.(e.id);
   const snapshotMotion = snapshotMovementSample(e, state);
   const renderMoving = renderedPositionChanged(e, motion);
-  const moveState = e?.state === STATE.MOVE || e?.state === STATE.ATTACK;
+  // Automatic pursuit can displace a unit whose public order state is still idle.
+  const moveState = e?.state === STATE.MOVE || e?.state === STATE.ATTACK || e?.state === STATE.IDLE;
   const freshSnapshot = snapshotMotion != null &&
     authoritativeSampleChanged(snapshotMotion, previousMotion);
   const observedMovement = moveState && (
     renderMoving ||
     (freshSnapshot && snapshotMotion.moving) ||
-    (snapshotMotion == null && previousMotion == null)
+    (e?.state !== STATE.IDLE && snapshotMotion == null && previousMotion == null)
   );
   let lastMovementAt = null;
   if (moveState) {

@@ -482,3 +482,42 @@ function frameStripMovementFor(entity, previous, current, motion = new Map(), ti
   assert(sample(3220).part === "frame:0", "returning disciple does not inherit removed motion within the movement hold");
   animation.destroy();
 }
+
+// After a Move completes, automatic pursuit may continue under the idle public
+// order state. Displacement must keep the main renderer and minimap walking and
+// facing travel instead of snapping to an old weapon bearing.
+{
+  const entity = { id: 101, kind: KIND.WARRIOR, dao: "war", state: STATE.MOVE,
+    x: 100, y: 100, facing: Math.PI / 2, weaponFacing: 0 };
+  const motion = new Map();
+  const animation = createMinimapAnimation();
+  const previous = { ...entity };
+  frameStripMovementFor(entity, previous, previous, motion, 1, 0);
+  entity.state = STATE.IDLE; entity.y = 104;
+  const state = { tick: 2, _prevById: new Map([[entity.id, previous]]),
+    _curById: new Map([[entity.id, { ...entity }]]) };
+  for (const now of [33, 50]) {
+    const movement = frameStripMovementFor(entity, previous, entity, motion, 2, now);
+    assert(movement.moving, "idle-state pursuit remains animated between snapshots");
+    const context = { now, frameStripMoving: movement.moving };
+    assert(WAR_PNG_FRAME_STRIP.movementFrames.includes(frameStripFrameIndex(WAR_PNG_FRAME_STRIP, entity, context)),
+      "idle-state pursuit selects walking art");
+    assert(frameStripVisualFacing(WAR_PNG_FRAME_STRIP, entity, context) === 0,
+      "idle-state pursuit faces down with travel rather than sideways with stale weapon aim");
+    animation.beginFrame([entity], state, now);
+    const layer = animation.layers(entity)[0];
+    assert(layer.part !== "dao-war:frame:0" && layer.rotation === 0,
+      "minimap shares idle-state pursuit walking and travel facing");
+  }
+  const stoppedContext = { now: 200, frameStripMoving:
+    frameStripMovementFor(entity, entity, entity, motion, 3, 200).moving };
+  assert(!stoppedContext.frameStripMoving, "idle-state pursuit stops after displacement expires");
+  assert(frameStripFrameIndex(WAR_PNG_FRAME_STRIP, entity, stoppedContext) === 0,
+    "stopped idle-state pursuit returns to idle art");
+  assert(frameStripFrameIndex(WAR_PNG_FRAME_STRIP, entity, { ...stoppedContext,
+    recoilProgress: 1, recoilPhase: 0.2, recoilWeaponKind: WEAPON_KIND.WARRIOR_SWORD }) === 4,
+    "idle-state pursuit still plays its spear strike when a shot arrives");
+  assert(!frameStripMovementFor(entity, entity, entity).moving,
+    "a stationary idle unit never invents walking without displacement");
+  animation.destroy();
+}
