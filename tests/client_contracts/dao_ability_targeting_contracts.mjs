@@ -1,10 +1,12 @@
 import { assert, assertDeepEqual } from "./assertions.mjs";
-import { ABILITY, KIND } from "../../client/src/protocol.js";
+import { ABILITY, KIND, UPGRADE } from "../../client/src/protocol.js";
 import { Input } from "../../client/src/input/index.js";
 import { Minimap } from "../../client/src/minimap.js";
 import { ClientIntent } from "../../client/src/client_intent.js";
 import { groupCooldownClocks } from "../../client/src/hud.js";
-import { selectedAbilityAffordances } from "../../client/src/hud_command_card.js";
+import { buildCommandCardDescriptors, selectedAbilityAffordances } from "../../client/src/hud_command_card.js";
+import { createCommandButton } from "../../client/src/hud_command_dom.js";
+import { withFakeDocument } from "./fakes.mjs";
 
 const swordInput = Object.create(Input.prototype);
 const swordSelection = [
@@ -52,5 +54,42 @@ const swordAffordance = selectedAbilityAffordances({
   .find((entry) => entry.definition.ability === ABILITY.THROW_SWORD);
 assertDeepEqual(swordAffordance.carrierIds, [101],
   "Throw Sword command card shares targeting carrier eligibility");
+
+for (const insight of [0, 60]) {
+  const disciple = { id: 106, owner: 1, kind: KIND.WARRIOR, insight, chosenDao: "war" };
+  for (const upgrades of [[], [UPGRADE.DAO_OF_HEAVINESS], [
+    UPGRADE.DAO_OF_LIGHTNESS, UPGRADE.DAO_OF_HEAVINESS, UPGRADE.DAO_OF_MAGIC,
+  ]]) {
+    const card = buildCommandCardDescriptors({
+      playerId: 1, factionId: "cultivators", selection: [disciple],
+      resources: { steel: 0, oil: 0 }, upgrades, groupCooldownClocks,
+      playerHasCompleteKind: () => true,
+    });
+    for (const [ability, upgrade] of [
+      [ABILITY.EVOLVE_LIGHTNESS, UPGRADE.DAO_OF_LIGHTNESS],
+      [ABILITY.EVOLVE_WAR, UPGRADE.DAO_OF_HEAVINESS],
+      [ABILITY.EVOLVE_MAGIC, UPGRADE.DAO_OF_MAGIC],
+    ]) {
+      const slot = card.slots.find((entry) => entry?.ability === ability);
+      const researched = upgrades.includes(upgrade);
+      assert(slot.enabled, "Dao choices remain queueable before research and insight are ready");
+      assert(slot.cls.includes("dao-awaiting-research") === !researched,
+        "Each Dao choice is grayed only until its own research completes");
+      assert(slot.cls.split(" ").includes("dao-ready") === (researched && insight >= 60),
+        "Dao radiance requires both completed research and sufficient insight");
+      assertDeepEqual(slot.intent.readyIds, [disciple.id], "Pending Dao choice retains its selected carrier");
+      if (ability === ABILITY.EVOLVE_WAR) {
+        assert(slot.countBadge === "1/1", "Pending chosen path retains its selection badge");
+      }
+      withFakeDocument(() => {
+        let clicked = false;
+        const button = createCommandButton({ ...slot, onClick: () => { clicked = true; } });
+        assert(!button.disabled, "Grayed Dao choices remain interactive");
+        button.click();
+        assert(clicked, "Clicking a pending Dao choice still dispatches the choice");
+      });
+    }
+  }
+}
 
 console.log("Dao ability targeting contracts passed");

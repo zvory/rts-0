@@ -51,6 +51,7 @@ export function abilityButtonDescriptor({
     cls: [
       active ? "active" : "",
       definition.ability.startsWith("evolve") ? "dao-choice" : "",
+      evolution && !affordance.unlocked ? "dao-awaiting-research" : "",
       definition.ability.startsWith("evolve") && affordance.unlocked && readyCount > 0 && affordance.affordable ? "dao-ready" : "",
       affordance.autocastEnabledIds.length > 0 ? "autocast-enabled" : "",
     ].filter(Boolean).join(" "),

@@ -26,7 +26,7 @@ serial research queue and existing prerequisite/faction gates.
 - War: armored melee damage dealer; 1.5 damage, +20 maximum HP, 50% armor
   reduction using the existing penetration mechanic (full AP bypasses it), keeps the Disciple's existing
   50% armor penetration. A centered neon-red sword with black outline identifies it, rotated 90 degrees and lengthened 20%. Classic W; grid X.
-- Magic: battlefield support; 1.1 times the buffed base movement speed (2.024 px/tick), existing Ekat pull field (renamed Anchor) and a new Shield, a centered green pentagram with black outline identifies it. Classic C; grid C. Bespoke rigs and audio remain deferred for this prototype.
+- Magic: battlefield support; 1.1 times the buffed base movement speed (2.024 px/tick), shared Ekat pull field (renamed Anchor), with doubled inward pull (0.70 movement-speed idle drag and up to 1.70x movement toward its center; radial falloff and weight resistance still apply) and a new Shield, a centered green pentagram with black outline identifies it. Classic C; grid C. Bespoke rigs and audio remain deferred for this prototype.
 
 Each path has a separate researched unlock. No automatic AI evolution in this pass;
 AI can encounter and damage evolved units. Insight uses a blue fill over red background
