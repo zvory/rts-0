@@ -108,3 +108,5 @@ mod tests {
 // Lab spawnEntity/spawnEntities entries accept optional dao: lightness | war | magic (Novice only).
 
 // Snapshot playerFactions (compact pf) projects public identity independently of private resources.
+
+// Cultivator Shop: wire kind shop, compact kind code 34; no additional snapshot fields.

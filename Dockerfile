@@ -76,6 +76,7 @@ RUN test -s ./client/vendor/sim-wasm/rts_sim_wasm.js \
     && test -s ./client/assets/rigs/three-dao-pavilion/pavilion-atlas.png \
     && test -s ./client/assets/rigs/tournament-grounds/tournament-atlas.png \
     && test -s ./client/assets/rigs/proven-grounds/proven-atlas.png \
+    && test -s ./client/assets/rigs/cultivator-shop/shop-atlas.png \
     && test -s ./client/assets/rigs/command-car-packed-radio-preview/generated/command-car-packed-radio-stars-30-atlas-v4.png \
     && test -s ./client/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png \
     && test -s ./client/assets/rigs/mortar-png-pass-01/generated/mortar-m2-wheeled-pass-01-alpha.png \

@@ -389,3 +389,5 @@ export const cmd = Object.freeze({
 // Lab spawnEntity/spawnEntities entries accept optional dao: lightness | war | magic (Novice only).
 
 // Snapshots carry public playerFactions: [{id, factionId}] independently of private playerResources.
+
+// Cultivator Shop: wire kind shop, compact kind code 34; no additional snapshot fields.

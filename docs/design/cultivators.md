@@ -111,3 +111,10 @@ paid Disciple training at the [Proving Grounds](proven-grounds.md). Combat-earne
 abilities, insight credit, icons, and hotkeys. Existing checkpoint/replay and owner-only
 upgrade projection carry the stable ids through the generic research system.
 Automatic AI evolution remains deferred.
+
+## Shop
+
+The [Shop](shop.md) is an inert durable gourd building constructed by Serfs: 200 steel, 200 oil,
+40 seconds, 1,000 HP, armored, 3×4 footprint. No prerequisites or services yet. Its approved art
+has an open covered counter, 愛 on the side, white team-painted cork/rope/canopy, and fresh impact
+rocks around the buried base.

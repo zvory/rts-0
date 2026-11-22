@@ -12,6 +12,8 @@ Use when tuning costs, supply, sight, sizes, unit/building stats, or any number 
   - Tournament Grounds
   - Proving Grounds
 
+- Cultivator Shop
+
 ## Code map
 - `server/crates/rules/src/defs.rs` — authoritative unit/building stat records
 - `server/crates/rules/src/faction.rs` — authoritative faction catalogs, train/build/research

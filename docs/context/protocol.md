@@ -20,6 +20,8 @@ Use when adding, removing, or changing any field on a client↔server message, s
 - [docs/projection-audit-checklist.md](../projection-audit-checklist.md) — checklist for new
   projection-affecting snapshot fields, events, or observer modes
 
+- Shop
+
 ## Code map
 - `server/crates/protocol/src/{client_message,server_message,lib}.rs` — Rust wire
   DTOs
@@ -32,7 +34,7 @@ Use when adding, removing, or changing any field on a client↔server message, s
 - `server/src/lobby/mod.rs` + `client/src/config.js` — `PLAYER_PALETTE` cross-surface mirror,
   checked by `node tests/protocol_parity.mjs`
 
-## Current lobby fields to remember
+## Current lobby fields
 - `setName { name }` updates the sender's sanitized name during the lobby
   phase; countdown and in-game requests are ignored.
 - `chatSend` is routed; lobby chat is ephemeral and game chat uses `chatLog[]`.
