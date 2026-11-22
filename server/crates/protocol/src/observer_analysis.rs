@@ -86,7 +86,7 @@ pub struct ReplayResourceSample {
     pub unit_oil: i64,
 }
 
-/// Absolute per-player values; collection is measured over the trailing eight seconds.
+/// Absolute per-player values; collection is measured over the trailing five seconds (displayed as a per-second average by the client).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ReplayPlayerResourceSample {

@@ -48,7 +48,7 @@ import { textWithin } from "./dom_text.mjs";
   });
   history.record(sample(0, 10, 20));
   history.record(sample(12, 99, 0));
-  history.record(sample(240, 40, 10, 2, 8));
+  history.record(sample(150, 40, 10, 2, 8));
   assert(
     history.samples.length === 2
       && history.samples[0].steel === 0
@@ -56,10 +56,14 @@ import { textWithin } from "./dom_text.mjs";
       && history.samples[1].oil === -6,
     "resource collection history samples signed lifetime-income differences over the trailing collection window",
   );
+  history.record(sample(180, 50, 10, 4, 8));
+  history.record(sample(300, 90, 20, 8, 10));
+  assert(history.samples.at(-1).steel === 40 && history.samples.at(-1).oil === 4,
+    "five-second collection excludes income older than the trailing window");
   history.record(sample(1200, 140, 10, 20, 8));
   assert(
     history.samples.at(-1).steel === 0 && history.samples.at(-1).oil === 0,
-    "resource collection history does not turn an arbitrarily old baseline into a false 8-second spike",
+    "resource collection history does not turn an arbitrarily old baseline into a false 5-second spike",
   );
   const aliveSample = sample(1230, 160, 30, 30, 10);
   aliveSample.players[0].resourcesLost = { steel: 200, oil: 5 };
@@ -114,9 +118,9 @@ import { textWithin } from "./dom_text.mjs";
   );
   assert(
     Math.abs(baseScaledPoints[0].y - 25) < 4
-      && RESOURCE_COLLECTION_WINDOW_SECONDS === 8
-      && RESOURCE_ADVANTAGE_MIN_EXTENT.steel === 144
-      && RESOURCE_ADVANTAGE_MIN_EXTENT.oil === 36,
+      && RESOURCE_COLLECTION_WINDOW_SECONDS === 5
+      && RESOURCE_ADVANTAGE_MIN_EXTENT.steel === 90
+      && RESOURCE_ADVANTAGE_MIN_EXTENT.oil === 22.5,
     "resource collection graph keeps one mine small within a full-base minimum Y extent",
   );
   history.record(sample(0, 4, 4));
@@ -157,25 +161,40 @@ import { textWithin } from "./dom_text.mjs";
     units: [{ steelValue: id * 50, oilValue: id * 20 }],
   })) });
   history.record(analysis(0));
-  history.record(analysis(240));
+  history.record(analysis(150));
   const latest = history.samples.at(-1);
   assert(latest.players.map((row) => row.id).join() === "1,2,3,4",
     "four-player histories use stable player ids regardless of incoming roster order");
   for (const row of latest.players) {
-    assert(row.steel === row.id * 240 && row.oil === row.id * 120
-      && row.aliveSteel === row.id * 140 && row.lostSteel === row.id * 100
+    assert(row.steel === row.id * 150 && row.oil === row.id * 75
+      && row.aliveSteel === row.id * 50 && row.lostSteel === row.id * 100
       && row.unitSteel === row.id * 50 && row.unitOil === row.id * 20,
     "every player retains independent collection, alive, lost, and current army values");
   }
   const replay = new ResourceCollectionHistory();
   replay.applyReplaySamples({ replace: true, samples: history.samples });
-  assert(replay.samples.at(-1).players[3].steel === 960,
+  assert(replay.samples.at(-1).players[3].steel === 600,
     "reliable replay history preserves all four individual series");
   withFakeOverlayDocument(() => {
     const rows = [1, 2, 3, 4].map((id) => ({ id, name: `Player ${id}`, color: `#${id}${id}${id}` }));
+    const fractional = renderMetricAdvantage({
+      rows: rows.slice(0, 3), currentTick: 150,
+      samples: [0, 150].map((tick) => ({ tick, steel: tick ? 1 : 0, oil: 0,
+        players: rows.slice(0, 3).map((row) => ({ id: row.id, steel: tick ? row.id : 0, oil: 0 })),
+      })),
+    });
+    assert(findFakes(fractional, (el) => el.getAttribute("data-player-id")).length === 6,
+      "fractional per-second collection values retain every multiplayer timeline");
     for (const metric of ["collection", "alive", "lost", "units"]) {
       for (const count of [3, 4]) {
         const chart = renderMetricAdvantage({ rows: rows.slice(0, count), samples: replay.samples, currentTick: 300, metric });
+        if (metric === "collection") {
+          assert(textWithin(chart).includes(String(count * 30)),
+            "multiplayer collection axis divides five-second totals by five");
+          const captions = findFakes(chart, (el) => el.tagName === "FIGCAPTION");
+          assert(captions.every((caption) => caption.innerHTML.includes("/s") && caption.title.includes("last 5 seconds")),
+            "collection headings label per-second rates and explain five-second smoothing");
+        }
         const paths = findFakes(chart, (el) => el.getAttribute("data-player-id"));
         assert(paths.length === count * 2 && paths.every((path) => !/NaN|undefined/.test(path.getAttribute("d"))),
           `${metric} charts draw a steel and oil line for every player in ${count}-player games`);
@@ -889,6 +908,8 @@ import { textWithin } from "./dom_text.mjs";
       "Resources charts render immediately when replay history arrives after analysis",
     );
     const firstChart = findFakes(root, (el) => el.classList.contains("replay-resource-advantage-chart"))[0];
+    assert(textWithin(firstChart).includes("+20") && !textWithin(firstChart).includes("+100"),
+      "two-player collection axis uses per-second values and rescales its full-base minimum");
     overlay.applyReplayResourceHistory({ replace: true, samples: [
       { tick: 0, steel: 0, oil: 0 }, { tick: 30, steel: -12, oil: 4 },
     ] });
@@ -974,12 +995,12 @@ import { textWithin } from "./dom_text.mjs";
     overlay.render();
     const resourcesLostText = textWithin(root);
     assert(
-      resourcesLostText.includes("Destroyed resource value")
-        && resourcesLostText.includes("Spent steel and oil value of units and buildings that were destroyed")
+      !resourcesLostText.includes("Destroyed resource value")
+        && !resourcesLostText.includes("Spent steel and oil value of units and buildings that were destroyed")
         && resourcesLostText.includes("Total")
         && resourcesLostText.includes("550")
         && resourcesLostText.includes("150"),
-      "resources lost tab labels the observer analysis definition and totals destroyed entity value",
+      "resources lost tab omits excessive explanation and totals destroyed entity value",
     );
     assert(
       resourcesLostText.includes("Red") && resourcesLostText.includes("Blue"),

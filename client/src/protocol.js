@@ -1,5 +1,5 @@
 // replayResourceHistory also carries players[] with id, lifetimeSteel/lifetimeOil and absolute steel/oil, aliveSteel/aliveOil, lostSteel/lostOil, unitSteel/unitOil values for up to four players.
-// replayResourceHistory samples carry signed steel/oil collection and aliveSteel/aliveOil lifetime-minus-loss advantages, lostSteel/lostOil destroyed-value differences, and unitSteel/unitOil current-army-value differences.
+// replayResourceHistory samples carry signed steel/oil trailing-five-second collection totals (client displays totals / 5 per second) and aliveSteel/aliveOil lifetime-minus-loss advantages, lostSteel/lostOil destroyed-value differences, and unitSteel/unitOil current-army-value differences.
 // Wire protocol — JavaScript mirror of `server/crates/protocol/src/lib.rs`.
 // See docs/design/protocol.md.
 // Change both files together. Builders construct the exact JSON the server expects.

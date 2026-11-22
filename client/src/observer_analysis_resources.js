@@ -4,14 +4,14 @@ import { HARVEST_TICKS, OIL_LOAD, TICK_HZ } from "./config.js";
 
 const SAMPLE_INTERVAL_TICKS = 30;
 const HISTORY_METRICS = Object.freeze({
-  collection: { label: "collection", fields: ["steel", "oil"], minExtent: true },
+  collection: { label: "collection per second", fields: ["steel", "oil"], minExtent: true },
   alive: { label: "alive resources", fields: ["aliveSteel", "aliveOil"] },
   lost: { label: "resources lost", fields: ["lostSteel", "lostOil"] },
   units: { label: "current army value", fields: ["unitSteel", "unitOil"] },
 });
 const HISTORY_FIELDS = Object.values(HISTORY_METRICS).flatMap((metric) => metric.fields);
 const SVG_NS = "http://www.w3.org/2000/svg";
-export const RESOURCE_COLLECTION_WINDOW_SECONDS = 8;
+export const RESOURCE_COLLECTION_WINDOW_SECONDS = 5;
 const COLLECTION_WINDOW_TICKS = TICK_HZ * RESOURCE_COLLECTION_WINDOW_SECONDS;
 const STEEL_LOAD = 2;
 const STEEL_PATCHES_PER_BASE = 12;
@@ -194,11 +194,9 @@ export function renderAliveResourcesMetric({ analysis, players, collectionHistor
 }
 
 export function renderResourcesLostMetric({ analysis, players, collectionHistory = [] }) {
-  const wrap = renderAnalysisMetric("replay-resources-lost", "Destroyed resource value");
-  const note = document.createElement("div");
-  note.className = "replay-analysis-note";
-  note.textContent = "Spent steel and oil value of units and buildings that were destroyed. Cancelled queues, refunds, harvesting, and stockpile changes are excluded. Higher graph values mean more resources lost.";
-  wrap.appendChild(note);
+  const wrap = document.createElement("div");
+  wrap.className = "replay-analysis-metric replay-resources-lost";
+  wrap.title = "Destroyed unit and building value. Higher graph values mean more resources lost.";
 
   const rows = playerAnalysisRows({ analysis, players });
   if (!analysis) {
@@ -246,7 +244,14 @@ const RESOURCE_WINDOWS = [
 export function renderMetricAdvantage({ rows, samples, currentTick, metric = "collection" }) {
   const descriptor = HISTORY_METRICS[metric];
   const metricLabel = descriptor.label;
+  const divisor = metric === "collection" ? RESOURCE_COLLECTION_WINDOW_SECONDS : 1;
+  const unit = metric === "collection" ? " /s" : "";
   samples = (samples || []).filter((sample) => descriptor.fields.every((field) => Number.isSafeInteger(sample[field])));
+  // Wire/history values remain integer five-second totals; convert only the chart projection.
+  if (metric === "collection") {
+    const perSecond = (row) => ({ ...row, steel: row.steel / divisor, oil: row.oil / divisor });
+    samples = samples.map((sample) => ({ ...perSecond(sample), players: sample.players?.map(perSecond) }));
+  }
   const section = document.createElement("section");
   section.className = "replay-resource-advantage";
 
@@ -255,8 +260,8 @@ export function renderMetricAdvantage({ rows, samples, currentTick, metric = "co
     for (const [index, resource] of ["steel", "oil"].entries()) {
       section.appendChild(renderPlayerHistoryChart({
         rows, samples, currentTick, resource, field: descriptor.fields[index],
-        metric: metricLabel,
-        minExtent: descriptor.minExtent ? RESOURCE_ADVANTAGE_MIN_EXTENT[resource] : 0,
+        metric: metricLabel, unit,
+        minExtent: descriptor.minExtent ? RESOURCE_ADVANTAGE_MIN_EXTENT[resource] / divisor : 0,
       }));
     }
     return section;
@@ -277,26 +282,27 @@ export function renderMetricAdvantage({ rows, samples, currentTick, metric = "co
       resource,
       label: resource === "steel" ? "Steel" : "Oil",
       rows, samples, currentTick,
-      metric: metricLabel,
+      metric: metricLabel, unit,
       field: descriptor.fields[index],
-      minExtent: descriptor.minExtent ? RESOURCE_ADVANTAGE_MIN_EXTENT[resource] : 0,
+      minExtent: descriptor.minExtent ? RESOURCE_ADVANTAGE_MIN_EXTENT[resource] / divisor : 0,
       serial: index,
     }));
   }
   return section;
 }
 
-function renderPlayerHistoryChart({ rows, samples, currentTick, resource, field, metric, minExtent }) {
+function renderPlayerHistoryChart({ rows, samples, currentTick, resource, field, metric, unit, minExtent }) {
   const figure = document.createElement("figure");
   figure.className = "replay-resource-advantage-chart replay-resource-player-chart";
   const caption = document.createElement("figcaption");
   caption.className = "replay-resource-advantage-chart-heading";
   const label = resource === "steel" ? "Steel" : "Oil";
-  caption.innerHTML = `${resourceIconHtml(resource)}<span>${label}</span>`;
+  caption.innerHTML = `${resourceIconHtml(resource)}<span>${label}${unit}</span>`;
+  if (unit) caption.title = `Per second, averaged over the last ${RESOURCE_COLLECTION_WINDOW_SECONDS} seconds`;
   figure.appendChild(caption);
   // Require matching player ids; roster order and observer vision may change independently.
   const timeline = samples.filter((sample) => rows.every((row) =>
-    sample.players?.some((player) => player.id === row.id && Number.isSafeInteger(player[field]))));
+    sample.players?.some((player) => player.id === row.id && Number.isFinite(player[field]))));
   if (timeline.length < 2) {
     figure.appendChild(renderEmptyMetric(`Play to build its ${metric} timeline.`));
     return figure;
@@ -365,7 +371,7 @@ function renderPlayerHistoryChart({ rows, samples, currentTick, resource, field,
   return figure;
 }
 
-function renderAdvantageChart({ resource, label, rows, samples, currentTick, metric, field, minExtent, serial }) {
+function renderAdvantageChart({ resource, label, rows, samples, currentTick, metric, unit, field, minExtent, serial }) {
   const width = 420;
   const chartHeight = 92;
   const labelHeight = 18;
@@ -393,7 +399,8 @@ function renderAdvantageChart({ resource, label, rows, samples, currentTick, met
   figure.className = "replay-resource-advantage-chart";
   const caption = document.createElement("figcaption");
   caption.className = "replay-resource-advantage-chart-heading";
-  caption.innerHTML = `${resourceIconHtml(resource)}<span>${label}</span>`;
+  caption.innerHTML = `${resourceIconHtml(resource)}<span>${label}${unit}</span>`;
+  if (unit) caption.title = `Per second, averaged over the last ${RESOURCE_COLLECTION_WINDOW_SECONDS} seconds`;
   figure.appendChild(caption);
 
   const svg = svgElement("svg", {

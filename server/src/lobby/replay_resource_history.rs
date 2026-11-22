@@ -14,7 +14,7 @@ impl ReplayResourceHistory {
 
     pub(super) fn record(&mut self, game: &Game) {
         const INTERVAL: u32 = 30;
-        const WINDOW: u32 = 8 * 30;
+        const WINDOW: u32 = 5 * 30;
         let tick = game.tick_count();
         if self
             .samples

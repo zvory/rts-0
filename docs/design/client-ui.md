@@ -610,10 +610,10 @@ and is read-only. The Army Value tab is client-side and viewport-specific, exclu
 (Engineer and Golem), and counts only combat units. Production, Research, Units, Resources, Alive
 Resources, Losses, and Resources Lost render the latest server-authored `observerAnalysis`
 payload. For two to four players, Resources also samples each player's server-authored lifetime
-mined totals once per second and derives trailing 8-second collection values. Three- and four-player matches render one color-coded line per player with a name legend and a shared numeric Y scale for each resource, including negative alive values. Exactly two players retain the advantage view, which renders
+mined totals once per second and derives trailing 5-second collection totals, displayed divided by five as a per-second average with `/s` in each chart heading. Three- and four-player matches render one color-coded line per player with a name legend and a shared numeric Y scale for each resource, including negative alive values. Exactly two players retain the advantage view, which renders
 divergent steel and oil area charts. The first player leads above the
 center line and the second leads below it. Each resource uses a symmetric minimum Y extent equal
-to one fully extracting base over that window (144 Steel or 36 Oil). Backward replay seeks
+to one fully extracting base per second (18 Steel/s or 4.5 Oil/s). Backward replay seeks
 truncate future samples before rebuilding the timeline. Alive Resources subtracts destroyed-unit and destroyed-building steel/oil value from
 lifetime mined resources; because starting resources are not lifetime mined income, the derived
 value can be negative. For 1v1s it also renders steel and oil advantage charts using that
@@ -627,7 +627,7 @@ of the latest analysis payload.
 Research groups
 completed permanent upgrades by player, retaining an explicit empty row when a player has
 completed none. The Losses tab lists destroyed units and buildings by kind, including zero-cost
-Steel Mines and Pump Jacks. Resources Lost is the spent steel/oil value of units and buildings that
+Steel Mines and Pump Jacks. Resources Lost uses the same panel width and chart dimensions as Resources and Alive Resources, with its definition in a tooltip instead of a heading and paragraph. Resources Lost is the spent steel/oil value of units and buildings that
 died, excluding stockpile changes, harvesting, refunds, and cancelled queues.
 
 `ai_diagnostics_panel.js`
