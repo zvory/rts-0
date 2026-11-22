@@ -227,7 +227,7 @@ fn validate_entity(
             field: "entities.chosenDao",
         });
     }
-    if entity.insight > config::DISCIPLE_INSIGHT_REQUIRED
+    if entity.insight > entity.insight_cap()
         || (entity.kind != crate::game::entity::EntityKind::Warrior
             && (entity.insight != 0 || entity.dao.is_some()))
         || entity.dao.is_some_and(|dao| {
@@ -238,7 +238,6 @@ fn validate_entity(
                     | crate::game::upgrade::UpgradeKind::DaoOfMagic
             )
         })
-        || (entity.dao.is_some() && entity.insight != config::DISCIPLE_INSIGHT_REQUIRED)
     {
         return Err(CheckpointPayloadError::InvalidValue {
             field: "entities.dao",

@@ -3,6 +3,8 @@ import { gfxNoFill, gfxEllipse, gfxPoly, gfxRect, gfxReset, gfxFill, gfxStroke }
 import {
   COLORS,
   STATS,
+  DISCIPLE_INSIGHT_REQUIRED,
+  DISCIPLE_EVOLVED_INSIGHT_CAP,
   PLAYER_PALETTE,
   RESOURCE_AMOUNTS,
   ANTI_TANK_GUN_DEPLOYED_RANGE_TILES,
@@ -329,7 +331,7 @@ export function _hpBar(g, e, status = null, ownerColor = null) {
     if (e.kind === KIND.WARRIOR) {
       if (Number.isFinite(e.insight)) {
         bar.rect(-halfW - 1, 6, barW + 2, 5).fill(0x8b2028);
-        bar.rect(-halfW, 7, barW * clamp01(e.insight / 60), 3).fill(0x368dff);
+        bar.rect(-halfW, 7, barW * clamp01(e.insight / (e.dao ? DISCIPLE_EVOLVED_INSIGHT_CAP : DISCIPLE_INSIGHT_REQUIRED)), 3).fill(0x368dff);
       }
       const x = 0, y = (stat.size || 9) + 8;
       icon.pivot.set(x, y);

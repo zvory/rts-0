@@ -9,7 +9,7 @@ entity-owned intent is independent of orders: moving, attacking, Stop, and queue
 do not cancel it. No automatic research purchase, Portal default, or army-wide promotion
 is added. Evolution is immediate and free once the chosen research is complete and the unit has 60 actual hostile
 HP damage dealt, capped at 60; misses, friendly fire, invulnerability and overkill grant
-no extra insight. Successful advancement fully restores HP to the evolved unit’s maximum,
+no extra insight. Advancement clears all existing insight. Successful advancement fully restores HP to the evolved unit’s maximum,
 after applying any path-specific maximum-HP bonus. Base, Lightness, and Magic have 115 maximum HP; War has 135. Base and War move at 2.0 px/tick. Choosing a pending path or repeating
 an evolution request does not heal; dead units cannot advance. One evolution per unit. Player research persists after Pavilion loss.
 The choice clears on evolution; evolved units cannot change paths. Pending choices persist
@@ -31,7 +31,9 @@ serial research queue and existing prerequisite/faction gates.
 Each path has a separate researched unlock. No automatic AI evolution in this pass;
 AI can encounter and damage evolved units. Insight uses a blue fill over red background
 under the HP bar and exact insight appears in selected-unit details for teammates and privileged observers only. Enemy snapshots omit exact insight. Evolved units
-keep the full insight bar. No new targeting or hidden-position information is exposed.
+reset to zero insight and have a doubled cap of 120. They continue earning insight from
+actual hostile HP damage; reaching 120 has no effect or further advancement. Their bars
+and selected-unit details use the new cap. Tournament winners follow the same rules. No new targeting or hidden-position information is exposed.
 State is checkpointed with the entity and snapshots use appended compact slots.
 
 Readiness radiance pulses around actionable Dao research/evolution buttons and around a

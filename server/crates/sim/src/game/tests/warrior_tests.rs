@@ -278,6 +278,8 @@ fn disciple_evolution_requires_insight_research_ownership_and_is_permanent() {
         game.tick();
         let evolved = game.state.entities.get(unit).unwrap();
         assert_eq!(evolved.dao, Some(upgrade));
+        assert_eq!(evolved.insight, 0);
+        assert_eq!(evolved.insight_cap(), 120);
         assert_eq!((evolved.hp, evolved.max_hp), (hp, hp));
         assert!((evolved.movement_speed() - speed).abs() < 0.0001);
         let entity = game.state.entities.get_mut(unit).unwrap();
@@ -295,7 +297,7 @@ fn disciple_evolution_requires_insight_research_ownership_and_is_permanent() {
             "evolved units cannot heal by choosing a Dao again"
         );
         let payload = game.checkpoint_payload_text_for_test().unwrap();
-        assert!(payload.contains("\"insight\":60"));
+        assert_eq!(game.state.entities.get(unit).unwrap().insight, 0);
         let restored = Game::restore_checkpoint_payload_text_for_test(
             &payload,
             game.state.map.clone(),
@@ -306,6 +308,18 @@ fn disciple_evolution_requires_insight_research_ownership_and_is_permanent() {
             restored.state.entities.get(unit).unwrap().dao,
             Some(upgrade)
         );
+        for insight in [0, 61, 120, 121] {
+            game.state.entities.get_mut(unit).unwrap().insight = insight;
+            let payload = game.checkpoint_payload_text_for_test();
+            if insight > 120 {
+                assert!(payload.is_err(), "over-cap insight must be rejected");
+                continue;
+            }
+            let restored = Game::restore_checkpoint_payload_text_for_test(
+                &payload.unwrap(), game.state.map.clone(), game.state.map_metadata.clone()
+            ).unwrap();
+            assert_eq!(restored.state.entities.get(unit).unwrap().insight, insight);
+        }
     }
 }
 
@@ -955,12 +969,12 @@ fn disciple_pending_dao_advances_on_combat_insight_without_interrupting_attack()
         .insert(UpgradeKind::DaoOfHeaviness);
     for _ in 0..60 {
         game.tick();
-        if game.state.entities.get(unit).unwrap().insight == 60 {
+        if game.state.entities.get(unit).unwrap().dao.is_some() {
             break;
         }
     }
     let entity = game.state.entities.get(unit).unwrap();
-    assert_eq!(entity.insight, 60);
+    assert_eq!(entity.insight, 0);
     assert_eq!(entity.dao, Some(UpgradeKind::DaoOfHeaviness));
     assert!(matches!(entity.order(), Order::Attack(_)));
     assert!(game.state.entities.get(target).unwrap().hp < 115);

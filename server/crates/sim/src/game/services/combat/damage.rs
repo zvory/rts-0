@@ -208,7 +208,7 @@ pub(super) fn apply_direct_hit(
                 source.insight = source
                     .insight
                     .saturating_add(actual)
-                    .min(crate::config::DISCIPLE_INSIGHT_REQUIRED);
+                    .min(source.insight_cap());
             }
         }
     }

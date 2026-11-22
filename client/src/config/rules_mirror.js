@@ -6,6 +6,8 @@ import { ABILITY, KIND, UPGRADE } from "../protocol.js";
 import { TICK_HZ } from "./timing.js";
 
 export const DAO_RANGED_RANGE_TILES = 5;
+export const DISCIPLE_INSIGHT_REQUIRED = 60;
+export const DISCIPLE_EVOLVED_INSIGHT_CAP = DISCIPLE_INSIGHT_REQUIRED * 2;
 
 export function entityAttackRangeTiles(entity) {
   if (entity?.kind === KIND.WARRIOR && entity.dao === "magic") {

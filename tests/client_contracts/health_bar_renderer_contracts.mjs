@@ -165,8 +165,8 @@ try {
     assert(dao === "war" ? iconDrawing.length > 0 : iconDrawing.length === 0,
       "only War retains its sword icon; Lightness and Magic have no legacy glyph");
     const rects = discipleBar.rtsInsight.calls.filter((call) => call[0] === "drawRect");
-    assert(rects.at(-1)[3] === (rects.at(-2)[3] - 2) / 2,
-      "30 insight fills half the Disciple insight bar");
+    assert(rects.at(-1)[3] === (rects.at(-2)[3] - 2) / (dao ? 4 : 2),
+      "30 insight fills half the base cap or one quarter of the evolved cap");
     assert(discipleBar.rtsDao.rotation === (dao === "war" ? Math.PI / 2 : 0),
       "Dao icon rotation resets when the authoritative specialization changes");
     assert(discipleBar.rtsDao.scaleY === (dao === "war" ? 1.2 : 1),

@@ -328,3 +328,22 @@ withFakeHudDocument(({ FakeElement }) => {
       "HUD returns to the diversity-first page when the selected entity set changes");
   });
 }
+
+withFakeHudDocument(({ FakeElement }) => {
+  const panel = new FakeElement("section");
+  const text = (node) => node.innerHTML + [...node.children].map(text).join("");
+  const disciple = { id: 1, owner: 1, kind: KIND.WARRIOR, insight: 60, hp: 115, maxHp: 115 };
+  const selectionPanel = new HudSelectionPanel(panel, {
+    players: [], selectedEntities: () => [disciple],
+  }, null, () => "");
+  selectionPanel.render();
+  assert(text(panel).includes("Insight: 60 / 60"), "base Disciple details show the 60 insight cap");
+  disciple.dao = "magic";
+  disciple.insight = 0;
+  selectionPanel.render();
+  assert(text(panel).includes("Insight: 0 / 120"), "evolution refreshes insight and the doubled cap");
+  disciple.insight = 120;
+  selectionPanel.render();
+  assert(text(panel).includes("Insight: 120 / 120"), "evolved details display the full cap");
+  selectionPanel.destroy();
+});

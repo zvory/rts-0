@@ -2163,7 +2163,9 @@ Tank tile entry exhausts the entire wire segment immediately, without damage or 
 See [Dao evolution playtest](dao-insight.md). Entity-owned `insight` and `dao` persist
 through checkpoints. Visible Disciple snapshots append `insight` (compact slot 45) and
 `dao` (slot 46: lightness/war/magic). Evolution buttons set replaceable, entity-owned `chosenDao` intent (team-private compact slot 49), independent of orders. Codes 14–16 and order stages 22–24 retain their positions.
-Evolution automatically occurs once the matching research and 60 insight are ready. Research ids are
+Evolution automatically occurs once the matching research and 60 insight are ready.
+Evolution clears all insight and doubles the cap to 120. Evolved Disciples continue earning
+insight from actual hostile HP damage; reaching 120 has no effect and enables no further evolution. Research ids are
 `dao_of_lightness`, `dao_of_heaviness` (War), `dao_of_magic` (Magic).
 
 Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md).

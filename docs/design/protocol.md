@@ -1191,7 +1191,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   state: string,                 // "idle","move","attack","gather","build","train","construct","dead"
   facing?: f32,                  // radians, for unit body/hull orientation (optional)
   weaponFacing?: f32,            // radians, for independent weapon/barrel orientation (optional)
-  insight?: u32,                 // team-private Disciple 0..60, compact slot 45
+  insight?: u32,                 // team-private Disciple 0..60 before evolution, 0..120 after, compact slot 45
   dao?: "lightness"|"war"|"magic", // evolved Disciple, compact slot 46
   daoReady?: bool,               // public maximum-insight readiness, slot 47
   daoAdvanceTicks?: u16,         // public realm burst, 1..15 ticks, slot 48
@@ -2004,7 +2004,9 @@ See [Dao evolution playtest](dao-insight.md). Entity-owned `insight` and `dao` p
 through checkpoints. Disciple snapshots append team-private `insight` (compact slot 45), public
 `dao` (slot 46: lightness/war/magic), `daoReady` (47), and optional
 `daoAdvanceTicks` (48, 1–15). Ordinary fog filtering applies to all public fields. Evolution buttons set replaceable, entity-owned `chosenDao` intent (team-private compact slot 49), independent of orders. Codes 14–16 and order stages 22–24 retain their positions.
-Evolution automatically occurs once the matching research and 60 insight are ready. Research ids are
+Evolution automatically occurs once the matching research and 60 insight are ready.
+Evolution clears all insight and doubles the cap to 120. Evolved Disciples continue earning
+insight from actual hostile HP damage; reaching 120 has no effect and enables no further evolution. Research ids are
 `dao_of_lightness`, `dao_of_heaviness` (War), `dao_of_magic` (Magic).
 
 Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md).
