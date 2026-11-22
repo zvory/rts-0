@@ -28,6 +28,9 @@ class RecordingCanvasContext {
   clearRect(x, y, w, h) { this.calls.push(["clearRect", x, y, w, h]); }
   fillRect(x, y, w, h) { this.calls.push(["fillRect", x, y, w, h]); }
   drawImage(...args) { this.calls.push(["drawImage", ...args]); }
+  createImageData(width, height) {
+    return { data: new Uint8ClampedArray(width * height * 4), width, height };
+  }
   getImageData(_x, _y, width, height) {
     return { data: new Uint8ClampedArray(width * height * 4), width, height };
   }

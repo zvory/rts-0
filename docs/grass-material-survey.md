@@ -1,7 +1,7 @@
 # Grass material studies
 
-Five Lab-only visual studies compare directions for replacing the coarse static grass surface.
-Normal gameplay keeps its current terrain. The prototypes share a world-anchored procedural mesh
+The selected default is **9 — mottled turf beneath distinct swaying blades**, with gusts and
+passing shade. The numbered Lab profiles retain the comparisons used to choose that direction. The prototypes share a world-anchored procedural mesh
 approach inspired by the animated water layer; they are five visual treatments, not five
 production-ready renderer architectures.
 
@@ -13,8 +13,8 @@ production-ready renderer architectures.
 | `grass-survey-4` | Dry meadow with taller blades and seed heads | Warm natural variation and slower-looking long stalks | Changes the biome/palette more substantially |
 | `grass-survey-5` | Mixed tuft carpet, coherent gusts, broad moving shade | Layered local motion and large-scale field movement | Most complex treatment; shade is decorative, not weather simulation |
 
-The selected direction is **5**. After comparing the dense carpet studies (6–8), the current
-refinement keeps profile 5's distinct blades and enriches the static ground underneath them.
+The selected default is **9**. It keeps profile 5's distinct blades and enriches the static
+ground underneath them. The dense carpet studies (6–8) remain comparison alternatives.
 Avoiding a fine moving carpet is a visual/video-compression preference, not a measured claim about
 YouTube's delivery pipeline. These are intentional visual studies, not pixel-parity optimizations.
 
@@ -116,7 +116,9 @@ study does not establish a new whole-frame performance result.
 | `grass-survey-11` | Muted earth/moss patches and coarse soil marks | Warmer, more weathered ground |
 
 The ground marks are static and subdued rather than numerous high-contrast moving strands.
-All existing Lab-only lighting/relief and shoreline-integration caveats still apply. Reproduce
+The production default preserves elevated terrain lighting through a cached ratio field and
+refreshes grass coverage during editor painting. Shore boundaries retain the existing tile-clipped
+material treatment. Reproduce
 these clips using the same Classic seed, unit arrangement, camera and capture settings above.
 Profile 5 is recaptured as a reference; the independently started sessions have different visual
 clock phases, so compare material character rather than exact wind position.
@@ -130,3 +132,14 @@ left and this constrained-bitrate H.264 result on the right. The WebM comparison
 high-quality VP9 encode to preserve the visible differences. These are codec stress previews,
 not a reproduction, upload, or guarantee of YouTube's processing. Native source WebMs are retained
 separately so the texture can also be reviewed without the stress encode.
+
+
+## Selected default delivery
+
+Ordinary rendering now selects material 9 without a Lab profile. Map construction creates it for
+matches, replay/spectator views and the editor; the presented visual clock animates it alongside
+water. Grass membership changes rebuild geometry and map replacement destroys the old resources.
+Elevated maps derive a neutral-128 RGB ratio field from the existing unlit/lit terrain pixels so
+slope relief and any baked terrain shadows remain visible under the selected material. This is an
+approximation for the old palette's additive altitude tint, not an exact-pixel lighting claim.
+Flat maps need no additional lighting texture and retain the selected preview's rendering.
