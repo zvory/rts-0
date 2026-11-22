@@ -432,3 +432,42 @@ fn ranged_dao_evolution_preserves_in_progress_reload_and_center_pursuit() {
         );
     }
 }
+
+#[test]
+fn ranged_evolution_cancels_lost_idle_approach_but_preserves_explicit_move() {
+    use crate::game::ability::AbilityKind;
+    let map = open_map(32);
+    for ability in [AbilityKind::EvolveLightness, AbilityKind::EvolveMagic] {
+        for explicit_move in [false, true] {
+            let mut entities = EntityStore::new();
+            let disciple = entities
+                .spawn_unit(1, EntityKind::Warrior, 400.0, 400.0)
+                .unwrap();
+            let target = entities
+                .spawn_unit(2, EntityKind::Rifleman, 520.0, 400.0)
+                .unwrap();
+            let players = [player_state(1, false), player_state(2, false)];
+            run_combat_tick_on_map(&mut entities, &players, &map);
+            let unit = entities.get_mut(disciple).unwrap();
+            assert!(
+                !unit.path_is_empty(),
+                "unevolved idle disciple should approach a target beyond sword reach"
+            );
+            let goal = (600.0, 400.0);
+            if explicit_move {
+                unit.set_order(Order::move_to(goal.0, goal.1));
+                unit.set_path(vec![goal]);
+                unit.set_path_goal(Some(goal));
+                unit.mark_move_phase(MovePhase::Moving);
+            }
+            unit.insight = 60;
+            assert!(unit.evolve_dao(ability));
+            entities.get_mut(target).unwrap().set_spawn_health(0);
+            run_combat_tick_on_map(&mut entities, &players, &map);
+            let unit = entities.get(disciple).unwrap();
+            assert_eq!(unit.path_is_empty(), !explicit_move);
+            assert_eq!(unit.path_goal(), explicit_move.then_some(goal));
+            assert_eq!(unit.target_id(), None);
+        }
+    }
+}

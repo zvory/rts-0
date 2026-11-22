@@ -290,7 +290,11 @@ pub(in crate::game) fn combat_system(
                         | Order::Point { .. }
                         | Order::HoldPosition
                 ) {
-                    if auto_pursuit {
+                    // Ranged evolution can leave an earlier sword approach behind.
+                    // Idle has no commanded route to preserve after its target is lost.
+                    if auto_pursuit
+                        || (e.kind == EntityKind::Warrior && matches!(e.order(), Order::Idle))
+                    {
                         if matches!(e.order(), Order::Idle) {
                             e.clear_path();
                             e.set_path_goal(None);
