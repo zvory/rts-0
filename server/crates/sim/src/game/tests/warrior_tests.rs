@@ -302,6 +302,81 @@ fn disciple_evolution_requires_insight_research_ownership_and_is_permanent() {
 }
 
 #[test]
+fn disciple_dash_casts_for_every_selected_ready_lightness_unit() {
+    use crate::game::ability::AbilityKind;
+    use crate::game::upgrade::UpgradeKind;
+    for queued in [false, true] {
+        let enemy = PlayerInit {
+            id: 2,
+            team_id: 2,
+            ..cultivator_player()
+        };
+        let mut game = empty_flat_game(&[cultivator_player(), enemy]);
+        let mut units = Vec::new();
+        let mut origins = Vec::new();
+        for (index, owner) in [1, 1, 1, 1, 2].into_iter().enumerate() {
+            let origin = game.state.map.tile_center(10, 10 + index as u32 * 2);
+            let id = game
+                .state
+                .entities
+                .spawn_unit(owner, EntityKind::Warrior, origin.0, origin.1)
+                .unwrap();
+            let entity = game.state.entities.get_mut(id).unwrap();
+            if index != 3 {
+                entity.dao = Some(UpgradeKind::DaoOfLightness);
+            }
+            if index == 2 {
+                entity.start_ability_cooldown(AbilityKind::EkatTeleport, 100);
+            }
+            units.push(id);
+            origins.push(origin);
+        }
+        let target = game.state.map.tile_center(14, 11);
+        let mut selection = units.clone();
+        selection.extend([units[0], u32::MAX]);
+        game.enqueue(
+            1,
+            Command::UseAbility {
+                ability: AbilityKind::EkatTeleport,
+                units: selection,
+                x: Some(target.0),
+                y: Some(target.1),
+                queued,
+            },
+        );
+        // Queued orders may activate on the following tick.
+        game.tick();
+        game.tick();
+        for (index, id) in units.iter().copied().enumerate() {
+            let entity = game.state.entities.get(id).unwrap();
+            if index < 2 {
+                assert!(
+                    (entity.pos_x() - target.0).hypot(entity.pos_y() - target.1)
+                        <= config::TILE_SIZE as f32,
+                    "each caster should reach the target area, allowing collision separation; queued={queued}",
+                );
+                assert!(entity.ability_cooldown_ticks(AbilityKind::EkatTeleport) > 0);
+                let marker = game
+                    .state
+                    .ability_runtime
+                    .active_return_marker(
+                        1,
+                        id,
+                        AbilityKind::EkatTeleport,
+                        None,
+                        game.current_tick(),
+                    )
+                    .expect("each ready caster should leave its own return marker");
+                assert_eq!((marker.x.to_world(), marker.y.to_world()), origins[index]);
+            } else {
+                assert_eq!((entity.pos_x(), entity.pos_y()), origins[index]);
+            }
+        }
+        assert_eq!(game.state.ability_runtime.world_objects().count(), 2);
+    }
+}
+
+#[test]
 fn disciple_dao_gates_blink_return_and_magic_anchor() {
     use crate::game::ability::AbilityKind;
     use crate::game::upgrade::UpgradeKind;

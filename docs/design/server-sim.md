@@ -1354,7 +1354,10 @@ projection from the initial state.
 Per-caster recast state is exposed to the owner through `EntityView.abilities`: active return marker
 id, availability tick, and remaining lifetime are projected only for the owning player's command
 card. Ekat's `ekatTeleport` world-point activation is a dash: it validates static standability,
-moves Ekat, and creates a four-second return marker at the original position. `recastAbility`
+moves the caster, and creates a four-second return marker at the original position. One dash
+command applies independently to every selected eligible caster, including Lightness Disciples,
+for both immediate and queued casts. Each caster keeps its own range clamp, cooldown, and return
+marker; unavailable or invalid casters do not block the others. `recastAbility`
 commands are explicit and validate a live owned caster plus matching active runtime state; missing
 state, same-tick/too-early return, stale caster ids, and invalid return destinations are ignored
 rather than overloading world-point `useAbility` commands. A valid recast returns Ekat to the
