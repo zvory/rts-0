@@ -94,7 +94,15 @@ pub(super) fn advance_moving_units(
                 Some(e) if e.is_unit() && (!e.path_is_empty() || barrage_target.is_some()) => e,
                 _ => continue,
             };
-            if panzerfaust_movement_locked(e) {
+            let post_shot_locked = e
+                .combat
+                .as_ref()
+                .and_then(|c| c.rifle_post_shot_tick)
+                .is_some_and(|shot_tick| {
+                    tick.saturating_sub(shot_tick)
+                        < config::METHAMPHETAMINES_RIFLE_POST_SHOT_LOCK_TICKS
+                });
+            if post_shot_locked || panzerfaust_movement_locked(e) {
                 continue;
             }
             if requires_weapon_setup(e.kind) && !matches!(e.weapon_setup(), WeaponSetup::Packed) {

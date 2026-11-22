@@ -25,6 +25,7 @@ mod forest;
 mod moving_fire_policy;
 mod range_targeting;
 mod retention;
+mod rifle_post_shot;
 mod support_weapon_attack_move;
 mod tank_he;
 mod tank_traps;

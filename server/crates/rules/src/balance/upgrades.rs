@@ -7,6 +7,8 @@ pub const METHAMPHETAMINES_COST_OIL: u32 = 100;
 pub const METHAMPHETAMINES_RESEARCH_TICKS: u32 = TICK_HZ * 20;
 pub const METHAMPHETAMINES_SPEED_MULTIPLIER: f32 = 1.25;
 pub const METHAMPHETAMINES_RIFLE_ATTACK_COOLDOWN_TICKS: u32 = 24;
+/// 150 ms rounded up to the next authoritative simulation tick.
+pub const METHAMPHETAMINES_RIFLE_POST_SHOT_LOCK_TICKS: u32 = (TICK_HZ * 150).div_ceil(1000);
 pub const PANZERFAUSTS_COST_STEEL: u32 = 100;
 pub const PANZERFAUSTS_COST_OIL: u32 = 100;
 pub const PANZERFAUSTS_RESEARCH_TICKS: u32 = TICK_HZ * 20;
@@ -46,6 +48,8 @@ pub const DAO_COST_STEEL: u32 = 200;
 pub const DAO_COST_OIL: u32 = 100;
 pub const DAO_RESEARCH_TICKS: u32 = METHAMPHETAMINES_RESEARCH_TICKS;
 
+/// Applied to every Disciple movement profile, including Lightness’s Scout Car baseline.
+pub const DISCIPLE_SPEED_MULTIPLIER: f32 = 1.15;
 pub const DISCIPLE_INSIGHT_REQUIRED: u32 = 60;
 pub const DAO_WAR_HP_BONUS: u32 = 20;
 pub const DAO_WAR_DAMAGE_MULTIPLIER: f32 = 1.5;

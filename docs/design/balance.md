@@ -224,7 +224,10 @@ Steel Mine and Oil Pumpjack, with Nexus, Portal, and Three Dao Pavilion availabl
 Cultivator Serfs can also construct the faction-specific Portal for 150 Steel: it has a 3x3
 footprint, 123 HP, one tile of sight, a five-second construction time, no prerequisite, and no
 research. A completed Portal trains the Cultivator Disciple for 100 Steel and 2 Supply in 300 ticks.
-The Disciple is a 135-HP, 13.5-pixel-radius ground melee unit moving at 1.6 pixels per tick. Its
+The Disciple is a 135-HP, 13.5-pixel-radius ground melee unit moving at 1.84 pixels per tick.
+All Disciple movement profiles receive a 15% speed increase,
+including Lightness (2.7025 pixels per tick) and Magic (2.024 pixels per tick); War retains
+the base Disciple speed. Its
 23-damage sword has 0.75-tile reach, a 64-tick cooldown, and 50% armor penetration.
 Disciples have a separate five-tile engagement range for Idle and Attack Move: they approach
 visible legal enemies to sword reach, then resume their original Attack Move destination when
@@ -339,8 +342,9 @@ path, turret aim, or stationary range. The first Tank cannon, Anti-Tank Gun, or 
 its source for three seconds. Hits during that window neither redirect the hull nor extend the lock;
 after it expires, the next qualifying hit may establish a new lock. Active movement paths and zero
 oil prevent this response, while Hold Position explicitly allows it. Riflemen take full incoming
-damage while moving. Riflemen upgraded with Methamphetamines gain permanent moving fire, keep
-advancing while firing with normal accuracy, move at tank speed, and use a 24-tick rifle cooldown.
+damage while moving. Riflemen upgraded with Methamphetamines gain permanent moving fire, pause path movement after each shot for 150 ms rounded up to five simulation ticks
+(~167 ms), retain their movement orders, fire with normal accuracy, move at tank speed,
+and use a 24-tick rifle cooldown. This pause applies to Riflemen only.
 Panzerfausts upgraded with Methamphetamines receive the normal Rifleman moving fire, tank-speed
 movement, and the same 24-tick rifle cooldown plus the Panzerfaust windup boost. Machine Gunners upgraded with
 Methamphetamines move at unupgraded Rifleman speed and use half-length setup/teardown timers; other
@@ -608,8 +612,10 @@ profiles and explicit activation/autocast policy instead of being folded into de
   projectile from the anchor toward the cursor. Her Magic Anchor ability targets up to 5 tiles, has
   no resource cost, places one replacement-style non-blocking, non-attackable 10-second pull field
   with a 3-tile radius, slows units moving away from the anchor to as low as 0.45x speed near the
-  center, boosts units moving toward the anchor up to 1.35x speed near the center, and drags idle
-  units toward the anchor with less displacement for braced or heavy units. Her Consume ability is
+  center, boosts units moving toward the anchor up to 1.70x speed near the center, and drags idle
+  units toward the anchor at 0.70 times their movement speed per tick, scaled by radial falloff
+  and reduced for braced or heavy units. This doubles the inward movement bonus and idle
+  displacement from the previous 0.35 strength; the outward slowdown is unchanged. Her Consume ability is
   self-targeted, has no resource cost or cooldown, consumes the nearest owned living Golem within 2
   tiles, and heals Ekat to full HP. Existing prototype combat abilities remain directly available
   until the Ekat tech-unlock building slice replaces them.
