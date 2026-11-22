@@ -248,7 +248,7 @@ pub const UNITS: &[UnitDef] = &[
             cooldown: balance::MORTAR_FIRE_COOLDOWN_TICKS,
             speed: 1.6,
             sight_tiles: 10,
-            cost_steel: 100,
+            cost_steel: 150,
             cost_oil: 40,
             supply: 3,
             build_ticks: 460,

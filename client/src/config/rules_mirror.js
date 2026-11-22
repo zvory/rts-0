@@ -170,7 +170,7 @@ export const STATS = Object.freeze({
     requires: [KIND.STEELWORKS, KIND.ENGINEERING_COMPLEX] },
   [KIND.MORTAR_TEAM]: { armored: false, label: "Mortar Team", icon: "MT", size: 21.6, sight: 10,
     rangeTiles: MORTAR_RANGE_TILES, minRangeTiles: MORTAR_MIN_RANGE_TILES,
-    cost: { steel: 100, oil: 40 }, supply: 3, buildTicks: 460,
+    cost: { steel: 150, oil: 40 }, supply: 3, buildTicks: 460,
     requires: KIND.STEELWORKS,
     description: "Manual indirect fire, extremely inaccurate without vision. Every shell requires a Mortar Fire command." },
   [KIND.ARTILLERY]: { armored: false, label: "Artillery", icon: "AR", size: 13.5, sight: 7, body: ARTILLERY_BODY,
