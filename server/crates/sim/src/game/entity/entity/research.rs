@@ -25,7 +25,7 @@ impl Entity {
         true
     }
 
-    pub(in crate::game) fn mark_front_research_paid(&mut self) -> bool {
+    pub(in crate::game) fn mark_front_research_paid(&mut self, total: u32) -> bool {
         let Some(front) = self
             .production
             .as_mut()
@@ -33,6 +33,7 @@ impl Entity {
         else {
             return false;
         };
+        front.total = total;
         front.paid = true;
         true
     }

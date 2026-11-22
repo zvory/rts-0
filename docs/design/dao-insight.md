@@ -48,8 +48,9 @@ absorbs 300 hostile damage after normal armor/terrain reductions; overflow damag
 unit, and depletion removes the field immediately. Friendly fire, environmental damage,
 buildings, invulnerable targets and enemy units do not consume the pool. Overlapping
 fields consume pools in stable caster-id order. Shield costs no resources, has a ten-second
-cooldown, replaces the caster’s prior shield, and persists until depletion, replacement,
-or caster death. The pool and fixed world center live on the caster entity and survive
+cooldown, replaces the caster’s prior shield, and expires after 15 seconds or earlier on
+depletion, replacement, or caster death. In-range casts preserve movement and queued orders;
+out-of-range immediate casts replace the current order with an approach-and-cast order. The pool, fixed world center, and absolute expiry tick live on the caster entity and survive
 checkpoints; the existing ability-runtime allocator supplies its unique visual id.
 All visible viewers see the field; owner/privileged viewers receive its remaining pool.
 

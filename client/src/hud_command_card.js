@@ -4,6 +4,7 @@ import {
   abilityCarriedByEntity,
   statsForFaction,
   UPGRADES,
+  researchDefinition,
   commandCardAbilitiesForFaction,
   researchableUpgradesForFaction,
   trainableUnitsForFaction,
@@ -405,7 +406,8 @@ export function buildTrainCard(ctx, building, { underConstruction = false } = {}
     `|research:` +
     researches.map((upgrade) => {
       const target = selectedResearchBuilding(ctx, upgrade, isOwn);
-      return `${upgrade}:${researchAvailability(ctx, upgrade, resources, isOwn)}:${target?.id ?? ""}`;
+      const def = researchDefinition(upgrade, ctx.upgrades, ctx.currentEntities || ctx.entities || ctx.selection, ctx.playerId);
+      return `${upgrade}:${researchAvailability(ctx, upgrade, resources, isOwn)}:${target?.id ?? ""}:${def.cost.steel}:${def.cost.oil}:${def.researchTicks}`;
     }).join(",") +
     `|abilities:${abilityAffordances.map((affordance) =>
       `${affordance.definition.ability}:${affordance.unlocked ? 1 : 0}:` +
@@ -459,7 +461,7 @@ export function buildTrainCard(ctx, building, { underConstruction = false } = {}
     };
   }
   for (const upgrade of researches) {
-    const def = UPGRADES[upgrade];
+    const def = researchDefinition(upgrade, ctx.upgrades, ctx.currentEntities || ctx.entities || ctx.selection, ctx.playerId);
     if (!def) continue;
     const preferredSlot = researchSlotForUpgrade(building.kind, upgrade, trains);
     const slot = firstOpenCommandSlot(slots, preferredSlot, cancelSlot);
@@ -480,6 +482,7 @@ export function buildTrainCard(ctx, building, { underConstruction = false } = {}
       title: researchDisabledReason(ctx, upgrade, resources, isOwn),
       cls: upgrade.startsWith("dao_of_") ? `dao-choice${availability === "ready" ? " dao-ready" : ""}` : "",
       tooltipUpgrade: upgrade,
+      researchDefinition: def,
       repeatable: false,
       onUnavailableIntent: { type: "playNotEnough", cost: def.cost },
     };

@@ -141,6 +141,7 @@ pub(crate) fn movement_system_with_context(
     for id in entities.ids() {
         if let Some(e) = entities.get_mut(id) {
             e.tick_breakthrough_status();
+            e.expire_shield(tick);
             e.tick_ability_cooldowns();
             e.tick_ability_charge_recharges();
         }

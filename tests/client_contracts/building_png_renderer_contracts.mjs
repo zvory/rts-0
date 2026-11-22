@@ -28,7 +28,7 @@ const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "../.."
 const expectedFootprints = new Map([
   [KIND.THREE_DAO_PAVILION, [3, 3]],
   [KIND.BARBED_WIRE, [1, 1]],
-  [KIND.TOURNAMENT_GROUNDS, [3, 3]],
+  [KIND.TOURNAMENT_GROUNDS, [4, 4]],
   [KIND.RESOURCE_DEPOT, [4, 4]],
   [KIND.BARRACKS, [3, 2]],
   [KIND.TRAINING_CENTRE, [3, 2]],

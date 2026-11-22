@@ -1603,7 +1603,7 @@ fn use_ability(
         }
     };
 
-    let units = if !request.queued {
+    let units = if !request.queued && ability != AbilityKind::EkatTeleport {
         if let Some((x, y)) = target_point {
             let eligible: Vec<u32> =
                 dedupe_cap_units(request.units.clone(), request.max_units_per_command)
@@ -1635,22 +1635,22 @@ fn use_ability(
         }),
         request.max_units_per_command,
     );
-    let order = planner::OrderRequest {
+    for order in command_helpers::ability_requests(
         units,
-        mode: issue_mode(request.queued),
-        order: planner::RequestedOrder::UseAbility {
-            ability: planner_id,
-            target,
-        },
-    };
-    planned_actions::execute(
-        ctx,
-        players,
-        player,
-        &facts,
-        &order,
+        request.queued,
+        ability,
+        target,
         request.max_units_per_command,
-    );
+    ) {
+        planned_actions::execute(
+            ctx,
+            players,
+            player,
+            &facts,
+            &order,
+            request.max_units_per_command,
+        );
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -2077,11 +2077,7 @@ fn order_cancel(
             ps.release_supply(rules::economy::supply_cost(item.unit));
         }
         cancel::Cancelled::Upgrade(item) if item.paid => {
-            let definition = upgrade::definition(item.upgrade);
-            ps.refund_cost(rules::economy::ResourceCost::new(
-                definition.cost_steel,
-                definition.cost_oil,
-            ));
+            ps.refund_cost(upgrade::paid_cost(&item));
         }
         _ => {}
     }

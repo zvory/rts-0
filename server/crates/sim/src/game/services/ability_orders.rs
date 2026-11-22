@@ -404,6 +404,7 @@ pub(crate) fn launch_world_ability(
                 x,
                 y,
                 definition.cooldown_ticks,
+                tick.saturating_add(config::DISCIPLE_SHIELD_DURATION_TICKS),
                 preserve_active_order,
             );
             true

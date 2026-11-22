@@ -100,7 +100,9 @@ scrolls and a three-lobed canopy. The canopy and finial receive team tint; timbe
 parchment retain natural colors. The square atlas preserves the generated proportions.
 
 Research Dao of Lightness, Dao of Magic, and Dao of War from slots Q/W/E. Each
-costs 200 Steel and 100 Oil and takes 600 ticks (20 seconds, matching Methamphetamines).
+uses player-wide purchase-order pricing: first 50 Steel / 100 Oil / 10 seconds,
+second 100 Steel / 200 Oil / 20 seconds, third 200 Steel / 400 Oil / 40 seconds.
+See [balance](balance.md#three-dao-pavilion-prototype) for payment and refund rules.
 Use existing player-wide permanent research and queue rules, including duplicate rejection,
 cancellation/refund and loss of unfinished research on destruction. All three can be completed;
 completed research survives building destruction. Each research unlocks the matching

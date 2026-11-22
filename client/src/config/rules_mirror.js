@@ -214,7 +214,7 @@ export const STATS = Object.freeze({
   [KIND.PORTAL]: { label: "Portal", icon: "PRT", footW: 3, footH: 3, sight: 1,
     cost: { steel: 150, oil: 0 }, buildTicks: TICK_HZ * 5, trains: [KIND.WARRIOR],
     description: "A supernatural gateway that trains Cultivator Disciples." },
-  [KIND.TOURNAMENT_GROUNDS]: { label: "Tournament Grounds", icon: "TG", footW: 3, footH: 3, sight: 1,
+  [KIND.TOURNAMENT_GROUNDS]: { label: "Tournament Grounds", icon: "TG", footW: 4, footH: 4, sight: 1,
     cost: { steel: 100, oil: 0 }, buildTicks: 200, trains: [], requires: [KIND.PORTAL],
     description: "Right-click four base Disciples inside, or rally a Portal here. A free ten-second tournament produces one winner with a random Dao specialization. Supports a rally point." },
   [KIND.THREE_DAO_PAVILION]: { label: "Three Dao Pavilion", icon: "DAO", footW: 3, footH: 3, sight: 1,
@@ -281,7 +281,7 @@ export const STATS = Object.freeze({
 export const ABILITIES = Object.freeze({
   [ABILITY.DISCIPLE_SHIELD]: Object.freeze({
     ability: ABILITY.DISCIPLE_SHIELD, label: "Shield", icon: "SHD", hotkey: "X",
-    title: "Place a shield that absorbs 300 enemy damage to allied units; lasts until depleted or replaced",
+    title: "Place a shield that absorbs 300 enemy damage to allied units; lasts up to 15 seconds",
     carriers: Object.freeze([KIND.WARRIOR]), targetMode: "worldPoint",
     rangeTiles: EKAT_MAGIC_ANCHOR_RANGE_TILES, radiusTiles: EKAT_MAGIC_ANCHOR_RADIUS_TILES,
     cooldownTicks: 300, cost: Object.freeze({ steel: 0, oil: 0 }),
@@ -518,19 +518,19 @@ export const ABILITIES = Object.freeze({
 export const UPGRADES = Object.freeze({
   [UPGRADE.DAO_OF_HEAVINESS]: Object.freeze({
     upgrade: UPGRADE.DAO_OF_HEAVINESS, label: "Dao of War", icon: "HVY",
-    cost: Object.freeze({ steel: 200, oil: 100 }), researchTicks: DAO_RESEARCH_TICKS,
+    cost: Object.freeze({ steel: 100, oil: 200 }), researchTicks: DAO_RESEARCH_TICKS,
     description: "Study the Dao of War. Unlocks the corresponding Disciple evolution at 60 insight.",
     researchedAt: KIND.THREE_DAO_PAVILION,
   }),
   [UPGRADE.DAO_OF_MAGIC]: Object.freeze({
     upgrade: UPGRADE.DAO_OF_MAGIC, label: "Dao of Magic", icon: "MAG",
-    cost: Object.freeze({ steel: 200, oil: 100 }), researchTicks: DAO_RESEARCH_TICKS,
+    cost: Object.freeze({ steel: 100, oil: 200 }), researchTicks: DAO_RESEARCH_TICKS,
     description: "Study the Dao of Magic. Unlocks the corresponding Disciple evolution at 60 insight.",
     researchedAt: KIND.THREE_DAO_PAVILION,
   }),
   [UPGRADE.DAO_OF_LIGHTNESS]: Object.freeze({
     upgrade: UPGRADE.DAO_OF_LIGHTNESS, label: "Dao of Lightness", icon: "LGT",
-    cost: Object.freeze({ steel: 200, oil: 100 }), researchTicks: DAO_RESEARCH_TICKS,
+    cost: Object.freeze({ steel: 100, oil: 200 }), researchTicks: DAO_RESEARCH_TICKS,
     description: "Study the Dao of Lightness. Unlocks the corresponding Disciple evolution at 60 insight.",
     researchedAt: KIND.THREE_DAO_PAVILION,
   }),
@@ -655,3 +655,17 @@ export const WORKER_BUILDABLE = Object.freeze([
 export const FIXTURE_FACTION_ID = "phase2_empty_fixture";
 export const EKAT_FACTION_ID = "ekat";
 export const CULTIVATORS_FACTION_ID = "cultivators";
+
+// Dao research tier is shared across a player's completed and paid active researches.
+export function researchDefinition(upgrade, upgrades = [], entities = [], owner = null) {
+  const def = UPGRADES[upgrade];
+  if (!def || def.researchedAt !== KIND.THREE_DAO_PAVILION) return def;
+  const isDao = (id) => UPGRADES[id]?.researchedAt === KIND.THREE_DAO_PAVILION;
+  const active = entities.filter((entity) => entity.owner === owner &&
+    entity.kind === KIND.THREE_DAO_PAVILION && entity.prodUpgrade && !entity.prodWaiting)
+    .map((entity) => entity.prodUpgrade);
+  const count = new Set([...upgrades, ...active].filter(isDao)).size;
+  const multiplier = 2 ** Math.min(count, 2) / 2;
+  return { ...def, cost: { steel: def.cost.steel * multiplier, oil: def.cost.oil * multiplier },
+    researchTicks: def.researchTicks * multiplier };
+}

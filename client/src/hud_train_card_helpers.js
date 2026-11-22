@@ -1,5 +1,5 @@
 import { KIND, UPGRADE, STATE, isBuilding } from "./protocol.js";
-import { STATS, UPGRADES } from "./config.js";
+import { STATS, UPGRADES, researchDefinition } from "./config.js";
 
 export function constructionCancelDescriptor(building) {
   return {
@@ -106,7 +106,7 @@ export function trainDisabledReason(ctx, unit, resources, isOwn) {
 }
 
 export function researchAvailability(ctx, upgrade, resources, isOwn) {
-  const def = UPGRADES[upgrade];
+  const def = researchDefinition(upgrade, ctx.upgrades, ctx.currentEntities || ctx.entities || ctx.selection, ctx.playerId);
   if (!def) return "locked";
   if ((ctx.upgrades || []).includes(upgrade)) return "locked";
   if (researchQueuedBuilding(ctx, def.researchedAt, upgrade, isOwn)) return "locked";
@@ -115,7 +115,7 @@ export function researchAvailability(ctx, upgrade, resources, isOwn) {
 }
 
 export function researchDisabledReason(ctx, upgrade, resources, isOwn) {
-  const def = UPGRADES[upgrade];
+  const def = researchDefinition(upgrade, ctx.upgrades, ctx.currentEntities || ctx.entities || ctx.selection, ctx.playerId);
   if (!def) return "";
   if ((ctx.upgrades || []).includes(upgrade)) return "Researched";
   const queuedAt = researchQueuedBuilding(ctx, def.researchedAt, upgrade, isOwn);

@@ -1163,7 +1163,10 @@ work never prepay. An unpaid unit reserves neither resources nor supply, cancell
 death refund only paid entries, and owner/team projections expose `prodWaiting` so clients do not
 extrapolate false progress. Human manual front entries attempt payment in stable entity-id order
 before any standing repeat admission, still before construction payment. AI producers retain their
-per-producer repeat/payment order.
+per-producer repeat/payment order. Dao research selects a player-wide tier at payment from
+completed plus paid active Dao researches, including other pavilions. Its committed `total`
+duration identifies the paid tier for cancellation/death refunds; unpaid entries reprice at
+activation. See [balance](balance.md#three-dao-pavilion-prototype) for tier costs and times.
 
 Human Auto-Build protects the combined Steel/Oil cost of remaining unpaid manual front entries on
 living, completed producers and active worker build purchases already in interaction range at a
@@ -1354,7 +1357,10 @@ projection from the initial state.
 Per-caster recast state is exposed to the owner through `EntityView.abilities`: active return marker
 id, availability tick, and remaining lifetime are projected only for the owning player's command
 card. Ekat's `ekatTeleport` world-point activation is a dash: it validates static standability,
-moves Ekat, and creates a four-second return marker at the original position. `recastAbility`
+moves the caster, and creates a four-second return marker at the original position. One dash
+command applies independently to every selected eligible caster, including Lightness Disciples,
+for both immediate and queued casts. Each caster keeps its own range clamp, cooldown, and return
+marker; unavailable or invalid casters do not block the others. `recastAbility`
 commands are explicit and validate a live owned caster plus matching active runtime state; missing
 state, same-tick/too-early return, stale caster ids, and invalid return destinations are ignored
 rather than overloading world-point `useAbility` commands. A valid recast returns Ekat to the
@@ -1935,7 +1941,9 @@ Allocation rules:
   world-targeted ability cannot execute noninterruptingly, the immediate order may replace the
   chosen idle caster's active order with an ability movement order. Abilities may also explicitly
   allow interrupting a moving caster; manual Mortar Fire uses that path so a non-queued fire order
-  stops the mortar's current movement and clears future queued intents.
+  stops the mortar's current movement and clears future queued intents. Movement policy is an
+  exhaustive ability match: every new ability must choose its behavior explicitly. Shield casts
+  preserve orders in range and replace active orders to approach out-of-range targets.
 - Support-weapon setup is queueable for selected Anti-Tank Guns and Artillery. Both store a point
   meaning "face toward this world point from wherever the weapon is when the setup stage promotes."
   Mortar Teams are not setup-capable: setup and teardown commands ignore them, and they retain no

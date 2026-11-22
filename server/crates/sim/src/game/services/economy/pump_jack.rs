@@ -34,7 +34,7 @@ pub(super) fn tick(entities: &mut EntityStore, teams: &TeamRelations) -> Vec<Pum
         if !super::pump_jack_has_completed_friendly_mining_anchor(entities, teams, owner, node_id) {
             if let Some(pump) = entities.get_mut(pump_id) {
                 if let Some(extractor) = pump.resource_extractor.as_mut() {
-                    // Integer fixed-point damage preserves the exact twenty-second lifetime
+                    // Integer fixed-point damage preserves the exact configured lifetime
                     // even for buildings with fewer HP than simulation ticks in that interval.
                     let numerator = u64::from(extractor.decay_remainder) + u64::from(pump.max_hp);
                     let duration = u64::from(config::EXTRACTOR_DECAY_TICKS);

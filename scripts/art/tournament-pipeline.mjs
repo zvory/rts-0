@@ -46,7 +46,7 @@ for (let y = 0; y < size; y++) {
     visible++;
     const saturation = (Math.max(...rgb) - Math.min(...rgb)) / Math.max(1, ...rgb);
     // White roof/finial paint; the natural stone arena and timber stay fixed.
-    const weight = y < size * 0.38
+    const weight = y < size * 0.25
       ? clamp((0.23 - saturation) / 0.07) * clamp((Math.min(...rgb) - 115) / 45)
       : 0;
     if (weight > 0) {

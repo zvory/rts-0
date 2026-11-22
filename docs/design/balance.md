@@ -691,9 +691,9 @@ profiles and explicit activation/autocast policy instead of being folded into de
   oil rate, and deplete the underlying oil node. When that final load empties the patch, its Pump
   Jack disappears with it and the permanent Depot job moves to the next eligible patch.
 - Unsupported extractors: completed Steel Mines and Pump Jacks without a living, completed
-  friendly Resource Depot or Zamok within the existing 11-tile mining-anchor range lose 5% of
-  maximum HP per second (`EXTRACTOR_DECAY_TICKS = 600`). A full-health extractor dies after
-  exactly 20 seconds without support; damaged extractors die sooner. Allied bases count.
+  friendly Resource Depot or Zamok within the existing 11-tile mining-anchor range lose 4% of
+  maximum HP per second (`EXTRACTOR_DECAY_TICKS = 750`). A full-health extractor dies after
+  exactly 25 seconds without support; damaged extractors die sooner. Allied bases count.
   Restoring support stops decay and clears fractional damage without healing lost HP.
   Extractors under construction do not decay. Decay uses ordinary unattributed damage/death
   handling; the underlying resource patch remains available.
@@ -813,7 +813,14 @@ It inherits the Training Centre baseline: 100 Steel, 25 Oil, 560 ticks construct
 120 HP, armored, one tile sight, no weapon, no supply or production. Its approved
 art uses a 3x3 placement and collision footprint.
 Its three independent, permanent researches (Dao of Lightness, Dao of War, and
-Dao of Magic) each cost 200 Steel and 100 Oil and take 600 ticks (20 seconds).
+Dao of Magic) share a player-wide escalating price, in any order: the first costs
+50 Steel / 100 Oil and takes 300 ticks (10 seconds), the second costs 100 Steel /
+200 Oil and takes 600 ticks (20 seconds), and the third costs 200 Steel / 400 Oil
+and takes 1200 ticks (40 seconds). The rules/client catalog retains the second-tier
+baseline; runtime pricing applies ½×, 1×, or 2× to costs and duration. Completed
+researches and paid active Dao researches across all owned pavilions reserve tiers.
+Unpaid entries select their tier when payment starts; a paid entry keeps its duration
+and refund value even if another research is cancelled or its pavilion destroyed.
 Each unlocks its corresponding evolution for Disciples with 60 insight. Existing research queue, cancellation,
 refund, completion, and destruction rules apply; completed research persists.
 See [Cultivators](cultivators.md#three-dao-pavilion-prototype) for the approved brief.
@@ -830,7 +837,7 @@ Dao presentation and support Shield follow [Disciple insight and Dao evolution](
 
 ### Tournament Grounds
 
-Cultivator Engineer building: 100 steel, no oil, completed Portal prerequisite, 3×3,
+Cultivator Engineer building: 100 steel, no oil, completed Portal prerequisite, 4×4,
 120 HP armored, sight 1, 200-tick construction. Four base Disciples are consumed
 for a free 300-tick tournament producing one full-health Disciple
 rolling an existing first Dao specialization uniformly. Two supply reserve the winner.

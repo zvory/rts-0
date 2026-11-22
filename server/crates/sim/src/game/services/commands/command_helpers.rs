@@ -65,3 +65,33 @@ pub(super) fn clear_staged_anti_tank_gun_setup(entities: &mut EntityStore, ids: 
         }
     }
 }
+
+// Dash applies to every selected caster. Singleton requests retain the normal
+// planner guards without its single-caster world-ability arbitration.
+pub(super) fn ability_requests(
+    units: Vec<u32>,
+    queued: bool,
+    ability: AbilityKind,
+    target: planner::AbilityTarget,
+    max_units_per_command: usize,
+) -> Vec<planner::OrderRequest> {
+    let unit_groups = if ability == AbilityKind::EkatTeleport {
+        dedupe_cap_units(units, max_units_per_command)
+            .into_iter()
+            .map(|unit| vec![unit])
+            .collect()
+    } else {
+        vec![units]
+    };
+    unit_groups
+        .into_iter()
+        .map(|units| planner::OrderRequest {
+            units,
+            mode: issue_mode(queued),
+            order: planner::RequestedOrder::UseAbility {
+                ability: ability_to_planner(ability),
+                target,
+            },
+        })
+        .collect()
+}

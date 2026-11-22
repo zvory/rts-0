@@ -16,7 +16,8 @@ fn fixture(kind: EntityKind) -> (EntityStore, TeamRelations, u32, u32) {
 }
 
 #[test]
-fn unsupported_extractors_die_at_exactly_twenty_seconds_and_preserve_nodes() {
+fn unsupported_extractors_die_at_exactly_twenty_five_seconds_and_preserve_nodes() {
+    assert_eq!(config::EXTRACTOR_DECAY_TICKS, config::TICK_HZ * 25);
     for kind in [EntityKind::SteelMine, EntityKind::PumpJack] {
         let (mut entities, teams, id, node) = fixture(kind);
         let max_hp = entities.get(id).unwrap().max_hp;

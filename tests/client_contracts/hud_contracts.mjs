@@ -1039,7 +1039,8 @@ withFakeHudDocument(({ FakeElement }) => {
     const slot = pavilionCard.slots[index];
     assert(slot.label === label && slot.enabled, "Pavilion exposes all three affordable Dao researches");
     assert(slot.hotkey === ["Q", "W", "E"][index], "Dao research uses Q/W/E");
-    assert(slot.cost.steel === 200 && slot.cost.oil === 100, "Each Dao costs 200 Steel and 100 Oil");
+    assert(slot.cost.steel === 50 && slot.cost.oil === 100, "Any first Dao costs 50 Steel and 100 Oil");
+    assert(slot.researchDefinition.researchTicks === 300, "Any first Dao takes 10 seconds");
     assert(slot.tooltipUpgrade === [UPGRADE.DAO_OF_LIGHTNESS, UPGRADE.DAO_OF_MAGIC, UPGRADE.DAO_OF_HEAVINESS][index], "Dao tooltip resolves the matching research description");
   }
 
