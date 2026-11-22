@@ -4,6 +4,7 @@ use crate::game::entity::{EntityStore, OrderIntent, ProdItem, RallyIntent, Rally
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::move_coordinator::MoveCoordinator;
+use crate::game::services::tournament;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::upgrade;
 #[cfg(test)]
@@ -33,7 +34,21 @@ pub(crate) fn production_system(
 ) {
     manual::pay_and_protect(entities, players, &mut pending_spending);
     let mut completed_buildings_by_owner = None;
-    for id in entities.ids() {
+    let producers: Vec<_> = entities
+        .ids()
+        .into_iter()
+        .flat_map(|id| {
+            let ready_tournament = entities.get(id).is_some_and(|e| {
+                e.kind == EntityKind::TournamentGrounds
+                    && e.prod_queue()
+                        .first()
+                        .is_some_and(|p| p.progress >= p.total.saturating_sub(1))
+            });
+            // Once the ten-second front item completes, all three winners can leave this tick.
+            std::iter::repeat_n(id, if ready_tournament { 3 } else { 1 })
+        })
+        .collect();
+    for id in producers {
         let active_producer = entities.get(id).is_some_and(|producer| {
             producer.hp > 0 && producer.is_building() && !producer.under_construction()
         });
@@ -235,6 +250,7 @@ pub(crate) fn production_system(
             let spawn_facing = first_rally
                 .and_then(|rally| coordinator.rally_spawn_facing(entities, unit, (sx, sy), rally));
             if let Some(spawned) = entities.spawn_unit(owner, unit, sx, sy) {
+                tournament::upgrade_winner(entities, id, spawned);
                 if let Some(facing) = spawn_facing {
                     if let Some(e) = entities.get_mut(spawned) {
                         e.set_facing(facing);

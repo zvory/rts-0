@@ -379,3 +379,6 @@ export const cmd = Object.freeze({
 // MG prototype: Attack.shotOrigin (compact v57, slot 6) fixes the ray origin; toPos fixes its endpoint.
 
 // Disciple EntityView slots 45–49: team-private insight/chosenDao; public dao, daoReady and daoAdvanceTicks.
+
+// Tournament Grounds: kind code 32; compact v62 slot 50 is team-private tournamentEntrants (0–8).
+// Existing production/rally fields carry its ten-second batch and pending winners.

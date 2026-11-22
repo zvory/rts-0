@@ -185,6 +185,7 @@ export const KIND = Object.freeze({
   RESOURCE_DEPOT: "resource_depot",
   PORTAL: "portal",
   THREE_DAO_PAVILION: "three_dao_pavilion",
+  TOURNAMENT_GROUNDS: "tournament_grounds",
   ZAMOK: "zamok",
   DEPOT: "depot",
   BARRACKS: "barracks",
@@ -220,6 +221,7 @@ export const BUILDING_KINDS = Object.freeze([
   KIND.RESOURCE_DEPOT,
   KIND.PORTAL,
   KIND.THREE_DAO_PAVILION,
+  KIND.TOURNAMENT_GROUNDS,
   KIND.ZAMOK,
   KIND.DEPOT,
   KIND.BARRACKS,
@@ -351,7 +353,7 @@ export const MOVEMENT_PATH_DIAGNOSTICS = Object.freeze({
 // --- Compact snapshot wire schema (must match protocol.rs) ---
 export const PREDICTION_PROTOCOL_VERSION = 1;
 export const DEFAULT_FACTION_ID = "kriegsia";
-export const COMPACT_SNAPSHOT_VERSION = 61;
+export const COMPACT_SNAPSHOT_VERSION = 62;
 export const MAX_COMPACT_GROUND_DECALS = 64;
 export const SNAPSHOT_CODEC_VERSION = 1;
 export const SNAPSHOT_CODEC = Object.freeze({
@@ -379,6 +381,7 @@ export const KIND_CODE = Object.freeze({
   [KIND.RESOURCE_DEPOT]: 6,
   [KIND.PORTAL]: 28,
   [KIND.THREE_DAO_PAVILION]: 31,
+  [KIND.TOURNAMENT_GROUNDS]: 32,
   [KIND.WARRIOR]: 29,
   [KIND.DEPOT]: 7,
   [KIND.BARRACKS]: 8,

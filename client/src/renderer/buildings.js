@@ -198,12 +198,15 @@ export function _drawBuilding(e, colorByOwner, state) {
     drawPortalVortex.call(this, e, w, h);
   }
 
-  const hasProductionProgress = typeof e.prodProgress === "number" && e.prodProgress > 0;
+  const tournamentFilling = e.kind === KIND.TOURNAMENT_GROUNDS && !underConstruction && !e.prodKind
+    && typeof e.tournamentEntrants === "number";
+  const progress = tournamentFilling ? e.tournamentEntrants / 8 : e.prodProgress;
+  const hasProductionProgress = tournamentFilling || (typeof progress === "number" && progress > 0);
   const extractorInactive = (e.kind === KIND.STEEL_MINE || e.kind === KIND.PUMP_JACK)
     && e.extractorActive === false
     && !underConstruction;
   if (hasProductionProgress || extractorInactive) {
-    const overlayKey = `${e.x}|${y0}|${w}|${e.prodProgress ?? ""}|${extractorInactive}`;
+    const overlayKey = `${e.x}|${y0}|${w}|${progress ?? ""}|${extractorInactive}`;
     const overlay = this._staticSlot?.(
       "buildingOverlays",
       e.id,
@@ -220,7 +223,7 @@ export function _drawBuilding(e, colorByOwner, state) {
         gfxRect(overlay, bx, by, bw, 5);
         gfxNoFill(overlay);
         gfxFill(overlay, COLORS.hpGood);
-        gfxRect(overlay, bx, by, bw * clamp01(e.prodProgress), 5);
+        gfxRect(overlay, bx, by, bw * clamp01(progress), 5);
         gfxNoFill(overlay);
       }
       if (extractorInactive) {
@@ -232,7 +235,7 @@ export function _drawBuilding(e, colorByOwner, state) {
 
   // Queue depth label: an unpaid front item is still waiting to begin, while a
   // paid front item occupies the active production slot and is not queued.
-  const queueDepth = Math.max(0, (e.prodQueue ?? 0) - (e.prodWaiting ? 0 : 1));
+  const queueDepth = e.kind === KIND.TOURNAMENT_GROUNDS ? 0 : Math.max(0, (e.prodQueue ?? 0) - (e.prodWaiting ? 0 : 1));
   this._queueLabel(e, e.x, y0 + 14, queueDepth, bodyAlpha);
 }
 

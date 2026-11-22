@@ -374,7 +374,13 @@ export class HudSelectionPanel {
 
     let prodHtml = "";
     const queue = e.prodQueue ?? 0;
-    if (queue > 0) {
+    if (e.kind === KIND.TOURNAMENT_GROUNDS && typeof e.tournamentEntrants === "number") {
+      const running = !!e.prodKind;
+      const pct = Math.round((running ? (e.prodProgress ?? 0) : e.tournamentEntrants / 8) * 100);
+      const label = running ? "Tournament · 10 seconds · 3 random Dao winners" : `Disciples inside: ${e.tournamentEntrants} / 8`;
+      prodHtml = `<div class="sel-prod-label">${label}</div><div class="sel-prod-bar">` +
+        `<div class="sel-prod-fill" style="width:${pct}%"></div></div>`;
+    } else if (queue > 0) {
       const pct = Math.round((e.prodProgress ?? 0) * 100);
       const kindLabel = (e.prodUpgrade && UPGRADES[e.prodUpgrade]?.label) ||
         (e.prodKind && statsForFaction(e.prodKind, factionId)?.label) ||
@@ -499,6 +505,7 @@ function selectionDetailSignature(entity, state = null) {
     resource ? `${resource.kind}:${formatResourceRemaining(resource.remaining)}` : "",
     sigValue(entity.prodQueue),
     sigValue(entity.prodKind),
+    sigValue(entity.tournamentEntrants),
     sigValue(entity.prodUpgrade),
     productionPct,
     entity.prodWaiting ? 1 : 0,

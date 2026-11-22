@@ -895,6 +895,8 @@ pub struct EntityView {
     pub dao: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub chosen_dao: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tournament_entrants: Option<u8>,
 
     /// Visible physical rounds on a Rocket Truck rack, including zero while reloading.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1015,6 +1017,7 @@ impl EntityView {
             dao_advance_ticks: None,
             dao: None,
             chosen_dao: None,
+            tournament_entrants: None,
             rocket_rack_count: None,
             facing: None,
             weapon_facing: None,

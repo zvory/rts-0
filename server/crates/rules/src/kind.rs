@@ -23,6 +23,7 @@ pub enum EntityKind {
     ResourceDepot,
     Portal,
     ThreeDaoPavilion,
+    TournamentGrounds,
     Zamok,
     Depot,
     Barracks,
@@ -39,7 +40,7 @@ pub enum EntityKind {
 }
 
 impl EntityKind {
-    pub const ALL: [EntityKind; 31] = [
+    pub const ALL: [EntityKind; 32] = [
         EntityKind::Worker,
         EntityKind::Golem,
         EntityKind::Warrior,
@@ -58,6 +59,7 @@ impl EntityKind {
         EntityKind::ResourceDepot,
         EntityKind::Portal,
         EntityKind::ThreeDaoPavilion,
+        EntityKind::TournamentGrounds,
         EntityKind::Zamok,
         EntityKind::Depot,
         EntityKind::Barracks,
@@ -117,6 +119,7 @@ impl EntityKind {
             EntityKind::ResourceDepot => "resource_depot",
             EntityKind::Portal => "portal",
             EntityKind::ThreeDaoPavilion => "three_dao_pavilion",
+            EntityKind::TournamentGrounds => "tournament_grounds",
             EntityKind::Zamok => "zamok",
             EntityKind::Depot => "depot",
             EntityKind::Barracks => "barracks",
@@ -157,6 +160,7 @@ impl FromStr for EntityKind {
             "resource_depot" => Ok(EntityKind::ResourceDepot),
             "portal" => Ok(EntityKind::Portal),
             "three_dao_pavilion" => Ok(EntityKind::ThreeDaoPavilion),
+            "tournament_grounds" => Ok(EntityKind::TournamentGrounds),
             "zamok" => Ok(EntityKind::Zamok),
             "depot" => Ok(EntityKind::Depot),
             "barracks" => Ok(EntityKind::Barracks),

@@ -495,7 +495,8 @@ for (const rustFaction of allRustCatalogs.catalogs) {
   );
   assert.deepEqual(
     rustFaction.productionAnchors.map((kind) => kindByStableId.get(kind)),
-    rustFaction.trainables.map((entry) => kindByStableId.get(entry.building)),
+    [...rustFaction.trainables.map((entry) => kindByStableId.get(entry.building)),
+      ...(rustFaction.id === "cultivators" ? [KIND.TOURNAMENT_GROUNDS] : [])],
     `${rustFaction.id} production anchors match exported trainable producers`,
   );
   for (const entry of rustFaction.abilities) {

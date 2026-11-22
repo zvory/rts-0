@@ -52,6 +52,12 @@ pub(super) fn apply(
         return Some(Cancelled::Construction { kind, cost_paid });
     }
 
+    if entities
+        .get(building)
+        .is_some_and(|e| e.kind == EntityKind::TournamentGrounds)
+    {
+        return None;
+    }
     let (cancelled, remove_extractor_scaffold) = {
         let b = match entities.get_mut(building) {
             Some(b) if b.owner == player && b.is_building() && !b.under_construction() => b,

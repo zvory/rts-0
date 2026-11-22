@@ -787,3 +787,13 @@ pendingDaoRecord[49] = "magic";
 const pendingDaoSnapshot = decodeServerMessage({ t: "snapshot", v: COMPACT_SNAPSHOT_VERSION,
   s: [1, 0, 0, 2, 10], e: [pendingDaoRecord], n: [0, 0, 0, 0, 0] });
 assert(pendingDaoSnapshot.entities[0].chosenDao === "magic", "compact private Dao intent decodes at slot 49");
+
+const tournamentRecord = [...pendingDaoRecord];
+tournamentRecord[2] = KIND_CODE[KIND.TOURNAMENT_GROUNDS];
+tournamentRecord[50] = 7;
+const tournamentSnapshot = decodeServerMessage({t: "snapshot", v: COMPACT_SNAPSHOT_VERSION,
+  s: [1, 0, 0, 2, 10], e: [tournamentRecord], n: [0, 0, 0, 0, 0]});
+assert(tournamentSnapshot.entities[0].kind === KIND.TOURNAMENT_GROUNDS,
+  "Tournament Grounds compact kind round trips");
+assert(tournamentSnapshot.entities[0].tournamentEntrants === 7,
+  "compact tournament entrant count decodes at slot 50");

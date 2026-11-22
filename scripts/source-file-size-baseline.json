@@ -20,8 +20,8 @@
     },
     {
       "path": "server/crates/archcheck/src/lib.rs",
-      "lines": 2470,
-      "reason": "The architecture checker now classifies the authoritative artillery attack-move tick service and shared shell-firing helper and records their narrow service dependencies; keep ratcheting until scanners and tests are split into modules."
+      "lines": 2477,
+      "reason": "Tournament Grounds classifies its narrow admission/winner executor and three exact service edges, including the explicit coordinator query exception; no broad role-matrix relaxation."
     },
     {
       "path": "server/crates/sim/src/game/services/combat/tests.rs",
@@ -30,8 +30,8 @@
     },
     {
       "path": "server/crates/sim/src/game/services/commands.rs",
-      "lines": 2111,
-      "reason": "Dao choice admission runs before ordinary ability research and queue gates so pending evolution can be replaced without changing combat orders; it reuses bounded unit admission and faction checks. Keep ratcheting by extracting cohesive targeted-command admission and execution."
+      "lines": 2118,
+      "reason": "Tournament contextual move admission adds one bounded dispatch to its focused entry executor. Movement and winner state stay in typed entity groups; normal command ownership and unit budget checks run first."
     },
     {
       "path": "server/crates/sim/src/game/services/move_coordinator.rs",

@@ -205,6 +205,9 @@ export const STATS = Object.freeze({
   [KIND.PORTAL]: { label: "Portal", icon: "PRT", footW: 3, footH: 3, sight: 1,
     cost: { steel: 150, oil: 0 }, buildTicks: TICK_HZ * 5, trains: [KIND.WARRIOR],
     description: "A supernatural gateway that trains Cultivator Disciples." },
+  [KIND.TOURNAMENT_GROUNDS]: { label: "Tournament Grounds", icon: "TG", footW: 3, footH: 3, sight: 1,
+    cost: { steel: 100, oil: 0 }, buildTicks: 200, trains: [], requires: [KIND.PORTAL],
+    description: "Right-click eight base Disciples inside. A free ten-second tournament produces three winners with random Dao specializations. Supports a rally point." },
   [KIND.THREE_DAO_PAVILION]: { label: "Three Dao Pavilion", icon: "DAO", footW: 3, footH: 3, sight: 1,
     cost: { steel: 100, oil: 25 }, buildTicks: 560, trains: [],
     researches: [UPGRADE.DAO_OF_LIGHTNESS, UPGRADE.DAO_OF_MAGIC, UPGRADE.DAO_OF_HEAVINESS],
@@ -620,7 +623,7 @@ export const UPGRADES = Object.freeze({
 
 // A building that trains units — the only buildings that accept a rally point.
 export const isProducerBuilding = (kind) =>
-  Array.isArray(STATS[kind]?.trains) && STATS[kind].trains.length > 0;
+  kind === KIND.TOURNAMENT_GROUNDS || (Array.isArray(STATS[kind]?.trains) && STATS[kind].trains.length > 0);
 
 export const RESOURCE_AMOUNTS = Object.freeze({
   [KIND.STEEL]: 625,

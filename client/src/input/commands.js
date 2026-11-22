@@ -232,6 +232,16 @@ function normalRightClickAction(input, p) {
     };
   }
 
+  if (target?.kind === KIND.TOURNAMENT_GROUNDS && ownOwner(input.state, target.owner, input.controlPolicy)
+      && !Number.isFinite(target.buildProgress)) {
+    const entrants = ownUnits.filter((id) => {
+      const unit = input.state.entityById(id);
+      return unit?.kind === KIND.WARRIOR && !unit.dao;
+    });
+    if (entrants.length) return { kind: "move", units: entrants, x: target.x, y: target.y,
+      feedback: rightClickFeedback("move", target.x, target.y) };
+    return null;
+  }
   const gatherers = input._selectedGathererIds();
   const workers = input._selectedWorkerIds();
   const contextualResource = resource;

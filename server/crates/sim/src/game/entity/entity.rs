@@ -180,6 +180,7 @@ impl Entity {
             },
             production: if rules::economy::trainable_units(kind).is_empty()
                 && crate::game::upgrade::researchable_upgrades(kind).is_empty()
+                && kind != EntityKind::TournamentGrounds
             {
                 None
             } else {
@@ -285,6 +286,7 @@ impl Entity {
             self.leave_trench_for_movement();
         }
         if let Some(m) = self.movement.as_mut() {
+            m.tournament_target = None;
             m.order = order;
             m.path.clear();
             m.path_goal = None;
@@ -1398,6 +1400,7 @@ impl Entity {
         self.cancel_panzerfaust_windup();
         if let Some(m) = self.movement.as_mut() {
             m.order = Order::Idle;
+            m.tournament_target = None;
             m.queued_orders.clear();
             m.path.clear();
             m.last_move_delta = (0.0, 0.0);
@@ -1412,6 +1415,7 @@ impl Entity {
         self.cancel_panzerfaust_windup();
         if let Some(m) = self.movement.as_mut() {
             m.order = Order::HoldPosition;
+            m.tournament_target = None;
             m.queued_orders.clear();
             m.path.clear();
             m.path_goal = None;

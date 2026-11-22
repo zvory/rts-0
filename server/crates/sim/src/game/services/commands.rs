@@ -1,3 +1,4 @@
+use crate::game::services::tournament;
 mod research;
 use crate::config::{self, support_weapon_teardown_ticks};
 use crate::game::ability::{self, AbilityEffectHook, AbilityKind, AbilityTargetMode};
@@ -194,6 +195,12 @@ pub(in crate::game) fn apply_commands(
                 else {
                     continue;
                 };
+                if !queued {
+                    if let Some(target) = tournament::entry_target(entities, player, x, y) {
+                        tournament::order_entry(entities, coordinator, player, &units, target);
+                        continue;
+                    }
+                }
                 let request = planner::OrderRequest {
                     units: units.clone(),
                     mode: issue_mode(queued),

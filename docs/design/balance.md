@@ -827,3 +827,11 @@ Evolution automatically occurs once the matching research and 60 insight are rea
 `dao_of_lightness`, `dao_of_heaviness` (War), `dao_of_magic` (Magic).
 
 Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md).
+
+### Tournament Grounds
+
+Cultivator Engineer building: 100 steel, no oil, completed Portal prerequisite, 3×3,
+120 HP armored, sight 1, 200-tick construction. Eight base Disciples are consumed
+for a free 300-tick tournament producing three full-health Disciples, each independently
+rolling an existing first Dao specialization uniformly. Six supply reserve the winners.
+See [Tournament Grounds rules](tournament-grounds.md).
