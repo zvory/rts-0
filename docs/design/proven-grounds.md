@@ -18,7 +18,8 @@ Nexus lotus, Pavilion's three roofs, and Tournament Grounds' circular bowl. Same
 white team-paint and isometric camera as existing faction art.
 
 Occupied presentation: while a trainee is inside, a blue-white ball of lightning pulses in the
-gate opening, with crawling spherical arcs and intermittent outward forks. Empty,
+gate opening, with jagged branching discharges, broken surface flashes and a hazy human
+form inside. The storm has no orbiting rings. Empty,
 unfinished and fog-remembered buildings show no lightning. Uses existing public production state.
 
 ## Phase 1: rules and balance — complete
