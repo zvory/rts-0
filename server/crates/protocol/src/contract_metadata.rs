@@ -81,6 +81,7 @@ pub mod kinds {
     pub const THREE_DAO_PAVILION: &str = "three_dao_pavilion";
     pub const TOURNAMENT_GROUNDS: &str = "tournament_grounds";
     pub const PROVEN_GROUNDS: &str = "proven_grounds";
+    pub const SHOP: &str = "shop";
     pub const ZAMOK: &str = "zamok";
     pub const DEPOT: &str = "depot";
     pub const BARRACKS: &str = "barracks";
@@ -412,6 +413,7 @@ const KIND_CODES: &[(&str, u8)] = &[
     (kinds::THREE_DAO_PAVILION, 31),
     (kinds::TOURNAMENT_GROUNDS, 32),
     (kinds::PROVEN_GROUNDS, 33),
+    (kinds::SHOP, 34),
     (kinds::DEPOT, 7),
     (kinds::BARRACKS, 8),
     (kinds::TRAINING_CENTRE, 9),
@@ -762,6 +764,7 @@ fn kind_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("THREE_DAO_PAVILION", kinds::THREE_DAO_PAVILION),
         ("TOURNAMENT_GROUNDS", kinds::TOURNAMENT_GROUNDS),
         ("PROVEN_GROUNDS", kinds::PROVEN_GROUNDS),
+        ("SHOP", kinds::SHOP),
         ("ZAMOK", kinds::ZAMOK),
         ("DEPOT", kinds::DEPOT),
         ("BARRACKS", kinds::BARRACKS),

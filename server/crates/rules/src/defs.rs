@@ -403,6 +403,25 @@ pub const UNITS: &[UnitDef] = &[
 
 pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
+        kind: EntityKind::Shop,
+        stats: balance::BuildingStats {
+            hp: 1000,
+            sight_tiles: 1,
+            cost_steel: 200,
+            cost_oil: 200,
+            foot_w: 3,
+            foot_h: 4,
+            build_ticks: 1200,
+            dmg: 0,
+            range_tiles: 0.0,
+            cooldown: 0,
+        },
+        armor_class: ArmorClass::Armored,
+        weapon: WeaponClass::None,
+        trains: &[],
+        build_requires: &[],
+    },
+    BuildingDef {
         kind: EntityKind::ResourceDepot,
         stats: balance::BuildingStats {
             hp: 180,
@@ -812,6 +831,7 @@ mod tests {
         assert_eq!(
             buildings,
             vec![
+                EntityKind::Shop,
                 EntityKind::ResourceDepot,
                 EntityKind::Portal,
                 EntityKind::Zamok,

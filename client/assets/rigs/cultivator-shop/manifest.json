@@ -1,0 +1,13 @@
+{
+  "id": "cultivator-shop-01",
+  "mode": "built-in-imagegen-plus-deterministic-raster-assembly",
+  "source": "shop-source.png",
+  "atlas": "shop-atlas.png",
+  "generator": "scripts/art/shop-pipeline.mjs",
+  "frameSize": [384, 384],
+  "frames": ["fixed", "teamPaint"],
+  "factionId": "cultivators",
+  "kind": "shop",
+  "visualScale": 1.1,
+  "omitFootprintShadow": true
+}

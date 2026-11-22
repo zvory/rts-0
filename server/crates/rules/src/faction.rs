@@ -793,6 +793,7 @@ pub const CULTIVATORS_CATALOG: FactionCatalog = FactionCatalog {
         EntityKind::ThreeDaoPavilion,
         EntityKind::TournamentGrounds,
         EntityKind::ProvenGrounds,
+        EntityKind::Shop,
         EntityKind::SteelMine,
         EntityKind::PumpJack,
     ],
@@ -802,6 +803,7 @@ pub const CULTIVATORS_CATALOG: FactionCatalog = FactionCatalog {
         EntityKind::ThreeDaoPavilion,
         EntityKind::TournamentGrounds,
         EntityKind::ProvenGrounds,
+        EntityKind::Shop,
     ],
     upgrades: &CULTIVATORS_UPGRADES,
     abilities: &CULTIVATOR_ABILITIES,
@@ -1363,7 +1365,8 @@ mod tests {
                 EntityKind::Portal,
                 EntityKind::ThreeDaoPavilion,
                 EntityKind::TournamentGrounds,
-                EntityKind::ProvenGrounds
+                EntityKind::ProvenGrounds,
+                EntityKind::Shop
             ]
         );
         assert_eq!(

@@ -104,3 +104,5 @@ mod tests {
 
 // Proving Grounds uses kind code 33; team-private dao_training_queue appends compact v63 slot 51.
 // Existing research commands targeting this building enqueue researched Dao training plans.
+
+// Cultivator Shop: wire kind shop, compact kind code 34; no additional snapshot fields.
