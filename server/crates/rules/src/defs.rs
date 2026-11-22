@@ -143,7 +143,7 @@ pub const UNITS: &[UnitDef] = &[
             dmg: 23,
             range_tiles: 0.75,
             cooldown: 64,
-            speed: 1.6,
+            speed: 1.6 * balance::DISCIPLE_SPEED_MULTIPLIER,
             sight_tiles: 11,
             cost_steel: 100,
             cost_oil: 0,

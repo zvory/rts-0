@@ -5,6 +5,9 @@ use crate::EntityKind;
 
 use super::TILE_SIZE;
 
+/// Disciples may approach visible enemies within this range without extending sword reach.
+pub const DISCIPLE_ENGAGEMENT_RANGE_TILES: f32 = 5.0;
+
 /// A contextual clear-area order prioritizes completed Tank Traps inside this objective radius.
 pub const TANK_TRAP_CLUSTER_ATTACK_RADIUS_TILES: f32 = 4.0;
 
@@ -68,7 +71,8 @@ pub fn building_stats(kind: EntityKind) -> Option<BuildingStats> {
     defs::building_def(kind).map(|d| d.stats)
 }
 
-/// Lightness deliberately shares the Scout Car's base movement speed.
+/// Lightness uses the Scout Car baseline with the universal Disciple speed buff.
 pub fn dao_lightness_speed() -> f32 {
-    unit_stats(EntityKind::ScoutCar).map_or(0.0, |stats| stats.speed)
+    unit_stats(EntityKind::ScoutCar)
+        .map_or(0.0, |stats| stats.speed * super::DISCIPLE_SPEED_MULTIPLIER)
 }

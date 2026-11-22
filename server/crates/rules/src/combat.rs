@@ -25,6 +25,17 @@ pub const TANK_ARMOR_REACTION_LOCK_TICKS: u32 = crate::balance::TICK_HZ * 3;
 /// Largest hull pivot that a direct-AP damage-facing preference may initiate.
 pub const TANK_ARMOR_REACTION_MAX_PIVOT_RAD: f32 = std::f32::consts::PI * 4.0 / 9.0;
 
+/// Automatic engagement defaults to the current attack range, including dynamic range bonuses.
+/// Disciples alone can acquire a target beyond their weapon's reach and approach it.
+pub fn engagement_range_tiles(kind: EntityKind, attack_range_tiles: f32) -> f32 {
+    match kind {
+        EntityKind::Warrior => {
+            crate::balance::DISCIPLE_ENGAGEMENT_RANGE_TILES.max(attack_range_tiles)
+        }
+        _ => attack_range_tiles,
+    }
+}
+
 /// Attack profile for a combat-capable unit or building.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AttackProfile {
