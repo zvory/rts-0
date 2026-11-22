@@ -173,7 +173,7 @@ export const STATS = Object.freeze({
   [KIND.LIGHTNESS_ADEPT]: { armored: false, label: "Lightness Adept", icon: "LA", size: 26, sight: 11,
     rangeTiles: 0.75, cost: { steel: 100, oil: 0 }, supply: 2, buildTicks: 300,
     description: "Fast sword infantry with Dash and 50% armor penetration." },
-  [KIND.WAR_ADEPT]: { armored: false, label: "War Adept", icon: "WA", size: 26 * DAO_WAR_BODY_SCALE, sight: 11,
+  [KIND.WAR_ADEPT]: { armored: false, label: "War Adept", icon: "WA", size: Math.fround(26 * Math.fround(DAO_WAR_BODY_SCALE)), sight: 11,
     rangeTiles: DAO_WAR_RANGE_TILES, cost: { steel: 100, oil: 0 }, supply: 2, buildTicks: 300,
     description: "Armored spear infantry with Throw Sword and 50% armor penetration." },
   [KIND.MAGIC_ADEPT]: { armored: false, label: "Magic Adept", icon: "MA", size: 26, sight: 11,
