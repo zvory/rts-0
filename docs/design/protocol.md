@@ -1161,7 +1161,12 @@ The connection writer sends a complete replacement baseline on first delivery, m
 seek, and perspective change (`resourceReset: true`, compact `rr: true`), then diffs each complete
 projection against the last snapshot taken for delivery. Ordinary snapshots omit unchanged resource
 rows and the reset flag. Latest-only pending snapshots remain complete, so coalescing cannot lose a
-resource change or a replacement baseline. Replacement epochs are connection-local transport state,
+resource change or a replacement baseline **before socket encoding**. Once encoded, resource rows
+are incremental: a client-side buffer cannot treat the entire snapshot as latest-only. It must
+retain the last replacement marker and fold subsequent resource rows by id alongside the latest
+complete entity/fog view. A newer replacement discards all prior pending rows, including explicit
+zeros from another time or perspective. Buffering must begin before asynchronous startup work;
+loading must not discard the first baseline. Replacement epochs are connection-local transport state,
 not simulation knowledge. The reset flag, resource rows, fog, and building views share one snapshot.
 Clients clear their resource display on replacement and apply the supplied rows; they never infer
 resource depletion from missing deltas, death effects, visibility, or the initial map. Seeking and

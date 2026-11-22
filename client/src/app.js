@@ -823,9 +823,9 @@ export class App {
       dom.gameOver.hidden = true;
       this.clearScoreboard();
     }
-
     const MatchClass = startsReplay ? ReplayViewer : Match;
-    const rendererPreparation = await settleRendererPreparationForStart(
+    // Await inside Match.create so its inbox captures the opening resource baseline.
+    const rendererPreparation = settleRendererPreparationForStart(
       this.rendererPreparationSlot,
       {
         lab: !!labMetadata,

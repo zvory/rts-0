@@ -1,7 +1,7 @@
 // tests/client_contracts/match_replay_contracts.mjs
 // Domain contract assertions imported by ../client_contracts.mjs.
-
 import { assert, assertApprox } from "./assertions.mjs";
+import { testAppResourceStartup } from "./match_startup_resource_contracts.mjs";
 import { HUD } from "../../client/src/hud.js";
 import {
   EVENT,
@@ -17,7 +17,6 @@ import { createLabControlPolicy } from "../../client/src/lab_control_policy.js";
 import { ReplayCameraInput } from "../../client/src/replay_camera_input.js";
 import { notePredictionAuthoritativeSnapshot } from "../../client/src/match_live_pause.js";
 import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
-
 {
   const priorWindow = globalThis.window;
   const priorDocument = globalThis.document;
@@ -78,6 +77,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     shouldWarnBeforeUnload,
   } = await import("../../client/src/app.js");
   const { dom } = await import("../../client/src/bootstrap.js");
+  await testAppResourceStartup({ App, Match, dom });
   assert(ReplayViewer.prototype instanceof Match, "ReplayViewer reuses Match rendering lifecycle");
   assert(ReplayControls.prototype instanceof RoomTimeControls, "replay controls keep a neutral room-time base");
   assert(!("command" in ReplayCameraInput.prototype), "Replay camera input has no gameplay command API");

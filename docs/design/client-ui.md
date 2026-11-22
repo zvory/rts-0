@@ -271,6 +271,15 @@ Neither visibility nor death effects infer depletion; seeks wait for a replaceme
 of restoring initial amounts. Observer changes replace resource knowledge in the same snapshot as
 fog and remembered buildings. See `protocol.md` for checkpoint and transport semantics.
 
+`Match.create` owns buffering before any asynchronous renderer work, including settling a warmed
+renderer or disposing an incompatible preparation. `App` passes the preparation promise without
+awaiting it. The startup inbox retains the newest complete entity/fog view, folds resource patches
+by id, and preserves the most recent `resourceReset` plus subsequent changes. A reset discards all
+pending resource rows from the previous projection. The handoff is consumed once and temporary
+listeners are removed on success, failure, or stale startup. Memory is proportional to resource ids,
+not the number of snapshots received while loading. Resource amounts remain server-authored; this
+buffer only preserves delivery semantics.
+
 `GameState.applySnapshot` remains authoritative. The partial WASM predictor returns a sparse
 `PredictionFrame` whose entity patches may identify an existing locally owned entity and claim only
 predicted position and an optional explicit motion presentation. Body facing remains authoritative
