@@ -1,7 +1,7 @@
 # Disciple insight and Dao evolution
 
 Phase 0/1 briefs and rules (completed before implementation): each path is a permanent
-specialization of the existing Disciple, retaining its entity identity, orders, cost,
+specialization of the existing Disciple, retaining its entity id, orders, cost,
 supply (2), sight, and ordinary ground pathing. War alone has a specialization-specific collision radius. Base and Lightness Disciples use 0.75-tile sword reach; War uses 1.75-tile spear reach. All three retain five-tile automatic engagement with melee pursuit. Magic replaces its sword with a five-tile ranged primary; its engagement range equals that five-tile attack range. No additional
 training source or build time. A Dao button assigns its path to every selected, owned, unevolved Disciple, even before
 insight is ready. Selecting another path replaces the pending choice. This
@@ -73,3 +73,25 @@ lifetime limit. Other Dao paths and unevolved Disciples cannot cast it. Its sepa
 lookup is needed to display the generated sword sprite. Ekat's Line Shot is unchanged.
 
 Magic uses shot-triggered windup, release, follow-through and recovery frames over 400 ms. Lightness uses four event-triggered melee swing poses from candidate B. Projectile presentation starts at the release frame (100 ms); the existing immediate authoritative damage timing is unchanged. Arrows use one shared generated texture and a bounded reusable sprite pool. Orbs are about seven world pixels across, with a small halo and one shimmering cross drawn into the shared feedback graphics batch: no emitter, per-orb display objects, blur, filters or retained particles. Retained arrow presentation support and Magic orbs consume only authorized attack endpoints and expire within 600 ms. Changing specialization preserves remaining reload and clears obsolete automatic melee pursuit without canceling explicit Move orders.
+
+## Engine unit identity
+
+The existing approved units are distinct authoritative kinds: Novice (`Warrior`, `warrior`),
+Lightness Adept (`LightnessAdept`, `lightness_adept`), War Adept (`WarAdept`, `war_adept`),
+and Magic Adept (`MagicAdept`, `magic_adept`). This is an identity correction for existing units,
+not additional content or a balance change. The user authorized implementation of this correction.
+
+Their Phase 0 roles, counters, descriptions, visuals, audio deferrals, and Phase 1 stats,
+abilities, keys, acquisition costs/timing/prerequisites, supply, sight, and movement/pathing
+remain as specified above and in the Proving Grounds design. Each path is already approved;
+no additional train buttons or research are introduced. Evolved kinds cannot be trained directly
+at the Portal. Combat evolution changes kind in place, preserving id, ownership, orders, and
+reload; paid training and tournament winners use the same transition. Direct Lab spawning of
+an Adept initializes its existing full stats and abilities.
+
+Kind is the single source of permanent specialization in simulation and checkpoints. The
+snapshot `dao` value is derived from kind for existing presentation consumers, with no second
+mutable Dao identity in the engine. Pending `chosenDao` remains base-only private intent.
+The new compact kind codes are 35 (Lightness), 36 (War), and 37 (Magic); slots are unchanged.
+Selection uses authoritative kind directly. Saves/replays from the old shared-kind representation
+are not migrated under the repository's latest-version-only policy.
