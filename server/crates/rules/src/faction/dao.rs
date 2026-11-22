@@ -100,7 +100,7 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 7] = [
         label: "Throw Sword",
         icon: "⚔",
         hotkey: Some("E"),
-        title: "Throw a spinning sword out and back; deals 40 damage outbound and 80 on return",
+        title: "Throw a spinning sword out and back; deals 44 damage outbound and 88 on return",
         carriers: &[EntityKind::Warrior],
         target_mode: AbilityTargetMode::WorldPoint,
         protocol_code: 18,

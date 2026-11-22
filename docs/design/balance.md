@@ -224,11 +224,13 @@ Steel Mine and Oil Pumpjack, with Nexus, Portal, and Three Dao Pavilion availabl
 Cultivator Serfs can also construct the faction-specific Portal for 150 Steel: it has a 3x3
 footprint, 123 HP, one tile of sight, a five-second construction time, no prerequisite, and no
 research. A completed Portal trains the Cultivator Disciple for 100 Steel and 2 Supply in 300 ticks.
-The Disciple is a 115-HP, 13.5-pixel-radius ground melee unit moving at 2.0 pixels per tick.
-Lightness independently uses 1.15 times Scout Car speed (2.7025 pixels per tick). War and Magic
-use 1.05 times base Disciple speed (2.1 pixels per tick). War gains 20 maximum HP (135 total);
-Lightness and Magic retain 115 maximum HP. Its
-23-damage sword has 0.75-tile reach, a 64-tick cooldown, and 50% armor penetration.
+The Disciple is a 138-HP, 13.5-pixel-radius ground melee unit moving at 2.4 pixels per tick.
+Lightness independently uses 1.38 times Scout Car speed (3.243 pixels per tick). War and Magic
+use 1.05 times base Disciple speed (2.52 pixels per tick). War gains 24 maximum HP (162 total);
+Lightness and Magic retain 138 maximum HP. Its
+25-damage sword has 0.75-tile reach, a 64-tick cooldown, and 50% armor penetration.
+Novices and all three Adepts receive 20% more movement speed and maximum HP; base damage
+is increased by 10%, rounded to the nearest whole damage point (23 to 25). Serfs are unchanged.
 Disciples have a separate five-tile engagement range for Idle and Attack Move: they approach
 visible legal enemies to sword reach, then resume their original Attack Move destination when
 the target dies, becomes hidden/illegal, or leaves engagement range. Hold Position and Point
@@ -725,7 +727,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 |-----------------|-----|-----|-------|----|-------|-------|-----|-----|-----|-----------|
 | worker          | 40  | 4   | 1     | 48 | 2.0   | 10    | 50  | 0   | 1   | 150 (5s) |
 | golem           | 160 | 16  | 1     | 48 | 2.0   | 10    | 0   | 0   | 4   | 396 (~13.2s); provisional free Ekat worker-like economy body trained at Zamok; mines at 4x worker load; can be consumed by Ekat for full heal |
-| warrior         | 115 | 23  | 0.75   | 64 | 2.0   | 11    | 100 | 0   | 2   | 300 (~10s); Cultivator Portal-trained melee bruiser; 50% armor penetration; no projectile or tracer |
+| warrior         | 138 | 25  | 0.75   | 64 | 2.4   | 11    | 100 | 0   | 2   | 300 (~10s); Cultivator Portal-trained melee bruiser; 50% armor penetration; no projectile or tracer |
 | rifleman        | 45  | 5   | 5     | 32 | 1.6   | 11    | 35  | 0   | 1   | 300 (~10s) |
 | panzerfaust     | 45  | 5 rifle / 100 launcher | 5 | 32 rifle / one lifetime launcher | 1.6 | 11 | 55 | 10 | 1 | 300 (~10s); requires completed Panzerfausts research |
 | machine_gunner  | 55  | 4   | 6.1   | 12  | 1.28  | 11    | 75  | 10  | 2   | 400 (~13s) |
@@ -842,7 +844,7 @@ Evolution clears all insight and doubles the cap to 120. Evolved Disciples conti
 insight from actual hostile HP damage (one per unit damage, half per building damage, rounded down per hit); reaching 120 has no effect and enables no further evolution. Research ids are
 `dao_of_lightness`, `dao_of_heaviness` (War), `dao_of_magic` (Magic).
 
-Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md). Lightness uses the base Disciple’s 0.75-tile sword reach, retaining 23 damage, 50% penetration, 43-tick cooldown, moving attacks, 2.7025 px/tick movement, and Dash. Its five-tile automatic engagement closes to melee reach. Magic uses a five-tile orb primary, retaining 23 damage, 50% penetration, and 64-tick cooldown, and stops to fire. Base is unchanged. War uses 1.75-tile spear reach (`DAO_WAR_RANGE_TILES`), retaining its damage, cooldown, armor and HP bonuses. Its sprite scale is 0.56 (previously 0.8), and its collision/interaction radius is 9.45 world pixels (previously 13.5); both shrink by 30%. The presentation-only lunge shrinks from 16 to 11.2 pixels. `DAO_WAR_BODY_SCALE` (0.7) is mirrored in the client for artwork, selection, and hit geometry. `DAO_WAR_RANGE_TILES` and `DAO_RANGED_RANGE_TILES` are mirrored in client config and range overlays.
+Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md). Lightness uses the base Disciple’s 0.75-tile sword reach, retaining 25 damage, 50% penetration, 43-tick cooldown, moving attacks, 3.243 px/tick movement, and Dash. Its five-tile automatic engagement closes to melee reach. Magic uses a five-tile orb primary, retaining 25 damage, 50% penetration, and 64-tick cooldown, and stops to fire. War uses 1.75-tile spear reach (`DAO_WAR_RANGE_TILES`), retaining its damage, cooldown, armor and HP bonuses. Its sprite scale is 0.56 (previously 0.8), and its collision/interaction radius is 9.45 world pixels (previously 13.5); both shrink by 30%. The presentation-only lunge shrinks from 16 to 11.2 pixels. `DAO_WAR_BODY_SCALE` (0.7) is mirrored in the client for artwork, selection, and hit geometry. `DAO_WAR_RANGE_TILES` and `DAO_RANGED_RANGE_TILES` are mirrored in client config and range overlays.
 
 ### Tournament Grounds
 
