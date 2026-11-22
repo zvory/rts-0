@@ -1367,7 +1367,8 @@ current server position each tick, so moving or dashing after firing can bend th
 Enemies intersecting the swept line are damaged once per leg; stale or dead casters remove the
 projectile without resolving further hits.
 
-Ekat's `ekatMagicAnchor` world-point activation places one replacement-style, non-blocking,
+Ekat's `ekatMagicAnchor` world-point activation has a 7.5-tile cast range (shared with Magic
+Disciples) and places one replacement-style, non-blocking,
 non-attackable runtime object at the target point. It naturally expires after 10 seconds. While
 active, it creates a 3-tile pull field: units moving away from the anchor are slowed, units moving
 toward it are boosted, and stationary units are pulled toward it. Pull strength increases closer to

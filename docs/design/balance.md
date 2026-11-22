@@ -26,6 +26,8 @@ first-shot readiness, windups, projectile travel, and barrage unload duration ar
 The disposable Panzerfaust rocket has no repeat cooldown; its rifle follows the doubled cadence.
 Mortar Fire has a further 50% cooldown increase to 180 ticks (6 seconds).
 Non-attack ability timers and attack-speed multipliers are unchanged.
+Ability maximum cast ranges use fractional tiles (`f32`) in the rules catalog and simulation;
+client descriptors and generated wiki tables retain fractional precision.
 Base weapon ranges use fractional tiles (`f32`) throughout stat records and attack profiles.
 The Machine Gunner has 6.1 tiles of base range (7.1 while entrenched), giving an approaching
 attack-moving MG a small standoff margin against a stationary entrenched Rifleman's 6 tiles.
@@ -609,7 +611,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   6 tiles, has no resource cost, has a 20s cooldown, and launches an 8 px/tick out-and-back
   projectile that deals 40 damage to enemy targetable entities intersecting each 0.6-tile-wide
   swept leg once per leg; if her Magic Anchor is active, the same activation also launches a second
-  projectile from the anchor toward the cursor. Her Magic Anchor ability targets up to 5 tiles, has
+  projectile from the anchor toward the cursor. Her Magic Anchor ability targets up to 7.5 tiles, has
   no resource cost, places one replacement-style non-blocking, non-attackable 10-second pull field
   with a 3-tile radius, slows units moving away from the anchor to as low as 0.45x speed near the
   center, boosts units moving toward the anchor up to 1.70x speed near the center, and drags idle

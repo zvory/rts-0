@@ -12,7 +12,7 @@ pub(crate) fn clamped_world_ability_vector(
     from_y: f32,
     target_x: f32,
     target_y: f32,
-    range_tiles: Option<u32>,
+    range_tiles: Option<f32>,
 ) -> Option<(f32, f32)> {
     let dx = target_x - from_x;
     let dy = target_y - from_y;
@@ -20,7 +20,7 @@ pub(crate) fn clamped_world_ability_vector(
     if !distance.is_finite() {
         return None;
     }
-    let max_distance = range_tiles.unwrap_or(0) as f32 * config::TILE_SIZE as f32;
+    let max_distance = range_tiles.unwrap_or(0.0) * config::TILE_SIZE as f32;
     if distance <= f32::EPSILON || max_distance <= f32::EPSILON {
         return Some((from_x, from_y));
     }
@@ -34,7 +34,7 @@ pub(crate) fn ekat_dash_destination(
     caster: u32,
     x: f32,
     y: f32,
-    range_tiles: Option<u32>,
+    range_tiles: Option<f32>,
 ) -> Option<(f32, f32)> {
     let caster_entity = entities.get(caster)?;
     let destination = clamped_world_ability_vector(
@@ -81,7 +81,7 @@ pub(crate) fn ekat_line_projectile_spec(
     caster: u32,
     target_x: f32,
     target_y: f32,
-    range_tiles: Option<u32>,
+    range_tiles: Option<f32>,
     tick: u32,
 ) -> Option<AbilityProjectileSpec> {
     let (from_x, from_y) = entities.get(caster).map(|e| (e.pos_x(), e.pos_y()))?;
@@ -102,14 +102,14 @@ pub(crate) fn ekat_line_projectile_spec_from_origin(
     source_object_id: Option<u32>,
     origin: (f32, f32),
     target: (f32, f32),
-    range_tiles: Option<u32>,
+    range_tiles: Option<f32>,
     tick: u32,
 ) -> Option<AbilityProjectileSpec> {
     let (from_x, from_y) = origin;
     let (to_x, to_y) =
         clamped_world_ability_vector(from_x, from_y, target.0, target.1, range_tiles)?;
     let range_px =
-        range_tiles.unwrap_or(config::EKAT_LINE_SHOT_RANGE_TILES) as f32 * config::TILE_SIZE as f32;
+        range_tiles.unwrap_or(config::EKAT_LINE_SHOT_RANGE_TILES as f32) * config::TILE_SIZE as f32;
     let max_round_trip_ticks =
         ((range_px * 2.0) / config::EKAT_LINE_SHOT_SPEED_PX_PER_TICK).ceil() as u32;
     Some(AbilityProjectileSpec {

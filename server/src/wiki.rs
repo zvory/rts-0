@@ -392,8 +392,8 @@ fn ability_table() -> StatsTable {
                         ability.title.to_string(),
                         kind_list(ability.carriers),
                         ability.target_mode.stable_id().to_string(),
-                        optional_u32(ability.range_tiles),
-                        optional_u32(ability.min_range_tiles),
+                        optional_number(ability.range_tiles),
+                        optional_number(ability.min_range_tiles),
                         ability.cooldown_ticks.to_string(),
                         optional_u16(ability.charges),
                         ability_cost_column(*ability, |cost| cost.steel),
@@ -546,7 +546,7 @@ fn optional_kind(kind: Option<EntityKind>) -> String {
     kind.map(kind_label).unwrap_or_else(|| "None".to_string())
 }
 
-fn optional_u32(value: Option<u32>) -> String {
+fn optional_number(value: Option<impl std::fmt::Display>) -> String {
     value
         .map(|value| value.to_string())
         .unwrap_or_else(|| "None".to_string())
@@ -1036,8 +1036,8 @@ mod tests {
                     ability.title.to_string(),
                     kind_list(ability.carriers),
                     ability.target_mode.stable_id().to_string(),
-                    optional_u32(ability.range_tiles),
-                    optional_u32(ability.min_range_tiles),
+                    optional_number(ability.range_tiles),
+                    optional_number(ability.min_range_tiles),
                     ability.cooldown_ticks.to_string(),
                     optional_u16(ability.charges),
                     ability_cost_column(*ability, |cost| cost.steel),

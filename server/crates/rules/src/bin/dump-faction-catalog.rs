@@ -113,8 +113,8 @@ fn print_catalog(catalog: faction::FactionCatalog, indent: &str) {
         print!(
             ",\"targetMode\":\"{}\",\"rangeTiles\":{},\"minRangeTiles\":{},\"cooldownTicks\":{},\"charges\":{},\"chargeRechargeTicks\":{},\"cost\":{{\"steel\":{},\"oil\":{}}},\"techRequirement\":{},\"upgradeRequirement\":{},\"mayQueue\":{},\"queuePolicy\":\"{}\",\"autocast\":{},\"commandCard\":{},\"protocolCode\":{},\"orderStageCode\":{}",
             ability.target_mode.stable_id(),
-            json_u32_or_null(ability.range_tiles),
-            json_u32_or_null(ability.min_range_tiles),
+            json_number_or_null(ability.range_tiles),
+            json_number_or_null(ability.min_range_tiles),
             ability.cooldown_ticks,
             json_u16_or_null(ability.charges),
             json_u16_or_null(ability.charge_recharge_ticks),
@@ -771,7 +771,7 @@ fn json_string_or_null(value: Option<&str>) -> String {
         .unwrap_or_else(|| "null".to_string())
 }
 
-fn json_u32_or_null(value: Option<u32>) -> String {
+fn json_number_or_null(value: Option<impl std::fmt::Display>) -> String {
     value
         .map(|value| value.to_string())
         .unwrap_or_else(|| "null".to_string())

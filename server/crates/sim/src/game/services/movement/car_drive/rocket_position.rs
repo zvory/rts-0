@@ -15,7 +15,7 @@ pub(in crate::game::services::movement) fn barrage_maneuver_target(
     }
     let target = (order.intent.x, order.intent.y);
     let range =
-        ability::definition(AbilityKind::Barrage).range_tiles? as f32 * config::TILE_SIZE as f32;
+        ability::definition(AbilityKind::Barrage).range_tiles? * config::TILE_SIZE as f32;
     let min = ability::definition(AbilityKind::Barrage)
         .min_range_tiles
         .unwrap_or(0) as f32
@@ -35,7 +35,7 @@ pub(in crate::game::services::movement) fn barrage_pose_ready(
     target: (f32, f32),
 ) -> bool {
     let definition = ability::definition(AbilityKind::Barrage);
-    let range = definition.range_tiles.unwrap_or(0) as f32 * config::TILE_SIZE as f32;
+    let range = definition.range_tiles.unwrap_or(0.0) * config::TILE_SIZE as f32;
     let min = definition.min_range_tiles.unwrap_or(0) as f32 * config::TILE_SIZE as f32;
     let distance = distance_between((e.pos_x(), e.pos_y()), target);
     distance >= min
@@ -61,7 +61,7 @@ pub(in crate::game::services::movement) fn plan_barrage_maneuver(
 ) -> Option<ScoutCarMotionPlan> {
     let profile = car_motion_profile(e.kind)?;
     let definition = ability::definition(AbilityKind::Barrage);
-    let range = definition.range_tiles? as f32 * config::TILE_SIZE as f32;
+    let range = definition.range_tiles? * config::TILE_SIZE as f32;
     let min = definition.min_range_tiles.unwrap_or(0) as f32 * config::TILE_SIZE as f32;
     let mut best = None;
     let mut best_score = f32::INFINITY;
