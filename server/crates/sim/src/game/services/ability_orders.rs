@@ -287,7 +287,7 @@ pub(crate) fn launch_world_ability(
                 caster,
                 x,
                 y,
-                definition.range_tiles,
+                entities.get(caster).and_then(|e| rules::faction::ability_range_for_carrier(ability, e.kind)),
             ) else {
                 return false;
             };
@@ -915,7 +915,7 @@ pub(crate) fn caster_in_range(
         return false;
     };
     let definition = ability::definition(ability);
-    let Some(range_tiles) = definition.range_tiles else {
+    let Some(range_tiles) = rules::faction::ability_range_for_carrier(ability, e.kind) else {
         return true;
     };
     if SmokeCloudStore::clamp_point_to_map(map, x, y).is_none() {
@@ -937,7 +937,7 @@ pub(crate) fn staging_point(
 ) -> Option<(f32, f32)> {
     let caster = entities.get(caster)?;
     let definition = ability::definition(ability);
-    let range_tiles = definition.range_tiles?;
+    let range_tiles = rules::faction::ability_range_for_carrier(ability, caster.kind)?;
     let range_px = range_tiles as f32 * config::TILE_SIZE as f32;
     let min_range_px = definition.min_range_tiles.unwrap_or(0) as f32 * config::TILE_SIZE as f32;
     let dx = caster.pos_x() - x;

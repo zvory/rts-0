@@ -12,6 +12,7 @@ import {
 import {
   ABILITIES,
   abilityCarriedByEntity,
+  entityAbilityRangeTiles,
   MINING_ANCHOR_RANGE_TILES,
   SCOUT_PLANE_SPEED_PX_PER_TICK,
   STATS,
@@ -604,7 +605,7 @@ export function _refreshAbilityTargetPreview() {
     return;
   }
   const tileSize = this.state.map?.tileSize || DEFAULT_TILE_SIZE;
-  const rangePx = scoutPlaneTravelRangePx || definition.rangeTiles * tileSize;
+  const rangePx = scoutPlaneTravelRangePx || Math.max(...carriers.map((c) => entityAbilityRangeTiles(definition, c))) * tileSize;
   const minRangePx = (definition.minRangeTiles || 0) * tileSize;
   const locksRangeBand = isArtilleryFireAbility(target.ability);
   // Cursor feedback is rendered after this frame's camera update. Map its
@@ -640,7 +641,7 @@ export function _refreshAbilityTargetPreview() {
       if (minRangePx > 0 && dist < minRangePx) {
         hoverInsideMinRange = true;
       }
-      if (dist <= rangePx && dist >= minRangePx) {
+      if (dist <= (scoutPlaneTravelRangePx || entityAbilityRangeTiles(definition, c) * tileSize) && dist >= minRangePx) {
         hoverInRange = true;
         break;
       }
