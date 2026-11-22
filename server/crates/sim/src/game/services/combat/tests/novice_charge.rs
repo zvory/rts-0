@@ -3,10 +3,20 @@ use crate::game::ability::AbilityKind;
 
 fn pair(distance: f32) -> (EntityStore, u32, u32) {
     let mut entities = EntityStore::new();
-    let novice = entities.spawn_unit(1, EntityKind::Warrior, 200.0, 200.0).unwrap();
-    let target = entities.spawn_unit(2, EntityKind::Rifleman, 200.0 + distance, 200.0).unwrap();
-    entities.get_mut(novice).unwrap().set_order(Order::attack(target));
-    entities.get_mut(target).unwrap().set_order(Order::HoldPosition);
+    let novice = entities
+        .spawn_unit(1, EntityKind::Warrior, 200.0, 200.0)
+        .unwrap();
+    let target = entities
+        .spawn_unit(2, EntityKind::Rifleman, 200.0 + distance, 200.0)
+        .unwrap();
+    entities
+        .get_mut(novice)
+        .unwrap()
+        .set_order(Order::attack(target));
+    entities
+        .get_mut(target)
+        .unwrap()
+        .set_order(Order::HoldPosition);
     (entities, novice, target)
 }
 
@@ -21,11 +31,17 @@ fn novice_charge_distance_and_retreat_trigger_matrix() {
         (40.0, (0.0, 1.0), false),
     ] {
         let (mut entities, novice, target) = pair(distance);
-        entities.get_mut(target).unwrap().set_movement_delta(delta.0, delta.1);
+        entities
+            .get_mut(target)
+            .unwrap()
+            .set_movement_delta(delta.0, delta.1);
         run_combat_tick(&mut entities);
         let unit = entities.get(novice).unwrap();
-        assert_eq!(unit.ability_cooldown_ticks(AbilityKind::Charge) > 0, expected,
-            "distance={distance}, movement={delta:?}");
+        assert_eq!(
+            unit.ability_cooldown_ticks(AbilityKind::Charge) > 0,
+            expected,
+            "distance={distance}, movement={delta:?}"
+        );
         assert_eq!(unit.movement_speed(), if expected { 3.0 } else { 2.0 });
     }
 }
@@ -36,7 +52,13 @@ fn novice_charge_automatic_acquisition_and_attack_move_trigger() {
         let (mut entities, novice, _) = pair(100.0);
         entities.get_mut(novice).unwrap().set_order(order);
         run_combat_tick(&mut entities);
-        assert_eq!(entities.get(novice).unwrap().ability_cooldown_ticks(AbilityKind::Charge), 450);
+        assert_eq!(
+            entities
+                .get(novice)
+                .unwrap()
+                .ability_cooldown_ticks(AbilityKind::Charge),
+            450
+        );
     }
 }
 
@@ -46,17 +68,33 @@ fn novice_charge_never_triggers_for_buildings_friends_or_specialists() {
         let (mut entities, novice, _) = pair(100.0);
         match case {
             0 => {
-                let building = entities.spawn_building(2, EntityKind::Depot, 300.0, 200.0, true).unwrap();
-                entities.get_mut(novice).unwrap().set_order(Order::attack(building));
+                let building = entities
+                    .spawn_building(2, EntityKind::Depot, 300.0, 200.0, true)
+                    .unwrap();
+                entities
+                    .get_mut(novice)
+                    .unwrap()
+                    .set_order(Order::attack(building));
             }
             1 => {
-                let friendly = entities.spawn_unit(1, EntityKind::Rifleman, 300.0, 200.0).unwrap();
-                entities.get_mut(novice).unwrap().set_order(Order::attack(friendly));
+                let friendly = entities
+                    .spawn_unit(1, EntityKind::Rifleman, 300.0, 200.0)
+                    .unwrap();
+                entities
+                    .get_mut(novice)
+                    .unwrap()
+                    .set_order(Order::attack(friendly));
             }
             _ => entities.get_mut(novice).unwrap().dao = Some(UpgradeKind::DaoOfLightness),
         }
         run_combat_tick(&mut entities);
-        assert_eq!(entities.get(novice).unwrap().ability_cooldown_ticks(AbilityKind::Charge), 0);
+        assert_eq!(
+            entities
+                .get(novice)
+                .unwrap()
+                .ability_cooldown_ticks(AbilityKind::Charge),
+            0
+        );
     }
 }
 
@@ -73,9 +111,18 @@ fn novice_charge_lasts_thirty_movement_ticks_and_rearms_after_450() {
         let spatial = SpatialIndex::build(&entities, map.width, map.height);
         movement_system(&map, &mut entities, &players, &occ, &spatial, tick);
         // Use a fresh distant hostile each time to avoid combat killing the original.
-        entities.get_mut(novice).unwrap().try_start_novice_charge((1000.0, 200.0), (0.0, 0.0), true);
-        assert_eq!(entities.get(novice).unwrap().ability_cooldown_ticks(AbilityKind::Charge),
-            if tick == 450 { 450 } else { 450 - tick as u16 });
+        entities.get_mut(novice).unwrap().try_start_novice_charge(
+            (1000.0, 200.0),
+            (0.0, 0.0),
+            true,
+        );
+        assert_eq!(
+            entities
+                .get(novice)
+                .unwrap()
+                .ability_cooldown_ticks(AbilityKind::Charge),
+            if tick == 450 { 450 } else { 450 - tick as u16 }
+        );
     }
     let unit = entities.get(novice).unwrap();
     let serialized = serde_json::to_string(unit).unwrap();

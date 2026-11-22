@@ -164,8 +164,15 @@ impl Entity {
         .round() as u32
     }
 
-    pub(in crate::game) fn try_start_novice_charge(&mut self, target_position: (f32, f32), target_movement: (f32, f32), hostile_unit: bool) {
-        if self.kind != EntityKind::Warrior || self.dao.is_some() || self.hp == 0
+    pub(in crate::game) fn try_start_novice_charge(
+        &mut self,
+        target_position: (f32, f32),
+        target_movement: (f32, f32),
+        hostile_unit: bool,
+    ) {
+        if self.kind != EntityKind::Warrior
+            || self.dao.is_some()
+            || self.hp == 0
             || !hostile_unit
             || self.ability_cooldown_ticks(AbilityKind::Charge) > 0
         {
@@ -191,7 +198,10 @@ impl Entity {
             Some(UpgradeKind::DaoOfHeaviness) => base * config::DAO_WAR_SPEED_MULTIPLIER,
             Some(UpgradeKind::DaoOfMagic) => base * config::DAO_MAGIC_SPEED_MULTIPLIER,
             _ if self.kind == EntityKind::Warrior
-                && self.movement.as_ref().is_some_and(|m| m.novice_charge_ticks > 0) =>
+                && self
+                    .movement
+                    .as_ref()
+                    .is_some_and(|m| m.novice_charge_ticks > 0) =>
             {
                 base * config::NOVICE_CHARGE_SPEED_MULTIPLIER
             }

@@ -23,6 +23,7 @@ mod entrenchment;
 mod fog_visibility;
 mod forest;
 mod moving_fire_policy;
+mod novice_charge;
 mod range_targeting;
 mod retention;
 mod rifle_post_shot;
@@ -32,7 +33,6 @@ mod tank_traps;
 mod target_legality;
 mod target_priority;
 mod warrior;
-mod novice_charge;
 mod weapon_cooldowns;
 mod weapon_profiles;
 fn rifleman_with_enemy() -> (EntityStore, u32, u32) {

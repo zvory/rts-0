@@ -287,7 +287,9 @@ pub(crate) fn launch_world_ability(
                 caster,
                 x,
                 y,
-                entities.get(caster).and_then(|e| rules::faction::ability_range_for_carrier(ability, e.kind)),
+                entities
+                    .get(caster)
+                    .and_then(|e| rules::faction::ability_range_for_carrier(ability, e.kind)),
             ) else {
                 return false;
             };

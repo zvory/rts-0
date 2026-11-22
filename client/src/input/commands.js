@@ -684,6 +684,7 @@ export function _refreshAbilityTargetPreview() {
     kind: carrier.kind,
     x: carrier.x,
     y: carrier.y,
+    rangePx: scoutPlaneTravelRangePx || entityAbilityRangeTiles(definition, carrier) * tileSize,
     radiusPx: Math.max(5, (STATS[carrier.kind]?.size || 8) * 0.45),
   }));
   const primaryLock = artilleryLocks[0] || null;
