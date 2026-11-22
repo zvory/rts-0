@@ -9,6 +9,10 @@ pub const TANK_BODY_CLEARANCE_PX: f32 = 1.5;
 pub const ANTI_TANK_GUN_BODY_LENGTH_PX: f32 = 42.0;
 pub const ANTI_TANK_GUN_BODY_WIDTH_PX: f32 = 24.0;
 pub const ANTI_TANK_GUN_BODY_CLEARANCE_PX: f32 = 1.0;
+// Mortar-only dimensions: 20% larger than the former shared support-weapon body.
+pub const MORTAR_BODY_LENGTH_PX: f32 = 50.4;
+pub const MORTAR_BODY_WIDTH_PX: f32 = 28.8;
+pub const MORTAR_BODY_CLEARANCE_PX: f32 = 1.2;
 pub const ARTILLERY_BODY_SCALE: f32 = 0.75;
 pub const ARTILLERY_BODY_LENGTH_PX: f32 = TANK_BODY_LENGTH_PX * ARTILLERY_BODY_SCALE;
 pub const ARTILLERY_BODY_WIDTH_PX: f32 = TANK_BODY_WIDTH_PX * ARTILLERY_BODY_SCALE;

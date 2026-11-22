@@ -424,6 +424,11 @@ profiles and explicit activation/autocast policy instead of being folded into de
 - Anti-Tank Guns use `ANTI_TANK_GUN_SETUP_TICKS = 120` (4s) and
   `ANTI_TANK_GUN_TEARDOWN_TICKS = 30` (1s). The client mirrors these ticks for
   matching world and minimap trail animation.
+- Mortar Teams use a bulkier white-painted sprite with team-tinted barrels and fixed dark wheels.
+  The whole rig renders at 1.2x scale, including shadow, recoil, baseplate and anchors.
+  Selection/placement radius is 21.6 px (formerly 18); circular collision radius is 15.6 px
+  (formerly 13), derived from a dedicated 28.8 px body width and 1.2 px clearance.
+  Mirrored body dimensions are 50.4×28.8 px; Anti-Tank Gun dimensions remain unchanged.
 - Mortar Teams move at 1.6 px/tick and have no setup, teardown, or stationary range-ramp timing. They use `MORTAR_MIN_RANGE_TILES = 5`,
   `MORTAR_RANGE_TILES = 17`, and `MORTAR_FIELD_OF_FIRE_RAD = 360 degrees total`,
   `MORTAR_FIRE_COOLDOWN_TICKS = 180` (6s between shells),

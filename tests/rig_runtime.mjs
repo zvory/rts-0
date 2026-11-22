@@ -1045,12 +1045,12 @@ test("mortar PNG atlas supplies the animated half-tile base plate", () => {
   const unit = renderer._liveRigPools.liveUnitRigs.get(entity.id);
   const underlay = renderer._liveRigPools.liveUnitRigShadows.get(entity.id);
   assert.equal(typeof unit.matchesPngAtlasRig, "function");
-  assert.ok(underlay);
   const carriage = unit.parts.get("sprite.mortar.carriage.deployed").display;
   const tube = unit.parts.get("sprite.mortar.tube.deployed").display;
   const leftTire = unit.parts.get("sprite.mortar.tire.left.deployed").display;
   const rightTire = unit.parts.get("sprite.mortar.tire.right.deployed").display;
   const basePlate = unit.parts.get("sprite.mortar.basePlate.deployed").display;
+  assert.deepEqual([unit.container.scaleX, unit.container.scaleY, underlay.container.scaleX, underlay.container.scaleY], [1.2, 1.2, 1.2, 1.2], "mortar art and shadow share enlarged scale");
   for (const display of [carriage, tube, leftTire, rightTire]) {
     assert.equal(display.visible, true);
     assert.equal(display.alpha, 1);

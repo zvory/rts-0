@@ -277,7 +277,7 @@ const TEST_WORKER_OVERRIDES = Object.freeze([
   const atlas = createLivePngRigAtlases().get(KIND.MORTAR_TEAM);
   assert(atlas?.enabled, "mortar PNG atlas is registered for live rendering");
   assert(
-    atlas.image.includes("/assets/rigs/mortar-png-pass-04/generated/mortar-m2-wheeled-baseplate-pass-04-alpha.png"),
+    atlas.image.includes("/assets/rigs/mortar-bulky-white/generated/mortar-bulky-white-atlas.png"),
     "mortar PNG atlas uses the checked-in generated alpha asset",
   );
   const imageSize = readPngDimensions(atlas.image);
