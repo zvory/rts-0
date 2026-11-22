@@ -710,3 +710,21 @@ assert.equal(createClassicPreset(buildHotkeyCommandCatalog(buildCommandCardConte
   const grid = profiles.presets.find((p) => p.id === HOTKEY_PRESET_GRID);
   assert.deepEqual(profiles.resolveCard(card, grid).slots.slice(6).map((s) => s.hotkey), ["Z", "X", "C"]);
 }
+
+{
+  const profiles = service();
+  const commandId = "cultivators.dao-training.dao_of_magic";
+  const classic = profiles.profileById(HOTKEY_PRESET_CLASSIC);
+  assert.equal(classic.factionBindings.cultivators[commandId], "KeyC",
+    "Dao training bindings belong to the Cultivator faction");
+  assert.equal(classic.bindings[commandId], undefined);
+  const imported = profiles.importProfile({
+    schemaVersion: HOTKEY_PROFILE_SCHEMA_VERSION,
+    id: "custom.daoTraining", name: "Dao Training", type: "custom", mode: "grid",
+    bindings: {}, factionBindings: { cultivators: { [commandId]: "KeyM" } },
+  });
+  assert.equal(imported.ok, true);
+  assert.equal(imported.profile.factionBindings.cultivators[commandId], "KeyM");
+  assert.equal(profiles.exportProfile(imported.profile.id).factionBindings.cultivators[commandId], "KeyM",
+    "Custom Dao training bindings survive export");
+}

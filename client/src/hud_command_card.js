@@ -65,7 +65,7 @@ export function factionCommandId(factionId, family, subject) {
 }
 
 export function parsedFactionCommandId(commandId) {
-  const match = /^([a-z0-9_]+)\.(build|train|research|ability)\.([A-Za-z0-9_]+)$/.exec(String(commandId || ""));
+  const match = /^([a-z0-9_]+)\.(build|train|research|ability|dao-training)\.([A-Za-z0-9_]+)$/.exec(String(commandId || ""));
   return match ? { factionId: match[1], family: match[2], subject: match[3] } : null;
 }
 
