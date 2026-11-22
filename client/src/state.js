@@ -327,7 +327,7 @@ export class GameState extends VisualEffectBackedState {
     };
     this.autoBuild = ab(msg.autoBuild, msg.netStatus);
     this.playerResources = msg.playerResources || [];
-    for (const row of this.playerResources) {
+    for (const row of msg.playerFactions || []) {
       const player = this.players.find((entry) => entry.id === row.id);
       if (player && row.factionId) player.factionId = row.factionId;
     }

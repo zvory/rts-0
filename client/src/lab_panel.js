@@ -631,12 +631,13 @@ export class LabPanel {
           onChange: (value) => {
             this.spawnPalette.factionId = value;
             this.spawnPalette.kind = "";
+            this.spawnPalette.dao = null;
             this.render();
           },
         },
       ),
       this.spawnPaletteReadout(unitKinds),
-      this.spawnPaletteGrid(unitKinds),
+      this.spawnPaletteGrid(),
     ];
     const section = this.fieldset("Unit Spawn", controls, this.spawnTargetFieldsetOptions("units"));
     return section;
@@ -686,7 +687,7 @@ export class LabPanel {
     };
   }
 
-  spawnPaletteGrid(unitKinds) {
+  spawnPaletteGrid() {
     const grid = document.createElement("div");
     grid.className = "lab-spawn-palette";
     for (const { kind, dao, label } of labSpawnUnitOptionsForFaction(this.spawnPalette.factionId)) {
@@ -698,7 +699,7 @@ export class LabPanel {
           kind,
           dao: dao || "",
           selected: kind === this.spawnPalette.kind && (dao || null) === (this.spawnPalette.dao || null) ? "true" : "false",
-          active: this.spawnToolActive(kind) && (active?.dao || null) === (dao || null) ? "true" : "false",
+          active: this.spawnToolActive(kind, this.spawnPalette.factionId) && (active?.dao || null) === (dao || null) ? "true" : "false",
         },
       });
       grid.appendChild(button);
@@ -717,7 +718,7 @@ export class LabPanel {
         dataset: {
           kind,
           selected: kind === this.buildingSpawnPalette.kind ? "true" : "false",
-          active: this.spawnToolActive(kind) ? "true" : "false",
+          active: this.spawnToolActive(kind, this.buildingSpawnPalette.factionId) ? "true" : "false",
         },
       });
       grid.appendChild(button);
@@ -1154,9 +1155,9 @@ export class LabPanel {
     return this.match?.clientIntent?.activeLabTool || null;
   }
 
-  spawnToolActive(kind) {
+  spawnToolActive(kind, factionId) {
     const active = this.activeLabTool();
-    return active?.kind === "spawnEntity" && active?.payload?.kind === kind;
+    return active?.kind === "spawnEntity" && active?.payload?.kind === kind && active?.payload?.factionId === factionId;
   }
 
   resourcesForTargetPlayer() {

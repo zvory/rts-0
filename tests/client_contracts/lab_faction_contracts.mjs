@@ -11,7 +11,8 @@ const state = new GameState({
 });
 const policy = createLabControlPolicy({ metadata: { role: LAB_ROLE.OPERATOR } });
 const snapshot = (factionId, tick) => state.applySnapshot({
-  tick, entities: [], events: [], playerResources: [{ id: 2, factionId, steel: 1000, oil: 1000, upgrades: [] }],
+  tick, entities: [], events: [], playerFactions: [{ id: 2, factionId }],
+  playerResources: [{ id: 1, steel: 1000, oil: 1000, upgrades: [] }],
 }, tick);
 snapshot("cultivators", 1);
 assert(state.playerById(2).factionId === "cultivators", "snapshot updates P2 faction identity");

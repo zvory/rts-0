@@ -747,6 +747,7 @@ transport decode:
   rememberedAntiTankGuns?: {id, owner, x, y, facing, observedTick}[], // stale deployed enemy AT-gun arcs for projected players
   events: Event[],               // transient things to surface (see 2.5)
   upgrades?: string[],           // completed permanent upgrades for this recipient
+  playerFactions?: {id, factionId}[], // public seat identities, independent of vision selection
   playerResources?: {id, steel, oil, supplyUsed, supplyCap, apm, upgrades?}[], // projected players; observer modes only; upgrades are that real owner's completed research
   netStatus: {                // per-recipient server-side health for the current match
     serverLagMs: u16,         // how late this room started the tick vs its scheduled time
@@ -967,6 +968,7 @@ adds an explicit application compression envelope.
   "mb": [[id, owner, kind, x, y, [[tileX, tileY], ...], observedTick]], // rememberedBuildings; omitted when empty
   "ma": [[id, owner, x, y, facing, observedTick]], // rememberedAntiTankGuns; omitted when empty
   "ev": [EventRecord],            // omitted when empty
+  "pf": [[id, factionId]],         // public seat identities; omitted when empty
   "pr": [[id, steel, oil, supplyUsed, supplyCap, apm, [upgradeCode...]]], // projected observer playerResources; omitted when empty
   "n": [serverLagMs, tickMs, flags, slowTickCount, headOfLineCount,
         predictionVersion?, lastSimConsumedClientSeq?, lastSimConsumedClientTick?]
@@ -2069,6 +2071,6 @@ field, and setup checkpoints retain the resulting entity specialization.
 Spawn entries also accept `factionId` from the faction catalog. A successful spawn sets
 the target player's faction; the kind must belong to that catalog. Invalid placement
 or invalid faction/kind combinations leave the player unchanged. Faction is a seat-level
-identity, so changing it affects all that player's entities. Observer `playerResources`
-rows carry `factionId` (compact `pr` slot 7, after upgrades); the client refreshes player
-identity from these authoritative rows, including after Lab rewind and replay seek.
+identity, so changing it affects all that player's entities. Snapshots carry public `playerFactions` rows (`{id, factionId}`, compact `pf`: `[[id, factionId], ...]`)
+independently of private resource projection. The client refreshes player identity from these
+authoritative rows, including unselected seats after Lab rewind and replay seek.

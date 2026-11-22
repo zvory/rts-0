@@ -106,3 +106,5 @@ mod tests {
 // Existing research commands targeting this building enqueue researched Dao training plans.
 
 // Lab spawnEntity/spawnEntities entries accept optional dao: lightness | war | magic (Novice only).
+
+// Snapshot playerFactions (compact pf) projects public identity independently of private resources.

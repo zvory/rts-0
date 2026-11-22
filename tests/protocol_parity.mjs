@@ -606,7 +606,8 @@ const decodedAck = decodeServerMessage({
   r: [[200, 0]],
   e: [],
   ma: [[91, 2, 320, 352, 0.75, 10]],
-  pr: [[1, 325, 80, 7, 14, 42, [1], "cultivators"]],
+  pr: [[1, 325, 80, 7, 14, 42, [1]]],
+  pf: [[1, "cultivators"], [2, "kriegsia"]],
   ao: [[70, 1, 6, 1, 384, 416, 90, 7, [45, null, null, null, null, null]]],
   n: [1, 2, 0, 3, 4, PREDICTION_PROTOCOL_VERSION, 7, 12],
 });
@@ -616,7 +617,7 @@ assert(decodedAck.netStatus.lastSimConsumedClientSeq === 7, "compact consumed cl
 assert(decodedAck.netStatus.lastSimConsumedClientTick === 12, "compact consumed client tick decodes");
 assert(decodedAck.abilityObjects[0].kind === "returnMarker", "compact ability object kind decodes");
 assert(decodedAck.abilityObjects[0].sourceCasterId === 7, "compact ability source caster decodes");
-assert(decodedAck.playerResources[0].factionId === "cultivators", "compact authoritative faction decodes");
+assert(decodedAck.playerFactions[0].factionId === "cultivators", "compact authoritative faction decodes");
 assert(decodedAck.playerResources[0].apm === 42, "compact observer player APM decodes");
 assert(decodedAck.playerResources[0].upgrades.length === 1, "compact observer upgrades decode");
 assert(

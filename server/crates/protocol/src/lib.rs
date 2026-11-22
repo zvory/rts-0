@@ -43,12 +43,13 @@ pub use rts_contract::{
     DiagnosticCapabilities, EntityView, Event, GroundDecalDelta, GroundDecalView, InitialCamera,
     LabStartMetadata, LabStartRole, LabVisionMode, MapInfo, MapTile, MatchControlCapabilities,
     MovementPathDiagnosticScope, NoticeSeverity, ObserverViewSelection, OrderPlanMarker,
-    PlayerResourceSnapshot, PlayerScore, PlayerStart, RememberedAntiTankGunView,
-    RememberedBuildingView, ReplayStartMetadata, ResourceDelta, ResourceNode, RoomCapabilities,
-    RoomTimeCapabilities, RoomTimeSeekState, RoomTimeState, ScoutPlaneStateView, SmokeCloudView,
-    Snapshot, SnapshotNetStatus, StartPayload, TankTrailView, TeamId, TrenchView,
-    VisibilityCapabilities, DEFAULT_FACTION_ID, GAME_CHECKPOINT_CURRENT_VERSION,
-    MAP_DOODAD_TYPE_IDS, MAP_TILE_SIZE_PX, MAX_GROUND_DECALS_PER_SNAPSHOT_DELTA,
+    PlayerFactionSnapshot, PlayerResourceSnapshot, PlayerScore, PlayerStart,
+    RememberedAntiTankGunView, RememberedBuildingView, ReplayStartMetadata, ResourceDelta,
+    ResourceNode, RoomCapabilities, RoomTimeCapabilities, RoomTimeSeekState, RoomTimeState,
+    ScoutPlaneStateView, SmokeCloudView, Snapshot, SnapshotNetStatus, StartPayload, TankTrailView,
+    TeamId, TrenchView, VisibilityCapabilities, DEFAULT_FACTION_ID,
+    GAME_CHECKPOINT_CURRENT_VERSION, MAP_DOODAD_TYPE_IDS, MAP_TILE_SIZE_PX,
+    MAX_GROUND_DECALS_PER_SNAPSHOT_DELTA,
 };
 pub use server_message::{
     LivePauseState, LiveResumeCountdown, MatchConclusion, MatchConclusionReason, ServerMessage,
@@ -1279,6 +1280,7 @@ mod tests {
             ],
             upgrades: vec![upgrades::ARTILLERY_UNLOCK.to_string()],
             player_resources: Vec::new(),
+            player_factions: Vec::new(),
             net_status: SnapshotNetStatus {
                 server_lag_ms: 4,
                 tick_ms: 17,

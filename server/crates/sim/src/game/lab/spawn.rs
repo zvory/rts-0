@@ -1,16 +1,25 @@
 use super::*;
 
 impl Game {
-    pub(super) fn lab_spawn_entity(&mut self, input: LabSpawnEntity) -> Result<LabOpOutcome, LabError> {
+    pub(super) fn lab_spawn_entity(
+        &mut self,
+        input: LabSpawnEntity,
+    ) -> Result<LabOpOutcome, LabError> {
         self.validate_owner(input.owner)?;
         if input.dao.is_some() && input.kind != EntityKind::Warrior {
-            return Err(invalid_kind(input.kind, "Dao specialization requires a Novice"));
+            return Err(invalid_kind(
+                input.kind,
+                "Dao specialization requires a Novice",
+            ));
         }
         if let Some(faction_id) = input.faction_id {
             let catalog = rts_rules::faction::catalog_for(faction_id)
                 .ok_or_else(|| invalid_kind(input.kind, "unknown spawn faction"))?;
             if !catalog.units.contains(&input.kind) && !catalog.buildings.contains(&input.kind) {
-                return Err(invalid_kind(input.kind, "kind is not in spawn faction catalog"));
+                return Err(invalid_kind(
+                    input.kind,
+                    "kind is not in spawn faction catalog",
+                ));
             }
         }
         let id = if input.kind.is_unit() {
@@ -51,5 +60,4 @@ impl Game {
         }
         Ok(LabOpOutcome::Spawned { entity_id: id })
     }
-
 }

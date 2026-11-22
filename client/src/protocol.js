@@ -387,3 +387,5 @@ export const cmd = Object.freeze({
 // research(building, upgrade) queues paid training at Proving Grounds; cancel removes unpaid tail plans.
 
 // Lab spawnEntity/spawnEntities entries accept optional dao: lightness | war | magic (Novice only).
+
+// Snapshots carry public playerFactions: [{id, factionId}] independently of private playerResources.

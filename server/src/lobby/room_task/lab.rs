@@ -216,7 +216,11 @@ fn lab_client_op_to_game_op(op: LabClientOp) -> Result<LabOp, (String, Option<u3
                 y,
                 completed,
                 dao,
-                faction_id: faction_id.as_deref().map(super::super::lab_replay_operations::resolve_spawn_faction).transpose().map_err(|error| (error, None))?,
+                faction_id: faction_id
+                    .as_deref()
+                    .map(super::super::lab_replay_operations::resolve_spawn_faction)
+                    .transpose()
+                    .map_err(|error| (error, None))?,
             }))
         }
         LabClientOp::SpawnEntities { spawns } => Ok(LabOp::SpawnEntities(
@@ -234,7 +238,12 @@ fn lab_client_op_to_game_op(op: LabClientOp) -> Result<LabOp, (String, Option<u3
                         y: spawn.y,
                         completed: spawn.completed,
                         dao: spawn.dao,
-                        faction_id: spawn.faction_id.as_deref().map(super::super::lab_replay_operations::resolve_spawn_faction).transpose().map_err(|error| (error, u32::try_from(index).ok()))?,
+                        faction_id: spawn
+                            .faction_id
+                            .as_deref()
+                            .map(super::super::lab_replay_operations::resolve_spawn_faction)
+                            .transpose()
+                            .map_err(|error| (error, u32::try_from(index).ok()))?,
                     })
                 })
                 .collect::<Result<Vec<_>, (String, Option<u32>)>>()?,

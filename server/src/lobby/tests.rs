@@ -241,6 +241,7 @@ pub(super) fn test_snapshot(tick: u32, resource_deltas: Vec<ResourceDelta>) -> S
         events: Vec::new(),
         upgrades: Vec::new(),
         player_resources: Vec::new(),
+        player_factions: Vec::new(),
         net_status: crate::protocol::SnapshotNetStatus::default(),
     }
 }
@@ -1257,6 +1258,7 @@ fn wire_compaction_removes_resource_entities_but_keeps_deltas() {
         }],
         upgrades: Vec::new(),
         player_resources: Vec::new(),
+        player_factions: Vec::new(),
         net_status: crate::protocol::SnapshotNetStatus::default(),
     };
 
@@ -1311,6 +1313,7 @@ fn wire_compaction_does_not_rewrite_authoritative_resource_knowledge_from_events
         }],
         upgrades: Vec::new(),
         player_resources: Vec::new(),
+        player_factions: Vec::new(),
         net_status: crate::protocol::SnapshotNetStatus::default(),
     };
 

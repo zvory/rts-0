@@ -621,6 +621,9 @@ pub struct Snapshot {
     /// Per-player resources for the projected observer players.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub player_resources: Vec<PlayerResourceSnapshot>,
+    /// Public seat identities, independent of private resource/vision projection.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub player_factions: Vec<PlayerFactionSnapshot>,
     /// Per-recipient server/network diagnostics for the current match.
     pub net_status: SnapshotNetStatus,
 }
@@ -780,11 +783,18 @@ fn is_zero_u32(value: &u32) -> bool {
     *value == 0
 }
 
+/// Public faction identity for one match player.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct PlayerFactionSnapshot {
+    pub id: u32,
+    pub faction_id: String,
+}
+
 /// Resources for one projected player, included in observer snapshots.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct PlayerResourceSnapshot {
     pub id: u32,
-    pub faction_id: String,
     pub steel: u32,
     pub oil: u32,
     pub supply_used: u32,

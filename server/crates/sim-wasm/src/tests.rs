@@ -95,6 +95,7 @@ fn snapshot() -> Snapshot {
         events: Vec::new(),
         upgrades: Vec::new(),
         player_resources: vec![],
+        player_factions: Vec::new(),
         net_status: SnapshotNetStatus::default(),
     }
 }

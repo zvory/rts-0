@@ -286,6 +286,7 @@ fn clearing_pending_snapshot_preserves_room_time_and_clears_snapshot_state() {
             events: Vec::new(),
             upgrades: Vec::new(),
             player_resources: Vec::new(),
+            player_factions: Vec::new(),
             net_status: crate::protocol::SnapshotNetStatus::default(),
         }),
         SnapshotSendStatus::Stored

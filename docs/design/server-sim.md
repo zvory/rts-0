@@ -2227,5 +2227,6 @@ field, and setup checkpoints retain the resulting entity specialization.
 
 `LabSpawnEntity.faction_id` optionally sets the owner's catalog identity on successful
 spawn. It is validated against the unit/building catalog before mutation and retained
-by timeline/replay operations. Dynamic player resource projections include faction
-identity so HUD and command admission share the same authoritative seat context.
+by timeline/replay operations. Public snapshot `playerFactions` rows include every seat independently of private resource
+projection, so rendering, HUD and command admission share authoritative faction identity
+even when observing another team.

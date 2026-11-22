@@ -133,7 +133,11 @@ pub(super) fn lab_replay_operation_to_entry_kind(
                             y: spawn.y,
                             completed: spawn.completed,
                             dao: spawn.dao,
-                            faction_id: spawn.faction_id.as_deref().map(resolve_spawn_faction).transpose()?,
+                            faction_id: spawn
+                                .faction_id
+                                .as_deref()
+                                .map(resolve_spawn_faction)
+                                .transpose()?,
                         })
                     })
                     .collect::<Result<Vec<_>, String>>()?,
@@ -173,7 +177,10 @@ pub(super) fn lab_replay_operation_to_entry_kind(
                     y: *y,
                     completed: *completed,
                     dao: *dao,
-                    faction_id: faction_id.as_deref().map(resolve_spawn_faction).transpose()?,
+                    faction_id: faction_id
+                        .as_deref()
+                        .map(resolve_spawn_faction)
+                        .transpose()?,
                 }),
             })
         }

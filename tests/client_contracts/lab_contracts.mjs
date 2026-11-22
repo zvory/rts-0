@@ -1037,9 +1037,11 @@ await withFakeDocument(async () => {
   panel.fields.get("spawn-faction").value = "ekat";
   panel.fields.get("spawn-faction").listeners.change();
   assert(panel.spawnPalette.kind === KIND.EKAT, "LabPanel faction selection updates the unit palette deterministically");
+  panel.armSpawnPaletteTool(KIND.WORKER);
   panel.fields.get("spawn-faction").value = "cultivators";
   panel.fields.get("spawn-faction").listeners.change();
   assert(buttonByText("Serf"), "Cultivator palette uses the faction worker label");
+  assert(buttonByText("Serf").dataset.active === "false", "Shared unit kinds in another faction do not claim the armed spawn tool");
   assert(buttonByText("Novice"), "Cultivator palette includes the base Novice");
   for (const dao of ["lightness", "war", "magic"]) {
     buttonByText(`${dao[0].toUpperCase() + dao.slice(1)} Adept`).listeners.click();

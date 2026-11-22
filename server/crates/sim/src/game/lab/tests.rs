@@ -1143,17 +1143,62 @@ fn lab_cultivator_spawns_set_owner_faction_and_initialize_each_dao() {
     ] {
         let mut game = new_game();
         let (x, y) = free_unit_position(&game, EntityKind::Warrior);
-        let outcome = game.apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
-            owner: 2, kind: EntityKind::Warrior, x, y, completed: true,
-            dao: Some(dao), faction_id: Some("cultivators"),
-        })).expect("specialized spawn");
-        let LabOpOutcome::Spawned { entity_id } = outcome else { panic!("spawn outcome") };
+        let outcome = game
+            .apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
+                owner: 2,
+                kind: EntityKind::Warrior,
+                x,
+                y,
+                completed: true,
+                dao: Some(dao),
+                faction_id: Some("cultivators"),
+            }))
+            .expect("specialized spawn");
+        let LabOpOutcome::Spawned { entity_id } = outcome else {
+            panic!("spawn outcome")
+        };
         let entity = game.state.entities.get(entity_id).expect("spawned entity");
         assert_eq!(entity.dao, Some(upgrade));
         assert_eq!(entity.hp, entity.max_hp);
         assert_eq!(entity.dao_advance_ticks, 0);
-        assert_eq!(game.player_inits().iter().find(|p| p.id == 2).unwrap().faction_id, "cultivators");
-        assert_eq!(game.snapshot_full_for(2).player_resources.iter().find(|p| p.id == 2).unwrap().faction_id, "cultivators");
+        assert_eq!(
+            game.player_inits()
+                .iter()
+                .find(|p| p.id == 2)
+                .unwrap()
+                .faction_id,
+            "cultivators"
+        );
+        assert_eq!(
+            game.snapshot_full_for(2)
+                .player_factions
+                .iter()
+                .find(|p| p.id == 2)
+                .unwrap()
+                .faction_id,
+            "cultivators"
+        );
+        // Seat identity is public even while viewing only the opposing team's private state.
+        let snapshot = game.snapshot_for_observer(&crate::game::ObserverView::Players(vec![1]));
+        assert!(snapshot.player_resources.iter().all(|p| p.id == 1));
+        assert_eq!(
+            snapshot
+                .player_factions
+                .iter()
+                .find(|p| p.id == 2)
+                .unwrap()
+                .faction_id,
+            "cultivators"
+        );
+        assert_eq!(
+            game.snapshot_for(1)
+                .player_factions
+                .iter()
+                .find(|p| p.id == 2)
+                .unwrap()
+                .faction_id,
+            "cultivators"
+        );
     }
 }
 
@@ -1163,15 +1208,34 @@ fn lab_invalid_dao_or_faction_spawn_is_atomic() {
     let (x, y) = free_unit_position(&game, EntityKind::Worker);
     let count = game.state.entities.iter().count();
     for (kind, dao, faction_id) in [
-        (EntityKind::Worker, Some(crate::protocol::LabSpawnDao::War), Some("cultivators")),
+        (
+            EntityKind::Worker,
+            Some(crate::protocol::LabSpawnDao::War),
+            Some("cultivators"),
+        ),
         (EntityKind::Rifleman, None, Some("cultivators")),
         (EntityKind::Worker, None, Some("missing")),
     ] {
-        assert!(game.apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
-            owner: 2, kind, x, y, completed: true, dao, faction_id,
-        })).is_err());
+        assert!(game
+            .apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
+                owner: 2,
+                kind,
+                x,
+                y,
+                completed: true,
+                dao,
+                faction_id,
+            }))
+            .is_err());
         assert_eq!(game.state.entities.iter().count(), count);
-        assert_eq!(game.player_inits().iter().find(|p| p.id == 2).unwrap().faction_id, "kriegsia");
+        assert_eq!(
+            game.player_inits()
+                .iter()
+                .find(|p| p.id == 2)
+                .unwrap()
+                .faction_id,
+            "kriegsia"
+        );
     }
 }
 
@@ -1179,14 +1243,38 @@ fn lab_invalid_dao_or_faction_spawn_is_atomic() {
 fn lab_p2_base_novice_can_evolve_after_cultivator_spawn() {
     let mut game = new_game();
     let (x, y) = free_unit_position(&game, EntityKind::Warrior);
-    let LabOpOutcome::Spawned { entity_id } = game.apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
-        owner: 2, kind: EntityKind::Warrior, x, y, completed: true,
-        dao: None, faction_id: Some("cultivators"),
-    })).unwrap() else { panic!("spawn outcome") };
+    let LabOpOutcome::Spawned { entity_id } = game
+        .apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
+            owner: 2,
+            kind: EntityKind::Warrior,
+            x,
+            y,
+            completed: true,
+            dao: None,
+            faction_id: Some("cultivators"),
+        }))
+        .unwrap()
+    else {
+        panic!("spawn outcome")
+    };
     game.state.entities.get_mut(entity_id).unwrap().insight = config::DISCIPLE_INSIGHT_REQUIRED;
-    game.issue_lab_command_as(2, Command::UseAbility {
-        ability: "evolveMagic".to_string(), units: vec![entity_id], x: None, y: None, queued: false,
-    }, LabCommandOptions { ignore_command_limits: true }).unwrap();
+    game.issue_lab_command_as(
+        2,
+        Command::UseAbility {
+            ability: "evolveMagic".to_string(),
+            units: vec![entity_id],
+            x: None,
+            y: None,
+            queued: false,
+        },
+        LabCommandOptions {
+            ignore_command_limits: true,
+        },
+    )
+    .unwrap();
     game.tick();
-    assert_eq!(game.state.entities.get(entity_id).unwrap().dao, Some(UpgradeKind::DaoOfMagic));
+    assert_eq!(
+        game.state.entities.get(entity_id).unwrap().dao,
+        Some(UpgradeKind::DaoOfMagic)
+    );
 }
