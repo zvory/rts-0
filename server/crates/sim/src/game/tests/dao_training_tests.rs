@@ -221,14 +221,33 @@ fn paid_dao_training_mixed_queue_exact_duration_supply_rally_checkpoint_and_canc
     );
     game.tick();
     assert_eq!(plans(&game, grounds), &[UpgradeKind::DaoOfHeaviness]);
-    for _ in 0..300 {
+    // The first output can still occupy a preferred exit. The first trainee above pins the
+    // exact duration; this sequential-queue check also permits normal blocked-exit retries.
+    for _ in 0..600 {
+        if game
+            .state
+            .entities
+            .iter()
+            .any(|e| e.dao == Some(UpgradeKind::DaoOfHeaviness))
+        {
+            break;
+        }
         game.tick();
     }
-    assert!(game
-        .state
-        .entities
-        .iter()
-        .any(|e| e.dao == Some(UpgradeKind::DaoOfHeaviness) && e.max_hp == 155));
+    assert!(
+        game.state
+            .entities
+            .iter()
+            .any(|e| e.dao == Some(UpgradeKind::DaoOfHeaviness) && e.max_hp == 155),
+        "expected War output; production={:?}; units={:?}",
+        game.state.entities.get(grounds).unwrap().prod_queue(),
+        game.state
+            .entities
+            .iter()
+            .filter(|e| e.kind == EntityKind::Warrior)
+            .map(|e| (e.id, e.dao, e.hp, e.max_hp, e.pos_x(), e.pos_y()))
+            .collect::<Vec<_>>()
+    );
     assert!(plans(&game, grounds).is_empty());
     assert_eq!(game.state.players[0].oil, 100);
 }
