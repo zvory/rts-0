@@ -50,9 +50,9 @@ wind-whipped scarf sweeping through three distinct curves. Standing and attack f
 remain byte-identical to the initial candidate B pass. The run prompt is preserved in
 `source/lightness-melee-b-windy-run-prompt.txt`.
 
-## Armored War Yari
+## Original armored War Yari
 
-War uses approved candidate B: broad angular eastern armor and a straight Yari spear.
+The original War art used broad angular eastern armor and a straight Yari spear.
 `source/war-yari-motion.png` supplies idle and two walking poses; only its first three
 cells are consumed. `source/war-yari-lunge.png` supplies anticipation, drive, full
 extension and recovery. The built-in imagegen lunge prompt is preserved beside the sources.
@@ -63,3 +63,21 @@ The collision radius shrinks by the same 30%, from 13.5 to 9.45 world pixels. Sh
 four attack frames over 400 ms, with a smooth 11.2-world-pixel local-forward visual step.
 War alone has 1.75-tile weapon reach to match the smaller spear and collision circle.
 The step never changes simulation coordinates, collision or damage timing.
+
+## War kabuto production art
+
+`source/war-kabuto-motion.png` is the approved candidate B split-crest helmet with inverted
+materials: white helmet and shoulder plates for team tinting, charcoal gloves/forearms/body armor,
+and a dark gunmetal spear tip. The initial helmet design is preserved as `source/war-kabuto-design-b.png`.
+The previous dark-shoulder candidate is preserved
+as `source/war-kabuto-dark-shoulders-v1.png`.
+It was generated with built-in imagegen; the initial prompt is in
+`source/war-kabuto-prompt.json` and the current color edit is in
+`source/war-kabuto-white-shoulders-prompt.json`. The final glove correction is in
+`source/war-kabuto-dark-hands-prompt.json`; the pale-hand sheet is preserved in
+`source/war-kabuto-pale-hands-v2.png`. The 4×2 sheet contains idle, two walking poses,
+an empty cell, then anticipation, drive, full lunge and recovery.
+The pipeline uses explicit helmet centers instead of dark-hair detection and
+retains the existing runtime body scale, spear reach and lunge timing. Original
+yari source sheets are preserved for the before comparison. All seven frames use dark armored gloves; only the helmet and shoulder plates
+remain bright for team tinting.

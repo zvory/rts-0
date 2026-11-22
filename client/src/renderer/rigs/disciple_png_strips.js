@@ -46,8 +46,8 @@ export const MAGIC_PNG_FRAME_STRIP = discipleStrip("/assets/rigs/disciple-dao/ge
 
 // Armored Yari B with a longer reach and an event-driven forward step.
 export const WAR_PNG_FRAME_STRIP = Object.freeze({
-  ...discipleStrip("/assets/rigs/disciple-dao/generated/war-yari-runtime-strip.png?v=yari-lunge-1", 7, [3, 4, 5, 6],
-    { x: 92, y: 107, w: 74, h: 143 }, "warrior_sword", "yari-lunge-1"),
+  ...discipleStrip("/assets/rigs/disciple-dao/generated/war-yari-runtime-strip.png?v=kabuto-dark-hands-3", 7, [3, 4, 5, 6],
+    { x: 92, y: 107, w: 74, h: 143 }, "warrior_sword", "kabuto-dark-hands-3"),
   movementFrames: Object.freeze([1, 2]),
   worldScale: 0.8 * DAO_WAR_BODY_SCALE,
   // Sword feedback lasts 720 ms; finish this authored clip after 400 ms.
