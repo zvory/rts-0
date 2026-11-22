@@ -1,4 +1,4 @@
-use crate::game::entity::EntityKind;
+use crate::game::entity::{EntityKind, EntityStore, ResearchItem};
 pub use crate::rules::faction::UpgradeKind;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,35 +28,43 @@ pub fn researchable_upgrades(building: EntityKind) -> Vec<UpgradeKind> {
 }
 
 /// Dao prices are selected when payment starts; paid queues reserve their tier.
-pub(crate) fn is_dao(kind: UpgradeKind) -> bool {
-    matches!(kind, UpgradeKind::DaoOfLightness | UpgradeKind::DaoOfHeaviness | UpgradeKind::DaoOfMagic)
+fn is_dao(kind: UpgradeKind) -> bool {
+    matches!(
+        kind,
+        UpgradeKind::DaoOfLightness | UpgradeKind::DaoOfHeaviness | UpgradeKind::DaoOfMagic
+    )
 }
 
 pub(crate) fn next_definition(
     kind: UpgradeKind,
-    player: &crate::game::PlayerState,
-    entities: &crate::game::entity::EntityStore,
+    owner: u32,
+    completed: &std::collections::BTreeSet<UpgradeKind>,
+    entities: &EntityStore,
 ) -> UpgradeDefinition {
     if !is_dao(kind) {
         return definition(kind);
     }
-    let count = player.upgrades.iter().filter(|kind| is_dao(**kind)).count()
-        + entities.iter().filter(|entity| entity.owner == player.id)
+    let count = completed.iter().filter(|kind| is_dao(**kind)).count()
+        + entities
+            .iter()
+            .filter(|entity| entity.owner == owner)
             .flat_map(|entity| entity.research_queue())
-            .filter(|item| item.paid && is_dao(item.upgrade)).count();
+            .filter(|item| item.paid && is_dao(item.upgrade))
+            .count();
     tier_definition(kind, count)
 }
 
 fn tier_definition(kind: UpgradeKind, count: usize) -> UpgradeDefinition {
     let mut def = definition(kind);
     if is_dao(kind) {
-        (def.cost_steel, def.cost_oil, def.research_ticks) = crate::config::dao_research_tier(count);
+        (def.cost_steel, def.cost_oil, def.research_ticks) =
+            crate::config::dao_research_tier(count);
     }
     def
 }
 
 /// Paid Dao duration records the committed tier, even if another research is cancelled.
-pub(crate) fn paid_cost(item: &crate::game::entity::ResearchItem) -> crate::rules::economy::ResourceCost {
+pub(crate) fn paid_cost(item: &ResearchItem) -> crate::rules::economy::ResourceCost {
     let count = match item.total {
         ticks if ticks == crate::config::DAO_RESEARCH_TICKS / 2 => 0,
         ticks if ticks == crate::config::DAO_RESEARCH_TICKS => 1,

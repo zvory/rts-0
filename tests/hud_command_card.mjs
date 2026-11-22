@@ -942,4 +942,23 @@ for (const researched of [false, true]) {
     assert.deepEqual(def.cost, { steel: cost, oil: cost * 2 });
     assert.equal(def.researchTicks, ticks);
   }
+
+  const selected = { id: 901, owner: 1, kind: KIND.THREE_DAO_PAVILION };
+  const context = {
+    playerId: 1,
+    factionId: "cultivators",
+    selection: [selected],
+    resources: { steel: 75, oil: 150 },
+    upgrades: [],
+    playerHasCompleteKind: () => true,
+    groupCooldownClocks: () => [],
+  };
+  const before = buildCommandCardDescriptors({ ...context, currentEntities: [selected] });
+  const after = buildCommandCardDescriptors({ ...context, currentEntities: [selected, pavilion] });
+  const slot = (card) => card.slots.find((entry) => entry?.id === `research:${dao}`);
+  assert.equal(slot(before).unaffordable, false);
+  assert.equal(slot(after).unaffordable, true);
+  assert.deepEqual(slot(after).cost, { steel: 100, oil: 200 });
+  assert.equal(slot(after).researchDefinition.researchTicks, 600);
+  assert.notEqual(before.signature, after.signature);
 }

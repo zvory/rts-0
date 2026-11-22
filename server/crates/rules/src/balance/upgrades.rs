@@ -64,6 +64,9 @@ pub const DISCIPLE_SHIELD_COOLDOWN_TICKS: u16 = (TICK_HZ * 10) as u16;
 /// Completed and paid active Dao researches reserve player-wide price tiers.
 pub fn dao_research_tier(reserved: usize) -> (u32, u32, u32) {
     let multiplier = 1u32 << reserved.min(2);
-    (DAO_COST_STEEL / 2 * multiplier, DAO_COST_OIL / 2 * multiplier,
-     DAO_RESEARCH_TICKS / 2 * multiplier)
+    (
+        DAO_COST_STEEL / 2 * multiplier,
+        DAO_COST_OIL / 2 * multiplier,
+        DAO_RESEARCH_TICKS / 2 * multiplier,
+    )
 }
