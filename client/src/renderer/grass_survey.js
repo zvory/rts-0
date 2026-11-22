@@ -77,7 +77,9 @@ void main(){
      color+=vec3(.03,.04,.012)*smoothstep(.2,.95,gust);
    }
  }
- finalColor=vec4(color*uTint,.90);
+ // Pixi's normal blend mode expects premultiplied color, including for custom meshes.
+ const float opacity=.90;
+ finalColor=vec4(color*uTint*opacity,opacity);
 }`;
 
 /** Lab-only material sketches, deliberately independent of authoritative map/simulation state. */
