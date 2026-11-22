@@ -17,6 +17,7 @@ const EXPECTED_LEGACY_READS = [
   "match.frameProfiler",
   "match.visualProfile.unitOverrides",
   "match.visualProfile.frameStripOverrides",
+  "match.visualProfile.grassTechnique",
   "match.visualProfile.terrainPreviewReveal",
   "match.presentationAssembler.staticMap",
 ];

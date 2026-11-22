@@ -14,6 +14,7 @@ export const PIXI_LEGACY_READ_ALLOWLIST = Object.freeze([
   Object.freeze({ id: "match.frameProfiler", reviewTrigger: "measurement needs backend-neutral metrics" }),
   Object.freeze({ id: "match.visualProfile.unitOverrides", reviewTrigger: "a playtest needs representative visuals" }),
   Object.freeze({ id: "match.visualProfile.frameStripOverrides", reviewTrigger: "a playtest needs representative visuals" }),
+  Object.freeze({ id: "match.visualProfile.grassTechnique", reviewTrigger: "a Lab grass survey needs animated material comparison" }),
   Object.freeze({ id: "match.visualProfile.terrainPreviewReveal", reviewTrigger: "a terrain matrix needs fog-free material review" }),
   Object.freeze({ id: "match.presentationAssembler.staticMap", reviewTrigger: "A detached static-map consumer needs a shared DTO" }),
 ]);
@@ -110,6 +111,7 @@ export class PixiPresentationAdapter {
           visualSamples: view.visualSamples,
           visualUnitOverrides: view.visualUnitOverrides,
           visualFrameStripOverrides: view.visualFrameStripOverrides,
+          visualGrassTechnique: view.visualGrassTechnique,
           observerMapAnalysis: view.observerMapAnalysis,
           feedbackView: view.feedback,
           reconciledGroundDecals: groundDecals,
@@ -263,6 +265,7 @@ export class PixiPresentationAdapter {
       visualSamples,
       visualUnitOverrides: visualProfile?.unitOverrides || null,
       visualFrameStripOverrides: visualProfile?.frameStripOverrides || null,
+      visualGrassTechnique: visualProfile?.grassTechnique || 0,
       observerMapAnalysis: recordOfType(layers.tacticalFeedback, "observerMapAnalysis")?.model || null,
       feedback,
       marquee: marqueeForFrame(layers.screenOverlay),
