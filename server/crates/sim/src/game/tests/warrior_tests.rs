@@ -55,8 +55,9 @@ fn cultivator_portal_trains_warrior_and_reserves_two_supply() {
         .iter()
         .find(|entity| entity.owner == 1 && entity.kind == EntityKind::Warrior)
         .expect("Portal should produce a Warrior");
-    assert_eq!((warrior.hp, warrior.max_hp), (135, 135));
+    assert_eq!((warrior.hp, warrior.max_hp), (115, 115));
     assert_eq!(warrior.radius(), 13.5);
+    assert_eq!(warrior.movement_speed(), 2.0);
 }
 
 #[test]
@@ -206,14 +207,15 @@ fn pavilion_prerequisites_and_research_are_faction_gated() {
 fn disciple_evolution_requires_insight_research_ownership_and_is_permanent() {
     use crate::game::ability::AbilityKind;
     use crate::game::upgrade::UpgradeKind;
-    for (ability, upgrade, hp) in [
+    for (ability, upgrade, hp, speed) in [
         (
             AbilityKind::EvolveLightness,
             UpgradeKind::DaoOfLightness,
-            135,
+            115,
+            2.7025,
         ),
-        (AbilityKind::EvolveWar, UpgradeKind::DaoOfHeaviness, 155),
-        (AbilityKind::EvolveMagic, UpgradeKind::DaoOfMagic, 135),
+        (AbilityKind::EvolveWar, UpgradeKind::DaoOfHeaviness, 135, 2.0),
+        (AbilityKind::EvolveMagic, UpgradeKind::DaoOfMagic, 115, 2.2),
     ] {
         let mut game = empty_flat_game(&[
             cultivator_player(),
@@ -272,6 +274,7 @@ fn disciple_evolution_requires_insight_research_ownership_and_is_permanent() {
         let evolved = game.state.entities.get(unit).unwrap();
         assert_eq!(evolved.dao, Some(upgrade));
         assert_eq!((evolved.hp, evolved.max_hp), (hp, hp));
+        assert!((evolved.movement_speed() - speed).abs() < 0.0001);
         let entity = game.state.entities.get_mut(unit).unwrap();
         entity.apply_damage(entity.hp - 1, None);
         game.enqueue(1, command);
@@ -955,7 +958,7 @@ fn disciple_pending_dao_advances_on_combat_insight_without_interrupting_attack()
     assert_eq!(entity.insight, 60);
     assert_eq!(entity.dao, Some(UpgradeKind::DaoOfHeaviness));
     assert!(matches!(entity.order(), Order::Attack(_)));
-    assert!(game.state.entities.get(target).unwrap().hp < 135);
+    assert!(game.state.entities.get(target).unwrap().hp < 115);
 }
 
 #[test]

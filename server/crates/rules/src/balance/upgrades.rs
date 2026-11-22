@@ -48,8 +48,8 @@ pub const DAO_COST_STEEL: u32 = 100;
 pub const DAO_COST_OIL: u32 = 200;
 pub const DAO_RESEARCH_TICKS: u32 = METHAMPHETAMINES_RESEARCH_TICKS;
 
-/// Applied to every Disciple movement profile, including Lightness’s Scout Car baseline.
-pub const DISCIPLE_SPEED_MULTIPLIER: f32 = 1.15;
+/// Lightness retains its Scout Car baseline independently of base Disciple speed.
+pub const DAO_LIGHTNESS_SPEED_MULTIPLIER: f32 = 1.15;
 pub const DISCIPLE_INSIGHT_REQUIRED: u32 = 60;
 pub const DAO_WAR_HP_BONUS: u32 = 20;
 pub const DAO_WAR_DAMAGE_MULTIPLIER: f32 = 1.5;
