@@ -72,7 +72,10 @@ for (const [dao, strip, weaponKind] of [
   }
   assert.equal(frameStripFrameIndex(strip, entity, { ...context, recoilProgress: 0,
     recoilPhase: 1, recoilWeaponKind: weaponKind }), gait);
-  assert.equal(frameStripFrameIndex(strip, { ...entity, state: STATE.IDLE }, context), 0);
+  assert.equal(frameStripFrameIndex(strip, { ...entity, state: STATE.IDLE }, context), gait,
+    "automatic pursuit walks even while the public order state is idle");
+  assert.equal(frameStripFrameIndex(strip, { ...entity, state: STATE.IDLE },
+    { ...context, frameStripMoving: false }), 0);
   assert.match(liveUnitIconMarkupFor(entity.kind, { dao }), new RegExp(dao === "lightness" ? "lightness-melee-b-runtime-strip" : dao === "war" ? "war-yari-runtime-strip" : "magic-runtime-strip"));
   assert.match(liveUnitIconMarkupFor(entity.kind, { minimapPart: `dao-${dao}:frame:2` }),
     new RegExp(dao === "lightness" ? "lightness-melee-b-runtime-strip" : dao === "war" ? "war-yari-runtime-strip" : "magic-runtime-strip"));
