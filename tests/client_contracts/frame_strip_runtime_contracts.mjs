@@ -29,7 +29,7 @@ for (const [elapsed, expectedFrame, expectedStep] of [
   const frame = frameStripFrameIndex(WAR_PNG_FRAME_STRIP, war, context);
   assert(frame === expectedFrame, `Yari frame at ${elapsed} ms`);
   const offset = frameStripSpriteOffset(WAR_PNG_FRAME_STRIP, frame, context);
-  assert(Math.abs(offset.y - expectedStep) < 1e-8, `Yari step at ${elapsed} ms`);
+  assert(Math.abs(offset.y - WAR_PNG_FRAME_STRIP.originLateralPx - expectedStep) < 1e-8, `Yari step at ${elapsed} ms`);
   warMinimap.beginFrame([war], {
     weaponRecoil: () => cycle.progress, weaponRecoilPhase: () => cycle.phase,
     weaponRecoilKind: () => WEAPON_KIND.WARRIOR_SWORD,
