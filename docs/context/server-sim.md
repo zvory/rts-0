@@ -14,7 +14,8 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
 - §3.1.4 Deterministic arithmetic; fixed-point grid and replay compatibility
 - §3.2 Concurrency model; the room task is the sole `Game` owner
 - §3.3 Rules layer
-- §3.5 Command planning and queued order semantics
+- §3.5 Commands and queued orders
+- Tournament Grounds
 - [docs/projection-audit-checklist.md](../projection-audit-checklist.md) — projection checklist
 - [docs/design/ai.md](../design/ai.md) — AI opponents
 - [docs/design/testing.md](../design/testing.md) §9 and §10 — self-play and dev scenarios when

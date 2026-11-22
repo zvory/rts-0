@@ -198,6 +198,7 @@ fn validate_entity(
         });
     }
     entities::validate_ownership(entity)?;
+    entities::validate_tournament_state(entity)?;
     if entity.dao_advance_ticks > 15
         || (entity.dao_advance_ticks > 0 && entity.dao.is_none())
         || entity.shield.as_ref().is_some_and(|shield| {

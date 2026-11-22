@@ -79,6 +79,7 @@ pub mod kinds {
     pub const RESOURCE_DEPOT: &str = "resource_depot";
     pub const PORTAL: &str = "portal";
     pub const THREE_DAO_PAVILION: &str = "three_dao_pavilion";
+    pub const TOURNAMENT_GROUNDS: &str = "tournament_grounds";
     pub const ZAMOK: &str = "zamok";
     pub const DEPOT: &str = "depot";
     pub const BARRACKS: &str = "barracks";
@@ -226,7 +227,7 @@ pub mod notices {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 61;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 62;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -408,6 +409,7 @@ const KIND_CODES: &[(&str, u8)] = &[
     (kinds::RESOURCE_DEPOT, 6),
     (kinds::PORTAL, 28),
     (kinds::THREE_DAO_PAVILION, 31),
+    (kinds::TOURNAMENT_GROUNDS, 32),
     (kinds::DEPOT, 7),
     (kinds::BARRACKS, 8),
     (kinds::TRAINING_CENTRE, 9),
@@ -756,6 +758,7 @@ fn kind_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("RESOURCE_DEPOT", kinds::RESOURCE_DEPOT),
         ("PORTAL", kinds::PORTAL),
         ("THREE_DAO_PAVILION", kinds::THREE_DAO_PAVILION),
+        ("TOURNAMENT_GROUNDS", kinds::TOURNAMENT_GROUNDS),
         ("ZAMOK", kinds::ZAMOK),
         ("DEPOT", kinds::DEPOT),
         ("BARRACKS", kinds::BARRACKS),

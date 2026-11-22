@@ -807,6 +807,9 @@ impl Serialize for CompactEntity<'_> {
         if entity.chosen_dao.is_some() {
             len = 50;
         }
+        if entity.tournament_entrants.is_some() {
+            len = 51;
+        }
         let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&entity.id)?;
         seq.serialize_element(&entity.owner)?;
@@ -971,6 +974,9 @@ impl Serialize for CompactEntity<'_> {
         }
         if len > 49 {
             seq.serialize_element(&entity.chosen_dao)?;
+        }
+        if len > 50 {
+            seq.serialize_element(&entity.tournament_entrants)?;
         }
         seq.end()
     }

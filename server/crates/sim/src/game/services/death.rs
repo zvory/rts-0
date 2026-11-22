@@ -122,7 +122,9 @@ pub(crate) fn death_system(
                 if !linked_construction_died
                     && (config::unit_stats(unit).is_some() || unit.is_resource_extractor())
                 {
-                    player.refund_cost(economy::resource_cost(unit));
+                    if dead.kind != EntityKind::TournamentGrounds {
+                        player.refund_cost(economy::resource_cost(unit));
+                    }
                     player.release_supply(economy::supply_cost(unit));
                 }
             }

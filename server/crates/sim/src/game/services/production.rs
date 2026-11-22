@@ -4,6 +4,7 @@ use crate::game::entity::{EntityStore, OrderIntent, ProdItem, RallyIntent, Rally
 use crate::game::fog::Fog;
 use crate::game::map::Map;
 use crate::game::services::move_coordinator::MoveCoordinator;
+use crate::game::services::tournament;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::upgrade;
 #[cfg(test)]
@@ -235,6 +236,7 @@ pub(crate) fn production_system(
             let spawn_facing = first_rally
                 .and_then(|rally| coordinator.rally_spawn_facing(entities, unit, (sx, sy), rally));
             if let Some(spawned) = entities.spawn_unit(owner, unit, sx, sy) {
+                tournament::upgrade_winner(entities, id, spawned);
                 if let Some(facing) = spawn_facing {
                     if let Some(e) = entities.get_mut(spawned) {
                         e.set_facing(facing);
@@ -250,6 +252,24 @@ pub(crate) fn production_system(
                 // to attack-move for combat units, but Engineers and faction gatherers keep move
                 // rally behavior.
                 if let Some(first) = rally_plan.first().copied() {
+                    if unit == EntityKind::Warrior
+                        && entities
+                            .get(id)
+                            .is_some_and(|e| e.kind == EntityKind::Portal)
+                    {
+                        if let Some(target) =
+                            tournament::entry_target(entities, owner, first.point.x, first.point.y)
+                        {
+                            tournament::order_entry(
+                                entities,
+                                coordinator,
+                                owner,
+                                &[spawned],
+                                target,
+                            );
+                            continue;
+                        }
+                    }
                     coordinator.order_rally_move(
                         entities,
                         owner,

@@ -45,4 +45,5 @@ mod smoke_mortar_visibility_tests;
 mod tank_attack_move_acquisition_tests;
 mod tank_direct_attack_tests;
 mod tank_trap_tests;
+mod tournament_tests;
 mod warrior_tests;

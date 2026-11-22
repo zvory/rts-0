@@ -517,6 +517,25 @@ pub const BUILDINGS: &[BuildingDef] = &[
         build_requires: RESOURCE_DEPOT_AND_BARRACKS_REQUIRED,
     },
     BuildingDef {
+        kind: EntityKind::TournamentGrounds,
+        stats: balance::BuildingStats {
+            hp: 120,
+            sight_tiles: 1,
+            cost_steel: 100,
+            cost_oil: 0,
+            foot_w: 3,
+            foot_h: 3,
+            build_ticks: 200,
+            dmg: 0,
+            range_tiles: 0.0,
+            cooldown: 0,
+        },
+        armor_class: ArmorClass::Armored,
+        weapon: WeaponClass::None,
+        trains: &[],
+        build_requires: &[EntityKind::Portal],
+    },
+    BuildingDef {
         kind: EntityKind::ThreeDaoPavilion,
         stats: balance::BuildingStats {
             hp: 120,
@@ -780,6 +799,7 @@ mod tests {
                 EntityKind::Depot,
                 EntityKind::Barracks,
                 EntityKind::TrainingCentre,
+                EntityKind::TournamentGrounds,
                 EntityKind::ThreeDaoPavilion,
                 EntityKind::Factory,
                 EntityKind::EngineeringComplex,

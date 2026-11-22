@@ -378,11 +378,18 @@ pub fn project_entity(
         view.setup_facing = entity.emplacement_facing();
     }
 
+    if entity.kind == EntityKind::TournamentGrounds && owner_or_ally {
+        view.tournament_entrants = entity.production.as_ref().map(|p| p.tournament_entrants);
+    }
     if entity.is_building() && !entity.prod_queue().is_empty() {
         if let Some(front) = entity.prod_queue().first() {
             view.prod_kind = Some(protocol::kind_to_wire(front.unit).to_string());
             view.prod_progress = Some(if front.total == 0 {
-                0.0
+                if entity.kind == EntityKind::TournamentGrounds {
+                    1.0
+                } else {
+                    0.0
+                }
             } else {
                 front.progress as f32 / front.total as f32
             });

@@ -94,6 +94,7 @@ client/assets/rigs/**/*.*
 !client/assets/rigs/rocket-truck-preview/rocket.png
 !client/assets/rigs/barbed-wire-tangled/barbed-wire.png
 !client/assets/rigs/three-dao-pavilion/pavilion-atlas.png
+!client/assets/rigs/tournament-grounds/tournament-atlas.png
 
 # Dao runtime strips; authoring sheets remain excluded by the rig rule above.
 !client/assets/rigs/disciple-dao/generated/lightness-runtime-strip.png

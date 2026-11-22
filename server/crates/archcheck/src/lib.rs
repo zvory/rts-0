@@ -53,6 +53,8 @@ const SERVICE_ROLES: &[(&str, ServiceRole)] = &[
     ("spatial", ServiceRole::QueryIndex),
     ("standability", ServiceRole::QueryIndex),
     ("supply", ServiceRole::TickSystem),
+    // Narrow entity-owned admission/winner executor shared by commands and production.
+    ("tournament", ServiceRole::MutationHelper),
     ("world_query", ServiceRole::QueryIndex),
 ];
 
@@ -62,6 +64,8 @@ const ROLE_EDGE_ALLOWLIST: &[(&str, &str)] = &[
     ("ability_orders", "commands"),
     // Ability execution may delegate movement/path staging through the coordinator boundary.
     ("ability_orders", "move_coordinator"),
+    // Admission queries legal perimeter approaches through the shared spawn/standability seam.
+    ("tournament", "move_coordinator"),
     // Combat uses movement's shared facing helpers while combat policy is being split out.
     ("combat", "movement"),
     // Residual command/order adapter edges into tick systems. Keep these explicit so adding another
@@ -134,6 +138,7 @@ const ALLOWED_SERVICE_IMPORTS: &[(&str, &[&str])] = &[
             "scout_plane",
             "spatial",
             "standability",
+            "tournament",
             "world_query",
         ],
     ),
@@ -190,9 +195,11 @@ const ALLOWED_SERVICE_IMPORTS: &[(&str, &[&str])] = &[
             "pathing",
             "scout_plane",
             "standability",
+            "tournament",
         ],
     ),
     ("standability", &["geometry", "occupancy", "spatial"]),
+    ("tournament", &["move_coordinator"]),
     ("world_query", &["spatial"]),
 ];
 

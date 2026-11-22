@@ -791,6 +791,7 @@ pub const CULTIVATORS_CATALOG: FactionCatalog = FactionCatalog {
         EntityKind::ResourceDepot,
         EntityKind::Portal,
         EntityKind::ThreeDaoPavilion,
+        EntityKind::TournamentGrounds,
         EntityKind::SteelMine,
         EntityKind::PumpJack,
     ],
@@ -798,12 +799,17 @@ pub const CULTIVATORS_CATALOG: FactionCatalog = FactionCatalog {
         EntityKind::ResourceDepot,
         EntityKind::Portal,
         EntityKind::ThreeDaoPavilion,
+        EntityKind::TournamentGrounds,
     ],
     upgrades: &CULTIVATORS_UPGRADES,
     abilities: &CULTIVATOR_ABILITIES,
     builders: &[EntityKind::Worker],
     gatherers: &[],
-    production_anchors: &[EntityKind::ResourceDepot, EntityKind::Portal],
+    production_anchors: &[
+        EntityKind::ResourceDepot,
+        EntityKind::Portal,
+        EntityKind::TournamentGrounds,
+    ],
 };
 
 pub const CATALOGS: &[FactionCatalog] = &[
@@ -1352,7 +1358,8 @@ mod tests {
             &[
                 EntityKind::ResourceDepot,
                 EntityKind::Portal,
-                EntityKind::ThreeDaoPavilion
+                EntityKind::ThreeDaoPavilion,
+                EntityKind::TournamentGrounds
             ]
         );
         assert_eq!(

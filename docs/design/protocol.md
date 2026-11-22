@@ -898,7 +898,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 61. The client also accepts compact
+`messagepack-compact`, codec version 1, compact snapshot version 62. The client also accepts compact
 snapshot versions 51 through 59: version 52 only appends a kind code, version 53 appends the
 optional `unitsKilled` entity slot, version 54 appends an optional `rocket` style bit to mortar
 launch/impact event records, and version 55 adds the `artilleryIncoming` event code, so the older
@@ -936,7 +936,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 61,
+  "v": 62,
   "gr": groundDecalRevision, // omitted when zero
   "gd": [afterRevision, [    // omitted when this tick has no discovered/created revision
     [id, decalClass, sourceKindCode, x, y, owner, seed, facing, weaponFacing, radiusTiles]
@@ -977,7 +977,7 @@ Compact numeric codes:
 
 | Vocabulary | Codes |
 |------------|-------|
-| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `resource_depot`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `engineering_complex`, 18 `command_car`, 19 `ekat`, 20 `zamok`, 21 `tank_trap`, 30 `barbed_wire`, 22 `golem`, 23 `pump_jack`, 24 `panzerfaust`, 25 `scout_plane`, 26 `steel_mine`, 27 `rocket_launcher`, 28 `portal`, 29 `warrior`, 31 `three_dao_pavilion` |
+| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `resource_depot`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `engineering_complex`, 18 `command_car`, 19 `ekat`, 20 `zamok`, 21 `tank_trap`, 30 `barbed_wire`, 22 `golem`, 23 `pump_jack`, 24 `panzerfaust`, 25 `scout_plane`, 26 `steel_mine`, 27 `rocket_launcher`, 28 `portal`, 29 `warrior`, 31 `three_dao_pavilion`, 32 `tournament_grounds` |
 | `state` | 1 `idle`, 2 `move`, 3 `attack`, 4 `gather`, 5 `build`, 6 `train`, 7 `construct`, 8 `dead` |
 | `setupState` | 1 `packed`, 2 `setting_up`, 3 `deployed`, 4 `tearing_down` |
 | `orderStage` | 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, 5 `build`, 6 `smoke`, 7 `setupAntiTankGuns`, 8 `charge`, 9 `mortarFire`, 10 `pointFire`, 11 `breakthrough`, 12 `ekatTeleport`, 13 `ekatLineShot`, 14 `ekatMagicAnchor`, 15 `deconstruct`, 16 `ekatConsumeGolem`, 17 `blanketFire`, 18 `dismissScoutPlane`, 19 `scoutPlane`, 20 `holdPosition`, 21 `barrage`, 22 `evolveLightness`, 23 `evolveWar`, 24 `evolveMagic`, 25 `discipleShield`, 26 `throwSword` |
@@ -2019,3 +2019,17 @@ world-point targeting and the existing `lineProjectile` ability-object kind/payl
 It is fog-filtered by the existing object projection; clients select its spinning sword
 sprite by ability id without requiring visibility of the caster. Entity ability availability
 is restricted to Dao of War. Checkpoints retain the shared projectile leg and per-leg hit sets.
+
+### Tournament Grounds
+
+`tournament_grounds` appends entity-kind compact code 32. Optional team-private
+`tournamentEntrants` (0–4) appends entity slot 50 in compact version 62. Ordinary
+`prodKind`, `prodProgress`, `prodQueue` and rally fields represent the ten-second batch
+and pending winners. Visible opponents see progress but no entrant count.
+A normal unqueued `move` to the exact owned completed building center means enter for
+base Disciples only; the client resolves right-clicks to that center. Entry intent is
+entity-owned, cancels on replacement/stop/hold, and records through existing replay commands.
+See [Tournament Grounds](tournament-grounds.md).
+
+Portal first-stage rallies to the exact owned completed Grounds center automatically issue
+entry movement to newly trained base Disciples. Busy grounds retain waiting entry intents.

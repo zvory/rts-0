@@ -112,6 +112,8 @@ pub struct CarryState {
 /// Mobile unit state. Only units have this group.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MovementState {
+    #[serde(default)]
+    pub(crate) tournament_target: Option<u32>,
     /// Facing angle in radians (for unit orientation / render). Updated when moving/attacking.
     pub facing: f32,
     /// Current high-level order / AI state.
@@ -167,6 +169,7 @@ pub struct MovementState {
 impl Default for MovementState {
     fn default() -> Self {
         MovementState {
+            tournament_target: None,
             facing: 0.0,
             order: Order::Idle,
             queued_orders: Vec::new(),
@@ -366,6 +369,10 @@ impl WeaponSetup {
 /// Production queue state. Present only on buildings that can train units.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ProductionState {
+    #[serde(default)]
+    pub(crate) tournament_entrants: u8,
+    #[serde(default)]
+    pub(crate) tournament_winners: Vec<crate::game::upgrade::UpgradeKind>,
     /// FIFO production queue (front = item being produced).
     pub queue: Vec<ProdItem>,
     /// FIFO research queue (front = item being researched).

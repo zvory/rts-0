@@ -75,10 +75,11 @@ export function _issueTargetedCommand(p, ev = {}) {
     if (commandTarget === "move" || commandTarget === "attack") {
       if (resource) return true;
       const kind = commandTarget === "attack" ? ORDER_STAGE.ATTACK_MOVE : ORDER_STAGE.MOVE;
+      const rally = tournamentRallyPoint(this, this._entityAtScreen(p, false), world);
       for (const building of producers) {
-        this.commandInteraction.issueCommand(cmd.setRally(building, world.x, world.y, queued, kind));
+        this.commandInteraction.issueCommand(cmd.setRally(building, rally.x, rally.y, queued, kind));
       }
-      this._addCommandFeedback(kind === ORDER_STAGE.ATTACK_MOVE ? "attack" : "move", world.x, world.y, queued);
+      this._addCommandFeedback(kind === ORDER_STAGE.ATTACK_MOVE ? "attack" : "move", rally.x, rally.y, queued);
     }
     return true;
   }
@@ -222,16 +223,27 @@ function normalRightClickAction(input, p) {
     const producers = input._selectedProducerBuildingIds();
     if (producers.length === 0 || !world) return null;
     if (resource) return null;
+    const rally = tournamentRallyPoint(input, target, world);
     return {
       kind: "setRally",
       producers,
-      x: world.x,
-      y: world.y,
+      x: rally.x,
+      y: rally.y,
       stage: ORDER_STAGE.MOVE,
-      feedback: rightClickFeedback("move", world.x, world.y),
+      feedback: rightClickFeedback("move", rally.x, rally.y),
     };
   }
 
+  if (target?.kind === KIND.TOURNAMENT_GROUNDS && ownOwner(input.state, target.owner, input.controlPolicy)
+      && !Number.isFinite(target.buildProgress)) {
+    const entrants = ownUnits.filter((id) => {
+      const unit = input.state.entityById(id);
+      return unit?.kind === KIND.WARRIOR && !unit.dao;
+    });
+    if (entrants.length) return { kind: "move", units: entrants, x: target.x, y: target.y,
+      feedback: rightClickFeedback("move", target.x, target.y) };
+    return null;
+  }
   const gatherers = input._selectedGathererIds();
   const workers = input._selectedWorkerIds();
   const contextualResource = resource;
@@ -1098,4 +1110,10 @@ function cancelActiveLabTool(input, reason) {
   if (!intent?.activeLabTool) return null;
   const cancelled = input?.labToolController?.cancel?.(reason);
   return cancelled || intent.cancelLabTool?.(reason) || null;
+}
+
+function tournamentRallyPoint(input, target, fallback) {
+  return target?.kind === KIND.TOURNAMENT_GROUNDS
+    && ownOwner(input.state, target.owner, input.controlPolicy)
+    && !Number.isFinite(target.buildProgress) ? target : fallback;
 }

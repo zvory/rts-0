@@ -29,6 +29,7 @@ pub(in crate::game) mod scout_plane;
 pub mod spatial;
 pub mod standability;
 pub mod supply;
+pub(in crate::game) mod tournament;
 pub mod world_query;
 
 use crate::game::entity::EntityKind;

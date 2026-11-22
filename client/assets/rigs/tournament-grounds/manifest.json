@@ -1,0 +1,13 @@
+{
+  "id": "cultivator-tournament-grounds-01",
+  "mode": "built-in-imagegen-plus-deterministic-raster-assembly",
+  "source": "tournament-source.png",
+  "atlas": "tournament-atlas.png",
+  "generator": "scripts/art/tournament-pipeline.mjs",
+  "frameSize": [384, 384],
+  "frames": ["fixed", "teamPaint"],
+  "factionId": "cultivators",
+  "kind": "tournament_grounds",
+  "visualScale": 1.1,
+  "omitFootprintShadow": true
+}

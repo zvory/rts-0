@@ -39,6 +39,46 @@ pub(super) fn validate_single_builders(entities: &[Entity]) -> Result<(), Checkp
     Ok(())
 }
 
+pub(super) fn validate_tournament_state(entity: &Entity) -> Result<(), CheckpointPayloadError> {
+    use crate::game::upgrade::UpgradeKind;
+    if entity.movement.as_ref().is_some_and(|m| {
+        m.tournament_target.is_some()
+            && (entity.kind != EntityKind::Warrior || entity.dao.is_some())
+    }) {
+        return Err(CheckpointPayloadError::InvalidValue {
+            field: "entities.tournamentTarget",
+        });
+    }
+    if let Some(p) = entity.production.as_ref() {
+        let invalid = if entity.kind == EntityKind::TournamentGrounds {
+            p.tournament_entrants > 4
+                || p.tournament_winners.len() > 1
+                || p.queue.len() != p.tournament_winners.len()
+                || (p.tournament_winners.is_empty() && p.tournament_entrants == 4)
+                || (!p.tournament_winners.is_empty() && p.tournament_entrants != 4)
+                || p.queue
+                    .iter()
+                    .any(|item| item.unit != EntityKind::Warrior || !item.paid)
+                || p.tournament_winners.iter().any(|dao| {
+                    !matches!(
+                        dao,
+                        UpgradeKind::DaoOfLightness
+                            | UpgradeKind::DaoOfHeaviness
+                            | UpgradeKind::DaoOfMagic
+                    )
+                })
+        } else {
+            p.tournament_entrants != 0 || !p.tournament_winners.is_empty()
+        };
+        if invalid {
+            return Err(CheckpointPayloadError::InvalidValue {
+                field: "entities.tournament",
+            });
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

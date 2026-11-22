@@ -1,5 +1,5 @@
 {
-  "reason": "Dao Shield adds a world-point dispatch in ability_orders.rs; keep all other architecture ratchets unchanged.",
+  "reason": "Tournament entry/winner executor with admission, blocked-approach, and evolution/checkpoint regression coverage; exact helper edges and entity-owned state only; unrelated ratchets retained.",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -115,7 +115,7 @@
     },
     {
       "path": "entity/entity.rs",
-      "lines": 1426
+      "lines": 1497
     },
     {
       "path": "entity/entity/production.rs",
@@ -151,7 +151,7 @@
     },
     {
       "path": "entity/state.rs",
-      "lines": 448
+      "lines": 467
     },
     {
       "path": "entity/store.rs",
@@ -535,7 +535,7 @@
     },
     {
       "path": "services/commands.rs",
-      "lines": 1940
+      "lines": 2118
     },
     {
       "path": "services/commands/auto_build.rs",
@@ -543,7 +543,7 @@
     },
     {
       "path": "services/commands/cancel.rs",
-      "lines": 79
+      "lines": 85
     },
     {
       "path": "services/commands/command_helpers.rs",
@@ -643,7 +643,7 @@
     },
     {
       "path": "services/death.rs",
-      "lines": 282
+      "lines": 320
     },
     {
       "path": "services/death/tests.rs",
@@ -683,7 +683,7 @@
     },
     {
       "path": "services/mod.rs",
-      "lines": 52
+      "lines": 53
     },
     {
       "path": "services/move_coordinator.rs",
@@ -895,7 +895,7 @@
     },
     {
       "path": "services/production.rs",
-      "lines": 856
+      "lines": 875
     },
     {
       "path": "services/production/extractors.rs",
@@ -1095,7 +1095,7 @@
     },
     {
       "path": "systems.rs",
-      "lines": 610
+      "lines": 642
     },
     {
       "path": "systems/occupancy_phase_cache.rs",
@@ -1107,7 +1107,7 @@
     },
     {
       "path": "tests.rs",
-      "lines": 42
+      "lines": 49
     },
     {
       "path": "tests/ability_runtime_tests.rs",
@@ -1284,6 +1284,14 @@
     {
       "path": "tests/repeat_production_tests/manual_spending.rs",
       "lines": 272
+    },
+    {
+      "path": "services/tournament.rs",
+      "lines": 162
+    },
+    {
+      "path": "tests/tournament_tests.rs",
+      "lines": 640
     }
   ],
   "service_edges": [
@@ -1808,6 +1816,24 @@
       "target": "spatial",
       "path": "services/combat/machine_gun.rs",
       "line": 16
+    },
+    {
+      "source": "commands",
+      "target": "tournament",
+      "path": "services/commands.rs",
+      "line": 1
+    },
+    {
+      "source": "production",
+      "target": "tournament",
+      "path": "services/production.rs",
+      "line": 7
+    },
+    {
+      "source": "tournament",
+      "target": "move_coordinator",
+      "path": "services/tournament.rs",
+      "line": 5
     }
   ],
   "broad_mutable_signatures": [
@@ -1940,6 +1966,11 @@
       "path": "services/production/manual.rs",
       "line": 59,
       "name": "pay_front"
+    },
+    {
+      "path": "services/tournament.rs",
+      "line": 61,
+      "name": "advance"
     }
   ],
   "player_state_usages": [
@@ -2232,6 +2263,11 @@
       "path": "services/production/manual.rs",
       "line": 59,
       "code": "pub(super) fn pay_front(entities: &mut EntityStore, players: &mut [PlayerState], id: u32) {"
+    },
+    {
+      "path": "services/tournament.rs",
+      "line": 63,
+      "code": "players: &mut [PlayerState],"
     }
   ],
   "player_state_field_writes": [
@@ -2732,6 +2768,10 @@
     {
       "path": "upgrade.rs",
       "count": 5
+    },
+    {
+      "path": "services/tournament.rs",
+      "count": 2
     }
   ]
 }

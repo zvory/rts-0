@@ -140,9 +140,10 @@ fn end_state_fingerprint_matches_native_and_wasm() {
     for _ in 0..3 {
         game.tick();
     }
-    // Fingerprint v2 includes checkpointed resource knowledge as well as entity and RNG state.
+    // Fingerprint v2 includes checkpointed resource knowledge and entity-owned tournament
+    // entry/production fields, as well as the remaining entity and RNG state.
     assert_eq!(
         game.replay_end_state_hash().unwrap(),
-        "929f10407832a42f414b0407dde24c375564f634bee9931f7db6eb2b420b69b3"
+        "a4eaa9cf7303fd289b4d351945a2f9ab92da5b8b449773432cc608eaf6d6090a"
     );
 }

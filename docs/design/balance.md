@@ -827,3 +827,14 @@ Evolution automatically occurs once the matching research and 60 insight are rea
 `dao_of_lightness`, `dao_of_heaviness` (War), `dao_of_magic` (Magic).
 
 Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md). Lightness and Magic replace melee with five-tile primary weapons (and five-tile engagement), retaining 23 damage and 50% penetration. Lightness retains 43-tick cooldown and fires while moving; Magic retains 64-tick cooldown and stops to fire. Base/War are unchanged. `DAO_RANGED_RANGE_TILES` is mirrored in client config and range overlays.
+
+### Tournament Grounds
+
+Cultivator Engineer building: 100 steel, no oil, completed Portal prerequisite, 3×3,
+120 HP armored, sight 1, 200-tick construction. Four base Disciples are consumed
+for a free 300-tick tournament producing one full-health Disciple
+rolling an existing first Dao specialization uniformly. Two supply reserve the winner.
+See [Tournament Grounds rules](tournament-grounds.md).
+
+Portal first-stage rallies to the exact owned completed Grounds center automatically issue
+entry movement to newly trained base Disciples. Busy grounds retain waiting entry intents.
