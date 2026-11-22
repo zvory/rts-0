@@ -1,8 +1,8 @@
 import { frameStripMovementVisual } from "../frame_strip_movement.js";
 import { KIND } from "../../protocol.js";
-import { createLiveFrameStrips } from "./frame_strip_routing.js";
+import { createLiveFrameStrips, liveFrameStripKeyForEntity } from "./frame_strip_routing.js";
 import { createLivePngRigAtlases } from "./png_routing.js";
-import { createLiveRigDefinitions, liveRigKeyForEntity, LOADED_RIFLEMAN_RIG_KEY } from "./live_routing.js";
+import { createLiveRigDefinitions, LOADED_RIFLEMAN_RIG_KEY } from "./live_routing.js";
 import { frameStripFrameIndex, frameStripVisualFacing, frameStripSpriteOffset } from "./frame_strip_runtime.js";
 import { createRigAnimationStage, createRigRenderContext, sampleRigAnimationInto } from "./animation.js";
 import { resolvePngSpriteTransform } from "./png_transform.js";
@@ -38,13 +38,19 @@ export function createMinimapAnimation() {
         const parts = Array.from({ length: strip.frameCount }, (_, i) => `frame:${i}`);
         if (kind === KIND.PANZERFAUST) parts.push(...Array.from(
           { length: strips.get(KIND.RIFLEMAN).frameCount }, (_, i) => `unloaded-frame:${i}`));
+        if (kind === KIND.WARRIOR) {
+          for (const dao of ["lightness", "magic"]) {
+            const variant = strips.get(liveFrameStripKeyForEntity({ kind, dao }));
+            parts.push(...Array.from({ length: variant.frameCount }, (_, i) => `dao-${dao}:frame:${i}`));
+          }
+        }
         return parts;
       }
       return sprites.get(kind)?.map(sprite => `sprite:${sprite.id}`) ?? null;
     },
     layers(entity) {
       if (layers.has(entity.id)) return layers.get(entity.id);
-      const strip = strips.get(liveRigKeyForEntity(entity));
+      const strip = strips.get(liveFrameStripKeyForEntity(entity));
       const entries = sprites.get(entity.kind);
       if (!strip && !entries) return null;
       const setupVisual = supportWeaponSetupVisual(entity, records, now);
@@ -61,7 +67,8 @@ export function createMinimapAnimation() {
         const scale = 1 / (Math.max(width, height) * 1.05);
         const kick = (offset.x - reference.x) * scale;
         const frameScale = Math.max(strip.frameWidth, strip.frameHeight) * scale;
-        const prefix = entity.kind === KIND.PANZERFAUST && entity.panzerfaustLoaded !== true
+        const prefix = entity.kind === KIND.WARRIOR && ["lightness", "magic"].includes(entity.dao)
+          ? `dao-${entity.dao}:frame` : entity.kind === KIND.PANZERFAUST && entity.panzerfaustLoaded !== true
           ? "unloaded-frame" : "frame";
         result = [{ part: `${prefix}:${frame}`, rotation, x: Math.cos(rotation) * kick,
           y: Math.sin(rotation) * kick, scaleX: frameScale, scaleY: frameScale, alpha: 1 }];

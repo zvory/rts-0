@@ -8,7 +8,7 @@ import {
   liveRigKeyForEntity,
   liveRigRoutePlanFor,
 } from "./rigs/live_routing.js";
-import { liveFrameStripFor } from "./rigs/frame_strip_routing.js";
+import { liveFrameStripFor, liveFrameStripKeyForEntity } from "./rigs/frame_strip_routing.js";
 import { livePngRigAtlasFor } from "./rigs/png_routing.js";
 import { createRigRenderContext, sampleRigAnimationInto } from "./rigs/animation.js";
 import {
@@ -112,9 +112,10 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
     throw new Error(`missing live rig route for unit kind ${e.kind}`);
   }
 
+  const frameStripKey = liveFrameStripKeyForEntity(e);
   const visualFrameStrip = !visualOverride ? pools.visualFrameStrip || null : null;
-  const frameStrip = visualFrameStrip?.strip || (visualOverride ? null : liveFrameStripFor(this._liveFrameStripsByKind, rigKey));
-  const frameStripTexture = visualFrameStrip?.texture || this._liveFrameStripTextures?.get?.(rigKey) || null;
+  const frameStrip = visualFrameStrip?.strip || (visualOverride ? null : liveFrameStripFor(this._liveFrameStripsByKind, frameStripKey));
+  const frameStripTexture = visualFrameStrip?.texture || this._liveFrameStripTextures?.get?.(frameStripKey) || null;
   if (frameStrip && !frameStripTexture) {
     throw new Error(`missing live PNG frame-strip texture for unit kind ${e.kind}`);
   }

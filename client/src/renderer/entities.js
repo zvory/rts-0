@@ -336,13 +336,7 @@ export function _hpBar(g, e, status = null, ownerColor = null) {
       icon.position.set(x, y);
       icon.rotation = e.dao === "war" ? Math.PI / 2 : 0;
       icon.scale.set(1, e.dao === "war" ? 1.2 : 1);
-      if (e.dao === "lightness") {
-        for (const dx of [-4, 3]) {
-          const path = () => icon.moveTo(x + dx + 3, y - 5).lineTo(x + dx - 2, y).lineTo(x + dx + 3, y + 5);
-          path().stroke({ color: 0x000000, width: 5 });
-          path().stroke({ color: 0xffd633, width: 2.5 });
-        }
-      } else if (e.dao === "war") {
+      if (e.dao === "war") {
         icon.poly([x-2,y+1,x-3,y-5,x,y-10,x+3,y-5,x+2,y+1])
           .fill(0xff1645).stroke({ color: 0x000000, width: 1.5 });
         icon.moveTo(x,y-7).lineTo(x,y-1).stroke({ color: 0xffacb8, width: 1 });
@@ -350,12 +344,7 @@ export function _hpBar(g, e, status = null, ownerColor = null) {
         hilt().stroke({ color: 0x000000, width: 5 });
         hilt().stroke({ color: 0xff1645, width: 2.5 });
         icon.circle(x,y+8,2).fill(0xff1645).stroke({ color: 0x000000, width: 1 });
-      } else if (e.dao === "magic") {
-        const points = Array.from({length:5}, (_,i) => { const a = Math.PI/2 + i * Math.PI*4/5; return [x+Math.cos(a)*9,y+Math.sin(a)*9]; }).flat();
-        icon.circle(x,y,10).stroke({color:0x000000,width:4});
-        icon.poly(points).stroke({color:0x000000,width:4});
-        icon.circle(x,y,10).stroke({color:0x36ef72,width:1.5});
-        icon.poly(points).stroke({color:0x36ef72,width:1.7});
+
       }
     }
   }

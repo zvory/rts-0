@@ -2,12 +2,17 @@ import { KIND } from "../../protocol.js";
 import { loadColorAdjustedTexture } from "./color_adjusted_texture.js";
 import { loadWorkerSafeTexture } from "../raster_primitives.js";
 import { frameStripRuntimeColorAdjustment } from "./frame_strip_color_profile.js";
-import { LOADED_RIFLEMAN_RIG_KEY } from "./live_routing.js";
+import { liveRigKeyForEntity, LOADED_RIFLEMAN_RIG_KEY } from "./live_routing.js";
 import { MACHINE_GUNNER_PNG_FRAME_STRIP } from "./machine_gunner_png_strip.js";
 import { RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP } from "./rifleman_panzerfaust_png_strip.js";
 import { RIFLEMAN_PNG_FRAME_STRIP } from "./rifleman_png_strip.js";
 import { SCOUT_PLANE_PNG_FRAME_STRIP } from "./scout_plane_png_strip.js";
 import { WARRIOR_PNG_FRAME_STRIP } from "./warrior_png_strip.js";
+
+import {
+  LIGHTNESS_FRAME_STRIP_KEY, MAGIC_FRAME_STRIP_KEY,
+  LIGHTNESS_PNG_FRAME_STRIP, MAGIC_PNG_FRAME_STRIP,
+} from "./disciple_png_strips.js";
 
 const LIVE_FRAME_STRIPS = Object.freeze([
   [KIND.MACHINE_GUNNER, MACHINE_GUNNER_PNG_FRAME_STRIP],
@@ -15,6 +20,8 @@ const LIVE_FRAME_STRIPS = Object.freeze([
   [KIND.RIFLEMAN, RIFLEMAN_PNG_FRAME_STRIP],
   [KIND.SCOUT_PLANE, SCOUT_PLANE_PNG_FRAME_STRIP],
   [KIND.WARRIOR, WARRIOR_PNG_FRAME_STRIP],
+  [LIGHTNESS_FRAME_STRIP_KEY, LIGHTNESS_PNG_FRAME_STRIP],
+  [MAGIC_FRAME_STRIP_KEY, MAGIC_PNG_FRAME_STRIP],
 ]);
 
 export function createLiveFrameStrips() {
@@ -23,6 +30,16 @@ export function createLiveFrameStrips() {
     if (strip?.enabled) strips.set(kind, strip);
   }
   return strips;
+}
+
+// Dao changes only the raster strip; the shared Warrior rig still owns shadows,
+// overlay routes and fallback geometry for all four Disciple forms.
+export function liveFrameStripKeyForEntity(entity) {
+  if (entity?.kind === KIND.WARRIOR) {
+    if (entity.dao === "lightness") return LIGHTNESS_FRAME_STRIP_KEY;
+    if (entity.dao === "magic") return MAGIC_FRAME_STRIP_KEY;
+  }
+  return liveRigKeyForEntity(entity);
 }
 
 export function liveFrameStripFor(strips, kind) {

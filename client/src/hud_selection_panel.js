@@ -42,6 +42,7 @@ export function selectionBudgetGridModel(entities, overflow = null, players = []
     return {
       id: entity?.id,
       kind: entity?.kind,
+      dao: entity?.dao,
       owner: entity?.owner,
       icon: st.icon || "",
       label: st.label || entity?.kind || "",
@@ -243,7 +244,7 @@ export class HudSelectionPanel {
         this.state?.players?.find?.((player) =>
           Number(player?.id) === Number(block.owner))?.color ||
         "#0072b2";
-      const unitIconMarkup = this.unitIconMarkupForKind?.(block.kind, { teamColor }) || "";
+      const unitIconMarkup = this.unitIconMarkupForKind?.(block.kind, { teamColor, dao: block.dao }) || "";
       if (unitIconMarkup) {
         cell.className += " has-unit-render-icon";
         cell.innerHTML = unitIconMarkup;
