@@ -1,6 +1,7 @@
 // tests/client_contracts/protocol_contracts.mjs
 // Domain contract assertions imported by ../client_contracts.mjs.
 
+import { MAX_COMPACT_ORDER_PLAN } from "../../client/src/protocol_constants.js";
 import {
   assert,
   assertApprox,
@@ -724,11 +725,16 @@ assert(
           null,
           null,
           null,
-          new Array(10),
+          Array.from({ length: MAX_COMPACT_ORDER_PLAN + 1 }, () => [ORDER_STAGE_CODE[ORDER_STAGE.MOVE], 32, 64]),
         ]],
       }),
     "compact snapshot enforces order plan bounds",
   );
+  const fullPlanEntity = [1, 1, KIND_CODE[KIND.WORKER], 0, 0, 1, 1, STATE_CODE[STATE.IDLE]];
+  while (fullPlanEntity.length < 21) fullPlanEntity.push(null);
+  fullPlanEntity.push(Array.from({ length: 33 }, (_, index) => [ORDER_STAGE_CODE[ORDER_STAGE.MOVE], index * 32, 64]));
+  const fullPlan = decodeServerMessage({ t: "snapshot", v: COMPACT_SNAPSHOT_VERSION, s: [1, 0, 0, 0, 0], n: [0, 0, 0, 0, 0], e: [fullPlanEntity] });
+  assert(fullPlan.entities[0].orderPlan.length === 33, "compact snapshot accepts active stage plus all 32 queued orders");
   assert(SNAPSHOT_CODEC.COMPACT_JSON === "compact-json", "client keeps compact JSON baseline codec name");
   assert(
     SNAPSHOT_CODEC.MESSAGEPACK_COMPACT === "messagepack-compact",
