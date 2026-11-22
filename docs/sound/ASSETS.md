@@ -37,8 +37,17 @@ with licensed recordings before any commercial distribution.
 
 ## Current keepers
 
+Disciple attack cues were selected by the user from ElevenLabs API auditions on 2026-11-22.
+See [DISCIPLE_ATTACKS.json](DISCIPLE_ATTACKS.json) for source/production hashes, generation model,
+audition file names, and decoded levels. Account-plan licensing remains unverified. These short
+transients retain their dynamics and stay below −16 LUFS where necessary to keep peaks ≤ −1 dBTP.
+
 | File | Role | Source | License |
 |------|------|--------|---------|
+| `combat/combat_disciple_orb_01.mp3` | Dao of Magic orb launch; selected revised orb audition | https://api.elevenlabs.io/v1/sound-generation | ElevenLabs account terms; plan unverified |
+| `combat/combat_disciple_spear_01.mp3` | Dao of Lightness spear thrust; selected original spear audition | https://api.elevenlabs.io/v1/sound-generation | ElevenLabs account terms; plan unverified |
+| `combat/combat_disciple_sword_stab_01.mp3` | Base / Dao of War vs infantry; selected variation 1, sword stab | https://api.elevenlabs.io/v1/sound-generation | ElevenLabs account terms; plan unverified |
+| `combat/combat_disciple_sword_strike_01.mp3` | Base / Dao of War vs vehicles and emplacements; original metallic strike repurposed by user | https://api.elevenlabs.io/v1/sound-generation | ElevenLabs account terms; plan unverified |
 | `combat/combat_kar98k_02.mp3` | Kar98k variation | unknown | unknown |
 | `combat/combat_kar98k_03.mp3` | Kar98k primary (trimmed, bolt removed) | unknown | unknown |
 | `combat/combat_kar98k_03_with_bolt_action.mp3` | Kar98k original (bolt retained) | unknown | unknown |
