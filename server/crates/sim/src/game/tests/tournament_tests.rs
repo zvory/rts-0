@@ -573,3 +573,68 @@ fn tournament_entry_intent_survives_a_fully_blocked_approach() {
     assert!(game.state.entities.get(disciple).is_none());
     assert_eq!(entrants(&game, grounds), 1);
 }
+
+#[test]
+fn tournament_evolution_during_approach_clears_entry_without_stopping_movement() {
+    use crate::game::ability::AbilityKind;
+
+    let mut game = empty_flat_game(&[player(1)]);
+    let grounds = arena(&mut game);
+    let disciple = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Warrior, 304.0, 656.0)
+        .unwrap();
+    let unit = game.state.entities.get_mut(disciple).unwrap();
+    unit.insight = config::DISCIPLE_INSIGHT_REQUIRED;
+    unit.choose_dao(AbilityKind::EvolveLightness);
+    game.enqueue(
+        1,
+        Command::Move {
+            units: vec![disciple],
+            x: 656.0,
+            y: 656.0,
+            queued: false,
+        },
+    );
+    game.tick();
+    assert_eq!(
+        game.state
+            .entities
+            .get(disciple)
+            .unwrap()
+            .movement
+            .as_ref()
+            .unwrap()
+            .tournament_target,
+        Some(grounds)
+    );
+
+    // Research can finish after the admission pass, evolving a unit still on its approach.
+    game.state.players[0]
+        .upgrades
+        .insert(UpgradeKind::DaoOfLightness);
+    game.tick();
+    let payload = game.checkpoint_payload_text_for_test().unwrap();
+    let mut restored = Game::restore_checkpoint_payload_text_for_test(
+        &payload,
+        game.state.map.clone(),
+        game.state.map_metadata.clone(),
+    )
+    .expect("an evolved entrant must remain checkpointable at the end of the tick");
+    let unit = game.state.entities.get(disciple).unwrap();
+    assert_eq!(unit.dao, Some(UpgradeKind::DaoOfLightness));
+    assert_eq!(unit.movement.as_ref().unwrap().tournament_target, None);
+    assert!(matches!(unit.order(), Order::Move(_)));
+    game.tick();
+    restored.tick();
+    assert!(matches!(
+        game.state.entities.get(disciple).unwrap().order(),
+        Order::Move(_)
+    ));
+    assert_eq!(entrants(&game, grounds), 0);
+    assert_eq!(
+        game.replay_end_state_hash().unwrap(),
+        restored.replay_end_state_hash().unwrap()
+    );
+}

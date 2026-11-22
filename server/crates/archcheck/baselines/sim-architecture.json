@@ -1,5 +1,5 @@
 {
-  "reason": "Tournament entry/winner executor: exact new helper edges, entity-owned durable state and scoped growth only; unrelated ratchets retained.",
+  "reason": "Tournament entry/winner executor with admission, blocked-approach, and evolution/checkpoint regression coverage; exact helper edges and entity-owned state only; unrelated ratchets retained.",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -1291,7 +1291,7 @@
     },
     {
       "path": "tests/tournament_tests.rs",
-      "lines": 362
+      "lines": 640
     }
   ],
   "service_edges": [

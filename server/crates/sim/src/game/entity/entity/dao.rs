@@ -100,6 +100,11 @@ impl Entity {
         // Evolution changes the primary weapon without granting a free extra shot.
         self.set_attack_cd(attack_cd);
         self.chosen_dao = None;
+        // Specialists cannot enter tournaments. Keep their movement order, but drop admission
+        // intent immediately so evolution late in the tick leaves checkpoint-valid state.
+        if let Some(movement) = self.movement.as_mut() {
+            movement.tournament_target = None;
+        }
         self.dao_advance_ticks = 15;
         if self.dao == Some(UpgradeKind::DaoOfHeaviness) {
             self.max_hp = self.max_hp.saturating_add(config::DAO_WAR_HP_BONUS);
