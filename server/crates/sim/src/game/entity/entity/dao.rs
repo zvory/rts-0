@@ -155,6 +155,7 @@ impl Entity {
         let base = config::unit_stats(self.kind).map_or(0.0, |s| s.speed);
         match self.dao {
             Some(UpgradeKind::DaoOfLightness) => config::dao_lightness_speed(),
+            Some(UpgradeKind::DaoOfHeaviness) => base * config::DAO_WAR_SPEED_MULTIPLIER,
             Some(UpgradeKind::DaoOfMagic) => base * config::DAO_MAGIC_SPEED_MULTIPLIER,
             _ => base,
         }
