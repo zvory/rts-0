@@ -1,7 +1,7 @@
 export const PRESENTATION_ENTITY_FIELDS = Object.freeze([
   "id", "kind", "owner", "x", "y", "facing", "weaponFacing", "commanderFacing", "state",
   "hp", "maxHp", "insight", "dao", "chosenDao", "daoReady", "daoAdvanceTicks", "remaining", "latchedNode", "occupiedTrenchId",
-  "buildProgress", "deconstructProgress", "prodProgress", "prodQueue", "prodWaiting", "prodRepeatKinds",
+  "tournamentEntrants", "daoTrainingQueue", "prodKind", "buildProgress", "deconstructProgress", "prodProgress", "prodQueue", "prodWaiting", "prodRepeatKinds",
   "setupState", "setupFacing", "recoilPhase", "recoilProgress",
   "panzerfaustLoaded", "panzerfaustWindupProgress", "rocketRackCount",
   "breakthroughTicks", "breakthroughAuraTicks", "abilities",

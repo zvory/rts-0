@@ -52,6 +52,16 @@ pub(super) fn apply(
         return Some(Cancelled::Construction { kind, cost_paid });
     }
 
+    if let Some(b) = entities.get_mut(building).filter(|e| {
+        e.owner == player && e.kind == EntityKind::ProvenGrounds && !e.under_construction()
+    }) {
+        if let Some(p) = b.production.as_mut() {
+            if p.dao_training_queue.len() > p.queue.len() {
+                p.dao_training_queue.pop();
+            }
+        }
+        return None;
+    }
     if entities
         .get(building)
         .is_some_and(|e| e.kind == EntityKind::TournamentGrounds)

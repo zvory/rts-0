@@ -2,7 +2,7 @@
 
 Use when changing tick logic, services, rules, AI, or the `Game` core.
 
-## Read first
+## Read
 - [docs/design/architecture.md](../design/architecture.md) — tick and networking model
 - [docs/design/server-sim.md](../design/server-sim.md) — Rust server and `Game` API
 - §3.1 `game::Game` public API and replay end-state fingerprint/verification contract; the seam, keep it stable
@@ -16,6 +16,7 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
 - §3.3 Rules layer
 - §3.5 Commands and queued orders
 - Tournament Grounds
+- Proven Grounds
 - [docs/projection-audit-checklist.md](../projection-audit-checklist.md) — projection checklist
 - [docs/design/ai.md](../design/ai.md) — AI opponents
 - [docs/design/testing.md](../design/testing.md) §9 and §10 — self-play and dev scenarios when
@@ -24,8 +25,8 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
 ## Code map
 - `server/crates/sim/src/game/mod.rs`, `state.rs`, `derived_state.rs`, `lab.rs`, `systems.rs`,
   `entity/`, `command*.rs`, `snapshot.rs`, `fog.rs`, `building_memory.rs`, `pathfinding.rs`, and
-  `map/` — `Game` API, durable/derived owners, lab ops, tick orchestration, and core sim behavior.
-- `server/crates/sim/src/game/services/` — per-tick services; `order_planner.rs` and
+  `map/` — `Game` API, durable/derived owners, lab ops, tick orchestration, and sim behavior.
+- `server/crates/sim/src/game/services/` — tick services; `order_planner.rs` and
   `order_execution.rs` own command/queue planning and issue-time mutation helpers.
 - `server/crates/rules/src/` and `server/crates/sim/src/rules/projection.rs` — declarative rules
   and fog-gated projection policy.

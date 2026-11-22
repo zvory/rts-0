@@ -101,3 +101,6 @@ mod tests {
 
 // Tournament Grounds uses the shared kind adapter (tournament_grounds/code 32);
 // EntityView tournament_entrants is team-private compact v62 slot 50.
+
+// Proven Grounds uses kind code 33; team-private dao_training_queue appends compact v63 slot 51.
+// Existing research commands targeting this building enqueue researched Dao training plans.

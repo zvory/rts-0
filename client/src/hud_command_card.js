@@ -1,3 +1,4 @@
+import { buildDaoTrainingCard } from "./hud_dao_training_card.js";
 import { ABILITY, DEFAULT_FACTION_ID, KIND, SETUP, UPGRADE, isBuilding, isUnit } from "./protocol.js";
 import {
   STATS,
@@ -231,6 +232,7 @@ export function commandSubject(ctx, selection) {
     if (!isOwn(ctx, e)) continue;
     if (isUnit(e.kind)) return e;
     if (underConstructionBuilding(ctx, e)) return e;
+    if (e.kind === KIND.PROVEN_GROUNDS) return e;
     if (isBuilding(e.kind) && (factionTrainsOf(ctx, e.kind).length > 0 || factionResearchesOf(ctx, e.kind).length > 0)) return e;
   }
   return null;
@@ -383,6 +385,10 @@ function abilityDescriptor(ctx, factionId, affordance) {
 }
 
 export function buildTrainCard(ctx, building, { underConstruction = false } = {}) {
+  if (building.kind === KIND.PROVEN_GROUNDS && !underConstruction) {
+    const training = buildDaoTrainingCard(ctx, building);
+    return card(training.kind, training.signature, training.slots);
+  }
   const resources = trainResourcesOf(ctx);
   const factionId = commandFactionId(ctx);
   const trains = factionTrainsOf(ctx, building.kind);

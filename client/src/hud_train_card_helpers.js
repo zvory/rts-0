@@ -47,10 +47,13 @@ export function selectedRepeatProducerBuildingsForUnit(ctx, unit, isOwn, faction
 }
 
 export function isCancellableProductionBuilding(entity, kind) {
+  if (entity.kind === KIND.PROVEN_GROUNDS) return entity.kind === kind && entity.buildProgress == null &&
+    (entity.daoTrainingQueue?.length ?? 0) > (entity.prodKind ? 1 : 0);
   return entity.kind === kind &&
     isBuilding(entity.kind) &&
     entity.buildProgress == null &&
-    ((entity.prodQueue ?? 0) > 0 ||
+    ((entity.daoTrainingQueue?.length ?? 0) > (entity.prodKind ? 1 : 0) ||
+      (entity.prodQueue ?? 0) > 0 ||
       entity.state === STATE.TRAIN ||
       (entity.prodRepeatKinds?.length ?? 0) > 0);
 }

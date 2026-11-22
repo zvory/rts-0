@@ -625,7 +625,7 @@ fn tournament_evolution_during_approach_clears_entry_without_stopping_movement()
         .spawn_unit(1, EntityKind::Warrior, 304.0, 640.0)
         .unwrap();
     let unit = game.state.entities.get_mut(disciple).unwrap();
-    unit.insight = config::DISCIPLE_INSIGHT_REQUIRED;
+    unit.insight = config::DISCIPLE_INSIGHT_REQUIRED - 1;
     unit.choose_dao(AbilityKind::EvolveLightness);
     game.enqueue(
         1,
@@ -649,10 +649,8 @@ fn tournament_evolution_during_approach_clears_entry_without_stopping_movement()
         Some(grounds)
     );
 
-    // Research can finish after the admission pass, evolving a unit still on its approach.
-    game.state.players[0]
-        .upgrades
-        .insert(UpgradeKind::DaoOfLightness);
+    // Combat insight can evolve a unit still on its approach after the admission pass.
+    game.state.entities.get_mut(disciple).unwrap().insight = config::DISCIPLE_INSIGHT_REQUIRED;
     game.tick();
     let payload = game.checkpoint_payload_text_for_test().unwrap();
     let mut restored = Game::restore_checkpoint_payload_text_for_test(

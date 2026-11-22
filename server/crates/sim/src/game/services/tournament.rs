@@ -16,8 +16,10 @@ pub(super) fn entry_target(entities: &EntityStore, owner: u32, x: f32, y: f32) -
     entities
         .iter()
         .find(|e| {
-            e.kind == EntityKind::TournamentGrounds
-                && e.owner == owner
+            matches!(
+                e.kind,
+                EntityKind::TournamentGrounds | EntityKind::ProvenGrounds
+            ) && e.owner == owner
                 && e.hp > 0
                 && !e.under_construction()
                 && e.pos_x() == x
@@ -79,7 +81,10 @@ pub(in crate::game) fn advance(
             eligible
                 && e.owner == owner
                 && e.hp > 0
-                && e.kind == EntityKind::TournamentGrounds
+                && matches!(
+                    e.kind,
+                    EntityKind::TournamentGrounds | EntityKind::ProvenGrounds
+                )
                 && !e.under_construction()
         }) else {
             if let Some(e) = entities.get_mut(id) {
@@ -109,6 +114,25 @@ pub(in crate::game) fn advance(
             // retain entry intent even when no legal staging point currently exists.
             if entities.get(id).is_some_and(|e| e.path_is_empty()) {
                 order_entry(entities, coordinator, owner, &[id], target);
+            }
+            continue;
+        }
+        if building.kind == EntityKind::ProvenGrounds {
+            let Some(choice) = p.dao_training_queue.first().copied() else {
+                continue;
+            };
+            let Some(player) = players.iter_mut().find(|p| {
+                p.id == owner
+                    && p.faction_id == crate::rules::faction::CULTIVATORS_FACTION_ID
+                    && p.has_upgrade(choice)
+            }) else {
+                continue;
+            };
+            if player.spend_cost(crate::rules::economy::ResourceCost::new(
+                0,
+                config::DAO_TRAINING_COST_OIL,
+            )) {
+                super::dao_training::admit(entities, target, id);
             }
             continue;
         }
