@@ -6,6 +6,7 @@ pub(super) type CacheKey = (
     (i32, i32),
     u32,
     RouteShape,
+    Option<u8>,
     usize,
     u64,
 );
@@ -31,6 +32,7 @@ impl PathingService {
             req.goal,
             req.radius_tiles,
             req.route_shape,
+            req.initial_direction,
             search_budget,
             static_fingerprint,
         );
@@ -69,6 +71,7 @@ impl PathingService {
                 req.goal,
                 req.radius_tiles,
                 req.route_shape,
+                req.initial_direction,
                 search_budget,
                 static_fingerprint,
             ),

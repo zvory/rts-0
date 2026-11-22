@@ -87,43 +87,67 @@ impl Game {
 mod tests {
     use super::*;
     #[test]
-    fn replay_384_isolated_tank_preserves_approach_and_escape_behavior() {
+    fn replay_384_isolated_tank_remains_legal_and_escapes_historical_forest_lock() {
         let mut setup =
             Game::new_replay_384_tank_forest_lock_scenario(EntityKind::Tank, 1, 0).unwrap();
-        let expected: Vec<serde_json::Value> =
+        let historical: Vec<serde_json::Value> =
             serde_json::from_str(include_str!("fixtures/replay_384_tank_positions.json")).unwrap();
         let commands = setup.scheduled_commands();
         let mut next = 0;
-        for frame in expected {
-            let tick = frame["tick"].as_u64().unwrap() as u32;
-            while setup.game.tick_count() < tick {
-                while commands
-                    .get(next)
-                    .is_some_and(|(t, _)| *t <= setup.game.tick_count())
-                {
-                    setup.game.enqueue(ALEX, commands[next].1.clone());
-                    next += 1;
-                }
-                setup.game.tick();
+        // Keep the exact recorded start and orders. The old trace contains the permanent
+        // forest lock, so matching every historical position would require preserving the bug.
+        while setup.game.tick_count() < 11_200 {
+            while commands
+                .get(next)
+                .is_some_and(|(tick, _)| *tick <= setup.game.tick_count())
+            {
+                setup.game.enqueue(ALEX, commands[next].1.clone());
+                next += 1;
             }
+            setup.game.tick();
             let tank = setup.game.state.entities.get(TANK).unwrap();
             assert_eq!((tank.hp, tank.max_hp, tank.units_killed()), (292, 292, 2));
-            let actual = (tank.pos_x(), tank.pos_y());
-            let expected = (
-                frame["x"].as_f64().unwrap() as f32,
-                frame["y"].as_f64().unwrap() as f32,
-            );
-            // Historical float positions are a behavioral reference, not current sim goldens.
-            // This short authored approach may move by subpixels after the math-version break.
-            assert!(
-                (actual.0 - expected.0).abs() < 0.1 && (actual.1 - expected.1).abs() < 0.1,
-                "approach at tick {tick}: {actual:?} vs historical {expected:?}"
+            let occ = crate::game::services::occupancy::Occupancy::build(
+                &setup.game.state.map,
+                &setup.game.state.entities,
             );
             assert!(
-                (tank.facing() - frame["facing"].as_f64().unwrap() as f32).abs() < 0.001,
-                "facing at tick {tick}"
+                crate::game::services::standability::unit_static_standable_with_facing(
+                    &setup.game.state.map,
+                    &occ,
+                    tank.kind,
+                    tank.pos_x(),
+                    tank.pos_y(),
+                    tank.facing()
+                ),
+                "illegal hull at {}",
+                setup.game.tick_count()
             );
+            if setup.game.tick_count() == START_TICK {
+                let first = &historical[0];
+                assert!((tank.pos_x() - first["x"].as_f64().unwrap() as f32).abs() < 0.1);
+                assert!((tank.pos_y() - first["y"].as_f64().unwrap() as f32).abs() < 0.1);
+                assert!((tank.facing() - first["facing"].as_f64().unwrap() as f32).abs() < 0.001);
+            }
         }
         assert_eq!(next, commands.len());
+        let tank = setup.game.state.entities.get(TANK).unwrap();
+        let lock = historical.last().unwrap();
+        let dx = tank.pos_x() - lock["x"].as_f64().unwrap() as f32;
+        let dy = tank.pos_y() - lock["y"].as_f64().unwrap() as f32;
+        assert!(
+            dx * dx + dy * dy > 32.0 * 32.0,
+            "tank must leave historical lock: {:?}",
+            (tank.pos_x(), tank.pos_y())
+        );
+        let goal = tank.path_goal().unwrap_or((1910.2272, 1283.0035));
+        let dx = tank.pos_x() - goal.0;
+        let dy = tank.pos_y() - goal.1;
+        assert!(
+            dx * dx + dy * dy < 96.0 * 96.0,
+            "tank must resume travel toward its final order: {:?} goal {:?}",
+            (tank.pos_x(), tank.pos_y()),
+            goal
+        );
     }
 }

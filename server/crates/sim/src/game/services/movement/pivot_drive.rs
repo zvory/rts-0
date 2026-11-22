@@ -197,15 +197,20 @@ pub(super) fn pivot_drive_intent(
 
     let profile = pivot_drive_profile(e.kind);
     let travel_facing = dy.det_atan2(dx);
-    let normal_desired_facing =
-        if pivot_drive_desired_point_is_final_waypoint(e, (desired_x, desired_y))
-            && dist <= profile.reverse_goal_distance_px
-            && angle_delta(e.facing(), travel_facing).abs() > profile.reverse_min_behind_angle_rad
-        {
-            normalize_angle(travel_facing + std::f32::consts::PI)
-        } else {
-            travel_facing
-        };
+    let reverse_distance = if intermediate_reverse_is_useful(e) {
+        crate::config::TILE_SIZE as f32
+    } else if e.movement.as_ref().is_some_and(|m| m.path.len() == 1) {
+        profile.reverse_goal_distance_px
+    } else {
+        0.0
+    };
+    let normal_desired_facing = if dist <= reverse_distance
+        && angle_delta(e.facing(), travel_facing).abs() > profile.reverse_min_behind_angle_rad
+    {
+        normalize_angle(travel_facing + std::f32::consts::PI)
+    } else {
+        travel_facing
+    };
 
     let desired_facing =
         super::armor_reaction::locked_source_facing(e).map_or(normal_desired_facing, |preferred| {
@@ -304,9 +309,18 @@ pub(super) fn pivot_drive_desired_path_point(
     vehicle_desired_path_point(map, occ, e, x, y)
 }
 
-fn pivot_drive_desired_point_is_final_waypoint(e: &Entity, desired: (f32, f32)) -> bool {
+/// Back up a short distance to enter a forward-going route; do not reverse through
+/// every bend of a route that actually needs a turnaround.
+fn intermediate_reverse_is_useful(e: &Entity) -> bool {
     let Some(path) = e.movement.as_ref().map(|m| m.path.as_slice()) else {
         return false;
     };
-    path.len() == 1 && distance_between(path[0], desired) <= 1.0e-3
+    let Some(index) = path.len().checked_sub(2) else {
+        return false;
+    };
+    let (Some(next), Some(following)) = (path.last(), path.get(index)) else {
+        return false;
+    };
+    let direction = (following.1 - next.1).det_atan2(following.0 - next.0);
+    angle_delta(e.facing(), direction).abs() <= std::f32::consts::FRAC_PI_2
 }

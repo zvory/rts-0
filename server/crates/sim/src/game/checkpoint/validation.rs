@@ -271,6 +271,17 @@ fn validate_entity(
         entity.research_queue().len(),
         MAX_PRODUCTION_QUEUE,
     )?;
+    if let Some(recovery) = entity.movement.as_ref().and_then(|m| m.pivot_recovery) {
+        if !crate::game::entity::uses_pivot_vehicle_movement(entity.kind)
+            || !in_world(recovery.goal.0, recovery.goal.1, world)
+            || !recovery.facing.is_finite()
+            || recovery.ticks_left > config::TICK_HZ as u16 * 3
+        {
+            return Err(CheckpointPayloadError::InvalidValue {
+                field: "entities.movement.pivotRecovery",
+            });
+        }
+    }
     validate_tank_armor_reaction_lock(entity, world, tick)?;
     validate_firing_reveal_reaction_gates(entity, next_id, tick)?;
     ability_charges::validate(entity)?;

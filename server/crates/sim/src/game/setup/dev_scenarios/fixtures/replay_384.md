@@ -54,3 +54,8 @@ cargo test --release --manifest-path server/Cargo.toml -p rts-sim replay_384
 The scenario covers the first escape-command burst. The later HoldPosition at
 10113 and orders after tick 20683 are outside its command schedule; the final
 move remains active to make the lock observable indefinitely.
+
+The route-entry/recovery regression now checks the recorded start and complete order schedule,
+static hull legality throughout playback, escape from the historical lock, and progress toward the
+last order. The historical position trace remains unchanged as evidence; it is no longer a golden
+requiring current movement to reproduce the original freeze.

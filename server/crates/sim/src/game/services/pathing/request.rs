@@ -38,6 +38,7 @@ impl PathingService {
     ) -> PathingRequestOutcome<Vec<(f32, f32)>> {
         let start = req.start;
         let kind = req.kind;
+        let initial_direction = req.initial_direction;
         if let Some((from, to)) = direct_segment {
             if req.start != req.goal
                 && standability::unit_static_segment_standable(map, occupancy, req.kind, from, to)
@@ -73,7 +74,12 @@ impl PathingService {
                 route_shape: RouteShape::VehicleClearance,
                 avoid_diagonal_pinch: true,
             };
-            let tile_path = expand_vehicle_diagonal_steps_to_l_waypoints(start, &tile_path, &pass);
+            let tile_path = expand_vehicle_diagonal_steps_to_l_waypoints(
+                start,
+                &tile_path,
+                &pass,
+                initial_direction,
+            );
             return PathingRequestOutcome::Resolved {
                 path: pathfinding::to_world_waypoints(&tile_path),
                 diagnostics,
@@ -134,12 +140,13 @@ impl PathingService {
         }
 
         let (tile_path, expanded_nodes, budget_exhausted) =
-            pathfinding::find_path_with_budget_and_turn_cost_with_diagnostics_and_scratch(
+            pathfinding::find_path_with_initial_direction(
                 &pass,
                 req.start,
                 req.goal,
                 search_budget,
                 req.route_shape.turn_penalty(),
+                req.initial_direction,
                 &mut self.search_scratch,
             );
 

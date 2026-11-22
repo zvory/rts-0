@@ -109,6 +109,15 @@ pub struct CarryState {
     pub kind: EntityKind,
 }
 
+/// A bounded, committed hull-axis escape. It is authoritative so replay/keyframe restore
+/// cannot choose a different escape direction halfway through a maneuver.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct PivotRecovery {
+    pub goal: (f32, f32),
+    pub facing: f32,
+    pub ticks_left: u16,
+}
+
 /// Mobile unit state. Only units have this group.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MovementState {
@@ -147,6 +156,9 @@ pub struct MovementState {
     /// Immediate waypoint this scout car is currently reversing toward. This latches a short
     /// reverse maneuver so drive direction cannot flip every tick as the hull rotates.
     pub scout_car_reverse_waypoint: Option<(f32, f32)>,
+    /// Move along the old hull before retrying a statically blocked turn.
+    #[serde(default)]
+    pub pivot_recovery: Option<PivotRecovery>,
     /// Consecutive ticks where the next path step was blocked by terrain/building occupancy.
     /// Once this reaches the debounce threshold, movement queues a fresh path to `path_goal`.
     pub static_blocked_ticks: u16,
@@ -182,6 +194,7 @@ impl Default for MovementState {
             sidestep_cooldown: 0,
             scout_car_recovery_cooldown: 0,
             scout_car_reverse_waypoint: None,
+            pivot_recovery: None,
             static_blocked_ticks: 0,
             breakthrough_ticks: 0,
             breakthrough_aura_ticks: 0,
@@ -467,4 +480,11 @@ pub struct EntityStateGroups {
     pub resource_node: bool,
     pub resource_extractor: bool,
     pub scout_plane: bool,
+}
+
+impl MovementState {
+    pub(super) fn clear_vehicle_recovery(&mut self) {
+        self.scout_car_reverse_waypoint = None;
+        self.pivot_recovery = None;
+    }
 }

@@ -66,6 +66,7 @@ impl<'a> StaticRouteAnalyzer<'a> {
             start,
             goal,
             radius_tiles: config::unit_radius_tiles(kind),
+            initial_direction: None,
             route_shape: if vehicle {
                 RouteShape::VehicleClearance
             } else {
