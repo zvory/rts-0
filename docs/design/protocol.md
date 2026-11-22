@@ -650,7 +650,7 @@ playable lifecycle policy; the `phase2_empty_fixture` test fixture and unknown i
 `cultivators.standard` loadout; Nexus is a faction-specific presentation name for
 `resource_depot`, and Serf is the presentation name for `worker`, while Portal uses the dedicated `portal` entity kind (compact kind code 28).
 Cultivator Warriors use the dedicated `warrior` entity kind (compact kind code 29); their generic
-base/War attack events carry `warrior_sword` (compact weapon-kind code 12). Lightness arrows use `disciple_arrow` (13), and Magic orbs use `disciple_orb` (14), through the same fog-filtered attack event and immediate authoritative damage timing.
+base/War/Lightness attack events carry `warrior_sword` (compact weapon-kind code 12). The retained arrow identity is `disciple_arrow` (13), and Magic orbs use `disciple_orb` (14), through the same fog-filtered attack event and immediate authoritative damage timing.
 
 Protocol vocabulary is not lifecycle admission: adding a string constant, compact code, or payload
 field does not make a faction playable. Fixture-only, reserved/future, and historical-only ids must

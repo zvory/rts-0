@@ -8,7 +8,7 @@ import { TICK_HZ } from "./timing.js";
 export const DAO_RANGED_RANGE_TILES = 5;
 
 export function entityAttackRangeTiles(entity) {
-  if (entity?.kind === KIND.WARRIOR && (entity.dao === "lightness" || entity.dao === "magic")) {
+  if (entity?.kind === KIND.WARRIOR && entity.dao === "magic") {
     return DAO_RANGED_RANGE_TILES;
   }
   return STATS[entity?.kind]?.rangeTiles || 0;
