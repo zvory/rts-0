@@ -28,6 +28,7 @@ const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "../.."
 const expectedFootprints = new Map([
   [KIND.THREE_DAO_PAVILION, [3, 3]],
   [KIND.PROVEN_GROUNDS, [3, 3]],
+  [KIND.SHOP, [3, 4]],
   [KIND.BARBED_WIRE, [1, 1]],
   [KIND.TOURNAMENT_GROUNDS, [4, 4]],
   [KIND.RESOURCE_DEPOT, [4, 4]],
@@ -166,7 +167,7 @@ for (const [kind, footprint] of expectedFootprints) {
         && sprite.frame.y + sprite.frame.h <= atlas.grid.height,
       `${kind}.${sprite.id} frame fits grid`,
     );
-    const expectedVisualScale = kind === KIND.RESOURCE_DEPOT || kind === KIND.THREE_DAO_PAVILION || kind === KIND.TOURNAMENT_GROUNDS || kind === KIND.PROVEN_GROUNDS
+    const expectedVisualScale = kind === KIND.RESOURCE_DEPOT || kind === KIND.THREE_DAO_PAVILION || kind === KIND.TOURNAMENT_GROUNDS || kind === KIND.PROVEN_GROUNDS || kind === KIND.SHOP
       ? 1.1
       : kind === KIND.STEEL_MINE
         ? 1.35

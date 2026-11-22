@@ -705,6 +705,7 @@ for (const [kind, upgrade] of [
     "cultivators-disciple-lightness",
     "cultivators-disciple-war",
     "cultivators-disciple-magic",
+    "cultivators-shop",
     "cultivators-worker",
     "cultivators-build",
     "cultivators-producer-resource_depot",
@@ -773,7 +774,7 @@ for (const [kind, upgrade] of [
   const builds = card.slots.filter((slot) => slot?.action === "build");
   assert.deepEqual(
     builds.map((slot) => slot.intent.building),
-    [KIND.RESOURCE_DEPOT, KIND.PORTAL, KIND.THREE_DAO_PAVILION, KIND.TOURNAMENT_GROUNDS, KIND.PROVEN_GROUNDS],
+    [KIND.RESOURCE_DEPOT, KIND.PORTAL, KIND.THREE_DAO_PAVILION, KIND.TOURNAMENT_GROUNDS, KIND.PROVEN_GROUNDS, KIND.SHOP],
   );
   assert.equal(builds[0].label, "Nexus");
   assert.equal(builds[0].commandId, "cultivators.build." + KIND.RESOURCE_DEPOT);
@@ -983,4 +984,23 @@ for (const researched of [false, true]) {
   assert.equal(buildCommandCardDescriptors(ctx).slots[8], null, "active trainee cannot be canceled");
   building.daoTrainingQueue = Array(64).fill(UPGRADE.DAO_OF_MAGIC);
   assert.equal(buildCommandCardDescriptors(ctx).slots[2].enabled, false);
+}
+
+// The inert Shop still exposes its construction cost and occupies an ordinary build slot.
+{
+  const card = buildCommandCardDescriptors({
+    playerId: 1, factionId: "cultivators",
+    selection: [{ id: 1, owner: 1, kind: KIND.WORKER }],
+    resources: { steel: 200, oil: 200 }, commandCardMode: "workerBuild",
+  });
+  const shop = card.slots.find((slot) => slot?.intent?.building === KIND.SHOP);
+  assert.equal(shop.label, "Shop");
+  assert.equal(shop.hotkey, "Z");
+  assert.equal(shop.commandId, "cultivators.build.shop");
+  const idle = buildCommandCardDescriptors({
+    playerId: 1, factionId: "cultivators",
+    selection: [{ id: 2, owner: 1, kind: KIND.SHOP }],
+    resources: { steel: 1000, oil: 1000 },
+  });
+  assert.equal(idle.slots.filter(Boolean).length, 0);
 }

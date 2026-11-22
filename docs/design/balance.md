@@ -861,3 +861,10 @@ Dao specialist emerges after 300 ticks (10 seconds), using legal exits and the f
 Blocked exits retry; destruction loses the trainee and oil. Unpaid plans can be canceled; active
 training cannot. Combat-earned 60-insight evolution requires no research.
 See [Proven Grounds brief and rules](proven-grounds.md) for details and deferred audio/AI work.
+
+## Cultivator Shop
+
+Cultivator Serfs can construct the inert Shop for **200 steel and 200 oil** in **1,200 ticks
+(40 seconds)**. It has **1,000 HP**, armored status, a **3×4** footprint and one-tile sight.
+No prerequisites, attack, production, research, abilities, supply or rally point. Normal building
+placement, cancellation, damage, fog and destruction apply. See [Shop](shop.md) for the brief.

@@ -41,6 +41,7 @@ mod resources_mining_tests;
 mod road_terrain_tests;
 mod rocket_barrage_tests;
 mod scoring_projection_tests;
+mod shop_tests;
 mod smoke_charge_tests;
 mod smoke_mortar_tests;
 mod smoke_mortar_visibility_tests;

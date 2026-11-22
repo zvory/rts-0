@@ -385,3 +385,5 @@ export const cmd = Object.freeze({
 
 // Proven Grounds: kind code 33; v63 slot 51 is team-private daoTrainingQueue (<=64 Dao ids).
 // research(building, upgrade) queues paid training at Proven Grounds; cancel removes unpaid tail plans.
+
+// Cultivator Shop: wire kind shop, compact kind code 34; no additional snapshot fields.
