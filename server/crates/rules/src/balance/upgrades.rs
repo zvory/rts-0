@@ -60,7 +60,9 @@ pub const DAO_WAR_HP_BONUS: u32 = 20;
 pub const DAO_WAR_DAMAGE_MULTIPLIER: f32 = 1.5;
 pub const DAO_WAR_ARMOR_REDUCTION: f32 = 0.5;
 /// Yari ready-tip reach, with the usual attacker radius and combat slack.
-pub const DAO_WAR_RANGE_TILES: f32 = 2.75;
+pub const DAO_WAR_RANGE_TILES: f32 = 1.75;
+/// War artwork and collision body shrink together to 70% of the former size.
+pub const DAO_WAR_BODY_SCALE: f32 = 0.7;
 pub const DAO_RANGED_RANGE_TILES: f32 = 5.0;
 pub const DAO_LIGHTNESS_ATTACK_RATE: f32 = 1.5;
 pub const DAO_MAGIC_SPEED_MULTIPLIER: f32 = 1.05;

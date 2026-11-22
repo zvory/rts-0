@@ -11,6 +11,14 @@ pub(crate) struct DiscipleShield {
 }
 
 impl Entity {
+    pub(super) fn dao_body_scale(&self) -> f32 {
+        if self.kind == EntityKind::Warrior && self.dao == Some(UpgradeKind::DaoOfHeaviness) {
+            config::DAO_WAR_BODY_SCALE
+        } else {
+            1.0
+        }
+    }
+
     pub(in crate::game) fn expire_shield(&mut self, tick: u32) {
         if self
             .shield
@@ -51,9 +59,14 @@ impl Entity {
         }
     }
 
-    /// Credit actual hostile HP loss after all damage protection and overkill.
-    pub(in crate::game) fn gain_insight(&mut self, damage: u32) {
+    /// Credit actual hostile HP loss after protection/overkill, at half rate for buildings.
+    pub(in crate::game) fn gain_insight(&mut self, damage: u32, target_is_building: bool) {
         if self.kind == EntityKind::Warrior {
+            let damage = if target_is_building {
+                damage / 2
+            } else {
+                damage
+            };
             self.insight = self.insight.saturating_add(damage).min(self.insight_cap());
         }
     }

@@ -1,4 +1,4 @@
-import { STATS } from "../config.js";
+import { entityBodyRadius } from "../config.js";
 
 export const FORMATION_LINE_MAX_POINTS = 64;
 
@@ -125,7 +125,7 @@ function sampleLine(metrics, distance) {
 }
 
 function unitRadius(entity) {
-  const size = Number(STATS[entity?.kind]?.size);
+  const size = Number(entityBodyRadius(entity));
   return Number.isFinite(size) && size > 0 ? size : 10;
 }
 

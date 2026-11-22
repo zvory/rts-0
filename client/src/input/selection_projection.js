@@ -1,4 +1,4 @@
-import { STATS } from "../config.js";
+import { STATS, entityBodyRadius } from "../config.js";
 import { isBuilding, isResource, isUnit } from "../protocol.js";
 import { DEFAULT_HIT_RADIUS, DEFAULT_TILE_SIZE } from "./constants.js";
 
@@ -51,7 +51,7 @@ export function selectionProxyForEntity(entity, tileSize = DEFAULT_TILE_SIZE, pr
   if (isResource(entity.kind) && entity.remaining === 0) return null;
 
   const stat = STATS[entity.kind] || {};
-  const size = finitePositive(stat.size, DEFAULT_HIT_RADIUS);
+  const size = finitePositive(entityBodyRadius(entity), DEFAULT_HIT_RADIUS);
   const mapTileSize = finitePositive(tileSize, DEFAULT_TILE_SIZE);
   let footprint;
   if (isBuilding(entity.kind)) {

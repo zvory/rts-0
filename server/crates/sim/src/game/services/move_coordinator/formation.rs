@@ -42,6 +42,7 @@ pub(super) struct KnownTrench {
 pub(super) struct FormationUnit {
     pub(super) id: u32,
     pub(super) kind: EntityKind,
+    pub(super) radius: f32,
     pub(super) pos: (f32, f32),
 }
 

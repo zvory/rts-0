@@ -1043,8 +1043,8 @@ fn war_throw_sword_is_dao_gated_and_hits_harder_on_return_after_checkpoint() {
     );
     assert_eq!(
         game.state.entities.get(caster).unwrap().insight,
-        47,
-        "projectile insight counts actual HP loss, excluding overkill and invulnerability"
+        27,
+        "projectile insight halves building HP loss, excluding overkill and invulnerability"
     );
     // A round trip through a checkpoint retains the projectile identity, leg and hit sets.
     let checkpoint = game.checkpoint_payload_text_for_test().unwrap();
@@ -1064,8 +1064,8 @@ fn war_throw_sword_is_dao_gated_and_hits_harder_on_return_after_checkpoint() {
         "exactly one 80 damage return hit"
     );
     assert_eq!(restored.state.entities.get(victim).unwrap().hp, 60);
-    assert_eq!(game.state.entities.get(caster).unwrap().insight, 120);
-    assert_eq!(restored.state.entities.get(caster).unwrap().insight, 120);
+    assert_eq!(game.state.entities.get(caster).unwrap().insight, 67);
+    assert_eq!(restored.state.entities.get(caster).unwrap().insight, 67);
     assert_eq!(game.state.ability_runtime.world_objects().count(), 0);
 }
 

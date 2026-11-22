@@ -58,8 +58,8 @@ cells are consumed. `source/war-yari-lunge.png` supplies anticipation, drive, fu
 extension and recovery. The built-in imagegen lunge prompt is preserved beside the sources.
 The deterministic pipeline packs seven 256-pixel cells in `generated/war-yari-runtime-strip.png`,
 normalizes crown pivots at the approved body scale, and leaves room for the full spear.
-Runtime scale 0.8 keeps the body larger than the other Disciples. Shot events drive
-four attack frames over 400 ms, with a smooth 16-world-pixel local-forward visual step.
-War alone has 2.75-tile weapon reach, matching the approximately 95-world-pixel ready tip
-once ordinary body radius/combat slack and typical target size are accounted for.
+Runtime scale 0.56 halves the excess scale over the base Disciple’s 0.32 (previously 0.8).
+The collision radius shrinks by the same 30%, from 13.5 to 9.45 world pixels. Shot events drive
+four attack frames over 400 ms, with a smooth 11.2-world-pixel local-forward visual step.
+War alone has 1.75-tile weapon reach to match the smaller spear and collision circle.
 The step never changes simulation coordinates, collision or damage timing.

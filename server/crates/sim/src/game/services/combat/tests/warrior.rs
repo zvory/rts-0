@@ -550,3 +550,58 @@ fn lightness_moving_sword_cannot_hit_at_former_arrow_range() {
         )));
     }
 }
+
+#[test]
+fn disciple_building_insight_halves_actual_damage_and_rounds_down() {
+    for dao in [
+        None,
+        Some(crate::game::upgrade::UpgradeKind::DaoOfHeaviness),
+    ] {
+        for hp in [1, 7, 180] {
+            let mut entities = EntityStore::new();
+            let unit = entities
+                .spawn_unit(1, EntityKind::Warrior, 100.0, 100.0)
+                .unwrap();
+            let target = entities
+                .spawn_building(2, EntityKind::ResourceDepot, 125.0, 100.0, true)
+                .unwrap();
+            entities.get_mut(target).unwrap().set_spawn_health(hp);
+            let attacker = entities.get_mut(unit).unwrap();
+            attacker.dao = dao;
+            attacker.set_order(Order::attack(target));
+            run_combat_tick(&mut entities);
+            let actual = hp - entities.get(target).unwrap().hp;
+            assert!(actual > 0);
+            assert_eq!(entities.get(unit).unwrap().insight, actual / 2);
+        }
+    }
+}
+
+#[test]
+fn war_smaller_body_controls_attack_boundary() {
+    for inside in [true, false] {
+        let mut entities = EntityStore::new();
+        let war = entities
+            .spawn_unit(1, EntityKind::Warrior, 100.0, 100.0)
+            .unwrap();
+        let unit = entities.get_mut(war).unwrap();
+        unit.dao = Some(crate::game::upgrade::UpgradeKind::DaoOfHeaviness);
+        let reach =
+            config::DAO_WAR_RANGE_TILES * config::TILE_SIZE as f32 + unit.radius() + RANGE_SLACK;
+        let target = entities
+            .spawn_unit(
+                2,
+                EntityKind::Rifleman,
+                100.0 + reach + if inside { -0.5 } else { 0.5 },
+                100.0,
+            )
+            .unwrap();
+        entities
+            .get_mut(war)
+            .unwrap()
+            .set_order(Order::attack(target));
+        let hp = entities.get(target).unwrap().hp;
+        run_combat_tick(&mut entities);
+        assert_eq!(entities.get(target).unwrap().hp < hp, inside);
+    }
+}

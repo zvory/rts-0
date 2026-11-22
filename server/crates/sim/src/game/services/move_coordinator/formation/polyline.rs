@@ -26,9 +26,7 @@ pub(in crate::game) fn slots(
     let spacing = units
         .iter()
         .fold(config::TILE_SIZE as f32, |spacing, unit| {
-            let diameter = config::unit_stats(unit.kind)
-                .map(|stats| stats.radius * 2.0)
-                .unwrap_or(config::TILE_SIZE as f32);
+            let diameter = unit.radius * 2.0;
             spacing.max(diameter + config::TILE_SIZE as f32 * 0.25)
         });
     let per_rank = (((total / spacing).floor() as usize).saturating_add(1)).clamp(1, units.len());
