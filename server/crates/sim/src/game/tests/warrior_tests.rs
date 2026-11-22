@@ -350,9 +350,10 @@ fn disciple_dash_casts_for_every_selected_ready_lightness_unit() {
         for (index, id) in units.iter().copied().enumerate() {
             let entity = game.state.entities.get(id).unwrap();
             if index < 2 {
+                let dx = entity.pos_x() - target.0;
+                let dy = entity.pos_y() - target.1;
                 assert!(
-                    (entity.pos_x() - target.0).hypot(entity.pos_y() - target.1)
-                        <= config::TILE_SIZE as f32,
+                    dx * dx + dy * dy <= (config::TILE_SIZE * config::TILE_SIZE) as f32,
                     "each caster should reach the target area, allowing collision separation; queued={queued}",
                 );
                 assert!(entity.ability_cooldown_ticks(AbilityKind::EkatTeleport) > 0);
