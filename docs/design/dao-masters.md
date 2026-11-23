@@ -119,7 +119,7 @@ frames, atlas dimensions and unclipped frame edges; pipeline determinism, client
 architecture, source caps and docs health pass. The task-only Lab server is stopped.
 
 Integration with current main retains separate authoritative Adept kinds, Novice
-Charge and ten-tile Lightness Dash. Master rank is the appended public `daoMaster`
+Charge and fifteen-tile Lightness Dash. Master rank is the appended public `daoMaster`
 boolean on each Adept kind; compact snapshot vocabulary is version 65.
 
 ### Safe body growth beside blockers
@@ -133,4 +133,4 @@ This prevents promotion or movement from leaving the larger body inside a buildi
 
 ## Lightness Dash charges
 
-Lightness uses its own ten-tile Dash without a return marker or recast. Adepts hold one charge; Masters hold two. Promotion adds one ready charge and preserves an existing recharge timer. Charges recharge sequentially, one every eight seconds; either ready charge can be used immediately. Kat retains its existing Dash and return behavior.
+Lightness uses its own fifteen-tile Dash without a return marker or recast. Adepts hold one charge; Masters hold two. Promotion adds one ready charge and preserves an existing recharge timer. Charges recharge sequentially, one every eight seconds; either ready charge can be used immediately. Kat retains its existing Dash and return behavior.

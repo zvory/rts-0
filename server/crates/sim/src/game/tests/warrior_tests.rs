@@ -1211,10 +1211,10 @@ fn dao_waiting_research_reprices_when_payment_starts() {
 }
 
 #[test]
-fn disciple_dash_doubles_range_for_immediate_and_queued_casts() {
+fn disciple_dash_reaches_fifteen_tiles_for_immediate_and_queued_casts() {
     use crate::game::ability::AbilityKind;
     for queued in [false, true] {
-        for requested_tiles in [8.0, 20.0] {
+        for requested_tiles in [12.0, 15.0, 20.0] {
             let mut game = empty_flat_game(&[cultivator_player()]);
             let origin = game.state.map.tile_center(10, 10);
             let unit = game
@@ -1241,7 +1241,7 @@ fn disciple_dash_doubles_range_for_immediate_and_queued_casts() {
             game.tick();
             game.tick();
             let entity = game.state.entities.get(unit).unwrap();
-            let expected = origin.0 + requested_tiles.min(10.0) * config::TILE_SIZE as f32;
+            let expected = origin.0 + requested_tiles.min(15.0) * config::TILE_SIZE as f32;
             assert!((entity.pos_x() - expected).abs() < 0.001);
             assert!((entity.pos_y() - origin.1).abs() < 0.001);
             assert!(game

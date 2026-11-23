@@ -122,8 +122,8 @@ assert(!mixedDashGfx.calls.some((call) => call[0] === "moveTo" && call[1] === 52
 
 dashInput.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.LIGHTNESS_DASH });
 dashInput._refreshAbilityTargetPreview();
-assertDeepEqual(dashInput.clientIntent.abilityTargetPreview.rangeOrigins.map((origin) => origin.rangePx), [320],
-  "Lightness Dash targets only Lightness units with ten-tile range");
+assertDeepEqual(dashInput.clientIntent.abilityTargetPreview.rangeOrigins.map((origin) => origin.rangePx), [480],
+  "Lightness Dash targets only Lightness units with fifteen-tile range");
 
 console.log("Dao ability targeting contracts passed");
 
