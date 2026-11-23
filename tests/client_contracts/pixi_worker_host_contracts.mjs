@@ -69,7 +69,10 @@ async function queueAndLifecycleContracts() {
     "opt-in worker GPU timing reaches the public diagnostic snapshot");
   assert(adapter.diagnostics().gpuShadowTiming?.staticTerrain?.buildCount === 1,
     "worker diagnostics prove static terrain visibility built once for the current map");
+  const statsEpoch = adapter.diagnostics().statsEpoch;
   adapter._control.reset();
+  assert(adapter.diagnostics().statsEpoch === statsEpoch + 1 && adapter.diagnostics().presented === 0,
+    "diagnostic epoch identifies resets independently of presentation counter values");
   assert(worker.messages.at(-1).type === "resetDiagnostics",
     "host diagnostic reset also resets bounded worker GPU queries");
 

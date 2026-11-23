@@ -6,6 +6,7 @@
 //! `rts_protocol` (including public Rocket Truck rack counts) and rules-aware kind conversion lives in the simulation adapter.
 
 // Escape protection status is projected only to owner/allies and privileged observers.
+// ClientNetReport includes the shared performance-summary wire DTO.
 pub use rts_protocol::*;
 pub use rts_sim::protocol::{kind_from_wire, kind_to_wire};
 

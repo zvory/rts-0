@@ -203,6 +203,8 @@ export const msg = Object.freeze({
   unpauseGame: () => ({ t: C.UNPAUSE_GAME }),
   returnToLobby: () => ({ t: C.RETURN_TO_LOBBY }),
   ping: (ts) => ({ t: C.PING, ts }),
+  // report.clientBuildId records the page-initialization server build observation; performanceSummary is the optional
+  // fixed-shape 60-second aggregate documented in docs/design/protocol.md.
   netReport: (report) => ({ t: C.NET_REPORT, report }),
   activity: () => ({ t: C.ACTIVITY }),
   setRoomTimeSpeed: (speed) => ({ t: C.SET_ROOM_TIME_SPEED, speed }),
