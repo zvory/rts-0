@@ -2,6 +2,7 @@ import { drawEscapeTrails } from "./escape_trail.js";
 import { gfxNoFill, gfxCircle, gfxEllipse, gfxPoly, gfxRect, gfxRoundRect, gfxStrokeLine, gfxStrokePaths, gfxReset, gfxFill, gfxStroke } from "./native_graphics.js";
 import {
   COLORS,
+  DISCIPLE_SHIELD_CAPACITY,
   DISCIPLE_SHIELD_DURATION_TICKS,
   STATS,
   RESOURCE_AMOUNTS,
@@ -514,6 +515,19 @@ export function _drawAbilityObjects(state) {
       gfxNoFill(g);
       gfxStroke(g, 1.5, 0xc4f8ff, 0.6 + pulse * 0.25);
       gfxEllipse(g, object.x, object.y, radius - 3, radius - 3);
+      if (finiteNumber(object.ownerState?.hp)) {
+        const width = 56;
+        const y = object.y - radius - 8;
+        const fraction = clamp01(object.ownerState.hp / DISCIPLE_SHIELD_CAPACITY);
+        gfxStroke(g, 0);
+        gfxFill(g, 0x000000, 1);
+        gfxRect(g, object.x - width / 2 - 1, y - 1, width + 2, 6);
+        if (fraction > 0) {
+          gfxFill(g, 0x6eeaff, 1);
+          gfxRect(g, object.x - width / 2, y, width * fraction, 4);
+        }
+        gfxNoFill(g);
+      }
       if (finiteNumber(object.expiresIn)) {
         // Same six-pixel offset below the HP row used by unit secondary bars.
         const width = 56;

@@ -2714,11 +2714,12 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   includes the shader and textures. Shore distance supplies stepped visual depth without
   changing authoritative terrain.
 - Grass (`renderer/grass.js`, `grass_baked_carpet.js`) defaults to selected material 9: an eight-pose
-  baked grass atlas with anchored roots, smoothly blended bending poses, a wind/cloud lookup, and
-  broad traveling light. Three material texture reads replace the former per-fragment neighboring
+  baked grass atlas with anchored roots, smoothly blended bending poses and a wind lookup. Cloud shade and curved, irregular
+  traveling light fronts use the original world-space procedural formulas shared with the other
+  procedural grass styles in `grass_lighting.js`. Three material texture reads replace per-fragment neighboring
   clump/blade reconstruction. The 256×2048 RGBA8 atlas and 128×128 wind texture occupy about
   2.06 MiB and are created once per layer; the current presentation clock drives blending every
-  frame. The softer blades, repeating pattern, and simpler clump shadows/fronts are an accepted
+  frame. The softer blades, repeating blade artwork, and simpler clump shadows are an accepted
   visual tradeoff documented in [the rendering ledger](rendering-parity.md). All ordinary matches,
   replays/spectators and Map Editor previews construct this grass-only mesh at map load, beneath
   decals/units/fog, and advance it with the same presentation clock as water. Editing terrain
@@ -2902,7 +2903,7 @@ new gameplay control.
 Disciple insight and Dao fields pass through the detached presentation entity snapshot
 to the Pixi worker. A blue-on-red insight bar appears below HP; evolved paths use
 the candidate B thin-katana strip for melee Lightness, and the Dao-specific Magic C hooded spellcaster strip. Original Lightness A archer assets remain preserved for reuse. Magic runs with arms swept back and its mantle trailing; their old chevrons/pentagram are removed. War uses the larger armored candidate B Yari strip (idle, two walking poses, four thrust poses); its legacy red sword glyph is removed. The selected unit shows
-exact insight and Dao, with a cap of 60 before evolution and 120 afterward. Evolution
+exact insight and Dao, with a cap of 60 before evolution and 200 afterward. Evolution
 resets insight to zero; reaching the evolved cap has no effect. Evolution choices occupy grid Z/X/C; classic L/W/C. Buttons remain actionable before
 research or insight, assign all selected unevolved Disciples, and show the pending path
 with an active highlight and assigned/eligible count. A new choice replaces the old one;

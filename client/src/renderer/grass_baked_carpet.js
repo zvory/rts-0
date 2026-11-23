@@ -1,3 +1,4 @@
+import { GRASS_LIGHTING_GLSL } from "./grass_lighting.js";
 import { createWorkerSafeCanvas } from "./raster_primitives.js";
 import { grassGroundPixels } from "./grass_ground.js";
 
@@ -15,6 +16,7 @@ uniform vec3 uTint;
 uniform sampler2D uGrassPoses;
 uniform sampler2D uWind;
 ${terrainLighting ? "uniform sampler2D uTerrainLight; uniform vec2 uMapWorldSize;" : ""}
+${GRASS_LIGHTING_GLSL}
 vec3 pose(vec2 uv,float index){
  return texture(uGrassPoses,vec2(fract(uv.x),(fract(uv.y)+mod(index,8.))/8.)).rgb;
 }
@@ -25,10 +27,8 @@ void main(){
  float phase=(dot(p,vec2(.022,.013))-uTime*1.7+field.r*3.)*(8./6.28318530718);
  float index=floor(phase);
  vec3 color=mix(pose(p/256.,index),pose(p/256.,index+1.),fract(phase));
- color*=mix(.80,1.09,smoothstep(.28,.73,field.g));
- // Broad traveling light, without the procedural hash/noise/exp front loop.
- float front=sin(p.x*.003927-uTime*.31416+(field.r-.5)*.8);
- color*=1.+smoothstep(.72,.99,front)*.25;
+ // Atmospheric scale/motion must not inherit the repeating blade-wind texture.
+ color=grassAtmosphere(p,color,1.);
  ${terrainLighting ? "color*=texture(uTerrainLight,p/uMapWorldSize).rgb*(255./128.);" : ""}
  const float opacity=.90;
  finalColor=vec4(color*uTint*opacity,opacity);

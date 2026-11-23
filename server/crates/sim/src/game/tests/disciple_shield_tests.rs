@@ -317,3 +317,35 @@ fn disciple_shield_replacement_refreshes_expiry() {
     }
     assert!(game.state.entities.get(caster).unwrap().shield.is_some());
 }
+
+#[test]
+fn disciple_shield_snapshots_track_absorption_and_remove_depleted_pool() {
+    let (mut game, caster) = setup();
+    game.enqueue(1, cast(caster, 480.0, false));
+    game.tick();
+    let teams = crate::game::teams::TeamRelations::from_player_teams([(1, 1), (2, 2)]);
+    for (damage, remaining) in [(0, 300), (100, 200), (150, 50)] {
+        assert_eq!(
+            game.state
+                .entities
+                .shielded_damage(caster, 2, damage, &teams),
+            0
+        );
+        let shield = game
+            .snapshot_full_for(1)
+            .ability_objects
+            .into_iter()
+            .find(|object| object.ability == "discipleShield")
+            .unwrap();
+        assert_eq!(shield.owner_state.unwrap().hp, Some(remaining));
+    }
+    assert_eq!(
+        game.state.entities.shielded_damage(caster, 2, 70, &teams),
+        20
+    );
+    assert!(!game
+        .snapshot_full_for(1)
+        .ability_objects
+        .iter()
+        .any(|object| object.ability == "discipleShield"));
+}

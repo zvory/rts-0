@@ -20,13 +20,13 @@ fn dao_master_advances_once_keeps_reload_and_persists_rank() {
         let speed = unit.movement_speed();
         let radius = unit.radius();
         unit.apply_damage(unit.hp - 1, None);
-        unit.insight = 119;
+        unit.insight = 199;
         unit.set_attack_cd(30);
         unit.set_order(Order::HoldPosition);
         game.tick();
         assert!(!game.state.entities.get(id).unwrap().dao_master);
         let unit = game.state.entities.get_mut(id).unwrap();
-        unit.insight = 120;
+        unit.insight = 200;
         game.tick();
         let unit = game.state.entities.get(id).unwrap();
         assert!(unit.dao_master);
@@ -79,7 +79,7 @@ fn dao_master_dead_unit_cannot_heal_and_invalid_rank_is_rejected() {
     unit.dao_master = false;
     unit.insight = 60;
     assert!(unit.evolve_dao(AbilityKind::EvolveWar));
-    unit.insight = 120;
+    unit.insight = 200;
     unit.apply_damage(u32::MAX, None);
     unit.advance_dao_master();
     assert_eq!(unit.hp, 0);
@@ -117,7 +117,7 @@ fn dao_master_combat_threshold_and_damage_apply_to_all_three_paths() {
         let unit = game.state.entities.get_mut(id).unwrap();
         unit.insight = 60;
         unit.evolve_dao(ability);
-        unit.insight = 119;
+        unit.insight = 199;
         unit.apply_damage(unit.hp - 1, None);
         unit.set_order(Order::attack(target));
         for _ in 0..30 {

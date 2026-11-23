@@ -12,7 +12,7 @@ decisions before implementation.
 ## Lightness Master: Phase 0/1
 
 Mobile melee skirmisher; twin flowing scarves and the existing single thin katana.
-Description: “Automatically advances at 120 insight, fully heals, and gains greater
+Description: “Automatically advances at 200 insight, fully heals, and gains greater
 size, speed, damage and health.” Same battlefield role and counters as Lightness
 Adept; no new targeting, movement, ability or economy mechanic. Automatically earned
 in normal games, including AI-owned units. No cost, build source, hotkey, build time,
@@ -42,7 +42,7 @@ Anchor strength, spell ranges and all cooldowns stay unchanged.
 
 ## Shared advancement and persistence
 
-At the end-of-tick advancement pass, a living Adept at 120 insight becomes its matching
+At the end-of-tick advancement pass, a living Adept at 200 insight becomes its matching
 Master once, resets insight to zero, and heals to its new maximum HP. No choice,
 research or order is needed; the Novice's existing chosen-Dao advancement is unchanged.
 Masters stop accumulating insight and cannot advance or heal this way again. No heal
@@ -62,7 +62,7 @@ current Adept before applying the 1.2 rank scale; do not size by flowing cloth b
 Inspect standing, moving and attacking in the real Pixi renderer and capture stills and
 video for user review. Bespoke audio remains deferred; existing audio behavior stays.
 
-Patch-note draft: Adepts automatically become Masters at 120 insight, fully heal, and
+Patch-note draft: Adepts automatically become Masters at 200 insight, fully heal, and
 gain 20% size/damage, 10% speed and 40% maximum HP, with distinct path-specific art.
 
 ## Local review evidence

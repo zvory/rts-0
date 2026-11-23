@@ -2198,8 +2198,8 @@ through checkpoints. Evolution changes Novice `warrior` (29) to `lightness_adept
 Permanent Dao identity is derived from kind; the engine stores no separate mutable `dao`. Visible Disciple snapshots append `insight` (compact slot 45) and
 `dao` (slot 46: lightness/war/magic). Evolution buttons set replaceable, entity-owned `chosenDao` intent (team-private compact slot 49), independent of orders. Codes 14–16 and order stages 22–24 retain their positions.
 Evolution automatically occurs once 60 insight is ready, without research or a Pavilion.
-Evolution clears all insight and doubles the cap to 120. Evolved Disciples continue earning
-insight from actual hostile HP damage; reaching 120 automatically advances a living Adept
+Evolution clears all insight and raises the cap to 200. Evolved Disciples continue earning
+insight from actual hostile HP damage; reaching 200 automatically advances a living Adept
 to its matching [Master](dao-masters.md), resets insight and fully heals. Public
 `daoMaster` (compact slot 52) persists alongside the authoritative Adept kind. Research ids are
 `dao_of_lightness`, `dao_of_heaviness` (War), `dao_of_magic` (Magic).

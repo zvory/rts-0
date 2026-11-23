@@ -74,7 +74,7 @@ fn warrior_sword_applies_fifty_percent_armor_penetration() {
 }
 
 #[test]
-fn disciple_insight_counts_actual_hp_loss_resets_on_evolution_and_doubles_cap() {
+fn disciple_insight_counts_actual_hp_loss_resets_on_evolution_and_raises_cap() {
     let mut entities = EntityStore::new();
     let unit = entities
         .spawn_unit(1, EntityKind::Warrior, 100.0, 100.0)
@@ -106,7 +106,7 @@ fn disciple_insight_counts_actual_hp_loss_resets_on_evolution_and_doubles_cap() 
         .unwrap()
         .evolve_dao(crate::game::ability::AbilityKind::EvolveWar));
     assert_eq!(entities.get(unit).unwrap().insight, 0);
-    for expected in [35, 70, 105, 120, 120] {
+    for expected in [35, 70, 105, 140, 175, 200, 200] {
         entities
             .get_mut(unit)
             .unwrap()

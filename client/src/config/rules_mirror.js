@@ -18,7 +18,7 @@ export function entityBodyRadius(entity) {
 }
 export const DAO_RANGED_RANGE_TILES = 5;
 export const DISCIPLE_INSIGHT_REQUIRED = 60;
-export const DISCIPLE_EVOLVED_INSIGHT_CAP = DISCIPLE_INSIGHT_REQUIRED * 2;
+export const DISCIPLE_EVOLVED_INSIGHT_CAP = 200;
 
 export function entityAttackRangeTiles(entity) {
   return STATS[entity?.kind]?.rangeTiles || 0;
@@ -162,6 +162,7 @@ export const SCOUT_PLANE_ABILITY_COOLDOWN_TICKS = TICK_HZ * 30;
 // `sight` (tiles) drives the local fog overlay. `rangeTiles` mirrors weapon range for visuals.
 // `cost`/`supply` drive the command card.
 export const DAO_TRAINING_COST_OIL = 100;
+export const DISCIPLE_SHIELD_CAPACITY = 300;
 export const DISCIPLE_SHIELD_DURATION_TICKS = TICK_HZ * 15;
 
 export const DAO_TRAINING_TICKS = TICK_HZ * 10;

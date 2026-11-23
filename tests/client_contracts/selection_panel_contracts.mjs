@@ -386,9 +386,9 @@ withFakeHudDocument(({ FakeElement }) => {
   disciple.kind = KIND.MAGIC_ADEPT;
   disciple.insight = 0;
   selectionPanel.render();
-  assert(text(panel).includes("Insight: 0 / 120"), "evolution refreshes insight and the doubled cap");
-  disciple.insight = 120;
+  assert(text(panel).includes("Insight: 0 / 200"), "evolution refreshes insight and the Adept cap");
+  disciple.insight = 200;
   selectionPanel.render();
-  assert(text(panel).includes("Insight: 120 / 120"), "evolved details display the full cap");
+  assert(text(panel).includes("Insight: 200 / 200"), "evolved details display the full cap");
   selectionPanel.destroy();
 });
