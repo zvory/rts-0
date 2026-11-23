@@ -109,13 +109,16 @@ SelectionProxyV1 = {
   footprint: { kind: "circle", radiusPx } |
              { kind: "polygon", points: WorldPoint[] },
   minScreenRadiusCssPx: 6,
+  clickFootprint, directClickFootprint, // same shape union as footprint
+  clickMinScreenRadiusCssPx, directClickMinScreenRadiusCssPx,
   interaction: DetachedEntityView
 }
 SelectionSceneV1 = { version: 1, generation, frameId, projection, proxies[] }
 ```
 
 Candidates come only from already fog-filtered interpolated views. The producer uses mirrored
-semantic stats and authoritative building footprints, never asset geometry. Click, hover,
+semantic stats and authoritative building footprints. Authored client-only click geometry is
+separate from collision bodies and marquee footprints; it never reads runtime asset geometry. Click, hover,
 entity-target commands, ctrl-in-viewport, control groups, marquee, and Lab entity tools use
 projected proxies. Ground commands/tools alone use nullable `groundAtScreen`.
 
@@ -125,7 +128,26 @@ successfully presented `SelectionSceneV1` used by ground-command input.
 
 The marquee is the actual CSS-pixel screen rectangle. A render failure leaves the previous
 successfully presented selection scene active. Selection never uses mesh picking, GPU ids, asset
-bounds, shadow proxies, or fresh mutable state.
+bounds at runtime, shadow proxies, or fresh mutable state.
+
+`input/click_geometry.js` owns point-click tolerances. Engineer, Rifleman, Panzerfaust and
+Machine Gunner radii grow 50%. Novice, Lightness Adept and Magic Adept radii shrink 25%;
+Lightness/Magic Masters keep their existing radii. War Adept grows 25% and War Master grows
+50%, after the existing Master body multiplier. Tank and Rocket Truck gain 10% total local
+length without wider sides. Anti-Tank Gun uses an authored sprite-fitting box in weapon-facing
+coordinates: forward extent −44 to +23 world pixels, lateral ±14 while packed or ±23 otherwise
+to cover deployed/transitional trails. These bounds were measured from visible articulated atlas
+pixels, excluding shadows; they are not queried from the renderer during input. Other kinds
+retain current click areas. Minimum screen click circles scale with circular adjustments.
+
+Click picking first admits direct hits: original bodies for expanded circles/vehicles, the
+replacement circle for reductions, or the full Anti-Tank Gun sprite box. A direct hit always
+beats another entity’s near-miss region, including ownership preferences. With no direct hit,
+admitted halos rank by distance to the projected original hit area (polygon plus minimum anchor
+circle), then anchor distance, depth and stable id, within existing ownership preference.
+Both click polygons use the presented projection and reject depth-plane gaps. Hover and
+entity-target commands share this picker; marquee and viewport admission retain original bodies.
+Simulation collision, placement, formation spacing, visuals and selection rings are unchanged.
 
 ## 4. Presentation frame
 

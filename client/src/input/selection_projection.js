@@ -1,5 +1,6 @@
 import { STATS, entityBodyRadius } from "../config.js";
 import { isBuilding, isResource, isUnit } from "../protocol.js";
+import { clickGeometry } from "./click_geometry.js";
 import { DEFAULT_HIT_RADIUS, DEFAULT_TILE_SIZE } from "./constants.js";
 
 const CIRCLE_SEGMENTS = 16;
@@ -88,6 +89,7 @@ export function selectionProxyForEntity(entity, tileSize = DEFAULT_TILE_SIZE, pr
     setupState: typeof entity.setupState === "string" ? entity.setupState : null,
     anchor: Object.freeze({ x: entity.x, y: entity.y, heightPx }),
     footprint,
+    ...clickGeometry(entity, footprint),
     minScreenRadiusCssPx: 6,
     interaction: prepared?.source === entity && prepared.interaction
       ? prepared.interaction
@@ -105,10 +107,31 @@ export function projectSelectionProxy(proxy, projection) {
   }
   if (!projectedDepthAdmitted(anchor)) return null;
 
-  const worldPoints = proxy.footprint?.kind === "polygon"
-    ? proxy.footprint.points
-    : circlePoints(proxy.anchor, proxy.footprint?.radiusPx);
-  const screenPolygon = [];
+  const screenPolygon = projectFootprint(proxy.footprint, proxy.anchor, projection);
+  if (!screenPolygon) return null;
+  const clickFootprint = proxy.clickFootprint || proxy.footprint;
+  const directFootprint = proxy.directClickFootprint || proxy.footprint;
+  const screenClickPolygon = clickFootprint === proxy.footprint ? screenPolygon
+    : projectFootprint(clickFootprint, proxy.anchor, projection);
+  const screenDirectClickPolygon = directFootprint === proxy.footprint ? screenPolygon
+    : directFootprint === clickFootprint ? screenClickPolygon
+    : projectFootprint(directFootprint, proxy.anchor, projection);
+  return Object.freeze({
+    proxy,
+    anchor,
+    screenPolygon,
+    screenClickPolygon,
+    screenDirectClickPolygon,
+    minScreenRadiusCssPx: finitePositive(proxy.minScreenRadiusCssPx, 6),
+    clickMinScreenRadiusCssPx: finitePositive(proxy.clickMinScreenRadiusCssPx, finitePositive(proxy.minScreenRadiusCssPx, 6)),
+    directClickMinScreenRadiusCssPx: finitePositive(proxy.directClickMinScreenRadiusCssPx, finitePositive(proxy.minScreenRadiusCssPx, 6)),
+  });
+}
+
+function projectFootprint(footprint, anchor, projection) {
+  const worldPoints = footprint?.kind === "polygon"
+    ? footprint.points : circlePoints(anchor, footprint?.radiusPx);
+  const points = [];
   for (const point of worldPoints) {
     let projected;
     try {
@@ -116,19 +139,11 @@ export function projectSelectionProxy(proxy, projection) {
     } catch {
       return null;
     }
-    // Do not stitch a selection polygon across a near/far-plane gap.  The
-    // surviving vertices are not a clipped version of the footprint, so
-    // connecting them can create a false screen-space hit region.
+    // Do not join across near/far-plane gaps, including expanded click areas.
     if (!projectedDepthAdmitted(projected)) return null;
-    screenPolygon.push(Object.freeze({ x: projected.x, y: projected.y, depth: projected.depth }));
+    points.push(Object.freeze({ x: projected.x, y: projected.y, depth: projected.depth }));
   }
-  if (screenPolygon.length < 3) return null;
-  return Object.freeze({
-    proxy,
-    anchor,
-    screenPolygon: Object.freeze(screenPolygon),
-    minScreenRadiusCssPx: finitePositive(proxy.minScreenRadiusCssPx, 6),
-  });
+  return points.length >= 3 ? Object.freeze(points) : null;
 }
 
 export function pickSelectionProxy(scene, screen, {
@@ -141,14 +156,19 @@ export function pickSelectionProxy(scene, screen, {
     if (!eligible(proxy)) continue;
     const projected = projectSelectionProxy(proxy, scene.projection);
     if (!projected || !screenPointHitsProjectedProxy(screen, projected)) continue;
+    const directDistance = distanceToDirectHitArea(screen, projected);
     hits.push({
       projected,
+      direct: directDistance <= EPSILON,
+      directDistance,
       preference: finiteNumber(preference(proxy), 0),
       distance: Math.hypot(screen.x - projected.anchor.x, screen.y - projected.anchor.y),
     });
   }
   hits.sort((a, b) =>
+    Number(b.direct) - Number(a.direct) ||
     b.preference - a.preference ||
+    (a.direct ? 0 : a.directDistance - b.directDistance) ||
     a.distance - b.distance ||
     a.projected.anchor.depth - b.projected.anchor.depth ||
     a.projected.proxy.id - b.projected.proxy.id);
@@ -224,10 +244,29 @@ export function groundCoverageForScreenRect(scene, rect) {
 }
 
 function screenPointHitsProjectedProxy(point, projected) {
-  if (Math.hypot(point.x - projected.anchor.x, point.y - projected.anchor.y) <= projected.minScreenRadiusCssPx) {
-    return true;
+  return !!projected.screenClickPolygon && (
+    Math.hypot(point.x - projected.anchor.x, point.y - projected.anchor.y)
+      <= projected.clickMinScreenRadiusCssPx
+    || pointInPolygon(point, projected.screenClickPolygon)
+  );
+}
+
+function distanceToDirectHitArea(point, projected) {
+  const polygon = projected.screenDirectClickPolygon;
+  // A depth-clipped expanded polygon cannot manufacture an anchor-only hit.
+  if (!polygon) return Number.POSITIVE_INFINITY;
+  const radius = projected.directClickMinScreenRadiusCssPx;
+  let distance = Math.max(0, Math.hypot(point.x - projected.anchor.x, point.y - projected.anchor.y) - radius);
+  if (distance === 0 || pointInPolygon(point, polygon)) return 0;
+  for (let i = 0; i < polygon.length; i += 1) {
+    const a = polygon[i], b = polygon[(i + 1) % polygon.length];
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const lengthSq = dx * dx + dy * dy;
+    const t = lengthSq > 0 ? Math.max(0, Math.min(1,
+      ((point.x - a.x) * dx + (point.y - a.y) * dy) / lengthSq)) : 0;
+    distance = Math.min(distance, Math.hypot(point.x - a.x - t * dx, point.y - a.y - t * dy));
   }
-  return pointInPolygon(point, projected.screenPolygon);
+  return distance;
 }
 
 function projectedProxyIntersectsScreenRect(projected, rect) {

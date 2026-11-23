@@ -1822,6 +1822,10 @@ and inspection panning.
 Selection, hover, and entity targeting use the last successfully presented detached
 `SelectionSceneV1`; move/ground abilities/placement use its nullable ground query. Screen clicks and
 marquees project plain mirrored proxies rather than reading current state or renderer geometry.
+Point clicks and hover apply the authored per-unit tolerances in `input/click_geometry.js`;
+direct hits win before expanded near-miss areas, while reduced circles replace the old click
+area. Marquee and viewport queries keep the original body footprints. The exact per-unit
+policy and proxy fields are documented in [client-rendering.md](client-rendering.md#3-renderer-neutral-selection).
 Selection and targeting still use `GameState` relationship helpers where the distinction is own/ally/enemy:
 single-click may select an allied entity for read-only inspection, box selection and same-kind
 selection stay own-only, and right-clicking own or allied entities with own units selected falls
