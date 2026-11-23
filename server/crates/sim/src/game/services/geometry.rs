@@ -111,7 +111,6 @@ impl OrientedBoxBody {
     fn forward_axis(self) -> (f32, f32) {
         (self.facing.det_cos(), self.facing.det_sin())
     }
-
 }
 
 impl OrientedCapsuleBody {
