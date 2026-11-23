@@ -1212,3 +1212,48 @@ fn dao_waiting_research_reprices_when_payment_starts() {
         (0, 0)
     );
 }
+
+#[test]
+fn disciple_dash_doubles_range_for_immediate_and_queued_casts() {
+    use crate::game::ability::AbilityKind;
+    use crate::game::upgrade::UpgradeKind;
+    for queued in [false, true] {
+        for requested_tiles in [8.0, 20.0] {
+            let mut game = empty_flat_game(&[cultivator_player()]);
+            let origin = game.state.map.tile_center(10, 10);
+            let unit = game
+                .state
+                .entities
+                .spawn_unit(1, EntityKind::Warrior, origin.0, origin.1)
+                .unwrap();
+            game.state.entities.get_mut(unit).unwrap().dao = Some(UpgradeKind::DaoOfLightness);
+            game.enqueue(
+                1,
+                Command::UseAbility {
+                    ability: AbilityKind::EkatTeleport,
+                    units: vec![unit],
+                    x: Some(origin.0 + requested_tiles * config::TILE_SIZE as f32),
+                    y: Some(origin.1),
+                    queued,
+                },
+            );
+            game.tick();
+            game.tick();
+            let entity = game.state.entities.get(unit).unwrap();
+            let expected = origin.0 + requested_tiles.min(10.0) * config::TILE_SIZE as f32;
+            assert!((entity.pos_x() - expected).abs() < 0.001);
+            assert!((entity.pos_y() - origin.1).abs() < 0.001);
+            assert!(game
+                .state
+                .ability_runtime
+                .active_return_marker(
+                    1,
+                    unit,
+                    AbilityKind::EkatTeleport,
+                    None,
+                    game.current_tick()
+                )
+                .is_some());
+        }
+    }
+}

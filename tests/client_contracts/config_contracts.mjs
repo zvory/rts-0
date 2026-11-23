@@ -42,6 +42,7 @@ import {
   ROCKETS_RESEARCH_TICKS,
   SCOUT_PLANE_SPEED_PX_PER_TICK,
   SMOKE_PLUS_RESEARCH_TICKS,
+  entityAbilityRangeTiles,
   commandCardAbilitiesForFaction,
   trainableUnitsForFaction,
 } from "../../client/src/config.js";
@@ -1375,3 +1376,15 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
 }
 
 // ---------------------------------------------------------------------------
+
+{
+  const dash = ABILITIES[ABILITY.EKAT_TELEPORT];
+  assert(entityAbilityRangeTiles(dash, { kind: KIND.WARRIOR, dao: "lightness" }) === 10,
+    "Lightness dash previews use ten tiles");
+  assert(entityAbilityRangeTiles(dash, { kind: KIND.EKAT }) === 5,
+    "Ekat dash retains five tiles");
+  assert(commandCardAbilitiesForFaction("cultivators").find((entry) => entry.ability === ABILITY.EKAT_TELEPORT)?.rangeTiles === 10,
+    "Cultivator Dash metadata matches its range preview");
+  assert(!commandCardAbilitiesForFaction("cultivators").some((entry) => entry.ability === ABILITY.CHARGE),
+    "Automatic Charge has no selectable button");
+}

@@ -83,6 +83,11 @@ pub fn rocket_barrage_building_damage(damage: u32) -> u32 {
 }
 
 pub const EKAT_CONSUME_GOLEM_RANGE_TILES: u32 = 2;
+pub const NOVICE_CHARGE_DURATION_TICKS: u16 = TICK_HZ as u16;
+pub const NOVICE_CHARGE_COOLDOWN_TICKS: u16 = (TICK_HZ as u16) * 15;
+pub const NOVICE_CHARGE_SPEED_MULTIPLIER: f32 = 1.5;
+pub const NOVICE_CHARGE_MIN_DISTANCE_TILES: u32 = 2;
+pub const DAO_LIGHTNESS_DASH_RANGE_TILES: u32 = 10;
 pub const EKAT_TELEPORT_RANGE_TILES: u32 = 5;
 pub const EKAT_TELEPORT_COOLDOWN_TICKS: u16 = (TICK_HZ as u16) * 8;
 pub const EKAT_RETURN_MARKER_DURATION_TICKS: u32 = TICK_HZ * 4;

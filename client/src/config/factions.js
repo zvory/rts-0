@@ -1,6 +1,7 @@
 import { ABILITY, DEFAULT_FACTION_ID, KIND, UPGRADE } from "../protocol.js";
 import {
   ABILITIES,
+  DAO_LIGHTNESS_DASH_RANGE_TILES,
   STATS,
   CULTIVATORS_FACTION_ID,
   EKAT_FACTION_ID,
@@ -184,7 +185,13 @@ export function researchableUpgradesForFaction(factionId, buildingKind) {
 export function commandCardAbilitiesForFaction(factionId) {
   return factionCatalog(factionId)
     .abilities
-    .map((ability) => ABILITIES[ability])
+    .map((ability) => factionId === CULTIVATORS_FACTION_ID && ability === ABILITY.EKAT_TELEPORT
+      ? {
+        ...ABILITIES[ability],
+        rangeTiles: DAO_LIGHTNESS_DASH_RANGE_TILES,
+        title: `Dash up to ${DAO_LIGHTNESS_DASH_RANGE_TILES} tiles, then recast to return`,
+      }
+      : ABILITIES[ability])
     .filter((entry) => entry && entry.commandCard !== false);
 }
 
@@ -194,6 +201,7 @@ const SERF_STATS = Object.freeze({ ...STATS[KIND.WORKER], label: "Serf" });
 const ADEPT_STATS = Object.freeze(Object.fromEntries(
   ["Lightness", "War", "Magic"].map((dao) => [dao.toLowerCase(), Object.freeze({
     ...STATS[KIND.WARRIOR], label: `${dao} Adept`,
+    description: `A Novice who has permanently advanced along the Dao of ${dao}.`,
   })]),
 ));
 export function statsForFaction(kind, factionId, dao = null) {
