@@ -1,4 +1,4 @@
-import { ARTILLERY_OUTER_RADIUS_TILES, MORTAR_OUTER_RADIUS_TILES, MORTAR_IMPACT_DURATION_MS } from "./config.js";
+import { ESCAPE_TRAIL_DURATION_MS, ARTILLERY_OUTER_RADIUS_TILES, MORTAR_OUTER_RADIUS_TILES, MORTAR_IMPACT_DURATION_MS } from "./config.js";
 import { EVENT, STATE, WEAPON_KIND, daoForKind, isUnit } from "./protocol.js";
 import { sampleWeaponRecoilCycle } from "./weapon_recoil_cycle.js";
 
@@ -62,7 +62,7 @@ export class VisualEffectBuffers {
   }
 
   liveEscapeTrails(now) {
-    this.escapeTrails = this.escapeTrails.filter((trail) => now - trail.createdAt < 500);
+    this.escapeTrails = this.escapeTrails.filter((trail) => now - trail.createdAt < ESCAPE_TRAIL_DURATION_MS);
     return this.escapeTrails;
   }
 

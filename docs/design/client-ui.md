@@ -2926,6 +2926,6 @@ lethal-damage autocast. The carried-item command has its own hotkey identity,
 the HP-fill height in both dimensions. See [Shop rules](shop.md) for consumption and rescue behavior.
 
 Escape consumption with a position jump between visible snapshots draws a purple swirling particle
-burst at both endpoints and a thin full-length double-helix trail, fading over 500 ms. The client
+burst at both endpoints and a thin full-length double-helix trail, fading over 1000 ms. The client
 uses only received endpoints; unseen arrivals produce no trace. Shop cancellation without a
 position jump produces no effect. Both manual activation and lethal-damage autocast share it.

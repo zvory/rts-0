@@ -1,3 +1,4 @@
+import { ESCAPE_TRAIL_DURATION_MS } from "../config.js";
 import { gfxCircle, gfxFill, gfxNoFill, gfxStroke, gfxStrokePaths } from "./native_graphics.js";
 
 const PURPLE = 0xa65cff;
@@ -6,7 +7,7 @@ const LILAC = 0xe8caff;
 /** A brief, complete teleport trace; presentation time never affects the rescue itself. */
 export function drawEscapeTrails(g, trails, now) {
   for (const trail of trails) {
-    const age = (now - trail.createdAt) / 500;
+    const age = (now - trail.createdAt) / ESCAPE_TRAIL_DURATION_MS;
     if (age < 0 || age >= 1) continue;
     const fade = (1 - age) ** 1.4;
     const dx = trail.toX - trail.fromX;
