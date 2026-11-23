@@ -3,8 +3,8 @@
 use super::TICK_HZ;
 
 pub const METHAMPHETAMINES_COST_STEEL: u32 = 100;
-pub const METHAMPHETAMINES_COST_OIL: u32 = 100;
-pub const METHAMPHETAMINES_RESEARCH_TICKS: u32 = TICK_HZ * 20;
+pub const METHAMPHETAMINES_COST_OIL: u32 = 200;
+pub const METHAMPHETAMINES_RESEARCH_TICKS: u32 = TICK_HZ * 40;
 pub const METHAMPHETAMINES_SPEED_MULTIPLIER: f32 = 1.25;
 pub const METHAMPHETAMINES_RIFLE_ATTACK_COOLDOWN_TICKS: u32 = 24;
 /// 150 ms rounded up to the next authoritative simulation tick.
@@ -49,7 +49,7 @@ pub const DAO_TRAINING_TICKS: u32 = TICK_HZ * 10;
 pub const MAX_DAO_TRAINING_QUEUE: usize = 64;
 pub const DAO_COST_STEEL: u32 = 100;
 pub const DAO_COST_OIL: u32 = 200;
-pub const DAO_RESEARCH_TICKS: u32 = METHAMPHETAMINES_RESEARCH_TICKS;
+pub const DAO_RESEARCH_TICKS: u32 = TICK_HZ * 20;
 
 /// Lightness retains its Scout Car baseline independently of base Disciple speed.
 pub const DAO_LIGHTNESS_SPEED_MULTIPLIER: f32 = 1.15;

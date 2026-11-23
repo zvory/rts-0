@@ -115,8 +115,8 @@ export const PANZERFAUST_ARMOR_PENETRATION = 0.5;
 export const PANZERFAUST_WINDUP_TICKS = TICK_HZ / 2;
 export const PANZERFAUST_TRAVEL_TICKS = TICK_HZ / 2;
 export const METHAMPHETAMINES_PANZERFAUST_WINDUP_TICKS = 12;
-export const METHAMPHETAMINES_RESEARCH_TICKS = TICK_HZ * 20;
-export const DAO_RESEARCH_TICKS = METHAMPHETAMINES_RESEARCH_TICKS;
+export const METHAMPHETAMINES_RESEARCH_TICKS = TICK_HZ * 40;
+export const DAO_RESEARCH_TICKS = TICK_HZ * 20;
 export const PANZERFAUSTS_RESEARCH_TICKS = TICK_HZ * 20;
 export const ENTRENCHMENT_RESEARCH_TICKS = TICK_HZ * 20;
 export const ENTRENCHMENT_DIG_IN_TICKS = TICK_HZ * 3;
@@ -560,7 +560,7 @@ export const UPGRADES = Object.freeze({
     upgrade: UPGRADE.METHAMPHETAMINES,
     label: "Methamphetamines",
     icon: "METH",
-    cost: Object.freeze({ steel: 100, oil: 100 }),
+    cost: Object.freeze({ steel: 100, oil: 200 }),
     researchTicks: METHAMPHETAMINES_RESEARCH_TICKS,
     description: "Boost Riflemen; speed up Machine Gunner movement and setup",
     researchedAt: KIND.TRAINING_CENTRE,
