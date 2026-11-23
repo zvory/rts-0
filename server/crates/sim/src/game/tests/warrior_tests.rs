@@ -1014,8 +1014,8 @@ fn war_throw_sword_is_dao_gated_and_hits_harder_on_return_after_checkpoint() {
         .replace_active_order(Order::HoldPosition);
     let object = game.state.ability_runtime.world_objects().next().unwrap();
     assert_eq!(object.ability, AbilityKind::ThrowSword);
-    assert!((object.x.to_world() - (400.0 + 40.0 / 7.0)).abs() < 0.01);
-    assert_eq!(object.expires_tick - object.created_tick, 114);
+    assert!((object.x.to_world() - (400.0 + 100.0 / 11.0)).abs() < 0.01);
+    assert_eq!(object.expires_tick - object.created_tick, 83);
     assert_eq!(
         game.state
             .entities
@@ -1024,7 +1024,7 @@ fn war_throw_sword_is_dao_gated_and_hits_harder_on_return_after_checkpoint() {
             .ability_cooldown_ticks(AbilityKind::ThrowSword),
         config::EKAT_LINE_SHOT_COOLDOWN_TICKS - 1
     );
-    for _ in 0..30 {
+    for _ in 0..20 {
         game.tick();
     }
     assert_eq!(
@@ -1038,8 +1038,8 @@ fn war_throw_sword_is_dao_gated_and_hits_harder_on_return_after_checkpoint() {
         "projectile insight halves building HP loss, excluding overkill and invulnerability"
     );
     // The depot is 76 px off the path: outside the former 64 + 9.6 px hit radius.
-    // The throw reaches 7.5 tiles after 42 ticks: a 2.8-second nominal round trip.
-    for _ in 0..11 {
+    // The 1.76-second target rounds each leg up to 27 ticks (54 ticks total).
+    for _ in 0..6 {
         game.tick();
     }
     let object = game.state.ability_runtime.world_objects().next().unwrap();
@@ -1052,7 +1052,7 @@ fn war_throw_sword_is_dao_gated_and_hits_harder_on_return_after_checkpoint() {
         game.state.map_metadata.clone(),
     )
     .unwrap();
-    for _ in 0..41 {
+    for _ in 0..26 {
         game.tick();
         restored.tick();
     }
