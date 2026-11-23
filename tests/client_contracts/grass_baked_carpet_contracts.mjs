@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { createGrassBakedCarpetMaterial } from "../../client/src/renderer/grass_baked_carpet.js";
 
+import { GRASS_LIGHTING_GLSL } from "../../client/src/renderer/grass_lighting.js";
+import { GrassLayer } from "../../client/src/renderer/grass.js";
+
 const previousCanvas = globalThis.OffscreenCanvas;
 class RecordingCanvas {
   constructor(width, height) {
@@ -47,6 +50,21 @@ try {
   assert(first.textures.every(({ texture }) => texture.source.addressMode === "repeat"));
   assert(first.material.fragment.includes("uniform sampler2D uTerrainLight;"));
   assert(!repeat.material.fragment.includes("uTerrainLight"), "flat maps do not need a missing lighting sampler");
+
+  // The atlas must use the same world-space atmosphere as the procedural reference.
+  // The tileable wind lookup only controls blades; using its shade channel caused repetition.
+  let proceduralFragment;
+  const reference = new GrassLayer({
+    Geometry: class { destroy() {} },
+    UniformGroup: class {},
+    Shader: { from({ gl }) { proceduralFragment = gl.fragment; return { destroy() {} }; } },
+    Mesh: class { destroy() {} },
+  }, { addChild() {} }, { width: 1, height: 1, tileSize: 32, terrain: [0] }, 5, 0xfff3e2);
+  assert(proceduralFragment.includes(GRASS_LIGHTING_GLSL));
+  assert(first.material.fragment.includes(GRASS_LIGHTING_GLSL));
+  assert(first.material.fragment.includes("color=grassAtmosphere(p,color,1.);"));
+  assert(!first.material.fragment.includes("field.g"), "repeating wind must not shade clouds");
+  reference.destroy();
 
   assert.equal(atlas.poses.length, 8);
   assert.deepEqual(atlas.images.map(({ y }) => y), Array.from({ length: 8 }, (_, i) => i * 256));

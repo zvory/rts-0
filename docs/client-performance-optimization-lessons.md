@@ -176,9 +176,14 @@ readback on both sides and passed a 12-frame zero-difference self-control at ful
 The subsequent three-approach experiment compared cached clump inputs, an animated texture atlas,
 and a simpler two-blade tuft shader against the shipped specialized shader on `1a4abeba8`.
 The user reviewed the scene/close-up/difference WebMs and selected the atlas. Default style 9 now
-bakes eight bending poses once and blends neighboring poses every frame with a wind/cloud lookup;
+bakes eight bending poses once and blends neighboring poses every frame with a wind lookup;
 the simpler appearance is explicitly accepted in the [rendering ledger](design/rendering-parity.md).
-Other Lab styles, including experimental matting style 12, retain their existing paths.
+Cloud/front simplification later proved visibly repetitive and was reverted to the original
+world-space noise and irregular curved fronts, without reverting blade baking. The measurements
+below describe the original atlas version, not the corrected atmospheric shading. A narrower
+post-correction GPU comparison is recorded in the rendering ledger; it retains most of the
+procedural-to-atlas material improvement without claiming updated whole-game performance.
+Other Lab styles, including experimental matting style 12, retain their existing appearance.
 
 On Apple M5 Pro, the isolated all-grass draw's DPR2 median across three per-run GPU-query p50s
 changed from 14.794 to 1.265 ms (91.45% lower). Each cell required 48 valid asynchronous queries

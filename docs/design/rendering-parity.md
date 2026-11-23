@@ -103,3 +103,23 @@ readback. Every decoded pixel matched, and asset/error/input/nonblank/changing-s
 passed. Thus the implementation retains the selected prototype's appearance. A separate
 SwiftShader/Vulkan check rendered all candidate approaches successfully; physical PC GPU
 performance remains unmeasured.
+
+### Restore irregular grass lighting (2026-11-23)
+
+The atlas initially replaced broad cloud shade with a lookup repeating every 650 world pixels
+and curved, irregular light fronts with a regular sine wave. This produced conspicuous repeating
+dark/light formations. Restore the pre-atlas world-space cloud noise and varying front widths,
+curves and spacing, shared in `grass_lighting.js` with procedural styles. This intentionally changes
+atlas pixels to correct that lighting regression. The eight-pose blade art, interpolation, wind
+phase, opacity, tint, terrain lighting, and every-frame cadence remain unchanged.
+
+The original atlas performance measurements above include the simplified atmosphere; they do not
+measure this corrected version. Retaining the atlas still eliminates neighboring clump/blade
+reconstruction. A local Apple M5 Pro isolated 1100×720 CSS/DPR2 all-grass draw, three rotated
+rounds of 48 valid GPU queries after eight warmups, measured median per-round GPU p50s of
+3.454 ms for pre-atlas style 9, 0.315 ms for the periodic atlas, and 0.722 ms for the corrected
+atlas. The corrected version remained 79.1% below procedural cost, while adding work over the
+periodic atlas. Per-round atlas medians were noisy (0.235–1.430 ms periodic, 0.705–1.616 ms
+corrected); these are isolated material timings, not whole-game frame rate or player hardware
+claims. Matching-clock 120-frame Interact captures confirmed irregular atmospheric motion with
+unchanged waving blade artwork; exact before/after pixel equality is intentionally not expected.

@@ -1,3 +1,4 @@
+import { GRASS_LIGHTING_GLSL } from "./grass_lighting.js";
 import { createGrassGroundMaterial } from "./grass_ground.js";
 import { createGrassCarpetMaterial } from "./grass_carpet.js";
 import { createGrassBakedCarpetMaterial } from "./grass_baked_carpet.js";
@@ -29,26 +30,7 @@ uniform vec3 uTint;
 ${groundTexture ? "uniform sampler2D uGround;" : ""}
 ${matting ? "uniform sampler2D uPressure; uniform vec2 uPressureWorldSize;" : ""}
 ${terrainLighting ? "uniform sampler2D uTerrainLight; uniform vec2 uMapWorldSize;" : ""}
-float hash(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
-float noise(vec2 p){
- vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f);
- return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1)),f.x),f.y);
-}
-// Wide, curved fronts travel across the field about twenty seconds apart.
-float windLight(vec2 p){
- float x=p.x-uTime*80.;
- float cell=floor(x/1600.);
- float light=0.;
- for(int i=-1;i<=1;i++){
-   float id=cell+float(i);
-   float center=(id+.5)*1600.+(hash(vec2(id,7.))-.5)*350.;
-   float curve=(noise(vec2(p.y/550.,id+91.))-.5)*350.;
-   float width=190.+hash(vec2(id,11.))*120.;
-   float d=(x-center+curve)/width;
-   light+=exp(-d*d*1.5)*(.24+hash(vec2(id,17.))*.12);
- }
- return light;
-}
+${GRASS_LIGHTING_GLSL}
 float blade(vec2 p, vec2 root, float h, float bend, float width){
  float t=clamp((root.y-p.y)/h,0.,1.);
  float center=root.x+bend*t*t;
@@ -109,9 +91,7 @@ void main(){
      }
    }
    if(uStyle==5. || uStyle>=9.){
-     float cloud=smoothstep(.36,.68,noise(p/250.+vec2(-uTime*.028,uTime*.009)));
-     color*=mix(.80,1.09,cloud);
-     color*=1.+windLight(p)${matting ? "*(1.-wear)" : ""};
+     color=grassAtmosphere(p,color,${matting ? "1.-wear" : "1."});
    }
  }
  ${terrainLighting ? "color*=texture(uTerrainLight,p/uMapWorldSize).rgb*(255./128.);" : ""}
