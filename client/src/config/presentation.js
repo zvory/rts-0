@@ -4,6 +4,7 @@
 import { KIND, TERRAIN } from "../protocol.js";
 
 export const MORTAR_IMPACT_DURATION_MS = 500;
+export const ESCAPE_TRAIL_DURATION_MS = 1000;
 
 export const COLORS = Object.freeze({
   bgVoid: 0x11110f, // outside the map

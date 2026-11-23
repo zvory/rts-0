@@ -308,6 +308,7 @@ export class GameState extends VisualEffectBackedState {
     const wireEntities = (msg.entities || [])
       .filter((e) => !isResource(e.kind))
       .map((e) => markActionableFiringReveal(e, this.map, visibleTiles, this.playerId));
+    this.visualEffects.applyEscapeTransitions(wireEntities, this._prevById, visualNow);
     this.visualEffects.applyAttackReveals(events, visualNow);
     const visibleIds = new Set(wireEntities.map((e) => e.id));
     const entities = wireEntities

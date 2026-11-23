@@ -1,4 +1,4 @@
-import { ARTILLERY_OUTER_RADIUS_TILES, MORTAR_OUTER_RADIUS_TILES, MORTAR_IMPACT_DURATION_MS } from "./config.js";
+import { ESCAPE_TRAIL_DURATION_MS, ARTILLERY_OUTER_RADIUS_TILES, MORTAR_OUTER_RADIUS_TILES, MORTAR_IMPACT_DURATION_MS } from "./config.js";
 import { EVENT, STATE, WEAPON_KIND, daoForKind, isUnit } from "./protocol.js";
 import { sampleWeaponRecoilCycle } from "./weapon_recoil_cycle.js";
 
@@ -9,6 +9,8 @@ const DISCIPLE_PROJECTILE_KINDS = new Set([WEAPON_KIND.DISCIPLE_ARROW, WEAPON_KI
 
 export class VisualEffectBuffers {
   constructor() {
+    /** @type {Array<{fromX:number,fromY:number,toX:number,toY:number,seed:number,createdAt:number}>} */
+    this.escapeTrails = [];
     /** @type {Array<{fromX:number,fromY:number,toX:number,toY:number,durationMs:number,createdAt:number}>} */
     this.smokeCanisters = [];
     /** @type {Array<{from:number,to:number,targetPos?:object,weaponKind?:string,createdAt:number}>} */
@@ -41,6 +43,27 @@ export class VisualEffectBuffers {
     /** @type {Map<number, object>} attacker id -> temporary fog reveal entity. */
     this.shotRevealsById = new Map();
     this._nextMissToastId = 1;
+  }
+
+  applyEscapeTransitions(entities, previousById, now) {
+    for (const entity of entities) {
+      const previous = previousById.get(entity.id);
+      // Both endpoints must have been received through the recipient's fog-filtered snapshots.
+      // Charge cancellation at a destroyed Shop must not create a stationary teleport effect.
+      if (!previous?.escapeTreasure || entity.escapeTreasure || entity.hp <= 0) continue;
+      if (![previous.x, previous.y, entity.x, entity.y].every(Number.isFinite)) continue;
+      if (Math.hypot(entity.x - previous.x, entity.y - previous.y) < 32) continue;
+      this.escapeTrails.push({
+        fromX: previous.x, fromY: previous.y, toX: entity.x, toY: entity.y,
+        createdAt: now, seed: entity.id,
+      });
+    }
+    trimHead(this.escapeTrails, 64);
+  }
+
+  liveEscapeTrails(now) {
+    this.escapeTrails = this.escapeTrails.filter((trail) => now - trail.createdAt < ESCAPE_TRAIL_DURATION_MS);
+    return this.escapeTrails;
   }
 
   pruneRecoilForSnapshot(curById) {
@@ -514,6 +537,7 @@ export class VisualEffectBackedState {
   addPanzerfaustImpact(ev, now = performance.now()) { this.visualEffects.addPanzerfaustImpact(ev, now); }
   addSmokeCanister(ev, now = performance.now()) { this.visualEffects.addSmokeCanister(ev, now); }
 
+  liveEscapeTrails(now) { return this.visualEffects.liveEscapeTrails(now); }
   liveSmokeCanisters(now) { return this.visualEffects.liveSmokeCanisters(now); }
   liveMortarLaunches(now) { return this.visualEffects.liveMortarLaunches(now); }
   liveMortarShells(now) { return this.visualEffects.liveMortarShells(now); }

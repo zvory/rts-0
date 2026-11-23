@@ -1,3 +1,4 @@
+import { drawEscapeTrails } from "./escape_trail.js";
 import { gfxNoFill, gfxCircle, gfxEllipse, gfxPoly, gfxRect, gfxRoundRect, gfxStrokeLine, gfxStrokePaths, gfxReset, gfxFill, gfxStroke } from "./native_graphics.js";
 import {
   COLORS,
@@ -199,6 +200,7 @@ export function _drawCommandFeedback(view) {
     }
   }
   drawFormationMovePreview(g, view.formationMovePreview);
+  drawEscapeTrails(g, view.liveEscapeTrails?.() || [], now);
 }
 
 export function _drawAttackTargetPreview(view) {
