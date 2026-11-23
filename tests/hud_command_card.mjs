@@ -709,7 +709,6 @@ for (const [kind, upgrade] of [
     "cultivators-disciple-lightness",
     "cultivators-disciple-war",
     "cultivators-disciple-magic",
-    "cultivators-item-escape",
     "cultivators-shop",
     "cultivators-worker",
     "cultivators-build",
