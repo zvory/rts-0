@@ -21,7 +21,8 @@ try {
  const layer=new PIXI.Container();
  const renderer={_map:map,layers:{terrain:layer},world:{tint:0xfff3e2}};
  reconcileShorelineLayer(renderer);
- assert.equal(layer.children.length,0,"ordinary matches allocate no shoreline study resources");
+ assert.equal(renderer._shorelineTechnique,3,"ordinary matches use animated swash");
+ assert.equal(layer.children.length,1);
  reconcileShorelineLayer(renderer,1);
  const first=renderer._shorelineLayer;
  reconcileShorelineLayer(renderer,1);
@@ -36,7 +37,12 @@ try {
  reconcileShorelineLayer(renderer,2);
  assert(second.mesh.destroyed,"map replacement invalidates the cached distance field");
  reconcileShorelineLayer(renderer,0);
- assert.equal(layer.children.length,0,"removing the profile removes its overlay");
+ assert.equal(renderer._shorelineTechnique,3,"removing the profile restores swash");
+ renderer._map={...map,terrain:[0,0,0]};
+ reconcileShorelineLayer(renderer);
+ assert.equal(layer.children.length,0,"uniform maps allocate no GPU shoreline resources");
+ renderer._map=null;
+ reconcileShorelineLayer(renderer);
  destroyShorelineLayer(renderer);
 } finally { restore(); }
 console.log("shoreline study contracts passed");
