@@ -3,16 +3,24 @@
 ## Delivered scope
 
 `grass-survey-12` is an opt-in Lab visual prototype, built on normal profile 9 turf.
-Infantry leaves a soft partly flattened central path; wheeled vehicles, guns, and tanks leave
-paired stronger lines. Other ground units use the central path. Aircraft never touch grass.
-Pressure bends blade tips along travel and reduces wind motion; the existing tank dirt tracks
-remain separate. No gameplay, network, checkpoint, or replay schema changes ship in this PR.
+Repeated foot-unit traffic gradually turns turf into softly feathered gray-brown dirt and thins
+its grass tufts and their root shadows. Individual passages stay below visible wear; about
+20 center-line passages over the same patch produce
+clear wear. This means repeated traffic over a patch, not merely having 20 units somewhere nearby.
+The field saturates and does not regrow. All vehicles and wheeled support weapons are excluded;
+the existing tank dirt-track renderer and authoritative tread history are unchanged.
+No gameplay, network, checkpoint, or replay schema changes ship with this visual experiment.
 
 Run `node scripts/interact/cli.mjs lab open '{"visualProfile":"grass-survey-12"}'`,
 then use catalog, spawn, and normal move orders. Use paused `capture-fixed` for dependable video.
 The field persists only for the current material instance. Seeking, changing perspective, and
 reconnecting are **not supported** by this prototype. Do not enable it outside Lab.
-There is no regrowth; this isolates the persistent-matting look requested for review.
+There is no regrowth; this isolates the persistent traffic-wear look requested for review.
+
+The visual review scene uses only 20 Riflemen in a 5×4 clump, initially spaced 20 world pixels
+apart from `(1660,1760)`. They make five round trips between group goals `(2040,1800)` and
+`(1700,1800)`. Fixed captures at 10 FPS retain every output frame when encoded at 30 FPS for
+3× playback. The camera focuses `(1870,1800)` at framing scale 2, viewport 1100×760, DPR 1.
 
 ## Existing machinery inspected
 
@@ -31,40 +39,74 @@ There is no regrowth; this isolates the persistent-matting look requested for re
 
 ## Cost and limits
 
-The prototype stores RGBA pressure plus travel direction on a grid with minimum 4-world-pixel
-spacing. Either dimension is capped at 1,024 texels by increasing spacing on large maps.
-The mask is opaque data with heading channels centered on byte 128, including untouched texels,
-so canvas premultiplication and linear filtering do not introduce a spurious edge direction.
-Zero-pressure blades retain the original curved silhouette.
-The retained field is at most 4 MiB, plus another 4 MiB ImageData staging copy, canvas backing,
-GPU texture, and current visible-unit poses. Canvas/driver copies are additional and not measured.
-Repeated pressure uses max, so stationary units and unchanged revisits do not queue uploads.
-Absent/revealed-only entities never connect motion across fog gaps; jumps over 96 pixels reset
-contact. This is presentation filtering, not a substitute for durable server fog authority.
+The prototype keeps a bounded RGBA data texture on a grid with minimum 4-world-pixel spacing.
+Either dimension is capped at 1,024 texels by increasing spacing on large maps. R contains the
+shader-visible wear; GB pack a saturating unsigned 16-bit traffic counter. Alpha is always opaque
+so canvas premultiplication cannot alter the data. The retained field is at most 4 MiB, plus another
+4 MiB ImageData staging copy, canvas backing, GPU texture, and currently visible contact poses.
+Canvas/driver copies are additional and not measured.
 
-`node scripts/bench-grass-matting.mjs` measures CPU field updates only: 600 frames, first 100
-excluded, 128×128 tiles, 75% infantry / 25% tanks moving 2.1 pixels per update and reversing
-before map edges so all contacts remain on-map. Corrected local results: 100 units median
-0.098 ms / p95 0.130 ms; 1,000 units median 1.009 ms / p95 1.225 ms.
-These are Node microbenchmarks on this machine, not browser frame-time or GPU claims.
-They exclude texture uploads, canvas copies, shader cost, simulation, and replay switching.
+Each foot unit deposits a soft 28-world-pixel-radius blob every four world pixels
+travelled. The contact pose carries the remaining distance to the next sample, so different render
+cadences trace the same spatial samples along the same path. The squared radial kernel is normalized
+by its center-line integral (16r/15), giving approximately 1/20 of full wear per passage. Integer
+credit is retained in GB before quantizing visible wear to R. Credit saturates at 65,535; stationary
+units cannot accumulate wear and a saturated/unchanged visible field queues no upload. Overlapping
+blobs and ground variation produce a broad, irregular worn lane rather than authored footsteps.
+
+Absent/revealed-only entities never connect motion across fog gaps; jumps over 96 pixels reset
+contact, including its sampling phase. This is presentation filtering, not durable server fog
+authority. The existing CPU microbenchmark is a field-only diagnostic; it excludes texture uploads,
+canvas copies, shader cost, simulation, and replay switching. Its 75% infantry / 25% tank mix now
+also exercises vehicle exclusion and must not be interpreted as 100% active foot-unit contacts.
 
 A changed frame currently uploads the whole mask. At the cap, 60 changed frames/second imply
 240 MiB/second of raw RGBA upload payload, before overhead. The shader also samples pressure
-once per candidate tuft (up to nine texture reads per grass fragment). This intentionally simple
-prototype is unsuitable as a production performance implementation.
+once per fragment for soil color plus once per candidate tuft (up to ten pressure reads per
+grass fragment). This simple prototype is unsuitable as a production performance implementation.
+
+## Measured cumulative-wear client cost
+
+A delegated check ran 23 valid serialized samples of the canonical
+`fixed-roster-hellhole-stream` at 1440×900, DPR 1, CPU throttle 1, on Apple M5 Pro. The earlier
+17 samples compared plain grass, previous matting, and cumulative wear before the final root-shadow
+fade. Six further samples validated the final shader: four 15-second uncapped samples in
+plain/new/new/plain order, then one normal-rAF pair. Final-source means were:
+
+| Metric | Plain grass | New infantry wear |
+| --- | ---: | ---: |
+| Uncapped worker-acknowledged frames/sec | 118.73 | 121.06 |
+| Worker update + present elapsed ms/frame | 6.415 | 6.310 |
+| Normal-rAF completed frames/sec | 59.60 | 59.53 |
+
+These values do not establish a causal improvement or precise regression. Same-mode capacity
+varied 113.67–123.80 for plain grass and 117.80–124.33 for new wear, exceeding the apparent mean
+difference. The earlier block also showed substantial session drift. All original samples were
+retained; no apparent gain is claimed by selecting one block. The defensible conclusion is no
+clear measurable steady-state slowdown in this local session.
+
+Worker-acknowledged capacity is a pipelined benchmark, not screen refresh rate or GPU-complete
+FPS. GPU timer queries were supported and valid, but their draw-cost contrasts varied across
+blocks and do not isolate an intrinsic shader penalty. Both variants used the same recorded
+battle, player fog, camera, terrain shadows, and presentation cadence. The sole final off/on
+switch was the default grass technique (9 versus 12). All 23 samples reported zero failed or
+superseded frames, GPU disjoint intervals, and dropped queries.
+
+These measurements cover steady-state short-stream rendering, not startup, fully worn long
+matches, weaker devices, or replay switching. Replay wear persistence and perspective caches
+are still unimplemented.
 
 ## Recommended durable representation (not implemented)
 
 Use sparse, server-owned 512-world-pixel pressure tiles with 4-pixel cells: 128×128 cells/tile.
-Two bytes per cell can encode quantized pressure and heading: 32 KiB per allocated tile,
+Two bytes per cell can encode a saturating traffic count: 32 KiB per allocated tile,
 plus map/index/revision overhead. A fully traversed 4,096²-world-pixel map has 64 tiles:
 2 MiB per complete pressure field before compression. Do not allocate a full copy per player
 by default. Compress checkpoint tiles with zero runs or another measured codec; transfer changed
 cell runs / tile revisions, not one permanent mark per footstep. Keep a bounded global state,
 not an ever-growing path log. Sweep moved contacts deterministically on simulation ticks,
-skipping stationary units and non-grass terrain. A monotone pressure field avoids regrowth timers.
-Direction ties need a deterministic rule shared by restore and live updates.
+skipping stationary units and non-grass terrain. A monotone traffic field avoids regrowth timers.
+Spatial sample carry and integer credit rules must be shared by live updates and checkpoint restore.
 
 Separate world pressure from per-player knowledge. Preserve the game's existing mark discovery
 semantics: materialize only owned/actually discovered pressure, and clip reveal to authoritative

@@ -53,14 +53,6 @@ float blade(vec2 p, vec2 root, float h, float bend, float width){
  return (1.-smoothstep(width*(1.-t)+.1,width*(1.-t)+.65,abs(p.x-center)))
    *step(root.y-h,p.y)*step(p.y,root.y);
 }
-float pressedBlade(vec2 p, vec2 root, float h, float bend, float width, vec3 pressure){
- if(pressure.r==0.)return blade(p,root,h,bend,width);
- vec2 direction=pressure.gb*255.-128.;
- direction=length(direction)>.01?normalize(direction):vec2(1.,0.);
- vec2 tip=mix(vec2(bend,-h),direction*h*.95+vec2(0.,-h*.12),pressure.r);
- float t=clamp(dot(p-root,tip)/max(dot(tip,tip),.01),0.,1.);
- return 1.-smoothstep(width*(1.-t)+.1,width*(1.-t)+.65,length(p-root-tip*t));
-}
 void main(){
  // Quantization deliberately follows the chunky water artwork rather than subpixel sparkles.
  vec2 p=floor(vWorld/1.25)*1.25;
@@ -70,6 +62,10 @@ void main(){
  vec3 dark=vec3(.225,.276,.135), light=vec3(.43,.47,.25);
  if(uStyle==4.){ dark=vec3(.30,.29,.16); light=vec3(.55,.51,.29); }
  vec3 color=${groundTexture ? "texture(uGround,fract(p/512.)).rgb" : "mix(dark,light,variation*.8+grain*.2)"};
+ ${matting ? `float traffic=texture(uPressure,p/uPressureWorldSize).r;
+ float wear=smoothstep(.28,.90,traffic*(.80+variation*.4));
+ vec3 soil=mix(vec3(.25,.245,.215),vec3(.43,.405,.35),variation*.8+grain*.2);
+ color=mix(color,soil,wear*.94);` : ""}
  if(uStyle==1.){
    float fleck=step(.70,grain)*step(.38,hash(floor(p/vec2(2.,5.))));
    color+=vec3(.065,.08,.025)*fleck;
@@ -88,14 +84,17 @@ void main(){
      float wave=sin(dot(root,vec2(.022,.013))-uTime*1.7+noise(root/180.)*3.);
      float bend=wave*(uStyle==4.?4.5:3.)+sin(uTime*2.1+r*6.28)*.65;
      float h=uStyle==2.?5.+r*6.:(uStyle==3.?7.+r*7.:(uStyle==4.?9.+r*9.:6.+r*7.));
+     ${matting ? `float rootTraffic=texture(uPressure,root/uPressureWorldSize).r;
+     float rootWear=smoothstep(.28,.90,rootTraffic);` : ""}
      // Low dark roots, then multiple tapered blades with different tips.
-     float shadow=(1.-smoothstep(1.,5.,length((p-root-vec2(2,1))*vec2(.7,1.5))))*.25;
+     float shadow=(1.-smoothstep(1.,5.,length((p-root-vec2(2,1))*vec2(.7,1.5))))*.25${matting ? "*(1.-rootWear*.95)" : ""};
      color*=1.-shadow;
-     ${matting ? `vec3 pressure=texture(uPressure,root/uPressureWorldSize).rgb;
-     bend*=1.-pressure.r;
-     float mask=pressedBlade(p,root,h,bend,.8,pressure);
-     mask=max(mask,pressedBlade(p,root+vec2(-2,0),h*.72,bend-2.,.7,pressure));
-     mask=max(mask,pressedBlade(p,root+vec2(2,0),h*.85,bend+2.,.7,pressure));` : `float mask=blade(p,root,h,bend,.8);
+     ${matting ? `h*=1.-rootWear*.65;
+     bend*=1.-rootWear;
+     float mask=blade(p,root,h,bend,.8);
+     mask=max(mask,blade(p,root+vec2(-2,0),h*.72,bend-2.,.7));
+     mask=max(mask,blade(p,root+vec2(2,0),h*.85,bend+2.,.7));
+     mask*=1.-rootWear*.94;` : `float mask=blade(p,root,h,bend,.8);
      mask=max(mask,blade(p,root+vec2(-2,0),h*.72,bend-2.,.7));
      mask=max(mask,blade(p,root+vec2(2,0),h*.85,bend+2.,.7));`}
      vec3 tip=mix(vec3(.34,.41,.19),vec3(.57,.59,.30),r*.6+(uStyle==5. || uStyle>=9. ? 0. : wave*.15)+.15);
@@ -110,7 +109,7 @@ void main(){
    if(uStyle==5. || uStyle>=9.){
      float cloud=smoothstep(.36,.68,noise(p/250.+vec2(-uTime*.028,uTime*.009)));
      color*=mix(.80,1.09,cloud);
-     color*=1.+windLight(p);
+     color*=1.+windLight(p)${matting ? "*(1.-wear)" : ""};
    }
  }
  ${terrainLighting ? "color*=texture(uTerrainLight,p/uMapWorldSize).rgb*(255./128.);" : ""}

@@ -154,7 +154,7 @@ const GRASS_SURVEY_PROFILES = Object.freeze([
   [9, "Mottled turf beneath blades", "Profile 5 blades, gusts and shade over broad olive and sage ground patches."],
   [10, "Brushed turf beneath blades", "Profile 5 blades, gusts and shade over restrained flattened-turf strokes."],
   [11, "Earth and moss beneath blades", "Profile 5 blades, gusts and shade over muted earthy and mossy patches."],
-  [12, "Grass matting prototype", "Lab-only persistent pressure: infantry paths and paired vehicle contact lines; no replay history."],
+  [12, "Infantry path wear prototype", "Lab-only cumulative infantry traffic: soft gray-brown dirt paths after repeated passes; no replay history."],
 ].map(([grassTechnique, label, description]) => Object.freeze({
   id: `grass-survey-${grassTechnique}`,
   label,
