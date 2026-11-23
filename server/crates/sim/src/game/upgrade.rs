@@ -180,14 +180,11 @@ pub fn definition(kind: UpgradeKind) -> UpgradeDefinition {
 
 pub fn required_for_unit(unit: EntityKind) -> Option<UpgradeKind> {
     match unit {
-        EntityKind::LightnessAdept => Some(UpgradeKind::DaoOfLightness),
-        EntityKind::WarAdept => Some(UpgradeKind::DaoOfHeaviness),
-        EntityKind::MagicAdept => Some(UpgradeKind::DaoOfMagic),
         EntityKind::Panzerfaust => Some(UpgradeKind::Panzerfausts),
         EntityKind::Artillery => Some(UpgradeKind::ArtilleryUnlock),
         EntityKind::RocketLauncher => Some(UpgradeKind::Rockets),
         EntityKind::Tank => Some(UpgradeKind::TankUnlock),
-        _ => None,
+        _ => unit.dao(),
     }
 }
 
