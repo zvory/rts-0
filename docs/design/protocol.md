@@ -2000,8 +2000,8 @@ durability. No new event or command fields; Rust kind adapters use the shared ru
 Cultivators can construct `three_dao_pavilion` (compact kind code 31) and research
 `dao_of_lightness`, `dao_of_magic`, and `dao_of_heaviness` (upgrade codes 14–16).
 The existing build/research commands, research queues, completed-upgrade lists, and
-owner-only projection rules apply. These upgrades unlock the corresponding Disciple
-evolutions described below. Rust protocol and sim adapters and the client protocol facade
+owner-only projection rules apply. These upgrades unlock the corresponding Adept production at Portals and paid
+training at Proving Grounds. Combat-earned evolution needs no research. Rust protocol and sim adapters and the client protocol facade
 continue to re-export their authoritative vocabulary.
 
 ### Disciple insight and Dao specializations
@@ -2044,13 +2044,21 @@ See [Tournament Grounds](tournament-grounds.md).
 Portal first-stage rallies to the exact owned completed Grounds center automatically issue
 entry movement to newly trained base Disciples. Busy grounds retain waiting entry intents.
 
+### Portal Adept production
+
+A completed Cultivator Portal trains Novices and, after matching Pavilion research,
+Lightness, War and Magic Adepts. Each Adept costs **35 oil, zero steel, two supply**
+and takes **300 ticks (ten seconds)**, without a Novice input. Use normal train/repeat
+commands, queue payment/refunds, legal spawn exits and rally behavior. An unresearched
+Dao cannot be trained. Combat-earned evolution and Tournament Grounds are unchanged.
+
 ### Proving Grounds
 
 Cultivator Engineers construct `proven_grounds` after a completed Portal: 100 steel, zero oil,
 200-tick construction, 3×3 tiles, 120 HP, armored, one-tile sight, no weapon or supply.
 Select the building to queue a mix of researched Dao training plans (maximum 64). Right-click
 base Disciples inside or rally a Portal there. Each admission consumes one base Disciple and
-50 oil, preserving its two supply as a paid replacement reservation. One full-health chosen
+100 oil, preserving its two supply as a paid replacement reservation. One full-health chosen
 Dao specialist emerges after 300 ticks (10 seconds), using legal exits and the full rally plan.
 Blocked exits retry; destruction loses the trainee and oil. Unpaid plans can be canceled; active
 training cannot. Combat-earned 60-insight evolution requires no research.

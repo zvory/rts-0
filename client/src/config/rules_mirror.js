@@ -157,7 +157,7 @@ export const SCOUT_PLANE_ABILITY_COOLDOWN_TICKS = TICK_HZ * 30;
 // Per-kind UI / render info. `size` is the render radius (units) or half-extent hint.
 // `sight` (tiles) drives the local fog overlay. `rangeTiles` mirrors weapon range for visuals.
 // `cost`/`supply` drive the command card.
-export const DAO_TRAINING_COST_OIL = 50;
+export const DAO_TRAINING_COST_OIL = 100;
 export const DAO_TRAINING_TICKS = TICK_HZ * 10;
 export const MAX_DAO_TRAINING_QUEUE = 64;
 
@@ -176,13 +176,16 @@ export const STATS = Object.freeze({
     rangeTiles: 0.75, cost: { steel: 100, oil: 0 }, supply: 2, buildTicks: 300,
     description: "Durable melee infantry with a short sword reach and 50% armor penetration. Slow attacks deal heavy damage. Charge (automatic): 1.5x movement speed for 1 second, with a 15-second cooldown, when attacking an enemy unit at least 2 tiles away or moving away." },
   [KIND.LIGHTNESS_ADEPT]: { armored: false, label: "Lightness Adept", icon: "LA", size: 26, sight: 11,
-    rangeTiles: 0.75, cost: { steel: 100, oil: 0 }, supply: 2, buildTicks: 300,
+    rangeTiles: 0.75, cost: { steel: 0, oil: 35 }, supply: 2, buildTicks: 300,
+    upgradeRequires: UPGRADE.DAO_OF_LIGHTNESS,
     description: "Fast sword infantry with Dash and 50% armor penetration." },
   [KIND.WAR_ADEPT]: { armored: false, label: "War Adept", icon: "WA", size: Math.fround(26 * Math.fround(DAO_WAR_BODY_SCALE)), sight: 11,
-    rangeTiles: DAO_WAR_RANGE_TILES, cost: { steel: 100, oil: 0 }, supply: 2, buildTicks: 300,
+    rangeTiles: DAO_WAR_RANGE_TILES, cost: { steel: 0, oil: 35 }, supply: 2, buildTicks: 300,
+    upgradeRequires: UPGRADE.DAO_OF_HEAVINESS,
     description: "Armored spear infantry with Throw Sword and 50% armor penetration." },
   [KIND.MAGIC_ADEPT]: { armored: false, label: "Magic Adept", icon: "MA", size: 26, sight: 11,
-    rangeTiles: DAO_RANGED_RANGE_TILES, cost: { steel: 100, oil: 0 }, supply: 2, buildTicks: 300,
+    rangeTiles: DAO_RANGED_RANGE_TILES, cost: { steel: 0, oil: 35 }, supply: 2, buildTicks: 300,
+    upgradeRequires: UPGRADE.DAO_OF_MAGIC,
     description: "Ranged orb infantry with Anchor and Shield." },
   [KIND.MACHINE_GUNNER]: { armored: false, label: "Machine Gunner", icon: "MG", size: 10, sight: 11,
     rangeTiles: 6.1, cost: { steel: 75, oil: 10 }, supply: 2, buildTicks: 400, requires: KIND.TRAINING_CENTRE },
@@ -224,14 +227,14 @@ export const STATS = Object.freeze({
     cost: { steel: 600, oil: 135 }, buildTicks: TICK_HZ * 5,
     trains: [KIND.WORKER, KIND.STEEL_MINE, KIND.PUMP_JACK] },
   [KIND.PORTAL]: { label: "Portal", icon: "PRT", footW: 3, footH: 3, sight: 1,
-    cost: { steel: 150, oil: 0 }, buildTicks: TICK_HZ * 5, trains: [KIND.WARRIOR],
-    description: "A supernatural gateway that trains Cultivator Novices." },
+    cost: { steel: 150, oil: 0 }, buildTicks: TICK_HZ * 5, trains: [KIND.WARRIOR, KIND.LIGHTNESS_ADEPT, KIND.WAR_ADEPT, KIND.MAGIC_ADEPT],
+    description: "A supernatural gateway that trains Novices and researched Adepts. Each Adept costs 35 oil and takes 10 seconds." },
   [KIND.SHOP]: { label: "Shop", icon: "SH", footW: 3, footH: 4, sight: 1,
     cost: { steel: 200, oil: 200 }, buildTicks: TICK_HZ * 40, trains: [],
     description: "A sturdy gourd-shaped shop. No goods or services are available yet." },
   [KIND.PROVEN_GROUNDS]: { label: "Proving Grounds", icon: "PG", footW: 3, footH: 3, sight: 1,
     cost: { steel: 100, oil: 0 }, buildTicks: 200, trains: [], requires: [KIND.PORTAL],
-    description: "Send base Novices inside for researched Dao training. Queue any mix of Lightness, War and Magic; each costs 50 oil and takes 10 seconds. Supports a rally point." },
+    description: "Send base Novices inside for researched Dao training. Queue any mix of Lightness, War and Magic; each costs 100 oil and takes 10 seconds. Supports a rally point." },
   [KIND.TOURNAMENT_GROUNDS]: { label: "Tournament Grounds", icon: "TG", footW: 4, footH: 4, sight: 1,
     cost: { steel: 100, oil: 0 }, buildTicks: 200, trains: [], requires: [KIND.PORTAL],
     description: "Right-click four base Novices inside, or rally a Portal here. A free five-second tournament produces one winner with a random Dao specialization. Supports a rally point." },
@@ -239,7 +242,7 @@ export const STATS = Object.freeze({
     cost: { steel: 100, oil: 25 }, buildTicks: 560, trains: [],
     researches: [UPGRADE.DAO_OF_LIGHTNESS, UPGRADE.DAO_OF_MAGIC, UPGRADE.DAO_OF_HEAVINESS],
     requires: [KIND.RESOURCE_DEPOT, KIND.PORTAL],
-    description: "Research Lightness, War, and Magic to unlock paid training at the Proving Grounds." },
+    description: "Research Lightness, War, and Magic to unlock matching Adepts at Portals and paid training at the Proving Grounds." },
   [KIND.ZAMOK]: { label: "Zamok", icon: "ZK", footW: 3, footH: 3, sight: 1,
     cost: { steel: 0, oil: 0 }, buildTicks: 0, trains: [KIND.GOLEM] },
   [KIND.DEPOT]: { label: "Supply Depot", icon: "SD", footW: 2, footH: 2, sight: 1,
@@ -537,19 +540,19 @@ export const UPGRADES = Object.freeze({
   [UPGRADE.DAO_OF_HEAVINESS]: Object.freeze({
     upgrade: UPGRADE.DAO_OF_HEAVINESS, label: "Dao of War", icon: "HVY",
     cost: Object.freeze({ steel: 100, oil: 200 }), researchTicks: DAO_RESEARCH_TICKS,
-    description: "Study the Dao of War. Unlocks the corresponding paid Adept training at the Proving Grounds.",
+    description: "Study the Dao of War. Unlocks the matching Adept at Portals for 35 oil, plus paid training at the Proving Grounds.",
     researchedAt: KIND.THREE_DAO_PAVILION,
   }),
   [UPGRADE.DAO_OF_MAGIC]: Object.freeze({
     upgrade: UPGRADE.DAO_OF_MAGIC, label: "Dao of Magic", icon: "MAG",
     cost: Object.freeze({ steel: 100, oil: 200 }), researchTicks: DAO_RESEARCH_TICKS,
-    description: "Study the Dao of Magic. Unlocks the corresponding paid Adept training at the Proving Grounds.",
+    description: "Study the Dao of Magic. Unlocks the matching Adept at Portals for 35 oil, plus paid training at the Proving Grounds.",
     researchedAt: KIND.THREE_DAO_PAVILION,
   }),
   [UPGRADE.DAO_OF_LIGHTNESS]: Object.freeze({
     upgrade: UPGRADE.DAO_OF_LIGHTNESS, label: "Dao of Lightness", icon: "LGT",
     cost: Object.freeze({ steel: 100, oil: 200 }), researchTicks: DAO_RESEARCH_TICKS,
-    description: "Study the Dao of Lightness. Unlocks the corresponding paid Adept training at the Proving Grounds.",
+    description: "Study the Dao of Lightness. Unlocks the matching Adept at Portals for 35 oil, plus paid training at the Proving Grounds.",
     researchedAt: KIND.THREE_DAO_PAVILION,
   }),
   [UPGRADE.METHAMPHETAMINES]: Object.freeze({

@@ -30,7 +30,12 @@ to use its existing supported-faction checks. Further art, audio, combat roster 
 ### Approved brief and rules (Phases 0 and 1)
 
 The **Portal** is the Cultivators' first dedicated production building and its name is final. It
-trains the faction's Disciple from grid slot 1 (`Q`). Its immediate player tradeoff is 150 Steel
+trains the faction's Novice from grid slot 1 (`Q`) and researched Adepts from the next
+three slots: Lightness (`W`), War (`E`), and Magic (`A`). Each Adept requires its matching
+completed Pavilion Dao research and costs 35 Oil, zero Steel, two supply, and 300 ticks
+(ten seconds). No Novice input or Proving Grounds is needed. Normal manual/repeat queues,
+payment, cancellation/refunds, blocked exits and rally behavior apply. Combat-earned
+evolution and Tournament Grounds are unchanged. Its immediate player tradeoff is 150 Steel
 invested in a vulnerable structure before it can produce a front-line military unit. Opponents
 counter it through ordinary scouting and building destruction; losing it cancels access to new
 Disciple production but has no additional special effect.
@@ -86,7 +91,7 @@ production/channeling states are deferred until units are specified.
 ### Approved brief and rules (Phases 0 and 1)
 
 The user authorized the **Three Dao Pavilion** and three research
-options that unlock permanent Disciple specializations at 60 insight. This is a Cultivator-only technology building
+options that unlock direct Adept production at Portals and paid training at Proving Grounds. This is a Cultivator-only technology building
 constructed by Serfs, available in normal games and Lab. Its investment competes with Portal
 production; opponents can scout and destroy it through ordinary building combat.
 
@@ -106,7 +111,8 @@ See [balance](balance.md#three-dao-pavilion-prototype) for payment and refund ru
 Use existing player-wide permanent research and queue rules, including duplicate rejection,
 cancellation/refund and loss of unfinished research on destruction. All three can be completed;
 completed research survives building destruction. Each research unlocks the matching
-paid Disciple training at the [Proving Grounds](proven-grounds.md). Combat-earned evolution at
+35-Oil Adept production at Portals and paid Disciple training at the
+[Proving Grounds](proven-grounds.md). Combat-earned evolution at
 60 insight requires neither research nor a Pavilion. See [Disciple insight and Dao evolution](dao-insight.md) for stats,
 abilities, insight credit, icons, and hotkeys. Existing checkpoint/replay and owner-only
 upgrade projection carry the stable ids through the generic research system.

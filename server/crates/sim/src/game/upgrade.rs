@@ -184,7 +184,7 @@ pub fn required_for_unit(unit: EntityKind) -> Option<UpgradeKind> {
         EntityKind::Artillery => Some(UpgradeKind::ArtilleryUnlock),
         EntityKind::RocketLauncher => Some(UpgradeKind::Rockets),
         EntityKind::Tank => Some(UpgradeKind::TankUnlock),
-        _ => None,
+        _ => unit.dao(),
     }
 }
 

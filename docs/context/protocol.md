@@ -1,6 +1,6 @@
 # Capsule: wire protocol
 
-Use when adding, removing, or changing any field on a client↔server message, snapshot, or event.
+Use for client↔server message, snapshot, and event changes.
 
 ## Read first
 - [docs/design/protocol.md](../design/protocol.md) — wire protocol
@@ -16,7 +16,7 @@ Use when adding, removing, or changing any field on a client↔server message, s
   - §2.7 Observer analysis state
   - Three Dao Pavilion prototype vocabulary
   - Tournament Grounds
-- Proving Grounds
+- Proving Grounds and Portal Adept production
 - [docs/projection-audit-checklist.md](../projection-audit-checklist.md) — checklist for new
   projection-affecting snapshot fields, events, or observer modes
 
