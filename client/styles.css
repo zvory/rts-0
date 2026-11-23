@@ -2376,8 +2376,7 @@ input[type="text"]:focus {
 }
 
 @media (pointer: coarse) and (max-width: 720px) {
-  .room-time-panel-collapse,
-  .spectator-controls-collapse {
+  .room-time-panel-collapse {
     min-height: 36px;
     padding: 7px 10px;
     touch-action: manipulation;
@@ -3626,8 +3625,7 @@ input[type="text"]:focus {
   align-items: center;
   gap: 5px;
 }
-.room-time-panel-collapse,
-.spectator-controls-collapse {
+.room-time-panel-collapse {
   appearance: none;
   flex: 0 0 auto;
   border: 1px solid var(--panel-edge);
@@ -3642,9 +3640,7 @@ input[type="text"]:focus {
   padding: 4px 7px;
 }
 .room-time-panel-collapse:hover,
-.room-time-panel-collapse:focus-visible,
-.spectator-controls-collapse:hover,
-.spectator-controls-collapse:focus-visible {
+.room-time-panel-collapse:focus-visible {
   border-color: var(--accent);
   color: var(--ink);
   outline: none;
@@ -3672,22 +3668,12 @@ input[type="text"]:focus {
   color: var(--ink);
   pointer-events: auto;
 }
-.spectator-controls-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 7px;
-}
-.spectator-controls-panel[data-collapsed="true"] .spectator-controls-header {
-  margin-bottom: 0;
-}
 .spectator-controls-drag-handle {
-  flex: 1 1 auto;
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
-  margin: -3px -4px 0;
+  margin: -3px -4px 7px;
   padding: 3px 4px;
   border-radius: var(--radius-sm);
   color: var(--ink-dim);
@@ -3730,9 +3716,6 @@ input[type="text"]:focus {
 .spectator-controls-rows {
   display: grid;
   gap: 6px;
-}
-.spectator-controls-rows[hidden] {
-  display: none;
 }
 .spectator-controls-label {
   color: var(--ink);
@@ -5082,7 +5065,6 @@ input[type="text"]:focus {
   }
 
   .room-time-panel-collapse,
-  .spectator-controls-collapse,
   .room-time-panel-body .spd-btn,
   .room-time-panel-body .vision-btn,
   .room-time-timeline-track {
