@@ -5,6 +5,7 @@
 //! Keeps existing `rts_server::protocol` call sites stable while wire protocol DTOs live in
 //! `rts_protocol` (including public Rocket Truck rack counts) and rules-aware kind conversion lives in the simulation adapter.
 
+// ClientNetReport includes the shared performance-summary wire DTO.
 pub use rts_protocol::*;
 pub use rts_sim::protocol::{kind_from_wire, kind_to_wire};
 

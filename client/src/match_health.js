@@ -1,3 +1,5 @@
+import { ClientPerformanceWindow } from "./client_performance_window.js";
+
 const LATENCY_ISSUE_MS = 180;
 const JITTER_ISSUE_MS = 20;
 const JITTER_WINDOW = 8;
@@ -18,6 +20,7 @@ export class MatchHealth {
     this.lastCommandIssuedAt = null;
     this.reportStartedAt = performance.now();
     this.reportStats = this.createReportStats();
+    this.performanceWindow = new ClientPerformanceWindow();
     this.frameSamples = [];
     this.frameWindowTotalMs = 0;
     this.health = {
@@ -73,6 +76,7 @@ export class MatchHealth {
   noteFrameGap(frameGapMs, now = performance.now()) {
     this.snapshotsThisFrame = 0;
     if (!Number.isFinite(frameGapMs) || frameGapMs < 0) return;
+    this.performanceWindow.add(frameGapMs);
     this.reportStats.frameCount += 1;
     this.reportStats.frameTotalMs += frameGapMs;
     this.reportStats.frameGapMaxMs = Math.max(this.reportStats.frameGapMaxMs, frameGapMs);

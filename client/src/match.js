@@ -512,8 +512,8 @@ export class Match {
     this.netReporter.stopNetReports();
   }
 
-  sendNetReport() {
-    this.netReporter.sendNetReport();
+  sendNetReport(options) {
+    this.netReporter.sendNetReport(options);
   }
 
   applyPredictionDisplayOverlay(overlay = null) {
@@ -1200,6 +1200,7 @@ export class Match {
 
   /** Pause the loop (used while the game-over overlay is up). Idempotent. */
   stop() {
+    if (this.running && !this.skipFinalNetReport) this.netReporter?.finishPerformanceWindow?.();
     this.captureRafWasRunning = false;
     this.uncappedPerfBenchmark = null;
     this.running = false;
@@ -1217,9 +1218,8 @@ export class Match {
    * room. A later destroy() still owns the full resource teardown.
    */
   freezeForBranchStagingBackground() {
-    this.sendNetReport();
-    this.skipFinalNetReport = true;
     this.stop();
+    this.skipFinalNetReport = true;
     this.teardownDesktopCursorAutoLock();
     this.stopMatchPings();
     this.stopNetReports();
@@ -1288,7 +1288,7 @@ export class Match {
    * build a fresh Match on the next `start`. Best-effort and idempotent.
    */
   destroy() {
-    if (!this.skipFinalNetReport) this.sendNetReport();
+    if (!this.running && !this.skipFinalNetReport) this.sendNetReport();
     this.stop();
     this.teardownDesktopCursorAutoLock();
     this.stopMatchPings();

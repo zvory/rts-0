@@ -6,6 +6,37 @@ const MAX_CLIENT_FRAME_PHASES: usize = 5;
 const MAX_CLIENT_RENDER_COUNTERS: usize = 5;
 
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ClientPerformanceTiming {
+    pub samples: u32,
+    pub max_ms: u16,
+    pub p95_ms: u16,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase", default)]
+pub struct ClientPerformanceSummary {
+    pub elapsed_ms: u32,
+    pub frame_count: u32,
+    pub frame_total_ms: u32,
+    pub frame_gap_max_ms: u32,
+    pub frame_gap_p95_ms: u16,
+    pub frame_gap_p99_ms: u16,
+    pub frames_over_33_ms: u32,
+    pub frames_over_50_ms: u32,
+    pub frames_over_100_ms: u32,
+    pub worker_presented_count: u32,
+    pub worker_counters_valid: bool,
+    pub visible_throughout: bool,
+    pub focused_throughout: bool,
+    pub visibility_change_count: u32,
+    pub worker_rolling_update: ClientPerformanceTiming,
+    pub worker_rolling_present: ClientPerformanceTiming,
+    pub worker_rolling_queue_age: ClientPerformanceTiming,
+    pub worker_rolling_display_age: ClientPerformanceTiming,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandLifecycleExemplar {
     pub client_seq: u32,
@@ -181,6 +212,10 @@ where
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ClientNetReport {
+    #[serde(default)]
+    pub client_build_id: String,
+    #[serde(default)]
+    pub performance_summary: Option<ClientPerformanceSummary>,
     pub schema_version: u8,
     #[serde(default)]
     pub match_run_id: String,
@@ -517,5 +552,32 @@ mod tests {
         assert_eq!(report.render_worker_failure_count, 1);
         assert_eq!(report.render_worker_error_code, "workerUncaughtError");
         assert_eq!(report.render_worker_context_lost_count, 0);
+    }
+}
+
+#[cfg(test)]
+mod performance_summary_tests {
+    use super::*;
+
+    #[test]
+    fn minute_summary_roundtrips_fixed_shape_and_defaults_absent_fields() {
+        let summary: ClientPerformanceSummary = serde_json::from_value(serde_json::json!({
+            "elapsedMs": 60000, "frameCount": 3600, "frameTotalMs": 60000,
+            "workerPresentedCount": 3500, "workerCountersValid": true,
+            "visibleThroughout": true, "focusedThroughout": false,
+            "workerRollingUpdate": { "samples": 2048, "maxMs": 35, "p95Ms": 8 }
+        })).expect("fixed summary payload");
+        assert_eq!(summary.worker_presented_count, 3500);
+        assert_eq!(summary.worker_rolling_update.samples, 2048);
+        assert_eq!(summary.worker_rolling_update.p95_ms, 8);
+        assert_eq!(summary.frames_over_100_ms, 0);
+        assert!(!summary.focused_throughout);
+        let roundtrip: ClientPerformanceSummary = serde_json::from_str(
+            &serde_json::to_string(&summary).expect("serialize summary")
+        ).expect("deserialize summary");
+        assert_eq!(roundtrip, summary);
+        assert!(serde_json::from_value::<ClientPerformanceSummary>(serde_json::json!({
+            "workerRollingUpdate": { "maxMs": 65536 }
+        })).is_err());
     }
 }

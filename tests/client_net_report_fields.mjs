@@ -1,4 +1,6 @@
 export const CLIENT_NET_REPORT_FIELDS = Object.freeze([
+  "clientBuildId",
+  "performanceSummary",
   "schemaVersion",
   "matchRunId",
   "elapsedMs",

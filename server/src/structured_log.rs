@@ -9,6 +9,7 @@ use crate::lobby::{
 };
 use crate::protocol::ClientNetReport;
 
+mod performance_summary;
 mod render_worker;
 
 static NEXT_MATCH_RUN_ID: AtomicU64 = AtomicU64::new(1);
@@ -107,6 +108,7 @@ pub fn log_client_net_report(
     report: ClientNetReport,
     outbound: ConnectionReportStats,
 ) {
+    performance_summary::log(player_id, current_room_name, &report);
     if !is_notable_net_report(&report, &outbound) {
         return;
     }
@@ -1207,11 +1209,6 @@ mod tests {
             command_ack_snapshot_received_to_applied_p95_ms: 0,
             oldest_pending_command_age_ms: 0,
             max_pending_command_count: 0,
-            command_family_move: 0,
-            command_family_attack_move: 0,
-            command_family_build: 0,
-            command_family_train: 0,
-            command_family_other: 0,
             command_lifecycle_exemplars: Vec::new(),
             correction_distance_px: 0,
             correction_count: 0,
@@ -1228,6 +1225,7 @@ mod tests {
             prediction_replay_max_ms: 0,
             prediction_replay_max_ticks: 0,
             prediction_replay_budget_exceeded_count: 0,
+            ..ClientNetReport::default()
         }
     }
 

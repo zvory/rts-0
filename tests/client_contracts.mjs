@@ -2,6 +2,8 @@
 // Stable client contract runner. Domain modules carry the assertions so
 // future failures can be triaged by contract area without loading one giant file.
 
+import "./client_performance_summary.mjs";
+
 import { runFrameProfilerContracts } from "./client_contracts/frame_profiler_contracts.mjs";
 import { runScoreboardContracts } from "./client_contracts/scoreboard_contracts.mjs";
 import "./client_contracts/apm_tracker_contracts.mjs";

@@ -6,6 +6,7 @@ import { installTauriNativeCursorBridge } from "./input/cursor_lock.js";
 
 const MATCH_PING_MS = 2000;
 const NET_REPORT_MS = 10000;
+const PERFORMANCE_SUMMARY_MS = 60000;
 
 export class MatchNetReporter {
   constructor({
@@ -32,6 +33,19 @@ export class MatchNetReporter {
     this.nextRenderWorkerBaseline = this.renderWorkerBaseline;
     this.matchPingTimer = undefined;
     this.netReportTimer = undefined;
+    this.performanceRecording = false;
+    this.performanceStartedAt = performance.now();
+    this.performancePresentedBaseline = 0;
+    this.performanceCounterReset = false;
+    this.lastPerformancePresented = 0;
+    this.visibilityChanges = 0;
+    this.visibleThroughout = !globalThis.document?.hidden;
+    this.focusedThroughout = globalThis.document?.hasFocus?.() ?? true;
+    this.noteVisibility = () => {
+      this.visibilityChanges += 1;
+      this.visibleThroughout &&= !globalThis.document?.hidden;
+    };
+    this.noteFocus = () => { this.focusedThroughout = false; };
   }
 
   startMatchPings() {
@@ -49,10 +63,18 @@ export class MatchNetReporter {
 
   startNetReports() {
     this.stopNetReports();
+    this.performanceRecording = true;
+    this.resetPerformanceWindow();
+    document.addEventListener?.("visibilitychange", this.noteVisibility);
+    window.addEventListener?.("blur", this.noteFocus);
+    window.addEventListener?.("focus", this.noteFocus);
     this.netReportTimer = window.setInterval(() => this.sendNetReport(), NET_REPORT_MS);
   }
 
   stopNetReports() {
+    document.removeEventListener?.("visibilitychange", this.noteVisibility);
+    window.removeEventListener?.("blur", this.noteFocus);
+    window.removeEventListener?.("focus", this.noteFocus);
     if (this.netReportTimer !== undefined) {
       clearInterval(this.netReportTimer);
       this.netReportTimer = undefined;
@@ -64,7 +86,7 @@ export class MatchNetReporter {
     this.sendNetReport();
   }
 
-  sendNetReport() {
+  sendNetReport({ final = false } = {}) {
     const stats = this.health.reportStats;
     const metrics = this.health.metrics();
     const transportStats = this.net.consumeSnapshotReportStats?.() || {};
@@ -73,6 +95,7 @@ export class MatchNetReporter {
     const report = {
       schemaVersion: 1,
       matchRunId: this.matchRunId,
+      clientBuildId: clampReportLabel(globalThis.__RTS_BUILD__ || "unknown"),
       elapsedMs: clampU32(elapsedMs),
       matchTick: clampU32(this.getLastSnapshotTick()),
       rttMs: clampU16(metrics.latencyMs),
@@ -114,7 +137,27 @@ export class MatchNetReporter {
       headOfLineCount: clampU32(metrics.issues.headOfLine.count),
       ...this.getPredictionReportFields(),
     };
+    const worker = this.currentRenderWorkerStats || {};
+    const presented = clampU32(worker.presented);
+    if (presented < this.lastPerformancePresented) this.performanceCounterReset = true;
+    this.lastPerformancePresented = presented;
+    const summaryElapsedMs = performance.now() - this.performanceStartedAt;
+    report.performanceSummary = this.performanceRecording && (summaryElapsedMs >= PERFORMANCE_SUMMARY_MS ||
+      (final && summaryElapsedMs >= 1000 && this.health.performanceWindow?.frameCount > 0)) ? {
+      elapsedMs: clampU32(summaryElapsedMs),
+      ...this.health.performanceWindow?.summary(),
+      workerPresentedCount: clampU32(Math.max(0, presented - this.performancePresentedBaseline)),
+      workerCountersValid: !this.performanceCounterReset,
+      visibleThroughout: this.visibleThroughout && !document.hidden,
+      focusedThroughout: this.focusedThroughout && (document.hasFocus?.() ?? true),
+      visibilityChangeCount: clampU32(this.visibilityChanges),
+      workerRollingUpdate: rollingTiming(worker.workerUpdateMs),
+      workerRollingPresent: rollingTiming(worker.workerPresentMs),
+      workerRollingQueueAge: rollingTiming(worker.queueAgeMs),
+      workerRollingDisplayAge: rollingTiming(worker.displayAgeMs),
+    } : null;
     const accepted = this.net.netReport(report);
+    if (accepted !== false && report.performanceSummary) this.resetPerformanceWindow(presented);
     if (accepted !== false) this.renderWorkerBaseline = this.nextRenderWorkerBaseline;
     this.diagnostics?.count("client.send.netReport", {
       rttMs: report.rttMs,
@@ -147,8 +190,26 @@ export class MatchNetReporter {
     this.snapshotProcessingReport.reset();
   }
 
+  finishPerformanceWindow() {
+    if (!this.performanceRecording) return;
+    this.sendNetReport({ final: true });
+    this.performanceRecording = false;
+  }
+
+  resetPerformanceWindow(presented = clampU32(this.getRenderWorkerDiagnostics?.()?.presented)) {
+    this.performanceStartedAt = performance.now();
+    this.performancePresentedBaseline = presented;
+    this.lastPerformancePresented = presented;
+    this.performanceCounterReset = false;
+    this.visibilityChanges = 0;
+    this.visibleThroughout = !document.hidden;
+    this.focusedThroughout = document.hasFocus?.() ?? true;
+    this.health.performanceWindow?.reset();
+  }
+
   consumeRenderWorkerReportFields() {
     const stats = this.getRenderWorkerDiagnostics?.() || {};
+    this.currentRenderWorkerStats = stats;
     const failed = clampU32(stats.failed);
     const contextLost = clampU32(stats.contextLost);
     const fields = renderWorkerReportFields(stats, {
@@ -158,6 +219,10 @@ export class MatchNetReporter {
     this.nextRenderWorkerBaseline = { failed, contextLost };
     return fields;
   }
+}
+
+function rollingTiming(stats = {}) {
+  return { samples: clampU32(stats.samples), maxMs: clampU16(stats.max), p95Ms: clampU16(stats.p95) };
 }
 
 export function renderWorkerReportFields(stats = {}, deltas = {}) {
