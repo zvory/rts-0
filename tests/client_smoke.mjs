@@ -291,7 +291,9 @@ try {
   const canvas = await page.evaluate(() => { const c = document.querySelector("#viewport canvas"); return c ? { w: c.width, h: c.height } : null; });
   ok(canvas && canvas.w > 0 && canvas.h > 0, `canvas mounted and sized (${canvas?.w}x${canvas?.h})`);
 
-  await sleep(2500);
+  await page.waitForFunction(() =>
+    parseInt(document.getElementById("res-steel")?.textContent, 10) >= 50,
+  { timeout: 5000 });
   const hud = await page.evaluate(() => ({
     m: document.getElementById("res-steel")?.textContent,
     s: document.getElementById("res-supply")?.textContent,

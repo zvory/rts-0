@@ -110,6 +110,7 @@ await import("./client_contracts/config_contracts.mjs");
 await import("./client_contracts/state_trench_contracts.mjs");
 await import("./client_contracts/miss_toast_contracts.mjs");
 await import("./client_contracts/selection_projection_contracts.mjs");
+await import("./client_contracts/unit_click_geometry_contracts.mjs");
 await import("./client_contracts/firing_reveal_contracts.mjs");
 await import("./client_contracts/firing_reveal_renderer_contracts.mjs");
 await import("./client_contracts/pump_jack_input_contracts.mjs");
