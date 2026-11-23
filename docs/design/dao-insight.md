@@ -22,7 +22,8 @@ one-for-one training in the [Proving Grounds](proven-grounds.md),
 with the existing shared research price tiers, serial queue and prerequisite/faction gates.
 Combat-earned evolution requires neither research nor a Pavilion.
 
-Novices have **Charge**, an automatic passive with no selectable command. Against a living
+Novices have **Charge**, an automatic passive shown as a disabled command-card tile with the
+autocast swirl and authoritative cooldown clock. It has no hotkey, cast action, or autocast toggle. Against a living
 hostile unit selected by normal combat targeting (explicit attack, attack-move, or automatic
 engagement), it grants 1.5× movement speed for 30 ticks (one second), with a 450-tick
 (15-second) cooldown from activation. It triggers at center distance at least two tiles,

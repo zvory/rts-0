@@ -737,3 +737,52 @@ fn smoke_launches_without_resource_cost() {
         })
     }));
 }
+
+#[test]
+fn novice_charge_cannot_be_cast_or_toggled_by_commands() {
+    let map = flat_map(24);
+    for cooldown in [0, 225] {
+        let mut entities = EntityStore::new();
+        let novice = entities
+            .spawn_unit(1, EntityKind::Warrior, 100.0, 100.0)
+            .unwrap();
+        let unit = entities.get_mut(novice).unwrap();
+        unit.set_order(Order::move_to(200.0, 200.0));
+        unit.start_ability_cooldown(AbilityKind::Charge, cooldown);
+        let before = unit.clone();
+        let mut players = vec![player_state(1)];
+        players[0].faction_id = rules::faction::CULTIVATORS_FACTION_ID.to_string();
+        for queued in [false, true] {
+            apply_with_players(
+                &map,
+                &mut entities,
+                &mut players,
+                vec![
+                    (
+                        1,
+                        SimCommand::UseAbility {
+                            ability: AbilityKind::Charge,
+                            units: vec![novice],
+                            x: None,
+                            y: None,
+                            target_id: None,
+                            queued,
+                        },
+                    ),
+                    (
+                        1,
+                        SimCommand::SetAutocast {
+                            ability: AbilityKind::Charge,
+                            units: vec![novice],
+                            enabled: false,
+                        },
+                    ),
+                ],
+            );
+            let after = entities.get(novice).unwrap();
+            assert_eq!(after.order(), before.order());
+            assert_eq!(after.ability_cooldown_ticks(AbilityKind::Charge), cooldown);
+            assert_eq!(after.movement_speed(), before.movement_speed());
+        }
+    }
+}

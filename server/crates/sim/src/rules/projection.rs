@@ -496,7 +496,7 @@ pub fn project_entity(
                 ability: kind.to_protocol_str().to_string(),
                 cooldown_left: *cooldown_left,
                 remaining_uses: entity.ability_uses_remaining(*kind),
-                autocast_enabled: None,
+                autocast_enabled: (*kind == ability::AbilityKind::Charge).then_some(true),
                 active_object_id: active_return_object_id(&context, entity, *kind),
                 available_tick: return_available_tick(&context, entity, *kind),
                 lockout_until_tick: entity.ability_lockout_until_tick(*kind, context.tick),
@@ -537,7 +537,7 @@ pub fn project_entity(
                     } else {
                         Some(0)
                     },
-                    autocast_enabled: None,
+                    autocast_enabled: (kind == ability::AbilityKind::Charge).then_some(true),
                     active_object_id: active_return_object_id(&context, entity, kind),
                     available_tick: return_available_tick(&context, entity, kind),
                     lockout_until_tick: entity.ability_lockout_until_tick(kind, context.tick),

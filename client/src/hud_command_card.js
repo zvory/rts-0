@@ -82,7 +82,7 @@ function hiddenPlaytestCommand(slot) {
 
 function renderedDescriptor(descriptor, slotIndex) {
   const commandId = descriptor.commandId || descriptor.id;
-  const hotkey = gridHotkeyForSlot(slotIndex);
+  const hotkey = descriptor.passive ? "" : gridHotkeyForSlot(slotIndex);
   return {
     ...descriptor,
     commandId,
@@ -360,9 +360,9 @@ function placeAbilityDescriptors(ctx, slots, abilityAffordances, factionId) {
     abilitySlotPriority(left.definition) - abilitySlotPriority(right.definition));
   for (const affordance of ordered) {
     const definition = affordance.definition;
-    const preferred = definition.hotkey ? GRID_HOTKEYS.indexOf(definition.hotkey) : -1;
+    const preferred = definition.ability === ABILITY.CHARGE ? 2 : GRID_HOTKEYS.indexOf(definition.hotkey);
     if (preferred < 0 || (slots[preferred] && slots[preferred].action !== "ability")) continue;
-    // Higher priority wins collisions.
+    // Higher priority wins.
     slots[preferred] = abilityDescriptor(ctx, factionId, affordance);
   }
 }

@@ -349,6 +349,13 @@ export const ABILITIES = Object.freeze({
     upgradeRequirement: null, queued: false, queuePolicy: "notQueueable",
   }),
 
+  [ABILITY.CHARGE]: Object.freeze({
+    ability: ABILITY.CHARGE, label: "Charge", icon: "CHG",
+    title: "Automatic Novice Charge: 1.5x speed for one second against a distant or retreating enemy unit",
+    carriers: Object.freeze([KIND.WARRIOR]), targetMode: "self",
+    cooldownTicks: 450, cost: Object.freeze({ steel: 0, oil: 0 }),
+    queued: false, queuePolicy: "notQueueable",
+  }),
   [ABILITY.SMOKE]: Object.freeze({
     ability: ABILITY.SMOKE,
     label: "Smoke",
