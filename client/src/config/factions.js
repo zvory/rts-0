@@ -196,7 +196,10 @@ const ADEPT_STATS = Object.freeze(Object.fromEntries(
     ...STATS[KIND.WARRIOR], label: `${dao} Adept`,
   })]),
 ));
-export function statsForFaction(kind, factionId, dao = null) {
+const MASTER_STATS = Object.freeze(Object.fromEntries(Object.entries(ADEPT_STATS)
+  .map(([dao, stats]) => [dao, Object.freeze({ ...stats, label: stats.label.replace("Adept", "Master") })])));
+export function statsForFaction(kind, factionId, dao = null, daoMaster = false) {
+  if (kind === KIND.WARRIOR && daoMaster && MASTER_STATS[dao]) return MASTER_STATS[dao];
   if (kind === KIND.WARRIOR && Object.prototype.hasOwnProperty.call(ADEPT_STATS, dao)) return ADEPT_STATS[dao];
   if (factionId === CULTIVATORS_FACTION_ID) {
     if (kind === KIND.RESOURCE_DEPOT) return NEXUS_STATS;

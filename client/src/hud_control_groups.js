@@ -16,7 +16,7 @@ export function buildControlGroupSummaries(state, selected = [], controlPolicy =
 
     const dominant = dominantControlGroupKind(entities);
     const representative = entities[dominant.first];
-    const st = statsForFaction(dominant.kind, state.players?.find?.((p) => p.id === representative?.owner)?.factionId, representative?.dao) || {};
+    const st = statsForFaction(dominant.kind, state.players?.find?.((p) => p.id === representative?.owner)?.factionId, representative?.dao, representative?.daoMaster) || {};
     out.push({
       key: slot === 9 ? "0" : String(slot + 1),
       count: entities.length,

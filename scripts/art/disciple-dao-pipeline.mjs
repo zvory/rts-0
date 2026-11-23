@@ -143,6 +143,23 @@ for (const [col, row, crownX, crownY] of warCells) {
   war.push(frame(cell, 0.31, [crownX, crownY]));
 }
 strip("war-yari", war);
+// Master sprites keep Adept-sized crowns/torsos here; the renderer applies the
+// rank's 1.2 body multiplier once. Cloth bounds never determine body size.
+strip("lightness-master", gridFrames("lightness-master-motion.png", 2, 0.50, 0.48));
+strip("magic-master", gridFrames("magic-master-motion.png", 2, 0.37, 0.48));
+const masterWarSheet = key(read(path.join(rig, "source/war-master-motion.png")));
+const masterWar = [];
+const helmetPivots = [[222, 86], [222, 86], [222, 86], [222, 86],
+  [222, 89], [222, 89], [222, 89], [222, 89]];
+for (let i = 0; i < 8; i++) {
+  const col = i % 4, row = Math.floor(i / 4);
+  const x = Math.round(col * masterWarSheet.width / 4), y = Math.round(row * masterWarSheet.height / 2);
+  const cell = crop(masterWarSheet, x, y,
+    Math.round((col + 1) * masterWarSheet.width / 4) - x,
+    Math.round((row + 1) * masterWarSheet.height / 2) - y);
+  masterWar.push(frame(cell, 0.30, helmetPivots[i]));
+}
+strip("war-master", masterWar);
 const arrowDir = path.join(root, "client/assets/effects/disciple-arrow");
 const arrow = key(read(path.join(arrowDir, "arrow-source.png")));
 let minX = arrow.width, minY = arrow.height, maxX = 0, maxY = 0;

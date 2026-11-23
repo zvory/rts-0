@@ -10,7 +10,7 @@ do not cancel it. No automatic research purchase, Portal default, or army-wide p
 is added. Evolution is immediate and free once the unit has 60 insight, capped at 60; misses, friendly fire, invulnerability and overkill grant
 no extra insight. Actual hostile unit HP loss grants one insight per damage; building HP loss grants half, rounded down per hit, for both ordinary attacks and ability projectiles. Advancement clears all existing insight. Successful advancement fully restores HP to the evolved unit’s maximum,
 after applying any path-specific maximum-HP bonus. Base, Lightness, and Magic have 115 maximum HP; War has 135. Base moves at 2.0 px/tick; War and Magic move at 2.1 px/tick. Choosing a pending path or repeating
-an evolution request does not heal; dead units cannot advance. One evolution per unit. Player research persists after Pavilion loss.
+an evolution request does not heal; dead units cannot advance. One chosen-path evolution per unit, followed by one automatic Master advancement. Player research persists after Pavilion loss.
 The choice clears on evolution; evolved units cannot change paths. Pending choices persist
 through checkpoints and are visible only to teammates and privileged observers. The command
 card highlights chosen paths with an assigned/eligible count; tooltips show missing
@@ -32,7 +32,10 @@ Each paid training path has a separate researched unlock; combat-earned evolutio
 AI can encounter and damage evolved units. Insight uses a blue fill over red background
 under the HP bar and exact insight appears in selected-unit details for teammates and privileged observers only. Enemy snapshots omit exact insight. Evolved units
 reset to zero insight and have a doubled cap of 120. They continue earning insight from
-actual hostile HP damage; reaching 120 has no effect or further advancement. Their bars
+actual hostile HP damage; reaching 120 automatically advances living Adepts to their matching
+[Master rank](dao-masters.md), fully healing to 1.4 times their Adept maximum HP. Masters
+are 1.2 times Adept size, 1.1 times speed and deal 1.2 times ordinary attack damage. They
+reset insight to zero and stop earning it; no further advancement or repeat healing. Adept bars
 and selected-unit details use the new cap. Tournament winners follow the same rules. No new targeting or hidden-position information is exposed.
 State is checkpointed with the entity and snapshots use appended compact slots.
 

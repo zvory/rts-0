@@ -341,7 +341,7 @@ assert(
   "compact snapshot scalar schema must match JS decoder",
 );
 assert(
-  protocolContract.compactSlotSchemas.entity.at(-1).name === "daoTrainingQueue",
+  protocolContract.compactSlotSchemas.entity.at(-1).name === "daoMaster",
   "compact entity slot schema must include the latest appended field",
 );
 assert(
@@ -813,3 +813,12 @@ const paidTrainingSnapshot = decodeServerMessage({t: "snapshot", v: COMPACT_SNAP
 assert(paidTrainingSnapshot.entities[0].kind === KIND.PROVEN_GROUNDS, "Proving Grounds kind roundtrips");
 assert(paidTrainingSnapshot.entities[0].daoTrainingQueue.join(",") === "dao_of_magic,dao_of_heaviness",
   "paid training plans decode at slot 51");
+
+const daoMasterRecord = [501, 1, KIND_CODE[KIND.WARRIOR], 400, 400, 161, 161, STATE_CODE[STATE.IDLE]];
+while (daoMasterRecord.length < 53) daoMasterRecord.push(null);
+daoMasterRecord[46] = "lightness";
+daoMasterRecord[52] = true;
+const daoMasterSnapshot = decodeServerMessage({ t: "snapshot", v: COMPACT_SNAPSHOT_VERSION,
+  s: [1, 0, 0, 2, 300], e: [daoMasterRecord], ev: [], n: [0, 0, 0, 0, 0] });
+assert(daoMasterSnapshot.entities[0].daoMaster === true, "public Master rank decodes at slot 52");
+assert(daoMasterSnapshot.entities[0].insight === undefined, "rank does not reveal exact insight");

@@ -406,7 +406,7 @@ pub(crate) fn run_tick(
             let Some(entity) = entities.get_mut(id) else {
                 continue;
             };
-            if entity.chosen_dao.is_none() {
+            if entity.chosen_dao.is_none() && entity.dao.is_none() {
                 continue;
             }
             if players.iter().any(|player| {
@@ -414,6 +414,7 @@ pub(crate) fn run_tick(
                     && player.faction_id == crate::rules::faction::CULTIVATORS_FACTION_ID
             }) {
                 entity.advance_chosen_dao();
+                entity.advance_dao_master();
             }
         }
     });

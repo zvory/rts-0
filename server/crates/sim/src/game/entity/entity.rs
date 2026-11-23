@@ -1,12 +1,3 @@
-use rts_rules::math::Coord;
-use std::collections::BTreeMap;
-
-use crate::config;
-use crate::game::ability::AbilityKind;
-use crate::protocol::states;
-use crate::rules;
-use serde::{Deserialize, Serialize};
-
 use super::order::BUILD_UNIT_BLOCK_GRACE_TICKS;
 #[cfg(test)]
 use super::EntityStateGroups;
@@ -16,7 +7,13 @@ use super::{
     PanzerfaustState, ProductionState, ResourceExtractorState, ResourceNodeState, ScoutPlaneState,
     WeaponSetup, WorkerState, MAX_QUEUED_ORDERS, NEUTRAL,
 };
-
+use crate::config;
+use crate::game::ability::AbilityKind;
+use crate::protocol::states;
+use crate::rules;
+use rts_rules::math::Coord;
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 mod dao;
 pub(crate) use dao::DiscipleShield;
 mod field_obstacles;
@@ -26,9 +23,7 @@ mod production;
 mod production_repeat;
 mod rally;
 mod research;
-
 use helpers::construction_hp_for_progress;
-
 const BUILDING_START_HP_NUMERATOR: u32 = 1;
 const BUILDING_START_HP_DENOMINATOR: u32 = 10;
 
@@ -54,6 +49,8 @@ pub struct Entity {
     pub insight: u32,
     #[serde(default)]
     pub dao: Option<crate::game::upgrade::UpgradeKind>,
+    #[serde(default)]
+    pub dao_master: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub chosen_dao: Option<crate::game::upgrade::UpgradeKind>,
     #[serde(default)]
@@ -111,6 +108,7 @@ impl Entity {
             units_killed: 0,
             insight: 0,
             dao: None,
+            dao_master: false,
             chosen_dao: None,
             dao_advance_ticks: 0,
             shield: None,
@@ -167,6 +165,7 @@ impl Entity {
             units_killed: 0,
             insight: 0,
             dao: None,
+            dao_master: false,
             chosen_dao: None,
             dao_advance_ticks: 0,
             shield: None,
@@ -225,6 +224,7 @@ impl Entity {
             units_killed: 0,
             insight: 0,
             dao: None,
+            dao_master: false,
             chosen_dao: None,
             dao_advance_ticks: 0,
             shield: None,

@@ -27,7 +27,7 @@ import { decodeCompactTrenches } from "./protocol_snapshot_trenches.js";
 
 export function decodeCompactSnapshot(raw) {
   // Older saved streams retain the same entity layouts; later fields are optional.
-  if (raw.v !== COMPACT_SNAPSHOT_VERSION && raw.v !== 62 && raw.v !== 61 && raw.v !== 60 && raw.v !== 59 && raw.v !== 58 && raw.v !== 57 && raw.v !== 56 && raw.v !== 55 && raw.v !== 54 && raw.v !== 53 && raw.v !== 52 && raw.v !== 51) {
+  if (raw.v !== COMPACT_SNAPSHOT_VERSION && raw.v !== 63 && raw.v !== 62 && raw.v !== 61 && raw.v !== 60 && raw.v !== 59 && raw.v !== 58 && raw.v !== 57 && raw.v !== 56 && raw.v !== 55 && raw.v !== 54 && raw.v !== 53 && raw.v !== 52 && raw.v !== 51) {
     throw new Error(`unsupported compact snapshot version: ${raw.v}`);
   }
 
@@ -323,7 +323,7 @@ function decodeCompactPlayerResource(record, index) {
 }
 
 function decodeCompactEntity(record, index) {
-  const fields = readArray(record, `entity ${index}`, 52);
+  const fields = readArray(record, `entity ${index}`, 53);
   if (fields.length < 8) throw new Error(`entity ${index} is too short`);
   const entity = {
     id: readU32(fields[0], "entity.id"),
@@ -347,7 +347,6 @@ function decodeCompactEntity(record, index) {
   assignOptionalCode(entity, "setupState", fields, 16, SETUP_BY_CODE);
   assignOptional(entity, "remaining", fields, 17, readU32);
   assignRally(entity, fields, 18);
-  // Slot 19 is reserved after retirement of per-unit movement-oil telemetry.
   assignOptional(entity, "setupFacing", fields, 20, readNumber);
   assignOrderPlan(entity, fields, 21);
   assignOptional(entity, "chargeCooldownLeft", fields, 22, readU32);
@@ -380,6 +379,7 @@ function decodeCompactEntity(record, index) {
   assignOptional(entity, "chosenDao", fields, 49, readString);
   assignOptional(entity, "tournamentEntrants", fields, 50, readU32);
   assignOptional(entity, "daoTrainingQueue", fields, 51, (v) => readArray(v, "Dao training", 64).map(readString));
+  assignOptional(entity, "daoMaster", fields, 52, readBool);
   return entity;
 }
 

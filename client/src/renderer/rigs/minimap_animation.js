@@ -40,8 +40,10 @@ export function createMinimapAnimation() {
           { length: strips.get(KIND.RIFLEMAN).frameCount }, (_, i) => `unloaded-frame:${i}`));
         if (kind === KIND.WARRIOR) {
           for (const dao of ["lightness", "magic", "war"]) {
-            const variant = strips.get(liveFrameStripKeyForEntity({ kind, dao }));
-            parts.push(...Array.from({ length: variant.frameCount }, (_, i) => `dao-${dao}:frame:${i}`));
+            for (const daoMaster of [false, true]) {
+              const variant = strips.get(liveFrameStripKeyForEntity({ kind, dao, daoMaster }));
+              parts.push(...Array.from({ length: variant.frameCount }, (_, i) => `dao-${dao}${daoMaster ? "-master" : ""}:frame:${i}`));
+            }
           }
         }
         return parts;
@@ -69,7 +71,7 @@ export function createMinimapAnimation() {
         const step = (offset.y - reference.y) / frameStripWorldScale(strip, entity, context) * scale;
         const frameScale = Math.max(strip.frameWidth, strip.frameHeight) * scale;
         const prefix = entity.kind === KIND.WARRIOR && ["lightness", "magic", "war"].includes(entity.dao)
-          ? `dao-${entity.dao}:frame` : entity.kind === KIND.PANZERFAUST && entity.panzerfaustLoaded !== true
+          ? `dao-${entity.dao}${entity.daoMaster ? "-master" : ""}:frame` : entity.kind === KIND.PANZERFAUST && entity.panzerfaustLoaded !== true
           ? "unloaded-frame" : "frame";
         result = [{ part: `${prefix}:${frame}`, rotation, x: Math.cos(rotation) * kick - Math.sin(rotation) * step,
           y: Math.sin(rotation) * kick + Math.cos(rotation) * step, scaleX: frameScale, scaleY: frameScale, alpha: 1 }];

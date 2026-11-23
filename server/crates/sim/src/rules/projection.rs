@@ -253,6 +253,7 @@ pub fn project_entity(
     view.vision_only = vision_only;
 
     if entity.kind == EntityKind::Warrior {
+        view.dao_master = Some(entity.dao_master);
         view.insight = owner_or_ally.then_some(entity.insight);
         view.dao_ready =
             Some(entity.dao.is_none() && entity.insight >= config::DISCIPLE_INSIGHT_REQUIRED);

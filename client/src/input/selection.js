@@ -106,7 +106,7 @@ export function _ownBuildingsOfKindInViewport(kind) {
 
 export function _unitSelectionGroup(entity) {
   if (!entity) return "";
-  if (entity.kind === KIND.WARRIOR) return `${entity.kind}:${entity.dao || "base"}`;
+  if (entity.kind === KIND.WARRIOR) return `${entity.kind}:${entity.dao || "base"}${entity.daoMaster ? ":master" : ""}`;
   if (entity.kind !== KIND.ANTI_TANK_GUN) return entity.kind;
   return `${entity.kind}:${entity.setupState || SETUP.PACKED}`;
 }

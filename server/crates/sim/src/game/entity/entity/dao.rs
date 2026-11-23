@@ -12,11 +12,18 @@ pub(crate) struct DiscipleShield {
 
 impl Entity {
     pub(super) fn dao_body_scale(&self) -> f32 {
-        if self.kind == EntityKind::Warrior && self.dao == Some(UpgradeKind::DaoOfHeaviness) {
-            config::DAO_WAR_BODY_SCALE
-        } else {
-            1.0
-        }
+        let adept =
+            if self.kind == EntityKind::Warrior && self.dao == Some(UpgradeKind::DaoOfHeaviness) {
+                config::DAO_WAR_BODY_SCALE
+            } else {
+                1.0
+            };
+        adept
+            * if self.dao_master {
+                config::DAO_MASTER_BODY_SCALE
+            } else {
+                1.0
+            }
     }
 
     pub(in crate::game) fn expire_shield(&mut self, tick: u32) {
@@ -52,7 +59,9 @@ impl Entity {
     }
 
     pub(crate) fn insight_cap(&self) -> u32 {
-        if self.dao.is_some() {
+        if self.dao_master {
+            0
+        } else if self.dao.is_some() {
             config::DISCIPLE_EVOLVED_INSIGHT_CAP
         } else {
             config::DISCIPLE_INSIGHT_REQUIRED
@@ -126,6 +135,23 @@ impl Entity {
         self.evolve_dao(ability);
     }
 
+    /// Second-rank advancement never changes path, orders, abilities or remaining reload.
+    pub(in crate::game) fn advance_dao_master(&mut self) {
+        if self.kind != EntityKind::Warrior
+            || self.hp == 0
+            || self.dao.is_none()
+            || self.dao_master
+            || self.insight < config::DISCIPLE_EVOLVED_INSIGHT_CAP
+        {
+            return;
+        }
+        self.dao_master = true;
+        self.insight = 0;
+        self.max_hp = ((self.max_hp as f32) * config::DAO_MASTER_HP_MULTIPLIER).round() as u32;
+        self.hp = self.max_hp;
+        self.dao_advance_ticks = 15;
+    }
+
     pub(crate) fn evolve_dao(&mut self, ability: AbilityKind) -> bool {
         if self.kind != EntityKind::Warrior || self.hp == 0 || !self.dao_ability_available(ability)
         {
@@ -166,11 +192,17 @@ impl Entity {
 
     pub(crate) fn movement_speed(&self) -> f32 {
         let base = config::unit_stats(self.kind).map_or(0.0, |s| s.speed);
-        match self.dao {
+        let adept = match self.dao {
             Some(UpgradeKind::DaoOfLightness) => config::dao_lightness_speed(),
             Some(UpgradeKind::DaoOfHeaviness) => base * config::DAO_WAR_SPEED_MULTIPLIER,
             Some(UpgradeKind::DaoOfMagic) => base * config::DAO_MAGIC_SPEED_MULTIPLIER,
             _ => base,
-        }
+        };
+        adept
+            * if self.dao_master {
+                config::DAO_MASTER_SPEED_MULTIPLIER
+            } else {
+                1.0
+            }
     }
 }

@@ -305,6 +305,9 @@ pub(super) fn effective_attack_profile(e: &Entity) -> EffectiveAttackProfile {
         profile.dmg = ((profile.dmg as f32) * config::DAO_WAR_DAMAGE_MULTIPLIER).round() as u32;
         profile.range_tiles = config::DAO_WAR_RANGE_TILES;
     }
+    if e.dao_master {
+        profile.dmg = ((profile.dmg as f32) * config::DAO_MASTER_DAMAGE_MULTIPLIER).round() as u32;
+    }
     if e.kind != EntityKind::AntiTankGun {
         return profile;
     }

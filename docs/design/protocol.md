@@ -899,7 +899,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 63. The client also accepts compact
+`messagepack-compact`, codec version 1, compact snapshot version 64. The client also accepts compact
 snapshot versions 51 through 62: version 52 only appends a kind code, version 53 appends the
 optional `unitsKilled` entity slot, version 54 appends an optional `rocket` style bit to mortar
 launch/impact event records, and version 55 adds the `artilleryIncoming` event code, so the older
@@ -937,7 +937,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 63,
+  "v": 64,
   "gr": groundDecalRevision, // omitted when zero
   "gd": [afterRevision, [    // omitted when this tick has no discovered/created revision
     [id, decalClass, sourceKindCode, x, y, owner, seed, facing, weaponFacing, radiusTiles]
@@ -955,7 +955,7 @@ adds an explicit application compression envelope.
       visionOnly?, debugPath?, rallyPlan?, prodUpgrade?, buildActive?, deconstructProgress?,
       weaponRangeTiles?, occupiedTrenchId?, scoutPlane?, prodScoutPlaneQueued?,
       panzerfaustLoaded?, prodRepeatKinds?, prodWaiting?, breakthroughAuraTicks?, extractorActive?,
-      prodUpgradeQueue?, panzerfaustWindupProgress?, unitsKilled?, rocketRackCount?, commanderFacing?, insight?, dao?, daoReady?, daoAdvanceTicks?, chosenDao?, tournamentEntrants?, daoTrainingQueue?
+      prodUpgradeQueue?, panzerfaustWindupProgress?, unitsKilled?, rocketRackCount?, commanderFacing?, insight?, dao?, daoReady?, daoAdvanceTicks?, chosenDao?, tournamentEntrants?, daoTrainingQueue?, daoMaster?
     ]
   ],
   "r": [[id, remaining]],         // omitted when empty
@@ -2011,7 +2011,9 @@ through checkpoints. Disciple snapshots append team-private `insight` (compact s
 `daoAdvanceTicks` (48, 1–15). Ordinary fog filtering applies to all public fields. Evolution buttons set replaceable, entity-owned `chosenDao` intent (team-private compact slot 49), independent of orders. Codes 14–16 and order stages 22–24 retain their positions.
 Evolution automatically occurs once 60 insight is ready, without research or a Pavilion.
 Evolution clears all insight and doubles the cap to 120. Evolved Disciples continue earning
-insight from actual hostile HP damage; reaching 120 has no effect and enables no further evolution. Research ids are
+insight from actual hostile HP damage; reaching 120 automatically advances a living Adept
+to its matching [Master](dao-masters.md), resets insight, and fully heals to the new maximum HP.
+`daoMaster` (public boolean, compact slot 52) persists with the entity; Masters cannot advance again. Research ids are
 `dao_of_lightness`, `dao_of_heaviness` (War), `dao_of_magic` (Magic).
 
 Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md).

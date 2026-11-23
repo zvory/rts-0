@@ -228,6 +228,8 @@ fn validate_entity(
         });
     }
     if entity.insight > entity.insight_cap()
+        || (entity.dao_master
+            && (entity.kind != crate::game::entity::EntityKind::Warrior || entity.dao.is_none()))
         || (entity.kind != crate::game::entity::EntityKind::Warrior
             && (entity.insight != 0 || entity.dao.is_some()))
         || entity.dao.is_some_and(|dao| {

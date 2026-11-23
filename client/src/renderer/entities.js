@@ -323,14 +323,14 @@ export function _hpBar(g, e, status = null, ownerColor = null) {
   }
   g.rtsInsight.visible = g.rtsDao.visible = g.rtsRadiance.visible = true;
   g.rtsRadiance.update(e, e.y - topY, this._renderClock?.now?.() ?? performance.now());
-  const insightKey = `${e.insight ?? ""}|${e.dao ?? ""}|${halfW}`;
+  const insightKey = `${e.insight ?? ""}|${e.dao ?? ""}|${e.daoMaster}|${halfW}`;
   if (g.rtsInsightKey !== insightKey) {
     g.rtsInsightKey = insightKey;
     const bar = g.rtsInsight;
     const icon = g.rtsDao;
     bar.clear(); icon.clear();
     if (e.kind === KIND.WARRIOR) {
-      if (Number.isFinite(e.insight)) {
+      if (Number.isFinite(e.insight) && !e.daoMaster) {
         bar.rect(-halfW - 1, 6, barW + 2, 5).fill(0x8b2028);
         bar.rect(-halfW, 7, barW * clamp01(e.insight / (e.dao ? DISCIPLE_EVOLVED_INSIGHT_CAP : DISCIPLE_INSIGHT_REQUIRED)), 3).fill(0x368dff);
       }

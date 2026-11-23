@@ -910,6 +910,9 @@ pub struct EntityView {
     pub tournament_entrants: Option<u8>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dao_training_queue: Option<Vec<String>>,
+    /// Public rank on a visible Disciple; exact insight remains team-private.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dao_master: Option<bool>,
 
     /// Visible physical rounds on a Rocket Truck rack, including zero while reloading.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -1032,6 +1035,7 @@ impl EntityView {
             chosen_dao: None,
             tournament_entrants: None,
             dao_training_queue: None,
+            dao_master: None,
             rocket_rack_count: None,
             facing: None,
             weapon_facing: None,

@@ -7,11 +7,13 @@ import { TICK_HZ } from "./timing.js";
 
 export const DAO_WAR_RANGE_TILES = 1.75;
 export const DAO_WAR_BODY_SCALE = 0.7;
+export const DAO_MASTER_BODY_SCALE = 1.2;
 
 export function entityBodyRadius(entity) {
   const size = STATS[entity?.kind]?.size || 0;
-  return entity?.kind === KIND.WARRIOR && entity.dao === "war"
+  const adept = entity?.kind === KIND.WARRIOR && entity.dao === "war"
     ? size * DAO_WAR_BODY_SCALE : size;
+  return adept * (entity?.kind === KIND.WARRIOR && entity.daoMaster ? DAO_MASTER_BODY_SCALE : 1);
 }
 export const DAO_RANGED_RANGE_TILES = 5;
 export const DISCIPLE_INSIGHT_REQUIRED = 60;

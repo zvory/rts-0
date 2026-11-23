@@ -110,3 +110,6 @@ mod tests {
 // Snapshot playerFactions (compact pf) projects public identity independently of private resources.
 
 // Cultivator Shop: wire kind shop, compact kind code 34; no additional snapshot fields.
+
+// Dao Master rank: EntityView daoMaster is a public bool at compact slot 52 (v64);
+// rts-contract owns the DTO, the sim owns advancement, and exact insight stays team-private.

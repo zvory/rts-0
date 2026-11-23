@@ -1497,3 +1497,4 @@ mod tests {
 }
 
 // EntityView::rocket_rack_count is re-exported from rts-contract; compact v56 uses slot 43.
+// EntityView daoMaster: public rank at compact slot 52 (v64), re-exported from rts-contract.

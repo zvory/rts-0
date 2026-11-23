@@ -12,6 +12,8 @@ import { WARRIOR_PNG_FRAME_STRIP } from "./warrior_png_strip.js";
 import {
   LIGHTNESS_FRAME_STRIP_KEY, MAGIC_FRAME_STRIP_KEY, WAR_FRAME_STRIP_KEY,
   LIGHTNESS_PNG_FRAME_STRIP, MAGIC_PNG_FRAME_STRIP, WAR_PNG_FRAME_STRIP,
+  LIGHTNESS_MASTER_FRAME_STRIP_KEY, MAGIC_MASTER_FRAME_STRIP_KEY, WAR_MASTER_FRAME_STRIP_KEY,
+  LIGHTNESS_MASTER_PNG_FRAME_STRIP, MAGIC_MASTER_PNG_FRAME_STRIP, WAR_MASTER_PNG_FRAME_STRIP,
 } from "./disciple_png_strips.js";
 
 const LIVE_FRAME_STRIPS = Object.freeze([
@@ -23,6 +25,9 @@ const LIVE_FRAME_STRIPS = Object.freeze([
   [LIGHTNESS_FRAME_STRIP_KEY, LIGHTNESS_PNG_FRAME_STRIP],
   [MAGIC_FRAME_STRIP_KEY, MAGIC_PNG_FRAME_STRIP],
   [WAR_FRAME_STRIP_KEY, WAR_PNG_FRAME_STRIP],
+  [LIGHTNESS_MASTER_FRAME_STRIP_KEY, LIGHTNESS_MASTER_PNG_FRAME_STRIP],
+  [MAGIC_MASTER_FRAME_STRIP_KEY, MAGIC_MASTER_PNG_FRAME_STRIP],
+  [WAR_MASTER_FRAME_STRIP_KEY, WAR_MASTER_PNG_FRAME_STRIP],
 ]);
 
 export function createLiveFrameStrips() {
@@ -37,6 +42,11 @@ export function createLiveFrameStrips() {
 // overlay routes and fallback geometry for all four Disciple forms.
 export function liveFrameStripKeyForEntity(entity) {
   if (entity?.kind === KIND.WARRIOR) {
+    if (entity.daoMaster) {
+      if (entity.dao === "lightness") return LIGHTNESS_MASTER_FRAME_STRIP_KEY;
+      if (entity.dao === "war") return WAR_MASTER_FRAME_STRIP_KEY;
+      if (entity.dao === "magic") return MAGIC_MASTER_FRAME_STRIP_KEY;
+    }
     if (entity.dao === "lightness") return LIGHTNESS_FRAME_STRIP_KEY;
     if (entity.dao === "war") return WAR_FRAME_STRIP_KEY;
     if (entity.dao === "magic") return MAGIC_FRAME_STRIP_KEY;

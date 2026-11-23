@@ -22,10 +22,11 @@ const ICON_COMPOSITION_STATE = Object.freeze({
  * PNG frame strips/atlases are authoritative for raster units. SVG portraits are used only for
  * units that do not yet have a PNG route.
  */
-export function liveUnitIconMarkupFor(kind, { teamColor = "#0072b2", minimapPart = null, dao = null } = {}) {
+export function liveUnitIconMarkupFor(kind, { teamColor = "#0072b2", minimapPart = null, dao = null, daoMaster = false } = {}) {
   const tintColor = normalizeTeamColor(teamColor);
-  const partDao = minimapPart?.startsWith("dao-") ? minimapPart.split(":")[0].slice(4) : dao;
-  const rigKey = kind === KIND.WARRIOR ? liveFrameStripKeyForEntity({ kind, dao: partDao })
+  const partDao = minimapPart?.startsWith("dao-") ? minimapPart.split(":")[0].slice(4).replace(/-master$/, "") : dao;
+  const partMaster = minimapPart?.startsWith("dao-") ? minimapPart.includes("-master:") : daoMaster;
+  const rigKey = kind === KIND.WARRIOR ? liveFrameStripKeyForEntity({ kind, dao: partDao, daoMaster: partMaster })
     : kind === KIND.PANZERFAUST
     ? (minimapPart?.startsWith("unloaded-frame:") ? KIND.RIFLEMAN : LOADED_RIFLEMAN_RIG_KEY) : kind;
   const strip = LIVE_FRAME_STRIPS.get(rigKey);

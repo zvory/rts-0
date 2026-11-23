@@ -1,9 +1,12 @@
-import { DAO_WAR_BODY_SCALE } from "../../config.js";
+import { DAO_WAR_BODY_SCALE, DAO_MASTER_BODY_SCALE } from "../../config.js";
 import { PRODUCTION_RASTER_COLOR_TARGET } from "./color_adjustment.js";
 
 export const LIGHTNESS_FRAME_STRIP_KEY = "warrior:lightness";
 export const WAR_FRAME_STRIP_KEY = "warrior:war";
 export const MAGIC_FRAME_STRIP_KEY = "warrior:magic";
+export const LIGHTNESS_MASTER_FRAME_STRIP_KEY = "warrior:lightness:master";
+export const WAR_MASTER_FRAME_STRIP_KEY = "warrior:war:master";
+export const MAGIC_MASTER_FRAME_STRIP_KEY = "warrior:magic:master";
 
 function discipleStrip(image, frameCount, firingFrames, iconVisibleBounds, weaponKind, imageVersion = "dao-ranged-1") {
   return Object.freeze({
@@ -58,3 +61,26 @@ export const WAR_PNG_FRAME_STRIP = Object.freeze({
   firingFrameHoldPhase: 400 / 720,
   firingLungePx: 16 * DAO_WAR_BODY_SCALE,
 });
+
+function masterStrip(adept, path, bounds) {
+  return Object.freeze({
+    ...adept,
+    image: `/assets/rigs/disciple-dao/generated/${path}-master-runtime-strip.png?v=master-1`,
+    imageVersion: "master-1",
+    frameCount: 8,
+    movementFrames: Object.freeze([1, 2, 3, 2]),
+    firingFrames: Object.freeze([4, 5, 6, 7]),
+    worldScale: adept.worldScale * DAO_MASTER_BODY_SCALE,
+    originLateralPx: adept.originLateralPx * DAO_MASTER_BODY_SCALE,
+    firingLungePx: (adept.firingLungePx || 0) * DAO_MASTER_BODY_SCALE,
+    iconVisibleBounds: Object.freeze(bounds),
+    source: Object.freeze({ generator: "scripts/art/disciple-dao-pipeline.mjs",
+      runtimeStrip: `client/assets/rigs/disciple-dao/generated/${path}-master-runtime-strip.png` }),
+  });
+}
+export const LIGHTNESS_MASTER_PNG_FRAME_STRIP = masterStrip(LIGHTNESS_PNG_FRAME_STRIP, "lightness",
+  { x: 42, y: 24, w: 175, h: 205 });
+export const WAR_MASTER_PNG_FRAME_STRIP = masterStrip(WAR_PNG_FRAME_STRIP, "war",
+  { x: 94, y: 106, w: 68, h: 122 });
+export const MAGIC_MASTER_PNG_FRAME_STRIP = masterStrip(MAGIC_PNG_FRAME_STRIP, "magic",
+  { x: 52, y: 53, w: 152, h: 151 });
