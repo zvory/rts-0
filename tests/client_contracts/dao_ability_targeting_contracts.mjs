@@ -101,7 +101,7 @@ dashInput.clientIntent = new ClientIntent();
 dashInput.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.EKAT_TELEPORT });
 dashInput._groundAtScreen = (x, y) => ({ x, y });
 
-const lightnessEntity = { id: 89, owner: 1, kind: KIND.WARRIOR, dao: "lightness", x: 200, y: 1000 };
+const lightnessEntity = { id: 89, owner: 1, kind: KIND.LIGHTNESS_ADEPT, dao: "lightness", x: 200, y: 1000 };
 dashInput.state.selectedEntities = () => [ekatEntity, lightnessEntity];
 dashInput.state.abilityObjects = [];
 dashInput._refreshAbilityTargetPreview();
