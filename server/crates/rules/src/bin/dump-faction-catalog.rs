@@ -522,6 +522,14 @@ fn print_client_constants(indent: &str) {
         balance::EKAT_MAGIC_ANCHOR_RANGE_TILES
     );
     println!(
+        "{indent}    \"discipleShieldCapacity\": {},",
+        balance::DISCIPLE_SHIELD_CAPACITY
+    );
+    println!(
+        "{indent}    \"discipleEvolvedInsightCap\": {},",
+        balance::DISCIPLE_EVOLVED_INSIGHT_CAP
+    );
+    println!(
         "{indent}    \"discipleShieldDurationTicks\": {},",
         balance::DISCIPLE_SHIELD_DURATION_TICKS
     );

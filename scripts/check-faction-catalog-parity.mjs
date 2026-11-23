@@ -6,6 +6,8 @@ import path from "node:path";
 
 import {
   ABILITIES,
+  DISCIPLE_EVOLVED_INSIGHT_CAP,
+  DISCIPLE_SHIELD_CAPACITY,
   DISCIPLE_SHIELD_DURATION_TICKS,
   ANTI_TANK_GUN_BODY,
   MORTAR_BODY,
@@ -192,6 +194,8 @@ const EXPECTED_CLIENT_CONFIG_CONSTANT_KEYS = Object.freeze([
   "ekatLineShotRangeTiles",
   "ekatLineShotSpeedPxPerTick",
   "ekatLineShotWidthTiles",
+  "discipleEvolvedInsightCap",
+  "discipleShieldCapacity",
   "discipleShieldDurationTicks",
   "ekatMagicAnchorDurationTicks",
   "ekatMagicAnchorPullAwayMultiplier",
@@ -612,6 +616,8 @@ const clientConstants = {
   ekatLineShotDamage: EKAT_LINE_SHOT_DAMAGE,
   ekatLineShotCooldownTicks: EKAT_LINE_SHOT_COOLDOWN_TICKS,
   ekatMagicAnchorRangeTiles: EKAT_MAGIC_ANCHOR_RANGE_TILES,
+  discipleShieldCapacity: DISCIPLE_SHIELD_CAPACITY,
+  discipleEvolvedInsightCap: DISCIPLE_EVOLVED_INSIGHT_CAP,
   discipleShieldDurationTicks: DISCIPLE_SHIELD_DURATION_TICKS,
   ekatMagicAnchorDurationTicks: EKAT_MAGIC_ANCHOR_DURATION_TICKS,
   ekatMagicAnchorRadiusTiles: EKAT_MAGIC_ANCHOR_RADIUS_TILES,

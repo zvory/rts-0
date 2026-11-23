@@ -151,7 +151,7 @@ fn cultivator_portal_trains_researched_adepts_for_35_oil_without_novices() {
         let adept = game.state.entities.iter().find(|e| e.kind == kind).unwrap();
         assert_eq!(adept.dao(), Some(required));
         assert_eq!(adept.insight, 0);
-        assert_eq!(adept.insight_cap(), 120);
+        assert_eq!(adept.insight_cap(), 200);
         assert_eq!(adept.hp, adept.max_hp);
         assert!(matches!(adept.order(), Order::AttackMove(_)));
         assert_eq!(game.state.players[0].supply_used, 3);

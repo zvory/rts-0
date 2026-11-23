@@ -198,7 +198,7 @@ fn paid_dao_training_mixed_queue_exact_duration_supply_rally_checkpoint_and_canc
         .unwrap();
     assert_eq!(output.dao(), Some(UpgradeKind::DaoOfLightness));
     assert_eq!(output.insight, 0);
-    assert_eq!(output.insight_cap(), 120);
+    assert_eq!(output.insight_cap(), 200);
     assert_eq!(output.hp, output.max_hp);
     assert!(matches!(output.order(), Order::AttackMove(_)));
     assert_eq!(game.state.players[0].supply_used, 3);

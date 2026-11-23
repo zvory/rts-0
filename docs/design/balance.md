@@ -839,11 +839,11 @@ through checkpoints. Evolution changes Novice `warrior` (29) to `lightness_adept
 Permanent Dao identity is derived from kind; the engine stores no separate mutable `dao`. Visible Disciple snapshots append `insight` (compact slot 45) and
 `dao` (slot 46: lightness/war/magic). Evolution buttons set replaceable, entity-owned `chosenDao` intent (team-private compact slot 49), independent of orders. Codes 14–16 and order stages 22–24 retain their positions.
 Evolution automatically occurs once 60 insight is ready, without research or a Pavilion.
-Evolution clears all insight and doubles the cap to 120. Evolved Disciples continue earning
-insight from actual hostile HP damage (one per unit damage, half per building damage, rounded down per hit); reaching 120 has no effect and enables no further evolution. Research ids are
+Evolution clears all insight and raises the cap to 200. Evolved Disciples continue earning
+insight from actual hostile HP damage (one per unit damage, half per building damage, rounded down per hit); reaching 200 automatically advances a living Adept to its matching Master. Research ids are
 `dao_of_lightness`, `dao_of_heaviness` (War), `dao_of_magic` (Magic).
 
-`DISCIPLE_SHIELD_DURATION_TICKS` is mirrored for the Shield lifetime bar and checked by faction catalog parity.
+`DISCIPLE_SHIELD_CAPACITY` (300) and `DISCIPLE_SHIELD_DURATION_TICKS` are mirrored for the Shield HP and lifetime bars and checked by faction catalog parity. `DISCIPLE_EVOLVED_INSIGHT_CAP` (200) is also parity-checked.
 Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md). Lightness uses the base Disciple’s 0.75-tile sword reach, retaining 23 damage, 50% penetration, 43-tick cooldown, moving attacks, 2.7025 px/tick movement, and Dash. Its five-tile automatic engagement closes to melee reach. Magic uses a five-tile orb primary, retaining 23 damage, 50% penetration, and 64-tick cooldown, and stops to fire. Novice Charge automatically grants 1.5× speed for one second with a 15-second cooldown against a hostile unit at least two tiles away or moving away; it has no selectable command. Lightness Dash reaches ten tiles, while Ekat retains five. War uses 1.75-tile spear reach (`DAO_WAR_RANGE_TILES`), retaining its damage, cooldown, armor and HP bonuses. Its sprite scale remains 0.56. The base, Lightness, and Magic collision/interaction radius is 26 world pixels; War uses 18.2 pixels (26 × `DAO_WAR_BODY_SCALE`, 0.7). The starting Novice stands five tiles toward the enemy from the Nexus to clear the base with its larger body. These footprints cover the rendered torsos instead of allowing tightly stacked bodies. Sprite origins center each torso on the authoritative position, including the War atlas's forward-offset torso. Weapons, scarves, and the presentation-only 11.2-pixel War lunge may extend outside the body footprint. `DAO_WAR_BODY_SCALE` remains mirrored for artwork, selection, and collision geometry. `DAO_WAR_RANGE_TILES` and `DAO_RANGED_RANGE_TILES` are mirrored in client config and range overlays.
 
 Throw Sword uses fractional ability range metadata: 7.5 tiles, 100/11 px/tick, and a
@@ -893,7 +893,7 @@ placement, cancellation, damage, fog and destruction apply. See [Shop](shop.md) 
 
 ### Dao Master advancement
 
-At 120 insight, each living Adept automatically becomes its matching Master and fully
+At 200 insight, each living Adept automatically becomes its matching Master and fully
 heals. Relative to that path’s Adept, size/collision ×1.2, movement ×1.1, ordinary
 attack damage ×1.2 (nearest integer), maximum HP ×1.4. No resource or supply cost,
 research, ability change or attack-rate change; no repeat advancement. Master HP is

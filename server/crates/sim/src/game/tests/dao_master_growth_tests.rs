@@ -27,7 +27,7 @@ fn dao_master_keeps_corner_waypoint_that_only_an_adept_can_skip() {
         .spawn_unit(1, EntityKind::LightnessAdept, 720.0, 600.0)
         .unwrap();
     let unit = game.state.entities.get_mut(id).unwrap();
-    unit.insight = 120;
+    unit.insight = 200;
     unit.advance_dao_master();
     unit.set_order(Order::move_to(600.0, 720.0));
     unit.set_path(vec![(600.0, 720.0), (720.0, 720.0)]);
@@ -83,7 +83,7 @@ fn dao_master_growth_near_portal_repositions_without_losing_orders_or_reload() {
         unit.evolve_dao(ability);
         let original_radius = unit.radius();
         unit.set_position(640.0 + original_radius + 0.5, 600.0);
-        unit.insight = 120;
+        unit.insight = 200;
         unit.apply_damage(unit.hp - 1, None);
         unit.set_order(Order::HoldPosition);
         unit.set_attack_cd(30);
@@ -131,7 +131,7 @@ fn dao_master_movement_and_collision_do_not_push_body_inside_portal() {
     let unit = game.state.entities.get_mut(id).unwrap();
     unit.insight = 60;
     unit.evolve_dao(AbilityKind::EvolveLightness);
-    unit.insight = 120;
+    unit.insight = 200;
     game.tick();
     game.enqueue(
         1,
@@ -182,7 +182,7 @@ fn dao_master_dash_and_return_reject_adept_sized_building_clearance() {
         .entities
         .spawn_unit(1, EntityKind::LightnessAdept, 800.0, 600.0)
         .unwrap();
-    game.state.entities.get_mut(id).unwrap().insight = 120;
+    game.state.entities.get_mut(id).unwrap().insight = 200;
     game.tick();
     assert!(crate::game::hero_abilities::ekat_dash_destination(
         &game.state.map,
@@ -215,7 +215,7 @@ fn dao_master_lab_moves_reject_adept_clearance_atomically() {
         .entities
         .spawn_unit(1, EntityKind::LightnessAdept, 800.0, 600.0)
         .unwrap();
-    game.state.entities.get_mut(id).unwrap().insight = 120;
+    game.state.entities.get_mut(id).unwrap().insight = 200;
     game.tick();
     let movement = LabMoveEntity {
         entity_id: id,
