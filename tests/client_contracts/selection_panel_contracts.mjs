@@ -70,6 +70,22 @@ withFakeHudDocument(({ FakeElement }) => {
   selectionPanel.destroy();
 });
 
+// Rank is part of the displayed type: a minority Master must not name an Adept group.
+for (const masterFirst of [true, false]) {
+  const adept = { owner: 1, kind: KIND.WAR_ADEPT, dao: "war" };
+  const master = { ...adept, daoMaster: true };
+  for (const [entities, label] of [
+    [masterFirst ? [master, adept, adept] : [adept, master, adept], "War Adept"],
+    [masterFirst ? [master, adept, master] : [adept, master, master], "War Master"],
+  ]) {
+    const summary = buildControlGroupSummaries({
+      players: [{ id: 1, factionId: "cultivators" }],
+      controlGroups: [[1, 2, 3]], controlGroupEntities: () => entities,
+    })[0];
+    assert(summary.label === label, "control-group label reflects the dominant rank");
+  }
+}
+
 // ---------------------------------------------------------------------------
 // HUD selection budget grid
 // ---------------------------------------------------------------------------

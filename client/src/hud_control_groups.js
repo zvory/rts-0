@@ -68,9 +68,10 @@ export function dominantControlGroupKind(entities) {
   let best = { kind: entities[0].kind, count: 0, first: 0 };
   for (let i = 0; i < entities.length; i++) {
     const kind = entities[i].kind;
-    const entry = counts.get(kind) || { kind, count: 0, first: i };
+    const key = `${kind}:${!!entities[i].daoMaster}`;
+    const entry = counts.get(key) || { kind, count: 0, first: i };
     entry.count += 1;
-    counts.set(kind, entry);
+    counts.set(key, entry);
     if (
       entry.count > best.count ||
       (entry.count === best.count && entry.first < best.first)

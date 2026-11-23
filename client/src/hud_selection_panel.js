@@ -6,6 +6,7 @@ import {
   ENTRENCHMENT_DIRECT_DAMAGE_REDUCTION,
   ENTRENCHMENT_RANGE_BONUS_TILES,
   STATS,
+  DAO_TRAINING_COST_OIL,
   DISCIPLE_INSIGHT_REQUIRED,
   DISCIPLE_EVOLVED_INSIGHT_CAP,
   statsForFaction,
@@ -382,7 +383,7 @@ export class HudSelectionPanel {
       const active = e.prodKind ? e.daoTrainingQueue[0] : null;
       const waiting = e.daoTrainingQueue.slice(active ? 1 : 0);
       const label = active ? `Training ${UPGRADES[active]?.label ?? "Dao"} · 10 seconds`
-        : e.daoTrainingQueue.length ? "Waiting for a base Novice and 100 oil" : "Queue Dao training, then send base Novices inside";
+        : e.daoTrainingQueue.length ? `Waiting for a base Novice and ${DAO_TRAINING_COST_OIL} oil` : "Queue Dao training, then send base Novices inside";
       const plans = waiting.slice(0, 4).map((dao) => UPGRADES[dao]?.label ?? "Dao").join(" → ") +
         (waiting.length > 4 ? ` (+${waiting.length - 4})` : "");
       prodHtml = `<div class="sel-prod-label">${label}</div><div class="sel-prod-bar"><div class="sel-prod-fill" style="width:${Math.round((e.prodProgress ?? 0) * 100)}%"></div></div>` +
