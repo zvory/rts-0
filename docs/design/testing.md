@@ -328,7 +328,13 @@ the supported range.
 Lab preview contracts require a 24-hour-or-longer artifact TTL and prove that a published URL remains
 fetchable after the Lab publisher closes and its originating worktree is removed. CLI coverage also
 proves daemon shutdown leaves issued screenshot links valid, while concurrent recording wait/stop
-callers receive the same deduplicated durable publication.
+callers receive the same deduplicated durable publication. Media finishing is a local CLI scope
+outside daemon/session lanes. Captures register immutable machine-local media IDs, preserving video,
+provenance, and optional lossless FFV1 sources through session/worktree cleanup. Real media contracts
+verify exact lossless RGBA preservation, VP9/MP4 exports, labeled grid/concat/before-after layouts,
+playback acceleration, full output decoding, and alignment rejection for difference videos. Differences
+operate on original RGB frames, never compressed outputs. These checks run in
+`tests/interact_media_contracts.mjs` via the existing selected `tests/media-contracts.sh` gate.
 
 Interact source, page-bridge, Rust artifact-bridge, focused-test, CLI-documentation, and local
 skill changes select `interact-contracts` plus the browser `client-smoke` shard. The fast

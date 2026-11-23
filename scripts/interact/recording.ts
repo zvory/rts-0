@@ -307,8 +307,9 @@ export async function createWallClockRecorder({ page, outputPath, clip, scale, t
   };
 }
 
-export function createPngMp4Encoder({ outputPath, fps, crop = null, scale = 1, tools }: {
+export function createPngMp4Encoder({ outputPath, fps, crop = null, scale = 1, tools, losslessPath }: {
   outputPath: string;
+  losslessPath?: string;
   fps: number;
   crop?: CaptureClip | null;
   scale?: number;
@@ -322,6 +323,7 @@ export function createPngMp4Encoder({ outputPath, fps, crop = null, scale = 1, t
     "-hide_banner", "-loglevel", "error", "-y", "-f", "image2pipe", "-framerate", String(fps), "-i", "pipe:0",
     "-an", "-vf", filters.join(","), "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-profile:v", "main",
     "-pix_fmt", "yuv420p", "-tag:v", "avc1", "-movflags", "+faststart", outputPath,
+    ...(losslessPath ? ["-an", "-c:v", "ffv1", "-level", "3", "-pix_fmt", "bgra", "-fs", String(512 * 1024 * 1024), losslessPath] : []),
   ], { stdio: ["pipe", "ignore", "pipe"] });
   let stderr = "";
   child.stderr.on("data", (chunk) => { stderr = `${stderr}${chunk}`.slice(-4000); });
@@ -365,6 +367,7 @@ export function createPngMp4Encoder({ outputPath, fps, crop = null, scale = 1, t
         await closed.catch(() => {});
       }
       fs.rmSync(outputPath, { force: true });
+      if (losslessPath) fs.rmSync(losslessPath, { force: true });
     },
   };
   function stderrFailure() { return stderr; }

@@ -5,7 +5,7 @@ import {
 } from "./runtime.ts";
 import { DEFAULT_LAB_MAP, DEFAULT_GAME_AI_PROFILE_ID, GAME_AI_PROFILE_IDS } from "./session_defaults.ts";
 
-export type CommandScope = "daemon" | "session";
+export type CommandScope = "daemon" | "session" | "local";
 export type CommandLane = "serialized" | "observation" | "cancellation" | "lifecycle";
 export type TimeoutClass = "ordinary" | "startup" | "lifecycle-media";
 
@@ -61,6 +61,22 @@ function namespace(summary: string, commands: Record<string, string>): Namespace
 }
 
 const COMMAND_RECORDS = Object.freeze({
+  "media-export": descriptor("Export a captured artifact as WebM or MP4; no daemon or browser required.", "{artifactId:string,format?:webm|mp4,preset?:compact|balanced|quality,speed?:number,name?:token}", {
+    scope: "local", recordable: false, defaults: ["format=webm", "preset=balanced", "speed=1"],
+    bounds: ["speed 0.25-8", "64 MiB output", "ten-minute output", "180-second encode deadline"],
+    example: {artifactId:"media_<32-hex>",format:"webm",preset:"balanced"},
+  }),
+  "media-compare": descriptor("Make a labeled grid, concatenation, before/after, or synchronized lossless-source difference video.", "{artifacts:string[],labels?:string[],layout?:grid|concat|before-after|difference,format?:webm|mp4,preset?:compact|balanced|quality,speed?:number,name?:token}", {
+    scope: "local", recordable: false, defaults: ["layout=grid", "format=webm", "preset=balanced", "speed=1", "labels=Case 1,Case 2,...; before-after=Before,After"],
+    bounds: ["2-4 artifacts; before-after/difference require two", "labels 1-64 ASCII characters", "cells at most 960x720 plus a 48px heading", "grid ends with shortest source", "difference rejects compressed-only or unsynchronized captures"],
+    example: {artifacts:["media_<before>","media_<after>"],layout:"before-after"},
+  }),
+  "media-inspect": descriptor("Inspect one machine-local media artifact and verify its source is still readable.", "{artifactId:string}", {
+    scope: "local", recordable: false, bounds: ["one media_<32-hex> artifact ID"], example: {artifactId:"media_<32-hex>"},
+  }),
+  "media-publish": descriptor("Publish or republish an existing artifact without recapture or encoding.", "{artifactId:string}", {
+    scope: "local", recordable: false, bounds: ["24-hour Tailnet publication or local delivery fallback", "64 MiB"], example: {artifactId:"media_<32-hex>"},
+  }),
   open: descriptor(
     "Open or recover the one authoritative Interact session for this worktree.",
     "{workspaceRoot?:string,map?:token,seed?:string|u32,scenario?:token,visualProfile?:token,viewport?:{width:int,height:int,deviceScaleFactor?:number}}",
@@ -181,9 +197,9 @@ const COMMAND_RECORDS = Object.freeze({
     bounds: ["a recording must have been started in the current session", "media IPC timeout is capped at 540 seconds"],
     example: { sessionId: "<lab-session-id>" },
   }),
-  "capture-fixed": descriptor("Capture a deterministic-environment fixed-step H.264 sequence and return a Tailnet video preview.", "{sessionId:string,name?:token,fps?:int,frameCount?:int,viewport?:viewport}", {
+  "capture-fixed": descriptor("Capture a deterministic-environment fixed-step H.264 sequence and return a Tailnet video preview.", "{sessionId:string,name?:token,fps?:int,frameCount?:int,viewport?:viewport,visualStartMs?:number}", {
     timeoutClass: "lifecycle-media",
-    defaults: ["name=fixed", "fps=30", "frameCount=30", "viewport=current dimensions at DPR 2"], bounds: ["paused room required", "fps 10-60", "1-1800 frames", "DPR >0 and <=4", "six retained representative PNGs", "Tailnet video/contact-sheet preview", "per-frame details in the manifest", "40 detailed aliases in the manifest"],
+    defaults: ["name=fixed", "fps=30", "frameCount=30", "viewport=current dimensions at DPR 2"], bounds: ["paused room required", "fps 10-60", "1-1800 frames", "DPR >0 and <=4", "six retained representative PNGs", "512 MiB lossless source for comparisons", "visualStartMs must not precede current render time", "Tailnet video/contact-sheet preview", "per-frame details in the manifest", "40 detailed aliases in the manifest"],
     example: { sessionId: "<lab-session-id>", name: "motion-fixed", fps: 30, frameCount: 60 },
   }),
   "capture-cancel": descriptor("Request cancellation of the active fixed-step or time-lapse capture.", "{sessionId:string}", {
@@ -344,7 +360,8 @@ const NAMESPACE_RECORDS = Object.freeze({
     Object.fromEntries(INTERACT_COMMAND_KEYS.filter(
       (name) => !name.startsWith("game-")
         && !name.startsWith("scenario-")
-        && !name.startsWith("map-editor-"),
+        && !name.startsWith("map-editor-")
+        && !name.startsWith("media-"),
     ).map((name) => [name, name])),
   ),
   game: namespace(
@@ -398,6 +415,9 @@ const NAMESPACE_RECORDS = Object.freeze({
       shutdown: "shutdown",
     },
   ),
+  media: namespace("Finish, inspect, and republish captured media without starting a daemon.", {
+    export: "media-export", compare: "media-compare", inspect: "media-inspect", publish: "media-publish",
+  }),
 });
 
 export const INTERACT_NAMESPACE_NAMES = Object.freeze(Object.keys(NAMESPACE_RECORDS));

@@ -44,7 +44,7 @@ function checkRegistry() {
   if (new Set(names).size !== names.length || names.length !== INTERACT_COMMAND_KEYS.length) {
     failures.push("registry command keys must be defined exactly once in command_registry.ts");
   }
-  const allowedScopes = new Set(["daemon", "session"]);
+  const allowedScopes = new Set(["daemon", "session", "local"]);
   const allowedLanes = new Set(SESSION_EXECUTION_LANES);
   const allowedTimeouts = new Set(["ordinary", "startup", "lifecycle-media"]);
   for (const [name, definition] of Object.entries(INTERACT_COMMAND_REGISTRY)) {
@@ -120,6 +120,10 @@ function checkServiceRouting() {
     }
   }
   for (const definition of Object.values(INTERACT_COMMAND_REGISTRY)) {
+    if (definition.scope === "local") {
+      if (!(sources.get("media_finish.ts") || "").includes(`"${definition.handlerKey}"`)) failures.push(`${definition.name} has no local media route`);
+      continue;
+    }
     if (!routes.includes(`"${definition.handlerKey}"`) && !routes.includes(`'${definition.handlerKey}'`)) {
       failures.push(`${definition.name} handler key ${definition.handlerKey} has no service route`);
     }

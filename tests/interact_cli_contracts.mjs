@@ -65,8 +65,8 @@ try {
     assert.equal(help.stderr, "", `${helpCommand} keeps machine-readable help on stdout`);
     const helpEnvelope = JSON.parse(help.stdout);
     assert.equal(helpEnvelope.ok, true, `${helpCommand} returns a successful envelope`);
-    assert.deepEqual(helpEnvelope.result.namespaces.map(({ name }) => name), ["lab", "game", "dev-scenario", "map-editor"], `${helpCommand} lists every supported namespace`);
-    assert.equal(helpEnvelope.result.usage, "node scripts/interact/cli.mjs <lab|game|dev-scenario|map-editor> <command> [JSON-object]", `${helpCommand} requires a namespace`);
+    assert.deepEqual(helpEnvelope.result.namespaces.map(({ name }) => name), ["lab", "game", "dev-scenario", "map-editor", "media"], `${helpCommand} lists every supported namespace`);
+    assert.equal(helpEnvelope.result.usage, "node scripts/interact/cli.mjs <lab|game|dev-scenario|map-editor|media> <command> [JSON-object]", `${helpCommand} requires a namespace`);
   }
   for (const args of [["lab", "--help"], ["help", "lab"]]) {
     const help = spawnSync(process.execPath, [cli, ...args], {

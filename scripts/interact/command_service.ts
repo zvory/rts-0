@@ -65,6 +65,7 @@ export class InteractService {
     if (!definition) {
       throw new InteractError("unknownCommand", `Unknown command ${JSON.stringify(command)}.`);
     }
+    if (definition.scope === "local") throw new InteractError("localCommandOnly", "Run media commands through the local CLI, outside the session daemon.");
     // The registry validator has already performed exact, bounded runtime validation.
     const input = definition.validator(rawInput) as ServiceInput;
     const session = definition.scope === "session" && command !== "close"

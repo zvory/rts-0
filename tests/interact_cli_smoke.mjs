@@ -164,10 +164,21 @@ try {
   assert.ok(recordingManifest.operations.some((entry) => entry.command === "camera"), "recording wait leaves camera interaction available");
   assert.deepEqual(recordingManifest.errors.page, [], "recording manifest reports no page errors");
 
+  call("time", { sessionId, control: { action: "pause" } });
+  const fixed = call("capture-fixed", { sessionId, name: "cli-media-source", frameCount: 8,
+    visualStartMs: 1_000_000, viewport: {width:640,height:480,deviceScaleFactor:1} });
+  assert.match(fixed.artifactId, /^media_[a-f0-9]{32}$/);
+  assert.equal(fixed.losslessSource, true, "real fixed captures retain original lossless source frames");
+  assert.equal(fixed.losslessPath, undefined, "capture responses do not leak internal lossless paths");
+
   const closedSessionId = sessionId;
   call("close", { sessionId });
   sessionId = null;
   assert.equal(callFailure("inspect", { sessionId: closedSessionId }).code, "unknownSession", "closed session ids are rejected as stale");
+  const finished = callMedia("export", {artifactId:fixed.artifactId,format:"webm"});
+  assert.equal(finished.probe.codec,"vp9", "closed-session fixed capture exports through the real media CLI");
+  assert.equal(finished.probe.frames,8);
+  assert.equal(callMedia("inspect",{artifactId:finished.artifactId}).format,"webm");
   const reopened = call("open", {
     map: "1v1-no-terrain", seed: 1234,
     viewport: { width: 1000, height: 700, deviceScaleFactor: 1 },
@@ -290,6 +301,14 @@ function callFailure(command, input = {}) {
   assert.notEqual(result.status, 0, `${command} rejects stale or invalid input`);
   assert.equal(result.stdout, "", `${command} failure keeps stdout empty`);
   return JSON.parse(result.stderr).error;
+}
+
+function callMedia(command, input = {}) {
+  const result = spawnSync(process.execPath, [cli, "media", command, JSON.stringify(input)], {
+    cwd: root, env, encoding: "utf8", maxBuffer: 2 * 1024 * 1024,
+  });
+  assert.equal(result.status, 0, `media ${command} succeeds: ${result.stderr}`);
+  return JSON.parse(result.stdout).result;
 }
 
 function callGame(command, input = {}) {

@@ -1,6 +1,6 @@
 ---
 name: interact
-description: Use the local Interact CLI to arrange authoritative Lab scenes, inspect isolated human-vs-AI or AI-vs-AI games, or run server-authored dev scenarios, then capture Pixi screenshots, H.264 video, or region-aware time lapses. Use for graphics, rendering, terrain, rig, animation, faction-color, fog, camera, HUD, dev-scenario, or live-match-flow review in a task worktree when Browser Use and Computer Use are unnecessary.
+description: Use the local Interact CLI to arrange authoritative Lab scenes, inspect isolated human-vs-AI or AI-vs-AI games, or run server-authored dev scenarios, then capture Pixi screenshots, gameplay video, or region-aware time lapses. Use for graphics, rendering, terrain, rig, animation, faction-color, fog, camera, HUD, dev-scenario, or live-match-flow review in a task worktree when Browser Use and Computer Use are unnecessary.
 ---
 
 # Interact Capture
@@ -69,10 +69,22 @@ editing surface remains visible.
    visual artifact. When `result.preview.localPath` is present, display or attach that local file
    using normal image/video delivery; do not retry or troubleshoot Tailscale. Otherwise share the
    Tailnet URL and a concise scene result. Never share a raw `target/interact` path; the adjacent JSON manifest remains local reproduction evidence.
-8. Run `close` when the session is complete. Use `shutdown` for immediate daemon teardown; otherwise
+8. For a WebM request, use the capture's `result.artifactId` with
+   `node scripts/interact/cli.mjs media export '{"artifactId":"media_<id>","format":"webm","preset":"balanced"}'`,
+   then `media publish` on the returned ID. Use `speed:2` (0.25–8) for finished playback acceleration.
+   Use `media compare` with `artifacts:[id,id,...]`, optional `labels`, and
+   `layout:"grid"|"concat"|"before-after"` for review layouts. `layout:"difference"` compares
+   original lossless fixed-capture RGB frames and rejects compressed-only or unsynchronized sources.
+   Match setup, camera, DPR, ticks, and render time; `capture-fixed` accepts a shared future
+   `visualStartMs`. Use `media inspect` to recover metadata and `media publish` to renew an expired
+   link. These commands need no daemon and IDs survive worktree cleanup until OS temporary cleanup.
+   Do not search capture directories, hand-write FFmpeg conversion/layout commands, or rebuild
+   subprocess/JSON wrappers for supported operations. Use the documented `runCli` batch recipe in
+   `docs/interact-cli.md` §Media finishing and artifact recovery; scene-specific orders remain task work.
+9. Run `close` when the session is complete. Use `shutdown` for immediate daemon teardown; otherwise
    it closes itself after 30 minutes without an accepted interaction.
 
-Capture files are confined to `target/interact/<lab|game|scenario|map-editor>/<session-id>/` and ignored by Git. Do
+Original capture files are confined to `target/interact/<lab|game|scenario|map-editor>/<session-id>/` and ignored by Git. Registered media copies live in private machine-local OS temporary storage. Do
 not request arbitrary paths or add image bytes to Git. Lab remains for bounded authored scenes;
 full-match observation is limited to the game namespace's isolated AI-vs-AI spectator mode. A
 local fallback copy survives worktree cleanup and lasts until manually removed or OS temporary
