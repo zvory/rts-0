@@ -80,3 +80,26 @@ and changing-sequence checks passed; exact equality intentionally remains failed
 
 See [client performance lessons](../client-performance-optimization-lessons.md) for the measured
 cost and limitations. Local diagnostic artifacts are not checked-in benchmark fixtures.
+
+### Animated grass atlas (2026-11-23)
+
+After reviewing synchronized scene, close-up and difference WebMs for three grass approaches, the
+user selected the animated atlas for the default style 9. It replaces procedural neighboring
+clump reconstruction with eight baked bending poses, a wind/cloud lookup and current-frame pose
+blending. Terrain-relief lighting, tint, premultiplied opacity, grass-only coverage and every-frame
+animation remain. Softer silhouettes, a repeating pattern and simpler clump shadows/light fronts
+are intentional visual changes.
+
+The reviewed 191-frame comparison against `1a4abeba8` used identical render histories, state,
+camera, DPR, ready assets and animation time at 4112×2408 physical pixels. Atlas artwork changed
+85.64–89.02% of image pixels (grass covers most of the view), with mean RGB MAE 9.732/255,
+maximum channel delta 172 and no alpha changes. These are original decoded-RGBA measurements,
+not video-compression differences or a perceptual-quality score. The user explicitly accepted
+this atlas appearance; exact equality with the old procedural artwork is not claimed.
+
+Shipping validation on base `88255f48f` compared the new default to the reviewed atlas prototype
+at 12 seeded deterministic ticks, with identical sparse render histories and full physical-buffer
+readback. Every decoded pixel matched, and asset/error/input/nonblank/changing-sequence checks
+passed. Thus the implementation retains the selected prototype's appearance. A separate
+SwiftShader/Vulkan check rendered all candidate approaches successfully; physical PC GPU
+performance remains unmeasured.

@@ -40,6 +40,7 @@ await import("./client_contracts/dao_corona_contracts.mjs");
 await import("./client_contracts/renderer_contracts.mjs");
 await import("./client_contracts/water_contracts.mjs");
 await import("./client_contracts/grass_survey_contracts.mjs");
+await import("./client_contracts/grass_baked_carpet_contracts.mjs");
 await import("./client_contracts/grass_matting_contracts.mjs");
 await import("./client_contracts/shoreline_study_contracts.mjs");
 await import("./client_contracts/scout_plane_shadow_contracts.mjs");

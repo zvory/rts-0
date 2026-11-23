@@ -119,8 +119,8 @@ measured roughly 134 worker acknowledgments/s before the grass release versus 93
 DPR2. DPR1 stayed around 134–137/s. Timing-disabled controls reproduced the high-DPR loss.
 These are uncapped, pipelined WebGL acknowledgments, not monitor FPS or GPU-completed frames.
 
-Grass already runs on the GPU as a mesh; per-frame JavaScript mainly updates its time uniform.
-The default fragment evaluates nine neighboring clumps with three blade masks each, plus
+The pre-atlas style 9 already ran on the GPU as a mesh; per-frame JavaScript mainly updated its time uniform.
+Its fragment evaluated nine neighboring clumps with three blade masks each, plus
 hash/noise, bending, shadows, cloud and wind-light math. `floor(vWorld/1.25)` quantizes artwork
 coordinates without reducing native fragment invocations. DPR2 supplies four times the physical
 pixels. A hypothetical full-grass 4112×2408 draw has up to 267 million blade evaluations per
@@ -170,6 +170,34 @@ so the old `GPU_COMPLETE` switch is not evidence of GPU completion; use an actua
 that boundary is required. Also, DPR2 pixel capture must read `gl.drawingBufferWidth/Height`, not
 Pixi's logical renderer dimensions. The investigation's external parity helper corrected the
 readback on both sides and passed a 12-frame zero-difference self-control at full resolution.
+
+### Animated grass atlas: accepted visual/performance tradeoff
+
+The subsequent three-approach experiment compared cached clump inputs, an animated texture atlas,
+and a simpler two-blade tuft shader against the shipped specialized shader on `1a4abeba8`.
+The user reviewed the scene/close-up/difference WebMs and selected the atlas. Default style 9 now
+bakes eight bending poses once and blends neighboring poses every frame with a wind/cloud lookup;
+the simpler appearance is explicitly accepted in the [rendering ledger](design/rendering-parity.md).
+Other Lab styles, including experimental matting style 12, retain their existing paths.
+
+On Apple M5 Pro, the isolated all-grass draw's DPR2 median across three per-run GPU-query p50s
+changed from 14.794 to 1.265 ms (91.45% lower). Each cell required 48 valid asynchronous queries
+after eight warmups, with no pending/dropped/disjoint results. This excludes simulation, units and
+terrain-relief lighting and is not a whole-game frame time. RGBA8 atlas/wind textures total
+2,162,688 bytes (2.0625 MiB), versus the old default ground texture's 0.25 MiB. Constructor timing
+does not establish GPU-completed startup/first-use cost.
+
+Three rotated, quiet-host canonical Hellhole pairs at 2056×1204 CSS/DPR2 improved median uncapped
+worker acknowledgment capacity from 115.63 to 131.63/s (+13.84%). Initial runs overlapping unrelated
+Rust builds were retained but excluded from that primary comparison. Four fresh shipping-validation
+cells on `88255f48f` reproduced medians 115.63 versus 131.94/s (+14.1%). All cells passed health and
+final queue checks. These are pipelined acknowledgments, not monitor FPS; remaining client work
+limits the reference machine once grass becomes cheap.
+
+The atlas uses portable WebGL shader/texture operations, without a Metal-specific path. A separate
+SwiftShader/Vulkan check supplies compiler/API coverage, not physical Nvidia/AMD/Intel performance
+evidence. Texture/ALU balance and gains on those GPUs remain unmeasured. Do not extrapolate the
+Mac percentages to players' PCs or present CPU software-renderer timings as hardware GPU results.
 
 ### Retained HP/status geometry: rejected and reverted
 
