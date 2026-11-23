@@ -555,27 +555,46 @@ try {
     const resourceDepot = s.entityById([...s.selection][0]);
     return resourceDepot?.prodQueue > 0 && resourceDepot.prodProgress >= 0;
   }, { timeout: 6000 });
-  const productionProgress = await page.evaluate(async () => {
+  const productionBefore = await page.evaluate(() => {
     const match = window.__rts.match;
     const state = match.state;
-    const id = [...state.selection][0];
-    const before = state.entityById(id)?.prodProgress ?? 0;
+    const before = state.entityById([...state.selection][0])?.prodProgress ?? 0;
     match.net.off("snapshot", match.onSnapshot);
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    const after = state.entityById(id)?.prodProgress ?? 0;
-    match.net.on("snapshot", match.onSnapshot);
-    return {
-      before,
-      after,
-      predicted: state.entityById(id)?.progressPredicted === true,
-      queue: state.entityById(id)?.prodQueue ?? 0,
-      prodKind: state.entityById(id)?.prodKind ?? null,
-      prodWaiting: state.entityById(id)?.prodWaiting ?? null,
-      progressPredictionEligible: match.progressPredictionEligible,
-      predictionReady: match.predictionAdapter.ready,
-      predictionEnabled: match.prediction.enabled,
-    };
+    return before;
   });
+  let productionProgress;
+  try {
+    // CI software rendering can take longer than 300 ms to present a frame. Wait for
+    // the behavior under test while keeping authoritative snapshots disconnected.
+    await page.waitForFunction((before) => {
+      const match = window.__rts.match;
+      const entity = match.state.entityById([...match.state.selection][0]);
+      return !match.predictionAdapter.ready ||
+        (entity?.progressPredicted === true && entity.prodProgress > before);
+    }, { timeout: 5000 }, productionBefore).catch(() => {});
+    productionProgress = await page.evaluate((before) => {
+      const match = window.__rts.match;
+      const entity = match.state.entityById([...match.state.selection][0]);
+      return {
+        before,
+        after: entity?.prodProgress ?? 0,
+        predicted: entity?.progressPredicted === true,
+        queue: entity?.prodQueue ?? 0,
+        prodKind: entity?.prodKind ?? null,
+        prodWaiting: entity?.prodWaiting ?? null,
+        progressPredictionEligible: match.progressPredictionEligible,
+        predictionReady: match.predictionAdapter.ready,
+        predictionEnabled: match.prediction.enabled,
+        predictionDiagnostics: match.predictionAdapter.diagnostics(),
+      };
+    }, productionBefore);
+  } finally {
+    await page.evaluate(() => {
+      const match = window.__rts.match;
+      match.net.on("snapshot", match.onSnapshot);
+    });
+  }
+
   ok(
     productionProgress.queue > 0 && (
       !productionProgress.predictionReady || (
