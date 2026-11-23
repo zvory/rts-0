@@ -140,12 +140,12 @@ fn end_state_fingerprint_matches_native_and_wasm() {
     for _ in 0..3 {
         game.tick();
     }
-    // Fingerprint v3 derives permanent Dao from kind, without a mutable Dao field.
+    // Fingerprint v3 derives permanent Dao from kind and includes persisted Master rank.
     // It includes the persisted Novice Charge timer, resource knowledge and tournament
     // entry/production and optional committed pivot-recovery fields, as well as the
     // remaining entity and RNG state. Native and WASM must share this known answer.
     assert_eq!(
         game.replay_end_state_hash().unwrap(),
-        "2411bbfaa1540eebeb799e8e87d1408a5c283b4ee8d0ea70629fdd5de2b842b2"
+        "c4607a1decd58a4d689734620060c6149f670723ff773d43b015004ff39d6207"
     );
 }
