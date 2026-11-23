@@ -385,6 +385,9 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/game/building_memory.rs",
   "server/crates/sim/src/game/command.rs",
   "server/crates/sim/src/game/entity/entity.rs",
+  // Novice Charge reuses the legacy Charge identity for an automatic Cultivator passive;
+  // this entity-owned duration/cooldown policy does not admit factions or selectable commands.
+  "server/crates/sim/src/game/entity/entity/dao.rs",
   "server/crates/sim/src/game/entity/store.rs",
   "server/crates/sim/src/game/fog.rs",
   "server/crates/sim/src/game/invariants.rs",

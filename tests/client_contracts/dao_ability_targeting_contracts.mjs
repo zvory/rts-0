@@ -6,6 +6,8 @@ import { ClientIntent } from "../../client/src/client_intent.js";
 import { groupCooldownClocks } from "../../client/src/hud.js";
 import { buildCommandCardDescriptors, selectedAbilityAffordances } from "../../client/src/hud_command_card.js";
 import { createCommandButton } from "../../client/src/hud_command_dom.js";
+import { _drawAbilityTargetPreview } from "../../client/src/renderer/feedback.js";
+import { RecordingGraphics } from "./pixi_fakes.mjs";
 import { withFakeDocument } from "./fakes.mjs";
 
 const swordInput = Object.create(Input.prototype);
@@ -90,5 +92,32 @@ for (const insight of [0, 60]) {
     }
   }
 }
+
+const dashInput = Object.create(Input.prototype);
+const ekatEntity = { id: 88, owner: 1, kind: KIND.EKAT, x: 200, y: 220 };
+dashInput.mouse = { x: 420, y: 260 };
+dashInput.state = { playerId: 1, map: { tileSize: 32 } };
+dashInput.clientIntent = new ClientIntent();
+dashInput.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.EKAT_TELEPORT });
+dashInput._groundAtScreen = (x, y) => ({ x, y });
+
+const lightnessEntity = { id: 89, owner: 1, kind: KIND.WARRIOR, dao: "lightness", x: 200, y: 1000 };
+dashInput.state.selectedEntities = () => [ekatEntity, lightnessEntity];
+dashInput.state.abilityObjects = [];
+dashInput._refreshAbilityTargetPreview();
+const mixedDashPreview = dashInput.clientIntent.abilityTargetPreview;
+assertDeepEqual(mixedDashPreview.rangeOrigins.map((origin) => origin.rangePx), [160, 320],
+  "Mixed Dash selection preserves each carrier's authoritative range");
+const mixedDashGfx = new RecordingGraphics();
+_drawAbilityTargetPreview.call(
+  { _feedbackGfx: mixedDashGfx },
+  { abilityTargetPreview: mixedDashPreview },
+);
+assert(mixedDashGfx.calls.some((call) => call[0] === "moveTo" && call[1] === 360 && call[2] === 220),
+  "Ekat Dash ring starts five tiles from its origin");
+assert(!mixedDashGfx.calls.some((call) => call[0] === "moveTo" && call[1] === 520 && call[2] === 220),
+  "Mixed selection does not expand Ekat's Dash ring to ten tiles");
+assert(mixedDashGfx.calls.some((call) => call[0] === "moveTo" && call[1] === 520 && call[2] === 1000),
+  "Lightness Dash ring starts ten tiles from its origin");
 
 console.log("Dao ability targeting contracts passed");

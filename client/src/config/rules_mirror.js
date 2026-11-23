@@ -5,6 +5,11 @@
 import { ABILITY, KIND, UPGRADE } from "../protocol.js";
 import { TICK_HZ } from "./timing.js";
 
+export const DAO_LIGHTNESS_DASH_RANGE_TILES = 10;
+export function entityAbilityRangeTiles(definition, entity) {
+  return definition?.ability === ABILITY.EKAT_TELEPORT && entity?.kind === KIND.LIGHTNESS_ADEPT
+    ? DAO_LIGHTNESS_DASH_RANGE_TILES : definition?.rangeTiles;
+}
 export const DAO_WAR_RANGE_TILES = 1.75;
 export const DAO_WAR_BODY_SCALE = 0.7;
 
@@ -169,7 +174,7 @@ export const STATS = Object.freeze({
     description: `Rifle infantry carrying one disposable ${PANZERFAUST_RANGE_TILES}-tile anti-vehicle shot. After launching it, the unit keeps fighting as ordinary rifle infantry.` },
   [KIND.WARRIOR]: { armored: false, label: "Novice", icon: "NV", size: 26, sight: 11,
     rangeTiles: 0.75, cost: { steel: 100, oil: 0 }, supply: 2, buildTicks: 300,
-    description: "Durable melee infantry with a short sword reach and 50% armor penetration. Slow attacks deal heavy damage." },
+    description: "Durable melee infantry with a short sword reach and 50% armor penetration. Slow attacks deal heavy damage. Charge (automatic): 1.5x movement speed for 1 second, with a 15-second cooldown, when attacking an enemy unit at least 2 tiles away or moving away." },
   [KIND.LIGHTNESS_ADEPT]: { armored: false, label: "Lightness Adept", icon: "LA", size: 26, sight: 11,
     rangeTiles: 0.75, cost: { steel: 100, oil: 0 }, supply: 2, buildTicks: 300,
     description: "Fast sword infantry with Dash and 50% armor penetration." },

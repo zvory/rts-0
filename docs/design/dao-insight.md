@@ -20,9 +20,18 @@ Pavilion research now unlocks paid one-for-one training in the [Proving Grounds]
 with the existing shared research price tiers, serial queue and prerequisite/faction gates.
 Combat-earned evolution requires neither research nor a Pavilion.
 
+Novices have **Charge**, an automatic passive with no selectable command. Against a living
+hostile unit selected by normal combat targeting (explicit attack, attack-move, or automatic
+engagement), it grants 1.5× movement speed for 30 ticks (one second), with a 450-tick
+(15-second) cooldown from activation. It triggers at center distance at least two tiles,
+or at shorter distance when the target's actual movement has a positive component away
+from the Novice. Nearby stationary, sideways-moving, or approaching targets do not trigger it.
+Buildings and friendly targets never trigger it. Movement duration and cooldown survive
+checkpoints; evolution immediately removes the speed benefit.
+
 - Lightness: mobile melee skirmisher; 1.15 times scout-car base speed (2.7025 px/tick), 1.5 attacks per original attack
-  interval (cooldown divided by 1.5), existing Ekat Dash with optional return unchanged.
-  Uses a sword at the base Disciple’s 0.75-tile reach, dealing the same 23 damage with 50% armor penetration and a 43-tick cooldown. Plain Move keeps its destination while striking legal targets within melee reach; automatic Idle/Attack Move retains five-tile acquisition and closes to sword reach. Speed and Ekat Dash with optional return are unchanged. The old archer source and strip are preserved for reuse. Selected candidate B uses a thin katana and a single shoulder scarf: resting close to the back at idle, trailing while running, and following four melee swing poses. Classic evolution key L; grid Z.
+  interval (cooldown divided by 1.5), ten-tile Dash with the existing optional return.
+  Uses a sword at the base Disciple’s 0.75-tile reach, dealing the same 23 damage with 50% armor penetration and a 43-tick cooldown. Plain Move keeps its destination while striking legal targets within melee reach; automatic Idle/Attack Move retains five-tile acquisition and closes to sword reach. Dash reaches ten tiles (doubled from five); Ekat retains five tiles. Optional return and cooldown are unchanged. The old archer source and strip are preserved for reuse. Selected candidate B uses a thin katana and a single shoulder scarf: resting close to the back at idle, trailing while running, and following four melee swing poses. Classic evolution key L; grid Z.
 - War: armored melee damage dealer; 1.05 times base movement speed (2.1 px/tick), 1.5 damage, +20 maximum HP, 50% armor
   reduction using the existing penetration mechanic (full AP bypasses it), keeps the Disciple's existing
   50% armor penetration. Uses the approved larger armored candidate B Yari silhouette, with idle, two walking poses and four thrust poses. Its sprite scale is 0.56, halfway from the former 0.8 toward the base Disciple’s 0.32. The collision/interaction circle shrinks by the same 30%, from 13.5 to 18.2 world pixels. Its 1.75-tile weapon range plus that radius and four-pixel range slack matches the smaller spear. Vehicle hulls and building footprints retain their existing contact geometry. The 400 ms attack clip anticipates, drives, extends and recovers, with a smooth 11.2-world-pixel presentation-only forward step; collision, authoritative position and damage timing do not move with the artwork. Classic W; grid X.

@@ -1,4 +1,4 @@
-import { destroyShorelineLayer } from "./shoreline.js";
+import { reconcileShorelineLayer, destroyShorelineLayer } from "./shoreline.js";
 import { reconcileGrassLayer, destroyGrassLayer } from "./grass.js";
 import { terrainLightingPixels } from "./terrain_lighting.js";
 import { WaterLayer } from "./water.js";
@@ -518,6 +518,7 @@ export function buildStaticMap(map, {
   }
   rebuildWaterLayer(this, this._map);
   reconcileGrassLayer(this);
+  reconcileShorelineLayer(this);
   if (!preserveMapLayers) {
     this._initGroundDecalsForMap?.(map);
     this._initTrenchesForMap?.(map);
@@ -578,6 +579,7 @@ export function updateStaticTerrainTiles(changes) {
       destroyGrassLayer(this);
       reconcileGrassLayer(this, technique);
     }
+    reconcileShorelineLayer(this);
   }
   return dirty.size;
 }

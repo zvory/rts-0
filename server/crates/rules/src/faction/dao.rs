@@ -67,7 +67,11 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 7] = [
         protocol_code: 16,
         order_stage_code: 24,
     },
-    EKAT_ABILITIES[0],
+    AbilityCatalogEntry {
+        range_tiles: Some(balance::DAO_LIGHTNESS_DASH_RANGE_TILES),
+        title: "Dash up to 10 tiles, then recast to return",
+        ..EKAT_ABILITIES[0]
+    },
     AbilityCatalogEntry {
         label: "Anchor",
         ..EKAT_ABILITIES[2]

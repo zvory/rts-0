@@ -426,12 +426,12 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 9] = [
         label: "Charge",
         icon: "CHG",
         hotkey: None,
-        title: "Legacy Charge command compatibility",
+        title: "Automatic Novice Charge: 1.5x speed for one second against a distant or retreating enemy unit",
         carriers: &[],
         target_mode: AbilityTargetMode::SelfTarget,
         range_tiles: None,
         min_range_tiles: None,
-        cooldown_ticks: 0,
+        cooldown_ticks: balance::NOVICE_CHARGE_COOLDOWN_TICKS,
         charges: None,
         charge_recharge_ticks: None,
         cost: ResourceCost::new(0, 0),
@@ -1072,6 +1072,14 @@ pub fn ability_definition(kind: AbilityKind) -> AbilityCatalogEntry {
     }
 }
 
+pub fn ability_range_for_carrier(kind: AbilityKind, carrier: EntityKind) -> Option<u32> {
+    if kind == AbilityKind::EkatTeleport && carrier == EntityKind::LightnessAdept {
+        Some(balance::DAO_LIGHTNESS_DASH_RANGE_TILES)
+    } else {
+        ability_definition(kind).range_tiles
+    }
+}
+
 pub fn ability_cost_for_carrier(kind: AbilityKind, carrier: EntityKind) -> ResourceCost {
     let definition = ability_definition(kind);
     let carrier_costs = match kind {
@@ -1306,7 +1314,7 @@ mod tests {
         let charge = ability_definition(AbilityKind::Charge);
         assert!(!charge.command_card);
         assert!(charge.carriers.is_empty());
-        assert_eq!(charge.cooldown_ticks, 0);
+        assert_eq!(charge.cooldown_ticks, balance::NOVICE_CHARGE_COOLDOWN_TICKS);
 
         let teleport = EKAT_CATALOG.ability(AbilityKind::EkatTeleport).unwrap();
         assert_eq!(

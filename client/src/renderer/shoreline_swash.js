@@ -7,11 +7,16 @@
 export const SHORELINE_SWASH_FRAGMENT = `
 void main() {
   vec2 p = floor(vWorld / 2.0) * 2.0;
+  // Noise can displace the contour by at most 3.4px. The widest bank
+  // ends at -33.5px and the water fade at +24px. Beyond these conservative
+  // bounds the original bankMask always discards, so skip all procedural art.
+  float distance = shoreDistance(p);
+  if (distance < -40.0 || distance > 32.0) discard;
   float coarse = shoreNoise(p / 49.0);
   float detail = shoreNoise(p / 9.0);
   float grain = shoreHash(floor(p / 2.0));
   // Keep the little coves fixed in world space while the water runs over them.
-  float d = shoreDistance(p) + (coarse - .5) * 5.0 + (detail - .5) * 1.8;
+  float d = distance + (coarse - .5) * 5.0 + (detail - .5) * 1.8;
   float bankWidth = 24.0 + (shoreNoise(p / 83.0) - .5) * 9.0;
   float outerBank = smoothstep(-bankWidth - 5.0, -bankWidth + 2.0, d);
   float innerBank = 1.0 - smoothstep(13.0, 24.0, d);
