@@ -511,6 +511,13 @@ export function _drawAbilityObjects(state) {
       gfxNoFill(g);
       gfxStroke(g, 1.5, 0xc4f8ff, 0.6 + pulse * 0.25);
       gfxEllipse(g, object.x, object.y, radius - 3, radius - 3);
+    } else if (object.kind === ABILITY_OBJECT_KIND.LINE_PROJECTILE
+        && (object.ability === ABILITY.HEALING_POTION || object.ability === ABILITY.ESCAPE_TREASURE)) {
+      const color = object.ability === ABILITY.HEALING_POTION ? 0x54e878 : 0xa653ec;
+      gfxStroke(g, 1, 0xffffff, 0.8);
+      gfxFill(g, color, 1);
+      gfxCircle(g, object.x, object.y, 4);
+      gfxNoFill(g);
     } else if (object.kind === ABILITY_OBJECT_KIND.LINE_PROJECTILE) {
       const r = Math.max(5, object.ownerState?.radius || ts * 0.18);
       activeLineProjectileIds.add(object.id);

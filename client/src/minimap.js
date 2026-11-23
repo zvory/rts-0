@@ -1366,9 +1366,9 @@ export class Minimap {
         e.kind === KIND.ARTILLERY));
   }
 
-  /** Issue the minimap's current command to the world point for any selected own units. */
   _issueOrder(wx, wy, queued = false) {
     const commandTarget = this._intent()?.commandTarget;
+    if (ABILITIES[commandTarget?.ability]?.targetMode === "friendlyUnit") return false;
     const sel = this.state.selectedEntities() || [];
     if (commandTarget === "pointTanks") {
       const tanks = sel.filter((e) => ownOwner(this.state, e.owner, this.controlPolicy) && e.kind === KIND.TANK);

@@ -70,7 +70,7 @@ export function _issueTargetedCommand(p, ev = {}) {
   const resource = this._resourceAtScreen(p);
   const world = this._groundAtScreen(p.x, p.y);
   if (!world && !explicitAttackCommandTarget(this.state, pickedTarget, this.controlPolicy)) return false;
-  if (ownUnits.length === 0) {
+  if (ownUnits.length === 0 && commandTarget?.kind !== "ability") {
     if (producers.length === 0 || !world) return true;
     const queued = !!ev.shiftKey;
     if (commandTarget === "move" || commandTarget === "attack") {
@@ -121,6 +121,21 @@ export function _issueTargetedCommand(p, ev = {}) {
           .map((e) => e.id)
       : ownUnits;
     if (units.length === 0) return true;
+    if (definition?.targetMode === "friendlyUnit") {
+      const target = this._entityAtScreen(p, false, (e) => isUnit(e.kind)
+        && friendlyOwner(this.state, e.owner, this.controlPolicy));
+      if (!target || !isUnit(target.kind) || target.hp <= 0 || target.visionOnly
+          || !friendlyOwner(this.state, target.owner, this.controlPolicy)) return false;
+      const tileSize = this.state.map?.tileSize || DEFAULT_TILE_SIZE;
+      const range = definition.rangeTiles * tileSize;
+      const shop = this.state.selectedEntities().find((e) => units.includes(e.id)
+        && e.buildProgress == null && e.hp > 0
+        && Math.hypot(e.x - target.x, e.y - target.y) <= range);
+      if (!shop || (ability === ABILITY.ESCAPE_TREASURE && target.escapeTreasure)) return false;
+      this.commandInteraction.issueCommand(cmd.useAbility(ability, [shop.id], null, null, false, target.id));
+      this._addCommandFeedback("move", target.x, target.y, false);
+      return true;
+    }
     const queued = !!ev.shiftKey;
     const selectedCarriers = this.state.selectedEntities().filter((e) => units.includes(e.id));
     const firstFireClick = ability === ABILITY.POINT_FIRE && !intent.artilleryFireCenter;

@@ -987,7 +987,7 @@ for (const researched of [false, true]) {
   assert.equal(buildCommandCardDescriptors(ctx).slots[2].enabled, false);
 }
 
-// The inert Shop still exposes its construction cost and occupies an ordinary build slot.
+// The Shop exposes its construction cost and occupies an ordinary build slot.
 {
   const card = buildCommandCardDescriptors({
     playerId: 1, factionId: "cultivators",
@@ -1001,9 +1001,14 @@ for (const researched of [false, true]) {
   const idle = buildCommandCardDescriptors({
     playerId: 1, factionId: "cultivators",
     selection: [{ id: 2, owner: 1, kind: KIND.SHOP }],
+    groupCooldownClocks: () => [],
     resources: { steel: 1000, oil: 1000 },
   });
-  assert.equal(idle.slots.filter(Boolean).length, 0);
+  const items = idle.slots.filter(Boolean);
+  assert.equal(items.length, 2);
+  assert.deepEqual(items.map((item) => item.ability), [ABILITY.HEALING_POTION, ABILITY.ESCAPE_TREASURE]);
+  assert(items.every((item) => item.intent.targetMode === "friendlyUnit"));
+  assert.deepEqual(items.map((item) => item.cost.oil), [50, 100]);
 }
 
 // Portal Adepts require their Dao, 150 steel, 35 oil and three supply.

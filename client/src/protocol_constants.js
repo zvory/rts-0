@@ -324,6 +324,8 @@ export const ABILITY = Object.freeze({
   EVOLVE_MAGIC: "evolveMagic",
   DISCIPLE_SHIELD: "discipleShield",
   THROW_SWORD: "throwSword",
+  HEALING_POTION: "healingPotion",
+  ESCAPE_TREASURE: "escapeTreasure",
 
 });
 
@@ -365,7 +367,7 @@ export const MOVEMENT_PATH_DIAGNOSTICS = Object.freeze({
 // --- Compact snapshot wire schema (must match protocol.rs) ---
 export const PREDICTION_PROTOCOL_VERSION = 1;
 export const DEFAULT_FACTION_ID = "kriegsia";
-export const COMPACT_SNAPSHOT_VERSION = 65;
+export const COMPACT_SNAPSHOT_VERSION = 66;
 export const MAX_COMPACT_GROUND_DECALS = 64;
 export const SNAPSHOT_CODEC_VERSION = 1;
 export const SNAPSHOT_CODEC = Object.freeze({
@@ -530,6 +532,8 @@ export const ORDER_STAGE = Object.freeze({
   EVOLVE_MAGIC: "evolveMagic",
   DISCIPLE_SHIELD: "discipleShield",
   THROW_SWORD: "throwSword",
+  HEALING_POTION: "healingPotion",
+  ESCAPE_TREASURE: "escapeTreasure",
 
   SETUP_ANTI_TANK_GUNS: "setupAntiTankGuns",
 });
@@ -561,6 +565,8 @@ export const ORDER_STAGE_CODE = Object.freeze({
   [ORDER_STAGE.EVOLVE_MAGIC]: 24,
   [ORDER_STAGE.DISCIPLE_SHIELD]: 25,
   [ORDER_STAGE.THROW_SWORD]: 26,
+  [ORDER_STAGE.HEALING_POTION]: 27,
+  [ORDER_STAGE.ESCAPE_TREASURE]: 28,
 
 });
 
@@ -583,6 +589,8 @@ export const ABILITY_CODE = Object.freeze({
   [ABILITY.EVOLVE_MAGIC]: 16,
   [ABILITY.DISCIPLE_SHIELD]: 17,
   [ABILITY.THROW_SWORD]: 18,
+  [ABILITY.HEALING_POTION]: 19,
+  [ABILITY.ESCAPE_TREASURE]: 20,
 
 });
 

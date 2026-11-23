@@ -232,7 +232,7 @@ export function commandSubject(ctx, selection) {
     if (!isOwn(ctx, e)) continue;
     if (isUnit(e.kind)) return e;
     if (underConstructionBuilding(ctx, e)) return e;
-    if (e.kind === KIND.PROVEN_GROUNDS) return e;
+    if (e.kind === KIND.PROVEN_GROUNDS || e.kind === KIND.SHOP) return e;
     if (isBuilding(e.kind) && (factionTrainsOf(ctx, e.kind).length > 0 || factionResearchesOf(ctx, e.kind).length > 0)) return e;
   }
   return null;

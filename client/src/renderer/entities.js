@@ -174,9 +174,10 @@ export function _drawSelectionAndHp(e, selection, state, ownerColor = null) {
     gfxEllipse(g, 0, 0, ring.rx, ring.ry);
   }
 
-  if (progressStatus || (hasHealth && (damaged || selected || alwaysShow))) {
+  const showHp = !!progressStatus || (hasHealth && (damaged || selected || alwaysShow));
+  if (showHp || e.escapeTreasure) {
     const g = this._hpBarSlot(e.id);
-    this._hpBar(g, e, progressStatus, ownerColor);
+    this._hpBar(g, e, progressStatus, ownerColor, showHp);
   }
 }
 
@@ -187,9 +188,10 @@ export function _drawAboveFogHp(e, state, ownerColor = null) {
     && e.hp < e.maxHp;
   if (e?.aboveFogReveal !== true && e?.visionOnly !== true) return;
   if (!hasHealth) return;
-  if (!damaged && !state?.showHealthBarsAlwaysEnabled && !isDiscipleKind(e.kind)) return;
+  const showHp = damaged || !!state?.showHealthBarsAlwaysEnabled || isDiscipleKind(e.kind);
+  if (!showHp && !e.escapeTreasure) return;
   const g = this._hpBarSlot(e.id, "aboveFogHpBars");
-  this._hpBar(g, e, null, ownerColor);
+  this._hpBar(g, e, null, ownerColor, showHp);
 }
 
 export function _hpBarSlot(id, poolName = "hpBars") {
@@ -250,7 +252,7 @@ export function _ringRadius(e) {
   return { rx: r, ry: r * 0.68, cy: r * 0.36 };
 }
 
-export function _hpBar(g, e, status = null, ownerColor = null) {
+export function _hpBar(g, e, status = null, ownerColor = null, showHp = true) {
   if (!e.maxHp && !status) return;
   const frac = clamp01(status ? status.fraction : e.hp / e.maxHp);
   const stat = STATS[e.kind] || {};
@@ -295,6 +297,20 @@ export function _hpBar(g, e, status = null, ownerColor = null) {
     if (dividerCount > 0) g.rtsTicks.fill({ color: 0x000000, alpha: 0.95 });
   }
   g.position.set(e.x, topY);
+  g.rtsBackground.visible = g.rtsFill.visible = g.rtsTicks.visible = showHp;
+  if (e.escapeTreasure && !g.rtsEscape) {
+    const badge = new PIXI.Graphics();
+    // Exactly one HP-fill height square; draw a geometric E to avoid tiny-font blur.
+    badge.rect(-barH / 2, -barH - 3, barH, barH).fill(0x8c32c8);
+    const x = -1.2;
+    const y = -barH - 2.4;
+    badge.rect(x, y, 0.65, 2.8).rect(x, y, 2.4, 0.6)
+      .rect(x, y + 1.1, 1.9, 0.6).rect(x, y + 2.2, 2.4, 0.6).fill(0xffffff);
+    g.rtsEscape = badge;
+    g.addChild(badge);
+  }
+  if (g.rtsEscape) g.rtsEscape.visible = !!e.escapeTreasure;
+
 
   let color = Number.isFinite(ownerColor)
     ? ownerColor

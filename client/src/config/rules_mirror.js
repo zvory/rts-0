@@ -232,7 +232,7 @@ export const STATS = Object.freeze({
     description: "A supernatural gateway that trains Novices and researched Adepts. Each Adept costs 150 steel and 35 oil and takes 10 seconds." },
   [KIND.SHOP]: { label: "Shop", icon: "SH", footW: 3, footH: 4, sight: 1,
     cost: { steel: 200, oil: 200 }, buildTicks: TICK_HZ * 40, trains: [],
-    description: "A sturdy gourd-shaped shop. No goods or services are available yet." },
+    description: "Sells Healing Potions and Escape Treasures for nearby friendly units." },
   [KIND.PROVEN_GROUNDS]: { label: "Proving Grounds", icon: "PG", footW: 3, footH: 3, sight: 1,
     cost: { steel: 100, oil: 0 }, buildTicks: 200, trains: [], requires: [KIND.PORTAL],
     description: "Send base Novices inside for researched Dao training. Queue any mix of Lightness, War and Magic; each costs 100 oil and takes 10 seconds. Supports a rally point." },
@@ -301,6 +301,21 @@ export const STATS = Object.freeze({
 });
 
 export const ABILITIES = Object.freeze({
+  [ABILITY.HEALING_POTION]: Object.freeze({
+    ability: ABILITY.HEALING_POTION, label: "Healing Potion", icon: "HP", hotkey: "Q",
+    title: "Deliver a healing potion to a friendly unit within 30 tiles; fully heals on arrival",
+    carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: 30,
+    cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 50 }),
+    queued: false, queuePolicy: "notQueueable",
+  }),
+  [ABILITY.ESCAPE_TREASURE]: Object.freeze({
+    ability: ABILITY.ESCAPE_TREASURE, label: "Escape Treasure", icon: "E", hotkey: "W",
+    title: "Deliver a one-use treasure to a friendly unit within 30 tiles; lethal damage returns it to this Shop at 1 HP",
+    carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: 30,
+    cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 100 }),
+    queued: false, queuePolicy: "notQueueable",
+  }),
+
   [ABILITY.DISCIPLE_SHIELD]: Object.freeze({
     ability: ABILITY.DISCIPLE_SHIELD, label: "Shield", icon: "SHD", hotkey: "X",
     title: "Place a shield that absorbs 300 enemy damage to allied units; lasts up to 15 seconds",
