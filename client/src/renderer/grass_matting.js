@@ -4,6 +4,13 @@ import { createWorkerSafeCanvas } from "./raster_primitives.js";
 const VEHICLES = new Set([KIND.TANK, KIND.SCOUT_CAR, KIND.COMMAND_CAR,
   KIND.MORTAR_TEAM, KIND.ANTI_TANK_GUN, KIND.ARTILLERY, KIND.ROCKET_LAUNCHER]);
 
+// A center-line passage integrates to 1/20 of full wear. Spatial sampling makes
+// traffic depend on distance travelled, not render FPS or time spent standing.
+export const INFANTRY_PATH_PASSES = 20;
+const SAMPLE_STEP = 4;
+const RADIUS = 28;
+const SAMPLE_CREDIT = 65535 * SAMPLE_STEP / (INFANTRY_PATH_PASSES * RADIUS * 16 / 15);
+
 /** Lab-only visual experiment. Bounded mask, no durable or replay authority. */
 export class GrassPressureField {
   constructor(map) {
@@ -13,13 +20,9 @@ export class GrassPressureField {
     this.width = Math.ceil(this.worldWidth / this.scale);
     this.height = Math.ceil(this.worldHeight / this.scale);
     this.pixels = new Uint8ClampedArray(this.width * this.height * 4);
-    // This is a data texture: keep it opaque so canvas premultiplication cannot
-    // alter headings, and make untouched texels neutral under linear filtering.
-    for (let i = 0; i < this.pixels.length; i += 4) {
-      this.pixels[i + 1] = 128;
-      this.pixels[i + 2] = 128;
-      this.pixels[i + 3] = 255;
-    }
+    // R is shader-visible wear; GB retain a 16-bit traffic counter. Opaque alpha
+    // prevents canvas premultiplication from changing this data texture.
+    for (let i = 3; i < this.pixels.length; i += 4) this.pixels[i] = 255;
     this.poses = new Map();
   }
 
@@ -27,47 +30,49 @@ export class GrassPressureField {
     const seen = new Set();
     let changed = false;
     for (const e of entities) {
-      if (!isUnit(e.kind) || e.kind === KIND.SCOUT_PLANE || !(e.hp > 0) ||
+      if (!isUnit(e.kind) || VEHICLES.has(e.kind) || e.kind === KIND.SCOUT_PLANE || !(e.hp > 0) ||
           e.shotReveal || e.aboveFogReveal || e.visionOnly ||
           !Number.isFinite(e.x) || !Number.isFinite(e.y)) continue;
       seen.add(e.id);
       const previous = this.poses.get(e.id);
       const distance = previous ? Math.hypot(e.x - previous.x, e.y - previous.y) : 0;
-      if (!previous || distance > 96) { this.poses.set(e.id, { x:e.x, y:e.y }); continue; }
-      if (distance < 2) continue;
-      const dx = (e.x - previous.x) / distance, dy = (e.y - previous.y) / distance;
-      const vehicle = VEHICLES.has(e.kind);
-      const offset = e.kind === KIND.TANK ? 18 : 11;
-      for (const side of vehicle ? [-1, 1] : [0]) {
-        const ox = -dy * offset * side, oy = dx * offset * side;
-        changed = this.stamp(previous.x + ox, previous.y + oy,
-          e.x + ox, e.y + oy, vehicle ? 4 : 5, vehicle ? 235 : 165, dx, dy) || changed;
+      if (!previous || distance > 96) {
+        this.poses.set(e.id, { x:e.x, y:e.y, untilSample:SAMPLE_STEP / 2 });
+        continue;
       }
-      this.poses.set(e.id, { x:e.x, y:e.y });
+      if (distance < .0001) continue;
+      const dx = (e.x - previous.x) / distance, dy = (e.y - previous.y) / distance;
+      let travel = previous.untilSample;
+      for (; travel <= distance; travel += SAMPLE_STEP) {
+        changed = this.stamp(previous.x + dx * travel, previous.y + dy * travel) || changed;
+      }
+      this.poses.set(e.id, { x:e.x, y:e.y, untilSample:travel - distance });
     }
     for (const id of this.poses.keys()) if (!seen.has(id)) this.poses.delete(id);
     return changed;
   }
 
-  stamp(ax, ay, bx, by, radius, pressure, dx, dy) {
-    const s = this.scale, vx = bx-ax, vy = by-ay, length2 = vx*vx+vy*vy;
-    const minX = Math.max(0, Math.floor((Math.min(ax,bx)-radius-s)/s));
-    const maxX = Math.min(this.width-1, Math.ceil((Math.max(ax,bx)+radius+s)/s));
-    const minY = Math.max(0, Math.floor((Math.min(ay,by)-radius-s)/s));
-    const maxY = Math.min(this.height-1, Math.ceil((Math.max(ay,by)+radius+s)/s));
+  stamp(cx, cy) {
+    const s = this.scale;
+    const minX = Math.max(0, Math.floor((cx - RADIUS) / s));
+    const maxX = Math.min(this.width - 1, Math.floor((cx + RADIUS) / s));
+    const minY = Math.max(0, Math.floor((cy - RADIUS) / s));
+    const maxY = Math.min(this.height - 1, Math.floor((cy + RADIUS) / s));
     let changed = false;
-    for (let y=minY;y<=maxY;y++) for (let x=minX;x<=maxX;x++) {
-      const px=(x+.5)*s, py=(y+.5)*s;
-      const t=length2 ? Math.max(0,Math.min(1,((px-ax)*vx+(py-ay)*vy)/length2)) : 0;
-      const distance=Math.hypot(px-ax-t*vx,py-ay-t*vy);
-      const value=Math.round(pressure*Math.max(0,Math.min(1,(radius+s*.5-distance)/s)));
-      const i=(y*this.width+x)*4;
-      // Max pressure makes revisiting a path idempotent instead of accumulating endless stamps.
-      if (value <= this.pixels[i]) continue;
-      this.pixels[i]=value;
-      this.pixels[i+1]=Math.round(128+dx*127);
-      this.pixels[i+2]=Math.round(128+dy*127);
-      changed=true;
+    for (let y = minY; y <= maxY; y++) for (let x = minX; x <= maxX; x++) {
+      const dx = (x + .5) * s - cx, dy = (y + .5) * s - cy;
+      const kernel = Math.max(0, 1 - (dx * dx + dy * dy) / (RADIUS * RADIUS));
+      const credit = Math.round(SAMPLE_CREDIT * kernel * kernel);
+      if (!credit) continue;
+      const i = (y * this.width + x) * 4;
+      const old = this.pixels[i + 1] * 256 + this.pixels[i + 2];
+      const next = Math.min(65535, old + credit);
+      if (next === old) continue;
+      this.pixels[i + 1] = next >>> 8;
+      this.pixels[i + 2] = next & 255;
+      const visible = Math.round(next / 257);
+      changed ||= visible !== this.pixels[i];
+      this.pixels[i] = visible;
     }
     return changed;
   }

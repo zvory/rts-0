@@ -571,8 +571,9 @@ tile buckets are discarded before rasterization; live cross-boundary stamps clea
 
 The opt-in Lab profile `grass-survey-12` prototypes grass pressure in
 `renderer/grass_matting.js`. It sweeps visible ground-unit motion into a bounded RGBA mask;
-infantry uses one partial-pressure path and vehicles use paired stronger contact paths.
-The grass shader bends blades along that direction and reduces sway. Normal matches still use
+foot-unit traffic accumulates into soft gray-brown soil patches, reaching clear wear around
+20 passages over the same ground. Vehicles do not contribute; tank dirt tracks keep their existing
+renderer. The shader thins worn grass and reduces sway. Normal matches still use
 profile 9 and allocate no pressure mask. This experiment has no replay/seek/reconnect persistence
 or perspective cache and must not be enabled in normal matches until authoritative history and
 fog-safe replacement are implemented. See [grass matting investigation](grass-matting.md).
