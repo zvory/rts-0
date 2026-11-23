@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   INTERACT_NAMESPACE_NAMES, INTERACT_NAMESPACE_SUMMARIES, INTERACT_NAMESPACES,
-  namespaceCommandKey, requestTimeoutMs,
+  namespaceCommandKey, requestTimeoutMs, commandDefinition,
 } from "./command_registry.ts";
 import { commandHelp, helpCatalog } from "./command_help.ts";
 import {
@@ -113,6 +113,10 @@ export async function runCli(argv = process.argv.slice(2), { cwd = process.cwd()
   let input: unknown;
   try { input = JSON.parse(rawInput); } catch { throw cliError("invalidJson", "Input must be one valid JSON object argument."); }
   if (!isRecord(input)) throw cliError("invalidJson", "Input must be a JSON object.");
+  if (commandDefinition(command)?.scope === "local") {
+    const { MediaFinisher } = await import("./media_finish.ts");
+    return { ok: true, result: await new MediaFinisher({ env }).execute(command, input) };
+  }
   const workspaceRoot = gitRoot(cwd);
   const currentCheckoutCommit = checkoutCommit(workspaceRoot);
   const paths = runtimePaths(workspaceRoot);

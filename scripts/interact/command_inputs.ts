@@ -1,3 +1,4 @@
+import { validateMediaInput } from "./media_inputs.ts";
 import { GAME_AI_PROFILE_IDS } from "./session_defaults.ts";
 import { FIXED_CAPTURE_LIMITS } from "./fixed_capture.ts";
 import { GAME_TIMELAPSE_LIMITS, timelapseFrameBound } from "./game_timelapse.ts";
@@ -62,6 +63,7 @@ export function validatorFor(command: string): (value: unknown) => CommandInput 
 }
 
 export function validateCommandInput(command: string, value: unknown): CommandInput {
+  if (command.startsWith("media-")) return validateMediaInput(command, value);
   record(value, "input");
   const session = () => sessionId(value.sessionId);
   if (command.startsWith("map-editor-")) return validateMapEditorNamespaceInput(command, value, session);
@@ -186,9 +188,10 @@ export function validateCommandInput(command: string, value: unknown): CommandIn
   } else if (command === "record-stop" || command === "record-wait") {
     exact(value, ["sessionId"], command);
   } else if (command === "capture-fixed") {
-    exact(value, ["sessionId", "name", "fps", "frameCount", "viewport"], command);
+    exact(value, ["sessionId", "name", "fps", "frameCount", "viewport", "visualStartMs"], command);
     if (value.name != null && (typeof value.name !== "string" || !/^[A-Za-z0-9_-]{1,48}$/.test(value.name))) invalid("capture-fixed.name", "must be a safe artifact token");
     if (value.fps != null) integer(value.fps, "capture-fixed.fps", FIXED_CAPTURE_LIMITS.minFps, FIXED_CAPTURE_LIMITS.maxFps);
+    if (value.visualStartMs != null) boundedNumber(value.visualStartMs, "capture-fixed.visualStartMs", 0, 1_000_000_000);
     if (value.frameCount != null) integer(value.frameCount, "capture-fixed.frameCount", 1, FIXED_CAPTURE_LIMITS.maxFrames);
     if (value.viewport != null) viewport(value.viewport, 2048, "capture-fixed.viewport");
   } else if (command === "capture-cancel") {

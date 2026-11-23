@@ -1,3 +1,4 @@
+import { MediaStore } from "../media_store.ts";
 import type { InteractTailnetPreview } from "../tailnet_preview.ts";
 import type { InteractSession, JsonObject, ServiceInput } from "../service_contract.ts";
 
@@ -68,6 +69,7 @@ export async function presentRecordingResult(
   artifactPreview: InteractTailnetPreview | null,
 ) {
   if (!artifactPreview) return result;
+  const artifact = new MediaStore().register(result.videoPath, result.manifestPath);
   const { videoPath, framePaths, contactSheetPath, manifestPath: _manifestPath, ...visible } = result;
   const [preview, poster] = await Promise.all([
     publishPreview(artifactPreview, videoPath, "video/mp4"),
@@ -75,6 +77,7 @@ export async function presentRecordingResult(
   ]);
   return {
     ...visible,
+    artifactId: artifact.artifactId,
     preview: { ...preview, poster },
     frames: { count: Array.isArray(framePaths) ? framePaths.length : 0, localPathsWithheld: true },
     manifest: { available: true, localPathWithheld: true },
@@ -82,11 +85,12 @@ export async function presentRecordingResult(
 }
 
 export async function presentFixedCaptureResult(
-  result: JsonObject & { videoPath: string; contactSheetPath: string; manifestPath: string; frameSummary: JsonObject },
+  result: JsonObject & { videoPath: string; losslessPath?: string; contactSheetPath: string; manifestPath: string; frameSummary: JsonObject },
   artifactPreview: InteractTailnetPreview | null,
 ) {
   if (!artifactPreview) return result;
-  const { videoPath, contactSheetPath, manifestPath: _manifestPath, frameSummary, ...visible } = result;
+  const artifact = new MediaStore().register(result.videoPath, result.manifestPath, result.losslessPath);
+  const { videoPath, losslessPath: _losslessPath, contactSheetPath, manifestPath: _manifestPath, frameSummary, ...visible } = result;
   const [preview, poster] = await Promise.all([
     publishPreview(artifactPreview, videoPath, "video/mp4"),
     publishPreview(artifactPreview, contactSheetPath, "image/png"),
@@ -94,6 +98,8 @@ export async function presentFixedCaptureResult(
   const { representativeFramePaths, ...summary } = frameSummary || {};
   return {
     ...visible,
+    artifactId: artifact.artifactId,
+    losslessSource: artifact.lossless,
     preview: { ...preview, poster },
     frameSummary: {
       ...summary,

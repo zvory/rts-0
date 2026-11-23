@@ -25,10 +25,11 @@ export function fixedRepresentativeIndices(frameCount: number, limit = FIXED_CAP
 }
 
 export async function createFixedCaptureEncoder({
-  outputPath, contactSheetPath, fps, frameCount,
+  outputPath, contactSheetPath, fps, frameCount, losslessPath,
   processRunner = new ProcessRunner(), signal,
 }: {
   outputPath: string;
+  losslessPath?: string;
   contactSheetPath: string;
   fps: number;
   frameCount: number;
@@ -36,7 +37,7 @@ export async function createFixedCaptureEncoder({
   signal?: AbortSignal;
 }) {
   const tools = await checkMediaCapabilities({ processRunner, signal });
-  const encoder = createPngMp4Encoder({ outputPath, fps, tools });
+  const encoder = createPngMp4Encoder({ outputPath, fps, tools, losslessPath });
   return {
     write(buffer: Buffer) { return encoder.write(buffer); },
     async abort() { await encoder.abort(); },
@@ -75,6 +76,11 @@ export async function createFixedCaptureEncoder({
       };
       if (probe.codec !== "h264" || probe.codecTag !== "avc1" || probe.pixelFormat !== "yuv420p" || probe.container !== "mov,mp4,m4a,3gp,3g2,mj2" || probe.frameCount !== actualFrameCount || probe.frameRate !== `${fps}/1` || !hasFastStart(outputPath)) {
         throw new InteractRecordingError("mediaProbeFailed", `Fixed capture media did not preserve mobile H.264 MP4/${fps} FPS/${actualFrameCount} frames.`);
+      }
+      if (losslessPath) {
+        const raw = await processRunner.run(tools.ffprobe, ["-v", "error", "-count_frames", "-select_streams", "v:0", "-show_entries", "stream=codec_name,nb_read_frames", "-of", "json", losslessPath], { timeoutMs: 30_000, signal });
+        const source = parseProbe(raw.stdout).streams?.[0];
+        if (raw.status !== 0 || source?.codec_name !== "ffv1" || Number(source?.nb_read_frames) !== actualFrameCount) throw new InteractRecordingError("mediaProbeFailed", "Lossless capture source was truncated or invalid.");
       }
       const contact = fs.readFileSync(contactSheetPath);
       return {

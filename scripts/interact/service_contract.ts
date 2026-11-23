@@ -54,6 +54,7 @@ export interface ServiceInput extends JsonObject {
   resumeSpeed?: number | null;
   fps?: number;
   frameCount?: number;
+  visualStartMs?: number;
   reproduction?: boolean;
   opponent?: string;
   spectate?: string[]; autoSpectator?: boolean; sampleEveryMs?: number; speed?: number;

@@ -585,11 +585,12 @@ export class InteractDriver {
     }
   }
 
-  async captureFixed({ sessionId, name = "fixed", fps = 30, frameCount = 30, viewport = null, sceneIdentity = null, sceneRevision = 0, aliases = [] }: {
+  async captureFixed({ sessionId, name = "fixed", fps = 30, frameCount = 30, viewport = null, visualStartMs = null, sceneIdentity = null, sceneRevision = 0, aliases = [] }: {
     sessionId?: string;
     name?: string;
     fps?: number;
     frameCount?: number;
+    visualStartMs?: number | null;
     viewport?: Viewport | null;
     sceneIdentity?: JsonObject | null;
     sceneRevision?: number;
@@ -626,8 +627,10 @@ export class InteractDriver {
         fs.mkdirSync(framesDir, { recursive: true });
         const videoPath = path.join(captureDir, `${artifactName}.mp4`);
         const contactSheetPath = path.join(captureDir, `${artifactName}-contact-sheet.png`);
+        const losslessPath = path.join(captureDir, `${artifactName}-source.mkv`);
         encoder = await createFixedCaptureEncoder({
           outputPath: videoPath,
+          losslessPath,
           contactSheetPath,
           fps,
           frameCount,
@@ -636,6 +639,10 @@ export class InteractDriver {
         const representativeIndices = fixedRepresentativeIndices(frameCount);
         const entered = await this.callBridge("captureFixedEnter", {});
         captureEntered = true;
+        if (visualStartMs != null) {
+          if (visualStartMs < Number(entered.visualStartMs)) throw new InteractDriverError("invalidVisualTime", "visualStartMs precedes the current render clock; choose a later shared timestamp.");
+          entered.visualStartMs = visualStartMs;
+        }
         const startTick = status.snapshotTick;
         if (typeof startTick !== "number" || !Number.isInteger(startTick)) throw new InteractDriverError("captureStateInvalid", "Fixed capture requires an authoritative start tick.");
         let currentTick = startTick;
@@ -691,13 +698,13 @@ export class InteractDriver {
             frameCount, clip, viewport: normalizedViewport, visualStartMs: entered.visualStartMs,
             streaming: true, retainedPngFrames: representativeIndices.size, processedPngBytes,
           },
-          frames, media: { videoPath, contactSheetPath, bytes: media.bytes, tools: media.tools, probe: media.probe, contactSheet: media.contactSheet },
+          frames, media: { videoPath, losslessPath, contactSheetPath, bytes: media.bytes, tools: media.tools, probe: media.probe, contactSheet: media.contactSheet },
           runtime: { node: process.version, platform: process.platform, architecture: process.arch, browser: this.browserVersion || null },
           errors: { pageConsole: diagnostics.pageConsoleErrors, page: diagnostics.pageErrors, requestFailures: diagnostics.requestFailures },
         };
         fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o600 });
         const result = {
-          videoPath, contactSheetPath, manifestPath,
+          videoPath, losslessPath, contactSheetPath, manifestPath,
           frameSummary: {
             count: frames.length,
             uniqueHashes: new Set(frames.map((frame) => frame.sha256)).size,

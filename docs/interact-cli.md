@@ -7,7 +7,8 @@ video, and sampled time-lapse video. The observation-only `dev-scenario` namespa
 server-authored dev scenarios for screenshots, before/after stills, real-time video, and sampled
 time lapses. The `map-editor` namespace loads one bounded bundled map for editor inspection,
 camera framing, and screenshots. All four start this worktree's normal Rust server and a headless client using the
-production Pixi renderer. Interact never edits source files.
+production Pixi renderer. The `media` namespace exports, compares, inspects, and republishes
+captured videos locally, without starting a browser, server, or daemon. Interact never edits source files.
 
 Interact requires Node 22.18 or newer and runs its TypeScript source directly through Node's
 built-in type stripping; there is no compile or generated-output step. Install the repository-owned
@@ -483,7 +484,10 @@ fixed capture never mixes live rAF interpolation into either case. The manifest 
 scenario/seed, branch/head/build/runtime identity, tick and visual timestamp for every frame,
 SHA-256 frame hashes, optional representative paths, and media paths. The bounded CLI response
 returns only frame count, unique-hash count, and a Tailnet MP4/contact-sheet preview; full rows
-remain in the manifest. Representative local paths are deliberately withheld. Hash repeatability is
+remain in the manifest. The response also includes a stable `media_<32-hex>` artifact ID.
+Fixed captures retain a lossless FFV1/BGRA source (512 MiB cap), streamed from the same
+original PNG frames before H.264 encoding. Source frame counts are verified; an oversized or
+truncated lossless source fails the capture. Representative local paths are deliberately withheld. Hash repeatability is
 evidence only within the pinned local browser/GPU environment, not a cross-browser, cross-GPU, or
 cross-OS golden-image promise.
 Fixed-capture scene alias metadata uses the same 40-row detailed-summary cap.
@@ -496,6 +500,98 @@ partial fixed media is removed and the normal render clock, rAF loop, viewport, 
 are restored. The initial supported review cases are idle/frame-strip animation, authoritative
 movement, and direct-fire/recoil; audio and other wall-clock-only UI are intentionally outside the
 fixed visual-time contract.
+
+## Media finishing and artifact recovery
+
+Prefer these commands over temporary FFmpeg/Python wrappers. All video captures (`capture-fixed`,
+`record-stop`, `record-wait`, and time lapses) return `artifactId`. The machine-local registry copies
+video, provenance, and any fixed-capture lossless source into private OS temporary storage. IDs work
+across worktrees and survive session shutdown and removal of the originating worktree. They last
+until manually removed or OS temporary cleanup; they are not permanent storage or remote IDs.
+Repeated wait/stop results for the same file return the same ID. Capture setup/replay `artifact_*`
+IDs remain a separate contract.
+
+```bash
+node scripts/interact/cli.mjs media export '{"artifactId":"media_<capture>","format":"webm","preset":"balanced","speed":2}'
+node scripts/interact/cli.mjs media compare '{"artifacts":["media_<before>","media_<after>"],"layout":"before-after"}'
+node scripts/interact/cli.mjs media compare '{"artifacts":["media_<one>","media_<two>","media_<three>"],"labels":["Broad sweeps","Broken gusts","Gentle breeze"],"layout":"grid"}'
+node scripts/interact/cli.mjs media inspect '{"artifactId":"media_<result>"}'
+node scripts/interact/cli.mjs media publish '{"artifactId":"media_<result>"}'
+```
+
+Export and comparison return a new artifact ID, codec/dimension/frame/duration verification, and
+processing metadata. They do not publish automatically. `publish` also republishes expired links
+without recapturing or encoding. It returns a 24-hour Tailnet link or a durable local fallback;
+use the returned delivery instructions. No game server is needed for media commands. Missing
+artifacts report `mediaArtifactMissing` rather than silently recapturing a different scene.
+
+Formats are VP9 WebM (default) and H.264/AVC MP4 with fast-start and YUV420p. Presets are `compact`,
+`balanced` (default), and `quality`: WebM CRF 38/30/22, MP4 CRF 28/23/18. Output is silent 30 FPS;
+`speed` 0.25–8 changes finished playback timing without rerunning the simulation. Exports preserve
+source dimensions, padding odd dimensions to even values. Fixed-capture exports use the retained
+lossless source to avoid recompressing H.264. Finished outputs are limited to 64 MiB and ten minutes;
+encoding has a 180-second deadline. The entire output must decode and match its expected duration,
+frame count (within one rounding frame), and codec. Size-cap truncation is a failure.
+
+Comparisons accept 2–4 IDs. `grid` uses two columns; `before-after` is a two-column comparison with
+Before/After headings; both end with the shortest clip. `concat` plays each complete clip in order.
+Cells fit within 960×720 with letterboxing, plus a 48px heading; these layouts intentionally resize
+for comparison. Labels accept up to 64 ASCII letters, digits, spaces, and `._()+:/-`, rendered with a
+portable uppercase bitmap font; FFmpeg does not need drawtext or installed fonts. Layouts default to Case 1,
+Case 2, etc.; user labels override them. Comparison provenance records source IDs and timing policy.
+
+`layout:"difference"` requires exactly two original fixed captures with retained lossless sources.
+It subtracts RGB pixels before scaling, labels, or lossy encoding, then encodes the difference for
+viewing. Identical source pixels produce black. It rejects compressed-only exports and differences
+in source dimensions, frame count/rate, duration, simulation ticks, visual timestamps, camera,
+viewport/DPR, map/seed/scenario, or browser environment. This checks alignment, not equivalence of
+all simulation state or assets: arrange the same setup, orders, selection, fog, and ready assets
+in both revisions. A difference video is visual evidence; exact pixel counts still belong to
+`client-render-parity.mjs`, not decoded lossy video.
+
+For reproducible render timing, `lab capture-fixed` accepts optional `visualStartMs` (0–1e9). Choose
+the same timestamp in both captures, at or after their current render clocks; a preceding timestamp
+fails with `invalidVisualTime`. Omitting it preserves the existing current-clock behavior. Advancing
+the render clock can age transient visual effects, so arrange those effects at corresponding times.
+
+### Batch recipe: capture, finish, verify, deliver
+
+Use the existing `runCli` API rather than spawning a subprocess and rewriting a JSON/error wrapper
+per operation. The following example records one configured scene and delivers a WebM. Use `catalog`
+and legal placement/normal `order` calls to arrange the task's actual subjects before capture.
+A response with `ok:false` must stop the batch. Teardown belongs in `finally`; media operations can
+run after it. To build comparisons, retain each variant's capture ID and call `media compare`.
+
+```js
+import { runCli } from "./scripts/interact/cli.ts";
+const command = async (namespace, name, input = {}) => {
+  const response = await runCli([namespace, name, JSON.stringify(input)]);
+  if (!response.ok) throw new Error(JSON.stringify(response.error));
+  return response.result;
+};
+let capture;
+try {
+  const { sessionId } = await command("lab", "open", {
+    seed: 42, viewport: { width: 1000, height: 700, deviceScaleFactor: 1 },
+  });
+  const catalog = await command("lab", "catalog", { sessionId });
+  // Arrange legal subjects, selection, camera and normal orders using this catalog.
+  await command("lab", "time", { sessionId, control: { action: "pause" } });
+  capture = await command("lab", "capture-fixed", {
+    sessionId, name: "review", fps: 30, frameCount: 180,
+  });
+} finally {
+  await command("lab", "shutdown");
+}
+const video = await command("media", "export", {
+  artifactId: capture.artifactId, format: "webm", preset: "balanced",
+});
+console.log(JSON.stringify(await command("media", "inspect", { artifactId: video.artifactId })));
+console.log(JSON.stringify(await command("media", "publish", { artifactId: video.artifactId })));
+```
+
+Run a saved `.mjs` recipe from the repository root, or use `node --input-type=module` with the code on
+stdin. Inspect the resulting clip/contact sheet once; verification does not replace visual QA.
 
 ## Recovery
 
