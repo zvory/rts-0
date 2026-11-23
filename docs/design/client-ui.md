@@ -568,6 +568,14 @@ complete intervening motion. Tread pigment is deliberately faint, and every live
 trail excludes road-tile pixels so paved surfaces never retain tank tracks. Historical road-only
 tile buckets are discarded before rasterization; live cross-boundary stamps clear their road area.
 
+The opt-in Lab profile `grass-survey-12` prototypes grass pressure in
+`renderer/grass_matting.js`. It sweeps visible ground-unit motion into a bounded RGBA mask;
+infantry uses one partial-pressure path and vehicles use paired stronger contact paths.
+The grass shader bends blades along that direction and reduces sway. Normal matches still use
+profile 9 and allocate no pressure mask. This experiment has no replay/seek/reconnect persistence
+or perspective cache and must not be enabled in normal matches until authoritative history and
+fog-safe replacement are implemented. See [grass matting investigation](grass-matting.md).
+
 `renderer/trenches.js`
 ```js
 export function normalizedTrenches(trenches, tileSize?)
