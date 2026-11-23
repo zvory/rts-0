@@ -395,6 +395,7 @@ fn the_push_scout_car_leads_a_march_but_keeps_the_push_smoke_cast() {
 
     // Casting for the push: left alone.
     let cast = Command::UseAbility {
+        target_id: None,
         ability: rts_rules::faction::AbilityKind::Smoke,
         units: vec![9],
         x: Some(50.0 * TS),

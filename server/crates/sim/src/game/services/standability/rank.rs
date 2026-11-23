@@ -8,9 +8,6 @@ pub(crate) fn unit_spawn_standable_for_entity(
     x: f32,
     y: f32,
 ) -> bool {
-    if !entity.dao_master {
-        return unit_spawn_standable(map, occ, entities, entity.kind, x, y);
-    }
     let Some((x, y)) = stored_position(x, y) else {
         return false;
     };
@@ -25,14 +22,21 @@ pub(crate) fn unit_spawn_standable_for_entity(
     ) {
         return false;
     }
-    let body = UnitBody::Circle(CircleBody {
-        x,
-        y,
-        radius: entity.radius(),
-    });
+    let Some(mut body) = unit_body_with_facing(entity.kind, x, y, entity.facing()) else {
+        return false;
+    };
+    if entity.kind.is_disciple() {
+        if let UnitBody::Circle(circle) = &mut body {
+            circle.radius = entity.radius();
+        }
+    }
     entities.iter().all(|e| {
         e.hp == 0
             || !e.is_unit()
             || unit_body_for_entity(e).is_none_or(|other| !unit_bodies_intersect(body, other))
     })
 }
+
+#[cfg(test)]
+#[path = "rank_tests.rs"]
+mod tests;

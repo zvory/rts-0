@@ -33,6 +33,7 @@ fn setup() -> (Game, u32) {
 
 fn cast(caster: u32, x: f32, queued: bool) -> Command {
     Command::UseAbility {
+        target_id: None,
         ability: AbilityKind::DiscipleShield,
         units: vec![caster],
         x: Some(x),

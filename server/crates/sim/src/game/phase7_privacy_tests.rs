@@ -452,6 +452,7 @@ fn artillery_target_marker_is_visible_to_allies_not_hidden_enemies() {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::PointFire,
             units: vec![artillery],
             x: Some(target.0),
@@ -504,6 +505,7 @@ fn manual_mortar_launch_and_impact_markers_are_visible_to_allies() {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::MortarFire,
             units: vec![mortar],
             x: Some(target_pos.0),

@@ -128,6 +128,21 @@ pub(super) fn validate_entities(
     for entity in &entities.entities {
         validate_entity(entity, entities.next_id, player_ids, world, tick, &mut ids)?;
     }
+    for entity in &entities.entities {
+        if let Some(shop) = entity.escape_treasure {
+            if !entities.entities.iter().any(|source| {
+                source.id == shop
+                    && source.kind == crate::game::entity::EntityKind::Shop
+                    && source.hp > 0
+                    && !source.under_construction()
+            }) {
+                return Err(CheckpointPayloadError::InvalidReference {
+                    field: "entities.escapeTreasure",
+                    id: shop,
+                });
+            }
+        }
+    }
     entities::validate_single_builders(&entities.entities)?;
     Ok(ids)
 }
@@ -196,6 +211,14 @@ fn validate_entity(
         return Err(CheckpointPayloadError::InvalidReference {
             field: "entities.owner",
             id: entity.owner,
+        });
+    }
+    if entity
+        .escape_treasure
+        .is_some_and(|shop| !entity.is_unit() || entity.hp == 0 || shop == 0 || shop >= next_id)
+    {
+        return Err(CheckpointPayloadError::InvalidValue {
+            field: "entities.escapeTreasure",
         });
     }
     entities::validate_ownership(entity)?;

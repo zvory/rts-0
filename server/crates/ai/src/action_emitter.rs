@@ -112,6 +112,7 @@ pub(crate) fn emit_request(request: AiActionRequest) -> SimCommand {
             y,
             queued,
         } => SimCommand::UseAbility {
+            target_id: None,
             units,
             ability,
             x,

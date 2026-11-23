@@ -50,6 +50,20 @@ try {
     "ordinary 15 HP dividers stay visible with three-quarter-pixel marks",
   );
 
+  const treasureBar = makeBar();
+  const protectedUnit = { kind: KIND.RIFLEMAN, x: 100, y: 120, hp: 40, maxHp: 40, escapeTreasure: true };
+  _hpBar.call({}, treasureBar, protectedUnit, null, null, false);
+  assert(treasureBar.rtsEscape.visible && !treasureBar.rtsBackground.visible
+    && !treasureBar.rtsFill.visible && !treasureBar.rtsTicks.visible,
+  "Escape Treasure badge remains visible while its health bar is hidden");
+  const badgeBox = treasureBar.rtsEscape.calls.find((call) => call[0] === "drawRect");
+  assert(badgeBox[3] === 4 && badgeBox[4] === 4,
+    "Escape badge width and height equal the four-pixel HP fill height");
+  const badge = treasureBar.rtsEscape;
+  _hpBar.call({}, treasureBar, { ...protectedUnit, escapeTreasure: false });
+  assert(treasureBar.rtsEscape === badge && !badge.visible,
+    "Consumed Escape Treasure hides its pooled badge");
+
   const highHpBar = makeBar();
   _hpBar.call({ _map: { tileSize: 32 } }, highHpBar, {
     kind: KIND.RIFLEMAN,

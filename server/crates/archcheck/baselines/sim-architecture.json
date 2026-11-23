@@ -1,5 +1,5 @@
 {
-  "reason": "Committed pivot-vehicle recovery uses the existing geometry service to check the complete escape corridor against nearby unit bodies; exact new helper edge only, unrelated ratchets retained.",
+  "reason": "Register narrow Shop purchase and rescue helper; exact new signature and player resource usage, unrelated ratchets retained.",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -1292,6 +1292,10 @@
     {
       "path": "tests/tournament_tests.rs",
       "lines": 640
+    },
+    {
+      "path": "services/shop_items.rs",
+      "lines": 195
     }
   ],
   "service_edges": [
@@ -1977,6 +1981,11 @@
       "path": "services/tournament.rs",
       "line": 61,
       "name": "advance"
+    },
+    {
+      "path": "services/shop_items.rs",
+      "line": 24,
+      "name": "purchase"
     }
   ],
   "player_state_usages": [
@@ -2274,6 +2283,16 @@
       "path": "services/tournament.rs",
       "line": 63,
       "code": "players: &mut [PlayerState],"
+    },
+    {
+      "path": "services/shop_items.rs",
+      "line": 27,
+      "code": "players: &mut [PlayerState],"
+    },
+    {
+      "path": "tests/shop_tests.rs",
+      "line": 344,
+      "code": "let ally_player = crate::game::PlayerState {"
     }
   ],
   "player_state_field_writes": [

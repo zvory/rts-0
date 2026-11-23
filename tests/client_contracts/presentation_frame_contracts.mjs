@@ -65,6 +65,7 @@ const normal = {
   prodQueue: 1,
   prodWaiting: true,
   extractorActive: false,
+  escapeTreasure: true,
   weaponFacing: 0.8,
   commanderFacing: -1.2,
   panzerfaustWindupProgress: 0.4,
@@ -192,6 +193,8 @@ assert(
   "prepared malformed admitted data follows the existing bounded entity-drop diagnostic",
 );
 
+assert(preparedFrame.layers.fogGatedWorld.find((record) => record.id === normal.id)?.escapeTreasure === true,
+  "escape protection crosses the worker presentation boundary");
 assert(Object.isFrozen(frame), "presentation frame is frozen");
 assert(Object.keys(frame.layers).join(",") === EXPECTED_LAYERS.join(","), "frame exposes exactly the locked layer keys");
 assert(EXPECTED_LAYERS.every((id) => Object.isFrozen(frame.layers[id])), "every semantic layer array is frozen");

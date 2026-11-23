@@ -567,7 +567,16 @@ fn validate_command(
         | Command::SetAutocast { units, .. } => {
             validate_unit_list(units, unit_cap, "command.units", state)?;
         }
-        Command::UseAbility { units, x, y, .. } => {
+        Command::UseAbility {
+            units,
+            x,
+            y,
+            target_id,
+            ..
+        } => {
+            if let Some(target) = target_id {
+                validate_entity_id(*target, "command.targetId", state)?;
+            }
             validate_unit_list(units, unit_cap, "command.units", state)?;
             if let (Some(x), Some(y)) = (x, y) {
                 validate_finite_point(*x, *y, "command.useAbility")?;

@@ -108,3 +108,32 @@ fn branch_staging_client_messages_deserialize() {
     ));
     assert!(matches!(start, ClientMessage::StartBranch));
 }
+
+#[test]
+fn unit_targeted_ability_keeps_target_id_without_world_point() {
+    let cmd: Command = serde_json::from_value(serde_json::json!({
+        "c": "useAbility", "ability": "healingPotion", "units": [17], "targetId": 29
+    }))
+    .unwrap();
+    assert!(matches!(
+        cmd,
+        Command::UseAbility {
+            target_id: Some(29),
+            x: None,
+            y: None,
+            ..
+        }
+    ));
+    assert_eq!(serde_json::to_value(cmd).unwrap()["targetId"], 29);
+    let legacy: Command = serde_json::from_value(serde_json::json!({
+        "c": "useAbility", "ability": "smoke", "units": [17], "x": 10, "y": 20
+    }))
+    .unwrap();
+    assert!(matches!(
+        legacy,
+        Command::UseAbility {
+            target_id: None,
+            ..
+        }
+    ));
+}

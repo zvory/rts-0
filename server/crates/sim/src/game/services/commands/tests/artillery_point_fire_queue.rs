@@ -71,6 +71,7 @@ fn queued_artillery_blanket_fire_preserves_center_after_future_move() {
         vec![(
             1,
             SimCommand::UseAbility {
+                target_id: None,
                 ability: AbilityKind::BlanketFire,
                 units: vec![artillery],
                 x: Some(raw_click.0),
@@ -178,6 +179,7 @@ fn queued_artillery_point_fire_at_future_origin_preserves_clicked_center() {
             (
                 1,
                 SimCommand::UseAbility {
+                    target_id: None,
                     ability: AbilityKind::PointFire,
                     units: vec![artillery],
                     x: Some(future.0),
@@ -207,6 +209,7 @@ fn queue_point_fire(map: &Map, entities: &mut EntityStore, artillery: u32, raw_c
         vec![(
             1,
             SimCommand::UseAbility {
+                target_id: None,
                 ability: AbilityKind::PointFire,
                 units: vec![artillery],
                 x: Some(raw_click.0),

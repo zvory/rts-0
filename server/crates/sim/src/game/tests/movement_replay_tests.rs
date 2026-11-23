@@ -438,6 +438,7 @@ fn out_of_range_smoke_moves_into_range_launches_then_idles() {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::Smoke,
             units: vec![scout],
             x: Some(target.0),
@@ -485,6 +486,7 @@ fn queued_out_of_range_smoke_command_log_replays_deterministically() {
     live.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::Smoke,
             units: vec![scout],
             x: Some(first_target.0),
@@ -495,6 +497,7 @@ fn queued_out_of_range_smoke_command_log_replays_deterministically() {
     live.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::Smoke,
             units: vec![scout],
             x: Some(second_target.0),
@@ -699,6 +702,7 @@ fn phase_six_mixed_intent_command_log_replays_deterministically() {
         game.enqueue(
             1,
             Command::UseAbility {
+                target_id: None,
                 ability: ability::AbilityKind::Smoke,
                 units: vec![scout_a, scout_b],
                 x: Some(target.0),
@@ -728,6 +732,7 @@ fn phase_six_mixed_intent_command_log_replays_deterministically() {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::Charge,
             units: vec![rifleman],
             x: None,

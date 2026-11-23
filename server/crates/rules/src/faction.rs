@@ -108,6 +108,8 @@ pub enum AbilityKind {
     EvolveMagic,
     DiscipleShield,
     ThrowSword,
+    HealingPotion,
+    EscapeTreasure,
 }
 
 impl AbilityKind {
@@ -130,6 +132,8 @@ impl AbilityKind {
         Self::EvolveMagic,
         Self::DiscipleShield,
         Self::ThrowSword,
+        Self::HealingPotion,
+        Self::EscapeTreasure,
     ];
 
     pub const fn stable_id(self) -> &'static str {
@@ -152,6 +156,8 @@ impl AbilityKind {
             Self::EvolveMagic => "evolveMagic",
             Self::DiscipleShield => "discipleShield",
             Self::ThrowSword => "throwSword",
+            Self::HealingPotion => "healingPotion",
+            Self::EscapeTreasure => "escapeTreasure",
         }
     }
 
@@ -780,7 +786,9 @@ const CULTIVATORS_UPGRADES: [UpgradeCatalogEntry; 3] = [
     },
 ];
 
+mod ability_targeting;
 mod dao;
+pub use ability_targeting::{AbilityQueuePolicy, AbilityTargetMode};
 use dao::CULTIVATOR_ABILITIES;
 
 pub const CULTIVATORS_CATALOG: FactionCatalog = FactionCatalog {
@@ -834,42 +842,6 @@ pub const CATALOGS: &[FactionCatalog] = &[
 pub struct UpgradeCatalogEntry {
     pub kind: UpgradeKind,
     pub researched_at: EntityKind,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AbilityTargetMode {
-    SelfTarget,
-    WorldPoint,
-}
-
-impl AbilityTargetMode {
-    pub fn stable_id(self) -> &'static str {
-        match self {
-            AbilityTargetMode::SelfTarget => "self",
-            AbilityTargetMode::WorldPoint => "worldPoint",
-        }
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AbilityQueuePolicy {
-    NotQueueable,
-    QueueSkipIfNotReady,
-    QueueWaitUntilReady,
-}
-
-impl AbilityQueuePolicy {
-    pub fn stable_id(self) -> &'static str {
-        match self {
-            AbilityQueuePolicy::NotQueueable => "notQueueable",
-            AbilityQueuePolicy::QueueSkipIfNotReady => "skipIfNotReady",
-            AbilityQueuePolicy::QueueWaitUntilReady => "waitUntilReady",
-        }
-    }
-
-    pub fn may_queue(self) -> bool {
-        !matches!(self, AbilityQueuePolicy::NotQueueable)
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1069,6 +1041,8 @@ pub fn ability_definition(kind: AbilityKind) -> AbilityCatalogEntry {
         AbilityKind::EvolveMagic => CULTIVATOR_ABILITIES[2],
         AbilityKind::DiscipleShield => CULTIVATOR_ABILITIES[5],
         AbilityKind::ThrowSword => CULTIVATOR_ABILITIES[6],
+        AbilityKind::HealingPotion => CULTIVATOR_ABILITIES[7],
+        AbilityKind::EscapeTreasure => CULTIVATOR_ABILITIES[8],
     }
 }
 

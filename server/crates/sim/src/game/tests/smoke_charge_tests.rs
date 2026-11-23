@@ -25,6 +25,7 @@ fn scout_car_smoke_defaults_missing_legacy_charge_state_to_full() {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::Smoke,
             units: vec![scout],
             x: Some(target.0),
@@ -55,6 +56,7 @@ fn scout_car_smoke_recharges_two_spent_charges_sequentially() {
         game.enqueue(
             1,
             Command::UseAbility {
+                target_id: None,
                 ability: ability::AbilityKind::Smoke,
                 units: vec![scout],
                 x: Some(target.0),
@@ -153,6 +155,7 @@ fn scout_car_smoke_recharges_two_spent_charges_sequentially() {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::Smoke,
             units: vec![scout],
             x: Some(target.0),

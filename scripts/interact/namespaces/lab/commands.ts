@@ -513,7 +513,7 @@ async function resolveCommand(session: InteractSession, command: JsonObject) {
     wire[field] = entries.map((entry) => entry.id);
     resolved[field] = entries;
   }
-  for (const field of ["target", "node", "building"]) {
+  for (const field of ["target", "targetId", "node", "building"]) {
     if (command[field] == null || (field === "building" && command.c === "build")) continue;
     const entry = await resolveEntityReference(session, command[field] as EntityRef); wire[field] = entry.id; resolved[field] = entry;
   }

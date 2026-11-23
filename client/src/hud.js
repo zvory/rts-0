@@ -655,7 +655,7 @@ export class HUD {
       this._intent()?.endCommandTarget?.();
       return;
     }
-    if (intent.targetMode === "worldPoint") {
+    if (intent.targetMode === "worldPoint" || intent.targetMode === "friendlyUnit") {
       this._intent()?.beginCommandTarget?.({ kind: "ability", ability: intent.ability }, { shiftKey: !!ev.shiftKey });
     } else {
       this.commandInteraction.issueCommand(cmd.useAbility(

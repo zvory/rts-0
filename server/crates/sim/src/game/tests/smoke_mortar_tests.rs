@@ -375,6 +375,7 @@ fn manual_mortar_fire_impacts_without_toast_notice() {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::MortarFire,
             units: vec![mortar],
             x: Some(target_pos.0),
@@ -521,6 +522,7 @@ fn manual_mortar_fire_impacts_after_shooter_dies_before_impact() {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::MortarFire,
             units: vec![mortar],
             x: Some(target_pos.0),
@@ -648,6 +650,7 @@ fn manual_mortar_fire_turns_briefly_before_launching() {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::MortarFire,
             units: vec![mortar],
             x: Some(target_pos.0),
@@ -770,6 +773,7 @@ fn manual_mortar_fire_damages_friendly_units_at_enemy_rate() {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::MortarFire,
             units: vec![mortar],
             x: Some(target_pos.0),
@@ -880,6 +884,7 @@ fn manual_mortar_fire_has_no_armor_piercing_in_either_splash_radius() {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::MortarFire,
             units: vec![mortar],
             x: Some(target_pos.0),
@@ -1011,6 +1016,7 @@ fn manual_mortar_fire_damages_allied_units_without_kill_credit() {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::MortarFire,
             units: vec![mortar],
             x: Some(target_pos.0),
@@ -1096,6 +1102,7 @@ fn manual_mortar_fire_damages_friendly_buildings() {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::MortarFire,
             units: vec![mortar],
             x: Some(target_pos.0),
@@ -1248,6 +1255,7 @@ fn smoke_queued_order_skipped_when_caster_dies() {
     game.enqueue(
         1,
         SimCommand::UseAbility {
+            target_id: None,
             ability: AbilityKind::Smoke,
             units: vec![scout],
             x: Some(target.0),
@@ -1276,6 +1284,7 @@ fn smoke_nonfinite_target_coordinates_are_rejected() {
     game.enqueue(
         1,
         SimCommand::UseAbility {
+            target_id: None,
             ability: AbilityKind::Smoke,
             units: vec![scout],
             x: Some(f32::NAN),

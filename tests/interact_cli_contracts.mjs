@@ -11,11 +11,18 @@ import {
   processAlive, readStartupLock, readState, reclaimStaleStartupLock,
   runtimePaths, sleep, startupLockStale,
 } from "../scripts/interact/runtime.ts";
+import { validateCommandInput } from "../scripts/interact/command_inputs.ts";
 import { INTERACT_COMMANDS } from "../scripts/interact/command_service.ts";
 import { INTERACT_COMMAND_HELP } from "../scripts/interact/command_help.ts";
 import { commandDefinition, namespaceCommandKey } from "../scripts/interact/command_registry.ts";
 import { InteractTestArtifacts } from "./fixtures/interact_test_artifacts.mjs";
 
+const targetedItem = { sessionId: "lab_0123456789abcdef0123456789abcdef", playerId: 1,
+  command: { c: "useAbility", ability: "healingPotion", units: [1], targetId: "patient" } };
+assert.equal(validateCommandInput("order", targetedItem).command.targetId, "patient");
+assert.throws(() => validateCommandInput("order", {
+  ...targetedItem, command: { ...targetedItem.command, targetId: -1 },
+}));
 const execFileAsync = promisify(execFile);
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const cli = path.join(root, "scripts/interact/cli.mjs");

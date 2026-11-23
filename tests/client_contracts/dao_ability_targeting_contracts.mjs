@@ -121,3 +121,30 @@ assert(mixedDashGfx.calls.some((call) => call[0] === "moveTo" && call[1] === 520
   "Lightness Dash ring starts ten tiles from its origin");
 
 console.log("Dao ability targeting contracts passed");
+
+// Shop targeting must work with a building-only selection and preserve unit identity.
+{
+  const input = Object.create(Input.prototype);
+  const shop = { id: 201, owner: 1, kind: KIND.SHOP, hp: 200, x: 100, y: 100 };
+  let target = { id: 202, owner: 2, kind: KIND.RIFLEMAN, hp: 40, x: 200, y: 100 };
+  const sent = [];
+  input.state = { playerId: 1, map: { tileSize: 32 }, selectedEntities: () => [shop], isAllyOwner: (owner) => owner === 2 };
+  input.clientIntent = new ClientIntent();
+  input.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.HEALING_POTION });
+  input._selectedOwnUnitIds = () => [];
+  input._selectedProducerBuildingIds = () => [];
+  input._resourceAtScreen = () => null;
+  input._groundAtScreen = () => ({ x: 200, y: 100 });
+  input._entityAtScreen = () => target;
+  input._addCommandFeedback = () => {};
+  input.commandInteraction = { issueCommand: (command) => sent.push(command) };
+  assert(input._issueTargetedCommand({ x: 200, y: 100 }), "Shop can target a friendly unit");
+  assertDeepEqual(sent[0], { c: "useAbility", ability: ABILITY.HEALING_POTION, units: [201], targetId: 202 },
+    "Shop purchase names exactly one source Shop and the clicked unit");
+  for (const invalid of [null, { ...target, kind: KIND.BARRACKS }, { ...target, owner: 3 },
+    { ...target, hp: 0 }, { ...target, x: 1100 }, { ...target, visionOnly: true }]) {
+    target = invalid;
+    assert(!input._issueTargetedCommand({ x: 200, y: 100 }), "Invalid shop target keeps targeting armed");
+  }
+  assert(sent.length === 1, "Invalid shop targets issue no purchase commands");
+}

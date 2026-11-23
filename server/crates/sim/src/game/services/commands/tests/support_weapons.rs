@@ -162,6 +162,7 @@ fn artillery_point_fire_inside_arc_keeps_setup_facing_fixed() {
         vec![(
             1,
             SimCommand::UseAbility {
+                target_id: None,
                 ability: AbilityKind::PointFire,
                 units: vec![artillery],
                 x: Some(target.0),
@@ -357,6 +358,7 @@ fn artillery_point_fire_outside_arc_replaces_active_fire_with_redeploy() {
         vec![(
             1,
             SimCommand::UseAbility {
+                target_id: None,
                 ability: AbilityKind::PointFire,
                 units: vec![artillery],
                 x: Some(target.0),
@@ -431,6 +433,7 @@ fn artillery_point_fire_can_retarget_while_redeploying() {
         vec![(
             1,
             SimCommand::UseAbility {
+                target_id: None,
                 ability: AbilityKind::PointFire,
                 units: vec![artillery],
                 x: Some(target.0),

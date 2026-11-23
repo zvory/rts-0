@@ -25,6 +25,16 @@ mod tests {
     }
 
     #[test]
+    fn shop_unit_target_round_trips_through_sim_adapter() {
+        let value = serde_json::json!({
+            "c":"useAbility", "ability":"escapeTreasure", "units":[1], "targetId":2
+        });
+        let wire: Command = serde_json::from_value(value.clone()).unwrap();
+        let sim = rts_sim::game::command::SimCommand::from_protocol(wire);
+        assert_eq!(serde_json::to_value(sim.to_protocol()).unwrap(), value);
+    }
+
+    #[test]
     fn point_tanks_command_round_trips_through_sim_adapter() {
         let wire: Command =
             serde_json::from_str(r#"{"c":"pointTanks","units":[1,2],"x":300.0,"y":400.0}"#)

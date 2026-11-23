@@ -145,6 +145,9 @@ impl AbilityProjectile {
         if !self.active_at(tick) || !self.caster_alive(entities) {
             return false;
         }
+        if crate::game::services::shop_items::is_shop_item(self.ability) {
+            return self.advance_shop_item(entities, teams);
+        }
         let Some(target) = self.target_point(entities) else {
             return false;
         };
@@ -171,6 +174,38 @@ impl AbilityProjectile {
         } else {
             true
         }
+    }
+
+    fn advance_shop_item(&mut self, entities: &mut EntityStore, teams: &TeamRelations) -> bool {
+        let AbilityProjectileReturnTarget::Entity { id } = self.return_target else {
+            return false;
+        };
+        let Some(target) = entities.get(id) else {
+            return false;
+        };
+        if target.hp == 0
+            || !target.is_unit()
+            || !teams.same_team_or_same_owner(self.owner, target.owner)
+        {
+            return false;
+        }
+        let (next, arrived, _) = step_toward(
+            (self.x.to_world(), self.y.to_world()),
+            (target.pos_x(), target.pos_y()),
+            self.speed_px_per_tick,
+        );
+        self.x = Coord::from_world(next.0);
+        self.y = Coord::from_world(next.1);
+        if arrived {
+            if let Some(target) = entities.get_mut(id) {
+                if self.ability == AbilityKind::HealingPotion {
+                    target.restore_hp(target.max_hp);
+                } else if target.escape_treasure.is_none() {
+                    target.escape_treasure = Some(self.caster_id);
+                }
+            }
+        }
+        !arrived
     }
 
     fn active_at(&self, tick: u32) -> bool {
