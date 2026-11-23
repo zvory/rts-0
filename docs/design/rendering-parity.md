@@ -56,3 +56,27 @@ remained far behind Pixi. Those checkpoints are historical architectural evidenc
 baseline, compatibility promise, or invitation to restore the removed engine.
 
 The abandoned catch-up plan is preserved under `plans/archive/render3d/` with the decision record.
+
+### Grass shader specialization (2026-11-23)
+
+The selected grass technique is fixed for a layer's lifetime; changing it already rebuilds the
+layer. Its procedural fragment shader now declares that technique as a compile-time constant,
+allowing the compiler to simplify irrelevant style paths. Animation, clump density, artwork
+coordinates, blending, and presentation cadence remain unchanged.
+
+This is an explicitly accepted small rasterization change, not exact pixel parity. After reviewing
+matching before/after/difference WebMs, the user authorized shipping the measured prototype.
+The 180 consecutive canonical Hellhole frames reviewed at 4112×2408 changed 38–136 pixels per
+frame (84.94 mean, at most 0.0014%); every changed RGB channel differed by exactly 1/255 and
+alpha matched. Inputs, camera, DPR, animation time and ready assets were identical. Counts were
+computed from original decoded RGBA, before video scaling/compression; the highlighted difference
+video deliberately enlarged and brightened changes. This approval is specific to specialization,
+not a general tolerance for future rendering changes.
+
+A fresh 12-seeded-tick shipping comparison against `54322c704`, using the same full physical
+buffer dimensions and fixed 120000 ms visual clock, changed 98–121 pixels/frame, maximum RGB
+channel delta 1/255, with no alpha differences. Capture health, identical inputs, nonblank content
+and changing-sequence checks passed; exact equality intentionally remains failed.
+
+See [client performance lessons](../client-performance-optimization-lessons.md) for the measured
+cost and limitations. Local diagnostic artifacts are not checked-in benchmark fixtures.

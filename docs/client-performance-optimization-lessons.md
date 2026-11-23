@@ -111,6 +111,66 @@ complete frame work improves without changing frame state, timing, or reviewed p
 
 ## Experiment ledger
 
+### Procedural grass: GPU pixel work and accepted specialization
+
+The 2026-11-23 investigation supersedes the July CPU-only diagnosis for the newly released grass.
+At 2056×1204 CSS pixels, three rotated canonical Hellhole capacity runs per historical revision
+measured roughly 134 worker acknowledgments/s before the grass release versus 93 afterward at
+DPR2. DPR1 stayed around 134–137/s. Timing-disabled controls reproduced the high-DPR loss.
+These are uncapped, pipelined WebGL acknowledgments, not monitor FPS or GPU-completed frames.
+
+Grass already runs on the GPU as a mesh; per-frame JavaScript mainly updates its time uniform.
+The default fragment evaluates nine neighboring clumps with three blade masks each, plus
+hash/noise, bending, shadows, cloud and wind-light math. `floor(vWorld/1.25)` quantizes artwork
+coordinates without reducing native fragment invocations. DPR2 supplies four times the physical
+pixels. A hypothetical full-grass 4112×2408 draw has up to 267 million blade evaluations per
+frame; actual visible grass coverage is smaller. One draw call does not imply cheap shader work.
+
+An isolated full-screen material probe (three rotated rounds, 48 valid GPU timer queries each)
+measured default-grass median p50s of 9.056 ms at DPR1 and 15.575 ms at DPR2 on an Apple M5 Pro.
+It omits units, relief lighting, water and simulation: do not substitute it for game frame time.
+Removing only the blade loop, retaining grass resources and geometry, substantially restored
+whole-client capacity. Real asynchronous GPU-fence controls confirmed GPU-path cost; their
+deliberate wait removes CPU/GPU overlap, so they are conservative diagnostic floors.
+
+The accepted change specializes the layer's fixed technique as a GLSL constant. Initial clean
+paired runs improved DPR2 whole-client capacity from 92.5 to 118.0 acknowledgments/s, about 28%.
+This recovers roughly half the loss and remains below the pre-grass baseline. Uniform style
+branches do not imply divergent pixels; compiler pruning, folding and resource reduction are
+plausible explanations, not measured register/occupancy results. The tiny decoded-pixel change
+was explicitly reviewed and accepted in the [rendering ledger](design/rendering-parity.md).
+
+Shipping validation on `54322c704` repeated three timing-disabled DPR2 pairs: baseline
+90.88/91.00/91.25 versus specialized 116.25/116.25/116.50 acknowledgments/s (medians 91.00 and
+116.25, +27.75%). Every cell preserved submitted/dispatched/completed equality and zero lost,
+superseded, failed or stale frames. The fresh 12 seeded full-buffer comparisons changed
+98–121 pixels/frame, maximum channel delta 1/255, no alpha changes; asset/error, input, nonblank
+and changing-sequence checks passed. Exact equality failed and was accepted, not relabeled a pass.
+All twelve grass styles compiled, drew and tore down in a real worker/WebGL smoke check.
+Fourteen capacity cells were retained, including six DPR1 controls. Later DPR1 and fence cells
+overlapped unrelated compilation/live rendering, so they do not establish a low-DPR gain or a
+clean fence-throughput improvement. The fence pair's retained GPU-pass p50s were 8.763 versus
+7.318 ms; these last-128-query summaries are diagnostic intervals, not whole-window frame times.
+
+GPU occupancy and hardware ALU/texture limiters were not measured. Neither overall spare capacity
+nor saturation can be inferred from JavaScript CPU idle time. Normal gameplay returns presentation
+metadata, not a CPU readback of the image. Additional JavaScript workers or draw calls do not
+automatically increase the parallelism of an already broad fragment draw.
+
+Further experiments could cache invariant clump/root data in lookup textures, or share shading
+within the existing quantized artwork cells while still updating animation every frame. Both
+trade arithmetic for texture/pass cost and require fresh performance and exact-pixel checks;
+they are unimplemented hypotheses. Apple's primary documentation explains
+[specialization](https://developer.apple.com/documentation/metal/using-function-specialization-to-build-pipeline-variants),
+[shader subsystem bottlenecks](https://developer.apple.com/documentation/xcode/reducing-shader-bottlenecks),
+and [occupancy](https://developer.apple.com/documentation/xcode/finding-your-metal-apps-gpu-occupancy).
+
+Two diagnostic pitfalls matter: Chromium's WebGL `finish()` implementation only flushes commands,
+so the old `GPU_COMPLETE` switch is not evidence of GPU completion; use an actual sync fence when
+that boundary is required. Also, DPR2 pixel capture must read `gl.drawingBufferWidth/Height`, not
+Pixi's logical renderer dimensions. The investigation's external parity helper corrected the
+readback on both sides and passed a 12-frame zero-difference self-control at full resolution.
+
 ### Retained HP/status geometry: rejected and reverted
 
 The experiment reduced HP graphics clears by 96.1%, from 133.4 to 5.2 per frame. That dramatic
