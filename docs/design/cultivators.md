@@ -32,7 +32,7 @@ to use its existing supported-faction checks. Further art, audio, combat roster 
 The **Portal** is the Cultivators' first dedicated production building and its name is final. It
 trains the faction's Novice from grid slot 1 (`Q`) and researched Adepts from the next
 three slots: Lightness (`W`), War (`E`), and Magic (`A`). Each Adept requires its matching
-completed Pavilion Dao research and costs 35 Oil, zero Steel, two supply, and 300 ticks
+completed Pavilion Dao research and costs 150 Steel, 35 Oil, three supply, and 300 ticks
 (ten seconds). No Novice input or Proving Grounds is needed. Normal manual/repeat queues,
 payment, cancellation/refunds, blocked exits and rally behavior apply. Combat-earned
 evolution and Tournament Grounds are unchanged. Its immediate player tradeoff is 150 Steel
@@ -111,7 +111,7 @@ See [balance](balance.md#three-dao-pavilion-prototype) for payment and refund ru
 Use existing player-wide permanent research and queue rules, including duplicate rejection,
 cancellation/refund and loss of unfinished research on destruction. All three can be completed;
 completed research survives building destruction. Each research unlocks the matching
-35-Oil Adept production at Portals and paid Disciple training at the
+150-Steel / 35-Oil Adept production at Portals and paid Disciple training at the
 [Proving Grounds](proven-grounds.md). Combat-earned evolution at
 60 insight requires neither research nor a Pavilion. See [Disciple insight and Dao evolution](dao-insight.md) for stats,
 abilities, insight credit, icons, and hotkeys. Existing checkpoint/replay and owner-only

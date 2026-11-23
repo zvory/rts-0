@@ -496,3 +496,19 @@ mod tests {
         );
     }
 }
+
+/// Conversion queues retain the Novice kind but reserve their Adept output's supply.
+pub fn production_supply_cost(producer: EntityKind, unit: EntityKind) -> u32 {
+    supply_cost(
+        if unit == EntityKind::Warrior
+            && matches!(
+                producer,
+                EntityKind::TournamentGrounds | EntityKind::ProvenGrounds
+            )
+        {
+            EntityKind::LightnessAdept
+        } else {
+            unit
+        },
+    )
+}

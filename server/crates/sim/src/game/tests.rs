@@ -36,6 +36,7 @@ mod meth_movement_tests;
 mod mortar_manual_fire_tests;
 mod movement_replay_tests;
 mod panzerfaust_upgrade_tests;
+mod portal_training_tests;
 mod primary_base_tests;
 mod repeat_production_tests;
 mod replay_artifact_tests;

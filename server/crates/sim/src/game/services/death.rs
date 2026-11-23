@@ -128,7 +128,7 @@ pub(crate) fn death_system(
                     ) {
                         player.refund_cost(economy::resource_cost(unit));
                     }
-                    player.release_supply(economy::supply_cost(unit));
+                    player.release_supply(economy::production_supply_cost(dead.kind, unit));
                 }
             }
             for queued_upgrade in dead.queued_upgrades {

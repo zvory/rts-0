@@ -147,8 +147,9 @@ pub(super) fn validate_player_supply(
             if entity.is_building() && !entity.under_construction() {
                 for item in entity.prod_queue().iter().filter(|item| item.paid) {
                     if catalog.is_some_and(|catalog| catalog.allows_unit(item.unit)) {
-                        expected_used =
-                            expected_used.saturating_add(rules::economy::supply_cost(item.unit));
+                        expected_used = expected_used.saturating_add(
+                            rules::economy::production_supply_cost(entity.kind, item.unit),
+                        );
                     }
                 }
             } else if entity.is_unit()

@@ -134,13 +134,32 @@ pub(in crate::game) fn advance(
             }) else {
                 continue;
             };
-            if player.spend_cost(crate::rules::economy::ResourceCost::new(
-                0,
-                config::DAO_TRAINING_COST_OIL,
-            )) {
+            let extra_supply =
+                crate::rules::economy::production_supply_cost(building.kind, EntityKind::Warrior)
+                    .saturating_sub(crate::rules::economy::supply_cost(EntityKind::Warrior));
+            if player.can_reserve_supply(extra_supply)
+                && player.spend_cost(crate::rules::economy::ResourceCost::new(
+                    0,
+                    config::DAO_TRAINING_COST_OIL,
+                ))
+            {
+                player.reserve_supply(extra_supply);
                 super::dao_training::admit(entities, target, id);
             }
             continue;
+        }
+        // Earlier entrants have already released their supply, and other production may
+        // have claimed it. Keep the final entrant outside until its replacement fits.
+        if p.tournament_entrants == CAPACITY - 1 {
+            let extra_supply =
+                crate::rules::economy::production_supply_cost(building.kind, EntityKind::Warrior)
+                    .saturating_sub(crate::rules::economy::supply_cost(EntityKind::Warrior));
+            if !players
+                .iter()
+                .any(|player| player.id == owner && player.can_reserve_supply(extra_supply))
+            {
+                continue;
+            }
         }
         entities.remove(id);
         if let Some(player) = players.iter_mut().find(|p| p.id == owner) {
@@ -161,9 +180,12 @@ pub(in crate::game) fn advance(
                     paid: true,
                 });
                 if let Some(player) = players.iter_mut().find(|p| p.id == owner) {
-                    // Four consumed Disciples free eight supply. The winner reservation
-                    // persist in paid production items and are rebuilt by the supply system.
-                    player.reserve_supply(2);
+                    // Admission checked room for the winner before consuming the last
+                    // entrant. The paid item retains this reservation through supply rebuilds.
+                    player.reserve_supply(crate::rules::economy::production_supply_cost(
+                        EntityKind::TournamentGrounds,
+                        EntityKind::Warrior,
+                    ));
                 }
             }
         }

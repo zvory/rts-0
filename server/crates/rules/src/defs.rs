@@ -190,8 +190,9 @@ pub const UNITS: &[UnitDef] = &[
             cooldown: (NOVICE_DEF.stats.cooldown as f32 / balance::DAO_LIGHTNESS_ATTACK_RATE + 0.5)
                 as u32,
             speed: SCOUT_CAR_DEF.stats.speed * balance::DAO_LIGHTNESS_SPEED_MULTIPLIER,
-            cost_steel: 0,
+            cost_steel: NOVICE_DEF.stats.cost_steel * 3 / 2,
             cost_oil: 35,
+            supply: 3,
             ..NOVICE_DEF.stats
         },
         ..NOVICE_DEF
@@ -204,8 +205,9 @@ pub const UNITS: &[UnitDef] = &[
             range_tiles: balance::DAO_WAR_RANGE_TILES,
             speed: NOVICE_DEF.stats.speed * balance::DAO_WAR_SPEED_MULTIPLIER,
             radius: NOVICE_DEF.stats.radius * balance::DAO_WAR_BODY_SCALE,
-            cost_steel: 0,
+            cost_steel: NOVICE_DEF.stats.cost_steel * 3 / 2,
             cost_oil: 35,
+            supply: 3,
             ..NOVICE_DEF.stats
         },
         ..NOVICE_DEF
@@ -215,8 +217,9 @@ pub const UNITS: &[UnitDef] = &[
         stats: balance::UnitStats {
             range_tiles: balance::DAO_RANGED_RANGE_TILES,
             speed: NOVICE_DEF.stats.speed * balance::DAO_MAGIC_SPEED_MULTIPLIER,
-            cost_steel: 0,
+            cost_steel: NOVICE_DEF.stats.cost_steel * 3 / 2,
             cost_oil: 35,
+            supply: 3,
             ..NOVICE_DEF.stats
         },
         ..NOVICE_DEF

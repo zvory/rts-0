@@ -75,6 +75,50 @@ fn wait_running(game: &mut Game, grounds: u32) {
 }
 
 #[test]
+fn tournament_final_entrant_waits_for_the_winners_extra_supply() {
+    let mut game = empty_flat_game(&[player(1)]);
+    let grounds = arena(&mut game);
+    send(&mut game, grounds, 3);
+    for _ in 0..100 {
+        game.tick();
+        if entrants(&game, grounds) == 3 {
+            break;
+        }
+    }
+    assert_eq!(entrants(&game, grounds), 3);
+    let final_entrant = send(&mut game, grounds, 1)[0];
+    // Other production can reclaim the supply released by the first three entrants.
+    let mut blockers = Vec::new();
+    for i in 1..config::PLAYER_SUPPLY_CAP / 2 {
+        blockers.push(
+            game.state
+                .entities
+                .spawn_unit(
+                    1,
+                    EntityKind::Warrior,
+                    1000.0 + (i % 25) as f32 * 96.0,
+                    1000.0 + (i / 25) as f32 * 96.0,
+                )
+                .unwrap(),
+        );
+    }
+    systems::recompute_supply(&mut game.state.players, &game.state.entities);
+    game.tick();
+    assert_eq!(entrants(&game, grounds), 3);
+    assert!(game.state.entities.get(final_entrant).is_some());
+    assert_eq!(game.state.players[0].supply_used, config::PLAYER_SUPPLY_CAP);
+    game.state.entities.remove(blockers[0]);
+    systems::recompute_supply(&mut game.state.players, &game.state.entities);
+    wait_running(&mut game, grounds);
+    assert!(game.state.entities.get(final_entrant).is_none());
+    assert_eq!(
+        game.state.players[0].supply_used,
+        config::PLAYER_SUPPLY_CAP - 1
+    );
+    assert!(game.checkpoint_payload_text_for_test().is_ok());
+}
+
+#[test]
 fn tournament_admits_at_each_side_and_corner_of_the_four_tile_footprint() {
     // The arena spans [576, 704] on each axis. Tile centers two rings outside
     // its sides and corners must leave space for the enlarged body.
@@ -127,7 +171,7 @@ fn tournament_four_enter_five_seconds_one_random_upgrade_rally_and_checkpoint() 
     wait_running(&mut game, grounds);
     assert!(sent.iter().all(|id| game.state.entities.get(*id).is_none()));
     assert_eq!(
-        game.state.players[0].supply_used, 2,
+        game.state.players[0].supply_used, 3,
         "the winner reserves supply"
     );
     let payload = game.checkpoint_payload_text_for_test().unwrap();
@@ -357,7 +401,7 @@ fn tournament_blocked_exits_keep_winners_until_legal_spawn_is_available() {
         game.state.entities.get(grounds).unwrap().prod_queue().len(),
         1
     );
-    assert_eq!(game.state.players[0].supply_used, 2);
+    assert_eq!(game.state.players[0].supply_used, 3);
     game.state.map.terrain.fill(crate::protocol::terrain::GRASS);
     game.tick();
     assert_eq!(
