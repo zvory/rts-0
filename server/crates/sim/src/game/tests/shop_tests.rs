@@ -461,3 +461,119 @@ fn escape_search_finds_distant_clearings_at_both_grid_alignments() {
         assert_eq!(target.escape_treasure, None);
     }
 }
+
+#[test]
+fn escape_manual_use_preserves_hp_and_consumes_once_even_with_autocast_off() {
+    let (mut game, shop, unit) = item_fixture();
+    buy(&mut game, shop, unit, AbilityKind::EscapeTreasure);
+    for _ in 0..31 {
+        game.tick();
+    }
+    game.enqueue(
+        1,
+        Command::SetAutocast {
+            ability: AbilityKind::EscapeTreasure,
+            units: vec![unit],
+            enabled: false,
+        },
+    );
+    game.tick();
+    assert!(
+        game.state
+            .entities
+            .get(unit)
+            .unwrap()
+            .escape_autocast_disabled
+    );
+    let mut game = Game::restore_checkpoint_payload_text_for_test(
+        &game.checkpoint_payload_text_for_test().unwrap(),
+        game.state.map.clone(),
+        game.state.map_metadata.clone(),
+    )
+    .unwrap();
+    assert!(
+        game.state
+            .entities
+            .get(unit)
+            .unwrap()
+            .escape_autocast_disabled
+    );
+    let target = game.state.entities.get_mut(unit).unwrap();
+    target.apply_damage(target.max_hp - 40, None);
+    target.set_position(2000.0, 2000.0);
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability: AbilityKind::EscapeTreasure,
+            units: vec![unit],
+            x: None,
+            y: None,
+            target_id: None,
+            queued: false,
+        },
+    );
+    game.tick();
+    let target = game.state.entities.get(unit).unwrap();
+    assert_eq!(target.hp, 40);
+    assert_eq!(target.escape_treasure, None);
+    assert!((target.pos_x() - 320.0).abs() < 200.0);
+    assert_eq!(game.state.players[0].oil, 900);
+}
+
+#[test]
+fn escape_autocast_can_be_disabled_and_reenabled_only_by_owner() {
+    for reenable in [false, true] {
+        let (mut game, shop, unit) = item_fixture();
+        game.state.entities.get_mut(unit).unwrap().escape_treasure = Some(shop);
+        game.enqueue(
+            1,
+            Command::SetAutocast {
+                ability: AbilityKind::EscapeTreasure,
+                units: vec![unit],
+                enabled: false,
+            },
+        );
+        game.tick();
+        game.enqueue(
+            2,
+            Command::SetAutocast {
+                ability: AbilityKind::EscapeTreasure,
+                units: vec![unit],
+                enabled: true,
+            },
+        );
+        game.enqueue(
+            2,
+            Command::UseAbility {
+                ability: AbilityKind::EscapeTreasure,
+                units: vec![unit],
+                x: None,
+                y: None,
+                target_id: None,
+                queued: false,
+            },
+        );
+        game.tick();
+        let target = game.state.entities.get(unit).unwrap();
+        assert_eq!(target.escape_treasure, Some(shop));
+        assert!(target.escape_autocast_disabled);
+        if reenable {
+            game.enqueue(
+                1,
+                Command::SetAutocast {
+                    ability: AbilityKind::EscapeTreasure,
+                    units: vec![unit],
+                    enabled: true,
+                },
+            );
+            game.tick();
+        }
+        game.state
+            .entities
+            .get_mut(unit)
+            .unwrap()
+            .apply_damage(u32::MAX, None);
+        game.tick();
+        assert_eq!(game.state.entities.get(unit).is_some(), reenable);
+    }
+}

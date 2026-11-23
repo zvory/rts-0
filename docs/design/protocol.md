@@ -2136,3 +2136,12 @@ omniscient/full-world observers retain it. The flag is true while the unit carri
 to false. This field reveals no supplying-Shop id or position. Existing ownership/visibility
 rules gate projectile source ids; no hidden target id is projected. Snapshot replacement clears
 consumed effects normally, including replay seeks and observer perspective changes.
+
+### Carried Escape Treasure activation
+
+`useAbility` with `ability: "escapeTreasure"`, no `targetId`, and owned living treasure
+carriers in `units` manually consumes their item and returns them to the supplying Shop,
+preserving current HP. With `targetId`, it retains the Shop purchase behavior. Neither form
+is queueable. `setAutocast` for `escapeTreasure` toggles lethal-damage rescue on owned carriers.
+Private carrier `abilities` includes `escapeTreasure`, `remainingUses: 1`, and
+`autocastEnabled` while the item exists; public `escapeTreasure` remains the visibility-gated badge.

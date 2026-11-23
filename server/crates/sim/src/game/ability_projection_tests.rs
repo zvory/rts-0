@@ -376,6 +376,14 @@ fn shop_goods_and_escape_badge_follow_visibility_without_exposing_shop_or_target
         .entities
         .iter()
         .any(|e| e.id == unit && e.escape_treasure));
+    let carried = own.entities.iter().find(|e| e.id == unit).unwrap();
+    let escape = carried
+        .abilities
+        .iter()
+        .find(|a| a.ability == "escapeTreasure")
+        .unwrap();
+    assert_eq!(escape.autocast_enabled, Some(true));
+    assert_eq!(escape.remaining_uses, Some(1));
     assert!(own.ability_objects.iter().any(|o| o.id == hidden));
     for friendly in [
         game.snapshot_for(3),
@@ -405,6 +413,10 @@ fn shop_goods_and_escape_badge_follow_visibility_without_exposing_shop_or_target
     let enemy = game.snapshot_for(2);
     let enemy_unit = enemy.entities.iter().find(|e| e.id == unit).unwrap();
     assert!(!enemy_unit.escape_treasure);
+    assert!(!enemy_unit
+        .abilities
+        .iter()
+        .any(|a| a.ability == "escapeTreasure"));
     assert!(serde_json::to_value(enemy_unit)
         .unwrap()
         .get("escapeTreasure")

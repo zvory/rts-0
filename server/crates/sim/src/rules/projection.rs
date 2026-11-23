@@ -504,6 +504,19 @@ pub fn project_entity(
                 charge_recharge_left: entity.ability_charge_recharge_ticks(*kind),
             })
             .collect();
+        if entity.escape_treasure.is_some() {
+            view.abilities.push(AbilityCooldownView {
+                ability: "escapeTreasure".into(),
+                cooldown_left: 0,
+                remaining_uses: Some(1),
+                autocast_enabled: Some(!entity.escape_autocast_disabled),
+                active_object_id: None,
+                available_tick: None,
+                lockout_until_tick: None,
+                expires_in: None,
+                charge_recharge_left: None,
+            });
+        }
         for entry in catalog
             .into_iter()
             .flat_map(|catalog| catalog.abilities_for_carrier(entity.kind))

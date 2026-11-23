@@ -571,8 +571,9 @@ tile buckets are discarded before rasterization; live cross-boundary stamps clea
 
 The opt-in Lab profile `grass-survey-12` prototypes grass pressure in
 `renderer/grass_matting.js`. It sweeps visible ground-unit motion into a bounded RGBA mask;
-infantry uses one partial-pressure path and vehicles use paired stronger contact paths.
-The grass shader bends blades along that direction and reduces sway. Normal matches still use
+foot-unit traffic accumulates into soft gray-brown soil patches, reaching clear wear around
+20 passages over the same ground. Vehicles do not contribute; tank dirt tracks keep their existing
+renderer. The shader thins worn grass and reduces sway. Normal matches still use
 profile 9 and allocate no pressure mask. This experiment has no replay/seek/reconnect persistence
 or perspective cache and must not be enabled in normal matches until authoritative history and
 fog-safe replacement are implemented. See [grass matting investigation](grass-matting.md).
@@ -2914,3 +2915,12 @@ forked-spear War and broad-sleeve Magic designs. Runtime world scale is 1.2 time
 corresponding Adept; Master source crowns/torsos are normalized before that multiplier.
 Portraits, selection groups, minimap frames and labels use the matching Master rank.
 Masters have no further insight meter. See [Master review spec](dao-masters.md).
+
+### Cultivator item slot
+
+Cultivator unit command cards reserve the fourth-column R slot (logical slot 9) for a single
+carried item, including Serfs. Empty inventories leave it blank. Escape Treasure shows Escape
+with a purple autocast border by default; R activates immediately, and right-click/Alt+R toggles
+lethal-damage autocast. The carried-item command has its own hotkey identity,
+`cultivators.item.escape`, separate from the Shop purchase. The unit badge is centered and twice
+the HP-fill height in both dimensions. See [Shop rules](shop.md) for consumption and rescue behavior.

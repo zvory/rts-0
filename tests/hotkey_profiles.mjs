@@ -728,3 +728,26 @@ assert.equal(createClassicPreset(buildHotkeyCommandCatalog(buildCommandCardConte
   assert.equal(profiles.exportProfile(imported.profile.id).factionBindings.cultivators[commandId], "KeyM",
     "Custom Dao training bindings survive export");
 }
+
+// Escape can share a card with each Dao's abilities and with the worker build menu.
+for (const [contextId, otherCommand] of [
+  ["cultivators-disciple-lightness", `cultivators.ability.${ABILITY.EKAT_TELEPORT}`],
+  ["cultivators-disciple-war", `cultivators.ability.${ABILITY.THROW_SWORD}`],
+  ["cultivators-disciple-magic", `cultivators.ability.${ABILITY.DISCIPLE_SHIELD}`],
+  ["cultivators-worker", "worker.buildMenu"],
+]) {
+  const hotkeys = service();
+  const classic = hotkeys.profileById(HOTKEY_PRESET_CLASSIC);
+  const itemCommand = "cultivators.item.escape";
+  const draft = structuredClone({ ...classic, id: "custom.item-conflict", type: "custom" });
+  const otherKey = otherCommand.startsWith("cultivators.")
+    ? draft.factionBindings.cultivators[otherCommand]
+    : draft.bindings[otherCommand];
+  assert(otherKey, `${otherCommand} has a preset binding`);
+  draft.factionBindings.cultivators[itemCommand] = otherKey;
+  const validation = hotkeys.validateDraftProfile(draft);
+  assert.equal(validation.ok, false);
+  assert(validation.errors.some((error) => error.code === "duplicateKey"
+    && error.contextId === contextId && error.commandIds.includes(itemCommand)
+    && error.commandIds.includes(otherCommand)), `${contextId} rejects an Escape key collision`);
+}

@@ -38,6 +38,10 @@ pub(super) fn purchase(
     if !is_shop_item(ability) {
         return;
     }
+    if ability == AbilityKind::EscapeTreasure && target_id.is_none() {
+        activate_escape(map, entities, teams, player, shops);
+        return;
+    }
     let Some(target_id) = target_id else {
         return;
     };
@@ -135,6 +139,34 @@ pub(super) fn purchase(
 /// Resolve before death attribution/removal so every damage source observes the same charge.
 /// A destroyed source shop cancels its treasure. A completely blocked shop cannot rescue a unit.
 pub(super) fn resolve_escapes(map: &Map, entities: &mut EntityStore, teams: &TeamRelations) {
+    resolve_selected_escapes(map, entities, teams, None);
+}
+
+fn activate_escape(
+    map: &Map,
+    entities: &mut EntityStore,
+    teams: &TeamRelations,
+    player: u32,
+    units: &[u32],
+) {
+    let owned: Vec<_> = units
+        .iter()
+        .copied()
+        .filter(|id| {
+            entities
+                .get(*id)
+                .is_some_and(|unit| unit.owner == player && unit.hp > 0 && unit.is_unit())
+        })
+        .collect();
+    resolve_selected_escapes(map, entities, teams, Some(&owned));
+}
+
+fn resolve_selected_escapes(
+    map: &Map,
+    entities: &mut EntityStore,
+    teams: &TeamRelations,
+    manual: Option<&[u32]>,
+) {
     let ids = entities.ids();
     let mut occupancy = None;
     for id in ids {
@@ -159,9 +191,14 @@ pub(super) fn resolve_escapes(map: &Map, entities: &mut EntityStore, teams: &Tea
             }
             continue;
         };
-        if unit.hp > 0 {
+        if let Some(selected) = manual {
+            if !selected.contains(&id) {
+                continue;
+            }
+        } else if unit.hp > 0 || unit.escape_autocast_disabled {
             continue;
         }
+        let hp = unit.hp.max(1);
         let occ = occupancy.get_or_insert_with(|| Occupancy::build(map, entities));
         let tile = config::TILE_SIZE as f32;
         // Even-sized Shop footprints have centers on tile edges. Also search tile centers
@@ -196,10 +233,30 @@ pub(super) fn resolve_escapes(map: &Map, entities: &mut EntityStore, teams: &Tea
         }
         if let Some(unit) = entities.get_mut(id) {
             if let Some((x, y)) = destination {
-                unit.rescue_shop_escape(x, y);
+                unit.rescue_shop_escape(x, y, hp);
             } else {
                 unit.escape_treasure = None;
             }
+        }
+    }
+}
+
+pub(super) fn set_autocast(
+    entities: &mut EntityStore,
+    player: u32,
+    units: &[u32],
+    ability: AbilityKind,
+    enabled: bool,
+) {
+    if ability != AbilityKind::EscapeTreasure {
+        return;
+    }
+    for id in units {
+        if let Some(unit) = entities
+            .get_mut(*id)
+            .filter(|unit| unit.owner == player && unit.hp > 0 && unit.escape_treasure.is_some())
+        {
+            unit.escape_autocast_disabled = !enabled;
         }
     }
 }

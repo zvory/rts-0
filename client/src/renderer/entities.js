@@ -300,16 +300,20 @@ export function _hpBar(g, e, status = null, ownerColor = null, showHp = true) {
   g.rtsBackground.visible = g.rtsFill.visible = g.rtsTicks.visible = showHp;
   if (e.escapeTreasure && !g.rtsEscape) {
     const badge = new PIXI.Graphics();
-    // Exactly one HP-fill height square; draw a geometric E to avoid tiny-font blur.
-    badge.rect(-barH / 2, -barH - 3, barH, barH).fill(0x8c32c8);
+    // Double the original badge and center it over the unit body.
+    badge.rect(-barH / 2, -barH / 2, barH, barH).fill(0x8c32c8);
     const x = -1.2;
-    const y = -barH - 2.4;
+    const y = -1.4;
     badge.rect(x, y, 0.65, 2.8).rect(x, y, 2.4, 0.6)
       .rect(x, y + 1.1, 1.9, 0.6).rect(x, y + 2.2, 2.4, 0.6).fill(0xffffff);
+    badge.scale.set(2);
     g.rtsEscape = badge;
     g.addChild(badge);
   }
-  if (g.rtsEscape) g.rtsEscape.visible = !!e.escapeTreasure;
+  if (g.rtsEscape) {
+    g.rtsEscape.visible = !!e.escapeTreasure;
+    g.rtsEscape.position.set(0, e.y - topY);
+  }
 
 
   let color = Number.isFinite(ownerColor)

@@ -1,4 +1,4 @@
-use crate::game::services::tournament;
+use super::{dist2, shop_items, standability, tournament};
 mod research;
 use crate::config::{self, support_weapon_teardown_ticks};
 use crate::game::ability::{self, AbilityEffectHook, AbilityKind, AbilityTargetMode};
@@ -22,7 +22,6 @@ use crate::game::services::ability_orders::{
     order_or_launch_world_ability, tech_requirement_met,
 };
 use crate::game::services::construction::unattended_site_for_build_intent;
-use crate::game::services::dist2;
 use crate::game::services::move_coordinator::MoveCoordinator;
 use crate::game::services::order_execution::targeting::{
     artillery_point_fire_target, queued_artillery_point_fire_target,
@@ -34,7 +33,6 @@ use crate::game::services::order_execution::{
 };
 use crate::game::services::order_planner as planner;
 use crate::game::services::spatial::SpatialIndex;
-use crate::game::services::standability;
 use crate::game::services::world_query::{self, owns_unit};
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::teams::TeamRelations;
@@ -559,12 +557,9 @@ pub(in crate::game) fn apply_commands(
                 else {
                     continue;
                 };
-                if matches!(
-                    ability,
-                    AbilityKind::HealingPotion | AbilityKind::EscapeTreasure
-                ) {
+                if shop_items::is_shop_item(ability) {
                     if !queued {
-                        super::shop_items::purchase(
+                        shop_items::purchase(
                             map,
                             entities,
                             players,
@@ -649,11 +644,15 @@ pub(in crate::game) fn apply_commands(
                     tick,
                 );
             }
-            SimCommand::SetAutocast { units, .. } => {
-                if validate_command_units(entities, events, player, units, command_admission)
-                    .is_none()
+            SimCommand::SetAutocast {
+                ability,
+                units,
+                enabled,
+            } => {
+                if let Some(units) =
+                    validate_command_units(entities, events, player, units, command_admission)
                 {
-                    continue;
+                    shop_items::set_autocast(entities, player, &units, ability, enabled);
                 }
             }
             SimCommand::Gather {

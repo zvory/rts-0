@@ -35,8 +35,12 @@ export function buildEkatCommandCardContextSamples(buildCard) {
 
 /** Cultivator commands must be registered for both preset and custom hotkey profiles. */
 export function buildCultivatorCommandCardContextSamples(buildCard) {
-  const disciple = { id: 20, owner: 1, kind: KIND.WARRIOR, insight: 60 };
-  const worker = { id: 21, owner: 1, kind: KIND.WORKER };
+  // Include the carried item wherever it can coexist with unit or worker commands,
+  // so profile validation catches conflicts on every carrier card.
+  const item = { escapeTreasure: true,
+    abilities: [{ ability: ABILITY.ESCAPE_TREASURE, autocastEnabled: true }] };
+  const disciple = { id: 20, owner: 1, kind: KIND.WARRIOR, insight: 60, ...item };
+  const worker = { id: 21, owner: 1, kind: KIND.WORKER, ...item };
   const ctx = (selection) => ({
     playerId: 1, factionId: CULTIVATORS_FACTION_ID, selection,
     entities: selection, resources: { steel: 1000, oil: 1000 },
