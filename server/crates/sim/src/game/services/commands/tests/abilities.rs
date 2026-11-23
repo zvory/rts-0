@@ -23,6 +23,7 @@ fn fixture_faction_point_fire_does_not_spend_steel() {
         vec![(
             1,
             SimCommand::UseAbility {
+                target_id: None,
                 ability: AbilityKind::PointFire,
                 units: vec![artillery],
                 x: Some(960.0),
@@ -69,6 +70,7 @@ fn blanket_fire_command_starts_runtime_order() {
         vec![(
             1,
             SimCommand::UseAbility {
+                target_id: None,
                 ability: AbilityKind::BlanketFire,
                 units: vec![artillery],
                 x: Some(960.0),
@@ -116,6 +118,7 @@ fn legacy_charge_command_is_noop_after_removal() {
         vec![(
             1,
             SimCommand::UseAbility {
+                target_id: None,
                 ability: AbilityKind::Charge,
                 units: vec![rifle, worker, enemy_rifle, rifle],
                 x: None,
@@ -148,6 +151,7 @@ fn legacy_charge_command_is_noop_after_removal() {
         vec![(
             1,
             SimCommand::UseAbility {
+                target_id: None,
                 ability: AbilityKind::Charge,
                 units: vec![rifle, worker, enemy_rifle, rifle],
                 x: None,
@@ -201,6 +205,7 @@ fn repeated_legacy_charge_command_remains_noop() {
         vec![(
             1,
             SimCommand::UseAbility {
+                target_id: None,
                 ability: AbilityKind::Charge,
                 units: vec![rifle],
                 x: None,
@@ -224,6 +229,7 @@ fn repeated_legacy_charge_command_remains_noop() {
         vec![(
             1,
             SimCommand::UseAbility {
+                target_id: None,
                 ability: AbilityKind::Charge,
                 units: vec![rifle],
                 x: None,
@@ -271,6 +277,7 @@ fn queued_legacy_charge_is_skipped_and_later_attack_move_hits_selection() {
             (
                 1,
                 SimCommand::UseAbility {
+                    target_id: None,
                     ability: AbilityKind::Charge,
                     units: vec![ready, cooldown, worker],
                     x: None,
@@ -329,6 +336,7 @@ fn in_range_smoke_launches_from_furthest_selected_carrier() {
         normal_pending(vec![(
             1,
             SimCommand::UseAbility {
+                target_id: None,
                 ability: AbilityKind::Smoke,
                 units: vec![near, far],
                 x: Some(target.0),
@@ -441,6 +449,7 @@ fn in_range_smoke_preserves_active_move_and_future_queue() {
         normal_pending(vec![(
             1,
             SimCommand::UseAbility {
+                target_id: None,
                 ability: AbilityKind::Smoke,
                 units: vec![scout],
                 x: Some(target.0),
@@ -487,6 +496,7 @@ fn mortar_fire_replaces_active_move_order() {
         vec![(
             1,
             SimCommand::UseAbility {
+                target_id: None,
                 ability: AbilityKind::MortarFire,
                 units: vec![mortar],
                 x: Some(292.0),
@@ -540,6 +550,7 @@ fn queued_mortar_fire_appends_while_reload_is_waitable() {
         vec![(
             1,
             SimCommand::UseAbility {
+                target_id: None,
                 ability: AbilityKind::MortarFire,
                 units: vec![mortar],
                 x: Some(292.0),
@@ -587,6 +598,7 @@ fn queued_smoke_appends_to_eligible_carriers_until_charges_reserved() {
                 (
                     1,
                     SimCommand::UseAbility {
+                        target_id: None,
                         ability: AbilityKind::Smoke,
                         units: vec![scout, rifle],
                         x: Some(target.0),
@@ -653,6 +665,7 @@ fn queued_smoke_distributes_one_click_per_ready_scout_by_queue_length() {
                 (
                     1,
                     SimCommand::UseAbility {
+                        target_id: None,
                         ability: AbilityKind::Smoke,
                         units: vec![first, second, cooling],
                         x: Some(target.0 + i as f32),
@@ -697,6 +710,7 @@ fn smoke_launches_without_resource_cost() {
         normal_pending(vec![(
             1,
             SimCommand::UseAbility {
+                target_id: None,
                 ability: AbilityKind::Smoke,
                 units: vec![scout],
                 x: Some(target.0),

@@ -64,6 +64,7 @@ fn order_barrage_with_queue(game: &mut Game, launcher: u32, target: (f32, f32), 
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::Barrage,
             units: vec![launcher],
             x: Some(target.0),

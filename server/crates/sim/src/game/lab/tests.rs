@@ -1261,6 +1261,7 @@ fn lab_p2_base_novice_can_evolve_after_cultivator_spawn() {
     game.issue_lab_command_as(
         2,
         Command::UseAbility {
+            target_id: None,
             ability: "evolveMagic".to_string(),
             units: vec![entity_id],
             x: None,

@@ -91,6 +91,7 @@ fn hidden_mortar_launch_is_not_sent_but_impact_reveals_attacker_to_victim() {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::MortarFire,
             units: vec![mortar],
             x: Some(target_pos.0),
@@ -241,6 +242,7 @@ fn mortar_warning_is_withheld_when_landing_area_is_hidden() {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::MortarFire,
             units: vec![mortar],
             x: Some(landing.0),

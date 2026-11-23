@@ -519,6 +519,7 @@ fn artillery_point_fire_queue_is_terminal() {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::PointFire,
             units: vec![artillery],
             x: Some(target.0),
@@ -614,6 +615,7 @@ fn artillery_firing_from_fog_is_actionable_for_all_enemies() {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::PointFire,
             units: vec![artillery],
             x: Some(target.0),
@@ -690,6 +692,7 @@ fn artillery_firing_reveal_does_not_override_smoke_concealment() {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::PointFire,
             units: vec![artillery],
             x: Some(target.0),
@@ -775,6 +778,7 @@ fn artillery_target_is_owner_only_and_enemy_events_require_current_vision() {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::PointFire,
             units: vec![artillery],
             x: Some(target.0),
@@ -855,6 +859,7 @@ fn packed_artillery_point_fire_auto_sets_up_before_firing() {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::PointFire,
             units: vec![artillery],
             x: Some(target.0),
@@ -937,6 +942,7 @@ fn manually_deployed_artillery_can_point_fire() {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::PointFire,
             units: vec![artillery],
             x: Some(fire_target.0),
@@ -979,6 +985,7 @@ fn artillery_point_fire_inside_minimum_range_repositions_and_fires_at_clicked_po
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::PointFire,
             units: vec![artillery],
             x: Some(too_close.0),
@@ -1055,6 +1062,7 @@ fn artillery_point_fire_beyond_maximum_range_moves_sets_up_and_fires_at_clicked_
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::PointFire,
             units: vec![artillery],
             x: Some(target.0),

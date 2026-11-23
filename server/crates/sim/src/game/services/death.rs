@@ -33,6 +33,7 @@ pub(crate) fn death_system(
     events: &mut HashMap<u32, Vec<Event>>,
     tick: u32,
 ) {
+    super::shop_items::resolve_escapes(map, entities, teams);
     let dead: Vec<DeadEntity> = entities
         .iter()
         .filter(|e| (e.is_targetable() || e.kind == EntityKind::BarbedWire) && e.hp == 0)

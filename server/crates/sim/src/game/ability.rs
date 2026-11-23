@@ -18,6 +18,7 @@ pub enum AbilityEffectHook {
     ConsumeGolem,
     ScoutPlane,
     Evolve,
+    ShopItem,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -90,6 +91,8 @@ pub(in crate::game) fn planner_code(kind: AbilityKind) -> u16 {
         AbilityKind::EvolveMagic => 15,
         AbilityKind::DiscipleShield => 16,
         AbilityKind::ThrowSword => 17,
+        AbilityKind::HealingPotion => 18,
+        AbilityKind::EscapeTreasure => 19,
     }
 }
 
@@ -113,6 +116,8 @@ pub(in crate::game) fn from_planner_code(code: u16) -> Option<AbilityKind> {
         15 => Some(AbilityKind::EvolveMagic),
         16 => Some(AbilityKind::DiscipleShield),
         17 => Some(AbilityKind::ThrowSword),
+        18 => Some(AbilityKind::HealingPotion),
+        19 => Some(AbilityKind::EscapeTreasure),
 
         _ => None,
     }
@@ -123,6 +128,7 @@ pub fn effect_hook(kind: AbilityKind) -> AbilityEffectHook {
         AbilityKind::EvolveLightness | AbilityKind::EvolveWar | AbilityKind::EvolveMagic => {
             AbilityEffectHook::Evolve
         }
+        AbilityKind::HealingPotion | AbilityKind::EscapeTreasure => AbilityEffectHook::ShopItem,
         AbilityKind::Charge => AbilityEffectHook::LegacyNoop,
         AbilityKind::Smoke | AbilityKind::MortarFire | AbilityKind::Barrage => {
             AbilityEffectHook::DelayedWorld

@@ -190,6 +190,7 @@ fn disciple_evolution_requires_insight_ownership_but_no_research_and_is_permanen
             .spawn_unit(1, EntityKind::Warrior, 400.0, 400.0)
             .unwrap();
         let command = Command::UseAbility {
+            target_id: None,
             ability,
             units: vec![unit, unit],
             x: None,
@@ -326,6 +327,7 @@ fn disciple_dash_casts_for_every_selected_ready_lightness_unit() {
         game.enqueue(
             1,
             Command::UseAbility {
+                target_id: None,
                 ability: AbilityKind::EkatTeleport,
                 units: selection,
                 x: Some(target.0),
@@ -377,6 +379,7 @@ fn disciple_dao_gates_blink_return_and_magic_anchor() {
         .spawn_unit(1, EntityKind::Warrior, 400.0, 400.0)
         .unwrap();
     let cast = |ability| Command::UseAbility {
+        target_id: None,
         ability,
         units: vec![unit],
         x: Some(480.0),
@@ -426,6 +429,7 @@ fn disciple_dao_gates_blink_return_and_magic_anchor() {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: AbilityKind::EvolveMagic,
             units: vec![support],
             x: None,
@@ -437,6 +441,7 @@ fn disciple_dao_gates_blink_return_and_magic_anchor() {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: AbilityKind::EkatMagicAnchor,
             units: vec![support],
             x: Some(640.0),
@@ -449,6 +454,7 @@ fn disciple_dao_gates_blink_return_and_magic_anchor() {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: AbilityKind::EkatTeleport,
             units: vec![support],
             x: Some(640.0),
@@ -496,6 +502,7 @@ fn disciple_shield_shared_pool_overflow_teams_and_checkpoint() {
         .upgrades
         .insert(UpgradeKind::DaoOfMagic);
     let cast = |ability| Command::UseAbility {
+        target_id: None,
         ability,
         units: vec![caster],
         x: Some(480.0),
@@ -641,6 +648,7 @@ fn disciple_insight_is_team_private_but_readiness_and_advance_are_public() {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: AbilityKind::EvolveLightness,
             units: vec![unit],
             x: None,
@@ -771,6 +779,7 @@ fn disciple_pending_dao_replaces_for_selection_survives_checkpoint_and_waits_for
         .spawn_unit(1, EntityKind::Warrior, 520.0, 400.0)
         .unwrap();
     let cast = |ability| Command::UseAbility {
+        target_id: None,
         ability,
         units: vec![first, second, first, foreign, u32::MAX],
         x: None,
@@ -941,6 +950,7 @@ fn war_throw_sword_is_dao_gated_and_hits_harder_on_return_after_checkpoint() {
         .spawn_building(2, EntityKind::ResourceDepot, 560.0, 400.0, true)
         .unwrap();
     let cast = Command::UseAbility {
+        target_id: None,
         ability: AbilityKind::ThrowSword,
         units: vec![caster],
         x: Some(1000.0),
@@ -1212,6 +1222,7 @@ fn disciple_dash_doubles_range_for_immediate_and_queued_casts() {
             game.enqueue(
                 1,
                 Command::UseAbility {
+                    target_id: None,
                     ability: AbilityKind::EkatTeleport,
                     units: vec![unit],
                     x: Some(origin.0 + requested_tiles * config::TILE_SIZE as f32),

@@ -83,6 +83,7 @@ fn enqueue_manual_mortar_fire(game: &mut Game, mortar: u32, target_pos: (f32, f3
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::MortarFire,
             units: vec![mortar],
             x: Some(target_pos.0),
@@ -96,6 +97,7 @@ fn enqueue_queued_manual_mortar_fire(game: &mut Game, mortar: u32, target_pos: (
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::MortarFire,
             units: vec![mortar],
             x: Some(target_pos.0),

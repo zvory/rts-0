@@ -17,6 +17,7 @@ fn artillery_blanket_fire_queue_is_terminal() {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::BlanketFire,
             units: vec![artillery],
             x: Some(target.0),
@@ -224,6 +225,7 @@ fn queued_blanket_fire_mixed_selection_repositions_artillery_and_keeps_rifle_que
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::BlanketFire,
             units: vec![first_artillery, rifle, second_artillery],
             x: Some(raw_click.0),
@@ -292,6 +294,7 @@ fn collect_blanket_fire_targets(ballistic_tables: bool) -> Vec<(u32, u32)> {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::BlanketFire,
             units: vec![artillery],
             x: Some(target.0),

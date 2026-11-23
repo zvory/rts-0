@@ -2,6 +2,7 @@ use super::*;
 
 fn scout_plane_command(units: Vec<u32>, x: f32, y: f32) -> SimCommand {
     SimCommand::UseAbility {
+        target_id: None,
         ability: AbilityKind::ScoutPlane,
         units,
         x: Some(x),

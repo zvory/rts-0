@@ -27,6 +27,7 @@ fn enqueue_ekat_dash(game: &mut Game, hero: u32, target: (f32, f32)) {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::EkatTeleport,
             units: vec![hero],
             x: Some(target.0),
@@ -52,6 +53,7 @@ fn enqueue_ekat_line_shot(game: &mut Game, hero: u32, target: (f32, f32)) {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::EkatLineShot,
             units: vec![hero],
             x: Some(target.0),
@@ -65,6 +67,7 @@ fn enqueue_ekat_anchor(game: &mut Game, hero: u32, target: (f32, f32)) {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::EkatMagicAnchor,
             units: vec![hero],
             x: Some(target.0),
@@ -78,6 +81,7 @@ fn enqueue_ekat_consume_golem(game: &mut Game, hero: u32) {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::EkatConsumeGolem,
             units: vec![hero],
             x: None,
@@ -398,6 +402,7 @@ fn queued_ekat_abilities_append_future_world_ability_intents() {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::EkatTeleport,
             units: vec![hero],
             x: Some(pos.0 + config::TILE_SIZE as f32 * 2.0),
@@ -408,6 +413,7 @@ fn queued_ekat_abilities_append_future_world_ability_intents() {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::EkatLineShot,
             units: vec![hero],
             x: Some(pos.0 + config::TILE_SIZE as f32 * 3.0),
@@ -418,6 +424,7 @@ fn queued_ekat_abilities_append_future_world_ability_intents() {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::EkatMagicAnchor,
             units: vec![hero],
             x: Some(pos.0),

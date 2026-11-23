@@ -163,6 +163,7 @@ fn unknown_faction_start_and_commands_fail_closed() {
             queued: false,
         },
         SimCommand::UseAbility {
+            target_id: None,
             ability: AbilityKind::PointFire,
             units: vec![artillery],
             x: Some(x + 256.0),

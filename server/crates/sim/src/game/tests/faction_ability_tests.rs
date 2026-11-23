@@ -31,6 +31,7 @@ fn scout_car_smoke_requires_completed_engineering_complex() {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::Smoke,
             units: vec![scout],
             x: Some(target.0),
@@ -69,6 +70,7 @@ fn scout_car_smoke_requires_completed_engineering_complex() {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::Smoke,
             units: vec![scout],
             x: Some(target.0),
@@ -114,6 +116,7 @@ fn smoke_plus_keeps_four_tile_radius_and_doubles_duration() {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::Smoke,
             units: vec![scout],
             x: Some(target.0),
@@ -280,6 +283,7 @@ fn breakthrough_applies_owned_nonstacking_speed_status_and_cooldown() {
     game.enqueue(
         1,
         Command::UseAbility {
+            target_id: None,
             ability: ability::AbilityKind::Breakthrough,
             units: vec![command_car],
             x: None,

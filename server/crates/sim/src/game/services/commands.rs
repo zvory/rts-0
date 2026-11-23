@@ -547,6 +547,7 @@ pub(in crate::game) fn apply_commands(
                 }
             }
             SimCommand::UseAbility {
+                target_id,
                 ability,
                 units,
                 x,
@@ -558,6 +559,28 @@ pub(in crate::game) fn apply_commands(
                 else {
                     continue;
                 };
+                if matches!(
+                    ability,
+                    AbilityKind::HealingPotion | AbilityKind::EscapeTreasure
+                ) {
+                    if !queued {
+                        super::shop_items::purchase(
+                            map,
+                            entities,
+                            players,
+                            &teams,
+                            fog,
+                            ability_runtime,
+                            events,
+                            player,
+                            &units,
+                            ability,
+                            target_id,
+                            tick,
+                        );
+                    }
+                    continue;
+                }
                 let mut ctx = command_context!();
                 use_ability(
                     &mut ctx,
@@ -1585,6 +1608,7 @@ fn use_ability(
     let tech_ready = tech_requirement_met(entities, player, ability);
 
     let (target, target_point) = match definition.target_mode {
+        AbilityTargetMode::FriendlyUnit => return,
         AbilityTargetMode::SelfTarget => (planner::AbilityTarget::SelfTarget, None),
         AbilityTargetMode::WorldPoint => {
             let Some(x) = request.x else {

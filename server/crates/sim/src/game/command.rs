@@ -59,6 +59,8 @@ pub enum SimCommand {
         units: Vec<u32>,
     },
     UseAbility {
+        #[serde(default)]
+        target_id: Option<u32>,
         ability: AbilityKind,
         units: Vec<u32>,
         x: Option<f32>,
@@ -252,6 +254,7 @@ impl SimCommand {
                 SimCommand::TearDownAntiTankGuns { units }
             }
             protocol::Command::Charge { units } => SimCommand::UseAbility {
+                target_id: None,
                 ability: AbilityKind::Charge,
                 units,
                 x: None,
@@ -259,6 +262,7 @@ impl SimCommand {
                 queued: false,
             },
             protocol::Command::UseAbility {
+                target_id,
                 ability,
                 units,
                 x,
@@ -266,6 +270,7 @@ impl SimCommand {
                 queued,
             } => match ability.parse::<AbilityKind>() {
                 Ok(ability) => SimCommand::UseAbility {
+                    target_id,
                     ability,
                     units,
                     x,
@@ -521,12 +526,14 @@ impl SimCommand {
                 units: units.clone(),
             },
             SimCommand::UseAbility {
+                target_id,
                 ability,
                 units,
                 x,
                 y,
                 queued,
             } => protocol::Command::UseAbility {
+                target_id: *target_id,
                 ability: ability.to_protocol_str().to_string(),
                 units: units.clone(),
                 x: *x,
@@ -836,6 +843,7 @@ mod tests {
     #[test]
     fn protocol_use_ability_command_round_trips() {
         let command = protocol::Command::UseAbility {
+            target_id: None,
             ability: protocol::abilities::SMOKE.to_string(),
             units: vec![10, 11],
             x: Some(320.0),
@@ -846,6 +854,7 @@ mod tests {
         assert_eq!(
             SimCommand::from_protocol(command.clone()),
             SimCommand::UseAbility {
+                target_id: None,
                 ability: AbilityKind::Smoke,
                 units: vec![10, 11],
                 x: Some(320.0),
@@ -862,6 +871,7 @@ mod tests {
     #[test]
     fn blanket_fire_protocol_command_round_trips() {
         let command = protocol::Command::UseAbility {
+            target_id: None,
             ability: protocol::abilities::BLANKET_FIRE.to_string(),
             units: vec![10],
             x: Some(704.0),
@@ -872,6 +882,7 @@ mod tests {
         assert_eq!(
             SimCommand::from_protocol(command.clone()),
             SimCommand::UseAbility {
+                target_id: None,
                 ability: AbilityKind::BlanketFire,
                 units: vec![10],
                 x: Some(704.0),
