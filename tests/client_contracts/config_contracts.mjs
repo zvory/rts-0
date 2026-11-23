@@ -384,8 +384,8 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
   );
   assert(
     UPGRADES[UPGRADE.METHAMPHETAMINES].cost.steel === 100 &&
-      UPGRADES[UPGRADE.METHAMPHETAMINES].cost.oil === 100 &&
-      UPGRADES[UPGRADE.METHAMPHETAMINES].researchTicks === 600,
+      UPGRADES[UPGRADE.METHAMPHETAMINES].cost.oil === 200 &&
+      UPGRADES[UPGRADE.METHAMPHETAMINES].researchTicks === 900,
     "Methamphetamines research cost and time mirror server",
   );
   assert(
