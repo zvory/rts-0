@@ -121,14 +121,16 @@ pub(crate) fn line_projectile_spec_from_origin(
     ability: AbilityKind,
     tick: u32,
 ) -> Option<AbilityProjectileSpec> {
-    let (speed_px_per_tick, width_tiles) = match ability {
+    let (speed_px_per_tick, width_tiles, damage) = match ability {
         AbilityKind::EkatLineShot => (
             config::EKAT_LINE_SHOT_SPEED_PX_PER_TICK,
             config::EKAT_LINE_SHOT_WIDTH_TILES,
+            config::EKAT_LINE_SHOT_DAMAGE,
         ),
         AbilityKind::ThrowSword => (
             config::THROW_SWORD_SPEED_PX_PER_TICK,
             config::THROW_SWORD_WIDTH_TILES,
+            config::THROW_SWORD_DAMAGE,
         ),
         _ => return None,
     };
@@ -148,7 +150,7 @@ pub(crate) fn line_projectile_spec_from_origin(
         return_target: AbilityProjectileReturnTarget::Entity { id: caster },
         speed_px_per_tick,
         width_px: width_tiles * config::TILE_SIZE as f32 * 0.5,
-        damage: config::EKAT_LINE_SHOT_DAMAGE,
+        damage,
         created_tick: tick,
         expires_tick: tick
             .saturating_add(max_round_trip_ticks)

@@ -1029,12 +1029,12 @@ fn war_throw_sword_is_dao_gated_and_hits_harder_on_return_after_checkpoint() {
     }
     assert_eq!(
         game.state.entities.get(victim).unwrap().hp,
-        170,
-        "exactly one 10 damage outbound hit after building armor"
+        175,
+        "exactly one 5 damage outbound hit after building armor"
     );
     assert_eq!(
         game.state.entities.get(caster).unwrap().insight,
-        12,
+        9,
         "projectile insight halves building HP loss, excluding overkill and invulnerability"
     );
     // The depot is 76 px off the path: outside the former 64 + 9.6 px hit radius.
@@ -1062,12 +1062,12 @@ fn war_throw_sword_is_dao_gated_and_hits_harder_on_return_after_checkpoint() {
     restored.tick();
     assert_eq!(
         game.state.entities.get(victim).unwrap().hp,
-        150,
-        "exactly one 20 damage return hit after building armor"
+        165,
+        "exactly one 10 damage return hit after building armor"
     );
-    assert_eq!(restored.state.entities.get(victim).unwrap().hp, 150);
-    assert_eq!(game.state.entities.get(caster).unwrap().insight, 22);
-    assert_eq!(restored.state.entities.get(caster).unwrap().insight, 22);
+    assert_eq!(restored.state.entities.get(victim).unwrap().hp, 165);
+    assert_eq!(game.state.entities.get(caster).unwrap().insight, 14);
+    assert_eq!(restored.state.entities.get(caster).unwrap().insight, 14);
     assert_eq!(game.state.ability_runtime.world_objects().count(), 0);
 }
 
