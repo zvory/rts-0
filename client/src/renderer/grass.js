@@ -17,12 +17,13 @@ void main(){
 }`;
 export const DEFAULT_GRASS_TECHNIQUE = 9;
 
-function grassFragment(groundTexture = false, terrainLighting = false, matting = false) { return `#version 300 es
+// A style change rebuilds the layer, so its shader can specialize the fixed technique.
+function grassFragment(groundTexture = false, terrainLighting = false, matting = false, technique = DEFAULT_GRASS_TECHNIQUE) { return `#version 300 es
 precision highp float;
 in vec2 vWorld;
 out vec4 finalColor;
 uniform float uTime;
-uniform float uStyle;
+const float uStyle=${technique}.;
 uniform vec3 uTint;
 ${groundTexture ? "uniform sampler2D uGround;" : ""}
 ${matting ? "uniform sampler2D uPressure; uniform vec2 uPressureWorldSize;" : ""}
@@ -156,7 +157,7 @@ export class GrassLayer {
     }
     this.uniforms = new pixi.UniformGroup(uniforms);
     this.shader = pixi.Shader.from({
-      gl: { vertex: VERTEX, fragment: this.material?.fragment || grassFragment(technique >= 9, !!this.lightingTexture, technique === 12), name: "grass-terrain" },
+      gl: { vertex: VERTEX, fragment: this.material?.fragment || grassFragment(technique >= 9, !!this.lightingTexture, technique === 12, technique), name: "grass-terrain" },
       resources: { grassUniforms: this.uniforms, ...(this.matting ? { uPressure: this.matting.texture.source } : {}), ...this.material?.resources, ...(this.lightingTexture ? { uTerrainLight: this.lightingTexture.source } : {}) },
     });
     this.mesh = new pixi.Mesh({ geometry: this.geometry, shader: this.shader });

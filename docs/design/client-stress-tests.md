@@ -60,9 +60,11 @@ assembly and cloning, worker update/present, HUD, minimap, health, and observer 
 finish with submitted = dispatched = completed, zero superseded/failed/stale responses, and no
 in-flight or pending frame. Its `match.liveFrame.workerAcknowledged` headline is independent of
 display refresh but remains a pipelined WebGL capacity measurement. Set
-`RTS_CLIENT_PERF_GPU_COMPLETE=1` to add `gl.finish()` before each worker acknowledgment; this emits
-the separately labeled conservative `match.liveFrame.gpuComplete` floor and must not be presented
-as ordinary gameplay FPS because it deliberately removes normal CPU/GPU overlap.
+`RTS_CLIENT_PERF_GPU_COMPLETE=1` to add `gl.finish()` before each worker acknowledgment. Its legacy
+`match.liveFrame.gpuComplete` label does not prove GPU completion: Chromium implements WebGL
+`finish()` as a command flush. Do not treat this switch as a GPU-complete floor or gameplay FPS.
+A diagnostic that needs actual completion must use a GPU sync fence and wait for it to signal;
+that deliberately removes normal CPU/GPU overlap and must be reported separately.
 
 For exact shadow-cost comparisons, `RTS_CLIENT_PERF_SHADOW_MODE=none|terrain|full` selects no cast
 shadows, the once-per-map terrain cache only, or cached terrain plus dynamic projected unit shadows.
