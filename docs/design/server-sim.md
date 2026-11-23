@@ -2129,7 +2129,9 @@ same physical legality.
 `services::standability` owns reusable legality predicates for unit bodies and building sites.
 Production spawn exits, construction/build intent, movement landing, steering
 candidates, collision push targets, and formation goal selection all use this shared standability
-layer for static/body legality. Swept segment checks sample the same body shape along a straight
+layer for static/body legality. Oriented-body queries derive the perpendicular axis from the
+already computed forward axis, reusing identical deterministic trig results within the query.
+Swept segment checks sample the same body shape along a straight
 segment, and broad-phase queries use each body's conservative bounding radius. Movement separates
 oriented vehicle body legality from drive behavior: tanks and anti-tank guns use pivot-drive
 locomotion that can rotate in place before advancing, while scout cars use car-drive path following
@@ -2137,6 +2139,11 @@ where hull facing changes through translation/curvature. Pivot vehicles can reve
 steering point within three tiles when it is more than 90 degrees behind. They can also back up
 at most one tile to a nearby intermediate point when its following segment is not behind the hull,
 so a short route-entry correction does not become reverse driving through every bend.
+Pivot intent also returns the already accepted waypoint-prefix count. The movement pass reuses
+that count while consuming the same prefix, after reverse-intent and traffic calculations and
+before translation. Accepted pops preserve the queried pose/facing and static occupancy, so
+this avoids duplicate hull sweeps without changing collision samples, path choice, or pop order.
+The count is local to that unit's movement pass and is never retained across ticks.
 If the old hull fits but its proposed turn is blocked and the immediate unjam fails, a vehicle
 stalled for at least 15 ticks and not yielding to forward traffic may begin bounded longitudinal
 recovery. It searches up to two tiles forward/backward for a position with room to complete the

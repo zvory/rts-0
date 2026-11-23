@@ -228,9 +228,11 @@ pub(super) fn advance_moving_units(
         let mut scout_car_reverse_waypoint = None;
         let mut static_blocked_this_tick = false;
         let mut yielding_to_traffic = false;
+        let mut accepted_pivot_waypoints = 0;
         if is_pivot_vehicle {
             if let Some(e) = entities.get(id) {
                 if let Some(mut intent) = pivot_drive_intent(map, occ, e, x, y) {
+                    accepted_pivot_waypoints = intent.pre_pop_count;
                     let traffic = vehicle_traffic_adjustment(
                         entities,
                         spatial,
@@ -316,14 +318,10 @@ pub(super) fn advance_moving_units(
                 let (next, path_len, next_next) = {
                     let Some(e) = entities.get(id) else { break };
                     let path_len = e.movement.as_ref().map(|m| m.path.len()).unwrap_or(0);
-                    // next_next: the waypoint after the current one (path is reversed, so index len-2).
-                    let next_next = e.movement.as_ref().and_then(|m| {
-                        if m.path.len() >= 2 {
-                            m.path.get(m.path.len() - 2).copied()
-                        } else {
-                            None
-                        }
-                    });
+                    let next_next = e
+                        .movement
+                        .as_ref()
+                        .and_then(|m| m.path.iter().rev().nth(1).copied());
                     (e.next_waypoint(), path_len, next_next)
                 };
                 let Some((wx, wy)) = next else { break };
@@ -335,13 +333,16 @@ pub(super) fn advance_moving_units(
                     // Intermediate waypoint: infantry and workers follow the route corridor only
                     // when their static swept body can reach the next segment. Vehicles keep their own
                     // proximity and facing guards so reverse/recovery waypoints work as authored.
-                    let accepts_waypoint = entities.get(id).is_some_and(|e| {
-                        if uses_vehicle_movement {
-                            route_accepts_waypoint(map, occ, e, (x, y), (wx, wy), next_next)
-                        } else {
-                            next_next.is_some_and(|next| segment_clear((x, y), next))
-                        }
-                    });
+                    // Accepted prefix pops keep the intent query's original pose/facing.
+                    let accepts_waypoint = accepted_pivot_waypoints > 0
+                        || entities.get(id).is_some_and(|e| {
+                            if uses_vehicle_movement {
+                                route_accepts_waypoint(map, occ, e, (x, y), (wx, wy), next_next)
+                            } else {
+                                next_next.is_some_and(|next| segment_clear((x, y), next))
+                            }
+                        });
+                    accepted_pivot_waypoints = accepted_pivot_waypoints.saturating_sub(1);
                     if accepts_waypoint {
                         if let Some(e) = entities.get_mut(id) {
                             e.pop_waypoint();

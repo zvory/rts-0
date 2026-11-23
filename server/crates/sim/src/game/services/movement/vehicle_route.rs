@@ -108,6 +108,7 @@ fn route_segment_standable_from_current_hull(
     static_swept_segment_legal(map, occ, e.kind, current, next_waypoint, e.facing())
 }
 
+#[cfg(test)]
 pub(super) fn vehicle_desired_path_point(
     map: &Map,
     occ: &Occupancy,

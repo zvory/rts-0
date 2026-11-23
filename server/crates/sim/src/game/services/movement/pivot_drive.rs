@@ -12,7 +12,9 @@ use super::traffic::{
     vehicle_body_half_width_with_clearance,
 };
 use super::vehicle_profiles::pivot_drive_profile;
+#[cfg(test)]
 use super::vehicle_route::vehicle_desired_path_point;
+use super::vehicle_route::vehicle_route_context;
 use super::{MAX_UNIT_BOUNDING_RADIUS_PX, STEERING_MAX_NEIGHBORS};
 
 pub(super) use super::vehicle_profiles::VEHICLE_REVERSE_GOAL_DISTANCE_PX;
@@ -30,6 +32,7 @@ const VEHICLE_FOLLOW_LONGITUDINAL_DEADBAND_PX: f32 = 1.0;
 pub(super) struct PivotDriveIntent {
     pub(super) desired_facing: f32,
     pub(super) traffic_facing: f32,
+    pub(super) pre_pop_count: usize,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -187,7 +190,8 @@ pub(super) fn pivot_drive_intent(
     x: f32,
     y: f32,
 ) -> Option<PivotDriveIntent> {
-    let (desired_x, desired_y) = pivot_drive_desired_path_point(map, occ, e, x, y)?;
+    let route = vehicle_route_context(map, occ, e, (x, y))?;
+    let (desired_x, desired_y) = route.lookahead;
     let dx = desired_x - x;
     let dy = desired_y - y;
     let dist = (dx * dx + dy * dy).det_sqrt();
@@ -235,6 +239,7 @@ pub(super) fn pivot_drive_intent(
     let reversing = angle_delta(desired_facing, reverse_facing).abs() <= 1.0e-4;
 
     Some(PivotDriveIntent {
+        pre_pop_count: route.pre_pop_count,
         desired_facing,
         traffic_facing: if reversing { travel_facing } else { e.facing() },
     })
@@ -299,6 +304,7 @@ pub(super) fn distance_between(from: (f32, f32), to: (f32, f32)) -> f32 {
     (dx * dx + dy * dy).det_sqrt()
 }
 
+#[cfg(test)]
 pub(super) fn pivot_drive_desired_path_point(
     map: &Map,
     occ: &Occupancy,
