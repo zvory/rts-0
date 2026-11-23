@@ -12,6 +12,37 @@ fn flat_test_map(size: u32) -> Map {
     }
 }
 
+#[test]
+fn dao_master_direct_path_rejects_adept_sized_corner_shortcut() {
+    for master in [false, true] {
+        let map = flat_test_map(40);
+        let mut entities = EntityStore::new();
+        entities
+            .spawn_building(1, EntityKind::Portal, 592.0, 592.0, true)
+            .unwrap();
+        let id = entities
+            .spawn_unit(1, EntityKind::LightnessAdept, 720.0, 600.0)
+            .unwrap();
+        entities.get_mut(id).unwrap().dao_master = master;
+        let occ = Occupancy::build(&map, &entities);
+        let mut pathing = PathingService::new(8_192, 256);
+        let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 1);
+        assert!(coordinator.request_path(
+            &mut entities,
+            id,
+            (600.0, 720.0),
+            true,
+            PathingRequestSource::Move,
+        ));
+        let unit = entities.get(id).unwrap();
+        assert_eq!(
+            unit.movement.as_ref().unwrap().path.len() == 1,
+            !master,
+            "only the Adept fits the direct diagonal past the Portal"
+        );
+    }
+}
+
 fn footprint_attempt(entities: &EntityStore, id: u32) -> Option<u32> {
     let movement = entities.get(id)?.movement.as_ref()?;
     match &movement.order {

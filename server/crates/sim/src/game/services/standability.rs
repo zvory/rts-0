@@ -118,9 +118,21 @@ pub(crate) fn unit_static_segment_standable(
     from: (f32, f32),
     to: (f32, f32),
 ) -> bool {
+    unit_static_segment_standable_with_radius(map, occ, kind, from, to, None)
+}
+
+/// Entity-aware shortcuts must use the same body as the eventual movement landings.
+pub(crate) fn unit_static_segment_standable_with_radius(
+    map: &Map,
+    occ: &Occupancy,
+    kind: EntityKind,
+    from: (f32, f32),
+    to: (f32, f32),
+    radius: Option<f32>,
+) -> bool {
     let facing = segment_body_facing(kind, from, to);
-    if !unit_static_standable_with_facing(map, occ, kind, from.0, from.1, facing)
-        || !unit_static_standable_with_facing(map, occ, kind, to.0, to.1, facing)
+    if !unit_static_standable_with_radius(map, occ, kind, from.0, from.1, facing, radius)
+        || !unit_static_standable_with_radius(map, occ, kind, to.0, to.1, facing, radius)
     {
         return false;
     }
@@ -138,7 +150,7 @@ pub(crate) fn unit_static_segment_standable(
         let t = i as f32 / steps as f32;
         let x = from.0 + dx * t;
         let y = from.1 + dy * t;
-        if !unit_static_standable_with_facing(map, occ, kind, x, y, facing) {
+        if !unit_static_standable_with_radius(map, occ, kind, x, y, facing, radius) {
             return false;
         }
     }

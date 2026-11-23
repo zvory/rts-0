@@ -11,7 +11,6 @@ use crate::game::services::geometry::{
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::standability as static_standability;
-use crate::game::services::standability::unit_static_segment_standable;
 use crate::game::upgrade::UpgradeKind;
 use crate::game::PlayerState;
 use crate::rules::terrain::{movement_speed_multiplier, TerrainKind};
@@ -129,6 +128,11 @@ pub(super) fn advance_moving_units(
             )
         };
         let radius = entities.get(id).map(|e| e.radius());
+        let segment_clear = |from, to| {
+            static_standability::unit_static_segment_standable_with_radius(
+                map, occ, kind, from, to, radius,
+            )
+        };
         let unit_static_standable = |occ: &Occupancy, map: &Map, kind, x, y, facing| {
             static_standability::unit_static_standable_with_radius(
                 map, occ, kind, x, y, facing, radius,
@@ -335,9 +339,7 @@ pub(super) fn advance_moving_units(
                         if uses_vehicle_movement {
                             route_accepts_waypoint(map, occ, e, (x, y), (wx, wy), next_next)
                         } else {
-                            next_next.is_some_and(|next| {
-                                unit_static_segment_standable(map, occ, e.kind, (x, y), next)
-                            })
+                            next_next.is_some_and(|next| segment_clear((x, y), next))
                         }
                     });
                     if accepts_waypoint {
@@ -686,9 +688,8 @@ pub(super) fn advance_moving_units(
                 if stuck_ticks >= recovery_threshold
                     && static_blocked_ticks == 0
                     && !uses_oriented_vehicle_body(kind)
-                    && skippable_next_waypoint.is_some_and(|following_waypoint| {
-                        unit_static_segment_standable(map, occ, e.kind, (x, y), following_waypoint)
-                    })
+                    && skippable_next_waypoint
+                        .is_some_and(|following_waypoint| segment_clear((x, y), following_waypoint))
                 {
                     e.pop_waypoint();
                     e.reset_stuck(x, y);
@@ -701,7 +702,7 @@ pub(super) fn advance_moving_units(
                         let dy = y - gy;
                         let dist_to_goal = (dx * dx + dy * dy).det_sqrt();
                         if dist_to_goal <= config::TOLERANT_ARRIVAL_RADIUS_PX
-                            && unit_static_segment_standable(map, occ, e.kind, (x, y), (gx, gy))
+                            && segment_clear((x, y), (gx, gy))
                         {
                             e.clear_path();
                             e.mark_move_phase(MovePhase::Arrived);

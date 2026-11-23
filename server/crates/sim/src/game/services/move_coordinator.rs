@@ -1041,6 +1041,17 @@ impl<'a> MoveCoordinator<'a> {
         };
         let direct_segment = (smooth_static_segments
             && !uses_oriented_vehicle_body(kind)
+            && entities.get(id).is_some_and(|e| {
+                !e.dao_master
+                    || standability::unit_static_segment_standable_with_radius(
+                        self.map,
+                        self.occ,
+                        kind,
+                        start_pos,
+                        goal,
+                        Some(e.radius()),
+                    )
+            })
             && matches!(
                 source,
                 PathingRequestSource::Move

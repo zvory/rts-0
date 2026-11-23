@@ -15,6 +15,52 @@ fn player() -> PlayerInit {
 }
 
 #[test]
+fn dao_master_keeps_corner_waypoint_that_only_an_adept_can_skip() {
+    let mut game = empty_flat_game(&[player()]);
+    game.state
+        .entities
+        .spawn_building(1, EntityKind::Portal, 592.0, 592.0, true)
+        .unwrap();
+    let id = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::LightnessAdept, 720.0, 600.0)
+        .unwrap();
+    let unit = game.state.entities.get_mut(id).unwrap();
+    unit.insight = 120;
+    unit.advance_dao_master();
+    unit.set_order(Order::move_to(600.0, 720.0));
+    unit.set_path(vec![(600.0, 720.0), (720.0, 720.0)]);
+    unit.set_path_goal(Some((600.0, 720.0)));
+    unit.mark_move_phase(crate::game::entity::MovePhase::Moving);
+    game.tick();
+    let unit = game.state.entities.get(id).unwrap();
+    assert_eq!(
+        unit.next_waypoint(),
+        Some((720.0, 720.0)),
+        "the diagonal clips the enlarged body on the Portal corner"
+    );
+    assert_eq!(unit.pos_x(), 720.0);
+    assert!(unit.pos_y() > 600.0);
+    for _ in 0..150 {
+        game.tick();
+        let unit = game.state.entities.get(id).unwrap();
+        let occ = Occupancy::build(&game.state.map, &game.state.entities);
+        assert!(standability::unit_static_standable_with_radius(
+            &game.state.map,
+            &occ,
+            unit.kind,
+            unit.pos_x(),
+            unit.pos_y(),
+            unit.facing(),
+            Some(unit.radius()),
+        ));
+    }
+    let unit = game.state.entities.get(id).unwrap();
+    assert_eq!((unit.pos_x(), unit.pos_y()), (600.0, 720.0));
+}
+
+#[test]
 fn dao_master_growth_near_portal_repositions_without_losing_orders_or_reload() {
     for ability in [
         AbilityKind::EvolveLightness,
