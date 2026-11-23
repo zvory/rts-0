@@ -947,7 +947,7 @@ fn war_throw_sword_is_dao_gated_and_hits_harder_on_return_after_checkpoint() {
     let victim = game
         .state
         .entities
-        .spawn_building(2, EntityKind::ResourceDepot, 560.0, 400.0, true)
+        .spawn_building(2, EntityKind::ResourceDepot, 560.0, 480.0, true)
         .unwrap();
     let cast = Command::UseAbility {
         target_id: None,
@@ -1014,6 +1014,8 @@ fn war_throw_sword_is_dao_gated_and_hits_harder_on_return_after_checkpoint() {
         .replace_active_order(Order::HoldPosition);
     let object = game.state.ability_runtime.world_objects().next().unwrap();
     assert_eq!(object.ability, AbilityKind::ThrowSword);
+    assert_eq!(object.x.to_world(), 404.0);
+    assert_eq!(object.expires_tick - object.created_tick, 150);
     assert_eq!(
         game.state
             .entities
@@ -1022,7 +1024,7 @@ fn war_throw_sword_is_dao_gated_and_hits_harder_on_return_after_checkpoint() {
             .ability_cooldown_ticks(AbilityKind::ThrowSword),
         config::EKAT_LINE_SHOT_COOLDOWN_TICKS - 1
     );
-    for _ in 0..22 {
+    for _ in 0..40 {
         game.tick();
     }
     assert_eq!(
@@ -1035,6 +1037,13 @@ fn war_throw_sword_is_dao_gated_and_hits_harder_on_return_after_checkpoint() {
         27,
         "projectile insight halves building HP loss, excluding overkill and invulnerability"
     );
+    // The depot is 80 px off the path: outside the former 64 + 9.6 px hit radius.
+    // The longer throw reaches 7.5 tiles after 60 ticks at half the original speed.
+    for _ in 0..19 {
+        game.tick();
+    }
+    let object = game.state.ability_runtime.world_objects().next().unwrap();
+    assert_eq!(object.x.to_world(), 640.0);
     // A round trip through a checkpoint retains the projectile identity, leg and hit sets.
     let checkpoint = game.checkpoint_payload_text_for_test().unwrap();
     let mut restored = Game::restore_checkpoint_payload_text_for_test(
@@ -1043,7 +1052,7 @@ fn war_throw_sword_is_dao_gated_and_hits_harder_on_return_after_checkpoint() {
         game.state.map_metadata.clone(),
     )
     .unwrap();
-    for _ in 0..30 {
+    for _ in 0..90 {
         game.tick();
         restored.tick();
     }

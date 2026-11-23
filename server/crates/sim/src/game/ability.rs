@@ -21,12 +21,12 @@ pub enum AbilityEffectHook {
     ShopItem,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AbilityDefinition {
     pub kind: AbilityKind,
     pub carriers: &'static [EntityKind],
     pub target_mode: AbilityTargetMode,
-    pub range_tiles: Option<u32>,
+    pub range_tiles: Option<f32>,
     pub min_range_tiles: Option<u32>,
     pub cooldown_ticks: u16,
     pub charges: Option<u16>,

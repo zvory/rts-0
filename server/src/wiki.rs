@@ -392,7 +392,10 @@ fn ability_table() -> StatsTable {
                         ability.title.to_string(),
                         kind_list(ability.carriers),
                         ability.target_mode.stable_id().to_string(),
-                        optional_u32(ability.range_tiles),
+                        ability
+                            .range_tiles
+                            .map(format_float)
+                            .unwrap_or_else(|| "None".to_string()),
                         optional_u32(ability.min_range_tiles),
                         ability.cooldown_ticks.to_string(),
                         optional_u16(ability.charges),
@@ -1041,7 +1044,10 @@ mod tests {
                     ability.title.to_string(),
                     kind_list(ability.carriers),
                     ability.target_mode.stable_id().to_string(),
-                    optional_u32(ability.range_tiles),
+                    ability
+                        .range_tiles
+                        .map(format_float)
+                        .unwrap_or_else(|| "None".to_string()),
                     optional_u32(ability.min_range_tiles),
                     ability.cooldown_ticks.to_string(),
                     optional_u16(ability.charges),

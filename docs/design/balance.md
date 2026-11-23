@@ -846,6 +846,11 @@ insight from actual hostile HP damage (one per unit damage, half per building da
 `DISCIPLE_SHIELD_DURATION_TICKS` is mirrored for the Shield lifetime bar and checked by faction catalog parity.
 Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md). Lightness uses the base Disciple’s 0.75-tile sword reach, retaining 23 damage, 50% penetration, 43-tick cooldown, moving attacks, 2.7025 px/tick movement, and Dash. Its five-tile automatic engagement closes to melee reach. Magic uses a five-tile orb primary, retaining 23 damage, 50% penetration, and 64-tick cooldown, and stops to fire. Novice Charge automatically grants 1.5× speed for one second with a 15-second cooldown against a hostile unit at least two tiles away or moving away; it has no selectable command. Lightness Dash reaches ten tiles, while Ekat retains five. War uses 1.75-tile spear reach (`DAO_WAR_RANGE_TILES`), retaining its damage, cooldown, armor and HP bonuses. Its sprite scale remains 0.56. The base, Lightness, and Magic collision/interaction radius is 26 world pixels; War uses 18.2 pixels (26 × `DAO_WAR_BODY_SCALE`, 0.7). The starting Novice stands five tiles toward the enemy from the Nexus to clear the base with its larger body. These footprints cover the rendered torsos instead of allowing tightly stacked bodies. Sprite origins center each torso on the authoritative position, including the War atlas's forward-offset torso. Weapons, scarves, and the presentation-only 11.2-pixel War lunge may extend outside the body footprint. `DAO_WAR_BODY_SCALE` remains mirrored for artwork, selection, and collision geometry. `DAO_WAR_RANGE_TILES` and `DAO_RANGED_RANGE_TILES` are mirrored in client config and range overlays.
 
+Throw Sword uses fractional ability range metadata: 7.5 tiles, 4 px/tick, and a
+1.2-tile damage width; see [Dao evolution](dao-insight.md). Ability catalog ranges
+support fractional tiles and remain mirrored in client descriptors.
+
+
 ### Tournament Grounds
 
 Cultivator Engineer building: 100 steel, no oil, completed Portal prerequisite, 4×4,

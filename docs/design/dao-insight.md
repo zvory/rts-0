@@ -81,11 +81,13 @@ refresh together with the restored simulation. Imports with unchanged rosters re
 the existing match and snapshot sequence. Mixed-faction Lab support is outside this change.
 
 War Disciples gain **Throw Sword** (E): a world-point aimed spinning sword using
-Line Shot's six-tile range, 0.6-tile width, eight pixels per tick travel, free cost,
+a 7.5-tile range, 1.2-tile hitbox width, four pixels per tick travel, free cost,
 and 20-second cooldown. Each enemy targetable can be hit once per leg: 40 damage
 outbound and 80 returning, with the existing terrain and Shield reductions. The sword
 tracks its living caster on return and expires on caster death or the shared projectile
-lifetime limit. Other Dao paths and unevolved Disciples cannot cast it. Its separate
+lifetime limit (round-trip travel time plus one second). At maximum range the flight
+lasts 2.5 times the original duration. The spinning sprite is 64 world pixels long,
+twice its original dimensions. Other Dao paths and unevolved Disciples cannot cast it. Its separate
 `throwSword` identity uses the existing fog-filtered line-projectile projection; no caster
 lookup is needed to display the generated sword sprite. Ekat's Line Shot is unchanged.
 

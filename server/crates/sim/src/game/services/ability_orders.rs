@@ -331,18 +331,11 @@ pub(crate) fn launch_world_ability(
             AbilityEffectHook::LineProjectile,
             AbilityKind::EkatLineShot | AbilityKind::ThrowSword,
         ) => {
-            let Some(mut hero_projectile_spec) = hero_abilities::ekat_line_projectile_spec(
-                entities,
-                player,
-                caster,
-                x,
-                y,
-                definition.range_tiles,
-                tick,
-            ) else {
+            let Some(hero_projectile_spec) =
+                hero_abilities::line_projectile_spec(entities, player, caster, x, y, ability, tick)
+            else {
                 return false;
             };
-            hero_projectile_spec.ability = ability;
             let target_x = hero_projectile_spec.endpoint.0;
             let target_y = hero_projectile_spec.endpoint.1;
             let mut projectile_specs = vec![hero_projectile_spec];
@@ -350,13 +343,13 @@ pub(crate) fn launch_world_ability(
                 ability_runtime.active_anchor(player, caster, AbilityKind::EkatMagicAnchor, tick)
             {
                 if let Some(anchor_projectile_spec) =
-                    hero_abilities::ekat_line_projectile_spec_from_origin(
+                    hero_abilities::line_projectile_spec_from_origin(
                         player,
                         caster,
                         Some(anchor.id.get()),
                         (anchor.x.to_world(), anchor.y.to_world()),
                         (x, y),
-                        definition.range_tiles,
+                        ability,
                         tick,
                     )
                 {
@@ -597,7 +590,7 @@ fn smoke_launch_delay_ticks(
     if SmokeCloudStore::clamp_point_to_map(map, x, y).is_none() {
         return 0;
     }
-    let range_px = range_tiles as f32 * config::TILE_SIZE as f32;
+    let range_px = range_tiles * config::TILE_SIZE as f32;
     if range_px <= f32::EPSILON {
         return 0;
     }
@@ -923,7 +916,7 @@ pub(crate) fn caster_in_range(
     if SmokeCloudStore::clamp_point_to_map(map, x, y).is_none() {
         return false;
     }
-    let range_px = range_tiles as f32 * config::TILE_SIZE as f32;
+    let range_px = range_tiles * config::TILE_SIZE as f32;
     let min_range_px = definition.min_range_tiles.unwrap_or(0) as f32 * config::TILE_SIZE as f32;
     let distance_sq = dist2(e.pos_x(), e.pos_y(), x, y);
     distance_sq >= min_range_px * min_range_px && distance_sq <= range_px * range_px
@@ -940,7 +933,7 @@ pub(crate) fn staging_point(
     let caster = entities.get(caster)?;
     let definition = ability::definition(ability);
     let range_tiles = rules::faction::ability_range_for_carrier(ability, caster.kind)?;
-    let range_px = range_tiles as f32 * config::TILE_SIZE as f32;
+    let range_px = range_tiles * config::TILE_SIZE as f32;
     let min_range_px = definition.min_range_tiles.unwrap_or(0) as f32 * config::TILE_SIZE as f32;
     let dx = caster.pos_x() - x;
     let dy = caster.pos_y() - y;
