@@ -36,6 +36,8 @@ class RecordingCanvasContext {
   }
   putImageData(imageData, x, y) { this.calls.push(["putImageData", imageData.width, imageData.height, x, y]); }
   beginPath() { this.calls.push(["beginPath"]); }
+  rect(x, y, width, height) { this.calls.push(["rect", x, y, width, height]); }
+  clip() { this.calls.push(["clip"]); }
   moveTo(x, y) { this.calls.push(["moveTo", x, y]); }
   lineTo(x, y) { this.calls.push(["lineTo", x, y]); }
   closePath() { this.calls.push(["closePath"]); }
@@ -136,7 +138,8 @@ class RecordingCanvasContext {
       renderer.layers.corpses.children.length === MAX_TRANSIENT_CORPSE_SPRITES,
     "stress renderer caps transient corpses on their dedicated layer while retaining one permanent decal surface");
 
-    const decalCtx = canvasContexts[1];
+    const decalCtx = renderer._groundDecals.ctx;
+    assert(canvasContexts.includes(decalCtx), "decal assertions use the decal surface rather than an unrelated terrain atlas");
     const callsAfterStamp = decalCtx.calls.length;
     for (let i = 0; i < 10; i += 1) {
       renderer.render(state, { x: 0, y: 0, zoom: 1 }, null, 1);

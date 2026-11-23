@@ -2713,14 +2713,17 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   clock drives animation in matches and the Map Editor, and asset readiness
   includes the shader and textures. Shore distance supplies stepped visual depth without
   changing authoritative terrain.
-- Grass (`renderer/grass.js`) defaults to selected material 9: distinct swaying blades, broad
-  curved wind-light fronts roughly twenty seconds apart, the original passing cloud shade, and a
-  baked mottled olive/sage ground texture. Blade color no longer follows the rapid diagonal sway
-  wave; blade motion and cloud contrast/speed are unchanged. All ordinary matches,
+- Grass (`renderer/grass.js`, `grass_baked_carpet.js`) defaults to selected material 9: an eight-pose
+  baked grass atlas with anchored roots, smoothly blended bending poses, a wind/cloud lookup, and
+  broad traveling light. Three material texture reads replace the former per-fragment neighboring
+  clump/blade reconstruction. The 256×2048 RGBA8 atlas and 128×128 wind texture occupy about
+  2.06 MiB and are created once per layer; the current presentation clock drives blending every
+  frame. The softer blades, repeating pattern, and simpler clump shadows/fronts are an accepted
+  visual tradeoff documented in [the rendering ledger](rendering-parity.md). All ordinary matches,
   replays/spectators and Map Editor previews construct this grass-only mesh at map load, beneath
   decals/units/fog, and advance it with the same presentation clock as water. Editing terrain
   rebuilds grass geometry when grass membership changes; map replacement and renderer destruction
-  free its mesh, shader and owned ground/lighting textures. No simulation or fog rules change.
+  free its mesh, shader and owned atlas/wind/lighting textures. No simulation or fog rules change.
   Flat maps retain the selected preview's appearance. Elevated maps cache RGB lighting ratios from
   the existing terrain relief/optional baked-shadow pass and apply them to the animated grass;
   supported unified terrain/unit shadows still composite on the decal layer above it. No lighting
@@ -2738,7 +2741,8 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   `shorelineTechnique` visual profile field. This never changes terrain codes, pathing, or fog.
 - Lab-only `grass-survey-1` through `grass-survey-11` profiles can override this renderer default
   through the bounded `grassTechnique` selector. Profiles 6–8 remain dense-carpet alternatives;
-  9–11 retain profile 5 blade/gust/shade parameters over static mottled, brushed, or earthy ground.
+  9 selects the default animated atlas; 10–11 retain profile 5 blade/gust/shade parameters over
+  static brushed or earthy ground.
   The default does not resolve a Lab profile or enable its terrain-preview fog reveal.
 - Local lab visual profiles may pass renderer-only static samples to `Renderer.render`. Static
   trench samples draw on the local visual-samples layer, labels draw as world-anchored Pixi text

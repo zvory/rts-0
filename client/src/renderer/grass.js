@@ -1,5 +1,6 @@
 import { createGrassGroundMaterial } from "./grass_ground.js";
 import { createGrassCarpetMaterial } from "./grass_carpet.js";
+import { createGrassBakedCarpetMaterial } from "./grass_baked_carpet.js";
 import { createWorkerSafeCanvas } from "./raster_primitives.js";
 import { GrassMattingMask } from "./grass_matting.js";
 import { TERRAIN } from "../protocol.js";
@@ -136,10 +137,12 @@ export class GrassLayer {
       uTint: { value: new Float32Array([((tint >> 16) & 255)/255, ((tint >> 8) & 255)/243, (tint & 255)/226]), type: "vec3<f32>" },
     };
     this.geometry = new pixi.Geometry({ attributes: { aPosition: { buffer: new Float32Array(positions), format: "float32x2" } } });
-    this.material = technique >= 9
+    this.material = technique === DEFAULT_GRASS_TECHNIQUE
+      ? createGrassBakedCarpetMaterial(pixi, !!lighting)
+      : technique >= 9
       ? createGrassGroundMaterial(pixi, technique === 12 ? 9 : technique)
       : technique >= 6 ? createGrassCarpetMaterial(pixi, technique) : null;
-    if (lighting && !this.material?.fragment) {
+    if (lighting && (!this.material?.fragment || technique === DEFAULT_GRASS_TECHNIQUE)) {
       const canvas = createWorkerSafeCanvas(lighting.width, lighting.height);
       const ctx = canvas.getContext("2d");
       const image = ctx.createImageData(lighting.width, lighting.height);
