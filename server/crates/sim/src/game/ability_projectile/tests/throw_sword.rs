@@ -22,10 +22,20 @@ fn throw_sword_uses_zero_penetration_and_target_armor_without_changing_line_shot
         spec.damage = 40;
         runtime.spawn_projectile(spec).unwrap();
         tick_runtime(&mut runtime, &mut entities, 1);
-        assert_eq!(entities.get(victim).unwrap().hp, initial_hp.saturating_sub(outbound), "{ability:?} outbound against {kind:?}");
+        assert_eq!(
+            entities.get(victim).unwrap().hp,
+            initial_hp.saturating_sub(outbound),
+            "{ability:?} outbound against {kind:?}"
+        );
         tick_runtime(&mut runtime, &mut entities, 2);
         tick_runtime(&mut runtime, &mut entities, 3);
-        assert_eq!(entities.get(victim).unwrap().hp, initial_hp.saturating_sub(outbound).saturating_sub(returning), "{ability:?} return against {kind:?}");
+        assert_eq!(
+            entities.get(victim).unwrap().hp,
+            initial_hp
+                .saturating_sub(outbound)
+                .saturating_sub(returning),
+            "{ability:?} return against {kind:?}"
+        );
     }
 }
 
@@ -41,8 +51,16 @@ fn throw_sword_return_respects_active_entrenchment() {
     tick_runtime(&mut runtime, &mut entities, 1);
     tick_runtime(&mut runtime, &mut entities, 2);
     // Enter only on the return leg: 80 raw damage becomes 40, leaving 5 HP.
-    let victim = entities.spawn_unit(2, EntityKind::Rifleman, 192.0, 128.0).unwrap();
-    entities.get_mut(victim).unwrap().movement.as_mut().unwrap().occupied_trench_id = Some(1);
+    let victim = entities
+        .spawn_unit(2, EntityKind::Rifleman, 192.0, 128.0)
+        .unwrap();
+    entities
+        .get_mut(victim)
+        .unwrap()
+        .movement
+        .as_mut()
+        .unwrap()
+        .occupied_trench_id = Some(1);
     tick_runtime(&mut runtime, &mut entities, 3);
     assert_eq!(entities.get(victim).unwrap().hp, 5);
 }
