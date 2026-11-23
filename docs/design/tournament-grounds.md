@@ -23,7 +23,7 @@ emerges with a random Dao specialization. Supports a rally point.”
 - One full-health Disciple emerges, drawing Lightness, War or Magic with
   equal probability from the simulation RNG. Existing first Dao evolution rules apply, including
   War HP. Winners start with zero insight and the evolved-Disciple cap of 120.
-- Entrants immediately release supply. The winner uses normal two supply; its two supply are
+- Entrants immediately release supply. The winner uses normal three supply; its three supply are
   reserved when the tournament starts, preventing other production from claiming their slots.
 - Spawn through normal legal building exits and follow the full rally plan. Blocked exits retain
   pending winners for retry. Destruction loses entrants/pending winners and releases reservations.

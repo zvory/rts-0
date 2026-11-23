@@ -134,10 +134,16 @@ pub(in crate::game) fn advance(
             }) else {
                 continue;
             };
-            if player.spend_cost(crate::rules::economy::ResourceCost::new(
-                0,
-                config::DAO_TRAINING_COST_OIL,
-            )) {
+            let extra_supply =
+                crate::rules::economy::production_supply_cost(building.kind, EntityKind::Warrior)
+                    .saturating_sub(crate::rules::economy::supply_cost(EntityKind::Warrior));
+            if player.can_reserve_supply(extra_supply)
+                && player.spend_cost(crate::rules::economy::ResourceCost::new(
+                    0,
+                    config::DAO_TRAINING_COST_OIL,
+                ))
+            {
+                player.reserve_supply(extra_supply);
                 super::dao_training::admit(entities, target, id);
             }
             continue;
@@ -163,7 +169,10 @@ pub(in crate::game) fn advance(
                 if let Some(player) = players.iter_mut().find(|p| p.id == owner) {
                     // Four consumed Disciples free eight supply. The winner reservation
                     // persist in paid production items and are rebuilt by the supply system.
-                    player.reserve_supply(2);
+                    player.reserve_supply(crate::rules::economy::production_supply_cost(
+                        EntityKind::TournamentGrounds,
+                        EntityKind::Warrior,
+                    ));
                 }
             }
         }

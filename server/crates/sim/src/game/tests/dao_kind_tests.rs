@@ -26,7 +26,7 @@ fn dao_kinds_spawn_with_resolved_stats_and_serialize_without_mutable_dao() {
         assert!(!unit.dao_ability_available(AbilityKind::EvolveWar));
         assert_eq!(combat::attack_profile(kind).cooldown, cooldown);
         assert_eq!(combat::attack_profile(kind).range_tiles, range);
-        assert_eq!(crate::rules::economy::supply_cost(kind), 2);
+        assert_eq!(crate::rules::economy::supply_cost(kind), 3);
         assert!(rts_rules::barbed_wire_affects(kind));
         assert!(!crate::rules::target::default_weapon_can_target(
             EntityKind::AntiTankGun,

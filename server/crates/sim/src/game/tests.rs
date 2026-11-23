@@ -52,3 +52,4 @@ mod tank_direct_attack_tests;
 mod tank_trap_tests;
 mod tournament_tests;
 mod warrior_tests;
+mod portal_training_tests;

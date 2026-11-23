@@ -169,7 +169,7 @@ fn paid_dao_training_mixed_queue_exact_duration_supply_rally_checkpoint_and_canc
     let input = send(&mut game, grounds, 1, EntityKind::Warrior, None);
     game.tick();
     assert!(game.state.entities.get(input).is_none());
-    assert_eq!(game.state.players[0].supply_used, 2);
+    assert_eq!(game.state.players[0].supply_used, 3);
     assert_eq!(game.state.players[0].oil, 200);
     // Tail cancellation is free and cannot cancel the active trainee.
     game.enqueue(
@@ -201,7 +201,7 @@ fn paid_dao_training_mixed_queue_exact_duration_supply_rally_checkpoint_and_canc
     assert_eq!(output.insight_cap(), 120);
     assert_eq!(output.hp, output.max_hp);
     assert!(matches!(output.order(), Order::AttackMove(_)));
-    assert_eq!(game.state.players[0].supply_used, 2);
+    assert_eq!(game.state.players[0].supply_used, 3);
     assert_eq!(
         game.replay_end_state_hash().unwrap(),
         restored.replay_end_state_hash().unwrap()
@@ -309,7 +309,7 @@ fn paid_dao_training_blocked_exit_holds_completed_trainee_and_reservation() {
         game.state.entities.get(grounds).unwrap().prod_queue()[0].progress,
         300
     );
-    assert_eq!(game.state.players[0].supply_used, 2);
+    assert_eq!(game.state.players[0].supply_used, 3);
     assert_eq!(game.state.players[0].oil, 200);
     let mut game = restore(&game);
     game.state.map.terrain.fill(crate::protocol::terrain::GRASS);
@@ -376,10 +376,55 @@ fn paid_dao_training_queue_is_bounded_and_portal_rally_supplies_the_input() {
         plans(&game, grounds).len(),
         config::MAX_DAO_TRAINING_QUEUE - 1
     );
-    assert_eq!(game.state.players[0].supply_used, 2);
+    assert_eq!(game.state.players[0].supply_used, 3);
     assert!(!game
         .state
         .entities
         .iter()
         .any(|e| e.kind.is_disciple() && e.dao().is_none()));
+}
+
+#[test]
+fn paid_dao_training_waits_for_extra_adept_supply_before_consuming_input_or_oil() {
+    let (mut game, grounds) = setup();
+    game.state.players[0]
+        .upgrades
+        .insert(UpgradeKind::DaoOfMagic);
+    queue(&mut game, 1, grounds, UpgradeKind::DaoOfMagic);
+    let input = send(&mut game, grounds, 1, EntityKind::Warrior, None);
+    let mut blockers = Vec::new();
+    for i in 1..config::PLAYER_SUPPLY_CAP / 2 {
+        blockers.push(
+            game.state
+                .entities
+                .spawn_unit(
+                    1,
+                    EntityKind::Warrior,
+                    1000.0 + (i % 25) as f32 * 96.0,
+                    1000.0 + (i / 25) as f32 * 96.0,
+                )
+                .unwrap(),
+        );
+    }
+    systems::recompute_supply(&mut game.state.players, &game.state.entities);
+    game.tick();
+    assert!(game.state.entities.get(input).is_some());
+    assert!(game
+        .state
+        .entities
+        .get(grounds)
+        .unwrap()
+        .prod_queue()
+        .is_empty());
+    assert_eq!(game.state.players[0].oil, 300);
+    game.state.entities.remove(blockers[0]);
+    systems::recompute_supply(&mut game.state.players, &game.state.entities);
+    game.tick();
+    assert!(game.state.entities.get(input).is_none());
+    assert_eq!(game.state.players[0].oil, 200);
+    assert_eq!(
+        game.state.players[0].supply_used,
+        config::PLAYER_SUPPLY_CAP - 1
+    );
+    assert!(game.checkpoint_payload_text_for_test().is_ok());
 }

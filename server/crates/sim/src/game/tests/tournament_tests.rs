@@ -127,7 +127,7 @@ fn tournament_four_enter_five_seconds_one_random_upgrade_rally_and_checkpoint() 
     wait_running(&mut game, grounds);
     assert!(sent.iter().all(|id| game.state.entities.get(*id).is_none()));
     assert_eq!(
-        game.state.players[0].supply_used, 2,
+        game.state.players[0].supply_used, 3,
         "the winner reserves supply"
     );
     let payload = game.checkpoint_payload_text_for_test().unwrap();
@@ -357,7 +357,7 @@ fn tournament_blocked_exits_keep_winners_until_legal_spawn_is_available() {
         game.state.entities.get(grounds).unwrap().prod_queue().len(),
         1
     );
-    assert_eq!(game.state.players[0].supply_used, 2);
+    assert_eq!(game.state.players[0].supply_used, 3);
     game.state.map.terrain.fill(crate::protocol::terrain::GRASS);
     game.tick();
     assert_eq!(
