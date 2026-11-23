@@ -40,6 +40,7 @@ export function buildRendererFeedbackView(
   const controlOwner = buildControlOwnerReadModel(state, selected, controlPolicy);
 
   const commandFeedback = liveArray(intent, "liveCommandFeedback", now);
+  const escapeTrails = liveArray(state, "liveEscapeTrails", now);
   const smokeCanisters = liveArray(state, "liveSmokeCanisters", now);
   const mortarLaunches = liveArray(state, "liveMortarLaunches", now);
   const mortarShells = liveArray(state, "liveMortarShells", now);
@@ -83,6 +84,7 @@ export function buildRendererFeedbackView(
     abilityTargetPreview: previewSurface ? null : intent?.abilityTargetPreview || null,
     abilityObjects: arrayOrEmpty(state?.abilityObjects),
     smokes: arrayOrEmpty(state?.smokes),
+    escapeTrails,
     smokeCanisters,
     mortarLaunches,
     mortarShells,
@@ -97,6 +99,7 @@ export function buildRendererFeedbackView(
     muzzleFlashes,
     missToasts,
     liveCommandFeedback: () => commandFeedback,
+    liveEscapeTrails: () => escapeTrails,
     liveSmokeCanisters: () => smokeCanisters,
     liveMortarLaunches: () => mortarLaunches,
     liveMortarShells: () => mortarShells,

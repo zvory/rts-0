@@ -16,6 +16,7 @@ const DOODAD_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 
 const FEEDBACK_ARRAYS = Object.freeze([
   ["commandFeedback", "command"],
+  ["escapeTrails", "escapeTrail"],
   ["smokeCanisters", "smokeCanister"],
   ["mortarLaunches", "mortarLaunch"],
   ["mortarShells", "mortarShell"],

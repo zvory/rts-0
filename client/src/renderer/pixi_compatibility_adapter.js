@@ -22,6 +22,7 @@ export const PIXI_LEGACY_READ_ALLOWLIST = Object.freeze([
 
 const FEEDBACK_ARRAY_TYPES = Object.freeze({
   command: "commandFeedback",
+  escapeTrail: "escapeTrails",
   smokeCanister: "smokeCanisters",
   mortarLaunch: "mortarLaunches",
   mortarShell: "mortarShells",
