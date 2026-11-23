@@ -538,8 +538,8 @@ profiles and explicit activation/autocast policy instead of being folded into de
   supply. Units use their mirrored supply as command weight, except Command Cars have zero command
   weight and add no capacity (`COMMAND_CAR_SUPPLY_CAP_BONUS = 0`). Tanks consume 5 command supply,
   so five Tanks fill the budget. A Command Car still uses 4 production supply.
-- **Methamphetamines** (Training Centre research): costs 100 steel / 200 oil and takes 900 ticks
-  (~30s). Once complete, all current and future Riflemen for that player gain permanent moving rifle fire,
+- **Methamphetamines** (Training Centre research): costs 100 steel / 200 oil and takes 1200 ticks
+  (~40s). Once complete, all current and future Riflemen for that player gain permanent moving rifle fire,
   1.25x movement speed (matching tank speed at 2.0 px/tick), no extra movement miss chance, and a
   shared Rifleman/Panzerfaust rifle cooldown of 24 ticks instead of 32 (25% shorter cooldown, or
   33⅓% more shots per second). It also increases that
