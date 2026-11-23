@@ -21,7 +21,7 @@ export function buildDaoTrainingCard(ctx, building) {
       countBadge: `${queue.filter((dao) => dao === upgrade).length}`,
       title: !researched ? `Requires ${def.label} research in the Three Dao Pavilion`
         : queue.length >= MAX_DAO_TRAINING_QUEUE ? "Training queue is full"
-        : `Train one Adept. Send a base Novice inside; costs ${DAO_TRAINING_COST_OIL} oil on entry and takes 10 seconds. Portal rally supported.`,
+        : "Train one Adept. Send a base Novice inside; costs 100 oil on entry and takes 10 seconds. Portal rally supported.",
       cls: `dao-choice${enabled ? " dao-ready" : ""}`,
     };
   }

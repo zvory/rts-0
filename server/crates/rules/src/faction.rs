@@ -1406,7 +1406,7 @@ mod tests {
         assert!(catalog.trainable_units(EntityKind::Barracks).is_empty());
         assert_eq!(
             catalog.trainable_units(EntityKind::Portal),
-            vec![EntityKind::Warrior]
+            catalog.units[1..].to_vec()
         );
         assert!(catalog
             .loadout

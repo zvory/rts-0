@@ -67,7 +67,12 @@ const RESOURCE_DEPOT_UNITS: &[EntityKind] = &[
     EntityKind::PumpJack,
 ];
 const GOLEM_ONLY: &[EntityKind] = &[EntityKind::Golem];
-const WARRIOR_ONLY: &[EntityKind] = &[EntityKind::Warrior];
+const PORTAL_UNITS: &[EntityKind] = &[
+    EntityKind::Warrior,
+    EntityKind::LightnessAdept,
+    EntityKind::WarAdept,
+    EntityKind::MagicAdept,
+];
 const BARRACKS_UNITS: &[EntityKind] = &[
     EntityKind::Rifleman,
     EntityKind::MachineGunner,
@@ -185,9 +190,10 @@ pub const UNITS: &[UnitDef] = &[
             cooldown: (NOVICE_DEF.stats.cooldown as f32 / balance::DAO_LIGHTNESS_ATTACK_RATE + 0.5)
                 as u32,
             speed: SCOUT_CAR_DEF.stats.speed * balance::DAO_LIGHTNESS_SPEED_MULTIPLIER,
+            cost_steel: 0,
+            cost_oil: 35,
             ..NOVICE_DEF.stats
         },
-        trained_at: None,
         ..NOVICE_DEF
     },
     UnitDef {
@@ -198,9 +204,10 @@ pub const UNITS: &[UnitDef] = &[
             range_tiles: balance::DAO_WAR_RANGE_TILES,
             speed: NOVICE_DEF.stats.speed * balance::DAO_WAR_SPEED_MULTIPLIER,
             radius: NOVICE_DEF.stats.radius * balance::DAO_WAR_BODY_SCALE,
+            cost_steel: 0,
+            cost_oil: 35,
             ..NOVICE_DEF.stats
         },
-        trained_at: None,
         ..NOVICE_DEF
     },
     UnitDef {
@@ -208,9 +215,10 @@ pub const UNITS: &[UnitDef] = &[
         stats: balance::UnitStats {
             range_tiles: balance::DAO_RANGED_RANGE_TILES,
             speed: NOVICE_DEF.stats.speed * balance::DAO_MAGIC_SPEED_MULTIPLIER,
+            cost_steel: 0,
+            cost_oil: 35,
             ..NOVICE_DEF.stats
         },
-        trained_at: None,
         ..NOVICE_DEF
     },
     UnitDef {
@@ -494,7 +502,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
         },
         armor_class: ArmorClass::Armored,
         weapon: WeaponClass::None,
-        trains: WARRIOR_ONLY,
+        trains: PORTAL_UNITS,
         build_requires: &[],
     },
     BuildingDef {

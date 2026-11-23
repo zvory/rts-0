@@ -2208,13 +2208,21 @@ See [Tournament Grounds](tournament-grounds.md).
 Portal first-stage rallies to the exact owned completed Grounds center automatically issue
 entry movement to newly trained base Disciples. Busy grounds retain waiting entry intents.
 
+### Portal Adept production
+
+A completed Cultivator Portal trains Novices and, after matching Pavilion research,
+Lightness, War and Magic Adepts. Each Adept costs **35 oil, zero steel, two supply**
+and takes **300 ticks (ten seconds)**, without a Novice input. Use normal train/repeat
+commands, queue payment/refunds, legal spawn exits and rally behavior. An unresearched
+Dao cannot be trained. Combat-earned evolution and Tournament Grounds are unchanged.
+
 ### Proving Grounds
 
 Cultivator Engineers construct `proven_grounds` after a completed Portal: 100 steel, zero oil,
 200-tick construction, 3×3 tiles, 120 HP, armored, one-tile sight, no weapon or supply.
 Select the building to queue a mix of researched Dao training plans (maximum 64). Right-click
 base Disciples inside or rally a Portal there. Each admission consumes one base Disciple and
-50 oil, preserving its two supply as a paid replacement reservation. One full-health chosen
+100 oil, preserving its two supply as a paid replacement reservation. One full-health chosen
 Dao specialist emerges after 300 ticks (10 seconds), using legal exits and the full rally plan.
 Blocked exits retry; destruction loses the trainee and oil. Unpaid plans can be canceled; active
 training cannot. Combat-earned 60-insight evolution requires no research.

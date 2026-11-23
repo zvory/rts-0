@@ -1,11 +1,11 @@
 # Capsule: server simulation
 
-Use when changing tick logic, services, rules, AI, or the `Game` core.
+For changes to tick logic, services, rules, AI, or the `Game` core.
 
 ## Read
 - [docs/design/architecture.md](../design/architecture.md) — tick and networking model
 - [docs/design/server-sim.md](../design/server-sim.md) — Rust server and `Game` API
-- §3.1 `game::Game` public API and replay end-state fingerprint/verification contract; the seam, keep it stable
+- §3.1 `game::Game` public API and replay fingerprint contract; keep the seam stable
 - §3.1.1 `Game` state ownership registry; update this when `GameState`/`DerivedState` fields change
 - §3.1.2 Ownership guardrails and readiness audit; read before state-owner, checkpoint, replay/lab
   migration, or archcheck work
@@ -16,7 +16,7 @@ Use when changing tick logic, services, rules, AI, or the `Game` core.
 - §3.3 Rules layer
 - §3.5 Commands and queued orders
 - Tournament Grounds
-- Proving Grounds
+- Proving Grounds and Portal Adept production
 - [docs/projection-audit-checklist.md](../projection-audit-checklist.md) — projection checklist
 - [docs/design/ai.md](../design/ai.md) — AI opponents
 - [docs/design/testing.md](../design/testing.md) §9 and §10 — self-play and dev scenarios when

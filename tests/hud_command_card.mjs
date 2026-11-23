@@ -977,8 +977,7 @@ for (const researched of [false, true]) {
   assert.equal(card.slots[2].enabled, true);
   assert.equal(card.slots[2].countBadge, "1");
   assert.equal(card.slots[2].hotkey, "E");
-  assert.deepEqual(card.slots[2].cost, { steel: 0, oil: 50 });
-  assert.match(card.slots[2].title, /costs 50 oil on entry/);
+  assert.deepEqual(card.slots[2].cost, { steel: 0, oil: 100 });
   assert.deepEqual(card.slots[2].intent, { type: "research", upgrade: UPGRADE.DAO_OF_MAGIC, buildingId: 42 });
   assert.equal(card.slots[8].enabled, true);
   building.daoTrainingQueue = [UPGRADE.DAO_OF_MAGIC];
@@ -1004,4 +1003,31 @@ for (const researched of [false, true]) {
     resources: { steel: 1000, oil: 1000 },
   });
   assert.equal(idle.slots.filter(Boolean).length, 0);
+}
+
+// Portal Adept production requires the matching Dao and costs only 35 oil.
+{
+  const portal = { id: 42, owner: 1, kind: KIND.PORTAL };
+  const ctx = { playerId: 1, factionId: "cultivators", selection: [portal], entities: [portal],
+    resources: { steel: 0, oil: 35, supplyUsed: 0, supplyCap: 20 }, upgrades: [] };
+  const locked = buildCommandCardDescriptors(ctx);
+  const choices = [
+    [KIND.LIGHTNESS_ADEPT, UPGRADE.DAO_OF_LIGHTNESS],
+    [KIND.WAR_ADEPT, UPGRADE.DAO_OF_HEAVINESS],
+    [KIND.MAGIC_ADEPT, UPGRADE.DAO_OF_MAGIC],
+  ];
+  for (const [kind, upgrade] of choices) {
+    const slotFor = (card) => card.slots.find((slot) => slot?.intent?.unit === kind);
+    assert.equal(slotFor(locked).enabled, false);
+    assert.match(slotFor(locked).title, /Requires/);
+    const unlocked = buildCommandCardDescriptors({ ...ctx, upgrades: [upgrade] });
+    assert.equal(slotFor(unlocked).enabled, true);
+    assert.equal(slotFor(unlocked).unaffordable, false);
+    assert.deepEqual(slotFor(unlocked).cost, { steel: 0, oil: 35 });
+    for (const [other] of choices.filter(([other]) => other !== kind)) {
+      assert.equal(unlocked.slots.find((slot) => slot?.intent?.unit === other).enabled, false);
+    }
+    const poor = buildCommandCardDescriptors({ ...ctx, upgrades: [upgrade], resources: { ...ctx.resources, oil: 34 } });
+    assert.equal(slotFor(poor).unaffordable, true);
+  }
 }

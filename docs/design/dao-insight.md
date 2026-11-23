@@ -1,8 +1,8 @@
 # Disciple insight and Dao evolution
 
 Phase 0/1 briefs and rules (completed before implementation): each path is a permanent
-specialization of the existing Disciple, retaining its entity id, orders, cost,
-supply (2), sight, and ordinary ground pathing. War alone has a specialization-specific collision radius. Base and Lightness Disciples use 0.75-tile sword reach; War uses 1.75-tile spear reach. All three retain five-tile automatic engagement with melee pursuit. Magic replaces its sword with a five-tile ranged primary; its engagement range equals that five-tile attack range. No additional
+specialization of the existing Disciple, retaining its entity id and orders,
+supply (2), sight, and ordinary ground pathing. War alone has a specialization-specific collision radius. Base and Lightness Disciples use 0.75-tile sword reach; War uses 1.75-tile spear reach. All three retain five-tile automatic engagement with melee pursuit. Magic replaces its sword with a five-tile ranged primary; its engagement range equals that five-tile attack range. Combat evolution needs no additional
 training source or build time. A Dao button assigns its path to every selected, owned, unevolved Disciple, even before
 insight is ready. Selecting another path replaces the pending choice. This
 entity-owned intent is independent of orders: moving, attacking, Stop, and queued orders
@@ -16,7 +16,9 @@ through checkpoints and are visible only to teammates and privileged observers. 
 card highlights chosen paths with an assigned/eligible count; tooltips show missing
 insight, and unit details show the pending path. Automatic evolution runs after combat,
 research production, and ability runtime each tick, skipping dead units.
-Pavilion research now unlocks paid one-for-one training in the [Proving Grounds](proven-grounds.md),
+Pavilion research unlocks direct Portal production of the matching Adept for 35 oil,
+zero steel, two supply and ten seconds, without a Novice input. It also unlocks paid
+one-for-one training in the [Proving Grounds](proven-grounds.md),
 with the existing shared research price tiers, serial queue and prerequisite/faction gates.
 Combat-earned evolution requires neither research nor a Pavilion.
 
@@ -93,8 +95,8 @@ not additional content or a balance change. The user authorized implementation o
 Their Phase 0 roles, counters, descriptions, visuals, audio deferrals, and Phase 1 stats,
 abilities, keys, acquisition costs/timing/prerequisites, supply, sight, and movement/pathing
 remain as specified above and in the Proving Grounds design. Each path is already approved;
-no additional train buttons or research are introduced. Evolved kinds cannot be trained directly
-at the Portal. Combat evolution changes kind in place, preserving id, ownership, orders, and
+the existing Dao researches also unlock their corresponding Portal train buttons.
+Direct Portal production costs 35 oil, zero steel, two supply and ten seconds. Combat evolution changes kind in place, preserving id, ownership, orders, and
 reload; paid training and tournament winners use the same transition. Direct Lab spawning of
 an Adept initializes its existing full stats and abilities.
 

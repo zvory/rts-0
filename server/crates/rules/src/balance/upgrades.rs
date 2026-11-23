@@ -44,7 +44,7 @@ pub const ROCKETS_COST_OIL: u32 = 125;
 pub const ROCKETS_RESEARCH_TICKS: u32 = TICK_HZ * 25;
 
 // Research unlocks paid Dao training; combat-earned evolution requires insight only.
-pub const DAO_TRAINING_COST_OIL: u32 = 50;
+pub const DAO_TRAINING_COST_OIL: u32 = 100;
 pub const DAO_TRAINING_TICKS: u32 = TICK_HZ * 10;
 pub const MAX_DAO_TRAINING_QUEUE: usize = 64;
 pub const DAO_COST_STEEL: u32 = 100;
