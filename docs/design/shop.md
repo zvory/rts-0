@@ -54,8 +54,9 @@ Healing Potion restores the target to full HP on arrival. This follows the user'
 “heals the unit fully” instruction, superseding the earlier 75 HP description.
 Escape Treasure grants one lethal-damage escape, returning the unit to its supplying Shop
 with **1 HP**, regardless of the unit's distance when it takes damage. The applied effect is
-shown as a purple square with a white **E**, centered on the unit; both dimensions equal twice
-the health bar height, even when health bars are hidden.
+shown only to the unit’s owner and allies as a purple square with a white **E**, centered on the unit; both dimensions equal twice
+the health bar height, even when health bars are hidden. Enemies receive no protection flag
+even when they see the unit.
 
 Cultivator units reserve **R** for their single carried item. An empty inventory leaves R empty.
 A delivered Escape Treasure exposes **Escape** in R, with autocast enabled by default. Lethal
