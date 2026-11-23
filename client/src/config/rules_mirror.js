@@ -138,6 +138,7 @@ export const BREAKTHROUGH_COOLDOWN_TICKS = TICK_HZ * 25;
 export const EKAT_CONSUME_GOLEM_RANGE_TILES = 2;
 export const EKAT_TELEPORT_RANGE_TILES = 5;
 export const EKAT_TELEPORT_COOLDOWN_TICKS = TICK_HZ * 8;
+export const THROW_SWORD_DAMAGE = 20;
 export const THROW_SWORD_RANGE_TILES = 7.5;
 export const THROW_SWORD_WIDTH_TILES = 0.9;
 export const THROW_SWORD_SPEED_PX_PER_TICK = 100 / 11;
@@ -493,7 +494,7 @@ export const ABILITIES = Object.freeze({
     label: "Throw Sword",
     icon: "⚔",
     hotkey: "E",
-    title: "Throw a spinning sword out and back; deals 40 damage outbound and 80 on return before armor and cover",
+    title: "Throw a spinning sword out and back; deals 20 damage outbound and 40 on return before armor and cover",
     carriers: Object.freeze([KIND.WAR_ADEPT]),
     targetMode: "worldPoint",
     rangeTiles: THROW_SWORD_RANGE_TILES,
@@ -501,7 +502,7 @@ export const ABILITIES = Object.freeze({
     cost: Object.freeze({ steel: 0, oil: 0 }),
     radiusTiles: THROW_SWORD_WIDTH_TILES * 0.5,
     speedPxPerTick: THROW_SWORD_SPEED_PX_PER_TICK,
-    damage: EKAT_LINE_SHOT_DAMAGE,
+    damage: THROW_SWORD_DAMAGE,
     queued: true,
     queuePolicy: "skipIfNotReady",
   }),
