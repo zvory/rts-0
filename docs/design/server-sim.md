@@ -2252,3 +2252,9 @@ even when observing another team.
 Shop item purchases use generic unit-targeted abilities and durable simulation state. Deliveries
 and applied escape protection are checkpointed for deterministic replay and Lab continuation.
 See [Shop](shop.md#targeted-goods) for costs, delivery, targeting, and lethal-damage behavior.
+
+`services::shop_items` is a mutation helper: command admission invokes its atomic purchase
+executor, while the death phase invokes its escape executor before death attribution/removal.
+Its standability and occupancy queries select legal rescue exits; it does not import command
+adapters or invoke another tick phase. Entity-owned protection and runtime projectiles use the
+existing checkpoint policies for entities and ability runtime.

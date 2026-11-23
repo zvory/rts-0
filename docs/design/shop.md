@@ -60,3 +60,7 @@ both dimensions equal the health bar height, even when health bars are hidden.
 A destroyed supplying Shop cancels in-flight goods and removes its applied escape protection.
 Repeated escape purchases do not stack. Delivery tracks a moving target directly; disappearing or
 dead targets cancel delivery. Oil is paid at launch, with no refund for interrupted delivery.
+
+Escape selects a deterministic legal exit around the supplying Shop, searching farther only when
+nearby exits are blocked. If no legal position exists anywhere on the map, the rescue cannot occur.
+Deliveries expire after 60 seconds if a moving target cannot be reached.

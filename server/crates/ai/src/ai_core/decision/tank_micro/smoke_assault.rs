@@ -519,7 +519,7 @@ fn order_hold(out: &mut Vec<Command>, unit: &AiEntitySummary) {
 
 fn cast(out: &mut Vec<Command>, scout: u32, point: (f32, f32)) {
     out.push(Command::UseAbility {
-                target_id: None,
+        target_id: None,
         ability: AbilityKind::Smoke,
         units: vec![scout],
         x: Some(point.0),

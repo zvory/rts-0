@@ -341,7 +341,7 @@ assert(
   "compact snapshot scalar schema must match JS decoder",
 );
 assert(
-  protocolContract.compactSlotSchemas.entity.at(-1).name === "daoMaster",
+  protocolContract.compactSlotSchemas.entity.at(-1).name === "escapeTreasure",
   "compact entity slot schema must include the latest appended field",
 );
 assert(
@@ -822,3 +822,9 @@ const daoMasterSnapshot = decodeServerMessage({ t: "snapshot", v: COMPACT_SNAPSH
   s: [1, 0, 0, 2, 300], e: [daoMasterRecord], ev: [], n: [0, 0, 0, 0, 0] });
 assert(daoMasterSnapshot.entities[0].daoMaster === true, "public Master rank decodes at slot 52");
 assert(daoMasterSnapshot.entities[0].insight === undefined, "rank does not reveal exact insight");
+
+const escapeRecord = [...daoMasterRecord, true];
+const escapeSnapshot = decodeServerMessage({ t: "snapshot", v: COMPACT_SNAPSHOT_VERSION,
+  s: [1, 0, 0, 2, 300], e: [escapeRecord], ev: [], n: [0, 0, 0, 0, 0] });
+assert(escapeSnapshot.entities[0].escapeTreasure === true, "escape protection decodes at slot 53");
+assert(daoMasterSnapshot.entities[0].escapeTreasure === undefined, "absent escape protection stays absent");

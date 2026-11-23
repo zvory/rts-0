@@ -880,7 +880,7 @@ See [Proving Grounds brief and rules](proven-grounds.md) for details and deferre
 
 Cultivator Serfs can construct the Shop for **200 steel and 200 oil** in **1,200 ticks
 (40 seconds)**. It has **200 HP**, armored status, a **3×4** footprint and one-tile sight.
-No prerequisites, attack, production, research, abilities, supply or rally point. Normal building
+No prerequisites, attack, production, research, supply or rally point. Targeted goods are listed below. Normal building
 placement, cancellation, damage, fog and destruction apply. See [Shop](shop.md) for the brief.
 
 ### Dao Master advancement

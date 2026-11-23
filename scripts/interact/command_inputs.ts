@@ -41,7 +41,7 @@ const COMMAND_FIELDS = Object.freeze({
   setupAntiTankGuns: ["c", "units", "x", "y", "queued"],
   tearDownAntiTankGuns: ["c", "units"],
   charge: ["c", "units"],
-  useAbility: ["c", "ability", "units", "x", "y", "queued"],
+  useAbility: ["c", "ability", "units", "x", "y", "targetId", "queued"],
   recastAbility: ["c", "ability", "units", "targetObjectId", "queued"],
   setAutocast: ["c", "ability", "units", "enabled"],
   gather: ["c", "units", "node", "queued"],
@@ -553,6 +553,7 @@ function validateGameCommand(value: unknown) {
     integer(value.tileX, "order.command.tileX", 0, U32_MAX);
     integer(value.tileY, "order.command.tileY", 0, U32_MAX);
   }
+  if (value.targetId != null) entityRef(value.targetId, "order.command.targetId");
   if (value.targetObjectId != null) u32(value.targetObjectId, "order.command.targetObjectId");
   if (allowed.includes("delta") && value.delta !== -1 && value.delta !== 1) invalid("order.command.delta", "must be -1 or 1");
   if (value.kind != null && (typeof value.kind !== "string" || !["move", "attackMove", "attack", "gather", "build"].includes(value.kind))) invalid("order.command.kind", "is unsupported");

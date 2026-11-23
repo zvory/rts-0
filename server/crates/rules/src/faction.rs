@@ -786,8 +786,8 @@ const CULTIVATORS_UPGRADES: [UpgradeCatalogEntry; 3] = [
     },
 ];
 
-mod dao;
 mod ability_targeting;
+mod dao;
 pub use ability_targeting::{AbilityQueuePolicy, AbilityTargetMode};
 use dao::CULTIVATOR_ABILITIES;
 

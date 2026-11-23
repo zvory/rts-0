@@ -339,3 +339,69 @@ fn recast_return_execution_rejects_missing_too_early_and_stale_state() {
         9,
     ));
 }
+
+#[test]
+fn shop_goods_and_escape_badge_follow_visibility_without_exposing_shop_or_target() {
+    let players = human_vs_ai_players();
+    let mut game = Game::new(&players, 0xCAFE_BABE);
+    let private = first_tile_matching(&game, |x, y| {
+        game.state.fog.is_visible_world(1, x, y) && !game.state.fog.is_visible_world(2, x, y)
+    });
+    let public = first_tile_matching(&game, |x, y| game.state.fog.is_visible_world(2, x, y));
+    let shop = game
+        .state
+        .entities
+        .spawn_building(1, EntityKind::Shop, private.0, private.1, true)
+        .unwrap();
+    let unit = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Warrior, private.0, private.1)
+        .unwrap();
+    game.state.entities.get_mut(unit).unwrap().escape_treasure = Some(shop);
+    let spec = ability_runtime::AbilityWorldObjectSpec {
+        ability: ability::AbilityKind::EscapeTreasure,
+        kind: ability_runtime::AbilityWorldObjectKind::LineProjectile,
+        payload: ability_runtime::AbilityObjectPayload::None,
+        ..ability_object_spec(1, shop, private.0, private.1)
+    };
+    let hidden = game.spawn_ability_world_object_for_test(spec).unwrap();
+    game.rebuild_final_spatial();
+    let own = game.snapshot_for(1);
+    assert!(own
+        .entities
+        .iter()
+        .any(|e| e.id == unit && e.escape_treasure));
+    assert!(own.ability_objects.iter().any(|o| o.id == hidden));
+    let enemy = game.snapshot_for(2);
+    assert!(!enemy.entities.iter().any(|e| e.id == unit));
+    assert!(!enemy.ability_objects.iter().any(|o| o.id == hidden));
+    game.state
+        .entities
+        .get_mut(unit)
+        .unwrap()
+        .set_position(public.0, public.1);
+    let visible = game
+        .spawn_ability_world_object_for_test(ability_runtime::AbilityWorldObjectSpec {
+            x: public.0,
+            y: public.1,
+            ..spec
+        })
+        .unwrap();
+    game.rebuild_final_spatial();
+    let enemy = game.snapshot_for(2);
+    assert!(enemy
+        .entities
+        .iter()
+        .any(|e| e.id == unit && e.escape_treasure));
+    let object = enemy
+        .ability_objects
+        .iter()
+        .find(|o| o.id == visible)
+        .unwrap();
+    assert!(object.source_caster_id.is_none());
+    assert!(object.owner_state.is_none());
+    let wire = serde_json::to_value(object).unwrap();
+    assert!(wire.get("targetId").is_none());
+    assert!(wire.get("sourceCasterId").is_none());
+}

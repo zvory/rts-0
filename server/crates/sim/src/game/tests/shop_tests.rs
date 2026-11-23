@@ -341,8 +341,10 @@ fn escaping_worker_releases_mining_slot_and_movement_state() {
 #[test]
 fn shop_purchase_accepts_allies_and_checks_visibility_range_money_and_source() {
     let (mut game, shop, unit) = item_fixture();
-    let mut ally_player = game.state.players[0].clone();
-    ally_player.id = 2;
+    let ally_player = crate::game::PlayerState {
+        id: 2,
+        ..game.state.players[0].clone()
+    };
     game.state.players.push(ally_player);
     let ally = game
         .state

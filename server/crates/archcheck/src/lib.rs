@@ -52,6 +52,7 @@ const SERVICE_ROLES: &[(&str, ServiceRole)] = &[
     ("pathing", ServiceRole::QueryIndex),
     ("production", ServiceRole::TickSystem),
     ("scout_plane", ServiceRole::MutationHelper),
+    ("shop_items", ServiceRole::MutationHelper),
     ("spatial", ServiceRole::QueryIndex),
     ("standability", ServiceRole::QueryIndex),
     ("supply", ServiceRole::TickSystem),
@@ -138,6 +139,7 @@ const ALLOWED_SERVICE_IMPORTS: &[(&str, &[&str])] = &[
             "order_execution",
             "order_planner",
             "scout_plane",
+            "shop_items",
             "spatial",
             "standability",
             "tournament",
@@ -146,6 +148,7 @@ const ALLOWED_SERVICE_IMPORTS: &[(&str, &[&str])] = &[
         ],
     ),
     ("construction", &["occupancy", "standability"]),
+    ("death", &["shop_items"]),
     (
         "economy",
         &[
@@ -158,6 +161,7 @@ const ALLOWED_SERVICE_IMPORTS: &[(&str, &[&str])] = &[
     ),
     ("entrenchment", &["geometry", "occupancy", "standability"]),
     ("geometry", &["occupancy"]),
+    ("shop_items", &["occupancy", "standability"]),
     (
         "move_coordinator",
         &["geometry", "occupancy", "pathing", "standability"],
