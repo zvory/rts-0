@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { renderDescriptorCardDom } from "../client/src/hud_command_dom.js";
+import { withFakeHudDocument } from "./client_contracts/fakes.mjs";
 import { COMMAND_CARD_SLOT_ORDER } from "../client/src/hud_command_layout.js";
 
 import {
@@ -1050,3 +1052,19 @@ for (const context of buildCommandCardContextCatalog()) {
     assert.equal(displayIndex % 4, slot.slotIndex % 3);
   }
 }
+
+withFakeHudDocument(() => {
+  const card = document.createElement("div");
+  const slots = Array.from({ length: 9 }, (_, slotIndex) => ({ slotIndex }));
+  renderDescriptorCardDom(card, { slots }, (slot) => {
+    const button = document.createElement("button");
+    button.dataset.slotIndex = slot.slotIndex;
+    return button;
+  });
+  const cells = card.children[0].children;
+  assert(cells.length === 12, "command card renders twelve cells");
+  assert([3, 7, 11].every((i) => cells[i].className === "cmd-empty"),
+    "new right column stays empty");
+  assert(cells[4].dataset.slotIndex === 3 && cells[10].dataset.slotIndex === 8,
+    "A and C commands retain their original row and column");
+});
