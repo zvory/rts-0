@@ -752,7 +752,13 @@ for (const [kind, upgrade] of [
     for (const slot of entry.card.slots) {
       if (!slot) continue;
       assert.equal(typeof slot.commandId, "string", `${entry.id} command has identity`);
-      assert.equal(slot.hotkey, gridHotkeyForSlot(slot.slotIndex));
+      assert.equal(slot.hotkey, slot.passive ? "" : gridHotkeyForSlot(slot.slotIndex));
+      if (slot.passive) {
+        assert.equal(slot.enabled, false, "passive indicators stay disabled");
+        assert.equal(slot.hotkeyCode, "", "passive indicators have no hotkey");
+        assert.equal(slot.intent, null, "passive indicators have no cast action");
+        assert.equal(slot.contextIntent, null, "passive indicators have no toggle action");
+      }
     }
   }
 
@@ -934,6 +940,8 @@ for (const researched of [false, true]) {
   }
   const sword = card.slots.find((slot) => slot?.ability === ABILITY.THROW_SWORD);
   assert(sword.enabled);
+  const charge = card.slots.find((slot) => slot?.ability === ABILITY.CHARGE);
+  assert(charge?.passive && !charge.enabled, "mixed Novice/War selection keeps Charge without hiding Throw Sword");
   assert.equal(sword.hotkey, "E");
   assert.deepEqual(sword.intent.readyIds, [3]);
   const changed = buildCommandCardDescriptors({ ...context,

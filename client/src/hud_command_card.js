@@ -360,7 +360,7 @@ function placeAbilityDescriptors(ctx, slots, abilityAffordances, factionId) {
     abilitySlotPriority(left.definition) - abilitySlotPriority(right.definition));
   for (const affordance of ordered) {
     const definition = affordance.definition;
-    const preferred = definition.ability === ABILITY.CHARGE ? 2 : GRID_HOTKEYS.indexOf(definition.hotkey);
+    const preferred = definition.ability === ABILITY.CHARGE ? 5 : GRID_HOTKEYS.indexOf(definition.hotkey);
     if (preferred < 0 || (slots[preferred] && slots[preferred].action !== "ability")) continue;
     // Higher priority wins.
     slots[preferred] = abilityDescriptor(ctx, factionId, affordance);
