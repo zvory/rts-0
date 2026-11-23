@@ -70,8 +70,10 @@ export class MediaFinisher {
         const names = probes.map((_,i) => `[c${i}]`).join("");
         result = "out";
         if (input.layout === "concat") {
-          duration = probes.reduce((total, p) => total + p.duration, 0) / speed;
-          filters.push(`${names}concat=n=${probes.length}:v=1:a=0[out]`);
+          // Each resampled clip occupies whole output frames, including one-frame clips.
+          // Rebuild timestamps after concat: it gives single-frame segments zero duration.
+          duration = probes.reduce((total, p) => total + Math.max(1, Math.round(p.duration / speed * 30)) / 30, 0);
+          filters.push(`${names}concat=n=${probes.length}:v=1:a=0,setpts=N/(30*TB)[out]`);
         } else {
           duration = Math.min(...probes.map(p => p.duration)) / speed;
           const positions = probes.map((_,i) => `${i%2*width}_${Math.floor(i/2)*(height+48)}`).join("|");

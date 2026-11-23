@@ -70,6 +70,17 @@ try {
   const short=await capture("single-frame",false,provenance,1);
   const accelerated=await finisher.execute("media-export",{artifactId:short.artifact.artifactId,speed:8});
   assert.equal(accelerated.probe.frames,1,"even accelerated single-frame captures retain one output frame");
+  const shortConcat=await finisher.execute("media-compare",{artifacts:Array(4).fill(short.artifact.artifactId),layout:"concat",speed:8});
+  assert.equal(shortConcat.probe.frames,4,"concatenation retains each accelerated single-frame clip");
+  const mixedConcat=await finisher.execute("media-compare",{artifacts:[short.artifact.artifactId,b.artifact.artifactId,short.artifact.artifactId,b.artifact.artifactId],layout:"concat",speed:8});
+  assert.equal(mixedConcat.probe.frames,10,"concat rounds each accelerated clip independently");
+  const mixedPixels=tool("ffmpeg",["-v","error","-i",store.file(store.read(mixedConcat.artifactId)),"-f","rawvideo","-pix_fmt","rgb24","-"],{encoding:null});
+  // The changed square is at the center of the letterboxed 320x240 cell below its heading.
+  const frameBytes=320*288*3, center=(168*320+160)*3;
+  for (const [index,changed] of [[0,false],[1,true],[5,false],[6,true]]) {
+    const red=mixedPixels[index*frameBytes+center], green=mixedPixels[index*frameBytes+center+1];
+    assert.equal(red>180 && green<60,changed,`concat preserves clip order at frame ${index}`);
+  }
   const mp4=await finisher.execute("media-export",{artifactId:a.artifact.artifactId,format:"mp4",preset:"quality"});
   assert.equal(mp4.probe.codec,"h264");
   for(const layout of ["grid","before-after","concat"]) {
