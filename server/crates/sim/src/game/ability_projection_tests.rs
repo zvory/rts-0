@@ -372,6 +372,14 @@ fn shop_goods_and_escape_badge_follow_visibility_without_exposing_shop_or_target
         .entities
         .iter()
         .any(|e| e.id == unit && e.escape_treasure));
+    let carried = own.entities.iter().find(|e| e.id == unit).unwrap();
+    let escape = carried
+        .abilities
+        .iter()
+        .find(|a| a.ability == "escapeTreasure")
+        .unwrap();
+    assert_eq!(escape.autocast_enabled, Some(true));
+    assert_eq!(escape.remaining_uses, Some(1));
     assert!(own.ability_objects.iter().any(|o| o.id == hidden));
     let enemy = game.snapshot_for(2);
     assert!(!enemy.entities.iter().any(|e| e.id == unit));
