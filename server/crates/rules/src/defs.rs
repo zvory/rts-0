@@ -405,7 +405,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
         kind: EntityKind::Shop,
         stats: balance::BuildingStats {
-            hp: 1000,
+            hp: 98,
             sight_tiles: 1,
             cost_steel: 200,
             cost_oil: 200,
