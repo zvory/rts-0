@@ -93,6 +93,9 @@ RUN test -s ./client/vendor/sim-wasm/rts_sim_wasm.js \
     && test -s ./client/assets/rigs/disciple-dao/generated/lightness-melee-b-runtime-strip.png \
     && test -s ./client/assets/rigs/disciple-dao/generated/magic-runtime-strip.png \
     && test -s ./client/assets/rigs/disciple-dao/generated/war-yari-runtime-strip.png \
+    && test -s ./client/assets/rigs/disciple-dao/generated/lightness-master-runtime-strip.png \
+    && test -s ./client/assets/rigs/disciple-dao/generated/war-master-runtime-strip.png \
+    && test -s ./client/assets/rigs/disciple-dao/generated/magic-master-runtime-strip.png \
     && test -s ./client/assets/effects/disciple-arrow/arrow.png \
     && test -s ./client/assets/rigs/rocket-truck-preview/truck.png \
     && test -s ./client/assets/rigs/rocket-truck-preview/rocket.png \

@@ -81,3 +81,20 @@ The pipeline uses explicit helmet centers instead of dark-hair detection and
 retains the existing runtime body scale, spear reach and lunge timing. Original
 yari source sheets are preserved for the before comparison. All seven frames use dark armored gloves; only the helmet and shoulder plates
 remain bright for team tinting.
+
+## Master animation review
+
+`source/{lightness,war,magic}-master-motion.png` are imagegen animation drafts from
+the user-selected Lightness A, War B and Magic C concepts. Exact reference paths and
+prompts are in `source/master-motion-prompts.json`. Each 4×2 source has standing,
+three movement poses and four attacks; the pipeline normalizes crown pivots and
+Adept-relative body scale. Master strips apply the 1.2 scale in their renderer config.
+The user approved these animations and the War scale correction for delivery.
+
+### War Master size correction
+
+The Master source has a smaller core torso than the Adept source; matching atlas
+cell dimensions did not match bodies. The pipeline now normalizes the approved
+112-pixel Adept / 84-pixel Master core-torso spans at the Adept raster scale before
+applying the existing 1.2 rank multiplier. All eight War Master cells are 256×384
+to preserve the full spear at extension; the poses, cadence and gameplay are unchanged.

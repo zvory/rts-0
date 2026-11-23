@@ -1,10 +1,13 @@
 import { KIND } from "../../protocol.js";
-import { DAO_WAR_BODY_SCALE } from "../../config.js";
+import { DAO_WAR_BODY_SCALE, DAO_MASTER_BODY_SCALE } from "../../config.js";
 import { PRODUCTION_RASTER_COLOR_TARGET } from "./color_adjustment.js";
 
 export const LIGHTNESS_FRAME_STRIP_KEY = KIND.LIGHTNESS_ADEPT;
 export const WAR_FRAME_STRIP_KEY = KIND.WAR_ADEPT;
 export const MAGIC_FRAME_STRIP_KEY = KIND.MAGIC_ADEPT;
+export const LIGHTNESS_MASTER_FRAME_STRIP_KEY = "lightness_adept:master";
+export const WAR_MASTER_FRAME_STRIP_KEY = "war_adept:master";
+export const MAGIC_MASTER_FRAME_STRIP_KEY = "magic_adept:master";
 
 function discipleStrip(image, frameCount, firingFrames, iconVisibleBounds, weaponKind, imageVersion = "dao-ranged-1") {
   return Object.freeze({
@@ -59,3 +62,31 @@ export const WAR_PNG_FRAME_STRIP = Object.freeze({
   firingFrameHoldPhase: 400 / 720,
   firingLungePx: 16 * DAO_WAR_BODY_SCALE,
 });
+
+function masterStrip(adept, image, bounds) {
+  return Object.freeze({
+    ...adept,
+    image,
+    imageVersion: "master-1",
+    frameCount: 8,
+    movementFrames: Object.freeze([1, 2, 3, 2]),
+    firingFrames: Object.freeze([4, 5, 6, 7]),
+    worldScale: adept.worldScale * DAO_MASTER_BODY_SCALE,
+    originLateralPx: adept.originLateralPx * DAO_MASTER_BODY_SCALE,
+    firingLungePx: (adept.firingLungePx || 0) * DAO_MASTER_BODY_SCALE,
+    iconVisibleBounds: Object.freeze(bounds),
+    source: Object.freeze({ generator: "scripts/art/disciple-dao-pipeline.mjs",
+      runtimeStrip: "client" + image.split("?")[0] }),
+  });
+}
+export const LIGHTNESS_MASTER_PNG_FRAME_STRIP = masterStrip(LIGHTNESS_PNG_FRAME_STRIP, "/assets/rigs/disciple-dao/generated/lightness-master-runtime-strip.png?v=master-1",
+  { x: 42, y: 24, w: 175, h: 205 });
+export const WAR_MASTER_PNG_FRAME_STRIP = Object.freeze({
+  ...masterStrip(WAR_PNG_FRAME_STRIP, "/assets/rigs/disciple-dao/generated/war-master-runtime-strip.png?v=master-torso-2", { x: 81, y: 155, w: 95, h: 185 }),
+  image: "/assets/rigs/disciple-dao/generated/war-master-runtime-strip.png?v=master-torso-2",
+  imageVersion: "master-torso-2",
+  frameWidth: 256,
+  frameHeight: 384,
+});
+export const MAGIC_MASTER_PNG_FRAME_STRIP = masterStrip(MAGIC_PNG_FRAME_STRIP, "/assets/rigs/disciple-dao/generated/magic-master-runtime-strip.png?v=master-1",
+  { x: 52, y: 53, w: 152, h: 151 });

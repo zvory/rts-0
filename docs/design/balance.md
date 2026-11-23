@@ -882,3 +882,11 @@ Cultivator Serfs can construct the inert Shop for **200 steel and 200 oil** in *
 (40 seconds)**. It has **200 HP**, armored status, a **3×4** footprint and one-tile sight.
 No prerequisites, attack, production, research, abilities, supply or rally point. Normal building
 placement, cancellation, damage, fog and destruction apply. See [Shop](shop.md) for the brief.
+
+### Dao Master advancement
+
+At 120 insight, each living Adept automatically becomes its matching Master and fully
+heals. Relative to that path’s Adept, size/collision ×1.2, movement ×1.1, ordinary
+attack damage ×1.2 (nearest integer), maximum HP ×1.4. No resource or supply cost,
+research, ability change or attack-rate change; no repeat advancement. Master HP is
+161 (Lightness/Magic) or 189 (War). See [Master rules and review](dao-masters.md).

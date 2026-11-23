@@ -53,6 +53,8 @@ pub struct Entity {
 
     #[serde(default)]
     pub insight: u32,
+    #[serde(default)]
+    pub dao_master: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub chosen_dao: Option<crate::game::upgrade::UpgradeKind>,
     #[serde(default)]
@@ -109,6 +111,7 @@ impl Entity {
             last_damage_entity: None,
             units_killed: 0,
             insight: 0,
+            dao_master: false,
             chosen_dao: None,
             dao_advance_ticks: 0,
             shield: None,
@@ -164,6 +167,7 @@ impl Entity {
             last_damage_entity: None,
             units_killed: 0,
             insight: 0,
+            dao_master: false,
             chosen_dao: None,
             dao_advance_ticks: 0,
             shield: None,
@@ -221,6 +225,7 @@ impl Entity {
             last_damage_entity: None,
             units_killed: 0,
             insight: 0,
+            dao_master: false,
             chosen_dao: None,
             dao_advance_ticks: 0,
             shield: None,
@@ -1336,22 +1341,6 @@ impl Entity {
         } else {
             // Resource nodes contribute no sight.
             0
-        }
-    }
-
-    /// The collision/interaction radius in world pixels.
-    pub fn radius(&self) -> f32 {
-        if let Some(s) = config::unit_stats(self.kind) {
-            s.radius
-        } else if self.is_building() {
-            // Footprint half-extent (approx) for range/interaction checks.
-            let Some(s) = config::building_stats(self.kind) else {
-                return config::TILE_SIZE as f32 * 0.5;
-            };
-            (s.foot_w.max(s.foot_h) as f32) * config::TILE_SIZE as f32 * 0.5
-        } else {
-            // Resource node footprint ~1 tile.
-            config::TILE_SIZE as f32 * 0.5
         }
     }
 

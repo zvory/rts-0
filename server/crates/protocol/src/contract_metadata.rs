@@ -232,7 +232,7 @@ pub mod notices {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 63;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 65;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -1044,6 +1044,7 @@ fn compact_slot_schemas() -> CompactSlotSchemas {
             optional_field(49, "chosenDao"),
             optional_field(50, "tournamentEntrants"),
             optional_field(51, "daoTrainingQueue"),
+            optional_field(52, "daoMaster"),
         ],
         event: event_slot_schemas(),
         trench: vec![

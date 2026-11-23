@@ -38,6 +38,10 @@ export function createMinimapAnimation() {
         const parts = Array.from({ length: strip.frameCount }, (_, i) => `frame:${i}`);
         if (kind === KIND.PANZERFAUST) parts.push(...Array.from(
           { length: strips.get(KIND.RIFLEMAN).frameCount }, (_, i) => `unloaded-frame:${i}`));
+        if ([KIND.LIGHTNESS_ADEPT, KIND.WAR_ADEPT, KIND.MAGIC_ADEPT].includes(kind)) {
+          const master = strips.get(liveFrameStripKeyForEntity({ kind, daoMaster: true }));
+          parts.push(...Array.from({ length: master.frameCount }, (_, i) => `master:frame:${i}`));
+        }
         return parts;
       }
       return sprites.get(kind)?.map(sprite => `sprite:${sprite.id}`) ?? null;
@@ -62,7 +66,7 @@ export function createMinimapAnimation() {
         const kick = (offset.x - reference.x) * scale;
         const step = (offset.y - reference.y) / frameStripWorldScale(strip, entity, context) * scale;
         const frameScale = Math.max(strip.frameWidth, strip.frameHeight) * scale;
-        const prefix = entity.kind === KIND.PANZERFAUST && entity.panzerfaustLoaded !== true
+        const prefix = entity.daoMaster ? "master:frame" : entity.kind === KIND.PANZERFAUST && entity.panzerfaustLoaded !== true
           ? "unloaded-frame" : "frame";
         result = [{ part: `${prefix}:${frame}`, rotation, x: Math.cos(rotation) * kick - Math.sin(rotation) * step,
           y: Math.sin(rotation) * kick + Math.cos(rotation) * step, scaleX: frameScale, scaleY: frameScale, alpha: 1 }];

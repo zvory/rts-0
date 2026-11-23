@@ -5,7 +5,7 @@ import {
   preparedPresentationEntityRecord,
 } from "./entity_snapshot.js";
 import { createRendererProjectionRecord } from "./projection_record.js";
-import { DEFAULT_MAP_SUN, DOODAD_TYPE_IDS } from "../config.js";
+import { DEFAULT_MAP_SUN, DOODAD_TYPE_IDS, DAO_MASTER_BODY_SCALE } from "../config.js";
 
 export const PRESENTATION_FRAME_VERSION = 2;
 export const STATIC_MAP_PRESENTATION_VERSION = 5;
@@ -366,7 +366,7 @@ function entityRecord(entity, {
   const y = finiteNumber(entity.y);
   const owner = Number.isFinite(Number(entity.owner)) ? Number(entity.owner) : 0;
   const baseStat = entityStats?.[entity.kind] || null;
-  const stat = baseStat;
+  const stat = entity.daoMaster && baseStat ? { ...baseStat, size: baseStat.size * DAO_MASTER_BODY_SCALE } : baseStat;
   const semanticHeight = entitySemanticHeight(stat, tileSizePx);
   const derived = {
     type: presentationKind,

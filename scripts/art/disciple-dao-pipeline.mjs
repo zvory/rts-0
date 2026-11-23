@@ -72,9 +72,9 @@ function paint(output, source, scale, left, top, width, height) {
   }
 }
 
-function frame(source, scale, pivot) {
-  const output = blank(256, 256);
-  paint(output, source, scale, Math.round(128 - pivot[0] * scale), Math.round(128 - pivot[1] * scale),
+function frame(source, scale, pivot, width = 256, height = width) {
+  const output = blank(width, height);
+  paint(output, source, scale, Math.round(width / 2 - pivot[0] * scale), Math.round(height / 2 - pivot[1] * scale),
     Math.ceil(source.width * scale), Math.ceil(source.height * scale));
   return output;
 }
@@ -102,9 +102,10 @@ function write(name, image) {
 }
 
 function strip(name, frames) {
-  const image = blank(frames.length * 256, 256);
-  for (let i = 0; i < frames.length; i++) for (let y = 0; y < 256; y++) {
-    frames[i].data.copy(image.data, (y * image.width + i * 256) * 4, y * 256 * 4, (y + 1) * 256 * 4);
+  const width = frames[0].width, height = frames[0].height;
+  const image = blank(frames.length * width, height);
+  for (let i = 0; i < frames.length; i++) for (let y = 0; y < height; y++) {
+    frames[i].data.copy(image.data, (y * image.width + i * width) * 4, y * width * 4, (y + 1) * width * 4);
   }
   write(path.join(rig, "generated", `${name}-runtime-strip.png`), image);
 }
@@ -143,6 +144,28 @@ for (const [col, row, crownX, crownY] of warCells) {
   war.push(frame(cell, 0.31, [crownX, crownY]));
 }
 strip("war-yari", war);
+// Master sprites keep Adept-sized crowns/torsos here; the renderer applies the
+// rank's 1.2 body multiplier once. Cloth bounds never determine body size.
+strip("lightness-master", gridFrames("lightness-master-motion.png", 2, 0.50, 0.48));
+strip("magic-master", gridFrames("magic-master-motion.png", 2, 0.37, 0.48));
+const masterWarSheet = key(read(path.join(rig, "source/war-master-motion.png")));
+const masterWar = [];
+// Approved idle art core-torso landmarks (exclude shoulder spikes and helmet fins):
+// Adept x=166..278 (112 source px), Master x=180..264 (84 source px).
+// Match torso scale FIRST, then the strip applies the rank's 1.2 multiplier.
+const masterWarScale = 0.31 * 112 / 84;
+const helmetPivots = [[222, 86], [222, 86], [222, 86], [222, 86],
+  [222, 89], [222, 89], [222, 89], [222, 89]];
+for (let i = 0; i < 8; i++) {
+  const col = i % 4, row = Math.floor(i / 4);
+  const x = Math.round(col * masterWarSheet.width / 4), y = Math.round(row * masterWarSheet.height / 2);
+  const cell = crop(masterWarSheet, x, y,
+    Math.round((col + 1) * masterWarSheet.width / 4) - x,
+    Math.round((row + 1) * masterWarSheet.height / 2) - y);
+  // Larger cells preserve the full spear through extension at the corrected body scale.
+  masterWar.push(frame(cell, masterWarScale, helmetPivots[i], 256, 384));
+}
+strip("war-master", masterWar);
 const arrowDir = path.join(root, "client/assets/effects/disciple-arrow");
 const arrow = key(read(path.join(arrowDir, "arrow-source.png")));
 let minX = arrow.width, minY = arrow.height, maxX = 0, maxY = 0;

@@ -106,6 +106,7 @@ export function _ownBuildingsOfKindInViewport(kind) {
 
 export function _unitSelectionGroup(entity) {
   if (!entity) return "";
+  if (entity.daoMaster) return `${entity.kind}:master`;
   if (entity.kind !== KIND.ANTI_TANK_GUN) return entity.kind;
   return `${entity.kind}:${entity.setupState || SETUP.PACKED}`;
 }

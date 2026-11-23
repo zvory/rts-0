@@ -3,7 +3,9 @@ import fs from "node:fs";
 import { PNG } from "pngjs";
 import { KIND, STATE } from "../../client/src/protocol.js";
 import { createLiveFrameStrips, liveFrameStripFor, liveFrameStripKeyForEntity } from "../../client/src/renderer/rigs/frame_strip_routing.js";
-import { LIGHTNESS_PNG_FRAME_STRIP, MAGIC_PNG_FRAME_STRIP, WAR_PNG_FRAME_STRIP } from "../../client/src/renderer/rigs/disciple_png_strips.js";
+import { LIGHTNESS_PNG_FRAME_STRIP, MAGIC_PNG_FRAME_STRIP, WAR_PNG_FRAME_STRIP,
+  LIGHTNESS_MASTER_PNG_FRAME_STRIP, MAGIC_MASTER_PNG_FRAME_STRIP, WAR_MASTER_PNG_FRAME_STRIP } from "../../client/src/renderer/rigs/disciple_png_strips.js";
+import { PRESENTATION_ENTITY_FIELDS } from "../../client/src/presentation/entity_snapshot.js";
 import { WARRIOR_PNG_FRAME_STRIP } from "../../client/src/renderer/rigs/warrior_png_strip.js";
 import { frameStripFrameIndex, frameStripVisualFacing, frameStripSpriteOffset } from "../../client/src/renderer/rigs/frame_strip_runtime.js";
 import { liveUnitIconMarkupFor } from "../../client/src/renderer/rigs/unit_icon_sources.js";
@@ -121,5 +123,32 @@ for (const [phase, expected] of [[0, 0], [0.2, -2.88], [0.5, 16], [0.7, 16], [1,
 assert.equal(frameStripSpriteOffset(WAR_PNG_FRAME_STRIP, 5).y, WAR_PNG_FRAME_STRIP.originLateralPx);
 assert.equal(frameStripSpriteOffset(WAR_PNG_FRAME_STRIP, 0, { recoilProgress: 1, recoilPhase: 0.5 }).y, WAR_PNG_FRAME_STRIP.originLateralPx);
 assert.deepEqual(warEntity, unchanged);
+assert.ok(PRESENTATION_ENTITY_FIELDS.includes("daoMaster"), "rank survives the worker presentation handoff");
+for (const [dao, master, adept] of [["lightness", LIGHTNESS_MASTER_PNG_FRAME_STRIP, LIGHTNESS_PNG_FRAME_STRIP],
+  ["war", WAR_MASTER_PNG_FRAME_STRIP, WAR_PNG_FRAME_STRIP],
+  ["magic", MAGIC_MASTER_PNG_FRAME_STRIP, MAGIC_PNG_FRAME_STRIP]]) {
+  const unit = { id: 123, kind: ({ lightness: KIND.LIGHTNESS_ADEPT, war: KIND.WAR_ADEPT, magic: KIND.MAGIC_ADEPT })[dao], dao, daoMaster: true, state: STATE.IDLE, x: 0, y: 0 };
+  assert.equal(strips.get(liveFrameStripKeyForEntity(unit)), master);
+  assert.equal(master.worldScale, adept.worldScale * 1.2);
+  assert.equal(entityBodyRadius(unit), entityBodyRadius({ ...unit, daoMaster: false }) * 1.2);
+  const png = PNG.sync.read(fs.readFileSync(new URL(`../../${master.source.runtimeStrip}`, import.meta.url)));
+  assert.equal(png.width, 8 * master.frameWidth);
+  assert.equal(png.height, master.frameHeight);
+  for (let frame = 0; frame < 8; frame++) {
+    let opaque = 0;
+    for (let y = 0; y < master.frameHeight; y++) for (let x = 0; x < master.frameWidth; x++) {
+      const alpha = png.data[(y * png.width + frame * master.frameWidth + x) * 4 + 3];
+      if (alpha) opaque++;
+      if (x === 0 || x === master.frameWidth - 1 || y === 0 || y === master.frameHeight - 1) assert.equal(alpha, 0, `${dao} frame ${frame} fits its cell`);
+    }
+    assert.ok(opaque > 500, `${dao} frame ${frame} is not blank`);
+  }
+  assert.match(liveUnitIconMarkupFor(unit.kind, { dao, daoMaster: true }), new RegExp(`${dao}-master-runtime-strip`));
+  assert.match(liveUnitIconMarkupFor(unit.kind, { minimapPart: `master:frame:2` }), new RegExp(`${dao}-master-runtime-strip`));
+  minimap.beginFrame([unit], {}, 600);
+  assert.match(minimap.layers(unit)[0].part, /^master:frame:/);
+  assert.ok(minimap.parts(unit.kind).includes(`master:frame:7`));
+  assert.equal(selectionBudgetGridModel([unit]).blocks[0].label, `${dao[0].toUpperCase() + dao.slice(1)} Master`);
+}
 minimap.destroy();
 console.log("disciple_dao_sprite_contracts: ok");

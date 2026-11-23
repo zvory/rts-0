@@ -104,3 +104,16 @@ fn dao_training_appends_private_plans_without_shifting_existing_slots() {
         serde_json::json!(["dao_of_magic", "dao_of_heaviness"])
     );
 }
+
+#[test]
+fn dao_master_rank_is_public_without_private_insight() {
+    let mut unit = EntityView::new(1, 1, "warrior", 320.0, 320.0, 161, 161, "idle");
+    unit.dao = Some("lightness".into());
+    unit.dao_master = Some(true);
+    let value = serde_json::to_value(CompactEntity(&unit)).unwrap();
+    assert_eq!(value.as_array().unwrap().len(), 53);
+    assert!(value[45].is_null());
+    assert_eq!(value[46], "lightness");
+    assert_eq!(value[52], true);
+    assert_eq!(serde_json::to_value(&unit).unwrap()["daoMaster"], true);
+}

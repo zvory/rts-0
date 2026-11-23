@@ -226,7 +226,9 @@ fn validate_entity(
             field: "entities.chosenDao",
         });
     }
-    if entity.insight > entity.insight_cap() || (!entity.kind.is_disciple() && entity.insight != 0)
+    if entity.insight > entity.insight_cap()
+        || (!entity.kind.is_disciple() && entity.insight != 0)
+        || (entity.dao_master && entity.dao().is_none())
     {
         return Err(CheckpointPayloadError::InvalidValue {
             field: "entities.dao",

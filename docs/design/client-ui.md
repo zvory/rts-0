@@ -2887,3 +2887,12 @@ unit details and tooltips show the chosen Dao and remaining requirements. See
 [Dao evolution rules](dao-insight.md).
 
 Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md). The entity-aware frame-strip key also selects HUD/minimap portraits. Actual attack events drive Magic’s four-frame 400 ms cycle, Lightness’s four-pose katana swing, and War’s four-pose spear lunge, including weapon aim during movement. War’s `firingLungePx:16` adds a smooth local-forward presentation offset through anticipation, drive, extension and recovery. The worker sprite/shadow and minimap sample the same offset; authoritative position, collision and immediate damage timing remain unchanged. `disciple_projectiles.js` draws an arrow texture at three times its native aspect-ratio thickness, tinted with the firing owner’s assigned color using the owner id captured with the attack event, from a reusable pool and fixed-cost shimmering orb geometry in the feedback batch. There are no per-orb emitters, filters or particle histories. Projectile endpoints are captured from authorized event/snapshot positions, persist for at most 600 ms, and launch at the 100 ms release pose. Unit range overlays show 0.75-tile reach for Lightness, 2.75 tiles for War, and five tiles for Magic.
+
+### Dao Master animation review
+
+Public `daoMaster` rank selects three separate eight-frame strips (standing, three
+movement poses, four shot-triggered attacks) using the chosen twin-scarf Lightness,
+forked-spear War and broad-sleeve Magic designs. Runtime world scale is 1.2 times the
+corresponding Adept; Master source crowns/torsos are normalized before that multiplier.
+Portraits, selection groups, minimap frames and labels use the matching Master rank.
+Masters have no further insight meter. See [Master review spec](dao-masters.md).

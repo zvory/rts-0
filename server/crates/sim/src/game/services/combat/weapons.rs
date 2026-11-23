@@ -294,6 +294,9 @@ pub(super) fn effective_attack_profile(e: &Entity) -> EffectiveAttackProfile {
         dmg: base.dmg,
         cooldown: base.cooldown,
     };
+    if e.dao_master {
+        profile.dmg = ((profile.dmg as f32) * config::DAO_MASTER_DAMAGE_MULTIPLIER).round() as u32;
+    }
     if e.kind != EntityKind::AntiTankGun {
         return profile;
     }

@@ -41,11 +41,12 @@ export function selectionBudgetGridModel(entities, overflow = null, players = []
   const blocks = (entities || []).map((entity, sourceIndex) => {
     const weight = commandWeight(entity?.kind);
     const shape = selectionBudgetBlockShape(weight);
-    const st = statsForFaction(entity?.kind, players.find?.((p) => p.id === entity?.owner)?.factionId, entity?.dao) || {};
+    const st = statsForFaction(entity?.kind, players.find?.((p) => p.id === entity?.owner)?.factionId, entity?.dao, entity?.daoMaster) || {};
     return {
       id: entity?.id,
       kind: entity?.kind,
       dao: entity?.dao,
+      daoMaster: entity?.daoMaster,
       owner: entity?.owner,
       icon: st.icon || "",
       label: st.label || entity?.kind || "",
@@ -247,7 +248,7 @@ export class HudSelectionPanel {
         this.state?.players?.find?.((player) =>
           Number(player?.id) === Number(block.owner))?.color ||
         "#0072b2";
-      const unitIconMarkup = this.unitIconMarkupForKind?.(block.kind, { teamColor, dao: block.dao }) || "";
+      const unitIconMarkup = this.unitIconMarkupForKind?.(block.kind, { teamColor, dao: block.dao, daoMaster: block.daoMaster }) || "";
       if (unitIconMarkup) {
         cell.className += " has-unit-render-icon";
         cell.innerHTML = unitIconMarkup;
@@ -336,7 +337,7 @@ export class HudSelectionPanel {
         ? this.state.selectedEntities()
         : [];
       this.state.setSelection(
-        sel.filter((e) => e.kind === entity.kind).map((e) => e.id),
+        sel.filter((e) => e.kind === entity.kind && !!e.daoMaster === !!entity.daoMaster).map((e) => e.id),
         { controlPolicy: this.controlPolicy },
       );
       return;
@@ -367,7 +368,7 @@ export class HudSelectionPanel {
   /** Build the detail node for a single selected entity. */
   _singleSelectionNode(e) {
     const factionId = this.state.players?.find?.((p) => p.id === e.owner)?.factionId;
-    const st = statsForFaction(e.kind, factionId, e.dao) || {};
+    const st = statsForFaction(e.kind, factionId, e.dao, e.daoMaster) || {};
     const node = document.createElement("div");
     node.className = "sel-single";
 
@@ -446,7 +447,7 @@ export class HudSelectionPanel {
     node.innerHTML =
       `<div class="sel-name">${st.label || e.kind}</div>` +
       hpHtml +
-      (isDiscipleKind(e.kind) && Number.isFinite(e.insight) ? `<div class="sel-stat">Insight: ${e.insight ?? 0} / ${e.dao ? DISCIPLE_EVOLVED_INSIGHT_CAP : DISCIPLE_INSIGHT_REQUIRED}${e.dao ? ` · Dao of ${e.dao[0].toUpperCase() + e.dao.slice(1)}` : e.chosenDao ? ` · Following ${e.chosenDao[0].toUpperCase() + e.chosenDao.slice(1)}` : ""}</div>` : "") +
+      (isDiscipleKind(e.kind) && e.daoMaster ? `<div class="sel-stat">Master · Dao of ${e.dao[0].toUpperCase() + e.dao.slice(1)}</div>` : isDiscipleKind(e.kind) && Number.isFinite(e.insight) ? `<div class="sel-stat">Insight: ${e.insight ?? 0} / ${e.dao ? DISCIPLE_EVOLVED_INSIGHT_CAP : DISCIPLE_INSIGHT_REQUIRED}${e.dao ? ` · Dao of ${e.dao[0].toUpperCase() + e.dao.slice(1)}` : e.chosenDao ? ` · Following ${e.chosenDao[0].toUpperCase() + e.chosenDao.slice(1)}` : ""}</div>` : "") +
       (unitsKilledHtml || (entityIdHtml ? `<div class="sel-stat">${entityIdHtml}</div>` : "")) +
       (e.dao === "war" ? `<div class="sel-stat">Armor: 50% · reduced by armor piercing</div>` : armorHtml) +
       resourceRemainingHtml +
@@ -460,7 +461,7 @@ export class HudSelectionPanel {
     node.setAttribute("data-selection-kind", String(entity.kind || ""));
     node.setAttribute(
       "aria-label",
-      `Selected ${entity.label || statsForFaction(entity.kind, this.state.players?.find?.((p) => p.id === entity.owner)?.factionId, entity.dao)?.label || entity.kind || "entity"}`,
+      `Selected ${entity.label || statsForFaction(entity.kind, this.state.players?.find?.((p) => p.id === entity.owner)?.factionId, entity.dao, entity.daoMaster)?.label || entity.kind || "entity"}`,
     );
     return node;
   }
@@ -512,7 +513,7 @@ function selectionDetailSignature(entity, state = null) {
     sigValue(entity.label),
     sigValue(entity.hp),
     sigValue(entity.maxHp),
-    sigValue(entity.unitsKilled), sigValue(entity.insight), sigValue(entity.dao), sigValue(entity.chosenDao),
+    sigValue(entity.unitsKilled), sigValue(entity.insight), sigValue(entity.dao), sigValue(entity.daoMaster), sigValue(entity.chosenDao),
     sigValue(entity.occupiedTrenchId),
     entrenchment ? `${entrenchment.label}:${entrenchment.value}` : "",
     resource ? `${resource.kind}:${formatResourceRemaining(resource.remaining)}` : "",
@@ -598,7 +599,7 @@ function selectionBudgetEntitySignature(entity, state = null) {
   return [
     sigValue(entity.id),
     sigValue(entity.kind),
-    sigValue(entity.dao),
+    sigValue(entity.dao), sigValue(entity.daoMaster),
     sigValue(entity.label),
     sigValue(entity.owner),
     sigValue(ownerColor),

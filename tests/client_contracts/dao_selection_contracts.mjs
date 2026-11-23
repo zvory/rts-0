@@ -12,6 +12,8 @@ const novices = [
   { id: 54, kind: KIND.WAR_ADEPT, dao: "war" },
   { id: 55, kind: KIND.MAGIC_ADEPT, dao: "magic" },
   { id: 56, kind: KIND.LIGHTNESS_ADEPT, dao: "lightness" },
+  { id: 57, kind: KIND.WAR_ADEPT, dao: "war", daoMaster: true },
+  { id: 58, kind: KIND.WAR_ADEPT, dao: "war", daoMaster: true },
 ].map((unit, i) => ({ owner: 1, kind: KIND.WARRIOR, x: 100 + i * 40, y: 100, ...unit }));
 const state = {
   playerId: 1,
@@ -29,16 +31,16 @@ input.selectionScene = buildSelectionScene({
   }, 1920),
 });
 const panel = new HudSelectionPanel(null, state);
-for (const [index, expected] of [[0, [51, 52]], [1, [52, 51]], [2, [53, 54]], [4, [55]], [5, [56]]]) {
+for (const [index, expected] of [[0, [51, 52]], [1, [52, 51]], [2, [53, 54]], [4, [55]], [5, [56]], [6, [57, 58]]]) {
   const novice = novices[index];
   input._commitClickSelection({ x: novice.x, y: novice.y }, false, true);
   assert.deepEqual([...state.selection], expected,
-    "world same-type selection separates each Dao and ignores chosen future Dao");
+    "world same-type selection separates each Dao and rank and ignores chosen future Dao");
   for (const modifiers of [{ ctrlKey: true }, { metaKey: true }]) {
     state.setSelection(novices.map((unit) => unit.id));
     panel._applySelectionClick(novice.id, modifiers);
     assert.deepEqual([...state.selection], expected.slice().sort((a, b) => a - b),
-      "HUD same-type selection separates each Dao and ignores chosen future Dao");
+      "HUD same-type selection separates each Dao and rank and ignores chosen future Dao");
   }
 }
 panel.destroy();

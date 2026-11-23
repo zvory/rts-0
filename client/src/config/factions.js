@@ -198,7 +198,11 @@ export function commandCardAbilitiesForFaction(factionId) {
 // Presentation aliases preserve the shared simulation and renderer identity.
 const NEXUS_STATS = Object.freeze({ ...STATS[KIND.RESOURCE_DEPOT], label: "Nexus" });
 const SERF_STATS = Object.freeze({ ...STATS[KIND.WORKER], label: "Serf" });
-export function statsForFaction(kind, factionId) {
+const MASTER_STATS = Object.freeze(Object.fromEntries(
+  [KIND.LIGHTNESS_ADEPT, KIND.WAR_ADEPT, KIND.MAGIC_ADEPT].map(kind =>
+    [kind, Object.freeze({ ...STATS[kind], label: STATS[kind].label.replace("Adept", "Master") })])));
+export function statsForFaction(kind, factionId, dao = null, daoMaster = false) {
+  if (daoMaster && MASTER_STATS[kind]) return MASTER_STATS[kind];
   if (factionId === CULTIVATORS_FACTION_ID) {
     if (kind === KIND.RESOURCE_DEPOT) return NEXUS_STATS;
     if (kind === KIND.WORKER) return SERF_STATS;

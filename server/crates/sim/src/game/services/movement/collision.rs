@@ -6,9 +6,7 @@ use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
 use rts_rules::math::GameplayMath as _;
 
-use super::standability::{
-    footing_profile, footing_resistance, unit_static_standable, FootingProfile,
-};
+use super::standability::{footing_profile, footing_resistance, FootingProfile};
 use super::MAX_UNIT_BOUNDING_RADIUS_PX;
 
 /// Extra slack added to the broad-phase query so small per-pass position drift never causes a
@@ -151,6 +149,7 @@ pub(crate) fn resolve_collisions(
                 let a_side = CollisionSide {
                     id: a,
                     kind: a_kind,
+                    radius: a_body.bounding_radius(),
                     profile: a_profile_now,
                     facing: a_facing,
                     x: ax,
@@ -160,6 +159,7 @@ pub(crate) fn resolve_collisions(
                 let b_side = CollisionSide {
                     id: b,
                     kind: b_kind,
+                    radius: b_body.bounding_radius(),
                     profile: b_profile,
                     facing: b_facing,
                     x: bx,
@@ -176,16 +176,16 @@ pub(crate) fn resolve_collisions(
                 let a_target = legal_lateral_target(occ, map, a_side, a_base_target, a_lateral);
                 let b_target = legal_lateral_target(occ, map, b_side, b_base_target, b_lateral);
                 let a_ok =
-                    unit_static_standable(occ, map, a_kind, a_target.0, a_target.1, a_facing);
+                    unit_static_standable(occ, map, a_side, a_target.0, a_target.1, a_facing);
                 let b_ok =
-                    unit_static_standable(occ, map, b_kind, b_target.0, b_target.1, b_facing);
+                    unit_static_standable(occ, map, b_side, b_target.0, b_target.1, b_facing);
 
                 let (a_push, b_push) = match (a_ok, b_ok) {
                     (true, true) => (Some(a_target), Some(b_target)),
                     (true, false) => {
                         let a_full = (ax - nx * overlap, ay - ny * overlap);
                         (
-                            if unit_static_standable(occ, map, a_kind, a_full.0, a_full.1, a_facing)
+                            if unit_static_standable(occ, map, a_side, a_full.0, a_full.1, a_facing)
                             {
                                 Some(a_full)
                             } else {
@@ -198,7 +198,7 @@ pub(crate) fn resolve_collisions(
                         let b_full = (bx + nx * overlap, by + ny * overlap);
                         (
                             None,
-                            if unit_static_standable(occ, map, b_kind, b_full.0, b_full.1, b_facing)
+                            if unit_static_standable(occ, map, b_side, b_full.0, b_full.1, b_facing)
                             {
                                 Some(b_full)
                             } else {
@@ -236,10 +236,10 @@ pub(crate) fn resolve_collisions(
                         let a_candidates = [a_primary, a_secondary];
                         let b_candidates = [b_primary, b_secondary];
                         let a_alt = a_candidates.into_iter().find(|&(x, y)| {
-                            unit_static_standable(occ, map, a_kind, x, y, a_facing)
+                            unit_static_standable(occ, map, a_side, x, y, a_facing)
                         });
                         let b_alt = b_candidates.into_iter().find(|&(x, y)| {
-                            unit_static_standable(occ, map, b_kind, x, y, b_facing)
+                            unit_static_standable(occ, map, b_side, x, y, b_facing)
                         });
                         (a_alt, b_alt)
                     }
@@ -270,6 +270,7 @@ pub(crate) fn resolve_collisions(
 struct CollisionSide {
     id: u32,
     kind: EntityKind,
+    radius: f32,
     profile: FootingProfile,
     facing: f32,
     x: f32,
@@ -345,7 +346,7 @@ fn legal_lateral_target(
         return base_target;
     }
     let target = (base_target.0 + lateral.0, base_target.1 + lateral.1);
-    if unit_static_standable(occ, map, side.kind, target.0, target.1, side.facing) {
+    if unit_static_standable(occ, map, side, target.0, target.1, side.facing) {
         target
     } else {
         base_target
@@ -399,4 +400,23 @@ fn collision_push_shares(a_profile: FootingProfile, b_profile: FootingProfile) -
             )
         }
     }
+}
+
+fn unit_static_standable(
+    occ: &Occupancy,
+    map: &Map,
+    side: CollisionSide,
+    x: f32,
+    y: f32,
+    facing: f32,
+) -> bool {
+    crate::game::services::standability::unit_static_standable_with_radius(
+        map,
+        occ,
+        side.kind,
+        x,
+        y,
+        facing,
+        Some(side.radius),
+    )
 }

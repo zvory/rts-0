@@ -21,6 +21,7 @@ mod checkpoint_visibility_tests;
 mod concealment_zone_tests;
 mod construction_followup_tests;
 mod dao_kind_tests;
+mod dao_master_growth_tests;
 mod dao_training_tests;
 mod deferred_producer_order_tests;
 mod derived_state_tests;

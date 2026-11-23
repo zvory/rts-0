@@ -4,6 +4,7 @@ use crate::game::entity::{
 use crate::game::map::Map;
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::standability as static_standability;
+pub(super) use static_standability::unit_static_standable_with_radius;
 
 /// Whether a unit body may stand at this world position against static blockers.
 pub(super) fn unit_static_standable(
