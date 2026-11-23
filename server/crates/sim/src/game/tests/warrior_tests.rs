@@ -316,7 +316,7 @@ fn disciple_dash_casts_for_every_selected_ready_lightness_unit() {
                 entity.set_disciple_kind_for_test(EntityKind::LightnessAdept);
             }
             if index == 2 {
-                entity.start_ability_cooldown(AbilityKind::EkatTeleport, 100);
+                entity.start_ability_cooldown(AbilityKind::LightnessDash, 100);
             }
             units.push(id);
             origins.push(origin);
@@ -328,7 +328,7 @@ fn disciple_dash_casts_for_every_selected_ready_lightness_unit() {
             1,
             Command::UseAbility {
                 target_id: None,
-                ability: AbilityKind::EkatTeleport,
+                ability: AbilityKind::LightnessDash,
                 units: selection,
                 x: Some(target.0),
                 y: Some(target.1),
@@ -347,29 +347,20 @@ fn disciple_dash_casts_for_every_selected_ready_lightness_unit() {
                     dx * dx + dy * dy <= (config::TILE_SIZE * config::TILE_SIZE) as f32,
                     "each caster should reach the target area, allowing collision separation; queued={queued}",
                 );
-                assert!(entity.ability_cooldown_ticks(AbilityKind::EkatTeleport) > 0);
-                let marker = game
-                    .state
-                    .ability_runtime
-                    .active_return_marker(
-                        1,
-                        id,
-                        AbilityKind::EkatTeleport,
-                        None,
-                        game.current_tick(),
-                    )
-                    .expect("each ready caster should leave its own return marker");
-                assert_eq!((marker.x.to_world(), marker.y.to_world()), origins[index]);
+                assert_eq!(
+                    entity.ability_uses_remaining(AbilityKind::LightnessDash),
+                    Some(0)
+                );
             } else {
                 assert_eq!((entity.pos_x(), entity.pos_y()), origins[index]);
             }
         }
-        assert_eq!(game.state.ability_runtime.world_objects().count(), 2);
+        assert_eq!(game.state.ability_runtime.world_objects().count(), 0);
     }
 }
 
 #[test]
-fn disciple_dao_gates_blink_return_and_magic_anchor() {
+fn disciple_dao_gates_dash_and_magic_anchor_without_return() {
     use crate::game::ability::AbilityKind;
     use crate::game::upgrade::UpgradeKind;
     let mut game = empty_flat_game(&[cultivator_player()]);
@@ -386,7 +377,7 @@ fn disciple_dao_gates_blink_return_and_magic_anchor() {
         y: Some(400.0),
         queued: false,
     };
-    game.enqueue(1, cast(AbilityKind::EkatTeleport));
+    game.enqueue(1, cast(AbilityKind::LightnessDash));
     game.tick();
     game.enqueue(1, cast(AbilityKind::EkatMagicAnchor));
     game.tick();
@@ -398,20 +389,24 @@ fn disciple_dao_gates_blink_return_and_magic_anchor() {
         .insert(UpgradeKind::DaoOfLightness);
     game.enqueue(1, cast(AbilityKind::EvolveLightness));
     game.tick();
-    game.enqueue(1, cast(AbilityKind::EkatTeleport));
+    game.enqueue(1, cast(AbilityKind::LightnessDash));
     game.tick();
     assert_eq!(game.state.entities.get(unit).unwrap().pos_x(), 480.0);
+    // The former Kat ability is not available to Lightness, even through a forged command.
+    game.enqueue(1, cast(AbilityKind::EkatTeleport));
+    game.tick();
+    assert_eq!(game.state.ability_runtime.world_objects().count(), 0);
     game.enqueue(
         1,
         Command::RecastAbility {
-            ability: AbilityKind::EkatTeleport,
+            ability: AbilityKind::LightnessDash,
             units: vec![unit],
             target_object_id: None,
             queued: false,
         },
     );
     game.tick();
-    assert_eq!(game.state.entities.get(unit).unwrap().pos_x(), 400.0);
+    assert_eq!(game.state.entities.get(unit).unwrap().pos_x(), 480.0);
     assert_eq!(game.state.ability_runtime.world_objects().count(), 0);
     game.enqueue(1, cast(AbilityKind::EkatMagicAnchor));
     game.tick();
@@ -455,7 +450,7 @@ fn disciple_dao_gates_blink_return_and_magic_anchor() {
         1,
         Command::UseAbility {
             target_id: None,
-            ability: AbilityKind::EkatTeleport,
+            ability: AbilityKind::LightnessDash,
             units: vec![support],
             x: Some(640.0),
             y: Some(400.0),
@@ -1236,7 +1231,7 @@ fn disciple_dash_doubles_range_for_immediate_and_queued_casts() {
                 1,
                 Command::UseAbility {
                     target_id: None,
-                    ability: AbilityKind::EkatTeleport,
+                    ability: AbilityKind::LightnessDash,
                     units: vec![unit],
                     x: Some(origin.0 + requested_tiles * config::TILE_SIZE as f32),
                     y: Some(origin.1),
@@ -1255,11 +1250,84 @@ fn disciple_dash_doubles_range_for_immediate_and_queued_casts() {
                 .active_return_marker(
                     1,
                     unit,
-                    AbilityKind::EkatTeleport,
+                    AbilityKind::LightnessDash,
                     None,
                     game.current_tick()
                 )
-                .is_some());
+                .is_none());
         }
     }
+}
+
+#[test]
+fn lightness_master_gains_second_dash_charge_and_recharges_sequentially() {
+    use crate::game::ability::AbilityKind;
+    let mut game = empty_flat_game(&[cultivator_player()]);
+    let unit = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::LightnessAdept, 400.0, 400.0)
+        .unwrap();
+    let cast = |x| Command::UseAbility {
+        target_id: None,
+        ability: AbilityKind::LightnessDash,
+        units: vec![unit],
+        x: Some(x),
+        y: Some(400.0),
+        queued: false,
+    };
+    game.enqueue(1, cast(480.0));
+    game.tick();
+    assert_eq!(
+        game.state
+            .entities
+            .get(unit)
+            .unwrap()
+            .ability_uses_remaining(AbilityKind::LightnessDash),
+        Some(0)
+    );
+    game.state.entities.get_mut(unit).unwrap().insight = config::DISCIPLE_EVOLVED_INSIGHT_CAP;
+    game.tick();
+    let entity = game.state.entities.get(unit).unwrap();
+    assert!(entity.dao_master);
+    assert_eq!(
+        entity.ability_uses_remaining(AbilityKind::LightnessDash),
+        Some(1)
+    );
+    let recharge_left = entity
+        .ability_charge_recharge_ticks(AbilityKind::LightnessDash)
+        .unwrap();
+    game.enqueue(1, cast(560.0));
+    game.tick();
+    let entity = game.state.entities.get(unit).unwrap();
+    assert_eq!(entity.pos_x(), 560.0);
+    assert_eq!(
+        entity.ability_uses_remaining(AbilityKind::LightnessDash),
+        Some(0)
+    );
+    assert!(
+        entity
+            .ability_charge_recharge_ticks(AbilityKind::LightnessDash)
+            .unwrap()
+            < recharge_left
+    );
+    assert_eq!(game.state.ability_runtime.world_objects().count(), 0);
+    let payload = game.checkpoint_payload_text_for_test().unwrap();
+    let mut game = Game::restore_checkpoint_payload_text_for_test(
+        &payload,
+        game.state.map.clone(),
+        game.state.map_metadata.clone(),
+    )
+    .unwrap();
+    for _ in 0..config::EKAT_TELEPORT_COOLDOWN_TICKS * 2 {
+        game.tick();
+    }
+    assert_eq!(
+        game.state
+            .entities
+            .get(unit)
+            .unwrap()
+            .ability_uses_remaining(AbilityKind::LightnessDash),
+        Some(2)
+    );
 }

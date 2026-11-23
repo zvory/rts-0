@@ -401,3 +401,5 @@ export const cmd = Object.freeze({
 
 // Dao Master rank: EntityView daoMaster is a public bool at compact slot 52 (v65);
 // rts-contract owns the DTO, the sim owns advancement, and exact insight stays team-private.
+
+// Lightness Dash uses lightnessDash (ability 21, order stage 29); no return marker.

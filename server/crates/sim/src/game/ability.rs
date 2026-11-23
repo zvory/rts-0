@@ -12,6 +12,7 @@ pub enum AbilityEffectHook {
     DelayedWorld,
     ArtilleryPointFire,
     DashReturn,
+    Dash,
     LineProjectile,
     MagicAnchor,
     Shield,
@@ -93,6 +94,7 @@ pub(in crate::game) fn planner_code(kind: AbilityKind) -> u16 {
         AbilityKind::ThrowSword => 17,
         AbilityKind::HealingPotion => 18,
         AbilityKind::EscapeTreasure => 19,
+        AbilityKind::LightnessDash => 20,
     }
 }
 
@@ -118,6 +120,7 @@ pub(in crate::game) fn from_planner_code(code: u16) -> Option<AbilityKind> {
         17 => Some(AbilityKind::ThrowSword),
         18 => Some(AbilityKind::HealingPotion),
         19 => Some(AbilityKind::EscapeTreasure),
+        20 => Some(AbilityKind::LightnessDash),
 
         _ => None,
     }
@@ -138,6 +141,7 @@ pub fn effect_hook(kind: AbilityKind) -> AbilityEffectHook {
         AbilityKind::ScoutPlane => AbilityEffectHook::ScoutPlane,
         AbilityKind::DismissScoutPlane => AbilityEffectHook::ReservedNoop,
         AbilityKind::EkatTeleport => AbilityEffectHook::DashReturn,
+        AbilityKind::LightnessDash => AbilityEffectHook::Dash,
         AbilityKind::EkatLineShot | AbilityKind::ThrowSword => AbilityEffectHook::LineProjectile,
         AbilityKind::EkatMagicAnchor => AbilityEffectHook::MagicAnchor,
         AbilityKind::DiscipleShield => AbilityEffectHook::Shield,

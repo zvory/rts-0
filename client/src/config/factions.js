@@ -1,7 +1,6 @@
 import { ABILITY, DEFAULT_FACTION_ID, KIND, UPGRADE } from "../protocol.js";
 import {
   ABILITIES,
-  DAO_LIGHTNESS_DASH_RANGE_TILES,
   STATS,
   CULTIVATORS_FACTION_ID,
   EKAT_FACTION_ID,
@@ -138,7 +137,7 @@ export const FACTION_CATALOGS = Object.freeze({
     research: {
       [KIND.THREE_DAO_PAVILION]: [UPGRADE.DAO_OF_LIGHTNESS, UPGRADE.DAO_OF_MAGIC, UPGRADE.DAO_OF_HEAVINESS],
     },
-    abilities: [ABILITY.EVOLVE_LIGHTNESS, ABILITY.EVOLVE_WAR, ABILITY.EVOLVE_MAGIC, ABILITY.EKAT_TELEPORT, ABILITY.EKAT_MAGIC_ANCHOR, ABILITY.DISCIPLE_SHIELD, ABILITY.THROW_SWORD, ABILITY.HEALING_POTION, ABILITY.ESCAPE_TREASURE],
+    abilities: [ABILITY.EVOLVE_LIGHTNESS, ABILITY.EVOLVE_WAR, ABILITY.EVOLVE_MAGIC, ABILITY.LIGHTNESS_DASH, ABILITY.EKAT_MAGIC_ANCHOR, ABILITY.DISCIPLE_SHIELD, ABILITY.THROW_SWORD, ABILITY.HEALING_POTION, ABILITY.ESCAPE_TREASURE],
   }),
 });
 
@@ -185,13 +184,7 @@ export function researchableUpgradesForFaction(factionId, buildingKind) {
 export function commandCardAbilitiesForFaction(factionId) {
   return factionCatalog(factionId)
     .abilities
-    .map((ability) => factionId === CULTIVATORS_FACTION_ID && ability === ABILITY.EKAT_TELEPORT
-      ? {
-        ...ABILITIES[ability],
-        rangeTiles: DAO_LIGHTNESS_DASH_RANGE_TILES,
-        title: `Dash up to ${DAO_LIGHTNESS_DASH_RANGE_TILES} tiles, then recast to return`,
-      }
-      : ABILITIES[ability])
+    .map((ability) => ABILITIES[ability])
     .filter((entry) => entry && entry.commandCard !== false);
 }
 

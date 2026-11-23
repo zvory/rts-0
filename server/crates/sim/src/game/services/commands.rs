@@ -1626,7 +1626,7 @@ fn use_ability(
         }
     };
 
-    let units = if !request.queued && ability != AbilityKind::EkatTeleport {
+    let units = if !request.queued && !ability.is_dash() {
         if let Some((x, y)) = target_point {
             let eligible: Vec<u32> =
                 dedupe_cap_units(request.units.clone(), request.max_units_per_command)

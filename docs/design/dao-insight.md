@@ -126,3 +126,5 @@ unchanged; catalog restoration checks validate every refreshed checkpoint with t
 Adepts (and their Master advancement) use three supply; Novices use two. Combat
 evolution increases used supply immediately and may exceed the cap. Conversion queues
 reserve three supply; Proving Grounds entrants wait if the additional supply is unavailable.
+
+Lightness uses the separate `lightnessDash` ability: ten-tile movement without a return marker or recast. Adepts hold one charge and Masters two, recharging sequentially every eight seconds. Promotion grants the additional ready charge while preserving existing recharge progress.

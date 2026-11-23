@@ -262,6 +262,7 @@ const EXPECTED_ABILITY_EFFECT_FIELDS_BY_ID = Object.freeze({
   [ABILITY.BLANKET_FIRE]: Object.freeze(["radiusTiles"]),
   [ABILITY.BREAKTHROUGH]: Object.freeze(["durationTicks", "radiusTiles"]),
   [ABILITY.EKAT_TELEPORT]: Object.freeze([]),
+  [ABILITY.LIGHTNESS_DASH]: Object.freeze([]),
   [ABILITY.EKAT_LINE_SHOT]: Object.freeze(["damage", "radiusTiles", "speedPxPerTick"]),
   [ABILITY.THROW_SWORD]: Object.freeze(["damage", "radiusTiles", "speedPxPerTick"]),
   [ABILITY.EKAT_MAGIC_ANCHOR]: Object.freeze([

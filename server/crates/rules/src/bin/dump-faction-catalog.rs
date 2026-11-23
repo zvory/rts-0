@@ -715,6 +715,10 @@ fn print_ability_effects(indent: &str) {
     );
     println!("{indent}    \"{}\": {{}},", faction::EKAT_TELEPORT_ABILITY,);
     println!(
+        "{indent}    \"{}\": {{}},",
+        faction::AbilityKind::LightnessDash.stable_id(),
+    );
+    println!(
         "{indent}    \"{}\": {{\"radiusTiles\":{},\"speedPxPerTick\":{},\"damage\":{}}},",
         faction::EKAT_LINE_SHOT_ABILITY,
         json_f32(balance::EKAT_LINE_SHOT_WIDTH_TILES * 0.5),

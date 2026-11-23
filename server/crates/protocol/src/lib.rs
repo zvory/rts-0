@@ -1,3 +1,4 @@
+// Lightness Dash: lightnessDash (ability 21, order stage 29), without a return marker.
 //! Wire protocol (JSON + binary snapshots over WebSocket). See `docs/design/protocol.md`.
 //!
 //! Rust is authoritative; update its JavaScript mirror (`client/src/protocol.js`) together.
@@ -372,7 +373,6 @@ pub struct ReplayBranchSeat {
     pub color: String,
     pub claimable: bool,
 }
-
 /// Original replay seat plus current claimant in a branch staging room.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]

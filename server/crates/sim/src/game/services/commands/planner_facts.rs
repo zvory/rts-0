@@ -239,7 +239,8 @@ fn world_ability_order_policy(ability: AbilityKind) -> (bool, bool) {
     match ability {
         AbilityKind::Smoke => (true, false),
         AbilityKind::MortarFire | AbilityKind::Barrage => (false, true),
-        AbilityKind::EkatTeleport
+        AbilityKind::LightnessDash
+        | AbilityKind::EkatTeleport
         | AbilityKind::EkatLineShot
         | AbilityKind::ThrowSword
         | AbilityKind::EkatMagicAnchor

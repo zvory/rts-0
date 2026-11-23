@@ -17,7 +17,7 @@ size, speed, damage and health.” Same battlefield role and counters as Lightne
 Adept; no new targeting, movement, ability or economy mechanic. Automatically earned
 in normal games, including AI-owned units. No cost, build source, hotkey, build time,
 research or additional supply: advancement of an existing Adept only. Retain supply
-2, ground pathing, sight, armor, range, cooldown, penetration, Dash behavior and all
+2, ground pathing, sight, armor, range, cooldown, penetration and all
 orders/cooldowns. Relative to Lightness Adept: render and collision radius ×1.2,
 movement ×1.1 (2.97275 px/tick), ordinary attack damage ×1.2 (23→28, nearest integer),
 maximum HP ×1.4 (115→161). No ability-damage changes.
@@ -130,3 +130,7 @@ twice the radius increase plus one pixel). If none fits, insight remains full an
 HP unchanged until a legal nearby body position becomes available. Movement, unit
 collision pushes, Dash/return and Lab placement validate the entity’s actual radius.
 This prevents promotion or movement from leaving the larger body inside a building.
+
+## Lightness Dash charges
+
+Lightness uses its own ten-tile Dash without a return marker or recast. Adepts hold one charge; Masters hold two. Promotion adds one ready charge and preserves an existing recharge timer. Charges recharge sequentially, one every eight seconds; either ready charge can be used immediately. Kat retains its existing Dash and return behavior.

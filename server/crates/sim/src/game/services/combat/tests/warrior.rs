@@ -145,7 +145,7 @@ fn war_armor_uses_weapon_penetration_and_lightness_changes_attack_rate() {
         combat_rules::WeaponKind::WarriorSword
     );
     assert!(can_fire_while_moving(&unit, false));
-    assert!(unit.dao_ability_available(crate::game::ability::AbilityKind::EkatTeleport));
+    assert!(unit.dao_ability_available(crate::game::ability::AbilityKind::LightnessDash));
     assert!((unit.movement_speed() - 2.7025).abs() < 0.001);
     unit.set_disciple_kind_for_test(EntityKind::MagicAdept);
     assert!((unit.movement_speed() - 2.1).abs() < 0.001);

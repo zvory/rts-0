@@ -75,7 +75,7 @@ pub(super) fn ability_requests(
     target: planner::AbilityTarget,
     max_units_per_command: usize,
 ) -> Vec<planner::OrderRequest> {
-    let unit_groups = if ability == AbilityKind::EkatTeleport {
+    let unit_groups = if ability.is_dash() {
         dedupe_cap_units(units, max_units_per_command)
             .into_iter()
             .map(|unit| vec![unit])

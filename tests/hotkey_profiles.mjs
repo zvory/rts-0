@@ -731,7 +731,7 @@ assert.equal(createClassicPreset(buildHotkeyCommandCatalog(buildCommandCardConte
 
 // Escape can share a card with each Dao's abilities and with the worker build menu.
 for (const [contextId, otherCommand] of [
-  ["cultivators-disciple-lightness", `cultivators.ability.${ABILITY.EKAT_TELEPORT}`],
+  ["cultivators-disciple-lightness", `cultivators.ability.${ABILITY.LIGHTNESS_DASH}`],
   ["cultivators-disciple-war", `cultivators.ability.${ABILITY.THROW_SWORD}`],
   ["cultivators-disciple-magic", `cultivators.ability.${ABILITY.DISCIPLE_SHIELD}`],
   ["cultivators-worker", "worker.buildMenu"],

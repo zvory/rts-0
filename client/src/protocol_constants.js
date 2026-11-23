@@ -313,6 +313,7 @@ export const ABILITY = Object.freeze({
   BLANKET_FIRE: "blanketFire",
   BREAKTHROUGH: "breakthrough",
   SCOUT_PLANE: "scoutPlane",
+  LIGHTNESS_DASH: "lightnessDash",
   EKAT_TELEPORT: "ekatTeleport",
   EKAT_LINE_SHOT: "ekatLineShot",
   EKAT_MAGIC_ANCHOR: "ekatMagicAnchor",
@@ -367,7 +368,7 @@ export const MOVEMENT_PATH_DIAGNOSTICS = Object.freeze({
 // --- Compact snapshot wire schema (must match protocol.rs) ---
 export const PREDICTION_PROTOCOL_VERSION = 1;
 export const DEFAULT_FACTION_ID = "kriegsia";
-export const COMPACT_SNAPSHOT_VERSION = 66;
+export const COMPACT_SNAPSHOT_VERSION = 67;
 export const MAX_COMPACT_GROUND_DECALS = 64;
 export const SNAPSHOT_CODEC_VERSION = 1;
 export const SNAPSHOT_CODEC = Object.freeze({
@@ -521,6 +522,7 @@ export const ORDER_STAGE = Object.freeze({
   BLANKET_FIRE: "blanketFire",
   BREAKTHROUGH: "breakthrough",
   SCOUT_PLANE: "scoutPlane",
+  LIGHTNESS_DASH: "lightnessDash",
   EKAT_TELEPORT: "ekatTeleport",
   EKAT_LINE_SHOT: "ekatLineShot",
   EKAT_MAGIC_ANCHOR: "ekatMagicAnchor",
@@ -550,6 +552,7 @@ export const ORDER_STAGE_CODE = Object.freeze({
   [ORDER_STAGE.MORTAR_FIRE]: 9,
   [ORDER_STAGE.POINT_FIRE]: 10,
   [ORDER_STAGE.BREAKTHROUGH]: 11,
+  [ORDER_STAGE.LIGHTNESS_DASH]: 29,
   [ORDER_STAGE.EKAT_TELEPORT]: 12,
   [ORDER_STAGE.EKAT_LINE_SHOT]: 13,
   [ORDER_STAGE.EKAT_MAGIC_ANCHOR]: 14,
@@ -576,6 +579,7 @@ export const ABILITY_CODE = Object.freeze({
   [ABILITY.MORTAR_FIRE]: 3,
   [ABILITY.POINT_FIRE]: 4,
   [ABILITY.BREAKTHROUGH]: 5,
+  [ABILITY.LIGHTNESS_DASH]: 21,
   [ABILITY.EKAT_TELEPORT]: 6,
   [ABILITY.EKAT_LINE_SHOT]: 7,
   [ABILITY.EKAT_MAGIC_ANCHOR]: 8,

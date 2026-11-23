@@ -7,8 +7,7 @@ import { TICK_HZ } from "./timing.js";
 
 export const DAO_LIGHTNESS_DASH_RANGE_TILES = 10;
 export function entityAbilityRangeTiles(definition, entity) {
-  return definition?.ability === ABILITY.EKAT_TELEPORT && entity?.kind === KIND.LIGHTNESS_ADEPT
-    ? DAO_LIGHTNESS_DASH_RANGE_TILES : definition?.rangeTiles;
+  return definition?.rangeTiles;
 }
 export const DAO_WAR_RANGE_TILES = 1.75;
 export const DAO_WAR_BODY_SCALE = 0.7;
@@ -475,13 +474,22 @@ export const ABILITIES = Object.freeze({
     queued: true,
     queuePolicy: "skipIfNotReady",
   }),
+  [ABILITY.LIGHTNESS_DASH]: Object.freeze({
+    ability: ABILITY.LIGHTNESS_DASH,
+    label: "Dash", icon: "DSH", hotkey: "D",
+    title: "Dash up to 10 tiles; one charge, two at Master rank; recharges every 8 seconds",
+    carriers: Object.freeze([KIND.LIGHTNESS_ADEPT]),
+    targetMode: "worldPoint", rangeTiles: DAO_LIGHTNESS_DASH_RANGE_TILES,
+    cooldownTicks: 0, charges: 1, chargeRechargeTicks: EKAT_TELEPORT_COOLDOWN_TICKS,
+    cost: Object.freeze({ steel: 0, oil: 0 }), queued: true, queuePolicy: "skipIfNotReady",
+  }),
   [ABILITY.EKAT_TELEPORT]: Object.freeze({
     ability: ABILITY.EKAT_TELEPORT,
     label: "Dash",
     icon: "DSH",
     hotkey: "D",
     title: "Dash up to 5 tiles, then recast to return",
-    carriers: Object.freeze([KIND.EKAT, KIND.LIGHTNESS_ADEPT]),
+    carriers: Object.freeze([KIND.EKAT]),
     targetMode: "worldPoint",
     rangeTiles: EKAT_TELEPORT_RANGE_TILES,
     cooldownTicks: EKAT_TELEPORT_COOLDOWN_TICKS,
