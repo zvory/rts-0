@@ -727,6 +727,7 @@ export class PixiWorkerPresentationAdapter {
     return {
       mode: "pixi-webgl-module-worker",
       surface: this.surface,
+      statsEpoch: this._statsEpoch,
       submitted: this._stats.submitted,
       dispatched: this._stats.dispatched,
       retained: this._stats.retained,

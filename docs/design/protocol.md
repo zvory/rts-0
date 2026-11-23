@@ -210,6 +210,8 @@ in a match:
   snapshotBurstCount: u32,   // frames where more than one snapshot arrived before the next rAF
   snapshotBurstMax: u32,     // max snapshots received before one rAF boundary
   frameGapMaxMs: u16,       // largest requestAnimationFrame gap in this report window
+  clientBuildId: string, // page-initialization /version observation (__RTS_BUILD__), bounded to 64 characters
+  performanceSummary: object | null, // optional 60-second aggregate described below
   fpsEstimate: u16,         // coarse average client frame rate for this report window
   frameWorkMaxMs: u16,      // largest measured JS frame work duration
   frameWorkP95Ms: u16,      // bucketed p95 measured JS frame work duration
@@ -381,6 +383,27 @@ One reliable message before a snapshot with no send age or slot replacement is n
 outbound pressure.
 Those server-only log fields are not client protocol fields. Values are advisory because clients are untrusted; use them to diagnose
 transport/browser/prediction/render behavior, not as gameplay authority.
+
+The optional `netReport.performanceSummary` is emitted after at least 60 seconds on the existing
+10-second report transport. The server writes a compact `client_performance_summary` event even
+when the exceptional diagnostics are healthy. Match end/teardown also attempts a final partial summary after at least one second and one
+recorded frame; delivery remains best effort if the socket closes. Summary
+windows reset only after an accepted send. `elapsedMs` is wall-clock window duration;
+`clientBuildId` records the server build observed by the page at initialization, not a
+content hash proving the version of every loaded asset. `frameCount` and `frameTotalMs` describe main-thread rAF gaps, not GPU/display FPS.
+`frameGapMaxMs`, bucketed `frameGapP95Ms`/`frameGapP99Ms`, and `framesOver33Ms`,
+`framesOver50Ms`, `framesOver100Ms` quantify stutters. Quantiles use upper buckets
+8/16/17/24/33/50/100/250/1000/65535 ms; gaps above the final bucket saturate quantiles.
+`workerPresentedCount` is the acknowledged worker presentation delta; divide by `elapsedMs`
+for throughput only when `workerCountersValid` is true. Counter resets invalidate that window.
+These acknowledgements mean render submission completed, not GPU completion or monitor scanout.
+`visibleThroughout`, `focusedThroughout`, and `visibilityChangeCount` flag mixed foreground and
+background windows, including hide/show between reports; exclude mixed windows when comparing.
+`workerRollingUpdate`, `workerRollingPresent`, `workerRollingQueueAge`, and
+`workerRollingDisplayAge` each contain `{samples: u32, maxMs: u16, p95Ms: u16}` over the
+worker host's **last 2048 acknowledged frames**, not the minute window. Present timing measures
+CPU command submission. Summaries do not reset host diagnostics or introduce GPU synchronization.
+All other counters/durations are u32 except quantiles (u16) and validity flags (bool).
 
 ### 2.2 Server → Client (`ServerMessage`)
 

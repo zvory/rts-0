@@ -96,6 +96,7 @@ src/
   match_observer_diagnostics.js # Match-owned observer/AI diagnostics surface composer
   client_perf_report.js # bounded client frame-profiler upload field shaping
   match_health.js # match network/render health reporter
+  client_performance_window.js # bounded minute frame-gap histogram, independent of exceptional reports
   frame_profiler.js # bounded client frame phase profiler and debug summary API
   live_pause_overlay.js # live-match pause state overlay and unpause affordance
   branch_staging.js # replay branch staging panel

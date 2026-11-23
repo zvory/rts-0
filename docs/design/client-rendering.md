@@ -317,6 +317,8 @@ existing lifetimes. Pending and capture frames keep their original immutable sou
 
 Worker diagnostics retain counters and bounded timing histories on every event, but compute
 summaries only when `diagnostics()`, the control snapshot, or the published diagnostic getter is read.
+The diagnostic `statsEpoch` increments on each counter reset so summary consumers can detect a reset
+even when counters catch up between reads.
 Frame submission/completion never copy and sort histories just to publish an unread snapshot. The
 published getter returns current counters and ages; teardown replaces an owned getter with a detached
 final record so global diagnostics cannot retain the destroyed host or overwrite a replacement match.
