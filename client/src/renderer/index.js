@@ -1,4 +1,3 @@
-import { drawEscapeTrails } from "./escape_trail.js";
 import { reconcileShorelineLayer, destroyShorelineLayer } from "./shoreline.js";
 import { reconcileGrassLayer, destroyGrassLayer, updateTerrainMaterials } from "./grass.js";
 import { drawTankPointPreview } from "./tank_point_preview.js";
@@ -853,7 +852,6 @@ export class Renderer {
     time("renderer.feedbackOverlays", () => {
       this._drawSafely("smokeCanisters", () => this._drawSmokeCanisters(feedbackView));
       this._drawSafely("commandFeedback", () => this._drawCommandFeedback(feedbackView));
-      this._drawSafely("escapeTrails", () => drawEscapeTrails(this._feedbackGfx, feedbackView.liveEscapeTrails(), this.visualNow()));
       this._drawSafely("attackTargetPreview", () => this._drawAttackTargetPreview(feedbackView));
       this._drawSafely("mortarTargets", () => this._drawMortarTargets(feedbackView));
       this._drawSafely("mortarLaunches", () => this._drawMortarLaunches(feedbackView));
