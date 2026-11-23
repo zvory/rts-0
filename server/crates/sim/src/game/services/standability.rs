@@ -16,6 +16,8 @@ use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
 
 mod placement_policy;
+mod rank;
+pub(crate) use rank::unit_spawn_standable_for_entity;
 mod pump_jack;
 mod tree_trunks;
 pub(super) use tree_trunks::segment_clear as unit_tree_segment_clear;
@@ -55,12 +57,34 @@ pub(crate) fn unit_static_standable_with_facing(
     y: f32,
     facing: f32,
 ) -> bool {
+    unit_static_standable_with_radius(map, occ, kind, x, y, facing, None)
+}
+
+/// Dynamic Disciple rank uses its entity radius, while catalog-only callers keep their body.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn unit_static_standable_with_radius(
+    map: &Map,
+    occ: &Occupancy,
+    kind: EntityKind,
+    x: f32,
+    y: f32,
+    facing: f32,
+    radius: Option<f32>,
+) -> bool {
     let Some((x, y)) = stored_position(x, y) else {
         return false;
     };
-    let Some(body) = unit_body_with_facing(kind, x, y, facing) else {
+    let Some(mut body) = unit_body_with_facing(kind, x, y, facing) else {
         return false;
     };
+    if kind.is_disciple() {
+        if let (UnitBody::Circle(circle), Some(radius)) = (&mut body, radius) {
+            if !radius.is_finite() || radius <= 0.0 {
+                return false;
+            }
+            circle.radius = radius;
+        }
+    }
     if !unit_body_inside_world(map, body) {
         return false;
     }
@@ -232,6 +256,7 @@ pub(crate) fn unit_position_clear_of_building_footprint(
     ignored_units: &BTreeSet<u32>,
     kind: EntityKind,
     facing: f32,
+    radius: Option<f32>,
     x: f32,
     y: f32,
     building: EntityKind,
@@ -244,11 +269,16 @@ pub(crate) fn unit_position_clear_of_building_footprint(
     let Some(site_rect) = building_rect_for_footprint(building, tile_x, tile_y) else {
         return false;
     };
-    let Some(candidate_body) = unit_body_with_facing(kind, x, y, facing) else {
+    let Some(mut candidate_body) = unit_body_with_facing(kind, x, y, facing) else {
         return false;
     };
+    if kind.is_disciple() {
+        if let (UnitBody::Circle(circle), Some(radius)) = (&mut candidate_body, radius) {
+            circle.radius = radius;
+        }
+    }
     !unit_body_intersects_rect(candidate_body, site_rect)
-        && unit_static_standable_with_facing(map, occupancy, kind, x, y, facing)
+        && unit_static_standable_with_radius(map, occupancy, kind, x, y, facing, radius)
         && entities.iter().all(|entity| {
             entity.hp == 0
                 || !entity.is_unit()
@@ -680,6 +710,7 @@ mod tests {
             &BTreeSet::new(),
             kind,
             0.0,
+            None,
             x,
             160.0,
             EntityKind::Depot,
@@ -971,6 +1002,7 @@ mod tests {
             &BTreeSet::new(),
             EntityKind::Tank,
             std::f32::consts::FRAC_PI_2,
+            None,
             candidate.0,
             candidate.1,
             EntityKind::PumpJack,

@@ -57,10 +57,15 @@ pub(super) fn eject_friendly_units_from_site(
     let occupancy = Occupancy::build(map, entities);
     let mut ignored_units: BTreeSet<u32> = ejecting.iter().copied().collect();
     for unit in ejecting {
-        let Some((kind, facing, x, y)) = entities
-            .get(unit)
-            .map(|entity| (entity.kind, entity.facing(), entity.pos_x(), entity.pos_y()))
-        else {
+        let Some((kind, facing, x, y, radius)) = entities.get(unit).map(|entity| {
+            (
+                entity.kind,
+                entity.facing(),
+                entity.pos_x(),
+                entity.pos_y(),
+                entity.radius(),
+            )
+        }) else {
             ignored_units.remove(&unit);
             continue;
         };
@@ -71,6 +76,7 @@ pub(super) fn eject_friendly_units_from_site(
             &ignored_units,
             kind,
             facing,
+            radius,
             x,
             y,
             tile_x,
@@ -92,6 +98,7 @@ fn ejection_position(
     ignored_units: &BTreeSet<u32>,
     kind: EntityKind,
     facing: f32,
+    body_radius: f32,
     x: f32,
     y: f32,
     site_tile_x: u32,
@@ -124,6 +131,7 @@ fn ejection_position(
                     ignored_units,
                     kind,
                     facing,
+                    Some(body_radius),
                     candidate_x,
                     candidate_y,
                     EntityKind::PumpJack,

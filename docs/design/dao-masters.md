@@ -121,3 +121,12 @@ architecture, source caps and docs health pass. The task-only Lab server is stop
 Integration with current main retains separate authoritative Adept kinds, Novice
 Charge and ten-tile Lightness Dash. Master rank is the appended public `daoMaster`
 boolean on each Adept kind; compact snapshot vocabulary is version 65.
+
+### Safe body growth beside blockers
+
+Master promotion uses the current post-production/death static topology. If growth
+needs clearance, it tries deterministic half-pixel local adjustments (bounded by
+twice the radius increase plus one pixel). If none fits, insight remains full and
+HP unchanged until a legal nearby body position becomes available. Movement, unit
+collision pushes, Dash/return and Lab placement validate the entity’s actual radius.
+This prevents promotion or movement from leaving the larger body inside a building.

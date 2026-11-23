@@ -128,6 +128,12 @@ pub(super) fn advance_moving_units(
                 e.next_waypoint(),
             )
         };
+        let radius = entities.get(id).map(|e| e.radius());
+        let unit_static_standable = |occ: &Occupancy, map: &Map, kind, x, y, facing| {
+            static_standability::unit_static_standable_with_radius(
+                map, occ, kind, x, y, facing, radius,
+            )
+        };
         let breakthrough_multiplier = breakthrough_speed_multiplier(
             entities,
             spatial,

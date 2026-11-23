@@ -20,6 +20,8 @@ use rts_rules::math::GameplayMath as _;
 
 mod armor_reaction;
 mod barbed_wire;
+mod body_growth;
+pub(crate) use body_growth::advance_dao_masters;
 mod car_drive;
 mod collision;
 mod pivot_drive;
@@ -212,7 +214,15 @@ fn apply_magic_anchor_stationary_pull(
         }
         let next_x = (x + dir.0 * pull_px).clamp(0.0, world_max_x);
         let next_y = (y + dir.1 * pull_px).clamp(0.0, world_max_y);
-        if !standability::unit_static_standable(occ, map, kind, next_x, next_y, facing) {
+        if !crate::game::services::standability::unit_static_standable_with_radius(
+            map,
+            occ,
+            kind,
+            next_x,
+            next_y,
+            facing,
+            entities.get(id).map(|e| e.radius()),
+        ) {
             continue;
         }
         if let Some(e) = entities.get_mut(id) {

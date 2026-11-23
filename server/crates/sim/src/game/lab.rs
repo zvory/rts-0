@@ -447,7 +447,7 @@ impl Game {
             );
             let (x, y) = if entity.is_unit() {
                 scratch
-                    .validate_unit_position(&validation_entities, entity.kind, input.x, input.y)
+                    .validate_unit_entity_position(&validation_entities, &entity, input.x, input.y)
                     .map_err(|error| LabBatchError {
                         failed_index: index,
                         error,
@@ -737,7 +737,7 @@ impl Game {
     }
 
     fn lab_move_entity(&mut self, input: LabMoveEntity) -> Result<LabOpOutcome, LabError> {
-        let (kind, is_unit, is_building) = {
+        let (kind, is_unit, is_building, body_entity) = {
             let entity = self
                 .state
                 .entities
@@ -745,12 +745,17 @@ impl Game {
                 .ok_or(LabError::StaleEntity {
                     entity_id: input.entity_id,
                 })?;
-            (entity.kind, entity.is_unit(), entity.is_building())
+            (
+                entity.kind,
+                entity.is_unit(),
+                entity.is_building(),
+                entity.clone(),
+            )
         };
         let mut entities_without = self.state.entities.clone();
         entities_without.remove(input.entity_id);
         let (x, y) = if is_unit {
-            self.validate_unit_position(&entities_without, kind, input.x, input.y)?;
+            self.validate_unit_entity_position(&entities_without, &body_entity, input.x, input.y)?;
             (input.x, input.y)
         } else if is_building {
             let (_, _, x, y) =
@@ -886,6 +891,34 @@ impl Game {
         } else {
             Err(LabError::InvalidPlayer { player_id })
         }
+    }
+
+    fn validate_unit_entity_position(
+        &self,
+        entities: &EntityStore,
+        entity: &Entity,
+        x: f32,
+        y: f32,
+    ) -> Result<(), LabError> {
+        let occ = Occupancy::build(&self.state.map, entities);
+        if standability::unit_spawn_standable_for_entity(
+            &self.state.map,
+            &occ,
+            entities,
+            entity,
+            x,
+            y,
+        ) {
+            return Ok(());
+        }
+        Err(placement_error(
+            &self.state.map,
+            entities,
+            entity.kind,
+            x,
+            y,
+            false,
+        ))
     }
 
     fn validate_unit_position(

@@ -406,7 +406,7 @@ pub(crate) fn run_tick(
             let Some(entity) = entities.get_mut(id) else {
                 continue;
             };
-            if entity.chosen_dao.is_none() && entity.dao().is_none() {
+            if entity.chosen_dao.is_none() {
                 continue;
             }
             if players.iter().any(|player| {
@@ -414,7 +414,6 @@ pub(crate) fn run_tick(
                     && player.faction_id == crate::rules::faction::CULTIVATORS_FACTION_ID
             }) {
                 entity.advance_chosen_dao();
-                entity.advance_dao_master();
             }
         }
     });
@@ -437,6 +436,16 @@ pub(crate) fn run_tick(
     let pre_collision = crate::perf::timed(perf.as_deref_mut(), "pre_collision_derived", || {
         PreCollisionDerivedState::rebuild(map, entities, &mut occupancy_cache)
     });
+    services::movement::advance_dao_masters(
+        map,
+        entities,
+        |owner| {
+            players.iter().any(|p| {
+                p.id == owner && p.faction_id == crate::rules::faction::CULTIVATORS_FACTION_ID
+            })
+        },
+        &pre_collision.occupancy,
+    );
     let pre_collision_positions =
         crate::perf::timed(perf.as_deref_mut(), "pre_collision_positions", || {
             entities

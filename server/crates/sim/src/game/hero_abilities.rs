@@ -1,7 +1,7 @@
 use crate::config;
 use crate::game::ability::AbilityKind;
 use crate::game::ability_projectile::{AbilityProjectileReturnTarget, AbilityProjectileSpec};
-use crate::game::entity::{EntityKind, EntityStore, MovePhase};
+use crate::game::entity::{EntityStore, MovePhase};
 use crate::game::map::Map;
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::standability;
@@ -45,8 +45,16 @@ pub(crate) fn ekat_dash_destination(
         range_tiles,
     )?;
     let occ = Occupancy::build(map, entities);
-    standability::unit_static_standable(map, &occ, EntityKind::Ekat, destination.0, destination.1)
-        .then_some(destination)
+    standability::unit_static_standable_with_radius(
+        map,
+        &occ,
+        caster_entity.kind,
+        destination.0,
+        destination.1,
+        caster_entity.facing(),
+        Some(caster_entity.radius()),
+    )
+    .then_some(destination)
 }
 
 pub(crate) fn ekat_return_destination_valid(
@@ -60,7 +68,15 @@ pub(crate) fn ekat_return_destination_valid(
         return false;
     };
     let occ = Occupancy::build(map, entities);
-    standability::unit_static_standable(map, &occ, caster_entity.kind, x, y)
+    standability::unit_static_standable_with_radius(
+        map,
+        &occ,
+        caster_entity.kind,
+        x,
+        y,
+        caster_entity.facing(),
+        Some(caster_entity.radius()),
+    )
 }
 
 pub(crate) fn move_ekat_to(entities: &mut EntityStore, caster: u32, x: f32, y: f32) -> bool {
