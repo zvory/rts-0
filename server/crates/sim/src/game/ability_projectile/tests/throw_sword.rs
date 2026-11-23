@@ -19,7 +19,11 @@ fn throw_sword_uses_zero_penetration_and_target_armor_without_changing_line_shot
         let mut runtime = AbilityRuntime::new();
         let mut spec = projectile_spec(caster, (128.0, 128.0), (256.0, 128.0));
         spec.ability = ability;
-        spec.damage = if ability == AbilityKind::ThrowSword { crate::config::THROW_SWORD_DAMAGE } else { crate::config::EKAT_LINE_SHOT_DAMAGE };
+        spec.damage = if ability == AbilityKind::ThrowSword {
+            crate::config::THROW_SWORD_DAMAGE
+        } else {
+            crate::config::EKAT_LINE_SHOT_DAMAGE
+        };
         runtime.spawn_projectile(spec).unwrap();
         tick_runtime(&mut runtime, &mut entities, 1);
         assert_eq!(
@@ -69,8 +73,16 @@ fn throw_sword_return_respects_active_entrenchment() {
 fn throw_sword_round_trip_leaves_entrenched_rifleman_alive() {
     let mut entities = EntityStore::default();
     let caster = spawn_caster(&mut entities, 1);
-    let victim = entities.spawn_unit(2, EntityKind::Rifleman, 192.0, 128.0).unwrap();
-    entities.get_mut(victim).unwrap().movement.as_mut().unwrap().occupied_trench_id = Some(1);
+    let victim = entities
+        .spawn_unit(2, EntityKind::Rifleman, 192.0, 128.0)
+        .unwrap();
+    entities
+        .get_mut(victim)
+        .unwrap()
+        .movement
+        .as_mut()
+        .unwrap()
+        .occupied_trench_id = Some(1);
     let mut runtime = AbilityRuntime::new();
     let mut spec = projectile_spec(caster, (128.0, 128.0), (256.0, 128.0));
     spec.ability = AbilityKind::ThrowSword;
