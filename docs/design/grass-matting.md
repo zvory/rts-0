@@ -33,6 +33,9 @@ There is no regrowth; this isolates the persistent-matting look requested for re
 
 The prototype stores RGBA pressure plus travel direction on a grid with minimum 4-world-pixel
 spacing. Either dimension is capped at 1,024 texels by increasing spacing on large maps.
+The mask is opaque data with heading channels centered on byte 128, including untouched texels,
+so canvas premultiplication and linear filtering do not introduce a spurious edge direction.
+Zero-pressure blades retain the original curved silhouette.
 The retained field is at most 4 MiB, plus another 4 MiB ImageData staging copy, canvas backing,
 GPU texture, and current visible-unit poses. Canvas/driver copies are additional and not measured.
 Repeated pressure uses max, so stationary units and unchanged revisits do not queue uploads.

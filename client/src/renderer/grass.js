@@ -54,7 +54,8 @@ float blade(vec2 p, vec2 root, float h, float bend, float width){
    *step(root.y-h,p.y)*step(p.y,root.y);
 }
 float pressedBlade(vec2 p, vec2 root, float h, float bend, float width, vec3 pressure){
- vec2 direction=pressure.gb*2.-1.;
+ if(pressure.r==0.)return blade(p,root,h,bend,width);
+ vec2 direction=pressure.gb*255.-128.;
  direction=length(direction)>.01?normalize(direction):vec2(1.,0.);
  vec2 tip=mix(vec2(bend,-h),direction*h*.95+vec2(0.,-h*.12),pressure.r);
  float t=clamp(dot(p-root,tip)/max(dot(tip,tip),.01),0.,1.);

@@ -13,6 +13,13 @@ export class GrassPressureField {
     this.width = Math.ceil(this.worldWidth / this.scale);
     this.height = Math.ceil(this.worldHeight / this.scale);
     this.pixels = new Uint8ClampedArray(this.width * this.height * 4);
+    // This is a data texture: keep it opaque so canvas premultiplication cannot
+    // alter headings, and make untouched texels neutral under linear filtering.
+    for (let i = 0; i < this.pixels.length; i += 4) {
+      this.pixels[i + 1] = 128;
+      this.pixels[i + 2] = 128;
+      this.pixels[i + 3] = 255;
+    }
     this.poses = new Map();
   }
 
@@ -58,9 +65,8 @@ export class GrassPressureField {
       // Max pressure makes revisiting a path idempotent instead of accumulating endless stamps.
       if (value <= this.pixels[i]) continue;
       this.pixels[i]=value;
-      this.pixels[i+1]=Math.round((dx*.5+.5)*255);
-      this.pixels[i+2]=Math.round((dy*.5+.5)*255);
-      this.pixels[i+3]=255;
+      this.pixels[i+1]=Math.round(128+dx*127);
+      this.pixels[i+2]=Math.round(128+dy*127);
       changed=true;
     }
     return changed;
@@ -73,6 +79,8 @@ export class GrassMattingMask {
     this.canvas = createWorkerSafeCanvas(this.field.width, this.field.height);
     this.ctx = this.canvas.getContext("2d");
     this.image = this.ctx.createImageData(this.field.width, this.field.height);
+    this.image.data.set(this.field.pixels);
+    this.ctx.putImageData(this.image, 0, 0);
     this.texture = pixi.Texture.from(this.canvas);
     this.texture.source.scaleMode = "linear";
   }

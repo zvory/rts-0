@@ -5,10 +5,21 @@ const map={width:128,height:128,tileSize:32};
 const unit=(id,x,y,kind=KIND.RIFLEMAN,extra={})=>({id,x,y,kind,hp:100,...extra});
 const field=new GrassPressureField(map);
 assert.equal(field.pixels.byteLength,4*1024*1024);
+assert.deepEqual([...field.pixels.slice(0,4)],[0,128,128,255],
+ "untouched pressure texels are opaque with a neutral heading");
 assert.equal(field.update([unit(1,50,50)]),false);
 assert.equal(field.update([unit(1,90,50)]),true);
 const sample=(f,x,y)=>f.pixels[(Math.floor(y/f.scale)*f.width+Math.floor(x/f.scale))*4];
 assert.ok(sample(field,70,50)>0,"infantry mats the center line");
+const pathIndex=(Math.floor(50/field.scale)*field.width+Math.floor(70/field.scale))*4;
+assert.deepEqual([...field.pixels.slice(pathIndex+1,pathIndex+4)],[255,128,255],
+ "eastward travel keeps the perpendicular heading neutral, including at filtered edges");
+for (const weight of [0.01,0.25,0.5,1]) {
+ const heading=[1,2].map(channel=>
+   field.pixels[channel]*(1-weight)+field.pixels[pathIndex+channel]*weight-128);
+ assert.ok(heading[0]>0);
+ assert.equal(heading[1],0,"linear filtering with untouched texels preserves travel direction");
+}
 const copy=field.pixels.slice();
 assert.equal(field.update([unit(1,90,50)]),false,"stationary units cause no upload");
 assert.deepEqual(field.pixels,copy);
@@ -48,9 +59,13 @@ try {
  assert.equal(renderer._grassLayer.matting,undefined);
  reconcileGrassLayer(renderer,12);
  const pressure=renderer._grassLayer.matting;
+ assert.deepEqual(pressure.image.data,pressure.field.pixels,"the initial canvas receives neutral opaque data");
+ const fragment=renderer._grassLayer.shader.options.gl.fragment;
+ assert.match(fragment,/if\(pressure\.r==0\.\)return blade\(p,root,h,bend,width\);/,
+   "unpressed grass retains the existing curved blade silhouette");
  pressure.update([unit(1,10,20)]);
  pressure.update([unit(1,30,20)]);
- assert.ok(pressure.field.pixels.some(v=>v>0));
+ assert.ok(pressure.field.pixels.some((v,i)=>i%4===0 && v>0));
  destroyGrassLayer(renderer);
  assert.equal(pressure.field.poses.size,0);
  assert.equal(renderer.layers.terrain.children.length,0);
