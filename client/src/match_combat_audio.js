@@ -11,6 +11,15 @@ import { TICK_HZ } from "./config.js";
 import { EVENT, KIND } from "./protocol.js";
 
 const COMBAT_GAIN_SCALE = 0.7;
+// Calibrated using the loudest decoded 50 ms RMS window: short transients
+// have different crest factors, so equal integrated LUFS would flatten attacks.
+// These land around -12 dBFS before category/master/spatial gains; tanks are -4.5.
+const DISCIPLE_ATTACK_GAINS = Object.freeze({
+  combat_disciple_spear_01: 0.75 * COMBAT_GAIN_SCALE,
+  combat_disciple_orb_01: 0.95 * COMBAT_GAIN_SCALE,
+  combat_disciple_sword_stab_01: 1.2 * COMBAT_GAIN_SCALE,
+  combat_disciple_sword_strike_01: 1.5 * COMBAT_GAIN_SCALE,
+});
 const KAR98K_GAIN = 0.25 * COMBAT_GAIN_SCALE;
 const MG_BURST_GAIN = 0.7 * COMBAT_GAIN_SCALE;
 const TANK_CANNON_GAIN = 2 * COMBAT_GAIN_SCALE;
@@ -42,7 +51,7 @@ const COMBAT_SOUNDS = Object.freeze({
   [KIND.WARRIOR]: {
     ids: ["combat_disciple_sword_stab_01"],
     priority: 2,
-    gain: 0.5 * COMBAT_GAIN_SCALE,
+    gain: DISCIPLE_ATTACK_GAINS.combat_disciple_sword_stab_01,
   },
   [KIND.TANK]: {
     ids: ["combat_tank_01"],
@@ -199,7 +208,7 @@ export class MatchCombatAudio {
       y: pos.y,
       category,
       priority: spec.priority,
-      gain: spec.gain,
+      gain: DISCIPLE_ATTACK_GAINS[id] ?? spec.gain,
       key,
     });
     if (played && key) this.activeMachineGunSoundKeys.set(ev.from, key);

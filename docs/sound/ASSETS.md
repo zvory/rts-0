@@ -15,6 +15,26 @@ See `REVIEW_PROCESS.md` for the one-by-one audition process and verdict format.
 
 Normalize to −16 LUFS integrated, true-peak ≤ −1 dBTP before shipping. Placeholder files are not normalized.
 
+### Cultivator attack playback mix
+
+The four Disciple recordings retain their original dynamics and encoded levels. Playback in
+`match_combat_audio.js` compensates per cue rather than forcing short, sparse transients to a
+whole-file LUFS target. Relative to the previous shared 0.35 gain:
+
+| Cue | Playback gain | Increase | Loudest 50 ms RMS after playback gain |
+|-----|---------------|----------|---------------------------------------|
+| Spear | 0.525 | +3.52 dB | −12.18 dBFS |
+| Magic orb | 0.665 | +5.58 dB | −11.32 dBFS |
+| Sword stab | 0.84 | +7.60 dB | −11.39 dBFS |
+| Metallic sword strike | 1.05 | +9.54 dB | −12.65 dBFS |
+
+Measured from decoded mono PCM at 44.1 kHz in consecutive 2,205-sample windows, before
+category, master, pitch variation, and spatial processing. For comparison, the unchanged tank
+cannon at gain 1.4 reaches −4.49 dBFS by the same measure, retaining about 7–8 dB of attack
+headroom over Cultivators. All four Cultivator decoded true peaks remain below −1 dBTP after
+these playback gains. These are mix reference measurements, not equal perceived loudness
+claims across different timbres or combat situations.
+
 ## Naming convention
 
 `category_subject_variant.ext` — e.g. `combat_kar98k_03.mp3`, `units_tank_engine_idle_03.mp3`
