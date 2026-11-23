@@ -21,6 +21,7 @@ mod dao;
 pub(crate) use dao::DiscipleShield;
 mod field_obstacles;
 mod helpers;
+mod items;
 mod position;
 mod production;
 mod production_repeat;
@@ -64,6 +65,8 @@ pub struct Entity {
     // Omit unused protection to preserve established end-state fingerprint known answers.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) escape_treasure: Option<u32>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub(crate) escape_autocast_disabled: bool,
     pub hp: u32,
     /// Full health ceiling. Construction earns current HP over time; damage never lowers this value.
     pub max_hp: u32,
@@ -119,6 +122,7 @@ impl Entity {
             dao_advance_ticks: 0,
             shield: None,
             escape_treasure: None,
+            escape_autocast_disabled: false,
             last_damage_tick: None,
             last_damage_pos: None,
             movement: Some(MovementState::default()),
@@ -176,6 +180,7 @@ impl Entity {
             dao_advance_ticks: 0,
             shield: None,
             escape_treasure: None,
+            escape_autocast_disabled: false,
             last_damage_tick: None,
             last_damage_pos: None,
             movement: None,
@@ -235,6 +240,7 @@ impl Entity {
             dao_advance_ticks: 0,
             shield: None,
             escape_treasure: None,
+            escape_autocast_disabled: false,
             last_damage_tick: None,
             last_damage_pos: None,
             movement: None,
@@ -1053,16 +1059,6 @@ impl Entity {
             self.last_damage_entity = Some(attacker);
         }
         damaged
-    }
-
-    /// Consume a delivered escape charge and reset all movement at the validated Shop exit.
-    pub(in crate::game) fn rescue_shop_escape(&mut self, x: f32, y: f32) {
-        self.escape_treasure = None;
-        self.hp = 1;
-        self.clear_orders();
-        self.replace_active_order(Order::Idle);
-        self.reset_stuck(x, y);
-        self.set_position(x, y);
     }
 
     pub fn restore_hp(&mut self, amount: u32) -> bool {

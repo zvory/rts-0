@@ -20,7 +20,7 @@ Use for client↔server message, snapshot, and event changes.
 - [docs/projection-audit-checklist.md](../projection-audit-checklist.md) — checklist for new
   projection-affecting snapshot fields, events, or observer modes
 
-- Shop
+- Shop / Escape activation
 
 ## Code map
 - `server/crates/protocol/src/{client_message,server_message,lib}.rs` — Rust wire

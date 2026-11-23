@@ -1,3 +1,4 @@
+import { itemSlotSignature, placeItemDescriptor } from "./hud_item_slot.js";
 import { buildDaoTrainingCard } from "./hud_dao_training_card.js";
 import { ABILITY, DEFAULT_FACTION_ID, KIND, SETUP, UPGRADE, isBuilding, isUnit } from "./protocol.js";
 import {
@@ -58,7 +59,7 @@ export function factionCommandId(factionId, family, subject) {
 }
 
 export function parsedFactionCommandId(commandId) {
-  const match = /^([a-z0-9_]+)\.(build|train|research|ability|dao-training)\.([A-Za-z0-9_]+)$/.exec(String(commandId || ""));
+  const match = /^([a-z0-9_]+)\.(build|train|research|ability|item|dao-training)\.([A-Za-z0-9_]+)$/.exec(String(commandId || ""));
   return match ? { factionId: match[1], family: match[2], subject: match[3] } : null;
 }
 
@@ -67,7 +68,7 @@ function card(kind, signature, slots, extras = {}) {
     kind,
     signature,
     ...extras,
-    // Hide playtest-disabled content only after layout, preserving every other slot/hotkey.
+    // Apply playtest visibility after layout.
     slots: slots.map((slot, slotIndex) => slot && !hiddenPlaytestCommand(slot)
       ? renderedDescriptor(slot, slotIndex) : null),
   };
@@ -302,7 +303,7 @@ export function buildUnitCard(ctx, selection) {
   const hasArmyUnit = ownUnits.some((e) => e.kind !== KIND.WORKER);
   const workerSelected = !hasArmyUnit && ownUnits.some((e) => e.kind === KIND.WORKER);
   const signature =
-    `units|${unitIds.join(".")}|target:${commandTargetSig(ctx.commandTarget)}|` +
+    `units|${unitIds.join(".")}|items:${itemSlotSignature(ownUnits)}|target:${commandTargetSig(ctx.commandTarget)}|` +
     `|setup:${setupGunIds.join(".")}|` +
     `|abilities:${abilityAffordances.map((affordance) =>
       `${affordance.definition.ability}:${affordance.unlocked ? 1 : 0}:${affordance.affordable ? 1 : 0}:` +
@@ -317,7 +318,9 @@ export function buildUnitCard(ctx, selection) {
     (workerSelected ? "worker-main" : "no-build");
 
   if (workerSelected) {
-    return card("unit", signature, workerCommandSlots(ctx, unitIds, factionId), { abilityAffordances });
+    const slots = workerCommandSlots(ctx, unitIds, factionId);
+    placeItemDescriptor(slots, ownUnits, factionId);
+    return card("unit", signature, slots, { abilityAffordances });
   }
 
   const slots = new Array(9).fill(null);
@@ -329,6 +332,7 @@ export function buildUnitCard(ctx, selection) {
   }
 
   placeAbilityDescriptors(ctx, slots, abilityAffordances, factionId);
+  placeItemDescriptor(slots, ownUnits, factionId);
 
   if (setupGunIds.length > 0) {
     const setupSlot = GRID_HOTKEYS.indexOf("Z");
@@ -358,7 +362,7 @@ function placeAbilityDescriptors(ctx, slots, abilityAffordances, factionId) {
     const definition = affordance.definition;
     const preferred = definition.hotkey ? GRID_HOTKEYS.indexOf(definition.hotkey) : -1;
     if (preferred < 0 || (slots[preferred] && slots[preferred].action !== "ability")) continue;
-    // Later, higher-priority abilities replace collisions without moving the losing command.
+    // Higher priority wins collisions.
     slots[preferred] = abilityDescriptor(ctx, factionId, affordance);
   }
 }

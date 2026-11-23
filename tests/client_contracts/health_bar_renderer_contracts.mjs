@@ -57,8 +57,11 @@ try {
     && !treasureBar.rtsFill.visible && !treasureBar.rtsTicks.visible,
   "Escape Treasure badge remains visible while its health bar is hidden");
   const badgeBox = treasureBar.rtsEscape.calls.find((call) => call[0] === "drawRect");
-  assert(badgeBox[3] === 4 && badgeBox[4] === 4,
-    "Escape badge width and height equal the four-pixel HP fill height");
+  assert(badgeBox[3] * treasureBar.rtsEscape.scaleX === 8 && badgeBox[4] * treasureBar.rtsEscape.scaleY === 8,
+    "Escape badge width and height double the four-pixel HP fill height");
+  assert(treasureBar.x + treasureBar.rtsEscape.x === protectedUnit.x &&
+    treasureBar.y + treasureBar.rtsEscape.y === protectedUnit.y,
+    "Escape badge is centered on the unit");
   const badge = treasureBar.rtsEscape;
   _hpBar.call({}, treasureBar, { ...protectedUnit, escapeTreasure: false });
   assert(treasureBar.rtsEscape === badge && !badge.visible,

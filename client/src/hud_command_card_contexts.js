@@ -49,6 +49,8 @@ export function buildCultivatorCommandCardContextSamples(buildCard) {
   }));
   return [
     ...unitCards,
+    { id: "cultivators-item-escape", card: buildCard(ctx([{ ...disciple, escapeTreasure: true,
+      abilities: [{ ability: ABILITY.ESCAPE_TREASURE, autocastEnabled: true }] }])) },
     { id: "cultivators-shop", card: buildCard(ctx([{ id: 30, owner: 1, kind: KIND.SHOP }])) },
     { id: "cultivators-worker", card: buildCard(ctx([worker])) },
     { id: "cultivators-build", card: buildCard({ ...ctx([worker]), commandCardMode: "workerBuild" }) },

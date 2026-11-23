@@ -202,6 +202,7 @@ impl AbilityProjectile {
                     target.restore_hp(target.max_hp);
                 } else if target.escape_treasure.is_none() {
                     target.escape_treasure = Some(self.caster_id);
+                    target.escape_autocast_disabled = false;
                 }
             }
         }

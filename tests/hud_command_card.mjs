@@ -709,6 +709,7 @@ for (const [kind, upgrade] of [
     "cultivators-disciple-lightness",
     "cultivators-disciple-war",
     "cultivators-disciple-magic",
+    "cultivators-item-escape",
     "cultivators-shop",
     "cultivators-worker",
     "cultivators-build",
@@ -752,7 +753,7 @@ for (const [kind, upgrade] of [
     for (const slot of entry.card.slots) {
       if (!slot) continue;
       assert.equal(typeof slot.commandId, "string", `${entry.id} command has identity`);
-      assert.equal(slot.hotkey, ["Q", "W", "E", "A", "S", "D", "Z", "X", "C"][slot.slotIndex]);
+      assert.equal(slot.hotkey, gridHotkeyForSlot(slot.slotIndex));
     }
   }
 
@@ -1051,7 +1052,11 @@ assert.deepEqual(COMMAND_CARD_SLOT_ORDER.map(gridHotkeyForSlot),
   ["Q", "W", "E", "R", "A", "S", "D", "F", "Z", "X", "C", "V"]);
 for (const context of buildCommandCardContextCatalog()) {
   for (const slot of context.card.slots.filter(Boolean)) {
-    assert(slot.slotIndex < 9, `${context.id}: fourth column remains reserved`);
+    if (slot.slotIndex === 9) {
+      assert.equal(slot.commandId, "cultivators.item.escape");
+      continue;
+    }
+    assert(slot.slotIndex < 9, `${context.id}: other fourth-column slots remain reserved`);
     const displayIndex = COMMAND_CARD_SLOT_ORDER.indexOf(slot.slotIndex);
     assert.equal(Math.floor(displayIndex / 4), Math.floor(slot.slotIndex / 3));
     assert.equal(displayIndex % 4, slot.slotIndex % 3);
@@ -1073,3 +1078,27 @@ withFakeHudDocument(() => {
   assert(cells[4].dataset.slotIndex === 3 && cells[10].dataset.slotIndex === 8,
     "A and C commands retain their original row and column");
 });
+
+// Item slot R is conditional, consumes only carriers, and exposes autocast controls.
+for (const kind of [KIND.WORKER, KIND.WARRIOR, KIND.LIGHTNESS_ADEPT, KIND.WAR_ADEPT, KIND.MAGIC_ADEPT]) {
+  const build = (escapeTreasure, auto = true) => buildCommandCardDescriptors({
+    playerId: 1, factionId: "cultivators", resources: { steel: 0, oil: 0 },
+    selection: [{ id: 1, owner: 1, kind, escapeTreasure,
+      abilities: [{ ability: ABILITY.ESCAPE_TREASURE, autocastEnabled: auto }] },
+    { id: 2, owner: 1, kind }],
+    groupCooldownClocks: () => [], playerHasCompleteKind: () => true,
+  });
+  const empty = build(false);
+  const filled = build(true);
+  assert.equal(empty.slots[9] ?? null, null);
+  assert.notEqual(empty.signature, filled.signature);
+  const slot = filled.slots[9];
+  assert.equal(slot.hotkey, "R");
+  assert.equal(slot.label, "Escape");
+  assert.equal(slot.enabled, true);
+  assert.deepEqual(slot.intent.readyIds, [1]);
+  assert.equal(slot.intent.targetMode, "self");
+  assert.equal(slot.cls, "autocast-enabled");
+  assert.equal(slot.contextIntent.enabled, false);
+  assert.equal(build(true, false).slots[9].contextIntent.enabled, true);
+}

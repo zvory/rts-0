@@ -2913,3 +2913,12 @@ forked-spear War and broad-sleeve Magic designs. Runtime world scale is 1.2 time
 corresponding Adept; Master source crowns/torsos are normalized before that multiplier.
 Portraits, selection groups, minimap frames and labels use the matching Master rank.
 Masters have no further insight meter. See [Master review spec](dao-masters.md).
+
+### Cultivator item slot
+
+Cultivator unit command cards reserve the fourth-column R slot (logical slot 9) for a single
+carried item, including Serfs. Empty inventories leave it blank. Escape Treasure shows Escape
+with a purple autocast border by default; R activates immediately, and right-click/Alt+R toggles
+lethal-damage autocast. The carried-item command has its own hotkey identity,
+`cultivators.item.escape`, separate from the Shop purchase. The unit badge is centered and twice
+the HP-fill height in both dimensions. See [Shop rules](shop.md) for consumption and rescue behavior.
