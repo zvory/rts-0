@@ -566,18 +566,22 @@ mod performance_summary_tests {
             "workerPresentedCount": 3500, "workerCountersValid": true,
             "visibleThroughout": true, "focusedThroughout": false,
             "workerRollingUpdate": { "samples": 2048, "maxMs": 35, "p95Ms": 8 }
-        })).expect("fixed summary payload");
+        }))
+        .expect("fixed summary payload");
         assert_eq!(summary.worker_presented_count, 3500);
         assert_eq!(summary.worker_rolling_update.samples, 2048);
         assert_eq!(summary.worker_rolling_update.p95_ms, 8);
         assert_eq!(summary.frames_over_100_ms, 0);
         assert!(!summary.focused_throughout);
-        let roundtrip: ClientPerformanceSummary = serde_json::from_str(
-            &serde_json::to_string(&summary).expect("serialize summary")
-        ).expect("deserialize summary");
+        let roundtrip: ClientPerformanceSummary =
+            serde_json::from_str(&serde_json::to_string(&summary).expect("serialize summary"))
+                .expect("deserialize summary");
         assert_eq!(roundtrip, summary);
-        assert!(serde_json::from_value::<ClientPerformanceSummary>(serde_json::json!({
-            "workerRollingUpdate": { "maxMs": 65536 }
-        })).is_err());
+        assert!(
+            serde_json::from_value::<ClientPerformanceSummary>(serde_json::json!({
+                "workerRollingUpdate": { "maxMs": 65536 }
+            }))
+            .is_err()
+        );
     }
 }

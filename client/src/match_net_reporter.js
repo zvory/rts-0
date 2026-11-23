@@ -139,7 +139,9 @@ export class MatchNetReporter {
     };
     const worker = this.currentRenderWorkerStats || {};
     const presented = clampU32(worker.presented);
-    if (presented < this.lastPerformancePresented) this.performanceCounterReset = true;
+    if (worker.statsEpoch !== this.performanceStatsEpoch || presented < this.lastPerformancePresented) {
+      this.performanceCounterReset = true;
+    }
     this.lastPerformancePresented = presented;
     const summaryElapsedMs = performance.now() - this.performanceStartedAt;
     report.performanceSummary = this.performanceRecording && (summaryElapsedMs >= PERFORMANCE_SUMMARY_MS ||
@@ -157,7 +159,7 @@ export class MatchNetReporter {
       workerRollingDisplayAge: rollingTiming(worker.displayAgeMs),
     } : null;
     const accepted = this.net.netReport(report);
-    if (accepted !== false && report.performanceSummary) this.resetPerformanceWindow(presented);
+    if (accepted !== false && report.performanceSummary) this.resetPerformanceWindow(worker);
     if (accepted !== false) this.renderWorkerBaseline = this.nextRenderWorkerBaseline;
     this.diagnostics?.count("client.send.netReport", {
       rttMs: report.rttMs,
@@ -196,8 +198,10 @@ export class MatchNetReporter {
     this.performanceRecording = false;
   }
 
-  resetPerformanceWindow(presented = clampU32(this.getRenderWorkerDiagnostics?.()?.presented)) {
+  resetPerformanceWindow(worker = this.getRenderWorkerDiagnostics?.() || {}) {
+    const presented = clampU32(worker.presented);
     this.performanceStartedAt = performance.now();
+    this.performanceStatsEpoch = worker.statsEpoch;
     this.performancePresentedBaseline = presented;
     this.lastPerformancePresented = presented;
     this.performanceCounterReset = false;

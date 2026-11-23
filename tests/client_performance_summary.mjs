@@ -6,6 +6,7 @@ const previous = Object.fromEntries(["window", "document", "performance", "__RTS
 let now = 0;
 let accept = true;
 let presented = 5;
+let statsEpoch = 0;
 const reports = [];
 const listeners = new Map();
 const listen = (name, fn) => listeners.set(name, fn);
@@ -20,7 +21,7 @@ try {
     net: { netReport: (report) => { reports.push(report); return accept; } },
     health,
     snapshotProcessingReport: { reset() {}, snapshotApplySummary: () => ({}), predictionApplySummary: () => ({}) },
-    getRenderWorkerDiagnostics: () => ({ presented, workerUpdateMs: { samples: 2048, max: 45.2, p95: 8.3 } }),
+    getRenderWorkerDiagnostics: () => ({ presented, statsEpoch, workerUpdateMs: { samples: 2048, max: 45.2, p95: 8.3 } }),
   });
   reporter.startNetReports();
   for (const gap of [16, 16, 40, 60, 120]) health.noteFrameGap(gap, now += gap);
@@ -64,9 +65,22 @@ try {
   assert.equal(health.performanceWindow.frameCount, 0);
   assert.equal(reporter.visibleThroughout, true);
   assert.equal(reporter.focusedThroughout, true);
-  health.noteFrameGap(20, 62000);
-  presented = 10; // host diagnostic reset: never report a misleading negative delta
   now = 62000;
+  presented = 110;
+  statsEpoch += 1; // reset and catch up between polls: a monotonic count alone cannot detect it
+  health.noteFrameGap(20, now);
+  reporter.sendNetReport({ final: true });
+  assert.equal(reports.at(-1).performanceSummary.workerCountersValid, false,
+    "diagnostic epoch detects resets even when the counter has caught up");
+  now = 63000;
+  presented = 120;
+  health.noteFrameGap(20, now);
+  reporter.sendNetReport({ final: true });
+  assert.equal(reports.at(-1).performanceSummary.workerCountersValid, true,
+    "accepted summary starts a valid window in the new epoch");
+  health.noteFrameGap(20, 64000);
+  presented = 10; // host diagnostic reset: never report a misleading negative delta
+  now = 64000;
   reporter.sendNetReport({ final: true });
   assert.equal(reports.at(-1).performanceSummary.workerCountersValid, false);
   assert.equal(reports.at(-1).performanceSummary.elapsedMs, 1000);
