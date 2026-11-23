@@ -61,7 +61,8 @@ pub struct Entity {
     pub dao_advance_ticks: u16,
     #[serde(default)]
     pub(crate) shield: Option<DiscipleShield>,
-    #[serde(default)]
+    // Omit unused protection to preserve established end-state fingerprint known answers.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) escape_treasure: Option<u32>,
     pub hp: u32,
     /// Full health ceiling. Construction earns current HP over time; damage never lowers this value.
