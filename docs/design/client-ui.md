@@ -2707,13 +2707,16 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   supported unified terrain/unit shadows still composite on the decal layer above it. No lighting
   texture is allocated for flat maps. The ratio field approximates the prior terrain's additive
   altitude tint on the new grass palette and is rebuilt when editor terrain or sun changes.
-- Lab-only `shoreline-study-1` through `shoreline-study-3` compare corner-mask autotiling,
-  noisy material splatting, and signed-distance swash. The bounded `shorelineTechnique` visual
-  profile field crosses the detached worker presentation adapter; it never changes terrain codes,
-  pathing, or fog authority. The overlay sits above grass/water and below world objects/fog, uses
-  the submitted presentation clock, and releases its owned mesh, shader, and distance texture
-  on profile removal, map replacement, and teardown. A two-sided distance field is generated only
-  on map/profile changes; all three alternatives remain opt-in Lab studies pending visual selection.
+- Animated distance-field swash (`renderer/shoreline.js`, `shoreline_swash.js`) is the shared
+  match/replay/spectator/Map Editor shoreline default: textured sand, a damp bank, and broken
+  shore-following wavelets. An early signed-distance rejection skips procedural noise outside a
+  conservative -40px/+32px band; uniform land/water maps allocate no field or GPU resources.
+  The original full-map geometry, field resolution, and animation cadence remain unchanged;
+  preserving geometry avoids interpolation rounding changes at fractional zooms. The overlay
+  stays above grass/water and below world objects/fog, including after async water loading. Map
+  edits/replacement and teardown invalidate/free its mesh, shader, and distance texture.
+  `shoreline-study-1` through `shoreline-study-3` remain Lab alternatives via the bounded
+  `shorelineTechnique` visual profile field. This never changes terrain codes, pathing, or fog.
 - Lab-only `grass-survey-1` through `grass-survey-11` profiles can override this renderer default
   through the bounded `grassTechnique` selector. Profiles 6–8 remain dense-carpet alternatives;
   9–11 retain profile 5 blade/gust/shade parameters over static mottled, brushed, or earthy ground.
