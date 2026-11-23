@@ -16,7 +16,7 @@ use objective::Objective;
 pub(crate) use production::uses_panzerfaust_production;
 
 type Point = (f32, f32);
-const STAGING_DISTANCE_TILES: f32 = 35.0;
+const STAGING_DISTANCE_TILES: f32 = 45.0;
 const TANK_REAR_OFFSET_TILES: f32 = 3.0;
 const FIRST_WAVE_RESEARCH_PROGRESS: f32 = 0.9;
 const SLOT_SPACING_TILES: f32 = 1.5;

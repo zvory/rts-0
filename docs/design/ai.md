@@ -268,7 +268,8 @@ response until that timeout; the controller shares a value budget across simulta
 
 `server/crates/ai/src/pressure.rs` intentionally copies Rush's terrain route, stable-slot, arrival,
 and cohort policy instead of calling Rush code. Its constants and persistent state are independent.
-Before 4:00 the line sits 35 tiles outside the enemy start, perpendicular to the routed approach.
+Before 4:00 the line sits 45 tiles outside the enemy start, perpendicular to the routed approach.
+This keeps the opening assembly ten tiles farther from the enemy main, toward Pressure’s own main.
 At 4:00 it moves to 25 tiles from the opponent's geographically ranked second base, toward
 Pressure's original main. It is perpendicular to the straight main-to-target axis. At 8:00 it
 moves to the opponent's third base with the same 25-tile distance and perpendicular geometry.
