@@ -43,8 +43,9 @@ Absent/revealed-only entities never connect motion across fog gaps; jumps over 9
 contact. This is presentation filtering, not a substitute for durable server fog authority.
 
 `node scripts/bench-grass-matting.mjs` measures CPU field updates only: 600 frames, first 100
-excluded, 128×128 tiles, 75% infantry / 25% tanks moving 2.1 pixels per update. Initial local
-results: 100 units median 0.120 ms / p95 0.443 ms; 1,000 units median 1.373 ms / p95 2.523 ms.
+excluded, 128×128 tiles, 75% infantry / 25% tanks moving 2.1 pixels per update and reversing
+before map edges so all contacts remain on-map. Corrected local results: 100 units median
+0.098 ms / p95 0.130 ms; 1,000 units median 1.009 ms / p95 1.225 ms.
 These are Node microbenchmarks on this machine, not browser frame-time or GPU claims.
 They exclude texture uploads, canvas copies, shader cost, simulation, and replay switching.
 
