@@ -378,11 +378,13 @@ impl AbilityRuntime {
 
     pub(crate) fn magic_anchor_movement_multiplier(
         &self,
-        x: f32,
-        y: f32,
+        owner: u32,
+        teams: &TeamRelations,
+        position: (f32, f32),
         move_dir: (f32, f32),
         tick: u32,
     ) -> f32 {
+        let (x, y) = position;
         if !x.is_finite() || !y.is_finite() {
             return 1.0;
         }
@@ -393,7 +395,8 @@ impl AbilityRuntime {
         let move_dir = (move_dir.0 / move_len, move_dir.1 / move_len);
         self.world_objects()
             .filter(|object| {
-                object.kind == AbilityWorldObjectKind::MagicAnchor
+                teams.is_enemy_owner(owner, object.owner)
+                    && object.kind == AbilityWorldObjectKind::MagicAnchor
                     && object.active_at(tick)
                     && matches!(object.payload, AbilityObjectPayload::MagicAnchor { .. })
             })
@@ -427,6 +430,8 @@ impl AbilityRuntime {
 
     pub(crate) fn magic_anchor_stationary_pull(
         &self,
+        owner: u32,
+        teams: &TeamRelations,
         x: f32,
         y: f32,
         tick: u32,
@@ -436,7 +441,8 @@ impl AbilityRuntime {
         }
         self.world_objects()
             .filter(|object| {
-                object.kind == AbilityWorldObjectKind::MagicAnchor
+                teams.is_enemy_owner(owner, object.owner)
+                    && object.kind == AbilityWorldObjectKind::MagicAnchor
                     && object.active_at(tick)
                     && matches!(object.payload, AbilityObjectPayload::MagicAnchor { .. })
             })

@@ -791,8 +791,8 @@ fn ekat_magic_anchor_is_not_attackable_by_enemy_weapons() {
 
 #[test]
 fn ekat_magic_anchor_pull_field_slows_away_and_boosts_toward_movement() {
-    let away_delta = ekat_anchor_move_delta(-6.0);
-    let toward_delta = ekat_anchor_move_delta(14.0);
+    let away_delta = ekat_anchor_move_delta(-6.0, 2);
+    let toward_delta = ekat_anchor_move_delta(14.0, 2);
 
     assert!(
         away_delta < config::unit_stats(EntityKind::Ekat).unwrap().speed,
@@ -809,9 +809,28 @@ fn ekat_magic_anchor_pull_field_slows_away_and_boosts_toward_movement() {
 }
 
 #[test]
+fn ekat_magic_anchor_leaves_owned_and_allied_movement_unchanged() {
+    let speed = config::unit_stats(EntityKind::Ekat).unwrap().speed;
+    for owner in [1, 3] {
+        for destination in [-6.0, 14.0] {
+            let delta = ekat_anchor_move_delta(destination, owner);
+            assert!(
+                (delta - speed).abs() < 0.01,
+                "owner={owner}, destination={destination}, delta={delta}"
+            );
+        }
+    }
+}
+
+#[test]
 fn ekat_magic_anchor_pulls_stationary_units_with_weight_resistance() {
     let players = [
         ekat_player(),
+        PlayerInit {
+            id: 3,
+            team_id: 1,
+            ..kriegsia_enemy()
+        },
         PlayerInit {
             id: 2,
             team_id: 2,
@@ -842,9 +861,24 @@ fn ekat_magic_anchor_pulls_stationary_units_with_weight_resistance() {
         .spawn_unit(2, EntityKind::Tank, tank_start.0, tank_start.1)
         .expect("tank should spawn");
 
+    let friendly_start = game.state.map.tile_center(12, 8);
+    let ally_start = game.state.map.tile_center(14, 10);
+    let friendly = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Worker, friendly_start.0, friendly_start.1)
+        .unwrap();
+    let ally = game
+        .state
+        .entities
+        .spawn_unit(3, EntityKind::Worker, ally_start.0, ally_start.1)
+        .unwrap();
     enqueue_ekat_anchor(&mut game, hero, anchor_target);
     game.tick();
     game.tick();
+    assert_eq!(entity_distance_to(&game, friendly, friendly_start), 0.0);
+    assert_eq!(entity_distance_to(&game, ally, ally_start), 0.0);
+    assert_eq!(entity_distance_to(&game, hero, hero_pos), 0.0);
 
     let infantry_delta = entity_distance_to(&game, infantry, infantry_start);
     let tank_delta = entity_distance_to(&game, tank, tank_start);
@@ -863,8 +897,13 @@ fn ekat_magic_anchor_pulls_stationary_units_with_weight_resistance() {
     );
 }
 
-fn ekat_anchor_move_delta(destination_tiles_from_start: f32) -> f32 {
-    let players = [ekat_player()];
+fn ekat_anchor_move_delta(destination_tiles_from_start: f32, owner: u32) -> f32 {
+    let ally = PlayerInit {
+        id: 3,
+        team_id: 1,
+        ..kriegsia_enemy()
+    };
+    let players = [ekat_player(), kriegsia_enemy(), ally];
     let mut game = empty_flat_game(&players);
     let start = game.state.map.tile_center(10, 10);
     let anchor_target = game.state.map.tile_center(12, 10);
@@ -875,13 +914,23 @@ fn ekat_anchor_move_delta(destination_tiles_from_start: f32) -> f32 {
     let hero = game
         .state
         .entities
-        .spawn_unit(1, EntityKind::Ekat, start.0, start.1)
+        .spawn_unit(owner, EntityKind::Ekat, start.0, start.1)
         .expect("hero should spawn");
 
-    enqueue_ekat_anchor(&mut game, hero, anchor_target);
+    let caster = game
+        .state
+        .entities
+        .spawn_unit(
+            1,
+            EntityKind::Ekat,
+            anchor_target.0,
+            anchor_target.1 + 4.0 * config::TILE_SIZE as f32,
+        )
+        .unwrap();
+    enqueue_ekat_anchor(&mut game, caster, anchor_target);
     game.tick();
     game.enqueue(
-        1,
+        owner,
         Command::Move {
             units: vec![hero],
             x: destination.0,
@@ -906,7 +955,8 @@ fn ekat_magic_anchor_projection_respects_fog_and_owner_lockout() {
         .entities
         .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
         .expect("hero should spawn");
-    game.state
+    let spotter = game
+        .state
         .entities
         .spawn_unit(2, EntityKind::Worker, target.0 + 500.0, target.1 + 500.0)
         .expect("enemy should spawn");
@@ -937,6 +987,32 @@ fn ekat_magic_anchor_projection_respects_fog_and_owner_lockout() {
         .ability_objects
         .iter()
         .any(|object| object.id == anchor_id));
+
+    game.state
+        .entities
+        .get_mut(spotter)
+        .unwrap()
+        .set_position(target.0, target.1);
+    refresh_visibility(&mut game);
+    let enemy_snapshot = game.snapshot_for(2);
+    let enemy_anchor = enemy_snapshot
+        .ability_objects
+        .iter()
+        .find(|object| object.id == anchor_id)
+        .expect("visible enemy anchor projects");
+    let owner_anchor = owner_snapshot
+        .ability_objects
+        .iter()
+        .find(|object| object.id == anchor_id)
+        .unwrap();
+    assert_eq!(
+        (enemy_anchor.x, enemy_anchor.y, enemy_anchor.expires_in),
+        (owner_anchor.x, owner_anchor.y, owner_anchor.expires_in)
+    );
+    assert!(
+        enemy_anchor.owner_state.is_none(),
+        "public effects need no private owner state"
+    );
 
     let lockout_until = game.current_tick().saturating_add(100);
     game.state

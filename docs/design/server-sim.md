@@ -1382,7 +1382,7 @@ projectile without resolving further hits.
 
 Ekat's `ekatMagicAnchor` world-point activation places one replacement-style, non-blocking,
 non-attackable runtime object at the target point. It naturally expires after 10 seconds. While
-active, it creates a 3-tile pull field: units moving away from the anchor are slowed, units moving
+active, it creates a 3-tile pull field affecting only enemy units (owned, allied, and neutral units are unaffected): units moving away from the anchor are slowed, units moving
 toward it are boosted, and stationary units are pulled toward it. Pull strength increases closer to
 the anchor, and stationary pull is reduced by the same footing resistance used by collision so
 braced and heavy units move less than soft infantry. If an active anchor exists when `ekatLineShot`
@@ -2199,7 +2199,7 @@ Permanent Dao identity is derived from kind; the engine stores no separate mutab
 `dao` (slot 46: lightness/war/magic). Evolution buttons set replaceable, entity-owned `chosenDao` intent (team-private compact slot 49), independent of orders. Codes 14–16 and order stages 22–24 retain their positions.
 Evolution automatically occurs once 60 insight is ready, without research or a Pavilion.
 Evolution clears all insight and raises the cap to 200. Evolved Disciples continue earning
-insight from actual hostile HP damage; reaching 200 automatically advances a living Adept
+insight from actual hostile HP damage except Throw Sword hits; reaching 200 automatically advances a living Adept
 to its matching [Master](dao-masters.md), resets insight and fully heals. Public
 `daoMaster` (compact slot 52) persists alongside the authoritative Adept kind. Research ids are
 `dao_of_lightness`, `dao_of_heaviness` (War), `dao_of_magic` (Magic).

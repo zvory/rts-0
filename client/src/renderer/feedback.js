@@ -2,6 +2,7 @@ import { drawEscapeTrails } from "./escape_trail.js";
 import { gfxNoFill, gfxCircle, gfxEllipse, gfxPoly, gfxRect, gfxRoundRect, gfxStrokeLine, gfxStrokePaths, gfxReset, gfxFill, gfxStroke } from "./native_graphics.js";
 import {
   COLORS,
+  EKAT_MAGIC_ANCHOR_RADIUS_TILES,
   DISCIPLE_SHIELD_CAPACITY,
   DISCIPLE_SHIELD_DURATION_TICKS,
   STATS,
@@ -504,7 +505,7 @@ export function _drawAbilityObjects(state) {
     if (object.kind === ABILITY_OBJECT_KIND.RETURN_MARKER) {
       drawReturnMarker(g, object.x, object.y, 13, ABILITY_RETURN_MARKER_COLOR, 0.82);
     } else if (object.kind === ABILITY_OBJECT_KIND.MAGIC_ANCHOR) {
-      drawMagicAnchor(g, object, Math.max(10, object.ownerState?.radius || ts * 0.38));
+      drawMagicAnchor(g, object, Math.max(10, object.ownerState?.radius || ts * EKAT_MAGIC_ANCHOR_RADIUS_TILES));
     } else if (object.kind === ABILITY_OBJECT_KIND.SHIELD) {
       const radius = ts * 3;
       const phase = (this._renderClock?.now?.() ?? performance.now()) / 350;

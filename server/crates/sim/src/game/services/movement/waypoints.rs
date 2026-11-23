@@ -11,6 +11,7 @@ use crate::game::services::geometry::{
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::standability as static_standability;
+use crate::game::teams::TeamRelations;
 use crate::game::upgrade::UpgradeKind;
 use crate::game::PlayerState;
 use crate::rules::terrain::{movement_speed_multiplier, TerrainKind};
@@ -55,6 +56,7 @@ pub(super) fn advance_moving_units(
     tick: u32,
     ability_runtime: &AbilityRuntime,
 ) {
+    let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
     let wire_tiles = super::barbed_wire::tiles(map, entities);
     for id in entities.ids() {
         let barrage_target = entities.get(id).and_then(barrage_maneuver_target);
@@ -188,11 +190,18 @@ pub(super) fn advance_moving_units(
                     }
             })
             .unwrap_or(0.0);
-        let directional_speed = |(wx, wy): (f32, f32)| {
-            speed
-                * map.elevation_movement_multiplier_at(x, y, (wx - x, wy - y))
-                * ability_runtime.magic_anchor_movement_multiplier(x, y, (wx - x, wy - y), tick)
+        let directional_multiplier = |direction| {
+            map.elevation_movement_multiplier_at(x, y, direction)
+                * ability_runtime.magic_anchor_movement_multiplier(
+                    owner,
+                    &teams,
+                    (x, y),
+                    direction,
+                    tick,
+                )
         };
+        let directional_speed =
+            |(wx, wy): (f32, f32)| speed * directional_multiplier((wx - x, wy - y));
 
         let uses_vehicle_movement = uses_oriented_vehicle_body(kind);
         let is_pivot_vehicle = uses_pivot_vehicle_movement(kind);
@@ -274,11 +283,7 @@ pub(super) fn advance_moving_units(
                         (x, y),
                         budget,
                         target,
-                        |direction| {
-                            map.elevation_movement_multiplier_at(x, y, direction)
-                                * ability_runtime
-                                    .magic_anchor_movement_multiplier(x, y, direction, tick)
-                        },
+                        directional_multiplier,
                     )
                 } else {
                     plan_scout_car_motion(

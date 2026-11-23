@@ -2345,7 +2345,8 @@ Ability object rendering (`renderer/feedback.js`, `_drawAbilityObjects`; drawn o
 overlay container as smoke clouds, below selection rings and HP bars):
 - Each frame, iterates `state.abilityObjects` (the latest snapshot's fog-filtered object list).
 - Return markers draw as small blue ground marks; Magic Anchors draw as persistent diamond-shaped
-  ground objects; line-projectile/debug objects draw as small red circles when projected.
+  ground objects with the full configured radius, circles, and particles for every viewer who can see
+  the anchor, including enemies without owner-only state; line-projectile/debug objects draw as small red circles when projected.
 - Ability objects are never routed through entity selection, minimap blips, HUD command-card state,
   or local prediction. They disappear when absent from the next authoritative snapshot.
 
