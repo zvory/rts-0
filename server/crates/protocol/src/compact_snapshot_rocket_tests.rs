@@ -119,7 +119,7 @@ fn dao_master_rank_is_public_without_private_insight() {
 }
 
 #[test]
-fn escape_treasure_is_public_and_omitted_when_absent() {
+fn escape_treasure_flag_is_omitted_when_absent() {
     let mut unit = EntityView::new(1, 1, "warrior", 320.0, 320.0, 75, 150, "idle");
     assert!(serde_json::to_value(&unit)
         .unwrap()
