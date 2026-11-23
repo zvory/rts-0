@@ -39,7 +39,7 @@ pub(in crate::game) fn enqueue(
 
 /// Called only after the shared entry flow validates ownership, unit eligibility and perimeter.
 pub(super) fn admit(entities: &mut EntityStore, building: u32, unit: u32) {
-    // The entrant's existing two supply becomes the paid replacement's reservation. The
+    // The shared entry flow reserves the Adept's extra supply before admission. The
     // authoritative supply pass rebuilds it from this item; there is no free-supply window.
     entities.remove(unit);
     if let Some(p) = entities

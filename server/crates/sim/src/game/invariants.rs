@@ -114,7 +114,8 @@ impl Game {
                 if e.is_building() && !e.under_construction() {
                     for item in e.prod_queue().iter().filter(|item| item.paid) {
                         if catalog.is_some_and(|catalog| catalog.allows_unit(item.unit)) {
-                            expected_used += rules::economy::supply_cost(item.unit);
+                            expected_used +=
+                                rules::economy::production_supply_cost(e.kind, item.unit);
                         }
                     }
                 } else if e.is_unit() && catalog.is_some_and(|catalog| catalog.allows_unit(e.kind))

@@ -15,7 +15,7 @@ pub(crate) fn recompute_supply(players: &mut [PlayerState], entities: &EntitySto
                 // Only paid production items reserve supply; manual waiting entries do not.
                 for item in e.prod_queue().iter().filter(|item| item.paid) {
                     if catalog.is_some_and(|catalog| catalog.allows_unit(item.unit)) {
-                        used += rules::economy::supply_cost(item.unit);
+                        used += rules::economy::production_supply_cost(e.kind, item.unit);
                     }
                 }
             } else if e.is_unit() && catalog.is_some_and(|catalog| catalog.allows_unit(e.kind)) {
