@@ -2144,4 +2144,4 @@ carriers in `units` manually consumes their item and returns them to the supplyi
 preserving current HP. With `targetId`, it retains the Shop purchase behavior. Neither form
 is queueable. `setAutocast` for `escapeTreasure` toggles lethal-damage rescue on owned carriers.
 Private carrier `abilities` includes `escapeTreasure`, `remainingUses: 1`, and
-`autocastEnabled` while the item exists; public `escapeTreasure` remains the visibility-gated badge.
+`autocastEnabled` while the item exists; team-private `escapeTreasure` remains the badge flag.
