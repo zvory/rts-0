@@ -3,11 +3,10 @@
 ## Phase 0: building brief — complete
 
 The user approved the gourd Shop concept and explicitly authorized implementation. The Shop is
-an inert Cultivator building for now: it has no goods, production, research, abilities,
-aura, resource storage, supply, attack, or rally point. Its future purpose is deferred. Building it
-currently trades resources and space for a structure; opponents can attack and destroy it.
+a Cultivator building selling targeted goods as specified below. It has no production, research,
+aura, resource storage, supply, attack, or rally point. Opponents can attack and destroy it.
 
-UI description: “A sturdy gourd-shaped shop. No goods or services are available yet.”
+UI description describes the Shop’s healing potions and escape treasures.
 
 Approved art: the upper part of a giant gourd recently driven into the earth, surrounded by
 fractured rocks. A covered open service window has no door. The side bears 愛 (love). The cork,
@@ -29,8 +28,8 @@ deep, no functionality. The Shop has **200 HP** per the latest balance request.
   cleanup, fog filtering, remembered-building rendering, checkpoint and replay rules apply.
   No capture, upgrade, transform, special death effect or special repair rule.
 - Ordinary construction/damage/destruction presentation and generic audio apply. Bespoke animation,
-  audio, autonomous AI construction and all shop interactions are deferred.
-- Wire kind `shop`, compact kind code 34. No new snapshot fields, commands or durable state.
+  audio and autonomous AI construction are deferred. Targeted shop interactions are specified below.
+- Wire kind `shop`, compact kind code 34. Goods extend generic ability targeting and visible unit state.
 
 ## Delivery checklist
 
@@ -40,3 +39,24 @@ deep, no functionality. The Shop has **200 HP** per the latest balance request.
 - [x] In-game appearance checked with the actual Shop kind.
 
 Focused checks and the owned PR record the final verification and merge outcome.
+
+## Targeted goods
+
+Completed Shops sell Healing Potion for **50 oil** and Escape Treasure for **100 oil**.
+Select the Shop, click an item, then click a living friendly unit (including allied units).
+Buildings and enemies are invalid targets. Purchases require the target to be visible and within
+**30 tiles** of the supplying Shop at purchase time. Invalid purchases spend nothing.
+Both items travel directly from the Shop toward the target at **10 tiles per second**;
+green circles represent healing potions and purple circles represent escape treasures.
+The server owns delivery and effects; the client renders fog-filtered projectile positions.
+
+Healing Potion restores the target to full HP on arrival. This follows the user's final
+“heals the unit fully” instruction, superseding the earlier 75 HP description.
+Escape Treasure grants one lethal-damage escape, returning the unit to its supplying Shop
+with **1 HP**, regardless of the unit's distance when it takes damage. The applied effect is
+shown as a purple square with a white **E**, placed above the health bar's normal location;
+both dimensions equal the health bar height, even when health bars are hidden.
+
+A destroyed supplying Shop cancels in-flight goods and removes its applied escape protection.
+Repeated escape purchases do not stack. Delivery tracks a moving target directly; disappearing or
+dead targets cancel delivery. Oil is paid at launch, with no refund for interrupted delivery.

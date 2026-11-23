@@ -355,14 +355,12 @@ pub struct AvailableMap {
     pub min_players: u32,
     pub max_players: u32,
 }
-
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum LobbyKind {
     Normal,
     Replay,
 }
-
 /// Original replay seat announced when a practice branch room is created.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]

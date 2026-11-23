@@ -878,7 +878,7 @@ See [Proving Grounds brief and rules](proven-grounds.md) for details and deferre
 
 ## Cultivator Shop
 
-Cultivator Serfs can construct the inert Shop for **200 steel and 200 oil** in **1,200 ticks
+Cultivator Serfs can construct the Shop for **200 steel and 200 oil** in **1,200 ticks
 (40 seconds)**. It has **200 HP**, armored status, a **3×4** footprint and one-tile sight.
 No prerequisites, attack, production, research, abilities, supply or rally point. Normal building
 placement, cancellation, damage, fog and destruction apply. See [Shop](shop.md) for the brief.
@@ -890,3 +890,9 @@ heals. Relative to that path’s Adept, size/collision ×1.2, movement ×1.1, or
 attack damage ×1.2 (nearest integer), maximum HP ×1.4. No resource or supply cost,
 research, ability change or attack-rate change; no repeat advancement. Master HP is
 161 (Lightness/Magic) or 189 (War). See [Master rules and review](dao-masters.md).
+
+### Shop goods
+
+Completed Shops offer Healing Potion (50 oil, full heal on delivery) and Escape Treasure
+(100 oil, one lethal-damage escape to the supplying Shop at 1 HP). Both target visible friendly
+units within 30 tiles and travel at 10 tiles/second. See [Shop](shop.md#targeted-goods).

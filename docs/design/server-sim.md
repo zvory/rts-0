@@ -2246,3 +2246,9 @@ spawn. It is validated against the unit/building catalog before mutation and ret
 by timeline/replay operations. Public snapshot `playerFactions` rows include every seat independently of private resource
 projection, so rendering, HUD and command admission share authoritative faction identity
 even when observing another team.
+
+### Shop goods
+
+Shop item purchases use generic unit-targeted abilities and durable simulation state. Deliveries
+and applied escape protection are checkpointed for deterministic replay and Lab continuation.
+See [Shop](shop.md#targeted-goods) for costs, delivery, targeting, and lethal-damage behavior.

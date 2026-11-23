@@ -117,3 +117,16 @@ fn dao_master_rank_is_public_without_private_insight() {
     assert_eq!(value[52], true);
     assert_eq!(serde_json::to_value(&unit).unwrap()["daoMaster"], true);
 }
+
+#[test]
+fn escape_treasure_is_public_and_omitted_when_absent() {
+    let mut unit = EntityView::new(1, 1, "warrior", 320.0, 320.0, 75, 150, "idle");
+    assert!(serde_json::to_value(&unit).unwrap().get("escapeTreasure").is_none());
+    assert_eq!(serde_json::to_value(CompactEntity(&unit)).unwrap().as_array().unwrap().len(), 8);
+    unit.escape_treasure = true;
+    let compact = serde_json::to_value(CompactEntity(&unit)).unwrap();
+    assert_eq!(compact.as_array().unwrap().len(), 54);
+    assert_eq!(compact[53], true);
+    assert!(compact[52].is_null());
+    assert_eq!(serde_json::to_value(&unit).unwrap()["escapeTreasure"], true);
+}

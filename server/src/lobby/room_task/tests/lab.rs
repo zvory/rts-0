@@ -609,6 +609,7 @@ fn issue_lab_mortar_fire(
         LabClientOp::IssueCommandAs {
             player_id,
             cmd: Command::UseAbility {
+                target_id: None,
                 ability: "mortarFire".to_string(),
                 units: vec![mortar_id],
                 x: Some(target.0),

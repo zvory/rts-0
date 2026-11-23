@@ -308,6 +308,7 @@ fn command_trace_label(command: &Command) -> String {
             format!("tear_down_anti_tank_guns units={}", id_list(units))
         }
         Command::UseAbility {
+            target_id: _,
             units,
             ability,
             x,

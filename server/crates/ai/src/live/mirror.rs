@@ -269,6 +269,7 @@ impl MirrorFrame {
                 }
             }
             SimCommand::UseAbility {
+                target_id,
                 ability,
                 units,
                 x: Some(x),
@@ -277,6 +278,7 @@ impl MirrorFrame {
             } => {
                 let (x, y) = point(x, y);
                 SimCommand::UseAbility {
+                target_id,
                     ability,
                     units,
                     x: Some(x),
