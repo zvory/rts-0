@@ -61,7 +61,7 @@ fn waves_wait_for_ninety_percent_then_require_five_arrivals_without_retasking_ol
     );
     let mut waves = PressureWaves::default();
     let rally = waves.rally(&frame, 2, target).unwrap();
-    assert!((distance(rally, target) / size - 35.0).abs() < 0.001);
+    assert!((distance(rally, target) / size - 45.0).abs() < 0.001);
     let specimen = snapshot
         .entities
         .iter()
@@ -199,7 +199,7 @@ fn route_and_staging_follow_the_passable_approach_around_a_wall() {
     assert!(path.iter().any(|point| point.1 >= 60.0 * 32.0));
     assert!(path.iter().all(|point| passable_world(&blocked, *point)));
     let line = StagingLine::on_route(&blocked, home, enemy).unwrap();
-    assert!((distance(line.center, enemy) / 32.0 - 35.0).abs() < 0.001);
+    assert!((distance(line.center, enemy) / 32.0 - 45.0).abs() < 0.001);
     assert!(
         line.center.1 > enemy.1 + 0.25 * 32.0,
         "staging must use the route around water, not the blocked base diagonal"
@@ -501,7 +501,7 @@ fn pressure_retargets_at_exact_four_and_eight_minute_boundaries_on_the_main_base
         assert_eq!(objective.phase, phase);
         assert_eq!(objective.target(), target);
         assert_eq!(objective.minimum_wave_size(), 5 << phase);
-        let radius = if phase == 0 { 35.0 } else { 25.0 };
+        let radius = if phase == 0 { 45.0 } else { 25.0 };
         assert!((distance(line.center, target) / size - radius).abs() < 0.001);
         if phase > 0 {
             let axis = (
