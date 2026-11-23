@@ -110,6 +110,7 @@ pub enum AbilityKind {
     ThrowSword,
     HealingPotion,
     EscapeTreasure,
+    LightnessDash,
 }
 
 impl AbilityKind {
@@ -134,6 +135,7 @@ impl AbilityKind {
         Self::ThrowSword,
         Self::HealingPotion,
         Self::EscapeTreasure,
+        Self::LightnessDash,
     ];
 
     pub const fn stable_id(self) -> &'static str {
@@ -158,7 +160,12 @@ impl AbilityKind {
             Self::ThrowSword => "throwSword",
             Self::HealingPotion => "healingPotion",
             Self::EscapeTreasure => "escapeTreasure",
+            Self::LightnessDash => "lightnessDash",
         }
+    }
+
+    pub const fn is_dash(self) -> bool {
+        matches!(self, Self::EkatTeleport | Self::LightnessDash)
     }
 
     pub const fn to_protocol_str(self) -> &'static str {
@@ -643,7 +650,7 @@ const EKAT_ABILITIES: [AbilityCatalogEntry; 4] = [
         icon: "DSH",
         hotkey: Some("D"),
         title: "Dash up to 5 tiles, then recast to return",
-        carriers: &[EntityKind::Ekat, EntityKind::LightnessAdept],
+        carriers: &[EntityKind::Ekat],
         target_mode: AbilityTargetMode::WorldPoint,
         range_tiles: Some(balance::EKAT_TELEPORT_RANGE_TILES as f32),
         min_range_tiles: None,
@@ -1043,11 +1050,12 @@ pub fn ability_definition(kind: AbilityKind) -> AbilityCatalogEntry {
         AbilityKind::ThrowSword => CULTIVATOR_ABILITIES[6],
         AbilityKind::HealingPotion => CULTIVATOR_ABILITIES[7],
         AbilityKind::EscapeTreasure => CULTIVATOR_ABILITIES[8],
+        AbilityKind::LightnessDash => CULTIVATOR_ABILITIES[3],
     }
 }
 
 pub fn ability_range_for_carrier(kind: AbilityKind, carrier: EntityKind) -> Option<f32> {
-    if kind == AbilityKind::EkatTeleport && carrier == EntityKind::LightnessAdept {
+    if kind == AbilityKind::LightnessDash && carrier == EntityKind::LightnessAdept {
         Some(balance::DAO_LIGHTNESS_DASH_RANGE_TILES as f32)
     } else {
         ability_definition(kind).range_tiles
@@ -1294,10 +1302,7 @@ mod tests {
         assert_eq!(charge.cooldown_ticks, balance::NOVICE_CHARGE_COOLDOWN_TICKS);
 
         let teleport = EKAT_CATALOG.ability(AbilityKind::EkatTeleport).unwrap();
-        assert_eq!(
-            teleport.carriers,
-            &[EntityKind::Ekat, EntityKind::LightnessAdept]
-        );
+        assert_eq!(teleport.carriers, &[EntityKind::Ekat]);
         assert_eq!(
             teleport.range_tiles,
             Some(balance::EKAT_TELEPORT_RANGE_TILES as f32)
@@ -1401,7 +1406,7 @@ mod tests {
         }
         assert!(catalog.allows_ability(AbilityKind::DiscipleShield, EntityKind::MagicAdept));
         assert!(catalog.allows_ability(AbilityKind::EkatMagicAnchor, EntityKind::MagicAdept));
-        assert!(catalog.allows_ability(AbilityKind::EkatTeleport, EntityKind::LightnessAdept));
+        assert!(catalog.allows_ability(AbilityKind::LightnessDash, EntityKind::LightnessAdept));
         assert!(catalog.allows_ability(AbilityKind::ThrowSword, EntityKind::WarAdept));
     }
 

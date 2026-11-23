@@ -93,7 +93,7 @@ impl Entity {
                 self.dao().is_none() && self.insight >= config::DISCIPLE_INSIGHT_REQUIRED
             }
             AbilityKind::ThrowSword => self.dao() == Some(UpgradeKind::DaoOfHeaviness),
-            AbilityKind::EkatTeleport => self.dao() == Some(UpgradeKind::DaoOfLightness),
+            AbilityKind::LightnessDash => self.dao() == Some(UpgradeKind::DaoOfLightness),
             AbilityKind::DiscipleShield | AbilityKind::EkatMagicAnchor => {
                 self.dao() == Some(UpgradeKind::DaoOfMagic)
             }
@@ -131,7 +131,7 @@ impl Entity {
         self.evolve_dao(ability);
     }
 
-    /// Second-rank advancement never changes path, orders, abilities or remaining reload.
+    /// Second-rank advancement preserves orders/reload and grants Lightness its extra charge.
     pub(in crate::game) fn advance_dao_master(&mut self) {
         if !self.kind.is_disciple()
             || self.hp == 0
@@ -141,7 +141,14 @@ impl Entity {
         {
             return;
         }
+        let dash_uses = self.ability_uses_remaining(AbilityKind::LightnessDash);
         self.dao_master = true;
+        if self.kind == EntityKind::LightnessAdept {
+            self.ability_uses_remaining.insert(
+                AbilityKind::LightnessDash,
+                dash_uses.unwrap_or(1).saturating_add(1),
+            );
+        }
         self.insight = 0;
         self.max_hp = ((self.max_hp as f32) * config::DAO_MASTER_HP_MULTIPLIER).round() as u32;
         self.hp = self.max_hp;

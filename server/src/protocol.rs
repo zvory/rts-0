@@ -127,3 +127,5 @@ mod tests {
 // or magic_adept (37). EntityView.dao is derived presentation metadata, not engine identity.
 
 // EntityView daoMaster: public Master rank at compact slot 52 (v65).
+
+// Lightness Dash uses lightnessDash (ability 21, order stage 29); no return marker.

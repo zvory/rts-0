@@ -122,6 +122,7 @@ pub mod abilities {
     pub const BREAKTHROUGH: &str = "breakthrough";
     pub const SCOUT_PLANE: &str = "scoutPlane";
     pub const DISMISS_SCOUT_PLANE: &str = "dismissScoutPlane";
+    pub const LIGHTNESS_DASH: &str = "lightnessDash";
     pub const EKAT_TELEPORT: &str = "ekatTeleport";
     pub const EKAT_LINE_SHOT: &str = "ekatLineShot";
     pub const EKAT_MAGIC_ANCHOR: &str = "ekatMagicAnchor";
@@ -144,6 +145,7 @@ pub mod abilities {
         BREAKTHROUGH,
         SCOUT_PLANE,
         DISMISS_SCOUT_PLANE,
+        LIGHTNESS_DASH,
         EKAT_TELEPORT,
         EKAT_LINE_SHOT,
         EKAT_MAGIC_ANCHOR,
@@ -236,7 +238,7 @@ pub mod notices {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 66;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 67;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -489,6 +491,7 @@ const ORDER_STAGE_CODES: &[(&str, u8)] = &[
     (abilities::MORTAR_FIRE, 9),
     (abilities::POINT_FIRE, 10),
     (abilities::BREAKTHROUGH, 11),
+    (abilities::LIGHTNESS_DASH, 29),
     (abilities::EKAT_TELEPORT, 12),
     (abilities::EKAT_LINE_SHOT, 13),
     (abilities::EKAT_MAGIC_ANCHOR, 14),
@@ -514,6 +517,7 @@ const ABILITY_CODES: &[(&str, u8)] = &[
     (abilities::MORTAR_FIRE, 3),
     (abilities::POINT_FIRE, 4),
     (abilities::BREAKTHROUGH, 5),
+    (abilities::LIGHTNESS_DASH, 21),
     (abilities::EKAT_TELEPORT, 6),
     (abilities::EKAT_LINE_SHOT, 7),
     (abilities::EKAT_MAGIC_ANCHOR, 8),
@@ -837,6 +841,7 @@ fn ability_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("BREAKTHROUGH", abilities::BREAKTHROUGH),
         ("SCOUT_PLANE", abilities::SCOUT_PLANE),
         ("DISMISS_SCOUT_PLANE", abilities::DISMISS_SCOUT_PLANE),
+        ("LIGHTNESS_DASH", abilities::LIGHTNESS_DASH),
         ("EKAT_TELEPORT", abilities::EKAT_TELEPORT),
         ("EKAT_LINE_SHOT", abilities::EKAT_LINE_SHOT),
         ("EKAT_MAGIC_ANCHOR", abilities::EKAT_MAGIC_ANCHOR),
@@ -934,6 +939,7 @@ fn order_stage_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("BREAKTHROUGH", abilities::BREAKTHROUGH),
         ("SCOUT_PLANE", abilities::SCOUT_PLANE),
         ("DISMISS_SCOUT_PLANE", abilities::DISMISS_SCOUT_PLANE),
+        ("LIGHTNESS_DASH", abilities::LIGHTNESS_DASH),
         ("EKAT_TELEPORT", abilities::EKAT_TELEPORT),
         ("EKAT_LINE_SHOT", abilities::EKAT_LINE_SHOT),
         ("EKAT_MAGIC_ANCHOR", abilities::EKAT_MAGIC_ANCHOR),

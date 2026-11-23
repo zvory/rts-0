@@ -69,7 +69,14 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 9] = [
     },
     AbilityCatalogEntry {
         range_tiles: Some(balance::DAO_LIGHTNESS_DASH_RANGE_TILES as f32),
-        title: "Dash up to 10 tiles, then recast to return",
+        kind: AbilityKind::LightnessDash,
+        carriers: &[EntityKind::LightnessAdept],
+        title: "Dash up to 10 tiles; one charge, two at Master rank; recharges every 8 seconds",
+        cooldown_ticks: 0,
+        charges: Some(1),
+        charge_recharge_ticks: Some(balance::EKAT_TELEPORT_COOLDOWN_TICKS),
+        protocol_code: 21,
+        order_stage_code: 29,
         ..EKAT_ABILITIES[0]
     },
     AbilityCatalogEntry {

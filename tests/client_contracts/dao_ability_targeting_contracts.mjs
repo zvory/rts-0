@@ -106,7 +106,7 @@ dashInput.state.selectedEntities = () => [ekatEntity, lightnessEntity];
 dashInput.state.abilityObjects = [];
 dashInput._refreshAbilityTargetPreview();
 const mixedDashPreview = dashInput.clientIntent.abilityTargetPreview;
-assertDeepEqual(mixedDashPreview.rangeOrigins.map((origin) => origin.rangePx), [160, 320],
+assertDeepEqual(mixedDashPreview.rangeOrigins.map((origin) => origin.rangePx), [160],
   "Mixed Dash selection preserves each carrier's authoritative range");
 const mixedDashGfx = new RecordingGraphics();
 _drawAbilityTargetPreview.call(
@@ -117,8 +117,13 @@ assert(mixedDashGfx.calls.some((call) => call[0] === "moveTo" && call[1] === 360
   "Ekat Dash ring starts five tiles from its origin");
 assert(!mixedDashGfx.calls.some((call) => call[0] === "moveTo" && call[1] === 520 && call[2] === 220),
   "Mixed selection does not expand Ekat's Dash ring to ten tiles");
-assert(mixedDashGfx.calls.some((call) => call[0] === "moveTo" && call[1] === 520 && call[2] === 1000),
-  "Lightness Dash ring starts ten tiles from its origin");
+assert(!mixedDashGfx.calls.some((call) => call[0] === "moveTo" && call[1] === 520 && call[2] === 1000),
+  "Kat Dash does not target Lightness units");
+
+dashInput.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.LIGHTNESS_DASH });
+dashInput._refreshAbilityTargetPreview();
+assertDeepEqual(dashInput.clientIntent.abilityTargetPreview.rangeOrigins.map((origin) => origin.rangePx), [320],
+  "Lightness Dash targets only Lightness units with ten-tile range");
 
 console.log("Dao ability targeting contracts passed");
 

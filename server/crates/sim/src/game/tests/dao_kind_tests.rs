@@ -6,7 +6,7 @@ fn dao_kinds_spawn_with_resolved_stats_and_serialize_without_mutable_dao() {
     for (kind, ability, hp, cooldown, range) in [
         (
             EntityKind::LightnessAdept,
-            AbilityKind::EkatTeleport,
+            AbilityKind::LightnessDash,
             115,
             43,
             0.75,

@@ -6,8 +6,8 @@ pub(super) fn validate(entity: &Entity) -> Result<(), CheckpointPayloadError> {
     for (&ability, &remaining) in &entity.ability_uses_remaining {
         let definition = crate::game::ability::definition(ability);
         if !definition.carriers.contains(&entity.kind)
-            || definition
-                .charges
+            || entity
+                .ability_max_charges(ability)
                 .is_none_or(|max_charges| remaining > max_charges)
         {
             return Err(CheckpointPayloadError::InvalidValue {
@@ -23,8 +23,8 @@ pub(super) fn validate(entity: &Entity) -> Result<(), CheckpointPayloadError> {
             || definition
                 .charge_recharge_ticks
                 .is_none_or(|recharge_ticks| ticks > recharge_ticks.saturating_add(1))
-            || definition
-                .charges
+            || entity
+                .ability_max_charges(ability)
                 .zip(remaining)
                 .is_none_or(|(max_charges, remaining)| remaining >= max_charges)
         {

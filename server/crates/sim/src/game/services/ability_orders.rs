@@ -276,6 +276,25 @@ pub(crate) fn launch_world_ability(
             );
             true
         }
+        (AbilityEffectHook::Dash, AbilityKind::LightnessDash) => {
+            let Some((blink_x, blink_y)) = hero_abilities::ekat_dash_destination(
+                map,
+                entities,
+                caster,
+                x,
+                y,
+                definition.range_tiles,
+            ) else {
+                return false;
+            };
+            let Some(e) = entities.get_mut(caster) else {
+                return false;
+            };
+            if !e.consume_ability_use(ability) {
+                return false;
+            }
+            hero_abilities::move_ekat_to(entities, caster, blink_x, blink_y)
+        }
         (AbilityEffectHook::DashReturn, AbilityKind::EkatTeleport) => {
             let Some((origin_x, origin_y)) = entities.get(caster).map(|e| (e.pos_x(), e.pos_y()))
             else {
@@ -453,7 +472,10 @@ pub(crate) fn launch_world_ability(
 fn ability_clamps_world_target(ability: AbilityKind) -> bool {
     matches!(
         ability,
-        AbilityKind::EkatTeleport | AbilityKind::EkatLineShot | AbilityKind::ThrowSword
+        AbilityKind::LightnessDash
+            | AbilityKind::EkatTeleport
+            | AbilityKind::EkatLineShot
+            | AbilityKind::ThrowSword
     )
 }
 

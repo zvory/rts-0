@@ -885,12 +885,21 @@ for (const researched of [false, true]) {
   assert.deepEqual(card.slots.slice(6).map((s) => s.hotkey), ["Z", "X", "C"]);
   assert(cardFor({ ...unit, insight: 60 }, { upgrades: [] }).slots.slice(6).every((s) => s.enabled));
   const light = cardFor({ ...unit, kind: KIND.LIGHTNESS_ADEPT, insight: 60, dao: "lightness" });
-  assert(light.slots.some((s) => s?.ability === ABILITY.EKAT_TELEPORT));
+  assert(light.slots.some((s) => s?.ability === ABILITY.LIGHTNESS_DASH));
+  for (const remainingUses of [0, 1, 2]) {
+    const master = cardFor({ ...unit, kind: KIND.LIGHTNESS_ADEPT, daoMaster: true,
+      abilities: [{ ability: ABILITY.LIGHTNESS_DASH, cooldownLeft: 0, remainingUses }] });
+    const dash = master.slots.find((slot) => slot?.ability === ABILITY.LIGHTNESS_DASH);
+    assert.equal(dash.countBadge, `${remainingUses}`);
+    assert.equal(dash.enabled, remainingUses > 0);
+    assert.equal(dash.intent.targetMode, "worldPoint");
+  }
+  assert(!light.slots.some((s) => s?.ability === ABILITY.EKAT_TELEPORT));
   assert(!light.slots.some((s) => s?.ability === ABILITY.EKAT_MAGIC_ANCHOR || s?.ability?.startsWith("evolve")));
   const magic = cardFor({ ...unit, kind: KIND.MAGIC_ADEPT, insight: 60, dao: "magic" });
   assert(magic.slots.some((s) => s?.ability === ABILITY.EKAT_MAGIC_ANCHOR && s.label === "Anchor"));
   assert(magic.slots.some((s) => s?.ability === ABILITY.DISCIPLE_SHIELD && s.enabled));
-  assert(!magic.slots.some((s) => s?.ability === ABILITY.EKAT_TELEPORT));
+  assert(!magic.slots.some((s) => s?.ability === ABILITY.LIGHTNESS_DASH));
 }
 
 {
