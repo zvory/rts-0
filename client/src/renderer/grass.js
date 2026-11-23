@@ -1,6 +1,7 @@
 import { createGrassGroundMaterial } from "./grass_ground.js";
 import { createGrassCarpetMaterial } from "./grass_carpet.js";
 import { createWorkerSafeCanvas } from "./raster_primitives.js";
+import { GrassMattingMask } from "./grass_matting.js";
 import { TERRAIN } from "../protocol.js";
 
 const VERTEX = `#version 300 es
@@ -16,7 +17,7 @@ void main(){
 }`;
 export const DEFAULT_GRASS_TECHNIQUE = 9;
 
-function grassFragment(groundTexture = false, terrainLighting = false) { return `#version 300 es
+function grassFragment(groundTexture = false, terrainLighting = false, matting = false) { return `#version 300 es
 precision highp float;
 in vec2 vWorld;
 out vec4 finalColor;
@@ -24,6 +25,7 @@ uniform float uTime;
 uniform float uStyle;
 uniform vec3 uTint;
 ${groundTexture ? "uniform sampler2D uGround;" : ""}
+${matting ? "uniform sampler2D uPressure; uniform vec2 uPressureWorldSize;" : ""}
 ${terrainLighting ? "uniform sampler2D uTerrainLight; uniform vec2 uMapWorldSize;" : ""}
 float hash(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
 float noise(vec2 p){
@@ -50,6 +52,14 @@ float blade(vec2 p, vec2 root, float h, float bend, float width){
  float center=root.x+bend*t*t;
  return (1.-smoothstep(width*(1.-t)+.1,width*(1.-t)+.65,abs(p.x-center)))
    *step(root.y-h,p.y)*step(p.y,root.y);
+}
+float pressedBlade(vec2 p, vec2 root, float h, float bend, float width, vec3 pressure){
+ if(pressure.r==0.)return blade(p,root,h,bend,width);
+ vec2 direction=pressure.gb*255.-128.;
+ direction=length(direction)>.01?normalize(direction):vec2(1.,0.);
+ vec2 tip=mix(vec2(bend,-h),direction*h*.95+vec2(0.,-h*.12),pressure.r);
+ float t=clamp(dot(p-root,tip)/max(dot(tip,tip),.01),0.,1.);
+ return 1.-smoothstep(width*(1.-t)+.1,width*(1.-t)+.65,length(p-root-tip*t));
 }
 void main(){
  // Quantization deliberately follows the chunky water artwork rather than subpixel sparkles.
@@ -81,9 +91,13 @@ void main(){
      // Low dark roots, then multiple tapered blades with different tips.
      float shadow=(1.-smoothstep(1.,5.,length((p-root-vec2(2,1))*vec2(.7,1.5))))*.25;
      color*=1.-shadow;
-     float mask=blade(p,root,h,bend,.8);
+     ${matting ? `vec3 pressure=texture(uPressure,root/uPressureWorldSize).rgb;
+     bend*=1.-pressure.r;
+     float mask=pressedBlade(p,root,h,bend,.8,pressure);
+     mask=max(mask,pressedBlade(p,root+vec2(-2,0),h*.72,bend-2.,.7,pressure));
+     mask=max(mask,pressedBlade(p,root+vec2(2,0),h*.85,bend+2.,.7,pressure));` : `float mask=blade(p,root,h,bend,.8);
      mask=max(mask,blade(p,root+vec2(-2,0),h*.72,bend-2.,.7));
-     mask=max(mask,blade(p,root+vec2(2,0),h*.85,bend+2.,.7));
+     mask=max(mask,blade(p,root+vec2(2,0),h*.85,bend+2.,.7));`}
      vec3 tip=mix(vec3(.34,.41,.19),vec3(.57,.59,.30),r*.6+(uStyle==5. || uStyle>=9. ? 0. : wave*.15)+.15);
      if(uStyle==4.)tip=mix(vec3(.46,.44,.22),vec3(.68,.61,.36),r);
      color=mix(color,tip,mask*.9);
@@ -123,7 +137,7 @@ export class GrassLayer {
     };
     this.geometry = new pixi.Geometry({ attributes: { aPosition: { buffer: new Float32Array(positions), format: "float32x2" } } });
     this.material = technique >= 9
-      ? createGrassGroundMaterial(pixi, technique)
+      ? createGrassGroundMaterial(pixi, technique === 12 ? 9 : technique)
       : technique >= 6 ? createGrassCarpetMaterial(pixi, technique) : null;
     if (lighting && !this.material?.fragment) {
       const canvas = createWorkerSafeCanvas(lighting.width, lighting.height);
@@ -135,10 +149,16 @@ export class GrassLayer {
       this.lightingTexture.source.scaleMode = "linear";
       uniforms.uMapWorldSize = { value: new Float32Array([map.width * ts, map.height * ts]), type: "vec2<f32>" };
     }
+    if (technique === 12) {
+      this.matting = new GrassMattingMask(pixi, map);
+      uniforms.uPressureWorldSize = { value: new Float32Array([
+        this.matting.field.width * this.matting.field.scale,
+        this.matting.field.height * this.matting.field.scale]), type: "vec2<f32>" };
+    }
     this.uniforms = new pixi.UniformGroup(uniforms);
     this.shader = pixi.Shader.from({
-      gl: { vertex: VERTEX, fragment: this.material?.fragment || grassFragment(technique >= 9, !!this.lightingTexture), name: "grass-terrain" },
-      resources: { grassUniforms: this.uniforms, ...this.material?.resources, ...(this.lightingTexture ? { uTerrainLight: this.lightingTexture.source } : {}) },
+      gl: { vertex: VERTEX, fragment: this.material?.fragment || grassFragment(technique >= 9, !!this.lightingTexture, technique === 12), name: "grass-terrain" },
+      resources: { grassUniforms: this.uniforms, ...(this.matting ? { uPressure: this.matting.texture.source } : {}), ...this.material?.resources, ...(this.lightingTexture ? { uTerrainLight: this.lightingTexture.source } : {}) },
     });
     this.mesh = new pixi.Mesh({ geometry: this.geometry, shader: this.shader });
     layer.addChild(this.mesh);
@@ -150,6 +170,7 @@ export class GrassLayer {
     this.geometry?.destroy(true);
     this.shader?.destroy();
     this.material?.destroy();
+    this.matting?.destroy();
     this.lightingTexture?.destroy(true);
   }
 }
@@ -162,7 +183,7 @@ export function destroyGrassLayer(renderer, { releaseLighting = false } = {}) {
 }
 
 export function reconcileGrassLayer(renderer, requestedTechnique = 0) {
-  const technique = Number.isInteger(requestedTechnique) && requestedTechnique >= 1 && requestedTechnique <= 11
+  const technique = Number.isInteger(requestedTechnique) && requestedTechnique >= 1 && requestedTechnique <= 12
     ? requestedTechnique : DEFAULT_GRASS_TECHNIQUE;
   if (!renderer._map) { destroyGrassLayer(renderer); return; }
   if (renderer._grassTechnique !== technique || !renderer._grassLayer) {

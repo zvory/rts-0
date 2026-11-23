@@ -649,7 +649,6 @@ export class Renderer {
     this.world.position.set(-camera.x * camera.zoom, -camera.y * camera.zoom);
     this.world.scale.set(camera.zoom);
     time("renderer.doodads", () => this._doodads?.updateVisibility(camera));
-    // Begin a fresh reconciliation pass.
     for (const key of Object.keys(this._seen)) this._seen[key].clear();
     let entities = [];
     let regularEntities = [];
@@ -681,6 +680,7 @@ export class Renderer {
       this._recordRenderDiagnostic("renderer.entities.regular", regularEntities.length);
       this._recordRenderDiagnostic("renderer.entities.shotReveal", shotReveals.length);
     });
+    if (this._grassLayer?.matting) time("renderer.grassMatting", () => this._grassLayer.matting.update(regularEntities));
     const feedbackView = preparedFeedbackView || time(
       "renderer.feedbackView",
       () => buildRendererFeedbackView(state, {
