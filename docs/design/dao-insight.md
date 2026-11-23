@@ -83,7 +83,10 @@ the existing match and snapshot sequence. Mixed-faction Lab support is outside t
 War Disciples gain **Throw Sword** (E): a world-point aimed spinning sword using
 a 7.5-tile range, 0.9-tile hitbox width, 100/11 pixels per tick travel, free cost,
 and 20-second cooldown. Each enemy targetable can be hit once per leg: 40 damage
-outbound and 80 returning, with the existing terrain and Shield reductions. The sword
+outbound and 80 returning before protection. Throw Sword has zero armor penetration:
+armored targets take one quarter damage (10 outbound, 20 returning). Dao armor and
+normal direct-hit entrenchment protection apply before the existing map-tile cover
+and Shield reductions. Small/unarmored targets retain full base damage. The sword
 tracks its living caster on return and expires on caster death or the shared projectile
 lifetime limit (round-trip travel time plus one second). At maximum range the flight
 targets 1.76 seconds, 10% above the original 1.6 seconds. Each leg rounds up
