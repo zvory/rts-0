@@ -54,7 +54,8 @@ Healing Potion restores the target to full HP on arrival. This follows the user'
 “heals the unit fully” instruction, superseding the earlier 75 HP description.
 Escape Treasure grants one lethal-damage escape, returning the unit to its supplying Shop
 with **1 HP**, regardless of the unit's distance when it takes damage. The applied effect is
-shown as a purple square with a white **E**, placed above the health bar's normal location;
+shown to the unit’s owner and allies as a purple square with a white **E**, placed above the
+health bar's normal location; enemies receive no protection flag even when they see the unit;
 both dimensions equal the health bar height, even when health bars are hidden.
 
 A destroyed supplying Shop cancels in-flight goods and removes its applied escape protection.

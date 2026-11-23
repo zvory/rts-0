@@ -342,7 +342,11 @@ fn recast_return_execution_rejects_missing_too_early_and_stale_state() {
 
 #[test]
 fn shop_goods_and_escape_badge_follow_visibility_without_exposing_shop_or_target() {
-    let players = human_vs_ai_players();
+    let mut players = human_vs_ai_players().to_vec();
+    players.push(PlayerInit {
+        id: 3,
+        ..players[0].clone()
+    });
     let mut game = Game::new(&players, 0xCAFE_BABE);
     let private = first_tile_matching(&game, |x, y| {
         game.state.fog.is_visible_world(1, x, y) && !game.state.fog.is_visible_world(2, x, y)
@@ -373,6 +377,15 @@ fn shop_goods_and_escape_badge_follow_visibility_without_exposing_shop_or_target
         .iter()
         .any(|e| e.id == unit && e.escape_treasure));
     assert!(own.ability_objects.iter().any(|o| o.id == hidden));
+    for friendly in [
+        game.snapshot_for(3),
+        game.snapshot_for_observer(&ObserverView::Players(vec![3])),
+    ] {
+        assert!(friendly
+            .entities
+            .iter()
+            .any(|e| e.id == unit && e.escape_treasure));
+    }
     let enemy = game.snapshot_for(2);
     assert!(!enemy.entities.iter().any(|e| e.id == unit));
     assert!(!enemy.ability_objects.iter().any(|o| o.id == hidden));
@@ -390,10 +403,30 @@ fn shop_goods_and_escape_badge_follow_visibility_without_exposing_shop_or_target
         .unwrap();
     game.rebuild_final_spatial();
     let enemy = game.snapshot_for(2);
-    assert!(enemy
-        .entities
-        .iter()
-        .any(|e| e.id == unit && e.escape_treasure));
+    let enemy_unit = enemy.entities.iter().find(|e| e.id == unit).unwrap();
+    assert!(!enemy_unit.escape_treasure);
+    assert!(serde_json::to_value(enemy_unit)
+        .unwrap()
+        .get("escapeTreasure")
+        .is_none());
+    let enemy_observer = game.snapshot_for_observer(&ObserverView::Players(vec![2]));
+    assert!(
+        !enemy_observer
+            .entities
+            .iter()
+            .find(|e| e.id == unit)
+            .unwrap()
+            .escape_treasure
+    );
+    for privileged in [
+        game.snapshot_for_observer(&ObserverView::Players(vec![1, 2])),
+        game.snapshot_for_observer(&ObserverView::Omniscient),
+    ] {
+        assert!(privileged
+            .entities
+            .iter()
+            .any(|e| e.id == unit && e.escape_treasure));
+    }
     let object = enemy
         .ability_objects
         .iter()

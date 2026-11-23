@@ -395,7 +395,7 @@ export const cmd = Object.freeze({
 
 // Snapshots carry public playerFactions: [{id, factionId}] independently of private playerResources.
 
-// Shop goods use useAbility targetId; v66 entity slot 53 carries public escapeTreasure.
+// Shop goods use useAbility targetId; v66 entity slot 53 carries owner/ally-only escapeTreasure (plus privileged observers).
 
 // Dao Master rank: EntityView daoMaster is a public bool at compact slot 52 (v65);
 // rts-contract owns the DTO, the sim owns advancement, and exact insight stays team-private.

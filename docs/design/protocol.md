@@ -2106,8 +2106,10 @@ and `escapeTreasure` are Shop abilities with compact ability codes 19/20 and ord
 buildings are rejected. Purchases are immediate and do not enqueue a movement order.
 
 Deliveries use existing fog-filtered `abilityObjects` with `kind: "lineProjectile"` and the item
-ability id. Public `EntityView.escapeTreasure` is true only while a visible unit carries escape
-protection; false is omitted in JSON and compact entity slot **53** (54-element record) defaults
+ability id. `EntityView.escapeTreasure` is team-private: only the unit’s owner/allies receive
+its protection status. Enemy player snapshots and enemy-selected observer views omit it even when
+the unit is visible. Selected observer unions include it when an owner or ally is selected, and
+omniscient/full-world observers retain it. The flag is true while the unit carries protection; false is omitted in JSON and compact entity slot **53** (54-element record) defaults
 to false. This field reveals no supplying-Shop id or position. Existing ownership/visibility
 rules gate projectile source ids; no hidden target id is projected. Snapshot replacement clears
 consumed effects normally, including replay seeks and observer perspective changes.

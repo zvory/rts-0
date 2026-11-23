@@ -1001,7 +1001,7 @@ pub struct EntityView {
     #[serde(default, skip_serializing_if = "is_false")]
     pub vision_only: bool,
 
-    /// Public single-use escape protection on this visible unit.
+    /// Single-use escape protection, projected only to owner/allies and privileged observers.
     #[serde(default, skip_serializing_if = "is_false")]
     pub escape_treasure: bool,
 
