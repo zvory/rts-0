@@ -826,6 +826,9 @@ impl Serialize for CompactEntity<'_> {
         if entity.dao_master.is_some() {
             len = 53;
         }
+        if entity.escape_treasure {
+            len = 54;
+        }
         let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&entity.id)?;
         seq.serialize_element(&entity.owner)?;
@@ -999,6 +1002,9 @@ impl Serialize for CompactEntity<'_> {
         }
         if len > 52 {
             seq.serialize_element(&entity.dao_master)?;
+        }
+        if len > 53 {
+            seq.serialize_element(&entity.escape_treasure)?;
         }
         seq.end()
     }

@@ -132,6 +132,8 @@ pub mod abilities {
     pub const EVOLVE_MAGIC: &str = "evolveMagic";
     pub const DISCIPLE_SHIELD: &str = "discipleShield";
     pub const THROW_SWORD: &str = "throwSword";
+    pub const HEALING_POTION: &str = "healingPotion";
+    pub const ESCAPE_TREASURE: &str = "escapeTreasure";
 
     pub const ALL: &[&str] = &[
         CHARGE,
@@ -152,6 +154,8 @@ pub mod abilities {
         EVOLVE_MAGIC,
         DISCIPLE_SHIELD,
         THROW_SWORD,
+        HEALING_POTION,
+        ESCAPE_TREASURE,
     ];
 }
 
@@ -500,6 +504,8 @@ const ORDER_STAGE_CODES: &[(&str, u8)] = &[
     (abilities::EVOLVE_MAGIC, 24),
     (abilities::DISCIPLE_SHIELD, 25),
     (abilities::THROW_SWORD, 26),
+    (abilities::HEALING_POTION, 27),
+    (abilities::ESCAPE_TREASURE, 28),
 ];
 
 const ABILITY_CODES: &[(&str, u8)] = &[
@@ -521,6 +527,8 @@ const ABILITY_CODES: &[(&str, u8)] = &[
     (abilities::EVOLVE_MAGIC, 16),
     (abilities::DISCIPLE_SHIELD, 17),
     (abilities::THROW_SWORD, 18),
+    (abilities::HEALING_POTION, 19),
+    (abilities::ESCAPE_TREASURE, 20),
 ];
 
 const ABILITY_OBJECT_KIND_CODES: &[(&str, u8)] = &[
@@ -839,6 +847,8 @@ fn ability_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("EVOLVE_MAGIC", abilities::EVOLVE_MAGIC),
         ("DISCIPLE_SHIELD", abilities::DISCIPLE_SHIELD),
         ("THROW_SWORD", abilities::THROW_SWORD),
+        ("HEALING_POTION", abilities::HEALING_POTION),
+        ("ESCAPE_TREASURE", abilities::ESCAPE_TREASURE),
     ])
 }
 
@@ -934,6 +944,8 @@ fn order_stage_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("EVOLVE_MAGIC", abilities::EVOLVE_MAGIC),
         ("DISCIPLE_SHIELD", abilities::DISCIPLE_SHIELD),
         ("THROW_SWORD", abilities::THROW_SWORD),
+        ("HEALING_POTION", abilities::HEALING_POTION),
+        ("ESCAPE_TREASURE", abilities::ESCAPE_TREASURE),
         ("SETUP_ANTI_TANK_GUNS", "setupAntiTankGuns"),
     ])
 }
@@ -1045,6 +1057,7 @@ fn compact_slot_schemas() -> CompactSlotSchemas {
             optional_field(50, "tournamentEntrants"),
             optional_field(51, "daoTrainingQueue"),
             optional_field(52, "daoMaster"),
+            optional_field(53, "escapeTreasure"),
         ],
         event: event_slot_schemas(),
         trench: vec![

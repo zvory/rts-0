@@ -1001,6 +1001,10 @@ pub struct EntityView {
     #[serde(default, skip_serializing_if = "is_false")]
     pub vision_only: bool,
 
+    /// Public single-use escape protection on this visible unit.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub escape_treasure: bool,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub debug_path: Option<DebugPathView>,
 }
@@ -1070,6 +1074,7 @@ impl EntityView {
             occupied_trench_id: None,
             scout_plane: None,
             vision_only: false,
+            escape_treasure: false,
             debug_path: None,
         }
     }

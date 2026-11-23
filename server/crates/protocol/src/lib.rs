@@ -115,6 +115,8 @@ pub enum Command {
         units: Vec<u32>,
     },
     UseAbility {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        target_id: Option<u32>,
         ability: String,
         units: Vec<u32>,
         #[serde(skip_serializing_if = "Option::is_none")]
