@@ -93,7 +93,7 @@ impl UnitBody {
             }
             UnitBody::OrientedBox(body) => {
                 let (fx, fy) = body.forward_axis();
-                let (sx, sy) = body.side_axis();
+                let (sx, sy) = (-fy, fx);
                 let extent_x = fx.abs() * body.half_len + sx.abs() * body.half_width;
                 let extent_y = fy.abs() * body.half_len + sy.abs() * body.half_width;
                 BodyAabb {
@@ -112,10 +112,6 @@ impl OrientedBoxBody {
         (self.facing.det_cos(), self.facing.det_sin())
     }
 
-    fn side_axis(self) -> (f32, f32) {
-        let (fx, fy) = self.forward_axis();
-        (-fy, fx)
-    }
 }
 
 impl OrientedCapsuleBody {
@@ -379,7 +375,7 @@ pub(crate) fn primary_combat_target_point(
         match unit_body_for_entity(target) {
             Some(UnitBody::OrientedBox(body)) => {
                 let (fx, fy) = body.forward_axis();
-                let (sx, sy) = body.side_axis();
+                let (sx, sy) = (-fy, fx);
                 let dx = attacker.0 - body.x;
                 let dy = attacker.1 - body.y;
                 let x = (dx * fx + dy * fy).clamp(-body.half_len, body.half_len);
@@ -575,7 +571,7 @@ fn oriented_box_intersects_rect(body: OrientedBoxBody, rect: RectBody) -> bool {
         (rect.max_y - rect.min_y) * 0.5,
     );
     let (fx, fy) = body.forward_axis();
-    let (sx, sy) = body.side_axis();
+    let (sx, sy) = (-fy, fx);
     let dx = rect_center.0 - body.x;
     let dy = rect_center.1 - body.y;
 
@@ -602,7 +598,7 @@ fn circle_intersects_capsule(circle: CircleBody, body: OrientedCapsuleBody) -> b
 
 fn circle_intersects_oriented_box(circle: CircleBody, body: OrientedBoxBody) -> bool {
     let (fx, fy) = body.forward_axis();
-    let (sx, sy) = body.side_axis();
+    let (sx, sy) = (-fy, fx);
     let dx = circle.x - body.x;
     let dy = circle.y - body.y;
     let local_x = (dx * fx + dy * fy).clamp(-body.half_len, body.half_len);
@@ -616,7 +612,7 @@ fn circle_intersects_oriented_box(circle: CircleBody, body: OrientedBoxBody) -> 
 
 fn capsule_intersects_oriented_box(capsule: OrientedCapsuleBody, body: OrientedBoxBody) -> bool {
     let (fx, fy) = body.forward_axis();
-    let (sx, sy) = body.side_axis();
+    let (sx, sy) = (-fy, fx);
     let (start, end) = capsule.endpoints();
     let local_start = (
         (start.0 - body.x) * fx + (start.1 - body.y) * fy,
@@ -640,9 +636,9 @@ fn capsule_intersects_oriented_box(capsule: OrientedCapsuleBody, body: OrientedB
 
 fn oriented_boxes_intersect(a: OrientedBoxBody, b: OrientedBoxBody) -> bool {
     let (afx, afy) = a.forward_axis();
-    let (asx, asy) = a.side_axis();
+    let (asx, asy) = (-afy, afx);
     let (bfx, bfy) = b.forward_axis();
-    let (bsx, bsy) = b.side_axis();
+    let (bsx, bsy) = (-bfy, bfx);
     let dx = b.x - a.x;
     let dy = b.y - a.y;
     let axes = [(afx, afy), (asx, asy), (bfx, bfy), (bsx, bsy)];
@@ -720,7 +716,7 @@ fn capsule_circle_overlap(capsule: OrientedCapsuleBody, circle: CircleBody) -> O
 
 fn circle_oriented_box_overlap(circle: CircleBody, body: OrientedBoxBody) -> Option<BodyOverlap> {
     let (fx, fy) = body.forward_axis();
-    let (sx, sy) = body.side_axis();
+    let (sx, sy) = (-fy, fx);
     let dx = circle.x - body.x;
     let dy = circle.y - body.y;
     let local_x = dx * fx + dy * fy;
@@ -796,7 +792,7 @@ fn capsule_oriented_box_overlap(
     body: OrientedBoxBody,
 ) -> Option<BodyOverlap> {
     let (bfx, bfy) = body.forward_axis();
-    let (bsx, bsy) = body.side_axis();
+    let (bsx, bsy) = (-bfy, bfx);
     let (start, end) = capsule.endpoints();
     let corners = oriented_box_corners(body);
     let mut axes = [(0.0, 0.0); 6];
@@ -837,9 +833,9 @@ fn capsule_oriented_box_overlap(
 
 fn oriented_box_overlap(a: OrientedBoxBody, b: OrientedBoxBody) -> Option<BodyOverlap> {
     let (afx, afy) = a.forward_axis();
-    let (asx, asy) = a.side_axis();
+    let (asx, asy) = (-afy, afx);
     let (bfx, bfy) = b.forward_axis();
-    let (bsx, bsy) = b.side_axis();
+    let (bsx, bsy) = (-bfy, bfx);
     let dx = b.x - a.x;
     let dy = b.y - a.y;
     let axes = [(afx, afy), (asx, asy), (bfx, bfy), (bsx, bsy)];
@@ -912,7 +908,7 @@ fn segment_intersects_capsule(
     body: OrientedCapsuleBody,
 ) -> Option<f32> {
     let (fx, fy) = body.forward_axis();
-    let (sx, sy) = body.side_axis();
+    let (sx, sy) = (-fy, fx);
     let local_start = (
         (start.0 - body.x) * fx + (start.1 - body.y) * fy,
         (start.0 - body.x) * sx + (start.1 - body.y) * sy,
@@ -961,7 +957,7 @@ fn segment_intersects_oriented_box(
     body: OrientedBoxBody,
 ) -> Option<f32> {
     let (fx, fy) = body.forward_axis();
-    let (sx, sy) = body.side_axis();
+    let (sx, sy) = (-fy, fx);
     let local_start = (
         (start.0 - body.x) * fx + (start.1 - body.y) * fy,
         (start.0 - body.x) * sx + (start.1 - body.y) * sy,
@@ -1111,7 +1107,7 @@ fn closest_points_between_segments(
 
 fn oriented_box_corners(body: OrientedBoxBody) -> [(f32, f32); 4] {
     let (fx, fy) = body.forward_axis();
-    let (sx, sy) = body.side_axis();
+    let (sx, sy) = (-fy, fx);
     [
         (
             body.x - fx * body.half_len - sx * body.half_width,
@@ -1141,7 +1137,7 @@ fn project_capsule(body: OrientedCapsuleBody, axis: (f32, f32)) -> (f32, f32) {
 
 fn project_oriented_box(body: OrientedBoxBody, axis: (f32, f32)) -> (f32, f32) {
     let (fx, fy) = body.forward_axis();
-    let (sx, sy) = body.side_axis();
+    let (sx, sy) = (-fy, fx);
     let center = body.x * axis.0 + body.y * axis.1;
     let extent =
         body.half_len * dot_abs(axis, (fx, fy)) + body.half_width * dot_abs(axis, (sx, sy));

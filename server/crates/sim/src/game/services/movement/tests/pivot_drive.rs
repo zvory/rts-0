@@ -56,3 +56,73 @@ fn tank_body_turns_twenty_five_percent_faster_than_baseline() {
         PIVOT_VEHICLE_BODY_TURN_RATE_RAD_PER_TICK * 1.25
     );
 }
+
+#[test]
+fn long_pivot_route_preserves_movement_trace_with_obstacles_and_traffic() {
+    use sha2::{Digest, Sha256};
+
+    // Captured before acceptance reuse: cover a long accepted prefix and a
+    // rejected shortcut with stationary traffic. Hash every movement step.
+    for (blocked, expected) in [
+        (
+            false,
+            "fe07fe1cec219f0d0d5ae9929fdc3ede9059214a3b923b59f512f3eae1a4e17e",
+        ),
+        (
+            true,
+            "de9fa7a9c0dbd9fc0c36a0a18f16265766812116264c5d180ab41ec53868d7f2",
+        ),
+    ] {
+        let map = Map {
+            width: 64,
+            height: 64,
+            terrain: vec![crate::protocol::terrain::GRASS; 64 * 64],
+            ..Default::default()
+        };
+        let mut entities = EntityStore::new();
+        let start = map.tile_center(8, 8);
+        let tank = entities
+            .spawn_unit(1, EntityKind::Tank, start.0, start.1)
+            .expect("tank should spawn");
+        let route: Vec<_> = (9..=40)
+            .flat_map(|tile| [map.tile_center(tile, tile - 1), map.tile_center(tile, tile)])
+            .collect();
+        let goal = *route.last().expect("route should have a goal");
+        if let Some(unit) = entities.get_mut(tank) {
+            unit.set_facing(std::f32::consts::FRAC_PI_4);
+            unit.set_order(Order::attack_move_to(goal.0, goal.1));
+        }
+        set_path_direct(&mut entities, tank, route);
+        if blocked {
+            let obstacle = footprint_center(&map, EntityKind::TankTrap, 20, 20);
+            entities
+                .spawn_building(2, EntityKind::TankTrap, obstacle.0, obstacle.1, true)
+                .expect("static obstacle should spawn");
+            entities
+                .spawn_unit(1, EntityKind::Tank, start.0 + 48.0, start.1 + 48.0)
+                .expect("stationary traffic should spawn");
+        }
+        let occ = Occupancy::build(&map, &entities);
+        let mut trace = Sha256::new();
+        for tick in 0..64 {
+            let spatial = SpatialIndex::build(&entities, map.width, map.height);
+            movement_system(&map, &mut entities, &[], &occ, &spatial, tick);
+            let unit = entities.get(tank).expect("tank should remain");
+            trace.update(
+                serde_json::to_vec(&(
+                    unit.pos_x().to_bits(),
+                    unit.pos_y().to_bits(),
+                    unit.facing().to_bits(),
+                    &unit.movement,
+                    unit.order(),
+                ))
+                .expect("movement trace should serialize"),
+            );
+        }
+        assert_eq!(
+            format!("{:x}", trace.finalize()),
+            expected,
+            "blocked={blocked}"
+        );
+    }
+}
