@@ -418,7 +418,8 @@ fn timed_fixture(count: usize) -> (StartPayload, Snapshot, Vec<crate::sdk::AiBas
     };
     let home = point(1);
     let main = point(2);
-    let second = (main.0 - 20.0 * size, main.1);
+    // Keep the later 25-tile line distinct from the opening 45-tile line.
+    let second = (main.0 - 18.0 * size, main.1);
     let third = (main.0 - 40.0 * size, main.1 - 10.0 * size);
     let mut sites = vec![
         AiBaseSite {
