@@ -594,7 +594,8 @@ fn effective_damage_for_weapon_class(
     )
 }
 
-fn effective_damage_for_armor_penetration(
+/// Resolve armor and terrain protection for a hit with explicit penetration (0 = none).
+pub fn effective_damage_for_armor_penetration(
     armor_penetration: f32,
     victim_kind: EntityKind,
     base_dmg: u32,

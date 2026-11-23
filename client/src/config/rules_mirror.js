@@ -493,7 +493,7 @@ export const ABILITIES = Object.freeze({
     label: "Throw Sword",
     icon: "⚔",
     hotkey: "E",
-    title: "Throw a spinning sword out and back; deals 40 damage outbound and 80 on return",
+    title: "Throw a spinning sword out and back; deals 40 damage outbound and 80 on return before armor and cover",
     carriers: Object.freeze([KIND.WAR_ADEPT]),
     targetMode: "worldPoint",
     rangeTiles: THROW_SWORD_RANGE_TILES,
