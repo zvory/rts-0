@@ -94,3 +94,35 @@ fn throw_sword_round_trip_leaves_entrenched_rifleman_alive() {
     tick_runtime(&mut runtime, &mut entities, 3);
     assert_eq!(entities.get(victim).unwrap().hp, 15);
 }
+
+#[test]
+fn throw_sword_neither_leg_grants_insight_but_line_shot_still_does() {
+    for master in [false, true] {
+        let kind = EntityKind::WarAdept;
+        for ability in [AbilityKind::ThrowSword, AbilityKind::EkatLineShot] {
+            let mut entities = EntityStore::default();
+            let caster = entities.spawn_unit(1, kind, 128.0, 128.0).unwrap();
+            let initial_insight = if master { 0 } else { 17 };
+            entities.get_mut(caster).unwrap().insight = initial_insight;
+            entities.get_mut(caster).unwrap().dao_master = master;
+            let victim = entities
+                .spawn_unit(2, EntityKind::Tank, 192.0, 128.0)
+                .unwrap();
+            let initial_hp = entities.get(victim).unwrap().hp;
+            let mut runtime = AbilityRuntime::new();
+            let mut spec = projectile_spec(caster, (128.0, 128.0), (256.0, 128.0));
+            spec.ability = ability;
+            runtime.spawn_projectile(spec).unwrap();
+            for tick in 1..=3 {
+                tick_runtime(&mut runtime, &mut entities, tick);
+                let insight = entities.get(caster).unwrap().insight;
+                if ability == AbilityKind::ThrowSword || master {
+                    assert_eq!(insight, initial_insight, "{kind:?} {ability:?} tick {tick}");
+                } else {
+                    assert!(insight > initial_insight);
+                }
+            }
+            assert!(entities.get(victim).unwrap().hp < initial_hp);
+        }
+    }
+}

@@ -1029,8 +1029,8 @@ fn war_throw_sword_is_dao_gated_and_hits_harder_on_return_after_checkpoint() {
     );
     assert_eq!(
         game.state.entities.get(caster).unwrap().insight,
-        9,
-        "projectile insight halves building HP loss, excluding overkill and invulnerability"
+        0,
+        "Throw Sword grants no insight from unit or building hits"
     );
     // The depot is 76 px off the path: outside the former 64 + 9.6 px hit radius.
     // The 1.76-second target rounds each leg up to 27 ticks (54 ticks total).
@@ -1061,8 +1061,8 @@ fn war_throw_sword_is_dao_gated_and_hits_harder_on_return_after_checkpoint() {
         "exactly one 10 damage return hit after building armor"
     );
     assert_eq!(restored.state.entities.get(victim).unwrap().hp, 165);
-    assert_eq!(game.state.entities.get(caster).unwrap().insight, 14);
-    assert_eq!(restored.state.entities.get(caster).unwrap().insight, 14);
+    assert_eq!(game.state.entities.get(caster).unwrap().insight, 0);
+    assert_eq!(restored.state.entities.get(caster).unwrap().insight, 0);
     assert_eq!(game.state.ability_runtime.world_objects().count(), 0);
 }
 

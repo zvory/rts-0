@@ -1,5 +1,5 @@
 {
-  "reason": "Register narrow Shop purchase and rescue helper; exact new signature and player resource usage, unrelated ratchets retained.",
+  "reason": "Pass team ownership into Magic Anchor movement modifiers so friendly units remain unaffected",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -807,7 +807,7 @@
     },
     {
       "path": "services/movement/waypoints.rs",
-      "lines": 981
+      "lines": 1084
     },
     {
       "path": "services/occupancy.rs",

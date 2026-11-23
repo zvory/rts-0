@@ -7,7 +7,7 @@ import { drawMagicAnchor } from "../../client/src/renderer/magic_anchor_effect.j
 import { drawRotatedRectOutline } from "../../client/src/renderer/shared.js";
 import { _drawPanzerfaustImpacts } from "../../client/src/renderer/panzerfaust_feedback.js";
 import { _drawAbilityObjects } from "../../client/src/renderer/feedback.js";
-import { DISCIPLE_SHIELD_DURATION_TICKS } from "../../client/src/config.js";
+import { EKAT_MAGIC_ANCHOR_RADIUS_TILES, DISCIPLE_SHIELD_DURATION_TICKS } from "../../client/src/config.js";
 import { RecordingGraphics } from "./pixi_fakes.mjs";
 
 function callsNamed(graphics, name) {
@@ -114,3 +114,17 @@ for (const [hp, expectedWidth] of [[300, 56], [150, 28], [75, 14], [0, 0], [600,
 }
 
 console.log("native_graphics_contracts: ok");
+
+// Enemy snapshots intentionally omit private ownerState; every public effect must match.
+{
+  const object = { id: 9, kind: "magicAnchor", x: 150, y: 170, expiresIn: 120 };
+  const owner = new RecordingGraphics();
+  const enemy = new RecordingGraphics();
+  const radius = 32 * EKAT_MAGIC_ANCHOR_RADIUS_TILES;
+  _drawAbilityObjects.call({ _abilityObjectGfx: owner }, {
+    abilityObjects: [{ ...object, ownerState: { radius } }],
+  });
+  _drawAbilityObjects.call({ _abilityObjectGfx: enemy }, { abilityObjects: [object] });
+  assert.deepEqual(enemy.calls, owner.calls, "enemy anchor circles and particles match owner geometry");
+  assert(enemy.calls.some(call => call[0] === "drawCircle" && call[3] === radius));
+}
