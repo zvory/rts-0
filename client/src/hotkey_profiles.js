@@ -126,7 +126,7 @@ export function createGridPreset(catalog = buildHotkeyCommandCatalog([])) {
     type: "preset",
     mode: "grid",
     name: "Grid",
-    description: "Command-card hotkeys follow the rendered QWE/ASD/ZXC grid.",
+    description: "Command-card hotkeys follow the rendered QWER/ASDF/ZXCV grid.",
     bindings,
     factionBindings: {},
   });

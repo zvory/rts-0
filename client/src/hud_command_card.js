@@ -50,15 +50,8 @@ import {
 import { workerCommandSlots } from "./hud_worker_commands.js";
 import { buildCultivatorCommandCardContextSamples, buildEkatCommandCardContextSamples } from "./hud_command_card_contexts.js";
 
-// Command-card hotkeys follow the keyboard grid (3 columns):
-//   Q W E
-//   A S D
-//   Z X C
-export const GRID_HOTKEYS = Object.freeze(["Q", "W", "E", "A", "S", "D", "Z", "X", "C"]);
-
-export function gridHotkeyForSlot(slotIndex) {
-  return GRID_HOTKEYS[slotIndex] || "";
-}
+import { GRID_HOTKEYS, gridHotkeyForSlot } from "./hud_command_layout.js";
+export { GRID_HOTKEYS, gridHotkeyForSlot } from "./hud_command_layout.js";
 
 export function factionCommandId(factionId, family, subject) {
   return `${normalizedFactionId(factionId)}.${family}.${subject}`;

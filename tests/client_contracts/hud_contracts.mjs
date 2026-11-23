@@ -844,7 +844,7 @@ withFakeHudDocument(({ FakeElement }) => {
     resources: { steel: 175, oil: 0 },
   }));
   assert(buildCard.kind === "workerBuild", "worker build menu should use build descriptor card");
-  assert(buildCard.slots.length === 9, "worker build card keeps a 3x3 grid");
+  assert(buildCard.slots.length === 9, "worker build card preserves its nine logical command slots");
   assert(buildCard.slots[0].intent.type === "beginPlacement", "worker build button should start placement");
   assert(buildCard.slots[0].commandId === defaultFactionCommandId("build", KIND.RESOURCE_DEPOT), "worker build button should expose stable command identity");
   assert(buildCard.slots[0].slotIndex === 0, "worker build button should expose rendered slot index");
