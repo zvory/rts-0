@@ -410,3 +410,54 @@ fn shop_purchase_accepts_allies_and_checks_visibility_range_money_and_source() {
     }
     assert_eq!(game.state.players[0].oil, 1000);
 }
+
+#[test]
+fn escape_search_finds_distant_clearings_at_both_grid_alignments() {
+    // Workers fit a single tile; the larger Novice needs the center of a 2-by-2 area.
+    for (kind, width) in [(EntityKind::Worker, 1), (EntityKind::Warrior, 2)] {
+        let (mut game, shop, unit) = item_fixture();
+        game.state.entities.remove(unit);
+        let unit = game
+            .state
+            .entities
+            .spawn_unit(1, kind, 640.0, 320.0)
+            .unwrap();
+        // Shop centers can lie on tile boundaries (the real footprint is 3 by 4 tiles).
+        // Neither the Shop-aligned grid nor the tile-center grid alone covers both exits.
+        game.state.map.terrain.fill(crate::protocol::terrain::ROCK);
+        for y in 30..30 + width {
+            for x in 30..30 + width {
+                let clearing = game.state.map.index(x, y);
+                game.state.map.terrain[clearing] = crate::protocol::terrain::GRASS;
+            }
+        }
+        let center = (30.0 + width as f32 / 2.0) * config::TILE_SIZE as f32;
+        assert!(
+            crate::game::services::standability::unit_spawn_standable_for_entity(
+                &game.state.map,
+                &crate::game::services::occupancy::Occupancy::build(
+                    &game.state.map,
+                    &game.state.entities
+                ),
+                &game.state.entities,
+                game.state.entities.get(unit).unwrap(),
+                center,
+                center,
+            )
+        );
+        let target = game.state.entities.get_mut(unit).unwrap();
+        target.escape_treasure = Some(shop);
+        target.apply_damage(u32::MAX, None);
+
+        game.tick();
+
+        let target = game
+            .state
+            .entities
+            .get(unit)
+            .expect("legal clearing rescues unit");
+        assert_eq!(target.hp, 1);
+        assert_eq!((target.pos_x(), target.pos_y()), (center, center));
+        assert_eq!(target.escape_treasure, None);
+    }
+}

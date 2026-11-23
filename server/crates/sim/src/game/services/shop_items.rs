@@ -164,6 +164,12 @@ pub(super) fn resolve_escapes(map: &Map, entities: &mut EntityStore, teams: &Tea
         }
         let occ = occupancy.get_or_insert_with(|| Occupancy::build(map, entities));
         let tile = config::TILE_SIZE as f32;
+        // Even-sized Shop footprints have centers on tile edges. Also search tile centers
+        // so a one-tile clearing is reachable without losing exits aligned with the Shop.
+        let origin = (
+            (source.0 / tile).floor() + 0.5,
+            (source.1 / tile).floor() + 0.5,
+        );
         let mut destination = None;
         // Stable nearest ring search around the Shop, including room for large unit bodies.
         'search: for ring in 1_i32..=map.width.max(map.height).min(i32::MAX as u32) as i32 {
@@ -173,11 +179,15 @@ pub(super) fn resolve_escapes(map: &Map, entities: &mut EntityStore, teams: &Tea
                 .chain((-ring..ring).rev().map(|dx| (dx, ring)))
                 .chain((-ring + 1..ring).rev().map(|dy| (-ring, dy)));
             for (dx, dy) in perimeter {
-                let x = source.0 + dx as f32 * tile;
-                let y = source.1 + dy as f32 * tile;
-                if standability::unit_spawn_standable_for_entity(map, occ, entities, unit, x, y) {
-                    destination = Some((x, y));
-                    break 'search;
+                for (x, y) in [
+                    (source.0 + dx as f32 * tile, source.1 + dy as f32 * tile),
+                    ((origin.0 + dx as f32) * tile, (origin.1 + dy as f32) * tile),
+                ] {
+                    if standability::unit_spawn_standable_for_entity(map, occ, entities, unit, x, y)
+                    {
+                        destination = Some((x, y));
+                        break 'search;
+                    }
                 }
             }
         }
