@@ -21,8 +21,13 @@ export class SpectatorControlsPanel {
     this.root = null;
     this.toggle = null;
     this.rangesToggle = null;
+    this.collapsed = false;
+    this.collapseButton = null;
+    this.rows = null;
     this.toggleActivation = createImmediateTouchButtonActivation(() => this.toggleEnabled());
     this.rangesToggleActivation = createImmediateTouchButtonActivation(() => this.toggleRanges());
+    this.collapseActivation = createImmediateTouchButtonActivation(() => this.toggleCollapsed());
+    this.collapseListeners = [];
     this.toggleListeners = [];
     this.rangesToggleListeners = [];
     this.positioner = null;
@@ -35,6 +40,9 @@ export class SpectatorControlsPanel {
     const root = document.createElement("section");
     root.className = "spectator-controls-panel hud-panel";
     root.setAttribute("aria-label", "Spectator controls");
+
+    const header = document.createElement("div");
+    header.className = "spectator-controls-header";
 
     const dragHandle = document.createElement("div");
     dragHandle.className = "spectator-controls-drag-handle";
@@ -54,7 +62,14 @@ export class SpectatorControlsPanel {
     title.textContent = "Spectator Controls";
     dragHandle.append(grip, title);
 
+    const collapse = document.createElement("button");
+    collapse.type = "button";
+    collapse.className = "spectator-controls-collapse";
+    collapse.setAttribute("aria-controls", "spectator-controls-rows");
+    header.append(dragHandle, collapse);
+
     const rows = document.createElement("div");
+    rows.id = "spectator-controls-rows";
     rows.className = "spectator-controls-rows";
     const row = document.createElement("div");
     row.className = "spectator-controls-row";
@@ -90,9 +105,15 @@ export class SpectatorControlsPanel {
     rangesRow.append(rangesLabel, rangesToggle);
 
     rows.append(row, rangesRow);
-    root.append(dragHandle, rows);
+    root.append(header, rows);
     this.host.appendChild(root);
     this.root = root;
+    this.collapseButton = collapse;
+    this.rows = rows;
+    this.syncCollapsed();
+    this.collapseListeners = Object.entries(this.collapseActivation)
+      .filter(([type]) => type !== "reset");
+    for (const [type, handler] of this.collapseListeners) collapse.addEventListener(type, handler);
     this.toggle = toggle;
     this.rangesToggle = rangesToggle;
 
@@ -136,6 +157,22 @@ export class SpectatorControlsPanel {
     this.rangesToggleListeners = listeners;
   }
 
+  toggleCollapsed() {
+    this.collapsed = !this.collapsed;
+    this.syncCollapsed();
+    this.positioner?.constrainToViewport();
+  }
+
+  syncCollapsed() {
+    const action = this.collapsed ? "Expand" : "Collapse";
+    this.collapseButton.textContent = action;
+    this.collapseButton.title = `${action} spectator controls`;
+    this.collapseButton.setAttribute("aria-label", `${action} spectator controls`);
+    this.collapseButton.setAttribute("aria-expanded", String(!this.collapsed));
+    this.rows.hidden = this.collapsed;
+    this.root.dataset.collapsed = String(this.collapsed);
+  }
+
   toggleEnabled() {
     const current = this.state() || {};
     if (current.available === false) return;
@@ -171,6 +208,13 @@ export class SpectatorControlsPanel {
 
   destroy() {
     this.positioner?.destroy();
+    this.collapseActivation.reset();
+    for (const [type, handler] of this.collapseListeners) {
+      this.collapseButton?.removeEventListener?.(type, handler);
+    }
+    this.collapseListeners = [];
+    this.collapseButton = null;
+    this.rows = null;
     this.toggleActivation.reset();
     this.rangesToggleActivation.reset();
     for (const [type, handler] of this.toggleListeners) {

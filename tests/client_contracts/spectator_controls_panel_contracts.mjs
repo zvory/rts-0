@@ -52,7 +52,25 @@ try {
       "spectator panel synchronizes the all-player range switch state");
     assert(listeners.has("resize"), "spectator panel constrains its floating position on resize");
 
+    const collapse = host.querySelector(".spectator-controls-collapse");
+    const rows = host.querySelector(".spectator-controls-rows");
+    assert(collapse.getAttribute("aria-expanded") === "true" && !rows.hidden,
+      "spectator controls start expanded");
+    collapse.listeners.click({ detail: 0 });
+    assert(rows.hidden && collapse.textContent === "Expand",
+      "keyboard activation collapses the controls and leaves an expand action");
+    assert(collapse.getAttribute("aria-expanded") === "false" && enabled && rangesEnabled,
+      "collapse exposes its state without disabling spectator settings");
+    const touch = { pointerType: "touch", pointerId: 1, button: 0 };
+    collapse.listeners.pointerdown(touch);
+    collapse.listeners.pointerup(touch);
+    collapse.listeners.click({ pointerType: "touch", detail: 1 });
+    assert(!rows.hidden && collapse.getAttribute("aria-expanded") === "true",
+      "touch expands once even when followed by a synthetic click");
+
     panel.destroy();
+    assert(Object.keys(collapse.listeners).length === 0,
+      "spectator panel removes collapse listeners on teardown");
     assert(host.children.length === 0, "spectator panel removes its DOM on teardown");
     assert(!listeners.has("resize"), "spectator panel removes its resize listener on teardown");
   });

@@ -1,0 +1,48 @@
+/* Collapsible spectator panel header; shared panel rules remain in styles.css. */
+.spectator-controls-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 7px;
+}
+.spectator-controls-panel[data-collapsed="true"] .spectator-controls-header {
+  margin-bottom: 0;
+}
+.spectator-controls-drag-handle {
+  flex: 1 1 auto;
+  margin-bottom: 0;
+}
+.spectator-controls-collapse {
+  appearance: none;
+  flex: 0 0 auto;
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius-sm);
+  background: rgba(17, 17, 15, 0.72);
+  color: var(--ink-faint);
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0;
+  padding: 4px 7px;
+}
+.spectator-controls-collapse:hover,
+.spectator-controls-collapse:focus-visible {
+  border-color: var(--accent);
+  color: var(--ink);
+  outline: none;
+}
+.spectator-controls-rows[hidden] {
+  display: none;
+}
+@media (pointer: coarse) and (max-width: 1024px) and (max-height: 1024px) {
+  .spectator-controls-collapse {
+    min-height: 36px;
+    touch-action: manipulation;
+  }
+}
+@media (pointer: coarse) and (max-width: 720px) {
+  .spectator-controls-collapse {
+    padding: 7px 10px;
+  }
+}
