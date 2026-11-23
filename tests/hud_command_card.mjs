@@ -977,7 +977,8 @@ for (const researched of [false, true]) {
   assert.equal(card.slots[2].enabled, true);
   assert.equal(card.slots[2].countBadge, "1");
   assert.equal(card.slots[2].hotkey, "E");
-  assert.deepEqual(card.slots[2].cost, { steel: 0, oil: 100 });
+  assert.deepEqual(card.slots[2].cost, { steel: 0, oil: 50 });
+  assert.match(card.slots[2].title, /costs 50 oil on entry/);
   assert.deepEqual(card.slots[2].intent, { type: "research", upgrade: UPGRADE.DAO_OF_MAGIC, buildingId: 42 });
   assert.equal(card.slots[8].enabled, true);
   building.daoTrainingQueue = [UPGRADE.DAO_OF_MAGIC];

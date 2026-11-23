@@ -157,7 +157,7 @@ export const SCOUT_PLANE_ABILITY_COOLDOWN_TICKS = TICK_HZ * 30;
 // Per-kind UI / render info. `size` is the render radius (units) or half-extent hint.
 // `sight` (tiles) drives the local fog overlay. `rangeTiles` mirrors weapon range for visuals.
 // `cost`/`supply` drive the command card.
-export const DAO_TRAINING_COST_OIL = 100;
+export const DAO_TRAINING_COST_OIL = 50;
 export const DAO_TRAINING_TICKS = TICK_HZ * 10;
 export const MAX_DAO_TRAINING_QUEUE = 64;
 
@@ -231,7 +231,7 @@ export const STATS = Object.freeze({
     description: "A sturdy gourd-shaped shop. No goods or services are available yet." },
   [KIND.PROVEN_GROUNDS]: { label: "Proving Grounds", icon: "PG", footW: 3, footH: 3, sight: 1,
     cost: { steel: 100, oil: 0 }, buildTicks: 200, trains: [], requires: [KIND.PORTAL],
-    description: "Send base Novices inside for researched Dao training. Queue any mix of Lightness, War and Magic; each costs 100 oil and takes 10 seconds. Supports a rally point." },
+    description: "Send base Novices inside for researched Dao training. Queue any mix of Lightness, War and Magic; each costs 50 oil and takes 10 seconds. Supports a rally point." },
   [KIND.TOURNAMENT_GROUNDS]: { label: "Tournament Grounds", icon: "TG", footW: 4, footH: 4, sight: 1,
     cost: { steel: 100, oil: 0 }, buildTicks: 200, trains: [], requires: [KIND.PORTAL],
     description: "Right-click four base Novices inside, or rally a Portal here. A free five-second tournament produces one winner with a random Dao specialization. Supports a rally point." },

@@ -100,7 +100,7 @@ fn paid_dao_training_requires_research_owned_base_disciple_and_oil() {
     game.tick();
     assert!(plans(&game, grounds).is_empty());
     queue(&mut game, 1, grounds, UpgradeKind::DaoOfMagic);
-    game.state.players[0].set_resources(0, 99);
+    game.state.players[0].set_resources(0, 49);
     let base = send(&mut game, grounds, 1, EntityKind::Warrior, None);
     game.tick();
     assert!(game
@@ -111,8 +111,8 @@ fn paid_dao_training_requires_research_owned_base_disciple_and_oil() {
         .prod_queue()
         .is_empty());
     assert!(game.state.entities.get(base).is_some());
-    assert_eq!(game.state.players[0].oil, 99);
-    game.state.players[0].set_resources(0, 100);
+    assert_eq!(game.state.players[0].oil, 49);
+    game.state.players[0].set_resources(0, 50);
     game.tick();
     assert!(game.state.entities.get(base).is_none());
     let foreign = send(&mut game, grounds, 2, EntityKind::Warrior, None);
@@ -170,7 +170,7 @@ fn paid_dao_training_mixed_queue_exact_duration_supply_rally_checkpoint_and_canc
     game.tick();
     assert!(game.state.entities.get(input).is_none());
     assert_eq!(game.state.players[0].supply_used, 2);
-    assert_eq!(game.state.players[0].oil, 200);
+    assert_eq!(game.state.players[0].oil, 250);
     // Tail cancellation is free and cannot cancel the active trainee.
     game.enqueue(
         1,
@@ -243,7 +243,7 @@ fn paid_dao_training_mixed_queue_exact_duration_supply_rally_checkpoint_and_canc
             .collect::<Vec<_>>()
     );
     assert!(plans(&game, grounds).is_empty());
-    assert_eq!(game.state.players[0].oil, 100);
+    assert_eq!(game.state.players[0].oil, 200);
 }
 
 #[test]
@@ -283,7 +283,7 @@ fn paid_dao_training_destroyed_building_loses_trainee_without_refund_and_hides_p
         .apply_damage(u32::MAX, None);
     game.tick();
     assert!(game.state.entities.get(grounds).is_none());
-    assert_eq!(game.state.players[0].oil, 200);
+    assert_eq!(game.state.players[0].oil, 250);
     assert_eq!(game.state.players[0].supply_used, 0);
     assert!(!game
         .state
@@ -310,7 +310,7 @@ fn paid_dao_training_blocked_exit_holds_completed_trainee_and_reservation() {
         300
     );
     assert_eq!(game.state.players[0].supply_used, 2);
-    assert_eq!(game.state.players[0].oil, 200);
+    assert_eq!(game.state.players[0].oil, 250);
     let mut game = restore(&game);
     game.state.map.terrain.fill(crate::protocol::terrain::GRASS);
     game.tick();
@@ -371,7 +371,7 @@ fn paid_dao_training_queue_is_bounded_and_portal_rally_supplies_the_input() {
         .find(|e| e.dao().is_some())
         .unwrap();
     assert_eq!(output.dao(), Some(UpgradeKind::DaoOfMagic));
-    assert_eq!(game.state.players[0].oil, 200);
+    assert_eq!(game.state.players[0].oil, 250);
     assert_eq!(
         plans(&game, grounds).len(),
         config::MAX_DAO_TRAINING_QUEUE - 1
