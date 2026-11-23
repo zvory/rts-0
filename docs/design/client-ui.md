@@ -1338,6 +1338,11 @@ export class HotkeyEditor {
 }
 ```
 
+The command card and hotkey editor preview render four columns by three rows (QWER / ASDF / ZXCV).
+Existing logical slots 0–8 retain their positions and bindings; reserved slots 9–11 form the
+empty right column (R/F/V). `COMMAND_CARD_SLOT_ORDER` maps logical slots to display order.
+The separate global Auto-Build grid retains QWE / ASD / ZXC.
+
 Hotkey profile schema v2 is physical-only: every binding value is a DOM `KeyboardEvent.code` such
 as `KeyQ`, never a layout-translated character from `KeyboardEvent.key`. Runtime activation,
 rebinding capture, held-target release, repeat handling, and conflict detection all use the physical

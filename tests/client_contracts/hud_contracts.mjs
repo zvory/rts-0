@@ -1,6 +1,7 @@
 // tests/client_contracts/hud_contracts.mjs
 // Domain contract assertions imported by ../client_contracts.mjs.
 
+import { renderDescriptorCardDom } from "../../client/src/hud_command_dom.js";
 import { assert } from "./assertions.mjs";
 import {
   fakeClassList,
@@ -844,7 +845,7 @@ withFakeHudDocument(({ FakeElement }) => {
     resources: { steel: 175, oil: 0 },
   }));
   assert(buildCard.kind === "workerBuild", "worker build menu should use build descriptor card");
-  assert(buildCard.slots.length === 9, "worker build card keeps a 3x3 grid");
+  assert(buildCard.slots.length === 9, "worker build card preserves its nine logical command slots");
   assert(buildCard.slots[0].intent.type === "beginPlacement", "worker build button should start placement");
   assert(buildCard.slots[0].commandId === defaultFactionCommandId("build", KIND.RESOURCE_DEPOT), "worker build button should expose stable command identity");
   assert(buildCard.slots[0].slotIndex === 0, "worker build button should expose rendered slot index");
@@ -1497,3 +1498,19 @@ withFakeHudDocument(({ FakeElement }) => {
     assert(primaryClicks === 0 && repeatToggles === 1, "Alt-click should invoke a locked command's secondary action");
   });
 }
+
+withFakeHudDocument(() => {
+  const card = document.createElement("div");
+  const slots = Array.from({ length: 9 }, (_, slotIndex) => ({ slotIndex }));
+  renderDescriptorCardDom(card, { slots }, (slot) => {
+    const button = document.createElement("button");
+    button.dataset.slotIndex = slot.slotIndex;
+    return button;
+  });
+  const cells = card.children[0].children;
+  assert(cells.length === 12, "command card renders twelve cells");
+  assert([3, 7, 11].every((i) => cells[i].className === "cmd-empty"),
+    "new right column stays empty");
+  assert(cells[4].dataset.slotIndex === 3 && cells[10].dataset.slotIndex === 8,
+    "A and C commands retain their original row and column");
+});

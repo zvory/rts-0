@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { COMMAND_CARD_SLOT_ORDER } from "../client/src/hud_command_layout.js";
 
 import {
+  gridHotkeyForSlot,
   buildCommandCardContextCatalog,
   buildCommandCardDescriptors,
   commandCardActivationCandidates,
@@ -1034,5 +1036,17 @@ for (const researched of [false, true]) {
     assert.equal(slotFor(noSupply).unaffordable, true);
     const poor = buildCommandCardDescriptors({ ...ctx, upgrades: [upgrade], resources: { ...ctx.resources, oil: 34 } });
     assert.equal(slotFor(poor).unaffordable, true);
+  }
+}
+
+// Widening the display preserves every existing keyboard position in every context.
+assert.deepEqual(COMMAND_CARD_SLOT_ORDER.map(gridHotkeyForSlot),
+  ["Q", "W", "E", "R", "A", "S", "D", "F", "Z", "X", "C", "V"]);
+for (const context of buildCommandCardContextCatalog()) {
+  for (const slot of context.card.slots.filter(Boolean)) {
+    assert(slot.slotIndex < 9, `${context.id}: fourth column remains reserved`);
+    const displayIndex = COMMAND_CARD_SLOT_ORDER.indexOf(slot.slotIndex);
+    assert.equal(Math.floor(displayIndex / 4), Math.floor(slot.slotIndex / 3));
+    assert.equal(displayIndex % 4, slot.slotIndex % 3);
   }
 }

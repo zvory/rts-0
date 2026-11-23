@@ -751,7 +751,7 @@ try {
   // rather than assuming a loaded CI browser has rendered it within 100 ms.
   await page.waitForFunction(() =>
     window.__rts.match.state.selection.size === 0 &&
-    document.querySelectorAll("#command-card .cmd-empty").length === 9 &&
+    document.querySelectorAll("#command-card .cmd-empty").length === 12 &&
     document.querySelectorAll("#command-card button").length === 0,
   { timeout: 3000 });
   const afterGameplayEscape = await page.evaluate(() => ({
@@ -763,8 +763,8 @@ try {
   }));
   ok(afterGameplayEscape.menuHidden && afterGameplayEscape.selected === 0,
      `ESCAPE: gameplay cancel clears selection without opening settings (hidden=${afterGameplayEscape.menuHidden}, selected=${afterGameplayEscape.selected})`);
-  ok(!afterGameplayEscape.commandCardHidden && afterGameplayEscape.commandSlots === 9 && afterGameplayEscape.commandButtons === 0,
-     `COMMAND CARD: empty selection keeps an inert 3x3 card (hidden=${afterGameplayEscape.commandCardHidden}, slots=${afterGameplayEscape.commandSlots}, buttons=${afterGameplayEscape.commandButtons})`);
+  ok(!afterGameplayEscape.commandCardHidden && afterGameplayEscape.commandSlots === 12 && afterGameplayEscape.commandButtons === 0,
+     `COMMAND CARD: empty selection keeps an inert 4×3 card (hidden=${afterGameplayEscape.commandCardHidden}, slots=${afterGameplayEscape.commandSlots}, buttons=${afterGameplayEscape.commandButtons})`);
 
   const beforePan = await page.evaluate(() => {
     const m = window.__rts.match, s = m.state;

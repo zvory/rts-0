@@ -1,3 +1,4 @@
+import { COMMAND_CARD_SLOT_ORDER, gridHotkeyForSlot } from "./hud_command_layout.js";
 import { HUD } from "./hud.js";
 import {
   HOTKEY_PRESET_CLASSIC,
@@ -183,7 +184,7 @@ export class HotkeyEditor {
     const ctx = this._selectedContext();
     const resolved = this._resolvedCard(ctx?.card);
     const slots = Array.isArray(resolved?.slots) ? resolved.slots : [];
-    for (let i = 0; i < 9; i++) {
+    for (const i of COMMAND_CARD_SLOT_ORDER) {
       const slot = slots[i] || null;
       if (!slot) {
         const empty = document.createElement("div");
@@ -525,7 +526,7 @@ export class HotkeyEditor {
         continue;
       }
       if (Number.isInteger(command.slotIndex)) {
-        const slotKey = ["Q", "W", "E", "A", "S", "D", "Z", "X", "C"][command.slotIndex] || "";
+        const slotKey = gridHotkeyForSlot(command.slotIndex);
         if (slotKey) setProfileBindingForCommand(profile, command.commandId, `Key${slotKey}`);
       }
     }

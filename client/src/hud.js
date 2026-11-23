@@ -990,13 +990,13 @@ export class HUD {
 
   /**
    * Pad a command-card fragment with empty placeholders up to `target` slots
-   * (default 9 — a full 3x3 grid). Use a smaller target to reserve trailing
+   * (default 12 — a full 4×3 grid). Use a smaller target to reserve trailing
    * slots for fixed-position buttons (e.g. cancel in slot 8).
    * @param {DocumentFragment} frag
    * @param {number} filled number of real buttons already appended.
-   * @param {number} [target=9] desired total slot count after padding.
+   * @param {number} [target=12] desired total slot count after padding.
    */
-  _padCard(frag, filled, target = 9) {
+  _padCard(frag, filled, target = 12) {
     for (let i = filled; i < target; i++) {
       frag.appendChild(this._emptyCommandSlot());
     }

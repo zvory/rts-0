@@ -1,10 +1,11 @@
+import { COMMAND_CARD_SLOT_ORDER } from "./hud_command_layout.js";
 import { ABILITY } from "./protocol.js";
 import { resourceIconHtml } from "./resource_icons.js";
 
 export function renderDescriptorCardDom(card, descriptorCard, buttonForDescriptor) {
   const frag = document.createDocumentFragment();
   const slots = Array.isArray(descriptorCard?.slots) ? descriptorCard.slots : [];
-  for (let i = 0; i < 9; i++) {
+  for (const i of COMMAND_CARD_SLOT_ORDER) {
     const descriptor = slots[i] || null;
     frag.appendChild(descriptor ? buttonForDescriptor(descriptor) : emptyCommandSlot());
   }
