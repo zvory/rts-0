@@ -63,10 +63,10 @@ export const WAR_PNG_FRAME_STRIP = Object.freeze({
   firingLungePx: 16 * DAO_WAR_BODY_SCALE,
 });
 
-function masterStrip(adept, path, bounds) {
+function masterStrip(adept, image, bounds) {
   return Object.freeze({
     ...adept,
-    image: `/assets/rigs/disciple-dao/generated/${path}-master-runtime-strip.png?v=master-1`,
+    image,
     imageVersion: "master-1",
     frameCount: 8,
     movementFrames: Object.freeze([1, 2, 3, 2]),
@@ -76,17 +76,17 @@ function masterStrip(adept, path, bounds) {
     firingLungePx: (adept.firingLungePx || 0) * DAO_MASTER_BODY_SCALE,
     iconVisibleBounds: Object.freeze(bounds),
     source: Object.freeze({ generator: "scripts/art/disciple-dao-pipeline.mjs",
-      runtimeStrip: `client/assets/rigs/disciple-dao/generated/${path}-master-runtime-strip.png` }),
+      runtimeStrip: "client" + image.split("?")[0] }),
   });
 }
-export const LIGHTNESS_MASTER_PNG_FRAME_STRIP = masterStrip(LIGHTNESS_PNG_FRAME_STRIP, "lightness",
+export const LIGHTNESS_MASTER_PNG_FRAME_STRIP = masterStrip(LIGHTNESS_PNG_FRAME_STRIP, "/assets/rigs/disciple-dao/generated/lightness-master-runtime-strip.png?v=master-1",
   { x: 42, y: 24, w: 175, h: 205 });
 export const WAR_MASTER_PNG_FRAME_STRIP = Object.freeze({
-  ...masterStrip(WAR_PNG_FRAME_STRIP, "war", { x: 145, y: 155, w: 95, h: 185 }),
+  ...masterStrip(WAR_PNG_FRAME_STRIP, "/assets/rigs/disciple-dao/generated/war-master-runtime-strip.png?v=master-torso-2", { x: 145, y: 155, w: 95, h: 185 }),
   image: "/assets/rigs/disciple-dao/generated/war-master-runtime-strip.png?v=master-torso-2",
   imageVersion: "master-torso-2",
   frameWidth: 384,
   frameHeight: 384,
 });
-export const MAGIC_MASTER_PNG_FRAME_STRIP = masterStrip(MAGIC_PNG_FRAME_STRIP, "magic",
+export const MAGIC_MASTER_PNG_FRAME_STRIP = masterStrip(MAGIC_PNG_FRAME_STRIP, "/assets/rigs/disciple-dao/generated/magic-master-runtime-strip.png?v=master-1",
   { x: 52, y: 53, w: 152, h: 151 });
