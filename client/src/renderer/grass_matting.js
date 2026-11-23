@@ -2,7 +2,7 @@ import { KIND, isUnit } from "../protocol.js";
 import { createWorkerSafeCanvas } from "./raster_primitives.js";
 
 const VEHICLES = new Set([KIND.TANK, KIND.SCOUT_CAR, KIND.COMMAND_CAR,
-  KIND.ANTI_TANK_GUN, KIND.ARTILLERY, KIND.ROCKET_LAUNCHER]);
+  KIND.MORTAR_TEAM, KIND.ANTI_TANK_GUN, KIND.ARTILLERY, KIND.ROCKET_LAUNCHER]);
 
 /** Lab-only visual experiment. Bounded mask, no durable or replay authority. */
 export class GrassPressureField {

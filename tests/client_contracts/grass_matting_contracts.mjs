@@ -33,6 +33,14 @@ tank.update([unit(2,50,100,KIND.TANK)]);
 tank.update([unit(2,90,100,KIND.TANK)]);
 assert.ok(sample(tank,70,82)>0 && sample(tank,70,118)>0);
 assert.equal(sample(tank,70,100),0,"paired vehicle lines leave the center upright");
+for(const kind of [KIND.SCOUT_CAR,KIND.COMMAND_CAR,KIND.MORTAR_TEAM,
+ KIND.ANTI_TANK_GUN,KIND.ARTILLERY,KIND.ROCKET_LAUNCHER]) {
+ const wheels=new GrassPressureField(map);
+ wheels.update([unit(2,50,100,kind)]);
+ wheels.update([unit(2,90,100,kind)]);
+ assert.ok(sample(wheels,70,89)>0 && sample(wheels,70,111)>0,`${kind} leaves paired contact paths`);
+ assert.equal(sample(wheels,70,100),0);
+}
 for(const extra of [{shotReveal:true},{aboveFogReveal:true},{visionOnly:true}]) {
  const f=new GrassPressureField(map);
  f.update([unit(1,50,50,KIND.RIFLEMAN,extra)]);
