@@ -343,6 +343,14 @@ pub(crate) fn launch_world_ability(
                 return false;
             };
             hero_projectile_spec.ability = ability;
+            if ability == AbilityKind::ThrowSword {
+                hero_projectile_spec.speed_px_per_tick = config::THROW_SWORD_SPEED_PX_PER_TICK;
+                hero_projectile_spec.width_px = config::THROW_SWORD_WIDTH_TILES * config::TILE_SIZE as f32 * 0.5;
+                hero_projectile_spec.expires_tick = tick.saturating_add(
+                    (config::THROW_SWORD_RANGE_TILES * config::TILE_SIZE as f32 * 2.0
+                        / config::THROW_SWORD_SPEED_PX_PER_TICK).ceil() as u32
+                ).saturating_add(config::TICK_HZ);
+            }
             let target_x = hero_projectile_spec.endpoint.0;
             let target_y = hero_projectile_spec.endpoint.1;
             let mut projectile_specs = vec![hero_projectile_spec];
@@ -597,7 +605,7 @@ fn smoke_launch_delay_ticks(
     if SmokeCloudStore::clamp_point_to_map(map, x, y).is_none() {
         return 0;
     }
-    let range_px = range_tiles as f32 * config::TILE_SIZE as f32;
+    let range_px = range_tiles * config::TILE_SIZE as f32;
     if range_px <= f32::EPSILON {
         return 0;
     }
@@ -923,7 +931,7 @@ pub(crate) fn caster_in_range(
     if SmokeCloudStore::clamp_point_to_map(map, x, y).is_none() {
         return false;
     }
-    let range_px = range_tiles as f32 * config::TILE_SIZE as f32;
+    let range_px = range_tiles * config::TILE_SIZE as f32;
     let min_range_px = definition.min_range_tiles.unwrap_or(0) as f32 * config::TILE_SIZE as f32;
     let distance_sq = dist2(e.pos_x(), e.pos_y(), x, y);
     distance_sq >= min_range_px * min_range_px && distance_sq <= range_px * range_px
@@ -940,7 +948,7 @@ pub(crate) fn staging_point(
     let caster = entities.get(caster)?;
     let definition = ability::definition(ability);
     let range_tiles = rules::faction::ability_range_for_carrier(ability, caster.kind)?;
-    let range_px = range_tiles as f32 * config::TILE_SIZE as f32;
+    let range_px = range_tiles * config::TILE_SIZE as f32;
     let min_range_px = definition.min_range_tiles.unwrap_or(0) as f32 * config::TILE_SIZE as f32;
     let dx = caster.pos_x() - x;
     let dy = caster.pos_y() - y;

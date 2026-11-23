@@ -113,7 +113,7 @@ fn print_catalog(catalog: faction::FactionCatalog, indent: &str) {
         print!(
             ",\"targetMode\":\"{}\",\"rangeTiles\":{},\"minRangeTiles\":{},\"cooldownTicks\":{},\"charges\":{},\"chargeRechargeTicks\":{},\"cost\":{{\"steel\":{},\"oil\":{}}},\"techRequirement\":{},\"upgradeRequirement\":{},\"mayQueue\":{},\"queuePolicy\":\"{}\",\"autocast\":{},\"commandCard\":{},\"protocolCode\":{},\"orderStageCode\":{}",
             ability.target_mode.stable_id(),
-            json_u32_or_null(ability.range_tiles),
+            ability.range_tiles.map(json_f32).unwrap_or_else(|| "null".into()),
             json_u32_or_null(ability.min_range_tiles),
             ability.cooldown_ticks,
             json_u16_or_null(ability.charges),
@@ -720,8 +720,8 @@ fn print_ability_effects(indent: &str) {
     println!(
         "{indent}    \"{}\": {{\"radiusTiles\":{},\"speedPxPerTick\":{},\"damage\":{}}},",
         faction::AbilityKind::ThrowSword.stable_id(),
-        json_f32(balance::EKAT_LINE_SHOT_WIDTH_TILES * 0.5),
-        json_f32(balance::EKAT_LINE_SHOT_SPEED_PX_PER_TICK),
+        json_f32(balance::THROW_SWORD_WIDTH_TILES * 0.5),
+        json_f32(balance::THROW_SWORD_SPEED_PX_PER_TICK),
         balance::EKAT_LINE_SHOT_DAMAGE,
     );
     println!(

@@ -68,7 +68,7 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 9] = [
         order_stage_code: 24,
     },
     AbilityCatalogEntry {
-        range_tiles: Some(balance::DAO_LIGHTNESS_DASH_RANGE_TILES),
+        range_tiles: Some(balance::DAO_LIGHTNESS_DASH_RANGE_TILES as f32),
         title: "Dash up to 10 tiles, then recast to return",
         ..EKAT_ABILITIES[0]
     },
@@ -85,7 +85,7 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 9] = [
             "Place a shield that absorbs 300 enemy damage to allied units; lasts up to 15 seconds",
         carriers: &[EntityKind::MagicAdept],
         target_mode: AbilityTargetMode::WorldPoint,
-        range_tiles: Some(balance::EKAT_MAGIC_ANCHOR_RANGE_TILES),
+        range_tiles: Some(balance::EKAT_MAGIC_ANCHOR_RANGE_TILES as f32),
         min_range_tiles: None,
         cooldown_ticks: balance::DISCIPLE_SHIELD_COOLDOWN_TICKS,
         charges: None,
@@ -101,6 +101,7 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 9] = [
     },
     AbilityCatalogEntry {
         kind: AbilityKind::ThrowSword,
+        range_tiles: Some(balance::THROW_SWORD_RANGE_TILES),
         label: "Throw Sword",
         icon: "⚔",
         hotkey: Some("E"),
@@ -116,7 +117,7 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 9] = [
         label: "Healing Potion", icon: "HP", hotkey: Some("Q"),
         title: "Deliver a healing potion to a friendly unit within 30 tiles; fully heals on arrival",
         carriers: &[EntityKind::Shop], target_mode: AbilityTargetMode::FriendlyUnit,
-        range_tiles: Some(30), min_range_tiles: None, cooldown_ticks: 0,
+        range_tiles: Some(30.0), min_range_tiles: None, cooldown_ticks: 0,
         charges: None, charge_recharge_ticks: None, cost: ResourceCost::new(0, 50),
         tech_requirement: None, upgrade_requirement: None,
         queue_policy: AbilityQueuePolicy::NotQueueable, autocast: false,
@@ -127,7 +128,7 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 9] = [
         label: "Escape Treasure", icon: "E", hotkey: Some("W"),
         title: "Deliver a one-use treasure to a friendly unit within 30 tiles; lethal damage returns it to this Shop at 1 HP",
         carriers: &[EntityKind::Shop], target_mode: AbilityTargetMode::FriendlyUnit,
-        range_tiles: Some(30), min_range_tiles: None, cooldown_ticks: 0,
+        range_tiles: Some(30.0), min_range_tiles: None, cooldown_ticks: 0,
         charges: None, charge_recharge_ticks: None, cost: ResourceCost::new(0, 100),
         tech_requirement: None, upgrade_requirement: None,
         queue_policy: AbilityQueuePolicy::NotQueueable, autocast: false,

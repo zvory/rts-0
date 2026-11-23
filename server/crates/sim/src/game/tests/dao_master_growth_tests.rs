@@ -190,7 +190,7 @@ fn dao_master_dash_and_return_reject_adept_sized_building_clearance() {
         id,
         666.5,
         600.0,
-        Some(10)
+        Some(10.0)
     )
     .is_none());
     assert!(!crate::game::hero_abilities::ekat_return_destination_valid(

@@ -457,7 +457,7 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 9] = [
         title: "Target a smoke grenade location",
         carriers: &[EntityKind::ScoutCar],
         target_mode: AbilityTargetMode::WorldPoint,
-        range_tiles: Some(balance::SMOKE_ABILITY_RANGE_TILES),
+        range_tiles: Some(balance::SMOKE_ABILITY_RANGE_TILES as f32),
         min_range_tiles: None,
         cooldown_ticks: balance::SMOKE_ABILITY_COOLDOWN_TICKS,
         charges: Some(balance::SCOUT_CAR_SMOKE_CHARGES),
@@ -482,7 +482,7 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 9] = [
         title: "Target mortar fire",
         carriers: &[EntityKind::MortarTeam],
         target_mode: AbilityTargetMode::WorldPoint,
-        range_tiles: Some(balance::MORTAR_RANGE_TILES),
+        range_tiles: Some(balance::MORTAR_RANGE_TILES as f32),
         min_range_tiles: Some(balance::MORTAR_MIN_RANGE_TILES),
         cooldown_ticks: balance::MORTAR_FIRE_COOLDOWN_TICKS as u16,
         charges: None,
@@ -504,7 +504,7 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 9] = [
         title: "Click a target, then click again to set the fire radius",
         carriers: ARTILLERY_ABILITY_CARRIERS,
         target_mode: AbilityTargetMode::WorldPoint,
-        range_tiles: Some(balance::ARTILLERY_MAX_RANGE_TILES),
+        range_tiles: Some(balance::ARTILLERY_MAX_RANGE_TILES as f32),
         min_range_tiles: Some(balance::ARTILLERY_MIN_RANGE_TILES),
         cooldown_ticks: balance::ARTILLERY_RELOAD_TICKS as u16,
         charges: None,
@@ -526,7 +526,7 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 9] = [
         title: "Target blanket artillery fire",
         carriers: ARTILLERY_ABILITY_CARRIERS,
         target_mode: AbilityTargetMode::WorldPoint,
-        range_tiles: Some(balance::ARTILLERY_MAX_RANGE_TILES),
+        range_tiles: Some(balance::ARTILLERY_MAX_RANGE_TILES as f32),
         min_range_tiles: Some(balance::ARTILLERY_MIN_RANGE_TILES),
         cooldown_ticks: balance::ARTILLERY_RELOAD_TICKS as u16,
         charges: None,
@@ -617,7 +617,7 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 9] = [
         title: "Target a 16-rocket saturation barrage",
         carriers: ROCKET_LAUNCHER_ABILITY_CARRIERS,
         target_mode: AbilityTargetMode::WorldPoint,
-        range_tiles: Some(balance::ROCKET_BARRAGE_MAX_RANGE_TILES),
+        range_tiles: Some(balance::ROCKET_BARRAGE_MAX_RANGE_TILES as f32),
         min_range_tiles: Some(balance::ROCKET_BARRAGE_MIN_RANGE_TILES),
         cooldown_ticks: balance::ROCKET_BARRAGE_RELOAD_TICKS,
         charges: Some(1),
@@ -645,7 +645,7 @@ const EKAT_ABILITIES: [AbilityCatalogEntry; 4] = [
         title: "Dash up to 5 tiles, then recast to return",
         carriers: &[EntityKind::Ekat, EntityKind::LightnessAdept],
         target_mode: AbilityTargetMode::WorldPoint,
-        range_tiles: Some(balance::EKAT_TELEPORT_RANGE_TILES),
+        range_tiles: Some(balance::EKAT_TELEPORT_RANGE_TILES as f32),
         min_range_tiles: None,
         cooldown_ticks: balance::EKAT_TELEPORT_COOLDOWN_TICKS,
         charges: None,
@@ -667,7 +667,7 @@ const EKAT_ABILITIES: [AbilityCatalogEntry; 4] = [
         title: "Send a line projectile out and back",
         carriers: &[EntityKind::Ekat],
         target_mode: AbilityTargetMode::WorldPoint,
-        range_tiles: Some(balance::EKAT_LINE_SHOT_RANGE_TILES),
+        range_tiles: Some(balance::EKAT_LINE_SHOT_RANGE_TILES as f32),
         min_range_tiles: None,
         cooldown_ticks: balance::EKAT_LINE_SHOT_COOLDOWN_TICKS,
         charges: None,
@@ -689,7 +689,7 @@ const EKAT_ABILITIES: [AbilityCatalogEntry; 4] = [
         title: "Place a 10-second pull field",
         carriers: &[EntityKind::Ekat, EntityKind::MagicAdept],
         target_mode: AbilityTargetMode::WorldPoint,
-        range_tiles: Some(balance::EKAT_MAGIC_ANCHOR_RANGE_TILES),
+        range_tiles: Some(balance::EKAT_MAGIC_ANCHOR_RANGE_TILES as f32),
         min_range_tiles: None,
         cooldown_ticks: 0,
         charges: None,
@@ -711,7 +711,7 @@ const EKAT_ABILITIES: [AbilityCatalogEntry; 4] = [
         title: "Consume a nearby Golem to heal Ekat to full HP",
         carriers: &[EntityKind::Ekat],
         target_mode: AbilityTargetMode::SelfTarget,
-        range_tiles: Some(balance::EKAT_CONSUME_GOLEM_RANGE_TILES),
+        range_tiles: Some(balance::EKAT_CONSUME_GOLEM_RANGE_TILES as f32),
         min_range_tiles: None,
         cooldown_ticks: 0,
         charges: None,
@@ -844,7 +844,7 @@ pub struct UpgradeCatalogEntry {
     pub researched_at: EntityKind,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct AbilityCatalogEntry {
     pub kind: AbilityKind,
     pub label: &'static str,
@@ -853,7 +853,7 @@ pub struct AbilityCatalogEntry {
     pub title: &'static str,
     pub carriers: &'static [EntityKind],
     pub target_mode: AbilityTargetMode,
-    pub range_tiles: Option<u32>,
+    pub range_tiles: Option<f32>,
     pub min_range_tiles: Option<u32>,
     pub cooldown_ticks: u16,
     pub charges: Option<u16>,
@@ -904,7 +904,7 @@ pub struct FactionLoadout {
     pub opening_upgrades: &'static [&'static str],
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FactionCatalog {
     pub id: &'static str,
     pub loadout: FactionLoadout,
@@ -1046,9 +1046,9 @@ pub fn ability_definition(kind: AbilityKind) -> AbilityCatalogEntry {
     }
 }
 
-pub fn ability_range_for_carrier(kind: AbilityKind, carrier: EntityKind) -> Option<u32> {
+pub fn ability_range_for_carrier(kind: AbilityKind, carrier: EntityKind) -> Option<f32> {
     if kind == AbilityKind::EkatTeleport && carrier == EntityKind::LightnessAdept {
-        Some(balance::DAO_LIGHTNESS_DASH_RANGE_TILES)
+        Some(balance::DAO_LIGHTNESS_DASH_RANGE_TILES as f32)
     } else {
         ability_definition(kind).range_tiles
     }
@@ -1196,7 +1196,7 @@ mod tests {
         assert_eq!(smoke.label, "Smoke");
         assert_eq!(smoke.carriers, &[EntityKind::ScoutCar]);
         assert_eq!(smoke.target_mode, AbilityTargetMode::WorldPoint);
-        assert_eq!(smoke.range_tiles, Some(balance::SMOKE_ABILITY_RANGE_TILES));
+        assert_eq!(smoke.range_tiles, Some(balance::SMOKE_ABILITY_RANGE_TILES as f32));
         assert_eq!(smoke.charges, Some(balance::SCOUT_CAR_SMOKE_CHARGES));
         assert_eq!(
             smoke.charge_recharge_ticks,
@@ -1237,7 +1237,7 @@ mod tests {
         );
         assert_eq!(
             point_fire.range_tiles,
-            Some(balance::ARTILLERY_MAX_RANGE_TILES)
+            Some(balance::ARTILLERY_MAX_RANGE_TILES as f32)
         );
         assert_eq!(
             point_fire.cost,
@@ -1253,7 +1253,7 @@ mod tests {
         assert_eq!(blanket_fire.target_mode, AbilityTargetMode::WorldPoint);
         assert_eq!(
             blanket_fire.range_tiles,
-            Some(balance::ARTILLERY_MAX_RANGE_TILES)
+            Some(balance::ARTILLERY_MAX_RANGE_TILES as f32)
         );
         assert_eq!(
             blanket_fire.min_range_tiles,
@@ -1297,21 +1297,21 @@ mod tests {
         );
         assert_eq!(
             teleport.range_tiles,
-            Some(balance::EKAT_TELEPORT_RANGE_TILES)
+            Some(balance::EKAT_TELEPORT_RANGE_TILES as f32)
         );
 
         let line_shot = EKAT_CATALOG.ability(AbilityKind::EkatLineShot).unwrap();
         assert_eq!(line_shot.carriers, &[EntityKind::Ekat]);
         assert_eq!(
             line_shot.range_tiles,
-            Some(balance::EKAT_LINE_SHOT_RANGE_TILES)
+            Some(balance::EKAT_LINE_SHOT_RANGE_TILES as f32)
         );
 
         let anchor = EKAT_CATALOG.ability(AbilityKind::EkatMagicAnchor).unwrap();
         assert_eq!(anchor.carriers, &[EntityKind::Ekat, EntityKind::MagicAdept]);
         assert_eq!(
             anchor.range_tiles,
-            Some(balance::EKAT_MAGIC_ANCHOR_RANGE_TILES)
+            Some(balance::EKAT_MAGIC_ANCHOR_RANGE_TILES as f32)
         );
 
         let consume = EKAT_CATALOG.ability(AbilityKind::EkatConsumeGolem).unwrap();
@@ -1319,7 +1319,7 @@ mod tests {
         assert_eq!(consume.target_mode, AbilityTargetMode::SelfTarget);
         assert_eq!(
             consume.range_tiles,
-            Some(balance::EKAT_CONSUME_GOLEM_RANGE_TILES)
+            Some(balance::EKAT_CONSUME_GOLEM_RANGE_TILES as f32)
         );
         assert_eq!(consume.protocol_code, 9);
         assert_eq!(consume.order_stage_code, 16);
