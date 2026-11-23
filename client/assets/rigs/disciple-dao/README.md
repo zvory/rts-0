@@ -96,5 +96,5 @@ The user approved these animations and the War scale correction for delivery.
 The Master source has a smaller core torso than the Adept source; matching atlas
 cell dimensions did not match bodies. The pipeline now normalizes the approved
 112-pixel Adept / 84-pixel Master core-torso spans at the Adept raster scale before
-applying the existing 1.2 rank multiplier. All eight War Master cells are 384×384
+applying the existing 1.2 rank multiplier. All eight War Master cells are 256×384
 to preserve the full spear at extension; the poses, cadence and gameplay are unchanged.

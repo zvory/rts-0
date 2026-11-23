@@ -82,10 +82,10 @@ function masterStrip(adept, image, bounds) {
 export const LIGHTNESS_MASTER_PNG_FRAME_STRIP = masterStrip(LIGHTNESS_PNG_FRAME_STRIP, "/assets/rigs/disciple-dao/generated/lightness-master-runtime-strip.png?v=master-1",
   { x: 42, y: 24, w: 175, h: 205 });
 export const WAR_MASTER_PNG_FRAME_STRIP = Object.freeze({
-  ...masterStrip(WAR_PNG_FRAME_STRIP, "/assets/rigs/disciple-dao/generated/war-master-runtime-strip.png?v=master-torso-2", { x: 145, y: 155, w: 95, h: 185 }),
+  ...masterStrip(WAR_PNG_FRAME_STRIP, "/assets/rigs/disciple-dao/generated/war-master-runtime-strip.png?v=master-torso-2", { x: 81, y: 155, w: 95, h: 185 }),
   image: "/assets/rigs/disciple-dao/generated/war-master-runtime-strip.png?v=master-torso-2",
   imageVersion: "master-torso-2",
-  frameWidth: 384,
+  frameWidth: 256,
   frameHeight: 384,
 });
 export const MAGIC_MASTER_PNG_FRAME_STRIP = masterStrip(MAGIC_PNG_FRAME_STRIP, "/assets/rigs/disciple-dao/generated/magic-master-runtime-strip.png?v=master-1",

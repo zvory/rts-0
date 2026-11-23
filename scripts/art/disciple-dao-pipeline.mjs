@@ -72,9 +72,9 @@ function paint(output, source, scale, left, top, width, height) {
   }
 }
 
-function frame(source, scale, pivot, size = 256) {
-  const output = blank(size, size);
-  paint(output, source, scale, Math.round(size / 2 - pivot[0] * scale), Math.round(size / 2 - pivot[1] * scale),
+function frame(source, scale, pivot, width = 256, height = width) {
+  const output = blank(width, height);
+  paint(output, source, scale, Math.round(width / 2 - pivot[0] * scale), Math.round(height / 2 - pivot[1] * scale),
     Math.ceil(source.width * scale), Math.ceil(source.height * scale));
   return output;
 }
@@ -102,10 +102,10 @@ function write(name, image) {
 }
 
 function strip(name, frames) {
-  const size = frames[0].width;
-  const image = blank(frames.length * size, size);
-  for (let i = 0; i < frames.length; i++) for (let y = 0; y < size; y++) {
-    frames[i].data.copy(image.data, (y * image.width + i * size) * 4, y * size * 4, (y + 1) * size * 4);
+  const width = frames[0].width, height = frames[0].height;
+  const image = blank(frames.length * width, height);
+  for (let i = 0; i < frames.length; i++) for (let y = 0; y < height; y++) {
+    frames[i].data.copy(image.data, (y * image.width + i * width) * 4, y * width * 4, (y + 1) * width * 4);
   }
   write(path.join(rig, "generated", `${name}-runtime-strip.png`), image);
 }
@@ -163,7 +163,7 @@ for (let i = 0; i < 8; i++) {
     Math.round((col + 1) * masterWarSheet.width / 4) - x,
     Math.round((row + 1) * masterWarSheet.height / 2) - y);
   // Larger cells preserve the full spear through extension at the corrected body scale.
-  masterWar.push(frame(cell, masterWarScale, helmetPivots[i], 384));
+  masterWar.push(frame(cell, masterWarScale, helmetPivots[i], 256, 384));
 }
 strip("war-master", masterWar);
 const arrowDir = path.join(root, "client/assets/effects/disciple-arrow");
