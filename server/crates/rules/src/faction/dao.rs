@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 7] = [
+pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 9] = [
     AbilityCatalogEntry {
         kind: AbilityKind::EvolveLightness,
         label: "Dao of Lightness",
@@ -110,5 +110,27 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 7] = [
         protocol_code: 18,
         order_stage_code: 26,
         ..EKAT_ABILITIES[1]
+    },
+    AbilityCatalogEntry {
+        kind: AbilityKind::HealingPotion,
+        label: "Healing Potion", icon: "HP", hotkey: Some("Q"),
+        title: "Deliver a healing potion to a friendly unit within 30 tiles; fully heals on arrival",
+        carriers: &[EntityKind::Shop], target_mode: AbilityTargetMode::FriendlyUnit,
+        range_tiles: Some(30), min_range_tiles: None, cooldown_ticks: 0,
+        charges: None, charge_recharge_ticks: None, cost: ResourceCost::new(0, 50),
+        tech_requirement: None, upgrade_requirement: None,
+        queue_policy: AbilityQueuePolicy::NotQueueable, autocast: false,
+        command_card: true, protocol_code: 19, order_stage_code: 27,
+    },
+    AbilityCatalogEntry {
+        kind: AbilityKind::EscapeTreasure,
+        label: "Escape Treasure", icon: "E", hotkey: Some("W"),
+        title: "Deliver a one-use treasure to a friendly unit within 30 tiles; lethal damage returns it to this Shop at 1 HP",
+        carriers: &[EntityKind::Shop], target_mode: AbilityTargetMode::FriendlyUnit,
+        range_tiles: Some(30), min_range_tiles: None, cooldown_ticks: 0,
+        charges: None, charge_recharge_ticks: None, cost: ResourceCost::new(0, 100),
+        tech_requirement: None, upgrade_requirement: None,
+        queue_policy: AbilityQueuePolicy::NotQueueable, autocast: false,
+        command_card: true, protocol_code: 20, order_stage_code: 28,
     },
 ];

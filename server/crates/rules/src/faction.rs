@@ -108,6 +108,8 @@ pub enum AbilityKind {
     EvolveMagic,
     DiscipleShield,
     ThrowSword,
+    HealingPotion,
+    EscapeTreasure,
 }
 
 impl AbilityKind {
@@ -130,6 +132,8 @@ impl AbilityKind {
         Self::EvolveMagic,
         Self::DiscipleShield,
         Self::ThrowSword,
+        Self::HealingPotion,
+        Self::EscapeTreasure,
     ];
 
     pub const fn stable_id(self) -> &'static str {
@@ -152,6 +156,8 @@ impl AbilityKind {
             Self::EvolveMagic => "evolveMagic",
             Self::DiscipleShield => "discipleShield",
             Self::ThrowSword => "throwSword",
+            Self::HealingPotion => "healingPotion",
+            Self::EscapeTreasure => "escapeTreasure",
         }
     }
 
@@ -840,6 +846,7 @@ pub struct UpgradeCatalogEntry {
 pub enum AbilityTargetMode {
     SelfTarget,
     WorldPoint,
+    FriendlyUnit,
 }
 
 impl AbilityTargetMode {
@@ -847,6 +854,7 @@ impl AbilityTargetMode {
         match self {
             AbilityTargetMode::SelfTarget => "self",
             AbilityTargetMode::WorldPoint => "worldPoint",
+            AbilityTargetMode::FriendlyUnit => "friendlyUnit",
         }
     }
 }
@@ -1069,6 +1077,8 @@ pub fn ability_definition(kind: AbilityKind) -> AbilityCatalogEntry {
         AbilityKind::EvolveMagic => CULTIVATOR_ABILITIES[2],
         AbilityKind::DiscipleShield => CULTIVATOR_ABILITIES[5],
         AbilityKind::ThrowSword => CULTIVATOR_ABILITIES[6],
+        AbilityKind::HealingPotion => CULTIVATOR_ABILITIES[7],
+        AbilityKind::EscapeTreasure => CULTIVATOR_ABILITIES[8],
     }
 }
 
