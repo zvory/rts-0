@@ -52,6 +52,8 @@ import {
   UPGRADE,
   UPGRADE_CODE,
   isBuilding,
+  isDiscipleKind,
+  daoForKind,
   isRoadTerrain,
   isResource,
   isUnit
@@ -103,6 +105,8 @@ export {
   UPGRADE,
   UPGRADE_CODE,
   isBuilding,
+  isDiscipleKind,
+  daoForKind,
   isRoadTerrain,
   isResource,
   isUnit
@@ -392,5 +396,5 @@ export const cmd = Object.freeze({
 
 // Cultivator Shop: wire kind shop, compact kind code 34; no additional snapshot fields.
 
-// Dao Master rank: EntityView daoMaster is a public bool at compact slot 52 (v64);
+// Dao Master rank: EntityView daoMaster is a public bool at compact slot 52 (v65);
 // rts-contract owns the DTO, the sim owns advancement, and exact insight stays team-private.

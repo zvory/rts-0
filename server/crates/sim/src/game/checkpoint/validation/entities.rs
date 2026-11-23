@@ -41,10 +41,11 @@ pub(super) fn validate_single_builders(entities: &[Entity]) -> Result<(), Checkp
 
 pub(super) fn validate_tournament_state(entity: &Entity) -> Result<(), CheckpointPayloadError> {
     use crate::game::upgrade::UpgradeKind;
-    if entity.movement.as_ref().is_some_and(|m| {
-        m.tournament_target.is_some()
-            && (entity.kind != EntityKind::Warrior || entity.dao.is_some())
-    }) {
+    if entity
+        .movement
+        .as_ref()
+        .is_some_and(|m| m.tournament_target.is_some() && entity.kind != EntityKind::Warrior)
+    {
         return Err(CheckpointPayloadError::InvalidValue {
             field: "entities.tournamentTarget",
         });

@@ -5,9 +5,8 @@
 The user selected Lightness A (twin scarves), War B (forked spear), and Magic C
 (broad casting sleeves), and explicitly authorized implementing all three with the
 simple advancement rules below. This is a second rank of the existing Warrior/Dao
-entity, not a new production catalog. Each path remains permanent.
-Implementation and focused checks are authorized; PR creation is held until the user
-has reviewed the in-game animation preview. This document records the Phase 0/1
+entity (now an authoritative path-specific Adept kind), not a new production catalog. Each path remains permanent.
+The user reviewed the animation and corrected War Master scale, then authorized merging. This document records the Phase 0/1
 decisions before implementation.
 
 ## Lightness Master: Phase 0/1
@@ -107,7 +106,7 @@ the existing 1.2 Master world scale. The full eight-frame Master strip uses 384-
 cells to avoid clipping the unchanged spear/attack geometry. Novice and War Adept
 art, all gameplay stats and animation cadence stay unchanged. Before/after captures
 use the same checkpoint, viewport, camera and unit positions, with Novice, War Adept
-and War Master from left to right. PR creation remains on hold for user review.
+and War Master from left to right. The user approved the result and authorized PR delivery.
 
 Follow-up review artifacts (one-hour preview lifetime):
 
@@ -118,3 +117,7 @@ The seven-second WebM shows standing and walking before the correction, followed
 the same sequence afterward. Focused sprite contracts check all eight War Master
 frames, atlas dimensions and unclipped frame edges; pipeline determinism, client
 architecture, source caps and docs health pass. The task-only Lab server is stopped.
+
+Integration with current main retains separate authoritative Adept kinds, Novice
+Charge and ten-tile Lightness Dash. Master rank is the appended public `daoMaster`
+boolean on each Adept kind; compact snapshot vocabulary is version 65.

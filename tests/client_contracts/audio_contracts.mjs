@@ -549,7 +549,7 @@ assert(
     return plays.at(-1);
   };
   for (const dao of [undefined, "war"]) {
-    attacker.dao = dao;
+    attacker.kind = dao === "war" ? KIND.WAR_ADEPT : KIND.WARRIOR;
     for (const kind of [KIND.RIFLEMAN, KIND.WORKER, KIND.WARRIOR, KIND.MACHINE_GUNNER, KIND.PANZERFAUST, KIND.EKAT]) {
       target.kind = kind;
       assert(attack().id === "combat_disciple_sword_stab_01", `${dao || "base"} Disciple stabs ${kind} without metallic impact`);
@@ -561,19 +561,19 @@ assert(
   }
   for (const kind of [KIND.RIFLEMAN, KIND.TANK, KIND.MORTAR_TEAM]) {
     target.kind = kind;
-    attacker.dao = "lightness";
+    attacker.kind = KIND.LIGHTNESS_ADEPT;
     assert(attack().id === "combat_disciple_spear_01", `Lightness spear cue is independent of ${kind} target material`);
-    attacker.dao = "magic";
+    attacker.kind = KIND.MAGIC_ADEPT;
     assert(attack(WEAPON_KIND.DISCIPLE_ORB).id === "combat_disciple_orb_01", `Magic orb cue is independent of ${kind} target material`);
     combatAudio.playAttackSound({ e: EVENT.ATTACK, from: 11, to: 12 });
     assert(plays.at(-1).id === "combat_disciple_orb_01", "attacker Dao selects orb when the event omits its weapon hint");
   }
-  attacker.dao = undefined;
+  attacker.kind = KIND.WARRIOR;
   assert(attack(WEAPON_KIND.DISCIPLE_ORB).id === "combat_disciple_orb_01", "explicit orb weapon hint wins over a stale pre-evolution snapshot");
-  attacker.dao = "magic";
+  attacker.kind = KIND.MAGIC_ADEPT;
   target.kind = KIND.RIFLEMAN;
   assert(attack().id === "combat_disciple_sword_stab_01", "explicit sword hint keeps a pre-evolution attack from becoming an orb");
-  attacker.dao = undefined;
+  attacker.kind = KIND.WARRIOR;
   entities.delete(12);
   const missingTarget = attack();
   assert(missingTarget.id === "combat_disciple_sword_stab_01", "missing or fog-filtered target uses the non-metallic default without hidden information");

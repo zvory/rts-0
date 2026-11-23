@@ -1,3 +1,12 @@
+use rts_rules::math::Coord;
+use std::collections::BTreeMap;
+
+use crate::config;
+use crate::game::ability::AbilityKind;
+use crate::protocol::states;
+use crate::rules;
+use serde::{Deserialize, Serialize};
+
 use super::order::BUILD_UNIT_BLOCK_GRACE_TICKS;
 #[cfg(test)]
 use super::EntityStateGroups;
@@ -7,13 +16,7 @@ use super::{
     PanzerfaustState, ProductionState, ResourceExtractorState, ResourceNodeState, ScoutPlaneState,
     WeaponSetup, WorkerState, MAX_QUEUED_ORDERS, NEUTRAL,
 };
-use crate::config;
-use crate::game::ability::AbilityKind;
-use crate::protocol::states;
-use crate::rules;
-use rts_rules::math::Coord;
-use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+
 mod dao;
 pub(crate) use dao::DiscipleShield;
 mod field_obstacles;
@@ -23,7 +26,9 @@ mod production;
 mod production_repeat;
 mod rally;
 mod research;
+
 use helpers::construction_hp_for_progress;
+
 const BUILDING_START_HP_NUMERATOR: u32 = 1;
 const BUILDING_START_HP_DENOMINATOR: u32 = 10;
 
@@ -33,6 +38,7 @@ const BUILDING_START_HP_DENOMINATOR: u32 = 10;
 /// State that only applies to a subset of kinds lives in typed optional groups, keeping
 /// the store homogeneous while making kind-specific state explicit.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Entity {
     /// Stable unique id (never reused).
     pub id: u32,
@@ -47,8 +53,6 @@ pub struct Entity {
 
     #[serde(default)]
     pub insight: u32,
-    #[serde(default)]
-    pub dao: Option<crate::game::upgrade::UpgradeKind>,
     #[serde(default)]
     pub dao_master: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -107,7 +111,6 @@ impl Entity {
             last_damage_entity: None,
             units_killed: 0,
             insight: 0,
-            dao: None,
             dao_master: false,
             chosen_dao: None,
             dao_advance_ticks: 0,
@@ -164,7 +167,6 @@ impl Entity {
             last_damage_entity: None,
             units_killed: 0,
             insight: 0,
-            dao: None,
             dao_master: false,
             chosen_dao: None,
             dao_advance_ticks: 0,
@@ -223,7 +225,6 @@ impl Entity {
             last_damage_entity: None,
             units_killed: 0,
             insight: 0,
-            dao: None,
             dao_master: false,
             chosen_dao: None,
             dao_advance_ticks: 0,
@@ -990,7 +991,7 @@ impl Entity {
     }
 
     pub(crate) fn default_weapon_kind(&self) -> Option<rules::combat::WeaponKind> {
-        rules::combat::resolved_weapon_kind(self.kind, self.dao)
+        rules::combat::default_weapon_kind(self.kind)
     }
 
     pub fn set_last_damage_owner(&mut self, owner: Option<u32>) {
@@ -1346,7 +1347,12 @@ impl Entity {
     /// The collision/interaction radius in world pixels.
     pub fn radius(&self) -> f32 {
         if let Some(s) = config::unit_stats(self.kind) {
-            s.radius * self.dao_body_scale()
+            s.radius
+                * if self.dao_master {
+                    config::DAO_MASTER_BODY_SCALE
+                } else {
+                    1.0
+                }
         } else if self.is_building() {
             // Footprint half-extent (approx) for range/interaction checks.
             let Some(s) = config::building_stats(self.kind) else {

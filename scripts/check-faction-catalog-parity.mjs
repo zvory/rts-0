@@ -327,7 +327,7 @@ function assertAbilityDescriptor(entry, factionId) {
     entry.orderStageCode,
     `${factionId} ${entry.id} order stage code mirrors Rust registry`,
   );
-  const descriptor = ABILITIES[ability];
+  const descriptor = commandCardAbilitiesForFaction(factionId).find((entry) => entry.ability === ability) || ABILITIES[ability];
   if (!entry.commandCard && !descriptor) {
     assert.equal(
       descriptor,

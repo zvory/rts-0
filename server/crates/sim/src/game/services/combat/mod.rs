@@ -292,9 +292,7 @@ pub(in crate::game) fn combat_system(
                 ) {
                     // Ranged evolution can leave an earlier sword approach behind.
                     // Idle has no commanded route to preserve after its target is lost.
-                    if auto_pursuit
-                        || (e.kind == EntityKind::Warrior && matches!(e.order(), Order::Idle))
-                    {
+                    if auto_pursuit || (e.kind.is_disciple() && matches!(e.order(), Order::Idle)) {
                         if matches!(e.order(), Order::Idle) {
                             e.clear_path();
                             e.set_path_goal(None);
@@ -358,6 +356,22 @@ pub(in crate::game) fn combat_system(
             || mode == CombatMode::Ordered && t_owner == owner)
         {
             continue; // Auto-acquisition stays hostile/obstacle-only; self-attacks are ordered.
+        }
+        if entities.get(id).is_some_and(|e| {
+            e.kind == EntityKind::Warrior
+                && e.ability_cooldown_ticks(crate::game::ability::AbilityKind::Charge) == 0
+        }) {
+            if let Some((position, movement, hostile_unit)) = entities.get(tid).map(|target| {
+                (
+                    (target.pos_x(), target.pos_y()),
+                    target.movement_delta(),
+                    target.is_unit() && target.hp > 0 && teams.is_enemy_owner(owner, t_owner),
+                )
+            }) {
+                if let Some(attacker) = entities.get_mut(id) {
+                    attacker.try_start_novice_charge(position, movement, hostile_unit);
+                }
+            }
         }
         let dist = target_distance_sq.det_sqrt();
         let clear_area_priority_target = entities.get(id).is_some_and(|entity| {

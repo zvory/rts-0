@@ -1,6 +1,7 @@
 import { ABILITY, DEFAULT_FACTION_ID, KIND, UPGRADE } from "../protocol.js";
 import {
   ABILITIES,
+  DAO_LIGHTNESS_DASH_RANGE_TILES,
   STATS,
   CULTIVATORS_FACTION_ID,
   EKAT_FACTION_ID,
@@ -127,7 +128,7 @@ export const FACTION_CATALOGS = Object.freeze({
   [CULTIVATORS_FACTION_ID]: freezeCatalog({
     id: CULTIVATORS_FACTION_ID,
     loadoutId: "cultivators.standard",
-    units: [KIND.WORKER, KIND.WARRIOR],
+    units: [KIND.WORKER, KIND.WARRIOR, KIND.LIGHTNESS_ADEPT, KIND.WAR_ADEPT, KIND.MAGIC_ADEPT],
     buildings: [KIND.RESOURCE_DEPOT, KIND.PORTAL, KIND.THREE_DAO_PAVILION, KIND.TOURNAMENT_GROUNDS, KIND.PROVEN_GROUNDS, KIND.SHOP, KIND.STEEL_MINE, KIND.PUMP_JACK],
     buildables: [KIND.RESOURCE_DEPOT, KIND.PORTAL, KIND.THREE_DAO_PAVILION, KIND.TOURNAMENT_GROUNDS, KIND.PROVEN_GROUNDS, KIND.SHOP],
     trainables: {
@@ -184,23 +185,24 @@ export function researchableUpgradesForFaction(factionId, buildingKind) {
 export function commandCardAbilitiesForFaction(factionId) {
   return factionCatalog(factionId)
     .abilities
-    .map((ability) => ABILITIES[ability])
+    .map((ability) => factionId === CULTIVATORS_FACTION_ID && ability === ABILITY.EKAT_TELEPORT
+      ? {
+        ...ABILITIES[ability],
+        rangeTiles: DAO_LIGHTNESS_DASH_RANGE_TILES,
+        title: `Dash up to ${DAO_LIGHTNESS_DASH_RANGE_TILES} tiles, then recast to return`,
+      }
+      : ABILITIES[ability])
     .filter((entry) => entry && entry.commandCard !== false);
 }
 
 // Presentation aliases preserve the shared simulation and renderer identity.
 const NEXUS_STATS = Object.freeze({ ...STATS[KIND.RESOURCE_DEPOT], label: "Nexus" });
 const SERF_STATS = Object.freeze({ ...STATS[KIND.WORKER], label: "Serf" });
-const ADEPT_STATS = Object.freeze(Object.fromEntries(
-  ["Lightness", "War", "Magic"].map((dao) => [dao.toLowerCase(), Object.freeze({
-    ...STATS[KIND.WARRIOR], label: `${dao} Adept`,
-  })]),
-));
-const MASTER_STATS = Object.freeze(Object.fromEntries(Object.entries(ADEPT_STATS)
-  .map(([dao, stats]) => [dao, Object.freeze({ ...stats, label: stats.label.replace("Adept", "Master") })])));
+const MASTER_STATS = Object.freeze(Object.fromEntries(
+  [KIND.LIGHTNESS_ADEPT, KIND.WAR_ADEPT, KIND.MAGIC_ADEPT].map(kind =>
+    [kind, Object.freeze({ ...STATS[kind], label: STATS[kind].label.replace("Adept", "Master") })])));
 export function statsForFaction(kind, factionId, dao = null, daoMaster = false) {
-  if (kind === KIND.WARRIOR && daoMaster && MASTER_STATS[dao]) return MASTER_STATS[dao];
-  if (kind === KIND.WARRIOR && Object.prototype.hasOwnProperty.call(ADEPT_STATS, dao)) return ADEPT_STATS[dao];
+  if (daoMaster && MASTER_STATS[kind]) return MASTER_STATS[kind];
   if (factionId === CULTIVATORS_FACTION_ID) {
     if (kind === KIND.RESOURCE_DEPOT) return NEXUS_STATS;
     if (kind === KIND.WORKER) return SERF_STATS;

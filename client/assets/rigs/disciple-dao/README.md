@@ -89,7 +89,7 @@ the user-selected Lightness A, War B and Magic C concepts. Exact reference paths
 prompts are in `source/master-motion-prompts.json`. Each 4×2 source has standing,
 three movement poses and four attacks; the pipeline normalizes crown pivots and
 Adept-relative body scale. Master strips apply the 1.2 scale in their renderer config.
-These remain local drafts pending user animation review before PR creation.
+The user approved these animations and the War scale correction for delivery.
 
 ### War Master size correction
 

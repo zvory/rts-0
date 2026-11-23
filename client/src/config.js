@@ -33,6 +33,8 @@ export {
 export {
   ABILITIES,
   abilityCarriedByEntity,
+  entityAbilityRangeTiles,
+  DAO_LIGHTNESS_DASH_RANGE_TILES,
   ANTI_TANK_GUN_BODY,
   MORTAR_BODY,
   ANTI_TANK_GUN_DEPLOYED_RANGE_TILES,

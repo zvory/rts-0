@@ -27,7 +27,7 @@ import { decodeCompactTrenches } from "./protocol_snapshot_trenches.js";
 
 export function decodeCompactSnapshot(raw) {
   // Older saved streams retain the same entity layouts; later fields are optional.
-  if (raw.v !== COMPACT_SNAPSHOT_VERSION && raw.v !== 63 && raw.v !== 62 && raw.v !== 61 && raw.v !== 60 && raw.v !== 59 && raw.v !== 58 && raw.v !== 57 && raw.v !== 56 && raw.v !== 55 && raw.v !== 54 && raw.v !== 53 && raw.v !== 52 && raw.v !== 51) {
+  if (raw.v !== COMPACT_SNAPSHOT_VERSION && raw.v !== 64 && raw.v !== 63 && raw.v !== 62 && raw.v !== 61 && raw.v !== 60 && raw.v !== 59 && raw.v !== 58 && raw.v !== 57 && raw.v !== 56 && raw.v !== 55 && raw.v !== 54 && raw.v !== 53 && raw.v !== 52 && raw.v !== 51) {
     throw new Error(`unsupported compact snapshot version: ${raw.v}`);
   }
 

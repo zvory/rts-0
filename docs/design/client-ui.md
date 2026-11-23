@@ -1596,7 +1596,7 @@ omits illegal build commands for those sites, and resumes on the far side; vehic
   `commandIssuer.issueCommand`. HUD selected-unit strip cells support direct selection refinement:
   left-click selects only that unit, Shift-click removes it from the selection, and Ctrl/Meta-click
   or control context-click filters the current selection to that unit kind. Base Novices and each
-  evolved Dao (War, Magic, Lightness) count as separate types for this filtering and world
+  evolved Dao (War, Magic, Lightness) have distinct authoritative unit kinds for this filtering and world
   Ctrl/Meta-click or double-click selection; a base Novice’s chosen future Dao does not split its
   type until evolution. This keeps base Novice Dao choices accessible without evolved abilities
   occupying their command-card slots. Unit command-card
@@ -2695,7 +2695,9 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   includes the shader and textures. Shore distance supplies stepped visual depth without
   changing authoritative terrain.
 - Grass (`renderer/grass.js`) defaults to selected material 9: distinct swaying blades, broad
-  gusts/passing shade, and a baked mottled olive/sage ground texture. All ordinary matches,
+  curved wind-light fronts roughly twenty seconds apart, the original passing cloud shade, and a
+  baked mottled olive/sage ground texture. Blade color no longer follows the rapid diagonal sway
+  wave; blade motion and cloud contrast/speed are unchanged. All ordinary matches,
   replays/spectators and Map Editor previews construct this grass-only mesh at map load, beneath
   decals/units/fog, and advance it with the same presentation clock as water. Editing terrain
   rebuilds grass geometry when grass membership changes; map replacement and renderer destruction
@@ -2705,13 +2707,16 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   supported unified terrain/unit shadows still composite on the decal layer above it. No lighting
   texture is allocated for flat maps. The ratio field approximates the prior terrain's additive
   altitude tint on the new grass palette and is rebuilt when editor terrain or sun changes.
-- Lab-only `shoreline-study-1` through `shoreline-study-3` compare corner-mask autotiling,
-  noisy material splatting, and signed-distance swash. The bounded `shorelineTechnique` visual
-  profile field crosses the detached worker presentation adapter; it never changes terrain codes,
-  pathing, or fog authority. The overlay sits above grass/water and below world objects/fog, uses
-  the submitted presentation clock, and releases its owned mesh, shader, and distance texture
-  on profile removal, map replacement, and teardown. A two-sided distance field is generated only
-  on map/profile changes; all three alternatives remain opt-in Lab studies pending visual selection.
+- Animated distance-field swash (`renderer/shoreline.js`, `shoreline_swash.js`) is the shared
+  match/replay/spectator/Map Editor shoreline default: textured sand, a damp bank, and broken
+  shore-following wavelets. An early signed-distance rejection skips procedural noise outside a
+  conservative -40px/+32px band; uniform land/water maps allocate no field or GPU resources.
+  The original full-map geometry, field resolution, and animation cadence remain unchanged;
+  preserving geometry avoids interpolation rounding changes at fractional zooms. The overlay
+  stays above grass/water and below world objects/fog, including after async water loading. Map
+  edits/replacement and teardown invalidate/free its mesh, shader, and distance texture.
+  `shoreline-study-1` through `shoreline-study-3` remain Lab alternatives via the bounded
+  `shorelineTechnique` visual profile field. This never changes terrain codes, pathing, or fog.
 - Lab-only `grass-survey-1` through `grass-survey-11` profiles can override this renderer default
   through the bounded `grassTechnique` selector. Profiles 6–8 remain dense-carpet alternatives;
   9–11 retain profile 5 blade/gust/shade parameters over static mottled, brushed, or earthy ground.

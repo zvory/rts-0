@@ -880,10 +880,10 @@ for (const researched of [false, true]) {
   assert(card.slots.slice(6).every((s) => s.enabled && s.cls.includes("dao-ready")));
   assert.deepEqual(card.slots.slice(6).map((s) => s.hotkey), ["Z", "X", "C"]);
   assert(cardFor({ ...unit, insight: 60 }, { upgrades: [] }).slots.slice(6).every((s) => s.enabled));
-  const light = cardFor({ ...unit, insight: 60, dao: "lightness" });
+  const light = cardFor({ ...unit, kind: KIND.LIGHTNESS_ADEPT, insight: 60, dao: "lightness" });
   assert(light.slots.some((s) => s?.ability === ABILITY.EKAT_TELEPORT));
   assert(!light.slots.some((s) => s?.ability === ABILITY.EKAT_MAGIC_ANCHOR || s?.ability?.startsWith("evolve")));
-  const magic = cardFor({ ...unit, insight: 60, dao: "magic" });
+  const magic = cardFor({ ...unit, kind: KIND.MAGIC_ADEPT, insight: 60, dao: "magic" });
   assert(magic.slots.some((s) => s?.ability === ABILITY.EKAT_MAGIC_ANCHOR && s.label === "Anchor"));
   assert(magic.slots.some((s) => s?.ability === ABILITY.DISCIPLE_SHIELD && s.enabled));
   assert(!magic.slots.some((s) => s?.ability === ABILITY.EKAT_TELEPORT));
@@ -900,7 +900,7 @@ for (const researched of [false, true]) {
   const selection = [
     { id: 1, owner: 1, kind: KIND.WARRIOR, insight: 0, chosenDao: "war" },
     { id: 2, owner: 1, kind: KIND.WARRIOR, insight: 60, chosenDao: "magic" },
-    { id: 3, owner: 1, kind: KIND.WARRIOR, insight: 60, dao: "war" },
+    { id: 3, owner: 1, kind: KIND.WAR_ADEPT, insight: 60, dao: "war" },
     { id: 4, owner: 2, kind: KIND.WARRIOR, insight: 0 },
     { id: 5, owner: 1, kind: KIND.WORKER },
   ];

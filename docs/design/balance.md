@@ -830,19 +830,20 @@ See [Cultivators](cultivators.md#three-dao-pavilion-prototype) for the approved 
 ### Disciple insight and Dao specializations
 
 Player-facing ranks are **Novice** for the base `warrior` and **Lightness Adept**,
-**War Adept**, or **Magic Adept** for its permanent Dao specialization. These are
-presentation names; internal warrior/Disciple identifiers and Dao values stay unchanged.
+**War Adept**, or **Magic Adept** for its permanent Dao specialization. Each Adept is a distinct authoritative unit kind; the base retains the `warrior` identifier.
 
 
-See [Dao evolution playtest](dao-insight.md). Entity-owned `insight` and `dao` persist
-through checkpoints. Visible Disciple snapshots append `insight` (compact slot 45) and
+See [Dao evolution playtest](dao-insight.md). Entity-owned `insight` and authoritative unit `kind` persist
+through checkpoints. Evolution changes Novice `warrior` (29) to `lightness_adept` (35),
+`war_adept` (36), or `magic_adept` (37), preserving the entity id and orders.
+Permanent Dao identity is derived from kind; the engine stores no separate mutable `dao`. Visible Disciple snapshots append `insight` (compact slot 45) and
 `dao` (slot 46: lightness/war/magic). Evolution buttons set replaceable, entity-owned `chosenDao` intent (team-private compact slot 49), independent of orders. Codes 14–16 and order stages 22–24 retain their positions.
 Evolution automatically occurs once 60 insight is ready, without research or a Pavilion.
 Evolution clears all insight and doubles the cap to 120. Evolved Disciples continue earning
 insight from actual hostile HP damage (one per unit damage, half per building damage, rounded down per hit); reaching 120 has no effect and enables no further evolution. Research ids are
 `dao_of_lightness`, `dao_of_heaviness` (War), `dao_of_magic` (Magic).
 
-Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md). Lightness uses the base Disciple’s 0.75-tile sword reach, retaining 23 damage, 50% penetration, 43-tick cooldown, moving attacks, 2.7025 px/tick movement, and Dash. Its five-tile automatic engagement closes to melee reach. Magic uses a five-tile orb primary, retaining 23 damage, 50% penetration, and 64-tick cooldown, and stops to fire. Base is unchanged. War uses 1.75-tile spear reach (`DAO_WAR_RANGE_TILES`), retaining its damage, cooldown, armor and HP bonuses. Its sprite scale remains 0.56. The base, Lightness, and Magic collision/interaction radius is 26 world pixels; War uses 18.2 pixels (26 × `DAO_WAR_BODY_SCALE`, 0.7). The starting Novice stands five tiles toward the enemy from the Nexus to clear the base with its larger body. These footprints cover the rendered torsos instead of allowing tightly stacked bodies. Sprite origins center each torso on the authoritative position, including the War atlas's forward-offset torso. Weapons, scarves, and the presentation-only 11.2-pixel War lunge may extend outside the body footprint. `DAO_WAR_BODY_SCALE` remains mirrored for artwork, selection, and collision geometry. `DAO_WAR_RANGE_TILES` and `DAO_RANGED_RANGE_TILES` are mirrored in client config and range overlays.
+Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md). Lightness uses the base Disciple’s 0.75-tile sword reach, retaining 23 damage, 50% penetration, 43-tick cooldown, moving attacks, 2.7025 px/tick movement, and Dash. Its five-tile automatic engagement closes to melee reach. Magic uses a five-tile orb primary, retaining 23 damage, 50% penetration, and 64-tick cooldown, and stops to fire. Novice Charge automatically grants 1.5× speed for one second with a 15-second cooldown against a hostile unit at least two tiles away or moving away; it has no selectable command. Lightness Dash reaches ten tiles, while Ekat retains five. War uses 1.75-tile spear reach (`DAO_WAR_RANGE_TILES`), retaining its damage, cooldown, armor and HP bonuses. Its sprite scale remains 0.56. The base, Lightness, and Magic collision/interaction radius is 26 world pixels; War uses 18.2 pixels (26 × `DAO_WAR_BODY_SCALE`, 0.7). The starting Novice stands five tiles toward the enemy from the Nexus to clear the base with its larger body. These footprints cover the rendered torsos instead of allowing tightly stacked bodies. Sprite origins center each torso on the authoritative position, including the War atlas's forward-offset torso. Weapons, scarves, and the presentation-only 11.2-pixel War lunge may extend outside the body footprint. `DAO_WAR_BODY_SCALE` remains mirrored for artwork, selection, and collision geometry. `DAO_WAR_RANGE_TILES` and `DAO_RANGED_RANGE_TILES` are mirrored in client config and range overlays.
 
 ### Tournament Grounds
 
@@ -870,7 +871,7 @@ See [Proving Grounds brief and rules](proven-grounds.md) for details and deferre
 ## Cultivator Shop
 
 Cultivator Serfs can construct the inert Shop for **200 steel and 200 oil** in **1,200 ticks
-(40 seconds)**. It has **1,000 HP**, armored status, a **3×4** footprint and one-tile sight.
+(40 seconds)**. It has **200 HP**, armored status, a **3×4** footprint and one-tile sight.
 No prerequisites, attack, production, research, abilities, supply or rally point. Normal building
 placement, cancellation, damage, fog and destruction apply. See [Shop](shop.md) for the brief.
 

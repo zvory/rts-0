@@ -406,7 +406,7 @@ pub(crate) fn run_tick(
             let Some(entity) = entities.get_mut(id) else {
                 continue;
             };
-            if entity.chosen_dao.is_none() && entity.dao.is_none() {
+            if entity.chosen_dao.is_none() && entity.dao().is_none() {
                 continue;
             }
             if players.iter().any(|player| {

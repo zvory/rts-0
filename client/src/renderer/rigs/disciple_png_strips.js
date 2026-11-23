@@ -1,12 +1,13 @@
+import { KIND } from "../../protocol.js";
 import { DAO_WAR_BODY_SCALE, DAO_MASTER_BODY_SCALE } from "../../config.js";
 import { PRODUCTION_RASTER_COLOR_TARGET } from "./color_adjustment.js";
 
-export const LIGHTNESS_FRAME_STRIP_KEY = "warrior:lightness";
-export const WAR_FRAME_STRIP_KEY = "warrior:war";
-export const MAGIC_FRAME_STRIP_KEY = "warrior:magic";
-export const LIGHTNESS_MASTER_FRAME_STRIP_KEY = "warrior:lightness:master";
-export const WAR_MASTER_FRAME_STRIP_KEY = "warrior:war:master";
-export const MAGIC_MASTER_FRAME_STRIP_KEY = "warrior:magic:master";
+export const LIGHTNESS_FRAME_STRIP_KEY = KIND.LIGHTNESS_ADEPT;
+export const WAR_FRAME_STRIP_KEY = KIND.WAR_ADEPT;
+export const MAGIC_FRAME_STRIP_KEY = KIND.MAGIC_ADEPT;
+export const LIGHTNESS_MASTER_FRAME_STRIP_KEY = "lightness_adept:master";
+export const WAR_MASTER_FRAME_STRIP_KEY = "war_adept:master";
+export const MAGIC_MASTER_FRAME_STRIP_KEY = "magic_adept:master";
 
 function discipleStrip(image, frameCount, firingFrames, iconVisibleBounds, weaponKind, imageVersion = "dao-ranged-1") {
   return Object.freeze({

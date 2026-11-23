@@ -23,6 +23,7 @@ mod entrenchment;
 mod fog_visibility;
 mod forest;
 mod moving_fire_policy;
+mod novice_charge;
 mod range_targeting;
 mod retention;
 mod rifle_post_shot;

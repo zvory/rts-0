@@ -1,7 +1,7 @@
 # Disciple insight and Dao evolution
 
 Phase 0/1 briefs and rules (completed before implementation): each path is a permanent
-specialization of the existing Disciple, retaining its entity identity, orders, cost,
+specialization of the existing Disciple, retaining its entity id, orders, cost,
 supply (2), sight, and ordinary ground pathing. War alone has a specialization-specific collision radius. Base and Lightness Disciples use 0.75-tile sword reach; War uses 1.75-tile spear reach. All three retain five-tile automatic engagement with melee pursuit. Magic replaces its sword with a five-tile ranged primary; its engagement range equals that five-tile attack range. No additional
 training source or build time. A Dao button assigns its path to every selected, owned, unevolved Disciple, even before
 insight is ready. Selecting another path replaces the pending choice. This
@@ -20,12 +20,21 @@ Pavilion research now unlocks paid one-for-one training in the [Proving Grounds]
 with the existing shared research price tiers, serial queue and prerequisite/faction gates.
 Combat-earned evolution requires neither research nor a Pavilion.
 
+Novices have **Charge**, an automatic passive with no selectable command. Against a living
+hostile unit selected by normal combat targeting (explicit attack, attack-move, or automatic
+engagement), it grants 1.5× movement speed for 30 ticks (one second), with a 450-tick
+(15-second) cooldown from activation. It triggers at center distance at least two tiles,
+or at shorter distance when the target's actual movement has a positive component away
+from the Novice. Nearby stationary, sideways-moving, or approaching targets do not trigger it.
+Buildings and friendly targets never trigger it. Movement duration and cooldown survive
+checkpoints; evolution immediately removes the speed benefit.
+
 - Lightness: mobile melee skirmisher; 1.15 times scout-car base speed (2.7025 px/tick), 1.5 attacks per original attack
-  interval (cooldown divided by 1.5), existing Ekat Dash with optional return unchanged.
-  Uses a sword at the base Disciple’s 0.75-tile reach, dealing the same 23 damage with 50% armor penetration and a 43-tick cooldown. Plain Move keeps its destination while striking legal targets within melee reach; automatic Idle/Attack Move retains five-tile acquisition and closes to sword reach. Speed and Ekat Dash with optional return are unchanged. The old archer source and strip are preserved for reuse. Selected candidate B uses a thin katana and a single shoulder scarf: resting close to the back at idle, trailing while running, and following four melee swing poses. Classic evolution key L; grid Z.
+  interval (cooldown divided by 1.5), ten-tile Dash with the existing optional return.
+  Uses a sword at the base Disciple’s 0.75-tile reach, dealing the same 23 damage with 50% armor penetration and a 43-tick cooldown. Plain Move keeps its destination while striking legal targets within melee reach; automatic Idle/Attack Move retains five-tile acquisition and closes to sword reach. Dash reaches ten tiles (doubled from five); Ekat retains five tiles. Optional return and cooldown are unchanged. The old archer source and strip are preserved for reuse. Selected candidate B uses a thin katana and a single shoulder scarf: resting close to the back at idle, trailing while running, and following four melee swing poses. Classic evolution key L; grid Z.
 - War: armored melee damage dealer; 1.05 times base movement speed (2.1 px/tick), 1.5 damage, +20 maximum HP, 50% armor
   reduction using the existing penetration mechanic (full AP bypasses it), keeps the Disciple's existing
-  50% armor penetration. Uses the approved larger armored candidate B Yari silhouette, with idle, two walking poses and four thrust poses. Its sprite scale is 0.56, halfway from the former 0.8 toward the base Disciple’s 0.32. The collision/interaction circle shrinks by the same 30%, from 13.5 to 9.45 world pixels. Its 1.75-tile weapon range plus that radius and four-pixel range slack matches the smaller spear. Vehicle hulls and building footprints retain their existing contact geometry. The 400 ms attack clip anticipates, drives, extends and recovers, with a smooth 11.2-world-pixel presentation-only forward step; collision, authoritative position and damage timing do not move with the artwork. Classic W; grid X.
+  50% armor penetration. Uses the approved larger armored candidate B Yari silhouette, with idle, two walking poses and four thrust poses. Its sprite scale is 0.56, halfway from the former 0.8 toward the base Disciple’s 0.32. The collision/interaction circle shrinks by the same 30%, from 13.5 to 18.2 world pixels. Its 1.75-tile weapon range plus that radius and four-pixel range slack matches the smaller spear. Vehicle hulls and building footprints retain their existing contact geometry. The 400 ms attack clip anticipates, drives, extends and recovers, with a smooth 11.2-world-pixel presentation-only forward step; collision, authoritative position and damage timing do not move with the artwork. Classic W; grid X.
 - Magic: battlefield support; 1.05 times base movement speed (2.1 px/tick), shared Ekat pull field (renamed Anchor), with doubled inward pull (0.70 movement-speed idle drag and up to 1.70x movement toward its center; radial falloff and weight resistance still apply) and a new Shield, uses the approved Magic C hooded spellcaster, with arms swept backward and flowing mantle while running. Its five-tile orbs deal the same 23 damage with 50% armor penetration and 64-tick cooldown. It stops to fire normally and has no secondary sword. Classic C; grid C. All three Dao silhouettes replace their legacy glyphs; insight, readiness and advancement overlays remain. Bespoke audio remains deferred.
 
 Each paid training path has a separate researched unlock; combat-earned evolution is unrestricted. No automatic AI evolution in this pass;
@@ -76,3 +85,28 @@ lifetime limit. Other Dao paths and unevolved Disciples cannot cast it. Its sepa
 lookup is needed to display the generated sword sprite. Ekat's Line Shot is unchanged.
 
 Magic uses shot-triggered windup, release, follow-through and recovery frames over 400 ms. Lightness uses four event-triggered melee swing poses from candidate B. Projectile presentation starts at the release frame (100 ms); the existing immediate authoritative damage timing is unchanged. Arrows use one shared generated texture and a bounded reusable sprite pool. Orbs are about seven world pixels across, with a small halo and one shimmering cross drawn into the shared feedback graphics batch: no emitter, per-orb display objects, blur, filters or retained particles. Retained arrow presentation support and Magic orbs consume only authorized attack endpoints and expire within 600 ms. Changing specialization preserves remaining reload and clears obsolete automatic melee pursuit without canceling explicit Move orders.
+
+## Engine unit identity
+
+The existing approved units are distinct authoritative kinds: Novice (`Warrior`, `warrior`),
+Lightness Adept (`LightnessAdept`, `lightness_adept`), War Adept (`WarAdept`, `war_adept`),
+and Magic Adept (`MagicAdept`, `magic_adept`). This is an identity correction for existing units,
+not additional content or a balance change. The user authorized implementation of this correction.
+
+Their Phase 0 roles, counters, descriptions, visuals, audio deferrals, and Phase 1 stats,
+abilities, keys, acquisition costs/timing/prerequisites, supply, sight, and movement/pathing
+remain as specified above and in the Proving Grounds design. Each path is already approved;
+no additional train buttons or research are introduced. Evolved kinds cannot be trained directly
+at the Portal. Combat evolution changes kind in place, preserving id, ownership, orders, and
+reload; paid training and tournament winners use the same transition. Direct Lab spawning of
+an Adept initializes its existing full stats and abilities.
+
+Kind is the single source of permanent specialization in simulation and checkpoints. The
+snapshot `dao` value is derived from kind for existing presentation consumers, with no second
+mutable Dao identity in the engine. Pending `chosenDao` remains base-only private intent.
+The new compact kind codes are 35 (Lightness), 36 (War), and 37 (Magic); slots are unchanged.
+Selection uses authoritative kind directly. Saves/replays from the old shared-kind representation
+are not migrated under the repository's latest-version-only policy.
+
+Bundled Lab setups declare simulation schema 7. Their existing non-Disciple entity states are
+unchanged; catalog restoration checks validate every refreshed checkpoint with the current engine.

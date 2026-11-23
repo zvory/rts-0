@@ -649,7 +649,8 @@ AI, self-play and dev contexts. Explicit `kriegsia`, `ekat` and `cultivators` re
 playable lifecycle policy; the `phase2_empty_fixture` test fixture and unknown ids remain restricted. Cultivators uses the
 `cultivators.standard` loadout; Nexus is a faction-specific presentation name for
 `resource_depot`, and Serf is the presentation name for `worker`, while Portal uses the dedicated `portal` entity kind (compact kind code 28).
-Cultivator Warriors use the dedicated `warrior` entity kind (compact kind code 29); their generic
+Cultivator Novices use `warrior` (compact kind code 29); evolved Adepts use
+`lightness_adept` (35), `war_adept` (36), and `magic_adept` (37). Their generic
 base/War/Lightness attack events carry `warrior_sword` (compact weapon-kind code 12). The retained arrow identity is `disciple_arrow` (13), and Magic orbs use `disciple_orb` (14), through the same fog-filtered attack event and immediate authoritative damage timing.
 
 Protocol vocabulary is not lifecycle admission: adding a string constant, compact code, or payload
@@ -899,7 +900,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 64. The client also accepts compact
+`messagepack-compact`, codec version 1, compact snapshot version 65. The client also accepts compact
 snapshot versions 51 through 62: version 52 only appends a kind code, version 53 appends the
 optional `unitsKilled` entity slot, version 54 appends an optional `rocket` style bit to mortar
 launch/impact event records, and version 55 adds the `artilleryIncoming` event code, so the older
@@ -937,7 +938,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 64,
+  "v": 65,
   "gr": groundDecalRevision, // omitted when zero
   "gd": [afterRevision, [    // omitted when this tick has no discovered/created revision
     [id, decalClass, sourceKindCode, x, y, owner, seed, facing, weaponFacing, radiusTiles]
@@ -979,7 +980,7 @@ Compact numeric codes:
 
 | Vocabulary | Codes |
 |------------|-------|
-| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `resource_depot`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `engineering_complex`, 18 `command_car`, 19 `ekat`, 20 `zamok`, 21 `tank_trap`, 30 `barbed_wire`, 22 `golem`, 23 `pump_jack`, 24 `panzerfaust`, 25 `scout_plane`, 26 `steel_mine`, 27 `rocket_launcher`, 28 `portal`, 29 `warrior`, 31 `three_dao_pavilion`, 32 `tournament_grounds`, 33 `proven_grounds`, 34 `shop` |
+| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `resource_depot`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `engineering_complex`, 18 `command_car`, 19 `ekat`, 20 `zamok`, 21 `tank_trap`, 30 `barbed_wire`, 22 `golem`, 23 `pump_jack`, 24 `panzerfaust`, 25 `scout_plane`, 26 `steel_mine`, 27 `rocket_launcher`, 28 `portal`, 29 `warrior`, 31 `three_dao_pavilion`, 32 `tournament_grounds`, 33 `proven_grounds`, 34 `shop`, 35 `lightness_adept`, 36 `war_adept`, 37 `magic_adept` |
 | `state` | 1 `idle`, 2 `move`, 3 `attack`, 4 `gather`, 5 `build`, 6 `train`, 7 `construct`, 8 `dead` |
 | `setupState` | 1 `packed`, 2 `setting_up`, 3 `deployed`, 4 `tearing_down` |
 | `orderStage` | 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, 5 `build`, 6 `smoke`, 7 `setupAntiTankGuns`, 8 `charge`, 9 `mortarFire`, 10 `pointFire`, 11 `breakthrough`, 12 `ekatTeleport`, 13 `ekatLineShot`, 14 `ekatMagicAnchor`, 15 `deconstruct`, 16 `ekatConsumeGolem`, 17 `blanketFire`, 18 `dismissScoutPlane`, 19 `scoutPlane`, 20 `holdPosition`, 21 `barrage`, 22 `evolveLightness`, 23 `evolveWar`, 24 `evolveMagic`, 25 `discipleShield`, 26 `throwSword` |
@@ -2005,8 +2006,10 @@ continue to re-export their authoritative vocabulary.
 
 ### Disciple insight and Dao specializations
 
-See [Dao evolution playtest](dao-insight.md). Entity-owned `insight` and `dao` persist
-through checkpoints. Disciple snapshots append team-private `insight` (compact slot 45), public
+See [Dao evolution playtest](dao-insight.md). Entity-owned `insight` and authoritative unit `kind` persist
+through checkpoints. Evolution changes Novice `warrior` (29) to `lightness_adept` (35),
+`war_adept` (36), or `magic_adept` (37), preserving the entity id and orders.
+Permanent Dao identity is derived from kind; the engine stores no separate mutable `dao`. Disciple snapshots append team-private `insight` (compact slot 45), public
 `dao` (slot 46: lightness/war/magic), `daoReady` (47), and optional
 `daoAdvanceTicks` (48, 1–15). Ordinary fog filtering applies to all public fields. Evolution buttons set replaceable, entity-owned `chosenDao` intent (team-private compact slot 49), independent of orders. Codes 14–16 and order stages 22–24 retain their positions.
 Evolution automatically occurs once 60 insight is ready, without research or a Pavilion.

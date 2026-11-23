@@ -56,7 +56,7 @@ fn shop_costs_both_resources_and_finishes_after_1200_work_ticks() {
         (0, 0)
     );
     let building = game.state.entities.get(site).unwrap();
-    assert_eq!(building.max_hp, 1000);
+    assert_eq!(building.max_hp, 200);
     assert_eq!(building.construction.as_ref().unwrap().total, 1200);
     let progress = building.construction.as_ref().unwrap().progress;
     for _ in progress..1199 {
@@ -66,7 +66,7 @@ fn shop_costs_both_resources_and_finishes_after_1200_work_ticks() {
     game.tick();
     let building = game.state.entities.get(site).unwrap();
     assert!(!building.under_construction());
-    assert_eq!(building.hp, 1000);
+    assert_eq!(building.hp, 200);
     assert!(building.production.is_none());
     assert!(building.combat.is_none());
     let restored = Game::restore_checkpoint_payload_text_for_test(

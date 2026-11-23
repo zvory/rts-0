@@ -38,18 +38,12 @@ export function createLiveFrameStrips() {
   return strips;
 }
 
-// Dao changes only the raster strip; the shared Warrior rig still owns shadows,
-// overlay routes and fallback geometry for all four Disciple forms.
+// Each authoritative kind routes to its own production strip.
 export function liveFrameStripKeyForEntity(entity) {
-  if (entity?.kind === KIND.WARRIOR) {
-    if (entity.daoMaster) {
-      if (entity.dao === "lightness") return LIGHTNESS_MASTER_FRAME_STRIP_KEY;
-      if (entity.dao === "war") return WAR_MASTER_FRAME_STRIP_KEY;
-      if (entity.dao === "magic") return MAGIC_MASTER_FRAME_STRIP_KEY;
-    }
-    if (entity.dao === "lightness") return LIGHTNESS_FRAME_STRIP_KEY;
-    if (entity.dao === "war") return WAR_FRAME_STRIP_KEY;
-    if (entity.dao === "magic") return MAGIC_FRAME_STRIP_KEY;
+  if (entity?.daoMaster) {
+    if (entity.kind === KIND.LIGHTNESS_ADEPT) return LIGHTNESS_MASTER_FRAME_STRIP_KEY;
+    if (entity.kind === KIND.WAR_ADEPT) return WAR_MASTER_FRAME_STRIP_KEY;
+    if (entity.kind === KIND.MAGIC_ADEPT) return MAGIC_MASTER_FRAME_STRIP_KEY;
   }
   return liveRigKeyForEntity(entity);
 }

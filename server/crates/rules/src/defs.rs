@@ -95,6 +95,48 @@ const FACTORY_BUILDING_REQUIRED: &[EntityKind] = &[EntityKind::Factory];
 const ENGINEERING_COMPLEX_REQUIRED: &[EntityKind] = &[EntityKind::EngineeringComplex];
 const FACTORY_REQUIRED: &[EntityKind] = &[EntityKind::ResourceDepot, EntityKind::TrainingCentre];
 
+const NOVICE_DEF: UnitDef = UnitDef {
+    kind: EntityKind::Warrior,
+    stats: balance::UnitStats {
+        hp: 115,
+        dmg: 23,
+        range_tiles: 0.75,
+        cooldown: 64,
+        speed: 2.0,
+        sight_tiles: 11,
+        cost_steel: 100,
+        cost_oil: 0,
+        supply: 2,
+        build_ticks: 300,
+        radius: 26.0,
+    },
+    armor_class: ArmorClass::Small,
+    weapon: WeaponClass::SmallArms,
+    trained_at: Some(EntityKind::Portal),
+    train_requirement: TechRequirement::All(&[]),
+};
+
+const SCOUT_CAR_DEF: UnitDef = UnitDef {
+    kind: EntityKind::ScoutCar,
+    stats: balance::UnitStats {
+        hp: 100,
+        dmg: 6,
+        range_tiles: 7.0,
+        cooldown: 12,
+        speed: 2.35,
+        sight_tiles: 15,
+        cost_steel: 125,
+        cost_oil: 60,
+        supply: 3,
+        build_ticks: 480,
+        radius: 9.6,
+    },
+    armor_class: ArmorClass::Small,
+    weapon: WeaponClass::SmallArms,
+    trained_at: Some(EntityKind::Factory),
+    train_requirement: TechRequirement::All(&[]),
+};
+
 pub const UNITS: &[UnitDef] = &[
     UnitDef {
         kind: EntityKind::Worker,
@@ -136,25 +178,40 @@ pub const UNITS: &[UnitDef] = &[
         trained_at: Some(EntityKind::Zamok),
         train_requirement: TechRequirement::All(&[]),
     },
+    NOVICE_DEF,
     UnitDef {
-        kind: EntityKind::Warrior,
+        kind: EntityKind::LightnessAdept,
         stats: balance::UnitStats {
-            hp: 115,
-            dmg: 23,
-            range_tiles: 0.75,
-            cooldown: 64,
-            speed: 2.0,
-            sight_tiles: 11,
-            cost_steel: 100,
-            cost_oil: 0,
-            supply: 2,
-            build_ticks: 300,
-            radius: 26.0,
+            cooldown: (NOVICE_DEF.stats.cooldown as f32 / balance::DAO_LIGHTNESS_ATTACK_RATE + 0.5)
+                as u32,
+            speed: SCOUT_CAR_DEF.stats.speed * balance::DAO_LIGHTNESS_SPEED_MULTIPLIER,
+            ..NOVICE_DEF.stats
         },
-        armor_class: ArmorClass::Small,
-        weapon: WeaponClass::SmallArms,
-        trained_at: Some(EntityKind::Portal),
-        train_requirement: TechRequirement::All(&[]),
+        trained_at: None,
+        ..NOVICE_DEF
+    },
+    UnitDef {
+        kind: EntityKind::WarAdept,
+        stats: balance::UnitStats {
+            hp: NOVICE_DEF.stats.hp + balance::DAO_WAR_HP_BONUS,
+            dmg: (NOVICE_DEF.stats.dmg as f32 * balance::DAO_WAR_DAMAGE_MULTIPLIER + 0.5) as u32,
+            range_tiles: balance::DAO_WAR_RANGE_TILES,
+            speed: NOVICE_DEF.stats.speed * balance::DAO_WAR_SPEED_MULTIPLIER,
+            radius: NOVICE_DEF.stats.radius * balance::DAO_WAR_BODY_SCALE,
+            ..NOVICE_DEF.stats
+        },
+        trained_at: None,
+        ..NOVICE_DEF
+    },
+    UnitDef {
+        kind: EntityKind::MagicAdept,
+        stats: balance::UnitStats {
+            range_tiles: balance::DAO_RANGED_RANGE_TILES,
+            speed: NOVICE_DEF.stats.speed * balance::DAO_MAGIC_SPEED_MULTIPLIER,
+            ..NOVICE_DEF.stats
+        },
+        trained_at: None,
+        ..NOVICE_DEF
     },
     UnitDef {
         kind: EntityKind::Rifleman,
@@ -319,26 +376,7 @@ pub const UNITS: &[UnitDef] = &[
         trained_at: Some(EntityKind::Factory),
         train_requirement: TechRequirement::All(FACTORY_BUILDING_REQUIRED),
     },
-    UnitDef {
-        kind: EntityKind::ScoutCar,
-        stats: balance::UnitStats {
-            hp: 100,
-            dmg: 6,
-            range_tiles: 7.0,
-            cooldown: 12,
-            speed: 2.35,
-            sight_tiles: 15,
-            cost_steel: 125,
-            cost_oil: 60,
-            supply: 3,
-            build_ticks: 480,
-            radius: 9.6,
-        },
-        armor_class: ArmorClass::Small,
-        weapon: WeaponClass::SmallArms,
-        trained_at: Some(EntityKind::Factory),
-        train_requirement: TechRequirement::All(&[]),
-    },
+    SCOUT_CAR_DEF,
     UnitDef {
         kind: EntityKind::ScoutPlane,
         stats: balance::UnitStats {
@@ -405,7 +443,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
         kind: EntityKind::Shop,
         stats: balance::BuildingStats {
-            hp: 1000,
+            hp: 200,
             sight_tiles: 1,
             cost_steel: 200,
             cost_oil: 200,
@@ -812,6 +850,9 @@ mod tests {
                 EntityKind::Worker,
                 EntityKind::Golem,
                 EntityKind::Warrior,
+                EntityKind::LightnessAdept,
+                EntityKind::WarAdept,
+                EntityKind::MagicAdept,
                 EntityKind::Rifleman,
                 EntityKind::Panzerfaust,
                 EntityKind::MachineGunner,

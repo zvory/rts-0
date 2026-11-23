@@ -432,7 +432,7 @@ export function _drawAbilityTargetPreview(view) {
         preview.minRangePx,
       );
     } else {
-      dashedCircle(g, carrier.x, carrier.y, preview.rangePx, 64, 1.5, rangeColor, 0.85);
+      dashedCircle(g, carrier.x, carrier.y, carrier.rangePx ?? preview.rangePx, 64, 1.5, rangeColor, 0.85);
       if (preview.minRangePx > 0) {
         dashedCircle(g, carrier.x, carrier.y, preview.minRangePx, 42, 1.3, minRangeColor, 0.82);
       }

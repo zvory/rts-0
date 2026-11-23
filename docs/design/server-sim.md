@@ -290,7 +290,7 @@ check once on reaching the end through playback or seeking, log status and cost,
 on mismatches or unavailable algorithms. Seeking backward re-arms verification. A mismatch signals
 divergence; it does not distinguish nondeterminism from build/rules/platform drift or corruption.
 
-The algorithm `rts-end-state-json-sha256-v2` hashes its ASCII identifier followed immediately by
+The algorithm `rts-end-state-json-sha256-v3` hashes its ASCII identifier followed immediately by
 compact serde_json serialization of the explicit ordered projection in
 `game/checkpoint/fingerprint.rs`. SHA-256 is streamed through a 64 KiB buffer. Struct fields have
 fixed serialization order; entity ids and unordered fog/memory collections are sorted by their
@@ -298,6 +298,7 @@ checkpoint adapters. Numbers use serde_json's locale-independent decimal represe
 native-endian memory, pointer addresses, Rust `Hash`, or debug text. Valid simulation floats are
 finite and their exact round-trip values participate without rounding/tolerance. Arrays retain
 semantic order. Changes to projection/serialization semantics require a new algorithm identifier.
+Version 3 removes the redundant mutable Dao field; simulation schema 7 records Adept identity in kind.
 The map uses its existing canonical materialized binding; map content is immutable during live play.
 The projection includes all committed authoritative owners (players/private economy/scores/upgrades,
 entities/orders, fog/memories, active abilities/projectiles, decals/trails, world combat signals,
@@ -351,7 +352,7 @@ architecture failures.
 | Field | Category | Checkpoint policy | Evidence and notes |
 | --- | --- | --- | --- |
 | `map` | `authoritative/serialized` | Internal cold checkpoints serialize the full live `Map` value. Public `GameCheckpointV1` payloads do not embed a map body; they carry `mapBinding` facts and import only with the exact container-supplied `Map`. See §3.1.3. | `Game::new_inner_with_map` stores the generated or supplied map; `systems::run_tick`, pathing, fog, placement, resource setup, and `start_payload` all read it. Runtime ownership and external artifact composition are intentionally separate contracts. |
-| `entities` | `authoritative/serialized` | Serialize the full `EntityStore`, including shared disciple entry targets, Proving Grounds training plans/active trainee production, tournament entrants and pre-rolled winners in movement/production groups, stable entity ids, allocator/high-water state, HP, orders, queues, movement state, selected waypoints, path goals, committed pivot-recovery goals/facing/timeouts, weapon cooldowns, Methamphetamines Rifleman post-shot lock timestamps, ability charges and charge-recharge timers, episode-keyed firing-reveal reaction gates, combat state (including the materialized `tank_plus` owner-research flag, refreshed before movement and after production each tick so new and existing Tanks share modifiers), per-unit kill totals and last-damaging entity attribution, Disciple insight, permanent Dao, Master rank and replaceable chosen Dao intent, production/build progress, rally plans, Scout Plane source-car/orbit/remaining-lifetime state, resource reservations, extractor fractional unsupported-decay damage (serialized with extractor harvest progress), body/weapon/setup facing, Tank commander MG facing and secondary target id, and entity flags. | `systems::run_tick` mutates the store every tick; snapshots, score, survival, command validation, replay determinism tests, and the Phase 0.5 comparator all treat entity state as semantic authority. Chosen movement paths and aerial orbit state live on entities, not in `pathing`. Scout Plane entities are excluded from standard fog sight stamping and contribute independent team aerial vision through the dedicated smoke-only pass. |
+| `entities` | `authoritative/serialized` | Serialize the full `EntityStore`, including shared disciple entry targets, Proving Grounds training plans/active trainee production, tournament entrants and pre-rolled winners in movement/production groups, stable entity ids, allocator/high-water state, HP, orders, queues, movement state, selected waypoints, path goals, committed pivot-recovery goals/facing/timeouts, weapon cooldowns, Methamphetamines Rifleman post-shot lock timestamps, ability charges and charge-recharge timers, episode-keyed firing-reveal reaction gates, combat state (including the materialized `tank_plus` owner-research flag, refreshed before movement and after production each tick so new and existing Tanks share modifiers), per-unit kill totals and last-damaging entity attribution, Novice Charge duration and cooldown, Disciple insight, permanent Dao and replaceable chosen Dao intent, production/build progress, rally plans, Scout Plane source-car/orbit/remaining-lifetime state, resource reservations, extractor fractional unsupported-decay damage (serialized with extractor harvest progress), body/weapon/setup facing, Tank commander MG facing and secondary target id, and entity flags. | `systems::run_tick` mutates the store every tick; snapshots, score, survival, command validation, replay determinism tests, and the Phase 0.5 comparator all treat entity state as semantic authority. Chosen movement paths and aerial orbit state live on entities, not in `pathing`. Scout Plane entities are excluded from standard fog sight stamping and contribute independent team aerial vision through the dedicated smoke-only pass. |
 | `fog` | `authoritative/serialized` | Serialize the latest 15 Hz actionable visibility sample and its bounded per-viewer firing-reveal provenance map. | `recompute_live_fog` separately records whether each sampled entity needs its firing reveal for targeting and whether the stamped terrain tile lacked ordinary sight. Combat consumes the first fact; snapshot `visibleTiles` removes only terrain-reveal-only stamps. Phase 0.5 compares per-player actionable tiles as semantic state. |
 | `building_memory` | `authoritative/serialized` | Serialize remembered building entries and cleared-observation ticks per player. | `BuildingMemory::refresh` records last-seen enemy building state, while match setup seeds entity-backed neutral buildings authored into the map for every player. Hidden destroyed entries are removed only after the footprint is scouted again; that clear tick prevents older positive memory from another selected player from resurrecting the building in union observer projections. Spectator/player snapshots project remembered buildings while fogged. |
 | `resource_memory` | `authoritative/serialized` | Serialize static resource identities, initial quantities, and per-player last-observed remaining quantities and ticks, retaining explicit depletion records. | Tick/setup/Lab fog-memory refresh observes only living-team visible tiles; player and selected observer projections resolve this state without mutating it. Checkpoints and replay keyframes restore resource knowledge alongside building memory. Legacy launch checkpoints without the field seed at tick zero; nonzero checkpoints missing it are rejected because historical knowledge cannot be recovered from the current world. |
@@ -543,7 +544,7 @@ Top-level shape:
   "compatibility": {
     "createdBy": "server|replay|lab|debug",
     "serverBuildSha": "...",
-    "simSchemaVersion": 6,
+    "simSchemaVersion": 7,
     "rulesVersion": 1,
     "protocolVersion": 1,
     "requiredFeatures": [],
@@ -2181,14 +2182,16 @@ Tank tile entry exhausts the entire wire segment immediately, without damage or 
 
 ### Disciple insight and Dao specializations
 
-See [Dao evolution playtest](dao-insight.md). Entity-owned `insight` and `dao` persist
-through checkpoints. Visible Disciple snapshots append `insight` (compact slot 45) and
+See [Dao evolution playtest](dao-insight.md). Entity-owned `insight` and authoritative unit `kind` persist
+through checkpoints. Evolution changes Novice `warrior` (29) to `lightness_adept` (35),
+`war_adept` (36), or `magic_adept` (37), preserving the entity id and orders.
+Permanent Dao identity is derived from kind; the engine stores no separate mutable `dao`. Visible Disciple snapshots append `insight` (compact slot 45) and
 `dao` (slot 46: lightness/war/magic). Evolution buttons set replaceable, entity-owned `chosenDao` intent (team-private compact slot 49), independent of orders. Codes 14–16 and order stages 22–24 retain their positions.
 Evolution automatically occurs once 60 insight is ready, without research or a Pavilion.
 Evolution clears all insight and doubles the cap to 120. Evolved Disciples continue earning
 insight from actual hostile HP damage; reaching 120 automatically advances a living Adept
-to its matching [Master](dao-masters.md), resets insight, and fully heals to the new maximum HP.
-`daoMaster` (public boolean, compact slot 52) persists with the entity; Masters cannot advance again. Research ids are
+to its matching [Master](dao-masters.md), resets insight and fully heals. Public
+`daoMaster` (compact slot 52) persists alongside the authoritative Adept kind. Research ids are
 `dao_of_lightness`, `dao_of_heaviness` (War), `dao_of_magic` (Magic).
 
 Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md).

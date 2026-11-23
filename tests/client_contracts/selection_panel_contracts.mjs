@@ -20,7 +20,7 @@ withFakeHudDocument(({ FakeElement }) => {
   const players = [{ id: 1, factionId: "cultivators" }];
   for (const [dao, label] of [[null, "Novice"], ["lightness", "Lightness Adept"],
     ["war", "War Adept"], ["magic", "Magic Adept"]]) {
-    const entity = { id: 1, owner: 1, kind: KIND.WARRIOR, dao };
+    const entity = { id: 1, owner: 1, kind: ({ lightness: KIND.LIGHTNESS_ADEPT, war: KIND.WAR_ADEPT, magic: KIND.MAGIC_ADEPT })[dao] || KIND.WARRIOR, dao };
     const state = {
       players,
       controlGroups: [[1]],
@@ -58,10 +58,12 @@ withFakeHudDocument(({ FakeElement }) => {
   selectionPanel.render();
   assert(portraits.length === 2, "unchanged multi-selection reuses its portraits");
   selected[0].dao = "lightness";
+  selected[0].kind = KIND.LIGHTNESS_ADEPT;
   selectionPanel.render();
   assert(portraits.length === 4 && portraits[2] === "lightness",
     "evolution refreshes the selected group's portraits without reselection");
   selected[1].dao = "magic";
+  selected[1].kind = KIND.MAGIC_ADEPT;
   selectionPanel.render();
   assert(portraits.length === 6 && portraits[5] === "magic",
     "each selected Disciple's Dao participates in portrait cache invalidation");
@@ -365,6 +367,7 @@ withFakeHudDocument(({ FakeElement }) => {
   selectionPanel.render();
   assert(text(panel).includes("Insight: 60 / 60"), "base Disciple details show the 60 insight cap");
   disciple.dao = "magic";
+  disciple.kind = KIND.MAGIC_ADEPT;
   disciple.insight = 0;
   selectionPanel.render();
   assert(text(panel).includes("Insight: 0 / 120"), "evolution refreshes insight and the doubled cap");

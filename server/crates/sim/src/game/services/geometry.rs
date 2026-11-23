@@ -148,13 +148,7 @@ pub(crate) fn unit_body(kind: EntityKind, x: f32, y: f32) -> Option<UnitBody> {
 }
 
 pub(crate) fn unit_body_for_entity(e: &Entity) -> Option<UnitBody> {
-    let mut body = unit_body_with_facing(e.kind, e.pos_x(), e.pos_y(), e.facing())?;
-    if let UnitBody::Circle(circle) = &mut body {
-        if e.kind == EntityKind::Warrior {
-            circle.radius = e.radius();
-        }
-    }
-    Some(body)
+    unit_body_with_facing(e.kind, e.pos_x(), e.pos_y(), e.facing())
 }
 
 pub(crate) fn unit_body_with_facing(

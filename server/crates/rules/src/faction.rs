@@ -426,12 +426,12 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 9] = [
         label: "Charge",
         icon: "CHG",
         hotkey: None,
-        title: "Legacy Charge command compatibility",
+        title: "Automatic Novice Charge: 1.5x speed for one second against a distant or retreating enemy unit",
         carriers: &[],
         target_mode: AbilityTargetMode::SelfTarget,
         range_tiles: None,
         min_range_tiles: None,
-        cooldown_ticks: 0,
+        cooldown_ticks: balance::NOVICE_CHARGE_COOLDOWN_TICKS,
         charges: None,
         charge_recharge_ticks: None,
         cost: ResourceCost::new(0, 0),
@@ -637,7 +637,7 @@ const EKAT_ABILITIES: [AbilityCatalogEntry; 4] = [
         icon: "DSH",
         hotkey: Some("D"),
         title: "Dash up to 5 tiles, then recast to return",
-        carriers: &[EntityKind::Ekat, EntityKind::Warrior],
+        carriers: &[EntityKind::Ekat, EntityKind::LightnessAdept],
         target_mode: AbilityTargetMode::WorldPoint,
         range_tiles: Some(balance::EKAT_TELEPORT_RANGE_TILES),
         min_range_tiles: None,
@@ -681,7 +681,7 @@ const EKAT_ABILITIES: [AbilityCatalogEntry; 4] = [
         icon: "ANC",
         hotkey: Some("C"),
         title: "Place a 10-second pull field",
-        carriers: &[EntityKind::Ekat, EntityKind::Warrior],
+        carriers: &[EntityKind::Ekat, EntityKind::MagicAdept],
         target_mode: AbilityTargetMode::WorldPoint,
         range_tiles: Some(balance::EKAT_MAGIC_ANCHOR_RANGE_TILES),
         min_range_tiles: None,
@@ -786,7 +786,13 @@ use dao::CULTIVATOR_ABILITIES;
 pub const CULTIVATORS_CATALOG: FactionCatalog = FactionCatalog {
     id: CULTIVATORS_FACTION_ID,
     loadout: CULTIVATORS_LOADOUT,
-    units: &[EntityKind::Worker, EntityKind::Warrior],
+    units: &[
+        EntityKind::Worker,
+        EntityKind::Warrior,
+        EntityKind::LightnessAdept,
+        EntityKind::WarAdept,
+        EntityKind::MagicAdept,
+    ],
     buildings: &[
         EntityKind::ResourceDepot,
         EntityKind::Portal,
@@ -1066,6 +1072,14 @@ pub fn ability_definition(kind: AbilityKind) -> AbilityCatalogEntry {
     }
 }
 
+pub fn ability_range_for_carrier(kind: AbilityKind, carrier: EntityKind) -> Option<u32> {
+    if kind == AbilityKind::EkatTeleport && carrier == EntityKind::LightnessAdept {
+        Some(balance::DAO_LIGHTNESS_DASH_RANGE_TILES)
+    } else {
+        ability_definition(kind).range_tiles
+    }
+}
+
 pub fn ability_cost_for_carrier(kind: AbilityKind, carrier: EntityKind) -> ResourceCost {
     let definition = ability_definition(kind);
     let carrier_costs = match kind {
@@ -1300,10 +1314,13 @@ mod tests {
         let charge = ability_definition(AbilityKind::Charge);
         assert!(!charge.command_card);
         assert!(charge.carriers.is_empty());
-        assert_eq!(charge.cooldown_ticks, 0);
+        assert_eq!(charge.cooldown_ticks, balance::NOVICE_CHARGE_COOLDOWN_TICKS);
 
         let teleport = EKAT_CATALOG.ability(AbilityKind::EkatTeleport).unwrap();
-        assert_eq!(teleport.carriers, &[EntityKind::Ekat, EntityKind::Warrior]);
+        assert_eq!(
+            teleport.carriers,
+            &[EntityKind::Ekat, EntityKind::LightnessAdept]
+        );
         assert_eq!(
             teleport.range_tiles,
             Some(balance::EKAT_TELEPORT_RANGE_TILES)
@@ -1317,7 +1334,7 @@ mod tests {
         );
 
         let anchor = EKAT_CATALOG.ability(AbilityKind::EkatMagicAnchor).unwrap();
-        assert_eq!(anchor.carriers, &[EntityKind::Ekat, EntityKind::Warrior]);
+        assert_eq!(anchor.carriers, &[EntityKind::Ekat, EntityKind::MagicAdept]);
         assert_eq!(
             anchor.range_tiles,
             Some(balance::EKAT_MAGIC_ANCHOR_RANGE_TILES)
@@ -1357,7 +1374,16 @@ mod tests {
         assert_eq!(catalog.loadout.id, "cultivators.standard");
         assert_eq!(catalog.loadout.initial_steel, balance::STARTING_STEEL);
         assert_eq!(catalog.loadout.initial_oil, balance::STARTING_OIL);
-        assert_eq!(catalog.units, &[EntityKind::Worker, EntityKind::Warrior]);
+        assert_eq!(
+            catalog.units,
+            &[
+                EntityKind::Worker,
+                EntityKind::Warrior,
+                EntityKind::LightnessAdept,
+                EntityKind::WarAdept,
+                EntityKind::MagicAdept
+            ]
+        );
         assert_eq!(
             catalog.buildables,
             &[
@@ -1393,12 +1419,13 @@ mod tests {
             AbilityKind::EvolveLightness,
             AbilityKind::EvolveWar,
             AbilityKind::EvolveMagic,
-            AbilityKind::DiscipleShield,
-            AbilityKind::EkatTeleport,
-            AbilityKind::EkatMagicAnchor,
         ] {
             assert!(catalog.allows_ability(ability, EntityKind::Warrior));
         }
+        assert!(catalog.allows_ability(AbilityKind::DiscipleShield, EntityKind::MagicAdept));
+        assert!(catalog.allows_ability(AbilityKind::EkatMagicAnchor, EntityKind::MagicAdept));
+        assert!(catalog.allows_ability(AbilityKind::EkatTeleport, EntityKind::LightnessAdept));
+        assert!(catalog.allows_ability(AbilityKind::ThrowSword, EntityKind::WarAdept));
     }
 
     #[test]

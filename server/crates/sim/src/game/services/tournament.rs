@@ -36,9 +36,10 @@ pub(super) fn order_entry(
     target: u32,
 ) {
     for id in units {
-        let Some(unit) = entities.get(*id).filter(|e| {
-            e.owner == owner && e.kind == EntityKind::Warrior && e.dao.is_none() && e.hp > 0
-        }) else {
+        let Some(unit) = entities
+            .get(*id)
+            .filter(|e| e.owner == owner && e.kind == EntityKind::Warrior && e.hp > 0)
+        else {
             continue;
         };
         let approach = (unit.pos_x(), unit.pos_y());
@@ -72,7 +73,7 @@ pub(in crate::game) fn advance(
                 e.movement.as_ref()?.tournament_target?,
                 e.pos_x(),
                 e.pos_y(),
-                e.hp > 0 && e.kind == EntityKind::Warrior && e.dao.is_none(),
+                e.hp > 0 && e.kind == EntityKind::Warrior,
             ))
         }) else {
             continue;

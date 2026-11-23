@@ -111,5 +111,7 @@ mod tests {
 
 // Cultivator Shop: wire kind shop, compact kind code 34; no additional snapshot fields.
 
-// Dao Master rank: EntityView daoMaster is a public bool at compact slot 52 (v64);
-// rts-contract owns the DTO, the sim owns advancement, and exact insight stays team-private.
+// Novice warrior (29) evolves into distinct kinds lightness_adept (35), war_adept (36),
+// or magic_adept (37). EntityView.dao is derived presentation metadata, not engine identity.
+
+// EntityView daoMaster: public Master rank at compact slot 52 (v65).

@@ -223,8 +223,7 @@ fn requires_weapon_setup(kind: EntityKind) -> bool {
 
 pub(super) fn can_fire_while_moving(e: &Entity, methamphetamines_researched: bool) -> bool {
     crate::game::entity::fires_while_moving(e.kind)
-        || (e.kind == EntityKind::Warrior
-            && e.dao == Some(crate::game::upgrade::UpgradeKind::DaoOfLightness))
+        || e.kind == EntityKind::LightnessAdept
         || (crate::rules::is_rifle_infantry(e.kind) && methamphetamines_researched)
         || breakthrough_moving_fire_active(e)
 }
@@ -280,9 +279,7 @@ pub(super) fn effective_attack_profile(e: &Entity) -> EffectiveAttackProfile {
     let weapon = e
         .default_weapon_kind()
         .and_then(combat_rules::weapon_profile);
-    let base = weapon
-        .map(|weapon| weapon.attack_profile())
-        .unwrap_or(combat_rules::AttackProfile::NONE);
+    let base = combat_rules::attack_profile(e.kind);
     let mut profile = EffectiveAttackProfile {
         weapon,
         min_range_tiles: if e.kind == EntityKind::MortarTeam {
@@ -297,14 +294,6 @@ pub(super) fn effective_attack_profile(e: &Entity) -> EffectiveAttackProfile {
         dmg: base.dmg,
         cooldown: base.cooldown,
     };
-    if e.dao == Some(crate::game::upgrade::UpgradeKind::DaoOfLightness) {
-        profile.cooldown =
-            ((profile.cooldown as f32) / config::DAO_LIGHTNESS_ATTACK_RATE).round() as u32;
-    }
-    if e.dao == Some(crate::game::upgrade::UpgradeKind::DaoOfHeaviness) {
-        profile.dmg = ((profile.dmg as f32) * config::DAO_WAR_DAMAGE_MULTIPLIER).round() as u32;
-        profile.range_tiles = config::DAO_WAR_RANGE_TILES;
-    }
     if e.dao_master {
         profile.dmg = ((profile.dmg as f32) * config::DAO_MASTER_DAMAGE_MULTIPLIER).round() as u32;
     }

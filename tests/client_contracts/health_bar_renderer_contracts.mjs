@@ -172,7 +172,7 @@ try {
   _hpBar.call({ _map: { tileSize: 32 } }, discipleBar, { ...disciple, kind: KIND.RIFLEMAN });
   assert(!discipleBar.rtsInsight.visible && !discipleBar.rtsDao.visible && !discipleBar.rtsRadiance.visible,
     "reused bars hide Disciple overlays when the entity kind changes");
-  _hpBar.call({ _map: { tileSize: 32 } }, discipleBar, { ...disciple, dao: "magic" });
+  _hpBar.call({ _map: { tileSize: 32 } }, discipleBar, { ...disciple, kind: KIND.MAGIC_ADEPT, dao: "magic" });
   assert(discipleBar.children.length === 6 && discipleBar.rtsInsight.visible && discipleBar.rtsDao.visible,
     "returning Disciples reuse and reveal their existing overlays");
 } finally {

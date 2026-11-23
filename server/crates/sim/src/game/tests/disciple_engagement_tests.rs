@@ -215,7 +215,7 @@ fn engagement_range_defaults_to_current_attack_range_for_every_other_kind() {
             let actual = combat::engagement_range_tiles(kind, range);
             assert_eq!(
                 actual,
-                if kind == EntityKind::Warrior {
+                if kind.is_disciple() {
                     range.max(5.0)
                 } else {
                     range
@@ -327,8 +327,11 @@ fn war_spear_approaches_then_stops_at_ready_tip_reach() {
     // Start outside spear reach but inside automatic engagement. Ordinary infantry
     // retains center targeting; reach includes the enlarged War body radius.
     let (mut game, attacker, target) = fixture(EntityKind::Warrior, 160.0);
-    game.state.entities.get_mut(attacker).unwrap().dao =
-        Some(crate::game::upgrade::UpgradeKind::DaoOfHeaviness);
+    game.state
+        .entities
+        .get_mut(attacker)
+        .unwrap()
+        .set_disciple_kind_for_test(EntityKind::WarAdept);
     game.state
         .entities
         .get_mut(target)

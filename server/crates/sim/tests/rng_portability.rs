@@ -140,11 +140,12 @@ fn end_state_fingerprint_matches_native_and_wasm() {
     for _ in 0..3 {
         game.tick();
     }
-    // Fingerprint v2 includes checkpointed resource knowledge and entity-owned tournament
+    // Fingerprint v3 derives permanent Dao from kind, without a mutable Dao field.
+    // It includes the persisted Novice Charge timer, resource knowledge and tournament
     // entry/production and optional committed pivot-recovery fields, as well as the
     // remaining entity and RNG state. Native and WASM must share this known answer.
     assert_eq!(
         game.replay_end_state_hash().unwrap(),
-        "0ce4442d68375138edec8eb1d4d2f2b070c4227c5e98984486ff95925076f081"
+        "2411bbfaa1540eebeb799e8e87d1408a5c283b4ee8d0ea70629fdd5de2b842b2"
     );
 }

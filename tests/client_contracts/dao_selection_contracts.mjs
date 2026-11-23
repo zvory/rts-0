@@ -8,10 +8,10 @@ import { HudSelectionPanel } from "../../client/src/hud_selection_panel.js";
 const novices = [
   { id: 51, dao: null },
   { id: 52, chosenDao: "war" },
-  { id: 53, dao: "war" },
-  { id: 54, dao: "war" },
-  { id: 55, dao: "magic" },
-  { id: 56, dao: "lightness" },
+  { id: 53, kind: KIND.WAR_ADEPT, dao: "war" },
+  { id: 54, kind: KIND.WAR_ADEPT, dao: "war" },
+  { id: 55, kind: KIND.MAGIC_ADEPT, dao: "magic" },
+  { id: 56, kind: KIND.LIGHTNESS_ADEPT, dao: "lightness" },
 ].map((unit, i) => ({ owner: 1, kind: KIND.WARRIOR, x: 100 + i * 40, y: 100, ...unit }));
 const state = {
   playerId: 1,
