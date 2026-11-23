@@ -2923,7 +2923,8 @@ Masters have no further insight meter. See [Master review spec](dao-masters.md).
 
 Novice Charge uses a passive command-card descriptor: always disabled, with the autocast swirl
 and server-projected cooldown clocks. Passive descriptors have no primary/context action or hotkey
-and are excluded from the hotkey command catalog. Evolution removes the Novice-only tile.
+and are excluded from the hotkey command catalog. Charge occupies logical slot 10 in the fourth
+column so mixed selections retain Lightness Dash and Throw Sword. Evolution removes the Novice-only tile.
 
 ### Cultivator item slot
 

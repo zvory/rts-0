@@ -706,9 +706,9 @@ assert.equal(createClassicPreset(buildHotkeyCommandCatalog(buildCommandCardConte
     groupCooldownClocks: () => [], playerHasCompleteKind: () => true,
   });
   const classic = profiles.presets.find((p) => p.id === HOTKEY_PRESET_CLASSIC);
-  assert.deepEqual(profiles.resolveCard(card, classic).slots.slice(6).map((s) => s.hotkey), ["L", "W", "C"]);
+  assert.deepEqual(profiles.resolveCard(card, classic).slots.slice(6, 9).map((s) => s.hotkey), ["L", "W", "C"]);
   const grid = profiles.presets.find((p) => p.id === HOTKEY_PRESET_GRID);
-  assert.deepEqual(profiles.resolveCard(card, grid).slots.slice(6).map((s) => s.hotkey), ["Z", "X", "C"]);
+  assert.deepEqual(profiles.resolveCard(card, grid).slots.slice(6, 9).map((s) => s.hotkey), ["Z", "X", "C"]);
 }
 
 {
