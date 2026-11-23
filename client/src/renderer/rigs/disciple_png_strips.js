@@ -80,7 +80,12 @@ function masterStrip(adept, path, bounds) {
 }
 export const LIGHTNESS_MASTER_PNG_FRAME_STRIP = masterStrip(LIGHTNESS_PNG_FRAME_STRIP, "lightness",
   { x: 42, y: 24, w: 175, h: 205 });
-export const WAR_MASTER_PNG_FRAME_STRIP = masterStrip(WAR_PNG_FRAME_STRIP, "war",
-  { x: 94, y: 106, w: 68, h: 122 });
+export const WAR_MASTER_PNG_FRAME_STRIP = Object.freeze({
+  ...masterStrip(WAR_PNG_FRAME_STRIP, "war", { x: 145, y: 155, w: 95, h: 185 }),
+  image: "/assets/rigs/disciple-dao/generated/war-master-runtime-strip.png?v=master-torso-2",
+  imageVersion: "master-torso-2",
+  frameWidth: 384,
+  frameHeight: 384,
+});
 export const MAGIC_MASTER_PNG_FRAME_STRIP = masterStrip(MAGIC_PNG_FRAME_STRIP, "magic",
   { x: 52, y: 53, w: 152, h: 151 });

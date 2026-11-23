@@ -132,14 +132,14 @@ for (const [dao, master, adept] of [["lightness", LIGHTNESS_MASTER_PNG_FRAME_STR
   assert.equal(master.worldScale, adept.worldScale * 1.2);
   assert.equal(entityBodyRadius(unit), entityBodyRadius({ ...unit, daoMaster: false }) * 1.2);
   const png = PNG.sync.read(fs.readFileSync(new URL(`../../${master.source.runtimeStrip}`, import.meta.url)));
-  assert.equal(png.width, 8 * 256);
-  assert.equal(png.height, 256);
+  assert.equal(png.width, 8 * master.frameWidth);
+  assert.equal(png.height, master.frameHeight);
   for (let frame = 0; frame < 8; frame++) {
     let opaque = 0;
-    for (let y = 0; y < 256; y++) for (let x = 0; x < 256; x++) {
-      const alpha = png.data[(y * png.width + frame * 256 + x) * 4 + 3];
+    for (let y = 0; y < master.frameHeight; y++) for (let x = 0; x < master.frameWidth; x++) {
+      const alpha = png.data[(y * png.width + frame * master.frameWidth + x) * 4 + 3];
       if (alpha) opaque++;
-      if (x === 0 || x === 255 || y === 0 || y === 255) assert.equal(alpha, 0, `${dao} frame ${frame} fits its cell`);
+      if (x === 0 || x === master.frameWidth - 1 || y === 0 || y === master.frameHeight - 1) assert.equal(alpha, 0, `${dao} frame ${frame} fits its cell`);
     }
     assert.ok(opaque > 500, `${dao} frame ${frame} is not blank`);
   }

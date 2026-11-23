@@ -90,3 +90,11 @@ prompts are in `source/master-motion-prompts.json`. Each 4×2 source has standin
 three movement poses and four attacks; the pipeline normalizes crown pivots and
 Adept-relative body scale. Master strips apply the 1.2 scale in their renderer config.
 These remain local drafts pending user animation review before PR creation.
+
+### War Master size correction
+
+The Master source has a smaller core torso than the Adept source; matching atlas
+cell dimensions did not match bodies. The pipeline now normalizes the approved
+112-pixel Adept / 84-pixel Master core-torso spans at the Adept raster scale before
+applying the existing 1.2 rank multiplier. All eight War Master cells are 384×384
+to preserve the full spear at extension; the poses, cadence and gameplay are unchanged.

@@ -96,3 +96,25 @@ artifact `artifact_752e3d0782334f5fb5a94fe2ddcf156f` is retained locally under t
 worktree’s ignored Interact artifacts. Targets and attackers use Lab invulnerability
 for repeated attack animation sampling; gameplay damage/advancement is tested separately.
 The gameplay server and Interact daemon are shut down after capture.
+
+## War Master scale follow-up
+
+The user accepted the animations and requested a size correction before PR creation.
+The initial source normalization used 0.30 for War Master versus 0.31 for War Adept,
+but the Master source’s core torso is smaller. Normalize the approved core-torso
+landmarks (Adept 112 source pixels, Master 84) using `0.31 * 112 / 84`, then retain
+the existing 1.2 Master world scale. The full eight-frame Master strip uses 384-pixel
+cells to avoid clipping the unchanged spear/attack geometry. Novice and War Adept
+art, all gameplay stats and animation cadence stay unchanged. Before/after captures
+use the same checkpoint, viewport, camera and unit positions, with Novice, War Adept
+and War Master from left to right. PR creation remains on hold for user review.
+
+Follow-up review artifacts (one-hour preview lifetime):
+
+- [Labeled before/after WebM](http://olympus.tail6943f.ts.net:8091/p/uiSTmgZBqBJBN0Q6tcIn16Yr/war-master-before-after.webm).
+- [Labeled before/after still](http://olympus.tail6943f.ts.net:8091/p/8zwvw7n3lP7z-JbNVdfCznji/war-master-before-after.png).
+
+The seven-second WebM shows standing and walking before the correction, followed by
+the same sequence afterward. Focused sprite contracts check all eight War Master
+frames, atlas dimensions and unclipped frame edges; pipeline determinism, client
+architecture, source caps and docs health pass. The task-only Lab server is stopped.

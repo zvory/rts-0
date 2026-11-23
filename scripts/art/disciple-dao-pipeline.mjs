@@ -72,9 +72,9 @@ function paint(output, source, scale, left, top, width, height) {
   }
 }
 
-function frame(source, scale, pivot) {
-  const output = blank(256, 256);
-  paint(output, source, scale, Math.round(128 - pivot[0] * scale), Math.round(128 - pivot[1] * scale),
+function frame(source, scale, pivot, size = 256) {
+  const output = blank(size, size);
+  paint(output, source, scale, Math.round(size / 2 - pivot[0] * scale), Math.round(size / 2 - pivot[1] * scale),
     Math.ceil(source.width * scale), Math.ceil(source.height * scale));
   return output;
 }
@@ -102,9 +102,10 @@ function write(name, image) {
 }
 
 function strip(name, frames) {
-  const image = blank(frames.length * 256, 256);
-  for (let i = 0; i < frames.length; i++) for (let y = 0; y < 256; y++) {
-    frames[i].data.copy(image.data, (y * image.width + i * 256) * 4, y * 256 * 4, (y + 1) * 256 * 4);
+  const size = frames[0].width;
+  const image = blank(frames.length * size, size);
+  for (let i = 0; i < frames.length; i++) for (let y = 0; y < size; y++) {
+    frames[i].data.copy(image.data, (y * image.width + i * size) * 4, y * size * 4, (y + 1) * size * 4);
   }
   write(path.join(rig, "generated", `${name}-runtime-strip.png`), image);
 }
@@ -149,6 +150,10 @@ strip("lightness-master", gridFrames("lightness-master-motion.png", 2, 0.50, 0.4
 strip("magic-master", gridFrames("magic-master-motion.png", 2, 0.37, 0.48));
 const masterWarSheet = key(read(path.join(rig, "source/war-master-motion.png")));
 const masterWar = [];
+// Approved idle art core-torso landmarks (exclude shoulder spikes and helmet fins):
+// Adept x=166..278 (112 source px), Master x=180..264 (84 source px).
+// Match torso scale FIRST, then the strip applies the rank's 1.2 multiplier.
+const masterWarScale = 0.31 * 112 / 84;
 const helmetPivots = [[222, 86], [222, 86], [222, 86], [222, 86],
   [222, 89], [222, 89], [222, 89], [222, 89]];
 for (let i = 0; i < 8; i++) {
@@ -157,7 +162,8 @@ for (let i = 0; i < 8; i++) {
   const cell = crop(masterWarSheet, x, y,
     Math.round((col + 1) * masterWarSheet.width / 4) - x,
     Math.round((row + 1) * masterWarSheet.height / 2) - y);
-  masterWar.push(frame(cell, 0.30, helmetPivots[i]));
+  // Larger cells preserve the full spear through extension at the corrected body scale.
+  masterWar.push(frame(cell, masterWarScale, helmetPivots[i], 384));
 }
 strip("war-master", masterWar);
 const arrowDir = path.join(root, "client/assets/effects/disciple-arrow");
