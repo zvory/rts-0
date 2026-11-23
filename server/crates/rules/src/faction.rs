@@ -1196,7 +1196,10 @@ mod tests {
         assert_eq!(smoke.label, "Smoke");
         assert_eq!(smoke.carriers, &[EntityKind::ScoutCar]);
         assert_eq!(smoke.target_mode, AbilityTargetMode::WorldPoint);
-        assert_eq!(smoke.range_tiles, Some(balance::SMOKE_ABILITY_RANGE_TILES as f32));
+        assert_eq!(
+            smoke.range_tiles,
+            Some(balance::SMOKE_ABILITY_RANGE_TILES as f32)
+        );
         assert_eq!(smoke.charges, Some(balance::SCOUT_CAR_SMOKE_CHARGES));
         assert_eq!(
             smoke.charge_recharge_ticks,

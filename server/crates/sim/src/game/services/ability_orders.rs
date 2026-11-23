@@ -331,26 +331,11 @@ pub(crate) fn launch_world_ability(
             AbilityEffectHook::LineProjectile,
             AbilityKind::EkatLineShot | AbilityKind::ThrowSword,
         ) => {
-            let Some(mut hero_projectile_spec) = hero_abilities::ekat_line_projectile_spec(
-                entities,
-                player,
-                caster,
-                x,
-                y,
-                definition.range_tiles,
-                tick,
-            ) else {
+            let Some(hero_projectile_spec) =
+                hero_abilities::line_projectile_spec(entities, player, caster, x, y, ability, tick)
+            else {
                 return false;
             };
-            hero_projectile_spec.ability = ability;
-            if ability == AbilityKind::ThrowSword {
-                hero_projectile_spec.speed_px_per_tick = config::THROW_SWORD_SPEED_PX_PER_TICK;
-                hero_projectile_spec.width_px = config::THROW_SWORD_WIDTH_TILES * config::TILE_SIZE as f32 * 0.5;
-                hero_projectile_spec.expires_tick = tick.saturating_add(
-                    (config::THROW_SWORD_RANGE_TILES * config::TILE_SIZE as f32 * 2.0
-                        / config::THROW_SWORD_SPEED_PX_PER_TICK).ceil() as u32
-                ).saturating_add(config::TICK_HZ);
-            }
             let target_x = hero_projectile_spec.endpoint.0;
             let target_y = hero_projectile_spec.endpoint.1;
             let mut projectile_specs = vec![hero_projectile_spec];
@@ -358,13 +343,13 @@ pub(crate) fn launch_world_ability(
                 ability_runtime.active_anchor(player, caster, AbilityKind::EkatMagicAnchor, tick)
             {
                 if let Some(anchor_projectile_spec) =
-                    hero_abilities::ekat_line_projectile_spec_from_origin(
+                    hero_abilities::line_projectile_spec_from_origin(
                         player,
                         caster,
                         Some(anchor.id.get()),
                         (anchor.x.to_world(), anchor.y.to_world()),
                         (x, y),
-                        definition.range_tiles,
+                        ability,
                         tick,
                     )
                 {
