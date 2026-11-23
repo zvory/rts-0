@@ -29,7 +29,7 @@ export class ThrowSwordVisuals {
         sprite = new this.pixi.Sprite(this.texture);
         // Original generated image, including its transparent padding. Painted sword is ~1170 px long.
         sprite.anchor.set(0.505, 0.505);
-        sprite.scale.set(64 / 1170);
+        sprite.scale.set(48 / 1170);
         this.layer.addChild(sprite);
         this.sprites.set(object.id, sprite);
       }
