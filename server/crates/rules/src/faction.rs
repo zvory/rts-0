@@ -1302,10 +1302,7 @@ mod tests {
         assert_eq!(charge.cooldown_ticks, balance::NOVICE_CHARGE_COOLDOWN_TICKS);
 
         let teleport = EKAT_CATALOG.ability(AbilityKind::EkatTeleport).unwrap();
-        assert_eq!(
-            teleport.carriers,
-            &[EntityKind::Ekat, EntityKind::LightnessAdept]
-        );
+        assert_eq!(teleport.carriers, &[EntityKind::Ekat]);
         assert_eq!(
             teleport.range_tiles,
             Some(balance::EKAT_TELEPORT_RANGE_TILES as f32)
