@@ -42,8 +42,8 @@ checkpoints; evolution immediately removes the speed benefit.
 Each paid training path has a separate researched unlock; combat-earned evolution is unrestricted. No automatic AI evolution in this pass;
 AI can encounter and damage evolved units. Insight uses a blue fill over red background
 under the HP bar and exact insight appears in selected-unit details for teammates and privileged observers only. Enemy snapshots omit exact insight. Evolved units
-reset to zero insight and have a doubled cap of 120. They continue earning insight from
-actual hostile HP damage; reaching 120 automatically advances living Adepts to their matching
+reset to zero insight and have a cap of 200. They continue earning insight from
+actual hostile HP damage; reaching 200 automatically advances living Adepts to their matching
 [Master rank](dao-masters.md), fully healing to 1.4 times their Adept maximum HP. Masters
 are 1.2 times Adept size, 1.1 times speed and deal 1.2 times ordinary attack damage. They
 reset insight to zero and stop earning it; no further advancement or repeat healing. Adept bars

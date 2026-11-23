@@ -2902,7 +2902,7 @@ new gameplay control.
 Disciple insight and Dao fields pass through the detached presentation entity snapshot
 to the Pixi worker. A blue-on-red insight bar appears below HP; evolved paths use
 the candidate B thin-katana strip for melee Lightness, and the Dao-specific Magic C hooded spellcaster strip. Original Lightness A archer assets remain preserved for reuse. Magic runs with arms swept back and its mantle trailing; their old chevrons/pentagram are removed. War uses the larger armored candidate B Yari strip (idle, two walking poses, four thrust poses); its legacy red sword glyph is removed. The selected unit shows
-exact insight and Dao, with a cap of 60 before evolution and 120 afterward. Evolution
+exact insight and Dao, with a cap of 60 before evolution and 200 afterward. Evolution
 resets insight to zero; reaching the evolved cap has no effect. Evolution choices occupy grid Z/X/C; classic L/W/C. Buttons remain actionable before
 research or insight, assign all selected unevolved Disciples, and show the pending path
 with an active highlight and assigned/eligible count. A new choice replaces the old one;

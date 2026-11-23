@@ -22,7 +22,7 @@ emerges with a random Dao specialization. Supports a rally point.”
   research prerequisite or additional command. While running it stages further entrants outside for the next tournament.
 - One full-health Disciple emerges, drawing Lightness, War or Magic with
   equal probability from the simulation RNG. Existing first Dao evolution rules apply, including
-  War HP. Winners start with zero insight and the evolved-Disciple cap of 120.
+  War HP. Winners start with zero insight and the evolved-Disciple cap of 200.
 - Entrants immediately release supply. The winner uses normal three supply; its three supply are
   reserved when the tournament starts, preventing other production from claiming their slots.
   The fourth entrant waits outside if replacing its two supply with the winner's three would

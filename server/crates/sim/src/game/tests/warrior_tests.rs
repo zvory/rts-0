@@ -237,7 +237,7 @@ fn disciple_evolution_requires_insight_ownership_but_no_research_and_is_permanen
             EntityKind::evolved_disciple(upgrade).unwrap().stable_id()
         );
         assert_eq!(evolved.insight, 0);
-        assert_eq!(evolved.insight_cap(), 120);
+        assert_eq!(evolved.insight_cap(), 200);
         assert_eq!((evolved.hp, evolved.max_hp), (hp, hp));
         assert!((evolved.movement_speed() - speed).abs() < 0.0001);
         let entity = game.state.entities.get_mut(unit).unwrap();
@@ -274,10 +274,10 @@ fn disciple_evolution_requires_insight_ownership_but_no_research_and_is_permanen
             !payload.contains("\"dao\":"),
             "checkpoint must not store a second Dao identity"
         );
-        for insight in [0, 61, 120, 121] {
+        for insight in [0, 61, 120, 199, 200, 201] {
             game.state.entities.get_mut(unit).unwrap().insight = insight;
             let payload = game.checkpoint_payload_text_for_test();
-            if insight > 120 {
+            if insight > 200 {
                 assert!(payload.is_err(), "over-cap insight must be rejected");
                 continue;
             }

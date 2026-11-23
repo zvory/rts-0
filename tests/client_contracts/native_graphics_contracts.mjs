@@ -95,4 +95,22 @@ for (const [expiresIn, expectedWidth] of [
   }
 }
 
+// The same shield redraws its current pool independently of its lifetime.
+for (const [hp, expectedWidth] of [[300, 56], [150, 28], [75, 14], [0, 0], [600, 56], [-1, 0]]) {
+  const g = new RecordingGraphics();
+  _drawAbilityObjects.call({ _abilityObjectGfx: g, _renderClock: { now: () => 0 } }, {
+    abilityObjects: [{ id: 1, kind: "shield", x: 100, y: 200,
+      expiresIn: DISCIPLE_SHIELD_DURATION_TICKS / 2, ownerState: { hp } }],
+  });
+  const rects = callsNamed(g, "drawRect");
+  assert.deepEqual(rects[0], ["drawRect", 71, 95, 58, 6], "HP backing sits above the timer");
+  if (expectedWidth > 0) {
+    assert.deepEqual(rects[1], ["drawRect", 72, 96, expectedWidth, 4]);
+    assert(g.calls.some(call => call[0] === "beginFill" && call[1] === 0x6eeaff));
+  } else {
+    assert.equal(rects.length, 3, "depleted HP has no fill");
+  }
+  assert.deepEqual(rects.at(-1), ["drawRect", 72, 102, 28, 4], "damage does not affect the timer");
+}
+
 console.log("native_graphics_contracts: ok");

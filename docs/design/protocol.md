@@ -2036,8 +2036,8 @@ Permanent Dao identity is derived from kind; the engine stores no separate mutab
 `dao` (slot 46: lightness/war/magic), `daoReady` (47), and optional
 `daoAdvanceTicks` (48, 1–15). Ordinary fog filtering applies to all public fields. Evolution buttons set replaceable, entity-owned `chosenDao` intent (team-private compact slot 49), independent of orders. Codes 14–16 and order stages 22–24 retain their positions.
 Evolution automatically occurs once 60 insight is ready, without research or a Pavilion.
-Evolution clears all insight and doubles the cap to 120. Evolved Disciples continue earning
-insight from actual hostile HP damage; reaching 120 automatically advances a living Adept
+Evolution clears all insight and raises the cap to 200. Evolved Disciples continue earning
+insight from actual hostile HP damage; reaching 200 automatically advances a living Adept
 to its matching [Master](dao-masters.md), resets insight, and fully heals to the new maximum HP.
 `daoMaster` (public boolean, compact slot 52) persists with the entity; Masters cannot advance again. Research ids are
 `dao_of_lightness`, `dao_of_heaviness` (War), `dao_of_magic` (Magic).
@@ -2045,7 +2045,7 @@ to its matching [Master](dao-masters.md), resets insight, and fully heals to the
 Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md).
 Shield uses ability `discipleShield` (code 17, order stage 25), world-point target,
 ability-object kind `shield` (code 4). It expires after 15 seconds, projected through `expiresIn`; `ownerState.hp` carries
-the remaining 300-point pool to authorized owner/observer projections only. The radius
+the remaining 300-point pool to authorized owner/observer projections only. The client renders this pool as a cyan HP bar above the public gray lifetime bar, updating it as damage is absorbed. The radius
 is three tiles for every viewer. Field visibility is gated at its center, independently
 of its caster; `sourceCasterId` is omitted when that caster is hidden.
 

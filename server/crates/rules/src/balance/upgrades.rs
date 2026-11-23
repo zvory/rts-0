@@ -54,7 +54,7 @@ pub const DAO_RESEARCH_TICKS: u32 = TICK_HZ * 20;
 /// Lightness retains its Scout Car baseline independently of base Disciple speed.
 pub const DAO_LIGHTNESS_SPEED_MULTIPLIER: f32 = 1.15;
 pub const DISCIPLE_INSIGHT_REQUIRED: u32 = 60;
-pub const DISCIPLE_EVOLVED_INSIGHT_CAP: u32 = DISCIPLE_INSIGHT_REQUIRED * 2;
+pub const DISCIPLE_EVOLVED_INSIGHT_CAP: u32 = 200;
 pub const DAO_MASTER_BODY_SCALE: f32 = 1.2;
 pub const DAO_MASTER_SPEED_MULTIPLIER: f32 = 1.1;
 pub const DAO_MASTER_DAMAGE_MULTIPLIER: f32 = 1.2;
