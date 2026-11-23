@@ -78,7 +78,9 @@ fn check_rush_opening(map_name: Option<&str>) {
     let mut manual_rifle_queued = false;
     let mut rifle_finished_after_training = false;
     let mut seen_riflemen = BTreeSet::new();
-    for _ in 0..6000 {
+    // The higher Methamphetamines oil cost can delay later queued research on Classic.
+    // Allow five minutes for the same production transitions to finish naturally.
+    for _ in 0..9000 {
         CanonicalAiTickDriver::run(
             &mut game,
             &mut controllers,
@@ -177,6 +179,10 @@ fn check_rush_opening(map_name: Option<&str>) {
             })
         {
             research_queued = Some(snapshot.tick);
+        }
+        // Stop after the opening transitions; later combat can rebuild repeat rosters.
+        if panzerfaust_produced {
+            break;
         }
     }
     let commands = game.command_log();
