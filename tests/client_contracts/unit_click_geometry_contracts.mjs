@@ -49,9 +49,28 @@ for (const setupState of [SETUP.DEPLOYED, SETUP.SETTING_UP, SETUP.TEARING_DOWN])
   assert.equal(pickSelectionProxy(s, { x: 57, y: 122 })?.id, 1, "deployed and transitional trails fit");
   assert.equal(pickSelectionProxy(s, { x: 100, y: 123.1 }), null);
 }
-const turned = scene([unit(KIND.ANTI_TANK_GUN, { setupState: SETUP.PACKED, weaponFacing: Math.PI / 2 })]);
-assert.equal(pickSelectionProxy(turned, { x: 100, y: 56.1 })?.id, 1, "sprite box follows weapon facing");
+const turned = scene([unit(KIND.ANTI_TANK_GUN, { setupState: SETUP.PACKED, facing: Math.PI / 2, weaponFacing: 0 })]);
+assert.equal(pickSelectionProxy(turned, { x: 100, y: 56.1 })?.id, 1, "packed sprite box follows hull facing despite stale weapon facing");
 assert.equal(pickSelectionProxy(turned, { x: 114.1, y: 100 }), null);
+const aimed = scene([unit(KIND.ANTI_TANK_GUN, { setupState: SETUP.DEPLOYED, facing: 0, weaponFacing: Math.PI / 2 })]);
+assert.equal(pickSelectionProxy(aimed, { x: 100, y: 56.1 })?.id, 1, "deployed sprite box follows weapon facing");
+assert.equal(pickSelectionProxy(aimed, { x: 56.1, y: 100 }), null);
+// Both ends alone miss the corners swept through intermediate setup poses.
+for (const setupState of [SETUP.SETTING_UP, SETUP.TEARING_DOWN]) {
+  for (const [facing, delta] of [[0, Math.PI / 2], [0.4, -Math.PI / 2], [3, 0.8]]) {
+    const weaponFacing = (facing + delta + Math.PI) % (Math.PI * 2) - Math.PI;
+    const s = scene([unit(KIND.ANTI_TANK_GUN, { setupState, facing, weaponFacing })]);
+    for (let step = 0; step <= 12; step += 1) {
+      const angle = facing + delta * step / 12;
+      for (const [x, y] of [[-43.9, -22.9], [22.9, -22.9], [22.9, 22.9], [-43.9, 22.9]]) {
+        assert.equal(pickSelectionProxy(s, {
+          x: 100 + x * Math.cos(angle) - y * Math.sin(angle),
+          y: 100 + x * Math.sin(angle) + y * Math.cos(angle),
+        })?.id, 1, "transition box contains each intermediate rotated corner, including wrapped angles");
+      }
+    }
+  }
+}
 
 // A direct hit beats a closer halo and even a halo with own-unit preference.
 const clump = scene([

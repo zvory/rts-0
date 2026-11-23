@@ -27,11 +27,16 @@ export function clickGeometry(entity, footprint) {
     }
   } else if (entity.kind === KIND.ANTI_TANK_GUN) {
     // Outward-rounded visible atlas bounds, excluding shadows. The articulated
-    // trails widen on deployment; transitions use the union of both end poses.
-    const packed = entity.setupState === SETUP.PACKED;
+    // trails widen on deployment; transitions cover the full facing sweep.
+    const transitional = entity.setupState === SETUP.SETTING_UP || entity.setupState === SETUP.TEARING_DOWN;
+    const packed = entity.setupState !== SETUP.DEPLOYED && !transitional;
     const halfWidth = packed ? 14 : 23;
-    const facing = Number.isFinite(entity.weaponFacing) ? entity.weaponFacing : entity.facing;
-    clickFootprint = orientedBounds(entity, -44, -halfWidth, 23, halfWidth, facing);
+    const facing = Number.isFinite(entity.facing) ? entity.facing : 0;
+    const weaponFacing = Number.isFinite(entity.weaponFacing) ? entity.weaponFacing : facing;
+    clickFootprint = transitional
+      ? sweptBounds(entity, facing, weaponFacing)
+      : orientedBounds(entity, -44, -halfWidth, 23, halfWidth,
+        entity.setupState === SETUP.DEPLOYED ? weaponFacing : facing);
     directClickFootprint = clickFootprint;
   } else if (entity.kind === KIND.TANK || entity.kind === KIND.ROCKET_LAUNCHER) {
     // Scale only the local forward coordinate, preserving lateral precision.
@@ -54,6 +59,33 @@ export function clickGeometry(entity, footprint) {
     clickMinScreenRadiusCssPx: 6 * scale,
     directClickMinScreenRadiusCssPx: 6 * Math.min(1, scale),
   };
+}
+
+function sweptBounds(entity, facing, weaponFacing) {
+  // Setup animation runs on the renderer's clock. Conservatively cover every
+  // intermediate shortest-arc orientation without consulting mutable rig state.
+  let delta = (weaponFacing - facing) % (Math.PI * 2);
+  if (delta > Math.PI) delta -= Math.PI * 2;
+  if (delta < -Math.PI) delta += Math.PI * 2;
+  const low = Math.min(0, delta), high = Math.max(0, delta);
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const [x, y] of [[-44, -23], [23, -23], [23, 23], [-44, 23]]) {
+    const angles = [low, high];
+    const phase = Math.atan2(y, x);
+    // Coordinate extrema occur at multiples of a quarter turn.
+    const quarterTurn = Math.PI / 2;
+    for (let k = Math.ceil((low + phase) / quarterTurn);
+      k <= Math.floor((high + phase) / quarterTurn); k += 1) {
+      angles.push(k * quarterTurn - phase);
+    }
+    for (const angle of angles) {
+      const px = x * Math.cos(angle) - y * Math.sin(angle);
+      const py = x * Math.sin(angle) + y * Math.cos(angle);
+      minX = Math.min(minX, px); maxX = Math.max(maxX, px);
+      minY = Math.min(minY, py); maxY = Math.max(maxY, py);
+    }
+  }
+  return orientedBounds(entity, minX, minY, maxX, maxY, facing);
 }
 
 function orientedBounds(entity, minX, minY, maxX, maxY, facingValue) {

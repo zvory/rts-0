@@ -134,11 +134,14 @@ bounds at runtime, shadow proxies, or fresh mutable state.
 Machine Gunner radii grow 50%. Novice, Lightness Adept and Magic Adept radii shrink 25%;
 Lightness/Magic Masters keep their existing radii. War Adept grows 25% and War Master grows
 50%, after the existing Master body multiplier. Tank and Rocket Truck gain 10% total local
-length without wider sides. Anti-Tank Gun uses an authored sprite-fitting box in weapon-facing
-coordinates: forward extent −44 to +23 world pixels, lateral ±14 while packed or ±23 otherwise
+length without wider sides. Anti-Tank Gun uses an authored sprite-fitting box in hull-facing
+coordinates while packed and weapon-facing coordinates while deployed:
+forward extent −44 to +23 world pixels, lateral ±14 while packed or ±23 otherwise
 to cover deployed/transitional trails. These bounds were measured from visible articulated atlas
 pixels, excluding shadows; they are not queried from the renderer during input. Other kinds
 retain current click areas. Minimum screen click circles scale with circular adjustments.
+During setup/teardown, a conservative box covers the full shortest-arc rotation between hull
+and weapon facing, including intermediate corner extrema, because the renderer owns setup timing.
 
 Click picking first admits direct hits: original bodies for expanded circles/vehicles, the
 replacement circle for reductions, or the full Anti-Tank Gun sprite box. A direct hit always
