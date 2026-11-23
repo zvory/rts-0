@@ -752,7 +752,13 @@ for (const [kind, upgrade] of [
     for (const slot of entry.card.slots) {
       if (!slot) continue;
       assert.equal(typeof slot.commandId, "string", `${entry.id} command has identity`);
-      assert.equal(slot.hotkey, gridHotkeyForSlot(slot.slotIndex));
+      assert.equal(slot.hotkey, slot.passive ? "" : gridHotkeyForSlot(slot.slotIndex));
+      if (slot.passive) {
+        assert.equal(slot.enabled, false, "passive indicators stay disabled");
+        assert.equal(slot.hotkeyCode, "", "passive indicators have no hotkey");
+        assert.equal(slot.intent, null, "passive indicators have no cast action");
+        assert.equal(slot.contextIntent, null, "passive indicators have no toggle action");
+      }
     }
   }
 
@@ -878,12 +884,12 @@ for (const researched of [false, true]) {
   const unit = { id: 50, owner: 1, kind: KIND.WARRIOR, insight: 59 };
   const cardFor = (entity, extra = {}) => buildCommandCardDescriptors({ ...context, ...extra, selection: [entity] });
   let card = cardFor(unit);
-  assert.deepEqual(card.slots.slice(6).map((s) => s.ability), [ABILITY.EVOLVE_LIGHTNESS, ABILITY.EVOLVE_WAR, ABILITY.EVOLVE_MAGIC]);
-  assert(card.slots.slice(6).every((s) => s.enabled && !s.cls.includes("dao-ready")));
+  assert.deepEqual(card.slots.slice(6, 9).map((s) => s.ability), [ABILITY.EVOLVE_LIGHTNESS, ABILITY.EVOLVE_WAR, ABILITY.EVOLVE_MAGIC]);
+  assert(card.slots.slice(6, 9).every((s) => s.enabled && !s.cls.includes("dao-ready")));
   card = cardFor({ ...unit, insight: 60 });
-  assert(card.slots.slice(6).every((s) => s.enabled && s.cls.includes("dao-ready")));
-  assert.deepEqual(card.slots.slice(6).map((s) => s.hotkey), ["Z", "X", "C"]);
-  assert(cardFor({ ...unit, insight: 60 }, { upgrades: [] }).slots.slice(6).every((s) => s.enabled));
+  assert(card.slots.slice(6, 9).every((s) => s.enabled && s.cls.includes("dao-ready")));
+  assert.deepEqual(card.slots.slice(6, 9).map((s) => s.hotkey), ["Z", "X", "C"]);
+  assert(cardFor({ ...unit, insight: 60 }, { upgrades: [] }).slots.slice(6, 9).every((s) => s.enabled));
   const light = cardFor({ ...unit, kind: KIND.LIGHTNESS_ADEPT, insight: 60, dao: "lightness" });
   assert(light.slots.some((s) => s?.ability === ABILITY.LIGHTNESS_DASH));
   for (const remainingUses of [0, 1, 2]) {
@@ -934,11 +940,32 @@ for (const researched of [false, true]) {
   }
   const sword = card.slots.find((slot) => slot?.ability === ABILITY.THROW_SWORD);
   assert(sword.enabled);
+  const charge = card.slots.find((slot) => slot?.ability === ABILITY.CHARGE);
+  assert(charge?.passive && !charge.enabled, "mixed Novice/War selection keeps Charge without hiding Throw Sword");
   assert.equal(sword.hotkey, "E");
   assert.deepEqual(sword.intent.readyIds, [3]);
   const changed = buildCommandCardDescriptors({ ...context,
     selection: selection.map((e) => e.id === 1 ? { ...e, chosenDao: "lightness" } : e) });
   assert.notEqual(changed.signature, card.signature);
+}
+
+// Charge must coexist with the Adepts' primary abilities in mixed selections.
+{
+  const selection = [KIND.WARRIOR, KIND.LIGHTNESS_ADEPT, KIND.WAR_ADEPT, KIND.MAGIC_ADEPT]
+    .map((kind, index) => ({ id: index + 1, owner: 1, kind, insight: 60 }));
+  selection[0].escapeTreasure = {};
+  const card = buildCommandCardDescriptors({ playerId: 1, factionId: "cultivators", selection,
+    resources: { steel: 0, oil: 0 }, upgrades: [], groupCooldownClocks: () => [] });
+  for (const ability of [ABILITY.LIGHTNESS_DASH, ABILITY.THROW_SWORD, ABILITY.EKAT_MAGIC_ANCHOR]) {
+    const slot = card.slots.find((slot) => slot?.ability === ability);
+    assert(slot?.enabled, `mixed selection preserves active ${ability}`);
+    assert.equal(slot.hotkey, commandCardAbilitiesForFaction("cultivators")
+      .find((definition) => definition.ability === ability).hotkey);
+  }
+  const charge = card.slots.find((slot) => slot?.ability === ABILITY.CHARGE);
+  assert(charge?.passive && !charge.enabled);
+  assert.equal(charge.hotkey, "");
+  assert.equal(card.slots[9].commandId, "cultivators.item.escape");
 }
 
 // Dao order is chosen by the player; completed and paid active researches reserve tiers.
@@ -1062,6 +1089,11 @@ for (const context of buildCommandCardContextCatalog()) {
   for (const slot of context.card.slots.filter(Boolean)) {
     if (slot.slotIndex === 9) {
       assert.equal(slot.commandId, "cultivators.item.escape");
+      continue;
+    }
+    if (slot.slotIndex === 10) {
+      assert.equal(slot.ability, ABILITY.CHARGE);
+      assert(slot.passive && !slot.hotkey);
       continue;
     }
     assert(slot.slotIndex < 9, `${context.id}: other fourth-column slots remain reserved`);

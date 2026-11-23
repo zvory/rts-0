@@ -89,7 +89,7 @@ export function buildHotkeyCommandCatalog(cards = []) {
     const contextLabel = entry?.label || labelFromContextId(contextId);
     const commandIds = [];
     for (const slot of card?.slots || []) {
-      if (!slot?.commandId) continue;
+      if (!slot?.commandId || slot.passive) continue;
       commandIds.push(slot.commandId);
       if (!commands.has(slot.commandId)) {
         commands.set(slot.commandId, {
@@ -443,6 +443,7 @@ export class HotkeyProfileService {
   }
 
   resolveSlot(slot, profile = this.getActiveProfile()) {
+    if (slot.passive) return { ...slot, hotkeyCode: "", hotkey: "" };
     const gridHotkey = hotkeyCodeForLabel(slot.gridHotkey);
     const hotkeyCode = profile?.mode === "direct"
       ? normalizeHotkeyCode(profileBindingForCommand(profile, slot.commandId)) || this._fallbackKeyForCommand(slot)

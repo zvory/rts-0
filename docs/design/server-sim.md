@@ -1938,9 +1938,9 @@ Allocation rules:
   when a deconstruct order is accepted or promoted. Deconstruction takes half of the Tank Trap's build
   time, is not accelerated by assigning multiple workers to the same trap, and refunds the Tank Trap
   cost to the deconstructing player.
-- Legacy Charge has no eligible carriers after the Methamphetamines research conversion. It remains
-  decodable for old command logs but does not create queued/immediate ability work, cooldowns, or
-  runtime status.
+- Manual Charge commands remain no-ops after the Methamphetamines conversion. Novices alone
+  activate Charge automatically through combat targeting; the registry exposes their disabled
+  command-card indicator and private cooldown. No command can cast or toggle this passive.
 - World-targeted abilities allocate one carrier per click. For queued commands the planner chooses
   an eligible selected carrier with the shortest current queue, which gives round-robin behavior
   across repeated clicks. Skip-if-not-ready abilities require a ready carrier at issue time;

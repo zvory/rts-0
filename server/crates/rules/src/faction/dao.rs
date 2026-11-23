@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 9] = [
+pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 10] = [
     AbilityCatalogEntry {
         kind: AbilityKind::EvolveLightness,
         label: "Dao of Lightness",
@@ -141,4 +141,5 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 9] = [
         queue_policy: AbilityQueuePolicy::NotQueueable, autocast: false,
         command_card: true, protocol_code: 20, order_stage_code: 28,
     },
+    DEFAULT_ABILITIES[0],
 ];

@@ -2922,6 +2922,11 @@ corresponding Adept; Master source crowns/torsos are normalized before that mult
 Portraits, selection groups, minimap frames and labels use the matching Master rank.
 Masters have no further insight meter. See [Master review spec](dao-masters.md).
 
+Novice Charge uses a passive command-card descriptor: always disabled, with the autocast swirl
+and server-projected cooldown clocks. Passive descriptors have no primary/context action or hotkey
+and are excluded from the hotkey command catalog. Charge occupies logical slot 10 in the fourth
+column so mixed selections retain Lightness Dash and Throw Sword. Evolution removes the Novice-only tile.
+
 ### Cultivator item slot
 
 Cultivator unit command cards reserve the fourth-column R slot (logical slot 9) for a single

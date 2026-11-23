@@ -742,3 +742,37 @@ fn tank_trap_deconstruction_projects_reverse_progress() {
         "deconstruction progress should be the remaining reverse fraction"
     );
 }
+
+#[test]
+fn novice_charge_projects_ready_and_cooling_only_to_private_viewer() {
+    for cooldown in [0, 450, 225, 1] {
+        let mut entities = EntityStore::new();
+        let id = entities
+            .spawn_unit(1, EntityKind::Warrior, 100.0, 100.0)
+            .unwrap();
+        entities
+            .get_mut(id)
+            .unwrap()
+            .start_ability_cooldown(ability::AbilityKind::Charge, cooldown);
+        let entity = entities.get(id).unwrap();
+        let fog = Fog::new(16, 16);
+        let owner = project_for_test(1, entity, &fog, false, &entities, None, false).unwrap();
+        let charge = owner
+            .abilities
+            .iter()
+            .find(|entry| entry.ability == "charge")
+            .unwrap();
+        assert_eq!(charge.cooldown_left, cooldown);
+        assert_eq!(charge.autocast_enabled, Some(true));
+        assert_eq!(
+            owner
+                .abilities
+                .iter()
+                .filter(|entry| entry.ability == "charge")
+                .count(),
+            1
+        );
+        let enemy = project_for_test(2, entity, &fog, false, &entities, None, false).unwrap();
+        assert!(enemy.abilities.is_empty());
+    }
+}

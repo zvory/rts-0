@@ -8,6 +8,16 @@ export function abilityButtonDescriptor({
   active,
 }) {
   const definition = affordance.definition;
+  if (definition.ability === ABILITY.CHARGE) {
+    return {
+      id: `ability:${definition.ability}`, commandId, kind: "button", action: "ability",
+      ability: definition.ability, icon: definition.icon, label: definition.label,
+      title: `${definition.title}. Passive: always automatic; cannot be cast or toggled. 15-second cooldown.`,
+      passive: true, enabled: false, intent: null, contextIntent: null, onUnavailableIntent: null,
+      contextHotkeyModifiers: [], cls: "autocast-enabled",
+      cooldownClocks: affordance.cooldownClocks,
+    };
+  }
   const evolution = definition.ability.startsWith("evolve");
   const recastActive = affordance.recastTargetObjectId != null;
   const readyCount = recastActive ? affordance.recastReadyIds.length : affordance.readyIds.length;

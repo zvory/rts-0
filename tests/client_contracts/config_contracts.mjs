@@ -373,7 +373,7 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
       ABILITIES[ABILITY.BARRAGE].cost.oil === 150,
     "Rocket Truck Barrage mirrors its range band, thirty-second cooldown, and repeat cost",
   );
-  assert(!ABILITIES[ABILITY.CHARGE], "client no longer exposes Rifleman Charge as a command-card ability");
+  assert(!ABILITIES[ABILITY.CHARGE].carriers.includes(KIND.RIFLEMAN), "Charge remains unavailable to Riflemen");
   assert(
     STATS[KIND.TRAINING_CENTRE].researches.includes(UPGRADE.METHAMPHETAMINES),
     "Training Centre should expose Methamphetamines research",
@@ -1385,6 +1385,6 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
     "Ekat dash retains five tiles");
   assert(commandCardAbilitiesForFaction("cultivators").find((entry) => entry.ability === ABILITY.LIGHTNESS_DASH)?.rangeTiles === 15,
     "Cultivator Dash metadata matches its range preview");
-  assert(!commandCardAbilitiesForFaction("cultivators").some((entry) => entry.ability === ABILITY.CHARGE),
-    "Automatic Charge has no selectable button");
+  assert(commandCardAbilitiesForFaction("cultivators").some((entry) => entry.ability === ABILITY.CHARGE),
+    "Automatic Charge has a passive command-card indicator");
 }
