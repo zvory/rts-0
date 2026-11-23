@@ -25,6 +25,8 @@ emerges with a random Dao specialization. Supports a rally point.”
   War HP. Winners start with zero insight and the evolved-Disciple cap of 120.
 - Entrants immediately release supply. The winner uses normal three supply; its three supply are
   reserved when the tournament starts, preventing other production from claiming their slots.
+  The fourth entrant waits outside if replacing its two supply with the winner's three would
+  exceed the cap; earlier entrants' released supply may already have been used by other production.
 - Spawn through normal legal building exits and follow the full rally plan. Blocked exits retain
   pending winners for retry. Destruction loses entrants/pending winners and releases reservations.
 - Entrant count is team-private. Tournament progress is visible whenever the building is visible.
