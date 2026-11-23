@@ -1379,11 +1379,11 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
 
 {
   const dash = ABILITIES[ABILITY.LIGHTNESS_DASH];
-  assert(entityAbilityRangeTiles(dash, { kind: KIND.LIGHTNESS_ADEPT, dao: "lightness" }) === 10,
-    "Lightness dash previews use ten tiles");
+  assert(entityAbilityRangeTiles(dash, { kind: KIND.LIGHTNESS_ADEPT, dao: "lightness" }) === 15,
+    "Lightness dash previews use fifteen tiles");
   assert(entityAbilityRangeTiles(ABILITIES[ABILITY.EKAT_TELEPORT], { kind: KIND.EKAT }) === 5,
     "Ekat dash retains five tiles");
-  assert(commandCardAbilitiesForFaction("cultivators").find((entry) => entry.ability === ABILITY.LIGHTNESS_DASH)?.rangeTiles === 10,
+  assert(commandCardAbilitiesForFaction("cultivators").find((entry) => entry.ability === ABILITY.LIGHTNESS_DASH)?.rangeTiles === 15,
     "Cultivator Dash metadata matches its range preview");
   assert(!commandCardAbilitiesForFaction("cultivators").some((entry) => entry.ability === ABILITY.CHARGE),
     "Automatic Charge has no selectable button");

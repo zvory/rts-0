@@ -5,7 +5,7 @@
 import { ABILITY, KIND, UPGRADE } from "../protocol.js";
 import { TICK_HZ } from "./timing.js";
 
-export const DAO_LIGHTNESS_DASH_RANGE_TILES = 10;
+export const DAO_LIGHTNESS_DASH_RANGE_TILES = 15;
 export function entityAbilityRangeTiles(definition, entity) {
   return definition?.rangeTiles;
 }
@@ -478,7 +478,7 @@ export const ABILITIES = Object.freeze({
   [ABILITY.LIGHTNESS_DASH]: Object.freeze({
     ability: ABILITY.LIGHTNESS_DASH,
     label: "Dash", icon: "DSH", hotkey: "D",
-    title: "Dash up to 10 tiles; one charge, two at Master rank; recharges every 8 seconds",
+    title: "Dash up to 15 tiles; one charge, two at Master rank; recharges every 8 seconds",
     carriers: Object.freeze([KIND.LIGHTNESS_ADEPT]),
     targetMode: "worldPoint", rangeTiles: DAO_LIGHTNESS_DASH_RANGE_TILES,
     cooldownTicks: 0, charges: 1, chargeRechargeTicks: EKAT_TELEPORT_COOLDOWN_TICKS,
