@@ -1344,27 +1344,6 @@ impl Entity {
         }
     }
 
-    /// The collision/interaction radius in world pixels.
-    pub fn radius(&self) -> f32 {
-        if let Some(s) = config::unit_stats(self.kind) {
-            s.radius
-                * if self.dao_master {
-                    config::DAO_MASTER_BODY_SCALE
-                } else {
-                    1.0
-                }
-        } else if self.is_building() {
-            // Footprint half-extent (approx) for range/interaction checks.
-            let Some(s) = config::building_stats(self.kind) else {
-                return config::TILE_SIZE as f32 * 0.5;
-            };
-            (s.foot_w.max(s.foot_h) as f32) * config::TILE_SIZE as f32 * 0.5
-        } else {
-            // Resource node footprint ~1 tile.
-            config::TILE_SIZE as f32 * 0.5
-        }
-    }
-
     /// The protocol `state` string reflecting this entity's current activity.
     pub fn state_str(&self) -> &'static str {
         if self.hp == 0 {

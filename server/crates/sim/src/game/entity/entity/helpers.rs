@@ -1,3 +1,4 @@
+use super::config;
 use super::{BUILDING_START_HP_DENOMINATOR, BUILDING_START_HP_NUMERATOR};
 
 pub(super) fn construction_hp_for_progress(max_hp: u32, progress: u32, total: u32) -> u32 {
@@ -20,6 +21,27 @@ pub(super) fn construction_hp_for_progress(max_hp: u32, progress: u32, total: u3
 }
 
 impl super::Entity {
+    /// The collision/interaction radius in world pixels.
+    pub fn radius(&self) -> f32 {
+        if let Some(s) = config::unit_stats(self.kind) {
+            s.radius
+                * if self.dao_master {
+                    config::DAO_MASTER_BODY_SCALE
+                } else {
+                    1.0
+                }
+        } else if self.is_building() {
+            // Footprint half-extent (approx) for range/interaction checks.
+            let Some(s) = config::building_stats(self.kind) else {
+                return config::TILE_SIZE as f32 * 0.5;
+            };
+            (s.foot_w.max(s.foot_h) as f32) * config::TILE_SIZE as f32 * 0.5
+        } else {
+            // Resource node footprint ~1 tile.
+            config::TILE_SIZE as f32 * 0.5
+        }
+    }
+
     pub fn last_damage_owner(&self) -> Option<u32> {
         self.last_damage_owner
     }
