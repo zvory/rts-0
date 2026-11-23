@@ -2695,7 +2695,9 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   includes the shader and textures. Shore distance supplies stepped visual depth without
   changing authoritative terrain.
 - Grass (`renderer/grass.js`) defaults to selected material 9: distinct swaying blades, broad
-  gusts/passing shade, and a baked mottled olive/sage ground texture. All ordinary matches,
+  curved wind-light fronts roughly twenty seconds apart, the original passing cloud shade, and a
+  baked mottled olive/sage ground texture. Blade color no longer follows the rapid diagonal sway
+  wave; blade motion and cloud contrast/speed are unchanged. All ordinary matches,
   replays/spectators and Map Editor previews construct this grass-only mesh at map load, beneath
   decals/units/fog, and advance it with the same presentation clock as water. Editing terrain
   rebuilds grass geometry when grass membership changes; map replacement and renderer destruction

@@ -30,6 +30,21 @@ float noise(vec2 p){
  vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f);
  return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1)),f.x),f.y);
 }
+// Wide, curved fronts travel across the field about twenty seconds apart.
+float windLight(vec2 p){
+ float x=p.x-uTime*80.;
+ float cell=floor(x/1600.);
+ float light=0.;
+ for(int i=-1;i<=1;i++){
+   float id=cell+float(i);
+   float center=(id+.5)*1600.+(hash(vec2(id,7.))-.5)*350.;
+   float curve=(noise(vec2(p.y/550.,id+91.))-.5)*350.;
+   float width=190.+hash(vec2(id,11.))*120.;
+   float d=(x-center+curve)/width;
+   light+=exp(-d*d*1.5)*(.24+hash(vec2(id,17.))*.12);
+ }
+ return light;
+}
 float blade(vec2 p, vec2 root, float h, float bend, float width){
  float t=clamp((root.y-p.y)/h,0.,1.);
  float center=root.x+bend*t*t;
@@ -69,7 +84,7 @@ void main(){
      float mask=blade(p,root,h,bend,.8);
      mask=max(mask,blade(p,root+vec2(-2,0),h*.72,bend-2.,.7));
      mask=max(mask,blade(p,root+vec2(2,0),h*.85,bend+2.,.7));
-     vec3 tip=mix(vec3(.34,.41,.19),vec3(.57,.59,.30),r*.6+wave*.15+.15);
+     vec3 tip=mix(vec3(.34,.41,.19),vec3(.57,.59,.30),r*.6+(uStyle==5. || uStyle>=9. ? 0. : wave*.15)+.15);
      if(uStyle==4.)tip=mix(vec3(.46,.44,.22),vec3(.68,.61,.36),r);
      color=mix(color,tip,mask*.9);
      if(uStyle==4. && r>.58){
@@ -81,7 +96,7 @@ void main(){
    if(uStyle==5. || uStyle>=9.){
      float cloud=smoothstep(.36,.68,noise(p/250.+vec2(-uTime*.028,uTime*.009)));
      color*=mix(.80,1.09,cloud);
-     color+=vec3(.03,.04,.012)*smoothstep(.2,.95,gust);
+     color*=1.+windLight(p);
    }
  }
  ${terrainLighting ? "color*=texture(uTerrainLight,p/uMapWorldSize).rgb*(255./128.);" : ""}
