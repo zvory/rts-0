@@ -224,7 +224,7 @@ mod tests {
 
         for (name, dimensions, base_count, expected_starts) in [
             ("Vintage", (126, 126), 10, [(9, 9), (116, 116)]),
-            ("Classic", (189, 126), 12, [(40, 9), (147, 116)]),
+            ("Classic", (155, 126), 12, [(23, 9), (130, 116)]),
         ] {
             let authored = available
                 .iter()
