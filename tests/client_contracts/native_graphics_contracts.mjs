@@ -6,6 +6,8 @@ import {
 import { drawMagicAnchor } from "../../client/src/renderer/magic_anchor_effect.js";
 import { drawRotatedRectOutline } from "../../client/src/renderer/shared.js";
 import { _drawPanzerfaustImpacts } from "../../client/src/renderer/panzerfaust_feedback.js";
+import { _drawAbilityObjects } from "../../client/src/renderer/feedback.js";
+import { DISCIPLE_SHIELD_DURATION_TICKS } from "../../client/src/config.js";
 import { RecordingGraphics } from "./pixi_fakes.mjs";
 
 function callsNamed(graphics, name) {
@@ -69,6 +71,28 @@ function callsNamed(graphics, name) {
   const joinedRingStroke = g.calls.some((call, index) => call[0] === "lineStyle" &&
     call[1] === 3 && callsNamed({ calls: g.calls.slice(Math.max(0, index - 12), index) }, "lineTo").length === 10);
   assert(joinedRingStroke, "Panzerfaust jagged ring commits one joined stroke after all segments");
+}
+
+// A lifetime indicator remains public even when the shield pool is owner-private.
+for (const [expiresIn, expectedWidth] of [
+  [DISCIPLE_SHIELD_DURATION_TICKS, 56],
+  [DISCIPLE_SHIELD_DURATION_TICKS / 2, 28],
+  [0, 0],
+  [DISCIPLE_SHIELD_DURATION_TICKS * 2, 56],
+  [-1, 0],
+]) {
+  const g = new RecordingGraphics();
+  _drawAbilityObjects.call({ _abilityObjectGfx: g, _renderClock: { now: () => 0 } }, {
+    abilityObjects: [{ id: 1, kind: "shield", x: 100, y: 200, expiresIn }],
+  });
+  const rects = callsNamed(g, "drawRect");
+  assert.deepEqual(rects[0], ["drawRect", 71, 101, 58, 6], "black backing below HP row");
+  if (expectedWidth > 0) {
+    assert.deepEqual(rects[1], ["drawRect", 72, 102, expectedWidth, 4]);
+    assert(g.calls.some(call => call[0] === "beginFill" && call[1] === 0x9a9a9a));
+  } else {
+    assert.equal(rects.length, 1, "expired shields have an empty bar");
+  }
 }
 
 console.log("native_graphics_contracts: ok");

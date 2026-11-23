@@ -2,6 +2,7 @@ import { drawEscapeTrails } from "./escape_trail.js";
 import { gfxNoFill, gfxCircle, gfxEllipse, gfxPoly, gfxRect, gfxRoundRect, gfxStrokeLine, gfxStrokePaths, gfxReset, gfxFill, gfxStroke } from "./native_graphics.js";
 import {
   COLORS,
+  DISCIPLE_SHIELD_DURATION_TICKS,
   STATS,
   RESOURCE_AMOUNTS,
   ANTI_TANK_GUN_DEPLOYED_RANGE_TILES,
@@ -513,6 +514,20 @@ export function _drawAbilityObjects(state) {
       gfxNoFill(g);
       gfxStroke(g, 1.5, 0xc4f8ff, 0.6 + pulse * 0.25);
       gfxEllipse(g, object.x, object.y, radius - 3, radius - 3);
+      if (finiteNumber(object.expiresIn)) {
+        // Same six-pixel offset below the HP row used by unit secondary bars.
+        const width = 56;
+        const y = object.y - radius - 2;
+        const fraction = clamp01(object.expiresIn / DISCIPLE_SHIELD_DURATION_TICKS);
+        gfxStroke(g, 0);
+        gfxFill(g, 0x000000, 1);
+        gfxRect(g, object.x - width / 2 - 1, y - 1, width + 2, 6);
+        if (fraction > 0) {
+          gfxFill(g, 0x9a9a9a, 1);
+          gfxRect(g, object.x - width / 2, y, width * fraction, 4);
+        }
+        gfxNoFill(g);
+      }
     } else if (object.kind === ABILITY_OBJECT_KIND.LINE_PROJECTILE
         && (object.ability === ABILITY.HEALING_POTION || object.ability === ABILITY.ESCAPE_TREASURE)) {
       const color = object.ability === ABILITY.HEALING_POTION ? 0x54e878 : 0xa653ec;

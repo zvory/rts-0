@@ -159,6 +159,8 @@ export const SCOUT_PLANE_ABILITY_COOLDOWN_TICKS = TICK_HZ * 30;
 // `sight` (tiles) drives the local fog overlay. `rangeTiles` mirrors weapon range for visuals.
 // `cost`/`supply` drive the command card.
 export const DAO_TRAINING_COST_OIL = 100;
+export const DISCIPLE_SHIELD_DURATION_TICKS = TICK_HZ * 15;
+
 export const DAO_TRAINING_TICKS = TICK_HZ * 10;
 export const MAX_DAO_TRAINING_QUEUE = 64;
 
