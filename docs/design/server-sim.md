@@ -290,7 +290,7 @@ check once on reaching the end through playback or seeking, log status and cost,
 on mismatches or unavailable algorithms. Seeking backward re-arms verification. A mismatch signals
 divergence; it does not distinguish nondeterminism from build/rules/platform drift or corruption.
 
-The algorithm `rts-end-state-json-sha256-v2` hashes its ASCII identifier followed immediately by
+The algorithm `rts-end-state-json-sha256-v3` hashes its ASCII identifier followed immediately by
 compact serde_json serialization of the explicit ordered projection in
 `game/checkpoint/fingerprint.rs`. SHA-256 is streamed through a 64 KiB buffer. Struct fields have
 fixed serialization order; entity ids and unordered fog/memory collections are sorted by their
@@ -298,6 +298,7 @@ checkpoint adapters. Numbers use serde_json's locale-independent decimal represe
 native-endian memory, pointer addresses, Rust `Hash`, or debug text. Valid simulation floats are
 finite and their exact round-trip values participate without rounding/tolerance. Arrays retain
 semantic order. Changes to projection/serialization semantics require a new algorithm identifier.
+Version 3 removes the redundant mutable Dao field; simulation schema 7 records Adept identity in kind.
 The map uses its existing canonical materialized binding; map content is immutable during live play.
 The projection includes all committed authoritative owners (players/private economy/scores/upgrades,
 entities/orders, fog/memories, active abilities/projectiles, decals/trails, world combat signals,
@@ -543,7 +544,7 @@ Top-level shape:
   "compatibility": {
     "createdBy": "server|replay|lab|debug",
     "serverBuildSha": "...",
-    "simSchemaVersion": 6,
+    "simSchemaVersion": 7,
     "rulesVersion": 1,
     "protocolVersion": 1,
     "requiredFeatures": [],
@@ -2181,8 +2182,10 @@ Tank tile entry exhausts the entire wire segment immediately, without damage or 
 
 ### Disciple insight and Dao specializations
 
-See [Dao evolution playtest](dao-insight.md). Entity-owned `insight` and `dao` persist
-through checkpoints. Visible Disciple snapshots append `insight` (compact slot 45) and
+See [Dao evolution playtest](dao-insight.md). Entity-owned `insight` and authoritative unit `kind` persist
+through checkpoints. Evolution changes Novice `warrior` (29) to `lightness_adept` (35),
+`war_adept` (36), or `magic_adept` (37), preserving the entity id and orders.
+Permanent Dao identity is derived from kind; the engine stores no separate mutable `dao`. Visible Disciple snapshots append `insight` (compact slot 45) and
 `dao` (slot 46: lightness/war/magic). Evolution buttons set replaceable, entity-owned `chosenDao` intent (team-private compact slot 49), independent of orders. Codes 14–16 and order stages 22–24 retain their positions.
 Evolution automatically occurs once 60 insight is ready, without research or a Pavilion.
 Evolution clears all insight and doubles the cap to 120. Evolved Disciples continue earning

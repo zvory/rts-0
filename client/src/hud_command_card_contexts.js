@@ -45,7 +45,7 @@ export function buildCultivatorCommandCardContextSamples(buildCard) {
   });
   const unitCards = [null, "lightness", "war", "magic"].map((dao) => ({
     id: `cultivators-disciple-${dao || "base"}`,
-    card: buildCard(ctx([{ ...disciple, dao }])),
+    card: buildCard(ctx([{ ...disciple, dao, kind: ({ lightness: KIND.LIGHTNESS_ADEPT, war: KIND.WAR_ADEPT, magic: KIND.MAGIC_ADEPT })[dao] || KIND.WARRIOR }])),
   }));
   return [
     ...unitCards,

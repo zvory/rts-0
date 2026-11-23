@@ -8,7 +8,7 @@ import { installFakePixi } from "./pixi_fakes.mjs";
 const grounds = {id: 10, owner: 1, kind: KIND.TOURNAMENT_GROUNDS, x: 500, y: 500};
 const units = [
   {id: 1, owner: 1, kind: KIND.WARRIOR},
-  {id: 2, owner: 1, kind: KIND.WARRIOR, dao: "magic"},
+  {id: 2, owner: 1, kind: KIND.MAGIC_ADEPT, dao: "magic"},
   {id: 3, owner: 1, kind: KIND.WORKER},
 ];
 const commands = [];

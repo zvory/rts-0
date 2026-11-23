@@ -110,3 +110,6 @@ mod tests {
 // Snapshot playerFactions (compact pf) projects public identity independently of private resources.
 
 // Cultivator Shop: wire kind shop, compact kind code 34; no additional snapshot fields.
+
+// Novice warrior (29) evolves into distinct kinds lightness_adept (35), war_adept (36),
+// or magic_adept (37). EntityView.dao is derived presentation metadata, not engine identity.

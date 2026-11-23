@@ -292,9 +292,7 @@ pub(in crate::game) fn combat_system(
                 ) {
                     // Ranged evolution can leave an earlier sword approach behind.
                     // Idle has no commanded route to preserve after its target is lost.
-                    if auto_pursuit
-                        || (e.kind == EntityKind::Warrior && matches!(e.order(), Order::Idle))
-                    {
+                    if auto_pursuit || (e.kind.is_disciple() && matches!(e.order(), Order::Idle)) {
                         if matches!(e.order(), Order::Idle) {
                             e.clear_path();
                             e.set_path_goal(None);
@@ -361,7 +359,6 @@ pub(in crate::game) fn combat_system(
         }
         if entities.get(id).is_some_and(|e| {
             e.kind == EntityKind::Warrior
-                && e.dao.is_none()
                 && e.ability_cooldown_ticks(crate::game::ability::AbilityKind::Charge) == 0
         }) {
             if let Some((position, movement, hostile_unit)) = entities.get(tid).map(|target| {

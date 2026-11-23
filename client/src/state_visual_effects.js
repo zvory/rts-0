@@ -1,5 +1,5 @@
 import { ARTILLERY_OUTER_RADIUS_TILES, MORTAR_OUTER_RADIUS_TILES, MORTAR_IMPACT_DURATION_MS } from "./config.js";
-import { EVENT, KIND, STATE, WEAPON_KIND, isUnit } from "./protocol.js";
+import { EVENT, STATE, WEAPON_KIND, daoForKind, isUnit } from "./protocol.js";
 import { sampleWeaponRecoilCycle } from "./weapon_recoil_cycle.js";
 
 const SHOT_REVEAL_MS = 1500;
@@ -436,8 +436,7 @@ export class VisualEffectBuffers {
       id: ev.from,
       owner: typeof r.owner === "number" ? r.owner : 0,
       kind: r.kind,
-      dao: ev.weaponKind === WEAPON_KIND.DISCIPLE_ARROW ? "lightness"
-        : ev.weaponKind === WEAPON_KIND.DISCIPLE_ORB ? "magic" : undefined,
+      dao: daoForKind(r.kind) ?? undefined,
       x: r.x,
       y: r.y,
       hp: 1,

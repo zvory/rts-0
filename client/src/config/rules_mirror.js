@@ -7,43 +7,26 @@ import { TICK_HZ } from "./timing.js";
 
 export const DAO_LIGHTNESS_DASH_RANGE_TILES = 10;
 export function entityAbilityRangeTiles(definition, entity) {
-  return definition?.ability === ABILITY.EKAT_TELEPORT && entity?.kind === KIND.WARRIOR
+  return definition?.ability === ABILITY.EKAT_TELEPORT && entity?.kind === KIND.LIGHTNESS_ADEPT
     ? DAO_LIGHTNESS_DASH_RANGE_TILES : definition?.rangeTiles;
 }
 export const DAO_WAR_RANGE_TILES = 1.75;
 export const DAO_WAR_BODY_SCALE = 0.7;
 
 export function entityBodyRadius(entity) {
-  const size = STATS[entity?.kind]?.size || 0;
-  return entity?.kind === KIND.WARRIOR && entity.dao === "war"
-    ? size * DAO_WAR_BODY_SCALE : size;
+  return STATS[entity?.kind]?.size || 0;
 }
 export const DAO_RANGED_RANGE_TILES = 5;
 export const DISCIPLE_INSIGHT_REQUIRED = 60;
 export const DISCIPLE_EVOLVED_INSIGHT_CAP = DISCIPLE_INSIGHT_REQUIRED * 2;
 
 export function entityAttackRangeTiles(entity) {
-  if (entity?.kind === KIND.WARRIOR && entity.dao === "war") return DAO_WAR_RANGE_TILES;
-  if (entity?.kind === KIND.WARRIOR && entity.dao === "magic") {
-    return DAO_RANGED_RANGE_TILES;
-  }
   return STATS[entity?.kind]?.rangeTiles || 0;
 }
 
 // Carrier identity includes permanent Dao specialization, independently of cooldown/readiness.
 export function abilityCarriedByEntity(definition, entity) {
-  if (!definition?.carriers?.includes(entity.kind)) return false;
-  if (entity.kind !== KIND.WARRIOR) return true;
-  switch (definition.ability) {
-    case ABILITY.EVOLVE_LIGHTNESS:
-    case ABILITY.EVOLVE_WAR:
-    case ABILITY.EVOLVE_MAGIC: return !entity.dao;
-    case ABILITY.THROW_SWORD: return entity.dao === "war";
-    case ABILITY.EKAT_TELEPORT: return entity.dao === "lightness";
-    case ABILITY.EKAT_MAGIC_ANCHOR:
-    case ABILITY.DISCIPLE_SHIELD: return entity.dao === "magic";
-    default: return true;
-  }
+  return !!definition?.carriers?.includes(entity?.kind);
 }
 
 // Mirrors server/src/config.rs *_BODY_* values. Server collision is authoritative;
@@ -192,6 +175,15 @@ export const STATS = Object.freeze({
   [KIND.WARRIOR]: { armored: false, label: "Novice", icon: "NV", size: 26, sight: 11,
     rangeTiles: 0.75, cost: { steel: 100, oil: 0 }, supply: 2, buildTicks: 300,
     description: "Durable melee infantry with a short sword reach and 50% armor penetration. Slow attacks deal heavy damage. Charge (automatic): 1.5x movement speed for 1 second, with a 15-second cooldown, when attacking an enemy unit at least 2 tiles away or moving away." },
+  [KIND.LIGHTNESS_ADEPT]: { armored: false, label: "Lightness Adept", icon: "LA", size: 26, sight: 11,
+    rangeTiles: 0.75, cost: { steel: 100, oil: 0 }, supply: 2, buildTicks: 300,
+    description: "Fast sword infantry with Dash and 50% armor penetration." },
+  [KIND.WAR_ADEPT]: { armored: false, label: "War Adept", icon: "WA", size: Math.fround(26 * Math.fround(DAO_WAR_BODY_SCALE)), sight: 11,
+    rangeTiles: DAO_WAR_RANGE_TILES, cost: { steel: 100, oil: 0 }, supply: 2, buildTicks: 300,
+    description: "Armored spear infantry with Throw Sword and 50% armor penetration." },
+  [KIND.MAGIC_ADEPT]: { armored: false, label: "Magic Adept", icon: "MA", size: 26, sight: 11,
+    rangeTiles: DAO_RANGED_RANGE_TILES, cost: { steel: 100, oil: 0 }, supply: 2, buildTicks: 300,
+    description: "Ranged orb infantry with Anchor and Shield." },
   [KIND.MACHINE_GUNNER]: { armored: false, label: "Machine Gunner", icon: "MG", size: 10, sight: 11,
     rangeTiles: 6.1, cost: { steel: 75, oil: 10 }, supply: 2, buildTicks: 400, requires: KIND.TRAINING_CENTRE },
   [KIND.ANTI_TANK_GUN]: { armored: false, label: "Anti-Tank Gun", icon: "ATG", size: 20, sight: 9, body: ANTI_TANK_GUN_BODY,
@@ -308,7 +300,7 @@ export const ABILITIES = Object.freeze({
   [ABILITY.DISCIPLE_SHIELD]: Object.freeze({
     ability: ABILITY.DISCIPLE_SHIELD, label: "Shield", icon: "SHD", hotkey: "X",
     title: "Place a shield that absorbs 300 enemy damage to allied units; lasts up to 15 seconds",
-    carriers: Object.freeze([KIND.WARRIOR]), targetMode: "worldPoint",
+    carriers: Object.freeze([KIND.MAGIC_ADEPT]), targetMode: "worldPoint",
     rangeTiles: EKAT_MAGIC_ANCHOR_RANGE_TILES, radiusTiles: EKAT_MAGIC_ANCHOR_RADIUS_TILES,
     cooldownTicks: 300, cost: Object.freeze({ steel: 0, oil: 0 }),
     queued: true, queuePolicy: "skipIfNotReady",
@@ -464,7 +456,7 @@ export const ABILITIES = Object.freeze({
     icon: "DSH",
     hotkey: "D",
     title: "Dash up to 5 tiles, then recast to return",
-    carriers: Object.freeze([KIND.EKAT, KIND.WARRIOR]),
+    carriers: Object.freeze([KIND.EKAT, KIND.LIGHTNESS_ADEPT]),
     targetMode: "worldPoint",
     rangeTiles: EKAT_TELEPORT_RANGE_TILES,
     cooldownTicks: EKAT_TELEPORT_COOLDOWN_TICKS,
@@ -478,7 +470,7 @@ export const ABILITIES = Object.freeze({
     icon: "⚔",
     hotkey: "E",
     title: "Throw a spinning sword out and back; deals 40 damage outbound and 80 on return",
-    carriers: Object.freeze([KIND.WARRIOR]),
+    carriers: Object.freeze([KIND.WAR_ADEPT]),
     targetMode: "worldPoint",
     rangeTiles: EKAT_LINE_SHOT_RANGE_TILES,
     cooldownTicks: EKAT_LINE_SHOT_COOLDOWN_TICKS,
@@ -512,7 +504,7 @@ export const ABILITIES = Object.freeze({
     icon: "ANC",
     hotkey: "C",
     title: "Place a 10-second pull field",
-    carriers: Object.freeze([KIND.EKAT, KIND.WARRIOR]),
+    carriers: Object.freeze([KIND.EKAT, KIND.MAGIC_ADEPT]),
     targetMode: "worldPoint",
     rangeTiles: EKAT_MAGIC_ANCHOR_RANGE_TILES,
     cooldownTicks: 0,

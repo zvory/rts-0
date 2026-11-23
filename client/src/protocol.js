@@ -52,6 +52,8 @@ import {
   UPGRADE,
   UPGRADE_CODE,
   isBuilding,
+  isDiscipleKind,
+  daoForKind,
   isRoadTerrain,
   isResource,
   isUnit
@@ -103,6 +105,8 @@ export {
   UPGRADE,
   UPGRADE_CODE,
   isBuilding,
+  isDiscipleKind,
+  daoForKind,
   isRoadTerrain,
   isResource,
   isUnit

@@ -1,4 +1,4 @@
-import { EVENT, KIND, WEAPON_KIND } from "./protocol.js";
+import { EVENT, KIND, WEAPON_KIND, daoForKind, isDiscipleKind } from "./protocol.js";
 
 export const PANZERFAUST_LAUNCH_SOUND_ID = "combat_panzerfaust_launch_01";
 export const PANZERFAUST_IMPACT_SOUND_ID = "combat_panzerfaust_impact_01";
@@ -13,10 +13,11 @@ const METALLIC_SWORD_TARGETS = new Set([
 ]);
 
 export function discipleAttackSoundId(attacker, target, weaponKind) {
-  if (weaponKind === WEAPON_KIND.DISCIPLE_ORB || (!weaponKind && attacker?.dao === "magic")) {
+  const dao = daoForKind(attacker?.kind);
+  if (weaponKind === WEAPON_KIND.DISCIPLE_ORB || (!weaponKind && dao === "magic")) {
     return "combat_disciple_orb_01";
   }
-  if (attacker?.dao === "lightness") return "combat_disciple_spear_01";
+  if (dao === "lightness") return "combat_disciple_spear_01";
   return METALLIC_SWORD_TARGETS.has(target?.kind)
     ? "combat_disciple_sword_strike_01"
     : "combat_disciple_sword_stab_01";
@@ -28,6 +29,9 @@ const DEFAULT_WEAPON_KIND_BY_ATTACKER_KIND = Object.freeze({
   [KIND.RIFLEMAN]: WEAPON_KIND.RIFLEMAN_RIFLE,
   [KIND.PANZERFAUST]: WEAPON_KIND.RIFLEMAN_RIFLE,
   [KIND.WARRIOR]: WEAPON_KIND.WARRIOR_SWORD,
+  [KIND.LIGHTNESS_ADEPT]: WEAPON_KIND.WARRIOR_SWORD,
+  [KIND.WAR_ADEPT]: WEAPON_KIND.WARRIOR_SWORD,
+  [KIND.MAGIC_ADEPT]: WEAPON_KIND.DISCIPLE_ORB,
   [KIND.MACHINE_GUNNER]: WEAPON_KIND.MACHINE_GUNNER_MG,
   [KIND.SCOUT_CAR]: WEAPON_KIND.SCOUT_CAR_MG,
   [KIND.ANTI_TANK_GUN]: WEAPON_KIND.ANTI_TANK_GUN,
@@ -75,7 +79,9 @@ export function defaultWeaponKindForAttackerKind(kind) {
 
 export function attackFeedbackKind(kind, weaponKind) {
   const defaultWeaponKind = defaultWeaponKindForAttackerKind(kind);
-  if (!weaponKind || weaponKind === defaultWeaponKind) return kind;
+  if (!weaponKind || weaponKind === defaultWeaponKind) {
+    return isDiscipleKind(kind) ? KIND.WARRIOR : kind;
+  }
   return ATTACK_FEEDBACK_KIND_BY_WEAPON[weaponKind] || kind;
 }
 

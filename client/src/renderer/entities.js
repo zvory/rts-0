@@ -12,7 +12,7 @@ import {
   ANTI_TANK_GUN_FIELD_OF_FIRE_RAD,
   isProducerBuilding,
 } from "../config.js";
-import { KIND, SETUP, STATE, isBuilding, isResource } from "../protocol.js";
+import { isDiscipleKind, KIND, SETUP, STATE, isBuilding, isResource } from "../protocol.js";
 import { buildingProgressStatus } from "./entity_state.js";
 import {
   DEPLOYED_WEAPON_ANIM_MS,
@@ -146,7 +146,7 @@ export function _drawSelectionAndHp(e, selection, state, ownerColor = null) {
   const selected = selection.has(e.id);
   const hasHealth = !isResource(e.kind) && Number.isFinite(e.maxHp) && e.maxHp > 0;
   const damaged = hasHealth && Number.isFinite(e.hp) && e.hp < e.maxHp;
-  const alwaysShow = !!state?.showHealthBarsAlwaysEnabled || e.kind === KIND.WARRIOR;
+  const alwaysShow = !!state?.showHealthBarsAlwaysEnabled || isDiscipleKind(e.kind);
   const progressStatus = buildingProgressStatus(e);
 
   if (selected) {
@@ -187,7 +187,7 @@ export function _drawAboveFogHp(e, state, ownerColor = null) {
     && e.hp < e.maxHp;
   if (e?.aboveFogReveal !== true && e?.visionOnly !== true) return;
   if (!hasHealth) return;
-  if (!damaged && !state?.showHealthBarsAlwaysEnabled && e.kind !== KIND.WARRIOR) return;
+  if (!damaged && !state?.showHealthBarsAlwaysEnabled && !isDiscipleKind(e.kind)) return;
   const g = this._hpBarSlot(e.id, "aboveFogHpBars");
   this._hpBar(g, e, null, ownerColor);
 }
@@ -308,7 +308,7 @@ export function _hpBar(g, e, status = null, ownerColor = null) {
   g.rtsFill.scale.set(frac, 1);
   // Most health bars never need Dao overlays. Allocate them only for Disciples,
   // retaining the same child order so their radiance stays behind the HP bar.
-  if (e.kind !== KIND.WARRIOR) {
+  if (!isDiscipleKind(e.kind)) {
     if (g.rtsInsight) {
       g.rtsInsight.visible = g.rtsDao.visible = g.rtsRadiance.visible = false;
     }
@@ -329,7 +329,7 @@ export function _hpBar(g, e, status = null, ownerColor = null) {
     const bar = g.rtsInsight;
     const icon = g.rtsDao;
     bar.clear(); icon.clear();
-    if (e.kind === KIND.WARRIOR) {
+    if (isDiscipleKind(e.kind)) {
       if (Number.isFinite(e.insight)) {
         bar.rect(-halfW - 1, 6, barW + 2, 5).fill(0x8b2028);
         bar.rect(-halfW, 7, barW * clamp01(e.insight / (e.dao ? DISCIPLE_EVOLVED_INSIGHT_CAP : DISCIPLE_INSIGHT_REQUIRED)), 3).fill(0x368dff);

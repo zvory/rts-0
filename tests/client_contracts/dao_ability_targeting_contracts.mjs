@@ -12,11 +12,11 @@ import { withFakeDocument } from "./fakes.mjs";
 
 const swordInput = Object.create(Input.prototype);
 const swordSelection = [
-  { id: 101, owner: 1, kind: KIND.WARRIOR, dao: "war", x: 200, y: 220 },
-  { id: 102, owner: 1, kind: KIND.WARRIOR, dao: "magic", x: 500, y: 220 },
-  { id: 103, owner: 1, kind: KIND.WARRIOR, dao: "lightness", x: 500, y: 220 },
+  { id: 101, owner: 1, kind: KIND.WAR_ADEPT, dao: "war", x: 200, y: 220 },
+  { id: 102, owner: 1, kind: KIND.MAGIC_ADEPT, dao: "magic", x: 500, y: 220 },
+  { id: 103, owner: 1, kind: KIND.LIGHTNESS_ADEPT, dao: "lightness", x: 500, y: 220 },
   { id: 104, owner: 1, kind: KIND.WARRIOR, x: 500, y: 220 },
-  { id: 105, owner: 2, kind: KIND.WARRIOR, dao: "war", x: 500, y: 220 },
+  { id: 105, owner: 2, kind: KIND.WAR_ADEPT, dao: "war", x: 500, y: 220 },
 ];
 swordInput.mouse = { x: 500, y: 220 };
 swordInput.state = {
@@ -101,7 +101,7 @@ dashInput.clientIntent = new ClientIntent();
 dashInput.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.EKAT_TELEPORT });
 dashInput._groundAtScreen = (x, y) => ({ x, y });
 
-const lightnessEntity = { id: 89, owner: 1, kind: KIND.WARRIOR, dao: "lightness", x: 200, y: 1000 };
+const lightnessEntity = { id: 89, owner: 1, kind: KIND.LIGHTNESS_ADEPT, dao: "lightness", x: 200, y: 1000 };
 dashInput.state.selectedEntities = () => [ekatEntity, lightnessEntity];
 dashInput.state.abilityObjects = [];
 dashInput._refreshAbilityTargetPreview();

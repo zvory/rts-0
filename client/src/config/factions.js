@@ -128,7 +128,7 @@ export const FACTION_CATALOGS = Object.freeze({
   [CULTIVATORS_FACTION_ID]: freezeCatalog({
     id: CULTIVATORS_FACTION_ID,
     loadoutId: "cultivators.standard",
-    units: [KIND.WORKER, KIND.WARRIOR],
+    units: [KIND.WORKER, KIND.WARRIOR, KIND.LIGHTNESS_ADEPT, KIND.WAR_ADEPT, KIND.MAGIC_ADEPT],
     buildings: [KIND.RESOURCE_DEPOT, KIND.PORTAL, KIND.THREE_DAO_PAVILION, KIND.TOURNAMENT_GROUNDS, KIND.PROVEN_GROUNDS, KIND.SHOP, KIND.STEEL_MINE, KIND.PUMP_JACK],
     buildables: [KIND.RESOURCE_DEPOT, KIND.PORTAL, KIND.THREE_DAO_PAVILION, KIND.TOURNAMENT_GROUNDS, KIND.PROVEN_GROUNDS, KIND.SHOP],
     trainables: {
@@ -198,14 +198,7 @@ export function commandCardAbilitiesForFaction(factionId) {
 // Presentation aliases preserve the shared simulation and renderer identity.
 const NEXUS_STATS = Object.freeze({ ...STATS[KIND.RESOURCE_DEPOT], label: "Nexus" });
 const SERF_STATS = Object.freeze({ ...STATS[KIND.WORKER], label: "Serf" });
-const ADEPT_STATS = Object.freeze(Object.fromEntries(
-  ["Lightness", "War", "Magic"].map((dao) => [dao.toLowerCase(), Object.freeze({
-    ...STATS[KIND.WARRIOR], label: `${dao} Adept`,
-    description: `A Novice who has permanently advanced along the Dao of ${dao}.`,
-  })]),
-));
-export function statsForFaction(kind, factionId, dao = null) {
-  if (kind === KIND.WARRIOR && Object.prototype.hasOwnProperty.call(ADEPT_STATS, dao)) return ADEPT_STATS[dao];
+export function statsForFaction(kind, factionId) {
   if (factionId === CULTIVATORS_FACTION_ID) {
     if (kind === KIND.RESOURCE_DEPOT) return NEXUS_STATS;
     if (kind === KIND.WORKER) return SERF_STATS;

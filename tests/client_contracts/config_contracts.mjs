@@ -1379,7 +1379,7 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
 
 {
   const dash = ABILITIES[ABILITY.EKAT_TELEPORT];
-  assert(entityAbilityRangeTiles(dash, { kind: KIND.WARRIOR, dao: "lightness" }) === 10,
+  assert(entityAbilityRangeTiles(dash, { kind: KIND.LIGHTNESS_ADEPT, dao: "lightness" }) === 10,
     "Lightness dash previews use ten tiles");
   assert(entityAbilityRangeTiles(dash, { kind: KIND.EKAT }) === 5,
     "Ekat dash retains five tiles");

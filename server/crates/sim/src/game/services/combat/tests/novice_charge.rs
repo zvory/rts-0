@@ -85,7 +85,10 @@ fn novice_charge_never_triggers_for_buildings_friends_or_specialists() {
                     .unwrap()
                     .set_order(Order::attack(friendly));
             }
-            _ => entities.get_mut(novice).unwrap().dao = Some(UpgradeKind::DaoOfLightness),
+            _ => entities
+                .get_mut(novice)
+                .unwrap()
+                .set_disciple_kind_for_test(EntityKind::LightnessAdept),
         }
         run_combat_tick(&mut entities);
         assert_eq!(

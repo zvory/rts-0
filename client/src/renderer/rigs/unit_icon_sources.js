@@ -1,7 +1,7 @@
 import { spriteRasterSource } from "./png_icon_source.js";
 import { KIND, SETUP } from "../../protocol.js";
 import { lightenColor } from "../shared.js";
-import { createLiveFrameStrips, liveFrameStripKeyForEntity } from "./frame_strip_routing.js";
+import { createLiveFrameStrips } from "./frame_strip_routing.js";
 import { liveRigIconSvgFor, LOADED_RIFLEMAN_RIG_KEY } from "./live_routing.js";
 import { createLivePngRigAtlases } from "./png_routing.js";
 import { resolvePngSpriteTransform } from "./png_transform.js";
@@ -22,11 +22,9 @@ const ICON_COMPOSITION_STATE = Object.freeze({
  * PNG frame strips/atlases are authoritative for raster units. SVG portraits are used only for
  * units that do not yet have a PNG route.
  */
-export function liveUnitIconMarkupFor(kind, { teamColor = "#0072b2", minimapPart = null, dao = null } = {}) {
+export function liveUnitIconMarkupFor(kind, { teamColor = "#0072b2", minimapPart = null } = {}) {
   const tintColor = normalizeTeamColor(teamColor);
-  const partDao = minimapPart?.startsWith("dao-") ? minimapPart.split(":")[0].slice(4) : dao;
-  const rigKey = kind === KIND.WARRIOR ? liveFrameStripKeyForEntity({ kind, dao: partDao })
-    : kind === KIND.PANZERFAUST
+  const rigKey = kind === KIND.PANZERFAUST
     ? (minimapPart?.startsWith("unloaded-frame:") ? KIND.RIFLEMAN : LOADED_RIFLEMAN_RIG_KEY) : kind;
   const strip = LIVE_FRAME_STRIPS.get(rigKey);
   if (strip) {

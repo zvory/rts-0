@@ -5,6 +5,7 @@
 //! Tag conventions: top-level messages use `"t"`, commands use `"c"`, events use `"e"`.
 //! Coordinates are world pixels (floats) unless the field name ends in `Tile`.
 use serde::{Deserialize, Serialize};
+// Dao Adepts have distinct kinds 35–37; snapshot Dao is derived from kind.
 pub mod chat;
 mod client_message;
 mod client_net_report;

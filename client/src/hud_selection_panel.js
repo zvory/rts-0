@@ -12,7 +12,7 @@ import {
   TICK_HZ,
   UPGRADES,
 } from "./config.js";
-import { KIND, UPGRADE } from "./protocol.js";
+import { KIND, UPGRADE, isDiscipleKind } from "./protocol.js";
 
 const SELECTION_BUDGET_ROWS = 4;
 const SELECTION_BUDGET_BLOCK_ROWS = 2;
@@ -335,9 +335,7 @@ export class HudSelectionPanel {
         ? this.state.selectedEntities()
         : [];
       this.state.setSelection(
-        sel.filter((e) => e.kind === entity.kind && (
-          entity.kind !== KIND.WARRIOR || (e.dao || null) === (entity.dao || null)
-        )).map((e) => e.id),
+        sel.filter((e) => e.kind === entity.kind).map((e) => e.id),
         { controlPolicy: this.controlPolicy },
       );
       return;
@@ -447,7 +445,7 @@ export class HudSelectionPanel {
     node.innerHTML =
       `<div class="sel-name">${st.label || e.kind}</div>` +
       hpHtml +
-      (e.kind === KIND.WARRIOR && Number.isFinite(e.insight) ? `<div class="sel-stat">Insight: ${e.insight ?? 0} / ${e.dao ? DISCIPLE_EVOLVED_INSIGHT_CAP : DISCIPLE_INSIGHT_REQUIRED}${e.dao ? ` · Dao of ${e.dao[0].toUpperCase() + e.dao.slice(1)}` : e.chosenDao ? ` · Following ${e.chosenDao[0].toUpperCase() + e.chosenDao.slice(1)}` : ""}</div>` : "") +
+      (isDiscipleKind(e.kind) && Number.isFinite(e.insight) ? `<div class="sel-stat">Insight: ${e.insight ?? 0} / ${e.dao ? DISCIPLE_EVOLVED_INSIGHT_CAP : DISCIPLE_INSIGHT_REQUIRED}${e.dao ? ` · Dao of ${e.dao[0].toUpperCase() + e.dao.slice(1)}` : e.chosenDao ? ` · Following ${e.chosenDao[0].toUpperCase() + e.chosenDao.slice(1)}` : ""}</div>` : "") +
       (unitsKilledHtml || (entityIdHtml ? `<div class="sel-stat">${entityIdHtml}</div>` : "")) +
       (e.dao === "war" ? `<div class="sel-stat">Armor: 50% · reduced by armor piercing</div>` : armorHtml) +
       resourceRemainingHtml +

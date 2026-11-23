@@ -38,6 +38,7 @@ const BUILDING_START_HP_DENOMINATOR: u32 = 10;
 /// State that only applies to a subset of kinds lives in typed optional groups, keeping
 /// the store homogeneous while making kind-specific state explicit.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Entity {
     /// Stable unique id (never reused).
     pub id: u32,
@@ -52,8 +53,6 @@ pub struct Entity {
 
     #[serde(default)]
     pub insight: u32,
-    #[serde(default)]
-    pub dao: Option<crate::game::upgrade::UpgradeKind>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub chosen_dao: Option<crate::game::upgrade::UpgradeKind>,
     #[serde(default)]
@@ -110,7 +109,6 @@ impl Entity {
             last_damage_entity: None,
             units_killed: 0,
             insight: 0,
-            dao: None,
             chosen_dao: None,
             dao_advance_ticks: 0,
             shield: None,
@@ -166,7 +164,6 @@ impl Entity {
             last_damage_entity: None,
             units_killed: 0,
             insight: 0,
-            dao: None,
             chosen_dao: None,
             dao_advance_ticks: 0,
             shield: None,
@@ -224,7 +221,6 @@ impl Entity {
             last_damage_entity: None,
             units_killed: 0,
             insight: 0,
-            dao: None,
             chosen_dao: None,
             dao_advance_ticks: 0,
             shield: None,
@@ -990,7 +986,7 @@ impl Entity {
     }
 
     pub(crate) fn default_weapon_kind(&self) -> Option<rules::combat::WeaponKind> {
-        rules::combat::resolved_weapon_kind(self.kind, self.dao)
+        rules::combat::default_weapon_kind(self.kind)
     }
 
     pub fn set_last_damage_owner(&mut self, owner: Option<u32>) {
@@ -1346,7 +1342,7 @@ impl Entity {
     /// The collision/interaction radius in world pixels.
     pub fn radius(&self) -> f32 {
         if let Some(s) = config::unit_stats(self.kind) {
-            s.radius * self.dao_body_scale()
+            s.radius
         } else if self.is_building() {
             // Footprint half-extent (approx) for range/interaction checks.
             let Some(s) = config::building_stats(self.kind) else {
