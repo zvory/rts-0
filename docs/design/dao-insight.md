@@ -68,6 +68,9 @@ cooldown, replaces the caster’s prior shield, and expires after 15 seconds or 
 depletion, replacement, or caster death. In-range casts preserve movement and queued orders;
 out-of-range immediate casts replace the current order with an approach-and-cast order. The pool, fixed world center, and absolute expiry tick live on the caster entity and survive
 checkpoints; the existing ability-runtime allocator supplies its unique visual id.
+All visible viewers see a gray lifetime bar on a black background at the top of the field,
+six pixels below its HP-bar position. It drains from full to empty using the server-provided
+remaining ticks and the mirrored 15-second duration, independently of damage absorption.
 All visible viewers see the field; owner/privileged viewers receive its remaining pool.
 
 Lab commands continue to use the selected owner’s faction and research. A Disciple

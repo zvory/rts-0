@@ -33,6 +33,7 @@ export {
 
 export {
   ABILITIES,
+  DISCIPLE_SHIELD_DURATION_TICKS,
   abilityCarriedByEntity,
   entityAbilityRangeTiles,
   DAO_LIGHTNESS_DASH_RANGE_TILES,

@@ -522,6 +522,10 @@ fn print_client_constants(indent: &str) {
         balance::EKAT_MAGIC_ANCHOR_RANGE_TILES
     );
     println!(
+        "{indent}    \"discipleShieldDurationTicks\": {},",
+        balance::DISCIPLE_SHIELD_DURATION_TICKS
+    );
+    println!(
         "{indent}    \"ekatMagicAnchorDurationTicks\": {},",
         balance::EKAT_MAGIC_ANCHOR_DURATION_TICKS
     );
