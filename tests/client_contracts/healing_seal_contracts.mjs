@@ -27,6 +27,32 @@ assert.equal(commands[0].x, 656);
 assert.equal(commands[0].y, 336);
 assert.equal(ABILITIES[ABILITY.HEALING_SEAL].cost.oil, 150);
 
+// Ground magic remains selectable, but must not swallow movement or attack-move clicks.
+const seal = { id: 8, owner: 2, kind: KIND.HEALING_SEAL, x: 656, y: 336, hp: 400, maxHp: 400 };
+const warrior = { id: 9, owner: 1, kind: KIND.WARRIOR };
+const enemy = { ...warrior, id: 10, owner: 2, x: seal.x, y: seal.y };
+let hitEntities = [seal];
+input.clientIntent = new ClientIntent();
+input.state = {
+  playerId: 1, map: { tileSize: 32 }, selectedEntities: () => [warrior],
+  isEnemyOwner: (owner) => owner === 2,
+};
+input._selectedOwnUnitIds = () => [warrior.id];
+input._selectedGathererIds = () => [];
+input._selectedWorkerIds = () => [];
+input._selectionEntities = () => hitEntities;
+input._entityAtScreen = (_point, _ownPreferred, eligible = () => true) => hitEntities.find(eligible) || null;
+input._onRightClick({ x: seal.x, y: seal.y });
+assert.equal(commands.at(-1).c, "move", "right-clicking enemy ground magic moves onto it");
+input.clientIntent.beginCommandTarget("attack");
+input._issueTargetedCommand({ x: seal.x, y: seal.y });
+assert.equal(commands.at(-1).c, "attackMove", "attack-clicking a seal attacks toward the ground");
+hitEntities = [seal, enemy];
+input.clientIntent.endCommandTarget();
+input._onRightClick({ x: seal.x, y: seal.y });
+assert.equal(commands.at(-1).c, "attack");
+assert.equal(commands.at(-1).target, enemy.id, "seal does not mask an attackable unit inside it");
+
 withFakeHudDocument(({ FakeElement }) => {
   const panel = new HudSelectionPanel(new FakeElement("section"), { players: [{ id: 1, factionId: "cultivators" }] }, null, () => "");
   const node = panel._singleSelectionNode({ id: 8, owner: 1, kind: KIND.HEALING_SEAL, hp: 75, maxHp: 400 });
