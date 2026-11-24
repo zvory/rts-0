@@ -24,10 +24,9 @@ export function entityAttackRangeTiles(entity) {
   return STATS[entity?.kind]?.rangeTiles || 0;
 }
 
-// Carrier identity includes permanent Dao specialization and rank, independently of cooldown/readiness.
+// Carrier identity includes permanent Dao specialization, independently of cooldown/readiness.
 export function abilityCarriedByEntity(definition, entity) {
-  return !!definition?.carriers?.includes(entity?.kind)
-    && (definition.ability !== ABILITY.THROW_SWORD || entity.daoMaster === true);
+  return !!definition?.carriers?.includes(entity?.kind);
 }
 
 // Mirrors server/src/config.rs *_BODY_* values. Server collision is authoritative;
@@ -191,7 +190,7 @@ export const STATS = Object.freeze({
   [KIND.WAR_ADEPT]: { armored: false, label: "War Adept", icon: "WA", size: Math.fround(26 * Math.fround(DAO_WAR_BODY_SCALE)), sight: 11,
     rangeTiles: DAO_WAR_RANGE_TILES, cost: { steel: 150, oil: 35 }, supply: 3, buildTicks: 300,
     trainSlots: { [KIND.PORTAL]: 4 }, upgradeRequires: UPGRADE.DAO_OF_HEAVINESS,
-    description: "Armored spear infantry with 50% armor penetration. Unlocks Throw Sword upon advancing to War Master." },
+    description: "Armored spear infantry with 50% armor penetration. Throw Sword has a 40-second cooldown, reduced to 20 seconds as a War Master." },
   [KIND.MAGIC_ADEPT]: { armored: false, label: "Magic Adept", icon: "MA", size: 26, sight: 11,
     rangeTiles: DAO_RANGED_RANGE_TILES, cost: { steel: 150, oil: 35 }, supply: 3, buildTicks: 300,
     trainSlots: { [KIND.PORTAL]: 5 }, upgradeRequires: UPGRADE.DAO_OF_MAGIC,
@@ -512,7 +511,7 @@ export const ABILITIES = Object.freeze({
     label: "Throw Sword",
     icon: "⚔",
     hotkey: "E",
-    title: "War Master: throw a spinning sword out and back; deals 20 damage outbound and 40 on return before armor and cover",
+    title: "Throw a spinning sword out and back; 20 damage outbound and 40 on return before armor and cover; cooldown 40s for War Adepts, 20s for War Masters",
     carriers: Object.freeze([KIND.WAR_ADEPT]),
     targetMode: "worldPoint",
     rangeTiles: THROW_SWORD_RANGE_TILES,

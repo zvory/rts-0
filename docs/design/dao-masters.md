@@ -26,8 +26,7 @@ maximum HP ×1.4 (150→210). No ability-damage changes.
 
 Armored melee damage dealer; swept helmet crest, pointed shoulders and forked yari.
 Description, automatic availability, free advancement, supply and unchanged properties
-as above, retaining War armor and 1.75-tile spear reach, and unlocking Throw Sword
-(previously available to War Adepts). Relative to War
+as above, retaining War armor and 1.75-tile spear reach, and reducing Throw Sword cooldown from 40 to 20 seconds. Advancement preserves an existing cooldown. Relative to War
 Adept: render and collision radius ×1.2, movement ×1.1 (2.31 px/tick), ordinary attack
 damage ×1.2 (35→42, after existing rounded War damage bonus), maximum HP ×1.4
 (176→246). Existing counters and penetration rules remain. No ability-damage changes.

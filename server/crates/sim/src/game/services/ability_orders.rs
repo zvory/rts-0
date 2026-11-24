@@ -384,7 +384,12 @@ pub(crate) fn launch_world_ability(
                 }
             }
             if let Some(e) = entities.get_mut(caster) {
-                e.start_ability_cooldown(ability, definition.cooldown_ticks);
+                let cooldown = if ability == AbilityKind::ThrowSword && !e.dao_master {
+                    definition.cooldown_ticks.saturating_mul(2)
+                } else {
+                    definition.cooldown_ticks
+                };
+                e.start_ability_cooldown(ability, cooldown);
                 if !preserve_active_order {
                     e.clear_active_order();
                 }
