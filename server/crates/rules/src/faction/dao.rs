@@ -89,7 +89,7 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 10] = [
         icon: "SHD",
         hotkey: Some("X"),
         title:
-            "Place a shield that absorbs 150 non-piercing enemy damage to allied units within 2.1 tiles; armor-piercing attacks bypass it; lasts up to 5 seconds",
+            "Place a shield that absorbs 150 incoming enemy damage to allied units within 2.1 tiles; attacks from inside bypass it; armor piercing passes its percentage through and the rest drains shield HP; lasts up to 5 seconds",
         carriers: &[EntityKind::MagicAdept],
         target_mode: AbilityTargetMode::WorldPoint,
         range_tiles: Some(balance::EKAT_MAGIC_ANCHOR_RANGE_TILES as f32),

@@ -531,29 +531,31 @@ fn disciple_shield_shared_pool_overflow_teams_and_checkpoint() {
     assert_eq!(
         game.state
             .entities
-            .shielded_damage(outside, 2, 50, 0.0, &teams),
-        50
-    );
-    assert_eq!(
-        game.state.entities.shielded_damage(foe, 1, 50, 0.0, &teams),
+            .shielded_damage(outside, 2, 50, 0.0, (0.0, 0.0), &teams),
         50
     );
     assert_eq!(
         game.state
             .entities
-            .shielded_damage(friend, 1, 50, 0.0, &teams),
+            .shielded_damage(foe, 1, 50, 0.0, (0.0, 0.0), &teams),
         50
     );
     assert_eq!(
         game.state
             .entities
-            .shielded_damage(friend, 2, 60, 0.0, &teams),
+            .shielded_damage(friend, 1, 50, 0.0, (0.0, 0.0), &teams),
+        50
+    );
+    assert_eq!(
+        game.state
+            .entities
+            .shielded_damage(friend, 2, 60, 0.0, (0.0, 0.0), &teams),
         0
     );
     assert_eq!(
         game.state
             .entities
-            .shielded_damage(caster, 2, 40, 0.0, &teams),
+            .shielded_damage(caster, 2, 40, 0.0, (0.0, 0.0), &teams),
         0
     );
     let payload = game.checkpoint_payload_text_for_test().unwrap();
@@ -567,7 +569,7 @@ fn disciple_shield_shared_pool_overflow_teams_and_checkpoint() {
         restored
             .state
             .entities
-            .shielded_damage(friend, 2, 100, 0.0, &teams),
+            .shielded_damage(friend, 2, 100, 0.0, (0.0, 0.0), &teams),
         50
     );
     assert!(restored
@@ -581,7 +583,7 @@ fn disciple_shield_shared_pool_overflow_teams_and_checkpoint() {
         restored
             .state
             .entities
-            .shielded_damage(friend, 2, 20, 0.0, &teams),
+            .shielded_damage(friend, 2, 20, 0.0, (0.0, 0.0), &teams),
         20
     );
     game.state
@@ -592,7 +594,7 @@ fn disciple_shield_shared_pool_overflow_teams_and_checkpoint() {
     assert_eq!(
         game.state
             .entities
-            .shielded_damage(friend, 2, 50, 0.0, &teams),
+            .shielded_damage(friend, 2, 50, 0.0, (0.0, 0.0), &teams),
         50
     );
 }
@@ -730,7 +732,7 @@ fn disciple_shield_does_not_identify_a_smoke_hidden_caster() {
         .find(|o| o.id == shield_id)
         .unwrap();
     assert_eq!(shield.source_caster_id, None);
-    assert_eq!(shield.owner_state, None);
+    assert_eq!(shield.owner_state.as_ref().unwrap().hp, Some(150));
     for snapshot in [game.snapshot_for(1), game.snapshot_full_for(2)] {
         let shield = snapshot
             .ability_objects

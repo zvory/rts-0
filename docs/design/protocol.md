@@ -1135,7 +1135,7 @@ encoded as `[x, y]`; `waypoints` is capped at 128 entries for transport.
 
 `AbilityObject`: `{ id, owner, ability, kind, x, y, expiresIn?, sourceCasterId?, ownerState? }`.
 The compact `ao` slot uses ability ids from the existing ability code table and
-`abilityObject.kind` codes from the table above. `ownerState` is owner/spectator/full-world data
+`abilityObject.kind` codes from the table above. `ownerState` is owner/spectator/full-world data (except Shield HP and radius, which are public whenever the field is visible)
 encoded as `[earliestReturnTick?, hp?, radius?, destroyedLockoutTicks?, distanceTraveled?, ticksOut?]`.
 Magic Anchor currently fills only `radius`; the hp and destroyed-lockout slots are retained as
 optional compact slots for compatibility.
@@ -2054,7 +2054,7 @@ to its matching [Master](dao-masters.md), resets insight, and fully heals to the
 Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md).
 Shield uses ability `discipleShield` (code 17, order stage 25), world-point target,
 ability-object kind `shield` (code 4). It expires after 5 seconds, projected through `expiresIn`; `ownerState.hp` carries
-the remaining 150-point pool to authorized owner/observer projections only. The client renders this pool as a cyan HP bar above the public gray lifetime bar, updating it as damage is absorbed. The radius
+the remaining 150-point pool to every viewer who can see the field, including enemies and allies. The client renders this pool as a cyan HP bar above the public gray lifetime bar, updating it as damage is absorbed. The radius
 is 2.1 tiles for every viewer. Field visibility is gated at its center, independently
 of its caster; `sourceCasterId` is omitted when that caster is hidden.
 

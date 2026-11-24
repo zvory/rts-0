@@ -9,7 +9,7 @@
 // the modules themselves are owned by other files. Keep this layer thin: it should
 // orchestrate, not implement game logic.
 import { Net } from "./net.js";
-import { VersionGuard } from "./version_guard.js";
+import { VersionGuard, canRefreshClient } from "./version_guard.js";
 import { Lobby } from "./lobby.js";
 import { BranchStaging } from "./branch_staging.js";
 import { createBirthdayBanner } from "./birthday_banner_composition.js";
@@ -346,7 +346,7 @@ export class App {
       });
     }
     this.versionGuard = new VersionGuard({ net: this.net,
-      isLobby: () => !dom.lobbyScreen.hidden && !this.match && !this.versionTransitionActive,
+      isLobby: () => canRefreshClient(this, !dom.lobbyScreen.hidden),
     });
     this.versionGuard.start({ offline: !!this.net.offline });
     if (this.labCatalogLaunch) {
@@ -1411,12 +1411,12 @@ export class App {
       onReplayRoom: (room, matchId) => this.joinReplayLobby(room, matchId),
     });
   }
-
   async joinReplayLobby(room, matchId = null) {
     if (!this.lobby) return false;
     if (Number.isSafeInteger(matchId) && matchId > 0) {
       this.replayLaunch = { matchId, room, staging: true, permalink: true };
       replaceReplayPermalink(matchId);
+      this.versionGuard?.update();
     }
     dom.lobbyScreen.hidden = false;
     this.lobby.show();

@@ -302,7 +302,10 @@ fn lateral_offset_one_way(
     {
         return None;
     }
-    if matches!(blocker.profile, FootingProfile::Ghost) {
+    if matches!(
+        blocker.profile,
+        FootingProfile::Ghost | FootingProfile::Rooted
+    ) {
         return None;
     }
 

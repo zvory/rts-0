@@ -100,7 +100,8 @@ pub(in crate::game) fn try_fire_artillery(
         weapon_facing: attacker.weapon_facing(),
         setup_state: Some(attacker.weapon_setup().to_protocol_str().to_string()),
     });
-    artillery_shells.schedule(player, unit, target_x, target_y, tick);
+    let source = reveal.as_ref().map_or((x, y), |r| (r.x, r.y));
+    artillery_shells.schedule(player, unit, target_x, target_y, source, tick);
     if let Some(reveal) = reveal.as_ref() {
         let facing = reveal.weapon_facing.or(reveal.facing).unwrap_or(0.0);
         let player_ids: Vec<u32> = events.keys().copied().collect();

@@ -70,7 +70,13 @@ target dies, becomes hidden/illegal, or leaves engagement range; Idle stops its 
 Position and Point stay in place, and plain Move keeps its route. Other unit kinds default
 engagement range to their current attack range.
 The sword uses general-purpose SmallArms target preference but has no projectile, tracer,
-muzzle flash or area damage. It holds position while attacking and otherwise uses
+muzzle flash or area damage. Novices, all three Adept kinds, and their Masters use rooted footing while they have a combat
+target and no movement path: resistance 60 instead of ordinary infantry combat resistance 3.
+Moving or untargeted Disciples retain soft footing (1). Rooted combatants are exempt from the
+extra traffic centerline lateral nudge; ordinary overlap separation still applies, so equally
+rooted units split an overlap evenly rather than stacking. The shared footing system also
+reduces stationary Magic Anchor pull with the higher resistance.
+It holds position while attacking and otherwise uses
 the ordinary attack, attack-move, hold, rally, fog, blocker, damage, and death rules.
 
 The first implementation uses clearly placeholder matte-white/off-white unarmored Chinese
