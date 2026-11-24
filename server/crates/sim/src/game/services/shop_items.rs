@@ -72,7 +72,7 @@ pub(super) fn purchase(
     }
     let endpoint = (target.pos_x(), target.pos_y());
     let definition = ability::definition(ability);
-    let range = definition.range_tiles.unwrap_or(0.0) * config::TILE_SIZE as f32;
+    let range = definition.range_tiles.map(|tiles| tiles * config::TILE_SIZE as f32);
     let Some(shop) = shops
         .iter()
         .filter_map(|id| entities.get(*id))
@@ -81,7 +81,9 @@ pub(super) fn purchase(
                 && shop.kind == EntityKind::Shop
                 && shop.hp > 0
                 && !shop.under_construction()
-                && dist2(shop.pos_x(), shop.pos_y(), endpoint.0, endpoint.1) <= range * range
+                && range.is_none_or(|range| {
+                    dist2(shop.pos_x(), shop.pos_y(), endpoint.0, endpoint.1) <= range * range
+                })
         })
     else {
         return;
@@ -132,8 +134,12 @@ pub(super) fn purchase(
             width_px: 0.0,
             damage: 0,
             created_tick: tick,
-            // A pursued unit can run; cap delivery lifetime instead of retaining it indefinitely.
-            expires_tick: tick.saturating_add(config::TICK_HZ * 60),
+            // Healing can cross the entire map; do not expire a long-distance delivery.
+            expires_tick: if ability == AbilityKind::HealingPotion {
+                u32::MAX
+            } else {
+                tick.saturating_add(config::TICK_HZ * 60)
+            },
         })
         .is_some()
     {

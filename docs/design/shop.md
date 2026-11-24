@@ -44,7 +44,8 @@ Focused checks and the owned PR record the final verification and merge outcome.
 
 Completed Shops sell Healing Potion for **50 oil** and Escape Treasure for **100 oil**.
 Select the Shop, click an item, then click a living friendly unit (including allied units).
-Buildings and enemies are invalid targets. Purchases require the target to be visible and within
+Buildings and enemies are invalid targets. Purchases require the target to be visible.
+Healing Potion has **unlimited range**; Escape Treasure requires the target to be within
 **30 tiles** of the supplying Shop at purchase time. Invalid purchases spend nothing.
 Both items travel directly from the Shop toward the target at **10 tiles per second**;
 green circles represent healing potions and purple circles represent escape treasures.
@@ -72,7 +73,8 @@ dead targets cancel delivery. Oil is paid at launch, with no refund for interrup
 
 Escape selects a deterministic legal exit around the supplying Shop, searching farther only when
 nearby exits are blocked. If no legal position exists anywhere on the map, the rescue cannot occur.
-Deliveries expire after 60 seconds if a moving target cannot be reached.
+Escape Treasure deliveries expire after 60 seconds if a moving target cannot be reached.
+Healing Potions have no flight timeout; distant targets take longer to reach.
 
 
 ### Healing Seal placement

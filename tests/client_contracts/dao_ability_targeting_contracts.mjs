@@ -190,11 +190,17 @@ console.log("Dao ability targeting contracts passed");
   assertDeepEqual(sent[0], { c: "useAbility", ability: ABILITY.HEALING_POTION, units: [201], targetId: 202 },
     "Shop purchase names exactly one source Shop and the clicked unit");
   for (const invalid of [null, { ...target, kind: KIND.BARRACKS }, { ...target, owner: 3 },
-    { ...target, hp: 0 }, { ...target, x: 1100 }, { ...target, visionOnly: true }]) {
+    { ...target, hp: 0 }, { ...target, visionOnly: true }]) {
     target = invalid;
     assert(!input._issueTargetedCommand({ x: 200, y: 100 }), "Invalid shop target keeps targeting armed");
   }
   assert(sent.length === 1, "Invalid shop targets issue no purchase commands");
+  target = { id: 202, owner: 2, kind: KIND.RIFLEMAN, hp: 40, x: 2100, y: 100 };
+  assert(input._issueTargetedCommand({ x: 200, y: 100 }), "Healing Potion accepts distant allies");
+  assert(sent.length === 2, "Distant potion purchase is issued");
+  input.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.ESCAPE_TREASURE });
+  assert(!input._issueTargetedCommand({ x: 200, y: 100 }), "Escape Treasure still rejects distant targets");
+  assert(sent.length === 2, "Out-of-range escape purchase issues no command");
 }
 
 // Passive Charge remains observable through its real cooldown without accepting commands.
