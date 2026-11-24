@@ -49,7 +49,7 @@ fn start(game: &mut Game, worker: u32) -> u32 {
 }
 
 #[test]
-fn shop_costs_both_resources_and_finishes_after_1200_work_ticks() {
+fn shop_costs_both_resources_and_finishes_after_600_work_ticks() {
     let (mut game, worker) = setup("cultivators", 200, 200);
     let site = start(&mut game, worker);
     assert_eq!(
@@ -58,9 +58,9 @@ fn shop_costs_both_resources_and_finishes_after_1200_work_ticks() {
     );
     let building = game.state.entities.get(site).unwrap();
     assert_eq!(building.max_hp, 200);
-    assert_eq!(building.construction.as_ref().unwrap().total, 1200);
+    assert_eq!(building.construction.as_ref().unwrap().total, 600);
     let progress = building.construction.as_ref().unwrap().progress;
-    for _ in progress..1199 {
+    for _ in progress..599 {
         game.tick();
     }
     assert!(game.state.entities.get(site).unwrap().under_construction());
