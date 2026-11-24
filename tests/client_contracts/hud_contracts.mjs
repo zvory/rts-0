@@ -1035,7 +1035,7 @@ withFakeHudDocument(({ FakeElement }) => {
 
   const pavilion = { ...portal, id: 23, kind: KIND.THREE_DAO_PAVILION };
   const pavilionCard = buildCommandCardDescriptors(commandCardCtx({ selection: [pavilion], entities: [pavilion], factionId: "cultivators", resources: { steel: 600, oil: 300 } }));
-  for (const [index, label] of ["Dao Wind", "Dao of Magic", "Dao of War"].entries()) {
+  for (const [index, label] of ["Dao of Wind", "Dao of Magic", "Dao of War"].entries()) {
     const slot = pavilionCard.slots[index];
     assert(slot.label === label && slot.enabled, "Pavilion exposes all three affordable Dao researches");
     assert(slot.hotkey === ["Q", "W", "E"][index], "Dao research uses Q/W/E");

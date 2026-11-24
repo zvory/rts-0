@@ -824,7 +824,7 @@ Cultivator Serfs can construct the Three Dao Pavilion after a completed Nexus an
 It inherits the Training Centre baseline: 100 Steel, 25 Oil, 560 ticks construction,
 120 HP, armored, one tile sight, no weapon, no supply or production. Its approved
 art uses a 3x3 placement and collision footprint.
-Its three independent, permanent researches (Dao Wind, Dao of War, and
+Its three independent, permanent researches (Dao of Wind, Dao of War, and
 Dao of Magic) share a player-wide escalating price, in any order: the first costs
 50 Steel / 100 Oil and takes 600 ticks (20 seconds), the second costs 100 Steel /
 200 Oil and takes 1200 ticks (40 seconds), and the third costs 200 Steel / 400 Oil
