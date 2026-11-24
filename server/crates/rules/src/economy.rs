@@ -506,7 +506,7 @@ pub fn production_supply_cost(producer: EntityKind, unit: EntityKind) -> u32 {
                 EntityKind::TournamentGrounds | EntityKind::ProvenGrounds
             )
         {
-            EntityKind::LightnessAdept
+            EntityKind::WindAdept
         } else {
             unit
         },

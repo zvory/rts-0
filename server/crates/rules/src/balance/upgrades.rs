@@ -51,8 +51,11 @@ pub const DAO_COST_STEEL: u32 = 100;
 pub const DAO_COST_OIL: u32 = 200;
 pub const DAO_RESEARCH_TICKS: u32 = TICK_HZ * 40;
 
-/// Lightness retains its Scout Car baseline independently of base Disciple speed.
-pub const DAO_LIGHTNESS_SPEED_MULTIPLIER: f32 = 1.15;
+/// Wind retains its Scout Car baseline independently of base Disciple speed.
+pub const DAO_WIND_SPEED_MULTIPLIER: f32 = 1.15;
+/// Ordinary Disciple attacks run at 70% of their former rate, rounded to whole ticks.
+pub const DISCIPLE_ATTACK_COOLDOWN_TICKS: u32 = (64 * 10 + 3) / 7;
+
 pub const DISCIPLE_INSIGHT_REQUIRED: u32 = 60;
 pub const DISCIPLE_EVOLVED_INSIGHT_CAP: u32 = 200;
 pub const DAO_MASTER_BODY_SCALE: f32 = 1.2;
@@ -68,7 +71,7 @@ pub const DAO_WAR_RANGE_TILES: f32 = 1.75;
 /// War artwork and collision body shrink together to 70% of the former size.
 pub const DAO_WAR_BODY_SCALE: f32 = 0.7;
 pub const DAO_RANGED_RANGE_TILES: f32 = 5.0;
-pub const DAO_LIGHTNESS_ATTACK_RATE: f32 = 1.5;
+pub const DAO_WIND_ATTACK_RATE: f32 = 1.5;
 pub const DAO_MAGIC_SPEED_MULTIPLIER: f32 = 1.05;
 
 pub const DISCIPLE_SHIELD_CAPACITY: u32 = 150;
@@ -102,7 +105,7 @@ pub fn disciple_insight_ratio(
     let numerator = if super::building_stats(target).is_some() {
         own
     } else {
-        (value(target) * 4).clamp(own, own * 8)
+        (value(target) * 4).clamp(own * 2, own * 8)
     };
     (numerator, denominator)
 }

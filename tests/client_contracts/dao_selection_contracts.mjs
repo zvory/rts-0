@@ -11,7 +11,7 @@ const novices = [
   { id: 53, kind: KIND.WAR_ADEPT, dao: "war" },
   { id: 54, kind: KIND.WAR_ADEPT, dao: "war" },
   { id: 55, kind: KIND.MAGIC_ADEPT, dao: "magic" },
-  { id: 56, kind: KIND.LIGHTNESS_ADEPT, dao: "lightness" },
+  { id: 56, kind: KIND.WIND_ADEPT, dao: "wind" },
   { id: 57, kind: KIND.WAR_ADEPT, dao: "war", daoMaster: true },
   { id: 58, kind: KIND.WAR_ADEPT, dao: "war", daoMaster: true },
 ].map((unit, i) => ({ owner: 1, kind: KIND.WARRIOR, x: 100 + i * 40, y: 100, ...unit }));

@@ -2,7 +2,7 @@ use super::*;
 
 impl Entity {
     pub(crate) fn ability_max_charges(&self, ability: AbilityKind) -> Option<u16> {
-        if ability == AbilityKind::LightnessDash && self.dao_master {
+        if ability == AbilityKind::WindDash && self.dao_master {
             Some(2)
         } else {
             crate::game::ability::definition(ability).charges
@@ -81,7 +81,7 @@ impl Entity {
             }
             let definition = crate::game::ability::definition(*ability);
             let (Some(max_charges), Some(recharge_ticks), Some(remaining)) = (
-                if *ability == AbilityKind::LightnessDash && dao_master {
+                if *ability == AbilityKind::WindDash && dao_master {
                     Some(2)
                 } else {
                     definition.charges

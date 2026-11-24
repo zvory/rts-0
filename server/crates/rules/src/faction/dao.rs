@@ -2,11 +2,11 @@ use super::*;
 
 pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 10] = [
     AbilityCatalogEntry {
-        kind: AbilityKind::EvolveLightness,
-        label: "Dao of Lightness",
+        kind: AbilityKind::EvolveWind,
+        label: "Dao Wind",
         icon: "Z",
         hotkey: Some("Z"),
-        title: "Choose Dao of Lightness; evolves automatically at 60 insight; no research required",
+        title: "Choose Dao Wind; evolves automatically at 60 insight; no research required",
         carriers: &[EntityKind::Warrior],
         target_mode: AbilityTargetMode::SelfTarget,
         range_tiles: None,
@@ -68,9 +68,9 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 10] = [
         order_stage_code: 24,
     },
     AbilityCatalogEntry {
-        range_tiles: Some(balance::DAO_LIGHTNESS_DASH_RANGE_TILES as f32),
-        kind: AbilityKind::LightnessDash,
-        carriers: &[EntityKind::LightnessAdept],
+        range_tiles: Some(balance::DAO_WIND_DASH_RANGE_TILES as f32),
+        kind: AbilityKind::WindDash,
+        carriers: &[EntityKind::WindAdept],
         title: "Dash up to 15 tiles; one charge, two at Master rank; recharges every 8 seconds",
         cooldown_ticks: 0,
         charges: Some(1),
@@ -89,7 +89,7 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 10] = [
         icon: "SHD",
         hotkey: Some("X"),
         title:
-            "Place a shield that absorbs 150 non-piercing enemy damage to allied units within 2.1 tiles; armor-piercing attacks bypass it; lasts up to 5 seconds",
+            "Place a shield that absorbs 150 incoming enemy damage to allied units within 2.1 tiles; attacks from inside bypass it; armor piercing passes its percentage through and the rest drains shield HP; lasts up to 5 seconds",
         carriers: &[EntityKind::MagicAdept],
         target_mode: AbilityTargetMode::WorldPoint,
         range_tiles: Some(balance::EKAT_MAGIC_ANCHOR_RANGE_TILES as f32),

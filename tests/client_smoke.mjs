@@ -31,6 +31,16 @@ const ok = (c, m) => { if (!c) { console.log("  FAIL " + m); failures++; } else 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const chromeProfileDir = fs.mkdtempSync(path.join(os.tmpdir(), "rts-chrome-"));
 
+function recordRequestFailure(request) {
+  const url = request.url();
+  const reason = request.failure()?.errorText || "unknown reason";
+  if (url.includes("favicon")) return;
+  // Lobby teardown and forced refresh deliberately cancel the previous list fetch.
+  if (request.method() === "GET" && new URL(url).pathname === "/api/lobbies"
+      && reason === "net::ERR_ABORTED") return;
+  consoleErrors.push(`requestfailed: ${url} (${reason})`);
+}
+
 function lobbyMapConfirmed(mapName) {
   return window.__rts.lobby._selectedMap === mapName &&
     document.querySelector("#lobby-map-trigger")?.textContent?.includes(mapName);
@@ -80,7 +90,7 @@ try {
   const page = await browser.newPage();
   page.on("console", (m) => { if (m.type() === "error") consoleErrors.push(m.text()); });
   page.on("pageerror", (e) => pageErrors.push(e.message));
-  page.on("requestfailed", (r) => { if (!r.url().includes("favicon")) consoleErrors.push(`requestfailed: ${r.url()} (${r.failure()?.errorText || "unknown reason"})`); });
+  page.on("requestfailed", recordRequestFailure);
   page.on("response", (response) => {
     const status = response.status();
     if (status < 400 || response.url().includes("favicon")) return;
@@ -795,31 +805,26 @@ try {
      `CAMERA: Space+drag pans the viewport (${beforePan.x.toFixed(1)},${beforePan.y.toFixed(1)} -> ${afterPan.x.toFixed(1)},${afterPan.y.toFixed(1)})`);
   ok(afterPan.selected === beforePan.selected, "CAMERA: Space+drag does not change selection");
 
-  // A version mismatch during real gameplay must warn without navigating or stopping snapshots.
-  const versionWarning = await page.evaluate(() => {
+  // Version changes during real gameplay must have no visible effect or navigation.
+  const versionWarning = await page.evaluate(async () => {
     const app = window.__rts;
     window.__versionReloads = 0;
     app.versionGuard.reload = () => { window.__versionReloads++; };
     app.versionGuard.observe("smoke-new-server-build");
     app.versionGuard.refresh();
-    const panel = document.querySelector(".version-mismatch-panel");
-    const rect = panel.getBoundingClientRect();
+    let probes = 0;
+    app.versionGuard.fetchVersion = async () => { probes++; throw new Error("unexpected probe"); };
+    await app.versionGuard.check();
     return {
       active: !!app.match?.running,
       reloads: window.__versionReloads,
-      disabled: document.querySelector("#version-mismatch button").disabled,
-      title: document.getElementById("version-mismatch-title").textContent,
-      centered: Math.abs(rect.left + rect.width / 2 - innerWidth / 2) < 2 &&
-        Math.abs(rect.top + rect.height / 2 - innerHeight / 2) < 2,
+      notice: !!document.querySelector("#version-mismatch"),
+      probes,
       tick: app.match.state.tick,
     };
   });
-  ok(versionWarning.active && versionWarning.reloads === 0 && versionWarning.disabled &&
-    versionWarning.title === "Version mismatch" && versionWarning.centered,
-  `VERSION: active game shows a centered warning without refreshing (${JSON.stringify(versionWarning)})`);
-  if (process.env.RTS_VERSION_WARNING_SCREENSHOT) {
-    await page.screenshot({ path: process.env.RTS_VERSION_WARNING_SCREENSHOT });
-  }
+  ok(versionWarning.active && versionWarning.reloads === 0 && !versionWarning.notice && !versionWarning.probes,
+  `VERSION: active game remains untouched (${JSON.stringify(versionWarning)})`);
   await page.waitForFunction((tick) => window.__rts.match.state.tick > tick, {}, versionWarning.tick);
   await page.evaluate(() => window.__rts.onBackToLobby());
   ok(await page.evaluate(() => window.__versionReloads === 1 && !window.__rts.match),
@@ -844,10 +849,25 @@ try {
   "VERSION: stale reload retains a manual refresh button and immutable client identity");
   await versionPage.close();
 
+  const labVersionPage = await browser.newPage();
+  await labVersionPage.goto(new URL("/lab", BASE_URL).href, { waitUntil: "networkidle2", timeout: 15000 });
+  await labVersionPage.waitForFunction(() => !!window.__rts?.versionGuard);
+  ok(await labVersionPage.evaluate(async () => {
+    const guard = window.__rts.versionGuard;
+    let reloads = 0, probes = 0;
+    guard.reload = () => { reloads++; };
+    guard.fetchVersion = async () => { probes++; throw new Error("unexpected probe"); };
+    await guard.check();
+    guard.observe("smoke-new-server-build");
+    guard.refresh();
+    return !guard.isLobby() && !document.querySelector("#version-mismatch") && !reloads && !probes;
+  }), "VERSION: Lab entry remains untouched by version changes");
+  await labVersionPage.close();
+
   const editorPage = await browser.newPage();
   editorPage.on("console", (m) => { if (m.type() === "error") consoleErrors.push(m.text()); });
   editorPage.on("pageerror", (e) => pageErrors.push(e.message));
-  editorPage.on("requestfailed", (r) => { if (!r.url().includes("favicon")) consoleErrors.push(`requestfailed: ${r.url()} (${r.failure()?.errorText || "unknown reason"})`); });
+  editorPage.on("requestfailed", recordRequestFailure);
   editorPage.on("response", (response) => {
     const status = response.status();
     if (status >= 400 && !response.url().includes("favicon")) responseErrors.push(`${status}: ${response.url()}`);

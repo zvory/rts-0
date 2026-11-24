@@ -341,6 +341,10 @@ fn apply_projectile_hits(
             } else {
                 0.0
             },
+            match projectile.leg {
+                AbilityProjectileLeg::Outbound => projectile.origin,
+                AbilityProjectileLeg::Return => projectile.endpoint,
+            },
             teams,
         );
         let target_kind = entities.get(id).map(|target| target.kind);

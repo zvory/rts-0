@@ -20,7 +20,7 @@ emerges with a random Dao specialization. Supports a rally point.”
   the perimeter and are consumed on arrival. Other units and enemy/allied disciples are rejected.
 - Capacity four. The fourth entrant starts 150 ticks (five seconds), with no resource charge,
   research prerequisite or additional command. While running it stages further entrants outside for the next tournament.
-- One full-health Disciple emerges, drawing Lightness, War or Magic with
+- One full-health Disciple emerges, drawing Wind, War or Magic with
   equal probability from the simulation RNG. Existing first Dao evolution rules apply, including
   War HP. Winners start with zero insight and the evolved-Disciple cap of 200.
 - Entrants immediately release supply. The winner uses normal three supply; its three supply are

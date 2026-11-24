@@ -104,7 +104,7 @@ export function validateCommandInput(command: string, value: unknown): CommandIn
       finite(spec.y, "spawn.y");
       optionalBoolean(spec.completed, "spawn.completed");
       if (spec.factionId != null) token(spec.factionId, "spawn.factionId");
-      if (spec.dao != null && !["lightness", "war", "magic"].includes(String(spec.dao))) invalid("spawn.dao", "must be lightness, war or magic");
+      if (spec.dao != null && !["wind", "war", "magic"].includes(String(spec.dao))) invalid("spawn.dao", "must be wind, war or magic");
       if (spec.alias != null) alias(spec.alias);
     });
   } else if (command === "update") {

@@ -21,7 +21,7 @@ fn dao_master_direct_path_rejects_adept_sized_corner_shortcut() {
             .spawn_building(1, EntityKind::Portal, 592.0, 592.0, true)
             .unwrap();
         let id = entities
-            .spawn_unit(1, EntityKind::LightnessAdept, 720.0, 600.0)
+            .spawn_unit(1, EntityKind::WindAdept, 720.0, 600.0)
             .unwrap();
         entities.get_mut(id).unwrap().dao_master = master;
         let occ = Occupancy::build(&map, &entities);

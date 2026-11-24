@@ -52,7 +52,7 @@ impl Game {
             use crate::protocol::LabSpawnDao;
             entity.insight = config::DISCIPLE_INSIGHT_REQUIRED;
             entity.evolve_dao(match dao {
-                LabSpawnDao::Lightness => AbilityKind::EvolveLightness,
+                LabSpawnDao::Wind => AbilityKind::EvolveWind,
                 LabSpawnDao::War => AbilityKind::EvolveWar,
                 LabSpawnDao::Magic => AbilityKind::EvolveMagic,
             });

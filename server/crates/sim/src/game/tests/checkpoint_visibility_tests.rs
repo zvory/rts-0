@@ -314,6 +314,7 @@ fn visibility_combat_checkpoint_preserves_smoke_ability_shells_and_combat_state(
         artillery,
         target.pos_x(),
         target.pos_y(),
+        (0.0, 0.0),
         baseline.tick_count(),
     );
     repair_after_authoritative_test_spawn(&mut baseline);

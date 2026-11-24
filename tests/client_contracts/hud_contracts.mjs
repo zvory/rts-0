@@ -1035,13 +1035,13 @@ withFakeHudDocument(({ FakeElement }) => {
 
   const pavilion = { ...portal, id: 23, kind: KIND.THREE_DAO_PAVILION };
   const pavilionCard = buildCommandCardDescriptors(commandCardCtx({ selection: [pavilion], entities: [pavilion], factionId: "cultivators", resources: { steel: 600, oil: 300 } }));
-  for (const [index, label] of ["Dao of Lightness", "Dao of Magic", "Dao of War"].entries()) {
+  for (const [index, label] of ["Dao Wind", "Dao of Magic", "Dao of War"].entries()) {
     const slot = pavilionCard.slots[index];
     assert(slot.label === label && slot.enabled, "Pavilion exposes all three affordable Dao researches");
     assert(slot.hotkey === ["Q", "W", "E"][index], "Dao research uses Q/W/E");
     assert(slot.cost.steel === 50 && slot.cost.oil === 100, "Any first Dao costs 50 Steel and 100 Oil");
     assert(slot.researchDefinition.researchTicks === 600, "Any first Dao takes 20 seconds");
-    assert(slot.tooltipUpgrade === [UPGRADE.DAO_OF_LIGHTNESS, UPGRADE.DAO_OF_MAGIC, UPGRADE.DAO_OF_HEAVINESS][index], "Dao tooltip resolves the matching research description");
+    assert(slot.tooltipUpgrade === [UPGRADE.DAO_WIND, UPGRADE.DAO_OF_MAGIC, UPGRADE.DAO_OF_HEAVINESS][index], "Dao tooltip resolves the matching research description");
   }
 
   producingBarracks.prodRepeatKinds = [KIND.RIFLEMAN, KIND.MACHINE_GUNNER];

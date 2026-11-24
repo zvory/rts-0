@@ -680,8 +680,8 @@ playable lifecycle policy; the `phase2_empty_fixture` test fixture and unknown i
 `cultivators.standard` loadout; Nexus is a faction-specific presentation name for
 `resource_depot`, and Serf is the presentation name for `worker`, while Portal uses the dedicated `portal` entity kind (compact kind code 28).
 Cultivator Novices use `warrior` (compact kind code 29); evolved Adepts use
-`lightness_adept` (35), `war_adept` (36), and `magic_adept` (37). Their generic
-base/War/Lightness attack events carry `warrior_sword` (compact weapon-kind code 12). The retained arrow identity is `disciple_arrow` (13), and Magic orbs use `disciple_orb` (14), through the same fog-filtered attack event and immediate authoritative damage timing.
+`wind_adept` (35), `war_adept` (36), and `magic_adept` (37). Their generic
+base/War/Wind attack events carry `warrior_sword` (compact weapon-kind code 12). The retained arrow identity is `disciple_arrow` (13), and Magic orbs use `disciple_orb` (14), through the same fog-filtered attack event and immediate authoritative damage timing.
 
 Protocol vocabulary is not lifecycle admission: adding a string constant, compact code, or payload
 field does not make a faction playable. Fixture-only, reserved/future, and historical-only ids must
@@ -930,7 +930,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 67. The client also accepts compact
+`messagepack-compact`, codec version 1, compact snapshot version 68. The client also accepts compact
 snapshot versions 51 through 62: version 52 only appends a kind code, version 53 appends the
 optional `unitsKilled` entity slot, version 54 appends an optional `rocket` style bit to mortar
 launch/impact event records, and version 55 adds the `artilleryIncoming` event code, so the older
@@ -968,7 +968,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 67,
+  "v": 68,
   "gr": groundDecalRevision, // omitted when zero
   "gd": [afterRevision, [    // omitted when this tick has no discovered/created revision
     [id, decalClass, sourceKindCode, x, y, owner, seed, facing, weaponFacing, radiusTiles]
@@ -1010,13 +1010,13 @@ Compact numeric codes:
 
 | Vocabulary | Codes |
 |------------|-------|
-| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `resource_depot`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `engineering_complex`, 18 `command_car`, 19 `ekat`, 20 `zamok`, 21 `tank_trap`, 30 `barbed_wire`, 22 `golem`, 23 `pump_jack`, 24 `panzerfaust`, 25 `scout_plane`, 26 `steel_mine`, 27 `rocket_launcher`, 28 `portal`, 29 `warrior`, 31 `three_dao_pavilion`, 32 `tournament_grounds`, 33 `proven_grounds`, 34 `shop`, 35 `lightness_adept`, 36 `war_adept`, 37 `magic_adept` |
+| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `resource_depot`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `engineering_complex`, 18 `command_car`, 19 `ekat`, 20 `zamok`, 21 `tank_trap`, 30 `barbed_wire`, 22 `golem`, 23 `pump_jack`, 24 `panzerfaust`, 25 `scout_plane`, 26 `steel_mine`, 27 `rocket_launcher`, 28 `portal`, 29 `warrior`, 31 `three_dao_pavilion`, 32 `tournament_grounds`, 33 `proven_grounds`, 34 `shop`, 35 `wind_adept`, 36 `war_adept`, 37 `magic_adept` |
 | `state` | 1 `idle`, 2 `move`, 3 `attack`, 4 `gather`, 5 `build`, 6 `train`, 7 `construct`, 8 `dead` |
 | `setupState` | 1 `packed`, 2 `setting_up`, 3 `deployed`, 4 `tearing_down` |
-| `orderStage` | 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, 5 `build`, 6 `smoke`, 7 `setupAntiTankGuns`, 8 `charge`, 9 `mortarFire`, 10 `pointFire`, 11 `breakthrough`, 12 `ekatTeleport`, 13 `ekatLineShot`, 14 `ekatMagicAnchor`, 15 `deconstruct`, 16 `ekatConsumeGolem`, 17 `blanketFire`, 18 `dismissScoutPlane`, 19 `scoutPlane`, 20 `holdPosition`, 21 `barrage`, 22 `evolveLightness`, 23 `evolveWar`, 24 `evolveMagic`, 25 `discipleShield`, 26 `throwSword`, 27 `healingPotion`, 28 `escapeTreasure`, 29 `lightnessDash` |
-| `ability` | 1 `charge`, 2 `smoke`, 3 `mortarFire`, 4 `pointFire`, 5 `breakthrough`, 6 `ekatTeleport`, 7 `ekatLineShot`, 8 `ekatMagicAnchor`, 9 `ekatConsumeGolem`, 10 `blanketFire`, 11 `dismissScoutPlane`, 12 `scoutPlane`, 13 `barrage`, 14 `evolveLightness`, 15 `evolveWar`, 16 `evolveMagic`, 17 `discipleShield`, 18 `throwSword`, 19 `healingPotion`, 20 `escapeTreasure`, 21 `lightnessDash` |
+| `orderStage` | 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, 5 `build`, 6 `smoke`, 7 `setupAntiTankGuns`, 8 `charge`, 9 `mortarFire`, 10 `pointFire`, 11 `breakthrough`, 12 `ekatTeleport`, 13 `ekatLineShot`, 14 `ekatMagicAnchor`, 15 `deconstruct`, 16 `ekatConsumeGolem`, 17 `blanketFire`, 18 `dismissScoutPlane`, 19 `scoutPlane`, 20 `holdPosition`, 21 `barrage`, 22 `evolveWind`, 23 `evolveWar`, 24 `evolveMagic`, 25 `discipleShield`, 26 `throwSword`, 27 `healingPotion`, 28 `escapeTreasure`, 29 `windDash` |
+| `ability` | 1 `charge`, 2 `smoke`, 3 `mortarFire`, 4 `pointFire`, 5 `breakthrough`, 6 `ekatTeleport`, 7 `ekatLineShot`, 8 `ekatMagicAnchor`, 9 `ekatConsumeGolem`, 10 `blanketFire`, 11 `dismissScoutPlane`, 12 `scoutPlane`, 13 `barrage`, 14 `evolveWind`, 15 `evolveWar`, 16 `evolveMagic`, 17 `discipleShield`, 18 `throwSword`, 19 `healingPotion`, 20 `escapeTreasure`, 21 `windDash` |
 | `abilityObject.kind` | 1 `returnMarker`, 2 `magicAnchor`, 3 `lineProjectile`, 4 `shield` |
-| `upgrade` | 1 `methamphetamines`, 2 `anti_tank_gun_unlock`, 3 `tank_unlock`, 4 `artillery_unlock`, 7 `ballistic_tables`, 8 `entrenchment`, 9 `smoke_plus`, 10 `panzerfausts`, 11 `scout_plane_unlock`, 12 `rockets`, 13 `tank_plus`, 14 `dao_of_lightness`, 15 `dao_of_magic`, 16 `dao_of_heaviness` |
+| `upgrade` | 1 `methamphetamines`, 2 `anti_tank_gun_unlock`, 3 `tank_unlock`, 4 `artillery_unlock`, 7 `ballistic_tables`, 8 `entrenchment`, 9 `smoke_plus`, 10 `panzerfausts`, 11 `scout_plane_unlock`, 12 `rockets`, 13 `tank_plus`, 14 `dao_wind`, 15 `dao_of_magic`, 16 `dao_of_heaviness` |
 | `weaponKind` | 1 `worker_tools`, 2 `golem_fists`, 3 `rifleman_rifle`, 4 `machine_gunner_mg`, 5 `scout_car_mg`, 6 `anti_tank_gun`, 7 `panzerfaust_loaded_shot`, 8 `mortar_team_mortar`, 9 `artillery_gun`, 10 `tank_cannon`, 11 `tank_coax`, 12 `warrior_sword`, 13 `disciple_arrow`, 14 `disciple_orb` |
 | `notice.severity` | 1 `info`, 2 `warn`, 3 `alert` |
 | `EventRecord` | `[1, from, to]` attack, `[1, from, to, reveal?, toPos?]` legacy attack with optional shooter reveal and target position, `[1, from, to, revealOrNull, toPosOrNull, weaponKind]` attack with compact weapon hint, `[2, id, x, y, kind]` death, `[3, id, kind]` build, `[4, msg]` notice, `[4, msg, severity]` position-free notice with severity, `[4, msg, severity, x, y]` positioned notice, `[5, [fromX, fromY], [toX, toY], delayTicks]` smoke launch, `[6, x, y, radiusTiles]` mortar impact/marker, `[6, x, y, radiusTiles, from?, reveal?]` mortar impact with optional shooter reveal, `[7, from, [x, y], radiusTiles, delayTicks]` artillery target marker, `[8, x, y, radiusTiles]` artillery impact, `[9, from, [fromX, fromY], [toX, toY], radiusTiles, delayTicks]` mortar launch, `[11, owner, x, y, facing]` global artillery firing minimap marker, `[12, from, [fromX, fromY], [toX, toY], delayTicks]` Panzerfaust launch, `[13, x, y]` Panzerfaust impact, `[15, to]` missed direct shot (14 removed with conversion) |
@@ -1135,7 +1135,7 @@ encoded as `[x, y]`; `waypoints` is capped at 128 entries for transport.
 
 `AbilityObject`: `{ id, owner, ability, kind, x, y, expiresIn?, sourceCasterId?, ownerState? }`.
 The compact `ao` slot uses ability ids from the existing ability code table and
-`abilityObject.kind` codes from the table above. `ownerState` is owner/spectator/full-world data
+`abilityObject.kind` codes from the table above. `ownerState` is owner/spectator/full-world data (except Shield HP and radius, which are public whenever the field is visible)
 encoded as `[earliestReturnTick?, hp?, radius?, destroyedLockoutTicks?, distanceTraveled?, ticksOut?]`.
 Magic Anchor currently fills only `radius`; the hp and destroyed-lockout slots are retained as
 optional compact slots for compatibility.
@@ -1227,10 +1227,10 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   facing?: f32,                  // radians, for unit body/hull orientation (optional)
   weaponFacing?: f32,            // radians, for independent weapon/barrel orientation (optional)
   insight?: u32,                 // team-private Disciple 0..60 before evolution, 0..120 after, compact slot 45
-  dao?: "lightness"|"war"|"magic", // evolved Disciple, compact slot 46
+  dao?: "wind"|"war"|"magic", // evolved Disciple, compact slot 46
   daoReady?: bool,               // public maximum-insight readiness, slot 47
   daoAdvanceTicks?: u16,         // public realm burst, 1..15 ticks, slot 48
-  chosenDao?: "lightness"|"war"|"magic", // team-private pending evolution, slot 49
+  chosenDao?: "wind"|"war"|"magic", // team-private pending evolution, slot 49
   commanderFacing?: f32,         // Tank roof MG world angle; compact entity slot 44
   // production buildings:
   prodKind?: string,             // unit currently being produced
@@ -2030,31 +2030,35 @@ durability. No new event or command fields; Rust kind adapters use the shared ru
 ### Three Dao Pavilion prototype vocabulary
 
 Cultivators can construct `three_dao_pavilion` (compact kind code 31) and research
-`dao_of_lightness`, `dao_of_magic`, and `dao_of_heaviness` (upgrade codes 14–16).
+`dao_wind`, `dao_of_magic`, and `dao_of_heaviness` (upgrade codes 14–16).
 The existing build/research commands, research queues, completed-upgrade lists, and
 owner-only projection rules apply. These upgrades unlock the corresponding Adept production at Portals and paid
 training at Proving Grounds. Combat-earned evolution needs no research. Rust protocol and sim adapters and the client protocol facade
 continue to re-export their authoritative vocabulary.
 
+The Wind rename uses `dao_wind`, `wind_adept`, `evolveWind`, `windDash`, and
+`wind` Dao values throughout commands, snapshots, Lab setup, and checkpoints. Compact
+snapshot version 68 keeps the existing numeric codes and slots.
+
 ### Disciple insight and Dao specializations
 
 See [Dao evolution playtest](dao-insight.md). Entity-owned `insight` and authoritative unit `kind` persist
-through checkpoints. Evolution changes Novice `warrior` (29) to `lightness_adept` (35),
+through checkpoints. Evolution changes Novice `warrior` (29) to `wind_adept` (35),
 `war_adept` (36), or `magic_adept` (37), preserving the entity id and orders.
 Permanent Dao identity is derived from kind; the engine stores no separate mutable `dao`. Disciple snapshots append team-private `insight` (compact slot 45), public
-`dao` (slot 46: lightness/war/magic), `daoReady` (47), and optional
+`dao` (slot 46: wind/war/magic), `daoReady` (47), and optional
 `daoAdvanceTicks` (48, 1–15). Ordinary fog filtering applies to all public fields. Evolution buttons set replaceable, entity-owned `chosenDao` intent (team-private compact slot 49), independent of orders. Codes 14–16 and order stages 22–24 retain their positions.
 Evolution automatically occurs once 60 insight is ready, without research or a Pavilion.
 Evolution clears all insight and raises the cap to 200. Evolved Disciples continue earning
 insight from actual hostile HP damage; reaching 200 automatically advances a living Adept
 to its matching [Master](dao-masters.md), resets insight, and fully heals to the new maximum HP.
 `daoMaster` (public boolean, compact slot 52) persists with the entity; Masters cannot advance again. Research ids are
-`dao_of_lightness`, `dao_of_heaviness` (War), `dao_of_magic` (Magic).
+`dao_wind`, `dao_of_heaviness` (War), `dao_of_magic` (Magic).
 
 Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md).
 Shield uses ability `discipleShield` (code 17, order stage 25), world-point target,
 ability-object kind `shield` (code 4). It expires after 5 seconds, projected through `expiresIn`; `ownerState.hp` carries
-the remaining 150-point pool to authorized owner/observer projections only. The client renders this pool as a cyan HP bar above the public gray lifetime bar, updating it as damage is absorbed. The radius
+the remaining 150-point pool to every viewer who can see the field, including enemies and allies. The client renders this pool as a cyan HP bar above the public gray lifetime bar, updating it as damage is absorbed. The radius
 is 2.1 tiles for every viewer. Field visibility is gated at its center, independently
 of its caster; `sourceCasterId` is omitted when that caster is hidden.
 
@@ -2081,7 +2085,7 @@ entry movement to newly trained base Disciples. Busy grounds retain waiting entr
 ### Portal Adept production
 
 A completed Cultivator Portal trains Novices and, after matching Pavilion research,
-Lightness, War and Magic Adepts. Each Adept costs **150 steel, 35 oil, three supply**
+Wind, War and Magic Adepts. Each Adept costs **150 steel, 35 oil, three supply**
 and takes **300 ticks (ten seconds)**, without a Novice input. Use normal train/repeat
 commands, queue payment/refunds, legal spawn exits and rally behavior. An unresearched
 Dao cannot be trained. Combat-earned evolution and Tournament Grounds are unchanged.
@@ -2109,7 +2113,7 @@ requests are no-ops. `cancel` removes the latest unpaid plan, preserving active 
 Move-to-center and Portal rally use the existing tournament admission convention for both grounds.
 Entity production state checkpoints the training plans and the active paid production item.
 
-Lab unit spawning accepts an optional `dao` (`lightness`, `war`, or `magic`) on
+Lab unit spawning accepts an optional `dao` (`wind`, `war`, or `magic`) on
 `spawnEntity` and each `spawnEntities` entry. Only the Novice (`warrior`) kind accepts
 it; other kinds are rejected before mutation. The authoritative spawn uses normal
 Dao evolution to initialize specialization stats, with its entrance animation already
@@ -2155,4 +2159,4 @@ is queueable. `setAutocast` for `escapeTreasure` toggles lethal-damage rescue on
 Private carrier `abilities` includes `escapeTreasure`, `remainingUses: 1`, and
 `autocastEnabled` while the item exists; team-private `escapeTreasure` remains the badge flag.
 
-Lightness Dash has its own `lightnessDash` ability (21) and order stage (29). Compact snapshot vocabulary is version 67. It creates no return object. Owner-visible `remainingUses` and `chargeRechargeLeft` carry one Adept charge or up to two Master charges; no new snapshot fields.
+Wind Dash has its own `windDash` ability (21) and order stage (29). Compact snapshot vocabulary is version 68. It creates no return object. Owner-visible `remainingUses` and `chargeRechargeLeft` carry one Adept charge or up to two Master charges; no new snapshot fields.

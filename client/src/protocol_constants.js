@@ -172,7 +172,7 @@ export const KIND = Object.freeze({
   RIFLEMAN: "rifleman",
   PANZERFAUST: "panzerfaust",
   WARRIOR: "warrior",
-  LIGHTNESS_ADEPT: "lightness_adept",
+  WIND_ADEPT: "wind_adept",
   WAR_ADEPT: "war_adept",
   MAGIC_ADEPT: "magic_adept",
   MACHINE_GUNNER: "machine_gunner",
@@ -211,7 +211,7 @@ export const UNIT_KINDS = Object.freeze([
   KIND.RIFLEMAN,
   KIND.PANZERFAUST,
   KIND.WARRIOR,
-  KIND.LIGHTNESS_ADEPT,
+  KIND.WIND_ADEPT,
   KIND.WAR_ADEPT,
   KIND.MAGIC_ADEPT,
   KIND.MACHINE_GUNNER,
@@ -313,14 +313,14 @@ export const ABILITY = Object.freeze({
   BLANKET_FIRE: "blanketFire",
   BREAKTHROUGH: "breakthrough",
   SCOUT_PLANE: "scoutPlane",
-  LIGHTNESS_DASH: "lightnessDash",
+  WIND_DASH: "windDash",
   EKAT_TELEPORT: "ekatTeleport",
   EKAT_LINE_SHOT: "ekatLineShot",
   EKAT_MAGIC_ANCHOR: "ekatMagicAnchor",
   EKAT_CONSUME_GOLEM: "ekatConsumeGolem",
   DISMISS_SCOUT_PLANE: "dismissScoutPlane",
   BARRAGE: "barrage",
-  EVOLVE_LIGHTNESS: "evolveLightness",
+  EVOLVE_WIND: "evolveWind",
   EVOLVE_WAR: "evolveWar",
   EVOLVE_MAGIC: "evolveMagic",
   DISCIPLE_SHIELD: "discipleShield",
@@ -368,7 +368,7 @@ export const MOVEMENT_PATH_DIAGNOSTICS = Object.freeze({
 // --- Compact snapshot wire schema (must match protocol.rs) ---
 export const PREDICTION_PROTOCOL_VERSION = 1;
 export const DEFAULT_FACTION_ID = "kriegsia";
-export const COMPACT_SNAPSHOT_VERSION = 67;
+export const COMPACT_SNAPSHOT_VERSION = 68;
 export const MAX_COMPACT_GROUND_DECALS = 64;
 export const SNAPSHOT_CODEC_VERSION = 1;
 export const SNAPSHOT_CODEC = Object.freeze({
@@ -400,7 +400,7 @@ export const KIND_CODE = Object.freeze({
   [KIND.PROVEN_GROUNDS]: 33,
   [KIND.SHOP]: 34,
   [KIND.WARRIOR]: 29,
-  [KIND.LIGHTNESS_ADEPT]: 35,
+  [KIND.WIND_ADEPT]: 35,
   [KIND.WAR_ADEPT]: 36,
   [KIND.MAGIC_ADEPT]: 37,
   [KIND.DEPOT]: 7,
@@ -449,7 +449,7 @@ export const UPGRADE = Object.freeze({
   TANK_PLUS: "tank_plus",
   SMOKE_PLUS: "smoke_plus",
   SCOUT_PLANE_UNLOCK: "scout_plane_unlock",
-  DAO_OF_LIGHTNESS: "dao_of_lightness",
+  DAO_WIND: "dao_wind",
   DAO_OF_MAGIC: "dao_of_magic",
   DAO_OF_HEAVINESS: "dao_of_heaviness",
   ROCKETS: "rockets",
@@ -466,7 +466,7 @@ export const UPGRADE_CODE = Object.freeze({
   [UPGRADE.TANK_PLUS]: 13,
   [UPGRADE.SMOKE_PLUS]: 9,
   [UPGRADE.SCOUT_PLANE_UNLOCK]: 11,
-  [UPGRADE.DAO_OF_LIGHTNESS]: 14,
+  [UPGRADE.DAO_WIND]: 14,
   [UPGRADE.DAO_OF_MAGIC]: 15,
   [UPGRADE.DAO_OF_HEAVINESS]: 16,
   [UPGRADE.ROCKETS]: 12,
@@ -522,14 +522,14 @@ export const ORDER_STAGE = Object.freeze({
   BLANKET_FIRE: "blanketFire",
   BREAKTHROUGH: "breakthrough",
   SCOUT_PLANE: "scoutPlane",
-  LIGHTNESS_DASH: "lightnessDash",
+  WIND_DASH: "windDash",
   EKAT_TELEPORT: "ekatTeleport",
   EKAT_LINE_SHOT: "ekatLineShot",
   EKAT_MAGIC_ANCHOR: "ekatMagicAnchor",
   EKAT_CONSUME_GOLEM: "ekatConsumeGolem",
   DISMISS_SCOUT_PLANE: "dismissScoutPlane",
   BARRAGE: "barrage",
-  EVOLVE_LIGHTNESS: "evolveLightness",
+  EVOLVE_WIND: "evolveWind",
   EVOLVE_WAR: "evolveWar",
   EVOLVE_MAGIC: "evolveMagic",
   DISCIPLE_SHIELD: "discipleShield",
@@ -552,7 +552,7 @@ export const ORDER_STAGE_CODE = Object.freeze({
   [ORDER_STAGE.MORTAR_FIRE]: 9,
   [ORDER_STAGE.POINT_FIRE]: 10,
   [ORDER_STAGE.BREAKTHROUGH]: 11,
-  [ORDER_STAGE.LIGHTNESS_DASH]: 29,
+  [ORDER_STAGE.WIND_DASH]: 29,
   [ORDER_STAGE.EKAT_TELEPORT]: 12,
   [ORDER_STAGE.EKAT_LINE_SHOT]: 13,
   [ORDER_STAGE.EKAT_MAGIC_ANCHOR]: 14,
@@ -563,7 +563,7 @@ export const ORDER_STAGE_CODE = Object.freeze({
   [ORDER_STAGE.SCOUT_PLANE]: 19,
   [ORDER_STAGE.HOLD_POSITION]: 20,
   [ORDER_STAGE.BARRAGE]: 21,
-  [ORDER_STAGE.EVOLVE_LIGHTNESS]: 22,
+  [ORDER_STAGE.EVOLVE_WIND]: 22,
   [ORDER_STAGE.EVOLVE_WAR]: 23,
   [ORDER_STAGE.EVOLVE_MAGIC]: 24,
   [ORDER_STAGE.DISCIPLE_SHIELD]: 25,
@@ -579,7 +579,7 @@ export const ABILITY_CODE = Object.freeze({
   [ABILITY.MORTAR_FIRE]: 3,
   [ABILITY.POINT_FIRE]: 4,
   [ABILITY.BREAKTHROUGH]: 5,
-  [ABILITY.LIGHTNESS_DASH]: 21,
+  [ABILITY.WIND_DASH]: 21,
   [ABILITY.EKAT_TELEPORT]: 6,
   [ABILITY.EKAT_LINE_SHOT]: 7,
   [ABILITY.EKAT_MAGIC_ANCHOR]: 8,
@@ -588,7 +588,7 @@ export const ABILITY_CODE = Object.freeze({
   [ABILITY.DISMISS_SCOUT_PLANE]: 11,
   [ABILITY.SCOUT_PLANE]: 12,
   [ABILITY.BARRAGE]: 13,
-  [ABILITY.EVOLVE_LIGHTNESS]: 14,
+  [ABILITY.EVOLVE_WIND]: 14,
   [ABILITY.EVOLVE_WAR]: 15,
   [ABILITY.EVOLVE_MAGIC]: 16,
   [ABILITY.DISCIPLE_SHIELD]: 17,
@@ -645,7 +645,7 @@ function reverseCodes(table) {
 
 export function daoForKind(kind) {
   switch (kind) {
-    case KIND.LIGHTNESS_ADEPT: return "lightness";
+    case KIND.WIND_ADEPT: return "wind";
     case KIND.WAR_ADEPT: return "war";
     case KIND.MAGIC_ADEPT: return "magic";
     default: return null;

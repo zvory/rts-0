@@ -25,6 +25,8 @@ tank coax, mortar/artillery fire, and Ekat Line Shot. Rocket Truck barrage reloa
 first-shot readiness, windups, projectile travel, and barrage unload duration are unchanged.
 The disposable Panzerfaust rocket has no repeat cooldown; its rifle follows the doubled cadence.
 Mortar Fire has a further 50% cooldown increase to 180 ticks (6 seconds).
+Novice and all Dao Adept/Master ordinary attack rates are reduced a further 30%,
+using whole-tick cooldowns: 91 ticks for Novice/War/Magic and 61 for Wind.
 Non-attack ability timers and attack-speed multipliers are unchanged.
 Base weapon ranges use fractional tiles (`f32`) throughout stat records and attack profiles.
 The Machine Gunner has 6.1 tiles of base range (7.1 while entrenched), giving an approaching
@@ -227,10 +229,10 @@ Cultivator Serfs can also construct the faction-specific Portal for 150 Steel: i
 footprint, 123 HP, one tile of sight, a five-second construction time, no prerequisite, and no
 research. A completed Portal trains the Cultivator Disciple for 100 Steel and 2 Supply in 300 ticks.
 The Disciple is a 115-HP, 13.5-pixel-radius ground melee unit moving at 2.0 pixels per tick.
-Lightness independently uses 1.15 times Scout Car speed (2.7025 pixels per tick). War and Magic
+Wind independently uses 1.15 times Scout Car speed (2.7025 pixels per tick). War and Magic
 use 1.05 times base Disciple speed (2.1 pixels per tick). War gains 20 maximum HP (135 total);
-Lightness and Magic retain 115 maximum HP. Its
-23-damage sword has 0.75-tile reach, a 64-tick cooldown, and 50% armor penetration.
+Wind and Magic retain 115 maximum HP. Its
+23-damage sword has 0.75-tile reach, a 91-tick cooldown, and 50% armor penetration.
 Disciples have a separate five-tile engagement range for Idle and Attack Move: they approach
 visible legal enemies to sword reach, then resume their original Attack Move destination when
 the target dies, becomes hidden/illegal, or leaves engagement range. Hold Position and Point
@@ -816,7 +818,7 @@ Cultivator Serfs can construct the Three Dao Pavilion after a completed Nexus an
 It inherits the Training Centre baseline: 100 Steel, 25 Oil, 560 ticks construction,
 120 HP, armored, one tile sight, no weapon, no supply or production. Its approved
 art uses a 3x3 placement and collision footprint.
-Its three independent, permanent researches (Dao of Lightness, Dao of War, and
+Its three independent, permanent researches (Dao Wind, Dao of War, and
 Dao of Magic) share a player-wide escalating price, in any order: the first costs
 50 Steel / 100 Oil and takes 600 ticks (20 seconds), the second costs 100 Steel /
 200 Oil and takes 1200 ticks (40 seconds), and the third costs 200 Steel / 400 Oil
@@ -831,22 +833,22 @@ See [Cultivators](cultivators.md#three-dao-pavilion-prototype) for the approved 
 
 ### Disciple insight and Dao specializations
 
-Player-facing ranks are **Novice** for the base `warrior` and **Lightness Adept**,
+Player-facing ranks are **Novice** for the base `warrior` and **Wind Adept**,
 **War Adept**, or **Magic Adept** for its permanent Dao specialization. Each Adept is a distinct authoritative unit kind; the base retains the `warrior` identifier.
 
 
 See [Dao evolution playtest](dao-insight.md). Entity-owned `insight` and authoritative unit `kind` persist
-through checkpoints. Evolution changes Novice `warrior` (29) to `lightness_adept` (35),
+through checkpoints. Evolution changes Novice `warrior` (29) to `wind_adept` (35),
 `war_adept` (36), or `magic_adept` (37), preserving the entity id and orders.
 Permanent Dao identity is derived from kind; the engine stores no separate mutable `dao`. Visible Disciple snapshots append `insight` (compact slot 45) and
-`dao` (slot 46: lightness/war/magic). Evolution buttons set replaceable, entity-owned `chosenDao` intent (team-private compact slot 49), independent of orders. Codes 14–16 and order stages 22–24 retain their positions.
+`dao` (slot 46: wind/war/magic). Evolution buttons set replaceable, entity-owned `chosenDao` intent (team-private compact slot 49), independent of orders. Codes 14–16 and order stages 22–24 retain their positions.
 Evolution automatically occurs once 60 insight is ready, without research or a Pavilion.
 Evolution clears all insight and raises the cap to 200. Evolved Disciples continue earning
 insight from actual hostile HP damage (cost-weighted unit damage, quarter-rate building damage, with exact fractional carry; Throw Sword grants none); reaching 200 automatically advances a living Adept to its matching Master. Research ids are
-`dao_of_lightness`, `dao_of_heaviness` (War), `dao_of_magic` (Magic).
+`dao_wind`, `dao_of_heaviness` (War), `dao_of_magic` (Magic).
 
 `DISCIPLE_SHIELD_CAPACITY` (150), `DISCIPLE_SHIELD_RADIUS_TILES` (2.1), and `DISCIPLE_SHIELD_DURATION_TICKS` are mirrored for the Shield HP and lifetime bars and checked by faction catalog parity. `DISCIPLE_EVOLVED_INSIGHT_CAP` (200) is also parity-checked.
-Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md). Lightness uses the base Disciple’s 0.75-tile sword reach, retaining 23 damage, 50% penetration, 43-tick cooldown, moving attacks, 2.7025 px/tick movement, and Dash. Its five-tile automatic engagement closes to melee reach. Magic uses a five-tile orb primary, retaining 23 damage, 50% penetration, and 64-tick cooldown, and stops to fire. Novice Charge automatically grants 1.5× speed for one second with a 15-second cooldown against a hostile unit at least two tiles away or moving away; it has no selectable command. Lightness Dash reaches fifteen tiles with no return recast, while Ekat retains its five-tile Dash and return. Lightness Adepts hold one Dash charge; Masters hold two. Each spent charge recharges sequentially in eight seconds, and promotion grants the additional ready charge without resetting an existing recharge. War uses 1.75-tile spear reach (`DAO_WAR_RANGE_TILES`), retaining its damage, cooldown, armor and HP bonuses. Its sprite scale remains 0.56. The base, Lightness, and Magic collision/interaction radius is 26 world pixels; War uses 18.2 pixels (26 × `DAO_WAR_BODY_SCALE`, 0.7). The starting Novice stands five tiles toward the enemy from the Nexus to clear the base with its larger body. These footprints cover the rendered torsos instead of allowing tightly stacked bodies. Sprite origins center each torso on the authoritative position, including the War atlas's forward-offset torso. Weapons, scarves, and the presentation-only 11.2-pixel War lunge may extend outside the body footprint. `DAO_WAR_BODY_SCALE` remains mirrored for artwork, selection, and collision geometry. `DAO_WAR_RANGE_TILES` and `DAO_RANGED_RANGE_TILES` are mirrored in client config and range overlays.
+Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md). Wind uses the base Disciple’s 0.75-tile sword reach, retaining 23 damage, 50% penetration, 61-tick cooldown, moving attacks, 2.7025 px/tick movement, and Dash. Its five-tile automatic engagement closes to melee reach. Magic uses a five-tile orb primary, retaining 23 damage, 50% penetration, and 91-tick cooldown, and stops to fire. Novice Charge automatically grants 1.5× speed for one second with a 15-second cooldown against a hostile unit at least two tiles away or moving away; it has no selectable command. Wind Dash reaches fifteen tiles with no return recast, while Ekat retains its five-tile Dash and return. Wind Adepts hold one Dash charge; Masters hold two. Each spent charge recharges sequentially in eight seconds, and promotion grants the additional ready charge without resetting an existing recharge. War uses 1.75-tile spear reach (`DAO_WAR_RANGE_TILES`), retaining its damage, cooldown, armor and HP bonuses. Its sprite scale remains 0.56. The base, Wind, and Magic collision/interaction radius is 26 world pixels; War uses 18.2 pixels (26 × `DAO_WAR_BODY_SCALE`, 0.7). The starting Novice stands five tiles toward the enemy from the Nexus to clear the base with its larger body. These footprints cover the rendered torsos instead of allowing tightly stacked bodies. Sprite origins center each torso on the authoritative position, including the War atlas's forward-offset torso. Weapons, scarves, and the presentation-only 11.2-pixel War lunge may extend outside the body footprint. `DAO_WAR_BODY_SCALE` remains mirrored for artwork, selection, and collision geometry. `DAO_WAR_RANGE_TILES` and `DAO_RANGED_RANGE_TILES` are mirrored in client config and range overlays.
 
 Throw Sword unlocks only at War Master (third tier), not War Adept. It uses fractional ability range metadata: 7.5 tiles, 100/11 px/tick, and a
 0.9-tile damage width and zero armor penetration (5/10 damage against armored
@@ -869,7 +871,7 @@ entry movement to newly trained base Disciples. Busy grounds retain waiting entr
 ### Portal Adept production
 
 A completed Cultivator Portal trains Novices and, after matching Pavilion research,
-Lightness, War and Magic Adepts. Each Adept costs **150 steel, 35 oil, three supply**
+Wind, War and Magic Adepts. Each Adept costs **150 steel, 35 oil, three supply**
 and takes **300 ticks (ten seconds)**, without a Novice input. Use normal train/repeat
 commands, queue payment/refunds, legal spawn exits and rally behavior. An unresearched
 Dao cannot be trained. Combat-earned evolution and Tournament Grounds are unchanged.
@@ -898,8 +900,8 @@ placement, cancellation, damage, fog and destruction apply. See [Shop](shop.md) 
 At 200 insight, each living Adept automatically becomes its matching Master and fully
 heals. Relative to that path’s Adept, size/collision ×1.2, movement ×1.1, ordinary
 attack damage ×1.2 (nearest integer), maximum HP ×1.4. No resource or supply cost,
-research or attack-rate change; War Masters unlock Throw Sword and Lightness Masters gain a second Dash charge; no repeat advancement. Master HP is
-161 (Lightness/Magic) or 189 (War). See [Master rules and review](dao-masters.md).
+research or attack-rate change; War Masters unlock Throw Sword and Wind Masters gain a second Dash charge; no repeat advancement. Master HP is
+161 (Wind/Magic) or 189 (War). See [Master rules and review](dao-masters.md).
 
 ### Shop goods
 

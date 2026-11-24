@@ -26,6 +26,8 @@ import {
   worldCombatBedAllowed,
 } from "../../client/src/match_combat_audio.js";
 import {
+  ABILITY,
+  ABILITY_OBJECT_KIND,
   EVENT,
   KIND,
   SETUP,
@@ -561,8 +563,8 @@ assert(
   }
   for (const kind of [KIND.RIFLEMAN, KIND.TANK, KIND.MORTAR_TEAM]) {
     target.kind = kind;
-    attacker.kind = KIND.LIGHTNESS_ADEPT;
-    assert(attack().id === "combat_disciple_spear_01", `Lightness spear cue is independent of ${kind} target material`);
+    attacker.kind = KIND.WIND_ADEPT;
+    assert(attack().id === "combat_disciple_spear_01", `Wind spear cue is independent of ${kind} target material`);
     attacker.kind = KIND.MAGIC_ADEPT;
     assert(attack(WEAPON_KIND.DISCIPLE_ORB).id === "combat_disciple_orb_01", `Magic orb cue is independent of ${kind} target material`);
     combatAudio.playAttackSound({ e: EVENT.ATTACK, from: 11, to: 12 });
@@ -830,3 +832,37 @@ assert(
 }
 
 // ---------------------------------------------------------------------------
+
+// Sustained Throw Sword audio follows the authoritative visible object lifetime.
+{
+  const plays = [], stops = [], positions = [];
+  const voices = new Set();
+  const audio = {
+    play(id, opts) { plays.push({ id, opts }); voices.add(opts.key); return true; },
+    stopByKey(key) { stops.push(key); voices.delete(key); },
+    hasVoiceKey(key) { return voices.has(key); },
+    setVoicePosition(key, x, y) { positions.push({ key, x, y }); },
+  };
+  const combat = new MatchCombatAudio({ audio, state: { playerId: 1 } });
+  const sword = { id: 10, owner: 1, ability: ABILITY.THROW_SWORD,
+    kind: ABILITY_OBJECT_KIND.LINE_PROJECTILE, x: 100, y: 200 };
+  combat.updateThrowSwordSounds([sword]);
+  assert(plays.length === 1 && plays[0].id === "combat_throw_sword_01", "Throw Sword uses the selected whirl");
+  assert(plays[0].opts.loop && plays[0].opts.pitchVariance === 0, "sword sustains without random timing changes");
+  assert(plays[0].opts.category === "combat_self", "own sword uses the self combat mix");
+  combat.updateThrowSwordSounds([{ ...sword, x: 300 }]);
+  assert(plays.length === 1 && positions.at(-1).x === 300, "outbound/return motion repans without restarting");
+  voices.clear();
+  combat.updateThrowSwordSounds([sword]);
+  assert(plays.length === 2, "an evicted sword voice can resume while the projectile exists");
+  combat.updateThrowSwordSounds([]);
+  assert(!voices.size && !combat.activeThrowSwordSoundKeys.size, "short casts and loss of visibility stop the sound immediately");
+  combat.updateThrowSwordSounds([{ ...sword, owner: 2 }]);
+  assert(plays.at(-1).opts.category === "combat_other", "visible enemy swords use other combat mix");
+  combat.updateThrowSwordSounds([{ ...sword, ability: ABILITY.EKAT_LINE_SHOT }, { ...sword, x: NaN }]);
+  assert(!voices.size && plays.length === 3, "other projectiles and invalid positions do not produce sword audio");
+  combat.updateThrowSwordSounds([sword]);
+  combat.destroy();
+  assert(!voices.size && stops.includes("combat:throw_sword:10"), "teardown clears sustained sword audio");
+  assert(SOUND_MANIFEST.some(s => s.id === "combat_throw_sword_01"), "Throw Sword asset is preloaded");
+}

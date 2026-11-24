@@ -399,6 +399,10 @@ export class Match {
           this.roomTimeControls?.roomTimeState,
         ) ? m.worldCombatPosition : null,
       );
+      this.combatAudio?.updateThrowSwordSounds(
+        worldCombatBedAllowed(this.running, this.livePauseState, this.roomTimeControls?.roomTimeState)
+          ? this.state.abilityObjects : [],
+      );
       this.stopInactiveMachineGunSounds();
       this.autoSpectator?.observeSnapshot(m);
       this.handleSnapshotEvents(m.events || []);
@@ -834,7 +838,10 @@ export class Match {
 
   applyLivePauseState(state) {
     applyLivePauseStateModel(this, state);
-    if (this.livePauseState.paused) this.combatAudio?.updateWorldCombatBed(false);
+    if (this.livePauseState.paused) {
+      this.combatAudio?.updateWorldCombatBed(false);
+      this.combatAudio?.updateThrowSwordSounds();
+    }
   }
 
   shouldUseDesktopCursorAutoLock() {
@@ -1204,6 +1211,7 @@ export class Match {
     this.captureRafWasRunning = false;
     this.uncappedPerfBenchmark = null;
     this.running = false;
+    this.combatAudio?.updateThrowSwordSounds();
     this.closeMenus();
     if (this.rafId !== undefined) {
       cancelAnimationFrame(this.rafId);
@@ -1267,6 +1275,7 @@ export class Match {
     if (!this.replayViewer) return false;
     this.stopAllMachineGunSounds();
     this.combatAudio?.updateWorldCombatBed(false);
+    this.combatAudio?.updateThrowSwordSounds();
     this.state?.resetForReplaySeek?.();
     this.groundDecalSync?.reset({ resetPresentation: false });
     this.clientIntent?.clearPlannedOrders?.();

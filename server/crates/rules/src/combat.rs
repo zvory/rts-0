@@ -162,7 +162,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
         id: WeaponKind::WarriorSword,
         range_tiles: 0.75,
         dmg: 23,
-        cooldown: 64,
+        cooldown: crate::balance::DISCIPLE_ATTACK_COOLDOWN_TICKS,
         weapon_class: WeaponClass::SmallArms,
         armor_penetration: 0.5,
         infantry_target_policy: InfantryTargetPolicy::None,
@@ -172,7 +172,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
         id: WeaponKind::DiscipleArrow,
         range_tiles: crate::balance::DAO_RANGED_RANGE_TILES,
         dmg: 23,
-        cooldown: 64,
+        cooldown: crate::balance::DISCIPLE_ATTACK_COOLDOWN_TICKS,
         weapon_class: WeaponClass::SmallArms,
         armor_penetration: 0.5,
         infantry_target_policy: InfantryTargetPolicy::None,
@@ -182,7 +182,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
         id: WeaponKind::DiscipleOrb,
         range_tiles: crate::balance::DAO_RANGED_RANGE_TILES,
         dmg: 23,
-        cooldown: 64,
+        cooldown: crate::balance::DISCIPLE_ATTACK_COOLDOWN_TICKS,
         weapon_class: WeaponClass::SmallArms,
         armor_penetration: 0.5,
         infantry_target_policy: InfantryTargetPolicy::None,
@@ -332,7 +332,7 @@ pub fn default_weapon_kind(kind: EntityKind) -> Option<WeaponKind> {
     match kind {
         EntityKind::Worker => Some(WeaponKind::WorkerTools),
         EntityKind::Golem => Some(WeaponKind::GolemFists),
-        EntityKind::Warrior | EntityKind::LightnessAdept | EntityKind::WarAdept => {
+        EntityKind::Warrior | EntityKind::WindAdept | EntityKind::WarAdept => {
             Some(WeaponKind::WarriorSword)
         }
         EntityKind::MagicAdept => Some(WeaponKind::DiscipleOrb),
@@ -839,7 +839,7 @@ mod tests {
             (EntityKind::Worker, Some(WeaponKind::WorkerTools)),
             (EntityKind::Golem, Some(WeaponKind::GolemFists)),
             (EntityKind::Warrior, Some(WeaponKind::WarriorSword)),
-            (EntityKind::LightnessAdept, Some(WeaponKind::WarriorSword)),
+            (EntityKind::WindAdept, Some(WeaponKind::WarriorSword)),
             (EntityKind::WarAdept, Some(WeaponKind::WarriorSword)),
             (EntityKind::MagicAdept, Some(WeaponKind::DiscipleOrb)),
             (EntityKind::Rifleman, Some(WeaponKind::RiflemanRifle)),

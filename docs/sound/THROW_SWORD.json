@@ -1,0 +1,12 @@
+{
+  "source": "Locally synthesized noise-band and pitched-air sound; user selected candidate 02-heavy-boomerang.wav.",
+  "provider": "Python standard-library procedural synthesis",
+  "source_sha256": "6b8397820dfd8a7ada082058ce8954bde4a5d7056ae5fc7b787f5a484880df2d",
+  "production_sha256": "ef83a24f01775e2964df64844fab9f14d29f48417997d969ee4600e0be44a650",
+  "processing": "FFmpeg atempo=1.083333333 (preserve pitch), apad, atrim=duration=1.8, volume=-3.4dB; 48 kHz mono MP3 at 128 kbps. Static normalization toward -16 LUFS constrained by -2 dBTP headroom, verified after lossy encoding. No dynamic compression.",
+  "decoded_lufs": -17.97,
+  "decoded_true_peak_dbtp": -2.25,
+  "decoded_duration_seconds": 1.8,
+  "nominal_timing": "2 * ceil(7.5 tiles * 32 px / (100/11 px per tick)) / 30 Hz = 1.8 seconds. Actual fog-filtered projectile lifetime controls voice stop; loop sustains a prolonged return.",
+  "runtime_gain": 0.49
+}

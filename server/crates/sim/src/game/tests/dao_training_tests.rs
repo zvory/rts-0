@@ -139,7 +139,7 @@ fn paid_dao_training_requires_research_owned_base_disciple_and_oil() {
 fn paid_dao_training_mixed_queue_exact_duration_supply_rally_checkpoint_and_cancel() {
     let (mut game, grounds) = setup();
     let choices = [
-        UpgradeKind::DaoOfLightness,
+        UpgradeKind::DaoWind,
         UpgradeKind::DaoOfHeaviness,
         UpgradeKind::DaoOfMagic,
     ];
@@ -196,7 +196,7 @@ fn paid_dao_training_mixed_queue_exact_duration_supply_rally_checkpoint_and_canc
         .iter()
         .find(|e| e.kind.is_disciple())
         .unwrap();
-    assert_eq!(output.dao(), Some(UpgradeKind::DaoOfLightness));
+    assert_eq!(output.dao(), Some(UpgradeKind::DaoWind));
     assert_eq!(output.insight, 0);
     assert_eq!(output.insight_cap(), 200);
     assert_eq!(output.hp, output.max_hp);

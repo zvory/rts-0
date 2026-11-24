@@ -64,7 +64,7 @@ pub mod kinds {
     pub const WORKER: &str = "worker";
     pub const GOLEM: &str = "golem";
     pub const WARRIOR: &str = "warrior";
-    pub const LIGHTNESS_ADEPT: &str = "lightness_adept";
+    pub const WIND_ADEPT: &str = "wind_adept";
     pub const WAR_ADEPT: &str = "war_adept";
     pub const MAGIC_ADEPT: &str = "magic_adept";
     pub const RIFLEMAN: &str = "rifleman";
@@ -122,13 +122,13 @@ pub mod abilities {
     pub const BREAKTHROUGH: &str = "breakthrough";
     pub const SCOUT_PLANE: &str = "scoutPlane";
     pub const DISMISS_SCOUT_PLANE: &str = "dismissScoutPlane";
-    pub const LIGHTNESS_DASH: &str = "lightnessDash";
+    pub const WIND_DASH: &str = "windDash";
     pub const EKAT_TELEPORT: &str = "ekatTeleport";
     pub const EKAT_LINE_SHOT: &str = "ekatLineShot";
     pub const EKAT_MAGIC_ANCHOR: &str = "ekatMagicAnchor";
     pub const EKAT_CONSUME_GOLEM: &str = "ekatConsumeGolem";
     pub const BARRAGE: &str = "barrage";
-    pub const EVOLVE_LIGHTNESS: &str = "evolveLightness";
+    pub const EVOLVE_WIND: &str = "evolveWind";
     pub const EVOLVE_WAR: &str = "evolveWar";
     pub const EVOLVE_MAGIC: &str = "evolveMagic";
     pub const DISCIPLE_SHIELD: &str = "discipleShield";
@@ -145,13 +145,13 @@ pub mod abilities {
         BREAKTHROUGH,
         SCOUT_PLANE,
         DISMISS_SCOUT_PLANE,
-        LIGHTNESS_DASH,
+        WIND_DASH,
         EKAT_TELEPORT,
         EKAT_LINE_SHOT,
         EKAT_MAGIC_ANCHOR,
         EKAT_CONSUME_GOLEM,
         BARRAGE,
-        EVOLVE_LIGHTNESS,
+        EVOLVE_WIND,
         EVOLVE_WAR,
         EVOLVE_MAGIC,
         DISCIPLE_SHIELD,
@@ -187,7 +187,7 @@ pub mod upgrades {
     pub const TANK_PLUS: &str = "tank_plus";
     pub const SMOKE_PLUS: &str = "smoke_plus";
     pub const SCOUT_PLANE_UNLOCK: &str = "scout_plane_unlock";
-    pub const DAO_OF_LIGHTNESS: &str = "dao_of_lightness";
+    pub const DAO_WIND: &str = "dao_wind";
     pub const DAO_OF_MAGIC: &str = "dao_of_magic";
     pub const DAO_OF_HEAVINESS: &str = "dao_of_heaviness";
     pub const ROCKETS: &str = "rockets";
@@ -202,7 +202,7 @@ pub mod upgrades {
         TANK_PLUS,
         SMOKE_PLUS,
         SCOUT_PLANE_UNLOCK,
-        DAO_OF_LIGHTNESS,
+        DAO_WIND,
         DAO_OF_MAGIC,
         DAO_OF_HEAVINESS,
         ROCKETS,
@@ -238,7 +238,7 @@ pub mod notices {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 67;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 68;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -407,7 +407,7 @@ const KIND_CODES: &[(&str, u8)] = &[
     (kinds::WORKER, 1),
     (kinds::GOLEM, 22),
     (kinds::WARRIOR, 29),
-    (kinds::LIGHTNESS_ADEPT, 35),
+    (kinds::WIND_ADEPT, 35),
     (kinds::WAR_ADEPT, 36),
     (kinds::MAGIC_ADEPT, 37),
     (kinds::RIFLEMAN, 2),
@@ -491,7 +491,7 @@ const ORDER_STAGE_CODES: &[(&str, u8)] = &[
     (abilities::MORTAR_FIRE, 9),
     (abilities::POINT_FIRE, 10),
     (abilities::BREAKTHROUGH, 11),
-    (abilities::LIGHTNESS_DASH, 29),
+    (abilities::WIND_DASH, 29),
     (abilities::EKAT_TELEPORT, 12),
     (abilities::EKAT_LINE_SHOT, 13),
     (abilities::EKAT_MAGIC_ANCHOR, 14),
@@ -502,7 +502,7 @@ const ORDER_STAGE_CODES: &[(&str, u8)] = &[
     (abilities::SCOUT_PLANE, 19),
     ("holdPosition", 20),
     (abilities::BARRAGE, 21),
-    (abilities::EVOLVE_LIGHTNESS, 22),
+    (abilities::EVOLVE_WIND, 22),
     (abilities::EVOLVE_WAR, 23),
     (abilities::EVOLVE_MAGIC, 24),
     (abilities::DISCIPLE_SHIELD, 25),
@@ -517,7 +517,7 @@ const ABILITY_CODES: &[(&str, u8)] = &[
     (abilities::MORTAR_FIRE, 3),
     (abilities::POINT_FIRE, 4),
     (abilities::BREAKTHROUGH, 5),
-    (abilities::LIGHTNESS_DASH, 21),
+    (abilities::WIND_DASH, 21),
     (abilities::EKAT_TELEPORT, 6),
     (abilities::EKAT_LINE_SHOT, 7),
     (abilities::EKAT_MAGIC_ANCHOR, 8),
@@ -526,7 +526,7 @@ const ABILITY_CODES: &[(&str, u8)] = &[
     (abilities::DISMISS_SCOUT_PLANE, 11),
     (abilities::SCOUT_PLANE, 12),
     (abilities::BARRAGE, 13),
-    (abilities::EVOLVE_LIGHTNESS, 14),
+    (abilities::EVOLVE_WIND, 14),
     (abilities::EVOLVE_WAR, 15),
     (abilities::EVOLVE_MAGIC, 16),
     (abilities::DISCIPLE_SHIELD, 17),
@@ -553,7 +553,7 @@ const UPGRADE_CODES: &[(&str, u8)] = &[
     (upgrades::TANK_PLUS, 13),
     (upgrades::SMOKE_PLUS, 9),
     (upgrades::SCOUT_PLANE_UNLOCK, 11),
-    (upgrades::DAO_OF_LIGHTNESS, 14),
+    (upgrades::DAO_WIND, 14),
     (upgrades::DAO_OF_MAGIC, 15),
     (upgrades::DAO_OF_HEAVINESS, 16),
     (upgrades::ROCKETS, 12),
@@ -765,7 +765,7 @@ fn kind_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("WORKER", kinds::WORKER),
         ("GOLEM", kinds::GOLEM),
         ("WARRIOR", kinds::WARRIOR),
-        ("LIGHTNESS_ADEPT", kinds::LIGHTNESS_ADEPT),
+        ("WIND_ADEPT", kinds::WIND_ADEPT),
         ("WAR_ADEPT", kinds::WAR_ADEPT),
         ("MAGIC_ADEPT", kinds::MAGIC_ADEPT),
         ("RIFLEMAN", kinds::RIFLEMAN),
@@ -841,13 +841,13 @@ fn ability_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("BREAKTHROUGH", abilities::BREAKTHROUGH),
         ("SCOUT_PLANE", abilities::SCOUT_PLANE),
         ("DISMISS_SCOUT_PLANE", abilities::DISMISS_SCOUT_PLANE),
-        ("LIGHTNESS_DASH", abilities::LIGHTNESS_DASH),
+        ("WIND_DASH", abilities::WIND_DASH),
         ("EKAT_TELEPORT", abilities::EKAT_TELEPORT),
         ("EKAT_LINE_SHOT", abilities::EKAT_LINE_SHOT),
         ("EKAT_MAGIC_ANCHOR", abilities::EKAT_MAGIC_ANCHOR),
         ("EKAT_CONSUME_GOLEM", abilities::EKAT_CONSUME_GOLEM),
         ("BARRAGE", abilities::BARRAGE),
-        ("EVOLVE_LIGHTNESS", abilities::EVOLVE_LIGHTNESS),
+        ("EVOLVE_WIND", abilities::EVOLVE_WIND),
         ("EVOLVE_WAR", abilities::EVOLVE_WAR),
         ("EVOLVE_MAGIC", abilities::EVOLVE_MAGIC),
         ("DISCIPLE_SHIELD", abilities::DISCIPLE_SHIELD),
@@ -885,7 +885,7 @@ fn upgrade_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("TANK_PLUS", upgrades::TANK_PLUS),
         ("SMOKE_PLUS", upgrades::SMOKE_PLUS),
         ("SCOUT_PLANE_UNLOCK", upgrades::SCOUT_PLANE_UNLOCK),
-        ("DAO_OF_LIGHTNESS", upgrades::DAO_OF_LIGHTNESS),
+        ("DAO_WIND", upgrades::DAO_WIND),
         ("DAO_OF_MAGIC", upgrades::DAO_OF_MAGIC),
         ("DAO_OF_HEAVINESS", upgrades::DAO_OF_HEAVINESS),
         ("ROCKETS", upgrades::ROCKETS),
@@ -939,13 +939,13 @@ fn order_stage_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("BREAKTHROUGH", abilities::BREAKTHROUGH),
         ("SCOUT_PLANE", abilities::SCOUT_PLANE),
         ("DISMISS_SCOUT_PLANE", abilities::DISMISS_SCOUT_PLANE),
-        ("LIGHTNESS_DASH", abilities::LIGHTNESS_DASH),
+        ("WIND_DASH", abilities::WIND_DASH),
         ("EKAT_TELEPORT", abilities::EKAT_TELEPORT),
         ("EKAT_LINE_SHOT", abilities::EKAT_LINE_SHOT),
         ("EKAT_MAGIC_ANCHOR", abilities::EKAT_MAGIC_ANCHOR),
         ("EKAT_CONSUME_GOLEM", abilities::EKAT_CONSUME_GOLEM),
         ("BARRAGE", abilities::BARRAGE),
-        ("EVOLVE_LIGHTNESS", abilities::EVOLVE_LIGHTNESS),
+        ("EVOLVE_WIND", abilities::EVOLVE_WIND),
         ("EVOLVE_WAR", abilities::EVOLVE_WAR),
         ("EVOLVE_MAGIC", abilities::EVOLVE_MAGIC),
         ("DISCIPLE_SHIELD", abilities::DISCIPLE_SHIELD),

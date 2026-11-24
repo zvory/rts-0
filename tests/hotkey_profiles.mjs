@@ -702,7 +702,7 @@ assert.equal(createClassicPreset(buildHotkeyCommandCatalog(buildCommandCardConte
     playerId: 1, factionId: "cultivators",
     selection: [{ id: 600, owner: 1, kind: KIND.WARRIOR, insight: 60 }],
     resources: { steel: 1000, oil: 1000 },
-    upgrades: [UPGRADE.DAO_OF_LIGHTNESS, UPGRADE.DAO_OF_HEAVINESS, UPGRADE.DAO_OF_MAGIC],
+    upgrades: [UPGRADE.DAO_WIND, UPGRADE.DAO_OF_HEAVINESS, UPGRADE.DAO_OF_MAGIC],
     groupCooldownClocks: () => [], playerHasCompleteKind: () => true,
   });
   const classic = profiles.presets.find((p) => p.id === HOTKEY_PRESET_CLASSIC);
@@ -731,8 +731,8 @@ assert.equal(createClassicPreset(buildHotkeyCommandCatalog(buildCommandCardConte
 
 // Escape can share a card with each Dao's abilities and with the worker build menu.
 for (const [contextId, otherCommand] of [
-  ["cultivators-disciple-lightness", `cultivators.ability.${ABILITY.LIGHTNESS_DASH}`],
-  ["cultivators-disciple-war", `cultivators.ability.${ABILITY.THROW_SWORD}`],
+  ["cultivators-disciple-wind", `cultivators.ability.${ABILITY.WIND_DASH}`],
+  ["cultivators-war-master", `cultivators.ability.${ABILITY.THROW_SWORD}`],
   ["cultivators-disciple-magic", `cultivators.ability.${ABILITY.DISCIPLE_SHIELD}`],
   ["cultivators-worker", "worker.buildMenu"],
 ]) {

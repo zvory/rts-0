@@ -29,7 +29,7 @@ pub enum UpgradeKind {
     SmokePlus,
     ScoutPlaneUnlock,
     Rockets,
-    DaoOfLightness,
+    DaoWind,
     DaoOfMagic,
     DaoOfHeaviness,
 }
@@ -47,7 +47,7 @@ impl UpgradeKind {
         Self::SmokePlus,
         Self::ScoutPlaneUnlock,
         Self::Rockets,
-        Self::DaoOfLightness,
+        Self::DaoWind,
         Self::DaoOfMagic,
         Self::DaoOfHeaviness,
     ];
@@ -65,7 +65,7 @@ impl UpgradeKind {
             Self::SmokePlus => "smoke_plus",
             Self::ScoutPlaneUnlock => "scout_plane_unlock",
             Self::Rockets => "rockets",
-            Self::DaoOfLightness => "dao_of_lightness",
+            Self::DaoWind => "dao_wind",
             Self::DaoOfMagic => "dao_of_magic",
             Self::DaoOfHeaviness => "dao_of_heaviness",
         }
@@ -103,14 +103,14 @@ pub enum AbilityKind {
     EkatMagicAnchor,
     EkatConsumeGolem,
     Barrage,
-    EvolveLightness,
+    EvolveWind,
     EvolveWar,
     EvolveMagic,
     DiscipleShield,
     ThrowSword,
     HealingPotion,
     EscapeTreasure,
-    LightnessDash,
+    WindDash,
 }
 
 impl AbilityKind {
@@ -128,14 +128,14 @@ impl AbilityKind {
         Self::EkatMagicAnchor,
         Self::EkatConsumeGolem,
         Self::Barrage,
-        Self::EvolveLightness,
+        Self::EvolveWind,
         Self::EvolveWar,
         Self::EvolveMagic,
         Self::DiscipleShield,
         Self::ThrowSword,
         Self::HealingPotion,
         Self::EscapeTreasure,
-        Self::LightnessDash,
+        Self::WindDash,
     ];
 
     pub const fn stable_id(self) -> &'static str {
@@ -153,19 +153,19 @@ impl AbilityKind {
             Self::EkatMagicAnchor => "ekatMagicAnchor",
             Self::EkatConsumeGolem => "ekatConsumeGolem",
             Self::Barrage => "barrage",
-            Self::EvolveLightness => "evolveLightness",
+            Self::EvolveWind => "evolveWind",
             Self::EvolveWar => "evolveWar",
             Self::EvolveMagic => "evolveMagic",
             Self::DiscipleShield => "discipleShield",
             Self::ThrowSword => "throwSword",
             Self::HealingPotion => "healingPotion",
             Self::EscapeTreasure => "escapeTreasure",
-            Self::LightnessDash => "lightnessDash",
+            Self::WindDash => "windDash",
         }
     }
 
     pub const fn is_dash(self) -> bool {
-        matches!(self, Self::EkatTeleport | Self::LightnessDash)
+        matches!(self, Self::EkatTeleport | Self::WindDash)
     }
 
     pub const fn to_protocol_str(self) -> &'static str {
@@ -780,7 +780,7 @@ pub const EKAT_CATALOG: FactionCatalog = FactionCatalog {
 
 const CULTIVATORS_UPGRADES: [UpgradeCatalogEntry; 3] = [
     UpgradeCatalogEntry {
-        kind: UpgradeKind::DaoOfLightness,
+        kind: UpgradeKind::DaoWind,
         researched_at: EntityKind::ThreeDaoPavilion,
     },
     UpgradeCatalogEntry {
@@ -804,7 +804,7 @@ pub const CULTIVATORS_CATALOG: FactionCatalog = FactionCatalog {
     units: &[
         EntityKind::Worker,
         EntityKind::Warrior,
-        EntityKind::LightnessAdept,
+        EntityKind::WindAdept,
         EntityKind::WarAdept,
         EntityKind::MagicAdept,
     ],
@@ -1044,20 +1044,20 @@ pub fn ability_definition(kind: AbilityKind) -> AbilityCatalogEntry {
         AbilityKind::EkatMagicAnchor => ekat_magic_anchor,
         AbilityKind::EkatConsumeGolem => ekat_consume_golem,
         AbilityKind::Barrage => barrage,
-        AbilityKind::EvolveLightness => CULTIVATOR_ABILITIES[0],
+        AbilityKind::EvolveWind => CULTIVATOR_ABILITIES[0],
         AbilityKind::EvolveWar => CULTIVATOR_ABILITIES[1],
         AbilityKind::EvolveMagic => CULTIVATOR_ABILITIES[2],
         AbilityKind::DiscipleShield => CULTIVATOR_ABILITIES[5],
         AbilityKind::ThrowSword => CULTIVATOR_ABILITIES[6],
         AbilityKind::HealingPotion => CULTIVATOR_ABILITIES[7],
         AbilityKind::EscapeTreasure => CULTIVATOR_ABILITIES[8],
-        AbilityKind::LightnessDash => CULTIVATOR_ABILITIES[3],
+        AbilityKind::WindDash => CULTIVATOR_ABILITIES[3],
     }
 }
 
 pub fn ability_range_for_carrier(kind: AbilityKind, carrier: EntityKind) -> Option<f32> {
-    if kind == AbilityKind::LightnessDash && carrier == EntityKind::LightnessAdept {
-        Some(balance::DAO_LIGHTNESS_DASH_RANGE_TILES as f32)
+    if kind == AbilityKind::WindDash && carrier == EntityKind::WindAdept {
+        Some(balance::DAO_WIND_DASH_RANGE_TILES as f32)
     } else {
         ability_definition(kind).range_tiles
     }
@@ -1090,7 +1090,7 @@ pub fn upgrade_definition(kind: UpgradeKind) -> UpgradeCatalogEntry {
         UpgradeKind::ArtilleryUnlock => artillery_unlock,
         UpgradeKind::ScoutPlaneUnlock => scout_plane_unlock,
         UpgradeKind::Rockets => rockets,
-        UpgradeKind::DaoOfLightness => CULTIVATORS_UPGRADES[0],
+        UpgradeKind::DaoWind => CULTIVATORS_UPGRADES[0],
         UpgradeKind::DaoOfMagic => CULTIVATORS_UPGRADES[1],
         UpgradeKind::DaoOfHeaviness => CULTIVATORS_UPGRADES[2],
     }
@@ -1362,7 +1362,7 @@ mod tests {
             &[
                 EntityKind::Worker,
                 EntityKind::Warrior,
-                EntityKind::LightnessAdept,
+                EntityKind::WindAdept,
                 EntityKind::WarAdept,
                 EntityKind::MagicAdept
             ]
@@ -1400,7 +1400,7 @@ mod tests {
         assert_eq!(catalog.upgrades, &CULTIVATORS_UPGRADES);
         assert_eq!(catalog.abilities, &CULTIVATOR_ABILITIES);
         for ability in [
-            AbilityKind::EvolveLightness,
+            AbilityKind::EvolveWind,
             AbilityKind::EvolveWar,
             AbilityKind::EvolveMagic,
         ] {
@@ -1408,7 +1408,7 @@ mod tests {
         }
         assert!(catalog.allows_ability(AbilityKind::DiscipleShield, EntityKind::MagicAdept));
         assert!(catalog.allows_ability(AbilityKind::EkatMagicAnchor, EntityKind::MagicAdept));
-        assert!(catalog.allows_ability(AbilityKind::LightnessDash, EntityKind::LightnessAdept));
+        assert!(catalog.allows_ability(AbilityKind::WindDash, EntityKind::WindAdept));
         assert!(catalog.allows_ability(AbilityKind::ThrowSword, EntityKind::WarAdept));
     }
 

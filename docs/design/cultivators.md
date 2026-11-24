@@ -31,7 +31,7 @@ to use its existing supported-faction checks. Further art, audio, combat roster 
 
 The **Portal** is the Cultivators' first dedicated production building and its name is final. It
 trains the faction's Novice from grid slot 1 (`Q`) and researched Adepts from the next
-three slots: Lightness (`W`), War (`E`), and Magic (`A`). Each Adept requires its matching
+three slots: Wind (`W`), War (`E`), and Magic (`A`). Each Adept requires its matching
 completed Pavilion Dao research and costs 150 Steel, 35 Oil, three supply, and 300 ticks
 (ten seconds). No Novice input or Proving Grounds is needed. Normal manual/repeat queues,
 payment, cancellation/refunds, blocked exits and rally behavior apply. Combat-earned
@@ -60,17 +60,23 @@ attacks deal heavy damage." It costs 100 Steel and zero Oil, consumes 2 Supply, 
 11-tile sight, a 13.5 px collision/selection/render radius, and ordinary ground movement at 2.0
 px/tick. These values give it about 2.56 times Rifleman HP, 25% more speed, and 1.5 times the radius.
 
-Its sword has 0.75-tile reach beyond collision radii, deals 23 base damage, attacks every 64 ticks,
+Its sword has 0.75-tile reach beyond collision radii, deals 23 base damage, attacks every 91 ticks,
 and applies 50% armor penetration. The 23 damage makes two successful hits lethal to a 45-HP
-Rifleman; the 64-tick cooldown interprets "half Rifleman attack speed" as half as many attacks per
-second. Idle and Attack Move use a separate five-tile engagement range (with normal attacker
+Rifleman. The 91-tick cooldown reduces its former 64-tick attack rate by 30%, rounded
+to whole simulation ticks. Idle and Attack Move use a separate five-tile engagement range (with normal attacker
 radius/range slack) to acquire and approach visible legal enemies. The sword still requires melee
 reach to deal damage. Attack Move preserves its original destination and resumes it after the
 target dies, becomes hidden/illegal, or leaves engagement range; Idle stops its approach. Hold
 Position and Point stay in place, and plain Move keeps its route. Other unit kinds default
 engagement range to their current attack range.
 The sword uses general-purpose SmallArms target preference but has no projectile, tracer,
-muzzle flash or area damage. It holds position while attacking and otherwise uses
+muzzle flash or area damage. Novices, all three Adept kinds, and their Masters use rooted footing while they have a combat
+target and no movement path: resistance 60 instead of ordinary infantry combat resistance 3.
+Moving or untargeted Disciples retain soft footing (1). Rooted combatants are exempt from the
+extra traffic centerline lateral nudge; ordinary overlap separation still applies, so equally
+rooted units split an overlap evenly rather than stacking. The shared footing system also
+reduces stationary Magic Anchor pull with the higher resistance.
+It holds position while attacking and otherwise uses
 the ordinary attack, attack-move, hold, rally, fog, blocker, damage, and death rules.
 
 The first implementation uses clearly placeholder matte-white/off-white unarmored Chinese
@@ -104,7 +110,7 @@ There is no build limit. Approved PNG art is a circular stone study dais with th
 scrolls and a three-lobed canopy. The canopy and finial receive team tint; timber, stone, and
 parchment retain natural colors. The square atlas preserves the generated proportions.
 
-Research Dao of Lightness, Dao of Magic, and Dao of War from slots Q/W/E. Each
+Research Dao Wind, Dao of Magic, and Dao of War from slots Q/W/E. Each
 uses player-wide purchase-order pricing: first 50 Steel / 100 Oil / 20 seconds,
 second 100 Steel / 200 Oil / 40 seconds, third 200 Steel / 400 Oil / 80 seconds.
 See [balance](balance.md#three-dao-pavilion-prototype) for payment and refund rules.

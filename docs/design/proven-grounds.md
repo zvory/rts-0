@@ -9,7 +9,7 @@ specialist. This trades oil and vulnerable training time for combat-earned insig
 attack the building or its waiting disciples. The display name is Proving Grounds; the internal `proven_grounds` kind is unchanged.
 
 UI description: “Send base Disciples inside for researched Dao training. Queue any mix of
-Lightness, War and Magic; each costs 100 oil and takes 10 seconds. Supports a rally point.”
+Wind, War and Magic; each costs 100 oil and takes 10 seconds. Supports a rally point.”
 
 Art: generated from existing Cultivator Nexus, Pavilion and Tournament Grounds references.
 Unique silhouette: a tall open horseshoe training gate around a small stepped exercise court,
@@ -33,7 +33,7 @@ prototype baseline, explicitly recorded here rather than blocking the authorized
   200-tick construction, 3×3 footprint, 120 HP, armored, one-tile sight. No attack, supply,
   special repair/capture rule, or passive economy. Normal placement, collision, construction
   cancellation/refund, fog memory and damage presentation apply.
-- A base Disciple with 60 insight can choose Lightness, War or Magic without any research or
+- A base Disciple with 60 insight can choose Wind, War or Magic without any research or
   Pavilion. Existing replaceable pending choice, permanent evolution, healing, and faction gates
   remain. Pavilion Dao research instead gates paid training; researched upgrades survive building loss.
 - Select the Grounds and enqueue any mixture of researched Dao training orders; one click adds

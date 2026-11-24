@@ -1,7 +1,7 @@
 import { KIND, UPGRADE } from "./protocol.js";
 import { UPGRADES, DAO_TRAINING_COST_OIL, MAX_DAO_TRAINING_QUEUE } from "./config.js";
 
-const CHOICES = [UPGRADE.DAO_OF_LIGHTNESS, UPGRADE.DAO_OF_HEAVINESS, UPGRADE.DAO_OF_MAGIC];
+const CHOICES = [UPGRADE.DAO_WIND, UPGRADE.DAO_OF_HEAVINESS, UPGRADE.DAO_OF_MAGIC];
 
 export function buildDaoTrainingCard(ctx, building) {
   const queue = building.daoTrainingQueue ?? [];
