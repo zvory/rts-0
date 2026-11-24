@@ -795,6 +795,55 @@ try {
      `CAMERA: Space+drag pans the viewport (${beforePan.x.toFixed(1)},${beforePan.y.toFixed(1)} -> ${afterPan.x.toFixed(1)},${afterPan.y.toFixed(1)})`);
   ok(afterPan.selected === beforePan.selected, "CAMERA: Space+drag does not change selection");
 
+  // A version mismatch during real gameplay must warn without navigating or stopping snapshots.
+  const versionWarning = await page.evaluate(() => {
+    const app = window.__rts;
+    window.__versionReloads = 0;
+    app.versionGuard.reload = () => { window.__versionReloads++; };
+    app.versionGuard.observe("smoke-new-server-build");
+    app.versionGuard.refresh();
+    const panel = document.querySelector(".version-mismatch-panel");
+    const rect = panel.getBoundingClientRect();
+    return {
+      active: !!app.match?.running,
+      reloads: window.__versionReloads,
+      disabled: document.querySelector("#version-mismatch button").disabled,
+      title: document.getElementById("version-mismatch-title").textContent,
+      centered: Math.abs(rect.left + rect.width / 2 - innerWidth / 2) < 2 &&
+        Math.abs(rect.top + rect.height / 2 - innerHeight / 2) < 2,
+      tick: app.match.state.tick,
+    };
+  });
+  ok(versionWarning.active && versionWarning.reloads === 0 && versionWarning.disabled &&
+    versionWarning.title === "Version mismatch" && versionWarning.centered,
+  `VERSION: active game shows a centered warning without refreshing (${JSON.stringify(versionWarning)})`);
+  if (process.env.RTS_VERSION_WARNING_SCREENSHOT) {
+    await page.screenshot({ path: process.env.RTS_VERSION_WARNING_SCREENSHOT });
+  }
+  await page.waitForFunction((tick) => window.__rts.match.state.tick > tick, {}, versionWarning.tick);
+  await page.evaluate(() => window.__rts.onBackToLobby());
+  ok(await page.evaluate(() => window.__versionReloads === 1 && !window.__rts.match),
+    "VERSION: returning to lobby refreshes once, after match teardown");
+
+  // A disconnected lobby detects changes over HTTP and performs a real browser reload.
+  const versionPage = await browser.newPage();
+  let versionNavigations = 0;
+  versionPage.on("framenavigated", (frame) => { if (frame === versionPage.mainFrame()) versionNavigations++; });
+  await versionPage.setRequestInterception(true);
+  versionPage.on("request", (request) => {
+    if (new URL(request.url()).pathname === "/version") {
+      void request.respond({ status: 200, contentType: "text/plain", body: "smoke-deployed-server" });
+    } else void request.continue();
+  });
+  await versionPage.goto(TEST_URL, { waitUntil: "networkidle2", timeout: 15000 });
+  await versionPage.waitForFunction(() => window.__rts?.versionGuard?.mismatch &&
+    !window.__rts.versionGuard.refreshing, { timeout: 10000 });
+  ok(versionNavigations === 2, "VERSION: idle lobby automatically refreshes once without a reload loop");
+  ok(await versionPage.evaluate(() => !document.querySelector("#version-mismatch button").disabled &&
+    window.__RTS_BUILD__ === document.querySelector('meta[name="rts-client-build"]').content),
+  "VERSION: stale reload retains a manual refresh button and immutable client identity");
+  await versionPage.close();
+
   const editorPage = await browser.newPage();
   editorPage.on("console", (m) => { if (m.type() === "error") consoleErrors.push(m.text()); });
   editorPage.on("pageerror", (e) => pageErrors.push(e.message));

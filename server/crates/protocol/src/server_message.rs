@@ -57,6 +57,7 @@ pub enum MatchConclusionReason {
 pub enum ServerMessage {
     Welcome {
         player_id: u32,
+        build_id: String,
     },
     Lobby {
         room: String,
@@ -64,6 +65,7 @@ pub enum ServerMessage {
         host_id: u32,
         players: Vec<LobbyPlayer>,
         can_start: bool,
+        countdown_active: bool,
         team_preset: String,
         /// Currently selected map name.
         map: String,
@@ -166,6 +168,7 @@ pub enum ServerMessage {
     },
     Pong {
         ts: f64,
+        build_id: String,
     },
     /// Reliable diagnostics-only command receipt. This is not the sim-consumption ack.
     CommandReceipt {

@@ -9,6 +9,7 @@
 // the modules themselves are owned by other files. Keep this layer thin: it should
 // orchestrate, not implement game logic.
 import { Net } from "./net.js";
+import { VersionGuard } from "./version_guard.js";
 import { Lobby } from "./lobby.js";
 import { BranchStaging } from "./branch_staging.js";
 import { createBirthdayBanner } from "./birthday_banner_composition.js";
@@ -344,7 +345,10 @@ export class App {
         force: true,
       });
     }
-    void this.loadVersion();
+    this.versionGuard = new VersionGuard({ net: this.net,
+      isLobby: () => !dom.lobbyScreen.hidden && !this.match && !this.versionTransitionActive,
+    });
+    this.versionGuard.start({ offline: !!this.net.offline });
     if (this.labCatalogLaunch) {
       this.showLabCatalog();
     } else {
@@ -524,6 +528,8 @@ export class App {
   }
 
   onLobbyForMatchLaunch(payload) {
+    this.versionTransitionActive = !!payload?.countdownActive;
+    this.versionGuard?.update();
     this.chat?.setLobbyContext(payload);
     if (!this.matchLaunch || this.matchLaunchDone || this.matchLaunchFailed) return;
     const action = nextMatchLaunchAction(this.matchLaunch, payload, this.net.playerId);
@@ -702,12 +708,13 @@ export class App {
     })) {
       this.lobby?.resetToBrowser();
       this.lobby?.show();
+      this.versionTransitionActive = false;
+      this.versionGuard?.update();
       return;
     }
     this.labCatalog?.setConnected(false);
     this.showConnectionLost();
   }
-
   /** Clear the heartbeat interval if one is running. Idempotent. */
   stopHeartbeat() {
     if (this.heartbeatTimer !== undefined) {
@@ -722,6 +729,8 @@ export class App {
    * @param {object} payload §2.3 start payload
    */
   onStart(payload) {
+    this.versionTransitionActive = true;
+    this.versionGuard?.update();
     this.chat?.setGameContext(payload, {
       onOpenChange: (open) => this.match?.handleInteractiveMenuStateChange?.(open),
     });
@@ -742,6 +751,8 @@ export class App {
   onMatchCountdown(payload) {
     const countdownId = Number(payload?.countdownId);
     if (!Number.isInteger(countdownId) || countdownId <= 0 || countdownId > 0xffffffff) return;
+    this.versionTransitionActive = true;
+    this.versionGuard?.update();
     const state = this.rendererPreparationSlot.current || this.warmMatchRenderer();
     if (!state) return;
     const durationMs = Math.max(1000, Number(payload?.durationMs) || 3000);
@@ -1153,6 +1164,8 @@ export class App {
     dom.lobbyScreen.hidden = false;
     if (dom.devLinks) dom.devLinks.hidden = false;
     applyBetaBadge(this, dom);
+    this.versionTransitionActive = false;
+    this.versionGuard?.update();
     this.lobby.resetToBrowser();
     this.lobby.show();
     this.disconnectIdleConnection();
@@ -1475,19 +1488,6 @@ export class App {
     if (dom.connectionLost) dom.connectionLost.hidden = false;
     if (this.lobby) this.lobby.setStatus("Server connection lost", true);
     this.labCatalog?.setStatus("Server connection lost", { error: true });
-  }
-
-  /** Fetch the build version used by compatibility checks and exported settings. */
-  async loadVersion() {
-    try {
-      const res = await fetch("/version", { cache: "no-store" });
-      if (!res.ok) throw new Error(`version request failed: ${res.status}`);
-      const text = await res.text();
-      const version = text.trim() || "unknown";
-      globalThis.__RTS_BUILD__ = version;
-    } catch {
-      globalThis.__RTS_BUILD__ = "unknown";
-    }
   }
 }
 

@@ -2940,3 +2940,22 @@ Escape consumption with a position jump between visible snapshots draws a purple
 burst at both endpoints and a thin full-length double-helix trail, fading over 1000 ms. The client
 uses only received endpoints; unseen arrivals produce no trace. Shop cancellation without a
 position jump produces no effect. Both manual activation and lethal-damage autocast share it.
+
+### Client version guard
+
+`App` owns `VersionGuard` for the entire page, across lobby and match transitions. The server
+stamps `rts-client-build` into the document alongside its versioned import map. This immutable
+loaded-client identity also supplies `__RTS_BUILD__`; `/version` must never overwrite it with a
+newer server identity. Reliable `welcome` and heartbeat `pong` messages compare `buildId` against
+that identity. A bounded, no-store `/version` check runs immediately, every ten seconds, and when
+the page becomes visible, including the lobby browser with no WebSocket. Network failures and
+unknown builds do not count as mismatches. Unsupported snapshot schema/codec versions also
+surface the warning instead of silently leaving the world empty.
+
+A mismatch latches a prominent center-screen warning. In the lobby it automatically reloads the
+embedded browser once per client/server build pair (session storage guards against reload loops).
+A Refresh client button is available in the lobby if automatic recovery already ran or storage
+is unavailable. Countdown, asynchronous match startup, live play, and replay viewing never
+automatically reload; the warning waits until Back to lobby. The notice does not block gameplay
+input, and its refresh button is disabled outside the lobby. Offline benchmark transports skip
+server version checks. `destroy()` removes listeners, timers, pending fetch, and notice DOM.

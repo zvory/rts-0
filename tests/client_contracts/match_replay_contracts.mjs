@@ -1,6 +1,7 @@
 // tests/client_contracts/match_replay_contracts.mjs
 // Domain contract assertions imported by ../client_contracts.mjs.
 import { assert, assertApprox } from "./assertions.mjs";
+import { testVersionGuardAppLifecycle } from "./version_guard_contracts.mjs";
 import { testAppResourceStartup } from "./match_startup_resource_contracts.mjs";
 import { HUD } from "../../client/src/hud.js";
 import {
@@ -814,27 +815,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     dom.gameOver = previousGameOver;
     dom.gameOverText = previousGameOverText;
   }
-  {
-    const app = Object.create(App.prototype);
-    let resetCount = 0;
-    let showCount = 0;
-    let warningCount = 0;
-    app.stopHeartbeat = () => {};
-    app.socketOpen = true;
-    app.intentionalIdleDisconnect = false;
-    app.match = null;
-    app.requiresConnectionOnStart = () => false;
-    app.lobby = {
-      resetToBrowser() { resetCount += 1; },
-      show() { showCount += 1; },
-    };
-    app.showConnectionWarning = () => { warningCount += 1; };
-    app.showConnectionLost = () => { warningCount += 1; };
-    app.onClose();
-    assert(resetCount === 1 && showCount === 1,
-      "an ordinary lobby disconnect resets and shows the main lobby browser");
-    assert(warningCount === 0, "an ordinary lobby disconnect does not show a warning");
-  }
+  testVersionGuardAppLifecycle(App);
   {
     const connectionLost = { hidden: true };
     dom.connectionLost = connectionLost;

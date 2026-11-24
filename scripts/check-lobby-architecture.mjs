@@ -55,7 +55,8 @@ const roomTaskChildLineBudgets = new Map(Object.entries({
 // verification work stays outside the room actor in the replay runtime.
 // Compare imported rosters before refreshing Lab viewers; unchanged rosters retain their session.
 // Replay takeover wires frozen snapshot delivery and setup; projection stays in replay_branch.rs.
-const roomTaskTotalLineBudget = 6808;
+// Lobby broadcasts expose one authoritative countdown flag for safe client version recovery.
+const roomTaskTotalLineBudget = 6809;
 
 const lobbyRustFiles = listRustFiles(lobbySrc);
 

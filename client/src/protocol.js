@@ -127,6 +127,8 @@ export function parseServerFrame(frame) {
 }
 
 /**
+ * Reliable welcome/pong messages carry buildId: string for the app version handshake.
+ * Lobby messages carry countdownActive: boolean, including membership updates during countdown.
  * Expand server messages into the semantic shapes the rest of the client expects.
  * Object-shaped JSON snapshots from older servers are passed through unchanged.
  * @param {object} raw parsed WebSocket JSON payload

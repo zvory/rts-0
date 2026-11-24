@@ -909,6 +909,7 @@ impl RoomTask {
             host_id,
             players,
             can_start: self.can_start(),
+            countdown_active: self.match_countdown_deadline.is_some(),
             team_preset: "custom".to_string(),
             map: self.lobby_map_name(),
             maps: if kind == LobbyKind::Replay {
