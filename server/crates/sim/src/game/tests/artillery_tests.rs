@@ -1225,7 +1225,7 @@ fn resolve_test_artillery_shell(game: &mut Game, x: f32, y: f32) {
     );
     game.state
         .artillery_shells
-        .schedule(1, 1, x, y, game.state.tick);
+        .schedule(1, 1, x, y, (0.0, 0.0), game.state.tick);
     game.state.artillery_shells.resolve_due(
         &game.state.map,
         &mut game.state.entities,

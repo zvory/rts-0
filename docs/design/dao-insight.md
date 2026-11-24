@@ -34,7 +34,7 @@ checkpoints; evolution immediately removes the speed benefit.
 
 - Wind: mobile melee skirmisher; 1.15 times scout-car base speed (2.7025 px/tick), 1.5 attacks per original attack
   interval (cooldown divided by 1.5), fifteen-tile Dash without a return recast.
-  Uses a sword at the base Disciple’s 0.75-tile reach, dealing the same 23 damage with 50% armor penetration and a 43-tick cooldown. Plain Move keeps its destination while striking legal targets within melee reach; automatic Idle/Attack Move retains five-tile acquisition and closes to sword reach. Dash reaches fifteen tiles; Ekat retains five tiles and its optional return. Wind charge and recharge rules are described below. The old archer source and strip are preserved for reuse. Selected candidate B uses a thin katana and a single shoulder scarf: resting close to the back at idle, trailing while running, and following four melee swing poses. Classic evolution key L; grid Z.
+  Uses a sword at the base Disciple’s 0.75-tile reach, dealing the same 23 damage with 50% armor penetration and a 43-tick cooldown. Plain Move keeps its destination while striking legal targets within melee reach. Explicit Attack and automatic melee pursuit also retain their current approach path while striking; the approach still ends at sword reach, so a fleeing target can cause short stop/repath cycles as it leaves range; automatic Idle/Attack Move retains five-tile acquisition and closes to sword reach. Dash reaches fifteen tiles; Ekat retains five tiles and its optional return. Wind charge and recharge rules are described below. The old archer source and strip are preserved for reuse. Selected candidate B uses a thin katana and a single shoulder scarf: resting close to the back at idle, trailing while running, and following four melee swing poses. Classic evolution key L; grid Z.
 - War: armored melee damage dealer; 1.05 times base movement speed (2.1 px/tick), 1.5 damage, +20 maximum HP, 50% armor
   reduction using the existing penetration mechanic (full AP bypasses it), keeps the Disciple's existing
   50% armor penetration. Uses the approved larger armored candidate B Yari silhouette, with idle, two walking poses and four thrust poses. Its sprite scale is 0.56, halfway from the former 0.8 toward the base Disciple’s 0.32. The collision/interaction circle shrinks by the same 30%, from 13.5 to 18.2 world pixels. Its 1.75-tile weapon range plus that radius and four-pixel range slack matches the smaller spear. Vehicle hulls and building footprints retain their existing contact geometry. The 400 ms attack clip anticipates, drives, extends and recovers, with a smooth 11.2-world-pixel presentation-only forward step; collision, authoritative position and damage timing do not move with the artwork. Classic W; grid X.
@@ -61,11 +61,17 @@ see the unit radiance, with ordinary fog filtering. Realm advancement projects a
 
 Magic Disciples can place Shield within five tiles: a shimmering circle with a
 2.1-tile radius (30% smaller than Anchor), covering allied units (including the caster). One shared pool
-absorbs 150 non-piercing hostile damage after normal armor/terrain reductions; overflow damages the
-unit, and depletion removes the field immediately. Any attack with positive armor penetration
-bypasses the shield without consuming its pool, including tank cannon hits and splash, anti-tank
-guns, Panzerfausts, Dao primary attacks, and piercing artillery/rocket impact cores.
-Throw Sword, Line Shot, and non-piercing area falloff remain absorbable. Friendly fire, environmental damage,
+absorbs up to 150 hostile damage after normal armor/terrain reductions; overflow damages the
+unit, and depletion removes the field immediately. Protection requires an attack originating
+outside the field and hitting an allied unit inside; attacks from within bypass it.
+Each attack's armor-penetration percentage passes through to the unit; the remaining percentage
+drains shield HP. For example, a 50% piercing hit splits damage equally between unit and shield,
+while a 100% piercing hit bypasses the pool entirely. The protected portion rounds down to whole HP,
+with the remainder reaching the unit. Overlapping fields share only the non-penetrating portion,
+so they cannot reduce the guaranteed penetration. This applies to primary weapons, Throw Sword,
+Line Shot, and area damage using each damage component's own penetration (tank HE splash is non-piercing).
+Mortar/rocket and artillery checks use the recorded firing position, which survives attacker death and checkpoint restore.
+Friendly fire, environmental damage,
 buildings, invulnerable targets and enemy units do not consume the pool. Overlapping
 fields consume pools in stable caster-id order. Shield costs no resources, has a ten-second
 cooldown, replaces the caster’s prior shield, and expires after 5 seconds or earlier on

@@ -9,6 +9,14 @@ function knownBuild(value) {
     ? value.trim() : null;
 }
 
+/** Only ordinary main/lobby screens can recover; room startup and authoring stay untouched. */
+export function canRefreshClient(app, lobbyVisible) {
+  return lobbyVisible && !app.match && !app.versionTransitionActive &&
+    !app.labLaunch && !app.labCatalogLaunch && !app.labHandoffLaunch &&
+    !app.replayLaunch && !app.matchLaunch && !app.snapshotStreamLaunch &&
+    !app.stressTestLaunch && !app.devWatch && !app.mapPreviewLaunch;
+}
+
 /** Page-owned build handshake and lobby-only embedded-browser refresh. */
 export class VersionGuard {
   constructor({
@@ -62,7 +70,7 @@ export class VersionGuard {
   }
 
   async check() {
-    if (this.destroyed || this.request || this.mismatch) return;
+    if (this.destroyed || this.request || this.mismatch || !this.isLobby()) return;
     const request = new AbortController();
     this.request = request;
     const timeout = this.win.setTimeout(() => request.abort(), CHECK_TIMEOUT_MS);
@@ -82,7 +90,6 @@ export class VersionGuard {
     if (!this.mismatch) {
       this.mismatch = true;
       this.serverBuild = serverBuild;
-      this.mount();
     }
     this.update();
   }
@@ -110,12 +117,16 @@ export class VersionGuard {
 
   update() {
     if (!this.mismatch || this.destroyed) return;
-    const lobby = this.isLobby();
-    this.button.disabled = !lobby || this.refreshing;
-    this.detail.textContent = lobby
-      ? "Restart client to load the current version. Refreshing keeps the app open."
-      : "Restart client after this game. Return to the lobby to refresh automatically.";
-    if (!lobby || this.refreshing) return;
+    if (!this.isLobby()) {
+      if (this.el) this.el.hidden = true;
+      if (this.button) this.button.disabled = true;
+      return;
+    }
+    if (!this.el) this.mount();
+    this.el.hidden = false;
+    this.button.disabled = this.refreshing;
+    this.detail.textContent = "Restart client to load the current version. Refreshing keeps the app open.";
+    if (this.refreshing) return;
     // Store before navigating. If cached HTML survives a reload, leave the warning and
     // manual button visible instead of continually reloading. No storage means manual only.
     try {

@@ -25,6 +25,7 @@ pub(super) enum FootingProfile {
     Firm,
     Braced,
     Heavy,
+    Rooted,
 }
 
 pub(super) fn footing_profile(e: &Entity) -> FootingProfile {
@@ -47,7 +48,11 @@ pub(super) fn footing_profile(e: &Entity) -> FootingProfile {
         && e.target_id().is_some()
         && e.path_is_empty()
     {
-        return FootingProfile::Firm;
+        return if e.kind.is_disciple() {
+            FootingProfile::Rooted
+        } else {
+            FootingProfile::Firm
+        };
     }
     FootingProfile::Soft
 }
@@ -71,6 +76,8 @@ pub(super) fn footing_resistance(profile: FootingProfile) -> f32 {
         FootingProfile::Firm => 3.0,
         FootingProfile::Braced => 8.0,
         FootingProfile::Heavy => 12.0,
+        // Stopped Cultivator combatants hold their ground against approaching traffic.
+        FootingProfile::Rooted => 60.0,
     }
 }
 

@@ -116,7 +116,7 @@ impl EntityStore {
                 < crate::game::ability_runtime::MAX_ACTIVE_ABILITY_OBJECTS
     }
 
-    /// Consume shared shield pools before applying non-piercing hostile damage. Stable caster order
+    /// Consume shared shield pools when hostile damage crosses into the barrier. Stable caster order
     /// makes overlapping shields deterministic; each point is absorbed only once.
     pub(in crate::game) fn shielded_damage(
         &mut self,
@@ -124,12 +124,13 @@ impl EntityStore {
         attacker_owner: u32,
         mut damage: u32,
         armor_penetration: f32,
+        source: (f32, f32),
         teams: &crate::game::teams::TeamRelations,
     ) -> u32 {
         let Some(target) = self.get(victim) else {
             return damage;
         };
-        if armor_penetration > 0.0
+        if armor_penetration >= 1.0
             || !target.is_unit()
             || target.hp == 0
             || target.invulnerable()
@@ -146,6 +147,12 @@ impl EntityStore {
             .map(|e| e.id)
             .collect();
         shields.sort_unstable();
+        // Penetrating damage bypasses every overlapping field. Round the protected portion
+        // down, leaving fractional damage on the victim rather than silently losing it.
+        let protected =
+            (damage as f64 * (1.0 - armor_penetration.clamp(0.0, 1.0) as f64)).floor() as u32;
+        let passthrough = damage - protected;
+        damage -= passthrough;
         for id in shields {
             let Some(caster) = self.get_mut(id) else {
                 continue;
@@ -163,6 +170,11 @@ impl EntityStore {
             if dx * dx + dy * dy > radius * radius {
                 continue;
             }
+            let sx = source.0 - shield.x.to_world();
+            let sy = source.1 - shield.y.to_world();
+            if sx * sx + sy * sy <= radius * radius {
+                continue;
+            }
             let absorbed = damage.min(shield.remaining);
             shield.remaining -= absorbed;
             damage -= absorbed;
@@ -173,7 +185,7 @@ impl EntityStore {
                 break;
             }
         }
-        damage
+        damage + passthrough
     }
 
     /// Whether an entity with this id still exists.
