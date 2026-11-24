@@ -1,3 +1,5 @@
+import { ABILITY } from "./protocol.js";
+
 function abilityStatus(entity, ability) {
   return Array.isArray(entity.abilities)
     ? entity.abilities.find((entry) => entry.ability === ability)
@@ -7,6 +9,28 @@ function abilityStatus(entity, ability) {
 export function abilityCooldownLeft(entity, ability) {
   const projected = abilityStatus(entity, ability);
   return projected && typeof projected.cooldownLeft === "number" ? projected.cooldownLeft : 0;
+}
+
+export function abilityCooldownClocks(carriers, definition, groupCooldownClocks) {
+  const cooldownGroups = new Map();
+  for (const entity of carriers) {
+    const cooldown = abilityCooldownLeft(entity, definition.ability);
+    const total = definition.cooldownTicks * (
+      definition.ability === ABILITY.THROW_SWORD && !entity.daoMaster ? 2 : 1
+    );
+    // Promotion preserves the Adept cooldown. The clock helper clamps values
+    // above the current rank's duration while still grouping nearby cooldowns.
+    if (!cooldownGroups.has(total)) cooldownGroups.set(total, []);
+    cooldownGroups.get(total).push(cooldown);
+  }
+  const chargeRecharges = carriers.map((e) =>
+    abilityChargeRechargeLeft(e, definition.ability),
+  );
+  return [
+    ...Array.from(cooldownGroups, ([total, cooldowns]) =>
+      groupCooldownClocks(cooldowns, total)).flat(),
+    ...groupCooldownClocks(chargeRecharges, definition.chargeRechargeTicks),
+  ];
 }
 
 export function abilityRemainingUses(entity, ability) {

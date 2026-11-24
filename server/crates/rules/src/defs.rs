@@ -187,6 +187,7 @@ pub const UNITS: &[UnitDef] = &[
     UnitDef {
         kind: EntityKind::WindAdept,
         stats: balance::UnitStats {
+            hp: balance::DAO_ADEPT_HP,
             cooldown: (NOVICE_DEF.stats.cooldown as f32 / balance::DAO_WIND_ATTACK_RATE + 0.5)
                 as u32,
             speed: SCOUT_CAR_DEF.stats.speed * balance::DAO_WIND_SPEED_MULTIPLIER,
@@ -200,7 +201,7 @@ pub const UNITS: &[UnitDef] = &[
     UnitDef {
         kind: EntityKind::WarAdept,
         stats: balance::UnitStats {
-            hp: NOVICE_DEF.stats.hp + balance::DAO_WAR_HP_BONUS,
+            hp: balance::DAO_ADEPT_HP + balance::DAO_WAR_HP_BONUS,
             dmg: (NOVICE_DEF.stats.dmg as f32 * balance::DAO_WAR_DAMAGE_MULTIPLIER + 0.5) as u32,
             range_tiles: balance::DAO_WAR_RANGE_TILES,
             speed: NOVICE_DEF.stats.speed * balance::DAO_WAR_SPEED_MULTIPLIER,
@@ -215,6 +216,7 @@ pub const UNITS: &[UnitDef] = &[
     UnitDef {
         kind: EntityKind::MagicAdept,
         stats: balance::UnitStats {
+            hp: balance::DAO_ADEPT_HP,
             range_tiles: balance::DAO_RANGED_RANGE_TILES,
             speed: NOVICE_DEF.stats.speed * balance::DAO_MAGIC_SPEED_MULTIPLIER,
             cost_steel: NOVICE_DEF.stats.cost_steel * 3 / 2,
@@ -479,7 +481,7 @@ pub const BUILDINGS: &[BuildingDef] = &[
             cost_oil: 200,
             foot_w: 3,
             foot_h: 4,
-            build_ticks: 1200,
+            build_ticks: balance::TICK_HZ * 20,
             dmg: 0,
             range_tiles: 0.0,
             cooldown: 0,

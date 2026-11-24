@@ -595,6 +595,11 @@ fn effective_damage_for_weapon_class(
     )
 }
 
+/// Apply a percentage armor layer using the weapon's ordinary armor penetration.
+pub fn damage_after_armor_reduction(damage: u32, reduction: f32, penetration: f32) -> u32 {
+    ((damage as f32) * (1.0 - reduction * (1.0 - penetration.clamp(0.0, 1.0)))).round() as u32
+}
+
 /// Resolve armor and terrain protection for a hit with explicit penetration (0 = none).
 pub fn effective_damage_for_armor_penetration(
     armor_penetration: f32,
@@ -606,10 +611,7 @@ pub fn effective_damage_for_armor_penetration(
     let penetration = armor_penetration.clamp(0.0, 1.0);
     let armor_adjusted = match armor_class {
         Some(ArmorClass::Armored) if penetration <= 0.0 => base_dmg / 4,
-        Some(ArmorClass::Armored) => {
-            let multiplier = 0.25 + (0.75 * penetration);
-            ((base_dmg as f32) * multiplier).round() as u32
-        }
+        Some(ArmorClass::Armored) => damage_after_armor_reduction(base_dmg, 0.75, penetration),
         _ => base_dmg,
     };
     let terrain = victim_terrain.unwrap_or(TerrainKind::Open);

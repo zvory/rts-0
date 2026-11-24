@@ -20,17 +20,16 @@ research or additional supply: advancement of an existing Adept only. Retain sup
 2, ground pathing, sight, armor, range, cooldown, penetration and all
 orders/cooldowns. Relative to Wind Adept: render and collision radius ×1.2,
 movement ×1.1 (2.97275 px/tick), ordinary attack damage ×1.2 (23→28, nearest integer),
-maximum HP ×1.4 (115→161). No ability-damage changes.
+maximum HP ×1.4 (150→210). No ability-damage changes.
 
 ## War Master: Phase 0/1
 
 Armored melee damage dealer; swept helmet crest, pointed shoulders and forked yari.
 Description, automatic availability, free advancement, supply and unchanged properties
-as above, retaining War armor and 1.75-tile spear reach, and unlocking Throw Sword
-(previously available to War Adepts). Relative to War
+as above, retaining War armor and 1.75-tile spear reach, and reducing Throw Sword cooldown from 40 to 20 seconds. Advancement preserves an existing cooldown. Relative to War
 Adept: render and collision radius ×1.2, movement ×1.1 (2.31 px/tick), ordinary attack
 damage ×1.2 (35→42, after existing rounded War damage bonus), maximum HP ×1.4
-(135→189). Existing counters and penetration rules remain. No ability-damage changes.
+(176→246). Existing counters and penetration rules remain. No ability-damage changes.
 
 ## Magic Master: Phase 0/1
 
@@ -38,7 +37,7 @@ Ranged support caster; broad bell sleeves and three trailing mantle panels.
 Description, automatic availability, free advancement, supply and unchanged properties
 as above, retaining five-tile orb primary, Shield and Anchor. Relative to Magic Adept:
 render and collision radius ×1.2, movement ×1.1 (2.31 px/tick), ordinary attack damage
-×1.2 (23→28), maximum HP ×1.4 (115→161). Existing counters remain. Shield capacity,
+×1.2 (23→28), maximum HP ×1.4 (150→210). Existing counters remain. Shield capacity,
 Anchor strength, spell ranges and all cooldowns stay unchanged.
 
 ## Shared advancement and persistence

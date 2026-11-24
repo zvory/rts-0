@@ -90,7 +90,7 @@ fn direct_weapons_only_damage_the_resolved_victim() {
 }
 
 #[test]
-fn disciple_shield_blocks_nonpiercing_hits_and_tank_splash() {
+fn disciple_shield_armors_direct_hits_and_tank_splash_and_charges_full_damage() {
     for kind in [
         combat_rules::WeaponKind::RiflemanRifle,
         combat_rules::WeaponKind::TankCannon,
@@ -150,21 +150,23 @@ fn disciple_shield_blocks_nonpiercing_hits_and_tank_splash() {
             .unwrap()
             .shield
             .as_ref()
-            .unwrap()
-            .remaining;
-        if weapon.armor_penetration == 0.0 {
-            assert_eq!(entities.get(primary).unwrap().hp, hp);
-            assert!(remaining < config::DISCIPLE_SHIELD_CAPACITY);
+            .map_or(0, |s| s.remaining);
+        assert!(entities.get(primary).unwrap().hp < hp, "{kind:?}");
+        let splash = if kind == combat_rules::WeaponKind::TankCannon {
+            config::TANK_HE_SPLASH_DAMAGE
         } else {
-            assert!(entities.get(primary).unwrap().hp < hp, "{kind:?}");
-            if weapon.armor_penetration < 1.0 || kind == combat_rules::WeaponKind::TankCannon {
-                assert!(remaining < config::DISCIPLE_SHIELD_CAPACITY, "{kind:?}");
-            } else {
-                assert_eq!(remaining, config::DISCIPLE_SHIELD_CAPACITY, "{kind:?}");
-            }
-        }
+            0
+        };
+        assert_eq!(
+            remaining,
+            config::DISCIPLE_SHIELD_CAPACITY.saturating_sub(weapon.dmg + splash),
+            "{kind:?}"
+        );
         if kind == combat_rules::WeaponKind::TankCannon {
-            assert_eq!(entities.get(neighbor).unwrap().hp, neighbor_hp);
+            assert_eq!(
+                neighbor_hp - entities.get(neighbor).unwrap().hp,
+                (config::TANK_HE_SPLASH_DAMAGE as f32 * 0.25).round() as u32
+            );
         }
     }
 }

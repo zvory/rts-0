@@ -16,8 +16,7 @@ import {
 import {
   abilityActiveObjectId,
   abilityAutocastEnabled,
-  abilityChargeRechargeLeft,
-  abilityCooldownLeft,
+  abilityCooldownClocks,
   abilityRemainingUses,
   abilityUnitQueueAdmissible,
   abilityUnitReady,
@@ -535,12 +534,6 @@ export function selectedAbilityAffordances(ctx, selection) {
       const queueAdmissibleUnits = carriers.filter((e) =>
         abilityUnitQueueAdmissible(e, definition));
       const recastUnits = carriers.filter((e) => abilityActiveObjectId(e, definition.ability) != null);
-      const cooldowns = carriers.map((e) =>
-        abilityCooldownLeft(e, definition.ability),
-      );
-      const chargeRecharges = carriers.map((e) =>
-        abilityChargeRechargeLeft(e, definition.ability),
-      );
       const depletedCount = definition.ability === ABILITY.BARRAGE
         ? 0
         : carriers.filter((e) => abilityRemainingUses(e, definition.ability) === 0).length;
@@ -569,10 +562,7 @@ export function selectedAbilityAffordances(ctx, selection) {
           ? abilityActiveObjectId(recastUnits[0], definition.ability)
           : null,
         autocastEnabledIds,
-        cooldownClocks: [
-          ...ctx.groupCooldownClocks(cooldowns, definition.cooldownTicks),
-          ...ctx.groupCooldownClocks(chargeRecharges, definition.chargeRechargeTicks),
-        ],
+        cooldownClocks: abilityCooldownClocks(carriers, definition, ctx.groupCooldownClocks),
       };
     })
     .filter(Boolean);

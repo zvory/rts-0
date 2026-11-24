@@ -39,6 +39,7 @@ mod movement_replay_tests;
 mod panzerfaust_upgrade_tests;
 mod portal_training_tests;
 mod primary_base_tests;
+mod pursuit_endpoint_tests;
 mod repeat_production_tests;
 mod replay_artifact_tests;
 mod resources_mining_tests;

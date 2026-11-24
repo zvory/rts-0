@@ -89,7 +89,7 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 11] = [
         icon: "SHD",
         hotkey: Some("X"),
         title:
-            "Place a shield that absorbs 150 incoming enemy damage to allied units within 2.1 tiles; attacks from inside bypass it; armor piercing passes its percentage through and the rest drains shield HP; lasts up to 5 seconds",
+            "Place a 150 HP shield granting allied units within 2.1 tiles 75% armor against attacks from outside; armor piercing works normally; each hit drains full attack damage from shield HP; lasts up to 5 seconds",
         carriers: &[EntityKind::MagicAdept],
         target_mode: AbilityTargetMode::WorldPoint,
         range_tiles: Some(balance::EKAT_MAGIC_ANCHOR_RANGE_TILES as f32),
@@ -112,7 +112,7 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 11] = [
         label: "Throw Sword",
         icon: "⚔",
         hotkey: Some("E"),
-        title: "War Master: throw a spinning sword out and back; deals 20 damage outbound and 40 on return before armor and cover",
+        title: "Throw a spinning sword out and back; 20 damage outbound and 40 on return before armor and cover; cooldown 40s for War Adepts, 20s for War Masters",
         carriers: &[EntityKind::WarAdept],
         target_mode: AbilityTargetMode::WorldPoint,
         protocol_code: 18,

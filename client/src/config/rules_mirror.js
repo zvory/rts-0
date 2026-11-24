@@ -24,10 +24,9 @@ export function entityAttackRangeTiles(entity) {
   return STATS[entity?.kind]?.rangeTiles || 0;
 }
 
-// Carrier identity includes permanent Dao specialization and rank, independently of cooldown/readiness.
+// Carrier identity includes permanent Dao specialization, independently of cooldown/readiness.
 export function abilityCarriedByEntity(definition, entity) {
-  return !!definition?.carriers?.includes(entity?.kind)
-    && (definition.ability !== ABILITY.THROW_SWORD || entity.daoMaster === true);
+  return !!definition?.carriers?.includes(entity?.kind);
 }
 
 // Mirrors server/src/config.rs *_BODY_* values. Server collision is authoritative;
@@ -191,7 +190,7 @@ export const STATS = Object.freeze({
   [KIND.WAR_ADEPT]: { armored: false, label: "War Adept", icon: "WA", size: Math.fround(26 * Math.fround(DAO_WAR_BODY_SCALE)), sight: 11,
     rangeTiles: DAO_WAR_RANGE_TILES, cost: { steel: 150, oil: 35 }, supply: 3, buildTicks: 300,
     trainSlots: { [KIND.PORTAL]: 4 }, upgradeRequires: UPGRADE.DAO_OF_HEAVINESS,
-    description: "Armored spear infantry with 50% armor penetration. Unlocks Throw Sword upon advancing to War Master." },
+    description: "Armored spear infantry with 50% armor penetration. Throw Sword has a 40-second cooldown, reduced to 20 seconds as a War Master." },
   [KIND.MAGIC_ADEPT]: { armored: false, label: "Magic Adept", icon: "MA", size: 26, sight: 11,
     rangeTiles: DAO_RANGED_RANGE_TILES, cost: { steel: 150, oil: 35 }, supply: 3, buildTicks: 300,
     trainSlots: { [KIND.PORTAL]: 5 }, upgradeRequires: UPGRADE.DAO_OF_MAGIC,
@@ -242,7 +241,7 @@ export const STATS = Object.freeze({
     cost: { steel: 0, oil: 150 }, buildTicks: 0, trains: [],
     description: "Friendly units inside recover 3 HP per second. Expires after restoring 400 HP." },
   [KIND.SHOP]: { label: "Shop", icon: "SH", footW: 3, footH: 4, sight: 1,
-    cost: { steel: 200, oil: 200 }, buildTicks: TICK_HZ * 40, trains: [],
+    cost: { steel: 200, oil: 200 }, buildTicks: TICK_HZ * 20, trains: [],
     description: "Sells Healing Potions, Escape Treasures and Healing Seals for nearby friendly units." },
   [KIND.PROVEN_GROUNDS]: { label: "Proving Grounds", icon: "PG", footW: 3, footH: 3, sight: 1,
     cost: { steel: 100, oil: 0 }, buildTicks: 200, trains: [], requires: [KIND.PORTAL],
@@ -336,7 +335,7 @@ export const ABILITIES = Object.freeze({
 
   [ABILITY.DISCIPLE_SHIELD]: Object.freeze({
     ability: ABILITY.DISCIPLE_SHIELD, label: "Shield", icon: "SHD", hotkey: "X",
-    title: "Place a shield that absorbs 150 incoming enemy damage to allied units within 2.1 tiles; attacks from inside bypass it; armor piercing passes its percentage through and the rest drains shield HP; lasts up to 5 seconds",
+    title: "Place a 150 HP shield granting allied units within 2.1 tiles 75% armor against attacks from outside; armor piercing works normally; each hit drains full attack damage from shield HP; lasts up to 5 seconds",
     carriers: Object.freeze([KIND.MAGIC_ADEPT]), targetMode: "worldPoint",
     rangeTiles: EKAT_MAGIC_ANCHOR_RANGE_TILES, radiusTiles: DISCIPLE_SHIELD_RADIUS_TILES,
     cooldownTicks: 300, cost: Object.freeze({ steel: 0, oil: 0 }),
@@ -522,7 +521,7 @@ export const ABILITIES = Object.freeze({
     label: "Throw Sword",
     icon: "⚔",
     hotkey: "E",
-    title: "War Master: throw a spinning sword out and back; deals 20 damage outbound and 40 on return before armor and cover",
+    title: "Throw a spinning sword out and back; 20 damage outbound and 40 on return before armor and cover; cooldown 40s for War Adepts, 20s for War Masters",
     carriers: Object.freeze([KIND.WAR_ADEPT]),
     targetMode: "worldPoint",
     rangeTiles: THROW_SWORD_RANGE_TILES,
