@@ -532,6 +532,11 @@ changed-file mapping selects the skipped behavior.
 
 ## 12. PR CI contract
 
+Browser smoke and tri-state setup allow 60 seconds for Chrome launch and 30 seconds for match
+readiness on shared runners. These are setup budgets, not retries or relaxed gameplay deadlines.
+Live starting-wallet checks allow passive income before the first delivered snapshot because
+snapshot delivery is latest-only; synchronous simulation setup tests verify exact initial wallets.
+
 Tri-state snapshot waits share a tick-aware default deadline in both remote and browser lanes:
 max(10 seconds, twice the requested tick duration at `TICK_HZ` plus 1 second). A 360-tick
 wait therefore gets 25 seconds at 30 Hz, covering normal-speed simulation and CI scheduling

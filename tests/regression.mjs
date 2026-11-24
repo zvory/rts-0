@@ -75,8 +75,10 @@ async function soloStart(room) {
     const visibleTiles = (snap.visibleTiles || []).filter(Boolean).length;
     ok(start.playerId === c.playerId && start.spectator === false,
        `SOLO START: start is stamped as host player (start=${start.playerId}, welcome=${c.playerId}, spectator=${start.spectator})`);
-    ok(snap.steel === 25 && snap.oil === 0,
-       `SOLO START: snapshot carries normal starting resources (steel=${snap.steel}, oil=${snap.oil})`);
+    // Latest-only snapshot delivery can skip opening ticks while extractors earn income.
+    // Exact initial wallets are covered synchronously by the simulation setup tests.
+    ok(Number.isInteger(snap.steel) && snap.steel >= 25 && Number.isInteger(snap.oil) && snap.oil >= 0,
+       `SOLO START: snapshot carries at least the starting resources (steel=${snap.steel}, oil=${snap.oil})`);
     ok(snap.supplyCap > 0 && snap.supplyUsed > 0,
        `SOLO START: snapshot carries host supply (${snap.supplyUsed}/${snap.supplyCap})`);
     ok(visibleTiles > 0,
