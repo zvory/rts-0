@@ -528,7 +528,7 @@ export class App {
   }
 
   onLobbyForMatchLaunch(payload) {
-    this.versionTransitionActive = false;
+    this.versionTransitionActive = !!payload?.countdownActive;
     this.versionGuard?.update();
     this.chat?.setLobbyContext(payload);
     if (!this.matchLaunch || this.matchLaunchDone || this.matchLaunchFailed) return;
@@ -708,12 +708,13 @@ export class App {
     })) {
       this.lobby?.resetToBrowser();
       this.lobby?.show();
+      this.versionTransitionActive = false;
+      this.versionGuard?.update();
       return;
     }
     this.labCatalog?.setConnected(false);
     this.showConnectionLost();
   }
-
   /** Clear the heartbeat interval if one is running. Idempotent. */
   stopHeartbeat() {
     if (this.heartbeatTimer !== undefined) {

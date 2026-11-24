@@ -65,6 +65,7 @@ pub enum ServerMessage {
         host_id: u32,
         players: Vec<LobbyPlayer>,
         can_start: bool,
+        countdown_active: bool,
         team_preset: String,
         /// Currently selected map name.
         map: String,

@@ -17,6 +17,35 @@ fn two_player_countdown_task(room: &str) -> (RoomTask, ConnectionWriter, Connect
 }
 
 #[test]
+fn lobby_broadcast_preserves_authoritative_countdown_state() {
+    let (mut task, mut host_writer, _guest_writer) = two_player_countdown_task("countdown-state");
+    while host_writer.reliable_rx.try_recv().is_ok() {}
+    task.on_start_request(1);
+    task.on_leave(2);
+    let messages: Vec<_> = std::iter::from_fn(|| host_writer.reliable_rx.try_recv().ok()).collect();
+    let countdown_states: Vec<_> = messages
+        .iter()
+        .filter_map(|message| match message {
+            ServerMessage::Lobby {
+                countdown_active, ..
+            } => Some(*countdown_active),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(countdown_states, vec![true, true]);
+
+    task.match_countdown_deadline = None;
+    task.broadcast_lobby();
+    assert!(matches!(
+        host_writer.reliable_rx.try_recv().unwrap(),
+        ServerMessage::Lobby {
+            countdown_active: false,
+            ..
+        }
+    ));
+}
+
+#[test]
 fn countdown_starts_only_after_every_active_human_loaded() {
     let (mut task, _host_writer, _guest_writer) = two_player_countdown_task("loaded-countdown");
     task.on_start_request(1);

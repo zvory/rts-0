@@ -106,6 +106,22 @@ function fixture({ lobby = false, clientBuild = "loaded-build", storage = new Ma
   offline.guard.destroy();
 }
 
+// Back/forward-cache navigation preserves the guard; a real page exit tears it down.
+{
+  const f = fixture();
+  f.guard.start();
+  await f.guard.check();
+  f.events.get("pagehide")({ persisted: true });
+  assert.equal(f.guard.destroyed, false);
+  assert.equal(typeof f.win.interval, "function");
+  f.net._onMessage({ data: JSON.stringify({ t: "pong", ts: 1, buildId: "new-server" }) });
+  assert.equal(f.guard.mismatch, true, "restored pages still detect server build changes");
+  f.events.get("pagehide")({ persisted: false });
+  assert.equal(f.guard.destroyed, true);
+  assert.equal(f.win.interval, null);
+  assert.equal(f.events.size, 0);
+}
+
 // A hung request is bounded, non-overlapping, and aborted on teardown.
 {
   let signal;
@@ -126,3 +142,45 @@ function fixture({ lobby = false, clientBuild = "loaded-build", storage = new Ma
 if (previousBuild === undefined) delete globalThis.__RTS_BUILD__;
 else globalThis.__RTS_BUILD__ = previousBuild;
 console.log("version guard contracts passed");
+
+export function testVersionGuardAppLifecycle(App) {
+  {
+    const app = Object.create(App.prototype);
+    let resetCount = 0;
+    let showCount = 0;
+    let warningCount = 0;
+    app.stopHeartbeat = () => {};
+    app.socketOpen = true;
+    app.intentionalIdleDisconnect = false;
+    app.match = null;
+    app.versionTransitionActive = true;
+    let versionUpdates = 0;
+    app.versionGuard = { update() {
+      assert(!app.versionTransitionActive && showCount === 1,
+        "disconnect recovery permits version refresh only after restoring the lobby");
+      versionUpdates += 1;
+    } };
+    app.requiresConnectionOnStart = () => false;
+    app.lobby = {
+      resetToBrowser() { resetCount += 1; },
+      show() { showCount += 1; },
+    };
+    app.showConnectionWarning = () => { warningCount += 1; };
+    app.showConnectionLost = () => { warningCount += 1; };
+    app.onClose();
+    assert(resetCount === 1 && showCount === 1,
+      "an ordinary lobby disconnect resets and shows the main lobby browser");
+    assert(warningCount === 0, "an ordinary lobby disconnect does not show a warning");
+    assert(versionUpdates === 1, "disconnect recovery updates a pending version warning");
+  }
+  {
+    const app = Object.create(App.prototype);
+    const transitions = [];
+    app.versionGuard = { update() { transitions.push(app.versionTransitionActive); } };
+    app.onLobbyForMatchLaunch({ countdownActive: true });
+    app.onLobbyForMatchLaunch({ countdownActive: true });
+    app.onLobbyForMatchLaunch({ countdownActive: false });
+    assert(JSON.stringify(transitions) === "[true,true,false]",
+      "lobby membership updates preserve countdown refresh protection until cancellation");
+  }
+}

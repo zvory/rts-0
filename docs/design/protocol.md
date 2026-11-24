@@ -27,6 +27,8 @@ Client build compatibility is checked using `buildId` on reliable `welcome`/`pon
 no-store HTTP `/version` checks. The document's `rts-client-build` stamp identifies the loaded
 client; a later HTTP response must not relabel it. Mismatch recovery and the persistent warning
 are described in [client-ui.md](client-ui.md#client-version-guard).
+Lobby messages carry `countdownActive: bool` so membership broadcasts during countdown do not
+permit a version-triggered reload. A false value also authoritatively signals countdown cancellation.
 
 ### 2.0 Boundary authority and guardrails
 
@@ -415,7 +417,7 @@ All other counters/durations are u32 except quantiles (u16) and validity flags (
 | `t`        | Fields |
 |------------|--------|
 | `welcome`  | `playerId: u32` — assigned on connect; `buildId: string` — running server build for the client version handshake. |
-| `lobby`    | `room: string`, `kind: LobbyKind`, `hostId: u32`, `players: LobbyPlayer[]`, `canStart: bool`, `teamPreset: string`, `map: string`, `maps: AvailableMap[]` |
+| `lobby`    | `room: string`, `kind: LobbyKind`, `hostId: u32`, `players: LobbyPlayer[]`, `canStart: bool`, `countdownActive: bool`, `teamPreset: string`, `map: string`, `maps: AvailableMap[]` |
 | `matchCountdown` | `countdownId: u32`, `durationMs: u32`, `words: string[]` — reliable pre-match countdown sent to every lobby participant after the host starts and before `start`. Active human clients begin warming their renderer when they become ready, then acknowledge this exact nonzero countdown generation with `matchLoadReady` once warmup completes. During this interval the server keeps the room in lobby setup, disables `canStart`, freezes lobby edits, and rejects new joins. At expiry it sends `start` only if every active human acknowledged; otherwise it returns the room to editable lobby state and broadcasts `<name> failed to load the game.` Spectators and AI do not block launch. |
 | `start`    | `Game start payload` (see 2.3). |
 | `snapshot` | `Per-player snapshot` (see 2.4). |

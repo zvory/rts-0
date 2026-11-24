@@ -35,7 +35,10 @@ export class VersionGuard {
     this.onVisible = () => {
       if (!this.doc.hidden) void this.check();
     };
-    this.onPageHide = () => this.destroy();
+    // A back/forward-cache entry resumes this same page, including its guard.
+    this.onPageHide = (event) => {
+      if (!event.persisted) this.destroy();
+    };
     this.onRefresh = () => this.refresh();
   }
 
