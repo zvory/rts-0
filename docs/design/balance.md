@@ -840,7 +840,7 @@ Permanent Dao identity is derived from kind; the engine stores no separate mutab
 `dao` (slot 46: lightness/war/magic). Evolution buttons set replaceable, entity-owned `chosenDao` intent (team-private compact slot 49), independent of orders. Codes 14–16 and order stages 22–24 retain their positions.
 Evolution automatically occurs once 60 insight is ready, without research or a Pavilion.
 Evolution clears all insight and raises the cap to 200. Evolved Disciples continue earning
-insight from actual hostile HP damage (one per unit damage, half per building damage, rounded down per hit); reaching 200 automatically advances a living Adept to its matching Master. Research ids are
+insight from actual hostile HP damage (cost-weighted unit damage, quarter-rate building damage, with exact fractional carry; Throw Sword grants none); reaching 200 automatically advances a living Adept to its matching Master. Research ids are
 `dao_of_lightness`, `dao_of_heaviness` (War), `dao_of_magic` (Magic).
 
 `DISCIPLE_SHIELD_CAPACITY` (300) and `DISCIPLE_SHIELD_DURATION_TICKS` are mirrored for the Shield HP and lifetime bars and checked by faction catalog parity. `DISCIPLE_EVOLVED_INSIGHT_CAP` (200) is also parity-checked.
