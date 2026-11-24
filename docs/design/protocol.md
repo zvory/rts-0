@@ -2058,15 +2058,15 @@ to its matching [Master](dao-masters.md), resets insight, and fully heals to the
 Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md).
 Shield uses ability `discipleShield` (code 17, order stage 25), world-point target,
 ability-object kind `shield` (code 4). It expires after 5 seconds, projected through `expiresIn`; `ownerState.hp` carries
-the remaining 150-point pool to every viewer who can see the field, including enemies and allies. The client renders this pool as a cyan HP bar above the public gray lifetime bar, updating it as damage is absorbed. The radius
+the remaining 150-point pool to every viewer who can see the field, including enemies and allies. The client renders this pool as a cyan HP bar above the public gray lifetime bar, updating it as full incoming hit damage drains shield HP. The radius
 is 2.1 tiles for every viewer. Field visibility is gated at its center, independently
 of its caster; `sourceCasterId` is omitted when that caster is hidden.
 
-War Master Throw Sword uses ability `throwSword` (compact code 18, order stage 26),
+War Adept and War Master Throw Sword uses ability `throwSword` (compact code 18, order stage 26),
 world-point targeting and the existing `lineProjectile` ability-object kind/payload.
 It is fog-filtered by the existing object projection; clients select its spinning sword
 sprite by ability id without requiring visibility of the caster. Entity ability availability
-is restricted to Dao of War with `daoMaster: true`; War Adepts cannot cast it. Checkpoints retain the shared projectile leg and per-leg hit sets.
+is restricted to Dao of War; `daoMaster` selects a 20-second rather than 40-second cooldown on cast. Checkpoints retain the shared projectile leg and per-leg hit sets.
 
 ### Tournament Grounds
 

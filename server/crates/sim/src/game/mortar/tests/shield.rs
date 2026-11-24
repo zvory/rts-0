@@ -1,8 +1,9 @@
 use super::*;
 
 #[test]
-fn disciple_shield_absorbs_mortars_and_rocket_falloff_but_not_rocket_core() {
+fn disciple_shield_armors_mortar_and_rocket_hits_and_drains_full_damage() {
     let map = open_map(20);
+    let inner = config::ROCKET_BARRAGE_INNER_RADIUS_TILES * config::TILE_SIZE as f32;
     let teams = TeamRelations::from_player_teams([(1, 1), (2, 2)]);
     for (rocket, offset, piercing) in [(false, 0.0, false), (true, 0.0, true), (true, 32.0, false)]
     {
@@ -58,26 +59,26 @@ fn disciple_shield_absorbs_mortars_and_rocket_falloff_but_not_rocket_core() {
                 }
                 assert_eq!(
                     damage,
-                    if piercing || inside {
+                    if inside {
                         unshielded_damage
                     } else {
-                        0
+                        ((unshielded_damage as f32) * if piercing { 1.0 } else { 0.25 }).round()
+                            as u32
                     }
                 );
+                let full_damage = shell_damage(rocket, offset * offset, inner * inner, piercing);
                 assert_eq!(
                     entities
                         .get(caster)
                         .unwrap()
                         .shield
                         .as_ref()
-                        .unwrap()
-                        .remaining,
-                    config::DISCIPLE_SHIELD_CAPACITY
-                        - if piercing || inside {
-                            0
-                        } else {
-                            unshielded_damage
-                        }
+                        .map_or(0, |s| s.remaining),
+                    config::DISCIPLE_SHIELD_CAPACITY.saturating_sub(if inside {
+                        0
+                    } else {
+                        full_damage
+                    })
                 );
             }
         }

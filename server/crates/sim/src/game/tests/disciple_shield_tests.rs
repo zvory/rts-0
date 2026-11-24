@@ -250,11 +250,12 @@ fn disciple_shield_expires_at_5_seconds_after_checkpoint_restore() {
                 caster,
                 2,
                 20,
+                20,
                 0.0,
                 (0.0, 0.0),
                 &crate::game::teams::TeamRelations::from_player_teams([(1, 1), (2, 2)])
             ),
-            0
+            5
         );
         game.tick();
         assert!(game.state.entities.get(caster).unwrap().shield.is_none());
@@ -267,6 +268,7 @@ fn disciple_shield_expires_at_5_seconds_after_checkpoint_restore() {
             game.state.entities.shielded_damage(
                 caster,
                 2,
+                20,
                 20,
                 0.0,
                 (0.0, 0.0),
@@ -326,7 +328,7 @@ fn disciple_shield_recast_after_cooldown_gets_fresh_expiry() {
 }
 
 #[test]
-fn disciple_shield_snapshots_track_absorption_and_remove_depleted_pool() {
+fn disciple_shield_snapshots_track_full_hit_cost_and_remove_depleted_pool() {
     let (mut game, caster) = setup();
     game.enqueue(1, cast(caster, 440.0, false));
     game.tick();
@@ -335,8 +337,8 @@ fn disciple_shield_snapshots_track_absorption_and_remove_depleted_pool() {
         assert_eq!(
             game.state
                 .entities
-                .shielded_damage(caster, 2, damage, 0.0, (0.0, 0.0), &teams),
-            0
+                .shielded_damage(caster, 2, damage, damage, 0.0, (0.0, 0.0), &teams),
+            ((damage as f32) * 0.25).round() as u32
         );
         let shield = game
             .snapshot_full_for(1)
@@ -349,8 +351,8 @@ fn disciple_shield_snapshots_track_absorption_and_remove_depleted_pool() {
     assert_eq!(
         game.state
             .entities
-            .shielded_damage(caster, 2, 70, 0.0, (0.0, 0.0), &teams),
-        20
+            .shielded_damage(caster, 2, 70, 70, 0.0, (0.0, 0.0), &teams),
+        18
     );
     assert!(!game
         .snapshot_full_for(1)
@@ -360,7 +362,7 @@ fn disciple_shield_snapshots_track_absorption_and_remove_depleted_pool() {
 }
 
 #[test]
-fn disciple_shield_smaller_radius_and_fully_piercing_hits_preserve_pool() {
+fn disciple_shield_only_protects_inside_targets_and_piercing_still_drains_hp() {
     let (mut game, caster) = setup();
     game.enqueue(1, cast(caster, 480.0, false));
     game.tick();
@@ -379,33 +381,20 @@ fn disciple_shield_smaller_radius_and_fully_piercing_hits_preserve_pool() {
     assert_eq!(
         game.state
             .entities
-            .shielded_damage(outside, 2, 20, 0.0, (0.0, 0.0), &teams),
+            .shielded_damage(outside, 2, 20, 20, 0.0, (0.0, 0.0), &teams),
         20
     );
-    for penetration in [1.0] {
-        assert_eq!(
-            game.state
-                .entities
-                .shielded_damage(inside, 2, 200, penetration, (0.0, 0.0), &teams),
-            200
-        );
-        assert_eq!(
-            game.state
-                .entities
-                .get(caster)
-                .unwrap()
-                .shield
-                .as_ref()
-                .unwrap()
-                .remaining,
-            150
-        );
-    }
     assert_eq!(
         game.state
             .entities
-            .shielded_damage(inside, 2, 20, 0.0, (0.0, 0.0), &teams),
-        0
+            .shielded_damage(inside, 2, 20, 20, 1.0, (0.0, 0.0), &teams),
+        20
+    );
+    assert_eq!(
+        game.state
+            .entities
+            .shielded_damage(inside, 2, 20, 20, 0.0, (0.0, 0.0), &teams),
+        5
     );
     let shield = game
         .snapshot_full_for(1)
@@ -414,28 +403,35 @@ fn disciple_shield_smaller_radius_and_fully_piercing_hits_preserve_pool() {
         .find(|o| o.ability == "discipleShield")
         .unwrap();
     let state = shield.owner_state.unwrap();
-    assert_eq!(state.hp, Some(130));
+    assert_eq!(state.hp, Some(110));
     assert_eq!(state.radius, Some(radius));
 }
 
 #[test]
-fn disciple_shield_penetration_splits_damage_and_shares_only_absorbable_overflow() {
+fn disciple_shield_armor_uses_normal_piercing_and_drains_full_hits_without_stacking() {
     let teams = crate::game::teams::TeamRelations::from_player_teams([(1, 1), (2, 2)]);
     for (penetration, damage, expected_hit, expected_pool) in [
-        (0.0, 100, 0, 50),
-        (0.25, 100, 25, 75),
-        (0.5, 100, 50, 100),
-        (0.5, 5, 3, 148),
-        (1.0, 100, 100, 150),
+        (0.0, 100, 25, 50),
+        (0.25, 100, 44, 50),
+        (0.5, 100, 63, 50),
+        (0.75, 100, 81, 50),
+        (0.5, 5, 3, 145),
+        (1.0, 100, 100, 50),
         (0.5, 400, 250, 0),
     ] {
         let (mut game, caster) = setup();
         game.enqueue(1, cast(caster, 440.0, false));
         game.tick();
         assert_eq!(
-            game.state
-                .entities
-                .shielded_damage(caster, 2, damage, penetration, (0.0, 0.0), &teams),
+            game.state.entities.shielded_damage(
+                caster,
+                2,
+                damage,
+                damage,
+                penetration,
+                (0.0, 0.0),
+                &teams
+            ),
             expected_hit
         );
         assert_eq!(
@@ -465,8 +461,8 @@ fn disciple_shield_penetration_splits_damage_and_shares_only_absorbable_overflow
     assert_eq!(
         game.state
             .entities
-            .shielded_damage(caster, 2, 400, 0.5, (0.0, 0.0), &teams),
-        200
+            .shielded_damage(caster, 2, 400, 400, 0.5, (0.0, 0.0), &teams),
+        250
     );
     assert!(game.state.entities.get(caster).unwrap().shield.is_none());
     assert_eq!(
@@ -478,7 +474,7 @@ fn disciple_shield_penetration_splits_damage_and_shares_only_absorbable_overflow
             .as_ref()
             .unwrap()
             .remaining,
-        100
+        150
     );
 }
 
@@ -499,7 +495,7 @@ fn disciple_shield_requires_outside_source_and_inside_target() {
             assert_eq!(
                 game.state
                     .entities
-                    .shielded_damage(caster, 2, 40, penetration, source, &teams),
+                    .shielded_damage(caster, 2, 40, 40, penetration, source, &teams),
                 40
             );
             assert_eq!(
@@ -573,4 +569,43 @@ fn disciple_shield_hp_and_expiry_are_public_but_hidden_fields_and_casters_stay_h
         .ability_objects
         .iter()
         .any(|o| o.ability == "discipleShield"));
+}
+
+#[test]
+fn disciple_shield_full_attack_cost_ignores_existing_reductions_and_breaking_hit_is_armored() {
+    let (mut game, caster) = setup();
+    game.enqueue(1, cast(caster, 440.0, false));
+    game.tick();
+    let teams = crate::game::teams::TeamRelations::from_player_teams([(1, 1), (2, 2)]);
+    // Existing armor/cover reduced a 100-damage attack to 20 before shield armor.
+    assert_eq!(
+        game.state
+            .entities
+            .shielded_damage(caster, 2, 20, 100, 0.0, (0.0, 0.0), &teams),
+        5
+    );
+    assert_eq!(
+        game.state
+            .entities
+            .get(caster)
+            .unwrap()
+            .shield
+            .as_ref()
+            .unwrap()
+            .remaining,
+        50
+    );
+    assert_eq!(
+        game.state
+            .entities
+            .shielded_damage(caster, 2, 100, 100, 0.0, (0.0, 0.0), &teams),
+        25
+    );
+    assert!(game.state.entities.get(caster).unwrap().shield.is_none());
+    assert_eq!(
+        game.state
+            .entities
+            .shielded_damage(caster, 2, 100, 100, 0.0, (0.0, 0.0), &teams),
+        100
+    );
 }

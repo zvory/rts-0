@@ -130,6 +130,11 @@ The single-unit selection panel displays Armored or Unarmored beneath the kill c
 against non-piercing attacks and partial/full armor penetration. Artillery is Small/unarmored
 and receives no armor damage reduction. Buildings and resource nodes omit this unit-only row.
 
+Shield grants a separate 75% armor layer against attacks entering its field, using ordinary
+armor penetration after existing target defenses. Its 150 HP durability pays each hit's full
+pre-reduction damage, including fully piercing hits. See [Dao insight](dao-insight.md) for
+breaking-hit, overlap, and area-damage rules.
+
 ### Client mirror boundary inventory
 
 Phase 1 records the current source-of-truth map before later phases add broader mechanical checks.
@@ -230,8 +235,8 @@ footprint, 123 HP, one tile of sight, a five-second construction time, no prereq
 research. A completed Portal trains the Cultivator Novice for 50 Steel and 2 Supply in 300 ticks.
 The Novice is a 58-HP, 26-pixel-radius ground melee unit moving at 2.0 pixels per tick.
 Wind independently uses 1.15 times Scout Car speed (2.7025 pixels per tick). War and Magic
-use 1.05 times base Disciple speed (2.1 pixels per tick). War has 135 maximum HP;
-Wind and Magic have 115 maximum HP. Novice cost is halved from 100 steel, and HP is
+use 1.05 times base Disciple speed (2.1 pixels per tick). War has 176 maximum HP;
+Wind and Magic have 150 maximum HP. Novice cost is halved from 100 steel, and HP is
 scaled from 115 to 57.5, rounded to 58; Adept and Master stats are unchanged. Its
 23-damage sword has 0.75-tile reach, a 91-tick cooldown, and 50% armor penetration.
 Disciples have a separate five-tile engagement range for Idle and Attack Move: they approach
@@ -730,7 +735,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 |-----------------|-----|-----|-------|----|-------|-------|-----|-----|-----|-----------|
 | worker          | 40  | 4   | 1     | 48 | 2.0   | 10    | 50  | 0   | 1   | 150 (5s) |
 | golem           | 160 | 16  | 1     | 48 | 2.0   | 10    | 0   | 0   | 4   | 396 (~13.2s); provisional free Ekat worker-like economy body trained at Zamok; mines at 4x worker load; can be consumed by Ekat for full heal |
-| warrior         | 115 | 23  | 0.75   | 64 | 2.0   | 11    | 100 | 0   | 2   | 300 (~10s); Cultivator Portal-trained melee bruiser; 50% armor penetration; no projectile or tracer |
+| warrior         | 58  | 23  | 0.75   | 91 | 2.0   | 11    | 50  | 0   | 2   | 300 (~10s); Cultivator Portal-trained melee bruiser; 50% armor penetration; no projectile or tracer |
 | rifleman        | 45  | 5   | 5     | 32 | 1.6   | 11    | 35  | 0   | 1   | 300 (~10s) |
 | panzerfaust     | 45  | 5 rifle / 100 launcher | 5 | 32 rifle / one lifetime launcher | 1.6 | 11 | 55 | 10 | 1 | 300 (~10s); requires completed Panzerfausts research |
 | machine_gunner  | 55  | 4   | 6.1   | 12  | 1.28  | 11    | 75  | 10  | 2   | 400 (~13s) |
@@ -851,7 +856,7 @@ insight from actual hostile HP damage (cost-weighted unit damage, quarter-rate b
 `DISCIPLE_SHIELD_CAPACITY` (150), `DISCIPLE_SHIELD_RADIUS_TILES` (2.1), and `DISCIPLE_SHIELD_DURATION_TICKS` are mirrored for the Shield HP and lifetime bars and checked by faction catalog parity. `DISCIPLE_EVOLVED_INSIGHT_CAP` (200) is also parity-checked.
 Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md). Wind uses the base Disciple’s 0.75-tile sword reach, retaining 23 damage, 50% penetration, 61-tick cooldown, moving attacks, 2.7025 px/tick movement, and Dash. Its five-tile automatic engagement closes to melee reach. Magic uses a five-tile orb primary, retaining 23 damage, 50% penetration, and 91-tick cooldown, and stops to fire. Novice Charge automatically grants 1.5× speed for one second with a 15-second cooldown against a hostile unit at least two tiles away or moving away; it has no selectable command. Wind Dash reaches fifteen tiles with no return recast, while Ekat retains its five-tile Dash and return. Wind Adepts hold one Dash charge; Masters hold two. Each spent charge recharges sequentially in eight seconds, and promotion grants the additional ready charge without resetting an existing recharge. War uses 1.75-tile spear reach (`DAO_WAR_RANGE_TILES`), retaining its damage, cooldown, armor and HP bonuses. Its sprite scale remains 0.56. The base, Wind, and Magic collision/interaction radius is 26 world pixels; War uses 18.2 pixels (26 × `DAO_WAR_BODY_SCALE`, 0.7). The starting Novice stands five tiles toward the enemy from the Nexus to clear the base with its larger body. These footprints cover the rendered torsos instead of allowing tightly stacked bodies. Sprite origins center each torso on the authoritative position, including the War atlas's forward-offset torso. Weapons, scarves, and the presentation-only 11.2-pixel War lunge may extend outside the body footprint. `DAO_WAR_BODY_SCALE` remains mirrored for artwork, selection, and collision geometry. `DAO_WAR_RANGE_TILES` and `DAO_RANGED_RANGE_TILES` are mirrored in client config and range overlays.
 
-Throw Sword unlocks only at War Master (third tier), not War Adept. It uses fractional ability range metadata: 7.5 tiles, 100/11 px/tick, and a
+War Adepts can cast Throw Sword with a 40-second cooldown; War Masters retain the normal 20-second cooldown. Advancement preserves a cooldown already in progress. It uses fractional ability range metadata: 7.5 tiles, 100/11 px/tick, and a
 0.9-tile damage width and zero armor penetration (5/10 damage against armored
 targets, 20/40 against unarmored targets before other protection); see
 [Dao evolution](dao-insight.md). Ability catalog ranges
@@ -891,8 +896,8 @@ See [Proving Grounds brief and rules](proven-grounds.md) for details and deferre
 
 ## Cultivator Shop
 
-Cultivator Serfs can construct the Shop for **200 steel and 200 oil** in **1,200 ticks
-(40 seconds)**. It has **200 HP**, armored status, a **3×4** footprint and one-tile sight.
+Cultivator Serfs can construct the Shop for **200 steel and 200 oil** in **600 ticks
+(20 seconds)**. It has **200 HP**, armored status, a **3×4** footprint and one-tile sight.
 No prerequisites, attack, production, research, supply or rally point. Targeted goods are listed below. Normal building
 placement, cancellation, damage, fog and destruction apply. See [Shop](shop.md) for the brief.
 
@@ -901,8 +906,9 @@ placement, cancellation, damage, fog and destruction apply. See [Shop](shop.md) 
 At 200 insight, each living Adept automatically becomes its matching Master and fully
 heals. Relative to that path’s Adept, size/collision ×1.2, movement ×1.1, ordinary
 attack damage ×1.2 (nearest integer), maximum HP ×1.4. No resource or supply cost,
-research or attack-rate change; War Masters unlock Throw Sword and Wind Masters gain a second Dash charge; no repeat advancement. Master HP is
-161 (Wind/Magic) or 189 (War). See [Master rules and review](dao-masters.md).
+research or attack-rate change; War Masters halve Throw Sword cooldown to 20 seconds and Wind Masters gain a second Dash charge; no repeat advancement. Adept maximum HP is 150 (Wind/Magic) or 176 (War), a 30% increase rounded to
+whole HP; Novices have 58 HP. Master HP follows the existing ×1.4 advancement
+multiplier after Adept rounding: 210 (Wind/Magic) or 246 (War). See [Master rules and review](dao-masters.md).
 
 ### Shop goods
 

@@ -2,7 +2,7 @@ use rts_rules::math::{Coord, GameplayMath as _};
 use std::collections::HashMap;
 
 use crate::config;
-use crate::game::entity::{Entity, EntityKind, EntityStore};
+use crate::game::entity::{Entity, EntityStore};
 use crate::game::entrenchment_combat;
 use crate::game::fog::Fog;
 use crate::game::map::Map;
@@ -127,19 +127,25 @@ fn resolve_shell(
         let Some(target) = entities.get(id) else {
             continue;
         };
+        let base = artillery_damage(d2, inner2, outer2);
+        let penetration = if d2 <= inner2 { 1.0 } else { 0.0 };
+        let damage = combat::effective_damage_for_armor_penetration(
+            penetration,
+            target.kind,
+            base,
+            Some(TerrainKind::Open),
+        );
         let damage = entrenchment_combat::reduce_area_damage(
             target,
-            target.dao_damage_after_armor(
-                artillery_damage(target.kind, d2, inner2, outer2),
-                if d2 <= inner2 { 1.0 } else { 0.0 },
-            ),
+            target.dao_damage_after_armor(damage, penetration),
         );
         let damage = map.damage_after_reduction_tile(target.pos_x(), target.pos_y(), damage);
         let damage = entities.shielded_damage(
             id,
             shell.owner,
             damage,
-            if d2 <= inner2 { 1.0 } else { 0.0 },
+            base,
+            penetration,
             (shell.from_x.to_world(), shell.from_y.to_world()),
             teams,
         );
@@ -169,10 +175,9 @@ fn resolve_shell(
     }
 }
 
-fn artillery_damage(victim_kind: EntityKind, d2: f32, inner2: f32, outer2: f32) -> u32 {
+/// Distance-falloff damage before any target defenses or shield armor.
+fn artillery_damage(d2: f32, inner2: f32, outer2: f32) -> u32 {
     if d2 <= inner2 {
-        // The direct blast core is fully armor-piercing. Entrenchment's area-damage
-        // reduction is applied by the caller after this zone-specific armor policy.
         return config::ARTILLERY_INNER_DAMAGE;
     }
     if d2 > outer2 {
@@ -185,16 +190,10 @@ fn artillery_damage(victim_kind: EntityKind, d2: f32, inner2: f32, outer2: f32) 
     }
     let d = d2.det_sqrt();
     let t = ((d - inner) / (outer - inner)).clamp(0.0, 1.0);
-    let base = (config::ARTILLERY_INNER_DAMAGE as f32
+    (config::ARTILLERY_INNER_DAMAGE as f32
         + (config::ARTILLERY_OUTER_MIN_DAMAGE as f32 - config::ARTILLERY_INNER_DAMAGE as f32) * t)
         .round()
-        .max(0.0) as u32;
-    combat::effective_damage(
-        EntityKind::Rifleman,
-        victim_kind,
-        base,
-        Some(TerrainKind::Open),
-    )
+        .max(0.0) as u32
 }
 
 fn impact_distance2_to_target(x: f32, y: f32, target: &Entity) -> f32 {
@@ -284,6 +283,7 @@ fn push_under_attack_notice(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::game::entity::EntityKind;
     use crate::game::map::Map;
     use crate::protocol::terrain;
 
@@ -327,21 +327,11 @@ mod tests {
         let outer = config::ARTILLERY_OUTER_RADIUS_TILES * config::TILE_SIZE as f32;
 
         assert_eq!(
-            artillery_damage(
-                EntityKind::Rifleman,
-                0.0,
-                inner.det_powi(2),
-                outer.det_powi(2)
-            ),
+            artillery_damage(0.0, inner.det_powi(2), outer.det_powi(2)),
             75
         );
         assert_eq!(
-            artillery_damage(
-                EntityKind::Rifleman,
-                outer.det_powi(2),
-                inner.det_powi(2),
-                outer.det_powi(2)
-            ),
+            artillery_damage(outer.det_powi(2), inner.det_powi(2), outer.det_powi(2)),
             20
         );
     }
@@ -375,12 +365,8 @@ mod tests {
         let after = entities.get(victim).expect("victim should survive").hp;
         let inner = config::ARTILLERY_INNER_RADIUS_TILES * config::TILE_SIZE as f32;
         let outer = config::ARTILLERY_OUTER_RADIUS_TILES * config::TILE_SIZE as f32;
-        let expected_base = artillery_damage(
-            EntityKind::Rifleman,
-            64.0_f32.det_powi(2),
-            inner.det_powi(2),
-            outer.det_powi(2),
-        );
+        let expected_base =
+            artillery_damage(64.0_f32.det_powi(2), inner.det_powi(2), outer.det_powi(2));
         let expected_damage =
             combat::area_damage_after_entrenchment(EntityKind::Rifleman, expected_base, true);
         assert_eq!(

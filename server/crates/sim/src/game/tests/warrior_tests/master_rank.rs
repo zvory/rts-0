@@ -4,9 +4,9 @@ use super::*;
 fn dao_master_advances_once_keeps_reload_and_persists_rank() {
     use crate::game::ability::AbilityKind;
     for (ability, hp) in [
-        (AbilityKind::EvolveWind, 161),
-        (AbilityKind::EvolveWar, 189),
-        (AbilityKind::EvolveMagic, 161),
+        (AbilityKind::EvolveWind, 210),
+        (AbilityKind::EvolveWar, 246),
+        (AbilityKind::EvolveMagic, 210),
     ] {
         let mut game = empty_flat_game(&[cultivator_player()]);
         let id = game
@@ -113,6 +113,7 @@ fn dao_master_combat_threshold_and_damage_apply_to_all_three_paths() {
             .spawn_unit(2, EntityKind::WindAdept, 425.0, 400.0)
             .unwrap();
         let victim = game.state.entities.get_mut(target).unwrap();
+        let target_hp = victim.hp;
         victim.set_attack_cd(1000);
         let unit = game.state.entities.get_mut(id).unwrap();
         unit.insight = 60;
@@ -132,13 +133,13 @@ fn dao_master_combat_threshold_and_damage_apply_to_all_three_paths() {
         assert!(matches!(unit.order(), Order::Attack(_)));
         assert_eq!(
             game.state.entities.get(target).unwrap().hp,
-            115 - adept_damage
+            target_hp - adept_damage
         );
         game.state.entities.get_mut(id).unwrap().set_attack_cd(0);
         game.tick();
         assert_eq!(
             game.state.entities.get(target).unwrap().hp,
-            115 - adept_damage - master_damage
+            target_hp - adept_damage - master_damage
         );
         assert_eq!(game.state.entities.get(id).unwrap().insight, 0);
         assert_eq!(game.state.entities.get(id).unwrap().attack_cd(), cooldown);
