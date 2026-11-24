@@ -184,7 +184,37 @@ if (previousBuild === undefined) delete globalThis.__RTS_BUILD__;
 else globalThis.__RTS_BUILD__ = previousBuild;
 console.log("version guard contracts passed");
 
-export function testVersionGuardAppLifecycle(App) {
+export async function testVersionGuardAppLifecycle(App, dom) {
+  {
+    const app = Object.create(App.prototype);
+    const f = fixture({ lobby: true, storage: new Map([
+      ["rts.versionGuard.lastReload", JSON.stringify(["loaded-build", "new-server"])],
+    ]) });
+    app.versionGuard = f.guard;
+    const previousLobbyScreen = dom.lobbyScreen;
+    dom.lobbyScreen = { hidden: false };
+    f.guard.isLobby = () => canRefreshClient(app, !dom.lobbyScreen.hidden);
+    f.guard.warn("new-server");
+    assert.equal(f.guard.el.hidden, false);
+    const previousHref = window.location.href;
+    window.location.href = "http://localhost/";
+    let finish;
+    app.lobby = { show() {}, joinReplayLobby() {
+      assert.equal(f.guard.el.hidden, true, "replay entry hides an existing warning before connecting");
+      return new Promise((resolve) => { finish = resolve; });
+    } };
+    try {
+      const pending = app.joinReplayLobby("replay-room", 123);
+      assert.equal(f.guard.el.hidden, true, "a pending replay connection stays untouched");
+      finish(false);
+      assert.equal(await pending, false);
+      assert.equal(f.guard.el.hidden, true, "a failed replay connection keeps recovery deferred");
+    } finally {
+      window.location.href = previousHref;
+      dom.lobbyScreen = previousLobbyScreen;
+      f.guard.destroy();
+    }
+  }
   {
     const app = Object.create(App.prototype);
     let resetCount = 0;

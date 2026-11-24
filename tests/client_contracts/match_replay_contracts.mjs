@@ -815,7 +815,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     dom.gameOver = previousGameOver;
     dom.gameOverText = previousGameOverText;
   }
-  testVersionGuardAppLifecycle(App);
+  await testVersionGuardAppLifecycle(App, dom);
   {
     const connectionLost = { hidden: true };
     dom.connectionLost = connectionLost;

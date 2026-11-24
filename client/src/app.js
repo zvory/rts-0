@@ -1411,12 +1411,12 @@ export class App {
       onReplayRoom: (room, matchId) => this.joinReplayLobby(room, matchId),
     });
   }
-
   async joinReplayLobby(room, matchId = null) {
     if (!this.lobby) return false;
     if (Number.isSafeInteger(matchId) && matchId > 0) {
       this.replayLaunch = { matchId, room, staging: true, permalink: true };
       replaceReplayPermalink(matchId);
+      this.versionGuard?.update();
     }
     dom.lobbyScreen.hidden = false;
     this.lobby.show();
