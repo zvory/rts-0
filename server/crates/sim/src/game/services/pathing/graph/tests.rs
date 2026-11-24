@@ -401,3 +401,21 @@ fn phase2_release_rich_edge_benchmark() {
         updates[updates.len() - 1],
     );
 }
+
+#[test]
+fn unwalkable_tiles_block_infantry_and_vehicle_route_graphs() {
+    let mut map = rich_map();
+    map.unwalkable_tiles = vec![(2, 2)];
+    let entities = EntityStore::new();
+    let occ = Occupancy::build(&map, &entities);
+    let mut graph = PathGraph::default();
+    for kind in [EntityKind::Rifleman, EntityKind::ScoutCar] {
+        let profile = RoutingProfile::for_request(kind, 0, RouteShape::Normal);
+        let reference = terrain_passability(profile, &map, &occ);
+        assert!(!reference.passable(2, 2));
+        assert!(reference.passable(1, 2));
+        let table = graph.view(&map, &occ, kind, 0, RouteShape::Normal);
+        assert!(!table.passable(2, 2));
+        assert!(table.passable(1, 2));
+    }
+}

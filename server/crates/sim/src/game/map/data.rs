@@ -27,4 +27,5 @@ pub struct AuthoredMapData {
     pub no_entrenchment_tiles: Vec<(u32, u32)>,
     pub damage_reduction_tiles: Vec<(u32, u32)>,
     pub slow_movement_tiles: Vec<(u32, u32)>,
+    pub unwalkable_tiles: Vec<(u32, u32)>,
 }

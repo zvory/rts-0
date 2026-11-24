@@ -188,10 +188,11 @@ function paintOverlays(draft, tiles, edit) {
   const noEntrenchment = new Map((draft.noEntrenchmentTiles || []).map((tile) => [locationKey(tile), tile]));
   const damageReduction = new Map((draft.damageReductionTiles || []).map((tile) => [locationKey(tile), tile]));
   const slowMovement = new Map((draft.slowMovementTiles || []).map((tile) => [locationKey(tile), tile]));
+  const unwalkable = new Map((draft.unwalkableTiles || []).map((tile) => [locationKey(tile), tile]));
   const overlayPatch = [];
   for (const tile of tiles) {
     const key = locationKey(tile);
-    const before = `${concealment.has(key)}:${noVehicle.has(key)}:${noBuilding.has(key)}:${noEntrenchment.has(key)}:${damageReduction.has(key)}:${slowMovement.has(key)}`;
+    const before = `${concealment.has(key)}:${noVehicle.has(key)}:${noBuilding.has(key)}:${noEntrenchment.has(key)}:${damageReduction.has(key)}:${slowMovement.has(key)}:${unwalkable.has(key)}`;
     applyOverlayEdit(concealment, key, tile, edit.concealment);
     applyOverlayEdit(noVehicle, key, tile, edit.noVehicle);
     applyOverlayEdit(noBuilding, key, tile, edit.noBuilding);
@@ -201,7 +202,8 @@ function paintOverlays(draft, tiles, edit) {
     }
     applyOverlayEdit(damageReduction, key, tile, edit.damageReduction);
     applyOverlayEdit(slowMovement, key, tile, edit.slowMovement);
-    if (before !== `${concealment.has(key)}:${noVehicle.has(key)}:${noBuilding.has(key)}:${noEntrenchment.has(key)}:${damageReduction.has(key)}:${slowMovement.has(key)}`) {
+    applyOverlayEdit(unwalkable, key, tile, edit.unwalkable);
+    if (before !== `${concealment.has(key)}:${noVehicle.has(key)}:${noBuilding.has(key)}:${noEntrenchment.has(key)}:${damageReduction.has(key)}:${slowMovement.has(key)}:${unwalkable.has(key)}`) {
       overlayPatch.push({ x: tile.x, y: tile.y });
     }
   }
@@ -211,6 +213,7 @@ function paintOverlays(draft, tiles, edit) {
   draft.noEntrenchmentTiles = [...noEntrenchment.values()];
   draft.damageReductionTiles = [...damageReduction.values()];
   draft.slowMovementTiles = [...slowMovement.values()];
+  draft.unwalkableTiles = [...unwalkable.values()];
   return { overlayPatch };
 }
 

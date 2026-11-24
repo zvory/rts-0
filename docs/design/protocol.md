@@ -613,11 +613,17 @@ Sent when a live match begins and when replay playback is rebuilt, including aft
     noBuildingTiles: [ { x: u32, y: u32 } ],
     noEntrenchmentTiles: [ { x: u32, y: u32 } ],
     damageReductionTiles: [ { x: u32, y: u32 } ],
+    unwalkableTiles: [ { x: u32, y: u32 } ],
     slowMovementTiles: [ { x: u32, y: u32 } ]
   },
   players: [ { id, teamId, factionId, name, color, isAi, startTileX, startTileY } ], // active match players only
 }
 ```
+`unwalkableTiles` is an independent sparse tile annotation (omission means empty) carried by
+authored maps, match-start map data, Lab drafts, handoffs, and checkpoint map containers.
+It preserves rendered terrain while rejecting ground movement, ability landings, unit spawns,
+and intersecting building footprints. It does not block teleport travel over a tile, sight, or shots.
+
 Units/buildings arrive via snapshots (so they obey fog), including the player's own starting
 loadout from the validated faction catalog. Normal live starts may skip countdown when there are
 one or zero active human seats, including one-human-vs-AI and AI-only rooms, but they still use
@@ -1620,6 +1626,7 @@ POST /api/map-handoffs
     noBuildingTiles: LabMapTile[],
     noEntrenchmentTiles: LabMapTile[],
     damageReductionTiles: LabMapTile[],
+    unwalkableTiles: LabMapTile[],
     slowMovementTiles: LabMapTile[]
   }
 }
@@ -1712,6 +1719,7 @@ validation previews, imports, and bundled catalog assets use `LabCheckpointScena
       noBuildingTiles: [{ x: u32, y: u32 }],
       noEntrenchmentTiles: [{ x: u32, y: u32 }],
       damageReductionTiles: [{ x: u32, y: u32 }],
+      unwalkableTiles: [{ x: u32, y: u32 }],
       slowMovementTiles: [{ x: u32, y: u32 }]
     }
   },

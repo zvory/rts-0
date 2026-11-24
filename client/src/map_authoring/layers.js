@@ -7,6 +7,7 @@ export const MAP_AUTHORING_LAYER = Object.freeze({
   NO_ENTRENCHMENT: "no-entrenchment",
   DAMAGE_REDUCTION: "damage-reduction",
   SLOW_MOVEMENT: "slow-movement",
+  UNWALKABLE: "unwalkable",
   TREES: "trees",
   GAMEPLAY_DOODADS: "gameplay-doodads",
   DECORATIVE_DOODADS: "decorative-doodads",
@@ -52,6 +53,11 @@ export const MAP_AUTHORING_LAYERS = Object.freeze([
     id: MAP_AUTHORING_LAYER.SLOW_MOVEMENT,
     label: "Slowed movement",
     description: "Tiles that reduce movement speed by 25%",
+  }),
+  Object.freeze({
+    id: MAP_AUTHORING_LAYER.UNWALKABLE,
+    label: "Unwalkable",
+    description: "Tiles blocked to ground movement, teleport landings, spawns, and buildings",
   }),
   Object.freeze({
     id: MAP_AUTHORING_LAYER.TREES,

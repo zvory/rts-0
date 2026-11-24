@@ -65,6 +65,8 @@ pub struct LabCheckpointScenarioMapData {
     pub damage_reduction_tiles: Vec<MapTile>,
     #[serde(default)]
     pub slow_movement_tiles: Vec<MapTile>,
+    #[serde(default)]
+    pub unwalkable_tiles: Vec<MapTile>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -139,6 +141,7 @@ impl LabCheckpointScenarioMap {
                 no_entrenchment_tiles: overlays.no_entrenchment,
                 damage_reduction_tiles: overlays.damage_reduction,
                 slow_movement_tiles: overlays.slow_movement,
+                unwalkable_tiles: overlays.unwalkable,
             },
         }
     }
@@ -209,6 +212,11 @@ impl LabCheckpointScenarioMap {
                 .collect(),
             slow_movement_tiles: data
                 .slow_movement_tiles
+                .into_iter()
+                .map(|tile| (tile.x, tile.y))
+                .collect(),
+            unwalkable_tiles: data
+                .unwalkable_tiles
                 .into_iter()
                 .map(|tile| (tile.x, tile.y))
                 .collect(),
@@ -383,6 +391,13 @@ impl LabCheckpointScenarioMap {
             width,
             height,
             "slowMovementTiles",
+            &self.name,
+        )?;
+        validate_overlay_tiles(
+            &self.data.unwalkable_tiles,
+            width,
+            height,
+            "unwalkableTiles",
             &self.name,
         )?;
         Ok(())

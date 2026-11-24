@@ -188,6 +188,7 @@ fn route_and_staging_follow_the_passable_approach_around_a_wall() {
         tile_size: 32,
         terrain: vec![AiTerrain::Grass; 96 * 96],
         no_building_tiles: BTreeSet::new(),
+        unwalkable_tiles: BTreeSet::new(),
     };
     let mut blocked = map.clone();
     for y in 0..60 {
@@ -684,6 +685,7 @@ fn pressure_ground_connectivity_does_not_cut_diagonally_blocked_corners() {
         tile_size: 32,
         terrain: vec![AiTerrain::Grass; 9],
         no_building_tiles: BTreeSet::new(),
+        unwalkable_tiles: BTreeSet::new(),
     };
     map.terrain[1] = AiTerrain::Water;
     map.terrain[3] = AiTerrain::Rock;

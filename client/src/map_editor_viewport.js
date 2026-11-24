@@ -471,6 +471,7 @@ export class MapEditorViewport {
       noEntrenchmentTiles: structuredCloneSafe(draft.noEntrenchmentTiles || []),
       damageReductionTiles: structuredCloneSafe(draft.damageReductionTiles || []),
       slowMovementTiles: structuredCloneSafe(draft.slowMovementTiles || []),
+      unwalkableTiles: structuredCloneSafe(draft.unwalkableTiles || []),
       forestTiles: structuredCloneSafe(this.session.forestTiles?.() || []),
       paintPreview: this.paintPreviewRecord(),
       doodadBrushPreview: this.doodadBrushPreviewRecord?.() || null,

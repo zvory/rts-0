@@ -3,6 +3,8 @@ use std::collections::HashSet;
 use serde::Deserialize;
 
 mod assignment;
+mod base_clearance;
+use base_clearance::validate_base_clearance;
 mod forest_spans;
 mod team_groups;
 use team_groups::{parse_team_groups, AuthoredStartLocation};
@@ -11,7 +13,7 @@ use forest_spans::{merge_overlay_locations, parse_forest_spans};
 
 use super::{
     supported_map_version, AuthoredMapData, BaseResourceCounts, Map, StartAssignmentPlayer,
-    BASE_PROTECTION_RADIUS_TILES, BASE_SITE_PROTECTION_RADIUS_TILES, CURRENT_MAP_VERSION,
+    CURRENT_MAP_VERSION,
 };
 use crate::protocol::terrain;
 use rts_protocol::{MapSun, MAX_OIL_PATCHES_PER_BASE, MAX_STEEL_PATCHES_PER_BASE};
@@ -95,6 +97,7 @@ pub(super) fn load_for_players(
         no_entrenchment_tiles: materialized.no_entrenchment_tiles,
         damage_reduction_tiles: materialized.damage_reduction_tiles,
         slow_movement_tiles: materialized.slow_movement_tiles,
+        unwalkable_tiles: materialized.unwalkable_tiles,
     })
 }
 
@@ -151,7 +154,6 @@ pub(super) fn materialize(player_count: usize, json: &str) -> Result<AuthoredMap
             ));
         }
     }
-    validate_base_clearance(width, height, &terrain, &start_locations, &base_locations)?;
     let base_resource_counts = base_sites
         .into_iter()
         .map(|site| {
@@ -202,6 +204,16 @@ pub(super) fn materialize(player_count: usize, json: &str) -> Result<AuthoredMap
         &authored.slow_movement_tiles,
         "slowMovementTiles",
     )?;
+    let unwalkable_tiles =
+        parse_overlay_locations(width, height, &authored.unwalkable_tiles, "unwalkableTiles")?;
+    validate_base_clearance(
+        width,
+        height,
+        &terrain,
+        &unwalkable_tiles,
+        &start_locations,
+        &base_locations,
+    )?;
     Ok(AuthoredMapData {
         name: authored.name,
         width,
@@ -220,6 +232,7 @@ pub(super) fn materialize(player_count: usize, json: &str) -> Result<AuthoredMap
         no_entrenchment_tiles,
         damage_reduction_tiles,
         slow_movement_tiles,
+        unwalkable_tiles,
     })
 }
 
@@ -255,6 +268,8 @@ struct AuthoredMap {
     damage_reduction_tiles: Vec<AuthoredLocation>,
     #[serde(default)]
     slow_movement_tiles: Vec<AuthoredLocation>,
+    #[serde(default)]
+    unwalkable_tiles: Vec<AuthoredLocation>,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -431,39 +446,4 @@ fn parse_base_sites(
         sites.push(site);
     }
     Ok(sites)
-}
-
-fn validate_base_clearance(
-    width: u32,
-    height: u32,
-    terrain_grid: &[u8],
-    start_locations: &[(u32, u32)],
-    base_sites: &[(u32, u32)],
-) -> Result<(), String> {
-    let starts: HashSet<_> = start_locations.iter().copied().collect();
-    for &(sx, sy) in base_sites {
-        let radius = if starts.contains(&(sx, sy)) {
-            BASE_PROTECTION_RADIUS_TILES
-        } else {
-            BASE_SITE_PROTECTION_RADIUS_TILES
-        };
-        for dy in -radius..=radius {
-            for dx in -radius..=radius {
-                let tx = sx as i32 + dx;
-                let ty = sy as i32 + dy;
-                if tx < 0 || ty < 0 || tx >= width as i32 || ty >= height as i32 {
-                    return Err(format!(
-                        "base site ({sx},{sy}) is too close to the map edge"
-                    ));
-                }
-                let idx = (ty as u32 * width + tx as u32) as usize;
-                if !crate::rules::terrain::is_passable_map_code(terrain_grid[idx]) {
-                    return Err(format!(
-                        "base site ({sx},{sy}) has impassable terrain in its protected area at ({tx},{ty})"
-                    ));
-                }
-            }
-        }
-    }
-    Ok(())
 }

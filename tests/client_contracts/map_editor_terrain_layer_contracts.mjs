@@ -56,9 +56,34 @@ import { MapEditorSession } from "../../client/src/map_editor_session.js";
     const source = JSON.parse(fs.readFileSync(new URL(filename, mapDirectory), "utf8"));
     const session = new MapEditorSession({ storage: null });
     session.loadAuthoredMap(source);
+    assert.deepEqual(session.exportMap().unwalkableTiles, source.unwalkableTiles || []);
     assert.deepEqual(session.exportMap().terrain, source.terrain,
       `${filename} recomposes its legacy terrain rows byte-for-byte after the internal layer split`);
   }
 }
 
 console.log("map_editor_terrain_layer_contracts: ok");
+
+{
+  const session = new MapEditorSession({ storage: null });
+  session.initializeBlank({ size: 32, playerCount: 2 });
+  const tile = { x: 16, y: 16 };
+  const terrain = session.exportMap().terrain;
+  session.beginOverlayStroke();
+  session.paintOverlayTiles([tile], { unwalkable: true });
+  assert.equal(session.commitOverlayStroke(), true);
+  assert.deepEqual(session.materialized().unwalkableTiles, [tile]);
+  assert.deepEqual(session.exportMap().terrain, terrain, "unwalkable annotation preserves ground art");
+  const exported = session.exportMap();
+  session.undo();
+  assert.deepEqual(session.draft.unwalkableTiles, []);
+  session.redo();
+  assert.deepEqual(session.draft.unwalkableTiles, [tile]);
+  const loaded = new MapEditorSession({ storage: null });
+  loaded.loadAuthoredMap(exported);
+  assert.deepEqual(loaded.materialized().unwalkableTiles, [tile]);
+  session.beginOverlayStroke();
+  session.paintOverlayTiles([tile], { unwalkable: false });
+  session.commitOverlayStroke();
+  assert.deepEqual(session.exportMap().unwalkableTiles, []);
+}

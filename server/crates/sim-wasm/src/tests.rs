@@ -29,6 +29,7 @@ fn start_payload() -> StartPayload {
             no_entrenchment_tiles: Vec::new(),
             damage_reduction_tiles: Vec::new(),
             slow_movement_tiles: Vec::new(),
+            unwalkable_tiles: Vec::new(),
         },
         players: vec![
             PlayerStart {

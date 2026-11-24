@@ -547,12 +547,18 @@ impl Game {
         let base_resource_counts = map_draft::resource_counts(&draft, name)?;
         let overlays = map_draft::canonical_overlays(&draft, name)?;
         let doodads = map_draft::canonical_doodads(draft.width, draft.height, draft.doodads, name)?;
+        let mut placement_terrain = draft.terrain.clone();
+        for &(x, y) in &overlays.unwalkable {
+            if let Some(code) = placement_terrain.get_mut((y * draft.width + x) as usize) {
+                *code = terrain::WATER;
+            }
+        }
         let mut occupied_sites = std::collections::HashSet::new();
         for &(x, y) in &starts {
             validate_lab_map_site(
                 name,
                 (draft.width, draft.height),
-                &draft.terrain,
+                &placement_terrain,
                 x,
                 y,
                 main_protection_radius,
@@ -566,7 +572,7 @@ impl Game {
             validate_lab_map_site(
                 name,
                 (draft.width, draft.height),
-                &draft.terrain,
+                &placement_terrain,
                 x,
                 y,
                 LAB_MAP_BASE_SITE_PROTECTION_RADIUS_TILES,
@@ -589,6 +595,7 @@ impl Game {
             no_entrenchment_tiles: overlays.no_entrenchment,
             damage_reduction_tiles: overlays.damage_reduction,
             slow_movement_tiles: overlays.slow_movement,
+            unwalkable_tiles: overlays.unwalkable,
         };
         let map_metadata = MapMetadata {
             name: name.to_string(),
