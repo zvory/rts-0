@@ -130,7 +130,7 @@ export function _issueTargetedCommand(p, ev = {}) {
       const range = definition.rangeTiles * tileSize;
       const shop = this.state.selectedEntities().find((e) => units.includes(e.id)
         && e.buildProgress == null && e.hp > 0
-        && Math.hypot(e.x - target.x, e.y - target.y) <= range);
+        && (definition.rangeTiles == null || Math.hypot(e.x - target.x, e.y - target.y) <= range));
       if (!shop || (ability === ABILITY.ESCAPE_TREASURE && target.escapeTreasure)) return false;
       this.commandInteraction.issueCommand(cmd.useAbility(ability, [shop.id], null, null, false, target.id));
       this._addCommandFeedback("move", target.x, target.y, false);

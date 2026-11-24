@@ -320,8 +320,8 @@ export const ABILITIES = Object.freeze({
   }),
   [ABILITY.HEALING_POTION]: Object.freeze({
     ability: ABILITY.HEALING_POTION, label: "Healing Potion", icon: "HP", hotkey: "Q",
-    title: "Deliver a healing potion to a friendly unit within 30 tiles; fully heals on arrival",
-    carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: 30,
+    title: "Deliver a healing potion to a friendly unit at any distance; fully heals on arrival",
+    carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: null,
     cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 50 }),
     queued: false, queuePolicy: "notQueueable",
   }),
