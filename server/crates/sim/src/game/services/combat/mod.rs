@@ -443,7 +443,14 @@ pub(in crate::game) fn combat_system(
                             + e.radius()
                             + RANGE_SLACK
             });
+        // Lightness may finish its approach while striking; the pursuit goal still
+        // stops at melee reach, and is refreshed when the target leaves that reach.
+        let lightness_moving_attack = entities
+            .get(id)
+            .is_some_and(|e| e.kind == EntityKind::LightnessAdept)
+            && (commanded_direct_target || auto_pursuit);
         if commanded_direct_target
+            && !lightness_moving_attack
             && clear_shot
             && (target_in_weapon_range || wait_for_stationary_range)
         {
@@ -468,8 +475,8 @@ pub(in crate::game) fn combat_system(
                 }
                 e.set_target_id(Some(tid));
                 e.mark_attack_phase(AttackPhase::Firing);
-                // Plain Move keeps advancing while firing. Attack Move stops to engage.
-                if !holds_commanded_movement_path {
+                // Moving-fire Move orders and Lightness melee approaches keep advancing.
+                if !holds_commanded_movement_path && !lightness_moving_attack {
                     e.clear_path();
                 }
             }
