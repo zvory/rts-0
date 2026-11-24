@@ -50,7 +50,6 @@ fn disciple_shield_armors_artillery_and_drains_full_core_or_falloff() {
                     }
                 );
                 let full_damage = artillery_damage(
-                    EntityKind::Rifleman,
                     offset * offset,
                     (config::ARTILLERY_INNER_RADIUS_TILES * config::TILE_SIZE as f32).powi(2),
                     (config::ARTILLERY_OUTER_RADIUS_TILES * config::TILE_SIZE as f32).powi(2),
