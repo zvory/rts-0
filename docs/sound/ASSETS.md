@@ -102,3 +102,12 @@ transients retain their dynamics and stay below −16 LUFS where necessary to ke
 - Replace generated Panzerfaust launch/impact cues with reviewed realistic recordings before final
   audio polish
 - `ambient/` directory is empty
+
+## Selected Dao ability cues
+
+The user selected Silk Gust (Dash), Resonant Shell (Shield), and magical portal candidate 1
+(Anchor). These ElevenLabs-generated cues use the existing combat buses; Anchor sustains only
+while its visible world object exists and is mastered below the cast cues. Exact submitted prompts,
+API/model settings, raw sources, processing, and decoded levels are recorded in
+[DAO_ABILITIES.json](DAO_ABILITIES.json). Commercial rights remain unverified under the account
+terms. No rejected auditions are shipped in the runtime manifest.

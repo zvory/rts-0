@@ -139,6 +139,7 @@ await import("./client_contracts/camera_fog_contracts.mjs");
 await import("./client_contracts/camera_projection_contracts.mjs");
 await import("./client_contracts/auto_spectator_contracts.mjs");
 await import("./client_contracts/audio_contracts.mjs");
+await import("./client_contracts/ability_audio_contracts.mjs");
 await import("./client_contracts/observer_analysis_contracts.mjs");
 await import("./client_contracts/map_editor_layer_contracts.mjs");
 await import("./client_contracts/map_editor_sun_contracts.mjs");
