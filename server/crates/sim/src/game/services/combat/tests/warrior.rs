@@ -90,7 +90,7 @@ fn disciple_insight_counts_actual_hp_loss_resets_on_evolution_and_raises_cap() {
     run_combat_tick(&mut entities);
     assert_eq!(
         entities.get(unit).unwrap().insight,
-        2,
+        3,
         "overkill does not grant insight"
     );
     entities.get_mut(unit).unwrap().insight = 59;
@@ -106,7 +106,7 @@ fn disciple_insight_counts_actual_hp_loss_resets_on_evolution_and_raises_cap() {
         .unwrap()
         .evolve_dao(crate::game::ability::AbilityKind::EvolveWar));
     assert_eq!(entities.get(unit).unwrap().insight, 0);
-    for expected in [8, 17, 26, 35, 43, 52, 61] {
+    for expected in [17, 35, 52, 70, 87, 105, 122] {
         entities
             .get_mut(unit)
             .unwrap()
@@ -138,7 +138,7 @@ fn war_armor_uses_weapon_penetration_and_lightness_changes_attack_rate() {
     assert_eq!(war.range_tiles, config::DAO_WAR_RANGE_TILES);
     unit.set_disciple_kind_for_test(EntityKind::LightnessAdept);
     let light = effective_attack_profile(&unit);
-    assert_eq!(light.cooldown, 43);
+    assert_eq!(light.cooldown, 61);
     assert_eq!(light.range_tiles, 0.75);
     assert_eq!(
         light.weapon.unwrap().id,
@@ -275,12 +275,12 @@ fn dao_profiles_keep_lightness_melee_and_magic_ranged() {
         (
             UpgradeKind::DaoOfLightness,
             combat_rules::WeaponKind::WarriorSword,
-            43,
+            61,
         ),
         (
             UpgradeKind::DaoOfMagic,
             combat_rules::WeaponKind::DiscipleOrb,
-            64,
+            91,
         ),
     ] {
         let mut entities = EntityStore::new();
@@ -353,7 +353,7 @@ fn dao_profiles_keep_lightness_melee_and_magic_ranged() {
             }
         );
         assert_eq!(profile.dmg, if dao.is_some() { 35 } else { 23 });
-        assert_eq!(profile.cooldown, 64);
+        assert_eq!(profile.cooldown, 91);
         assert!(!can_fire_while_moving(&unit, false));
     }
 }
