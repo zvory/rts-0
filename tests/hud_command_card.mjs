@@ -785,17 +785,21 @@ for (const [kind, upgrade] of [
   const builds = card.slots.filter((slot) => slot?.action === "build");
   assert.deepEqual(
     builds.map((slot) => slot.intent.building),
-    [KIND.RESOURCE_DEPOT, KIND.PORTAL, KIND.THREE_DAO_PAVILION, KIND.TOURNAMENT_GROUNDS, KIND.PROVEN_GROUNDS, KIND.SHOP],
+    [KIND.RESOURCE_DEPOT, KIND.PUMP_JACK, KIND.PORTAL, KIND.THREE_DAO_PAVILION, KIND.TOURNAMENT_GROUNDS, KIND.PROVEN_GROUNDS, KIND.SHOP],
   );
   assert.equal(builds[0].label, "Nexus");
   assert.equal(builds[0].commandId, "cultivators.build." + KIND.RESOURCE_DEPOT);
-  assert.equal(builds[1].label, "Portal");
-  assert.equal(builds[1].commandId, "cultivators.build." + KIND.PORTAL);
-  assert.equal(builds[2].label, "Three Dao Pavilion");
-  assert.equal(builds[2].commandId, "cultivators.build." + KIND.THREE_DAO_PAVILION);
-  assert.equal(builds[2].hotkey, "A");
-  assert.equal(builds[3].label, "Tournament Grounds");
-  assert.equal(builds[3].commandId, "cultivators.build." + KIND.TOURNAMENT_GROUNDS);
+  assert.equal(builds[1].label, "Pump Jack");
+  assert.equal(builds[1].commandId, "cultivators.build." + KIND.PUMP_JACK);
+  assert.equal(builds[1].enabled, true);
+  assert.deepEqual(builds[1].cost, { steel: 150, oil: 0 });
+  assert.equal(builds[2].label, "Portal");
+  assert.equal(builds[2].commandId, "cultivators.build." + KIND.PORTAL);
+  assert.equal(builds[3].label, "Three Dao Pavilion");
+  assert.equal(builds[3].commandId, "cultivators.build." + KIND.THREE_DAO_PAVILION);
+  assert.equal(builds[3].hotkey, "A");
+  assert.equal(builds[4].label, "Tournament Grounds");
+  assert.equal(builds[4].commandId, "cultivators.build." + KIND.TOURNAMENT_GROUNDS);
 }
 
 {
