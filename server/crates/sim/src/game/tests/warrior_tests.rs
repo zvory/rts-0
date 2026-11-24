@@ -162,12 +162,7 @@ fn disciple_evolution_requires_insight_ownership_but_no_research_and_is_permanen
     use crate::game::ability::AbilityKind;
     use crate::game::upgrade::UpgradeKind;
     for (ability, upgrade, hp, speed) in [
-        (
-            AbilityKind::EvolveWind,
-            UpgradeKind::DaoWind,
-            115,
-            2.7025,
-        ),
+        (AbilityKind::EvolveWind, UpgradeKind::DaoWind, 115, 2.7025),
         (
             AbilityKind::EvolveWar,
             UpgradeKind::DaoOfHeaviness,
@@ -384,9 +379,7 @@ fn disciple_dao_gates_dash_and_magic_anchor_without_return() {
     assert_eq!(game.state.entities.get(unit).unwrap().pos_x(), 400.0);
     assert_eq!(game.state.ability_runtime.world_objects().count(), 0);
     game.state.entities.get_mut(unit).unwrap().insight = 60;
-    game.state.players[0]
-        .upgrades
-        .insert(UpgradeKind::DaoWind);
+    game.state.players[0].upgrades.insert(UpgradeKind::DaoWind);
     game.enqueue(1, cast(AbilityKind::EvolveWind));
     game.tick();
     game.enqueue(1, cast(AbilityKind::WindDash));
@@ -650,9 +643,7 @@ fn disciple_insight_is_team_private_but_readiness_and_advance_are_public() {
         assert_eq!(view.chosen_dao.as_deref(), insight.map(|_| "magic"));
         assert_eq!(view.dao_ready, Some(true));
     }
-    game.state.players[0]
-        .upgrades
-        .insert(UpgradeKind::DaoWind);
+    game.state.players[0].upgrades.insert(UpgradeKind::DaoWind);
     game.enqueue(
         1,
         Command::UseAbility {
@@ -1265,13 +1256,7 @@ fn disciple_dash_reaches_fifteen_tiles_for_immediate_and_queued_casts() {
             assert!(game
                 .state
                 .ability_runtime
-                .active_return_marker(
-                    1,
-                    unit,
-                    AbilityKind::WindDash,
-                    None,
-                    game.current_tick()
-                )
+                .active_return_marker(1, unit, AbilityKind::WindDash, None, game.current_tick())
                 .is_none());
         }
     }

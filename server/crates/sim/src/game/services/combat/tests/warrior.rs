@@ -380,11 +380,7 @@ fn wind_fires_during_move_and_magic_keeps_normal_stop_to_fire_policy() {
         run_combat_tick(&mut entities);
         assert_eq!(
             entities.get(target).unwrap().hp,
-            if dao == UpgradeKind::DaoWind {
-                22
-            } else {
-                45
-            }
+            if dao == UpgradeKind::DaoWind { 22 } else { 45 }
         );
         let unit = entities.get_mut(disciple).unwrap();
         assert!(!unit.path_is_empty());

@@ -199,9 +199,7 @@ fn tournament_four_enter_five_seconds_one_random_upgrade_rally_and_checkpoint() 
     for e in winners {
         assert!(matches!(
             e.dao(),
-            Some(
-                UpgradeKind::DaoWind | UpgradeKind::DaoOfHeaviness | UpgradeKind::DaoOfMagic
-            )
+            Some(UpgradeKind::DaoWind | UpgradeKind::DaoOfHeaviness | UpgradeKind::DaoOfMagic)
         ));
         assert_eq!(e.hp, e.max_hp);
         assert_eq!(e.insight, 0);
