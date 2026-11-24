@@ -418,12 +418,56 @@ try {
 
   const vp = await page.$("#viewport");
   const box = await vp.boundingBox();
-  await page.mouse.move(box.x + 60, box.y + 60);
+  // Finish the movement setup before testing selection against a stable target.
+  const stopWorkerSeq = await page.evaluate(() => {
+    const m = window.__rts.match, s = m.state;
+    const worker = s.entitiesInterpolated(1).find((e) => e.owner === s.playerId && e.kind === "worker");
+    if (!worker) throw new Error("box-select requires the starting worker");
+    const issued = m.commandIssuer.issueCommand({ c: "stop", units: [worker.id] });
+    if (!issued.sent) throw new Error("box-select worker stop must reach the server");
+    return issued.clientSeq;
+  });
+  await page.waitForFunction((seq) => window.__rts.match.prediction.latestAckSeq >= seq,
+    { timeout: 3000 }, stopWorkerSeq);
+  // Use the live worker position: earlier prediction checks move it, and the
+  // bottom HUD overlays the viewport. A fixed viewport-wide drag can hit that
+  // HUD or miss every unit depending on server/browser timing.
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  const boxSelectWorker = await page.evaluate(() => {
+    const m = window.__rts.match, s = m.state;
+    const worker = s.entitiesInterpolated(1).find((e) => e.owner === s.playerId && e.kind === "worker");
+    if (!worker) throw new Error("box-select requires the starting worker");
+    m.camera.centerOn(worker.x, worker.y);
+    m.clientIntent.closeCommandCardMenu();
+    s.setSelection([]);
+    const frameId = m.input.selectionScene?.frameId;
+    return { id: worker.id, frameId, camera: m.camera.projectionSnapshot().camera };
+  });
+  await page.waitForFunction(({ frameId, camera }) => {
+    const scene = window.__rts.match.input.selectionScene;
+    return scene?.frameId > frameId && JSON.stringify(scene.projection.camera) === JSON.stringify(camera);
+  }, { timeout: 3000 }, boxSelectWorker);
+  const drag = await page.evaluate((id) => {
+    const scene = window.__rts.match.input.selectionScene;
+    const proxy = scene.proxies.find((entity) => entity.id === id);
+    if (!proxy) throw new Error("box-select worker must be in the presented scene");
+    const point = scene.projection.project(proxy.anchor);
+    const rect = document.getElementById("viewport").getBoundingClientRect();
+    return { x: rect.left + point.x, y: rect.top + point.y };
+  }, boxSelectWorker.id);
+  for (const offset of [-60, 60]) {
+    const hitsViewport = await page.evaluate(({ x, y }) =>
+      !!document.elementFromPoint(x, y)?.closest("#viewport"),
+    { x: drag.x + offset, y: drag.y + offset });
+    if (!hitsViewport) throw new Error("box-select drag must stay clear of HUD overlays");
+  }
+  await page.mouse.move(drag.x - 60, drag.y - 60);
   await page.mouse.down();
-  await page.mouse.move(box.x + box.width - 120, box.y + box.height - 160, { steps: 10 });
+  await page.mouse.move(drag.x + 60, drag.y + 60, { steps: 10 });
   await page.mouse.up();
-  await sleep(250);
-  ok(await page.evaluate(() => window.__rts.match.state.selection.size) >= 1, "box-select selected own units");
+  await page.waitForFunction((id) => window.__rts.match.state.selection.has(id),
+    { timeout: 3000 }, boxSelectWorker.id);
+  ok(true, "box-select selected the own worker through real pointer input");
 
   const engineerSelected = await page.evaluate(() => {
     const m = window.__rts.match, s = m.state;

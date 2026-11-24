@@ -15,12 +15,12 @@ Cultivator camera, painterly outlines, timber and stone styling.
 
 ## Phase 1: rules and balance — complete
 
-User-specified: 200 steel, 200 oil, 40 seconds of construction, three tiles wide by four tiles
+User-specified: 200 steel, 200 oil, 20 seconds of construction, three tiles wide by four tiles
 deep, no functionality. The Shop has **200 HP** per the latest balance request.
 
 - Cultivator Serfs construct it through their normal build card (slot Z in the grid preset).
   No additional prerequisite or build limit. It is available in normal matches and Lab.
-- Authoritative construction is 1,200 ticks at 30 Hz. Footprint is 3×4, with ordinary placement,
+- Authoritative construction is 600 ticks at 30 Hz. Footprint is 3×4, with ordinary placement,
   collision, terrain restrictions, line-of-sight blocking and selection geometry.
 - Armored, one-tile sight, zero weapon damage/range, zero supply used/provided. No producer or
   production-anchor registration. Other factions cannot construct it.

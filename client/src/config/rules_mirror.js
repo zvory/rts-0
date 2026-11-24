@@ -239,7 +239,7 @@ export const STATS = Object.freeze({
     cost: { steel: 150, oil: 0 }, buildTicks: TICK_HZ * 5, trains: [KIND.WARRIOR, KIND.WIND_ADEPT, KIND.WAR_ADEPT, KIND.MAGIC_ADEPT],
     description: "A supernatural gateway that trains Novices and researched Adepts. Each Adept costs 150 steel and 35 oil and takes 10 seconds." },
   [KIND.SHOP]: { label: "Shop", icon: "SH", footW: 3, footH: 4, sight: 1,
-    cost: { steel: 200, oil: 200 }, buildTicks: TICK_HZ * 40, trains: [],
+    cost: { steel: 200, oil: 200 }, buildTicks: TICK_HZ * 20, trains: [],
     description: "Sells Healing Potions and Escape Treasures for nearby friendly units." },
   [KIND.PROVEN_GROUNDS]: { label: "Proving Grounds", icon: "PG", footW: 3, footH: 3, sight: 1,
     cost: { steel: 100, oil: 0 }, buildTicks: 200, trains: [], requires: [KIND.PORTAL],
