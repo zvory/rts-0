@@ -192,6 +192,7 @@ pub const UNITS: &[UnitDef] = &[
             cooldown: (NOVICE_DEF.stats.cooldown as f32 / balance::DAO_WIND_ATTACK_RATE + 0.5)
                 as u32,
             speed: SCOUT_CAR_DEF.stats.speed * balance::DAO_WIND_SPEED_MULTIPLIER,
+            sight_tiles: SCOUT_CAR_DEF.stats.sight_tiles - 1,
             cost_steel: 150,
             cost_oil: 35,
             supply: 3,
