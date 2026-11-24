@@ -36,13 +36,7 @@ fn terminal_tracking_updates_rotated_hull_goals_without_search_budget() {
         let mut pathing = PathingService::new(8192, 256);
         let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 11);
         let budget = coordinator.budget;
-        assert!(coordinator.request_direct_attack_path(
-            &mut entities,
-            attacker,
-            target,
-            0.0,
-            54.0
-        ));
+        assert!(coordinator.request_direct_attack_path(&mut entities, attacker, target, 0.0, 54.0));
         assert_eq!(
             coordinator.budget, budget,
             "local tracking must not consume tile searches"
@@ -54,8 +48,7 @@ fn terminal_tracking_updates_rotated_hull_goals_without_search_budget() {
             (410.0, 600.0),
             entities.get(target).unwrap(),
         );
-        let expected =
-            direct_attack_staging_goal(&map, (410.0, 600.0), point, 0.0, 54.0).unwrap();
+        let expected = direct_attack_staging_goal(&map, (410.0, 600.0), point, 0.0, 54.0).unwrap();
         assert_eq!(unit.path_goal(), Some(expected));
         assert_eq!(unit.next_waypoint(), Some(expected));
         assert_eq!(
@@ -64,6 +57,33 @@ fn terminal_tracking_updates_rotated_hull_goals_without_search_budget() {
             "tracking is not a new tile search"
         );
     }
+}
+
+#[test]
+fn terminal_tracking_preserves_progress_and_traffic_recovery() {
+    let (map, mut entities, attacker, target) = fixture();
+    let movement = entities
+        .get_mut(attacker)
+        .unwrap()
+        .movement
+        .as_mut()
+        .unwrap();
+    movement.stuck_ticks = 7;
+    movement.last_progress_pos = (405.0, 600.0);
+    movement.sidestep_cooldown = 12;
+    let occ = Occupancy::build(&map, &entities);
+    let mut pathing = PathingService::new(8192, 256);
+    let mut coordinator = MoveCoordinator::new(&mut pathing, &map, &occ, 11);
+
+    assert!(coordinator.request_direct_attack_path(&mut entities, attacker, target, 0.0, 54.0));
+
+    let movement = entities.get(attacker).unwrap().movement.as_ref().unwrap();
+    assert_eq!(movement.stuck_ticks, 7, "tracking is not movement progress");
+    assert_eq!(movement.last_progress_pos, (405.0, 600.0));
+    assert_eq!(
+        movement.sidestep_cooldown, 12,
+        "keep traffic recovery cooldowns"
+    );
 }
 
 #[test]
@@ -121,14 +141,7 @@ fn terminal_tracking_preserves_stationary_approaching_detour_and_travel_paths() 
             (428.6, 600.0)
         };
         assert!(
-            !coordinator.track_pursuit_endpoint(
-                &mut entities,
-                attacker,
-                target,
-                goal,
-                min,
-                54.0
-            ),
+            !coordinator.track_pursuit_endpoint(&mut entities, attacker, target, goal, min, 54.0),
             "{case}"
         );
         assert_eq!(

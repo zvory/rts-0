@@ -82,11 +82,12 @@ impl MoveCoordinator<'_> {
             return false;
         }
         if let Some(entity) = entities.get_mut(id) {
+            // Refreshing a destination is not progress. Let movement retain its stuck
+            // accounting and recovery cooldowns while following this same pursuit.
             entity.begin_weapon_teardown_for_movement();
             entity.set_path(vec![goal]);
             entity.set_path_goal(Some(goal));
             entity.mark_attack_phase(AttackPhase::Pursuing);
-            entity.reset_stuck(start.0, start.1);
         }
         true
     }
