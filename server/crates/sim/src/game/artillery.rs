@@ -21,6 +21,8 @@ struct ArtilleryShell {
     attacker: u32,
     x: Coord,
     y: Coord,
+    from_x: Coord,
+    from_y: Coord,
     impact_tick: u32,
 }
 
@@ -34,13 +36,23 @@ impl ArtilleryShellStore {
         self.shells.len()
     }
 
-    pub(crate) fn schedule(&mut self, owner: u32, attacker: u32, x: f32, y: f32, tick: u32) {
+    pub(crate) fn schedule(
+        &mut self,
+        owner: u32,
+        attacker: u32,
+        x: f32,
+        y: f32,
+        source: (f32, f32),
+        tick: u32,
+    ) {
         if !x.is_finite() || !y.is_finite() {
             return;
         }
         self.shells.push(ArtilleryShell {
             owner,
             attacker,
+            from_x: Coord::from_world(source.0),
+            from_y: Coord::from_world(source.1),
             x: Coord::from_world(x),
             y: Coord::from_world(y),
             impact_tick: tick.saturating_add(config::ARTILLERY_SHELL_DELAY_TICKS),
@@ -128,6 +140,7 @@ fn resolve_shell(
             shell.owner,
             damage,
             if d2 <= inner2 { 1.0 } else { 0.0 },
+            (shell.from_x.to_world(), shell.from_y.to_world()),
             teams,
         );
         if damage == 0 {
@@ -350,6 +363,8 @@ mod tests {
         let shell = ArtilleryShell {
             owner: 1,
             attacker: 1,
+            from_x: Coord::from_world(0.0),
+            from_y: Coord::from_world(0.0),
             x: Coord::from_world(160.0),
             y: Coord::from_world(160.0),
             impact_tick: 0,

@@ -90,12 +90,13 @@ fn direct_weapons_only_damage_the_resolved_victim() {
 }
 
 #[test]
-fn disciple_shield_blocks_rifles_but_not_piercing_weapons_or_tank_splash() {
+fn disciple_shield_blocks_nonpiercing_hits_and_tank_splash() {
     for kind in [
         combat_rules::WeaponKind::RiflemanRifle,
         combat_rules::WeaponKind::TankCannon,
         combat_rules::WeaponKind::AntiTankGun,
         combat_rules::WeaponKind::WarriorSword,
+        combat_rules::WeaponKind::DiscipleOrb,
     ] {
         let map = open_map(16);
         let mut entities = EntityStore::new();
@@ -151,15 +152,19 @@ fn disciple_shield_blocks_rifles_but_not_piercing_weapons_or_tank_splash() {
             .as_ref()
             .unwrap()
             .remaining;
-        if kind == combat_rules::WeaponKind::RiflemanRifle {
+        if weapon.armor_penetration == 0.0 {
             assert_eq!(entities.get(primary).unwrap().hp, hp);
             assert!(remaining < config::DISCIPLE_SHIELD_CAPACITY);
         } else {
             assert!(entities.get(primary).unwrap().hp < hp, "{kind:?}");
-            assert_eq!(remaining, config::DISCIPLE_SHIELD_CAPACITY, "{kind:?}");
+            if weapon.armor_penetration < 1.0 || kind == combat_rules::WeaponKind::TankCannon {
+                assert!(remaining < config::DISCIPLE_SHIELD_CAPACITY, "{kind:?}");
+            } else {
+                assert_eq!(remaining, config::DISCIPLE_SHIELD_CAPACITY, "{kind:?}");
+            }
         }
         if kind == combat_rules::WeaponKind::TankCannon {
-            assert!(entities.get(neighbor).unwrap().hp < neighbor_hp);
+            assert_eq!(entities.get(neighbor).unwrap().hp, neighbor_hp);
         }
     }
 }
