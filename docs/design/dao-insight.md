@@ -8,7 +8,7 @@ insight is ready. Selecting another path replaces the pending choice. This
 entity-owned intent is independent of orders: moving, attacking, Stop, and queued orders
 do not cancel it. No automatic research purchase, Portal default, or army-wide promotion
 is added. Evolution is immediate and free once the unit has 60 insight, capped at 60; misses, friendly fire, invulnerability and overkill grant
-no extra insight. Actual hostile unit HP loss grants one insight per damage; building HP loss grants half, rounded down per hit, for ordinary attacks and ability projectiles except Throw Sword, whose outbound and return hits grant no insight. Advancement clears all existing insight. Successful advancement fully restores HP to the evolved unit’s maximum,
+no extra insight. Actual hostile unit HP loss grants cost-weighted insight as specified below; building HP loss grants a fixed quarter rate. Ordinary attacks and eligible ability projectiles share this rule; Throw Sword grants no insight. Advancement clears all existing insight. Successful advancement fully restores HP to the evolved unit’s maximum,
 after applying any path-specific maximum-HP bonus. Base, Lightness, and Magic have 115 maximum HP; War has 135. Base moves at 2.0 px/tick; War and Magic move at 2.1 px/tick. Choosing a pending path or repeating
 an evolution request does not heal; dead units cannot advance. One chosen-path evolution per unit, followed by one automatic Master advancement. Player research persists after Pavilion loss.
 The choice clears on evolution; evolved units cannot change paths. Pending choices persist
@@ -129,3 +129,22 @@ evolution increases used supply immediately and may exceed the cap. Conversion q
 reserve three supply; Proving Grounds entrants wait if the additional supply is unavailable.
 
 Lightness uses the separate `lightnessDash` ability: fifteen-tile movement without a return marker or recast. Adepts hold one charge and Masters two, recharging sequentially every eight seconds. Promotion grants the additional ready charge while preserving existing recharge progress.
+
+
+## Cost-weighted combat insight
+
+For Novices and Adepts, value is listed steel cost plus 2.5 times listed oil cost.
+Unit HP damage earns insight at target value / attacker value, clamped to 0.25–2.
+Use the current unit kind's listed cost regardless of acquisition route; omit research,
+infrastructure, supply, and rank bonuses. Novice value is 100; all Adepts are 237.5.
+Zero-cost targets receive the 0.25 floor. Buildings always give 0.25 insight per actual
+hostile HP lost, bypassing cost scaling. There is no killing-blow bonus, and Throw Sword
+continues to grant no insight. Existing shield, armor, hostility, and overkill rules apply.
+
+Arithmetic is exact integer arithmetic: weighted value W = 2 × steel + 5 × oil;
+the denominator is 4 × attacker W, and the numerator is clamp(4 × target W,
+attacker W, 8 × attacker W), or attacker W for buildings. Fractional numerators carry
+between hits and target changes, persist in checkpoints, and remain server-private.
+At the insight cap, evolution, or Master advancement, discard the remainder alongside
+any excess insight. Masters earn no further insight. This preserves small-hit rewards
+without rounding down each attack or introducing floating-point replay drift.

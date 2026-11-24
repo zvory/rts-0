@@ -84,3 +84,24 @@ pub fn dao_research_tier(reserved: usize) -> (u32, u32, u32) {
         DAO_RESEARCH_TICKS / 2 * multiplier,
     )
 }
+
+/// Exact insight ratio. Doubling resource value makes oil worth 2.5 steel without floats.
+/// The denominator depends only on the attacker, so fractions survive target changes.
+pub fn disciple_insight_ratio(
+    attacker: crate::EntityKind,
+    target: crate::EntityKind,
+) -> (u64, u64) {
+    let value = |kind| {
+        super::unit_stats(kind).map_or(0, |stats| {
+            u64::from(stats.cost_steel) * 2 + u64::from(stats.cost_oil) * 5
+        })
+    };
+    let own = value(attacker).max(1);
+    let denominator = own * 4;
+    let numerator = if super::building_stats(target).is_some() {
+        own
+    } else {
+        (value(target) * 4).clamp(own, own * 8)
+    };
+    (numerator, denominator)
+}

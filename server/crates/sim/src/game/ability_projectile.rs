@@ -333,7 +333,7 @@ fn apply_projectile_hits(
             map.damage_after_reduction_tile(target.pos_x(), target.pos_y(), damage)
         });
         let damage = entities.shielded_damage(id, projectile.owner, damage, teams);
-        let target_is_building = entities.get(id).is_some_and(|target| target.is_building());
+        let target_kind = entities.get(id).map(|target| target.kind);
         let actual = if let Some(target) = entities.get_mut(id) {
             let before_hp = target.hp;
             target.apply_damage_from_entity(
@@ -348,8 +348,10 @@ fn apply_projectile_hits(
             0
         };
         if projectile.ability != AbilityKind::ThrowSword {
-            if let Some(caster) = entities.get_mut(projectile.caster_id) {
-                caster.gain_insight(actual, target_is_building);
+            if let (Some(caster), Some(target_kind)) =
+                (entities.get_mut(projectile.caster_id), target_kind)
+            {
+                caster.gain_insight(actual, target_kind);
             }
         }
     }

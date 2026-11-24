@@ -54,7 +54,7 @@ fn dao_master_advances_once_keeps_reload_and_persists_rank() {
         assert_eq!(view.dao_master, Some(true));
         let unit = game.state.entities.get_mut(id).unwrap();
         unit.apply_damage(unit.hp - 1, None);
-        unit.gain_insight(1000, false);
+        unit.gain_insight(1000, EntityKind::Rifleman);
         unit.advance_dao_master();
         assert_eq!((unit.hp, unit.max_hp, unit.insight), (1, hp, 0));
     }
@@ -150,4 +150,76 @@ fn dao_master_combat_threshold_and_damage_apply_to_all_three_paths() {
         assert_eq!(enemy.dao_master, Some(true));
         assert_eq!(enemy.insight, None);
     }
+}
+
+#[test]
+fn disciple_weighted_insight_carries_exact_fractions_through_targets_and_checkpoints() {
+    let mut game = empty_flat_game(&[cultivator_player()]);
+    let id = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::MagicAdept, 400.0, 400.0)
+        .unwrap();
+    game.tick();
+    let unit = game.state.entities.get_mut(id).unwrap();
+    // Adept value 475, MG value 200 in half-steel units: 19 HP earns exactly 8.
+    for _ in 0..18 {
+        unit.gain_insight(1, EntityKind::MachineGunner);
+    }
+    assert_eq!(unit.insight, 7);
+    let checkpoint = game.checkpoint_payload_text_for_test().unwrap();
+    let mut restored = Game::restore_checkpoint_payload_text_for_test(
+        &checkpoint,
+        game.state.map.clone(),
+        game.state.map_metadata.clone(),
+    )
+    .unwrap();
+    let unit = restored.state.entities.get_mut(id).unwrap();
+    unit.gain_insight(1, EntityKind::MachineGunner);
+    assert_eq!((unit.insight, unit.insight_fraction), (8, 0));
+    // Switching targets retains quarters, including zero-resource targets at the floor.
+    for target in [
+        EntityKind::Rifleman,
+        EntityKind::ResourceDepot,
+        EntityKind::Golem,
+        EntityKind::Rifleman,
+    ] {
+        unit.gain_insight(1, target);
+    }
+    assert_eq!((unit.insight, unit.insight_fraction), (9, 0));
+    unit.gain_insight(1, EntityKind::Tank);
+    assert_eq!(unit.insight, 11, "expensive targets cap at double insight");
+    unit.gain_insight(u32::MAX, EntityKind::Tank);
+    assert_eq!((unit.insight, unit.insight_fraction), (200, 0));
+    unit.advance_dao_master();
+    unit.gain_insight(1, EntityKind::Rifleman);
+    assert_eq!((unit.insight, unit.insight_fraction), (0, 0));
+}
+
+#[test]
+fn disciple_insight_fraction_checkpoint_validation_and_evolution_reset() {
+    let mut game = empty_flat_game(&[cultivator_player()]);
+    let id = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Warrior, 400.0, 400.0)
+        .unwrap();
+    game.tick();
+    let unit = game.state.entities.get_mut(id).unwrap();
+    unit.gain_insight(1, EntityKind::Rifleman);
+    assert!(unit.insight_fraction > 0);
+    unit.insight_fraction = 800; // Novice denominator is 4 * (100 steel * 2).
+    assert!(game.checkpoint_payload_text_for_test().is_err());
+    let unit = game.state.entities.get_mut(id).unwrap();
+    unit.insight_fraction = 1;
+    unit.insight = 60;
+    assert!(
+        game.checkpoint_payload_text_for_test().is_err(),
+        "capped units cannot retain fractions"
+    );
+    let unit = game.state.entities.get_mut(id).unwrap();
+    assert!(unit.evolve_dao(crate::game::ability::AbilityKind::EvolveMagic));
+    assert_eq!((unit.insight, unit.insight_fraction), (0, 0));
+    game.tick();
+    assert!(game.checkpoint_payload_text_for_test().is_ok());
 }

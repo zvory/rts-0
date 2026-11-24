@@ -64,16 +64,22 @@ impl Entity {
         }
     }
 
-    /// Credit actual hostile HP loss after protection/overkill, at half rate for buildings.
-    pub(in crate::game) fn gain_insight(&mut self, damage: u32, target_is_building: bool) {
-        if self.kind.is_disciple() {
-            let damage = if target_is_building {
-                damage / 2
-            } else {
-                damage
-            };
-            self.insight = self.insight.saturating_add(damage).min(self.insight_cap());
+    /// Credit actual hostile HP loss using exact cost-weighted fractions.
+    pub(in crate::game) fn gain_insight(&mut self, damage: u32, target_kind: EntityKind) {
+        if !self.kind.is_disciple() || self.insight >= self.insight_cap() {
+            return;
         }
+        let (numerator, denominator) = config::disciple_insight_ratio(self.kind, target_kind);
+        let total = u64::from(damage)
+            .saturating_mul(numerator)
+            .saturating_add(self.insight_fraction);
+        let earned = (total / denominator).min(u64::from(self.insight_cap() - self.insight));
+        self.insight += earned as u32;
+        self.insight_fraction = if self.insight == self.insight_cap() {
+            0
+        } else {
+            total % denominator
+        };
     }
 
     pub(crate) fn units_killed(&self) -> u32 {
@@ -150,6 +156,7 @@ impl Entity {
             );
         }
         self.insight = 0;
+        self.insight_fraction = 0;
         self.max_hp = ((self.max_hp as f32) * config::DAO_MASTER_HP_MULTIPLIER).round() as u32;
         self.hp = self.max_hp;
         self.dao_advance_ticks = 15;
@@ -171,6 +178,7 @@ impl Entity {
         self.set_attack_cd(attack_cd);
         self.chosen_dao = None;
         self.insight = 0;
+        self.insight_fraction = 0;
         // Specialists cannot enter tournaments. Keep their movement order, but drop admission
         // intent immediately so evolution late in the tick leaves checkpoint-valid state.
         if let Some(movement) = self.movement.as_mut() {

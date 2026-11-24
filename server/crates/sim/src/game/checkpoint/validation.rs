@@ -250,7 +250,11 @@ fn validate_entity(
             field: "entities.chosenDao",
         });
     }
-    if entity.insight > entity.insight_cap()
+    let (_, insight_denominator) = config::disciple_insight_ratio(entity.kind, entity.kind);
+    if entity.insight_fraction >= insight_denominator
+        || (entity.insight_fraction != 0
+            && (!entity.kind.is_disciple() || entity.insight >= entity.insight_cap()))
+        || entity.insight > entity.insight_cap()
         || (!entity.kind.is_disciple() && entity.insight != 0)
         || (entity.dao_master && entity.dao().is_none())
     {

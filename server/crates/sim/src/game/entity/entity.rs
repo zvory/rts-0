@@ -17,6 +17,10 @@ use super::{
     WeaponSetup, WorkerState, MAX_QUEUED_ORDERS, NEUTRAL,
 };
 
+fn insight_fraction_is_zero(value: &u64) -> bool {
+    *value == 0
+}
+
 mod ability_charges;
 mod dao;
 pub(crate) use dao::DiscipleShield;
@@ -55,6 +59,9 @@ pub struct Entity {
 
     #[serde(default)]
     pub insight: u32,
+    /// Numerator remainder in the current kind's insight-ratio denominator.
+    #[serde(default, skip_serializing_if = "insight_fraction_is_zero")]
+    pub(crate) insight_fraction: u64,
     #[serde(default)]
     pub dao_master: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -118,6 +125,7 @@ impl Entity {
             last_damage_entity: None,
             units_killed: 0,
             insight: 0,
+            insight_fraction: 0,
             dao_master: false,
             chosen_dao: None,
             dao_advance_ticks: 0,
@@ -176,6 +184,7 @@ impl Entity {
             last_damage_entity: None,
             units_killed: 0,
             insight: 0,
+            insight_fraction: 0,
             dao_master: false,
             chosen_dao: None,
             dao_advance_ticks: 0,
@@ -236,6 +245,7 @@ impl Entity {
             last_damage_entity: None,
             units_killed: 0,
             insight: 0,
+            insight_fraction: 0,
             dao_master: false,
             chosen_dao: None,
             dao_advance_ticks: 0,
