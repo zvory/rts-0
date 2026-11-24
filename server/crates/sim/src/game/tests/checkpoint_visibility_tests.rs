@@ -308,6 +308,7 @@ fn visibility_combat_checkpoint_preserves_smoke_ability_shells_and_combat_state(
         target.pos_x(),
         target.pos_y(),
         baseline.tick_count(),
+        true,
     );
     baseline.state.artillery_shells.schedule(
         1,
@@ -316,6 +317,7 @@ fn visibility_combat_checkpoint_preserves_smoke_ability_shells_and_combat_state(
         target.pos_y(),
         (0.0, 0.0),
         baseline.tick_count(),
+        true,
     );
     repair_after_authoritative_test_spawn(&mut baseline);
 

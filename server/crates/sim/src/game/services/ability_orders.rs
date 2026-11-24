@@ -194,14 +194,19 @@ pub(crate) fn launch_world_ability(
             }
             let reload = mortar_fire_weapon_cooldown_ticks();
             e.set_attack_cd(if haste { (reload / 2).max(1) } else { reload });
-            mortar_shells
-                .schedule_manual(events, teams, player, caster, from_x, from_y, x, y, tick);
-            if entities
-                .get(caster)
-                .is_some_and(|e| e.shop_item_active(AbilityKind::DoubleDamage))
-            {
-                mortar_shells.empower_latest_primary();
-            }
+            let double_damage = e.shop_item_active(AbilityKind::DoubleDamage);
+            mortar_shells.schedule_manual(
+                events,
+                teams,
+                player,
+                caster,
+                from_x,
+                from_y,
+                x,
+                y,
+                tick,
+                double_damage,
+            );
             true
         }
         (AbilityEffectHook::DelayedWorld, AbilityKind::Barrage) => {

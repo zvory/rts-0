@@ -34,15 +34,11 @@ pub(crate) struct ArtilleryShellStore {
 }
 
 impl ArtilleryShellStore {
-    pub(in crate::game) fn empower_latest_primary(&mut self) {
-        if let Some(shell) = self.shells.last_mut() {
-            shell.double_damage = true;
-        }
-    }
     pub(in crate::game) fn checkpoint_len(&self) -> usize {
         self.shells.len()
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn schedule(
         &mut self,
         owner: u32,
@@ -51,6 +47,7 @@ impl ArtilleryShellStore {
         y: f32,
         source: (f32, f32),
         tick: u32,
+        double_damage: bool,
     ) {
         if !x.is_finite() || !y.is_finite() {
             return;
@@ -63,7 +60,7 @@ impl ArtilleryShellStore {
             x: Coord::from_world(x),
             y: Coord::from_world(y),
             impact_tick: tick.saturating_add(config::ARTILLERY_SHELL_DELAY_TICKS),
-            double_damage: false,
+            double_damage,
         });
     }
 

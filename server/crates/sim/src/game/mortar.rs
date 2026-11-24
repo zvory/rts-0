@@ -103,11 +103,6 @@ fn rotate_toward(current: f32, desired: f32, max_delta: f32) -> f32 {
 }
 
 impl MortarShellStore {
-    pub(in crate::game) fn empower_latest_primary(&mut self) {
-        if let Some(shell) = self.shells.last_mut() {
-            shell.double_damage = true;
-        }
-    }
     pub(in crate::game) fn checkpoint_len(&self) -> usize {
         self.shells.len()
     }
@@ -124,6 +119,7 @@ impl MortarShellStore {
         x: f32,
         y: f32,
         tick: u32,
+        double_damage: bool,
     ) {
         let delay_ticks = config::MORTAR_MANUAL_SHELL_DELAY_TICKS;
         self.shells.push(MortarShell {
@@ -137,7 +133,7 @@ impl MortarShellStore {
             impact_tick: tick.saturating_add(delay_ticks),
             launched: true,
             rocket: false,
-            double_damage: false,
+            double_damage,
         });
         emit_launch(
             events,
