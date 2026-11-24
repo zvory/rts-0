@@ -66,10 +66,7 @@ impl Entity {
 
     /// Credit actual hostile HP loss using exact cost-weighted fractions.
     pub(in crate::game) fn gain_insight(&mut self, damage: u32, target_kind: EntityKind) {
-        if !self.kind.is_disciple()
-            || self.kind == EntityKind::MagicAdept
-            || self.insight >= self.insight_cap()
-        {
+        if !self.kind.is_disciple() || self.insight >= self.insight_cap() {
             return;
         }
         let (numerator, denominator) = config::disciple_insight_ratio(self.kind, target_kind);

@@ -173,15 +173,10 @@ impl EntityStore {
             if shield.remaining == 0 || full_damage == 0 {
                 continue;
             }
-            let capacity = crate::config::DISCIPLE_SHIELD_CAPACITY;
-            let reward = crate::config::MAGIC_SHIELD_INSIGHT;
-            let before = (capacity - shield.remaining) * reward / capacity;
             shield.remaining = shield.remaining.saturating_sub(full_damage);
-            let earned = (capacity - shield.remaining) * reward / capacity - before;
             if shield.remaining == 0 {
                 caster.shield = None;
             }
-            caster.gain_magic_insight(earned);
             return crate::rules::combat::damage_after_armor_reduction(
                 damage,
                 crate::config::DISCIPLE_SHIELD_ARMOR_REDUCTION,
