@@ -75,6 +75,7 @@ fn scores_record_kills_and_losses_on_death() {
     let teams = game.team_relations();
     services::death::death_system(
         &game.state.map,
+        &game.state.ability_runtime,
         &mut game.state.entities,
         &game.state.fog,
         &game.state.smokes,
@@ -217,6 +218,7 @@ fn observer_analysis_reports_authoritative_inventory_production_and_losses() {
     let teams = game.team_relations();
     services::death::death_system(
         &game.state.map,
+        &game.state.ability_runtime,
         &mut game.state.entities,
         &game.state.fog,
         &game.state.smokes,

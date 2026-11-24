@@ -35,6 +35,7 @@ fn barbed_wire_two_mixed_crossings_and_reentry() {
             assert_eq!(entities.get(wire).unwrap().hp, 0);
             crate::game::services::death::death_system(
                 &map,
+                &crate::game::ability_runtime::AbilityRuntime::new(),
                 &mut entities,
                 &crate::game::fog::Fog::new(map.width, map.height),
                 &SmokeCloudStore::new(),

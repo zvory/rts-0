@@ -422,6 +422,7 @@ pub(crate) fn run_tick(
         let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
         services::death::death_system(
             map,
+            ability_runtime,
             entities,
             fog,
             smokes,
@@ -466,6 +467,7 @@ pub(crate) fn run_tick(
     if wire_deaths {
         services::death::death_system(
             map,
+            ability_runtime,
             entities,
             fog,
             smokes,

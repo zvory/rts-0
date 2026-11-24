@@ -609,3 +609,109 @@ fn disciple_shield_full_attack_cost_ignores_existing_reductions_and_breaking_hit
         100
     );
 }
+
+#[test]
+fn magic_support_insight_shield_tracks_consumption_across_checkpoint_and_caps() {
+    let (mut game, caster) = setup();
+    game.tick();
+    let unit = game.state.entities.get_mut(caster).unwrap();
+    unit.insight = 0;
+    unit.gain_insight(1000, EntityKind::Tank);
+    assert_eq!(unit.insight, 0, "Magic attacks grant no insight");
+    let shield_id = game.state.ability_runtime.allocate_id().get();
+    game.state
+        .entities
+        .get_mut(caster)
+        .unwrap()
+        .place_shield(shield_id, 400.0, 400.0, 0, 100, true);
+    let teams = game.team_relations();
+    for _ in 0..7 {
+        game.state
+            .entities
+            .shielded_damage(caster, 2, 1, 1, 0.0, (0.0, 0.0), &teams);
+    }
+    assert_eq!(game.state.entities.get(caster).unwrap().insight, 2);
+    let checkpoint = game.checkpoint_payload_text_for_test().unwrap();
+    let mut game = Game::restore_checkpoint_payload_text_for_test(
+        &checkpoint,
+        game.state.map.clone(),
+        game.state.map_metadata.clone(),
+    )
+    .unwrap();
+    game.state
+        .entities
+        .shielded_damage(caster, 2, 1000, 1000, 1.0, (0.0, 0.0), &teams);
+    let unit = game.state.entities.get_mut(caster).unwrap();
+    assert_eq!(
+        unit.insight, 60,
+        "full shield grants exactly 60 despite overkill"
+    );
+    assert!(unit.shield.is_none());
+    unit.place_shield(2, 400.0, 400.0, 0, 200, true);
+    unit.expire_shield(200);
+    assert_eq!(unit.insight, 60, "expiration grants nothing");
+    unit.insight = 199;
+    unit.gain_magic_insight(20);
+    assert_eq!(unit.insight, 200);
+    unit.advance_dao_master();
+    unit.gain_magic_insight(60);
+    assert_eq!(unit.insight, 0, "Masters gain nothing");
+}
+
+#[test]
+fn magic_support_insight_anchor_rewards_enemy_unit_deaths_once_per_caster() {
+    use crate::game::ability_runtime::{
+        AbilityObjectPayload, AbilityWorldObjectKind, AbilityWorldObjectSpec,
+    };
+    let (mut game, caster) = setup();
+    game.state.entities.get_mut(caster).unwrap().insight = 0;
+    game.state
+        .ability_runtime
+        .spawn_world_object(AbilityWorldObjectSpec {
+            owner: 1,
+            caster_id: caster,
+            ability: AbilityKind::EkatMagicAnchor,
+            kind: AbilityWorldObjectKind::MagicAnchor,
+            x: 400.0,
+            y: 400.0,
+            created_tick: 0,
+            expires_tick: 100,
+            payload: AbilityObjectPayload::MagicAnchor { radius: 100.0 },
+        })
+        .unwrap();
+    for (owner, x, kind) in [
+        (2, 410.0, EntityKind::Rifleman),
+        (2, 420.0, EntityKind::Tank),
+        (1, 430.0, EntityKind::Rifleman),
+        (2, 700.0, EntityKind::Rifleman),
+    ] {
+        let id = game
+            .state
+            .entities
+            .spawn_unit(owner, kind, x, 400.0)
+            .unwrap();
+        game.state
+            .entities
+            .get_mut(id)
+            .unwrap()
+            .apply_damage(u32::MAX, None);
+    }
+    let building = game
+        .state
+        .entities
+        .spawn_building(2, EntityKind::ResourceDepot, 440.0, 400.0, true)
+        .unwrap();
+    game.state
+        .entities
+        .get_mut(building)
+        .unwrap()
+        .apply_damage(u32::MAX, None);
+    game.tick();
+    assert_eq!(game.state.entities.get(caster).unwrap().insight, 40);
+    game.tick();
+    assert_eq!(
+        game.state.entities.get(caster).unwrap().insight,
+        40,
+        "removed deaths cannot reward twice"
+    );
+}

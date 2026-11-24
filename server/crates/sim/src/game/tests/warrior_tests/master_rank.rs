@@ -87,12 +87,11 @@ fn dao_master_dead_unit_cannot_heal_and_invalid_rank_is_rejected() {
 }
 
 #[test]
-fn dao_master_combat_threshold_and_damage_apply_to_all_three_paths() {
+fn dao_master_combat_threshold_and_damage_apply_to_combat_paths() {
     use crate::game::ability::AbilityKind;
     for (ability, adept_damage, master_damage, cooldown) in [
         (AbilityKind::EvolveWind, 23, 28, 61),
         (AbilityKind::EvolveWar, 35, 42, 91),
-        (AbilityKind::EvolveMagic, 23, 28, 91),
     ] {
         let mut game = empty_flat_game(&[
             cultivator_player(),
@@ -160,7 +159,7 @@ fn disciple_weighted_insight_carries_exact_fractions_through_targets_and_checkpo
     let id = game
         .state
         .entities
-        .spawn_unit(1, EntityKind::MagicAdept, 400.0, 400.0)
+        .spawn_unit(1, EntityKind::WarAdept, 400.0, 400.0)
         .unwrap();
     game.tick();
     let unit = game.state.entities.get_mut(id).unwrap();
@@ -225,4 +224,39 @@ fn disciple_insight_fraction_checkpoint_validation_and_evolution_reset() {
     assert_eq!((unit.insight, unit.insight_fraction), (0, 0));
     game.tick();
     assert!(game.checkpoint_payload_text_for_test().is_ok());
+}
+
+#[test]
+fn wind_insight_extractors_grant_full_actual_damage_other_buildings_quarter() {
+    for kind in [
+        EntityKind::WindAdept,
+        EntityKind::WarAdept,
+        EntityKind::MagicAdept,
+        EntityKind::Warrior,
+    ] {
+        let mut game = empty_flat_game(&[cultivator_player()]);
+        let id = game
+            .state
+            .entities
+            .spawn_unit(1, kind, 400.0, 400.0)
+            .unwrap();
+        for target in [
+            EntityKind::PumpJack,
+            EntityKind::SteelMine,
+            EntityKind::ResourceDepot,
+        ] {
+            let unit = game.state.entities.get_mut(id).unwrap();
+            unit.insight = 0;
+            unit.insight_fraction = 0;
+            unit.gain_insight(12, target);
+            let expected = if kind == EntityKind::MagicAdept {
+                0
+            } else if kind == EntityKind::WindAdept && target.is_resource_extractor() {
+                12
+            } else {
+                3
+            };
+            assert_eq!(unit.insight, expected, "{kind:?} against {target:?}");
+        }
+    }
 }

@@ -23,6 +23,7 @@ const EXTRACTOR_RESPAWN_DELAY_TICKS: u32 = config::TICK_HZ * 5;
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn death_system(
     map: &Map,
+    ability_runtime: &crate::game::ability_runtime::AbilityRuntime,
     entities: &mut EntityStore,
     fog: &Fog,
     smokes: &SmokeCloudStore,
@@ -64,6 +65,35 @@ pub(crate) fn death_system(
                 .collect(),
         })
         .collect();
+
+    // Resolve once, before removal, so every death source and overlapping Anchor is covered.
+    for object in ability_runtime.world_objects() {
+        let crate::game::ability_runtime::AbilityObjectPayload::MagicAnchor { radius } =
+            object.payload
+        else {
+            continue;
+        };
+        if object.expires_tick <= tick {
+            continue;
+        }
+        let deaths = dead
+            .iter()
+            .filter(|victim| {
+                let dx = victim.x - object.x.to_world();
+                let dy = victim.y - object.y.to_world();
+                victim.kind.is_unit()
+                    && teams.is_enemy_owner(object.owner, victim.owner)
+                    && dx * dx + dy * dy <= radius * radius
+            })
+            .count();
+        if let Some(caster) = entities.get_mut(object.caster_id) {
+            if caster.owner == object.owner {
+                caster.gain_magic_insight(
+                    (deaths as u32).saturating_mul(config::MAGIC_ANCHOR_DEATH_INSIGHT),
+                );
+            }
+        }
+    }
 
     for dead_entity in &dead {
         if config::unit_stats(dead_entity.kind).is_none()

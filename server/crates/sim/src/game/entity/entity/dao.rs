@@ -66,7 +66,10 @@ impl Entity {
 
     /// Credit actual hostile HP loss using exact cost-weighted fractions.
     pub(in crate::game) fn gain_insight(&mut self, damage: u32, target_kind: EntityKind) {
-        if !self.kind.is_disciple() || self.insight >= self.insight_cap() {
+        if !self.kind.is_disciple()
+            || self.kind == EntityKind::MagicAdept
+            || self.insight >= self.insight_cap()
+        {
             return;
         }
         let (numerator, denominator) = config::disciple_insight_ratio(self.kind, target_kind);
@@ -80,6 +83,17 @@ impl Entity {
         } else {
             total % denominator
         };
+    }
+
+    /// Support rewards are whole insight and never credit dead casters or Masters.
+    pub(in crate::game) fn gain_magic_insight(&mut self, amount: u32) {
+        if self.kind != EntityKind::MagicAdept || self.hp == 0 || self.dao_master {
+            return;
+        }
+        self.insight = self.insight.saturating_add(amount).min(self.insight_cap());
+        if self.insight == self.insight_cap() {
+            self.insight_fraction = 0;
+        }
     }
 
     pub(crate) fn units_killed(&self) -> u32 {
