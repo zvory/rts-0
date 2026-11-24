@@ -375,7 +375,7 @@ export class HudSelectionPanel {
     const hp = e.hp ?? 0;
     const maxHp = e.maxHp ?? hp ?? 1;
     const frac = maxHp > 0 ? Math.max(0, Math.min(1, hp / maxHp)) : 0;
-    const hpClass = frac > 0.5 ? "good" : frac > 0.25 ? "mid" : "low";
+    const hpClass = e.kind === KIND.HEALING_SEAL || frac > 0.5 ? "good" : frac > 0.25 ? "mid" : "low";
 
     let prodHtml = "";
     const queue = e.prodQueue ?? 0;
@@ -422,7 +422,7 @@ export class HudSelectionPanel {
       ? ""
       : `<div class="sel-hpbar"><div class="sel-hpfill ${hpClass}" ` +
         `style="width:${(frac * 100).toFixed(0)}%"></div></div>` +
-        `<div class="sel-hptext">${hp} / ${maxHp}</div>`;
+        `<div class="sel-hptext">${hp} / ${maxHp}${e.kind === KIND.HEALING_SEAL ? " healing left" : ""}</div>`;
     const entrenchment = entrenchmentSelectionStatus(e, this.state);
     const entrenchmentHtml = entrenchment
       ? `<div class="sel-stat sel-trench-status"><span>${entrenchment.label}:</span>` +
@@ -436,7 +436,7 @@ export class HudSelectionPanel {
         `${Math.max(0, Math.floor(Number(e.unitsKilled)))}${entityIdHtml}</div>`
       : "";
 
-    const armorHtml = typeof st.armored === "boolean"
+    const armorHtml = e.kind !== KIND.HEALING_SEAL && typeof st.armored === "boolean"
       ? `<div class="sel-stat sel-armor">Armor: <abbr class="sel-armor-label" tabindex="0" ` +
         `title="${st.armored
           ? "Armored: takes 75% less HP damage from attacks without armor penetration. Armor-piercing attacks bypass some or all of this protection."

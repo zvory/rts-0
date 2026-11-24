@@ -1,5 +1,5 @@
 {
-  "reason": "Allow projectile shield checks to use Throw Sword armor penetration",
+  "reason": "Register healing seal purchase admission in existing Shop service; reuse checkpointed entity capacity through an entity helper",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -1295,7 +1295,7 @@
     },
     {
       "path": "services/shop_items.rs",
-      "lines": 195
+      "lines": 413
     }
   ],
   "service_edges": [
@@ -1984,6 +1984,11 @@
     },
     {
       "path": "services/shop_items.rs",
+      "line": 271,
+      "name": "place_healing_seal"
+    },
+    {
+      "path": "services/shop_items.rs",
       "line": 24,
       "name": "purchase"
     }
@@ -2287,6 +2292,11 @@
     {
       "path": "services/shop_items.rs",
       "line": 27,
+      "code": "players: &mut [PlayerState],"
+    },
+    {
+      "path": "services/shop_items.rs",
+      "line": 274,
       "code": "players: &mut [PlayerState],"
     },
     {

@@ -450,7 +450,8 @@ function explicitAttackCommandTarget(state, target, controlPolicy = null) {
 }
 
 function isAttackableEntityTarget(target) {
-  return !!target && !isResource(target.kind) && target.kind !== KIND.SCOUT_PLANE;
+  return !!target && !isResource(target.kind) &&
+    target.kind !== KIND.SCOUT_PLANE && target.kind !== KIND.HEALING_SEAL;
 }
 
 function isNeutralObstacle(target) {

@@ -29,6 +29,7 @@ pub enum EntityKind {
     TournamentGrounds,
     ProvenGrounds,
     Shop,
+    HealingSeal,
     Zamok,
     Depot,
     Barracks,
@@ -45,7 +46,7 @@ pub enum EntityKind {
 }
 
 impl EntityKind {
-    pub const ALL: [EntityKind; 37] = [
+    pub const ALL: [EntityKind; 38] = [
         EntityKind::Worker,
         EntityKind::Golem,
         EntityKind::Warrior,
@@ -70,6 +71,7 @@ impl EntityKind {
         EntityKind::TournamentGrounds,
         EntityKind::ProvenGrounds,
         EntityKind::Shop,
+        EntityKind::HealingSeal,
         EntityKind::Zamok,
         EntityKind::Depot,
         EntityKind::Barracks,
@@ -162,6 +164,7 @@ impl EntityKind {
             EntityKind::TournamentGrounds => "tournament_grounds",
             EntityKind::ProvenGrounds => "proven_grounds",
             EntityKind::Shop => "shop",
+            EntityKind::HealingSeal => "healing_seal",
             EntityKind::Zamok => "zamok",
             EntityKind::Depot => "depot",
             EntityKind::Barracks => "barracks",
@@ -208,6 +211,7 @@ impl FromStr for EntityKind {
             "tournament_grounds" => Ok(EntityKind::TournamentGrounds),
             "proven_grounds" => Ok(EntityKind::ProvenGrounds),
             "shop" => Ok(EntityKind::Shop),
+            "healing_seal" => Ok(EntityKind::HealingSeal),
             "zamok" => Ok(EntityKind::Zamok),
             "depot" => Ok(EntityKind::Depot),
             "barracks" => Ok(EntityKind::Barracks),
@@ -283,7 +287,10 @@ pub fn static_blocker_class(kind: EntityKind) -> StaticBlockerClass {
         StaticBlockerClass::VehicleBodyOnly
     } else if matches!(
         kind,
-        EntityKind::BarbedWire | EntityKind::SteelMine | EntityKind::PumpJack
+        EntityKind::HealingSeal
+            | EntityKind::BarbedWire
+            | EntityKind::SteelMine
+            | EntityKind::PumpJack
     ) {
         StaticBlockerClass::None
     } else if kind.is_building() {
@@ -297,7 +304,8 @@ pub fn blocks_line_of_sight(kind: EntityKind) -> bool {
     kind.is_building()
         && !matches!(
             kind,
-            EntityKind::TankTrap
+            EntityKind::HealingSeal
+                | EntityKind::TankTrap
                 | EntityKind::BarbedWire
                 | EntityKind::SteelMine
                 | EntityKind::PumpJack
@@ -346,7 +354,7 @@ pub fn death_ground_decal_class(kind: EntityKind) -> Option<&'static str> {
         | EntityKind::AntiTankGun
         | EntityKind::Artillery => Some("scorch"),
         EntityKind::RocketLauncher => Some("scorch"),
-        EntityKind::BarbedWire => None,
+        EntityKind::BarbedWire | EntityKind::HealingSeal => None,
         kind if kind.is_building() => Some("buildingScorch"),
         _ => None,
     }

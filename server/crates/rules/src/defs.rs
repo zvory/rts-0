@@ -454,6 +454,25 @@ pub const UNITS: &[UnitDef] = &[
 
 pub const BUILDINGS: &[BuildingDef] = &[
     BuildingDef {
+        kind: EntityKind::HealingSeal,
+        stats: balance::BuildingStats {
+            hp: balance::HEALING_SEAL_CAPACITY,
+            sight_tiles: 0,
+            cost_steel: 0,
+            cost_oil: 150,
+            foot_w: 3,
+            foot_h: 3,
+            build_ticks: 0,
+            dmg: 0,
+            range_tiles: 0.0,
+            cooldown: 0,
+        },
+        armor_class: ArmorClass::Small,
+        weapon: WeaponClass::None,
+        trains: &[],
+        build_requires: &[],
+    },
+    BuildingDef {
         kind: EntityKind::Shop,
         stats: balance::BuildingStats {
             hp: 200,
@@ -885,6 +904,7 @@ mod tests {
         assert_eq!(
             buildings,
             vec![
+                EntityKind::HealingSeal,
                 EntityKind::Shop,
                 EntityKind::ResourceDepot,
                 EntityKind::Portal,
@@ -1018,7 +1038,10 @@ mod tests {
     #[test]
     fn non_obstacle_buildings_grant_only_local_sight() {
         for building in BUILDINGS {
-            if matches!(building.kind, EntityKind::TankTrap | EntityKind::BarbedWire) {
+            if matches!(
+                building.kind,
+                EntityKind::HealingSeal | EntityKind::TankTrap | EntityKind::BarbedWire
+            ) {
                 continue;
             }
             assert_eq!(

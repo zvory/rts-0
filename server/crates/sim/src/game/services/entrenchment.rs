@@ -8,7 +8,7 @@ use std::collections::BTreeMap;
 
 use crate::config;
 use crate::game::entity::{
-    active_trench_occupation, AttackPhase, Entity, EntityStore, MovePhase, Order,
+    active_trench_occupation, AttackPhase, Entity, EntityKind, EntityStore, MovePhase, Order,
 };
 use crate::game::map::Map;
 use crate::game::services::geometry::{
@@ -403,6 +403,7 @@ fn slot_intersects_building(
             entities.get(other_id).is_some_and(|other| {
                 other.hp > 0
                     && other.is_building()
+                    && other.kind != EntityKind::HealingSeal
                     && building_rect_for_entity(map, other)
                         .is_some_and(|rect| unit_body_intersects_rect(candidate_body, rect))
             })

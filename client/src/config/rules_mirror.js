@@ -237,9 +237,12 @@ export const STATS = Object.freeze({
   [KIND.PORTAL]: { label: "Portal", icon: "PRT", footW: 3, footH: 3, sight: 1,
     cost: { steel: 150, oil: 0 }, buildTicks: TICK_HZ * 5, trains: [KIND.WARRIOR, KIND.WIND_ADEPT, KIND.WAR_ADEPT, KIND.MAGIC_ADEPT],
     description: "A supernatural gateway that trains Novices and researched Adepts. Each Adept costs 150 steel and 35 oil and takes 10 seconds." },
+  [KIND.HEALING_SEAL]: { label: "Healing Seal", icon: "+", footW: 3, footH: 3, sight: 0,
+    cost: { steel: 0, oil: 150 }, buildTicks: 0, trains: [],
+    description: "Friendly units inside recover 3 HP per second. Expires after restoring 400 HP." },
   [KIND.SHOP]: { label: "Shop", icon: "SH", footW: 3, footH: 4, sight: 1,
     cost: { steel: 200, oil: 200 }, buildTicks: TICK_HZ * 20, trains: [],
-    description: "Sells Healing Potions and Escape Treasures for nearby friendly units." },
+    description: "Sells Healing Potions, Escape Treasures and Healing Seals for nearby friendly units." },
   [KIND.PROVEN_GROUNDS]: { label: "Proving Grounds", icon: "PG", footW: 3, footH: 3, sight: 1,
     cost: { steel: 100, oil: 0 }, buildTicks: 200, trains: [], requires: [KIND.PORTAL],
     description: "Send base Novices inside for researched Dao training. Queue any mix of Wind, War and Magic; each costs 100 oil and takes 10 seconds. Supports a rally point." },
@@ -308,6 +311,13 @@ export const STATS = Object.freeze({
 });
 
 export const ABILITIES = Object.freeze({
+  [ABILITY.HEALING_SEAL]: Object.freeze({
+    ability: ABILITY.HEALING_SEAL, label: "Healing Seal", icon: "+", hotkey: "E",
+    title: "Place a 3-tile-wide healing circle within 30 tiles; friendly units recover 3 HP per second, up to 400 HP total",
+    carriers: Object.freeze([KIND.SHOP]), targetMode: "worldPoint", rangeTiles: 30,
+    radiusTiles: 1.5, cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 150 }),
+    queued: false, queuePolicy: "notQueueable",
+  }),
   [ABILITY.HEALING_POTION]: Object.freeze({
     ability: ABILITY.HEALING_POTION, label: "Healing Potion", icon: "HP", hotkey: "Q",
     title: "Deliver a healing potion to a friendly unit within 30 tiles; fully heals on arrival",

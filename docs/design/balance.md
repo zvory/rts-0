@@ -914,3 +914,17 @@ multiplier after Adept rounding: 210 (Wind/Magic) or 246 (War). See [Master rule
 Completed Shops offer Healing Potion (50 oil, full heal on delivery) and Escape Treasure
 (100 oil, one lethal-damage escape to the supplying Shop at 1 HP). Both target visible friendly
 units within 30 tiles and travel at 10 tiles/second. See [Shop](shop.md#targeted-goods).
+
+
+### Healing Seal
+
+Completed Cultivator Shops sell Healing Seals for **150 oil / 0 steel**. Each seal is a
+walk-through 3×3-tile field (circular radius **1.5 tiles**) with **400 HP** of shared
+healing capacity. Every 10 simulation ticks, each wounded living friendly ground unit
+whose center is inside the circle recovers **1 HP** (3 HP per second); only actual HP
+restored consumes capacity. Stable seal/unit id order resolves the last points.
+Overlapping seals stack. Full-health units, enemies, buildings and air sorties consume
+nothing. The seal expires on depletion, persists after its Shop dies, has no combat HP,
+sight, supply, weapon, repair/refund, or survival-building status, and costs no construction
+time. Purchase uses visible, terrain-valid ground within 30 tiles of the Shop.
+See [Healing Seal](healing-seal.md).

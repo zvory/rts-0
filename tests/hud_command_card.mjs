@@ -1050,10 +1050,21 @@ for (const researched of [false, true]) {
     resources: { steel: 1000, oil: 1000 },
   });
   const items = idle.slots.filter(Boolean);
-  assert.equal(items.length, 2);
-  assert.deepEqual(items.map((item) => item.ability), [ABILITY.HEALING_POTION, ABILITY.ESCAPE_TREASURE]);
-  assert(items.every((item) => item.intent.targetMode === "friendlyUnit"));
-  assert.deepEqual(items.map((item) => item.cost.oil), [50, 100]);
+  assert.equal(items.length, 3);
+  assert.deepEqual(items.map((item) => item.ability), [ABILITY.HEALING_POTION, ABILITY.ESCAPE_TREASURE, ABILITY.HEALING_SEAL]);
+  assert.deepEqual(items.map((item) => item.intent.targetMode), ["friendlyUnit", "friendlyUnit", "worldPoint"]);
+  assert.deepEqual(items.map((item) => item.cost.oil), [50, 100, 150]);
+  const seal = items.find((item) => item.ability === ABILITY.HEALING_SEAL);
+  assert.equal(seal.hotkey, "E");
+  assert.equal(seal.commandId, "cultivators.ability.healingSeal");
+  for (const oil of [149, 150]) {
+    const card = buildCommandCardDescriptors({
+      playerId: 1, factionId: "cultivators",
+      selection: [{ id: 2, owner: 1, kind: KIND.SHOP }],
+      groupCooldownClocks: () => [], resources: { steel: 0, oil },
+    });
+    assert.equal(card.slots.find((slot) => slot?.ability === ABILITY.HEALING_SEAL).unaffordable, oil < 150);
+  }
 }
 
 // Portal Adepts require their Dao, 150 steel, 35 oil and three supply.

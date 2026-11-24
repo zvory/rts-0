@@ -265,6 +265,7 @@ export function movementBodyClass(kind) {
 }
 
 function entityBlocksPlacement(e, policy) {
+  if (e.kind === KIND.HEALING_SEAL) return false;
   if (isBuilding(e.kind) || isResource(e.kind)) return true;
   if (!isUnit(e.kind)) return false;
   if (STATS[e.kind]?.blocksGroundPlacement === false) return false;

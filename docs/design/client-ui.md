@@ -2976,3 +2976,13 @@ version probes. Reliable version observations may be retained silently for recov
 to the ordinary lobby/main screen. An existing notice is hidden when entering a protected context.
 Offline benchmark transports skip server version checks. `destroy()` removes listeners, timers,
 pending fetch, and notice DOM.
+
+
+### Healing Seal presentation
+
+Cultivator Shop E places a Healing Seal using the generic world-point ability command and
+radius preview. The selectable 3×3 field renders on the ground beneath units: fixed green
+circle, central green plus, layered soft glow, and a two-second render-clock pulse.
+The always-visible green bar represents remaining healing capacity, not combat health.
+The bottom selection panel says `275 / 400 healing left`; no combat armor label is shown.
+Existing pooled graphics, snapshot replacement, fog gating and match teardown own its lifecycle.

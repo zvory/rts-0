@@ -433,7 +433,7 @@ fn entity_build_site_status(
     ignored_unit: Option<u32>,
     policy: BuildPlacementPolicy,
 ) -> BuildSiteStatus {
-    if e.hp == 0 {
+    if e.hp == 0 || e.kind == EntityKind::HealingSeal {
         return BuildSiteStatus::Clear;
     }
     if e.is_unit() && ignored_unit == Some(e.id) {
@@ -455,6 +455,9 @@ fn entity_build_site_status(
         return BuildSiteStatus::BlockedByResourceNode;
     }
     if e.is_unit() {
+        if policy == BuildPlacementPolicy::GroundField {
+            return BuildSiteStatus::Clear;
+        }
         if policy == BuildPlacementPolicy::VehicleBodyOnly
             && movement_body_class(e.kind) == MovementBodyClass::InfantryLike
         {

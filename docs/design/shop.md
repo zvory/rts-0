@@ -73,3 +73,12 @@ dead targets cancel delivery. Oil is paid at launch, with no refund for interrup
 Escape selects a deterministic legal exit around the supplying Shop, searching farther only when
 nearby exits are blocked. If no legal position exists anywhere on the map, the rescue cannot occur.
 Deliveries expire after 60 seconds if a moving target cannot be reached.
+
+
+### Healing Seal placement
+
+The Shop also sells [Healing Seal](healing-seal.md) for **150 oil** (E). Choose the good,
+then click visible ground within 30 tiles. It appears immediately as a selectable,
+non-blocking 3×3 green circle. Friendly ground units inside heal 3 HP/s each from a shared
+400 HP budget. Its green capacity bar and selection text show healing remaining; it
+disappears when empty. It is ground magic, not a carried item or projectile.

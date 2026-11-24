@@ -950,7 +950,11 @@ impl Entity {
         amount: u32,
         attribution: Option<(u32, (f32, f32), u32)>,
     ) -> bool {
-        if self.hp == 0 || amount == 0 || self.invulnerable || self.kind == EntityKind::BarbedWire {
+        if self.hp == 0
+            || amount == 0
+            || self.invulnerable
+            || matches!(self.kind, EntityKind::BarbedWire | EntityKind::HealingSeal)
+        {
             return false;
         }
         self.hp = self.hp.saturating_sub(amount);
@@ -984,7 +988,7 @@ impl Entity {
     }
 
     pub fn restore_hp(&mut self, amount: u32) -> bool {
-        if self.kind == EntityKind::BarbedWire {
+        if matches!(self.kind, EntityKind::BarbedWire | EntityKind::HealingSeal) {
             return false;
         }
         if self.hp == 0 || amount == 0 || self.hp >= self.max_hp {
@@ -1232,7 +1236,7 @@ impl Entity {
     /// Whether this building can be attacked / can take damage and die. Resource nodes are
     /// indestructible (they only deplete).
     pub fn is_targetable(&self) -> bool {
-        if self.kind == EntityKind::BarbedWire {
+        if matches!(self.kind, EntityKind::BarbedWire | EntityKind::HealingSeal) {
             return false;
         }
         !self.is_node() && self.kind != EntityKind::ScoutPlane

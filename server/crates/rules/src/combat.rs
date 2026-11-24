@@ -352,6 +352,7 @@ pub fn default_weapon_kind(kind: EntityKind) -> Option<WeaponKind> {
         | EntityKind::ThreeDaoPavilion
         | EntityKind::TournamentGrounds
         | EntityKind::ProvenGrounds
+        | EntityKind::HealingSeal
         | EntityKind::Shop
         | EntityKind::Zamok
         | EntityKind::Depot
@@ -862,6 +863,7 @@ mod tests {
             (EntityKind::TournamentGrounds, None),
             (EntityKind::ProvenGrounds, None),
             (EntityKind::Shop, None),
+            (EntityKind::HealingSeal, None),
             (EntityKind::Zamok, None),
             (EntityKind::Depot, None),
             (EntityKind::Barracks, None),

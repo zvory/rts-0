@@ -95,6 +95,7 @@ pub(in crate::game) fn planner_code(kind: AbilityKind) -> u16 {
         AbilityKind::HealingPotion => 18,
         AbilityKind::EscapeTreasure => 19,
         AbilityKind::WindDash => 20,
+        AbilityKind::HealingSeal => 21,
     }
 }
 
@@ -121,6 +122,7 @@ pub(in crate::game) fn from_planner_code(code: u16) -> Option<AbilityKind> {
         18 => Some(AbilityKind::HealingPotion),
         19 => Some(AbilityKind::EscapeTreasure),
         20 => Some(AbilityKind::WindDash),
+        21 => Some(AbilityKind::HealingSeal),
 
         _ => None,
     }
@@ -131,7 +133,9 @@ pub fn effect_hook(kind: AbilityKind) -> AbilityEffectHook {
         AbilityKind::EvolveWind | AbilityKind::EvolveWar | AbilityKind::EvolveMagic => {
             AbilityEffectHook::Evolve
         }
-        AbilityKind::HealingPotion | AbilityKind::EscapeTreasure => AbilityEffectHook::ShopItem,
+        AbilityKind::HealingPotion | AbilityKind::EscapeTreasure | AbilityKind::HealingSeal => {
+            AbilityEffectHook::ShopItem
+        }
         AbilityKind::Charge => AbilityEffectHook::LegacyNoop,
         AbilityKind::Smoke | AbilityKind::MortarFire | AbilityKind::Barrage => {
             AbilityEffectHook::DelayedWorld

@@ -930,7 +930,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 68. The client also accepts compact
+`messagepack-compact`, codec version 1, compact snapshot version 69. The client also accepts compact
 snapshot versions 51 through 62: version 52 only appends a kind code, version 53 appends the
 optional `unitsKilled` entity slot, version 54 appends an optional `rocket` style bit to mortar
 launch/impact event records, and version 55 adds the `artilleryIncoming` event code, so the older
@@ -968,7 +968,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 68,
+  "v": 69,
   "gr": groundDecalRevision, // omitted when zero
   "gd": [afterRevision, [    // omitted when this tick has no discovered/created revision
     [id, decalClass, sourceKindCode, x, y, owner, seed, facing, weaponFacing, radiusTiles]
@@ -1010,11 +1010,11 @@ Compact numeric codes:
 
 | Vocabulary | Codes |
 |------------|-------|
-| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `resource_depot`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `engineering_complex`, 18 `command_car`, 19 `ekat`, 20 `zamok`, 21 `tank_trap`, 30 `barbed_wire`, 22 `golem`, 23 `pump_jack`, 24 `panzerfaust`, 25 `scout_plane`, 26 `steel_mine`, 27 `rocket_launcher`, 28 `portal`, 29 `warrior`, 31 `three_dao_pavilion`, 32 `tournament_grounds`, 33 `proven_grounds`, 34 `shop`, 35 `wind_adept`, 36 `war_adept`, 37 `magic_adept` |
+| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `resource_depot`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `engineering_complex`, 18 `command_car`, 19 `ekat`, 20 `zamok`, 21 `tank_trap`, 30 `barbed_wire`, 22 `golem`, 23 `pump_jack`, 24 `panzerfaust`, 25 `scout_plane`, 26 `steel_mine`, 27 `rocket_launcher`, 28 `portal`, 29 `warrior`, 31 `three_dao_pavilion`, 32 `tournament_grounds`, 33 `proven_grounds`, 34 `shop`, 35 `wind_adept`, 36 `war_adept`, 37 `magic_adept`, 38 `healing_seal` |
 | `state` | 1 `idle`, 2 `move`, 3 `attack`, 4 `gather`, 5 `build`, 6 `train`, 7 `construct`, 8 `dead` |
 | `setupState` | 1 `packed`, 2 `setting_up`, 3 `deployed`, 4 `tearing_down` |
-| `orderStage` | 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, 5 `build`, 6 `smoke`, 7 `setupAntiTankGuns`, 8 `charge`, 9 `mortarFire`, 10 `pointFire`, 11 `breakthrough`, 12 `ekatTeleport`, 13 `ekatLineShot`, 14 `ekatMagicAnchor`, 15 `deconstruct`, 16 `ekatConsumeGolem`, 17 `blanketFire`, 18 `dismissScoutPlane`, 19 `scoutPlane`, 20 `holdPosition`, 21 `barrage`, 22 `evolveWind`, 23 `evolveWar`, 24 `evolveMagic`, 25 `discipleShield`, 26 `throwSword`, 27 `healingPotion`, 28 `escapeTreasure`, 29 `windDash` |
-| `ability` | 1 `charge`, 2 `smoke`, 3 `mortarFire`, 4 `pointFire`, 5 `breakthrough`, 6 `ekatTeleport`, 7 `ekatLineShot`, 8 `ekatMagicAnchor`, 9 `ekatConsumeGolem`, 10 `blanketFire`, 11 `dismissScoutPlane`, 12 `scoutPlane`, 13 `barrage`, 14 `evolveWind`, 15 `evolveWar`, 16 `evolveMagic`, 17 `discipleShield`, 18 `throwSword`, 19 `healingPotion`, 20 `escapeTreasure`, 21 `windDash` |
+| `orderStage` | 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, 5 `build`, 6 `smoke`, 7 `setupAntiTankGuns`, 8 `charge`, 9 `mortarFire`, 10 `pointFire`, 11 `breakthrough`, 12 `ekatTeleport`, 13 `ekatLineShot`, 14 `ekatMagicAnchor`, 15 `deconstruct`, 16 `ekatConsumeGolem`, 17 `blanketFire`, 18 `dismissScoutPlane`, 19 `scoutPlane`, 20 `holdPosition`, 21 `barrage`, 22 `evolveWind`, 23 `evolveWar`, 24 `evolveMagic`, 25 `discipleShield`, 26 `throwSword`, 27 `healingPotion`, 28 `escapeTreasure`, 29 `windDash`, 30 `healingSeal` |
+| `ability` | 1 `charge`, 2 `smoke`, 3 `mortarFire`, 4 `pointFire`, 5 `breakthrough`, 6 `ekatTeleport`, 7 `ekatLineShot`, 8 `ekatMagicAnchor`, 9 `ekatConsumeGolem`, 10 `blanketFire`, 11 `dismissScoutPlane`, 12 `scoutPlane`, 13 `barrage`, 14 `evolveWind`, 15 `evolveWar`, 16 `evolveMagic`, 17 `discipleShield`, 18 `throwSword`, 19 `healingPotion`, 20 `escapeTreasure`, 21 `windDash`, 22 `healingSeal` |
 | `abilityObject.kind` | 1 `returnMarker`, 2 `magicAnchor`, 3 `lineProjectile`, 4 `shield` |
 | `upgrade` | 1 `methamphetamines`, 2 `anti_tank_gun_unlock`, 3 `tank_unlock`, 4 `artillery_unlock`, 7 `ballistic_tables`, 8 `entrenchment`, 9 `smoke_plus`, 10 `panzerfausts`, 11 `scout_plane_unlock`, 12 `rockets`, 13 `tank_plus`, 14 `dao_wind`, 15 `dao_of_magic`, 16 `dao_of_heaviness` |
 | `weaponKind` | 1 `worker_tools`, 2 `golem_fists`, 3 `rifleman_rifle`, 4 `machine_gunner_mg`, 5 `scout_car_mg`, 6 `anti_tank_gun`, 7 `panzerfaust_loaded_shot`, 8 `mortar_team_mortar`, 9 `artillery_gun`, 10 `tank_cannon`, 11 `tank_coax`, 12 `warrior_sword`, 13 `disciple_arrow`, 14 `disciple_orb` |
@@ -2038,7 +2038,7 @@ continue to re-export their authoritative vocabulary.
 
 The Wind rename uses `dao_wind`, `wind_adept`, `evolveWind`, `windDash`, and
 `wind` Dao values throughout commands, snapshots, Lab setup, and checkpoints. Compact
-snapshot version 68 keeps the existing numeric codes and slots.
+snapshot version 69 keeps the existing numeric codes and slots.
 
 ### Disciple insight and Dao specializations
 
@@ -2159,4 +2159,20 @@ is queueable. `setAutocast` for `escapeTreasure` toggles lethal-damage rescue on
 Private carrier `abilities` includes `escapeTreasure`, `remainingUses: 1`, and
 `autocastEnabled` while the item exists; team-private `escapeTreasure` remains the badge flag.
 
-Wind Dash has its own `windDash` ability (21) and order stage (29). Compact snapshot vocabulary is version 68. It creates no return object. Owner-visible `remainingUses` and `chargeRechargeLeft` carry one Adept charge or up to two Master charges; no new snapshot fields.
+Wind Dash has its own `windDash` ability (21) and order stage (29). Compact snapshot vocabulary is version 69. It creates no return object. Owner-visible `remainingUses` and `chargeRechargeLeft` carry one Adept charge or up to two Master charges; no new snapshot fields.
+
+
+### Healing Seal
+
+Cultivator Shops expose `healingSeal` (ability code 22, order stage 30) through the
+existing non-queued `useAbility` world-point command. The server checks ownership,
+faction, completed Shop, current target visibility, 30-tile range, terrain, map bounds,
+static overlap, active-field cap and affordability before charging 150 oil.
+
+`healing_seal` is selectable building-kind code 38, a non-blocking, non-attackable field.
+Its existing entity `hp` / `maxHp` pair represents **healing remaining / total capacity**
+(400), rather than combat health. Damage and repair cannot modify it. No entity slots
+are added; the compact vocabulary version is 69. The field is checkpointed with ordinary
+entities; its healing pulse uses authoritative tick multiples of 10. Ordinary ownership
+and positional fog filtering apply, including observer views. It provides no vision and
+is excluded from enemy building memory. Depletion removes the entity without a death event.

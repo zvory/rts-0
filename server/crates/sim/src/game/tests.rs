@@ -31,6 +31,7 @@ mod disciple_shield_tests;
 mod ekat_tests;
 mod faction_ability_tests;
 mod fixtures;
+mod healing_seal_tests;
 mod invariant_projection_tests;
 mod meth_movement_tests;
 mod mortar_manual_fire_tests;
