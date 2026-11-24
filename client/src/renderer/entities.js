@@ -146,7 +146,7 @@ export function _drawSelectionAndHp(e, selection, state, ownerColor = null) {
   const selected = selection.has(e.id);
   const hasHealth = !isResource(e.kind) && Number.isFinite(e.maxHp) && e.maxHp > 0;
   const damaged = hasHealth && Number.isFinite(e.hp) && e.hp < e.maxHp;
-  const alwaysShow = !!state?.showHealthBarsAlwaysEnabled || isDiscipleKind(e.kind);
+  const alwaysShow = !!state?.showHealthBarsAlwaysEnabled || isDiscipleKind(e.kind) || e.kind === KIND.HEALING_SEAL;
   const progressStatus = buildingProgressStatus(e);
 
   if (selected) {
@@ -262,8 +262,8 @@ export function _hpBar(g, e, status = null, ownerColor = null, showHp = true) {
     const ts = (this._map && this._map.tileSize) || 32;
     const w = (stat.footW || 2) * ts;
     const h = (stat.footH || 2) * ts;
-    halfW = Math.min(w * 0.45, 28);
-    topY = e.y - h / 2 - 8;
+    halfW = e.kind === KIND.HEALING_SEAL ? w * 0.4 : Math.min(w * 0.45, 28);
+    topY = e.kind === KIND.HEALING_SEAL ? e.y + h / 2 + 10 : e.y - h / 2 - 8;
   } else {
     if (usesVehicleSelectionBody(e.kind)) {
       const body = tankBodyVisual(stat);
@@ -278,7 +278,7 @@ export function _hpBar(g, e, status = null, ownerColor = null, showHp = true) {
   const barW = halfW * 2;
   const barH = 4;
   const maxHp = Number.isFinite(e.maxHp) && e.maxHp > 0 ? e.maxHp : 0;
-  const segmentCount = Math.max(1, Math.round(maxHp / HP_PER_SEGMENT));
+  const segmentCount = e.kind === KIND.HEALING_SEAL ? 1 : Math.max(1, Math.round(maxHp / HP_PER_SEGMENT));
   const dividerCount = segmentCount - 1;
   const geometryKey = `${halfW}|${barH}|${segmentCount}`;
   if (g.rtsGeometryKey !== geometryKey) {
@@ -324,6 +324,7 @@ export function _hpBar(g, e, status = null, ownerColor = null, showHp = true) {
   } else if (status?.kind === "construction") {
     color = COLORS.hpGood;
   }
+  if (e.kind === KIND.HEALING_SEAL) color = 0x46eb81;
   g.rtsFill.tint = color;
   g.rtsFill.scale.set(frac, 1);
   // Most health bars never need Dao overlays. Allocate them only for Disciples,

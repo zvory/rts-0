@@ -125,6 +125,7 @@ await import("./client_contracts/auto_build_contracts.mjs");
 await import("./client_contracts/state_input_contracts.mjs");
 await import("./client_contracts/dao_selection_contracts.mjs");
 await import("./client_contracts/dao_ability_targeting_contracts.mjs");
+await import("./client_contracts/healing_seal_contracts.mjs");
 await import("./client_contracts/resource_vision_contracts.mjs");
 await import("./client_contracts/client_intent_order_queue_contracts.mjs");
 await import("./client_contracts/control_group_camera_contracts.mjs");

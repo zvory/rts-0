@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 10] = [
+pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 11] = [
     AbilityCatalogEntry {
         kind: AbilityKind::EvolveWind,
         label: "Dao Wind",
@@ -142,4 +142,15 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 10] = [
         command_card: true, protocol_code: 20, order_stage_code: 28,
     },
     DEFAULT_ABILITIES[0],
+    AbilityCatalogEntry {
+        kind: AbilityKind::HealingSeal,
+        label: "Healing Seal", icon: "+", hotkey: Some("E"),
+        title: "Place a 3-tile-wide healing circle within 30 tiles; friendly units recover 3 HP per second, up to 400 HP total",
+        carriers: &[EntityKind::Shop], target_mode: AbilityTargetMode::WorldPoint,
+        range_tiles: Some(30.0), min_range_tiles: None, cooldown_ticks: 0,
+        charges: None, charge_recharge_ticks: None, cost: ResourceCost::new(0, 150),
+        tech_requirement: None, upgrade_requirement: None,
+        queue_policy: AbilityQueuePolicy::NotQueueable, autocast: false,
+        command_card: true, protocol_code: 22, order_stage_code: 30,
+    },
 ];

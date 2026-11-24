@@ -85,6 +85,7 @@ pub mod kinds {
     pub const TOURNAMENT_GROUNDS: &str = "tournament_grounds";
     pub const PROVEN_GROUNDS: &str = "proven_grounds";
     pub const SHOP: &str = "shop";
+    pub const HEALING_SEAL: &str = "healing_seal";
     pub const ZAMOK: &str = "zamok";
     pub const DEPOT: &str = "depot";
     pub const BARRACKS: &str = "barracks";
@@ -134,6 +135,7 @@ pub mod abilities {
     pub const DISCIPLE_SHIELD: &str = "discipleShield";
     pub const THROW_SWORD: &str = "throwSword";
     pub const HEALING_POTION: &str = "healingPotion";
+    pub const HEALING_SEAL: &str = "healingSeal";
     pub const ESCAPE_TREASURE: &str = "escapeTreasure";
 
     pub const ALL: &[&str] = &[
@@ -157,6 +159,7 @@ pub mod abilities {
         DISCIPLE_SHIELD,
         THROW_SWORD,
         HEALING_POTION,
+        HEALING_SEAL,
         ESCAPE_TREASURE,
     ];
 }
@@ -238,7 +241,7 @@ pub mod notices {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 68;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 69;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -426,6 +429,7 @@ const KIND_CODES: &[(&str, u8)] = &[
     (kinds::TOURNAMENT_GROUNDS, 32),
     (kinds::PROVEN_GROUNDS, 33),
     (kinds::SHOP, 34),
+    (kinds::HEALING_SEAL, 38),
     (kinds::DEPOT, 7),
     (kinds::BARRACKS, 8),
     (kinds::TRAINING_CENTRE, 9),
@@ -508,6 +512,7 @@ const ORDER_STAGE_CODES: &[(&str, u8)] = &[
     (abilities::DISCIPLE_SHIELD, 25),
     (abilities::THROW_SWORD, 26),
     (abilities::HEALING_POTION, 27),
+    (abilities::HEALING_SEAL, 30),
     (abilities::ESCAPE_TREASURE, 28),
 ];
 
@@ -532,6 +537,7 @@ const ABILITY_CODES: &[(&str, u8)] = &[
     (abilities::DISCIPLE_SHIELD, 17),
     (abilities::THROW_SWORD, 18),
     (abilities::HEALING_POTION, 19),
+    (abilities::HEALING_SEAL, 22),
     (abilities::ESCAPE_TREASURE, 20),
 ];
 
@@ -786,6 +792,7 @@ fn kind_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("TOURNAMENT_GROUNDS", kinds::TOURNAMENT_GROUNDS),
         ("PROVEN_GROUNDS", kinds::PROVEN_GROUNDS),
         ("SHOP", kinds::SHOP),
+        ("HEALING_SEAL", kinds::HEALING_SEAL),
         ("ZAMOK", kinds::ZAMOK),
         ("DEPOT", kinds::DEPOT),
         ("BARRACKS", kinds::BARRACKS),
@@ -853,6 +860,7 @@ fn ability_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("DISCIPLE_SHIELD", abilities::DISCIPLE_SHIELD),
         ("THROW_SWORD", abilities::THROW_SWORD),
         ("HEALING_POTION", abilities::HEALING_POTION),
+        ("HEALING_SEAL", abilities::HEALING_SEAL),
         ("ESCAPE_TREASURE", abilities::ESCAPE_TREASURE),
     ])
 }
@@ -951,6 +959,7 @@ fn order_stage_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("DISCIPLE_SHIELD", abilities::DISCIPLE_SHIELD),
         ("THROW_SWORD", abilities::THROW_SWORD),
         ("HEALING_POTION", abilities::HEALING_POTION),
+        ("HEALING_SEAL", abilities::HEALING_SEAL),
         ("ESCAPE_TREASURE", abilities::ESCAPE_TREASURE),
         ("SETUP_ANTI_TANK_GUNS", "setupAntiTankGuns"),
     ])

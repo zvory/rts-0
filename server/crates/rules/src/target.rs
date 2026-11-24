@@ -473,6 +473,20 @@ mod tests {
                 },
             ),
             (
+                EntityKind::HealingSeal,
+                ExpectedTargetFacts {
+                    is_unit: false,
+                    is_building: true,
+                    is_resource_node: false,
+                    armor_class: Some(ArmorClass::Small),
+                    weapon_class: WeaponClass::None,
+                    threat_role: TargetThreatRole::Ordinary,
+                    is_vehicle_body: false,
+                    is_economy_unit: false,
+                    is_coax_infantry_priority: false,
+                },
+            ),
+            (
                 EntityKind::Zamok,
                 ExpectedTargetFacts {
                     is_unit: false,

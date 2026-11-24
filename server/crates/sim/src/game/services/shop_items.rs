@@ -16,7 +16,7 @@ use crate::protocol::Event;
 pub(in crate::game) fn is_shop_item(ability: AbilityKind) -> bool {
     matches!(
         ability,
-        AbilityKind::HealingPotion | AbilityKind::EscapeTreasure
+        AbilityKind::HealingPotion | AbilityKind::EscapeTreasure | AbilityKind::HealingSeal
     )
 }
 
@@ -33,9 +33,14 @@ pub(super) fn purchase(
     shops: &[u32],
     ability: AbilityKind,
     target_id: Option<u32>,
+    point: (Option<f32>, Option<f32>),
     tick: u32,
 ) {
     if !is_shop_item(ability) {
+        return;
+    }
+    if ability == AbilityKind::HealingSeal {
+        place_healing_seal(map, entities, players, fog, events, player, shops, point);
         return;
     }
     if ability == AbilityKind::EscapeTreasure && target_id.is_none() {
@@ -257,6 +262,152 @@ pub(super) fn set_autocast(
             .filter(|unit| unit.owner == player && unit.hp > 0 && unit.escape_treasure.is_some())
         {
             unit.escape_autocast_disabled = !enabled;
+        }
+    }
+}
+
+/// Selectable, non-blocking ground magic. Capacity uses hp/max_hp and is immune to combat/repair.
+#[allow(clippy::too_many_arguments)]
+fn place_healing_seal(
+    map: &Map,
+    entities: &mut EntityStore,
+    players: &mut [PlayerState],
+    fog: &Fog,
+    events: &mut HashMap<u32, Vec<Event>>,
+    player: u32,
+    shops: &[u32],
+    point: (Option<f32>, Option<f32>),
+) {
+    let (Some(x), Some(y)) = point else {
+        return;
+    };
+    if !map.contains_world_point(x, y) {
+        return;
+    }
+    let ts = config::TILE_SIZE as f32;
+    let (tx, ty) = map.tile_of(x, y);
+    // Odd footprint, tile-centered. Validate every covered tile without unchecked arithmetic.
+    let (Some(left), Some(top), Some(right), Some(bottom)) = (
+        tx.checked_sub(1),
+        ty.checked_sub(1),
+        tx.checked_add(1),
+        ty.checked_add(1),
+    ) else {
+        return;
+    };
+    if right >= map.width || bottom >= map.height {
+        return;
+    }
+    for yy in top..=bottom {
+        for xx in left..=right {
+            if !map.is_passable(xx as i32, yy as i32) || map.is_no_building_tile(xx, yy) {
+                return;
+            }
+        }
+    }
+    let (x, y) = map.tile_center(tx, ty);
+    if !fog.is_visible_world(player, x, y) {
+        return;
+    }
+    let definition = ability::definition(AbilityKind::HealingSeal);
+    let range = definition.range_tiles.unwrap_or(0.0) * ts;
+    if !shops.iter().filter_map(|id| entities.get(*id)).any(|shop| {
+        shop.owner == player
+            && shop.kind == EntityKind::Shop
+            && shop.hp > 0
+            && !shop.under_construction()
+            && dist2(shop.pos_x(), shop.pos_y(), x, y) <= range * range
+    }) {
+        return;
+    }
+    // Units may already stand inside the field. Existing static structures may not.
+    let half = ts * 1.5;
+    if entities.iter().any(|e| {
+        e.hp > 0
+            && e.is_building()
+            && e.kind != EntityKind::HealingSeal
+            && config::building_stats(e.kind).is_some_and(|s| {
+                (e.pos_x() - x).abs() < half + s.foot_w as f32 * ts * 0.5
+                    && (e.pos_y() - y).abs() < half + s.foot_h as f32 * ts * 0.5
+            })
+    }) {
+        return;
+    }
+    if entities
+        .iter()
+        .filter(|e| e.kind == EntityKind::HealingSeal)
+        .count()
+        >= crate::game::ability_runtime::MAX_ACTIVE_ABILITY_OBJECTS
+    {
+        return;
+    }
+    let Some(ps) = players.iter_mut().find(|p| p.id == player) else {
+        return;
+    };
+    if !crate::rules::faction::catalog_for(&ps.faction_id)
+        .is_some_and(|c| c.allows_ability(AbilityKind::HealingSeal, EntityKind::Shop))
+    {
+        return;
+    }
+    if !ps.can_afford(definition.cost.steel, definition.cost.oil) {
+        events.entry(player).or_default().push(Event::Notice {
+            msg: crate::rules::economy::resource_shortage_notice_for_cost(
+                ps.steel,
+                ps.oil,
+                definition.cost,
+            )
+            .to_string(),
+            x: None,
+            y: None,
+            severity: crate::protocol::NoticeSeverity::Info,
+        });
+        return;
+    }
+    if entities
+        .spawn_building(player, EntityKind::HealingSeal, x, y, true)
+        .is_some()
+    {
+        ps.spend_cost(definition.cost);
+    }
+}
+
+pub(in crate::game) fn heal_seals(entities: &mut EntityStore, teams: &TeamRelations, tick: u32) {
+    if !tick.is_multiple_of(config::HEALING_SEAL_PULSE_TICKS) {
+        return;
+    }
+    let mut seals: Vec<_> = entities
+        .iter()
+        .filter(|e| e.kind == EntityKind::HealingSeal && e.hp > 0 && !e.under_construction())
+        .map(|e| (e.id, e.owner, e.pos_x(), e.pos_y(), e.hp))
+        .collect();
+    seals.sort_by_key(|e| e.0);
+    let radius = config::HEALING_SEAL_RADIUS_TILES * config::TILE_SIZE as f32;
+    let mut units = entities.ids();
+    units.sort_unstable();
+    for (id, owner, x, y, mut remaining) in seals {
+        for unit_id in &units {
+            if remaining == 0 {
+                break;
+            }
+            let Some(unit) = entities.get_mut(*unit_id) else {
+                continue;
+            };
+            if unit.hp > 0
+                && unit.hp < unit.max_hp
+                && unit.is_unit()
+                && unit.kind != EntityKind::ScoutPlane
+                && teams.same_team_or_same_owner(owner, unit.owner)
+                && dist2(x, y, unit.pos_x(), unit.pos_y()) <= radius * radius
+                && unit.restore_hp(1)
+            {
+                remaining -= 1;
+            }
+        }
+        if remaining == 0 {
+            // Expiry is not a combat death: no wreck, score, lingering vision, or death event.
+            entities.remove(id);
+        } else if let Some(seal) = entities.get_mut(id) {
+            seal.spend_seal_healing(seal.hp.saturating_sub(remaining));
         }
     }
 }

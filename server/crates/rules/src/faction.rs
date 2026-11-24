@@ -109,6 +109,7 @@ pub enum AbilityKind {
     DiscipleShield,
     ThrowSword,
     HealingPotion,
+    HealingSeal,
     EscapeTreasure,
     WindDash,
 }
@@ -134,6 +135,7 @@ impl AbilityKind {
         Self::DiscipleShield,
         Self::ThrowSword,
         Self::HealingPotion,
+        Self::HealingSeal,
         Self::EscapeTreasure,
         Self::WindDash,
     ];
@@ -159,6 +161,7 @@ impl AbilityKind {
             Self::DiscipleShield => "discipleShield",
             Self::ThrowSword => "throwSword",
             Self::HealingPotion => "healingPotion",
+            Self::HealingSeal => "healingSeal",
             Self::EscapeTreasure => "escapeTreasure",
             Self::WindDash => "windDash",
         }
@@ -815,6 +818,7 @@ pub const CULTIVATORS_CATALOG: FactionCatalog = FactionCatalog {
         EntityKind::TournamentGrounds,
         EntityKind::ProvenGrounds,
         EntityKind::Shop,
+        EntityKind::HealingSeal,
         EntityKind::SteelMine,
         EntityKind::PumpJack,
     ],
@@ -1050,6 +1054,7 @@ pub fn ability_definition(kind: AbilityKind) -> AbilityCatalogEntry {
         AbilityKind::DiscipleShield => CULTIVATOR_ABILITIES[5],
         AbilityKind::ThrowSword => CULTIVATOR_ABILITIES[6],
         AbilityKind::HealingPotion => CULTIVATOR_ABILITIES[7],
+        AbilityKind::HealingSeal => CULTIVATOR_ABILITIES[10],
         AbilityKind::EscapeTreasure => CULTIVATOR_ABILITIES[8],
         AbilityKind::WindDash => CULTIVATOR_ABILITIES[3],
     }

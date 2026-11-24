@@ -571,6 +571,7 @@ pub(in crate::game) fn apply_commands(
                             &units,
                             ability,
                             target_id,
+                            (x, y),
                             tick,
                         );
                     }

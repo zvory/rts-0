@@ -160,3 +160,6 @@ mod tests {
 // EntityView daoMaster: public Master rank at compact slot 52 (v65).
 
 // Wind Dash uses windDash (ability 21, order stage 29); no return marker.
+
+// Healing Seal: kind healing_seal (38), ability healingSeal (22), stage 30, compact v69.
+// Existing hp/maxHp carry healing budget/capacity, not damageable health.

@@ -246,7 +246,8 @@ fn world_ability_order_policy(ability: AbilityKind) -> (bool, bool) {
         | AbilityKind::EkatMagicAnchor
         | AbilityKind::DiscipleShield => (true, true),
         // Self-targeted abilities or abilities with dedicated command dispatch.
-        AbilityKind::HealingPotion
+        AbilityKind::HealingSeal
+        | AbilityKind::HealingPotion
         | AbilityKind::EscapeTreasure
         | AbilityKind::Charge
         | AbilityKind::PointFire

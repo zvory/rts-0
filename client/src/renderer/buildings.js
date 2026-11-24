@@ -60,6 +60,27 @@ import {
 } from "./terrain_palette.js";
 
 export function _drawBuilding(e, colorByOwner, state) {
+  if (e.kind === KIND.HEALING_SEAL) {
+    const g = this._slot("buildingShadows", e.id);
+    g.position.set(e.x, e.y);
+    const radius = 1.5 * (this._map?.tileSize || 32);
+    const pulse = (Math.sin(rendererVisualNow(this) * Math.PI / 1000) + 1) / 2;
+    // Layered translucent strokes provide a soft glow without a filter or extra texture.
+    gfxFill(g, 0x22c55e, 0.10 + pulse * 0.06);
+    gfxStroke(g, 14, 0x36ff88, 0.025 + pulse * 0.025);
+    gfxCircle(g, 0, 0, radius);
+    gfxNoFill(g);
+    gfxStroke(g, 7, 0x36ff88, 0.07 + pulse * 0.06);
+    gfxCircle(g, 0, 0, radius);
+    gfxStroke(g, 2, 0x65ff9b, 0.65 + pulse * 0.3);
+    gfxCircle(g, 0, 0, radius);
+    const arm = radius * 0.35;
+    for (const [width, alpha] of [[18, 0.04], [12, 0.12], [6, 0.8 + pulse * 0.2]]) {
+      gfxStrokeLine(g, -arm, 0, arm, 0, width, 0x65ff9b, alpha);
+      gfxStrokeLine(g, 0, -arm, 0, arm, width, 0x65ff9b, alpha);
+    }
+    return;
+  }
   const stat = STATS[e.kind] || {};
   const ts = (this._map && this._map.tileSize) || 32;
   const w = (stat.footW || 2) * ts;

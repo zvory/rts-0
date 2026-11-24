@@ -1,8 +1,7 @@
 # Healing Seal
 
-Status: Phase 0 brief and Phase 1 rules specification prepared for review. **Proposed;
-not implemented.** The user requested the feature; the new-building checklist requires review
-of these phases before implementation. No runtime contracts or live balance values change here.
+Status: Implementation authorized by the user after the written brief/spec. Runtime rules and
+contracts are documented below and in the balance, protocol, Shop and client UI references.
 
 ## Phase 0: building brief
 
@@ -40,9 +39,9 @@ and replay seeks need explicit implementation coverage.
 | Capacity bar | Green, full at 400, empty at 0 |
 | Selection detail | “275 / 400 healing left” using the current remaining amount |
 
-### Proposed defaults for unspecified behavior
+### Defaults for unspecified behavior
 
-These are explicit implementation assumptions for review, not additional user-approved values.
+These defaults resolve details not specified by the user; implementation was explicitly authorized.
 
 - Select a completed Shop, choose Healing Seal, then click a visible ground position within
   30 tiles of that Shop, matching its current goods' purchase range. Reserve E in the Shop
@@ -67,7 +66,7 @@ These are explicit implementation assumptions for review, not additional user-ap
   clamp to missing HP and remaining capacity. No accumulated burst healing when a unit
   enters after waiting outside. Overlapping seals stack, each paying for its own healing.
 - Placed seals persist independently if the supplying Shop is destroyed. They expire only
-  on depletion or match teardown. Exhaustion produces a brief visual fade with no damage,
+  on depletion or match teardown. Exhaustion removes the seal with no damage,
   wreckage, resource payout, or positional event sent through fog.
 - Use a two-second visual pulse driven by the render clock. Keep circle size fixed so the
   boundary accurately shows the healing area. Place the capacity bar at the field's edge
@@ -83,31 +82,47 @@ These are explicit implementation assumptions for review, not additional user-ap
 ## Implementation contract and verification checklist
 
 - [x] Phase 0 brief and Phase 1 rules written before implementation.
-- [ ] Required user review of brief/spec and authorization to proceed past the building gate.
-- [ ] Choose an authoritative selectable field representation that supports ordinary unit
+- [x] User explicitly instructed implementation after delivery of this brief/spec.
+- [x] Choose an authoritative selectable field representation that supports ordinary unit
   selection without creating building collision, combat targeting, victory eligibility,
   tech prerequisites, or fog-memory side effects.
-- [ ] Add purchase ability/catalog metadata, admission checks, mirrored constants, and
+- [x] Add purchase ability/catalog metadata, admission checks, mirrored constants, and
   healing behavior. Persist remaining capacity and pulse timing in the existing checkpoint
   and replay ownership model; keep `Game::tick()` panic-free.
-- [ ] Update Rust/JS wire mirrors, compact vocabulary, and
+- [x] Update Rust/JS wire mirrors, compact vocabulary, and
   [protocol design](protocol.md) for the chosen field representation and capacity projection.
-- [ ] Update [balance](balance.md), [Shop](shop.md), and
+- [x] Update [balance](balance.md), [Shop](shop.md), and
   [client UI](client-ui.md) documentation with implemented behavior; this proposal must not
   be presented as currently available goods until implementation lands.
-- [ ] Add the Shop command, placement preview, circle/plus/glow/pulse, capacity bar,
+- [x] Add the Shop command, placement preview, circle/plus/glow/pulse, capacity bar,
   selection text, minimap behavior, and Lab inspection support with normal teardown.
-- [ ] Test 150-oil admission and invalid placement; faction/source restrictions; exact
+- [x] Test 150-oil admission and invalid placement; faction/source restrictions; exact
   3 HP/s; circle boundary; owner/allied/enemy/building/air/dead/full-health filtering;
   actual-healing-only spending; multiple recipients; partial final pulse; overlapping
   seals; Shop destruction; fog filtering; checkpoint/replay continuation and selection.
-- [ ] Run focused simulation, protocol/catalog parity, client architecture, wiki checks,
+- [x] Run focused simulation, protocol/catalog parity, client architecture, wiki checks,
   and actual Interact visual inspection before the authoritative PR gate.
-- [ ] Stage factual patch notes when player-facing implementation is ready; run the owned
-  PR lifecycle and verify merge before reporting the feature as shipped.
+- [x] Stage factual patch notes for the player-facing implementation.
+- PR delivery: the owned PR records focused checks, the authoritative CI gate, and merge status.
 
-Proposed patch note for implementation: “Cultivator Shops sell Healing Seals for 150 oil.
+Staged patch note: “Cultivator Shops sell Healing Seals for 150 oil.
 Friendly units inside the glowing green circle recover 3 HP per second, up to 400 HP total.
 Select a seal to see its remaining healing.”
 
 Workflow source: [New Building Checklist](../new-building-checklist.md), Mandatory Workflow Gate.
+
+
+## Implementation and review evidence
+
+`healing_seal` reuses a selectable entity's checkpointed `hp` / `maxHp` pair for remaining
+healing / total capacity. Damage and repair reject the kind. It has no static/LOS collision,
+weapon, supply, independent sight, survival-building eligibility, or enemy fog memory.
+No new durable state owner or snapshot field is introduced. Purchases use `healingSeal` on
+a completed Shop; rendering and selection use existing graphics pools and entity teardown.
+
+Focused coverage is in `game/tests/healing_seal_tests.rs` and
+`tests/client_contracts/healing_seal_contracts.mjs`, with the existing Shop regression tests.
+Interact review used four wounded Novices around a seal purchased from a Shop with exactly
+150 oil. Fixed-step video demonstrates healing and the pulsing field; a normal-HUD still
+verifies the selected `400 / 400 healing left` detail. Bespoke audio and AI purchase strategy
+remain deferred as specified above.

@@ -191,6 +191,7 @@ export const KIND = Object.freeze({
   TOURNAMENT_GROUNDS: "tournament_grounds",
   PROVEN_GROUNDS: "proven_grounds",
   SHOP: "shop",
+  HEALING_SEAL: "healing_seal",
   ZAMOK: "zamok",
   DEPOT: "depot",
   BARRACKS: "barracks",
@@ -232,6 +233,7 @@ export const BUILDING_KINDS = Object.freeze([
   KIND.TOURNAMENT_GROUNDS,
   KIND.PROVEN_GROUNDS,
   KIND.SHOP,
+  KIND.HEALING_SEAL,
   KIND.ZAMOK,
   KIND.DEPOT,
   KIND.BARRACKS,
@@ -326,6 +328,7 @@ export const ABILITY = Object.freeze({
   DISCIPLE_SHIELD: "discipleShield",
   THROW_SWORD: "throwSword",
   HEALING_POTION: "healingPotion",
+  HEALING_SEAL: "healingSeal",
   ESCAPE_TREASURE: "escapeTreasure",
 
 });
@@ -368,7 +371,7 @@ export const MOVEMENT_PATH_DIAGNOSTICS = Object.freeze({
 // --- Compact snapshot wire schema (must match protocol.rs) ---
 export const PREDICTION_PROTOCOL_VERSION = 1;
 export const DEFAULT_FACTION_ID = "kriegsia";
-export const COMPACT_SNAPSHOT_VERSION = 68;
+export const COMPACT_SNAPSHOT_VERSION = 69;
 export const MAX_COMPACT_GROUND_DECALS = 64;
 export const SNAPSHOT_CODEC_VERSION = 1;
 export const SNAPSHOT_CODEC = Object.freeze({
@@ -399,6 +402,7 @@ export const KIND_CODE = Object.freeze({
   [KIND.TOURNAMENT_GROUNDS]: 32,
   [KIND.PROVEN_GROUNDS]: 33,
   [KIND.SHOP]: 34,
+  [KIND.HEALING_SEAL]: 38,
   [KIND.WARRIOR]: 29,
   [KIND.WIND_ADEPT]: 35,
   [KIND.WAR_ADEPT]: 36,
@@ -535,6 +539,7 @@ export const ORDER_STAGE = Object.freeze({
   DISCIPLE_SHIELD: "discipleShield",
   THROW_SWORD: "throwSword",
   HEALING_POTION: "healingPotion",
+  HEALING_SEAL: "healingSeal",
   ESCAPE_TREASURE: "escapeTreasure",
 
   SETUP_ANTI_TANK_GUNS: "setupAntiTankGuns",
@@ -569,6 +574,7 @@ export const ORDER_STAGE_CODE = Object.freeze({
   [ORDER_STAGE.DISCIPLE_SHIELD]: 25,
   [ORDER_STAGE.THROW_SWORD]: 26,
   [ORDER_STAGE.HEALING_POTION]: 27,
+  [ORDER_STAGE.HEALING_SEAL]: 30,
   [ORDER_STAGE.ESCAPE_TREASURE]: 28,
 
 });
@@ -594,6 +600,7 @@ export const ABILITY_CODE = Object.freeze({
   [ABILITY.DISCIPLE_SHIELD]: 17,
   [ABILITY.THROW_SWORD]: 18,
   [ABILITY.HEALING_POTION]: 19,
+  [ABILITY.HEALING_SEAL]: 22,
   [ABILITY.ESCAPE_TREASURE]: 20,
 
 });

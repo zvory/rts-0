@@ -68,7 +68,8 @@ fn survival_building_kind(kind: EntityKind) -> bool {
     kind.is_building()
         && !matches!(
             kind,
-            EntityKind::TankTrap
+            EntityKind::HealingSeal
+                | EntityKind::TankTrap
                 | EntityKind::BarbedWire
                 | EntityKind::SteelMine
                 | EntityKind::PumpJack
