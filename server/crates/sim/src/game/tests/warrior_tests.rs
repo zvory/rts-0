@@ -72,10 +72,10 @@ fn cultivator_pavilion_research_spends_resources_completes_and_leaves_disciple_u
         3
     );
     for dao in daos {
-        assert_eq!(upgrade::definition(dao).research_ticks, 600);
+        assert_eq!(upgrade::definition(dao).research_ticks, 1200);
     }
     // The shared queue pays each item when it becomes active.
-    for _ in 0..2100 {
+    for _ in 0..4200 {
         game.tick();
     }
     assert_eq!(
@@ -1098,7 +1098,7 @@ fn dao_parallel_research_reserves_tiers_and_refunds_committed_costs() {
         (game.state.players[0].steel, game.state.players[0].oil),
         (650, 300)
     );
-    for (id, total) in buildings.iter().zip([300, 600, 1200]) {
+    for (id, total) in buildings.iter().zip([600, 1200, 2400]) {
         assert_eq!(
             game.state.entities.get(*id).unwrap().research_queue()[0].total,
             total
@@ -1171,7 +1171,7 @@ fn dao_waiting_research_reprices_when_payment_starts() {
     for id in &buildings {
         let item = &game.state.entities.get(*id).unwrap().research_queue()[0];
         assert!(!item.paid);
-        assert_eq!((item.total, item.progress), (300, 0));
+        assert_eq!((item.total, item.progress), (600, 0));
     }
 
     game.state.players[0].set_resources(50, 100);
@@ -1203,7 +1203,7 @@ fn dao_waiting_research_reprices_when_payment_starts() {
         .unwrap()
         .research_queue()[0];
     assert!(started.paid);
-    assert_eq!((started.total, started.progress), (600, 1));
+    assert_eq!((started.total, started.progress), (1200, 1));
     assert_eq!(
         (game.state.players[0].steel, game.state.players[0].oil),
         (0, 0)

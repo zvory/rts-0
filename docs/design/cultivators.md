@@ -105,8 +105,8 @@ scrolls and a three-lobed canopy. The canopy and finial receive team tint; timbe
 parchment retain natural colors. The square atlas preserves the generated proportions.
 
 Research Dao of Lightness, Dao of Magic, and Dao of War from slots Q/W/E. Each
-uses player-wide purchase-order pricing: first 50 Steel / 100 Oil / 10 seconds,
-second 100 Steel / 200 Oil / 20 seconds, third 200 Steel / 400 Oil / 40 seconds.
+uses player-wide purchase-order pricing: first 50 Steel / 100 Oil / 20 seconds,
+second 100 Steel / 200 Oil / 40 seconds, third 200 Steel / 400 Oil / 80 seconds.
 See [balance](balance.md#three-dao-pavilion-prototype) for payment and refund rules.
 Use existing player-wide permanent research and queue rules, including duplicate rejection,
 cancellation/refund and loss of unfinished research on destruction. All three can be completed;
