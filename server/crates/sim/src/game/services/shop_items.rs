@@ -72,7 +72,9 @@ pub(super) fn purchase(
     }
     let endpoint = (target.pos_x(), target.pos_y());
     let definition = ability::definition(ability);
-    let range = definition.range_tiles.map(|tiles| tiles * config::TILE_SIZE as f32);
+    let range = definition
+        .range_tiles
+        .map(|tiles| tiles * config::TILE_SIZE as f32);
     let Some(shop) = shops
         .iter()
         .filter_map(|id| entities.get(*id))

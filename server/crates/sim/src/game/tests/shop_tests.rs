@@ -203,15 +203,29 @@ fn healing_potion_has_unlimited_range_and_tracks_a_moving_target_until_arrival()
     target.set_position(1600.0, 320.0); // Forty tiles from the Shop.
     target.apply_damage(target.max_hp - 1, None);
     let hp = target.hp;
-    game.state.fog.recompute(&[1], &game.state.entities, &game.state.map);
+    game.state
+        .fog
+        .recompute(&[1], &game.state.entities, &game.state.map);
     assert!(hp > 0);
     assert!(game.state.fog.is_visible_world(1, 1600.0, 320.0));
     buy(&mut game, shop, unit, AbilityKind::HealingPotion);
     game.tick();
     assert_eq!(game.state.players[0].oil, 950);
-    assert_eq!(game.state.ability_runtime.projectiles().next().unwrap().expires_tick, u32::MAX);
+    assert_eq!(
+        game.state
+            .ability_runtime
+            .projectiles()
+            .next()
+            .unwrap()
+            .expires_tick,
+        u32::MAX
+    );
     // The potion follows the unit rather than healing its original location.
-    game.state.entities.get_mut(unit).unwrap().set_position(1920.0, 320.0);
+    game.state
+        .entities
+        .get_mut(unit)
+        .unwrap()
+        .set_position(1920.0, 320.0);
     for _ in 1..149 {
         game.tick();
     }
@@ -233,7 +247,11 @@ fn healing_potion_disappears_without_refund_when_target_dies_or_is_removed() {
         if remove {
             game.state.entities.remove(unit);
         } else {
-            game.state.entities.get_mut(unit).unwrap().apply_damage(u32::MAX, None);
+            game.state
+                .entities
+                .get_mut(unit)
+                .unwrap()
+                .apply_damage(u32::MAX, None);
         }
         game.tick();
         assert!(game.state.entities.get(unit).is_none());
