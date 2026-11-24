@@ -90,7 +90,7 @@ fn disciple_insight_counts_actual_hp_loss_resets_on_evolution_and_raises_cap() {
     run_combat_tick(&mut entities);
     assert_eq!(
         entities.get(unit).unwrap().insight,
-        3,
+        4, // Seven actual HP lost × (30 / 50) cost weighting, floored.
         "overkill does not grant insight"
     );
     entities.get_mut(unit).unwrap().insight = 59;

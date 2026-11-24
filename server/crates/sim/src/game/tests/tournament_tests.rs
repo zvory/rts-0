@@ -495,7 +495,7 @@ fn tournament_portal_rally_trains_and_feeds_four_disciples_automatically() {
     );
     assert!(!game.state.entities.iter().any(|e| e.kind.is_disciple()));
     assert_eq!(
-        game.state.players[0].steel, 600,
+        game.state.players[0].steel, 800,
         "only the four Portal training costs are paid"
     );
     for _ in 0..300 {

@@ -179,7 +179,7 @@ fn healing_potion_costs_50_and_arrives_after_ten_tiles_of_flight() {
         .entities
         .get_mut(unit)
         .unwrap()
-        .apply_damage(80, None);
+        .apply_damage(40, None);
     let hp = game.state.entities.get(unit).unwrap().hp;
     buy(&mut game, shop, unit, AbilityKind::HealingPotion);
     game.tick();
