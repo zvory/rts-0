@@ -142,6 +142,7 @@ export class MapEditorSession {
       noEntrenchmentTiles: map.noEntrenchmentTiles,
       damageReductionTiles: map.damageReductionTiles,
       slowMovementTiles: map.slowMovementTiles,
+      unwalkableTiles: map.unwalkableTiles,
     });
     this.markSaved({ notify: false });
     this.notify("initialized");
@@ -169,6 +170,7 @@ export class MapEditorSession {
       noEntrenchmentTiles: data.noEntrenchmentTiles,
       damageReductionTiles: data.damageReductionTiles,
       slowMovementTiles: data.slowMovementTiles,
+      unwalkableTiles: data.unwalkableTiles,
     });
     this.undoStack = [];
     this.redoStack = [];
@@ -206,6 +208,7 @@ export class MapEditorSession {
       noEntrenchmentTiles: [],
       damageReductionTiles: [],
       slowMovementTiles: [],
+      unwalkableTiles: [],
     });
     this.undoStack = [];
     this.redoStack = [];
@@ -610,6 +613,7 @@ export class MapEditorSession {
       noEntrenchmentTiles: normalizeOverlayTiles(draft.noEntrenchmentTiles, draft),
       damageReductionTiles: mergedOverlayTiles(draft.damageReductionTiles, forestTiles),
       slowMovementTiles: normalizeOverlayTiles(draft.slowMovementTiles, draft),
+      unwalkableTiles: normalizeOverlayTiles(draft.unwalkableTiles, draft),
     };
   }
 
@@ -854,6 +858,7 @@ export function authoredMapFromMaterialized({
   noEntrenchmentTiles = [],
   damageReductionTiles = [],
   slowMovementTiles = [],
+  unwalkableTiles = [],
 }) {
   const mapWidth = Math.max(1, Math.trunc(Number(width)) || 1);
   const mapHeight = Math.max(1, Math.trunc(Number(height)) || 1);
@@ -896,6 +901,7 @@ export function authoredMapFromMaterialized({
     noEntrenchmentTiles: normalizeOverlayTiles(noEntrenchmentTiles, dimensions),
     damageReductionTiles: normalizeOverlayTiles(damageReductionTiles, dimensions),
     slowMovementTiles: normalizeOverlayTiles(slowMovementTiles, dimensions),
+    unwalkableTiles: normalizeOverlayTiles(unwalkableTiles, dimensions),
   };
   normalizeDraft(draft);
   return draft;
@@ -914,6 +920,7 @@ export function materializedMapsEqual(left, right) {
     && sameLocationSet(left.noBuildingTiles, right.noBuildingTiles)
     && sameLocationSet(left.noEntrenchmentTiles, right.noEntrenchmentTiles)
     && sameLocationSet(left.damageReductionTiles, right.damageReductionTiles)
+    && sameLocationSet(left.unwalkableTiles, right.unwalkableTiles)
     && sameLocationSet(left.slowMovementTiles, right.slowMovementTiles);
 }
 
@@ -974,6 +981,7 @@ function normalizeDraft(draft) {
   draft.noEntrenchmentTiles = normalizeOverlayTiles(draft.noEntrenchmentTiles, dimensions);
   draft.damageReductionTiles = normalizeOverlayTiles(draft.damageReductionTiles, dimensions);
   draft.slowMovementTiles = normalizeOverlayTiles(draft.slowMovementTiles, dimensions);
+  draft.unwalkableTiles = normalizeOverlayTiles(draft.unwalkableTiles, dimensions);
   reconcileForestDoodads(draft);
 }
 
@@ -1028,6 +1036,7 @@ function resizeDraftCentered(source, width, height) {
     noEntrenchmentTiles: (source.noEntrenchmentTiles || []).map(shiftTile),
     damageReductionTiles: (source.damageReductionTiles || []).map(shiftTile),
     slowMovementTiles: (source.slowMovementTiles || []).map(shiftTile),
+    unwalkableTiles: (source.unwalkableTiles || []).map(shiftTile),
   };
   if (startLocations.some((location) => !draftLocationTileWithinClearance(draft, location, MAP_EDITOR_MAIN_CLEARANCE_TILES))) {
     return draftEditError("Resize would move a start location inside the map edge clearance.");

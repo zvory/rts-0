@@ -70,6 +70,7 @@ fn map_draft() -> LabMapDraft {
         no_entrenchment_tiles: Vec::new(),
         damage_reduction_tiles: Vec::new(),
         slow_movement_tiles: Vec::new(),
+        unwalkable_tiles: Vec::new(),
         doodads: vec![
             MapDoodad {
                 id: 9,
@@ -202,6 +203,34 @@ fn lab_map_draft_rejects_blocked_base_protection_area() {
 }
 
 #[test]
+fn lab_map_draft_checks_unwalkable_clearance_without_changing_terrain() {
+    let protection_radius = super::super::setup::starting_protection_radius_tiles(&lab_players());
+    let start_edge_x = 12 + u32::try_from(protection_radius).expect("non-negative radius");
+    for (x, y, blocked) in [
+        (start_edge_x, 12, true),
+        (32, 32, true),
+        (start_edge_x + 1, 12, false),
+    ] {
+        let mut game = new_game();
+        let original_hash = game.state.map.materialized_hash();
+        let mut draft = map_draft();
+        draft.unwalkable_tiles = vec![crate::protocol::MapTile { x, y }];
+        let terrain = draft.terrain.clone();
+        let result = game.apply_lab_op(LabOp::ApplyMapDraft(Box::new(draft)));
+        if blocked {
+            assert!(matches!(result,
+                Err(LabError::InvalidMap { reason, .. }) if reason.contains("protected area")
+            ));
+            assert_eq!(game.state.map.materialized_hash(), original_hash);
+        } else {
+            result.expect("unwalkable tile beyond the protected area is legal");
+            assert_eq!(game.state.map.terrain, terrain);
+            assert!(!game.state.map.is_passable(x as i32, y as i32));
+        }
+    }
+}
+
+#[test]
 fn lab_map_draft_allows_terrain_immediately_beyond_starting_unit_area() {
     let mut game = new_game();
     let mut draft = map_draft();
@@ -265,6 +294,7 @@ fn terrain_only_lab_map_draft_restarts_a_fresh_test() {
         no_entrenchment_tiles: Vec::new(),
         damage_reduction_tiles: Vec::new(),
         slow_movement_tiles: Vec::new(),
+        unwalkable_tiles: Vec::new(),
         doodads: Vec::new(),
     };
 

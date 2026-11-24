@@ -97,6 +97,7 @@ fn map_editor_handoff_materializes_before_the_first_lab_start_payload() {
         no_entrenchment_tiles: Vec::new(),
         damage_reduction_tiles: Vec::new(),
         slow_movement_tiles: Vec::new(),
+        unwalkable_tiles: Vec::new(),
     });
     let mut task = RoomTask::new(
         "__lab__:map-editor:map=Chokes".to_string(),

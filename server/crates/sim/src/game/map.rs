@@ -86,6 +86,8 @@ pub struct Map {
     pub damage_reduction_tiles: Vec<(u32, u32)>,
     /// Canonical sparse tile coordinates reducing occupant movement speed by 25%.
     pub slow_movement_tiles: Vec<(u32, u32)>,
+    /// Sparse tiles blocked to all ground movement, landings, spawns, and building footprints.
+    pub unwalkable_tiles: Vec<(u32, u32)>,
 }
 
 pub(crate) fn validate_elevation_sun(elevation: &[u8], sun: Option<MapSun>) -> Result<(), String> {
@@ -181,6 +183,7 @@ impl Map {
         }
         hash = hash_tiles(hash, b"damage-reduction", &self.damage_reduction_tiles);
         hash = hash_tiles(hash, b"slow-movement", &self.slow_movement_tiles);
+        hash = hash_tiles(hash, b"unwalkable", &self.unwalkable_tiles);
         format!("{hash:016x}")
     }
 
@@ -254,7 +257,8 @@ impl Map {
     pub(crate) fn world_point_allows_entrenchment(&self, x: f32, y: f32) -> bool {
         self.contains_world_point(x, y) && {
             let (tx, ty) = self.tile_of(x, y);
-            self.no_entrenchment_tiles.binary_search(&(tx, ty)).is_err()
+            self.is_passable(tx as i32, ty as i32)
+                && self.no_entrenchment_tiles.binary_search(&(tx, ty)).is_err()
                 && terrain_rules::TerrainKind::from_map_code(self.terrain_at(tx, ty))
                     != Some(terrain_rules::TerrainKind::Road)
         }
@@ -329,6 +333,7 @@ impl Map {
             no_entrenchment: convert(&self.no_entrenchment_tiles),
             damage_reduction: convert(&self.damage_reduction_tiles),
             slow_movement: convert(&self.slow_movement_tiles),
+            unwalkable: convert(&self.unwalkable_tiles),
         }
     }
 
@@ -339,7 +344,10 @@ impl Map {
         if !self.in_bounds(x, y) {
             return false;
         }
-        terrain_rules::is_passable_map_code(self.terrain_at(x as u32, y as u32))
+        self.unwalkable_tiles
+            .binary_search(&(x as u32, y as u32))
+            .is_err()
+            && terrain_rules::is_passable_map_code(self.terrain_at(x as u32, y as u32))
     }
 
     /// World-pixel center of a tile.

@@ -101,6 +101,21 @@ assert.deepEqual(
 );
 assert(validateMap(protectedMap).warnings.some((warning) => warning.includes("protected area")));
 
+{
+  const openMap = buildMapFromRecipe({
+    name: "Unwalkable clearance", width: 48, height: 32,
+    operations: [{ type: "start", at: [8, 8] }, { type: "base", at: [32, 16] }],
+  });
+  for (const tile of [{ x: 15, y: 8 }, { x: 36, y: 16 }]) {
+    const warnings = validateMap({ ...openMap, unwalkableTiles: [tile] }).warnings;
+    assert(warnings.some((warning) => warning.includes("unwalkable tile in its protected area")),
+      "unwalkable overlays warn at the protected radius of starts and expansion bases");
+  }
+  assert(!validateMap({ ...openMap, unwalkableTiles: [{ x: 16, y: 8 }] }).warnings
+    .some((warning) => warning.includes("protected area")), "tiles outside base protection remain legal");
+  assert.doesNotThrow(() => validateMap({ ...openMap, unwalkableTiles: [null] }));
+}
+
 const groupedSession = new MapEditorSession({ storage: null });
 const groupedMap = structuredClone(map);
 groupedMap.startLocations.forEach((start, index) => { start.teamGroup = index + 1; });

@@ -23,6 +23,8 @@ pub(crate) use unit_blockers::UnitBlockers;
 
 mod placement_policy;
 mod rank;
+#[cfg(test)]
+mod unwalkable_tests;
 pub(crate) use rank::unit_spawn_standable_for_entity;
 mod pump_jack;
 mod tree_trunks;

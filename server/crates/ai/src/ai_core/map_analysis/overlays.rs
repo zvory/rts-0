@@ -26,7 +26,11 @@ impl AiMapAnalysis {
 /// The gameplay overlays the analysis reads, so two maps that differ only there never share it.
 pub(super) fn hash_overlays(map: &MapInfo) -> u64 {
     let mut hash = FNV_OFFSET_BASIS;
-    for tiles in [&map.concealment_tiles, &map.no_entrenchment_tiles] {
+    for tiles in [
+        &map.concealment_tiles,
+        &map.no_entrenchment_tiles,
+        &map.unwalkable_tiles,
+    ] {
         hash = fnv_u32(hash, tiles.len() as u32);
         for tile in tiles {
             hash = fnv_u32(hash, tile.x);

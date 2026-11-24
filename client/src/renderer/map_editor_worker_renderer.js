@@ -292,6 +292,7 @@ const OVERLAY_VISUALS = Object.freeze({
   noEntrenchment: Object.freeze({ color: 0xb84a8f, icon: drawNoEntry }),
   damageReduction: Object.freeze({ color: 0x3e82d7, icon: drawHalfShield }),
   slowMovement: Object.freeze({ color: 0x8b5fc7, icon: drawMiredBoot }),
+  unwalkable: Object.freeze({ color: 0xe04040, icon: drawNoEntry }),
 });
 
 function drawGameplayOverlays(graphics, overlay, visibility) {
@@ -319,6 +320,7 @@ function drawGameplayOverlays(graphics, overlay, visibility) {
   add("noEntrenchment", overlay.noEntrenchmentTiles, MAP_AUTHORING_LAYER.NO_ENTRENCHMENT);
   add("damageReduction", overlay.damageReductionTiles, MAP_AUTHORING_LAYER.DAMAGE_REDUCTION);
   add("slowMovement", overlay.slowMovementTiles, MAP_AUTHORING_LAYER.SLOW_MOVEMENT);
+  add("unwalkable", overlay.unwalkableTiles, MAP_AUTHORING_LAYER.UNWALKABLE);
 
   for (const tile of byTile.values()) {
     const shared = tile.effects.length > 1;

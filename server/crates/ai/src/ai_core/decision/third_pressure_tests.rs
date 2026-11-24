@@ -963,6 +963,7 @@ fn open_analysis() -> AiMapAnalysis {
             no_entrenchment_tiles: Vec::new(),
             damage_reduction_tiles: Vec::new(),
             slow_movement_tiles: Vec::new(),
+            unwalkable_tiles: Vec::new(),
         },
         players: [(1, (10, 10)), (2, (110, 110))]
             .into_iter()

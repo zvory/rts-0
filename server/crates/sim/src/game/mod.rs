@@ -96,6 +96,7 @@ struct MapOverlayTiles<T> {
     no_entrenchment: Vec<T>,
     damage_reduction: Vec<T>,
     slow_movement: Vec<T>,
+    unwalkable: Vec<T>,
 }
 
 const AI_WORKER_RETREAT_TILES: f32 = 5.0;

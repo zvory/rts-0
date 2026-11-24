@@ -71,6 +71,7 @@ pub struct AiMap {
     pub tile_size: u32,
     pub terrain: Vec<AiTerrain>,
     pub no_building_tiles: BTreeSet<(u32, u32)>,
+    pub unwalkable_tiles: BTreeSet<(u32, u32)>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -500,6 +501,12 @@ impl AiFrame {
                     .iter()
                     .copied()
                     .map(AiTerrain::from_code)
+                    .collect(),
+                unwalkable_tiles: start
+                    .map
+                    .unwalkable_tiles
+                    .iter()
+                    .map(|tile| (tile.x, tile.y))
                     .collect(),
                 no_building_tiles: start
                     .map

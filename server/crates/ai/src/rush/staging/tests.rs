@@ -177,6 +177,7 @@ fn route_and_staging_follow_the_passable_approach_around_a_wall() {
         tile_size: 32,
         terrain: vec![AiTerrain::Grass; 96 * 96],
         no_building_tiles: BTreeSet::new(),
+        unwalkable_tiles: BTreeSet::new(),
     };
     let mut blocked = map.clone();
     for y in 0..60 {

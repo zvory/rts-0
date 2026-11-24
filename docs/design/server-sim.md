@@ -623,13 +623,18 @@ store a separate authoritative command stream, but they must not infer live stat
 
 Map policy:
 
+- Optional `unwalkableTiles` annotations preserve terrain appearance but make the shared
+  `Map::is_passable` rule reject ground movement, body-overlapping ability landings, spawns, and
+  building footprints. Pathing and formation oracles apply the same rule. Classic explicitly marks
+  terrain disconnected from all starts; this is authored data, not a global connectivity policy.
+
 - Authored-map schema v10 requires compact non-overlapping `[y, xStart, xEnd]` forest spans and an
   explicit `noEntrenchmentTiles` overlay. Loading
   expands every forest tile into the stealth, no-vehicle, no-building, and damage-reduction
   vectors before `Map` construction. Slow movement remains an independent authored overlay. Earlier schemas and v9 documents missing the
   required forest array are rejected rather than migrated.
 - `GameState.map` remains authoritative runtime state because systems read terrain, selected starts,
-  permanent base sites, six sparse gameplay-overlay tile sets, vehicle tree-trunk collision, and
+  permanent base sites, seven sparse gameplay-overlay tile sets, vehicle tree-trunk collision, and
   infantry tree path-cost data on every tick, while start/export
   boundaries read all static doodads. Internal cold checkpoints may still clone the full `Map` while
   they are private test machinery.

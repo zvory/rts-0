@@ -296,7 +296,9 @@ impl<'a> WorldQueries<'a> {
                 let Some(index) = tile_index(self.frame, x, y) else {
                     return KnownBuildSite::Invalid;
                 };
-                if !is_passable(self.frame.map().terrain[index]) {
+                if self.frame.map().unwalkable_tiles.contains(&(x, y))
+                    || !is_passable(self.frame.map().terrain[index])
+                {
                     return KnownBuildSite::KnownBlocked(KnownBuildSiteBlocker::KnownTerrain);
                 }
                 if self.frame.map().no_building_tiles.contains(&(x, y)) {
@@ -356,7 +358,12 @@ impl<'a> WorldQueries<'a> {
             let Some(index) = tile_index(self.frame, spawn_x, spawn_y) else {
                 return KnownBuildSite::Invalid;
             };
-            if !is_passable(self.frame.map().terrain[index])
+            if self
+                .frame
+                .map()
+                .unwalkable_tiles
+                .contains(&(spawn_x, spawn_y))
+                || !is_passable(self.frame.map().terrain[index])
                 || self.resource_at_tile(spawn_x, spawn_y)
                 || self
                     .current_buildings()

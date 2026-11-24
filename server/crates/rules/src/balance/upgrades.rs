@@ -109,7 +109,7 @@ pub fn disciple_insight_ratio(
     let denominator = own * 4;
     let numerator = if super::building_stats(target).is_some() {
         if attacker == crate::EntityKind::WindAdept && target.is_resource_extractor() {
-            denominator
+            denominator * 9 / 10
         } else {
             own
         }

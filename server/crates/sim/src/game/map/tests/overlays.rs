@@ -235,3 +235,74 @@ fn current_authored_schema_requires_no_entrenchment_tiles() {
         "error was: {error}"
     );
 }
+
+#[test]
+fn unwalkable_annotation_preserves_terrain_and_rejects_bad_coordinates() {
+    let mut authored: serde_json::Value = serde_json::from_str(&authored_map_with_overlays(
+        serde_json::json!([]),
+        serde_json::json!([]),
+    ))
+    .expect("test map JSON");
+    let original = Map::from_authored_json(1, &authored.to_string(), 0).expect("map");
+    authored["unwalkableTiles"] = serde_json::json!([
+        {"x": 20, "y": 19}, {"x": 19, "y": 20}
+    ]);
+    let map = Map::from_authored_json(1, &authored.to_string(), 0).expect("annotated map");
+    assert_eq!(map.terrain, original.terrain);
+    assert_eq!(map.unwalkable_tiles, vec![(19, 20), (20, 19)]);
+    assert!(!map.is_passable(20, 19));
+    assert!(map.is_passable(19, 19));
+    assert_ne!(map.materialized_hash(), original.materialized_hash());
+    assert_eq!(map.protocol_overlay_tiles().unwalkable.len(), 2);
+    authored["unwalkableTiles"] = serde_json::json!([{"x": 32, "y": 19}]);
+    assert!(Map::from_authored_json(1, &authored.to_string(), 0).is_err());
+    authored["unwalkableTiles"] = serde_json::json!([{"x": 20, "y": 19}, {"x": 20, "y": 19}]);
+    assert!(Map::from_authored_json(1, &authored.to_string(), 0).is_err());
+}
+
+#[test]
+fn classic_marks_exactly_the_land_disconnected_from_its_starts() {
+    use std::collections::{BTreeSet, VecDeque};
+    let map = Map::from_authored_json(
+        2,
+        include_str!("../../../../../../assets/maps/classic.json"),
+        0,
+    )
+    .expect("classic map");
+    let mut reachable: BTreeSet<_> = map.starts.iter().copied().collect();
+    let mut pending: VecDeque<_> = map.starts.iter().copied().collect();
+    while let Some((x, y)) = pending.pop_front() {
+        for (dx, dy) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+            let (tx, ty) = (x as i32 + dx, y as i32 + dy);
+            if map.in_bounds(tx, ty)
+                && terrain_rules::is_passable_map_code(map.terrain_at(tx as u32, ty as u32))
+                && reachable.insert((tx as u32, ty as u32))
+            {
+                pending.push_back((tx as u32, ty as u32));
+            }
+        }
+    }
+    let mut expected = BTreeSet::new();
+    for x in 0..map.width {
+        for y in 0..map.height {
+            if terrain_rules::is_passable_map_code(map.terrain_at(x, y))
+                && !reachable.contains(&(x, y))
+            {
+                expected.insert((x, y));
+                assert!(!map.is_passable(x as i32, y as i32));
+            }
+        }
+    }
+    assert_eq!(expected.len(), 426);
+    assert_eq!(
+        map.unwalkable_tiles
+            .iter()
+            .copied()
+            .collect::<BTreeSet<_>>(),
+        expected
+    );
+    assert!(map.base_sites.iter().all(|tile| reachable.contains(tile)));
+    assert!(reachable
+        .iter()
+        .all(|&(x, y)| map.is_passable(x as i32, y as i32)));
+}

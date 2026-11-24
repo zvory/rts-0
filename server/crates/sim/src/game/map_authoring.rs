@@ -243,6 +243,7 @@ fn map_from_materialized(map: AuthoredMapData) -> Map {
         no_entrenchment_tiles: map.no_entrenchment_tiles,
         damage_reduction_tiles: map.damage_reduction_tiles,
         slow_movement_tiles: map.slow_movement_tiles,
+        unwalkable_tiles: map.unwalkable_tiles,
     }
 }
 

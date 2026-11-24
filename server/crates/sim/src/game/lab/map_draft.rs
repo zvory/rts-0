@@ -41,6 +41,7 @@ pub(super) fn export(map: &Map, name: &str) -> LabMapDraft {
         no_entrenchment_tiles: overlays.no_entrenchment,
         damage_reduction_tiles: overlays.damage_reduction,
         slow_movement_tiles: overlays.slow_movement,
+        unwalkable_tiles: overlays.unwalkable,
     }
 }
 
@@ -161,6 +162,13 @@ pub(super) fn canonical_overlays(
             draft.width,
             draft.height,
             "slowMovementTiles",
+            name,
+        )?,
+        unwalkable: canonical_tiles(
+            &draft.unwalkable_tiles,
+            draft.width,
+            draft.height,
+            "unwalkableTiles",
             name,
         )?,
     })

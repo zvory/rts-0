@@ -328,6 +328,9 @@ pub struct MapInfo {
     /// Sparse tile overlay that reduces occupant movement speed by 25%.
     #[serde(default)]
     pub slow_movement_tiles: Vec<MapTile>,
+    /// Ground that retains its appearance but rejects movement and placement.
+    #[serde(default)]
+    pub unwalkable_tiles: Vec<MapTile>,
 }
 
 /// Authored static sunlight used only to render elevated terrain.

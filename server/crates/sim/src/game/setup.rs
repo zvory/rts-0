@@ -432,6 +432,7 @@ impl Game {
             no_entrenchment_tiles: overlays.no_entrenchment,
             damage_reduction_tiles: overlays.damage_reduction,
             slow_movement_tiles: overlays.slow_movement,
+            unwalkable_tiles: overlays.unwalkable,
         };
         let players = self
             .state

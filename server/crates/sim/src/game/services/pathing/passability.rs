@@ -23,7 +23,7 @@ pub(super) struct TerrainPassability<'a> {
 
 impl TerrainPassability<'_> {
     fn tile_passable(&self, tx: i32, ty: i32) -> bool {
-        if !self.map.in_bounds(tx, ty) {
+        if !self.map.is_passable(tx, ty) {
             return false;
         }
         let Some(terrain_kind) =

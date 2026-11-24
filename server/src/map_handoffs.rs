@@ -266,6 +266,9 @@ fn validate_materialized_binding(
     ) {
         return Err("Authored and materialized slow-movement tiles do not match.".to_string());
     }
+    if !tiles_match(&authored.unwalkable_tiles, &materialized.unwalkable_tiles) {
+        return Err("Authored and materialized unwalkable tiles do not match.".to_string());
+    }
     if !locations_match(&authored.starts, &materialized.starts)
         || !base_sites_match(authored, &materialized.base_sites)
     {
@@ -370,6 +373,7 @@ mod tests {
                 no_entrenchment_tiles: Vec::new(),
                 damage_reduction_tiles: Vec::new(),
                 slow_movement_tiles: Vec::new(),
+                unwalkable_tiles: Vec::new(),
             }),
         }
     }
@@ -438,11 +442,12 @@ mod tests {
             ("noBuildingTiles", "no-building"),
             ("damageReductionTiles", "damage-reduction"),
             ("slowMovementTiles", "slow-movement"),
+            ("unwalkableTiles", "unwalkable"),
         ];
         for (field, expected_error) in fields {
             let mut request = valid_request();
-            request.authored_map[field] = serde_json::json!([{"x": 20, "y": 20}]);
-            let tile = MapTile { x: 20, y: 20 };
+            request.authored_map[field] = serde_json::json!([{"x": 16, "y": 16}]);
+            let tile = MapTile { x: 16, y: 16 };
             match field {
                 "concealmentTiles" => materialized(&mut request).concealment_tiles.push(tile),
                 "noVehicleTiles" => materialized(&mut request).no_vehicle_tiles.push(tile),
@@ -451,6 +456,7 @@ mod tests {
                     materialized(&mut request).damage_reduction_tiles.push(tile)
                 }
                 "slowMovementTiles" => materialized(&mut request).slow_movement_tiles.push(tile),
+                "unwalkableTiles" => materialized(&mut request).unwalkable_tiles.push(tile),
                 _ => unreachable!(),
             }
             assert_eq!(validate_request(&request), Ok(()));
@@ -460,6 +466,7 @@ mod tests {
             materialized(&mut request).no_building_tiles.clear();
             materialized(&mut request).damage_reduction_tiles.clear();
             materialized(&mut request).slow_movement_tiles.clear();
+            materialized(&mut request).unwalkable_tiles.clear();
             assert!(validate_request(&request)
                 .expect_err("mismatched overlay materialization must fail")
                 .contains(expected_error));
@@ -570,6 +577,7 @@ mod tests {
             no_entrenchment_tiles: Vec::new(),
             damage_reduction_tiles: Vec::new(),
             slow_movement_tiles: Vec::new(),
+            unwalkable_tiles: Vec::new(),
         });
 
         assert_eq!(validate_request(&request), Ok(()));

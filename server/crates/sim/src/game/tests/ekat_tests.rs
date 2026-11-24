@@ -483,6 +483,31 @@ fn ekat_dash_snaps_blocked_request_to_nearest_valid_landing() {
 }
 
 #[test]
+fn ekat_dash_rejects_unwalkable_landing_without_marker_or_cooldown() {
+    let players = [ekat_player()];
+    let mut game = empty_flat_game(&players);
+    let pos = game.state.map.tile_center(10, 10);
+    let target = game.state.map.tile_center(15, 10);
+    game.state.map.unwalkable_tiles = vec![(15, 10)];
+    let hero = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Ekat, pos.0, pos.1)
+        .expect("hero should spawn");
+
+    enqueue_ekat_dash(&mut game, hero, target);
+    game.tick();
+
+    let hero_entity = game.state.entities.get(hero).expect("hero exists");
+    assert!((hero_entity.pos_x() - pos.0).abs() < f32::EPSILON);
+    assert_eq!(
+        hero_entity.ability_cooldown_ticks(ability::AbilityKind::EkatTeleport),
+        0
+    );
+    assert!(active_return_marker_id(&game, hero).is_none());
+}
+
+#[test]
 fn ekat_return_cannot_happen_in_same_tick_as_dash() {
     let players = [ekat_player()];
     let mut game = empty_flat_game(&players);

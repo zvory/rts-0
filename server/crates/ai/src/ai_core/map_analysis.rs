@@ -778,12 +778,15 @@ fn build_passability(map: &MapInfo) -> Vec<bool> {
     let Some(tile_count) = tile_count(map.width, map.height) else {
         return Vec::new();
     };
+    let blocked = overlay_grid(map.width, map.height, &map.unwalkable_tiles);
     (0..tile_count)
         .map(|idx| {
-            map.terrain
-                .get(idx)
-                .copied()
-                .is_some_and(rts_rules::terrain::is_passable_map_code)
+            !blocked.get(idx).copied().unwrap_or(true)
+                && map
+                    .terrain
+                    .get(idx)
+                    .copied()
+                    .is_some_and(rts_rules::terrain::is_passable_map_code)
         })
         .collect()
 }
