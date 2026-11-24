@@ -547,38 +547,6 @@ impl Game {
         let base_resource_counts = map_draft::resource_counts(&draft, name)?;
         let overlays = map_draft::canonical_overlays(&draft, name)?;
         let doodads = map_draft::canonical_doodads(draft.width, draft.height, draft.doodads, name)?;
-        let mut placement_terrain = draft.terrain.clone();
-        for &(x, y) in &overlays.unwalkable {
-            if let Some(code) = placement_terrain.get_mut((y * draft.width + x) as usize) {
-                *code = terrain::WATER;
-            }
-        }
-        let mut occupied_sites = std::collections::HashSet::new();
-        for &(x, y) in &starts {
-            validate_lab_map_site(
-                name,
-                (draft.width, draft.height),
-                &placement_terrain,
-                x,
-                y,
-                main_protection_radius,
-                &mut occupied_sites,
-            )?;
-        }
-        for &(x, y) in &base_sites {
-            if starts.contains(&(x, y)) {
-                continue;
-            }
-            validate_lab_map_site(
-                name,
-                (draft.width, draft.height),
-                &placement_terrain,
-                x,
-                y,
-                LAB_MAP_BASE_SITE_PROTECTION_RADIUS_TILES,
-                &mut occupied_sites,
-            )?;
-        }
         let map = Map {
             width: draft.width,
             height: draft.height,
@@ -597,6 +565,30 @@ impl Game {
             slow_movement_tiles: overlays.slow_movement,
             unwalkable_tiles: overlays.unwalkable,
         };
+        let mut occupied_sites = std::collections::HashSet::new();
+        for &(x, y) in &map.starts {
+            validate_lab_map_site(
+                name,
+                &map,
+                x,
+                y,
+                main_protection_radius,
+                &mut occupied_sites,
+            )?;
+        }
+        for &(x, y) in &map.base_sites {
+            if map.starts.contains(&(x, y)) {
+                continue;
+            }
+            validate_lab_map_site(
+                name,
+                &map,
+                x,
+                y,
+                LAB_MAP_BASE_SITE_PROTECTION_RADIUS_TILES,
+                &mut occupied_sites,
+            )?;
+        }
         let map_metadata = MapMetadata {
             name: name.to_string(),
             schema_version: CURRENT_MAP_VERSION,
@@ -1307,14 +1299,13 @@ fn terrain_name(tile: u8) -> &'static str {
 
 fn validate_lab_map_site(
     name: &str,
-    dimensions: (u32, u32),
-    terrain_grid: &[u8],
+    map: &Map,
     x: u32,
     y: u32,
     radius: i32,
     occupied_sites: &mut std::collections::HashSet<(u32, u32)>,
 ) -> Result<(), LabError> {
-    let (width, height) = dimensions;
+    let (width, height) = (map.width, map.height);
     if x >= width || y >= height {
         return Err(LabError::InvalidMap {
             name: name.to_string(),
@@ -1353,12 +1344,7 @@ fn validate_lab_map_site(
                     reason: format!("base site ({x},{y}) is too close to the map edge"),
                 });
             }
-            let index = ty as usize * width as usize + tx as usize;
-            if !terrain_grid
-                .get(index)
-                .copied()
-                .is_some_and(crate::rules::terrain::is_passable_map_code)
-            {
+            if !map.is_passable(tx, ty) {
                 return Err(LabError::InvalidMap {
                     name: name.to_string(),
                     reason: format!(
