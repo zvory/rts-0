@@ -63,9 +63,20 @@ export function createMinimapAnimation() {
         const width = strip.iconVisibleBounds?.w || strip.frameWidth;
         const height = strip.iconVisibleBounds?.h || strip.frameHeight;
         const scale = 1 / (Math.max(width, height) * 1.05);
-        const kick = (offset.x - reference.x) * scale;
-        const step = (offset.y - reference.y) / frameStripWorldScale(strip, entity, context) * scale;
-        const frameScale = Math.max(strip.frameWidth, strip.frameHeight) * scale;
+        const worldScale = frameStripWorldScale(strip, entity, context, frame);
+        const adjusted = !!strip.firingWorldScale;
+        const bodyScale = adjusted ? worldScale / strip.worldScale : 1;
+        if (adjusted) {
+          // Idle and firing cells may use different facing axes. Subtract the idle
+          // origin in the active pose's axes so scaling preserves world anchors.
+          const angle = frameStripVisualFacing(strip, entity, context, strip.idleFrame || 0) - rotation;
+          const x = reference.x, y = reference.y;
+          reference.x = x * Math.cos(angle) - y * Math.sin(angle);
+          reference.y = x * Math.sin(angle) + y * Math.cos(angle);
+        }
+        const kick = (offset.x - reference.x) / (adjusted ? strip.worldScale : 1) * scale;
+        const step = (offset.y - reference.y) / (adjusted ? strip.worldScale : worldScale) * scale;
+        const frameScale = Math.max(strip.frameWidth, strip.frameHeight) * scale * bodyScale;
         const prefix = entity.daoMaster ? "master:frame" : entity.kind === KIND.PANZERFAUST && entity.panzerfaustLoaded !== true
           ? "unloaded-frame" : "frame";
         result = [{ part: `${prefix}:${frame}`, rotation, x: Math.cos(rotation) * kick - Math.sin(rotation) * step,
