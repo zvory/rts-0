@@ -25,6 +25,7 @@ use crate::game::services::standability;
 use crate::game::{PlayerState, ScoreState};
 use rayon::prelude::*;
 mod barbed_wire;
+mod cultivator_footing;
 mod infantry_facing;
 mod pivot_drive;
 mod side_push;
