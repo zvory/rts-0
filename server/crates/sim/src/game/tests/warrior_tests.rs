@@ -927,7 +927,8 @@ fn disciple_pending_dao_advances_on_combat_insight_without_interrupting_attack()
     assert_eq!(entity.insight, 0);
     assert_eq!(entity.dao(), Some(UpgradeKind::DaoOfHeaviness));
     assert!(matches!(entity.order(), Order::Attack(_)));
-    assert!(game.state.entities.get(target).unwrap().hp < 115);
+    let victim = game.state.entities.get(target).unwrap();
+    assert!(victim.hp < victim.max_hp);
 }
 
 #[test]

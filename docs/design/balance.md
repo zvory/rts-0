@@ -227,11 +227,12 @@ for 150 Steel in 300 ticks (10 seconds), using the existing extractor placement 
 `cultivators.standard` loadout matches Kriegsia's starting economy and replaces the starting Riflemen with one completed Disciple.
 Cultivator Serfs can also construct the faction-specific Portal for 150 Steel: it has a 3x3
 footprint, 123 HP, one tile of sight, a five-second construction time, no prerequisite, and no
-research. A completed Portal trains the Cultivator Disciple for 100 Steel and 2 Supply in 300 ticks.
-The Disciple is a 115-HP, 13.5-pixel-radius ground melee unit moving at 2.0 pixels per tick.
+research. A completed Portal trains the Cultivator Novice for 50 Steel and 2 Supply in 300 ticks.
+The Novice is a 58-HP, 26-pixel-radius ground melee unit moving at 2.0 pixels per tick.
 Wind independently uses 1.15 times Scout Car speed (2.7025 pixels per tick). War and Magic
-use 1.05 times base Disciple speed (2.1 pixels per tick). War gains 20 maximum HP (135 total);
-Wind and Magic retain 115 maximum HP. Its
+use 1.05 times base Disciple speed (2.1 pixels per tick). War has 135 maximum HP;
+Wind and Magic have 115 maximum HP. Novice cost is halved from 100 steel, and HP is
+scaled from 115 to 57.5, rounded to 58; Adept and Master stats are unchanged. Its
 23-damage sword has 0.75-tile reach, a 91-tick cooldown, and 50% armor penetration.
 Disciples have a separate five-tile engagement range for Idle and Attack Move: they approach
 visible legal enemies to sword reach, then resume their original Attack Move destination when
