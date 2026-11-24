@@ -92,6 +92,7 @@ fn dao_master_combat_threshold_and_damage_apply_to_combat_paths() {
     for (ability, adept_damage, master_damage, cooldown) in [
         (AbilityKind::EvolveWind, 23, 28, 61),
         (AbilityKind::EvolveWar, 35, 42, 91),
+        (AbilityKind::EvolveMagic, 23, 28, 91),
     ] {
         let mut game = empty_flat_game(&[
             cultivator_player(),
@@ -155,47 +156,49 @@ fn dao_master_combat_threshold_and_damage_apply_to_combat_paths() {
 
 #[test]
 fn disciple_weighted_insight_carries_exact_fractions_through_targets_and_checkpoints() {
-    let mut game = empty_flat_game(&[cultivator_player()]);
-    let id = game
-        .state
-        .entities
-        .spawn_unit(1, EntityKind::WarAdept, 400.0, 400.0)
+    for kind in [EntityKind::WarAdept, EntityKind::MagicAdept] {
+        let mut game = empty_flat_game(&[cultivator_player()]);
+        let id = game
+            .state
+            .entities
+            .spawn_unit(1, kind, 400.0, 400.0)
+            .unwrap();
+        game.tick();
+        let unit = game.state.entities.get_mut(id).unwrap();
+        // Adept value 475, Scout Car value 550: 19 HP earns exactly 22.
+        for _ in 0..18 {
+            unit.gain_insight(1, EntityKind::ScoutCar);
+        }
+        assert_eq!(unit.insight, 20);
+        let checkpoint = game.checkpoint_payload_text_for_test().unwrap();
+        let mut restored = Game::restore_checkpoint_payload_text_for_test(
+            &checkpoint,
+            game.state.map.clone(),
+            game.state.map_metadata.clone(),
+        )
         .unwrap();
-    game.tick();
-    let unit = game.state.entities.get_mut(id).unwrap();
-    // Adept value 475, Scout Car value 550: 19 HP earns exactly 22.
-    for _ in 0..18 {
+        let unit = restored.state.entities.get_mut(id).unwrap();
         unit.gain_insight(1, EntityKind::ScoutCar);
+        assert_eq!((unit.insight, unit.insight_fraction), (22, 0));
+        // Unit hits retain halves at the floor; buildings still retain quarters.
+        for target in [
+            EntityKind::Rifleman,
+            EntityKind::ResourceDepot,
+            EntityKind::Golem,
+            EntityKind::Rifleman,
+            EntityKind::ResourceDepot,
+        ] {
+            unit.gain_insight(1, target);
+        }
+        assert_eq!((unit.insight, unit.insight_fraction), (24, 0));
+        unit.gain_insight(1, EntityKind::Tank);
+        assert_eq!(unit.insight, 26, "expensive targets cap at double insight");
+        unit.gain_insight(u32::MAX, EntityKind::Tank);
+        assert_eq!((unit.insight, unit.insight_fraction), (200, 0));
+        unit.advance_dao_master();
+        unit.gain_insight(1, EntityKind::Rifleman);
+        assert_eq!((unit.insight, unit.insight_fraction), (0, 0));
     }
-    assert_eq!(unit.insight, 20);
-    let checkpoint = game.checkpoint_payload_text_for_test().unwrap();
-    let mut restored = Game::restore_checkpoint_payload_text_for_test(
-        &checkpoint,
-        game.state.map.clone(),
-        game.state.map_metadata.clone(),
-    )
-    .unwrap();
-    let unit = restored.state.entities.get_mut(id).unwrap();
-    unit.gain_insight(1, EntityKind::ScoutCar);
-    assert_eq!((unit.insight, unit.insight_fraction), (22, 0));
-    // Unit hits retain halves at the floor; buildings still retain quarters.
-    for target in [
-        EntityKind::Rifleman,
-        EntityKind::ResourceDepot,
-        EntityKind::Golem,
-        EntityKind::Rifleman,
-        EntityKind::ResourceDepot,
-    ] {
-        unit.gain_insight(1, target);
-    }
-    assert_eq!((unit.insight, unit.insight_fraction), (24, 0));
-    unit.gain_insight(1, EntityKind::Tank);
-    assert_eq!(unit.insight, 26, "expensive targets cap at double insight");
-    unit.gain_insight(u32::MAX, EntityKind::Tank);
-    assert_eq!((unit.insight, unit.insight_fraction), (200, 0));
-    unit.advance_dao_master();
-    unit.gain_insight(1, EntityKind::Rifleman);
-    assert_eq!((unit.insight, unit.insight_fraction), (0, 0));
 }
 
 #[test]
@@ -249,9 +252,7 @@ fn wind_insight_extractors_grant_full_actual_damage_other_buildings_quarter() {
             unit.insight = 0;
             unit.insight_fraction = 0;
             unit.gain_insight(12, target);
-            let expected = if kind == EntityKind::MagicAdept {
-                0
-            } else if kind == EntityKind::WindAdept && target.is_resource_extractor() {
+            let expected = if kind == EntityKind::WindAdept && target.is_resource_extractor() {
                 12
             } else {
                 3

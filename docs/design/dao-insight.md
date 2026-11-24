@@ -8,7 +8,7 @@ insight is ready. Selecting another path replaces the pending choice. This
 entity-owned intent is independent of orders: moving, attacking, Stop, and queued orders
 do not cancel it. No automatic research purchase, Portal default, or army-wide promotion
 is added. Evolution is immediate and free once the unit has 60 insight, capped at 60; misses, friendly fire, invulnerability and overkill grant
-no extra insight. Actual hostile unit HP loss grants cost-weighted insight as specified below; building HP loss grants a fixed quarter rate. Novice, Wind, and War ordinary attacks and eligible ability projectiles share this rule; Magic attacks grant no insight; Throw Sword grants no insight. Advancement clears all existing insight. Successful advancement fully restores HP to the evolved unit’s maximum,
+no extra insight. Actual hostile unit HP loss grants cost-weighted insight as specified below; building HP loss grants a fixed quarter rate. Novice, Wind, War, and Magic ordinary attacks and eligible ability projectiles share this rule; Throw Sword grants no insight. Advancement clears all existing insight. Successful advancement fully restores HP to the evolved unit’s maximum,
 after applying any path-specific maximum-HP bonus. Novices have 58 maximum HP; Wind and Magic Adepts have 150; War Adepts have 176. Base moves at 2.0 px/tick; War and Magic move at 2.1 px/tick. Choosing a pending path or repeating
 an evolution request does not heal; dead units cannot advance. One chosen-path evolution per unit, followed by one automatic Master advancement. Player research persists after Pavilion loss.
 The choice clears on evolution; evolved units cannot change paths. Pending choices persist
@@ -43,8 +43,8 @@ checkpoints; evolution immediately removes the speed benefit.
 Each paid training path has a separate researched unlock; combat-earned evolution is unrestricted. No automatic AI evolution in this pass;
 AI can encounter and damage evolved units. Insight uses a blue fill over red background
 under the HP bar and exact insight appears in selected-unit details for teammates and privileged observers only. Enemy snapshots omit exact insight. Evolved units
-reset to zero insight and have a cap of 200. Wind and War continue earning insight from
-actual hostile HP damage; Magic earns support insight as described below; reaching 200 automatically advances living Adepts to their matching
+reset to zero insight and have a cap of 200. Wind, War, and Magic continue earning insight from
+actual hostile HP damage; Magic also earns Anchor insight as described below; reaching 200 automatically advances living Adepts to their matching
 [Master rank](dao-masters.md), fully healing to 1.4 times their Adept maximum HP. Masters
 are 1.2 times Adept size, 1.1 times speed and deal 1.2 times ordinary attack damage. They
 reset insight to zero and stop earning it; no further advancement or repeat healing. Adept bars
@@ -145,13 +145,13 @@ Wind uses the separate `windDash` ability: fifteen-tile movement without a retur
 
 ## Cost-weighted combat insight
 
-For Novices, Wind Adepts, and War Adepts, value is listed steel cost plus 2.5 times listed oil cost.
+For Novices, Wind Adepts, War Adepts, and Magic Adepts, value is listed steel cost plus 2.5 times listed oil cost.
 Unit HP damage earns insight at target value / attacker value, clamped to 0.5–2.
 Use the current unit kind's listed cost regardless of acquisition route; omit research,
 infrastructure, supply, and rank bonuses. Novice value is 100; all Adepts are 237.5.
 Zero-cost targets receive the 0.5 floor. Buildings always give 0.25 insight per actual
 hostile HP lost, bypassing cost scaling, except Wind (Dao of Lightness) earns one insight per actual hostile HP removed from Pumpjacks and Steel Mines. This includes damage before the killing blow; overkill grants nothing. There is no killing-blow bonus, and Throw Sword
-continues to grant no insight. Magic Adepts gain no attack insight against units or buildings. Existing shield, armor, hostility, and overkill rules apply.
+continues to grant no insight. Existing shield, armor, hostility, and overkill rules apply.
 
 Arithmetic is exact integer arithmetic: weighted value W = 2 × steel + 5 × oil;
 the denominator is 4 × attacker W, and the numerator is clamp(4 × target W,
@@ -164,12 +164,7 @@ without rounding down each attack or introducing floating-point replay drift.
 
 ## Magic support insight
 
-Magic Adepts earn 90 insight for consuming a full Shield: credit is proportional to actual
-durability spent, with whole insight computed from cumulative consumption (90 / 150 HP).
-The shield pool preserves fractional progress across hits and checkpoints. Overkill, expiry,
-replacement, and caster death grant no bonus; partial shields grant only their consumed share.
-Piercing hits still earn support insight because they drain durability. The normal shield
-eligibility and stable overlap rules determine which caster earns the reward.
+Shield grants no insight from casting, durability consumption, piercing hits, expiry, or replacement.
 
 Each enemy unit that dies with its center inside an active Anchor grants its living Magic
 caster 20 insight, regardless of killer or unit cost. Allied deaths, buildings, expired Anchors,

@@ -611,13 +611,11 @@ fn disciple_shield_full_attack_cost_ignores_existing_reductions_and_breaking_hit
 }
 
 #[test]
-fn magic_support_insight_shield_tracks_consumption_across_checkpoint_and_caps() {
+fn magic_shield_grants_no_insight_across_checkpoint_consumption_and_expiry() {
     let (mut game, caster) = setup();
     game.tick();
     let unit = game.state.entities.get_mut(caster).unwrap();
     unit.insight = 0;
-    unit.gain_insight(1000, EntityKind::Tank);
-    assert_eq!(unit.insight, 0, "Magic attacks grant no insight");
     let shield_id = game.state.ability_runtime.allocate_id().get();
     game.state
         .entities
@@ -630,7 +628,7 @@ fn magic_support_insight_shield_tracks_consumption_across_checkpoint_and_caps() 
             .entities
             .shielded_damage(caster, 2, 1, 1, 0.0, (0.0, 0.0), &teams);
     }
-    assert_eq!(game.state.entities.get(caster).unwrap().insight, 4);
+    assert_eq!(game.state.entities.get(caster).unwrap().insight, 0);
     let checkpoint = game.checkpoint_payload_text_for_test().unwrap();
     let mut game = Game::restore_checkpoint_payload_text_for_test(
         &checkpoint,
@@ -643,13 +641,13 @@ fn magic_support_insight_shield_tracks_consumption_across_checkpoint_and_caps() 
         .shielded_damage(caster, 2, 1000, 1000, 1.0, (0.0, 0.0), &teams);
     let unit = game.state.entities.get_mut(caster).unwrap();
     assert_eq!(
-        unit.insight, 90,
-        "full shield grants exactly 90 despite overkill"
+        unit.insight, 0,
+        "shield consumption and overkill grant no insight"
     );
     assert!(unit.shield.is_none());
     unit.place_shield(2, 400.0, 400.0, 0, 200, true);
     unit.expire_shield(200);
-    assert_eq!(unit.insight, 90, "expiration grants nothing");
+    assert_eq!(unit.insight, 0, "expiration grants nothing");
     unit.insight = 199;
     unit.gain_magic_insight(20);
     assert_eq!(unit.insight, 200);
