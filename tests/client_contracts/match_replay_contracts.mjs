@@ -741,13 +741,36 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     match.presentationAssembler = { reset({ map }) { calls.push(`presentation:${map.width}`); } };
     match.roomTimeControls = { noteRoomTimeSeekStarted(seek) { calls.push(`controls:${seek.targetTick}`); } };
     match.stopAllMachineGunSounds = () => calls.push("audio");
-    match.combatAudio = { updateWorldCombatBed() {} };
+    match.combatAudio = {
+      updateWorldCombatBed() {},
+      updateThrowSwordSounds(objects = []) {
+        assert(objects.length === 0, "replay seek clears all sustained sword voices");
+        calls.push("sword-audio");
+      },
+    };
     match.presentationFrame = {};
     assert(match.prepareReplaySeek({ fromTick: 10, targetTick: 500 }),
       "replay Match accepts an in-place authoritative seek reset");
-    assert(calls.join(",") === "audio,state,intent,fog:8x6,presentation:8,controls:500",
+    assert(calls.join(",") === "audio,sword-audio,state,intent,fog:8x6,presentation:8,controls:500",
       "in-place replay seek clears transient state, fog, durable presentation, and controls together");
     assert(match.presentationFrame === null, "in-place replay seek drops the stale assembled frame");
+  }
+  {
+    const match = Object.create(Match.prototype);
+    let swordStops = 0;
+    match.running = true;
+    match.closeMenus = () => {};
+    match.combatAudio = {
+      updateThrowSwordSounds(objects = []) {
+        assert(objects.length === 0, "stopping a match clears sustained sword voices");
+        swordStops += 1;
+      },
+    };
+    match.stop();
+    assert(!match.running && swordStops === 1,
+      "the live game-over stop silences swords without waiting for another snapshot");
+    match.stop();
+    assert(swordStops === 2, "repeated match stops safely clear sword audio");
   }
   {
     const app = Object.create(App.prototype);
@@ -1265,8 +1288,13 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
     closedMenusForResume += 1;
   };
   const worldBedStates = [];
+  let swordAudioClears = 0;
   livePauseStateMatch.combatAudio = {
     updateWorldCombatBed(active) { worldBedStates.push(active); },
+    updateThrowSwordSounds(objects = []) {
+      assert(objects.length === 0, "live pause clears sustained sword voices");
+      swordAudioClears += 1;
+    },
   };
   livePauseStateMatch.applyLivePauseState({
     paused: true,
@@ -1296,6 +1324,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   assert(livePauseStateMatch.state.poseCleared === true, "entering live pause drops pose without clearing progress");
   assert(progressPauseStates.at(-1) === true, "live pause freezes progress prediction for a non-pausing client");
   assert(worldBedStates.at(-1) === false, "entering live pause fades out the world combat bed");
+  assert(swordAudioClears === 2, "live pause and countdown refresh keep sword loops silent");
   livePauseStateMatch.applyLivePauseState({ paused: false, canPause: true, canUnpause: false });
   assert(
     livePauseStateMatch.predictionVisualSuspended,
@@ -1311,6 +1340,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   livePauseStateMatch.applyRoomTimeState({ currentTick: 90, durationTicks: 600, speed: 0, paused: true });
   assert(renderClockRates.at(-1) === 0, "room-time pause freezes battlefield animation time");
   assert(worldBedStates.at(-1) === false, "room-time pause fades out the world combat bed");
+  assert(swordAudioClears === 3, "room-time pause clears sword loops");
   livePauseStateMatch.applyRoomTimeState({ currentTick: 120, durationTicks: 600, speed: 2, paused: false });
   assert(renderClockRates.at(-1) === 2, "room-time playback speed scales battlefield animation time");
   livePauseStateMatch.applyRoomTimeState({ currentTick: 601, durationTicks: 600, speed: 2, paused: false, ended: false });
@@ -1318,6 +1348,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
   livePauseStateMatch.applyRoomTimeState({ currentTick: 600, durationTicks: 600, speed: 2, paused: false, ended: true });
   assert(renderClockRates.at(-1) === 0, "authoritatively ended replay playback freezes battlefield animation time");
   assert(worldBedStates.at(-1) === false, "ended replay playback fades out the world combat bed");
+  assert(swordAudioClears === 4, "replay completion clears sword loops");
   const rateCount = renderClockRates.length;
   livePauseStateMatch.applyRoomTimeState({ currentTick: 600, durationTicks: 0, paused: false });
   assert(renderClockRates.length === rateCount, "incomplete room-time state preserves the prior animation rate");

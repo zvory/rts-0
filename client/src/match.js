@@ -400,7 +400,7 @@ export class Match {
         ) ? m.worldCombatPosition : null,
       );
       this.combatAudio?.updateThrowSwordSounds(
-        worldCombatBedAllowed(true, this.livePauseState, this.roomTimeControls?.roomTimeState)
+        worldCombatBedAllowed(this.running, this.livePauseState, this.roomTimeControls?.roomTimeState)
           ? this.state.abilityObjects : [],
       );
       this.stopInactiveMachineGunSounds();
@@ -1211,6 +1211,7 @@ export class Match {
     this.captureRafWasRunning = false;
     this.uncappedPerfBenchmark = null;
     this.running = false;
+    this.combatAudio?.updateThrowSwordSounds();
     this.closeMenus();
     if (this.rafId !== undefined) {
       cancelAnimationFrame(this.rafId);
