@@ -55,8 +55,9 @@ pub(super) fn steered_candidate(
     y: f32,
     path_dir: (f32, f32),
     budget: f32,
+    teams: &crate::game::teams::TeamRelations,
 ) -> Option<(f32, f32)> {
-    let steer_dir = local_steering_dir(entities, spatial, id, x, y, path_dir);
+    let steer_dir = local_steering_dir(entities, spatial, id, x, y, path_dir, teams);
     if (steer_dir.0 - path_dir.0).abs() <= 1e-4 && (steer_dir.1 - path_dir.1).abs() <= 1e-4 {
         return None;
     }
@@ -78,6 +79,7 @@ pub(super) fn local_steering_dir(
     x: f32,
     y: f32,
     path_dir: (f32, f32),
+    teams: &crate::game::teams::TeamRelations,
 ) -> (f32, f32) {
     let Some(unit) = entities.get(id) else {
         return path_dir;
@@ -93,10 +95,11 @@ pub(super) fn local_steering_dir(
             };
             neighbor.hp > 0
                 && neighbor.is_unit()
-                && !matches!(
-                    footing_profile(neighbor),
-                    FootingProfile::Ghost | FootingProfile::Soft
-                )
+                && (!teams.same_team_or_same_owner(unit.owner, neighbor.owner)
+                    || !matches!(
+                        footing_profile(neighbor),
+                        FootingProfile::Ghost | FootingProfile::Soft
+                    ))
                 && {
                     let dx = x - neighbor.pos_x();
                     let dy = y - neighbor.pos_y();
@@ -134,7 +137,11 @@ pub(super) fn local_steering_dir(
         } else {
             1.0
         };
-        let footing_weight = footing_resistance(footing_profile(neighbor)).det_sqrt();
+        let footing_weight = if teams.same_team_or_same_owner(unit.owner, neighbor.owner) {
+            footing_resistance(footing_profile(neighbor)).det_sqrt()
+        } else {
+            12.0_f32.det_sqrt()
+        };
         let weight = proximity * proximity * overlap_boost * footing_weight;
         sep_x += away_x * weight;
         sep_y += away_y * weight;

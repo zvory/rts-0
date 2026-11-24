@@ -6,6 +6,9 @@ use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
 use rts_rules::math::GameplayMath as _;
 
+use super::standability::UnitBlockers;
+use crate::game::teams::TeamRelations;
+
 use super::standability::{footing_profile, footing_resistance, FootingProfile};
 use super::MAX_UNIT_BOUNDING_RADIUS_PX;
 
@@ -27,21 +30,22 @@ pub(super) const COLLISION_EPS_PX: f32 = 0.001;
 /// unit's centerline. The normal overlap-resolution push is unchanged.
 const CENTERLINE_LATERAL_PUSH_SCALE: f32 = 0.5;
 
-/// Resolve unit-unit overlaps with iterative pair-wise pushes so units do not stack on top of
+/// Resolve friendly unit-unit overlaps with iterative pair-wise pushes so units do not stack on top of
 /// each other. Push direction and depth come from the shared body geometry: infantry resolve as
 /// circles while tanks resolve as oriented hulls. Non-ghost units split the overlap by footing
-/// resistance, so lower-resistance units move more.
+/// resistance, so lower-resistance units move more. Enemies never exchange pushes; every friendly
+/// displacement is rejected if its sweep would deepen an enemy intersection. Enemy-pinned
+/// friendly traffic may retain overlap.
 ///
-/// **Ghost pass-through exception.** Workers on gather or build orders are *fully exempt*
-/// from collision: they neither push nor are pushed. This is intentional — work orders must
+/// **Friendly ghost pass-through exception.** Workers on gather or build orders are exempt
+/// from friendly collision: they neither push nor are pushed. This is intentional — work orders must
 /// keep moving through traffic, and walking units must be able to pass through active workers
 /// without kicking them backward each tick, which would deadlock the economy or strand
 /// construction.
 ///
 /// Pushes that would land on impassable terrain or a building footprint are skipped, so a
-/// unit cornered by terrain may keep a small residual overlap. The invariant
-/// [`Game::assert_invariants`] tolerates ≤ `OVERLAP_TOLERANCE_PX` of overlap to absorb this
-/// and floating-point noise.
+/// unit cornered by terrain or enemies may retain friendly overlap. Enemy admission remains
+/// independent of footing and friendly overlap cleanup.
 ///
 /// Pair iteration is deterministic (sorted ids, then spatial-index order, both stable per
 /// tick), which is required by the replay harness.
@@ -50,10 +54,12 @@ pub(crate) fn resolve_collisions(
     spatial: &SpatialIndex,
     map: &Map,
     occ: &Occupancy,
+    teams: &TeamRelations,
 ) {
     let world_max_x = map.world_width_px() - 0.01;
     let world_max_y = map.world_height_px() - 0.01;
     let ids = entities.ids();
+    let mut blockers = UnitBlockers::new(entities);
     let mut candidates = Vec::new();
 
     for pass in 0..COLLISION_PASSES {
@@ -99,6 +105,14 @@ pub(crate) fn resolve_collisions(
             candidates.sort_unstable();
 
             for &b in &candidates {
+                // Opponents block admission; contact never transfers displacement.
+                if entities
+                    .get(a)
+                    .zip(entities.get(b))
+                    .is_some_and(|(a, b)| !teams.same_team_or_same_owner(a.owner, b.owner))
+                {
+                    continue;
+                }
                 let (b_kind, b_profile, b_facing, bx, by, b_path_empty, b_body) =
                     match entities.get(b) {
                         Some(e) if e.is_unit() => {
@@ -245,15 +259,27 @@ pub(crate) fn resolve_collisions(
                     }
                 };
 
+                let a_push = a_push.filter(|&pos| {
+                    entities
+                        .get(a)
+                        .is_some_and(|e| blockers.motion_clear(e, pos, e.facing(), teams))
+                });
                 if let Some((nax, nay)) = a_push {
                     if let Some(e) = entities.get_mut(a) {
                         e.set_position(nax.clamp(0.0, world_max_x), nay.clamp(0.0, world_max_y));
+                        blockers.update(e);
                         moved_any = true;
                     }
                 }
+                let b_push = b_push.filter(|&pos| {
+                    entities
+                        .get(b)
+                        .is_some_and(|e| blockers.motion_clear(e, pos, e.facing(), teams))
+                });
                 if let Some((nbx, nby)) = b_push {
                     if let Some(e) = entities.get_mut(b) {
                         e.set_position(nbx.clamp(0.0, world_max_x), nby.clamp(0.0, world_max_y));
+                        blockers.update(e);
                         moved_any = true;
                     }
                 }

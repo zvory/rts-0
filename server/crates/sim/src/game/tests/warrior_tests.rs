@@ -339,8 +339,8 @@ fn disciple_dash_casts_for_every_selected_ready_wind_unit() {
                 let dx = entity.pos_x() - target.0;
                 let dy = entity.pos_y() - target.1;
                 assert!(
-                    dx * dx + dy * dy <= (config::TILE_SIZE * config::TILE_SIZE) as f32,
-                    "each caster should reach the target area, allowing collision separation; queued={queued}",
+                    dx * dx + dy * dy <= (entity.radius() * 2.0 + 1.0).powi(2),
+                    "each caster should reach a distinct valid landing near the target; queued={queued}",
                 );
                 assert_eq!(
                     entity.ability_uses_remaining(AbilityKind::WindDash),
@@ -908,7 +908,7 @@ fn disciple_pending_dao_advances_on_combat_insight_without_interrupting_attack()
     let target = game
         .state
         .entities
-        .spawn_unit(2, EntityKind::Warrior, 425.0, 400.0)
+        .spawn_unit(2, EntityKind::Warrior, 455.0, 400.0)
         .unwrap();
     let entity = game.state.entities.get_mut(unit).unwrap();
     entity.insight = 59;

@@ -116,6 +116,11 @@ fn paid_dao_training_requires_research_owned_base_disciple_and_oil() {
     game.tick();
     assert!(game.state.entities.get(base).is_none());
     let foreign = send(&mut game, grounds, 2, EntityKind::Warrior, None);
+    game.state
+        .entities
+        .get_mut(foreign)
+        .unwrap()
+        .set_position(544.0, 704.0);
     let evolved = send(
         &mut game,
         grounds,

@@ -459,7 +459,7 @@ fn queued_ekat_abilities_append_future_world_ability_intents() {
 }
 
 #[test]
-fn ekat_dash_rejects_invalid_landing_without_marker_or_cooldown() {
+fn ekat_dash_snaps_blocked_request_to_nearest_valid_landing() {
     let players = [ekat_player()];
     let mut game = empty_flat_game(&players);
     let pos = game.state.map.tile_center(10, 10);
@@ -476,12 +476,10 @@ fn ekat_dash_rejects_invalid_landing_without_marker_or_cooldown() {
     game.tick();
 
     let hero_entity = game.state.entities.get(hero).expect("hero exists");
-    assert!((hero_entity.pos_x() - pos.0).abs() < f32::EPSILON);
-    assert_eq!(
-        hero_entity.ability_cooldown_ticks(ability::AbilityKind::EkatTeleport),
-        0
-    );
-    assert!(active_return_marker_id(&game, hero).is_none());
+    assert_ne!((hero_entity.pos_x(), hero_entity.pos_y()), target);
+    assert!((hero_entity.pos_x() - target.0).det_hypot(hero_entity.pos_y() - target.1) < 40.0);
+    assert!(hero_entity.ability_cooldown_ticks(ability::AbilityKind::EkatTeleport) > 0);
+    assert!(active_return_marker_id(&game, hero).is_some());
 }
 
 #[test]

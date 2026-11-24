@@ -124,11 +124,15 @@ pub(in crate::game) fn combat_system(
     firing_reveals: &mut Vec<FiringRevealSource>,
     tick: u32,
 ) {
+    let mut body_blockers = crate::game::services::standability::UnitBlockers::new(entities);
     let los = LineOfSight::with_smoke(map, smokes);
     for id in entities.ids() {
         if let Some(e) = entities.get_mut(id) {
             e.tick_weapon_cooldowns();
-            tick_deployed_weapon_setup(e);
+            tick_deployed_weapon_setup(e, |e, facing| {
+                body_blockers.motion_clear(e, (e.pos_x(), e.pos_y()), facing, teams)
+            });
+            body_blockers.update(e);
             weapons::tick_tank_stationary_range(e);
         }
     }
@@ -471,7 +475,11 @@ pub(in crate::game) fn combat_system(
                 if uses_vehicle_weapon_policy(e) {
                     weapon_aligned = rotate_vehicle_weapon_for_combat(e, target_angle);
                 } else if e.kind == EntityKind::AntiTankGun {
-                    weapon_aligned = rotate_anti_tank_gun_for_combat(e, target_angle);
+                    weapon_aligned =
+                        rotate_anti_tank_gun_for_combat(e, target_angle, |e, facing| {
+                            body_blockers.motion_clear(e, (e.pos_x(), e.pos_y()), facing, teams)
+                        });
+                    body_blockers.update(e);
                 } else if target_angle.is_finite() {
                     e.set_facing(target_angle);
                     mirror_weapon_to_body(e, target_angle);

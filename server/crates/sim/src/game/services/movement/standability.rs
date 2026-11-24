@@ -4,7 +4,7 @@ use crate::game::entity::{
 use crate::game::map::Map;
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::standability as static_standability;
-pub(super) use static_standability::unit_static_standable_with_radius;
+pub(super) use static_standability::{unit_static_standable_with_radius, UnitBlockers};
 
 /// Whether a unit body may stand at this world position against static blockers.
 pub(super) fn unit_static_standable(
@@ -86,7 +86,7 @@ fn is_pass_through(profile: FootingProfile) -> bool {
 }
 
 /// Whether this unit is currently a ghost for collision and must not be pushed by
-/// collision. Ghost units neither push nor are pushed, so other mobile units can pass
+/// friendly collision. Ghost units neither push nor are pushed, so friendly mobile units can pass
 /// through them freely.
 pub(crate) fn is_collision_anchored(e: &Entity) -> bool {
     is_pass_through(footing_profile(e))

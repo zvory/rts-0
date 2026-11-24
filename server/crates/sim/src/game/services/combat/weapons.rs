@@ -106,7 +106,11 @@ pub(super) fn mirror_weapon_to_body(e: &mut Entity, angle: f32) {
     e.set_weapon_facing(angle);
 }
 
-pub(super) fn rotate_anti_tank_gun_for_combat(e: &mut Entity, target_angle: f32) -> bool {
+pub(super) fn rotate_anti_tank_gun_for_combat(
+    e: &mut Entity,
+    target_angle: f32,
+    turn_allowed: impl Fn(&Entity, f32) -> bool,
+) -> bool {
     if !target_angle.is_finite() || !anti_tank_gun_target_inside_field_of_fire(e, target_angle) {
         return false;
     }
@@ -123,7 +127,7 @@ pub(super) fn rotate_anti_tank_gun_for_combat(e: &mut Entity, target_angle: f32)
             }
         });
     let rotated = rotate_toward(current, target_angle, ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK);
-    if rotated.is_finite() {
+    if rotated.is_finite() && turn_allowed(e, rotated) {
         e.set_facing(rotated);
         e.set_weapon_facing(rotated);
     } else {
@@ -132,11 +136,14 @@ pub(super) fn rotate_anti_tank_gun_for_combat(e: &mut Entity, target_angle: f32)
     angle_delta(rotated, target_angle).abs() <= ANTI_TANK_GUN_FIRE_TOLERANCE_RAD
 }
 
-pub(super) fn tick_deployed_weapon_setup(e: &mut Entity) {
+pub(super) fn tick_deployed_weapon_setup(
+    e: &mut Entity,
+    turn_allowed: impl Fn(&Entity, f32) -> bool,
+) {
     if !requires_weapon_setup(e.kind) {
         return;
     }
-    rotate_support_weapon_toward_setup_facing(e);
+    rotate_support_weapon_toward_setup_facing(e, turn_allowed);
     maybe_begin_support_weapon_setup_after_alignment(e);
     e.tick_weapon_setup();
 }
@@ -335,7 +342,10 @@ fn anti_tank_gun_field_center(e: &Entity) -> Option<f32> {
         .filter(|facing| facing.is_finite())
 }
 
-fn rotate_support_weapon_toward_setup_facing(e: &mut Entity) {
+fn rotate_support_weapon_toward_setup_facing(
+    e: &mut Entity,
+    turn_allowed: impl Fn(&Entity, f32) -> bool,
+) {
     if !supports_manual_emplacement(e.kind) {
         return;
     }
@@ -355,7 +365,7 @@ fn rotate_support_weapon_toward_setup_facing(e: &mut Entity) {
     e.set_desired_weapon_facing(target);
     let current = e.facing();
     let rotated = rotate_toward(current, target, turn_rate);
-    if rotated.is_finite() {
+    if rotated.is_finite() && turn_allowed(e, rotated) {
         e.set_facing(rotated);
         e.set_weapon_facing(rotated);
     }

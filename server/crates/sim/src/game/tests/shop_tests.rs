@@ -267,7 +267,7 @@ fn shop_items_reject_buildings_out_of_range_stale_and_enemy_targets_without_spen
     let enemy = game
         .state
         .entities
-        .spawn_unit(2, EntityKind::Warrior, 640.0, 352.0)
+        .spawn_unit(2, EntityKind::Warrior, 640.0, 384.0)
         .unwrap();
     for target in [shop, enemy, u32::MAX] {
         buy(&mut game, shop, target, AbilityKind::HealingPotion);

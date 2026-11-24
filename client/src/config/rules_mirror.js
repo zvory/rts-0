@@ -495,8 +495,8 @@ export const ABILITIES = Object.freeze({
   }),
   [ABILITY.WIND_DASH]: Object.freeze({
     ability: ABILITY.WIND_DASH,
-    label: "Dash", icon: "DSH", hotkey: "D",
-    title: "Dash up to 15 tiles; one charge, two at Master rank; recharges every 8 seconds",
+    label: "Blink", icon: "BLK", hotkey: "D",
+    title: "Blink up to 15 tiles; one charge, two at Master rank; recharges every 8 seconds",
     carriers: Object.freeze([KIND.WIND_ADEPT]),
     targetMode: "worldPoint", rangeTiles: DAO_WIND_DASH_RANGE_TILES,
     cooldownTicks: 0, charges: 1, chargeRechargeTicks: EKAT_TELEPORT_COOLDOWN_TICKS,

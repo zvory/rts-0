@@ -12,7 +12,9 @@ pub(crate) fn advance_dao_masters(
     entities: &mut EntityStore,
     eligible_owner: impl Fn(u32) -> bool,
     occ: &Occupancy,
+    teams: &crate::game::teams::TeamRelations,
 ) {
+    let mut blockers = crate::game::services::standability::UnitBlockers::new(entities);
     for id in entities.ids() {
         let Some(unit) = entities.get(id) else {
             continue;
@@ -35,7 +37,7 @@ pub(crate) fn advance_dao_masters(
                 y,
                 unit.facing(),
                 Some(radius),
-            )
+            ) && blockers.pose_clear(unit, (x, y), unit.facing(), radius, teams)
         };
         let origin = (unit.pos_x(), unit.pos_y());
         let mut destination = legal(origin.0, origin.1).then_some(origin);
@@ -68,6 +70,7 @@ pub(crate) fn advance_dao_masters(
         if let (Some((x, y)), Some(unit)) = (destination, entities.get_mut(id)) {
             unit.advance_dao_master();
             unit.set_position(x, y);
+            blockers.update(unit);
         }
     }
 }

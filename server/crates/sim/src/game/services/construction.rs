@@ -452,11 +452,16 @@ fn eject_worker_from_static_overlap(map: &Map, entities: &mut EntityStore, worke
         return;
     }
 
+    let blockers = standability::UnitBlockers::new(entities);
     let mut destination: Option<((f32, f32), f32)> = None;
     for ty in 0..map.height {
         for tx in 0..map.width {
             let (cx, cy) = map.tile_center(tx, ty);
-            if !standability::unit_static_standable(map, &occ, wkind, cx, cy) {
+            if !standability::unit_static_standable(map, &occ, wkind, cx, cy)
+                || entities
+                    .get(worker)
+                    .is_none_or(|e| !blockers.placement_clear(e, (cx, cy)))
+            {
                 continue;
             }
             let distance2 = dist2(wx, wy, cx, cy);

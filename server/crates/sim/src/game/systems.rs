@@ -447,6 +447,7 @@ pub(crate) fn run_tick(
             })
         },
         &pre_collision.occupancy,
+        &teams,
     );
     let pre_collision_positions =
         crate::perf::timed(perf.as_deref_mut(), "pre_collision_positions", || {
@@ -457,11 +458,12 @@ pub(crate) fn run_tick(
                 .collect::<HashMap<_, _>>()
         });
     let wire_deaths = crate::perf::timed(perf.as_deref_mut(), "collision", || {
-        services::movement::resolve_collisions(
+        services::movement::resolve_collisions_with_teams(
             entities,
             &pre_collision.spatial,
             map,
             &pre_collision.occupancy,
+            &teams,
         )
     });
     if wire_deaths {

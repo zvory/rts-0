@@ -45,16 +45,14 @@ pub(crate) fn ekat_dash_destination(
         range_tiles,
     )?;
     let occ = Occupancy::build(map, entities);
-    standability::unit_static_standable_with_radius(
+    standability::nearest_blink_landing(
         map,
         &occ,
-        caster_entity.kind,
-        destination.0,
-        destination.1,
-        caster_entity.facing(),
-        Some(caster_entity.radius()),
+        entities,
+        caster_entity,
+        destination,
+        range_tiles.unwrap_or(0.0) * config::TILE_SIZE as f32,
     )
-    .then_some(destination)
 }
 
 pub(crate) fn ekat_return_destination_valid(
@@ -76,7 +74,7 @@ pub(crate) fn ekat_return_destination_valid(
         y,
         caster_entity.facing(),
         Some(caster_entity.radius()),
-    )
+    ) && standability::UnitBlockers::new(entities).placement_clear(caster_entity, (x, y))
 }
 
 pub(crate) fn move_ekat_to(entities: &mut EntityStore, caster: u32, x: f32, y: f32) -> bool {

@@ -1360,14 +1360,21 @@ projection from the initial state.
 
 Per-caster recast state is exposed to the owner through `EntityView.abilities`: active return marker
 id, availability tick, and remaining lifetime are projected only for the owning player's command
-card. Ekat's `ekatTeleport` world-point activation is a dash: it validates static standability,
+card. Ekat's `ekatTeleport` world-point activation is a dash: it selects the nearest unoccupied, statically legal landing within cast range,
 moves the caster, and creates a four-second return marker at the original position. One dash
 command applies independently to every selected eligible Ekat for both immediate and queued casts.
 Each caster keeps its own range clamp, cooldown, and return marker; unavailable or invalid casters
-do not block the others. Wind uses the separate `windDash` ability with a ten-tile clamp
+do not block the others. Wind uses the separate `windDash` ability, displayed as Blink, with a fifteen-tile clamp
 and no return marker or recast. Adepts hold one charge and Masters two, recharging sequentially
 every eight seconds. Promotion adds one ready charge without resetting recharge progress.
-Wind Dash also applies independently to every selected eligible caster. `recastAbility`
+Wind Blink also applies independently to every selected eligible caster. Both outgoing dashes
+first try the exact range-clamped request, then search a one-world-pixel lattice anchored there
+across the full cast disk, ordered by squared distance with deterministic ties. Branch-and-bound
+prunes regions outside range, inside occupied bodies, or inside an impassable tile. Every landing
+checks the current bodies of all other living units, including allies and working workers; each
+accepted caster immediately occupies its spot before the next caster is processed. There is no
+additional snap-distance cap. Return markers retain their exact destination and reject occupied
+landings without consuming the marker. `recastAbility`
 commands are explicit and validate a live owned caster plus matching active runtime state; missing
 state, same-tick/too-early return, stale caster ids, and invalid return destinations are ignored
 rather than overloading world-point `useAbility` commands. A valid recast returns Ekat to the
@@ -2130,6 +2137,18 @@ vehicles route around enemy walls even when their player has never seen the trap
 fingerprints include the vehicle-only blocker layer. Movement, collision, and standability use the
 same physical legality.
 `services::standability` owns reusable legality predicates for unit bodies and building sites.
+Its tick-local `UnitBlockers` index tracks current living unit bodies, updating after each accepted
+move or push. Units belonging to different teams block one another: ordinary motion, hull turns,
+recovery motion, body growth, and friendly collision pushes cannot create or deepen an enemy
+intersection. Swept motion includes translation and rotation, with conservative expanded samples
+to cover between-sample poses and stored-coordinate rounding. Existing authored overlaps may
+separate without moving the opponent. Opposing collision pairs never exchange separation pushes.
+Same-owner and same-team traffic retains footing-weighted separation; workers on work orders keep
+friendly pass-through, but still respect enemy blockers. Friendly pushes rejected by enemy bodies
+can leave compressed friendly overlap; the debug overlap invariant therefore applies to opponents,
+with the existing tolerance retained for authored/legacy overlap. Global paths remain static;
+enemy congestion can require local steering or waiting rather than a new global pathfinder.
+
 Production spawn exits, construction/build intent, movement landing, steering
 candidates, collision push targets, and formation goal selection all use this shared standability
 layer for static/body legality. Oriented-body queries derive the perpendicular axis from the

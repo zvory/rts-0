@@ -26,6 +26,7 @@ use crate::game::{PlayerState, ScoreState};
 use rayon::prelude::*;
 mod barbed_wire;
 mod cultivator_footing;
+mod enemy_blocking;
 mod infantry_facing;
 mod pivot_drive;
 mod side_push;
@@ -617,7 +618,7 @@ fn tank_pushes_soft_infantry_more_than_it_moves() {
         .spawn_unit(1, EntityKind::Tank, cx - 10.0, cy)
         .unwrap();
     let rifleman = entities
-        .spawn_unit(2, EntityKind::Rifleman, cx + 10.0, cy)
+        .spawn_unit(1, EntityKind::Rifleman, cx + 10.0, cy)
         .unwrap();
     mark_moving(&mut entities, rifleman, (cx + 64.0, cy));
     let tank_before = pos(&entities, tank);
@@ -657,7 +658,7 @@ fn tank_infantry_overlap_resolves_from_oriented_hull() {
         .radius;
     let rifleman = entities
         .spawn_unit(
-            2,
+            1,
             EntityKind::Rifleman,
             cx + tank_body_half_len() + rifle_radius - 4.0,
             cy,
@@ -703,7 +704,7 @@ fn anti_tank_gun_infantry_overlap_resolves_from_circular_body() {
         .radius;
     let rifleman = entities
         .spawn_unit(
-            2,
+            1,
             EntityKind::Rifleman,
             cx + anti_tank_gun_body_radius() + rifle_radius - 4.0,
             cy,
@@ -754,7 +755,7 @@ fn tank_tank_head_on_conflict_resolves_without_side_slide() {
         .expect("left tank spawn");
     let right = entities
         .spawn_unit(
-            2,
+            1,
             EntityKind::Tank,
             cx + tank_body_half_len() - overlap_px * 0.5,
             cy,
@@ -797,7 +798,7 @@ fn braced_machine_gunner_holds_ground_against_soft_unit() {
         .spawn_unit(1, EntityKind::MachineGunner, cx - 5.0, cy)
         .unwrap();
     let rifleman = entities
-        .spawn_unit(2, EntityKind::Rifleman, cx + 5.0, cy)
+        .spawn_unit(1, EntityKind::Rifleman, cx + 5.0, cy)
         .unwrap();
     if let Some(e) = entities.get_mut(mg) {
         e.set_weapon_setup(WeaponSetup::Deployed);
@@ -829,7 +830,7 @@ fn firing_rifleman_is_firmer_than_moving_rifleman() {
         .spawn_unit(1, EntityKind::Rifleman, cx - 5.0, cy)
         .unwrap();
     let moving = entities
-        .spawn_unit(2, EntityKind::Rifleman, cx + 5.0, cy)
+        .spawn_unit(1, EntityKind::Rifleman, cx + 5.0, cy)
         .unwrap();
     if let Some(e) = entities.get_mut(firing) {
         e.set_target_id(Some(moving));
@@ -1375,7 +1376,7 @@ fn tank_phase0_baseline_traffic_cluster() {
     }
     for (dx, dy) in [(96.0, -18.0), (118.0, 16.0), (144.0, 0.0), (170.0, -14.0)] {
         entities
-            .spawn_unit(2, EntityKind::Rifleman, start.0 + dx, start.1 + dy)
+            .spawn_unit(1, EntityKind::Rifleman, start.0 + dx, start.1 + dy)
             .expect("traffic spawn");
     }
 
@@ -2491,7 +2492,7 @@ fn scout_car_phase0_traffic_compression_near_factory() {
         (86.0, 0.0, EntityKind::Tank),
     ] {
         let id = entities
-            .spawn_unit(2, kind, rect.min_x + dx, lane_y + dy)
+            .spawn_unit(1, kind, rect.min_x + dx, lane_y + dy)
             .expect("traffic unit should spawn");
         if let Some(e) = entities.get_mut(id) {
             e.set_facing(0.0);
@@ -3357,7 +3358,7 @@ fn collision_push_does_not_move_tank_body_into_building() {
         .spawn_unit(1, EntityKind::Tank, tank_start.0, tank_start.1)
         .expect("tank spawn");
     let rifleman = entities
-        .spawn_unit(2, EntityKind::Rifleman, tank_start.0 + 8.0, tank_start.1)
+        .spawn_unit(1, EntityKind::Rifleman, tank_start.0 + 8.0, tank_start.1)
         .expect("rifleman spawn");
     mark_moving(&mut entities, rifleman, (tank_start.0 + 64.0, tank_start.1));
 

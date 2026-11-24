@@ -43,7 +43,7 @@ fn resource_knowledge_survives_hidden_depletion_checkpoint_and_observer_switches
             .entities
             .get_mut(scout2)
             .unwrap()
-            .set_position(near.0, near.1);
+            .set_position(near.0 + 24.0, near.1);
         advance_to_next_fog_refresh(&mut game);
         game.state
             .entities

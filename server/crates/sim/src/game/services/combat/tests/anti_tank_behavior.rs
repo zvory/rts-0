@@ -115,7 +115,7 @@ fn deployed_anti_tank_gun_rotation_rejects_target_outside_fixed_arc() {
     at.set_weapon_facing(0.0);
 
     assert!(
-        !rotate_anti_tank_gun_for_combat(at, std::f32::consts::FRAC_PI_2),
+        !rotate_anti_tank_gun_for_combat(at, std::f32::consts::FRAC_PI_2, |_, _| true),
         "a target outside the fixed field must not become fireable"
     );
     assert!(
