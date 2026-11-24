@@ -63,7 +63,9 @@ pub const DAO_MASTER_SPEED_MULTIPLIER: f32 = 1.1;
 pub const DAO_MASTER_DAMAGE_MULTIPLIER: f32 = 1.2;
 pub const DAO_MASTER_HP_MULTIPLIER: f32 = 1.4;
 pub const DAO_WAR_SPEED_MULTIPLIER: f32 = 1.05;
-pub const DAO_WAR_HP_BONUS: u32 = 20;
+// Adept HP increased by 30%, rounded to whole HP; Novices keep their base HP.
+pub const DAO_ADEPT_HP: u32 = 150;
+pub const DAO_WAR_HP_BONUS: u32 = 26;
 pub const DAO_WAR_DAMAGE_MULTIPLIER: f32 = 1.5;
 pub const DAO_WAR_ARMOR_REDUCTION: f32 = 0.5;
 /// Yari ready-tip reach, with the usual attacker radius and combat slack.

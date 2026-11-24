@@ -4,9 +4,9 @@ use super::*;
 fn dao_master_advances_once_keeps_reload_and_persists_rank() {
     use crate::game::ability::AbilityKind;
     for (ability, hp) in [
-        (AbilityKind::EvolveWind, 161),
-        (AbilityKind::EvolveWar, 189),
-        (AbilityKind::EvolveMagic, 161),
+        (AbilityKind::EvolveWind, 210),
+        (AbilityKind::EvolveWar, 246),
+        (AbilityKind::EvolveMagic, 210),
     ] {
         let mut game = empty_flat_game(&[cultivator_player()]);
         let id = game

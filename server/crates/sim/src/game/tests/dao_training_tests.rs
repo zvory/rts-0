@@ -227,7 +227,7 @@ fn paid_dao_training_mixed_queue_exact_duration_supply_rally_checkpoint_and_canc
     for _ in 0..300 {
         game.tick();
     }
-    let war_hp = config::unit_stats(EntityKind::Warrior).unwrap().hp + config::DAO_WAR_HP_BONUS;
+    let war_hp = config::unit_stats(EntityKind::WarAdept).unwrap().hp;
     assert!(
         game.state
             .entities

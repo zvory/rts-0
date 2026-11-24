@@ -162,14 +162,14 @@ fn disciple_evolution_requires_insight_ownership_but_no_research_and_is_permanen
     use crate::game::ability::AbilityKind;
     use crate::game::upgrade::UpgradeKind;
     for (ability, upgrade, hp, speed) in [
-        (AbilityKind::EvolveWind, UpgradeKind::DaoWind, 115, 2.7025),
+        (AbilityKind::EvolveWind, UpgradeKind::DaoWind, 150, 2.7025),
         (
             AbilityKind::EvolveWar,
             UpgradeKind::DaoOfHeaviness,
-            135,
+            176,
             2.1,
         ),
-        (AbilityKind::EvolveMagic, UpgradeKind::DaoOfMagic, 115, 2.1),
+        (AbilityKind::EvolveMagic, UpgradeKind::DaoOfMagic, 150, 2.1),
     ] {
         let mut game = empty_flat_game(&[
             cultivator_player(),
