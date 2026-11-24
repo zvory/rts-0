@@ -2947,15 +2947,17 @@ position jump produces no effect. Both manual activation and lethal-damage autoc
 stamps `rts-client-build` into the document alongside its versioned import map. This immutable
 loaded-client identity also supplies `__RTS_BUILD__`; `/version` must never overwrite it with a
 newer server identity. Reliable `welcome` and heartbeat `pong` messages compare `buildId` against
-that identity. A bounded, no-store `/version` check runs immediately, every ten seconds, and when
-the page becomes visible, including the lobby browser with no WebSocket. Network failures and
-unknown builds do not count as mismatches. Unsupported snapshot schema/codec versions also
-surface the warning instead of silently leaving the world empty.
+that identity. On ordinary main/lobby screens, a bounded, no-store `/version` check runs immediately,
+every ten seconds, and when the page becomes visible, including without a WebSocket. Network
+failures and unknown builds do not count as mismatches. Unsupported snapshot schema/codec versions
+also record pending recovery.
 
-A mismatch latches a prominent center-screen warning. In the lobby it automatically reloads the
-embedded browser once per client/server build pair (session storage guards against reload loops).
-A Refresh client button is available in the lobby if automatic recovery already ran or storage
-is unavailable. Countdown, asynchronous match startup, live play, and replay viewing never
-automatically reload; the warning waits until Back to lobby. The notice does not block gameplay
-input, and its refresh button is disabled outside the lobby. Offline benchmark transports skip
-server version checks. `destroy()` removes listeners, timers, pending fetch, and notice DOM.
+Only ordinary main/lobby screens can show the center-screen mismatch warning or refresh. A mismatch
+reloads the embedded browser once per client/server build pair (session storage prevents reload
+loops); a Refresh client button remains if automatic recovery already ran or storage is unavailable.
+Countdown, asynchronous room startup, live play, Lab (including its entry/catalog), replays,
+spectating, previews, and other game-like modes stay untouched: no warning, no refresh, and no HTTP
+version probes. Reliable version observations may be retained silently for recovery after returning
+to the ordinary lobby/main screen. An existing notice is hidden when entering a protected context.
+Offline benchmark transports skip server version checks. `destroy()` removes listeners, timers,
+pending fetch, and notice DOM.
