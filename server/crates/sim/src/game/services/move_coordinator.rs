@@ -50,6 +50,7 @@ mod footprint_pathing;
 mod formation;
 #[cfg(test)]
 mod pathing_budget_tests;
+mod pursuit_endpoint;
 mod rally;
 #[cfg(test)]
 mod spawn_tests;
@@ -768,6 +769,10 @@ impl<'a> MoveCoordinator<'a> {
         ) else {
             return false;
         };
+        let target_id = target.id;
+        if self.track_pursuit_endpoint(entities, id, target_id, goal, min_range_px, max_range_px) {
+            return true;
+        }
         let needs_initial_path = entities
             .get(id)
             .is_some_and(|entity| entity.path_goal().is_none());
