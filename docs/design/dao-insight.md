@@ -59,10 +59,13 @@ Labels split after “Dao of”. Visible enemies
 see the unit radiance, with ordinary fog filtering. Realm advancement projects a 15-tick
 (half-second) expanding gold corona reaching about one tile, independently of insight privacy.
 
-Magic Disciples can place Shield within five tiles: a shimmering circle with the same
-three-tile radius as Anchor, covering allied units (including the caster). One shared pool
-absorbs 300 hostile damage after normal armor/terrain reductions; overflow damages the
-unit, and depletion removes the field immediately. Friendly fire, environmental damage,
+Magic Disciples can place Shield within five tiles: a shimmering circle with a
+2.1-tile radius (30% smaller than Anchor), covering allied units (including the caster). One shared pool
+absorbs 150 non-piercing hostile damage after normal armor/terrain reductions; overflow damages the
+unit, and depletion removes the field immediately. Any attack with positive armor penetration
+bypasses the shield without consuming its pool, including tank cannon hits and splash, anti-tank
+guns, Panzerfausts, Dao attacks, Throw Sword, and piercing artillery/rocket impact cores.
+Non-piercing area falloff remains absorbable. Friendly fire, environmental damage,
 buildings, invulnerable targets and enemy units do not consume the pool. Overlapping
 fields consume pools in stable caster-id order. Shield costs no resources, has a ten-second
 cooldown, replaces the caster’s prior shield, and expires after 15 seconds or earlier on

@@ -7,7 +7,7 @@ import { drawMagicAnchor } from "../../client/src/renderer/magic_anchor_effect.j
 import { drawRotatedRectOutline } from "../../client/src/renderer/shared.js";
 import { _drawPanzerfaustImpacts } from "../../client/src/renderer/panzerfaust_feedback.js";
 import { _drawAbilityObjects } from "../../client/src/renderer/feedback.js";
-import { EKAT_MAGIC_ANCHOR_RADIUS_TILES, DISCIPLE_SHIELD_DURATION_TICKS } from "../../client/src/config.js";
+import { EKAT_MAGIC_ANCHOR_RADIUS_TILES, DISCIPLE_SHIELD_DURATION_TICKS, DISCIPLE_SHIELD_RADIUS_TILES } from "../../client/src/config.js";
 import { RecordingGraphics } from "./pixi_fakes.mjs";
 
 function callsNamed(graphics, name) {
@@ -86,9 +86,9 @@ for (const [expiresIn, expectedWidth] of [
     abilityObjects: [{ id: 1, kind: "shield", x: 100, y: 200, expiresIn }],
   });
   const rects = callsNamed(g, "drawRect");
-  assert.deepEqual(rects[0], ["drawRect", 71, 101, 58, 6], "black backing below HP row");
+  assert.deepEqual(rects[0], ["drawRect", 71, 200 - 32 * DISCIPLE_SHIELD_RADIUS_TILES - 3, 58, 6], "black backing below HP row");
   if (expectedWidth > 0) {
-    assert.deepEqual(rects[1], ["drawRect", 72, 102, expectedWidth, 4]);
+    assert.deepEqual(rects[1], ["drawRect", 72, 200 - 32 * DISCIPLE_SHIELD_RADIUS_TILES - 2, expectedWidth, 4]);
     assert(g.calls.some(call => call[0] === "beginFill" && call[1] === 0x9a9a9a));
   } else {
     assert.equal(rects.length, 1, "expired shields have an empty bar");
@@ -96,21 +96,21 @@ for (const [expiresIn, expectedWidth] of [
 }
 
 // The same shield redraws its current pool independently of its lifetime.
-for (const [hp, expectedWidth] of [[300, 56], [150, 28], [75, 14], [0, 0], [600, 56], [-1, 0]]) {
+for (const [hp, expectedWidth] of [[150, 56], [75, 28], [37.5, 14], [0, 0], [300, 56], [-1, 0]]) {
   const g = new RecordingGraphics();
   _drawAbilityObjects.call({ _abilityObjectGfx: g, _renderClock: { now: () => 0 } }, {
     abilityObjects: [{ id: 1, kind: "shield", x: 100, y: 200,
       expiresIn: DISCIPLE_SHIELD_DURATION_TICKS / 2, ownerState: { hp } }],
   });
   const rects = callsNamed(g, "drawRect");
-  assert.deepEqual(rects[0], ["drawRect", 71, 95, 58, 6], "HP backing sits above the timer");
+  assert.deepEqual(rects[0], ["drawRect", 71, 200 - 32 * DISCIPLE_SHIELD_RADIUS_TILES - 9, 58, 6], "HP backing sits above the timer");
   if (expectedWidth > 0) {
-    assert.deepEqual(rects[1], ["drawRect", 72, 96, expectedWidth, 4]);
+    assert.deepEqual(rects[1], ["drawRect", 72, 200 - 32 * DISCIPLE_SHIELD_RADIUS_TILES - 8, expectedWidth, 4]);
     assert(g.calls.some(call => call[0] === "beginFill" && call[1] === 0x6eeaff));
   } else {
     assert.equal(rects.length, 3, "depleted HP has no fill");
   }
-  assert.deepEqual(rects.at(-1), ["drawRect", 72, 102, 28, 4], "damage does not affect the timer");
+  assert.deepEqual(rects.at(-1), ["drawRect", 72, 200 - 32 * DISCIPLE_SHIELD_RADIUS_TILES - 2, 28, 4], "damage does not affect the timer");
 }
 
 console.log("native_graphics_contracts: ok");

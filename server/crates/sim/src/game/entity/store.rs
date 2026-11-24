@@ -116,19 +116,21 @@ impl EntityStore {
                 < crate::game::ability_runtime::MAX_ACTIVE_ABILITY_OBJECTS
     }
 
-    /// Consume shared shield pools before applying hostile damage. Stable caster order
+    /// Consume shared shield pools before applying non-piercing hostile damage. Stable caster order
     /// makes overlapping shields deterministic; each point is absorbed only once.
     pub(in crate::game) fn shielded_damage(
         &mut self,
         victim: u32,
         attacker_owner: u32,
         mut damage: u32,
+        armor_penetration: f32,
         teams: &crate::game::teams::TeamRelations,
     ) -> u32 {
         let Some(target) = self.get(victim) else {
             return damage;
         };
-        if !target.is_unit()
+        if armor_penetration > 0.0
+            || !target.is_unit()
             || target.hp == 0
             || target.invulnerable()
             || !teams.is_enemy_owner(attacker_owner, target.owner)
@@ -136,8 +138,7 @@ impl EntityStore {
             return damage;
         }
         let (owner, x, y) = (target.owner, target.pos_x(), target.pos_y());
-        let radius =
-            crate::config::EKAT_MAGIC_ANCHOR_RADIUS_TILES * crate::config::TILE_SIZE as f32;
+        let radius = crate::config::DISCIPLE_SHIELD_RADIUS_TILES * crate::config::TILE_SIZE as f32;
         let mut shields: Vec<_> = self
             .map
             .values()

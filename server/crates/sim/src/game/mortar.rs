@@ -359,7 +359,13 @@ fn resolve(context: MortarResolutionContext<'_>, shell: &MortarShell) {
                 map.damage_after_reduction_tile(target.pos_x(), target.pos_y(), damage)
             })
             .unwrap_or(0);
-        let effective = entities.shielded_damage(id, shell.owner, effective, teams);
+        let effective = entities.shielded_damage(
+            id,
+            shell.owner,
+            effective,
+            u8::from(piercing_hit) as f32,
+            teams,
+        );
         if effective == 0 {
             continue;
         }

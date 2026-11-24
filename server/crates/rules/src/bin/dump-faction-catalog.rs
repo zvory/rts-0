@@ -526,6 +526,10 @@ fn print_client_constants(indent: &str) {
         balance::DISCIPLE_SHIELD_CAPACITY
     );
     println!(
+        "{indent}    \"discipleShieldRadiusTiles\": {},",
+        json_f32(balance::DISCIPLE_SHIELD_RADIUS_TILES)
+    );
+    println!(
         "{indent}    \"discipleEvolvedInsightCap\": {},",
         balance::DISCIPLE_EVOLVED_INSIGHT_CAP
     );

@@ -4,6 +4,7 @@ import {
   COLORS,
   EKAT_MAGIC_ANCHOR_RADIUS_TILES,
   DISCIPLE_SHIELD_CAPACITY,
+  DISCIPLE_SHIELD_RADIUS_TILES,
   DISCIPLE_SHIELD_DURATION_TICKS,
   STATS,
   RESOURCE_AMOUNTS,
@@ -507,7 +508,7 @@ export function _drawAbilityObjects(state) {
     } else if (object.kind === ABILITY_OBJECT_KIND.MAGIC_ANCHOR) {
       drawMagicAnchor(g, object, Math.max(10, object.ownerState?.radius || ts * EKAT_MAGIC_ANCHOR_RADIUS_TILES));
     } else if (object.kind === ABILITY_OBJECT_KIND.SHIELD) {
-      const radius = ts * 3;
+      const radius = ts * DISCIPLE_SHIELD_RADIUS_TILES;
       const phase = (this._renderClock?.now?.() ?? performance.now()) / 350;
       const pulse = 0.5 + Math.sin(phase) * 0.5;
       gfxFill(g, 0x7eeaff, 0.055 + pulse * 0.035);
