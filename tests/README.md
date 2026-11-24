@@ -283,7 +283,10 @@ latency-sensitive under workstation CPU contention; opt in with `--with-tri-stat
 be disabled with `RTS_RUN_WASM_TRI_STATE=0`; the split browser CI job uses that switch while
 client smoke verifies that the WASM adapter can load.
 
-Paused single-step checks retain the pre-command tick as their snapshot wait baseline and
+Room-speed changes wait for the requested authoritative speed. Pausing also waits for the
+client snapshot to reach the acknowledged pause tick, since room-time metadata can arrive
+before the final running snapshot. Paused single-step checks retain that settled pre-command
+tick as their snapshot wait baseline and
 assert the resulting snapshot tick. This accepts an already-delivered step snapshot without
 waiting for a second tick or relying on room-time metadata delivery order.
 

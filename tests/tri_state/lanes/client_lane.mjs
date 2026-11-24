@@ -446,12 +446,19 @@ export class ClientLane {
 
   async setRoomTimeSpeed(speed) {
     await this.page.evaluate((speed) => window.__rts.match.net.setRoomTimeSpeed(speed), speed);
-    if (speed === 0) {
-      await this.page.waitForFunction(
-        () => window.__rts?.match?.roomTimeControls?.roomTimeState?.paused === true,
-        { timeout: 5000 },
-      );
-    }
+    await this.page.waitForFunction(
+      (speed) => {
+        const match = window.__rts?.match;
+        const time = match?.roomTimeControls?.roomTimeState;
+        if (time?.speed !== speed || time.paused !== (speed === 0)) return false;
+        // The pause acknowledgement can overtake the last running snapshot.
+        // Settle on the acknowledged tick before measuring a one-tick step.
+        return speed !== 0 || (Number.isInteger(time.currentTick)
+          && match.state?._cur?.tick >= time.currentTick);
+      },
+      { timeout: 5000 },
+      speed,
+    );
     this.artifacts.client({ event: "setRoomTimeSpeed", speed });
   }
 
