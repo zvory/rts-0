@@ -974,11 +974,11 @@ for (const researched of [false, true]) {
   const pavilion = { id: 900, owner: 1, kind: KIND.THREE_DAO_PAVILION,
     prodUpgrade: UPGRADE.DAO_OF_LIGHTNESS };
   for (const [upgrades, entities, cost, ticks] of [
-    [[], [], 50, 300],
-    [[UPGRADE.DAO_OF_HEAVINESS], [], 100, 600],
-    [[UPGRADE.DAO_OF_HEAVINESS], [pavilion], 200, 1200],
-    [[], [{ ...pavilion, prodWaiting: true }], 50, 300],
-    [[], [{ ...pavilion, owner: 2 }], 50, 300],
+    [[], [], 50, 600],
+    [[UPGRADE.DAO_OF_HEAVINESS], [], 100, 1200],
+    [[UPGRADE.DAO_OF_HEAVINESS], [pavilion], 200, 2400],
+    [[], [{ ...pavilion, prodWaiting: true }], 50, 600],
+    [[], [{ ...pavilion, owner: 2 }], 50, 600],
   ]) {
     const def = researchDefinition(dao, upgrades, entities, 1);
     assert.deepEqual(def.cost, { steel: cost, oil: cost * 2 });
@@ -1001,7 +1001,7 @@ for (const researched of [false, true]) {
   assert.equal(slot(before).unaffordable, false);
   assert.equal(slot(after).unaffordable, true);
   assert.deepEqual(slot(after).cost, { steel: 100, oil: 200 });
-  assert.equal(slot(after).researchDefinition.researchTicks, 600);
+  assert.equal(slot(after).researchDefinition.researchTicks, 1200);
   assert.notEqual(before.signature, after.signature);
 }
 
