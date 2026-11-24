@@ -210,7 +210,7 @@ fn disciple_insight_fraction_checkpoint_validation_and_evolution_reset() {
     let unit = game.state.entities.get_mut(id).unwrap();
     unit.gain_insight(1, EntityKind::Rifleman);
     assert!(unit.insight_fraction > 0);
-    unit.insight_fraction = 800; // Novice denominator is 4 * (100 steel * 2).
+    unit.insight_fraction = 400; // Novice denominator is 4 * (50 steel * 2).
     assert!(game.checkpoint_payload_text_for_test().is_err());
     let unit = game.state.entities.get_mut(id).unwrap();
     unit.insight_fraction = 1;
