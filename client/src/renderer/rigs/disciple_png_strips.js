@@ -1,3 +1,4 @@
+import { withGoldenAttackTrail } from "./golden_attack_strip.js";
 import { KIND } from "../../protocol.js";
 import { DAO_WAR_BODY_SCALE, DAO_MASTER_BODY_SCALE } from "../../config.js";
 import { PRODUCTION_RASTER_COLOR_TARGET } from "./color_adjustment.js";
@@ -10,7 +11,7 @@ export const WAR_MASTER_FRAME_STRIP_KEY = "war_adept:master";
 export const MAGIC_MASTER_FRAME_STRIP_KEY = "magic_adept:master";
 
 function discipleStrip(image, frameCount, firingFrames, iconVisibleBounds, weaponKind, imageVersion = "dao-ranged-1") {
-  return Object.freeze({
+  return withGoldenAttackTrail({
     enabled: true,
     unit: "warrior",
     image,
@@ -51,7 +52,7 @@ export const MAGIC_PNG_FRAME_STRIP = discipleStrip("/assets/rigs/disciple-dao/ge
   { x: 63, y: 80, w: 128, h: 113 }, "disciple_orb");
 
 // Armored Yari B with a longer reach and an event-driven forward step.
-export const WAR_PNG_FRAME_STRIP = Object.freeze({
+export const WAR_PNG_FRAME_STRIP = withGoldenAttackTrail({
   ...discipleStrip("/assets/rigs/disciple-dao/generated/war-yari-runtime-strip.png?v=kabuto-dark-hands-3", 7, [3, 4, 5, 6],
     { x: 92, y: 107, w: 74, h: 143 }, "warrior_sword", "kabuto-dark-hands-3"),
   movementFrames: Object.freeze([1, 2]),
@@ -64,7 +65,7 @@ export const WAR_PNG_FRAME_STRIP = Object.freeze({
 });
 
 function masterStrip(adept, image, bounds) {
-  return Object.freeze({
+  return withGoldenAttackTrail({
     ...adept,
     image,
     imageVersion: "master-1",
@@ -81,7 +82,7 @@ function masterStrip(adept, image, bounds) {
 }
 export const WIND_MASTER_PNG_FRAME_STRIP = masterStrip(WIND_PNG_FRAME_STRIP, "/assets/rigs/disciple-dao/generated/wind-master-runtime-strip.png?v=master-1",
   { x: 42, y: 24, w: 175, h: 205 });
-export const WAR_MASTER_PNG_FRAME_STRIP = Object.freeze({
+export const WAR_MASTER_PNG_FRAME_STRIP = withGoldenAttackTrail({
   ...masterStrip(WAR_PNG_FRAME_STRIP, "/assets/rigs/disciple-dao/generated/war-master-runtime-strip.png?v=master-torso-2", { x: 81, y: 155, w: 95, h: 185 }),
   image: "/assets/rigs/disciple-dao/generated/war-master-runtime-strip.png?v=master-torso-2",
   imageVersion: "master-torso-2",

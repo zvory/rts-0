@@ -96,6 +96,13 @@ RUN test -s ./client/vendor/sim-wasm/rts_sim_wasm.js \
     && test -s ./client/assets/rigs/disciple-dao/generated/wind-master-runtime-strip.png \
     && test -s ./client/assets/rigs/disciple-dao/generated/war-master-runtime-strip.png \
     && test -s ./client/assets/rigs/disciple-dao/generated/magic-master-runtime-strip.png \
+    && test -s ./client/assets/rigs/cultivator-golden/generated/warrior-runtime-strip.png \
+    && test -s ./client/assets/rigs/cultivator-golden/generated/wind-melee-b-runtime-strip.png \
+    && test -s ./client/assets/rigs/cultivator-golden/generated/war-yari-runtime-strip.png \
+    && test -s ./client/assets/rigs/cultivator-golden/generated/magic-runtime-strip.png \
+    && test -s ./client/assets/rigs/cultivator-golden/generated/wind-master-runtime-strip.png \
+    && test -s ./client/assets/rigs/cultivator-golden/generated/war-master-runtime-strip.png \
+    && test -s ./client/assets/rigs/cultivator-golden/generated/magic-master-runtime-strip.png \
     && test -s ./client/assets/effects/disciple-arrow/arrow.png \
     && test -s ./client/assets/rigs/rocket-truck-preview/truck.png \
     && test -s ./client/assets/rigs/rocket-truck-preview/rocket.png \

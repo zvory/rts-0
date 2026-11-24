@@ -440,7 +440,13 @@ Raster rig workflow:
   shared rig animation sampler. Raster-native metadata owns anchors, animation bindings, semantic
   part ids, recoil, facing, shadows, effects, and route splits; frame strips may declare a base
   facing offset plus a firing-frame override when authored locomotion and attack poses use different
-  forward axes. No SVG source or vector-art fallback
+  forward axes. Cultivator combat strips retain the original character row and carry four
+  image-generated golden attack-effect cells in a second row (`attackTrail`). The body keeps
+  its normal team tint through every attack pose; the separate effect sprite stays gold, follows
+  the same facing, lunge and recoil envelope, and is omitted from silhouette shadows. Attack
+  state alone never starts a trail. `scripts/art/cultivator-golden-pipeline.mjs` reproducibly packs
+  the checked-in effect sources without altering the original body pixels. Workers have no
+  combat trail. No SVG source or vector-art fallback
   exists for those units. Command-card and selection-panel portraits use an atlas's
   assembled reference when available; setup-capable component-only atlases declare an explicit
   deployed composition so the UI shows the complete set-up silhouette, including support legs,

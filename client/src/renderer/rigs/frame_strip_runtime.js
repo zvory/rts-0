@@ -1,3 +1,4 @@
+import { goldenAttackTrailFrame } from "./golden_attack_strip.js";
 import { SETUP, STATE } from "../../protocol.js";
 import { hexToInt, lightenColor } from "../shared.js";
 import { rigContainerScale } from "./animation.js";
@@ -224,6 +225,17 @@ class FrameStripUnitInstance {
     this.sprite.anchor?.set?.(0.5, 0.5);
     this.sprite.position?.set?.(0, 0);
     this.container.addChild(this.sprite);
+    this.trailTextures = [];
+    if (strip.attackTrail && !silhouetteShadow) {
+      for (let i = 0; i < strip.attackTrail.frameCount; i += 1) {
+        const rect = pixiFactory.createRectangle(i * frameWidth, strip.attackTrail.row * frameHeight, frameWidth, frameHeight);
+        this.trailTextures.push(pixiFactory.createTexture(baseTexture, rect));
+      }
+      this.trailSprite = pixiFactory.createSprite(this.trailTextures[0]);
+      this.trailSprite.anchor?.set?.(0.5, 0.5);
+      this.trailSprite.visible = false;
+      this.container.addChild(this.trailSprite);
+    }
   }
 
   matchesFrameStripUnit(kind, strip, texture) {
@@ -255,6 +267,16 @@ class FrameStripUnitInstance {
     this.sprite.alpha = 1;
     this.sprite.tint = this.silhouetteShadow ? 0x000000 : tintForSlot(this.strip.tintSlot, renderContext);
     this.sprite.visible = true;
+    if (this.trailSprite) {
+      const trailFrame = goldenAttackTrailFrame(this.strip, renderContext);
+      this.trailSprite.visible = trailFrame != null;
+      if (trailFrame != null) {
+        this.trailSprite.texture = this.trailTextures[trailFrame];
+        setPoint(this.trailSprite.scale, worldScale, worldScale);
+        setPoint(this.trailSprite.position, spriteOffset.x, spriteOffset.y);
+        this.trailSprite.tint = 0xffffff;
+      }
+    }
     options.diagnostics?.("renderer.frameStrip.redraw.completed");
   }
 
@@ -264,6 +286,9 @@ class FrameStripUnitInstance {
     this.shadowBlur?.destroy?.();
     this.container.parent?.removeChild?.(this.container);
     this.sprite?.destroy?.({ texture: false, textureSource: false });
+    this.trailSprite?.destroy?.({ texture: false, textureSource: false });
+    for (const texture of this.trailTextures) texture?.destroy?.(false);
+    this.trailTextures = [];
     for (const texture of this.frameTextures) texture?.destroy?.(false);
     this.frameTextures = [];
     this.container.destroy?.({ children: true });

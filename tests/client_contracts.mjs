@@ -33,6 +33,7 @@ await import("./client_contracts/tree_unit_depth_contracts.mjs");
 await import("./client_contracts/presentation_coordinator_contracts.mjs");
 await import("./client_contracts/pixi_presentation_adapter_contracts.mjs");
 await import("./client_contracts/frame_strip_runtime_contracts.mjs");
+await import("./client_contracts/cultivator_golden_attack_contracts.mjs");
 await import("./client_contracts/machine_gunner_white_strip_contracts.mjs");
 await import("./client_contracts/rifleman_png_strip_contracts.mjs");
 await import("./client_contracts/launch_url_contracts.mjs");

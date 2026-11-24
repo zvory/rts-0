@@ -1,3 +1,4 @@
+import { withGoldenAttackTrail } from "./golden_attack_strip.js";
 import { PRODUCTION_RASTER_COLOR_TARGET } from "./color_adjustment.js";
 
 function deepFreeze(value) {
@@ -7,7 +8,7 @@ function deepFreeze(value) {
   return value;
 }
 
-export const WARRIOR_PNG_FRAME_STRIP = deepFreeze({
+export const WARRIOR_PNG_FRAME_STRIP = withGoldenAttackTrail(deepFreeze({
   enabled: true,
   unit: "warrior",
   image: "/assets/rigs/warrior-placeholder-pass-01/generated/warrior-runtime-strip.png?v=placeholder-2",
@@ -35,4 +36,4 @@ export const WARRIOR_PNG_FRAME_STRIP = deepFreeze({
     generatedSource: "client/assets/rigs/warrior-placeholder-pass-01/generated/warrior-source.png",
     runtimeStrip: "client/assets/rigs/warrior-placeholder-pass-01/generated/warrior-runtime-strip.png",
   },
-});
+}));
