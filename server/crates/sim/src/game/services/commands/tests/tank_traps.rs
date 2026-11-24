@@ -254,6 +254,7 @@ fn tank_trap_cluster_attack_captures_visible_traps_inside_four_tiles() {
     let mut ground_decals = crate::game::ground_decal::GroundDecalStore::new();
     crate::game::services::death::death_system(
         &map,
+        &crate::game::ability_runtime::AbilityRuntime::new(),
         &mut entities,
         &fog,
         &SmokeCloudStore::new(),
