@@ -1,6 +1,7 @@
 // tests/client_contracts/match_replay_contracts.mjs
 // Domain contract assertions imported by ../client_contracts.mjs.
 import { assert, assertApprox } from "./assertions.mjs";
+import { assertMatchStopClearsSwordAudio } from "./match_audio_lifecycle_contracts.mjs";
 import { testVersionGuardAppLifecycle } from "./version_guard_contracts.mjs";
 import { testAppResourceStartup } from "./match_startup_resource_contracts.mjs";
 import { HUD } from "../../client/src/hud.js";
@@ -755,23 +756,7 @@ import { createRoomCapabilities } from "../../client/src/room_capabilities.js";
       "in-place replay seek clears transient state, fog, durable presentation, and controls together");
     assert(match.presentationFrame === null, "in-place replay seek drops the stale assembled frame");
   }
-  {
-    const match = Object.create(Match.prototype);
-    let swordStops = 0;
-    match.running = true;
-    match.closeMenus = () => {};
-    match.combatAudio = {
-      updateThrowSwordSounds(objects = []) {
-        assert(objects.length === 0, "stopping a match clears sustained sword voices");
-        swordStops += 1;
-      },
-    };
-    match.stop();
-    assert(!match.running && swordStops === 1,
-      "the live game-over stop silences swords without waiting for another snapshot");
-    match.stop();
-    assert(swordStops === 2, "repeated match stops safely clear sword audio");
-  }
+  assertMatchStopClearsSwordAudio(Match);
   {
     const app = Object.create(App.prototype);
     app.matchStartGeneration = 4;
