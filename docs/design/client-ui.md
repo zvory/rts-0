@@ -1925,7 +1925,7 @@ export function noticeSoundId(msg)
 ```
 
 Disciple attack events use dedicated cues in `match_combat_audio.js`: Dao of Magic's
-`disciple_orb` weapon plays the orb launch, and Dao Wind's spear plays the spear thrust.
+`disciple_orb` weapon plays the orb launch, and Dao of Wind's spear plays the spear thrust.
 Base and Dao of War sword attacks use the soft stab against infantry; tanks, scout/command cars,
 scout planes, mortar teams, anti-tank guns, artillery, and rocket trucks use the metallic strike.
 This is presentation material selection, independent of the balance `armored` flag. A missing

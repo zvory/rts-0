@@ -342,8 +342,8 @@ export const ABILITIES = Object.freeze({
     queued: true, queuePolicy: "skipIfNotReady",
   }),
   [ABILITY.EVOLVE_WIND]: Object.freeze({
-    ability: ABILITY.EVOLVE_WIND, label: "Dao Wind", icon: "Z", hotkey: "Z",
-    title: "Choose Dao Wind; evolves automatically at 60 insight; no research required", carriers: Object.freeze([KIND.WARRIOR]),
+    ability: ABILITY.EVOLVE_WIND, label: "Dao of Wind", icon: "Z", hotkey: "Z",
+    title: "Choose Dao of Wind; evolves automatically at 60 insight; no research required", carriers: Object.freeze([KIND.WARRIOR]),
     targetMode: "self", cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 0 }),
     upgradeRequirement: null, queued: false, queuePolicy: "notQueueable",
   }),
@@ -599,9 +599,9 @@ export const UPGRADES = Object.freeze({
     researchedAt: KIND.THREE_DAO_PAVILION,
   }),
   [UPGRADE.DAO_WIND]: Object.freeze({
-    upgrade: UPGRADE.DAO_WIND, label: "Dao Wind", icon: "WND",
+    upgrade: UPGRADE.DAO_WIND, label: "Dao of Wind", icon: "WND",
     cost: Object.freeze({ steel: 100, oil: 200 }), researchTicks: DAO_RESEARCH_TICKS,
-    description: "Study the Dao Wind. Unlocks the matching Adept at Portals for 150 steel and 35 oil, plus paid training at the Proving Grounds.",
+    description: "Study the Dao of Wind. Unlocks the matching Adept at Portals for 150 steel and 35 oil, plus paid training at the Proving Grounds.",
     researchedAt: KIND.THREE_DAO_PAVILION,
   }),
   [UPGRADE.METHAMPHETAMINES]: Object.freeze({

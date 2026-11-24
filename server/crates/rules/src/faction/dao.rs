@@ -3,10 +3,10 @@ use super::*;
 pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 11] = [
     AbilityCatalogEntry {
         kind: AbilityKind::EvolveWind,
-        label: "Dao Wind",
+        label: "Dao of Wind",
         icon: "Z",
         hotkey: Some("Z"),
-        title: "Choose Dao Wind; evolves automatically at 60 insight; no research required",
+        title: "Choose Dao of Wind; evolves automatically at 60 insight; no research required",
         carriers: &[EntityKind::Warrior],
         target_mode: AbilityTargetMode::SelfTarget,
         range_tiles: None,
