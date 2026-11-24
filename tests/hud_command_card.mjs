@@ -709,6 +709,7 @@ for (const [kind, upgrade] of [
     "cultivators-disciple-lightness",
     "cultivators-disciple-war",
     "cultivators-disciple-magic",
+    "cultivators-war-master",
     "cultivators-shop",
     "cultivators-worker",
     "cultivators-build",
@@ -919,7 +920,7 @@ for (const researched of [false, true]) {
   const selection = [
     { id: 1, owner: 1, kind: KIND.WARRIOR, insight: 0, chosenDao: "war" },
     { id: 2, owner: 1, kind: KIND.WARRIOR, insight: 60, chosenDao: "magic" },
-    { id: 3, owner: 1, kind: KIND.WAR_ADEPT, insight: 60, dao: "war" },
+    { id: 3, owner: 1, kind: KIND.WAR_ADEPT, insight: 0, dao: "war", daoMaster: true },
     { id: 4, owner: 2, kind: KIND.WARRIOR, insight: 0 },
     { id: 5, owner: 1, kind: KIND.WORKER },
   ];
@@ -949,10 +950,10 @@ for (const researched of [false, true]) {
   assert.notEqual(changed.signature, card.signature);
 }
 
-// Charge must coexist with the Adepts' primary abilities in mixed selections.
+// Charge must coexist with Adept and Master abilities in mixed selections.
 {
   const selection = [KIND.WARRIOR, KIND.LIGHTNESS_ADEPT, KIND.WAR_ADEPT, KIND.MAGIC_ADEPT]
-    .map((kind, index) => ({ id: index + 1, owner: 1, kind, insight: 60 }));
+    .map((kind, index) => ({ id: index + 1, owner: 1, kind, insight: 60, daoMaster: kind === KIND.WAR_ADEPT }));
   selection[0].escapeTreasure = {};
   const card = buildCommandCardDescriptors({ playerId: 1, factionId: "cultivators", selection,
     resources: { steel: 0, oil: 0 }, upgrades: [], groupCooldownClocks: () => [] });

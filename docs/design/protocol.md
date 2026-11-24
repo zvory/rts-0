@@ -2051,11 +2051,11 @@ the remaining 300-point pool to authorized owner/observer projections only. The 
 is three tiles for every viewer. Field visibility is gated at its center, independently
 of its caster; `sourceCasterId` is omitted when that caster is hidden.
 
-War Disciple Throw Sword uses ability `throwSword` (compact code 18, order stage 26),
+War Master Throw Sword uses ability `throwSword` (compact code 18, order stage 26),
 world-point targeting and the existing `lineProjectile` ability-object kind/payload.
 It is fog-filtered by the existing object projection; clients select its spinning sword
 sprite by ability id without requiring visibility of the caster. Entity ability availability
-is restricted to Dao of War. Checkpoints retain the shared projectile leg and per-leg hit sets.
+is restricted to Dao of War with `daoMaster: true`; War Adepts cannot cast it. Checkpoints retain the shared projectile leg and per-leg hit sets.
 
 ### Tournament Grounds
 

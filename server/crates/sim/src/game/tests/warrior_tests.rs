@@ -925,7 +925,7 @@ fn disciple_pending_dao_advances_on_combat_insight_without_interrupting_attack()
 }
 
 #[test]
-fn war_throw_sword_is_dao_gated_and_hits_harder_on_return_after_checkpoint() {
+fn war_throw_sword_is_master_gated_and_hits_harder_on_return_after_checkpoint() {
     use crate::game::ability::AbilityKind;
     use crate::game::upgrade::UpgradeKind;
     let mut game = empty_flat_game(&[cultivator_player(), human_vs_ai_players()[1].clone()]);
@@ -956,6 +956,7 @@ fn war_throw_sword_is_dao_gated_and_hits_harder_on_return_after_checkpoint() {
         None,
         Some(UpgradeKind::DaoOfLightness),
         Some(UpgradeKind::DaoOfMagic),
+        Some(UpgradeKind::DaoOfHeaviness),
     ] {
         let unit = game.state.entities.get_mut(caster).unwrap();
         unit.set_disciple_kind_for_test(
@@ -974,6 +975,10 @@ fn war_throw_sword_is_dao_gated_and_hits_harder_on_return_after_checkpoint() {
         .get_mut(caster)
         .unwrap()
         .set_disciple_kind_for_test(EntityKind::WarAdept);
+    let unit = game.state.entities.get_mut(caster).unwrap();
+    unit.insight = config::DISCIPLE_EVOLVED_INSIGHT_CAP;
+    unit.advance_dao_master();
+    assert!(unit.dao_ability_available(AbilityKind::ThrowSword));
     let fragile = game
         .state
         .entities
