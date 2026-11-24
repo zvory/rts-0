@@ -56,6 +56,7 @@ export function buildMapFromRecipe(recipe) {
       : [],
     damageReductionTiles: [],
     slowMovementTiles: [],
+    unwalkableTiles: [],
   };
   for (const operation of recipe.operations || []) {
     validateRecipeSymmetry(operation.symmetry ?? defaultSymmetry, map);

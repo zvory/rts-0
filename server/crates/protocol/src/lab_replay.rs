@@ -815,6 +815,14 @@ fn validate_map_container(
         height,
         tile_count,
     )?;
+    validate_overlay_tiles(
+        label,
+        "unwalkableTiles",
+        &scenario.map.data.unwalkable_tiles,
+        width,
+        height,
+        tile_count,
+    )?;
     Ok(())
 }
 

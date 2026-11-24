@@ -1392,3 +1392,50 @@ fn wind_master_gains_second_dash_charge_and_recharges_sequentially() {
         Some(2)
     );
 }
+
+#[test]
+fn disciple_dash_rejects_unwalkable_landings_but_can_cross_them() {
+    use crate::game::ability::AbilityKind;
+    for queued in [false, true] {
+        for blocked_landing in [false, true] {
+            let mut game = empty_flat_game(&[cultivator_player()]);
+            let origin = game.state.map.tile_center(10, 10);
+            let target = game.state.map.tile_center(20, 10);
+            game.state.map.unwalkable_tiles = if blocked_landing {
+                vec![(20, 10)]
+            } else {
+                vec![(15, 10)]
+            };
+            let unit = game
+                .state
+                .entities
+                .spawn_unit(1, EntityKind::Warrior, origin.0, origin.1)
+                .unwrap();
+            game.state
+                .entities
+                .get_mut(unit)
+                .unwrap()
+                .set_disciple_kind_for_test(EntityKind::WindAdept);
+            game.enqueue(
+                1,
+                Command::UseAbility {
+                    target_id: None,
+                    ability: AbilityKind::WindDash,
+                    units: vec![unit],
+                    x: Some(target.0),
+                    y: Some(target.1),
+                    queued,
+                },
+            );
+            game.tick();
+            game.tick();
+            let entity = game.state.entities.get(unit).unwrap();
+            let expected = if blocked_landing { origin } else { target };
+            assert!((entity.pos_x() - expected.0).abs() < 0.001);
+            assert!((entity.pos_y() - expected.1).abs() < 0.001);
+            if blocked_landing {
+                assert_eq!(entity.ability_cooldown_ticks(AbilityKind::WindDash), 0);
+            }
+        }
+    }
+}

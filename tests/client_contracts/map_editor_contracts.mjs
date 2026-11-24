@@ -1109,7 +1109,7 @@ assert(
 
 {
   const overlap = [{ x: 6, y: 7 }];
-  const effectFields = ["concealmentTiles", "noVehicleTiles", "noBuildingTiles", "noEntrenchmentTiles", "damageReductionTiles", "slowMovementTiles"];
+  const effectFields = ["concealmentTiles", "noVehicleTiles", "noBuildingTiles", "noEntrenchmentTiles", "damageReductionTiles", "slowMovementTiles", "unwalkableTiles"];
   const draft = authoredMapFromMaterialized({
     name: "Independent overlapping effects", description: "", size: 16,
     terrain: Array(16 * 16).fill(TERRAIN.GRASS), starts: [], baseSites: [], doodads: [],

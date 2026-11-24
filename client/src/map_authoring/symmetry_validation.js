@@ -37,6 +37,7 @@ export function mapSymmetryWarnings(map, symmetry = MAP_AUTHORING_SYMMETRY.NONE)
   pushLocationWarnings(warnings, "no-entrenchment tiles", map.noEntrenchmentTiles, dimensions, symmetry);
   pushLocationWarnings(warnings, "damage-reduction tiles", map.damageReductionTiles, dimensions, symmetry);
   pushLocationWarnings(warnings, "slow-movement tiles", map.slowMovementTiles, dimensions, symmetry);
+  pushLocationWarnings(warnings, "unwalkable tiles", map.unwalkableTiles, dimensions, symmetry);
   // Forest symmetry is authoritative at the tile-mask level above. Generated trees remain
   // upright and align their asymmetric vertical foliage bounds to the mask perimeter, so their
   // grounded root coordinates are intentionally not geometric symmetry partners.

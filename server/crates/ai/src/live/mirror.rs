@@ -172,6 +172,7 @@ impl MirrorFrame {
         map.no_entrenchment_tiles = self.tiles(&start.map.no_entrenchment_tiles);
         map.damage_reduction_tiles = self.tiles(&start.map.damage_reduction_tiles);
         map.slow_movement_tiles = self.tiles(&start.map.slow_movement_tiles);
+        map.unwalkable_tiles = self.tiles(&start.map.unwalkable_tiles);
         for player in &mut out.players {
             (player.start_tile_x, player.start_tile_y) =
                 self.tile((player.start_tile_x, player.start_tile_y));

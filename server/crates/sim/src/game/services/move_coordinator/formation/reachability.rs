@@ -196,7 +196,7 @@ fn single_tile_passable(
     tx: i32,
     ty: i32,
 ) -> bool {
-    if !map.in_bounds(tx, ty) {
+    if !map.is_passable(tx, ty) {
         return false;
     }
     let Some(terrain_kind) = TerrainKind::from_map_code(map.terrain_at(tx as u32, ty as u32))

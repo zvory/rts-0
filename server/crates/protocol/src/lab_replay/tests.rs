@@ -73,6 +73,7 @@ fn checkpoint_scenario(entity_ids: &[u32], next_id: u32) -> LabCheckpointScenari
                 no_entrenchment_tiles: Vec::new(),
                 damage_reduction_tiles: Vec::new(),
                 slow_movement_tiles: Vec::new(),
+                unwalkable_tiles: Vec::new(),
             },
         },
         metadata: LabCheckpointScenarioMetadata {

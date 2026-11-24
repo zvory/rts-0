@@ -42,7 +42,7 @@ const DOODAD_TYPES = new Set([
 const MAP_FIELDS = new Set([
   "version", "name", "description", "width", "height", "terrain", "startLocations",
   "baseSites", "_design", "doodads", "forestSpans", "concealmentTiles", "noVehicleTiles",
-  "noBuildingTiles", "damageReductionTiles", "slowMovementTiles",
+  "noBuildingTiles", "damageReductionTiles", "slowMovementTiles", "unwalkableTiles",
   "noEntrenchmentTiles",
 ]);
 const START_FIELDS = new Set(["x", "y"]);
@@ -126,10 +126,13 @@ function terrainCounts(map) {
 }
 
 function blockedClearance(map, site, radius) {
+  const unwalkable = new Set((Array.isArray(map.unwalkableTiles) ? map.unwalkableTiles : [])
+    .filter((tile) => tile && isUint32(tile.x) && isUint32(tile.y)).map(locationKey));
   for (let y = site.y - radius; y <= site.y + radius; y += 1) {
     for (let x = site.x - radius; x <= site.x + radius; x += 1) {
       if (!inBounds(map.width, map.height, x, y)) return { x, y, reason: "map edge" };
       if (!PASSABLE.has(map.terrain[y]?.[x])) return { x, y, reason: "impassable terrain" };
+      if (unwalkable.has(locationKey({ x, y }))) return { x, y, reason: "unwalkable tile" };
     }
   }
   return null;
@@ -246,7 +249,7 @@ export function validateMap(map, { symmetry = "none" } = {}) {
     if (blocked) warnings.push(`base (${site.x},${site.y}) has ${blocked.reason} in its protected area at (${blocked.x},${blocked.y})`);
   }
   warnings.push(...validateForestSpans(map.forestSpans, width, height));
-  for (const field of ["concealmentTiles", "noVehicleTiles", "noBuildingTiles", "noEntrenchmentTiles", "damageReductionTiles", "slowMovementTiles"]) {
+  for (const field of ["concealmentTiles", "noVehicleTiles", "noBuildingTiles", "noEntrenchmentTiles", "damageReductionTiles", "slowMovementTiles", "unwalkableTiles"]) {
     const required = field === "noBuildingTiles" || field === "noEntrenchmentTiles";
     const locations = map[field] === undefined && !required ? [] : map[field];
     if (!Array.isArray(locations)) {
@@ -413,6 +416,11 @@ export function renderPreviewSvg(map, { tilePixels = 5, layers = "all" } = {}) {
     height,
     fill: "#8b5fc7",
     stroke: "#d9bfff",
+  });
+  appendSemanticTileLayer(elements, map.unwalkableTiles, {
+    id: MAP_AUTHORING_LAYER.UNWALKABLE,
+    visible: visibility[MAP_AUTHORING_LAYER.UNWALKABLE],
+    width, height, fill: "#e04040", stroke: "#ffa0a0",
   });
   appendDoodadLayers(elements, map.doodads, visibility, width, height);
   const validStarts = Array.isArray(map.startLocations)

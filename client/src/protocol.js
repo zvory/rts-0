@@ -405,3 +405,6 @@ export const cmd = Object.freeze({
 // rts-contract owns the DTO, the sim owns advancement, and exact insight stays team-private.
 
 // Wind Dash uses windDash (ability 21, order stage 29); no return marker.
+
+// Static map DTOs include unwalkableTiles: [{ x, y }], defaulting to [].
+// This overlay preserves terrain art and blocks ground movement/landing/placement on the server.

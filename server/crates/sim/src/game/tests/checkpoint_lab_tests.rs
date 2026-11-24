@@ -274,6 +274,7 @@ fn lab_checkpoint_scenario_rejects_player_starts_that_disagree_with_its_map() {
         no_entrenchment_tiles: Vec::new(),
         damage_reduction_tiles: Vec::new(),
         slow_movement_tiles: Vec::new(),
+        unwalkable_tiles: Vec::new(),
     };
     let materialized_hash = map.materialized_hash();
     checkpoint.map.materialized_hash = materialized_hash.clone();
@@ -347,4 +348,23 @@ fn lab_checkpoint_scenario_restore_bounds_map_site_lists() {
         too_many_base_sites.map.data.base_sites.push(base_site);
     }
     assert_restore_invalid_map(too_many_base_sites, "base site count");
+}
+
+#[test]
+fn lab_checkpoint_preserves_unwalkable_tiles_and_their_map_identity() {
+    let mut game = default_lab_game(0x5150_5010);
+    game.state.map.unwalkable_tiles = vec![(2, 2), (3, 2)];
+    let scenario = game
+        .export_lab_checkpoint_scenario("Unwalkable".to_string(), TEST_BUILD_SHA)
+        .expect("checkpoint export");
+    assert_eq!(scenario.map.data.unwalkable_tiles.len(), 2);
+    let restored = Game::restore_lab_checkpoint_scenario(scenario.clone()).expect("restore");
+    assert_eq!(
+        restored.state.map.unwalkable_tiles,
+        game.state.map.unwalkable_tiles
+    );
+    assert!(!restored.state.map.is_passable(2, 2));
+    let mut altered = scenario;
+    altered.map.data.unwalkable_tiles.clear();
+    assert_restore_invalid_map(altered, "hash");
 }

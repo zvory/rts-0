@@ -690,6 +690,7 @@ export class MapEditorPanel {
       ["noEntrenchment", "No entrenchment"],
       ["damageReduction", "Damage reduction"],
       ["slowMovement", "Slowed movement"],
+      ["unwalkable", "Unwalkable"],
     ]) {
       const input = document.createElement("input");
       input.type = "checkbox";
@@ -709,7 +710,7 @@ export class MapEditorPanel {
       palette.appendChild(control);
     }
     section.append(
-      readout(`${this.session.draft.concealmentTiles.length} concealment; ${this.session.draft.noVehicleTiles.length} no-vehicle; ${this.session.draft.noBuildingTiles.length} no-building; ${this.session.draft.noEntrenchmentTiles.length} no-entrenchment; ${this.session.draft.damageReductionTiles.length} damage-reduction; ${this.session.draft.slowMovementTiles.length} slowed tiles.`),
+      readout(`${this.session.draft.concealmentTiles.length} concealment; ${this.session.draft.noVehicleTiles.length} no-vehicle; ${this.session.draft.noBuildingTiles.length} no-building; ${this.session.draft.noEntrenchmentTiles.length} no-entrenchment; ${this.session.draft.damageReductionTiles.length} damage-reduction; ${this.session.draft.slowMovementTiles.length} slowed; ${this.session.draft.unwalkableTiles.length} unwalkable tiles.`),
       readout("Select any combination, then paint or erase all selected effects in one stroke. Damage reduction and slowed movement each reduce their affected value by 25%."),
       palette,
     );
@@ -1289,6 +1290,7 @@ function overlayEffectName(key) {
   if (key === "noEntrenchment") return "no entrenchment";
   if (key === "damageReduction") return "damage reduction";
   if (key === "slowMovement") return "slowed movement";
+  if (key === "unwalkable") return "unwalkable";
   return "concealment";
 }
 

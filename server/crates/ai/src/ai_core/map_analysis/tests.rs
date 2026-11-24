@@ -98,6 +98,7 @@ fn start_payload_for_terrain(
             no_entrenchment_tiles: Vec::new(),
             damage_reduction_tiles: Vec::new(),
             slow_movement_tiles: Vec::new(),
+            unwalkable_tiles: Vec::new(),
         },
         players: starts
             .iter()
@@ -675,6 +676,7 @@ fn resource_mappings_prefer_reachable_components_over_cross_wall_distance() {
             no_entrenchment_tiles: Vec::new(),
             damage_reduction_tiles: Vec::new(),
             slow_movement_tiles: Vec::new(),
+            unwalkable_tiles: Vec::new(),
         },
         players: vec![
             PlayerStart {
@@ -762,6 +764,7 @@ fn analysis_key_tracks_static_map_start_and_resource_identity() {
             no_entrenchment_tiles: Vec::new(),
             damage_reduction_tiles: Vec::new(),
             slow_movement_tiles: Vec::new(),
+            unwalkable_tiles: Vec::new(),
         },
         players: vec![PlayerStart {
             id: 1,
@@ -783,4 +786,19 @@ fn analysis_key_tracks_static_map_start_and_resource_identity() {
 
     assert_ne!(original, moved_start);
     assert_ne!(moved_start, changed_terrain);
+}
+
+#[test]
+fn unwalkable_tiles_change_ai_passability_and_analysis_identity() {
+    let mut start = start_payload_for_terrain(48, 32, grass_terrain(48, 32), &[(10, 16), (38, 16)]);
+    let original = AiMapAnalysis::analyze(&start);
+    assert!(original.tile_is_passable(24, 16));
+    start
+        .map
+        .unwalkable_tiles
+        .push(rts_sim::protocol::MapTile { x: 24, y: 16 });
+    let annotated = AiMapAnalysis::analyze(&start);
+    assert!(!annotated.tile_is_passable(24, 16));
+    assert!(annotated.tile_is_passable(23, 16));
+    assert_ne!(annotated.key, original.key);
 }

@@ -452,6 +452,7 @@ fn forest_test_analysis(forest: &[(u32, u32)], rock: &[(u32, u32)]) -> AiMapAnal
             no_entrenchment_tiles: Vec::new(),
             damage_reduction_tiles: tiles(forest),
             slow_movement_tiles: Vec::new(),
+            unwalkable_tiles: Vec::new(),
         },
         players: [(9_u32, 9_u32), (116, 116)]
             .iter()

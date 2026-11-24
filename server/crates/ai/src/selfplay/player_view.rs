@@ -184,7 +184,12 @@ pub(crate) fn footprint_placeable_from_snapshot(
             {
                 return false;
             }
-            if occupied.contains(&(tx, ty)) {
+            if map
+                .unwalkable_tiles
+                .iter()
+                .any(|tile| tile.x == tx && tile.y == ty)
+                || occupied.contains(&(tx, ty))
+            {
                 return false;
             }
         }
@@ -206,7 +211,12 @@ pub(crate) fn footprint_placeable_from_snapshot(
         {
             return false;
         }
-        if occupied.contains(&(spawn_x, spawn_y)) {
+        if map
+            .unwalkable_tiles
+            .iter()
+            .any(|tile| tile.x == spawn_x && tile.y == spawn_y)
+            || occupied.contains(&(spawn_x, spawn_y))
+        {
             return false;
         }
     }

@@ -355,6 +355,7 @@ fn analysis_with_forest(forest: &[(u32, u32)]) -> AiMapAnalysis {
             no_entrenchment_tiles: Vec::new(),
             damage_reduction_tiles: Vec::new(),
             slow_movement_tiles: Vec::new(),
+            unwalkable_tiles: Vec::new(),
         },
         players: [(1, (8, 8)), (2, (56, 56))]
             .into_iter()
