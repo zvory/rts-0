@@ -68,13 +68,13 @@ guns, Panzerfausts, Dao attacks, Throw Sword, and piercing artillery/rocket impa
 Non-piercing area falloff remains absorbable. Friendly fire, environmental damage,
 buildings, invulnerable targets and enemy units do not consume the pool. Overlapping
 fields consume pools in stable caster-id order. Shield costs no resources, has a ten-second
-cooldown, replaces the caster’s prior shield, and expires after 15 seconds or earlier on
+cooldown, replaces the caster’s prior shield, and expires after 5 seconds or earlier on
 depletion, replacement, or caster death. In-range casts preserve movement and queued orders;
 out-of-range immediate casts replace the current order with an approach-and-cast order. The pool, fixed world center, and absolute expiry tick live on the caster entity and survive
 checkpoints; the existing ability-runtime allocator supplies its unique visual id.
 All visible viewers see a gray lifetime bar on a black background at the top of the field,
 six pixels below its HP-bar position. It drains from full to empty using the server-provided
-remaining ticks and the mirrored 15-second duration, independently of damage absorption.
+remaining ticks and the mirrored 5-second duration, independently of damage absorption.
 All visible viewers see the field; owner/privileged viewers receive its remaining pool.
 
 Lab commands continue to use the selected owner’s faction and research. A Disciple

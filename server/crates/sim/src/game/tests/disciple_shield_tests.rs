@@ -207,10 +207,11 @@ fn disciple_shield_shift_waits_for_move_and_cooldown_does_not_replace_field() {
 }
 
 #[test]
-fn disciple_shield_expires_at_15_seconds_after_checkpoint_restore() {
+fn disciple_shield_expires_at_5_seconds_after_checkpoint_restore() {
     let (mut game, caster) = setup();
     game.enqueue(1, cast(caster, 440.0, false));
     game.tick();
+    assert_eq!(config::DISCIPLE_SHIELD_DURATION_TICKS, 5 * config::TICK_HZ);
     let expires = game.state.tick + config::DISCIPLE_SHIELD_DURATION_TICKS;
     assert_eq!(
         game.state
@@ -275,7 +276,7 @@ fn disciple_shield_expires_at_15_seconds_after_checkpoint_restore() {
 }
 
 #[test]
-fn disciple_shield_replacement_refreshes_expiry() {
+fn disciple_shield_recast_after_cooldown_gets_fresh_expiry() {
     let (mut game, caster) = setup();
     game.enqueue(1, cast(caster, 480.0, false));
     game.tick();
@@ -297,6 +298,8 @@ fn disciple_shield_replacement_refreshes_expiry() {
     {
         game.tick();
     }
+    assert!(game.state.tick >= original.expires_tick);
+    assert!(game.state.entities.get(caster).unwrap().shield.is_none());
     game.enqueue(1, cast(caster, 500.0, false));
     game.tick();
     let replacement = game

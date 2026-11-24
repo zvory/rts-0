@@ -73,7 +73,7 @@ pub const DAO_MAGIC_SPEED_MULTIPLIER: f32 = 1.05;
 
 pub const DISCIPLE_SHIELD_CAPACITY: u32 = 150;
 pub const DISCIPLE_SHIELD_RADIUS_TILES: f32 = 2.1;
-pub const DISCIPLE_SHIELD_DURATION_TICKS: u32 = TICK_HZ * 15;
+pub const DISCIPLE_SHIELD_DURATION_TICKS: u32 = TICK_HZ * 5;
 pub const DISCIPLE_SHIELD_COOLDOWN_TICKS: u16 = (TICK_HZ * 10) as u16;
 
 /// Completed and paid active Dao researches reserve player-wide price tiers.
