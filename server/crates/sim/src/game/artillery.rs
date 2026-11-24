@@ -333,6 +333,8 @@ mod tests {
         );
     }
 
+    mod shield;
+
     #[test]
     fn artillery_outer_area_damage_is_reduced_against_entrenched_infantry() {
         let map = open_map(20);

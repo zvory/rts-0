@@ -64,8 +64,8 @@ Magic Disciples can place Shield within five tiles: a shimmering circle with a
 absorbs 150 non-piercing hostile damage after normal armor/terrain reductions; overflow damages the
 unit, and depletion removes the field immediately. Any attack with positive armor penetration
 bypasses the shield without consuming its pool, including tank cannon hits and splash, anti-tank
-guns, Panzerfausts, Dao attacks, Throw Sword, and piercing artillery/rocket impact cores.
-Non-piercing area falloff remains absorbable. Friendly fire, environmental damage,
+guns, Panzerfausts, Dao primary attacks, and piercing artillery/rocket impact cores.
+Throw Sword, Line Shot, and non-piercing area falloff remain absorbable. Friendly fire, environmental damage,
 buildings, invulnerable targets and enemy units do not consume the pool. Overlapping
 fields consume pools in stable caster-id order. Shield costs no resources, has a ten-second
 cooldown, replaces the caster’s prior shield, and expires after 5 seconds or earlier on

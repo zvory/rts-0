@@ -67,6 +67,8 @@ fn half_turn_completes_in_two_hundred_ms() {
     );
 }
 
+mod shield;
+
 #[test]
 fn fixed_mortar_shell_checkpoint_defaults_to_already_launched() {
     let store: MortarShellStore = serde_json::from_value(serde_json::json!({
