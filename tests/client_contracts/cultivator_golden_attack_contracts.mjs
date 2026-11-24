@@ -3,7 +3,9 @@ import fs from 'node:fs';
 import { PNG } from 'pngjs';
 import { createLiveFrameStrips } from '../../client/src/renderer/rigs/frame_strip_routing.js';
 import { goldenAttackTrailFrame } from '../../client/src/renderer/rigs/golden_attack_strip.js';
-import { renderFrameStripUnit } from '../../client/src/renderer/rigs/frame_strip_runtime.js';
+import { WARRIOR_PNG_FRAME_STRIP } from '../../client/src/renderer/rigs/warrior_png_strip.js';
+import { frameStripWorldScale, frameStripSpriteOffset, frameStripVisualFacing, renderFrameStripUnit } from '../../client/src/renderer/rigs/frame_strip_runtime.js';
+import { createMinimapAnimation } from '../../client/src/renderer/rigs/minimap_animation.js';
 import { installFakePixi } from './pixi_fakes.mjs';
 const specs = JSON.parse(fs.readFileSync(new URL('../../client/assets/rigs/cultivator-golden/source/specs.json', import.meta.url)));
 const golden = [...createLiveFrameStrips()].filter(([, s]) => s.attackTrail);
@@ -36,6 +38,46 @@ for (const [, file, w, h, , options = {}] of specs) {
     assert.ok(visible > 20, `nonempty golden effect cell ${frame}: ${file}`);
   }
 }
+// Compare the actual head pixels at rendered scale, rather than accepting equal cell sizes.
+const novice = WARRIOR_PNG_FRAME_STRIP;
+const novicePng = PNG.sync.read(fs.readFileSync(new URL(`../../${novice.source.runtimeStrip}`, import.meta.url)));
+function headSample(frame, cx, cy, radius) {
+  const points = [];
+  for (let y = cy - radius; y <= cy + radius; y++) for (let x = cx - radius; x <= cx + radius; x++) {
+    const i = (y * novicePng.width + frame * 160 + x) * 4;
+    if (novicePng.data[i + 3] > 230 && Math.max(...novicePng.data.subarray(i, i + 3)) < 105) points.push([x, y]);
+  }
+  const x = points.reduce((n, p) => n + p[0], 0) / points.length;
+  const y = points.reduce((n, p) => n + p[1], 0) / points.length;
+  const radiusPx = Math.sqrt(points.reduce((n, p) => n + (p[0] - x) ** 2 + (p[1] - y) ** 2, 0) / points.length);
+  return { x, y, radiusPx };
+}
+const idleHead = headSample(0, 58, 72, 24);
+const subject = { kind: 'warrior', weaponFacing: 0, facing: 0 };
+function worldHead(frame, head, context) {
+  const scale = frameStripWorldScale(novice, subject, context, frame);
+  const offset = frameStripSpriteOffset(novice, frame, context);
+  const angle = frameStripVisualFacing(novice, subject, context, frame);
+  const x = (head.x - 80) * scale + offset.x, y = (head.y - 80) * scale + offset.y;
+  return { x: x * Math.cos(angle) - y * Math.sin(angle), y: x * Math.sin(angle) + y * Math.cos(angle), radius: head.radiusPx * scale };
+}
+const idleWorld = worldHead(0, idleHead, {});
+for (const [i, frame] of novice.firingFrames.entries()) {
+  const context = { recoilProgress: 1, recoilWeaponKind: 'warrior_sword', recoilPhase: (i + .1) / 6 * novice.firingFrameHoldPhase };
+  const head = worldHead(frame, headSample(frame, 40, 69, 17), context);
+  assert.ok(Math.abs(head.radius / idleWorld.radius - 1) < .03, 'attack head size matches idle within 3%');
+  assert.ok(Math.hypot(head.x - idleWorld.x, head.y - idleWorld.y) < .35, 'head anchor does not jump during swing');
+}
+const minimap = createMinimapAnimation();
+const minimapUnit = { ...subject, id: 42, x: 0, y: 0 };
+minimap.beginFrame([minimapUnit], {}, 0);
+const idleLayer = minimap.layers(minimapUnit)[0];
+minimap.beginFrame([minimapUnit], {
+  weaponRecoil: () => 1, weaponRecoilPhase: () => .2, weaponRecoilKind: () => 'warrior_sword',
+}, 1);
+const attackLayer = minimap.layers(minimapUnit)[0];
+assert.ok(Math.abs(attackLayer.scaleX / idleLayer.scaleX - 1.59) < 1e-12, 'minimap shares corrected Novice attack sizing');
+minimap.destroy();
 const restore = installFakePixi();
 try {
   for (const [kind, strip] of golden) {
@@ -58,6 +100,15 @@ try {
         assert.equal(rig.trailSprite.tint, 0xffffff, 'gold texture is independent of team tint');
         assert.equal(rig.trailSprite.visible, true);
         assert.equal(rig.trailSprite.texture, rig.trailTextures[i]);
+        if (kind.startsWith('magic_adept')) {
+          assert.ok(Math.abs(rig.trailSprite.scaleX / rig.sprite.scaleX - 2) < 1e-12, 'Magic energy has twice its original diameter');
+          const center = strip.attackTrail.centers[i];
+          const sourceCenter = strip.attackTrail.sourceCenters[i];
+          assert.ok(Math.abs(rig.trailSprite.x + (sourceCenter[0] - 128) * rig.trailSprite.scaleX
+            - rig.sprite.x - (center[0] - 128) * rig.sprite.scaleX) < 1e-8, 'energy stays centered horizontally on the hand anchor');
+          assert.ok(Math.abs(rig.trailSprite.y + (sourceCenter[1] - 128) * rig.trailSprite.scaleY
+            - rig.sprite.y - (center[1] - 128) * rig.sprite.scaleY) < 1e-8, 'energy stays centered vertically on the hand anchor');
+        }
       }
       draw({ teamColor, recoilProgress: 1, recoilPhase: 1, recoilWeaponKind: strip.firingWeaponKinds[0] });
       assert.equal(rig.trailSprite.visible, false, 'recovery ends the trail');

@@ -152,8 +152,12 @@ function frameStripFacingOffset(strip, frameIndex) {
   return baseOffset;
 }
 
-export function frameStripWorldScale(strip, entity, renderContext = null) {
+export function frameStripWorldScale(strip, entity, renderContext = null, frameIndex = null) {
   const baseScale = Math.max(0.01, finite(strip?.worldScale, 1));
+  if (strip?.firingWorldScale && strip.firingFrames?.includes(
+    frameIndex ?? frameStripFrameIndex(strip, entity, renderContext ?? {}))) {
+    return Math.max(0.01, finite(strip.firingWorldScale, baseScale));
+  }
   if (frameStripUsesMovementFrames(strip, entity, renderContext)) {
     return Math.max(0.01, finite(strip?.movementWorldScale, baseScale));
   }
@@ -166,7 +170,11 @@ export function frameStripSpriteOffset(strip, frameIndex, renderContext = {}) {
   const forwardPx = windupFrames.includes(frameIndex)
     ? finite(strip?.windupOriginForwardPx, defaultForwardPx)
     : defaultForwardPx;
-  const lateralPx = finite(strip?.originLateralPx, 0);
+  const firingPose = strip?.firingFrames?.includes(frameIndex);
+  const poseForwardPx = firingPose ? finite(strip?.firingOriginForwardPx, forwardPx) : forwardPx;
+  const lateralPx = firingPose
+    ? finite(strip?.firingOriginLateralPx, finite(strip?.originLateralPx, 0))
+    : finite(strip?.originLateralPx, 0);
   const firingFrames = validFrameList(strip, strip?.firingFrames);
   const recoilPx = firingFrames.includes(frameIndex) ? Math.max(0, finite(strip?.firingRecoilPx, 0)) : 0;
   // The overhead attack art faces local +Y. Move the whole pose through anticipation,
@@ -183,7 +191,7 @@ export function frameStripSpriteOffset(strip, frameIndex, renderContext = {}) {
     const t = (phase - start) / (end - start);
     lunge = (from + (to - from) * t * t * (3 - 2 * t)) * Math.max(0, finite(strip?.firingLungePx, 0));
   }
-  return { x: forwardPx - recoilPx, y: lateralPx + lunge };
+  return { x: poseForwardPx - recoilPx, y: lateralPx + lunge };
 }
 
 function createDefaultFrameStripPixiFactory(pixi = globalThis.PIXI) {
@@ -260,7 +268,7 @@ class FrameStripUnitInstance {
       this._frameIndex = frameIndex;
     }
 
-    const worldScale = frameStripWorldScale(this.strip, entity, renderContext);
+    const worldScale = frameStripWorldScale(this.strip, entity, renderContext, frameIndex);
     setPoint(this.sprite.scale, worldScale, worldScale);
     const spriteOffset = frameStripSpriteOffset(this.strip, frameIndex, renderContext);
     setPoint(this.sprite.position, spriteOffset.x, spriteOffset.y);
@@ -272,8 +280,13 @@ class FrameStripUnitInstance {
       this.trailSprite.visible = trailFrame != null;
       if (trailFrame != null) {
         this.trailSprite.texture = this.trailTextures[trailFrame];
-        setPoint(this.trailSprite.scale, worldScale, worldScale);
-        setPoint(this.trailSprite.position, spriteOffset.x, spriteOffset.y);
+        const effectScale = this.strip.attackTrail.scale || 1;
+        const center = this.strip.attackTrail.centers?.[trailFrame] || [this.strip.frameWidth / 2, this.strip.frameHeight / 2];
+        const sourceCenter = this.strip.attackTrail.sourceCenters?.[trailFrame] || center;
+        setPoint(this.trailSprite.scale, worldScale * effectScale, worldScale * effectScale);
+        setPoint(this.trailSprite.position,
+          spriteOffset.x + ((center[0] - this.strip.frameWidth / 2) - (sourceCenter[0] - this.strip.frameWidth / 2) * effectScale) * worldScale,
+          spriteOffset.y + ((center[1] - this.strip.frameHeight / 2) - (sourceCenter[1] - this.strip.frameHeight / 2) * effectScale) * worldScale);
         this.trailSprite.tint = 0xffffff;
       }
     }

@@ -24,6 +24,11 @@ export const WARRIOR_PNG_FRAME_STRIP = withGoldenAttackTrail(deepFreeze({
   firingFrameHoldPhase: 0.7,
   fps: 8,
   worldScale: 0.32,
+  // Match the idle head radius (17.43 px) to the generated poses (10.96 px).
+  firingWorldScale: 0.32 * 1.59,
+  // Preserve the idle head's world anchor while changing facing axes and scale.
+  firingOriginForwardPx: 17.4,
+  firingOriginLateralPx: 5.2,
   facingOffset: -Math.PI / 2,
   firingFacingOffset: 0,
   // Idle torso sits 22 source pixels left of the cell midpoint.

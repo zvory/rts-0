@@ -444,6 +444,10 @@ Raster rig workflow:
   image-generated golden attack-effect cells in a second row (`attackTrail`). The body keeps
   its normal team tint through every attack pose; Novice adds six intermediate body and effect
   frames, while Magic Adept/Master gather hand-centered energy instead of weapon swooshes.
+  Novice firing poses use a calibrated `firingWorldScale` and firing-origin overrides so their
+  head size and world anchor match idle; the minimap applies the same scale correction.
+  Magic effects render at twice the authored diameter, mapping measured `sourceCenters` to
+  per-frame hand `centers` so enlargement keeps the energy attached to the caster.
   The separate effect sprite stays gold, follows the same facing, lunge and recoil envelope, and is omitted from silhouette shadows. Attack
   state alone never starts a trail. `scripts/art/cultivator-golden-pipeline.mjs` reproducibly packs
   the checked-in effect sources while preserving original body cells and appending the new

@@ -20,7 +20,18 @@ export function withGoldenAttackTrail(strip) {
     ...strip,
     image: `${image}?v=${revision}`,
     imageVersion: `${strip.imageVersion.replace(/-gold-\d+$/, "")}-${revision}`,
-    attackTrail: Object.freeze({ row: 1, frameCount: basename === "warrior-runtime-strip.png" ? 6 : 4 }),
+    attackTrail: Object.freeze({ row: 1, frameCount: basename === "warrior-runtime-strip.png" ? 6 : 4,
+      ...(/^magic/.test(basename) ? {
+        scale: 2,
+        // Target hand anchors plus measured energy-core centers in the source cells.
+        sourceCenters: basename.startsWith("magic-master")
+          ? [[128.21, 136.96], [122.87, 136.23], [127.98, 137.19], [123.45, 136.8]]
+          : [[105.3, 152.35], [127.04, 167.36], [132.5, 175.9], [125.78, 170.18]],
+        centers: basename.startsWith("magic-master")
+          ? [[128, 164], [110, 183], [128, 183], [128, 167]]
+          : [[108, 159], [128, 169], [135, 181], [128, 173]],
+      } : {}),
+    }),
     source: Object.freeze({ ...strip.source,
       generator: 'scripts/art/cultivator-golden-pipeline.mjs', runtimeStrip: `client${image}` }),
   });
