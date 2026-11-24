@@ -57,6 +57,7 @@ pub enum MatchConclusionReason {
 pub enum ServerMessage {
     Welcome {
         player_id: u32,
+        build_id: String,
     },
     Lobby {
         room: String,
@@ -166,6 +167,7 @@ pub enum ServerMessage {
     },
     Pong {
         ts: f64,
+        build_id: String,
     },
     /// Reliable diagnostics-only command receipt. This is not the sim-consumption ack.
     CommandReceipt {

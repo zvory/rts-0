@@ -1012,7 +1012,10 @@ async fn handle_connection(socket: WebSocket, lobby: Lobby) {
 
     // Announce the assigned id before anything else.
     if conn_tx
-        .send_reliable(ServerMessage::Welcome { player_id })
+        .send_reliable(ServerMessage::Welcome {
+            player_id,
+            build_id: rts_server::build_info::build_id().to_string(),
+        })
         .await
         .is_err()
     {
@@ -1406,7 +1409,10 @@ async fn handle_client_message(
         }
         ClientMessage::Ping { ts } => {
             // Answer directly so latency probes work regardless of room state.
-            let _ = conn_tx.try_send_reliable(ServerMessage::Pong { ts });
+            let _ = conn_tx.try_send_reliable(ServerMessage::Pong {
+                ts,
+                build_id: rts_server::build_info::build_id().to_string(),
+            });
         }
         ClientMessage::NetReport { report } => {
             let outbound = conn_tx.consume_report_stats();

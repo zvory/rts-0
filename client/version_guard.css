@@ -1,0 +1,50 @@
+#version-mismatch {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483647;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  pointer-events: none;
+}
+
+.version-mismatch-panel {
+  box-sizing: border-box;
+  width: min(540px, 100%);
+  padding: 28px;
+  border: 2px solid #ffbb57;
+  border-radius: 12px;
+  background: #211b16;
+  box-shadow: 0 12px 64px #000c;
+  color: #fff4df;
+  text-align: center;
+  pointer-events: auto;
+}
+
+#version-mismatch h2 {
+  margin: 0 0 14px;
+  color: #ffcb7a;
+  font-size: clamp(28px, 5vw, 40px);
+}
+
+#version-mismatch p {
+  margin: 0 0 22px;
+  font-size: 18px;
+  line-height: 1.5;
+}
+
+#version-mismatch button {
+  padding: 12px 24px;
+  border: 1px solid #ffcb7a;
+  border-radius: 6px;
+  background: #ffcb7a;
+  color: #211b16;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+#version-mismatch button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

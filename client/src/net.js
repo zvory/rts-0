@@ -584,6 +584,9 @@ export class Net {
       m = decodeServerMessage(raw);
       decodeMs = performance.now() - decodeStartedAt;
     } catch (err) {
+      if (/^unsupported (compact snapshot|MessagePack snapshot codec) version:/.test(err?.message || "")) {
+        this._emit("versionMismatch");
+      }
       // Ignore malformed frames rather than tearing down the connection.
       this.diagnostics?.mark("server.recv.malformed", { bytes: rawBytes });
       return;

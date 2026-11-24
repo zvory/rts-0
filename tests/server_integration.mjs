@@ -27,6 +27,12 @@ const { ok } = assertions;
 (async () => {
   const A = await connectClient("A");
   ok(A.playerId != null, `A got welcome playerId=${A.playerId}`);
+  const welcome = await A.waitFor((m) => m.t === "welcome");
+  ok(typeof welcome.buildId === "string" && welcome.buildId.length > 0,
+    "welcome identifies the running server build");
+  A.send({ t: "ping", ts: 42 });
+  const pong = await A.waitFor((m) => m.t === "pong" && m.ts === 42);
+  ok(pong.buildId === welcome.buildId, "heartbeat repeats the server build before joining a room");
   A.send({ t: "join", name: "Alpha", room: ROOM });
   const initialLobby = await A.waitFor((m) => m.t === "lobby", 3000, "A lobby");
   ok(Array.isArray(initialLobby.maps) && initialLobby.maps.length >= 1,

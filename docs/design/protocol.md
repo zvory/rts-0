@@ -23,6 +23,11 @@ carrying compatibility shims for old builds by default.
 layer such as `server/src/protocol.rs` or `server/crates/sim/src/protocol.rs`, not in the wire DTO
 crate.
 
+Client build compatibility is checked using `buildId` on reliable `welcome`/`pong` messages and
+no-store HTTP `/version` checks. The document's `rts-client-build` stamp identifies the loaded
+client; a later HTTP response must not relabel it. Mismatch recovery and the persistent warning
+are described in [client-ui.md](client-ui.md#client-version-guard).
+
 ### 2.0 Boundary authority and guardrails
 
 `server/crates/protocol/src/lib.rs` owns the wire DTO vocabulary, with protocol constants, message
@@ -409,7 +414,7 @@ All other counters/durations are u32 except quantiles (u16) and validity flags (
 
 | `t`        | Fields |
 |------------|--------|
-| `welcome`  | `playerId: u32` — assigned on connect. |
+| `welcome`  | `playerId: u32` — assigned on connect; `buildId: string` — running server build for the client version handshake. |
 | `lobby`    | `room: string`, `kind: LobbyKind`, `hostId: u32`, `players: LobbyPlayer[]`, `canStart: bool`, `teamPreset: string`, `map: string`, `maps: AvailableMap[]` |
 | `matchCountdown` | `countdownId: u32`, `durationMs: u32`, `words: string[]` — reliable pre-match countdown sent to every lobby participant after the host starts and before `start`. Active human clients begin warming their renderer when they become ready, then acknowledge this exact nonzero countdown generation with `matchLoadReady` once warmup completes. During this interval the server keeps the room in lobby setup, disables `canStart`, freezes lobby edits, and rejects new joins. At expiry it sends `start` only if every active human acknowledged; otherwise it returns the room to editable lobby state and broadcasts `<name> failed to load the game.` Spectators and AI do not block launch. |
 | `start`    | `Game start payload` (see 2.3). |
@@ -428,7 +433,7 @@ All other counters/durations are u32 except quantiles (u16) and validity flags (
 | `shutdownWarning` | `deadlineUnixMs: u64`, `secondsRemaining: u64` — deploy/termination drain has started; active matches may continue until the deadline, but new match starts are disabled. |
 | `observationReady` | `matchRunId: string` — a watched all-AI match has resolved; this id retrieves its saved replay and joins its structured server logs. |
 | `gameOver` | `winnerId: u32 | null`, `winnerTeamId: u32 | null`, `conclusion?: MatchConclusion`, `you: "won" | "lost" | "draw"`, `scores: PlayerScore[]` |
-| `pong`     | `ts: number` (echo of the ping ts) |
+| `pong`     | `ts: number` (echo of the ping ts), `buildId: string` (running server build). |
 | `commandReceipt` | `clientSeq: u32`, `serverTick: u32`, `accepted: bool`, `reason?: string` — reliable diagnostics-only room receipt. Does not reconcile prediction. |
 | `error`    | `msg: string` |
 

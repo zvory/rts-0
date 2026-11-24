@@ -255,14 +255,17 @@ fn connection_sink_keeps_reliable_fifo_separate_from_snapshots() {
         msg: "first".to_string(),
     })
     .unwrap();
-    sink.try_send_reliable(ServerMessage::Pong { ts: 42.0 })
-        .unwrap();
+    sink.try_send_reliable(ServerMessage::Pong {
+        ts: 42.0,
+        build_id: "test-build".to_string(),
+    })
+    .unwrap();
 
     let first = writer.reliable_rx.try_recv().unwrap();
     let second = writer.reliable_rx.try_recv().unwrap();
 
     assert!(matches!(first, ServerMessage::Error { .. }));
-    assert!(matches!(second, ServerMessage::Pong { ts } if ts == 42.0));
+    assert!(matches!(second, ServerMessage::Pong { ts, .. } if ts == 42.0));
     assert_eq!(writer.snapshots.take().unwrap().tick, 10);
 }
 

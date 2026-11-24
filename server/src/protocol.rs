@@ -16,6 +16,28 @@ mod tests {
     use rts_sim::game::entity::EntityKind;
 
     #[test]
+    fn version_handshake_serializes_through_server_adapter() {
+        for (message, expected) in [
+            (
+                ServerMessage::Welcome {
+                    player_id: 7,
+                    build_id: "build-a".into(),
+                },
+                serde_json::json!({"t":"welcome", "playerId":7, "buildId":"build-a"}),
+            ),
+            (
+                ServerMessage::Pong {
+                    ts: 42.0,
+                    build_id: "build-a".into(),
+                },
+                serde_json::json!({"t":"pong", "ts":42.0, "buildId":"build-a"}),
+            ),
+        ] {
+            assert_eq!(serde_json::to_value(message).unwrap(), expected);
+        }
+    }
+
+    #[test]
     fn room_notice_serializes_through_server_adapter() {
         let message = ServerMessage::RoomNotice {
             msg: "Scout has joined the replay".to_string(),

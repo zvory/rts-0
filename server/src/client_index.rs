@@ -26,6 +26,16 @@ fn build_from_html(
     google_analytics_id: Option<&str>,
 ) -> String {
     let html = inject_google_analytics_id(html, google_analytics_id);
+    let escaped_version = version
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;");
+    let html = html.replace(
+        "<meta name=\"rts-client-build\" content=\"\" />",
+        &format!("<meta name=\"rts-client-build\" content=\"{escaped_version}\" />"),
+    );
 
     let src_dir = format!("{client_dir}/src");
     let mut entries = String::new();
@@ -131,6 +141,7 @@ mod tests {
         assert!(html
             .contains("\"/src/renderer/terrain.js\": \"/src/renderer/terrain.js?v=test-version\""));
         assert!(html.contains("src=\"/src/main.js?v=test-version\""));
+        assert!(html.contains("name=\"rts-client-build\" content=\"test-version\""));
         assert!(html.contains("href=\"/live_pause.css?v=test-version\""));
         assert!(html.contains("href=\"/manifest.webmanifest?v=test-version\""));
         assert!(html.contains("name=\"rts-google-analytics-id\" content=\"\""));
