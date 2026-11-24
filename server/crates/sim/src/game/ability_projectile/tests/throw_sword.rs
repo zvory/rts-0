@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn disciple_shield_absorbs_projectiles_crossing_barrier_on_both_legs() {
+fn disciple_shield_armors_projectiles_crossing_barrier_and_pays_full_damage_on_both_legs() {
     for (ability, damage, total) in [
         (
             AbilityKind::ThrowSword,
@@ -34,12 +34,12 @@ fn disciple_shield_absorbs_projectiles_crossing_barrier_on_both_legs() {
         runtime.spawn_projectile(spec).unwrap();
         for tick in 1..=6 {
             tick_runtime(&mut runtime, &mut entities, tick);
-            assert_eq!(
-                entities.get(victim).unwrap().hp,
-                hp,
-                "{ability:?}, tick {tick}"
-            );
         }
+        assert_eq!(
+            entities.get(victim).unwrap().hp,
+            hp - total / 4,
+            "{ability:?}"
+        );
         assert_eq!(
             entities
                 .get(shield_caster)

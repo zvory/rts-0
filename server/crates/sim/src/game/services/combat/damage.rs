@@ -177,6 +177,7 @@ pub(super) fn apply_direct_hit(
     };
     let before_hp = target.hp;
     let target_kind = target.kind;
+    let full_damage = damage;
     let damage = combat_rules::effective_damage_with_facing_for_weapon(
         weapon,
         target.kind,
@@ -196,6 +197,7 @@ pub(super) fn apply_direct_hit(
         victim,
         owner,
         damage,
+        full_damage,
         weapon.armor_penetration,
         source,
         teams,
@@ -283,7 +285,15 @@ fn apply_tank_he_splash(
         let damage = map.damage_after_reduction_tile(target.pos_x(), target.pos_y(), damage);
         let victim_owner = target.owner;
         let pos = (target.pos_x(), target.pos_y());
-        let damage = entities.shielded_damage(id, owner, damage, 0.0, source, teams);
+        let damage = entities.shielded_damage(
+            id,
+            owner,
+            damage,
+            crate::config::TANK_HE_SPLASH_DAMAGE,
+            0.0,
+            source,
+            teams,
+        );
         let damaged = entities.get_mut(id).is_some_and(|target| {
             if teams.is_enemy_owner(owner, target.owner) {
                 target.apply_damage_from_entity(damage, owner, attacker, source, tick)

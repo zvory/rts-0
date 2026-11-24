@@ -130,6 +130,11 @@ The single-unit selection panel displays Armored or Unarmored beneath the kill c
 against non-piercing attacks and partial/full armor penetration. Artillery is Small/unarmored
 and receives no armor damage reduction. Buildings and resource nodes omit this unit-only row.
 
+Shield grants a separate 75% armor layer against attacks entering its field, using ordinary
+armor penetration after existing target defenses. Its 150 HP durability pays each hit's full
+pre-reduction damage, including fully piercing hits. See [Dao insight](dao-insight.md) for
+breaking-hit, overlap, and area-damage rules.
+
 ### Client mirror boundary inventory
 
 Phase 1 records the current source-of-truth map before later phases add broader mechanical checks.
@@ -900,8 +905,9 @@ placement, cancellation, damage, fog and destruction apply. See [Shop](shop.md) 
 At 200 insight, each living Adept automatically becomes its matching Master and fully
 heals. Relative to that path’s Adept, size/collision ×1.2, movement ×1.1, ordinary
 attack damage ×1.2 (nearest integer), maximum HP ×1.4. No resource or supply cost,
-research or attack-rate change; War Masters halve Throw Sword cooldown to 20 seconds and Wind Masters gain a second Dash charge; no repeat advancement. Master HP is
-161 (Wind/Magic) or 189 (War). See [Master rules and review](dao-masters.md).
+research or attack-rate change; War Masters halve Throw Sword cooldown to 20 seconds and Wind Masters gain a second Dash charge; no repeat advancement. Adept maximum HP is 150 (Wind/Magic) or 176 (War), a 30% increase rounded to
+whole HP; Novices remain at 115 HP. Master HP follows the existing ×1.4 advancement
+multiplier after Adept rounding: 210 (Wind/Magic) or 246 (War). See [Master rules and review](dao-masters.md).
 
 ### Shop goods
 

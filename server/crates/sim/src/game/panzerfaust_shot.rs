@@ -154,6 +154,7 @@ fn resolve(
             shot.target,
             shot.owner,
             damage,
+            config::PANZERFAUST_DAMAGE,
             config::PANZERFAUST_ARMOR_PENETRATION,
             source_pos,
             teams,

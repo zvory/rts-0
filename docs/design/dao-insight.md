@@ -9,7 +9,7 @@ entity-owned intent is independent of orders: moving, attacking, Stop, and queue
 do not cancel it. No automatic research purchase, Portal default, or army-wide promotion
 is added. Evolution is immediate and free once the unit has 60 insight, capped at 60; misses, friendly fire, invulnerability and overkill grant
 no extra insight. Actual hostile unit HP loss grants cost-weighted insight as specified below; building HP loss grants a fixed quarter rate. Ordinary attacks and eligible ability projectiles share this rule; Throw Sword grants no insight. Advancement clears all existing insight. Successful advancement fully restores HP to the evolved unit’s maximum,
-after applying any path-specific maximum-HP bonus. Base, Wind, and Magic have 115 maximum HP; War has 135. Base moves at 2.0 px/tick; War and Magic move at 2.1 px/tick. Choosing a pending path or repeating
+after applying any path-specific maximum-HP bonus. Novices have 115 maximum HP; Wind and Magic Adepts have 150; War Adepts have 176. Base moves at 2.0 px/tick; War and Magic move at 2.1 px/tick. Choosing a pending path or repeating
 an evolution request does not heal; dead units cannot advance. One chosen-path evolution per unit, followed by one automatic Master advancement. Player research persists after Pavilion loss.
 The choice clears on evolution; evolved units cannot change paths. Pending choices persist
 through checkpoints and are visible only to teammates and privileged observers. The command
@@ -35,7 +35,7 @@ checkpoints; evolution immediately removes the speed benefit.
 - Wind: mobile melee skirmisher; 1.15 times scout-car base speed (2.7025 px/tick), 1.5 attacks per original attack
   interval (cooldown divided by 1.5), fifteen-tile Dash without a return recast.
   Uses a sword at the base Disciple’s 0.75-tile reach, dealing the same 23 damage with 50% armor penetration and a 61-tick cooldown. Plain Move keeps its destination while striking legal targets within melee reach. Explicit Attack and automatic melee pursuit also retain their current approach path while striking; the approach still ends at sword reach, so a fleeing target can cause short stop/repath cycles as it leaves range; automatic Idle/Attack Move retains five-tile acquisition and closes to sword reach. Dash reaches fifteen tiles; Ekat retains five tiles and its optional return. Wind charge and recharge rules are described below. The old archer source and strip are preserved for reuse. Selected candidate B uses a thin katana and a single shoulder scarf: resting close to the back at idle, trailing while running, and following four melee swing poses. Classic evolution key L; grid Z.
-- War: armored melee damage dealer; 1.05 times base movement speed (2.1 px/tick), 1.5 damage, +20 maximum HP, 50% armor
+- War: armored melee damage dealer; 1.05 times base movement speed (2.1 px/tick), 1.5 damage, +26 maximum HP relative to the other Adepts, 50% armor
   reduction using the existing penetration mechanic (full AP bypasses it), keeps the Disciple's existing
   50% armor penetration. Uses the approved larger armored candidate B Yari silhouette, with idle, two walking poses and four thrust poses. Its sprite scale is 0.56, halfway from the former 0.8 toward the base Disciple’s 0.32. The collision/interaction circle shrinks by the same 30%, from 13.5 to 18.2 world pixels. Its 1.75-tile weapon range plus that radius and four-pixel range slack matches the smaller spear. Vehicle hulls and building footprints retain their existing contact geometry. The 400 ms attack clip anticipates, drives, extends and recovers, with a smooth 11.2-world-pixel presentation-only forward step; collision, authoritative position and damage timing do not move with the artwork. Classic W; grid X.
 - Magic: battlefield support; 1.05 times base movement speed (2.1 px/tick), shared Ekat pull field (renamed Anchor), with doubled inward pull (0.70 movement-speed idle drag and up to 1.70x movement toward its center; radial falloff and weight resistance still apply) and a new Shield, uses the approved Magic C hooded spellcaster, with arms swept backward and flowing mantle while running. Its five-tile orbs deal the same 23 damage with 50% armor penetration and 91-tick cooldown. It stops to fire normally and has no secondary sword. Classic C; grid C. All three Dao silhouettes replace their legacy glyphs; insight, readiness and advancement overlays remain. Bespoke audio remains deferred.
@@ -60,28 +60,31 @@ see the unit radiance, with ordinary fog filtering. Realm advancement projects a
 (half-second) expanding gold corona reaching about one tile, independently of insight privacy.
 
 Magic Disciples can place Shield within five tiles: a shimmering circle with a
-2.1-tile radius (30% smaller than Anchor), covering allied units (including the caster). One shared pool
-absorbs up to 150 hostile damage after normal armor/terrain reductions; overflow damages the
-unit, and depletion removes the field immediately. Protection requires an attack originating
-outside the field and hitting an allied unit inside; attacks from within bypass it.
-Each attack's armor-penetration percentage passes through to the unit; the remaining percentage
-drains shield HP. For example, a 50% piercing hit splits damage equally between unit and shield,
-while a 100% piercing hit bypasses the pool entirely. The protected portion rounds down to whole HP,
-with the remainder reaching the unit. Overlapping fields share only the non-penetrating portion,
-so they cannot reduce the guaranteed penetration. This applies to primary weapons, Throw Sword,
-Line Shot, and area damage using each damage component's own penetration (tank HE splash is non-piercing).
-Mortar/rocket and artillery checks use the recorded firing position, which survives attacker death and checkpoint restore.
-Friendly fire, environmental damage,
-buildings, invulnerable targets and enemy units do not consume the pool. Overlapping
-fields consume pools in stable caster-id order. Shield costs no resources, has a ten-second
+2.1-tile radius (30% smaller than Anchor), covering allied units (including the caster).
+The field has 150 HP and grants a separate 75% armor layer against hostile attacks entering
+from outside; attacks originating inside bypass its armor and do not drain its HP. Existing
+unit armor, facing, cover, and terrain reductions apply first. Shield armor then uses the ordinary
+armor-penetration formula: `damage × (1 − 0.75 × (1 − penetration))`, rounded to the nearest HP.
+An otherwise 100-damage hit deals 25 HP at 0% piercing, 63 HP at 50% piercing, and 100 HP at
+100% piercing. Regardless of piercing or the unit's defenses, the shield loses the attack's full
+pre-reduction damage (area hits use their distance-falloff damage). Even fully piercing hits drain it.
+A field active at impact protects the entire hit, including the hit that depletes it; excess durability
+cost does not become damage to the unit. Depletion removes the field immediately for later hits.
+Overlapping fields never multiply armor or charge the same hit twice: the first eligible field in
+stable caster-id order supplies the armor and pays the full hit, even when that hit breaks it.
+This applies to direct weapons, Throw Sword (per leg), Line Shot, and each area-damage victim;
+tank HE splash is non-piercing. Mortar/rocket and artillery checks use recorded firing positions,
+which survive attacker death and checkpoint restore. Friendly fire, environmental damage,
+buildings, invulnerable targets, and enemy units receive no shield armor and do not drain it.
+Shield costs no resources, has a ten-second
 cooldown, replaces the caster’s prior shield, and expires after 5 seconds or earlier on
 depletion, replacement, or caster death. In-range casts preserve movement and queued orders;
 out-of-range immediate casts replace the current order with an approach-and-cast order. The pool, fixed world center, and absolute expiry tick live on the caster entity and survive
 checkpoints; the existing ability-runtime allocator supplies its unique visual id.
 All visible viewers see a gray lifetime bar on a black background at the top of the field,
 six pixels below its HP-bar position. It drains from full to empty using the server-provided
-remaining ticks and the mirrored 5-second duration, independently of damage absorption.
-All visible viewers see the field; owner/privileged viewers receive its remaining pool.
+remaining ticks and the mirrored 5-second duration, independently of damage received.
+All viewers who can see the field receive its remaining HP, including enemies and allies.
 
 Lab commands continue to use the selected owner’s faction and research. A Disciple
 spawned for a Kriegsia player can move but cannot evolve; the Dao preview’s P2 is

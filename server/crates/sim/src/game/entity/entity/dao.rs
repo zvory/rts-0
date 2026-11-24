@@ -194,9 +194,11 @@ impl Entity {
         if self.dao() != Some(UpgradeKind::DaoOfHeaviness) {
             return damage;
         }
-        ((damage as f32)
-            * (1.0 - config::DAO_WAR_ARMOR_REDUCTION * (1.0 - penetration.clamp(0.0, 1.0))))
-        .round() as u32
+        crate::rules::combat::damage_after_armor_reduction(
+            damage,
+            config::DAO_WAR_ARMOR_REDUCTION,
+            penetration,
+        )
     }
 
     pub(in crate::game) fn try_start_novice_charge(
