@@ -443,12 +443,15 @@ pub(in crate::game) fn combat_system(
                             + e.radius()
                             + RANGE_SLACK
             });
-        // Lightness may finish its approach while striking; the pursuit goal still
-        // stops at melee reach, and is refreshed when the target leaves that reach.
-        let lightness_moving_attack = entities
-            .get(id)
-            .is_some_and(|e| e.kind == EntityKind::LightnessAdept)
-            && (commanded_direct_target || auto_pursuit);
+        // Lightness may finish its melee approach while striking. An Attack Move's
+        // original travel route must still stop for an in-range engagement.
+        let lightness_moving_attack = entities.get(id).is_some_and(|e| {
+            e.kind == EntityKind::LightnessAdept
+                && (commanded_direct_target
+                    || (auto_pursuit
+                        && e.path_goal()
+                            .is_some_and(|goal| Some(goal) != e.move_intent())))
+        });
         if commanded_direct_target
             && !lightness_moving_attack
             && clear_shot

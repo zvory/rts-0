@@ -615,16 +615,22 @@ fn war_smaller_body_controls_attack_boundary() {
 
 #[test]
 fn lightness_strikes_without_canceling_its_melee_approach() {
-    for attack_move in [false, true] {
-        for kind in [EntityKind::LightnessAdept, EntityKind::Warrior, EntityKind::MagicAdept] {
+    for order_name in ["Attack", "AttackMove", "Idle"] {
+        for kind in [
+            EntityKind::LightnessAdept,
+            EntityKind::Warrior,
+            EntityKind::MagicAdept,
+        ] {
             let mut entities = EntityStore::new();
             let attacker = entities.spawn_unit(1, kind, 100.0, 100.0).unwrap();
-            let target = entities.spawn_unit(2, EntityKind::ScoutCar, 145.0, 100.0).unwrap();
+            let target = entities
+                .spawn_unit(2, EntityKind::ScoutCar, 145.0, 100.0)
+                .unwrap();
             let unit = entities.get_mut(attacker).unwrap();
-            unit.set_order(if attack_move {
-                Order::attack_move_to(400.0, 100.0)
-            } else {
-                Order::attack(target)
+            unit.set_order(match order_name {
+                "Attack" => Order::attack(target),
+                "AttackMove" => Order::attack_move_to(400.0, 100.0),
+                _ => Order::Idle,
             });
             // An existing legal approach ends inside melee range of the vehicle hull.
             unit.set_path(vec![(110.0, 100.0)]);
@@ -633,8 +639,11 @@ fn lightness_strikes_without_canceling_its_melee_approach() {
             run_combat_tick(&mut entities);
             assert!(entities.get(target).unwrap().hp < hp_before);
             let unit = entities.get(attacker).unwrap();
-            assert_eq!(unit.path_is_empty(), kind != EntityKind::LightnessAdept,
-                "{kind:?}, attack_move={attack_move}");
+            assert_eq!(
+                unit.path_is_empty(),
+                kind != EntityKind::LightnessAdept,
+                "{kind:?}, order={order_name}"
+            );
             if kind == EntityKind::LightnessAdept {
                 assert_eq!(unit.path_goal(), Some((110.0, 100.0)));
                 run_movement_tick_on_map(&mut entities, &open_map(32), 1);
@@ -642,4 +651,30 @@ fn lightness_strikes_without_canceling_its_melee_approach() {
             }
         }
     }
+}
+
+#[test]
+fn lightness_attack_move_stops_its_travel_route_to_engage() {
+    let mut entities = EntityStore::new();
+    let attacker = entities
+        .spawn_unit(1, EntityKind::LightnessAdept, 100.0, 100.0)
+        .unwrap();
+    let target = entities
+        .spawn_unit(2, EntityKind::Rifleman, 125.0, 100.0)
+        .unwrap();
+    let destination = (400.0, 100.0);
+    let unit = entities.get_mut(attacker).unwrap();
+    unit.set_order(Order::attack_move_to(destination.0, destination.1));
+    unit.set_path(vec![destination]);
+    unit.set_path_goal(Some(destination));
+
+    let hp_before = entities.get(target).unwrap().hp;
+    run_combat_tick(&mut entities);
+    assert!(entities.get(target).unwrap().hp < hp_before);
+    let unit = entities.get(attacker).unwrap();
+    assert!(
+        unit.path_is_empty(),
+        "the travel route is not a melee approach"
+    );
+    assert_eq!(unit.move_intent(), Some(destination));
 }
