@@ -219,7 +219,9 @@ branch, self-play, dev, match-history, and post-match paths. Fixture-only and
 reserved/future ids must not inherit Kriegsia economy behavior or appear in product selectors just
 because their catalog rows are dumpable.
 The playable `cultivators` catalog reuses Resource Depot (displayed as Nexus), Worker (displayed as Serf),
-Steel Mine and Oil Pumpjack, with Nexus, Portal, and Three Dao Pavilion available for Serf construction. Its
+Steel Mine and Oil Pumpjack, with Nexus, Pump Jack, Portal, Three Dao Pavilion, Tournament Grounds,
+Proving Grounds, and Shop available for Serf construction. Serfs construct Pump Jacks on Oil patches
+for 150 Steel in 300 ticks (10 seconds), using the existing extractor placement and mining rules. Its
 `cultivators.standard` loadout matches Kriegsia's starting economy and replaces the starting Riflemen with one completed Disciple.
 Cultivator Serfs can also construct the faction-specific Portal for 150 Steel: it has a 3x3
 footprint, 123 HP, one tile of sight, a five-second construction time, no prerequisite, and no
@@ -759,7 +761,7 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 | steelworks                 | Gun Works          | 120 | 1     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team immediately, Anti-Tank Guns after ever owning a completed Engineering Complex (temporary hack), Artillery after Artillery research, and Rocket Trucks after Rockets research; requires a Resource Depot and Training Centre |
 | tank_trap                  | Tank Trap          | 72 | 0     | 20 steel + 0 oil | 1x1  | 150       | engineer-built vehicle obstacle available from the worker build card after a completed Training Centre; A-clicking a visible or remembered completed trap creates a four-tile clear-area Attack Move objective whose actionable traps outrank ordinary enemies; workers deconstruct completed traps in 75 ticks and refund the cost to the deconstructing player; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, no fog reveal, not an elimination building |
 | steel_mine                 | Steel Mine         | 37  | 1     | 0 | 1x1  | 720       | free permanent Resource Depot background job on in-range Steel patches; mines 2 steel per 40 ticks; unarmored, immobile, no trains, no supply, and no weapon |
-| pump_jack                  | Pump Jack          | 56  | 1     | 150 steel | 1x1  | 300      | manual Engineer construction; also a free 1080-tick permanent Resource Depot background job on in-range Oil patches; mines 2 oil per 40 ticks; unarmored, immobile, no trains, no supply, no weapon, and does not block shots or line of sight |
+| pump_jack                  | Pump Jack          | 56  | 1     | 150 steel | 1x1  | 300      | manual Engineer or Serf construction; also a free 1080-tick permanent Resource Depot background job on in-range Oil patches; mines 2 oil per 40 ticks; unarmored, immobile, no trains, no supply, no weapon, and does not block shots or line of sight |
 
 Win: a player is **eliminated** when they own zero elimination-counting buildings; units and
 Tank Traps alone do not keep them alive. Last player standing wins; a 1-player match never ends

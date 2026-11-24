@@ -820,6 +820,7 @@ pub const CULTIVATORS_CATALOG: FactionCatalog = FactionCatalog {
     ],
     buildables: &[
         EntityKind::ResourceDepot,
+        EntityKind::PumpJack,
         EntityKind::Portal,
         EntityKind::ThreeDaoPavilion,
         EntityKind::TournamentGrounds,
@@ -1370,6 +1371,7 @@ mod tests {
             catalog.buildables,
             &[
                 EntityKind::ResourceDepot,
+                EntityKind::PumpJack,
                 EntityKind::Portal,
                 EntityKind::ThreeDaoPavilion,
                 EntityKind::TournamentGrounds,
