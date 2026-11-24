@@ -61,11 +61,17 @@ see the unit radiance, with ordinary fog filtering. Realm advancement projects a
 
 Magic Disciples can place Shield within five tiles: a shimmering circle with a
 2.1-tile radius (30% smaller than Anchor), covering allied units (including the caster). One shared pool
-absorbs 150 non-piercing hostile damage after normal armor/terrain reductions; overflow damages the
-unit, and depletion removes the field immediately. Any attack with positive armor penetration
-bypasses the shield without consuming its pool, including tank cannon hits and splash, anti-tank
-guns, Panzerfausts, Dao primary attacks, and piercing artillery/rocket impact cores.
-Throw Sword, Line Shot, and non-piercing area falloff remain absorbable. Friendly fire, environmental damage,
+absorbs up to 150 hostile damage after normal armor/terrain reductions; overflow damages the
+unit, and depletion removes the field immediately. Protection requires an attack originating
+outside the field and hitting an allied unit inside; attacks from within bypass it.
+Each attack's armor-penetration percentage passes through to the unit; the remaining percentage
+drains shield HP. For example, a 50% piercing hit splits damage equally between unit and shield,
+while a 100% piercing hit bypasses the pool entirely. The protected portion rounds down to whole HP,
+with the remainder reaching the unit. Overlapping fields share only the non-penetrating portion,
+so they cannot reduce the guaranteed penetration. This applies to primary weapons, Throw Sword,
+Line Shot, and area damage using each damage component's own penetration (tank HE splash is non-piercing).
+Mortar/rocket and artillery checks use the recorded firing position, which survives attacker death and checkpoint restore.
+Friendly fire, environmental damage,
 buildings, invulnerable targets and enemy units do not consume the pool. Overlapping
 fields consume pools in stable caster-id order. Shield costs no resources, has a ten-second
 cooldown, replaces the caster’s prior shield, and expires after 5 seconds or earlier on

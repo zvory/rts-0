@@ -155,6 +155,7 @@ fn resolve(
             shot.owner,
             damage,
             config::PANZERFAUST_ARMOR_PENETRATION,
+            source_pos,
             teams,
         );
         let damaged = entities.get_mut(shot.target).is_some_and(|target| {

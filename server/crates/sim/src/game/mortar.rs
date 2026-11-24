@@ -364,6 +364,7 @@ fn resolve(context: MortarResolutionContext<'_>, shell: &MortarShell) {
             shell.owner,
             effective,
             u8::from(piercing_hit) as f32,
+            (shell.from_x.to_world(), shell.from_y.to_world()),
             teams,
         );
         if effective == 0 {

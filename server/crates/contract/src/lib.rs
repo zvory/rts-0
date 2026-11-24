@@ -650,6 +650,7 @@ pub struct AbilityObjectView {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub source_caster_id: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    /// Owner/observer state, except visible Shield HP/radius are public to all viewers.
     pub owner_state: Option<AbilityObjectOwnerStateView>,
 }
 
