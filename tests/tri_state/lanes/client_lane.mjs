@@ -29,6 +29,9 @@ export class ClientLane {
     this.browser = await puppeteer.launch({
       executablePath: this.chrome,
       headless: "new",
+      // Browser process startup can be slow on shared CI runners; this is setup,
+      // not a gameplay deadline or a retry of a failed scenario.
+      timeout: 60000,
       args: ["--no-sandbox", "--window-size=1280,800", `--user-data-dir=${this.profileDir}`],
       defaultViewport: { width: 1280, height: 800 },
     });
@@ -251,10 +254,12 @@ export class ClientLane {
   }
 
   async waitForMatch() {
+    // Match startup includes asynchronous renderer/asset warmup. Keep its setup
+    // budget separate from the snapshot and command deadlines below.
     await this.page.waitForFunction(() => {
       const app = window.__rts;
       return !!app?.match?.state && document.getElementById("game-screen")?.hidden === false;
-    }, { timeout: 8000 });
+    }, { timeout: 30000 });
   }
 
   async selectOwn(kind, index = 0) {

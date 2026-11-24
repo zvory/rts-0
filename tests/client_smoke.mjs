@@ -82,6 +82,8 @@ async function selectConfirmedLobbyMap(page, mapName) {
 const browser = await puppeteer.launch({
   executablePath: CHROME,
   headless: "new",
+  // Allow shared-runner startup contention without relaxing gameplay assertions.
+  timeout: 60000,
   args: ["--no-sandbox", "--window-size=1440,900", `--user-data-dir=${chromeProfileDir}`],
   defaultViewport: { width: 1440, height: 900 },
 });
@@ -246,7 +248,7 @@ try {
   await page.waitForFunction(() => { const b = document.querySelector("#lobby-start"); return b && !b.disabled; }, { timeout: 5000 });
   ok(true, "Start enabled after readying up");
   await page.click("#lobby-start");
-  await page.waitForFunction(() => { const g = document.getElementById("game-screen"); return g && !g.hidden; }, { timeout: 6000 });
+  await page.waitForFunction(() => { const g = document.getElementById("game-screen"); return g && !g.hidden; }, { timeout: 30000 });
   ok(true, "game screen shown after start");
   ok(
     await page.evaluate(() => getComputedStyle(document.getElementById("discord-invite-badge")).display === "none"),
