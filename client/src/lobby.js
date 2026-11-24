@@ -145,6 +145,7 @@ export class Lobby {
     this._spectator = false;
     this._hostId = null;
     this._canStart = false;
+    this._tabTitleBeforeReady = null;
     this._roomKind = LOBBY_KIND.NORMAL;
     this._teamPreset = "custom";
     this._selectedMap = "";
@@ -203,6 +204,8 @@ export class Lobby {
     };
     this._onClose = () => {
       this._browserConnected = false;
+      this._canStart = false;
+      this._reflectStartButton();
       if (this._joined || this._browserActionPending) {
         this._browserActionPending = false;
         this._renderLobbyBrowser({ error: "Disconnected." });
@@ -217,6 +220,8 @@ export class Lobby {
     this._onNameChange = () => this._flushNameUpdate();
     this._onBrowserActivity = () => this._noteLobbyBrowserActivity();
     this._onBrowserVisibilityChange = () => {
+      this._updateTabTitle();
+      if (!this._browserAutoRefreshEnabled) return;
       if (document.hidden) {
         this._stopLobbyBrowserAutoRefresh({ cancelRequest: true });
         return;
@@ -239,6 +244,7 @@ export class Lobby {
   show() {
     const enteringBrowser = !this._browserActivityTracking || !!this.root.hidden;
     this.root.hidden = false;
+    this._updateTabTitle();
     this._browserActivityTracking = true;
     this._renderLobbyBrowser();
     if (
@@ -253,6 +259,7 @@ export class Lobby {
   /** Hide the lobby screen (main.js reveals the game screen). */
   hide() {
     this.root.hidden = true;
+    this._updateTabTitle();
     this.mapSelector?.close();
     this._browserActivityTracking = false;
     this._stopLobbyBrowserAutoRefresh({ cancelRequest: true });
@@ -527,15 +534,18 @@ export class Lobby {
   }
 
   _wireLobbyBrowserActivity() {
-    if (!this._browserAutoRefreshEnabled || typeof document === "undefined") return;
+    if (typeof document === "undefined") return;
+    document.addEventListener("visibilitychange", this._onBrowserVisibilityChange);
+    if (!this._browserAutoRefreshEnabled) return;
     for (const eventName of LOBBY_BROWSER_ACTIVITY_EVENTS) {
       document.addEventListener(eventName, this._onBrowserActivity, { passive: true });
     }
-    document.addEventListener("visibilitychange", this._onBrowserVisibilityChange);
   }
 
   /** Tear down listeners (not normally needed for a single-screen lifetime). */
   destroy() {
+    this._canStart = false;
+    this._updateTabTitle();
     this.net.off(S.LOBBY, this._onLobby);
     this.net.off(S.MATCH_COUNTDOWN, this._onMatchCountdown);
     this.net.off(S.START, this._onStart);
@@ -549,6 +559,8 @@ export class Lobby {
       for (const eventName of LOBBY_BROWSER_ACTIVITY_EVENTS) {
         document.removeEventListener(eventName, this._onBrowserActivity);
       }
+    }
+    if (typeof document !== "undefined") {
       document.removeEventListener("visibilitychange", this._onBrowserVisibilityChange);
     }
     this._stopLobbyBrowserAutoRefresh({ cancelRequest: true });
@@ -655,11 +667,27 @@ export class Lobby {
 
   /** Enable Start only for the host and only when the server says the match can start. */
   _reflectStartButton() {
+    this._updateTabTitle();
     if (!this.btnStart) return;
     const isHost = this.net.playerId != null && this.net.playerId === this._hostId;
     this.btnStart.disabled = this._countdownActive || !(isHost && this._canStart);
     this.btnStart.classList.toggle("host-only", isHost);
     this.btnStart.textContent = this._isReplayLobby() ? "Start replay" : "Start match";
+  }
+
+  /** Alert an away host while the server says the lobby can start. */
+  _updateTabTitle() {
+    if (typeof document === "undefined") return;
+    const ready = document.hidden && !this.root.hidden && this._joined &&
+      !this._countdownActive && this._canStart &&
+      this.net.playerId != null && this.net.playerId === this._hostId;
+    if (ready) {
+      if (this._tabTitleBeforeReady == null) this._tabTitleBeforeReady = document.title;
+      document.title = "Lobby ready to start";
+    } else if (this._tabTitleBeforeReady != null) {
+      document.title = this._tabTitleBeforeReady;
+      this._tabTitleBeforeReady = null;
+    }
   }
 
   /** Reflect the local ready state on the Ready button (label + pressed style). */
@@ -879,6 +907,7 @@ export class Lobby {
 
   /** The server signaled match start: fire subscribers (main.js switches screens). */
   _handleStart() {
+    this._canStart = false;
     this._cancelNameUpdate();
     this._clearCountdown();
     this._hideReplayPrompt(false);
