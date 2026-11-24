@@ -227,7 +227,7 @@ fn disciple_insight_fraction_checkpoint_validation_and_evolution_reset() {
 }
 
 #[test]
-fn wind_insight_extractors_grant_full_actual_damage_other_buildings_quarter() {
+fn wind_insight_extractors_grant_ninety_percent_other_buildings_quarter() {
     for kind in [
         EntityKind::WindAdept,
         EntityKind::WarAdept,
@@ -252,11 +252,16 @@ fn wind_insight_extractors_grant_full_actual_damage_other_buildings_quarter() {
             let expected = if kind == EntityKind::MagicAdept {
                 0
             } else if kind == EntityKind::WindAdept && target.is_resource_extractor() {
-                12
+                10
             } else {
                 3
             };
             assert_eq!(unit.insight, expected, "{kind:?} against {target:?}");
+            if kind == EntityKind::WindAdept && target.is_resource_extractor() {
+                // Twelve HP earns 10.8; another eight earns 7.2, retaining every fraction.
+                unit.gain_insight(8, target);
+                assert_eq!((unit.insight, unit.insight_fraction), (18, 0));
+            }
         }
     }
 }
