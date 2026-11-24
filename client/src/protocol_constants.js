@@ -330,6 +330,9 @@ export const ABILITY = Object.freeze({
   HEALING_POTION: "healingPotion",
   HEALING_SEAL: "healingSeal",
   ESCAPE_TREASURE: "escapeTreasure",
+  HASTE: "haste",
+  DOUBLE_DAMAGE: "doubleDamage",
+  ARMOR_TREASURE: "armorTreasure",
 
 });
 
@@ -541,6 +544,9 @@ export const ORDER_STAGE = Object.freeze({
   HEALING_POTION: "healingPotion",
   HEALING_SEAL: "healingSeal",
   ESCAPE_TREASURE: "escapeTreasure",
+  HASTE: "haste",
+  DOUBLE_DAMAGE: "doubleDamage",
+  ARMOR_TREASURE: "armorTreasure",
 
   SETUP_ANTI_TANK_GUNS: "setupAntiTankGuns",
 });
@@ -575,6 +581,9 @@ export const ORDER_STAGE_CODE = Object.freeze({
   [ORDER_STAGE.THROW_SWORD]: 26,
   [ORDER_STAGE.HEALING_POTION]: 27,
   [ORDER_STAGE.HEALING_SEAL]: 30,
+  [ORDER_STAGE.HASTE]: 31,
+  [ORDER_STAGE.DOUBLE_DAMAGE]: 32,
+  [ORDER_STAGE.ARMOR_TREASURE]: 33,
   [ORDER_STAGE.ESCAPE_TREASURE]: 28,
 
 });
@@ -602,6 +611,9 @@ export const ABILITY_CODE = Object.freeze({
   [ABILITY.HEALING_POTION]: 19,
   [ABILITY.HEALING_SEAL]: 22,
   [ABILITY.ESCAPE_TREASURE]: 20,
+  [ABILITY.HASTE]: 23,
+  [ABILITY.DOUBLE_DAMAGE]: 24,
+  [ABILITY.ARMOR_TREASURE]: 25,
 
 });
 

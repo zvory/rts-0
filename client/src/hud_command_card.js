@@ -1,4 +1,4 @@
-import { itemSlotSignature, placeItemDescriptor } from "./hud_item_slot.js";
+import { itemSlotSignature, placeItemDescriptor, itemCooldownAffordances } from "./hud_item_slot.js";
 import { buildDaoTrainingCard } from "./hud_dao_training_card.js";
 import { ABILITY, DEFAULT_FACTION_ID, KIND, SETUP, UPGRADE, isBuilding, isUnit } from "./protocol.js";
 import {
@@ -299,6 +299,7 @@ export function buildUnitCard(ctx, selection) {
     .map((e) => e.id);
   const setupWeapons = ownUnits.filter((e) => setupGunIds.includes(e.id));
   const abilityAffordances = selectedAbilityAffordances(ctx, ownUnits);
+  const clocks = [...abilityAffordances, ...itemCooldownAffordances(ownUnits, ctx.groupCooldownClocks)];
   const hasArmyUnit = ownUnits.some((e) => e.kind !== KIND.WORKER);
   const workerSelected = !hasArmyUnit && ownUnits.some((e) => e.kind === KIND.WORKER);
   const signature =
@@ -318,8 +319,8 @@ export function buildUnitCard(ctx, selection) {
 
   if (workerSelected) {
     const slots = workerCommandSlots(ctx, unitIds, factionId);
-    placeItemDescriptor(slots, ownUnits, factionId);
-    return card("unit", signature, slots, { abilityAffordances });
+    placeItemDescriptor(slots, ownUnits, factionId, ctx.groupCooldownClocks);
+    return card("unit", signature, slots, { abilityAffordances: clocks });
   }
 
   const slots = new Array(9).fill(null);
@@ -331,7 +332,7 @@ export function buildUnitCard(ctx, selection) {
   }
 
   placeAbilityDescriptors(ctx, slots, abilityAffordances, factionId);
-  placeItemDescriptor(slots, ownUnits, factionId);
+  placeItemDescriptor(slots, ownUnits, factionId, ctx.groupCooldownClocks);
 
   if (setupGunIds.length > 0) {
     const setupSlot = GRID_HOTKEYS.indexOf("Z");
@@ -342,7 +343,7 @@ export function buildUnitCard(ctx, selection) {
 
   if (!slots[7] && ownUnits.some((e) => e.kind === KIND.TANK)) slots[7] = pointTanksDescriptor(ctx);
 
-  return card("unit", signature, slots, { abilityAffordances });
+  return card("unit", signature, slots, { abilityAffordances: clocks });
 }
 
 function abilitySlotPriority(definition) {
@@ -356,10 +357,11 @@ function abilityCostForCarriers(definition, carriers) {
 
 function placeAbilityDescriptors(ctx, slots, abilityAffordances, factionId) {
   const ordered = [...abilityAffordances].sort((left, right) =>
-    abilitySlotPriority(left.definition) - abilitySlotPriority(right.definition));
+    Number(left.definition.ability === ABILITY.CHARGE) - Number(right.definition.ability === ABILITY.CHARGE)
+    || abilitySlotPriority(left.definition) - abilitySlotPriority(right.definition));
   for (const affordance of ordered) {
     const definition = affordance.definition;
-    const preferred = definition.ability === ABILITY.CHARGE ? 10 : GRID_HOTKEYS.indexOf(definition.hotkey);
+    const preferred = definition.ability === ABILITY.CHARGE ? slots.findIndex((slot) => !slot) : GRID_HOTKEYS.indexOf(definition.hotkey);
     if (preferred < 0 || (slots[preferred] && slots[preferred].action !== "ability")) continue;
     // Higher priority wins.
     slots[preferred] = abilityDescriptor(ctx, factionId, affordance);

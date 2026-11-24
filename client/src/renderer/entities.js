@@ -12,7 +12,7 @@ import {
   ANTI_TANK_GUN_FIELD_OF_FIRE_RAD,
   isProducerBuilding,
 } from "../config.js";
-import { isDiscipleKind, KIND, SETUP, STATE, isBuilding, isResource } from "../protocol.js";
+import { isDiscipleKind, ABILITY, KIND, SETUP, STATE, isBuilding, isResource } from "../protocol.js";
 import { buildingProgressStatus } from "./entity_state.js";
 import {
   DEPLOYED_WEAPON_ANIM_MS,
@@ -175,7 +175,7 @@ export function _drawSelectionAndHp(e, selection, state, ownerColor = null) {
   }
 
   const showHp = !!progressStatus || (hasHealth && (damaged || selected || alwaysShow));
-  if (showHp || e.escapeTreasure) {
+  if (showHp || e.escapeTreasure || hasCategoryItem(e)) {
     const g = this._hpBarSlot(e.id);
     this._hpBar(g, e, progressStatus, ownerColor, showHp);
   }
@@ -189,7 +189,7 @@ export function _drawAboveFogHp(e, state, ownerColor = null) {
   if (e?.aboveFogReveal !== true && e?.visionOnly !== true) return;
   if (!hasHealth) return;
   const showHp = damaged || !!state?.showHealthBarsAlwaysEnabled || isDiscipleKind(e.kind);
-  if (!showHp && !e.escapeTreasure) return;
+  if (!showHp && !e.escapeTreasure && !hasCategoryItem(e)) return;
   const g = this._hpBarSlot(e.id, "aboveFogHpBars");
   this._hpBar(g, e, null, ownerColor, showHp);
 }
@@ -250,6 +250,41 @@ export function _ringRadius(e) {
   }
   const r = (entityBodyRadius(e) || 9) + 6;
   return { rx: r, ry: r * 0.68, cy: r * 0.36 };
+}
+
+const CATEGORY_ITEM_BADGES = Object.freeze([
+  { ability: ABILITY.ARMOR_TREASURE, label: "AR", color: 0x58ccec },
+  { ability: ABILITY.HASTE, label: "H", color: 0xffda52 },
+  { ability: ABILITY.DOUBLE_DAMAGE, label: "2X", color: 0xff704f },
+]);
+
+function hasCategoryItem(entity) {
+  return !isBuilding(entity.kind) && entity.abilities?.some((entry) =>
+    CATEGORY_ITEM_BADGES.some((item) => item.ability === entry.ability));
+}
+
+function drawCategoryItemBadges(container, entity, topY) {
+  for (const [index, item] of CATEGORY_ITEM_BADGES.entries()) {
+    const entry = !isBuilding(entity.kind) && entity.abilities?.find((value) => value.ability === item.ability);
+    const key = `rtsItem${index}`;
+    let badge = container[key];
+    if (entry && !badge) {
+      badge = new PIXI.Text({ text: item.label, style: {
+        fontFamily: "monospace", fontSize: 9, fontWeight: "bold", fill: item.color,
+        stroke: { color: 0x101019, width: 3 },
+      } });
+      badge.anchor.set(0.5);
+      container[key] = badge;
+      container.addChild(badge);
+    }
+    if (!badge) continue;
+    badge.visible = !!entry;
+    if (!entry) continue;
+    // An asterisk and full opacity distinguish active effects from carried goods.
+    badge.text = `${item.label}${entry.cooldownLeft > 0 ? "*" : ""}`;
+    badge.alpha = entry.cooldownLeft > 0 ? 1 : 0.65;
+    badge.position.set(index === 0 ? -12 : 12, entity.y - topY + 13);
+  }
 }
 
 export function _hpBar(g, e, status = null, ownerColor = null, showHp = true) {
@@ -315,6 +350,8 @@ export function _hpBar(g, e, status = null, ownerColor = null, showHp = true) {
     g.rtsEscape.position.set(0, e.y - topY);
   }
 
+
+  drawCategoryItemBadges(g, e, topY);
 
   let color = Number.isFinite(ownerColor)
     ? ownerColor

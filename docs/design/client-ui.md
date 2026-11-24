@@ -2960,13 +2960,20 @@ Masters have no further insight meter. See [Master review spec](dao-masters.md).
 
 Novice Charge uses a passive command-card descriptor: always disabled, with the autocast swirl
 and server-projected cooldown clocks. Passive descriptors have no primary/context action or hotkey
-and are excluded from the hotkey command catalog. Charge occupies logical slot 10 in the fourth
-column so mixed selections retain Wind Dash and Throw Sword. Evolution removes the Novice-only tile.
+and are excluded from the hotkey command catalog. Charge uses an empty ordinary slot after active commands are placed. Full mixed cards omit
+the passive tile so active commands and the item column retain their positions. Evolution removes the Novice-only tile.
 
 ### Cultivator item slot
 
-Cultivator unit command cards reserve the fourth-column R slot (logical slot 9) for a single
-carried item, including Serfs. Empty inventories leave it blank. Escape Treasure shows Escape
+Cultivator unit command cards reserve the fourth column for movement at R (logical slot 9),
+defense at F (10), and attack at V (11), including Serfs. Allied deliveries expose the same
+carried-item commands on other factions’ units. Empty categories stay blank.
+Escape is movement; Armor Treasure is defense; Haste and Double Damage share attack.
+Ready items activate immediately, consume once, and show an active highlight and a 30-second
+remaining-duration clock. Mixed attack selections expose a ready type before an already active
+type. Healing Potion and Healing Seal are immediate Shop defense goods.
+Colored placeholder badges show AR (cyan), H (yellow), or 2X (orange); an asterisk marks an
+active buff. Badges use authorized projected ability state and never appear on Shops. Escape Treasure shows Escape
 with a purple autocast border by default; R activates immediately, and right-click/Alt+R toggles
 lethal-damage autocast. The carried-item command has its own hotkey identity,
 `cultivators.item.escape`, separate from the Shop purchase. The unit badge is centered and twice
