@@ -150,12 +150,12 @@ Unit HP damage earns insight at target value / attacker value, clamped to 0.5–
 Use the current unit kind's listed cost regardless of acquisition route; omit research,
 infrastructure, supply, and rank bonuses. Novice value is 100; all Adepts are 237.5.
 Zero-cost targets receive the 0.5 floor. Buildings always give 0.25 insight per actual
-hostile HP lost, bypassing cost scaling, except Wind (Dao of Lightness) earns 0.9 insight per actual hostile HP removed from Pumpjacks and Steel Mines. This includes damage before the killing blow; overkill grants nothing. There is no killing-blow bonus, and Throw Sword
+hostile HP lost, bypassing cost scaling, except Wind (Dao of Lightness) earns one insight per actual hostile HP removed from Pumpjacks and Steel Mines. This includes damage before the killing blow; overkill grants nothing. There is no killing-blow bonus, and Throw Sword
 continues to grant no insight. Magic Adepts gain no attack insight against units or buildings. Existing shield, armor, hostility, and overkill rules apply.
 
 Arithmetic is exact integer arithmetic: weighted value W = 2 × steel + 5 × oil;
 the denominator is 4 × attacker W, and the numerator is clamp(4 × target W,
-2 × attacker W, 8 × attacker W), or attacker W for ordinary buildings. Wind extractor damage instead uses 90% of the denominator as its numerator (1710 / 1900 at the listed Wind cost). Fractional numerators carry
+2 × attacker W, 8 × attacker W), or attacker W for ordinary buildings. Wind extractor damage instead uses the full denominator as its numerator (one insight per HP). Fractional numerators carry
 between hits and target changes, persist in checkpoints, and remain server-private.
 At the insight cap, evolution, or Master advancement, discard the remainder alongside
 any excess insight. Masters earn no further insight. This preserves small-hit rewards
@@ -164,8 +164,8 @@ without rounding down each attack or introducing floating-point replay drift.
 
 ## Magic support insight
 
-Magic Adepts earn 60 insight for consuming a full Shield: credit is proportional to actual
-durability spent, with whole insight computed from cumulative consumption (60 / 150 HP).
+Magic Adepts earn 90 insight for consuming a full Shield: credit is proportional to actual
+durability spent, with whole insight computed from cumulative consumption (90 / 150 HP).
 The shield pool preserves fractional progress across hits and checkpoints. Overkill, expiry,
 replacement, and caster death grant no bonus; partial shields grant only their consumed share.
 Piercing hits still earn support insight because they drain durability. The normal shield

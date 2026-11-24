@@ -630,7 +630,7 @@ fn magic_support_insight_shield_tracks_consumption_across_checkpoint_and_caps() 
             .entities
             .shielded_damage(caster, 2, 1, 1, 0.0, (0.0, 0.0), &teams);
     }
-    assert_eq!(game.state.entities.get(caster).unwrap().insight, 2);
+    assert_eq!(game.state.entities.get(caster).unwrap().insight, 4);
     let checkpoint = game.checkpoint_payload_text_for_test().unwrap();
     let mut game = Game::restore_checkpoint_payload_text_for_test(
         &checkpoint,
@@ -643,18 +643,18 @@ fn magic_support_insight_shield_tracks_consumption_across_checkpoint_and_caps() 
         .shielded_damage(caster, 2, 1000, 1000, 1.0, (0.0, 0.0), &teams);
     let unit = game.state.entities.get_mut(caster).unwrap();
     assert_eq!(
-        unit.insight, 60,
-        "full shield grants exactly 60 despite overkill"
+        unit.insight, 90,
+        "full shield grants exactly 90 despite overkill"
     );
     assert!(unit.shield.is_none());
     unit.place_shield(2, 400.0, 400.0, 0, 200, true);
     unit.expire_shield(200);
-    assert_eq!(unit.insight, 60, "expiration grants nothing");
+    assert_eq!(unit.insight, 90, "expiration grants nothing");
     unit.insight = 199;
     unit.gain_magic_insight(20);
     assert_eq!(unit.insight, 200);
     unit.advance_dao_master();
-    unit.gain_magic_insight(60);
+    unit.gain_magic_insight(90);
     assert_eq!(unit.insight, 0, "Masters gain nothing");
 }
 
