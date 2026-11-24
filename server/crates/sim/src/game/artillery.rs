@@ -16,6 +16,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct ArtilleryShell {
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    double_damage: bool,
     owner: u32,
     #[serde(default)]
     attacker: u32,
@@ -36,6 +38,7 @@ impl ArtilleryShellStore {
         self.shells.len()
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn schedule(
         &mut self,
         owner: u32,
@@ -44,6 +47,7 @@ impl ArtilleryShellStore {
         y: f32,
         source: (f32, f32),
         tick: u32,
+        double_damage: bool,
     ) {
         if !x.is_finite() || !y.is_finite() {
             return;
@@ -56,6 +60,7 @@ impl ArtilleryShellStore {
             x: Coord::from_world(x),
             y: Coord::from_world(y),
             impact_tick: tick.saturating_add(config::ARTILLERY_SHELL_DELAY_TICKS),
+            double_damage,
         });
     }
 
@@ -128,6 +133,11 @@ fn resolve_shell(
             continue;
         };
         let base = artillery_damage(d2, inner2, outer2);
+        let base = if shell.double_damage {
+            base.saturating_mul(2)
+        } else {
+            base
+        };
         let penetration = if d2 <= inner2 { 1.0 } else { 0.0 };
         let damage = combat::effective_damage_for_armor_penetration(
             penetration,
@@ -351,6 +361,7 @@ mod tests {
         let fog = visible_team_fog(&map, &entities);
         let mut events = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
         let shell = ArtilleryShell {
+            double_damage: false,
             owner: 1,
             attacker: 1,
             from_x: Coord::from_world(0.0),

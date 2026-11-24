@@ -135,6 +135,7 @@ fn mortar_falloff_resolves_distance_armor_entrenchment_and_friendly_fire() {
                 let mut events = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
                 let mut firing_reveals = Vec::new();
                 let shell = MortarShell {
+                    double_damage: false,
                     owner: 1,
                     attacker: 0,
                     x: Coord::from_world(160.0),
@@ -254,6 +255,7 @@ fn rocket_blast_bands_apply_damage_and_armor_at_exact_boundaries() {
             let mut events = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
             let mut firing_reveals = Vec::new();
             let shell = MortarShell {
+                double_damage: false,
                 owner: 1,
                 attacker: 0,
                 x: rts_rules::math::Coord::from_world(160.0),

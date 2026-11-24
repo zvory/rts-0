@@ -96,6 +96,9 @@ pub(in crate::game) fn planner_code(kind: AbilityKind) -> u16 {
         AbilityKind::EscapeTreasure => 19,
         AbilityKind::WindDash => 20,
         AbilityKind::HealingSeal => 21,
+        AbilityKind::Haste => 22,
+        AbilityKind::DoubleDamage => 23,
+        AbilityKind::ArmorTreasure => 24,
     }
 }
 
@@ -123,6 +126,9 @@ pub(in crate::game) fn from_planner_code(code: u16) -> Option<AbilityKind> {
         19 => Some(AbilityKind::EscapeTreasure),
         20 => Some(AbilityKind::WindDash),
         21 => Some(AbilityKind::HealingSeal),
+        22 => Some(AbilityKind::Haste),
+        23 => Some(AbilityKind::DoubleDamage),
+        24 => Some(AbilityKind::ArmorTreasure),
 
         _ => None,
     }
@@ -133,9 +139,12 @@ pub fn effect_hook(kind: AbilityKind) -> AbilityEffectHook {
         AbilityKind::EvolveWind | AbilityKind::EvolveWar | AbilityKind::EvolveMagic => {
             AbilityEffectHook::Evolve
         }
-        AbilityKind::HealingPotion | AbilityKind::EscapeTreasure | AbilityKind::HealingSeal => {
-            AbilityEffectHook::ShopItem
-        }
+        AbilityKind::HealingPotion
+        | AbilityKind::EscapeTreasure
+        | AbilityKind::HealingSeal
+        | AbilityKind::Haste
+        | AbilityKind::DoubleDamage
+        | AbilityKind::ArmorTreasure => AbilityEffectHook::ShopItem,
         AbilityKind::Charge => AbilityEffectHook::LegacyNoop,
         AbilityKind::Smoke | AbilityKind::MortarFire | AbilityKind::Barrage => {
             AbilityEffectHook::DelayedWorld

@@ -38,7 +38,9 @@ export function buildCultivatorCommandCardContextSamples(buildCard) {
   // Include the carried item wherever it can coexist with unit or worker commands,
   // so profile validation catches conflicts on every carrier card.
   const item = { escapeTreasure: true,
-    abilities: [{ ability: ABILITY.ESCAPE_TREASURE, autocastEnabled: true }] };
+    abilities: [{ ability: ABILITY.ESCAPE_TREASURE, autocastEnabled: true },
+      { ability: ABILITY.ARMOR_TREASURE, remainingUses: 1 },
+      { ability: ABILITY.HASTE, remainingUses: 1 }] };
   const disciple = { id: 20, owner: 1, kind: KIND.WARRIOR, insight: 60, ...item };
   const worker = { id: 21, owner: 1, kind: KIND.WORKER, ...item };
   const ctx = (selection) => ({
@@ -53,6 +55,9 @@ export function buildCultivatorCommandCardContextSamples(buildCard) {
   }));
   return [
     ...unitCards,
+    { id: "cultivators-double-damage", card: buildCard(ctx([{ ...disciple, abilities: [
+      { ability: ABILITY.ARMOR_TREASURE, remainingUses: 1 },
+      { ability: ABILITY.DOUBLE_DAMAGE, remainingUses: 1 }] }])) },
     { id: "cultivators-war-master", card: buildCard(ctx([{ ...disciple, kind: KIND.WAR_ADEPT, dao: "war", daoMaster: true }])) },
     { id: "cultivators-shop", card: buildCard(ctx([{ id: 30, owner: 1, kind: KIND.SHOP }])) },
     { id: "cultivators-worker", card: buildCard(ctx([worker])) },

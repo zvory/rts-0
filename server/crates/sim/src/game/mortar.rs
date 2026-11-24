@@ -28,6 +28,8 @@ pub(crate) const TURN_RATE_RAD_PER_TICK: f32 = std::f32::consts::PI / HALF_TURN_
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct MortarShell {
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    double_damage: bool,
     owner: u32,
     attacker: u32,
     x: Coord,
@@ -117,6 +119,7 @@ impl MortarShellStore {
         x: f32,
         y: f32,
         tick: u32,
+        double_damage: bool,
     ) {
         let delay_ticks = config::MORTAR_MANUAL_SHELL_DELAY_TICKS;
         self.shells.push(MortarShell {
@@ -130,6 +133,7 @@ impl MortarShellStore {
             impact_tick: tick.saturating_add(delay_ticks),
             launched: true,
             rocket: false,
+            double_damage,
         });
         emit_launch(
             events,
@@ -192,6 +196,7 @@ impl MortarShellStore {
                 impact_tick: launch_tick.saturating_add(flight_ticks),
                 launched: false,
                 rocket: true,
+                double_damage: false,
             });
         }
     }
@@ -336,6 +341,11 @@ fn resolve(context: MortarResolutionContext<'_>, shell: &MortarShell) {
         let piercing_hit = shell.rocket && d2 <= ap_radius2;
         if d2 <= outer2 {
             let base = shell_damage(shell.rocket, d2, inner2, piercing_hit);
+            let base = if shell.double_damage {
+                base.saturating_mul(2)
+            } else {
+                base
+            };
             hits.push((
                 id,
                 base,

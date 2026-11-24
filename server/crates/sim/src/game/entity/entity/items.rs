@@ -1,6 +1,59 @@
 use super::{Entity, EntityKind, Order};
 
 impl Entity {
+    pub(in crate::game) fn shop_item_reload(&self, ticks: u32) -> u32 {
+        if self.shop_item_active(crate::game::ability::AbilityKind::Haste) {
+            (ticks / 2).max(1)
+        } else {
+            ticks
+        }
+    }
+
+    pub(in crate::game) fn shop_item_active(
+        &self,
+        ability: crate::game::ability::AbilityKind,
+    ) -> bool {
+        self.ability_cooldowns.get(&ability).copied().unwrap_or(0) > 0
+    }
+    pub(in crate::game) fn shop_item_category_occupied(
+        &self,
+        ability: crate::game::ability::AbilityKind,
+    ) -> bool {
+        use crate::game::ability::AbilityKind::*;
+        let kinds: &[crate::game::ability::AbilityKind] = if ability == ArmorTreasure {
+            &[ArmorTreasure]
+        } else {
+            &[Haste, DoubleDamage]
+        };
+        kinds.iter().any(|kind| {
+            self.ability_uses_remaining.get(kind).copied().unwrap_or(0) > 0
+                || self.shop_item_active(*kind)
+        })
+    }
+    pub(in crate::game) fn receive_shop_item(
+        &mut self,
+        ability: crate::game::ability::AbilityKind,
+    ) {
+        if !self.shop_item_category_occupied(ability) {
+            self.ability_uses_remaining.insert(ability, 1);
+        }
+    }
+    pub(in crate::game) fn activate_shop_item(
+        &mut self,
+        ability: crate::game::ability::AbilityKind,
+    ) {
+        if self
+            .ability_uses_remaining
+            .get(&ability)
+            .copied()
+            .unwrap_or(0)
+            == 1
+        {
+            self.ability_uses_remaining.remove(&ability);
+            self.ability_cooldowns.insert(ability, 900);
+        }
+    }
+
     /// Healing fields store capacity in the ordinary health pair, immune to combat and repair.
     pub(in crate::game) fn spend_seal_healing(&mut self, amount: u32) {
         if self.kind == EntityKind::HealingSeal {

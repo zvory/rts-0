@@ -27,6 +27,7 @@ fn disciple_shield_armors_artillery_and_drains_full_core_or_falloff() {
                 let fog = visible_team_fog(&map, &entities);
                 let mut events = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
                 let shell = ArtilleryShell {
+                    double_damage: false,
                     owner: 1,
                     attacker: 0,
                     from_x: Coord::from_world(if inside { 160.0 } else { 0.0 }),

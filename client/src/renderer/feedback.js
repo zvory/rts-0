@@ -545,8 +545,9 @@ export function _drawAbilityObjects(state) {
         gfxNoFill(g);
       }
     } else if (object.kind === ABILITY_OBJECT_KIND.LINE_PROJECTILE
-        && (object.ability === ABILITY.HEALING_POTION || object.ability === ABILITY.ESCAPE_TREASURE)) {
-      const color = object.ability === ABILITY.HEALING_POTION ? 0x54e878 : 0xa653ec;
+        && [ABILITY.HEALING_POTION, ABILITY.ESCAPE_TREASURE, ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE, ABILITY.ARMOR_TREASURE].includes(object.ability)) {
+      const color = ({ [ABILITY.HEALING_POTION]: 0x54e878, [ABILITY.ESCAPE_TREASURE]: 0xa653ec,
+        [ABILITY.HASTE]: 0xffda52, [ABILITY.DOUBLE_DAMAGE]: 0xff704f, [ABILITY.ARMOR_TREASURE]: 0x58ccec })[object.ability];
       gfxStroke(g, 1, 0xffffff, 0.8);
       gfxFill(g, color, 1);
       gfxCircle(g, object.x, object.y, 4);

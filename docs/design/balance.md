@@ -931,3 +931,5 @@ nothing. The seal expires on depletion, persists after its Shop dies, has no com
 sight, supply, weapon, repair/refund, or survival-building status, and costs no construction
 time. Purchase uses visible, terrain-valid ground within 30 tiles of the Shop.
 See [Healing Seal](healing-seal.md).
+
+Cultivator carried item categories are movement (Escape, R), defense (Armor Treasure, F), and attack (Haste or Double Damage, V). Haste costs 100 oil, Double Damage 150 oil, Armor Treasure 100 oil; each activated buff lasts 30 seconds. Haste halves primary weapon reload, Double Damage doubles primary weapon damage, Armor Treasure adds 50% damage mitigation (round damage upward). Escape's 100-oil purchase starts a 60-second per-player cooldown shared across all owned Shops. See [Shop item rules](shop.md#carried-attack-and-defense-goods).

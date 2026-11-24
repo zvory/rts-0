@@ -32,7 +32,7 @@ pub(in crate::game) fn try_fire_artillery(
     tick: u32,
     ability: AbilityKind,
     radius_tiles: f32,
-    initial_attack_cd: u32,
+    cooldown_tick_pending: bool,
 ) -> bool {
     if !matches!(ability, AbilityKind::PointFire | AbilityKind::BlanketFire) {
         return false;
@@ -57,6 +57,12 @@ pub(in crate::game) fn try_fire_artillery(
     {
         return false;
     }
+    let initial_attack_cd = entities
+        .get(unit)
+        .map_or(0, |entity| {
+            entity.shop_item_reload(config::ARTILLERY_RELOAD_TICKS)
+        })
+        .saturating_add(u32::from(cooldown_tick_pending));
     let ammo_cost = ability::definition(ability).cost;
     let Some(player_state) = players.iter_mut().find(|candidate| candidate.id == player) else {
         return false;
@@ -101,7 +107,18 @@ pub(in crate::game) fn try_fire_artillery(
         setup_state: Some(attacker.weapon_setup().to_protocol_str().to_string()),
     });
     let source = reveal.as_ref().map_or((x, y), |r| (r.x, r.y));
-    artillery_shells.schedule(player, unit, target_x, target_y, source, tick);
+    let double_damage = entities
+        .get(unit)
+        .is_some_and(|e| e.shop_item_active(AbilityKind::DoubleDamage));
+    artillery_shells.schedule(
+        player,
+        unit,
+        target_x,
+        target_y,
+        source,
+        tick,
+        double_damage,
+    );
     if let Some(reveal) = reveal.as_ref() {
         let facing = reveal.weapon_facing.or(reveal.facing).unwrap_or(0.0);
         let player_ids: Vec<u32> = events.keys().copied().collect();

@@ -374,6 +374,11 @@ fn artillery_attack_move_targets_buildings_only_after_units_are_gone() {
 
 #[test]
 fn deployed_artillery_attack_move_fires_in_field_without_tearing_down() {
+    assert_deployed_artillery_attack_move_reload(false);
+    assert_deployed_artillery_attack_move_reload(true);
+}
+
+fn assert_deployed_artillery_attack_move_reload(haste: bool) {
     let players = human_vs_ai_players();
     let mut game = empty_flat_game(&players);
     let gun_pos = game.state.map.tile_center(10, 10);
@@ -392,6 +397,11 @@ fn deployed_artillery_attack_move_fires_in_field_without_tearing_down() {
         .entities
         .spawn_unit(1, EntityKind::Worker, target_pos.0, target_pos.1 + 32.0)
         .expect("spotter should spawn");
+    if haste {
+        let entity = game.state.entities.get_mut(artillery).unwrap();
+        entity.receive_shop_item(ability::AbilityKind::Haste);
+        entity.activate_shop_item(ability::AbilityKind::Haste);
+    }
     deploy_artillery_toward(&mut game, artillery, target_pos);
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
@@ -419,7 +429,11 @@ fn deployed_artillery_attack_move_fires_in_field_without_tearing_down() {
     assert_eq!(artillery_entity.weapon_setup(), WeaponSetup::Deployed);
     assert_eq!(
         artillery_entity.attack_cd(),
-        config::ARTILLERY_RELOAD_TICKS,
+        if haste {
+            config::ARTILLERY_RELOAD_TICKS / 2
+        } else {
+            config::ARTILLERY_RELOAD_TICKS
+        },
         "autonomous fire should retain the same effective reload as manual fire"
     );
     assert!(artillery_entity.path_is_empty());
@@ -1225,7 +1239,7 @@ fn resolve_test_artillery_shell(game: &mut Game, x: f32, y: f32) {
     );
     game.state
         .artillery_shells
-        .schedule(1, 1, x, y, (0.0, 0.0), game.state.tick);
+        .schedule(1, 1, x, y, (0.0, 0.0), game.state.tick, false);
     game.state.artillery_shells.resolve_due(
         &game.state.map,
         &mut game.state.entities,

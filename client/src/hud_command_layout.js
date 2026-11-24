@@ -4,7 +4,7 @@
 //   Z X C V
 export const GRID_HOTKEYS = Object.freeze(["Q", "W", "E", "A", "S", "D", "Z", "X", "C"]);
 
-// The fourth column holds the R item slot and passive Charge in F; V remains reserved.
+// The fourth column holds movement (R), defense (F), and attack (V) items.
 export const COMMAND_CARD_SLOT_ORDER = Object.freeze([0, 1, 2, 9, 3, 4, 5, 10, 6, 7, 8, 11]);
 const COMMAND_CARD_HOTKEYS = Object.freeze([...GRID_HOTKEYS, "R", "F", "V"]);
 

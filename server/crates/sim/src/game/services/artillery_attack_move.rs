@@ -111,7 +111,7 @@ pub(crate) fn run(
                 dispersion_tiles,
                 // Autonomous fire runs before combat's cooldown tick. Compensate for that tick so
                 // it retains the same effective reload as manual fire, which runs afterward.
-                config::ARTILLERY_RELOAD_TICKS.saturating_add(1),
+                true,
             );
         }
     }

@@ -709,6 +709,7 @@ for (const [kind, upgrade] of [
     "cultivators-disciple-wind",
     "cultivators-disciple-war",
     "cultivators-disciple-magic",
+    "cultivators-double-damage",
     "cultivators-war-master",
     "cultivators-shop",
     "cultivators-worker",
@@ -946,7 +947,7 @@ for (const researched of [false, true]) {
   const sword = card.slots.find((slot) => slot?.ability === ABILITY.THROW_SWORD);
   assert(sword.enabled);
   const charge = card.slots.find((slot) => slot?.ability === ABILITY.CHARGE);
-  assert(charge?.passive && !charge.enabled, "mixed Novice/War selection keeps Charge without hiding Throw Sword");
+  assert(charge?.passive && !charge.enabled, "mixed Novice/War selection keeps Charge when a slot is available");
   assert.equal(sword.hotkey, "E");
   assert.deepEqual(sword.intent.readyIds, [3]);
   const changed = buildCommandCardDescriptors({ ...context,
@@ -968,8 +969,7 @@ for (const researched of [false, true]) {
       .find((definition) => definition.ability === ability).hotkey);
   }
   const charge = card.slots.find((slot) => slot?.ability === ABILITY.CHARGE);
-  assert(charge?.passive && !charge.enabled);
-  assert.equal(charge.hotkey, "");
+  assert.equal(charge, undefined, "a full mixed card gives active abilities priority over passive Charge");
   assert.equal(card.slots[9].commandId, "cultivators.item.escape");
 }
 
@@ -1050,10 +1050,10 @@ for (const researched of [false, true]) {
     resources: { steel: 1000, oil: 1000 },
   });
   const items = idle.slots.filter(Boolean);
-  assert.equal(items.length, 3);
-  assert.deepEqual(items.map((item) => item.ability), [ABILITY.HEALING_POTION, ABILITY.ESCAPE_TREASURE, ABILITY.HEALING_SEAL]);
-  assert.deepEqual(items.map((item) => item.intent.targetMode), ["friendlyUnit", "friendlyUnit", "worldPoint"]);
-  assert.deepEqual(items.map((item) => item.cost.oil), [50, 100, 150]);
+  assert.equal(items.length, 6);
+  assert.deepEqual(items.map((item) => item.ability), [ABILITY.HEALING_POTION, ABILITY.ESCAPE_TREASURE, ABILITY.HEALING_SEAL, ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE, ABILITY.ARMOR_TREASURE]);
+  assert.deepEqual(items.map((item) => item.intent.targetMode), ["friendlyUnit", "friendlyUnit", "worldPoint", "friendlyUnit", "friendlyUnit", "friendlyUnit"]);
+  assert.deepEqual(items.map((item) => item.cost.oil), [50, 100, 150, 100, 150, 100]);
   const seal = items.find((item) => item.ability === ABILITY.HEALING_SEAL);
   assert.equal(seal.hotkey, "E");
   assert.equal(seal.commandId, "cultivators.ability.healingSeal");
@@ -1108,8 +1108,13 @@ for (const context of buildCommandCardContextCatalog()) {
       continue;
     }
     if (slot.slotIndex === 10) {
-      assert.equal(slot.ability, ABILITY.CHARGE);
-      assert(slot.passive && !slot.hotkey);
+      assert.equal(slot.ability, ABILITY.ARMOR_TREASURE);
+      assert.equal(slot.hotkey, "F");
+      continue;
+    }
+    if (slot.slotIndex === 11) {
+      assert([ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE].includes(slot.ability));
+      assert.equal(slot.hotkey, "V");
       continue;
     }
     assert(slot.slotIndex < 9, `${context.id}: other fourth-column slots remain reserved`);
@@ -1157,4 +1162,45 @@ for (const kind of [KIND.WORKER, KIND.WARRIOR, KIND.WIND_ADEPT, KIND.WAR_ADEPT, 
   assert.equal(slot.cls, "autocast-enabled");
   assert.equal(slot.contextIntent.enabled, false);
   assert.equal(build(true, false).slots[9].contextIntent.enabled, true);
+}
+
+// The item column separates categories, consumes ready carriers, and keeps active duration clocks.
+{
+  const units = [
+    { id: 1, owner: 1, kind: KIND.WARRIOR, escapeTreasure: true, abilities: [
+      { ability: ABILITY.HASTE, remainingUses: 1, cooldownLeft: 0 },
+      { ability: ABILITY.ARMOR_TREASURE, remainingUses: 1, cooldownLeft: 0 }] },
+    { id: 2, owner: 1, kind: KIND.WARRIOR, abilities: [
+      { ability: ABILITY.DOUBLE_DAMAGE, remainingUses: 1, cooldownLeft: 0 }] },
+  ];
+  const build = (selection) => buildCommandCardDescriptors({ playerId: 1, factionId: "cultivators",
+    selection, resources: { steel: 0, oil: 0 }, groupCooldownClocks: (ticks, total) =>
+      ticks.filter((tick) => tick > 0).map((tick) => ({ count: 1, rotationDeg: tick / total * 360 })) });
+  const carried = build(units);
+  assert.equal(carried.slots[9].hotkey, "R");
+  assert.equal(carried.slots[10].hotkey, "F");
+  assert.equal(carried.slots[11].hotkey, "V");
+  assert.deepEqual(carried.slots[10].intent.readyIds, [1]);
+  assert.deepEqual(carried.slots[11].intent.readyIds, [1]);
+  const active = build([{ ...units[0], abilities: [
+    { ability: ABILITY.HASTE, remainingUses: 0, cooldownLeft: 450 },
+    { ability: ABILITY.ARMOR_TREASURE, remainingUses: 0, cooldownLeft: 450 }] }, units[1]]);
+  assert.equal(active.slots[11].ability, ABILITY.DOUBLE_DAMAGE, "mixed selection exposes the remaining ready attack item");
+  assert.equal(active.slots[10].enabled, false);
+  assert.equal(active.slots[10].cls, "active");
+  assert.deepEqual(active.slots[10].cooldownClocks, [{ count: 1, rotationDeg: 180 }]);
+  assert.notEqual(active.signature, carried.signature);
+  const charge = active.slots.find((slot) => slot?.ability === ABILITY.CHARGE);
+  assert(charge.slotIndex < 9, "passive Charge leaves the defense category available");
+}
+
+// Allied deliveries stay usable on units belonging to another faction.
+for (const factionId of ["kriegsia", "ekat"]) {
+  const card = buildCommandCardDescriptors({ playerId: 1, factionId,
+    selection: [{ id: 1, owner: 1, kind: KIND.WORKER, escapeTreasure: true,
+      abilities: [{ ability: ABILITY.HASTE, remainingUses: 1, cooldownLeft: 0 }] }],
+    resources: { steel: 0, oil: 0 }, groupCooldownClocks: () => [] });
+  assert.equal(card.slots[9].commandId, "cultivators.item.escape");
+  assert.equal(card.slots[11].commandId, "cultivators.item.haste");
+  assert.deepEqual(card.slots[11].intent.readyIds, [1]);
 }

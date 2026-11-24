@@ -59,16 +59,16 @@ shown only to the unit’s owner and allies as a purple square with a white **E*
 the health bar height, even when health bars are hidden. Enemies receive no protection flag
 even when they see the unit.
 
-Cultivator units reserve **R** for their single carried item. An empty inventory leaves R empty.
+Cultivator units reserve **R** for movement items, **F** for defense items (below R), and **V** for attack items (bottom right). Empty categories leave their slots blank. One item can occupy each category; attack items cannot stack or replace one another while carried or active.
 A delivered Escape Treasure exposes **Escape** in R, with autocast enabled by default. Lethal
 damage triggers the automatic escape at 1 HP; manual activation consumes the same treasure and
 returns the unit immediately while preserving its current HP. Right-click or Alt+R toggles
 autocast; manual use remains available when autocast is disabled. Only owned living carriers
 can activate or toggle their item. Healing Potion is consumed on delivery rather than carried;
-there is never more than one carried item.
+Healing Potion and Healing Seal are defense goods consumed on delivery/placement and do not occupy the carried defense slot.
 
 A destroyed supplying Shop cancels in-flight goods and removes its applied escape protection.
-Repeated escape purchases do not stack. Delivery tracks a moving target directly; disappearing or
+Escape Treasure has a **60-second purchase cooldown shared across all Shops owned by the purchasing player**, starting only on successful launch. This cooldown survives building destruction, new Shops, checkpoints and replays. Repeated escape purchases do not stack. Delivery tracks a moving target directly; disappearing or
 dead targets cancel delivery. Oil is paid at launch, with no refund for interrupted delivery.
 
 Escape selects a deterministic legal exit around the supplying Shop, searching farther only when
@@ -84,3 +84,11 @@ then click visible ground within 30 tiles. It appears immediately as a selectabl
 non-blocking 3×3 green circle. Friendly ground units inside heal 3 HP/s each from a shared
 400 HP budget. Its green capacity bar and selection text show healing remaining; it
 disappears when empty. It is ground magic, not a carried item or projectile.
+
+### Carried attack and defense goods
+
+Shops also deliver Haste (**100 oil**, A), Double Damage (**150 oil**, S), and Armor Treasure (**100 oil**, D) to visible friendly units within 30 tiles, using the same delivery speed and timeout as Escape Treasure. Haste and Double Damage share the attack category; Armor Treasure uses defense. A delivery reserves its category immediately, so simultaneous or in-flight purchases cannot stack. Invalid purchases spend nothing.
+
+Activate the carried attack or defense item to consume it and apply its effect for **30 seconds**. Haste doubles primary weapon attack speed by halving its reload (minimum one tick); Double Damage doubles primary weapon damage before normal mitigation. Double Damage also affects primary tank splash and manual mortar/artillery shells; launched shells retain the bonus through impact. Haste also reduces manual mortar and artillery reload. Neither affects spells, rockets, disposable panzerfaust shots, or secondary weapons. Armor Treasure applies an additional **50% damage reduction**, rounded upward per hit; this is the useful percentage-armor interpretation of “+50% armor,” including units without native armor. Buffs do not stack in their category and cannot be replenished until expiry. Movement Escape may coexist with both categories.
+
+Carried items and active timers use existing entity ability-use/cooldown state; the owner and privileged diagnostic perspectives see the item and remaining activation duration through private ability entries. Enemy snapshots do not expose inventory or item timers. Checkpoint/replay restore preserves carried items, active durations, and purchase cooldowns.
