@@ -286,24 +286,11 @@ fn place_healing_seal(
     }
     let ts = config::TILE_SIZE as f32;
     let (tx, ty) = map.tile_of(x, y);
-    // Odd footprint, tile-centered. Validate every covered tile without unchecked arithmetic.
-    let (Some(left), Some(top), Some(right), Some(bottom)) = (
-        tx.checked_sub(1),
-        ty.checked_sub(1),
-        tx.checked_add(1),
-        ty.checked_add(1),
-    ) else {
+    let (Some(left), Some(top)) = (tx.checked_sub(1), ty.checked_sub(1)) else {
         return;
     };
-    if right >= map.width || bottom >= map.height {
+    if !standability::building_site_clear(map, entities, EntityKind::HealingSeal, left, top) {
         return;
-    }
-    for yy in top..=bottom {
-        for xx in left..=right {
-            if !map.is_passable(xx as i32, yy as i32) || map.is_no_building_tile(xx, yy) {
-                return;
-            }
-        }
     }
     let (x, y) = map.tile_center(tx, ty);
     if !fog.is_visible_world(player, x, y) {
@@ -317,19 +304,6 @@ fn place_healing_seal(
             && shop.hp > 0
             && !shop.under_construction()
             && dist2(shop.pos_x(), shop.pos_y(), x, y) <= range * range
-    }) {
-        return;
-    }
-    // Units may already stand inside the field. Existing static structures may not.
-    let half = ts * 1.5;
-    if entities.iter().any(|e| {
-        e.hp > 0
-            && e.is_building()
-            && e.kind != EntityKind::HealingSeal
-            && config::building_stats(e.kind).is_some_and(|s| {
-                (e.pos_x() - x).abs() < half + s.foot_w as f32 * ts * 0.5
-                    && (e.pos_y() - y).abs() < half + s.foot_h as f32 * ts * 0.5
-            })
     }) {
         return;
     }

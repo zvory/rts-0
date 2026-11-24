@@ -156,6 +156,44 @@ fn healing_seals_do_not_block_building_sites_for_any_owner() {
 }
 
 #[test]
+fn healing_seal_overlaps_survive_normal_ticks() {
+    let (mut game, shop, unit) = fixture();
+    purchase(&mut game, shop, 656.0, 336.0);
+    purchase(&mut game, shop, 656.0, 336.0);
+    assert_eq!(game.state.players[0].oil, 700);
+    assert_eq!(
+        game.state
+            .entities
+            .iter()
+            .filter(|e| e.kind == EntityKind::HealingSeal)
+            .count(),
+        2,
+    );
+    game.state.entities.remove(unit);
+    game.state
+        .entities
+        .spawn_building(1, EntityKind::Portal, 656.0, 336.0, true)
+        .unwrap();
+    game.tick();
+    game.assert_invariants();
+}
+
+#[test]
+fn healing_seal_purchase_rejects_resource_nodes() {
+    for kind in [EntityKind::Steel, EntityKind::Oil] {
+        let (mut game, shop, _) = fixture();
+        game.state.entities.spawn_node(kind, 656.0, 336.0).unwrap();
+        purchase(&mut game, shop, 656.0, 336.0);
+        assert_eq!(game.state.players[0].oil, 1000);
+        assert!(!game
+            .state
+            .entities
+            .iter()
+            .any(|e| e.kind == EntityKind::HealingSeal));
+    }
+}
+
+#[test]
 fn healing_seal_invalid_purchases_spend_nothing() {
     for (x, y) in [
         (320.0, 320.0),

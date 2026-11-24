@@ -455,6 +455,9 @@ fn entity_build_site_status(
         return BuildSiteStatus::BlockedByResourceNode;
     }
     if e.is_unit() {
+        if policy == BuildPlacementPolicy::GroundField {
+            return BuildSiteStatus::Clear;
+        }
         if policy == BuildPlacementPolicy::VehicleBodyOnly
             && movement_body_class(e.kind) == MovementBodyClass::InfantryLike
         {

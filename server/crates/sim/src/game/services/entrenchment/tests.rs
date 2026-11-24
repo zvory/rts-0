@@ -232,3 +232,32 @@ fn road_terrain_blocks_entrenchment_without_a_redundant_overlay_record() {
         "road terrain itself must enforce the gameplay rule for legacy Lab/checkpoint maps",
     );
 }
+
+#[test]
+fn healing_seal_does_not_obstruct_trench_slots() {
+    let map = flat_map(32);
+    let mut entities = EntityStore::new();
+    let unit = Entity::new_unit(1, EntityKind::Rifleman, 336.0, 336.0).unwrap();
+    entities
+        .spawn_building(1, EntityKind::HealingSeal, 336.0, 336.0, true)
+        .unwrap();
+    let index = EntrenchmentEntityIndex::build(&map, &entities);
+    assert!(!slot_intersects_building(
+        &map,
+        &entities,
+        &index,
+        &unit,
+        (336.0, 336.0)
+    ));
+    entities
+        .spawn_building(1, EntityKind::Shop, 336.0, 336.0, true)
+        .unwrap();
+    let index = EntrenchmentEntityIndex::build(&map, &entities);
+    assert!(slot_intersects_building(
+        &map,
+        &entities,
+        &index,
+        &unit,
+        (336.0, 336.0)
+    ));
+}

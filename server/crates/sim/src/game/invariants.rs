@@ -131,11 +131,11 @@ impl Game {
         }
 
         // ------------------------------------------------------------------
-        // 4. Buildings never overlap
+        // 4. Buildings never overlap (consumable ground fields do not reserve footprints)
         // ------------------------------------------------------------------
         let mut occupied: Vec<(u32, EntityKind, (u32, u32))> = Vec::new();
         for e in self.state.entities.iter() {
-            if !e.is_building() {
+            if !e.is_building() || e.kind == EntityKind::HealingSeal {
                 continue;
             }
             let footprint = building_footprint(&self.state.map, e);
