@@ -8,7 +8,7 @@ import {
   panzerfaustFeedbackSoundId,
 } from "./combat_audio.js";
 import { TICK_HZ } from "./config.js";
-import { EVENT, KIND } from "./protocol.js";
+import { ABILITY, ABILITY_OBJECT_KIND, EVENT, KIND } from "./protocol.js";
 
 const COMBAT_GAIN_SCALE = 0.7;
 // Calibrated using the loudest decoded 50 ms RMS window: short transients
@@ -134,6 +134,7 @@ export class MatchCombatAudio {
     this.clearTimer = clearTimer;
     this.missingCombatSoundKinds = new Set();
     this.activeMachineGunSoundKeys = new Map();
+    this.activeThrowSwordSoundKeys = new Map();
     this.pendingArtilleryLandingTimers = new Set();
     this.worldCombatBedPlaying = false;
   }
@@ -171,6 +172,37 @@ export class MatchCombatAudio {
     if (!this.worldCombatBedPlaying) return;
     this.audio.stopByKey(WORLD_COMBAT_BED_KEY, { fadeOutMs: WORLD_COMBAT_BED_FADE_OUT_MS });
     this.worldCombatBedPlaying = false;
+  }
+
+  // Snapshot objects are already fog-filtered. Their lifetime, rather than the
+  // maximum-range timer, handles short casts, moving casters, and loss of sight.
+  updateThrowSwordSounds(objects = []) {
+    if (!this.audio) return;
+    const seen = new Set();
+    for (const object of objects) {
+      if (object.ability !== ABILITY.THROW_SWORD
+        || object.kind !== ABILITY_OBJECT_KIND.LINE_PROJECTILE
+        || !Number.isFinite(object.x) || !Number.isFinite(object.y)) continue;
+      seen.add(object.id);
+      const key = `combat:throw_sword:${object.id}`;
+      if (this.activeThrowSwordSoundKeys.has(object.id)
+        && this.audio.hasVoiceKey?.(key) !== false) {
+        this.audio.setVoicePosition?.(key, object.x, object.y);
+        continue;
+      }
+      const category = audioSelfOwner(this.state, object.owner, this.controlPolicy)
+        ? "combat_self" : "combat_other";
+      if (this.audio.play("combat_throw_sword_01", {
+        key, category, x: object.x, y: object.y,
+        priority: 3, gain: 0.7 * COMBAT_GAIN_SCALE,
+        loop: true, pitchVariance: 0, cooldownMs: 0, fadeInMs: 10,
+      })) this.activeThrowSwordSoundKeys.set(object.id, key);
+    }
+    for (const [id, key] of this.activeThrowSwordSoundKeys) {
+      if (seen.has(id)) continue;
+      this.audio.stopByKey(key);
+      this.activeThrowSwordSoundKeys.delete(id);
+    }
   }
 
   playAttackSound(ev) {
@@ -286,6 +318,7 @@ export class MatchCombatAudio {
   }
 
   destroy() {
+    this.updateThrowSwordSounds();
     this.audio?.stopByKey(WORLD_COMBAT_BED_KEY);
     this.worldCombatBedPlaying = false;
     this.stopAllMachineGunSounds();
