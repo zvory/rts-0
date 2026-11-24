@@ -53,6 +53,7 @@ export function buildCultivatorCommandCardContextSamples(buildCard) {
   }));
   return [
     ...unitCards,
+    { id: "cultivators-war-master", card: buildCard(ctx([{ ...disciple, kind: KIND.WAR_ADEPT, dao: "war", daoMaster: true }])) },
     { id: "cultivators-shop", card: buildCard(ctx([{ id: 30, owner: 1, kind: KIND.SHOP }])) },
     { id: "cultivators-worker", card: buildCard(ctx([worker])) },
     { id: "cultivators-build", card: buildCard({ ...ctx([worker]), commandCardMode: "workerBuild" }) },

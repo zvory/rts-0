@@ -22,7 +22,7 @@ fn dao_kinds_spawn_with_resolved_stats_and_serialize_without_mutable_dao() {
     ] {
         let unit = Entity::new_unit(1, kind, 200.0, 200.0).unwrap();
         assert_eq!((unit.hp, unit.max_hp), (hp, hp));
-        assert!(unit.dao_ability_available(ability));
+        assert_eq!(unit.dao_ability_available(ability), kind != EntityKind::WarAdept);
         assert!(!unit.dao_ability_available(AbilityKind::EvolveWar));
         assert_eq!(combat::attack_profile(kind).cooldown, cooldown);
         assert_eq!(combat::attack_profile(kind).range_tiles, range);

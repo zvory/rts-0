@@ -12,6 +12,7 @@ import { cmd } from "./protocol.js";
 import { ABILITY, KIND, STATE, isBuilding, isUnit } from "./protocol.js";
 import {
   ABILITIES,
+  abilityCarriedByEntity,
   STATS,
   statsForFaction,
   TICK_HZ,
@@ -699,11 +700,10 @@ export class HUD {
   }
 
   _abilityAreaOrigins(definition) {
-    const carriers = Array.isArray(definition?.carriers) ? definition.carriers : [];
     return (this.state.selectedEntities() || [])
       .filter((e) =>
         this._isOwn(e) &&
-        carriers.includes(e.kind) &&
+        abilityCarriedByEntity(definition, e) &&
         e.buildProgress == null)
       .map((e) => ({ id: e.id, kind: e.kind, x: e.x, y: e.y }));
   }

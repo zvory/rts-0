@@ -13,11 +13,12 @@ import { withFakeDocument } from "./fakes.mjs";
 
 const swordInput = Object.create(Input.prototype);
 const swordSelection = [
-  { id: 101, owner: 1, kind: KIND.WAR_ADEPT, dao: "war", x: 200, y: 220 },
+  { id: 101, owner: 1, kind: KIND.WAR_ADEPT, dao: "war", daoMaster: true, x: 200, y: 220 },
   { id: 102, owner: 1, kind: KIND.MAGIC_ADEPT, dao: "magic", x: 500, y: 220 },
   { id: 103, owner: 1, kind: KIND.LIGHTNESS_ADEPT, dao: "lightness", x: 500, y: 220 },
+  { id: 107, owner: 1, kind: KIND.WAR_ADEPT, dao: "war", x: 500, y: 220 },
   { id: 104, owner: 1, kind: KIND.WARRIOR, x: 500, y: 220 },
-  { id: 105, owner: 2, kind: KIND.WAR_ADEPT, dao: "war", x: 500, y: 220 },
+  { id: 105, owner: 2, kind: KIND.WAR_ADEPT, dao: "war", daoMaster: true, x: 500, y: 220 },
 ];
 swordInput.mouse = { x: 500, y: 220 };
 swordInput.state = {
@@ -30,7 +31,7 @@ swordInput._groundAtScreen = (x, y) => ({ x, y });
 swordInput._refreshAbilityTargetPreview();
 assertDeepEqual(
   swordInput.clientIntent.abilityTargetPreview.pathOrigins.map((origin) => origin.id),
-  [101], "Throw Sword previews originate only from owned War Disciples",
+  [101], "Throw Sword previews originate only from owned War Masters",
 );
 assert(!swordInput.clientIntent.abilityTargetPreview.hoverInRange,
   "Ineligible nearby Disciples do not mark the Throw Sword cursor in range");
@@ -57,6 +58,16 @@ const swordAffordance = selectedAbilityAffordances({
   .find((entry) => entry.definition.ability === ABILITY.THROW_SWORD);
 assertDeepEqual(swordAffordance.carrierIds, [101],
   "Throw Sword command card shares targeting carrier eligibility");
+
+for (const daoMaster of [false, true]) {
+  const card = buildCommandCardDescriptors({
+    playerId: 1, factionId: "cultivators", groupCooldownClocks,
+    selection: [{ id: 107, owner: 1, kind: KIND.WAR_ADEPT, daoMaster }],
+    resources: { steel: 0, oil: 0 }, upgrades: [],
+  });
+  assert(card.slots.some((slot) => slot?.ability === ABILITY.THROW_SWORD) === daoMaster,
+    "Throw Sword appears only after War Master advancement");
+}
 
 for (const insight of [0, 60]) {
   const disciple = { id: 106, owner: 1, kind: KIND.WARRIOR, insight, chosenDao: "war" };
