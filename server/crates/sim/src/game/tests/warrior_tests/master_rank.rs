@@ -89,10 +89,10 @@ fn dao_master_dead_unit_cannot_heal_and_invalid_rank_is_rejected() {
 #[test]
 fn dao_master_combat_threshold_and_damage_apply_to_all_three_paths() {
     use crate::game::ability::AbilityKind;
-    for (ability, adept_damage, master_damage) in [
-        (AbilityKind::EvolveWind, 23, 28),
-        (AbilityKind::EvolveWar, 35, 42),
-        (AbilityKind::EvolveMagic, 23, 28),
+    for (ability, adept_damage, master_damage, cooldown) in [
+        (AbilityKind::EvolveWind, 23, 28, 61),
+        (AbilityKind::EvolveWar, 35, 42, 91),
+        (AbilityKind::EvolveMagic, 23, 28, 91),
     ] {
         let mut game = empty_flat_game(&[
             cultivator_player(),
@@ -141,6 +141,7 @@ fn dao_master_combat_threshold_and_damage_apply_to_all_three_paths() {
             115 - adept_damage - master_damage
         );
         assert_eq!(game.state.entities.get(id).unwrap().insight, 0);
+        assert_eq!(game.state.entities.get(id).unwrap().attack_cd(), cooldown);
         let enemy = game
             .snapshot_for(2)
             .entities
@@ -162,11 +163,11 @@ fn disciple_weighted_insight_carries_exact_fractions_through_targets_and_checkpo
         .unwrap();
     game.tick();
     let unit = game.state.entities.get_mut(id).unwrap();
-    // Adept value 475, MG value 200 in half-steel units: 19 HP earns exactly 8.
+    // Adept value 475, Scout Car value 550: 19 HP earns exactly 22.
     for _ in 0..18 {
-        unit.gain_insight(1, EntityKind::MachineGunner);
+        unit.gain_insight(1, EntityKind::ScoutCar);
     }
-    assert_eq!(unit.insight, 7);
+    assert_eq!(unit.insight, 20);
     let checkpoint = game.checkpoint_payload_text_for_test().unwrap();
     let mut restored = Game::restore_checkpoint_payload_text_for_test(
         &checkpoint,
@@ -175,20 +176,21 @@ fn disciple_weighted_insight_carries_exact_fractions_through_targets_and_checkpo
     )
     .unwrap();
     let unit = restored.state.entities.get_mut(id).unwrap();
-    unit.gain_insight(1, EntityKind::MachineGunner);
-    assert_eq!((unit.insight, unit.insight_fraction), (8, 0));
-    // Switching targets retains quarters, including zero-resource targets at the floor.
+    unit.gain_insight(1, EntityKind::ScoutCar);
+    assert_eq!((unit.insight, unit.insight_fraction), (22, 0));
+    // Unit hits retain halves at the floor; buildings still retain quarters.
     for target in [
         EntityKind::Rifleman,
         EntityKind::ResourceDepot,
         EntityKind::Golem,
         EntityKind::Rifleman,
+        EntityKind::ResourceDepot,
     ] {
         unit.gain_insight(1, target);
     }
-    assert_eq!((unit.insight, unit.insight_fraction), (9, 0));
+    assert_eq!((unit.insight, unit.insight_fraction), (24, 0));
     unit.gain_insight(1, EntityKind::Tank);
-    assert_eq!(unit.insight, 11, "expensive targets cap at double insight");
+    assert_eq!(unit.insight, 26, "expensive targets cap at double insight");
     unit.gain_insight(u32::MAX, EntityKind::Tank);
     assert_eq!((unit.insight, unit.insight_fraction), (200, 0));
     unit.advance_dao_master();

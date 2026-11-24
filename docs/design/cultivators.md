@@ -60,10 +60,10 @@ attacks deal heavy damage." It costs 100 Steel and zero Oil, consumes 2 Supply, 
 11-tile sight, a 13.5 px collision/selection/render radius, and ordinary ground movement at 2.0
 px/tick. These values give it about 2.56 times Rifleman HP, 25% more speed, and 1.5 times the radius.
 
-Its sword has 0.75-tile reach beyond collision radii, deals 23 base damage, attacks every 64 ticks,
+Its sword has 0.75-tile reach beyond collision radii, deals 23 base damage, attacks every 91 ticks,
 and applies 50% armor penetration. The 23 damage makes two successful hits lethal to a 45-HP
-Rifleman; the 64-tick cooldown interprets "half Rifleman attack speed" as half as many attacks per
-second. Idle and Attack Move use a separate five-tile engagement range (with normal attacker
+Rifleman. The 91-tick cooldown reduces its former 64-tick attack rate by 30%, rounded
+to whole simulation ticks. Idle and Attack Move use a separate five-tile engagement range (with normal attacker
 radius/range slack) to acquire and approach visible legal enemies. The sword still requires melee
 reach to deal damage. Attack Move preserves its original destination and resumes it after the
 target dies, becomes hidden/illegal, or leaves engagement range; Idle stops its approach. Hold

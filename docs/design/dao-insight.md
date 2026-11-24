@@ -34,11 +34,11 @@ checkpoints; evolution immediately removes the speed benefit.
 
 - Wind: mobile melee skirmisher; 1.15 times scout-car base speed (2.7025 px/tick), 1.5 attacks per original attack
   interval (cooldown divided by 1.5), fifteen-tile Dash without a return recast.
-  Uses a sword at the base Disciple’s 0.75-tile reach, dealing the same 23 damage with 50% armor penetration and a 43-tick cooldown. Plain Move keeps its destination while striking legal targets within melee reach. Explicit Attack and automatic melee pursuit also retain their current approach path while striking; the approach still ends at sword reach, so a fleeing target can cause short stop/repath cycles as it leaves range; automatic Idle/Attack Move retains five-tile acquisition and closes to sword reach. Dash reaches fifteen tiles; Ekat retains five tiles and its optional return. Wind charge and recharge rules are described below. The old archer source and strip are preserved for reuse. Selected candidate B uses a thin katana and a single shoulder scarf: resting close to the back at idle, trailing while running, and following four melee swing poses. Classic evolution key L; grid Z.
+  Uses a sword at the base Disciple’s 0.75-tile reach, dealing the same 23 damage with 50% armor penetration and a 61-tick cooldown. Plain Move keeps its destination while striking legal targets within melee reach. Explicit Attack and automatic melee pursuit also retain their current approach path while striking; the approach still ends at sword reach, so a fleeing target can cause short stop/repath cycles as it leaves range; automatic Idle/Attack Move retains five-tile acquisition and closes to sword reach. Dash reaches fifteen tiles; Ekat retains five tiles and its optional return. Wind charge and recharge rules are described below. The old archer source and strip are preserved for reuse. Selected candidate B uses a thin katana and a single shoulder scarf: resting close to the back at idle, trailing while running, and following four melee swing poses. Classic evolution key L; grid Z.
 - War: armored melee damage dealer; 1.05 times base movement speed (2.1 px/tick), 1.5 damage, +20 maximum HP, 50% armor
   reduction using the existing penetration mechanic (full AP bypasses it), keeps the Disciple's existing
   50% armor penetration. Uses the approved larger armored candidate B Yari silhouette, with idle, two walking poses and four thrust poses. Its sprite scale is 0.56, halfway from the former 0.8 toward the base Disciple’s 0.32. The collision/interaction circle shrinks by the same 30%, from 13.5 to 18.2 world pixels. Its 1.75-tile weapon range plus that radius and four-pixel range slack matches the smaller spear. Vehicle hulls and building footprints retain their existing contact geometry. The 400 ms attack clip anticipates, drives, extends and recovers, with a smooth 11.2-world-pixel presentation-only forward step; collision, authoritative position and damage timing do not move with the artwork. Classic W; grid X.
-- Magic: battlefield support; 1.05 times base movement speed (2.1 px/tick), shared Ekat pull field (renamed Anchor), with doubled inward pull (0.70 movement-speed idle drag and up to 1.70x movement toward its center; radial falloff and weight resistance still apply) and a new Shield, uses the approved Magic C hooded spellcaster, with arms swept backward and flowing mantle while running. Its five-tile orbs deal the same 23 damage with 50% armor penetration and 64-tick cooldown. It stops to fire normally and has no secondary sword. Classic C; grid C. All three Dao silhouettes replace their legacy glyphs; insight, readiness and advancement overlays remain. Bespoke audio remains deferred.
+- Magic: battlefield support; 1.05 times base movement speed (2.1 px/tick), shared Ekat pull field (renamed Anchor), with doubled inward pull (0.70 movement-speed idle drag and up to 1.70x movement toward its center; radial falloff and weight resistance still apply) and a new Shield, uses the approved Magic C hooded spellcaster, with arms swept backward and flowing mantle while running. Its five-tile orbs deal the same 23 damage with 50% armor penetration and 91-tick cooldown. It stops to fire normally and has no secondary sword. Classic C; grid C. All three Dao silhouettes replace their legacy glyphs; insight, readiness and advancement overlays remain. Bespoke audio remains deferred.
 
 Each paid training path has a separate researched unlock; combat-earned evolution is unrestricted. No automatic AI evolution in this pass;
 AI can encounter and damage evolved units. Insight uses a blue fill over red background
@@ -143,16 +143,16 @@ Wind uses the separate `windDash` ability: fifteen-tile movement without a retur
 ## Cost-weighted combat insight
 
 For Novices and Adepts, value is listed steel cost plus 2.5 times listed oil cost.
-Unit HP damage earns insight at target value / attacker value, clamped to 0.25–2.
+Unit HP damage earns insight at target value / attacker value, clamped to 0.5–2.
 Use the current unit kind's listed cost regardless of acquisition route; omit research,
 infrastructure, supply, and rank bonuses. Novice value is 100; all Adepts are 237.5.
-Zero-cost targets receive the 0.25 floor. Buildings always give 0.25 insight per actual
+Zero-cost targets receive the 0.5 floor. Buildings always give 0.25 insight per actual
 hostile HP lost, bypassing cost scaling. There is no killing-blow bonus, and Throw Sword
 continues to grant no insight. Existing shield, armor, hostility, and overkill rules apply.
 
 Arithmetic is exact integer arithmetic: weighted value W = 2 × steel + 5 × oil;
 the denominator is 4 × attacker W, and the numerator is clamp(4 × target W,
-attacker W, 8 × attacker W), or attacker W for buildings. Fractional numerators carry
+2 × attacker W, 8 × attacker W), or attacker W for buildings. Fractional numerators carry
 between hits and target changes, persist in checkpoints, and remain server-private.
 At the insight cap, evolution, or Master advancement, discard the remainder alongside
 any excess insight. Masters earn no further insight. This preserves small-hit rewards

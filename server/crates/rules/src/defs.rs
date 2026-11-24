@@ -106,7 +106,7 @@ const NOVICE_DEF: UnitDef = UnitDef {
         hp: 115,
         dmg: 23,
         range_tiles: 0.75,
-        cooldown: 64,
+        cooldown: balance::DISCIPLE_ATTACK_COOLDOWN_TICKS,
         speed: 2.0,
         sight_tiles: 11,
         cost_steel: 100,
