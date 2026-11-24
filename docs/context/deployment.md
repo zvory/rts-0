@@ -23,6 +23,8 @@ binary and prediction WASM. Runtime client files are copied after both stages so
 reuse the Rust layers. The WASM stage runs `scripts/build-sim-wasm.sh` into a separate output, and
 the final image fails if `client/vendor/sim-wasm/rts_sim_wasm.js` or
 `rts_sim_wasm_bg.wasm` is missing. Beta workflow summaries report each deploy phase and cache hit.
+Every push to `main` triggers beta deployment independently of post-merge CI. Required PR checks
+still gate merging; serialized deploys finish the active rollout and coalesce pending pushes.
 
 ## Invariants
 - **Clients are untrusted.** Validate and bound every wire input:

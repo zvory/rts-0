@@ -139,7 +139,10 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   so deploys must not depend on untracked files in a local checkout. Missing static asset requests
   under paths such as `/vendor`, `/src`, `/assets`, or root files with extensions return 404 instead
   of the SPA
-  `index.html`, making packaging mistakes visible to the client and probes. GitHub beta deploys
+  `index.html`, making packaging mistakes visible to the client and probes. Every push to `main`
+  triggers beta deployment of that exact commit independently of post-merge CI; required PR checks
+  still gate merging. Deploys are serialized without interrupting an active rollout, with frequent
+  pushes coalesced into the latest pending deployment. GitHub beta deploys
   stream timestamped `flyctl` output into a step summary covering builder wait, both Rust builds,
   image export, rollout, and total time, including cache-hit and failed-deploy reporting.
 - **Fog is authoritative**: `snapshot_for` and per-recipient event delivery go through
