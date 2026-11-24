@@ -3,8 +3,8 @@ import { abilityAutocastEnabled } from "./hud_ability_affordance.js";
 
 const ITEMS = Object.freeze([
   { ability: ABILITY.ARMOR_TREASURE, slot: 10, category: "defense", label: "Armor", icon: "AR", effect: "50% additional armor" },
-  { ability: ABILITY.HASTE, slot: 11, category: "attack", label: "Haste", icon: "H", effect: "Double attack speed" },
-  { ability: ABILITY.DOUBLE_DAMAGE, slot: 11, category: "attack", label: "Double Damage", icon: "2X", effect: "Double weapon damage" },
+  { ability: ABILITY.HASTE, slot: 11, category: "attack", label: "Haste", icon: "H", effect: "Double primary weapon attack speed" },
+  { ability: ABILITY.DOUBLE_DAMAGE, slot: 11, category: "attack", label: "Double Damage", icon: "2X", effect: "Double primary weapon damage" },
 ]);
 
 function status(unit, ability) {

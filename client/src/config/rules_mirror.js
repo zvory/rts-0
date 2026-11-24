@@ -335,14 +335,14 @@ export const ABILITIES = Object.freeze({
 
   [ABILITY.HASTE]: Object.freeze({
     ability: ABILITY.HASTE, label: "Haste", icon: "H", hotkey: "A",
-    title: "Deliver an attack item within 30 tiles; activate for double attack speed for 30 seconds",
+    title: "Deliver an attack item within 30 tiles; activate for double primary weapon attack speed for 30 seconds",
     carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: 30,
     cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 100 }),
     queued: false, queuePolicy: "notQueueable",
   }),
   [ABILITY.DOUBLE_DAMAGE]: Object.freeze({
     ability: ABILITY.DOUBLE_DAMAGE, label: "Double Damage", icon: "2X", hotkey: "S",
-    title: "Deliver an attack item within 30 tiles; activate for double weapon damage for 30 seconds",
+    title: "Deliver an attack item within 30 tiles; activate for double primary weapon damage for 30 seconds",
     carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: 30,
     cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 150 }),
     queued: false, queuePolicy: "notQueueable",
