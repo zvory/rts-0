@@ -3,6 +3,8 @@ use super::*;
 #[test]
 fn disciple_shield_armors_artillery_and_drains_full_core_or_falloff() {
     let map = open_map(20);
+    let inner = config::ARTILLERY_INNER_RADIUS_TILES * config::TILE_SIZE as f32;
+    let outer = config::ARTILLERY_OUTER_RADIUS_TILES * config::TILE_SIZE as f32;
     let teams = TeamRelations::from_player_teams([(1, 1), (2, 2)]);
     for (offset, piercing) in [(0.0, true), (32.0, false)] {
         for inside in [false, true] {
@@ -49,11 +51,7 @@ fn disciple_shield_armors_artillery_and_drains_full_core_or_falloff() {
                             as u32
                     }
                 );
-                let full_damage = artillery_damage(
-                    offset * offset,
-                    (config::ARTILLERY_INNER_RADIUS_TILES * config::TILE_SIZE as f32).powi(2),
-                    (config::ARTILLERY_OUTER_RADIUS_TILES * config::TILE_SIZE as f32).powi(2),
-                );
+                let full_damage = artillery_damage(offset * offset, inner * inner, outer * outer);
                 assert_eq!(
                     entities
                         .get(caster)

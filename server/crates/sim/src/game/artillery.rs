@@ -2,7 +2,7 @@ use rts_rules::math::{Coord, GameplayMath as _};
 use std::collections::HashMap;
 
 use crate::config;
-use crate::game::entity::{Entity, EntityKind, EntityStore};
+use crate::game::entity::{Entity, EntityStore};
 use crate::game::entrenchment_combat;
 use crate::game::fog::Fog;
 use crate::game::map::Map;
@@ -283,6 +283,7 @@ fn push_under_attack_notice(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::game::entity::EntityKind;
     use crate::game::map::Map;
     use crate::protocol::terrain;
 

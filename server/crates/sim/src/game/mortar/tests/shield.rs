@@ -3,6 +3,7 @@ use super::*;
 #[test]
 fn disciple_shield_armors_mortar_and_rocket_hits_and_drains_full_damage() {
     let map = open_map(20);
+    let inner = config::ROCKET_BARRAGE_INNER_RADIUS_TILES * config::TILE_SIZE as f32;
     let teams = TeamRelations::from_player_teams([(1, 1), (2, 2)]);
     for (rocket, offset, piercing) in [(false, 0.0, false), (true, 0.0, true), (true, 32.0, false)]
     {
@@ -65,12 +66,7 @@ fn disciple_shield_armors_mortar_and_rocket_hits_and_drains_full_damage() {
                             as u32
                     }
                 );
-                let full_damage = shell_damage(
-                    rocket,
-                    offset * offset,
-                    (config::ROCKET_BARRAGE_INNER_RADIUS_TILES * config::TILE_SIZE as f32).powi(2),
-                    piercing,
-                );
+                let full_damage = shell_damage(rocket, offset * offset, inner * inner, piercing);
                 assert_eq!(
                     entities
                         .get(caster)
