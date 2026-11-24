@@ -756,12 +756,22 @@ fn manual_mortar_fire_damages_friendly_units_at_enemy_rate() {
     let friendly = game
         .state
         .entities
-        .spawn_unit(1, EntityKind::MachineGunner, target_pos.0, target_pos.1)
+        .spawn_unit(
+            1,
+            EntityKind::MachineGunner,
+            target_pos.0 - 12.0,
+            target_pos.1,
+        )
         .expect("friendly should spawn");
     let enemy = game
         .state
         .entities
-        .spawn_unit(2, EntityKind::MachineGunner, target_pos.0, target_pos.1)
+        .spawn_unit(
+            2,
+            EntityKind::MachineGunner,
+            target_pos.0 + 12.0,
+            target_pos.1,
+        )
         .expect("enemy should spawn");
     systems::recompute_supply(&mut game.state.players, &game.state.entities);
     game.rebuild_final_spatial();
@@ -788,12 +798,12 @@ fn manual_mortar_fire_damages_friendly_units_at_enemy_rate() {
         .entities
         .get_mut(friendly)
         .expect("friendly should still exist")
-        .set_position(impact_pos.0, impact_pos.1);
+        .set_position(impact_pos.0 - 12.0, impact_pos.1);
     game.state
         .entities
         .get_mut(enemy)
         .expect("enemy should still exist")
-        .set_position(impact_pos.0, impact_pos.1);
+        .set_position(impact_pos.0 + 12.0, impact_pos.1);
     for _ in 0..config::MORTAR_MANUAL_SHELL_DELAY_TICKS {
         game.tick();
     }

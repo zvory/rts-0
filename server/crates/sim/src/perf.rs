@@ -894,6 +894,31 @@ fn millis(duration: Duration) -> u128 {
     duration.as_millis()
 }
 
+// The sim cannot depend on server logging. Keep replay diagnostics in its permitted
+// centralized logging surface, alongside the existing simulation performance events.
+pub(crate) fn replay_hash_mismatch(expected: &str, actual: &str, tick: u32, recorded_build: &str) {
+    tracing::warn!(
+        expected,
+        actual,
+        tick,
+        recorded_build,
+        "replay end-state hash mismatch"
+    );
+}
+
+pub(crate) fn replay_hash_capture_failed(error: &str) {
+    tracing::warn!(error, "replay end-state hash capture failed");
+}
+
+pub(crate) fn replay_hash_capture_finished(elapsed: Duration, tick: u32, captured: bool) {
+    tracing::info!(
+        hash_us = elapsed.as_micros() as u64,
+        tick,
+        captured,
+        "replay end-state hash capture finished"
+    );
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

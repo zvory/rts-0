@@ -110,6 +110,11 @@ pub struct Entity {
 }
 
 impl Entity {
+    /// Rejected body motion must not consume waypoints or complete an arrival.
+    pub(crate) fn restore_blocked_movement(&mut self, previous: Option<MovementState>) {
+        self.movement = previous;
+    }
+
     pub fn new_unit(owner: u32, kind: EntityKind, x: f32, y: f32) -> Option<Self> {
         let s = config::unit_stats(kind)?;
         Some(Entity {

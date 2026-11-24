@@ -348,11 +348,10 @@ impl Game {
         );
 
         // ------------------------------------------------------------------
-        // 9. Mobile units do not stack on top of each other (PLAN §4.3).
-        //     Harvesting workers are anchored to their resource node and excluded — they
-        //     intentionally cannot be pushed by collision. All other mobile-unit pairs must
-        //     keep body overlap within `OVERLAP_TOLERANCE_PX` of floating-point and terrain-pinned
-        //     residue.
+        // 9. Opposing mobile units do not stack beyond authored/legacy overlap tolerance.
+        //     Friendly traffic may remain compressed when pinned by terrain or enemies.
+        //     Working workers retain the existing invariant exemption; movement admission
+        //     nevertheless checks their enemy contacts.
         // ------------------------------------------------------------------
         let units: Vec<_> = self.state.entities.iter().filter(|e| e.is_unit()).collect();
         for i in 0..units.len() {
@@ -361,7 +360,11 @@ impl Game {
                 continue;
             }
             for &b in units.iter().skip(i + 1) {
-                if is_collision_anchored(b) {
+                // Friendly traffic can remain compressed when pinned by enemy blockers.
+                if is_collision_anchored(b)
+                    || a.owner == b.owner
+                    || self.same_team_owner(a.owner, b.owner)
+                {
                     continue;
                 }
                 let Some(a_body) = unit_body_for_entity(a) else {

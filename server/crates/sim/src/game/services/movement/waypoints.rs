@@ -10,7 +10,7 @@ use crate::game::services::geometry::{
 };
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
-use crate::game::services::standability as static_standability;
+use crate::game::services::standability::{self as static_standability, UnitBlockers};
 use crate::game::teams::TeamRelations;
 use crate::game::upgrade::UpgradeKind;
 use crate::game::PlayerState;
@@ -57,6 +57,7 @@ pub(super) fn advance_moving_units(
     ability_runtime: &AbilityRuntime,
 ) {
     let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
+    let mut blockers = UnitBlockers::new(entities);
     let wire_tiles = super::barbed_wire::tiles(map, entities);
     for id in entities.ids() {
         let barrage_target = entities.get(id).and_then(barrage_maneuver_target);
@@ -129,16 +130,20 @@ pub(super) fn advance_moving_units(
                 e.next_waypoint(),
             )
         };
+        let Some(motion_entity) = entities.get(id).cloned() else {
+            continue;
+        };
+        let original_movement = motion_entity.movement.clone();
         let radius = entities.get(id).map(|e| e.radius());
-        let segment_clear = |from, to| {
+        let segment_clear = |blockers: &UnitBlockers, from, to| {
             static_standability::unit_static_segment_standable_with_radius(
                 map, occ, kind, from, to, radius,
-            )
+            ) && blockers.motion_clear(&motion_entity, to, motion_entity.facing(), &teams)
         };
         let unit_static_standable = |occ: &Occupancy, map: &Map, kind, x, y, facing| {
             static_standability::unit_static_standable_with_radius(
                 map, occ, kind, x, y, facing, radius,
-            )
+            ) && blockers.motion_clear(&motion_entity, (x, y), facing, &teams)
         };
         let breakthrough_multiplier = breakthrough_speed_multiplier(
             entities,
@@ -218,10 +223,18 @@ pub(super) fn advance_moving_units(
                 .get(id)
                 .map(|e| super::pivot_recovery::neighbors(entities, spatial, e))
                 .unwrap_or_default();
-            if entities.get_mut(id).is_some_and(|e| {
-                super::pivot_recovery::advance(e, map, occ, recovery_speed, &neighbors)
-            }) {
-                continue;
+            if let Some(e) = entities.get_mut(id) {
+                let before = e.clone();
+                if super::pivot_recovery::advance(e, map, occ, recovery_speed, &neighbors) {
+                    if !blockers.motion_clear(&before, (e.pos_x(), e.pos_y()), e.facing(), &teams) {
+                        *e = before;
+                        if let Some(m) = e.movement.as_mut() {
+                            m.pivot_recovery = None;
+                        }
+                    }
+                    blockers.update(e);
+                    continue;
+                }
             }
         }
         speed = movement_target.map_or(speed, directional_speed);
@@ -344,7 +357,7 @@ pub(super) fn advance_moving_units(
                             if uses_vehicle_movement {
                                 route_accepts_waypoint(map, occ, e, (x, y), (wx, wy), next_next)
                             } else {
-                                next_next.is_some_and(|next| segment_clear((x, y), next))
+                                next_next.is_some_and(|next| segment_clear(&blockers, (x, y), next))
                             }
                         });
                     accepted_pivot_waypoints = accepted_pivot_waypoints.saturating_sub(1);
@@ -416,6 +429,7 @@ pub(super) fn advance_moving_units(
                             y,
                             steering_path_dir,
                             budget,
+                            &teams,
                         )
                     } else {
                         None
@@ -538,6 +552,18 @@ pub(super) fn advance_moving_units(
             }
         }
 
+        // Car arcs, arrival snaps, rotation unjams and all fallback paths share admission.
+        if entities.get(id).is_some_and(|e| {
+            !blockers.motion_clear(e, (x, y), new_facing.unwrap_or(original_facing), &teams)
+        }) {
+            x = orig_x;
+            y = orig_y;
+            new_facing = None;
+            if let Some(e) = entities.get_mut(id) {
+                e.restore_blocked_movement(original_movement);
+            }
+        }
+
         // Compute neighbor repulsion before taking the mutable borrow.
         let repulsion_dir: (f32, f32) = {
             let unit_radius = entities
@@ -588,6 +614,8 @@ pub(super) fn advance_moving_units(
             if let Some(f) = new_facing {
                 e.set_facing(f);
             }
+            // Recovery below may finish early. Later units must always see the committed pose.
+            blockers.update(e);
             if is_car {
                 let active_reverse_waypoint = scout_car_reverse_waypoint.filter(|wp| {
                     e.next_waypoint()
@@ -694,8 +722,9 @@ pub(super) fn advance_moving_units(
                 if stuck_ticks >= recovery_threshold
                     && static_blocked_ticks == 0
                     && !uses_oriented_vehicle_body(kind)
-                    && skippable_next_waypoint
-                        .is_some_and(|following_waypoint| segment_clear((x, y), following_waypoint))
+                    && skippable_next_waypoint.is_some_and(|following_waypoint| {
+                        segment_clear(&blockers, (x, y), following_waypoint)
+                    })
                 {
                     e.pop_waypoint();
                     e.reset_stuck(x, y);
@@ -708,7 +737,7 @@ pub(super) fn advance_moving_units(
                         let dy = y - gy;
                         let dist_to_goal = (dx * dx + dy * dy).det_sqrt();
                         if dist_to_goal <= config::TOLERANT_ARRIVAL_RADIUS_PX
-                            && segment_clear((x, y), (gx, gy))
+                            && segment_clear(&blockers, (x, y), (gx, gy))
                         {
                             e.clear_path();
                             e.mark_move_phase(MovePhase::Arrived);

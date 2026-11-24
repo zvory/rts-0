@@ -17,10 +17,20 @@ fn point_tanks_rotate_at_normal_rate_without_translation() {
         tank.set_order(Order::Point { facing: desired });
     }
     let occ = Occupancy::build(&map, &entities);
-    super::super::tank_point::advance(&map, &mut entities, &occ);
+    super::super::tank_point::advance(
+        &map,
+        &mut entities,
+        &occ,
+        &crate::game::teams::TeamRelations::from_player_teams([]),
+    );
     assert!((entities.get(a).unwrap().facing() - TANK_BODY_TURN_RATE_RAD_PER_TICK).abs() < 0.0001);
     for _ in 0..100 {
-        super::super::tank_point::advance(&map, &mut entities, &occ);
+        super::super::tank_point::advance(
+            &map,
+            &mut entities,
+            &occ,
+            &crate::game::teams::TeamRelations::from_player_teams([]),
+        );
     }
     for (id, x) in [(a, 500.0), (b, 700.0)] {
         let tank = entities.get(id).unwrap();
@@ -43,7 +53,12 @@ fn tank_plus_point_turn_is_fifty_percent_faster() {
         facing: std::f32::consts::FRAC_PI_2,
     });
     let occ = Occupancy::build(&map, &entities);
-    super::super::tank_point::advance(&map, &mut entities, &occ);
+    super::super::tank_point::advance(
+        &map,
+        &mut entities,
+        &occ,
+        &crate::game::teams::TeamRelations::from_player_teams([]),
+    );
     assert!(
         (entities.get(id).unwrap().facing() - TANK_BODY_TURN_RATE_RAD_PER_TICK * 1.5).abs()
             < 0.0001

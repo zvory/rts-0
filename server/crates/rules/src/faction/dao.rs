@@ -70,8 +70,10 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 11] = [
     AbilityCatalogEntry {
         range_tiles: Some(balance::DAO_WIND_DASH_RANGE_TILES as f32),
         kind: AbilityKind::WindDash,
+        label: "Blink",
+        icon: "BLK",
         carriers: &[EntityKind::WindAdept],
-        title: "Dash up to 15 tiles; one charge, two at Master rank; recharges every 8 seconds",
+        title: "Blink up to 15 tiles; one charge, two at Master rank; recharges every 8 seconds",
         cooldown_ticks: 0,
         charges: Some(1),
         charge_recharge_ticks: Some(balance::EKAT_TELEPORT_COOLDOWN_TICKS),

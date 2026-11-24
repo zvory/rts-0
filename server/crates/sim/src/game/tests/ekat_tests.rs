@@ -459,7 +459,7 @@ fn queued_ekat_abilities_append_future_world_ability_intents() {
 }
 
 #[test]
-fn ekat_dash_rejects_invalid_landing_without_marker_or_cooldown() {
+fn ekat_dash_snaps_blocked_request_to_nearest_valid_landing() {
     let players = [ekat_player()];
     let mut game = empty_flat_game(&players);
     let pos = game.state.map.tile_center(10, 10);
@@ -476,16 +476,14 @@ fn ekat_dash_rejects_invalid_landing_without_marker_or_cooldown() {
     game.tick();
 
     let hero_entity = game.state.entities.get(hero).expect("hero exists");
-    assert!((hero_entity.pos_x() - pos.0).abs() < f32::EPSILON);
-    assert_eq!(
-        hero_entity.ability_cooldown_ticks(ability::AbilityKind::EkatTeleport),
-        0
-    );
-    assert!(active_return_marker_id(&game, hero).is_none());
+    assert_ne!((hero_entity.pos_x(), hero_entity.pos_y()), target);
+    assert!((hero_entity.pos_x() - target.0).det_hypot(hero_entity.pos_y() - target.1) < 40.0);
+    assert!(hero_entity.ability_cooldown_ticks(ability::AbilityKind::EkatTeleport) > 0);
+    assert!(active_return_marker_id(&game, hero).is_some());
 }
 
 #[test]
-fn ekat_dash_rejects_unwalkable_landing_without_marker_or_cooldown() {
+fn ekat_dash_snaps_unwalkable_landing_and_starts_marker_and_cooldown() {
     let players = [ekat_player()];
     let mut game = empty_flat_game(&players);
     let pos = game.state.map.tile_center(10, 10);
@@ -501,12 +499,28 @@ fn ekat_dash_rejects_unwalkable_landing_without_marker_or_cooldown() {
     game.tick();
 
     let hero_entity = game.state.entities.get(hero).expect("hero exists");
-    assert!((hero_entity.pos_x() - pos.0).abs() < f32::EPSILON);
-    assert_eq!(
-        hero_entity.ability_cooldown_ticks(ability::AbilityKind::EkatTeleport),
-        0
+    let landing = (hero_entity.pos_x(), hero_entity.pos_y());
+    assert_ne!(landing, target);
+    assert!((landing.0 - target.0).det_hypot(landing.1 - target.1) <= 43.0);
+    let occ =
+        crate::game::services::occupancy::Occupancy::build(&game.state.map, &game.state.entities);
+    assert!(
+        crate::game::services::standability::unit_static_standable_with_radius(
+            &game.state.map,
+            &occ,
+            hero_entity.kind,
+            landing.0,
+            landing.1,
+            hero_entity.facing(),
+            Some(hero_entity.radius())
+        )
     );
-    assert!(active_return_marker_id(&game, hero).is_none());
+    assert!(
+        (landing.0 - pos.0).det_hypot(landing.1 - pos.1)
+            <= config::EKAT_TELEPORT_RANGE_TILES as f32 * config::TILE_SIZE as f32
+    );
+    assert!(hero_entity.ability_cooldown_ticks(ability::AbilityKind::EkatTeleport) > 0);
+    assert!(active_return_marker_id(&game, hero).is_some());
 }
 
 #[test]

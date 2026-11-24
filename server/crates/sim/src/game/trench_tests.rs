@@ -373,7 +373,7 @@ fn collision_shove_cancels_dig_in_progress() {
 
     game.state
         .entities
-        .spawn_unit(2, EntityKind::Rifleman, pos.0 + 1.0, pos.1)
+        .spawn_unit(1, EntityKind::Rifleman, pos.0 + 1.0, pos.1)
         .expect("blocking rifleman should spawn");
     repair_world(&mut game);
 

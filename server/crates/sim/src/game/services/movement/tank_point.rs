@@ -6,7 +6,13 @@ use super::{
 use crate::game::entity::{EntityKind, EntityStore, Order};
 use crate::game::map::Map;
 
-pub(super) fn advance(map: &Map, entities: &mut EntityStore, occ: &Occupancy) {
+pub(super) fn advance(
+    map: &Map,
+    entities: &mut EntityStore,
+    occ: &Occupancy,
+    teams: &crate::game::teams::TeamRelations,
+) {
+    let mut blockers = crate::game::services::standability::UnitBlockers::new(entities);
     for id in entities.ids() {
         let Some(tank) = entities.get_mut(id) else {
             continue;
@@ -29,8 +35,10 @@ pub(super) fn advance(map: &Map, entities: &mut EntityStore, occ: &Occupancy) {
             tank.pos_x(),
             tank.pos_y(),
             next,
-        ) {
+        ) && blockers.motion_clear(tank, (tank.pos_x(), tank.pos_y()), next, teams)
+        {
             tank.set_facing(next);
+            blockers.update(tank);
         }
     }
 }

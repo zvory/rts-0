@@ -184,15 +184,17 @@ fn dao_master_dash_and_return_reject_adept_sized_building_clearance() {
         .unwrap();
     game.state.entities.get_mut(id).unwrap().insight = 200;
     game.tick();
-    assert!(crate::game::hero_abilities::ekat_dash_destination(
+    let landing = crate::game::hero_abilities::ekat_dash_destination(
         &game.state.map,
         &game.state.entities,
         id,
         666.5,
         600.0,
-        Some(10.0)
+        Some(10.0),
     )
-    .is_none());
+    .expect("blocked requested spot should snap to a nearby legal landing");
+    assert_ne!(landing, (666.5, 600.0));
+
     assert!(!crate::game::hero_abilities::ekat_return_destination_valid(
         &game.state.map,
         &game.state.entities,

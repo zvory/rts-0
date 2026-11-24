@@ -75,7 +75,10 @@ muzzle flash or area damage. Novices, all three Adept kinds, and their Masters u
 target and no movement path: resistance 60 instead of ordinary infantry combat resistance 3.
 Moving or untargeted Disciples retain soft footing (1). Rooted combatants are exempt from the
 extra traffic centerline lateral nudge; ordinary overlap separation still applies, so equally
-rooted units split an overlap evenly rather than stacking. The shared footing system also
+friendly rooted units split an overlap evenly when space permits. Opponents block movement and
+never receive contact pushes, regardless of footing; friendly traffic may stay compressed against
+an enemy. Wind’s ability is displayed as **Blink** (the internal `windDash` id and D hotkey
+remain unchanged). Blink chooses the nearest unoccupied legal landing within cast range. The shared footing system also
 reduces stationary Magic Anchor pull with the higher resistance.
 It holds position while attacking and otherwise uses
 the ordinary attack, attack-move, hold, rally, fog, blocker, damage, and death rules.

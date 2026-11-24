@@ -620,7 +620,7 @@ fn wind_strikes_without_canceling_its_melee_approach() {
             let mut entities = EntityStore::new();
             let attacker = entities.spawn_unit(1, kind, 100.0, 100.0).unwrap();
             let target = entities
-                .spawn_unit(2, EntityKind::ScoutCar, 145.0, 100.0)
+                .spawn_unit(2, EntityKind::ScoutCar, 165.0, 100.0)
                 .unwrap();
             let unit = entities.get_mut(attacker).unwrap();
             unit.set_order(match order_name {

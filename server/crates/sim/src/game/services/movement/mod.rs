@@ -48,14 +48,31 @@ pub(super) const STEERING_MAX_NEIGHBORS: usize = 16;
 const MAGIC_ANCHOR_STATIONARY_PULL_PER_TICK_SCALE: f32 =
     config::EKAT_MAGIC_ANCHOR_PULL_TOWARD_MULTIPLIER - 1.0;
 
+#[cfg(test)]
 pub(crate) fn resolve_collisions(
     entities: &mut EntityStore,
     spatial: &SpatialIndex,
     map: &Map,
     occ: &Occupancy,
 ) -> bool {
+    resolve_collisions_with_teams(
+        entities,
+        spatial,
+        map,
+        occ,
+        &crate::game::teams::TeamRelations::from_player_teams([]),
+    )
+}
+
+pub(crate) fn resolve_collisions_with_teams(
+    entities: &mut EntityStore,
+    spatial: &SpatialIndex,
+    map: &Map,
+    occ: &Occupancy,
+    teams: &crate::game::teams::TeamRelations,
+) -> bool {
     let before = barbed_wire::positions(map, entities);
-    collision::resolve_collisions(entities, spatial, map, occ);
+    collision::resolve_collisions(entities, spatial, map, occ, teams);
     barbed_wire::apply_entries(map, entities, &before)
 }
 pub(crate) use pivot_drive::{angle_delta, rotate_toward};
@@ -130,14 +147,22 @@ pub(crate) fn movement_system_with_context(
         }
     }
     scout_plane::advance_scout_planes(map, entities);
-    tank_point::advance(map, entities, occ);
-    armor_reaction::turn_stationary_tanks_toward_locked_ap_source(
-        entities,
-        tick,
-        |_owner, kind, x, y, facing| {
-            standability::unit_static_standable(occ, map, kind, x, y, facing)
-        },
+    let teams = crate::game::teams::TeamRelations::from_player_teams(
+        players.iter().map(|p| (p.id, p.team_id)),
     );
+    tank_point::advance(map, entities, occ, &teams);
+    let mut turn_blockers = crate::game::services::standability::UnitBlockers::new(entities);
+    armor_reaction::turn_stationary_tanks_toward_locked_ap_source(entities, tick, |e, facing| {
+        let allowed =
+            standability::unit_static_standable(occ, map, e.kind, e.pos_x(), e.pos_y(), facing)
+                && turn_blockers.motion_clear(e, (e.pos_x(), e.pos_y()), facing, &teams);
+        if allowed {
+            let mut turned = e.clone();
+            turned.set_facing(facing);
+            turn_blockers.update(&turned);
+        }
+        allowed
+    });
     waypoints::advance_moving_units(map, entities, players, occ, spatial, tick, ability_runtime);
     apply_magic_anchor_stationary_pull(map, entities, players, occ, tick, ability_runtime);
     barbed_wire::apply_entries(map, entities, &wire_positions);
@@ -191,6 +216,7 @@ fn apply_magic_anchor_stationary_pull(
     let teams = crate::game::teams::TeamRelations::from_player_teams(
         players.iter().map(|p| (p.id, p.team_id)),
     );
+    let mut blockers = crate::game::services::standability::UnitBlockers::new(entities);
     let world_max_x = map.world_width_px() - 0.01;
     let world_max_y = map.world_height_px() - 0.01;
     for id in entities.ids() {
@@ -239,8 +265,15 @@ fn apply_magic_anchor_stationary_pull(
         ) {
             continue;
         }
+        if entities
+            .get(id)
+            .is_some_and(|e| !blockers.motion_clear(e, (next_x, next_y), facing, &teams))
+        {
+            continue;
+        }
         if let Some(e) = entities.get_mut(id) {
             e.set_position(next_x, next_y);
+            blockers.update(e);
             let (next_x, next_y) = (e.pos_x(), e.pos_y());
             e.set_movement_delta(next_x - x, next_y - y);
         }

@@ -1,4 +1,4 @@
-use crate::game::entity::{AttackPhase, Entity, EntityKind, EntityStore, MovePhase, Order};
+use crate::game::entity::{AttackPhase, Entity, EntityStore, MovePhase, Order};
 use rts_rules::math::GameplayMath as _;
 
 use super::pivot_drive::{angle_delta, rotate_toward, vehicle_body_turn_rate};
@@ -14,7 +14,7 @@ pub(super) fn turn_stationary_tanks_toward_locked_ap_source<F>(
     tick: u32,
     mut turn_is_allowed: F,
 ) where
-    F: FnMut(u32, EntityKind, f32, f32, f32) -> bool,
+    F: FnMut(&Entity, f32) -> bool,
 {
     for id in entities.ids() {
         if let Some(combat) = entities.get_mut(id).and_then(|tank| tank.combat.as_mut()) {
@@ -26,18 +26,9 @@ pub(super) fn turn_stationary_tanks_toward_locked_ap_source<F>(
             }
         }
 
-        let Some((owner, kind, x, y, current, desired)) = entities.get(id).and_then(|tank| {
+        let Some((kind, current, desired)) = entities.get(id).and_then(|tank| {
             tank_can_react(tank).then(|| {
-                locked_source_facing(tank).map(|desired| {
-                    (
-                        tank.owner,
-                        tank.kind,
-                        tank.pos_x(),
-                        tank.pos_y(),
-                        tank.facing(),
-                        desired,
-                    )
-                })
+                locked_source_facing(tank).map(|desired| (tank.kind, tank.facing(), desired))
             })?
         }) else {
             continue;
@@ -49,7 +40,9 @@ pub(super) fn turn_stationary_tanks_toward_locked_ap_source<F>(
         let multiplier = entities.get(id).map_or(1.0, |e| e.tank_turn_multiplier());
         let rotated = rotate_toward(current, desired, vehicle_body_turn_rate(kind) * multiplier);
         if angle_delta(current, rotated).abs() <= FACING_EPS_RAD
-            || !turn_is_allowed(owner, kind, x, y, rotated)
+            || !entities
+                .get(id)
+                .is_some_and(|e| turn_is_allowed(e, rotated))
         {
             continue;
         }
@@ -92,10 +85,11 @@ pub(super) fn locked_source_facing(tank: &Entity) -> Option<f32> {
 mod tests {
     use super::*;
     use crate::config;
+    use crate::game::entity::EntityKind;
     use crate::game::entity::EntityStore;
 
     fn turn_once(entities: &mut EntityStore, tick: u32) {
-        turn_stationary_tanks_toward_locked_ap_source(entities, tick, |_, _, _, _, _| true);
+        turn_stationary_tanks_toward_locked_ap_source(entities, tick, |_, _| true);
     }
 
     #[test]
@@ -259,7 +253,8 @@ mod tests {
         let before = (tank.pos_x(), tank.pos_y(), tank.facing());
 
         let mut checked_legality = false;
-        turn_stationary_tanks_toward_locked_ap_source(&mut entities, 11, |owner, kind, x, y, _| {
+        turn_stationary_tanks_toward_locked_ap_source(&mut entities, 11, |e, _| {
+            let (owner, kind, x, y) = (e.owner, e.kind, e.pos_x(), e.pos_y());
             checked_legality = true;
             assert_eq!((owner, kind, x, y), (1, EntityKind::Tank, 15.0, 300.0));
             false

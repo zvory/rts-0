@@ -33,8 +33,12 @@ impl ReplayArtifactV1 {
         }
         let actual = game.replay_end_state_hash()?;
         if actual != expected.digest {
-            tracing::warn!(expected = %expected.digest, %actual, tick = game.tick_count(),
-                recorded_build = %self.server_build_sha, "replay end-state hash mismatch");
+            crate::perf::replay_hash_mismatch(
+                &expected.digest,
+                &actual,
+                game.tick_count(),
+                &self.server_build_sha,
+            );
         }
         Ok(Some(actual == expected.digest))
     }

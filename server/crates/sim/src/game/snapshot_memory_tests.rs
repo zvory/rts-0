@@ -595,7 +595,7 @@ fn observer_switches_restore_each_players_authoritative_anti_tank_gun_memory() {
 
     game.state
         .entities
-        .spawn_unit(2, EntityKind::ScoutCar, gun_pos.0, gun_pos.1)
+        .spawn_unit(2, EntityKind::ScoutCar, gun_pos.0 - 64.0, gun_pos.1)
         .expect("Bravo re-scout should spawn");
     advance_to_next_fog_refresh(&mut game);
     assert!(

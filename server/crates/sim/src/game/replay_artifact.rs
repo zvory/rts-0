@@ -233,15 +233,14 @@ impl ReplayStartComposition {
                 digest,
             }),
             Err(error) => {
-                tracing::warn!(%error, "replay end-state hash capture failed");
+                crate::perf::replay_hash_capture_failed(&error);
                 None
             }
         };
-        tracing::info!(
-            hash_us = started.elapsed().as_micros() as u64,
-            tick = game.tick_count(),
-            captured = end_state_hash.is_some(),
-            "replay end-state hash capture finished"
+        crate::perf::replay_hash_capture_finished(
+            started.elapsed(),
+            game.tick_count(),
+            end_state_hash.is_some(),
         );
         ReplayArtifactV1 {
             artifact_schema_version: REPLAY_ARTIFACT_CURRENT_SCHEMA_VERSION,

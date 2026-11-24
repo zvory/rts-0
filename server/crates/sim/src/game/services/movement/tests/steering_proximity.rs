@@ -17,7 +17,15 @@ fn steering_with_blocker_offset(offset: (f32, f32)) -> (f32, f32) {
         .expect("blocker")
         .set_weapon_setup(WeaponSetup::Deployed);
     let spatial = SpatialIndex::build(&entities, map.width, map.height);
-    steering::local_steering_dir(&entities, &spatial, mover, sx, sy, (1.0, 0.0))
+    steering::local_steering_dir(
+        &entities,
+        &spatial,
+        mover,
+        sx,
+        sy,
+        (1.0, 0.0),
+        &crate::game::teams::TeamRelations::from_player_teams([]),
+    )
 }
 
 #[test]

@@ -109,7 +109,7 @@ fn dao_master_combat_threshold_and_damage_apply_to_combat_paths() {
         let target = game
             .state
             .entities
-            .spawn_unit(2, EntityKind::WindAdept, 425.0, 400.0)
+            .spawn_unit(2, EntityKind::WindAdept, 455.0, 400.0)
             .unwrap();
         let victim = game.state.entities.get_mut(target).unwrap();
         let target_hp = victim.hp;
