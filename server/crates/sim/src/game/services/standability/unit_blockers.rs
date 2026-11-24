@@ -86,8 +86,8 @@ impl UnitBlockers {
         })
     }
 
-    /// Swept checks include rotation and stored-coordinate rounding. Conservative expansion
-    /// covers the gaps between samples, so even a fast push cannot tunnel through a body.
+    /// Swept checks include rotation and stored-coordinate rounding. Moving circles use a swept
+    /// capsule; conservative expansion covers the gaps between oriented-body samples.
     /// Pre-existing authored overlaps may escape, but may never deepen.
     pub(crate) fn motion_clear(
         &self,
@@ -143,6 +143,31 @@ impl UnitBlockers {
                 continue;
             }
             let initial = unit_body_overlap(start, other.body).map_or(0.0, |o| o.depth);
+            if let (UnitBody::Circle(start), UnitBody::Circle(end)) = (start, end_body) {
+                // For an existing overlap with a hull, retain the pose-by-pose depth checks:
+                // the whole capsule's separation depth need not match a single disk's depth.
+                if initial <= 0.001 || matches!(other.body, UnitBody::Circle(_)) {
+                    // The swept disk is a capsule. Unlike expanded midpoint samples, this permits
+                    // tangent motion at contact while still checking the complete stored-pose segment.
+                    let dx = end.x - start.x;
+                    let dy = end.y - start.y;
+                    let sweep = UnitBody::OrientedCapsule(OrientedCapsuleBody {
+                        x: (start.x + end.x) * 0.5,
+                        y: (start.y + end.y) * 0.5,
+                        half_segment: dx.det_hypot(dy) * 0.5,
+                        radius: start.radius,
+                        facing: dy.det_atan2(dx),
+                    });
+                    if unit_body_overlap(sweep, other.body)
+                        .is_some_and(|o| o.depth > initial + 0.001)
+                        || unit_body_overlap(end_body, other.body)
+                            .is_some_and(|o| o.depth > initial)
+                    {
+                        return false;
+                    }
+                    continue;
+                }
+            }
             // Already overlapping scenes must be able to separate. For legal scenes, a
             // midpoint's expanded body bounds every pose in its sample interval.
             for step in 0..steps {

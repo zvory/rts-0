@@ -10,8 +10,8 @@ use crate::game::map::Map;
 use crate::game::services::geometry::{
     building_rect_for_entity, building_rect_for_footprint, circle_intersects_rect, rects_intersect,
     tile_rect, unit_bodies_intersect, unit_body, unit_body_for_entity, unit_body_intersects_circle,
-    unit_body_intersects_rect, unit_body_overlap, unit_body_with_facing, CircleBody, RectBody,
-    UnitBody,
+    unit_body_intersects_rect, unit_body_overlap, unit_body_with_facing, CircleBody,
+    OrientedCapsuleBody, RectBody, UnitBody,
 };
 use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;

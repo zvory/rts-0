@@ -123,6 +123,29 @@ fn swept_enemy_check_rejects_tunneling_and_hull_rotation() {
 }
 
 #[test]
+fn touching_infantry_can_slide_along_enemy_contact_without_crossing() {
+    for kind in [EntityKind::Rifleman, EntityKind::Tank, EntityKind::ScoutCar] {
+        let mut entities = EntityStore::new();
+        let radius = config::unit_stats(EntityKind::Rifleman).unwrap().radius;
+        let enemy = entities.spawn_unit(2, kind, 450.0, 600.0).unwrap();
+        let hull = unit_body_for_entity(entities.get(enemy).unwrap()).unwrap();
+        let x = hull.aabb().min_x - radius;
+        let a = entities
+            .spawn_unit(1, EntityKind::Rifleman, x, 600.0)
+            .unwrap();
+        let blockers = standability::UnitBlockers::new(&entities);
+        let unit = entities.get(a).unwrap();
+        assert!(
+            blockers.motion_clear(unit, (x, 601.0), 0.0, &teams()),
+            "{kind:?}"
+        );
+        assert!(blockers.motion_clear(unit, (x - 1.0, 600.0), 0.0, &teams()));
+        assert!(!blockers.motion_clear(unit, (x + 1.0, 601.0), 0.0, &teams()));
+        assert!(!blockers.motion_clear(unit, (hull.aabb().max_x + radius, 600.0), 0.0, &teams()));
+    }
+}
+
+#[test]
 fn wall_slide_repath_updates_body_before_later_enemy_moves() {
     let map = flat_map(2);
     let mut entities = EntityStore::new();
