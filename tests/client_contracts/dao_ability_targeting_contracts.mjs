@@ -31,17 +31,17 @@ swordInput._groundAtScreen = (x, y) => ({ x, y });
 swordInput._refreshAbilityTargetPreview();
 assertDeepEqual(
   swordInput.clientIntent.abilityTargetPreview.pathOrigins.map((origin) => origin.id),
-  [101], "Throw Sword previews originate only from owned War Masters",
+  [101, 107], "Throw Sword previews originate from owned War Adepts and Masters",
 );
-assert(!swordInput.clientIntent.abilityTargetPreview.hoverInRange,
-  "Ineligible nearby Disciples do not mark the Throw Sword cursor in range");
+assert(swordInput.clientIntent.abilityTargetPreview.hoverInRange,
+  "A nearby War Adept marks the Throw Sword cursor in range");
 const swordCommands = [];
 swordInput.commandInteraction = { issueCommand: (command) => swordCommands.push(command) };
 swordInput._selectedOwnUnitIds = () => swordSelection.filter((e) => e.owner === 1).map((e) => e.id);
 swordInput._resourceAtScreen = () => null;
 swordInput._addCommandFeedback = () => {};
 swordInput._issueTargetedCommand(swordInput.mouse);
-assertDeepEqual(swordCommands[0].units, [101],
+assertDeepEqual(swordCommands[0].units, [101, 107],
   "Throw Sword commands include the same eligible carriers as the preview");
 const swordMinimap = Object.create(Minimap.prototype);
 swordMinimap.state = swordInput.state;
@@ -49,14 +49,14 @@ swordMinimap._intent = () => swordInput.clientIntent;
 swordMinimap.commandInteraction = swordInput.commandInteraction;
 swordMinimap._addCommandFeedback = () => {};
 swordMinimap._issueOrder(500, 220, true);
-assertDeepEqual(swordCommands[1].units, [101],
+assertDeepEqual(swordCommands[1].units, [101, 107],
   "Minimap Throw Sword commands exclude other Dao paths and enemy Disciples");
 assert(swordCommands[1].queued, "Minimap Throw Sword retains queued targeting");
 const swordAffordance = selectedAbilityAffordances({
   playerId: 1, factionId: "cultivators", groupCooldownClocks,
 }, swordSelection)
   .find((entry) => entry.definition.ability === ABILITY.THROW_SWORD);
-assertDeepEqual(swordAffordance.carrierIds, [101],
+assertDeepEqual(swordAffordance.carrierIds, [101, 107],
   "Throw Sword command card shares targeting carrier eligibility");
 
 for (const daoMaster of [false, true]) {
@@ -65,9 +65,31 @@ for (const daoMaster of [false, true]) {
     selection: [{ id: 107, owner: 1, kind: KIND.WAR_ADEPT, daoMaster }],
     resources: { steel: 0, oil: 0 }, upgrades: [],
   });
-  assert(card.slots.some((slot) => slot?.ability === ABILITY.THROW_SWORD) === daoMaster,
-    "Throw Sword appears only after War Master advancement");
+  assert(card.slots.some((slot) => slot?.ability === ABILITY.THROW_SWORD),
+    "Throw Sword appears for War Adepts and Masters");
 }
+
+for (const [daoMaster, total] of [[false, 1200], [true, 600]]) {
+  const affordance = selectedAbilityAffordances({
+    playerId: 1, factionId: "cultivators", groupCooldownClocks,
+    resources: { steel: 0, oil: 0 }, upgrades: [],
+  }, [{ id: 107, owner: 1, kind: KIND.WAR_ADEPT, daoMaster,
+    abilities: [{ ability: ABILITY.THROW_SWORD, cooldownLeft: total / 2 }] }])
+    .find((entry) => entry.definition.ability === ABILITY.THROW_SWORD);
+  assertDeepEqual(affordance.cooldownClocks, groupCooldownClocks([total / 2], total),
+    "Throw Sword clock uses its rank's full cooldown");
+}
+
+const mixedSword = selectedAbilityAffordances({
+  playerId: 1, factionId: "cultivators", groupCooldownClocks,
+  resources: { steel: 0, oil: 0 }, upgrades: [],
+}, [false, true].map((daoMaster, index) => ({
+  id: 200 + index, owner: 1, kind: KIND.WAR_ADEPT, daoMaster,
+  abilities: [{ ability: ABILITY.THROW_SWORD, cooldownLeft: 300 }],
+}))).find((entry) => entry.definition.ability === ABILITY.THROW_SWORD);
+assertDeepEqual(mixedSword.cooldownClocks, [
+  ...groupCooldownClocks([300], 1200), ...groupCooldownClocks([300], 600),
+], "Mixed ranks keep separate cooldown clock durations");
 
 for (const insight of [0, 60]) {
   const disciple = { id: 106, owner: 1, kind: KIND.WARRIOR, insight, chosenDao: "war" };

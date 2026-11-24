@@ -931,150 +931,205 @@ fn disciple_pending_dao_advances_on_combat_insight_without_interrupting_attack()
 }
 
 #[test]
-fn war_throw_sword_is_master_gated_and_hits_harder_on_return_after_checkpoint() {
-    use crate::game::ability::AbilityKind;
-    use crate::game::upgrade::UpgradeKind;
-    let mut game = empty_flat_game(&[cultivator_player(), human_vs_ai_players()[1].clone()]);
-    let caster = game
-        .state
-        .entities
-        .spawn_unit(1, EntityKind::Warrior, 400.0, 400.0)
-        .unwrap();
-    game.state
-        .entities
-        .get_mut(caster)
-        .unwrap()
-        .replace_active_order(Order::HoldPosition);
-    let victim = game
-        .state
-        .entities
-        .spawn_building(2, EntityKind::ResourceDepot, 560.0, 476.0, true)
-        .unwrap();
-    let cast = Command::UseAbility {
-        target_id: None,
-        ability: AbilityKind::ThrowSword,
-        units: vec![caster],
-        x: Some(1000.0),
-        y: Some(400.0),
-        queued: false,
-    };
-    for dao in [
-        None,
-        Some(UpgradeKind::DaoWind),
-        Some(UpgradeKind::DaoOfMagic),
-        Some(UpgradeKind::DaoOfHeaviness),
-    ] {
-        let unit = game.state.entities.get_mut(caster).unwrap();
-        unit.set_disciple_kind_for_test(
-            dao.and_then(EntityKind::evolved_disciple)
-                .unwrap_or(EntityKind::Warrior),
-        );
-        // Isolate ability gating from the new ordinary ranged attacks.
-        unit.set_attack_cd(1000);
-        game.enqueue(1, cast.clone());
-        game.tick();
-        assert_eq!(game.state.ability_runtime.world_objects().count(), 0);
-    }
-    game.state.entities.get_mut(caster).unwrap().insight = 0;
-    game.state
-        .entities
-        .get_mut(caster)
-        .unwrap()
-        .set_disciple_kind_for_test(EntityKind::WarAdept);
-    let unit = game.state.entities.get_mut(caster).unwrap();
-    unit.insight = config::DISCIPLE_EVOLVED_INSIGHT_CAP;
-    unit.advance_dao_master();
-    assert!(unit.dao_ability_available(AbilityKind::ThrowSword));
-    let fragile = game
-        .state
-        .entities
-        .spawn_unit(2, EntityKind::Rifleman, 440.0, 400.0)
-        .unwrap();
-    game.state
-        .entities
-        .get_mut(fragile)
-        .unwrap()
-        .set_spawn_health(7);
-    let protected = game
-        .state
-        .entities
-        .spawn_unit(2, EntityKind::Rifleman, 460.0, 400.0)
-        .unwrap();
-    game.state
-        .entities
-        .get_mut(protected)
-        .unwrap()
-        .set_invulnerable(true);
-    for id in [fragile, protected] {
-        let target = game.state.entities.get_mut(id).unwrap();
-        target.set_attack_cd(1000);
-        target.replace_active_order(Order::HoldPosition);
-    }
-    game.enqueue(1, cast);
-    game.tick();
-    // Throw Sword clears the active order. Keep ordinary melee out of this projectile test.
-    game.state
-        .entities
-        .get_mut(caster)
-        .unwrap()
-        .replace_active_order(Order::HoldPosition);
-    let object = game.state.ability_runtime.world_objects().next().unwrap();
-    assert_eq!(object.ability, AbilityKind::ThrowSword);
-    assert!((object.x.to_world() - (400.0 + 100.0 / 11.0)).abs() < 0.01);
-    assert_eq!(object.expires_tick - object.created_tick, 83);
-    assert_eq!(
+fn war_throw_sword_has_rank_cooldown_and_hits_harder_on_return_after_checkpoint() {
+    for master in [false, true] {
+        use crate::game::ability::AbilityKind;
+        use crate::game::upgrade::UpgradeKind;
+        let mut game = empty_flat_game(&[cultivator_player(), human_vs_ai_players()[1].clone()]);
+        let caster = game
+            .state
+            .entities
+            .spawn_unit(1, EntityKind::Warrior, 400.0, 400.0)
+            .unwrap();
         game.state
+            .entities
+            .get_mut(caster)
+            .unwrap()
+            .replace_active_order(Order::HoldPosition);
+        let victim = game
+            .state
+            .entities
+            .spawn_building(2, EntityKind::ResourceDepot, 560.0, 476.0, true)
+            .unwrap();
+        let cast = Command::UseAbility {
+            target_id: None,
+            ability: AbilityKind::ThrowSword,
+            units: vec![caster],
+            x: Some(1000.0),
+            y: Some(400.0),
+            queued: false,
+        };
+        for dao in [
+            None,
+            Some(UpgradeKind::DaoWind),
+            Some(UpgradeKind::DaoOfMagic),
+        ] {
+            let unit = game.state.entities.get_mut(caster).unwrap();
+            unit.set_disciple_kind_for_test(
+                dao.and_then(EntityKind::evolved_disciple)
+                    .unwrap_or(EntityKind::Warrior),
+            );
+            // Isolate ability gating from the new ordinary ranged attacks.
+            unit.set_attack_cd(1000);
+            game.enqueue(1, cast.clone());
+            game.tick();
+            assert_eq!(game.state.ability_runtime.world_objects().count(), 0);
+        }
+        game.state.entities.get_mut(caster).unwrap().insight = 0;
+        game.state
+            .entities
+            .get_mut(caster)
+            .unwrap()
+            .set_disciple_kind_for_test(EntityKind::WarAdept);
+        let unit = game.state.entities.get_mut(caster).unwrap();
+        if master {
+            unit.insight = config::DISCIPLE_EVOLVED_INSIGHT_CAP;
+            unit.advance_dao_master();
+        }
+        assert!(unit.dao_ability_available(AbilityKind::ThrowSword));
+        let fragile = game
+            .state
+            .entities
+            .spawn_unit(2, EntityKind::Rifleman, 440.0, 400.0)
+            .unwrap();
+        game.state
+            .entities
+            .get_mut(fragile)
+            .unwrap()
+            .set_spawn_health(7);
+        let protected = game
+            .state
+            .entities
+            .spawn_unit(2, EntityKind::Rifleman, 460.0, 400.0)
+            .unwrap();
+        game.state
+            .entities
+            .get_mut(protected)
+            .unwrap()
+            .set_invulnerable(true);
+        for id in [fragile, protected] {
+            let target = game.state.entities.get_mut(id).unwrap();
+            target.set_attack_cd(1000);
+            target.replace_active_order(Order::HoldPosition);
+        }
+        game.enqueue(1, cast);
+        game.tick();
+        // Throw Sword clears the active order. Keep ordinary melee out of this projectile test.
+        game.state
+            .entities
+            .get_mut(caster)
+            .unwrap()
+            .replace_active_order(Order::HoldPosition);
+        let object = game.state.ability_runtime.world_objects().next().unwrap();
+        assert_eq!(object.ability, AbilityKind::ThrowSword);
+        assert!((object.x.to_world() - (400.0 + 100.0 / 11.0)).abs() < 0.01);
+        assert_eq!(object.expires_tick - object.created_tick, 83);
+        assert_eq!(
+            game.state
+                .entities
+                .get(caster)
+                .unwrap()
+                .ability_cooldown_ticks(AbilityKind::ThrowSword),
+            config::EKAT_LINE_SHOT_COOLDOWN_TICKS * if master { 1 } else { 2 } - 1
+        );
+        for _ in 0..20 {
+            game.tick();
+        }
+        assert_eq!(
+            game.state.entities.get(victim).unwrap().hp,
+            175,
+            "exactly one 5 damage outbound hit after building armor"
+        );
+        assert_eq!(
+            game.state.entities.get(caster).unwrap().insight,
+            0,
+            "Throw Sword grants no insight from unit or building hits"
+        );
+        // The depot is 76 px off the path: outside the former 64 + 9.6 px hit radius.
+        // The 1.76-second target rounds each leg up to 27 ticks (54 ticks total).
+        for _ in 0..6 {
+            game.tick();
+        }
+        let object = game.state.ability_runtime.world_objects().next().unwrap();
+        assert!((object.x.to_world() - 640.0).abs() < 0.01);
+        // A round trip through a checkpoint retains the projectile identity, leg and hit sets.
+        let checkpoint = game.checkpoint_payload_text_for_test().unwrap();
+        let mut restored = Game::restore_checkpoint_payload_text_for_test(
+            &checkpoint,
+            game.state.map.clone(),
+            game.state.map_metadata.clone(),
+        )
+        .unwrap();
+        for _ in 0..26 {
+            game.tick();
+            restored.tick();
+        }
+        assert_eq!(game.state.ability_runtime.world_objects().count(), 1);
+        assert_eq!(restored.state.ability_runtime.world_objects().count(), 1);
+        game.tick();
+        restored.tick();
+        assert_eq!(
+            game.state.entities.get(victim).unwrap().hp,
+            165,
+            "exactly one 10 damage return hit after building armor"
+        );
+        assert_eq!(restored.state.entities.get(victim).unwrap().hp, 165);
+        assert_eq!(game.state.entities.get(caster).unwrap().insight, 0);
+        assert_eq!(restored.state.entities.get(caster).unwrap().insight, 0);
+        assert_eq!(game.state.ability_runtime.world_objects().count(), 0);
+        let remaining = game
+            .state
             .entities
             .get(caster)
             .unwrap()
-            .ability_cooldown_ticks(AbilityKind::ThrowSword),
-        config::EKAT_LINE_SHOT_COOLDOWN_TICKS - 1
-    );
-    for _ in 0..20 {
+            .ability_cooldown_ticks(AbilityKind::ThrowSword);
+        assert_eq!(
+            restored
+                .state
+                .entities
+                .get(caster)
+                .unwrap()
+                .ability_cooldown_ticks(AbilityKind::ThrowSword),
+            remaining
+        );
+        let cast = Command::UseAbility {
+            target_id: None,
+            ability: AbilityKind::ThrowSword,
+            units: vec![caster],
+            x: Some(1000.0),
+            y: Some(400.0),
+            queued: false,
+        };
+        game.enqueue(1, cast.clone());
         game.tick();
-    }
-    assert_eq!(
-        game.state.entities.get(victim).unwrap().hp,
-        175,
-        "exactly one 5 damage outbound hit after building armor"
-    );
-    assert_eq!(
-        game.state.entities.get(caster).unwrap().insight,
-        0,
-        "Throw Sword grants no insight from unit or building hits"
-    );
-    // The depot is 76 px off the path: outside the former 64 + 9.6 px hit radius.
-    // The 1.76-second target rounds each leg up to 27 ticks (54 ticks total).
-    for _ in 0..6 {
+        assert_eq!(
+            game.state.ability_runtime.world_objects().count(),
+            0,
+            "Throw Sword cannot be recast while cooling down"
+        );
+        let unit = game.state.entities.get_mut(caster).unwrap();
+        if !master {
+            unit.insight = config::DISCIPLE_EVOLVED_INSIGHT_CAP;
+            unit.advance_dao_master();
+            assert_eq!(
+                unit.ability_cooldown_ticks(AbilityKind::ThrowSword),
+                remaining - 1,
+                "Promotion preserves an existing Adept cooldown"
+            );
+        }
+        unit.start_ability_cooldown(AbilityKind::ThrowSword, 0);
+        game.enqueue(1, cast);
         game.tick();
+        assert_eq!(game.state.ability_runtime.world_objects().count(), 1);
+        assert_eq!(
+            game.state
+                .entities
+                .get(caster)
+                .unwrap()
+                .ability_cooldown_ticks(AbilityKind::ThrowSword),
+            config::EKAT_LINE_SHOT_COOLDOWN_TICKS - 1
+        );
     }
-    let object = game.state.ability_runtime.world_objects().next().unwrap();
-    assert!((object.x.to_world() - 640.0).abs() < 0.01);
-    // A round trip through a checkpoint retains the projectile identity, leg and hit sets.
-    let checkpoint = game.checkpoint_payload_text_for_test().unwrap();
-    let mut restored = Game::restore_checkpoint_payload_text_for_test(
-        &checkpoint,
-        game.state.map.clone(),
-        game.state.map_metadata.clone(),
-    )
-    .unwrap();
-    for _ in 0..26 {
-        game.tick();
-        restored.tick();
-    }
-    assert_eq!(game.state.ability_runtime.world_objects().count(), 1);
-    assert_eq!(restored.state.ability_runtime.world_objects().count(), 1);
-    game.tick();
-    restored.tick();
-    assert_eq!(
-        game.state.entities.get(victim).unwrap().hp,
-        165,
-        "exactly one 10 damage return hit after building armor"
-    );
-    assert_eq!(restored.state.entities.get(victim).unwrap().hp, 165);
-    assert_eq!(game.state.entities.get(caster).unwrap().insight, 0);
-    assert_eq!(restored.state.entities.get(caster).unwrap().insight, 0);
-    assert_eq!(game.state.ability_runtime.world_objects().count(), 0);
 }
 
 #[test]

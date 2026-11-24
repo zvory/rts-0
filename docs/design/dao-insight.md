@@ -90,9 +90,9 @@ authoritative start payloads to every viewer so faction/team rosters and command
 refresh together with the restored simulation. Imports with unchanged rosters retain
 the existing match and snapshot sequence. Mixed-faction Lab support is outside this change.
 
-War Masters (third tier) gain **Throw Sword** (E); War Adepts cannot cast it. It is a world-point aimed spinning sword using
+War Adepts and War Masters can cast **Throw Sword** (E). It is a world-point aimed spinning sword using
 a 7.5-tile range, 0.9-tile hitbox width, 100/11 pixels per tick travel, free cost,
-and 20-second cooldown. Each enemy targetable can be hit once per leg: 20 damage
+and a 40-second cooldown for Adepts or 20 seconds for Masters. Advancement preserves an existing cooldown. Each enemy targetable can be hit once per leg: 20 damage
 outbound and 40 returning before protection. Throw Sword has zero armor penetration:
 armored targets take one quarter damage (5 outbound, 10 returning). Dao armor and
 normal direct-hit entrenchment protection apply before the existing map-tile cover

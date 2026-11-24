@@ -535,9 +535,17 @@ export function selectedAbilityAffordances(ctx, selection) {
       const queueAdmissibleUnits = carriers.filter((e) =>
         abilityUnitQueueAdmissible(e, definition));
       const recastUnits = carriers.filter((e) => abilityActiveObjectId(e, definition.ability) != null);
-      const cooldowns = carriers.map((e) =>
-        abilityCooldownLeft(e, definition.ability),
-      );
+      const cooldownGroups = new Map();
+      for (const entity of carriers) {
+        const cooldown = abilityCooldownLeft(entity, definition.ability);
+        const total = definition.cooldownTicks * (
+          definition.ability === ABILITY.THROW_SWORD && !entity.daoMaster ? 2 : 1
+        );
+        // Promotion preserves an already-running cooldown from the Adept cast.
+        const duration = Math.max(total, cooldown);
+        if (!cooldownGroups.has(duration)) cooldownGroups.set(duration, []);
+        cooldownGroups.get(duration).push(cooldown);
+      }
       const chargeRecharges = carriers.map((e) =>
         abilityChargeRechargeLeft(e, definition.ability),
       );
@@ -570,7 +578,8 @@ export function selectedAbilityAffordances(ctx, selection) {
           : null,
         autocastEnabledIds,
         cooldownClocks: [
-          ...ctx.groupCooldownClocks(cooldowns, definition.cooldownTicks),
+          ...Array.from(cooldownGroups, ([total, cooldowns]) =>
+            ctx.groupCooldownClocks(cooldowns, total)).flat(),
           ...ctx.groupCooldownClocks(chargeRecharges, definition.chargeRechargeTicks),
         ],
       };

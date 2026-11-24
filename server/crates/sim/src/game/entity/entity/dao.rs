@@ -98,9 +98,7 @@ impl Entity {
             AbilityKind::EvolveWind | AbilityKind::EvolveWar | AbilityKind::EvolveMagic => {
                 self.dao().is_none() && self.insight >= config::DISCIPLE_INSIGHT_REQUIRED
             }
-            AbilityKind::ThrowSword => {
-                self.dao() == Some(UpgradeKind::DaoOfHeaviness) && self.dao_master
-            }
+            AbilityKind::ThrowSword => self.dao() == Some(UpgradeKind::DaoOfHeaviness),
             AbilityKind::WindDash => self.dao() == Some(UpgradeKind::DaoWind),
             AbilityKind::DiscipleShield | AbilityKind::EkatMagicAnchor => {
                 self.dao() == Some(UpgradeKind::DaoOfMagic)
