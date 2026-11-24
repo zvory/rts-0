@@ -121,3 +121,55 @@ fn swept_enemy_check_rejects_tunneling_and_hull_rotation() {
         &teams()
     ));
 }
+
+#[test]
+fn wall_slide_repath_updates_body_before_later_enemy_moves() {
+    let map = flat_map(2);
+    let mut entities = EntityStore::new();
+    let (bx, by) = footprint_center(&map, EntityKind::Depot, 10, 10);
+    entities
+        .spawn_building(1, EntityKind::Depot, bx, by, true)
+        .unwrap();
+    let rect = building_rect_for_footprint(EntityKind::Depot, 10, 10).unwrap();
+    let radius = config::unit_stats(EntityKind::WindAdept).unwrap().radius;
+    let start = (rect.min_x - radius - 0.1, rect.min_y + 16.0);
+    let adept = entities
+        .spawn_unit(1, EntityKind::WindAdept, start.0, start.1)
+        .unwrap();
+    let goal = (start.0 + 64.0, start.1 + 64.0);
+    mark_moving(&mut entities, adept, goal);
+    let unit = entities.get_mut(adept).unwrap();
+    // Ability approaches do not use local steering, so this exercises a pure wall slide.
+    unit.set_order(Order::ability(
+        crate::game::ability::AbilityKind::WindDash,
+        goal.0,
+        goal.1,
+        goal.0,
+        goal.1,
+    ));
+    unit.mark_move_phase(MovePhase::Moving);
+    unit.movement.as_mut().unwrap().static_blocked_ticks = config::STATIC_BLOCKED_REPATH_TICKS - 1;
+    let worker_radius = config::unit_stats(EntityKind::Worker).unwrap().radius;
+    let worker_y = start.1 - radius - worker_radius - 0.5;
+    let worker = entities
+        .spawn_unit(2, EntityKind::Worker, start.0, worker_y)
+        .unwrap();
+    mark_moving(&mut entities, worker, (start.0, worker_y + 0.75));
+    entities
+        .get_mut(worker)
+        .unwrap()
+        .set_order(Order::gather(u32::MAX));
+    let occ = Occupancy::build(&map, &entities);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
+    movement_system(&map, &mut entities, &[], &occ, &spatial, 0);
+    assert_eq!(
+        entities.get(adept).unwrap().move_phase(),
+        Some(MovePhase::AwaitingPath)
+    );
+    assert!(pos(&entities, adept).1 > start.1 + 0.5);
+    assert!(
+        pos(&entities, worker).1 > worker_y + 0.74,
+        "worker should enter space vacated by the repathing adept"
+    );
+    assert!(body_overlap_depth(&entities, adept, worker) <= 0.001);
+}

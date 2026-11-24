@@ -135,7 +135,7 @@ pub(super) fn advance_moving_units(
         };
         let original_movement = motion_entity.movement.clone();
         let radius = entities.get(id).map(|e| e.radius());
-        let segment_clear = |from, to| {
+        let segment_clear = |blockers: &UnitBlockers, from, to| {
             static_standability::unit_static_segment_standable_with_radius(
                 map, occ, kind, from, to, radius,
             ) && blockers.motion_clear(&motion_entity, to, motion_entity.facing(), &teams)
@@ -357,7 +357,7 @@ pub(super) fn advance_moving_units(
                             if uses_vehicle_movement {
                                 route_accepts_waypoint(map, occ, e, (x, y), (wx, wy), next_next)
                             } else {
-                                next_next.is_some_and(|next| segment_clear((x, y), next))
+                                next_next.is_some_and(|next| segment_clear(&blockers, (x, y), next))
                             }
                         });
                     accepted_pivot_waypoints = accepted_pivot_waypoints.saturating_sub(1);
@@ -614,6 +614,8 @@ pub(super) fn advance_moving_units(
             if let Some(f) = new_facing {
                 e.set_facing(f);
             }
+            // Recovery below may finish early. Later units must always see the committed pose.
+            blockers.update(e);
             if is_car {
                 let active_reverse_waypoint = scout_car_reverse_waypoint.filter(|wp| {
                     e.next_waypoint()
@@ -720,8 +722,9 @@ pub(super) fn advance_moving_units(
                 if stuck_ticks >= recovery_threshold
                     && static_blocked_ticks == 0
                     && !uses_oriented_vehicle_body(kind)
-                    && skippable_next_waypoint
-                        .is_some_and(|following_waypoint| segment_clear((x, y), following_waypoint))
+                    && skippable_next_waypoint.is_some_and(|following_waypoint| {
+                        segment_clear(&blockers, (x, y), following_waypoint)
+                    })
                 {
                     e.pop_waypoint();
                     e.reset_stuck(x, y);
@@ -734,7 +737,7 @@ pub(super) fn advance_moving_units(
                         let dy = y - gy;
                         let dist_to_goal = (dx * dx + dy * dy).det_sqrt();
                         if dist_to_goal <= config::TOLERANT_ARRIVAL_RADIUS_PX
-                            && segment_clear((x, y), (gx, gy))
+                            && segment_clear(&blockers, (x, y), (gx, gy))
                         {
                             e.clear_path();
                             e.mark_move_phase(MovePhase::Arrived);
@@ -785,9 +788,6 @@ pub(super) fn advance_moving_units(
                     }
                 }
             }
-        }
-        if let Some(e) = entities.get(id) {
-            blockers.update(e);
         }
     }
 }
