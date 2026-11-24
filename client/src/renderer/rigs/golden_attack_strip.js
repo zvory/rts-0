@@ -9,16 +9,18 @@ const GOLDEN_IMAGES = Object.freeze({
 });
 
 // The first row remains the original team-tinted character atlas. The second row
-// contains four generated, independently colored attack effects in its first cells.
+// contains generated, independently colored attack effects in its first cells.
 export function withGoldenAttackTrail(strip) {
   const basename = strip.image.split('/').at(-1).split('?')[0];
   const image = GOLDEN_IMAGES[basename];
   if (!image) throw new Error(`Unknown Cultivator attack strip: ${basename}`);
+  const revised = /^(warrior|magic|magic-master)-runtime-strip\.png$/.test(basename);
+  const revision = revised ? "gold-2" : "gold-1";
   return Object.freeze({
     ...strip,
-    image: `${image}?v=gold-1`,
-    imageVersion: strip.imageVersion.endsWith("-gold-1") ? strip.imageVersion : `${strip.imageVersion}-gold-1`,
-    attackTrail: Object.freeze({ row: 1, frameCount: 4 }),
+    image: `${image}?v=${revision}`,
+    imageVersion: `${strip.imageVersion.replace(/-gold-\d+$/, "")}-${revision}`,
+    attackTrail: Object.freeze({ row: 1, frameCount: basename === "warrior-runtime-strip.png" ? 6 : 4 }),
     source: Object.freeze({ ...strip.source,
       generator: 'scripts/art/cultivator-golden-pipeline.mjs', runtimeStrip: `client${image}` }),
   });

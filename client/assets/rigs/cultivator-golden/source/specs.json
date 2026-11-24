@@ -9,7 +9,13 @@
       5,
       5,
       5
-    ]
+    ],
+    {
+      "attackBody": "novice-attacks.png",
+      "bodyFrames": 6,
+      "effectFrames": 6,
+      "effectColumns": 3
+    }
   ],
   [
     "wind",
