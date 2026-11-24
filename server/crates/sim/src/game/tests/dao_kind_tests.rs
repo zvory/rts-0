@@ -4,12 +4,12 @@ use crate::game::ability::AbilityKind;
 #[test]
 fn dao_kinds_spawn_with_resolved_stats_and_serialize_without_mutable_dao() {
     for (kind, ability, hp, cooldown, range) in [
-        (EntityKind::WindAdept, AbilityKind::WindDash, 115, 61, 0.75),
-        (EntityKind::WarAdept, AbilityKind::ThrowSword, 135, 91, 1.75),
+        (EntityKind::WindAdept, AbilityKind::WindDash, 150, 61, 0.75),
+        (EntityKind::WarAdept, AbilityKind::ThrowSword, 176, 91, 1.75),
         (
             EntityKind::MagicAdept,
             AbilityKind::DiscipleShield,
-            115,
+            150,
             91,
             5.0,
         ),

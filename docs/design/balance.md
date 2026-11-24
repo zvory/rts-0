@@ -905,8 +905,9 @@ placement, cancellation, damage, fog and destruction apply. See [Shop](shop.md) 
 At 200 insight, each living Adept automatically becomes its matching Master and fully
 heals. Relative to that path’s Adept, size/collision ×1.2, movement ×1.1, ordinary
 attack damage ×1.2 (nearest integer), maximum HP ×1.4. No resource or supply cost,
-research or attack-rate change; War Masters unlock Throw Sword and Wind Masters gain a second Dash charge; no repeat advancement. Master HP is
-161 (Wind/Magic) or 189 (War). See [Master rules and review](dao-masters.md).
+research or attack-rate change; War Masters unlock Throw Sword and Wind Masters gain a second Dash charge; no repeat advancement. Adept maximum HP is 150 (Wind/Magic) or 176 (War), a 30% increase rounded to
+whole HP; Novices remain at 115 HP. Master HP follows the existing ×1.4 advancement
+multiplier after Adept rounding: 210 (Wind/Magic) or 246 (War). See [Master rules and review](dao-masters.md).
 
 ### Shop goods
 
