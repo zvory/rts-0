@@ -18,9 +18,9 @@ import { buildControlGroupSummaries } from "../../client/src/hud_control_groups.
 
 withFakeHudDocument(({ FakeElement }) => {
   const players = [{ id: 1, factionId: "cultivators" }];
-  for (const [dao, label] of [[null, "Novice"], ["lightness", "Lightness Adept"],
+  for (const [dao, label] of [[null, "Novice"], ["wind", "Wind Adept"],
     ["war", "War Adept"], ["magic", "Magic Adept"]]) {
-    const entity = { id: 1, owner: 1, kind: ({ lightness: KIND.LIGHTNESS_ADEPT, war: KIND.WAR_ADEPT, magic: KIND.MAGIC_ADEPT })[dao] || KIND.WARRIOR, dao };
+    const entity = { id: 1, owner: 1, kind: ({ wind: KIND.WIND_ADEPT, war: KIND.WAR_ADEPT, magic: KIND.MAGIC_ADEPT })[dao] || KIND.WARRIOR, dao };
     const state = {
       players,
       controlGroups: [[1]],
@@ -57,10 +57,10 @@ withFakeHudDocument(({ FakeElement }) => {
   selectionPanel.render();
   selectionPanel.render();
   assert(portraits.length === 2, "unchanged multi-selection reuses its portraits");
-  selected[0].dao = "lightness";
-  selected[0].kind = KIND.LIGHTNESS_ADEPT;
+  selected[0].dao = "wind";
+  selected[0].kind = KIND.WIND_ADEPT;
   selectionPanel.render();
-  assert(portraits.length === 4 && portraits[2] === "lightness",
+  assert(portraits.length === 4 && portraits[2] === "wind",
     "evolution refreshes the selected group's portraits without reselection");
   selected[1].dao = "magic";
   selected[1].kind = KIND.MAGIC_ADEPT;

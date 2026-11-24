@@ -38,7 +38,7 @@ export function createMinimapAnimation() {
         const parts = Array.from({ length: strip.frameCount }, (_, i) => `frame:${i}`);
         if (kind === KIND.PANZERFAUST) parts.push(...Array.from(
           { length: strips.get(KIND.RIFLEMAN).frameCount }, (_, i) => `unloaded-frame:${i}`));
-        if ([KIND.LIGHTNESS_ADEPT, KIND.WAR_ADEPT, KIND.MAGIC_ADEPT].includes(kind)) {
+        if ([KIND.WIND_ADEPT, KIND.WAR_ADEPT, KIND.MAGIC_ADEPT].includes(kind)) {
           const master = strips.get(liveFrameStripKeyForEntity({ kind, daoMaster: true }));
           parts.push(...Array.from({ length: master.frameCount }, (_, i) => `master:frame:${i}`));
         }

@@ -31,6 +31,16 @@ const ok = (c, m) => { if (!c) { console.log("  FAIL " + m); failures++; } else 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const chromeProfileDir = fs.mkdtempSync(path.join(os.tmpdir(), "rts-chrome-"));
 
+function recordRequestFailure(request) {
+  const url = request.url();
+  const reason = request.failure()?.errorText || "unknown reason";
+  if (url.includes("favicon")) return;
+  // Lobby teardown and forced refresh deliberately cancel the previous list fetch.
+  if (request.method() === "GET" && new URL(url).pathname === "/api/lobbies"
+      && reason === "net::ERR_ABORTED") return;
+  consoleErrors.push(`requestfailed: ${url} (${reason})`);
+}
+
 function lobbyMapConfirmed(mapName) {
   return window.__rts.lobby._selectedMap === mapName &&
     document.querySelector("#lobby-map-trigger")?.textContent?.includes(mapName);
@@ -80,7 +90,7 @@ try {
   const page = await browser.newPage();
   page.on("console", (m) => { if (m.type() === "error") consoleErrors.push(m.text()); });
   page.on("pageerror", (e) => pageErrors.push(e.message));
-  page.on("requestfailed", (r) => { if (!r.url().includes("favicon")) consoleErrors.push(`requestfailed: ${r.url()} (${r.failure()?.errorText || "unknown reason"})`); });
+  page.on("requestfailed", recordRequestFailure);
   page.on("response", (response) => {
     const status = response.status();
     if (status < 400 || response.url().includes("favicon")) return;
@@ -857,7 +867,7 @@ try {
   const editorPage = await browser.newPage();
   editorPage.on("console", (m) => { if (m.type() === "error") consoleErrors.push(m.text()); });
   editorPage.on("pageerror", (e) => pageErrors.push(e.message));
-  editorPage.on("requestfailed", (r) => { if (!r.url().includes("favicon")) consoleErrors.push(`requestfailed: ${r.url()} (${r.failure()?.errorText || "unknown reason"})`); });
+  editorPage.on("requestfailed", recordRequestFailure);
   editorPage.on("response", (response) => {
     const status = response.status();
     if (status >= 400 && !response.url().includes("favicon")) responseErrors.push(`${status}: ${response.url()}`);

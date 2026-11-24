@@ -332,7 +332,7 @@ pub fn default_weapon_kind(kind: EntityKind) -> Option<WeaponKind> {
     match kind {
         EntityKind::Worker => Some(WeaponKind::WorkerTools),
         EntityKind::Golem => Some(WeaponKind::GolemFists),
-        EntityKind::Warrior | EntityKind::LightnessAdept | EntityKind::WarAdept => {
+        EntityKind::Warrior | EntityKind::WindAdept | EntityKind::WarAdept => {
             Some(WeaponKind::WarriorSword)
         }
         EntityKind::MagicAdept => Some(WeaponKind::DiscipleOrb),
@@ -839,7 +839,7 @@ mod tests {
             (EntityKind::Worker, Some(WeaponKind::WorkerTools)),
             (EntityKind::Golem, Some(WeaponKind::GolemFists)),
             (EntityKind::Warrior, Some(WeaponKind::WarriorSword)),
-            (EntityKind::LightnessAdept, Some(WeaponKind::WarriorSword)),
+            (EntityKind::WindAdept, Some(WeaponKind::WarriorSword)),
             (EntityKind::WarAdept, Some(WeaponKind::WarriorSword)),
             (EntityKind::MagicAdept, Some(WeaponKind::DiscipleOrb)),
             (EntityKind::Rifleman, Some(WeaponKind::RiflemanRifle)),

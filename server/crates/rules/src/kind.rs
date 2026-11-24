@@ -8,7 +8,7 @@ pub enum EntityKind {
     Worker,
     Golem,
     Warrior,
-    LightnessAdept,
+    WindAdept,
     WarAdept,
     MagicAdept,
     Rifleman,
@@ -49,7 +49,7 @@ impl EntityKind {
         EntityKind::Worker,
         EntityKind::Golem,
         EntityKind::Warrior,
-        EntityKind::LightnessAdept,
+        EntityKind::WindAdept,
         EntityKind::WarAdept,
         EntityKind::MagicAdept,
         EntityKind::Rifleman,
@@ -88,14 +88,14 @@ impl EntityKind {
     pub const fn is_disciple(self) -> bool {
         matches!(
             self,
-            Self::Warrior | Self::LightnessAdept | Self::WarAdept | Self::MagicAdept
+            Self::Warrior | Self::WindAdept | Self::WarAdept | Self::MagicAdept
         )
     }
 
     pub const fn dao(self) -> Option<crate::faction::UpgradeKind> {
         use crate::faction::UpgradeKind;
         match self {
-            Self::LightnessAdept => Some(UpgradeKind::DaoOfLightness),
+            Self::WindAdept => Some(UpgradeKind::DaoWind),
             Self::WarAdept => Some(UpgradeKind::DaoOfHeaviness),
             Self::MagicAdept => Some(UpgradeKind::DaoOfMagic),
             _ => None,
@@ -105,7 +105,7 @@ impl EntityKind {
     pub const fn evolved_disciple(dao: crate::faction::UpgradeKind) -> Option<Self> {
         use crate::faction::UpgradeKind;
         match dao {
-            UpgradeKind::DaoOfLightness => Some(Self::LightnessAdept),
+            UpgradeKind::DaoWind => Some(Self::WindAdept),
             UpgradeKind::DaoOfHeaviness => Some(Self::WarAdept),
             UpgradeKind::DaoOfMagic => Some(Self::MagicAdept),
             _ => None,
@@ -140,7 +140,7 @@ impl EntityKind {
         match self {
             EntityKind::Worker => "worker",
             EntityKind::Golem => "golem",
-            EntityKind::LightnessAdept => "lightness_adept",
+            EntityKind::WindAdept => "wind_adept",
             EntityKind::WarAdept => "war_adept",
             EntityKind::MagicAdept => "magic_adept",
             EntityKind::Warrior => "warrior",
@@ -186,7 +186,7 @@ impl FromStr for EntityKind {
         match s {
             "worker" => Ok(EntityKind::Worker),
             "golem" => Ok(EntityKind::Golem),
-            "lightness_adept" => Ok(EntityKind::LightnessAdept),
+            "wind_adept" => Ok(EntityKind::WindAdept),
             "war_adept" => Ok(EntityKind::WarAdept),
             "magic_adept" => Ok(EntityKind::MagicAdept),
             "warrior" => Ok(EntityKind::Warrior),
@@ -332,7 +332,7 @@ pub fn death_ground_decal_class(kind: EntityKind) -> Option<&'static str> {
     match kind {
         EntityKind::Worker
         | EntityKind::Warrior
-        | EntityKind::LightnessAdept
+        | EntityKind::WindAdept
         | EntityKind::WarAdept
         | EntityKind::MagicAdept
         | EntityKind::Rifleman
@@ -435,7 +435,7 @@ pub fn barbed_wire_affects(kind: EntityKind) -> bool {
         EntityKind::Worker
             | EntityKind::Golem
             | EntityKind::Warrior
-            | EntityKind::LightnessAdept
+            | EntityKind::WindAdept
             | EntityKind::WarAdept
             | EntityKind::MagicAdept
             | EntityKind::Rifleman

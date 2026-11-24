@@ -816,7 +816,7 @@ assert(paidTrainingSnapshot.entities[0].daoTrainingQueue.join(",") === "dao_of_m
 
 const daoMasterRecord = [501, 1, KIND_CODE[KIND.WARRIOR], 400, 400, 161, 161, STATE_CODE[STATE.IDLE]];
 while (daoMasterRecord.length < 53) daoMasterRecord.push(null);
-daoMasterRecord[46] = "lightness";
+daoMasterRecord[46] = "wind";
 daoMasterRecord[52] = true;
 const daoMasterSnapshot = decodeServerMessage({ t: "snapshot", v: COMPACT_SNAPSHOT_VERSION,
   s: [1, 0, 0, 2, 300], e: [daoMasterRecord], ev: [], n: [0, 0, 0, 0, 0] });

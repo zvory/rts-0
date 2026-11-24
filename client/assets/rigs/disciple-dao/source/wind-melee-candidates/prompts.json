@@ -1,0 +1,21 @@
+{
+  "generator": "Built-in image_gen tool",
+  "references": [
+    "client/assets/rigs/warrior-placeholder-pass-01/generated/warrior-source.png",
+    "client/assets/rigs/disciple-dao/source/concepts.png"
+  ],
+  "candidates": [
+    {
+      "candidate": "A",
+      "prompt": "Use case: stylized-concept. Asset type: RTS unit sprite concept, one isolated character. Reference images: original Disciple warrior and previous Wind/Magic concept sheet, style/camera/identity references only. Create the melee Dao Wind: white and grayscale light cloth for runtime team tinting, black topknot, pale skin hands, thin gently curved katana with clean silver blade and dark hilt, no bow or quiver. Strict orthographic camera directly overhead: show crown, shoulders, forearms and weapon ONLY; NO face, frontal torso, legs or feet. Character faces screen bottom. Match the painted shading, crisp dark outlines and chunky readable RTS forms of references. Full silhouette centered, ample margins, pure solid #ff00ff magenta matte, no shadow, no text, no labels, no motion blur, no glow, no extra objects. A nimble fast melee swordsman clearly different from broad-bladed base Disciple and hooded wide-mantle Magic. Katana thin but clearly readable at small game size. Split-tail duelist: narrow wrapped sleeves, two very long thin headband streamers sweeping back, compact shoulders, katana held one-handed out to the right in an open ready guard. No cape. Distinctive two-ribbon fork silhouette."
+    },
+    {
+      "candidate": "B",
+      "prompt": "Use case: stylized-concept. Asset type: RTS unit sprite concept, one isolated character. Reference images: original Disciple warrior and previous Wind/Magic concept sheet, style/camera/identity references only. Create the melee Dao Wind: white and grayscale light cloth for runtime team tinting, black topknot, pale skin hands, thin gently curved katana with clean silver blade and dark hilt, no bow or quiver. Strict orthographic camera directly overhead: show crown, shoulders, forearms and weapon ONLY; NO face, frontal torso, legs or feet. Character faces screen bottom. Match the painted shading, crisp dark outlines and chunky readable RTS forms of references. Full silhouette centered, ample margins, pure solid #ff00ff magenta matte, no shadow, no text, no labels, no motion blur, no glow, no extra objects. A nimble fast melee swordsman clearly different from broad-bladed base Disciple and hooded wide-mantle Magic. Katana thin but clearly readable at small game size. Wind-sash swordsman: asymmetrical short shoulder scarf with a single long tapering cloth sash flowing back to the left, fitted forearm wraps, compact shoulders, katana extended diagonally to the lower right. No hood or cape. Distinctive diagonal blade and single sweeping scarf silhouette."
+    },
+    {
+      "candidate": "C",
+      "prompt": "Use case: stylized-concept. Asset type: RTS unit sprite concept, one isolated character. Reference images: original Disciple warrior and previous Wind/Magic concept sheet, style/camera/identity references only. Create the melee Dao Wind: white and grayscale light cloth for runtime team tinting, black topknot, pale skin hands, thin gently curved katana with clean silver blade and dark hilt, no bow or quiver. Strict orthographic camera directly overhead: show crown, shoulders, forearms and weapon ONLY; NO face, frontal torso, legs or feet. Character faces screen bottom. Match the painted shading, crisp dark outlines and chunky readable RTS forms of references. Full silhouette centered, ample margins, pure solid #ff00ff magenta matte, no shadow, no text, no labels, no motion blur, no glow, no extra objects. A nimble fast melee swordsman clearly different from broad-bladed base Disciple and hooded wide-mantle Magic. Katana thin but clearly readable at small game size. Swift ronin: slim sleeveless outer vest over fitted white sleeves, high black topknot, narrow split coat tails streaming behind, katana held in both hands across the front with blade pointing left. No hood, no broad mantle. Distinctive swept coat-tail and horizontal thin blade silhouette."
+    }
+  ]
+}

@@ -241,7 +241,7 @@ fn validate_entity(
         entity.kind != crate::game::entity::EntityKind::Warrior
             || !matches!(
                 choice,
-                crate::game::upgrade::UpgradeKind::DaoOfLightness
+                crate::game::upgrade::UpgradeKind::DaoWind
                     | crate::game::upgrade::UpgradeKind::DaoOfHeaviness
                     | crate::game::upgrade::UpgradeKind::DaoOfMagic
             )

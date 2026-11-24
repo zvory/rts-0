@@ -563,8 +563,8 @@ assert(
   }
   for (const kind of [KIND.RIFLEMAN, KIND.TANK, KIND.MORTAR_TEAM]) {
     target.kind = kind;
-    attacker.kind = KIND.LIGHTNESS_ADEPT;
-    assert(attack().id === "combat_disciple_spear_01", `Lightness spear cue is independent of ${kind} target material`);
+    attacker.kind = KIND.WIND_ADEPT;
+    assert(attack().id === "combat_disciple_spear_01", `Wind spear cue is independent of ${kind} target material`);
     attacker.kind = KIND.MAGIC_ADEPT;
     assert(attack(WEAPON_KIND.DISCIPLE_ORB).id === "combat_disciple_orb_01", `Magic orb cue is independent of ${kind} target material`);
     combatAudio.playAttackSound({ e: EVENT.ATTACK, from: 11, to: 12 });

@@ -1364,10 +1364,10 @@ card. Ekat's `ekatTeleport` world-point activation is a dash: it validates stati
 moves the caster, and creates a four-second return marker at the original position. One dash
 command applies independently to every selected eligible Ekat for both immediate and queued casts.
 Each caster keeps its own range clamp, cooldown, and return marker; unavailable or invalid casters
-do not block the others. Lightness uses the separate `lightnessDash` ability with a ten-tile clamp
+do not block the others. Wind uses the separate `windDash` ability with a ten-tile clamp
 and no return marker or recast. Adepts hold one charge and Masters two, recharging sequentially
 every eight seconds. Promotion adds one ready charge without resetting recharge progress.
-Lightness Dash also applies independently to every selected eligible caster. `recastAbility`
+Wind Dash also applies independently to every selected eligible caster. `recastAbility`
 commands are explicit and validate a live owned caster plus matching active runtime state; missing
 state, same-tick/too-early return, stale caster ids, and invalid return destinations are ignored
 rather than overloading world-point `useAbility` commands. A valid recast returns Ekat to the
@@ -1503,7 +1503,7 @@ and barrel turn together to track an in-cone target before firing, while the set
 remains fixed. Targets outside the cone do not cause rotation and require teardown and redeployment
 before the gun can engage them.
 
-Automatic acquisition defaults to legal enemy candidates inside the attacker's current weapon range, then applies the existing target-priority ranking. Range to buildings is measured from the attacker's center to the closest point on the authoritative building footprint; melee attacks (Worker tools, Golem fists, and Disciple swords) measure range to the authoritative oriented vehicle body, including clearance, for vehicle targets. Other unit-target range remains center-to-center. Melee pursuit uses the same closest hull point so an attacker stops outside collision instead of repeatedly pushing toward a vehicle center. Building acquisition broadphase queries include the maximum building half-extent so a footprint inside range is discoverable even when its indexed center is not. Explicit Attack orders may target the issuing player's own units or buildings, but not allied teammate entities, and retain their commanded target while it remains legal and visible. A direct attack pursues that target to the current weapon range band, using the closest footprint-boundary point for buildings and the closest hull point for melee attacks on vehicles, stops to fire, and repaths if the same target moves out of range. Tanks instead hold position when the commanded target is within their maximum stationary cannon range (including the usual attacker radius and range slack), allowing the range ramp to reach it; they still fire only inside the current range and pursue if the target leaves the maximum stationary range. A direct attack never switches targets while the commanded target remains valid. Opportunistic moving-fire acquisition for a plain Move uses the same in-range boundary. Lightness Disciples use the base Disciple’s 0.75-tile sword profile while retaining a plain Move destination and striking in melee range. They also retain an explicit Attack or automatic pursuit approach path while striking, rather than clearing it on each in-range combat tick. The approach still ends at melee reach; moving targets can cause brief stops and renewed pursuit when they leave range; speed, Dash, and the 61-tick cooldown remain unchanged. Magic uses a five-tile orb profile, ordinary stop-to-fire behavior, no sword secondary, and engagement range equal to attack range. Base/War/Lightness keep sword reach and five-tile automatic approach. Attack Move may pause for an in-range engagement and resumes only its original player-issued destination afterward. While retaining a building target, Attack Move rechecks for visible enemy combat units in weapon range each tick and switches to a legal shot on one when available, even during weapon cooldown. This does not change the movement destination or override explicit Attack orders. Disciples are the sole automatic-pursuit exception: aggressive Idle/Attack Move uses a five-tile engagement range, approaches to sword reach, and can switch from a building to a visible combat defender within that engagement range. Other kinds remain weapon-range-only.
+Automatic acquisition defaults to legal enemy candidates inside the attacker's current weapon range, then applies the existing target-priority ranking. Range to buildings is measured from the attacker's center to the closest point on the authoritative building footprint; melee attacks (Worker tools, Golem fists, and Disciple swords) measure range to the authoritative oriented vehicle body, including clearance, for vehicle targets. Other unit-target range remains center-to-center. Melee pursuit uses the same closest hull point so an attacker stops outside collision instead of repeatedly pushing toward a vehicle center. Building acquisition broadphase queries include the maximum building half-extent so a footprint inside range is discoverable even when its indexed center is not. Explicit Attack orders may target the issuing player's own units or buildings, but not allied teammate entities, and retain their commanded target while it remains legal and visible. A direct attack pursues that target to the current weapon range band, using the closest footprint-boundary point for buildings and the closest hull point for melee attacks on vehicles, stops to fire, and repaths if the same target moves out of range. Tanks instead hold position when the commanded target is within their maximum stationary cannon range (including the usual attacker radius and range slack), allowing the range ramp to reach it; they still fire only inside the current range and pursue if the target leaves the maximum stationary range. A direct attack never switches targets while the commanded target remains valid. Opportunistic moving-fire acquisition for a plain Move uses the same in-range boundary. Wind Disciples use the base Disciple’s 0.75-tile sword profile while retaining a plain Move destination and striking in melee range. They also retain an explicit Attack or automatic pursuit approach path while striking, rather than clearing it on each in-range combat tick. The approach still ends at melee reach; moving targets can cause brief stops and renewed pursuit when they leave range; speed, Dash, and the 61-tick cooldown remain unchanged. Magic uses a five-tile orb profile, ordinary stop-to-fire behavior, no sword secondary, and engagement range equal to attack range. Base/War/Wind keep sword reach and five-tile automatic approach. Attack Move may pause for an in-range engagement and resumes only its original player-issued destination afterward. While retaining a building target, Attack Move rechecks for visible enemy combat units in weapon range each tick and switches to a legal shot on one when available, even during weapon cooldown. This does not change the movement destination or override explicit Attack orders. Disciples are the sole automatic-pursuit exception: aggressive Idle/Attack Move uses a five-tile engagement range, approaches to sword reach, and can switch from a building to a visible combat defender within that engagement range. Other kinds remain weapon-range-only.
 
 After the 50 Steel / 100 Oil, 20-second Scout Plane research completes at the Engineering Complex, Resource Depots and Command Cars activate Scout Plane on the C grid slot. A Resource Depot sortie costs 38 Steel / 56 Oil; a Command Car sortie costs 63 Steel / 94 Oil. Activation launches immediately from a selected ready carrier and starts that carrier's 30-second cooldown. Sorties are independent: any number may coexist and each contributes its own team aerial vision. Activation does not replace or clear a selected Command Car's active or queued orders. The plane has a 30-second total lifetime from launch: transit consumes that lifetime, it orbits only for any time remaining after arrival, and it despawns when the timer expires even if it never reaches the target. Scout Planes have no fuel reserve, Oil upkeep, selected-plane retargeting, return leg, or dismissal commands.
 
@@ -2193,16 +2193,16 @@ Tank tile entry exhausts the entire wire segment immediately, without damage or 
 ### Disciple insight and Dao specializations
 
 See [Dao evolution playtest](dao-insight.md). Entity-owned `insight` and authoritative unit `kind` persist
-through checkpoints. Evolution changes Novice `warrior` (29) to `lightness_adept` (35),
+through checkpoints. Evolution changes Novice `warrior` (29) to `wind_adept` (35),
 `war_adept` (36), or `magic_adept` (37), preserving the entity id and orders.
 Permanent Dao identity is derived from kind; the engine stores no separate mutable `dao`. Visible Disciple snapshots append `insight` (compact slot 45) and
-`dao` (slot 46: lightness/war/magic). Evolution buttons set replaceable, entity-owned `chosenDao` intent (team-private compact slot 49), independent of orders. Codes 14–16 and order stages 22–24 retain their positions.
+`dao` (slot 46: wind/war/magic). Evolution buttons set replaceable, entity-owned `chosenDao` intent (team-private compact slot 49), independent of orders. Codes 14–16 and order stages 22–24 retain their positions.
 Evolution automatically occurs once 60 insight is ready, without research or a Pavilion.
 Evolution clears all insight and raises the cap to 200. Evolved Disciples continue earning
 insight from cost-weighted actual hostile unit HP damage or quarter-rate building HP damage, carrying exact fractional remainders through checkpoints; Throw Sword grants none; reaching 200 automatically advances a living Adept
 to its matching [Master](dao-masters.md), resets insight and fully heals. Public
 `daoMaster` (compact slot 52) persists alongside the authoritative Adept kind. Research ids are
-`dao_of_lightness`, `dao_of_heaviness` (War), `dao_of_magic` (Magic).
+`dao_wind`, `dao_of_heaviness` (War), `dao_of_magic` (Magic).
 
 Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md).
 
@@ -2223,7 +2223,7 @@ entry movement to newly trained base Disciples. Busy grounds retain waiting entr
 ### Portal Adept production
 
 A completed Cultivator Portal trains Novices and, after matching Pavilion research,
-Lightness, War and Magic Adepts. Each Adept costs **150 steel, 35 oil, three supply**
+Wind, War and Magic Adepts. Each Adept costs **150 steel, 35 oil, three supply**
 and takes **300 ticks (ten seconds)**, without a Novice input. Use normal train/repeat
 commands, queue payment/refunds, legal spawn exits and rally behavior. An unresearched
 Dao cannot be trained. Combat-earned evolution and Tournament Grounds are unchanged.
@@ -2244,7 +2244,7 @@ Empty Proving Grounds training-plan vectors are omitted from checkpoint serializ
 existing replay fingerprints for games that never use this building; nonempty plans remain semantic
 authority and survive checkpoint restore. Native/WASM RNG portability tests pin this boundary.
 
-Lab unit spawning accepts an optional `dao` (`lightness`, `war`, or `magic`) on
+Lab unit spawning accepts an optional `dao` (`wind`, `war`, or `magic`) on
 `spawnEntity` and each `spawnEntities` entry. Only the Novice (`warrior`) kind accepts
 it; other kinds are rejected before mutation. The authoritative spawn uses normal
 Dao evolution to initialize specialization stats, with its entrance animation already

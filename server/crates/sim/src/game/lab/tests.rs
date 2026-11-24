@@ -1137,7 +1137,7 @@ fn lab_checkpoint_setup_round_trips_exact_state_with_id_map() {
 fn lab_cultivator_spawns_set_owner_faction_and_initialize_each_dao() {
     use crate::protocol::LabSpawnDao;
     for (dao, upgrade) in [
-        (LabSpawnDao::Lightness, UpgradeKind::DaoOfLightness),
+        (LabSpawnDao::Wind, UpgradeKind::DaoWind),
         (LabSpawnDao::War, UpgradeKind::DaoOfHeaviness),
         (LabSpawnDao::Magic, UpgradeKind::DaoOfMagic),
     ] {

@@ -4,7 +4,7 @@ use super::*;
 fn dao_master_advances_once_keeps_reload_and_persists_rank() {
     use crate::game::ability::AbilityKind;
     for (ability, hp) in [
-        (AbilityKind::EvolveLightness, 161),
+        (AbilityKind::EvolveWind, 161),
         (AbilityKind::EvolveWar, 189),
         (AbilityKind::EvolveMagic, 161),
     ] {
@@ -90,7 +90,7 @@ fn dao_master_dead_unit_cannot_heal_and_invalid_rank_is_rejected() {
 fn dao_master_combat_threshold_and_damage_apply_to_all_three_paths() {
     use crate::game::ability::AbilityKind;
     for (ability, adept_damage, master_damage, cooldown) in [
-        (AbilityKind::EvolveLightness, 23, 28, 61),
+        (AbilityKind::EvolveWind, 23, 28, 61),
         (AbilityKind::EvolveWar, 35, 42, 91),
         (AbilityKind::EvolveMagic, 23, 28, 91),
     ] {

@@ -1611,7 +1611,7 @@ omits illegal build commands for those sites, and resumes on the far side; vehic
   `commandIssuer.issueCommand`. HUD selected-unit strip cells support direct selection refinement:
   left-click selects only that unit, Shift-click removes it from the selection, and Ctrl/Meta-click
   or control context-click filters the current selection to that unit kind. Base Novices and each
-  evolved Dao (War, Magic, Lightness) have distinct authoritative unit kinds for this filtering and world
+  evolved Dao (War, Magic, Wind) have distinct authoritative unit kinds for this filtering and world
   Ctrl/Meta-click or double-click selection; a base Novice’s chosen future Dao does not split its
   type until evolution. This keeps base Novice Dao choices accessible without evolved abilities
   occupying their command-card slots. Unit command-card
@@ -1913,7 +1913,7 @@ export function noticeSoundId(msg)
 ```
 
 Disciple attack events use dedicated cues in `match_combat_audio.js`: Dao of Magic's
-`disciple_orb` weapon plays the orb launch, and Dao of Lightness's spear plays the spear thrust.
+`disciple_orb` weapon plays the orb launch, and Dao Wind's spear plays the spear thrust.
 Base and Dao of War sword attacks use the soft stab against infantry; tanks, scout/command cars,
 scout planes, mortar teams, anti-tank guns, artillery, and rocket trucks use the metallic strike.
 This is presentation material selection, independent of the balance `armored` flag. A missing
@@ -2911,7 +2911,7 @@ new gameplay control.
 
 Disciple insight and Dao fields pass through the detached presentation entity snapshot
 to the Pixi worker. A blue-on-red insight bar appears below HP; evolved paths use
-the candidate B thin-katana strip for melee Lightness, and the Dao-specific Magic C hooded spellcaster strip. Original Lightness A archer assets remain preserved for reuse. Magic runs with arms swept back and its mantle trailing; their old chevrons/pentagram are removed. War uses the larger armored candidate B Yari strip (idle, two walking poses, four thrust poses); its legacy red sword glyph is removed. The selected unit shows
+the candidate B thin-katana strip for melee Wind, and the Dao-specific Magic C hooded spellcaster strip. Original Wind A archer assets remain preserved for reuse. Magic runs with arms swept back and its mantle trailing; their old chevrons/pentagram are removed. War uses the larger armored candidate B Yari strip (idle, two walking poses, four thrust poses); its legacy red sword glyph is removed. The selected unit shows
 exact insight and Dao, with a cap of 60 before evolution and 200 afterward. Evolution
 resets insight to zero; reaching the evolved cap has no effect. Evolution choices occupy grid Z/X/C; classic L/W/C. Buttons remain actionable before
 research or insight, assign all selected unevolved Disciples, and show the pending path
@@ -2919,12 +2919,12 @@ with an active highlight and assigned/eligible count. A new choice replaces the 
 unit details and tooltips show the chosen Dao and remaining requirements. See
 [Dao evolution rules](dao-insight.md).
 
-Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md). The entity-aware frame-strip key also selects HUD/minimap portraits. Actual attack events drive Magic’s four-frame 400 ms cycle, Lightness’s four-pose katana swing, and War’s four-pose spear lunge, including weapon aim during movement. War’s `firingLungePx:16` adds a smooth local-forward presentation offset through anticipation, drive, extension and recovery. The worker sprite/shadow and minimap sample the same offset; authoritative position, collision and immediate damage timing remain unchanged. `disciple_projectiles.js` draws an arrow texture at three times its native aspect-ratio thickness, tinted with the firing owner’s assigned color using the owner id captured with the attack event, from a reusable pool and fixed-cost shimmering orb geometry in the feedback batch. There are no per-orb emitters, filters or particle histories. Projectile endpoints are captured from authorized event/snapshot positions, persist for at most 600 ms, and launch at the 100 ms release pose. Unit range overlays show 0.75-tile reach for Lightness, 2.75 tiles for War, and five tiles for Magic.
+Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md). The entity-aware frame-strip key also selects HUD/minimap portraits. Actual attack events drive Magic’s four-frame 400 ms cycle, Wind’s four-pose katana swing, and War’s four-pose spear lunge, including weapon aim during movement. War’s `firingLungePx:16` adds a smooth local-forward presentation offset through anticipation, drive, extension and recovery. The worker sprite/shadow and minimap sample the same offset; authoritative position, collision and immediate damage timing remain unchanged. `disciple_projectiles.js` draws an arrow texture at three times its native aspect-ratio thickness, tinted with the firing owner’s assigned color using the owner id captured with the attack event, from a reusable pool and fixed-cost shimmering orb geometry in the feedback batch. There are no per-orb emitters, filters or particle histories. Projectile endpoints are captured from authorized event/snapshot positions, persist for at most 600 ms, and launch at the 100 ms release pose. Unit range overlays show 0.75-tile reach for Wind, 2.75 tiles for War, and five tiles for Magic.
 
 ### Dao Master animation review
 
 Public `daoMaster` rank selects three separate eight-frame strips (standing, three
-movement poses, four shot-triggered attacks) using the chosen twin-scarf Lightness,
+movement poses, four shot-triggered attacks) using the chosen twin-scarf Wind,
 forked-spear War and broad-sleeve Magic designs. Runtime world scale is 1.2 times the
 corresponding Adept; Master source crowns/torsos are normalized before that multiplier.
 Portraits, selection groups, minimap frames and labels use the matching Master rank.
@@ -2933,7 +2933,7 @@ Masters have no further insight meter. See [Master review spec](dao-masters.md).
 Novice Charge uses a passive command-card descriptor: always disabled, with the autocast swirl
 and server-projected cooldown clocks. Passive descriptors have no primary/context action or hotkey
 and are excluded from the hotkey command catalog. Charge occupies logical slot 10 in the fourth
-column so mixed selections retain Lightness Dash and Throw Sword. Evolution removes the Novice-only tile.
+column so mixed selections retain Wind Dash and Throw Sword. Evolution removes the Novice-only tile.
 
 ### Cultivator item slot
 

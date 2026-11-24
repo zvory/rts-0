@@ -499,7 +499,7 @@ await withFakeDocument(async () => {
   );
   assertDeepEqual(
     labSpawnUnitKindsForFaction("cultivators"),
-    [KIND.WORKER, KIND.WARRIOR, KIND.LIGHTNESS_ADEPT, KIND.WAR_ADEPT, KIND.MAGIC_ADEPT],
+    [KIND.WORKER, KIND.WARRIOR, KIND.WIND_ADEPT, KIND.WAR_ADEPT, KIND.MAGIC_ADEPT],
     "LabPanel and Interact expose the Cultivator Warrior spawn kind",
   );
   assertDeepEqual(
@@ -1043,9 +1043,9 @@ await withFakeDocument(async () => {
   assert(buttonByText("Serf"), "Cultivator palette uses the faction worker label");
   assert(buttonByText("Serf").dataset.active === "false", "Shared unit kinds in another faction do not claim the armed spawn tool");
   assert(buttonByText("Novice"), "Cultivator palette includes the base Novice");
-  for (const dao of ["lightness", "war", "magic"]) {
+  for (const dao of ["wind", "war", "magic"]) {
     buttonByText(`${dao[0].toUpperCase() + dao.slice(1)} Adept`).listeners.click();
-    const kind = ({ lightness: KIND.LIGHTNESS_ADEPT, war: KIND.WAR_ADEPT, magic: KIND.MAGIC_ADEPT })[dao];
+    const kind = ({ wind: KIND.WIND_ADEPT, war: KIND.WAR_ADEPT, magic: KIND.MAGIC_ADEPT })[dao];
     assert(armedTool.payload.kind === kind, "Adept selection uses its authoritative kind");
     armedCallbacks.onWorldClick({ tool: { ...armedTool }, x: 128, y: 160 });
     assert(sent.at(-1).op.kind === kind && sent.at(-1).op.factionId === "cultivators" && sent.at(-1).op.owner === 2,

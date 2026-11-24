@@ -1,4 +1,4 @@
-// Lightness Dash: lightnessDash (ability 21, order stage 29), without a return marker.
+// Wind Dash: windDash (ability 21, order stage 29), without a return marker.
 //! Wire protocol (JSON + binary snapshots over WebSocket). See `docs/design/protocol.md`.
 //!
 //! Rust is authoritative; update its JavaScript mirror (`client/src/protocol.js`) together.
@@ -290,7 +290,7 @@ pub enum LabClientOp {
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum LabSpawnDao {
-    Lightness,
+    Wind,
     War,
     Magic,
 }

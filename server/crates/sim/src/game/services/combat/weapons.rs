@@ -223,7 +223,7 @@ fn requires_weapon_setup(kind: EntityKind) -> bool {
 
 pub(super) fn can_fire_while_moving(e: &Entity, methamphetamines_researched: bool) -> bool {
     crate::game::entity::fires_while_moving(e.kind)
-        || e.kind == EntityKind::LightnessAdept
+        || e.kind == EntityKind::WindAdept
         || (crate::rules::is_rifle_infantry(e.kind) && methamphetamines_researched)
         || breakthrough_moving_fire_active(e)
 }

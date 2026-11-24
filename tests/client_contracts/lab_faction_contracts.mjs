@@ -25,7 +25,7 @@ const context = (entity) => ({
 });
 const novice = { id: 20, owner: 2, kind: KIND.WARRIOR, insight: 60 };
 const card = buildCommandCardDescriptors(context(novice));
-for (const ability of [ABILITY.EVOLVE_LIGHTNESS, ABILITY.EVOLVE_WAR, ABILITY.EVOLVE_MAGIC]) {
+for (const ability of [ABILITY.EVOLVE_WIND, ABILITY.EVOLVE_WAR, ABILITY.EVOLVE_MAGIC]) {
   assert(card.abilityAffordances.some((row) => row.definition.ability === ability && row.readyIds.includes(20)),
     `P2 full-insight Novice can choose ${ability}`);
 }

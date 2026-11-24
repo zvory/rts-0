@@ -87,14 +87,14 @@ pub(in crate::game) fn planner_code(kind: AbilityKind) -> u16 {
         AbilityKind::DismissScoutPlane => 10,
         AbilityKind::ScoutPlane => 11,
         AbilityKind::Barrage => 12,
-        AbilityKind::EvolveLightness => 13,
+        AbilityKind::EvolveWind => 13,
         AbilityKind::EvolveWar => 14,
         AbilityKind::EvolveMagic => 15,
         AbilityKind::DiscipleShield => 16,
         AbilityKind::ThrowSword => 17,
         AbilityKind::HealingPotion => 18,
         AbilityKind::EscapeTreasure => 19,
-        AbilityKind::LightnessDash => 20,
+        AbilityKind::WindDash => 20,
     }
 }
 
@@ -113,14 +113,14 @@ pub(in crate::game) fn from_planner_code(code: u16) -> Option<AbilityKind> {
         10 => Some(AbilityKind::DismissScoutPlane),
         11 => Some(AbilityKind::ScoutPlane),
         12 => Some(AbilityKind::Barrage),
-        13 => Some(AbilityKind::EvolveLightness),
+        13 => Some(AbilityKind::EvolveWind),
         14 => Some(AbilityKind::EvolveWar),
         15 => Some(AbilityKind::EvolveMagic),
         16 => Some(AbilityKind::DiscipleShield),
         17 => Some(AbilityKind::ThrowSword),
         18 => Some(AbilityKind::HealingPotion),
         19 => Some(AbilityKind::EscapeTreasure),
-        20 => Some(AbilityKind::LightnessDash),
+        20 => Some(AbilityKind::WindDash),
 
         _ => None,
     }
@@ -128,7 +128,7 @@ pub(in crate::game) fn from_planner_code(code: u16) -> Option<AbilityKind> {
 
 pub fn effect_hook(kind: AbilityKind) -> AbilityEffectHook {
     match kind {
-        AbilityKind::EvolveLightness | AbilityKind::EvolveWar | AbilityKind::EvolveMagic => {
+        AbilityKind::EvolveWind | AbilityKind::EvolveWar | AbilityKind::EvolveMagic => {
             AbilityEffectHook::Evolve
         }
         AbilityKind::HealingPotion | AbilityKind::EscapeTreasure => AbilityEffectHook::ShopItem,
@@ -141,7 +141,7 @@ pub fn effect_hook(kind: AbilityKind) -> AbilityEffectHook {
         AbilityKind::ScoutPlane => AbilityEffectHook::ScoutPlane,
         AbilityKind::DismissScoutPlane => AbilityEffectHook::ReservedNoop,
         AbilityKind::EkatTeleport => AbilityEffectHook::DashReturn,
-        AbilityKind::LightnessDash => AbilityEffectHook::Dash,
+        AbilityKind::WindDash => AbilityEffectHook::Dash,
         AbilityKind::EkatLineShot | AbilityKind::ThrowSword => AbilityEffectHook::LineProjectile,
         AbilityKind::EkatMagicAnchor => AbilityEffectHook::MagicAnchor,
         AbilityKind::DiscipleShield => AbilityEffectHook::Shield,

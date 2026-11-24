@@ -8,7 +8,7 @@ function radiusScale(entity) {
     case KIND.PANZERFAUST:
     case KIND.MACHINE_GUNNER: return 1.5;
     case KIND.WARRIOR: return 0.75;
-    case KIND.LIGHTNESS_ADEPT:
+    case KIND.WIND_ADEPT:
     case KIND.MAGIC_ADEPT: return entity.daoMaster ? 1 : 0.75;
     case KIND.WAR_ADEPT: return entity.daoMaster ? 1.5 : 1.25;
     default: return 1;

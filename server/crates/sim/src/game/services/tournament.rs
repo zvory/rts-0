@@ -169,7 +169,7 @@ pub(in crate::game) fn advance(
             p.tournament_entrants = p.tournament_entrants.saturating_add(1);
             if p.tournament_entrants == CAPACITY {
                 p.tournament_winners = vec![match rng.gen_range(0..3) {
-                    0 => UpgradeKind::DaoOfLightness,
+                    0 => UpgradeKind::DaoWind,
                     1 => UpgradeKind::DaoOfHeaviness,
                     _ => UpgradeKind::DaoOfMagic,
                 }];
@@ -210,7 +210,7 @@ pub(super) fn upgrade_winner(entities: &mut EntityStore, building: u32, winner: 
     if let Some(e) = entities.get_mut(winner) {
         e.insight = config::DISCIPLE_INSIGHT_REQUIRED;
         e.evolve_dao(match choice {
-            UpgradeKind::DaoOfLightness => AbilityKind::EvolveLightness,
+            UpgradeKind::DaoWind => AbilityKind::EvolveWind,
             UpgradeKind::DaoOfHeaviness => AbilityKind::EvolveWar,
             _ => AbilityKind::EvolveMagic,
         });

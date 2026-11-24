@@ -5,7 +5,7 @@ use super::*;
 fn cultivator_combat_footing_resists_incoming_cultivators() {
     for kind in [
         EntityKind::Warrior,
-        EntityKind::LightnessAdept,
+        EntityKind::WindAdept,
         EntityKind::WarAdept,
         EntityKind::MagicAdept,
     ] {

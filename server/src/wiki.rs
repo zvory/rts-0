@@ -480,7 +480,7 @@ fn kind_label(kind: EntityKind) -> String {
         EntityKind::Golem => "Golem",
         EntityKind::Rifleman => "Rifleman",
         EntityKind::Warrior => "Novice",
-        EntityKind::LightnessAdept => "Lightness Adept",
+        EntityKind::WindAdept => "Wind Adept",
         EntityKind::WarAdept => "War Adept",
         EntityKind::MagicAdept => "Magic Adept",
         EntityKind::Panzerfaust => "Panzerfaust",

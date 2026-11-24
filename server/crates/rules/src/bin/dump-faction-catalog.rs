@@ -571,7 +571,7 @@ fn print_client_constants(indent: &str) {
 fn print_upgrades(indent: &str) {
     println!("{indent}  \"upgrades\": {{");
     for kind in [
-        faction::UpgradeKind::DaoOfLightness,
+        faction::UpgradeKind::DaoWind,
         faction::UpgradeKind::DaoOfMagic,
         faction::UpgradeKind::DaoOfHeaviness,
     ] {
@@ -728,7 +728,7 @@ fn print_ability_effects(indent: &str) {
     println!("{indent}    \"{}\": {{}},", faction::EKAT_TELEPORT_ABILITY,);
     println!(
         "{indent}    \"{}\": {{}},",
-        faction::AbilityKind::LightnessDash.stable_id(),
+        faction::AbilityKind::WindDash.stable_id(),
     );
     println!(
         "{indent}    \"{}\": {{\"radiusTiles\":{},\"speedPxPerTick\":{},\"damage\":{}}},",

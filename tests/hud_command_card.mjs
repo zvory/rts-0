@@ -706,7 +706,7 @@ for (const [kind, upgrade] of [
     "ekat-unit",
     "ekat-zamok-train",
     "cultivators-disciple-base",
-    "cultivators-disciple-lightness",
+    "cultivators-disciple-wind",
     "cultivators-disciple-war",
     "cultivators-disciple-magic",
     "cultivators-war-master",
@@ -883,24 +883,24 @@ for (const researched of [false, true]) {
   const context = {
     playerId: 1, factionId: "cultivators",
     resources: { steel: 1000, oil: 1000 },
-    upgrades: [UPGRADE.DAO_OF_LIGHTNESS, UPGRADE.DAO_OF_HEAVINESS, UPGRADE.DAO_OF_MAGIC],
+    upgrades: [UPGRADE.DAO_WIND, UPGRADE.DAO_OF_HEAVINESS, UPGRADE.DAO_OF_MAGIC],
     playerHasCompleteKind: () => true, groupCooldownClocks: () => [],
   };
   const unit = { id: 50, owner: 1, kind: KIND.WARRIOR, insight: 59 };
   const cardFor = (entity, extra = {}) => buildCommandCardDescriptors({ ...context, ...extra, selection: [entity] });
   let card = cardFor(unit);
-  assert.deepEqual(card.slots.slice(6, 9).map((s) => s.ability), [ABILITY.EVOLVE_LIGHTNESS, ABILITY.EVOLVE_WAR, ABILITY.EVOLVE_MAGIC]);
+  assert.deepEqual(card.slots.slice(6, 9).map((s) => s.ability), [ABILITY.EVOLVE_WIND, ABILITY.EVOLVE_WAR, ABILITY.EVOLVE_MAGIC]);
   assert(card.slots.slice(6, 9).every((s) => s.enabled && !s.cls.includes("dao-ready")));
   card = cardFor({ ...unit, insight: 60 });
   assert(card.slots.slice(6, 9).every((s) => s.enabled && s.cls.includes("dao-ready")));
   assert.deepEqual(card.slots.slice(6, 9).map((s) => s.hotkey), ["Z", "X", "C"]);
   assert(cardFor({ ...unit, insight: 60 }, { upgrades: [] }).slots.slice(6, 9).every((s) => s.enabled));
-  const light = cardFor({ ...unit, kind: KIND.LIGHTNESS_ADEPT, insight: 60, dao: "lightness" });
-  assert(light.slots.some((s) => s?.ability === ABILITY.LIGHTNESS_DASH));
+  const light = cardFor({ ...unit, kind: KIND.WIND_ADEPT, insight: 60, dao: "wind" });
+  assert(light.slots.some((s) => s?.ability === ABILITY.WIND_DASH));
   for (const remainingUses of [0, 1, 2]) {
-    const master = cardFor({ ...unit, kind: KIND.LIGHTNESS_ADEPT, daoMaster: true,
-      abilities: [{ ability: ABILITY.LIGHTNESS_DASH, cooldownLeft: 0, remainingUses }] });
-    const dash = master.slots.find((slot) => slot?.ability === ABILITY.LIGHTNESS_DASH);
+    const master = cardFor({ ...unit, kind: KIND.WIND_ADEPT, daoMaster: true,
+      abilities: [{ ability: ABILITY.WIND_DASH, cooldownLeft: 0, remainingUses }] });
+    const dash = master.slots.find((slot) => slot?.ability === ABILITY.WIND_DASH);
     assert.equal(dash.countBadge, `${remainingUses}`);
     assert.equal(dash.enabled, remainingUses > 0);
     assert.equal(dash.intent.targetMode, "worldPoint");
@@ -910,7 +910,7 @@ for (const researched of [false, true]) {
   const magic = cardFor({ ...unit, kind: KIND.MAGIC_ADEPT, insight: 60, dao: "magic" });
   assert(magic.slots.some((s) => s?.ability === ABILITY.EKAT_MAGIC_ANCHOR && s.label === "Anchor"));
   assert(magic.slots.some((s) => s?.ability === ABILITY.DISCIPLE_SHIELD && s.enabled));
-  assert(!magic.slots.some((s) => s?.ability === ABILITY.LIGHTNESS_DASH));
+  assert(!magic.slots.some((s) => s?.ability === ABILITY.WIND_DASH));
 }
 
 {
@@ -932,13 +932,13 @@ for (const researched of [false, true]) {
     resources: { steel: 0, oil: 0 }, playerHasCompleteKind: () => false,
     groupCooldownClocks: () => [] };
   const card = buildCommandCardDescriptors(context);
-  for (const ability of [ABILITY.EVOLVE_LIGHTNESS, ABILITY.EVOLVE_WAR, ABILITY.EVOLVE_MAGIC]) {
+  for (const ability of [ABILITY.EVOLVE_WIND, ABILITY.EVOLVE_WAR, ABILITY.EVOLVE_MAGIC]) {
     const slot = card.slots.find((slot) => slot?.ability === ability);
     assert(slot.enabled);
     assert.deepEqual(slot.intent.readyIds, [1, 2]);
     assert(slot.title.includes("60 insight"));
     assert(slot.cls.includes("dao-ready"));
-    if (ability !== ABILITY.EVOLVE_LIGHTNESS) {
+    if (ability !== ABILITY.EVOLVE_WIND) {
       assert(slot.cls.includes("active"));
       assert.equal(slot.countBadge, "1/2");
     }
@@ -950,18 +950,18 @@ for (const researched of [false, true]) {
   assert.equal(sword.hotkey, "E");
   assert.deepEqual(sword.intent.readyIds, [3]);
   const changed = buildCommandCardDescriptors({ ...context,
-    selection: selection.map((e) => e.id === 1 ? { ...e, chosenDao: "lightness" } : e) });
+    selection: selection.map((e) => e.id === 1 ? { ...e, chosenDao: "wind" } : e) });
   assert.notEqual(changed.signature, card.signature);
 }
 
 // Charge must coexist with Adept and Master abilities in mixed selections.
 {
-  const selection = [KIND.WARRIOR, KIND.LIGHTNESS_ADEPT, KIND.WAR_ADEPT, KIND.MAGIC_ADEPT]
+  const selection = [KIND.WARRIOR, KIND.WIND_ADEPT, KIND.WAR_ADEPT, KIND.MAGIC_ADEPT]
     .map((kind, index) => ({ id: index + 1, owner: 1, kind, insight: 60, daoMaster: kind === KIND.WAR_ADEPT }));
   selection[0].escapeTreasure = {};
   const card = buildCommandCardDescriptors({ playerId: 1, factionId: "cultivators", selection,
     resources: { steel: 0, oil: 0 }, upgrades: [], groupCooldownClocks: () => [] });
-  for (const ability of [ABILITY.LIGHTNESS_DASH, ABILITY.THROW_SWORD, ABILITY.EKAT_MAGIC_ANCHOR]) {
+  for (const ability of [ABILITY.WIND_DASH, ABILITY.THROW_SWORD, ABILITY.EKAT_MAGIC_ANCHOR]) {
     const slot = card.slots.find((slot) => slot?.ability === ability);
     assert(slot?.enabled, `mixed selection preserves active ${ability}`);
     assert.equal(slot.hotkey, commandCardAbilitiesForFaction("cultivators")
@@ -977,7 +977,7 @@ for (const researched of [false, true]) {
 {
   const dao = UPGRADE.DAO_OF_MAGIC;
   const pavilion = { id: 900, owner: 1, kind: KIND.THREE_DAO_PAVILION,
-    prodUpgrade: UPGRADE.DAO_OF_LIGHTNESS };
+    prodUpgrade: UPGRADE.DAO_WIND };
   for (const [upgrades, entities, cost, ticks] of [
     [[], [], 50, 600],
     [[UPGRADE.DAO_OF_HEAVINESS], [], 100, 1200],
@@ -1063,7 +1063,7 @@ for (const researched of [false, true]) {
     resources: { steel: 150, oil: 35, supplyUsed: 0, supplyCap: 20 }, upgrades: [] };
   const locked = buildCommandCardDescriptors(ctx);
   const choices = [
-    [KIND.LIGHTNESS_ADEPT, UPGRADE.DAO_OF_LIGHTNESS],
+    [KIND.WIND_ADEPT, UPGRADE.DAO_WIND],
     [KIND.WAR_ADEPT, UPGRADE.DAO_OF_HEAVINESS],
     [KIND.MAGIC_ADEPT, UPGRADE.DAO_OF_MAGIC],
   ];
@@ -1125,7 +1125,7 @@ withFakeHudDocument(() => {
 });
 
 // Item slot R is conditional, consumes only carriers, and exposes autocast controls.
-for (const kind of [KIND.WORKER, KIND.WARRIOR, KIND.LIGHTNESS_ADEPT, KIND.WAR_ADEPT, KIND.MAGIC_ADEPT]) {
+for (const kind of [KIND.WORKER, KIND.WARRIOR, KIND.WIND_ADEPT, KIND.WAR_ADEPT, KIND.MAGIC_ADEPT]) {
   const build = (escapeTreasure, auto = true) => buildCommandCardDescriptors({
     playerId: 1, factionId: "cultivators", resources: { steel: 0, oil: 0 },
     selection: [{ id: 1, owner: 1, kind, escapeTreasure,

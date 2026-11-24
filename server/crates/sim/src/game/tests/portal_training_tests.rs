@@ -66,7 +66,7 @@ fn cultivator_portal_trains_researched_adepts_for_35_oil_without_novices() {
     use crate::game::upgrade::UpgradeKind;
 
     for (kind, required) in [
-        (EntityKind::LightnessAdept, UpgradeKind::DaoOfLightness),
+        (EntityKind::WindAdept, UpgradeKind::DaoWind),
         (EntityKind::WarAdept, UpgradeKind::DaoOfHeaviness),
         (EntityKind::MagicAdept, UpgradeKind::DaoOfMagic),
     ] {
@@ -84,7 +84,7 @@ fn cultivator_portal_trains_researched_adepts_for_35_oil_without_novices() {
             .set_rally_point(Some(RallyIntent::new(RallyKind::Move, 950.0, 624.0)));
         // Other Dao research must not unlock this specialization.
         for other in [
-            UpgradeKind::DaoOfLightness,
+            UpgradeKind::DaoWind,
             UpgradeKind::DaoOfHeaviness,
             UpgradeKind::DaoOfMagic,
         ] {

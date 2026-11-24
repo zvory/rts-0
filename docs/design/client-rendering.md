@@ -131,8 +131,8 @@ successfully presented selection scene active. Selection never uses mesh picking
 bounds at runtime, shadow proxies, or fresh mutable state.
 
 `input/click_geometry.js` owns point-click tolerances. Engineer, Rifleman, Panzerfaust and
-Machine Gunner radii grow 50%. Novice, Lightness Adept and Magic Adept radii shrink 25%;
-Lightness/Magic Masters keep their existing radii. War Adept grows 25% and War Master grows
+Machine Gunner radii grow 50%. Novice, Wind Adept and Magic Adept radii shrink 25%;
+Wind/Magic Masters keep their existing radii. War Adept grows 25% and War Master grows
 50%, after the existing Master body multiplier. Tank and Rocket Truck gain 10% total local
 length without wider sides. Anti-Tank Gun uses an authored sprite-fitting box in hull-facing
 coordinates while packed and weapon-facing coordinates while deployed:

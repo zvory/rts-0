@@ -395,7 +395,7 @@ export const cmd = Object.freeze({
 // Proving Grounds: kind code 33; v63 slot 51 is team-private daoTrainingQueue (<=64 Dao ids).
 // research(building, upgrade) queues paid training at Proving Grounds; cancel removes unpaid tail plans.
 
-// Lab spawnEntity/spawnEntities entries accept optional dao: lightness | war | magic (Novice only).
+// Lab spawnEntity/spawnEntities entries accept optional dao: wind | war | magic (Novice only).
 
 // Snapshots carry public playerFactions: [{id, factionId}] independently of private playerResources.
 
@@ -404,4 +404,4 @@ export const cmd = Object.freeze({
 // Dao Master rank: EntityView daoMaster is a public bool at compact slot 52 (v65);
 // rts-contract owns the DTO, the sim owns advancement, and exact insight stays team-private.
 
-// Lightness Dash uses lightnessDash (ability 21, order stage 29); no return marker.
+// Wind Dash uses windDash (ability 21, order stage 29); no return marker.

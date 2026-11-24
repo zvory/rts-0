@@ -4,7 +4,7 @@ use super::*;
 fn master_rank_enlarges_collision_and_projectile_geometry() {
     use crate::game::entity::EntityStore;
     for kind in [
-        EntityKind::LightnessAdept,
+        EntityKind::WindAdept,
         EntityKind::WarAdept,
         EntityKind::MagicAdept,
     ] {

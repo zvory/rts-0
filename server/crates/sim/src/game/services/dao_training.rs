@@ -7,7 +7,7 @@ use crate::game::upgrade::UpgradeKind;
 pub(crate) fn is_dao(choice: UpgradeKind) -> bool {
     matches!(
         choice,
-        UpgradeKind::DaoOfLightness | UpgradeKind::DaoOfHeaviness | UpgradeKind::DaoOfMagic
+        UpgradeKind::DaoWind | UpgradeKind::DaoOfHeaviness | UpgradeKind::DaoOfMagic
     )
 }
 
@@ -67,7 +67,7 @@ pub(super) fn upgrade_trainee(entities: &mut EntityStore, building: u32, trainee
     if let Some(e) = entities.get_mut(trainee) {
         e.insight = config::DISCIPLE_INSIGHT_REQUIRED;
         e.evolve_dao(match choice {
-            UpgradeKind::DaoOfLightness => AbilityKind::EvolveLightness,
+            UpgradeKind::DaoWind => AbilityKind::EvolveWind,
             UpgradeKind::DaoOfHeaviness => AbilityKind::EvolveWar,
             _ => AbilityKind::EvolveMagic,
         });

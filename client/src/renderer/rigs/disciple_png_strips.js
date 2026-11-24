@@ -2,10 +2,10 @@ import { KIND } from "../../protocol.js";
 import { DAO_WAR_BODY_SCALE, DAO_MASTER_BODY_SCALE } from "../../config.js";
 import { PRODUCTION_RASTER_COLOR_TARGET } from "./color_adjustment.js";
 
-export const LIGHTNESS_FRAME_STRIP_KEY = KIND.LIGHTNESS_ADEPT;
+export const WIND_FRAME_STRIP_KEY = KIND.WIND_ADEPT;
 export const WAR_FRAME_STRIP_KEY = KIND.WAR_ADEPT;
 export const MAGIC_FRAME_STRIP_KEY = KIND.MAGIC_ADEPT;
-export const LIGHTNESS_MASTER_FRAME_STRIP_KEY = "lightness_adept:master";
+export const WIND_MASTER_FRAME_STRIP_KEY = "wind_adept:master";
 export const WAR_MASTER_FRAME_STRIP_KEY = "war_adept:master";
 export const MAGIC_MASTER_FRAME_STRIP_KEY = "magic_adept:master";
 
@@ -45,7 +45,7 @@ function discipleStrip(image, frameCount, firingFrames, iconVisibleBounds, weapo
 
 // Candidate B: scarf rests at idle, streams while running, and follows the sword swing.
 // Original archer source and runtime strips are preserved for future reuse.
-export const LIGHTNESS_PNG_FRAME_STRIP = discipleStrip("/assets/rigs/disciple-dao/generated/lightness-melee-b-runtime-strip.png?v=melee-b-wind-2", 8, [4, 5, 6, 7],
+export const WIND_PNG_FRAME_STRIP = discipleStrip("/assets/rigs/disciple-dao/generated/wind-melee-b-runtime-strip.png?v=melee-b-wind-2", 8, [4, 5, 6, 7],
   { x: 75, y: 93, w: 131, h: 120 }, "warrior_sword", "melee-b-wind-2");
 export const MAGIC_PNG_FRAME_STRIP = discipleStrip("/assets/rigs/disciple-dao/generated/magic-runtime-strip.png?v=dao-ranged-1", 8, [4, 5, 6, 7],
   { x: 63, y: 80, w: 128, h: 113 }, "disciple_orb");
@@ -79,7 +79,7 @@ function masterStrip(adept, image, bounds) {
       runtimeStrip: "client" + image.split("?")[0] }),
   });
 }
-export const LIGHTNESS_MASTER_PNG_FRAME_STRIP = masterStrip(LIGHTNESS_PNG_FRAME_STRIP, "/assets/rigs/disciple-dao/generated/lightness-master-runtime-strip.png?v=master-1",
+export const WIND_MASTER_PNG_FRAME_STRIP = masterStrip(WIND_PNG_FRAME_STRIP, "/assets/rigs/disciple-dao/generated/wind-master-runtime-strip.png?v=master-1",
   { x: 42, y: 24, w: 175, h: 205 });
 export const WAR_MASTER_PNG_FRAME_STRIP = Object.freeze({
   ...masterStrip(WAR_PNG_FRAME_STRIP, "/assets/rigs/disciple-dao/generated/war-master-runtime-strip.png?v=master-torso-2", { x: 81, y: 155, w: 95, h: 185 }),

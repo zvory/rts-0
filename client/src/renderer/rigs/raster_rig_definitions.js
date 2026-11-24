@@ -368,7 +368,7 @@ const RASTER_DEFINITION_ENTRIES = Object.freeze([
   [KIND.ARTILLERY, ARTILLERY_DEFINITION],
   [KIND.MACHINE_GUNNER, MACHINE_GUNNER_DEFINITION],
   [KIND.WARRIOR, WARRIOR_DEFINITION],
-  [KIND.LIGHTNESS_ADEPT, { ...WARRIOR_DEFINITION, kind: KIND.LIGHTNESS_ADEPT, id: "lightness_adept.raster" }],
+  [KIND.WIND_ADEPT, { ...WARRIOR_DEFINITION, kind: KIND.WIND_ADEPT, id: "wind_adept.raster" }],
   [KIND.WAR_ADEPT, { ...WARRIOR_DEFINITION, kind: KIND.WAR_ADEPT, id: "war_adept.raster" }],
   [KIND.MAGIC_ADEPT, { ...WARRIOR_DEFINITION, kind: KIND.MAGIC_ADEPT, id: "magic_adept.raster" }],
 
@@ -386,7 +386,7 @@ const RASTER_PART_ENTRIES = Object.freeze([
   [KIND.ARTILLERY, { shadow: ["part.shadow"], unit: [...atlasSourceParts(ARTILLERY_PNG_RIG_ATLAS), ...ARTILLERY_FLASH_IDS] }],
   [KIND.MACHINE_GUNNER, { shadow: ["part.shadow"], unit: ["raster.frame"] }],
   [KIND.WARRIOR, { shadow: ["part.shadow"], unit: ["raster.frame"] }],
-  [KIND.LIGHTNESS_ADEPT, { shadow: ["part.shadow"], unit: ["raster.frame"] }],
+  [KIND.WIND_ADEPT, { shadow: ["part.shadow"], unit: ["raster.frame"] }],
   [KIND.WAR_ADEPT, { shadow: ["part.shadow"], unit: ["raster.frame"] }],
   [KIND.MAGIC_ADEPT, { shadow: ["part.shadow"], unit: ["raster.frame"] }],
   [KIND.MORTAR_TEAM, { shadow: ["part.shadow"], unit: atlasSourceParts(MORTAR_TEAM_PNG_RIG_ATLAS) }],

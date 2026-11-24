@@ -56,7 +56,7 @@ Runtime identity is still global `EntityKind`. The current roster has 37 global 
 
 The current production catalog is in `server/crates/rules/src/defs.rs`:
 
-- Units: Worker, Golem, Novice (Warrior), Lightness Adept, War Adept, Magic Adept, Rifleman, Panzerfaust, Machine Gunner, Anti-Tank Gun, Mortar Team,
+- Units: Worker, Golem, Novice (Warrior), Wind Adept, War Adept, Magic Adept, Rifleman, Panzerfaust, Machine Gunner, Anti-Tank Gun, Mortar Team,
   Artillery, Rocket Truck, Scout Car, Scout Plane, Tank, Command Car, and Ekat.
 - Buildings: Resource Depot, Portal, Three Dao Pavilion, Tournament Grounds, Proving Grounds, Shop, Zamok,
   Depot, Barracks, Training Centre, Engineering Complex, Factory, Gun

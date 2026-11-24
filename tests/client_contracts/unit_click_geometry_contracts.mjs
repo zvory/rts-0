@@ -15,10 +15,10 @@ function edge(kind, inside, outside, extras = {}) {
 }
 for (const kind of [KIND.WORKER, KIND.RIFLEMAN, KIND.PANZERFAUST]) edge(kind, 13.4, 13.6);
 edge(KIND.MACHINE_GUNNER, 14.9, 15.1);
-for (const kind of [KIND.WARRIOR, KIND.LIGHTNESS_ADEPT, KIND.MAGIC_ADEPT]) edge(kind, 19.4, 19.6);
+for (const kind of [KIND.WARRIOR, KIND.WIND_ADEPT, KIND.MAGIC_ADEPT]) edge(kind, 19.4, 19.6);
 edge(KIND.WAR_ADEPT, 22.7, 22.8);
 edge(KIND.WAR_ADEPT, 32.7, 32.8, { daoMaster: true });
-for (const kind of [KIND.LIGHTNESS_ADEPT, KIND.MAGIC_ADEPT]) edge(kind, 31.1, 31.3, { daoMaster: true });
+for (const kind of [KIND.WIND_ADEPT, KIND.MAGIC_ADEPT]) edge(kind, 31.1, 31.3, { daoMaster: true });
 edge(KIND.MORTAR_TEAM, 21.5, 21.7);
 
 // Minimum screen tolerance scales as well, even where the world footprint is tiny.
