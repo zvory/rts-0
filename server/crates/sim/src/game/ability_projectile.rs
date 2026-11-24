@@ -336,6 +336,7 @@ fn apply_projectile_hits(
             id,
             projectile.owner,
             damage,
+            base_damage,
             if projectile.ability == AbilityKind::ThrowSword {
                 crate::config::THROW_SWORD_ARMOR_PENETRATION
             } else {

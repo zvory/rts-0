@@ -60,28 +60,31 @@ see the unit radiance, with ordinary fog filtering. Realm advancement projects a
 (half-second) expanding gold corona reaching about one tile, independently of insight privacy.
 
 Magic Disciples can place Shield within five tiles: a shimmering circle with a
-2.1-tile radius (30% smaller than Anchor), covering allied units (including the caster). One shared pool
-absorbs up to 150 hostile damage after normal armor/terrain reductions; overflow damages the
-unit, and depletion removes the field immediately. Protection requires an attack originating
-outside the field and hitting an allied unit inside; attacks from within bypass it.
-Each attack's armor-penetration percentage passes through to the unit; the remaining percentage
-drains shield HP. For example, a 50% piercing hit splits damage equally between unit and shield,
-while a 100% piercing hit bypasses the pool entirely. The protected portion rounds down to whole HP,
-with the remainder reaching the unit. Overlapping fields share only the non-penetrating portion,
-so they cannot reduce the guaranteed penetration. This applies to primary weapons, Throw Sword,
-Line Shot, and area damage using each damage component's own penetration (tank HE splash is non-piercing).
-Mortar/rocket and artillery checks use the recorded firing position, which survives attacker death and checkpoint restore.
-Friendly fire, environmental damage,
-buildings, invulnerable targets and enemy units do not consume the pool. Overlapping
-fields consume pools in stable caster-id order. Shield costs no resources, has a ten-second
+2.1-tile radius (30% smaller than Anchor), covering allied units (including the caster).
+The field has 150 HP and grants a separate 75% armor layer against hostile attacks entering
+from outside; attacks originating inside bypass its armor and do not drain its HP. Existing
+unit armor, facing, cover, and terrain reductions apply first. Shield armor then uses the ordinary
+armor-penetration formula: `damage × (1 − 0.75 × (1 − penetration))`, rounded to the nearest HP.
+An otherwise 100-damage hit deals 25 HP at 0% piercing, 63 HP at 50% piercing, and 100 HP at
+100% piercing. Regardless of piercing or the unit's defenses, the shield loses the attack's full
+pre-reduction damage (area hits use their distance-falloff damage). Even fully piercing hits drain it.
+A field active at impact protects the entire hit, including the hit that depletes it; excess durability
+cost does not become damage to the unit. Depletion removes the field immediately for later hits.
+Overlapping fields never multiply armor or charge the same hit twice: the first eligible field in
+stable caster-id order supplies the armor and pays the full hit, even when that hit breaks it.
+This applies to direct weapons, Throw Sword (per leg), Line Shot, and each area-damage victim;
+tank HE splash is non-piercing. Mortar/rocket and artillery checks use recorded firing positions,
+which survive attacker death and checkpoint restore. Friendly fire, environmental damage,
+buildings, invulnerable targets, and enemy units receive no shield armor and do not drain it.
+Shield costs no resources, has a ten-second
 cooldown, replaces the caster’s prior shield, and expires after 5 seconds or earlier on
 depletion, replacement, or caster death. In-range casts preserve movement and queued orders;
 out-of-range immediate casts replace the current order with an approach-and-cast order. The pool, fixed world center, and absolute expiry tick live on the caster entity and survive
 checkpoints; the existing ability-runtime allocator supplies its unique visual id.
 All visible viewers see a gray lifetime bar on a black background at the top of the field,
 six pixels below its HP-bar position. It drains from full to empty using the server-provided
-remaining ticks and the mirrored 5-second duration, independently of damage absorption.
-All visible viewers see the field; owner/privileged viewers receive its remaining pool.
+remaining ticks and the mirrored 5-second duration, independently of damage received.
+All viewers who can see the field receive its remaining HP, including enemies and allies.
 
 Lab commands continue to use the selected owner’s faction and research. A Disciple
 spawned for a Kriegsia player can move but cannot evolve; the Dao preview’s P2 is

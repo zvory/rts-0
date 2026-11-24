@@ -116,13 +116,15 @@ impl EntityStore {
                 < crate::game::ability_runtime::MAX_ACTIVE_ABILITY_OBJECTS
     }
 
-    /// Consume shared shield pools when hostile damage crosses into the barrier. Stable caster order
-    /// makes overlapping shields deterministic; each point is absorbed only once.
+    /// Apply one shield armor layer to an incoming hostile hit. The first eligible field
+    /// in caster-id order takes the full unmitigated hit, including the hit that breaks it.
+    #[allow(clippy::too_many_arguments)]
     pub(in crate::game) fn shielded_damage(
         &mut self,
         victim: u32,
         attacker_owner: u32,
-        mut damage: u32,
+        damage: u32,
+        full_damage: u32,
         armor_penetration: f32,
         source: (f32, f32),
         teams: &crate::game::teams::TeamRelations,
@@ -130,8 +132,7 @@ impl EntityStore {
         let Some(target) = self.get(victim) else {
             return damage;
         };
-        if armor_penetration >= 1.0
-            || !target.is_unit()
+        if !target.is_unit()
             || target.hp == 0
             || target.invulnerable()
             || !teams.is_enemy_owner(attacker_owner, target.owner)
@@ -147,12 +148,6 @@ impl EntityStore {
             .map(|e| e.id)
             .collect();
         shields.sort_unstable();
-        // Penetrating damage bypasses every overlapping field. Round the protected portion
-        // down, leaving fractional damage on the victim rather than silently losing it.
-        let protected =
-            (damage as f64 * (1.0 - armor_penetration.clamp(0.0, 1.0) as f64)).floor() as u32;
-        let passthrough = damage - protected;
-        damage -= passthrough;
         for id in shields {
             let Some(caster) = self.get_mut(id) else {
                 continue;
@@ -175,17 +170,20 @@ impl EntityStore {
             if sx * sx + sy * sy <= radius * radius {
                 continue;
             }
-            let absorbed = damage.min(shield.remaining);
-            shield.remaining -= absorbed;
-            damage -= absorbed;
+            if shield.remaining == 0 || full_damage == 0 {
+                continue;
+            }
+            shield.remaining = shield.remaining.saturating_sub(full_damage);
             if shield.remaining == 0 {
                 caster.shield = None;
             }
-            if damage == 0 {
-                break;
-            }
+            return crate::rules::combat::damage_after_armor_reduction(
+                damage,
+                crate::config::DISCIPLE_SHIELD_ARMOR_REDUCTION,
+                armor_penetration,
+            );
         }
-        damage + passthrough
+        damage
     }
 
     /// Whether an entity with this id still exists.

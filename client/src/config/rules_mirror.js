@@ -326,7 +326,7 @@ export const ABILITIES = Object.freeze({
 
   [ABILITY.DISCIPLE_SHIELD]: Object.freeze({
     ability: ABILITY.DISCIPLE_SHIELD, label: "Shield", icon: "SHD", hotkey: "X",
-    title: "Place a shield that absorbs 150 incoming enemy damage to allied units within 2.1 tiles; attacks from inside bypass it; armor piercing passes its percentage through and the rest drains shield HP; lasts up to 5 seconds",
+    title: "Place a 150 HP shield granting allied units within 2.1 tiles 75% armor against attacks from outside; armor piercing works normally; each hit drains full attack damage from shield HP; lasts up to 5 seconds",
     carriers: Object.freeze([KIND.MAGIC_ADEPT]), targetMode: "worldPoint",
     rangeTiles: EKAT_MAGIC_ANCHOR_RANGE_TILES, radiusTiles: DISCIPLE_SHIELD_RADIUS_TILES,
     cooldownTicks: 300, cost: Object.freeze({ steel: 0, oil: 0 }),
