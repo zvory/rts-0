@@ -41,14 +41,14 @@ for (const [elapsed, expectedFrame, expectedStep] of [
 }
 warMinimap.destroy();
 
-assert(WARRIOR_PNG_FRAME_STRIP.frameCount === 6, "Warrior placeholder exposes six consistent atlas cells");
+assert(WARRIOR_PNG_FRAME_STRIP.frameCount === 12, "Novice preserves six original cells and adds six attack poses");
 assert(
   frameStripFrameIndex(
     WARRIOR_PNG_FRAME_STRIP,
     { id: 6, kind: KIND.WARRIOR, state: STATE.ATTACK },
     { recoilProgress: 1, recoilPhase: 0.2, recoilWeaponKind: WEAPON_KIND.WARRIOR_SWORD },
-  ) === 5,
-  "Warrior sword attack selects the authored swipe frame",
+  ) === 7,
+  "Novice sword attack selects the intermediate early-swing pose",
 );
 assert(
   frameStripFrameIndex(
@@ -472,7 +472,7 @@ function frameStripMovementFor(entity, previous, current, motion = new Map(), ti
   state.weaponRecoil = () => 1;
   state.weaponRecoilPhase = () => 0.2;
   state.weaponRecoilKind = () => WEAPON_KIND.WARRIOR_SWORD;
-  assert(sample(3100).part === "frame:5", "stationary disciple still shows its sword attack");
+  assert(sample(3100).part === "frame:7", "stationary disciple still shows its sword attack");
   delete state.weaponRecoil; delete state.weaponRecoilPhase; delete state.weaponRecoilKind;
   disciple.state = STATE.MOVE;
   state.tick++; state._curById.set(6, { x: 112, y: 100 }); disciple.x = 112;

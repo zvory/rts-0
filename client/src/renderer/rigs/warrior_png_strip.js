@@ -1,3 +1,4 @@
+import { withGoldenAttackTrail } from "./golden_attack_strip.js";
 import { PRODUCTION_RASTER_COLOR_TARGET } from "./color_adjustment.js";
 
 function deepFreeze(value) {
@@ -7,18 +8,18 @@ function deepFreeze(value) {
   return value;
 }
 
-export const WARRIOR_PNG_FRAME_STRIP = deepFreeze({
+export const WARRIOR_PNG_FRAME_STRIP = withGoldenAttackTrail(deepFreeze({
   enabled: true,
   unit: "warrior",
   image: "/assets/rigs/warrior-placeholder-pass-01/generated/warrior-runtime-strip.png?v=placeholder-2",
   imageVersion: "placeholder-2",
   frameWidth: 160,
   frameHeight: 160,
-  frameCount: 6,
+  frameCount: 12,
   idleFrame: 0,
   iconVisibleBounds: { x: 3, y: 48, w: 153, h: 64 },
   movementFrames: [1, 2, 3, 4],
-  firingFrames: [5],
+  firingFrames: [6, 7, 8, 9, 10, 11],
   firingWeaponKinds: ["warrior_sword"],
   firingFrameHoldPhase: 0.7,
   fps: 8,
@@ -35,4 +36,4 @@ export const WARRIOR_PNG_FRAME_STRIP = deepFreeze({
     generatedSource: "client/assets/rigs/warrior-placeholder-pass-01/generated/warrior-source.png",
     runtimeStrip: "client/assets/rigs/warrior-placeholder-pass-01/generated/warrior-runtime-strip.png",
   },
-});
+}));

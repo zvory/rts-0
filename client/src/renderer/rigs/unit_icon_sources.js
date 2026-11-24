@@ -35,7 +35,7 @@ export function liveUnitIconMarkupFor(kind, { teamColor = "#0072b2", minimapPart
       source: "frame-strip",
       image: strip.image,
       sheetWidth: strip.frameWidth * strip.frameCount,
-      sheetHeight: strip.frameHeight,
+      sheetHeight: strip.frameHeight * (strip.attackTrail ? 2 : 1),
       frame: {
         x: frameX,
         y: 0,
