@@ -113,19 +113,19 @@ function strip(name, frames) {
 const concepts = key(read(path.join(rig, "source/concepts.png")));
 const xs = [125, 352, 574, 792, 1014, 1254];
 const crowns = [237, 455, 675, 895, 1126];
-const lightness = [];
+const wind = [];
 for (let i = 0; i < 4; i++) {
   const cell = crop(concepts, xs[i], 50, xs[i + 1] - xs[i], 205);
   // Row labels occupy the upper-left margin of the first cell, outside its actor.
   if (i === 0) for (let y = 0; y < 110; y++) for (let x = 0; x < 32; x++) cell.data[(y * cell.width + x) * 4 + 3] = 0;
-  lightness.push(frame(cell, 0.70, hairPivot(cell, crowns[i] - xs[i], 83, 30)));
+  wind.push(frame(cell, 0.70, hairPivot(cell, crowns[i] - xs[i], 83, 30)));
 }
-strip("lightness", [...lightness, ...gridFrames("lightness-attack.png", 1, 0.34)]);
-const meleeLightness = gridFrames("lightness-melee-b-motion.png", 2, 0.40, 0.38);
+strip("wind", [...wind, ...gridFrames("wind-attack.png", 1, 0.34)]);
+const meleeWind = gridFrames("wind-melee-b-motion.png", 2, 0.40, 0.38);
 // Preserve standing and attack pixels; only the three running poses get the windier scarf.
-const windyRun = gridFrames("lightness-melee-b-windy-run.png", 1, 0.27, 0.60, 3);
-meleeLightness.splice(1, 3, ...windyRun);
-strip("lightness-melee-b", meleeLightness);
+const windyRun = gridFrames("wind-melee-b-windy-run.png", 1, 0.27, 0.60, 3);
+meleeWind.splice(1, 3, ...windyRun);
+strip("wind-melee-b", meleeWind);
 strip("magic", gridFrames("magic-motion.png", 2, 0.37));
 // Kabuto candidate B: white team-tinted helmet and charcoal body armor.
 // Explicit helmet centers replace dark-hair detection; the crown is now white.
@@ -146,7 +146,7 @@ for (const [col, row, crownX, crownY] of warCells) {
 strip("war-yari", war);
 // Master sprites keep Adept-sized crowns/torsos here; the renderer applies the
 // rank's 1.2 body multiplier once. Cloth bounds never determine body size.
-strip("lightness-master", gridFrames("lightness-master-motion.png", 2, 0.50, 0.48));
+strip("wind-master", gridFrames("wind-master-motion.png", 2, 0.50, 0.48));
 strip("magic-master", gridFrames("magic-master-motion.png", 2, 0.37, 0.48));
 const masterWarSheet = key(read(path.join(rig, "source/war-master-motion.png")));
 const masterWar = [];

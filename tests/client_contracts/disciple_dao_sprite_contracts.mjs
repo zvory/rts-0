@@ -3,8 +3,8 @@ import fs from "node:fs";
 import { PNG } from "pngjs";
 import { KIND, STATE } from "../../client/src/protocol.js";
 import { createLiveFrameStrips, liveFrameStripFor, liveFrameStripKeyForEntity } from "../../client/src/renderer/rigs/frame_strip_routing.js";
-import { LIGHTNESS_PNG_FRAME_STRIP, MAGIC_PNG_FRAME_STRIP, WAR_PNG_FRAME_STRIP,
-  LIGHTNESS_MASTER_PNG_FRAME_STRIP, MAGIC_MASTER_PNG_FRAME_STRIP, WAR_MASTER_PNG_FRAME_STRIP } from "../../client/src/renderer/rigs/disciple_png_strips.js";
+import { WIND_PNG_FRAME_STRIP, MAGIC_PNG_FRAME_STRIP, WAR_PNG_FRAME_STRIP,
+  WIND_MASTER_PNG_FRAME_STRIP, MAGIC_MASTER_PNG_FRAME_STRIP, WAR_MASTER_PNG_FRAME_STRIP } from "../../client/src/renderer/rigs/disciple_png_strips.js";
 import { PRESENTATION_ENTITY_FIELDS } from "../../client/src/presentation/entity_snapshot.js";
 import { WARRIOR_PNG_FRAME_STRIP } from "../../client/src/renderer/rigs/warrior_png_strip.js";
 import { frameStripFrameIndex, frameStripVisualFacing, frameStripSpriteOffset } from "../../client/src/renderer/rigs/frame_strip_runtime.js";
@@ -40,17 +40,17 @@ assert.ok(Math.abs(WAR_PNG_FRAME_STRIP.worldScale - 0.56) < 1e-8);
 assert.equal(entityAttackRangeTiles({ kind: KIND.WARRIOR }), 0.75);
 const strips = createLiveFrameStrips();
 for (const dao of [undefined]) {
-  const entity = { kind: ({ lightness: KIND.LIGHTNESS_ADEPT, war: KIND.WAR_ADEPT, magic: KIND.MAGIC_ADEPT })[dao] || KIND.WARRIOR, dao };
+  const entity = { kind: ({ wind: KIND.WIND_ADEPT, war: KIND.WAR_ADEPT, magic: KIND.MAGIC_ADEPT })[dao] || KIND.WARRIOR, dao };
   assert.equal(liveFrameStripFor(strips, liveFrameStripKeyForEntity(entity)), WARRIOR_PNG_FRAME_STRIP);
   assert.match(liveUnitIconMarkupFor(entity.kind, { dao }), /warrior-runtime-strip/);
 }
 const minimap = createMinimapAnimation();
 for (const [dao, strip, weaponKind] of [
-  ["lightness", LIGHTNESS_PNG_FRAME_STRIP, "warrior_sword"],
+  ["wind", WIND_PNG_FRAME_STRIP, "warrior_sword"],
   ["magic", MAGIC_PNG_FRAME_STRIP, "disciple_orb"],
   ["war", WAR_PNG_FRAME_STRIP, "warrior_sword"],
 ]) {
-  const entity = { id: 90, kind: ({ lightness: KIND.LIGHTNESS_ADEPT, war: KIND.WAR_ADEPT, magic: KIND.MAGIC_ADEPT })[dao] || KIND.WARRIOR, dao, state: STATE.MOVE,
+  const entity = { id: 90, kind: ({ wind: KIND.WIND_ADEPT, war: KIND.WAR_ADEPT, magic: KIND.MAGIC_ADEPT })[dao] || KIND.WARRIOR, dao, state: STATE.MOVE,
     x: 10, y: 10, facing: 0.3, weaponFacing: 1.2 };
   assert.equal(liveFrameStripFor(strips, liveFrameStripKeyForEntity(entity)), strip);
   const png = PNG.sync.read(fs.readFileSync(new URL(`../../${strip.source.runtimeStrip}`, import.meta.url)));
@@ -78,9 +78,9 @@ for (const [dao, strip, weaponKind] of [
     "automatic pursuit walks even while the public order state is idle");
   assert.equal(frameStripFrameIndex(strip, { ...entity, state: STATE.IDLE },
     { ...context, frameStripMoving: false }), 0);
-  assert.match(liveUnitIconMarkupFor(entity.kind, { dao }), new RegExp(dao === "lightness" ? "lightness-melee-b-runtime-strip" : dao === "war" ? "war-yari-runtime-strip" : "magic-runtime-strip"));
+  assert.match(liveUnitIconMarkupFor(entity.kind, { dao }), new RegExp(dao === "wind" ? "wind-melee-b-runtime-strip" : dao === "war" ? "war-yari-runtime-strip" : "magic-runtime-strip"));
   assert.match(liveUnitIconMarkupFor(entity.kind, { minimapPart: `frame:2` }),
-    new RegExp(dao === "lightness" ? "lightness-melee-b-runtime-strip" : dao === "war" ? "war-yari-runtime-strip" : "magic-runtime-strip"));
+    new RegExp(dao === "wind" ? "wind-melee-b-runtime-strip" : dao === "war" ? "war-yari-runtime-strip" : "magic-runtime-strip"));
   minimap.beginFrame([entity], {}, 600);
   assert.match(minimap.layers(entity)[0].part, /^frame:/);
   assert.ok(minimap.parts(entity.kind).includes(`frame:${strip.frameCount - 1}`));
@@ -90,11 +90,11 @@ for (const [dao, strip, weaponKind] of [
 // by placement, formation spacing, and click selection, at every facing.
 for (const [dao, strip, cx, cy, halfWidth, halfDepth] of [
   [undefined, WARRIOR_PNG_FRAME_STRIP, 58, 80, 48, 32],
-  ["lightness", LIGHTNESS_PNG_FRAME_STRIP, 128, 140, 48, 40],
+  ["wind", WIND_PNG_FRAME_STRIP, 128, 140, 48, 40],
   ["magic", MAGIC_PNG_FRAME_STRIP, 128, 140, 64, 52],
   ["war", WAR_PNG_FRAME_STRIP, 128, 146, 32, 28],
 ]) {
-  const subject = { ...bodySubject, kind: ({ lightness: KIND.LIGHTNESS_ADEPT, war: KIND.WAR_ADEPT, magic: KIND.MAGIC_ADEPT })[dao] || KIND.WARRIOR, dao };
+  const subject = { ...bodySubject, kind: ({ wind: KIND.WIND_ADEPT, war: KIND.WAR_ADEPT, magic: KIND.MAGIC_ADEPT })[dao] || KIND.WARRIOR, dao };
   const offset = frameStripSpriteOffset(strip, 0);
   for (let facing = 0; facing < Math.PI * 2; facing += Math.PI / 4) {
     const angle = frameStripVisualFacing(strip, { ...subject, facing }, {}, 0);
@@ -124,10 +124,10 @@ assert.equal(frameStripSpriteOffset(WAR_PNG_FRAME_STRIP, 5).y, WAR_PNG_FRAME_STR
 assert.equal(frameStripSpriteOffset(WAR_PNG_FRAME_STRIP, 0, { recoilProgress: 1, recoilPhase: 0.5 }).y, WAR_PNG_FRAME_STRIP.originLateralPx);
 assert.deepEqual(warEntity, unchanged);
 assert.ok(PRESENTATION_ENTITY_FIELDS.includes("daoMaster"), "rank survives the worker presentation handoff");
-for (const [dao, master, adept] of [["lightness", LIGHTNESS_MASTER_PNG_FRAME_STRIP, LIGHTNESS_PNG_FRAME_STRIP],
+for (const [dao, master, adept] of [["wind", WIND_MASTER_PNG_FRAME_STRIP, WIND_PNG_FRAME_STRIP],
   ["war", WAR_MASTER_PNG_FRAME_STRIP, WAR_PNG_FRAME_STRIP],
   ["magic", MAGIC_MASTER_PNG_FRAME_STRIP, MAGIC_PNG_FRAME_STRIP]]) {
-  const unit = { id: 123, kind: ({ lightness: KIND.LIGHTNESS_ADEPT, war: KIND.WAR_ADEPT, magic: KIND.MAGIC_ADEPT })[dao], dao, daoMaster: true, state: STATE.IDLE, x: 0, y: 0 };
+  const unit = { id: 123, kind: ({ wind: KIND.WIND_ADEPT, war: KIND.WAR_ADEPT, magic: KIND.MAGIC_ADEPT })[dao], dao, daoMaster: true, state: STATE.IDLE, x: 0, y: 0 };
   assert.equal(strips.get(liveFrameStripKeyForEntity(unit)), master);
   assert.equal(master.worldScale, adept.worldScale * 1.2);
   assert.equal(entityBodyRadius(unit), entityBodyRadius({ ...unit, daoMaster: false }) * 1.2);

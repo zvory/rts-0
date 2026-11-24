@@ -95,13 +95,13 @@ impl Entity {
             return true;
         }
         match ability {
-            AbilityKind::EvolveLightness | AbilityKind::EvolveWar | AbilityKind::EvolveMagic => {
+            AbilityKind::EvolveWind | AbilityKind::EvolveWar | AbilityKind::EvolveMagic => {
                 self.dao().is_none() && self.insight >= config::DISCIPLE_INSIGHT_REQUIRED
             }
             AbilityKind::ThrowSword => {
                 self.dao() == Some(UpgradeKind::DaoOfHeaviness) && self.dao_master
             }
-            AbilityKind::LightnessDash => self.dao() == Some(UpgradeKind::DaoOfLightness),
+            AbilityKind::WindDash => self.dao() == Some(UpgradeKind::DaoWind),
             AbilityKind::DiscipleShield | AbilityKind::EkatMagicAnchor => {
                 self.dao() == Some(UpgradeKind::DaoOfMagic)
             }
@@ -115,7 +115,7 @@ impl Entity {
             return false;
         }
         self.chosen_dao = Some(match ability {
-            AbilityKind::EvolveLightness => UpgradeKind::DaoOfLightness,
+            AbilityKind::EvolveWind => UpgradeKind::DaoWind,
             AbilityKind::EvolveWar => UpgradeKind::DaoOfHeaviness,
             AbilityKind::EvolveMagic => UpgradeKind::DaoOfMagic,
             _ => return false,
@@ -131,7 +131,7 @@ impl Entity {
             return;
         }
         let ability = match choice {
-            UpgradeKind::DaoOfLightness => AbilityKind::EvolveLightness,
+            UpgradeKind::DaoWind => AbilityKind::EvolveWind,
             UpgradeKind::DaoOfHeaviness => AbilityKind::EvolveWar,
             UpgradeKind::DaoOfMagic => AbilityKind::EvolveMagic,
             _ => return,
@@ -139,7 +139,7 @@ impl Entity {
         self.evolve_dao(ability);
     }
 
-    /// Second-rank advancement preserves orders/reload and grants Lightness its extra charge.
+    /// Second-rank advancement preserves orders/reload and grants Wind its extra charge.
     pub(in crate::game) fn advance_dao_master(&mut self) {
         if !self.kind.is_disciple()
             || self.hp == 0
@@ -149,11 +149,11 @@ impl Entity {
         {
             return;
         }
-        let dash_uses = self.ability_uses_remaining(AbilityKind::LightnessDash);
+        let dash_uses = self.ability_uses_remaining(AbilityKind::WindDash);
         self.dao_master = true;
-        if self.kind == EntityKind::LightnessAdept {
+        if self.kind == EntityKind::WindAdept {
             self.ability_uses_remaining.insert(
-                AbilityKind::LightnessDash,
+                AbilityKind::WindDash,
                 dash_uses.unwrap_or(1).saturating_add(1),
             );
         }
@@ -171,7 +171,7 @@ impl Entity {
         }
         let attack_cd = self.attack_cd();
         self.kind = match ability {
-            AbilityKind::EvolveLightness => EntityKind::LightnessAdept,
+            AbilityKind::EvolveWind => EntityKind::WindAdept,
             AbilityKind::EvolveWar => EntityKind::WarAdept,
             AbilityKind::EvolveMagic => EntityKind::MagicAdept,
             _ => return false,

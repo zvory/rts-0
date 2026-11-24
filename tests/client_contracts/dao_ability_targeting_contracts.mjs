@@ -15,7 +15,7 @@ const swordInput = Object.create(Input.prototype);
 const swordSelection = [
   { id: 101, owner: 1, kind: KIND.WAR_ADEPT, dao: "war", daoMaster: true, x: 200, y: 220 },
   { id: 102, owner: 1, kind: KIND.MAGIC_ADEPT, dao: "magic", x: 500, y: 220 },
-  { id: 103, owner: 1, kind: KIND.LIGHTNESS_ADEPT, dao: "lightness", x: 500, y: 220 },
+  { id: 103, owner: 1, kind: KIND.WIND_ADEPT, dao: "wind", x: 500, y: 220 },
   { id: 107, owner: 1, kind: KIND.WAR_ADEPT, dao: "war", x: 500, y: 220 },
   { id: 104, owner: 1, kind: KIND.WARRIOR, x: 500, y: 220 },
   { id: 105, owner: 2, kind: KIND.WAR_ADEPT, dao: "war", daoMaster: true, x: 500, y: 220 },
@@ -72,7 +72,7 @@ for (const daoMaster of [false, true]) {
 for (const insight of [0, 60]) {
   const disciple = { id: 106, owner: 1, kind: KIND.WARRIOR, insight, chosenDao: "war" };
   for (const upgrades of [[], [UPGRADE.DAO_OF_HEAVINESS], [
-    UPGRADE.DAO_OF_LIGHTNESS, UPGRADE.DAO_OF_HEAVINESS, UPGRADE.DAO_OF_MAGIC,
+    UPGRADE.DAO_WIND, UPGRADE.DAO_OF_HEAVINESS, UPGRADE.DAO_OF_MAGIC,
   ]]) {
     const card = buildCommandCardDescriptors({
       playerId: 1, factionId: "cultivators", selection: [disciple],
@@ -80,7 +80,7 @@ for (const insight of [0, 60]) {
       playerHasCompleteKind: () => true,
     });
     for (const [ability] of [
-      [ABILITY.EVOLVE_LIGHTNESS, UPGRADE.DAO_OF_LIGHTNESS],
+      [ABILITY.EVOLVE_WIND, UPGRADE.DAO_WIND],
       [ABILITY.EVOLVE_WAR, UPGRADE.DAO_OF_HEAVINESS],
       [ABILITY.EVOLVE_MAGIC, UPGRADE.DAO_OF_MAGIC],
     ]) {
@@ -113,8 +113,8 @@ dashInput.clientIntent = new ClientIntent();
 dashInput.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.EKAT_TELEPORT });
 dashInput._groundAtScreen = (x, y) => ({ x, y });
 
-const lightnessEntity = { id: 89, owner: 1, kind: KIND.LIGHTNESS_ADEPT, dao: "lightness", x: 200, y: 1000 };
-dashInput.state.selectedEntities = () => [ekatEntity, lightnessEntity];
+const windEntity = { id: 89, owner: 1, kind: KIND.WIND_ADEPT, dao: "wind", x: 200, y: 1000 };
+dashInput.state.selectedEntities = () => [ekatEntity, windEntity];
 dashInput.state.abilityObjects = [];
 dashInput._refreshAbilityTargetPreview();
 const mixedDashPreview = dashInput.clientIntent.abilityTargetPreview;
@@ -130,12 +130,12 @@ assert(mixedDashGfx.calls.some((call) => call[0] === "moveTo" && call[1] === 360
 assert(!mixedDashGfx.calls.some((call) => call[0] === "moveTo" && call[1] === 520 && call[2] === 220),
   "Mixed selection does not expand Ekat's Dash ring to ten tiles");
 assert(!mixedDashGfx.calls.some((call) => call[0] === "moveTo" && call[1] === 520 && call[2] === 1000),
-  "Kat Dash does not target Lightness units");
+  "Kat Dash does not target Wind units");
 
-dashInput.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.LIGHTNESS_DASH });
+dashInput.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.WIND_DASH });
 dashInput._refreshAbilityTargetPreview();
 assertDeepEqual(dashInput.clientIntent.abilityTargetPreview.rangeOrigins.map((origin) => origin.rangePx), [480],
-  "Lightness Dash targets only Lightness units with fifteen-tile range");
+  "Wind Dash targets only Wind units with fifteen-tile range");
 
 console.log("Dao ability targeting contracts passed");
 
@@ -194,7 +194,7 @@ for (const cooldownLeft of [0, 450, 225, 1]) {
     assert(button.disabled, "Charge uses a native disabled button");
     assert(!button.dataset.contextAction, "Charge cannot be toggled by right click");
   });
-  for (const kind of [KIND.LIGHTNESS_ADEPT, KIND.WAR_ADEPT, KIND.MAGIC_ADEPT]) {
+  for (const kind of [KIND.WIND_ADEPT, KIND.WAR_ADEPT, KIND.MAGIC_ADEPT]) {
     assert(!buildCommandCardDescriptors({ ...ctx, selection: [{ ...novice, kind }] }).slots
       .some((slot) => slot?.ability === ABILITY.CHARGE), "Evolution removes Charge");
   }

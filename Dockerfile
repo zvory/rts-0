@@ -89,11 +89,11 @@ RUN test -s ./client/vendor/sim-wasm/rts_sim_wasm.js \
     && test -s ./client/assets/rigs/scout-car-white-pass-01/generated/scout-car-white-atlas.png \
     && test -s ./client/assets/rigs/scout-plane-fw189-pass-01/generated/scout-plane-fw189-pass-01-alpha.png \
     && test -s ./client/assets/rigs/warrior-placeholder-pass-01/generated/warrior-runtime-strip.png \
-    && test -s ./client/assets/rigs/disciple-dao/generated/lightness-runtime-strip.png \
-    && test -s ./client/assets/rigs/disciple-dao/generated/lightness-melee-b-runtime-strip.png \
+    && test -s ./client/assets/rigs/disciple-dao/generated/wind-runtime-strip.png \
+    && test -s ./client/assets/rigs/disciple-dao/generated/wind-melee-b-runtime-strip.png \
     && test -s ./client/assets/rigs/disciple-dao/generated/magic-runtime-strip.png \
     && test -s ./client/assets/rigs/disciple-dao/generated/war-yari-runtime-strip.png \
-    && test -s ./client/assets/rigs/disciple-dao/generated/lightness-master-runtime-strip.png \
+    && test -s ./client/assets/rigs/disciple-dao/generated/wind-master-runtime-strip.png \
     && test -s ./client/assets/rigs/disciple-dao/generated/war-master-runtime-strip.png \
     && test -s ./client/assets/rigs/disciple-dao/generated/magic-master-runtime-strip.png \
     && test -s ./client/assets/effects/disciple-arrow/arrow.png \

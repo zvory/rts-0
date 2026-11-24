@@ -17,7 +17,7 @@ export function discipleAttackSoundId(attacker, target, weaponKind) {
   if (weaponKind === WEAPON_KIND.DISCIPLE_ORB || (!weaponKind && dao === "magic")) {
     return "combat_disciple_orb_01";
   }
-  if (dao === "lightness") return "combat_disciple_spear_01";
+  if (dao === "wind") return "combat_disciple_spear_01";
   return METALLIC_SWORD_TARGETS.has(target?.kind)
     ? "combat_disciple_sword_strike_01"
     : "combat_disciple_sword_stab_01";
@@ -29,7 +29,7 @@ const DEFAULT_WEAPON_KIND_BY_ATTACKER_KIND = Object.freeze({
   [KIND.RIFLEMAN]: WEAPON_KIND.RIFLEMAN_RIFLE,
   [KIND.PANZERFAUST]: WEAPON_KIND.RIFLEMAN_RIFLE,
   [KIND.WARRIOR]: WEAPON_KIND.WARRIOR_SWORD,
-  [KIND.LIGHTNESS_ADEPT]: WEAPON_KIND.WARRIOR_SWORD,
+  [KIND.WIND_ADEPT]: WEAPON_KIND.WARRIOR_SWORD,
   [KIND.WAR_ADEPT]: WEAPON_KIND.WARRIOR_SWORD,
   [KIND.MAGIC_ADEPT]: WEAPON_KIND.DISCIPLE_ORB,
   [KIND.MACHINE_GUNNER]: WEAPON_KIND.MACHINE_GUNNER_MG,

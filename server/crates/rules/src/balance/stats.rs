@@ -71,9 +71,9 @@ pub fn building_stats(kind: EntityKind) -> Option<BuildingStats> {
     defs::building_def(kind).map(|d| d.stats)
 }
 
-/// Lightness uses the Scout Car baseline with its own speed multiplier.
-pub fn dao_lightness_speed() -> f32 {
+/// Wind uses the Scout Car baseline with its own speed multiplier.
+pub fn dao_wind_speed() -> f32 {
     unit_stats(EntityKind::ScoutCar).map_or(0.0, |stats| {
-        stats.speed * super::DAO_LIGHTNESS_SPEED_MULTIPLIER
+        stats.speed * super::DAO_WIND_SPEED_MULTIPLIER
     })
 }

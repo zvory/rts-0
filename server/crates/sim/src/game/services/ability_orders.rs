@@ -276,7 +276,7 @@ pub(crate) fn launch_world_ability(
             );
             true
         }
-        (AbilityEffectHook::Dash, AbilityKind::LightnessDash) => {
+        (AbilityEffectHook::Dash, AbilityKind::WindDash) => {
             let Some((blink_x, blink_y)) = hero_abilities::ekat_dash_destination(
                 map,
                 entities,
@@ -472,7 +472,7 @@ pub(crate) fn launch_world_ability(
 fn ability_clamps_world_target(ability: AbilityKind) -> bool {
     matches!(
         ability,
-        AbilityKind::LightnessDash
+        AbilityKind::WindDash
             | AbilityKind::EkatTeleport
             | AbilityKind::EkatLineShot
             | AbilityKind::ThrowSword

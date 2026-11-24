@@ -5,9 +5,9 @@ Original approved ranged art generated with the built-in imagegen tool, using th
 identity and painted-style reference. Every source uses a magenta matte and
 white/grayscale cloth for runtime team tinting.
 
-- `source/concepts.png`: approved Lightness A in row 1 (oversized bow, quiver,
+- `source/concepts.png`: approved Wind A in row 1 (oversized bow, quiver,
   streaming headband); five columns are idle, three walking poses, attack-ready.
-- `source/lightness-attack.png`: the same approved archer, four sequential
+- `source/wind-attack.png`: the same approved archer, four sequential
   poses: draw, release, follow-through, recovery. Keep the large bow and costume.
 - `source/magic-motion.png`: approved Magic C hood and mantle, 4×2 grid. Row 1
   is idle and three arms-back runs, hands held behind the crown and mantle
@@ -32,23 +32,23 @@ pixels long. The orb is fixed-cost geometry rather than another bitmap or emitte
 Damage and shot timing remain server-authoritative. The four-frame attack art is
 shot-triggered, not an idle loop; visual projectile release follows at 100 ms.
 
-## Melee Lightness revision
+## Melee Wind revision
 
-Lightness now uses the base Disciple’s 0.75-tile sword weapon with moving attacks,
+Wind now uses the base Disciple’s 0.75-tile sword weapon with moving attacks,
 existing speed, and Dash. The current archer source files and generated strip above
-are preserved unchanged; `archive/lightness-archer/` also contains an explicit copy
+are preserved unchanged; `archive/wind-archer/` also contains an explicit copy
 for reuse. Runtime uses the selected candidate B katana strip, generated from
-`source/lightness-melee-b-motion.png`: idle, three running poses, and four attack poses. Magic remains unchanged.
+`source/wind-melee-b-motion.png`: idle, three running poses, and four attack poses. Magic remains unchanged.
 
-`source/lightness-melee-candidates/` contains three built-in imagegen concepts and
+`source/wind-melee-candidates/` contains three built-in imagegen concepts and
 the exact prompt set. These are design candidates, not animation strips:
 A (twin streamers/open guard), B (single scarf/diagonal blade),
-and C (compact two-handed guard). Candidate B is selected. Its standing scarf rests against the back; running poses stream it behind. The exact animation prompt is in `source/lightness-melee-b-prompt.txt`.
+and C (compact two-handed guard). Candidate B is selected. Its standing scarf rests against the back; running poses stream it behind. The exact animation prompt is in `source/wind-melee-b-prompt.txt`.
 
-The running poses now use `source/lightness-melee-b-windy-run.png`, with a longer
+The running poses now use `source/wind-melee-b-windy-run.png`, with a longer
 wind-whipped scarf sweeping through three distinct curves. Standing and attack frames
 remain byte-identical to the initial candidate B pass. The run prompt is preserved in
-`source/lightness-melee-b-windy-run-prompt.txt`.
+`source/wind-melee-b-windy-run-prompt.txt`.
 
 ## Original armored War Yari
 
@@ -84,8 +84,8 @@ remain bright for team tinting.
 
 ## Master animation review
 
-`source/{lightness,war,magic}-master-motion.png` are imagegen animation drafts from
-the user-selected Lightness A, War B and Magic C concepts. Exact reference paths and
+`source/{wind,war,magic}-master-motion.png` are imagegen animation drafts from
+the user-selected Wind A, War B and Magic C concepts. Exact reference paths and
 prompts are in `source/master-motion-prompts.json`. Each 4×2 source has standing,
 three movement poses and four attacks; the pipeline normalizes crown pivots and
 Adept-relative body scale. Master strips apply the 1.2 scale in their renderer config.

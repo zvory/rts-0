@@ -124,7 +124,7 @@ fn disciple_insight_counts_actual_hp_loss_resets_on_evolution_and_raises_cap() {
 }
 
 #[test]
-fn war_armor_uses_weapon_penetration_and_lightness_changes_attack_rate() {
+fn war_armor_uses_weapon_penetration_and_wind_changes_attack_rate() {
     let mut unit =
         crate::game::entity::Entity::new_unit(1, EntityKind::Warrior, 100.0, 100.0).unwrap();
     assert!((unit.movement_speed() - 2.0).abs() < 0.001);
@@ -136,7 +136,7 @@ fn war_armor_uses_weapon_penetration_and_lightness_changes_attack_rate() {
     let war = effective_attack_profile(&unit);
     assert_eq!(war.dmg, 35);
     assert_eq!(war.range_tiles, config::DAO_WAR_RANGE_TILES);
-    unit.set_disciple_kind_for_test(EntityKind::LightnessAdept);
+    unit.set_disciple_kind_for_test(EntityKind::WindAdept);
     let light = effective_attack_profile(&unit);
     assert_eq!(light.cooldown, 43);
     assert_eq!(light.range_tiles, 0.75);
@@ -145,7 +145,7 @@ fn war_armor_uses_weapon_penetration_and_lightness_changes_attack_rate() {
         combat_rules::WeaponKind::WarriorSword
     );
     assert!(can_fire_while_moving(&unit, false));
-    assert!(unit.dao_ability_available(crate::game::ability::AbilityKind::LightnessDash));
+    assert!(unit.dao_ability_available(crate::game::ability::AbilityKind::WindDash));
     assert!((unit.movement_speed() - 2.7025).abs() < 0.001);
     unit.set_disciple_kind_for_test(EntityKind::MagicAdept);
     assert!((unit.movement_speed() - 2.1).abs() < 0.001);
@@ -269,11 +269,11 @@ fn disciple_vehicle_range_is_bounded_by_hull_surface() {
 }
 
 #[test]
-fn dao_profiles_keep_lightness_melee_and_magic_ranged() {
+fn dao_profiles_keep_wind_melee_and_magic_ranged() {
     use crate::game::upgrade::UpgradeKind;
     for (dao, weapon, cooldown) in [
         (
-            UpgradeKind::DaoOfLightness,
+            UpgradeKind::DaoWind,
             combat_rules::WeaponKind::WarriorSword,
             43,
         ),
@@ -296,7 +296,7 @@ fn dao_profiles_keep_lightness_melee_and_magic_ranged() {
         let profile = effective_attack_profile(unit);
         assert_eq!(
             profile.range_tiles,
-            if dao == UpgradeKind::DaoOfLightness {
+            if dao == UpgradeKind::DaoWind {
                 0.75
             } else {
                 5.0
@@ -318,7 +318,7 @@ fn dao_profiles_keep_lightness_melee_and_magic_ranged() {
                 .get(disciple)
                 .unwrap()
                 .weapon_cooldown(combat_rules::WeaponKind::WarriorSword),
-            if dao == UpgradeKind::DaoOfLightness {
+            if dao == UpgradeKind::DaoWind {
                 cooldown
             } else {
                 0
@@ -359,9 +359,9 @@ fn dao_profiles_keep_lightness_melee_and_magic_ranged() {
 }
 
 #[test]
-fn lightness_fires_during_move_and_magic_keeps_normal_stop_to_fire_policy() {
+fn wind_fires_during_move_and_magic_keeps_normal_stop_to_fire_policy() {
     use crate::game::upgrade::UpgradeKind;
-    for dao in [UpgradeKind::DaoOfLightness, UpgradeKind::DaoOfMagic] {
+    for dao in [UpgradeKind::DaoWind, UpgradeKind::DaoOfMagic] {
         let mut entities = EntityStore::new();
         let disciple = entities
             .spawn_unit(1, EntityKind::Warrior, 100.0, 100.0)
@@ -380,7 +380,7 @@ fn lightness_fires_during_move_and_magic_keeps_normal_stop_to_fire_policy() {
         run_combat_tick(&mut entities);
         assert_eq!(
             entities.get(target).unwrap().hp,
-            if dao == UpgradeKind::DaoOfLightness {
+            if dao == UpgradeKind::DaoWind {
                 22
             } else {
                 45
@@ -446,7 +446,7 @@ fn dao_evolution_preserves_reload_and_uses_matching_pursuit_geometry() {
     let map = open_map(32);
     for (ability, weapon) in [
         (
-            AbilityKind::EvolveLightness,
+            AbilityKind::EvolveWind,
             combat_rules::WeaponKind::WarriorSword,
         ),
         (
@@ -469,7 +469,7 @@ fn dao_evolution_preserves_reload_and_uses_matching_pursuit_geometry() {
             (100.0, 100.0),
             &tank,
         );
-        assert_eq!(point.0 < 400.0, ability == AbilityKind::EvolveLightness);
+        assert_eq!(point.0 < 400.0, ability == AbilityKind::EvolveWind);
         assert_eq!(point.1, 100.0);
         assert!(
             crate::game::services::geometry::primary_combat_target_point(
@@ -487,7 +487,7 @@ fn dao_evolution_preserves_reload_and_uses_matching_pursuit_geometry() {
 fn ranged_evolution_cancels_lost_idle_approach_but_preserves_explicit_move() {
     use crate::game::ability::AbilityKind;
     let map = open_map(32);
-    for ability in [AbilityKind::EvolveLightness, AbilityKind::EvolveMagic] {
+    for ability in [AbilityKind::EvolveWind, AbilityKind::EvolveMagic] {
         for explicit_move in [false, true] {
             let mut entities = EntityStore::new();
             let disciple = entities
@@ -523,7 +523,7 @@ fn ranged_evolution_cancels_lost_idle_approach_but_preserves_explicit_move() {
 }
 
 #[test]
-fn lightness_moving_sword_cannot_hit_at_former_arrow_range() {
+fn wind_moving_sword_cannot_hit_at_former_arrow_range() {
     for distance in [20.0, 120.0] {
         let mut entities = EntityStore::new();
         let disciple = entities
@@ -533,7 +533,7 @@ fn lightness_moving_sword_cannot_hit_at_former_arrow_range() {
             .spawn_unit(2, EntityKind::Rifleman, 100.0 + distance, 100.0)
             .unwrap();
         let unit = entities.get_mut(disciple).unwrap();
-        unit.set_disciple_kind_for_test(EntityKind::LightnessAdept);
+        unit.set_disciple_kind_for_test(EntityKind::WindAdept);
         unit.set_order(Order::move_to(400.0, 100.0));
         unit.set_path(vec![(400.0, 100.0)]);
         unit.set_path_goal(Some((400.0, 100.0)));

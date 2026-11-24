@@ -29,7 +29,7 @@ for (const weaponKind of [WEAPON_KIND.DISCIPLE_ARROW, WEAPON_KIND.DISCIPLE_ORB])
   hidden.applySnapshotEvents([{ e: EVENT.ATTACK, from: 1, to: 99, weaponKind }], 0, () => null);
   assert.equal(sampleDiscipleFlight(hidden.muzzleFlashes[0], 120), null, "no guessed endpoints for absent entities");
 }
-for (const [kind, dao] of [[KIND.WARRIOR, undefined], [KIND.LIGHTNESS_ADEPT, "lightness"],
+for (const [kind, dao] of [[KIND.WARRIOR, undefined], [KIND.WIND_ADEPT, "wind"],
   [KIND.WAR_ADEPT, "war"], [KIND.MAGIC_ADEPT, "magic"]]) {
   for (const weaponKind of [undefined, WEAPON_KIND.WARRIOR_SWORD, WEAPON_KIND.DISCIPLE_ORB]) {
     const hidden = new VisualEffectBuffers();
@@ -40,7 +40,7 @@ for (const [kind, dao] of [[KIND.WARRIOR, undefined], [KIND.LIGHTNESS_ADEPT, "li
     assert.equal(liveFrameStripKeyForEntity(reveal), kind, "firing reveal retains its specialized sprite route");
   }
 }
-assert.equal(entityAttackRangeTiles({ kind: KIND.LIGHTNESS_ADEPT, dao: "lightness" }), 0.75);
+assert.equal(entityAttackRangeTiles({ kind: KIND.WIND_ADEPT, dao: "wind" }), 0.75);
 assert.equal(entityAttackRangeTiles({ kind: KIND.MAGIC_ADEPT, dao: "magic" }), 5);
 assert.equal(entityAttackRangeTiles({ kind: KIND.WAR_ADEPT, dao: "war" }), 1.75);
 assert.equal(entityAttackRangeTiles({ kind: KIND.WARRIOR }), 0.75);

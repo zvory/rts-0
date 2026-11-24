@@ -223,8 +223,8 @@ export const THREE_DAO_PAVILION_BUILDING_SVG = `<svg viewBox="-48 -32 96 64" dat
   <line id="part.ridge" x1="-25" y1="-28" x2="25" y2="-28" stroke="#d9c592" stroke-width="3" />
   <rect id="part.pillar.left" x="-35" y="-9" width="5" height="34" fill="#754a3b" />
   <rect id="part.pillar.right" x="30" y="-9" width="5" height="34" fill="#754a3b" />
-  <rect id="part.scroll.lightness" x="-25" y="-3" width="12" height="20" fill="#e9dfb5" stroke="#7c6446" stroke-width="2" />
-  <polyline id="part.glyph.lightness" points="-23,10 -19,2 -15,10" fill="none" stroke="#3f7977" stroke-width="2" />
+  <rect id="part.scroll.wind" x="-25" y="-3" width="12" height="20" fill="#e9dfb5" stroke="#7c6446" stroke-width="2" />
+  <polyline id="part.glyph.wind" points="-23,10 -19,2 -15,10" fill="none" stroke="#3f7977" stroke-width="2" />
   <rect id="part.scroll.barriers" x="-6" y="-3" width="12" height="20" fill="#e9dfb5" stroke="#7c6446" stroke-width="2" />
   <rect id="part.glyph.barriers" x="-3" y="2" width="6" height="8" fill="none" stroke="#6d598e" stroke-width="2" />
   <rect id="part.scroll.heaviness" x="13" y="-3" width="12" height="20" fill="#e9dfb5" stroke="#7c6446" stroke-width="2" />

@@ -86,7 +86,7 @@ pub(super) fn validate_tournament_state(entity: &Entity) -> Result<(), Checkpoin
                 || p.tournament_winners.iter().any(|dao| {
                     !matches!(
                         dao,
-                        UpgradeKind::DaoOfLightness
+                        UpgradeKind::DaoWind
                             | UpgradeKind::DaoOfHeaviness
                             | UpgradeKind::DaoOfMagic
                     )

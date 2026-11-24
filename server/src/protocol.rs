@@ -148,15 +148,15 @@ mod tests {
 // Proving Grounds uses kind code 33; team-private dao_training_queue appends compact v63 slot 51.
 // Existing research commands targeting this building enqueue researched Dao training plans.
 
-// Lab spawnEntity/spawnEntities entries accept optional dao: lightness | war | magic (Novice only).
+// Lab spawnEntity/spawnEntities entries accept optional dao: wind | war | magic (Novice only).
 
 // Snapshot playerFactions (compact pf) projects public identity independently of private resources.
 
 // Cultivator Shop: wire kind shop, compact kind code 34; no additional snapshot fields.
 
-// Novice warrior (29) evolves into distinct kinds lightness_adept (35), war_adept (36),
+// Novice warrior (29) evolves into distinct kinds wind_adept (35), war_adept (36),
 // or magic_adept (37). EntityView.dao is derived presentation metadata, not engine identity.
 
 // EntityView daoMaster: public Master rank at compact slot 52 (v65).
 
-// Lightness Dash uses lightnessDash (ability 21, order stage 29); no return marker.
+// Wind Dash uses windDash (ability 21, order stage 29); no return marker.

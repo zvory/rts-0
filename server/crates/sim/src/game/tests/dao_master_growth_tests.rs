@@ -24,7 +24,7 @@ fn dao_master_keeps_corner_waypoint_that_only_an_adept_can_skip() {
     let id = game
         .state
         .entities
-        .spawn_unit(1, EntityKind::LightnessAdept, 720.0, 600.0)
+        .spawn_unit(1, EntityKind::WindAdept, 720.0, 600.0)
         .unwrap();
     let unit = game.state.entities.get_mut(id).unwrap();
     unit.insight = 200;
@@ -63,7 +63,7 @@ fn dao_master_keeps_corner_waypoint_that_only_an_adept_can_skip() {
 #[test]
 fn dao_master_growth_near_portal_repositions_without_losing_orders_or_reload() {
     for ability in [
-        AbilityKind::EvolveLightness,
+        AbilityKind::EvolveWind,
         AbilityKind::EvolveWar,
         AbilityKind::EvolveMagic,
     ] {
@@ -130,7 +130,7 @@ fn dao_master_movement_and_collision_do_not_push_body_inside_portal() {
         .unwrap();
     let unit = game.state.entities.get_mut(id).unwrap();
     unit.insight = 60;
-    unit.evolve_dao(AbilityKind::EvolveLightness);
+    unit.evolve_dao(AbilityKind::EvolveWind);
     unit.insight = 200;
     game.tick();
     game.enqueue(
@@ -180,7 +180,7 @@ fn dao_master_dash_and_return_reject_adept_sized_building_clearance() {
     let id = game
         .state
         .entities
-        .spawn_unit(1, EntityKind::LightnessAdept, 800.0, 600.0)
+        .spawn_unit(1, EntityKind::WindAdept, 800.0, 600.0)
         .unwrap();
     game.state.entities.get_mut(id).unwrap().insight = 200;
     game.tick();
@@ -213,7 +213,7 @@ fn dao_master_lab_moves_reject_adept_clearance_atomically() {
     let id = game
         .state
         .entities
-        .spawn_unit(1, EntityKind::LightnessAdept, 800.0, 600.0)
+        .spawn_unit(1, EntityKind::WindAdept, 800.0, 600.0)
         .unwrap();
     game.state.entities.get_mut(id).unwrap().insight = 200;
     game.tick();

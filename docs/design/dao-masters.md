@@ -2,23 +2,23 @@
 
 ## Brief and authorization
 
-The user selected Lightness A (twin scarves), War B (forked spear), and Magic C
+The user selected Wind A (twin scarves), War B (forked spear), and Magic C
 (broad casting sleeves), and explicitly authorized implementing all three with the
 simple advancement rules below. This is a second rank of the existing Warrior/Dao
 entity (now an authoritative path-specific Adept kind), not a new production catalog. Each path remains permanent.
 The user reviewed the animation and corrected War Master scale, then authorized merging. This document records the Phase 0/1
 decisions before implementation.
 
-## Lightness Master: Phase 0/1
+## Wind Master: Phase 0/1
 
 Mobile melee skirmisher; twin flowing scarves and the existing single thin katana.
 Description: “Automatically advances at 200 insight, fully heals, and gains greater
-size, speed, damage and health.” Same battlefield role and counters as Lightness
+size, speed, damage and health.” Same battlefield role and counters as Wind
 Adept; no new targeting, movement, ability or economy mechanic. Automatically earned
 in normal games, including AI-owned units. No cost, build source, hotkey, build time,
 research or additional supply: advancement of an existing Adept only. Retain supply
 2, ground pathing, sight, armor, range, cooldown, penetration and all
-orders/cooldowns. Relative to Lightness Adept: render and collision radius ×1.2,
+orders/cooldowns. Relative to Wind Adept: render and collision radius ×1.2,
 movement ×1.1 (2.97275 px/tick), ordinary attack damage ×1.2 (23→28, nearest integer),
 maximum HP ×1.4 (115→161). No ability-damage changes.
 
@@ -73,7 +73,7 @@ Links were published for at least 24 hours; captured media remains outside Git.
 
 - [Standing: Adepts above, Masters below](http://olympus.tail6943f.ts.net:8091/p/w9YpITSN4ppbQXPSUT0p2bPQ/dao-master-standing-final-2026-11-23T00-08-35-129Z.png).
 - [Walking, all three paths](http://olympus.tail6943f.ts.net:8091/p/c7bWaXOtkcXwtGjpkyJT7cY6/dao-master-walking-smooth.mp4).
-- [Lightness attacks](http://olympus.tail6943f.ts.net:8091/p/sK3oPRFpncsvhnLcMtVv1ZYu/lightness-master-attack-review.mp4).
+- [Wind attacks](http://olympus.tail6943f.ts.net:8091/p/sK3oPRFpncsvhnLcMtVv1ZYu/wind-master-attack-review.mp4).
 - [War attacks](http://olympus.tail6943f.ts.net:8091/p/VH4rTsHVOiC4QWRuopLNxDpT/war-master-attack-review.mp4).
 - [Magic attacks](http://olympus.tail6943f.ts.net:8091/p/Qy59ya6mumu5a5IhCFqVRjow/magic-master-attack-review.mp4).
 
@@ -120,7 +120,7 @@ frames, atlas dimensions and unclipped frame edges; pipeline determinism, client
 architecture, source caps and docs health pass. The task-only Lab server is stopped.
 
 Integration with current main retains separate authoritative Adept kinds, Novice
-Charge and fifteen-tile Lightness Dash. Master rank is the appended public `daoMaster`
+Charge and fifteen-tile Wind Dash. Master rank is the appended public `daoMaster`
 boolean on each Adept kind; compact snapshot vocabulary is version 65.
 
 ### Safe body growth beside blockers
@@ -132,6 +132,6 @@ HP unchanged until a legal nearby body position becomes available. Movement, uni
 collision pushes, Dash/return and Lab placement validate the entity’s actual radius.
 This prevents promotion or movement from leaving the larger body inside a building.
 
-## Lightness Dash charges
+## Wind Dash charges
 
-Lightness uses its own fifteen-tile Dash without a return marker or recast. Adepts hold one charge; Masters hold two. Promotion adds one ready charge and preserves an existing recharge timer. Charges recharge sequentially, one every eight seconds; either ready charge can be used immediately. Kat retains its existing Dash and return behavior.
+Wind uses its own fifteen-tile Dash without a return marker or recast. Adepts hold one charge; Masters hold two. Promotion adds one ready charge and preserves an existing recharge timer. Charges recharge sequentially, one every eight seconds; either ready charge can be used immediately. Kat retains its existing Dash and return behavior.

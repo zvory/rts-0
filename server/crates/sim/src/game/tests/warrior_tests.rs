@@ -40,7 +40,7 @@ fn cultivator_pavilion_research_spends_resources_completes_and_leaves_disciple_u
         .expect("Disciple should spawn");
     let before = game.state.entities.get(disciple).unwrap().clone();
     let daos = [
-        UpgradeKind::DaoOfLightness,
+        UpgradeKind::DaoWind,
         UpgradeKind::DaoOfMagic,
         UpgradeKind::DaoOfHeaviness,
     ];
@@ -135,7 +135,7 @@ fn pavilion_prerequisites_and_research_are_faction_gated() {
         &[EntityKind::ResourceDepot, EntityKind::Portal]
     ));
     for dao in [
-        UpgradeKind::DaoOfLightness,
+        UpgradeKind::DaoWind,
         UpgradeKind::DaoOfMagic,
         UpgradeKind::DaoOfHeaviness,
     ] {
@@ -163,8 +163,8 @@ fn disciple_evolution_requires_insight_ownership_but_no_research_and_is_permanen
     use crate::game::upgrade::UpgradeKind;
     for (ability, upgrade, hp, speed) in [
         (
-            AbilityKind::EvolveLightness,
-            UpgradeKind::DaoOfLightness,
+            AbilityKind::EvolveWind,
+            UpgradeKind::DaoWind,
             115,
             2.7025,
         ),
@@ -293,7 +293,7 @@ fn disciple_evolution_requires_insight_ownership_but_no_research_and_is_permanen
 }
 
 #[test]
-fn disciple_dash_casts_for_every_selected_ready_lightness_unit() {
+fn disciple_dash_casts_for_every_selected_ready_wind_unit() {
     use crate::game::ability::AbilityKind;
     for queued in [false, true] {
         let enemy = PlayerInit {
@@ -313,10 +313,10 @@ fn disciple_dash_casts_for_every_selected_ready_lightness_unit() {
                 .unwrap();
             let entity = game.state.entities.get_mut(id).unwrap();
             if index != 3 {
-                entity.set_disciple_kind_for_test(EntityKind::LightnessAdept);
+                entity.set_disciple_kind_for_test(EntityKind::WindAdept);
             }
             if index == 2 {
-                entity.start_ability_cooldown(AbilityKind::LightnessDash, 100);
+                entity.start_ability_cooldown(AbilityKind::WindDash, 100);
             }
             units.push(id);
             origins.push(origin);
@@ -328,7 +328,7 @@ fn disciple_dash_casts_for_every_selected_ready_lightness_unit() {
             1,
             Command::UseAbility {
                 target_id: None,
-                ability: AbilityKind::LightnessDash,
+                ability: AbilityKind::WindDash,
                 units: selection,
                 x: Some(target.0),
                 y: Some(target.1),
@@ -348,7 +348,7 @@ fn disciple_dash_casts_for_every_selected_ready_lightness_unit() {
                     "each caster should reach the target area, allowing collision separation; queued={queued}",
                 );
                 assert_eq!(
-                    entity.ability_uses_remaining(AbilityKind::LightnessDash),
+                    entity.ability_uses_remaining(AbilityKind::WindDash),
                     Some(0)
                 );
             } else {
@@ -377,7 +377,7 @@ fn disciple_dao_gates_dash_and_magic_anchor_without_return() {
         y: Some(400.0),
         queued: false,
     };
-    game.enqueue(1, cast(AbilityKind::LightnessDash));
+    game.enqueue(1, cast(AbilityKind::WindDash));
     game.tick();
     game.enqueue(1, cast(AbilityKind::EkatMagicAnchor));
     game.tick();
@@ -386,20 +386,20 @@ fn disciple_dao_gates_dash_and_magic_anchor_without_return() {
     game.state.entities.get_mut(unit).unwrap().insight = 60;
     game.state.players[0]
         .upgrades
-        .insert(UpgradeKind::DaoOfLightness);
-    game.enqueue(1, cast(AbilityKind::EvolveLightness));
+        .insert(UpgradeKind::DaoWind);
+    game.enqueue(1, cast(AbilityKind::EvolveWind));
     game.tick();
-    game.enqueue(1, cast(AbilityKind::LightnessDash));
+    game.enqueue(1, cast(AbilityKind::WindDash));
     game.tick();
     assert_eq!(game.state.entities.get(unit).unwrap().pos_x(), 480.0);
-    // The former Kat ability is not available to Lightness, even through a forged command.
+    // The former Kat ability is not available to Wind, even through a forged command.
     game.enqueue(1, cast(AbilityKind::EkatTeleport));
     game.tick();
     assert_eq!(game.state.ability_runtime.world_objects().count(), 0);
     game.enqueue(
         1,
         Command::RecastAbility {
-            ability: AbilityKind::LightnessDash,
+            ability: AbilityKind::WindDash,
             units: vec![unit],
             target_object_id: None,
             queued: false,
@@ -450,7 +450,7 @@ fn disciple_dao_gates_dash_and_magic_anchor_without_return() {
         1,
         Command::UseAbility {
             target_id: None,
-            ability: AbilityKind::LightnessDash,
+            ability: AbilityKind::WindDash,
             units: vec![support],
             x: Some(640.0),
             y: Some(400.0),
@@ -652,12 +652,12 @@ fn disciple_insight_is_team_private_but_readiness_and_advance_are_public() {
     }
     game.state.players[0]
         .upgrades
-        .insert(UpgradeKind::DaoOfLightness);
+        .insert(UpgradeKind::DaoWind);
     game.enqueue(
         1,
         Command::UseAbility {
             target_id: None,
-            ability: AbilityKind::EvolveLightness,
+            ability: AbilityKind::EvolveWind,
             units: vec![unit],
             x: None,
             y: None,
@@ -967,7 +967,7 @@ fn war_throw_sword_is_master_gated_and_hits_harder_on_return_after_checkpoint() 
     };
     for dao in [
         None,
-        Some(UpgradeKind::DaoOfLightness),
+        Some(UpgradeKind::DaoWind),
         Some(UpgradeKind::DaoOfMagic),
         Some(UpgradeKind::DaoOfHeaviness),
     ] {
@@ -1092,7 +1092,7 @@ fn dao_parallel_research_reserves_tiers_and_refunds_committed_costs() {
     let daos = [
         UpgradeKind::DaoOfMagic,
         UpgradeKind::DaoOfHeaviness,
-        UpgradeKind::DaoOfLightness,
+        UpgradeKind::DaoWind,
     ];
     let mut buildings = Vec::new();
     for (index, dao) in daos.into_iter().enumerate() {
@@ -1166,7 +1166,7 @@ fn dao_waiting_research_reprices_when_payment_starts() {
     let mut game = empty_flat_game(&[cultivator_player()]);
     game.state.players[0].set_resources(0, 0);
     let mut buildings = Vec::new();
-    for (index, dao) in [UpgradeKind::DaoOfMagic, UpgradeKind::DaoOfLightness]
+    for (index, dao) in [UpgradeKind::DaoOfMagic, UpgradeKind::DaoWind]
         .into_iter()
         .enumerate()
     {
@@ -1244,12 +1244,12 @@ fn disciple_dash_reaches_fifteen_tiles_for_immediate_and_queued_casts() {
                 .entities
                 .get_mut(unit)
                 .unwrap()
-                .set_disciple_kind_for_test(EntityKind::LightnessAdept);
+                .set_disciple_kind_for_test(EntityKind::WindAdept);
             game.enqueue(
                 1,
                 Command::UseAbility {
                     target_id: None,
-                    ability: AbilityKind::LightnessDash,
+                    ability: AbilityKind::WindDash,
                     units: vec![unit],
                     x: Some(origin.0 + requested_tiles * config::TILE_SIZE as f32),
                     y: Some(origin.1),
@@ -1268,7 +1268,7 @@ fn disciple_dash_reaches_fifteen_tiles_for_immediate_and_queued_casts() {
                 .active_return_marker(
                     1,
                     unit,
-                    AbilityKind::LightnessDash,
+                    AbilityKind::WindDash,
                     None,
                     game.current_tick()
                 )
@@ -1278,17 +1278,17 @@ fn disciple_dash_reaches_fifteen_tiles_for_immediate_and_queued_casts() {
 }
 
 #[test]
-fn lightness_master_gains_second_dash_charge_and_recharges_sequentially() {
+fn wind_master_gains_second_dash_charge_and_recharges_sequentially() {
     use crate::game::ability::AbilityKind;
     let mut game = empty_flat_game(&[cultivator_player()]);
     let unit = game
         .state
         .entities
-        .spawn_unit(1, EntityKind::LightnessAdept, 400.0, 400.0)
+        .spawn_unit(1, EntityKind::WindAdept, 400.0, 400.0)
         .unwrap();
     let cast = |x| Command::UseAbility {
         target_id: None,
-        ability: AbilityKind::LightnessDash,
+        ability: AbilityKind::WindDash,
         units: vec![unit],
         x: Some(x),
         y: Some(400.0),
@@ -1301,7 +1301,7 @@ fn lightness_master_gains_second_dash_charge_and_recharges_sequentially() {
             .entities
             .get(unit)
             .unwrap()
-            .ability_uses_remaining(AbilityKind::LightnessDash),
+            .ability_uses_remaining(AbilityKind::WindDash),
         Some(0)
     );
     game.state.entities.get_mut(unit).unwrap().insight = config::DISCIPLE_EVOLVED_INSIGHT_CAP;
@@ -1309,23 +1309,23 @@ fn lightness_master_gains_second_dash_charge_and_recharges_sequentially() {
     let entity = game.state.entities.get(unit).unwrap();
     assert!(entity.dao_master);
     assert_eq!(
-        entity.ability_uses_remaining(AbilityKind::LightnessDash),
+        entity.ability_uses_remaining(AbilityKind::WindDash),
         Some(1)
     );
     let recharge_left = entity
-        .ability_charge_recharge_ticks(AbilityKind::LightnessDash)
+        .ability_charge_recharge_ticks(AbilityKind::WindDash)
         .unwrap();
     game.enqueue(1, cast(560.0));
     game.tick();
     let entity = game.state.entities.get(unit).unwrap();
     assert_eq!(entity.pos_x(), 560.0);
     assert_eq!(
-        entity.ability_uses_remaining(AbilityKind::LightnessDash),
+        entity.ability_uses_remaining(AbilityKind::WindDash),
         Some(0)
     );
     assert!(
         entity
-            .ability_charge_recharge_ticks(AbilityKind::LightnessDash)
+            .ability_charge_recharge_ticks(AbilityKind::WindDash)
             .unwrap()
             < recharge_left
     );
@@ -1345,7 +1345,7 @@ fn lightness_master_gains_second_dash_charge_and_recharges_sequentially() {
             .entities
             .get(unit)
             .unwrap()
-            .ability_uses_remaining(AbilityKind::LightnessDash),
+            .ability_uses_remaining(AbilityKind::WindDash),
         Some(2)
     );
 }

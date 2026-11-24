@@ -31,7 +31,7 @@ to use its existing supported-faction checks. Further art, audio, combat roster 
 
 The **Portal** is the Cultivators' first dedicated production building and its name is final. It
 trains the faction's Novice from grid slot 1 (`Q`) and researched Adepts from the next
-three slots: Lightness (`W`), War (`E`), and Magic (`A`). Each Adept requires its matching
+three slots: Wind (`W`), War (`E`), and Magic (`A`). Each Adept requires its matching
 completed Pavilion Dao research and costs 150 Steel, 35 Oil, three supply, and 300 ticks
 (ten seconds). No Novice input or Proving Grounds is needed. Normal manual/repeat queues,
 payment, cancellation/refunds, blocked exits and rally behavior apply. Combat-earned
@@ -104,7 +104,7 @@ There is no build limit. Approved PNG art is a circular stone study dais with th
 scrolls and a three-lobed canopy. The canopy and finial receive team tint; timber, stone, and
 parchment retain natural colors. The square atlas preserves the generated proportions.
 
-Research Dao of Lightness, Dao of Magic, and Dao of War from slots Q/W/E. Each
+Research Dao Wind, Dao of Magic, and Dao of War from slots Q/W/E. Each
 uses player-wide purchase-order pricing: first 50 Steel / 100 Oil / 20 seconds,
 second 100 Steel / 200 Oil / 40 seconds, third 200 Steel / 400 Oil / 80 seconds.
 See [balance](balance.md#three-dao-pavilion-prototype) for payment and refund rules.

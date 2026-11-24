@@ -173,7 +173,7 @@ try {
   assert(barsDrawn === 6, "full-health Disciples retain insight overlays both below and above fog");
 
   const discipleBar = makeBar();
-  for (const dao of [null, "lightness", "war", "magic"]) {
+  for (const dao of [null, "wind", "war", "magic"]) {
     _hpBar.call({ _map: { tileSize: 32 } }, discipleBar, { ...disciple, dao });
     const iconCalls = discipleBar.rtsDao.calls;
     const lastClear = iconCalls.findLastIndex((call) => call[0] === "clear");

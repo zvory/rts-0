@@ -88,7 +88,7 @@ fn novice_charge_never_triggers_for_buildings_friends_or_specialists() {
             _ => entities
                 .get_mut(novice)
                 .unwrap()
-                .set_disciple_kind_for_test(EntityKind::LightnessAdept),
+                .set_disciple_kind_for_test(EntityKind::WindAdept),
         }
         run_combat_tick(&mut entities);
         assert_eq!(

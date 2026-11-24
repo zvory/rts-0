@@ -5,8 +5,8 @@ use crate::game::ability::AbilityKind;
 fn dao_kinds_spawn_with_resolved_stats_and_serialize_without_mutable_dao() {
     for (kind, ability, hp, cooldown, range) in [
         (
-            EntityKind::LightnessAdept,
-            AbilityKind::LightnessDash,
+            EntityKind::WindAdept,
+            AbilityKind::WindDash,
             115,
             43,
             0.75,

@@ -5,7 +5,7 @@
 import { ABILITY, KIND, UPGRADE } from "../protocol.js";
 import { TICK_HZ } from "./timing.js";
 
-export const DAO_LIGHTNESS_DASH_RANGE_TILES = 15;
+export const DAO_WIND_DASH_RANGE_TILES = 15;
 export function entityAbilityRangeTiles(definition, entity) {
   return definition?.rangeTiles;
 }
@@ -184,9 +184,9 @@ export const STATS = Object.freeze({
   [KIND.WARRIOR]: { armored: false, label: "Novice", icon: "NV", size: 26, sight: 11,
     rangeTiles: 0.75, cost: { steel: 100, oil: 0 }, supply: 2, buildTicks: 300,
     description: "Durable melee infantry with a short sword reach and 50% armor penetration. Slow attacks deal heavy damage. Charge (automatic): 1.5x movement speed for 1 second, with a 15-second cooldown, when attacking an enemy unit at least 2 tiles away or moving away." },
-  [KIND.LIGHTNESS_ADEPT]: { armored: false, label: "Lightness Adept", icon: "LA", size: 26, sight: 11,
+  [KIND.WIND_ADEPT]: { armored: false, label: "Wind Adept", icon: "WI", size: 26, sight: 11,
     rangeTiles: 0.75, cost: { steel: 150, oil: 35 }, supply: 3, buildTicks: 300,
-    trainSlots: { [KIND.PORTAL]: 3 }, upgradeRequires: UPGRADE.DAO_OF_LIGHTNESS,
+    trainSlots: { [KIND.PORTAL]: 3 }, upgradeRequires: UPGRADE.DAO_WIND,
     description: "Fast sword infantry with Dash and 50% armor penetration." },
   [KIND.WAR_ADEPT]: { armored: false, label: "War Adept", icon: "WA", size: Math.fround(26 * Math.fround(DAO_WAR_BODY_SCALE)), sight: 11,
     rangeTiles: DAO_WAR_RANGE_TILES, cost: { steel: 150, oil: 35 }, supply: 3, buildTicks: 300,
@@ -236,22 +236,22 @@ export const STATS = Object.freeze({
     cost: { steel: 600, oil: 135 }, buildTicks: TICK_HZ * 5,
     trains: [KIND.WORKER, KIND.STEEL_MINE, KIND.PUMP_JACK] },
   [KIND.PORTAL]: { label: "Portal", icon: "PRT", footW: 3, footH: 3, sight: 1,
-    cost: { steel: 150, oil: 0 }, buildTicks: TICK_HZ * 5, trains: [KIND.WARRIOR, KIND.LIGHTNESS_ADEPT, KIND.WAR_ADEPT, KIND.MAGIC_ADEPT],
+    cost: { steel: 150, oil: 0 }, buildTicks: TICK_HZ * 5, trains: [KIND.WARRIOR, KIND.WIND_ADEPT, KIND.WAR_ADEPT, KIND.MAGIC_ADEPT],
     description: "A supernatural gateway that trains Novices and researched Adepts. Each Adept costs 150 steel and 35 oil and takes 10 seconds." },
   [KIND.SHOP]: { label: "Shop", icon: "SH", footW: 3, footH: 4, sight: 1,
     cost: { steel: 200, oil: 200 }, buildTicks: TICK_HZ * 40, trains: [],
     description: "Sells Healing Potions and Escape Treasures for nearby friendly units." },
   [KIND.PROVEN_GROUNDS]: { label: "Proving Grounds", icon: "PG", footW: 3, footH: 3, sight: 1,
     cost: { steel: 100, oil: 0 }, buildTicks: 200, trains: [], requires: [KIND.PORTAL],
-    description: "Send base Novices inside for researched Dao training. Queue any mix of Lightness, War and Magic; each costs 100 oil and takes 10 seconds. Supports a rally point." },
+    description: "Send base Novices inside for researched Dao training. Queue any mix of Wind, War and Magic; each costs 100 oil and takes 10 seconds. Supports a rally point." },
   [KIND.TOURNAMENT_GROUNDS]: { label: "Tournament Grounds", icon: "TG", footW: 4, footH: 4, sight: 1,
     cost: { steel: 100, oil: 0 }, buildTicks: 200, trains: [], requires: [KIND.PORTAL],
     description: "Right-click four base Novices inside, or rally a Portal here. A free five-second tournament produces one winner with a random Dao specialization. Supports a rally point." },
   [KIND.THREE_DAO_PAVILION]: { label: "Three Dao Pavilion", icon: "DAO", footW: 3, footH: 3, sight: 1,
     cost: { steel: 100, oil: 25 }, buildTicks: 560, trains: [],
-    researches: [UPGRADE.DAO_OF_LIGHTNESS, UPGRADE.DAO_OF_MAGIC, UPGRADE.DAO_OF_HEAVINESS],
+    researches: [UPGRADE.DAO_WIND, UPGRADE.DAO_OF_MAGIC, UPGRADE.DAO_OF_HEAVINESS],
     requires: [KIND.RESOURCE_DEPOT, KIND.PORTAL],
-    description: "Research Lightness, War, and Magic to unlock matching Adepts at Portals and paid training at the Proving Grounds." },
+    description: "Research Wind, War, and Magic to unlock matching Adepts at Portals and paid training at the Proving Grounds." },
   [KIND.ZAMOK]: { label: "Zamok", icon: "ZK", footW: 3, footH: 3, sight: 1,
     cost: { steel: 0, oil: 0 }, buildTicks: 0, trains: [KIND.GOLEM] },
   [KIND.DEPOT]: { label: "Supply Depot", icon: "SD", footW: 2, footH: 2, sight: 1,
@@ -332,9 +332,9 @@ export const ABILITIES = Object.freeze({
     cooldownTicks: 300, cost: Object.freeze({ steel: 0, oil: 0 }),
     queued: true, queuePolicy: "skipIfNotReady",
   }),
-  [ABILITY.EVOLVE_LIGHTNESS]: Object.freeze({
-    ability: ABILITY.EVOLVE_LIGHTNESS, label: "Dao of Lightness", icon: "Z", hotkey: "Z",
-    title: "Choose Dao of Lightness; evolves automatically at 60 insight; no research required", carriers: Object.freeze([KIND.WARRIOR]),
+  [ABILITY.EVOLVE_WIND]: Object.freeze({
+    ability: ABILITY.EVOLVE_WIND, label: "Dao Wind", icon: "Z", hotkey: "Z",
+    title: "Choose Dao Wind; evolves automatically at 60 insight; no research required", carriers: Object.freeze([KIND.WARRIOR]),
     targetMode: "self", cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 0 }),
     upgradeRequirement: null, queued: false, queuePolicy: "notQueueable",
   }),
@@ -484,12 +484,12 @@ export const ABILITIES = Object.freeze({
     queued: true,
     queuePolicy: "skipIfNotReady",
   }),
-  [ABILITY.LIGHTNESS_DASH]: Object.freeze({
-    ability: ABILITY.LIGHTNESS_DASH,
+  [ABILITY.WIND_DASH]: Object.freeze({
+    ability: ABILITY.WIND_DASH,
     label: "Dash", icon: "DSH", hotkey: "D",
     title: "Dash up to 15 tiles; one charge, two at Master rank; recharges every 8 seconds",
-    carriers: Object.freeze([KIND.LIGHTNESS_ADEPT]),
-    targetMode: "worldPoint", rangeTiles: DAO_LIGHTNESS_DASH_RANGE_TILES,
+    carriers: Object.freeze([KIND.WIND_ADEPT]),
+    targetMode: "worldPoint", rangeTiles: DAO_WIND_DASH_RANGE_TILES,
     cooldownTicks: 0, charges: 1, chargeRechargeTicks: EKAT_TELEPORT_COOLDOWN_TICKS,
     cost: Object.freeze({ steel: 0, oil: 0 }), queued: true, queuePolicy: "skipIfNotReady",
   }),
@@ -589,10 +589,10 @@ export const UPGRADES = Object.freeze({
     description: "Study the Dao of Magic. Unlocks the matching Adept at Portals for 150 steel and 35 oil, plus paid training at the Proving Grounds.",
     researchedAt: KIND.THREE_DAO_PAVILION,
   }),
-  [UPGRADE.DAO_OF_LIGHTNESS]: Object.freeze({
-    upgrade: UPGRADE.DAO_OF_LIGHTNESS, label: "Dao of Lightness", icon: "LGT",
+  [UPGRADE.DAO_WIND]: Object.freeze({
+    upgrade: UPGRADE.DAO_WIND, label: "Dao Wind", icon: "WND",
     cost: Object.freeze({ steel: 100, oil: 200 }), researchTicks: DAO_RESEARCH_TICKS,
-    description: "Study the Dao of Lightness. Unlocks the matching Adept at Portals for 150 steel and 35 oil, plus paid training at the Proving Grounds.",
+    description: "Study the Dao Wind. Unlocks the matching Adept at Portals for 150 steel and 35 oil, plus paid training at the Proving Grounds.",
     researchedAt: KIND.THREE_DAO_PAVILION,
   }),
   [UPGRADE.METHAMPHETAMINES]: Object.freeze({

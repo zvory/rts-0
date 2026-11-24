@@ -67,7 +67,7 @@ pub fn is_coax_infantry_priority(kind: EntityKind) -> bool {
     matches!(
         kind,
         EntityKind::Warrior
-            | EntityKind::LightnessAdept
+            | EntityKind::WindAdept
             | EntityKind::WarAdept
             | EntityKind::MagicAdept
             | EntityKind::Rifleman
@@ -85,7 +85,7 @@ pub fn is_anti_tank_gun_infantry_target(kind: EntityKind) -> bool {
         EntityKind::Worker
             | EntityKind::Golem
             | EntityKind::Warrior
-            | EntityKind::LightnessAdept
+            | EntityKind::WindAdept
             | EntityKind::WarAdept
             | EntityKind::MagicAdept
             | EntityKind::Rifleman
@@ -179,7 +179,7 @@ mod tests {
                 },
             ),
             (
-                EntityKind::LightnessAdept,
+                EntityKind::WindAdept,
                 ExpectedTargetFacts {
                     is_unit: true,
                     is_building: false,
@@ -722,7 +722,7 @@ mod tests {
             EntityKind::Worker,
             EntityKind::Golem,
             EntityKind::Warrior,
-            EntityKind::LightnessAdept,
+            EntityKind::WindAdept,
             EntityKind::WarAdept,
             EntityKind::MagicAdept,
             EntityKind::Rifleman,

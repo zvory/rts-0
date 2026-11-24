@@ -69,7 +69,7 @@ const RESOURCE_DEPOT_UNITS: &[EntityKind] = &[
 const GOLEM_ONLY: &[EntityKind] = &[EntityKind::Golem];
 const PORTAL_UNITS: &[EntityKind] = &[
     EntityKind::Warrior,
-    EntityKind::LightnessAdept,
+    EntityKind::WindAdept,
     EntityKind::WarAdept,
     EntityKind::MagicAdept,
 ];
@@ -185,11 +185,11 @@ pub const UNITS: &[UnitDef] = &[
     },
     NOVICE_DEF,
     UnitDef {
-        kind: EntityKind::LightnessAdept,
+        kind: EntityKind::WindAdept,
         stats: balance::UnitStats {
-            cooldown: (NOVICE_DEF.stats.cooldown as f32 / balance::DAO_LIGHTNESS_ATTACK_RATE + 0.5)
+            cooldown: (NOVICE_DEF.stats.cooldown as f32 / balance::DAO_WIND_ATTACK_RATE + 0.5)
                 as u32,
-            speed: SCOUT_CAR_DEF.stats.speed * balance::DAO_LIGHTNESS_SPEED_MULTIPLIER,
+            speed: SCOUT_CAR_DEF.stats.speed * balance::DAO_WIND_SPEED_MULTIPLIER,
             cost_steel: NOVICE_DEF.stats.cost_steel * 3 / 2,
             cost_oil: 35,
             supply: 3,
@@ -861,7 +861,7 @@ mod tests {
                 EntityKind::Worker,
                 EntityKind::Golem,
                 EntityKind::Warrior,
-                EntityKind::LightnessAdept,
+                EntityKind::WindAdept,
                 EntityKind::WarAdept,
                 EntityKind::MagicAdept,
                 EntityKind::Rifleman,

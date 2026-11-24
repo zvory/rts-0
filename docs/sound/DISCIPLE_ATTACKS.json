@@ -18,7 +18,7 @@
     {
       "file": "client/assets/sound/combat/combat_disciple_spear_01.mp3",
       "audition_file": "01-spear-thrust.mp3",
-      "role": "Dao of Lightness spear",
+      "role": "Dao Wind spear",
       "source_sha256": "c611ba2c5b66751f7a9406602734f39b78126aedd4eb8699b52a72f482c21dfa",
       "production_sha256": "a8c0503905374e6d604a282202a53f7b44fbc6f231cf99298d36cdd2adfc2bc6",
       "decoded_lufs": "-20.10",

@@ -31,7 +31,7 @@ pub fn researchable_upgrades(building: EntityKind) -> Vec<UpgradeKind> {
 fn is_dao(kind: UpgradeKind) -> bool {
     matches!(
         kind,
-        UpgradeKind::DaoOfLightness | UpgradeKind::DaoOfHeaviness | UpgradeKind::DaoOfMagic
+        UpgradeKind::DaoWind | UpgradeKind::DaoOfHeaviness | UpgradeKind::DaoOfMagic
     )
 }
 
@@ -157,7 +157,7 @@ pub fn definition(kind: UpgradeKind) -> UpgradeDefinition {
             cost_oil: crate::config::SCOUT_PLANE_UNLOCK_COST_OIL,
             research_ticks: crate::config::SCOUT_PLANE_UNLOCK_RESEARCH_TICKS,
         },
-        UpgradeKind::DaoOfLightness | UpgradeKind::DaoOfMagic | UpgradeKind::DaoOfHeaviness => {
+        UpgradeKind::DaoWind | UpgradeKind::DaoOfMagic | UpgradeKind::DaoOfHeaviness => {
             UpgradeDefinition {
                 kind,
                 researched_at: catalog.researched_at,
@@ -217,7 +217,7 @@ mod tests {
         assert_eq!(
             researchable_upgrades(EntityKind::ThreeDaoPavilion),
             vec![
-                UpgradeKind::DaoOfLightness,
+                UpgradeKind::DaoWind,
                 UpgradeKind::DaoOfMagic,
                 UpgradeKind::DaoOfHeaviness
             ]

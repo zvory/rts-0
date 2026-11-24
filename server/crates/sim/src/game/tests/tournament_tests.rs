@@ -200,7 +200,7 @@ fn tournament_four_enter_five_seconds_one_random_upgrade_rally_and_checkpoint() 
         assert!(matches!(
             e.dao(),
             Some(
-                UpgradeKind::DaoOfLightness | UpgradeKind::DaoOfHeaviness | UpgradeKind::DaoOfMagic
+                UpgradeKind::DaoWind | UpgradeKind::DaoOfHeaviness | UpgradeKind::DaoOfMagic
             )
         ));
         assert_eq!(e.hp, e.max_hp);
@@ -671,7 +671,7 @@ fn tournament_evolution_during_approach_clears_entry_without_stopping_movement()
         .unwrap();
     let unit = game.state.entities.get_mut(disciple).unwrap();
     unit.insight = config::DISCIPLE_INSIGHT_REQUIRED - 1;
-    unit.choose_dao(AbilityKind::EvolveLightness);
+    unit.choose_dao(AbilityKind::EvolveWind);
     game.enqueue(
         1,
         Command::Move {
@@ -705,7 +705,7 @@ fn tournament_evolution_during_approach_clears_entry_without_stopping_movement()
     )
     .expect("an evolved entrant must remain checkpointable at the end of the tick");
     let unit = game.state.entities.get(disciple).unwrap();
-    assert_eq!(unit.dao(), Some(UpgradeKind::DaoOfLightness));
+    assert_eq!(unit.dao(), Some(UpgradeKind::DaoWind));
     assert_eq!(unit.movement.as_ref().unwrap().tournament_target, None);
     assert!(matches!(unit.order(), Order::Move(_)));
     game.tick();
