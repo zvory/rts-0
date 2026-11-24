@@ -1395,7 +1395,7 @@ fn wind_master_gains_second_dash_charge_and_recharges_sequentially() {
 }
 
 #[test]
-fn disciple_dash_rejects_unwalkable_landings_but_can_cross_them() {
+fn disciple_blink_snaps_unwalkable_landings_and_can_cross_them() {
     use crate::game::ability::AbilityKind;
     for queued in [false, true] {
         for blocked_landing in [false, true] {
@@ -1431,12 +1431,36 @@ fn disciple_dash_rejects_unwalkable_landings_but_can_cross_them() {
             game.tick();
             game.tick();
             let entity = game.state.entities.get(unit).unwrap();
-            let expected = if blocked_landing { origin } else { target };
-            assert!((entity.pos_x() - expected.0).abs() < 0.001);
-            assert!((entity.pos_y() - expected.1).abs() < 0.001);
+            let landing = (entity.pos_x(), entity.pos_y());
             if blocked_landing {
-                assert_eq!(entity.ability_cooldown_ticks(AbilityKind::WindDash), 0);
+                assert_ne!(landing, target);
+                assert!((landing.0 - target.0).det_hypot(landing.1 - target.1) <= 43.0);
+            } else {
+                assert_eq!(landing, target);
             }
+            let occ = crate::game::services::occupancy::Occupancy::build(
+                &game.state.map,
+                &game.state.entities,
+            );
+            assert!(
+                crate::game::services::standability::unit_static_standable_with_radius(
+                    &game.state.map,
+                    &occ,
+                    entity.kind,
+                    landing.0,
+                    landing.1,
+                    entity.facing(),
+                    Some(entity.radius())
+                )
+            );
+            assert!(
+                (landing.0 - origin.0).det_hypot(landing.1 - origin.1)
+                    <= config::DAO_WIND_DASH_RANGE_TILES as f32 * config::TILE_SIZE as f32
+            );
+            assert_eq!(
+                entity.ability_uses_remaining(AbilityKind::WindDash),
+                Some(0)
+            );
         }
     }
 }
