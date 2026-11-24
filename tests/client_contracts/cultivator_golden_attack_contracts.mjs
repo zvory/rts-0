@@ -77,6 +77,27 @@ minimap.beginFrame([minimapUnit], {
 }, 1);
 const attackLayer = minimap.layers(minimapUnit)[0];
 assert.ok(Math.abs(attackLayer.scaleX / idleLayer.scaleX - 1.59) < 1e-12, 'minimap shares corrected Novice attack sizing');
+function minimapHead(layer, head) {
+  const x = (head.x - 80) / 160 * layer.scaleX;
+  const y = (head.y - 80) / 160 * layer.scaleY;
+  return { x: layer.x + x * Math.cos(layer.rotation) - y * Math.sin(layer.rotation),
+    y: layer.y + x * Math.sin(layer.rotation) + y * Math.cos(layer.rotation) };
+}
+const iconWorldScale = 1 / (153 * 1.05 * novice.worldScale);
+for (const facing of [0, Math.PI / 2, 2.3]) {
+  minimapUnit.facing = minimapUnit.weaponFacing = facing;
+  minimap.beginFrame([minimapUnit], {}, 0);
+  const idle = minimapHead(minimap.layers(minimapUnit)[0], idleHead);
+  for (const [i, frame] of novice.firingFrames.entries()) {
+    minimap.beginFrame([minimapUnit], {
+      weaponRecoil: () => 1, weaponRecoilKind: () => 'warrior_sword',
+      weaponRecoilPhase: () => (i + .1) / 6 * novice.firingFrameHoldPhase,
+    }, 1);
+    const head = minimapHead(minimap.layers(minimapUnit)[0], headSample(frame, 40, 69, 17));
+    assert.ok(Math.hypot(head.x - idle.x, head.y - idle.y) < .35 * iconWorldScale,
+      'minimap preserves the head anchor across firing rotations and scales');
+  }
+}
 minimap.destroy();
 const restore = installFakePixi();
 try {
