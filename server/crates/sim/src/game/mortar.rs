@@ -363,6 +363,7 @@ fn resolve(context: MortarResolutionContext<'_>, shell: &MortarShell) {
             id,
             shell.owner,
             effective,
+            base,
             u8::from(piercing_hit) as f32,
             (shell.from_x.to_world(), shell.from_y.to_world()),
             teams,

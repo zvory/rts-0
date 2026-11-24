@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn disciple_shield_bypasses_artillery_core_but_absorbs_falloff() {
+fn disciple_shield_armors_artillery_and_drains_full_core_or_falloff() {
     let map = open_map(20);
     let teams = TeamRelations::from_player_teams([(1, 1), (2, 2)]);
     for (offset, piercing) in [(0.0, true), (32.0, false)] {
@@ -42,11 +42,18 @@ fn disciple_shield_bypasses_artillery_core_but_absorbs_falloff() {
                 }
                 assert_eq!(
                     damage,
-                    if piercing || inside {
+                    if inside {
                         unshielded_damage
                     } else {
-                        0
+                        ((unshielded_damage as f32) * if piercing { 1.0 } else { 0.25 }).round()
+                            as u32
                     }
+                );
+                let full_damage = artillery_damage(
+                    EntityKind::Rifleman,
+                    offset * offset,
+                    (config::ARTILLERY_INNER_RADIUS_TILES * config::TILE_SIZE as f32).powi(2),
+                    (config::ARTILLERY_OUTER_RADIUS_TILES * config::TILE_SIZE as f32).powi(2),
                 );
                 assert_eq!(
                     entities
@@ -54,14 +61,12 @@ fn disciple_shield_bypasses_artillery_core_but_absorbs_falloff() {
                         .unwrap()
                         .shield
                         .as_ref()
-                        .unwrap()
-                        .remaining,
-                    config::DISCIPLE_SHIELD_CAPACITY
-                        - if piercing || inside {
-                            0
-                        } else {
-                            unshielded_damage
-                        }
+                        .map_or(0, |s| s.remaining),
+                    config::DISCIPLE_SHIELD_CAPACITY.saturating_sub(if inside {
+                        0
+                    } else {
+                        full_damage
+                    })
                 );
             }
         }

@@ -456,7 +456,7 @@ fn disciple_dao_gates_dash_and_magic_anchor_without_return() {
 }
 
 #[test]
-fn disciple_shield_shared_pool_overflow_teams_and_checkpoint() {
+fn disciple_shield_durability_breaking_hit_teams_and_checkpoint() {
     use crate::game::ability::AbilityKind;
     use crate::game::teams::TeamRelations;
     use crate::game::upgrade::UpgradeKind;
@@ -524,32 +524,32 @@ fn disciple_shield_shared_pool_overflow_teams_and_checkpoint() {
     assert_eq!(
         game.state
             .entities
-            .shielded_damage(outside, 2, 50, 0.0, (0.0, 0.0), &teams),
+            .shielded_damage(outside, 2, 50, 50, 0.0, (0.0, 0.0), &teams),
         50
     );
     assert_eq!(
         game.state
             .entities
-            .shielded_damage(foe, 1, 50, 0.0, (0.0, 0.0), &teams),
+            .shielded_damage(foe, 1, 50, 50, 0.0, (0.0, 0.0), &teams),
         50
     );
     assert_eq!(
         game.state
             .entities
-            .shielded_damage(friend, 1, 50, 0.0, (0.0, 0.0), &teams),
+            .shielded_damage(friend, 1, 50, 50, 0.0, (0.0, 0.0), &teams),
         50
     );
     assert_eq!(
         game.state
             .entities
-            .shielded_damage(friend, 2, 60, 0.0, (0.0, 0.0), &teams),
-        0
+            .shielded_damage(friend, 2, 60, 60, 0.0, (0.0, 0.0), &teams),
+        15
     );
     assert_eq!(
         game.state
             .entities
-            .shielded_damage(caster, 2, 40, 0.0, (0.0, 0.0), &teams),
-        0
+            .shielded_damage(caster, 2, 40, 40, 0.0, (0.0, 0.0), &teams),
+        10
     );
     let payload = game.checkpoint_payload_text_for_test().unwrap();
     let mut restored = Game::restore_checkpoint_payload_text_for_test(
@@ -562,8 +562,8 @@ fn disciple_shield_shared_pool_overflow_teams_and_checkpoint() {
         restored
             .state
             .entities
-            .shielded_damage(friend, 2, 100, 0.0, (0.0, 0.0), &teams),
-        50
+            .shielded_damage(friend, 2, 100, 100, 0.0, (0.0, 0.0), &teams),
+        25
     );
     assert!(restored
         .state
@@ -576,7 +576,7 @@ fn disciple_shield_shared_pool_overflow_teams_and_checkpoint() {
         restored
             .state
             .entities
-            .shielded_damage(friend, 2, 20, 0.0, (0.0, 0.0), &teams),
+            .shielded_damage(friend, 2, 20, 20, 0.0, (0.0, 0.0), &teams),
         20
     );
     game.state
@@ -587,7 +587,7 @@ fn disciple_shield_shared_pool_overflow_teams_and_checkpoint() {
     assert_eq!(
         game.state
             .entities
-            .shielded_damage(friend, 2, 50, 0.0, (0.0, 0.0), &teams),
+            .shielded_damage(friend, 2, 50, 50, 0.0, (0.0, 0.0), &teams),
         50
     );
 }

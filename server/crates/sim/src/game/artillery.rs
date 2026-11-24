@@ -139,6 +139,7 @@ fn resolve_shell(
             id,
             shell.owner,
             damage,
+            artillery_damage(EntityKind::Rifleman, d2, inner2, outer2),
             if d2 <= inner2 { 1.0 } else { 0.0 },
             (shell.from_x.to_world(), shell.from_y.to_world()),
             teams,
