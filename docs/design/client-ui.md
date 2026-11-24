@@ -1922,6 +1922,14 @@ take precedence over the attacker's Magic evolution state; events without a weap
 current Dao. The normal spatial combat buses, deduplication, pitch variation, and voice cap apply.
 Asset provenance, audition selections, and decoded levels are in `docs/sound/DISCIPLE_ATTACKS.json`.
 
+Throw Sword uses the selected heavy-boomerang whirl, normalized with peak headroom and stretched
+without pitch shift to the nominal 54-tick / 1.8-second full-range round trip. `MatchCombatAudio`
+tracks only fog-filtered Throw Sword line-projectile objects, spatially follows each sword, and
+loops the cue if the caster moves far enough to prolong its return. Object removal stops the cue
+immediately, including short casts and loss of visibility. Pause, replay seek, match end, and
+teardown clear these voices. No random pitch variation changes the cue's duration. Processing and
+provenance are recorded in `docs/sound/THROW_SWORD.json`.
+
 `match_notice_presenter.js`
 ```js
 export class MatchNoticePresenter {
