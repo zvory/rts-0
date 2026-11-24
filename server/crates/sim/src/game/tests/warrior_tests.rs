@@ -338,8 +338,9 @@ fn disciple_dash_casts_for_every_selected_ready_wind_unit() {
             if index < 2 {
                 let dx = entity.pos_x() - target.0;
                 let dy = entity.pos_y() - target.1;
+                let max_landing_distance = entity.radius() * 2.0 + 1.0;
                 assert!(
-                    dx * dx + dy * dy <= (entity.radius() * 2.0 + 1.0).powi(2),
+                    dx * dx + dy * dy <= max_landing_distance * max_landing_distance,
                     "each caster should reach a distinct valid landing near the target; queued={queued}",
                 );
                 assert_eq!(

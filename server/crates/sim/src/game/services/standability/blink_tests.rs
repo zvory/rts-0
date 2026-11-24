@@ -30,7 +30,9 @@ fn blink_selects_nearest_legal_lattice_point_and_group_landings_do_not_stack() {
     let occ = Occupancy::build(&map, &entities);
     let blockers = UnitBlockers::new(&entities);
     let unit = entities.get(caster).unwrap();
-    let chosen_d2 = (landing.0 - requested.0).powi(2) + (landing.1 - requested.1).powi(2);
+    let chosen_dx = landing.0 - requested.0;
+    let chosen_dy = landing.1 - requested.1;
+    let chosen_d2 = chosen_dx * chosen_dx + chosen_dy * chosen_dy;
     for x in -60..=60 {
         for y in -60..=60 {
             if (x * x + y * y) as f32 >= chosen_d2 {
