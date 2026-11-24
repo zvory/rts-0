@@ -132,6 +132,10 @@ is loaded from the CDN, and `cargo run` from `server/` serves the client.
 
 ## Specialized workflows
 
+- Generated sound effects: follow [the sound provenance policy](docs/sound/REVIEW_PROCESS.md#generated-sound-provenance-required).
+  Save each candidate's exact prompt, API/model or generator, settings, invocation, and processing
+  history alongside its audio before review; preserve matching provenance when integrating it.
+
 - To record a minimap video of a selected replay, use `node scripts/record-minimap.mjs <match-id> <output.webm>`; see `scripts/minimap-webm/README.md` for server selection, setup, and re-encoding.
 
 - Never use the in-app browser skill.

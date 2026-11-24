@@ -2,6 +2,35 @@
 
 Use this process when auditioning candidate sound effects.
 
+## Generated sound provenance (required)
+
+Whenever generating sound effects, save the exact prompt and generation method alongside the
+resulting audio before sharing it for review. This applies to every candidate, variation, and
+regeneration, including rejected auditions; do not wait until a sound is selected for integration.
+
+Use a per-file JSON sidecar or a batch `generation.json` in the same directory as the audio. A batch
+manifest must map each output filename to its own complete record. Preserve:
+
+- The exact prompt submitted, verbatim, including negative instructions. Record any additional
+  prompt fields separately rather than replacing the submitted text with a summary.
+- Provider, API endpoint and method, model ID/version, and the actual request parameters used,
+  including duration, prompt influence, output format, and seed when supported. Mark provider
+  defaults or unavailable values explicitly; never invent a seed or model version.
+- The invocation used: CLI/package and version plus command arguments, or script path and version
+  plus invocation. For procedural synthesis, save the generator source, parameters, and random
+  seed; mark the prompt as not applicable when no text prompt was used.
+- Generation date, raw output filename and SHA-256, and any returned request/generation ID when
+  available. Keep separate records for repeated requests even when their prompts are identical.
+- Every subsequent trim, fade, gain change, normalization, resample, encoding, or other processing
+  step, with exact settings or the preserved processing script and invocation. Map the processed
+  filename and SHA-256 back to its raw source; retain the original during review.
+
+Never put credentials, authentication headers, access tokens, or signed URLs in these records.
+Document the endpoint and invocation with credential values omitted. Preserve provenance with the
+sound when copying or promoting it: integrated assets must have their matching records committed
+under `docs/sound/` (or beside the asset), with repository-relative paths to the final files. Keep
+existing source and license tracking as well; generation metadata does not establish usage rights.
+
 ## Selection Criteria
 
 - Prefer realistic, real-world recordings or convincing naturalistic edits.
