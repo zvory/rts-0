@@ -8,15 +8,15 @@ fn dao_kinds_spawn_with_resolved_stats_and_serialize_without_mutable_dao() {
             EntityKind::LightnessAdept,
             AbilityKind::LightnessDash,
             115,
-            43,
+            61,
             0.75,
         ),
-        (EntityKind::WarAdept, AbilityKind::ThrowSword, 135, 64, 1.75),
+        (EntityKind::WarAdept, AbilityKind::ThrowSword, 135, 91, 1.75),
         (
             EntityKind::MagicAdept,
             AbilityKind::DiscipleShield,
             115,
-            64,
+            91,
             5.0,
         ),
     ] {
