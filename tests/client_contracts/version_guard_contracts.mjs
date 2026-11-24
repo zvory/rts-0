@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { VersionGuard } from "../../client/src/version_guard.js";
+import { VersionGuard, canRefreshClient } from "../../client/src/version_guard.js";
 import { Net } from "../../client/src/net.js";
 import { COMPACT_SNAPSHOT_VERSION } from "../../client/src/protocol.js";
 
@@ -50,7 +50,7 @@ function fixture({ lobby = false, clientBuild = "loaded-build", storage = new Ma
   assert.equal(f.guard.mismatch, true);
   assert.equal(globalThis.__RTS_BUILD__, "loaded-build");
   assert.equal(f.state.reloads, 0, "active match is never refreshed");
-  assert.equal(f.guard.button.disabled, true);
+  assert.equal(f.guard.el, undefined, "active rooms never mount a warning");
   f.guard.refresh();
   assert.equal(f.state.reloads, 0, "manual refresh also respects active-game safety");
   f.state.lobby = true;
@@ -79,7 +79,7 @@ function fixture({ lobby = false, clientBuild = "loaded-build", storage = new Ma
   f.guard.destroy();
 }
 
-// Reproduce the incident: a newer snapshot schema must surface recovery, not just disappear.
+// A newer snapshot schema records pending recovery silently until the player leaves the room.
 {
   const f = fixture();
   f.guard.start();
@@ -91,7 +91,7 @@ function fixture({ lobby = false, clientBuild = "loaded-build", storage = new Ma
 
 // Ordinary malformed packets, missing build ids, offline mode, and failed probes are not mismatches.
 {
-  const f = fixture({ fetch: async () => { throw new Error("offline"); } });
+  const f = fixture({ lobby: true, fetch: async () => { throw new Error("offline"); } });
   f.guard.start();
   f.net._onMessage({ data: "broken JSON" });
   f.guard.observe("unknown");
@@ -125,7 +125,7 @@ function fixture({ lobby = false, clientBuild = "loaded-build", storage = new Ma
 // A hung request is bounded, non-overlapping, and aborted on teardown.
 {
   let signal;
-  const f = fixture({ fetch: async (_url, options) => {
+  const f = fixture({ lobby: true, fetch: async (_url, options) => {
     signal = options.signal;
     await new Promise((resolve) => signal.addEventListener("abort", resolve));
     throw new Error("aborted");
@@ -136,6 +136,47 @@ function fixture({ lobby = false, clientBuild = "loaded-build", storage = new Ma
   await pending;
   assert.equal(signal.aborted, true);
   assert.equal(f.guard.mismatch, false);
+  f.guard.destroy();
+}
+
+// A probe begun in the lobby can finish during room startup without interrupting it.
+{
+  let finish;
+  const f = fixture({ lobby: true, fetch: () => new Promise((resolve) => { finish = resolve; }) });
+  const pending = f.guard.check();
+  f.state.lobby = false;
+  finish({ ok: true, text: async () => "new-server" });
+  await pending;
+  assert.equal(f.guard.mismatch, true);
+  assert.equal(f.guard.el, undefined);
+  assert.equal(f.state.reloads, 0);
+  f.state.lobby = true;
+  f.guard.update();
+  assert.equal(f.state.reloads, 1);
+  f.guard.destroy();
+}
+
+// Main screen and ordinary lobby are eligible; every room, authoring flow, and startup is protected.
+{
+  assert.equal(canRefreshClient({}, true), true, "main screen without a joined lobby refreshes");
+  assert.equal(canRefreshClient({}, false), false);
+  for (const field of ["match", "versionTransitionActive", "labLaunch", "labCatalogLaunch",
+    "labHandoffLaunch", "replayLaunch", "matchLaunch", "snapshotStreamLaunch",
+    "stressTestLaunch", "devWatch", "mapPreviewLaunch"]) {
+    assert.equal(canRefreshClient({ [field]: {} }, true), false, `${field} blocks recovery`);
+  }
+  const f = fixture();
+  f.guard.start();
+  await f.guard.check();
+  assert.equal(f.state.fetches, 0, "protected rooms do not run HTTP probes");
+  f.guard.observe("new-server");
+  assert.equal(f.guard.el, undefined, "protected rooms remain visually untouched");
+  f.state.lobby = true;
+  f.guard.update();
+  assert.equal(f.state.reloads, 1);
+  f.state.lobby = false;
+  f.guard.update();
+  assert.equal(f.guard.el.hidden, true, "a stale reload notice disappears on entering a room");
   f.guard.destroy();
 }
 
