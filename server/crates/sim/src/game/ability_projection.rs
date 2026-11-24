@@ -85,7 +85,7 @@ pub(in crate::game) fn ability_object_views_for(
                                 as u16,
                         ),
                         radius: Some(
-                            crate::config::EKAT_MAGIC_ANCHOR_RADIUS_TILES
+                            crate::config::DISCIPLE_SHIELD_RADIUS_TILES
                                 * crate::config::TILE_SIZE as f32,
                         ),
                         ..Default::default()

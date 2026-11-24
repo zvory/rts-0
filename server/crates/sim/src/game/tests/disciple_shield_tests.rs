@@ -207,10 +207,11 @@ fn disciple_shield_shift_waits_for_move_and_cooldown_does_not_replace_field() {
 }
 
 #[test]
-fn disciple_shield_expires_at_15_seconds_after_checkpoint_restore() {
+fn disciple_shield_expires_at_5_seconds_after_checkpoint_restore() {
     let (mut game, caster) = setup();
-    game.enqueue(1, cast(caster, 480.0, false));
+    game.enqueue(1, cast(caster, 440.0, false));
     game.tick();
+    assert_eq!(config::DISCIPLE_SHIELD_DURATION_TICKS, 5 * config::TICK_HZ);
     let expires = game.state.tick + config::DISCIPLE_SHIELD_DURATION_TICKS;
     assert_eq!(
         game.state
@@ -249,6 +250,7 @@ fn disciple_shield_expires_at_15_seconds_after_checkpoint_restore() {
                 caster,
                 2,
                 20,
+                0.0,
                 &crate::game::teams::TeamRelations::from_player_teams([(1, 1), (2, 2)])
             ),
             0
@@ -265,6 +267,7 @@ fn disciple_shield_expires_at_15_seconds_after_checkpoint_restore() {
                 caster,
                 2,
                 20,
+                0.0,
                 &crate::game::teams::TeamRelations::from_player_teams([(1, 1), (2, 2)])
             ),
             20
@@ -273,7 +276,7 @@ fn disciple_shield_expires_at_15_seconds_after_checkpoint_restore() {
 }
 
 #[test]
-fn disciple_shield_replacement_refreshes_expiry() {
+fn disciple_shield_recast_after_cooldown_gets_fresh_expiry() {
     let (mut game, caster) = setup();
     game.enqueue(1, cast(caster, 480.0, false));
     game.tick();
@@ -295,6 +298,8 @@ fn disciple_shield_replacement_refreshes_expiry() {
     {
         game.tick();
     }
+    assert!(game.state.tick >= original.expires_tick);
+    assert!(game.state.entities.get(caster).unwrap().shield.is_none());
     game.enqueue(1, cast(caster, 500.0, false));
     game.tick();
     let replacement = game
@@ -306,7 +311,7 @@ fn disciple_shield_replacement_refreshes_expiry() {
         .as_ref()
         .unwrap();
     assert_ne!(replacement.id, original.id);
-    assert_eq!(replacement.remaining, 300);
+    assert_eq!(replacement.remaining, 150);
     assert_eq!(replacement.x.to_world(), 500.0);
     assert_eq!(
         replacement.expires_tick,
@@ -321,14 +326,14 @@ fn disciple_shield_replacement_refreshes_expiry() {
 #[test]
 fn disciple_shield_snapshots_track_absorption_and_remove_depleted_pool() {
     let (mut game, caster) = setup();
-    game.enqueue(1, cast(caster, 480.0, false));
+    game.enqueue(1, cast(caster, 440.0, false));
     game.tick();
     let teams = crate::game::teams::TeamRelations::from_player_teams([(1, 1), (2, 2)]);
-    for (damage, remaining) in [(0, 300), (100, 200), (150, 50)] {
+    for (damage, remaining) in [(0, 150), (50, 100), (50, 50)] {
         assert_eq!(
             game.state
                 .entities
-                .shielded_damage(caster, 2, damage, &teams),
+                .shielded_damage(caster, 2, damage, 0.0, &teams),
             0
         );
         let shield = game
@@ -340,7 +345,9 @@ fn disciple_shield_snapshots_track_absorption_and_remove_depleted_pool() {
         assert_eq!(shield.owner_state.unwrap().hp, Some(remaining));
     }
     assert_eq!(
-        game.state.entities.shielded_damage(caster, 2, 70, &teams),
+        game.state
+            .entities
+            .shielded_damage(caster, 2, 70, 0.0, &teams),
         20
     );
     assert!(!game
@@ -348,4 +355,63 @@ fn disciple_shield_snapshots_track_absorption_and_remove_depleted_pool() {
         .ability_objects
         .iter()
         .any(|object| object.ability == "discipleShield"));
+}
+
+#[test]
+fn disciple_shield_smaller_radius_and_piercing_hits_preserve_pool() {
+    let (mut game, caster) = setup();
+    game.enqueue(1, cast(caster, 480.0, false));
+    game.tick();
+    let teams = crate::game::teams::TeamRelations::from_player_teams([(1, 1), (2, 2)]);
+    let radius = config::DISCIPLE_SHIELD_RADIUS_TILES * config::TILE_SIZE as f32;
+    let inside = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, 480.0 + radius - 1.0, 400.0)
+        .unwrap();
+    let outside = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Rifleman, 480.0 + radius + 1.0, 400.0)
+        .unwrap();
+    assert_eq!(
+        game.state
+            .entities
+            .shielded_damage(outside, 2, 20, 0.0, &teams),
+        20
+    );
+    for penetration in [0.5, 1.0] {
+        assert_eq!(
+            game.state
+                .entities
+                .shielded_damage(inside, 2, 200, penetration, &teams),
+            200
+        );
+        assert_eq!(
+            game.state
+                .entities
+                .get(caster)
+                .unwrap()
+                .shield
+                .as_ref()
+                .unwrap()
+                .remaining,
+            150
+        );
+    }
+    assert_eq!(
+        game.state
+            .entities
+            .shielded_damage(inside, 2, 20, 0.0, &teams),
+        0
+    );
+    let shield = game
+        .snapshot_full_for(1)
+        .ability_objects
+        .into_iter()
+        .find(|o| o.ability == "discipleShield")
+        .unwrap();
+    let state = shield.owner_state.unwrap();
+    assert_eq!(state.hp, Some(130));
+    assert_eq!(state.radius, Some(radius));
 }

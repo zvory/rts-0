@@ -480,7 +480,7 @@ fn disciple_shield_shared_pool_overflow_teams_and_checkpoint() {
     let caster = game
         .state
         .entities
-        .spawn_unit(1, EntityKind::Warrior, 400.0, 400.0)
+        .spawn_unit(1, EntityKind::Warrior, 440.0, 400.0)
         .unwrap();
     let friend = game
         .state
@@ -520,7 +520,7 @@ fn disciple_shield_shared_pool_overflow_teams_and_checkpoint() {
             .as_ref()
             .unwrap()
             .remaining,
-        300
+        150
     );
     let foe = game
         .state
@@ -529,20 +529,31 @@ fn disciple_shield_shared_pool_overflow_teams_and_checkpoint() {
         .unwrap();
     let teams = TeamRelations::from_player_teams([(1, 1), (2, 2), (3, 1)]);
     assert_eq!(
-        game.state.entities.shielded_damage(outside, 2, 50, &teams),
-        50
-    );
-    assert_eq!(game.state.entities.shielded_damage(foe, 1, 50, &teams), 50);
-    assert_eq!(
-        game.state.entities.shielded_damage(friend, 1, 50, &teams),
+        game.state
+            .entities
+            .shielded_damage(outside, 2, 50, 0.0, &teams),
         50
     );
     assert_eq!(
-        game.state.entities.shielded_damage(friend, 2, 120, &teams),
+        game.state.entities.shielded_damage(foe, 1, 50, 0.0, &teams),
+        50
+    );
+    assert_eq!(
+        game.state
+            .entities
+            .shielded_damage(friend, 1, 50, 0.0, &teams),
+        50
+    );
+    assert_eq!(
+        game.state
+            .entities
+            .shielded_damage(friend, 2, 60, 0.0, &teams),
         0
     );
     assert_eq!(
-        game.state.entities.shielded_damage(caster, 2, 80, &teams),
+        game.state
+            .entities
+            .shielded_damage(caster, 2, 40, 0.0, &teams),
         0
     );
     let payload = game.checkpoint_payload_text_for_test().unwrap();
@@ -556,7 +567,7 @@ fn disciple_shield_shared_pool_overflow_teams_and_checkpoint() {
         restored
             .state
             .entities
-            .shielded_damage(friend, 2, 150, &teams),
+            .shielded_damage(friend, 2, 100, 0.0, &teams),
         50
     );
     assert!(restored
@@ -570,7 +581,7 @@ fn disciple_shield_shared_pool_overflow_teams_and_checkpoint() {
         restored
             .state
             .entities
-            .shielded_damage(friend, 2, 20, &teams),
+            .shielded_damage(friend, 2, 20, 0.0, &teams),
         20
     );
     game.state
@@ -579,7 +590,9 @@ fn disciple_shield_shared_pool_overflow_teams_and_checkpoint() {
         .unwrap()
         .apply_damage(u32::MAX, None);
     assert_eq!(
-        game.state.entities.shielded_damage(friend, 2, 50, &teams),
+        game.state
+            .entities
+            .shielded_damage(friend, 2, 50, 0.0, &teams),
         50
     );
 }
@@ -725,7 +738,7 @@ fn disciple_shield_does_not_identify_a_smoke_hidden_caster() {
             .find(|o| o.id == shield_id)
             .unwrap();
         assert_eq!(shield.source_caster_id, Some(caster));
-        assert_eq!(shield.owner_state.as_ref().unwrap().hp, Some(300));
+        assert_eq!(shield.owner_state.as_ref().unwrap().hp, Some(150));
     }
     game.state.smokes = crate::game::smoke::SmokeCloudStore::new();
     let visible = game.snapshot_for(2);

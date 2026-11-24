@@ -332,7 +332,17 @@ fn apply_projectile_hits(
             };
             map.damage_after_reduction_tile(target.pos_x(), target.pos_y(), damage)
         });
-        let damage = entities.shielded_damage(id, projectile.owner, damage, teams);
+        let damage = entities.shielded_damage(
+            id,
+            projectile.owner,
+            damage,
+            if projectile.ability == AbilityKind::ThrowSword {
+                crate::config::THROW_SWORD_ARMOR_PENETRATION
+            } else {
+                0.0
+            },
+            teams,
+        );
         let target_kind = entities.get(id).map(|target| target.kind);
         let actual = if let Some(target) = entities.get_mut(id) {
             let before_hp = target.hp;

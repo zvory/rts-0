@@ -1,6 +1,60 @@
 use super::*;
 
 #[test]
+fn disciple_shield_absorbs_non_piercing_projectiles_on_both_legs() {
+    for (ability, damage, total) in [
+        (
+            AbilityKind::ThrowSword,
+            crate::config::THROW_SWORD_DAMAGE,
+            60,
+        ),
+        (
+            AbilityKind::EkatLineShot,
+            crate::config::EKAT_LINE_SHOT_DAMAGE,
+            80,
+        ),
+    ] {
+        let mut entities = EntityStore::default();
+        let caster = spawn_caster(&mut entities, 1);
+        let victim = entities
+            .spawn_unit(2, EntityKind::Rifleman, 192.0, 128.0)
+            .unwrap();
+        let shield_caster = entities
+            .spawn_unit(2, EntityKind::MagicAdept, 400.0, 400.0)
+            .unwrap();
+        entities
+            .get_mut(shield_caster)
+            .unwrap()
+            .place_shield(1, 192.0, 128.0, 0, 150, true);
+        let hp = entities.get(victim).unwrap().hp;
+        let mut runtime = AbilityRuntime::new();
+        let mut spec = projectile_spec(caster, (128.0, 128.0), (256.0, 128.0));
+        spec.ability = ability;
+        spec.damage = damage;
+        runtime.spawn_projectile(spec).unwrap();
+        for tick in 1..=3 {
+            tick_runtime(&mut runtime, &mut entities, tick);
+            assert_eq!(
+                entities.get(victim).unwrap().hp,
+                hp,
+                "{ability:?}, tick {tick}"
+            );
+        }
+        assert_eq!(
+            entities
+                .get(shield_caster)
+                .unwrap()
+                .shield
+                .as_ref()
+                .unwrap()
+                .remaining,
+            crate::config::DISCIPLE_SHIELD_CAPACITY - total,
+            "{ability:?}"
+        );
+    }
+}
+
+#[test]
 fn throw_sword_uses_zero_penetration_and_target_armor_without_changing_line_shot() {
     for (ability, kind, outbound, returning) in [
         (AbilityKind::ThrowSword, EntityKind::Tank, 5, 10),

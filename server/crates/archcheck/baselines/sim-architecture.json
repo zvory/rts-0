@@ -1,5 +1,5 @@
 {
-  "reason": "Pass team ownership into Magic Anchor movement modifiers so friendly units remain unaffected",
+  "reason": "Allow projectile shield checks to use Throw Sword armor penetration",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -7,7 +7,7 @@
     },
     {
       "path": "ability_projectile.rs",
-      "lines": 512
+      "lines": 602
     },
     {
       "path": "ability_projection.rs",

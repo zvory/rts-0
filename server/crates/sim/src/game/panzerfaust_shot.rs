@@ -150,7 +150,13 @@ fn resolve(
         let damage = map.damage_after_reduction_tile(victim_pos.0, victim_pos.1, damage);
         let source_pos = (shot.source_x.to_world(), shot.source_y.to_world());
         let enemy_hit = teams.is_enemy_owner(shot.owner, victim_owner);
-        let damage = entities.shielded_damage(shot.target, shot.owner, damage, teams);
+        let damage = entities.shielded_damage(
+            shot.target,
+            shot.owner,
+            damage,
+            config::PANZERFAUST_ARMOR_PENETRATION,
+            teams,
+        );
         let damaged = entities.get_mut(shot.target).is_some_and(|target| {
             let damaged = if enemy_hit {
                 target.apply_damage_from_entity(damage, shot.owner, shot.attacker, source_pos, tick)
