@@ -91,6 +91,15 @@ assertDeepEqual(mixedSword.cooldownClocks, [
   ...groupCooldownClocks([300], 1200), ...groupCooldownClocks([300], 600),
 ], "Mixed ranks keep separate cooldown clock durations");
 
+const promotedSword = selectedAbilityAffordances({
+  playerId: 1, factionId: "cultivators", groupCooldownClocks,
+}, [900, 899].map((cooldownLeft, index) => ({
+  id: 210 + index, owner: 1, kind: KIND.WAR_ADEPT, daoMaster: true,
+  abilities: [{ ability: ABILITY.THROW_SWORD, cooldownLeft }],
+}))).find((entry) => entry.definition.ability === ABILITY.THROW_SWORD);
+assertDeepEqual(promotedSword.cooldownClocks, groupCooldownClocks([900, 899], 600),
+  "Promoted Adept cooldowns share a clock while above the Master duration");
+
 for (const insight of [0, 60]) {
   const disciple = { id: 106, owner: 1, kind: KIND.WARRIOR, insight, chosenDao: "war" };
   for (const upgrades of [[], [UPGRADE.DAO_OF_HEAVINESS], [
