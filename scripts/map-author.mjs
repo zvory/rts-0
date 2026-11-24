@@ -126,10 +126,13 @@ function terrainCounts(map) {
 }
 
 function blockedClearance(map, site, radius) {
+  const unwalkable = new Set((Array.isArray(map.unwalkableTiles) ? map.unwalkableTiles : [])
+    .filter((tile) => tile && isUint32(tile.x) && isUint32(tile.y)).map(locationKey));
   for (let y = site.y - radius; y <= site.y + radius; y += 1) {
     for (let x = site.x - radius; x <= site.x + radius; x += 1) {
       if (!inBounds(map.width, map.height, x, y)) return { x, y, reason: "map edge" };
       if (!PASSABLE.has(map.terrain[y]?.[x])) return { x, y, reason: "impassable terrain" };
+      if (unwalkable.has(locationKey({ x, y }))) return { x, y, reason: "unwalkable tile" };
     }
   }
   return null;

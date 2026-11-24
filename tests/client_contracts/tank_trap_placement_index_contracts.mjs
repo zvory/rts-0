@@ -65,4 +65,18 @@ assert(
   "Tank Trap line queries reuse the spatial index instead of rescanning visible entities per preview site",
 );
 
+{
+  const blockedMap = { ...map, unwalkableTiles: [{ x: 6, y: 6 }] };
+  for (const building of [KIND.DEPOT, KIND.TANK_TRAP, KIND.BARBED_WIRE]) {
+    const buildingPolicy = placementPolicyForBuilding(building);
+    const indexed = createFootprintPlacementBlockerQuery([], new Set(), blockedMap, buildingPolicy);
+    assert(footprintPlacementBlocker([], new Set(), 5, 5, 2, 2, blockedMap, buildingPolicy) === "terrain",
+      "building preview rejects any footprint tile on unwalkable ground");
+    assert(indexed(5, 5, 2, 2) === "terrain",
+      "indexed line preview rejects unwalkable ground");
+    assert(indexed(4, 4, 2, 2) === null,
+      "unwalkable ground does not block a neighboring clear footprint");
+  }
+}
+
 console.log("✅ tank_trap_placement_index_contracts.mjs: parity and one-scan contracts passed");
