@@ -10,6 +10,21 @@
 pub use rts_protocol::*;
 pub use rts_sim::protocol::{kind_from_wire, kind_to_wire};
 
+/// Stamp reliable connection messages with the current server build for the client handshake.
+pub fn welcome_message(player_id: u32) -> ServerMessage {
+    ServerMessage::Welcome {
+        player_id,
+        build_id: crate::build_info::build_id().to_string(),
+    }
+}
+
+pub fn pong_message(ts: f64) -> ServerMessage {
+    ServerMessage::Pong {
+        ts,
+        build_id: crate::build_info::build_id().to_string(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -19,18 +34,12 @@ mod tests {
     fn version_handshake_serializes_through_server_adapter() {
         for (message, expected) in [
             (
-                ServerMessage::Welcome {
-                    player_id: 7,
-                    build_id: "build-a".into(),
-                },
-                serde_json::json!({"t":"welcome", "playerId":7, "buildId":"build-a"}),
+                welcome_message(7),
+                serde_json::json!({"t":"welcome", "playerId":7, "buildId":crate::build_info::build_id()}),
             ),
             (
-                ServerMessage::Pong {
-                    ts: 42.0,
-                    build_id: "build-a".into(),
-                },
-                serde_json::json!({"t":"pong", "ts":42.0, "buildId":"build-a"}),
+                pong_message(42.0),
+                serde_json::json!({"t":"pong", "ts":42.0, "buildId":crate::build_info::build_id()}),
             ),
         ] {
             assert_eq!(serde_json::to_value(message).unwrap(), expected);
