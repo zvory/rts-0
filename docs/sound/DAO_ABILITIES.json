@@ -1,0 +1,152 @@
+{
+  "assets": [
+    {
+      "id": "combat_lightness_dash_01",
+      "selection": "Dash 1 \u2014 Silk gust",
+      "exact_prompt": "A single extremely quick wind dash by a light-footed martial artist. Dry close silk sleeve snap and sharp breath of rushing air, accelerating immediately then stopping cleanly. Light agile physical whoosh, no heavy impact. One compact event under half a second, no lead-in, no voice, music, ambience, electronic tones or long reverb.",
+      "provider": "ElevenLabs",
+      "endpoint": "https://api.elevenlabs.io/v1/sound-generation",
+      "method": "POST",
+      "model_id": "eleven_text_to_sound_v2",
+      "request_parameters": {
+        "duration_seconds": 0.55,
+        "prompt_influence": 0.65,
+        "output_format": "mp3_44100_128 (CLI default)",
+        "loop": "Provider default; flag not supplied"
+      },
+      "original_invocation": "npx -y @elevenlabs/cli@latest text-to-sound-effects convert --text <exact_prompt> --duration-seconds 0.55 --prompt-influence 0.65 --model-id eleven_text_to_sound_v2 --output <raw_file>",
+      "cli_version": "Not pinned or recorded at generation time",
+      "generated_at_utc": "Not recorded in original manifest",
+      "seed": "Unavailable",
+      "request_id": "Not exposed by CLI",
+      "raw_file": "docs/sound/sources/dao-abilities/combat_lightness_dash_01-raw.mp3",
+      "raw_sha256": "cea439c6358ea6ab553317bc8f6440e6649ebecdc0a313cc75886ee88d92f922",
+      "license": "ElevenLabs account terms; commercial rights unverified",
+      "file": "client/assets/sound/combat/combat_lightness_dash_01.mp3",
+      "production_sha256": "1cea46da261c65340c9467a53818a812a64c3fcc164b81e4c3842cc78d56af0e",
+      "processing": {
+        "script": "scripts/prepare-dao-ability-audio.py",
+        "invocation": "python3 scripts/prepare-dao-ability-audio.py",
+        "target_lufs": -16,
+        "gain_db": -4.38,
+        "maximum_premaster_true_peak_dbtp": -2,
+        "source_filter": null,
+        "final_filter": "volume=-4.380000dB,afade=t=in:d=0.004,afade=t=out:st=0.495000:d=0.025",
+        "output": "mono 44.1kHz MP3 128kbps",
+        "runtime_gain": 0.7,
+        "decoded": {
+          "lufs": -22.86,
+          "true_peak_dbtp": -2.33,
+          "max_50ms_rms_dbfs": -15.638570171856854,
+          "duration_seconds": 0.52
+        }
+      }
+    },
+    {
+      "id": "combat_magic_shield_01",
+      "selection": "Shield 3 \u2014 Resonant shell",
+      "exact_prompt": "One magical shield snapping into existence. Immediate rounded resonant bronze-bowl pressure bloom layered with soft air and fine glass shimmer, rising briefly then settling into silence. Solid reassuring defensive energy, low-mid weight, muted highs, no sharp metallic clang. Single compact activation, no musical phrase, voices, background, repeated pulses or long drone.",
+      "provider": "ElevenLabs",
+      "endpoint": "https://api.elevenlabs.io/v1/sound-generation",
+      "method": "POST",
+      "model_id": "eleven_text_to_sound_v2",
+      "request_parameters": {
+        "duration_seconds": 1.4,
+        "prompt_influence": 0.65,
+        "output_format": "mp3_44100_128 (CLI default)",
+        "loop": "Provider default; flag not supplied"
+      },
+      "original_invocation": "npx -y @elevenlabs/cli@latest text-to-sound-effects convert --text <exact_prompt> --duration-seconds 1.4 --prompt-influence 0.65 --model-id eleven_text_to_sound_v2 --output <raw_file>",
+      "cli_version": "Not pinned or recorded at generation time",
+      "generated_at_utc": "Not recorded in original manifest",
+      "seed": "Unavailable",
+      "request_id": "Not exposed by CLI",
+      "raw_file": "docs/sound/sources/dao-abilities/combat_magic_shield_01-raw.mp3",
+      "raw_sha256": "e67310085606b577bbfe8a493ff7fb46f3620fe17a68378f769791dcc034754e",
+      "license": "ElevenLabs account terms; commercial rights unverified",
+      "file": "client/assets/sound/combat/combat_magic_shield_01.mp3",
+      "production_sha256": "3fa9416de441bd0e9fc7e2f9988e844d97c57caa338dd9e848fdedb927eca86b",
+      "processing": {
+        "script": "scripts/prepare-dao-ability-audio.py",
+        "invocation": "python3 scripts/prepare-dao-ability-audio.py",
+        "target_lufs": -16,
+        "gain_db": 1.4300000000000002,
+        "maximum_premaster_true_peak_dbtp": -2,
+        "source_filter": null,
+        "final_filter": "volume=1.430000dB,afade=t=in:d=0.004,afade=t=out:st=1.335000:d=0.025",
+        "output": "mono 44.1kHz MP3 128kbps",
+        "runtime_gain": 0.7,
+        "decoded": {
+          "lufs": -21.8,
+          "true_peak_dbtp": -2.48,
+          "max_50ms_rms_dbfs": -14.086714496672844,
+          "duration_seconds": 1.36
+        }
+      }
+    },
+    {
+      "id": "combat_magic_anchor_01",
+      "selection": "1 \u00b7 Magical portal 1",
+      "exact_prompt": "An unmistakably magical vortex PORTAL: swirling arcane energy, shimmering ethereal overtones, deep otherworldly resonance and sparkling wisps spiraling into a hollow sucking center. A mysterious enchanted gateway bending space, layered magical texture with slowly evolving irregular surges. Eight continuous seconds, seamless active loop. No ordinary windstorm, vacuum cleaner, machinery, sci-fi engine, voices, music, regular beat or silence.",
+      "provider": "ElevenLabs",
+      "endpoint": "https://api.elevenlabs.io/v1/sound-generation",
+      "method": "POST",
+      "model_id": "eleven_text_to_sound_v3",
+      "request_parameters": {
+        "duration_seconds": 8,
+        "loop": true,
+        "prompt_influence": 0.65,
+        "output_format": "mp3_44100_128"
+      },
+      "original_invocation": [
+        "npx",
+        "-y",
+        "@elevenlabs/cli@1.13.0",
+        "text-to-sound-effects",
+        "convert",
+        "--text",
+        "An unmistakably magical vortex PORTAL: swirling arcane energy, shimmering ethereal overtones, deep otherworldly resonance and sparkling wisps spiraling into a hollow sucking center. A mysterious enchanted gateway bending space, layered magical texture with slowly evolving irregular surges. Eight continuous seconds, seamless active loop. No ordinary windstorm, vacuum cleaner, machinery, sci-fi engine, voices, music, regular beat or silence.",
+        "--duration-seconds",
+        "8",
+        "--loop",
+        "true",
+        "--prompt-influence",
+        "0.65",
+        "--model-id",
+        "eleven_text_to_sound_v3",
+        "--output-format",
+        "mp3_44100_128",
+        "--output",
+        "<raw_file>"
+      ],
+      "cli_version": "1.13.0",
+      "generated_at_utc": "2026-11-24T19:33:10.085061+00:00",
+      "seed": "Unavailable",
+      "request_id": "Not exposed by CLI",
+      "raw_file": "docs/sound/sources/dao-abilities/combat_magic_anchor_01-raw.mp3",
+      "raw_sha256": "8bfe09d003533c70c46dbb8fc850e9eefccd8e70cc8a3daa098a6db1966f220f",
+      "license": "ElevenLabs account terms; commercial rights unverified",
+      "file": "client/assets/sound/combat/combat_magic_anchor_01.mp3",
+      "production_sha256": "5697f7f944acf4716b3f8b2faea3c8ff36c17b7dd162a77dd1afa05d801d599a",
+      "processing": {
+        "script": "scripts/prepare-dao-ability-audio.py",
+        "invocation": "python3 scripts/prepare-dao-ability-audio.py",
+        "target_lufs": -20,
+        "gain_db": -4.178625705573051,
+        "maximum_premaster_true_peak_dbtp": -2,
+        "source_filter": "[0:a]aformat=sample_rates=44100:channel_layouts=mono,asplit=3[h][b][t];[h]atrim=0:0.8,asetpts=PTS-STARTPTS,afade=t=in:d=0.8:curve=qsin[head];[t]atrim=7.2:8,asetpts=PTS-STARTPTS,afade=t=out:d=0.8:curve=qsin[tail];[tail][head]amix=inputs=2:normalize=0[mix];[b]atrim=0.8:7.2,asetpts=PTS-STARTPTS[body];[body][mix]concat=n=2:v=0:a=1[out]",
+        "final_filter": "volume=-4.178626dB",
+        "output": "mono 44.1kHz MP3 128kbps",
+        "runtime_gain": 0.7,
+        "decoded": {
+          "lufs": -24.1,
+          "true_peak_dbtp": -9.41,
+          "max_50ms_rms_dbfs": -19.09281273820338,
+          "duration_seconds": 7.2
+        }
+      }
+    }
+  ],
+  "ffmpeg_version": "ffmpeg version 8.1.2 Copyright (c) 2000-2026 the FFmpeg developers",
+  "anchor_mix": "4 LUFS below cast mastering target, additionally at least 3 dB below both cast cues in loudest decoded 50ms RMS before shared runtime gain."
+}

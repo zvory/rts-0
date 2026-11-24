@@ -138,6 +138,7 @@ src/
   match.js        # Match lifecycle, module dependency wiring, render loop, transient events
   match_startup_inbox.js # semantic buffering while asynchronous Match construction completes
   match_combat_audio.js # Match-owned combat sound routing and machine-gunner sound cleanup
+  match_ability_audio.js # Visible Dao cast cues and authoritative Anchor sustain lifetime
   match_notice_presenter.js # Match-owned existing-notice fanout and under-attack incident admission
   match_room_time.js # authoritative room-time presentation clock and combat-audio synchronization
   match_command_issuer.js # gameplay command gate, budget, prediction, and issue metrics
@@ -1941,6 +1942,22 @@ immediately, including short casts and loss of visibility. Pause, replay seek, m
 teardown clear these voices. No random pitch variation changes the cue's duration. Processing and
 provenance are recorded in `docs/sound/THROW_SWORD.json`.
 
+Dao ability audio uses the selected Silk Gust dash, Resonant Shell shield placement, and magical
+portal candidate 1 for Anchor. `MatchCombatAudio` owns `MatchAbilityAudio`, which receives only
+recipient-filtered snapshot entities and ability objects. Dash plays on an observed decrease in
+`windDash.remainingUses`; it does not guess from input or position changes. Because charges are
+owner-only affordances, enemy dashes without that metadata remain silent. A newly visible Shield
+object plays one cast cue; the sound is not repeated on damage or subsequent snapshots. Each visible
+Anchor owns a spatial, pitch-stable loop. It stops immediately when the object disappears (including
+expiry, replacement, or lost visibility), and can resume after voice eviction. Pausing stops Anchor
+voices while retaining cast baselines; paused snapshots advance those baselines silently. Match end,
+replay seek, and teardown clear voices and baselines. The selected 8-second portal is circularly
+crossfaded into a 7.2-second sustain asset. Normalization preserves transient peaks; Anchor targets
+4 LUFS below cast mastering and its loudest 50 ms is at least 3 dB below both cast cues. All three
+share a 0.7 runtime gain and the ordinary spatial combat buses. Exact prompts, source hashes,
+generation settings, and measured production levels are in `docs/sound/DAO_ABILITIES.json`;
+`scripts/prepare-dao-ability-audio.py` reproduces the processing from retained raw inputs.
+
 `match_notice_presenter.js`
 ```js
 export class MatchNoticePresenter {
@@ -2813,7 +2830,7 @@ removed `GameState` intent shims such as `state.commandTarget`, `state.placement
 update methods; use injected `ClientIntent` or a renderer read model instead.
 
 Current areas:
-- `app-shell`: `main.js`, `app.js`, `match.js`, `match_startup_inbox.js`, `prediction_runtime_startup.js`, `match_combat_audio.js`,
+- `app-shell`: `main.js`, `app.js`, `match.js`, `match_startup_inbox.js`, `prediction_runtime_startup.js`, `match_combat_audio.js`, `match_ability_audio.js`,
   `match_notice_presenter.js`, `match_room_time.js`,
   `match_net_reporter.js`, `match_observer_diagnostics.js`, `match_settings_context.js`,
   `match_settings_toggles.js`, `match_auto_spectator.js`, `auto_spectator.js`,

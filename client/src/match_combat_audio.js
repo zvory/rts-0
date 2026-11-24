@@ -1,3 +1,4 @@
+import { MatchAbilityAudio } from "./match_ability_audio.js";
 import {
   attackFeedbackKind,
   attackKindHasCombatSound,
@@ -137,6 +138,11 @@ export class MatchCombatAudio {
     this.activeThrowSwordSoundKeys = new Map();
     this.pendingArtilleryLandingTimers = new Set();
     this.worldCombatBedPlaying = false;
+    this.abilityAudio = new MatchAbilityAudio({
+      audio,
+      categoryForOwner: owner => audioSelfOwner(this.state, owner, this.controlPolicy)
+        ? "combat_self" : "combat_other",
+    });
   }
 
   updateWorldCombatBed(position) {
@@ -318,6 +324,7 @@ export class MatchCombatAudio {
   }
 
   destroy() {
+    this.abilityAudio.destroy();
     this.updateThrowSwordSounds();
     this.audio?.stopByKey(WORLD_COMBAT_BED_KEY);
     this.worldCombatBedPlaying = false;

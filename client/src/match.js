@@ -403,6 +403,10 @@ export class Match {
         worldCombatBedAllowed(this.running, this.livePauseState, this.roomTimeControls?.roomTimeState)
           ? this.state.abilityObjects : [],
       );
+      this.combatAudio?.abilityAudio?.update(
+        this.state.abilityObjects, m.entities || [],
+        worldCombatBedAllowed(this.running, this.livePauseState, this.roomTimeControls?.roomTimeState),
+      );
       this.stopInactiveMachineGunSounds();
       this.autoSpectator?.observeSnapshot(m);
       this.handleSnapshotEvents(m.events || []);
@@ -841,6 +845,7 @@ export class Match {
     if (this.livePauseState.paused) {
       this.combatAudio?.updateWorldCombatBed(false);
       this.combatAudio?.updateThrowSwordSounds();
+      this.combatAudio?.abilityAudio?.stop();
     }
   }
 
@@ -1212,6 +1217,7 @@ export class Match {
     this.uncappedPerfBenchmark = null;
     this.running = false;
     this.combatAudio?.updateThrowSwordSounds();
+    this.combatAudio?.abilityAudio?.stop({ reset: true });
     this.closeMenus();
     if (this.rafId !== undefined) {
       cancelAnimationFrame(this.rafId);
@@ -1276,6 +1282,7 @@ export class Match {
     this.stopAllMachineGunSounds();
     this.combatAudio?.updateWorldCombatBed(false);
     this.combatAudio?.updateThrowSwordSounds();
+    this.combatAudio?.abilityAudio?.stop({ reset: true });
     this.state?.resetForReplaySeek?.();
     this.groundDecalSync?.reset({ resetPresentation: false });
     this.clientIntent?.clearPlannedOrders?.();

@@ -8,5 +8,6 @@ export function applyRoomTimeState(match, state) {
   if (state?.paused === true || (Number.isFinite(speed) && speed <= 0) || ended) {
     match.combatAudio?.updateWorldCombatBed(false);
     match.combatAudio?.updateThrowSwordSounds?.();
+    match.combatAudio?.abilityAudio?.stop();
   }
 }
