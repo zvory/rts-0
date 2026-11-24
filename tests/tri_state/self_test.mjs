@@ -105,6 +105,77 @@ assert.equal(snapshotTimeoutMs(), 10000);
   assert.match(summary, /intentional test failure/);
 }
 
+// Pause metadata and the final running snapshot travel through separate server slots.
+// Neither delivery order may expose a stale snapshot as the next step's baseline.
+for (const snapshotFirst of [true, false]) {
+  const originalWindow = globalThis.window;
+  const state = { _cur: { tick: 40 } };
+  let time = { speed: 1, paused: false, currentTick: 40 };
+  const controls = { get roomTimeState() { return time; } };
+  const lane = new ClientLane({
+    scenario: { network: {} }, room: "pause-barrier", artifacts: { client() {} },
+  });
+  globalThis.window = { __rts: { match: {
+    state, roomTimeControls: controls,
+    net: { setRoomTimeSpeed(speed) { assert.equal(speed, 0); } },
+  } } };
+  lane.page = {
+    evaluate: async (fn, arg) => fn(arg),
+    waitForFunction: async (fn, options, arg) => {
+      if (arg && typeof arg === "object") {
+        assert.equal(fn(arg), true, "step snapshot satisfies the settled baseline");
+        return;
+      }
+      assert.equal(fn(arg), false, "wait for the requested speed acknowledgement");
+      if (snapshotFirst) state._cur.tick = 41;
+      time = { speed: 0, paused: true, currentTick: 41 };
+      assert.equal(fn(arg), snapshotFirst,
+        "pause acknowledgement alone cannot settle a stale snapshot");
+      state._cur.tick = 41;
+      assert.equal(fn(arg), true, "both clocks must reach the acknowledged pause tick");
+    },
+  };
+  lane.summary = async () => ({ tick: state._cur.tick });
+  lane.stepRoomTime = async () => { state._cur.tick++; };
+  const context = { lanes: { client: lane }, tickMarks: [], artifacts: { diff() {} } };
+  try {
+    await lane.setRoomTimeSpeed(0);
+    await executeStep(context, { op: "stepRoomTime" });
+    await executeStep(context, { op: "assertTickAdvanced", delta: 1 });
+    assert.deepEqual(context.tickMarks, [{ before: 41, after: 42 }]);
+  } finally {
+    if (originalWindow === undefined) delete globalThis.window;
+    else globalThis.window = originalWindow;
+  }
+}
+
+// Starting a dev scenario must acknowledge resume before a subsequent pause can
+// accidentally observe the initial paused state.
+{
+  const originalWindow = globalThis.window;
+  let time = { speed: 0, paused: true, currentTick: 40 };
+  const lane = new ClientLane({
+    scenario: { network: {} }, room: "resume-barrier", artifacts: { client() {} },
+  });
+  globalThis.window = { __rts: { match: {
+    roomTimeControls: { get roomTimeState() { return time; } },
+    net: { setRoomTimeSpeed(speed) { assert.equal(speed, 1); } },
+  } } };
+  lane.page = {
+    evaluate: async (fn, arg) => fn(arg),
+    waitForFunction: async (fn, options, arg) => {
+      assert.equal(fn(arg), false, "old paused state does not acknowledge resume");
+      time = { speed: 1, paused: false, currentTick: 40 };
+      assert.equal(fn(arg), true);
+    },
+  };
+  try { await lane.setRoomTimeSpeed(1); }
+  finally {
+    if (originalWindow === undefined) delete globalThis.window;
+    else globalThis.window = originalWindow;
+  }
+}
+
 // A paused room emits exactly one new snapshot for a step. Exercise both sides
 // of the browser/CDP scheduling race without allowing a second snapshot.
 for (const { arrivedBeforeWait, roomTimeTick } of [true, false].flatMap((arrivedBeforeWait) =>
