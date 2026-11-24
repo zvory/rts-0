@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 11] = [
+pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 14] = [
     AbilityCatalogEntry {
         kind: AbilityKind::EvolveWind,
         label: "Dao of Wind",
@@ -124,7 +124,7 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 11] = [
     AbilityCatalogEntry {
         kind: AbilityKind::HealingPotion,
         label: "Healing Potion", icon: "HP", hotkey: Some("Q"),
-        title: "Deliver a healing potion to a friendly unit at any distance; fully heals on arrival",
+        title: "Defense item: Deliver a healing potion to a friendly unit at any distance; fully heals on arrival",
         carriers: &[EntityKind::Shop], target_mode: AbilityTargetMode::FriendlyUnit,
         range_tiles: None, min_range_tiles: None, cooldown_ticks: 0,
         charges: None, charge_recharge_ticks: None, cost: ResourceCost::new(0, 50),
@@ -135,9 +135,9 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 11] = [
     AbilityCatalogEntry {
         kind: AbilityKind::EscapeTreasure,
         label: "Escape Treasure", icon: "E", hotkey: Some("W"),
-        title: "Deliver a one-use treasure to a friendly unit within 30 tiles; lethal damage returns it to this Shop at 1 HP",
+        title: "Deliver a one-use treasure to a friendly unit within 30 tiles; lethal damage returns it to this Shop at 1 HP; 60-second purchase cooldown shared across all your Shops",
         carriers: &[EntityKind::Shop], target_mode: AbilityTargetMode::FriendlyUnit,
-        range_tiles: Some(30.0), min_range_tiles: None, cooldown_ticks: 0,
+        range_tiles: Some(30.0), min_range_tiles: None, cooldown_ticks: 1800,
         charges: None, charge_recharge_ticks: None, cost: ResourceCost::new(0, 100),
         tech_requirement: None, upgrade_requirement: None,
         queue_policy: AbilityQueuePolicy::NotQueueable, autocast: false,
@@ -147,12 +147,39 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 11] = [
     AbilityCatalogEntry {
         kind: AbilityKind::HealingSeal,
         label: "Healing Seal", icon: "+", hotkey: Some("E"),
-        title: "Place a 3-tile-wide healing circle within 30 tiles; friendly units recover 3 HP per second, up to 400 HP total",
+        title: "Defense item: Place a 3-tile-wide healing circle within 30 tiles; friendly units recover 3 HP per second, up to 400 HP total",
         carriers: &[EntityKind::Shop], target_mode: AbilityTargetMode::WorldPoint,
         range_tiles: Some(30.0), min_range_tiles: None, cooldown_ticks: 0,
         charges: None, charge_recharge_ticks: None, cost: ResourceCost::new(0, 150),
         tech_requirement: None, upgrade_requirement: None,
         queue_policy: AbilityQueuePolicy::NotQueueable, autocast: false,
         command_card: true, protocol_code: 22, order_stage_code: 30,
+    },
+    AbilityCatalogEntry {
+        kind: AbilityKind::Haste, label: "Haste", icon: "H", hotkey: Some("A"),
+        title: "Deliver an attack item within 30 tiles; activate for double primary weapon attack speed for 30 seconds", carriers: &[EntityKind::Shop], target_mode: AbilityTargetMode::FriendlyUnit,
+        range_tiles: Some(30.0), min_range_tiles: None, cooldown_ticks: 0,
+        charges: None, charge_recharge_ticks: None, cost: ResourceCost::new(0, 100),
+        tech_requirement: None, upgrade_requirement: None,
+        queue_policy: AbilityQueuePolicy::NotQueueable, autocast: false,
+        command_card: true, protocol_code: 23, order_stage_code: 31,
+    },
+    AbilityCatalogEntry {
+        kind: AbilityKind::DoubleDamage, label: "Double Damage", icon: "2X", hotkey: Some("S"),
+        title: "Deliver an attack item within 30 tiles; activate for double primary weapon damage for 30 seconds", carriers: &[EntityKind::Shop], target_mode: AbilityTargetMode::FriendlyUnit,
+        range_tiles: Some(30.0), min_range_tiles: None, cooldown_ticks: 0,
+        charges: None, charge_recharge_ticks: None, cost: ResourceCost::new(0, 150),
+        tech_requirement: None, upgrade_requirement: None,
+        queue_policy: AbilityQueuePolicy::NotQueueable, autocast: false,
+        command_card: true, protocol_code: 24, order_stage_code: 32,
+    },
+    AbilityCatalogEntry {
+        kind: AbilityKind::ArmorTreasure, label: "Armor Treasure", icon: "AR", hotkey: Some("D"),
+        title: "Deliver a defense item within 30 tiles; activate for 50% additional armor for 30 seconds", carriers: &[EntityKind::Shop], target_mode: AbilityTargetMode::FriendlyUnit,
+        range_tiles: Some(30.0), min_range_tiles: None, cooldown_ticks: 0,
+        charges: None, charge_recharge_ticks: None, cost: ResourceCost::new(0, 100),
+        tech_requirement: None, upgrade_requirement: None,
+        queue_policy: AbilityQueuePolicy::NotQueueable, autocast: false,
+        command_card: true, protocol_code: 25, order_stage_code: 33,
     },
 ];

@@ -16,7 +16,12 @@ use crate::protocol::Event;
 pub(in crate::game) fn is_shop_item(ability: AbilityKind) -> bool {
     matches!(
         ability,
-        AbilityKind::HealingPotion | AbilityKind::EscapeTreasure | AbilityKind::HealingSeal
+        AbilityKind::HealingPotion
+            | AbilityKind::EscapeTreasure
+            | AbilityKind::HealingSeal
+            | AbilityKind::Haste
+            | AbilityKind::DoubleDamage
+            | AbilityKind::ArmorTreasure
     )
 }
 
@@ -47,6 +52,17 @@ pub(super) fn purchase(
         activate_escape(map, entities, teams, player, shops);
         return;
     }
+    if is_buff_item(ability) && target_id.is_none() {
+        for id in shops {
+            if let Some(unit) = entities
+                .get_mut(*id)
+                .filter(|u| u.owner == player && u.hp > 0 && u.is_unit())
+            {
+                unit.activate_shop_item(ability);
+            }
+        }
+        return;
+    }
     let Some(target_id) = target_id else {
         return;
     };
@@ -70,6 +86,9 @@ pub(super) fn purchase(
     {
         return;
     }
+    if is_buff_item(ability) && (target.shop_item_category_occupied(ability) || runtime.projectiles().any(|p| {
+        same_item_category(p.ability, ability) && matches!(p.return_target, AbilityProjectileReturnTarget::Entity { id } if id == target_id)
+    })) { return; }
     let endpoint = (target.pos_x(), target.pos_y());
     let definition = ability::definition(ability);
     let range = definition
@@ -95,6 +114,11 @@ pub(super) fn purchase(
     };
     if !crate::rules::faction::catalog_for(&ps.faction_id)
         .is_some_and(|catalog| catalog.allows_ability(ability, EntityKind::Shop))
+    {
+        return;
+    }
+    if ability == AbilityKind::EscapeTreasure
+        && ps.ability_cooldowns.get(&ability).copied().unwrap_or(0) > 0
     {
         return;
     }
@@ -146,7 +170,23 @@ pub(super) fn purchase(
         .is_some()
     {
         ps.spend_cost(definition.cost);
+        if ability == AbilityKind::EscapeTreasure {
+            ps.ability_cooldowns
+                .insert(ability, definition.cooldown_ticks);
+        }
     }
+}
+
+pub(in crate::game) fn is_buff_item(ability: AbilityKind) -> bool {
+    matches!(
+        ability,
+        AbilityKind::Haste | AbilityKind::DoubleDamage | AbilityKind::ArmorTreasure
+    )
+}
+fn same_item_category(a: AbilityKind, b: AbilityKind) -> bool {
+    is_buff_item(a)
+        && is_buff_item(b)
+        && ((a == AbilityKind::ArmorTreasure) == (b == AbilityKind::ArmorTreasure))
 }
 
 /// Resolve before death attribution/removal so every damage source observes the same charge.

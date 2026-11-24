@@ -28,6 +28,7 @@ fn disciple_shield_armors_mortar_and_rocket_hits_and_drains_full_damage() {
                 let mut events = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
                 let mut firing_reveals = Vec::new();
                 let shell = MortarShell {
+                    double_damage: false,
                     owner: 1,
                     attacker: 0,
                     x: Coord::from_world(160.0),

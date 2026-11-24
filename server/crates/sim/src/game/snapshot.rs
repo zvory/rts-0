@@ -112,7 +112,7 @@ impl Game {
             let target = e
                 .target_id()
                 .and_then(|target| self.state.entities.get(target));
-            if let Some(view) = projection::project_entity(
+            if let Some(mut view) = projection::project_entity(
                 player,
                 e,
                 projection::EntityProjectionContext {
@@ -137,6 +137,23 @@ impl Game {
                     tick: self.state.tick,
                 },
             ) {
+                if e.kind == EntityKind::Shop && !view.abilities.is_empty() {
+                    let cooldown = self
+                        .player(e.owner)
+                        .and_then(|p| {
+                            p.ability_cooldowns
+                                .get(&ability::AbilityKind::EscapeTreasure)
+                        })
+                        .copied()
+                        .unwrap_or(0);
+                    if let Some(entry) = view
+                        .abilities
+                        .iter_mut()
+                        .find(|a| a.ability == "escapeTreasure")
+                    {
+                        entry.cooldown_left = cooldown;
+                    }
+                }
                 entities.push(view);
             }
         }

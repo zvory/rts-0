@@ -2292,3 +2292,5 @@ executor, while the death phase invokes its escape executor before death attribu
 Its standability and occupancy queries select legal rescue exits; it does not import command
 adapters or invoke another tick phase. Entity-owned protection and runtime projectiles use the
 existing checkpoint policies for entities and ability runtime.
+
+Carried Shop attack/defense items persist under entity `ability_uses_remaining`; active 30-second item durations use entity `ability_cooldowns`. Escape's global 60-second purchase timer uses existing durable player `ability_cooldowns`. These existing owners checkpoint and fingerprint the state without a new state-tree owner. See [categorized Shop items](shop.md#carried-attack-and-defense-goods).

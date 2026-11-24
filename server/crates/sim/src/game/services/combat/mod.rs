@@ -228,7 +228,7 @@ pub(in crate::game) fn combat_system(
             } else {
                 cd
             };
-            let cd = moving_attack_cooldown(e, cd);
+            let cd = moving_attack_cooldown(e, e.shop_item_reload(cd));
             let range_px = range_tiles * config::TILE_SIZE as f32 + e.radius() + RANGE_SLACK;
             let min_range_px = profile.min_range_tiles * config::TILE_SIZE as f32;
             let mode = combat_mode_with_moving_fire(e, can_move_fire);

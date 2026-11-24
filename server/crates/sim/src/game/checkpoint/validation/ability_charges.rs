@@ -3,7 +3,45 @@ use crate::game::entity::Entity;
 use super::CheckpointPayloadError;
 
 pub(super) fn validate(entity: &Entity) -> Result<(), CheckpointPayloadError> {
+    use crate::game::ability::AbilityKind::{ArmorTreasure, DoubleDamage, Haste};
+    for ability in [Haste, DoubleDamage, ArmorTreasure] {
+        let ticks = entity.ability_cooldowns.get(&ability).copied().unwrap_or(0);
+        if ticks > 900
+            || (ticks > 0
+                && (!entity.is_unit()
+                    || (ability == Haste && entity.shop_item_active(DoubleDamage))))
+        {
+            return Err(CheckpointPayloadError::InvalidValue {
+                field: "entities.abilityCooldowns",
+            });
+        }
+    }
     for (&ability, &remaining) in &entity.ability_uses_remaining {
+        if matches!(ability, Haste | DoubleDamage | ArmorTreasure) {
+            let conflicting = if ability == ArmorTreasure {
+                &[ArmorTreasure][..]
+            } else {
+                &[Haste, DoubleDamage][..]
+            };
+            if !entity.is_unit()
+                || remaining != 1
+                || conflicting.iter().any(|kind| {
+                    entity.shop_item_active(*kind)
+                        || (*kind != ability
+                            && entity
+                                .ability_uses_remaining
+                                .get(kind)
+                                .copied()
+                                .unwrap_or(0)
+                                > 0)
+                })
+            {
+                return Err(CheckpointPayloadError::InvalidValue {
+                    field: "entities.abilityUsesRemaining",
+                });
+            }
+            continue;
+        }
         let definition = crate::game::ability::definition(ability);
         if !definition.carriers.contains(&entity.kind)
             || entity

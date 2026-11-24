@@ -504,6 +504,31 @@ pub fn project_entity(
                 charge_recharge_left: entity.ability_charge_recharge_ticks(*kind),
             })
             .collect();
+        for kind in [
+            ability::AbilityKind::Haste,
+            ability::AbilityKind::DoubleDamage,
+            ability::AbilityKind::ArmorTreasure,
+        ] {
+            let remaining = entity
+                .ability_uses_remaining
+                .get(&kind)
+                .copied()
+                .unwrap_or(0);
+            let active = entity.ability_cooldowns.get(&kind).copied().unwrap_or(0);
+            if remaining > 0 || active > 0 {
+                view.abilities.push(AbilityCooldownView {
+                    ability: kind.to_protocol_str().into(),
+                    cooldown_left: active,
+                    remaining_uses: Some(remaining),
+                    autocast_enabled: None,
+                    active_object_id: None,
+                    available_tick: None,
+                    lockout_until_tick: None,
+                    expires_in: (active > 0).then_some(active),
+                    charge_recharge_left: None,
+                });
+            }
+        }
         if entity.escape_treasure.is_some() {
             view.abilities.push(AbilityCooldownView {
                 ability: "escapeTreasure".into(),

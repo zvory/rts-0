@@ -304,6 +304,9 @@ pub(super) fn effective_attack_profile(e: &Entity) -> EffectiveAttackProfile {
     if e.dao_master {
         profile.dmg = ((profile.dmg as f32) * config::DAO_MASTER_DAMAGE_MULTIPLIER).round() as u32;
     }
+    if e.shop_item_active(crate::game::ability::AbilityKind::DoubleDamage) {
+        profile.dmg = profile.dmg.saturating_mul(2);
+    }
     if e.kind != EntityKind::AntiTankGun {
         return profile;
     }
@@ -422,5 +425,28 @@ mod tank_plus_tests {
                 .abs()
                 < 0.0001
         );
+    }
+}
+
+#[cfg(test)]
+mod shop_item_tests {
+    use super::*;
+    use crate::game::ability::AbilityKind;
+
+    #[test]
+    fn attack_items_modify_primary_damage_and_final_reload_only_while_active() {
+        let mut warrior = Entity::new_unit(1, EntityKind::Warrior, 320.0, 320.0).unwrap();
+        let base = effective_attack_profile(&warrior);
+        warrior.receive_shop_item(AbilityKind::DoubleDamage);
+        assert_eq!(effective_attack_profile(&warrior).dmg, base.dmg);
+        warrior.activate_shop_item(AbilityKind::DoubleDamage);
+        assert_eq!(effective_attack_profile(&warrior).dmg, base.dmg * 2);
+        warrior.ability_cooldowns.clear();
+        warrior.receive_shop_item(AbilityKind::Haste);
+        warrior.activate_shop_item(AbilityKind::Haste);
+        assert_eq!(warrior.shop_item_reload(30), 15);
+        assert_eq!(warrior.shop_item_reload(1), 1);
+        warrior.ability_cooldowns.clear();
+        assert_eq!(warrior.shop_item_reload(30), 30);
     }
 }

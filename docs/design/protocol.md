@@ -2184,3 +2184,7 @@ are added; the compact vocabulary version is 69. The field is checkpointed with 
 entities; its healing pulse uses authoritative tick multiples of 10. Ordinary ownership
 and positional fog filtering apply, including observer views. It provides no vision and
 is excluded from enemy building memory. Depletion removes the entity without a death event.
+
+### Categorized carried Shop items
+
+Abilities `haste` (compact23, order-stage31), `doubleDamage` (24,32), and `armorTreasure` (25,33) use the existing `useAbility` command with a Shop and friendly `targetId` for purchase, or with owned unit ids and no target for activation. Private entity `abilities` entries expose `remainingUses:1` while carried; active consumed buffs expose `remainingUses:0`, `cooldownLeft` and `expiresIn` as remaining duration ticks. Empty/expired items omit the entry. Escape remains movement, Haste/Double Damage attack, Armor Treasure defense. Shop `escapeTreasure.cooldownLeft` projects the purchasing owner's shared cooldown across all their Shops. No new snapshot fields.

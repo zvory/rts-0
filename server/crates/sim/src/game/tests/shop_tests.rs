@@ -642,3 +642,159 @@ fn escape_autocast_can_be_disabled_and_reenabled_only_by_owner() {
         assert_eq!(game.state.entities.get(unit).is_some(), reenable);
     }
 }
+
+fn activate_item(game: &mut Game, unit: u32, ability: AbilityKind) {
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            ability,
+            units: vec![unit],
+            x: None,
+            y: None,
+            target_id: None,
+            queued: false,
+        },
+    );
+}
+
+#[test]
+fn item_categories_reserve_in_flight_and_activate_independently_after_checkpoint() {
+    let (mut game, shop, unit) = item_fixture();
+    buy(&mut game, shop, unit, AbilityKind::Haste);
+    buy(&mut game, shop, unit, AbilityKind::DoubleDamage);
+    buy(&mut game, shop, unit, AbilityKind::ArmorTreasure);
+    for _ in 0..32 {
+        game.tick();
+    }
+    assert_eq!(game.state.players[0].oil, 800);
+    let target = game.state.entities.get(unit).unwrap();
+    assert_eq!(
+        target.ability_uses_remaining.get(&AbilityKind::Haste),
+        Some(&1)
+    );
+    assert_eq!(
+        target
+            .ability_uses_remaining
+            .get(&AbilityKind::ArmorTreasure),
+        Some(&1)
+    );
+    assert!(!target
+        .ability_uses_remaining
+        .contains_key(&AbilityKind::DoubleDamage));
+    let enemy_view = game.snapshot_for(2);
+    assert!(enemy_view.entities.iter().all(|e| e.id != unit
+        || e.abilities
+            .iter()
+            .all(|a| a.ability != "haste" && a.ability != "armorTreasure")));
+    let mut game = Game::restore_checkpoint_payload_text_for_test(
+        &game.checkpoint_payload_text_for_test().unwrap(),
+        game.state.map.clone(),
+        game.state.map_metadata.clone(),
+    )
+    .unwrap();
+    activate_item(&mut game, unit, AbilityKind::Haste);
+    activate_item(&mut game, unit, AbilityKind::ArmorTreasure);
+    game.tick();
+    let target = game.state.entities.get_mut(unit).unwrap();
+    assert!(target.shop_item_active(AbilityKind::Haste));
+    assert!(target.shop_item_active(AbilityKind::ArmorTreasure));
+    let restored = Game::restore_checkpoint_payload_text_for_test(
+        &game.checkpoint_payload_text_for_test().unwrap(),
+        game.state.map.clone(),
+        game.state.map_metadata.clone(),
+    )
+    .unwrap();
+    assert!(restored
+        .state
+        .entities
+        .get(unit)
+        .unwrap()
+        .shop_item_active(AbilityKind::Haste));
+    assert!(restored
+        .state
+        .entities
+        .get(unit)
+        .unwrap()
+        .shop_item_active(AbilityKind::ArmorTreasure));
+    let target = game.state.entities.get_mut(unit).unwrap();
+    let hp = target.hp;
+    target.apply_damage(20, None);
+    assert_eq!(target.hp, hp - 10);
+    buy(&mut game, shop, unit, AbilityKind::DoubleDamage);
+    game.tick();
+    assert_eq!(game.state.players[0].oil, 800);
+    for _ in 0..900 {
+        game.tick();
+    }
+    assert!(!game
+        .state
+        .entities
+        .get(unit)
+        .unwrap()
+        .shop_item_active(AbilityKind::Haste));
+    buy(&mut game, shop, unit, AbilityKind::DoubleDamage);
+    for _ in 0..32 {
+        game.tick();
+    }
+    assert_eq!(game.state.players[0].oil, 650);
+    assert_eq!(
+        game.state
+            .entities
+            .get(unit)
+            .unwrap()
+            .ability_uses_remaining
+            .get(&AbilityKind::DoubleDamage),
+        Some(&1)
+    );
+}
+
+#[test]
+fn escape_purchase_cooldown_is_shared_by_old_and_new_shops_and_checkpointed() {
+    let (mut game, shop, unit) = item_fixture();
+    let second = game
+        .state
+        .entities
+        .spawn_building(1, EntityKind::Shop, 960.0, 320.0, true)
+        .unwrap();
+    let other = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Warrior, 680.0, 320.0)
+        .unwrap();
+    buy(&mut game, shop, unit, AbilityKind::EscapeTreasure);
+    buy(&mut game, second, other, AbilityKind::EscapeTreasure);
+    game.tick();
+    assert_eq!(game.state.players[0].oil, 900);
+    assert!(game.state.players[0].ability_cooldowns[&AbilityKind::EscapeTreasure] >= 1799);
+    let mut game = Game::restore_checkpoint_payload_text_for_test(
+        &game.checkpoint_payload_text_for_test().unwrap(),
+        game.state.map.clone(),
+        game.state.map_metadata.clone(),
+    )
+    .unwrap();
+    let third = game
+        .state
+        .entities
+        .spawn_building(1, EntityKind::Shop, 960.0, 640.0, true)
+        .unwrap();
+    buy(&mut game, third, other, AbilityKind::EscapeTreasure);
+    game.tick();
+    assert_eq!(game.state.players[0].oil, 900);
+    let view = game.snapshot_for(1);
+    for id in [shop, second, third] {
+        assert!(view
+            .entities
+            .iter()
+            .find(|e| e.id == id)
+            .unwrap()
+            .abilities
+            .iter()
+            .any(|a| a.ability == "escapeTreasure" && a.cooldown_left > 0));
+    }
+    for _ in 0..1800 {
+        game.tick();
+    }
+    buy(&mut game, third, other, AbilityKind::EscapeTreasure);
+    game.tick();
+    assert_eq!(game.state.players[0].oil, 800);
+}

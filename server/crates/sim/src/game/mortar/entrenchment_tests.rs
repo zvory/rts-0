@@ -46,6 +46,7 @@ fn mortar_falloff_damage_is_reduced_against_entrenched_infantry() {
     let mut events = HashMap::from([(1, Vec::new()), (2, Vec::new())]);
     let mut firing_reveals = Vec::new();
     let shell = MortarShell {
+        double_damage: false,
         owner: 1,
         attacker,
         x: rts_rules::math::Coord::from_world(160.0),

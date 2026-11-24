@@ -74,6 +74,14 @@ pub(in crate::game) fn try_fire_artillery(
         notice(events, player, protocol::notices::ARTILLERY_STEEL_SHORTAGE);
         return false;
     }
+    let initial_attack_cd = if entities
+        .get(unit)
+        .is_some_and(|e| e.shop_item_active(AbilityKind::Haste))
+    {
+        (initial_attack_cd / 2).max(1)
+    } else {
+        initial_attack_cd
+    };
     let (target_x, target_y) = {
         let Some(entity) = entities.get_mut(unit) else {
             player_state.refund_cost(ammo_cost);
@@ -102,6 +110,12 @@ pub(in crate::game) fn try_fire_artillery(
     });
     let source = reveal.as_ref().map_or((x, y), |r| (r.x, r.y));
     artillery_shells.schedule(player, unit, target_x, target_y, source, tick);
+    if entities
+        .get(unit)
+        .is_some_and(|e| e.shop_item_active(AbilityKind::DoubleDamage))
+    {
+        artillery_shells.empower_latest_primary();
+    }
     if let Some(reveal) = reveal.as_ref() {
         let facing = reveal.weapon_facing.or(reveal.facing).unwrap_or(0.0);
         let player_ids: Vec<u32> = events.keys().copied().collect();

@@ -254,6 +254,14 @@ fn apply_tank_he_splash(
     impact: (f32, f32),
     tick: u32,
 ) {
+    let splash_damage = if entities
+        .get(attacker)
+        .is_some_and(|e| e.shop_item_active(crate::game::ability::AbilityKind::DoubleDamage))
+    {
+        crate::config::TANK_HE_SPLASH_DAMAGE.saturating_mul(2)
+    } else {
+        crate::config::TANK_HE_SPLASH_DAMAGE
+    };
     let radius = crate::config::TANK_HE_RADIUS_TILES * crate::config::TILE_SIZE as f32;
     let mut victims: Vec<_> = entities
         .ids()
@@ -277,7 +285,7 @@ fn apply_tank_he_splash(
         let damage = combat_rules::effective_damage(
             crate::game::entity::EntityKind::MortarTeam,
             target.kind,
-            crate::config::TANK_HE_SPLASH_DAMAGE,
+            splash_damage,
             Some(TerrainKind::Open),
         );
         let damage = target.dao_damage_after_armor(damage, 0.0);
@@ -285,15 +293,7 @@ fn apply_tank_he_splash(
         let damage = map.damage_after_reduction_tile(target.pos_x(), target.pos_y(), damage);
         let victim_owner = target.owner;
         let pos = (target.pos_x(), target.pos_y());
-        let damage = entities.shielded_damage(
-            id,
-            owner,
-            damage,
-            crate::config::TANK_HE_SPLASH_DAMAGE,
-            0.0,
-            source,
-            teams,
-        );
+        let damage = entities.shielded_damage(id, owner, damage, splash_damage, 0.0, source, teams);
         let damaged = entities.get_mut(id).is_some_and(|target| {
             if teams.is_enemy_owner(owner, target.owner) {
                 target.apply_damage_from_entity(damage, owner, attacker, source, tick)

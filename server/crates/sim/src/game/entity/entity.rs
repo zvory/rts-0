@@ -962,6 +962,11 @@ impl Entity {
         {
             return false;
         }
+        let amount = if self.shop_item_active(AbilityKind::ArmorTreasure) {
+            amount / 2 + amount % 2
+        } else {
+            amount
+        };
         self.hp = self.hp.saturating_sub(amount);
         if let Some((owner, pos, tick)) = attribution {
             self.last_damage_owner = Some(owner);
