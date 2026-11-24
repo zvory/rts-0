@@ -112,6 +112,50 @@ fn healing_seal_purchase_cost_placement_and_checkpoint() {
 }
 
 #[test]
+fn healing_seals_do_not_block_building_sites_for_any_owner() {
+    use crate::game::services::standability::{
+        building_site_status_for_build_intent, BuildSiteStatus,
+    };
+
+    let (mut game, _, unit) = fixture();
+    game.state.entities.remove(unit);
+    for owner in [1, 2] {
+        game.state
+            .entities
+            .spawn_building(owner, EntityKind::HealingSeal, 656.0, 336.0, true)
+            .unwrap();
+    }
+    assert_eq!(
+        building_site_status_for_build_intent(
+            &game.state.map,
+            &game.state.entities,
+            EntityKind::Portal,
+            19,
+            9,
+            0,
+        ),
+        BuildSiteStatus::Clear,
+        "neither allied nor enemy ground magic reserves a construction footprint"
+    );
+    game.state
+        .entities
+        .spawn_building(2, EntityKind::Portal, 656.0, 336.0, true)
+        .unwrap();
+    assert_eq!(
+        building_site_status_for_build_intent(
+            &game.state.map,
+            &game.state.entities,
+            EntityKind::Portal,
+            19,
+            9,
+            0,
+        ),
+        BuildSiteStatus::BlockedByBuilding,
+        "ordinary structures still block construction"
+    );
+}
+
+#[test]
 fn healing_seal_invalid_purchases_spend_nothing() {
     for (x, y) in [
         (320.0, 320.0),

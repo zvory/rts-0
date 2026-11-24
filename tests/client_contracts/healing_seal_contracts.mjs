@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { ABILITIES } from "../../client/src/config.js";
 import { ABILITY, KIND } from "../../client/src/protocol.js";
 import { Input } from "../../client/src/input/index.js";
+import { footprintPlacementBlocker, createFootprintPlacementBlockerQuery } from "../../client/src/input/placement.js";
 import { ClientIntent } from "../../client/src/client_intent.js";
 import { HudSelectionPanel } from "../../client/src/hud_selection_panel.js";
 import { _drawBuilding } from "../../client/src/renderer/buildings.js";
@@ -29,6 +30,14 @@ assert.equal(ABILITIES[ABILITY.HEALING_SEAL].cost.oil, 150);
 
 // Ground magic remains selectable, but must not swallow movement or attack-move clicks.
 const seal = { id: 8, owner: 2, kind: KIND.HEALING_SEAL, x: 656, y: 336, hp: 400, maxHp: 400 };
+const placementMap = { width: 32, height: 32, tileSize: 32, terrain: new Array(32 * 32).fill(0) };
+const fields = [seal, { ...seal, id: 11, owner: 1 }];
+assert.equal(footprintPlacementBlocker(fields, null, 19, 9, 3, 3, placementMap), null,
+  "allied and enemy seals do not reserve building footprints");
+assert.equal(createFootprintPlacementBlockerQuery(fields, null, placementMap)(19, 9, 3, 3), null,
+  "indexed construction previews also ignore seals");
+assert.equal(footprintPlacementBlocker([...fields, { ...seal, id: 12, kind: KIND.PORTAL }],
+  null, 19, 9, 3, 3, placementMap), "structure", "ordinary structures still block placement");
 const warrior = { id: 9, owner: 1, kind: KIND.WARRIOR };
 const enemy = { ...warrior, id: 10, owner: 2, x: seal.x, y: seal.y };
 let hitEntities = [seal];

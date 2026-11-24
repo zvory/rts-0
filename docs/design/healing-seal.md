@@ -52,6 +52,7 @@ These defaults resolve details not specified by the user; implementation was exp
   invalid terrain. Units and other seals do not obstruct placement. Invalid placement,
   insufficient funds, stale Shop ids, and unauthorized purchases spend nothing.
 - The seal is walk-through ground magic. It does not block movement, projectiles, or sight;
+  existing seals do not reserve footprints against subsequent building construction.
   it is selectable but cannot be attacked, repaired, captured, upgraded, or reclaimed.
   It has no combat HP or armor; its green bar represents healing capacity only.
 - It has no weapon, resource storage, production, research, supply, or independent vision.
