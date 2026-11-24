@@ -110,9 +110,10 @@ fn dao_master_combat_threshold_and_damage_apply_to_all_three_paths() {
         let target = game
             .state
             .entities
-            .spawn_unit(2, EntityKind::Warrior, 425.0, 400.0)
+            .spawn_unit(2, EntityKind::WindAdept, 425.0, 400.0)
             .unwrap();
         let victim = game.state.entities.get_mut(target).unwrap();
+        let target_hp = victim.hp;
         victim.set_attack_cd(1000);
         let unit = game.state.entities.get_mut(id).unwrap();
         unit.insight = 60;
@@ -132,13 +133,13 @@ fn dao_master_combat_threshold_and_damage_apply_to_all_three_paths() {
         assert!(matches!(unit.order(), Order::Attack(_)));
         assert_eq!(
             game.state.entities.get(target).unwrap().hp,
-            115 - adept_damage
+            target_hp - adept_damage
         );
         game.state.entities.get_mut(id).unwrap().set_attack_cd(0);
         game.tick();
         assert_eq!(
             game.state.entities.get(target).unwrap().hp,
-            115 - adept_damage - master_damage
+            target_hp - adept_damage - master_damage
         );
         assert_eq!(game.state.entities.get(id).unwrap().insight, 0);
         assert_eq!(game.state.entities.get(id).unwrap().attack_cd(), cooldown);
@@ -210,7 +211,7 @@ fn disciple_insight_fraction_checkpoint_validation_and_evolution_reset() {
     let unit = game.state.entities.get_mut(id).unwrap();
     unit.gain_insight(1, EntityKind::Rifleman);
     assert!(unit.insight_fraction > 0);
-    unit.insight_fraction = 800; // Novice denominator is 4 * (100 steel * 2).
+    unit.insight_fraction = 400; // Novice denominator is 4 * (50 steel * 2).
     assert!(game.checkpoint_payload_text_for_test().is_err());
     let unit = game.state.entities.get_mut(id).unwrap();
     unit.insight_fraction = 1;

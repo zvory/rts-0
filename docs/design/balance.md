@@ -232,11 +232,12 @@ for 150 Steel in 300 ticks (10 seconds), using the existing extractor placement 
 `cultivators.standard` loadout matches Kriegsia's starting economy and replaces the starting Riflemen with one completed Disciple.
 Cultivator Serfs can also construct the faction-specific Portal for 150 Steel: it has a 3x3
 footprint, 123 HP, one tile of sight, a five-second construction time, no prerequisite, and no
-research. A completed Portal trains the Cultivator Disciple for 100 Steel and 2 Supply in 300 ticks.
-The Disciple is a 115-HP, 13.5-pixel-radius ground melee unit moving at 2.0 pixels per tick.
+research. A completed Portal trains the Cultivator Novice for 50 Steel and 2 Supply in 300 ticks.
+The Novice is a 58-HP, 26-pixel-radius ground melee unit moving at 2.0 pixels per tick.
 Wind independently uses 1.15 times Scout Car speed (2.7025 pixels per tick). War and Magic
-use 1.05 times base Disciple speed (2.1 pixels per tick). War gains 20 maximum HP (135 total);
-Wind and Magic retain 115 maximum HP. Its
+use 1.05 times base Disciple speed (2.1 pixels per tick). War has 176 maximum HP;
+Wind and Magic have 150 maximum HP. Novice cost is halved from 100 steel, and HP is
+scaled from 115 to 57.5, rounded to 58; Adept and Master stats are unchanged. Its
 23-damage sword has 0.75-tile reach, a 91-tick cooldown, and 50% armor penetration.
 Disciples have a separate five-tile engagement range for Idle and Attack Move: they approach
 visible legal enemies to sword reach, then resume their original Attack Move destination when
@@ -734,7 +735,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 |-----------------|-----|-----|-------|----|-------|-------|-----|-----|-----|-----------|
 | worker          | 40  | 4   | 1     | 48 | 2.0   | 10    | 50  | 0   | 1   | 150 (5s) |
 | golem           | 160 | 16  | 1     | 48 | 2.0   | 10    | 0   | 0   | 4   | 396 (~13.2s); provisional free Ekat worker-like economy body trained at Zamok; mines at 4x worker load; can be consumed by Ekat for full heal |
-| warrior         | 115 | 23  | 0.75   | 64 | 2.0   | 11    | 100 | 0   | 2   | 300 (~10s); Cultivator Portal-trained melee bruiser; 50% armor penetration; no projectile or tracer |
+| warrior         | 58  | 23  | 0.75   | 91 | 2.0   | 11    | 50  | 0   | 2   | 300 (~10s); Cultivator Portal-trained melee bruiser; 50% armor penetration; no projectile or tracer |
 | rifleman        | 45  | 5   | 5     | 32 | 1.6   | 11    | 35  | 0   | 1   | 300 (~10s) |
 | panzerfaust     | 45  | 5 rifle / 100 launcher | 5 | 32 rifle / one lifetime launcher | 1.6 | 11 | 55 | 10 | 1 | 300 (~10s); requires completed Panzerfausts research |
 | machine_gunner  | 55  | 4   | 6.1   | 12  | 1.28  | 11    | 75  | 10  | 2   | 400 (~13s) |
@@ -906,7 +907,7 @@ At 200 insight, each living Adept automatically becomes its matching Master and 
 heals. Relative to that path’s Adept, size/collision ×1.2, movement ×1.1, ordinary
 attack damage ×1.2 (nearest integer), maximum HP ×1.4. No resource or supply cost,
 research or attack-rate change; War Masters halve Throw Sword cooldown to 20 seconds and Wind Masters gain a second Dash charge; no repeat advancement. Adept maximum HP is 150 (Wind/Magic) or 176 (War), a 30% increase rounded to
-whole HP; Novices remain at 115 HP. Master HP follows the existing ×1.4 advancement
+whole HP; Novices have 58 HP. Master HP follows the existing ×1.4 advancement
 multiplier after Adept rounding: 210 (Wind/Magic) or 246 (War). See [Master rules and review](dao-masters.md).
 
 ### Shop goods

@@ -15,7 +15,7 @@ fn cultivator_player() -> PlayerInit {
 #[test]
 fn cultivator_portal_trains_warrior_and_reserves_two_supply() {
     let mut game = empty_flat_game(&[cultivator_player()]);
-    game.state.players[0].set_resources(100, 0);
+    game.state.players[0].set_resources(50, 0);
     let position = game.state.map.tile_center(12, 12);
     let portal = game
         .state
@@ -55,7 +55,7 @@ fn cultivator_portal_trains_warrior_and_reserves_two_supply() {
         .iter()
         .find(|entity| entity.owner == 1 && entity.kind == EntityKind::Warrior)
         .expect("Portal should produce a Warrior");
-    assert_eq!((warrior.hp, warrior.max_hp), (115, 115));
+    assert_eq!((warrior.hp, warrior.max_hp), (58, 58));
     assert_eq!(warrior.radius(), 26.0);
     assert_eq!(warrior.movement_speed(), 2.0);
 }

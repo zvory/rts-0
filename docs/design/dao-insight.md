@@ -9,7 +9,7 @@ entity-owned intent is independent of orders: moving, attacking, Stop, and queue
 do not cancel it. No automatic research purchase, Portal default, or army-wide promotion
 is added. Evolution is immediate and free once the unit has 60 insight, capped at 60; misses, friendly fire, invulnerability and overkill grant
 no extra insight. Actual hostile unit HP loss grants cost-weighted insight as specified below; building HP loss grants a fixed quarter rate. Ordinary attacks and eligible ability projectiles share this rule; Throw Sword grants no insight. Advancement clears all existing insight. Successful advancement fully restores HP to the evolved unit’s maximum,
-after applying any path-specific maximum-HP bonus. Novices have 115 maximum HP; Wind and Magic Adepts have 150; War Adepts have 176. Base moves at 2.0 px/tick; War and Magic move at 2.1 px/tick. Choosing a pending path or repeating
+after applying any path-specific maximum-HP bonus. Novices have 58 maximum HP; Wind and Magic Adepts have 150; War Adepts have 176. Base moves at 2.0 px/tick; War and Magic move at 2.1 px/tick. Choosing a pending path or repeating
 an evolution request does not heal; dead units cannot advance. One chosen-path evolution per unit, followed by one automatic Master advancement. Player research persists after Pavilion loss.
 The choice clears on evolution; evolved units cannot change paths. Pending choices persist
 through checkpoints and are visible only to teammates and privileged observers. The command

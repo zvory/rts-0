@@ -103,13 +103,13 @@ const FACTORY_REQUIRED: &[EntityKind] = &[EntityKind::ResourceDepot, EntityKind:
 const NOVICE_DEF: UnitDef = UnitDef {
     kind: EntityKind::Warrior,
     stats: balance::UnitStats {
-        hp: 115,
+        hp: 58,
         dmg: 23,
         range_tiles: 0.75,
         cooldown: balance::DISCIPLE_ATTACK_COOLDOWN_TICKS,
         speed: 2.0,
         sight_tiles: 11,
-        cost_steel: 100,
+        cost_steel: 50,
         cost_oil: 0,
         supply: 2,
         build_ticks: 300,
@@ -184,6 +184,7 @@ pub const UNITS: &[UnitDef] = &[
         train_requirement: TechRequirement::All(&[]),
     },
     NOVICE_DEF,
+    // Adept HP and production costs are independent of the cheaper base Novice.
     UnitDef {
         kind: EntityKind::WindAdept,
         stats: balance::UnitStats {
@@ -191,7 +192,7 @@ pub const UNITS: &[UnitDef] = &[
             cooldown: (NOVICE_DEF.stats.cooldown as f32 / balance::DAO_WIND_ATTACK_RATE + 0.5)
                 as u32,
             speed: SCOUT_CAR_DEF.stats.speed * balance::DAO_WIND_SPEED_MULTIPLIER,
-            cost_steel: NOVICE_DEF.stats.cost_steel * 3 / 2,
+            cost_steel: 150,
             cost_oil: 35,
             supply: 3,
             ..NOVICE_DEF.stats
@@ -206,7 +207,7 @@ pub const UNITS: &[UnitDef] = &[
             range_tiles: balance::DAO_WAR_RANGE_TILES,
             speed: NOVICE_DEF.stats.speed * balance::DAO_WAR_SPEED_MULTIPLIER,
             radius: NOVICE_DEF.stats.radius * balance::DAO_WAR_BODY_SCALE,
-            cost_steel: NOVICE_DEF.stats.cost_steel * 3 / 2,
+            cost_steel: 150,
             cost_oil: 35,
             supply: 3,
             ..NOVICE_DEF.stats
@@ -219,7 +220,7 @@ pub const UNITS: &[UnitDef] = &[
             hp: balance::DAO_ADEPT_HP,
             range_tiles: balance::DAO_RANGED_RANGE_TILES,
             speed: NOVICE_DEF.stats.speed * balance::DAO_MAGIC_SPEED_MULTIPLIER,
-            cost_steel: NOVICE_DEF.stats.cost_steel * 3 / 2,
+            cost_steel: 150,
             cost_oil: 35,
             supply: 3,
             ..NOVICE_DEF.stats
