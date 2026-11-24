@@ -78,7 +78,7 @@ pub const DAO_MAGIC_SPEED_MULTIPLIER: f32 = 1.05;
 
 pub const DISCIPLE_SHIELD_ARMOR_REDUCTION: f32 = 0.75;
 pub const DISCIPLE_SHIELD_CAPACITY: u32 = 150;
-pub const MAGIC_SHIELD_INSIGHT: u32 = 60;
+pub const MAGIC_SHIELD_INSIGHT: u32 = 90;
 pub const MAGIC_ANCHOR_DEATH_INSIGHT: u32 = 20;
 pub const DISCIPLE_SHIELD_RADIUS_TILES: f32 = 2.1;
 pub const DISCIPLE_SHIELD_DURATION_TICKS: u32 = TICK_HZ * 5;
@@ -109,7 +109,7 @@ pub fn disciple_insight_ratio(
     let denominator = own * 4;
     let numerator = if super::building_stats(target).is_some() {
         if attacker == crate::EntityKind::WindAdept && target.is_resource_extractor() {
-            denominator * 9 / 10
+            denominator
         } else {
             own
         }
