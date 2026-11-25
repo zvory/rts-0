@@ -349,7 +349,7 @@ export const ABILITIES = Object.freeze({
   }),
   [ABILITY.ARMOR_TREASURE]: Object.freeze({
     ability: ABILITY.ARMOR_TREASURE, label: "Armor Treasure", icon: "AR", hotkey: "D",
-    title: "Deliver a defense item within 30 tiles; activate for 50% additional armor for 30 seconds",
+    title: "Deliver a permanent passive defense item within 30 tiles; grants 50% additional armor on arrival",
     carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: 30,
     cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 100 }),
     queued: false, queuePolicy: "notQueueable",
@@ -357,7 +357,7 @@ export const ABILITIES = Object.freeze({
 
   [ABILITY.VITALITY_TREASURE]: Object.freeze({
     ability: ABILITY.VITALITY_TREASURE, label: "Vitality Treasure", icon: "+HP", hotkey: "F",
-    title: "Deliver a defense item within 30 tiles; activate for +150 maximum and current HP for 30 seconds",
+    title: "Deliver a permanent passive defense item within 30 tiles; grants +150 maximum and current HP on arrival",
     carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: 30,
     cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 100 }),
     queued: false, queuePolicy: "notQueueable",

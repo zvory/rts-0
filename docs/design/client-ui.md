@@ -2969,12 +2969,15 @@ Cultivator unit command cards reserve the fourth column for movement at R (logic
 defense at F (10), and attack at V (11), including Serfs. Allied deliveries expose the same
 carried-item commands on other factions’ units. Empty categories stay blank.
 Escape is movement; Armor Treasure and Vitality Treasure share defense; Haste and Double Damage share attack.
-Ready items activate immediately, consume once, and show an active highlight and a 30-second
-remaining-duration clock. Mixed attack selections expose a ready type before an already active
-type in either category. Vitality temporarily adds 150 to maximum and current HP; expiry
-restores maximum HP and clamps current HP to that maximum. Healing Potion and Healing Seal are immediate Shop defense goods.
-Colored placeholder badges show AR (cyan), +HP (magenta), H (yellow), or 2X (orange); an asterisk marks an
-active buff. Badges use authorized projected ability state and never appear on Shops. Escape Treasure shows Escape
+Attack items activate immediately, consume once, and show an active highlight and a 30-second
+remaining-duration clock. Mixed attack selections expose a ready type before an already active type.
+Armor and Vitality apply permanently on delivery, keep the defense slot occupied, and appear as
+passive disabled tiles without activation, hotkeys, or clocks. Vitality adds 150 to maximum and
+current HP on arrival; its maximum-HP bonus persists through Dao promotion.
+Healing Potion and Healing Seal are immediate Shop defense goods.
+Colored placeholder badges show AR (cyan), +HP (magenta), H (yellow), or 2X (orange).
+Defense badges remain fully visible; an asterisk marks an activated attack buff.
+Badges use authorized projected ability state and never appear on Shops. Escape Treasure shows Escape
 with a purple autocast border by default; R activates immediately, and right-click/Alt+R toggles
 lethal-damage autocast. The carried-item command has its own hotkey identity,
 `cultivators.item.escape`, separate from the Shop purchase. The unit badge is centered and twice
