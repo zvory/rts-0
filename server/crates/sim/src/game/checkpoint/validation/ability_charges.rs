@@ -10,8 +10,7 @@ pub(super) fn validate(entity: &Entity) -> Result<(), CheckpointPayloadError> {
             || (ticks > 0
                 && (!entity.is_unit()
                     || (ability == Haste && entity.shop_item_active(DoubleDamage))
-                    || (ability == VitalityTreasure
-                        && (entity.max_hp <= 150 || entity.shop_item_active(ArmorTreasure)))))
+                    || matches!(ability, ArmorTreasure | VitalityTreasure)))
         {
             return Err(CheckpointPayloadError::InvalidValue {
                 field: "entities.abilityCooldowns",
@@ -30,15 +29,20 @@ pub(super) fn validate(entity: &Entity) -> Result<(), CheckpointPayloadError> {
             };
             if !entity.is_unit()
                 || remaining != 1
+                || (ability == VitalityTreasure && entity.max_hp <= 150)
                 || conflicting.iter().any(|kind| {
-                    entity.shop_item_active(*kind)
-                        || (*kind != ability
-                            && entity
+                    if *kind == ability {
+                        !matches!(ability, ArmorTreasure | VitalityTreasure)
+                            && entity.shop_item_active(*kind)
+                    } else {
+                        entity.shop_item_active(*kind)
+                            || entity
                                 .ability_uses_remaining
                                 .get(kind)
                                 .copied()
                                 .unwrap_or(0)
-                                > 0)
+                                > 0
+                    }
                 })
             {
                 return Err(CheckpointPayloadError::InvalidValue {

@@ -13,7 +13,16 @@ impl Entity {
         &self,
         ability: crate::game::ability::AbilityKind,
     ) -> bool {
-        self.ability_cooldowns.get(&ability).copied().unwrap_or(0) > 0
+        use crate::game::ability::AbilityKind::{ArmorTreasure, VitalityTreasure};
+        if matches!(ability, ArmorTreasure | VitalityTreasure) {
+            self.ability_uses_remaining
+                .get(&ability)
+                .copied()
+                .unwrap_or(0)
+                > 0
+        } else {
+            self.ability_cooldowns.get(&ability).copied().unwrap_or(0) > 0
+        }
     }
     pub(in crate::game) fn shop_item_category_occupied(
         &self,
@@ -35,28 +44,31 @@ impl Entity {
         &mut self,
         ability: crate::game::ability::AbilityKind,
     ) {
-        if !self.shop_item_category_occupied(ability) {
-            self.ability_uses_remaining.insert(ability, 1);
+        if self.shop_item_category_occupied(ability) {
+            return;
         }
+        if ability == crate::game::ability::AbilityKind::VitalityTreasure {
+            let Some(max_hp) = self.max_hp.checked_add(150) else {
+                return;
+            };
+            self.max_hp = max_hp;
+            self.hp = self.hp.saturating_add(150).min(max_hp);
+        }
+        self.ability_uses_remaining.insert(ability, 1);
     }
     pub(in crate::game) fn activate_shop_item(
         &mut self,
         ability: crate::game::ability::AbilityKind,
     ) {
-        if self
-            .ability_uses_remaining
-            .get(&ability)
-            .copied()
-            .unwrap_or(0)
-            == 1
+        use crate::game::ability::AbilityKind::{DoubleDamage, Haste};
+        if matches!(ability, Haste | DoubleDamage)
+            && self
+                .ability_uses_remaining
+                .get(&ability)
+                .copied()
+                .unwrap_or(0)
+                == 1
         {
-            if ability == crate::game::ability::AbilityKind::VitalityTreasure {
-                let Some(max_hp) = self.max_hp.checked_add(150) else {
-                    return;
-                };
-                self.max_hp = max_hp;
-                self.hp = self.hp.saturating_add(150).min(max_hp);
-            }
             self.ability_uses_remaining.remove(&ability);
             self.ability_cooldowns.insert(ability, 900);
         }
@@ -67,17 +79,6 @@ impl Entity {
             150
         } else {
             0
-        }
-    }
-
-    pub(in crate::game) fn expire_shop_vitality(&mut self) {
-        if self
-            .ability_cooldowns
-            .get(&crate::game::ability::AbilityKind::VitalityTreasure)
-            == Some(&1)
-        {
-            self.max_hp = self.max_hp.saturating_sub(150).max(1);
-            self.hp = self.hp.min(self.max_hp);
         }
     }
 

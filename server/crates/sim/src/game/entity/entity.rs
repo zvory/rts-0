@@ -733,7 +733,6 @@ impl Entity {
     }
 
     pub fn tick_ability_cooldowns(&mut self) {
-        self.expire_shop_vitality();
         self.dao_advance_ticks = self.dao_advance_ticks.saturating_sub(1);
         self.ability_cooldowns.retain(|_, ticks| {
             *ticks = ticks.saturating_sub(1);

@@ -90,6 +90,9 @@ pub(super) fn purchase(
     if is_buff_item(ability) && (target.shop_item_category_occupied(ability) || runtime.projectiles().any(|p| {
         same_item_category(p.ability, ability) && matches!(p.return_target, AbilityProjectileReturnTarget::Entity { id } if id == target_id)
     })) { return; }
+    if ability == AbilityKind::VitalityTreasure && target.max_hp.checked_add(150).is_none() {
+        return;
+    }
     let endpoint = (target.pos_x(), target.pos_y());
     let definition = ability::definition(ability);
     let range = definition

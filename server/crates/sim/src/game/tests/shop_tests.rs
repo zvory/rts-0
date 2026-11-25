@@ -800,7 +800,7 @@ fn escape_purchase_cooldown_is_shared_by_old_and_new_shops_and_checkpointed() {
 }
 
 #[test]
-fn vitality_treasure_boosts_both_health_values_and_restores_wounded_health_after_expiry() {
+fn vitality_treasure_is_passive_on_delivery_and_permanent_after_checkpoint() {
     let (mut game, shop, unit) = item_fixture();
     let target = game.state.entities.get_mut(unit).unwrap();
     let base = target.max_hp;
@@ -815,7 +815,7 @@ fn vitality_treasure_boosts_both_health_values_and_restores_wounded_health_after
         "in-flight defense reservation prevents a second purchase"
     );
     let target = game.state.entities.get(unit).unwrap();
-    assert_eq!((target.hp, target.max_hp), (base - 20, base));
+    assert_eq!((target.hp, target.max_hp), (base + 130, base + 150));
     activate_item(&mut game, unit, AbilityKind::VitalityTreasure);
     game.tick();
     let target = game.state.entities.get_mut(unit).unwrap();
@@ -837,16 +837,26 @@ fn vitality_treasure_boosts_both_health_values_and_restores_wounded_health_after
         game.tick();
     }
     let target = game.state.entities.get(unit).unwrap();
-    assert_eq!((target.hp, target.max_hp), (wounded, base));
+    assert_eq!((target.hp, target.max_hp), (wounded, base + 150));
+    buy(&mut game, shop, unit, AbilityKind::VitalityTreasure);
     buy(&mut game, shop, unit, AbilityKind::ArmorTreasure);
     for _ in 0..32 {
         game.tick();
     }
-    assert_eq!(game.state.players[0].oil, 800);
+    assert_eq!(game.state.players[0].oil, 900);
+    let target = game.state.entities.get(unit).unwrap();
+    assert_eq!((target.hp, target.max_hp), (wounded, base + 150));
+    game.state
+        .entities
+        .get_mut(shop)
+        .unwrap()
+        .apply_damage(u32::MAX, None);
+    game.tick();
+    assert_eq!(game.state.entities.get(unit).unwrap().max_hp, base + 150);
 }
 
 #[test]
-fn vitality_treasure_keeps_a_flat_bonus_through_dao_advancement_and_clamps_on_expiry() {
+fn vitality_treasure_keeps_a_permanent_flat_bonus_through_dao_advancement() {
     let mut unit =
         crate::game::entity::Entity::new_unit(1, EntityKind::Warrior, 320.0, 320.0).unwrap();
     unit.receive_shop_item(AbilityKind::VitalityTreasure);
@@ -864,5 +874,52 @@ fn vitality_treasure_keeps_a_flat_bonus_through_dao_advancement_and_clamps_on_ex
     for _ in 0..900 {
         unit.tick_ability_cooldowns();
     }
-    assert_eq!((unit.hp, unit.max_hp), (master, master));
+    assert_eq!((unit.hp, unit.max_hp), (master + 150, master + 150));
+}
+
+#[test]
+fn armor_treasure_applies_on_delivery_without_activation_or_expiry() {
+    let (mut game, shop, unit) = item_fixture();
+    buy(&mut game, shop, unit, AbilityKind::ArmorTreasure);
+    for _ in 0..32 {
+        game.tick();
+    }
+    let target = game.state.entities.get_mut(unit).unwrap();
+    let hp = target.hp;
+    target.apply_damage(20, None);
+    assert_eq!(target.hp, hp - 10);
+    activate_item(&mut game, unit, AbilityKind::ArmorTreasure);
+    game.tick();
+    game.state
+        .entities
+        .get_mut(shop)
+        .unwrap()
+        .apply_damage(u32::MAX, None);
+    for _ in 0..1800 {
+        game.tick();
+    }
+    let target = game.state.entities.get_mut(unit).unwrap();
+    assert_eq!(
+        target
+            .ability_uses_remaining
+            .get(&AbilityKind::ArmorTreasure),
+        Some(&1)
+    );
+    assert!(!target
+        .ability_cooldowns
+        .contains_key(&AbilityKind::ArmorTreasure));
+    target.apply_damage(20, None);
+    assert_eq!(target.hp, hp - 20);
+    let restored = Game::restore_checkpoint_payload_text_for_test(
+        &game.checkpoint_payload_text_for_test().unwrap(),
+        game.state.map.clone(),
+        game.state.map_metadata.clone(),
+    )
+    .unwrap();
+    assert!(restored
+        .state
+        .entities
+        .get(unit)
+        .unwrap()
+        .shop_item_active(AbilityKind::ArmorTreasure));
 }
