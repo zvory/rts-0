@@ -1050,10 +1050,10 @@ for (const researched of [false, true]) {
     resources: { steel: 1000, oil: 1000 },
   });
   const items = idle.slots.filter(Boolean);
-  assert.equal(items.length, 6);
-  assert.deepEqual(items.map((item) => item.ability), [ABILITY.HEALING_POTION, ABILITY.ESCAPE_TREASURE, ABILITY.HEALING_SEAL, ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE, ABILITY.ARMOR_TREASURE]);
-  assert.deepEqual(items.map((item) => item.intent.targetMode), ["friendlyUnit", "friendlyUnit", "worldPoint", "friendlyUnit", "friendlyUnit", "friendlyUnit"]);
-  assert.deepEqual(items.map((item) => item.cost.oil), [50, 100, 150, 100, 150, 100]);
+  assert.equal(items.length, 7);
+  assert.deepEqual(items.map((item) => item.ability), [ABILITY.HEALING_POTION, ABILITY.ESCAPE_TREASURE, ABILITY.HEALING_SEAL, ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE, ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE]);
+  assert.deepEqual(items.map((item) => item.intent.targetMode), ["friendlyUnit", "friendlyUnit", "worldPoint", "friendlyUnit", "friendlyUnit", "friendlyUnit", "friendlyUnit"]);
+  assert.deepEqual(items.map((item) => item.cost.oil), [50, 100, 150, 100, 150, 100, 100]);
   const seal = items.find((item) => item.ability === ABILITY.HEALING_SEAL);
   assert.equal(seal.hotkey, "E");
   assert.equal(seal.commandId, "cultivators.ability.healingSeal");
@@ -1108,7 +1108,7 @@ for (const context of buildCommandCardContextCatalog()) {
       continue;
     }
     if (slot.slotIndex === 10) {
-      assert.equal(slot.ability, ABILITY.ARMOR_TREASURE);
+      assert([ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE].includes(slot.ability));
       assert.equal(slot.hotkey, "F");
       continue;
     }
@@ -1203,4 +1203,31 @@ for (const factionId of ["kriegsia", "ekat"]) {
   assert.equal(card.slots[9].commandId, "cultivators.item.escape");
   assert.equal(card.slots[11].commandId, "cultivators.item.haste");
   assert.deepEqual(card.slots[11].intent.readyIds, [1]);
+}
+
+// Vitality is a Shop F purchase and shares the carried F defense slot with Armor.
+{
+  const build = (selection) => buildCommandCardDescriptors({ playerId: 1, factionId: "cultivators",
+    selection, resources: { steel: 0, oil: 100 }, groupCooldownClocks: () => [] });
+  const shop = build([{ id: 1, owner: 1, kind: KIND.SHOP }]);
+  assert.equal(shop.slots[10].ability, ABILITY.VITALITY_TREASURE);
+  assert.equal(shop.slots[10].hotkey, "F");
+  assert.equal(shop.slots[10].cost.oil, 100);
+  assert.equal(shop.slots[10].intent.targetMode, "friendlyUnit");
+  const units = [
+    { id: 2, owner: 1, kind: KIND.WARRIOR, abilities: [
+      { ability: ABILITY.ARMOR_TREASURE, remainingUses: 0, cooldownLeft: 450 }] },
+    { id: 3, owner: 1, kind: KIND.WARRIOR, abilities: [
+      { ability: ABILITY.VITALITY_TREASURE, remainingUses: 1, cooldownLeft: 0 }] },
+  ];
+  const ready = build(units);
+  assert.equal(ready.slots[10].ability, ABILITY.VITALITY_TREASURE);
+  assert.equal(ready.slots[10].commandId, "cultivators.item.vitalityTreasure");
+  assert.equal(ready.slots[10].hotkey, "F");
+  assert.deepEqual(ready.slots[10].intent.readyIds, [3]);
+  assert(ready.slots[10].title.includes("+150 maximum and current HP"));
+  const active = build([{ ...units[1], abilities: [
+    { ability: ABILITY.VITALITY_TREASURE, remainingUses: 0, cooldownLeft: 900 }] }]);
+  assert.equal(active.slots[10].enabled, false);
+  assert.equal(active.slots[10].cls, "active");
 }

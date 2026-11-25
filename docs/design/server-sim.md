@@ -2294,3 +2294,5 @@ adapters or invoke another tick phase. Entity-owned protection and runtime proje
 existing checkpoint policies for entities and ability runtime.
 
 Carried Shop attack/defense items persist under entity `ability_uses_remaining`; active 30-second item durations use entity `ability_cooldowns`. Escape's global 60-second purchase timer uses existing durable player `ability_cooldowns`. These existing owners checkpoint and fingerprint the state without a new state-tree owner. See [categorized Shop items](shop.md#carried-attack-and-defense-goods).
+
+Vitality Treasure shares existing carried/cooldown owners and checkpoints its activated bonus in the existing `hp`/`max_hp` pair. Cooldown expiry removes exactly 150 maximum HP and clamps current HP. Dao promotion excludes this flat temporary bonus before scaling permanent health. See [Vitality rules](shop.md#vitality-treasure).

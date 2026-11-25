@@ -1,9 +1,7 @@
 //! Faction-aware catalog queries.
 //!
-//! Runtime and wire identity remain global: faction entries reference the same [`EntityKind`],
-//! upgrade ids, ability ids, and Steel/Oil/Supply costs used by the current game. Reuse a global
-//! id across factions only when its gameplay semantics are identical for every faction that can
-//! use it; divergent behavior needs a distinct global id gated by catalog availability.
+//! Factions share global kind, upgrade, ability, and resource identities. Reuse an id only for
+//! identical gameplay semantics; divergent behavior needs a distinct, faction-gated id.
 
 use std::str::FromStr;
 
@@ -115,6 +113,7 @@ pub enum AbilityKind {
     Haste,
     DoubleDamage,
     ArmorTreasure,
+    VitalityTreasure,
 }
 
 impl AbilityKind {
@@ -144,6 +143,7 @@ impl AbilityKind {
         Self::Haste,
         Self::DoubleDamage,
         Self::ArmorTreasure,
+        Self::VitalityTreasure,
     ];
 
     pub const fn stable_id(self) -> &'static str {
@@ -173,6 +173,7 @@ impl AbilityKind {
             Self::Haste => "haste",
             Self::DoubleDamage => "doubleDamage",
             Self::ArmorTreasure => "armorTreasure",
+            Self::VitalityTreasure => "vitalityTreasure",
         }
     }
 
@@ -1069,6 +1070,7 @@ pub fn ability_definition(kind: AbilityKind) -> AbilityCatalogEntry {
         AbilityKind::Haste => CULTIVATOR_ABILITIES[11],
         AbilityKind::DoubleDamage => CULTIVATOR_ABILITIES[12],
         AbilityKind::ArmorTreasure => CULTIVATOR_ABILITIES[13],
+        AbilityKind::VitalityTreasure => CULTIVATOR_ABILITIES[14],
     }
 }
 

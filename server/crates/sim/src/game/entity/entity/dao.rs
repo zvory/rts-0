@@ -168,7 +168,11 @@ impl Entity {
         }
         self.insight = 0;
         self.insight_fraction = 0;
-        self.max_hp = ((self.max_hp as f32) * config::DAO_MASTER_HP_MULTIPLIER).round() as u32;
+        let vitality = self.vitality_health_bonus();
+        self.max_hp = (((self.max_hp.saturating_sub(vitality)) as f32)
+            * config::DAO_MASTER_HP_MULTIPLIER)
+            .round() as u32;
+        self.max_hp = self.max_hp.saturating_add(vitality);
         self.hp = self.max_hp;
         self.dao_advance_ticks = 15;
     }
@@ -196,7 +200,9 @@ impl Entity {
             movement.tournament_target = None;
         }
         self.dao_advance_ticks = 15;
-        self.max_hp = config::unit_stats(self.kind).map_or(self.max_hp, |stats| stats.hp);
+        self.max_hp = config::unit_stats(self.kind).map_or(self.max_hp, |stats| {
+            stats.hp.saturating_add(self.vitality_health_bonus())
+        });
         self.hp = self.max_hp;
         true
     }
