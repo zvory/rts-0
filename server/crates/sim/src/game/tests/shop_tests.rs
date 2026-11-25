@@ -658,7 +658,7 @@ fn activate_item(game: &mut Game, unit: u32, ability: AbilityKind) {
 }
 
 #[test]
-fn item_categories_reserve_in_flight_and_activate_independently_after_checkpoint() {
+fn item_categories_are_passive_and_permanent_after_checkpoint() {
     let (mut game, shop, unit) = item_fixture();
     buy(&mut game, shop, unit, AbilityKind::Haste);
     buy(&mut game, shop, unit, AbilityKind::DoubleDamage);
@@ -726,26 +726,11 @@ fn item_categories_reserve_in_flight_and_activate_independently_after_checkpoint
     for _ in 0..900 {
         game.tick();
     }
-    assert!(!game
-        .state
-        .entities
-        .get(unit)
-        .unwrap()
-        .shop_item_active(AbilityKind::Haste));
+    assert!(game.state.entities.get(unit).unwrap().shop_item_active(AbilityKind::Haste));
     buy(&mut game, shop, unit, AbilityKind::DoubleDamage);
-    for _ in 0..32 {
-        game.tick();
-    }
-    assert_eq!(game.state.players[0].oil, 650);
-    assert_eq!(
-        game.state
-            .entities
-            .get(unit)
-            .unwrap()
-            .ability_uses_remaining
-            .get(&AbilityKind::DoubleDamage),
-        Some(&1)
-    );
+    for _ in 0..32 { game.tick(); }
+    assert_eq!(game.state.players[0].oil, 800);
+    assert!(!game.state.entities.get(unit).unwrap().ability_uses_remaining.contains_key(&AbilityKind::DoubleDamage));
 }
 
 #[test]
@@ -860,7 +845,6 @@ fn vitality_treasure_keeps_a_permanent_flat_bonus_through_dao_advancement() {
     let mut unit =
         crate::game::entity::Entity::new_unit(1, EntityKind::Warrior, 320.0, 320.0).unwrap();
     unit.receive_shop_item(AbilityKind::VitalityTreasure);
-    unit.activate_shop_item(AbilityKind::VitalityTreasure);
     let base = config::unit_stats(EntityKind::Warrior).unwrap().hp;
     assert_eq!((unit.hp, unit.max_hp), (base + 150, base + 150));
     unit.insight = config::DISCIPLE_INSIGHT_REQUIRED;
@@ -922,4 +906,50 @@ fn armor_treasure_applies_on_delivery_without_activation_or_expiry() {
         .get(unit)
         .unwrap()
         .shop_item_active(AbilityKind::ArmorTreasure));
+}
+
+#[test]
+fn every_passive_item_applies_on_delivery_and_ignores_activation_forever() {
+    for ability in [AbilityKind::Haste, AbilityKind::DoubleDamage, AbilityKind::ArmorTreasure, AbilityKind::VitalityTreasure] {
+        let (mut game, shop, unit) = item_fixture();
+        buy(&mut game, shop, unit, ability);
+        for _ in 0..32 { game.tick(); }
+        assert!(game.state.entities.get(unit).unwrap().shop_item_active(ability));
+        let mut game = Game::restore_checkpoint_payload_text_for_test(
+            &game.checkpoint_payload_text_for_test().unwrap(),
+            game.state.map.clone(), game.state.map_metadata.clone(),
+        ).unwrap();
+        activate_item(&mut game, unit, ability);
+        for _ in 0..1000 { game.tick(); }
+        let target = game.state.entities.get(unit).unwrap();
+        assert!(target.shop_item_active(ability));
+        assert_eq!(target.ability_uses_remaining.get(&ability), Some(&1));
+        assert_eq!(target.ability_cooldowns.get(&ability).copied().unwrap_or(0), 0);
+    }
+}
+
+#[test]
+fn occupied_item_categories_send_private_notices_without_spending() {
+    for (first, second, category) in [
+        (AbilityKind::EscapeTreasure, AbilityKind::EscapeTreasure, "Movement"),
+        (AbilityKind::ArmorTreasure, AbilityKind::VitalityTreasure, "Defense"),
+        (AbilityKind::Haste, AbilityKind::DoubleDamage, "Attack"),
+    ] {
+        let (mut game, shop, unit) = item_fixture();
+        buy(&mut game, shop, unit, first);
+        game.tick();
+        let oil = game.state.players[0].oil;
+        // Both an in-flight delivery and an equipped item reserve the category.
+        for ticks in [0, 32] {
+            for _ in 0..ticks { game.tick(); }
+            buy(&mut game, shop, unit, second);
+            let events = game.tick();
+            let message = format!("{category} slot already full");
+            assert!(events.iter().any(|(player, events)| *player == 1 && events.iter().any(
+                |event| matches!(event, crate::protocol::Event::Notice { msg, .. } if msg == &message))));
+            assert!(events.iter().filter(|(player, _)| *player != 1).all(|(_, events)| events.iter().all(
+                |event| !matches!(event, crate::protocol::Event::Notice { msg, .. } if msg == &message))));
+            assert_eq!(game.state.players[0].oil, oil);
+        }
+    }
 }
