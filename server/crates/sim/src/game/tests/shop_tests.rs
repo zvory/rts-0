@@ -199,9 +199,13 @@ fn regen_costs_50_and_arrives_after_ten_tiles_of_flight() {
     assert!(target.hp <= hp + 1, "delivery must not instantly heal");
     assert!(target.shop_item_active(AbilityKind::Regen));
     let before = target.hp;
-    for _ in 0..config::TICK_HZ { game.tick(); }
+    for _ in 0..config::TICK_HZ {
+        game.tick();
+    }
     assert_eq!(game.state.entities.get(unit).unwrap().hp, before + 3);
-    for _ in 0..config::TICK_HZ * 20 { game.tick(); }
+    for _ in 0..config::TICK_HZ * 20 {
+        game.tick();
+    }
     let target = game.state.entities.get(unit).unwrap();
     assert_eq!(target.hp, target.max_hp, "Regen caps at maximum HP");
     assert_eq!(game.state.ability_runtime.world_objects().count(), 0);
@@ -1079,6 +1083,28 @@ fn item_radiance_is_public_for_visible_carriers_without_private_inventory() {
             assert_eq!(view.item_radiance_tier, Some(expected));
         }
     }
+    // Regen contributes the sixth public tier without revealing its identity to visible enemies.
+    game.state
+        .entities
+        .get_mut(carrier)
+        .unwrap()
+        .receive_shop_item(AbilityKind::Regen);
+    for viewer in [1, 2, 3] {
+        let snapshot = game.snapshot_for(viewer);
+        let view = snapshot.entities.iter().find(|e| e.id == carrier).unwrap();
+        assert_eq!(view.item_radiance_tier, Some(6));
+        assert_eq!(
+            view.abilities.iter().any(|entry| entry.ability == "regen"),
+            viewer == 1,
+            "only the owner sees Regen inventory on a visible carrier"
+        );
+    }
+    game.state
+        .entities
+        .get_mut(carrier)
+        .unwrap()
+        .ability_uses_remaining
+        .remove(&AbilityKind::Regen);
     // Permanent equipment keeps contributing without cooldowns; Escape consumption lowers the tier.
     let unit = game.state.entities.get_mut(carrier).unwrap();
     assert_eq!(unit.item_radiance_tier(), 5);
@@ -1222,7 +1248,10 @@ fn rank_slot_limits_reserve_deliveries_and_reject_regen_when_full() {
                     game.tick();
                 }
                 let carrier = game.state.entities.get(unit).unwrap();
-                assert!(!carrier.shop_item_active(AbilityKind::Regen), "full slots reject Regen");
+                assert!(
+                    !carrier.shop_item_active(AbilityKind::Regen),
+                    "full slots reject Regen"
+                );
                 assert!(carrier.hp < carrier.max_hp);
                 // Promotion opens the additional slots immediately.
                 game.state.entities.get_mut(unit).unwrap().dao_master = true;
@@ -1386,31 +1415,50 @@ fn enemy_rifle_fire_intercepts_flying_goods_without_refund() {
 #[test]
 fn regen_reserves_slot_rejects_duplicates_projects_privately_and_survives_checkpoint() {
     let (mut game, shop, unit) = item_fixture();
-    game.state.entities.get_mut(unit).unwrap().apply_damage(40, None);
+    game.state
+        .entities
+        .get_mut(unit)
+        .unwrap()
+        .apply_damage(40, None);
     buy(&mut game, shop, unit, AbilityKind::Regen);
     game.tick();
     buy(&mut game, shop, unit, AbilityKind::Regen);
     game.tick();
     assert_eq!(game.state.players[0].oil, 950);
-    for _ in 0..40 { game.tick(); }
-    assert_eq!(game.state.entities.get(unit).unwrap().carried_item_count(), 1);
+    for _ in 0..40 {
+        game.tick();
+    }
+    assert_eq!(
+        game.state.entities.get(unit).unwrap().carried_item_count(),
+        1
+    );
     let own = game.snapshot_for(1);
-    assert!(own.entities.iter().find(|e| e.id == unit).unwrap().abilities.iter()
+    assert!(own
+        .entities
+        .iter()
+        .find(|e| e.id == unit)
+        .unwrap()
+        .abilities
+        .iter()
         .any(|entry| entry.ability == "regen" && entry.remaining_uses == Some(1)));
-    let enemy = game.snapshot_for(2);
-    assert!(enemy.entities.iter().filter(|e| e.id == unit)
-        .all(|e| !e.abilities.iter().any(|entry| entry.ability == "regen")));
     buy(&mut game, shop, unit, AbilityKind::Regen);
     game.tick();
     assert_eq!(game.state.players[0].oil, 950);
     game.state.entities.remove(shop);
     let mut restored = Game::restore_checkpoint_payload_text_for_test(
         &game.checkpoint_payload_text_for_test().unwrap(),
-        game.state.map.clone(), game.state.map_metadata.clone()).unwrap();
+        game.state.map.clone(),
+        game.state.map_metadata.clone(),
+    )
+    .unwrap();
     let hp = game.state.entities.get(unit).unwrap().hp;
     for _ in 0..config::TICK_HZ {
-        game.tick(); restored.tick();
-        assert_eq!(game.replay_end_state_hash().unwrap(), restored.replay_end_state_hash().unwrap());
+        game.tick();
+        restored.tick();
+        assert_eq!(
+            game.replay_end_state_hash().unwrap(),
+            restored.replay_end_state_hash().unwrap()
+        );
     }
     assert_eq!(game.state.entities.get(unit).unwrap().hp, hp + 3);
 }

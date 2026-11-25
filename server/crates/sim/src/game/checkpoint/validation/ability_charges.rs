@@ -3,7 +3,9 @@ use crate::game::entity::Entity;
 use super::CheckpointPayloadError;
 
 pub(super) fn validate(entity: &Entity) -> Result<(), CheckpointPayloadError> {
-    use crate::game::ability::AbilityKind::{ArmorTreasure, DoubleDamage, Haste, Regen, VitalityTreasure};
+    use crate::game::ability::AbilityKind::{
+        ArmorTreasure, DoubleDamage, Haste, Regen, VitalityTreasure,
+    };
     for ability in [Regen, Haste, DoubleDamage, ArmorTreasure, VitalityTreasure] {
         let ticks = entity.ability_cooldowns.get(&ability).copied().unwrap_or(0);
         if ticks > 0 {
