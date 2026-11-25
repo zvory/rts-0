@@ -27,7 +27,6 @@ for(const direction of [[1,0],[0,1],[-1,-1]]){
  assert(points.length>=10);
  assert(points.every(c=>Number.isFinite(c[1])&&Number.isFinite(c[2])));
 }
-console.log('vector_field_contracts: ok');
 
 const {selectedAbilityAffordances}=await import('../../client/src/hud_command_card.js');
 for(const daoMaster of [false,true]){
@@ -57,3 +56,20 @@ for (const sizeTiles of [4,5]) {
  }
  assert(checked>0);
 }
+
+// Minimap clicks use the same fixed center and dedicated command as viewport targeting.
+const {Minimap} = await import('../../client/src/minimap.js');
+const minimap = Object.create(Minimap.prototype);
+minimap.state = input.state;
+minimap.clientIntent = new ClientIntent();
+minimap.commandInteraction = input.commandInteraction;
+minimap.clientIntent.beginCommandTarget({kind:'ability', ability:ABILITY.VECTOR_FIELD});
+const beforeMinimap = commands.length;
+assert.equal(minimap._issueOrder(300, 250, true), false);
+assert.equal(minimap._issueOrder(300, 250, true), false);
+assert.equal(commands.length, beforeMinimap);
+minimap._issueOrder(240, 210, true);
+assert.deepEqual(commands.at(-1), commands[0], 'minimap uses vectorField, without queueing');
+assert.equal(minimap.clientIntent.vectorFieldCenter, null);
+
+console.log('vector_field_contracts: ok');

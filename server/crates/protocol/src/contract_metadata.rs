@@ -1129,6 +1129,8 @@ fn compact_slot_schemas() -> CompactSlotSchemas {
             optional_field(6, "expiresIn"),
             optional_field(7, "sourceCasterId"),
             optional_field(8, "ownerState"),
+            optional_field(9, "vector"),
+            optional_field(10, "fieldSize"),
         ],
         ability_object_owner_state: vec![
             optional_field(0, "earliestReturnTick"),

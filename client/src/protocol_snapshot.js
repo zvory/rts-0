@@ -135,7 +135,7 @@ function decodeCompactTankTrail(record, index) {
 
 function decodeCompactGroundDecal(record, index) {
   const fields = readArray(record, `ground decal ${index}`, 10);
-  if (fields.length !== 11 && fields.length !== 10 && fields.length !== 9) throw new Error(`ground decal ${index} field count mismatch`);
+  if (fields.length !== 10) throw new Error(`ground decal ${index} field count mismatch`);
   const decal = {
     id: readU32(fields[0], "groundDecal.id"),
     decalClass: readString(fields[1], "groundDecal.decalClass"),

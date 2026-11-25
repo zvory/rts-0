@@ -161,3 +161,47 @@ fn compact_snapshot_carries_bounded_ground_decal_delta() {
     assert!(value.get("gr").is_none());
     assert!(value.get("gd").is_none());
 }
+
+#[test]
+fn compact_vector_field_geometry_matches_slot_schema_without_private_state() {
+    for size in [4.0, 5.0] {
+        let object = AbilityObjectView {
+            id: 72,
+            owner: 2,
+            ability: crate::abilities::VECTOR_FIELD.into(),
+            kind: crate::ability_object_kinds::VECTOR_FIELD.into(),
+            x: 480.0,
+            y: 400.0,
+            expires_in: Some(299),
+            source_caster_id: None,
+            owner_state: None,
+            vector: Some([0.0, -1.0]),
+            field_size: Some(size),
+        };
+        let value = serde_json::to_value(CompactAbilityObject(&object)).unwrap();
+        assert_eq!(
+            value,
+            serde_json::json!([
+                72,
+                2,
+                27,
+                5,
+                480.0,
+                400.0,
+                299,
+                null,
+                null,
+                [0.0, -1.0],
+                size
+            ])
+        );
+        let contract = serde_json::to_value(crate::protocol_contract()).unwrap();
+        assert_eq!(
+            value.as_array().unwrap().len(),
+            contract["compactSlotSchemas"]["abilityObject"]
+                .as_array()
+                .unwrap()
+                .len()
+        );
+    }
+}

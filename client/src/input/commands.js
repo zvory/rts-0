@@ -1,4 +1,4 @@
-import {vectorFieldSize} from "./two_stage_target.js";
+import {vectorFieldSize, vectorFieldTargetCommand} from "./two_stage_target.js";
 import { carriedItemSlotsFull } from "./shop_full_cursor.js";
 import {
   ABILITY,
@@ -142,15 +142,9 @@ export function _issueTargetedCommand(p, ev = {}) {
       return true;
     }
     if (ability === ABILITY.VECTOR_FIELD) {
-      if (!intent.vectorFieldCenter) {
-        intent.vectorFieldCenter = {x: world.x, y: world.y};
-        return false;
-      }
-      const center = intent.vectorFieldCenter;
-      const dx = world.x - center.x, dy = world.y - center.y;
-      if (Math.hypot(dx, dy) < 4) return false;
-      this.commandInteraction.issueCommand(cmd.vectorField(units, center.x, center.y, dx, dy));
-      intent.vectorFieldCenter = null;
+      const command = vectorFieldTargetCommand(intent, units, world);
+      if (!command) return false;
+      this.commandInteraction.issueCommand(command);
       return true;
     }
     const queued = !!ev.shiftKey;

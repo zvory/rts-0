@@ -345,8 +345,9 @@ assert(
   "compact entity slot schema must include the latest appended field",
 );
 assert(
-  protocolContract.compactSlotSchemas.abilityObject.length === 9,
-  "compact ability object slot count must match JS decoder",
+  protocolContract.compactSlotSchemas.abilityObject.map((field) => field.name).join(",") ===
+    "id,owner,ability,kind,x,y,expiresIn,sourceCasterId,ownerState,vector,fieldSize",
+  "compact ability object slots must match JS decoder",
 );
 assert(
   protocolContract.compactSlotSchemas.trench.map((field) => field.name).join(",") ===
@@ -609,7 +610,8 @@ const decodedAck = decodeServerMessage({
   pr: [[1, 325, 80, 7, 14, 42, [1]]],
   pf: [[1, "cultivators"], [2, "kriegsia"]],
   ao: [[70, 1, 6, 1, 384, 416, 90, 7, [45, null, null, null, null, null, null, null]],
-    [71, 1, 17, 4, 400, 400, 300, 7, [null, 240, 67.2, null, null, null, 300, 300]]],
+    [71, 1, 17, 4, 400, 400, 300, 7, [null, 240, 67.2, null, null, null, 300, 300]],
+    [72, 2, 27, 5, 480, 400, 299, null, null, [0, -1], 5]],
   n: [1, 2, 0, 3, 4, PREDICTION_PROTOCOL_VERSION, 7, 12],
 });
 assert(decodedAck.resourceReset === true && decodedAck.resourceDeltas[0].remaining === 0, "compact authoritative resource replacement decodes");
@@ -618,6 +620,10 @@ assert(decodedAck.netStatus.lastSimConsumedClientSeq === 7, "compact consumed cl
 assert(decodedAck.netStatus.lastSimConsumedClientTick === 12, "compact consumed client tick decodes");
 assert(decodedAck.abilityObjects[0].kind === "returnMarker", "compact ability object kind decodes");
 assert(decodedAck.abilityObjects[0].sourceCasterId === 7, "compact ability source caster decodes");
+assert(JSON.stringify(decodedAck.abilityObjects[2]) === JSON.stringify({
+  id: 72, owner: 2, ability: ABILITY.VECTOR_FIELD, kind: ABILITY_OBJECT_KIND.VECTOR_FIELD,
+  x: 480, y: 400, expiresIn: 299, vector: [0, -1], fieldSize: 5,
+}), "visible enemy Vector Field decodes public geometry without private caster state");
 assert(decodedAck.playerFactions[0].factionId === "cultivators", "compact authoritative faction decodes");
 assert(decodedAck.playerResources[0].apm === 42, "compact observer player APM decodes");
 assert(decodedAck.playerResources[0].upgrades.length === 1, "compact observer upgrades decode");
@@ -784,7 +790,6 @@ assert(
   "observerAnalysis preserves map-analysis overlay primitives",
 );
 
-console.log("✅ protocol_parity.mjs: Rust protocol contract dump matches JS mirror");
 
 assert(JSON.stringify(cmd.pointTanks([1, 2], 300, 400)) === JSON.stringify({ c: "pointTanks", units: [1, 2], x: 300, y: 400 }), "Point command preserves one group target");
 
@@ -855,3 +860,19 @@ for (const tier of [-1, 7, 1.5, "3"]) {
   } catch { rejected = true; }
   assert(rejected, "out-of-range or malformed public item tiers are rejected");
 }
+
+// Ground decal records retain their independent ten-slot contract.
+const groundDecal = [1, "wreck", KIND_CODE[KIND.TANK], 100, 100, 1, 7, null, null, 1];
+const decalSnapshot = decodeServerMessage({ t: "snapshot", v: COMPACT_SNAPSHOT_VERSION,
+  s: [1, 0, 0, 2, 300], e: [], n: [0, 0, 0, 0, 0], gr: 1, gd: [0, [groundDecal]] });
+assert(decalSnapshot.groundDecalDelta.decals[0].radiusTiles === 1, "valid ground decal geometry decodes");
+for (const record of [groundDecal.slice(0, 9), [...groundDecal, null]]) {
+  let rejected = false;
+  try {
+    decodeServerMessage({ t: "snapshot", v: COMPACT_SNAPSHOT_VERSION,
+      s: [1, 0, 0, 2, 300], e: [], n: [0, 0, 0, 0, 0], gr: 1, gd: [0, [record]] });
+  } catch { rejected = true; }
+  assert(rejected, "malformed ground decal slot counts are rejected");
+}
+
+console.log("✅ protocol_parity.mjs: Rust protocol contract dump matches JS mirror");
