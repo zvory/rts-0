@@ -80,7 +80,7 @@ tank HE splash is non-piercing. Mortar/rocket and artillery checks use recorded 
 which survive attacker death and checkpoint restore. Friendly fire, environmental damage,
 buildings, invulnerable targets, and enemy units receive no shield armor and do not drain it.
 Shield costs no resources, has a ten-second
-cooldown, replaces the caster’s prior shield, and expires after 5 seconds or earlier on
+cooldown, replaces the caster’s prior shield, and expires after 5 seconds (10 seconds for Magic Masters, whose shield also has 300 HP) or earlier on
 depletion, replacement, or caster death. In-range casts preserve movement and queued orders;
 out-of-range immediate casts replace the current order with an approach-and-cast order. The pool, fixed world center, and absolute expiry tick live on the caster entity and survive
 checkpoints; the existing ability-runtime allocator supplies its unique visual id.

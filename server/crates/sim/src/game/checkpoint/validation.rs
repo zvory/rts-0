@@ -229,7 +229,18 @@ fn validate_entity(
             entity.dao() != Some(crate::game::upgrade::UpgradeKind::DaoOfMagic)
                 || shield.id == 0
                 || shield.remaining == 0
-                || shield.remaining > config::DISCIPLE_SHIELD_CAPACITY
+                || shield.remaining > shield.capacity
+                || !matches!(
+                    (shield.capacity, shield.duration_ticks),
+                    (
+                        config::DISCIPLE_SHIELD_CAPACITY,
+                        config::DISCIPLE_SHIELD_DURATION_TICKS
+                    ) | (
+                        config::MAGIC_MASTER_SHIELD_CAPACITY,
+                        config::MAGIC_MASTER_SHIELD_DURATION_TICKS
+                    )
+                )
+                || (!entity.dao_master && shield.capacity != config::DISCIPLE_SHIELD_CAPACITY)
                 || !in_world(shield.x.to_world(), shield.y.to_world(), world)
         })
     {

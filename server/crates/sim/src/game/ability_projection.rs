@@ -80,12 +80,9 @@ pub(in crate::game) fn ability_object_views_for(
                     || fog.is_visible_world(player, caster.pos_x(), caster.pos_y()))
                 .then_some(caster.id),
                 owner_state: Some(crate::protocol::AbilityObjectOwnerStateView {
-                    hp: Some(
-                        shield
-                            .remaining
-                            .min(crate::config::DISCIPLE_SHIELD_CAPACITY)
-                            as u16,
-                    ),
+                    hp: Some(shield.remaining.min(shield.capacity) as u16),
+                    max_hp: Some(shield.capacity as u16),
+                    duration_ticks: Some(shield.duration_ticks),
                     radius: Some(
                         crate::config::DISCIPLE_SHIELD_RADIUS_TILES
                             * crate::config::TILE_SIZE as f32,

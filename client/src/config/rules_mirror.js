@@ -370,7 +370,7 @@ export const ABILITIES = Object.freeze({
 
   [ABILITY.DISCIPLE_SHIELD]: Object.freeze({
     ability: ABILITY.DISCIPLE_SHIELD, label: "Shield", icon: "SHD", hotkey: "X",
-    title: "Place a 150 HP shield granting allied units within 2.1 tiles 75% armor against attacks from outside; armor piercing works normally; each hit drains full attack damage from shield HP; lasts up to 5 seconds",
+    title: "Place a 150 HP shield granting allied units within 2.1 tiles 75% armor against attacks from outside; armor piercing works normally; each hit drains full attack damage from shield HP; lasts up to 5 seconds; Magic Masters place a 300 HP shield lasting up to 10 seconds",
     carriers: Object.freeze([KIND.MAGIC_ADEPT]), targetMode: "worldPoint",
     rangeTiles: 5, radiusTiles: DISCIPLE_SHIELD_RADIUS_TILES,
     cooldownTicks: 300, cost: Object.freeze({ steel: 0, oil: 0 }),
@@ -397,7 +397,7 @@ export const ABILITIES = Object.freeze({
 
   [ABILITY.CHARGE]: Object.freeze({
     ability: ABILITY.CHARGE, label: "Charge", icon: "CHG",
-    title: "Automatic Charge: 1.5x speed for one second against an enemy unit within 5 tiles, at least 2 tiles away or retreating",
+    title: "Automatic Charge: 1.5x speed for one second (three seconds for War Masters) against an enemy unit within 5 tiles, at least 2 tiles away or retreating",
     carriers: Object.freeze([KIND.WARRIOR, KIND.WAR_ADEPT]), targetMode: "self",
     cooldownTicks: 450, cost: Object.freeze({ steel: 0, oil: 0 }),
     queued: false, queuePolicy: "notQueueable",

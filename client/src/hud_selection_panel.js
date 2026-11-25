@@ -1,4 +1,6 @@
+import { HudCarriedItems } from "./hud_carried_items.js";
 import {
+  carriedItemMask,
   BASE_COMMAND_SUPPLY_CAP,
   COMMAND_CAR_SUPPLY_CAP_BONUS,
   ENTRENCHMENT_AREA_DAMAGE_REDUCTION,
@@ -104,6 +106,7 @@ export function selectionBudgetGridModel(entities, overflow = null, players = []
 export class HudSelectionPanel {
   constructor(panel, state, controlPolicy = null, unitIconMarkupForKind = null, { showEntityIds = false } = {}) {
     this.panel = panel;
+    this.carriedItems = new HudCarriedItems(panel);
     this.showEntityIds = showEntityIds;
     this.state = state;
     this.controlPolicy = controlPolicy;
@@ -123,6 +126,7 @@ export class HudSelectionPanel {
   }
 
   destroy() {
+    this.carriedItems.destroy();
     if (this.panel && typeof this.panel.removeEventListener === "function") {
       this.panel.removeEventListener("click", this._onClick);
       this.panel.removeEventListener("contextmenu", this._onContextMenu);
@@ -145,6 +149,7 @@ export class HudSelectionPanel {
       : typeof this.state?.selectedEntities === "function"
       ? this.state.selectedEntities()
       : [];
+    this.carriedItems.setSelection(sel || [], this.state.players || []);
     if (!sel || sel.length === 0) {
       if (this._renderSig === "empty") {
         this._recordSelectionDiagnostic("hud.dirty.selectionPanel.hit");
@@ -170,6 +175,8 @@ export class HudSelectionPanel {
       this._renderSig = sig;
       panel.innerHTML = "";
       panel.appendChild(this._selectionEntityNode(this._singleSelectionNode(sel[0]), sel[0]));
+      const summary = this.carriedItems.createSummary();
+      if (summary) panel.appendChild(summary);
       return;
     }
 
@@ -202,6 +209,8 @@ export class HudSelectionPanel {
     header.appendChild(count);
     header.appendChild(budget);
     frag.appendChild(header);
+    const summary = this.carriedItems.createSummary();
+    if (summary) frag.appendChild(summary);
 
     if (model.pages.length > 1) {
       const tabs = document.createElement("div");
@@ -256,6 +265,7 @@ export class HudSelectionPanel {
         cell.textContent = block.icon;
       }
       this._selectionEntityNode(cell, block);
+      this.carriedItems.decoratePortrait(cell, sel[block.sourceIndex]);
       grid.appendChild(cell);
     }
     frag.appendChild(grid);
@@ -508,6 +518,7 @@ function selectionDetailSignature(entity, state = null) {
   const entrenchment = entrenchmentSelectionStatus(entity, state);
   const resource = selectionResourceDetails(entity, state);
   return [
+    carriedItemMask(entity),
     sigValue(entity.id),
     sigValue(entity.kind),
     sigValue(entity.label),
@@ -597,6 +608,7 @@ function selectionBudgetEntitySignature(entity, state = null) {
     state?.players?.find?.((player) =>
       Number(player?.id) === Number(entity.owner))?.color;
   return [
+    carriedItemMask(entity),
     sigValue(entity.id),
     sigValue(entity.kind),
     sigValue(entity.dao), sigValue(entity.daoMaster),

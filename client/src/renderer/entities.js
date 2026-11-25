@@ -1,6 +1,8 @@
+import { drawCarriedItemRosette } from "./carried_items.js";
 import { createDaoCorona } from "./dao_corona.js";
 import { gfxNoFill, gfxEllipse, gfxPoly, gfxRect, gfxReset, gfxFill, gfxStroke } from "./native_graphics.js";
 import {
+  carriedItemMask,
   COLORS,
   STATS,
   entityBodyRadius,
@@ -12,7 +14,7 @@ import {
   ANTI_TANK_GUN_FIELD_OF_FIRE_RAD,
   isProducerBuilding,
 } from "../config.js";
-import { isDiscipleKind, ABILITY, KIND, SETUP, STATE, isBuilding, isResource } from "../protocol.js";
+import { isDiscipleKind, KIND, SETUP, STATE, isBuilding, isResource } from "../protocol.js";
 import { buildingProgressStatus } from "./entity_state.js";
 import {
   DEPLOYED_WEAPON_ANIM_MS,
@@ -185,9 +187,10 @@ export function _drawSelectionAndHp(e, selection, state, ownerColor = null) {
   }
 
   const showHp = !!progressStatus || (hasHealth && (damaged || selected || alwaysShow));
-  if (showHp || e.escapeTreasure || hasCategoryItem(e)) {
+  if (showHp || carriedItemMask(e)) {
     const g = this._hpBarSlot(e.id);
-    this._hpBar(g, e, progressStatus, ownerColor, showHp);
+    this._hpBar(g, e, progressStatus, ownerColor, showHp, e.factionId);
+    drawCarriedItemRosette(this, e);
   }
 }
 
@@ -199,9 +202,10 @@ export function _drawAboveFogHp(e, state, ownerColor = null) {
   if (e?.aboveFogReveal !== true && e?.visionOnly !== true) return;
   if (!hasHealth) return;
   const showHp = damaged || !!state?.showHealthBarsAlwaysEnabled || isDiscipleKind(e.kind);
-  if (!showHp && !e.escapeTreasure && !hasCategoryItem(e)) return;
+  if (!showHp && !carriedItemMask(e)) return;
   const g = this._hpBarSlot(e.id, "aboveFogHpBars");
-  this._hpBar(g, e, null, ownerColor, showHp);
+  this._hpBar(g, e, null, ownerColor, showHp, e.factionId);
+  drawCarriedItemRosette(this, e, "aboveFogCarriedItems");
 }
 
 export function _hpBarSlot(id, poolName = "hpBars") {
@@ -262,52 +266,7 @@ export function _ringRadius(e) {
   return { rx: r, ry: r * 0.68, cy: r * 0.36 };
 }
 
-const CATEGORY_ITEM_BADGES = Object.freeze([
-  { ability: ABILITY.ARMOR_TREASURE, label: "ARM", color: 0x58ccec },
-  { ability: ABILITY.VITALITY_TREASURE, label: "VIT", color: 0xf291ff },
-  { ability: ABILITY.HASTE, label: "HST", color: 0xffda52 },
-  { ability: ABILITY.DOUBLE_DAMAGE, label: "DD", color: 0xff704f },
-]);
-
-function hasCategoryItem(entity) {
-  return !isBuilding(entity.kind) && entity.abilities?.some((entry) =>
-    CATEGORY_ITEM_BADGES.some((item) => item.ability === entry.ability));
-}
-
-function drawCategoryItemBadges(container, entity) {
-  // Disciples draw their insight meter at y=6..11 below the health bar.
-  const top = isDiscipleKind(entity.kind) && Number.isFinite(entity.insight) && !entity.daoMaster ? 14 : 7;
-  const totalWidth = (entity.escapeTreasure ? 22 : 0) + CATEGORY_ITEM_BADGES
-    .filter((item) => !isBuilding(entity.kind) && entity.abilities?.some((entry) => entry.ability === item.ability))
-    .reduce((width, item) => width + item.label.length * 6 + 4, 0);
-  let offset = -Math.max(0, totalWidth - 4) / 2;
-  if (container.rtsEscape) container.rtsEscape.position.set(offset, top);
-  if (entity.escapeTreasure) offset += 22;
-  for (const [index, item] of CATEGORY_ITEM_BADGES.entries()) {
-    const entry = !isBuilding(entity.kind) && entity.abilities?.find((value) => value.ability === item.ability);
-    const key = `rtsItem${index}`;
-    let badge = container[key];
-    if (entry && !badge) {
-      badge = new PIXI.Text({ text: item.label, style: {
-        fontFamily: "monospace", fontSize: 9, fontWeight: "bold", fill: item.color,
-        stroke: { color: 0x101019, width: 3 },
-      } });
-      badge.anchor.set(0.5);
-      container[key] = badge;
-      container.addChild(badge);
-    }
-    if (!badge) continue;
-    badge.visible = !!entry;
-    if (!entry) continue;
-    badge.text = item.label;
-    badge.alpha = 1;
-    badge.anchor.set(0, 0);
-    badge.position.set(offset, top);
-    offset += item.label.length * 6 + 4;
-  }
-}
-
-export function _hpBar(g, e, status = null, ownerColor = null, showHp = true) {
+export function _hpBar(g, e, status = null, ownerColor = null, showHp = true, ownerFactionId = null) {
   if (!e.maxHp && !status) return;
   const frac = clamp01(status ? status.fraction : e.hp / e.maxHp);
   const stat = STATS[e.kind] || {};
@@ -332,6 +291,7 @@ export function _hpBar(g, e, status = null, ownerColor = null, showHp = true) {
   }
   const barW = halfW * 2;
   const barH = 4;
+  if (isDiscipleKind(e.kind) || (e.kind === KIND.WORKER && ownerFactionId === "cultivators")) topY += barH / 2;
   const maxHp = Number.isFinite(e.maxHp) && e.maxHp > 0 ? e.maxHp : 0;
   const segmentCount = e.kind === KIND.HEALING_SEAL ? 1 : Math.max(1, Math.round(maxHp / HP_PER_SEGMENT));
   const dividerCount = segmentCount - 1;
@@ -353,23 +313,6 @@ export function _hpBar(g, e, status = null, ownerColor = null, showHp = true) {
   }
   g.position.set(e.x, topY);
   g.rtsBackground.visible = g.rtsFill.visible = g.rtsTicks.visible = showHp;
-  if (e.escapeTreasure && !g.rtsEscape) {
-    const badge = new PIXI.Text({ text: "ESC", style: {
-      fontFamily: "monospace", fontSize: 9, fontWeight: "bold", fill: 0xdd9aff,
-      stroke: { color: 0x101019, width: 3 },
-    } });
-    badge.anchor.set(0, 0);
-    g.rtsEscape = badge;
-    g.addChild(badge);
-  }
-  if (g.rtsEscape) {
-    g.rtsEscape.visible = !!e.escapeTreasure;
-    g.rtsEscape.position.set(0, 7);
-  }
-
-
-  drawCategoryItemBadges(g, e);
-
   let color = Number.isFinite(ownerColor)
     ? ownerColor
     : hexToInt(typeof e.teamColor === "string" ? e.teamColor : "#9aa0a8");
@@ -406,8 +349,8 @@ export function _hpBar(g, e, status = null, ownerColor = null, showHp = true) {
     bar.clear(); icon.clear();
     if (isDiscipleKind(e.kind)) {
       if (Number.isFinite(e.insight) && !e.daoMaster) {
-        bar.rect(-halfW - 1, 6, barW + 2, 5).fill(0x8b2028);
-        bar.rect(-halfW, 7, barW * clamp01(e.insight / (e.dao ? DISCIPLE_EVOLVED_INSIGHT_CAP : DISCIPLE_INSIGHT_REQUIRED)), 3).fill(0x368dff);
+        bar.rect(-halfW - 1, 5, barW + 2, 2.5).fill(0x8b2028);
+        bar.rect(-halfW, 5.5, barW * clamp01(e.insight / (e.dao ? DISCIPLE_EVOLVED_INSIGHT_CAP : DISCIPLE_INSIGHT_REQUIRED)), 1.5).fill(0x368dff);
       }
     }
   }

@@ -2982,10 +2982,28 @@ Escape Treasure automatically rescues the carrier on lethal damage. Novices and 
 are rejected, including deliveries already in flight. Healing Potion and Healing Seal are consumed goods.
 Vitality adds 150 maximum and current HP and persists through Dao promotion.
 
-Private projected item badges appear in a variable-width row seven world pixels below the HP bar
-(fourteen when a Disciple insight meter is present):
-ESC (purple), ARM (cyan), VIT (magenta), HST (yellow), DD (orange). Badges remain visible when
-health bars are hidden and never appear on Shops. Their labels supplement color identification.
+Private carried-item rosettes use redundant color and vector silhouettes at the exact unit center:
+Haste is a gold bolt, Double Damage an orange sword, Armor Treasure a cyan shield,
+Vitality Treasure a green heart, and Escape Treasure a purple return diamond. Icons are nine
+world pixels with a thin outline. The full five-item rosette places Escape at its center;
+smaller inventories stay compact in stable catalog order. Layout geometry scales to additional
+item counts without inventing items or changing inventory rules. Icons remain visible when health
+bars are hidden and never appear on Shops. They read only projected carried-item entries and
+the Escape flag, never the public radiance count. Pooled geometry redraws only when inventory
+changes; world positions update each frame. Separate ordinary/above-fog item layers follow their
+HP layers and retain the same authoritative visibility rules and eviction/teardown lifecycle.
+
+Selected portraits show small item counts and a purple Escape outline. A focused readout beside
+the portraits shows the actual unit type, exact loadout, and current Shop oil value (not historical
+spend). It initially inspects the most equipped selected unit; pointer hover or keyboard focus
+inspects that portrait without issuing a command or changing selection. Inventory changes refresh
+the selection cache, and teardown removes inspection listeners. There are no carried-item hotkeys.
+
+Cultivator unit HP groups sit two world pixels lower (half the unchanged four-pixel HP fill height).
+The shared Serf/Worker kind uses its owner's projected faction metadata to avoid moving other
+factions' worker bars. Non-Master Insight backing is 2.5 pixels tall with a 1.5-pixel fill and
+starts flush against the HP backing at local y=5. Masters still omit Insight meters. Neither
+HP placement nor Insight geometry moves the world-centered item rosette or Dao corona.
 Escape's existing fog-safe particle burst and trail still render on rescue.
 
 Cultivator fighter radiance uses the public visual strength `itemRadianceTier` (0–6), counting

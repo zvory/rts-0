@@ -936,7 +936,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 71. The client also accepts compact
+`messagepack-compact`, codec version 1, compact snapshot version 72. The client also accepts compact
 snapshot versions 51 through 62: version 52 only appends a kind code, version 53 appends the
 optional `unitsKilled` entity slot, version 54 appends an optional `rocket` style bit to mortar
 launch/impact event records, and version 55 adds the `artilleryIncoming` event code, so the older
@@ -974,7 +974,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 71,
+  "v": 72,
   "gr": groundDecalRevision, // omitted when zero
   "gd": [afterRevision, [    // omitted when this tick has no discovered/created revision
     [id, decalClass, sourceKindCode, x, y, owner, seed, facing, weaponFacing, radiusTiles]
@@ -1141,8 +1141,8 @@ encoded as `[x, y]`; `waypoints` is capped at 128 entries for transport.
 
 `AbilityObject`: `{ id, owner, ability, kind, x, y, expiresIn?, sourceCasterId?, ownerState? }`.
 The compact `ao` slot uses ability ids from the existing ability code table and
-`abilityObject.kind` codes from the table above. `ownerState` is owner/spectator/full-world data (except Shield HP and radius, which are public whenever the field is visible)
-encoded as `[earliestReturnTick?, hp?, radius?, destroyedLockoutTicks?, distanceTraveled?, ticksOut?]`.
+`abilityObject.kind` codes from the table above. `ownerState` is owner/spectator/full-world data (except Shield HP, maximum HP, duration and radius, which are public whenever the field is visible)
+encoded as `[earliestReturnTick?, hp?, radius?, destroyedLockoutTicks?, distanceTraveled?, ticksOut?, maxHp?, durationTicks?]`.
 Magic Anchor currently fills only `radius`; the hp and destroyed-lockout slots are retained as
 optional compact slots for compatibility.
 Normal enemy snapshots receive only the public object fields needed to render a marker at a visible
@@ -2065,8 +2065,8 @@ to its matching [Master](dao-masters.md), resets insight, and fully heals to the
 
 Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md).
 Shield uses ability `discipleShield` (code 17, order stage 25), world-point target,
-ability-object kind `shield` (code 4). It expires after 5 seconds, projected through `expiresIn`; `ownerState.hp` carries
-the remaining 150-point pool to every viewer who can see the field, including enemies and allies. The client renders this pool as a cyan HP bar above the public gray lifetime bar, updating it as full incoming hit damage drains shield HP. The radius
+ability-object kind `shield` (code 4). It expires after 5 seconds for Adepts or 10 seconds for Masters, projected through `expiresIn`; `ownerState.hp` carries
+the remaining pool (150 HP for Adepts, 300 HP for Masters); `ownerState.maxHp` and `ownerState.durationTicks` carry the cast-time maxima for the bars to every viewer who can see the field, including enemies and allies. The client renders this pool as a cyan HP bar above the public gray lifetime bar, updating it as full incoming hit damage drains shield HP. The radius
 is 2.1 tiles for every viewer. Field visibility is gated at its center, independently
 of its caster; `sourceCasterId` is omitted when that caster is hidden.
 
@@ -2149,7 +2149,7 @@ and `escapeTreasure` are Shop abilities with compact ability codes 19/20 and ord
 27/28. Unit targeting is authoritative: a visible living friendly unit at any distance is required;
 buildings are rejected. Purchases are immediate and do not enqueue a movement order.
 
-Compact vocabulary version 71 adds `shop_delivery` (kind code 39), a transient 10-HP
+Compact vocabulary version 72 adds `shop_delivery` (kind code 39), a transient 10-HP
 combat body with ordinary entity HP, targeting, and visibility. Its id is server-linked to
 the delivery projectile; no recipient id is exposed. It is not a controllable unit, building,
 or resource. It has no collision, sight, supply, or weapon. Delivery removal also removes the body.

@@ -7,6 +7,8 @@ pub(crate) struct DiscipleShield {
     pub x: Coord,
     pub y: Coord,
     pub remaining: u32,
+    pub capacity: u32,
+    pub duration_ticks: u32,
     pub expires_tick: u32,
 }
 
@@ -41,11 +43,18 @@ impl Entity {
         expires_tick: u32,
         preserve_order: bool,
     ) {
+        let capacity = if self.kind == EntityKind::MagicAdept && self.dao_master {
+            config::MAGIC_MASTER_SHIELD_CAPACITY
+        } else {
+            config::DISCIPLE_SHIELD_CAPACITY
+        };
         self.shield = Some(DiscipleShield {
             id,
             x: Coord::from_world(x),
             y: Coord::from_world(y),
-            remaining: config::DISCIPLE_SHIELD_CAPACITY,
+            remaining: capacity,
+            capacity,
+            duration_ticks: config::disciple_shield_duration_ticks(self.dao_master),
             expires_tick,
         });
         self.start_ability_cooldown(AbilityKind::DiscipleShield, cooldown);
@@ -261,7 +270,11 @@ impl Entity {
             return;
         }
         if let Some(movement) = self.movement.as_mut() {
-            movement.novice_charge_ticks = config::NOVICE_CHARGE_DURATION_TICKS;
+            movement.novice_charge_ticks = if self.kind == EntityKind::WarAdept && self.dao_master {
+                config::WAR_MASTER_CHARGE_DURATION_TICKS
+            } else {
+                config::NOVICE_CHARGE_DURATION_TICKS
+            };
             self.start_ability_cooldown(AbilityKind::Charge, config::NOVICE_CHARGE_COOLDOWN_TICKS);
         }
     }

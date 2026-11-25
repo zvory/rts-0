@@ -270,7 +270,7 @@ assert(
         416,
         90,
         7,
-        [45, null, 14, null, null, null],
+        [45, null, 14, null, null, null, null, null],
       ],
     ],
     tr: [[80, 448, 480, 0.375]],

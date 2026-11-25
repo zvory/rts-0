@@ -1369,7 +1369,7 @@ mod tests {
                 416.0,
                 90,
                 7,
-                [45, null, null, null, null, null]
+                [45, null, null, null, null, null, null, null]
             ]])
         );
         assert_eq!(value["tr"], serde_json::json!([[80, 448.0, 480.0, 0.375]]));
@@ -1497,4 +1497,4 @@ mod tests {
     }
 }
 
-// EntityView::rocket_rack_count is re-exported from rts-contract; compact v56 uses slot 43.
+// Compact v71: visible Shield ownerState appends maxHp (slot 6) and durationTicks (slot 7).

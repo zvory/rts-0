@@ -3,9 +3,7 @@ import { gfxNoFill, gfxCircle, gfxEllipse, gfxPoly, gfxRect, gfxRoundRect, gfxSt
 import {
   COLORS,
   EKAT_MAGIC_ANCHOR_RADIUS_TILES,
-  DISCIPLE_SHIELD_CAPACITY,
   DISCIPLE_SHIELD_RADIUS_TILES,
-  DISCIPLE_SHIELD_DURATION_TICKS,
   STATS,
   RESOURCE_AMOUNTS,
   ANTI_TANK_GUN_DEPLOYED_RANGE_TILES,
@@ -520,7 +518,7 @@ export function _drawAbilityObjects(state) {
       if (finiteNumber(object.ownerState?.hp)) {
         const width = 56;
         const y = object.y - radius - 8;
-        const fraction = clamp01(object.ownerState.hp / DISCIPLE_SHIELD_CAPACITY);
+        const fraction = clamp01(object.ownerState.hp / object.ownerState.maxHp);
         gfxStroke(g, 0);
         gfxFill(g, 0x000000, 1);
         gfxRect(g, object.x - width / 2 - 1, y - 1, width + 2, 6);
@@ -534,7 +532,7 @@ export function _drawAbilityObjects(state) {
         // Same six-pixel offset below the HP row used by unit secondary bars.
         const width = 56;
         const y = object.y - radius - 2;
-        const fraction = clamp01(object.expiresIn / DISCIPLE_SHIELD_DURATION_TICKS);
+        const fraction = clamp01(object.expiresIn / object.ownerState?.durationTicks);
         gfxStroke(g, 0);
         gfxFill(g, 0x000000, 1);
         gfxRect(g, object.x - width / 2 - 1, y - 1, width + 2, 6);

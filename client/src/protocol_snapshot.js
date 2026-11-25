@@ -264,8 +264,8 @@ function decodeCompactAbilityObject(record, index) {
 }
 
 function decodeCompactAbilityObjectOwnerState(record) {
-  const fields = readArray(record, "abilityObject.ownerState", 6);
-  if (fields.length !== 6) throw new Error("abilityObject.ownerState field count mismatch");
+  const fields = readArray(record, "abilityObject.ownerState", 8);
+  if (fields.length !== 8) throw new Error("abilityObject.ownerState field count mismatch");
   const state = {};
   if (fields[0] != null) {
     state.earliestReturnTick = readU32(fields[0], "abilityObject.ownerState.earliestReturnTick");
@@ -282,6 +282,8 @@ function decodeCompactAbilityObjectOwnerState(record) {
     state.distanceTraveled = readNumber(fields[4], "abilityObject.ownerState.distanceTraveled");
   }
   if (fields[5] != null) state.ticksOut = readU32(fields[5], "abilityObject.ownerState.ticksOut");
+  if (fields[6] != null) state.maxHp = readU32(fields[6], "abilityObject.ownerState.maxHp");
+  if (fields[7] != null) state.durationTicks = readU32(fields[7], "abilityObject.ownerState.durationTicks");
   return state;
 }
 
