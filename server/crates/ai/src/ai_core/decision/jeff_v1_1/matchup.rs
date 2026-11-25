@@ -1473,14 +1473,14 @@ fn decide(
 
 use rts_sim::game::command::SimCommand as Command;
 
-/// The live parameters: `JEFF_V11_MM` (`key=value,...`) over the tuned defaults.
+/// The live parameters: `JEFF_V1_1_MM` (`key=value,...`, or `JEFF_V11_MM` in local testing) over
+/// the tuned defaults.
 fn live_params() -> Params {
     static PARAMS: std::sync::OnceLock<Params> = std::sync::OnceLock::new();
     *PARAMS.get_or_init(|| {
-        let mut params = std::env::var("JEFF_V11_MM")
-            .ok()
-            .and_then(|spec| Params::parse(&spec).ok())
-            .unwrap_or_default();
+        let spec = std::env::var("JEFF_V11_MM")
+            .unwrap_or_else(|_| crate::ai_core::profiles::JEFF_V1_1_MM.to_string());
+        let mut params = Params::parse(&spec).unwrap_or_default();
         // `standfire` as a V1.1 switch too.
         params.stand_fire |= !crate::ai_core::profiles::jeff_v1_1_feature_off("standfire");
         params
