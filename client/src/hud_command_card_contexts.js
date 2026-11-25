@@ -56,7 +56,7 @@ export function buildCultivatorCommandCardContextSamples(buildCard) {
   return [
     ...unitCards,
     { id: "cultivators-double-damage", card: buildCard(ctx([{ ...disciple, abilities: [
-      { ability: ABILITY.ARMOR_TREASURE, remainingUses: 1 },
+      { ability: ABILITY.VITALITY_TREASURE, remainingUses: 1 },
       { ability: ABILITY.DOUBLE_DAMAGE, remainingUses: 1 }] }])) },
     { id: "cultivators-war-master", card: buildCard(ctx([{ ...disciple, kind: KIND.WAR_ADEPT, dao: "war", daoMaster: true }])) },
     { id: "cultivators-shop", card: buildCard(ctx([{ id: 30, owner: 1, kind: KIND.SHOP }])) },

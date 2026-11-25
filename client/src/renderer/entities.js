@@ -254,6 +254,7 @@ export function _ringRadius(e) {
 
 const CATEGORY_ITEM_BADGES = Object.freeze([
   { ability: ABILITY.ARMOR_TREASURE, label: "AR", color: 0x58ccec },
+  { ability: ABILITY.VITALITY_TREASURE, label: "+HP", color: 0xf291ff },
   { ability: ABILITY.HASTE, label: "H", color: 0xffda52 },
   { ability: ABILITY.DOUBLE_DAMAGE, label: "2X", color: 0xff704f },
 ]);
@@ -283,7 +284,7 @@ function drawCategoryItemBadges(container, entity, topY) {
     // An asterisk and full opacity distinguish active effects from carried goods.
     badge.text = `${item.label}${entry.cooldownLeft > 0 ? "*" : ""}`;
     badge.alpha = entry.cooldownLeft > 0 ? 1 : 0.65;
-    badge.position.set(index === 0 ? -12 : 12, entity.y - topY + 13);
+    badge.position.set([ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE].includes(item.ability) ? -12 : 12, entity.y - topY + 13);
   }
 }
 

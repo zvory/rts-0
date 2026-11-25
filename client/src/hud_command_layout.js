@@ -11,3 +11,7 @@ const COMMAND_CARD_HOTKEYS = Object.freeze([...GRID_HOTKEYS, "R", "F", "V"]);
 export function gridHotkeyForSlot(slotIndex) {
   return COMMAND_CARD_HOTKEYS[slotIndex] || "";
 }
+
+export function gridSlotForHotkey(hotkey) {
+  return COMMAND_CARD_HOTKEYS.indexOf(hotkey);
+}

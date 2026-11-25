@@ -50,7 +50,7 @@ import {
 import { workerCommandSlots } from "./hud_worker_commands.js";
 import { buildCultivatorCommandCardContextSamples, buildEkatCommandCardContextSamples } from "./hud_command_card_contexts.js";
 
-import { GRID_HOTKEYS, gridHotkeyForSlot } from "./hud_command_layout.js";
+import { GRID_HOTKEYS, gridHotkeyForSlot, gridSlotForHotkey } from "./hud_command_layout.js";
 export { GRID_HOTKEYS, gridHotkeyForSlot } from "./hud_command_layout.js";
 
 export function factionCommandId(factionId, family, subject) {
@@ -361,7 +361,7 @@ function placeAbilityDescriptors(ctx, slots, abilityAffordances, factionId) {
     || abilitySlotPriority(left.definition) - abilitySlotPriority(right.definition));
   for (const affordance of ordered) {
     const definition = affordance.definition;
-    const preferred = definition.ability === ABILITY.CHARGE ? slots.findIndex((slot) => !slot) : GRID_HOTKEYS.indexOf(definition.hotkey);
+    const preferred = definition.ability === ABILITY.CHARGE ? slots.findIndex((slot) => !slot) : gridSlotForHotkey(definition.hotkey);
     if (preferred < 0 || (slots[preferred] && slots[preferred].action !== "ability")) continue;
     // Higher priority wins.
     slots[preferred] = abilityDescriptor(ctx, factionId, affordance);

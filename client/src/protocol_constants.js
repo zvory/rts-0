@@ -333,6 +333,7 @@ export const ABILITY = Object.freeze({
   HASTE: "haste",
   DOUBLE_DAMAGE: "doubleDamage",
   ARMOR_TREASURE: "armorTreasure",
+  VITALITY_TREASURE: "vitalityTreasure",
 
 });
 
@@ -547,6 +548,7 @@ export const ORDER_STAGE = Object.freeze({
   HASTE: "haste",
   DOUBLE_DAMAGE: "doubleDamage",
   ARMOR_TREASURE: "armorTreasure",
+  VITALITY_TREASURE: "vitalityTreasure",
 
   SETUP_ANTI_TANK_GUNS: "setupAntiTankGuns",
 });
@@ -584,6 +586,7 @@ export const ORDER_STAGE_CODE = Object.freeze({
   [ORDER_STAGE.HASTE]: 31,
   [ORDER_STAGE.DOUBLE_DAMAGE]: 32,
   [ORDER_STAGE.ARMOR_TREASURE]: 33,
+  [ORDER_STAGE.VITALITY_TREASURE]: 34,
   [ORDER_STAGE.ESCAPE_TREASURE]: 28,
 
 });
@@ -614,6 +617,7 @@ export const ABILITY_CODE = Object.freeze({
   [ABILITY.HASTE]: 23,
   [ABILITY.DOUBLE_DAMAGE]: 24,
   [ABILITY.ARMOR_TREASURE]: 25,
+  [ABILITY.VITALITY_TREASURE]: 26,
 
 });
 

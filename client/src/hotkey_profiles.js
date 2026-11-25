@@ -21,6 +21,7 @@ const DEFAULT_EXPORT_BUILD = "unknown";
 const CLASSIC_DIRECT_BINDINGS = Object.freeze({
   "cultivators.item.escape": "KeyR",
   "cultivators.item.armorTreasure": "KeyF",
+  "cultivators.item.vitalityTreasure": "KeyF",
   "cultivators.item.haste": "KeyV",
   "cultivators.item.doubleDamage": "KeyV",
   "cultivators.dao-training.dao_wind": "KeyL",

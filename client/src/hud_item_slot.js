@@ -3,6 +3,7 @@ import { abilityAutocastEnabled } from "./hud_ability_affordance.js";
 
 const ITEMS = Object.freeze([
   { ability: ABILITY.ARMOR_TREASURE, slot: 10, category: "defense", label: "Armor", icon: "AR", effect: "50% additional armor" },
+  { ability: ABILITY.VITALITY_TREASURE, slot: 10, category: "defense", label: "Vitality", icon: "+HP", effect: "+150 maximum and current HP" },
   { ability: ABILITY.HASTE, slot: 11, category: "attack", label: "Haste", icon: "H", effect: "Double primary weapon attack speed" },
   { ability: ABILITY.DOUBLE_DAMAGE, slot: 11, category: "attack", label: "Double Damage", icon: "2X", effect: "Double primary weapon damage" },
 ]);
@@ -14,7 +15,7 @@ function status(unit, ability) {
 function shownItems(units) {
   const available = ITEMS.filter((item) => units.some((unit) => status(unit, item.ability)));
   // A mixed selection exposes a ready item before an active buff. Once used,
-  // the other attack item becomes the actionable tile in this shared category.
+  // the other item becomes the actionable tile in this shared category.
   return available.sort((a, b) => Number(!units.some((u) => status(u, a.ability)?.remainingUses > 0))
     - Number(!units.some((u) => status(u, b.ability)?.remainingUses > 0)))
     .filter((item, index, all) => all.findIndex((other) => other.slot === item.slot) === index);

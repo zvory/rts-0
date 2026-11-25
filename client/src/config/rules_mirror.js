@@ -355,6 +355,14 @@ export const ABILITIES = Object.freeze({
     queued: false, queuePolicy: "notQueueable",
   }),
 
+  [ABILITY.VITALITY_TREASURE]: Object.freeze({
+    ability: ABILITY.VITALITY_TREASURE, label: "Vitality Treasure", icon: "+HP", hotkey: "F",
+    title: "Deliver a defense item within 30 tiles; activate for +150 maximum and current HP for 30 seconds",
+    carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: 30,
+    cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 100 }),
+    queued: false, queuePolicy: "notQueueable",
+  }),
+
   [ABILITY.DISCIPLE_SHIELD]: Object.freeze({
     ability: ABILITY.DISCIPLE_SHIELD, label: "Shield", icon: "SHD", hotkey: "X",
     title: "Place a 150 HP shield granting allied units within 2.1 tiles 75% armor against attacks from outside; armor piercing works normally; each hit drains full attack damage from shield HP; lasts up to 5 seconds",
