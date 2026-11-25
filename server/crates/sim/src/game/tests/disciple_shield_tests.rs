@@ -43,6 +43,27 @@ fn cast(caster: u32, x: f32, queued: bool) -> Command {
 }
 
 #[test]
+fn disciple_shield_keeps_five_tile_cast_range() {
+    for (range_tiles, should_cast) in [(5.0, true), (5.1, false)] {
+        let (mut game, caster) = setup();
+        game.enqueue(
+            1,
+            cast(
+                caster,
+                400.0 + range_tiles * config::TILE_SIZE as f32,
+                false,
+            ),
+        );
+        game.tick();
+        assert_eq!(
+            game.state.entities.get(caster).unwrap().shield.is_some(),
+            should_cast,
+            "Shield must retain its own range independently of Magic Anchor"
+        );
+    }
+}
+
+#[test]
 fn disciple_shield_in_range_preserves_movement_and_future_orders() {
     for attack_move in [false, true] {
         let (mut game, caster) = setup();
