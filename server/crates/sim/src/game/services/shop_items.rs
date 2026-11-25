@@ -22,6 +22,7 @@ pub(in crate::game) fn is_shop_item(ability: AbilityKind) -> bool {
             | AbilityKind::Haste
             | AbilityKind::DoubleDamage
             | AbilityKind::ArmorTreasure
+            | AbilityKind::VitalityTreasure
     )
 }
 
@@ -180,13 +181,22 @@ pub(super) fn purchase(
 pub(in crate::game) fn is_buff_item(ability: AbilityKind) -> bool {
     matches!(
         ability,
-        AbilityKind::Haste | AbilityKind::DoubleDamage | AbilityKind::ArmorTreasure
+        AbilityKind::Haste
+            | AbilityKind::DoubleDamage
+            | AbilityKind::ArmorTreasure
+            | AbilityKind::VitalityTreasure
     )
 }
 fn same_item_category(a: AbilityKind, b: AbilityKind) -> bool {
     is_buff_item(a)
         && is_buff_item(b)
-        && ((a == AbilityKind::ArmorTreasure) == (b == AbilityKind::ArmorTreasure))
+        && (matches!(
+            a,
+            AbilityKind::ArmorTreasure | AbilityKind::VitalityTreasure
+        ) == matches!(
+            b,
+            AbilityKind::ArmorTreasure | AbilityKind::VitalityTreasure
+        ))
 }
 
 /// Resolve before death attribution/removal so every damage source observes the same charge.

@@ -140,6 +140,7 @@ pub mod abilities {
     pub const HASTE: &str = "haste";
     pub const DOUBLE_DAMAGE: &str = "doubleDamage";
     pub const ARMOR_TREASURE: &str = "armorTreasure";
+    pub const VITALITY_TREASURE: &str = "vitalityTreasure";
 
     pub const ALL: &[&str] = &[
         CHARGE,
@@ -167,6 +168,7 @@ pub mod abilities {
         HASTE,
         DOUBLE_DAMAGE,
         ARMOR_TREASURE,
+        VITALITY_TREASURE,
     ];
 }
 
@@ -523,6 +525,7 @@ const ORDER_STAGE_CODES: &[(&str, u8)] = &[
     (abilities::HASTE, 31),
     (abilities::DOUBLE_DAMAGE, 32),
     (abilities::ARMOR_TREASURE, 33),
+    (abilities::VITALITY_TREASURE, 34),
 ];
 
 const ABILITY_CODES: &[(&str, u8)] = &[
@@ -551,6 +554,7 @@ const ABILITY_CODES: &[(&str, u8)] = &[
     (abilities::HASTE, 23),
     (abilities::DOUBLE_DAMAGE, 24),
     (abilities::ARMOR_TREASURE, 25),
+    (abilities::VITALITY_TREASURE, 26),
 ];
 
 const ABILITY_OBJECT_KIND_CODES: &[(&str, u8)] = &[
@@ -877,6 +881,7 @@ fn ability_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("HASTE", abilities::HASTE),
         ("DOUBLE_DAMAGE", abilities::DOUBLE_DAMAGE),
         ("ARMOR_TREASURE", abilities::ARMOR_TREASURE),
+        ("VITALITY_TREASURE", abilities::VITALITY_TREASURE),
     ])
 }
 
@@ -979,6 +984,7 @@ fn order_stage_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("HASTE", abilities::HASTE),
         ("DOUBLE_DAMAGE", abilities::DOUBLE_DAMAGE),
         ("ARMOR_TREASURE", abilities::ARMOR_TREASURE),
+        ("VITALITY_TREASURE", abilities::VITALITY_TREASURE),
         ("SETUP_ANTI_TANK_GUNS", "setupAntiTankGuns"),
     ])
 }

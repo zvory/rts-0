@@ -508,6 +508,7 @@ pub fn project_entity(
             ability::AbilityKind::Haste,
             ability::AbilityKind::DoubleDamage,
             ability::AbilityKind::ArmorTreasure,
+            ability::AbilityKind::VitalityTreasure,
         ] {
             let remaining = entity
                 .ability_uses_remaining

@@ -798,3 +798,71 @@ fn escape_purchase_cooldown_is_shared_by_old_and_new_shops_and_checkpointed() {
     game.tick();
     assert_eq!(game.state.players[0].oil, 800);
 }
+
+#[test]
+fn vitality_treasure_boosts_both_health_values_and_restores_wounded_health_after_expiry() {
+    let (mut game, shop, unit) = item_fixture();
+    let target = game.state.entities.get_mut(unit).unwrap();
+    let base = target.max_hp;
+    target.apply_damage(20, None);
+    buy(&mut game, shop, unit, AbilityKind::VitalityTreasure);
+    buy(&mut game, shop, unit, AbilityKind::ArmorTreasure);
+    for _ in 0..32 {
+        game.tick();
+    }
+    assert_eq!(
+        game.state.players[0].oil, 900,
+        "in-flight defense reservation prevents a second purchase"
+    );
+    let target = game.state.entities.get(unit).unwrap();
+    assert_eq!((target.hp, target.max_hp), (base - 20, base));
+    activate_item(&mut game, unit, AbilityKind::VitalityTreasure);
+    game.tick();
+    let target = game.state.entities.get_mut(unit).unwrap();
+    assert_eq!((target.hp, target.max_hp), (base + 130, base + 150));
+    target.apply_damage(140, None);
+    let wounded = target.hp;
+    let mut game = Game::restore_checkpoint_payload_text_for_test(
+        &game.checkpoint_payload_text_for_test().unwrap(),
+        game.state.map.clone(),
+        game.state.map_metadata.clone(),
+    )
+    .unwrap();
+    let target = game.state.entities.get(unit).unwrap();
+    assert_eq!((target.hp, target.max_hp), (wounded, base + 150));
+    buy(&mut game, shop, unit, AbilityKind::ArmorTreasure);
+    game.tick();
+    assert_eq!(game.state.players[0].oil, 900);
+    for _ in 0..900 {
+        game.tick();
+    }
+    let target = game.state.entities.get(unit).unwrap();
+    assert_eq!((target.hp, target.max_hp), (wounded, base));
+    buy(&mut game, shop, unit, AbilityKind::ArmorTreasure);
+    for _ in 0..32 {
+        game.tick();
+    }
+    assert_eq!(game.state.players[0].oil, 800);
+}
+
+#[test]
+fn vitality_treasure_keeps_a_flat_bonus_through_dao_advancement_and_clamps_on_expiry() {
+    let mut unit =
+        crate::game::entity::Entity::new_unit(1, EntityKind::Warrior, 320.0, 320.0).unwrap();
+    unit.receive_shop_item(AbilityKind::VitalityTreasure);
+    unit.activate_shop_item(AbilityKind::VitalityTreasure);
+    let base = config::unit_stats(EntityKind::Warrior).unwrap().hp;
+    assert_eq!((unit.hp, unit.max_hp), (base + 150, base + 150));
+    unit.insight = config::DISCIPLE_INSIGHT_REQUIRED;
+    assert!(unit.evolve_dao(AbilityKind::EvolveWar));
+    let adept = config::unit_stats(EntityKind::WarAdept).unwrap().hp;
+    assert_eq!((unit.hp, unit.max_hp), (adept + 150, adept + 150));
+    unit.insight = config::DISCIPLE_EVOLVED_INSIGHT_CAP;
+    unit.advance_dao_master();
+    let master = ((adept as f32) * config::DAO_MASTER_HP_MULTIPLIER).round() as u32;
+    assert_eq!((unit.hp, unit.max_hp), (master + 150, master + 150));
+    for _ in 0..900 {
+        unit.tick_ability_cooldowns();
+    }
+    assert_eq!((unit.hp, unit.max_hp), (master, master));
+}

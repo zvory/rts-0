@@ -3,13 +3,15 @@ use crate::game::entity::Entity;
 use super::CheckpointPayloadError;
 
 pub(super) fn validate(entity: &Entity) -> Result<(), CheckpointPayloadError> {
-    use crate::game::ability::AbilityKind::{ArmorTreasure, DoubleDamage, Haste};
-    for ability in [Haste, DoubleDamage, ArmorTreasure] {
+    use crate::game::ability::AbilityKind::{ArmorTreasure, DoubleDamage, Haste, VitalityTreasure};
+    for ability in [Haste, DoubleDamage, ArmorTreasure, VitalityTreasure] {
         let ticks = entity.ability_cooldowns.get(&ability).copied().unwrap_or(0);
         if ticks > 900
             || (ticks > 0
                 && (!entity.is_unit()
-                    || (ability == Haste && entity.shop_item_active(DoubleDamage))))
+                    || (ability == Haste && entity.shop_item_active(DoubleDamage))
+                    || (ability == VitalityTreasure
+                        && (entity.max_hp <= 150 || entity.shop_item_active(ArmorTreasure)))))
         {
             return Err(CheckpointPayloadError::InvalidValue {
                 field: "entities.abilityCooldowns",
@@ -17,9 +19,12 @@ pub(super) fn validate(entity: &Entity) -> Result<(), CheckpointPayloadError> {
         }
     }
     for (&ability, &remaining) in &entity.ability_uses_remaining {
-        if matches!(ability, Haste | DoubleDamage | ArmorTreasure) {
-            let conflicting = if ability == ArmorTreasure {
-                &[ArmorTreasure][..]
+        if matches!(
+            ability,
+            Haste | DoubleDamage | ArmorTreasure | VitalityTreasure
+        ) {
+            let conflicting = if matches!(ability, ArmorTreasure | VitalityTreasure) {
+                &[ArmorTreasure, VitalityTreasure][..]
             } else {
                 &[Haste, DoubleDamage][..]
             };
