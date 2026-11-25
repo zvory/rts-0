@@ -1,4 +1,5 @@
 use crate::config;
+use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::entity::{
     uses_car_movement_semantics, uses_oriented_vehicle_body, uses_pivot_vehicle_movement,
     AttackPhase, Entity, EntityKind, EntityStore, MovePhase, Order, PanzerfaustState, WeaponSetup,
@@ -15,6 +16,7 @@ use crate::game::upgrade::UpgradeKind;
 use crate::game::PlayerState;
 use crate::rules::terrain::{movement_speed_multiplier, TerrainKind};
 use rts_rules::math::GameplayMath as _;
+use std::collections::BTreeSet;
 
 use super::car_drive::{
     barrage_maneuver_target, barrage_pose_ready, plan_barrage_maneuver, plan_scout_car_motion,
@@ -53,9 +55,14 @@ pub(super) fn advance_moving_units(
     occ: &Occupancy,
     spatial: &SpatialIndex,
     tick: u32,
-) {
+    ability_runtime: &AbilityRuntime,
+) -> BTreeSet<u32> {
+    let mut integrated = BTreeSet::new();
     let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
-    let mut blockers = UnitBlockers::new(entities);
+    let mut blockers = UnitBlockers::with_contact_locks(
+        entities,
+        super::anchor_contact_ids(entities, &teams, ability_runtime, tick),
+    );
     let wire_tiles = super::barbed_wire::tiles(map, entities);
     for id in entities.ids() {
         let barrage_target = entities.get(id).and_then(barrage_maneuver_target);
@@ -542,6 +549,33 @@ pub(super) fn advance_moving_units(
             }
         }
 
+        // Admit the sum of voluntary motion and forced motion once. A blocked inward
+        // pull must not leave an earlier outward path step behind as free movement.
+        if let Some((pull_x, pull_y)) =
+            super::anchor_displacement(&motion_entity, &teams, ability_runtime, tick)
+        {
+            integrated.insert(id);
+            let desired = (x + pull_x, y + pull_y);
+            let facing = new_facing.unwrap_or(original_facing);
+            let candidates = [desired, (desired.0, orig_y), (orig_x, desired.1)];
+            let legal = candidates.into_iter().find(|&to| {
+                segment_clear(&blockers, (orig_x, orig_y), to)
+                    && unit_static_standable(occ, map, kind, to.0, to.1, facing)
+            });
+            (x, y) = legal.unwrap_or((orig_x, orig_y));
+            let consumed_goal = entities.get(id).is_some_and(|e| e.path_is_empty())
+                && motion_entity
+                    .movement
+                    .as_ref()
+                    .and_then(|m| m.path.first())
+                    .is_some_and(|&goal| distance_between((x, y), goal) > ARRIVE_EPS);
+            if legal.is_none() || consumed_goal {
+                if let Some(e) = entities.get_mut(id) {
+                    e.restore_blocked_movement(original_movement.clone());
+                }
+            }
+        }
+
         // Car arcs, arrival snaps, rotation unjams and all fallback paths share admission.
         if entities.get(id).is_some_and(|e| {
             !blockers.motion_clear(e, (x, y), new_facing.unwrap_or(original_facing), &teams)
@@ -780,6 +814,7 @@ pub(super) fn advance_moving_units(
             }
         }
     }
+    integrated
 }
 
 /// Return the strongest current Command Car speed effect for an owned unit.

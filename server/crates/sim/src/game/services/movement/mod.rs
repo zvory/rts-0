@@ -17,6 +17,7 @@ use crate::game::smoke::SmokeCloudStore;
 use crate::game::upgrade::UpgradeKind;
 use crate::game::PlayerState;
 use rts_rules::math::GameplayMath as _;
+use std::collections::BTreeSet;
 
 mod armor_reaction;
 mod barbed_wire;
@@ -58,6 +59,7 @@ pub(crate) fn resolve_collisions(
         map,
         occ,
         &crate::game::teams::TeamRelations::from_player_teams([]),
+        None,
     )
 }
 
@@ -67,9 +69,10 @@ pub(crate) fn resolve_collisions_with_teams(
     map: &Map,
     occ: &Occupancy,
     teams: &crate::game::teams::TeamRelations,
+    anchor_context: Option<(&AbilityRuntime, u32)>,
 ) -> bool {
     let before = barbed_wire::positions(map, entities);
-    collision::resolve_collisions(entities, spatial, map, occ, teams);
+    collision::resolve_collisions(entities, spatial, map, occ, teams, anchor_context);
     barbed_wire::apply_entries(map, entities, &before)
 }
 pub(crate) use pivot_drive::{angle_delta, rotate_toward};
@@ -160,8 +163,24 @@ pub(crate) fn movement_system_with_context(
         }
         allowed
     });
-    waypoints::advance_moving_units(map, entities, players, occ, spatial, tick);
-    apply_magic_anchor_pull(map, entities, players, occ, tick, ability_runtime);
+    let integrated = waypoints::advance_moving_units(
+        map,
+        entities,
+        players,
+        occ,
+        spatial,
+        tick,
+        ability_runtime,
+    );
+    apply_magic_anchor_pull(
+        map,
+        entities,
+        players,
+        occ,
+        tick,
+        ability_runtime,
+        &integrated,
+    );
     barbed_wire::apply_entries(map, entities, &wire_positions);
     for id in entities.ids() {
         if let Some(e) = entities.get_mut(id) {
@@ -202,6 +221,41 @@ fn clamp_meth_machine_gunner_setup(entities: &mut EntityStore, id: u32) {
     }
 }
 
+fn anchor_contact_ids(
+    entities: &EntityStore,
+    teams: &crate::game::teams::TeamRelations,
+    runtime: &AbilityRuntime,
+    tick: u32,
+) -> Vec<u32> {
+    entities
+        .iter()
+        .filter(|e| {
+            e.is_unit()
+                && e.kind != EntityKind::ScoutPlane
+                && runtime
+                    .magic_anchor_pull(e.owner, teams, e.pos_x(), e.pos_y(), tick)
+                    .is_some()
+        })
+        .map(|e| e.id)
+        .collect()
+}
+
+fn anchor_displacement(
+    e: &crate::game::entity::Entity,
+    teams: &crate::game::teams::TeamRelations,
+    runtime: &AbilityRuntime,
+    tick: u32,
+) -> Option<(f32, f32)> {
+    let (dir, strength, distance) =
+        runtime.magic_anchor_pull(e.owner, teams, e.pos_x(), e.pos_y(), tick)?;
+    let resistance = standability::footing_resistance(standability::footing_profile(e)).max(1.0);
+    let magnitude =
+        (e.movement_speed() * config::EKAT_MAGIC_ANCHOR_PULL_SPEED_MULTIPLIER * strength
+            / resistance.det_sqrt())
+        .min(distance);
+    (magnitude.is_finite()).then_some((dir.0 * magnitude, dir.1 * magnitude))
+}
+
 fn apply_magic_anchor_pull(
     map: &Map,
     entities: &mut EntityStore,
@@ -209,48 +263,37 @@ fn apply_magic_anchor_pull(
     occ: &Occupancy,
     tick: u32,
     ability_runtime: &AbilityRuntime,
+    integrated: &BTreeSet<u32>,
 ) {
     let teams = crate::game::teams::TeamRelations::from_player_teams(
         players.iter().map(|p| (p.id, p.team_id)),
     );
-    let mut blockers = crate::game::services::standability::UnitBlockers::new(entities);
+    let mut blockers = crate::game::services::standability::UnitBlockers::with_contact_locks(
+        entities,
+        anchor_contact_ids(entities, &teams, ability_runtime, tick),
+    );
     let world_max_x = map.world_width_px() - 0.01;
     let world_max_y = map.world_height_px() - 0.01;
     for id in entities.ids() {
-        let Some((kind, owner, x, y, facing, speed, resistance)) = entities.get(id).and_then(|e| {
+        if integrated.contains(&id) {
+            continue;
+        }
+        let Some((kind, x, y, facing, delta)) = entities.get(id).and_then(|e| {
             if !e.is_unit() || e.kind == EntityKind::ScoutPlane {
                 return None;
             }
-            let profile = standability::footing_profile(e);
-            // Work orders allow workers to pass through friendly traffic, but must not
-            // make them immune to hostile displacement (or divide by zero).
-            let resistance = standability::footing_resistance(profile).max(1.0);
-            let speed = e.movement_speed();
             Some((
                 e.kind,
-                e.owner,
                 e.pos_x(),
                 e.pos_y(),
                 e.facing(),
-                speed,
-                resistance,
+                anchor_displacement(e, &teams, ability_runtime, tick)?,
             ))
         }) else {
             continue;
         };
-        let Some((dir, strength, distance)) =
-            ability_runtime.magic_anchor_pull(owner, &teams, x, y, tick)
-        else {
-            continue;
-        };
-        let pull_px = (speed * config::EKAT_MAGIC_ANCHOR_PULL_SPEED_MULTIPLIER * strength
-            / resistance.det_sqrt())
-        .min(distance);
-        if pull_px <= 0.0 || !pull_px.is_finite() {
-            continue;
-        }
-        let next_x = (x + dir.0 * pull_px).clamp(0.0, world_max_x);
-        let next_y = (y + dir.1 * pull_px).clamp(0.0, world_max_y);
+        let next_x = (x + delta.0).clamp(0.0, world_max_x);
+        let next_y = (y + delta.1).clamp(0.0, world_max_y);
         if !crate::game::services::standability::unit_static_standable_with_radius(
             map,
             occ,

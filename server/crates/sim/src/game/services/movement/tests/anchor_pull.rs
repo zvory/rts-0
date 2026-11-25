@@ -3,6 +3,7 @@ use crate::game::ability::AbilityKind;
 use crate::game::ability_runtime::{
     AbilityObjectPayload, AbilityWorldObjectKind, AbilityWorldObjectSpec,
 };
+use std::collections::BTreeSet;
 
 fn anchor(center: (f32, f32), expires_tick: u32) -> AbilityRuntime {
     let mut runtime = AbilityRuntime::new();
@@ -48,6 +49,7 @@ fn anchor_pull_clamps_at_center_and_ignores_expired_or_outside_fields() {
             &occ,
             1,
             &anchor(center, expires_tick),
+            &BTreeSet::new(),
         );
         assert!((pos(&entities, unit).0 - center.0 - expected_offset).abs() < 0.01);
     }
@@ -75,7 +77,15 @@ fn anchor_vector_respects_enemy_body_blockers_and_preserves_path() {
     entities.get_mut(unit).unwrap().set_path(vec![destination]);
     let occ = Occupancy::build(&map, &entities);
     let runtime = anchor((start.0 + 32.0, start.1), 100);
-    apply_magic_anchor_pull(&map, &mut entities, &players, &occ, 1, &runtime);
+    apply_magic_anchor_pull(
+        &map,
+        &mut entities,
+        &players,
+        &occ,
+        1,
+        &runtime,
+        &BTreeSet::new(),
+    );
     assert_eq!(
         pos(&entities, unit),
         start,
@@ -106,7 +116,15 @@ fn anchor_pull_affects_workers_with_pass_through_work_orders() {
             .unwrap();
         entities.get_mut(worker).unwrap().set_order(order.clone());
         let occ = Occupancy::build(&map, &entities);
-        apply_magic_anchor_pull(&map, &mut entities, &players, &occ, 1, &runtime);
+        apply_magic_anchor_pull(
+            &map,
+            &mut entities,
+            &players,
+            &occ,
+            1,
+            &runtime,
+            &BTreeSet::new(),
+        );
         let pulled = pos(&entities, worker);
         assert!(
             pulled.0 > start.0,
@@ -114,5 +132,160 @@ fn anchor_pull_affects_workers_with_pass_through_work_orders() {
         );
         assert_eq!(pulled, *idle_position.get_or_insert(pulled));
         assert_eq!(entities.get(worker).unwrap().order(), order);
+    }
+}
+
+#[test]
+fn anchor_contact_prevents_rear_pressure_from_advancing_the_front() {
+    let map = flat_map(2);
+    let players = [player_with_oil(1, 0), player_with_oil(2, 0)];
+    let teams = crate::game::teams::TeamRelations::from_player_teams([(1, 1), (2, 2)]);
+    let center = map.tile_center(14, 14);
+    for reverse_spawn in [false, true] {
+        let mut entities = EntityStore::new();
+        let mut ids = Vec::new();
+        let indices: Vec<usize> = if reverse_spawn {
+            (0..10).rev().collect()
+        } else {
+            (0..10).collect()
+        };
+        let mut front = 0;
+        for index in indices {
+            let unit = entities
+                .spawn_unit(
+                    2,
+                    EntityKind::Rifleman,
+                    center.0 + 40.0 - index as f32 * 18.1,
+                    center.1,
+                )
+                .unwrap();
+            mark_moving(&mut entities, unit, (center.0 + 240.0, center.1));
+            if index == 0 {
+                front = unit;
+            }
+            ids.push(unit);
+        }
+        let start_x = pos(&entities, front).0;
+        let runtime = anchor(center, 100);
+        for tick in 1..=30 {
+            let occ = Occupancy::build(&map, &entities);
+            let spatial = SpatialIndex::build(&entities, map.width, map.height);
+            movement_system_with_context(
+                &map,
+                &mut entities,
+                &players,
+                &occ,
+                &spatial,
+                tick,
+                &SmokeCloudStore::new(),
+                &runtime,
+            );
+            let spatial = SpatialIndex::build(&entities, map.width, map.height);
+            resolve_collisions_with_teams(
+                &mut entities,
+                &spatial,
+                &map,
+                &occ,
+                &teams,
+                Some((&runtime, tick)),
+            );
+            assert!(pos(&entities, front).0 <= start_x + 0.01,
+                "rear traffic must not override net inward motion: reverse={reverse_spawn}, tick={tick}, front={:?}", pos(&entities, front));
+        }
+        // With the same queued movement, expiry restores ordinary friendly traffic.
+        let before = pos(&entities, front).0;
+        for tick in 100..110 {
+            let occ = Occupancy::build(&map, &entities);
+            let spatial = SpatialIndex::build(&entities, map.width, map.height);
+            movement_system_with_context(
+                &map,
+                &mut entities,
+                &players,
+                &occ,
+                &spatial,
+                tick,
+                &SmokeCloudStore::new(),
+                &runtime,
+            );
+            let spatial = SpatialIndex::build(&entities, map.width, map.height);
+            resolve_collisions_with_teams(
+                &mut entities,
+                &spatial,
+                &map,
+                &occ,
+                &teams,
+                Some((&runtime, tick)),
+            );
+        }
+        assert!(
+            pos(&entities, front).0 > before + 1.0,
+            "movement must resume on expiry"
+        );
+    }
+}
+
+#[test]
+fn anchor_combines_outward_walking_with_pull_before_admitting_contact() {
+    let map = flat_map(2);
+    let players = [player_with_oil(1, 0), player_with_oil(2, 0)];
+    let center = map.tile_center(14, 14);
+    let mut entities = EntityStore::new();
+    let front = entities
+        .spawn_unit(2, EntityKind::Rifleman, center.0 + 40.0, center.1)
+        .unwrap();
+    entities
+        .spawn_unit(2, EntityKind::Rifleman, center.0 + 22.0, center.1)
+        .unwrap();
+    mark_moving(&mut entities, front, (center.0 + 240.0, center.1));
+    let occ = Occupancy::build(&map, &entities);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
+    movement_system_with_context(
+        &map,
+        &mut entities,
+        &players,
+        &occ,
+        &spatial,
+        1,
+        &SmokeCloudStore::new(),
+        &anchor(center, 100),
+    );
+    assert!(
+        pos(&entities, front).0 <= center.0 + 40.01,
+        "a blocked inward vector must not leave a free outward path step"
+    );
+}
+
+#[test]
+fn anchor_collision_cleanup_cannot_add_outward_movement() {
+    let map = flat_map(2);
+    let teams = crate::game::teams::TeamRelations::from_player_teams([(1, 1), (2, 2)]);
+    let center = map.tile_center(14, 14);
+    for active in [false, true] {
+        let mut entities = EntityStore::new();
+        let front = entities
+            .spawn_unit(2, EntityKind::Rifleman, center.0 + 40.0, center.1)
+            .unwrap();
+        entities
+            .spawn_unit(2, EntityKind::Rifleman, center.0 + 30.0, center.1)
+            .unwrap();
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
+        let runtime = anchor(center, 100);
+        resolve_collisions_with_teams(
+            &mut entities,
+            &spatial,
+            &map,
+            &occ,
+            &teams,
+            active.then_some((&runtime, 1)),
+        );
+        if active {
+            assert!(pos(&entities, front).0 <= center.0 + 40.01);
+        } else {
+            assert!(
+                pos(&entities, front).0 > center.0 + 40.01,
+                "control must reproduce ordinary pushing"
+            );
+        }
     }
 }

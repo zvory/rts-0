@@ -19,8 +19,8 @@ fn ekat_magic_anchor_adds_same_inward_vector_for_idle_and_every_move_direction()
             delta: reported_delta,
             ..
         } = anchor_vector_step(destination, 2, true);
-        let dx = center.0 - base.0;
-        let dy = center.1 - base.1;
+        let dx = center.0 - start.0;
+        let dy = center.1 - start.1;
         let distance = (dx * dx + dy * dy).det_sqrt();
         let radius = config::EKAT_MAGIC_ANCHOR_RADIUS_TILES * config::TILE_SIZE as f32;
         let speed = config::unit_stats(EntityKind::Rifleman).unwrap().speed;

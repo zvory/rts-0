@@ -1,4 +1,5 @@
 use crate::config;
+use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::entity::{EntityKind, EntityStore};
 use crate::game::map::Map;
 use crate::game::services::geometry::{unit_body_for_entity, unit_body_overlap, UnitBody};
@@ -55,11 +56,31 @@ pub(crate) fn resolve_collisions(
     map: &Map,
     occ: &Occupancy,
     teams: &TeamRelations,
+    anchor_context: Option<(&AbilityRuntime, u32)>,
 ) {
     let world_max_x = map.world_width_px() - 0.01;
     let world_max_y = map.world_height_px() - 0.01;
     let ids = entities.ids();
-    let mut blockers = UnitBlockers::new(entities);
+    let locks = anchor_context
+        .map(|(runtime, tick)| super::anchor_contact_ids(entities, teams, runtime, tick))
+        .unwrap_or_default();
+    let mut blockers = UnitBlockers::with_contact_locks(entities, locks);
+    // Separation is housekeeping, not an extra outward movement budget. Let the
+    // blocked follower absorb congestion instead of undoing the field on the front unit.
+    let pull_allows = |e: &crate::game::entity::Entity, pos: (f32, f32)| {
+        let Some((runtime, tick)) = anchor_context else {
+            return true;
+        };
+        let Some((dir, _, distance)) =
+            runtime.magic_anchor_pull(e.owner, teams, e.pos_x(), e.pos_y(), tick)
+        else {
+            return true;
+        };
+        let center = (e.pos_x() + dir.0 * distance, e.pos_y() + dir.1 * distance);
+        let dx = pos.0 - center.0;
+        let dy = pos.1 - center.1;
+        dx * dx + dy * dy <= distance * distance + 0.001
+    };
     let mut candidates = Vec::new();
 
     for pass in 0..COLLISION_PASSES {
@@ -260,9 +281,9 @@ pub(crate) fn resolve_collisions(
                 };
 
                 let a_push = a_push.filter(|&pos| {
-                    entities
-                        .get(a)
-                        .is_some_and(|e| blockers.motion_clear(e, pos, e.facing(), teams))
+                    entities.get(a).is_some_and(|e| {
+                        pull_allows(e, pos) && blockers.motion_clear(e, pos, e.facing(), teams)
+                    })
                 });
                 if let Some((nax, nay)) = a_push {
                     if let Some(e) = entities.get_mut(a) {
@@ -272,9 +293,9 @@ pub(crate) fn resolve_collisions(
                     }
                 }
                 let b_push = b_push.filter(|&pos| {
-                    entities
-                        .get(b)
-                        .is_some_and(|e| blockers.motion_clear(e, pos, e.facing(), teams))
+                    entities.get(b).is_some_and(|e| {
+                        pull_allows(e, pos) && blockers.motion_clear(e, pos, e.facing(), teams)
+                    })
                 });
                 if let Some((nbx, nby)) = b_push {
                     if let Some(e) = entities.get_mut(b) {

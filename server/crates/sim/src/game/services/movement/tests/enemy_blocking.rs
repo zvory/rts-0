@@ -37,7 +37,7 @@ fn friendly_push_chain_stops_at_enemy_tank() {
             let occ = Occupancy::build(&map, &entities);
             let spatial = SpatialIndex::build(&entities, map.width, map.height);
             movement_system(&map, &mut entities, &[], &occ, &spatial, 0);
-            resolve_collisions_with_teams(&mut entities, &spatial, &map, &occ, &teams());
+            resolve_collisions_with_teams(&mut entities, &spatial, &map, &occ, &teams(), None);
             assert_eq!(
                 pos(&entities, tank),
                 before,
@@ -68,7 +68,7 @@ fn opposing_moving_units_cannot_cross_or_push_each_other() {
         movement_system(&map, &mut entities, &[], &occ, &spatial, tick);
         assert!(body_overlap_depth(&entities, a, b) <= 0.001);
         let before = (pos(&entities, a), pos(&entities, b));
-        resolve_collisions_with_teams(&mut entities, &spatial, &map, &occ, &teams());
+        resolve_collisions_with_teams(&mut entities, &spatial, &map, &occ, &teams(), None);
         assert_eq!((pos(&entities, a), pos(&entities, b)), before);
     }
 }
@@ -87,7 +87,7 @@ fn teammate_units_still_separate_but_opponents_do_not() {
         let before = (pos(&entities, a), pos(&entities, b));
         let occ = Occupancy::build(&map, &entities);
         let spatial = SpatialIndex::build(&entities, map.width, map.height);
-        resolve_collisions_with_teams(&mut entities, &spatial, &map, &occ, &teams());
+        resolve_collisions_with_teams(&mut entities, &spatial, &map, &occ, &teams(), None);
         if owner == 2 {
             assert_eq!((pos(&entities, a), pos(&entities, b)), before);
         } else {

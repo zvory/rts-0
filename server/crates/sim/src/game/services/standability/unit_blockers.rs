@@ -12,11 +12,21 @@ struct Entry {
 pub(crate) struct UnitBlockers {
     entries: BTreeMap<u32, Entry>,
     cells: BTreeMap<(i32, i32), BTreeSet<u32>>,
+    contact_locks: BTreeSet<u32>,
 }
 
 impl UnitBlockers {
     pub(crate) fn new(entities: &EntityStore) -> Self {
+        Self::with_contact_locks(entities, [])
+    }
+
+    /// Locked units exchange no friendly pressure: contact blocks entry instead.
+    pub(crate) fn with_contact_locks(
+        entities: &EntityStore,
+        ids: impl IntoIterator<Item = u32>,
+    ) -> Self {
         let mut index = Self {
+            contact_locks: ids.into_iter().collect(),
             entries: BTreeMap::new(),
             cells: BTreeMap::new(),
         };
@@ -80,7 +90,9 @@ impl UnitBlockers {
         self.neighbors(body).into_iter().all(|id| {
             id == entity.id
                 || self.entries.get(&id).is_none_or(|other| {
-                    teams.same_team_or_same_owner(entity.owner, other.owner)
+                    (teams.same_team_or_same_owner(entity.owner, other.owner)
+                        && !self.contact_locks.contains(&entity.id)
+                        && !self.contact_locks.contains(&id))
                         || !unit_bodies_intersect(body, other.body)
                 })
         })
@@ -139,7 +151,11 @@ impl UnitBlockers {
             let Some(other) = self.entries.get(&id) else {
                 continue;
             };
-            if id == entity.id || teams.same_team_or_same_owner(entity.owner, other.owner) {
+            if id == entity.id
+                || (teams.same_team_or_same_owner(entity.owner, other.owner)
+                    && !self.contact_locks.contains(&entity.id)
+                    && !self.contact_locks.contains(&id))
+            {
                 continue;
             }
             let initial = unit_body_overlap(start, other.body).map_or(0.0, |o| o.depth);

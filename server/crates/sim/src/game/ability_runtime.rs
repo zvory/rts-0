@@ -403,11 +403,16 @@ impl AbilityRuntime {
                 let dx = object.x.to_world() - x;
                 let dy = object.y.to_world() - y;
                 let dist = (dx * dx + dy * dy).det_sqrt();
-                if dist > radius || dist <= 0.0001 {
+                if dist > radius {
                     return None;
                 }
                 let strength = 1.0 - (dist / radius).clamp(0.0, 1.0);
-                Some((((dx / dist), (dy / dist)), strength, dist))
+                let direction = if dist <= 0.0001 {
+                    (0.0, 0.0)
+                } else {
+                    (dx / dist, dy / dist)
+                };
+                Some((direction, strength, dist))
             })
             .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
     }
