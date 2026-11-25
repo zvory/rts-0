@@ -1,3 +1,4 @@
+import { CULTIVATOR_MASTER_ITEM_CAPACITY } from "../config.js";
 import { KIND } from "../protocol.js";
 
 const CULTIVATOR_FIGHTERS = new Set([
@@ -11,7 +12,7 @@ const CULTIVATOR_FIGHTERS = new Set([
 export function cultivatorItemTier(entity) {
   if (!CULTIVATOR_FIGHTERS.has(entity?.kind)) return 0;
   const tier = entity.itemRadianceTier;
-  return Number.isInteger(tier) && tier >= 0 && tier <= 3 ? tier : 0;
+  return Number.isInteger(tier) && tier >= 0 && tier <= CULTIVATOR_MASTER_ITEM_CAPACITY ? tier : 0;
 }
 const vertex = `
 in vec2 aPosition;
@@ -56,9 +57,13 @@ void main() {
 }`;
 export function updateItemRadiance(instance, entity, now) {
   if (instance.silhouetteShadow) return;
-  const tier = cultivatorItemTier(entity);
-  if (instance.itemGlow) instance.itemGlow.visible = tier >= 2;
-  if (tier >= 2) {
+  const count = cultivatorItemTier(entity);
+  // Preserve the former one/two/three-item appearances at counts one/three/six.
+  // Counts two, four and five interpolate smoothly between those approved endpoints.
+  const tier = count <= 3 ? 1 + (count - 1) / 2 : 2 + (count - 3) / 3;
+  const bloom = Math.max(0, Math.min(1, tier - 1));
+  if (instance.itemGlow) instance.itemGlow.visible = count >= 2;
+  if (count >= 2) {
     if (!instance.itemGlow) {
       instance.itemGlow = new PIXI.Sprite(instance.sprite.texture);
       instance.itemGlow.anchor.set(0.5);
@@ -72,12 +77,12 @@ export function updateItemRadiance(instance, entity, now) {
     glow.texture = instance.sprite.texture;
     glow.position.copyFrom(instance.sprite.position);
     glow.scale.copyFrom(instance.sprite.scale);
-    instance.itemGlowBlur.strength = tier === 2 ? 3 : 6;
+    instance.itemGlowBlur.strength = tier <= 2 ? 3 * bloom : 3 + 3 * (tier - 2);
     glow.alpha =
-      (tier === 2 ? 0.6 : 0.95) * (0.8 + 0.2 * Math.sin((now / 1000) * 3));
+      (tier <= 2 ? 0.6 * bloom : 0.6 + 0.35 * (tier - 2)) * (0.8 + 0.2 * Math.sin((now / 1000) * 3));
   }
-  if (instance.itemRays) instance.itemRays.visible = tier > 0;
-  if (tier > 0) {
+  if (instance.itemRays) instance.itemRays.visible = count > 0;
+  if (count > 0) {
     if (!instance.itemRays) {
       instance.itemRays = new PIXI.Graphics();
       instance.container.addChildAt(instance.itemRays, 0);
@@ -85,7 +90,7 @@ export function updateItemRadiance(instance, entity, now) {
     const g = instance.itemRays,
       t = now / 1000;
     g.clear();
-    const rayCount = 12 + (tier - 1) * 4;
+    const rayCount = 12 + Math.round((tier - 1) * 4);
     const boost = 1 + (tier - 1) * 0.4;
     for (let i = 0; i < rayCount; i++) {
       const a = (i * Math.PI * 2) / rayCount + t * 0.1;
@@ -105,7 +110,7 @@ export function updateItemRadiance(instance, entity, now) {
         });
     }
   }
-  if (!tier) {
+  if (!count) {
     if (instance.itemRim) instance.sprite.filters = null;
     return;
   }

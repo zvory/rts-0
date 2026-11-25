@@ -5,6 +5,10 @@
 import { ABILITY, KIND, UPGRADE } from "../protocol.js";
 import { TICK_HZ } from "./timing.js";
 
+// Mirrored from rules balance: total carried-item slots by rank.
+export const CULTIVATOR_ITEM_CAPACITY = 3;
+export const CULTIVATOR_MASTER_ITEM_CAPACITY = 6;
+
 export const DAO_WIND_DASH_RANGE_TILES = 15;
 export function entityAbilityRangeTiles(definition, entity) {
   return definition?.rangeTiles;

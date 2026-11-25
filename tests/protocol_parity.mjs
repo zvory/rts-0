@@ -836,14 +836,14 @@ const escapeSnapshot = decodeServerMessage({ t: "snapshot", v: COMPACT_SNAPSHOT_
 assert(escapeSnapshot.entities[0].escapeTreasure === true, "escape protection decodes at slot 53");
 assert(daoMasterSnapshot.entities[0].escapeTreasure === undefined, "absent escape protection stays absent");
 
-for (let tier = 0; tier <= 3; tier++) {
+for (let tier = 0; tier <= 6; tier++) {
   const record = [...daoMasterRecord, false, tier];
   const snapshot = decodeServerMessage({ t: "snapshot", v: COMPACT_SNAPSHOT_VERSION,
     s: [1, 0, 0, 2, 300], e: [record], ev: [], n: [0, 0, 0, 0, 0] });
   assert(snapshot.entities[0].itemRadianceTier === tier, "public item tier decodes at slot 54, including zero");
   assert(!snapshot.entities[0].abilities, "public tier does not require private ability entries");
 }
-for (const tier of [-1, 4, 1.5, "3"]) {
+for (const tier of [-1, 7, 1.5, "3"]) {
   let rejected = false;
   try {
     decodeServerMessage({ t: "snapshot", v: COMPACT_SNAPSHOT_VERSION,

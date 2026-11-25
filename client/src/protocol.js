@@ -409,4 +409,4 @@ export const cmd = Object.freeze({
 // Static map DTOs include unwalkableTiles: [{ x, y }], defaulting to [].
 // This overlay preserves terrain art and blocks ground movement/landing/placement on the server.
 
-// Compact v70 entity slot 54: public itemRadianceTier (0–3), fog-gated with its carrier.
+// Compact v70 entity slot 54: public itemRadianceTier (0–6), fog-gated with its carrier.

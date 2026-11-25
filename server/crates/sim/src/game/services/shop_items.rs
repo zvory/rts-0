@@ -118,6 +118,24 @@ pub(super) fn purchase(
         });
         return;
     }
+    // Reserve slots on launch so concurrent deliveries cannot overfill a carrier.
+    if ability == AbilityKind::EscapeTreasure || is_buff_item(ability) {
+        let incoming = runtime.projectiles().filter(|p| {
+            (p.ability == AbilityKind::EscapeTreasure || is_buff_item(p.ability))
+                && matches!(p.return_target, AbilityProjectileReturnTarget::Entity { id } if id == target_id)
+        }).count();
+        if target.carried_item_capacity().is_some_and(|capacity| {
+            usize::from(target.carried_item_count()) + incoming >= usize::from(capacity)
+        }) {
+            events.entry(player).or_default().push(Event::Notice {
+                msg: "Carried item slots are full".into(),
+                x: None,
+                y: None,
+                severity: crate::protocol::NoticeSeverity::Info,
+            });
+            return;
+        }
+    }
     if ability == AbilityKind::EscapeTreasure
         && ps.ability_cooldowns.get(&ability).copied().unwrap_or(0) > 0
     {
