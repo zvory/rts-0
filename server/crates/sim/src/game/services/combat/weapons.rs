@@ -279,7 +279,7 @@ fn support_weapon_attack_move_waiting_without_target(e: &Entity) -> bool {
 
 #[derive(Clone, Copy, Debug)]
 pub(super) struct EffectiveAttackProfile {
-    pub weapon: Option<&'static combat_rules::WeaponProfile>,
+    pub weapon: Option<combat_rules::WeaponProfile>,
     pub min_range_tiles: f32,
     pub range_tiles: f32,
     pub dmg: u32,
@@ -287,9 +287,7 @@ pub(super) struct EffectiveAttackProfile {
 }
 
 pub(super) fn effective_attack_profile(e: &Entity) -> EffectiveAttackProfile {
-    let weapon = e
-        .default_weapon_kind()
-        .and_then(combat_rules::weapon_profile);
+    let weapon = combat_rules::ranked_primary_weapon_profile(e.kind, e.dao_master);
     let base = combat_rules::attack_profile(e.kind);
     let mut profile = EffectiveAttackProfile {
         weapon,
@@ -305,9 +303,7 @@ pub(super) fn effective_attack_profile(e: &Entity) -> EffectiveAttackProfile {
         dmg: base.dmg,
         cooldown: base.cooldown,
     };
-    if e.dao_master {
-        profile.dmg = ((profile.dmg as f32) * config::DAO_MASTER_DAMAGE_MULTIPLIER).round() as u32;
-    }
+    profile.dmg = combat_rules::ranked_primary_damage(e.kind, e.dao_master, profile.dmg);
     if e.shop_item_active(crate::game::ability::AbilityKind::DoubleDamage) {
         profile.dmg = profile.dmg.saturating_mul(2);
     }

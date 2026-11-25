@@ -270,12 +270,20 @@ impl Entity {
             return;
         }
         if let Some(movement) = self.movement.as_mut() {
-            movement.novice_charge_ticks = if self.kind == EntityKind::WarAdept && self.dao_master {
-                config::WAR_MASTER_CHARGE_DURATION_TICKS
+            movement.novice_charge_ticks = if self.kind == EntityKind::WarAdept {
+                config::WAR_CHARGE_DURATION_TICKS
             } else {
                 config::NOVICE_CHARGE_DURATION_TICKS
             };
             self.start_ability_cooldown(AbilityKind::Charge, config::NOVICE_CHARGE_COOLDOWN_TICKS);
+        }
+    }
+
+    pub(in crate::game) fn end_war_charge(&mut self) {
+        if self.kind == EntityKind::WarAdept {
+            if let Some(movement) = self.movement.as_mut() {
+                movement.novice_charge_ticks = 0;
+            }
         }
     }
 
@@ -292,7 +300,11 @@ impl Entity {
                 .as_ref()
                 .is_some_and(|m| m.novice_charge_ticks > 0)
         {
-            config::NOVICE_CHARGE_SPEED_MULTIPLIER
+            if self.kind == EntityKind::WarAdept {
+                config::WAR_CHARGE_SPEED_MULTIPLIER
+            } else {
+                config::NOVICE_CHARGE_SPEED_MULTIPLIER
+            }
         } else {
             1.0
         };

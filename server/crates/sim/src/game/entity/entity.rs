@@ -300,6 +300,9 @@ impl Entity {
 
     pub fn set_order(&mut self, order: Order) {
         self.cancel_panzerfaust_windup();
+        if !matches!(order, Order::Attack(_) | Order::AttackMove(_)) {
+            self.end_war_charge();
+        }
         if let Some(m) = self.movement.as_mut() {
             m.order = order;
         }
@@ -312,6 +315,7 @@ impl Entity {
     /// previous path, target latch, and path goal no longer belong to the new order.
     pub(crate) fn replace_active_order(&mut self, order: Order) {
         self.cancel_panzerfaust_windup();
+        self.end_war_charge();
         if matches!(order, Order::Move(_) | Order::AttackMove(_)) {
             self.leave_trench_for_movement();
         }

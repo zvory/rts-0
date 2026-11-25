@@ -309,9 +309,9 @@ fn dao_profiles_keep_wind_melee_and_magic_ranged() {
         assert_eq!(profile.dmg, 23);
         assert_eq!(profile.cooldown, cooldown);
         assert_eq!(profile.weapon.unwrap().id, weapon);
-        assert_eq!(profile.weapon.unwrap().armor_penetration, 0.5);
+        assert_eq!(profile.weapon.unwrap().armor_penetration, 0.25);
         let events = run_combat_tick(&mut entities);
-        assert_eq!(entities.get(target).unwrap().hp, 278);
+        assert_eq!(entities.get(target).unwrap().hp, 282);
         assert_eq!(entities.get(disciple).unwrap().attack_cd(), cooldown);
         assert_eq!(
             entities
@@ -329,7 +329,7 @@ fn dao_profiles_keep_wind_melee_and_magic_ranged() {
         )).count(), 1);
         // The resolved primary cooldown is ticked by the compatibility helper as well.
         run_combat_tick(&mut entities);
-        assert_eq!(entities.get(target).unwrap().hp, 278);
+        assert_eq!(entities.get(target).unwrap().hp, 282);
         assert_eq!(entities.get(disciple).unwrap().attack_cd(), cooldown - 1);
     }
     let mut unit =

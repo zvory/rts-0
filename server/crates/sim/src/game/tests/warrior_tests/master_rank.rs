@@ -91,7 +91,7 @@ fn dao_master_combat_threshold_and_damage_apply_to_combat_paths() {
     use crate::game::ability::AbilityKind;
     for (ability, adept_damage, master_damage, cooldown) in [
         (AbilityKind::EvolveWind, 23, 28, 61),
-        (AbilityKind::EvolveWar, 35, 42, 91),
+        (AbilityKind::EvolveWar, 35, 84, 91),
         (AbilityKind::EvolveMagic, 23, 28, 91),
     ] {
         let mut game = empty_flat_game(&[

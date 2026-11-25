@@ -17,19 +17,19 @@ size, speed, damage and health.” Same battlefield role and counters as Wind
 Adept; no new targeting, movement, ability or economy mechanic. Automatically earned
 in normal games, including AI-owned units. No cost, build source, hotkey, build time,
 research or additional supply: advancement of an existing Adept only. Retain supply
-2, ground pathing, sight, armor, range, cooldown, penetration and all
+2, ground pathing, sight, armor, range, cooldown and all
 orders/cooldowns. Relative to Wind Adept: render and collision radius ×1.2,
 movement ×1.1 (2.97275 px/tick), ordinary attack damage ×1.2 (23→28, nearest integer),
-maximum HP ×1.4 (150→210). No ability-damage changes.
+maximum HP ×1.4 (150→210). Primary armor penetration rises from 25% to 50%. No ability-damage changes.
 
 ## War Master: Phase 0/1
 
 Armored melee damage dealer; swept helmet crest, pointed shoulders and forked yari.
 Description, automatic availability, free advancement, supply and unchanged properties
-as above, retaining War armor and 1.75-tile spear reach, reducing Throw Sword cooldown from 40 to 20 seconds, and extending automatic Charge from one to three seconds. Advancement preserves an existing cooldown. Relative to War
+as above, retaining War armor and 1.75-tile spear reach, reducing Throw Sword cooldown from 40 to 20 seconds, and retaining the Adept’s 2× automatic Charge for up to four seconds, ending on the first primary attack, loss of a legal target, or replacement of the engagement order. Advancement preserves an existing cooldown. Relative to War
 Adept: render and collision radius ×1.2, movement ×1.1 (2.31 px/tick), ordinary attack
-damage ×1.2 (35→42, after existing rounded War damage bonus), maximum HP ×1.4
-(176→246). Existing counters and penetration rules remain. No ability-damage changes.
+damage ×1.2 then ×2 (35→42→84, after existing rounded War damage bonus), maximum HP ×1.4
+(176→246). Primary armor penetration remains 100% at both ranks. No ability-damage changes.
 
 ## Magic Master: Phase 0/1
 
@@ -37,7 +37,7 @@ Ranged support caster; broad bell sleeves and three trailing mantle panels.
 Description, automatic availability, free advancement, supply and unchanged properties
 as above, retaining five-tile orb primary, Shield and Vector Field. Relative to Magic Adept:
 render and collision radius ×1.2, movement ×1.1 (2.31 px/tick), ordinary attack damage
-×1.2 (23→28), maximum HP ×1.4 (150→210). Existing counters remain. Shield capacity doubles from 150 to 300 HP and its lifetime doubles from five to ten seconds. Vector Field grows from 4 by 4 to 5 by 5 tiles; its 3-world-pixel-per-tick displacement, cast range and cooldown stay unchanged. Field size is fixed at cast time, so promotion does not resize an existing Adept field. Shield strength is fixed at cast time, so promotion preserves an existing Adept shield.
+×1.2 (23→28), maximum HP ×1.4 (150→210). Primary armor penetration rises from 25% to 50%. Existing counters remain. Shield capacity doubles from 150 to 300 HP and its lifetime doubles from five to ten seconds. Vector Field grows from 4 by 4 to 5 by 5 tiles; its 3-world-pixel-per-tick displacement, cast range and cooldown stay unchanged. Field size is fixed at cast time, so promotion does not resize an existing Adept field. Shield strength is fixed at cast time, so promotion preserves an existing Adept shield.
 
 ## Shared advancement and persistence
 
@@ -62,7 +62,7 @@ Inspect standing, moving and attacking in the real Pixi renderer and capture sti
 video for user review. Bespoke audio remains deferred; existing audio behavior stays.
 
 Patch-note draft: Adepts automatically become Masters at 200 insight, fully heal, and
-gain 20% size/damage, 10% speed and 40% maximum HP, with distinct path-specific art.
+gain 20% size, 10% speed and 40% maximum HP, with distinct path-specific art. Wind and Magic gain 20% primary damage and advance from 25% to 50% penetration; War gains 140% primary damage over its Adept and retains 100% penetration.
 
 ## Local review evidence
 
