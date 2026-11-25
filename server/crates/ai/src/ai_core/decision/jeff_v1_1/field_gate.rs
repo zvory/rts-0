@@ -51,8 +51,14 @@ impl FieldGateMemory {
         format!("fg={} lb={} ab={}", self.note, self.wait, recent.join(";"))
     }
 
-    pub(in crate::ai_core::decision) fn note_abandon(&mut self, reason: &str, site: (u32, u32), tick: u32) {
-        self.abandons.push(format!("{reason}@{},{}@{tick}", site.0, site.1));
+    pub(in crate::ai_core::decision) fn note_abandon(
+        &mut self,
+        reason: &str,
+        site: (u32, u32),
+        tick: u32,
+    ) {
+        self.abandons
+            .push(format!("{reason}@{},{}@{tick}", site.0, site.1));
     }
 }
 
@@ -81,11 +87,9 @@ pub(in crate::ai_core::decision) fn base_due(
     // A: the nodes at Jeff's Depots now, and those that will still be mining after the lookahead.
     let need = MINED_PER_TICK * param("fgmin", LOOKAHEAD_MINUTES) * 60.0 * config::TICK_HZ as f32;
     let (mut now, mut later) = (0_u32, 0_u32);
-    for node in observation
-        .resources
-        .iter()
-        .filter(|node| matches!(node.kind, EntityKind::Steel | EntityKind::Oil) && node.remaining > 0)
-    {
+    for node in observation.resources.iter().filter(|node| {
+        matches!(node.kind, EntityKind::Steel | EntityKind::Oil) && node.remaining > 0
+    }) {
         if !depots.iter().any(|depot| {
             dist2(node.x, node.y, depot.0, depot.1) <= squared(mining_range_tiles * ts)
         }) {

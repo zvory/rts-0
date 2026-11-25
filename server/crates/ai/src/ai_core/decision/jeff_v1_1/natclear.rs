@@ -191,9 +191,7 @@ pub(in crate::ai_core::decision) fn barracks_wanted(
     let clear = &memory.jeff_v1_1.natclear;
     let short = clear.active() && clear.charge.is_empty() && clear.members.len() < clear.need;
     let (steel, _) = rts_rules::economy::cost(EntityKind::Barracks);
-    (short
-        && barracks < MAX_BUY_BARRACKS
-        && observation.economy.steel >= steel + BUY_BARRACKS_BANK)
+    (short && barracks < MAX_BUY_BARRACKS && observation.economy.steel >= steel + BUY_BARRACKS_BANK)
         .then_some(barracks + 1)
 }
 

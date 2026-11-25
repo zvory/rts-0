@@ -136,8 +136,7 @@ pub(in crate::ai_core::decision) fn charge_tanks(
             EntityKind::Rifleman | EntityKind::MachineGunner | EntityKind::Panzerfaust
         )
     };
-    let near_target =
-        |x: f32, y: f32| dist2(x, y, target.x, target.y) <= squared(GROUP_TILES * ts);
+    let near_target = |x: f32, y: f32| dist2(x, y, target.x, target.y) <= squared(GROUP_TILES * ts);
     let seen_escort: BTreeSet<u32> = observation
         .visible_enemies
         .iter()
@@ -166,9 +165,8 @@ pub(in crate::ai_core::decision) fn charge_tanks(
     let crowded = escort_rule && full_escort >= MAX_ESCORT;
     // `chargeesc`: an escorted Tank is charged only by the Riflemen already close to it.
     if escort_rule && previous != Some(target.id) && full_escort >= CLOSE_ESCORT {
-        chargers.retain(|unit| {
-            dist2(unit.x, unit.y, target.x, target.y) <= squared(CLOSE_TILES * ts)
-        });
+        chargers
+            .retain(|unit| dist2(unit.x, unit.y, target.x, target.y) <= squared(CLOSE_TILES * ts));
     }
     let enough = chargers.len() >= RIFLES_PER_TANK * group.max(1)
         && escort as f32 <= chargers.len() as f32 * ESCORT_SHARE
@@ -188,7 +186,12 @@ pub(in crate::ai_core::decision) fn charge_tanks(
                 .riflemen
                 .iter()
                 .copied()
-                .filter(|id| observation.owned.iter().any(|unit| unit.id == *id && unit.hp > 0))
+                .filter(|id| {
+                    observation
+                        .owned
+                        .iter()
+                        .any(|unit| unit.id == *id && unit.hp > 0)
+                })
                 .collect();
             for id in &back {
                 let Some(unit) = observation.owned.iter().find(|unit| unit.id == *id) else {

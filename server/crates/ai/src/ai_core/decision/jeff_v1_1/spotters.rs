@@ -74,7 +74,11 @@ impl SpotterMemory {
     }
 
     /// The manned post watching the base at `at`, for the push's base call (`spalarm` 2).
-    pub(in crate::ai_core::decision) fn post_for(&self, at: (f32, f32), ts: f32) -> Option<(f32, f32)> {
+    pub(in crate::ai_core::decision) fn post_for(
+        &self,
+        at: (f32, f32),
+        ts: f32,
+    ) -> Option<(f32, f32)> {
         if alarm_level() < 2 {
             return None;
         }
@@ -112,7 +116,12 @@ fn walk_field(analysis: &AiMapAnalysis, width: u32, height: u32, from: (u32, u32
         for dy in -1_i32..=1 {
             for dx in -1_i32..=1 {
                 let (nx, ny) = (x as i32 + dx, y as i32 + dy);
-                if (dx == 0 && dy == 0) || nx < 0 || ny < 0 || nx >= width as i32 || ny >= height as i32 {
+                if (dx == 0 && dy == 0)
+                    || nx < 0
+                    || ny < 0
+                    || nx >= width as i32
+                    || ny >= height as i32
+                {
                     continue;
                 }
                 let (nx, ny) = (nx as u32, ny as u32);
@@ -130,7 +139,12 @@ fn walk_field(analysis: &AiMapAnalysis, width: u32, height: u32, from: (u32, u32
 
 /// The tile `SPOT_TILES` steps from `base` toward the enemy start, down the walking field.
 fn post_tile(field: &[u32], width: u32, height: u32, base: (u32, u32)) -> Option<(u32, u32)> {
-    let at = |t: (u32, u32)| field.get((t.1 * width + t.0) as usize).copied().unwrap_or(u32::MAX);
+    let at = |t: (u32, u32)| {
+        field
+            .get((t.1 * width + t.0) as usize)
+            .copied()
+            .unwrap_or(u32::MAX)
+    };
     // A Depot's footprint may sit off the walkable grid: start from the nearest walkable tile.
     let mut current = (0..=3_i32)
         .flat_map(|r| (-r..=r).flat_map(move |dy| (-r..=r).map(move |dx| (dx, dy))))
@@ -208,8 +222,13 @@ pub(in crate::ai_core::decision) fn post(
         .map(|unit| (unit.x, unit.y))
         .collect();
     if let Some(site) = memory.later_bases.site() {
-        if let Some(center) = building_center(site, EntityKind::ResourceDepot, observation.map.tile_size) {
-            if !bases.iter().any(|b| dist2(b.0, b.1, center.0, center.1) <= squared(4.0 * ts)) {
+        if let Some(center) =
+            building_center(site, EntityKind::ResourceDepot, observation.map.tile_size)
+        {
+            if !bases
+                .iter()
+                .any(|b| dist2(b.0, b.1, center.0, center.1) <= squared(4.0 * ts))
+            {
                 bases.push(center);
             }
         }
@@ -217,7 +236,11 @@ pub(in crate::ai_core::decision) fn post(
     let state = &memory.jeff_v1_1.spotters;
     let field_at = |p: (f32, f32)| {
         let (tx, ty) = ((p.0 / ts) as u32, (p.1 / ts) as u32);
-        state.field.get((ty * state.width + tx) as usize).copied().unwrap_or(u32::MAX)
+        state
+            .field
+            .get((ty * state.width + tx) as usize)
+            .copied()
+            .unwrap_or(u32::MAX)
     };
     // Nearest the enemy first.
     bases.sort_by_key(|b| field_at(*b));
@@ -226,7 +249,10 @@ pub(in crate::ai_core::decision) fn post(
         .filter_map(|b| {
             let tile = ((b.0 / ts) as u32, (b.1 / ts) as u32);
             post_tile(&state.field, width, height, tile).map(|t| {
-                (stored(*b), stored(tile_center(t, observation.map.tile_size)))
+                (
+                    stored(*b),
+                    stored(tile_center(t, observation.map.tile_size)),
+                )
             })
         })
         .take(MAX_SPOTTERS)
@@ -265,7 +291,11 @@ pub(in crate::ai_core::decision) fn post(
     });
     let mut spotters: BTreeMap<u32, Spotter> = BTreeMap::new();
     for (base, post) in &posts {
-        if let Some((id, mut s)) = previous.iter().find(|(_, s)| s.base == *base).map(|(id, s)| (*id, s.clone())) {
+        if let Some((id, mut s)) = previous
+            .iter()
+            .find(|(_, s)| s.base == *base)
+            .map(|(id, s)| (*id, s.clone()))
+        {
             s.post = *post;
             spotters.insert(id, s);
             continue;
@@ -280,7 +310,15 @@ pub(in crate::ai_core::decision) fn post(
                     .then(a.id.cmp(&b.id))
             });
         if let Some(unit) = pick {
-            spotters.insert(unit.id, Spotter { base: *base, post: *post, ordered: 0, back_until: 0 });
+            spotters.insert(
+                unit.id,
+                Spotter {
+                    base: *base,
+                    post: *post,
+                    ordered: 0,
+                    back_until: 0,
+                },
+            );
         }
     }
     // Hold the posts, backing off from enemy fighters.
@@ -296,12 +334,23 @@ pub(in crate::ai_core::decision) fn post(
                 && enemy.kind.is_unit()
                 && !matches!(enemy.kind, EntityKind::Worker | EntityKind::Golem)
                 && dist2(enemy.x, enemy.y, at.0, at.1)
-                    <= squared(if enemy.kind == EntityKind::Tank { FLEE_TANK_TILES } else { FLEE_TILES } * ts)
+                    <= squared(
+                        if enemy.kind == EntityKind::Tank {
+                            FLEE_TANK_TILES
+                        } else {
+                            FLEE_TILES
+                        } * ts,
+                    )
         });
         if threat {
             if s.back_until <= tick {
                 let back = normalized_direction(at, base)
-                    .map(|d| (at.0 + d.0 * FLEE_BACK_TILES * ts, at.1 + d.1 * FLEE_BACK_TILES * ts))
+                    .map(|d| {
+                        (
+                            at.0 + d.0 * FLEE_BACK_TILES * ts,
+                            at.1 + d.1 * FLEE_BACK_TILES * ts,
+                        )
+                    })
                     .unwrap_or(base);
                 let back = clamp_to_map(back, observation.map);
                 if let Some(units) = actions::move_units(actions, [*id], back.0, back.1) {

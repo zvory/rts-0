@@ -185,7 +185,12 @@ impl BreakoutMemory {
 
     /// Ends the sortie (not a look under way) and returns its units.
     fn end(&mut self, tick: u32, why: &'static str) -> Vec<u32> {
-        let released: Vec<u32> = self.tanks.iter().chain(self.infantry.iter()).copied().collect();
+        let released: Vec<u32> = self
+            .tanks
+            .iter()
+            .chain(self.infantry.iter())
+            .copied()
+            .collect();
         self.phase = Phase::Idle;
         self.tanks.clear();
         self.infantry.clear();
@@ -749,8 +754,8 @@ fn peek(
             state.peek_cooldown_until = tick + PEEK_COOLDOWN_TICKS;
             return None;
         }
-        let stalled = unit.state == AiEntityState::Idle
-            && tick.saturating_sub(peek.ordered) >= REORDER_TICKS;
+        let stalled =
+            unit.state == AiEntityState::Idle && tick.saturating_sub(peek.ordered) >= REORDER_TICKS;
         if peek.ordered == 0 || stalled {
             send_peek(actions, intents, &mut peek, to, tick);
         }
@@ -767,9 +772,7 @@ fn peek(
     {
         return None;
     }
-    let Some((spot, value, tanks_there, seen)) = state.last_contain else {
-        return None;
-    };
+    let (spot, value, tanks_there, seen) = state.last_contain?;
     let age = tick.saturating_sub(seen);
     if age < FRESH_TICKS {
         return None;
@@ -783,7 +786,7 @@ fn peek(
     // nearest the contain. The sortie must still go at the contain as last seen without it.
     let (tanks, infantry) = force(observation, memory, held, None, at, main);
     let full = config::unit_stats(EntityKind::Rifleman).map_or(1, |stats| stats.hp);
-    let Some(scout) = infantry
+    let scout = infantry
         .iter()
         .copied()
         .filter(|unit| unit.kind == EntityKind::Rifleman && unit.hp >= full)
@@ -796,10 +799,7 @@ fn peek(
             dist2(a.x, a.y, at.0, at.1)
                 .total_cmp(&dist2(b.x, b.y, at.0, at.1))
                 .then(a.id.cmp(&b.id))
-        })
-    else {
-        return None;
-    };
+        })?;
     let rest = infantry.iter().filter(|unit| unit.id != scout.id).count();
     let worth: u32 = tanks
         .iter()
@@ -812,11 +812,10 @@ fn peek(
     }
     // It walks `PEEK_PAST_TILES` past the contain, away from the nearest Depot.
     let from = (scout.x, scout.y);
-    let Some(depot) = depots.iter().copied().min_by(|a, b| {
-        dist2(a.0, a.1, at.0, at.1).total_cmp(&dist2(b.0, b.1, at.0, at.1))
-    }) else {
-        return None;
-    };
+    let depot = depots
+        .iter()
+        .copied()
+        .min_by(|a, b| dist2(a.0, a.1, at.0, at.1).total_cmp(&dist2(b.0, b.1, at.0, at.1)))?;
     let out = from_depots(at);
     let vantage = match normalized_direction(depot, at) {
         Some(away) if out < PEEK_REACH_TILES => {
@@ -825,7 +824,12 @@ fn peek(
         }
         _ => at,
     };
-    let vantage = clear(observation, map_analysis, from, clamp_to_map(vantage, observation.map));
+    let vantage = clear(
+        observation,
+        map_analysis,
+        from,
+        clamp_to_map(vantage, observation.map),
+    );
     let mut peek = Peek {
         unit: scout.id,
         origin: stored(from),

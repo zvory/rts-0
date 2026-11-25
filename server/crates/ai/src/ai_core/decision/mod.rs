@@ -323,22 +323,15 @@ where
     }
     let save_for_required_tech_building =
         should_save_for_required_tech_building(&facts, required_tech_path, production_policy);
-    // Jeff's AI V1.1's paid Pump Jacks (`pumpfirst`, `natpump`): the opening Barracks waits for the
-    // main's.
-    let pump_waits = jeff_v1_1::paid_pump::run(
-        &mut actions,
-        observation,
-        &facts,
-        memory,
-        profile.id,
-        (&builder_pools, &mut intents),
-    );
-    let delay_opening_barracks = pump_waits
-        || profile.fast_tank_timing.is_some_and(|timing| {
+    // Jeff's AI V1.1's paid Pump Jacks (`pumpfirst`): the opening Barracks waits for the main's.
+    let live = (&mut actions, observation, &facts, &mut *memory);
+    let pump_waits = jeff_v1_1::paid_pump::run(live, profile.id, (&builder_pools, &mut intents));
+    let fast_tank_wait = profile.fast_tank_timing.is_some_and(|timing| {
         facts.complete_building_count(EntityKind::Barracks) == 0
             && (facts.worker_count < timing.workers_before_barracks
                 || facts.building_count(EntityKind::PumpJack) < timing.pump_jacks_before_barracks)
     });
+    let delay_opening_barracks = pump_waits || fast_tank_wait;
     let preserve_fast_tank_economy = profile
         .fast_tank_timing
         .map(|timing| timing.preserve_during_defensive_panic)
@@ -442,7 +435,8 @@ where
             expansion_secured || natural_sheltered,
             spend_plan.as_ref(),
         );
-    jeff_v1_1::entrenchment_after_meth((&mut actions, &facts, &mut *memory, &mut intents), profile.id);
+    let live = (&mut actions, &facts, &mut *memory, &mut intents);
+    jeff_v1_1::entrenchment_after_meth(live, profile.id);
     if (jeff_natural && natural_ready)
         || (!jeff_natural
             && (economy_manager_output.proposes(EconomyProposal::BuildExpansionResourceDepot)
@@ -779,7 +773,13 @@ where
     }
     // Jeff's AI V1.1 `methlate`: no Meth for a large infantry count while it waits for the Tank tech.
     if !(is_jeff_v1_1(profile.id) && jeff_v1_1::meth_held(observation, &facts, memory)) {
-        queue_jeff_infantry_mass_methamphetamines(&mut actions, &facts, memory, &mut intents, profile);
+        queue_jeff_infantry_mass_methamphetamines(
+            &mut actions,
+            &facts,
+            memory,
+            &mut intents,
+            profile,
+        );
     }
     queue_jeff_smoke_plus(&mut actions, &facts, memory, &mut intents, profile);
     if profile.turtle_defense.is_none() {
@@ -1267,8 +1267,7 @@ where
         let held = &held | &memory.jeff_v1_1.natural.support.keys().copied().collect();
         jeff_v1_1::base_line::hold(live, memory, profile, &defensive_machine_gunners, &held);
         actions.mark("baseline");
-        // Jeff's AI V1.1 posts a few free Riflemen out on the enemy's way to its bases
-        // (`spotters`), before the rovers take the rest.
+        // Jeff's AI V1.1 posts free Riflemen on the enemy's way (`spotters`) before the rovers.
         let live = (&mut actions, observation, map_analysis, &mut intents);
         jeff_v1_1::spotters::post(live, memory, &held);
         actions.mark("spotters");

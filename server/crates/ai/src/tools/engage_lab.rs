@@ -59,6 +59,9 @@ struct Cand {
     params: Option<Params>,
 }
 
+/// One lab job (scenario, candidate, seed, slot) and its fight's result.
+type JobResult = ((usize, usize, u32, u32), Result<FightResult, String>);
+
 #[derive(Clone, Debug, Default)]
 struct FightResult {
     our_lost: f32,
@@ -78,7 +81,9 @@ fn parse_side(text: &str) -> Result<Vec<(EntityKind, usize)>, String> {
             let kind: EntityKind = kind
                 .parse()
                 .map_err(|_| format!("unknown unit kind {kind:?}"))?;
-            let count: usize = count.parse().map_err(|_| format!("bad count in {part:?}"))?;
+            let count: usize = count
+                .parse()
+                .map_err(|_| format!("bad count in {part:?}"))?;
             Ok((kind, count))
         })
         .collect()
@@ -87,8 +92,12 @@ fn parse_side(text: &str) -> Result<Vec<(EntityKind, usize)>, String> {
 fn parse_at(text: &str) -> Result<Vec<(EntityKind, f32, f32)>, String> {
     text.split('/')
         .map(|part| {
-            let (kind, at) = part.split_once('@').ok_or_else(|| format!("bad unit {part:?}"))?;
-            let (along, across) = at.split_once(',').ok_or_else(|| format!("bad place {part:?}"))?;
+            let (kind, at) = part
+                .split_once('@')
+                .ok_or_else(|| format!("bad unit {part:?}"))?;
+            let (along, across) = at
+                .split_once(',')
+                .ok_or_else(|| format!("bad place {part:?}"))?;
             let kind: EntityKind = kind
                 .parse()
                 .map_err(|_| format!("unknown unit kind {kind:?}"))?;
@@ -147,12 +156,28 @@ fn parse_scenarios(text: &str) -> Result<Vec<Scenario>, String> {
                 }
             }
             let snap = fields[1].contains('@');
-            let ours_at = if snap { parse_at(fields[1])? } else { Vec::new() };
-            let theirs_at = if snap { parse_at(fields[2])? } else { Vec::new() };
+            let ours_at = if snap {
+                parse_at(fields[1])?
+            } else {
+                Vec::new()
+            };
+            let theirs_at = if snap {
+                parse_at(fields[2])?
+            } else {
+                Vec::new()
+            };
             Ok(Scenario {
                 name: fields[0].to_string(),
-                ours: if snap { counts(&ours_at) } else { parse_side(fields[1])? },
-                theirs: if snap { counts(&theirs_at) } else { parse_side(fields[2])? },
+                ours: if snap {
+                    counts(&ours_at)
+                } else {
+                    parse_side(fields[1])?
+                },
+                theirs: if snap {
+                    counts(&theirs_at)
+                } else {
+                    parse_side(fields[2])?
+                },
                 ours_at,
                 theirs_at,
                 hold: match fields[3] {
@@ -224,9 +249,7 @@ impl AiStrategy for LabSide {
         let units: Vec<&crate::ai_core::observation::AiEntitySummary> = observation
             .owned
             .iter()
-            .filter(|unit| {
-                unit.hp > 0 && unit.kind.is_unit() && unit.kind != EntityKind::Worker
-            })
+            .filter(|unit| unit.hp > 0 && unit.kind.is_unit() && unit.kind != EntityKind::Worker)
             .collect();
         if self.hold {
             if !self.started {
@@ -237,7 +260,8 @@ impl AiStrategy for LabSide {
             }
             // A holding side with micro: the micro steers, released units hold again.
             if let Some(params) = &self.params {
-                let plan = matchup::plan(&observation, params, &mut self.memory, &|_| true, self.home);
+                let plan =
+                    matchup::plan(&observation, params, &mut self.memory, &|_| true, self.home);
                 for (id, order) in &plan.orders {
                     emit(actions, *id, *order);
                 }
@@ -443,10 +467,18 @@ fn run_fight(setup: &Setup<'_>) -> Result<FightResult, String> {
                 let jx = jitter(setup.seed.wrapping_add(salt), index) * 0.6;
                 let jy = jitter(setup.seed.wrapping_add(salt + 7), index) * 0.6;
                 let base = at(along + jx, across + jy);
-                let points: Vec<(f32, f32)> = [(0.0, 0.0), (0.7, 0.0), (-0.7, 0.0), (0.0, 0.7), (0.0, -0.7), (1.4, 1.4), (-1.4, -1.4)]
-                    .iter()
-                    .map(|(ox, oy)| (base.0 + ox * TILE_PX, base.1 + oy * TILE_PX))
-                    .collect();
+                let points: Vec<(f32, f32)> = [
+                    (0.0, 0.0),
+                    (0.7, 0.0),
+                    (-0.7, 0.0),
+                    (0.0, 0.7),
+                    (0.0, -0.7),
+                    (1.4, 1.4),
+                    (-1.4, -1.4),
+                ]
+                .iter()
+                .map(|(ox, oy)| (base.0 + ox * TILE_PX, base.1 + oy * TILE_PX))
+                .collect();
                 if spawn_first(&mut game, owner, *kind, &points) {
                     spawned += 1;
                 }
@@ -478,16 +510,30 @@ fn run_fight(setup: &Setup<'_>) -> Result<FightResult, String> {
                 let jx = jitter(setup.seed.wrapping_add(salt), index as u32 + 1) * 0.5;
                 let jy = jitter(setup.seed.wrapping_add(salt + 7), index as u32 + 1) * 0.5;
                 let base = world(along + jx, across + jy);
-                let points: Vec<(f32, f32)> = [(0.0, 0.0), (0.7, 0.0), (-0.7, 0.0), (0.0, 0.7), (0.0, -0.7), (1.4, 1.4), (-1.4, -1.4), (2.1, 0.0), (-2.1, 0.0)]
-                    .iter()
-                    .map(|(ox, oy)| (base.0 + ox * TILE_PX, base.1 + oy * TILE_PX))
-                    .collect();
+                let points: Vec<(f32, f32)> = [
+                    (0.0, 0.0),
+                    (0.7, 0.0),
+                    (-0.7, 0.0),
+                    (0.0, 0.7),
+                    (0.0, -0.7),
+                    (1.4, 1.4),
+                    (-1.4, -1.4),
+                    (2.1, 0.0),
+                    (-2.1, 0.0),
+                ]
+                .iter()
+                .map(|(ox, oy)| (base.0 + ox * TILE_PX, base.1 + oy * TILE_PX))
+                .collect();
                 if spawn_first(&mut game, owner, *kind, &points) {
                     spawned += 1;
                 }
             }
             if spawned * 10 < side.len() * if abs { 8 } else { 9 } {
-                return Err(format!("spawn failed in {} ({spawned}/{})", setup.scenario.name, side.len()));
+                return Err(format!(
+                    "spawn failed in {} ({spawned}/{})",
+                    setup.scenario.name,
+                    side.len()
+                ));
             }
         }
     } else if place(candidate, &setup.scenario.ours, 1.0, 101) != want_ours
@@ -579,7 +625,7 @@ fn run_fight(setup: &Setup<'_>) -> Result<FightResult, String> {
     while game.tick_count() < setup.ticks {
         CanonicalAiTickDriver::run(&mut game, &mut controllers, AiAlivePolicy::Normal);
         let _ = game.tick();
-        if game.tick_count() % 15 == 0 {
+        if game.tick_count().is_multiple_of(15) {
             let a = hp_of(&game, candidate, &ours);
             let b = hp_of(&game, opponent, &theirs);
             if alive(&a) == 0 || alive(&b) == 0 {
@@ -642,12 +688,15 @@ pub fn run_from_env() {
     let map = get("--map").unwrap_or_else(|| "1v1 No Terrain".to_string());
     let ticks: u32 = get("--ticks").and_then(|s| s.parse().ok()).unwrap_or(2700);
     let gap: f32 = get("--gap").and_then(|s| s.parse().ok()).unwrap_or(20.0);
-    let threads: usize = get("--threads").and_then(|s| s.parse().ok()).unwrap_or(8).min(8);
+    let threads: usize = get("--threads")
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(8)
+        .min(8);
     let meth_us = get("--meth-us").is_none_or(|s| s != "0");
     let meth_them = get("--meth-them").is_none_or(|s| s != "0");
     let fights_out = get("--fights");
     let mut jobs = Vec::new();
-    for (si, scenario) in scenarios.iter().enumerate() {
+    for (si, _) in scenarios.iter().enumerate() {
         for (ci, _) in cands.iter().enumerate() {
             for seed in 0..seeds {
                 for candidate in [1u32, 2] {
@@ -660,7 +709,7 @@ pub fn run_from_env() {
         .num_threads(threads)
         .build()
         .expect("thread pool");
-    let results: Vec<((usize, usize, u32, u32), Result<FightResult, String>)> = pool.install(|| {
+    let results: Vec<JobResult> = pool.install(|| {
         jobs.par_iter()
             .map(|&(si, ci, seed, candidate)| {
                 let scenario = &scenarios[si];
@@ -679,8 +728,9 @@ pub fn run_from_env() {
                     meth_us,
                     meth_them,
                 };
-                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run_fight(&setup)))
-                    .unwrap_or_else(|_| Err("panic".to_string()));
+                let result =
+                    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run_fight(&setup)))
+                        .unwrap_or_else(|_| Err("panic".to_string()));
                 ((si, ci, seed, candidate), result)
             })
             .collect()
@@ -692,8 +742,18 @@ pub fn run_from_env() {
                     let _ = writeln!(
                         file,
                         "{}\t{}\t{}\tp{}\t{:.0}\t{:.0}\t{}\t{}\t{}\t{}\t{}{}",
-                        scenarios[*si].name, cands[*ci].label, seed, candidate, r.our_lost, r.their_lost,
-                        r.our_dead, r.their_dead, r.our_alive, r.their_alive, r.ticks, r.orders
+                        scenarios[*si].name,
+                        cands[*ci].label,
+                        seed,
+                        candidate,
+                        r.our_lost,
+                        r.their_lost,
+                        r.our_dead,
+                        r.their_dead,
+                        r.our_alive,
+                        r.their_alive,
+                        r.ticks,
+                        r.orders
                     );
                 }
             }
@@ -719,8 +779,14 @@ pub fn run_from_env() {
                 continue;
             }
             let n = rows.len() as f32;
-            let wins = rows.iter().filter(|r| r.their_alive == 0 && r.our_alive > 0).count();
-            let losses = rows.iter().filter(|r| r.our_alive == 0 && r.their_alive > 0).count();
+            let wins = rows
+                .iter()
+                .filter(|r| r.their_alive == 0 && r.our_alive > 0)
+                .count();
+            let losses = rows
+                .iter()
+                .filter(|r| r.our_alive == 0 && r.their_alive > 0)
+                .count();
             let our: f32 = rows.iter().map(|r| r.our_lost).sum();
             let their: f32 = rows.iter().map(|r| r.their_lost).sum();
             let od: f32 = rows.iter().map(|r| r.our_dead as f32).sum::<f32>() / n;
@@ -738,7 +804,11 @@ pub fn run_from_env() {
                 (their - our) / n,
                 od,
                 td,
-                if errors > 0 { format!(" err={errors}") } else { String::new() }
+                if errors > 0 {
+                    format!(" err={errors}")
+                } else {
+                    String::new()
+                }
             );
         }
     }

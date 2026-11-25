@@ -227,10 +227,10 @@ pub(super) fn entrenchment_after_meth(
 pub(super) fn entrenchment_started(observation: &AiObservation) -> bool {
     off("entafter")
         || observation.upgrades.contains(&UpgradeKind::Entrenchment)
-        || observation
-            .owned
-            .iter()
-            .any(|unit| unit.research.is_some_and(|(upgrade, _)| upgrade == UpgradeKind::Entrenchment))
+        || observation.owned.iter().any(|unit| {
+            unit.research
+                .is_some_and(|(upgrade, _)| upgrade == UpgradeKind::Entrenchment)
+        })
 }
 
 fn param(name: &str, default: f32) -> f32 {

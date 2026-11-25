@@ -368,12 +368,8 @@ where
             let base_wait = v1_1 && !jeff_v1_1::off("basewait");
             let enemy_near = |x: u32, y: u32| {
                 base_wait
-                    && building_center(
-                        (x, y),
-                        EntityKind::ResourceDepot,
-                        observation.map.tile_size,
-                    )
-                    .is_some_and(|center| enemies_near_site(observation, memory, center))
+                    && building_center((x, y), EntityKind::ResourceDepot, observation.map.tile_size)
+                        .is_some_and(|center| enemies_near_site(observation, memory, center))
             };
             // `sitealt` (testing): a base given up `SITEALT_TRIES` times is passed over while any
             // other site will do. Wald des Todes vs Pressure AI from the top right as player 2:
@@ -464,7 +460,10 @@ where
         if let Some(site) = memory.later_bases.site {
             // A guard died before the Depot went down, so the site is contested. Replacing it
             // would feed Tanks one at a time into whatever killed it; back off and retry later.
-            memory.jeff_v1_1.field_gate.note_abandon("guard", site, tick);
+            memory
+                .jeff_v1_1
+                .field_gate
+                .note_abandon("guard", site, tick);
             let state = &mut memory.later_bases;
             let reject = note_site_failure(state, site);
             abandon_site(state, site, tick, reject);
@@ -497,7 +496,10 @@ where
     let staged_for = tick.saturating_sub(staging_since);
 
     if staged_for >= SITE_GIVE_UP_TICKS {
-        memory.jeff_v1_1.field_gate.note_abandon("stale", site, tick);
+        memory
+            .jeff_v1_1
+            .field_gate
+            .note_abandon("stale", site, tick);
         abandon_site(&mut memory.later_bases, site, tick, true);
         return status;
     }
@@ -802,7 +804,10 @@ fn refresh_guard_site(observation: &AiObservation, memory: &mut AiDecisionMemory
         state.guards.clear();
     }
     if lost {
-        memory.jeff_v1_1.field_gate.note_abandon("lost", guard_site, tick);
+        memory
+            .jeff_v1_1
+            .field_gate
+            .note_abandon("lost", guard_site, tick);
     }
 }
 
@@ -842,7 +847,9 @@ fn rejected_radius(state: &LaterBases) -> f32 {
 }
 
 fn site_is_rejected(rejected: &BTreeSet<(u32, u32)>, tile: (u32, u32), radius: f32) -> bool {
-    rejected.iter().any(|site| tiles_within(*site, tile, radius))
+    rejected
+        .iter()
+        .any(|site| tiles_within(*site, tile, radius))
 }
 
 /// Move each guard to its slot and hold it there. These go out as ordinary moves, not staging:

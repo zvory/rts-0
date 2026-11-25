@@ -251,7 +251,8 @@ fn targets(
             dist2(a.0, a.1, home.0, home.1).total_cmp(&dist2(b.0, b.1, home.0, home.1))
         })
         .map(|player| player.id);
-    let near = |a: (f32, f32), b: (f32, f32), tiles: f32| dist2(a.0, a.1, b.0, b.1) <= squared(tiles * ts);
+    let near =
+        |a: (f32, f32), b: (f32, f32), tiles: f32| dist2(a.0, a.1, b.0, b.1) <= squared(tiles * ts);
     let state = &mut memory.jeff_v1_1.rifle_raid;
     state.empty.retain(|_, until| tick < *until);
     let mut all = known;
@@ -272,11 +273,15 @@ fn targets(
         {
             continue;
         }
-        let enemy_building = observation
-            .visible_enemies
-            .iter()
-            .any(|enemy| enemy.hp > 0 && enemy.kind.is_building() && near((enemy.x, enemy.y), at, DEPOT_TILES));
-        if !enemy_building && observation.owned.iter().any(|unit| near((unit.x, unit.y), at, SIGHT_TILES)) {
+        let enemy_building = observation.visible_enemies.iter().any(|enemy| {
+            enemy.hp > 0 && enemy.kind.is_building() && near((enemy.x, enemy.y), at, DEPOT_TILES)
+        });
+        if !enemy_building
+            && observation
+                .owned
+                .iter()
+                .any(|unit| near((unit.x, unit.y), at, SIGHT_TILES))
+        {
             state.empty.insert(cluster.id, tick + EMPTY_TICKS);
             continue;
         }
@@ -303,7 +308,7 @@ fn pick_target(
     let memory: &AiDecisionMemory = memory;
     found
         .into_iter()
-        .filter(|(at, _)| hot.get(&stored(*at)).map_or(true, |until| tick >= *until))
+        .filter(|(at, _)| hot.get(&stored(*at)).is_none_or(|until| tick >= *until))
         .filter(|(at, _)| dist2(at.0, at.1, enemy_main.0, enemy_main.1) > squared(main_clear * ts))
         .filter_map(|(at, worth)| {
             let defence = remembered_near(observation, memory, &[at], DEFENCE_TILES);
@@ -558,9 +563,7 @@ fn hit(
         }
         return;
     }
-    let in_sight = party
-        .iter()
-        .any(|unit| near(unit.x, unit.y, SIGHT_TILES));
+    let in_sight = party.iter().any(|unit| near(unit.x, unit.y, SIGHT_TILES));
     if !in_sight {
         if reorder {
             if let Some(units) = actions::attack_move_units(actions, ids, at.0, at.1) {
@@ -704,7 +707,11 @@ fn look(
         })
         .min_by(|a, b| a.0.max(a.1).total_cmp(&b.0.max(b.1)));
     match threat {
-        Some((defence, route)) => format!("s{spare} k{}/{} d{defence:.0} r{route:.0}", out.len(), all.len()),
+        Some((defence, route)) => format!(
+            "s{spare} k{}/{} d{defence:.0} r{route:.0}",
+            out.len(),
+            all.len()
+        ),
         None => format!("s{spare} k0/{}", all.len()),
     }
 }

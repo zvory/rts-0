@@ -472,7 +472,11 @@ pub(super) fn sync_containment_recovery(
             .approach
             .note_failed_push(observation.player_id, observation.tick);
     }
-    jeff_v1_1::push::note_fell(observation, memory, if tanks_intact { "scout" } else { "losses" });
+    jeff_v1_1::push::note_fell(
+        observation,
+        memory,
+        if tanks_intact { "scout" } else { "losses" },
+    );
     begin_containment_recovery(memory);
 }
 

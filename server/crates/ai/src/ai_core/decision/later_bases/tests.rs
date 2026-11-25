@@ -113,10 +113,26 @@ fn an_out_of_sight_placeholder_reading_does_not_count_as_a_dry_well() {
 #[test]
 fn a_rejected_site_rules_out_its_neighbours_but_not_other_bases() {
     let rejected = BTreeSet::from([(65, 23)]);
-    assert!(site_is_rejected(&rejected, (65, 23), REJECTED_SITE_RADIUS_TILES));
-    assert!(site_is_rejected(&rejected, (65, 24), REJECTED_SITE_RADIUS_TILES));
-    assert!(site_is_rejected(&rejected, (69, 26), REJECTED_SITE_RADIUS_TILES));
-    assert!(!site_is_rejected(&rejected, (12, 27), REJECTED_SITE_RADIUS_TILES));
+    assert!(site_is_rejected(
+        &rejected,
+        (65, 23),
+        REJECTED_SITE_RADIUS_TILES
+    ));
+    assert!(site_is_rejected(
+        &rejected,
+        (65, 24),
+        REJECTED_SITE_RADIUS_TILES
+    ));
+    assert!(site_is_rejected(
+        &rejected,
+        (69, 26),
+        REJECTED_SITE_RADIUS_TILES
+    ));
+    assert!(!site_is_rejected(
+        &rejected,
+        (12, 27),
+        REJECTED_SITE_RADIUS_TILES
+    ));
 }
 
 #[test]
@@ -156,7 +172,11 @@ fn a_destroyed_depot_puts_the_next_base_on_a_cooldown_and_releases_the_guards() 
     assert!(state.guards.is_empty());
     assert_eq!(state.retry_after_tick, 5_300 + SITE_RETRY_COOLDOWN_TICKS);
     assert_eq!(state.site_failures.get(&site), Some(&1));
-    assert!(!site_is_rejected(&state.rejected_sites, site, REJECTED_SITE_RADIUS_TILES));
+    assert!(!site_is_rejected(
+        &state.rejected_sites,
+        site,
+        REJECTED_SITE_RADIUS_TILES
+    ));
 }
 
 #[test]
@@ -238,10 +258,18 @@ fn an_abandoned_site_is_only_ruled_out_when_rejected() {
     assert!(state.guards.is_empty());
     assert_eq!(state.site, None);
     assert_eq!(state.retry_after_tick, 1_000 + SITE_RETRY_COOLDOWN_TICKS);
-    assert!(!site_is_rejected(&state.rejected_sites, (40, 40), REJECTED_SITE_RADIUS_TILES));
+    assert!(!site_is_rejected(
+        &state.rejected_sites,
+        (40, 40),
+        REJECTED_SITE_RADIUS_TILES
+    ));
 
     abandon_site(&mut state, (40, 40), 2_000, true);
-    assert!(site_is_rejected(&state.rejected_sites, (40, 40), REJECTED_SITE_RADIUS_TILES));
+    assert!(site_is_rejected(
+        &state.rejected_sites,
+        (40, 40),
+        REJECTED_SITE_RADIUS_TILES
+    ));
 }
 
 #[test]

@@ -85,8 +85,9 @@ const NATMOVE_RECENT_TICKS: u32 = config::TICK_HZ * 20;
 const NATMOVE_CLEAR_TILES: f32 = 12.0;
 
 fn natmove_ticks() -> u32 {
-    crate::ai_core::profiles::jeff_v1_1_param("nmt")
-        .map_or(NATMOVE_TICKS, |seconds| (seconds.max(10.0) as u32) * config::TICK_HZ)
+    crate::ai_core::profiles::jeff_v1_1_param("nmt").map_or(NATMOVE_TICKS, |seconds| {
+        (seconds.max(10.0) as u32) * config::TICK_HZ
+    })
 }
 
 impl ExpansionSecurity {
@@ -339,7 +340,11 @@ const NATWAIT_VALUE: u32 = 300;
 const NATWAIT_TILES: f32 = 25.0;
 const NATWAIT_TICKS: u32 = config::TICK_HZ * 45;
 
-fn natural_watched(observation: &AiObservation, memory: &AiDecisionMemory, site: (u32, u32)) -> bool {
+fn natural_watched(
+    observation: &AiObservation,
+    memory: &AiDecisionMemory,
+    site: (u32, u32),
+) -> bool {
     if !memory.profile_id().is_some_and(is_jeff_v1_1) || jeff_v1_1::off("natwait") {
         return false;
     }
@@ -572,9 +577,9 @@ pub(super) fn prepare<F: FnMut(EntityKind, u32, u32) -> bool>(
             security.due_since = None;
         } else if let Some(site) = security.site {
             let since = *security.due_since.get_or_insert(observation.tick);
-            let held_lately = security.contested_tick.is_some_and(|tick| {
-                observation.tick.saturating_sub(tick) <= NATMOVE_RECENT_TICKS
-            });
+            let held_lately = security
+                .contested_tick
+                .is_some_and(|tick| observation.tick.saturating_sub(tick) <= NATMOVE_RECENT_TICKS);
             if observation.tick.saturating_sub(since) >= natmove_ticks()
                 && held_lately
                 && !depot_order_pending(observation, site)

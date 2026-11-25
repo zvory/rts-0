@@ -14,6 +14,7 @@
 //! - pull: wounded infantry under fire steps back so the shooter retargets;
 //! - charge: infantry closes on a Machine Gunner instead of trading at its longer range;
 //! - stand: a Tank in sight of enemy Tanks stops, so its cannon ramps to full range.
+//!
 //! Every tactic is a parameter (`Params`), so the engagement lab (`ai-engage-lab`) scores each
 //! matchup against plain attack-move before any of it runs in a game.
 use std::collections::{BTreeMap, BTreeSet};
@@ -22,6 +23,13 @@ use crate::ai_core::observation::{AiEntityState, AiEntitySummary, AiObservation}
 use rts_rules::math::GameplayMath as _;
 use rts_sim::game::entity::EntityKind;
 use rts_sim::game::upgrade::UpgradeKind;
+
+mod kinds;
+mod live;
+
+use kinds::{armored, avoids, fights, fires_moving, infantry, steers, vehicle};
+pub(crate) use kinds::{cost, dps, reach};
+pub(in crate::ai_core::decision) use live::finish;
 
 const TICK_HZ: f32 = 30.0;
 /// A Tank's cannon reach while moving, and after standing still for `TANK_RAMP_TICKS`.
@@ -253,7 +261,11 @@ impl Params {
     /// `key=value` pairs over the defaults; `none` first starts from everything off.
     pub(crate) fn parse(spec: &str) -> Result<Self, String> {
         let mut params = Self::default();
-        for pair in spec.split(',').map(str::trim).filter(|pair| !pair.is_empty()) {
+        for pair in spec
+            .split(',')
+            .map(str::trim)
+            .filter(|pair| !pair.is_empty())
+        {
             if pair == "none" {
                 params = Self::none();
                 continue;
@@ -436,7 +448,13 @@ impl MatchupMemory {
     pub(crate) fn trace(&self) -> String {
         let counts: Vec<String> = Mode::ALL
             .iter()
-            .map(|mode| format!("{}{}", mode.short(), self.orders.get(mode).copied().unwrap_or(0)))
+            .map(|mode| {
+                format!(
+                    "{}{}",
+                    mode.short(),
+                    self.orders.get(mode).copied().unwrap_or(0)
+                )
+            })
             .collect();
         format!(
             "v1_1_mm held={} {} rt{} dir{}",
@@ -448,6 +466,9 @@ impl MatchupMemory {
     }
 }
 
+/// A unit's tactic this decision and the order it takes, if any.
+type Choice = Option<(Mode, Option<Order>)>;
+
 /// One decision's micro: new orders, the units it steers (strip them from every other order), and
 /// the units it let go (give them their other orders back).
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -455,150 +476,6 @@ pub(crate) struct Plan {
     pub(crate) orders: Vec<(u32, Order)>,
     pub(crate) held: BTreeSet<u32>,
     pub(crate) released: Vec<u32>,
-}
-
-/// The kinds the micro steers.
-fn steers(kind: EntityKind) -> bool {
-    matches!(
-        kind,
-        EntityKind::Rifleman
-            | EntityKind::Panzerfaust
-            | EntityKind::MachineGunner
-            | EntityKind::Tank
-            | EntityKind::ScoutCar
-    )
-}
-
-/// Enemy kinds that fight (workers and buildings are left to the other systems).
-fn fights(kind: EntityKind) -> bool {
-    matches!(
-        kind,
-        EntityKind::Rifleman
-            | EntityKind::Panzerfaust
-            | EntityKind::MachineGunner
-            | EntityKind::Tank
-            | EntityKind::ScoutCar
-            | EntityKind::AntiTankGun
-            | EntityKind::MortarTeam
-            | EntityKind::Warrior
-            | EntityKind::Golem
-            | EntityKind::Ekat
-    )
-}
-
-fn infantry(kind: EntityKind) -> bool {
-    matches!(
-        kind,
-        EntityKind::Rifleman | EntityKind::Panzerfaust | EntityKind::MachineGunner
-    )
-}
-
-fn vehicle(kind: EntityKind) -> bool {
-    matches!(
-        kind,
-        EntityKind::Tank
-            | EntityKind::ScoutCar
-            | EntityKind::CommandCar
-            | EntityKind::RocketLauncher
-            | EntityKind::Artillery
-    )
-}
-
-fn armored(kind: EntityKind) -> bool {
-    rts_rules::combat::is_armored(kind)
-}
-
-/// The steel plus oil a unit costs.
-pub(crate) fn cost(kind: EntityKind) -> f32 {
-    rts_rules::balance::unit_stats(kind).map_or(0.0, |s| (s.cost_steel + s.cost_oil) as f32)
-}
-
-/// Reach in tiles of `attacker` against `target`; a Tank's cannon ramps from 5 to 14 tiles over
-/// its first three seconds standing still, and its coax reaches 6 against soft targets.
-pub(crate) fn reach(attacker: EntityKind, target: EntityKind, still_ticks: u32) -> f32 {
-    match attacker {
-        EntityKind::Tank => {
-            let ramp = (still_ticks as f32 / TANK_RAMP_TICKS).min(1.0);
-            let cannon = TANK_BASE_REACH + (TANK_FULL_REACH - TANK_BASE_REACH) * ramp;
-            if armored(target) {
-                cannon
-            } else {
-                cannon.max(6.0)
-            }
-        }
-        EntityKind::ScoutCar => 7.0,
-        EntityKind::MachineGunner => 6.1,
-        EntityKind::Rifleman | EntityKind::Panzerfaust | EntityKind::AntiTankGun => 5.0,
-        EntityKind::MortarTeam => 17.0,
-        EntityKind::Ekat => 6.0,
-        EntityKind::Warrior | EntityKind::Golem | EntityKind::Worker => 1.0,
-        _ => 0.0,
-    }
-}
-
-/// Damage per second of `attacker` against `target`, roughly: Machine-gun bursts are three rays
-/// at 60% damage and some miss; a Panzerfaust's single rocket is spread over its reload.
-pub(crate) fn dps(attacker: EntityKind, target: EntityKind, meth: bool) -> f32 {
-    let hard = armored(target);
-    let rifle = if hard { 1.0 } else { 5.0 } * TICK_HZ / if meth { 24.0 } else { 32.0 };
-    match attacker {
-        EntityKind::Rifleman => rifle,
-        EntityKind::Panzerfaust => rifle + if vehicle(target) { 10.0 } else { 0.0 },
-        EntityKind::MachineGunner => {
-            if hard {
-                3.0
-            } else {
-                12.0
-            }
-        }
-        EntityKind::ScoutCar => {
-            if hard {
-                4.5
-            } else {
-                19.0
-            }
-        }
-        EntityKind::Tank => {
-            if hard {
-                12.5
-            } else {
-                25.0
-            }
-        }
-        EntityKind::AntiTankGun => {
-            if hard {
-                20.8
-            } else {
-                6.0
-            }
-        }
-        EntityKind::MortarTeam => 6.0,
-        EntityKind::Warrior => 10.0,
-        EntityKind::Golem => 10.0,
-        EntityKind::Ekat => 8.0,
-        EntityKind::Worker => {
-            if hard {
-                0.6
-            } else {
-                2.5
-            }
-        }
-        _ => 0.0,
-    }
-}
-
-/// The pairs where the first kind should not fight the second at all.
-fn avoids(own: EntityKind, enemy: EntityKind) -> bool {
-    enemy == EntityKind::Tank
-        && matches!(
-            own,
-            EntityKind::Rifleman | EntityKind::MachineGunner | EntityKind::ScoutCar
-        )
-}
-
-/// Fires on the move without losing its rate of fire.
-fn fires_moving(kind: EntityKind, meth: bool, params: &Params) -> bool {
-    vehicle(kind) || (params.kite_rifles && meth && matches!(kind, EntityKind::Rifleman))
 }
 
 fn dist(a: (f32, f32), b: (f32, f32)) -> f32 {
@@ -736,7 +613,10 @@ impl Ctx<'_> {
         let home = unit_dir(from, self.home);
         let dir = normalized((away.0 + home.0 * lean_home, away.1 + home.1 * lean_home));
         let dir = if dir == (0.0, 0.0) { home } else { dir };
-        self.clamp((from.0 + dir.0 * tiles * self.ts, from.1 + dir.1 * tiles * self.ts))
+        self.clamp((
+            from.0 + dir.0 * tiles * self.ts,
+            from.1 + dir.1 * tiles * self.ts,
+        ))
     }
 }
 
@@ -762,7 +642,9 @@ pub(crate) fn plan(
         params,
         memory,
         ts,
-        meth: observation.upgrades.contains(&UpgradeKind::Methamphetamines),
+        meth: observation
+            .upgrades
+            .contains(&UpgradeKind::Methamphetamines),
         // Unknown for the enemy: assume it has it, the worse case for our margins.
         enemy_meth: true,
         home,
@@ -789,7 +671,8 @@ pub(crate) fn plan(
             .iter()
             .filter(|unit| unit.kind == EntityKind::Tank && unit.hp > 0)
             .map(|unit| {
-                let max = rts_rules::balance::unit_stats(unit.kind).map_or(unit.hp.max(1), |s| s.hp.max(1));
+                let max = rts_rules::balance::unit_stats(unit.kind)
+                    .map_or(unit.hp.max(1), |s| s.hp.max(1));
                 (unit.id, (unit.x, unit.y), unit.hp as f32 / max as f32)
             })
             .collect(),
@@ -803,7 +686,10 @@ pub(crate) fn plan(
             .owned
             .iter()
             .filter(|unit| {
-                unit.hp > 0 && unit.is_complete && steers(unit.kind) && unit.state == AiEntityState::Move
+                unit.hp > 0
+                    && unit.is_complete
+                    && steers(unit.kind)
+                    && unit.state == AiEntityState::Move
             })
             .map(|unit| ((unit.x, unit.y), unit.kind))
             .collect(),
@@ -817,19 +703,15 @@ pub(crate) fn plan(
         ),
     };
     let mut assigned: BTreeMap<u32, f32> = BTreeMap::new();
-    let mut decisions: Vec<(u32, Option<(Mode, Option<Order>)>)> = Vec::new();
+    let mut decisions: Vec<(u32, Choice)> = Vec::new();
     let mut retreating: Vec<u32> = Vec::new();
-    for unit in observation
-        .owned
-        .iter()
-        .filter(|unit| {
-            unit.hp > 0
-                && unit.is_complete
-                && steers(unit.kind)
-                && params.steers_kind(unit.kind)
-                && eligible(unit.id)
-        })
-    {
+    for unit in observation.owned.iter().filter(|unit| {
+        unit.hp > 0
+            && unit.is_complete
+            && steers(unit.kind)
+            && params.steers_kind(unit.kind)
+            && eligible(unit.id)
+    }) {
         let pos = (unit.x, unit.y);
         let contact: Vec<&AiEntitySummary> = enemies
             .iter()
@@ -841,7 +723,11 @@ pub(crate) fn plan(
                         && enemy.kind == EntityKind::Tank
                         && d <= params.face * ts)
                     || (avoids(unit.kind, enemy.kind)
-                        && d <= (ctx.enemy_reach(enemy, unit.kind) + params.avoid_margin + params.avoid_hold + 1.0) * ts)
+                        && d <= (ctx.enemy_reach(enemy, unit.kind)
+                            + params.avoid_margin
+                            + params.avoid_hold
+                            + 1.0)
+                            * ts)
             })
             .collect();
         if contact.is_empty() {
@@ -852,39 +738,43 @@ pub(crate) fn plan(
                         .own_buildings
                         .iter()
                         .any(|building| dist(*building, pos) <= params.join_home * ts)))
-                .then(|| {
-                    enemies
-                        .iter()
-                        .filter(|enemy| {
-                            let at = (enemy.x, enemy.y);
-                            dist(pos, at) <= params.join * ts
-                                && !avoids(unit.kind, enemy.kind)
-                                && dps(unit.kind, enemy.kind, ctx.meth) >= 0.5
-                                && ctx.own_fighters.iter().any(|own| {
-                                    own.0 != pos && dist(own.0, at) <= params.contact * ts
+            .then(|| {
+                enemies
+                    .iter()
+                    .filter(|enemy| {
+                        let at = (enemy.x, enemy.y);
+                        dist(pos, at) <= params.join * ts
+                            && !avoids(unit.kind, enemy.kind)
+                            && dps(unit.kind, enemy.kind, ctx.meth) >= 0.5
+                            && ctx
+                                .own_fighters
+                                .iter()
+                                .any(|own| own.0 != pos && dist(own.0, at) <= params.contact * ts)
+                            && !(params.join_no_mg > 0.0
+                                && infantry(unit.kind)
+                                && enemies.iter().any(|gun| {
+                                    gun.kind == EntityKind::MachineGunner
+                                        && !ctx.moving(gun)
+                                        && dist((gun.x, gun.y), at)
+                                            <= (ctx.enemy_reach(gun, unit.kind) + params.join_no_mg)
+                                                * ts
+                                }))
+                            && !(params.join_safe
+                                && enemies.iter().any(|tank| {
+                                    avoids(unit.kind, tank.kind)
+                                        && dist((tank.x, tank.y), at)
+                                            <= (ctx.enemy_reach(tank, unit.kind)
+                                                + params.avoid_margin)
+                                                * ts
                                 })
-                                && !(params.join_no_mg > 0.0
-                                    && infantry(unit.kind)
-                                    && enemies.iter().any(|gun| {
-                                        gun.kind == EntityKind::MachineGunner
-                                            && !ctx.moving(gun)
-                                            && dist((gun.x, gun.y), at)
-                                                <= (ctx.enemy_reach(gun, unit.kind) + params.join_no_mg) * ts
-                                    }))
-                                && !(params.join_safe
-                                    && enemies.iter().any(|tank| {
-                                        avoids(unit.kind, tank.kind)
-                                            && dist((tank.x, tank.y), at)
-                                                <= (ctx.enemy_reach(tank, unit.kind) + params.avoid_margin) * ts
-                                    })
-                                    && !ctx
-                                        .own_tanks
-                                        .iter()
-                                        .any(|own| dist(*own, at) <= params.near * ts))
-                        })
-                        .min_by(|a, b| dist(pos, (a.x, a.y)).total_cmp(&dist(pos, (b.x, b.y))))
-                })
-                .flatten();
+                                && !ctx
+                                    .own_tanks
+                                    .iter()
+                                    .any(|own| dist(*own, at) <= params.near * ts))
+                    })
+                    .min_by(|a, b| dist(pos, (a.x, a.y)).total_cmp(&dist(pos, (b.x, b.y))))
+            })
+            .flatten();
             if let Some(target) = target {
                 let order = (unit.target_id != Some(target.id)).then_some(Order::Attack(target.id));
                 decisions.push((unit.id, Some((Mode::Join, order))));
@@ -904,7 +794,8 @@ pub(crate) fn plan(
                 let target = (goal.x, goal.y);
                 !goal.attack
                     && dist(pos, target) > 2.0 * ts
-                    && nearest.is_some_and(|enemy| dist(target, enemy) > dist(pos, enemy) + 2.0 * ts)
+                    && nearest
+                        .is_some_and(|enemy| dist(target, enemy) > dist(pos, enemy) + 2.0 * ts)
             });
             if away {
                 retreating.push(unit.id);
@@ -976,7 +867,9 @@ pub(crate) fn plan(
     }
     // Units that died or left the eligible set are forgotten.
     let alive: BTreeSet<u32> = observation.owned.iter().map(|unit| unit.id).collect();
-    memory.held.retain(|id, _| alive.contains(id) && eligible(*id));
+    memory
+        .held
+        .retain(|id, _| alive.contains(id) && eligible(*id));
     plan
 }
 
@@ -1019,20 +912,35 @@ fn decide(
             .filter(|enemy| dist(enemy.0, pos) <= 14.0 * ts)
             .collect();
         if !ours.is_empty() && !theirs.is_empty() {
-            let power = |side: &[&((f32, f32), EntityKind, f32)], other: &[&((f32, f32), EntityKind, f32)], meth: bool| -> f32 {
+            let power = |side: &[&((f32, f32), EntityKind, f32)],
+                         other: &[&((f32, f32), EntityKind, f32)],
+                         meth: bool|
+             -> f32 {
                 let hp: f32 = side.iter().map(|unit| unit.2).sum();
                 let rate: f32 = side
                     .iter()
-                    .map(|unit| other.iter().map(|foe| dps(unit.1, foe.1, meth)).sum::<f32>() / other.len() as f32)
+                    .map(|unit| {
+                        other
+                            .iter()
+                            .map(|foe| dps(unit.1, foe.1, meth))
+                            .sum::<f32>()
+                            / other.len() as f32
+                    })
                     .sum();
                 hp * rate
             };
             let mine = power(&ours, &theirs, ctx.meth);
             let foe = power(&theirs, &ours, ctx.enemy_meth);
             if mine < foe * params.odds * params.odds {
-                let (sx, sy) = theirs.iter().fold((0.0, 0.0), |acc, enemy| (acc.0 + enemy.0 .0, acc.1 + enemy.0 .1));
+                let (sx, sy) = theirs.iter().fold((0.0, 0.0), |acc, enemy| {
+                    (acc.0 + enemy.0 .0, acc.1 + enemy.0 .1)
+                });
                 let centroid = (sx / theirs.len() as f32, sy / theirs.len() as f32);
-                let step = if unit.kind == EntityKind::Tank { REVERSE_HOP_TILES } else { 5.0 };
+                let step = if unit.kind == EntityKind::Tank {
+                    REVERSE_HOP_TILES
+                } else {
+                    5.0
+                };
                 let point = ctx.away(pos, centroid, step, 0.5);
                 return Some((Mode::Avoid, Some(Order::Move(point.0, point.1))));
             }
@@ -1043,7 +951,10 @@ fn decide(
     if params.mg_wait > 0.0
         && infantry(unit.kind)
         && !defending
-        && ctx.own_tanks.iter().any(|tank| dist(*tank, pos) <= params.mg_wait * ts)
+        && ctx
+            .own_tanks
+            .iter()
+            .any(|tank| dist(*tank, pos) <= params.mg_wait * ts)
     {
         let nest = contact
             .iter()
@@ -1088,22 +999,19 @@ fn decide(
         if let Some(enemy) = watched {
             let threat = (enemy.x, enemy.y);
             wary = params.avoid_hold > 0.0
-                && (free_scout || !((params.support > 0.0
-                    && ctx.own_tanks.iter().any(|tank| {
-                        dist(*tank, pos) <= 10.0 * ts
-                            && dist(*tank, threat) + params.support * ts <= dist(pos, threat)
-                    }))
-                    || (params.near > 0.0
-                        && ctx
-                            .own_tanks
-                            .iter()
-                            .any(|tank| dist(*tank, pos) <= params.near * ts))));
+                && (free_scout
+                    || !((params.support > 0.0
+                        && ctx.own_tanks.iter().any(|tank| {
+                            dist(*tank, pos) <= 10.0 * ts
+                                && dist(*tank, threat) + params.support * ts <= dist(pos, threat)
+                        }))
+                        || (params.near > 0.0
+                            && ctx
+                                .own_tanks
+                                .iter()
+                                .any(|tank| dist(*tank, pos) <= params.near * ts))));
         }
-        if let Some(nearest) = danger
-            .iter()
-            .min_by(|a, b| d(a).total_cmp(&d(b)))
-            .copied()
-        {
+        if let Some(nearest) = danger.iter().min_by(|a, b| d(a).total_cmp(&d(b))).copied() {
             let threat = (nearest.x, nearest.y);
             let screened = (params.support > 0.0
                 && ctx.own_tanks.iter().any(|tank| {
@@ -1157,7 +1065,9 @@ fn decide(
                 *id != unit.id && dist(*at, pos) <= 8.0 * ts && *other >= share + 0.25
             });
             if !shooters.is_empty() && cover {
-                let (sx, sy) = shooters.iter().fold((0.0, 0.0), |acc, enemy| (acc.0 + enemy.x, acc.1 + enemy.y));
+                let (sx, sy) = shooters
+                    .iter()
+                    .fold((0.0, 0.0), |acc, enemy| (acc.0 + enemy.x, acc.1 + enemy.y));
                 let centroid = (sx / shooters.len() as f32, sy / shooters.len() as f32);
                 let point = ctx.away(pos, centroid, REVERSE_HOP_TILES, 0.0);
                 return Some((Mode::Pull, Some(Order::Move(point.0, point.1))));
@@ -1316,7 +1226,9 @@ fn decide(
                 let guns = ctx
                     .enemy_fighters
                     .iter()
-                    .filter(|enemy| enemy.1 == EntityKind::MachineGunner && dist(enemy.0, at) <= 6.0 * ts)
+                    .filter(|enemy| {
+                        enemy.1 == EntityKind::MachineGunner && dist(enemy.0, at) <= 6.0 * ts
+                    })
                     .count()
                     .max(1) as f32;
                 if ready < params.mass * guns {
@@ -1375,7 +1287,9 @@ fn decide(
     if params.charge > 0.0 && infantry(unit.kind) && !(params.charge_no_tank && tank_near) {
         if let Some(mg) = contact
             .iter()
-            .filter(|enemy| enemy.kind == EntityKind::MachineGunner && d(enemy) <= params.charge * ts)
+            .filter(|enemy| {
+                enemy.kind == EntityKind::MachineGunner && d(enemy) <= params.charge * ts
+            })
             .min_by(|a, b| d(a).total_cmp(&d(b)))
         {
             if unit.target_id == Some(mg.id) {
@@ -1399,7 +1313,7 @@ fn decide(
             params.focus_slack
         };
         let armored_only = unit.kind == EntityKind::Tank && params.tank_focus == 1;
-        let score =|enemy: &AiEntitySummary, booked: f32| -> f32 {
+        let score = |enemy: &AiEntitySummary, booked: f32| -> f32 {
             let face = if params.facing_focus && armored(enemy.kind) {
                 heading_of(ctx.memory, enemy.id)
                     .map_or(1.0, |heading| facing_mult(heading, (enemy.x, enemy.y), pos))
@@ -1408,9 +1322,11 @@ fn decide(
             };
             let rate = dps(unit.kind, enemy.kind, ctx.meth).max(0.05) * face;
             let left = (enemy.hp as f32 - booked).max(5.0);
-            let threat = dps(enemy.kind, EntityKind::Rifleman, ctx.enemy_meth)
-                .max(dps(enemy.kind, EntityKind::Tank, ctx.enemy_meth))
-                + 0.01 * cost(enemy.kind);
+            let threat = dps(enemy.kind, EntityKind::Rifleman, ctx.enemy_meth).max(dps(
+                enemy.kind,
+                EntityKind::Tank,
+                ctx.enemy_meth,
+            )) + 0.01 * cost(enemy.kind);
             threat * rate / left
         };
         let in_reach: Vec<&&AiEntitySummary> = contact
@@ -1467,273 +1383,4 @@ fn decide(
         return Some((Mode::Stand, None));
     }
     None
-}
-
-// In-game hook: Jeff's AI V1.1 with the `mm` switch.
-
-use rts_sim::game::command::SimCommand as Command;
-
-/// The live parameters: `JEFF_V1_1_MM` (`key=value,...`, or `JEFF_V11_MM` in local testing) over
-/// the tuned defaults.
-fn live_params() -> Params {
-    static PARAMS: std::sync::OnceLock<Params> = std::sync::OnceLock::new();
-    *PARAMS.get_or_init(|| {
-        let spec = std::env::var("JEFF_V11_MM")
-            .unwrap_or_else(|_| crate::ai_core::profiles::JEFF_V1_1_MM.to_string());
-        let mut params = Params::parse(&spec).unwrap_or_default();
-        // `standfire` as a V1.1 switch too.
-        params.stand_fire |= !crate::ai_core::profiles::jeff_v1_1_feature_off("standfire");
-        params
-    })
-}
-
-/// The units a command orders, for the commands that order units.
-fn units_of(command: &Command) -> &[u32] {
-    match command {
-        Command::Move { units, .. }
-        | Command::FormationMove { units, .. }
-        | Command::AttackMove { units, .. }
-        | Command::ClearObstacleArea { units, .. }
-        | Command::Attack { units, .. }
-        | Command::AttackTankTrapCluster { units, .. }
-        | Command::UseAbility { units, .. }
-        | Command::RecastAbility { units, .. }
-        | Command::PointTanks { units, .. }
-        | Command::Stop { units }
-        | Command::HoldPosition { units, .. } => units,
-        _ => &[],
-    }
-}
-
-/// Takes `held` out of a movement or attack order; abilities (smoke) and economy orders stay.
-/// Returns false when the order no longer orders anyone.
-fn strip(command: &mut Command, held: &BTreeSet<u32>) -> bool {
-    match command {
-        Command::FormationMove { units, points, .. } => {
-            let pairs: Vec<(u32, (f32, f32))> = units
-                .iter()
-                .copied()
-                .zip(points.iter().copied())
-                .filter(|(unit, _)| !held.contains(unit))
-                .collect();
-            if pairs.len() != units.len() {
-                *units = pairs.iter().map(|(unit, _)| *unit).collect();
-                *points = pairs.iter().map(|(_, point)| *point).collect();
-            }
-            !units.is_empty()
-        }
-        Command::Move { units, .. }
-        | Command::AttackMove { units, .. }
-        | Command::ClearObstacleArea { units, .. }
-        | Command::Attack { units, .. }
-        | Command::AttackTankTrapCluster { units, .. }
-        | Command::PointTanks { units, .. }
-        | Command::Stop { units }
-        | Command::HoldPosition { units, .. } => {
-            units.retain(|unit| !held.contains(unit));
-            !units.is_empty()
-        }
-        _ => true,
-    }
-}
-
-/// Remembers where this decision's orders send each unit.
-fn note_goals(commands: &[Command], memory: &mut MatchupMemory) {
-    for command in commands {
-        match command {
-            Command::Move { units, x, y, .. } | Command::AttackMove { units, x, y, .. } => {
-                let attack = matches!(command, Command::AttackMove { .. });
-                for unit in units {
-                    memory.goals.insert(*unit, Goal { attack, x: *x, y: *y });
-                }
-            }
-            Command::FormationMove {
-                units,
-                points,
-                attack_move,
-                ..
-            } => {
-                for (unit, point) in units.iter().zip(points) {
-                    memory.goals.insert(
-                        *unit,
-                        Goal {
-                            attack: *attack_move,
-                            x: point.0,
-                            y: point.1,
-                        },
-                    );
-                }
-            }
-            _ => {}
-        }
-    }
-}
-
-/// Marks the units this decision sends at a building, worker or obstacle (raids, trap clearing),
-/// and forgets marks that ran out (a mark lasts `eco` ticks, or while the unit still shoots it).
-fn note_directed(
-    commands: &[Command],
-    observation: &AiObservation,
-    params: &Params,
-    memory: &mut MatchupMemory,
-) {
-    let tick = observation.tick;
-    if params.eco == 0 {
-        memory.directed.clear();
-        return;
-    }
-    let soft = |target: u32| {
-        observation
-            .visible_enemies
-            .iter()
-            .find(|enemy| enemy.id == target)
-            .is_none_or(|enemy| !fights(enemy.kind))
-    };
-    for command in commands {
-        match command {
-            Command::Attack { units, target, .. } if soft(*target) => {
-                for unit in units {
-                    memory.directed.insert(*unit, (tick + params.eco, Some(*target)));
-                }
-            }
-            Command::ClearObstacleArea { units, .. }
-            | Command::AttackTankTrapCluster { units, .. } => {
-                for unit in units {
-                    memory.directed.insert(*unit, (tick + params.eco, None));
-                }
-            }
-            _ => {}
-        }
-    }
-    let shooting: BTreeMap<u32, Option<u32>> = observation
-        .owned
-        .iter()
-        .map(|unit| (unit.id, unit.target_id))
-        .collect();
-    memory.directed.retain(|unit, (until, target)| {
-        shooting.get(unit).is_some_and(|now| {
-            tick < *until || (target.is_some() && *now == *target)
-        })
-    });
-}
-
-fn to_command(unit: u32, order: Order) -> Command {
-    match order {
-        Order::Move(x, y) => Command::Move {
-            units: vec![unit],
-            x,
-            y,
-            queued: false,
-        },
-        Order::Attack(target) => Command::Attack {
-            units: vec![unit],
-            target,
-            queued: false,
-        },
-        Order::Point(x, y) => Command::PointTanks {
-            units: vec![unit],
-            x,
-            y,
-            queued: false,
-        },
-        Order::Hold => Command::HoldPosition {
-            units: vec![unit],
-            queued: false,
-        },
-    }
-}
-
-/// Runs the matchup micro over V1.1's finished decision: the units it steers lose every other
-/// movement order, it adds its own, and units it lets go get their last other order back.
-pub(in crate::ai_core::decision) fn finish(
-    decision: &mut crate::ai_core::decision::AiDecision,
-    observation: &AiObservation,
-    memory: &mut MatchupMemory,
-    reserved: &BTreeSet<u32>,
-) {
-    if !crate::ai_core::profiles::is_jeff_v1_1(decision.profile_id)
-        || crate::ai_core::profiles::jeff_v1_1_feature_off("mm")
-    {
-        return;
-    }
-    let params = live_params();
-    let ts = observation.map.tile_size.max(1) as f32;
-    let home = (
-        (observation.own_start_tile.0 as f32 + 0.5) * ts,
-        (observation.own_start_tile.1 as f32 + 0.5) * ts,
-    );
-    note_goals(&decision.commands, memory);
-    note_directed(&decision.commands, observation, &params, memory);
-    let directed: BTreeSet<u32> = memory.directed.keys().copied().collect();
-    let kinds: BTreeMap<u32, EntityKind> = observation
-        .owned
-        .iter()
-        .map(|unit| (unit.id, unit.kind))
-        .collect();
-    memory.goals.retain(|id, _| kinds.contains_key(id));
-    // Units on another system's errand that an enemy is about to fight: the micro takes them.
-    let broken: BTreeSet<u32> = if params.tank_break > 0.0 || params.unit_break > 0.0 {
-        observation
-            .owned
-            .iter()
-            .filter(|unit| unit.hp > 0 && (reserved.contains(&unit.id) || directed.contains(&unit.id)))
-            .filter(|unit| {
-                let (range, tanks_only) = if unit.kind == EntityKind::Tank {
-                    (params.tank_break, true)
-                } else {
-                    (params.unit_break, false)
-                };
-                range > 0.0
-                    && observation.visible_enemies.iter().any(|enemy| {
-                        enemy.hp > 0
-                            && if tanks_only { enemy.kind == EntityKind::Tank } else { fights(enemy.kind) }
-                            && dist((unit.x, unit.y), (enemy.x, enemy.y)) <= range * ts
-                    })
-            })
-            .map(|unit| unit.id)
-            .collect()
-    } else {
-        BTreeSet::new()
-    };
-    let eligible = |id: u32| {
-        kinds.get(&id).is_some_and(|kind| params.steers_kind(*kind))
-            && (broken.contains(&id) || (!reserved.contains(&id) && !directed.contains(&id)))
-    };
-    let plan = plan(observation, &params, memory, &eligible, home);
-    if !plan.held.is_empty() {
-        decision
-            .commands
-            .retain_mut(|command| strip(command, &plan.held));
-    }
-    for (unit, order) in &plan.orders {
-        decision.commands.push(to_command(*unit, *order));
-    }
-    let ordered: BTreeSet<u32> = decision
-        .commands
-        .iter()
-        .flat_map(|command| units_of(command).iter().copied())
-        .collect();
-    for unit in &plan.released {
-        if ordered.contains(unit) {
-            continue;
-        }
-        if let Some(goal) = memory.goals.get(unit) {
-            decision.commands.push(if goal.attack {
-                Command::AttackMove {
-                    units: vec![*unit],
-                    x: goal.x,
-                    y: goal.y,
-                    queued: false,
-                }
-            } else {
-                Command::Move {
-                    units: vec![*unit],
-                    x: goal.x,
-                    y: goal.y,
-                    queued: false,
-                }
-            });
-        }
-    }
-    decision.trace.matchup = Some(memory.trace());
 }

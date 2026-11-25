@@ -34,10 +34,12 @@ pub(in crate::ai_core::decision) struct PaidPumpMemory {
 
 /// Orders the paid Pump Jacks. Returns whether the opening Barracks waits for the main's.
 pub(in crate::ai_core::decision) fn run(
-    actions: &mut AiActionContext<'_>,
-    observation: &AiObservation,
-    facts: &AiFacts,
-    memory: &mut AiDecisionMemory,
+    (actions, observation, facts, memory): (
+        &mut AiActionContext<'_>,
+        &AiObservation,
+        &AiFacts,
+        &mut AiDecisionMemory,
+    ),
     profile_id: &str,
     (builder_pools, intents): (&[&[u32]], &mut Vec<AiIntent>),
 ) -> bool {

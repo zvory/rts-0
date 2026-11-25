@@ -352,9 +352,12 @@ pub(super) fn train_units(
         // `clearbuy` (testing): the natural's clearing group short of the Riflemen it needs buys
         // them from the bank, past the spend plan's cap.
         if building_kind == EntityKind::Barracks {
-            if let Some(target) =
-                jeff_v1_1::natclear::buy_target(profile.id, observation, memory, production_unit_counts)
-            {
+            if let Some(target) = jeff_v1_1::natclear::buy_target(
+                profile.id,
+                observation,
+                memory,
+                production_unit_counts,
+            ) {
                 opening_rush::raise_rifle_cap(&mut building_max_counts, target);
             }
         }
@@ -628,7 +631,12 @@ pub(super) fn finish_trace(
         .chain(memory.jeff_v1_1.rifle_raid.units())
         .chain(memory.jeff_v1_1.deny.units())
         .collect();
-    jeff_v1_1::matchup::finish(decision, observation, &mut memory.jeff_v1_1.matchup, &reserved);
+    jeff_v1_1::matchup::finish(
+        decision,
+        observation,
+        &mut memory.jeff_v1_1.matchup,
+        &reserved,
+    );
     if memory.profile_id().is_some_and(is_jeff_v1_1) {
         // Which system holds each Tank, for the decision trace: two short lines, under the
         // trace's line cap.
