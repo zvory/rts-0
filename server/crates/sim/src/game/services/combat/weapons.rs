@@ -439,9 +439,11 @@ mod shop_item_tests {
         let base = effective_attack_profile(&warrior);
         warrior.receive_shop_item(AbilityKind::DoubleDamage);
         assert_eq!(effective_attack_profile(&warrior).dmg, base.dmg * 2);
-        // The attack category stays occupied; Haste cannot replace Double Damage.
+        // Both attack effects coexist without replacing one another.
         warrior.receive_shop_item(AbilityKind::Haste);
-        assert!(!warrior.shop_item_active(AbilityKind::Haste));
+        assert!(warrior.shop_item_active(AbilityKind::Haste));
+        assert_eq!(effective_attack_profile(&warrior).dmg, base.dmg * 2);
+        assert_eq!(warrior.shop_item_reload(30), 15);
         let mut hasted = Entity::new_unit(1, EntityKind::Warrior, 320.0, 320.0).unwrap();
         hasted.receive_shop_item(AbilityKind::Haste);
         for _ in 0..1000 {
