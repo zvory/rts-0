@@ -451,6 +451,8 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/game/services/geometry.rs",
   "server/crates/sim/src/game/services/move_coordinator.rs",
   "server/crates/sim/src/game/services/movement/mod.rs",
+  // Extracted Anchor displacement preserves the existing Tank stationary-range reset.
+  "server/crates/sim/src/game/services/movement/anchor.rs",
   // Armor-reaction runtime eligibility is rules-routed; focused inline tests use the Tank entry.
   "server/crates/sim/src/game/services/movement/armor_reaction.rs",
   "server/crates/sim/src/game/services/movement/pivot_drive.rs",
@@ -595,6 +597,8 @@ const sourceRoots = [
 ];
 const offenders = [];
 const approvedSpecialCaseBudgets = new Map([
+  // One existing Tank reset moved from movement/mod.rs; no new faction admission rule.
+  ["server/crates/sim/src/game/services/movement/anchor.rs", 1],
   // Phase 7 final audit: catalog, economy helper, and command-service references intentionally
   // grew during the fixture, ability, and client-surface phases; keep the ratchet explicit until
   // those helpers shrink or move behind catalog APIs.
