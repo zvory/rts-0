@@ -444,12 +444,10 @@ mod shop_item_tests {
         assert!(warrior.shop_item_active(AbilityKind::Haste));
         assert_eq!(effective_attack_profile(&warrior).dmg, base.dmg * 2);
         assert_eq!(warrior.shop_item_reload(30), 15);
-        let mut hasted = Entity::new_unit(1, EntityKind::Warrior, 320.0, 320.0).unwrap();
-        hasted.receive_shop_item(AbilityKind::Haste);
         for _ in 0..1000 {
-            hasted.tick_ability_cooldowns();
+            warrior.tick_ability_cooldowns();
         }
-        assert_eq!(hasted.shop_item_reload(30), 15);
-        assert_eq!(hasted.shop_item_reload(1), 1);
+        assert_eq!(warrior.shop_item_reload(30), 15);
+        assert_eq!(warrior.shop_item_reload(1), 1);
     }
 }
