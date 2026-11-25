@@ -18,8 +18,9 @@ function fixture({ lobby = false, clientBuild = "loaded-build", storage = new Ma
     removeEventListener(type) { events.delete(type); },
   };
   const navigations = [];
+  let documentReloads = 0;
   const win = {
-    location: { href, replace(url) { navigations.push(url); } },
+    location: { href, replace(url) { navigations.push(url); }, reload() { documentReloads++; } },
     sessionStorage: { getItem: (k) => storage.get(k), setItem: (k, v) => storage.set(k, v) },
     setInterval(fn) { this.interval = fn; return 1; }, clearInterval() { this.interval = null; },
     setTimeout(fn) { this.timeout = fn; return 2; }, clearTimeout() { this.timeout = null; },
@@ -38,7 +39,8 @@ function fixture({ lobby = false, clientBuild = "loaded-build", storage = new Ma
       return { ok: true, text: async () => clientBuild };
     }),
   });
-  return { guard, net, state, win, doc, events, storage, navigations };
+  return { guard, net, state, win, doc, events, storage, navigations,
+    get documentReloads() { return documentReloads; } };
 }
 
 // Same page stays stamped with its loaded build, even when the server changes.
@@ -99,7 +101,8 @@ function fixture({ lobby = false, clientBuild = "loaded-build", storage = new Ma
   assert.equal(stale.navigations.length, 0, "URL bounds automatic recovery without storage");
   assert.equal(stale.guard.button.disabled, false, "manual recovery stays available");
   stale.guard.refresh();
-  assert.equal(stale.navigations.length, 1);
+  assert.equal(stale.navigations.length, 0, "manual recovery avoids same-document fragment navigation");
+  assert.equal(stale.documentReloads, 1, "manual retry explicitly reloads stale HTML at the build URL");
   stale.guard.destroy();
   const later = fixture({ lobby: true, nativeReload: true, storage, href: url.href });
   later.guard.observe("later-server");

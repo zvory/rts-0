@@ -30,7 +30,10 @@ export class VersionGuard {
     reload = (build) => {
       const url = new URL(win.location.href);
       url.searchParams.set(REFRESH_BUILD_PARAM, build);
-      win.location.replace(url.href);
+      // Replacing an identical URL with a fragment can be a same-document
+      // navigation. Manual recovery must actually request the document again.
+      if (url.href === win.location.href) win.location.reload();
+      else win.location.replace(url.href);
     },
   }) {
     this.net = net;
