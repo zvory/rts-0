@@ -132,10 +132,9 @@ export function _issueTargetedCommand(p, ev = {}) {
         && e.buildProgress == null && e.hp > 0
         && (definition.rangeTiles == null || Math.hypot(e.x - target.x, e.y - target.y) <= range));
       if (!shop || (ability === ABILITY.ESCAPE_TREASURE && target.escapeTreasure)) return false;
-      const defense = [ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE];
-      const category = defense.includes(ability) ? defense
-        : [ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE].includes(ability) ? [ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE] : [];
-      if (target.abilities?.some((entry) => category.includes(entry.ability))) return false;
+      const passiveItem = [ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE,
+        ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE].includes(ability);
+      if (passiveItem && target.abilities?.some((entry) => entry.ability === ability)) return false;
       this.commandInteraction.issueCommand(cmd.useAbility(ability, [shop.id], null, null, false, target.id));
       this._addCommandFeedback("move", target.x, target.y, false);
       return true;

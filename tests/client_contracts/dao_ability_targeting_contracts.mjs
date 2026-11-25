@@ -201,6 +201,26 @@ console.log("Dao ability targeting contracts passed");
   input.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.ESCAPE_TREASURE });
   assert(!input._issueTargetedCommand({ x: 200, y: 100 }), "Escape Treasure still rejects distant targets");
   assert(sent.length === 2, "Out-of-range escape purchase issues no command");
+
+  target = { ...target, owner: 1, x: 200 };
+  const passiveItems = [ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE,
+    ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE];
+  for (const equipped of passiveItems) {
+    target.abilities = [{ ability: equipped, remainingUses: 1 }];
+    for (const ability of passiveItems) {
+      input.clientIntent.beginCommandTarget({ kind: "ability", ability });
+      const before = sent.length;
+      const accepted = input._issueTargetedCommand({ x: 200, y: 100 });
+      assert(accepted === (ability !== equipped),
+        "Shop targeting rejects only the identical equipped passive item");
+      assert(sent.length === before + (ability !== equipped ? 1 : 0),
+        "Distinct item purchases reach the server, including within the old categories");
+      if (ability !== equipped) {
+        assertDeepEqual(sent.at(-1), { c: "useAbility", ability, units: [201], targetId: 202 },
+          "Coexisting item purchase preserves ability, Shop and target identity");
+      }
+    }
+  }
 }
 
 // Passive Charge remains observable through its real cooldown without accepting commands.
