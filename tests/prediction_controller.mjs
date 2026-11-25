@@ -983,7 +983,7 @@ function sentSeqs(sent) {
   const files = [
     ["client/src/input/commands.js", "viewport right-click and hotkeys"],
     ["client/src/input/placement.js", "build placement"],
-    ["client/src/minimap.js", "minimap right-click and rally"],
+    ["client/src/minimap_commands.js", "minimap right-click and rally"],
     ["client/src/hud.js", "HUD stop/train/research/cancel/ability"],
   ];
   for (const [file, label] of files) {
@@ -991,6 +991,9 @@ function sentSeqs(sent) {
     assert(source.includes("this.commandInteraction.issueCommand"), `${file} routes ${label} through the shared command interaction`);
     assert(!source.includes(".net.command("), `${file} does not send gameplay commands through Net`);
   }
+  const minimapSource = fs.readFileSync(new URL("../client/src/minimap.js", import.meta.url), "utf8");
+  assert(minimapSource.includes("issueMinimapOrder.call(this") && !minimapSource.includes(".net.command("),
+    "Minimap delegates command dispatch to its shared-interaction helper");
   const interactionSource = fs.readFileSync(new URL("../client/src/command_interaction.js", import.meta.url), "utf8");
   assert(
     interactionSource.includes("function issueGameplayCommand") &&
