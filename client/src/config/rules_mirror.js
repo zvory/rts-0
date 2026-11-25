@@ -149,8 +149,7 @@ export const EKAT_LINE_SHOT_COOLDOWN_TICKS = TICK_HZ * 20;
 export const EKAT_MAGIC_ANCHOR_RANGE_TILES = 7.5;
 export const EKAT_MAGIC_ANCHOR_DURATION_TICKS = TICK_HZ * 10;
 export const EKAT_MAGIC_ANCHOR_RADIUS_TILES = 3.0;
-export const EKAT_MAGIC_ANCHOR_PULL_AWAY_MULTIPLIER = 0.45;
-export const EKAT_MAGIC_ANCHOR_PULL_TOWARD_MULTIPLIER = 2.40;
+export const EKAT_MAGIC_ANCHOR_PULL_SPEED_MULTIPLIER = 2.0;
 export const BASE_COMMAND_SUPPLY_CAP = 25;
 export const COMMAND_CAR_SUPPLY_CAP_BONUS = 0;
 export const SCOUT_PLANE_ORBIT_RADIUS_TILES = 2;
@@ -593,8 +592,7 @@ export const ABILITIES = Object.freeze({
     cost: Object.freeze({ steel: 0, oil: 0 }),
     radiusTiles: EKAT_MAGIC_ANCHOR_RADIUS_TILES,
     durationTicks: EKAT_MAGIC_ANCHOR_DURATION_TICKS,
-    pullAwayMultiplier: EKAT_MAGIC_ANCHOR_PULL_AWAY_MULTIPLIER,
-    pullTowardMultiplier: EKAT_MAGIC_ANCHOR_PULL_TOWARD_MULTIPLIER,
+    pullSpeedMultiplier: EKAT_MAGIC_ANCHOR_PULL_SPEED_MULTIPLIER,
     queued: true,
     queuePolicy: "skipIfNotReady",
   }),

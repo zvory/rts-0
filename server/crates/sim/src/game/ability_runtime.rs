@@ -1,6 +1,5 @@
 #![allow(dead_code)]
 
-use crate::config;
 use crate::game::ability::AbilityKind;
 use crate::game::ability_projectile::{AbilityProjectile, AbilityProjectileSpec};
 use crate::game::entity::EntityStore;
@@ -376,66 +375,14 @@ impl AbilityRuntime {
         })
     }
 
-    pub(crate) fn magic_anchor_movement_multiplier(
-        &self,
-        owner: u32,
-        teams: &TeamRelations,
-        position: (f32, f32),
-        move_dir: (f32, f32),
-        tick: u32,
-    ) -> f32 {
-        let (x, y) = position;
-        if !x.is_finite() || !y.is_finite() {
-            return 1.0;
-        }
-        let move_len = (move_dir.0 * move_dir.0 + move_dir.1 * move_dir.1).det_sqrt();
-        if move_len <= 0.0001 {
-            return 1.0;
-        }
-        let move_dir = (move_dir.0 / move_len, move_dir.1 / move_len);
-        self.world_objects()
-            .filter(|object| {
-                teams.is_enemy_owner(owner, object.owner)
-                    && object.kind == AbilityWorldObjectKind::MagicAnchor
-                    && object.active_at(tick)
-                    && matches!(object.payload, AbilityObjectPayload::MagicAnchor { .. })
-            })
-            .filter_map(|object| {
-                let AbilityObjectPayload::MagicAnchor { radius } = object.payload else {
-                    return None;
-                };
-                if radius <= 0.0 || !radius.is_finite() {
-                    return None;
-                }
-                let dx = object.x.to_world() - x;
-                let dy = object.y.to_world() - y;
-                let dist = (dx * dx + dy * dy).det_sqrt();
-                if dist > radius || dist <= 0.0001 {
-                    return None;
-                }
-                let toward = (dx / dist, dy / dist);
-                let alignment = move_dir.0 * toward.0 + move_dir.1 * toward.1;
-                let strength = 1.0 - (dist / radius).clamp(0.0, 1.0);
-                let directional = if alignment >= 0.0 {
-                    (config::EKAT_MAGIC_ANCHOR_PULL_TOWARD_MULTIPLIER - 1.0) * alignment
-                } else {
-                    (1.0 - config::EKAT_MAGIC_ANCHOR_PULL_AWAY_MULTIPLIER) * alignment
-                };
-                Some(1.0 + directional * strength)
-            })
-            .min_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-            .unwrap_or(1.0)
-            .max(0.0)
-    }
-
-    pub(crate) fn magic_anchor_stationary_pull(
+    pub(crate) fn magic_anchor_pull(
         &self,
         owner: u32,
         teams: &TeamRelations,
         x: f32,
         y: f32,
         tick: u32,
-    ) -> Option<((f32, f32), f32)> {
+    ) -> Option<((f32, f32), f32, f32)> {
         if !x.is_finite() || !y.is_finite() {
             return None;
         }
@@ -460,7 +407,7 @@ impl AbilityRuntime {
                     return None;
                 }
                 let strength = 1.0 - (dist / radius).clamp(0.0, 1.0);
-                Some((((dx / dist), (dy / dist)), strength))
+                Some((((dx / dist), (dy / dist)), strength, dist))
             })
             .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
     }

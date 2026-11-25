@@ -829,34 +829,63 @@ fn ekat_magic_anchor_is_not_attackable_by_enemy_weapons() {
 }
 
 #[test]
-fn ekat_magic_anchor_pull_field_slows_away_and_boosts_toward_movement() {
-    let away_delta = ekat_anchor_move_delta(-6.0, 2);
-    let toward_delta = ekat_anchor_move_delta(14.0, 2);
-
-    assert!(
-        away_delta < config::unit_stats(EntityKind::Ekat).unwrap().speed,
-        "moving away from the anchor should be slowed, delta={away_delta}"
-    );
-    assert!(
-        toward_delta > config::unit_stats(EntityKind::Ekat).unwrap().speed,
-        "moving toward the anchor should be boosted, delta={toward_delta}"
-    );
-    assert!(
-        toward_delta > away_delta,
-        "toward movement should cover more distance than away movement"
-    );
+fn ekat_magic_anchor_adds_same_inward_vector_for_idle_and_every_move_direction() {
+    for destination in [
+        None,
+        Some((10.0, 0.0)),
+        Some((-10.0, 0.0)),
+        Some((0.0, 10.0)),
+    ] {
+        let AnchorVectorStep {
+            position: base,
+            start,
+            center,
+            ..
+        } = anchor_vector_step(destination, 2, false);
+        let AnchorVectorStep {
+            position: pulled,
+            delta: reported_delta,
+            ..
+        } = anchor_vector_step(destination, 2, true);
+        let dx = center.0 - base.0;
+        let dy = center.1 - base.1;
+        let distance = (dx * dx + dy * dy).sqrt();
+        let radius = config::EKAT_MAGIC_ANCHOR_RADIUS_TILES * config::TILE_SIZE as f32;
+        let speed = config::unit_stats(EntityKind::Rifleman).unwrap().speed;
+        let magnitude = speed * 2.0 * (1.0 - distance / radius);
+        assert!(
+            (pulled.0 - base.0 - dx / distance * magnitude).abs() < 0.02,
+            "destination={destination:?}, pulled={pulled:?}, base={base:?}"
+        );
+        assert!((pulled.1 - base.1 - dy / distance * magnitude).abs() < 0.02);
+        assert!((reported_delta.0 - (pulled.0 - start.0)).abs() < 0.02);
+        assert!((reported_delta.1 - (pulled.1 - start.1)).abs() < 0.02);
+        // At this distance the inward vector is stronger than normal retreat.
+        assert!(
+            pulled.0 > start.0,
+            "even retreat must move inward near the center"
+        );
+        if destination == Some((0.0, 10.0)) {
+            assert!(
+                pulled.1 > start.1,
+                "sideways movement remains while bending inward"
+            );
+        }
+    }
 }
 
 #[test]
 fn ekat_magic_anchor_leaves_owned_and_allied_movement_unchanged() {
-    let speed = config::unit_stats(EntityKind::Ekat).unwrap().speed;
     for owner in [1, 3] {
-        for destination in [-6.0, 14.0] {
-            let delta = ekat_anchor_move_delta(destination, owner);
-            assert!(
-                (delta - speed).abs() < 0.01,
-                "owner={owner}, destination={destination}, delta={delta}"
-            );
+        for destination in [
+            None,
+            Some((10.0, 0.0)),
+            Some((-10.0, 0.0)),
+            Some((0.0, 10.0)),
+        ] {
+            let base = anchor_vector_step(destination, owner, false).position;
+            let pulled = anchor_vector_step(destination, owner, true).position;
+            assert_eq!(pulled, base, "owner={owner}, destination={destination:?}");
         }
     }
 }
@@ -936,51 +965,70 @@ fn ekat_magic_anchor_pulls_stationary_units_with_weight_resistance() {
     );
 }
 
-fn ekat_anchor_move_delta(destination_tiles_from_start: f32, owner: u32) -> f32 {
+struct AnchorVectorStep {
+    position: (f32, f32),
+    start: (f32, f32),
+    center: (f32, f32),
+    delta: (f32, f32),
+}
+
+// Return final position, start, field center, and recorded movement for one measured tick.
+fn anchor_vector_step(
+    destination: Option<(f32, f32)>,
+    owner: u32,
+    with_anchor: bool,
+) -> AnchorVectorStep {
     let ally = PlayerInit {
         id: 3,
         team_id: 1,
         ..kriegsia_enemy()
     };
-    let players = [ekat_player(), kriegsia_enemy(), ally];
-    let mut game = empty_flat_game(&players);
+    let mut game = empty_flat_game(&[ekat_player(), kriegsia_enemy(), ally]);
     let start = game.state.map.tile_center(10, 10);
-    let anchor_target = game.state.map.tile_center(12, 10);
-    let destination = (
-        start.0 + destination_tiles_from_start * config::TILE_SIZE as f32,
-        start.1,
-    );
-    let hero = game
+    let center = game.state.map.tile_center(11, 10);
+    let unit = game
         .state
         .entities
-        .spawn_unit(owner, EntityKind::Ekat, start.0, start.1)
-        .expect("hero should spawn");
-
+        .spawn_unit(owner, EntityKind::Rifleman, start.0, start.1)
+        .unwrap();
     let caster = game
         .state
         .entities
         .spawn_unit(
             1,
             EntityKind::Ekat,
-            anchor_target.0,
-            anchor_target.1 + 4.0 * config::TILE_SIZE as f32,
+            center.0,
+            center.1 + 6.5 * config::TILE_SIZE as f32,
         )
         .unwrap();
-    enqueue_ekat_anchor(&mut game, caster, anchor_target);
+    if with_anchor {
+        enqueue_ekat_anchor(&mut game, caster, center);
+    }
     game.tick();
-    game.enqueue(
-        owner,
-        Command::Move {
-            units: vec![hero],
-            x: destination.0,
-            y: destination.1,
-            queued: false,
-        },
-    );
+    game.state
+        .entities
+        .get_mut(unit)
+        .unwrap()
+        .set_position(start.0, start.1);
+    if let Some((dx, dy)) = destination {
+        game.enqueue(
+            owner,
+            Command::Move {
+                units: vec![unit],
+                x: start.0 + dx * config::TILE_SIZE as f32,
+                y: start.1 + dy * config::TILE_SIZE as f32,
+                queued: false,
+            },
+        );
+    }
     game.tick();
-
-    let hero_entity = game.state.entities.get(hero).expect("hero exists");
-    (hero_entity.pos_x() - start.0).abs()
+    let entity = game.state.entities.get(unit).unwrap();
+    AnchorVectorStep {
+        position: (entity.pos_x(), entity.pos_y()),
+        start,
+        center,
+        delta: entity.movement_delta(),
+    }
 }
 
 #[test]

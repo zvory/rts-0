@@ -24,6 +24,7 @@ use crate::game::services::pathing::PathingService;
 use crate::game::services::standability;
 use crate::game::{PlayerState, ScoreState};
 use rayon::prelude::*;
+mod anchor_pull;
 mod barbed_wire;
 mod cultivator_footing;
 mod enemy_blocking;
