@@ -241,7 +241,7 @@ export const STATS = Object.freeze({
     cost: { steel: 0, oil: 150 }, buildTicks: 0, trains: [],
     description: "Friendly units inside recover 3 HP per second. Expires after restoring 400 HP." },
   [KIND.SHOP]: { label: "Shop", icon: "SH", footW: 3, footH: 4, sight: 1,
-    cost: { steel: 200, oil: 200 }, buildTicks: TICK_HZ * 20, trains: [],
+    cost: { steel: 100, oil: 100 }, buildTicks: TICK_HZ * 20, trains: [],
     description: "Sells Healing Potions, Escape Treasures and Healing Seals for nearby friendly units." },
   [KIND.PROVEN_GROUNDS]: { label: "Proving Grounds", icon: "PG", footW: 3, footH: 3, sight: 1,
     cost: { steel: 100, oil: 0 }, buildTicks: 200, trains: [], requires: [KIND.PORTAL],

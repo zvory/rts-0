@@ -15,7 +15,7 @@ Cultivator camera, painterly outlines, timber and stone styling.
 
 ## Phase 1: rules and balance — complete
 
-User-specified: 200 steel, 200 oil, 20 seconds of construction, three tiles wide by four tiles
+User-specified: 100 steel, 100 oil, 20 seconds of construction, three tiles wide by four tiles
 deep, no functionality. The Shop has **200 HP** per the latest balance request.
 
 - Cultivator Serfs construct it through their normal build card (slot Z in the grid preset).
