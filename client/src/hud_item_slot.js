@@ -22,7 +22,7 @@ function shownItems(units) {
 }
 
 export function itemCooldownAffordances(units, groupCooldownClocks = () => []) {
-  return shownItems(units).map((item) => ({
+  return shownItems(units).filter((item) => item.category === "attack").map((item) => ({
     definition: { ability: item.ability },
     cooldownClocks: groupCooldownClocks(units.map((u) => status(u, item.ability)?.cooldownLeft || 0), 900),
   }));
@@ -47,13 +47,25 @@ export function placeItemDescriptor(slots, units, factionId, groupCooldownClocks
   }
   for (const item of shownItems(units)) {
     const carriers = units.filter((unit) => status(unit, item.ability));
+    if (item.category === "defense") {
+      slots[item.slot] = {
+        id: `item:${item.ability}`, commandId: `cultivators.item.${item.ability}`,
+        kind: "button", action: null, ability: item.ability,
+        icon: item.icon, label: item.label,
+        title: `Permanent passive defense item: ${item.effect}, applied on arrival.`,
+        passive: true, enabled: false, intent: null, contextIntent: null,
+        contextHotkeyModifiers: [], cooldownClocks: [],
+        countBadge: carriers.length > 1 ? `${carriers.length}` : "",
+      };
+      continue;
+    }
     const readyIds = carriers.filter((unit) => status(unit, item.ability).remainingUses > 0).map((unit) => unit.id);
     const active = carriers.some((unit) => status(unit, item.ability).cooldownLeft > 0);
     slots[item.slot] = {
       id: `item:${item.ability}`, commandId: `cultivators.item.${item.ability}`,
       kind: "button", action: "ability", ability: item.ability,
       icon: item.icon, label: item.label,
-      title: `${item.category === "defense" ? "Defense" : "Attack"} item: ${item.effect} for 30 seconds. ${readyIds.length ? "Activate to consume." : "Active; expires when the clock completes."}`,
+      title: `Attack item: ${item.effect} for 30 seconds. ${readyIds.length ? "Activate to consume." : "Active; expires when the clock completes."}`,
       enabled: readyIds.length > 0,
       intent: { type: "ability", ability: item.ability, targetMode: "self", readyIds },
       cls: active ? "active" : "", countBadge: carriers.length > 1 ? `${readyIds.length}` : "",

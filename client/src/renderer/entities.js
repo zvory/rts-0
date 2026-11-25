@@ -281,10 +281,12 @@ function drawCategoryItemBadges(container, entity, topY) {
     if (!badge) continue;
     badge.visible = !!entry;
     if (!entry) continue;
-    // An asterisk and full opacity distinguish active effects from carried goods.
-    badge.text = `${item.label}${entry.cooldownLeft > 0 ? "*" : ""}`;
-    badge.alpha = entry.cooldownLeft > 0 ? 1 : 0.65;
-    badge.position.set([ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE].includes(item.ability) ? -12 : 12, entity.y - topY + 13);
+    const passive = [ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE].includes(item.ability);
+    const active = !passive && entry.cooldownLeft > 0;
+    // Passive defense is always applied; an asterisk marks an activated attack buff.
+    badge.text = `${item.label}${active ? "*" : ""}`;
+    badge.alpha = passive || active ? 1 : 0.65;
+    badge.position.set(passive ? -12 : 12, entity.y - topY + 13);
   }
 }
 

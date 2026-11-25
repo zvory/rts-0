@@ -1109,7 +1109,8 @@ for (const context of buildCommandCardContextCatalog()) {
     }
     if (slot.slotIndex === 10) {
       assert([ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE].includes(slot.ability));
-      assert.equal(slot.hotkey, "F");
+      if (slot.commandId === "cultivators.ability.vitalityTreasure") assert.equal(slot.hotkey, "F");
+      else assert(slot.passive && !slot.hotkey);
       continue;
     }
     if (slot.slotIndex === 11) {
@@ -1178,17 +1179,17 @@ for (const kind of [KIND.WORKER, KIND.WARRIOR, KIND.WIND_ADEPT, KIND.WAR_ADEPT, 
       ticks.filter((tick) => tick > 0).map((tick) => ({ count: 1, rotationDeg: tick / total * 360 })) });
   const carried = build(units);
   assert.equal(carried.slots[9].hotkey, "R");
-  assert.equal(carried.slots[10].hotkey, "F");
+  assert.equal(carried.slots[10].hotkey, "");
   assert.equal(carried.slots[11].hotkey, "V");
-  assert.deepEqual(carried.slots[10].intent.readyIds, [1]);
+  assert.equal(carried.slots[10].intent, null);
   assert.deepEqual(carried.slots[11].intent.readyIds, [1]);
   const active = build([{ ...units[0], abilities: [
     { ability: ABILITY.HASTE, remainingUses: 0, cooldownLeft: 450 },
-    { ability: ABILITY.ARMOR_TREASURE, remainingUses: 0, cooldownLeft: 450 }] }, units[1]]);
+    { ability: ABILITY.ARMOR_TREASURE, remainingUses: 1, cooldownLeft: 0 }] }, units[1]]);
   assert.equal(active.slots[11].ability, ABILITY.DOUBLE_DAMAGE, "mixed selection exposes the remaining ready attack item");
   assert.equal(active.slots[10].enabled, false);
-  assert.equal(active.slots[10].cls, "active");
-  assert.deepEqual(active.slots[10].cooldownClocks, [{ count: 1, rotationDeg: 180 }]);
+  assert.equal(active.slots[10].passive, true);
+  assert.deepEqual(active.slots[10].cooldownClocks, []);
   assert.notEqual(active.signature, carried.signature);
   const charge = active.slots.find((slot) => slot?.ability === ABILITY.CHARGE);
   assert(charge.slotIndex < 9, "passive Charge leaves the defense category available");
@@ -1216,18 +1217,25 @@ for (const factionId of ["kriegsia", "ekat"]) {
   assert.equal(shop.slots[10].intent.targetMode, "friendlyUnit");
   const units = [
     { id: 2, owner: 1, kind: KIND.WARRIOR, abilities: [
-      { ability: ABILITY.ARMOR_TREASURE, remainingUses: 0, cooldownLeft: 450 }] },
+      { ability: ABILITY.ARMOR_TREASURE, remainingUses: 1, cooldownLeft: 0 }] },
     { id: 3, owner: 1, kind: KIND.WARRIOR, abilities: [
       { ability: ABILITY.VITALITY_TREASURE, remainingUses: 1, cooldownLeft: 0 }] },
   ];
-  const ready = build(units);
-  assert.equal(ready.slots[10].ability, ABILITY.VITALITY_TREASURE);
-  assert.equal(ready.slots[10].commandId, "cultivators.item.vitalityTreasure");
-  assert.equal(ready.slots[10].hotkey, "F");
-  assert.deepEqual(ready.slots[10].intent.readyIds, [3]);
-  assert(ready.slots[10].title.includes("+150 maximum and current HP"));
-  const active = build([{ ...units[1], abilities: [
-    { ability: ABILITY.VITALITY_TREASURE, remainingUses: 0, cooldownLeft: 900 }] }]);
-  assert.equal(active.slots[10].enabled, false);
-  assert.equal(active.slots[10].cls, "active");
+  assert.equal(build(units).slots[10].ability, ABILITY.ARMOR_TREASURE);
+  for (const unit of units) {
+    const passive = build([unit]);
+    const slot = passive.slots[10];
+    assert.equal(slot.ability, unit.abilities[0].ability);
+    assert.equal(slot.hotkey, "");
+    assert.equal(slot.passive, true);
+    assert.equal(slot.enabled, false);
+    assert.equal(slot.action, null);
+    assert.equal(slot.intent, null);
+    assert.equal(slot.contextIntent, null);
+    assert.deepEqual(slot.cooldownClocks, []);
+    assert(slot.title.includes("Permanent passive"));
+    assert(!slot.title.includes("30 seconds"));
+    assert(!passive.abilityAffordances.some((entry) => entry.definition.ability === slot.ability));
+  }
+  assert(build([units[1]]).slots[10].title.includes("+150 maximum and current HP"));
 }

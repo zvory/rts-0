@@ -175,7 +175,7 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 15] = [
     },
     AbilityCatalogEntry {
         kind: AbilityKind::ArmorTreasure, label: "Armor Treasure", icon: "AR", hotkey: Some("D"),
-        title: "Deliver a defense item within 30 tiles; activate for 50% additional armor for 30 seconds", carriers: &[EntityKind::Shop], target_mode: AbilityTargetMode::FriendlyUnit,
+        title: "Deliver a permanent passive defense item within 30 tiles; grants 50% additional armor on arrival", carriers: &[EntityKind::Shop], target_mode: AbilityTargetMode::FriendlyUnit,
         range_tiles: Some(30.0), min_range_tiles: None, cooldown_ticks: 0,
         charges: None, charge_recharge_ticks: None, cost: ResourceCost::new(0, 100),
         tech_requirement: None, upgrade_requirement: None,
@@ -184,7 +184,7 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 15] = [
     },
     AbilityCatalogEntry {
         kind: AbilityKind::VitalityTreasure, label: "Vitality Treasure", icon: "+HP", hotkey: Some("F"),
-        title: "Deliver a defense item within 30 tiles; activate for +150 maximum and current HP for 30 seconds", carriers: &[EntityKind::Shop], target_mode: AbilityTargetMode::FriendlyUnit,
+        title: "Deliver a permanent passive defense item within 30 tiles; grants +150 maximum and current HP on arrival", carriers: &[EntityKind::Shop], target_mode: AbilityTargetMode::FriendlyUnit,
         range_tiles: Some(30.0), min_range_tiles: None, cooldown_ticks: 0,
         charges: None, charge_recharge_ticks: None, cost: ResourceCost::new(0, 100),
         tech_requirement: None, upgrade_requirement: None,
