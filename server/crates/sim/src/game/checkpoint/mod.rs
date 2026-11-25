@@ -359,8 +359,7 @@ impl GameCheckpointV1 {
             .filter_map(|e| e.shield.as_ref())
         {
             if shield.expires_tick <= self.tick
-                || shield.expires_tick.saturating_sub(self.tick)
-                    > crate::config::DISCIPLE_SHIELD_DURATION_TICKS
+                || shield.expires_tick.saturating_sub(self.tick) > shield.duration_ticks
                 || !shield_ids.insert(shield.id)
                 || !self.ability_runtime.valid_external_object_id(shield.id)
             {

@@ -665,6 +665,10 @@ pub struct AbilityObjectOwnerStateView {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hp: Option<u16>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_hp: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duration_ticks: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub radius: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub destroyed_lockout_ticks: Option<u32>,

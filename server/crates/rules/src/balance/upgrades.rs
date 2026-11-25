@@ -78,6 +78,8 @@ pub const DAO_MAGIC_SPEED_MULTIPLIER: f32 = 1.05;
 
 pub const DISCIPLE_SHIELD_ARMOR_REDUCTION: f32 = 0.75;
 pub const DISCIPLE_SHIELD_CAPACITY: u32 = 150;
+pub const MAGIC_MASTER_SHIELD_CAPACITY: u32 = DISCIPLE_SHIELD_CAPACITY * 2;
+pub const MAGIC_MASTER_SHIELD_DURATION_TICKS: u32 = DISCIPLE_SHIELD_DURATION_TICKS * 2;
 pub const MAGIC_ANCHOR_DEATH_INSIGHT: u32 = 20;
 pub const DISCIPLE_SHIELD_RADIUS_TILES: f32 = 2.1;
 pub const DISCIPLE_SHIELD_DURATION_TICKS: u32 = TICK_HZ * 5;
@@ -104,5 +106,14 @@ pub fn disciple_insight_ratio(
         (1, 4)
     } else {
         (4, 4)
+    }
+}
+
+/// Shield strength is selected at cast time and retained through later promotion.
+pub const fn disciple_shield_duration_ticks(master: bool) -> u32 {
+    if master {
+        MAGIC_MASTER_SHIELD_DURATION_TICKS
+    } else {
+        DISCIPLE_SHIELD_DURATION_TICKS
     }
 }

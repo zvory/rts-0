@@ -638,13 +638,15 @@ impl Serialize for CompactAbilityObjectOwnerState<'_> {
         S: Serializer,
     {
         let state = self.0;
-        let mut seq = serializer.serialize_seq(Some(6))?;
+        let mut seq = serializer.serialize_seq(Some(8))?;
         seq.serialize_element(&state.earliest_return_tick)?;
         seq.serialize_element(&state.hp)?;
         seq.serialize_element(&state.radius)?;
         seq.serialize_element(&state.destroyed_lockout_ticks)?;
         seq.serialize_element(&state.distance_traveled)?;
         seq.serialize_element(&state.ticks_out)?;
+        seq.serialize_element(&state.max_hp)?;
+        seq.serialize_element(&state.duration_ticks)?;
         seq.end()
     }
 }

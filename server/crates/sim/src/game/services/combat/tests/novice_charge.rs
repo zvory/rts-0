@@ -165,3 +165,45 @@ fn war_adept_and_master_charge_only_within_five_tiles_and_stack_speed_bonuses() 
         }
     }
 }
+
+#[test]
+fn war_master_charge_lasts_three_seconds_without_changing_cooldown() {
+    for (kind, master, duration) in [
+        (EntityKind::Warrior, false, 30),
+        (EntityKind::WarAdept, false, 30),
+        (EntityKind::WarAdept, true, 90),
+    ] {
+        let (mut entities, id, _) = pair(100.0);
+        let unit = entities.get_mut(id).unwrap();
+        unit.set_disciple_kind_for_test(kind);
+        if master {
+            unit.insight = config::DISCIPLE_EVOLVED_INSIGHT_CAP;
+            unit.advance_dao_master();
+        }
+        let base_speed = unit.movement_speed();
+        unit.try_start_novice_charge((300.0, 200.0), (0.0, 0.0), true);
+        assert_eq!(
+            unit.movement.as_ref().unwrap().novice_charge_ticks,
+            duration
+        );
+        assert_eq!(unit.ability_cooldown_ticks(AbilityKind::Charge), 450);
+        let map = open_map(40);
+        for tick in 0..=duration {
+            let unit = entities.get(id).unwrap();
+            let expected = base_speed * if tick < duration { 1.5 } else { 1.0 };
+            assert!((unit.movement_speed() - expected).abs() < 0.00001);
+            if tick < duration {
+                let occ = Occupancy::build(&map, &entities);
+                let spatial = SpatialIndex::build(&entities, map.width, map.height);
+                movement_system(
+                    &map,
+                    &mut entities,
+                    &[],
+                    &occ,
+                    &spatial,
+                    u32::from(tick) + 1,
+                );
+            }
+        }
+    }
+}

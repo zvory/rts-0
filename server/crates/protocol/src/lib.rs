@@ -1498,3 +1498,5 @@ mod tests {
 }
 
 // EntityView::rocket_rack_count is re-exported from rts-contract; compact v56 uses slot 43.
+
+// Compact v71: shield ownerState adds maxHp (slot 6) and durationTicks (slot 7), public with the visible field.
