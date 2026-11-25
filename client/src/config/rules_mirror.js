@@ -312,21 +312,21 @@ export const STATS = Object.freeze({
 
 export const ABILITIES = Object.freeze({
   [ABILITY.HEALING_SEAL]: Object.freeze({
-    ability: ABILITY.HEALING_SEAL, label: "Healing Seal", icon: "+", hotkey: "E",
+    ability: ABILITY.HEALING_SEAL, label: "Healing Seal", icon: "+", hotkey: "S",
     title: "Defense item: Place a 3-tile-wide healing circle within 30 tiles; friendly units recover 3 HP per second, up to 400 HP total",
     carriers: Object.freeze([KIND.SHOP]), targetMode: "worldPoint", rangeTiles: 30,
     radiusTiles: 1.5, cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 150 }),
     queued: false, queuePolicy: "notQueueable",
   }),
   [ABILITY.HEALING_POTION]: Object.freeze({
-    ability: ABILITY.HEALING_POTION, label: "Healing Potion", icon: "HP", hotkey: "Q",
+    ability: ABILITY.HEALING_POTION, label: "Healing Potion", icon: "HP", hotkey: "A",
     title: "Defense item: Deliver a healing potion to a friendly unit at any distance; fully heals on arrival",
     carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: null,
     cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 50 }),
     queued: false, queuePolicy: "notQueueable",
   }),
   [ABILITY.ESCAPE_TREASURE]: Object.freeze({
-    ability: ABILITY.ESCAPE_TREASURE, label: "Escape Treasure", icon: "E", hotkey: "W",
+    ability: ABILITY.ESCAPE_TREASURE, label: "Escape Treasure", icon: "E", hotkey: "Q",
     title: "Deliver a one-use treasure to a friendly unit within 30 tiles; lethal damage returns it to this Shop at 1 HP; 60-second purchase cooldown shared across all your Shops",
     carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: 30,
     cooldownTicks: 1800, cost: Object.freeze({ steel: 0, oil: 100 }),
@@ -334,15 +334,15 @@ export const ABILITIES = Object.freeze({
   }),
 
   [ABILITY.HASTE]: Object.freeze({
-    ability: ABILITY.HASTE, label: "Haste", icon: "H", hotkey: "A",
-    title: "Deliver an attack item within 30 tiles; activate for double primary weapon attack speed for 30 seconds",
+    ability: ABILITY.HASTE, label: "Haste", icon: "H", hotkey: "Z",
+    title: "Deliver a permanent passive attack item within 30 tiles; doubles primary weapon attack speed on arrival",
     carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: 30,
     cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 100 }),
     queued: false, queuePolicy: "notQueueable",
   }),
   [ABILITY.DOUBLE_DAMAGE]: Object.freeze({
-    ability: ABILITY.DOUBLE_DAMAGE, label: "Double Damage", icon: "2X", hotkey: "S",
-    title: "Deliver an attack item within 30 tiles; activate for double primary weapon damage for 30 seconds",
+    ability: ABILITY.DOUBLE_DAMAGE, label: "Double Damage", icon: "2X", hotkey: "X",
+    title: "Deliver a permanent passive attack item within 30 tiles; doubles primary weapon damage on arrival",
     carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: 30,
     cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 150 }),
     queued: false, queuePolicy: "notQueueable",

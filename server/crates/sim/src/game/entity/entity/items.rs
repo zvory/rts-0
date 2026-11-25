@@ -24,17 +24,13 @@ impl Entity {
         &self,
         ability: crate::game::ability::AbilityKind,
     ) -> bool {
-        use crate::game::ability::AbilityKind::{ArmorTreasure, VitalityTreasure};
-        if matches!(ability, ArmorTreasure | VitalityTreasure) {
-            self.ability_uses_remaining
-                .get(&ability)
-                .copied()
-                .unwrap_or(0)
-                > 0
-        } else {
-            self.ability_cooldowns.get(&ability).copied().unwrap_or(0) > 0
-        }
+        self.ability_uses_remaining
+            .get(&ability)
+            .copied()
+            .unwrap_or(0)
+            > 0
     }
+
     pub(in crate::game) fn shop_item_category_occupied(
         &self,
         ability: crate::game::ability::AbilityKind,
@@ -46,10 +42,7 @@ impl Entity {
             } else {
                 &[Haste, DoubleDamage]
             };
-        kinds.iter().any(|kind| {
-            self.ability_uses_remaining.get(kind).copied().unwrap_or(0) > 0
-                || self.shop_item_active(*kind)
-        })
+        kinds.iter().any(|kind| self.shop_item_active(*kind))
     }
     pub(in crate::game) fn receive_shop_item(
         &mut self,
@@ -67,24 +60,6 @@ impl Entity {
         }
         self.ability_uses_remaining.insert(ability, 1);
     }
-    pub(in crate::game) fn activate_shop_item(
-        &mut self,
-        ability: crate::game::ability::AbilityKind,
-    ) {
-        use crate::game::ability::AbilityKind::{DoubleDamage, Haste};
-        if matches!(ability, Haste | DoubleDamage)
-            && self
-                .ability_uses_remaining
-                .get(&ability)
-                .copied()
-                .unwrap_or(0)
-                == 1
-        {
-            self.ability_uses_remaining.remove(&ability);
-            self.ability_cooldowns.insert(ability, 900);
-        }
-    }
-
     pub(in crate::game) fn vitality_health_bonus(&self) -> u32 {
         if self.shop_item_active(crate::game::ability::AbilityKind::VitalityTreasure) {
             150

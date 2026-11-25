@@ -6,12 +6,7 @@ pub(super) fn validate(entity: &Entity) -> Result<(), CheckpointPayloadError> {
     use crate::game::ability::AbilityKind::{ArmorTreasure, DoubleDamage, Haste, VitalityTreasure};
     for ability in [Haste, DoubleDamage, ArmorTreasure, VitalityTreasure] {
         let ticks = entity.ability_cooldowns.get(&ability).copied().unwrap_or(0);
-        if ticks > 900
-            || (ticks > 0
-                && (!entity.is_unit()
-                    || (ability == Haste && entity.shop_item_active(DoubleDamage))
-                    || matches!(ability, ArmorTreasure | VitalityTreasure)))
-        {
+        if ticks > 0 {
             return Err(CheckpointPayloadError::InvalidValue {
                 field: "entities.abilityCooldowns",
             });
@@ -30,20 +25,9 @@ pub(super) fn validate(entity: &Entity) -> Result<(), CheckpointPayloadError> {
             if !entity.is_unit()
                 || remaining != 1
                 || (ability == VitalityTreasure && entity.max_hp <= 150)
-                || conflicting.iter().any(|kind| {
-                    if *kind == ability {
-                        !matches!(ability, ArmorTreasure | VitalityTreasure)
-                            && entity.shop_item_active(*kind)
-                    } else {
-                        entity.shop_item_active(*kind)
-                            || entity
-                                .ability_uses_remaining
-                                .get(kind)
-                                .copied()
-                                .unwrap_or(0)
-                                > 0
-                    }
-                })
+                || conflicting
+                    .iter()
+                    .any(|kind| *kind != ability && entity.shop_item_active(*kind))
             {
                 return Err(CheckpointPayloadError::InvalidValue {
                     field: "entities.abilityUsesRemaining",

@@ -2169,6 +2169,10 @@ export class LobbyCreateModal {
   destroy()
 }
 ```
+The hidden-tab title changes to `Lobby ready to start` only for a joined host whose room can
+start and contains another ready human player. AI seats and spectators do not trigger this alert;
+the original title returns when those conditions stop holding or the tab becomes visible.
+
 The ordinary pre-join lobby browser loads once when shown. It then refreshes at most every five
 seconds only while the document is visible and the player has generated pointer, keyboard, touch,
 or scroll activity within the last 30 seconds. Hidden or inactive tabs stop the timer and abort an
@@ -2975,14 +2979,15 @@ Cultivator unit command cards reserve the fourth column for movement at R (logic
 defense at F (10), and attack at V (11), including Serfs. Allied deliveries expose the same
 carried-item commands on other factions’ units. Empty categories stay blank.
 Escape is movement; Armor Treasure and Vitality Treasure share defense; Haste and Double Damage share attack.
-Attack items activate immediately, consume once, and show an active highlight and a 30-second
-remaining-duration clock. Mixed attack selections expose a ready type before an already active type.
-Armor and Vitality apply permanently on delivery, keep the defense slot occupied, and appear as
+Haste, Double Damage, Armor, and Vitality apply permanently on delivery, keep their category occupied, and appear as
 passive disabled tiles without activation, hotkeys, or clocks. Vitality adds 150 to maximum and
 current HP on arrival; its maximum-HP bonus persists through Dao promotion.
-Healing Potion and Healing Seal are immediate Shop defense goods.
+Healing Potion and Healing Seal are immediate Shop defense goods. Shop rows group movement
+on top (Escape Q), defense in the middle (Potion A, Seal S, Armor D, Vitality F), and attack
+on the bottom (Haste Z, Double Damage X). Full equipped or reserved categories send the normal
+info notice naming the movement, defense, or attack slot.
 Colored placeholder badges show AR (cyan), +HP (magenta), H (yellow), or 2X (orange).
-Defense badges remain fully visible; an asterisk marks an activated attack buff.
+Permanent item badges remain fully visible.
 Badges use authorized projected ability state and never appear on Shops. Escape Treasure shows Escape
 with a purple autocast border by default; R activates immediately, and right-click/Alt+R toggles
 lethal-damage autocast. The carried-item command has its own hotkey identity,
@@ -2997,8 +3002,8 @@ position jump produces no effect. Both manual activation and lethal-damage autoc
 Cultivator fighters (Novices, all three Adepts, and their Masters) gain a gold silhouette rim
 and pulsing rays for each occupied item category. One item uses the full twelve-ray baseline;
 two add soft bloom and sixteen longer, wider rays; three use the strongest bloom and twenty rays.
-Zero items produce no item radiance. Defense items count while carried; attack items count while
-carried or active and stop counting at expiry; Escape counts until consumed. The effect uses the server-projected public `itemRadianceTier` (0–3), so owners, allies,
+Zero items produce no item radiance. Permanent attack and defense items count while equipped;
+Escape counts until consumed. The effect uses the server-projected public `itemRadianceTier` (0–3), so owners, allies,
 enemies and observers see the same strength whenever the carrier is visible. Specific item
 identities and timers remain private; hidden carriers reveal no glow or tier.
 Frame-strip instances own and dispose the rim and bloom filters with their display objects.
@@ -3030,7 +3035,7 @@ pending fetch, and notice DOM.
 
 ### Healing Seal presentation
 
-Cultivator Shop E places a Healing Seal using the generic world-point ability command and
+Cultivator Shop S places a Healing Seal using the generic world-point ability command and
 radius preview. The selectable 3×3 field renders on the ground beneath units: fixed green
 circle, central green plus, layered soft glow, and a two-second render-clock pulse.
 The always-visible green bar represents remaining healing capacity, not combat health.

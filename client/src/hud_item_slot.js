@@ -14,21 +14,10 @@ function status(unit, ability) {
 
 function shownItems(units) {
   const available = ITEMS.filter((item) => units.some((unit) => status(unit, item.ability)));
-  // A mixed selection exposes a ready item before an active buff. Once used,
-  // the other item becomes the actionable tile in this shared category.
-  return available.sort((a, b) => Number(!units.some((u) => status(u, a.ability)?.remainingUses > 0))
-    - Number(!units.some((u) => status(u, b.ability)?.remainingUses > 0)))
-    .filter((item, index, all) => all.findIndex((other) => other.slot === item.slot) === index);
+  return available.filter((item, index, all) => all.findIndex((other) => other.slot === item.slot) === index);
 }
 
-export function itemCooldownAffordances(units, groupCooldownClocks = () => []) {
-  return shownItems(units).filter((item) => item.category === "attack").map((item) => ({
-    definition: { ability: item.ability },
-    cooldownClocks: groupCooldownClocks(units.map((u) => status(u, item.ability)?.cooldownLeft || 0), 900),
-  }));
-}
-
-export function placeItemDescriptor(slots, units, factionId, groupCooldownClocks = () => []) {
+export function placeItemDescriptor(slots, units) {
   // Allied deliveries may equip another faction; carried commands keep one stable identity.
   const carriers = units.filter((e) => e.escapeTreasure);
   if (carriers.length) {
@@ -47,29 +36,14 @@ export function placeItemDescriptor(slots, units, factionId, groupCooldownClocks
   }
   for (const item of shownItems(units)) {
     const carriers = units.filter((unit) => status(unit, item.ability));
-    if (item.category === "defense") {
-      slots[item.slot] = {
-        id: `item:${item.ability}`, commandId: `cultivators.item.${item.ability}`,
-        kind: "button", action: null, ability: item.ability,
-        icon: item.icon, label: item.label,
-        title: `Permanent passive defense item: ${item.effect}, applied on arrival.`,
-        passive: true, enabled: false, intent: null, contextIntent: null,
-        contextHotkeyModifiers: [], cooldownClocks: [],
-        countBadge: carriers.length > 1 ? `${carriers.length}` : "",
-      };
-      continue;
-    }
-    const readyIds = carriers.filter((unit) => status(unit, item.ability).remainingUses > 0).map((unit) => unit.id);
-    const active = carriers.some((unit) => status(unit, item.ability).cooldownLeft > 0);
     slots[item.slot] = {
       id: `item:${item.ability}`, commandId: `cultivators.item.${item.ability}`,
-      kind: "button", action: "ability", ability: item.ability,
+      kind: "button", action: null, ability: item.ability,
       icon: item.icon, label: item.label,
-      title: `Attack item: ${item.effect} for 30 seconds. ${readyIds.length ? "Activate to consume." : "Active; expires when the clock completes."}`,
-      enabled: readyIds.length > 0,
-      intent: { type: "ability", ability: item.ability, targetMode: "self", readyIds },
-      cls: active ? "active" : "", countBadge: carriers.length > 1 ? `${readyIds.length}` : "",
-      cooldownClocks: groupCooldownClocks(carriers.map((unit) => status(unit, item.ability).cooldownLeft || 0), 900),
+      title: `Permanent passive ${item.category} item: ${item.effect}, applied on arrival.`,
+      passive: true, enabled: false, intent: null, contextIntent: null,
+      contextHotkeyModifiers: [], cooldownClocks: [],
+      countBadge: carriers.length > 1 ? `${carriers.length}` : "",
     };
   }
 }

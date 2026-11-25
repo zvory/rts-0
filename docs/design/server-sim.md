@@ -2223,7 +2223,7 @@ Permanent Dao identity is derived from kind; the engine stores no separate mutab
 `dao` (slot 46: wind/war/magic). Evolution buttons set replaceable, entity-owned `chosenDao` intent (team-private compact slot 49), independent of orders. Codes 14–16 and order stages 22–24 retain their positions.
 Evolution automatically occurs once 60 insight is ready, without research or a Pavilion.
 Evolution clears all insight and raises the cap to 200. Evolved Disciples continue earning
-insight from cost-weighted actual hostile unit HP damage or quarter-rate building HP damage, carrying exact fractional remainders through checkpoints; Throw Sword grants none; reaching 200 automatically advances a living Adept
+insight from actual hostile unit HP damage at one insight per HP or quarter-rate building HP damage, carrying exact fractional remainders through checkpoints; Throw Sword grants none; reaching 200 automatically advances a living Adept
 to its matching [Master](dao-masters.md), resets insight and fully heals. Public
 `daoMaster` (compact slot 52) persists alongside the authoritative Adept kind. Research ids are
 `dao_wind`, `dao_of_heaviness` (War), `dao_of_magic` (Magic).
@@ -2299,6 +2299,6 @@ Its standability and occupancy queries select legal rescue exits; it does not im
 adapters or invoke another tick phase. Entity-owned protection and runtime projectiles use the
 existing checkpoint policies for entities and ability runtime.
 
-Carried Shop attack/defense items persist under entity `ability_uses_remaining`; active 30-second attack item durations use entity `ability_cooldowns`. Armor and Vitality remain permanently equipped under `ability_uses_remaining`, and their effects are applied immediately on delivery without cooldowns or activation. Escape's global 60-second purchase timer uses existing durable player `ability_cooldowns`. These existing owners checkpoint and fingerprint the state without a new state-tree owner. See [categorized Shop items](shop.md#carried-attack-and-defense-goods).
+Carried Shop attack/defense items (Haste, Double Damage, Armor, and Vitality) persist permanently under entity `ability_uses_remaining`; their effects apply immediately on delivery without cooldowns or activation. Escape's global 60-second purchase timer uses existing durable player `ability_cooldowns`. These existing owners checkpoint and fingerprint the state without a new state-tree owner. See [categorized Shop items](shop.md#carried-attack-and-defense-goods).
 
 Vitality Treasure shares the existing carried owner and checkpoints its permanent bonus in the existing `hp`/`max_hp` pair. It has no expiry. Dao promotion excludes this flat bonus before scaling base health. See [Vitality rules](shop.md#vitality-treasure).

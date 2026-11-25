@@ -2187,7 +2187,7 @@ is excluded from enemy building memory. Depletion removes the entity without a d
 
 ### Categorized carried Shop items
 
-Abilities `haste` (compact23, order-stage31), `doubleDamage` (24,32), and `armorTreasure` (25,33) use the existing `useAbility` command with a Shop and friendly `targetId` for purchase, or, for attack items only, with owned unit ids and no target for activation. Private entity `abilities` entries expose `remainingUses:1` while carried; Armor and Vitality retain this entry permanently with zero cooldown and no expiry, indicating an equipped passive rather than an activatable charge. Active consumed attack buffs expose `remainingUses:0`, `cooldownLeft` and `expiresIn` as remaining duration ticks. Empty/expired items omit the entry. Escape remains movement, Haste/Double Damage attack, Armor Treasure defense. Shop `escapeTreasure.cooldownLeft` projects the purchasing owner's shared cooldown across all their Shops. No new snapshot fields.
+Abilities `haste` (compact23, order-stage31), `doubleDamage` (24,32), and `armorTreasure` (25,33) use the existing `useAbility` command with a Shop and friendly `targetId` for purchase. All four attack/defense items are permanent passives applied on delivery, not activatable carrier abilities. Private entity `abilities` entries expose `remainingUses:1` while equipped, with zero cooldown and no expiry. Empty categories omit the entry. Escape remains movement, Haste/Double Damage attack, and Armor/Vitality defense. Shop `escapeTreasure.cooldownLeft` projects the purchasing owner's shared cooldown across all their Shops. Item identities stay private; public visual strength is specified below.
 
 Vitality Treasure uses ability `vitalityTreasure` (compact ability 26, order-stage 34), with the same private permanent carried-passive `abilities` entry as Armor Treasure. Existing public `hp`/`maxHp` fields include its bonus from delivery onward. No new snapshot fields.
 
@@ -2197,7 +2197,7 @@ Compact v70 appends optional entity slot **54**, `itemRadianceTier: u8` (0–3),
 as a complete per-snapshot visual value for already-visible Cultivator fighters.
 All recipients (owners, allies, visible enemies, selected-player/spectator unions and full-world
 observers) receive the same tier. Zero is explicitly projected to clear consumed or expired items.
-Movement Escape, permanent passive defense, and carried/active attack each contribute one tier.
+Movement Escape, permanent passive defense, and permanent passive attack each contribute one tier.
 The tier discloses only the number of occupied categories, never their identities or timers.
 Existing private `abilities` and team-private `escapeTreasure` retain their privacy policies.
 Fog-hidden carriers are omitted as usual; vision-only entities omit this field. The client

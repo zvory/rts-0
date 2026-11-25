@@ -400,7 +400,6 @@ fn assert_deployed_artillery_attack_move_reload(haste: bool) {
     if haste {
         let entity = game.state.entities.get_mut(artillery).unwrap();
         entity.receive_shop_item(ability::AbilityKind::Haste);
-        entity.activate_shop_item(ability::AbilityKind::Haste);
     }
     deploy_artillery_toward(&mut game, artillery, target_pos);
     systems::recompute_supply(&mut game.state.players, &game.state.entities);

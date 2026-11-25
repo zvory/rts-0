@@ -794,6 +794,52 @@ import { textWithin } from "./dom_text.mjs";
   assert(cancelledRefreshes === 1, "normal lobby render cancels any pending browser refresh");
 }
 
+// Hidden-tab readiness alerts require another ready human, not just a startable room.
+withFakeDocument(() => {
+  document.hidden = true;
+  document.title = "Bewegungskrieg";
+  const lobby = Object.assign(Object.create(Lobby.prototype), {
+    root: { hidden: false },
+    net: { playerId: 7 },
+    btnStart: { classList: fakeClassList() },
+    _countdownActive: false,
+    _tabTitleBeforeReady: null,
+    _stopLobbyBrowserAutoRefresh() {},
+    _reflectJoinedState() {},
+    _reflectSummary() {},
+    _renderPlayers() {},
+    _reflectMap() {},
+    _reflectTeamPreset() {},
+    setStatus() {},
+  });
+  const host = { id: 7, ready: true };
+  const guest = { id: 8, ready: true };
+  const render = (peers, extra = {}) => lobby._renderLobby({
+    hostId: 7, players: [host, ...peers], canStart: true, ...extra,
+  });
+  for (const peers of [[], [{ ...guest, isAi: true }],
+    [{ ...guest, isSpectator: true }], [{ ...guest, ready: false }]]) {
+    render(peers);
+    assert(document.title === "Bewegungskrieg", "solo, AI, spectator, and unready peers do not alert");
+    assert(!lobby.btnStart.disabled, "suppressing the alert preserves server-authorized starting");
+  }
+  render([guest]);
+  assert(document.title === "Lobby ready to start", "another ready human alerts the away host");
+  render([]);
+  assert(document.title === "Bewegungskrieg", "a departing human clears the alert");
+  render([guest]);
+  render([{ ...guest, ready: false }]);
+  assert(document.title === "Bewegungskrieg", "a human becoming unready clears the alert");
+  render([guest], { canStart: false });
+  assert(document.title === "Bewegungskrieg", "a blocked start does not alert");
+  render([guest], { hostId: 8 });
+  assert(document.title === "Bewegungskrieg", "a non-host does not receive the alert");
+  render([guest]);
+  document.hidden = false;
+  lobby._updateTabTitle();
+  assert(document.title === "Bewegungskrieg", "returning to the tab restores the title");
+});
+
 // ---------------------------------------------------------------------------
 // Lobby browser UI helpers
 // ---------------------------------------------------------------------------

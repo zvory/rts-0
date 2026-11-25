@@ -155,8 +155,13 @@ fn dao_master_combat_threshold_and_damage_apply_to_combat_paths() {
 }
 
 #[test]
-fn disciple_weighted_insight_carries_exact_fractions_through_targets_and_checkpoints() {
-    for kind in [EntityKind::WarAdept, EntityKind::MagicAdept] {
+fn disciple_flat_unit_insight_carries_building_fractions_through_checkpoints() {
+    for kind in [
+        EntityKind::Warrior,
+        EntityKind::WindAdept,
+        EntityKind::WarAdept,
+        EntityKind::MagicAdept,
+    ] {
         let mut game = empty_flat_game(&[cultivator_player()]);
         let id = game
             .state
@@ -165,11 +170,17 @@ fn disciple_weighted_insight_carries_exact_fractions_through_targets_and_checkpo
             .unwrap();
         game.tick();
         let unit = game.state.entities.get_mut(id).unwrap();
-        // Adept value 475, Scout Car value 550: 19 HP earns exactly 22.
-        for _ in 0..18 {
-            unit.gain_insight(1, EntityKind::ScoutCar);
+        for target in [
+            EntityKind::Rifleman,
+            EntityKind::ScoutCar,
+            EntityKind::Golem,
+            EntityKind::Tank,
+        ] {
+            unit.gain_insight(3, target);
         }
-        assert_eq!(unit.insight, 20);
+        assert_eq!((unit.insight, unit.insight_fraction), (12, 0), "{kind:?}");
+        unit.gain_insight(3, EntityKind::ResourceDepot);
+        assert_eq!((unit.insight, unit.insight_fraction), (12, 3));
         let checkpoint = game.checkpoint_payload_text_for_test().unwrap();
         let mut restored = Game::restore_checkpoint_payload_text_for_test(
             &checkpoint,
@@ -178,26 +189,20 @@ fn disciple_weighted_insight_carries_exact_fractions_through_targets_and_checkpo
         )
         .unwrap();
         let unit = restored.state.entities.get_mut(id).unwrap();
-        unit.gain_insight(1, EntityKind::ScoutCar);
-        assert_eq!((unit.insight, unit.insight_fraction), (22, 0));
-        // Unit hits retain halves at the floor; buildings still retain quarters.
-        for target in [
-            EntityKind::Rifleman,
-            EntityKind::ResourceDepot,
-            EntityKind::Golem,
-            EntityKind::Rifleman,
-            EntityKind::ResourceDepot,
-        ] {
-            unit.gain_insight(1, target);
-        }
-        assert_eq!((unit.insight, unit.insight_fraction), (24, 0));
-        unit.gain_insight(1, EntityKind::Tank);
-        assert_eq!(unit.insight, 26, "expensive targets cap at double insight");
-        unit.gain_insight(u32::MAX, EntityKind::Tank);
-        assert_eq!((unit.insight, unit.insight_fraction), (200, 0));
-        unit.advance_dao_master();
         unit.gain_insight(1, EntityKind::Rifleman);
-        assert_eq!((unit.insight, unit.insight_fraction), (0, 0));
+        assert_eq!((unit.insight, unit.insight_fraction), (13, 3));
+        unit.gain_insight(1, EntityKind::ResourceDepot);
+        assert_eq!((unit.insight, unit.insight_fraction), (14, 0));
+        unit.gain_insight(u32::MAX, EntityKind::Tank);
+        assert_eq!(
+            (unit.insight, unit.insight_fraction),
+            (unit.insight_cap(), 0)
+        );
+        if kind != EntityKind::Warrior {
+            unit.advance_dao_master();
+            unit.gain_insight(1, EntityKind::Rifleman);
+            assert_eq!((unit.insight, unit.insight_fraction), (0, 0));
+        }
     }
 }
 
@@ -211,9 +216,9 @@ fn disciple_insight_fraction_checkpoint_validation_and_evolution_reset() {
         .unwrap();
     game.tick();
     let unit = game.state.entities.get_mut(id).unwrap();
-    unit.gain_insight(1, EntityKind::Rifleman);
+    unit.gain_insight(1, EntityKind::ResourceDepot);
     assert!(unit.insight_fraction > 0);
-    unit.insight_fraction = 400; // Novice denominator is 4 * (50 steel * 2).
+    unit.insight_fraction = 4; // Building fractions use a fixed denominator of four.
     assert!(game.checkpoint_payload_text_for_test().is_err());
     let unit = game.state.entities.get_mut(id).unwrap();
     unit.insight_fraction = 1;
