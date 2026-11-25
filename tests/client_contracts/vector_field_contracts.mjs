@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import {ABILITY,KIND} from '../../client/src/protocol.js';
+import {Input} from '../../client/src/input/index.js';
+import {ClientIntent} from '../../client/src/client_intent.js';
+import {drawVectorField} from '../../client/src/renderer/vector_field.js';
+import {RecordingGraphics} from './pixi_fakes.mjs';
+const input=Object.create(Input.prototype);
+const caster={id:9,owner:1,kind:KIND.EKAT,x:200,y:200,hp:150};
+input.state={playerId:1,map:{tileSize:32},selectedEntities:()=>[caster]};
+input.clientIntent=new ClientIntent();
+input._selectedOwnUnitIds=()=>[9];input._resourceAtScreen=()=>null;
+input._groundAtScreen=(x,y)=>({x,y});
+const commands=[];input.commandInteraction={issueCommand:c=>commands.push(c)};
+input.clientIntent.beginCommandTarget({kind:'ability',ability:ABILITY.EKAT_MAGIC_ANCHOR});
+assert.equal(input._issueTargetedCommand({x:300,y:250}),false);
+assert.deepEqual(input.clientIntent.vectorFieldCenter,{x:300,y:250});
+assert.equal(commands.length,0);
+assert.equal(input._issueTargetedCommand({x:300,y:250}),false,'zero-length direction cannot place');
+assert.equal(input._issueTargetedCommand({x:240,y:210}),true);
+assert.deepEqual(commands[0],{c:'vectorField',units:[9],x:300,y:250,directionX:-60,directionY:-40});
+assert.equal(input.clientIntent.vectorFieldCenter,null);
+input.clientIntent.vectorFieldCenter={x:1,y:2};input.clientIntent.endCommandTarget();
+assert.equal(input.clientIntent.vectorFieldCenter,null,'cancel clears the fixed center');
+for(const direction of [[1,0],[0,1],[-1,-1]]){
+ const g=new RecordingGraphics();drawVectorField(g,400,300,direction);
+ const points=g.calls.filter(c=>['moveTo','lineTo'].includes(c[0]));
+ assert(points.length>=10);
+ assert(points.every(c=>Number.isFinite(c[1])&&Number.isFinite(c[2])));
+}
+console.log('vector_field_contracts: ok');
