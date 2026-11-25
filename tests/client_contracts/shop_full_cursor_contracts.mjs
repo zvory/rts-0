@@ -25,6 +25,16 @@ input.clientIntent.commandTarget = {kind:'ability',ability:ABILITY.HEALING_POTIO
 assert(!_shopFullCursorTarget.call(input), 'healing remains usable at capacity');
 input.clientIntent.commandTarget.ability = ABILITY.HASTE;
 assert(_shopFullCursorTarget.call(input), 'carried-item targeting retains hint');
+const originalPick = input._entityAtScreen;
+let overlapping = [shop, {...unit, owner: 3}, unit];
+input._entityAtScreen = (_point, _ownPreferred, eligible = () => true) => overlapping.find(eligible);
+assert(_shopFullCursorTarget.call(input) === unit, 'item hint picks through buildings and enemies like purchase targeting');
+overlapping = [{...unit, itemRadianceTier: 2}, unit];
+assert(!_shopFullCursorTarget.call(input), 'hint does not skip a friendly recipient with free slots');
+input.clientIntent.commandTarget = null;
+overlapping = [shop, unit];
+assert(!_shopFullCursorTarget.call(input), 'ordinary hover still uses the frontmost entity');
+input._entityAtScreen = originalPick;
 input.inputRouter = {activePreviewSurface: () => 'hud'};
 assert(!_shopFullCursorTarget.call(input), 'UI hover clears hint');
 input.inputRouter = null;

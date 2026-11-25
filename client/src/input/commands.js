@@ -1152,7 +1152,11 @@ export function _shopFullCursorTarget() {
     ABILITY.DOUBLE_DAMAGE].includes(mode.ability))) return null;
   if (!this.state.selectedEntities().some((entity) => entity.kind === KIND.SHOP &&
       entity.hp > 0 && entity.buildProgress == null && ownOwner(this.state, entity.owner, this.controlPolicy))) return null;
-  const target = this._entityAtScreen(this.mouse, false);
+  // Item purchases pick through overlapping buildings and hostile units. Keep
+  // the hint on the same friendly unit that a targeting click would use.
+  const target = this._entityAtScreen(this.mouse, false, (entity) => !mode || (
+    isUnit(entity.kind) && friendlyOwner(this.state, entity.owner, this.controlPolicy)
+  ));
   return target?.hp > 0 && !target.visionOnly &&
     friendlyOwner(this.state, target.owner, this.controlPolicy) && carriedItemSlotsFull(target) ? target : null;
 }
