@@ -58,12 +58,8 @@ pub(crate) fn advance_scout_planes(map: &Map, entities: &mut EntityStore) {
 
     let world_max_x = (map.world_width_px() - 0.01).max(0.0);
     let world_max_y = (map.world_height_px() - 0.01).max(0.0);
-    let speed = config::unit_stats(EntityKind::ScoutPlane)
-        .map(|stats| stats.speed)
-        .unwrap_or(config::SCOUT_PLANE_SPEED_PX_PER_TICK)
-        .max(0.0);
     let orbit_radius = config::SCOUT_PLANE_ORBIT_RADIUS_TILES as f32 * config::TILE_SIZE as f32;
-    if speed <= 0.0 || orbit_radius <= 0.0 || !orbit_radius.is_finite() {
+    if orbit_radius <= 0.0 || !orbit_radius.is_finite() {
         return;
     }
 
@@ -76,7 +72,7 @@ pub(crate) fn advance_scout_planes(map: &Map, entities: &mut EntityStore) {
 
         let step = advance_one(
             snapshot.flight,
-            speed,
+            snapshot.speed,
             orbit_radius,
             world_max_x,
             world_max_y,
@@ -135,6 +131,7 @@ fn ensure_state(entities: &mut EntityStore, id: u32) {
 #[derive(Clone, Copy)]
 struct ScoutPlaneRuntimeSnapshot {
     flight: ScoutPlaneSnapshot,
+    speed: f32,
 }
 
 #[derive(Clone, Copy)]
@@ -164,6 +161,7 @@ fn scout_plane_runtime_snapshot(
         0.0
     };
     Some(ScoutPlaneRuntimeSnapshot {
+        speed: plane.movement_speed(),
         flight: ScoutPlaneSnapshot {
             x: plane.pos_x(),
             y: plane.pos_y(),
