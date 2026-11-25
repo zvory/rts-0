@@ -50,7 +50,7 @@ fn start(game: &mut Game, worker: u32) -> u32 {
 
 #[test]
 fn shop_costs_both_resources_and_finishes_after_600_work_ticks() {
-    let (mut game, worker) = setup("cultivators", 200, 200);
+    let (mut game, worker) = setup("cultivators", 100, 100);
     let site = start(&mut game, worker);
     assert_eq!(
         (game.state.players[0].steel, game.state.players[0].oil),
@@ -92,8 +92,8 @@ fn shop_costs_both_resources_and_finishes_after_600_work_ticks() {
 #[test]
 fn shop_waits_for_either_missing_resource_and_rejects_other_factions() {
     for (faction, steel, oil) in [
-        ("cultivators", 199, 200),
-        ("cultivators", 200, 199),
+        ("cultivators", 99, 100),
+        ("cultivators", 100, 99),
         ("kriegsia", 1000, 1000),
     ] {
         let (mut game, _) = setup(faction, steel, oil);
@@ -114,7 +114,7 @@ fn shop_waits_for_either_missing_resource_and_rejects_other_factions() {
 
 #[test]
 fn shop_cancellation_uses_normal_construction_refund() {
-    let (mut game, worker) = setup("cultivators", 200, 200);
+    let (mut game, worker) = setup("cultivators", 100, 100);
     let site = start(&mut game, worker);
     game.enqueue(
         1,
@@ -127,7 +127,7 @@ fn shop_cancellation_uses_normal_construction_refund() {
     assert!(game.state.entities.get(site).is_none());
     assert_eq!(
         (game.state.players[0].steel, game.state.players[0].oil),
-        (200, 200)
+        (100, 100)
     );
 }
 
