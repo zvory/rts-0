@@ -95,6 +95,7 @@ export function buildRendererFeedbackView(
     artilleryImpacts,
     panzerfaustShots,
     panzerfaustImpacts,
+    shopDeliveryPreview: previewSurface ? null : intent?.shopDeliveryPreview || null,
     resourceMiningPreview: previewSurface ? null : intent?.resourceMiningPreview || null,
     muzzleFlashes,
     missToasts,

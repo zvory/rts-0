@@ -75,6 +75,7 @@ import {
 } from "./commands.js";
 import { _handleBlur, _handleKeyDown, _handleKeyUp, _handleWheel } from "./camera_controls.js";
 import { CameraNavigationInput } from "./camera_navigation.js";
+import { updateShopDeliveryPreview } from "./shop_delivery_preview.js";
 import { ShopFullCursor } from "./shop_full_cursor.js";
 import { ScreenOverlay } from "./screen_overlay.js";
 import {
@@ -407,6 +408,7 @@ export class Input {
     void dt;
     this._flushPointerLockCursor();
     this.shopFullCursor?.update(this);
+    updateShopDeliveryPreview(this);
     this._intent()?.updateContextualBuildPreview?.(null);
     if (this.inputRouter?.activePreviewSurface?.()) {
       this._cancelFormationGesture();

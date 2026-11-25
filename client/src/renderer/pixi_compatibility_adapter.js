@@ -48,6 +48,7 @@ const FEEDBACK_SINGLETON_TYPES = Object.freeze({
   pointTargetPreview: "pointTargetPreview",
   abilityTargetPreview: "abilityTargetPreview",
   resourceMiningPreview: "resourceMiningPreview",
+  shopDeliveryPreview: "shopDeliveryPreview",
 });
 
 /**

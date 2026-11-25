@@ -45,9 +45,8 @@ Focused checks and the owned PR record the final verification and merge outcome.
 Completed Shops sell Healing Potion for **50 oil** and Escape Treasure for **100 oil**.
 Select the Shop, click an item, then click a living friendly unit (including allied units).
 Buildings and enemies are invalid targets. Purchases require the target to be visible.
-Healing Potion has **unlimited range**; Escape Treasure requires the target to be within
-**30 tiles** of the supplying Shop at purchase time. Invalid purchases spend nothing.
-Both items travel directly from the Shop toward the target at **10 tiles per second**;
+All unit-targeted goods have **unlimited range**. Invalid purchases spend nothing.
+Both items travel directly from the Shop toward the target at **7.5 tiles per second**;
 green circles represent healing potions and purple circles represent escape treasures.
 The server owns delivery and effects; the client renders fog-filtered projectile positions.
 
@@ -68,8 +67,12 @@ dead targets cancel delivery. Oil is paid at launch, with no refund for interrup
 
 Escape selects a deterministic legal exit around the supplying Shop, searching farther only when
 nearby exits are blocked. If no legal position exists anywhere on the map, the rescue cannot occur.
-Escape Treasure deliveries expire after 60 seconds if a moving target cannot be reached.
-Healing Potions have no flight timeout; distant targets take longer to reach.
+All unit-targeted deliveries have no flight timeout; distant targets take longer to reach.
+Flying goods have **10 HP**, are unarmored and targetable by enemy weapons, and never block
+ground movement or contribute sight, supply, or army control. Destroying a good cancels its
+effect and releases its reserved slot with **no refund**. Each has a tiny 12×1-pixel HP fill.
+With a completed Shop selected, hovering an eligible friendly unit draws a thin dotted
+Shop-to-unit line.
 
 
 ### Healing Seal placement
@@ -82,7 +85,7 @@ disappears when empty. It is ground magic, not a carried item or projectile.
 
 ### Carried attack and defense goods
 
-Shops also deliver Haste (**100 oil**, Z), Double Damage (**150 oil**, X), and Armor Treasure (**100 oil**, D) to visible friendly units within 30 tiles, using the same delivery speed and timeout as Escape Treasure. Attack and defense describe item roles only. A delivery reserves its distinct item type immediately, preventing duplicate purchases. Invalid purchases spend nothing.
+Shops also deliver Haste (**100 oil**, Z), Double Damage (**150 oil**, X), and Armor Treasure (**100 oil**, D) to visible friendly units at any distance, using the same delivery speed and lifetime as Escape Treasure. Attack and defense describe item roles only. A delivery reserves its distinct item type immediately, preventing duplicate purchases. Invalid purchases spend nothing.
 
 Attack items are permanent passives applied immediately on delivery, with no activation, consumption, or expiry. Haste increases movement speed by **15%**, increases primary weapon attack speed by **25%** (reload divided by 1.25, rounded upward to a whole tick, minimum one tick), and permits attacks while moving; Double Damage doubles primary weapon damage before normal mitigation. Double Damage also affects primary tank splash and manual mortar/artillery shells; launched shells retain the bonus through impact. Haste also reduces manual mortar and artillery reload. Automatic direct primary fire may bypass deployment while carrying Haste; ordinary weapon targeting restrictions and indirect-fire deployment rules still apply. Neither affects spells, rockets, disposable panzerfaust shots, or secondary weapons. Armor Treasure is a permanent passive item: delivery immediately applies an additional **50% damage reduction**, rounded upward per hit, including units without native armor. It is never activated or consumed. Within the rank slot limit, permanent passive effects can coexist; identical copies do not stack. Escape occupies one slot alongside the passive items.
 
@@ -90,7 +93,7 @@ Carried passive items use existing entity ability-use state; the owner and privi
 
 ### Vitality Treasure
 
-Vitality Treasure is a **100 oil** defense item, purchased from a completed Shop with **F** and can coexist with Armor Treasure. It uses the same visible friendly-unit targeting, 30-tile purchase range, delivery, same-item reservation, and non-stacking rules. Delivery immediately grants **+150 maximum HP and +150 current HP permanently**, preserving any pre-existing missing HP. It remains carried and passive, with no activation, consumption, or expiry. For example, 30/58 HP becomes 180/208 HP. Dao evolution and Master advancement retain the flat 150 bonus without multiplying it. Carried passive state, including the health pair, survives checkpoints. Destroying the supplying Shop after delivery does not remove Armor or Vitality.
+Vitality Treasure is a **100 oil** defense item, purchased from a completed Shop with **F** and can coexist with Armor Treasure. It uses the same visible friendly-unit targeting, unlimited purchase range, delivery, same-item reservation, and non-stacking rules. Delivery immediately grants **+150 maximum HP and +150 current HP permanently**, preserving any pre-existing missing HP. It remains carried and passive, with no activation, consumption, or expiry. For example, 30/58 HP becomes 180/208 HP. Dao evolution and Master advancement retain the flat 150 bonus without multiplying it. Carried passive state, including the health pair, survives checkpoints. Destroying the supplying Shop after delivery does not remove Armor or Vitality.
 
 Shop command rows mirror the carried categories: top row movement (Escape Q); middle row defense
 (Healing Potion A, Healing Seal S, Armor D, Vitality F); bottom row attack (Haste Z, Double Damage X).

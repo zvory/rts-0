@@ -42,6 +42,7 @@ const FEEDBACK_SINGLETONS = Object.freeze([
   ["pointTargetPreview", "pointTargetPreview"],
   ["abilityTargetPreview", "abilityTargetPreview"],
   ["resourceMiningPreview", "resourceMiningPreview"],
+  ["shopDeliveryPreview", "shopDeliveryPreview"],
 ]);
 
 export class PresentationFrameAssembler {

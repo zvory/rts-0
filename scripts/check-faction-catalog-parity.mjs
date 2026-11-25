@@ -277,7 +277,8 @@ const EXPECTED_ABILITY_EFFECT_FIELDS_BY_ID = Object.freeze({
   [ABILITY.EKAT_CONSUME_GOLEM]: Object.freeze(["radiusTiles"]),
   [ABILITY.BARRAGE]: Object.freeze(["radiusTiles"]),
 });
-const EXPECTED_EXTRA_UNIT_STATS = Object.freeze([]);
+// Flying purchases use unit stats for their combat body, but are never trained or controlled.
+const EXPECTED_EXTRA_UNIT_STATS = Object.freeze([KIND.SHOP_DELIVERY]);
 
 function asClientKinds(kinds) {
   return kinds.map((kind) => {

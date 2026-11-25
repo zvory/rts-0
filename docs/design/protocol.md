@@ -936,7 +936,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 70. The client also accepts compact
+`messagepack-compact`, codec version 1, compact snapshot version 71. The client also accepts compact
 snapshot versions 51 through 62: version 52 only appends a kind code, version 53 appends the
 optional `unitsKilled` entity slot, version 54 appends an optional `rocket` style bit to mortar
 launch/impact event records, and version 55 adds the `artilleryIncoming` event code, so the older
@@ -974,7 +974,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 70,
+  "v": 71,
   "gr": groundDecalRevision, // omitted when zero
   "gd": [afterRevision, [    // omitted when this tick has no discovered/created revision
     [id, decalClass, sourceKindCode, x, y, owner, seed, facing, weaponFacing, radiusTiles]
@@ -1016,7 +1016,7 @@ Compact numeric codes:
 
 | Vocabulary | Codes |
 |------------|-------|
-| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `resource_depot`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `engineering_complex`, 18 `command_car`, 19 `ekat`, 20 `zamok`, 21 `tank_trap`, 30 `barbed_wire`, 22 `golem`, 23 `pump_jack`, 24 `panzerfaust`, 25 `scout_plane`, 26 `steel_mine`, 27 `rocket_launcher`, 28 `portal`, 29 `warrior`, 31 `three_dao_pavilion`, 32 `tournament_grounds`, 33 `proven_grounds`, 34 `shop`, 35 `wind_adept`, 36 `war_adept`, 37 `magic_adept`, 38 `healing_seal` |
+| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `resource_depot`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `engineering_complex`, 18 `command_car`, 19 `ekat`, 20 `zamok`, 21 `tank_trap`, 30 `barbed_wire`, 22 `golem`, 23 `pump_jack`, 24 `panzerfaust`, 25 `scout_plane`, 26 `steel_mine`, 27 `rocket_launcher`, 28 `portal`, 29 `warrior`, 31 `three_dao_pavilion`, 32 `tournament_grounds`, 33 `proven_grounds`, 34 `shop`, 35 `wind_adept`, 36 `war_adept`, 37 `magic_adept`, 38 `healing_seal`, 39 `shop_delivery` |
 | `state` | 1 `idle`, 2 `move`, 3 `attack`, 4 `gather`, 5 `build`, 6 `train`, 7 `construct`, 8 `dead` |
 | `setupState` | 1 `packed`, 2 `setting_up`, 3 `deployed`, 4 `tearing_down` |
 | `orderStage` | 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, 5 `build`, 6 `smoke`, 7 `setupAntiTankGuns`, 8 `charge`, 9 `mortarFire`, 10 `pointFire`, 11 `breakthrough`, 12 `ekatTeleport`, 13 `ekatLineShot`, 14 `ekatMagicAnchor`, 15 `deconstruct`, 16 `ekatConsumeGolem`, 17 `blanketFire`, 18 `dismissScoutPlane`, 19 `scoutPlane`, 20 `holdPosition`, 21 `barrage`, 22 `evolveWind`, 23 `evolveWar`, 24 `evolveMagic`, 25 `discipleShield`, 26 `throwSword`, 27 `healingPotion`, 28 `escapeTreasure`, 29 `windDash`, 30 `healingSeal`, 31 `haste`, 32 `doubleDamage`, 33 `armorTreasure`, 34 `vitalityTreasure` |
@@ -2146,11 +2146,17 @@ It has no production, research or weapon. Its targeted goods extend ability targ
 
 Generic `useAbility` accepts optional `targetId` for `friendlyUnit` abilities. `healingPotion`
 and `escapeTreasure` are Shop abilities with compact ability codes 19/20 and order stage codes
-27/28. Unit targeting is authoritative: a visible living friendly unit within 30 tiles is required;
+27/28. Unit targeting is authoritative: a visible living friendly unit at any distance is required;
 buildings are rejected. Purchases are immediate and do not enqueue a movement order.
 
-Deliveries use existing fog-filtered `abilityObjects` with `kind: "lineProjectile"` and the item
-ability id. `EntityView.escapeTreasure` is team-private: only the unit’s owner/allies receive
+Compact vocabulary version 71 adds `shop_delivery` (kind code 39), a transient 10-HP
+combat body with ordinary entity HP, targeting, and visibility. Its id is server-linked to
+the delivery projectile; no recipient id is exposed. It is not a controllable unit, building,
+or resource. It has no collision, sight, supply, or weapon. Delivery removal also removes the body.
+
+Deliveries travel at 7.5 tiles/second with no timeout and use existing fog-filtered `abilityObjects` with `kind: "lineProjectile"` and the item
+ability id; owners/allies also receive their own deliveries outside current vision.
+`EntityView.escapeTreasure` is team-private: only the unit’s owner/allies receive
 its protection status. Enemy player snapshots and enemy-selected observer views omit it even when
 the unit is visible. Selected observer unions include it when an owner or ally is selected, and
 omniscient/full-world observers retain it. The flag is true while the unit carries protection; false is omitted in JSON and compact entity slot **53** (54-element record) defaults

@@ -86,6 +86,7 @@ pub mod kinds {
     pub const PROVEN_GROUNDS: &str = "proven_grounds";
     pub const SHOP: &str = "shop";
     pub const HEALING_SEAL: &str = "healing_seal";
+    pub const SHOP_DELIVERY: &str = "shop_delivery";
     pub const ZAMOK: &str = "zamok";
     pub const DEPOT: &str = "depot";
     pub const BARRACKS: &str = "barracks";
@@ -249,7 +250,7 @@ pub mod notices {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 70;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 71;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -438,6 +439,7 @@ const KIND_CODES: &[(&str, u8)] = &[
     (kinds::PROVEN_GROUNDS, 33),
     (kinds::SHOP, 34),
     (kinds::HEALING_SEAL, 38),
+    (kinds::SHOP_DELIVERY, 39),
     (kinds::DEPOT, 7),
     (kinds::BARRACKS, 8),
     (kinds::TRAINING_CENTRE, 9),
@@ -809,6 +811,7 @@ fn kind_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("PROVEN_GROUNDS", kinds::PROVEN_GROUNDS),
         ("SHOP", kinds::SHOP),
         ("HEALING_SEAL", kinds::HEALING_SEAL),
+        ("SHOP_DELIVERY", kinds::SHOP_DELIVERY),
         ("ZAMOK", kinds::ZAMOK),
         ("DEPOT", kinds::DEPOT),
         ("BARRACKS", kinds::BARRACKS),

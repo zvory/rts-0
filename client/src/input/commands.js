@@ -957,7 +957,7 @@ export function _nearestCompletedMiningAnchor(x, y, includeAllies = false) {
   return best;
 }
 
-function ownOwner(state, owner, controlPolicy = null) {
+export function ownOwner(state, owner, controlPolicy = null) {
   if (controlPolicy?.kind === "lab") {
     if (typeof controlPolicy.isCommandOwner === "function") {
       return controlPolicy.isCommandOwner(owner, state);
@@ -983,7 +983,7 @@ function enemyOwner(state, owner, controlPolicy = null) {
   return fallbackEnemyOwner(state?.playerId, owner);
 }
 
-function friendlyOwner(state, owner, controlPolicy = null) {
+export function friendlyOwner(state, owner, controlPolicy = null) {
   if (controlPolicy?.kind === "lab") {
     return ownOwner(state, owner, controlPolicy) || !!controlPolicy.isCommandAllyOwner?.(owner, state);
   }

@@ -143,6 +143,16 @@ export function _vehicleShadow(g, cx, cy, body, facing) {
 }
 
 export function _drawSelectionAndHp(e, selection, state, ownerColor = null) {
+  if (e.kind === KIND.SHOP_DELIVERY) {
+    const g = this._slot("shotReveals", e.id);
+    gfxStroke(g, 0);
+    gfxFill(g, 0x000000, 0.9);
+    gfxRect(g, e.x - 7, e.y - 10, 14, 3);
+    gfxFill(g, 0x65e879, 1);
+    gfxRect(g, e.x - 6, e.y - 9, 12 * clamp01(e.hp / e.maxHp), 1);
+    gfxNoFill(g);
+    return;
+  }
   const selected = selection.has(e.id);
   const hasHealth = !isResource(e.kind) && Number.isFinite(e.maxHp) && e.maxHp > 0;
   const damaged = hasHealth && Number.isFinite(e.hp) && e.hp < e.maxHp;

@@ -166,25 +166,27 @@ pub(super) fn purchase(
     {
         return;
     }
+    let origin = (shop.pos_x(), shop.pos_y());
+    let shop_id = shop.id;
+    let Some(body_id) = entities.spawn_unit(player, EntityKind::ShopDelivery, origin.0, origin.1)
+    else {
+        return;
+    };
     if runtime
         .spawn_projectile(AbilityProjectileSpec {
             owner: player,
-            caster_id: shop.id,
-            source_object_id: None,
+            caster_id: shop_id,
+            source_object_id: Some(body_id),
             ability,
-            origin: (shop.pos_x(), shop.pos_y()),
+            origin,
             endpoint,
             return_target: AbilityProjectileReturnTarget::Entity { id: target_id },
-            speed_px_per_tick: 10.0 * config::TILE_SIZE as f32 / config::TICK_HZ as f32,
+            speed_px_per_tick: 7.5 * config::TILE_SIZE as f32 / config::TICK_HZ as f32,
             width_px: 0.0,
             damage: 0,
             created_tick: tick,
-            // Healing can cross the entire map; do not expire a long-distance delivery.
-            expires_tick: if ability == AbilityKind::HealingPotion {
-                u32::MAX
-            } else {
-                tick.saturating_add(config::TICK_HZ * 60)
-            },
+            // Unlimited range also means no arbitrary flight timeout.
+            expires_tick: u32::MAX,
         })
         .is_some()
     {
@@ -193,6 +195,8 @@ pub(super) fn purchase(
             ps.ability_cooldowns
                 .insert(ability, definition.cooldown_ticks);
         }
+    } else {
+        entities.remove(body_id);
     }
 }
 

@@ -1229,6 +1229,18 @@ function drawDashedCircle(g, x, y, radius, segments, width, color, alpha) {
 }
 
 export function _drawResourceMiningPreview(view) {
+  const delivery = view?.shopDeliveryPreview;
+  if (delivery) {
+    const g = this._feedbackGfx;
+    const dx = delivery.targetX - delivery.x, dy = delivery.targetY - delivery.y;
+    const length = Math.hypot(dx, dy);
+    gfxStroke(g, 0);
+    gfxFill(g, 0xffffff, 0.9);
+    for (let d = 0; d < length; d += 6) {
+      gfxCircle(g, delivery.x + dx * d / length, delivery.y + dy * d / length, 0.8);
+    }
+    gfxNoFill(g);
+  }
   if (!view || !view.resourceMiningPreview) return;
   const g = this._feedbackGfx;
   const p = view.resourceMiningPreview;

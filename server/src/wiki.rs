@@ -501,6 +501,7 @@ fn kind_label(kind: EntityKind) -> String {
         EntityKind::ProvenGrounds => "Proving Grounds",
         EntityKind::Shop => "Shop",
         EntityKind::HealingSeal => "Healing Seal",
+        EntityKind::ShopDelivery => "Flying item",
         EntityKind::Zamok => "Zamok",
         EntityKind::Depot => "Supply Depot",
         EntityKind::Barracks => "Barracks",

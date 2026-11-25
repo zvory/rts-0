@@ -335,6 +335,7 @@ fn is_combat_unit(kind: EntityKind) -> bool {
         | EntityKind::TournamentGrounds
         | EntityKind::ProvenGrounds
         | EntityKind::HealingSeal
+        | EntityKind::ShopDelivery
         | EntityKind::Shop
         | EntityKind::Zamok
         | EntityKind::Depot

@@ -259,7 +259,8 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   // progress patches composed at GameState's existing display-overlay seam.
   "state.js": 31772,
   // Lab MVP2 Phase 5 routes lab setup-tool cancellation through the input controller.
-  "input/index.js": 40927,
+  // Shop delivery preview logic lives in a focused input collaborator.
+  "input/index.js": 40954,
   // Visual Experimentation Phase 1 injects local lab visual profile state for renderer-only samples.
   // Interact Phase 6 adds only the public fixed-capture lifecycle seam; its state machine lives
   // in match_fixed_capture.js so Match retains renderer/rAF ownership without absorbing the logic.

@@ -353,6 +353,7 @@ pub fn default_weapon_kind(kind: EntityKind) -> Option<WeaponKind> {
         | EntityKind::TournamentGrounds
         | EntityKind::ProvenGrounds
         | EntityKind::HealingSeal
+        | EntityKind::ShopDelivery
         | EntityKind::Shop
         | EntityKind::Zamok
         | EntityKind::Depot
@@ -864,6 +865,7 @@ mod tests {
             (EntityKind::ProvenGrounds, None),
             (EntityKind::Shop, None),
             (EntityKind::HealingSeal, None),
+            (EntityKind::ShopDelivery, None),
             (EntityKind::Zamok, None),
             (EntityKind::Depot, None),
             (EntityKind::Barracks, None),

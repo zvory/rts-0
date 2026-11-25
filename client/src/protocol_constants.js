@@ -192,6 +192,7 @@ export const KIND = Object.freeze({
   PROVEN_GROUNDS: "proven_grounds",
   SHOP: "shop",
   HEALING_SEAL: "healing_seal",
+  SHOP_DELIVERY: "shop_delivery",
   ZAMOK: "zamok",
   DEPOT: "depot",
   BARRACKS: "barracks",
@@ -375,7 +376,7 @@ export const MOVEMENT_PATH_DIAGNOSTICS = Object.freeze({
 // --- Compact snapshot wire schema (must match protocol.rs) ---
 export const PREDICTION_PROTOCOL_VERSION = 1;
 export const DEFAULT_FACTION_ID = "kriegsia";
-export const COMPACT_SNAPSHOT_VERSION = 70;
+export const COMPACT_SNAPSHOT_VERSION = 71;
 export const MAX_COMPACT_GROUND_DECALS = 64;
 export const SNAPSHOT_CODEC_VERSION = 1;
 export const SNAPSHOT_CODEC = Object.freeze({
@@ -407,6 +408,7 @@ export const KIND_CODE = Object.freeze({
   [KIND.PROVEN_GROUNDS]: 33,
   [KIND.SHOP]: 34,
   [KIND.HEALING_SEAL]: 38,
+  [KIND.SHOP_DELIVERY]: 39,
   [KIND.WARRIOR]: 29,
   [KIND.WIND_ADEPT]: 35,
   [KIND.WAR_ADEPT]: 36,

@@ -1479,6 +1479,7 @@ export class ClientIntent {
   releaseCommandTargetShift()
   commandFeedback, addCommandFeedback(kind, x, y, append?, radiusTiles?, now?), liveCommandFeedback(now)
   resourceMiningPreview, updateResourceMiningPreview(preview)
+  shopDeliveryPreview, updateShopDeliveryPreview(preview)
   antiTankGunSetupPreview, updateAntiTankGunSetupPreview(preview)
   abilityTargetPreview, updateAbilityTargetPreview(preview)
   recordPlannedCommand(command, selectedEntities, result?)
@@ -3024,3 +3025,7 @@ circle, central green plus, layered soft glow, and a two-second render-clock pul
 The always-visible green bar represents remaining healing capacity, not combat health.
 The bottom selection panel says `275 / 400 healing left`; no combat armor label is shown.
 Existing pooled graphics, snapshot replacement, fog gating and match teardown own its lifecycle.
+
+Shop selection previews use `shopDeliveryPreview` through the renderer-neutral feedback seam.
+Hovering an eligible friendly unit draws a one-pixel dotted line from the completed selected Shop.
+Flying goods render their existing colored circle plus a tiny 12×1-pixel HP fill from their combat body.

@@ -45,6 +45,7 @@ export class ClientIntent {
     this.attackTargetPreview = null;
     /** @type {null | {resourceId:number, resourceX:number, resourceY:number, anchorId:number, anchorX:number, anchorY:number, inRange:boolean}} */
     this.resourceMiningPreview = null;
+    this.shopDeliveryPreview = null;
     /** @type {null | {building:string, tileX:number, tileY:number, valid:boolean}} */
     this.contextualBuildPreview = null;
     /** @type {null | {source?:string, mouseX:number, mouseY:number, guns:Array<object>}} */
@@ -249,6 +250,10 @@ export class ClientIntent {
    * Set or clear the hovered resource-to-Resource-Depot mining preview.
    * @param {null | {resourceId:number, resourceX:number, resourceY:number, anchorId:number, anchorX:number, anchorY:number, inRange:boolean}} preview
    */
+  updateShopDeliveryPreview(preview) {
+    this.shopDeliveryPreview = preview;
+  }
+
   updateResourceMiningPreview(preview) {
     this.resourceMiningPreview = preview;
   }
@@ -461,6 +466,7 @@ export class ClientIntent {
     this.commandCardMode = null;
     this.attackTargetPreview = null;
     this.resourceMiningPreview = null;
+    this.shopDeliveryPreview = null;
     this.contextualBuildPreview = null;
     const active = { id, kind };
     if (tool?.payload && typeof tool.payload === "object") active.payload = { ...tool.payload };
