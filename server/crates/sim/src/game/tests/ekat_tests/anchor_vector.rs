@@ -24,7 +24,7 @@ fn ekat_magic_anchor_adds_same_inward_vector_for_idle_and_every_move_direction()
         let distance = (dx * dx + dy * dy).det_sqrt();
         let radius = config::EKAT_MAGIC_ANCHOR_RADIUS_TILES * config::TILE_SIZE as f32;
         let speed = config::unit_stats(EntityKind::Rifleman).unwrap().speed;
-        let magnitude = speed * 2.0 * (1.0 - distance / radius);
+        let magnitude = speed * 2.4 * (1.0 - distance / radius);
         assert!(
             (pulled.0 - base.0 - dx / distance * magnitude).abs() < 0.02,
             "destination={destination:?}, pulled={pulled:?}, base={base:?}"
