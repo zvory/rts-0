@@ -43,7 +43,7 @@ const LIVE_DECISION_TRACE_TRUNCATED_LINE: &str = "trace_truncated=true";
 const CUSTOM_STRATEGY_PROFILE_ID: &str = "custom_strategy";
 
 /// The default live-lobby profile id.
-pub const DEFAULT_LIVE_PROFILE_ID: &str = AI_2_3_ID;
+pub const DEFAULT_LIVE_PROFILE_ID: &str = JEFFS_AI_V1_1_ID;
 
 /// Canonical profile ids understood by the live adapter. Experimental profiles are available to
 /// internal observer-only sessions; the room actor prevents them from entering human matches.

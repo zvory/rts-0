@@ -559,7 +559,7 @@ import { textWithin } from "./dom_text.mjs";
     );
     assert(
       staleProfileSelectors.length === 1 &&
-        staleProfileSelectors[0].value === "ai_2_3" &&
+        staleProfileSelectors[0].value === "jeffs_ai_v1_1" &&
         staleProfileSelectors[0].children.length === 4,
       "player lobby does not expose an internal Turtle profile received from stale state",
     );

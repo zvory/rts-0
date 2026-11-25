@@ -113,7 +113,7 @@ mod tests {
             let seed = (0..128)
                 .find(|seed| composition.select(*seed, 1) == Some(RUSH_AI_ID))
                 .unwrap();
-            let mut controller = AiController::new(1);
+            let mut controller = AiController::with_profile_id(1, AI_2_3_ID);
             controller.select_for_match(seed);
             controller
                 .rush_strategy
