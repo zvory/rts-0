@@ -287,14 +287,17 @@ fn novice_evolution_clears_the_larger_body_from_adjacent_buildings() {
     let unit = game.state.entities.get_mut(id).unwrap();
     unit.insight = config::DISCIPLE_INSIGHT_REQUIRED;
     unit.set_order(Order::HoldPosition);
-    game.enqueue(1, Command::UseAbility {
-        target_id: None,
-        ability: crate::game::ability::AbilityKind::EvolveMagic,
-        units: vec![id],
-        x: None,
-        y: None,
-        queued: false,
-    });
+    game.enqueue(
+        1,
+        Command::UseAbility {
+            target_id: None,
+            ability: crate::game::ability::AbilityKind::EvolveMagic,
+            units: vec![id],
+            x: None,
+            y: None,
+            queued: false,
+        },
+    );
     game.tick();
     let unit = game.state.entities.get(id).unwrap();
     assert_eq!(unit.kind, EntityKind::MagicAdept);
