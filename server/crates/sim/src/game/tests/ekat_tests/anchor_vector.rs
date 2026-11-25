@@ -1,4 +1,5 @@
 use super::*;
+use rts_rules::math::GameplayMath as _;
 
 #[test]
 fn ekat_magic_anchor_adds_same_inward_vector_for_idle_and_every_move_direction() {
@@ -21,7 +22,7 @@ fn ekat_magic_anchor_adds_same_inward_vector_for_idle_and_every_move_direction()
         } = anchor_vector_step(destination, 2, true);
         let dx = center.0 - base.0;
         let dy = center.1 - base.1;
-        let distance = (dx * dx + dy * dy).sqrt();
+        let distance = (dx * dx + dy * dy).det_sqrt();
         let radius = config::EKAT_MAGIC_ANCHOR_RADIUS_TILES * config::TILE_SIZE as f32;
         let speed = config::unit_stats(EntityKind::Rifleman).unwrap().speed;
         let magnitude = speed * 2.0 * (1.0 - distance / radius);
