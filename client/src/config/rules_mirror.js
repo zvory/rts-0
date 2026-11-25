@@ -252,7 +252,7 @@ export const STATS = Object.freeze({
     description: "Friendly units inside recover 3 HP per second. Expires after restoring 400 HP." },
   [KIND.SHOP]: { label: "Shop", icon: "SH", footW: 3, footH: 4, sight: 1,
     cost: { steel: 100, oil: 100 }, buildTicks: TICK_HZ * 20, trains: [],
-    description: "Sells Healing Potions, Escape Treasures and Healing Seals for nearby friendly units." },
+    description: "Sells Regen items, Escape Treasures and Healing Seals for nearby friendly units." },
   [KIND.PROVEN_GROUNDS]: { label: "Proving Grounds", icon: "PG", footW: 3, footH: 3, sight: 1,
     cost: { steel: 100, oil: 0 }, buildTicks: 200, trains: [], requires: [KIND.PORTAL],
     description: "Send base Novices inside for researched Dao training. Queue any mix of Wind, War and Magic; each costs 100 oil and takes 10 seconds. Supports a rally point." },
@@ -328,9 +328,9 @@ export const ABILITIES = Object.freeze({
     radiusTiles: 1.5, cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 150 }),
     queued: false, queuePolicy: "notQueueable",
   }),
-  [ABILITY.HEALING_POTION]: Object.freeze({
-    ability: ABILITY.HEALING_POTION, label: "Healing Potion", icon: "HP", hotkey: "A",
-    title: "Defense item: Deliver a healing potion to a friendly unit at any distance; fully heals on arrival",
+  [ABILITY.REGEN]: Object.freeze({
+    ability: ABILITY.REGEN, label: "Regen", icon: "HP", hotkey: "A",
+    title: "Defense item: Deliver Regen to a friendly unit at any distance; permanently regenerates 3 HP per second on arrival",
     carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: null,
     cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 50 }),
     queued: false, queuePolicy: "notQueueable",

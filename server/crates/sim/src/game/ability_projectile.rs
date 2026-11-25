@@ -209,9 +209,7 @@ impl AbilityProjectile {
         }
         if arrived {
             if let Some(target) = entities.get_mut(id) {
-                if self.ability == AbilityKind::HealingPotion {
-                    target.restore_hp(target.max_hp);
-                } else if crate::game::services::shop_items::is_buff_item(self.ability) {
+                if crate::game::services::shop_items::is_buff_item(self.ability) {
                     target.receive_shop_item(self.ability);
                 } else if target.escape_treasure.is_none() {
                     target.escape_treasure = Some(self.caster_id);

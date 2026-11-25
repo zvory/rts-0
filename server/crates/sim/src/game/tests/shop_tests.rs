@@ -177,7 +177,7 @@ fn buy(game: &mut Game, shop: u32, target: u32, ability: AbilityKind) {
 }
 
 #[test]
-fn healing_potion_costs_50_and_arrives_after_ten_tiles_of_flight() {
+fn regen_costs_50_and_arrives_after_ten_tiles_of_flight() {
     let (mut game, shop, unit) = item_fixture();
     game.state
         .entities
@@ -185,7 +185,7 @@ fn healing_potion_costs_50_and_arrives_after_ten_tiles_of_flight() {
         .unwrap()
         .apply_damage(40, None);
     let hp = game.state.entities.get(unit).unwrap().hp;
-    buy(&mut game, shop, unit, AbilityKind::HealingPotion);
+    buy(&mut game, shop, unit, AbilityKind::Regen);
     game.tick();
     assert_eq!(game.state.players[0].oil, 950);
     let object = game.state.ability_runtime.world_objects().next().unwrap();
@@ -195,13 +195,20 @@ fn healing_potion_costs_50_and_arrives_after_ten_tiles_of_flight() {
     }
     assert_eq!(game.state.entities.get(unit).unwrap().hp, hp);
     game.tick();
-    let unit = game.state.entities.get(unit).unwrap();
-    assert_eq!(unit.hp, unit.max_hp);
+    let target = game.state.entities.get(unit).unwrap();
+    assert!(target.hp <= hp + 1, "delivery must not instantly heal");
+    assert!(target.shop_item_active(AbilityKind::Regen));
+    let before = target.hp;
+    for _ in 0..config::TICK_HZ { game.tick(); }
+    assert_eq!(game.state.entities.get(unit).unwrap().hp, before + 3);
+    for _ in 0..config::TICK_HZ * 20 { game.tick(); }
+    let target = game.state.entities.get(unit).unwrap();
+    assert_eq!(target.hp, target.max_hp, "Regen caps at maximum HP");
     assert_eq!(game.state.ability_runtime.world_objects().count(), 0);
 }
 
 #[test]
-fn healing_potion_has_unlimited_range_and_tracks_a_moving_target_until_arrival() {
+fn regen_has_unlimited_range_and_tracks_a_moving_target_until_arrival() {
     let (mut game, shop, unit) = item_fixture();
     let target = game.state.entities.get_mut(unit).unwrap();
     target.set_position(1600.0, 320.0); // Forty tiles from the Shop.
@@ -212,7 +219,7 @@ fn healing_potion_has_unlimited_range_and_tracks_a_moving_target_until_arrival()
         .recompute(&[1], &game.state.entities, &game.state.map);
     assert!(hp > 0);
     assert!(game.state.fog.is_visible_world(1, 1600.0, 320.0));
-    buy(&mut game, shop, unit, AbilityKind::HealingPotion);
+    buy(&mut game, shop, unit, AbilityKind::Regen);
     game.tick();
     assert_eq!(game.state.players[0].oil, 950);
     assert_eq!(
@@ -224,7 +231,7 @@ fn healing_potion_has_unlimited_range_and_tracks_a_moving_target_until_arrival()
             .expires_tick,
         u32::MAX
     );
-    // The potion follows the unit rather than healing its original location.
+    // Regen follows the unit rather than healing its original location.
     game.state
         .entities
         .get_mut(unit)
@@ -236,16 +243,17 @@ fn healing_potion_has_unlimited_range_and_tracks_a_moving_target_until_arrival()
     assert_eq!(game.state.entities.get(unit).unwrap().hp, hp);
     game.tick();
     let target = game.state.entities.get(unit).unwrap();
-    assert_eq!(target.hp, target.max_hp);
+    assert!(target.hp <= hp + 1);
+    assert!(target.shop_item_active(AbilityKind::Regen));
     assert_eq!(game.state.ability_runtime.projectiles().count(), 0);
     assert_eq!(game.state.ability_runtime.world_objects().count(), 0);
 }
 
 #[test]
-fn healing_potion_disappears_without_refund_when_target_dies_or_is_removed() {
+fn regen_disappears_without_refund_when_target_dies_or_is_removed() {
     for remove in [false, true] {
         let (mut game, shop, unit) = item_fixture();
-        buy(&mut game, shop, unit, AbilityKind::HealingPotion);
+        buy(&mut game, shop, unit, AbilityKind::Regen);
         game.tick();
         assert_eq!(game.state.ability_runtime.projectiles().count(), 1);
         if remove {
@@ -274,7 +282,7 @@ fn shop_items_reject_buildings_hidden_stale_and_enemy_targets_without_spending()
         .spawn_unit(2, EntityKind::Warrior, 640.0, 384.0)
         .unwrap();
     for target in [shop, enemy, u32::MAX] {
-        buy(&mut game, shop, target, AbilityKind::HealingPotion);
+        buy(&mut game, shop, target, AbilityKind::Regen);
         game.tick();
     }
     game.state
@@ -352,7 +360,7 @@ fn in_flight_shop_item_checkpoint_continues_identically() {
         .get_mut(unit)
         .unwrap()
         .apply_damage(80, None);
-    buy(&mut game, shop, unit, AbilityKind::HealingPotion);
+    buy(&mut game, shop, unit, AbilityKind::Regen);
     game.tick();
     let mut restored = Game::restore_checkpoint_payload_text_for_test(
         &game.checkpoint_payload_text_for_test().unwrap(),
@@ -441,7 +449,7 @@ fn shop_purchase_accepts_allies_and_checks_visibility_range_money_and_source() {
         .unwrap()
         .set_position(1248.0, 320.0);
     game.state.fog = crate::game::fog::Fog::new(game.state.map.width, game.state.map.height);
-    buy(&mut game, shop, unit, AbilityKind::HealingPotion);
+    buy(&mut game, shop, unit, AbilityKind::Regen);
     game.tick();
     assert_eq!(game.state.players[0].oil, 900);
 
@@ -454,11 +462,11 @@ fn shop_purchase_accepts_allies_and_checks_visibility_range_money_and_source() {
     game.state
         .fog
         .recompute(&[1, 2], &game.state.entities, &game.state.map);
-    buy(&mut game, shop, unit, AbilityKind::HealingPotion);
+    buy(&mut game, shop, unit, AbilityKind::Regen);
     game.tick();
     assert_eq!(game.state.players[0].oil, 850);
     game.state.players[0].set_resources(0, 49);
-    buy(&mut game, shop, unit, AbilityKind::HealingPotion);
+    buy(&mut game, shop, unit, AbilityKind::Regen);
     game.tick();
     assert_eq!(game.state.players[0].oil, 49);
 
@@ -474,7 +482,7 @@ fn shop_purchase_accepts_allies_and_checks_visibility_range_money_and_source() {
         .spawn_building(2, EntityKind::Shop, 1200.0, 800.0, true)
         .unwrap();
     for source in [unfinished, foreign] {
-        buy(&mut game, source, unit, AbilityKind::HealingPotion);
+        buy(&mut game, source, unit, AbilityKind::Regen);
         game.tick();
     }
     assert_eq!(game.state.players[0].oil, 1000);
@@ -925,6 +933,7 @@ fn armor_treasure_applies_on_delivery_without_activation_or_expiry() {
 #[test]
 fn every_passive_item_applies_on_delivery_and_ignores_activation_forever() {
     for ability in [
+        AbilityKind::Regen,
         AbilityKind::Haste,
         AbilityKind::DoubleDamage,
         AbilityKind::ArmorTreasure,
@@ -1127,10 +1136,11 @@ fn item_radiance_is_public_for_visible_carriers_without_private_inventory() {
 }
 
 #[test]
-fn master_carries_all_five_current_items_without_category_limits() {
+fn master_carries_all_six_current_items_without_category_limits() {
     let (mut game, shop, unit) = item_fixture();
     game.state.entities.get_mut(unit).unwrap().dao_master = true;
     let items = [
+        AbilityKind::Regen,
         AbilityKind::Haste,
         AbilityKind::DoubleDamage,
         AbilityKind::ArmorTreasure,
@@ -1151,13 +1161,13 @@ fn master_carries_all_five_current_items_without_category_limits() {
     assert_eq!(target.escape_treasure, Some(shop));
     assert_eq!(
         target.item_radiance_tier(),
-        5,
+        6,
         "every current item contributes to the six-tier visual scale"
     );
 }
 
 #[test]
-fn rank_slot_limits_reserve_deliveries_and_leave_consumable_healing_available() {
+fn rank_slot_limits_reserve_deliveries_and_reject_regen_when_full() {
     for kind in [
         EntityKind::Warrior,
         EntityKind::WindAdept,
@@ -1207,12 +1217,13 @@ fn rank_slot_limits_reserve_deliveries_and_leave_consumable_healing_available() 
                     .get_mut(unit)
                     .unwrap()
                     .apply_damage(20, None);
-                buy(&mut game, shop, unit, AbilityKind::HealingPotion);
+                buy(&mut game, shop, unit, AbilityKind::Regen);
                 for _ in 0..60 {
                     game.tick();
                 }
                 let carrier = game.state.entities.get(unit).unwrap();
-                assert_eq!(carrier.hp, carrier.max_hp);
+                assert!(!carrier.shop_item_active(AbilityKind::Regen), "full slots reject Regen");
+                assert!(carrier.hp < carrier.max_hp);
                 // Promotion opens the additional slots immediately.
                 game.state.entities.get_mut(unit).unwrap().dao_master = true;
                 buy(&mut game, shop, unit, AbilityKind::VitalityTreasure);
@@ -1231,7 +1242,7 @@ fn rank_slot_limits_reserve_deliveries_and_leave_consumable_healing_available() 
 #[test]
 fn every_unit_targeted_good_has_unlimited_range_and_ten_hp_at_seven_point_five_tiles_per_second() {
     for ability in [
-        AbilityKind::HealingPotion,
+        AbilityKind::Regen,
         AbilityKind::EscapeTreasure,
         AbilityKind::Haste,
         AbilityKind::DoubleDamage,
@@ -1370,4 +1381,36 @@ fn enemy_rifle_fire_intercepts_flying_goods_without_refund() {
         .get(unit)
         .unwrap()
         .shop_item_active(AbilityKind::VitalityTreasure));
+}
+
+#[test]
+fn regen_reserves_slot_rejects_duplicates_projects_privately_and_survives_checkpoint() {
+    let (mut game, shop, unit) = item_fixture();
+    game.state.entities.get_mut(unit).unwrap().apply_damage(40, None);
+    buy(&mut game, shop, unit, AbilityKind::Regen);
+    game.tick();
+    buy(&mut game, shop, unit, AbilityKind::Regen);
+    game.tick();
+    assert_eq!(game.state.players[0].oil, 950);
+    for _ in 0..40 { game.tick(); }
+    assert_eq!(game.state.entities.get(unit).unwrap().carried_item_count(), 1);
+    let own = game.snapshot_for(1);
+    assert!(own.entities.iter().find(|e| e.id == unit).unwrap().abilities.iter()
+        .any(|entry| entry.ability == "regen" && entry.remaining_uses == Some(1)));
+    let enemy = game.snapshot_for(2);
+    assert!(enemy.entities.iter().filter(|e| e.id == unit)
+        .all(|e| !e.abilities.iter().any(|entry| entry.ability == "regen")));
+    buy(&mut game, shop, unit, AbilityKind::Regen);
+    game.tick();
+    assert_eq!(game.state.players[0].oil, 950);
+    game.state.entities.remove(shop);
+    let mut restored = Game::restore_checkpoint_payload_text_for_test(
+        &game.checkpoint_payload_text_for_test().unwrap(),
+        game.state.map.clone(), game.state.map_metadata.clone()).unwrap();
+    let hp = game.state.entities.get(unit).unwrap().hp;
+    for _ in 0..config::TICK_HZ {
+        game.tick(); restored.tick();
+        assert_eq!(game.replay_end_state_hash().unwrap(), restored.replay_end_state_hash().unwrap());
+    }
+    assert_eq!(game.state.entities.get(unit).unwrap().hp, hp + 3);
 }

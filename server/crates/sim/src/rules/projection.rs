@@ -506,6 +506,7 @@ pub fn project_entity(
             })
             .collect();
         for kind in [
+            ability::AbilityKind::Regen,
             ability::AbilityKind::Haste,
             ability::AbilityKind::DoubleDamage,
             ability::AbilityKind::ArmorTreasure,

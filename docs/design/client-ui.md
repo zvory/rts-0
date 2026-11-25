@@ -2978,8 +2978,9 @@ the passive tile so active commands and the item column retain their positions. 
 
 Carried items have no command-card tiles or RFV bindings. Shop purchase controls remain unchanged. With a completed controllable Shop selected, hovering a visible friendly Cultivator fighter at its rank capacity shows “Full” beside the gameplay cursor in white 22px text with a black outline. The hint also follows locked cursors, clears on selection/hover changes and teardown, and is suppressed over UI, during dragging/placement, or when targeting consumable healing. It uses the public equipped-item count; incoming deliveries continue to reserve slots authoritatively at purchase time.
 Haste, Double Damage, Armor Treasure, and Vitality Treasure are permanent passive effects;
-Escape Treasure automatically rescues the carrier on lethal damage. Novices and Adepts have three carried-item slots; Masters have six. In-flight deliveries reserve slots, while Healing Potion and Healing Seal use none. There is no category cap; duplicate copies of the same effect
-are rejected, including deliveries already in flight. Healing Potion and Healing Seal are consumed goods.
+Escape Treasure automatically rescues the carrier on lethal damage. Novices and Adepts have three carried-item slots; Masters have six. In-flight deliveries reserve slots, while Healing Seal uses none and Regen uses one. There is no category cap; duplicate copies of the same effect
+are rejected, including deliveries already in flight. Regen is a permanent passive restoring 3 HP/s; Healing Seal is placed on the ground.
+Flying goods and minimap delivery markers share the equipped item icon geometry and color.
 Vitality adds 150 maximum and current HP and persists through Dao promotion.
 
 Private carried-item rosettes use redundant color and vector silhouettes at the exact unit center:

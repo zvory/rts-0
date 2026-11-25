@@ -1,14 +1,8 @@
-import { CARRIED_ITEMS, carriedItemMask } from "../config.js";
+import { CARRIED_ITEMS, carriedItemMask, ITEM_ICON_SHAPES } from "../config.js";
 
 const ICON_SCALE = 0.9;
 const OUTLINE_WIDTH = 0.7 * ICON_SCALE;
-const SHAPES = Object.freeze({
-  bolt: [-1, -5, -4.5, 1, 0, 1, -1, 5, 4.5, -1, 1, -1],
-  sword: [0, -5, 3, -2, 1, 1, 3, 1, 3, 2, 1, 2, 1, 5, -1, 5, -1, 2, -3, 2, -3, 1, -1, 1, -3, -2],
-  shield: [-4.5, -5, 4.5, -5, 4, 1, 2, 3, 0, 5, -2, 3, -4, 1],
-  heart: [-4.5, -2, -3, -4.5, -1, -4.5, 0, -2.5, 1, -4.5, 3, -4.5, 4.5, -2, 4, 1, 0, 5, -4, 1],
-  return: [0, -5, 5, 0, 0, 5, -5, 0],
-});
+
 
 // Geometry is independent of the catalog; additional items need no inventory-slot layout.
 export function itemRosettePositions(count, centerIndex = count - 1) {
@@ -27,8 +21,8 @@ export function itemRosettePositions(count, centerIndex = count - 1) {
   });
 }
 
-function drawIcon(g, item, x, y) {
-  const points = SHAPES[item.shape].map((value, i) => value * ICON_SCALE + (i % 2 ? y : x));
+export function drawItemIcon(g, item, x, y) {
+  const points = ITEM_ICON_SHAPES[item.shape].map((value, i) => value * ICON_SCALE + (i % 2 ? y : x));
   g.poly(points).fill(item.color).stroke({ color: 0x09121c, width: OUTLINE_WIDTH, join: "round" });
   if (item.shape === "return") {
     const point = (a, b) => [x + a * ICON_SCALE, y + b * ICON_SCALE];
@@ -50,6 +44,6 @@ export function drawCarriedItemRosette(renderer, entity, poolName = "carriedItem
   const items = CARRIED_ITEMS.filter((_, i) => mask & (1 << i));
   const escapeIndex = items.findIndex((item) => item.shape === "return");
   const positions = itemRosettePositions(items.length, escapeIndex < 0 ? items.length - 1 : escapeIndex);
-  items.forEach((item, i) => drawIcon(g, item, ...positions[i]));
+  items.forEach((item, i) => drawItemIcon(g, item, ...positions[i]));
   g.rtsStaticRenderKey = mask;
 }

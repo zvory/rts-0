@@ -178,7 +178,7 @@ console.log("Dao ability targeting contracts passed");
   const sent = [];
   input.state = { playerId: 1, map: { tileSize: 32 }, selectedEntities: () => [shop], isAllyOwner: (owner) => owner === 2 };
   input.clientIntent = new ClientIntent();
-  input.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.HEALING_POTION });
+  input.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.REGEN });
   input._selectedOwnUnitIds = () => [];
   input._selectedProducerBuildingIds = () => [];
   input._resourceAtScreen = () => null;
@@ -187,7 +187,7 @@ console.log("Dao ability targeting contracts passed");
   input._addCommandFeedback = () => {};
   input.commandInteraction = { issueCommand: (command) => sent.push(command) };
   assert(input._issueTargetedCommand({ x: 200, y: 100 }), "Shop can target a friendly unit");
-  assertDeepEqual(sent[0], { c: "useAbility", ability: ABILITY.HEALING_POTION, units: [201], targetId: 202 },
+  assertDeepEqual(sent[0], { c: "useAbility", ability: ABILITY.REGEN, units: [201], targetId: 202 },
     "Shop purchase names exactly one source Shop and the clicked unit");
   for (const invalid of [null, { ...target, kind: KIND.BARRACKS }, { ...target, owner: 3 },
     { ...target, hp: 0 }, { ...target, visionOnly: true }]) {
@@ -196,7 +196,7 @@ console.log("Dao ability targeting contracts passed");
   }
   assert(sent.length === 1, "Invalid shop targets issue no purchase commands");
   target = { id: 202, owner: 2, kind: KIND.RIFLEMAN, hp: 40, x: 2100, y: 100 };
-  assert(input._issueTargetedCommand({ x: 200, y: 100 }), "Healing Potion accepts distant allies");
+  assert(input._issueTargetedCommand({ x: 200, y: 100 }), "Regen accepts distant allies");
   assert(sent.length === 2, "Distant potion purchase is issued");
   for (const ability of [ABILITY.ESCAPE_TREASURE, ABILITY.ARMOR_TREASURE,
     ABILITY.VITALITY_TREASURE, ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE]) {

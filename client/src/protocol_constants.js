@@ -331,7 +331,7 @@ export const ABILITY = Object.freeze({
   EVOLVE_MAGIC: "evolveMagic",
   DISCIPLE_SHIELD: "discipleShield",
   THROW_SWORD: "throwSword",
-  HEALING_POTION: "healingPotion",
+  REGEN: "regen",
   HEALING_SEAL: "healingSeal",
   ESCAPE_TREASURE: "escapeTreasure",
   HASTE: "haste",
@@ -379,7 +379,7 @@ export const MOVEMENT_PATH_DIAGNOSTICS = Object.freeze({
 // --- Compact snapshot wire schema (must match protocol.rs) ---
 export const PREDICTION_PROTOCOL_VERSION = 1;
 export const DEFAULT_FACTION_ID = "kriegsia";
-export const COMPACT_SNAPSHOT_VERSION = 74;
+export const COMPACT_SNAPSHOT_VERSION = 75;
 export const MAX_COMPACT_GROUND_DECALS = 64;
 export const SNAPSHOT_CODEC_VERSION = 1;
 export const SNAPSHOT_CODEC = Object.freeze({
@@ -548,7 +548,7 @@ export const ORDER_STAGE = Object.freeze({
   EVOLVE_MAGIC: "evolveMagic",
   DISCIPLE_SHIELD: "discipleShield",
   THROW_SWORD: "throwSword",
-  HEALING_POTION: "healingPotion",
+  REGEN: "regen",
   HEALING_SEAL: "healingSeal",
   ESCAPE_TREASURE: "escapeTreasure",
   HASTE: "haste",
@@ -588,7 +588,7 @@ export const ORDER_STAGE_CODE = Object.freeze({
   [ORDER_STAGE.EVOLVE_MAGIC]: 24,
   [ORDER_STAGE.DISCIPLE_SHIELD]: 25,
   [ORDER_STAGE.THROW_SWORD]: 26,
-  [ORDER_STAGE.HEALING_POTION]: 27,
+  [ORDER_STAGE.REGEN]: 27,
   [ORDER_STAGE.HEALING_SEAL]: 30,
   [ORDER_STAGE.HASTE]: 31,
   [ORDER_STAGE.DOUBLE_DAMAGE]: 32,
@@ -619,7 +619,7 @@ export const ABILITY_CODE = Object.freeze({
   [ABILITY.EVOLVE_MAGIC]: 16,
   [ABILITY.DISCIPLE_SHIELD]: 17,
   [ABILITY.THROW_SWORD]: 18,
-  [ABILITY.HEALING_POTION]: 19,
+  [ABILITY.REGEN]: 19,
   [ABILITY.HEALING_SEAL]: 22,
   [ABILITY.ESCAPE_TREASURE]: 20,
   [ABILITY.HASTE]: 23,

@@ -136,7 +136,7 @@ pub mod abilities {
     pub const EVOLVE_MAGIC: &str = "evolveMagic";
     pub const DISCIPLE_SHIELD: &str = "discipleShield";
     pub const THROW_SWORD: &str = "throwSword";
-    pub const HEALING_POTION: &str = "healingPotion";
+    pub const REGEN: &str = "regen";
     pub const HEALING_SEAL: &str = "healingSeal";
     pub const ESCAPE_TREASURE: &str = "escapeTreasure";
     pub const HASTE: &str = "haste";
@@ -165,7 +165,7 @@ pub mod abilities {
         EVOLVE_MAGIC,
         DISCIPLE_SHIELD,
         THROW_SWORD,
-        HEALING_POTION,
+        REGEN,
         HEALING_SEAL,
         ESCAPE_TREASURE,
         HASTE,
@@ -253,7 +253,7 @@ pub mod notices {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 74;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 75;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -525,7 +525,7 @@ const ORDER_STAGE_CODES: &[(&str, u8)] = &[
     (abilities::EVOLVE_MAGIC, 24),
     (abilities::DISCIPLE_SHIELD, 25),
     (abilities::THROW_SWORD, 26),
-    (abilities::HEALING_POTION, 27),
+    (abilities::REGEN, 27),
     (abilities::HEALING_SEAL, 30),
     (abilities::ESCAPE_TREASURE, 28),
     (abilities::HASTE, 31),
@@ -555,7 +555,7 @@ const ABILITY_CODES: &[(&str, u8)] = &[
     (abilities::EVOLVE_MAGIC, 16),
     (abilities::DISCIPLE_SHIELD, 17),
     (abilities::THROW_SWORD, 18),
-    (abilities::HEALING_POTION, 19),
+    (abilities::REGEN, 19),
     (abilities::HEALING_SEAL, 22),
     (abilities::ESCAPE_TREASURE, 20),
     (abilities::HASTE, 23),
@@ -886,7 +886,7 @@ fn ability_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("EVOLVE_MAGIC", abilities::EVOLVE_MAGIC),
         ("DISCIPLE_SHIELD", abilities::DISCIPLE_SHIELD),
         ("THROW_SWORD", abilities::THROW_SWORD),
-        ("HEALING_POTION", abilities::HEALING_POTION),
+        ("REGEN", abilities::REGEN),
         ("HEALING_SEAL", abilities::HEALING_SEAL),
         ("ESCAPE_TREASURE", abilities::ESCAPE_TREASURE),
         ("HASTE", abilities::HASTE),
@@ -991,7 +991,7 @@ fn order_stage_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("EVOLVE_MAGIC", abilities::EVOLVE_MAGIC),
         ("DISCIPLE_SHIELD", abilities::DISCIPLE_SHIELD),
         ("THROW_SWORD", abilities::THROW_SWORD),
-        ("HEALING_POTION", abilities::HEALING_POTION),
+        ("REGEN", abilities::REGEN),
         ("HEALING_SEAL", abilities::HEALING_SEAL),
         ("ESCAPE_TREASURE", abilities::ESCAPE_TREASURE),
         ("HASTE", abilities::HASTE),

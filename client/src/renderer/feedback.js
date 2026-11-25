@@ -1,7 +1,9 @@
+import { drawItemIcon } from "./carried_items.js";
 import { drawVectorField, drawVectorFieldPreview } from "./vector_field.js";
 import { drawEscapeTrails } from "./escape_trail.js";
 import { gfxNoFill, gfxCircle, gfxEllipse, gfxPoly, gfxRect, gfxRoundRect, gfxStrokeLine, gfxStrokePaths, gfxReset, gfxFill, gfxStroke } from "./native_graphics.js";
 import {
+  CARRIED_ITEMS,
   COLORS,
   EKAT_MAGIC_ANCHOR_RADIUS_TILES,
   DISCIPLE_SHIELD_RADIUS_TILES,
@@ -550,13 +552,8 @@ export function _drawAbilityObjects(state) {
         gfxNoFill(g);
       }
     } else if (object.kind === ABILITY_OBJECT_KIND.LINE_PROJECTILE
-        && [ABILITY.HEALING_POTION, ABILITY.ESCAPE_TREASURE, ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE, ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE].includes(object.ability)) {
-      const color = ({ [ABILITY.HEALING_POTION]: 0x54e878, [ABILITY.ESCAPE_TREASURE]: 0xa653ec,
-        [ABILITY.HASTE]: 0xffda52, [ABILITY.DOUBLE_DAMAGE]: 0xff704f, [ABILITY.ARMOR_TREASURE]: 0x58ccec, [ABILITY.VITALITY_TREASURE]: 0xf291ff })[object.ability];
-      gfxStroke(g, 1, 0xffffff, 0.8);
-      gfxFill(g, color, 1);
-      gfxCircle(g, object.x, object.y, 4);
-      gfxNoFill(g);
+        && CARRIED_ITEMS.some((item) => item.ability === object.ability)) {
+      drawItemIcon(g, CARRIED_ITEMS.find((item) => item.ability === object.ability), object.x, object.y);
     } else if (object.kind === ABILITY_OBJECT_KIND.LINE_PROJECTILE) {
       const r = Math.max(5, object.ownerState?.radius || ts * 0.18);
       activeLineProjectileIds.add(object.id);

@@ -401,6 +401,7 @@ pub(crate) fn run_tick(
         ability_runtime.tick_projectiles(map, entities, &teams, &post_movement.spatial, tick);
         ability_runtime.tick(entities, tick);
         services::shop_items::heal_seals(entities, &teams, tick);
+        services::shop_items::heal_regen(entities, tick);
     });
     crate::perf::timed(perf.as_deref_mut(), "dao_evolution", || {
         for id in entities.ids() {

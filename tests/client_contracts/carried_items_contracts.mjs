@@ -1,5 +1,7 @@
+import { drawMinimapItems } from "../../client/src/minimap_items.js";
+import { _drawAbilityObjects } from "../../client/src/renderer/feedback.js";
 import assert from "node:assert/strict";
-import { ABILITY, KIND } from "../../client/src/protocol.js";
+import { ABILITY, ABILITY_OBJECT_KIND, KIND } from "../../client/src/protocol.js";
 import { ABILITIES, CARRIED_ITEMS, carriedItemMask, carriedItemsForEntity } from "../../client/src/config.js";
 import { drawCarriedItemRosette, itemRosettePositions } from "../../client/src/renderer/carried_items.js";
 import { _staticSlot } from "../../client/src/renderer/entities.js";
@@ -11,8 +13,8 @@ import { withFakeHudDocument } from "./fakes.mjs";
 
 const equipped = { id: 5, owner: 1, kind: KIND.WAR_ADEPT, dao: "war", daoMaster: true,
   x: 320, y: 400, hp: 100, maxHp: 300, escapeTreasure: true,
-  abilities: CARRIED_ITEMS.slice(0, 4).map(({ ability }) => ({ ability, remainingUses: 1 })) };
-assert.equal(carriedItemsForEntity(equipped).length, 5);
+  abilities: CARRIED_ITEMS.filter(({ ability }) => ability !== ABILITY.ESCAPE_TREASURE).map(({ ability }) => ({ ability, remainingUses: 1 })) };
+assert.equal(carriedItemsForEntity(equipped).length, 6);
 assert.equal(carriedItemMask({ ...equipped, kind: KIND.SHOP }), 0, "Shop abilities are not inventory");
 assert.equal(carriedItemMask({ id: 9, kind: KIND.WAR_ADEPT, itemRadianceTier: 6 }), 0,
   "public radiance never reconstructs private inventory");
@@ -33,8 +35,8 @@ try {
   drawCarriedItemRosette(renderer, equipped);
   const graphic = renderer._pools.carriedItems.get(equipped.id);
   assert.equal(graphic.x, equipped.x); assert.equal(graphic.y, equipped.y);
-  assert.equal(graphic.calls.filter((call) => call[0] === "drawPolygon").length, 6, "five silhouettes plus Escape return arrow");
-  assert.equal(graphic.calls.filter((call) => call[0] === "lineStyle" && call[1] === 0.63).length, 5);
+  assert.equal(graphic.calls.filter((call) => call[0] === "drawPolygon").length, 7, "six silhouettes plus Escape return arrow");
+  assert.equal(graphic.calls.filter((call) => call[0] === "lineStyle" && call[1] === 0.63).length, 6);
   const drawCalls = graphic.calls.length;
   drawCarriedItemRosette(renderer, { ...equipped, x: 330, y: 410 });
   assert.equal(graphic.calls.length, drawCalls, "unchanged inventory reuses cached geometry");
@@ -58,9 +60,9 @@ withFakeHudDocument(({ FakeElement }) => {
   ui.render();
   let summary = panel.querySelector(".sel-item-summary");
   const value = CARRIED_ITEMS.reduce((sum, { ability }) => sum + ABILITIES[ability].cost.oil, 0);
-  assert(summary.textContent.includes(`War Master · 5 carried items · ${value} oil value`));
+  assert(summary.textContent.includes(`War Master · 6 carried items · ${value} oil value`));
   let portraits = panel.querySelectorAll("[data-selection-entity-id]");
-  assert.equal(portraits[0].querySelector(".sel-item-count").textContent, "5");
+  assert.equal(portraits[0].querySelector(".sel-item-count").textContent, "6");
   assert(portraits[0].className.includes("has-carried-escape"));
   assert(portraits[0].getAttribute("aria-describedby"));
   panel.listeners.focusin({ target: portraits[1] });
@@ -79,3 +81,23 @@ withFakeHudDocument(({ FakeElement }) => {
 });
 assert(carriedItemDetails({ id: 1, kind: KIND.WAR_ADEPT, itemRadianceTier: 6 }).includes("0 carried items"));
 console.log("carried_items_contracts: ok");
+
+// Every traveling good retains its equipped silhouette and color in both renderers.
+for (const item of CARRIED_ITEMS) {
+  const object = { id: 77, kind: ABILITY_OBJECT_KIND.LINE_PROJECTILE,
+    ability: item.ability, x: 30, y: 40 };
+  const fills = [], paths = [];
+  const ctx = { save() {}, restore() {}, translate() {}, scale() {},
+    beginPath() { paths.push([]); }, moveTo(x, y) { paths.at(-1).push(x, y); },
+    lineTo(x, y) { paths.at(-1).push(x, y); }, closePath() {}, stroke() {},
+    fill() { fills.push(this.fillStyle); } };
+  drawMinimapItems(ctx, [object], (x, y) => ({x, y}));
+  assert.equal(fills[0], `#${item.color.toString(16).padStart(6, "0")}`);
+  const restorePixi = installFakePixi();
+  try {
+    const g = new PIXI.Graphics();
+    _drawAbilityObjects.call({ _abilityObjectGfx: g }, { abilityObjects: [object] });
+    const polygon = g.calls.find(([op]) => op === "drawPolygon")[1];
+    assert.deepEqual(polygon, paths[0].map((value, i) => value * 0.9 + (i % 2 ? 40 : 30)));
+  } finally { restorePixi(); }
+}

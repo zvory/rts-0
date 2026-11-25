@@ -92,7 +92,7 @@ pub(in crate::game) fn planner_code(kind: AbilityKind) -> u16 {
         AbilityKind::EvolveMagic => 15,
         AbilityKind::DiscipleShield => 16,
         AbilityKind::ThrowSword => 17,
-        AbilityKind::HealingPotion => 18,
+        AbilityKind::Regen => 18,
         AbilityKind::EscapeTreasure => 19,
         AbilityKind::WindDash => 20,
         AbilityKind::HealingSeal => 21,
@@ -124,7 +124,7 @@ pub(in crate::game) fn from_planner_code(code: u16) -> Option<AbilityKind> {
         15 => Some(AbilityKind::EvolveMagic),
         16 => Some(AbilityKind::DiscipleShield),
         17 => Some(AbilityKind::ThrowSword),
-        18 => Some(AbilityKind::HealingPotion),
+        18 => Some(AbilityKind::Regen),
         19 => Some(AbilityKind::EscapeTreasure),
         20 => Some(AbilityKind::WindDash),
         21 => Some(AbilityKind::HealingSeal),
@@ -143,7 +143,7 @@ pub fn effect_hook(kind: AbilityKind) -> AbilityEffectHook {
         AbilityKind::EvolveWind | AbilityKind::EvolveWar | AbilityKind::EvolveMagic => {
             AbilityEffectHook::Evolve
         }
-        AbilityKind::HealingPotion
+        AbilityKind::Regen
         | AbilityKind::EscapeTreasure
         | AbilityKind::HealingSeal
         | AbilityKind::Haste
