@@ -1,3 +1,4 @@
+import { carriedItemSlotsFull } from "./shop_full_cursor.js";
 import {
   ABILITY,
   ABILITY_OBJECT_KIND,
@@ -1137,4 +1138,21 @@ function tournamentRallyPoint(input, target, fallback) {
   return [KIND.TOURNAMENT_GROUNDS, KIND.PROVEN_GROUNDS].includes(target?.kind)
     && ownOwner(input.state, target.owner, input.controlPolicy)
     && !Number.isFinite(target.buildProgress) ? target : fallback;
+}
+
+
+/** Only public carried-item strength is needed; enemy inventories stay private. */
+export function _shopFullCursorTarget() {
+  const intent = clientIntent(this);
+  if (!this.mouse || this._drag || intent?.activeLabTool || intent?.placement ||
+      this.inputRouter?.activePreviewSurface?.()) return null;
+  const mode = intent?.commandTarget;
+  if (mode && !(mode.kind === "ability" && [ABILITY.ESCAPE_TREASURE,
+    ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE, ABILITY.HASTE,
+    ABILITY.DOUBLE_DAMAGE].includes(mode.ability))) return null;
+  if (!this.state.selectedEntities().some((entity) => entity.kind === KIND.SHOP &&
+      entity.hp > 0 && entity.buildProgress == null && ownOwner(this.state, entity.owner, this.controlPolicy))) return null;
+  const target = this._entityAtScreen(this.mouse, false);
+  return target?.hp > 0 && !target.visionOnly &&
+    friendlyOwner(this.state, target.owner, this.controlPolicy) && carriedItemSlotsFull(target) ? target : null;
 }

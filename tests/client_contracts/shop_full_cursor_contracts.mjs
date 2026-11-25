@@ -1,0 +1,49 @@
+import { assert } from './assertions.mjs';
+import { KIND, ABILITY } from '../../client/src/protocol.js';
+import { carriedItemSlotsFull, ShopFullCursor } from '../../client/src/input/shop_full_cursor.js';
+import { _shopFullCursorTarget } from '../../client/src/input/commands.js';
+const unit = {kind: KIND.WARRIOR, owner: 1, hp: 58, itemRadianceTier: 3};
+const shop = {kind: KIND.SHOP, owner: 1, hp: 200};
+const input = {mouse: {x: 50,y: 70}, state: {playerId: 1, selectedEntities: () => [shop]},
+  clientIntent: {}, _entityAtScreen: () => unit, _shopFullCursorTarget};
+assert(_shopFullCursorTarget.call(input) === unit, 'selected Shop shows full Novice');
+for (const kind of [KIND.WARRIOR,KIND.WIND_ADEPT,KIND.WAR_ADEPT,KIND.MAGIC_ADEPT]) {
+  assert(carriedItemSlotsFull({...unit,kind}), 'Novice and Adept limit is three');
+  assert(!carriedItemSlotsFull({...unit,kind,itemRadianceTier:2}), 'free slot hides hint');
+  assert(!carriedItemSlotsFull({...unit,kind,daoMaster:true,itemRadianceTier:5}), 'Master fifth item leaves room');
+  assert(carriedItemSlotsFull({...unit,kind,daoMaster:true,itemRadianceTier:6}), 'Master sixth item fills slots');
+}
+assert(!carriedItemSlotsFull({...unit,kind:KIND.RIFLEMAN}), 'unlimited other units have no hint');
+unit.owner = 2;
+assert(!_shopFullCursorTarget.call(input), 'enemy receives no friendly hint');
+input.state.isAllyOwner = owner => owner === 2;
+assert(_shopFullCursorTarget.call(input) === unit, 'visible allied full carrier has hint');
+unit.visionOnly = true;
+assert(!_shopFullCursorTarget.call(input), 'vision-only records are excluded');
+unit.visionOnly = false;
+input.clientIntent.commandTarget = {kind:'ability',ability:ABILITY.HEALING_POTION};
+assert(!_shopFullCursorTarget.call(input), 'healing remains usable at capacity');
+input.clientIntent.commandTarget.ability = ABILITY.HASTE;
+assert(_shopFullCursorTarget.call(input), 'carried-item targeting retains hint');
+input.inputRouter = {activePreviewSurface: () => 'hud'};
+assert(!_shopFullCursorTarget.call(input), 'UI hover clears hint');
+input.inputRouter = null;
+input._drag = {};
+assert(!_shopFullCursorTarget.call(input), 'drag clears hint');
+input._drag = null;
+input.state.selectedEntities = () => [];
+assert(!_shopFullCursorTarget.call(input), 'deselection clears hint');
+const before = globalThis.document;
+let removed = false;
+globalThis.document = {createElement: () => ({style:{},remove(){removed=true;}})};
+try {
+  const dom = {clientWidth:300,clientHeight:200,appendChild(){}};
+  const hint = new ShopFullCursor(dom);
+  hint.update({mouse:{x:50,y:70},_shopFullCursorTarget:()=>unit});
+  assert(!hint.label.hidden && hint.label.style.transform==='translate(66px, 88px)', 'plain label follows gameplay cursor');
+  hint.update({mouse:null,_shopFullCursorTarget:()=>unit});
+  assert(hint.label.hidden, 'leaving viewport clears hint');
+  hint.destroy();
+  assert(removed, 'teardown removes label');
+} finally {globalThis.document=before;}
+console.log('Shop full cursor contracts passed');
