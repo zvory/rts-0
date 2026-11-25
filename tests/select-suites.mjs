@@ -90,6 +90,7 @@ const configModulePolicies = new Map([
     { ciClass: "full", suites: ["nextest-contract-protocol", "js-protocol-contracts"] },
   ],
   ["client/src/config/presentation.js", { ciClass: "client_only", suites: [] }],
+  ["client/src/config/carried_items.js", { ciClass: "client_only", suites: [] }],
 ]);
 
 const ciClientFullFallbackPaths = new Set([
@@ -612,6 +613,7 @@ function verify() {
     ["client/src/config/timing.js", ["source-file-sizes", "nextest-rules", "nextest-sim", "client-architecture", "js-protocol-contracts", "node-minimap-input-contracts", "client-smoke"]],
     ["client/src/config/player_palette_mirror.js", ["source-file-sizes", "nextest-server", "client-architecture", "js-protocol-contracts", "node-minimap-input-contracts", "client-smoke"]],
     ["client/src/config/presentation.js", ["source-file-sizes", "client-architecture", "js-protocol-contracts", "node-minimap-input-contracts", "client-smoke"]],
+    ["client/src/config/carried_items.js", ["source-file-sizes", "client-architecture", "js-protocol-contracts", "node-minimap-input-contracts", "client-smoke"]],
   ];
   for (const [file, expected] of exactConfigCases) {
     const actual = selectSuites([file]);
@@ -669,6 +671,7 @@ function verify() {
     [["client/src/config/timing.js"], { ci_class: "full", run_rust: true }],
     [["client/src/config/player_palette_mirror.js"], { ci_class: "full", run_rust: true }],
     [["client/src/config/presentation.js"], { ci_class: "client_only", run_rust: false }],
+    [["client/src/config/carried_items.js"], { ci_class: "client_only", run_rust: false }],
     [["client/styles.css"], { ci_class: "client_only", run_rust: false }],
     [["client/vendor/sim-wasm/rts_sim_wasm.js"], { ci_class: "full", run_rust: true }],
     [["client/src/match.js", "server/src/main.rs"], { ci_class: "full", run_rust: true }],

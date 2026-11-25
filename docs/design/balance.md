@@ -108,7 +108,7 @@ cards while preserving the historical public import path. Rust-owned mirrored va
 body dimensions, client-visible timing/range/duration constants, faction legality, upgrade
 metadata, ability descriptors exported by the Rust faction catalog, ability effect fields exported
 in the rules dump—including Smoke Plus cloud radius and duration—and resource starting amounts. Client-owned values live in
-`client/src/config/presentation.js` and include render colors, camera defaults, fog overlay alpha,
+`client/src/config/presentation.js` and `client/src/config/carried_items.js` and include render colors, carried-item silhouettes/private projected-inventory helpers, camera defaults, fog overlay alpha,
 command-card layout hints, local presentation labels/icons that are not exported by Rust, and
 resource render labels/sizes.
 
