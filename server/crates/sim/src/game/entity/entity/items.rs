@@ -6,7 +6,8 @@ impl Entity {
         if !self.kind.is_disciple() {
             return 0;
         }
-        self.carried_item_count().min(crate::config::CULTIVATOR_MASTER_ITEM_CAPACITY)
+        self.carried_item_count()
+            .min(crate::config::CULTIVATOR_MASTER_ITEM_CAPACITY)
     }
 
     pub(in crate::game) fn carried_item_capacity(&self) -> Option<u8> {

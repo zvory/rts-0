@@ -1073,8 +1073,10 @@ fn item_radiance_is_public_for_visible_carriers_without_private_inventory() {
     // Permanent equipment keeps contributing without cooldowns; Escape consumption lowers the tier.
     let unit = game.state.entities.get_mut(carrier).unwrap();
     assert_eq!(unit.item_radiance_tier(), 5);
-    unit.ability_uses_remaining.remove(&AbilityKind::VitalityTreasure);
-    unit.ability_uses_remaining.remove(&AbilityKind::DoubleDamage);
+    unit.ability_uses_remaining
+        .remove(&AbilityKind::VitalityTreasure);
+    unit.ability_uses_remaining
+        .remove(&AbilityKind::DoubleDamage);
     assert_eq!(unit.item_radiance_tier(), 3);
     assert_eq!(unit.ability_cooldowns.get(&AbilityKind::Haste), None);
     unit.escape_treasure = None;
@@ -1154,41 +1156,73 @@ fn master_carries_all_five_current_items_without_category_limits() {
     );
 }
 
-
 #[test]
 fn rank_slot_limits_reserve_deliveries_and_leave_consumable_healing_available() {
-    for kind in [EntityKind::Warrior, EntityKind::WindAdept, EntityKind::WarAdept, EntityKind::MagicAdept] {
+    for kind in [
+        EntityKind::Warrior,
+        EntityKind::WindAdept,
+        EntityKind::WarAdept,
+        EntityKind::MagicAdept,
+    ] {
         for master in [false, true] {
             let (mut game, shop, unit) = item_fixture_for_kind(kind);
             let carrier = game.state.entities.get_mut(unit).unwrap();
             carrier.dao_master = master;
-            assert_eq!(carrier.carried_item_capacity(), Some(if master { 6 } else { 3 }));
-            for ability in [AbilityKind::Haste, AbilityKind::DoubleDamage, AbilityKind::ArmorTreasure] {
+            assert_eq!(
+                carrier.carried_item_capacity(),
+                Some(if master { 6 } else { 3 })
+            );
+            for ability in [
+                AbilityKind::Haste,
+                AbilityKind::DoubleDamage,
+                AbilityKind::ArmorTreasure,
+            ] {
                 buy(&mut game, shop, unit, ability);
             }
             game.tick();
             let oil = game.state.players[0].oil;
             buy(&mut game, shop, unit, AbilityKind::VitalityTreasure);
             game.tick();
-            assert_eq!(game.state.players[0].oil, oil - if master { 100 } else { 0 });
-            for _ in 0..40 { game.tick(); }
-            assert_eq!(game.state.entities.get(unit).unwrap().carried_item_count(), if master { 4 } else { 3 });
+            assert_eq!(
+                game.state.players[0].oil,
+                oil - if master { 100 } else { 0 }
+            );
+            for _ in 0..40 {
+                game.tick();
+            }
+            assert_eq!(
+                game.state.entities.get(unit).unwrap().carried_item_count(),
+                if master { 4 } else { 3 }
+            );
             if !master {
                 let oil = game.state.players[0].oil;
                 buy(&mut game, shop, unit, AbilityKind::EscapeTreasure);
                 game.tick();
                 assert_eq!(game.state.players[0].oil, oil);
-                assert!(!game.state.players[0].ability_cooldowns.contains_key(&AbilityKind::EscapeTreasure));
-                game.state.entities.get_mut(unit).unwrap().apply_damage(20, None);
+                assert!(!game.state.players[0]
+                    .ability_cooldowns
+                    .contains_key(&AbilityKind::EscapeTreasure));
+                game.state
+                    .entities
+                    .get_mut(unit)
+                    .unwrap()
+                    .apply_damage(20, None);
                 buy(&mut game, shop, unit, AbilityKind::HealingPotion);
-                for _ in 0..40 { game.tick(); }
+                for _ in 0..40 {
+                    game.tick();
+                }
                 let carrier = game.state.entities.get(unit).unwrap();
                 assert_eq!(carrier.hp, carrier.max_hp);
                 // Promotion opens the additional slots immediately.
                 game.state.entities.get_mut(unit).unwrap().dao_master = true;
                 buy(&mut game, shop, unit, AbilityKind::VitalityTreasure);
-                for _ in 0..40 { game.tick(); }
-                assert_eq!(game.state.entities.get(unit).unwrap().carried_item_count(), 4);
+                for _ in 0..40 {
+                    game.tick();
+                }
+                assert_eq!(
+                    game.state.entities.get(unit).unwrap().carried_item_count(),
+                    4
+                );
             }
         }
     }
