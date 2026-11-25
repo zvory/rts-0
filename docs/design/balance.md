@@ -624,7 +624,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   projectile from the anchor toward the cursor. Her Magic Anchor ability targets up to 7.5 tiles (shared with Magic Adepts and Masters), has
   no resource cost, places one replacement-style non-blocking, non-attackable 10-second pull field
   with a 3-tile radius. Every tick, affected enemies receive an inward displacement vector
-  in addition to normal movement, whether moving or stationary. Its magnitude is twice the
+  in addition to normal movement, whether moving or stationary. Its magnitude is 2.4 times the
   unit's movement speed, multiplied by linear radial falloff (zero at the edge, full strength
   toward the center) and divided by the square root of footing resistance, with a minimum
   resistance of 1.0 so working workers are still pulled. The strongest
