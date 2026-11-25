@@ -1,4 +1,4 @@
-import { drawVectorField } from "./vector_field.js";
+import { drawVectorField, drawVectorFieldPreview } from "./vector_field.js";
 import { drawEscapeTrails } from "./escape_trail.js";
 import { gfxNoFill, gfxCircle, gfxEllipse, gfxPoly, gfxRect, gfxRoundRect, gfxStrokeLine, gfxStrokePaths, gfxReset, gfxFill, gfxStroke } from "./native_graphics.js";
 import {
@@ -401,8 +401,7 @@ export function _drawAbilityTargetPreview(view) {
   }
   if (!finiteNumber(preview.mouseX) || !finiteNumber(preview.mouseY)) return;
   if (preview.vectorField) {
-    const center = preview.vectorCenter;
-    drawVectorField(g, center.x, center.y, preview.vectorDirection, this._map?.tileSize || 32, true);
+    drawVectorFieldPreview(g, preview, this._map?.tileSize || 32, rendererVisualNow(this));
     return;
   }
   const rangeColor = FIELD_OF_FIRE_COLOR;
@@ -510,7 +509,7 @@ export function _drawAbilityObjects(state) {
     if (object.kind === ABILITY_OBJECT_KIND.RETURN_MARKER) {
       drawReturnMarker(g, object.x, object.y, 13, ABILITY_RETURN_MARKER_COLOR, 0.82);
     } else if (object.kind === ABILITY_OBJECT_KIND.VECTOR_FIELD && object.vector) {
-      drawVectorField(g, object.x, object.y, object.vector, ts);
+      drawVectorField(g, object.x, object.y, object.vector, ts, {sizeTiles: object.fieldSize, now: rendererVisualNow(this), particles: true, seed: object.id});
     } else if (object.kind === ABILITY_OBJECT_KIND.MAGIC_ANCHOR) {
       drawMagicAnchor(g, object, Math.max(10, object.ownerState?.radius || ts * EKAT_MAGIC_ANCHOR_RADIUS_TILES));
     } else if (object.kind === ABILITY_OBJECT_KIND.SHIELD) {

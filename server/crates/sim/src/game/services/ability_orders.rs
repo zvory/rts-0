@@ -482,6 +482,11 @@ pub(crate) fn launch_world_ability(
                     payload: if vector {
                         AbilityObjectPayload::VectorField {
                             direction: [1.0, 0.0],
+                            size_tiles: if e.dao_master {
+                                config::VECTOR_FIELD_MASTER_SIZE_TILES
+                            } else {
+                                config::VECTOR_FIELD_ADEPT_SIZE_TILES
+                            },
                         }
                     } else {
                         AbilityObjectPayload::MagicAnchor { radius }

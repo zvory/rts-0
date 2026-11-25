@@ -1,5 +1,5 @@
 {
-  "reason": "Validate cast-time Adept and Master Shield capacity and duration during checkpoint restore",
+  "reason": "Add distinct Vector Field command DTO and exhaustive wire adapters without overloading Anchor",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -99,7 +99,7 @@
     },
     {
       "path": "command.rs",
-      "lines": 859
+      "lines": 955
     },
     {
       "path": "commands.rs",

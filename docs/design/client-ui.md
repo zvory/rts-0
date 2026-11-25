@@ -3050,6 +3050,6 @@ Flying goods render their existing colored circle plus a tiny 12×1-pixel HP fil
 Delivery bodies retain current snapshot positions through the entity-view pipeline, matching the
 non-interpolated ability-object circles so HP bars and selection geometry stay aligned in flight.
 
-### Local Vector Field placement prototype
+### Vector Field placement
 
-Magic Adepts and Masters have a separate Vector Field command-card ability on C; Ekat retains Anchor. The first left press fixes the field center; drag-release sets direction, or a stationary first click leaves it armed and a second click sets direction. Cursor movement rotates a six-tile-wide, three-tile-deep preview about that fixed center. Escape/right-click cancel through ordinary target cancellation. Preview and placed field share a large green arrow and rectangular outline without particles.
+Magic Adepts and Masters have a separate Vector Field command-card ability on C; Ekat retains Anchor. The first left press fixes the field center; drag-release sets direction, or a stationary first click leaves it armed and a second click sets direction. Cursor movement rotates a rank-aware 4-by-4 or 5-by-5 tile preview about that fixed center. Escape/right-click cancel through ordinary target cancellation. Preview and placed field share a large green arrow and rectangular outline with green particles traveling at the authoritative field speed (3 world pixels per tick, or 90 pixels per second).

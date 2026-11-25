@@ -936,7 +936,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 73. The client also accepts compact
+`messagepack-compact`, codec version 1, compact snapshot version 74. The client also accepts compact
 snapshot versions 51 through 62: version 52 only appends a kind code, version 53 appends the
 optional `unitsKilled` entity slot, version 54 appends an optional `rocket` style bit to mortar
 launch/impact event records, and version 55 adds the `artilleryIncoming` event code, so the older
@@ -974,7 +974,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 73,
+  "v": 74,
   "gr": groundDecalRevision, // omitted when zero
   "gd": [afterRevision, [    // omitted when this tick has no discovered/created revision
     [id, decalClass, sourceKindCode, x, y, owner, seed, facing, weaponFacing, radiusTiles]
@@ -997,7 +997,7 @@ adds an explicit application compression envelope.
   ],
   "r": [[id, remaining]],         // omitted when empty
   "sm": [[id, x, y, radiusTiles, expiresIn]], // omitted when empty
-  "ao": [[id, owner, ability, kind, x, y, expiresIn?, sourceCasterId?, ownerState?, vector?]], // abilityObjects; omitted when empty
+  "ao": [[id, owner, ability, kind, x, y, expiresIn?, sourceCasterId?, ownerState?, vector?, fieldSize?]], // abilityObjects; omitted when empty
   "tr": [[id, x, y, radiusTiles]], // trenches; omitted when empty
   "fg": [firstValue, runLen, ...], // RLE visibleTiles; omitted when empty/no-fog
   "eg": [firstValue, runLen, ...], // RLE exploredTiles; omitted when empty/no-fog
@@ -2210,6 +2210,6 @@ Fog-hidden carriers are omitted as usual; vision-only entities omit this field. 
 uses this public field exclusively for the golden rim, bloom and rays, including allies' defense
 and attack items. No glow renders on the minimap or through unexplored/hidden terrain.
 
-### Local Vector Field prototype
+### Vector Field
 
-`vectorField { units: u32[], x: f32, y: f32, directionX: f32, directionY: f32 }` immediately places the new Magic Dao ability. Center and direction must be finite; a nonzero direction is normalized server-side. Unit ids use normal command admission. Owner, carrier, faction, range, resource, readiness and cooldown validation remain authoritative. Its ability id is `vectorField` (ability code 27, order-stage code 35), distinct from `ekatMagicAnchor`. Its world-object kind is `vectorField` (kind code 5), distinct from `magicAnchor`. Compact v73 `ao` records append a tenth optional public `vector: [f32,f32]` slot; the entire object uses the existing authoritative fog gate. Ekat's Anchor command, shape and projection remain unchanged.
+`vectorField { units: u32[], x: f32, y: f32, directionX: f32, directionY: f32 }` immediately places the new Magic Dao ability. Center and direction must be finite; a nonzero direction is normalized server-side. Unit ids use normal command admission. Owner, carrier, faction, range, resource, readiness and cooldown validation remain authoritative. Its ability id is `vectorField` (ability code 27, order-stage code 35), distinct from `ekatMagicAnchor`. Its world-object kind is `vectorField` (kind code 5), distinct from `magicAnchor`. Compact v74 `ao` records append public `vector: [f32,f32]` and `fieldSize: 4|5` slots; the entire object uses the existing authoritative fog gate. Ekat's Anchor command, shape and projection remain unchanged.

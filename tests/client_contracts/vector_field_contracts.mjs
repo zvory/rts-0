@@ -40,3 +40,20 @@ const ekatEntries=selectedAbilityAffordances({playerId:1,factionId:'ekat',groupC
  [{id:1,owner:1,kind:KIND.EKAT,hp:150}]);
 assert(ekatEntries.some(e=>e.definition.ability===ABILITY.EKAT_MAGIC_ANCHOR));
 assert(!ekatEntries.some(e=>e.definition.ability===ABILITY.VECTOR_FIELD));
+
+// Particle travel is physical world speed, independent of field rank or render rate.
+for (const sizeTiles of [4,5]) {
+ const frames=[1000,1010].map(now=>{
+  const g=new RecordingGraphics();drawVectorField(g,400,300,[1,0],32,{sizeTiles,now,particles:true,seed:7});
+  return g.calls.filter(c=>c[0]==='drawCircle');
+ });
+ assert.equal(frames[0].length,sizeTiles*sizeTiles*2);
+ let checked=0;
+ for(let i=0;i<frames[0].length;i++) {
+  const dx=frames[1][i][1]-frames[0][i][1];
+  if(dx<0)continue; // edge respawn
+  assert(Math.abs(dx-0.9)<1e-7);
+  assert.equal(frames[1][i][2],frames[0][i][2]);checked++;
+ }
+ assert(checked>0);
+}

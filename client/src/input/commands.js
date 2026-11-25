@@ -1,3 +1,4 @@
+import {vectorFieldSize} from "./two_stage_target.js";
 import { carriedItemSlotsFull } from "./shop_full_cursor.js";
 import {
   ABILITY,
@@ -732,6 +733,7 @@ export function _refreshAbilityTargetPreview() {
   const vectorCenter = target.ability === ABILITY.VECTOR_FIELD ? intent.vectorFieldCenter : null;
   intent?.updateAbilityTargetPreview?.({
     vectorField: target.ability === ABILITY.VECTOR_FIELD,
+    vectorFieldSize: vectorFieldSize(carriers, vectorCenter || world, rangePx),
     vectorCenter: vectorCenter || world,
     vectorDirection: vectorCenter ? [world.x - vectorCenter.x, world.y - vectorCenter.y] : [1, 0],
     ability: target.ability,

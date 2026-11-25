@@ -1,6 +1,6 @@
 use super::{dist2, shop_items, standability, tournament};
-use rts_rules::math::GameplayMath as _;
 mod research;
+mod vector_field;
 use crate::config::{self, support_weapon_teardown_ticks};
 use crate::game::ability::{self, AbilityEffectHook, AbilityKind, AbilityTargetMode};
 use crate::game::ability_runtime::AbilityRuntime;
@@ -58,6 +58,7 @@ mod tank_point;
 use self::command_helpers::{
     artillery_fire_mode_for, choose_smoke_caster, clear_queued_orders,
     clear_staged_anti_tank_gun_setup, gather_node_valid, immediate_unit_can_replace,
+    sanitize_formation_points,
 };
 use self::guards::{
     command_admission_for, dedupe_cap_units, dedupe_units, is_constructing, player_is_ai,
@@ -604,43 +605,17 @@ pub(in crate::game) fn apply_commands(
                 direction_x,
                 direction_y,
             } => {
-                let length = direction_x.det_hypot(direction_y);
-                if !x.is_finite() || !y.is_finite() || !length.is_finite() || length < 0.001 {
-                    continue;
-                }
-                let Some(units) =
-                    validate_command_units(entities, events, player, units, command_admission)
-                else {
-                    continue;
-                };
-                for caster in units {
-                    if launch_world_ability(
-                        map,
-                        entities,
-                        players,
-                        &teams,
-                        smokes,
-                        ability_runtime,
-                        mortar_shells,
-                        events,
-                        player,
-                        &faction_id,
-                        caster,
-                        AbilityKind::VectorField,
-                        x,
-                        y,
-                        tick,
-                        false,
-                        true,
-                    ) {
-                        ability_runtime.configure_vector_field(
-                            player,
-                            caster,
-                            [direction_x / length, direction_y / length],
-                        );
-                        break;
-                    }
-                }
+                let mut ctx = command_context!();
+                vector_field::place(
+                    &mut ctx,
+                    players,
+                    player,
+                    &faction_id,
+                    units,
+                    (x, y),
+                    (direction_x, direction_y),
+                    command_admission,
+                );
             }
             SimCommand::ArtilleryFire {
                 units,
@@ -883,31 +858,6 @@ fn validate_command_units(
         return None;
     }
     Some(units)
-}
-
-fn sanitize_formation_points(map: &Map, points: Vec<(f32, f32)>) -> Option<Vec<(f32, f32)>> {
-    if points.len() < 2 || points.len() > protocol::MAX_FORMATION_POINTS {
-        return None;
-    }
-    let max_x = map.world_width_px() - 1.0;
-    let max_y = map.world_height_px() - 1.0;
-    let min_distance_sq = MIN_FORMATION_POINT_DISTANCE_PX * MIN_FORMATION_POINT_DISTANCE_PX;
-    let mut sanitized = Vec::with_capacity(points.len());
-    for (x, y) in points {
-        if !x.is_finite() || !y.is_finite() {
-            continue;
-        }
-        let point = (x.clamp(0.0, max_x), y.clamp(0.0, max_y));
-        if sanitized.last().is_some_and(|last: &(f32, f32)| {
-            let dx = point.0 - last.0;
-            let dy = point.1 - last.1;
-            dx * dx + dy * dy < min_distance_sq
-        }) {
-            continue;
-        }
-        sanitized.push(point);
-    }
-    (sanitized.len() >= 2).then_some(sanitized)
 }
 
 fn faction_id_for<'a>(mut players: impl Iterator<Item = (u32, &'a str)>, player: u32) -> String {

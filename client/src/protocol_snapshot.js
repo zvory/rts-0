@@ -135,7 +135,7 @@ function decodeCompactTankTrail(record, index) {
 
 function decodeCompactGroundDecal(record, index) {
   const fields = readArray(record, `ground decal ${index}`, 10);
-  if (fields.length !== 10 && fields.length !== 9) throw new Error(`ground decal ${index} field count mismatch`);
+  if (fields.length !== 11 && fields.length !== 10 && fields.length !== 9) throw new Error(`ground decal ${index} field count mismatch`);
   const decal = {
     id: readU32(fields[0], "groundDecal.id"),
     decalClass: readString(fields[1], "groundDecal.decalClass"),
@@ -244,8 +244,8 @@ function decodeCompactSmoke(record, index) {
 }
 
 function decodeCompactAbilityObject(record, index) {
-  const fields = readArray(record, `ability object ${index}`, 10);
-  if (fields.length !== 10 && fields.length !== 9) throw new Error(`ability object ${index} field count mismatch`);
+  const fields = readArray(record, `ability object ${index}`, 11);
+  if (fields.length !== 11 && fields.length !== 10 && fields.length !== 9) throw new Error(`ability object ${index} field count mismatch`);
   const object = {
     id: readU32(fields[0], "abilityObject.id"),
     owner: readU32(fields[1], "abilityObject.owner"),
@@ -265,6 +265,10 @@ function decodeCompactAbilityObject(record, index) {
     const vector = readArray(fields[9], "abilityObject.vector", 2);
     if (vector.length !== 2) throw new Error("Invalid field vector");
     object.vector = vector.map(v => readNumber(v, "vector component"));
+  }
+  if (fields[10] != null) {
+    object.fieldSize = readNumber(fields[10], "abilityObject.fieldSize");
+    if (![4, 5].includes(object.fieldSize)) throw new Error("Invalid field size");
   }
   return object;
 }

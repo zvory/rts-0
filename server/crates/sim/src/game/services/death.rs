@@ -84,13 +84,11 @@ pub(crate) fn death_system(
                         } => dx * dx + dy * dy <= radius * radius,
                         crate::game::ability_runtime::AbilityObjectPayload::VectorField {
                             direction: [vx, vy],
+                            size_tiles,
                         } => {
-                            (dx * vx + dy * vy).abs()
-                                <= config::VECTOR_FIELD_DEPTH_TILES * config::TILE_SIZE as f32 * 0.5
+                            (dx * vx + dy * vy).abs() <= size_tiles * config::TILE_SIZE as f32 * 0.5
                                 && (-dx * vy + dy * vx).abs()
-                                    <= config::VECTOR_FIELD_WIDTH_TILES
-                                        * config::TILE_SIZE as f32
-                                        * 0.5
+                                    <= size_tiles * config::TILE_SIZE as f32 * 0.5
                         }
                         _ => false,
                     }

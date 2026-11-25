@@ -86,7 +86,7 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 15] = [
         label: "Vector Field",
         icon: "VEC",
         hotkey: Some("C"),
-        title: "Direct a field six tiles across and three deep; displaces every ground unit 4 pixels per tick",
+        title: "Direct a 4 x 4 tile field (5 x 5 for Masters); moves every ground unit 3 pixels per tick",
         carriers: &[EntityKind::MagicAdept],
         target_mode: AbilityTargetMode::WorldPoint,
         range_tiles: Some(balance::VECTOR_FIELD_RANGE_TILES),

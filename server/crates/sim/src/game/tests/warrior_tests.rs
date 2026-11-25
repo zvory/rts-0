@@ -1466,3 +1466,5 @@ fn disciple_blink_snaps_unwalkable_landings_and_can_cross_them() {
         }
     }
 }
+
+mod vector_field;

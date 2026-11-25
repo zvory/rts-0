@@ -150,9 +150,9 @@ export const EKAT_LINE_SHOT_WIDTH_TILES = 0.6;
 export const EKAT_LINE_SHOT_SPEED_PX_PER_TICK = 8;
 export const EKAT_LINE_SHOT_DAMAGE = 40;
 export const EKAT_LINE_SHOT_COOLDOWN_TICKS = TICK_HZ * 20;
-export const VECTOR_FIELD_SPEED_PX_PER_TICK = 4;
-export const VECTOR_FIELD_WIDTH_TILES = 6;
-export const VECTOR_FIELD_DEPTH_TILES = 3;
+export const VECTOR_FIELD_SPEED_PX_PER_TICK = 3;
+export const VECTOR_FIELD_ADEPT_SIZE_TILES = 4;
+export const VECTOR_FIELD_MASTER_SIZE_TILES = 5;
 export const VECTOR_FIELD_RANGE_TILES = 7.5;
 export const VECTOR_FIELD_DURATION_TICKS = TICK_HZ * 10;
 export const EKAT_MAGIC_ANCHOR_RANGE_TILES = 7.5;
@@ -612,7 +612,7 @@ export const ABILITIES = Object.freeze({
     label: "Vector Field",
     icon: "VEC",
     hotkey: "C",
-    title: "Direct a field six tiles across and three deep; displaces every ground unit 4 pixels per tick",
+    title: "Direct a 4 x 4 tile field (5 x 5 for Masters); moves every ground unit 3 pixels per tick",
     carriers: Object.freeze([KIND.MAGIC_ADEPT]),
     targetMode: "worldPoint",
     rangeTiles: VECTOR_FIELD_RANGE_TILES,

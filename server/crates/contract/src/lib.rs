@@ -643,6 +643,8 @@ pub struct AutoBuildSettingsSnapshot {
 #[serde(rename_all = "camelCase")]
 pub struct AbilityObjectView {
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub field_size: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vector: Option<[f32; 2]>,
     pub id: u32,
     pub owner: u32,

@@ -945,6 +945,8 @@ Cultivator Novices and Adepts carry up to three items; Masters carry up to six, 
 
 Vitality Treasure costs **100 oil** and can coexist with all other distinct carried items. Delivery permanently adds **150 maximum HP and 150 current HP**. The item remains carried and passive, without activation or expiry. See [Vitality rules](shop.md#vitality-treasure).
 
-### Local Vector Field prototype
+### Vector Field
 
-Vector Field is a separate ability (`vectorField`) replacing Anchor for Magic Adepts and Magic Masters only. Ekat retains her original Magic Anchor and radial pull. The centered rectangle is six tiles across and three tiles deep along the selected arrow, lasts ten seconds, and uses the existing 7.5-tile cast range. Every ground unit in it, allied or enemy, receives an additive four-world-pixel-per-tick displacement along the arrow, independent of mass/footing. Inward/outward movement resistance and spiral forces are not applied by this ability. Terrain and hostile-body admission remain. Magic Dao death Insight is preserved for hostile unit deaths inside the rectangle.
+Vector Field is a separate ability (`vectorField`) replacing Anchor for Magic Adepts and Magic Masters only. Ekat retains her original Magic Anchor and radial pull. The centered square is 4 by 4 tiles for Magic Adepts and 5 by 5 tiles for Magic Masters, oriented along the selected arrow, lasts ten seconds, and uses the existing 7.5-tile cast range. Every ground unit in it, allied or enemy, receives an additive three-world-pixel-per-tick displacement along the arrow, independent of mass/footing. Inward/outward movement resistance and spiral forces are not applied by this ability. Terrain and hostile-body admission remain. Magic Dao death Insight is preserved for hostile unit deaths inside the rectangle.
+
+See [Vector Field](vector-field.md) for placement, rank geometry, force, and presentation rules.

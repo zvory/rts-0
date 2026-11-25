@@ -36,8 +36,12 @@ pub(in crate::game) fn ability_object_views_for(
                 None
             };
             crate::protocol::AbilityObjectView {
+                field_size: match object.payload {
+                    AbilityObjectPayload::VectorField { size_tiles, .. } => Some(size_tiles),
+                    _ => None,
+                },
                 vector: match object.payload {
-                    AbilityObjectPayload::VectorField { direction } => Some(direction),
+                    AbilityObjectPayload::VectorField { direction, .. } => Some(direction),
                     _ => None,
                 },
                 id: object.id.get(),
@@ -65,6 +69,7 @@ pub(in crate::game) fn ability_object_views_for(
                 || owner_visible_players.contains(&caster.owner)
                 || omniscient;
             Some(crate::protocol::AbilityObjectView {
+                field_size: None,
                 vector: None,
                 id: shield.id,
                 owner: caster.owner,

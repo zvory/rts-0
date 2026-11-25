@@ -49,6 +49,7 @@ pub(crate) enum AbilityObjectPayload {
     },
     VectorField {
         direction: [f32; 2],
+        size_tiles: f32,
     },
     LineProjectile {
         distance_traveled: f32,
@@ -385,7 +386,12 @@ impl AbilityRuntime {
                 && object.caster_id == caster
                 && object.kind == AbilityWorldObjectKind::VectorField
             {
-                object.payload = AbilityObjectPayload::VectorField { direction };
+                if let AbilityObjectPayload::VectorField { size_tiles, .. } = object.payload {
+                    object.payload = AbilityObjectPayload::VectorField {
+                        direction,
+                        size_tiles,
+                    };
+                }
             }
         }
     }
@@ -396,6 +402,7 @@ impl AbilityRuntime {
             .find_map(|o| {
                 let AbilityObjectPayload::VectorField {
                     direction: [dx, dy],
+                    size_tiles,
                 } = o.payload
                 else {
                     return None;
@@ -403,15 +410,8 @@ impl AbilityRuntime {
                 let offset = (x - o.x.to_world(), y - o.y.to_world());
                 let along = offset.0 * dx + offset.1 * dy;
                 let across = -offset.0 * dy + offset.1 * dx;
-                (along.abs()
-                    <= crate::config::VECTOR_FIELD_DEPTH_TILES
-                        * 0.5
-                        * crate::config::TILE_SIZE as f32
-                    && across.abs()
-                        <= crate::config::VECTOR_FIELD_WIDTH_TILES
-                            * 0.5
-                            * crate::config::TILE_SIZE as f32)
-                    .then_some([dx, dy])
+                let half = size_tiles * 0.5 * crate::config::TILE_SIZE as f32;
+                (along.abs() <= half && across.abs() <= half).then_some([dx, dy])
             })
     }
 
