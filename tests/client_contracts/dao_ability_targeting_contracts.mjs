@@ -224,35 +224,37 @@ console.log("Dao ability targeting contracts passed");
 }
 
 // Passive Charge remains observable through its real cooldown without accepting commands.
-for (const cooldownLeft of [0, 450, 225, 1]) {
-  const novice = { id: 910, owner: 1, kind: KIND.WARRIOR, insight: 0,
-    abilities: [{ ability: ABILITY.CHARGE, cooldownLeft, autocastEnabled: true }] };
-  const ctx = { playerId: 1, factionId: "cultivators", selection: [novice],
-    resources: { steel: 0, oil: 0 }, upgrades: [], groupCooldownClocks };
-  const charge = buildCommandCardDescriptors(ctx).slots.find((slot) => slot?.ability === ABILITY.CHARGE);
-  assert(charge && charge.label === "Charge" && !charge.enabled, "Charge is visibly disabled");
-  assert(charge.cls.includes("autocast-enabled"), "Charge always shows the automatic swirl");
-  assert(!charge.intent && !charge.contextIntent && !charge.onUnavailableIntent,
-    "Charge has no cast, toggle, or unavailable-click action");
-  assert(!charge.hotkey && !charge.hotkeyCode, "Charge has no misleading hotkey");
-  const catalog = buildHotkeyCommandCatalog([buildCommandCardDescriptors(ctx)]);
-  assert(!catalog.commands.some((entry) => entry.commandId === charge.commandId),
-    "Charge cannot be assigned a custom hotkey");
-  const profiles = new HotkeyProfileService({ storage: null, catalog });
-  for (const mode of ["grid", "direct"]) {
-    assert(!profiles.resolveSlot(charge, { mode }).hotkeyCode, "Hotkey profiles preserve passive indicators");
-  }
-  assertDeepEqual(charge.cooldownClocks, groupCooldownClocks([cooldownLeft], 450),
-    "Charge clocks follow authoritative cooldown ticks");
-  const affordance = selectedAbilityAffordances(ctx, [novice]).find((a) => a.definition.ability === ABILITY.CHARGE);
-  assertDeepEqual(affordance.readyIds, [], "Charge is never manually ready, including off cooldown");
-  withFakeDocument(() => {
-    const button = createCommandButton(charge);
-    assert(button.disabled, "Charge uses a native disabled button");
-    assert(!button.dataset.contextAction, "Charge cannot be toggled by right click");
-  });
-  for (const kind of [KIND.WIND_ADEPT, KIND.WAR_ADEPT, KIND.MAGIC_ADEPT]) {
-    assert(!buildCommandCardDescriptors({ ...ctx, selection: [{ ...novice, kind }] }).slots
-      .some((slot) => slot?.ability === ABILITY.CHARGE), "Evolution removes Charge");
+for (const [kind, daoMaster] of [[KIND.WARRIOR, false], [KIND.WAR_ADEPT, false], [KIND.WAR_ADEPT, true]]) {
+  for (const cooldownLeft of [0, 450, 225, 1]) {
+    const novice = { id: 910, owner: 1, kind, daoMaster, insight: 0,
+      abilities: [{ ability: ABILITY.CHARGE, cooldownLeft, autocastEnabled: true }] };
+    const ctx = { playerId: 1, factionId: "cultivators", selection: [novice],
+      resources: { steel: 0, oil: 0 }, upgrades: [], groupCooldownClocks };
+    const charge = buildCommandCardDescriptors(ctx).slots.find((slot) => slot?.ability === ABILITY.CHARGE);
+    assert(charge && charge.label === "Charge" && !charge.enabled, "Charge is visibly disabled");
+    assert(charge.cls.includes("autocast-enabled"), "Charge always shows the automatic swirl");
+    assert(!charge.intent && !charge.contextIntent && !charge.onUnavailableIntent,
+      "Charge has no cast, toggle, or unavailable-click action");
+    assert(!charge.hotkey && !charge.hotkeyCode, "Charge has no misleading hotkey");
+    const catalog = buildHotkeyCommandCatalog([buildCommandCardDescriptors(ctx)]);
+    assert(!catalog.commands.some((entry) => entry.commandId === charge.commandId),
+      "Charge cannot be assigned a custom hotkey");
+    const profiles = new HotkeyProfileService({ storage: null, catalog });
+    for (const mode of ["grid", "direct"]) {
+      assert(!profiles.resolveSlot(charge, { mode }).hotkeyCode, "Hotkey profiles preserve passive indicators");
+    }
+    assertDeepEqual(charge.cooldownClocks, groupCooldownClocks([cooldownLeft], 450),
+      "Charge clocks follow authoritative cooldown ticks");
+    const affordance = selectedAbilityAffordances(ctx, [novice]).find((a) => a.definition.ability === ABILITY.CHARGE);
+    assertDeepEqual(affordance.readyIds, [], "Charge is never manually ready, including off cooldown");
+    withFakeDocument(() => {
+      const button = createCommandButton(charge);
+      assert(button.disabled, "Charge uses a native disabled button");
+      assert(!button.dataset.contextAction, "Charge cannot be toggled by right click");
+    });
+    for (const kind of [KIND.WIND_ADEPT, KIND.MAGIC_ADEPT]) {
+      assert(!buildCommandCardDescriptors({ ...ctx, selection: [{ ...novice, kind }] }).slots
+        .some((slot) => slot?.ability === ABILITY.CHARGE), "Wind and Magic evolution remove Charge");
+    }
   }
 }

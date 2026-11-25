@@ -181,19 +181,14 @@ pub(crate) fn launch_world_ability(
             if !ps.spend_cost(definition.cost) {
                 return false;
             }
-            let haste = e.shop_item_active(AbilityKind::Haste);
-            let cooldown = if haste {
-                (definition.cooldown_ticks / 2).max(1)
-            } else {
-                definition.cooldown_ticks
-            };
+            let cooldown = e.shop_item_reload(u32::from(definition.cooldown_ticks)) as u16;
             e.start_ability_cooldown(ability, cooldown);
             if !preserve_active_order {
                 e.clear_active_order();
                 e.set_path_goal(None);
             }
             let reload = mortar_fire_weapon_cooldown_ticks();
-            e.set_attack_cd(if haste { (reload / 2).max(1) } else { reload });
+            e.set_attack_cd(e.shop_item_reload(reload));
             let double_damage = e.shop_item_active(AbilityKind::DoubleDamage);
             mortar_shells.schedule_manual(
                 events,

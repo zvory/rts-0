@@ -242,7 +242,7 @@ impl Entity {
         target_movement: (f32, f32),
         hostile_unit: bool,
     ) {
-        if self.kind != EntityKind::Warrior
+        if !matches!(self.kind, EntityKind::Warrior | EntityKind::WarAdept)
             || self.hp == 0
             || !hostile_unit
             || self.ability_cooldown_ticks(AbilityKind::Charge) > 0
@@ -253,7 +253,11 @@ impl Entity {
         let dy = target_position.1 - self.pos_y();
         let (mx, my) = target_movement;
         let min_distance = (config::NOVICE_CHARGE_MIN_DISTANCE_TILES * config::TILE_SIZE) as f32;
-        if dx * dx + dy * dy < min_distance * min_distance && dx * mx + dy * my <= 0.0 {
+        let max_distance = (config::NOVICE_CHARGE_MAX_DISTANCE_TILES * config::TILE_SIZE) as f32;
+        let distance_squared = dx * dx + dy * dy;
+        if distance_squared > max_distance * max_distance
+            || (distance_squared < min_distance * min_distance && dx * mx + dy * my <= 0.0)
+        {
             return;
         }
         if let Some(movement) = self.movement.as_mut() {
@@ -264,19 +268,26 @@ impl Entity {
 
     pub(crate) fn movement_speed(&self) -> f32 {
         let base = config::unit_stats(self.kind).map_or(0.0, |s| s.speed);
-        if self.kind == EntityKind::Warrior
+        let master = if self.dao_master {
+            config::DAO_MASTER_SPEED_MULTIPLIER
+        } else {
+            1.0
+        };
+        let charge = if matches!(self.kind, EntityKind::Warrior | EntityKind::WarAdept)
             && self
                 .movement
                 .as_ref()
                 .is_some_and(|m| m.novice_charge_ticks > 0)
         {
-            base * config::NOVICE_CHARGE_SPEED_MULTIPLIER
+            config::NOVICE_CHARGE_SPEED_MULTIPLIER
         } else {
-            base * if self.dao_master {
-                config::DAO_MASTER_SPEED_MULTIPLIER
-            } else {
-                1.0
-            }
-        }
+            1.0
+        };
+        let haste = if self.shop_item_active(AbilityKind::Haste) {
+            config::HASTE_SPEED_MULTIPLIER
+        } else {
+            1.0
+        };
+        base * master * charge * haste
     }
 }

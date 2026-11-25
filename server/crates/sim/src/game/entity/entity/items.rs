@@ -22,7 +22,8 @@ impl Entity {
 
     pub(in crate::game) fn shop_item_reload(&self, ticks: u32) -> u32 {
         if self.shop_item_active(crate::game::ability::AbilityKind::Haste) {
-            (ticks / 2).max(1)
+            // +25% attack rate means 80% reload time, rounded up to a whole tick.
+            ((u64::from(ticks) * 4).div_ceil(5) as u32).max(1)
         } else {
             ticks
         }

@@ -34,6 +34,46 @@ fn plane_state(entities: &EntityStore, id: u32) -> ScoutPlaneState {
 }
 
 #[test]
+fn haste_boosts_scout_plane_transit_and_orbit_speed() {
+    let map = test_map(32);
+    let radius = (config::SCOUT_PLANE_ORBIT_RADIUS_TILES * config::TILE_SIZE) as f32;
+    for orbiting in [false, true] {
+        for haste in [false, true] {
+            let mut entities = EntityStore::new();
+            let x = 256.0 + radius;
+            let plane = spawn_plane(&mut entities, 1, x, 256.0);
+            let entity = entities.get_mut(plane).unwrap();
+            if haste {
+                entity.receive_shop_item(AbilityKind::Haste);
+            }
+            let state = entity.scout_plane_state_mut().unwrap();
+            *state = ScoutPlaneState::launched_at(if orbiting { 256.0 } else { 790.0 }, 256.0);
+            state.orbiting = orbiting;
+            state.orbit_phase = 0.0;
+
+            advance_scout_planes(&map, &mut entities);
+
+            let entity = entities.get(plane).unwrap();
+            let traveled = if orbiting {
+                plane_state(&entities, plane).orbit_phase * radius
+            } else {
+                entity.pos_x() - x
+            };
+            let expected = config::SCOUT_PLANE_SPEED_PX_PER_TICK
+                * if haste {
+                    config::HASTE_SPEED_MULTIPLIER
+                } else {
+                    1.0
+                };
+            assert!(
+                (traveled - expected).abs() < EPS,
+                "orbiting={orbiting}, haste={haste}"
+            );
+        }
+    }
+}
+
+#[test]
 fn scout_plane_requirement_numbers_and_non_combat_contract_are_stable() {
     let def = defs::unit_def(EntityKind::ScoutPlane).expect("Scout Plane def");
     assert_eq!(def.trained_at, None);

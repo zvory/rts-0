@@ -24,15 +24,16 @@ one-for-one training in the [Proving Grounds](proven-grounds.md),
 with the existing shared research price tiers, serial queue and prerequisite/faction gates.
 Combat-earned evolution requires neither research nor a Pavilion.
 
-Novices have **Charge**, an automatic passive shown as a disabled command-card tile with the
+Novices, War Adepts, and War Masters have **Charge**, an automatic passive shown as a disabled command-card tile with the
 autocast swirl and authoritative cooldown clock. It has no hotkey, cast action, or autocast toggle. Against a living
 hostile unit selected by normal combat targeting (explicit attack, attack-move, or automatic
 engagement), it grants 1.5× movement speed for 30 ticks (one second), with a 450-tick
-(15-second) cooldown from activation. It triggers at center distance at least two tiles,
+(15-second) cooldown from activation. It only triggers within five tiles of center distance, at least two tiles away,
 or at shorter distance when the target's actual movement has a positive component away
-from the Novice. Nearby stationary, sideways-moving, or approaching targets do not trigger it.
+from the carrier. Nearby stationary, sideways-moving, or approaching targets do not trigger it.
 Buildings and friendly targets never trigger it. Movement duration and cooldown survive
-checkpoints; evolution immediately removes the speed benefit.
+checkpoints; evolution into War retains the speed benefit, while Wind or Magic removes it.
+Charge, Master movement bonuses, and Haste multiply together.
 
 - Wind: mobile melee skirmisher; 1.15 times scout-car base speed (2.7025 px/tick), 1.5 attacks per original attack
   interval (cooldown divided by 1.5), fifteen-tile Dash without a return recast.

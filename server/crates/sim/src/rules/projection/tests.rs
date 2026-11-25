@@ -745,11 +745,12 @@ fn tank_trap_deconstruction_projects_reverse_progress() {
 
 #[test]
 fn novice_charge_projects_ready_and_cooling_only_to_private_viewer() {
-    for cooldown in [0, 450, 225, 1] {
+    for (kind, cooldown) in [EntityKind::Warrior, EntityKind::WarAdept]
+        .into_iter()
+        .flat_map(|kind| [0, 450, 225, 1].map(|cooldown| (kind, cooldown)))
+    {
         let mut entities = EntityStore::new();
-        let id = entities
-            .spawn_unit(1, EntityKind::Warrior, 100.0, 100.0)
-            .unwrap();
+        let id = entities.spawn_unit(1, kind, 100.0, 100.0).unwrap();
         entities
             .get_mut(id)
             .unwrap()

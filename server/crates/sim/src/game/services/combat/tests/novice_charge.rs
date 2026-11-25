@@ -25,6 +25,9 @@ fn novice_charge_distance_and_retreat_trigger_matrix() {
     let two_tiles = (2 * config::TILE_SIZE) as f32;
     for (distance, delta, expected) in [
         (two_tiles, (0.0, 0.0), true),
+        ((5 * config::TILE_SIZE) as f32, (0.0, 0.0), true),
+        ((5 * config::TILE_SIZE) as f32 + 1.0, (0.0, 0.0), false),
+        ((5 * config::TILE_SIZE) as f32 + 1.0, (1.0, 0.0), false),
         (two_tiles - 1.0, (0.0, 0.0), false),
         (40.0, (1.0, 0.0), true),
         (40.0, (-1.0, 0.0), false),
@@ -113,9 +116,10 @@ fn novice_charge_lasts_thirty_movement_ticks_and_rearms_after_450() {
         let occ = Occupancy::build(&map, &entities);
         let spatial = SpatialIndex::build(&entities, map.width, map.height);
         movement_system(&map, &mut entities, &players, &occ, &spatial, tick);
-        // Use a fresh distant hostile each time to avoid combat killing the original.
+        // Use a fresh hostile within five tiles to avoid combat killing the original.
+        let x = entities.get(novice).unwrap().pos_x();
         entities.get_mut(novice).unwrap().try_start_novice_charge(
-            (1000.0, 200.0),
+            (x + 100.0, 200.0),
             (0.0, 0.0),
             true,
         );
@@ -132,4 +136,32 @@ fn novice_charge_lasts_thirty_movement_ticks_and_rearms_after_450() {
     let restored: crate::game::entity::Entity = serde_json::from_str(&serialized).unwrap();
     assert_eq!(restored.movement_speed(), 3.0);
     assert_eq!(restored.ability_cooldown_ticks(AbilityKind::Charge), 450);
+}
+
+#[test]
+fn war_adept_and_master_charge_only_within_five_tiles_and_stack_speed_bonuses() {
+    for master in [false, true] {
+        let five_tiles = (5 * config::TILE_SIZE) as f32;
+        for distance in [five_tiles, five_tiles + 1.0] {
+            let (mut entities, warrior, _) = pair(distance);
+            let unit = entities.get_mut(warrior).unwrap();
+            unit.set_disciple_kind_for_test(EntityKind::WarAdept);
+            if master {
+                unit.insight = config::DISCIPLE_EVOLVED_INSIGHT_CAP;
+                unit.advance_dao_master();
+                assert!(unit.dao_master);
+            }
+            let base_speed = unit.movement_speed();
+            unit.receive_shop_item(AbilityKind::Haste);
+            run_combat_tick(&mut entities);
+            let unit = entities.get(warrior).unwrap();
+            let triggered = distance <= (5 * config::TILE_SIZE) as f32;
+            assert_eq!(
+                unit.ability_cooldown_ticks(AbilityKind::Charge) > 0,
+                triggered
+            );
+            let expected = base_speed * 1.15 * if triggered { 1.5 } else { 1.0 };
+            assert!((unit.movement_speed() - expected).abs() < 0.00001);
+        }
+    }
 }

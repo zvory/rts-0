@@ -182,7 +182,7 @@ export const STATS = Object.freeze({
     description: `Rifle infantry carrying one disposable ${PANZERFAUST_RANGE_TILES}-tile anti-vehicle shot. After launching it, the unit keeps fighting as ordinary rifle infantry.` },
   [KIND.WARRIOR]: { armored: false, label: "Novice", icon: "NV", size: 26, sight: 11,
     rangeTiles: 0.75, cost: { steel: 50, oil: 0 }, supply: 2, buildTicks: 300,
-    description: "Durable melee infantry with a short sword reach and 50% armor penetration. Slow attacks deal heavy damage. Charge (automatic): 1.5x movement speed for 1 second, with a 15-second cooldown, when attacking an enemy unit at least 2 tiles away or moving away." },
+    description: "Durable melee infantry with a short sword reach and 50% armor penetration. Slow attacks deal heavy damage. Charge (automatic): 1.5x movement speed for 1 second, with a 15-second cooldown, when attacking an enemy unit within 5 tiles that is at least 2 tiles away or moving away." },
   [KIND.WIND_ADEPT]: { armored: false, label: "Wind Adept", icon: "WI", size: 26, sight: 14,
     rangeTiles: 0.75, cost: { steel: 150, oil: 35 }, supply: 3, buildTicks: 300,
     trainSlots: { [KIND.PORTAL]: 3 }, upgradeRequires: UPGRADE.DAO_WIND,
@@ -335,7 +335,7 @@ export const ABILITIES = Object.freeze({
 
   [ABILITY.HASTE]: Object.freeze({
     ability: ABILITY.HASTE, label: "Haste", icon: "H", hotkey: "Z",
-    title: "Deliver a permanent passive attack item within 30 tiles; doubles primary weapon attack speed on arrival",
+    title: "Deliver a permanent passive attack item within 30 tiles; grants 15% movement speed, 25% primary weapon attack speed, and attacks while moving on arrival",
     carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: 30,
     cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 100 }),
     queued: false, queuePolicy: "notQueueable",
@@ -392,8 +392,8 @@ export const ABILITIES = Object.freeze({
 
   [ABILITY.CHARGE]: Object.freeze({
     ability: ABILITY.CHARGE, label: "Charge", icon: "CHG",
-    title: "Automatic Novice Charge: 1.5x speed for one second against a distant or retreating enemy unit",
-    carriers: Object.freeze([KIND.WARRIOR]), targetMode: "self",
+    title: "Automatic Charge: 1.5x speed for one second against an enemy unit within 5 tiles, at least 2 tiles away or retreating",
+    carriers: Object.freeze([KIND.WARRIOR, KIND.WAR_ADEPT]), targetMode: "self",
     cooldownTicks: 450, cost: Object.freeze({ steel: 0, oil: 0 }),
     queued: false, queuePolicy: "notQueueable",
   }),

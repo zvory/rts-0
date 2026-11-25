@@ -182,7 +182,10 @@ pub(super) fn deployed_weapon_ready_to_fire(entities: &mut EntityStore, id: u32)
     let Some(e) = entities.get_mut(id) else {
         return false;
     };
-    if !requires_weapon_setup(e.kind) || e.kind == EntityKind::AntiTankGun {
+    if e.shop_item_active(crate::game::ability::AbilityKind::Haste)
+        || !requires_weapon_setup(e.kind)
+        || e.kind == EntityKind::AntiTankGun
+    {
         return true;
     }
     match e.weapon_setup() {
@@ -230,6 +233,7 @@ fn requires_weapon_setup(kind: EntityKind) -> bool {
 
 pub(super) fn can_fire_while_moving(e: &Entity, methamphetamines_researched: bool) -> bool {
     crate::game::entity::fires_while_moving(e.kind)
+        || e.shop_item_active(crate::game::ability::AbilityKind::Haste)
         || e.kind == EntityKind::WindAdept
         || (crate::rules::is_rifle_infantry(e.kind) && methamphetamines_researched)
         || breakthrough_moving_fire_active(e)
@@ -310,16 +314,10 @@ pub(super) fn effective_attack_profile(e: &Entity) -> EffectiveAttackProfile {
     if e.kind != EntityKind::AntiTankGun {
         return profile;
     }
-    match e.weapon_setup() {
-        WeaponSetup::Deployed => {
-            profile.range_tiles = config::ANTI_TANK_GUN_DEPLOYED_RANGE_TILES as f32
-        }
-        WeaponSetup::Packed
-        | WeaponSetup::SettingUp { .. }
-        | WeaponSetup::TearingDown { .. }
-        | WeaponSetup::TearingDownToRedeploy { .. } => {
-            profile.dmg = 0;
-        }
+    if matches!(e.weapon_setup(), WeaponSetup::Deployed) {
+        profile.range_tiles = config::ANTI_TANK_GUN_DEPLOYED_RANGE_TILES as f32;
+    } else if !e.shop_item_active(crate::game::ability::AbilityKind::Haste) {
+        profile.dmg = 0;
     }
     profile
 }
@@ -443,11 +441,11 @@ mod shop_item_tests {
         warrior.receive_shop_item(AbilityKind::Haste);
         assert!(warrior.shop_item_active(AbilityKind::Haste));
         assert_eq!(effective_attack_profile(&warrior).dmg, base.dmg * 2);
-        assert_eq!(warrior.shop_item_reload(30), 15);
+        assert_eq!(warrior.shop_item_reload(30), 24);
         for _ in 0..1000 {
             warrior.tick_ability_cooldowns();
         }
-        assert_eq!(warrior.shop_item_reload(30), 15);
+        assert_eq!(warrior.shop_item_reload(30), 24);
         assert_eq!(warrior.shop_item_reload(1), 1);
     }
 }

@@ -164,7 +164,7 @@ pub struct MovementState {
     pub static_blocked_ticks: u16,
     /// Ticks remaining for Command Car Breakthrough movement boost.
     pub breakthrough_ticks: u16,
-    /// Automatic Novice Charge duration; cooldown uses ability_cooldowns[Charge].
+    /// Automatic Novice/War Charge duration; cooldown uses ability_cooldowns[Charge].
     #[serde(default)]
     pub novice_charge_ticks: u16,
     /// Ticks remaining for this Command Car's active Breakthrough aura origin.
