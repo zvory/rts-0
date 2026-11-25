@@ -13,6 +13,7 @@ fn cultivator_player() -> PlayerInit {
 }
 
 mod master_rank;
+mod random_tao;
 
 #[test]
 fn cultivator_pavilion_research_spends_resources_completes_and_leaves_disciple_unchanged() {
@@ -206,7 +207,6 @@ fn disciple_evolution_requires_insight_ownership_but_no_research_and_is_permanen
             None,
             "60 insight is required"
         );
-        game.state.entities.get_mut(unit).unwrap().insight = 60;
         game.state.entities.get_mut(unit).unwrap().chosen_dao = None;
         game.enqueue(2, command.clone());
         game.tick();
@@ -215,6 +215,8 @@ fn disciple_evolution_requires_insight_ownership_but_no_research_and_is_permanen
             None,
             "ownership is required"
         );
+        assert_eq!(game.state.entities.get(unit).unwrap().chosen_dao, None);
+        game.state.entities.get_mut(unit).unwrap().insight = 60;
         game.enqueue(1, command.clone());
         game.tick();
         let evolved = game.state.entities.get(unit).unwrap();
@@ -486,7 +488,7 @@ fn disciple_shield_durability_breaking_hit_teams_and_checkpoint() {
         .entities
         .spawn_unit(1, EntityKind::Rifleman, 700.0, 400.0)
         .unwrap();
-    game.state.entities.get_mut(caster).unwrap().insight = 60;
+    game.state.entities.get_mut(caster).unwrap().insight = 59;
     game.state.players[0]
         .upgrades
         .insert(UpgradeKind::DaoOfMagic);
@@ -501,6 +503,7 @@ fn disciple_shield_durability_breaking_hit_teams_and_checkpoint() {
     game.enqueue(1, cast(AbilityKind::DiscipleShield));
     game.tick();
     assert!(game.state.entities.get(caster).unwrap().shield.is_none());
+    game.state.entities.get_mut(caster).unwrap().insight = 60;
     game.enqueue(1, cast(AbilityKind::EvolveMagic));
     game.tick();
     game.enqueue(1, cast(AbilityKind::DiscipleShield));

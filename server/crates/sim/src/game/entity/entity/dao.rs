@@ -132,6 +132,24 @@ impl Entity {
         true
     }
 
+    /// Ready novices without player intent pick uniformly from the three paths.
+    pub(in crate::game) fn advance_dao(&mut self, rng: &mut impl rand::Rng) {
+        if self.kind != EntityKind::Warrior
+            || self.hp == 0
+            || self.insight < config::DISCIPLE_INSIGHT_REQUIRED
+        {
+            return;
+        }
+        if self.chosen_dao.is_none() {
+            self.chosen_dao = Some(match rng.gen_range(0..3) {
+                0 => UpgradeKind::DaoWind,
+                1 => UpgradeKind::DaoOfHeaviness,
+                _ => UpgradeKind::DaoOfMagic,
+            });
+        }
+        self.advance_chosen_dao();
+    }
+
     pub(in crate::game) fn advance_chosen_dao(&mut self) {
         let Some(choice) = self.chosen_dao else {
             return;

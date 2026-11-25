@@ -407,14 +407,11 @@ pub(crate) fn run_tick(
             let Some(entity) = entities.get_mut(id) else {
                 continue;
             };
-            if entity.chosen_dao.is_none() {
-                continue;
-            }
             if players.iter().any(|player| {
                 player.id == entity.owner
                     && player.faction_id == crate::rules::faction::CULTIVATORS_FACTION_ID
             }) {
-                entity.advance_chosen_dao();
+                entity.advance_dao(rng);
             }
         }
     });
