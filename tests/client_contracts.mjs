@@ -162,3 +162,5 @@ await import("./client_contracts/disciple_projectile_contracts.mjs");
 
 await import("./client_contracts/item_radiance_contracts.mjs");
 await import("./client_contracts/shop_full_cursor_contracts.mjs");
+
+await import("./client_contracts/carried_items_contracts.mjs");

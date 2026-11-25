@@ -73,7 +73,7 @@ import { _drawSelectedMortarRanges, _drawSelectedUnitRanges } from "./unit_range
 import { _drawFog, _fogLevel } from "./fog.js";
 import { buildRendererFeedbackView } from "./feedback_view_model.js";
 import { LabRulerOverlay } from "./lab_ruler_overlay.js";
-import { LAYERS, _sweep } from "./layers.js";
+import { createEntityPools, LAYERS, _sweep } from "./layers.js";
 import { GroundDecalLayer, _drawGroundDecals, _initGroundDecalsForMap } from "./decals.js";
 import { _drawObserverMapAnalysisOverlay } from "./observer_map_analysis.js";
 import {
@@ -313,22 +313,7 @@ export class Renderer {
 
     // Pools of reusable Graphics keyed by entity id, one per visual layer that
     // hosts per-entity objects. Reconciled by id each frame (see _reconcile).
-    this._pools = {
-      resources: new Map(),
-      buildingShadows: new Map(),
-      buildings: new Map(),
-      buildingEffects: new Map(),
-      buildingOverlays: new Map(),
-      unitShadows: new Map(),
-      trenchOccupantShadows: new Map(),
-      units: new Map(),
-      trenchOccupantLips: new Map(),
-      selectionRings: new Map(),
-      hpBars: new Map(),
-      shotRevealShadows: new Map(),
-      shotReveals: new Map(),
-      aboveFogHpBars: new Map(),
-    };
+    this._pools = createEntityPools();
     // Ids touched this frame, per pool, so we can hide stale entries afterwards.
     this._seen = {};
     for (const key of Object.keys(this._pools)) this._seen[key] = new Set();

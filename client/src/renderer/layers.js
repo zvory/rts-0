@@ -21,15 +21,39 @@ export const LAYERS = [
   "forestUnitOutlines",
   "smokes",
   "hpBars",
+  "carriedItems",
   "fog",
   "concealmentUnitOutlines",
   "visualSampleLabels",
   "shotRevealShadows",
   "shotReveals",
   "aboveFogHpBars",
+  "aboveFogCarriedItems",
   "feedback",
   "placement",
 ];
+
+// The same pools are swept and disposed by the renderer lifecycle.
+export function createEntityPools() {
+  return Object.fromEntries([
+    "resources",
+    "buildingShadows",
+    "buildings",
+    "buildingEffects",
+    "buildingOverlays",
+    "unitShadows",
+    "trenchOccupantShadows",
+    "units",
+    "trenchOccupantLips",
+    "selectionRings",
+    "hpBars",
+    "carriedItems",
+    "shotRevealShadows",
+    "shotReveals",
+    "aboveFogHpBars",
+    "aboveFogCarriedItems",
+  ].map((name) => [name, new Map()]));
+}
 
 export function _sweep() {
   // Tally which ids were touched in any pool this frame, then bump/reset the

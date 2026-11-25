@@ -1,4 +1,4 @@
-import { ABILITY, KIND } from "../../client/src/protocol.js";
+import { KIND } from "../../client/src/protocol.js";
 import {
   _drawAboveFogHp,
   _drawSelectionAndHp,
@@ -50,41 +50,31 @@ try {
     "ordinary 15 HP dividers stay visible with three-quarter-pixel marks",
   );
 
-  const treasureBar = makeBar();
-  const protectedUnit = { kind: KIND.RIFLEMAN, x: 100, y: 120, hp: 40, maxHp: 40, escapeTreasure: true };
-  _hpBar.call({}, treasureBar, protectedUnit, null, null, false);
-  assert(treasureBar.rtsEscape.visible && !treasureBar.rtsBackground.visible
-    && !treasureBar.rtsFill.visible && !treasureBar.rtsTicks.visible,
-  "Escape Treasure badge remains visible while its health bar is hidden");
-  assert(treasureBar.rtsEscape.text === "ESC", "Escape has its explicit ESC label");
-  assert(treasureBar.rtsEscape.y === 7, "Escape sits immediately below the HP bar");
-  const badge = treasureBar.rtsEscape;
-  _hpBar.call({}, treasureBar, { ...protectedUnit, escapeTreasure: false });
-  assert(treasureBar.rtsEscape === badge && !badge.visible,
-    "Consumed Escape Treasure hides its pooled badge");
-
-  const equippedBar = makeBar();
-  _hpBar.call({}, equippedBar, { ...protectedUnit,
-    abilities: [ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE,
-      ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE].map((ability) => ({ ability, remainingUses: 1 })) });
-  const badges = [equippedBar.rtsEscape, ...[0, 1, 2, 3].map((index) => equippedBar[`rtsItem${index}`])];
-  assert(badges.map((badge) => badge.text).join(" ") === "ESC ARM VIT HST DD", "every carried item has its own readable label");
-  assert(badges.every((badge) => badge.visible && badge.y === 7), "all item badges sit directly below HP");
-  assert(badges.every((badge, index) => !index || badge.x > badges[index - 1].x), "same-category items never overlap each other");
-
-  for (const dao of [null, "wind", "war", "magic"]) {
-    _hpBar.call({}, equippedBar, { ...protectedUnit, kind: KIND.WARRIOR, dao, insight: 30,
-      abilities: [ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE,
-        ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE].map((ability) => ({ ability, remainingUses: 1 })) });
-    const insightBottom = Math.max(...equippedBar.rtsInsight.calls
-      .filter((call) => call[0] === "drawRect").map((call) => call[2] + call[4]));
-    assert(badges.every((badge) => badge.visible && badge.y > insightBottom + 1.5),
-      "carried labels and their stroke clear the Disciple insight meter");
+  // Cultivator health/Insight geometry stays independent of world-center item overlays.
+  for (const kind of [KIND.WARRIOR, KIND.WIND_ADEPT, KIND.WAR_ADEPT, KIND.MAGIC_ADEPT]) {
+    const unit = { kind, x: 100, y: 120, hp: 100, maxHp: 150, insight: 30 };
+    const b = makeBar();
+    _hpBar.call({}, b, unit);
+    const rects = b.rtsInsight.calls.filter((call) => call[0] === "drawRect");
+    assert(rects[0][2] === 5 && rects[0][4] === 2.5,
+      "half-height Insight backing touches the HP background at y=5");
+    assert(rects[1][2] === 5.5 && rects[1][4] === 1.5,
+      "Insight fill is half-height within its backing");
+    assert(b.rtsFill.calls.find((call) => call[0] === "drawRect")[4] === 4,
+      "lowering the bar preserves its four-pixel HP fill height");
   }
-  _hpBar.call({}, equippedBar, { ...protectedUnit, kind: KIND.WARRIOR, insight: 200, daoMaster: true,
-    abilities: [ABILITY.ARMOR_TREASURE].map((ability) => ({ ability, remainingUses: 1 })) });
-  assert(equippedBar.rtsEscape.y === 7 && equippedBar.rtsItem0.y === 7,
-    "Master badges return directly below HP when the insight meter disappears");
+  const worker = { kind: KIND.WORKER, x: 100, y: 120, hp: 40, maxHp: 40 };
+  const serfBar = makeBar(), workerBar = makeBar();
+  _hpBar.call({}, serfBar, worker, null, null, true, "cultivators");
+  _hpBar.call({}, workerBar, worker, null, null, true, "kriegsia");
+  assert(serfBar.y === workerBar.y + 2, "shared worker kind lowers only for the Cultivator faction");
+
+  const presentedBars = { _pools: { hpBars: new Map() }, _seen: { hpBars: new Set() },
+    layers: { hpBars: new PIXI.Container() }, _hpBarSlot, _hpBar };
+  const presentedWorker = { ...worker, id: 88, factionId: "cultivators" };
+  _drawSelectionAndHp.call(presentedBars, presentedWorker, new Set(), { showHealthBarsAlwaysEnabled: true });
+  assert(presentedBars._pools.hpBars.get(88).y === serfBar.y,
+    "faction identity on the detached presentation entity reaches worker HP geometry");
 
   const highHpBar = makeBar();
   _hpBar.call({ _map: { tileSize: 32 } }, highHpBar, {
