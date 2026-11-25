@@ -42,10 +42,12 @@ fn anchor_pull_clamps_at_center_and_ignores_expired_or_outside_fields() {
             .spawn_unit(2, EntityKind::Rifleman, center.0 + offset, center.1)
             .unwrap();
         let occ = Occupancy::build(&map, &entities);
-        apply_magic_anchor_pull(
+        super::super::anchor::apply_pull(
             &map,
             &mut entities,
-            &players,
+            &crate::game::teams::TeamRelations::from_player_teams(
+                players.iter().map(|p| (p.id, p.team_id)),
+            ),
             &occ,
             1,
             &anchor(center, expires_tick),
@@ -77,10 +79,12 @@ fn anchor_vector_respects_enemy_body_blockers_and_preserves_path() {
     entities.get_mut(unit).unwrap().set_path(vec![destination]);
     let occ = Occupancy::build(&map, &entities);
     let runtime = anchor((start.0 + 32.0, start.1), 100);
-    apply_magic_anchor_pull(
+    super::super::anchor::apply_pull(
         &map,
         &mut entities,
-        &players,
+        &crate::game::teams::TeamRelations::from_player_teams(
+            players.iter().map(|p| (p.id, p.team_id)),
+        ),
         &occ,
         1,
         &runtime,
@@ -116,10 +120,12 @@ fn anchor_pull_affects_workers_with_pass_through_work_orders() {
             .unwrap();
         entities.get_mut(worker).unwrap().set_order(order.clone());
         let occ = Occupancy::build(&map, &entities);
-        apply_magic_anchor_pull(
+        super::super::anchor::apply_pull(
             &map,
             &mut entities,
-            &players,
+            &crate::game::teams::TeamRelations::from_player_teams(
+                players.iter().map(|p| (p.id, p.team_id)),
+            ),
             &occ,
             1,
             &runtime,

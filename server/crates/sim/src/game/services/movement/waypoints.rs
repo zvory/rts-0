@@ -61,7 +61,7 @@ pub(super) fn advance_moving_units(
     let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
     let mut blockers = UnitBlockers::with_contact_locks(
         entities,
-        super::anchor_contact_ids(entities, &teams, ability_runtime, tick),
+        super::anchor::contact_ids(entities, &teams, ability_runtime, tick),
     );
     let wire_tiles = super::barbed_wire::tiles(map, entities);
     for id in entities.ids() {
@@ -552,7 +552,7 @@ pub(super) fn advance_moving_units(
         // Admit the sum of voluntary motion and forced motion once. A blocked inward
         // pull must not leave an earlier outward path step behind as free movement.
         if let Some((pull_x, pull_y)) =
-            super::anchor_displacement(&motion_entity, &teams, ability_runtime, tick)
+            super::anchor::displacement(&motion_entity, &teams, ability_runtime, tick)
         {
             integrated.insert(id);
             let desired = (x + pull_x, y + pull_y);

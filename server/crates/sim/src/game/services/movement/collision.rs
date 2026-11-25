@@ -62,7 +62,7 @@ pub(crate) fn resolve_collisions(
     let world_max_y = map.world_height_px() - 0.01;
     let ids = entities.ids();
     let locks = anchor_context
-        .map(|(runtime, tick)| super::anchor_contact_ids(entities, teams, runtime, tick))
+        .map(|(runtime, tick)| super::anchor::contact_ids(entities, teams, runtime, tick))
         .unwrap_or_default();
     let mut blockers = UnitBlockers::with_contact_locks(entities, locks);
     // Separation is housekeeping, not an extra outward movement budget. Let the
