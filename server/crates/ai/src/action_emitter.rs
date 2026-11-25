@@ -94,6 +94,17 @@ pub(crate) fn emit_request(request: AiActionRequest) -> SimCommand {
         AiActionRequest::HoldPosition { units, queued } => {
             SimCommand::HoldPosition { units, queued }
         }
+        AiActionRequest::PointTanks {
+            units,
+            x,
+            y,
+            queued,
+        } => SimCommand::PointTanks {
+            units,
+            x,
+            y,
+            queued,
+        },
         AiActionRequest::SetupAntiTankGuns {
             units,
             x,

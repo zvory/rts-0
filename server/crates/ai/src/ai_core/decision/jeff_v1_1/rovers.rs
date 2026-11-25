@@ -126,7 +126,7 @@ pub(in crate::ai_core::decision) fn roam(
         .iter()
         .filter(|unit| unit.kind == EntityKind::ResourceDepot && unit.hp > 0)
         .collect();
-    let sites: Vec<(f32, f32)> = observation
+    let mut sites: Vec<(f32, f32)> = observation
         .owned
         .iter()
         .filter(|unit| {
@@ -138,6 +138,8 @@ pub(in crate::ai_core::decision) fn roam(
         })
         .map(|unit| (unit.x, unit.y))
         .collect();
+    // `spotters`: enemies near a spotter's post are a raid on its base.
+    sites.extend(memory.jeff_v1_1.spotters.posts());
     let mut raids: BTreeMap<u32, Vec<&AiEntitySummary>> = BTreeMap::new();
     for enemy in observation.visible_enemies.iter().filter(|enemy| {
         enemy.hp > 0

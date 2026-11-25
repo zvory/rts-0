@@ -550,7 +550,8 @@ push,rifleline,opening4,methstrike,scoutsafe,upgradebank,nomg,riflenat,depot4,fa
 nearnat,keephome,tankgroup,strikebig,goin,wideline,southroute,natsiege,marchorders,marchstrike,\
 thirdguard,noschoneraid,southhold,keepspotter,natclear,resume,spareworker,keepguards,raidodds,\
 ncskipguards,sitewalk,stations,pushstation,wayhalf,riflestations,natseat,siteclear,openfight,\
-breakout,mainfront,rebuild,ncbreak,siteretry,mirror";
+breakout,mainfront,rebuild,ncbreak,siteretry,mirror,skipmid,raidcamp,raidfight,fieldgate,standfire,\
+pumpfirst,entafter";
 /// The Tank line's numbers Jeff's AI plays with (`jeff_v1_1::front_line`).
 const JEFF_V1_1_LINE: &str = "shape=2,spacing=8";
 

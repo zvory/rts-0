@@ -917,9 +917,17 @@ fn legacy_fallback_profile() -> &'static AiProfile {
 }
 
 fn bounded_decision_trace_lines(lines: Vec<String>) -> Vec<String> {
+    // Local bench hook (drop before shipping): RTS_AI_TRACE_LINES raises the line cap.
+    static MAX_LINES: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    let max_lines = *MAX_LINES.get_or_init(|| {
+        std::env::var("RTS_AI_TRACE_LINES")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(LIVE_DECISION_TRACE_MAX_LINES)
+    });
     let mut iter = lines.into_iter();
     let mut bounded = Vec::new();
-    for _ in 0..LIVE_DECISION_TRACE_MAX_LINES {
+    for _ in 0..max_lines {
         let Some(line) = iter.next() else {
             return bounded;
         };

@@ -39,6 +39,8 @@ const SIGHT_TILES: f32 = 8.0;
 const ADVANCE_RATIO: f32 = 1.2;
 /// Enemies seen this close to the enemy's route to Jeff, or to the push, count against its launch.
 const ROUTE_TILES: f32 = 20.0;
+/// `routegroup`: remembered fighters this close to one another count as one group.
+const ROUTE_GROUP_TILES: f32 = 12.0;
 /// Enemies this close to a push unit are the fight in front of it.
 const FRONT_TILES: f32 = 16.0;
 /// Anchors along the enemy's route, as shares of its length from Jeff's start, each moved onto the
@@ -180,6 +182,11 @@ pub(in crate::ai_core::decision) struct PushMemory {
     peak_tanks: (usize, u32),
     /// `pushstation`: the heaviest call looked at this decision, for the trace.
     call: String,
+    /// The last fall back, for the trace: seconds, why, the front, the part of it the push's own
+    /// units see, and the push.
+    fell: String,
+    /// `pairmg`: whether an enemy Machine Gunner was ever seen.
+    mg_seen: bool,
 }
 
 impl PushMemory {
@@ -270,6 +277,52 @@ fn stored((x, y): (f32, f32)) -> (i32, i32) {
     (x.round() as i32, y.round() as i32)
 }
 
+/// `fieldgate`: the value of every enemy fighter remembered.
+/// `pairmg`: whether an enemy Machine Gunner was ever seen (Rush AI fields them by 2:30, Pressure
+/// AI never does that early).
+pub(in crate::ai_core::decision) fn enemy_mg_seen(memory: &AiDecisionMemory) -> bool {
+    memory.jeff_v1_1.push.mg_seen
+}
+
+pub(in crate::ai_core::decision) fn remembered_army(memory: &AiDecisionMemory) -> u32 {
+    memory.jeff_v1_1.push.enemies.values().map(|seen| seen.value).fold(0, u32::saturating_add)
+}
+
+/// `fieldgate`: whether any remembered enemy fighter was seen within `radius` (px) of `points`
+/// at or after `since`.
+pub(in crate::ai_core::decision) fn army_seen_near(
+    memory: &AiDecisionMemory,
+    points: &[(f32, f32)],
+    radius: f32,
+    since: u32,
+) -> bool {
+    memory.jeff_v1_1.push.enemies.values().any(|seen| {
+        let at = point(seen.at);
+        seen.tick >= since && points.iter().any(|p| dist2(p.0, p.1, at.0, at.1) <= squared(radius))
+    })
+}
+
+/// `basewait` (testing): the value of the remembered enemy fighters seen within `radius` (px) of
+/// `at` at or after `since`.
+pub(in crate::ai_core::decision) fn value_seen_near(
+    memory: &AiDecisionMemory,
+    at: (f32, f32),
+    radius: f32,
+    since: u32,
+) -> u32 {
+    memory
+        .jeff_v1_1
+        .push
+        .enemies
+        .values()
+        .filter(|seen| {
+            let p = point(seen.at);
+            seen.tick >= since && dist2(p.0, p.1, at.0, at.1) <= squared(radius)
+        })
+        .map(|seen| seen.value)
+        .fold(0, u32::saturating_add)
+}
+
 /// A unit's weight in a fight: its cost, Oil counted double.
 pub(in crate::ai_core::decision) fn unit_value(kind: EntityKind) -> u32 {
     let (steel, oil) = rts_rules::economy::cost(kind);
@@ -296,6 +349,9 @@ pub(in crate::ai_core::decision) fn note_enemy_army(
     {
         seen.insert(enemy.id);
         let at = stored((enemy.x, enemy.y));
+        if enemy.kind == EntityKind::MachineGunner {
+            push.mg_seen = true;
+        }
         if is_fighter(enemy.kind) {
             let value = unit_value(enemy.kind);
             let kind = enemy.kind;
@@ -411,21 +467,39 @@ fn route_army(
         .filter(|unit| units.contains(&unit.id))
         .map(|unit| (unit.x, unit.y))
         .collect();
-    memory
+    let near: Vec<(&Sighting, (f32, f32))> = memory
         .jeff_v1_1
         .push
         .enemies
         .values()
-        .filter(|sighting| {
-            let at = point(sighting.at);
+        .map(|sighting| (sighting, point(sighting.at)))
+        .filter(|(_, at)| {
             route.is_empty()
                 || route
                     .iter()
                     .chain(pushing.iter())
                     .any(|near| dist2(near.0, near.1, at.0, at.1) <= reach)
         })
-        .map(|sighting| faded(observation, sighting))
-        .sum()
+        .collect();
+    if super::off("routegroup") {
+        return near
+            .iter()
+            .map(|(sighting, _)| faded(observation, sighting))
+            .sum();
+    }
+    // `routegroup`: the heaviest group the push could meet at once, not every fighter seen along
+    // the way. With spotters out the sum took in the wave gathering in the middle and the guns at
+    // the enemy natural together, and the push waited at home for a force it never meets whole.
+    let tiles = crate::ai_core::profiles::jeff_v1_1_param("rgtiles").unwrap_or(ROUTE_GROUP_TILES);
+    let group = squared(tiles * ts);
+    near.iter()
+        .map(|(_, center)| {
+            near.iter()
+                .filter(|(_, at)| dist2(at.0, at.1, center.0, center.1) <= group)
+                .map(|(sighting, _)| faded(observation, sighting))
+                .sum::<f32>()
+        })
+        .fold(0.0, f32::max)
 }
 
 /// The push's weight: its units alive, and `joining` Tanks more.
@@ -473,9 +547,13 @@ pub(in crate::ai_core::decision) fn launch_ready(
     push.target = None;
     push.rally = None;
     note_strike(observation, memory, ours);
+    // `basehold` (testing): the push stays home while a later base is taken and covered.
+    if !super::off("basehold") && memory.later_bases.covering() {
+        return Some(memory.jeff_v1_1.push.strike.is_some());
+    }
     Some(
         memory.jeff_v1_1.push.strike.is_some()
-            || ours >= route_army(observation, map_analysis, memory) * ADVANCE_RATIO,
+            || ours >= route_army(observation, map_analysis, memory) * crate::ai_core::profiles::jeff_v1_1_param("adv").unwrap_or(ADVANCE_RATIO),
     )
 }
 
@@ -611,6 +689,8 @@ fn answer_base(
                     })
                     .map(|unit| (unit.x, unit.y)),
             )
+            // `spotters`: a force seen at the base's spotter post calls too.
+            .chain(memory.jeff_v1_1.spotters.post_for((depot.x, depot.y), ts))
             .collect();
         let near = |x: f32, y: f32| {
             sites
@@ -994,6 +1074,21 @@ pub(in crate::ai_core::decision) fn objective(
             return Some(base);
         }
     }
+    // `hitexp` (testing): the push makes for the nearest known enemy base past its main instead of
+    // the enemy natural. Against Pressure AI V1.1 killed its first enemy Depot at 11:55 in lost
+    // games (8:12 in won ones) while Pressure ran 4-5 bases by 8:00.
+    if !super::off("hitexp") {
+        let nearest = known_depots(observation, memory, enemy_main)
+            .into_iter()
+            .min_by(|a, b| {
+                dist2(a.0, a.1, center.0, center.1).total_cmp(&dist2(b.0, b.1, center.0, center.1))
+            });
+        if let Some(base) = nearest {
+            memory.approach.force(None);
+            memory.jeff_v1_1.push.rally = None;
+            return Some(base);
+        }
+    }
     let anchors = if super::off("anchors") {
         Vec::new()
     } else {
@@ -1357,6 +1452,7 @@ pub(in crate::ai_core::decision) fn trace_line(
     let push = &memory.jeff_v1_1.push;
     let launched = memory.containment.wave_launched && !memory.containment.recovery_active;
     let units = push_units(memory);
+    let behind = behind_push(observation, memory);
     let bases = push
         .buildings
         .values()
@@ -1364,11 +1460,13 @@ pub(in crate::ai_core::decision) fn trace_line(
         .count();
     Some(format!(
         // The trace keeps 256 characters a line: the aim comes before the unit ids.
-        "v1_1_push launched={launched} tanks={} enemy_army={:.0} ours={:.0} route_army={:.0} target={:?} anchor={} short={} strike={:?} rally={:?} riflemen={} hot={} ids={:?} scout={:?} {} convoy={} goin={} forced={}/{} enemy_depots_known={bases} enemies_known={} {}",
+        "v1_1_push launched={launched} tanks={} enemy_army={:.0} ours={:.0} route_army={:.0} behind={:.0} fell={} target={:?} anchor={} short={} strike={:?} rally={:?} riflemen={} hot={} ids={:?} scout={:?} {} convoy={} goin={} forced={}/{} enemy_depots_known={bases} enemies_known={} {}",
         memory.containment.active_tanks.len(),
         enemy_army(observation, memory),
         push_army(observation, &units, 0),
         route_army(observation, map_analysis, memory),
+        behind,
+        push.fell,
         push.target.map(|target| (target.at, target.side)),
         push.anchor,
         push.short,
@@ -1429,21 +1527,105 @@ pub(in crate::ai_core::decision) fn outweighed(
     }
     let units = push_units(memory);
     let ours = push_army(observation, &units, 0);
-    let front = front_value(observation, &units);
+    let seen = front_value(observation, &units);
+    let own = own_front_value(observation, &units);
+    // `contactfront`: the push weighs only the enemies its own units see. A wave a spotter sees
+    // gathering 16 tiles off is a warning, not a fight: on Classic against Pressure AI, 19 of 21
+    // falls back from the first anchor with spotters out came where the enemy in the push's own
+    // sight was the smaller, and the waves then met the re-forming push at home.
+    let front = if super::off("contactfront") { seen } else { own };
     if front <= ours {
         return Some(false);
     }
     let tick = observation.tick;
     let push = &mut memory.jeff_v1_1.push;
-    if let Some(target) = push.target.take() {
+    let (why, falls) = if let Some(target) = push.target.take() {
         push.hot.insert(target.at, tick + HOT_TICKS);
         push.retargeted = 0;
-        return Some(front > ours * ROUT_RATIO);
+        ("raid", front > ours * ROUT_RATIO)
+    } else if push.forced && push.anchor == 0 {
+        // A forced wave short of its first anchor falls back only when routed, as on a raid: it
+        // would otherwise turn round at the first enemy it saw.
+        ("forced", front > ours * ROUT_RATIO)
+    } else if super::off("holdfirst") {
+        ("anchor", push.anchor == 0)
+    } else {
+        // `holdfirst`: at its first anchor, a choke with home behind it, the push too gives way
+        // only when routed, as on a raid: it turned round at enemies 1.0-1.3 times its weight.
+        ("anchor", push.anchor == 0 && front > ours * ROUT_RATIO)
+    };
+    if falls {
+        push.fell = format!(
+            "{}:{why}:f{seen:.0}s{own:.0}o{ours:.0}",
+            tick / config::TICK_HZ
+        );
     }
-    // A forced wave short of its first anchor falls back only when routed, as on a raid: it would
-    // otherwise turn round at the first enemy it saw.
-    if push.forced && push.anchor == 0 {
-        return Some(front > ours * ROUT_RATIO);
+    Some(falls)
+}
+
+/// The remembered enemy strength (faded) nearer Jeff's main than the push's Tanks are and more
+/// than `FRONT_TILES` from them: a force the push has walked past. 0 with no Tanks out.
+pub(in crate::ai_core::decision) fn behind_push(
+    observation: &AiObservation,
+    memory: &AiDecisionMemory,
+) -> f32 {
+    let tanks: Vec<u32> = memory.containment.active_tanks.iter().copied().collect();
+    let launched = memory.containment.wave_launched && !memory.containment.recovery_active;
+    let Some(center) = super::super::frontal::group_center(observation, &tanks).filter(|_| launched)
+    else {
+        return 0.0;
+    };
+    let ts = observation.map.tile_size as f32;
+    let home = tile_center(observation.own_start_tile, observation.map.tile_size);
+    let reach = dist2(center.0, center.1, home.0, home.1);
+    memory
+        .jeff_v1_1
+        .push
+        .enemies
+        .values()
+        .filter(|sighting| {
+            let at = point(sighting.at);
+            dist2(at.0, at.1, home.0, home.1) < reach
+                && dist2(at.0, at.1, center.0, center.1) > squared(FRONT_TILES * ts)
+        })
+        .map(|sighting| faded(observation, sighting))
+        .sum()
+}
+
+/// Notes a fall back that `outweighed` did not order, for the trace.
+pub(in crate::ai_core::decision) fn note_fell(
+    observation: &AiObservation,
+    memory: &mut AiDecisionMemory,
+    why: &str,
+) {
+    if !v1_1(memory) {
+        return;
     }
-    Some(push.anchor == 0)
+    let units = push_units(memory);
+    let front = front_value(observation, &units);
+    let own = own_front_value(observation, &units);
+    let ours = push_army(observation, &units, 0);
+    memory.jeff_v1_1.push.fell = format!(
+        "{}:{why}:f{front:.0}s{own:.0}o{ours:.0}",
+        observation.tick / config::TICK_HZ
+    );
+}
+
+/// The part of `front_value` within sight of the push's own units.
+fn own_front_value(observation: &AiObservation, units: &[u32]) -> f32 {
+    let ts = observation.map.tile_size as f32;
+    observation
+        .visible_enemies
+        .iter()
+        .filter(|enemy| is_fighter(enemy.kind) && enemy.hp > 0)
+        .filter(|enemy| {
+            observation.owned.iter().any(|unit| {
+                let sight = config::unit_stats(unit.kind).map_or(9.0, |s| s.sight_tiles as f32);
+                units.contains(&unit.id)
+                    && dist2(unit.x, unit.y, enemy.x, enemy.y)
+                        <= squared(FRONT_TILES.min(sight) * ts)
+            })
+        })
+        .map(|enemy| unit_value(enemy.kind) as f32)
+        .sum()
 }

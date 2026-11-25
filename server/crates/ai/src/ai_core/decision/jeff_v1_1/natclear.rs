@@ -169,6 +169,68 @@ fn ideal_for(kind: EntityKind) -> f32 {
     }
 }
 
+/// The most Riflemen `clearbuy` adds at once.
+const MAX_BUY: usize = 10;
+/// `clearbuy`: the most Barracks it builds, and the Steel it leaves in the bank past one.
+const MAX_BUY_BARRACKS: usize = 4;
+const BUY_BARRACKS_BANK: u32 = 400;
+
+/// `clearbuy` (testing): whether the clearing group stands short while the bank could pay for one
+/// more Barracks: both Barracks trained a Rifleman every 10 s while 900-1,200 Steel sat in the bank
+/// (Schone Tage vs Rush AI), so Barracks, not Steel, held the group back. Returns the Barracks to
+/// build toward.
+pub(in crate::ai_core::decision) fn barracks_wanted(
+    profile_id: &str,
+    observation: &AiObservation,
+    memory: &AiDecisionMemory,
+    barracks: usize,
+) -> Option<usize> {
+    if !is_jeff_v1_1(profile_id) || super::off("clearbuy") {
+        return None;
+    }
+    let clear = &memory.jeff_v1_1.natclear;
+    let short = clear.active() && clear.charge.is_empty() && clear.members.len() < clear.need;
+    let (steel, _) = rts_rules::economy::cost(EntityKind::Barracks);
+    (short
+        && barracks < MAX_BUY_BARRACKS
+        && observation.economy.steel >= steel + BUY_BARRACKS_BANK)
+        .then_some(barracks + 1)
+}
+
+/// `clearbuy` (testing): the Rifleman count the Barracks trains up to while the clearing group is
+/// at work short of the fewest it needs: the shortfall on top of the Riflemen now (in training
+/// included), less those already in training. Against Rush AI on Schone Tage the group stood at
+/// 3-9 of the 6-20 it needed for minutes while 700-1,400 Steel sat in the bank for the natural.
+pub(in crate::ai_core::decision) fn buy_target(
+    profile_id: &str,
+    observation: &AiObservation,
+    memory: &AiDecisionMemory,
+    counts: &[(EntityKind, usize)],
+) -> Option<usize> {
+    if !is_jeff_v1_1(profile_id) || super::off("clearbuy") {
+        return None;
+    }
+    let clear = &memory.jeff_v1_1.natclear;
+    if !clear.active() || !clear.charge.is_empty() || clear.members.len() >= clear.need {
+        return None;
+    }
+    let queued: usize = observation
+        .owned
+        .iter()
+        .filter(|unit| {
+            unit.kind == EntityKind::Barracks && unit.production_kind == Some(EntityKind::Rifleman)
+        })
+        .map(|unit| unit.production_queue_len.unwrap_or(0))
+        .sum();
+    let shortfall = (clear.need - clear.members.len()).min(MAX_BUY);
+    let current = counts
+        .iter()
+        .find_map(|(kind, count)| (*kind == EntityKind::Rifleman).then_some(*count))
+        .unwrap_or(0);
+    let more = shortfall.saturating_sub(queued);
+    (more > 0).then_some(current + more)
+}
+
 /// Gathers and charges the natural's clearing group (see the module docs). `held`: units other
 /// systems keep this decision. Returns the group's Riflemen.
 pub(in crate::ai_core::decision) fn plan(

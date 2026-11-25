@@ -2,6 +2,7 @@
 
 pub mod arena;
 pub mod balance_matrix;
+pub mod engage_lab;
 pub mod map_analysis_debug;
 pub mod matchup;
 pub mod skirmish;
