@@ -100,6 +100,9 @@ const FACTORY_BUILDING_REQUIRED: &[EntityKind] = &[EntityKind::Factory];
 const ENGINEERING_COMPLEX_REQUIRED: &[EntityKind] = &[EntityKind::EngineeringComplex];
 const FACTORY_REQUIRED: &[EntityKind] = &[EntityKind::ResourceDepot, EntityKind::TrainingCentre];
 
+// Adept footprints stay independent of the smaller base Novice.
+const ADEPT_BODY_RADIUS: f32 = 26.0;
+
 const NOVICE_DEF: UnitDef = UnitDef {
     kind: EntityKind::Warrior,
     stats: balance::UnitStats {
@@ -113,7 +116,7 @@ const NOVICE_DEF: UnitDef = UnitDef {
         cost_oil: 0,
         supply: 2,
         build_ticks: 300,
-        radius: 26.0,
+        radius: 17.0,
     },
     armor_class: ArmorClass::Small,
     weapon: WeaponClass::SmallArms,
@@ -184,11 +187,12 @@ pub const UNITS: &[UnitDef] = &[
         train_requirement: TechRequirement::All(&[]),
     },
     NOVICE_DEF,
-    // Adept HP and production costs are independent of the cheaper base Novice.
+    // Adept bodies, HP and production costs are independent of the base Novice.
     UnitDef {
         kind: EntityKind::WindAdept,
         stats: balance::UnitStats {
             hp: balance::DAO_ADEPT_HP,
+            radius: ADEPT_BODY_RADIUS,
             cooldown: (NOVICE_DEF.stats.cooldown as f32 / balance::DAO_WIND_ATTACK_RATE + 0.5)
                 as u32,
             speed: SCOUT_CAR_DEF.stats.speed * balance::DAO_WIND_SPEED_MULTIPLIER,
@@ -207,7 +211,7 @@ pub const UNITS: &[UnitDef] = &[
             dmg: (NOVICE_DEF.stats.dmg as f32 * balance::DAO_WAR_DAMAGE_MULTIPLIER + 0.5) as u32,
             range_tiles: balance::DAO_WAR_RANGE_TILES,
             speed: NOVICE_DEF.stats.speed * balance::DAO_WAR_SPEED_MULTIPLIER,
-            radius: NOVICE_DEF.stats.radius * balance::DAO_WAR_BODY_SCALE,
+            radius: ADEPT_BODY_RADIUS * balance::DAO_WAR_BODY_SCALE,
             cost_steel: 150,
             cost_oil: 35,
             supply: 3,
@@ -219,6 +223,7 @@ pub const UNITS: &[UnitDef] = &[
         kind: EntityKind::MagicAdept,
         stats: balance::UnitStats {
             hp: balance::DAO_ADEPT_HP,
+            radius: ADEPT_BODY_RADIUS,
             range_tiles: balance::DAO_RANGED_RANGE_TILES,
             speed: NOVICE_DEF.stats.speed * balance::DAO_MAGIC_SPEED_MULTIPLIER,
             cost_steel: 150,
