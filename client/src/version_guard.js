@@ -3,6 +3,7 @@ import { S } from "./protocol.js";
 const CHECK_INTERVAL_MS = 10000;
 const CHECK_TIMEOUT_MS = 3000;
 const RELOAD_KEY = "rts.versionGuard.lastReload";
+const REFRESH_BUILD_PARAM = "rtsClientBuild";
 
 function knownBuild(value) {
   return typeof value === "string" && value.trim() && value.trim() !== "unknown"
@@ -17,7 +18,7 @@ export function canRefreshClient(app, lobbyVisible) {
     !app.stressTestLaunch && !app.devWatch && !app.mapPreviewLaunch;
 }
 
-/** Page-owned build handshake and lobby-only embedded-browser refresh. */
+/** Page-owned build handshake and lobby-only browser refresh. */
 export class VersionGuard {
   constructor({
     net,
@@ -26,7 +27,11 @@ export class VersionGuard {
     document: doc = globalThis.document,
     window: win = globalThis.window,
     fetch: fetchVersion = (...args) => globalThis.fetch(...args),
-    reload = () => win.location.reload(),
+    reload = (build) => {
+      const url = new URL(win.location.href);
+      url.searchParams.set(REFRESH_BUILD_PARAM, build);
+      win.location.replace(url.href);
+    },
   }) {
     this.net = net;
     this.isLobby = isLobby;
@@ -59,6 +64,8 @@ export class VersionGuard {
     this.net.on("versionMismatch", this.onMismatch);
     this.doc.addEventListener("visibilitychange", this.onVisible);
     this.win.addEventListener("pagehide", this.onPageHide);
+    this.win.addEventListener("pageshow", this.onVisible);
+    this.win.addEventListener("focus", this.onVisible);
     this.timer = this.win.setInterval(() => void this.check(), CHECK_INTERVAL_MS);
     void this.check();
   }
@@ -125,16 +132,17 @@ export class VersionGuard {
     if (!this.el) this.mount();
     this.el.hidden = false;
     this.button.disabled = this.refreshing;
-    this.detail.textContent = "Restart client to load the current version. Refreshing keeps the app open.";
+    this.detail.textContent = "A game update is available. Refreshing loads the current client.";
     if (this.refreshing) return;
-    // Store before navigating. If cached HTML survives a reload, leave the warning and
-    // manual button visible instead of continually reloading. No storage means manual only.
+    // A build-specific URL bypasses a stale document cache and also bounds recovery
+    // when browser privacy settings make sessionStorage unavailable.
+    if (new URL(this.win.location.href).searchParams.get(REFRESH_BUILD_PARAM) === this.serverBuild) return;
     try {
       const pair = JSON.stringify([this.clientBuild, this.serverBuild]);
       if (this.win.sessionStorage.getItem(RELOAD_KEY) === pair) return;
       this.win.sessionStorage.setItem(RELOAD_KEY, pair);
     } catch {
-      return;
+      // Navigation carries the loop guard even without browser storage.
     }
     this.refresh();
   }
@@ -145,7 +153,7 @@ export class VersionGuard {
     this.refreshing = true;
     this.button.disabled = true;
     this.detail.textContent = "Refreshing client…";
-    this.reload();
+    this.reload(this.serverBuild);
   }
 
   destroy() {
@@ -158,6 +166,8 @@ export class VersionGuard {
     this.net.off("versionMismatch", this.onMismatch);
     this.doc.removeEventListener("visibilitychange", this.onVisible);
     this.win.removeEventListener("pagehide", this.onPageHide);
+    this.win.removeEventListener("pageshow", this.onVisible);
+    this.win.removeEventListener("focus", this.onVisible);
     this.button?.removeEventListener("click", this.onRefresh);
     this.el?.remove();
   }

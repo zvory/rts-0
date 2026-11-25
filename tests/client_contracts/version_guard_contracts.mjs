@@ -5,7 +5,7 @@ import { COMPACT_SNAPSHOT_VERSION } from "../../client/src/protocol.js";
 
 const previousBuild = globalThis.__RTS_BUILD__;
 
-function fixture({ lobby = false, clientBuild = "loaded-build", storage = new Map(), fetch } = {}) {
+function fixture({ lobby = false, clientBuild = "loaded-build", storage = new Map(), fetch, nativeReload = false, href = "https://example.test/" } = {}) {
   const events = new Map();
   const makeElement = () => ({
     children: [], disabled: false,
@@ -17,7 +17,9 @@ function fixture({ lobby = false, clientBuild = "loaded-build", storage = new Ma
     addEventListener(type, fn) { events.set(type, fn); },
     removeEventListener(type) { events.delete(type); },
   };
+  const navigations = [];
   const win = {
+    location: { href, replace(url) { navigations.push(url); } },
     sessionStorage: { getItem: (k) => storage.get(k), setItem: (k, v) => storage.set(k, v) },
     setInterval(fn) { this.interval = fn; return 1; }, clearInterval() { this.interval = null; },
     setTimeout(fn) { this.timeout = fn; return 2; }, clearTimeout() { this.timeout = null; },
@@ -29,14 +31,14 @@ function fixture({ lobby = false, clientBuild = "loaded-build", storage = new Ma
   const guard = new VersionGuard({
     net, clientBuild, document: doc, window: win,
     isLobby: () => state.lobby,
-    reload: () => { state.reloads++; },
+    ...(nativeReload ? {} : { reload: () => { state.reloads++; } }),
     fetch: fetch || (async (_url, options) => {
       state.fetches++;
       assert.equal(options.cache, "no-store");
       return { ok: true, text: async () => clientBuild };
     }),
   });
-  return { guard, net, state, win, doc, events, storage };
+  return { guard, net, state, win, doc, events, storage, navigations };
 }
 
 // Same page stays stamped with its loaded build, even when the server changes.
@@ -55,7 +57,7 @@ function fixture({ lobby = false, clientBuild = "loaded-build", storage = new Ma
   assert.equal(f.state.reloads, 0, "manual refresh also respects active-game safety");
   f.state.lobby = true;
   f.guard.update();
-  assert.equal(f.state.reloads, 1, "returning to lobby refreshes the embedded browser");
+  assert.equal(f.state.reloads, 1, "returning to lobby refreshes the browser");
   f.guard.update();
   assert.equal(f.state.reloads, 1, "only one navigation per page");
   f.guard.destroy();
@@ -76,6 +78,44 @@ function fixture({ lobby = false, clientBuild = "loaded-build", storage = new Ma
   const f = fixture({ lobby: true, fetch: async () => ({ ok: true, text: async () => "deployed-build" }) });
   await f.guard.check();
   assert.equal(f.state.reloads, 1);
+  f.guard.destroy();
+}
+
+// Real browser navigation cache-busts the document while preserving room links.
+{
+  const storage = { get() { throw new Error("storage blocked"); } };
+  const f = fixture({ lobby: true, nativeReload: true, storage,
+    href: "https://example.test/?room=friends#lobby" });
+  f.guard.observe("new-server");
+  const url = new URL(f.navigations[0]);
+  assert.equal(url.searchParams.get("rtsClientBuild"), "new-server");
+  assert.equal(url.searchParams.get("room"), "friends");
+  assert.equal(url.hash, "#lobby");
+  f.guard.update();
+  assert.equal(f.navigations.length, 1);
+  f.guard.destroy();
+  const stale = fixture({ lobby: true, nativeReload: true, storage, href: url.href });
+  stale.guard.observe("new-server");
+  assert.equal(stale.navigations.length, 0, "URL bounds automatic recovery without storage");
+  assert.equal(stale.guard.button.disabled, false, "manual recovery stays available");
+  stale.guard.refresh();
+  assert.equal(stale.navigations.length, 1);
+  stale.guard.destroy();
+  const later = fixture({ lobby: true, nativeReload: true, storage, href: url.href });
+  later.guard.observe("later-server");
+  assert.equal(later.navigations.length, 1, "a later deploy can recover again");
+  later.guard.destroy();
+}
+
+// Focus and history restoration probe immediately, including without visibilitychange.
+for (const event of ["focus", "pageshow"]) {
+  const f = fixture({ lobby: true });
+  f.guard.start();
+  while (f.guard.request) await Promise.resolve();
+  const before = f.state.fetches;
+  f.events.get(event)({ persisted: true });
+  while (f.guard.request) await Promise.resolve();
+  assert.equal(f.state.fetches, before + 1, `${event} probes on browser resume`);
   f.guard.destroy();
 }
 
