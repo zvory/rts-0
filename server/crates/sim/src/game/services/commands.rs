@@ -1,4 +1,5 @@
 use super::{dist2, shop_items, standability, tournament};
+use rts_rules::math::GameplayMath as _;
 mod research;
 use crate::config::{self, support_weapon_teardown_ticks};
 use crate::game::ability::{self, AbilityEffectHook, AbilityKind, AbilityTargetMode};
@@ -592,6 +593,51 @@ pub(in crate::game) fn apply_commands(
                         max_units_per_command: command_admission.max_units_per_command,
                     },
                 );
+            }
+            SimCommand::VectorField {
+                units,
+                x,
+                y,
+                direction_x,
+                direction_y,
+            } => {
+                let length = direction_x.det_hypot(direction_y);
+                if !x.is_finite() || !y.is_finite() || !length.is_finite() || length < 0.001 {
+                    continue;
+                }
+                let Some(units) =
+                    validate_command_units(entities, events, player, units, command_admission)
+                else {
+                    continue;
+                };
+                for caster in units {
+                    if launch_world_ability(
+                        map,
+                        entities,
+                        players,
+                        &teams,
+                        smokes,
+                        ability_runtime,
+                        mortar_shells,
+                        events,
+                        player,
+                        &faction_id,
+                        caster,
+                        AbilityKind::EkatMagicAnchor,
+                        x,
+                        y,
+                        tick,
+                        false,
+                        true,
+                    ) {
+                        ability_runtime.configure_vector_field(
+                            player,
+                            caster,
+                            [direction_x / length, direction_y / length],
+                        );
+                        break;
+                    }
+                }
             }
             SimCommand::ArtilleryFire {
                 units,

@@ -1,3 +1,4 @@
+import {targetCenter, firstTargetPress} from "./two_stage_target.js";
 // Input — mouse/keyboard -> selection, protocol commands, and build placement.
 // See docs/design/client-ui.md §4.1 (export contract) and the gameplay rules below.
 //
@@ -645,7 +646,7 @@ export class Input {
       const gesture = this._artilleryFireGesture;
       if (
         this._commandTarget()?.ability !== gesture.ability ||
-        !this._intent()?.artilleryFireCenter
+        !targetCenter(this._intent())
       ) {
         this._artilleryFireGesture = null;
         return;
@@ -723,7 +724,7 @@ export class Input {
       if (
         gesture.moved &&
         this._commandTarget()?.ability === gesture.ability &&
-        this._intent()?.artilleryFireCenter
+        targetCenter(this._intent())
       ) {
         const actionEvent = { shiftKey: gesture.shiftKey };
         if (this._issueTargetedCommand(p, actionEvent) !== false) {
@@ -844,9 +845,9 @@ export class Input {
         return;
       }
       const firstArtilleryFirePress =
-        this._commandTarget()?.ability === ABILITY.POINT_FIRE && !this._intent()?.artilleryFireCenter;
+        firstTargetPress(this._intent());
       if (this._issueTargetedCommand(p, ev) === false) {
-        if (firstArtilleryFirePress && this._intent()?.artilleryFireCenter) {
+        if (firstArtilleryFirePress && targetCenter(this._intent())) {
           this._artilleryFireGesture = {
             ability: this._commandTarget().ability,
             x0: p.x,

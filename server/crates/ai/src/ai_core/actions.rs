@@ -307,6 +307,7 @@ fn command_trace_label(command: &Command) -> String {
         Command::TearDownAntiTankGuns { units } => {
             format!("tear_down_anti_tank_guns units={}", id_list(units))
         }
+        Command::VectorField { .. } => "vector_field".into(),
         Command::UseAbility {
             target_id: _,
             units,

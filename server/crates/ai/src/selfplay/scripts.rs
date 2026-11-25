@@ -101,6 +101,7 @@ fn is_combat_command(command: &Command) -> bool {
         | Command::PointTanks { .. }
         | Command::SetupAntiTankGuns { .. }
         | Command::TearDownAntiTankGuns { .. }
+        | Command::VectorField { .. }
         | Command::UseAbility { .. }
         | Command::ArtilleryFire { .. }
         | Command::RecastAbility { .. }

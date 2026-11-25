@@ -341,6 +341,7 @@ export const cmd = Object.freeze({
     withQueued({ c: CMD.POINT_TANKS, units, x, y }, queued),
   tearDownAntiTankGuns: (units) => ({ c: CMD.TEAR_DOWN_ANTI_TANK_GUNS, units }),
   charge: (units) => ({ c: CMD.CHARGE, units }),
+  vectorField: (units, x, y, directionX, directionY) => ({c: "vectorField", units, x, y, directionX, directionY}),
   useAbility: (ability, units, x = null, y = null, queued = false, targetId = null) => {
     const command = { c: CMD.USE_ABILITY, ability, units };
     if (x != null) command.x = x;

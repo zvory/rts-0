@@ -1,3 +1,4 @@
+import { decodeCompactAbilityObjectOwnerState } from "./protocol_snapshot_ability_state.js";
 import {
   ABILITY_BY_CODE,
   ABILITY_OBJECT_KIND_BY_CODE,
@@ -26,7 +27,7 @@ import { decodeCompactEvent } from "./protocol_snapshot_events.js";
 import { decodeCompactTrenches } from "./protocol_snapshot_trenches.js";
 
 export function decodeCompactSnapshot(raw) {
-  if (raw.v !== COMPACT_SNAPSHOT_VERSION && raw.v !== 65 && raw.v !== 64 && raw.v !== 63 && raw.v !== 62 && raw.v !== 61 && raw.v !== 60 && raw.v !== 59 && raw.v !== 58 && raw.v !== 57 && raw.v !== 56 && raw.v !== 55 && raw.v !== 54 && raw.v !== 53 && raw.v !== 52 && raw.v !== 51) {
+  if (raw.v !== COMPACT_SNAPSHOT_VERSION && raw.v !== 72 && raw.v !== 65 && raw.v !== 64 && raw.v !== 63 && raw.v !== 62 && raw.v !== 61 && raw.v !== 60 && raw.v !== 59 && raw.v !== 58 && raw.v !== 57 && raw.v !== 56 && raw.v !== 55 && raw.v !== 54 && raw.v !== 53 && raw.v !== 52 && raw.v !== 51) {
     throw new Error(`unsupported compact snapshot version: ${raw.v}`);
   }
 
@@ -134,7 +135,7 @@ function decodeCompactTankTrail(record, index) {
 
 function decodeCompactGroundDecal(record, index) {
   const fields = readArray(record, `ground decal ${index}`, 10);
-  if (fields.length !== 10) throw new Error(`ground decal ${index} field count mismatch`);
+  if (fields.length !== 10 && fields.length !== 9) throw new Error(`ground decal ${index} field count mismatch`);
   const decal = {
     id: readU32(fields[0], "groundDecal.id"),
     decalClass: readString(fields[1], "groundDecal.decalClass"),
@@ -243,8 +244,8 @@ function decodeCompactSmoke(record, index) {
 }
 
 function decodeCompactAbilityObject(record, index) {
-  const fields = readArray(record, `ability object ${index}`, 9);
-  if (fields.length !== 9) throw new Error(`ability object ${index} field count mismatch`);
+  const fields = readArray(record, `ability object ${index}`, 10);
+  if (fields.length !== 10 && fields.length !== 9) throw new Error(`ability object ${index} field count mismatch`);
   const object = {
     id: readU32(fields[0], "abilityObject.id"),
     owner: readU32(fields[1], "abilityObject.owner"),
@@ -258,33 +259,14 @@ function decodeCompactAbilityObject(record, index) {
     object.sourceCasterId = readU32(fields[7], "abilityObject.sourceCasterId");
   }
   if (fields[8] != null) {
-    object.ownerState = decodeCompactAbilityObjectOwnerState(fields[8]);
+    object.ownerState = decodeCompactAbilityObjectOwnerState(fields[8], readArray, readU32, readNumber);
+  }
+  if (fields[9] != null) {
+    const vector = readArray(fields[9], "abilityObject.vector", 2);
+    if (vector.length !== 2) throw new Error("Invalid field vector");
+    object.vector = vector.map(v => readNumber(v, "vector component"));
   }
   return object;
-}
-
-function decodeCompactAbilityObjectOwnerState(record) {
-  const fields = readArray(record, "abilityObject.ownerState", 8);
-  if (fields.length !== 8) throw new Error("abilityObject.ownerState field count mismatch");
-  const state = {};
-  if (fields[0] != null) {
-    state.earliestReturnTick = readU32(fields[0], "abilityObject.ownerState.earliestReturnTick");
-  }
-  if (fields[1] != null) state.hp = readU32(fields[1], "abilityObject.ownerState.hp");
-  if (fields[2] != null) state.radius = readNumber(fields[2], "abilityObject.ownerState.radius");
-  if (fields[3] != null) {
-    state.destroyedLockoutTicks = readU32(
-      fields[3],
-      "abilityObject.ownerState.destroyedLockoutTicks",
-    );
-  }
-  if (fields[4] != null) {
-    state.distanceTraveled = readNumber(fields[4], "abilityObject.ownerState.distanceTraveled");
-  }
-  if (fields[5] != null) state.ticksOut = readU32(fields[5], "abilityObject.ownerState.ticksOut");
-  if (fields[6] != null) state.maxHp = readU32(fields[6], "abilityObject.ownerState.maxHp");
-  if (fields[7] != null) state.durationTicks = readU32(fields[7], "abilityObject.ownerState.durationTicks");
-  return state;
 }
 
 function decodeCompactNetStatus(record) {

@@ -46,6 +46,9 @@ pub(crate) enum AbilityObjectPayload {
     MagicAnchor {
         radius: f32,
     },
+    VectorField {
+        direction: [f32; 2],
+    },
     LineProjectile {
         distance_traveled: f32,
         ticks_out: u32,
@@ -373,6 +376,36 @@ impl AbilityRuntime {
                 && object.kind == AbilityWorldObjectKind::MagicAnchor
                 && object.active_at(tick)
         })
+    }
+
+    pub(crate) fn configure_vector_field(&mut self, owner: u32, caster: u32, direction: [f32; 2]) {
+        for object in &mut self.world_objects.objects {
+            if object.owner == owner
+                && object.caster_id == caster
+                && object.kind == AbilityWorldObjectKind::MagicAnchor
+            {
+                object.payload = AbilityObjectPayload::VectorField { direction };
+            }
+        }
+    }
+
+    pub(crate) fn vector_field_at(&self, x: f32, y: f32, tick: u32) -> Option<[f32; 2]> {
+        self.world_objects()
+            .filter(|o| o.active_at(tick))
+            .find_map(|o| {
+                let AbilityObjectPayload::VectorField {
+                    direction: [dx, dy],
+                } = o.payload
+                else {
+                    return None;
+                };
+                let offset = (x - o.x.to_world(), y - o.y.to_world());
+                let along = offset.0 * dx + offset.1 * dy;
+                let across = -offset.0 * dy + offset.1 * dx;
+                (along.abs() <= 3.0 * crate::config::TILE_SIZE as f32
+                    && across.abs() <= 1.5 * crate::config::TILE_SIZE as f32)
+                    .then_some([dx, dy])
+            })
     }
 
     pub(crate) fn magic_anchor_pull(

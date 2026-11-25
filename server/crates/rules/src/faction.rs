@@ -703,10 +703,10 @@ const EKAT_ABILITIES: [AbilityCatalogEntry; 4] = [
     },
     AbilityCatalogEntry {
         kind: AbilityKind::EkatMagicAnchor,
-        label: "Anchor",
-        icon: "ANC",
+        label: "Vector Field",
+        icon: "VEC",
         hotkey: Some("C"),
-        title: "Place a 10-second pull field",
+        title: "Click-drag or click twice to direct a 6 x 3 tile Vector Field",
         carriers: &[EntityKind::Ekat, EntityKind::MagicAdept],
         target_mode: AbilityTargetMode::WorldPoint,
         range_tiles: Some(balance::EKAT_MAGIC_ANCHOR_RANGE_TILES),

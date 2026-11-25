@@ -643,3 +643,5 @@ node tests/interact_driver_smoke.mjs
 Lab spawn entries optionally accept `factionId` (sets the target seat faction) and
 `dao` (`wind`, `war`, `magic`, Novice only). Catalog `unitOptions` exposes the
 same base and specialized unit choices as the human palette.
+
+Lab `record-start` also accepts `presentation:"normal"` to retain command-card and placement UI during gesture review. Default remains `clean`.

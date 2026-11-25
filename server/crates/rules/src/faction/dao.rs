@@ -82,7 +82,7 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 15] = [
         ..EKAT_ABILITIES[0]
     },
     AbilityCatalogEntry {
-        label: "Anchor",
+        label: "Vector Field",
         ..EKAT_ABILITIES[2]
     },
     AbilityCatalogEntry {

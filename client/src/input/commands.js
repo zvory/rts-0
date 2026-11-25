@@ -140,6 +140,18 @@ export function _issueTargetedCommand(p, ev = {}) {
       this._addCommandFeedback("move", target.x, target.y, false);
       return true;
     }
+    if (ability === ABILITY.EKAT_MAGIC_ANCHOR) {
+      if (!intent.vectorFieldCenter) {
+        intent.vectorFieldCenter = {x: world.x, y: world.y};
+        return false;
+      }
+      const center = intent.vectorFieldCenter;
+      const dx = world.x - center.x, dy = world.y - center.y;
+      if (Math.hypot(dx, dy) < 4) return false;
+      this.commandInteraction.issueCommand(cmd.vectorField(units, center.x, center.y, dx, dy));
+      intent.vectorFieldCenter = null;
+      return true;
+    }
     const queued = !!ev.shiftKey;
     const selectedCarriers = this.state.selectedEntities().filter((e) => units.includes(e.id));
     const firstFireClick = ability === ABILITY.POINT_FIRE && !intent.artilleryFireCenter;
@@ -717,7 +729,11 @@ export function _refreshAbilityTargetPreview() {
         artilleryMinFireRadiusTiles(commandUpgrades(this.state, this.controlPolicy)),
       )
     : abilityTargetRadiusTiles(definition, target.ability, this.state, this.controlPolicy);
+  const vectorCenter = target.ability === ABILITY.EKAT_MAGIC_ANCHOR ? intent.vectorFieldCenter : null;
   intent?.updateAbilityTargetPreview?.({
+    vectorField: target.ability === ABILITY.EKAT_MAGIC_ANCHOR,
+    vectorCenter: vectorCenter || world,
+    vectorDirection: vectorCenter ? [world.x - vectorCenter.x, world.y - vectorCenter.y] : [1, 0],
     ability: target.ability,
     mouseX: primaryLock?.x ?? world.x,
     mouseY: primaryLock?.y ?? world.y,

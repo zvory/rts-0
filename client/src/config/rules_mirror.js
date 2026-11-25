@@ -587,10 +587,10 @@ export const ABILITIES = Object.freeze({
   }),
   [ABILITY.EKAT_MAGIC_ANCHOR]: Object.freeze({
     ability: ABILITY.EKAT_MAGIC_ANCHOR,
-    label: "Anchor",
-    icon: "ANC",
+    label: "Vector Field",
+    icon: "VEC",
     hotkey: "C",
-    title: "Place a 10-second pull field",
+    title: "Click-drag or click twice to direct a 6 x 3 tile Vector Field",
     carriers: Object.freeze([KIND.EKAT, KIND.MAGIC_ADEPT]),
     targetMode: "worldPoint",
     rangeTiles: EKAT_MAGIC_ANCHOR_RANGE_TILES,

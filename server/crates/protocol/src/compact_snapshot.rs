@@ -611,7 +611,7 @@ impl Serialize for CompactAbilityObject<'_> {
         S: Serializer,
     {
         let object = self.0;
-        let mut seq = serializer.serialize_seq(Some(9))?;
+        let mut seq = serializer.serialize_seq(Some(10))?;
         seq.serialize_element(&object.id)?;
         seq.serialize_element(&object.owner)?;
         seq.serialize_element(&ability_code(&object.ability))?;
@@ -626,6 +626,7 @@ impl Serialize for CompactAbilityObject<'_> {
                 .as_ref()
                 .map(CompactAbilityObjectOwnerState),
         )?;
+        seq.serialize_element(&object.vector)?;
         seq.end()
     }
 }

@@ -3049,3 +3049,7 @@ Hovering an eligible friendly unit draws a one-pixel dotted line from the comple
 Flying goods render their existing colored circle plus a tiny 12×1-pixel HP fill from their combat body.
 Delivery bodies retain current snapshot positions through the entity-view pipeline, matching the
 non-interpolated ability-object circles so HP bars and selection geometry stay aligned in flight.
+
+### Local Vector Field placement prototype
+
+Anchor command-card entry becomes Vector Field. First left press locks the rectangle center; drag-release sets direction, or a stationary first click leaves it armed and a second click sets direction. Cursor movement rotates a 6 by 3 tile preview about that fixed center. Escape/right-click cancel through ordinary target cancellation. The placed field and preview use a large solid green arrow and green rectangular outline, without particles. The prototype retains existing stable Anchor ids behind the displayed label.

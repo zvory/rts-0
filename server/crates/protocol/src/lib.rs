@@ -127,6 +127,13 @@ pub enum Command {
         #[serde(default, skip_serializing_if = "is_false")]
         queued: bool,
     },
+    VectorField {
+        units: Vec<u32>,
+        x: f32,
+        y: f32,
+        direction_x: f32,
+        direction_y: f32,
+    },
     ArtilleryFire {
         units: Vec<u32>,
         x: f32,
@@ -1164,6 +1171,7 @@ mod tests {
                 expires_in: 120,
             }],
             ability_objects: vec![AbilityObjectView {
+                vector: None,
                 id: 70,
                 owner: 1,
                 ability: abilities::EKAT_TELEPORT.to_string(),

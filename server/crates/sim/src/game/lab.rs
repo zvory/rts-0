@@ -1367,6 +1367,7 @@ fn command_authority_entities(command: &Command) -> Vec<u32> {
         | Command::SetupAntiTankGuns { units, .. }
         | Command::TearDownAntiTankGuns { units }
         | Command::Charge { units }
+        | Command::VectorField { units, .. }
         | Command::UseAbility { units, .. }
         | Command::ArtilleryFire { units, .. }
         | Command::RecastAbility { units, .. }

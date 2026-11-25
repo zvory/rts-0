@@ -250,7 +250,7 @@ pub mod notices {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 72;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 73;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -698,6 +698,7 @@ pub fn protocol_contract() -> ProtocolContract {
             ("SETUP_ANTI_TANK_GUNS", "setupAntiTankGuns"),
             ("TEAR_DOWN_ANTI_TANK_GUNS", "tearDownAntiTankGuns"),
             ("CHARGE", "charge"),
+            ("VECTOR_FIELD", "vectorField"),
             ("USE_ABILITY", "useAbility"),
             ("ARTILLERY_FIRE", "artilleryFire"),
             ("RECAST_ABILITY", "recastAbility"),

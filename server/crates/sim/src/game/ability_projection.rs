@@ -36,6 +36,10 @@ pub(in crate::game) fn ability_object_views_for(
                 None
             };
             crate::protocol::AbilityObjectView {
+                vector: match object.payload {
+                    AbilityObjectPayload::VectorField { direction } => Some(direction),
+                    _ => None,
+                },
                 id: object.id.get(),
                 owner: object.owner,
                 ability: object.ability.to_protocol_str().to_string(),
@@ -61,6 +65,7 @@ pub(in crate::game) fn ability_object_views_for(
                 || owner_visible_players.contains(&caster.owner)
                 || omniscient;
             Some(crate::protocol::AbilityObjectView {
+                vector: None,
                 id: shield.id,
                 owner: caster.owner,
                 ability: crate::game::ability::AbilityKind::DiscipleShield
@@ -110,7 +115,7 @@ fn ability_object_owner_state_to_protocol(
     payload: AbilityObjectPayload,
 ) -> crate::protocol::AbilityObjectOwnerStateView {
     match payload {
-        AbilityObjectPayload::None => Default::default(),
+        AbilityObjectPayload::None | AbilityObjectPayload::VectorField { .. } => Default::default(),
         AbilityObjectPayload::DashReturn {
             earliest_return_tick,
         } => crate::protocol::AbilityObjectOwnerStateView {

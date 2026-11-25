@@ -567,6 +567,17 @@ fn validate_command(
         | Command::SetAutocast { units, .. } => {
             validate_unit_list(units, unit_cap, "command.units", state)?;
         }
+        Command::VectorField {
+            units,
+            x,
+            y,
+            direction_x,
+            direction_y,
+        } => {
+            validate_unit_list(units, unit_cap, "command.units", state)?;
+            validate_finite_point(*x, *y, "command.vectorField.center")?;
+            validate_finite_point(*direction_x, *direction_y, "command.vectorField.direction")?;
+        }
         Command::UseAbility {
             units,
             x,

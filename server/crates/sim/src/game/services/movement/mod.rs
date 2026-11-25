@@ -217,38 +217,42 @@ fn apply_magic_anchor_pull(
     let world_max_x = map.world_width_px() - 0.01;
     let world_max_y = map.world_height_px() - 0.01;
     for id in entities.ids() {
-        let Some((kind, owner, x, y, facing, speed, resistance)) = entities.get(id).and_then(|e| {
-            if !e.is_unit() || e.kind == EntityKind::ScoutPlane {
-                return None;
-            }
-            let profile = standability::footing_profile(e);
-            // Work orders allow workers to pass through friendly traffic, but must not
-            // make them immune to hostile displacement (or divide by zero).
-            let resistance = standability::footing_resistance(profile).max(1.0);
-            let speed = e.movement_speed();
-            Some((
-                e.kind,
-                e.owner,
-                e.pos_x(),
-                e.pos_y(),
-                e.facing(),
-                speed,
-                resistance,
-            ))
-        }) else {
-            continue;
-        };
-        let Some((dir, strength, distance)) =
-            ability_runtime.magic_anchor_pull(owner, &teams, x, y, tick)
+        let Some((kind, _owner, x, y, facing, _speed, resistance)) =
+            entities.get(id).and_then(|e| {
+                if !e.is_unit() || e.kind == EntityKind::ScoutPlane {
+                    return None;
+                }
+                let profile = standability::footing_profile(e);
+                // Work orders allow workers to pass through friendly traffic, but must not
+                // make them immune to hostile displacement (or divide by zero).
+                let resistance = standability::footing_resistance(profile).max(1.0);
+                let speed = e.movement_speed();
+                Some((
+                    e.kind,
+                    e.owner,
+                    e.pos_x(),
+                    e.pos_y(),
+                    e.facing(),
+                    speed,
+                    resistance,
+                ))
+            })
         else {
             continue;
         };
-        let pull_px = (speed * config::EKAT_MAGIC_ANCHOR_PULL_SPEED_MULTIPLIER * strength
-            / resistance.det_sqrt())
-        .min(distance);
-        if pull_px <= 0.0 || !pull_px.is_finite() {
+        let Some([dx, dy]) = ability_runtime.vector_field_at(x, y, tick) else {
             continue;
-        }
+        };
+        let dir = (dx, dy);
+        let base = config::unit_stats(EntityKind::Tank)
+            .map(|s| s.speed)
+            .unwrap_or(0.0)
+            * 0.5;
+        let pull_px = if config::VECTOR_FIELD_WEIGHTED {
+            base * (12.0 / resistance).det_sqrt()
+        } else {
+            base
+        };
         let next_x = (x + dir.0 * pull_px).clamp(0.0, world_max_x);
         let next_y = (y + dir.1 * pull_px).clamp(0.0, world_max_y);
         if !crate::game::services::standability::unit_static_standable_with_radius(

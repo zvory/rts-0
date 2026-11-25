@@ -118,3 +118,6 @@ pub const HEALING_SEAL_PULSE_TICKS: u32 = super::TICK_HZ / 3;
 /// Total carried-item slots by Cultivator rank. Consumable goods do not occupy slots.
 pub const CULTIVATOR_ITEM_CAPACITY: u8 = 3;
 pub const CULTIVATOR_MASTER_ITEM_CAPACITY: u8 = 6;
+
+// Local Vector Field prototype: toggle only for the matched visual comparison.
+pub const VECTOR_FIELD_WEIGHTED: bool = true;
