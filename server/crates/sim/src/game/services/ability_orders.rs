@@ -476,7 +476,7 @@ pub(crate) fn launch_world_ability(
             notice_positioned(
                 events,
                 player,
-                "Anchor",
+                "Vector Field",
                 crate::protocol::NoticeSeverity::Info,
                 anchor_x,
                 anchor_y,

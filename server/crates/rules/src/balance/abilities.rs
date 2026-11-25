@@ -120,4 +120,4 @@ pub const CULTIVATOR_ITEM_CAPACITY: u8 = 3;
 pub const CULTIVATOR_MASTER_ITEM_CAPACITY: u8 = 6;
 
 // Local Vector Field prototype: toggle only for the matched visual comparison.
-pub const VECTOR_FIELD_WEIGHTED: bool = true;
+pub const VECTOR_FIELD_WEIGHTED: bool = false;
