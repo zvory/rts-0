@@ -64,7 +64,7 @@ impl Entity {
         }
     }
 
-    /// Credit actual hostile HP loss using exact cost-weighted fractions.
+    /// Credit actual hostile HP loss with exact fractional carry for building damage.
     pub(in crate::game) fn gain_insight(&mut self, damage: u32, target_kind: EntityKind) {
         if !self.kind.is_disciple() || self.insight >= self.insight_cap() {
             return;

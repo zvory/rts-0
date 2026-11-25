@@ -90,7 +90,7 @@ fn disciple_insight_counts_actual_hp_loss_resets_on_evolution_and_raises_cap() {
     run_combat_tick(&mut entities);
     assert_eq!(
         entities.get(unit).unwrap().insight,
-        4, // Seven actual HP lost × (35 / 50) cost weighting, floored.
+        7, // One insight per actual HP lost, regardless of target cost.
         "overkill does not grant insight"
     );
     entities.get_mut(unit).unwrap().insight = 59;
@@ -106,7 +106,7 @@ fn disciple_insight_counts_actual_hp_loss_resets_on_evolution_and_raises_cap() {
         .unwrap()
         .evolve_dao(crate::game::ability::AbilityKind::EvolveWar));
     assert_eq!(entities.get(unit).unwrap().insight, 0);
-    for expected in [17, 35, 52, 70, 87, 105, 122] {
+    for expected in [35, 70, 105, 140, 175, 200, 200] {
         entities
             .get_mut(unit)
             .unwrap()
