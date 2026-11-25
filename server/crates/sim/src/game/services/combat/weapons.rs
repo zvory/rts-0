@@ -434,19 +434,20 @@ mod shop_item_tests {
     use crate::game::ability::AbilityKind;
 
     #[test]
-    fn attack_items_modify_primary_damage_and_final_reload_only_while_active() {
+    fn attack_items_modify_primary_damage_and_final_reload_on_delivery_permanently() {
         let mut warrior = Entity::new_unit(1, EntityKind::Warrior, 320.0, 320.0).unwrap();
         let base = effective_attack_profile(&warrior);
         warrior.receive_shop_item(AbilityKind::DoubleDamage);
-        assert_eq!(effective_attack_profile(&warrior).dmg, base.dmg);
-        warrior.activate_shop_item(AbilityKind::DoubleDamage);
         assert_eq!(effective_attack_profile(&warrior).dmg, base.dmg * 2);
-        warrior.ability_cooldowns.clear();
+        // The attack category stays occupied; Haste cannot replace Double Damage.
         warrior.receive_shop_item(AbilityKind::Haste);
-        warrior.activate_shop_item(AbilityKind::Haste);
-        assert_eq!(warrior.shop_item_reload(30), 15);
-        assert_eq!(warrior.shop_item_reload(1), 1);
-        warrior.ability_cooldowns.clear();
-        assert_eq!(warrior.shop_item_reload(30), 30);
+        assert!(!warrior.shop_item_active(AbilityKind::Haste));
+        let mut hasted = Entity::new_unit(1, EntityKind::Warrior, 320.0, 320.0).unwrap();
+        hasted.receive_shop_item(AbilityKind::Haste);
+        for _ in 0..1000 {
+            hasted.tick_ability_cooldowns();
+        }
+        assert_eq!(hasted.shop_item_reload(30), 15);
+        assert_eq!(hasted.shop_item_reload(1), 1);
     }
 }

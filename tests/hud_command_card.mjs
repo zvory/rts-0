@@ -1050,11 +1050,11 @@ for (const researched of [false, true]) {
   });
   const items = idle.slots.filter(Boolean);
   assert.equal(items.length, 7);
-  assert.deepEqual(items.map((item) => item.ability), [ABILITY.HEALING_POTION, ABILITY.ESCAPE_TREASURE, ABILITY.HEALING_SEAL, ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE, ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE]);
+  assert.deepEqual(items.map((item) => item.ability), [ABILITY.ESCAPE_TREASURE, ABILITY.HEALING_POTION, ABILITY.HEALING_SEAL, ABILITY.ARMOR_TREASURE, ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE, ABILITY.VITALITY_TREASURE]);
   assert.deepEqual(items.map((item) => item.intent.targetMode), ["friendlyUnit", "friendlyUnit", "worldPoint", "friendlyUnit", "friendlyUnit", "friendlyUnit", "friendlyUnit"]);
-  assert.deepEqual(items.map((item) => item.cost.oil), [50, 100, 150, 100, 150, 100, 100]);
+  assert.deepEqual(items.map((item) => item.cost.oil), [100, 50, 150, 100, 100, 150, 100]);
   const seal = items.find((item) => item.ability === ABILITY.HEALING_SEAL);
-  assert.equal(seal.hotkey, "E");
+  assert.equal(seal.hotkey, "S");
   assert.equal(seal.commandId, "cultivators.ability.healingSeal");
   for (const oil of [149, 150]) {
     const card = buildCommandCardDescriptors({
@@ -1097,7 +1097,7 @@ for (const researched of [false, true]) {
   }
 }
 
-// Widening the display preserves every existing keyboard position in every context.
+// The display order keeps carried item categories in the fourth column.
 assert.deepEqual(COMMAND_CARD_SLOT_ORDER.map(gridHotkeyForSlot),
   ["Q", "W", "E", "R", "A", "S", "D", "F", "Z", "X", "C", "V"]);
 for (const context of buildCommandCardContextCatalog()) {
@@ -1114,7 +1114,7 @@ for (const context of buildCommandCardContextCatalog()) {
     }
     if (slot.slotIndex === 11) {
       assert([ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE].includes(slot.ability));
-      assert.equal(slot.hotkey, "V");
+      assert.equal(slot.hotkey, "");
       continue;
     }
     assert(slot.slotIndex < 9, `${context.id}: other fourth-column slots remain reserved`);
@@ -1179,22 +1179,20 @@ for (const kind of [KIND.WORKER, KIND.WARRIOR, KIND.WIND_ADEPT, KIND.WAR_ADEPT, 
   const carried = build(units);
   assert.equal(carried.slots[9].hotkey, "R");
   assert.equal(carried.slots[10].hotkey, "");
-  assert.equal(carried.slots[11].hotkey, "V");
+  assert.equal(carried.slots[11].hotkey, "");
   assert.equal(carried.slots[10].intent, null);
-  assert.deepEqual(carried.slots[11].intent.readyIds, [1]);
-  const active = build([{ ...units[0], abilities: [
-    { ability: ABILITY.HASTE, remainingUses: 0, cooldownLeft: 450 },
-    { ability: ABILITY.ARMOR_TREASURE, remainingUses: 1, cooldownLeft: 0 }] }, units[1]]);
-  assert.equal(active.slots[11].ability, ABILITY.DOUBLE_DAMAGE, "mixed selection exposes the remaining ready attack item");
-  assert.equal(active.slots[10].enabled, false);
-  assert.equal(active.slots[10].passive, true);
-  assert.deepEqual(active.slots[10].cooldownClocks, []);
-  assert.notEqual(active.signature, carried.signature);
-  const charge = active.slots.find((slot) => slot?.ability === ABILITY.CHARGE);
+  assert.equal(carried.slots[11].intent, null);
+  const mixed = build([...units].reverse());
+  assert.equal(mixed.slots[11].ability, ABILITY.HASTE, "mixed selection keeps a stable passive category tile");
+  assert.equal(mixed.slots[10].enabled, false);
+  assert.equal(mixed.slots[10].passive, true);
+  assert.deepEqual(mixed.slots[10].cooldownClocks, []);
+  assert.notEqual(mixed.signature, carried.signature);
+  const charge = mixed.slots.find((slot) => slot?.ability === ABILITY.CHARGE);
   assert(charge.slotIndex < 9, "passive Charge leaves the defense category available");
 }
 
-// Allied deliveries stay usable on units belonging to another faction.
+// Allied passive deliveries appear on units belonging to another faction.
 for (const factionId of ["kriegsia", "ekat"]) {
   const card = buildCommandCardDescriptors({ playerId: 1, factionId,
     selection: [{ id: 1, owner: 1, kind: KIND.WORKER, escapeTreasure: true,
@@ -1202,7 +1200,9 @@ for (const factionId of ["kriegsia", "ekat"]) {
     resources: { steel: 0, oil: 0 }, groupCooldownClocks: () => [] });
   assert.equal(card.slots[9].commandId, "cultivators.item.escape");
   assert.equal(card.slots[11].commandId, "cultivators.item.haste");
-  assert.deepEqual(card.slots[11].intent.readyIds, [1]);
+  assert.equal(card.slots[11].intent, null);
+  assert.equal(card.slots[11].passive, true);
+  assert.equal(card.slots[11].enabled, false);
 }
 
 // Vitality is a Shop F purchase and shares the carried F defense slot with Armor.
@@ -1237,4 +1237,30 @@ for (const factionId of ["kriegsia", "ekat"]) {
     assert(!passive.abilityAffordances.some((entry) => entry.definition.ability === slot.ability));
   }
   assert(build([units[1]]).slots[10].title.includes("+150 maximum and current HP"));
+}
+
+// Shop goods occupy the same rows as the carried movement/defense/attack slots.
+{
+  const card = buildCommandCardDescriptors({
+    playerId: 1, factionId: "cultivators",
+    selection: [{ id: 1, owner: 1, kind: KIND.SHOP }],
+    resources: { steel: 0, oil: 1000 }, groupCooldownClocks: () => [],
+  });
+  const rows = COMMAND_CARD_SLOT_ORDER.map((i) => card.slots[i]?.ability || null);
+  assert.deepEqual(rows.slice(0, 4), [ABILITY.ESCAPE_TREASURE, null, null, null]);
+  assert.deepEqual(rows.slice(4, 8), [ABILITY.HEALING_POTION, ABILITY.HEALING_SEAL, ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE]);
+  assert.deepEqual(rows.slice(8), [ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE, null, null]);
+  for (const ability of [ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE, ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE]) {
+    const carried = buildCommandCardDescriptors({
+      playerId: 1, factionId: "cultivators",
+      selection: [{ id: 2, owner: 1, kind: KIND.WARRIOR,
+        abilities: [{ ability, remainingUses: 1, cooldownLeft: 0 }] }],
+      resources: {}, groupCooldownClocks: () => [],
+    });
+    const slot = carried.slots.find((entry) => entry?.ability === ability);
+    assert(slot.passive && !slot.enabled && !slot.hotkey);
+    assert.equal(slot.intent, null);
+    assert.equal(slot.contextIntent, null);
+    assert.deepEqual(slot.cooldownClocks, []);
+  }
 }

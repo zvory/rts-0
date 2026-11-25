@@ -281,12 +281,10 @@ function drawCategoryItemBadges(container, entity, topY) {
     if (!badge) continue;
     badge.visible = !!entry;
     if (!entry) continue;
-    const passive = [ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE].includes(item.ability);
-    const active = !passive && entry.cooldownLeft > 0;
-    // Passive defense is always applied; an asterisk marks an activated attack buff.
-    badge.text = `${item.label}${active ? "*" : ""}`;
-    badge.alpha = passive || active ? 1 : 0.65;
-    badge.position.set(passive ? -12 : 12, entity.y - topY + 13);
+    const defense = [ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE].includes(item.ability);
+    badge.text = item.label;
+    badge.alpha = 1;
+    badge.position.set(defense ? -12 : 12, entity.y - topY + 13);
   }
 }
 

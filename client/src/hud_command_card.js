@@ -1,4 +1,4 @@
-import { itemSlotSignature, placeItemDescriptor, itemCooldownAffordances } from "./hud_item_slot.js";
+import { itemSlotSignature, placeItemDescriptor } from "./hud_item_slot.js";
 import { buildDaoTrainingCard } from "./hud_dao_training_card.js";
 import { ABILITY, DEFAULT_FACTION_ID, KIND, SETUP, UPGRADE, isBuilding, isUnit } from "./protocol.js";
 import {
@@ -299,7 +299,7 @@ export function buildUnitCard(ctx, selection) {
     .map((e) => e.id);
   const setupWeapons = ownUnits.filter((e) => setupGunIds.includes(e.id));
   const abilityAffordances = selectedAbilityAffordances(ctx, ownUnits);
-  const clocks = [...abilityAffordances, ...itemCooldownAffordances(ownUnits, ctx.groupCooldownClocks)];
+  const clocks = abilityAffordances;
   const hasArmyUnit = ownUnits.some((e) => e.kind !== KIND.WORKER);
   const workerSelected = !hasArmyUnit && ownUnits.some((e) => e.kind === KIND.WORKER);
   const signature =
@@ -319,7 +319,7 @@ export function buildUnitCard(ctx, selection) {
 
   if (workerSelected) {
     const slots = workerCommandSlots(ctx, unitIds, factionId);
-    placeItemDescriptor(slots, ownUnits, factionId, ctx.groupCooldownClocks);
+    placeItemDescriptor(slots, ownUnits);
     return card("unit", signature, slots, { abilityAffordances: clocks });
   }
 
@@ -332,7 +332,7 @@ export function buildUnitCard(ctx, selection) {
   }
 
   placeAbilityDescriptors(ctx, slots, abilityAffordances, factionId);
-  placeItemDescriptor(slots, ownUnits, factionId, ctx.groupCooldownClocks);
+  placeItemDescriptor(slots, ownUnits);
 
   if (setupGunIds.length > 0) {
     const setupSlot = GRID_HOTKEYS.indexOf("Z");

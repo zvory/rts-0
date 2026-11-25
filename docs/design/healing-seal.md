@@ -44,8 +44,8 @@ and replay seeks need explicit implementation coverage.
 These defaults resolve details not specified by the user; implementation was explicitly authorized.
 
 - Select a completed Shop, choose Healing Seal, then click a visible ground position within
-  30 tiles of that Shop, matching its current goods' purchase range. Reserve E in the Shop
-  command card, leaving Q/W for Healing Potion/Escape Treasure. Placement is immediate;
+  30 tiles of that Shop, matching its current goods' purchase range. Reserve S in the Shop
+  command card defense row, alongside Healing Potion (A), Armor (D), and Vitality (F). Placement is immediate;
   there is no delivery projectile, builder, construction time, cooldown, or research prerequisite.
 - Snap the center to the center tile of a 3×3 placement area. Require the whole area to be
   in map bounds and on ordinary traversable ground; reject static blocking structures and
