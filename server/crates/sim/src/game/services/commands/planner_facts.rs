@@ -252,7 +252,7 @@ fn world_ability_order_policy(ability: AbilityKind) -> (bool, bool) {
         | AbilityKind::ArmorTreasure
         | AbilityKind::VitalityTreasure
         | AbilityKind::HealingSeal
-        | AbilityKind::HealingPotion
+        | AbilityKind::Regen
         | AbilityKind::EscapeTreasure
         | AbilityKind::Charge
         | AbilityKind::PointFire

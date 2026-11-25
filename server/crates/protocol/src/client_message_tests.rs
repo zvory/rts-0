@@ -112,7 +112,7 @@ fn branch_staging_client_messages_deserialize() {
 #[test]
 fn unit_targeted_ability_keeps_target_id_without_world_point() {
     let cmd: Command = serde_json::from_value(serde_json::json!({
-        "c": "useAbility", "ability": "healingPotion", "units": [17], "targetId": 29
+        "c": "useAbility", "ability": "regen", "units": [17], "targetId": 29
     }))
     .unwrap();
     assert!(matches!(

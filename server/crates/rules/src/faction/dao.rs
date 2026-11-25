@@ -140,9 +140,9 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 15] = [
         ..EKAT_ABILITIES[1]
     },
     AbilityCatalogEntry {
-        kind: AbilityKind::HealingPotion,
-        label: "Healing Potion", icon: "HP", hotkey: Some("A"),
-        title: "Defense item: Deliver a healing potion to a friendly unit at any distance; fully heals on arrival",
+        kind: AbilityKind::Regen,
+        label: "Regen", icon: "HP", hotkey: Some("A"),
+        title: "Defense item: Deliver Regen to a friendly unit at any distance; permanently regenerates 3 HP per second on arrival",
         carriers: &[EntityKind::Shop], target_mode: AbilityTargetMode::FriendlyUnit,
         range_tiles: None, min_range_tiles: None, cooldown_ticks: 0,
         charges: None, charge_recharge_ticks: None, cost: ResourceCost::new(0, 50),

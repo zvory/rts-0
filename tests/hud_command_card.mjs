@@ -1051,7 +1051,7 @@ for (const researched of [false, true]) {
   });
   const items = idle.slots.filter(Boolean);
   assert.equal(items.length, 7);
-  assert.deepEqual(items.map((item) => item.ability), [ABILITY.ESCAPE_TREASURE, ABILITY.HEALING_POTION, ABILITY.HEALING_SEAL, ABILITY.ARMOR_TREASURE, ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE, ABILITY.VITALITY_TREASURE]);
+  assert.deepEqual(items.map((item) => item.ability), [ABILITY.ESCAPE_TREASURE, ABILITY.REGEN, ABILITY.HEALING_SEAL, ABILITY.ARMOR_TREASURE, ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE, ABILITY.VITALITY_TREASURE]);
   assert.deepEqual(items.map((item) => item.intent.targetMode), ["friendlyUnit", "friendlyUnit", "worldPoint", "friendlyUnit", "friendlyUnit", "friendlyUnit", "friendlyUnit"]);
   assert.deepEqual(items.map((item) => item.cost.oil), [100, 50, 150, 100, 100, 150, 100]);
   const seal = items.find((item) => item.ability === ABILITY.HEALING_SEAL);
@@ -1161,7 +1161,7 @@ for (const factionId of ["cultivators", "kriegsia", "ekat"]) {
   });
   const rows = COMMAND_CARD_SLOT_ORDER.map((i) => card.slots[i]?.ability || null);
   assert.deepEqual(rows.slice(0, 4), [ABILITY.ESCAPE_TREASURE, null, null, null]);
-  assert.deepEqual(rows.slice(4, 8), [ABILITY.HEALING_POTION, ABILITY.HEALING_SEAL, ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE]);
+  assert.deepEqual(rows.slice(4, 8), [ABILITY.REGEN, ABILITY.HEALING_SEAL, ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE]);
   assert.deepEqual(rows.slice(8), [ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE, null, null]);
   for (const ability of [ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE, ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE]) {
     const carried = buildCommandCardDescriptors({

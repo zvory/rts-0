@@ -22,6 +22,7 @@ impl Entity {
         use crate::game::ability::AbilityKind::{ArmorTreasure, Haste};
         u8::from(self.escape_treasure.is_some())
             + [
+                crate::game::ability::AbilityKind::Regen,
                 ArmorTreasure,
                 Haste,
                 crate::game::ability::AbilityKind::VitalityTreasure,

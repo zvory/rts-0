@@ -920,7 +920,7 @@ multiplier after Adept rounding: 210 (Wind/Magic) or 246 (War). See [Master rule
 
 ### Shop goods
 
-Completed Shops offer Healing Potion (50 oil, full heal on delivery) and Escape Treasure
+Completed Shops offer Regen (50 oil, permanent 3 HP/s regeneration after delivery, one carried slot) and Escape Treasure
 (100 oil, one lethal-damage escape to the supplying Shop at 1 HP). Both target visible friendly
 units at unlimited range and travel at 7.5 tiles/second without a flight timeout. All flying
 goods have 10 HP and can be destroyed by enemy weapons. Destroyed goods and dead targets

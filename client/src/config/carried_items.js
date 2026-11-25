@@ -1,7 +1,17 @@
 // Presentation of server-projected carried items. Never infer inventory from public radiance.
 import { ABILITY, isBuilding } from "../protocol.js";
 
+export const ITEM_ICON_SHAPES = Object.freeze({
+  cross: [-1.5, -5, 1.5, -5, 1.5, -1.5, 5, -1.5, 5, 1.5, 1.5, 1.5, 1.5, 5, -1.5, 5, -1.5, 1.5, -5, 1.5, -5, -1.5, -1.5, -1.5],
+  bolt: [-1, -5, -4.5, 1, 0, 1, -1, 5, 4.5, -1, 1, -1],
+  sword: [0, -5, 3, -2, 1, 1, 3, 1, 3, 2, 1, 2, 1, 5, -1, 5, -1, 2, -3, 2, -3, 1, -1, 1, -3, -2],
+  shield: [-4.5, -5, 4.5, -5, 4, 1, 2, 3, 0, 5, -2, 3, -4, 1],
+  heart: [-4.5, -2, -3, -4.5, -1, -4.5, 0, -2.5, 1, -4.5, 3, -4.5, 4.5, -2, 4, 1, 0, 5, -4, 1],
+  return: [0, -5, 5, 0, 0, 5, -5, 0],
+});
+
 export const CARRIED_ITEMS = Object.freeze([
+  { ability: ABILITY.REGEN, label: "Regen", shortLabel: "RGN", color: 0x54e878, shape: "cross" },
   { ability: ABILITY.HASTE, label: "Haste", shortLabel: "HST", color: 0xffd15e, shape: "bolt" },
   { ability: ABILITY.DOUBLE_DAMAGE, label: "Double Damage", shortLabel: "DD", color: 0xff825d, shape: "sword" },
   { ability: ABILITY.ARMOR_TREASURE, label: "Armor Treasure", shortLabel: "ARM", color: 0x73d8ff, shape: "shield" },

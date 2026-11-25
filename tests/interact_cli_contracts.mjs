@@ -18,7 +18,7 @@ import { commandDefinition, namespaceCommandKey } from "../scripts/interact/comm
 import { InteractTestArtifacts } from "./fixtures/interact_test_artifacts.mjs";
 
 const targetedItem = { sessionId: "lab_0123456789abcdef0123456789abcdef", playerId: 1,
-  command: { c: "useAbility", ability: "healingPotion", units: [1], targetId: "patient" } };
+  command: { c: "useAbility", ability: "regen", units: [1], targetId: "patient" } };
 assert.equal(validateCommandInput("order", targetedItem).command.targetId, "patient");
 assert.throws(() => validateCommandInput("order", {
   ...targetedItem, command: { ...targetedItem.command, targetId: -1 },

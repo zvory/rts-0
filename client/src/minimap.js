@@ -1,3 +1,4 @@
+import { drawMinimapItems } from "./minimap_items.js";
 import { issueMinimapOrder } from "./minimap_commands.js";
 import { firstTargetPress, targetCenter } from "./input/two_stage_target.js";
 import { updateMinimapPointPreview } from "./minimap_point_preview.js";
@@ -341,6 +342,7 @@ export class Minimap {
     this._drawPlayerOwnedEntityOutline(entities);
     this._drawEntities(entities, { foregroundPlayerOnly: true, attackFlashIds });
     this._drawEntities(entities.filter((entity) => entity.aboveFogReveal), { attackFlashIds });
+    drawMinimapItems(this.ctx, this.state.abilityObjects, (x, y) => this._worldToCanvas(x, y), this._presentationScale());
     if (!capturePresentation) this._drawArtilleryFiringMarkers(now);
     if (!capturePresentation) this._drawViewport();
     if (!capturePresentation) this._drawPings(now);
@@ -768,6 +770,7 @@ export class Minimap {
   }
 
   _drawEntityBlip(ctx, e, color, playerOwned) {
+    if (e.kind === KIND.SHOP_DELIVERY) return;
     const p = this._worldToCanvas(e.x, e.y);
     ctx.fillStyle = color;
     const entityScale = this._entityBlipScale(e);

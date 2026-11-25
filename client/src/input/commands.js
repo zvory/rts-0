@@ -1159,7 +1159,7 @@ export function _shopFullCursorTarget() {
   if (!this.mouse || this._drag || intent?.activeLabTool || intent?.placement ||
       this.inputRouter?.activePreviewSurface?.()) return null;
   const mode = intent?.commandTarget;
-  if (mode && !(mode.kind === "ability" && [ABILITY.ESCAPE_TREASURE,
+  if (mode && !(mode.kind === "ability" && [ABILITY.REGEN, ABILITY.ESCAPE_TREASURE,
     ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE, ABILITY.HASTE,
     ABILITY.DOUBLE_DAMAGE].includes(mode.ability))) return null;
   if (!this.state.selectedEntities().some((entity) => entity.kind === KIND.SHOP &&

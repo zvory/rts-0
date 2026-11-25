@@ -16,7 +16,7 @@ use crate::protocol::Event;
 pub(in crate::game) fn is_shop_item(ability: AbilityKind) -> bool {
     matches!(
         ability,
-        AbilityKind::HealingPotion
+        AbilityKind::Regen
             | AbilityKind::EscapeTreasure
             | AbilityKind::HealingSeal
             | AbilityKind::Haste
@@ -203,7 +203,8 @@ pub(super) fn purchase(
 pub(in crate::game) fn is_buff_item(ability: AbilityKind) -> bool {
     matches!(
         ability,
-        AbilityKind::Haste
+        AbilityKind::Regen
+            | AbilityKind::Haste
             | AbilityKind::DoubleDamage
             | AbilityKind::ArmorTreasure
             | AbilityKind::VitalityTreasure
@@ -450,6 +451,20 @@ pub(in crate::game) fn heal_seals(entities: &mut EntityStore, teams: &TeamRelati
             entities.remove(id);
         } else if let Some(seal) = entities.get_mut(id) {
             seal.spend_seal_healing(seal.hp.saturating_sub(remaining));
+        }
+    }
+}
+
+/// Permanent Regen heals one HP every ten simulation ticks, capped at max HP.
+pub(in crate::game) fn heal_regen(entities: &mut EntityStore, tick: u32) {
+    if !tick.is_multiple_of(config::REGEN_PULSE_TICKS) {
+        return;
+    }
+    for id in entities.ids() {
+        if let Some(unit) = entities.get_mut(id) {
+            if unit.hp > 0 && unit.shop_item_active(AbilityKind::Regen) {
+                unit.restore_hp(1);
+            }
         }
     }
 }

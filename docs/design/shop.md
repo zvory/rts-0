@@ -6,7 +6,7 @@ The user approved the gourd Shop concept and explicitly authorized implementatio
 a Cultivator building selling targeted goods as specified below. It has no production, research,
 aura, resource storage, supply, attack, or rally point. Opponents can attack and destroy it.
 
-UI description describes the Shop’s healing potions and escape treasures.
+UI description describes the Shop’s Regen items and escape treasures.
 
 Approved art: the upper part of a giant gourd recently driven into the earth, surrounded by
 fractured rocks. A covered open service window has no door. The side bears 愛 (love). The cork,
@@ -42,24 +42,25 @@ Focused checks and the owned PR record the final verification and merge outcome.
 
 ## Targeted goods
 
-Completed Shops sell Healing Potion for **50 oil** and Escape Treasure for **100 oil**.
+Completed Shops sell Regen for **50 oil** and Escape Treasure for **100 oil**.
 Select the Shop, click an item, then click a living friendly unit (including allied units).
 Buildings and enemies are invalid targets. Purchases require the target to be visible.
 All unit-targeted goods have **unlimited range**. Invalid purchases spend nothing.
-Both items travel directly from the Shop toward the target at **7.5 tiles per second**;
-green circles represent healing potions and purple circles represent escape treasures.
+All targeted items travel directly from the Shop toward the target at **7.5 tiles per second**;
+deliveries use the same colored icons displayed on equipped units, in the world and minimap.
 The server owns delivery and effects; the client renders fog-filtered projectile positions.
 
-Healing Potion restores the target to full HP on arrival. This follows the user's final
-“heals the unit fully” instruction, superseding the earlier 75 HP description.
+Regen is a permanent carried passive that restores **3 HP per second** after arrival
+(one HP every ten simulation ticks), capped at maximum HP. It does not instantly heal,
+expire, or stack; it occupies one carried slot and survives supplying-Shop destruction.
 Escape Treasure grants one lethal-damage escape, returning the unit to its supplying Shop
 with **1 HP**, regardless of the unit's distance when it takes damage. The applied effect is
 shown only to the unit’s owner and allies as a purple **ESC** label below the health bar,
 even when health bars are hidden. Enemies receive no protection flag even when they see the unit.
 
-Novices and Adepts carry up to three items; Masters carry up to six, without category limits and no RFV command-card controls. Distinct passive goods can coexist with Escape Treasure within the rank limit. In-flight deliveries reserve slots; Healing Potion and Healing Seal do not use slots. Other unit kinds retain their existing behavior. Duplicate copies of the same item are rejected,
+Novices and Adepts carry up to three items; Masters carry up to six, without category limits and no RFV command-card controls. Distinct passive goods can coexist with Escape Treasure within the rank limit. In-flight deliveries reserve slots; Healing Seal does not use slots; Regen uses one. Other unit kinds retain their existing behavior. Duplicate copies of the same item are rejected,
 including a copy already in flight, without spending oil. Escape automatically activates on lethal
-damage by default. Healing Potion and Healing Seal are consumed rather than carried.
+damage by default. Healing Seal is placed rather than carried.
 
 A destroyed supplying Shop cancels in-flight goods and removes its applied escape protection.
 Escape Treasure has a **60-second purchase cooldown shared across all Shops owned by the purchasing player**, starting only on successful launch. This cooldown survives building destruction, new Shops, checkpoints and replays. Repeated escape purchases do not stack. Delivery tracks a moving target directly; disappearing or
@@ -96,7 +97,9 @@ Carried passive items use existing entity ability-use state; the owner and privi
 Vitality Treasure is a **100 oil** defense item, purchased from a completed Shop with **F** and can coexist with Armor Treasure. It uses the same visible friendly-unit targeting, unlimited purchase range, delivery, same-item reservation, and non-stacking rules. Delivery immediately grants **+150 maximum HP and +150 current HP permanently**, preserving any pre-existing missing HP. It remains carried and passive, with no activation, consumption, or expiry. For example, 30/58 HP becomes 180/208 HP. Dao evolution and Master advancement retain the flat 150 bonus without multiplying it. Carried passive state, including the health pair, survives checkpoints. Destroying the supplying Shop after delivery does not remove Armor or Vitality.
 
 Shop command rows mirror the carried categories: top row movement (Escape Q); middle row defense
-(Healing Potion A, Healing Seal S, Armor D, Vitality F); bottom row attack (Haste Z, Double Damage X).
-Carried goods appear below the health bar as ESC, ARM, VIT, HST, and DD rather than command-card tiles.
+(Regen A, Healing Seal S, Armor D, Vitality F); bottom row attack (Haste Z, Double Damage X).
+Carried goods appear as a rosette of colored icons at the unit center: a green cross for Regen,
+a purple return diamond for Escape, a shield for Armor, a heart for Vitality, a bolt for Haste,
+and a sword for Double Damage. Flying goods and minimap markers use the same icons.
 Rejected duplicate purchases send the purchasing player an info Notice:
 “Item already equipped or being delivered”, without spending resources.
