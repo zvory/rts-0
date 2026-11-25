@@ -150,6 +150,11 @@ export const EKAT_LINE_SHOT_WIDTH_TILES = 0.6;
 export const EKAT_LINE_SHOT_SPEED_PX_PER_TICK = 8;
 export const EKAT_LINE_SHOT_DAMAGE = 40;
 export const EKAT_LINE_SHOT_COOLDOWN_TICKS = TICK_HZ * 20;
+export const VECTOR_FIELD_SPEED_PX_PER_TICK = 4;
+export const VECTOR_FIELD_WIDTH_TILES = 6;
+export const VECTOR_FIELD_DEPTH_TILES = 3;
+export const VECTOR_FIELD_RANGE_TILES = 7.5;
+export const VECTOR_FIELD_DURATION_TICKS = TICK_HZ * 10;
 export const EKAT_MAGIC_ANCHOR_RANGE_TILES = 7.5;
 export const EKAT_MAGIC_ANCHOR_DURATION_TICKS = TICK_HZ * 10;
 export const EKAT_MAGIC_ANCHOR_RADIUS_TILES = 3.0;
@@ -610,10 +615,10 @@ export const ABILITIES = Object.freeze({
     title: "Direct a field six tiles across and three deep; displaces every ground unit 4 pixels per tick",
     carriers: Object.freeze([KIND.MAGIC_ADEPT]),
     targetMode: "worldPoint",
-    rangeTiles: EKAT_MAGIC_ANCHOR_RANGE_TILES,
+    rangeTiles: VECTOR_FIELD_RANGE_TILES,
     cooldownTicks: 0,
     cost: Object.freeze({ steel: 0, oil: 0 }),
-    durationTicks: EKAT_MAGIC_ANCHOR_DURATION_TICKS,
+    durationTicks: VECTOR_FIELD_DURATION_TICKS,
     queued: false,
     queuePolicy: "notQueueable",
   }),
@@ -788,7 +793,3 @@ export function researchDefinition(upgrade, upgrades = [], entities = [], owner 
   return { ...def, cost: { steel: def.cost.steel * multiplier, oil: def.cost.oil * multiplier },
     researchTicks: def.researchTicks * multiplier };
 }
-
-export const VECTOR_FIELD_SPEED_PX_PER_TICK = 4;
-export const VECTOR_FIELD_WIDTH_TILES = 6;
-export const VECTOR_FIELD_DEPTH_TILES = 3;

@@ -14,3 +14,5 @@ This remains a local visual-review prototype. Placement is immediate, not queued
 Vector Fields currently select the first active field rather than stacking. Compact snapshot v73
 carries public field direction under normal fog visibility. Prior weighted/unweighted recordings
 are historical prototypes and no longer represent the current balance.
+
+Current gameplay recording source: `media_729f3dccf50cb3f8ad670e847c9f25c8`. Focused checks: 25 Anchor regressions, three Vector Field cases, staged client targeting and separate Adept/Master/Ekat command cards, protocol/catalog parity, client architecture, and strict simulation-library Clippy. Vector Field range/lifetime constants are independent of Anchor.

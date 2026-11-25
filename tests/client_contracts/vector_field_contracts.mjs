@@ -28,3 +28,15 @@ for(const direction of [[1,0],[0,1],[-1,-1]]){
  assert(points.every(c=>Number.isFinite(c[1])&&Number.isFinite(c[2])));
 }
 console.log('vector_field_contracts: ok');
+
+const {selectedAbilityAffordances}=await import('../../client/src/hud_command_card.js');
+for(const daoMaster of [false,true]){
+ const entries=selectedAbilityAffordances({playerId:1,factionId:'cultivators',groupCooldownClocks:()=>[]},
+   [{id:1,owner:1,kind:KIND.MAGIC_ADEPT,dao:'magic',daoMaster,hp:150}]);
+ assert(entries.some(e=>e.definition.ability===ABILITY.VECTOR_FIELD));
+ assert(!entries.some(e=>e.definition.ability===ABILITY.EKAT_MAGIC_ANCHOR));
+}
+const ekatEntries=selectedAbilityAffordances({playerId:1,factionId:'ekat',groupCooldownClocks:()=>[]},
+ [{id:1,owner:1,kind:KIND.EKAT,hp:150}]);
+assert(ekatEntries.some(e=>e.definition.ability===ABILITY.EKAT_MAGIC_ANCHOR));
+assert(!ekatEntries.some(e=>e.definition.ability===ABILITY.VECTOR_FIELD));

@@ -474,7 +474,11 @@ pub(crate) fn launch_world_ability(
                     x: anchor_x,
                     y: anchor_y,
                     created_tick: tick,
-                    expires_tick: tick.saturating_add(config::EKAT_MAGIC_ANCHOR_DURATION_TICKS),
+                    expires_tick: tick.saturating_add(if vector {
+                        config::VECTOR_FIELD_DURATION_TICKS
+                    } else {
+                        config::EKAT_MAGIC_ANCHOR_DURATION_TICKS
+                    }),
                     payload: if vector {
                         AbilityObjectPayload::VectorField {
                             direction: [1.0, 0.0],
