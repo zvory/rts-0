@@ -65,6 +65,7 @@ import {
   _refreshAntiTankGunSetupPreview,
   _refreshPointTargetPreview,
   _refreshResourceMiningPreview,
+  _shopFullCursorTarget,
   _selectedGathererIds,
   _selectedOwnAntiTankGunIds,
   _selectedOwnLandUnitIds,
@@ -74,6 +75,7 @@ import {
 } from "./commands.js";
 import { _handleBlur, _handleKeyDown, _handleKeyUp, _handleWheel } from "./camera_controls.js";
 import { CameraNavigationInput } from "./camera_navigation.js";
+import { ShopFullCursor } from "./shop_full_cursor.js";
 import { ScreenOverlay } from "./screen_overlay.js";
 import {
   _confirmPlacement,
@@ -202,6 +204,7 @@ export class Input {
     this.commandInteraction = commandInteraction;
     this.controlPolicy = controlPolicy;
     this.screenOverlay = new ScreenOverlay(drawMarquee);
+    this.shopFullCursor = new ShopFullCursor(domElement);
     this.fog = fog;
     this.audio = audio || null;
     this.inputRouter = inputRouter;
@@ -324,6 +327,7 @@ export class Input {
     this._artilleryFireGesture = null;
     this.exitPointerLock();
     this.screenOverlay?.destroy?.();
+    this.shopFullCursor?.destroy();
     this.clientIntent?.clearPlannedOrders?.();
     const el = this.dom;
     el.removeEventListener("mousedown", this._onMouseDown);
@@ -402,6 +406,7 @@ export class Input {
   update(dt) {
     void dt;
     this._flushPointerLockCursor();
+    this.shopFullCursor?.update(this);
     this._intent()?.updateContextualBuildPreview?.(null);
     if (this.inputRouter?.activePreviewSurface?.()) {
       this._cancelFormationGesture();
@@ -1025,6 +1030,7 @@ Object.assign(Input.prototype, {
   _selectedOwnUnitIds,
   _selectedOwnLandUnitIds,
   _selectedProducerBuildingIds,
+  _shopFullCursorTarget,
   _selectedGathererIds,
   _selectedWorkerIds,
   _selectedOwnAntiTankGunIds,
