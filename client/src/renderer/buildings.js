@@ -217,7 +217,8 @@ export function _drawBuilding(e, colorByOwner, state) {
 
   }
 
-  if (e.kind === KIND.PORTAL && !underConstruction) {
+  // The aperture is fitted to the gate atlas, not the opaque circular fallback.
+  if (e.kind === KIND.PORTAL && !underConstruction && usePngRig) {
     this._jadeSilkPortal ||= new JadeSilkPortal(this);
     this._jadeSilkPortal.draw(e, w, rendererVisualNow(this));
   }

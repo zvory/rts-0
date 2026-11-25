@@ -27,7 +27,14 @@ try {
   const ownerColors = new Map([[1, 0x4878c8]]);
   const state = { playerId: 1, players: [{ id: 1, color: "#4878c8" }] };
 
+  renderer._buildingPngRigAtlasTextures.delete(KIND.PORTAL);
   renderer._drawBuilding(portal, ownerColors, state);
+  assert(!renderer._jadeSilkPortal && !renderer._pools.buildingShadows.has(portal.id),
+    "unavailable gate atlas keeps the circular fallback without a mismatched aperture");
+  renderer._buildingPngRigAtlasTextures.set(KIND.PORTAL, PIXI.Texture.from("portal-test-atlas"));
+  renderer._drawBuilding(portal, ownerColors, state);
+  assert(renderer._liveRigPools.buildingRigs.get(portal.id)?.matchesPngAtlasRig,
+    "loaded gate atlas replaces the circular fallback before rendering its aperture");
   const aperture = renderer._pools.buildingShadows.get(portal.id);
   const texture = renderer._jadeSilkPortal.texture;
   assert(aperture?.silk.length === 3, "completed Portal renders three silk layers");
