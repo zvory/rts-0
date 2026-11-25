@@ -1395,13 +1395,21 @@ projectile without resolving further hits.
 Ekat's `ekatMagicAnchor` world-point activation places one replacement-style, non-blocking,
 non-attackable runtime object at the target point. It naturally expires after 10 seconds. While
 active, it creates a 3-tile pull field affecting only enemy ground units (owned, allied, neutral,
-and Scout Plane units are unaffected). After normal movement, one inward displacement vector
-applies to every eligible unit regardless of its path or movement direction. Its magnitude is
+and Scout Plane units are unaffected). One inward displacement vector applies to every eligible unit regardless of its path or
+movement direction. For routed units it is added to the proposed walking displacement before
+body admission; other units receive the same vector without a walking component. Its magnitude is
 `movement_speed × EKAT_MAGIC_ANCHOR_PULL_SPEED_MULTIPLIER` (2.4), scaled by linear radial
 falloff and divided by the square root of collision footing resistance (at least 1.0, so
 pass-through worker orders receive normal infantry pull). The strongest overlapping
 field applies. Pull is clamped to the center and checked against terrain and unit blockers;
 orders and paths are preserved, and the reported movement delta includes both displacements.
+Affected units and their friendly contacts block entry rather than transferring crowd pressure.
+Both routed motion and pull use swept contact checks. Collision cleanup may resolve existing
+intersections inward or laterally, but cannot increase an affected unit's distance from the field
+center. Constrained intersections may temporarily remain instead of ejecting the front of a crowd.
+Normal friendly pushing resumes when the field expires or a unit leaves it. Voluntary escape
+remains possible when its net movement overcomes the resisted pull. These rules also cover the
+exact field center; they do not affect allied/owned units outside an enemy field.
 There are no Anchor directional speed multipliers or separate stationary movement rules. If an active anchor exists when `ekatLineShot`
 is accepted, the runtime spawns one projectile from Ekat and one from the anchor toward the same
 cursor point; both return toward Ekat's current server position.

@@ -629,7 +629,11 @@ profiles and explicit activation/autocast policy instead of being folded into de
   toward the center) and divided by the square root of footing resistance, with a minimum
   resistance of 1.0 so working workers are still pulled. The strongest
   overlapping field applies; displacement cannot overshoot its center or cross blocking bodies
-  or impassable terrain. This replaces directional speed multipliers and the separate idle rule. Her Consume ability is
+  or impassable terrain. Walking and pull are combined before movement admission. Friendly
+  contacts involving affected units block or slide instead of pushing the front of a crowd through
+  the field; overlap cleanup cannot add outward displacement to an affected unit. Existing
+  intersections may remain constrained until space opens, and ordinary friendly pushing returns
+  on expiry. This replaces directional speed multipliers and the separate idle rule. Her Consume ability is
   self-targeted, has no resource cost or cooldown, consumes the nearest owned living Golem within 2
   tiles, and heals Ekat to full HP. Existing prototype combat abilities remain directly available
   until the Ekat tech-unlock building slice replaces them.

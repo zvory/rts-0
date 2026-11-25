@@ -16,8 +16,11 @@ use crate::game::services::spatial::SpatialIndex;
 use crate::game::smoke::SmokeCloudStore;
 use crate::game::upgrade::UpgradeKind;
 use crate::game::PlayerState;
+
+#[cfg(test)]
 use rts_rules::math::GameplayMath as _;
 
+mod anchor;
 mod armor_reaction;
 mod barbed_wire;
 mod body_growth;
@@ -58,6 +61,7 @@ pub(crate) fn resolve_collisions(
         map,
         occ,
         &crate::game::teams::TeamRelations::from_player_teams([]),
+        None,
     )
 }
 
@@ -67,9 +71,10 @@ pub(crate) fn resolve_collisions_with_teams(
     map: &Map,
     occ: &Occupancy,
     teams: &crate::game::teams::TeamRelations,
+    anchor_context: Option<(&AbilityRuntime, u32)>,
 ) -> bool {
     let before = barbed_wire::positions(map, entities);
-    collision::resolve_collisions(entities, spatial, map, occ, teams);
+    collision::resolve_collisions(entities, spatial, map, occ, teams, anchor_context);
     barbed_wire::apply_entries(map, entities, &before)
 }
 pub(crate) use pivot_drive::{angle_delta, rotate_toward};
@@ -160,8 +165,24 @@ pub(crate) fn movement_system_with_context(
         }
         allowed
     });
-    waypoints::advance_moving_units(map, entities, players, occ, spatial, tick);
-    apply_magic_anchor_pull(map, entities, players, occ, tick, ability_runtime);
+    let integrated = waypoints::advance_moving_units(
+        map,
+        entities,
+        players,
+        occ,
+        spatial,
+        tick,
+        ability_runtime,
+    );
+    anchor::apply_pull(
+        map,
+        entities,
+        &teams,
+        occ,
+        tick,
+        ability_runtime,
+        &integrated,
+    );
     barbed_wire::apply_entries(map, entities, &wire_positions);
     for id in entities.ids() {
         if let Some(e) = entities.get_mut(id) {
@@ -199,87 +220,5 @@ fn clamp_meth_machine_gunner_setup(entities: &mut EntityStore, id: u32) {
     };
     if let Some(setup) = boosted_setup {
         e.set_weapon_setup(setup);
-    }
-}
-
-fn apply_magic_anchor_pull(
-    map: &Map,
-    entities: &mut EntityStore,
-    players: &[PlayerState],
-    occ: &Occupancy,
-    tick: u32,
-    ability_runtime: &AbilityRuntime,
-) {
-    let teams = crate::game::teams::TeamRelations::from_player_teams(
-        players.iter().map(|p| (p.id, p.team_id)),
-    );
-    let mut blockers = crate::game::services::standability::UnitBlockers::new(entities);
-    let world_max_x = map.world_width_px() - 0.01;
-    let world_max_y = map.world_height_px() - 0.01;
-    for id in entities.ids() {
-        let Some((kind, owner, x, y, facing, speed, resistance)) = entities.get(id).and_then(|e| {
-            if !e.is_unit() || e.kind == EntityKind::ScoutPlane {
-                return None;
-            }
-            let profile = standability::footing_profile(e);
-            // Work orders allow workers to pass through friendly traffic, but must not
-            // make them immune to hostile displacement (or divide by zero).
-            let resistance = standability::footing_resistance(profile).max(1.0);
-            let speed = e.movement_speed();
-            Some((
-                e.kind,
-                e.owner,
-                e.pos_x(),
-                e.pos_y(),
-                e.facing(),
-                speed,
-                resistance,
-            ))
-        }) else {
-            continue;
-        };
-        let Some((dir, strength, distance)) =
-            ability_runtime.magic_anchor_pull(owner, &teams, x, y, tick)
-        else {
-            continue;
-        };
-        let pull_px = (speed * config::EKAT_MAGIC_ANCHOR_PULL_SPEED_MULTIPLIER * strength
-            / resistance.det_sqrt())
-        .min(distance);
-        if pull_px <= 0.0 || !pull_px.is_finite() {
-            continue;
-        }
-        let next_x = (x + dir.0 * pull_px).clamp(0.0, world_max_x);
-        let next_y = (y + dir.1 * pull_px).clamp(0.0, world_max_y);
-        if !crate::game::services::standability::unit_static_standable_with_radius(
-            map,
-            occ,
-            kind,
-            next_x,
-            next_y,
-            facing,
-            entities.get(id).map(|e| e.radius()),
-        ) {
-            continue;
-        }
-        if entities
-            .get(id)
-            .is_some_and(|e| !blockers.motion_clear(e, (next_x, next_y), facing, &teams))
-        {
-            continue;
-        }
-        if let Some(e) = entities.get_mut(id) {
-            e.set_position(next_x, next_y);
-            blockers.update(e);
-            let (next_x, next_y) = (e.pos_x(), e.pos_y());
-            let previous_delta = e.movement_delta();
-            e.set_movement_delta(previous_delta.0 + next_x - x, previous_delta.1 + next_y - y);
-            if kind == EntityKind::Tank && (next_x != x || next_y != y) {
-                if let Some(combat) = e.combat.as_mut() {
-                    combat.tank_stationary_range_ticks = 0;
-                    combat.tank_stationary_range_reset_this_tick = true;
-                }
-            }
-        }
     }
 }

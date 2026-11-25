@@ -1,4 +1,5 @@
 use crate::config;
+use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::entity::{
     uses_car_movement_semantics, uses_oriented_vehicle_body, uses_pivot_vehicle_movement,
     AttackPhase, Entity, EntityKind, EntityStore, MovePhase, Order, PanzerfaustState, WeaponSetup,
@@ -15,6 +16,7 @@ use crate::game::upgrade::UpgradeKind;
 use crate::game::PlayerState;
 use crate::rules::terrain::{movement_speed_multiplier, TerrainKind};
 use rts_rules::math::GameplayMath as _;
+use std::collections::BTreeSet;
 
 use super::car_drive::{
     barrage_maneuver_target, barrage_pose_ready, plan_barrage_maneuver, plan_scout_car_motion,
@@ -53,9 +55,14 @@ pub(super) fn advance_moving_units(
     occ: &Occupancy,
     spatial: &SpatialIndex,
     tick: u32,
-) {
+    ability_runtime: &AbilityRuntime,
+) -> BTreeSet<u32> {
+    let mut integrated = BTreeSet::new();
     let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
-    let mut blockers = UnitBlockers::new(entities);
+    let mut blockers = UnitBlockers::with_contact_locks(
+        entities,
+        super::anchor::contact_ids(entities, &teams, ability_runtime, tick),
+    );
     let wire_tiles = super::barbed_wire::tiles(map, entities);
     for id in entities.ids() {
         let barrage_target = entities.get(id).and_then(barrage_maneuver_target);
@@ -216,7 +223,44 @@ pub(super) fn advance_moving_units(
             if let Some(e) = entities.get_mut(id) {
                 let before = e.clone();
                 if super::pivot_recovery::advance(e, map, occ, recovery_speed, &neighbors) {
-                    if !blockers.motion_clear(&before, (e.pos_x(), e.pos_y()), e.facing(), &teams) {
+                    let admitted = if let Some(pull) =
+                        super::anchor::displacement(&before, &teams, ability_runtime, tick)
+                    {
+                        integrated.insert(id);
+                        super::anchor::admit_motion(
+                            map,
+                            occ,
+                            &blockers,
+                            &before,
+                            &teams,
+                            (e.pos_x() + pull.0, e.pos_y() + pull.1),
+                            e.facing(),
+                        )
+                    } else {
+                        blockers
+                            .motion_clear(&before, (e.pos_x(), e.pos_y()), e.facing(), &teams)
+                            .then_some((e.pos_x(), e.pos_y()))
+                    };
+                    if let Some(pos) = admitted {
+                        e.set_position(pos.0, pos.1);
+                        let pos = (e.pos_x(), e.pos_y());
+                        e.set_movement_delta(pos.0 - before.pos_x(), pos.1 - before.pos_y());
+                        // Recovery reset this before Anchor admission; stationary
+                        // range must follow the displacement that actually committed.
+                        if distance_between((before.pos_x(), before.pos_y()), pos) <= 0.01 {
+                            if let Some((combat, old)) =
+                                e.combat.as_mut().zip(before.combat.as_ref())
+                            {
+                                combat.tank_stationary_range_ticks =
+                                    old.tank_stationary_range_ticks;
+                                combat.tank_stationary_range_reset_this_tick =
+                                    old.tank_stationary_range_reset_this_tick;
+                            }
+                        }
+                        if let Some(m) = e.movement.as_mut() {
+                            m.last_progress_pos = pos;
+                        }
+                    } else {
                         *e = before;
                         if let Some(m) = e.movement.as_mut() {
                             m.pivot_recovery = None;
@@ -542,6 +586,37 @@ pub(super) fn advance_moving_units(
             }
         }
 
+        // Admit the sum of voluntary motion and forced motion once. A blocked inward
+        // pull must not leave an earlier outward path step behind as free movement.
+        if let Some((pull_x, pull_y)) =
+            super::anchor::displacement(&motion_entity, &teams, ability_runtime, tick)
+        {
+            integrated.insert(id);
+            let desired = (x + pull_x, y + pull_y);
+            let facing = new_facing.unwrap_or(original_facing);
+            let legal = super::anchor::admit_motion(
+                map,
+                occ,
+                &blockers,
+                &motion_entity,
+                &teams,
+                desired,
+                facing,
+            );
+            (x, y) = legal.unwrap_or((orig_x, orig_y));
+            let consumed_goal = entities.get(id).is_some_and(|e| e.path_is_empty())
+                && motion_entity
+                    .movement
+                    .as_ref()
+                    .and_then(|m| m.path.first())
+                    .is_some_and(|&goal| distance_between((x, y), goal) > ARRIVE_EPS);
+            if legal.is_none() || consumed_goal {
+                if let Some(e) = entities.get_mut(id) {
+                    e.restore_blocked_movement(original_movement.clone());
+                }
+            }
+        }
+
         // Car arcs, arrival snaps, rotation unjams and all fallback paths share admission.
         if entities.get(id).is_some_and(|e| {
             !blockers.motion_clear(e, (x, y), new_facing.unwrap_or(original_facing), &teams)
@@ -780,6 +855,7 @@ pub(super) fn advance_moving_units(
             }
         }
     }
+    integrated
 }
 
 /// Return the strongest current Command Car speed effect for an owned unit.

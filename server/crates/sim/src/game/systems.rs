@@ -461,6 +461,7 @@ pub(crate) fn run_tick(
             map,
             &pre_collision.occupancy,
             &teams,
+            Some((ability_runtime, tick)),
         )
     });
     if wire_deaths {
