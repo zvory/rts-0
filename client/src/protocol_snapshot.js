@@ -382,7 +382,7 @@ function decodeCompactEntity(record, index) {
   assignOptional(entity, "escapeTreasure", fields, 53, readBool);
   assignOptional(entity, "itemRadianceTier", fields, 54, (value) => {
     const tier = readU32(value, "entity.itemRadianceTier");
-    if (tier > 3) throw new Error("entity.itemRadianceTier must be 0-3");
+    if (tier > 6) throw new Error("entity.itemRadianceTier must be 0-6");
     return tier;
   });
   return entity;

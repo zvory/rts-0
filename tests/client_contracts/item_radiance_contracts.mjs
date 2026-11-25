@@ -17,7 +17,7 @@ for (const kind of [
   KIND.MAGIC_ADEPT,
 ]) {
   for (const daoMaster of [false, true]) {
-    for (let tier = 0; tier <= 3; tier++) {
+    for (let tier = 0; tier <= 6; tier++) {
       const publicView = { kind, daoMaster, itemRadianceTier: tier };
       assert(
         cultivatorItemTier(publicView) === tier,
@@ -48,7 +48,7 @@ for (const kind of [
     }
   }
 }
-for (const itemRadianceTier of [undefined, null, -1, 4, 1.5, "3", NaN]) {
+for (const itemRadianceTier of [undefined, null, -1, 7, 1.5, "3", NaN]) {
   assert(
     cultivatorItemTier({ kind: KIND.MAGIC_ADEPT, itemRadianceTier }) === 0,
     "missing or invalid visual tiers fail closed",
@@ -175,16 +175,16 @@ try {
     live.itemRimUniforms.uniforms.uTier === 3 && !live.itemGlow,
     "one item starts at the approved former maximum without allocating bloom",
   );
-  unit.itemRadianceTier = 2;
+  unit.itemRadianceTier = 3;
   updateItemRadiance(live, unit, 1100);
   const rim = live.itemRim,
     blur = live.itemGlowBlur;
   assert(
     live.itemRimUniforms.uniforms.uTier === 5 &&
       live.itemGlow.visible !== false,
-    "two items add bloom and increase rim strength",
+    "three items add bloom and increase rim strength",
   );
-  unit.itemRadianceTier = 3;
+  unit.itemRadianceTier = 6;
   body.texture = "moving-frame";
   updateItemRadiance(live, unit, 1200);
   assert(
@@ -196,12 +196,20 @@ try {
   assert(
     live.itemRimUniforms.uniforms.uTier === 7 &&
       live.itemGlowBlur.strength === 6,
-    "three items use the strongest rim and bloom",
+    "six items use the strongest rim and bloom",
   );
   assert(
     live.itemRim === rim && live.itemGlowBlur === blur && createdFilters === 2,
     "animated updates reuse GPU filters",
   );
+  let previousStrength = 0;
+  for (let count = 1; count <= 6; count++) {
+    unit.itemRadianceTier = count;
+    updateItemRadiance(live, unit, 1200);
+    const strength = live.itemRimUniforms.uniforms.uTier;
+    assert(strength > previousStrength, "every additional item increases rim strength");
+    previousStrength = strength;
+  }
   unit.itemRadianceTier = 0;
   updateItemRadiance(live, unit, 1300);
   assert(

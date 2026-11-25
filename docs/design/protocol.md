@@ -2193,11 +2193,11 @@ Vitality Treasure uses ability `vitalityTreasure` (compact ability 26, order-sta
 
 ### Public Cultivator item radiance
 
-Compact v70 appends optional entity slot **54**, `itemRadianceTier: u8` (0–3),
+Compact v70 appends optional entity slot **54**, `itemRadianceTier: u8` (0–6),
 as a complete per-snapshot visual value for already-visible Cultivator fighters.
 All recipients (owners, allies, visible enemies, selected-player/spectator unions and full-world
 observers) receive the same tier. Zero is explicitly projected to clear consumed or expired items.
-Each distinct carried item contributes one tier, saturated at three (a visual cap only).
+Each distinct carried item contributes one tier, saturated at six.
 The tier discloses visual strength, never inventory identities or timers.
 Existing private `abilities` and team-private `escapeTreasure` retain their privacy policies.
 Fog-hidden carriers are omitted as usual; vision-only entities omit this field. The client

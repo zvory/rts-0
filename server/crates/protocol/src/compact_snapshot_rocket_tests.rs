@@ -144,7 +144,7 @@ fn escape_treasure_flag_is_omitted_when_absent() {
 #[test]
 fn item_radiance_tier_appends_public_strength_including_explicit_zero() {
     let mut unit = EntityView::new(1, 1, "magic_adept", 320.0, 320.0, 75, 150, "idle");
-    for tier in 0..=3 {
+    for tier in 0..=6 {
         unit.item_radiance_tier = Some(tier);
         let compact = serde_json::to_value(CompactEntity(&unit)).unwrap();
         assert_eq!(compact.as_array().unwrap().len(), 55);

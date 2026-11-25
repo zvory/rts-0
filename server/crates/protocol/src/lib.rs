@@ -6,7 +6,7 @@
 //! Tag conventions: top-level messages use `"t"`, commands use `"c"`, events use `"e"`.
 //! Coordinates are world pixels (floats) unless the field name ends in `Tile`.
 use serde::{Deserialize, Serialize};
-// Dao Adepts: kinds 35–37; public Master rank is EntityView slot 52 (v65); public itemRadianceTier is slot 54 (v70), fog-gated with its carrier.
+// Dao Adepts: kinds 35–37; public Master rank is EntityView slot 52 (v65); public itemRadianceTier is slot 54 (v70), range 0–6, fog-gated with its carrier.
 pub mod chat;
 mod client_message;
 mod client_net_report;

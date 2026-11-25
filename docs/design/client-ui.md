@@ -2977,8 +2977,7 @@ the passive tile so active commands and the item column retain their positions. 
 
 Carried items have no command-card tiles or RFV bindings. Shop purchase controls remain unchanged.
 Haste, Double Damage, Armor Treasure, and Vitality Treasure are permanent passive effects;
-Escape Treasure automatically rescues the carrier on lethal damage. There is no total or category
-inventory cap. Each distinct item can coexist with all others; duplicate copies of the same effect
+Escape Treasure automatically rescues the carrier on lethal damage. Novices and Adepts have three carried-item slots; Masters have six. In-flight deliveries reserve slots, while Healing Potion and Healing Seal use none. There is no category cap; duplicate copies of the same effect
 are rejected, including deliveries already in flight. Healing Potion and Healing Seal are consumed goods.
 Vitality adds 150 maximum and current HP and persists through Dao promotion.
 
@@ -2988,8 +2987,8 @@ ESC (purple), ARM (cyan), VIT (magenta), HST (yellow), DD (orange). Badges remai
 health bars are hidden and never appear on Shops. Their labels supplement color identification.
 Escape's existing fog-safe particle burst and trail still render on rescue.
 
-Cultivator fighter radiance uses the public visual strength `itemRadianceTier` (0–3), counting
-distinct carried items and saturating at three. This is a presentation cap, never an inventory cap.
+Cultivator fighter radiance uses the public visual strength `itemRadianceTier` (0–6), counting
+distinct carried items and saturating at six. The former three-item glow is now the six-item glow; counts two, four and five interpolate between the former one/two/three-item appearances at counts one/three/six. Only five distinct items currently exist, so six is a reserved visual endpoint.
 Identities remain private; hidden carriers reveal no glow. Frame-strip instances dispose their filters.
 
 ### Client version guard

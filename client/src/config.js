@@ -156,3 +156,5 @@ export {
 } from "./config/factions.js";
 
 export { statsForFaction } from "./config/factions.js";
+
+export { CULTIVATOR_ITEM_CAPACITY, CULTIVATOR_MASTER_ITEM_CAPACITY } from "./config/rules_mirror.js";

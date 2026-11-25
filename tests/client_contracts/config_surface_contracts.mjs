@@ -30,6 +30,8 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   "COMMAND_CAR_BODY",
   "COMMAND_CAR_SUPPLY_CAP_BONUS",
   "CULTIVATORS_FACTION_ID",
+  "CULTIVATOR_ITEM_CAPACITY",
+  "CULTIVATOR_MASTER_ITEM_CAPACITY",
   "DAO_MASTER_BODY_SCALE",
   "DAO_RANGED_RANGE_TILES",
   "DAO_RESEARCH_TICKS",
@@ -147,4 +149,10 @@ assertDeepEqual(
   Object.keys(configExports).sort(),
   EXPECTED_CONFIG_EXPORT_NAMES,
   "client config public export names remain stable across internal splits",
+);
+
+assertDeepEqual(
+  [configExports.CULTIVATOR_ITEM_CAPACITY, configExports.CULTIVATOR_MASTER_ITEM_CAPACITY],
+  [3, 6],
+  "carried-item capacity mirrors the Novice/Adept and Master limits",
 );

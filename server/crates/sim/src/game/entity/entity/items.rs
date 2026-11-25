@@ -3,11 +3,24 @@ use super::{Entity, EntityKind, Order};
 impl Entity {
     /// Public visual strength only; inventory identities and timers stay private.
     pub(crate) fn item_radiance_tier(&self) -> u8 {
-        use crate::game::ability::AbilityKind::{ArmorTreasure, Haste};
         if !self.kind.is_disciple() {
             return 0;
         }
-        (u8::from(self.escape_treasure.is_some())
+        self.carried_item_count()
+            .min(crate::config::CULTIVATOR_MASTER_ITEM_CAPACITY)
+    }
+
+    pub(in crate::game) fn carried_item_capacity(&self) -> Option<u8> {
+        self.kind.is_disciple().then_some(if self.dao_master {
+            crate::config::CULTIVATOR_MASTER_ITEM_CAPACITY
+        } else {
+            crate::config::CULTIVATOR_ITEM_CAPACITY
+        })
+    }
+
+    pub(in crate::game) fn carried_item_count(&self) -> u8 {
+        use crate::game::ability::AbilityKind::{ArmorTreasure, Haste};
+        u8::from(self.escape_treasure.is_some())
             + [
                 ArmorTreasure,
                 Haste,
@@ -16,8 +29,7 @@ impl Entity {
             ]
             .iter()
             .filter(|&&kind| self.shop_item_active(kind))
-            .count() as u8)
-            .min(3)
+            .count() as u8
     }
 
     pub(in crate::game) fn shop_item_reload(&self, ticks: u32) -> u32 {
