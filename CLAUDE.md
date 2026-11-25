@@ -222,3 +222,8 @@ is loaded from the CDN, and `cargo run` from `server/` serves the client.
 Lead with the outcome. Include the evidence needed to support it, material caveats, and the next
 action. For gameplay-affecting changes, explain the player-facing impact. Omit filler and repeated
 process narration.
+
+When visual inspection was performed, include the most representative existing screenshots
+inline in the final response, with brief captions explaining what they demonstrate. Prefer a
+small, useful selection. Use local image embeds for inline display; preview links may supplement
+them. Do not capture additional images solely for the final response.

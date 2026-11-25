@@ -160,18 +160,18 @@ fn war_adept_and_master_charge_only_within_five_tiles_and_stack_speed_bonuses() 
                 unit.ability_cooldown_ticks(AbilityKind::Charge) > 0,
                 triggered
             );
-            let expected = base_speed * 1.15 * if triggered { 1.5 } else { 1.0 };
+            let expected = base_speed * 1.15 * if triggered { 2.0 } else { 1.0 };
             assert!((unit.movement_speed() - expected).abs() < 0.00001);
         }
     }
 }
 
 #[test]
-fn war_master_charge_lasts_three_seconds_without_changing_cooldown() {
+fn war_charge_lasts_four_seconds_without_changing_novice_or_cooldown() {
     for (kind, master, duration) in [
         (EntityKind::Warrior, false, 30),
-        (EntityKind::WarAdept, false, 30),
-        (EntityKind::WarAdept, true, 90),
+        (EntityKind::WarAdept, false, 120),
+        (EntityKind::WarAdept, true, 120),
     ] {
         let (mut entities, id, _) = pair(100.0);
         let unit = entities.get_mut(id).unwrap();
@@ -190,7 +190,14 @@ fn war_master_charge_lasts_three_seconds_without_changing_cooldown() {
         let map = open_map(40);
         for tick in 0..=duration {
             let unit = entities.get(id).unwrap();
-            let expected = base_speed * if tick < duration { 1.5 } else { 1.0 };
+            let expected = base_speed
+                * if tick >= duration {
+                    1.0
+                } else if kind == EntityKind::WarAdept {
+                    2.0
+                } else {
+                    1.5
+                };
             assert!((unit.movement_speed() - expected).abs() < 0.00001);
             if tick < duration {
                 let occ = Occupancy::build(&map, &entities);
@@ -205,5 +212,64 @@ fn war_master_charge_lasts_three_seconds_without_changing_cooldown() {
                 );
             }
         }
+    }
+}
+
+#[test]
+fn war_charge_ends_on_first_primary_attack_but_not_while_reloading() {
+    for master in [false, true] {
+        let (mut entities, id, target) = pair(40.0);
+        let unit = entities.get_mut(id).unwrap();
+        unit.set_disciple_kind_for_test(EntityKind::WarAdept);
+        if master {
+            unit.insight = config::DISCIPLE_EVOLVED_INSIGHT_CAP;
+            unit.advance_dao_master();
+        }
+        let base_speed = unit.movement_speed();
+        unit.set_weapon_cooldown(combat_rules::WeaponKind::WarriorSword, 10);
+        entities
+            .get_mut(target)
+            .unwrap()
+            .set_movement_delta(2.0, 0.0);
+        run_combat_tick(&mut entities);
+        let unit = entities.get(id).unwrap();
+        assert_eq!(unit.movement_speed(), base_speed * 2.0);
+        assert_eq!(unit.ability_cooldown_ticks(AbilityKind::Charge), 450);
+        assert_eq!(entities.get(target).unwrap().hp, 45);
+        entities
+            .get_mut(id)
+            .unwrap()
+            .set_weapon_cooldown(combat_rules::WeaponKind::WarriorSword, 0);
+        run_combat_tick(&mut entities);
+        let unit = entities.get(id).unwrap();
+        assert_eq!(unit.movement_speed(), base_speed);
+        assert_eq!(unit.ability_cooldown_ticks(AbilityKind::Charge), 450);
+        assert_eq!(unit.attack_cd(), 91);
+        assert!(entities.get(target).unwrap().hp < 45);
+        assert!(!can_fire_while_moving(unit, false));
+    }
+}
+
+#[test]
+fn war_charge_cannot_be_redirected_into_plain_move_or_kept_without_target() {
+    for lose_target in [false, true] {
+        let (mut entities, id, target) = pair(100.0);
+        let unit = entities.get_mut(id).unwrap();
+        unit.set_disciple_kind_for_test(EntityKind::WarAdept);
+        let base_speed = unit.movement_speed();
+        run_combat_tick(&mut entities);
+        assert_eq!(entities.get(id).unwrap().movement_speed(), base_speed * 2.0);
+        if lose_target {
+            entities.get_mut(target).unwrap().apply_damage(45, None);
+            run_combat_tick(&mut entities);
+        } else {
+            entities
+                .get_mut(id)
+                .unwrap()
+                .replace_active_order(Order::move_to(100.0, 400.0));
+        }
+        let unit = entities.get(id).unwrap();
+        assert_eq!(unit.movement_speed(), base_speed);
+        assert_eq!(unit.ability_cooldown_ticks(AbilityKind::Charge), 450);
     }
 }

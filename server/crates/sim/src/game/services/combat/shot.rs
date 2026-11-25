@@ -127,6 +127,9 @@ pub(super) fn try_fire(
     }
     if let Some(source) = entities.get_mut(attacker) {
         source.set_weapon_cooldown(weapon.id, cooldown);
+        if source.default_weapon_kind() == Some(weapon.id) {
+            source.end_war_charge();
+        }
     }
     true
 }
