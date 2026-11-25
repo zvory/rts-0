@@ -636,13 +636,29 @@ fn reloading_attack_move_replaces_an_invalid_committed_target_before_resuming() 
 #[test]
 fn haste_grants_moving_fire_without_interrupting_move_destination() {
     use crate::game::ability::AbilityKind;
-    for kind in [EntityKind::Warrior, EntityKind::WarAdept, EntityKind::MagicAdept, EntityKind::Rifleman, EntityKind::MachineGunner, EntityKind::AntiTankGun] {
+    for kind in [
+        EntityKind::Warrior,
+        EntityKind::WarAdept,
+        EntityKind::MagicAdept,
+        EntityKind::Rifleman,
+        EntityKind::MachineGunner,
+        EntityKind::AntiTankGun,
+    ] {
         let mut entities = EntityStore::new();
         let id = entities.spawn_unit(1, kind, 200.0, 200.0).unwrap();
         let distance = 40.0;
-        let target_kind = if kind == EntityKind::AntiTankGun { EntityKind::Tank } else { EntityKind::Rifleman };
-        let target = entities.spawn_unit(2, target_kind, 200.0 + distance, 200.0).unwrap();
-        entities.get_mut(target).unwrap().set_order(Order::HoldPosition);
+        let target_kind = if kind == EntityKind::AntiTankGun {
+            EntityKind::Tank
+        } else {
+            EntityKind::Rifleman
+        };
+        let target = entities
+            .spawn_unit(2, target_kind, 200.0 + distance, 200.0)
+            .unwrap();
+        entities
+            .get_mut(target)
+            .unwrap()
+            .set_order(Order::HoldPosition);
         let unit = entities.get_mut(id).unwrap();
         let base_speed = unit.movement_speed();
         unit.receive_shop_item(AbilityKind::Haste);

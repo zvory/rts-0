@@ -156,7 +156,10 @@ fn war_adept_and_master_charge_only_within_five_tiles_and_stack_speed_bonuses() 
             run_combat_tick(&mut entities);
             let unit = entities.get(warrior).unwrap();
             let triggered = distance <= (5 * config::TILE_SIZE) as f32;
-            assert_eq!(unit.ability_cooldown_ticks(AbilityKind::Charge) > 0, triggered);
+            assert_eq!(
+                unit.ability_cooldown_ticks(AbilityKind::Charge) > 0,
+                triggered
+            );
             let expected = base_speed * 1.15 * if triggered { 1.5 } else { 1.0 };
             assert!((unit.movement_speed() - expected).abs() < 0.00001);
         }

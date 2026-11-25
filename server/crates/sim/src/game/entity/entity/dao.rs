@@ -274,7 +274,10 @@ impl Entity {
             1.0
         };
         let charge = if matches!(self.kind, EntityKind::Warrior | EntityKind::WarAdept)
-            && self.movement.as_ref().is_some_and(|m| m.novice_charge_ticks > 0)
+            && self
+                .movement
+                .as_ref()
+                .is_some_and(|m| m.novice_charge_ticks > 0)
         {
             config::NOVICE_CHARGE_SPEED_MULTIPLIER
         } else {

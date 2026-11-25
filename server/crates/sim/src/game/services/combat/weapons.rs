@@ -311,21 +311,13 @@ pub(super) fn effective_attack_profile(e: &Entity) -> EffectiveAttackProfile {
     if e.shop_item_active(crate::game::ability::AbilityKind::DoubleDamage) {
         profile.dmg = profile.dmg.saturating_mul(2);
     }
-    if e.kind != EntityKind::AntiTankGun
-        || e.shop_item_active(crate::game::ability::AbilityKind::Haste)
-    {
+    if e.kind != EntityKind::AntiTankGun {
         return profile;
     }
-    match e.weapon_setup() {
-        WeaponSetup::Deployed => {
-            profile.range_tiles = config::ANTI_TANK_GUN_DEPLOYED_RANGE_TILES as f32
-        }
-        WeaponSetup::Packed
-        | WeaponSetup::SettingUp { .. }
-        | WeaponSetup::TearingDown { .. }
-        | WeaponSetup::TearingDownToRedeploy { .. } => {
-            profile.dmg = 0;
-        }
+    if matches!(e.weapon_setup(), WeaponSetup::Deployed) {
+        profile.range_tiles = config::ANTI_TANK_GUN_DEPLOYED_RANGE_TILES as f32;
+    } else if !e.shop_item_active(crate::game::ability::AbilityKind::Haste) {
+        profile.dmg = 0;
     }
     profile
 }

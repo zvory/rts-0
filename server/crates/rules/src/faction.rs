@@ -1315,7 +1315,10 @@ mod tests {
 
         let charge = ability_definition(AbilityKind::Charge);
         assert!(charge.command_card);
-        assert_eq!(charge.carriers, &[EntityKind::Warrior, EntityKind::WarAdept]);
+        assert_eq!(
+            charge.carriers,
+            &[EntityKind::Warrior, EntityKind::WarAdept]
+        );
         assert_eq!(charge.cooldown_ticks, balance::NOVICE_CHARGE_COOLDOWN_TICKS);
 
         let teleport = EKAT_CATALOG.ability(AbilityKind::EkatTeleport).unwrap();

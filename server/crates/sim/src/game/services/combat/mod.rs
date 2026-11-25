@@ -450,7 +450,8 @@ pub(in crate::game) fn combat_system(
         // Wind and Haste carriers may finish their approach while striking. An Attack Move's
         // original travel route must still stop for an in-range engagement.
         let moving_attack_approach = entities.get(id).is_some_and(|e| {
-            (e.kind == EntityKind::WindAdept || e.shop_item_active(crate::game::ability::AbilityKind::Haste))
+            (e.kind == EntityKind::WindAdept
+                || e.shop_item_active(crate::game::ability::AbilityKind::Haste))
                 && (commanded_direct_target
                     || (auto_pursuit
                         && e.path_goal()

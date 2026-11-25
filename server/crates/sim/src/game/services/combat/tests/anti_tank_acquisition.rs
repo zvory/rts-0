@@ -1,6 +1,54 @@
 use super::*;
 
 #[test]
+fn haste_preserves_deployed_anti_tank_range_without_granting_it_while_packed() {
+    use crate::game::ability::AbilityKind;
+
+    for haste in [false, true] {
+        for deployed in [false, true] {
+            let mut entities = EntityStore::new();
+            let gun = entities
+                .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
+                .unwrap();
+            let target = entities
+                .spawn_unit(
+                    2,
+                    EntityKind::Tank,
+                    100.0 + 8.0 * config::TILE_SIZE as f32,
+                    100.0,
+                )
+                .unwrap();
+            entities
+                .get_mut(target)
+                .unwrap()
+                .set_order(Order::HoldPosition);
+            let unit = entities.get_mut(gun).unwrap();
+            unit.set_order(Order::HoldPosition);
+            unit.set_facing(0.0);
+            unit.set_weapon_facing(0.0);
+            if haste {
+                unit.receive_shop_item(AbilityKind::Haste);
+            }
+            if deployed {
+                unit.set_weapon_setup(WeaponSetup::Deployed);
+                unit.set_emplacement_facing(Some(0.0));
+            }
+            let hp = entities.get(target).unwrap().hp;
+            run_combat_tick_on_map(
+                &mut entities,
+                &[player_state(1, false), player_state(2, false)],
+                &open_map(32),
+            );
+            assert_eq!(
+                entities.get(target).unwrap().hp < hp,
+                deployed,
+                "haste={haste}, deployed={deployed}"
+            );
+        }
+    }
+}
+
+#[test]
 fn packed_anti_tank_gun_cannot_fire() {
     let mut entities = EntityStore::new();
     let at_id = entities
