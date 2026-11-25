@@ -1,5 +1,4 @@
 use super::*;
-use rts_rules::math::GameplayMath as _;
 
 #[test]
 fn ekat_magic_anchor_adds_same_inward_vector_for_idle_and_every_move_direction() {
