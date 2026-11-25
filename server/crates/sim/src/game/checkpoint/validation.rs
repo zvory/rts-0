@@ -566,6 +566,7 @@ fn validate_command_units(command: &SimCommand) -> Result<(), CheckpointPayloadE
         | SimCommand::PointTanks { units, .. }
         | SimCommand::SetupAntiTankGuns { units, .. }
         | SimCommand::TearDownAntiTankGuns { units }
+        | SimCommand::VectorField { units, .. }
         | SimCommand::UseAbility { units, .. }
         | SimCommand::ArtilleryFire { units, .. }
         | SimCommand::RecastAbility { units, .. }

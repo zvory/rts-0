@@ -95,3 +95,31 @@ pub(super) fn ability_requests(
         })
         .collect()
 }
+
+pub(super) fn sanitize_formation_points(
+    map: &Map,
+    points: Vec<(f32, f32)>,
+) -> Option<Vec<(f32, f32)>> {
+    if points.len() < 2 || points.len() > protocol::MAX_FORMATION_POINTS {
+        return None;
+    }
+    let max_x = map.world_width_px() - 1.0;
+    let max_y = map.world_height_px() - 1.0;
+    let min_distance_sq = MIN_FORMATION_POINT_DISTANCE_PX * MIN_FORMATION_POINT_DISTANCE_PX;
+    let mut sanitized = Vec::with_capacity(points.len());
+    for (x, y) in points {
+        if !x.is_finite() || !y.is_finite() {
+            continue;
+        }
+        let point = (x.clamp(0.0, max_x), y.clamp(0.0, max_y));
+        if sanitized.last().is_some_and(|last: &(f32, f32)| {
+            let dx = point.0 - last.0;
+            let dy = point.1 - last.1;
+            dx * dx + dy * dy < min_distance_sq
+        }) {
+            continue;
+        }
+        sanitized.push(point);
+    }
+    (sanitized.len() >= 2).then_some(sanitized)
+}

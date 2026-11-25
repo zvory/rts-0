@@ -1,3 +1,4 @@
+import {vectorFieldSize, vectorFieldTargetCommand} from "./two_stage_target.js";
 import { carriedItemSlotsFull } from "./shop_full_cursor.js";
 import {
   ABILITY,
@@ -138,6 +139,12 @@ export function _issueTargetedCommand(p, ev = {}) {
       if (passiveItem && target.abilities?.some((entry) => entry.ability === ability)) return false;
       this.commandInteraction.issueCommand(cmd.useAbility(ability, [shop.id], null, null, false, target.id));
       this._addCommandFeedback("move", target.x, target.y, false);
+      return true;
+    }
+    if (ability === ABILITY.VECTOR_FIELD) {
+      const command = vectorFieldTargetCommand(intent, units, world);
+      if (!command) return false;
+      this.commandInteraction.issueCommand(command);
       return true;
     }
     const queued = !!ev.shiftKey;
@@ -717,7 +724,12 @@ export function _refreshAbilityTargetPreview() {
         artilleryMinFireRadiusTiles(commandUpgrades(this.state, this.controlPolicy)),
       )
     : abilityTargetRadiusTiles(definition, target.ability, this.state, this.controlPolicy);
+  const vectorCenter = target.ability === ABILITY.VECTOR_FIELD ? intent.vectorFieldCenter : null;
   intent?.updateAbilityTargetPreview?.({
+    vectorField: target.ability === ABILITY.VECTOR_FIELD,
+    vectorFieldSize: vectorFieldSize(carriers, vectorCenter || world, rangePx),
+    vectorCenter: vectorCenter || world,
+    vectorDirection: vectorCenter ? [world.x - vectorCenter.x, world.y - vectorCenter.y] : [1, 0],
     ability: target.ability,
     mouseX: primaryLock?.x ?? world.x,
     mouseY: primaryLock?.y ?? world.y,

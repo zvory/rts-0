@@ -67,6 +67,13 @@ pub enum SimCommand {
         y: Option<f32>,
         queued: bool,
     },
+    VectorField {
+        units: Vec<u32>,
+        x: f32,
+        y: f32,
+        direction_x: f32,
+        direction_y: f32,
+    },
     ArtilleryFire {
         units: Vec<u32>,
         x: f32,
@@ -280,6 +287,19 @@ impl SimCommand {
                 Err(_) => SimCommand::Rejected {
                     reason: CommandRejection::Ability,
                 },
+            },
+            protocol::Command::VectorField {
+                units,
+                x,
+                y,
+                direction_x,
+                direction_y,
+            } => SimCommand::VectorField {
+                units,
+                x,
+                y,
+                direction_x,
+                direction_y,
             },
             protocol::Command::ArtilleryFire {
                 units,
@@ -539,6 +559,19 @@ impl SimCommand {
                 x: *x,
                 y: *y,
                 queued: *queued,
+            },
+            SimCommand::VectorField {
+                units,
+                x,
+                y,
+                direction_x,
+                direction_y,
+            } => protocol::Command::VectorField {
+                units: units.clone(),
+                x: *x,
+                y: *y,
+                direction_x: *direction_x,
+                direction_y: *direction_y,
             },
             SimCommand::ArtilleryFire {
                 units,

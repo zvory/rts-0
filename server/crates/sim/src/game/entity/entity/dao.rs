@@ -120,7 +120,7 @@ impl Entity {
             }
             AbilityKind::ThrowSword => self.dao() == Some(UpgradeKind::DaoOfHeaviness),
             AbilityKind::WindDash => self.dao() == Some(UpgradeKind::DaoWind),
-            AbilityKind::DiscipleShield | AbilityKind::EkatMagicAnchor => {
+            AbilityKind::DiscipleShield | AbilityKind::VectorField => {
                 self.dao() == Some(UpgradeKind::DaoOfMagic)
             }
             _ => true,

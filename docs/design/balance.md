@@ -621,7 +621,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   6 tiles, has no resource cost, has a 20s cooldown, and launches an 8 px/tick out-and-back
   projectile that deals 40 damage to enemy targetable entities intersecting each 0.6-tile-wide
   swept leg once per leg; if her Magic Anchor is active, the same activation also launches a second
-  projectile from the anchor toward the cursor. Her Magic Anchor ability targets up to 7.5 tiles (shared with Magic Adepts and Masters), has
+  projectile from the anchor toward the cursor. Her Magic Anchor ability targets up to 7.5 tiles, has
   no resource cost, places one replacement-style non-blocking, non-attackable 10-second pull field
   with a 3-tile radius. Every tick, affected enemies receive an inward displacement vector
   in addition to normal movement, whether moving or stationary. Its magnitude is 2.4 times the
@@ -852,7 +852,7 @@ Permanent Dao identity is derived from kind; the engine stores no separate mutab
 `dao` (slot 46: wind/war/magic). Evolution buttons set replaceable, entity-owned `chosenDao` intent (team-private compact slot 49), independent of orders. Codes 14–16 and order stages 22–24 retain their positions.
 Evolution automatically occurs once 60 insight is ready, without research or a Pavilion.
 Evolution clears all insight and raises the cap to 200. Wind and War Adepts continue earning
-insight from actual hostile HP damage (one insight per unit HP removed, quarter-rate building damage, with exact fractional carry; Wind earns full one-per-HP insight from Pumpjacks and Steel Mines; Throw Sword grants none). Magic Adepts earn the same combat insight, plus 20 per enemy unit death inside their active Anchor; Shield grants no insight; reaching 200 automatically advances a living Adept to its matching Master. Research ids are
+insight from actual hostile HP damage (one insight per unit HP removed, quarter-rate building damage, with exact fractional carry; Wind earns full one-per-HP insight from Pumpjacks and Steel Mines; Throw Sword grants none). Magic Adepts earn the same combat insight, plus 20 per enemy unit death inside their active Vector Field; Shield grants no insight; reaching 200 automatically advances a living Adept to its matching Master. Research ids are
 `dao_wind`, `dao_of_heaviness` (War), `dao_of_magic` (Magic).
 
 `DISCIPLE_SHIELD_CAPACITY` (150), `DISCIPLE_SHIELD_RADIUS_TILES` (2.1), and `DISCIPLE_SHIELD_DURATION_TICKS` are mirrored for the Shield HP and lifetime bars and checked by faction catalog parity. `DISCIPLE_EVOLVED_INSIGHT_CAP` (200) is also parity-checked. Master Shield capacity and duration are sent as public cast-time maxima with each visible field for accurate bars.
@@ -944,3 +944,9 @@ See [Healing Seal](healing-seal.md).
 Cultivator Novices and Adepts carry up to three items; Masters carry up to six, with no category cap and no carried-item hotkeys. Distinct effects coexist; duplicate copies do not stack. Haste costs 100 oil, Double Damage 150 oil, Armor Treasure 100 oil; Haste, Double Damage, Armor, and Vitality are permanent passives applied on delivery. Haste grants 15% movement speed, 25% primary weapon attack speed (reload / 1.25, rounded upward to a whole tick), and attacks while moving, Double Damage doubles primary weapon damage, Armor Treasure adds 50% damage mitigation (round damage upward). Escape's 100-oil purchase starts a 60-second per-player cooldown shared across all owned Shops. See [Shop item rules](shop.md#carried-attack-and-defense-goods).
 
 Vitality Treasure costs **100 oil** and can coexist with all other distinct carried items. Delivery permanently adds **150 maximum HP and 150 current HP**. The item remains carried and passive, without activation or expiry. See [Vitality rules](shop.md#vitality-treasure).
+
+### Vector Field
+
+Vector Field is a separate ability (`vectorField`) replacing Anchor for Magic Adepts and Magic Masters only. Ekat retains her original Magic Anchor and radial pull. The centered square is 4 by 4 tiles for Magic Adepts and 5 by 5 tiles for Magic Masters, oriented along the selected arrow, lasts ten seconds, and uses the existing 7.5-tile cast range. Every ground unit in it, allied or enemy, receives an additive three-world-pixel-per-tick displacement along the arrow, independent of mass/footing. Inward/outward movement resistance and spiral forces are not applied by this ability. Terrain and hostile-body admission remain. Magic Dao death Insight is preserved for hostile unit deaths inside the rectangle.
+
+See [Vector Field](vector-field.md) for placement, rank geometry, force, and presentation rules.

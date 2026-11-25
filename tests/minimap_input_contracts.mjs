@@ -695,12 +695,12 @@ function pointerEvent(canvas, clientX, clientY, {
 }
 
 // Smoke Plus minimap targeting uses the upgraded cloud radius in local feedback.
-// Artillery Fire also accepts a single press-drag-release gesture on the minimap.
-{
+// Both two-stage abilities accept a press-drag-release gesture on the minimap.
+for (const ability of [ABILITY.POINT_FIRE, ABILITY.VECTOR_FIELD]) {
   const artillery = {
     id: 18,
     owner: 1,
-    kind: KIND.ARTILLERY,
+    kind: ability === ABILITY.VECTOR_FIELD ? KIND.MAGIC_ADEPT : KIND.ARTILLERY,
     x: 20,
     y: 20,
     setupState: SETUP.DEPLOYED,
@@ -708,35 +708,34 @@ function pointerEvent(canvas, clientX, clientY, {
   };
   const h = minimapHarness({
     selected: [artillery],
-    commandTarget: { kind: "ability", ability: ABILITY.POINT_FIRE },
+    commandTarget: { kind: "ability", ability },
   });
   const down = listenerFor(h.canvas, "pointerdown");
   const move = listenerFor(h.canvas, "pointermove");
   const up = listenerFor(h.canvas, "pointerup");
   down(pointerEvent(h.canvas, 150, 220, { pointerId: 71, pointerType: "mouse", shiftKey: true }));
   assert(
-    h.net.sent.length === 0 && h.clientIntent.artilleryFireCenter?.x === 50,
-    "minimap Artillery Fire press stores the center before a possible drag",
+    h.net.sent.length === 0 && (h.clientIntent.artilleryFireCenter || h.clientIntent.vectorFieldCenter)?.x === 50,
+    "minimap two-stage ability press stores the center before a possible drag",
   );
   move(pointerEvent(h.canvas, 160, 220, { pointerId: 71, pointerType: "mouse", shiftKey: true }));
   up(pointerEvent(h.canvas, 160, 220, { pointerId: 71, pointerType: "mouse", shiftKey: true }));
   assert(
-    h.net.sent[0]?.c === "artilleryFire" &&
-      h.net.sent[0].x === 50 &&
-      h.net.sent[0].radiusTiles === 10 &&
-      h.net.sent[0].queued === true,
-    "minimap Artillery Fire drag releases the selected radius as one gesture",
+    h.net.sent[0]?.x === 50 && (ability === ABILITY.VECTOR_FIELD
+      ? h.net.sent[0].c === "vectorField" && h.net.sent[0].directionX === 10 && h.net.sent[0].directionY === 0
+      : h.net.sent[0].c === "artilleryFire" && h.net.sent[0].radiusTiles === 10 && h.net.sent[0].queued === true),
+    "minimap two-stage ability drag issues the selected geometry as one gesture",
   );
 
-  h.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.POINT_FIRE });
+  h.clientIntent.beginCommandTarget({ kind: "ability", ability });
   down(pointerEvent(h.canvas, 150, 220, { pointerId: 72, pointerType: "touch" }));
   listenerFor(h.canvas, "pointercancel")(
     pointerEvent(h.canvas, 150, 220, { pointerId: 72, pointerType: "touch" }),
   );
   assert(
-    h.clientIntent.artilleryFireCenter === null &&
-      h.clientIntent.commandTarget?.ability === ABILITY.POINT_FIRE,
-    "cancelling the minimap drag clears its center without disarming Artillery Fire",
+    !h.clientIntent.artilleryFireCenter && !h.clientIntent.vectorFieldCenter &&
+      h.clientIntent.commandTarget?.ability === ability,
+    "cancelling the minimap drag clears its center without disarming the ability",
   );
 
   down(pointerEvent(h.canvas, 150, 220, { pointerId: 73, pointerType: "mouse" }));
@@ -744,9 +743,9 @@ function pointerEvent(canvas, clientX, clientY, {
   up(pointerEvent(h.canvas, 400, 220, { pointerId: 73, pointerType: "mouse" }));
   assert(
     h.net.sent.length === 1 &&
-      h.clientIntent.artilleryFireCenter === null &&
-      h.clientIntent.commandTarget?.ability === ABILITY.POINT_FIRE,
-    "releasing an Artillery Fire drag outside the minimap cancels its center without firing",
+      !h.clientIntent.artilleryFireCenter && !h.clientIntent.vectorFieldCenter &&
+      h.clientIntent.commandTarget?.ability === ability,
+    "releasing a two-stage drag outside the minimap cancels its center without firing",
   );
   h.minimap.destroy();
 }

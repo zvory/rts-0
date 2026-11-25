@@ -55,6 +55,7 @@ export class ClientIntent {
     this.abilityTargetPreview = null;
     /** @type {null | {x:number,y:number}} */
     this.artilleryFireCenter = null;
+    this.vectorFieldCenter = null;
     /** @type {Map<number, Array<{kind:string,x?:number,y?:number,clientSeq:number|null,createdAt:number,replacesAuthority?:boolean,replacesQueued?:boolean}>>} */
     this._plannedOrderStagesByUnit = new Map();
   }
@@ -128,6 +129,7 @@ export class ClientIntent {
     this.placement = null;
     this.closeCommandCardMenu();
     this.artilleryFireCenter = null;
+    this.vectorFieldCenter = null;
     const armed = this.commandComposer.arm(kind, options);
     this.lastCommandTargetArm = armed;
     this._syncCommandTargetFromComposer();
@@ -139,6 +141,7 @@ export class ClientIntent {
     this.commandComposer.cancel();
     this.lastCommandTargetArm = null;
     this.artilleryFireCenter = null;
+    this.vectorFieldCenter = null;
     this._syncCommandTargetFromComposer();
   }
 
@@ -288,6 +291,7 @@ export class ClientIntent {
   /** Cancel or complete radius selection without disarming Artillery Fire. */
   endArtilleryFireRadiusSelection() {
     this.artilleryFireCenter = null;
+    this.vectorFieldCenter = null;
   }
 
   /**

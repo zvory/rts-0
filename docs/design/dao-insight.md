@@ -41,13 +41,13 @@ Charge, Master movement bonuses, and Haste multiply together.
 - War: armored melee damage dealer; 1.05 times base movement speed (2.1 px/tick), 1.5 damage, +26 maximum HP relative to the other Adepts, 50% armor
   reduction using the existing penetration mechanic (full AP bypasses it), keeps the Disciple's existing
   50% armor penetration. Uses the approved larger armored candidate B Yari silhouette, with idle, two walking poses and four thrust poses. Its sprite scale is 0.56, halfway from the former 0.8 toward the base Disciple’s 0.32. The collision/interaction circle shrinks by the same 30%, from 13.5 to 18.2 world pixels. Its 1.75-tile weapon range plus that radius and four-pixel range slack matches the smaller spear. Vehicle hulls and building footprints retain their existing contact geometry. The 400 ms attack clip anticipates, drives, extends and recovers, with a smooth 11.2-world-pixel presentation-only forward step; collision, authoritative position and damage timing do not move with the artwork. Classic W; grid X.
-- Magic: battlefield support; 1.05 times base movement speed (2.1 px/tick), shared Ekat pull field (renamed Anchor), with one inward displacement vector applied to moving and stationary enemies at 2.4 times their movement speed before radial falloff and footing resistance and a new Shield, uses the approved Magic C hooded spellcaster, with arms swept backward and flowing mantle while running. Its five-tile orbs deal the same 23 damage with 50% armor penetration and 91-tick cooldown. It stops to fire normally and has no secondary sword. Classic C; grid C. All three Dao silhouettes replace their legacy glyphs; insight, readiness and advancement overlays remain. Bespoke audio remains deferred.
+- Magic: battlefield support; 1.05 times base movement speed (2.1 px/tick), Vector Field and Shield. Vector Field is a centered 4-by-4-tile square (5 by 5 at Master rank) that adds 3 world pixels per tick in the selected direction to every allied or enemy ground unit, independent of weight. Ekat retains her separate radial Magic Anchor. Magic uses the approved Magic C hooded spellcaster, with arms swept backward and flowing mantle while running. Its five-tile orbs deal the same 23 damage with 50% armor penetration and 91-tick cooldown. It stops to fire normally and has no secondary sword. Classic C; grid C. All three Dao silhouettes replace their legacy glyphs; insight, readiness and advancement overlays remain. Bespoke audio remains deferred.
 
 Each paid training path has a separate researched unlock; combat-earned evolution is unrestricted. No automatic AI evolution in this pass;
 AI can encounter and damage evolved units. Insight uses a blue fill over red background
 under the HP bar and exact insight appears in selected-unit details for teammates and privileged observers only. Enemy snapshots omit exact insight. Evolved units
 reset to zero insight and have a cap of 200. Wind, War, and Magic continue earning insight from
-actual hostile HP damage; Magic also earns Anchor insight as described below; reaching 200 automatically advances living Adepts to their matching
+actual hostile HP damage; Magic also earns Vector Field insight as described below; reaching 200 automatically advances living Adepts to their matching
 [Master rank](dao-masters.md), fully healing to 1.4 times their Adept maximum HP. Masters
 are 1.2 times Adept size, 1.1 times speed and deal 1.2 times ordinary attack damage. They
 reset insight to zero and stop earning it; no further advancement or repeat healing. Adept bars
@@ -63,7 +63,7 @@ see the unit radiance, with ordinary fog filtering. Realm advancement projects a
 (half-second) expanding gold corona reaching about one tile, independently of insight privacy.
 
 Magic Disciples can place Shield within five tiles: a shimmering circle with a
-2.1-tile radius (30% smaller than Anchor), covering allied units (including the caster).
+2.1-tile radius, covering allied units (including the caster).
 The field has 150 HP and grants a separate 75% armor layer against hostile attacks entering
 from outside; attacks originating inside bypass its armor and do not drain its HP. Existing
 unit armor, facing, cover, and terrain reductions apply first. Shield armor then uses the ordinary
@@ -166,7 +166,7 @@ discard the remainder alongside any excess insight. Masters earn no further insi
 
 Shield grants no insight from casting, durability consumption, piercing hits, expiry, or replacement.
 
-Each enemy unit that dies with its center inside an active Anchor grants its living Magic
-caster 20 insight, regardless of killer or unit cost. Allied deaths, buildings, expired Anchors,
-and dead casters grant nothing. Each overlapping Anchor rewards its own caster. Rewards cap
+Each enemy unit that dies with its center inside an active Vector Field grants its living Magic
+caster 20 insight, regardless of killer or unit cost. Allied deaths, buildings, expired Vector Fields,
+and dead casters grant nothing. Each overlapping Vector Field rewards its own caster. Rewards cap
 at 200; Masters earn none. No public death information or wire fields are added.

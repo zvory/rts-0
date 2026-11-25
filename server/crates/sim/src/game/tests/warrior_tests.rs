@@ -358,7 +358,7 @@ fn disciple_dash_casts_for_every_selected_ready_wind_unit() {
 }
 
 #[test]
-fn disciple_dao_gates_dash_and_magic_anchor_without_return() {
+fn disciple_dao_gates_vector_field_and_preserves_ekat_anchor() {
     use crate::game::ability::AbilityKind;
     use crate::game::upgrade::UpgradeKind;
     let mut game = empty_flat_game(&[cultivator_player()]);
@@ -431,13 +431,12 @@ fn disciple_dao_gates_dash_and_magic_anchor_without_return() {
     game.tick();
     game.enqueue(
         1,
-        Command::UseAbility {
-            target_id: None,
-            ability: AbilityKind::EkatMagicAnchor,
+        Command::VectorField {
             units: vec![support],
-            x: Some(640.0),
-            y: Some(400.0),
-            queued: false,
+            x: 640.0,
+            y: 400.0,
+            direction_x: 0.0,
+            direction_y: -1.0,
         },
     );
     game.tick();
@@ -454,7 +453,7 @@ fn disciple_dao_gates_dash_and_magic_anchor_without_return() {
         },
     );
     game.tick();
-    // The Anchor can pull its own caster slightly; a forbidden blink must not cross 40px.
+    // The field moves its caster vertically; a forbidden Wind blink must not change x.
     assert!((game.state.entities.get(support).unwrap().pos_x() - 600.0).abs() < 2.0);
 }
 
@@ -1467,3 +1466,5 @@ fn disciple_blink_snaps_unwalkable_landings_and_can_cross_them() {
         }
     }
 }
+
+mod vector_field;

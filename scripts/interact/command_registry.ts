@@ -181,7 +181,7 @@ const COMMAND_RECORDS = Object.freeze({
     variants: ["provide exactly one of artifactId or path", "kind may be omitted when artifactId/path identifies it"], bounds: ["artifact <=8 MiB", "at most 400 sidecar aliases"],
     example: { sessionId: "<lab-session-id>", artifactId: "artifact_<32-hex>" },
   }),
-  "record-start": descriptor("Start one real-time clean-presentation H.264 recording.", "{sessionId:string,name?:token,maxDurationMs?:int,viewport?:viewport,crop?:{x,y,width,height},scale?:number,resumeSpeed?:number}", {
+  "record-start": descriptor("Start one real-time H.264 recording; normal presentation retains placement UI.", "{sessionId:string,name?:token,maxDurationMs?:int,viewport?:viewport,crop?:{x,y,width,height},scale?:number,resumeSpeed?:number,presentation?:\"clean\"|\"normal\"}", {
     recordable: false,
     variants: ["resumeSpeed atomically resumes authoritative time after the recorder has its initial frame"],
     defaults: ["name=recording", "maxDurationMs=10000", "viewport=current dimensions at DPR 2", "crop=game viewport", "scale=1", "resumeSpeed=omitted"], bounds: ["duration 1000-60000 ms", "viewport/crop <=2048", "DPR >0 and <=4", "scale 0.25-1", "resumeSpeed 0.01-16", "one active recorder", "64 MiB output"],

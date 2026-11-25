@@ -441,7 +441,10 @@ pub(crate) fn launch_world_ability(
             );
             true
         }
-        (AbilityEffectHook::MagicAnchor, AbilityKind::EkatMagicAnchor) => {
+        (
+            AbilityEffectHook::MagicAnchor,
+            AbilityKind::EkatMagicAnchor | AbilityKind::VectorField,
+        ) => {
             let Some((anchor_x, anchor_y)) = SmokeCloudStore::clamp_point_to_map(map, x, y) else {
                 return false;
             };
@@ -451,19 +454,43 @@ pub(crate) fn launch_world_ability(
             let Some(e) = entities.get_mut(caster) else {
                 return false;
             };
-            ability_runtime.clear_active_anchors(player, caster, ability);
+            let vector = ability == AbilityKind::VectorField;
+            if vector {
+                ability_runtime.clear_vector_fields(player, caster);
+            } else {
+                ability_runtime.clear_active_anchors(player, caster, ability);
+            }
             let radius = config::EKAT_MAGIC_ANCHOR_RADIUS_TILES * config::TILE_SIZE as f32;
             if ability_runtime
                 .spawn_world_object(AbilityWorldObjectSpec {
                     owner: player,
                     caster_id: caster,
                     ability,
-                    kind: AbilityWorldObjectKind::MagicAnchor,
+                    kind: if vector {
+                        AbilityWorldObjectKind::VectorField
+                    } else {
+                        AbilityWorldObjectKind::MagicAnchor
+                    },
                     x: anchor_x,
                     y: anchor_y,
                     created_tick: tick,
-                    expires_tick: tick.saturating_add(config::EKAT_MAGIC_ANCHOR_DURATION_TICKS),
-                    payload: AbilityObjectPayload::MagicAnchor { radius },
+                    expires_tick: tick.saturating_add(if vector {
+                        config::VECTOR_FIELD_DURATION_TICKS
+                    } else {
+                        config::EKAT_MAGIC_ANCHOR_DURATION_TICKS
+                    }),
+                    payload: if vector {
+                        AbilityObjectPayload::VectorField {
+                            direction: [1.0, 0.0],
+                            size_tiles: if e.dao_master {
+                                config::VECTOR_FIELD_MASTER_SIZE_TILES
+                            } else {
+                                config::VECTOR_FIELD_ADEPT_SIZE_TILES
+                            },
+                        }
+                    } else {
+                        AbilityObjectPayload::MagicAnchor { radius }
+                    },
                 })
                 .is_none()
             {
@@ -476,7 +503,7 @@ pub(crate) fn launch_world_ability(
             notice_positioned(
                 events,
                 player,
-                "Anchor",
+                if vector { "Vector Field" } else { "Anchor" },
                 crate::protocol::NoticeSeverity::Info,
                 anchor_x,
                 anchor_y,

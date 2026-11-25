@@ -550,6 +550,26 @@ fn print_client_constants(indent: &str) {
         json_f32(balance::EKAT_MAGIC_ANCHOR_PULL_SPEED_MULTIPLIER)
     );
     println!(
+        "{indent}    \"vectorFieldAdeptSizeTiles\": {},",
+        json_f32(balance::VECTOR_FIELD_ADEPT_SIZE_TILES)
+    );
+    println!(
+        "{indent}    \"vectorFieldMasterSizeTiles\": {},",
+        json_f32(balance::VECTOR_FIELD_MASTER_SIZE_TILES)
+    );
+    println!(
+        "{indent}    \"vectorFieldSpeedPxPerTick\": {},",
+        json_f32(balance::VECTOR_FIELD_SPEED_PX_PER_TICK)
+    );
+    println!(
+        "{indent}    \"vectorFieldRangeTiles\": {},",
+        json_f32(balance::VECTOR_FIELD_RANGE_TILES)
+    );
+    println!(
+        "{indent}    \"vectorFieldDurationTicks\": {},",
+        json_f32(balance::VECTOR_FIELD_DURATION_TICKS as f32)
+    );
+    println!(
         "{indent}    \"breakthroughRadiusTiles\": {},",
         json_f32(balance::BREAKTHROUGH_RADIUS_TILES)
     );

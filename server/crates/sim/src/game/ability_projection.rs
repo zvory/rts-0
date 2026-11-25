@@ -36,6 +36,14 @@ pub(in crate::game) fn ability_object_views_for(
                 None
             };
             crate::protocol::AbilityObjectView {
+                field_size: match object.payload {
+                    AbilityObjectPayload::VectorField { size_tiles, .. } => Some(size_tiles),
+                    _ => None,
+                },
+                vector: match object.payload {
+                    AbilityObjectPayload::VectorField { direction, .. } => Some(direction),
+                    _ => None,
+                },
                 id: object.id.get(),
                 owner: object.owner,
                 ability: object.ability.to_protocol_str().to_string(),
@@ -61,6 +69,8 @@ pub(in crate::game) fn ability_object_views_for(
                 || owner_visible_players.contains(&caster.owner)
                 || omniscient;
             Some(crate::protocol::AbilityObjectView {
+                field_size: None,
+                vector: None,
                 id: shield.id,
                 owner: caster.owner,
                 ability: crate::game::ability::AbilityKind::DiscipleShield
@@ -99,6 +109,7 @@ fn ability_object_kind_to_protocol(kind: AbilityWorldObjectKind) -> &'static str
         AbilityWorldObjectKind::ReturnMarker => {
             crate::protocol::ability_object_kinds::RETURN_MARKER
         }
+        AbilityWorldObjectKind::VectorField => crate::protocol::ability_object_kinds::VECTOR_FIELD,
         AbilityWorldObjectKind::MagicAnchor => crate::protocol::ability_object_kinds::MAGIC_ANCHOR,
         AbilityWorldObjectKind::LineProjectile => {
             crate::protocol::ability_object_kinds::LINE_PROJECTILE
@@ -110,7 +121,7 @@ fn ability_object_owner_state_to_protocol(
     payload: AbilityObjectPayload,
 ) -> crate::protocol::AbilityObjectOwnerStateView {
     match payload {
-        AbilityObjectPayload::None => Default::default(),
+        AbilityObjectPayload::None | AbilityObjectPayload::VectorField { .. } => Default::default(),
         AbilityObjectPayload::DashReturn {
             earliest_return_tick,
         } => crate::protocol::AbilityObjectOwnerStateView {

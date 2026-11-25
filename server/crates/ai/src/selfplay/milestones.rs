@@ -469,6 +469,7 @@ impl PlayerMilestones {
             | Command::PointTanks { .. }
             | Command::SetupAntiTankGuns { .. }
             | Command::TearDownAntiTankGuns { .. }
+            | Command::VectorField { .. }
             | Command::UseAbility { .. }
             | Command::ArtilleryFire { .. }
             | Command::RecastAbility { .. }

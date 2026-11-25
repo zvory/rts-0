@@ -118,3 +118,10 @@ pub const HEALING_SEAL_PULSE_TICKS: u32 = super::TICK_HZ / 3;
 /// Total carried-item slots by Cultivator rank. Consumable goods do not occupy slots.
 pub const CULTIVATOR_ITEM_CAPACITY: u8 = 3;
 pub const CULTIVATOR_MASTER_ITEM_CAPACITY: u8 = 6;
+
+pub const VECTOR_FIELD_SPEED_PX_PER_TICK: f32 = 3.0;
+pub const VECTOR_FIELD_ADEPT_SIZE_TILES: f32 = 4.0;
+pub const VECTOR_FIELD_MASTER_SIZE_TILES: f32 = 5.0;
+
+pub const VECTOR_FIELD_RANGE_TILES: f32 = 7.5;
+pub const VECTOR_FIELD_DURATION_TICKS: u32 = TICK_HZ * 10;

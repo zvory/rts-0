@@ -35,6 +35,7 @@ mod static_repath;
 mod steering_proximity;
 mod tank_point;
 mod tree_trunks;
+mod vector_field;
 mod vehicle_traffic;
 
 /// Distance (px) between two entity centers.

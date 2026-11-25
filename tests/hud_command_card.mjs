@@ -906,9 +906,10 @@ for (const researched of [false, true]) {
     assert.equal(dash.intent.targetMode, "worldPoint");
   }
   assert(!light.slots.some((s) => s?.ability === ABILITY.EKAT_TELEPORT));
-  assert(!light.slots.some((s) => s?.ability === ABILITY.EKAT_MAGIC_ANCHOR || s?.ability?.startsWith("evolve")));
+  assert(!light.slots.some((s) => s?.ability === ABILITY.EKAT_MAGIC_ANCHOR || s?.ability === ABILITY.VECTOR_FIELD || s?.ability?.startsWith("evolve")));
   const magic = cardFor({ ...unit, kind: KIND.MAGIC_ADEPT, insight: 60, dao: "magic" });
-  assert(magic.slots.some((s) => s?.ability === ABILITY.EKAT_MAGIC_ANCHOR && s.label === "Anchor"));
+  assert(magic.slots.some((s) => s?.ability === ABILITY.VECTOR_FIELD && s.label === "Vector Field"));
+  assert(!magic.slots.some((s) => s?.ability === ABILITY.EKAT_MAGIC_ANCHOR));
   assert(magic.slots.some((s) => s?.ability === ABILITY.DISCIPLE_SHIELD && s.enabled));
   assert(!magic.slots.some((s) => s?.ability === ABILITY.WIND_DASH));
 }
@@ -961,7 +962,7 @@ for (const researched of [false, true]) {
   selection[0].escapeTreasure = {};
   const card = buildCommandCardDescriptors({ playerId: 1, factionId: "cultivators", selection,
     resources: { steel: 0, oil: 0 }, upgrades: [], groupCooldownClocks: () => [] });
-  for (const ability of [ABILITY.WIND_DASH, ABILITY.THROW_SWORD, ABILITY.EKAT_MAGIC_ANCHOR]) {
+  for (const ability of [ABILITY.WIND_DASH, ABILITY.THROW_SWORD, ABILITY.VECTOR_FIELD]) {
     const slot = card.slots.find((slot) => slot?.ability === ability);
     assert(slot?.enabled, `mixed selection preserves active ${ability}`);
     assert.equal(slot.hotkey, commandCardAbilitiesForFaction("cultivators")

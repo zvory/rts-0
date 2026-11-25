@@ -3,6 +3,7 @@
 // future failures can be triaged by contract area without loading one giant file.
 
 import "./client_performance_summary.mjs";
+await import("./client_contracts/vector_field_contracts.mjs");
 
 import { runFrameProfilerContracts } from "./client_contracts/frame_profiler_contracts.mjs";
 import { runScoreboardContracts } from "./client_contracts/scoreboard_contracts.mjs";

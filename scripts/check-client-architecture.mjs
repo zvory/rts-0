@@ -113,6 +113,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "protocol_snapshot.js": "transport",
   "protocol_snapshot_events.js": "transport",
   "protocol_snapshot_trenches.js": "transport",
+  "protocol_snapshot_ability_state.js": "transport",
   "lab_client.js": "transport",
   "map_editor_handoff.js": "transport",
   "report_window_aggregate.js": "platform",
@@ -145,6 +146,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "resource_icons.js": "ui",
   "status_badge.js": "ui",
   "minimap.js": "ui",
+  "minimap_commands.js": "ui",
   "minimap_point_preview.js": "ui",
   "minimap_capture.js": "ui",
   "minimap_icon_image.js": "ui",
@@ -211,9 +213,11 @@ const AREA_PREFIXES = [
 ];
 
 const ALLOWED_CROSS_AREA_IMPORTS = new Map(Object.entries({
+  "minimap.js -> input/two_stage_target.js": "Viewport and minimap share two-stage target gesture state.",
+  "minimap_commands.js -> input/two_stage_target.js": "Viewport and minimap share Vector Field command construction and direction validation.",
   "net.js -> report_window_aggregate.js": "Net Report Phase 1 shares bounded report-window aggregation with client perf and command diagnostics.",
   "prediction_controller.js -> report_window_aggregate.js": "Net Report Phase 2 reuses the bounded report-window helper for command milestone diagnostics.",
-  "minimap.js -> input/artillery_targeting.js": "Minimap command targeting shares the pure artillery target-lock predictor with viewport input so local feedback matches server locking.",
+  "minimap_commands.js -> input/artillery_targeting.js": "Minimap command targeting shares the pure artillery target-lock predictor with viewport input so local feedback matches server locking.",
   "minimap.js -> input/support_weapon_setup_targeting.js": "Minimap and viewport setup targeting share the same pure AT-gun convergence, parallel, and fan curves so preview and issued facing agree.",
   "renderer/backend_bundle.js -> camera.js": "The selected Pixi bundle owns construction of its orthographic semantic camera.",
   "renderer/pixi_compatibility_adapter.js -> presentation/submission.js": "The Pixi backend returns the renderer-neutral asynchronous presentation lifecycle result.",

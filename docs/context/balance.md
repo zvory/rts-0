@@ -3,6 +3,7 @@
 Use when tuning costs, supply, sight, sizes, unit/building stats, or any number a player feels.
 
 ## Read first
+- [docs/design/vector-field.md](../design/vector-field.md) — Magic Dao field ranks, displacement, placement, and particles
 - [docs/design/balance.md](../design/balance.md) — balance definitions & constants
   - Final source-of-truth map and guardrails
   - Client mirror boundary inventory

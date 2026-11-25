@@ -97,6 +97,7 @@ export const CMD = Object.freeze({
   SETUP_ANTI_TANK_GUNS: "setupAntiTankGuns",
   TEAR_DOWN_ANTI_TANK_GUNS: "tearDownAntiTankGuns",
   CHARGE: "charge",
+  VECTOR_FIELD: "vectorField",
   USE_ABILITY: "useAbility",
   ARTILLERY_FIRE: "artilleryFire",
   RECAST_ABILITY: "recastAbility",
@@ -293,6 +294,7 @@ export const EVENT = Object.freeze({
 
 export const ABILITY_OBJECT_KIND = Object.freeze({
   RETURN_MARKER: "returnMarker",
+  VECTOR_FIELD: "vectorField",
   MAGIC_ANCHOR: "magicAnchor",
   LINE_PROJECTILE: "lineProjectile",
   SHIELD: "shield",
@@ -319,6 +321,7 @@ export const ABILITY = Object.freeze({
   WIND_DASH: "windDash",
   EKAT_TELEPORT: "ekatTeleport",
   EKAT_LINE_SHOT: "ekatLineShot",
+  VECTOR_FIELD: "vectorField",
   EKAT_MAGIC_ANCHOR: "ekatMagicAnchor",
   EKAT_CONSUME_GOLEM: "ekatConsumeGolem",
   DISMISS_SCOUT_PLANE: "dismissScoutPlane",
@@ -376,7 +379,7 @@ export const MOVEMENT_PATH_DIAGNOSTICS = Object.freeze({
 // --- Compact snapshot wire schema (must match protocol.rs) ---
 export const PREDICTION_PROTOCOL_VERSION = 1;
 export const DEFAULT_FACTION_ID = "kriegsia";
-export const COMPACT_SNAPSHOT_VERSION = 72;
+export const COMPACT_SNAPSHOT_VERSION = 74;
 export const MAX_COMPACT_GROUND_DECALS = 64;
 export const SNAPSHOT_CODEC_VERSION = 1;
 export const SNAPSHOT_CODEC = Object.freeze({
@@ -535,6 +538,7 @@ export const ORDER_STAGE = Object.freeze({
   WIND_DASH: "windDash",
   EKAT_TELEPORT: "ekatTeleport",
   EKAT_LINE_SHOT: "ekatLineShot",
+  VECTOR_FIELD: "vectorField",
   EKAT_MAGIC_ANCHOR: "ekatMagicAnchor",
   EKAT_CONSUME_GOLEM: "ekatConsumeGolem",
   DISMISS_SCOUT_PLANE: "dismissScoutPlane",
@@ -570,6 +574,7 @@ export const ORDER_STAGE_CODE = Object.freeze({
   [ORDER_STAGE.WIND_DASH]: 29,
   [ORDER_STAGE.EKAT_TELEPORT]: 12,
   [ORDER_STAGE.EKAT_LINE_SHOT]: 13,
+  [ORDER_STAGE.VECTOR_FIELD]: 35,
   [ORDER_STAGE.EKAT_MAGIC_ANCHOR]: 14,
   [ORDER_STAGE.DECONSTRUCT]: 15,
   [ORDER_STAGE.EKAT_CONSUME_GOLEM]: 16,
@@ -602,6 +607,7 @@ export const ABILITY_CODE = Object.freeze({
   [ABILITY.WIND_DASH]: 21,
   [ABILITY.EKAT_TELEPORT]: 6,
   [ABILITY.EKAT_LINE_SHOT]: 7,
+  [ABILITY.VECTOR_FIELD]: 27,
   [ABILITY.EKAT_MAGIC_ANCHOR]: 8,
   [ABILITY.EKAT_CONSUME_GOLEM]: 9,
   [ABILITY.BLANKET_FIRE]: 10,
@@ -625,6 +631,7 @@ export const ABILITY_CODE = Object.freeze({
 
 export const ABILITY_OBJECT_KIND_CODE = Object.freeze({
   [ABILITY_OBJECT_KIND.RETURN_MARKER]: 1,
+  [ABILITY_OBJECT_KIND.VECTOR_FIELD]: 5,
   [ABILITY_OBJECT_KIND.MAGIC_ANCHOR]: 2,
   [ABILITY_OBJECT_KIND.LINE_PROJECTILE]: 3,
   [ABILITY_OBJECT_KIND.SHIELD]: 4,

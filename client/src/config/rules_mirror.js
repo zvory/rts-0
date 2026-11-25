@@ -150,6 +150,11 @@ export const EKAT_LINE_SHOT_WIDTH_TILES = 0.6;
 export const EKAT_LINE_SHOT_SPEED_PX_PER_TICK = 8;
 export const EKAT_LINE_SHOT_DAMAGE = 40;
 export const EKAT_LINE_SHOT_COOLDOWN_TICKS = TICK_HZ * 20;
+export const VECTOR_FIELD_SPEED_PX_PER_TICK = 3;
+export const VECTOR_FIELD_ADEPT_SIZE_TILES = 4;
+export const VECTOR_FIELD_MASTER_SIZE_TILES = 5;
+export const VECTOR_FIELD_RANGE_TILES = 7.5;
+export const VECTOR_FIELD_DURATION_TICKS = TICK_HZ * 10;
 export const EKAT_MAGIC_ANCHOR_RANGE_TILES = 7.5;
 export const EKAT_MAGIC_ANCHOR_DURATION_TICKS = TICK_HZ * 10;
 export const EKAT_MAGIC_ANCHOR_RADIUS_TILES = 3.0;
@@ -591,7 +596,7 @@ export const ABILITIES = Object.freeze({
     icon: "ANC",
     hotkey: "C",
     title: "Place a 10-second pull field",
-    carriers: Object.freeze([KIND.EKAT, KIND.MAGIC_ADEPT]),
+    carriers: Object.freeze([KIND.EKAT]),
     targetMode: "worldPoint",
     rangeTiles: EKAT_MAGIC_ANCHOR_RANGE_TILES,
     cooldownTicks: 0,
@@ -601,6 +606,21 @@ export const ABILITIES = Object.freeze({
     pullSpeedMultiplier: EKAT_MAGIC_ANCHOR_PULL_SPEED_MULTIPLIER,
     queued: true,
     queuePolicy: "skipIfNotReady",
+  }),
+  [ABILITY.VECTOR_FIELD]: Object.freeze({
+    ability: ABILITY.VECTOR_FIELD,
+    label: "Vector Field",
+    icon: "VEC",
+    hotkey: "C",
+    title: "Direct a 4 x 4 tile field (5 x 5 for Masters); moves every ground unit 3 pixels per tick",
+    carriers: Object.freeze([KIND.MAGIC_ADEPT]),
+    targetMode: "worldPoint",
+    rangeTiles: VECTOR_FIELD_RANGE_TILES,
+    cooldownTicks: 0,
+    cost: Object.freeze({ steel: 0, oil: 0 }),
+    durationTicks: VECTOR_FIELD_DURATION_TICKS,
+    queued: false,
+    queuePolicy: "notQueueable",
   }),
   [ABILITY.EKAT_CONSUME_GOLEM]: Object.freeze({
     ability: ABILITY.EKAT_CONSUME_GOLEM,
