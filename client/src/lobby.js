@@ -145,6 +145,7 @@ export class Lobby {
     this._spectator = false;
     this._hostId = null;
     this._canStart = false;
+    this._hasReadyHumanPeer = false;
     this._tabTitleBeforeReady = null;
     this._roomKind = LOBBY_KIND.NORMAL;
     this._teamPreset = "custom";
@@ -598,6 +599,8 @@ export class Lobby {
 
     const players = m.players || [];
     this._playerCount = players.filter((p) => !p.isSpectator).length;
+    this._hasReadyHumanPeer = players.some((p) =>
+      p.id !== this.net.playerId && !p.isAi && !p.isSpectator && p.ready);
     this._reflectSummary(m.room, players);
     this._renderPlayers(players);
     this._reflectStartButton();
@@ -675,11 +678,11 @@ export class Lobby {
     this.btnStart.textContent = this._isReplayLobby() ? "Start replay" : "Start match";
   }
 
-  /** Alert an away host while the server says the lobby can start. */
+  /** Alert an away host when another ready human is waiting in a startable lobby. */
   _updateTabTitle() {
     if (typeof document === "undefined") return;
     const ready = document.hidden && !this.root.hidden && this._joined &&
-      !this._countdownActive && this._canStart &&
+      !this._countdownActive && this._canStart && this._hasReadyHumanPeer &&
       this.net.playerId != null && this.net.playerId === this._hostId;
     if (ready) {
       if (this._tabTitleBeforeReady == null) this._tabTitleBeforeReady = document.title;

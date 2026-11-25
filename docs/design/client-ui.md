@@ -2169,6 +2169,10 @@ export class LobbyCreateModal {
   destroy()
 }
 ```
+The hidden-tab title changes to `Lobby ready to start` only for a joined host whose room can
+start and contains another ready human player. AI seats and spectators do not trigger this alert;
+the original title returns when those conditions stop holding or the tab becomes visible.
+
 The ordinary pre-join lobby browser loads once when shown. It then refreshes at most every five
 seconds only while the document is visible and the player has generated pointer, keyboard, touch,
 or scroll activity within the last 30 seconds. Hidden or inactive tabs stop the timer and abort an
