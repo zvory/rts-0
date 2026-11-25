@@ -42,6 +42,46 @@ pub(super) fn displacement(
     (magnitude.is_finite()).then_some((dir.0 * magnitude, dir.1 * magnitude))
 }
 
+/// Admit combined walking/recovery and pull against the original pose.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn admit_motion(
+    map: &Map,
+    occ: &Occupancy,
+    blockers: &standability::UnitBlockers,
+    entity: &crate::game::entity::Entity,
+    teams: &crate::game::teams::TeamRelations,
+    desired: (f32, f32),
+    facing: f32,
+) -> Option<(f32, f32)> {
+    let from = (entity.pos_x(), entity.pos_y());
+    [desired, (desired.0, from.1), (from.0, desired.1)]
+        .into_iter()
+        .find(|&to| {
+            // Forced sideways motion does not turn a vehicle's hull toward
+            // its displacement. Route shortcut checks assume that turn.
+            let static_clear = if crate::game::entity::uses_oriented_vehicle_body(entity.kind) {
+                super::vehicle_route::static_swept_segment_legal(
+                    map,
+                    occ,
+                    entity.kind,
+                    from,
+                    to,
+                    facing,
+                )
+            } else {
+                crate::game::services::standability::unit_static_segment_standable_with_radius(
+                    map,
+                    occ,
+                    entity.kind,
+                    from,
+                    to,
+                    Some(entity.radius()),
+                )
+            };
+            static_clear && blockers.motion_clear(entity, to, facing, teams)
+        })
+}
+
 pub(super) fn apply_pull(
     map: &Map,
     entities: &mut EntityStore,

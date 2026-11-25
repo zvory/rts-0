@@ -223,7 +223,44 @@ pub(super) fn advance_moving_units(
             if let Some(e) = entities.get_mut(id) {
                 let before = e.clone();
                 if super::pivot_recovery::advance(e, map, occ, recovery_speed, &neighbors) {
-                    if !blockers.motion_clear(&before, (e.pos_x(), e.pos_y()), e.facing(), &teams) {
+                    let admitted = if let Some(pull) =
+                        super::anchor::displacement(&before, &teams, ability_runtime, tick)
+                    {
+                        integrated.insert(id);
+                        super::anchor::admit_motion(
+                            map,
+                            occ,
+                            &blockers,
+                            &before,
+                            &teams,
+                            (e.pos_x() + pull.0, e.pos_y() + pull.1),
+                            e.facing(),
+                        )
+                    } else {
+                        blockers
+                            .motion_clear(&before, (e.pos_x(), e.pos_y()), e.facing(), &teams)
+                            .then_some((e.pos_x(), e.pos_y()))
+                    };
+                    if let Some(pos) = admitted {
+                        e.set_position(pos.0, pos.1);
+                        let pos = (e.pos_x(), e.pos_y());
+                        e.set_movement_delta(pos.0 - before.pos_x(), pos.1 - before.pos_y());
+                        // Recovery reset this before Anchor admission; stationary
+                        // range must follow the displacement that actually committed.
+                        if distance_between((before.pos_x(), before.pos_y()), pos) <= 0.01 {
+                            if let Some((combat, old)) =
+                                e.combat.as_mut().zip(before.combat.as_ref())
+                            {
+                                combat.tank_stationary_range_ticks =
+                                    old.tank_stationary_range_ticks;
+                                combat.tank_stationary_range_reset_this_tick =
+                                    old.tank_stationary_range_reset_this_tick;
+                            }
+                        }
+                        if let Some(m) = e.movement.as_mut() {
+                            m.last_progress_pos = pos;
+                        }
+                    } else {
                         *e = before;
                         if let Some(m) = e.movement.as_mut() {
                             m.pivot_recovery = None;
@@ -557,11 +594,15 @@ pub(super) fn advance_moving_units(
             integrated.insert(id);
             let desired = (x + pull_x, y + pull_y);
             let facing = new_facing.unwrap_or(original_facing);
-            let candidates = [desired, (desired.0, orig_y), (orig_x, desired.1)];
-            let legal = candidates.into_iter().find(|&to| {
-                segment_clear(&blockers, (orig_x, orig_y), to)
-                    && unit_static_standable(occ, map, kind, to.0, to.1, facing)
-            });
+            let legal = super::anchor::admit_motion(
+                map,
+                occ,
+                &blockers,
+                &motion_entity,
+                &teams,
+                desired,
+                facing,
+            );
             (x, y) = legal.unwrap_or((orig_x, orig_y));
             let consumed_goal = entities.get(id).is_some_and(|e| e.path_is_empty())
                 && motion_entity

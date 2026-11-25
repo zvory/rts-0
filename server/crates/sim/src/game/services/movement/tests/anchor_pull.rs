@@ -295,3 +295,116 @@ fn anchor_collision_cleanup_cannot_add_outward_movement() {
         }
     }
 }
+
+#[test]
+fn anchor_sideways_pull_checks_the_actual_vehicle_hull_facing() {
+    let size = 32;
+    let mut map = Map {
+        width: size,
+        height: size,
+        terrain: vec![crate::protocol::terrain::GRASS; (size * size) as usize],
+        ..Default::default()
+    };
+    // The horizontal hull fits beside this shore. The diagonal movement vector
+    // must not be mistaken for a hull rotation into the water.
+    for x in 0..size {
+        let index = map.index(x, 13);
+        map.terrain[index] = crate::protocol::terrain::WATER;
+    }
+    let start = (
+        464.0,
+        448.0 + config::TANK_BODY_WIDTH_PX * 0.5 + config::TANK_BODY_CLEARANCE_PX + 0.25,
+    );
+    let players = [player_with_oil(1, 0), player_with_oil(2, 0)];
+    let mut entities = EntityStore::new();
+    let tank = entities
+        .spawn_unit(2, EntityKind::Tank, start.0, start.1)
+        .unwrap();
+    entities.get_mut(tank).unwrap().set_facing(0.0);
+    mark_moving(&mut entities, tank, (start.0 + 200.0, start.1));
+    let occ = Occupancy::build(&map, &entities);
+    let spatial = SpatialIndex::build(&entities, map.width, map.height);
+    let runtime = anchor((start.0, start.1 + 32.0), 100);
+    let teams = crate::game::teams::TeamRelations::from_player_teams([(1, 1), (2, 2)]);
+    let pull = super::super::anchor::displacement(entities.get(tank).unwrap(), &teams, &runtime, 1)
+        .unwrap();
+    movement_system_with_context(
+        &map,
+        &mut entities,
+        &players,
+        &occ,
+        &spatial,
+        1,
+        &SmokeCloudStore::new(),
+        &runtime,
+    );
+    let moved = entities.get(tank).unwrap();
+    assert!(moved.pos_x() > start.0, "voluntary walking remains legal");
+    assert!(
+        (moved.pos_y() - start.1 - pull.1).abs() < 0.01,
+        "legal sideways pull must survive admission: {:?}, pull={pull:?}",
+        pos(&entities, tank)
+    );
+    assert!(moved.facing().abs() < 0.001);
+}
+
+#[test]
+fn anchor_combines_committed_vehicle_recovery_before_contact_admission() {
+    let map = flat_map(2);
+    let players = [player_with_oil(1, 0), player_with_oil(2, 0)];
+    let start = map.tile_center(14, 14);
+    let teams = crate::game::teams::TeamRelations::from_player_teams([(1, 1), (2, 2)]);
+    for blocked in [false, true] {
+        let mut entities = EntityStore::new();
+        let tank = entities
+            .spawn_unit(2, EntityKind::Tank, start.0, start.1)
+            .unwrap();
+        mark_moving(&mut entities, tank, (start.0 + 200.0, start.1));
+        let e = entities.get_mut(tank).unwrap();
+        e.set_facing(0.0);
+        e.combat.as_mut().unwrap().tank_stationary_range_ticks = 10;
+        e.movement.as_mut().unwrap().pivot_recovery = Some(crate::game::entity::PivotRecovery {
+            goal: (start.0 + 0.25, start.1),
+            facing: 0.0,
+            ticks_left: 10,
+        });
+        if blocked {
+            let spacing = config::TANK_BODY_LENGTH_PX + 2.0 * config::TANK_BODY_CLEARANCE_PX + 0.1;
+            let rear = entities
+                .spawn_unit(2, EntityKind::Tank, start.0 - spacing, start.1)
+                .unwrap();
+            entities.get_mut(rear).unwrap().set_facing(0.0);
+        }
+        let runtime = anchor((start.0 - 32.0, start.1), 100);
+        let pull =
+            super::super::anchor::displacement(entities.get(tank).unwrap(), &teams, &runtime, 1)
+                .unwrap();
+        let occ = Occupancy::build(&map, &entities);
+        let spatial = SpatialIndex::build(&entities, map.width, map.height);
+        movement_system_with_context(
+            &map,
+            &mut entities,
+            &players,
+            &occ,
+            &spatial,
+            1,
+            &SmokeCloudStore::new(),
+            &runtime,
+        );
+        let expected_x = if blocked {
+            start.0
+        } else {
+            start.0 + 0.25 + pull.0
+        };
+        let e = entities.get(tank).unwrap();
+        assert!((e.pos_x() - expected_x).abs() < 0.002,
+            "recovery must admit the net vector once: blocked={blocked}, actual={}, expected={expected_x}", e.pos_x());
+        assert!((e.movement_delta().0 - (e.pos_x() - start.0)).abs() < 0.002);
+        let combat = e.combat.as_ref().unwrap();
+        assert_eq!(
+            combat.tank_stationary_range_ticks,
+            if blocked { 10 } else { 0 }
+        );
+        assert_eq!(combat.tank_stationary_range_reset_this_tick, !blocked);
+    }
+}
