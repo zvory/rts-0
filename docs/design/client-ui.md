@@ -2994,6 +2994,14 @@ burst at both endpoints and a thin full-length double-helix trail, fading over 1
 uses only received endpoints; unseen arrivals produce no trace. Shop cancellation without a
 position jump produces no effect. Both manual activation and lethal-damage autocast share it.
 
+Cultivator fighters (Novices, all three Adepts, and their Masters) gain a gold silhouette rim
+and pulsing rays for each occupied item category. One item uses the full twelve-ray baseline;
+two add soft bloom and sixteen longer, wider rays; three use the strongest bloom and twenty rays.
+Zero items produce no item radiance. Defense items count while carried; attack items count while
+carried or active and stop counting at expiry; Escape counts until consumed. The effect uses only
+existing authorized inventory fields, so it does not expose enemy inventory or alter fog rules.
+Frame-strip instances own and dispose the rim and bloom filters with their display objects.
+
 ### Client version guard
 
 `App` owns `VersionGuard` for the entire page, across lobby and match transitions. The server

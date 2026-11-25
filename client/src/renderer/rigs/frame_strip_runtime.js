@@ -1,3 +1,4 @@
+import { updateItemRadiance, destroyItemRadiance } from "../item_radiance.js";
 import { goldenAttackTrailFrame } from "./golden_attack_strip.js";
 import { SETUP, STATE } from "../../protocol.js";
 import { hexToInt, lightenColor } from "../shared.js";
@@ -275,6 +276,7 @@ class FrameStripUnitInstance {
     this.sprite.alpha = 1;
     this.sprite.tint = this.silhouetteShadow ? 0x000000 : tintForSlot(this.strip.tintSlot, renderContext);
     this.sprite.visible = true;
+    updateItemRadiance(this, entity, renderContext.now || 0);
     if (this.trailSprite) {
       const trailFrame = goldenAttackTrailFrame(this.strip, renderContext);
       this.trailSprite.visible = trailFrame != null;
@@ -296,6 +298,7 @@ class FrameStripUnitInstance {
   destroy() {
     if (this._destroyed) return;
     this._destroyed = true;
+    destroyItemRadiance(this);
     this.shadowBlur?.destroy?.();
     this.container.parent?.removeChild?.(this.container);
     this.sprite?.destroy?.({ texture: false, textureSource: false });
