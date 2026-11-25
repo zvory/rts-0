@@ -159,3 +159,5 @@ console.log("✅ client_contracts.mjs: all contract assertions passed");
 
 await import("./client_contracts/tournament_contracts.mjs");
 await import("./client_contracts/disciple_projectile_contracts.mjs");
+
+await import("./client_contracts/item_radiance_contracts.mjs");
