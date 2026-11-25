@@ -113,6 +113,25 @@ import { GameState } from "../../client/src/state.js";
   assert(frameViews.debug.entitiesInterpolatedCalls === 0, "production frame views bypass legacy interpolation calls");
 }
 
+{
+  const state = Object.create(GameState.prototype);
+  const delivery = { id: 9, owner: 1, kind: KIND.SHOP_DELIVERY, x: 108, y: 100, hp: 5, maxHp: 10 };
+  state._cur = { entities: [delivery] };
+  state._prevById = new Map([[9, { ...delivery, x: 100 }]]);
+  state.visualNow = () => 0;
+  state._applyPredictedEntity = (entity) => entity;
+  state._applyDisplayEntity = (entity) => entity;
+  for (const alpha of [0, 0.5, 1]) {
+    const views = state.entityVariants(alpha);
+    for (const entity of [state.entitiesInterpolated(alpha)[0], views.interpolatedEntities[0]]) {
+      assert(entity.x === delivery.x && entity.y === delivery.y,
+        "delivery HP and hit geometry stay aligned with current-snapshot item circles at every render alpha");
+      assert(entity.hp === 5 && entity !== delivery,
+        "delivery views retain authoritative health without sharing the snapshot record");
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Match health
 // ---------------------------------------------------------------------------

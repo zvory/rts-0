@@ -14,7 +14,10 @@ pub(in crate::game) fn ability_object_views_for(
         .ability_runtime
         .world_objects()
         .filter(|object| {
-            !fogged || fog.is_visible_world(player, object.x.to_world(), object.y.to_world())
+            !fogged
+                || fog.is_visible_world(player, object.x.to_world(), object.y.to_world())
+                || (crate::game::services::shop_items::is_shop_item(object.ability)
+                    && (object.owner == player || owner_visible_players.contains(&object.owner)))
         })
         .map(|object| {
             let owner_visible = object.owner == player

@@ -30,6 +30,7 @@ pub enum EntityKind {
     ProvenGrounds,
     Shop,
     HealingSeal,
+    ShopDelivery,
     Zamok,
     Depot,
     Barracks,
@@ -46,7 +47,7 @@ pub enum EntityKind {
 }
 
 impl EntityKind {
-    pub const ALL: [EntityKind; 38] = [
+    pub const ALL: [EntityKind; 39] = [
         EntityKind::Worker,
         EntityKind::Golem,
         EntityKind::Warrior,
@@ -72,6 +73,7 @@ impl EntityKind {
         EntityKind::ProvenGrounds,
         EntityKind::Shop,
         EntityKind::HealingSeal,
+        EntityKind::ShopDelivery,
         EntityKind::Zamok,
         EntityKind::Depot,
         EntityKind::Barracks,
@@ -115,7 +117,8 @@ impl EntityKind {
     }
 
     pub fn is_unit(self) -> bool {
-        crate::defs::unit_def(self).is_some()
+        // Delivery combat bodies reuse stats without joining army control or ground movement.
+        self != Self::ShopDelivery && crate::defs::unit_def(self).is_some()
     }
 
     pub fn is_building(self) -> bool {
@@ -165,6 +168,7 @@ impl EntityKind {
             EntityKind::ProvenGrounds => "proven_grounds",
             EntityKind::Shop => "shop",
             EntityKind::HealingSeal => "healing_seal",
+            EntityKind::ShopDelivery => "shop_delivery",
             EntityKind::Zamok => "zamok",
             EntityKind::Depot => "depot",
             EntityKind::Barracks => "barracks",
@@ -212,6 +216,7 @@ impl FromStr for EntityKind {
             "proven_grounds" => Ok(EntityKind::ProvenGrounds),
             "shop" => Ok(EntityKind::Shop),
             "healing_seal" => Ok(EntityKind::HealingSeal),
+            "shop_delivery" => Ok(EntityKind::ShopDelivery),
             "zamok" => Ok(EntityKind::Zamok),
             "depot" => Ok(EntityKind::Depot),
             "barracks" => Ok(EntityKind::Barracks),

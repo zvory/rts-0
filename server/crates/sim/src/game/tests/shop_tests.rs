@@ -189,8 +189,8 @@ fn healing_potion_costs_50_and_arrives_after_ten_tiles_of_flight() {
     game.tick();
     assert_eq!(game.state.players[0].oil, 950);
     let object = game.state.ability_runtime.world_objects().next().unwrap();
-    assert!((object.x.to_world() - (320.0 + 320.0 / 30.0)).abs() < 0.01);
-    for _ in 1..29 {
+    assert!((object.x.to_world() - (320.0 + 8.0)).abs() < 0.01);
+    for _ in 1..39 {
         game.tick();
     }
     assert_eq!(game.state.entities.get(unit).unwrap().hp, hp);
@@ -230,7 +230,7 @@ fn healing_potion_has_unlimited_range_and_tracks_a_moving_target_until_arrival()
         .get_mut(unit)
         .unwrap()
         .set_position(1920.0, 320.0);
-    for _ in 1..149 {
+    for _ in 1..199 {
         game.tick();
     }
     assert_eq!(game.state.entities.get(unit).unwrap().hp, hp);
@@ -266,7 +266,7 @@ fn healing_potion_disappears_without_refund_when_target_dies_or_is_removed() {
 }
 
 #[test]
-fn shop_items_reject_buildings_out_of_range_stale_and_enemy_targets_without_spending() {
+fn shop_items_reject_buildings_hidden_stale_and_enemy_targets_without_spending() {
     let (mut game, shop, unit) = item_fixture();
     let enemy = game
         .state
@@ -294,7 +294,7 @@ fn escape_treasure_is_delivered_once_checkpointed_and_saves_a_lethal_unit_anywhe
     buy(&mut game, shop, unit, AbilityKind::EscapeTreasure);
     game.tick();
     buy(&mut game, shop, unit, AbilityKind::EscapeTreasure);
-    for _ in 1..31 {
+    for _ in 1..41 {
         game.tick();
     }
     assert_eq!(game.state.players[0].oil, 900);
@@ -360,7 +360,7 @@ fn in_flight_shop_item_checkpoint_continues_identically() {
         game.state.map_metadata.clone(),
     )
     .unwrap();
-    for _ in 0..40 {
+    for _ in 0..60 {
         game.tick();
         restored.tick();
         assert_eq!(
@@ -426,7 +426,7 @@ fn shop_purchase_accepts_allies_and_checks_visibility_range_money_and_source() {
     buy(&mut game, shop, ally, AbilityKind::EscapeTreasure);
     game.tick();
     assert_eq!(game.state.players[0].oil, 900);
-    for _ in 0..40 {
+    for _ in 0..60 {
         game.tick();
     }
     assert_eq!(
@@ -535,7 +535,7 @@ fn escape_search_finds_distant_clearings_at_both_grid_alignments() {
 fn escape_manual_use_preserves_hp_and_consumes_once_even_with_autocast_off() {
     let (mut game, shop, unit) = item_fixture();
     buy(&mut game, shop, unit, AbilityKind::EscapeTreasure);
-    for _ in 0..31 {
+    for _ in 0..41 {
         game.tick();
     }
     game.enqueue(
@@ -667,7 +667,7 @@ fn carried_items_are_passive_and_permanent_after_checkpoint() {
     buy(&mut game, shop, unit, AbilityKind::Haste);
     buy(&mut game, shop, unit, AbilityKind::DoubleDamage);
     buy(&mut game, shop, unit, AbilityKind::ArmorTreasure);
-    for _ in 0..32 {
+    for _ in 0..42 {
         game.tick();
     }
     assert_eq!(game.state.players[0].oil, 650);
@@ -735,7 +735,7 @@ fn carried_items_are_passive_and_permanent_after_checkpoint() {
         .unwrap()
         .shop_item_active(AbilityKind::Haste));
     buy(&mut game, shop, unit, AbilityKind::DoubleDamage);
-    for _ in 0..32 {
+    for _ in 0..42 {
         game.tick();
     }
     assert_eq!(game.state.players[0].oil, 650);
@@ -806,7 +806,7 @@ fn vitality_treasure_is_passive_on_delivery_and_permanent_after_checkpoint() {
     target.apply_damage(20, None);
     buy(&mut game, shop, unit, AbilityKind::VitalityTreasure);
     buy(&mut game, shop, unit, AbilityKind::ArmorTreasure);
-    for _ in 0..32 {
+    for _ in 0..42 {
         game.tick();
     }
     assert_eq!(
@@ -839,7 +839,7 @@ fn vitality_treasure_is_passive_on_delivery_and_permanent_after_checkpoint() {
     assert_eq!((target.hp, target.max_hp), (wounded, base + 150));
     buy(&mut game, shop, unit, AbilityKind::VitalityTreasure);
     buy(&mut game, shop, unit, AbilityKind::ArmorTreasure);
-    for _ in 0..32 {
+    for _ in 0..42 {
         game.tick();
     }
     assert_eq!(game.state.players[0].oil, 800);
@@ -879,7 +879,7 @@ fn vitality_treasure_keeps_a_permanent_flat_bonus_through_dao_advancement() {
 fn armor_treasure_applies_on_delivery_without_activation_or_expiry() {
     let (mut game, shop, unit) = item_fixture();
     buy(&mut game, shop, unit, AbilityKind::ArmorTreasure);
-    for _ in 0..32 {
+    for _ in 0..42 {
         game.tick();
     }
     let target = game.state.entities.get_mut(unit).unwrap();
@@ -932,7 +932,7 @@ fn every_passive_item_applies_on_delivery_and_ignores_activation_forever() {
     ] {
         let (mut game, shop, unit) = item_fixture();
         buy(&mut game, shop, unit, ability);
-        for _ in 0..32 {
+        for _ in 0..42 {
             game.tick();
         }
         assert!(game
@@ -1141,7 +1141,7 @@ fn master_carries_all_five_current_items_without_category_limits() {
         game.tick();
     }
     buy(&mut game, shop, unit, AbilityKind::EscapeTreasure);
-    for _ in 0..40 {
+    for _ in 0..60 {
         game.tick();
     }
     let target = game.state.entities.get(unit).unwrap();
@@ -1187,7 +1187,7 @@ fn rank_slot_limits_reserve_deliveries_and_leave_consumable_healing_available() 
                 game.state.players[0].oil,
                 oil - if master { 100 } else { 0 }
             );
-            for _ in 0..40 {
+            for _ in 0..60 {
                 game.tick();
             }
             assert_eq!(
@@ -1208,7 +1208,7 @@ fn rank_slot_limits_reserve_deliveries_and_leave_consumable_healing_available() 
                     .unwrap()
                     .apply_damage(20, None);
                 buy(&mut game, shop, unit, AbilityKind::HealingPotion);
-                for _ in 0..40 {
+                for _ in 0..60 {
                     game.tick();
                 }
                 let carrier = game.state.entities.get(unit).unwrap();
@@ -1216,7 +1216,7 @@ fn rank_slot_limits_reserve_deliveries_and_leave_consumable_healing_available() 
                 // Promotion opens the additional slots immediately.
                 game.state.entities.get_mut(unit).unwrap().dao_master = true;
                 buy(&mut game, shop, unit, AbilityKind::VitalityTreasure);
-                for _ in 0..40 {
+                for _ in 0..60 {
                     game.tick();
                 }
                 assert_eq!(
@@ -1226,4 +1226,148 @@ fn rank_slot_limits_reserve_deliveries_and_leave_consumable_healing_available() 
             }
         }
     }
+}
+
+#[test]
+fn every_unit_targeted_good_has_unlimited_range_and_ten_hp_at_seven_point_five_tiles_per_second() {
+    for ability in [
+        AbilityKind::HealingPotion,
+        AbilityKind::EscapeTreasure,
+        AbilityKind::Haste,
+        AbilityKind::DoubleDamage,
+        AbilityKind::ArmorTreasure,
+        AbilityKind::VitalityTreasure,
+    ] {
+        let (mut game, shop, unit) = item_fixture();
+        game.state
+            .entities
+            .get_mut(unit)
+            .unwrap()
+            .set_position(1600.0, 320.0);
+        game.state
+            .fog
+            .recompute(&[1], &game.state.entities, &game.state.map);
+        buy(&mut game, shop, unit, ability);
+        game.tick();
+        let projectile = game.state.ability_runtime.projectiles().next().unwrap();
+        assert_eq!(projectile.expires_tick, u32::MAX);
+        assert_eq!(projectile.x.to_world(), 328.0); // 8 px/tick = 7.5 tiles/s.
+        let body = game
+            .state
+            .entities
+            .get(projectile.source_object_id.unwrap())
+            .unwrap();
+        assert_eq!((body.hp, body.max_hp), (10, 10));
+        assert_eq!(body.kind, EntityKind::ShopDelivery);
+        assert!(body.is_targetable());
+        assert!(!body.is_unit());
+        assert_eq!(body.pos_x(), projectile.x.to_world());
+        assert_eq!(body.sight_tiles(), 0);
+    }
+}
+
+#[test]
+fn destroyed_delivery_keeps_payment_releases_slot_and_never_applies_after_checkpoint() {
+    let (mut game, shop, unit) = item_fixture();
+    buy(&mut game, shop, unit, AbilityKind::VitalityTreasure);
+    game.tick();
+    let body_id = game
+        .state
+        .ability_runtime
+        .projectiles()
+        .next()
+        .unwrap()
+        .source_object_id
+        .unwrap();
+    game.state
+        .entities
+        .get_mut(body_id)
+        .unwrap()
+        .apply_damage(9, None);
+    let mut game = Game::restore_checkpoint_payload_text_for_test(
+        &game.checkpoint_payload_text_for_test().unwrap(),
+        game.state.map.clone(),
+        game.state.map_metadata.clone(),
+    )
+    .unwrap();
+    assert_eq!(game.state.entities.get(body_id).unwrap().hp, 1);
+    game.state
+        .entities
+        .get_mut(body_id)
+        .unwrap()
+        .apply_damage(1, None);
+    game.tick();
+    assert!(game.state.entities.get(body_id).is_none());
+    assert_eq!(game.state.ability_runtime.projectiles().count(), 0);
+    assert_eq!(game.state.ability_runtime.world_objects().count(), 0);
+    assert_eq!(game.state.players[0].oil, 900);
+    for _ in 0..50 {
+        game.tick();
+    }
+    assert!(!game
+        .state
+        .entities
+        .get(unit)
+        .unwrap()
+        .shop_item_active(AbilityKind::VitalityTreasure));
+    buy(&mut game, shop, unit, AbilityKind::VitalityTreasure);
+    for _ in 0..40 {
+        game.tick();
+    }
+    assert_eq!(game.state.players[0].oil, 800);
+    assert!(game
+        .state
+        .entities
+        .get(unit)
+        .unwrap()
+        .shop_item_active(AbilityKind::VitalityTreasure));
+    assert!(!game
+        .state
+        .entities
+        .iter()
+        .any(|e| e.kind == EntityKind::ShopDelivery));
+}
+
+#[test]
+fn enemy_rifle_fire_intercepts_flying_goods_without_refund() {
+    let (mut game, shop, unit) = item_fixture();
+    let enemy = PlayerState {
+        id: 2,
+        team_id: 2,
+        faction_id: "kriegsia".into(),
+        ..game.state.players[0].clone()
+    };
+    game.state.players.push(enemy);
+    game.state
+        .entities
+        .get_mut(unit)
+        .unwrap()
+        .set_position(1600.0, 320.0);
+    let rifle = game
+        .state
+        .entities
+        .spawn_unit(2, EntityKind::Rifleman, 800.0, 400.0)
+        .unwrap();
+    game.enqueue(
+        2,
+        Command::HoldPosition {
+            units: vec![rifle],
+            queued: false,
+        },
+    );
+    game.state
+        .fog
+        .recompute(&[1, 2], &game.state.entities, &game.state.map);
+    buy(&mut game, shop, unit, AbilityKind::VitalityTreasure);
+    for _ in 0..170 {
+        game.tick();
+    }
+    assert_eq!(game.state.players[0].oil, 900);
+    assert_eq!(game.state.ability_runtime.projectiles().count(), 0);
+    assert!(!game
+        .state
+        .entities
+        .get(unit)
+        .unwrap()
+        .shop_item_active(AbilityKind::VitalityTreasure));
 }

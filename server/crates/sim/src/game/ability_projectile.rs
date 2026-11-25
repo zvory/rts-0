@@ -179,6 +179,12 @@ impl AbilityProjectile {
     }
 
     fn advance_shop_item(&mut self, entities: &mut EntityStore, teams: &TeamRelations) -> bool {
+        if self
+            .source_object_id
+            .is_some_and(|id| entities.get(id).is_none_or(|body| body.hp == 0))
+        {
+            return false;
+        }
         let AbilityProjectileReturnTarget::Entity { id } = self.return_target else {
             return false;
         };
@@ -198,6 +204,9 @@ impl AbilityProjectile {
         );
         self.x = Coord::from_world(next.0);
         self.y = Coord::from_world(next.1);
+        if let Some(body) = self.source_object_id.and_then(|id| entities.get_mut(id)) {
+            body.set_position(next.0, next.1);
+        }
         if arrived {
             if let Some(target) = entities.get_mut(id) {
                 if self.ability == AbilityKind::HealingPotion {

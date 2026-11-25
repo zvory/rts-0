@@ -428,6 +428,11 @@ impl AbilityRuntime {
                 active.push(projectile);
             } else {
                 self.world_objects.remove(projectile.id.get());
+                if crate::game::services::shop_items::is_shop_item(projectile.ability) {
+                    if let Some(id) = projectile.source_object_id {
+                        entities.remove(id);
+                    }
+                }
             }
         }
         self.projectiles = active;

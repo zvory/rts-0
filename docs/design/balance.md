@@ -922,8 +922,9 @@ multiplier after Adept rounding: 210 (Wind/Magic) or 246 (War). See [Master rule
 
 Completed Shops offer Healing Potion (50 oil, full heal on delivery) and Escape Treasure
 (100 oil, one lethal-damage escape to the supplying Shop at 1 HP). Both target visible friendly
-units and travel at 10 tiles/second. Healing Potion has unlimited range and no flight timeout;
-Escape Treasure requires a target within 30 tiles. Dead targets cancel delivery without a refund.
+units at unlimited range and travel at 7.5 tiles/second without a flight timeout. All flying
+goods have 10 HP and can be destroyed by enemy weapons. Destroyed goods and dead targets
+cancel delivery without a refund.
 See [Shop](shop.md#targeted-goods).
 
 

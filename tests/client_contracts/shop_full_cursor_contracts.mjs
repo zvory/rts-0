@@ -57,3 +57,32 @@ try {
   assert(removed, 'teardown removes label');
 } finally {globalThis.document=before;}
 console.log('Shop full cursor contracts passed');
+
+// Shop hover previews follow recipient eligibility and the explicit intent seam.
+const { updateShopDeliveryPreview } = await import('../../client/src/input/shop_delivery_preview.js');
+const { buildRendererFeedbackView } = await import('../../client/src/renderer/feedback_view_model.js');
+const previewShop = {id:91,kind:KIND.SHOP,owner:1,hp:200,x:100,y:200};
+let hovered = {id:92,kind:KIND.WARRIOR,owner:1,hp:58,x:1500,y:200,itemRadianceTier:0};
+const previewIntent = {updateShopDeliveryPreview(value) {this.shopDeliveryPreview=value;}};
+const previewInput = {_intent:()=>previewIntent,mouse:{x:50,y:50},
+  state:{playerId:1,selectedEntities:()=>[previewShop]},
+  _entityAtScreen:(_point,_own,eligible)=>eligible(hovered)?hovered:null};
+updateShopDeliveryPreview(previewInput);
+assert(previewIntent.shopDeliveryPreview?.targetX===1500,'hover line has unlimited range');
+assert(buildRendererFeedbackView(previewInput.state,{clientIntent:previewIntent}).shopDeliveryPreview?.x===100,
+  'hover line reaches renderer feedback');
+hovered={...hovered,owner:2};
+updateShopDeliveryPreview(previewInput);
+assert(!previewIntent.shopDeliveryPreview,'enemy hover clears line');
+previewInput.state.isAllyOwner=owner=>owner===2;
+updateShopDeliveryPreview(previewInput);
+assert(previewIntent.shopDeliveryPreview,'allied recipients show line');
+hovered={...hovered,itemRadianceTier:3};
+updateShopDeliveryPreview(previewInput);
+assert(!previewIntent.shopDeliveryPreview,'full carried inventory hides line');
+previewIntent.commandTarget={kind:'ability',ability:ABILITY.HEALING_POTION};
+updateShopDeliveryPreview(previewInput);
+assert(previewIntent.shopDeliveryPreview,'healing remains eligible at full inventory');
+hovered={...hovered,visionOnly:true};
+updateShopDeliveryPreview(previewInput);
+assert(!previewIntent.shopDeliveryPreview,'vision-only entities never show line');

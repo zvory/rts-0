@@ -2303,6 +2303,11 @@
       "path": "tests/shop_tests.rs",
       "line": 344,
       "code": "let ally_player = crate::game::PlayerState {"
+    },
+    {
+      "path": "tests/shop_tests.rs",
+      "line": 1334,
+      "code": "let enemy = PlayerState {"
     }
   ],
   "player_state_field_writes": [

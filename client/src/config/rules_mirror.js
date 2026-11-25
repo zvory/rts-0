@@ -173,6 +173,8 @@ export const DAO_TRAINING_TICKS = TICK_HZ * 10;
 export const MAX_DAO_TRAINING_QUEUE = 64;
 
 export const STATS = Object.freeze({
+  [KIND.SHOP_DELIVERY]: { armored: false, label: "Flying item", icon: "IT", size: 4, sight: 0,
+    rangeTiles: 0, cost: { steel: 0, oil: 0 }, supply: 0, buildTicks: 0 },
   [KIND.WORKER]: { armored: false, label: "Engineer", icon: "EN", size: 9, sight: 10,
     rangeTiles: 1, cost: { steel: 50, oil: 0 }, supply: 1, buildTicks: 150 },
   [KIND.GOLEM]: { armored: false, label: "Golem", icon: "GLM", size: 9, sight: 10,
@@ -330,38 +332,38 @@ export const ABILITIES = Object.freeze({
   }),
   [ABILITY.ESCAPE_TREASURE]: Object.freeze({
     ability: ABILITY.ESCAPE_TREASURE, label: "Escape Treasure", icon: "E", hotkey: "Q",
-    title: "Deliver a one-use treasure to a friendly unit within 30 tiles; lethal damage returns it to this Shop at 1 HP; 60-second purchase cooldown shared across all your Shops",
-    carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: 30,
+    title: "Deliver a one-use treasure to a friendly unit at any distance; lethal damage returns it to this Shop at 1 HP; 60-second purchase cooldown shared across all your Shops",
+    carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: null,
     cooldownTicks: 1800, cost: Object.freeze({ steel: 0, oil: 100 }),
     queued: false, queuePolicy: "notQueueable",
   }),
 
   [ABILITY.HASTE]: Object.freeze({
     ability: ABILITY.HASTE, label: "Haste", icon: "H", hotkey: "Z",
-    title: "Deliver a permanent passive attack item within 30 tiles; grants 15% movement speed, 25% primary weapon attack speed, and attacks while moving on arrival",
-    carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: 30,
+    title: "Deliver a permanent passive attack item at any distance; grants 15% movement speed, 25% primary weapon attack speed, and attacks while moving on arrival",
+    carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: null,
     cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 100 }),
     queued: false, queuePolicy: "notQueueable",
   }),
   [ABILITY.DOUBLE_DAMAGE]: Object.freeze({
     ability: ABILITY.DOUBLE_DAMAGE, label: "Double Damage", icon: "2X", hotkey: "X",
-    title: "Deliver a permanent passive attack item within 30 tiles; doubles primary weapon damage on arrival",
-    carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: 30,
+    title: "Deliver a permanent passive attack item at any distance; doubles primary weapon damage on arrival",
+    carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: null,
     cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 150 }),
     queued: false, queuePolicy: "notQueueable",
   }),
   [ABILITY.ARMOR_TREASURE]: Object.freeze({
     ability: ABILITY.ARMOR_TREASURE, label: "Armor Treasure", icon: "AR", hotkey: "D",
-    title: "Deliver a permanent passive defense item within 30 tiles; grants 50% additional armor on arrival",
-    carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: 30,
+    title: "Deliver a permanent passive defense item at any distance; grants 50% additional armor on arrival",
+    carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: null,
     cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 100 }),
     queued: false, queuePolicy: "notQueueable",
   }),
 
   [ABILITY.VITALITY_TREASURE]: Object.freeze({
     ability: ABILITY.VITALITY_TREASURE, label: "Vitality Treasure", icon: "+HP", hotkey: "F",
-    title: "Deliver a permanent passive defense item within 30 tiles; grants +150 maximum and current HP on arrival",
-    carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: 30,
+    title: "Deliver a permanent passive defense item at any distance; grants +150 maximum and current HP on arrival",
+    carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: null,
     cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 100 }),
     queued: false, queuePolicy: "notQueueable",
   }),
