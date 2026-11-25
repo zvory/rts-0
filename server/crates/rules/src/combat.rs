@@ -13,6 +13,9 @@ use serde::{Deserialize, Serialize};
 
 pub use crate::target::{damage_after_target_type_modifier, InfantryTargetPolicy};
 
+mod dao;
+pub use dao::{ranked_primary_damage, ranked_primary_weapon_profile};
+
 const FRONT_ARC_RAD: f32 = std::f32::consts::FRAC_PI_4;
 const SIDE_ARC_RAD: f32 = std::f32::consts::PI * 3.0 / 4.0;
 const FRONT_ARMOR_DAMAGE_MULTIPLIER: f32 = 1.0;
@@ -535,8 +538,8 @@ pub fn effective_damage(
     base_dmg: u32,
     victim_terrain: Option<TerrainKind>,
 ) -> u32 {
-    default_weapon_profile(attacker_kind)
-        .map(|profile| effective_damage_for_weapon(profile, victim_kind, base_dmg, victim_terrain))
+    ranked_primary_weapon_profile(attacker_kind, false)
+        .map(|profile| effective_damage_for_weapon(&profile, victim_kind, base_dmg, victim_terrain))
         .unwrap_or_else(|| {
             effective_damage_for_weapon_class(
                 WeaponClass::None,
@@ -673,10 +676,10 @@ pub fn effective_damage_with_facing(
     victim_pos: (f32, f32),
     attacker_pos: (f32, f32),
 ) -> u32 {
-    default_weapon_profile(attacker_kind)
+    ranked_primary_weapon_profile(attacker_kind, false)
         .map(|profile| {
             effective_damage_with_facing_for_weapon(
-                profile,
+                &profile,
                 victim_kind,
                 base_dmg,
                 victim_terrain,

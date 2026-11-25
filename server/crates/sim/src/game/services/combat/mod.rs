@@ -285,6 +285,7 @@ pub(in crate::game) fn combat_system(
         );
         let Some(tid) = target else {
             if let Some(e) = entities.get_mut(id) {
+                e.end_war_charge();
                 if matches!(
                     e.order(),
                     Order::Attack(_)
@@ -512,7 +513,7 @@ pub(in crate::game) fn combat_system(
                 firing_reveals,
                 id,
                 tid,
-                weapon_profile,
+                &weapon_profile,
                 range_px,
                 dmg,
                 cd_reset,

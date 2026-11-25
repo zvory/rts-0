@@ -402,7 +402,7 @@ export const ABILITIES = Object.freeze({
 
   [ABILITY.CHARGE]: Object.freeze({
     ability: ABILITY.CHARGE, label: "Charge", icon: "CHG",
-    title: "Automatic Charge: 1.5x speed for one second (three seconds for War Masters) against an enemy unit within 5 tiles, at least 2 tiles away or retreating",
+    title: "Automatic Charge: Novices gain 1.5x speed for 1s; War Adepts and Masters gain 2x speed for up to 4s, ending on their first primary attack; triggers against an enemy unit within 5 tiles, at least 2 tiles away or retreating",
     carriers: Object.freeze([KIND.WARRIOR, KIND.WAR_ADEPT]), targetMode: "self",
     cooldownTicks: 450, cost: Object.freeze({ steel: 0, oil: 0 }),
     queued: false, queuePolicy: "notQueueable",

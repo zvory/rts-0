@@ -61,6 +61,8 @@ pub const DISCIPLE_EVOLVED_INSIGHT_CAP: u32 = 200;
 pub const DAO_MASTER_BODY_SCALE: f32 = 1.2;
 pub const DAO_MASTER_SPEED_MULTIPLIER: f32 = 1.1;
 pub const DAO_MASTER_DAMAGE_MULTIPLIER: f32 = 1.2;
+/// Additional primary damage multiplier after ordinary War Master rank scaling.
+pub const DAO_WAR_MASTER_DAMAGE_MULTIPLIER: u32 = 2;
 pub const DAO_MASTER_HP_MULTIPLIER: f32 = 1.4;
 pub const DAO_WAR_SPEED_MULTIPLIER: f32 = 1.05;
 // Adept HP increased by 30%, rounded to whole HP; Novices keep their base HP.

@@ -364,6 +364,8 @@ const approvedCurrentFactionFiles = new Set([
   // Catalog dump tool projects current catalog stats for parity checks.
   "server/crates/rules/src/bin/dump-faction-catalog.rs",
   "server/crates/rules/src/combat.rs",
+  // Pure Dao primary-weapon penetration and damage rules vary by specialization and rank.
+  "server/crates/rules/src/combat/dao.rs",
   "server/crates/rules/src/defs.rs",
   "server/crates/rules/src/economy.rs",
   "server/crates/rules/src/faction.rs",

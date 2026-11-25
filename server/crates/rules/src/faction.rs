@@ -455,7 +455,7 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 9] = [
         label: "Charge",
         icon: "CHG",
         hotkey: None,
-        title: "Automatic Charge: 1.5x speed for one second (three seconds for War Masters) against an enemy unit within 5 tiles, at least 2 tiles away or retreating",
+        title: "Automatic Charge: Novices gain 1.5x speed for 1s; War Adepts and Masters gain 2x speed for up to 4s, ending on their first primary attack; triggers against an enemy unit within 5 tiles, at least 2 tiles away or retreating",
         carriers: &[EntityKind::Warrior, EntityKind::WarAdept],
         target_mode: AbilityTargetMode::SelfTarget,
         range_tiles: None,
