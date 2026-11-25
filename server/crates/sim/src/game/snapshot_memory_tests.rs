@@ -564,6 +564,7 @@ fn observer_switches_restore_each_players_authoritative_anti_tank_gun_memory() {
             y: scout_pos.1,
             completed: true,
             dao: None,
+            dao_master: false,
             faction_id: None,
         }))
         .expect("Lab scout should spawn within sight of the remembered gun");

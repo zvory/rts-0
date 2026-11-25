@@ -70,8 +70,13 @@ export class LabClient {
     return this.net.seekRoomTimeTo(0);
   }
 
-  spawnEntity({ owner, kind, x, y, completed = true, dao = null, factionId = null }) {
-    return this.request({ op: "spawnEntity", owner, kind, x, y, completed: !!completed, ...(dao ? { dao } : {}), ...(factionId ? { factionId } : {}) });
+  spawnEntity({ owner, kind, x, y, completed = true, dao = null, daoMaster = false, factionId = null }) {
+    return this.request({
+      op: "spawnEntity", owner, kind, x, y, completed: !!completed,
+      ...(dao ? { dao } : {}),
+      ...(daoMaster ? { daoMaster } : {}),
+      ...(factionId ? { factionId } : {}),
+    });
   }
 
   spawnEntities(spawns) {

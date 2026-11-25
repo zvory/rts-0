@@ -1043,13 +1043,13 @@ await withFakeDocument(async () => {
   assert(buttonByText("Serf"), "Cultivator palette uses the faction worker label");
   assert(buttonByText("Serf").dataset.active === "false", "Shared unit kinds in another faction do not claim the armed spawn tool");
   assert(buttonByText("Novice"), "Cultivator palette includes the base Novice");
-  for (const dao of ["wind", "war", "magic"]) {
-    buttonByText(`${dao[0].toUpperCase() + dao.slice(1)} Adept`).listeners.click();
-    const kind = ({ wind: KIND.WIND_ADEPT, war: KIND.WAR_ADEPT, magic: KIND.MAGIC_ADEPT })[dao];
-    assert(armedTool.payload.kind === kind, "Adept selection uses its authoritative kind");
+  for (const [dao, kind] of Object.entries({ Wind: KIND.WIND_ADEPT, War: KIND.WAR_ADEPT, Magic: KIND.MAGIC_ADEPT })) {
+    buttonByText(`${dao} Master`).listeners.click();
+    assert(armedTool.label === `Spawn ${dao} Master` && buttonByText(`${dao} Adept`).dataset.active === "false",
+      "LabPanel names the armed Master and leaves its Adept option inactive");
     armedCallbacks.onWorldClick({ tool: { ...armedTool }, x: 128, y: 160 });
-    assert(sent.at(-1).op.kind === kind && sent.at(-1).op.factionId === "cultivators" && sent.at(-1).op.owner === 2,
-      "P2 Cultivator spawn transmits faction and specialization to the authority");
+    const op = sent.at(-1).op;
+    assert(op.kind === kind && op.daoMaster === true && op.factionId === "cultivators" && op.owner === 2, "Master spawn transmits its kind, rank, faction, and owner");
     resolveLastLabResult({ outcome: { entityId: 90 } });
   }
   panel.armBuildingSpawnPaletteTool(KIND.RESOURCE_DEPOT);

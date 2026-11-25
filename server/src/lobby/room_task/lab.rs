@@ -205,6 +205,7 @@ fn lab_client_op_to_game_op(op: LabClientOp) -> Result<LabOp, (String, Option<u3
             y,
             completed,
             dao,
+            dao_master,
             faction_id,
         } => {
             let kind = EntityKind::from_str(&kind)
@@ -216,6 +217,7 @@ fn lab_client_op_to_game_op(op: LabClientOp) -> Result<LabOp, (String, Option<u3
                 y,
                 completed,
                 dao,
+                dao_master,
                 faction_id: faction_id
                     .as_deref()
                     .map(super::super::lab_replay_operations::resolve_spawn_faction)

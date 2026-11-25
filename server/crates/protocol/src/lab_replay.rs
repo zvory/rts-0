@@ -101,6 +101,8 @@ pub enum LabReplayOperation {
         completed: bool,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         dao: Option<crate::LabSpawnDao>,
+        #[serde(default, skip_serializing_if = "is_false")]
+        dao_master: bool,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         faction_id: Option<String>,
     },

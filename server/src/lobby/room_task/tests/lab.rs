@@ -521,6 +521,7 @@ fn spawn_lab_entity(
             y: position.1,
             completed: true,
             dao: None,
+            dao_master: false,
             faction_id: None,
         },
     );
