@@ -726,11 +726,24 @@ fn item_categories_are_passive_and_permanent_after_checkpoint() {
     for _ in 0..900 {
         game.tick();
     }
-    assert!(game.state.entities.get(unit).unwrap().shop_item_active(AbilityKind::Haste));
+    assert!(game
+        .state
+        .entities
+        .get(unit)
+        .unwrap()
+        .shop_item_active(AbilityKind::Haste));
     buy(&mut game, shop, unit, AbilityKind::DoubleDamage);
-    for _ in 0..32 { game.tick(); }
+    for _ in 0..32 {
+        game.tick();
+    }
     assert_eq!(game.state.players[0].oil, 800);
-    assert!(!game.state.entities.get(unit).unwrap().ability_uses_remaining.contains_key(&AbilityKind::DoubleDamage));
+    assert!(!game
+        .state
+        .entities
+        .get(unit)
+        .unwrap()
+        .ability_uses_remaining
+        .contains_key(&AbilityKind::DoubleDamage));
 }
 
 #[test]
@@ -910,29 +923,56 @@ fn armor_treasure_applies_on_delivery_without_activation_or_expiry() {
 
 #[test]
 fn every_passive_item_applies_on_delivery_and_ignores_activation_forever() {
-    for ability in [AbilityKind::Haste, AbilityKind::DoubleDamage, AbilityKind::ArmorTreasure, AbilityKind::VitalityTreasure] {
+    for ability in [
+        AbilityKind::Haste,
+        AbilityKind::DoubleDamage,
+        AbilityKind::ArmorTreasure,
+        AbilityKind::VitalityTreasure,
+    ] {
         let (mut game, shop, unit) = item_fixture();
         buy(&mut game, shop, unit, ability);
-        for _ in 0..32 { game.tick(); }
-        assert!(game.state.entities.get(unit).unwrap().shop_item_active(ability));
+        for _ in 0..32 {
+            game.tick();
+        }
+        assert!(game
+            .state
+            .entities
+            .get(unit)
+            .unwrap()
+            .shop_item_active(ability));
         let mut game = Game::restore_checkpoint_payload_text_for_test(
             &game.checkpoint_payload_text_for_test().unwrap(),
-            game.state.map.clone(), game.state.map_metadata.clone(),
-        ).unwrap();
+            game.state.map.clone(),
+            game.state.map_metadata.clone(),
+        )
+        .unwrap();
         activate_item(&mut game, unit, ability);
-        for _ in 0..1000 { game.tick(); }
+        for _ in 0..1000 {
+            game.tick();
+        }
         let target = game.state.entities.get(unit).unwrap();
         assert!(target.shop_item_active(ability));
         assert_eq!(target.ability_uses_remaining.get(&ability), Some(&1));
-        assert_eq!(target.ability_cooldowns.get(&ability).copied().unwrap_or(0), 0);
+        assert_eq!(
+            target.ability_cooldowns.get(&ability).copied().unwrap_or(0),
+            0
+        );
     }
 }
 
 #[test]
 fn occupied_item_categories_send_private_notices_without_spending() {
     for (first, second, category) in [
-        (AbilityKind::EscapeTreasure, AbilityKind::EscapeTreasure, "Movement"),
-        (AbilityKind::ArmorTreasure, AbilityKind::VitalityTreasure, "Defense"),
+        (
+            AbilityKind::EscapeTreasure,
+            AbilityKind::EscapeTreasure,
+            "Movement",
+        ),
+        (
+            AbilityKind::ArmorTreasure,
+            AbilityKind::VitalityTreasure,
+            "Defense",
+        ),
         (AbilityKind::Haste, AbilityKind::DoubleDamage, "Attack"),
     ] {
         let (mut game, shop, unit) = item_fixture();
@@ -941,7 +981,9 @@ fn occupied_item_categories_send_private_notices_without_spending() {
         let oil = game.state.players[0].oil;
         // Both an in-flight delivery and an equipped item reserve the category.
         for ticks in [0, 32] {
-            for _ in 0..ticks { game.tick(); }
+            for _ in 0..ticks {
+                game.tick();
+            }
             buy(&mut game, shop, unit, second);
             let events = game.tick();
             let message = format!("{category} slot already full");

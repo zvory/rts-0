@@ -98,10 +98,12 @@ pub(super) fn purchase(
         return;
     }
     let category_full = if ability == AbilityKind::EscapeTreasure {
-        target.escape_treasure.is_some() || runtime.projectiles().any(|p| {
-            p.ability == ability && matches!(p.return_target,
+        target.escape_treasure.is_some()
+            || runtime.projectiles().any(|p| {
+                p.ability == ability
+                    && matches!(p.return_target,
                 AbilityProjectileReturnTarget::Entity { id } if id == target_id)
-        })
+            })
     } else {
         is_buff_item(ability) && (target.shop_item_category_occupied(ability)
             || runtime.projectiles().any(|p| same_item_category(p.ability, ability)
@@ -115,7 +117,8 @@ pub(super) fn purchase(
         };
         events.entry(player).or_default().push(Event::Notice {
             msg: format!("{category} slot already full"),
-            x: None, y: None,
+            x: None,
+            y: None,
             severity: crate::protocol::NoticeSeverity::Info,
         });
         return;

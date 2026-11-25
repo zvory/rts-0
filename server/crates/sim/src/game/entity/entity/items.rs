@@ -13,7 +13,11 @@ impl Entity {
         &self,
         ability: crate::game::ability::AbilityKind,
     ) -> bool {
-        self.ability_uses_remaining.get(&ability).copied().unwrap_or(0) > 0
+        self.ability_uses_remaining
+            .get(&ability)
+            .copied()
+            .unwrap_or(0)
+            > 0
     }
 
     pub(in crate::game) fn shop_item_category_occupied(
@@ -27,9 +31,7 @@ impl Entity {
             } else {
                 &[Haste, DoubleDamage]
             };
-        kinds.iter().any(|kind| {
-            self.shop_item_active(*kind)
-        })
+        kinds.iter().any(|kind| self.shop_item_active(*kind))
     }
     pub(in crate::game) fn receive_shop_item(
         &mut self,
