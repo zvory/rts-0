@@ -249,7 +249,7 @@ Back-to-front layer ids are exact:
 Each descriptor is `{id, order, space, visibilityPolicy, depthPolicy}`. Later work may add optional
 namespaced metadata but cannot rename/reorder layers or weaken visibility policy.
 Within Pixi's fog-gated world, tree canopies and unit body/overlay/effect containers share
-back-to-front world-Y ordering; tree understory and shadows remain below them, while selection, HP,
+back-to-front world-Y ordering; tree understory and shadows remain below them, while selection, HP and private carried-item rosettes,
 and fog remain above. Any received ordinary unit occupying concealment, or overlapping a foreground
 concealment tile with its presentation footprint, gets a white outer edge plus an 85%-opacity
 owner/team-color silhouette derived from the alpha of its current production rig/frame above the

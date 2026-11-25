@@ -1,0 +1,25 @@
+/* Carried inventory is inspected beside portraits, leaving the command card free. */
+#selected-panel .sel-item-summary {
+  padding: 4px 6px 5px;
+  border-bottom: 1px solid #45566e;
+  color: #e5edf8;
+  font: 11px/1.45 Arial, sans-serif;
+  white-space: pre-line;
+}
+#selected-panel .sel-item-count {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  min-width: 11px;
+  height: 12px;
+  border-radius: 2px;
+  background: #111a25;
+  box-shadow: 0 0 0 1px #bda45e;
+  color: #ffe3a3;
+  font: bold 10px/12px Arial, sans-serif;
+  text-align: center;
+}
+#selected-panel .sel-budget-block.has-carried-escape:not(:focus-visible) {
+  outline: 1px solid #c89bea;
+  outline-offset: -2px;
+}
