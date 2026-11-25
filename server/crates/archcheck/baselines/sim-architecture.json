@@ -531,7 +531,7 @@
     },
     {
       "path": "services/combat/weapons.rs",
-      "lines": 373
+      "lines": 379
     },
     {
       "path": "services/commands.rs",

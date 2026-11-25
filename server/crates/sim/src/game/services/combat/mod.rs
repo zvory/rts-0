@@ -362,7 +362,7 @@ pub(in crate::game) fn combat_system(
             continue; // Auto-acquisition stays hostile/obstacle-only; self-attacks are ordered.
         }
         if entities.get(id).is_some_and(|e| {
-            e.kind == EntityKind::Warrior
+            matches!(e.kind, EntityKind::Warrior | EntityKind::WarAdept)
                 && e.ability_cooldown_ticks(crate::game::ability::AbilityKind::Charge) == 0
         }) {
             if let Some((position, movement, hostile_unit)) = entities.get(tid).map(|target| {
@@ -447,17 +447,17 @@ pub(in crate::game) fn combat_system(
                             + e.radius()
                             + RANGE_SLACK
             });
-        // Wind may finish its melee approach while striking. An Attack Move's
+        // Wind and Haste carriers may finish their approach while striking. An Attack Move's
         // original travel route must still stop for an in-range engagement.
-        let wind_moving_attack = entities.get(id).is_some_and(|e| {
-            e.kind == EntityKind::WindAdept
+        let moving_attack_approach = entities.get(id).is_some_and(|e| {
+            (e.kind == EntityKind::WindAdept || e.shop_item_active(crate::game::ability::AbilityKind::Haste))
                 && (commanded_direct_target
                     || (auto_pursuit
                         && e.path_goal()
                             .is_some_and(|goal| Some(goal) != e.move_intent())))
         });
         if commanded_direct_target
-            && !wind_moving_attack
+            && !moving_attack_approach
             && clear_shot
             && (target_in_weapon_range || wait_for_stationary_range)
         {
@@ -486,8 +486,8 @@ pub(in crate::game) fn combat_system(
                 }
                 e.set_target_id(Some(tid));
                 e.mark_attack_phase(AttackPhase::Firing);
-                // Moving-fire Move orders and Wind melee approaches keep advancing.
-                if !holds_commanded_movement_path && !wind_moving_attack {
+                // Moving-fire Move orders and eligible attack approaches keep advancing.
+                if !holds_commanded_movement_path && !moving_attack_approach {
                     e.clear_path();
                 }
             }

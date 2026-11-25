@@ -632,3 +632,34 @@ fn reloading_attack_move_replaces_an_invalid_committed_target_before_resuming() 
         "finding another in-range target should hold the attack-move route"
     );
 }
+
+#[test]
+fn haste_grants_moving_fire_without_interrupting_move_destination() {
+    use crate::game::ability::AbilityKind;
+    for kind in [EntityKind::Warrior, EntityKind::WarAdept, EntityKind::MagicAdept, EntityKind::Rifleman, EntityKind::MachineGunner, EntityKind::AntiTankGun] {
+        let mut entities = EntityStore::new();
+        let id = entities.spawn_unit(1, kind, 200.0, 200.0).unwrap();
+        let distance = 40.0;
+        let target_kind = if kind == EntityKind::AntiTankGun { EntityKind::Tank } else { EntityKind::Rifleman };
+        let target = entities.spawn_unit(2, target_kind, 200.0 + distance, 200.0).unwrap();
+        entities.get_mut(target).unwrap().set_order(Order::HoldPosition);
+        let unit = entities.get_mut(id).unwrap();
+        let base_speed = unit.movement_speed();
+        unit.receive_shop_item(AbilityKind::Haste);
+        unit.receive_shop_item(AbilityKind::Haste);
+        assert!((unit.movement_speed() - base_speed * 1.15).abs() < 0.00001);
+        let goal = (500.0, 200.0);
+        unit.set_order(Order::move_to(goal.0, goal.1));
+        unit.set_path(vec![goal]);
+        unit.set_path_goal(Some(goal));
+        unit.mark_move_phase(MovePhase::Moving);
+        unit.set_movement_delta(2.0, 0.0);
+        let cooldown = combat_rules::attack_profile(kind).cooldown;
+        run_combat_tick(&mut entities);
+        let unit = entities.get(id).unwrap();
+        assert_eq!(unit.attack_cd(), (cooldown * 4).div_ceil(5), "{kind:?}");
+        assert_eq!(unit.path_goal(), Some(goal));
+        assert!(!unit.path_is_empty());
+        assert_eq!(unit.target_id(), Some(target));
+    }
+}

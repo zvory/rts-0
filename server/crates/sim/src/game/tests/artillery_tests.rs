@@ -429,7 +429,7 @@ fn assert_deployed_artillery_attack_move_reload(haste: bool) {
     assert_eq!(
         artillery_entity.attack_cd(),
         if haste {
-            config::ARTILLERY_RELOAD_TICKS / 2
+            (config::ARTILLERY_RELOAD_TICKS * 4).div_ceil(5)
         } else {
             config::ARTILLERY_RELOAD_TICKS
         },

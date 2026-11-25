@@ -157,7 +157,7 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 15] = [
     },
     AbilityCatalogEntry {
         kind: AbilityKind::Haste, label: "Haste", icon: "H", hotkey: Some("Z"),
-        title: "Deliver a permanent passive attack item within 30 tiles; doubles primary weapon attack speed on arrival", carriers: &[EntityKind::Shop], target_mode: AbilityTargetMode::FriendlyUnit,
+        title: "Deliver a permanent passive attack item within 30 tiles; grants 15% movement speed, 25% primary weapon attack speed, and attacks while moving on arrival", carriers: &[EntityKind::Shop], target_mode: AbilityTargetMode::FriendlyUnit,
         range_tiles: Some(30.0), min_range_tiles: None, cooldown_ticks: 0,
         charges: None, charge_recharge_ticks: None, cost: ResourceCost::new(0, 100),
         tech_requirement: None, upgrade_requirement: None,

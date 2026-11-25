@@ -452,8 +452,8 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 9] = [
         label: "Charge",
         icon: "CHG",
         hotkey: None,
-        title: "Automatic Novice Charge: 1.5x speed for one second against a distant or retreating enemy unit",
-        carriers: &[EntityKind::Warrior],
+        title: "Automatic Charge: 1.5x speed for one second against an enemy unit within 5 tiles, at least 2 tiles away or retreating",
+        carriers: &[EntityKind::Warrior, EntityKind::WarAdept],
         target_mode: AbilityTargetMode::SelfTarget,
         range_tiles: None,
         min_range_tiles: None,
@@ -1315,7 +1315,7 @@ mod tests {
 
         let charge = ability_definition(AbilityKind::Charge);
         assert!(charge.command_card);
-        assert_eq!(charge.carriers, &[EntityKind::Warrior]);
+        assert_eq!(charge.carriers, &[EntityKind::Warrior, EntityKind::WarAdept]);
         assert_eq!(charge.cooldown_ticks, balance::NOVICE_CHARGE_COOLDOWN_TICKS);
 
         let teleport = EKAT_CATALOG.ability(AbilityKind::EkatTeleport).unwrap();
