@@ -341,7 +341,7 @@ assert(
   "compact snapshot scalar schema must match JS decoder",
 );
 assert(
-  protocolContract.compactSlotSchemas.entity.at(-1).name === "itemRadianceTier",
+  protocolContract.compactSlotSchemas.entity.at(-1).name === "chargeActive",
   "compact entity slot schema must include the latest appended field",
 );
 assert(
@@ -876,3 +876,9 @@ for (const record of [groundDecal.slice(0, 9), [...groundDecal, null]]) {
 }
 
 console.log("✅ protocol_parity.mjs: Rust protocol contract dump matches JS mirror");
+
+const chargeRecord = [...daoMasterRecord, false, null, true];
+const chargeSnapshot = decodeServerMessage({ t: "snapshot", v: COMPACT_SNAPSHOT_VERSION,
+  s: [1, 0, 0, 2, 300], e: [chargeRecord], ev: [], n: [0, 0, 0, 0, 0] });
+assert(chargeSnapshot.entities[0].chargeActive === true, "active Charge decodes at slot 55");
+assert(daoMasterSnapshot.entities[0].chargeActive === undefined, "absent Charge stays absent");

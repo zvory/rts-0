@@ -1017,6 +1017,10 @@ pub struct EntityView {
     #[serde(default, skip_serializing_if = "is_false")]
     pub escape_treasure: bool,
 
+    /// Public active Charge visual on an already-visible, actionable carrier.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub charge_active: bool,
+
     /// Public visual item-category count (0–3) on an already-visible Cultivator fighter.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub item_radiance_tier: Option<u8>,
@@ -1092,6 +1096,7 @@ impl EntityView {
             vision_only: false,
             escape_treasure: false,
             item_radiance_tier: None,
+            charge_active: false,
             debug_path: None,
         }
     }

@@ -937,7 +937,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 75. The client also accepts compact
+`messagepack-compact`, codec version 1, compact snapshot version 76. The client also accepts compact
 snapshot versions 51 through 62: version 52 only appends a kind code, version 53 appends the
 optional `unitsKilled` entity slot, version 54 appends an optional `rocket` style bit to mortar
 launch/impact event records, and version 55 adds the `artilleryIncoming` event code, so the older
@@ -975,7 +975,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 75,
+  "v": 76,
   "gr": groundDecalRevision, // omitted when zero
   "gd": [afterRevision, [    // omitted when this tick has no discovered/created revision
     [id, decalClass, sourceKindCode, x, y, owner, seed, facing, weaponFacing, radiusTiles]
@@ -993,7 +993,7 @@ adds an explicit application compression envelope.
       visionOnly?, debugPath?, rallyPlan?, prodUpgrade?, buildActive?, deconstructProgress?,
       weaponRangeTiles?, occupiedTrenchId?, scoutPlane?, prodScoutPlaneQueued?,
       panzerfaustLoaded?, prodRepeatKinds?, prodWaiting?, breakthroughAuraTicks?, extractorActive?,
-      prodUpgradeQueue?, panzerfaustWindupProgress?, unitsKilled?, rocketRackCount?, commanderFacing?, insight?, dao?, daoReady?, daoAdvanceTicks?, chosenDao?, tournamentEntrants?, daoTrainingQueue?, daoMaster?, escapeTreasure?, itemRadianceTier?
+      prodUpgradeQueue?, panzerfaustWindupProgress?, unitsKilled?, rocketRackCount?, commanderFacing?, insight?, dao?, daoReady?, daoAdvanceTicks?, chosenDao?, tournamentEntrants?, daoTrainingQueue?, daoMaster?, escapeTreasure?, itemRadianceTier?, chargeActive?
     ]
   ],
   "r": [[id, remaining]],         // omitted when empty
@@ -2217,3 +2217,14 @@ and attack items. No glow renders on the minimap or through unexplored/hidden te
 ### Vector Field
 
 `vectorField { units: u32[], x: f32, y: f32, directionX: f32, directionY: f32 }` immediately places the new Magic Dao ability. Center and direction must be finite; a nonzero direction is normalized server-side. Unit ids use normal command admission. Owner, carrier, faction, range, resource, readiness and cooldown validation remain authoritative. Its ability id is `vectorField` (ability code 27, order-stage code 35), distinct from `ekatMagicAnchor`. Its world-object kind is `vectorField` (kind code 5), distinct from `magicAnchor`. Compact v74 `ao` records append public `vector: [f32,f32]` and `fieldSize: 4|5` slots; the entire object uses the existing authoritative fog gate. Ekat's Anchor command, shape and projection remain unchanged.
+
+### Charge speed streaks
+
+Compact v76 appends optional entity slot **55**, `chargeActive: bool` (56-element record).
+It is a complete public visual flag on an already-visible actionable Novice, War Adept or
+War Master, true only while the authoritative Charge movement timer is active. False is omitted
+in JSON/trailing compact records and defaults to inactive. It exposes no cooldown, target,
+position beyond the carrier, or private ability state. Vision-only entities omit the flag;
+hidden entities remain absent. Selected-team observers and full-world diagnostics use their
+ordinary entity projection policy. Losing Charge or visibility immediately removes the streaks;
+no world-space trail persists into fog. The flag crosses the detached presentation frame to Pixi.

@@ -777,3 +777,47 @@ fn novice_charge_projects_ready_and_cooling_only_to_private_viewer() {
         assert!(enemy.abilities.is_empty());
     }
 }
+
+#[test]
+fn charge_visual_is_public_only_for_visible_active_charge_carriers() {
+    for kind in [
+        EntityKind::Warrior,
+        EntityKind::WarAdept,
+        EntityKind::WindAdept,
+    ] {
+        let mut entities = EntityStore::new();
+        let id = entities.spawn_unit(1, kind, 100.0, 100.0).unwrap();
+        entities
+            .spawn_unit(2, EntityKind::Worker, 200.0, 100.0)
+            .unwrap();
+        let map = flat_map(32);
+        let mut fog = Fog::new(map.width, map.height);
+        fog.recompute(&[1, 2], &entities, &map);
+        let unit = entities.get(id).unwrap();
+        assert!(
+            !project_for_test(1, unit, &fog, true, &entities, None, false)
+                .unwrap()
+                .charge_active
+        );
+        entities
+            .get_mut(id)
+            .unwrap()
+            .movement
+            .as_mut()
+            .unwrap()
+            .novice_charge_ticks = 30;
+        let unit = entities.get(id).unwrap();
+        for viewer in [1, 2] {
+            let view = project_for_test(viewer, unit, &fog, true, &entities, None, false).unwrap();
+            assert_eq!(view.charge_active, kind != EntityKind::WindAdept);
+            if viewer == 2 {
+                assert!(
+                    view.abilities.is_empty(),
+                    "visual flag exposes no private cooldowns"
+                );
+            }
+        }
+        let hidden_fog = Fog::new(map.width, map.height);
+        assert!(project_for_test(2, unit, &hidden_fog, true, &entities, None, false).is_none());
+    }
+}

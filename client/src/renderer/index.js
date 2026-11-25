@@ -1,3 +1,4 @@
+import { drawChargeStreaks } from "./charge_streaks.js";
 import { reconcileShorelineLayer, destroyShorelineLayer } from "./shoreline.js";
 import { reconcileGrassLayer, destroyGrassLayer, updateTerrainMaterials } from "./grass.js";
 import { drawTankPointPreview } from "./tank_point_preview.js";
@@ -756,6 +757,9 @@ export class Renderer {
         liveIds.add(e.id);
         if (isUnit(e.kind) && !e.visionOnly) {
           this._drawEntitySafely("unit", e, "units", () => {
+            if (e.chargeActive) {
+              drawChargeStreaks(this._slot("chargeStreaks", e.id), e, this._renderClock?.now?.() ?? performance.now());
+            }
             this._drawUnit(e, colorByOwner, state, {
               visualOverride: visualUnitOverrideMap.get(e.id) || null,
               visualFrameStrip: visualFrameStripOverrideMap.get(liveRigKeyForEntity(e)) || null,

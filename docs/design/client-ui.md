@@ -3054,3 +3054,9 @@ non-interpolated ability-object circles so HP bars and selection geometry stay a
 ### Vector Field placement
 
 Magic Adepts and Masters have a separate Vector Field command-card ability on C; Ekat retains Anchor. The first left press fixes the field center; drag-release sets direction, or a stationary first click leaves it armed and a second click sets direction. Cursor movement rotates a rank-aware 4-by-4 or 5-by-5 tile preview about that fixed center. Escape/right-click cancel through ordinary target cancellation. Preview and placed field share a large green arrow and rectangular outline with green particles traveling at the authoritative field speed (3 world pixels per tick, or 90 pixels per second).
+
+Charge presentation: `renderer/charge_streaks.js` draws seven animated translucent, tapered
+speed lines behind visible charging Novices, War Adepts and War Masters, beneath their sprites
+and below fog. The server’s public `chargeActive` flag is the sole activation source; it is not
+inferred from speed or private cooldowns. Lines rotate with facing and scale with body/rank.
+The existing Graphics pool sweep hides inactive/hidden carriers immediately and owns teardown.
