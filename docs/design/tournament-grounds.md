@@ -27,7 +27,7 @@ emerges with a random Dao specialization. Supports a rally point.”
   reserved when the tournament starts, preventing other production from claiming their slots.
   The fourth entrant waits outside if replacing its two supply with the winner's three would
   exceed the cap; earlier entrants' released supply may already have been used by other production.
-- Spawn through normal legal building exits and follow the full rally plan. Blocked exits retain
+- Spawn through normal legal building exits checked for the chosen Adept body, then evolve the queued Novice and follow the full rally plan. Blocked exits retain
   pending winners for retry. Destruction loses entrants/pending winners and releases reservations.
 - Entrant count is team-private. Tournament progress is visible whenever the building is visible.
   Progress/fullness bars and selected-building text explain the two stages.
