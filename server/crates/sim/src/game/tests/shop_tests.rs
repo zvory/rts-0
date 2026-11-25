@@ -923,3 +923,123 @@ fn armor_treasure_applies_on_delivery_without_activation_or_expiry() {
         .unwrap()
         .shop_item_active(AbilityKind::ArmorTreasure));
 }
+
+#[test]
+fn item_radiance_is_public_for_visible_carriers_without_private_inventory() {
+    let mut game = empty_flat_game(&[
+        PlayerInit {
+            id: 1,
+            team_id: 1,
+            faction_id: "cultivators".into(),
+            name: "Owner".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 2,
+            team_id: 2,
+            faction_id: "kriegsia".into(),
+            name: "Enemy".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        },
+        PlayerInit {
+            id: 3,
+            team_id: 1,
+            faction_id: "kriegsia".into(),
+            name: "Ally".into(),
+            color: "#fff".into(),
+            is_ai: false,
+        },
+    ]);
+    let carrier = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::MagicAdept, 640.0, 640.0)
+        .unwrap();
+    let spotter = game
+        .state
+        .entities
+        .spawn_unit(2, EntityKind::Rifleman, 704.0, 640.0)
+        .unwrap();
+    game.state
+        .entities
+        .spawn_unit(3, EntityKind::Rifleman, 600.0, 640.0)
+        .unwrap();
+    game.rebuild_final_spatial();
+    game.state
+        .fog
+        .recompute(&[1, 2, 3], &game.state.entities, &game.state.map);
+    for expected in 0..=3 {
+        let unit = game.state.entities.get_mut(carrier).unwrap();
+        match expected {
+            1 => unit.escape_treasure = Some(999),
+            2 => unit.receive_shop_item(AbilityKind::ArmorTreasure),
+            3 => unit.receive_shop_item(AbilityKind::Haste),
+            _ => {}
+        }
+        for viewer in [1, 2, 3] {
+            let snapshot = game.snapshot_for(viewer);
+            let view = snapshot.entities.iter().find(|e| e.id == carrier).unwrap();
+            assert_eq!(view.item_radiance_tier, Some(expected));
+            if viewer != 1 {
+                assert!(view.abilities.is_empty());
+            }
+            if viewer == 2 {
+                assert!(!view.escape_treasure);
+            }
+        }
+        for snapshot in [game.snapshot_for_spectator(&[2]), game.snapshot_full_for(2)] {
+            let view = snapshot.entities.iter().find(|e| e.id == carrier).unwrap();
+            assert_eq!(view.item_radiance_tier, Some(expected));
+        }
+    }
+    // Activation keeps the attack category occupied, expiry removes it, passive defense persists.
+    let unit = game.state.entities.get_mut(carrier).unwrap();
+    unit.activate_shop_item(AbilityKind::Haste);
+    assert_eq!(unit.item_radiance_tier(), 3);
+    unit.ability_cooldowns.remove(&AbilityKind::Haste);
+    assert_eq!(unit.item_radiance_tier(), 2);
+    unit.escape_treasure = None;
+    assert_eq!(unit.item_radiance_tier(), 1);
+    unit.ability_uses_remaining
+        .remove(&AbilityKind::ArmorTreasure);
+    assert_eq!(unit.item_radiance_tier(), 0);
+    let snapshot = game.snapshot_for(2);
+    assert_eq!(
+        snapshot
+            .entities
+            .iter()
+            .find(|e| e.id == carrier)
+            .unwrap()
+            .item_radiance_tier,
+        Some(0)
+    );
+
+    // Neither a hidden carrier nor its public tier may leak to enemy/selected-enemy views.
+    let unit = game.state.entities.get_mut(carrier).unwrap();
+    unit.receive_shop_item(AbilityKind::VitalityTreasure);
+    unit.receive_shop_item(AbilityKind::DoubleDamage);
+    unit.escape_treasure = Some(999);
+    game.state
+        .entities
+        .get_mut(spotter)
+        .unwrap()
+        .set_position(2200.0, 2200.0);
+    game.rebuild_final_spatial();
+    game.state
+        .fog
+        .recompute(&[1, 2, 3], &game.state.entities, &game.state.map);
+    for snapshot in [game.snapshot_for(2), game.snapshot_for_spectator(&[2])] {
+        assert!(snapshot.entities.iter().all(|e| e.id != carrier));
+    }
+    assert_eq!(
+        game.snapshot_full_for(2)
+            .entities
+            .iter()
+            .find(|e| e.id == carrier)
+            .unwrap()
+            .item_radiance_tier,
+        Some(3)
+    );
+}

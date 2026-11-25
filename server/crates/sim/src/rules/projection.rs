@@ -254,6 +254,7 @@ pub fn project_entity(
     view.escape_treasure = owner_or_ally && entity.escape_treasure.is_some();
 
     if entity.kind.is_disciple() {
+        view.item_radiance_tier = (!vision_only).then(|| entity.item_radiance_tier());
         view.dao_master = Some(entity.dao_master);
         view.insight = owner_or_ally.then_some(entity.insight);
         view.dao_ready =

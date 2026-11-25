@@ -1,6 +1,6 @@
 # Capsule: wire protocol
 
-Use for client↔server message, snapshot, and event changes.
+Use for wire protocol changes.
 
 ## Read first
 - [docs/design/protocol.md](../design/protocol.md) — wire protocol
@@ -20,7 +20,7 @@ Use for client↔server message, snapshot, and event changes.
 - [docs/projection-audit-checklist.md](../projection-audit-checklist.md) — checklist for new
   projection-affecting snapshot fields, events, or observer modes
 
-- Shop / Escape activation
+- Shop items and public Cultivator item radiance
 
 ## Code map
 - `server/crates/protocol/src/{client_message,server_message,lib}.rs` — Rust wire

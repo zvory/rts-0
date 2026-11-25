@@ -1009,6 +1009,10 @@ pub struct EntityView {
     #[serde(default, skip_serializing_if = "is_false")]
     pub escape_treasure: bool,
 
+    /// Public visual item-category count (0–3) on an already-visible Cultivator fighter.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub item_radiance_tier: Option<u8>,
+
     #[serde(skip_serializing_if = "Option::is_none")]
     pub debug_path: Option<DebugPathView>,
 }
@@ -1079,6 +1083,7 @@ impl EntityView {
             scout_plane: None,
             vision_only: false,
             escape_treasure: false,
+            item_radiance_tier: None,
             debug_path: None,
         }
     }

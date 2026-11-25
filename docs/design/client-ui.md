@@ -2998,8 +2998,9 @@ Cultivator fighters (Novices, all three Adepts, and their Masters) gain a gold s
 and pulsing rays for each occupied item category. One item uses the full twelve-ray baseline;
 two add soft bloom and sixteen longer, wider rays; three use the strongest bloom and twenty rays.
 Zero items produce no item radiance. Defense items count while carried; attack items count while
-carried or active and stop counting at expiry; Escape counts until consumed. The effect uses only
-existing authorized inventory fields, so it does not expose enemy inventory or alter fog rules.
+carried or active and stop counting at expiry; Escape counts until consumed. The effect uses the server-projected public `itemRadianceTier` (0–3), so owners, allies,
+enemies and observers see the same strength whenever the carrier is visible. Specific item
+identities and timers remain private; hidden carriers reveal no glow or tier.
 Frame-strip instances own and dispose the rim and bloom filters with their display objects.
 
 ### Client version guard

@@ -936,7 +936,7 @@ safe for the recipient or the recipient is an owner/spectator/full-world viewer.
 MessagePack compact binary snapshot frames are the live WebSocket snapshot path. Each binary frame
 starts with the ASCII magic `RTSM`, a one-byte snapshot codec version (`1`), then a MessagePack map
 containing the same compact snapshot object shape shown below. The active snapshot codec is
-`messagepack-compact`, codec version 1, compact snapshot version 69. The client also accepts compact
+`messagepack-compact`, codec version 1, compact snapshot version 70. The client also accepts compact
 snapshot versions 51 through 62: version 52 only appends a kind code, version 53 appends the
 optional `unitsKilled` entity slot, version 54 appends an optional `rocket` style bit to mortar
 launch/impact event records, and version 55 adds the `artilleryIncoming` event code, so the older
@@ -974,7 +974,7 @@ adds an explicit application compression envelope.
 ```
 {
   "t": "snapshot",
-  "v": 69,
+  "v": 70,
   "gr": groundDecalRevision, // omitted when zero
   "gd": [afterRevision, [    // omitted when this tick has no discovered/created revision
     [id, decalClass, sourceKindCode, x, y, owner, seed, facing, weaponFacing, radiusTiles]
@@ -992,7 +992,7 @@ adds an explicit application compression envelope.
       visionOnly?, debugPath?, rallyPlan?, prodUpgrade?, buildActive?, deconstructProgress?,
       weaponRangeTiles?, occupiedTrenchId?, scoutPlane?, prodScoutPlaneQueued?,
       panzerfaustLoaded?, prodRepeatKinds?, prodWaiting?, breakthroughAuraTicks?, extractorActive?,
-      prodUpgradeQueue?, panzerfaustWindupProgress?, unitsKilled?, rocketRackCount?, commanderFacing?, insight?, dao?, daoReady?, daoAdvanceTicks?, chosenDao?, tournamentEntrants?, daoTrainingQueue?, daoMaster?
+      prodUpgradeQueue?, panzerfaustWindupProgress?, unitsKilled?, rocketRackCount?, commanderFacing?, insight?, dao?, daoReady?, daoAdvanceTicks?, chosenDao?, tournamentEntrants?, daoTrainingQueue?, daoMaster?, escapeTreasure?, itemRadianceTier?
     ]
   ],
   "r": [[id, remaining]],         // omitted when empty
@@ -2190,3 +2190,16 @@ is excluded from enemy building memory. Depletion removes the entity without a d
 Abilities `haste` (compact23, order-stage31), `doubleDamage` (24,32), and `armorTreasure` (25,33) use the existing `useAbility` command with a Shop and friendly `targetId` for purchase, or, for attack items only, with owned unit ids and no target for activation. Private entity `abilities` entries expose `remainingUses:1` while carried; Armor and Vitality retain this entry permanently with zero cooldown and no expiry, indicating an equipped passive rather than an activatable charge. Active consumed attack buffs expose `remainingUses:0`, `cooldownLeft` and `expiresIn` as remaining duration ticks. Empty/expired items omit the entry. Escape remains movement, Haste/Double Damage attack, Armor Treasure defense. Shop `escapeTreasure.cooldownLeft` projects the purchasing owner's shared cooldown across all their Shops. No new snapshot fields.
 
 Vitality Treasure uses ability `vitalityTreasure` (compact ability 26, order-stage 34), with the same private permanent carried-passive `abilities` entry as Armor Treasure. Existing public `hp`/`maxHp` fields include its bonus from delivery onward. No new snapshot fields.
+
+### Public Cultivator item radiance
+
+Compact v70 appends optional entity slot **54**, `itemRadianceTier: u8` (0–3),
+as a complete per-snapshot visual value for already-visible Cultivator fighters.
+All recipients (owners, allies, visible enemies, selected-player/spectator unions and full-world
+observers) receive the same tier. Zero is explicitly projected to clear consumed or expired items.
+Movement Escape, permanent passive defense, and carried/active attack each contribute one tier.
+The tier discloses only the number of occupied categories, never their identities or timers.
+Existing private `abilities` and team-private `escapeTreasure` retain their privacy policies.
+Fog-hidden carriers are omitted as usual; vision-only entities omit this field. The client
+uses this public field exclusively for the golden rim, bloom and rays, including allies' defense
+and attack items. No glow renders on the minimap or through unexplored/hidden terrain.
