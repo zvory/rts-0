@@ -1,6 +1,8 @@
 use super::fixtures::*;
 use super::*;
 
+mod anchor_vector;
+
 fn ekat_player() -> PlayerInit {
     PlayerInit {
         id: 1,
@@ -829,39 +831,6 @@ fn ekat_magic_anchor_is_not_attackable_by_enemy_weapons() {
 }
 
 #[test]
-fn ekat_magic_anchor_pull_field_slows_away_and_boosts_toward_movement() {
-    let away_delta = ekat_anchor_move_delta(-6.0, 2);
-    let toward_delta = ekat_anchor_move_delta(14.0, 2);
-
-    assert!(
-        away_delta < config::unit_stats(EntityKind::Ekat).unwrap().speed,
-        "moving away from the anchor should be slowed, delta={away_delta}"
-    );
-    assert!(
-        toward_delta > config::unit_stats(EntityKind::Ekat).unwrap().speed,
-        "moving toward the anchor should be boosted, delta={toward_delta}"
-    );
-    assert!(
-        toward_delta > away_delta,
-        "toward movement should cover more distance than away movement"
-    );
-}
-
-#[test]
-fn ekat_magic_anchor_leaves_owned_and_allied_movement_unchanged() {
-    let speed = config::unit_stats(EntityKind::Ekat).unwrap().speed;
-    for owner in [1, 3] {
-        for destination in [-6.0, 14.0] {
-            let delta = ekat_anchor_move_delta(destination, owner);
-            assert!(
-                (delta - speed).abs() < 0.01,
-                "owner={owner}, destination={destination}, delta={delta}"
-            );
-        }
-    }
-}
-
-#[test]
 fn ekat_magic_anchor_pulls_stationary_units_with_weight_resistance() {
     let players = [
         ekat_player(),
@@ -934,53 +903,6 @@ fn ekat_magic_anchor_pulls_stationary_units_with_weight_resistance() {
         tank_delta < infantry_delta,
         "heavy units should receive less pull than infantry, infantry={infantry_delta}, tank={tank_delta}"
     );
-}
-
-fn ekat_anchor_move_delta(destination_tiles_from_start: f32, owner: u32) -> f32 {
-    let ally = PlayerInit {
-        id: 3,
-        team_id: 1,
-        ..kriegsia_enemy()
-    };
-    let players = [ekat_player(), kriegsia_enemy(), ally];
-    let mut game = empty_flat_game(&players);
-    let start = game.state.map.tile_center(10, 10);
-    let anchor_target = game.state.map.tile_center(12, 10);
-    let destination = (
-        start.0 + destination_tiles_from_start * config::TILE_SIZE as f32,
-        start.1,
-    );
-    let hero = game
-        .state
-        .entities
-        .spawn_unit(owner, EntityKind::Ekat, start.0, start.1)
-        .expect("hero should spawn");
-
-    let caster = game
-        .state
-        .entities
-        .spawn_unit(
-            1,
-            EntityKind::Ekat,
-            anchor_target.0,
-            anchor_target.1 + 4.0 * config::TILE_SIZE as f32,
-        )
-        .unwrap();
-    enqueue_ekat_anchor(&mut game, caster, anchor_target);
-    game.tick();
-    game.enqueue(
-        owner,
-        Command::Move {
-            units: vec![hero],
-            x: destination.0,
-            y: destination.1,
-            queued: false,
-        },
-    );
-    game.tick();
-
-    let hero_entity = game.state.entities.get(hero).expect("hero exists");
-    (hero_entity.pos_x() - start.0).abs()
 }
 
 #[test]

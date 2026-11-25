@@ -623,11 +623,13 @@ profiles and explicit activation/autocast policy instead of being folded into de
   swept leg once per leg; if her Magic Anchor is active, the same activation also launches a second
   projectile from the anchor toward the cursor. Her Magic Anchor ability targets up to 7.5 tiles (shared with Magic Adepts and Masters), has
   no resource cost, places one replacement-style non-blocking, non-attackable 10-second pull field
-  with a 3-tile radius, slows units moving away from the anchor to as low as 0.45x speed near the
-  center, boosts units moving toward the anchor up to 2.40x speed near the center, and drags idle
-  units toward the anchor at 1.40 times their movement speed per tick, scaled by radial falloff
-  and reduced for braced or heavy units. This doubles the inward movement bonus and idle
-  displacement again from the previous 0.70 strength; the outward slowdown is unchanged. Her Consume ability is
+  with a 3-tile radius. Every tick, affected enemies receive an inward displacement vector
+  in addition to normal movement, whether moving or stationary. Its magnitude is twice the
+  unit's movement speed, multiplied by linear radial falloff (zero at the edge, full strength
+  toward the center) and divided by the square root of footing resistance, with a minimum
+  resistance of 1.0 so working workers are still pulled. The strongest
+  overlapping field applies; displacement cannot overshoot its center or cross blocking bodies
+  or impassable terrain. This replaces directional speed multipliers and the separate idle rule. Her Consume ability is
   self-targeted, has no resource cost or cooldown, consumes the nearest owned living Golem within 2
   tiles, and heals Ekat to full HP. Existing prototype combat abilities remain directly available
   until the Ekat tech-unlock building slice replaces them.

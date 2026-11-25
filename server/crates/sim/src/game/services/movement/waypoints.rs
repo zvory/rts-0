@@ -1,5 +1,4 @@
 use crate::config;
-use crate::game::ability_runtime::AbilityRuntime;
 use crate::game::entity::{
     uses_car_movement_semantics, uses_oriented_vehicle_body, uses_pivot_vehicle_movement,
     AttackPhase, Entity, EntityKind, EntityStore, MovePhase, Order, PanzerfaustState, WeaponSetup,
@@ -54,7 +53,6 @@ pub(super) fn advance_moving_units(
     occ: &Occupancy,
     spatial: &SpatialIndex,
     tick: u32,
-    ability_runtime: &AbilityRuntime,
 ) {
     let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
     let mut blockers = UnitBlockers::new(entities);
@@ -195,16 +193,8 @@ pub(super) fn advance_moving_units(
                     }
             })
             .unwrap_or(0.0);
-        let directional_multiplier = |direction| {
-            map.elevation_movement_multiplier_at(x, y, direction)
-                * ability_runtime.magic_anchor_movement_multiplier(
-                    owner,
-                    &teams,
-                    (x, y),
-                    direction,
-                    tick,
-                )
-        };
+        let directional_multiplier =
+            |direction| map.elevation_movement_multiplier_at(x, y, direction);
         let directional_speed =
             |(wx, wy): (f32, f32)| speed * directional_multiplier((wx - x, wy - y));
 
@@ -217,7 +207,7 @@ pub(super) fn advance_moving_units(
             .and_then(|e| e.movement.as_ref()?.pivot_recovery)
         {
             // Recovery may retreat opposite the route: directional modifiers must follow
-            // the committed escape, including elevation and Magic Anchor pull.
+            // the committed escape, including elevation.
             let recovery_speed = directional_speed(recovery.goal);
             let neighbors = entities
                 .get(id)

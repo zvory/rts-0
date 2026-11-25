@@ -45,9 +45,6 @@ pub(super) const MAX_UNIT_BOUNDING_RADIUS_PX: f32 = 32.0;
 
 pub(super) const STEERING_MAX_NEIGHBORS: usize = 16;
 
-const MAGIC_ANCHOR_STATIONARY_PULL_PER_TICK_SCALE: f32 =
-    config::EKAT_MAGIC_ANCHOR_PULL_TOWARD_MULTIPLIER - 1.0;
-
 #[cfg(test)]
 pub(crate) fn resolve_collisions(
     entities: &mut EntityStore,
@@ -163,8 +160,8 @@ pub(crate) fn movement_system_with_context(
         }
         allowed
     });
-    waypoints::advance_moving_units(map, entities, players, occ, spatial, tick, ability_runtime);
-    apply_magic_anchor_stationary_pull(map, entities, players, occ, tick, ability_runtime);
+    waypoints::advance_moving_units(map, entities, players, occ, spatial, tick);
+    apply_magic_anchor_pull(map, entities, players, occ, tick, ability_runtime);
     barbed_wire::apply_entries(map, entities, &wire_positions);
     for id in entities.ids() {
         if let Some(e) = entities.get_mut(id) {
@@ -205,7 +202,7 @@ fn clamp_meth_machine_gunner_setup(entities: &mut EntityStore, id: u32) {
     }
 }
 
-fn apply_magic_anchor_stationary_pull(
+fn apply_magic_anchor_pull(
     map: &Map,
     entities: &mut EntityStore,
     players: &[PlayerState],
@@ -221,14 +218,13 @@ fn apply_magic_anchor_stationary_pull(
     let world_max_y = map.world_height_px() - 0.01;
     for id in entities.ids() {
         let Some((kind, owner, x, y, facing, speed, resistance)) = entities.get(id).and_then(|e| {
-            if !e.is_unit() || e.kind == EntityKind::ScoutPlane || !e.path_is_empty() {
+            if !e.is_unit() || e.kind == EntityKind::ScoutPlane {
                 return None;
             }
             let profile = standability::footing_profile(e);
-            let resistance = standability::footing_resistance(profile);
-            if resistance <= 0.0 {
-                return None;
-            }
+            // Work orders allow workers to pass through friendly traffic, but must not
+            // make them immune to hostile displacement (or divide by zero).
+            let resistance = standability::footing_resistance(profile).max(1.0);
             let speed = e.movement_speed();
             Some((
                 e.kind,
@@ -242,13 +238,14 @@ fn apply_magic_anchor_stationary_pull(
         }) else {
             continue;
         };
-        let Some((dir, strength)) =
-            ability_runtime.magic_anchor_stationary_pull(owner, &teams, x, y, tick)
+        let Some((dir, strength, distance)) =
+            ability_runtime.magic_anchor_pull(owner, &teams, x, y, tick)
         else {
             continue;
         };
-        let pull_px =
-            speed * MAGIC_ANCHOR_STATIONARY_PULL_PER_TICK_SCALE * strength / resistance.det_sqrt();
+        let pull_px = (speed * config::EKAT_MAGIC_ANCHOR_PULL_SPEED_MULTIPLIER * strength
+            / resistance.det_sqrt())
+        .min(distance);
         if pull_px <= 0.0 || !pull_px.is_finite() {
             continue;
         }
@@ -275,7 +272,14 @@ fn apply_magic_anchor_stationary_pull(
             e.set_position(next_x, next_y);
             blockers.update(e);
             let (next_x, next_y) = (e.pos_x(), e.pos_y());
-            e.set_movement_delta(next_x - x, next_y - y);
+            let previous_delta = e.movement_delta();
+            e.set_movement_delta(previous_delta.0 + next_x - x, previous_delta.1 + next_y - y);
+            if kind == EntityKind::Tank && (next_x != x || next_y != y) {
+                if let Some(combat) = e.combat.as_mut() {
+                    combat.tank_stationary_range_ticks = 0;
+                    combat.tank_stationary_range_reset_this_tick = true;
+                }
+            }
         }
     }
 }
