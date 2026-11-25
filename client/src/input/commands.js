@@ -140,7 +140,7 @@ export function _issueTargetedCommand(p, ev = {}) {
       this._addCommandFeedback("move", target.x, target.y, false);
       return true;
     }
-    if (ability === ABILITY.EKAT_MAGIC_ANCHOR) {
+    if (ability === ABILITY.VECTOR_FIELD) {
       if (!intent.vectorFieldCenter) {
         intent.vectorFieldCenter = {x: world.x, y: world.y};
         return false;
@@ -729,9 +729,9 @@ export function _refreshAbilityTargetPreview() {
         artilleryMinFireRadiusTiles(commandUpgrades(this.state, this.controlPolicy)),
       )
     : abilityTargetRadiusTiles(definition, target.ability, this.state, this.controlPolicy);
-  const vectorCenter = target.ability === ABILITY.EKAT_MAGIC_ANCHOR ? intent.vectorFieldCenter : null;
+  const vectorCenter = target.ability === ABILITY.VECTOR_FIELD ? intent.vectorFieldCenter : null;
   intent?.updateAbilityTargetPreview?.({
-    vectorField: target.ability === ABILITY.EKAT_MAGIC_ANCHOR,
+    vectorField: target.ability === ABILITY.VECTOR_FIELD,
     vectorCenter: vectorCenter || world,
     vectorDirection: vectorCenter ? [world.x - vectorCenter.x, world.y - vectorCenter.y] : [1, 0],
     ability: target.ability,

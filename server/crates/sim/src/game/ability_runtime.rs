@@ -31,6 +31,7 @@ pub(in crate::game) enum ActiveAbilityInstanceKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[allow(dead_code)]
 pub(in crate::game) enum AbilityWorldObjectKind {
+    VectorField,
     ReturnMarker,
     MagicAnchor,
     LineProjectile,
@@ -382,7 +383,7 @@ impl AbilityRuntime {
         for object in &mut self.world_objects.objects {
             if object.owner == owner
                 && object.caster_id == caster
-                && object.kind == AbilityWorldObjectKind::MagicAnchor
+                && object.kind == AbilityWorldObjectKind::VectorField
             {
                 object.payload = AbilityObjectPayload::VectorField { direction };
             }
@@ -402,10 +403,24 @@ impl AbilityRuntime {
                 let offset = (x - o.x.to_world(), y - o.y.to_world());
                 let along = offset.0 * dx + offset.1 * dy;
                 let across = -offset.0 * dy + offset.1 * dx;
-                (along.abs() <= 3.0 * crate::config::TILE_SIZE as f32
-                    && across.abs() <= 1.5 * crate::config::TILE_SIZE as f32)
+                (along.abs()
+                    <= crate::config::VECTOR_FIELD_DEPTH_TILES
+                        * 0.5
+                        * crate::config::TILE_SIZE as f32
+                    && across.abs()
+                        <= crate::config::VECTOR_FIELD_WIDTH_TILES
+                            * 0.5
+                            * crate::config::TILE_SIZE as f32)
                     .then_some([dx, dy])
             })
+    }
+
+    pub(crate) fn clear_vector_fields(&mut self, owner: u32, caster: u32) {
+        self.world_objects.objects.retain(|o| {
+            !(o.owner == owner
+                && o.caster_id == caster
+                && o.kind == AbilityWorldObjectKind::VectorField)
+        });
     }
 
     pub(crate) fn magic_anchor_pull(

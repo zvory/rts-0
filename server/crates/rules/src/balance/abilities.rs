@@ -119,5 +119,6 @@ pub const HEALING_SEAL_PULSE_TICKS: u32 = super::TICK_HZ / 3;
 pub const CULTIVATOR_ITEM_CAPACITY: u8 = 3;
 pub const CULTIVATOR_MASTER_ITEM_CAPACITY: u8 = 6;
 
-// Local Vector Field prototype: toggle only for the matched visual comparison.
-pub const VECTOR_FIELD_WEIGHTED: bool = false;
+pub const VECTOR_FIELD_SPEED_PX_PER_TICK: f32 = 4.0;
+pub const VECTOR_FIELD_WIDTH_TILES: f32 = 6.0;
+pub const VECTOR_FIELD_DEPTH_TILES: f32 = 3.0;

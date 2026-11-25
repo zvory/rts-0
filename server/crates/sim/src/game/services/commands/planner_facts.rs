@@ -243,6 +243,7 @@ fn world_ability_order_policy(ability: AbilityKind) -> (bool, bool) {
         | AbilityKind::EkatTeleport
         | AbilityKind::EkatLineShot
         | AbilityKind::ThrowSword
+        | AbilityKind::VectorField
         | AbilityKind::EkatMagicAnchor
         | AbilityKind::DiscipleShield => (true, true),
         // Self-targeted abilities or abilities with dedicated command dispatch.

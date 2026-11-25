@@ -82,7 +82,14 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 15] = [
         ..EKAT_ABILITIES[0]
     },
     AbilityCatalogEntry {
+        kind: AbilityKind::VectorField,
         label: "Vector Field",
+        icon: "VEC",
+        title: "Direct a field six tiles across and three deep; displaces every ground unit 4 pixels per tick",
+        carriers: &[EntityKind::MagicAdept],
+        protocol_code: 27,
+        order_stage_code: 35,
+        queue_policy: AbilityQueuePolicy::NotQueueable,
         ..EKAT_ABILITIES[2]
     },
     AbilityCatalogEntry {

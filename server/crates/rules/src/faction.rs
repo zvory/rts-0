@@ -99,6 +99,7 @@ pub enum AbilityKind {
     EkatTeleport,
     EkatLineShot,
     EkatMagicAnchor,
+    VectorField,
     EkatConsumeGolem,
     Barrage,
     EvolveWind,
@@ -129,6 +130,7 @@ impl AbilityKind {
         Self::EkatTeleport,
         Self::EkatLineShot,
         Self::EkatMagicAnchor,
+        Self::VectorField,
         Self::EkatConsumeGolem,
         Self::Barrage,
         Self::EvolveWind,
@@ -159,6 +161,7 @@ impl AbilityKind {
             Self::EkatTeleport => "ekatTeleport",
             Self::EkatLineShot => "ekatLineShot",
             Self::EkatMagicAnchor => "ekatMagicAnchor",
+            Self::VectorField => "vectorField",
             Self::EkatConsumeGolem => "ekatConsumeGolem",
             Self::Barrage => "barrage",
             Self::EvolveWind => "evolveWind",
@@ -703,11 +706,11 @@ const EKAT_ABILITIES: [AbilityCatalogEntry; 4] = [
     },
     AbilityCatalogEntry {
         kind: AbilityKind::EkatMagicAnchor,
-        label: "Vector Field",
-        icon: "VEC",
+        label: "Anchor",
+        icon: "ANC",
         hotkey: Some("C"),
-        title: "Click-drag or click twice to direct a 6 x 3 tile Vector Field",
-        carriers: &[EntityKind::Ekat, EntityKind::MagicAdept],
+        title: "Place a 10-second pull field",
+        carriers: &[EntityKind::Ekat],
         target_mode: AbilityTargetMode::WorldPoint,
         range_tiles: Some(balance::EKAT_MAGIC_ANCHOR_RANGE_TILES),
         min_range_tiles: None,
@@ -1053,6 +1056,7 @@ pub fn ability_definition(kind: AbilityKind) -> AbilityCatalogEntry {
         AbilityKind::EkatTeleport => ekat_teleport,
         AbilityKind::EkatLineShot => ekat_line_shot,
         AbilityKind::EkatMagicAnchor => ekat_magic_anchor,
+        AbilityKind::VectorField => CULTIVATOR_ABILITIES[4],
         AbilityKind::EkatConsumeGolem => ekat_consume_golem,
         AbilityKind::Barrage => barrage,
         AbilityKind::EvolveWind => CULTIVATOR_ABILITIES[0],
@@ -1427,7 +1431,7 @@ mod tests {
             assert!(catalog.allows_ability(ability, EntityKind::Warrior));
         }
         assert!(catalog.allows_ability(AbilityKind::DiscipleShield, EntityKind::MagicAdept));
-        assert!(catalog.allows_ability(AbilityKind::EkatMagicAnchor, EntityKind::MagicAdept));
+        assert!(catalog.allows_ability(AbilityKind::VectorField, EntityKind::MagicAdept));
         assert!(catalog.allows_ability(AbilityKind::WindDash, EntityKind::WindAdept));
         assert!(catalog.allows_ability(AbilityKind::ThrowSword, EntityKind::WarAdept));
     }

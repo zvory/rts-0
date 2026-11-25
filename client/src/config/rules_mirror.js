@@ -587,11 +587,11 @@ export const ABILITIES = Object.freeze({
   }),
   [ABILITY.EKAT_MAGIC_ANCHOR]: Object.freeze({
     ability: ABILITY.EKAT_MAGIC_ANCHOR,
-    label: "Vector Field",
-    icon: "VEC",
+    label: "Anchor",
+    icon: "ANC",
     hotkey: "C",
-    title: "Click-drag or click twice to direct a 6 x 3 tile Vector Field",
-    carriers: Object.freeze([KIND.EKAT, KIND.MAGIC_ADEPT]),
+    title: "Place a 10-second pull field",
+    carriers: Object.freeze([KIND.EKAT]),
     targetMode: "worldPoint",
     rangeTiles: EKAT_MAGIC_ANCHOR_RANGE_TILES,
     cooldownTicks: 0,
@@ -601,6 +601,21 @@ export const ABILITIES = Object.freeze({
     pullSpeedMultiplier: EKAT_MAGIC_ANCHOR_PULL_SPEED_MULTIPLIER,
     queued: true,
     queuePolicy: "skipIfNotReady",
+  }),
+  [ABILITY.VECTOR_FIELD]: Object.freeze({
+    ability: ABILITY.VECTOR_FIELD,
+    label: "Vector Field",
+    icon: "VEC",
+    hotkey: "C",
+    title: "Direct a field six tiles across and three deep; displaces every ground unit 4 pixels per tick",
+    carriers: Object.freeze([KIND.MAGIC_ADEPT]),
+    targetMode: "worldPoint",
+    rangeTiles: EKAT_MAGIC_ANCHOR_RANGE_TILES,
+    cooldownTicks: 0,
+    cost: Object.freeze({ steel: 0, oil: 0 }),
+    durationTicks: EKAT_MAGIC_ANCHOR_DURATION_TICKS,
+    queued: false,
+    queuePolicy: "notQueueable",
   }),
   [ABILITY.EKAT_CONSUME_GOLEM]: Object.freeze({
     ability: ABILITY.EKAT_CONSUME_GOLEM,
@@ -773,3 +788,7 @@ export function researchDefinition(upgrade, upgrades = [], entities = [], owner 
   return { ...def, cost: { steel: def.cost.steel * multiplier, oil: def.cost.oil * multiplier },
     researchTicks: def.researchTicks * multiplier };
 }
+
+export const VECTOR_FIELD_SPEED_PX_PER_TICK = 4;
+export const VECTOR_FIELD_WIDTH_TILES = 6;
+export const VECTOR_FIELD_DEPTH_TILES = 3;

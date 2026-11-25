@@ -68,11 +68,6 @@ pub(crate) fn death_system(
 
     // Resolve once, before removal, so every death source and overlapping Anchor is covered.
     for object in ability_runtime.world_objects() {
-        let crate::game::ability_runtime::AbilityObjectPayload::MagicAnchor { radius } =
-            object.payload
-        else {
-            continue;
-        };
         if object.expires_tick <= tick {
             continue;
         }
@@ -83,7 +78,22 @@ pub(crate) fn death_system(
                 let dy = victim.y - object.y.to_world();
                 victim.kind.is_unit()
                     && teams.is_enemy_owner(object.owner, victim.owner)
-                    && dx * dx + dy * dy <= radius * radius
+                    && match object.payload {
+                        crate::game::ability_runtime::AbilityObjectPayload::MagicAnchor {
+                            radius,
+                        } => dx * dx + dy * dy <= radius * radius,
+                        crate::game::ability_runtime::AbilityObjectPayload::VectorField {
+                            direction: [vx, vy],
+                        } => {
+                            (dx * vx + dy * vy).abs()
+                                <= config::VECTOR_FIELD_DEPTH_TILES * config::TILE_SIZE as f32 * 0.5
+                                && (-dx * vy + dy * vx).abs()
+                                    <= config::VECTOR_FIELD_WIDTH_TILES
+                                        * config::TILE_SIZE as f32
+                                        * 0.5
+                        }
+                        _ => false,
+                    }
             })
             .count();
         if let Some(caster) = entities.get_mut(object.caster_id) {

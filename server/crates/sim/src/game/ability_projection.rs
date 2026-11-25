@@ -104,6 +104,7 @@ fn ability_object_kind_to_protocol(kind: AbilityWorldObjectKind) -> &'static str
         AbilityWorldObjectKind::ReturnMarker => {
             crate::protocol::ability_object_kinds::RETURN_MARKER
         }
+        AbilityWorldObjectKind::VectorField => crate::protocol::ability_object_kinds::VECTOR_FIELD,
         AbilityWorldObjectKind::MagicAnchor => crate::protocol::ability_object_kinds::MAGIC_ANCHOR,
         AbilityWorldObjectKind::LineProjectile => {
             crate::protocol::ability_object_kinds::LINE_PROJECTILE

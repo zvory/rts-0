@@ -558,6 +558,9 @@ pub(in crate::game) fn apply_commands(
                 else {
                     continue;
                 };
+                if ability == AbilityKind::VectorField {
+                    continue;
+                }
                 if shop_items::is_shop_item(ability) {
                     if !queued {
                         shop_items::purchase(
@@ -623,7 +626,7 @@ pub(in crate::game) fn apply_commands(
                         player,
                         &faction_id,
                         caster,
-                        AbilityKind::EkatMagicAnchor,
+                        AbilityKind::VectorField,
                         x,
                         y,
                         tick,

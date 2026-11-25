@@ -100,6 +100,7 @@ pub(in crate::game) fn planner_code(kind: AbilityKind) -> u16 {
         AbilityKind::DoubleDamage => 23,
         AbilityKind::ArmorTreasure => 24,
         AbilityKind::VitalityTreasure => 25,
+        AbilityKind::VectorField => 26,
     }
 }
 
@@ -131,6 +132,7 @@ pub(in crate::game) fn from_planner_code(code: u16) -> Option<AbilityKind> {
         23 => Some(AbilityKind::DoubleDamage),
         24 => Some(AbilityKind::ArmorTreasure),
         25 => Some(AbilityKind::VitalityTreasure),
+        26 => Some(AbilityKind::VectorField),
 
         _ => None,
     }
@@ -159,7 +161,7 @@ pub fn effect_hook(kind: AbilityKind) -> AbilityEffectHook {
         AbilityKind::EkatTeleport => AbilityEffectHook::DashReturn,
         AbilityKind::WindDash => AbilityEffectHook::Dash,
         AbilityKind::EkatLineShot | AbilityKind::ThrowSword => AbilityEffectHook::LineProjectile,
-        AbilityKind::EkatMagicAnchor => AbilityEffectHook::MagicAnchor,
+        AbilityKind::EkatMagicAnchor | AbilityKind::VectorField => AbilityEffectHook::MagicAnchor,
         AbilityKind::DiscipleShield => AbilityEffectHook::Shield,
         AbilityKind::EkatConsumeGolem => AbilityEffectHook::ConsumeGolem,
     }

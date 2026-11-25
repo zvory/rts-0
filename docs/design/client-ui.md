@@ -3052,4 +3052,4 @@ non-interpolated ability-object circles so HP bars and selection geometry stay a
 
 ### Local Vector Field placement prototype
 
-Anchor command-card entry becomes Vector Field. First left press locks the rectangle center; drag-release sets direction, or a stationary first click leaves it armed and a second click sets direction. Cursor movement rotates a 6 by 3 tile preview about that fixed center. Escape/right-click cancel through ordinary target cancellation. The placed field and preview use a large solid green arrow and green rectangular outline, without particles. The prototype retains existing stable Anchor ids behind the displayed label.
+Magic Adepts and Masters have a separate Vector Field command-card ability on C; Ekat retains Anchor. The first left press fixes the field center; drag-release sets direction, or a stationary first click leaves it armed and a second click sets direction. Cursor movement rotates a six-tile-wide, three-tile-deep preview about that fixed center. Escape/right-click cancel through ordinary target cancellation. Preview and placed field share a large green arrow and rectangular outline without particles.

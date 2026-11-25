@@ -127,6 +127,7 @@ pub mod abilities {
     pub const WIND_DASH: &str = "windDash";
     pub const EKAT_TELEPORT: &str = "ekatTeleport";
     pub const EKAT_LINE_SHOT: &str = "ekatLineShot";
+    pub const VECTOR_FIELD: &str = "vectorField";
     pub const EKAT_MAGIC_ANCHOR: &str = "ekatMagicAnchor";
     pub const EKAT_CONSUME_GOLEM: &str = "ekatConsumeGolem";
     pub const BARRAGE: &str = "barrage";
@@ -155,6 +156,7 @@ pub mod abilities {
         WIND_DASH,
         EKAT_TELEPORT,
         EKAT_LINE_SHOT,
+        VECTOR_FIELD,
         EKAT_MAGIC_ANCHOR,
         EKAT_CONSUME_GOLEM,
         BARRAGE,
@@ -176,6 +178,7 @@ pub mod abilities {
 /// `AbilityObjectView.kind` values.
 pub mod ability_object_kinds {
     pub const RETURN_MARKER: &str = "returnMarker";
+    pub const VECTOR_FIELD: &str = "vectorField";
     pub const MAGIC_ANCHOR: &str = "magicAnchor";
     pub const LINE_PROJECTILE: &str = "lineProjectile";
     pub const SHIELD: &str = "shield";
@@ -508,6 +511,7 @@ const ORDER_STAGE_CODES: &[(&str, u8)] = &[
     (abilities::WIND_DASH, 29),
     (abilities::EKAT_TELEPORT, 12),
     (abilities::EKAT_LINE_SHOT, 13),
+    (abilities::VECTOR_FIELD, 35),
     (abilities::EKAT_MAGIC_ANCHOR, 14),
     ("deconstruct", 15),
     (abilities::EKAT_CONSUME_GOLEM, 16),
@@ -539,6 +543,7 @@ const ABILITY_CODES: &[(&str, u8)] = &[
     (abilities::WIND_DASH, 21),
     (abilities::EKAT_TELEPORT, 6),
     (abilities::EKAT_LINE_SHOT, 7),
+    (abilities::VECTOR_FIELD, 27),
     (abilities::EKAT_MAGIC_ANCHOR, 8),
     (abilities::EKAT_CONSUME_GOLEM, 9),
     (abilities::BLANKET_FIRE, 10),
@@ -561,6 +566,7 @@ const ABILITY_CODES: &[(&str, u8)] = &[
 
 const ABILITY_OBJECT_KIND_CODES: &[(&str, u8)] = &[
     (ability_object_kinds::RETURN_MARKER, 1),
+    (ability_object_kinds::VECTOR_FIELD, 5),
     (ability_object_kinds::MAGIC_ANCHOR, 2),
     (ability_object_kinds::LINE_PROJECTILE, 3),
     (ability_object_kinds::SHIELD, 4),
@@ -871,6 +877,7 @@ fn ability_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("WIND_DASH", abilities::WIND_DASH),
         ("EKAT_TELEPORT", abilities::EKAT_TELEPORT),
         ("EKAT_LINE_SHOT", abilities::EKAT_LINE_SHOT),
+        ("VECTOR_FIELD", abilities::VECTOR_FIELD),
         ("EKAT_MAGIC_ANCHOR", abilities::EKAT_MAGIC_ANCHOR),
         ("EKAT_CONSUME_GOLEM", abilities::EKAT_CONSUME_GOLEM),
         ("BARRAGE", abilities::BARRAGE),
@@ -892,6 +899,7 @@ fn ability_vocabulary() -> BTreeMap<&'static str, &'static str> {
 fn ability_object_kind_vocabulary() -> BTreeMap<&'static str, &'static str> {
     string_map(&[
         ("RETURN_MARKER", ability_object_kinds::RETURN_MARKER),
+        ("VECTOR_FIELD", ability_object_kinds::VECTOR_FIELD),
         ("MAGIC_ANCHOR", ability_object_kinds::MAGIC_ANCHOR),
         ("LINE_PROJECTILE", ability_object_kinds::LINE_PROJECTILE),
         ("SHIELD", ability_object_kinds::SHIELD),
@@ -974,6 +982,7 @@ fn order_stage_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("WIND_DASH", abilities::WIND_DASH),
         ("EKAT_TELEPORT", abilities::EKAT_TELEPORT),
         ("EKAT_LINE_SHOT", abilities::EKAT_LINE_SHOT),
+        ("VECTOR_FIELD", abilities::VECTOR_FIELD),
         ("EKAT_MAGIC_ANCHOR", abilities::EKAT_MAGIC_ANCHOR),
         ("EKAT_CONSUME_GOLEM", abilities::EKAT_CONSUME_GOLEM),
         ("BARRAGE", abilities::BARRAGE),

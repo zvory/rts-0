@@ -509,9 +509,10 @@ export function _drawAbilityObjects(state) {
     if (!finiteNumber(object?.x) || !finiteNumber(object?.y)) continue;
     if (object.kind === ABILITY_OBJECT_KIND.RETURN_MARKER) {
       drawReturnMarker(g, object.x, object.y, 13, ABILITY_RETURN_MARKER_COLOR, 0.82);
+    } else if (object.kind === ABILITY_OBJECT_KIND.VECTOR_FIELD && object.vector) {
+      drawVectorField(g, object.x, object.y, object.vector, ts);
     } else if (object.kind === ABILITY_OBJECT_KIND.MAGIC_ANCHOR) {
-      if (object.vector) drawVectorField(g, object.x, object.y, object.vector, ts);
-      else drawMagicAnchor(g, object, Math.max(10, object.ownerState?.radius || ts * EKAT_MAGIC_ANCHOR_RADIUS_TILES));
+      drawMagicAnchor(g, object, Math.max(10, object.ownerState?.radius || ts * EKAT_MAGIC_ANCHOR_RADIUS_TILES));
     } else if (object.kind === ABILITY_OBJECT_KIND.SHIELD) {
       const radius = ts * DISCIPLE_SHIELD_RADIUS_TILES;
       const phase = (this._renderClock?.now?.() ?? performance.now()) / 350;
