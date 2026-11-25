@@ -229,7 +229,9 @@ pub(crate) fn production_system(
             // the side of the building facing the rally plan.
             let rally_plan = entities.get(id).map(|b| b.rally_plan()).unwrap_or_default();
             let first_rally = rally_plan.first().map(|r| (r.point.x, r.point.y));
-            let Some((sx, sy)) = coordinator.find_spawn_point(entities, id, unit, first_rally)
+            let spawn_body = completed_unit_kind(entities, id, unit);
+            let Some((sx, sy)) =
+                coordinator.find_spawn_point(entities, id, spawn_body, first_rally)
             else {
                 continue;
             };
@@ -288,6 +290,25 @@ pub(crate) fn production_system(
             }
         }
     }
+}
+
+/// Training exits must fit the evolved body, not just the smaller temporary Novice.
+fn completed_unit_kind(entities: &EntityStore, producer: u32, queued: EntityKind) -> EntityKind {
+    if queued != EntityKind::Warrior {
+        return queued;
+    }
+    entities
+        .get(producer)
+        .and_then(|building| {
+            let production = building.production.as_ref()?;
+            let choice = match building.kind {
+                EntityKind::TournamentGrounds => production.tournament_winners.last(),
+                EntityKind::ProvenGrounds => production.dao_training_queue.first(),
+                _ => None,
+            };
+            choice.copied().and_then(EntityKind::evolved_disciple)
+        })
+        .unwrap_or(queued)
 }
 
 fn production_ticks(kind: EntityKind) -> Option<u32> {

@@ -33,14 +33,14 @@ fn master_rank_enlarges_collision_and_projectile_geometry() {
 }
 
 #[test]
-fn war_smaller_body_controls_collision() {
+fn novice_smaller_body_controls_collision_without_shrinking_war() {
     use crate::game::entity::EntityStore;
     let mut entities = EntityStore::new();
     let war = entities
         .spawn_unit(1, EntityKind::Warrior, 100.0, 100.0)
         .unwrap();
     let other = entities
-        .spawn_unit(2, EntityKind::Rifleman, 132.0, 100.0)
+        .spawn_unit(2, EntityKind::Rifleman, 127.0, 100.0)
         .unwrap();
     let unit = entities.get_mut(war).unwrap();
     unit.set_disciple_kind_for_test(EntityKind::WarAdept);
@@ -51,14 +51,15 @@ fn war_smaller_body_controls_collision() {
         body,
         unit_body_for_entity(entities.get(other).unwrap()).unwrap()
     )
-    .is_none());
+    .is_some());
     entities
         .get_mut(war)
         .unwrap()
         .set_disciple_kind_for_test(EntityKind::Warrior);
+    assert_eq!(entities.get(war).unwrap().radius(), 17.0);
     assert!(unit_body_overlap(
         unit_body_for_entity(entities.get(war).unwrap()).unwrap(),
         unit_body_for_entity(entities.get(other).unwrap()).unwrap()
     )
-    .is_some());
+    .is_none());
 }

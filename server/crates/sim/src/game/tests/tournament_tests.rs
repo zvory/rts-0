@@ -121,7 +121,8 @@ fn tournament_final_entrant_waits_for_the_winners_extra_supply() {
 #[test]
 fn tournament_admits_at_each_side_and_corner_of_the_four_tile_footprint() {
     // The arena spans [576, 704] on each axis. Tile centers two rings outside
-    // its sides and corners must leave space for the enlarged body.
+    // its sides and corners leave space for the body. Smaller Novices must
+    // walk a few ticks from the outer corners to reach the intake threshold.
     for (x, y) in [
         (528.0, 640.0),
         (752.0, 640.0),
@@ -148,7 +149,12 @@ fn tournament_admits_at_each_side_and_corner_of_the_four_tile_footprint() {
                 queued: false,
             },
         );
-        game.tick();
+        for _ in 0..config::TICK_HZ {
+            game.tick();
+            if game.state.entities.get(unit).is_none() {
+                break;
+            }
+        }
         assert!(
             game.state.entities.get(unit).is_none(),
             "entrant at ({x}, {y}) must be admitted at the perimeter"

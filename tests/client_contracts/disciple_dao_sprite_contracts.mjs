@@ -19,18 +19,18 @@ import { entityAttackRangeTiles, DAO_WAR_RANGE_TILES, DAO_WAR_BODY_SCALE, entity
 assert.equal(entityAttackRangeTiles({ kind: KIND.WAR_ADEPT, dao: "war" }), DAO_WAR_RANGE_TILES);
 assert.equal(DAO_WAR_RANGE_TILES, 1.75);
 assert.equal(entityBodyRadius({ kind: KIND.WAR_ADEPT, dao: "war" }), Math.fround(26 * Math.fround(DAO_WAR_BODY_SCALE)));
-assert.equal(entityBodyRadius({ kind: KIND.WARRIOR }), 26);
+assert.equal(entityBodyRadius({ kind: KIND.WARRIOR }), 17);
 const bodySubject = { id: 75, kind: KIND.WAR_ADEPT, dao: "war", x: 100, y: 100 };
 assert.equal(circularBodyRadius(bodySubject), Math.fround(26 * Math.fround(DAO_WAR_BODY_SCALE)));
 assert.equal(pointHitsBodyCircle(bodySubject, 120, 100, 0), false);
-assert.equal(pointHitsBodyCircle({ ...bodySubject, kind: KIND.WARRIOR, dao: undefined }, 120, 100, 0), true);
+assert.equal(pointHitsBodyCircle({ ...bodySubject, kind: KIND.WARRIOR, dao: undefined }, 120, 100, 0), false);
 assert.equal(selectionProxyForEntity(bodySubject).footprint.radiusPx, Math.fround(26 * Math.fround(DAO_WAR_BODY_SCALE)));
 const formationPoints = [{ x: 300, y: 300 }, { x: 400, y: 300 }];
 const formationUnits = Array.from({ length: 3 }, (_, index) =>
   ({ ...bodySubject, id: index + 1, y: 100 + index * 40 }));
 assert.ok(buildFormationLinePreview(formationPoints, formationUnits).slots.every(slot => slot.y === 300));
 assert.ok(buildFormationLinePreview(formationPoints, formationUnits.map(unit =>
-  ({ ...unit, kind: KIND.WARRIOR, dao: undefined }))).slots.some(slot => slot.y !== 300));
+  ({ ...unit, kind: KIND.WARRIOR, dao: undefined }))).slots.every(slot => slot.y === 300));
 const rustUpgrades = fs.readFileSync(new URL("../../server/crates/rules/src/balance/upgrades.rs", import.meta.url), "utf8");
 for (const [name, value] of [["DAO_WAR_BODY_SCALE", DAO_WAR_BODY_SCALE], ["DAO_WAR_RANGE_TILES", DAO_WAR_RANGE_TILES]]) {
   assert.equal(Number(rustUpgrades.match(new RegExp(`pub const ${name}: f32 = ([0-9.]+);`))[1]), value);
