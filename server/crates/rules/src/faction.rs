@@ -709,7 +709,7 @@ const EKAT_ABILITIES: [AbilityCatalogEntry; 4] = [
         title: "Place a 10-second pull field",
         carriers: &[EntityKind::Ekat, EntityKind::MagicAdept],
         target_mode: AbilityTargetMode::WorldPoint,
-        range_tiles: Some(balance::EKAT_MAGIC_ANCHOR_RANGE_TILES as f32),
+        range_tiles: Some(balance::EKAT_MAGIC_ANCHOR_RANGE_TILES),
         min_range_tiles: None,
         cooldown_ticks: 0,
         charges: None,
@@ -1336,7 +1336,7 @@ mod tests {
         assert_eq!(anchor.carriers, &[EntityKind::Ekat, EntityKind::MagicAdept]);
         assert_eq!(
             anchor.range_tiles,
-            Some(balance::EKAT_MAGIC_ANCHOR_RANGE_TILES as f32)
+            Some(balance::EKAT_MAGIC_ANCHOR_RANGE_TILES)
         );
 
         let consume = EKAT_CATALOG.ability(AbilityKind::EkatConsumeGolem).unwrap();

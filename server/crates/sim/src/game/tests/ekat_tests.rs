@@ -678,7 +678,7 @@ fn ekat_magic_anchor_places_single_visible_ten_second_object() {
     let players = [ekat_player()];
     let mut game = empty_flat_game(&players);
     let pos = game.state.map.tile_center(10, 10);
-    let first_target = game.state.map.tile_center(13, 10);
+    let first_target = (pos.0 + 7.5 * config::TILE_SIZE as f32, pos.1);
     let second_target = game.state.map.tile_center(14, 10);
     let hero = game
         .state
@@ -725,7 +725,7 @@ fn ekat_magic_anchor_rejects_out_of_range_or_locked_placement() {
     let players = [ekat_player()];
     let mut game = empty_flat_game(&players);
     let pos = game.state.map.tile_center(10, 10);
-    let far_target = game.state.map.tile_center(40, 10);
+    let far_target = (pos.0 + 7.6 * config::TILE_SIZE as f32, pos.1);
     let hero = game
         .state
         .entities
