@@ -18,7 +18,7 @@ export class ShopFullCursor {
     this.label.textContent = "Full";
     Object.assign(this.label.style, {
       position: "absolute", left: "0", top: "0", zIndex: "30", pointerEvents: "none",
-      color: "#fff", font: "14px Arial, sans-serif", whiteSpace: "nowrap",
+      color: "#fff", font: "22px Arial, sans-serif", whiteSpace: "nowrap",
       webkitTextStroke: "2px #000", paintOrder: "stroke fill",
     });
     this.label.hidden = true;
@@ -29,8 +29,8 @@ export class ShopFullCursor {
     const visible = !!input.mouse && !!input._shopFullCursorTarget();
     this.label.hidden = !visible;
     if (!visible) return;
-    const x = Math.max(0, Math.min(input.mouse.x + 16, this.dom.clientWidth - 40));
-    const y = Math.max(0, Math.min(input.mouse.y + 18, this.dom.clientHeight - 24));
+    const x = Math.max(0, Math.min(input.mouse.x + 16, this.dom.clientWidth - 64));
+    const y = Math.max(0, Math.min(input.mouse.y + 18, this.dom.clientHeight - 32));
     this.label.style.transform = `translate(${x}px, ${y}px)`;
   }
 
