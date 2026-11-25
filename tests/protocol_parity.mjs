@@ -608,7 +608,8 @@ const decodedAck = decodeServerMessage({
   ma: [[91, 2, 320, 352, 0.75, 10]],
   pr: [[1, 325, 80, 7, 14, 42, [1]]],
   pf: [[1, "cultivators"], [2, "kriegsia"]],
-  ao: [[70, 1, 6, 1, 384, 416, 90, 7, [45, null, null, null, null, null]]],
+  ao: [[70, 1, 6, 1, 384, 416, 90, 7, [45, null, null, null, null, null, null, null]],
+    [71, 1, 17, 4, 400, 400, 300, 7, [null, 240, 67.2, null, null, null, 300, 300]]],
   n: [1, 2, 0, 3, 4, PREDICTION_PROTOCOL_VERSION, 7, 12],
 });
 assert(decodedAck.resourceReset === true && decodedAck.resourceDeltas[0].remaining === 0, "compact authoritative resource replacement decodes");
@@ -630,6 +631,9 @@ assert(
   decodedAck.abilityObjects[0].ownerState.earliestReturnTick === 45,
   "compact ability owner state decodes",
 );
+assert(decodedAck.abilityObjects[1].ownerState.maxHp === 300
+  && decodedAck.abilityObjects[1].ownerState.durationTicks === 300,
+  "compact Master Shield cast-time maxima decode");
 assert(
   C.SET_VISION_SELECTION === "setVisionSelection",
   "setVisionSelection client message tag must match Rust",

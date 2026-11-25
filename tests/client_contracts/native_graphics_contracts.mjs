@@ -73,7 +73,7 @@ function callsNamed(graphics, name) {
   assert(joinedRingStroke, "Panzerfaust jagged ring commits one joined stroke after all segments");
 }
 
-// A lifetime indicator remains public even when the shield pool is owner-private.
+// Shield lifetime maxima are public with the visible field.
 for (const [expiresIn, expectedWidth] of [
   [DISCIPLE_SHIELD_DURATION_TICKS, 56],
   [DISCIPLE_SHIELD_DURATION_TICKS / 2, 28],
@@ -83,7 +83,7 @@ for (const [expiresIn, expectedWidth] of [
 ]) {
   const g = new RecordingGraphics();
   _drawAbilityObjects.call({ _abilityObjectGfx: g, _renderClock: { now: () => 0 } }, {
-    abilityObjects: [{ id: 1, kind: "shield", x: 100, y: 200, expiresIn }],
+    abilityObjects: [{ id: 1, kind: "shield", x: 100, y: 200, expiresIn, ownerState: { durationTicks: DISCIPLE_SHIELD_DURATION_TICKS } }],
   });
   const rects = callsNamed(g, "drawRect");
   assert.deepEqual(rects[0], ["drawRect", 71, 200 - 32 * DISCIPLE_SHIELD_RADIUS_TILES - 3, 58, 6], "black backing below HP row");
@@ -100,7 +100,7 @@ for (const [hp, expectedWidth] of [[150, 56], [75, 28], [37.5, 14], [0, 0], [300
   const g = new RecordingGraphics();
   _drawAbilityObjects.call({ _abilityObjectGfx: g, _renderClock: { now: () => 0 } }, {
     abilityObjects: [{ id: 1, kind: "shield", x: 100, y: 200,
-      expiresIn: DISCIPLE_SHIELD_DURATION_TICKS / 2, ownerState: { hp } }],
+      expiresIn: DISCIPLE_SHIELD_DURATION_TICKS / 2, ownerState: { hp, maxHp: 150, durationTicks: DISCIPLE_SHIELD_DURATION_TICKS } }],
   });
   const rects = callsNamed(g, "drawRect");
   assert.deepEqual(rects[0], ["drawRect", 71, 200 - 32 * DISCIPLE_SHIELD_RADIUS_TILES - 9, 58, 6], "HP backing sits above the timer");
@@ -111,6 +111,18 @@ for (const [hp, expectedWidth] of [[150, 56], [75, 28], [37.5, 14], [0, 0], [300
     assert.equal(rects.length, 3, "depleted HP has no fill");
   }
   assert.deepEqual(rects.at(-1), ["drawRect", 72, 200 - 32 * DISCIPLE_SHIELD_RADIUS_TILES - 2, 28, 4], "damage does not affect the timer");
+}
+
+// A damaged Master shield uses its cast-time maxima for both public bars.
+{
+  const g = new RecordingGraphics();
+  _drawAbilityObjects.call({ _abilityObjectGfx: g, _renderClock: { now: () => 0 } }, {
+    abilityObjects: [{ id: 1, kind: "shield", x: 100, y: 200,
+      expiresIn: 150, ownerState: { hp: 150, maxHp: 300, durationTicks: 300 } }],
+  });
+  const fills = callsNamed(g, "drawRect").filter(call => call[4] === 4);
+  assert.equal(fills.length, 2);
+  assert(fills.every(call => call[3] === 28), "both Master bars show half remaining");
 }
 
 console.log("native_graphics_contracts: ok");

@@ -26,7 +26,7 @@ maximum HP ×1.4 (150→210). No ability-damage changes.
 
 Armored melee damage dealer; swept helmet crest, pointed shoulders and forked yari.
 Description, automatic availability, free advancement, supply and unchanged properties
-as above, retaining War armor and 1.75-tile spear reach, and reducing Throw Sword cooldown from 40 to 20 seconds. Advancement preserves an existing cooldown. Relative to War
+as above, retaining War armor and 1.75-tile spear reach, reducing Throw Sword cooldown from 40 to 20 seconds, and extending automatic Charge from one to three seconds. Advancement preserves an existing cooldown. Relative to War
 Adept: render and collision radius ×1.2, movement ×1.1 (2.31 px/tick), ordinary attack
 damage ×1.2 (35→42, after existing rounded War damage bonus), maximum HP ×1.4
 (176→246). Existing counters and penetration rules remain. No ability-damage changes.
@@ -37,8 +37,7 @@ Ranged support caster; broad bell sleeves and three trailing mantle panels.
 Description, automatic availability, free advancement, supply and unchanged properties
 as above, retaining five-tile orb primary, Shield and Anchor. Relative to Magic Adept:
 render and collision radius ×1.2, movement ×1.1 (2.31 px/tick), ordinary attack damage
-×1.2 (23→28), maximum HP ×1.4 (150→210). Existing counters remain. Shield capacity,
-Anchor strength, spell ranges and all cooldowns stay unchanged.
+×1.2 (23→28), maximum HP ×1.4 (150→210). Existing counters remain. Shield capacity doubles from 150 to 300 HP and its lifetime doubles from five to ten seconds. Anchor strength, spell ranges and all cooldowns stay unchanged. Shield strength is fixed at cast time, so promotion preserves an existing Adept shield.
 
 ## Shared advancement and persistence
 

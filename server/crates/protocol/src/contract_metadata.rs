@@ -249,7 +249,7 @@ pub mod notices {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 70;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 71;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -1124,6 +1124,8 @@ fn compact_slot_schemas() -> CompactSlotSchemas {
             optional_field(3, "destroyedLockoutTicks"),
             optional_field(4, "distanceTraveled"),
             optional_field(5, "ticksOut"),
+            optional_field(6, "maxHp"),
+            optional_field(7, "durationTicks"),
         ],
         ability_cooldown: vec![
             code_field(0, "ability", "ability"),

@@ -734,3 +734,82 @@ fn magic_support_insight_anchor_rewards_enemy_unit_deaths_once_per_caster() {
         "removed deaths cannot reward twice"
     );
 }
+
+#[test]
+fn magic_master_shield_doubles_capacity_lifetime_and_survives_checkpoint() {
+    for master in [false, true] {
+        let (mut game, caster) = setup();
+        if master {
+            let unit = game.state.entities.get_mut(caster).unwrap();
+            unit.insight = config::DISCIPLE_EVOLVED_INSIGHT_CAP;
+            unit.advance_dao_master();
+        }
+        game.enqueue(1, cast(caster, 400.0, false));
+        game.tick();
+        let unit = game.state.entities.get(caster).unwrap();
+        let shield = unit.shield.as_ref().unwrap();
+        let capacity = if master { 300 } else { 150 };
+        let duration = config::TICK_HZ * if master { 10 } else { 5 };
+        assert_eq!(shield.remaining, capacity);
+        assert_eq!(shield.duration_ticks, duration);
+        assert_eq!(shield.expires_tick - game.state.tick, duration);
+        let snapshot = game.snapshot_full_for(1);
+        let view = snapshot
+            .ability_objects
+            .iter()
+            .find(|o| o.id == shield.id)
+            .unwrap();
+        let public = view.owner_state.as_ref().unwrap();
+        assert_eq!(public.hp, Some(capacity as u16));
+        assert_eq!(public.max_hp, Some(capacity as u16));
+        assert_eq!(public.duration_ticks, Some(duration));
+        assert_eq!(view.expires_in, Some(duration as u16));
+        let checkpoint = game.checkpoint_payload_text_for_test().unwrap();
+        let restored = Game::restore_checkpoint_payload_text_for_test(
+            &checkpoint,
+            game.state.map.clone(),
+            game.state.map_metadata.clone(),
+        )
+        .unwrap();
+        assert_eq!(
+            restored
+                .state
+                .entities
+                .get(caster)
+                .unwrap()
+                .shield
+                .as_ref()
+                .unwrap()
+                .remaining,
+            capacity
+        );
+        let expires = shield.expires_tick;
+        let unit = game.state.entities.get_mut(caster).unwrap();
+        unit.expire_shield(expires - 1);
+        assert!(unit.shield.is_some());
+        unit.expire_shield(expires);
+        assert!(unit.shield.is_none());
+    }
+}
+
+#[test]
+fn promotion_preserves_existing_adept_shield_strength() {
+    let (mut game, caster) = setup();
+    game.enqueue(1, cast(caster, 400.0, false));
+    game.tick();
+    let unit = game.state.entities.get_mut(caster).unwrap();
+    let expires = unit.shield.as_ref().unwrap().expires_tick;
+    unit.insight = config::DISCIPLE_EVOLVED_INSIGHT_CAP;
+    unit.advance_dao_master();
+    let shield = unit.shield.as_ref().unwrap();
+    assert_eq!(shield.capacity, 150);
+    assert_eq!(shield.duration_ticks, config::TICK_HZ * 5);
+    assert_eq!(shield.expires_tick, expires);
+    let checkpoint = game.checkpoint_payload_text_for_test().unwrap();
+    Game::restore_checkpoint_payload_text_for_test(
+        &checkpoint,
+        game.state.map.clone(),
+        game.state.map_metadata.clone(),
+    )
+    .unwrap();
+}

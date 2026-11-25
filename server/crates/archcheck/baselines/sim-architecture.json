@@ -1,5 +1,5 @@
 {
-  "reason": "Register healing seal purchase admission in existing Shop service; reuse checkpointed entity capacity through an entity helper",
+  "reason": "Validate cast-time Adept and Master Shield capacity and duration during checkpoint restore",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -71,7 +71,7 @@
     },
     {
       "path": "checkpoint/validation.rs",
-      "lines": 528
+      "lines": 611
     },
     {
       "path": "checkpoint/validation/ability_charges.rs",
