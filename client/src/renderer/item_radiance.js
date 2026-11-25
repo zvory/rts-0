@@ -1,4 +1,4 @@
-import { ABILITY, KIND } from "../protocol.js";
+import { KIND } from "../protocol.js";
 
 const CULTIVATOR_FIGHTERS = new Set([
   KIND.WARRIOR,
@@ -7,25 +7,11 @@ const CULTIVATOR_FIGHTERS = new Set([
   KIND.MAGIC_ADEPT,
 ]);
 
-/** Count occupied item categories from authorized snapshot state, including active buffs. */
+/** Use the same authoritative visual tier for owners, allies, enemies and observers. */
 export function cultivatorItemTier(entity) {
   if (!CULTIVATOR_FIGHTERS.has(entity?.kind)) return 0;
-  let defense = false,
-    attack = false;
-  for (const entry of entity.abilities || []) {
-    if (!(entry.remainingUses > 0 || entry.cooldownLeft > 0)) continue;
-    if (
-      entry.ability === ABILITY.ARMOR_TREASURE ||
-      entry.ability === ABILITY.VITALITY_TREASURE
-    )
-      defense = true;
-    if (
-      entry.ability === ABILITY.HASTE ||
-      entry.ability === ABILITY.DOUBLE_DAMAGE
-    )
-      attack = true;
-  }
-  return Number(!!entity.escapeTreasure) + Number(defense) + Number(attack);
+  const tier = entity.itemRadianceTier;
+  return Number.isInteger(tier) && tier >= 0 && tier <= 3 ? tier : 0;
 }
 const vertex = `
 in vec2 aPosition;

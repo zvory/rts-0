@@ -1,6 +1,17 @@
 use super::{Entity, EntityKind, Order};
 
 impl Entity {
+    /// Public visual strength only; inventory identities and timers stay private.
+    pub(crate) fn item_radiance_tier(&self) -> u8 {
+        use crate::game::ability::AbilityKind::{ArmorTreasure, Haste};
+        if !self.kind.is_disciple() {
+            return 0;
+        }
+        u8::from(self.escape_treasure.is_some())
+            + u8::from(self.shop_item_category_occupied(ArmorTreasure))
+            + u8::from(self.shop_item_category_occupied(Haste))
+    }
+
     pub(in crate::game) fn shop_item_reload(&self, ticks: u32) -> u32 {
         if self.shop_item_active(crate::game::ability::AbilityKind::Haste) {
             (ticks / 2).max(1)

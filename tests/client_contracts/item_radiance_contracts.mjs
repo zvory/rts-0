@@ -1,3 +1,7 @@
+import {
+  prepareEntitySnapshots,
+  preparedPresentationEntityRecord,
+} from "../../client/src/presentation/entity_snapshot.js";
 import { assert } from "./assertions.mjs";
 import { ABILITY, KIND } from "../../client/src/protocol.js";
 import {
@@ -6,7 +10,6 @@ import {
   destroyItemRadiance,
 } from "../../client/src/renderer/item_radiance.js";
 
-const carried = (ability) => ({ ability, remainingUses: 1, cooldownLeft: 0 });
 for (const kind of [
   KIND.WARRIOR,
   KIND.WIND_ADEPT,
@@ -14,60 +17,58 @@ for (const kind of [
   KIND.MAGIC_ADEPT,
 ]) {
   for (const daoMaster of [false, true]) {
-    const unit = { kind, daoMaster, x: 1120.75, abilities: [] };
-    assert(
-      cultivatorItemTier(unit) === 0,
-      "position and rank cannot invent items",
-    );
-    unit.escapeTreasure = true;
-    assert(cultivatorItemTier(unit) === 1, "Escape occupies movement");
-    unit.abilities = [carried(ABILITY.VITALITY_TREASURE)];
-    assert(cultivatorItemTier(unit) === 2, "permanent passive defense counts");
-    unit.abilities.push(carried(ABILITY.HASTE));
-    assert(cultivatorItemTier(unit) === 3, "all three categories count");
-    unit.abilities[1] = {
-      ability: ABILITY.HASTE,
-      remainingUses: 0,
-      cooldownLeft: 899,
-    };
-    assert(
-      cultivatorItemTier(unit) === 3,
-      "activated attack item counts until expiry",
-    );
-    unit.abilities[1].cooldownLeft = 0;
-    assert(
-      cultivatorItemTier(unit) === 2,
-      "expired attack item stops counting",
-    );
-    unit.escapeTreasure = false;
-    assert(cultivatorItemTier(unit) === 1, "consumed Escape stops counting");
+    for (let tier = 0; tier <= 3; tier++) {
+      const publicView = { kind, daoMaster, itemRadianceTier: tier };
+      assert(
+        cultivatorItemTier(publicView) === tier,
+        "enemies render the public tier without inventory",
+      );
+      const prepared = prepareEntitySnapshots([publicView]).entries[0];
+      const presented = preparedPresentationEntityRecord(prepared, {
+        type: "unit",
+        x: 100,
+        y: 100,
+        owner: 2,
+        relationship: "enemy",
+        visualBounds: {},
+        anchors: {},
+      });
+      assert(
+        cultivatorItemTier(presented) === tier,
+        "public item tier survives the real render snapshot boundary without private inventory",
+      );
+      assert(
+        cultivatorItemTier({
+          ...publicView,
+          escapeTreasure: true,
+          abilities: [{ ability: ABILITY.HASTE, remainingUses: 1 }],
+        }) === tier,
+        "private owner fields cannot change the public presentation",
+      );
+    }
   }
 }
+for (const itemRadianceTier of [undefined, null, -1, 4, 1.5, "3", NaN]) {
+  assert(
+    cultivatorItemTier({ kind: KIND.MAGIC_ADEPT, itemRadianceTier }) === 0,
+    "missing or invalid visual tiers fail closed",
+  );
+}
 assert(
-  cultivatorItemTier({ kind: KIND.MAGIC_ADEPT }) === 0,
-  "private fields absent from enemy snapshots produce no glow",
+  cultivatorItemTier({ kind: KIND.SHOP, itemRadianceTier: 3 }) === 0,
+  "Shop cannot gain fighter radiance",
 );
 assert(
-  cultivatorItemTier({ kind: KIND.SHOP, escapeTreasure: true }) === 0,
-  "Shop never glows as an item carrier",
-);
-assert(
-  cultivatorItemTier({ kind: KIND.RIFLEMAN, escapeTreasure: true }) === 0,
-  "other factions retain their existing presentation",
+  cultivatorItemTier({ kind: KIND.RIFLEMAN, itemRadianceTier: 3 }) === 0,
+  "other faction presentation is unchanged",
 );
 assert(
   cultivatorItemTier({
-    kind: KIND.WAR_ADEPT,
-    abilities: [
-      carried(ABILITY.ARMOR_TREASURE),
-      carried(ABILITY.VITALITY_TREASURE),
-      carried(ABILITY.HASTE),
-      carried(ABILITY.DOUBLE_DAMAGE),
-      carried(ABILITY.HASTE),
-      carried(ABILITY.THROW_SWORD),
-    ],
-  }) === 2,
-  "count categories, not duplicate entries or native abilities",
+    kind: KIND.MAGIC_ADEPT,
+    escapeTreasure: true,
+    abilities: [{ ability: ABILITY.HASTE, remainingUses: 1 }],
+  }) === 0,
+  "private state alone cannot invent a public glow",
 );
 
 let disposed = 0;
@@ -168,13 +169,13 @@ try {
   };
   const body = new Sprite("idle-frame");
   const live = { sprite: body, container: { addChildAt() {} } };
-  const unit = { kind: KIND.MAGIC_ADEPT, escapeTreasure: true, abilities: [] };
+  const unit = { kind: KIND.MAGIC_ADEPT, itemRadianceTier: 1 };
   updateItemRadiance(live, unit, 1000);
   assert(
     live.itemRimUniforms.uniforms.uTier === 3 && !live.itemGlow,
     "one item starts at the approved former maximum without allocating bloom",
   );
-  unit.abilities = [carried(ABILITY.ARMOR_TREASURE)];
+  unit.itemRadianceTier = 2;
   updateItemRadiance(live, unit, 1100);
   const rim = live.itemRim,
     blur = live.itemGlowBlur;
@@ -183,7 +184,7 @@ try {
       live.itemGlow.visible !== false,
     "two items add bloom and increase rim strength",
   );
-  unit.abilities.push(carried(ABILITY.DOUBLE_DAMAGE));
+  unit.itemRadianceTier = 3;
   body.texture = "moving-frame";
   updateItemRadiance(live, unit, 1200);
   assert(
@@ -201,8 +202,7 @@ try {
     live.itemRim === rim && live.itemGlowBlur === blur && createdFilters === 2,
     "animated updates reuse GPU filters",
   );
-  unit.abilities = [];
-  unit.escapeTreasure = false;
+  unit.itemRadianceTier = 0;
   updateItemRadiance(live, unit, 1300);
   assert(
     !live.itemGlow.visible && !live.itemRays.visible && body.filters === null,

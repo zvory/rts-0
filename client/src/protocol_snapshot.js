@@ -322,7 +322,7 @@ function decodeCompactPlayerResource(record, index) {
 }
 
 function decodeCompactEntity(record, index) {
-  const fields = readArray(record, `entity ${index}`, 54);
+  const fields = readArray(record, `entity ${index}`, 55);
   if (fields.length < 8) throw new Error(`entity ${index} is too short`);
   const entity = {
     id: readU32(fields[0], "entity.id"),
@@ -380,6 +380,11 @@ function decodeCompactEntity(record, index) {
   assignOptional(entity, "daoTrainingQueue", fields, 51, (v) => readArray(v, "Dao training", 64).map(readString));
   assignOptional(entity, "daoMaster", fields, 52, readBool);
   assignOptional(entity, "escapeTreasure", fields, 53, readBool);
+  assignOptional(entity, "itemRadianceTier", fields, 54, (value) => {
+    const tier = readU32(value, "entity.itemRadianceTier");
+    if (tier > 3) throw new Error("entity.itemRadianceTier must be 0-3");
+    return tier;
+  });
   return entity;
 }
 

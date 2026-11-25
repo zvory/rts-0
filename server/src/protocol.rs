@@ -163,3 +163,5 @@ mod tests {
 
 // Healing Seal: kind healing_seal (38), ability healingSeal (22), stage 30, compact v69.
 // Existing hp/maxHp carry healing budget/capacity, not damageable health.
+
+// Compact v70 entity slot 54: public itemRadianceTier (0–3), fog-gated with its carrier.

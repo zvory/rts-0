@@ -140,3 +140,20 @@ fn escape_treasure_flag_is_omitted_when_absent() {
     assert!(compact[52].is_null());
     assert_eq!(serde_json::to_value(&unit).unwrap()["escapeTreasure"], true);
 }
+
+#[test]
+fn item_radiance_tier_appends_public_strength_including_explicit_zero() {
+    let mut unit = EntityView::new(1, 1, "magic_adept", 320.0, 320.0, 75, 150, "idle");
+    for tier in 0..=3 {
+        unit.item_radiance_tier = Some(tier);
+        let compact = serde_json::to_value(CompactEntity(&unit)).unwrap();
+        assert_eq!(compact.as_array().unwrap().len(), 55);
+        assert_eq!(compact[53], false);
+        assert_eq!(compact[54], tier);
+        assert_eq!(
+            serde_json::to_value(&unit).unwrap()["itemRadianceTier"],
+            tier
+        );
+        assert!(unit.abilities.is_empty());
+    }
+}
