@@ -53,17 +53,6 @@ pub(super) fn purchase(
         activate_escape(map, entities, teams, player, shops);
         return;
     }
-    if is_buff_item(ability) && target_id.is_none() {
-        for id in shops {
-            if let Some(unit) = entities
-                .get_mut(*id)
-                .filter(|u| u.owner == player && u.hp > 0 && u.is_unit())
-            {
-                unit.activate_shop_item(ability);
-            }
-        }
-        return;
-    }
     let Some(target_id) = target_id else {
         return;
     };
@@ -77,19 +66,6 @@ pub(super) fn purchase(
     {
         return;
     }
-    if ability == AbilityKind::EscapeTreasure
-        && (target.escape_treasure.is_some()
-            || runtime.projectiles().any(|p| {
-                p.ability == ability
-                    && matches!(p.return_target,
-            AbilityProjectileReturnTarget::Entity { id } if id == target_id)
-            }))
-    {
-        return;
-    }
-    if is_buff_item(ability) && (target.shop_item_category_occupied(ability) || runtime.projectiles().any(|p| {
-        same_item_category(p.ability, ability) && matches!(p.return_target, AbilityProjectileReturnTarget::Entity { id } if id == target_id)
-    })) { return; }
     if ability == AbilityKind::VitalityTreasure && target.max_hp.checked_add(150).is_none() {
         return;
     }
@@ -119,6 +95,32 @@ pub(super) fn purchase(
     if !crate::rules::faction::catalog_for(&ps.faction_id)
         .is_some_and(|catalog| catalog.allows_ability(ability, EntityKind::Shop))
     {
+        return;
+    }
+    let category_full = if ability == AbilityKind::EscapeTreasure {
+        target.escape_treasure.is_some()
+            || runtime.projectiles().any(|p| {
+                p.ability == ability
+                    && matches!(p.return_target,
+                AbilityProjectileReturnTarget::Entity { id } if id == target_id)
+            })
+    } else {
+        is_buff_item(ability) && (target.shop_item_category_occupied(ability)
+            || runtime.projectiles().any(|p| same_item_category(p.ability, ability)
+                && matches!(p.return_target, AbilityProjectileReturnTarget::Entity { id } if id == target_id)))
+    };
+    if category_full {
+        let category = match ability {
+            AbilityKind::EscapeTreasure => "Movement",
+            AbilityKind::ArmorTreasure | AbilityKind::VitalityTreasure => "Defense",
+            _ => "Attack",
+        };
+        events.entry(player).or_default().push(Event::Notice {
+            msg: format!("{category} slot already full"),
+            x: None,
+            y: None,
+            severity: crate::protocol::NoticeSeverity::Info,
+        });
         return;
     }
     if ability == AbilityKind::EscapeTreasure

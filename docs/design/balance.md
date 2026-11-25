@@ -850,7 +850,7 @@ Permanent Dao identity is derived from kind; the engine stores no separate mutab
 `dao` (slot 46: wind/war/magic). Evolution buttons set replaceable, entity-owned `chosenDao` intent (team-private compact slot 49), independent of orders. Codes 14–16 and order stages 22–24 retain their positions.
 Evolution automatically occurs once 60 insight is ready, without research or a Pavilion.
 Evolution clears all insight and raises the cap to 200. Wind and War Adepts continue earning
-insight from actual hostile HP damage (cost-weighted unit damage, quarter-rate building damage, with exact fractional carry; Wind earns full one-per-HP insight from Pumpjacks and Steel Mines; Throw Sword grants none). Magic Adepts earn the same combat insight, plus 20 per enemy unit death inside their active Anchor; Shield grants no insight; reaching 200 automatically advances a living Adept to its matching Master. Research ids are
+insight from actual hostile HP damage (one insight per unit HP removed, quarter-rate building damage, with exact fractional carry; Wind earns full one-per-HP insight from Pumpjacks and Steel Mines; Throw Sword grants none). Magic Adepts earn the same combat insight, plus 20 per enemy unit death inside their active Anchor; Shield grants no insight; reaching 200 automatically advances a living Adept to its matching Master. Research ids are
 `dao_wind`, `dao_of_heaviness` (War), `dao_of_magic` (Magic).
 
 `DISCIPLE_SHIELD_CAPACITY` (150), `DISCIPLE_SHIELD_RADIUS_TILES` (2.1), and `DISCIPLE_SHIELD_DURATION_TICKS` are mirrored for the Shield HP and lifetime bars and checked by faction catalog parity. `DISCIPLE_EVOLVED_INSIGHT_CAP` (200) is also parity-checked.
@@ -938,6 +938,6 @@ sight, supply, weapon, repair/refund, or survival-building status, and costs no 
 time. Purchase uses visible, terrain-valid ground within 30 tiles of the Shop.
 See [Healing Seal](healing-seal.md).
 
-Cultivator carried item categories are movement (Escape, R), defense (Armor Treasure, F), and attack (Haste or Double Damage, V). Haste costs 100 oil, Double Damage 150 oil, Armor Treasure 100 oil; activated attack buffs last 30 seconds; Armor and Vitality are permanent passives applied on delivery. Haste halves primary weapon reload, Double Damage doubles primary weapon damage, Armor Treasure adds 50% damage mitigation (round damage upward). Escape's 100-oil purchase starts a 60-second per-player cooldown shared across all owned Shops. See [Shop item rules](shop.md#carried-attack-and-defense-goods).
+Cultivator carried item categories are movement (Escape, R), defense (Armor Treasure, F), and attack (Haste or Double Damage, V). Haste costs 100 oil, Double Damage 150 oil, Armor Treasure 100 oil; Haste, Double Damage, Armor, and Vitality are permanent passives applied on delivery. Haste halves primary weapon reload, Double Damage doubles primary weapon damage, Armor Treasure adds 50% damage mitigation (round damage upward). Escape's 100-oil purchase starts a 60-second per-player cooldown shared across all owned Shops. See [Shop item rules](shop.md#carried-attack-and-defense-goods).
 
 Vitality Treasure costs **100 oil** and occupies the carried defense category. Delivery permanently adds **150 maximum HP and 150 current HP**. The item remains carried and passive, without activation or expiry. See [Vitality rules](shop.md#vitality-treasure).
