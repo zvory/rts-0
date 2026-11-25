@@ -106,7 +106,7 @@ pub const EKAT_MAGIC_ANCHOR_RANGE_TILES: f32 = 7.5;
 pub const EKAT_MAGIC_ANCHOR_DURATION_TICKS: u32 = TICK_HZ * 10;
 pub const EKAT_MAGIC_ANCHOR_RADIUS_TILES: f32 = 3.0;
 pub const EKAT_MAGIC_ANCHOR_PULL_AWAY_MULTIPLIER: f32 = 0.45;
-pub const EKAT_MAGIC_ANCHOR_PULL_TOWARD_MULTIPLIER: f32 = 1.70;
+pub const EKAT_MAGIC_ANCHOR_PULL_TOWARD_MULTIPLIER: f32 = 2.40;
 
 // Shop ground field: HP stores consumable healing capacity, never combat durability.
 pub const HEALING_SEAL_CAPACITY: u32 = 400;
