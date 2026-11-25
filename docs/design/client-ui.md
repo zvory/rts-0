@@ -2085,8 +2085,14 @@ human seats with Kriegsia and Cultivators options; Ekat is omitted. Cultivators 
 Resource Depot and Worker rules with the faction-specific Nexus and Serf labels in
 selection, build, and production UI. Its Nexus uses dedicated white-lotus sect architecture with
 team-tinted roofs; the Serf retains shared Worker art. Other factions retain Resource Depot art.
-Its dedicated Portal build card routes the `portal` kind to a black-and-blue animated vortex with
-counter-rotating rings and deterministic particles; the full effect remains dormant on construction scaffolds. Replay lobbies hide the selector, fixture-only ids remain test harness
+Its Portal reuses the retired Proving Grounds stone-and-timber gate atlas. The Jade Silk Gate
+fills its opening with an opaque, slanted aperture behind the frame and three counter-rotating
+additive sprites sharing a single 256×256 raster texture (256 KiB RGBA). A static polygon mask
+keeps the effect underneath the lintel, pillars and platform, with no grass gaps. The texture is
+generated once per renderer; animation updates only sprite transforms and opacity. Pooled roots
+follow normal visibility/sweep handling, and renderer teardown releases the shared texture.
+The effect remains dormant on construction scaffolds. Proving Grounds is absent from the playable
+Cultivator build menu and server construction catalog. Replay lobbies hide the selector, fixture-only ids remain test harness
 data, public AI controls do not expose a faction selector, and local prediction remains disabled
 for unsupported local faction ids such as the current Ekat slice.
 Generation is not required as long as the parity check remains a required gate comparing every

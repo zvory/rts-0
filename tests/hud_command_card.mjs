@@ -718,7 +718,6 @@ for (const [kind, upgrade] of [
     "cultivators-producer-portal",
     "cultivators-producer-three_dao_pavilion",
     "cultivators-producer-tournament_grounds",
-    "cultivators-producer-proven_grounds",
   ]);
   assert(
     catalog.some((entry) =>
@@ -786,7 +785,7 @@ for (const [kind, upgrade] of [
   const builds = card.slots.filter((slot) => slot?.action === "build");
   assert.deepEqual(
     builds.map((slot) => slot.intent.building),
-    [KIND.RESOURCE_DEPOT, KIND.PUMP_JACK, KIND.PORTAL, KIND.THREE_DAO_PAVILION, KIND.TOURNAMENT_GROUNDS, KIND.PROVEN_GROUNDS, KIND.SHOP],
+    [KIND.RESOURCE_DEPOT, KIND.PUMP_JACK, KIND.PORTAL, KIND.THREE_DAO_PAVILION, KIND.TOURNAMENT_GROUNDS, KIND.SHOP],
   );
   assert.equal(builds[0].label, "Nexus");
   assert.equal(builds[0].commandId, "cultivators.build." + KIND.RESOURCE_DEPOT);

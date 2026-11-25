@@ -1,5 +1,9 @@
 # Proving Grounds
 
+Retired from the playable faction catalog. The Portal now reuses this gate artwork with the
+Jade Silk Gate effect. The specification below records the retained fixture mechanics; normal
+Cultivator construction and progression no longer offer paid Grounds training.
+
 ## Phase 0: building brief — complete
 
 The user explicitly requested implementation of the Proving Grounds and unrestricted combat-earned

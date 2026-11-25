@@ -2254,7 +2254,13 @@ Dao cannot be trained. Combat-earned evolution and Tournament Grounds are unchan
 
 ### Proving Grounds
 
-Cultivator Engineers construct `proven_grounds` after a completed Portal: 100 steel, zero oil,
+Retired from the playable Cultivator catalog: Serfs cannot construct it, it is not a
+production anchor, and the build menu no longer offers it. Its gate artwork is reused by the
+Portal's Jade Silk Gate effect. Direct researched Adept production remains at Portals.
+The internal kind and training machinery below remain for authored fixtures; they are not an
+available progression path in normal matches.
+
+The retained `proven_grounds` fixture has the former construction baseline: 100 steel, zero oil,
 200-tick construction, 3×3 tiles, 120 HP, armored, one-tile sight, no weapon or supply.
 Select the building to queue a mix of researched Dao training plans (maximum 64). Right-click
 base Disciples inside or rally a Portal there. Each admission consumes one base Disciple and

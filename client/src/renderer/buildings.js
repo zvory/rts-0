@@ -1,3 +1,4 @@
+import { JadeSilkPortal } from "./jade_silk_portal.js";
 import { drawTrainingLightning } from "./training_lightning.js";
 import { gfxNoFill, gfxCircle, gfxRect, gfxStrokeLine, gfxFill, gfxStroke } from "./native_graphics.js";
 import {
@@ -217,7 +218,8 @@ export function _drawBuilding(e, colorByOwner, state) {
   }
 
   if (e.kind === KIND.PORTAL && !underConstruction) {
-    drawPortalVortex.call(this, e, w, h);
+    this._jadeSilkPortal ||= new JadeSilkPortal(this);
+    this._jadeSilkPortal.draw(e, w, rendererVisualNow(this));
   }
 
   if (e.kind === KIND.PROVEN_GROUNDS && !underConstruction && e.prodKind) {
@@ -279,74 +281,6 @@ function drawPortalFrame(g, cx, cy, width, alpha) {
   gfxFill(g, 0x0b1628, 0.98 * alpha);
   gfxCircle(g, cx, cy, width * 0.42);
   gfxNoFill(g);
-}
-
-function drawPortalVortex(e, width, height) {
-  const g = this._slot("buildingEffects", e.id);
-  g.position.set(0, 0);
-  const time = rendererVisualNow(this) / 1000;
-  const radius = Math.min(width, height) * 0.39;
-  const pulse = 0.5 + 0.5 * Math.sin(time * 4.2 + e.id * 0.17);
-
-  gfxFill(g, 0x010207, 0.98);
-  gfxCircle(g, e.x, e.y, radius * (0.42 + pulse * 0.035));
-  gfxNoFill(g);
-
-  const ringColors = [0x0a2c5c, 0x125a9e, 0x2c91da, 0x65c8ff];
-  for (let ring = 0; ring < ringColors.length; ring += 1) {
-    const ringRadius = radius * (0.48 + ring * 0.13);
-    const direction = ring % 2 === 0 ? 1 : -1;
-    const offset = time * (0.72 + ring * 0.18) * direction + ring * 1.37;
-    const segments = 15 + ring * 3;
-    for (let segment = 0; segment < segments; segment += 1) {
-      if ((segment + ring) % 4 === 3) continue;
-      const a0 = offset + (segment / segments) * Math.PI * 2;
-      const a1 = offset + ((segment + 0.72) / segments) * Math.PI * 2;
-      const wobble0 = 1 + Math.sin(a0 * 3 - time * 2.4) * 0.045;
-      const wobble1 = 1 + Math.sin(a1 * 3 - time * 2.4) * 0.045;
-      gfxStrokeLine(
-        g,
-        e.x + Math.cos(a0) * ringRadius * wobble0,
-        e.y + Math.sin(a0) * ringRadius * wobble0 * 0.78,
-        e.x + Math.cos(a1) * ringRadius * wobble1,
-        e.y + Math.sin(a1) * ringRadius * wobble1 * 0.78,
-        1.2 + ring * 0.45,
-        ringColors[ring],
-        0.38 + ring * 0.12,
-      );
-    }
-  }
-
-  for (let index = 0; index < 42; index += 1) {
-    const seed = index * 12.9898 + e.id * 0.731;
-    const speed = 0.42 + (index % 7) * 0.055;
-    const inward = 1 - ((time * speed + seed) % 1);
-    const particleRadius = radius * (0.22 + inward * 0.92);
-    const angle = seed * 2.31 + time * (1.7 + (index % 5) * 0.21) + inward * 5.8;
-    const px = e.x + Math.cos(angle) * particleRadius;
-    const py = e.y + Math.sin(angle) * particleRadius * 0.78;
-    const size = 0.8 + (index % 4) * 0.48;
-    const color = index % 6 === 0 ? 0xb9ecff : index % 2 === 0 ? 0x4db7ff : 0x1768bb;
-    gfxFill(g, color, 0.3 + inward * 0.65);
-    gfxCircle(g, px, py, size);
-    gfxNoFill(g);
-  }
-
-  for (let arc = 0; arc < 6; arc += 1) {
-    const angle = time * -1.9 + arc * Math.PI / 3;
-    const inner = radius * 0.2;
-    const outer = radius * (0.47 + 0.06 * Math.sin(time * 3 + arc));
-    gfxStrokeLine(
-      g,
-      e.x + Math.cos(angle) * outer,
-      e.y + Math.sin(angle) * outer * 0.78,
-      e.x + Math.cos(angle + 0.7) * inner,
-      e.y + Math.sin(angle + 0.7) * inner * 0.78,
-      2.2,
-      0x6bd4ff,
-      0.58 + pulse * 0.3,
-    );
-  }
 }
 
 function drawInactiveExtractorBadge(g, cx, buildingTop, tileSize) {

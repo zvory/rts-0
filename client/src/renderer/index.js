@@ -1295,7 +1295,6 @@ export class Renderer {
     if (this._destroyed) return;
     this._destroyed = true;
     this.app?.ticker?.stop?.();
-
     // Per-id pooled display objects across every layer. HP bars are containers
     // whose immutable Graphics children must be released with the pool entry.
     for (const key of Object.keys(this._pools)) {
@@ -1313,6 +1312,7 @@ export class Renderer {
       for (const t of this._missToastPool.values()) t.destroy();
       this._missToastPool.clear();
     }
+    this._jadeSilkPortal?.destroy();
     this._unseen.clear();
     this._fogRenderFog = null;
     this._fogRenderKey = null;

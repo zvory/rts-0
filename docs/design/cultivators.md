@@ -101,7 +101,7 @@ production/channeling states are deferred until units are specified.
 ### Approved brief and rules (Phases 0 and 1)
 
 The user authorized the **Three Dao Pavilion** and three research
-options that unlock direct Adept production at Portals and paid training at Proving Grounds. This is a Cultivator-only technology building
+options that unlock direct Adept production at Portals. This is a Cultivator-only technology building
 constructed by Serfs, available in normal games and Lab. Its investment competes with Portal
 production; opponents can scout and destroy it through ordinary building combat.
 
@@ -121,7 +121,7 @@ See [balance](balance.md#three-dao-pavilion-prototype) for payment and refund ru
 Use existing player-wide permanent research and queue rules, including duplicate rejection,
 cancellation/refund and loss of unfinished research on destruction. All three can be completed;
 completed research survives building destruction. Each research unlocks the matching
-150-Steel / 35-Oil Adept production at Portals and paid Disciple training at the
+150-Steel / 35-Oil Adept production at Portals. The former paid training hall is retired; see
 [Proving Grounds](proven-grounds.md). Combat-earned evolution at
 60 insight requires neither research nor a Pavilion. See [Disciple insight and Dao evolution](dao-insight.md) for stats,
 abilities, insight credit, icons, and hotkeys. Existing checkpoint/replay and owner-only

@@ -505,7 +505,7 @@ for (const rustFaction of allRustCatalogs.catalogs) {
   assert.deepEqual(
     rustFaction.productionAnchors.map((kind) => kindByStableId.get(kind)),
     [...rustFaction.trainables.map((entry) => kindByStableId.get(entry.building)),
-      ...(rustFaction.id === "cultivators" ? [KIND.TOURNAMENT_GROUNDS, KIND.PROVEN_GROUNDS] : [])],
+      ...(rustFaction.id === "cultivators" ? [KIND.TOURNAMENT_GROUNDS] : [])],
     `${rustFaction.id} production anchors match exported trainable producers`,
   );
   for (const entry of rustFaction.abilities) {
@@ -682,8 +682,9 @@ for (const [kind, expected] of Object.entries(rustClientConfig.unitStats)) {
 
 assertSortedObjectKeys(
   rustClientConfig.buildingStats,
-  new Set(allRustCatalogs.catalogs.flatMap((catalog) => catalog.buildings)),
-  "rules dump buildingStats cover every client-mirrored catalog building",
+  // Retired Grounds fixtures still render and retain their rules/client stat mirror.
+  new Set([...allRustCatalogs.catalogs.flatMap((catalog) => catalog.buildings), KIND.PROVEN_GROUNDS]),
+  "rules dump buildingStats cover catalog buildings and the retired Grounds fixture",
 );
 for (const [kind, expected] of Object.entries(rustClientConfig.buildingStats)) {
   assertSortedObjectKeys(
