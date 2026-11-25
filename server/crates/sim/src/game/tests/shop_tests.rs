@@ -658,7 +658,7 @@ fn activate_item(game: &mut Game, unit: u32, ability: AbilityKind) {
 }
 
 #[test]
-fn item_categories_are_passive_and_permanent_after_checkpoint() {
+fn carried_items_are_passive_and_permanent_after_checkpoint() {
     let (mut game, shop, unit) = item_fixture();
     buy(&mut game, shop, unit, AbilityKind::Haste);
     buy(&mut game, shop, unit, AbilityKind::DoubleDamage);
@@ -666,7 +666,7 @@ fn item_categories_are_passive_and_permanent_after_checkpoint() {
     for _ in 0..32 {
         game.tick();
     }
-    assert_eq!(game.state.players[0].oil, 800);
+    assert_eq!(game.state.players[0].oil, 650);
     let target = game.state.entities.get(unit).unwrap();
     assert_eq!(
         target.ability_uses_remaining.get(&AbilityKind::Haste),
@@ -678,9 +678,7 @@ fn item_categories_are_passive_and_permanent_after_checkpoint() {
             .get(&AbilityKind::ArmorTreasure),
         Some(&1)
     );
-    assert!(!target
-        .ability_uses_remaining
-        .contains_key(&AbilityKind::DoubleDamage));
+    assert!(target.shop_item_active(AbilityKind::DoubleDamage));
     let enemy_view = game.snapshot_for(2);
     assert!(enemy_view.entities.iter().all(|e| e.id != unit
         || e.abilities
@@ -722,7 +720,7 @@ fn item_categories_are_passive_and_permanent_after_checkpoint() {
     assert_eq!(target.hp, hp - 10);
     buy(&mut game, shop, unit, AbilityKind::DoubleDamage);
     game.tick();
-    assert_eq!(game.state.players[0].oil, 800);
+    assert_eq!(game.state.players[0].oil, 650);
     for _ in 0..900 {
         game.tick();
     }
@@ -736,14 +734,13 @@ fn item_categories_are_passive_and_permanent_after_checkpoint() {
     for _ in 0..32 {
         game.tick();
     }
-    assert_eq!(game.state.players[0].oil, 800);
-    assert!(!game
+    assert_eq!(game.state.players[0].oil, 650);
+    assert!(game
         .state
         .entities
         .get(unit)
         .unwrap()
-        .ability_uses_remaining
-        .contains_key(&AbilityKind::DoubleDamage));
+        .shop_item_active(AbilityKind::DoubleDamage));
 }
 
 #[test]
@@ -809,8 +806,8 @@ fn vitality_treasure_is_passive_on_delivery_and_permanent_after_checkpoint() {
         game.tick();
     }
     assert_eq!(
-        game.state.players[0].oil, 900,
-        "in-flight defense reservation prevents a second purchase"
+        game.state.players[0].oil, 800,
+        "distinct defense items can be purchased together"
     );
     let target = game.state.entities.get(unit).unwrap();
     assert_eq!((target.hp, target.max_hp), (base + 130, base + 150));
@@ -830,7 +827,7 @@ fn vitality_treasure_is_passive_on_delivery_and_permanent_after_checkpoint() {
     assert_eq!((target.hp, target.max_hp), (wounded, base + 150));
     buy(&mut game, shop, unit, AbilityKind::ArmorTreasure);
     game.tick();
-    assert_eq!(game.state.players[0].oil, 900);
+    assert_eq!(game.state.players[0].oil, 800);
     for _ in 0..900 {
         game.tick();
     }
@@ -841,7 +838,7 @@ fn vitality_treasure_is_passive_on_delivery_and_permanent_after_checkpoint() {
     for _ in 0..32 {
         game.tick();
     }
-    assert_eq!(game.state.players[0].oil, 900);
+    assert_eq!(game.state.players[0].oil, 800);
     let target = game.state.entities.get(unit).unwrap();
     assert_eq!((target.hp, target.max_hp), (wounded, base + 150));
     game.state
@@ -961,8 +958,8 @@ fn every_passive_item_applies_on_delivery_and_ignores_activation_forever() {
 }
 
 #[test]
-fn occupied_item_categories_send_private_notices_without_spending() {
-    for (first, second, category) in [
+fn duplicate_items_send_private_notices_without_spending() {
+    for (first, second, _category) in [
         (
             AbilityKind::EscapeTreasure,
             AbilityKind::EscapeTreasure,
@@ -970,27 +967,27 @@ fn occupied_item_categories_send_private_notices_without_spending() {
         ),
         (
             AbilityKind::ArmorTreasure,
-            AbilityKind::VitalityTreasure,
+            AbilityKind::ArmorTreasure,
             "Defense",
         ),
-        (AbilityKind::Haste, AbilityKind::DoubleDamage, "Attack"),
+        (AbilityKind::Haste, AbilityKind::Haste, "Attack"),
     ] {
         let (mut game, shop, unit) = item_fixture();
         buy(&mut game, shop, unit, first);
         game.tick();
         let oil = game.state.players[0].oil;
-        // Both an in-flight delivery and an equipped item reserve the category.
+        // Both an in-flight delivery and an equipped item reserve the same item type.
         for ticks in [0, 32] {
             for _ in 0..ticks {
                 game.tick();
             }
             buy(&mut game, shop, unit, second);
             let events = game.tick();
-            let message = format!("{category} slot already full");
+            let message = "Item already equipped or being delivered";
             assert!(events.iter().any(|(player, events)| *player == 1 && events.iter().any(
-                |event| matches!(event, crate::protocol::Event::Notice { msg, .. } if msg == &message))));
+                |event| matches!(event, crate::protocol::Event::Notice { msg, .. } if msg == message))));
             assert!(events.iter().filter(|(player, _)| *player != 1).all(|(_, events)| events.iter().all(
-                |event| !matches!(event, crate::protocol::Event::Notice { msg, .. } if msg == &message))));
+                |event| !matches!(event, crate::protocol::Event::Notice { msg, .. } if msg == message))));
             assert_eq!(game.state.players[0].oil, oil);
         }
     }
@@ -1115,4 +1112,18 @@ fn item_radiance_is_public_for_visible_carriers_without_private_inventory() {
             .item_radiance_tier,
         Some(3)
     );
+}
+
+#[test]
+fn all_distinct_carried_items_coexist_without_category_limits() {
+    let (mut game, shop, unit) = item_fixture();
+    let items = [AbilityKind::Haste, AbilityKind::DoubleDamage,
+        AbilityKind::ArmorTreasure, AbilityKind::VitalityTreasure];
+    for ability in items { buy(&mut game, shop, unit, ability); game.tick(); }
+    buy(&mut game, shop, unit, AbilityKind::EscapeTreasure);
+    for _ in 0..40 { game.tick(); }
+    let target = game.state.entities.get(unit).unwrap();
+    for ability in items { assert!(target.shop_item_active(ability)); }
+    assert_eq!(target.escape_treasure, Some(shop));
+    assert_eq!(target.item_radiance_tier(), 3, "visual strength saturates independently of inventory");
 }

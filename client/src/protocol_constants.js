@@ -653,7 +653,7 @@ export const MAX_COMPACT_TRENCHES = 20000;
 export const MAX_COMPACT_EVENTS = 5000;
 // One active stage plus the server's 32 queued unit orders.
 export const MAX_COMPACT_ORDER_PLAN = 33;
-export const MAX_COMPACT_ABILITIES = 8;
+export const MAX_COMPACT_ABILITIES = 16;
 export const MAX_COMPACT_DEBUG_WAYPOINTS = 128;
 export const MAX_COMPACT_VISIBLE_TILES = 65536;
 export const MAX_COMPACT_REMEMBERED_BUILDINGS = 20000;

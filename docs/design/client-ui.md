@@ -2973,40 +2973,23 @@ and server-projected cooldown clocks. Passive descriptors have no primary/contex
 and are excluded from the hotkey command catalog. Charge uses an empty ordinary slot after active commands are placed. Full mixed cards omit
 the passive tile so active commands and the item column retain their positions. Evolution removes the Novice-only tile.
 
-### Cultivator item slot
+### Cultivator carried items
 
-Cultivator unit command cards reserve the fourth column for movement at R (logical slot 9),
-defense at F (10), and attack at V (11), including Serfs. Allied deliveries expose the same
-carried-item commands on other factions’ units. Empty categories stay blank.
-Escape is movement; Armor Treasure and Vitality Treasure share defense; Haste and Double Damage share attack.
-Haste, Double Damage, Armor, and Vitality apply permanently on delivery, keep their category occupied, and appear as
-passive disabled tiles without activation, hotkeys, or clocks. Vitality adds 150 to maximum and
-current HP on arrival; its maximum-HP bonus persists through Dao promotion.
-Healing Potion and Healing Seal are immediate Shop defense goods. Shop rows group movement
-on top (Escape Q), defense in the middle (Potion A, Seal S, Armor D, Vitality F), and attack
-on the bottom (Haste Z, Double Damage X). Full equipped or reserved categories send the normal
-info notice naming the movement, defense, or attack slot.
-Colored placeholder badges show AR (cyan), +HP (magenta), H (yellow), or 2X (orange).
-Permanent item badges remain fully visible.
-Badges use authorized projected ability state and never appear on Shops. Escape Treasure shows Escape
-with a purple autocast border by default; R activates immediately, and right-click/Alt+R toggles
-lethal-damage autocast. The carried-item command has its own hotkey identity,
-`cultivators.item.escape`, separate from the Shop purchase. The unit badge is centered and twice
-the HP-fill height in both dimensions. See [Shop rules](shop.md) for consumption and rescue behavior.
+Carried items have no command-card tiles or RFV bindings. Shop purchase controls remain unchanged.
+Haste, Double Damage, Armor Treasure, and Vitality Treasure are permanent passive effects;
+Escape Treasure automatically rescues the carrier on lethal damage. There is no total or category
+inventory cap. Each distinct item can coexist with all others; duplicate copies of the same effect
+are rejected, including deliveries already in flight. Healing Potion and Healing Seal are consumed goods.
+Vitality adds 150 maximum and current HP and persists through Dao promotion.
 
-Escape consumption with a position jump between visible snapshots draws a purple swirling particle
-burst at both endpoints and a thin full-length double-helix trail, fading over 1000 ms. The client
-uses only received endpoints; unseen arrivals produce no trace. Shop cancellation without a
-position jump produces no effect. Both manual activation and lethal-damage autocast share it.
+Private projected item badges appear in a variable-width row seven world pixels below the HP bar:
+ESC (purple), ARM (cyan), VIT (magenta), HST (yellow), DD (orange). Badges remain visible when
+health bars are hidden and never appear on Shops. Their labels supplement color identification.
+Escape's existing fog-safe particle burst and trail still render on rescue.
 
-Cultivator fighters (Novices, all three Adepts, and their Masters) gain a gold silhouette rim
-and pulsing rays for each occupied item category. One item uses the full twelve-ray baseline;
-two add soft bloom and sixteen longer, wider rays; three use the strongest bloom and twenty rays.
-Zero items produce no item radiance. Permanent attack and defense items count while equipped;
-Escape counts until consumed. The effect uses the server-projected public `itemRadianceTier` (0–3), so owners, allies,
-enemies and observers see the same strength whenever the carrier is visible. Specific item
-identities and timers remain private; hidden carriers reveal no glow or tier.
-Frame-strip instances own and dispose the rim and bloom filters with their display objects.
+Cultivator fighter radiance uses the public visual strength `itemRadianceTier` (0–3), counting
+distinct carried items and saturating at three. This is a presentation cap, never an inventory cap.
+Identities remain private; hidden carriers reveal no glow. Frame-strip instances dispose their filters.
 
 ### Client version guard
 

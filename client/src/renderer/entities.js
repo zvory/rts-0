@@ -253,10 +253,10 @@ export function _ringRadius(e) {
 }
 
 const CATEGORY_ITEM_BADGES = Object.freeze([
-  { ability: ABILITY.ARMOR_TREASURE, label: "AR", color: 0x58ccec },
-  { ability: ABILITY.VITALITY_TREASURE, label: "+HP", color: 0xf291ff },
-  { ability: ABILITY.HASTE, label: "H", color: 0xffda52 },
-  { ability: ABILITY.DOUBLE_DAMAGE, label: "2X", color: 0xff704f },
+  { ability: ABILITY.ARMOR_TREASURE, label: "ARM", color: 0x58ccec },
+  { ability: ABILITY.VITALITY_TREASURE, label: "VIT", color: 0xf291ff },
+  { ability: ABILITY.HASTE, label: "HST", color: 0xffda52 },
+  { ability: ABILITY.DOUBLE_DAMAGE, label: "DD", color: 0xff704f },
 ]);
 
 function hasCategoryItem(entity) {
@@ -264,7 +264,13 @@ function hasCategoryItem(entity) {
     CATEGORY_ITEM_BADGES.some((item) => item.ability === entry.ability));
 }
 
-function drawCategoryItemBadges(container, entity, topY) {
+function drawCategoryItemBadges(container, entity) {
+  const totalWidth = (entity.escapeTreasure ? 22 : 0) + CATEGORY_ITEM_BADGES
+    .filter((item) => !isBuilding(entity.kind) && entity.abilities?.some((entry) => entry.ability === item.ability))
+    .reduce((width, item) => width + item.label.length * 6 + 4, 0);
+  let offset = -Math.max(0, totalWidth - 4) / 2;
+  if (container.rtsEscape) container.rtsEscape.position.set(offset, 7);
+  if (entity.escapeTreasure) offset += 22;
   for (const [index, item] of CATEGORY_ITEM_BADGES.entries()) {
     const entry = !isBuilding(entity.kind) && entity.abilities?.find((value) => value.ability === item.ability);
     const key = `rtsItem${index}`;
@@ -281,10 +287,11 @@ function drawCategoryItemBadges(container, entity, topY) {
     if (!badge) continue;
     badge.visible = !!entry;
     if (!entry) continue;
-    const defense = [ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE].includes(item.ability);
     badge.text = item.label;
     badge.alpha = 1;
-    badge.position.set(defense ? -12 : 12, entity.y - topY + 13);
+    badge.anchor.set(0, 0);
+    badge.position.set(offset, 7);
+    offset += item.label.length * 6 + 4;
   }
 }
 
@@ -335,24 +342,21 @@ export function _hpBar(g, e, status = null, ownerColor = null, showHp = true) {
   g.position.set(e.x, topY);
   g.rtsBackground.visible = g.rtsFill.visible = g.rtsTicks.visible = showHp;
   if (e.escapeTreasure && !g.rtsEscape) {
-    const badge = new PIXI.Graphics();
-    // Double the original badge and center it over the unit body.
-    badge.rect(-barH / 2, -barH / 2, barH, barH).fill(0x8c32c8);
-    const x = -1.2;
-    const y = -1.4;
-    badge.rect(x, y, 0.65, 2.8).rect(x, y, 2.4, 0.6)
-      .rect(x, y + 1.1, 1.9, 0.6).rect(x, y + 2.2, 2.4, 0.6).fill(0xffffff);
-    badge.scale.set(2);
+    const badge = new PIXI.Text({ text: "ESC", style: {
+      fontFamily: "monospace", fontSize: 9, fontWeight: "bold", fill: 0xdd9aff,
+      stroke: { color: 0x101019, width: 3 },
+    } });
+    badge.anchor.set(0, 0);
     g.rtsEscape = badge;
     g.addChild(badge);
   }
   if (g.rtsEscape) {
     g.rtsEscape.visible = !!e.escapeTreasure;
-    g.rtsEscape.position.set(0, e.y - topY);
+    g.rtsEscape.position.set(0, 7);
   }
 
 
-  drawCategoryItemBadges(g, e, topY);
+  drawCategoryItemBadges(g, e);
 
   let color = Number.isFinite(ownerColor)
     ? ownerColor

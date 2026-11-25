@@ -97,7 +97,7 @@ pub(super) fn purchase(
     {
         return;
     }
-    let category_full = if ability == AbilityKind::EscapeTreasure {
+    let already_equipped = if ability == AbilityKind::EscapeTreasure {
         target.escape_treasure.is_some()
             || runtime.projectiles().any(|p| {
                 p.ability == ability
@@ -105,18 +105,13 @@ pub(super) fn purchase(
                 AbilityProjectileReturnTarget::Entity { id } if id == target_id)
             })
     } else {
-        is_buff_item(ability) && (target.shop_item_category_occupied(ability)
-            || runtime.projectiles().any(|p| same_item_category(p.ability, ability)
+        is_buff_item(ability) && (target.shop_item_active(ability)
+            || runtime.projectiles().any(|p| p.ability == ability
                 && matches!(p.return_target, AbilityProjectileReturnTarget::Entity { id } if id == target_id)))
     };
-    if category_full {
-        let category = match ability {
-            AbilityKind::EscapeTreasure => "Movement",
-            AbilityKind::ArmorTreasure | AbilityKind::VitalityTreasure => "Defense",
-            _ => "Attack",
-        };
+    if already_equipped {
         events.entry(player).or_default().push(Event::Notice {
-            msg: format!("{category} slot already full"),
+            msg: "Item already equipped or being delivered".into(),
             x: None,
             y: None,
             severity: crate::protocol::NoticeSeverity::Info,
@@ -192,18 +187,6 @@ pub(in crate::game) fn is_buff_item(ability: AbilityKind) -> bool {
             | AbilityKind::VitalityTreasure
     )
 }
-fn same_item_category(a: AbilityKind, b: AbilityKind) -> bool {
-    is_buff_item(a)
-        && is_buff_item(b)
-        && (matches!(
-            a,
-            AbilityKind::ArmorTreasure | AbilityKind::VitalityTreasure
-        ) == matches!(
-            b,
-            AbilityKind::ArmorTreasure | AbilityKind::VitalityTreasure
-        ))
-}
-
 /// Resolve before death attribution/removal so every damage source observes the same charge.
 /// A destroyed source shop cancels its treasure. A completely blocked shop cannot rescue a unit.
 pub(super) fn resolve_escapes(map: &Map, entities: &mut EntityStore, teams: &TeamRelations) {

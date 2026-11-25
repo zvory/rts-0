@@ -17,17 +17,9 @@ pub(super) fn validate(entity: &Entity) -> Result<(), CheckpointPayloadError> {
             ability,
             Haste | DoubleDamage | ArmorTreasure | VitalityTreasure
         ) {
-            let conflicting = if matches!(ability, ArmorTreasure | VitalityTreasure) {
-                &[ArmorTreasure, VitalityTreasure][..]
-            } else {
-                &[Haste, DoubleDamage][..]
-            };
             if !entity.is_unit()
                 || remaining != 1
                 || (ability == VitalityTreasure && entity.max_hp <= 150)
-                || conflicting
-                    .iter()
-                    .any(|kind| *kind != ability && entity.shop_item_active(*kind))
             {
                 return Err(CheckpointPayloadError::InvalidValue {
                     field: "entities.abilityUsesRemaining",
