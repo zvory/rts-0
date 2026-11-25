@@ -1,5 +1,5 @@
 {
-  "reason": "Add distinct Vector Field command DTO and exhaustive wire adapters without overloading Anchor",
+  "reason": "Distinct Vector Field wire adapters and one command-helper PlayerState forwarding site; no new PlayerState field writes",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -2308,6 +2308,11 @@
       "path": "tests/shop_tests.rs",
       "line": 1334,
       "code": "let enemy = PlayerState {"
+    },
+    {
+      "path": "services/commands/vector_field.rs",
+      "line": 7,
+      "code": "players: &mut [PlayerState],"
     }
   ],
   "player_state_field_writes": [
