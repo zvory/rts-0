@@ -13,7 +13,7 @@ import {
   normalizeProgressPatch,
   progressPatchMatches,
 } from "./prediction_frame.js";
-import { MOVEMENT_PATH_DIAGNOSTICS, isBuilding, isResource, isUnit } from "./protocol.js";
+import { KIND, MOVEMENT_PATH_DIAGNOSTICS, isBuilding, isResource, isUnit } from "./protocol.js";
 import { admitControlGroupIds } from "./state_control_groups.js";
 import { GroundDecalBuffer } from "./state_ground_decals.js";
 import { autoBuild as ab } from "./state_auto_build.js";
@@ -55,7 +55,7 @@ function lerpAngle(from, to, t) {
 }
 
 function interpolateEntity(entity, prior, alpha) {
-  if (!prior) return { ...entity };
+  if (!prior || entity.kind === KIND.SHOP_DELIVERY) return { ...entity };
   const next = {
     ...entity,
     x: prior.x + (entity.x - prior.x) * alpha,
