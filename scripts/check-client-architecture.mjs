@@ -113,6 +113,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "protocol_snapshot.js": "transport",
   "protocol_snapshot_events.js": "transport",
   "protocol_snapshot_trenches.js": "transport",
+  "protocol_snapshot_ability_state.js": "transport",
   "lab_client.js": "transport",
   "map_editor_handoff.js": "transport",
   "report_window_aggregate.js": "platform",

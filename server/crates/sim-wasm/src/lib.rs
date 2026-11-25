@@ -665,6 +665,7 @@ impl CorePredictor {
             | Command::TearDownAntiTankGuns { .. }
             | Command::Charge { .. }
             | Command::ArtilleryFire { .. }
+            | Command::VectorField { .. }
             | Command::UseAbility { .. }
             | Command::RecastAbility { .. }
             | Command::SetAutocast { .. }
@@ -1151,6 +1152,7 @@ fn command_kind(command: &Command) -> &'static str {
         Command::TearDownAntiTankGuns { .. } => "tearDownAntiTankGuns",
         Command::Charge { .. } => "charge",
         Command::ArtilleryFire { .. } => "artilleryFire",
+        Command::VectorField { .. } => "vectorField",
         Command::UseAbility { .. } => "useAbility",
         Command::RecastAbility { .. } => "recastAbility",
         Command::SetAutocast { .. } => "setAutocast",
