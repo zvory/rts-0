@@ -2233,6 +2233,13 @@ to its matching [Master](dao-masters.md), resets insight and fully heals. Public
 `daoMaster` (compact slot 52) persists alongside the authoritative Adept kind. Research ids are
 `dao_wind`, `dao_of_heaviness` (War), `dao_of_magic` (Magic).
 
+Dao body growth: Novice evolution and Adept-to-Master advancement share
+`services/movement/body_growth.rs` after the post-production/death occupancy rebuild.
+The existing bounded local clearance search validates the finished body against terrain,
+buildings and hostile units before committing rank, healing and position. Blocked Novices retain their
+chosen Dao (including an automatic RNG choice), insight and HP and retry without rerolling.
+Training exits separately validate their queued Adept’s body before spawning/evolving it.
+
 Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md).
 
 ### Tournament Grounds

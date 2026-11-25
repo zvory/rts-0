@@ -1500,9 +1500,7 @@ fn use_ability(
                 .get_mut(unit)
                 .filter(|entity| entity.owner == player)
             {
-                if entity.choose_dao(ability) {
-                    entity.advance_chosen_dao();
-                }
+                entity.choose_dao(ability);
             }
         }
         return;

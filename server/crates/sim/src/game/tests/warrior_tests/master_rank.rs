@@ -271,3 +271,79 @@ fn wind_insight_extractors_grant_full_actual_damage_other_buildings_quarter() {
         }
     }
 }
+
+#[test]
+fn novice_evolution_clears_the_larger_body_from_adjacent_buildings() {
+    let mut game = empty_flat_game(&[cultivator_player()]);
+    game.state
+        .entities
+        .spawn_building(1, EntityKind::ProvenGrounds, 624.0, 624.0, true)
+        .unwrap();
+    let id = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Warrior, 692.0, 624.0)
+        .unwrap();
+    let unit = game.state.entities.get_mut(id).unwrap();
+    unit.insight = config::DISCIPLE_INSIGHT_REQUIRED;
+    unit.set_order(Order::HoldPosition);
+    game.enqueue(1, Command::UseAbility {
+        target_id: None,
+        ability: crate::game::ability::AbilityKind::EvolveMagic,
+        units: vec![id],
+        x: None,
+        y: None,
+        queued: false,
+    });
+    game.tick();
+    let unit = game.state.entities.get(id).unwrap();
+    assert_eq!(unit.kind, EntityKind::MagicAdept);
+    assert!(
+        unit.pos_x() >= 698.0,
+        "the 26px Adept must clear the building's right edge at x=672"
+    );
+    assert!(game.checkpoint_payload_text_for_test().is_ok());
+}
+
+#[test]
+fn novice_evolution_waits_for_room_without_healing_or_losing_insight() {
+    let mut game = empty_flat_game(&[cultivator_player(), human_vs_ai_players()[1].clone()]);
+    let blockers = [
+        (430.0, 400.0),
+        (400.0, 370.0),
+        (370.0, 400.0),
+        (400.0, 430.0),
+    ]
+    .map(|(x, y)| {
+        game.state
+            .entities
+            .spawn_unit(2, EntityKind::Worker, x, y)
+            .unwrap()
+    });
+    let id = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Warrior, 400.0, 400.0)
+        .unwrap();
+    let unit = game.state.entities.get_mut(id).unwrap();
+    unit.insight = config::DISCIPLE_INSIGHT_REQUIRED;
+    unit.choose_dao(crate::game::ability::AbilityKind::EvolveMagic);
+    unit.apply_damage(1, None);
+    game.tick();
+    let unit = game.state.entities.get(id).unwrap();
+    assert_eq!(
+        (unit.kind, unit.hp, unit.insight),
+        (EntityKind::Warrior, 57, 60)
+    );
+    assert!(unit.chosen_dao.is_some());
+    assert!(game.checkpoint_payload_text_for_test().is_ok());
+    game.state.entities.remove(blockers[0]);
+    game.state.entities.remove(blockers[1]);
+    game.tick();
+    let unit = game.state.entities.get(id).unwrap();
+    assert_eq!(
+        (unit.kind, unit.hp, unit.insight),
+        (EntityKind::MagicAdept, 150, 0)
+    );
+    assert!(unit.chosen_dao.is_none());
+}

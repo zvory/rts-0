@@ -403,19 +403,6 @@ pub(crate) fn run_tick(
         services::shop_items::heal_seals(entities, &teams, tick);
         services::shop_items::heal_regen(entities, tick);
     });
-    crate::perf::timed(perf.as_deref_mut(), "dao_evolution", || {
-        for id in entities.ids() {
-            let Some(entity) = entities.get_mut(id) else {
-                continue;
-            };
-            if players.iter().any(|player| {
-                player.id == entity.owner
-                    && player.faction_id == crate::rules::faction::CULTIVATORS_FACTION_ID
-            }) {
-                entity.advance_dao(rng);
-            }
-        }
-    });
     crate::perf::timed(perf.as_deref_mut(), "death", || {
         let teams = TeamRelations::from_player_teams(players.iter().map(|p| (p.id, p.team_id)));
         services::death::death_system(
@@ -436,17 +423,21 @@ pub(crate) fn run_tick(
     let pre_collision = crate::perf::timed(perf.as_deref_mut(), "pre_collision_derived", || {
         PreCollisionDerivedState::rebuild(map, entities, &mut occupancy_cache)
     });
-    services::movement::advance_dao_masters(
-        map,
-        entities,
-        |owner| {
-            players.iter().any(|p| {
-                p.id == owner && p.faction_id == crate::rules::faction::CULTIVATORS_FACTION_ID
-            })
-        },
-        &pre_collision.occupancy,
-        &teams,
-    );
+    crate::perf::timed(perf.as_deref_mut(), "dao_evolution", || {
+        services::movement::advance_dao_units(
+            map,
+            entities,
+            |owner| {
+                players.iter().any(|p| {
+                    p.id == owner && p.faction_id == crate::rules::faction::CULTIVATORS_FACTION_ID
+                })
+            },
+            &pre_collision.occupancy,
+            &teams,
+            rng,
+        );
+    });
+
     let pre_collision_positions =
         crate::perf::timed(perf.as_deref_mut(), "pre_collision_positions", || {
             entities

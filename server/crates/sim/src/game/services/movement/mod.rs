@@ -21,7 +21,7 @@ use rts_rules::math::GameplayMath as _;
 mod armor_reaction;
 mod barbed_wire;
 mod body_growth;
-pub(crate) use body_growth::advance_dao_masters;
+pub(crate) use body_growth::advance_dao_units;
 mod car_drive;
 mod collision;
 mod pivot_drive;
