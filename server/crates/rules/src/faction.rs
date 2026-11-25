@@ -1312,13 +1312,10 @@ mod tests {
         assert!(!dismiss.command_card);
         assert_eq!(dismiss.protocol_code, 11);
         assert_eq!(dismiss.order_stage_code, 18);
-
         let charge = ability_definition(AbilityKind::Charge);
         assert!(charge.command_card);
-        assert_eq!(
-            charge.carriers,
-            &[EntityKind::Warrior, EntityKind::WarAdept]
-        );
+        let charge_carriers = &[EntityKind::Warrior, EntityKind::WarAdept];
+        assert_eq!(charge.carriers, charge_carriers);
         assert_eq!(charge.cooldown_ticks, balance::NOVICE_CHARGE_COOLDOWN_TICKS);
 
         let teleport = EKAT_CATALOG.ability(AbilityKind::EkatTeleport).unwrap();
