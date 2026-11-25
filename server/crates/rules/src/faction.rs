@@ -1373,7 +1373,9 @@ mod tests {
         assert_eq!(catalog.loadout.id, "cultivators.standard");
         assert!(!catalog.can_build(EntityKind::Worker, EntityKind::ProvenGrounds));
         assert!(!catalog.buildings.contains(&EntityKind::ProvenGrounds));
-        assert!(!catalog.production_anchors.contains(&EntityKind::ProvenGrounds));
+        assert!(!catalog
+            .production_anchors
+            .contains(&EntityKind::ProvenGrounds));
         assert_eq!(catalog.loadout.initial_steel, balance::STARTING_STEEL);
         assert_eq!(catalog.loadout.initial_oil, balance::STARTING_OIL);
         assert_eq!(
