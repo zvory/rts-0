@@ -94,7 +94,7 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 15] = [
             "Place a 150 HP shield granting allied units within 2.1 tiles 75% armor against attacks from outside; armor piercing works normally; each hit drains full attack damage from shield HP; lasts up to 5 seconds",
         carriers: &[EntityKind::MagicAdept],
         target_mode: AbilityTargetMode::WorldPoint,
-        range_tiles: Some(balance::EKAT_MAGIC_ANCHOR_RANGE_TILES as f32),
+        range_tiles: Some(5.0),
         min_range_tiles: None,
         cooldown_ticks: balance::DISCIPLE_SHIELD_COOLDOWN_TICKS,
         charges: None,
