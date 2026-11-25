@@ -251,6 +251,12 @@ pub fn project_entity(
                 })
                 .unwrap_or_else(|| entity_visible_to(viewer, entity, actionable_fog)));
     view.vision_only = vision_only;
+    view.charge_active = !vision_only
+        && matches!(entity.kind, EntityKind::Warrior | EntityKind::WarAdept)
+        && entity
+            .movement
+            .as_ref()
+            .is_some_and(|movement| movement.novice_charge_ticks > 0);
     view.escape_treasure = owner_or_ally && entity.escape_treasure.is_some();
 
     if entity.kind.is_disciple() {

@@ -157,3 +157,18 @@ fn item_radiance_tier_appends_public_strength_including_explicit_zero() {
         assert!(unit.abilities.is_empty());
     }
 }
+
+#[test]
+fn charge_active_appends_public_flag_and_omits_inactive_state() {
+    let mut unit = EntityView::new(1, 1, "war_adept", 320.0, 320.0, 176, 176, "attack");
+    assert!(serde_json::to_value(&unit)
+        .unwrap()
+        .get("chargeActive")
+        .is_none());
+    unit.charge_active = true;
+    let compact = serde_json::to_value(CompactEntity(&unit)).unwrap();
+    assert_eq!(compact.as_array().unwrap().len(), 56);
+    assert_eq!(compact[55], true);
+    assert!(compact[54].is_null());
+    assert_eq!(serde_json::to_value(&unit).unwrap()["chargeActive"], true);
+}

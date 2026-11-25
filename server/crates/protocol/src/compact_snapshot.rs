@@ -836,6 +836,9 @@ impl Serialize for CompactEntity<'_> {
         if entity.item_radiance_tier.is_some() {
             len = 55;
         }
+        if entity.charge_active {
+            len = 56;
+        }
         let mut seq = serializer.serialize_seq(Some(len))?;
         seq.serialize_element(&entity.id)?;
         seq.serialize_element(&entity.owner)?;
@@ -1015,6 +1018,9 @@ impl Serialize for CompactEntity<'_> {
         }
         if len > 54 {
             seq.serialize_element(&entity.item_radiance_tier)?;
+        }
+        if len > 55 {
+            seq.serialize_element(&entity.charge_active)?;
         }
         seq.end()
     }

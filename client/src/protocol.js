@@ -413,3 +413,5 @@ export const cmd = Object.freeze({
 // Compact v70 entity slot 54: public itemRadianceTier (0–6), fog-gated with its carrier.
 
 // Compact v71: shield ownerState adds maxHp (slot 6) and durationTicks (slot 7), public with the visible field.
+
+// Compact v76 entity slot 55: chargeActive is a public, fog-gated Charge visual flag.

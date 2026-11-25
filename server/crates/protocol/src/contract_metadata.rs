@@ -253,7 +253,7 @@ pub mod notices {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 75;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 76;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -1111,6 +1111,7 @@ fn compact_slot_schemas() -> CompactSlotSchemas {
             optional_field(52, "daoMaster"),
             optional_field(53, "escapeTreasure"),
             optional_field(54, "itemRadianceTier"),
+            optional_field(55, "chargeActive"),
         ],
         event: event_slot_schemas(),
         trench: vec![

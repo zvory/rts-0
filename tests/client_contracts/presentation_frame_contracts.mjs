@@ -66,6 +66,7 @@ const normal = {
   prodWaiting: true,
   extractorActive: false,
   escapeTreasure: true,
+  chargeActive: true,
   weaponFacing: 0.8,
   commanderFacing: -1.2,
   panzerfaustWindupProgress: 0.4,
@@ -203,6 +204,8 @@ assert(
   frame.layers.fogGatedWorld.find((record) => record.id === normal.id)?.prodWaiting === true,
   "production waiting state crosses the renderer presentation boundary",
 );
+assert(frame.layers.fogGatedWorld.find((record) => record.id === normal.id)?.chargeActive === true,
+  "Charge visual flag crosses the detached worker presentation frame");
 assert(frame.layers.belowFogIntel[0]?.type === "intelEntity", "vision-only received entities stay below fog");
 assert(frame.layers.aboveFogReveal[0]?.type === "shotRevealEntity", "explicit shot reveals stay above fog");
 assert(frame.layers.rememberedWorld[0]?.type === "rememberedBuilding", "remembered buildings remain a distinct category");

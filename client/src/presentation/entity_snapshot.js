@@ -4,7 +4,7 @@ export const PRESENTATION_ENTITY_FIELDS = Object.freeze([
   "tournamentEntrants", "daoTrainingQueue", "prodKind", "buildProgress", "deconstructProgress", "prodProgress", "prodQueue", "prodWaiting", "prodRepeatKinds",
   "setupState", "setupFacing", "recoilPhase", "recoilProgress",
   "panzerfaustLoaded", "panzerfaustWindupProgress", "rocketRackCount",
-  "breakthroughTicks", "breakthroughAuraTicks", "abilities",
+  "breakthroughTicks", "breakthroughAuraTicks", "chargeActive", "abilities",
   "extractorActive", "escapeTreasure", "itemRadianceTier",
   "orderPlan", "rally", "rallyPlan", "optimisticRally", "debugPath",
   "attackArcRad", "attackMinRangePx", "attackMinRangeTiles", "attackRangePx",
