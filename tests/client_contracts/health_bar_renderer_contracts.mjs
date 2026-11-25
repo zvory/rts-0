@@ -1,4 +1,4 @@
-import { KIND } from "../../client/src/protocol.js";
+import { ABILITY, KIND } from "../../client/src/protocol.js";
 import {
   _drawAboveFogHp,
   _drawSelectionAndHp,
@@ -56,16 +56,35 @@ try {
   assert(treasureBar.rtsEscape.visible && !treasureBar.rtsBackground.visible
     && !treasureBar.rtsFill.visible && !treasureBar.rtsTicks.visible,
   "Escape Treasure badge remains visible while its health bar is hidden");
-  const badgeBox = treasureBar.rtsEscape.calls.find((call) => call[0] === "drawRect");
-  assert(badgeBox[3] * treasureBar.rtsEscape.scaleX === 8 && badgeBox[4] * treasureBar.rtsEscape.scaleY === 8,
-    "Escape badge width and height double the four-pixel HP fill height");
-  assert(treasureBar.x + treasureBar.rtsEscape.x === protectedUnit.x &&
-    treasureBar.y + treasureBar.rtsEscape.y === protectedUnit.y,
-    "Escape badge is centered on the unit");
+  assert(treasureBar.rtsEscape.text === "ESC", "Escape has its explicit ESC label");
+  assert(treasureBar.rtsEscape.y === 7, "Escape sits immediately below the HP bar");
   const badge = treasureBar.rtsEscape;
   _hpBar.call({}, treasureBar, { ...protectedUnit, escapeTreasure: false });
   assert(treasureBar.rtsEscape === badge && !badge.visible,
     "Consumed Escape Treasure hides its pooled badge");
+
+  const equippedBar = makeBar();
+  _hpBar.call({}, equippedBar, { ...protectedUnit,
+    abilities: [ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE,
+      ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE].map((ability) => ({ ability, remainingUses: 1 })) });
+  const badges = [equippedBar.rtsEscape, ...[0, 1, 2, 3].map((index) => equippedBar[`rtsItem${index}`])];
+  assert(badges.map((badge) => badge.text).join(" ") === "ESC ARM VIT HST DD", "every carried item has its own readable label");
+  assert(badges.every((badge) => badge.visible && badge.y === 7), "all item badges sit directly below HP");
+  assert(badges.every((badge, index) => !index || badge.x > badges[index - 1].x), "same-category items never overlap each other");
+
+  for (const dao of [null, "wind", "war", "magic"]) {
+    _hpBar.call({}, equippedBar, { ...protectedUnit, kind: KIND.WARRIOR, dao, insight: 30,
+      abilities: [ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE,
+        ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE].map((ability) => ({ ability, remainingUses: 1 })) });
+    const insightBottom = Math.max(...equippedBar.rtsInsight.calls
+      .filter((call) => call[0] === "drawRect").map((call) => call[2] + call[4]));
+    assert(badges.every((badge) => badge.visible && badge.y > insightBottom + 1.5),
+      "carried labels and their stroke clear the Disciple insight meter");
+  }
+  _hpBar.call({}, equippedBar, { ...protectedUnit, kind: KIND.WARRIOR, insight: 200, daoMaster: true,
+    abilities: [ABILITY.ARMOR_TREASURE].map((ability) => ({ ability, remainingUses: 1 })) });
+  assert(equippedBar.rtsEscape.y === 7 && equippedBar.rtsItem0.y === 7,
+    "Master badges return directly below HP when the insight meter disappears");
 
   const highHpBar = makeBar();
   _hpBar.call({ _map: { tileSize: 32 } }, highHpBar, {

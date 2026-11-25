@@ -969,7 +969,7 @@ for (const researched of [false, true]) {
   }
   const charge = card.slots.find((slot) => slot?.ability === ABILITY.CHARGE);
   assert.equal(charge, undefined, "a full mixed card gives active abilities priority over passive Charge");
-  assert.equal(card.slots[9].commandId, "cultivators.item.escape");
+  assert.equal(card.slots[9] ?? null, null);
 }
 
 // Dao order is chosen by the player; completed and paid active researches reserve tiers.
@@ -1140,103 +1140,15 @@ withFakeHudDocument(() => {
     "A and C commands retain their original row and column");
 });
 
-// Item slot R is conditional, consumes only carriers, and exposes autocast controls.
-for (const kind of [KIND.WORKER, KIND.WARRIOR, KIND.WIND_ADEPT, KIND.WAR_ADEPT, KIND.MAGIC_ADEPT]) {
-  const build = (escapeTreasure, auto = true) => buildCommandCardDescriptors({
-    playerId: 1, factionId: "cultivators", resources: { steel: 0, oil: 0 },
-    selection: [{ id: 1, owner: 1, kind, escapeTreasure,
-      abilities: [{ ability: ABILITY.ESCAPE_TREASURE, autocastEnabled: auto }] },
-    { id: 2, owner: 1, kind }],
-    groupCooldownClocks: () => [], playerHasCompleteKind: () => true,
-  });
-  const empty = build(false);
-  const filled = build(true);
-  assert.equal(empty.slots[9] ?? null, null);
-  assert.notEqual(empty.signature, filled.signature);
-  const slot = filled.slots[9];
-  assert.equal(slot.hotkey, "R");
-  assert.equal(slot.label, "Escape");
-  assert.equal(slot.enabled, true);
-  assert.deepEqual(slot.intent.readyIds, [1]);
-  assert.equal(slot.intent.targetMode, "self");
-  assert.equal(slot.cls, "autocast-enabled");
-  assert.equal(slot.contextIntent.enabled, false);
-  assert.equal(build(true, false).slots[9].contextIntent.enabled, true);
-}
-
-// The item column separates categories, consumes ready carriers, and keeps active duration clocks.
-{
-  const units = [
-    { id: 1, owner: 1, kind: KIND.WARRIOR, escapeTreasure: true, abilities: [
-      { ability: ABILITY.HASTE, remainingUses: 1, cooldownLeft: 0 },
-      { ability: ABILITY.ARMOR_TREASURE, remainingUses: 1, cooldownLeft: 0 }] },
-    { id: 2, owner: 1, kind: KIND.WARRIOR, abilities: [
-      { ability: ABILITY.DOUBLE_DAMAGE, remainingUses: 1, cooldownLeft: 0 }] },
-  ];
-  const build = (selection) => buildCommandCardDescriptors({ playerId: 1, factionId: "cultivators",
-    selection, resources: { steel: 0, oil: 0 }, groupCooldownClocks: (ticks, total) =>
-      ticks.filter((tick) => tick > 0).map((tick) => ({ count: 1, rotationDeg: tick / total * 360 })) });
-  const carried = build(units);
-  assert.equal(carried.slots[9].hotkey, "R");
-  assert.equal(carried.slots[10].hotkey, "");
-  assert.equal(carried.slots[11].hotkey, "");
-  assert.equal(carried.slots[10].intent, null);
-  assert.equal(carried.slots[11].intent, null);
-  const mixed = build([...units].reverse());
-  assert.equal(mixed.slots[11].ability, ABILITY.HASTE, "mixed selection keeps a stable passive category tile");
-  assert.equal(mixed.slots[10].enabled, false);
-  assert.equal(mixed.slots[10].passive, true);
-  assert.deepEqual(mixed.slots[10].cooldownClocks, []);
-  assert.notEqual(mixed.signature, carried.signature);
-  const charge = mixed.slots.find((slot) => slot?.ability === ABILITY.CHARGE);
-  assert(charge.slotIndex < 9, "passive Charge leaves the defense category available");
-}
-
-// Allied passive deliveries appear on units belonging to another faction.
-for (const factionId of ["kriegsia", "ekat"]) {
+// Carried items never occupy the command card or bind RFV, including mixed factions.
+for (const factionId of ["cultivators", "kriegsia", "ekat"]) {
   const card = buildCommandCardDescriptors({ playerId: 1, factionId,
-    selection: [{ id: 1, owner: 1, kind: KIND.WORKER, escapeTreasure: true,
-      abilities: [{ ability: ABILITY.HASTE, remainingUses: 1, cooldownLeft: 0 }] }],
-    resources: { steel: 0, oil: 0 }, groupCooldownClocks: () => [] });
-  assert.equal(card.slots[9].commandId, "cultivators.item.escape");
-  assert.equal(card.slots[11].commandId, "cultivators.item.haste");
-  assert.equal(card.slots[11].intent, null);
-  assert.equal(card.slots[11].passive, true);
-  assert.equal(card.slots[11].enabled, false);
-}
-
-// Vitality is a Shop F purchase and shares the carried F defense slot with Armor.
-{
-  const build = (selection) => buildCommandCardDescriptors({ playerId: 1, factionId: "cultivators",
-    selection, resources: { steel: 0, oil: 100 }, groupCooldownClocks: () => [] });
-  const shop = build([{ id: 1, owner: 1, kind: KIND.SHOP }]);
-  assert.equal(shop.slots[10].ability, ABILITY.VITALITY_TREASURE);
-  assert.equal(shop.slots[10].hotkey, "F");
-  assert.equal(shop.slots[10].cost.oil, 100);
-  assert.equal(shop.slots[10].intent.targetMode, "friendlyUnit");
-  const units = [
-    { id: 2, owner: 1, kind: KIND.WARRIOR, abilities: [
-      { ability: ABILITY.ARMOR_TREASURE, remainingUses: 1, cooldownLeft: 0 }] },
-    { id: 3, owner: 1, kind: KIND.WARRIOR, abilities: [
-      { ability: ABILITY.VITALITY_TREASURE, remainingUses: 1, cooldownLeft: 0 }] },
-  ];
-  assert.equal(build(units).slots[10].ability, ABILITY.ARMOR_TREASURE);
-  for (const unit of units) {
-    const passive = build([unit]);
-    const slot = passive.slots[10];
-    assert.equal(slot.ability, unit.abilities[0].ability);
-    assert.equal(slot.hotkey, "");
-    assert.equal(slot.passive, true);
-    assert.equal(slot.enabled, false);
-    assert.equal(slot.action, null);
-    assert.equal(slot.intent, null);
-    assert.equal(slot.contextIntent, null);
-    assert.deepEqual(slot.cooldownClocks, []);
-    assert(slot.title.includes("Permanent passive"));
-    assert(!slot.title.includes("30 seconds"));
-    assert(!passive.abilityAffordances.some((entry) => entry.definition.ability === slot.ability));
-  }
-  assert(build([units[1]]).slots[10].title.includes("+150 maximum and current HP"));
+    selection: [{ id: 1, owner: 1, kind: KIND.WARRIOR, escapeTreasure: true,
+      abilities: [ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE, ABILITY.ARMOR_TREASURE,
+        ABILITY.VITALITY_TREASURE].map((ability) => ({ ability, remainingUses: 1 })) }],
+    resources: {}, groupCooldownClocks: () => [] });
+  assert(!card.slots.some((slot) => slot?.commandId?.startsWith("cultivators.item.")));
+  for (const index of [9, 10, 11]) assert.equal(card.slots[index] ?? null, null);
 }
 
 // Shop goods occupy the same rows as the carried movement/defense/attack slots.
@@ -1258,9 +1170,6 @@ for (const factionId of ["kriegsia", "ekat"]) {
       resources: {}, groupCooldownClocks: () => [],
     });
     const slot = carried.slots.find((entry) => entry?.ability === ability);
-    assert(slot.passive && !slot.enabled && !slot.hotkey);
-    assert.equal(slot.intent, null);
-    assert.equal(slot.contextIntent, null);
-    assert.deepEqual(slot.cooldownClocks, []);
+    assert.equal(slot, undefined);
   }
 }

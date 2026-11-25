@@ -55,17 +55,13 @@ Healing Potion restores the target to full HP on arrival. This follows the user'
 “heals the unit fully” instruction, superseding the earlier 75 HP description.
 Escape Treasure grants one lethal-damage escape, returning the unit to its supplying Shop
 with **1 HP**, regardless of the unit's distance when it takes damage. The applied effect is
-shown only to the unit’s owner and allies as a purple square with a white **E**, centered on the unit; both dimensions equal twice
-the health bar height, even when health bars are hidden. Enemies receive no protection flag
-even when they see the unit.
+shown only to the unit’s owner and allies as a purple **ESC** label below the health bar,
+even when health bars are hidden. Enemies receive no protection flag even when they see the unit.
 
-Cultivator units reserve **R** for movement items, **F** for defense items (below R), and **V** for attack items (bottom right). Empty categories leave their slots blank. One item can occupy each category; attack items cannot stack or replace one another while equipped.
-A delivered Escape Treasure exposes **Escape** in R, with autocast enabled by default. Lethal
-damage triggers the automatic escape at 1 HP; manual activation consumes the same treasure and
-returns the unit immediately while preserving its current HP. Right-click or Alt+R toggles
-autocast; manual use remains available when autocast is disabled. Only owned living carriers
-can activate or toggle their item. Healing Potion is consumed on delivery rather than carried;
-Healing Potion and Healing Seal are defense goods consumed on delivery/placement and do not occupy the carried defense slot.
+Carried items have no total or category limit and no RFV command-card controls. All distinct
+passive goods can coexist with Escape Treasure. Duplicate copies of the same item are rejected,
+including a copy already in flight, without spending oil. Escape automatically activates on lethal
+damage by default. Healing Potion and Healing Seal are consumed rather than carried.
 
 A destroyed supplying Shop cancels in-flight goods and removes its applied escape protection.
 Escape Treasure has a **60-second purchase cooldown shared across all Shops owned by the purchasing player**, starting only on successful launch. This cooldown survives building destruction, new Shops, checkpoints and replays. Repeated escape purchases do not stack. Delivery tracks a moving target directly; disappearing or
@@ -87,19 +83,18 @@ disappears when empty. It is ground magic, not a carried item or projectile.
 
 ### Carried attack and defense goods
 
-Shops also deliver Haste (**100 oil**, Z), Double Damage (**150 oil**, X), and Armor Treasure (**100 oil**, D) to visible friendly units within 30 tiles, using the same delivery speed and timeout as Escape Treasure. Haste and Double Damage share the attack category; Armor Treasure uses defense. A delivery reserves its category immediately, so simultaneous or in-flight purchases cannot stack. Invalid purchases spend nothing.
+Shops also deliver Haste (**100 oil**, Z), Double Damage (**150 oil**, X), and Armor Treasure (**100 oil**, D) to visible friendly units within 30 tiles, using the same delivery speed and timeout as Escape Treasure. Attack and defense describe item roles only. A delivery reserves its distinct item type immediately, preventing duplicate purchases. Invalid purchases spend nothing.
 
-Attack items are permanent passives applied immediately on delivery, with no activation, consumption, or expiry. Haste doubles primary weapon attack speed by halving its reload (minimum one tick); Double Damage doubles primary weapon damage before normal mitigation. Double Damage also affects primary tank splash and manual mortar/artillery shells; launched shells retain the bonus through impact. Haste also reduces manual mortar and artillery reload. Neither affects spells, rockets, disposable panzerfaust shots, or secondary weapons. Armor Treasure is a permanent passive item: delivery immediately applies an additional **50% damage reduction**, rounded upward per hit, including units without native armor. It is never activated or consumed. Defense items cannot stack or replace one another; their category stays occupied for the carrier’s lifetime. Attack items cannot be replaced for the carrier’s lifetime. Movement Escape may coexist with both categories.
+Attack items are permanent passives applied immediately on delivery, with no activation, consumption, or expiry. Haste doubles primary weapon attack speed by halving its reload (minimum one tick); Double Damage doubles primary weapon damage before normal mitigation. Double Damage also affects primary tank splash and manual mortar/artillery shells; launched shells retain the bonus through impact. Haste also reduces manual mortar and artillery reload. Neither affects spells, rockets, disposable panzerfaust shots, or secondary weapons. Armor Treasure is a permanent passive item: delivery immediately applies an additional **50% damage reduction**, rounded upward per hit, including units without native armor. It is never activated or consumed. All four permanent passive effects can coexist; identical copies do not stack. Escape may coexist with all of them.
 
-Carried passive items use existing entity ability-use state; the owner and privileged diagnostic perspectives see equipped items through private ability entries. Enemy snapshots do not expose inventory identities. Already-visible Cultivator fighters expose only the public occupied-category count (`itemRadianceTier`, 0–3) for their golden glow; hidden fighters expose nothing. Checkpoint/replay restore preserves carried items and purchase cooldowns.
+Carried passive items use existing entity ability-use state; the owner and privileged diagnostic perspectives see equipped items through private ability entries. Enemy snapshots do not expose inventory identities. Already-visible Cultivator fighters expose only the public visual strength (distinct item count saturated at three, `itemRadianceTier`, 0–3) for their golden glow; hidden fighters expose nothing. Checkpoint/replay restore preserves carried items and purchase cooldowns.
 
 ### Vitality Treasure
 
-Vitality Treasure is a **100 oil** defense item, purchased from a completed Shop with **F** and carried in the defense slot alongside the alternative Armor Treasure. It uses the same visible friendly-unit targeting, 30-tile purchase range, delivery, category reservation, and non-stacking rules. Delivery immediately grants **+150 maximum HP and +150 current HP permanently**, preserving any pre-existing missing HP. It remains carried and passive, with no activation, consumption, or expiry. For example, 30/58 HP becomes 180/208 HP. Dao evolution and Master advancement retain the flat 150 bonus without multiplying it. Carried passive state, including the health pair, survives checkpoints. The defense category remains occupied for the carrier’s lifetime. Destroying the supplying Shop after delivery does not remove Armor or Vitality.
+Vitality Treasure is a **100 oil** defense item, purchased from a completed Shop with **F** and can coexist with Armor Treasure. It uses the same visible friendly-unit targeting, 30-tile purchase range, delivery, same-item reservation, and non-stacking rules. Delivery immediately grants **+150 maximum HP and +150 current HP permanently**, preserving any pre-existing missing HP. It remains carried and passive, with no activation, consumption, or expiry. For example, 30/58 HP becomes 180/208 HP. Dao evolution and Master advancement retain the flat 150 bonus without multiplying it. Carried passive state, including the health pair, survives checkpoints. Destroying the supplying Shop after delivery does not remove Armor or Vitality.
 
 Shop command rows mirror the carried categories: top row movement (Escape Q); middle row defense
 (Healing Potion A, Healing Seal S, Armor D, Vitality F); bottom row attack (Haste Z, Double Damage X).
-All four permanent items appear as passive disabled carried tiles, without cast or toggle actions,
-hotkeys, or duration clocks. Rejected purchases into an equipped or in-flight reserved category
-send the purchasing player a standard info Notice: “Movement slot already full”,
-“Defense slot already full”, or “Attack slot already full”, without spending resources.
+Carried goods appear below the health bar as ESC, ARM, VIT, HST, and DD rather than command-card tiles.
+Rejected duplicate purchases send the purchasing player an info Notice:
+“Item already equipped or being delivered”, without spending resources.

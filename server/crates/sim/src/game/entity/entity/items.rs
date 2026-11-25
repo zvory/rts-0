@@ -7,9 +7,17 @@ impl Entity {
         if !self.kind.is_disciple() {
             return 0;
         }
-        u8::from(self.escape_treasure.is_some())
-            + u8::from(self.shop_item_category_occupied(ArmorTreasure))
-            + u8::from(self.shop_item_category_occupied(Haste))
+        (u8::from(self.escape_treasure.is_some())
+            + [
+                ArmorTreasure,
+                Haste,
+                crate::game::ability::AbilityKind::VitalityTreasure,
+                crate::game::ability::AbilityKind::DoubleDamage,
+            ]
+            .iter()
+            .filter(|&&kind| self.shop_item_active(kind))
+            .count() as u8)
+            .min(3)
     }
 
     pub(in crate::game) fn shop_item_reload(&self, ticks: u32) -> u32 {
@@ -31,24 +39,11 @@ impl Entity {
             > 0
     }
 
-    pub(in crate::game) fn shop_item_category_occupied(
-        &self,
-        ability: crate::game::ability::AbilityKind,
-    ) -> bool {
-        use crate::game::ability::AbilityKind::*;
-        let kinds: &[crate::game::ability::AbilityKind] =
-            if matches!(ability, ArmorTreasure | VitalityTreasure) {
-                &[ArmorTreasure, VitalityTreasure]
-            } else {
-                &[Haste, DoubleDamage]
-            };
-        kinds.iter().any(|kind| self.shop_item_active(*kind))
-    }
     pub(in crate::game) fn receive_shop_item(
         &mut self,
         ability: crate::game::ability::AbilityKind,
     ) {
-        if self.shop_item_category_occupied(ability) {
+        if self.shop_item_active(ability) {
             return;
         }
         if ability == crate::game::ability::AbilityKind::VitalityTreasure {

@@ -823,6 +823,13 @@ const daoMasterSnapshot = decodeServerMessage({ t: "snapshot", v: COMPACT_SNAPSH
 assert(daoMasterSnapshot.entities[0].daoMaster === true, "public Master rank decodes at slot 52");
 assert(daoMasterSnapshot.entities[0].insight === undefined, "rank does not reveal exact insight");
 
+// A fully equipped Novice can project four innate entries plus five carried entries.
+const equippedNovice = [...daoMasterRecord];
+equippedNovice[23] = Array.from({ length: 9 }, (_, index) => [index + 1, 0]);
+const equippedSnapshot = decodeServerMessage({ t: "snapshot", v: COMPACT_SNAPSHOT_VERSION,
+  s: [1, 0, 0, 2, 300], e: [equippedNovice], ev: [], n: [0, 0, 0, 0, 0] });
+assert(equippedSnapshot.entities[0].abilities.length === 9, "fully equipped units exceed the old eight-entry bound");
+
 const escapeRecord = [...daoMasterRecord, true];
 const escapeSnapshot = decodeServerMessage({ t: "snapshot", v: COMPACT_SNAPSHOT_VERSION,
   s: [1, 0, 0, 2, 300], e: [escapeRecord], ev: [], n: [0, 0, 0, 0, 0] });
