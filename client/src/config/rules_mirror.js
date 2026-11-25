@@ -253,7 +253,7 @@ export const STATS = Object.freeze({
     cost: { steel: 100, oil: 25 }, buildTicks: 560, trains: [],
     researches: [UPGRADE.DAO_WIND, UPGRADE.DAO_OF_MAGIC, UPGRADE.DAO_OF_HEAVINESS],
     requires: [KIND.RESOURCE_DEPOT, KIND.PORTAL],
-    description: "Research Wind, War, and Magic to unlock matching Adepts at Portals and paid training at the Proving Grounds." },
+    description: "Research Wind, War, and Magic to unlock matching Adepts at Portals." },
   [KIND.ZAMOK]: { label: "Zamok", icon: "ZK", footW: 3, footH: 3, sight: 1,
     cost: { steel: 0, oil: 0 }, buildTicks: 0, trains: [KIND.GOLEM] },
   [KIND.DEPOT]: { label: "Supply Depot", icon: "SD", footW: 2, footH: 2, sight: 1,
@@ -619,19 +619,19 @@ export const UPGRADES = Object.freeze({
   [UPGRADE.DAO_OF_HEAVINESS]: Object.freeze({
     upgrade: UPGRADE.DAO_OF_HEAVINESS, label: "Dao of War", icon: "HVY",
     cost: Object.freeze({ steel: 100, oil: 200 }), researchTicks: DAO_RESEARCH_TICKS,
-    description: "Study the Dao of War. Unlocks the matching Adept at Portals for 150 steel and 35 oil, plus paid training at the Proving Grounds.",
+    description: "Study the Dao of War. Unlocks the matching Adept at Portals for 150 steel and 35 oil.",
     researchedAt: KIND.THREE_DAO_PAVILION,
   }),
   [UPGRADE.DAO_OF_MAGIC]: Object.freeze({
     upgrade: UPGRADE.DAO_OF_MAGIC, label: "Dao of Magic", icon: "MAG",
     cost: Object.freeze({ steel: 100, oil: 200 }), researchTicks: DAO_RESEARCH_TICKS,
-    description: "Study the Dao of Magic. Unlocks the matching Adept at Portals for 150 steel and 35 oil, plus paid training at the Proving Grounds.",
+    description: "Study the Dao of Magic. Unlocks the matching Adept at Portals for 150 steel and 35 oil.",
     researchedAt: KIND.THREE_DAO_PAVILION,
   }),
   [UPGRADE.DAO_WIND]: Object.freeze({
     upgrade: UPGRADE.DAO_WIND, label: "Dao of Wind", icon: "WND",
     cost: Object.freeze({ steel: 100, oil: 200 }), researchTicks: DAO_RESEARCH_TICKS,
-    description: "Study the Dao of Wind. Unlocks the matching Adept at Portals for 150 steel and 35 oil, plus paid training at the Proving Grounds.",
+    description: "Study the Dao of Wind. Unlocks the matching Adept at Portals for 150 steel and 35 oil.",
     researchedAt: KIND.THREE_DAO_PAVILION,
   }),
   [UPGRADE.METHAMPHETAMINES]: Object.freeze({

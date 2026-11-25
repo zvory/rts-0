@@ -11,7 +11,8 @@ try {
     appendChild(view) { view.parentNode = this; },
     removeChild(view) { view.parentNode = null; },
   };
-  const renderer = await Renderer.create(parent, { renderClock: { now: () => 1600 } });
+  let renderNow = 1600;
+  const renderer = await Renderer.create(parent, { renderClock: { now: () => renderNow } });
   renderer._map = { tileSize: 32 };
   const portal = {
     id: 506,
@@ -26,21 +27,44 @@ try {
   const ownerColors = new Map([[1, 0x4878c8]]);
   const state = { playerId: 1, players: [{ id: 1, color: "#4878c8" }] };
 
+  renderer._buildingPngRigAtlasTextures.delete(KIND.PORTAL);
   renderer._drawBuilding(portal, ownerColors, state);
-  const portalCalls = renderer._pools.buildingEffects.get(portal.id)?.calls || [];
-  assert(
-    portalCalls.filter((call) => call[0] === "drawCircle").length >= 40,
-    "completed Portal renders a dense animated vortex particle field",
-  );
-  assert(
-    portalCalls.some((call) => call[0] === "lineTo"),
-    "completed Portal renders rotating vortex arcs and energy spokes",
-  );
+  assert(!renderer._jadeSilkPortal && !renderer._pools.buildingShadows.has(portal.id),
+    "unavailable gate atlas keeps the circular fallback without a mismatched aperture");
+  renderer._buildingPngRigAtlasTextures.set(KIND.PORTAL, PIXI.Texture.from("portal-test-atlas"));
+  renderer._drawBuilding(portal, ownerColors, state);
+  assert(renderer._liveRigPools.buildingRigs.get(portal.id)?.matchesPngAtlasRig,
+    "loaded gate atlas replaces the circular fallback before rendering its aperture");
+  const aperture = renderer._pools.buildingShadows.get(portal.id);
+  const texture = renderer._jadeSilkPortal.texture;
+  assert(aperture?.silk.length === 3, "completed Portal renders three silk layers");
+  const [background, mask, flow] = aperture.children;
+  assert(flow.mask === mask, "animated layers are clipped behind the gate frame");
+  assert(background.calls.some(call => call[0] === "beginFill"),
+    "opaque background seals the full opening behind the animated layers");
+  const rotations = aperture.silk.map(sprite => sprite.rotation);
+  const staticCalls = JSON.stringify([background.calls, mask.calls]);
+  renderNow = 2600;
+  // Exercise the effect at a second visual time without replacing pooled GPU resources.
+  renderer._drawBuilding(portal, ownerColors, state);
+  assert(aperture.silk.some((sprite, i) => sprite.rotation !== rotations[i]),
+    "silk animation advances with renderer visual time");
+  assert(aperture.silk.every(sprite => sprite.texture === texture),
+    "all layers share the single reusable texture");
+  assert(JSON.stringify([background.calls, mask.calls]) === staticCalls,
+    "animation does not rebuild aperture geometry");
+  assert(texture.sourceUpdateCount === 0, "animation never uploads new texture pixels");
+  renderer._seen.buildingShadows.clear();
+  renderer._sweep();
+  assert(!aperture.visible, "portal effect disappears when no longer rendered/visible");
+  renderer._drawBuilding(portal, ownerColors, state);
+  assert(aperture.visible && renderer._pools.buildingShadows.get(portal.id) === aperture,
+    "returning visibility reuses the aperture");
 
   const producingPortal = { ...portal, id: 508, prodProgress: 0.5 };
   renderer._drawBuilding(producingPortal, ownerColors, state);
   assert(
-    renderer._pools.buildingEffects.get(producingPortal.id)?.calls.length > 0 &&
+    renderer._pools.buildingShadows.get(producingPortal.id)?.silk.length === 3 &&
       renderer._pools.buildingOverlays.get(producingPortal.id)?.calls.length > 0,
     "Portal effects coexist with production and status overlays",
   );
@@ -48,15 +72,17 @@ try {
   const portalScaffold = { ...portal, id: 507, buildProgress: 0.5 };
   renderer._drawBuilding(portalScaffold, ownerColors, state);
   assert(
-    !renderer._pools.buildingEffects.has(portalScaffold.id),
+    !renderer._pools.buildingShadows.has(portalScaffold.id),
     "Portal vortex remains dormant during construction",
   );
   assert(
-    renderer.world.children.indexOf(renderer.layers.buildingEffects) <
-      renderer.world.children.indexOf(renderer.layers.buildingOverlays),
-    "Portal effects render below production and status overlays",
+    renderer.world.children.indexOf(renderer.layers.buildingShadows) <
+      renderer.world.children.indexOf(renderer.layers.buildings),
+    "Portal aperture renders behind gate artwork and overlays",
   );
 
+  renderer.destroy();
+  assert(texture.destroyed, "renderer teardown releases shared portal texture");
   renderer.destroy();
 } finally {
   restorePixi();

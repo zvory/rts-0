@@ -826,7 +826,6 @@ pub const CULTIVATORS_CATALOG: FactionCatalog = FactionCatalog {
         EntityKind::Portal,
         EntityKind::ThreeDaoPavilion,
         EntityKind::TournamentGrounds,
-        EntityKind::ProvenGrounds,
         EntityKind::Shop,
         EntityKind::HealingSeal,
         EntityKind::SteelMine,
@@ -838,7 +837,6 @@ pub const CULTIVATORS_CATALOG: FactionCatalog = FactionCatalog {
         EntityKind::Portal,
         EntityKind::ThreeDaoPavilion,
         EntityKind::TournamentGrounds,
-        EntityKind::ProvenGrounds,
         EntityKind::Shop,
     ],
     upgrades: &CULTIVATORS_UPGRADES,
@@ -849,7 +847,6 @@ pub const CULTIVATORS_CATALOG: FactionCatalog = FactionCatalog {
         EntityKind::ResourceDepot,
         EntityKind::Portal,
         EntityKind::TournamentGrounds,
-        EntityKind::ProvenGrounds,
     ],
 };
 
@@ -1374,6 +1371,11 @@ mod tests {
     fn cultivators_catalog_trains_warriors_from_portals() {
         let catalog = catalog_for(CULTIVATORS_FACTION_ID).unwrap();
         assert_eq!(catalog.loadout.id, "cultivators.standard");
+        assert!(!catalog.can_build(EntityKind::Worker, EntityKind::ProvenGrounds));
+        assert!(!catalog.buildings.contains(&EntityKind::ProvenGrounds));
+        assert!(!catalog
+            .production_anchors
+            .contains(&EntityKind::ProvenGrounds));
         assert_eq!(catalog.loadout.initial_steel, balance::STARTING_STEEL);
         assert_eq!(catalog.loadout.initial_oil, balance::STARTING_OIL);
         assert_eq!(
@@ -1394,7 +1396,6 @@ mod tests {
                 EntityKind::Portal,
                 EntityKind::ThreeDaoPavilion,
                 EntityKind::TournamentGrounds,
-                EntityKind::ProvenGrounds,
                 EntityKind::Shop
             ]
         );

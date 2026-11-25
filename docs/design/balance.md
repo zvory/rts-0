@@ -227,7 +227,7 @@ reserved/future ids must not inherit Kriegsia economy behavior or appear in prod
 because their catalog rows are dumpable.
 The playable `cultivators` catalog reuses Resource Depot (displayed as Nexus), Worker (displayed as Serf),
 Steel Mine and Oil Pumpjack, with Nexus, Pump Jack, Portal, Three Dao Pavilion, Tournament Grounds,
-Proving Grounds, and Shop available for Serf construction. Serfs construct Pump Jacks on Oil patches
+and Shop available for Serf construction. Serfs construct Pump Jacks on Oil patches
 for 150 Steel in 300 ticks (10 seconds), using the existing extractor placement and mining rules. Its
 `cultivators.standard` loadout matches Kriegsia's starting economy and replaces the starting Riflemen with one completed Disciple.
 Cultivator Serfs can also construct the faction-specific Portal for 150 Steel: it has a 3x3
@@ -833,7 +833,7 @@ baseline; runtime pricing applies ½×, 1×, or 2× to costs and duration. Compl
 researches and paid active Dao researches across all owned pavilions reserve tiers.
 Unpaid entries select their tier when payment starts; a paid entry keeps its duration
 and refund value even if another research is cancelled or its pavilion destroyed.
-Each unlocks its corresponding 150-steel / 35-oil Adept production at Portals and paid Disciple training at the Proving Grounds. Existing research queue, cancellation,
+Each unlocks its corresponding 150-steel / 35-oil Adept production at Portals. Existing research queue, cancellation,
 refund, completion, and destruction rules apply; completed research persists.
 See [Cultivators](cultivators.md#three-dao-pavilion-prototype) for the approved brief.
 
@@ -884,7 +884,13 @@ Dao cannot be trained. Combat-earned evolution and Tournament Grounds are unchan
 
 ### Proving Grounds
 
-Cultivator Engineers construct `proven_grounds` after a completed Portal: 100 steel, zero oil,
+Retired from the playable Cultivator catalog: Serfs cannot construct it, it is not a
+production anchor, and the build menu no longer offers it. Its gate artwork is reused by the
+Portal's Jade Silk Gate effect. Direct researched Adept production remains at Portals.
+The internal kind and training machinery below remain for authored fixtures; they are not an
+available progression path in normal matches.
+
+The retained `proven_grounds` fixture has the former construction baseline: 100 steel, zero oil,
 200-tick construction, 3×3 tiles, 120 HP, armored, one-tile sight, no weapon or supply.
 Select the building to queue a mix of researched Dao training plans (maximum 64). Right-click
 base Disciples inside or rally a Portal there. Each admission consumes one base Disciple and
