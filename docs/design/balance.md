@@ -902,7 +902,7 @@ See [Proving Grounds brief and rules](proven-grounds.md) for details and deferre
 
 ## Cultivator Shop
 
-Cultivator Serfs can construct the Shop for **200 steel and 200 oil** in **600 ticks
+Cultivator Serfs can construct the Shop for **100 steel and 100 oil** in **600 ticks
 (20 seconds)**. It has **200 HP**, armored status, a **3×4** footprint and one-tile sight.
 No prerequisites, attack, production, research, supply or rally point. Targeted goods are listed below. Normal building
 placement, cancellation, damage, fog and destruction apply. See [Shop](shop.md) for the brief.

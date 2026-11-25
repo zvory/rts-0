@@ -479,8 +479,8 @@ pub const BUILDINGS: &[BuildingDef] = &[
         stats: balance::BuildingStats {
             hp: 200,
             sight_tiles: 1,
-            cost_steel: 200,
-            cost_oil: 200,
+            cost_steel: 100,
+            cost_oil: 100,
             foot_w: 3,
             foot_h: 4,
             build_ticks: balance::TICK_HZ * 20,
