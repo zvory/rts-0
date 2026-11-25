@@ -9,7 +9,7 @@ export const AI_PROFILES = Object.freeze([
   { id: "pressure_ai", label: "Pressure AI" },
 ]);
 
-export const DEFAULT_AI_PROFILE_ID = "ai_2_3";
+export const DEFAULT_AI_PROFILE_ID = "jeffs_ai_v1_1";
 
 export function teamSlotsForLobby(players = [], maxPlayers = MAX_LOBBY_TEAMS) {
   const slotLimit = lobbyTeamSlotLimit(maxPlayers);

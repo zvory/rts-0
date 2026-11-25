@@ -429,7 +429,7 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   assert(msg.setName("Renamed").name === "Renamed", "lobby name builder payload");
   assert(msg.setTeam(7, 2).teamId === 2, "team assignment builder payload");
   assert(msg.setFaction("ekat").factionId === "ekat", "faction selection builder payload");
-  assert(DEFAULT_AI_PROFILE_ID === "ai_2_3", "lobby defaults to AI 2.3");
+  assert(DEFAULT_AI_PROFILE_ID === "jeffs_ai_v1_1", "lobby defaults to Jeff's AI");
   assert(
     AI_PROFILES.length === 4 &&
       AI_PROFILES[0].id === "ai_2_3" &&

@@ -8,7 +8,7 @@ fn composition_selects_once_and_keeps_the_requested_identity() {
         let seed = (0..128)
             .find(|seed| composition.select(*seed, 1) == Some(member))
             .unwrap();
-        let mut controller = AiController::new(1);
+        let mut controller = AiController::with_profile_id(1, AI_2_3_ID);
         assert_eq!(controller.profile_id(), AI_2_3_ID);
         assert_eq!(controller.selected_profile_id(), None);
         controller.select_for_match(seed);
@@ -24,7 +24,7 @@ fn composition_selects_once_and_keeps_the_requested_identity() {
     assert!(!is_player_live_profile_id(AI_2_1_ID));
     assert!(is_player_live_profile_id(JEFFS_AI_V1_1_ID));
     assert!(!is_player_live_profile_id(JEFFS_AI_ID));
-    assert_eq!(live_profile_label("default"), "AI 2.3");
+    assert_eq!(live_profile_label("default"), "Jeff's AI");
 }
 
 #[test]

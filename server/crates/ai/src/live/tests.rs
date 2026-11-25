@@ -545,8 +545,8 @@ fn live_adapter_knows_public_and_internal_profiles() {
 }
 
 #[test]
-fn live_default_is_ai_2_3() {
-    assert_eq!(DEFAULT_LIVE_PROFILE_ID, AI_2_3_ID);
+fn live_default_is_jeffs_ai_v1_1() {
+    assert_eq!(DEFAULT_LIVE_PROFILE_ID, JEFFS_AI_V1_1_ID);
 }
 
 #[test]
@@ -643,7 +643,7 @@ fn live_profile_labels_match_lobby_selector_names() {
     assert_eq!(live_profile_label(JEFFS_AI_ID), "Jeff's AI V1.0");
     assert_eq!(live_profile_label(JEFFS_AI_V1_1_ID), "Jeff's AI");
     assert_eq!(live_profile_label(AI_TURTLE_ID), "AI Turtle");
-    assert_eq!(live_profile_label("default"), "AI 2.3");
+    assert_eq!(live_profile_label("default"), "Jeff's AI");
     assert_eq!(live_profile_label("unsupported_profile"), "AI");
     assert_eq!(live_profile_label("unknown"), "AI");
 }

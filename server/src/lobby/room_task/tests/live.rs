@@ -237,14 +237,14 @@ fn player_lobby_replaces_internal_ai_profile_with_supported_opponent() {
         task.on_add_ai(host_id, Some(2), Some(internal_profile.to_string()));
         assert_eq!(
             task.ai_players.first().map(|ai| ai.profile_id),
-            Some("ai_2_3")
+            Some("jeffs_ai_v1_1")
         );
-        assert_eq!(ai_slot_names(&task), vec!["AI 2.3"]);
+        assert_eq!(ai_slot_names(&task), vec!["Jeff's AI"]);
 
         task.start_match();
 
         assert_eq!(task.ai_controllers.len(), 1);
-        assert_eq!(task.ai_controllers[0].profile_id(), "ai_2_3");
+        assert_eq!(task.ai_controllers[0].profile_id(), "jeffs_ai_v1_1");
     }
 }
 
@@ -290,20 +290,20 @@ fn player_lobby_cannot_select_jeffs_ai_v1_0() {
     task.on_add_ai(host_id, Some(2), Some("jeffs_ai".to_string()));
     assert_eq!(
         task.ai_players.first().map(|ai| ai.profile_id),
-        Some("ai_2_3")
+        Some("jeffs_ai_v1_1")
     );
 
     let ai_id = task.ai_players[0].id;
     task.on_set_ai_profile(host_id, ai_id, "jeffs_ai".to_string());
     assert_eq!(
         task.ai_players.first().map(|ai| ai.profile_id),
-        Some("ai_2_3")
+        Some("jeffs_ai_v1_1")
     );
 
     task.start_match();
 
     assert_eq!(task.ai_controllers.len(), 1);
-    assert_eq!(task.ai_controllers[0].profile_id(), "ai_2_3");
+    assert_eq!(task.ai_controllers[0].profile_id(), "jeffs_ai_v1_1");
 }
 
 #[test]
@@ -324,8 +324,8 @@ fn match_start_cannot_launch_internal_ai_profile_against_human() {
     task.ai_players[0].profile_id = "ai_turtle";
     task.start_match();
 
-    assert_eq!(task.ai_players[0].profile_id, "ai_2_3");
-    assert_eq!(task.ai_controllers[0].profile_id(), "ai_2_3");
+    assert_eq!(task.ai_players[0].profile_id, "jeffs_ai_v1_1");
+    assert_eq!(task.ai_controllers[0].profile_id(), "jeffs_ai_v1_1");
 }
 
 #[test]

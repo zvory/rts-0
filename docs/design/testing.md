@@ -102,7 +102,7 @@ cargo run --bin ai-matchup -- --list-profiles
 ```
 
 The `ai-arena` binary is the agent-facing profile comparison layer. It runs side-swapped seed pairs
-around the same profile matchup result, defaults to AI 2.3 against AI Turtle, and writes a
+around the same profile matchup result, defaults to Jeff's AI against AI Turtle, and writes a
 top-level `arena-summary.json` plus per-run sidecars:
 
 ```bash
