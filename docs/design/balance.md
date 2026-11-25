@@ -626,7 +626,8 @@ profiles and explicit activation/autocast policy instead of being folded into de
   with a 3-tile radius. Every tick, affected enemies receive an inward displacement vector
   in addition to normal movement, whether moving or stationary. Its magnitude is twice the
   unit's movement speed, multiplied by linear radial falloff (zero at the edge, full strength
-  toward the center) and divided by the square root of footing resistance. The strongest
+  toward the center) and divided by the square root of footing resistance, with a minimum
+  resistance of 1.0 so working workers are still pulled. The strongest
   overlapping field applies; displacement cannot overshoot its center or cross blocking bodies
   or impassable terrain. This replaces directional speed multipliers and the separate idle rule. Her Consume ability is
   self-targeted, has no resource cost or cooldown, consumes the nearest owned living Golem within 2

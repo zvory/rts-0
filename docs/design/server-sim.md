@@ -1398,7 +1398,8 @@ active, it creates a 3-tile pull field affecting only enemy ground units (owned,
 and Scout Plane units are unaffected). After normal movement, one inward displacement vector
 applies to every eligible unit regardless of its path or movement direction. Its magnitude is
 `movement_speed × EKAT_MAGIC_ANCHOR_PULL_SPEED_MULTIPLIER` (2.0), scaled by linear radial
-falloff and divided by the square root of collision footing resistance. The strongest overlapping
+falloff and divided by the square root of collision footing resistance (at least 1.0, so
+pass-through worker orders receive normal infantry pull). The strongest overlapping
 field applies. Pull is clamped to the center and checked against terrain and unit blockers;
 orders and paths are preserved, and the reported movement delta includes both displacements.
 There are no Anchor directional speed multipliers or separate stationary movement rules. If an active anchor exists when `ekatLineShot`

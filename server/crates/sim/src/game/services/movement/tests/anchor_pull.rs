@@ -86,3 +86,33 @@ fn anchor_vector_respects_enemy_body_blockers_and_preserves_path() {
         "pull must preserve movement intent"
     );
 }
+
+#[test]
+fn anchor_pull_affects_workers_with_pass_through_work_orders() {
+    let map = flat_map(2);
+    let players = [player_with_oil(1, 0), player_with_oil(2, 0)];
+    let start = map.tile_center(10, 10);
+    let runtime = anchor((start.0 + 32.0, start.1), 100);
+    let mut idle_position = None;
+    for order in [
+        Order::Idle,
+        Order::gather(u32::MAX),
+        Order::build(EntityKind::Barracks, 15, 15),
+        Order::deconstruct(u32::MAX),
+    ] {
+        let mut entities = EntityStore::new();
+        let worker = entities
+            .spawn_unit(2, EntityKind::Worker, start.0, start.1)
+            .unwrap();
+        entities.get_mut(worker).unwrap().set_order(order.clone());
+        let occ = Occupancy::build(&map, &entities);
+        apply_magic_anchor_pull(&map, &mut entities, &players, &occ, 1, &runtime);
+        let pulled = pos(&entities, worker);
+        assert!(
+            pulled.0 > start.0,
+            "work order must not grant immunity: {order:?}"
+        );
+        assert_eq!(pulled, *idle_position.get_or_insert(pulled));
+        assert_eq!(entities.get(worker).unwrap().order(), order);
+    }
+}

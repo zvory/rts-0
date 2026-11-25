@@ -222,10 +222,9 @@ fn apply_magic_anchor_pull(
                 return None;
             }
             let profile = standability::footing_profile(e);
-            let resistance = standability::footing_resistance(profile);
-            if resistance <= 0.0 {
-                return None;
-            }
+            // Work orders allow workers to pass through friendly traffic, but must not
+            // make them immune to hostile displacement (or divide by zero).
+            let resistance = standability::footing_resistance(profile).max(1.0);
             let speed = e.movement_speed();
             Some((
                 e.kind,
