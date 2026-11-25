@@ -150,7 +150,7 @@ fn throw_sword_round_trip_leaves_entrenched_rifleman_alive() {
 }
 
 #[test]
-fn throw_sword_neither_leg_grants_insight_but_line_shot_still_does() {
+fn sword_and_line_shot_grant_insight_from_actual_damage_on_both_legs() {
     for master in [false, true] {
         let kind = EntityKind::WarAdept;
         for ability in [AbilityKind::ThrowSword, AbilityKind::EkatLineShot] {
@@ -169,12 +169,12 @@ fn throw_sword_neither_leg_grants_insight_but_line_shot_still_does() {
             runtime.spawn_projectile(spec).unwrap();
             for tick in 1..=3 {
                 tick_runtime(&mut runtime, &mut entities, tick);
-                let insight = entities.get(caster).unwrap().insight;
-                if ability == AbilityKind::ThrowSword || master {
-                    assert_eq!(insight, initial_insight, "{kind:?} {ability:?} tick {tick}");
-                } else {
-                    assert!(insight > initial_insight);
-                }
+                let damage = initial_hp - entities.get(victim).unwrap().hp;
+                assert_eq!(
+                    entities.get(caster).unwrap().insight,
+                    initial_insight + if master { 0 } else { damage },
+                    "{kind:?} {ability:?} tick {tick}"
+                );
             }
             assert!(entities.get(victim).unwrap().hp < initial_hp);
         }

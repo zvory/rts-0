@@ -37,7 +37,7 @@ pub(super) fn place(
             center.0,
             center.1,
             ctx.tick,
-            false,
+            true,
             true,
         ) {
             ctx.ability_runtime.configure_vector_field(

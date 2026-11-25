@@ -11,6 +11,7 @@ import {
   VECTOR_FIELD_SPEED_PX_PER_TICK,
   VECTOR_FIELD_RANGE_TILES,
   VECTOR_FIELD_DURATION_TICKS,
+  VECTOR_FIELD_MASTER_COOLDOWN_TICKS,
 
   DISCIPLE_EVOLVED_INSIGHT_CAP,
   DISCIPLE_SHIELD_CAPACITY,
@@ -209,6 +210,7 @@ const EXPECTED_CLIENT_CONFIG_CONSTANT_KEYS = Object.freeze([
   "vectorFieldSpeedPxPerTick",
   "vectorFieldRangeTiles",
   "vectorFieldDurationTicks",
+  "vectorFieldMasterCooldownTicks",
   "ekatMagicAnchorDurationTicks",
   "ekatMagicAnchorPullSpeedMultiplier",
   "ekatMagicAnchorRadiusTiles",
@@ -632,6 +634,7 @@ const clientConstants = {
   vectorFieldSpeedPxPerTick: VECTOR_FIELD_SPEED_PX_PER_TICK,
   vectorFieldRangeTiles: VECTOR_FIELD_RANGE_TILES,
   vectorFieldDurationTicks: VECTOR_FIELD_DURATION_TICKS,
+  vectorFieldMasterCooldownTicks: VECTOR_FIELD_MASTER_COOLDOWN_TICKS,
   ekatMagicAnchorRangeTiles: EKAT_MAGIC_ANCHOR_RANGE_TILES,
   discipleShieldCapacity: DISCIPLE_SHIELD_CAPACITY,
   discipleShieldRadiusTiles: DISCIPLE_SHIELD_RADIUS_TILES,

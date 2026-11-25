@@ -12,7 +12,9 @@ without needing visibility of its caster. It lasts ten seconds and casts up to 7
 Every allied or hostile ground unit inside receives an additive 3-world-pixel-per-tick displacement
 (90 px/s at 30 Hz), independent of footing. Static terrain and enemy-body admission remain.
 Normal commanded movement continues. Displacement does not rotate bodies. Overlapping fields
-select the first active field rather than stacking. Placement is immediate and not queued.
+select the first active field rather than stacking. Placement is immediate and preserves the caster's active order and queued orders. A successful
+cast starts a 30-second cooldown for Magic Adepts or a 20-second cooldown for Magic Masters.
+Promotion preserves a cooldown already in progress.
 
 Preview and placed field share a green arrow, square outline, and green particles. Particles move
 at 90 world pixels per second in field direction, using the renderer clock so fixed captures and

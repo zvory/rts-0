@@ -37,7 +37,7 @@ Ranged support caster; broad bell sleeves and three trailing mantle panels.
 Description, automatic availability, free advancement, supply and unchanged properties
 as above, retaining five-tile orb primary, Shield and Vector Field. Relative to Magic Adept:
 render and collision radius ×1.2, movement ×1.1 (2.31 px/tick), ordinary attack damage
-×1.2 (23→28), maximum HP ×1.4 (150→210). Primary armor penetration rises from 25% to 50%. Existing counters remain. Shield capacity doubles from 150 to 300 HP and its lifetime doubles from five to ten seconds. Vector Field grows from 4 by 4 to 5 by 5 tiles; its 3-world-pixel-per-tick displacement, cast range and cooldown stay unchanged. Field size is fixed at cast time, so promotion does not resize an existing Adept field. Shield strength is fixed at cast time, so promotion preserves an existing Adept shield.
+×1.2 (23→28), maximum HP ×1.4 (150→210). Primary armor penetration rises from 25% to 50%. Existing counters remain. Shield capacity doubles from 150 to 300 HP and its lifetime doubles from five to ten seconds. Vector Field grows from 4 by 4 to 5 by 5 tiles and its cooldown drops from 30 to 20 seconds. Promotion preserves any cooldown already in progress. Field size is fixed at cast time, so promotion does not resize an existing Adept field. Shield strength is fixed at cast time, so promotion preserves an existing Adept shield.
 
 ## Shared advancement and persistence
 
