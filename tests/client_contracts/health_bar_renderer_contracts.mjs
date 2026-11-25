@@ -72,6 +72,20 @@ try {
   assert(badges.every((badge) => badge.visible && badge.y === 7), "all item badges sit directly below HP");
   assert(badges.every((badge, index) => !index || badge.x > badges[index - 1].x), "same-category items never overlap each other");
 
+  for (const dao of [null, "wind", "war", "magic"]) {
+    _hpBar.call({}, equippedBar, { ...protectedUnit, kind: KIND.WARRIOR, dao, insight: 30,
+      abilities: [ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE,
+        ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE].map((ability) => ({ ability, remainingUses: 1 })) });
+    const insightBottom = Math.max(...equippedBar.rtsInsight.calls
+      .filter((call) => call[0] === "drawRect").map((call) => call[2] + call[4]));
+    assert(badges.every((badge) => badge.visible && badge.y > insightBottom + 1.5),
+      "carried labels and their stroke clear the Disciple insight meter");
+  }
+  _hpBar.call({}, equippedBar, { ...protectedUnit, kind: KIND.WARRIOR, insight: 200, daoMaster: true,
+    abilities: [ABILITY.ARMOR_TREASURE].map((ability) => ({ ability, remainingUses: 1 })) });
+  assert(equippedBar.rtsEscape.y === 7 && equippedBar.rtsItem0.y === 7,
+    "Master badges return directly below HP when the insight meter disappears");
+
   const highHpBar = makeBar();
   _hpBar.call({ _map: { tileSize: 32 } }, highHpBar, {
     kind: KIND.RIFLEMAN,

@@ -265,11 +265,13 @@ function hasCategoryItem(entity) {
 }
 
 function drawCategoryItemBadges(container, entity) {
+  // Disciples draw their insight meter at y=6..11 below the health bar.
+  const top = isDiscipleKind(entity.kind) && Number.isFinite(entity.insight) && !entity.daoMaster ? 14 : 7;
   const totalWidth = (entity.escapeTreasure ? 22 : 0) + CATEGORY_ITEM_BADGES
     .filter((item) => !isBuilding(entity.kind) && entity.abilities?.some((entry) => entry.ability === item.ability))
     .reduce((width, item) => width + item.label.length * 6 + 4, 0);
   let offset = -Math.max(0, totalWidth - 4) / 2;
-  if (container.rtsEscape) container.rtsEscape.position.set(offset, 7);
+  if (container.rtsEscape) container.rtsEscape.position.set(offset, top);
   if (entity.escapeTreasure) offset += 22;
   for (const [index, item] of CATEGORY_ITEM_BADGES.entries()) {
     const entry = !isBuilding(entity.kind) && entity.abilities?.find((value) => value.ability === item.ability);
@@ -290,7 +292,7 @@ function drawCategoryItemBadges(container, entity) {
     badge.text = item.label;
     badge.alpha = 1;
     badge.anchor.set(0, 0);
-    badge.position.set(offset, 7);
+    badge.position.set(offset, top);
     offset += item.label.length * 6 + 4;
   }
 }

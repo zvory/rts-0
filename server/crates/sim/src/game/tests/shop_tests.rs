@@ -1117,13 +1117,28 @@ fn item_radiance_is_public_for_visible_carriers_without_private_inventory() {
 #[test]
 fn all_distinct_carried_items_coexist_without_category_limits() {
     let (mut game, shop, unit) = item_fixture();
-    let items = [AbilityKind::Haste, AbilityKind::DoubleDamage,
-        AbilityKind::ArmorTreasure, AbilityKind::VitalityTreasure];
-    for ability in items { buy(&mut game, shop, unit, ability); game.tick(); }
+    let items = [
+        AbilityKind::Haste,
+        AbilityKind::DoubleDamage,
+        AbilityKind::ArmorTreasure,
+        AbilityKind::VitalityTreasure,
+    ];
+    for ability in items {
+        buy(&mut game, shop, unit, ability);
+        game.tick();
+    }
     buy(&mut game, shop, unit, AbilityKind::EscapeTreasure);
-    for _ in 0..40 { game.tick(); }
+    for _ in 0..40 {
+        game.tick();
+    }
     let target = game.state.entities.get(unit).unwrap();
-    for ability in items { assert!(target.shop_item_active(ability)); }
+    for ability in items {
+        assert!(target.shop_item_active(ability));
+    }
     assert_eq!(target.escape_treasure, Some(shop));
-    assert_eq!(target.item_radiance_tier(), 3, "visual strength saturates independently of inventory");
+    assert_eq!(
+        target.item_radiance_tier(),
+        3,
+        "visual strength saturates independently of inventory"
+    );
 }

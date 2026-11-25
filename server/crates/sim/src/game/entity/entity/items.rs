@@ -8,8 +8,16 @@ impl Entity {
             return 0;
         }
         (u8::from(self.escape_treasure.is_some())
-            + [ArmorTreasure, Haste, crate::game::ability::AbilityKind::VitalityTreasure, crate::game::ability::AbilityKind::DoubleDamage]
-                .iter().filter(|&&kind| self.shop_item_active(kind)).count() as u8).min(3)
+            + [
+                ArmorTreasure,
+                Haste,
+                crate::game::ability::AbilityKind::VitalityTreasure,
+                crate::game::ability::AbilityKind::DoubleDamage,
+            ]
+            .iter()
+            .filter(|&&kind| self.shop_item_active(kind))
+            .count() as u8)
+            .min(3)
     }
 
     pub(in crate::game) fn shop_item_reload(&self, ticks: u32) -> u32 {

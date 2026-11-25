@@ -2982,7 +2982,8 @@ inventory cap. Each distinct item can coexist with all others; duplicate copies 
 are rejected, including deliveries already in flight. Healing Potion and Healing Seal are consumed goods.
 Vitality adds 150 maximum and current HP and persists through Dao promotion.
 
-Private projected item badges appear in a variable-width row seven world pixels below the HP bar:
+Private projected item badges appear in a variable-width row seven world pixels below the HP bar
+(fourteen when a Disciple insight meter is present):
 ESC (purple), ARM (cyan), VIT (magenta), HST (yellow), DD (orange). Badges remain visible when
 health bars are hidden and never appear on Shops. Their labels supplement color identification.
 Escape's existing fog-safe particle burst and trail still render on rescue.
