@@ -770,7 +770,7 @@ fn ai_only_live_start_payload_advertises_speed_controls_without_seek() {
         .iter()
         .map(|player| player.name.as_str())
         .collect();
-    assert_eq!(ai_names, vec!["AI 2.3 1", "AI 2.3 2"]);
+    assert_eq!(ai_names, vec!["Jeff's AI 1", "Jeff's AI 2"]);
 
     let state = writer
         .room_time_state
