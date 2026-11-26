@@ -52,6 +52,7 @@ mod formation;
 mod pathing_budget_tests;
 mod pursuit_endpoint;
 mod rally;
+mod repair;
 #[cfg(test)]
 mod spawn_tests;
 mod tree_paths;
@@ -621,10 +622,8 @@ impl<'a> MoveCoordinator<'a> {
             .iter()
             .filter(|e| {
                 e.is_unit()
-                    && ((e.path_is_empty() && matches!(e.order(), Order::Repair(order) if entities.get(order.intent.target).is_none_or(|t| {
-                        let range = super::interact_range_for_kind(t.kind);
-                        super::dist2(e.pos_x(), e.pos_y(), t.pos_x(), t.pos_y()) > range * range
-                    }))) || e.move_phase() == Some(MovePhase::AwaitingPath)
+                    && (repair::needs_path(e, entities)
+                        || e.move_phase() == Some(MovePhase::AwaitingPath)
                         || (e.path_is_empty()
                             && matches!(e.build_phase(), Some(BuildPhase::ToSite)))
                         || (e.path_is_empty()
@@ -654,22 +653,7 @@ impl<'a> MoveCoordinator<'a> {
                     }
                 }
                 Some(Order::Repair(order)) => {
-                    let footprint = self.repair_footprint(entities, order.intent.target);
-                    let attempt = footprint.map_or(PathAttempt::Failed, |(kind, tx, ty)| {
-                        self.plan_footprint_interaction_path(
-                            entities,
-                            id,
-                            kind,
-                            tx,
-                            ty,
-                            PathingRequestSource::Build,
-                        )
-                    });
-                    if matches!(attempt, PathAttempt::Failed) {
-                        if let Some(e) = entities.get_mut(id) {
-                            e.clear_active_order();
-                        }
-                    }
+                    self.request_repair_path(entities, id, order.intent.target);
                 }
                 Some(Order::Deconstruct(order)) => {
                     let target = order.intent.target;

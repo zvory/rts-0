@@ -55,4 +55,5 @@ mod tank_attack_move_acquisition_tests;
 mod tank_direct_attack_tests;
 mod tank_trap_tests;
 mod tournament_tests;
+mod vehicle_repair_tests;
 mod warrior_tests;

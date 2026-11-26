@@ -5,6 +5,11 @@
 import { ABILITY, KIND, UPGRADE } from "../protocol.js";
 import { TICK_HZ } from "./timing.js";
 
+// Mirrored from rules::target; catalog parity checks this complete set.
+export const REPAIRABLE_UNIT_KINDS = Object.freeze([
+  KIND.TANK, KIND.ROCKET_LAUNCHER, KIND.MORTAR_TEAM, KIND.ANTI_TANK_GUN,
+]);
+
 // Mirrored from rules balance: total carried-item slots by rank.
 export const CULTIVATOR_ITEM_CAPACITY = 3;
 export const CULTIVATOR_MASTER_ITEM_CAPACITY = 6;

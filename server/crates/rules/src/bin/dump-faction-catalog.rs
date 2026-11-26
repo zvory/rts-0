@@ -39,6 +39,12 @@ fn print_catalog(catalog: faction::FactionCatalog, indent: &str) {
     println!("{indent}  \"loadoutId\": \"{}\",", catalog.loadout.id);
     print_kind_array("units", catalog.units, true, indent);
     print_kind_array("buildings", catalog.buildings, true, indent);
+    print_kind_array(
+        "repairableUnits",
+        &rts_rules::target::REPAIRABLE_UNIT_KINDS,
+        true,
+        indent,
+    );
     println!("{indent}  \"buildables\": [");
     for (index, kind) in catalog.buildables.iter().enumerate() {
         let comma = if index + 1 == catalog.buildables.len() {

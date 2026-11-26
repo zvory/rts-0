@@ -29,7 +29,7 @@ pub const MINING_ANCHOR_RANGE_TILES: f32 = 11.0;
 pub const STEEL_BLOCK_DIST_TILES: f32 = 4.5;
 pub const OIL_DIST_TILES: f32 = 6.0;
 
-/// Each engineer/serf restores two building HP per second.
-pub const BUILDING_REPAIR_HP_PER_SECOND: u32 = 2;
-/// A full repair costs one quarter of the original steel and oil price.
-pub const BUILDING_REPAIR_COST_DIVISOR: u32 = 4;
+/// Each engineer/serf restores two target HP per second.
+pub const REPAIR_HP_PER_SECOND: u32 = 2;
+/// A full repair costs one quarter of the target's original steel and oil price.
+pub const REPAIR_COST_DIVISOR: u32 = 4;

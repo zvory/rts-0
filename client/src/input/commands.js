@@ -18,6 +18,7 @@ import {
   MINING_ANCHOR_RANGE_TILES,
   SCOUT_PLANE_SPEED_PX_PER_TICK,
   STATS,
+  REPAIRABLE_UNIT_KINDS,
   TANK_TRAP_CLUSTER_ATTACK_RADIUS_TILES,
   isProducerBuilding,
 } from "../config.js";
@@ -261,7 +262,7 @@ function normalRightClickAction(input, p) {
     };
   }
 
-  if (target && ownOwner(input.state, target.owner, input.controlPolicy) && isBuilding(target.kind)
+  if (target && ownOwner(input.state, target.owner, input.controlPolicy) && (isBuilding(target.kind) || REPAIRABLE_UNIT_KINDS.includes(target.kind))
       && ![KIND.HEALING_SEAL, KIND.BARBED_WIRE].includes(target.kind)
       && !Number.isFinite(target.buildProgress) && target.hp > 0 && target.hp < target.maxHp) {
     const repairers = input._selectedWorkerIds();

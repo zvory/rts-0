@@ -78,7 +78,7 @@ pub struct Entity {
     pub hp: u32,
     /// Full health ceiling. Construction earns current HP over time; damage never lowers this value.
     pub max_hp: u32,
-    /// Prepaid fractional steel/oil repair credit, in price-numerator units. Building-owned so
+    /// Prepaid fractional steel/oil repair credit, in price-numerator units. Target-owned so
     /// repeated damage, replacement orders, and multiple workers share one exact billing ledger.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(in crate::game) repair_credit: Option<[u64; 2]>,
@@ -1011,7 +1011,7 @@ impl Entity {
 
     pub(in crate::game) fn can_be_repaired_by(&self, owner: u32) -> bool {
         self.owner == owner
-            && self.kind.is_building()
+            && (self.kind.is_building() || crate::rules::target::is_repairable_unit(self.kind))
             && !matches!(self.kind, EntityKind::BarbedWire | EntityKind::HealingSeal)
             && self.hp > 0
             && self.hp < self.max_hp

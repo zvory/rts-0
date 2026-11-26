@@ -92,6 +92,7 @@ import {
   SMOKE_CLOUD_RADIUS_TILES,
   SMOKE_LAUNCH_MAX_DELAY_MS,
   STATS,
+  REPAIRABLE_UNIT_KINDS,
   TANK_BODY,
   TICK_HZ,
   UPGRADES,
@@ -813,3 +814,5 @@ for (const [abilityId, expected] of Object.entries(rustClientConfig.abilityEffec
 }
 
 console.log("faction catalog parity check passed");
+
+assert.deepEqual(REPAIRABLE_UNIT_KINDS, rustCatalog.repairableUnits, "repairable mobile kinds must match Rust rules");

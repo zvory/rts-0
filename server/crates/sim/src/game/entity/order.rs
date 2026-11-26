@@ -44,7 +44,7 @@ pub enum Order {
     /// not exist until the worker arrives, re-validates placement/affordability, and pays
     /// the cost; until then the order carries only the intent (kind + top-left tile).
     Build(BuildOrder),
-    /// Walk to an owned completed building and repair damage until full health.
+    /// Walk to an owned repairable entity and repair damage until full health.
     Repair(RepairOrder),
     /// Walk to a completed Tank Trap and dismantle it for the issuing player's refund.
     Deconstruct(DeconstructOrder),
