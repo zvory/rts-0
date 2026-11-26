@@ -11,6 +11,7 @@ export const REPAIRABLE_UNIT_KINDS = Object.freeze([
 ]);
 
 // Mirrored from rules balance: total carried-item slots by rank.
+export const CULTIVATOR_NOVICE_ITEM_CAPACITY = 1;
 export const CULTIVATOR_ITEM_CAPACITY = 3;
 export const CULTIVATOR_MASTER_ITEM_CAPACITY = 6;
 

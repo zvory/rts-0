@@ -33,6 +33,7 @@ const EXPECTED_CONFIG_EXPORT_NAMES = Object.freeze([
   "CULTIVATORS_FACTION_ID",
   "CULTIVATOR_ITEM_CAPACITY",
   "CULTIVATOR_MASTER_ITEM_CAPACITY",
+  "CULTIVATOR_NOVICE_ITEM_CAPACITY",
   "DAO_MASTER_BODY_SCALE",
   "DAO_RANGED_RANGE_TILES",
   "DAO_RESEARCH_TICKS",
@@ -163,7 +164,7 @@ assertDeepEqual(
 );
 
 assertDeepEqual(
-  [configExports.CULTIVATOR_ITEM_CAPACITY, configExports.CULTIVATOR_MASTER_ITEM_CAPACITY],
-  [3, 6],
-  "carried-item capacity mirrors the Novice/Adept and Master limits",
+  [configExports.CULTIVATOR_NOVICE_ITEM_CAPACITY, configExports.CULTIVATOR_ITEM_CAPACITY, configExports.CULTIVATOR_MASTER_ITEM_CAPACITY],
+  [1, 3, 6],
+  "carried-item capacity mirrors the Novice, Adept, and Master limits",
 );

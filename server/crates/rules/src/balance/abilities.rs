@@ -120,6 +120,7 @@ pub const HEALING_SEAL_RADIUS_TILES: f32 = 1.5;
 pub const HEALING_SEAL_PULSE_TICKS: u32 = super::TICK_HZ / 3;
 
 /// Total carried-item slots by Cultivator rank. Consumable goods do not occupy slots.
+pub const CULTIVATOR_NOVICE_ITEM_CAPACITY: u8 = 1;
 pub const CULTIVATOR_ITEM_CAPACITY: u8 = 3;
 pub const CULTIVATOR_MASTER_ITEM_CAPACITY: u8 = 6;
 

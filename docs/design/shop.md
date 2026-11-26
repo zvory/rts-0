@@ -69,7 +69,7 @@ with **1 HP**, regardless of the unit's distance when it takes damage. The appli
 shown only to the unit’s owner and allies as a purple **ESC** label below the health bar,
 even when health bars are hidden. Enemies receive no protection flag even when they see the unit.
 
-Novices and Adepts carry up to three items; Masters carry up to six, without category limits and no RFV command-card controls. Distinct passive goods can coexist with Escape Treasure within the rank limit. In-flight deliveries reserve slots; Healing Seal does not use slots; Regen uses one. Other unit kinds retain their existing behavior. Duplicate copies of the same item are rejected,
+Novices carry one item, Adepts carry up to three, and Masters carry up to six, without category limits and no RFV command-card controls. Distinct passive goods can coexist with Escape Treasure within the rank limit. In-flight deliveries reserve slots; Healing Seal does not use slots; Regen uses one. Other unit kinds retain their existing behavior. Duplicate copies of the same item are rejected,
 including a copy already in flight, without spending oil. Escape automatically activates on lethal
 damage by default. Healing Seal is placed rather than carried.
 
