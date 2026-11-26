@@ -339,6 +339,7 @@ export const ABILITY = Object.freeze({
   DOUBLE_DAMAGE: "doubleDamage",
   ARMOR_TREASURE: "armorTreasure",
   VITALITY_TREASURE: "vitalityTreasure",
+  BREAKTHROUGH_TREASURE: "breakthroughTreasure",
 
 });
 
@@ -380,7 +381,7 @@ export const MOVEMENT_PATH_DIAGNOSTICS = Object.freeze({
 // --- Compact snapshot wire schema (must match protocol.rs) ---
 export const PREDICTION_PROTOCOL_VERSION = 1;
 export const DEFAULT_FACTION_ID = "kriegsia";
-export const COMPACT_SNAPSHOT_VERSION = 76;
+export const COMPACT_SNAPSHOT_VERSION = 77;
 export const MAX_COMPACT_GROUND_DECALS = 64;
 export const SNAPSHOT_CODEC_VERSION = 1;
 export const SNAPSHOT_CODEC = Object.freeze({
@@ -557,6 +558,7 @@ export const ORDER_STAGE = Object.freeze({
   DOUBLE_DAMAGE: "doubleDamage",
   ARMOR_TREASURE: "armorTreasure",
   VITALITY_TREASURE: "vitalityTreasure",
+  BREAKTHROUGH_TREASURE: "breakthroughTreasure",
 
   SETUP_ANTI_TANK_GUNS: "setupAntiTankGuns",
 });
@@ -597,6 +599,7 @@ export const ORDER_STAGE_CODE = Object.freeze({
   [ORDER_STAGE.DOUBLE_DAMAGE]: 32,
   [ORDER_STAGE.ARMOR_TREASURE]: 33,
   [ORDER_STAGE.VITALITY_TREASURE]: 34,
+  [ORDER_STAGE.BREAKTHROUGH_TREASURE]: 37,
   [ORDER_STAGE.ESCAPE_TREASURE]: 28,
 
 });
@@ -629,6 +632,7 @@ export const ABILITY_CODE = Object.freeze({
   [ABILITY.DOUBLE_DAMAGE]: 24,
   [ABILITY.ARMOR_TREASURE]: 25,
   [ABILITY.VITALITY_TREASURE]: 26,
+  [ABILITY.BREAKTHROUGH_TREASURE]: 28,
 
 });
 

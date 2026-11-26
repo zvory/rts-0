@@ -264,7 +264,7 @@ function fakeHudRootWithoutResourceSpans() {
     set innerHTML(value) {
       this._html = String(value);
       ids.clear();
-      for (const id of ["res-steel", "res-oil", "res-supply"]) {
+      for (const id of ["res-steel", "res-oil", "res-supply", "res-cosmic-energy"]) {
         if (this._html.includes(`id="${id}"`)) {
           ids.set(id, resourceSpan(id));
         }
@@ -416,7 +416,7 @@ function fakeHudRootWithoutResourceSpans() {
 {
   const { root, ids } = fakeHudRootWithoutResourceSpans();
   const state = {
-    resources: { steel: 325, oil: 80, supplyUsed: 7, supplyCap: 14 },
+    resources: { steel: 325, oil: 80, cosmicEnergy: 123, supplyUsed: 7, supplyCap: 14 },
     playerResources: [],
   };
   const hud = new HUD(root, state, {}, null);
@@ -425,6 +425,7 @@ function fakeHudRootWithoutResourceSpans() {
   assert(ids.has("res-supply"), "HUD constructor restores supply span after replay resource rows");
   hud._renderSinglePlayerResources();
   assert(ids.get("res-steel").textContent === "325", "restored HUD steel span updates from live resources");
+  assert(ids.get("res-cosmic-energy").textContent === "123", "HUD renders authoritative Cosmic Energy");
   assert(ids.get("res-oil").textContent === "80", "restored HUD oil span updates from live resources");
   assert(ids.get("res-supply").textContent === "7 / 14", "restored HUD supply span updates from live supply");
   const steelWrites = ids.get("res-steel").textWrites;

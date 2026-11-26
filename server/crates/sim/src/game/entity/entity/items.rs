@@ -27,6 +27,7 @@ impl Entity {
                 crate::game::ability::AbilityKind::Regen,
                 ArmorTreasure,
                 Haste,
+                crate::game::ability::AbilityKind::BreakthroughTreasure,
                 crate::game::ability::AbilityKind::VitalityTreasure,
                 crate::game::ability::AbilityKind::DoubleDamage,
             ]

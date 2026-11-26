@@ -3094,3 +3094,11 @@ speed lines behind visible charging Novices, War Adepts and War Masters, beneath
 and below fog. The server’s public `chargeActive` flag is the sole activation source; it is not
 inferred from speed or private cooldowns. Lines rotate with facing and scale with body/rank.
 The existing Graphics pool sweep hides inactive/hidden carriers immediately and owns teardown.
+
+### Cosmic Energy and Breakthrough Shop presentation
+
+The resource HUD displays Cosmic Energy with a ✨ sparkle and its current authoritative total,
+including projected observer player rows. Breakthrough occupies utility E on the Shop/Buy menu,
+costs 100 oil, and describes a permanent +25% movement aura within three tiles for friendly units.
+Its carried and delivery icon uses the existing bolt shape and a pale cyan color. Inventory stays
+private under existing ability-entry projection; public item radiance includes its carried slot.

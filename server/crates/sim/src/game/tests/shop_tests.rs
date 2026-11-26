@@ -938,6 +938,7 @@ fn armor_treasure_applies_on_delivery_without_activation_or_expiry() {
 fn every_passive_item_applies_on_delivery_and_ignores_activation_forever() {
     for ability in [
         AbilityKind::Regen,
+        AbilityKind::BreakthroughTreasure,
         AbilityKind::Haste,
         AbilityKind::DoubleDamage,
         AbilityKind::ArmorTreasure,

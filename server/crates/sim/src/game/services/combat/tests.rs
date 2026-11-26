@@ -132,6 +132,7 @@ fn spawn_tank_priority_target(entities: &mut EntityStore, kind: EntityKind, x: f
 
 fn player_state(id: u32, is_ai: bool) -> PlayerState {
     PlayerState {
+        cosmic_energy: 0,
         id,
         team_id: id,
         faction_id: "kriegsia".to_string(),

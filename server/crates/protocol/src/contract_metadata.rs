@@ -143,6 +143,7 @@ pub mod abilities {
     pub const DOUBLE_DAMAGE: &str = "doubleDamage";
     pub const ARMOR_TREASURE: &str = "armorTreasure";
     pub const VITALITY_TREASURE: &str = "vitalityTreasure";
+    pub const BREAKTHROUGH_TREASURE: &str = "breakthroughTreasure";
 
     pub const ALL: &[&str] = &[
         CHARGE,
@@ -172,6 +173,7 @@ pub mod abilities {
         DOUBLE_DAMAGE,
         ARMOR_TREASURE,
         VITALITY_TREASURE,
+        BREAKTHROUGH_TREASURE,
     ];
 }
 
@@ -253,7 +255,7 @@ pub mod notices {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 76;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 77;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -533,6 +535,7 @@ const ORDER_STAGE_CODES: &[(&str, u8)] = &[
     (abilities::DOUBLE_DAMAGE, 32),
     (abilities::ARMOR_TREASURE, 33),
     (abilities::VITALITY_TREASURE, 34),
+    (abilities::BREAKTHROUGH_TREASURE, 37),
 ];
 
 const ABILITY_CODES: &[(&str, u8)] = &[
@@ -563,6 +566,7 @@ const ABILITY_CODES: &[(&str, u8)] = &[
     (abilities::DOUBLE_DAMAGE, 24),
     (abilities::ARMOR_TREASURE, 25),
     (abilities::VITALITY_TREASURE, 26),
+    (abilities::BREAKTHROUGH_TREASURE, 28),
 ];
 
 const ABILITY_OBJECT_KIND_CODES: &[(&str, u8)] = &[
@@ -895,6 +899,7 @@ fn ability_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("DOUBLE_DAMAGE", abilities::DOUBLE_DAMAGE),
         ("ARMOR_TREASURE", abilities::ARMOR_TREASURE),
         ("VITALITY_TREASURE", abilities::VITALITY_TREASURE),
+        ("BREAKTHROUGH_TREASURE", abilities::BREAKTHROUGH_TREASURE),
     ])
 }
 
@@ -1001,6 +1006,7 @@ fn order_stage_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("DOUBLE_DAMAGE", abilities::DOUBLE_DAMAGE),
         ("ARMOR_TREASURE", abilities::ARMOR_TREASURE),
         ("VITALITY_TREASURE", abilities::VITALITY_TREASURE),
+        ("BREAKTHROUGH_TREASURE", abilities::BREAKTHROUGH_TREASURE),
         ("SETUP_ANTI_TANK_GUNS", "setupAntiTankGuns"),
     ])
 }

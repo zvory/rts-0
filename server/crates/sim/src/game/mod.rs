@@ -166,6 +166,8 @@ pub(crate) struct PlayerState {
     pub(crate) start_tile: (u32, u32),
     pub(crate) steel: u32,
     pub(crate) oil: u32,
+    #[serde(default)]
+    pub(crate) cosmic_energy: u32,
     /// Supply currently consumed by living + in-production units.
     pub(crate) supply_used: u32,
     pub(crate) is_ai: bool,

@@ -13,6 +13,8 @@ pub(super) struct PlayerStateV1 {
     pub(super) start_tile: (u32, u32),
     pub(super) steel: u32,
     pub(super) oil: u32,
+    #[serde(default)]
+    pub(super) cosmic_energy: u32,
     pub(super) supply_used: u32,
     pub(super) supply_cap: u32,
     pub(super) is_ai: bool,

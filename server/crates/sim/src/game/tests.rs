@@ -49,6 +49,7 @@ mod rocket_barrage_tests;
 mod scoring_projection_tests;
 mod shop_buy_menu_tests;
 mod shop_tests;
+mod cosmic_breakthrough_tests;
 mod smoke_charge_tests;
 mod smoke_mortar_tests;
 mod smoke_mortar_visibility_tests;

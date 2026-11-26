@@ -248,7 +248,8 @@ fn world_ability_order_policy(ability: AbilityKind) -> (bool, bool) {
         | AbilityKind::EkatMagicAnchor
         | AbilityKind::DiscipleShield => (true, true),
         // Self-targeted abilities or abilities with dedicated command dispatch.
-        AbilityKind::Haste
+        AbilityKind::BreakthroughTreasure
+        | AbilityKind::Haste
         | AbilityKind::DoubleDamage
         | AbilityKind::ArmorTreasure
         | AbilityKind::VitalityTreasure

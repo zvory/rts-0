@@ -1,6 +1,6 @@
 # Capsule: server simulation
 
-For changes to tick logic, services, rules, AI, or the `Game` core.
+For simulation, rules, and AI.
 
 ## Read
 - [docs/design/architecture.md](../design/architecture.md) — tick and networking model
@@ -15,12 +15,13 @@ For changes to tick logic, services, rules, AI, or the `Game` core.
 - §3.2 Concurrency model; the room task is the sole `Game` owner
 - §3.3 Rules layer
 - §3.5 Commands and queued orders
-- Tournament Grounds
+- Tournament Grounds; Cosmic Energy and Breakthrough
 - Proving Grounds and Portal Adept production
 - [docs/projection-audit-checklist.md](../projection-audit-checklist.md) — projection checklist
 - [docs/design/ai.md](../design/ai.md) — AI opponents
 - [docs/design/testing.md](../design/testing.md) §9 and §10 — self-play and dev scenarios when
   touching scripted tests or scenario setup
+
 
 ## Code map
 - `server/crates/sim/src/game/mod.rs`, `state.rs`, `derived_state.rs`, `lab.rs`, `systems.rs`,

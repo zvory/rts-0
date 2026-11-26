@@ -272,6 +272,7 @@ fn compact_snapshot_encodes_appended_entity_state() {
     panzerfaust.panzerfaust_windup_progress = Some(0.4);
 
     let snapshot = Snapshot {
+        cosmic_energy: 0,
         tick: 1,
         ground_decal_revision: 0,
         ground_decal_delta: None,

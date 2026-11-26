@@ -978,3 +978,25 @@ vehicles remain ineligible.
 AT guns may target Wind, War, and Magic Adepts and Masters (all three Adept kinds at either rank).
 Novices (Warrior), workers, and Kriegsia rifle infantry remain excluded. The existing 30% infantry
 damage multiplier on Dao Adept bodies is unchanged.
+
+### Cosmic Energy
+
+Each player starts with zero **Cosmic Energy**, displayed with the **✨** sparkle icon.
+Every whole point of non-passive insight actually gained by an owned Cultivator also grants
+one Cosmic Energy. This includes hostile damage (with existing unit/building ratios and fractional
+carry), Throw Sword, Magic field death rewards, and insight granted by training or tournament
+promotion. Passive five-second insight grants none. Existing insight caps apply, so over-cap
+rewards and terminal Masters grant none. Spending/resetting insight on evolution does not remove
+Cosmic Energy. It accumulates with saturating u32 arithmetic, survives checkpoints/replays, and
+has no spending action or effect yet. Lab-authored initial insight does not generate income.
+
+### Breakthrough utility item
+
+Breakthrough costs **100 oil**, occupies the Shop's **E** utility slot, and permanently grants
+its carrier and living friendly units within **3 tiles** (inclusive center distance) **25% movement
+speed**. Friendly includes allies. The carried item uses one normal slot and ordinary targeted
+delivery; no activation, cooldown, or expiry. Aura membership is sampled simultaneously before
+movement each tick. Identical auras do not stack; the multiplier combines with Haste, Charge,
+Master rank and other movement modifiers. Leaving range or losing the carrier removes the aura
+on the next movement tick. It grants no attack speed or moving attacks. Constants are owned by
+Rust balance; the client catalog mirrors the price and description.

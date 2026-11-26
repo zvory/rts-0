@@ -520,6 +520,7 @@ fn representative_snapshot() -> Snapshot {
     ];
 
     Snapshot {
+        cosmic_energy: 0,
         tick: 42,
         ground_decal_revision: 17,
         ground_decal_delta: None,

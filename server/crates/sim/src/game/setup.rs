@@ -291,6 +291,7 @@ impl Game {
                 .or_else(|| loadout.map(|loadout| (loadout.initial_steel, loadout.initial_oil)))
                 .unwrap_or((0, 0));
             let mut ps = PlayerState {
+                cosmic_energy: 0,
                 id: p.id,
                 team_id: super::teams::normalize_team_id(p.id, p.team_id),
                 faction_id: faction_id.clone(),

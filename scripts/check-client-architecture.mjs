@@ -264,7 +264,7 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   // Death decals add a narrow browser-local decal queue owned by GameState.
   // WASM display progress replaces the parallel JS calculator with sparse baseline-validated
   // progress patches composed at GameState's existing display-overlay seam.
-  "state.js": 31772,
+  "state.js": 31845, // Cosmic Energy authoritative resource mirror.
   // Lab MVP2 Phase 5 routes lab setup-tool cancellation through the input controller.
   // Shop delivery preview logic lives in a focused input collaborator.
   "input/index.js": 40954,

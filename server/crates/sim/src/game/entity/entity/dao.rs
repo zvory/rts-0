@@ -99,6 +99,7 @@ impl Entity {
             .saturating_add(self.insight_fraction);
         let earned = (total / denominator).min(u64::from(self.insight_cap() - self.insight));
         self.insight += earned as u32;
+        self.cosmic_energy_pending = self.cosmic_energy_pending.saturating_add(earned as u32);
         self.insight_fraction = if self.insight == self.insight_cap() {
             0
         } else {
@@ -111,10 +112,15 @@ impl Entity {
         if self.kind != EntityKind::MagicAdept || self.hp == 0 || self.dao_master {
             return;
         }
+        self.gain_non_passive_insight(amount);
+    }
+
+    pub(in crate::game) fn gain_non_passive_insight(&mut self, amount: u32) {
+        if !self.kind.is_disciple() || self.hp == 0 || self.dao_master { return; }
+        let before = self.insight;
         self.insight = self.insight.saturating_add(amount).min(self.insight_cap());
-        if self.insight == self.insight_cap() {
-            self.insight_fraction = 0;
-        }
+        self.cosmic_energy_pending = self.cosmic_energy_pending.saturating_add(self.insight - before);
+        if self.insight == self.insight_cap() { self.insight_fraction = 0; }
     }
 
     pub(crate) fn units_killed(&self) -> u32 {
@@ -328,7 +334,8 @@ impl Entity {
         } else {
             1.0
         };
-        base * master * charge * haste
+        let aura = if self.breakthrough_aura { config::BREAKTHROUGH_ITEM_SPEED_MULTIPLIER } else { 1.0 };
+        base * master * charge * haste * aura
     }
 }
 

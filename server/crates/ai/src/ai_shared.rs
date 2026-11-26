@@ -503,6 +503,7 @@ mod tests {
         let in_range = (config::START_RESOURCE_MAX_DIST_TILES - 0.25) * config::TILE_SIZE as f32;
         let out_of_range = (config::START_RESOURCE_MAX_DIST_TILES + 2.0) * config::TILE_SIZE as f32;
         let snapshot = Snapshot {
+        cosmic_energy: 0,
             tick: 0,
             ground_decal_revision: 0,
             ground_decal_delta: None,

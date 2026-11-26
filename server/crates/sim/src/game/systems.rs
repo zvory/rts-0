@@ -242,6 +242,7 @@ pub(crate) fn run_tick(
         services::combat::hold_charged_attack_move_tanks(map, entities, &teams, fog, smokes);
     });
     services::tournament::advance(entities, players, rng, &coordinator);
+    services::shop_items::refresh_breakthrough_auras(entities, &teams);
     crate::perf::timed(perf.as_deref_mut(), "movement", || {
         services::movement::movement_system_with_context(
             map,
@@ -545,6 +546,7 @@ mod tests {
 
     fn player_state(id: u32) -> PlayerState {
         PlayerState {
+        cosmic_energy: 0,
             id,
             team_id: id,
             faction_id: "kriegsia".to_string(),

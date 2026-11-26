@@ -63,6 +63,11 @@ pub struct Entity {
 
     #[serde(default)]
     pub insight: u32,
+    #[serde(default)]
+    pub(crate) cosmic_energy_pending: u32,
+    /// Rebuilt from living friendly carriers before movement; never checkpointed.
+    #[serde(skip)]
+    pub(crate) breakthrough_aura: bool,
     /// Living ticks toward the next passive insight; preserved through Dao evolution.
     #[serde(default, skip_serializing_if = "passive_insight_ticks_is_zero")]
     pub(crate) passive_insight_ticks: u16,
@@ -142,6 +147,8 @@ impl Entity {
             last_damage_entity: None,
             units_killed: 0,
             insight: 0,
+            cosmic_energy_pending: 0,
+            breakthrough_aura: false,
             passive_insight_ticks: 0,
             insight_fraction: 0,
             dao_master: false,
@@ -203,6 +210,8 @@ impl Entity {
             last_damage_entity: None,
             units_killed: 0,
             insight: 0,
+            cosmic_energy_pending: 0,
+            breakthrough_aura: false,
             passive_insight_ticks: 0,
             insight_fraction: 0,
             dao_master: false,
@@ -266,6 +275,8 @@ impl Entity {
             last_damage_entity: None,
             units_killed: 0,
             insight: 0,
+            cosmic_energy_pending: 0,
+            breakthrough_aura: false,
             passive_insight_ticks: 0,
             insight_fraction: 0,
             dao_master: false,

@@ -103,6 +103,15 @@ pub(crate) fn death_system(
         }
     }
 
+    for id in entities.ids() {
+        if let Some(unit) = entities.get_mut(id) {
+            let earned = std::mem::take(&mut unit.cosmic_energy_pending);
+            if let Some(player) = players.iter_mut().find(|p| p.id == unit.owner) {
+                player.cosmic_energy = player.cosmic_energy.saturating_add(earned);
+            }
+        }
+    }
+
     for dead_entity in &dead {
         if config::unit_stats(dead_entity.kind).is_none()
             && config::building_stats(dead_entity.kind).is_none()

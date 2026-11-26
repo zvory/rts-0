@@ -114,3 +114,13 @@ a purple return diamond for Escape, a shield for Armor, a heart for Vitality, a 
 and a sword for Double Damage. Flying goods and minimap markers use the same icons.
 Rejected duplicate purchases send the purchasing player an info Notice:
 “Item already equipped or being delivered”, without spending resources.
+
+### Breakthrough utility item
+
+The Shop sells **Breakthrough** in utility slot **E** for **100 oil**. It is a permanent carried
+passive delivered through the same targeted goods and Buy menu pipeline. It uses one slot,
+reserves capacity in flight, rejects duplicates, survives source-Shop destruction after arrival,
+and contributes one public radiance tier. Its carrier and friendly units whose centers are within
+three tiles gain 25% movement speed. Multiple Breakthrough auras do not stack; they multiply with
+other movement bonuses. No active cast, duration or cooldown. It is distinct from Wehrmacht's
+existing Breakthrough! command. See [balance](balance.md#breakthrough-utility-item).
