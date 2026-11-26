@@ -514,6 +514,7 @@ pub fn project_entity(
         for kind in [
             ability::AbilityKind::Regen,
             ability::AbilityKind::Haste,
+            ability::AbilityKind::BreakthroughTreasure,
             ability::AbilityKind::DoubleDamage,
             ability::AbilityKind::DoubleXp,
             ability::AbilityKind::ArmorTreasure,

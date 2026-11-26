@@ -102,6 +102,7 @@ pub(in crate::game) fn planner_code(kind: AbilityKind) -> u16 {
         AbilityKind::VitalityTreasure => 25,
         AbilityKind::VectorField => 26,
         AbilityKind::DoubleXp => 27,
+        AbilityKind::BreakthroughTreasure => 28,
     }
 }
 
@@ -135,6 +136,7 @@ pub(in crate::game) fn from_planner_code(code: u16) -> Option<AbilityKind> {
         25 => Some(AbilityKind::VitalityTreasure),
         26 => Some(AbilityKind::VectorField),
         27 => Some(AbilityKind::DoubleXp),
+        28 => Some(AbilityKind::BreakthroughTreasure),
 
         _ => None,
     }
@@ -152,7 +154,8 @@ pub fn effect_hook(kind: AbilityKind) -> AbilityEffectHook {
         | AbilityKind::DoubleXp
         | AbilityKind::DoubleDamage
         | AbilityKind::ArmorTreasure
-        | AbilityKind::VitalityTreasure => AbilityEffectHook::ShopItem,
+        | AbilityKind::VitalityTreasure
+        | AbilityKind::BreakthroughTreasure => AbilityEffectHook::ShopItem,
         AbilityKind::Charge => AbilityEffectHook::LegacyNoop,
         AbilityKind::Smoke | AbilityKind::MortarFire | AbilityKind::Barrage => {
             AbilityEffectHook::DelayedWorld

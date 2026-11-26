@@ -19,6 +19,7 @@ export const CARRIED_ITEMS = Object.freeze([
   { ability: ABILITY.VITALITY_TREASURE, label: "Vitality Treasure", shortLabel: "VIT", color: 0x87edaa, shape: "heart" },
   { ability: ABILITY.ESCAPE_TREASURE, label: "Escape Treasure", shortLabel: "ESC", color: 0xdfa5ff, shape: "return" },
   { ability: ABILITY.DOUBLE_XP, label: "2X XP", shortLabel: "2X", color: 0x68a9ff, shape: "xp" },
+  { ability: ABILITY.BREAKTHROUGH_TREASURE, label: "Breakthrough", shortLabel: "BT", color: 0xafffff, shape: "bolt" },
 ].map(Object.freeze));
 
 export function carriedItemMask(entity) {

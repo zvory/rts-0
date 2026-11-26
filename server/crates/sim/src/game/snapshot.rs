@@ -281,6 +281,7 @@ impl Game {
             ),
             steel,
             oil,
+            cosmic_energy: ps.map_or(0, |p| p.cosmic_energy),
             supply_used,
             supply_cap,
             auto_build: ps.map(|player| AutoBuildSettingsSnapshot {
@@ -448,6 +449,7 @@ impl Game {
                 id: player.id,
                 steel: player.steel,
                 oil: player.oil,
+                cosmic_energy: player.cosmic_energy,
                 supply_used: player.supply_used,
                 supply_cap: config::PLAYER_SUPPLY_CAP,
                 apm: self.current_apm(player.id),

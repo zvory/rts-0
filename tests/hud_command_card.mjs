@@ -1099,10 +1099,12 @@ for (const researched of [false, true]) {
     resources: { steel: 1000, oil: 1000 },
   });
   const items = idle.slots.filter(Boolean);
-  assert.equal(items.length, 7);
-  assert.deepEqual(items.map((item) => item.ability), [ABILITY.ESCAPE_TREASURE, ABILITY.DOUBLE_XP, ABILITY.REGEN, ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE, ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE]);
-  assert.deepEqual(items.map((item) => item.intent.targetMode), Array(7).fill("friendlyUnit"));
-  assert.deepEqual(items.map((item) => item.cost.oil), [100, 50, 50, 100, 100, 100, 150]);
+  assert.equal(items.length, 8);
+  assert.equal(idle.slots[2].ability, ABILITY.BREAKTHROUGH_TREASURE);
+  assert.equal(idle.slots[2].hotkey, "E");
+  assert.deepEqual(items.map((item) => item.ability), [ABILITY.ESCAPE_TREASURE, ABILITY.DOUBLE_XP, ABILITY.BREAKTHROUGH_TREASURE, ABILITY.REGEN, ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE, ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE]);
+  assert.deepEqual(items.map((item) => item.intent.targetMode), Array(8).fill("friendlyUnit"));
+  assert.deepEqual(items.map((item) => item.cost.oil), [100, 50, 100, 50, 100, 100, 100, 150]);
   assert(!items.some((item) => item.ability === ABILITY.HEALING_SEAL));
   assert.deepEqual(idle.rowLabels, ["Util", "Defense", "Offense"]);
 }
@@ -1200,10 +1202,10 @@ for (const factionId of ["cultivators", "kriegsia", "ekat"]) {
     resources: { steel: 0, oil: 1000 }, groupCooldownClocks: () => [],
   });
   const rows = COMMAND_CARD_SLOT_ORDER.map((i) => card.slots[i]?.ability || null);
-  assert.deepEqual(rows.slice(0, 4), [ABILITY.ESCAPE_TREASURE, ABILITY.DOUBLE_XP, null, null]);
+  assert.deepEqual(rows.slice(0, 4), [ABILITY.ESCAPE_TREASURE, ABILITY.DOUBLE_XP, ABILITY.BREAKTHROUGH_TREASURE, null]);
   assert.deepEqual(rows.slice(4, 8), [ABILITY.REGEN, ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE, null]);
   assert.deepEqual(rows.slice(8), [ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE, null, null]);
-  for (const ability of [ABILITY.DOUBLE_XP, ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE, ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE]) {
+  for (const ability of [ABILITY.BREAKTHROUGH_TREASURE, ABILITY.DOUBLE_XP, ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE, ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE]) {
     const carried = buildCommandCardDescriptors({
       playerId: 1, factionId: "cultivators",
       selection: [{ id: 2, owner: 1, kind: KIND.WARRIOR,
@@ -1227,9 +1229,9 @@ for (const factionId of ["cultivators", "kriegsia", "ekat"]) {
   const menu = buildCommandCardDescriptors({ ...ctx, commandCardMode: "shopBuy" });
   assert.deepEqual(menu.rowLabels, ["Util", "Defense", "Offense"]);
   const goods = menu.slots.filter((s) => s?.action === "ability");
-  assert.equal(goods.length, 7);
+  assert.equal(goods.length, 8);
   assert(goods.every((s) => s.intent.type === "buyShopItem" && s.enabled));
-  assert.deepEqual(goods.map((s) => s.icon), ["ESC", "2X", "HP", "ARM", "+HP", "HST", "DD"]);
+  assert.deepEqual(goods.map((s) => s.icon), ["ESC", "2X", "BT", "HP", "ARM", "+HP", "HST", "DD"]);
   assert.equal(menu.slots[11].intent.type, "closeCommandCardMenu");
   assert.equal(menu.slots[11].hotkey, "V");
   assert.equal(menu.slots[1].ability, ABILITY.DOUBLE_XP);

@@ -4,6 +4,7 @@ use crate::{kinds, states};
 #[test]
 fn compact_entity_trims_trailing_optional_nulls() {
     let mut snapshot = Snapshot {
+        cosmic_energy: 123,
         tick: 1,
         ground_decal_revision: 0,
         ground_decal_delta: None,
@@ -52,6 +53,7 @@ fn compact_entity_trims_trailing_optional_nulls() {
         value.get("pr").is_none(),
         "public factions do not require private resource rows"
     );
+    assert_eq!(value["ce"], 123);
     assert!(value.get("r").is_none());
     assert!(value.get("ev").is_none());
     snapshot.entities[0].commander_facing = Some(-1.25);
@@ -64,6 +66,7 @@ fn compact_entity_trims_trailing_optional_nulls() {
 #[test]
 fn compact_json_snapshot_codec_remains_available_for_local_baselines() {
     let snapshot = Snapshot {
+        cosmic_energy: 0,
         tick: 1,
         ground_decal_revision: 0,
         ground_decal_delta: None,
@@ -104,6 +107,7 @@ fn compact_json_snapshot_codec_remains_available_for_local_baselines() {
 #[test]
 fn compact_snapshot_carries_bounded_ground_decal_delta() {
     let mut snapshot = Snapshot {
+        cosmic_energy: 0,
         tick: 1,
         ground_decal_revision: 31,
         ground_decal_delta: Some(rts_contract::GroundDecalDelta {

@@ -100,6 +100,7 @@ impl Serialize for CompactSnapshot<'_> {
                 snapshot.supply_cap,
             ],
         )?;
+        map.serialize_entry("ce", &snapshot.cosmic_energy)?;
         if let Some(settings) = snapshot.auto_build {
             map.serialize_entry(
                 "ab",
@@ -224,6 +225,7 @@ impl Serialize for CompactSnapshot<'_> {
                                 .iter()
                                 .map(|upgrade| upgrade_code(upgrade))
                                 .collect::<Vec<_>>(),
+                            p.cosmic_energy,
                         )
                     })
                     .collect::<Vec<_>>(),

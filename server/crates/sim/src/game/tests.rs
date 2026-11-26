@@ -20,6 +20,7 @@ mod checkpoint_start_tests;
 mod checkpoint_visibility_tests;
 mod concealment_zone_tests;
 mod construction_followup_tests;
+mod cosmic_breakthrough_tests;
 mod dao_kind_tests;
 mod dao_master_growth_tests;
 mod dao_training_tests;

@@ -140,13 +140,14 @@ fn end_state_fingerprint_matches_native_and_wasm() {
     for _ in 0..3 {
         game.tick();
     }
-    // Fingerprint v4 also covers waypoint-bound normal forward/reverse commitments.
+    // Fingerprint v5 adds Cosmic Energy balances and pending non-passive credits.
+    // It also covers waypoint-bound normal forward/reverse commitments.
     // It includes the persisted Novice Charge timer, resource knowledge and tournament
     // entry/production and optional committed pivot-recovery fields, as well as the
-    // remaining entity and RNG state. Sim schema 8 adds detached magic-orb impacts.
+    // remaining entity and RNG state. Sim schema 9 adds Cosmic Energy state.
     // Native and WASM must share this known answer.
     assert_eq!(
         game.replay_end_state_hash().unwrap(),
-        "69469ccf232e412489905864f664582a32aa3ea7abd6ee4f6e9842c1ad0398cb"
+        "410c8344f3cc381f0caa5ab7bd066da05fbc8a35e87813866202123b2dac1996"
     );
 }

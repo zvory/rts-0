@@ -939,6 +939,7 @@ fn every_passive_item_applies_on_delivery_and_ignores_activation_forever() {
     for ability in [
         AbilityKind::DoubleXp,
         AbilityKind::Regen,
+        AbilityKind::BreakthroughTreasure,
         AbilityKind::Haste,
         AbilityKind::DoubleDamage,
         AbilityKind::ArmorTreasure,

@@ -65,7 +65,7 @@ pub(super) fn upgrade_trainee(entities: &mut EntityStore, building: u32, trainee
         return;
     };
     if let Some(e) = entities.get_mut(trainee) {
-        e.insight = config::DISCIPLE_INSIGHT_REQUIRED;
+        e.gain_non_passive_insight(config::DISCIPLE_INSIGHT_REQUIRED.saturating_sub(e.insight));
         e.evolve_dao(match choice {
             UpgradeKind::DaoWind => AbilityKind::EvolveWind,
             UpgradeKind::DaoOfHeaviness => AbilityKind::EvolveWar,

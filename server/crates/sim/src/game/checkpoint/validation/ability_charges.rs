@@ -4,9 +4,10 @@ use super::CheckpointPayloadError;
 
 pub(super) fn validate(entity: &Entity) -> Result<(), CheckpointPayloadError> {
     use crate::game::ability::AbilityKind::{
-        ArmorTreasure, DoubleDamage, DoubleXp, Haste, Regen, VitalityTreasure,
+        ArmorTreasure, BreakthroughTreasure, DoubleDamage, DoubleXp, Haste, Regen, VitalityTreasure,
     };
     for ability in [
+        BreakthroughTreasure,
         Regen,
         Haste,
         DoubleXp,
@@ -24,7 +25,13 @@ pub(super) fn validate(entity: &Entity) -> Result<(), CheckpointPayloadError> {
     for (&ability, &remaining) in &entity.ability_uses_remaining {
         if matches!(
             ability,
-            Regen | Haste | DoubleXp | DoubleDamage | ArmorTreasure | VitalityTreasure
+            BreakthroughTreasure
+                | Regen
+                | Haste
+                | DoubleXp
+                | DoubleDamage
+                | ArmorTreasure
+                | VitalityTreasure
         ) {
             if !entity.is_unit()
                 || remaining != 1

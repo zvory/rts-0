@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 16] = [
+pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 17] = [
     AbilityCatalogEntry {
         kind: AbilityKind::EvolveWind,
         label: "Dao of Wind",
@@ -217,5 +217,14 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 16] = [
         tech_requirement: None, upgrade_requirement: None,
         queue_policy: AbilityQueuePolicy::NotQueueable, autocast: false,
         command_card: true, protocol_code: 28, order_stage_code: 37,
+    },
+    AbilityCatalogEntry {
+        kind: AbilityKind::BreakthroughTreasure, label: "Breakthrough", icon: "BT", hotkey: Some("E"),
+        title: "Utility item: Deliver a permanent aura at any distance; grants this unit and friendly units within 3 tiles 25% movement speed; overlapping Breakthrough auras do not stack", carriers: &[EntityKind::Shop], target_mode: AbilityTargetMode::FriendlyUnit,
+        range_tiles: None, min_range_tiles: None, cooldown_ticks: 0,
+        charges: None, charge_recharge_ticks: None, cost: ResourceCost::new(0, 100),
+        tech_requirement: None, upgrade_requirement: None,
+        queue_policy: AbilityQueuePolicy::NotQueueable, autocast: false,
+        command_card: true, protocol_code: 29, order_stage_code: 38,
     },
 ];

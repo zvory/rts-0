@@ -210,6 +210,7 @@ impl match_history_writes::MatchHistoryWriter for RecordingMatchHistoryWriter {
 
 pub(super) fn test_snapshot(tick: u32, resource_deltas: Vec<ResourceDelta>) -> Snapshot {
     Snapshot {
+        cosmic_energy: 0,
         tick,
         ground_decal_revision: 0,
         ground_decal_delta: None,
@@ -1229,6 +1230,7 @@ fn automated_match_history_participants_are_detected() {
 #[test]
 fn wire_compaction_removes_resource_entities_but_keeps_deltas() {
     let mut snapshot = Snapshot {
+        cosmic_energy: 0,
         tick: 10,
         ground_decal_revision: 0,
         ground_decal_delta: None,
@@ -1279,6 +1281,7 @@ fn wire_compaction_removes_resource_entities_but_keeps_deltas() {
 #[test]
 fn wire_compaction_does_not_rewrite_authoritative_resource_knowledge_from_events() {
     let mut snapshot = Snapshot {
+        cosmic_energy: 0,
         tick: 10,
         ground_decal_revision: 0,
         ground_decal_delta: None,

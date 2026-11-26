@@ -43,6 +43,7 @@ export function decodeCompactSnapshot(raw) {
     worldCombatPosition: raw.wc == null
       ? null
       : decodeCompactPoint(raw.wc, "worldCombatPosition"),
+    cosmicEnergy: readOptionalU32(raw.ce, "cosmicEnergy"),
     steel: readU32(scalars[1], "steel"),
     oil: readU32(scalars[2], "oil"),
     supplyUsed: readU32(scalars[3], "supplyUsed"),
@@ -295,12 +296,13 @@ function decodeCompactNetStatus(record) {
 }
 
 function decodeCompactPlayerResource(record, index) {
-  const fields = readArray(record, `playerResource ${index}`, 7);
+  const fields = readArray(record, `playerResource ${index}`, 8);
   if (fields.length < 6) throw new Error(`playerResource ${index} is too short`);
   return {
     id: readU32(fields[0], "playerResource.id"),
     steel: readU32(fields[1], "playerResource.steel"),
     oil: readU32(fields[2], "playerResource.oil"),
+    cosmicEnergy: readOptionalU32(fields[7], "playerResource.cosmicEnergy"),
     supplyUsed: readU32(fields[3], "playerResource.supplyUsed"),
     supplyCap: readU32(fields[4], "playerResource.supplyCap"),
     apm: readU32(fields[5], "playerResource.apm"),

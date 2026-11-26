@@ -12,6 +12,7 @@ impl PlayerState {
     pub(crate) fn reset_for_dev_scenario(&mut self, start_tile: (u32, u32)) {
         self.start_tile = start_tile;
         self.steel = 0;
+        self.cosmic_energy = 0;
         self.oil = 10_000;
         self.supply_used = 0;
         self.score = Default::default();

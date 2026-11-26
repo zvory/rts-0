@@ -180,3 +180,14 @@ Each enemy unit that dies with its center inside an active Vector Field grants i
 caster 20 insight, regardless of killer or unit cost. Allied deaths, buildings, expired Vector Fields,
 and dead casters grant nothing. Each overlapping Vector Field rewards its own caster. Rewards cap
 at 200; Masters earn none. No public death information or wire fields are added.
+
+### Cosmic Energy
+
+Each player starts with zero **Cosmic Energy**, displayed with the **✨** sparkle icon.
+Every whole point of non-passive insight actually gained by an owned Cultivator also grants
+one Cosmic Energy. This includes hostile damage (with existing unit/building ratios and fractional
+carry), Throw Sword, Magic field death rewards, and insight granted by training or tournament
+promotion. Passive five-second insight grants none. Existing insight caps apply, so over-cap
+rewards and terminal Masters grant none. Spending/resetting insight on evolution does not remove
+Cosmic Energy. It accumulates with saturating u32 arithmetic, survives checkpoints/replays, and
+has no spending action or effect yet. Lab-authored initial insight does not generate income.

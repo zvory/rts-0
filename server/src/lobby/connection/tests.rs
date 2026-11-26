@@ -264,6 +264,7 @@ fn clearing_pending_snapshot_preserves_room_time_and_clears_snapshot_state() {
 
     assert_eq!(
         sink.try_send_snapshot(Snapshot {
+            cosmic_energy: 0,
             tick: 1,
             ground_decal_revision: 0,
             ground_decal_delta: None,

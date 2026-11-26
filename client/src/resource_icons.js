@@ -2,6 +2,7 @@ const RESOURCE_ICON_FALLBACKS = Object.freeze({
   steel: "▰",
   oil: "⬤",
   supply: "▲",
+  cosmicEnergy: "✨",
 });
 
 export function resourceIconHtml(kind) {

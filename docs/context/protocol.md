@@ -20,7 +20,8 @@ Use for wire protocol changes.
 - [docs/projection-audit-checklist.md](../projection-audit-checklist.md) — checklist for new
   projection-affecting snapshot fields, events, or observer modes
 
-- Shop items and public Cultivator item radiance
+- Shop items, radiance, Cosmic Energy and Breakthrough
+
 
 ## Code map
 - `server/crates/protocol/src/{client_message,server_message,lib}.rs` — Rust wire

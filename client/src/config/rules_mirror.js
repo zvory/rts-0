@@ -365,6 +365,13 @@ export const ABILITIES = Object.freeze({
     cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 100 }),
     queued: false, queuePolicy: "notQueueable",
   }),
+  [ABILITY.BREAKTHROUGH_TREASURE]: Object.freeze({
+    ability: ABILITY.BREAKTHROUGH_TREASURE, label: "Breakthrough", icon: "BT", hotkey: "E",
+    title: "Utility item: Deliver a permanent aura at any distance; grants this unit and friendly units within 3 tiles 25% movement speed; overlapping Breakthrough auras do not stack",
+    carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: null,
+    cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 100 }),
+    queued: false, queuePolicy: "notQueueable",
+  }),
   [ABILITY.DOUBLE_DAMAGE]: Object.freeze({
     ability: ABILITY.DOUBLE_DAMAGE, label: "2x damage", icon: "DD", hotkey: "X",
     title: "Deliver a permanent passive attack item at any distance; doubles primary weapon damage on arrival",

@@ -197,7 +197,7 @@ fn stable_rust_public_surface_compiles() {
     assert_eq!(PREDICTION_PROTOCOL_VERSION, 1);
     assert_eq!(DEFAULT_FACTION_ID, "kriegsia");
     assert_eq!(GAME_CHECKPOINT_CURRENT_VERSION, 2);
-    assert_eq!(COMPACT_SNAPSHOT_VERSION, 76);
+    assert_eq!(COMPACT_SNAPSHOT_VERSION, 77);
     assert_eq!(abilities::REGEN, "regen");
     assert_eq!(SNAPSHOT_CODEC_VERSION, 1);
     assert_eq!(COMPACT_UNKNOWN_CODE, 255);
@@ -272,6 +272,7 @@ fn compact_snapshot_encodes_appended_entity_state() {
     panzerfaust.panzerfaust_windup_progress = Some(0.4);
 
     let snapshot = Snapshot {
+        cosmic_energy: 0,
         tick: 1,
         ground_decal_revision: 0,
         ground_decal_delta: None,

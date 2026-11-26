@@ -607,7 +607,8 @@ const decodedAck = decodeServerMessage({
   r: [[200, 0]],
   e: [],
   ma: [[91, 2, 320, 352, 0.75, 10]],
-  pr: [[1, 325, 80, 7, 14, 42, [1]]],
+  ce: 123,
+  pr: [[1, 325, 80, 7, 14, 42, [1], 456]],
   pf: [[1, "cultivators"], [2, "kriegsia"]],
   ao: [[70, 1, 6, 1, 384, 416, 90, 7, [45, null, null, null, null, null, null, null]],
     [71, 1, 17, 4, 400, 400, 300, 7, [null, 240, 67.2, null, null, null, 300, 300]],
@@ -625,6 +626,8 @@ assert(JSON.stringify(decodedAck.abilityObjects[2]) === JSON.stringify({
   x: 480, y: 400, expiresIn: 299, vector: [0, -1], fieldSize: 5,
 }), "visible enemy Vector Field decodes public geometry without private caster state");
 assert(decodedAck.playerFactions[0].factionId === "cultivators", "compact authoritative faction decodes");
+assert(decodedAck.cosmicEnergy === 123, "compact private Cosmic Energy decodes");
+assert(decodedAck.playerResources[0].cosmicEnergy === 456, "compact observer Cosmic Energy decodes");
 assert(decodedAck.playerResources[0].apm === 42, "compact observer player APM decodes");
 assert(decodedAck.playerResources[0].upgrades.length === 1, "compact observer upgrades decode");
 assert(

@@ -6,6 +6,7 @@ export function restoreSinglePlayerResourceShell(elHud) {
   elHud.innerHTML =
     `<div class="res">${resourceIconHtml("steel")}<span id="res-steel">0</span></div>` +
     `<div class="res">${resourceIconHtml("oil")}<span id="res-oil">0</span></div>` +
+    `<div class="res" title="Cosmic Energy"><span class="res-icon cosmicEnergy">✨</span><span id="res-cosmic-energy">0</span></div>` +
     `<div class="res">${resourceIconHtml("supply")}<span id="res-supply">0 / 0</span></div>`;
   return {
     elSteel: elHud.querySelector("#res-steel"),
@@ -41,13 +42,16 @@ export function renderSinglePlayerResources({
   const oil = resources.oil ?? 0;
   const used = resources.supplyUsed ?? 0;
   const cap = resources.supplyCap ?? 0;
-  const sig = `single:${steel}:${oil}:${used}:${cap}`;
+  const cosmicEl = elHud?.querySelector("#res-cosmic-energy");
+  const cosmic = resources.cosmicEnergy ?? 0;
+  const sig = `single:${steel}:${oil}:${used}:${cap}:${cosmic}`;
   if (sig === nextSig) {
     recordDiagnostic("hud.dirty.resources.hit");
     return { sig: nextSig, elSteel: steelEl, elOil: oilEl, elSupply: supplyEl };
   }
 
   recordDiagnostic("hud.dirty.resources.miss");
+  if (cosmicEl) cosmicEl.textContent = String(cosmic);
   if (steelEl) steelEl.textContent = String(steel);
   if (oilEl) oilEl.textContent = String(oil);
   if (supplyEl) {
@@ -67,7 +71,7 @@ export function renderAllPlayersResources({
   if (!elHud) return { sig: currentSig };
 
   const sig = "multi:" + playerResources.map(
-    (p) => `${p.id}:${p.steel}:${p.oil}:${p.supplyUsed}:${p.supplyCap}:${p.apm}`,
+    (p) => `${p.id}:${p.steel}:${p.oil}:${p.supplyUsed}:${p.supplyCap}:${p.cosmicEnergy ?? 0}:${p.apm}`,
   ).join("|");
   if (sig === currentSig) {
     recordDiagnostic("hud.dirty.resources.hit");
@@ -91,6 +95,7 @@ export function renderAllPlayersResources({
       `<span class="replay-player-dot" style="background:${color}" title="${name}"></span>` +
       `${resourceIconHtml("steel")}<span class="replay-res-val">${resources.steel}</span>` +
       `${resourceIconHtml("oil")}<span class="replay-res-val">${resources.oil}</span>` +
+      `${resourceIconHtml("cosmicEnergy")}<span class="replay-res-val" title="Cosmic Energy">${resources.cosmicEnergy ?? 0}</span>` +
       `${resourceIconHtml("supply")}` +
       `<span class="replay-res-val${supplyCapped ? " supply-capped" : ""}">${resources.supplyUsed} / ${resources.supplyCap}</span>` +
       `<span class="replay-res-val replay-apm-val" title="Current actions per minute: ${apm}" aria-label="${apm} actions per minute">${apm}</span>`;

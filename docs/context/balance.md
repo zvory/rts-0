@@ -15,7 +15,7 @@ Use when tuning costs, supply, sight, sizes, unit/building stats, or any number 
   - Proving Grounds
   - [Building repair and AT gun Dao targets](../design/balance.md#building-repair-and-at-gun-dao-targets)
 
-- Cultivator Shop; [2X XP](../design/balance.md#2x-xp)
+- Cultivator Shop; [2X XP](../design/balance.md#2x-xp); Cosmic Energy and Breakthrough
 
 ## Code map
 - `server/crates/rules/src/defs.rs` — authoritative unit/building stat records

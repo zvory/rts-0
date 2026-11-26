@@ -110,10 +110,10 @@ export class GameState extends VisualEffectBackedState {
     this._prevById = new Map();
 
     // --- derived latest state ---
-    /** @type {{steel:number,oil:number,supplyUsed:number,supplyCap:number}} */
-    this.resources = { steel: 0, oil: 0, supplyUsed: 0, supplyCap: 0 };
+    /** @type {{steel:number,oil:number,cosmicEnergy:number,supplyUsed:number,supplyCap:number}} */
+    this.resources = { steel: 0, oil: 0, cosmicEnergy: 0, supplyUsed: 0, supplyCap: 0 };
     this.autoBuild = ab();
-    /** @type {Array<{id:number,steel:number,oil:number,supplyUsed:number,supplyCap:number,apm:number}>} */
+    /** @type {Array<{id:number,steel:number,oil:number,cosmicEnergy:number,supplyUsed:number,supplyCap:number,apm:number}>} */
     this.playerResources = [];
     /** @type {Array<object>} latest snapshot's transient events. */
     this.events = [];
@@ -323,6 +323,7 @@ export class GameState extends VisualEffectBackedState {
     this.resources = {
       steel: msg.steel ?? 0,
       oil: msg.oil ?? 0,
+      cosmicEnergy: msg.cosmicEnergy ?? 0,
       supplyUsed: msg.supplyUsed | 0,
       supplyCap: msg.supplyCap | 0,
     };

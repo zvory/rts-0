@@ -56,6 +56,7 @@ fn pending_tracker_start_payload() -> StartPayload {
 #[cfg(test)]
 fn pending_tracker_snapshot(tick: u32, worker_x: f32, worker_y: f32) -> Snapshot {
     Snapshot {
+        cosmic_energy: 0,
         tick,
         ground_decal_revision: 0,
         ground_decal_delta: None,

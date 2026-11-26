@@ -588,6 +588,8 @@ pub struct Snapshot {
     pub world_combat_position: Option<[f32; 2]>,
     pub steel: u32,
     pub oil: u32,
+    #[serde(default)]
+    pub cosmic_energy: u32,
     pub supply_used: u32,
     pub supply_cap: u32,
     /// Authoritative settings for the player whose private resources this snapshot projects.
@@ -809,6 +811,8 @@ pub struct PlayerResourceSnapshot {
     pub id: u32,
     pub steel: u32,
     pub oil: u32,
+    #[serde(default)]
+    pub cosmic_energy: u32,
     pub supply_used: u32,
     pub supply_cap: u32,
     /// Rolling command-envelope rate over the last ten simulated seconds.

@@ -74,6 +74,7 @@ fn snapshot() -> Snapshot {
     }];
     let neutral_tank_trap = EntityView::new(303, 0, "tank_trap", 300.0, 300.0, 100, 100, "idle");
     Snapshot {
+        cosmic_energy: 0,
         tick: 10,
         ground_decal_revision: 0,
         ground_decal_delta: None,

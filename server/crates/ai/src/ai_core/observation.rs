@@ -651,6 +651,7 @@ mod tests {
 
     fn empty_snapshot(tick: u32) -> Snapshot {
         Snapshot {
+            cosmic_energy: 0,
             tick,
             ground_decal_revision: 0,
             ground_decal_delta: None,
