@@ -85,10 +85,21 @@ fn disciple_insight_is_public_but_chosen_dao_stays_team_private() {
     // Partial Adept XP is public too, while fog still hides the whole unit.
     game.state.entities.get_mut(unit).unwrap().insight = 37;
     assert_eq!(
-        game.snapshot_for(2).entities.iter().find(|e| e.id == unit).unwrap().insight,
+        game.snapshot_for(2)
+            .entities
+            .iter()
+            .find(|e| e.id == unit)
+            .unwrap()
+            .insight,
         Some(37)
     );
-    game.state.entities.get_mut(unit).unwrap().set_position(1000.0, 1000.0);
-    game.state.fog.recompute(&[1, 2, 3], &game.state.entities, &game.state.map);
+    game.state
+        .entities
+        .get_mut(unit)
+        .unwrap()
+        .set_position(1000.0, 1000.0);
+    game.state
+        .fog
+        .recompute(&[1, 2, 3], &game.state.entities, &game.state.map);
     assert!(!game.snapshot_for(2).entities.iter().any(|e| e.id == unit));
 }
