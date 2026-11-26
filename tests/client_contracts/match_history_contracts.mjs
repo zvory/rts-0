@@ -229,7 +229,7 @@ withFakeHudDocument(() => {
   const table = history._tableHost.children[0];
   const [thead, tbody] = table.children;
   const replayRows = tbody.children.filter((row) => row.className === "match-history-row");
-  assert(thead.innerHTML.includes("Replay #"), "match history labels its replay-number column");
+  assert(thead.innerHTML.includes('aria-label="Replay number">#</th>'), "match history labels its replay-number column");
   assert(
     replayRows.map((row) => row.children[0].textContent).join(",") === "105,102",
     "match history renders canonical match ids and preserves gaps from hidden matches",

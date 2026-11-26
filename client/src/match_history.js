@@ -127,7 +127,7 @@ export class MatchHistory {
     const thead = document.createElement("thead");
     thead.innerHTML = `
       <tr>
-        <th scope="col">Replay #</th>
+        <th scope="col" aria-label="Replay number">#</th>
         <th scope="col">When</th>
         <th scope="col">Map</th>
         <th scope="col">Players</th>
