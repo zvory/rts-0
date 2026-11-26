@@ -137,3 +137,79 @@ fn end_state_hash_cost() {
     eprintln!("END_STATE_HASH_BENCH entities={} historical_commands={} rounds=100 median_us={} p95_us={} max_us={}",
         game.state.entities.iter().count(), game.state.command_log.len(), samples[50], samples[95], samples[99]);
 }
+
+#[test]
+fn pivot_drive_choice_roundtrips_and_changes_authoritative_fingerprint() {
+    use crate::game::entity::{EntityKind, Order, PivotDriveCommitment};
+    let mut game = game();
+    let start = game.state.map.tile_center(20, 20);
+    let waypoint = (start.0 + 32.0, start.1);
+    let id = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Tank, start.0, start.1)
+        .unwrap();
+    assert!(
+        game.state.players[0].reserve_supply(crate::rules::economy::supply_cost(EntityKind::Tank))
+    );
+    let e = game.state.entities.get_mut(id).unwrap();
+    e.replace_active_order(Order::move_to(waypoint.0, waypoint.1));
+    e.set_path(vec![waypoint]);
+    for reversing in [false, true] {
+        game.state
+            .entities
+            .get_mut(id)
+            .unwrap()
+            .movement
+            .as_mut()
+            .unwrap()
+            .pivot_drive = Some(PivotDriveCommitment {
+            waypoint,
+            reversing,
+        });
+        let hash = game.replay_end_state_hash().unwrap();
+        let payload = game.checkpoint_payload_text().unwrap();
+        let mut restored = Game::restore_checkpoint_payload_text(
+            &payload,
+            game.state.map.clone(),
+            game.state.map_metadata.clone(),
+        )
+        .unwrap();
+        assert_eq!(hash, restored.replay_end_state_hash().unwrap());
+        let mut original = game.clone_for_replay_keyframe();
+        for _ in 0..5 {
+            original.tick();
+            restored.tick();
+            assert_eq!(
+                original.replay_end_state_hash().unwrap(),
+                restored.replay_end_state_hash().unwrap()
+            );
+        }
+        game.state
+            .entities
+            .get_mut(id)
+            .unwrap()
+            .movement
+            .as_mut()
+            .unwrap()
+            .pivot_drive
+            .as_mut()
+            .unwrap()
+            .reversing = !reversing;
+        assert_ne!(hash, game.replay_end_state_hash().unwrap());
+        let mut invalid: serde_json::Value = serde_json::from_str(&payload).unwrap();
+        let tank = invalid["entities"]["entities"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|e| e["id"] == id)
+            .unwrap();
+        tank["movement"]["pivot_drive"]["waypoint"] = serde_json::json!([-1.0, 20.0]);
+        assert!(Game::restore_checkpoint_payload_text(
+            &invalid.to_string(),
+            game.state.map.clone(),
+            game.state.map_metadata.clone(),
+        )
+        .is_err());
+    }
+}

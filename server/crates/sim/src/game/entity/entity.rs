@@ -500,6 +500,7 @@ impl Entity {
         order.intent.target = next_target;
         order.execution.phase = AttackPhase::Waiting;
         movement.path.clear();
+        movement.clear_vehicle_recovery();
         movement.path_goal = None;
         self.set_target_id(Some(next_target));
         true
@@ -1357,6 +1358,7 @@ impl Entity {
             m.tournament_target = None;
             m.queued_orders.clear();
             m.path.clear();
+            m.clear_vehicle_recovery();
             m.last_move_delta = (0.0, 0.0);
         }
         self.set_target_id(None);
@@ -1390,6 +1392,7 @@ impl Entity {
         if let Some(m) = self.movement.as_mut() {
             m.order = Order::Idle;
             m.path.clear();
+            m.clear_vehicle_recovery();
             m.last_move_delta = (0.0, 0.0);
         }
         self.set_target_id(None);
