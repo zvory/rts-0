@@ -1379,12 +1379,12 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
 
 {
   const dash = ABILITIES[ABILITY.WIND_DASH];
-  assert(entityAbilityRangeTiles(dash, { kind: KIND.WIND_ADEPT, dao: "wind" }) === 15,
-    "Wind dash previews use fifteen tiles");
+  assert(entityAbilityRangeTiles(dash, { kind: KIND.WIND_ADEPT, dao: "wind" }) === 12,
+    "Wind Blink previews use twelve tiles");
   assert(entityAbilityRangeTiles(ABILITIES[ABILITY.EKAT_TELEPORT], { kind: KIND.EKAT }) === 5,
     "Ekat dash retains five tiles");
-  assert(commandCardAbilitiesForFaction("cultivators").find((entry) => entry.ability === ABILITY.WIND_DASH)?.rangeTiles === 15,
-    "Cultivator Dash metadata matches its range preview");
+  assert(commandCardAbilitiesForFaction("cultivators").find((entry) => entry.ability === ABILITY.WIND_DASH)?.rangeTiles === 12,
+    "Cultivator Blink metadata matches its range preview");
   assert(commandCardAbilitiesForFaction("cultivators").some((entry) => entry.ability === ABILITY.CHARGE),
     "Automatic Charge has a passive command-card indicator");
 }

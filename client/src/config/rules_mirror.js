@@ -9,7 +9,7 @@ import { TICK_HZ } from "./timing.js";
 export const CULTIVATOR_ITEM_CAPACITY = 3;
 export const CULTIVATOR_MASTER_ITEM_CAPACITY = 6;
 
-export const DAO_WIND_DASH_RANGE_TILES = 15;
+export const DAO_WIND_DASH_RANGE_TILES = 12;
 export function entityAbilityRangeTiles(definition, entity) {
   return definition?.rangeTiles;
 }
@@ -198,7 +198,7 @@ export const STATS = Object.freeze({
   [KIND.WIND_ADEPT]: { armored: false, label: "Wind Adept", icon: "WI", size: 26, sight: 14,
     rangeTiles: 0.75, cost: { steel: 150, oil: 35 }, supply: 3, buildTicks: 300,
     trainSlots: { [KIND.PORTAL]: 3 }, upgradeRequires: UPGRADE.DAO_WIND,
-    description: "Fast sword infantry with Dash and 50% armor penetration." },
+    description: "Fast sword infantry with Blink and 50% armor penetration." },
   [KIND.WAR_ADEPT]: { armored: false, label: "War Adept", icon: "WA", size: Math.fround(26 * Math.fround(DAO_WAR_BODY_SCALE)), sight: 11,
     rangeTiles: DAO_WAR_RANGE_TILES, cost: { steel: 150, oil: 35 }, supply: 3, buildTicks: 300,
     trainSlots: { [KIND.PORTAL]: 4 }, upgradeRequires: UPGRADE.DAO_OF_HEAVINESS,
@@ -538,10 +538,10 @@ export const ABILITIES = Object.freeze({
   [ABILITY.WIND_DASH]: Object.freeze({
     ability: ABILITY.WIND_DASH,
     label: "Blink", icon: "BLK", hotkey: "D",
-    title: "Blink up to 15 tiles; one charge, two at Master rank; recharges every 8 seconds",
+    title: "Blink up to 12 tiles; one charge, two at Master rank; recharges every 18 seconds",
     carriers: Object.freeze([KIND.WIND_ADEPT]),
     targetMode: "worldPoint", rangeTiles: DAO_WIND_DASH_RANGE_TILES,
-    cooldownTicks: 0, charges: 1, chargeRechargeTicks: EKAT_TELEPORT_COOLDOWN_TICKS,
+    cooldownTicks: 0, charges: 1, chargeRechargeTicks: 18 * TICK_HZ,
     cost: Object.freeze({ steel: 0, oil: 0 }), queued: true, queuePolicy: "skipIfNotReady",
   }),
   [ABILITY.EKAT_TELEPORT]: Object.freeze({

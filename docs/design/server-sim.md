@@ -1369,9 +1369,9 @@ card. Ekat's `ekatTeleport` world-point activation is a dash: it selects the nea
 moves the caster, and creates a four-second return marker at the original position. One dash
 command applies independently to every selected eligible Ekat for both immediate and queued casts.
 Each caster keeps its own range clamp, cooldown, and return marker; unavailable or invalid casters
-do not block the others. Wind uses the separate `windDash` ability, displayed as Blink, with a fifteen-tile clamp
+do not block the others. Wind uses the separate `windDash` ability, displayed as Blink, with a twelve-tile clamp
 and no return marker or recast. Adepts hold one charge and Masters two, recharging sequentially
-every eight seconds. Promotion adds one ready charge without resetting recharge progress.
+every eighteen seconds. Promotion adds one ready charge without resetting recharge progress.
 Wind Blink also applies independently to every selected eligible caster. Both outgoing dashes
 first try the exact range-clamped request, then search a one-world-pixel lattice anchored there
 across the full cast disk, ordered by squared distance with deterministic ties. Branch-and-bound

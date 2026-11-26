@@ -171,8 +171,8 @@ assert(!mixedDashGfx.calls.some((call) => call[0] === "moveTo" && call[1] === 52
 
 dashInput.clientIntent.beginCommandTarget({ kind: "ability", ability: ABILITY.WIND_DASH });
 dashInput._refreshAbilityTargetPreview();
-assertDeepEqual(dashInput.clientIntent.abilityTargetPreview.rangeOrigins.map((origin) => origin.rangePx), [480],
-  "Wind Dash targets only Wind units with fifteen-tile range");
+assertDeepEqual(dashInput.clientIntent.abilityTargetPreview.rangeOrigins.map((origin) => origin.rangePx), [384],
+  "Wind Blink targets only Wind units with twelve-tile range");
 
 console.log("Dao ability targeting contracts passed");
 
