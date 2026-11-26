@@ -168,6 +168,7 @@ pub(crate) fn movement_system_with_context(
             if let Some(movement) = e.movement.as_mut() {
                 movement.novice_charge_ticks = movement.novice_charge_ticks.saturating_sub(1);
             }
+            e.tick_passive_insight();
             e.tick_breakthrough_status();
             e.expire_shield(tick);
             e.tick_ability_cooldowns();

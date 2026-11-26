@@ -851,6 +851,9 @@ through checkpoints. Evolution changes Novice `warrior` (29) to `wind_adept` (35
 Permanent Dao identity is derived from kind; the engine stores no separate mutable `dao`. Visible Disciple snapshots append `insight` (compact slot 45) and
 `dao` (slot 46: wind/war/magic). Evolution buttons set replaceable, entity-owned `chosenDao` intent (team-private compact slot 49), independent of orders. Codes 14–16 and order stages 22–24 retain their positions.
 Evolution automatically occurs once 60 insight is ready, without research or a Pavilion.
+Living Novices and all three Adept paths additionally earn one passive insight every five seconds
+(150 ticks per unit since spawning, with the remainder preserved through evolution and checkpoints).
+Serfs are excluded; existing 60/200 caps and terminal zero-insight Masters are unchanged.
 Evolution clears all insight and raises the cap to 200. Wind and War Adepts continue earning
 insight from actual hostile HP damage (one insight per unit HP removed, quarter-rate building damage, with exact fractional carry; Wind earns full one-per-HP insight from Pumpjacks and Steel Mines; War Adepts earn double insight from actual Tank HP removed; both legs of Throw Sword earn Insight at these rates). Magic Adepts earn the same combat insight, plus 20 per enemy unit death inside their active Vector Field; Shield grants no insight; reaching 200 automatically advances a living Adept to its matching Master. Research ids are
 `dao_wind`, `dao_of_heaviness` (War), `dao_of_magic` (Magic).

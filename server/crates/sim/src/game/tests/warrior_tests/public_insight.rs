@@ -103,3 +103,61 @@ fn disciple_insight_is_public_but_chosen_dao_stays_team_private() {
         .recompute(&[1, 2, 3], &game.state.entities, &game.state.map);
     assert!(!game.snapshot_for(2).entities.iter().any(|e| e.id == unit));
 }
+
+#[test]
+fn passive_insight_ticks_in_game_and_triggers_automatic_evolution() {
+    let mut game = empty_flat_game(&[cultivator_player()]);
+    let novice = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Warrior, 400.0, 400.0)
+        .unwrap();
+    let serf = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Worker, 600.0, 400.0)
+        .unwrap();
+    let unit = game.state.entities.get_mut(novice).unwrap();
+    unit.insight = 59;
+    unit.chosen_dao = Some(crate::game::upgrade::UpgradeKind::DaoWind);
+    for _ in 1..config::DISCIPLE_PASSIVE_INSIGHT_TICKS {
+        game.tick();
+    }
+    assert_eq!(
+        game.state.entities.get(novice).unwrap().kind,
+        EntityKind::Warrior
+    );
+    // A later spawn must start its own cadence, including across a real game checkpoint.
+    let late = game
+        .state
+        .entities
+        .spawn_unit(1, EntityKind::Warrior, 800.0, 400.0)
+        .unwrap();
+    // Refresh derived state and supply before exporting the newly spawned fixture.
+    game.tick();
+    let evolved = game.state.entities.get(novice).unwrap();
+    assert_eq!(evolved.kind, EntityKind::WindAdept);
+    assert_eq!(evolved.insight, 0);
+    assert_eq!(game.state.entities.get(serf).unwrap().insight, 0);
+    let payload = game.checkpoint_payload_text_for_test().unwrap();
+    let mut restored = Game::restore_checkpoint_payload_text_for_test(
+        &payload,
+        game.state.map.clone(),
+        game.state.map_metadata.clone(),
+    )
+    .unwrap();
+    for _ in 1..config::DISCIPLE_PASSIVE_INSIGHT_TICKS {
+        game.tick();
+        restored.tick();
+    }
+    for continued in [&game, &restored] {
+        assert_eq!(continued.state.entities.get(novice).unwrap().insight, 0);
+        assert_eq!(continued.state.entities.get(late).unwrap().insight, 1);
+    }
+    game.tick();
+    restored.tick();
+    for continued in [&game, &restored] {
+        assert_eq!(continued.state.entities.get(novice).unwrap().insight, 1);
+        assert_eq!(continued.state.entities.get(late).unwrap().insight, 1);
+    }
+}
