@@ -179,7 +179,11 @@ fn disciple_flat_unit_insight_carries_building_fractions_through_checkpoints() {
             unit.gain_insight(3, target);
         }
         let expected = if kind == EntityKind::WarAdept { 15 } else { 12 };
-        assert_eq!((unit.insight, unit.insight_fraction), (expected, 0), "{kind:?}");
+        assert_eq!(
+            (unit.insight, unit.insight_fraction),
+            (expected, 0),
+            "{kind:?}"
+        );
         unit.gain_insight(3, EntityKind::ResourceDepot);
         assert_eq!((unit.insight, unit.insight_fraction), (expected, 3));
         let checkpoint = game.checkpoint_payload_text_for_test().unwrap();

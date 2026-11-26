@@ -696,13 +696,18 @@ fn war_adept_tank_insight_doubles_actual_damage_only() {
                 run_combat_tick(&mut entities);
                 let damage = hp - entities.get(target).unwrap().hp;
                 assert!(damage > 0);
-                let multiplier = if kind == EntityKind::WarAdept && target_kind == EntityKind::Tank {
+                let multiplier = if kind == EntityKind::WarAdept && target_kind == EntityKind::Tank
+                {
                     2
                 } else {
                     1
                 };
                 let unit = entities.get(attacker).unwrap();
-                assert_eq!(unit.insight, damage * multiplier, "{kind:?} vs {target_kind:?}, hp={hp}");
+                assert_eq!(
+                    unit.insight,
+                    damage * multiplier,
+                    "{kind:?} vs {target_kind:?}, hp={hp}"
+                );
                 assert_eq!(unit.insight_fraction, 1);
             }
         }
