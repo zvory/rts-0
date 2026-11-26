@@ -1099,10 +1099,12 @@ for (const researched of [false, true]) {
     resources: { steel: 1000, oil: 1000 },
   });
   const items = idle.slots.filter(Boolean);
-  assert.equal(items.length, 7);
-  assert.deepEqual(items.map((item) => item.ability), [ABILITY.ESCAPE_TREASURE, ABILITY.DOUBLE_XP, ABILITY.REGEN, ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE, ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE]);
-  assert.deepEqual(items.map((item) => item.intent.targetMode), Array(7).fill("friendlyUnit"));
-  assert.deepEqual(items.map((item) => item.cost.oil), [100, 50, 50, 100, 100, 100, 150]);
+  assert.equal(items.length, 8);
+  assert.equal(idle.slots[2].ability, ABILITY.BREAKTHROUGH_TREASURE);
+  assert.equal(idle.slots[2].hotkey, "E");
+  assert.deepEqual(items.map((item) => item.ability), [ABILITY.ESCAPE_TREASURE, ABILITY.DOUBLE_XP, ABILITY.BREAKTHROUGH_TREASURE, ABILITY.REGEN, ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE, ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE]);
+  assert.deepEqual(items.map((item) => item.intent.targetMode), Array(8).fill("friendlyUnit"));
+  assert.deepEqual(items.map((item) => item.cost.oil), [100, 50, 100, 50, 100, 100, 100, 150]);
   assert(!items.some((item) => item.ability === ABILITY.HEALING_SEAL));
   assert.deepEqual(idle.rowLabels, ["Util", "Defense", "Offense"]);
 }
