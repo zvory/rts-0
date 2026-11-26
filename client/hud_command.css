@@ -136,5 +136,8 @@
 
 #command-card .cmd-btn[data-ability="regen"] .cmd-label,
 #command-card .cmd-btn[data-ability="armorTreasure"] .cmd-label {
-  white-space: nowrap;
+  white-space: normal;
+  text-overflow: clip;
+  text-align: center;
+  line-height: 1.1;
 }
