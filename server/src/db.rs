@@ -112,6 +112,9 @@ pub struct MatchSummary {
     pub winner_name: Option<String>,
     pub outcome: String,
     pub participants: Vec<String>,
+    /// Replay launch-time faction ids, keyed by score-screen player id.
+    #[serde(rename = "playerFactions", default)]
+    pub player_factions: serde_json::Value,
     #[serde(rename = "scoreScreen")]
     pub score_screen: serde_json::Value,
     #[serde(rename = "humanCount")]
@@ -315,6 +318,12 @@ impl Db {
                    matches.outcome as outcome,
                    matches.participants as participants,
                    matches.score_screen as score_screen,
+                   coalesce((
+                       select jsonb_object_agg(player->>'id', player->>'faction_id')
+                       from jsonb_array_elements(r.artifact_json->'players') as player
+                       where player->>'id' is not null
+                         and player->>'faction_id' is not null
+                   ), '{}'::jsonb) as player_factions,
                    matches.human_count as human_count,
                    matches.debug_mode as debug_mode,
                    matches.local_only as local_only,
@@ -378,6 +387,12 @@ impl Db {
                    matches.outcome as outcome,
                    matches.participants as participants,
                    matches.score_screen as score_screen,
+                   coalesce((
+                       select jsonb_object_agg(player->>'id', player->>'faction_id')
+                       from jsonb_array_elements(r.artifact_json->'players') as player
+                       where player->>'id' is not null
+                         and player->>'faction_id' is not null
+                   ), '{}'::jsonb) as player_factions,
                    matches.human_count as human_count,
                    matches.debug_mode as debug_mode,
                    matches.local_only as local_only,
@@ -456,6 +471,7 @@ fn row_to_summary(row: PgRow) -> MatchSummary {
         winner_name: row.get("winner_name"),
         outcome: row.get("outcome"),
         participants: row.get("participants"),
+        player_factions: row.get("player_factions"),
         score_screen: row.get("score_screen"),
         human_count: row.get("human_count"),
         debug_mode: row.get("debug_mode"),
@@ -559,6 +575,7 @@ mod tests {
             winner_name: None,
             outcome: "aborted".to_string(),
             participants: vec!["Alpha".to_string(), "Bravo".to_string()],
+            player_factions: serde_json::json!({"1": "cultivators", "2": "kriegsia"}),
             score_screen: serde_json::Value::Array(Vec::new()),
             human_count: 2,
             debug_mode: false,
@@ -569,6 +586,8 @@ mod tests {
         };
 
         let value = serde_json::to_value(summary).expect("summary serializes");
+        assert_eq!(value["playerFactions"]["1"], "cultivators");
+        assert_eq!(value["playerFactions"]["2"], "kriegsia");
         assert_eq!(value["winnerName"], serde_json::Value::Null);
         assert_eq!(value["outcome"], "aborted");
         assert_eq!(value["matchRunId"], "ai-observation-123");

@@ -79,6 +79,14 @@ Migrations are versioned SQL files run by `sqlx::migrate!` at server boot. Never
   one-participant rows. Solo sandbox rows, AI-only rows, and historical debug rows may be
   persisted with replay artifacts but stay out of the lobby table. Local-only rows are included
   only when the request peer address is loopback; public beta/mainline requests filter them out.
+  Each summary includes `playerFactions`, an object mapping score-screen player ids to their
+  launch-time faction ids from the stored replay (`players[].faction_id`). This small projection
+  uses existing replay storage, including historical and currently incompatible replay rows; no
+  new columns or writes are needed. Missing faction data produces an empty object. The lobby
+  appends `(C)` for Cultivators and `(K)` for Kriegsia in participant, winner, and expanded score
+  names; unknown or missing factions leave names unchanged. Duplicate participant names consume
+  score seats in order; a winner whose name matches multiple factions stays unlabeled because
+  `winner_name` alone cannot identify that seat.
   Each summary includes `replayNumber`, equal to the canonical `matches.id` primary key used by
   replay launch and diagnostics. Because hidden solo sandbox, AI-only, debug, local-only, and
   historical test rows still consume primary keys, the visible sequence intentionally has gaps.

@@ -3,7 +3,7 @@
 
 import { assert } from "./assertions.mjs";
 import { withFakeHudDocument } from "./fakes.mjs";
-import { MatchHistory, matchHistoryWinnerLabel } from "../../client/src/match_history.js";
+import { MatchHistory, matchHistoryWinnerLabel, matchHistoryParticipantLabels } from "../../client/src/match_history.js";
 
 const FALLBACK_LABEL = "\u2014";
 
@@ -31,6 +31,31 @@ assert(
   matchHistoryWinnerLabel({}) === FALLBACK_LABEL,
   "match history winner label falls back for empty rows",
 );
+
+{
+  const row = {
+    participants: ["Same", "Same", "Unknown", "Legacy"],
+    scoreScreen: [
+      { id: 7, name: "Same" },
+      { id: 2, name: "Same" },
+      { id: 9, name: "Unknown" },
+    ],
+    playerFactions: { 7: "cultivators", 2: "kriegsia", 9: "future-faction" },
+    winnerName: "Same",
+    outcome: "win",
+  };
+  assert(matchHistoryParticipantLabels(row).join(", ") === "Same (C), Same (K), Unknown, Legacy",
+    "participants use player ids and seat order, preserving unknown and historical factions");
+  assert(matchHistoryWinnerLabel(row) === "Same",
+    "duplicate winner names with different factions do not guess a faction");
+  row.winnerName = "Solo";
+  row.scoreScreen.push({ id: 4, name: "Solo" });
+  row.playerFactions[4] = "cultivators";
+  assert(matchHistoryWinnerLabel(row) === "Solo (C)", "winner includes its recorded faction");
+  delete row.playerFactions;
+  assert(matchHistoryParticipantLabels(row).join(", ") === "Same, Same, Unknown, Legacy",
+    "historical summaries without faction metadata preserve plain names");
+}
 
 withFakeHudDocument(() => {
   let refreshes = 0;
@@ -133,9 +158,10 @@ withFakeHudDocument(() => {
     durationMs: 12_000,
     replayAvailable: true,
     replayUnavailableReason: null,
+    playerFactions: { 1: "cultivators", 2: "kriegsia" },
     scoreScreen: [
-      { name: "Alice", unitScore: 10, structureScore: 0 },
-      { name: "Bravo", unitScore: 9, structureScore: 0 },
+      { id: 1, name: "Alice", unitScore: 10, structureScore: 0 },
+      { id: 2, name: "Bravo", unitScore: 9, structureScore: 0 },
     ],
   };
   const history = Object.assign(Object.create(MatchHistory.prototype), {
@@ -157,6 +183,12 @@ withFakeHudDocument(() => {
   assert(renderedText.includes("Watch replay"), "expanded aborted match row exposes replay launch");
   assert(renderedText.includes("Alice") && renderedText.includes("Bravo"),
     "expanded aborted match row keeps score-screen player detail");
+
+  const tableBody = history._tableHost.children[0].children[1];
+  assert(tableBody.children[0].children[3].textContent === "Alice (C), Bravo (K)",
+    "recent match player list renders faction suffixes");
+  assert(renderedText.includes("Alice (C)") && renderedText.includes("Bravo (K)"),
+    "expanded scores render faction suffixes");
 
   const buttons = history._tableHost.querySelectorAll("button");
   assert(buttons.length === 1, "expanded aborted match row renders one replay button");
