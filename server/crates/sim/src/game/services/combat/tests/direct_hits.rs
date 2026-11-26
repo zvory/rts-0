@@ -170,3 +170,73 @@ fn disciple_shield_armors_direct_hits_and_tank_splash_and_charges_full_damage() 
         }
     }
 }
+
+#[test]
+fn shop_armor_adds_to_unit_armor_before_penetration_and_health_mutation() {
+    use crate::game::ability::AbilityKind;
+    for (kind, item, penetration, expected) in [
+        (EntityKind::WindAdept, false, 0.0, 100),
+        (EntityKind::WindAdept, true, 0.0, 50),
+        (EntityKind::WindAdept, true, 0.5, 75),
+        (EntityKind::WindAdept, true, 1.0, 100),
+        (EntityKind::WarAdept, false, 0.0, 50),
+        (EntityKind::WarAdept, true, 0.0, 0),
+        (EntityKind::WarAdept, true, 0.5, 50),
+        (EntityKind::WarAdept, true, 1.0, 100),
+        (EntityKind::Tank, true, 0.0, 0),
+        (EntityKind::Tank, true, 0.5, 50),
+        (EntityKind::Tank, true, 1.0, 100),
+    ] {
+        let map = open_map(16);
+        let mut entities = EntityStore::new();
+        let attacker = entities
+            .spawn_unit(1, EntityKind::Rifleman, 100.0, 200.0)
+            .unwrap();
+        let target = entities.spawn_unit(2, kind, 300.0, 200.0).unwrap();
+        let unit = entities.get_mut(target).unwrap();
+        unit.set_spawn_health(1000);
+        if item {
+            unit.receive_shop_item(AbilityKind::ArmorTreasure);
+        }
+        let mut weapon =
+            *combat_rules::weapon_profile(combat_rules::WeaponKind::RiflemanRifle).unwrap();
+        weapon.armor_penetration = penetration;
+        let teams = default_team_relations();
+        let fog = visible_fog(&map, &entities);
+        let mut events = HashMap::new();
+        super::super::damage::apply_direct_hit(
+            &map,
+            &mut entities,
+            &teams,
+            &mut events,
+            &fog,
+            attacker,
+            target,
+            &weapon,
+            100,
+            1,
+            (100.0, 200.0),
+            0,
+            1,
+        );
+        assert_eq!(
+            1000 - entities.get(target).unwrap().hp,
+            expected,
+            "{kind:?}, item={item}, penetration={penetration}"
+        );
+    }
+}
+
+#[test]
+fn resolved_and_armor_bypassing_damage_is_not_halved_again() {
+    let mut unit =
+        crate::game::entity::Entity::new_unit(1, EntityKind::WindAdept, 100.0, 100.0).unwrap();
+    unit.receive_shop_item(crate::game::ability::AbilityKind::ArmorTreasure);
+    let hp = unit.hp;
+    unit.apply_damage(20, None);
+    assert_eq!(
+        unit.hp,
+        hp - 20,
+        "raw HP mutation receives already-resolved damage"
+    );
+}

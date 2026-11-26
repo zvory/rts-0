@@ -130,9 +130,9 @@ fn war_armor_uses_weapon_penetration_and_wind_changes_attack_rate() {
     assert!((unit.movement_speed() - 2.0).abs() < 0.001);
     unit.set_disciple_kind_for_test(EntityKind::WarAdept);
     assert!((unit.movement_speed() - 2.1).abs() < 0.001);
-    assert_eq!(unit.dao_damage_after_armor(100, 0.0), 50);
-    assert_eq!(unit.dao_damage_after_armor(100, 0.5), 75);
-    assert_eq!(unit.dao_damage_after_armor(100, 1.0), 100);
+    assert_eq!(unit.damage_after_armor(100, 0.0), 50);
+    assert_eq!(unit.damage_after_armor(100, 0.5), 75);
+    assert_eq!(unit.damage_after_armor(100, 1.0), 100);
     let war = effective_attack_profile(&unit);
     assert_eq!(war.dmg, 35);
     assert_eq!(war.range_tiles, config::DAO_WAR_RANGE_TILES);

@@ -17,8 +17,10 @@ use crate::game::map::Map;
 use crate::game::services::dist2;
 use crate::game::teams::TeamRelations;
 use crate::protocol::{self, AttackReveal, Event};
+#[cfg(test)]
 use crate::rules::combat;
 use crate::rules::projection;
+#[cfg(test)]
 use crate::rules::terrain::TerrainKind;
 use serde::{Deserialize, Serialize};
 
@@ -363,8 +365,12 @@ fn resolve(context: MortarResolutionContext<'_>, shell: &MortarShell) {
         let effective = entities
             .get(id)
             .map(|target| {
-                let base = shell_effective_damage(target.kind, shell.rocket, base, piercing_hit);
-                let damage = target.dao_damage_after_armor(base, u8::from(piercing_hit) as f32);
+                let damage = target.damage_after_armor(base, u8::from(piercing_hit) as f32);
+                let damage = if shell.rocket && config::building_stats(target.kind).is_some() {
+                    config::rocket_barrage_building_damage(damage)
+                } else {
+                    damage
+                };
                 let damage = entrenchment_combat::reduce_area_damage(target, damage);
                 map.damage_after_reduction_tile(target.pos_x(), target.pos_y(), damage)
             })
@@ -445,6 +451,7 @@ fn mortar_reveal_for(attacker: Option<&Entity>, owner: u32) -> Option<AttackReve
     })
 }
 
+#[cfg(test)]
 fn mortar_damage(victim_kind: EntityKind, base: u32) -> u32 {
     combat::effective_damage(
         EntityKind::MortarTeam,
@@ -468,6 +475,7 @@ fn shell_damage(rocket: bool, d2: f32, inner2: f32, piercing_hit: bool) -> u32 {
     }
 }
 
+#[cfg(test)]
 fn shell_effective_damage(
     victim_kind: EntityKind,
     rocket: bool,

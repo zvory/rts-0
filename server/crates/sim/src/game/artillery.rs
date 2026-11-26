@@ -9,9 +9,9 @@ use crate::game::map::Map;
 use crate::game::services::geometry::RectBody;
 use crate::game::teams::TeamRelations;
 use crate::protocol::{Event, NoticeSeverity};
+#[cfg(test)]
 use crate::rules::combat;
 use crate::rules::projection;
-use crate::rules::terrain::TerrainKind;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -139,15 +139,9 @@ fn resolve_shell(
             base
         };
         let penetration = if d2 <= inner2 { 1.0 } else { 0.0 };
-        let damage = combat::effective_damage_for_armor_penetration(
-            penetration,
-            target.kind,
-            base,
-            Some(TerrainKind::Open),
-        );
         let damage = entrenchment_combat::reduce_area_damage(
             target,
-            target.dao_damage_after_armor(damage, penetration),
+            target.damage_after_armor(base, penetration),
         );
         let damage = map.damage_after_reduction_tile(target.pos_x(), target.pos_y(), damage);
         let damage = entities.shielded_damage(

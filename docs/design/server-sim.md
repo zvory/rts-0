@@ -2345,7 +2345,7 @@ Its standability and occupancy queries select legal rescue exits; it does not im
 adapters or invoke another tick phase. Entity-owned protection and runtime projectiles use the
 existing checkpoint policies for entities and ability runtime.
 
-Carried Shop attack/defense items (Regen, Haste, Double Damage, Armor, and Vitality) persist permanently under entity `ability_uses_remaining`; their effects apply immediately on delivery without cooldowns or activation. Escape's global 60-second purchase timer uses existing durable player `ability_cooldowns`. These existing owners checkpoint and fingerprint the state without a new state-tree owner. See [categorized Shop items](shop.md#carried-attack-and-defense-goods).
+Carried Shop attack/defense items (Regen, Haste, Double Damage, Armor, and Vitality) persist permanently under entity `ability_uses_remaining`; their effects apply immediately on delivery without cooldowns or activation. Armor is resolved with native/Dao armor before penetration at hit production, rather than inside raw `Entity::apply_damage`; shared rules combine and cap additive bonuses before other defenses. Escape's global 60-second purchase timer uses existing durable player `ability_cooldowns`. These existing owners checkpoint and fingerprint the state without a new state-tree owner. See [categorized Shop items](shop.md#carried-attack-and-defense-goods).
 
 Vitality Treasure shares the existing carried owner and checkpoints its permanent bonus in the existing `hp`/`max_hp` pair. It has no expiry. Dao promotion excludes this flat bonus before scaling base health. See [Vitality rules](shop.md#vitality-treasure).
 
