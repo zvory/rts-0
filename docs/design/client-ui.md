@@ -3095,6 +3095,18 @@ and below fog. The server’s public `chargeActive` flag is the sole activation 
 inferred from speed or private cooldowns. Lines rotate with facing and scale with body/rank.
 The existing Graphics pool sweep hides inactive/hidden carriers immediately and owns teardown.
 
+### Shop item tooltips
+
+Shop and Buy menu items reuse the existing command-button `.cmd-tooltip` markup and
+CSS hover/focus behavior used by training and research. There is no separate overlay,
+hover timer, or tooltip lifecycle. Short authored presentation fields (`tooltipName`,
+`summary`, `qualifier`) live with `CARRIED_ITEMS` in `config/carried_items.js`; cost comes
+from the current ability affordance. The shared Shop formatter adds an unavailable
+reason only when applicable. Existing long catalog `title` text remains rules reference
+metadata and is not parsed to generate short copy. Rich-tooltip buttons omit native
+`title` popups and retain the title as an accessible label. Shop flyouts sit left of
+the command grid on desktop and above it on touch screens.
+
 ### Cosmic Energy and Breakthrough Shop presentation
 
 The resource HUD displays Cosmic Energy with a ✨ sparkle and its current authoritative total,
