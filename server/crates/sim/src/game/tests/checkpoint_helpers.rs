@@ -29,6 +29,7 @@ struct SemanticGameView {
     ability_runtime: String,
     mortar_shells: String,
     artillery_shells: String,
+    disciple_shots: String,
     panzerfaust_shots: String,
     observer_analysis: String,
 }
@@ -266,6 +267,7 @@ fn semantic_game_view(game: &Game) -> SemanticGameView {
         ability_runtime: format!("{:?}", game.state.ability_runtime),
         mortar_shells: format!("{:?}", game.state.mortar_shells),
         artillery_shells: format!("{:?}", game.state.artillery_shells),
+        disciple_shots: format!("{:?}", game.state.disciple_shots),
         panzerfaust_shots: format!("{:?}", game.state.panzerfaust_shots),
         observer_analysis: format!("{:?}", game.observer_analysis()),
     }

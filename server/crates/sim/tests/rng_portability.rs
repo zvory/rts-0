@@ -143,9 +143,10 @@ fn end_state_fingerprint_matches_native_and_wasm() {
     // Fingerprint v4 also covers waypoint-bound normal forward/reverse commitments.
     // It includes the persisted Novice Charge timer, resource knowledge and tournament
     // entry/production and optional committed pivot-recovery fields, as well as the
-    // remaining entity and RNG state. Native and WASM must share this known answer.
+    // remaining entity and RNG state. Sim schema 8 adds detached magic-orb impacts.
+    // Native and WASM must share this known answer.
     assert_eq!(
         game.replay_end_state_hash().unwrap(),
-        "e1626bb6ef4e5744090b7c0604b897e5f8bc783d4d4897faca91b2702acf3710"
+        "69469ccf232e412489905864f664582a32aa3ea7abd6ee4f6e9842c1ad0398cb"
     );
 }

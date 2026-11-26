@@ -25,6 +25,7 @@ mod checkpoint;
 pub mod command;
 mod commands;
 mod derived_state;
+mod disciple_shot;
 pub mod entity;
 mod entrenchment_combat;
 mod firing_reveal;
@@ -297,6 +298,7 @@ impl Game {
             &mut self.state.mortar_shells,
             &mut self.state.artillery_shells,
             &mut self.state.panzerfaust_shots,
+            &mut self.state.disciple_shots,
             &mut self.state.active_construction_sites,
             pending,
             &mut events,

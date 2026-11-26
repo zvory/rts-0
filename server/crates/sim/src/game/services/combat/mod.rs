@@ -42,8 +42,6 @@ mod tests;
 #[cfg(test)]
 use acquisition::{combat_mode, resolve_target as resolve_target_for_test};
 use acquisition::{combat_mode_with_moving_fire, CombatMode};
-#[cfg(test)]
-use damage::apply_damage;
 use projection::primary_target_distance_sq;
 use shot_blocker_index::ShotBlockerIndex;
 use target_legality::{direct_fire_target_legal, DirectFireLegality};
@@ -119,11 +117,13 @@ pub(in crate::game) fn combat_system(
     fog: &Fog,
     smokes: &SmokeCloudStore,
     panzerfaust_shots: &mut PanzerfaustShotStore,
+    disciple_shots: &mut crate::game::disciple_shot::DiscipleShotStore,
     rng: &mut impl Rng,
     events: &mut HashMap<u32, Vec<Event>>,
     firing_reveals: &mut Vec<FiringRevealSource>,
     tick: u32,
 ) {
+    shot::resolve_orbs(map, entities, teams, fog, events, disciple_shots, tick);
     let mut body_blockers = crate::game::services::standability::UnitBlockers::new(entities);
     let los = LineOfSight::with_smoke(map, smokes);
     for id in entities.ids() {
@@ -508,6 +508,7 @@ pub(in crate::game) fn combat_system(
                 &los,
                 fog,
                 smokes,
+                disciple_shots,
                 rng,
                 events,
                 firing_reveals,
@@ -618,6 +619,7 @@ pub(in crate::game) fn combat_system(
         &los,
         fog,
         smokes,
+        disciple_shots,
         rng,
         events,
         firing_reveals,

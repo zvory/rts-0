@@ -1,5 +1,5 @@
 {
-  "reason": "Reject repairs of consumable building HP; register the focused Healing Seal regression fixture HP write.",
+  "reason": "Allow explicit through-impact combat test helper player slices for detached magic-orb coverage.",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -2072,6 +2072,16 @@
     {
       "path": "services/combat/tests.rs",
       "line": 187,
+      "code": "players: &[PlayerState],"
+    },
+    {
+      "path": "services/combat/tests.rs",
+      "line": 201,
+      "code": "players: &[PlayerState],"
+    },
+    {
+      "path": "services/combat/tests.rs",
+      "line": 225,
       "code": "players: &[PlayerState],"
     },
     {

@@ -47,10 +47,10 @@ struct PlayerCheckpointRef<'a, T> {
 
 const CHECKPOINT_SCHEMA: &str = "rts.gameCheckpoint";
 const CHECKPOINT_VERSION: u32 = rts_contract::GAME_CHECKPOINT_CURRENT_VERSION;
-// Version 7 records permanent Dao identity in EntityKind instead of a mutable Dao field.
+// Version 8 adds detached magic-orb impacts.
 // Physical positions remain Q19.12 with pinned portable gameplay math.
 // Keep older payloads outside this boundary instead of silently guessing missing fields.
-const SIM_SCHEMA_VERSION: u32 = 7;
+const SIM_SCHEMA_VERSION: u32 = 8;
 const RULES_VERSION: u32 = 1;
 const PROTOCOL_VERSION: u32 = 1;
 const RNG_ALGORITHM: &str = "rts-xoshiro256pp-pcg32-rand086-draws-v1";
@@ -157,6 +157,7 @@ struct GameCheckpointV1 {
     ability_runtime: AbilityRuntime,
     mortar_shells: MortarShellStore,
     artillery_shells: ArtilleryShellStore,
+    disciple_shots: super::disciple_shot::DiscipleShotStore,
     #[serde(default)]
     panzerfaust_shots: PanzerfaustShotStore,
     active_construction_sites: BTreeSet<u32>,
@@ -212,6 +213,7 @@ impl GameCheckpointV1 {
             ability_runtime: state.ability_runtime.clone(),
             mortar_shells: state.mortar_shells.clone(),
             artillery_shells: state.artillery_shells.clone(),
+            disciple_shots: state.disciple_shots.clone(),
             panzerfaust_shots: state.panzerfaust_shots.clone(),
             active_construction_sites: state.active_construction_sites.clone(),
             lab_god_mode_players: state.lab_god_mode_players.clone(),
@@ -289,6 +291,7 @@ impl GameCheckpointV1 {
             ability_runtime: self.ability_runtime,
             mortar_shells: self.mortar_shells,
             artillery_shells: self.artillery_shells,
+            disciple_shots: self.disciple_shots,
             panzerfaust_shots,
             seed: self.seed,
             starting_loadouts: self.starting_loadouts,
@@ -437,6 +440,13 @@ impl GameCheckpointV1 {
             self.tick,
             &player_ids,
             &entity_ids,
+        )?;
+        validate_disciple_shots(
+            &self.disciple_shots,
+            &player_ids,
+            self.entities.next_id,
+            map,
+            self.tick,
         )?;
         validate_panzerfaust_shots(
             &self.panzerfaust_shots,
