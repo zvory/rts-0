@@ -147,7 +147,7 @@ export class MatchHistory {
       tr.appendChild(td(formatReplayNumber(row.replayNumber)));
       tr.appendChild(td(formatRelative(row.startedAt)));
       tr.appendChild(td(row.mapName || "—"));
-      tr.appendChild(td((row.participants || []).join(", ")));
+      tr.appendChild(td(matchHistoryParticipantLabels(row).join(", ")));
       tr.appendChild(td(matchHistoryWinnerLabel(row)));
       tr.appendChild(td(formatDuration(row.durationMs)));
       tr.addEventListener("click", () => this._toggleRow(row.id));
@@ -188,7 +188,7 @@ export class MatchHistory {
     const wrap = document.createElement("div");
     wrap.className = "match-history-detail-wrap";
     wrap.appendChild(this._renderReplayAction(row));
-    wrap.appendChild(renderScoreScreen(row.scoreScreen));
+    wrap.appendChild(renderScoreScreen(row.scoreScreen, row.playerFactions));
     return wrap;
   }
 
@@ -271,9 +271,29 @@ export async function requestReplayRoom(id, fetchImpl = window.fetch.bind(window
 
 export function matchHistoryWinnerLabel(row) {
   if (row?.outcome === "aborted") return "Aborted";
-  if (row?.winnerName) return row.winnerName;
+  if (row?.winnerName) {
+    // Display names can collide. Only label the winner when its faction is unambiguous.
+    const scores = (row.scoreScreen || []).filter((score) => score.name === row.winnerName);
+    const factions = new Set(scores.map((score) => row.playerFactions?.[score.id]));
+    return factionName(row.winnerName, factions.size === 1 ? [...factions][0] : null);
+  }
   if (row?.outcome === "draw") return "Draw";
   return "—";
+}
+
+export function matchHistoryParticipantLabels(row) {
+  const remaining = [...(row.scoreScreen || [])];
+  return (row.participants || []).map((name) => {
+    // Consume seats in order so identical display names can still have different factions.
+    const index = remaining.findIndex((score) => score.name === name);
+    const score = index < 0 ? null : remaining.splice(index, 1)[0];
+    return factionName(name, row.playerFactions?.[score?.id]);
+  });
+}
+
+function factionName(name, factionId) {
+  const suffix = factionId === "cultivators" ? "C" : factionId === "kriegsia" ? "K" : null;
+  return suffix ? `${name} (${suffix})` : name;
 }
 
 function td(text) {
@@ -305,7 +325,7 @@ function formatRelative(iso) {
   return new Date(t).toLocaleDateString();
 }
 
-function renderScoreScreen(scores) {
+function renderScoreScreen(scores, playerFactions) {
   const wrap = document.createElement("div");
   wrap.className = "match-history-score";
   if (!Array.isArray(scores) || scores.length === 0) {
@@ -328,7 +348,7 @@ function renderScoreScreen(scores) {
   const tbody = document.createElement("tbody");
   for (const s of scores) {
     const tr = document.createElement("tr");
-    const nameTd = td(s.name || "—");
+    const nameTd = td(factionName(s.name || "—", playerFactions?.[s.id]));
     if (s.color) {
       const swatch = document.createElement("span");
       swatch.className = "match-history-color";

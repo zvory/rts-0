@@ -25,6 +25,7 @@ fn replay_summary_for(
         winner_name: Some("Alpha".to_string()),
         outcome: "win".to_string(),
         participants: vec!["Alpha".to_string(), "Bravo".to_string()],
+        player_factions: serde_json::json!({}),
         score_screen: serde_json::Value::Array(Vec::new()),
         human_count: 2,
         debug_mode: false,
