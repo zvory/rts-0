@@ -106,6 +106,8 @@ pub fn disciple_insight_ratio(
         && !(attacker == crate::EntityKind::WindAdept && target.is_resource_extractor())
     {
         (1, 4)
+    } else if attacker == crate::EntityKind::WarAdept && target == crate::EntityKind::Tank {
+        (8, 4)
     } else {
         (4, 4)
     }

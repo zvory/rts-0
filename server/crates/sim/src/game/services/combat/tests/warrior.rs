@@ -674,3 +674,42 @@ fn wind_attack_move_stops_its_travel_route_to_engage() {
     );
     assert_eq!(unit.move_intent(), Some(destination));
 }
+
+#[test]
+fn war_adept_tank_insight_doubles_actual_damage_only() {
+    for kind in [
+        EntityKind::Warrior,
+        EntityKind::WindAdept,
+        EntityKind::WarAdept,
+        EntityKind::MagicAdept,
+    ] {
+        for target_kind in [EntityKind::Tank, EntityKind::ScoutCar, EntityKind::Rifleman] {
+            for hp in [1, 180] {
+                let mut entities = EntityStore::new();
+                let attacker = entities.spawn_unit(1, kind, 100.0, 100.0).unwrap();
+                let target = entities.spawn_unit(2, target_kind, 125.0, 100.0).unwrap();
+                entities.get_mut(target).unwrap().set_spawn_health(hp);
+                let unit = entities.get_mut(attacker).unwrap();
+                // A prior building hit's fractional credit must survive the tank bonus.
+                unit.gain_insight(1, EntityKind::ResourceDepot);
+                unit.set_order(Order::attack(target));
+                run_combat_tick(&mut entities);
+                let damage = hp - entities.get(target).unwrap().hp;
+                assert!(damage > 0);
+                let multiplier = if kind == EntityKind::WarAdept && target_kind == EntityKind::Tank
+                {
+                    2
+                } else {
+                    1
+                };
+                let unit = entities.get(attacker).unwrap();
+                assert_eq!(
+                    unit.insight,
+                    damage * multiplier,
+                    "{kind:?} vs {target_kind:?}, hp={hp}"
+                );
+                assert_eq!(unit.insight_fraction, 1);
+            }
+        }
+    }
+}

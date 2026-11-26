@@ -178,9 +178,14 @@ fn disciple_flat_unit_insight_carries_building_fractions_through_checkpoints() {
         ] {
             unit.gain_insight(3, target);
         }
-        assert_eq!((unit.insight, unit.insight_fraction), (12, 0), "{kind:?}");
+        let expected = if kind == EntityKind::WarAdept { 15 } else { 12 };
+        assert_eq!(
+            (unit.insight, unit.insight_fraction),
+            (expected, 0),
+            "{kind:?}"
+        );
         unit.gain_insight(3, EntityKind::ResourceDepot);
-        assert_eq!((unit.insight, unit.insight_fraction), (12, 3));
+        assert_eq!((unit.insight, unit.insight_fraction), (expected, 3));
         let checkpoint = game.checkpoint_payload_text_for_test().unwrap();
         let mut restored = Game::restore_checkpoint_payload_text_for_test(
             &checkpoint,
@@ -190,9 +195,9 @@ fn disciple_flat_unit_insight_carries_building_fractions_through_checkpoints() {
         .unwrap();
         let unit = restored.state.entities.get_mut(id).unwrap();
         unit.gain_insight(1, EntityKind::Rifleman);
-        assert_eq!((unit.insight, unit.insight_fraction), (13, 3));
+        assert_eq!((unit.insight, unit.insight_fraction), (expected + 1, 3));
         unit.gain_insight(1, EntityKind::ResourceDepot);
-        assert_eq!((unit.insight, unit.insight_fraction), (14, 0));
+        assert_eq!((unit.insight, unit.insight_fraction), (expected + 2, 0));
         unit.gain_insight(u32::MAX, EntityKind::Tank);
         assert_eq!(
             (unit.insight, unit.insight_fraction),

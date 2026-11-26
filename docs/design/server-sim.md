@@ -2229,7 +2229,8 @@ Permanent Dao identity is derived from kind; the engine stores no separate mutab
 Evolution automatically occurs once 60 insight is ready, without research or a Pavilion.
 Evolution clears all insight and raises the cap to 200. Evolved Disciples continue earning
 insight from actual hostile unit HP damage at one insight per HP or quarter-rate building HP
-damage, carrying exact fractional remainders through checkpoints. Both legs of Throw Sword count
+damage, carrying exact fractional remainders through checkpoints. War Adepts earn two insight
+per actual Tank HP removed. Both legs of Throw Sword count
 toward insight. Reaching 200 automatically advances a living Adept to its matching
 [Master](dao-masters.md), resets insight and fully heals. Public
 `daoMaster` (compact slot 52) persists alongside the authoritative Adept kind. Research ids are
