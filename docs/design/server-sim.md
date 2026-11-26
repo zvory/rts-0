@@ -2290,7 +2290,7 @@ entry movement to newly trained base Disciples. Busy grounds retain waiting entr
 ### Portal Adept production
 
 A completed Cultivator Portal trains Novices and, after matching Pavilion research,
-Wind, War and Magic Adepts. Each Adept costs **150 steel, 35 oil, three supply**
+Wind, War and Magic Adepts. Each Adept costs **150 steel, 45 oil, three supply**
 and takes **300 ticks (ten seconds)**, without a Novice input. Use normal train/repeat
 commands, queue payment/refunds, legal spawn exits and rally behavior. An unresearched
 Dao cannot be trained. Combat-earned evolution and Tournament Grounds are unchanged.

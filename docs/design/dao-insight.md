@@ -19,7 +19,7 @@ card highlights chosen paths with an assigned/eligible count; tooltips show miss
 insight, and unit details show the pending path. Automatic evolution runs after combat,
 research production, and ability runtime each tick, skipping dead units.
 Pavilion research unlocks direct Portal production of the matching Adept for 150 steel,
-35 oil, three supply and ten seconds, without a Novice input. It also unlocks paid
+45 oil, three supply and ten seconds, without a Novice input. It also unlocks paid
 one-for-one training in the [Proving Grounds](proven-grounds.md),
 with the existing shared research price tiers, serial queue and prerequisite/faction gates.
 Combat-earned evolution requires neither research nor a Pavilion.
@@ -132,7 +132,7 @@ Their Phase 0 roles, counters, descriptions, visuals, audio deferrals, and Phase
 abilities, keys, acquisition costs/timing/prerequisites, supply, sight, and movement/pathing
 remain as specified above and in the Proving Grounds design. Each path is already approved;
 the existing Dao researches also unlock their corresponding Portal train buttons.
-Direct Portal production costs 150 steel, 35 oil, three supply and ten seconds. Combat evolution changes kind in place, preserving id, ownership, orders, and
+Direct Portal production costs 150 steel, 45 oil, three supply and ten seconds. Combat evolution changes kind in place, preserving id, ownership, orders, and
 reload; paid training and tournament winners use the same transition. Direct Lab spawning of
 an Adept initializes its existing full stats and abilities.
 
