@@ -645,3 +645,58 @@ fn checkpoint_round_trip_preserves_committed_pivot_escape() {
         "committed tank recovery continuation",
     );
 }
+
+#[test]
+fn checkpoint_payload_round_trips_magic_orb_in_flight() {
+    let (mut baseline, attacker, target) = panzerfaust_fixture();
+    let source = baseline.state.entities.get(attacker).unwrap();
+    let start = (source.pos_x(), source.pos_y());
+    let victim = baseline.state.entities.get(target).unwrap();
+    let end = (victim.pos_x(), victim.pos_y());
+    baseline.state.disciple_shots.schedule(
+        1,
+        attacker,
+        target,
+        start,
+        end,
+        28,
+        0.5,
+        baseline.state.tick,
+    );
+    let mut restored =
+        restore_checkpoint_and_assert_equivalent(&baseline, "magic orb in-flight round trip");
+    tick_pair_for(&mut baseline, &mut restored, 30, "magic orb continuation");
+    assert!(baseline.state.disciple_shots.shots.is_empty());
+}
+
+#[test]
+fn checkpoint_payload_rejects_invalid_magic_orb_state() {
+    let (mut game, attacker, target) = panzerfaust_fixture();
+    let source = game.state.entities.get(attacker).unwrap();
+    let start = (source.pos_x(), source.pos_y());
+    let victim = game.state.entities.get(target).unwrap();
+    let end = (victim.pos_x(), victim.pos_y());
+    game.state
+        .disciple_shots
+        .schedule(1, attacker, target, start, end, 28, 0.5, game.state.tick);
+    let text = checkpoint_payload_text_for(&game, "magic orb validation");
+    for (field, value) in [
+        ("owner", serde_json::json!(999)),
+        ("target", serde_json::json!(999999)),
+        ("impact_tick", serde_json::json!(0)),
+        ("penetration", serde_json::json!(2)),
+    ] {
+        let invalid = mutate_payload(&text, |payload| {
+            payload["discipleShots"]["shots"][0][field] = value;
+        });
+        assert!(
+            Game::restore_checkpoint_payload_text_for_test(
+                &invalid,
+                game.state.map.clone(),
+                game.map_metadata().clone()
+            )
+            .is_err(),
+            "{field}"
+        );
+    }
+}

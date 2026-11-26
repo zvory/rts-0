@@ -24,6 +24,45 @@ mod building_memory;
 mod resource_memory;
 pub(super) use resource_memory::validate as validate_resource_memory;
 mod entities;
+
+pub(super) fn validate_disciple_shots(
+    store: &crate::game::disciple_shot::DiscipleShotStore,
+    players: &BTreeSet<u32>,
+    next_id: u32,
+    map: &Map,
+    tick: u32,
+) -> Result<(), CheckpointPayloadError> {
+    validate_count("discipleShots", store.shots.len(), 4096)?;
+    for shot in &store.shots {
+        if !players.contains(&shot.owner) {
+            return Err(CheckpointPayloadError::InvalidReference {
+                field: "discipleShots.owner",
+                id: shot.owner,
+            });
+        }
+        validate_allocated_entity_ref("discipleShots.attacker", shot.attacker, next_id)?;
+        validate_allocated_entity_ref("discipleShots.target", shot.target, next_id)?;
+        let world = (map.world_width_px(), map.world_height_px());
+        if shot.impact_tick <= tick
+            || shot.impact_tick > tick.saturating_add(crate::config::TICK_HZ)
+            || shot.damage > 10000
+            || !shot.penetration.is_finite()
+            || !(0.0..=1.0).contains(&shot.penetration)
+            || !in_world(shot.source[0].to_world(), shot.source[1].to_world(), world)
+            || !in_world(
+                shot.endpoint[0].to_world(),
+                shot.endpoint[1].to_world(),
+                world,
+            )
+        {
+            return Err(CheckpointPayloadError::InvalidValue {
+                field: "discipleShots",
+            });
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod entities_tests;
 mod firing_reveal;

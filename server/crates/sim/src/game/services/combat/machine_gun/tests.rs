@@ -372,7 +372,6 @@ fn shooting_traps_does_not_disclose_a_concealed_shooter() {
 }
 
 mod building_range;
-
 #[allow(clippy::too_many_arguments)]
 fn fire(
     map: &Map,
@@ -401,6 +400,7 @@ fn fire(
         los,
         fog,
         smokes,
+        &mut crate::game::disciple_shot::DiscipleShotStore::default(),
         rng,
         events,
         reveals,

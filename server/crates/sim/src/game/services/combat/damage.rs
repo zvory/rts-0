@@ -24,7 +24,7 @@ pub(super) struct ShotOutcome {
     pub(super) reveals_attacker: bool,
 }
 
-/// Apply `dmg` to `victim` from `attacker`, emitting an `Attack` event for every fired shot.
+/// Resolve a fired shot, emitting its attack event and applying or scheduling its damage.
 /// Returns the resolved shot outcome when a shot was emitted. Death itself is
 /// handled by the death system (we only zero hp here).
 #[allow(clippy::too_many_arguments)]
@@ -35,6 +35,7 @@ pub(super) fn apply_damage(
     teams: &TeamRelations,
     events: &mut HashMap<u32, Vec<Event>>,
     fog: &Fog,
+    disciple_shots: &mut crate::game::disciple_shot::DiscipleShotStore,
     rng: &mut impl Rng,
     attacker: u32,
     victim: u32,
@@ -108,7 +109,22 @@ pub(super) fn apply_damage(
     } else {
         false
     };
-    let outcome = if primary_missed {
+    let outcome = if !primary_missed && weapon_profile.id == combat_rules::WeaponKind::DiscipleOrb {
+        disciple_shots.schedule(
+            attacker_owner,
+            attacker,
+            shot_victim,
+            (ax, ay),
+            shot_victim_pos,
+            dmg,
+            weapon_profile.armor_penetration,
+            tick,
+        );
+        victim.map(|v| ShotOutcome {
+            victim_owner: v.owner,
+            reveals_attacker,
+        })
+    } else if primary_missed {
         victim.map(|v| ShotOutcome {
             victim_owner: v.owner,
             reveals_attacker,

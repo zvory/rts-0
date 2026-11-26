@@ -34,7 +34,7 @@ fn dao_primary_attacks_apply_ranked_penetration_and_war_master_damage_to_tanks()
                 .get_mut(target)
                 .unwrap()
                 .set_order(Order::HoldPosition);
-            run_combat_tick(&mut entities);
+            run_combat_through_orb_impacts(&mut entities);
             // Item doubling precedes armor rounding: 46 * 0.4375 rounds to 20;
             // 56 * 0.625 rounds to 35 rather than twice the rounded 18.
             let expected = if double_damage && master && kind != EntityKind::WarAdept {
