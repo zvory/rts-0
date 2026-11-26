@@ -129,6 +129,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "hud_command_card_contexts.js": "ui",
   "hud_train_card_helpers.js": "ui",
   "hud_dao_training_card.js": "ui",
+  "hud_shop_card.js": "ui",
   "hud_control_groups.js": "ui",
   "hud_resources.js": "ui",
   "hud_selection_panel.js": "ui",
@@ -292,7 +293,8 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   // Lab MVP Phase 5 lets command descriptors ask the injected policy which owner is controllable.
   // Point adds a tank hotkey catalog sample and delegates its descriptor to hud_unit_commands.
   // Proven Grounds dispatches its descriptors to the separate training card module.
-  "hud_command_card.js": 29800,
+  // Shop submenu composition stays here; its layout and eligibility live in hud_shop_card.js.
+  "hud_command_card.js": 29900,
   // Interact Phase 6 centralizes renderer visual-clock fallback so extracted draw modules
   // share the injected clock without each growing its own compatibility expression.
   "renderer/shared.js": 28217,

@@ -69,7 +69,7 @@ const frameInputs = {
     exploredRevision: 3,
   },
   feedback: {
-    shopDeliveryPreview: {x: 10, y: 20, targetX: 1500, targetY: 20},
+    shopDeliveryPreview: {lines: [{x: 10, y: 20, targetX: 1500, targetY: 20}, {x: 10, y: 20, targetX: 1200, targetY: 40}]},
     feedbackOwnerId: 1,
     feedbackOwnerIds: [1],
     showUnitRangesEnabled: true,
@@ -151,7 +151,7 @@ const adapter = new PixiPresentationAdapter(null, sources, { renderer: engine })
 const first = adapter.render(frame);
 const readsAfterFirst = stateReadCount;
 const second = adapter.render(frame);
-assert(engine.renders[0].options.feedbackView.shopDeliveryPreview?.targetX === 1500, "Shop hover line survives presentation assembly and Pixi adaptation");
+assert(engine.renders[0].options.feedbackView.shopDeliveryPreview?.lines?.length === 2 && engine.renders[0].options.feedbackView.shopDeliveryPreview.lines[0].targetX === 1500, "All Shop buy lines survive presentation assembly and Pixi adaptation");
 assert((await first.settled).status === PRESENTATION_OUTCOME.PRESENTED
   && (await second.settled).status === PRESENTATION_OUTCOME.PRESENTED,
 "Pixi adapter presents an immutable frame and a repeated call through asynchronous outcomes");

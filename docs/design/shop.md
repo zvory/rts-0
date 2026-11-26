@@ -43,7 +43,18 @@ Focused checks and the owned PR record the final verification and merge outcome.
 ## Targeted goods
 
 Completed Shops sell Regen for **50 oil** and Escape Treasure for **100 oil**.
-Select the Shop, click an item, then click a living friendly unit (including allied units).
+Select a completed Shop, click an item, then click a living friendly unit (including allied units).
+Alternatively, select one or more Novices, Adepts or Masters and press **R** to open the
+**Buy menu** without changing selection (Serfs have no Buy menu). Each item click/key buys
+one copy for an eligible selected owned fighter. The server ranks eligible recipients by
+Master > Adept > Novice, then descending Insight, then descending carried-plus-in-flight item
+count, then ascending entity id. Full inventories and duplicate equipped/in-flight items are
+skipped. This lets repeated purchases distribute copies without waiting for delivery.
+The client chooses the lowest-id completed owned Shop as source; a missing or destroyed
+source cannot purchase. The menu stays open until Return (C), Escape, or selection change.
+Throw Sword remains on E. While the Buy menu is open, dotted lines connect its Shop to all
+selected owned fighters, including full carriers. Existing resource costs, shared Escape
+cooldown, visibility and command admission limits still apply.
 Buildings and enemies are invalid targets. Purchases require the target to be visible.
 All unit-targeted goods have **unlimited range**. Invalid purchases spend nothing.
 All targeted items travel directly from the Shop toward the target at **7.5 tiles per second**;
@@ -78,11 +89,8 @@ Shop-to-unit line.
 
 ### Healing Seal placement
 
-The Shop also sells [Healing Seal](healing-seal.md) for **150 oil** (S). Choose the good,
-then click visible ground within 30 tiles. It appears immediately as a selectable,
-non-blocking 3×3 green circle. Friendly ground units inside heal 3 HP/s each from a shared
-400 HP budget. Its green capacity bar and selection text show healing remaining; it
-disappears when empty. It is ground magic, not a carried item or projectile.
+Healing Seal is no longer sold or exposed on the Shop command card. Its reserved ability id,
+authored fields, healing, rendering and checkpoint behavior remain available for Lab/replays.
 
 ### Carried attack and defense goods
 
@@ -96,8 +104,11 @@ Carried passive items use existing entity ability-use state; the owner and privi
 
 Vitality Treasure is a **100 oil** defense item, purchased from a completed Shop with **F** and can coexist with Armor Treasure. It uses the same visible friendly-unit targeting, unlimited purchase range, delivery, same-item reservation, and non-stacking rules. Delivery immediately grants **+150 maximum HP and +150 current HP permanently**, preserving any pre-existing missing HP. It remains carried and passive, with no activation, consumption, or expiry. For example, 30/58 HP becomes 180/208 HP. Dao evolution and Master advancement retain the flat 150 bonus without multiplying it. Carried passive state, including the health pair, survives checkpoints. Destroying the supplying Shop after delivery does not remove Armor or Vitality.
 
-Shop command rows mirror the carried categories: top row movement (Escape Q); middle row defense
-(Regen A, Healing Seal S, Armor D, Vitality F); bottom row attack (Haste Z, Double Damage X).
+Both Shop and Buy menu cards annotate each row on the left: **Util** (Escape Q), **Defense**
+(Regen A, Armor D, Vitality F; S empty), **Offense** (Haste Z, Double Damage X).
+Item glyph/subtitle pairs are `ESC` / Escape, `HP` / +3 per second, `ARM` / +50% base armor,
+`+HP` / +150 HP, `HST` / Haste, and `DD` / 2x damage. Armor's subtitle describes the existing
+50% mitigation effect; no armor or other item balance value changes.
 Carried goods appear as a rosette of colored icons at the unit center: a green cross for Regen,
 a purple return diamond for Escape, a shield for Armor, a heart for Vitality, a bolt for Haste,
 and a sword for Double Damage. Flying goods and minimap markers use the same icons.

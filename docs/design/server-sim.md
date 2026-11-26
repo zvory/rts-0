@@ -2334,7 +2334,10 @@ even when observing another team.
 
 Shop item purchases use generic unit-targeted abilities and durable simulation state. Deliveries
 and applied escape protection are checkpointed for deterministic replay and Lab continuation.
-See [Shop](shop.md#targeted-goods) for costs, delivery, targeting, and lethal-damage behavior.
+The R Buy menu sends a source Shop and selected fighters through generic `useAbility` without
+a target id. `shop_items::purchase` chooses one eligible recipient from authoritative rank,
+Insight, inventory and in-flight reservations; no client inventory prediction or new durable state
+is required. See [Shop](shop.md#targeted-goods) for costs, delivery, targeting, and lethal-damage behavior.
 
 `services::shop_items` is a mutation helper: command admission invokes its atomic purchase
 executor, while the death phase invokes its escape executor before death attribution/removal.

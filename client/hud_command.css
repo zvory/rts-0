@@ -91,3 +91,26 @@
   .cmd-btn.has-cooldown .cmd-ready-count { font-size: 8px; }
   .cmd-btn.has-cooldown .cmd-label { line-height: 1; transform: translateY(-2px); }
 }
+
+/* Shop categories occupy a dedicated column to the left of the item rows. */
+#command-card[data-shop-card="true"] { grid-template-columns: 62px repeat(4, 75px); }
+.shop-row-label { align-self: center; color: var(--ink); font-size: 12px; font-weight: 600; }
+
+@media (max-width: 1366px), (max-height: 768px) {
+  #command-card[data-shop-card="true"] { grid-template-columns: 58px repeat(4, 64px); }
+}
+@media (pointer: coarse) and (max-width: 1024px) and (max-height: 1024px) {
+  #command-card[data-shop-card="true"] { grid-template-columns: 44px repeat(4, 40px); }
+  .shop-row-label { font-size: 10px; }
+}
+@media (pointer: coarse) and (max-width: 1024px) and (max-height: 599px) {
+  #command-card[data-shop-card="true"] { grid-template-columns: 44px repeat(4, 36px); }
+}
+
+#command-card[data-shop-card="true"] .cmd-label {
+  white-space: normal;
+  text-overflow: clip;
+  text-align: center;
+  line-height: 1.1;
+  padding: 0 3px;
+}

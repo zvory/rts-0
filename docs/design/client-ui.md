@@ -3047,8 +3047,7 @@ pending fetch, and notice DOM.
 
 ### Healing Seal presentation
 
-Cultivator Shop S places a Healing Seal using the generic world-point ability command and
-radius preview. The selectable 3×3 field renders on the ground beneath units: fixed green
+Healing Seal is no longer sold by the Shop. Authored/checkpointed fields retain their presentation. The selectable 3×3 field renders on the ground beneath units: fixed green
 circle, central green plus, layered soft glow, and a two-second render-clock pulse.
 The always-visible green bar represents remaining healing capacity, not combat health.
 The bottom selection panel says `275 / 400 healing left`; no combat armor label is shown.
@@ -3056,6 +3055,17 @@ Existing pooled graphics, snapshot replacement, fog gating and match teardown ow
 
 Shop selection previews use `shopDeliveryPreview` through the renderer-neutral feedback seam.
 Hovering an eligible friendly unit draws a one-pixel dotted line from the completed selected Shop.
+Novices, Adepts and Masters have a **Buy menu on R**; Serfs do not. It leaves selection intact,
+sends one automatic purchase per item key/click and stays open after purchase. Return (C),
+Escape and selection changes close it. Throw Sword stays on E. The server resolves recipient
+priority and in-flight reservations; see [Shop](shop.md#targeted-goods).
+Both Shop and Buy menu cards add a left annotation column (Util / Defense / Offense), hide
+Healing Seal, and use effect subtitles beneath ESC, HP, ARM, +HP, HST and DD glyphs.
+`hud_shop_card.js` owns this submenu's descriptors; `ClientIntent.commandCardMode = "shopBuy"`
+owns its lifetime. `shopDeliveryPreview` accepts a single hover segment or `{ lines: [...] }` containing segments
+from the lowest-id completed owned Shop to every selected owned fighter while buying.
+Only visible snapshot positions feed this renderer-neutral feedback seam. Item subtitles wrap
+instead of truncating effect text; row/column sizes follow the existing responsive command grid.
 Flying goods render their existing colored circle plus a tiny 12×1-pixel HP fill from their combat body.
 Delivery bodies retain current snapshot positions through the entity-view pipeline, matching the
 non-interpolated ability-object circles so HP bars and selection geometry stay aligned in flight.

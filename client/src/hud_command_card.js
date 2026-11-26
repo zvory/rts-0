@@ -1,3 +1,4 @@
+import { buildShopBuyCard, isShopBuyer, shopBuyMenuDescriptor, shopCardExtras } from "./hud_shop_card.js";
 import { buildDaoTrainingCard } from "./hud_dao_training_card.js";
 import { ABILITY, DEFAULT_FACTION_ID, KIND, SETUP, UPGRADE, isBuilding, isUnit } from "./protocol.js";
 import {
@@ -203,6 +204,8 @@ export function buildCommandCardDescriptors(ctx) {
   const primary = commandSubject(ctx, selection);
   if (!primary) return card("empty", "empty", new Array(9).fill(null));
 
+  const buyCard = buildShopBuyCard(ctx, isOwn, buildTrainCard);
+  if (buyCard) return buyCard;
   if (["workerBuild", "workerAdvancedBuild"].includes(ctx.commandCardMode) && workerOnlySelection(ctx, selection)) {
     return buildWorkerBuildCard(ctx);
   }
@@ -330,6 +333,7 @@ export function buildUnitCard(ctx, selection) {
     slots[4] = stopDescriptor(unitIds);
   }
 
+  if (ownUnits.some(isShopBuyer)) slots[9] = shopBuyMenuDescriptor();
   placeAbilityDescriptors(ctx, slots, abilityAffordances, factionId);
 
   if (setupGunIds.length > 0) {
@@ -511,7 +515,8 @@ export function buildTrainCard(ctx, building, { underConstruction = false } = {}
     };
   }
 
-  return card(underConstruction ? "construction" : "train", signature, slots);
+  return card(underConstruction ? "construction" : "train", signature, slots,
+    shopCardExtras(building, underConstruction, abilityAffordances));
 }
 
 export function selectedAbilityAffordances(ctx, selection) {
