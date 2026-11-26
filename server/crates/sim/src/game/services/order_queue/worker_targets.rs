@@ -29,5 +29,5 @@ pub(super) fn repair_intent_valid(
     target: u32,
 ) -> bool {
     matches!(entities.get(worker), Some(e) if e.owner == owner && e.kind == EntityKind::Worker && e.hp > 0)
-        && matches!(entities.get(target), Some(t) if t.owner == owner && t.kind.is_building() && t.hp > 0 && t.hp < t.max_hp && !t.under_construction())
+        && matches!(entities.get(target), Some(t) if t.can_be_repaired_by(owner))
 }

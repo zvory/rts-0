@@ -1,5 +1,5 @@
 {
-  "reason": "Add authoritative worker repair tick service, serialized repair work and building billing, and focused regression fixtures; route worker footprint interactions in the existing pathing helper",
+  "reason": "Reject repairs of consumable building HP; register the focused Healing Seal regression fixture HP write.",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -2459,6 +2459,12 @@
       "line": 179,
       "field": "hp",
       "code": "\"dead\" => b.hp = 0,"
+    },
+    {
+      "path": "tests/repair_tests.rs",
+      "line": 226,
+      "field": "hp",
+      "code": "target.hp -= 100;"
     }
   ],
   "public_export_counts": [

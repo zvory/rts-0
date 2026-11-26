@@ -212,3 +212,42 @@ fn repair_rejects_enemy_scaffolds_units_and_full_health_and_can_be_interrupted()
         Order::Idle
     ));
 }
+
+#[test]
+fn repair_rejects_consumable_healing_capacity_without_spending_resources() {
+    let (mut game, worker, _) = fixture("cultivators");
+    let seal = game
+        .state
+        .entities
+        .spawn_building(1, EntityKind::HealingSeal, 300.0, 300.0, true)
+        .unwrap();
+    // Seals spend HP as healing capacity; it must never be refilled by paid repairs.
+    let target = game.state.entities.get_mut(seal).unwrap();
+    target.hp -= 100;
+    let before = target.hp;
+    for queued in [false, true] {
+        game.enqueue(1, repair(worker, seal, queued));
+        game.tick();
+        let w = game.state.entities.get(worker).unwrap();
+        assert!(!matches!(w.order(), Order::Repair(_)));
+        assert!(w.queued_orders().is_empty());
+    }
+    // Tick validation must also terminate an invalid active order from restored state.
+    game.state
+        .entities
+        .get_mut(worker)
+        .unwrap()
+        .set_order(Order::repair(seal));
+    for _ in 0..30 {
+        game.tick();
+    }
+    assert!(matches!(
+        game.state.entities.get(worker).unwrap().order(),
+        Order::Idle
+    ));
+    assert_eq!(game.state.entities.get(seal).unwrap().hp, before);
+    assert_eq!(
+        (game.state.players[0].steel, game.state.players[0].oil),
+        (10_000, 10_000)
+    );
+}

@@ -262,6 +262,7 @@ function normalRightClickAction(input, p) {
   }
 
   if (target && ownOwner(input.state, target.owner, input.controlPolicy) && isBuilding(target.kind)
+      && ![KIND.HEALING_SEAL, KIND.BARBED_WIRE].includes(target.kind)
       && !Number.isFinite(target.buildProgress) && target.hp > 0 && target.hp < target.maxHp) {
     const repairers = input._selectedWorkerIds();
     if (repairers.length) return { kind: "repair", units: repairers, target,

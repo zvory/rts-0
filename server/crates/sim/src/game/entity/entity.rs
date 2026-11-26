@@ -1008,6 +1008,15 @@ impl Entity {
         damaged
     }
 
+    pub(in crate::game) fn can_be_repaired_by(&self, owner: u32) -> bool {
+        self.owner == owner
+            && self.kind.is_building()
+            && !matches!(self.kind, EntityKind::BarbedWire | EntityKind::HealingSeal)
+            && self.hp > 0
+            && self.hp < self.max_hp
+            && !self.under_construction()
+    }
+
     pub fn restore_hp(&mut self, amount: u32) -> bool {
         if matches!(self.kind, EntityKind::BarbedWire | EntityKind::HealingSeal) {
             return false;

@@ -17,8 +17,7 @@ pub(in crate::game) fn repair_system(entities: &mut EntityStore, players: &mut [
     workers.sort_unstable_by_key(|worker| worker.0);
     for &(id, owner, target) in &workers {
         let valid = matches!(entities.get(id), Some(w) if w.kind == EntityKind::Worker)
-            && matches!(entities.get(target), Some(t) if t.owner == owner && t.kind.is_building()
-                && t.hp > 0 && t.hp < t.max_hp && !t.under_construction());
+            && matches!(entities.get(target), Some(t) if t.can_be_repaired_by(owner));
         if !valid {
             if let Some(w) = entities.get_mut(id) {
                 w.clear_active_order();
