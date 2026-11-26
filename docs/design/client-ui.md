@@ -1960,6 +1960,17 @@ share a 0.7 runtime gain and the ordinary spatial combat buses. Exact prompts, s
 generation settings, and measured production levels are in `docs/sound/DAO_ABILITIES.json`;
 `scripts/prepare-dao-ability-audio.py` reproduces the processing from retained raw inputs.
 
+Vector Field uses the selected Silk Current wind, assembled from irregularly offset overlapping
+sections into a complete 10-second cue. It follows the same visible-object spatial sustain lifecycle
+as Anchor (including pause, expiry, lost visibility, eviction, replay seek, and teardown), with its
+own asset and voice keys. The full take covers a normal field lifetime; looping is only a fallback
+when a visible object outlives the recording, such as slowed playback. It has no random pitch shift.
+Production is mono, with a −20 LUFS mastering target constrained by a −2 dBTP peak ceiling and a
+loudest 50 ms at least 3 dB below both cast cues, before the shared 0.7 runtime gain. Selection,
+original generation, overlap processing, and measured levels are retained in
+`docs/sound/VECTOR_FIELD.json`; `scripts/prepare-vector-field-audio.py` reproduces normalization.
+
+
 `match_notice_presenter.js`
 ```js
 export class MatchNoticePresenter {

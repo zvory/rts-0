@@ -1,6 +1,6 @@
 import { ABILITY, ABILITY_OBJECT_KIND } from "./protocol.js";
 
-// Assets share the combat mix. Anchor is mastered 4 dB below the cast cues.
+// Sustained fields share the quieter combat mix below the cast cues.
 const GAIN = 0.7;
 
 /** Uses only authoritative, recipient-visible objects and ability affordances. */
@@ -9,13 +9,14 @@ export class MatchAbilityAudio {
     this.audio = audio;
     this.categoryForOwner = categoryForOwner;
     this.anchors = new Map();
+    this.vectorFields = new Map();
     this.shields = new Set();
     this.dashCharges = new Map();
   }
 
   update(objects = [], entities = [], active = true) {
     if (!this.audio) return;
-    const anchors = new Set(), shields = new Set(), charges = new Map();
+    const anchors = new Set(), vectorFields = new Set(), shields = new Set(), charges = new Map();
     for (const object of objects) {
       if (!Number.isFinite(object.x) || !Number.isFinite(object.y)) continue;
       const category = this.categoryForOwner(object.owner);
@@ -28,22 +29,30 @@ export class MatchAbilityAudio {
           });
         }
       }
-      if (object.ability !== ABILITY.EKAT_MAGIC_ANCHOR
-        || object.kind !== ABILITY_OBJECT_KIND.MAGIC_ANCHOR) continue;
-      anchors.add(object.id);
+      const vectorField = object.ability === ABILITY.VECTOR_FIELD
+        && object.kind === ABILITY_OBJECT_KIND.VECTOR_FIELD;
+      const anchor = object.ability === ABILITY.EKAT_MAGIC_ANCHOR
+        && object.kind === ABILITY_OBJECT_KIND.MAGIC_ANCHOR;
+      if (!anchor && !vectorField) continue;
+      const tracked = vectorField ? this.vectorFields : this.anchors;
+      const visible = vectorField ? vectorFields : anchors;
+      const name = vectorField ? "vector_field" : "magic_anchor";
+      visible.add(object.id);
       if (!active) continue;
-      const key = `combat:magic_anchor:${object.id}`;
-      if (this.anchors.has(object.id) && this.audio.hasVoiceKey?.(key) !== false) {
+      const key = `combat:${name}:${object.id}`;
+      if (tracked.has(object.id) && this.audio.hasVoiceKey?.(key) !== false) {
         this.audio.setVoicePosition?.(key, object.x, object.y);
-      } else if (this.audio.play("combat_magic_anchor_01", {
+      } else if (this.audio.play(`combat_${name}_01`, {
         key, x: object.x, y: object.y, category, gain: GAIN, priority: 1,
         loop: true, pitchVariance: 0, cooldownMs: 0, fadeInMs: 80,
-      })) this.anchors.set(object.id, key);
+      })) tracked.set(object.id, key);
     }
-    for (const [id, key] of this.anchors) {
-      if (active && anchors.has(id)) continue;
-      this.audio.stopByKey(key);
-      this.anchors.delete(id);
+    for (const [tracked, visible] of [[this.anchors, anchors], [this.vectorFields, vectorFields]]) {
+      for (const [id, key] of tracked) {
+        if (active && visible.has(id)) continue;
+        this.audio.stopByKey(key);
+        tracked.delete(id);
+      }
     }
     for (const entity of entities) {
       if (entity.shotReveal || entity.visionOnly || entity.hp <= 0
@@ -68,6 +77,8 @@ export class MatchAbilityAudio {
   stop({ reset = false } = {}) {
     for (const key of this.anchors.values()) this.audio?.stopByKey(key);
     this.anchors.clear();
+    for (const key of this.vectorFields.values()) this.audio?.stopByKey(key);
+    this.vectorFields.clear();
     if (reset) {
       this.shields.clear();
       this.dashCharges.clear();

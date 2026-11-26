@@ -1,0 +1,356 @@
+{
+  "name": "Silk current",
+  "exact_prompt": "Ten seconds of enchanted directional wind grounded in natural air. Close silk-like wisps and fine airy filaments stream over a continuous rushing bed. Subtle hollow air resonance without musical pitch. Differently sized whooshes overlap irregularly, renewing forward flow. Immediate soft onset, brief release only at end. No gaps, repeated beat, portal, suction, sparkles, chimes, voices, breathing, music, electronics, machines or reverb.",
+  "provider": "ElevenLabs",
+  "endpoint": "https://api.elevenlabs.io/v1/sound-generation",
+  "method": "POST",
+  "model_id": "eleven_text_to_sound_v3",
+  "model_version": "Provider version unavailable beyond model ID",
+  "request_parameters": {
+    "duration_seconds": 10,
+    "loop": false,
+    "prompt_influence": 0.65,
+    "output_format": "mp3_44100_128",
+    "enable_logging": "CLI default true"
+  },
+  "seed": "Unavailable",
+  "request_id": "Not exposed by CLI",
+  "cli_version": "1.13.0",
+  "invocation": [
+    "npx",
+    "-y",
+    "@elevenlabs/cli@1.13.0",
+    "text-to-sound-effects",
+    "convert",
+    "--text",
+    "Ten seconds of enchanted directional wind grounded in natural air. Close silk-like wisps and fine airy filaments stream over a continuous rushing bed. Subtle hollow air resonance without musical pitch. Differently sized whooshes overlap irregularly, renewing forward flow. Immediate soft onset, brief release only at end. No gaps, repeated beat, portal, suction, sparkles, chimes, voices, breathing, music, electronics, machines or reverb.",
+    "--duration-seconds",
+    "10",
+    "--loop",
+    "false",
+    "--prompt-influence",
+    "0.65",
+    "--model-id",
+    "eleven_text_to_sound_v3",
+    "--output-format",
+    "mp3_44100_128",
+    "--no-retry",
+    "--output",
+    "/Users/az/.codex/artifacts/vector-field-20261126/03-silk-current-raw.mp3"
+  ],
+  "raw_file": "docs/sound/sources/vector-field/03-silk-current-raw.mp3",
+  "generation_started_at_utc": "2026-11-26T15:20:54.842622+00:00",
+  "status": "ready_for_review",
+  "processing": [
+    {
+      "step": "Loudness analysis only",
+      "invocation": [
+        "ffmpeg",
+        "-hide_banner",
+        "-i",
+        "/Users/az/.codex/artifacts/vector-field-20261126/03-silk-current-raw.mp3",
+        "-af",
+        "loudnorm=I=-20:TP=-2:LRA=11:print_format=json",
+        "-f",
+        "null",
+        "-"
+      ],
+      "measurement": {
+        "input_i": "-38.42",
+        "input_tp": "-24.49",
+        "input_lra": "16.90",
+        "input_thresh": "-49.84",
+        "output_i": "-20.16",
+        "output_tp": "-7.23",
+        "output_lra": "9.30",
+        "output_thresh": "-31.30",
+        "normalization_type": "dynamic",
+        "target_offset": "0.16"
+      }
+    },
+    {
+      "step": "Constant gain, exact 10-second trim/pad, 40ms onset fade, 180ms release fade, PCM encoding",
+      "invocation": [
+        "ffmpeg",
+        "-y",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-i",
+        "/Users/az/.codex/artifacts/vector-field-20261126/03-silk-current-raw.mp3",
+        "-af",
+        "apad,atrim=duration=10,asetpts=PTS-STARTPTS,volume=18.420000000dB,afade=t=in:d=0.04,afade=t=out:st=9.82:d=0.18",
+        "-ar",
+        "44100",
+        "-c:a",
+        "pcm_s16le",
+        "/Users/az/.codex/artifacts/vector-field-20261126/03-silk-current-10s.wav"
+      ],
+      "filter": "apad,atrim=duration=10,asetpts=PTS-STARTPTS,volume=18.420000000dB,afade=t=in:d=0.04,afade=t=out:st=9.82:d=0.18",
+      "gain_db": 18.42,
+      "output": "docs/sound/sources/vector-field/03-silk-current-10s.wav",
+      "sha256": "81b6c990eb343515db4a93e410276ea4334afcb0c6449b5bb5e02823e9c9b5d4"
+    },
+    {
+      "step": "Review MP3 encoding",
+      "invocation": [
+        "ffmpeg",
+        "-y",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-i",
+        "/Users/az/.codex/artifacts/vector-field-20261126/03-silk-current-10s.wav",
+        "-c:a",
+        "libmp3lame",
+        "-b:a",
+        "192k",
+        "/Users/az/.codex/artifacts/vector-field-20261126/03-silk-current-10s.mp3"
+      ],
+      "output": "docs/sound/sources/vector-field/03-silk-current-10s.mp3",
+      "sha256": "00cf9862387baa3555886456b650499c90e98d1307b93e6f3e83886f35af6d5e"
+    },
+    {
+      "step": "Sustained audition: four differently offset and unequal-duration interior sections, constant gain per section, 1.1-second equal-power crossfades, exact 10-second trim, onset/release fades",
+      "source": "03-silk-current-raw.mp3",
+      "source_sha256": "58f276d023af59f896e61dd1fcb4cd2347d9b2cf340f3dfa348439a86fca14cf",
+      "source_starts_seconds": [
+        1.2,
+        2.6,
+        1.8,
+        3.4
+      ],
+      "section_durations_seconds": [
+        3.4,
+        3.7,
+        3.2,
+        3.4
+      ],
+      "section_measurements": [
+        {
+          "analysis_invocation": [
+            "ffmpeg",
+            "-hide_banner",
+            "-i",
+            "/Users/az/.codex/artifacts/vector-field-20261126/03-silk-current-raw.mp3",
+            "-af",
+            "atrim=start=1.2:duration=3.4,volumedetect",
+            "-f",
+            "null",
+            "-"
+          ],
+          "mean_dbfs": -39.6,
+          "peak_dbfs": -25.8,
+          "constant_gain_db": 16.6
+        },
+        {
+          "analysis_invocation": [
+            "ffmpeg",
+            "-hide_banner",
+            "-i",
+            "/Users/az/.codex/artifacts/vector-field-20261126/03-silk-current-raw.mp3",
+            "-af",
+            "atrim=start=2.6:duration=3.7,volumedetect",
+            "-f",
+            "null",
+            "-"
+          ],
+          "mean_dbfs": -39.1,
+          "peak_dbfs": -24.5,
+          "constant_gain_db": 16.1
+        },
+        {
+          "analysis_invocation": [
+            "ffmpeg",
+            "-hide_banner",
+            "-i",
+            "/Users/az/.codex/artifacts/vector-field-20261126/03-silk-current-raw.mp3",
+            "-af",
+            "atrim=start=1.8:duration=3.2,volumedetect",
+            "-f",
+            "null",
+            "-"
+          ],
+          "mean_dbfs": -39.2,
+          "peak_dbfs": -24.5,
+          "constant_gain_db": 16.200000000000003
+        },
+        {
+          "analysis_invocation": [
+            "ffmpeg",
+            "-hide_banner",
+            "-i",
+            "/Users/az/.codex/artifacts/vector-field-20261126/03-silk-current-raw.mp3",
+            "-af",
+            "atrim=start=3.4:duration=3.4,volumedetect",
+            "-f",
+            "null",
+            "-"
+          ],
+          "mean_dbfs": -39.5,
+          "peak_dbfs": -24.5,
+          "constant_gain_db": 16.5
+        }
+      ],
+      "invocation": [
+        "ffmpeg",
+        "-y",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-i",
+        "/Users/az/.codex/artifacts/vector-field-20261126/03-silk-current-raw.mp3",
+        "-filter_complex",
+        "[0:a]asplit=4[s0][s1][s2][s3];[s0]atrim=start=1.2:duration=3.4,asetpts=PTS-STARTPTS,volume=16.6dB[c0];[s1]atrim=start=2.6:duration=3.7,asetpts=PTS-STARTPTS,volume=16.1dB[c1];[s2]atrim=start=1.8:duration=3.2,asetpts=PTS-STARTPTS,volume=16.200000000000003dB[c2];[s3]atrim=start=3.4:duration=3.4,asetpts=PTS-STARTPTS,volume=16.5dB[c3];[c0][c1]acrossfade=d=1.1:c1=qsin:c2=qsin[x1];[x1][c2]acrossfade=d=1.1:c1=qsin:c2=qsin[x2];[x2][c3]acrossfade=d=1.1:c1=qsin:c2=qsin,atrim=duration=10,afade=t=in:d=0.04,afade=t=out:st=9.82:d=0.18[out]",
+        "-map",
+        "[out]",
+        "-ar",
+        "44100",
+        "-c:a",
+        "pcm_s16le",
+        "/Users/az/.codex/artifacts/vector-field-20261126/03-silk-current-sustained-10s.wav"
+      ],
+      "output": "docs/sound/sources/vector-field/03-silk-current-sustained-10s.wav",
+      "sha256": "8e2e7caf22fc98200901fca0b323b8e563b4bd70e327f38c07b8ce69b20f467e",
+      "script": "sustain.py",
+      "script_sha256": "c5b20a75339bf2731efbf9b1c06b1eeccbbf24550e9a7c0b0d42c800f5ef5999",
+      "script_invocation": "python3 /Users/az/.codex/artifacts/vector-field-20261126/sustain.py"
+    },
+    {
+      "step": "Sustained review MP3 encoding",
+      "invocation": [
+        "ffmpeg",
+        "-y",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-i",
+        "/Users/az/.codex/artifacts/vector-field-20261126/03-silk-current-sustained-10s.wav",
+        "-c:a",
+        "libmp3lame",
+        "-b:a",
+        "192k",
+        "/Users/az/.codex/artifacts/vector-field-20261126/03-silk-current-sustained-10s.mp3"
+      ],
+      "output": "docs/sound/sources/vector-field/03-silk-current-sustained-10s.mp3",
+      "sha256": "f71d574dab4f6cd55763324d0203673e1c07c1796e4517a9be0a1175f58f101e"
+    }
+  ],
+  "generated_at_utc": "2026-11-26T15:20:57.972356+00:00",
+  "raw_sha256": "58f276d023af59f896e61dd1fcb4cd2347d9b2cf340f3dfa348439a86fca14cf",
+  "raw_probe": {
+    "streams": [
+      {
+        "index": 0,
+        "codec_name": "mp3",
+        "codec_long_name": "MP3 (MPEG audio layer 3)",
+        "codec_type": "audio",
+        "codec_tag_string": "[0][0][0][0]",
+        "codec_tag": "0x0000",
+        "mime_codec_string": "mp4a.40.34",
+        "sample_fmt": "fltp",
+        "sample_rate": "44100",
+        "channels": 2,
+        "channel_layout": "stereo",
+        "bits_per_sample": 0,
+        "initial_padding": 0,
+        "r_frame_rate": "0/0",
+        "avg_frame_rate": "0/0",
+        "time_base": "1/14112000",
+        "start_pts": 353600,
+        "start_time": "0.025057",
+        "duration_ts": 141120000,
+        "duration": "10.000000",
+        "bit_rate": "128000",
+        "disposition": {
+          "default": 0,
+          "dub": 0,
+          "original": 0,
+          "comment": 0,
+          "lyrics": 0,
+          "karaoke": 0,
+          "forced": 0,
+          "hearing_impaired": 0,
+          "visual_impaired": 0,
+          "clean_effects": 0,
+          "attached_pic": 0,
+          "timed_thumbnails": 0,
+          "non_diegetic": 0,
+          "captions": 0,
+          "descriptions": 0,
+          "metadata": 0,
+          "dependent": 0,
+          "still_image": 0,
+          "multilayer": 0
+        },
+        "tags": {
+          "encoder": "Lavf"
+        }
+      }
+    ],
+    "format": {
+      "filename": "/Users/az/.codex/artifacts/vector-field-20261126/03-silk-current-raw.mp3",
+      "nb_streams": 1,
+      "nb_programs": 0,
+      "nb_stream_groups": 0,
+      "format_name": "mp3",
+      "format_long_name": "MP2/3 (MPEG audio layer 2/3)",
+      "start_time": "0.025057",
+      "duration": "10.000000",
+      "size": "160957",
+      "bit_rate": "128765",
+      "probe_score": 51,
+      "tags": {
+        "encoder": "Lavf63.1.102"
+      }
+    }
+  },
+  "original_artifact_directory": "/Users/az/.codex/artifacts/vector-field-20261126",
+  "selection": {
+    "verdict": "keep",
+    "user_notes": "Okay, let's do Silk current. That looks good. Make sure to normalize the sound levels.",
+    "date": "2026-11-26",
+    "selected_source": "docs/sound/sources/vector-field/03-silk-current-sustained-10s.wav"
+  },
+  "license": "ElevenLabs free account at generation time; commercial rights not established",
+  "production": {
+    "file": "client/assets/sound/combat/combat_vector_field_01.mp3",
+    "sha256": "53b56143115562da992a106c076ffafc4e4315a6e3c15437465edfd27b665f7b",
+    "script": "scripts/prepare-vector-field-audio.py",
+    "invocation": "python3 scripts/prepare-vector-field-audio.py",
+    "ffmpeg_version": "ffmpeg version 8.1.2 Copyright (c) 2000-2026 the FFmpeg developers",
+    "filter": "aformat=channel_layouts=mono,volume=-0.764445605dB",
+    "target_lufs": -20,
+    "gain_db": -0.7644456050537975,
+    "true_peak_ceiling_dbtp": -2,
+    "max_50ms_rms_ceiling_dbfs": -18.638570171856855,
+    "source_measurements": {
+      "lufs": -21.61,
+      "true_peak_dbtp": -6.5,
+      "max_50ms_rms_dbfs": -17.874124566803058,
+      "duration_seconds": 10.0
+    },
+    "cast_reference_measurements": [
+      {
+        "lufs": -22.86,
+        "true_peak_dbtp": -2.33,
+        "max_50ms_rms_dbfs": -15.638570171856854,
+        "duration_seconds": 0.52
+      },
+      {
+        "lufs": -21.8,
+        "true_peak_dbtp": -2.48,
+        "max_50ms_rms_dbfs": -14.086714496672844,
+        "duration_seconds": 1.36
+      }
+    ],
+    "decoded": {
+      "lufs": -22.81,
+      "true_peak_dbtp": -7.69,
+      "max_50ms_rms_dbfs": -19.095772280759345,
+      "duration_seconds": 10.0
+    },
+    "runtime_gain": 0.7,
+    "format": "mono 44.1kHz MP3 128kbps"
+  }
+}

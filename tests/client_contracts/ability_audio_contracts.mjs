@@ -45,6 +45,37 @@ admitted = true;
 sounds.update([anchor], []);
 assert(voices.size === 1, "a temporarily inaudible anchor can become audible later");
 sounds.destroy();
+
+const field = { id: 10, ability: ABILITY.VECTOR_FIELD, kind: ABILITY_OBJECT_KIND.VECTOR_FIELD,
+  owner: 1, x: 300, y: 400 };
+const start = plays.length;
+sounds.update([field], []);
+assert(plays.length === start + 1 && plays.at(-1).id === "combat_vector_field_01"
+  && plays.at(-1).opts.key === "combat:vector_field:10" && plays.at(-1).opts.loop
+  && plays.at(-1).opts.pitchVariance === 0 && plays.at(-1).opts.gain === 0.7,
+  "visible vector field starts normalized, pitch-stable Silk Current on its own spatial voice");
+sounds.update([field], []);
+assert(plays.length === start + 1, "snapshots do not restart the full-duration field recording");
+voices.clear();
+sounds.update([field], []);
+assert(plays.length === start + 2, "field recovers after spatial voice eviction");
+sounds.update([field], [], false);
+assert(!voices.size && !sounds.vectorFields.size, "pause stops vector field sound");
+sounds.update([field], []);
+assert(voices.has("combat:vector_field:10"), "resume restores the visible field sound");
+sounds.update([], []);
+assert(!voices.size && stops.includes("combat:vector_field:10"),
+  "expiry or lost visibility stops field audio");
+sounds.update([{ ...field, kind: ABILITY_OBJECT_KIND.MAGIC_ANCHOR }], []);
+assert(!voices.size, "mismatched object kind cannot create a field voice");
+admitted = false;
+sounds.update([field], []);
+assert(!sounds.vectorFields.size, "spatially inaudible field does not claim a voice");
+admitted = true;
+sounds.update([field, { ...anchor, id: field.id }], []);
+assert(voices.size === 2, "Anchor and Vector Field have independent voice keys");
+sounds.destroy();
+assert(!voices.size && !sounds.vectorFields.size, "teardown clears vector field voices");
 assert(!voices.size && !sounds.shields.size && !sounds.dashCharges.size,
   "teardown clears voices and timeline baselines");
 sounds.update([shield], [caster(0)]);

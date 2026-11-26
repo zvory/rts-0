@@ -111,3 +111,14 @@ while its visible world object exists and is mastered below the cast cues. Exact
 API/model settings, raw sources, processing, and decoded levels are recorded in
 [DAO_ABILITIES.json](DAO_ABILITIES.json). Commercial rights remain unverified under the account
 terms. No rejected auditions are shipped in the runtime manifest.
+
+### Vector Field — Silk Current
+
+Selected by the user on 2026-11-26. The complete 10-second wind uses overlapping interior
+sections with unequal offsets and durations. The production mono MP3 targets −20 LUFS, subject
+to a −2 dBTP ceiling and a loudest 50 ms at least 3 dB below the Dash and Shield cast cues;
+playback uses the same 0.7 gain and spatial combat buses as Anchor. See
+[VECTOR_FIELD.json](VECTOR_FIELD.json) for exact prompts, source/production hashes, user verdict,
+processing commands, and decoded levels; `scripts/prepare-vector-field-audio.py` rebuilds the
+normalization. The raw and selected audition are retained in `sources/vector-field/`.
+ElevenLabs account was free at generation time; commercial rights are not established.
