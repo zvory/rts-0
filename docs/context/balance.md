@@ -13,6 +13,7 @@ Use when tuning costs, supply, sight, sizes, unit/building stats, or any number 
   - Tournament Grounds
   - Portal Adept production
   - Proving Grounds
+  - [Building repair and AT gun Dao targets](../design/balance.md#building-repair-and-at-gun-dao-targets)
 
 - Cultivator Shop
 

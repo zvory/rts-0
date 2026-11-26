@@ -954,7 +954,9 @@ See [Vector Field](vector-field.md) for placement, rank geometry, force, and pre
 ### Building repair and AT gun Dao targets
 
 Right-clicking a damaged owned completed building with Engineers or Serfs assigns repairs at
-2 HP per second per worker; multiple repairers add their rates. Each resource is charged in
+2 HP per second per worker; multiple repairers add their rates. Healing Seals retain their
+non-repairable consumable capacity, and neutral field obstacles remain outside owned-building
+repair. Each resource is charged in
 proportion to HP restored at 25% of the building's original steel/oil price for a full HP bar
 ([SC2 reference](https://liquipedia.net/starcraft2/Repair)). Because resources are integers, billing
 precharges the ceiling of the cumulative repair cost and keeps fractional prepaid steel/oil
