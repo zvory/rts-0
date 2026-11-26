@@ -1,4 +1,4 @@
-//! Worker building repair. Prepaid fractional costs live on buildings, so repeated damage,
+//! Worker building and vehicle repair. Prepaid fractional costs live on repair targets, so repeated damage,
 //! replacement orders, and additional workers cannot reset billing or multiply rounding overhead.
 use super::{dist2, interact_range_for_kind};
 use crate::config;
@@ -49,7 +49,7 @@ pub(in crate::game) fn repair_system(entities: &mut EntityStore, players: &mut [
         let Order::Repair(order) = &mut m.order else {
             continue;
         };
-        let interval = config::TICK_HZ / config::BUILDING_REPAIR_HP_PER_SECOND;
+        let interval = config::TICK_HZ / config::REPAIR_HP_PER_SECOND;
         order.ticks = order.ticks.saturating_add(1).min(interval);
         if order.ticks < interval {
             continue;
@@ -80,7 +80,7 @@ pub(in crate::game) fn repair_system(entities: &mut EntityStore, players: &mut [
             }
         }
     }
-    // Release every repairer together when the final worker finishes the building, so queued
+    // Release every repairer together when the final worker finishes the target, so queued
     // orders can promote on the next tick regardless of worker iteration order.
     for (id, _, target) in workers {
         if entities.get(target).is_none_or(|t| t.hp >= t.max_hp) {
@@ -92,7 +92,7 @@ pub(in crate::game) fn repair_system(entities: &mut EntityStore, players: &mut [
 }
 
 fn hp_cost(price: u32, credit: u64, max_hp: u32) -> (u32, u64) {
-    let denominator = u64::from(max_hp.max(1)) * u64::from(config::BUILDING_REPAIR_COST_DIVISOR);
+    let denominator = u64::from(max_hp.max(1)) * u64::from(config::REPAIR_COST_DIVISOR);
     let needed = u64::from(price).saturating_sub(credit);
     let charge = needed.div_ceil(denominator);
     (
@@ -116,8 +116,8 @@ mod tests {
                 total += charge;
                 credit = next;
             }
-            assert_eq!(total, price.div_ceil(config::BUILDING_REPAIR_COST_DIVISOR));
-            assert!(credit < u64::from(max_hp) * u64::from(config::BUILDING_REPAIR_COST_DIVISOR));
+            assert_eq!(total, price.div_ceil(config::REPAIR_COST_DIVISOR));
+            assert!(credit < u64::from(max_hp) * u64::from(config::REPAIR_COST_DIVISOR));
         }
     }
 }

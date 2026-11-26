@@ -356,54 +356,6 @@ fn build_staging_goals(
 }
 
 impl MoveCoordinator<'_> {
-    /// Route repairers to the building's outside staging ring.
-    pub fn order_repair(&mut self, entities: &mut EntityStore, id: u32, target: u32) -> bool {
-        let Some((kind, tx, ty)) = self.repair_footprint(entities, target) else {
-            return false;
-        };
-        entities.release_miner(id);
-        if let Some(e) = entities.get_mut(id) {
-            e.replace_active_order(Order::repair(target));
-            e.set_target_id(Some(target));
-            e.reset_gather_state();
-            let (px, py) = (e.pos_x(), e.pos_y());
-            e.reset_stuck(px, py);
-        }
-        let attempt = self.plan_footprint_interaction_path(
-            entities,
-            id,
-            kind,
-            tx,
-            ty,
-            PathingRequestSource::Build,
-        );
-        if matches!(attempt, PathAttempt::Failed) {
-            if let Some(e) = entities.get_mut(id) {
-                e.clear_active_order();
-            }
-            return false;
-        }
-        true
-    }
-
-    pub(super) fn repair_footprint(
-        &self,
-        entities: &EntityStore,
-        target: u32,
-    ) -> Option<(EntityKind, u32, u32)> {
-        let t = entities.get(target)?;
-        if t.hp == 0 || t.under_construction() {
-            return None;
-        }
-        let stats = config::building_stats(t.kind)?;
-        let (cx, cy) = self.map.tile_of(t.pos_x(), t.pos_y());
-        Some((
-            t.kind,
-            cx.checked_sub(stats.foot_w / 2)?,
-            cy.checked_sub(stats.foot_h / 2)?,
-        ))
-    }
-
     /// Route Tank Trap dismantling to the outside staging ring.
     pub fn order_deconstruct(&mut self, entities: &mut EntityStore, id: u32, target: u32) -> bool {
         let (target_x, target_y, tile_x, tile_y) = match entities.get(target) {

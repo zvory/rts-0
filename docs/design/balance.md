@@ -953,18 +953,22 @@ See [Vector Field](vector-field.md) for placement, rank geometry, force, and pre
 
 ### Building repair and AT gun Dao targets
 
-Right-clicking a damaged owned completed building with Engineers or Serfs assigns repairs at
+Right-clicking a damaged owned completed building, Tank, Rocket Truck, Mortar Team, or AT Gun
+with Engineers or Serfs assigns repairs at
 2 HP per second per worker; multiple repairers add their rates. Healing Seals retain their
 non-repairable consumable capacity, and neutral field obstacles remain outside owned-building
 repair. Each resource is charged in
-proportion to HP restored at 25% of the building's original steel/oil price for a full HP bar
+proportion to HP restored at 25% of the target's original steel/oil price for a full HP bar
 ([SC2 reference](https://liquipedia.net/starcraft2/Repair)). Because resources are integers, billing
 precharges the ceiling of the cumulative repair cost and keeps fractional prepaid steel/oil
-credit on the building. Each HP consumes `original price / (4 × max HP)` from that credit.
-This bounds rounding to less than one resource over the building's lifetime and remains
+credit on the repair target. Each HP consumes `original price / (4 × max HP)` from that credit.
+This bounds rounding to less than one resource over the target's lifetime and remains
 identical across damage cycles, replacement orders, additional repairers, and checkpoint restores. Work pauses when its next HP charge is unaffordable.
 `balance/economy.rs` owns the server-only rate and cost divisor; the client consumes authoritative
-HP/resources and adds only the right-click command affordance.
+HP/resources and adds only the right-click command affordance. The rules-owned mobile target list
+is mirrored in client config and checked by faction catalog parity. Workers follow moving targets
+and pause work whenever the target leaves interaction range; ordinary infantry and unlisted
+vehicles remain ineligible.
 
 AT guns may target Wind, War, and Magic Adepts and Masters (all three Adept kinds at either rank).
 Novices (Warrior), workers, and Kriegsia rifle infantry remain excluded. The existing 30% infantry

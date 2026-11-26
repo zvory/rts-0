@@ -1254,15 +1254,15 @@ function buttonByLabel(card, label) {
       rightClickCommands[0].queued === true,
     "Shift right-click on a Tank Trap with workers selected should send queued deconstruct",
   );
-  for (const kind of [KIND.BARRACKS, KIND.HEALING_SEAL]) for (const queued of [false, true]) {
+  for (const kind of [KIND.BARRACKS, KIND.HEALING_SEAL, KIND.RIFLEMAN, KIND.TANK, KIND.ROCKET_LAUNCHER, KIND.MORTAR_TEAM, KIND.ANTI_TANK_GUN]) for (const queued of [false, true]) {
     const building = { id: 44, owner: 1, kind, x: 240, y: 240, hp: 100, maxHp: 500 };
     input.state.entitiesInterpolated = () => [deconstructWorker, building];
     publishSelectionTestScene(input);
     rightClickCommands.length = 0;
     input._onRightClick({ x: 240, y: 240 }, { shiftKey: queued });
-    if (kind === KIND.HEALING_SEAL) assert(!rightClickCommands.some((command) => command.c === "repair"), "Workers must not repair consumed healing capacity");
+    if ([KIND.HEALING_SEAL, KIND.RIFLEMAN].includes(kind)) assert(!rightClickCommands.some((command) => command.c === "repair"), "Workers must not repair healing capacity or infantry");
     else assertDeepEqual(rightClickCommands, [{ c: "repair", units: [42], target: 44, ...(queued ? { queued: true } : {}) }],
-      "Worker right-click on an owned damaged building repairs and preserves Shift queueing");
+      "Worker right-click on owned damaged repair targets preserves Shift queueing");
   }
   input.dom = { clientWidth: 800, clientHeight: 600 };
   input.camera = { screenToWorld: (x, y) => ({ x, y }) };
