@@ -172,7 +172,7 @@ fn sword_and_line_shot_grant_insight_from_actual_damage_on_both_legs() {
                 let damage = initial_hp - entities.get(victim).unwrap().hp;
                 assert_eq!(
                     entities.get(caster).unwrap().insight,
-                    initial_insight + if master { 0 } else { damage },
+                    initial_insight + if master { 0 } else { damage * 2 },
                     "{kind:?} {ability:?} tick {tick}"
                 );
             }

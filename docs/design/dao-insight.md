@@ -10,7 +10,7 @@ do not cancel it. No automatic research purchase, Portal default, or army-wide p
 is added. At full insight, a Novice without a pending choice automatically receives one of the
 three Taos with equal probability using the authoritative, checkpointed simulation RNG.
 An explicitly selected path always takes precedence. Evolution is free and commits during the tick once a legal evolved body fits and the unit has 60 insight, capped at 60; misses, friendly fire, invulnerability and overkill grant
-no extra insight. Actual hostile unit HP loss grants one insight per HP removed; building HP loss grants a fixed quarter rate. Novice, Wind, War, and Magic ordinary attacks and eligible ability projectiles share this rule, including both legs of Throw Sword. Advancement clears all existing insight. Successful advancement fully restores HP to the evolved unit’s maximum,
+no extra insight. Actual hostile unit HP loss grants one insight per HP removed (two for War Adepts damaging Tanks); building HP loss grants a fixed quarter rate. Novice, Wind, War, and Magic ordinary attacks and eligible ability projectiles share this rule, including both legs of Throw Sword. Advancement clears all existing insight. Successful advancement fully restores HP to the evolved unit’s maximum,
 after applying any path-specific maximum-HP bonus. Novices have 58 maximum HP; Wind and Magic Adepts have 150; War Adepts have 176. Novice evolution uses the existing bounded body-growth clearance search before committing the larger Adept body. If no nearby legal pose exists, keep the chosen Dao, insight and HP and retry next tick; do not reroll an automatic choice or heal until evolution can commit. Novice collision radius is 17 world pixels; its artwork and 19.5-pixel direct/outer click radius remain unchanged. Adept collision radii stay independent at 26 pixels for Wind/Magic and 18.2 for War, with the existing Master ×1.2 body scaling. Base moves at 2.0 px/tick; War and Magic move at 2.1 px/tick. Choosing a pending path or repeating
 an evolution request does not heal; dead units cannot advance. One chosen-path evolution per unit, followed by one automatic Master advancement. Player research persists after Pavilion loss.
 The choice clears on evolution; evolved units cannot change paths. Pending choices persist
@@ -150,13 +150,16 @@ Wind uses the separate `windDash` ability: twelve-tile movement without a return
 
 Novices, Wind Adepts, War Adepts, and Magic Adepts earn one insight per actual hostile
 unit HP removed, regardless of attacker or target cost, including zero-cost units.
+War Adepts earn double insight (two per HP removed) against Tanks, including both
+legs of Throw Sword.
 Buildings give 0.25 insight per actual hostile HP removed, except Wind (Dao of Lightness)
 earns one insight per HP removed from Pumpjacks and Steel Mines. Damage before the
 killing blow counts; overkill grants nothing. There is no killing-blow bonus, and Throw
-Sword grants no insight. Existing shield, armor, and hostility rules apply.
+Sword earns insight at the same target-specific rates. Existing shield, armor, and hostility rules apply.
 
 Arithmetic uses a fixed denominator of four: unit damage and Wind extractor damage
-contribute four numerator units per HP, and ordinary building damage contributes one.
+contribute four numerator units per HP, War Adept damage to Tanks contributes eight,
+and ordinary building damage contributes one.
 Fractional numerators carry between hits and target changes, persist in checkpoints,
 and remain server-private. At the insight cap, evolution, or Master advancement,
 discard the remainder alongside any excess insight. Masters earn no further insight.
