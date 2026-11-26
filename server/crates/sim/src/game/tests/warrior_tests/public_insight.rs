@@ -103,3 +103,22 @@ fn disciple_insight_is_public_but_chosen_dao_stays_team_private() {
         .recompute(&[1, 2, 3], &game.state.entities, &game.state.map);
     assert!(!game.snapshot_for(2).entities.iter().any(|e| e.id == unit));
 }
+
+#[test]
+fn passive_insight_ticks_in_game_and_triggers_automatic_evolution() {
+    let mut game = empty_flat_game(&[cultivator_player()]);
+    let novice = game.state.entities.spawn_unit(1, EntityKind::Warrior, 400.0, 400.0).unwrap();
+    let serf = game.state.entities.spawn_unit(1, EntityKind::Worker, 600.0, 400.0).unwrap();
+    let unit = game.state.entities.get_mut(novice).unwrap();
+    unit.insight = 59;
+    unit.chosen_dao = Some(crate::game::upgrade::UpgradeKind::DaoWind);
+    for _ in 1..config::DISCIPLE_PASSIVE_INSIGHT_TICKS {
+        game.tick();
+    }
+    assert_eq!(game.state.entities.get(novice).unwrap().kind, EntityKind::Warrior);
+    game.tick();
+    let evolved = game.state.entities.get(novice).unwrap();
+    assert_eq!(evolved.kind, EntityKind::WindAdept);
+    assert_eq!(evolved.insight, 0);
+    assert_eq!(game.state.entities.get(serf).unwrap().insight, 0);
+}

@@ -73,6 +73,21 @@ impl Entity {
         }
     }
 
+    /// Each unit owns its cadence; global tick boundaries never credit newly spawned units.
+    pub(in crate::game) fn tick_passive_insight(&mut self) {
+        if !self.kind.is_disciple() || self.hp == 0 || self.dao_master {
+            return;
+        }
+        self.passive_insight_ticks = self.passive_insight_ticks.saturating_add(1);
+        if self.passive_insight_ticks >= config::DISCIPLE_PASSIVE_INSIGHT_TICKS {
+            self.passive_insight_ticks = 0;
+            self.insight = self.insight.saturating_add(1).min(self.insight_cap());
+            if self.insight == self.insight_cap() {
+                self.insight_fraction = 0;
+            }
+        }
+    }
+
     /// Credit actual hostile HP loss with exact fractional carry for building damage.
     pub(in crate::game) fn gain_insight(&mut self, damage: u32, target_kind: EntityKind) {
         if !self.kind.is_disciple() || self.insight >= self.insight_cap() {
@@ -314,5 +329,66 @@ impl Entity {
             1.0
         };
         base * master * charge * haste
+    }
+}
+
+#[cfg(test)]
+mod passive_insight_tests {
+    use super::*;
+
+    #[test]
+    fn passive_insight_uses_each_living_cultivators_full_five_seconds() {
+        for kind in [EntityKind::Warrior, EntityKind::WindAdept, EntityKind::WarAdept,
+                     EntityKind::MagicAdept, EntityKind::Worker, EntityKind::Rifleman] {
+            let mut unit = Entity::new_unit(1, kind, 100.0, 100.0).unwrap();
+            for _ in 1..config::DISCIPLE_PASSIVE_INSIGHT_TICKS {
+                unit.tick_passive_insight();
+            }
+            assert_eq!(unit.insight, 0);
+            unit.tick_passive_insight();
+            assert_eq!(unit.insight, u32::from(kind.is_disciple()));
+            for _ in 0..config::DISCIPLE_PASSIVE_INSIGHT_TICKS {
+                unit.tick_passive_insight();
+            }
+            assert_eq!(unit.insight, 2 * u32::from(kind.is_disciple()));
+            unit.hp = 0;
+            for _ in 0..config::DISCIPLE_PASSIVE_INSIGHT_TICKS {
+                unit.tick_passive_insight();
+            }
+            assert_eq!(unit.insight, 2 * u32::from(kind.is_disciple()));
+        }
+    }
+
+    #[test]
+    fn passive_insight_preserves_cadence_and_combat_fraction_through_restore_and_evolution() {
+        let mut unit = Entity::new_unit(1, EntityKind::Warrior, 100.0, 100.0).unwrap();
+        unit.insight = 59;
+        unit.insight_fraction = 1;
+        unit.passive_insight_ticks = config::DISCIPLE_PASSIVE_INSIGHT_TICKS - 1;
+        let serialized = serde_json::to_string(&unit).unwrap();
+        let mut unit: Entity = serde_json::from_str(&serialized).unwrap();
+        unit.tick_passive_insight();
+        assert_eq!(unit.insight, 60);
+        assert_eq!(unit.insight_fraction, 0);
+        unit.tick_passive_insight();
+        assert!(unit.evolve_dao(AbilityKind::EvolveWar));
+        assert_eq!(unit.passive_insight_ticks, 1);
+        unit.gain_insight(1, EntityKind::ResourceDepot);
+        for _ in 1..config::DISCIPLE_PASSIVE_INSIGHT_TICKS {
+            unit.tick_passive_insight();
+        }
+        assert_eq!(unit.insight, 1);
+        assert_eq!(unit.insight_fraction, 1);
+        unit.insight = 199;
+        for _ in 0..config::DISCIPLE_PASSIVE_INSIGHT_TICKS {
+            unit.tick_passive_insight();
+        }
+        assert_eq!(unit.insight, 200);
+        unit.advance_dao_master();
+        for _ in 0..config::DISCIPLE_PASSIVE_INSIGHT_TICKS {
+            unit.tick_passive_insight();
+        }
+        assert!(unit.dao_master);
+        assert_eq!(unit.insight, 0);
     }
 }

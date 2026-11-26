@@ -24,6 +24,13 @@ one-for-one training in the [Proving Grounds](proven-grounds.md),
 with the existing shared research price tiers, serial queue and prerequisite/faction gates.
 Combat-earned evolution requires neither research nor a Pavilion.
 
+Every living Novice, Wind Adept, War Adept, and Magic Adept also earns one passive
+insight per five seconds (150 simulation ticks) since spawning. Serfs and other factions’
+units earn none. Each unit’s tick remainder is checkpointed and survives evolution;
+passive income adds to combat income, respects the 60/200 caps, and uses the same
+automatic advancement. Masters retain their terminal zero-insight state and earn none.
+Dead units do not advance the timer. Time at a cap is not banked as extra insight.
+
 Novices, War Adepts, and War Masters have **Charge**, an automatic passive shown as a disabled command-card tile with the
 autocast swirl and authoritative cooldown clock. It has no hotkey, cast action, or autocast toggle. Against a living
 hostile unit selected by normal combat targeting (explicit attack, attack-move, or automatic
