@@ -675,7 +675,7 @@ fn activate_item(game: &mut Game, unit: u32, ability: AbilityKind) {
 
 #[test]
 fn carried_items_are_passive_and_permanent_after_checkpoint() {
-    let (mut game, shop, unit) = item_fixture();
+    let (mut game, shop, unit) = item_fixture_for_kind(EntityKind::WindAdept);
     buy(&mut game, shop, unit, AbilityKind::Haste);
     buy(&mut game, shop, unit, AbilityKind::DoubleDamage);
     buy(&mut game, shop, unit, AbilityKind::ArmorTreasure);
@@ -812,7 +812,7 @@ fn escape_purchase_cooldown_is_shared_by_old_and_new_shops_and_checkpointed() {
 
 #[test]
 fn vitality_treasure_is_passive_on_delivery_and_permanent_after_checkpoint() {
-    let (mut game, shop, unit) = item_fixture();
+    let (mut game, shop, unit) = item_fixture_for_kind(EntityKind::WindAdept);
     let target = game.state.entities.get_mut(unit).unwrap();
     let base = target.max_hp;
     target.apply_damage(20, None);
@@ -1204,10 +1204,14 @@ fn rank_slot_limits_reserve_deliveries_and_reject_regen_when_full() {
             let (mut game, shop, unit) = item_fixture_for_kind(kind);
             let carrier = game.state.entities.get_mut(unit).unwrap();
             carrier.dao_master = master;
-            assert_eq!(
-                carrier.carried_item_capacity(),
-                Some(if master { 6 } else { 3 })
-            );
+            let capacity = if master {
+                6
+            } else if kind == EntityKind::Warrior {
+                1
+            } else {
+                3
+            };
+            assert_eq!(carrier.carried_item_capacity(), Some(capacity));
             for ability in [
                 AbilityKind::Haste,
                 AbilityKind::DoubleDamage,
@@ -1216,6 +1220,10 @@ fn rank_slot_limits_reserve_deliveries_and_reject_regen_when_full() {
                 buy(&mut game, shop, unit, ability);
             }
             game.tick();
+            assert_eq!(
+                game.state.players[0].oil,
+                if capacity == 1 { 900 } else { 650 }
+            );
             let oil = game.state.players[0].oil;
             buy(&mut game, shop, unit, AbilityKind::VitalityTreasure);
             game.tick();
@@ -1228,7 +1236,7 @@ fn rank_slot_limits_reserve_deliveries_and_reject_regen_when_full() {
             }
             assert_eq!(
                 game.state.entities.get(unit).unwrap().carried_item_count(),
-                if master { 4 } else { 3 }
+                if master { 4 } else { capacity }
             );
             if !master {
                 let oil = game.state.players[0].oil;
@@ -1261,7 +1269,7 @@ fn rank_slot_limits_reserve_deliveries_and_reject_regen_when_full() {
                 }
                 assert_eq!(
                     game.state.entities.get(unit).unwrap().carried_item_count(),
-                    4
+                    capacity + 1
                 );
             }
         }

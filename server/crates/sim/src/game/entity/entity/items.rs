@@ -13,6 +13,8 @@ impl Entity {
     pub(in crate::game) fn carried_item_capacity(&self) -> Option<u8> {
         self.kind.is_disciple().then_some(if self.dao_master {
             crate::config::CULTIVATOR_MASTER_ITEM_CAPACITY
+        } else if self.kind == EntityKind::Warrior {
+            crate::config::CULTIVATOR_NOVICE_ITEM_CAPACITY
         } else {
             crate::config::CULTIVATOR_ITEM_CAPACITY
         })
