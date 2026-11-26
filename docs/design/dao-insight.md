@@ -45,7 +45,7 @@ Charge, Master movement bonuses, and Haste multiply together.
 
 Each paid training path has a separate researched unlock; combat-earned evolution is unrestricted. No automatic AI evolution in this pass;
 AI can encounter and damage evolved units. Insight uses a blue fill over red background
-under the HP bar and exact insight appears in selected-unit details for teammates and privileged observers only. Enemy snapshots omit exact insight. Evolved units
+under the HP bar for everyone who can see the unit, including enemies. Exact insight is public in visible-unit snapshots and selected-unit details. Evolved units
 reset to zero insight and have a cap of 200. Wind, War, and Magic continue earning insight from
 actual hostile HP damage; Magic also earns Vector Field insight as described below; reaching 200 automatically advances living Adepts to their matching
 [Master rank](dao-masters.md), fully healing to 1.4 times their Adept maximum HP. Masters
@@ -60,7 +60,7 @@ Corona shader: a warm, softly blooming, animated corona centered about 13.6 worl
 from the unit (roughly half the previous ray effect radius), with no geometric rays.
 Labels split after “Dao of”. Visible enemies
 see the unit radiance, with ordinary fog filtering. Realm advancement projects a 15-tick
-(half-second) expanding gold corona reaching about one tile, independently of insight privacy.
+(half-second) expanding gold corona reaching about one tile, alongside the public insight bar.
 
 Magic Disciples can place Shield within five tiles: a shimmering circle with a
 2.1-tile radius, covering allied units (including the caster).

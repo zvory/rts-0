@@ -1233,7 +1233,7 @@ events, and positioned notices remain fog-gated and are withheld when smoke hide
   state: string,                 // "idle","move","attack","gather","build","train","construct","dead"
   facing?: f32,                  // radians, for unit body/hull orientation (optional)
   weaponFacing?: f32,            // radians, for independent weapon/barrel orientation (optional)
-  insight?: u32,                 // team-private Disciple 0..60 before evolution, 0..120 after, compact slot 45
+  insight?: u32,                 // public Disciple 0..60 before evolution, 0..200 after, compact slot 45
   dao?: "wind"|"war"|"magic", // evolved Disciple, compact slot 46
   daoReady?: bool,               // public maximum-insight readiness, slot 47
   daoAdvanceTicks?: u16,         // public realm burst, 1..15 ticks, slot 48
@@ -2054,7 +2054,7 @@ snapshot version 69 keeps the existing numeric codes and slots.
 See [Dao evolution playtest](dao-insight.md). Entity-owned `insight` and authoritative unit `kind` persist
 through checkpoints. Evolution changes Novice `warrior` (29) to `wind_adept` (35),
 `war_adept` (36), or `magic_adept` (37), preserving the entity id and orders.
-Permanent Dao identity is derived from kind; the engine stores no separate mutable `dao`. Disciple snapshots append team-private `insight` (compact slot 45), public
+Permanent Dao identity is derived from kind; the engine stores no separate mutable `dao`. Disciple snapshots append public `insight` (compact slot 45), public
 `dao` (slot 46: wind/war/magic), `daoReady` (47), and optional
 `daoAdvanceTicks` (48, 1–15). Ordinary fog filtering applies to all public fields. Evolution buttons set replaceable, entity-owned `chosenDao` intent (team-private compact slot 49), independent of orders. Codes 14–16 and order stages 22–24 retain their positions.
 Evolution automatically occurs once 60 insight is ready, without research or a Pavilion.

@@ -140,7 +140,7 @@ mod tests {
 
 // MG prototype: Attack.shotOrigin (compact v57, slot 6) fixes the ray origin; toPos fixes its endpoint.
 
-// Disciple EntityView insight/dao/daoReady/daoAdvanceTicks/chosenDao are re-exported from rts-contract (slots 45–49).
+// Disciple EntityView public insight/dao/daoReady/daoAdvanceTicks and team-private chosenDao are re-exported from rts-contract (slots 45–49).
 
 // Tournament Grounds uses the shared kind adapter (tournament_grounds/code 32);
 // EntityView tournament_entrants is team-private compact v62 slot 50.

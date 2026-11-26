@@ -388,7 +388,7 @@ export const cmd = Object.freeze({
 
 // MG prototype: Attack.shotOrigin (compact v57, slot 6) fixes the ray origin; toPos fixes its endpoint.
 
-// Disciple EntityView slots 45–49: team-private insight/chosenDao; public dao, daoReady and daoAdvanceTicks.
+// Disciple EntityView slots 45–49: team-private chosenDao; public insight, dao, daoReady and daoAdvanceTicks.
 
 // Tournament Grounds: kind code 32; compact v62 slot 50 is team-private tournamentEntrants (0–4).
 // Existing production/rally fields carry its five-second batch and pending winners.
@@ -403,7 +403,7 @@ export const cmd = Object.freeze({
 // Shop goods use useAbility targetId; v66 entity slot 53 carries owner/ally-only escapeTreasure (plus privileged observers).
 
 // Dao Master rank: EntityView daoMaster is a public bool at compact slot 52 (v65);
-// rts-contract owns the DTO, the sim owns advancement, and exact insight stays team-private.
+// rts-contract owns the DTO, the sim owns advancement, and exact insight is public on visible Disciples.
 
 // Wind Dash uses windDash (ability 21, order stage 29); no return marker.
 

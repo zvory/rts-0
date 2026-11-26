@@ -596,7 +596,7 @@ fn disciple_shield_durability_breaking_hit_teams_and_checkpoint() {
 }
 
 #[test]
-fn disciple_insight_is_team_private_but_readiness_and_advance_are_public() {
+fn disciple_insight_is_public_but_chosen_dao_stays_team_private() {
     use crate::game::ability::AbilityKind;
     use crate::game::upgrade::UpgradeKind;
     let enemy = PlayerInit {
@@ -628,7 +628,7 @@ fn disciple_insight_is_team_private_but_readiness_and_advance_are_public() {
     game.state
         .fog
         .recompute(&[1, 2, 3], &game.state.entities, &game.state.map);
-    for (viewer, insight) in [(1, Some(60)), (2, None), (3, Some(60))] {
+    for viewer in [1, 2, 3] {
         let snapshot = game.snapshot_for(viewer);
         let view = snapshot
             .entities
@@ -644,8 +644,8 @@ fn disciple_insight_is_team_private_but_readiness_and_advance_are_public() {
                         .collect::<Vec<_>>()
                 )
             });
-        assert_eq!(view.insight, insight);
-        assert_eq!(view.chosen_dao.as_deref(), insight.map(|_| "magic"));
+        assert_eq!(view.insight, Some(60));
+        assert_eq!(view.chosen_dao.as_deref(), (viewer != 2).then_some("magic"));
         assert_eq!(view.dao_ready, Some(true));
     }
     game.state.players[0].upgrades.insert(UpgradeKind::DaoWind);
@@ -667,7 +667,7 @@ fn disciple_insight_is_team_private_but_readiness_and_advance_are_public() {
         .into_iter()
         .find(|e| e.id == unit)
         .unwrap();
-    assert_eq!(enemy_view.insight, None);
+    assert_eq!(enemy_view.insight, Some(0));
     assert_eq!(enemy_view.dao_ready, Some(false));
     assert!(enemy_view
         .dao_advance_ticks
@@ -676,6 +676,16 @@ fn disciple_insight_is_team_private_but_readiness_and_advance_are_public() {
         game.tick();
     }
     assert_eq!(game.state.entities.get(unit).unwrap().dao_advance_ticks, 0);
+
+    // Partial Adept XP is public too, while fog still hides the whole unit.
+    game.state.entities.get_mut(unit).unwrap().insight = 37;
+    assert_eq!(
+        game.snapshot_for(2).entities.iter().find(|e| e.id == unit).unwrap().insight,
+        Some(37)
+    );
+    game.state.entities.get_mut(unit).unwrap().set_position(1000.0, 1000.0);
+    game.state.fog.recompute(&[1, 2, 3], &game.state.entities, &game.state.map);
+    assert!(!game.snapshot_for(2).entities.iter().any(|e| e.id == unit));
 }
 
 #[test]

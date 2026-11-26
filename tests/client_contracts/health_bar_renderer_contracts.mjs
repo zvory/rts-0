@@ -181,9 +181,13 @@ try {
   _drawAboveFogHp.call(renderer, disciple, {});
   assert(barsDrawn === 6, "full-health Disciples retain insight overlays both below and above fog");
 
+  const enemyDisciple = { ...disciple, id: 15, owner: 2 };
+  _drawSelectionAndHp.call(renderer, enemyDisciple, new Set(), {});
+  assert(barsDrawn === 7, "full-health enemy Disciples retain public insight overlays without selection");
+
   const discipleBar = makeBar();
   for (const dao of [null, "wind", "war", "magic"]) {
-    _hpBar.call({ _map: { tileSize: 32 } }, discipleBar, { ...disciple, dao });
+    _hpBar.call({ _map: { tileSize: 32 } }, discipleBar, { ...enemyDisciple, dao });
     const iconCalls = discipleBar.rtsDao.calls;
     const lastClear = iconCalls.findLastIndex((call) => call[0] === "clear");
     const iconDrawing = iconCalls.slice(lastClear + 1).filter((call) =>

@@ -47,7 +47,7 @@ research or order is needed; the Novice's existing chosen-Dao advancement is unc
 Masters stop accumulating insight and cannot advance or heal this way again. No heal
 for dead entities. Retain entity id, owner, target/order queue, ability state and attack
 reload. Reuse the existing 15-tick advancement corona. Rank is durable entity state,
-checkpointed and fog-filtered with the visible entity. Exact insight remains private.
+checkpointed and fog-filtered with the visible entity. Exact insight is public for visible Disciples.
 HUD/portraits/minimap use the Master label and matching art. Lab review uses normal
 combat advancement or a valid checkpoint; no network command grants free advancement.
 
