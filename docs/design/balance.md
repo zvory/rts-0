@@ -975,3 +975,7 @@ vehicles remain ineligible.
 AT guns may target Wind, War, and Magic Adepts and Masters (all three Adept kinds at either rank).
 Novices (Warrior), workers, and Kriegsia rifle infantry remain excluded. The existing 30% infantry
 damage multiplier on Dao Adept bodies is unchanged.
+
+### 2X XP
+
+The Shop sells a permanent utility item with glyph **2X**, subtitle **2X XP**, hotkey **W**, and cost **50 oil** (no steel). After delivery it doubles all Insight gain, including combat, fractional building damage, War-versus-Tank bonuses, and Magic Vector Field death rewards. It uses one carried slot, does not stack, survives supplying-Shop destruction after delivery, and follows existing delivery, reservation, visibility, checkpoint, and rank-cap rules. Multiplication applies to new rewards before fractional carry and the existing Insight caps.

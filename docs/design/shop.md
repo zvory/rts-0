@@ -104,7 +104,7 @@ Carried passive items use existing entity ability-use state; the owner and privi
 
 Vitality Treasure is a **100 oil** defense item, purchased from a completed Shop with **D** and can coexist with Armor Treasure. It uses the same visible friendly-unit targeting, unlimited purchase range, delivery, same-item reservation, and non-stacking rules. Delivery immediately grants **+150 maximum HP and +150 current HP permanently**, preserving any pre-existing missing HP. It remains carried and passive, with no activation, consumption, or expiry. For example, 30/58 HP becomes 180/208 HP. Dao evolution and Master advancement retain the flat 150 bonus without multiplying it. Carried passive state, including the health pair, survives checkpoints. Destroying the supplying Shop after delivery does not remove Armor or Vitality.
 
-Both Shop and Buy menu cards attach a small tab to the existing left edge of each row, without extending the panel: **Util** (Escape Q), **Defense**
+Both Shop and Buy menu cards attach a small tab to the existing left edge of each row, without extending the panel: **Util** (Escape Q, 2X XP W), **Defense**
 (Regen A, Armor S, Vitality D; F empty), **Offense** (Haste Z, Double Damage X). Buy menu Return occupies V.
 Item glyph/subtitle pairs are `ESC` / Escape, `HP` / +3 per second, `ARM` / +50% base armor,
 `+HP` / +150 HP, `HST` / Haste, and `DD` / 2x damage. Armor's subtitle describes the existing
@@ -114,3 +114,7 @@ a purple return diamond for Escape, a shield for Armor, a heart for Vitality, a 
 and a sword for Double Damage. Flying goods and minimap markers use the same icons.
 Rejected duplicate purchases send the purchasing player an info Notice:
 “Item already equipped or being delivered”, without spending resources.
+
+### 2X XP
+
+The Shop sells a permanent utility item with glyph **2X**, subtitle **2X XP**, hotkey **W**, and cost **50 oil** (no steel). After delivery it doubles all Insight gain, including combat, fractional building damage, War-versus-Tank bonuses, and Magic Vector Field death rewards. It uses one carried slot, does not stack, survives supplying-Shop destruction after delivery, and follows existing delivery, reservation, visibility, checkpoint, and rank-cap rules. Multiplication applies to new rewards before fractional carry and the existing Insight caps.

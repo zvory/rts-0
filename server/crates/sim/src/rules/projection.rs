@@ -515,6 +515,7 @@ pub fn project_entity(
             ability::AbilityKind::Regen,
             ability::AbilityKind::Haste,
             ability::AbilityKind::DoubleDamage,
+            ability::AbilityKind::DoubleXp,
             ability::AbilityKind::ArmorTreasure,
             ability::AbilityKind::VitalityTreasure,
         ] {

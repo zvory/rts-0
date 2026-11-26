@@ -101,6 +101,7 @@ pub(in crate::game) fn planner_code(kind: AbilityKind) -> u16 {
         AbilityKind::ArmorTreasure => 24,
         AbilityKind::VitalityTreasure => 25,
         AbilityKind::VectorField => 26,
+        AbilityKind::DoubleXp => 27,
     }
 }
 
@@ -133,6 +134,7 @@ pub(in crate::game) fn from_planner_code(code: u16) -> Option<AbilityKind> {
         24 => Some(AbilityKind::ArmorTreasure),
         25 => Some(AbilityKind::VitalityTreasure),
         26 => Some(AbilityKind::VectorField),
+        27 => Some(AbilityKind::DoubleXp),
 
         _ => None,
     }
@@ -147,6 +149,7 @@ pub fn effect_hook(kind: AbilityKind) -> AbilityEffectHook {
         | AbilityKind::EscapeTreasure
         | AbilityKind::HealingSeal
         | AbilityKind::Haste
+        | AbilityKind::DoubleXp
         | AbilityKind::DoubleDamage
         | AbilityKind::ArmorTreasure
         | AbilityKind::VitalityTreasure => AbilityEffectHook::ShopItem,

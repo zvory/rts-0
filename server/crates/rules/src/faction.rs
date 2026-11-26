@@ -115,6 +115,7 @@ pub enum AbilityKind {
     DoubleDamage,
     ArmorTreasure,
     VitalityTreasure,
+    DoubleXp,
 }
 
 impl AbilityKind {
@@ -146,6 +147,7 @@ impl AbilityKind {
         Self::DoubleDamage,
         Self::ArmorTreasure,
         Self::VitalityTreasure,
+        Self::DoubleXp,
     ];
 
     pub const fn stable_id(self) -> &'static str {
@@ -177,6 +179,7 @@ impl AbilityKind {
             Self::DoubleDamage => "doubleDamage",
             Self::ArmorTreasure => "armorTreasure",
             Self::VitalityTreasure => "vitalityTreasure",
+            Self::DoubleXp => "doubleXp",
         }
     }
 
@@ -1072,6 +1075,7 @@ pub fn ability_definition(kind: AbilityKind) -> AbilityCatalogEntry {
         AbilityKind::DoubleDamage => CULTIVATOR_ABILITIES[12],
         AbilityKind::ArmorTreasure => CULTIVATOR_ABILITIES[13],
         AbilityKind::VitalityTreasure => CULTIVATOR_ABILITIES[14],
+        AbilityKind::DoubleXp => CULTIVATOR_ABILITIES[15],
     }
 }
 

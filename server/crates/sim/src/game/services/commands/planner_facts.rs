@@ -249,6 +249,7 @@ fn world_ability_order_policy(ability: AbilityKind) -> (bool, bool) {
         | AbilityKind::DiscipleShield => (true, true),
         // Self-targeted abilities or abilities with dedicated command dispatch.
         AbilityKind::Haste
+        | AbilityKind::DoubleXp
         | AbilityKind::DoubleDamage
         | AbilityKind::ArmorTreasure
         | AbilityKind::VitalityTreasure

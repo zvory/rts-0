@@ -4,9 +4,16 @@ use super::CheckpointPayloadError;
 
 pub(super) fn validate(entity: &Entity) -> Result<(), CheckpointPayloadError> {
     use crate::game::ability::AbilityKind::{
-        ArmorTreasure, DoubleDamage, Haste, Regen, VitalityTreasure,
+        ArmorTreasure, DoubleDamage, DoubleXp, Haste, Regen, VitalityTreasure,
     };
-    for ability in [Regen, Haste, DoubleDamage, ArmorTreasure, VitalityTreasure] {
+    for ability in [
+        Regen,
+        Haste,
+        DoubleXp,
+        DoubleDamage,
+        ArmorTreasure,
+        VitalityTreasure,
+    ] {
         let ticks = entity.ability_cooldowns.get(&ability).copied().unwrap_or(0);
         if ticks > 0 {
             return Err(CheckpointPayloadError::InvalidValue {
@@ -17,7 +24,7 @@ pub(super) fn validate(entity: &Entity) -> Result<(), CheckpointPayloadError> {
     for (&ability, &remaining) in &entity.ability_uses_remaining {
         if matches!(
             ability,
-            Regen | Haste | DoubleDamage | ArmorTreasure | VitalityTreasure
+            Regen | Haste | DoubleXp | DoubleDamage | ArmorTreasure | VitalityTreasure
         ) {
             if !entity.is_unit()
                 || remaining != 1
