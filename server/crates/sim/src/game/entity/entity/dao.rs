@@ -338,8 +338,14 @@ mod passive_insight_tests {
 
     #[test]
     fn passive_insight_uses_each_living_cultivators_full_five_seconds() {
-        for kind in [EntityKind::Warrior, EntityKind::WindAdept, EntityKind::WarAdept,
-                     EntityKind::MagicAdept, EntityKind::Worker, EntityKind::Rifleman] {
+        for kind in [
+            EntityKind::Warrior,
+            EntityKind::WindAdept,
+            EntityKind::WarAdept,
+            EntityKind::MagicAdept,
+            EntityKind::Worker,
+            EntityKind::Rifleman,
+        ] {
             let mut unit = Entity::new_unit(1, kind, 100.0, 100.0).unwrap();
             for _ in 1..config::DISCIPLE_PASSIVE_INSIGHT_TICKS {
                 unit.tick_passive_insight();
