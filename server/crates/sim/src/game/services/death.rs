@@ -299,6 +299,7 @@ pub(crate) fn death_system(
                     .map(|site| !entities.contains(site))
                     .map(|stale| (stale, None))
                     .unwrap_or((false, None)),
+                Order::Repair(order) => (!entities.contains(order.intent.target), None),
                 Order::Deconstruct(_) => e
                     .order()
                     .deconstruct_target()

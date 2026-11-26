@@ -448,6 +448,11 @@ const approvedCurrentFactionFiles = new Set([
   // Command planner fact extraction keeps existing current-catalog capability facts split out of commands.rs.
   "server/crates/sim/src/game/services/commands/planner_facts.rs",
   "server/crates/sim/src/game/services/construction.rs",
+  // Engineers and Serfs share the Worker body. These helpers retain worker-only dismantling
+  // checks extracted from commands/order_queue and admit building repairs for that shared body.
+  "server/crates/sim/src/game/services/commands/worker_targets.rs",
+  "server/crates/sim/src/game/services/order_queue/worker_targets.rs",
+  "server/crates/sim/src/game/services/repair.rs",
   "server/crates/sim/src/game/services/economy.rs",
   // Pump Jack extraction is a deliberate current-catalog oil special case until generic resource
   // extractors exist in catalog data.
@@ -625,6 +630,9 @@ const approvedSpecialCaseBudgets = new Map([
   ["server/crates/sim/src/game/services/ability_orders.rs", 18],
   // Tank Trap deconstruction adds worker-only command validation and trap target admission.
   ["server/crates/sim/src/game/services/commands.rs", 259],
+  ["server/crates/sim/src/game/services/commands/worker_targets.rs", 2],
+  ["server/crates/sim/src/game/services/order_queue/worker_targets.rs", 2],
+  ["server/crates/sim/src/game/services/repair.rs", 1],
   ["server/crates/sim/src/game/services/pathing/graph.rs", 2],
   ["server/crates/sim/src/game/services/movement/pivot_recovery.rs", 1],
   ["server/crates/sim/src/game/invariants.rs", 13],

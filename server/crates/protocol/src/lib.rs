@@ -97,6 +97,12 @@ pub enum Command {
         #[serde(default, skip_serializing_if = "is_false")]
         queued: bool,
     },
+    Repair {
+        units: Vec<u32>,
+        target: u32,
+        #[serde(default, skip_serializing_if = "is_false")]
+        queued: bool,
+    },
     Deconstruct {
         units: Vec<u32>,
         target: u32,

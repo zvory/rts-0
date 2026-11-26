@@ -20,8 +20,8 @@
     },
     {
       "path": "server/crates/archcheck/src/lib.rs",
-      "lines": 2485,
-      "reason": "Register Shop item mutation helper and exact command/death/occupancy/standability edges; preserve existing role matrix."
+      "lines": 2486,
+      "reason": "Register the dedicated building-repair tick service in the existing role matrix; one classification row, no relaxed dependency edges."
     },
     {
       "path": "server/crates/sim/src/game/services/combat/tests.rs",

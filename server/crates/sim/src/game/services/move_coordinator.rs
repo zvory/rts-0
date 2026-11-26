@@ -609,43 +609,6 @@ impl<'a> MoveCoordinator<'a> {
         }
     }
 
-    /// Issue a Tank Trap deconstruction order and walk the worker to the same outside staging ring
-    /// used for construction.
-    pub fn order_deconstruct(&mut self, entities: &mut EntityStore, id: u32, target: u32) -> bool {
-        let (target_x, target_y, tile_x, tile_y) = match entities.get(target) {
-            Some(t) if t.kind == EntityKind::TankTrap => {
-                let (tile_x, tile_y) = self.map.tile_of(t.pos_x(), t.pos_y());
-                (t.pos_x(), t.pos_y(), tile_x, tile_y)
-            }
-            _ => return false,
-        };
-        entities.release_miner(id);
-        if let Some(e) = entities.get_mut(id) {
-            e.replace_active_order(Order::deconstruct(target));
-            e.set_target_id(Some(target));
-            e.set_path_goal(Some((target_x, target_y)));
-            e.reset_gather_state();
-            let (px, py) = (e.pos_x(), e.pos_y());
-            e.reset_stuck(px, py);
-        }
-        match self.plan_footprint_interaction_path(
-            entities,
-            id,
-            EntityKind::TankTrap,
-            tile_x,
-            tile_y,
-            PathingRequestSource::Deconstruct,
-        ) {
-            PathAttempt::Ready(()) | PathAttempt::Deferred => true,
-            PathAttempt::Failed => {
-                if let Some(e) = entities.get_mut(id) {
-                    e.clear_orders();
-                }
-                false
-            }
-        }
-    }
-
     // -------------------------------------------------------------------
     // Tick-scoped bulk processing
     // -------------------------------------------------------------------
@@ -658,7 +621,10 @@ impl<'a> MoveCoordinator<'a> {
             .iter()
             .filter(|e| {
                 e.is_unit()
-                    && (e.move_phase() == Some(MovePhase::AwaitingPath)
+                    && ((e.path_is_empty() && matches!(e.order(), Order::Repair(order) if entities.get(order.intent.target).is_none_or(|t| {
+                        let range = super::interact_range_for_kind(t.kind);
+                        super::dist2(e.pos_x(), e.pos_y(), t.pos_x(), t.pos_y()) > range * range
+                    }))) || e.move_phase() == Some(MovePhase::AwaitingPath)
                         || (e.path_is_empty()
                             && matches!(e.build_phase(), Some(BuildPhase::ToSite)))
                         || (e.path_is_empty()
@@ -684,6 +650,24 @@ impl<'a> MoveCoordinator<'a> {
                     ) {
                         if let Some(entity) = entities.get_mut(id) {
                             entity.clear_orders();
+                        }
+                    }
+                }
+                Some(Order::Repair(order)) => {
+                    let footprint = self.repair_footprint(entities, order.intent.target);
+                    let attempt = footprint.map_or(PathAttempt::Failed, |(kind, tx, ty)| {
+                        self.plan_footprint_interaction_path(
+                            entities,
+                            id,
+                            kind,
+                            tx,
+                            ty,
+                            PathingRequestSource::Build,
+                        )
+                    });
+                    if matches!(attempt, PathAttempt::Failed) {
+                        if let Some(e) = entities.get_mut(id) {
+                            e.clear_active_order();
                         }
                     }
                 }
@@ -1204,7 +1188,7 @@ fn pathing_source_from_order(order: &Order) -> PathingRequestSource {
         Order::AttackMove(_) => PathingRequestSource::AttackMove,
         Order::Attack(_) => PathingRequestSource::DirectAttack,
         Order::Gather(_) => PathingRequestSource::Gather,
-        Order::Build(_) => PathingRequestSource::Build,
+        Order::Build(_) | Order::Repair(_) => PathingRequestSource::Build,
         Order::Deconstruct(_) => PathingRequestSource::Deconstruct,
         Order::Ability(_) => PathingRequestSource::Ability,
         Order::Idle

@@ -623,6 +623,7 @@ function clearsPlannedStages(commandKind) {
     commandKind === CMD.ATTACK ||
     commandKind === CMD.GATHER ||
     commandKind === CMD.BUILD ||
+    commandKind === CMD.REPAIR ||
     commandKind === CMD.DECONSTRUCT ||
     commandKind === CMD.TEAR_DOWN_ANTI_TANK_GUNS ||
     commandKind === CMD.RECAST_ABILITY ||

@@ -62,6 +62,7 @@ pub(super) fn entity_order_intent_from_planner(
         planner::OrderIntent::AttackTarget(target) => Some(OrderIntent::attack(target)),
         planner::OrderIntent::AttackCluster(targets) => OrderIntent::attack_cluster(targets),
         planner::OrderIntent::Gather(node) => Some(OrderIntent::gather(node)),
+        planner::OrderIntent::Repair(target) => Some(OrderIntent::repair(target)),
         planner::OrderIntent::Deconstruct(target) => Some(OrderIntent::deconstruct(target)),
         planner::OrderIntent::Build {
             kind,

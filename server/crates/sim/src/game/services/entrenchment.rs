@@ -168,6 +168,7 @@ fn holds_ground(entity: &Entity) -> bool {
         Order::Move(_)
         | Order::Gather(_)
         | Order::Build(_)
+        | Order::Repair(_)
         | Order::Deconstruct(_)
         | Order::Ability(_)
         | Order::ArtilleryPointFire(_)

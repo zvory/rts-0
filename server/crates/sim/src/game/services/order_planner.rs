@@ -167,6 +167,10 @@ pub enum RequestedOrder {
         target: Point,
         placement_valid: bool,
     },
+    Repair {
+        target: EntityId,
+        target_valid: bool,
+    },
     Deconstruct {
         target: EntityId,
         target_point: Point,
@@ -223,6 +227,7 @@ pub enum OrderIntent {
         tile_x: u32,
         tile_y: u32,
     },
+    Repair(EntityId),
     Deconstruct(EntityId),
     SetupAntiTankGuns {
         face_toward: Point,
@@ -349,6 +354,17 @@ pub fn plan_order(
             tile_x,
             tile_y,
             target,
+        ),
+        RequestedOrder::Repair {
+            target,
+            target_valid: true,
+            ..
+        } => plan_filtered_units(
+            config,
+            request.mode,
+            &ordered_facts,
+            |u| u.can_build,
+            OrderIntent::Repair(target),
         ),
         RequestedOrder::Deconstruct {
             target,

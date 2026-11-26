@@ -61,7 +61,7 @@ fn worker_has_pass_through_work_order(e: &Entity) -> bool {
     e.kind == EntityKind::Worker
         && matches!(
             e.order(),
-            Order::Gather(_) | Order::Build(_) | Order::Deconstruct(_)
+            Order::Gather(_) | Order::Build(_) | Order::Repair(_) | Order::Deconstruct(_)
         )
 }
 

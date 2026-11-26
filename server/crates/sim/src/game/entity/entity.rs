@@ -78,6 +78,10 @@ pub struct Entity {
     pub hp: u32,
     /// Full health ceiling. Construction earns current HP over time; damage never lowers this value.
     pub max_hp: u32,
+    /// Prepaid fractional steel/oil repair credit, in price-numerator units. Building-owned so
+    /// repeated damage, replacement orders, and multiple workers share one exact billing ledger.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(in crate::game) repair_credit: Option<[u64; 2]>,
     invulnerable: bool,
     /// Player id that most recently damaged this target. Used for score attribution when the
     /// death system removes the entity.
@@ -125,6 +129,7 @@ impl Entity {
             pos_y: Coord::try_from_world(y)?,
             hp: s.hp,
             max_hp: s.hp,
+            repair_credit: None,
             invulnerable: false,
             last_damage_owner: None,
             last_damage_entity: None,
@@ -184,6 +189,7 @@ impl Entity {
                 construction_hp_for_progress(s.hp, 0, s.build_ticks)
             },
             max_hp: s.hp,
+            repair_credit: None,
             invulnerable: false,
             last_damage_owner: None,
             last_damage_entity: None,
@@ -245,6 +251,7 @@ impl Entity {
             pos_y: Coord::try_from_world(y)?,
             hp: 1,
             max_hp: 1,
+            repair_credit: None,
             invulnerable: false,
             last_damage_owner: None,
             last_damage_entity: None,
@@ -1001,6 +1008,15 @@ impl Entity {
         damaged
     }
 
+    pub(in crate::game) fn can_be_repaired_by(&self, owner: u32) -> bool {
+        self.owner == owner
+            && self.kind.is_building()
+            && !matches!(self.kind, EntityKind::BarbedWire | EntityKind::HealingSeal)
+            && self.hp > 0
+            && self.hp < self.max_hp
+            && !self.under_construction()
+    }
+
     pub fn restore_hp(&mut self, amount: u32) -> bool {
         if matches!(self.kind, EntityKind::BarbedWire | EntityKind::HealingSeal) {
             return false;
@@ -1326,7 +1342,7 @@ impl Entity {
             Order::Attack(_) => states::ATTACK,
             Order::Gather(_) => states::GATHER,
             Order::Build(_) => states::BUILD,
-            Order::Deconstruct(_) => states::BUILD,
+            Order::Repair(_) | Order::Deconstruct(_) => states::BUILD,
             Order::Ability(_) => states::MOVE,
             Order::ArtilleryPointFire(_) | Order::ArtilleryBlanketFire { .. } => states::ATTACK,
         }

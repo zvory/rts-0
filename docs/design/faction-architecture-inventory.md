@@ -74,6 +74,9 @@ special-case count ratchet so newly added current-faction checks inside those la
 visible during review. The ratchet is an inventory review tool, not approval to expand Kriegsia,
 Ekat, or fixture special cases casually.
 
+Engineers and Serfs share `EntityKind::Worker` for building repair. Worker-only repair admission,
+queued promotion, and execution keep that shared body check; Golems do not repair buildings.
+
 ## Current Economy Shape
 
 Steel, Oil, and Supply are the only player resources in snapshots, compact snapshots, replay

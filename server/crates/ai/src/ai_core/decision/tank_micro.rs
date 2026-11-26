@@ -637,6 +637,7 @@ fn units_mut(command: &mut Command) -> Option<&mut Vec<u32>> {
         | Command::ClearObstacleArea { units, .. }
         | Command::Attack { units, .. }
         | Command::AttackTankTrapCluster { units, .. }
+        | Command::Repair { units, .. }
         | Command::Deconstruct { units, .. }
         | Command::SetupAntiTankGuns { units, .. }
         | Command::TearDownAntiTankGuns { units }

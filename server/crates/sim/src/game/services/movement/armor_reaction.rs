@@ -67,6 +67,7 @@ fn tank_can_react(tank: &Entity) -> bool {
         | Order::Move(_)
         | Order::Gather(_)
         | Order::Build(_)
+        | Order::Repair(_)
         | Order::Deconstruct(_)
         | Order::Ability(_)
         | Order::ArtilleryPointFire(_)

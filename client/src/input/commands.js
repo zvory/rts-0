@@ -261,6 +261,13 @@ function normalRightClickAction(input, p) {
     };
   }
 
+  if (target && ownOwner(input.state, target.owner, input.controlPolicy) && isBuilding(target.kind)
+      && ![KIND.HEALING_SEAL, KIND.BARBED_WIRE].includes(target.kind)
+      && !Number.isFinite(target.buildProgress) && target.hp > 0 && target.hp < target.maxHp) {
+    const repairers = input._selectedWorkerIds();
+    if (repairers.length) return { kind: "repair", units: repairers, target,
+      feedback: rightClickFeedback("move", target.x, target.y) };
+  }
   if ([KIND.TOURNAMENT_GROUNDS, KIND.PROVEN_GROUNDS].includes(target?.kind) && ownOwner(input.state, target.owner, input.controlPolicy)
       && !Number.isFinite(target.buildProgress)) {
     const entrants = ownUnits.filter((id) => {
@@ -404,6 +411,9 @@ function issueNormalRightClickAction(input, action, queued) {
       break;
     case "gather":
       input.commandInteraction.issueCommand(cmd.gather(action.units, action.target.id, queued));
+      break;
+    case "repair":
+      input.commandInteraction.issueCommand(cmd.repair(action.units, action.target.id, queued));
       break;
     case "deconstruct":
       input.commandInteraction.issueCommand(cmd.deconstruct(action.units, action.target.id, queued));

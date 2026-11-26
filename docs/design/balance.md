@@ -308,8 +308,8 @@ Core unit roles:
   infantry, buildings, and obstacles are not launcher targets. Explicit Attack orders remain
   stationary, so the vehicle must already be within launcher range. There is no salvo coordination
   or overkill suppression.
-- **Anti-tank gun team** is the ambush counter to tanks: it can fight while packed at short
-  range with reduced damage, or manually set up into a longer-ranged fixed field of fire.
+- **Anti-tank gun team** is the ambush counter to tanks: it must manually set up into
+  a longer-ranged fixed field of fire before firing.
   Deployed guns are dangerous from the side or rear, but weak or inefficient against regular
   infantry and cannot fire outside their emplacement arc.
 - **Mortar Team** is the Superior Firepower path-entry pressure unit from Gun Works: it has no
@@ -388,7 +388,7 @@ on the approach, but currently actionable traps inside that objective preempt or
 Hidden traps remain ineligible until revealed, while vehicle pathfinding continues routing around
 the obstacles. Anti-armor default weapons
 prefer anti-armor threats and armored units over ordinary soft units. Anti-Tank Guns cannot
-auto-acquire or accept direct Attack orders against infantry: Workers, Golems, Disciples,
+auto-acquire or accept direct Attack orders against Workers, Golems, Novices,
 Riflemen, Panzerfausts, and Machine Gunners. Crewed support weapons, including Mortar Teams,
 remain legal targets and take full damage. AT Guns automatically prefer a fireable Tank over a
 nearer Mortar Team; an explicit Attack order may select the mortar instead. Tanks keep a narrower
@@ -476,9 +476,9 @@ profiles and explicit activation/autocast policy instead of being folded into de
   remains unrestricted even when the selected impact point would hit same-team units or buildings.
 - anti-tank guns fire only while deployed, with `ANTI_TANK_GUN_DEPLOYED_RANGE_TILES = 20` and
   `ANTI_TANK_GUN_FIELD_OF_FIRE_RAD = 40 degrees total`; packed, setting-up, and tearing-down guns
-  cannot fire. AT guns cannot target infantry-sized units (Workers, Golems, Disciples, Riflemen,
-  Panzerfausts, or Machine Gunners), either automatically or through direct Attack orders.
-  Crewed support weapons, vehicles, Ekat, and buildings remain legal targets. A deployed gun's setup cone remains fixed while its body and barrel turn together at
+  cannot fire. AT guns cannot target Workers, Golems, Novices, Riflemen,
+  Panzerfausts, or Machine Gunners, either automatically or through direct Attack orders.
+  Adepts, Masters, crewed support weapons, vehicles, Ekat, and buildings remain legal targets. A deployed gun's setup cone remains fixed while its body and barrel turn together at
   `ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK = 0.070` to track targets inside that cone;
   targets outside the cone are ignored until teardown and redeployment. While packed and mobile, an
   Anti-Tank Gun moves at 1.7556 px/tick and turns its body at
@@ -575,7 +575,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   normal weapon/armor/facing calculations,
   reduces incoming area damage by 25% after existing falloff/armor rules. Entrenchment does not add a direct-shot
   miss chance. Tank cannon direct shots have no intrinsic infantry dodge chance. Anti-Tank Guns
-  cannot target infantry-sized units. Direct shots damage only their resolved victim.
+  cannot target Novices, economy bodies, or Kriegsia rifle infantry. Adepts and Masters are legal targets. Direct shots damage only their resolved victim.
   The trench radius is 0.375 tile.
   The client
   renders neutral trench terrain as brown ground and marks occupied eligible infantry with a small
@@ -950,3 +950,22 @@ Vitality Treasure costs **100 oil** and can coexist with all other distinct carr
 Vector Field is a separate ability (`vectorField`) replacing Anchor for Magic Adepts and Magic Masters only. Ekat retains her original Magic Anchor and radial pull. The centered square is 4 by 4 tiles for Magic Adepts and 5 by 5 tiles for Magic Masters, oriented along the selected arrow, lasts ten seconds, and uses the existing 7.5-tile cast range. Successful placement starts a 30-second cooldown for Magic Adepts and a 20-second cooldown for Magic Masters. Promotion preserves a cooldown already in progress. Every ground unit in it, allied or enemy, receives an additive three-world-pixel-per-tick displacement along the arrow, independent of mass/footing. Inward/outward movement resistance and spiral forces are not applied by this ability. Terrain and hostile-body admission remain. Magic Dao death Insight is preserved for hostile unit deaths inside the rectangle.
 
 See [Vector Field](vector-field.md) for placement, rank geometry, force, and presentation rules.
+
+### Building repair and AT gun Dao targets
+
+Right-clicking a damaged owned completed building with Engineers or Serfs assigns repairs at
+2 HP per second per worker; multiple repairers add their rates. Healing Seals retain their
+non-repairable consumable capacity, and neutral field obstacles remain outside owned-building
+repair. Each resource is charged in
+proportion to HP restored at 25% of the building's original steel/oil price for a full HP bar
+([SC2 reference](https://liquipedia.net/starcraft2/Repair)). Because resources are integers, billing
+precharges the ceiling of the cumulative repair cost and keeps fractional prepaid steel/oil
+credit on the building. Each HP consumes `original price / (4 × max HP)` from that credit.
+This bounds rounding to less than one resource over the building's lifetime and remains
+identical across damage cycles, replacement orders, additional repairers, and checkpoint restores. Work pauses when its next HP charge is unaffordable.
+`balance/economy.rs` owns the server-only rate and cost divisor; the client consumes authoritative
+HP/resources and adds only the right-click command affordance.
+
+AT guns may target Wind, War, and Magic Adepts and Masters (all three Adept kinds at either rank).
+Novices (Warrior), workers, and Kriegsia rifle infantry remain excluded. The existing 30% infantry
+damage multiplier on Dao Adept bodies is unchanged.

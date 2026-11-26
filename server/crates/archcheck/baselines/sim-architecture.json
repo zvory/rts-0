@@ -1,5 +1,5 @@
 {
-  "reason": "Distinct Vector Field wire adapters and one command-helper PlayerState forwarding site; no new PlayerState field writes",
+  "reason": "Reject repairs of consumable building HP; register the focused Healing Seal regression fixture HP write.",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -143,7 +143,11 @@
     },
     {
       "path": "entity/order.rs",
-      "lines": 585
+      "lines": 677
+    },
+    {
+      "path": "services/move_coordinator/footprint_pathing.rs",
+      "lines": 442
     },
     {
       "path": "entity/reveal_reaction.rs",
@@ -692,10 +696,6 @@
     {
       "path": "services/move_coordinator/building_attack_tests.rs",
       "lines": 50
-    },
-    {
-      "path": "services/move_coordinator/footprint_pathing.rs",
-      "lines": 353
     },
     {
       "path": "services/move_coordinator/formation.rs",
@@ -1991,6 +1991,11 @@
       "path": "services/shop_items.rs",
       "line": 24,
       "name": "purchase"
+    },
+    {
+      "path": "services/repair.rs",
+      "line": 9,
+      "name": "repair_system"
     }
   ],
   "player_state_usages": [
@@ -2313,6 +2318,11 @@
       "path": "services/commands/vector_field.rs",
       "line": 7,
       "code": "players: &mut [PlayerState],"
+    },
+    {
+      "path": "services/repair.rs",
+      "line": 9,
+      "code": "pub(in crate::game) fn repair_system(entities: &mut EntityStore, players: &mut [PlayerState]) {"
     }
   ],
   "player_state_field_writes": [
@@ -2419,6 +2429,42 @@
       "line": 1299,
       "field": "pos_y",
       "code": "unit.pos_y = smoke_pos.1;"
+    },
+    {
+      "path": "tests/repair_tests.rs",
+      "line": 22,
+      "field": "hp",
+      "code": "game.state.entities.get_mut(building).unwrap().hp -= 100;"
+    },
+    {
+      "path": "tests/repair_tests.rs",
+      "line": 82,
+      "field": "hp",
+      "code": "game.state.entities.get_mut(building).unwrap().hp ="
+    },
+    {
+      "path": "tests/repair_tests.rs",
+      "line": 174,
+      "field": "owner",
+      "code": "\"enemy\" => b.owner = 2,"
+    },
+    {
+      "path": "tests/repair_tests.rs",
+      "line": 178,
+      "field": "hp",
+      "code": "\"full\" => b.hp = b.max_hp,"
+    },
+    {
+      "path": "tests/repair_tests.rs",
+      "line": 179,
+      "field": "hp",
+      "code": "\"dead\" => b.hp = 0,"
+    },
+    {
+      "path": "tests/repair_tests.rs",
+      "line": 226,
+      "field": "hp",
+      "code": "target.hp -= 100;"
     }
   ],
   "public_export_counts": [
@@ -2488,7 +2534,7 @@
     },
     {
       "path": "entity/order.rs",
-      "count": 64
+      "count": 68
     },
     {
       "path": "entity/state.rs",

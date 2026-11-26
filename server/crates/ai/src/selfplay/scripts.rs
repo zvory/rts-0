@@ -109,6 +109,7 @@ fn is_combat_command(command: &Command) -> bool {
         Command::FormationMove { .. } | Command::HoldPosition { .. } => true,
         Command::Gather { .. }
         | Command::Build { .. }
+        | Command::Repair { .. }
         | Command::Deconstruct { .. }
         | Command::Train { .. }
         | Command::AdjustProductionRepeat { .. }
