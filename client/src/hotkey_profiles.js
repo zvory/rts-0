@@ -20,7 +20,7 @@ const DEFAULT_EXPORT_BUILD = "unknown";
 // commands that can share a card.
 const CLASSIC_DIRECT_BINDINGS = Object.freeze({
   "cultivators.item.buyMenu": "KeyR",
-  "cultivators.item.returnBuyMenu": "KeyC",
+  "cultivators.item.returnBuyMenu": "KeyV",
   "cultivators.item.escape": "KeyR",
   "cultivators.dao-training.dao_wind": "KeyL",
   "cultivators.dao-training.dao_of_heaviness": "KeyW",

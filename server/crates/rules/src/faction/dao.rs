@@ -192,7 +192,7 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 15] = [
         command_card: true, protocol_code: 24, order_stage_code: 32,
     },
     AbilityCatalogEntry {
-        kind: AbilityKind::ArmorTreasure, label: "+50% base armor", icon: "ARM", hotkey: Some("D"),
+        kind: AbilityKind::ArmorTreasure, label: "+50% base armor", icon: "ARM", hotkey: Some("S"),
         title: "Deliver a permanent passive defense item at any distance; grants 50% additional armor on arrival", carriers: &[EntityKind::Shop], target_mode: AbilityTargetMode::FriendlyUnit,
         range_tiles: None, min_range_tiles: None, cooldown_ticks: 0,
         charges: None, charge_recharge_ticks: None, cost: ResourceCost::new(0, 100),
@@ -201,7 +201,7 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 15] = [
         command_card: true, protocol_code: 25, order_stage_code: 33,
     },
     AbilityCatalogEntry {
-        kind: AbilityKind::VitalityTreasure, label: "+150 HP", icon: "+HP", hotkey: Some("F"),
+        kind: AbilityKind::VitalityTreasure, label: "+150 HP", icon: "+HP", hotkey: Some("D"),
         title: "Deliver a permanent passive defense item at any distance; grants +150 maximum and current HP on arrival", carriers: &[EntityKind::Shop], target_mode: AbilityTargetMode::FriendlyUnit,
         range_tiles: None, min_range_tiles: None, cooldown_ticks: 0,
         charges: None, charge_recharge_ticks: None, cost: ResourceCost::new(0, 100),

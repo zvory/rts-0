@@ -28,10 +28,10 @@ export function buildShopBuyCard(ctx, isOwn, buildTrainCard) {
     slot.unaffordable &&= shops.length > 0;
     if (!shops.length) slot.title = "Requires a completed Shop";
   }
-  result.slots[8] = {
+  result.slots[11] = {
     id: "shop:return", commandId: "cultivators.item.returnBuyMenu", kind: "button", action: "return",
     intent: { type: "closeCommandCardMenu" }, icon: "RTN", label: "Return", enabled: true,
-    slotIndex: 8, hotkey: gridHotkeyForSlot(8), hotkeyCode: "KeyC",
+    slotIndex: 11, hotkey: gridHotkeyForSlot(11), hotkeyCode: "KeyV",
   };
   result.signature += `|buy:${buyers.map((e) => e.id).join(".")}|shops:${shops.map((e) => e.id).join(".")}`;
   return result;

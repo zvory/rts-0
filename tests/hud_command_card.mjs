@@ -1100,9 +1100,9 @@ for (const researched of [false, true]) {
   });
   const items = idle.slots.filter(Boolean);
   assert.equal(items.length, 6);
-  assert.deepEqual(items.map((item) => item.ability), [ABILITY.ESCAPE_TREASURE, ABILITY.REGEN, ABILITY.ARMOR_TREASURE, ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE, ABILITY.VITALITY_TREASURE]);
+  assert.deepEqual(items.map((item) => item.ability), [ABILITY.ESCAPE_TREASURE, ABILITY.REGEN, ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE, ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE]);
   assert.deepEqual(items.map((item) => item.intent.targetMode), Array(6).fill("friendlyUnit"));
-  assert.deepEqual(items.map((item) => item.cost.oil), [100, 50, 100, 100, 150, 100]);
+  assert.deepEqual(items.map((item) => item.cost.oil), [100, 50, 100, 100, 100, 150]);
   assert(!items.some((item) => item.ability === ABILITY.HEALING_SEAL));
   assert.deepEqual(idle.rowLabels, ["Util", "Defense", "Offense"]);
 }
@@ -1154,8 +1154,8 @@ for (const context of buildCommandCardContextCatalog()) {
       continue;
     }
     if (slot.slotIndex === 11) {
-      assert([ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE].includes(slot.ability));
-      assert.equal(slot.hotkey, "");
+      assert.equal(slot.intent.type, "closeCommandCardMenu");
+      assert.equal(slot.hotkey, "V");
       continue;
     }
     assert(slot.slotIndex < 9, `${context.id}: other fourth-column slots remain reserved`);
@@ -1201,7 +1201,7 @@ for (const factionId of ["cultivators", "kriegsia", "ekat"]) {
   });
   const rows = COMMAND_CARD_SLOT_ORDER.map((i) => card.slots[i]?.ability || null);
   assert.deepEqual(rows.slice(0, 4), [ABILITY.ESCAPE_TREASURE, null, null, null]);
-  assert.deepEqual(rows.slice(4, 8), [ABILITY.REGEN, null, ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE]);
+  assert.deepEqual(rows.slice(4, 8), [ABILITY.REGEN, ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE, null]);
   assert.deepEqual(rows.slice(8), [ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE, null, null]);
   for (const ability of [ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE, ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE]) {
     const carried = buildCommandCardDescriptors({
@@ -1229,8 +1229,13 @@ for (const factionId of ["cultivators", "kriegsia", "ekat"]) {
   const goods = menu.slots.filter((s) => s?.action === "ability");
   assert.equal(goods.length, 6);
   assert(goods.every((s) => s.intent.type === "buyShopItem" && s.enabled));
-  assert.deepEqual(goods.map((s) => s.icon), ["ESC", "HP", "ARM", "HST", "DD", "+HP"]);
-  assert.equal(menu.slots[8].intent.type, "closeCommandCardMenu");
+  assert.deepEqual(goods.map((s) => s.icon), ["ESC", "HP", "ARM", "+HP", "HST", "DD"]);
+  assert.equal(menu.slots[11].intent.type, "closeCommandCardMenu");
+  assert.equal(menu.slots[11].hotkey, "V");
+  assert.equal(menu.slots[4].ability, ABILITY.ARMOR_TREASURE);
+  assert.equal(menu.slots[4].hotkey, "S");
+  assert.equal(menu.slots[5].ability, ABILITY.VITALITY_TREASURE);
+  assert.equal(menu.slots[5].hotkey, "D");
   const unavailable = buildCommandCardDescriptors({ ...ctx, entities: [unit], commandCardMode: "shopBuy" });
   assert(unavailable.slots.filter((s) => s?.action === "ability").every((s) => !s.enabled && !s.unaffordable));
   const serf = buildCommandCardDescriptors({ ...ctx, selection: [{ ...unit, kind: KIND.WORKER }] });
@@ -1238,8 +1243,8 @@ for (const factionId of ["cultivators", "kriegsia", "ekat"]) {
   withFakeHudDocument(() => {
     const element = document.createElement("div");
     renderDescriptorCardDom(element, menu, createCommandButton);
-    assert.equal(element.children[0].children.length, 15, "three left annotations plus twelve grid cells");
-    assert.deepEqual(Array.from(element.children[0].children).filter((e) => e.className === "shop-row-label")
-      .map((e) => e.textContent), ["Util", "Defense", "Offense"]);
+    assert.equal(element.children[0].children.length, 12, "edge tabs preserve twelve grid cells");
+    assert.deepEqual(Array.from(element.children[0].children).filter((e) => e.className === "shop-row-start")
+      .map((e) => e.children[1].textContent), ["Util", "Defense", "Offense"]);
   });
 }

@@ -365,7 +365,7 @@ export const ABILITIES = Object.freeze({
     queued: false, queuePolicy: "notQueueable",
   }),
   [ABILITY.ARMOR_TREASURE]: Object.freeze({
-    ability: ABILITY.ARMOR_TREASURE, label: "+50% base armor", icon: "ARM", hotkey: "D",
+    ability: ABILITY.ARMOR_TREASURE, label: "+50% base armor", icon: "ARM", hotkey: "S",
     title: "Deliver a permanent passive defense item at any distance; grants 50% additional armor on arrival",
     carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: null,
     cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 100 }),
@@ -373,7 +373,7 @@ export const ABILITIES = Object.freeze({
   }),
 
   [ABILITY.VITALITY_TREASURE]: Object.freeze({
-    ability: ABILITY.VITALITY_TREASURE, label: "+150 HP", icon: "+HP", hotkey: "F",
+    ability: ABILITY.VITALITY_TREASURE, label: "+150 HP", icon: "+HP", hotkey: "D",
     title: "Deliver a permanent passive defense item at any distance; grants +150 maximum and current HP on arrival",
     carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: null,
     cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 100 }),

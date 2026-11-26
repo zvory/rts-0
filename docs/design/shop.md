@@ -51,7 +51,7 @@ Master > Adept > Novice, then descending Insight, then descending carried-plus-i
 count, then ascending entity id. Full inventories and duplicate equipped/in-flight items are
 skipped. This lets repeated purchases distribute copies without waiting for delivery.
 The client chooses the lowest-id completed owned Shop as source; a missing or destroyed
-source cannot purchase. The menu stays open until Return (C), Escape, or selection change.
+source cannot purchase. The menu stays open until Return (V), Escape, or selection change.
 Throw Sword remains on E. While the Buy menu is open, dotted lines connect its Shop to all
 selected owned fighters, including full carriers. Existing resource costs, shared Escape
 cooldown, visibility and command admission limits still apply.
@@ -94,7 +94,7 @@ authored fields, healing, rendering and checkpoint behavior remain available for
 
 ### Carried attack and defense goods
 
-Shops also deliver Haste (**100 oil**, Z), Double Damage (**150 oil**, X), and Armor Treasure (**100 oil**, D) to visible friendly units at any distance, using the same delivery speed and lifetime as Escape Treasure. Attack and defense describe item roles only. A delivery reserves its distinct item type immediately, preventing duplicate purchases. Invalid purchases spend nothing.
+Shops also deliver Haste (**100 oil**, Z), Double Damage (**150 oil**, X), and Armor Treasure (**100 oil**, S) to visible friendly units at any distance, using the same delivery speed and lifetime as Escape Treasure. Attack and defense describe item roles only. A delivery reserves its distinct item type immediately, preventing duplicate purchases. Invalid purchases spend nothing.
 
 Attack items are permanent passives applied immediately on delivery, with no activation, consumption, or expiry. Haste increases movement speed by **15%**, increases primary weapon attack speed by **25%** (reload divided by 1.25, rounded upward to a whole tick, minimum one tick), and permits attacks while moving; Double Damage doubles primary weapon damage before normal mitigation. Double Damage also affects primary tank splash and manual mortar/artillery shells; launched shells retain the bonus through impact. Haste also reduces manual mortar and artillery reload. Automatic direct primary fire may bypass deployment while carrying Haste; ordinary weapon targeting restrictions and indirect-fire deployment rules still apply. Neither affects spells, rockets, disposable panzerfaust shots, or secondary weapons. Armor Treasure is a permanent passive item: delivery immediately applies an additional **50% damage reduction**, rounded upward per hit, including units without native armor. It is never activated or consumed. Within the rank slot limit, permanent passive effects can coexist; identical copies do not stack. Escape occupies one slot alongside the passive items.
 
@@ -102,10 +102,10 @@ Carried passive items use existing entity ability-use state; the owner and privi
 
 ### Vitality Treasure
 
-Vitality Treasure is a **100 oil** defense item, purchased from a completed Shop with **F** and can coexist with Armor Treasure. It uses the same visible friendly-unit targeting, unlimited purchase range, delivery, same-item reservation, and non-stacking rules. Delivery immediately grants **+150 maximum HP and +150 current HP permanently**, preserving any pre-existing missing HP. It remains carried and passive, with no activation, consumption, or expiry. For example, 30/58 HP becomes 180/208 HP. Dao evolution and Master advancement retain the flat 150 bonus without multiplying it. Carried passive state, including the health pair, survives checkpoints. Destroying the supplying Shop after delivery does not remove Armor or Vitality.
+Vitality Treasure is a **100 oil** defense item, purchased from a completed Shop with **D** and can coexist with Armor Treasure. It uses the same visible friendly-unit targeting, unlimited purchase range, delivery, same-item reservation, and non-stacking rules. Delivery immediately grants **+150 maximum HP and +150 current HP permanently**, preserving any pre-existing missing HP. It remains carried and passive, with no activation, consumption, or expiry. For example, 30/58 HP becomes 180/208 HP. Dao evolution and Master advancement retain the flat 150 bonus without multiplying it. Carried passive state, including the health pair, survives checkpoints. Destroying the supplying Shop after delivery does not remove Armor or Vitality.
 
-Both Shop and Buy menu cards annotate each row on the left: **Util** (Escape Q), **Defense**
-(Regen A, Armor D, Vitality F; S empty), **Offense** (Haste Z, Double Damage X).
+Both Shop and Buy menu cards attach a small tab to the existing left edge of each row, without extending the panel: **Util** (Escape Q), **Defense**
+(Regen A, Armor S, Vitality D; F empty), **Offense** (Haste Z, Double Damage X). Buy menu Return occupies V.
 Item glyph/subtitle pairs are `ESC` / Escape, `HP` / +3 per second, `ARM` / +50% base armor,
 `+HP` / +150 HP, `HST` / Haste, and `DD` / 2x damage. Armor's subtitle describes the existing
 50% mitigation effect; no armor or other item balance value changes.
