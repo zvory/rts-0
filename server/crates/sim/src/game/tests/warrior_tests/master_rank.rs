@@ -150,7 +150,7 @@ fn dao_master_combat_threshold_and_damage_apply_to_combat_paths() {
             .find(|e| e.id == id)
             .unwrap();
         assert_eq!(enemy.dao_master, Some(true));
-        assert_eq!(enemy.insight, None);
+        assert_eq!(enemy.insight, Some(0));
     }
 }
 
