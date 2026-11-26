@@ -1391,53 +1391,31 @@ fn wind_master_gains_second_blink_charge_and_recharges_sequentially() {
         game.state.map_metadata.clone(),
     )
     .unwrap();
-    let first_recharge_left = game
-        .state
-        .entities
-        .get(unit)
-        .unwrap()
-        .ability_charge_recharge_ticks(AbilityKind::WindDash)
-        .unwrap();
-    for _ in 1..first_recharge_left {
+    for expected_charges in 0..2 {
+        let recharge_left = game
+            .state
+            .entities
+            .get(unit)
+            .unwrap()
+            .ability_charge_recharge_ticks(AbilityKind::WindDash)
+            .unwrap();
+        if expected_charges == 1 {
+            assert_eq!(recharge_left, 18 * config::TICK_HZ as u16);
+        }
+        for _ in 1..recharge_left {
+            game.tick();
+        }
+        let charges = |game: &Game| {
+            game.state
+                .entities
+                .get(unit)
+                .unwrap()
+                .ability_uses_remaining(AbilityKind::WindDash)
+        };
+        assert_eq!(charges(&game), Some(expected_charges));
         game.tick();
+        assert_eq!(charges(&game), Some(expected_charges + 1));
     }
-    assert_eq!(
-        game.state
-            .entities
-            .get(unit)
-            .unwrap()
-            .ability_uses_remaining(AbilityKind::WindDash),
-        Some(0)
-    );
-    game.tick();
-    assert_eq!(
-        game.state
-            .entities
-            .get(unit)
-            .unwrap()
-            .ability_uses_remaining(AbilityKind::WindDash),
-        Some(1)
-    );
-    for _ in 1..config::DAO_WIND_DASH_RECHARGE_TICKS {
-        game.tick();
-    }
-    assert_eq!(
-        game.state
-            .entities
-            .get(unit)
-            .unwrap()
-            .ability_uses_remaining(AbilityKind::WindDash),
-        Some(1)
-    );
-    game.tick();
-    assert_eq!(
-        game.state
-            .entities
-            .get(unit)
-            .unwrap()
-            .ability_uses_remaining(AbilityKind::WindDash),
-        Some(2)
-    );
 }
 
 #[test]
