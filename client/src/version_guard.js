@@ -60,6 +60,17 @@ export class VersionGuard {
 
   start({ offline = false } = {}) {
     globalThis.__RTS_BUILD__ = this.clientBuild || "unknown";
+    // Once recovery loaded the requested build, the URL marker has done its job.
+    // Keep it on stale pages so blocked storage cannot cause a refresh loop.
+    const url = new URL(this.win.location.href);
+    if (this.clientBuild && url.searchParams.get(REFRESH_BUILD_PARAM) === this.clientBuild) {
+      url.searchParams.delete(REFRESH_BUILD_PARAM);
+      try {
+        this.win.history.replaceState(this.win.history.state, "", url.href);
+      } catch {
+        // URL cleanup is cosmetic; restricted history must not block version checks.
+      }
+    }
     if (offline || this.started) return;
     this.started = true;
     this.net.on(S.WELCOME, this.onBuild);

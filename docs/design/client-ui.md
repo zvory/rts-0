@@ -3037,6 +3037,9 @@ refreshes ordinary browsers and embedded clients using a build-specific page URL
 existing query parameters and fragments. Session storage bounds recovery per client/server build
 pair; the URL also prevents repeated automatic navigation when storage is blocked or stale HTML
 survives recovery. A Refresh client button remains for manual retry.
+Once the loaded client build matches `rtsClientBuild`, startup removes that query parameter
+using `history.replaceState`, preserving the other parameters, fragment, and history state without
+navigation. Stale or unknown client builds retain the marker for refresh-loop protection.
 Countdown, asynchronous room startup, live play, Lab (including its entry/catalog), replays,
 spectating, previews, and other game-like modes stay untouched: no warning, no refresh, and no HTTP
 version probes. Reliable version observations may be retained silently for recovery after returning

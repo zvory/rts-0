@@ -18,9 +18,17 @@ function fixture({ lobby = false, clientBuild = "loaded-build", storage = new Ma
     removeEventListener(type) { events.delete(type); },
   };
   const navigations = [];
+  const replacements = [];
   let documentReloads = 0;
   const win = {
     location: { href, replace(url) { navigations.push(url); }, reload() { documentReloads++; } },
+    history: {
+      state: { route: "lobby" },
+      replaceState(state, _title, url) {
+        replacements.push({ state, url });
+        win.location.href = url;
+      },
+    },
     sessionStorage: { getItem: (k) => storage.get(k), setItem: (k, v) => storage.set(k, v) },
     setInterval(fn) { this.interval = fn; return 1; }, clearInterval() { this.interval = null; },
     setTimeout(fn) { this.timeout = fn; return 2; }, clearTimeout() { this.timeout = null; },
@@ -39,7 +47,7 @@ function fixture({ lobby = false, clientBuild = "loaded-build", storage = new Ma
       return { ok: true, text: async () => clientBuild };
     }),
   });
-  return { guard, net, state, win, doc, events, storage, navigations,
+  return { guard, net, state, win, doc, events, storage, navigations, replacements,
     get documentReloads() { return documentReloads; } };
 }
 
@@ -97,6 +105,9 @@ function fixture({ lobby = false, clientBuild = "loaded-build", storage = new Ma
   assert.equal(f.navigations.length, 1);
   f.guard.destroy();
   const stale = fixture({ lobby: true, nativeReload: true, storage, href: url.href });
+  stale.guard.start();
+  await stale.guard.check();
+  assert.equal(stale.replacements.length, 0, "stale HTML retains the URL loop guard");
   stale.guard.observe("new-server");
   assert.equal(stale.navigations.length, 0, "URL bounds automatic recovery without storage");
   assert.equal(stale.guard.button.disabled, false, "manual recovery stays available");
@@ -108,6 +119,37 @@ function fixture({ lobby = false, clientBuild = "loaded-build", storage = new Ma
   later.guard.observe("later-server");
   assert.equal(later.navigations.length, 1, "a later deploy can recover again");
   later.guard.destroy();
+}
+
+// Successful recovery cleans the address without navigation or losing route/history state.
+{
+  const f = fixture({ lobby: true, clientBuild: "new-server", nativeReload: true,
+    href: "https://example.test/?room=friends&rtsClientBuild=new-server#lobby" });
+  const historyState = f.win.history.state;
+  f.guard.start();
+  await f.guard.check();
+  assert.deepEqual(f.replacements, [{ state: historyState, url: "https://example.test/?room=friends#lobby" }]);
+  assert.equal(f.navigations.length, 0);
+  assert.equal(f.documentReloads, 0);
+  f.guard.observe("later-server");
+  assert.equal(new URL(f.navigations[0]).searchParams.get("rtsClientBuild"), "later-server",
+    "a later deployment still refreshes after cleanup");
+  f.guard.destroy();
+}
+
+// Unknown builds retain recovery evidence; unavailable history cannot disable the guard.
+{
+  const unknown = fixture({ clientBuild: "unknown", href: "https://example.test/?rtsClientBuild=unknown" });
+  unknown.guard.start();
+  assert.equal(unknown.replacements.length, 0);
+  unknown.guard.destroy();
+  const restricted = fixture({ lobby: true, href: "https://example.test/?rtsClientBuild=loaded-build" });
+  restricted.win.history.replaceState = () => { throw new Error("history blocked"); };
+  restricted.guard.start();
+  await restricted.guard.check();
+  restricted.guard.observe("new-server");
+  assert.equal(restricted.state.reloads, 1);
+  restricted.guard.destroy();
 }
 
 // Focus and history restoration probe immediately, including without visibilitychange.
