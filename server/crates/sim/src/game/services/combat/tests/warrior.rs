@@ -404,6 +404,10 @@ fn magic_vehicle_range_uses_center_and_never_acquires_beyond_attack_range() {
             let disciple = entities
                 .spawn_unit(1, EntityKind::Warrior, 400.0, 400.0)
                 .unwrap();
+            entities
+                .get_mut(disciple)
+                .unwrap()
+                .set_disciple_kind_for_test(EntityKind::evolved_disciple(dao).unwrap());
             let range = 5.0 * config::TILE_SIZE as f32
                 + entities.get(disciple).unwrap().radius()
                 + RANGE_SLACK;
@@ -415,10 +419,6 @@ fn magic_vehicle_range_uses_center_and_never_acquires_beyond_attack_range() {
                     400.0,
                 )
                 .unwrap();
-            entities
-                .get_mut(disciple)
-                .unwrap()
-                .set_disciple_kind_for_test(EntityKind::evolved_disciple(dao).unwrap());
             let hp = entities.get(target).unwrap().hp;
             run_combat_tick_on_map(
                 &mut entities,

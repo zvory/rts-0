@@ -21,7 +21,11 @@ export function clickGeometry(entity, footprint) {
   let scale = 1;
   if (footprint.kind === "circle") {
     scale = radiusScale(entity);
-    if (scale !== 1) {
+    if (entity.kind === KIND.WARRIOR) {
+      // Preserve the reviewed art-based click area independently of collision size.
+      clickFootprint = Object.freeze({ kind: "circle", radiusPx: 19.5 });
+      directClickFootprint = clickFootprint;
+    } else if (scale !== 1) {
       clickFootprint = Object.freeze({ kind: "circle", radiusPx: footprint.radiusPx * scale });
       if (scale < 1) directClickFootprint = clickFootprint;
     }

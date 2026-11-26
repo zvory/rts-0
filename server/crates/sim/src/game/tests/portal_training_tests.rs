@@ -56,7 +56,7 @@ fn cultivator_portal_trains_warrior_and_reserves_two_supply() {
         .find(|entity| entity.owner == 1 && entity.kind == EntityKind::Warrior)
         .expect("Portal should produce a Warrior");
     assert_eq!((warrior.hp, warrior.max_hp), (58, 58));
-    assert_eq!(warrior.radius(), 26.0);
+    assert_eq!(warrior.radius(), 17.0);
     assert_eq!(warrior.movement_speed(), 2.0);
 }
 

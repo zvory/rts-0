@@ -850,7 +850,7 @@ fn formation_goal_accepts_side_on_tank_tile_center_near_building() {
 }
 
 #[test]
-fn war_polyline_uses_evolved_radius_for_rank_count() {
+fn disciple_polyline_uses_independent_specialization_body_sizes() {
     let mut entities = EntityStore::new();
     let ids = (0..3)
         .map(|index| {
@@ -870,9 +870,21 @@ fn war_polyline_uses_evolved_radius_for_rank_count() {
     assert_eq!(slots.len(), 3);
     assert!(
         slots.iter().all(|(_, point)| point.1 == 300.0),
-        "three smaller War bodies fit in one rank on a 100px stroke"
+        "three War bodies fit in one rank on a 100px stroke"
     );
 
+    for id in &ids {
+        entities
+            .get_mut(*id)
+            .unwrap()
+            .set_disciple_kind_for_test(EntityKind::WindAdept);
+    }
+    let units = super::super::formation_units(&entities, 1, &ids);
+    let slots = polyline_slots(&units, &points);
+    assert!(
+        slots.iter().any(|(_, point)| point.1 != 300.0),
+        "larger Wind Adepts need two ranks on the same stroke"
+    );
     for id in &ids {
         entities
             .get_mut(*id)
@@ -880,9 +892,10 @@ fn war_polyline_uses_evolved_radius_for_rank_count() {
             .set_disciple_kind_for_test(EntityKind::Warrior);
     }
     let units = super::super::formation_units(&entities, 1, &ids);
-    let slots = polyline_slots(&units, &points);
     assert!(
-        slots.iter().any(|(_, point)| point.1 != 300.0),
-        "base Disciples still need two ranks on the same stroke"
+        polyline_slots(&units, &points)
+            .iter()
+            .all(|(_, point)| point.1 == 300.0),
+        "17px Novices fit in one rank on the same stroke"
     );
 }

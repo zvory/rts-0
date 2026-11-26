@@ -192,7 +192,7 @@ export const STATS = Object.freeze({
     rangeTiles: 5, cost: { steel: 55, oil: 10 }, supply: 1, buildTicks: 300,
     upgradeRequires: UPGRADE.PANZERFAUSTS,
     description: `Rifle infantry carrying one disposable ${PANZERFAUST_RANGE_TILES}-tile anti-vehicle shot. After launching it, the unit keeps fighting as ordinary rifle infantry.` },
-  [KIND.WARRIOR]: { armored: false, label: "Novice", icon: "NV", size: 26, sight: 11,
+  [KIND.WARRIOR]: { armored: false, label: "Novice", icon: "NV", size: 17, sight: 11,
     rangeTiles: 0.75, cost: { steel: 50, oil: 0 }, supply: 2, buildTicks: 300,
     description: "Durable melee infantry with a short sword reach and 50% armor penetration. Slow attacks deal heavy damage. Charge (automatic): 1.5x movement speed for 1 second, with a 15-second cooldown, when attacking an enemy unit within 5 tiles that is at least 2 tiles away or moving away." },
   [KIND.WIND_ADEPT]: { armored: false, label: "Wind Adept", icon: "WI", size: 26, sight: 14,

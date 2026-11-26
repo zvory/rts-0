@@ -557,7 +557,7 @@ pub(crate) fn launch_self_ability(
     match (definition.effect_hook, ability) {
         (AbilityEffectHook::Evolve, _) => entities
             .get_mut(caster)
-            .is_some_and(|e| e.evolve_dao(ability)),
+            .is_some_and(|e| e.choose_dao(ability)),
         (AbilityEffectHook::OwnedAreaStatus, AbilityKind::Breakthrough) => {
             let Some((caster_x, caster_y)) = entities.get(caster).map(|e| (e.pos_x(), e.pos_y()))
             else {
