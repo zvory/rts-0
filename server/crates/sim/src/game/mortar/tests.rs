@@ -112,6 +112,7 @@ fn mortar_falloff_resolves_distance_armor_entrenchment_and_friendly_fire() {
     ] {
         for (kind, entrenched) in [
             (EntityKind::Artillery, false),
+            (EntityKind::Rifleman, false),
             (EntityKind::Tank, false),
             (EntityKind::Rifleman, false),
             (EntityKind::MachineGunner, false),
@@ -177,69 +178,27 @@ fn mortar_falloff_resolves_distance_armor_entrenchment_and_friendly_fire() {
 }
 
 #[test]
-fn rocket_damage_preserves_unit_damage_but_is_reduced_against_buildings() {
-    let inner2 = (config::ROCKET_BARRAGE_INNER_RADIUS_TILES * config::TILE_SIZE as f32).det_powi(2);
-    let inner = shell_damage(true, 0.0, inner2, false);
-    let outer = shell_damage(true, inner2 + 1.0, inner2, false);
-    let direct = shell_damage(true, 0.0, inner2, true);
-
-    assert_eq!(inner, 53);
-    assert_eq!(outer, 21);
-    assert_eq!(direct, 70);
-    assert_eq!(
-        shell_effective_damage(EntityKind::Tank, true, inner, false),
-        13
-    );
-    assert_eq!(
-        shell_effective_damage(EntityKind::Tank, true, outer, false),
-        5
-    );
-    assert_eq!(
-        shell_effective_damage(EntityKind::Tank, true, direct, true),
-        70
-    );
-    assert_eq!(
-        shell_effective_damage(EntityKind::Rifleman, true, inner, false),
-        53
-    );
-    assert_eq!(
-        shell_effective_damage(EntityKind::SteelMine, true, direct, true),
-        18,
-        "a direct rocket must no longer one-shot a mine"
-    );
-    assert_eq!(
-        shell_effective_damage(EntityKind::PumpJack, true, inner, false),
-        14,
-        "soft buildings take one quarter damage, rounded up"
-    );
-    assert_eq!(
-        shell_effective_damage(EntityKind::ResourceDepot, true, direct, true),
-        18,
-        "central-blast armor penetration is preserved before the building penalty"
-    );
-    assert_eq!(
-        shell_effective_damage(EntityKind::ResourceDepot, true, inner, false),
-        4,
-        "ordinary splash applies armor before the building penalty"
-    );
-}
-
-#[test]
 fn rocket_blast_bands_apply_damage_and_armor_at_exact_boundaries() {
     let map = open_map(20);
-    for (distance_tiles, base, armored) in [
-        (0.0, 70, 70),
-        (0.5, 70, 70),
-        (0.501, 53, 13),
-        (1.0, 53, 13),
-        (1.001, 21, 5),
-        (2.0, 21, 5),
-        (2.001, 0, 0),
+    for (distance_tiles, base, armored, half_armor, full_armor, soft_building, armored_building) in [
+        (0.0, 70, 70, 70, 70, 18, 18),
+        (0.5, 70, 70, 70, 70, 18, 18),
+        (0.501, 53, 13, 27, 0, 14, 4),
+        (1.0, 53, 13, 27, 0, 14, 4),
+        (1.001, 21, 5, 11, 0, 6, 2),
+        (2.0, 21, 5, 11, 0, 6, 2),
+        (2.001, 0, 0, 0, 0, 0, 0),
     ] {
-        for kind in [
-            EntityKind::Tank,
-            EntityKind::Artillery,
-            EntityKind::ResourceDepot,
+        for (kind, item) in [
+            (EntityKind::Tank, false),
+            (EntityKind::Artillery, false),
+            (EntityKind::Rifleman, false),
+            (EntityKind::ResourceDepot, false),
+            (EntityKind::SteelMine, false),
+            (EntityKind::PumpJack, false),
+            (EntityKind::WindAdept, true),
+            (EntityKind::WarAdept, false),
+            (EntityKind::WarAdept, true),
         ] {
             let mut entities = EntityStore::new();
             let victim = if config::building_stats(kind).is_some() {
@@ -249,6 +208,14 @@ fn rocket_blast_bands_apply_damage_and_armor_at_exact_boundaries() {
             } else {
                 entities.spawn_unit(2, kind, 160.0, 160.0).unwrap()
             };
+            // Keep lethal hits from hiding the resolved damage behind the HP cap.
+            entities.get_mut(victim).unwrap().set_spawn_health(1000);
+            if item {
+                entities
+                    .get_mut(victim)
+                    .unwrap()
+                    .receive_shop_item(crate::game::ability::AbilityKind::ArmorTreasure);
+            }
             let before = entities.get(victim).unwrap().hp;
             let teams = TeamRelations::from_player_teams([(1, 1), (2, 2)]);
             let fog = visible_team_fog(&map, &entities);
@@ -283,13 +250,17 @@ fn rocket_blast_bands_apply_damage_and_armor_at_exact_boundaries() {
             );
             let expected_damage = match kind {
                 EntityKind::Tank => armored,
-                EntityKind::ResourceDepot => config::rocket_barrage_building_damage(armored),
+                EntityKind::ResourceDepot => armored_building,
+                EntityKind::SteelMine | EntityKind::PumpJack => soft_building,
+                EntityKind::WindAdept => half_armor,
+                EntityKind::WarAdept if item => full_armor,
+                EntityKind::WarAdept => half_armor,
                 _ => base,
             };
             assert_eq!(
                 before - entities.get(victim).unwrap().hp,
                 expected_damage,
-                "kind={kind:?}, distance={distance_tiles}"
+                "kind={kind:?}, item={item}, distance={distance_tiles}"
             );
         }
     }

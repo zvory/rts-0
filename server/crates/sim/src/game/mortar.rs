@@ -17,11 +17,7 @@ use crate::game::map::Map;
 use crate::game::services::dist2;
 use crate::game::teams::TeamRelations;
 use crate::protocol::{self, AttackReveal, Event};
-#[cfg(test)]
-use crate::rules::combat;
 use crate::rules::projection;
-#[cfg(test)]
-use crate::rules::terrain::TerrainKind;
 use serde::{Deserialize, Serialize};
 
 pub(crate) const FIRE_TOLERANCE_RAD: f32 = 15.0_f32.to_radians();
@@ -451,16 +447,6 @@ fn mortar_reveal_for(attacker: Option<&Entity>, owner: u32) -> Option<AttackReve
     })
 }
 
-#[cfg(test)]
-fn mortar_damage(victim_kind: EntityKind, base: u32) -> u32 {
-    combat::effective_damage(
-        EntityKind::MortarTeam,
-        victim_kind,
-        base,
-        Some(TerrainKind::Open),
-    )
-}
-
 fn shell_damage(rocket: bool, d2: f32, inner2: f32, piercing_hit: bool) -> u32 {
     if !rocket {
         let tile_size = config::TILE_SIZE as f32;
@@ -472,25 +458,6 @@ fn shell_damage(rocket: bool, d2: f32, inner2: f32, piercing_hit: bool) -> u32 {
         config::ROCKET_BARRAGE_INNER_DAMAGE
     } else {
         config::ROCKET_BARRAGE_OUTER_DAMAGE
-    }
-}
-
-#[cfg(test)]
-fn shell_effective_damage(
-    victim_kind: EntityKind,
-    rocket: bool,
-    base: u32,
-    piercing_hit: bool,
-) -> u32 {
-    let damage = if rocket && piercing_hit {
-        base
-    } else {
-        mortar_damage(victim_kind, base)
-    };
-    if rocket && config::building_stats(victim_kind).is_some() {
-        config::rocket_barrage_building_damage(damage)
-    } else {
-        damage
     }
 }
 
