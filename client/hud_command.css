@@ -147,3 +147,34 @@
   text-align: center;
   line-height: 1.1;
 }
+
+/* Touch cells can be only 36px tall. Omit the redundant icon and keyboard hint
+   to leave room for three subtitle lines plus the cost without badge overlap. */
+@media (pointer: coarse) and (max-width: 1024px) and (max-height: 1024px) {
+  #command-card .cmd-btn[data-ability="regen"],
+  #command-card .cmd-btn[data-ability="armorTreasure"] {
+    padding-bottom: 10px;
+  }
+
+  #command-card .cmd-btn[data-ability="regen"] .cmd-icon,
+  #command-card .cmd-btn[data-ability="armorTreasure"] .cmd-icon,
+  #command-card .cmd-btn[data-ability="regen"] .cmd-hotkey,
+  #command-card .cmd-btn[data-ability="armorTreasure"] .cmd-hotkey {
+    display: none;
+  }
+
+  #command-card .cmd-btn[data-ability="regen"] .cmd-label,
+  #command-card .cmd-btn[data-ability="armorTreasure"] .cmd-label {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 0;
+    font-size: 8px;
+    line-height: 1;
+  }
+
+  #command-card .cmd-btn[data-ability="regen"] .cmd-cost,
+  #command-card .cmd-btn[data-ability="armorTreasure"] .cmd-cost {
+    bottom: 1px;
+    line-height: 1;
+  }
+}
