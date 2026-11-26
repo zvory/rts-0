@@ -6,6 +6,8 @@ server sends per-player, fog-filtered snapshots.
 
 This is a pre-alpha game: prioritize strong architectural foundations and moving fast; breaking changes are acceptable, and backward compatibility or careful migrations are not required.
 
+Desktop UI is the product target. Phone support exists only for remote debugging and inspection; mobile gameplay is unsupported.
+
 ## Start with relevant context
 
 Read the smallest relevant capsule in `docs/context/` before exploring broadly. The index covers
