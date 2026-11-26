@@ -61,6 +61,7 @@ pub(super) fn begin(
     }
     if let Some((goal, _)) = best {
         if let Some(m) = e.movement.as_mut() {
+            m.pivot_drive = None;
             m.pivot_recovery = Some(PivotRecovery {
                 goal,
                 facing,

@@ -1,5 +1,7 @@
 use crate::config;
-use crate::game::entity::{uses_oriented_vehicle_body, Entity, EntityKind, EntityStore};
+use crate::game::entity::{
+    uses_oriented_vehicle_body, Entity, EntityKind, EntityStore, PivotDriveCommitment,
+};
 use crate::game::map::Map;
 use crate::game::services::geometry::unit_body_for_entity;
 use crate::game::services::occupancy::Occupancy;
@@ -30,6 +32,7 @@ const VEHICLE_FOLLOW_LONGITUDINAL_DEADBAND_PX: f32 = 1.0;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) struct PivotDriveIntent {
+    pub(super) commitment: PivotDriveCommitment,
     pub(super) desired_facing: f32,
     pub(super) traffic_facing: f32,
     pub(super) pre_pop_count: usize,
@@ -201,16 +204,25 @@ pub(super) fn pivot_drive_intent(
 
     let profile = pivot_drive_profile(e.kind);
     let travel_facing = dy.det_atan2(dx);
-    let reverse_distance = if intermediate_reverse_is_useful(e) {
+    let reverse_distance = if intermediate_reverse_is_useful(e, route.next_index) {
         crate::config::TILE_SIZE as f32
-    } else if e.movement.as_ref().is_some_and(|m| m.path.len() == 1) {
+    } else if route.next_index == 0 {
         profile.reverse_goal_distance_px
     } else {
         0.0
     };
-    let normal_desired_facing = if dist <= reverse_distance
-        && angle_delta(e.facing(), travel_facing).abs() > profile.reverse_min_behind_angle_rad
-    {
+    let commitment = e
+        .movement
+        .as_ref()
+        .and_then(|m| m.pivot_drive)
+        .filter(|choice| choice.waypoint == route.target)
+        .unwrap_or(PivotDriveCommitment {
+            waypoint: route.target,
+            reversing: dist <= reverse_distance
+                && angle_delta(e.facing(), travel_facing).abs()
+                    > profile.reverse_min_behind_angle_rad,
+        });
+    let normal_desired_facing = if commitment.reversing {
         normalize_angle(travel_facing + std::f32::consts::PI)
     } else {
         travel_facing
@@ -239,6 +251,7 @@ pub(super) fn pivot_drive_intent(
     let reversing = angle_delta(desired_facing, reverse_facing).abs() <= 1.0e-4;
 
     Some(PivotDriveIntent {
+        commitment,
         pre_pop_count: route.pre_pop_count,
         desired_facing,
         traffic_facing: if reversing { travel_facing } else { e.facing() },
@@ -317,14 +330,14 @@ pub(super) fn pivot_drive_desired_path_point(
 
 /// Back up a short distance to enter a forward-going route; do not reverse through
 /// every bend of a route that actually needs a turnaround.
-fn intermediate_reverse_is_useful(e: &Entity) -> bool {
+fn intermediate_reverse_is_useful(e: &Entity, next_index: usize) -> bool {
     let Some(path) = e.movement.as_ref().map(|m| m.path.as_slice()) else {
         return false;
     };
-    let Some(index) = path.len().checked_sub(2) else {
+    let Some(index) = next_index.checked_sub(1) else {
         return false;
     };
-    let (Some(next), Some(following)) = (path.last(), path.get(index)) else {
+    let (Some(next), Some(following)) = (path.get(next_index), path.get(index)) else {
         return false;
     };
     let direction = (following.1 - next.1).det_atan2(following.0 - next.0);

@@ -108,12 +108,18 @@ fn long_pivot_route_preserves_movement_trace_with_obstacles_and_traffic() {
             let spatial = SpatialIndex::build(&entities, map.width, map.height);
             movement_system(&map, &mut entities, &[], &occ, &spatial, tick);
             let unit = entities.get(tank).expect("tank should remain");
+            // Keep the pre-commitment trace oracle: only the new decision state
+            // is omitted, so every prior position/facing/path field must still match.
+            let mut movement = unit.movement.clone();
+            if let Some(movement) = movement.as_mut() {
+                movement.pivot_drive = None;
+            }
             trace.update(
                 serde_json::to_vec(&(
                     unit.pos_x().to_bits(),
                     unit.pos_y().to_bits(),
                     unit.facing().to_bits(),
-                    &unit.movement,
+                    &movement,
                     unit.order(),
                 ))
                 .expect("movement trace should serialize"),

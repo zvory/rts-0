@@ -118,6 +118,14 @@ pub struct PivotRecovery {
     pub ticks_left: u16,
 }
 
+/// Normal forward/reverse choice for one effective route waypoint. Both choices are
+/// committed: turning the hull must not change the decision that caused that turn.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub(in crate::game) struct PivotDriveCommitment {
+    pub waypoint: (f32, f32),
+    pub reversing: bool,
+}
+
 /// Mobile unit state. Only units have this group.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MovementState {
@@ -156,6 +164,9 @@ pub struct MovementState {
     /// Immediate waypoint this scout car is currently reversing toward. This latches a short
     /// reverse maneuver so drive direction cannot flip every tick as the hull rotates.
     pub scout_car_reverse_waypoint: Option<(f32, f32)>,
+    /// Serialized with the route so checkpoint restore continues the same maneuver.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(in crate::game) pivot_drive: Option<PivotDriveCommitment>,
     /// Move along the old hull before retrying a statically blocked turn.
     #[serde(default)]
     pub pivot_recovery: Option<PivotRecovery>,
@@ -198,6 +209,7 @@ impl Default for MovementState {
             scout_car_recovery_cooldown: 0,
             scout_car_reverse_waypoint: None,
             pivot_recovery: None,
+            pivot_drive: None,
             static_blocked_ticks: 0,
             breakthrough_ticks: 0,
             novice_charge_ticks: 0,
@@ -490,5 +502,6 @@ impl MovementState {
     pub(super) fn clear_vehicle_recovery(&mut self) {
         self.scout_car_reverse_waypoint = None;
         self.pivot_recovery = None;
+        self.pivot_drive = None;
     }
 }

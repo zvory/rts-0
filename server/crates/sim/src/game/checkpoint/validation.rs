@@ -300,6 +300,20 @@ fn validate_entity(
         entity.research_queue().len(),
         MAX_PRODUCTION_QUEUE,
     )?;
+    if let Some(choice) = entity.movement.as_ref().and_then(|m| m.pivot_drive) {
+        if !crate::game::entity::uses_pivot_vehicle_movement(entity.kind)
+            || !in_world(choice.waypoint.0, choice.waypoint.1, world)
+            || entity.next_waypoint() != Some(choice.waypoint)
+            || entity
+                .movement
+                .as_ref()
+                .is_some_and(|m| m.pivot_recovery.is_some())
+        {
+            return Err(CheckpointPayloadError::InvalidValue {
+                field: "entities.movement.pivotDrive",
+            });
+        }
+    }
     if let Some(recovery) = entity.movement.as_ref().and_then(|m| m.pivot_recovery) {
         if !crate::game::entity::uses_pivot_vehicle_movement(entity.kind)
             || !in_world(recovery.goal.0, recovery.goal.1, world)

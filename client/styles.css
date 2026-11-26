@@ -5297,7 +5297,7 @@ input[type="text"]:focus {
 }
 
 #lobby-screen:not(.is-joined) .match-history {
-  width: min(520px, 100%);
+  width: min(800px, 100%);
 }
 .match-history-panel {
   border: 1px solid var(--panel-edge);
