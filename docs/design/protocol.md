@@ -1554,7 +1554,7 @@ ally.
 `LabClientOp` is tagged by `op`:
 ```
 { op: "exportMap" }
-{ op: "spawnEntities", spawns: [{ owner: u32, kind: string, x: f32, y: f32, completed?: bool }] }
+{ op: "spawnEntities", spawns: [{ owner: u32, kind: string, x: f32, y: f32, completed?: bool, daoMaster?: bool }] }
 { op: "applyUpdates", updates: [
   { operation: "move", entityId: u32, x: f32, y: f32 } |
   { operation: "reassign", entityId: u32, owner: u32 } |
@@ -1564,7 +1564,7 @@ ally.
 ] }
 { op: "deleteEntities", entityIds: u32[] }
 // Existing singular browser/UI operations remain accepted for compatibility.
-{ op: "spawnEntity", owner: u32, kind: string, x: f32, y: f32, completed?: bool }
+{ op: "spawnEntity", owner: u32, kind: string, x: f32, y: f32, completed?: bool, daoMaster?: bool }
 { op: "deleteEntity", entityId: u32 }
 { op: "moveEntity", entityId: u32, x: f32, y: f32 }
 { op: "setEntityOwner", entityId: u32, owner: u32 }
@@ -1810,11 +1810,11 @@ move into the browser or daemon.
 
 `LabReplayOperation` deliberately promotes only replayable lab state changes:
 ```
-{ op: "spawnEntities", spawns: [{ owner: u32, kind: string, x: f32, y: f32, completed?: bool }] }
+{ op: "spawnEntities", spawns: [{ owner: u32, kind: string, x: f32, y: f32, completed?: bool, daoMaster?: bool }] }
 { op: "applyUpdates", updates: [LabUpdateSpec] }
 { op: "deleteEntities", entityIds: u32[] }
 // Reader-only compatibility for artifacts written before plural operations:
-{ op: "spawnEntity", owner: u32, kind: string, x: f32, y: f32, completed?: bool }
+{ op: "spawnEntity", owner: u32, kind: string, x: f32, y: f32, completed?: bool, daoMaster?: bool }
 { op: "deleteEntity", entityId: u32 }
 { op: "moveEntity", entityId: u32, x: f32, y: f32 }
 { op: "setEntityOwner", entityId: u32, owner: u32 }
@@ -2128,6 +2128,11 @@ it; other kinds are rejected before mutation. The authoritative spawn uses norma
 Dao evolution to initialize specialization stats, with its entrance animation already
 complete. Omission spawns a base unit. Lab timeline and replay operations retain this
 field, and setup checkpoints retain the resulting entity specialization.
+
+Set `daoMaster: true` on a Wind, War, or Magic Adept kind to spawn it at Master rank.
+The server uses standard promotion to initialize full Master health and abilities, then
+validates placement with the Master body. Other kinds reject Master rank. Omission or
+`false` keeps the base rank. Timeline and replay operations preserve Master spawns.
 
 Spawn entries also accept `factionId` from the faction catalog. A successful spawn sets
 the target player's faction; the kind must belong to that catalog. Invalid placement

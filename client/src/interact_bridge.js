@@ -208,6 +208,7 @@ export class InteractBridge {
       completed: spec?.completed !== false,
       ...(spec?.factionId ? { factionId: safeKind(spec.factionId, "spawn.factionId") } : {}),
       ...(spec?.dao ? { dao: safeKind(spec.dao, "spawn.dao") } : {}),
+      ...(spec?.daoMaster === true ? { daoMaster: true } : {}),
     }));
     const result = await this.mutate(
       () => labClient.spawnEntities(spawns),

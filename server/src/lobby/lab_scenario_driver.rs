@@ -471,6 +471,7 @@ mod tests {
                 y: 320.0,
                 completed: true,
                 dao: None,
+                dao_master: false,
                 faction_id: None,
             }]),
         };

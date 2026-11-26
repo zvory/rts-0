@@ -25,6 +25,7 @@ fn spawn_replay_test_entity(
             y: position.1,
             completed: true,
             dao: None,
+            dao_master: false,
             faction_id: None,
         }))
         .expect("test entity spawn should succeed")
@@ -63,6 +64,7 @@ fn spawn_hidden_replay_depot_and_scout_position(
                     y: depot_pos.1,
                     completed: true,
                     dao: None,
+                    dao_master: false,
                     faction_id: None,
                 }))
             else {
@@ -91,6 +93,7 @@ fn spawn_hidden_replay_depot_and_scout_position(
                             y: scout_pos.1,
                             completed: true,
                             dao: None,
+                            dao_master: false,
                             faction_id: None,
                         }))
                     else {
@@ -119,7 +122,6 @@ fn replay_game_with_split_building_memory(players: &[PlayerInit]) -> (Game, u32)
 
     delete_replay_test_entity(&mut game, p2_scout);
     game.tick();
-
     assert!(
         game.snapshot_for_spectator(&[viewers[0]])
             .remembered_buildings

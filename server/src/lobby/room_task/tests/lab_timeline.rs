@@ -176,6 +176,7 @@ fn lab_seek_rebuilds_world_and_resends_authoritative_reset_state() {
             y: spawn_position.1,
             completed: true,
             dao: None,
+            dao_master: false,
             faction_id: None,
         },
     );

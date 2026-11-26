@@ -148,7 +148,7 @@ mod tests {
 // Proving Grounds uses kind code 33; team-private dao_training_queue appends compact v63 slot 51.
 // Existing research commands targeting this building enqueue researched Dao training plans.
 
-// Lab spawnEntity/spawnEntities entries accept optional dao: wind | war | magic (Novice only).
+// Lab spawnEntity/spawnEntities entries accept optional dao: wind | war | magic (Novice only) and daoMaster: bool (Adepts only).
 
 // Snapshot playerFactions (compact pf) projects public identity independently of private resources.
 

@@ -58,6 +58,7 @@ fn free_spawn_position(game: &Game, owner: u32, kind: EntityKind) -> (f32, f32) 
                     y: py,
                     completed: true,
                     dao: None,
+                    dao_master: false,
                     faction_id: None,
                 }))
                 .is_ok()
@@ -125,6 +126,7 @@ fn checkpoint_lab_scenario_export_matches_direct_state() {
             y,
             completed: true,
             dao: None,
+            dao_master: false,
             faction_id: None,
         }))
         .expect("tank should spawn");

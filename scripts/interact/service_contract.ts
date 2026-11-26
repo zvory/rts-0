@@ -11,6 +11,7 @@ export interface SpawnInput extends JsonObject {
   x: number;
   y: number;
   alias?: string;
+  daoMaster?: boolean;
 }
 export interface ViewportInput { width: number; height: number; deviceScaleFactor?: number }
 export interface ServiceInput extends JsonObject {

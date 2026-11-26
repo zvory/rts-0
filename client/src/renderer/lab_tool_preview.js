@@ -1,5 +1,5 @@
 import { gfxNoFill, gfxCircle, gfxRoundRect, gfxStrokePaths, gfxFill, gfxStroke } from "./native_graphics.js";
-import { COLORS, PLAYER_PALETTE, STATS } from "../config.js";
+import { COLORS, DAO_MASTER_BODY_SCALE, PLAYER_PALETTE, STATS } from "../config.js";
 import { isBuilding, isUnit } from "../protocol.js";
 import {
   finiteNumber,
@@ -48,7 +48,8 @@ function drawLabSpawnPreview(g, x, y, payload, tileSize) {
   }
   if (!isUnit(kind)) return;
   const stat = STATS[kind] || {};
-  const radius = Math.max(7, Math.min(tileSize * 0.34, Number(stat.size) || tileSize * 0.27));
+  const baseRadius = Math.max(7, Math.min(tileSize * 0.34, Number(stat.size) || tileSize * 0.27));
+  const radius = baseRadius * (payload.daoMaster ? DAO_MASTER_BODY_SCALE : 1);
   gfxStroke(g, 2, color, 0.95);
   gfxFill(g, color, 0.32);
   gfxCircle(g, x, y, radius);

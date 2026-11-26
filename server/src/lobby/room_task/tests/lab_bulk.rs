@@ -28,12 +28,13 @@ fn lab_plural_mutation_is_one_logged_operation_with_structured_failure_details()
             spawns: vec![
                 crate::protocol::LabSpawnEntitySpec {
                     owner: LAB_PLAYER_ONE_ID,
-                    kind: crate::protocol::kinds::RIFLEMAN.to_string(),
+                    kind: crate::protocol::kinds::WIND_ADEPT.to_string(),
                     x: first.0,
                     y: first.1,
                     completed: true,
                     dao: None,
-                    faction_id: None,
+                    dao_master: true,
+                    faction_id: Some("cultivators".to_string()),
                 },
                 crate::protocol::LabSpawnEntitySpec {
                     owner: LAB_PLAYER_TWO_ID,
@@ -42,6 +43,7 @@ fn lab_plural_mutation_is_one_logged_operation_with_structured_failure_details()
                     y: second.1,
                     completed: true,
                     dao: None,
+                    dao_master: false,
                     faction_id: None,
                 },
             ],
@@ -88,13 +90,17 @@ fn lab_plural_mutation_is_one_logged_operation_with_structured_failure_details()
     assert!(spawned_ids
         .iter()
         .all(|id| snapshot.entities.iter().any(|entity| entity.id == *id)));
+    assert!(snapshot
+        .entities
+        .iter()
+        .any(|entity| { entity.id == spawned_ids[0] && entity.dao_master == Some(true) }));
     assert_eq!(task.lab_session.as_ref().unwrap().operation_log.len(), 1);
     assert!(matches!(
         task.lab_timeline
             .as_ref()
             .and_then(|timeline| timeline.replay_entries().first())
             .map(|entry| &entry.op),
-        Some(crate::protocol::LabReplayOperation::SpawnEntities { spawns }) if spawns.len() == 2
+        Some(crate::protocol::LabReplayOperation::SpawnEntities { spawns }) if spawns.len() == 2 && spawns[0].dao_master && !spawns[1].dao_master
     ));
 
     let entity_count = match &task.phase {
@@ -112,6 +118,7 @@ fn lab_plural_mutation_is_one_logged_operation_with_structured_failure_details()
                 y: first.1,
                 completed: true,
                 dao: None,
+                dao_master: false,
                 faction_id: None,
             }],
         },
@@ -138,6 +145,10 @@ fn lab_plural_mutation_is_one_logged_operation_with_structured_failure_details()
         },
         entity_count
     );
+    assert!(snapshot
+        .entities
+        .iter()
+        .any(|entity| { entity.id == spawned_ids[0] && entity.dao_master == Some(true) }));
     assert_eq!(task.lab_session.as_ref().unwrap().operation_log.len(), 1);
     assert_eq!(task.lab_timeline.as_ref().unwrap().replay_entry_count(), 1);
 }

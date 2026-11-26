@@ -147,6 +147,7 @@ fn spawn(game: &mut Game, owner: u32, kind: EntityKind, point: (f32, f32)) -> Re
         y: point.1,
         completed: true,
         dao: None,
+        dao_master: false,
         faction_id: None,
     }))
     .map(|_| ())

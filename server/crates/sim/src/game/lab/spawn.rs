@@ -22,7 +22,26 @@ impl Game {
                 ));
             }
         }
-        let id = if input.kind.is_unit() {
+        if input.dao_master && input.kind.dao().is_none() {
+            return Err(invalid_kind(
+                input.kind,
+                "Master rank requires a Wind, War, or Magic Adept",
+            ));
+        }
+        let id = if input.dao_master {
+            let mut unit = Entity::new_unit(input.owner, input.kind, input.x, input.y).ok_or(
+                LabError::InvalidPosition {
+                    x: input.x,
+                    y: input.y,
+                    reason: "position cannot be stored",
+                },
+            )?;
+            unit.insight = config::DISCIPLE_EVOLVED_INSIGHT_CAP;
+            unit.advance_dao_master();
+            unit.dao_advance_ticks = 0;
+            self.validate_unit_entity_position(&self.state.entities, &unit, input.x, input.y)?;
+            self.state.entities.insert(unit)
+        } else if input.kind.is_unit() {
             self.validate_unit_position(&self.state.entities, input.kind, input.x, input.y)?;
             self.state
                 .entities
@@ -60,4 +79,15 @@ impl Game {
         }
         Ok(LabOpOutcome::Spawned { entity_id: id })
     }
+}
+
+pub(super) fn unit_entity_position_valid(
+    map: &Map,
+    entities: &EntityStore,
+    entity: &Entity,
+    x: f32,
+    y: f32,
+) -> bool {
+    let occ = Occupancy::build(map, entities);
+    standability::unit_spawn_standable_for_entity(map, &occ, entities, entity, x, y)
 }

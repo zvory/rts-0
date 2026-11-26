@@ -98,13 +98,14 @@ export function validateCommandInput(command: string, value: unknown): CommandIn
     optionalBoolean(value.details, "spawn.details");
     array(value.spawns, "spawn.spawns", 1, INTERACT_LIMITS.maxSpawnBatch, (spec, index) => {
       record(spec, `spawn.spawns[${index}]`);
-      exact(spec, ["owner", "kind", "x", "y", "completed", "alias", "factionId", "dao"], "spawn spec");
+      exact(spec, ["owner", "kind", "x", "y", "completed", "alias", "factionId", "dao", "daoMaster"], "spawn spec");
       u32(spec.owner, "spawn.owner");
       token(spec.kind, "spawn.kind");
       finite(spec.x, "spawn.x");
       finite(spec.y, "spawn.y");
       optionalBoolean(spec.completed, "spawn.completed");
       if (spec.factionId != null) token(spec.factionId, "spawn.factionId");
+      optionalBoolean(spec.daoMaster, "spawn.daoMaster");
       if (spec.dao != null && !["wind", "war", "magic"].includes(String(spec.dao))) invalid("spawn.dao", "must be wind, war or magic");
       if (spec.alias != null) alias(spec.alias);
     });

@@ -247,6 +247,8 @@ pub enum LabClientOp {
         completed: bool,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         dao: Option<LabSpawnDao>,
+        #[serde(default, skip_serializing_if = "formation_point::is_false")]
+        dao_master: bool,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         faction_id: Option<String>,
     },
@@ -313,6 +315,8 @@ pub struct LabSpawnEntitySpec {
     pub completed: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dao: Option<LabSpawnDao>,
+    #[serde(default, skip_serializing_if = "formation_point::is_false")]
+    pub dao_master: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub faction_id: Option<String>,
 }

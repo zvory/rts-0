@@ -3,7 +3,7 @@
 // server-validated kinds without scraping rendered controls.
 
 import { PLAYABLE_FACTIONS } from "./lobby_view.js";
-import { KIND } from "./protocol.js";
+import { KIND, daoForKind } from "./protocol.js";
 import { factionCatalog, STATS, statsForFaction } from "./config.js";
 
 const ABILITY_ONLY_UNIT_KINDS = Object.freeze(new Set([KIND.SCOUT_PLANE]));
@@ -27,7 +27,13 @@ export function labSpawnBuildingKindsForFaction(factionId) {
 }
 
 export function labSpawnUnitOptionsForFaction(factionId) {
-  return labSpawnUnitKindsForFaction(factionId).map((kind) => ({
+  const unitKinds = labSpawnUnitKindsForFaction(factionId);
+  const baseOptions = unitKinds.map((kind) => ({
     kind, dao: null, label: statsForFaction(kind, factionId).label,
   }));
+  const masterOptions = unitKinds.filter((kind) => daoForKind(kind))
+    .map((kind) => ({
+      kind, dao: null, daoMaster: true, label: statsForFaction(kind, factionId, null, true).label,
+    }));
+  return [...baseOptions, ...masterOptions];
 }

@@ -632,6 +632,7 @@ export class LabPanel {
             this.spawnPalette.factionId = value;
             this.spawnPalette.kind = "";
             this.spawnPalette.dao = null;
+            this.spawnPalette.daoMaster = false;
             this.render();
           },
         },
@@ -690,16 +691,17 @@ export class LabPanel {
   spawnPaletteGrid() {
     const grid = document.createElement("div");
     grid.className = "lab-spawn-palette";
-    for (const { kind, dao, label } of labSpawnUnitOptionsForFaction(this.spawnPalette.factionId)) {
+    for (const { kind, dao, daoMaster = false, label } of labSpawnUnitOptionsForFaction(this.spawnPalette.factionId)) {
       const active = this.activeLabTool()?.payload;
-      const button = this.button(label, () => this.armSpawnPaletteTool(kind, dao), {
+      const sameRank = (payload) => Boolean(payload?.daoMaster) === daoMaster;
+      const button = this.button(label, () => this.armSpawnPaletteTool(kind, dao, daoMaster), {
         className: "lab-btn lab-spawn-option",
         title: `Spawn ${label}`,
         dataset: {
           kind,
           dao: dao || "",
-          selected: kind === this.spawnPalette.kind && (dao || null) === (this.spawnPalette.dao || null) ? "true" : "false",
-          active: this.spawnToolActive(kind, this.spawnPalette.factionId) && (active?.dao || null) === (dao || null) ? "true" : "false",
+          selected: kind === this.spawnPalette.kind && (dao || null) === (this.spawnPalette.dao || null) && sameRank(this.spawnPalette) ? "true" : "false",
+          active: this.spawnToolActive(kind, this.spawnPalette.factionId) && (active?.dao || null) === (dao || null) && sameRank(active) ? "true" : "false",
         },
       });
       grid.appendChild(button);
@@ -740,15 +742,17 @@ export class LabPanel {
     return this.readout("No building catalog entries");
   }
 
-  armSpawnPaletteTool(kind = this.spawnPalette.kind, dao = null) {
+  armSpawnPaletteTool(kind = this.spawnPalette.kind, dao = null, daoMaster = false) {
     this.captureSpawnPaletteFields();
     if (!kind) return null;
     this.spawnPalette.kind = kind;
     this.spawnPalette.dao = dao;
+    this.spawnPalette.daoMaster = daoMaster;
     const payload = {
       owner: this.targetPlayer(),
       factionId: this.spawnPalette.factionId,
       ...(dao ? { dao } : {}),
+      ...(daoMaster ? { daoMaster } : {}),
       kind,
       completed: true,
     };
@@ -775,7 +779,7 @@ export class LabPanel {
       {
         kind: "spawnEntity",
         payload: { ...payload },
-        label: `Spawn ${statsForFaction(kind, payload.factionId, payload.dao)?.label || KIND_LABELS[kind] || kind}`,
+        label: `Spawn ${statsForFaction(kind, payload.factionId, payload.dao, payload.daoMaster)?.label || KIND_LABELS[kind] || kind}`,
         keepArmedOnWorldClick: true,
         paintOnDrag: true,
       },
@@ -792,6 +796,7 @@ export class LabPanel {
       kind: payload.kind,
       factionId: payload.factionId,
       ...(payload.dao ? { dao: payload.dao } : {}),
+      ...(payload.daoMaster ? { daoMaster: true } : {}),
       owner: Number(payload.owner),
       x: event.x,
       y: event.y,
@@ -808,6 +813,7 @@ export class LabPanel {
     const unitKinds = labSpawnUnitKindsForFaction(this.spawnPalette.factionId);
     if (!unitKinds.includes(this.spawnPalette.kind)) {
       this.spawnPalette.kind = unitKinds[0] || "";
+      this.spawnPalette.daoMaster = false;
     }
   }
 

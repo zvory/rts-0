@@ -18,6 +18,7 @@ use crate::rules;
 mod checkpoint_scenario;
 mod map_draft;
 mod spawn;
+use spawn::unit_entity_position_valid;
 
 pub use checkpoint_scenario::{
     LabCheckpointScenarioMap, LabCheckpointScenarioMapData, LabCheckpointScenarioMetadata,
@@ -58,6 +59,7 @@ pub struct LabSpawnEntity {
     pub y: f32,
     pub completed: bool,
     pub dao: Option<crate::protocol::LabSpawnDao>,
+    pub dao_master: bool,
     pub faction_id: Option<&'static str>,
 }
 
@@ -701,6 +703,7 @@ impl Game {
                     y,
                     completed: true,
                     dao: None,
+                    dao_master: false,
                     faction_id: None,
                 };
                 if scratch_entities.spawn_unit(owner, kind, x, y).is_none() {
@@ -899,15 +902,7 @@ impl Game {
         x: f32,
         y: f32,
     ) -> Result<(), LabError> {
-        let occ = Occupancy::build(&self.state.map, entities);
-        if standability::unit_spawn_standable_for_entity(
-            &self.state.map,
-            &occ,
-            entities,
-            entity,
-            x,
-            y,
-        ) {
+        if unit_entity_position_valid(&self.state.map, entities, entity, x, y) {
             return Ok(());
         }
         Err(placement_error(
@@ -917,6 +912,7 @@ impl Game {
             x,
             y,
             false,
+            Some(entity),
         ))
     }
 
@@ -937,6 +933,7 @@ impl Game {
             x,
             y,
             false,
+            None,
         ))
     }
 
@@ -950,7 +947,8 @@ impl Game {
         if let Some(result) = building_position_if_valid(&self.state.map, entities, kind, x, y) {
             return Ok(result);
         }
-        Err(placement_error(&self.state.map, entities, kind, x, y, true))
+        let map = &self.state.map;
+        Err(placement_error(map, entities, kind, x, y, true, None))
     }
 
     fn cleanup_entity_references(&mut self, entity_id: u32) {
@@ -1089,9 +1087,11 @@ fn placement_error(
     x: f32,
     y: f32,
     building: bool,
+    unit: Option<&Entity>,
 ) -> LabError {
-    let blockers = placement_blockers(map, entities, kind, x, y, building);
-    let suggestions = placement_suggestions(map, entities, kind, x, y, building);
+    let unit_radius = unit.map(Entity::radius);
+    let blockers = placement_blockers(map, entities, kind, x, y, building, unit_radius);
+    let suggestions = placement_suggestions(map, entities, kind, x, y, building, unit);
     LabError::Placement {
         x,
         y,
@@ -1107,6 +1107,7 @@ fn placement_blockers(
     x: f32,
     y: f32,
     building: bool,
+    unit_radius: Option<f32>,
 ) -> Vec<LabPlacementBlocker> {
     let mut blockers = Vec::new();
     let world_width = map.width.saturating_mul(config::TILE_SIZE);
@@ -1125,6 +1126,9 @@ fn placement_blockers(
     }
 
     let tile_size = config::TILE_SIZE as f32;
+    let unit_radius = unit_radius
+        .or_else(|| config::unit_stats(kind).map(|stats| stats.radius))
+        .unwrap_or(tile_size / 2.0);
     let (min_tx, max_tx, min_ty, max_ty) = if building {
         match building_top_left_for_center(map, kind, x, y) {
             Ok((tile_x, tile_y, _, _)) => {
@@ -1148,14 +1152,11 @@ fn placement_blockers(
             }
         }
     } else {
-        let radius = config::unit_stats(kind)
-            .map(|stats| stats.radius)
-            .unwrap_or(tile_size / 2.0);
         (
-            ((x - radius) / tile_size).floor() as i32,
-            ((x + radius) / tile_size).floor() as i32,
-            ((y - radius) / tile_size).floor() as i32,
-            ((y + radius) / tile_size).floor() as i32,
+            ((x - unit_radius) / tile_size).floor() as i32,
+            ((x + unit_radius) / tile_size).floor() as i32,
+            ((y - unit_radius) / tile_size).floor() as i32,
+            ((y + unit_radius) / tile_size).floor() as i32,
         )
     };
     for ty in min_ty..=max_ty {
@@ -1192,9 +1193,7 @@ fn placement_blockers(
             .map(|stats| stats.foot_w.max(stats.foot_h) as f32 * tile_size * 0.5)
             .unwrap_or(tile_size)
     } else {
-        config::unit_stats(kind)
-            .map(|stats| stats.radius)
-            .unwrap_or(tile_size / 2.0)
+        unit_radius
     };
     for entity in entities.iter().filter(|entity| entity.hp > 0) {
         let dx = entity.pos_x() - x;
@@ -1232,6 +1231,7 @@ fn placement_suggestions(
     x: f32,
     y: f32,
     building: bool,
+    unit: Option<&Entity>,
 ) -> Vec<(f32, f32)> {
     let tile_size = config::TILE_SIZE as f32;
     let mut suggestions = Vec::new();
@@ -1256,7 +1256,17 @@ fn placement_suggestions(
                     };
                     (snapped_x, snapped_y)
                 } else {
-                    if !unit_position_valid(map, entities, kind, candidate_x, candidate_y) {
+                    let valid = match unit {
+                        Some(unit) => unit_entity_position_valid(
+                            map,
+                            entities,
+                            unit,
+                            candidate_x,
+                            candidate_y,
+                        ),
+                        None => unit_position_valid(map, entities, kind, candidate_x, candidate_y),
+                    };
+                    if !valid {
                         continue;
                     }
                     (candidate_x, candidate_y)

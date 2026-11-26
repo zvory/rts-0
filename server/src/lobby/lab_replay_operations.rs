@@ -24,6 +24,7 @@ pub(super) fn lab_op_to_replay_operation(op: &LabOp) -> Option<LabReplayOperatio
                     y: input.y,
                     completed: input.completed,
                     dao: input.dao,
+                    dao_master: input.dao_master,
                     faction_id: input.faction_id.map(str::to_string),
                 })
                 .collect(),
@@ -42,6 +43,7 @@ pub(super) fn lab_op_to_replay_operation(op: &LabOp) -> Option<LabReplayOperatio
                 y: input.y,
                 completed: input.completed,
                 dao: input.dao,
+                dao_master: input.dao_master,
                 faction_id: input.faction_id.map(str::to_string),
             }],
         }),
@@ -149,6 +151,7 @@ pub(super) fn lab_replay_operation_to_entry_kind(
             y,
             completed,
             dao,
+            dao_master,
             faction_id,
         } => {
             let kind = EntityKind::from_str(kind).map_err(|_| "unknown entity kind".to_string())?;
@@ -161,6 +164,7 @@ pub(super) fn lab_replay_operation_to_entry_kind(
                     y: *y,
                     completed: *completed,
                     dao: *dao,
+                    dao_master: *dao_master,
                     faction_id: faction_id
                         .as_deref()
                         .map(resolve_spawn_faction)
@@ -301,6 +305,7 @@ pub(super) fn lab_spawn_from_protocol(
         y: spawn.y,
         completed: spawn.completed,
         dao: spawn.dao,
+        dao_master: spawn.dao_master,
         faction_id: spawn
             .faction_id
             .as_deref()
