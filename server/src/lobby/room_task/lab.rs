@@ -1,10 +1,9 @@
 use std::collections::HashMap;
 use std::str::FromStr;
 
-use rts_sim::game::entity::EntityKind;
 use rts_sim::game::lab::{
     LabCommandOptions, LabError, LabMoveEntity, LabOp, LabOpOutcome, LabSetCompletedResearch,
-    LabSetEntityOwner, LabSetPlayerResources, LabSpawnEntity, LabUpdate,
+    LabSetEntityOwner, LabSetPlayerResources, LabUpdate,
 };
 use rts_sim::game::map::Map;
 use rts_sim::game::upgrade::UpgradeKind;
@@ -207,10 +206,8 @@ fn lab_client_op_to_game_op(op: LabClientOp) -> Result<LabOp, (String, Option<u3
             dao,
             dao_master,
             faction_id,
-        } => {
-            let kind = EntityKind::from_str(&kind)
-                .map_err(|_| ("unknown entity kind".to_string(), None))?;
-            Ok(LabOp::SpawnEntity(LabSpawnEntity {
+        } => super::super::lab_replay_operations::lab_spawn_from_protocol(
+            &crate::protocol::LabSpawnEntitySpec {
                 owner,
                 kind,
                 x,
@@ -218,13 +215,11 @@ fn lab_client_op_to_game_op(op: LabClientOp) -> Result<LabOp, (String, Option<u3
                 completed,
                 dao,
                 dao_master,
-                faction_id: faction_id
-                    .as_deref()
-                    .map(super::super::lab_replay_operations::resolve_spawn_faction)
-                    .transpose()
-                    .map_err(|error| (error, None))?,
-            }))
-        }
+                faction_id,
+            },
+        )
+        .map(LabOp::SpawnEntity)
+        .map_err(|error| (error, None)),
         LabClientOp::SpawnEntities { spawns } => Ok(LabOp::SpawnEntities(
             spawns
                 .into_iter()
