@@ -64,7 +64,6 @@ export function abilityButtonDescriptor({
     cooldownSeconds: affordance.cooldownSeconds,
     cost: affordance.cost,
     cls: [
-      shopTooltip ? "shop-item" : "",
       active ? "active" : "",
       definition.ability.startsWith("evolve") ? "dao-choice" : "",
       evolution && !affordance.unlocked ? "dao-awaiting-research" : "",

@@ -1268,7 +1268,8 @@ for (const factionId of ["cultivators", "kriegsia", "ekat"]) {
   assert.equal(items.length, 8);
   for (const item of items) {
     assert.match(item.tooltipHtml, /cmd-tooltip-title/);
-    assert.match(item.tooltipHtml, /cmd-shop-effect/);
+    assert.match(item.tooltipHtml, /cmd-tooltip-desc/);
+    assert.match(item.tooltipHtml, /cmd-tooltip-cost/);
     assert.match(item.tooltipHtml, new RegExp(`${item.cost.oil} oil`));
     assert(!item.tooltipHtml.includes("at any distance"));
     withFakeHudDocument(() => {

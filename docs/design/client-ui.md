@@ -3104,8 +3104,9 @@ hover timer, or tooltip lifecycle. Short authored presentation fields (`tooltipN
 from the current ability affordance. The shared Shop formatter adds an unavailable
 reason only when applicable. Existing long catalog `title` text remains rules reference
 metadata and is not parsed to generate short copy. Rich-tooltip buttons omit native
-`title` popups and retain the title as an accessible label. Shop flyouts sit left of
-the command grid on desktop and above it on touch screens.
+`title` popups and retain the title as an accessible label. Shop items use the exact
+existing title/cost/description classes, appearance, and button-relative placement
+of Barracks training tooltips, without Shop-specific CSS or positioning.
 
 ### Cosmic Energy and Breakthrough Shop presentation
 
