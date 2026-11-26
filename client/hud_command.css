@@ -134,6 +134,12 @@
   padding: 0 3px;
 }
 
+/* Reserve space above the absolute cost for the two-line item subtitles. */
+#command-card .cmd-btn[data-ability="regen"],
+#command-card .cmd-btn[data-ability="armorTreasure"] {
+  padding-bottom: 16px;
+}
+
 #command-card .cmd-btn[data-ability="regen"] .cmd-label,
 #command-card .cmd-btn[data-ability="armorTreasure"] .cmd-label {
   white-space: normal;
