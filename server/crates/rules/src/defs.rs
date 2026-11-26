@@ -279,7 +279,7 @@ pub const UNITS: &[UnitDef] = &[
             hp: 55,
             dmg: 4,
             range_tiles: 6.1,
-            cooldown: 12,
+            cooldown: 10,
             speed: 1.28,
             sight_tiles: 11,
             cost_steel: 75,

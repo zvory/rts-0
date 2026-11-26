@@ -24,6 +24,8 @@ All repeating unit attack cooldowns are at least doubled from the original caden
 tank coax, mortar/artillery fire, and Ekat Line Shot. Rocket Truck barrage reload is 30 seconds. Damage,
 first-shot readiness, windups, projectile travel, and barrage unload duration are unchanged.
 The disposable Panzerfaust rocket has no repeat cooldown; its rifle follows the doubled cadence.
+The infantry Machine Gunner fires 20% faster than that cadence: 10 ticks instead of 12.
+Scout Car MG and Tank coax retain 12-tick cooldowns.
 Mortar Fire has a further 50% cooldown increase to 180 ticks (6 seconds).
 Novice and all Dao Adept/Master ordinary attack rates are reduced a further 30%,
 using whole-tick cooldowns: 91 ticks for Novice/War/Magic and 61 for Wind.
@@ -740,7 +742,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | warrior         | 58  | 23  | 0.75   | 91 | 2.0   | 11    | 50  | 0   | 2   | 300 (~10s); Cultivator Portal-trained melee bruiser; 50% armor penetration; no projectile or tracer |
 | rifleman        | 45  | 5   | 5     | 32 | 1.6   | 11    | 35  | 0   | 1   | 300 (~10s) |
 | panzerfaust     | 45  | 5 rifle / 100 launcher | 5 | 32 rifle / one lifetime launcher | 1.6 | 11 | 55 | 10 | 1 | 300 (~10s); requires completed Panzerfausts research |
-| machine_gunner  | 55  | 4   | 6.1   | 12  | 1.28  | 11    | 75  | 10  | 2   | 400 (~13s) |
+| machine_gunner  | 55  | 4   | 6.1   | 10  | 1.28  | 11    | 75  | 10  | 2   | 400 (~13s) |
 | mortar_team     | 75  | 100→10 rounded inverse-square AOE over 0–2 tiles | 5-17 | 180 | 1.6 | 10 | 150 | 40 | 3 | 460 (~15s); trained at Gun Works (`steelworks` kind) |
 | anti_tank_gun         | 45  | 100 deployed; cannot target infantry | 20 deployed | 144 | 1.7556 | 9    | 150 | 40  | 3   | 440 (~15s); cannot fire while packed or transitioning; requires a completed owned Gun Works (`steelworks` kind) and past ownership of a completed Engineering Complex; no research required (temporary hack; remove later) |
 | artillery       | 200 | 75 AP inner / 75-20 outer AOE | 10-35 artillery fire | 180 | 1.6 | 7 | 150 | 50 | 4 | 600 (~20s); requires Gun Works (`steelworks` kind) and Artillery (`artillery_unlock`) researched in Engineering Complex; rendered at 75% of its prior size with a matching 75%-of-Tank gameplay footprint; 2/3-tile inner and 2-tile outer blast radii; soft target with no armor damage reduction |
@@ -784,14 +786,14 @@ snapshot immediately while the remaining players keep playing; final match resol
 
 ## Machine-gun cone
 
-Machine Gunner, Scout Car MG, and Tank coax keep their existing 12-tick firing cycle
-and acquisition ranges. Each cycle emits three simultaneous server rays. The first
+The infantry Machine Gunner has a 10-tick firing cycle (20% faster than 12 ticks);
+Scout Car MG and Tank coax retain their 12-tick cycles. Acquisition ranges are unchanged. Each cycle emits three simultaneous server rays. The first
 is aimed at the selected target (the nearest footprint surface for buildings); the other two are uniformly random over a
 20-degree full cone centered on that target. Each bullet
 contributes 60% of the profile damage (2.4 MG/coax, 3.6 Scout Car), a 20% increase
 from the previous half-damage rays. Damage sums per victim and rounds to the nearest
 whole point once per burst before protection reductions. The nominal maximum emitted
-DPS is 18/18/27 respectively; actual HP damage reflects integer rounding. A clear center ray hits the selected target;
+DPS is 21.6/27/18 for Machine Gunner/Scout Car MG/Tank coax respectively; actual HP damage reflects integer rounding. A clear center ray hits the selected target;
 terrain, smoke, or another body can still intercept it. Spread rays may hit that
 target, another target, or nothing.
 
