@@ -211,7 +211,7 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
         id: WeaponKind::MachineGunnerMg,
         range_tiles: 6.1,
         dmg: 4,
-        cooldown: 12,
+        cooldown: 10,
         weapon_class: WeaponClass::SmallArms,
         armor_penetration: NO_ARMOR_PENETRATION,
         infantry_target_policy: InfantryTargetPolicy::None,
@@ -932,7 +932,7 @@ mod tests {
         assert_eq!(machine_gunner.armor_penetration, NO_ARMOR_PENETRATION);
         assert_eq!(machine_gunner.range_tiles, 6.1);
         assert_eq!(machine_gunner.dmg, 4);
-        assert_eq!(machine_gunner.cooldown, 12);
+        assert_eq!(machine_gunner.cooldown, 10);
 
         let scout_car = weapon_profile(WeaponKind::ScoutCarMg).expect("Scout Car MG profile");
         assert_eq!(scout_car.weapon_class, WeaponClass::SmallArms);
