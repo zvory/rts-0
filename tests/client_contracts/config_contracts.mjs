@@ -611,6 +611,9 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
       querySelectorAll() {
         return [];
       },
+      setAttribute(name, value) {
+        this[name] = String(value);
+      },
       addEventListener(type, listener) {
         listeners.set(type, listener);
       },
