@@ -31,9 +31,7 @@ pub enum Order {
     /// weapon range.
     HoldPosition,
     /// Hold ground with an explicit shared hull heading; turret targeting remains automatic.
-    Point {
-        facing: f32,
-    },
+    Point { facing: f32 },
     /// Move to a world point; stop on arrival. No engaging en route.
     Move(MoveOrder),
     /// Move to a world point while engaging enemies encountered along the way.
