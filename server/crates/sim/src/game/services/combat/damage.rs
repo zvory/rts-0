@@ -178,7 +178,7 @@ pub(super) fn apply_direct_hit(
     let before_hp = target.hp;
     let target_kind = target.kind;
     let full_damage = damage;
-    let damage = combat_rules::effective_damage_with_facing_for_weapon(
+    let damage = combat_rules::effective_damage_with_facing_for_weapon_and_armor_bonus(
         weapon,
         target.kind,
         damage,
@@ -186,8 +186,8 @@ pub(super) fn apply_direct_hit(
         Some(target.facing()),
         pos,
         source,
+        target.armor_bonus_reduction(),
     );
-    let damage = target.dao_damage_after_armor(damage, weapon.armor_penetration);
     let damage = entrenchment_combat::reduce_direct_damage(target, damage);
     let damage = map
         .damage_after_reduction_tile(pos.0, pos.1, damage)
@@ -282,13 +282,7 @@ fn apply_tank_he_splash(
         {
             continue;
         }
-        let damage = combat_rules::effective_damage(
-            crate::game::entity::EntityKind::MortarTeam,
-            target.kind,
-            splash_damage,
-            Some(TerrainKind::Open),
-        );
-        let damage = target.dao_damage_after_armor(damage, 0.0);
+        let damage = target.damage_after_armor(splash_damage, 0.0);
         let damage = entrenchment_combat::reduce_direct_damage(target, damage);
         let damage = map.damage_after_reduction_tile(target.pos_x(), target.pos_y(), damage);
         let victim_owner = target.owner;

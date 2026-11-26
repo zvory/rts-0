@@ -3080,7 +3080,7 @@ owns its lifetime. `shopDeliveryPreview` accepts a single hover segment or `{ li
 from the lowest-id completed owned Shop to every selected owned fighter while buying.
 Only visible snapshot positions feed this renderer-neutral feedback seam. Item subtitles wrap
 instead of truncating effect text. The tabs are absolutely positioned on wrappers around each row's first cell, so the card keeps its existing four-column width, padding, row sizes and responsive grid.
-Armor uses S and +HP uses D to fill the former Healing Seal gap. Return uses the V position.
+Armor uses S and +HP uses D to fill the former Healing Seal gap. Return uses the V position. Regen's `+3/s` and Armor's `+50% ARM` subtitles stay on one line.
 Flying goods render their existing colored circle plus a tiny 12×1-pixel HP fill from their combat body.
 Delivery bodies retain current snapshot positions through the entity-view pipeline, matching the
 non-interpolated ability-object circles so HP bars and selection geometry stay aligned in flight.

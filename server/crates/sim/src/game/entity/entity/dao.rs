@@ -259,17 +259,6 @@ impl Entity {
         true
     }
 
-    pub(crate) fn dao_damage_after_armor(&self, damage: u32, penetration: f32) -> u32 {
-        if self.dao() != Some(UpgradeKind::DaoOfHeaviness) {
-            return damage;
-        }
-        crate::rules::combat::damage_after_armor_reduction(
-            damage,
-            config::DAO_WAR_ARMOR_REDUCTION,
-            penetration,
-        )
-    }
-
     pub(in crate::game) fn try_start_novice_charge(
         &mut self,
         target_position: (f32, f32),

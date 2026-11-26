@@ -7,12 +7,18 @@ pub const MG_BURST_BULLETS: usize = 3;
 pub const MG_RAY_DAMAGE_MULTIPLIER: f32 = 0.6;
 
 use crate::defs::{self, ArmorClass, WeaponClass};
-use crate::terrain::{self, TerrainKind};
+use crate::terrain::TerrainKind;
 use crate::{movement_body_class, EntityKind, MovementBodyClass};
 use serde::{Deserialize, Serialize};
 
 pub use crate::target::{damage_after_target_type_modifier, InfantryTargetPolicy};
 
+mod armor;
+pub use armor::{
+    damage_after_armor_reduction, effective_damage_for_armor_penetration,
+    effective_damage_for_armor_penetration_with_bonus, effective_damage_with_facing_for_weapon,
+    effective_damage_with_facing_for_weapon_and_armor_bonus,
+};
 mod dao;
 pub use dao::{ranked_primary_damage, ranked_primary_weapon_profile};
 
@@ -599,29 +605,6 @@ fn effective_damage_for_weapon_class(
     )
 }
 
-/// Apply a percentage armor layer using the weapon's ordinary armor penetration.
-pub fn damage_after_armor_reduction(damage: u32, reduction: f32, penetration: f32) -> u32 {
-    ((damage as f32) * (1.0 - reduction * (1.0 - penetration.clamp(0.0, 1.0)))).round() as u32
-}
-
-/// Resolve armor and terrain protection for a hit with explicit penetration (0 = none).
-pub fn effective_damage_for_armor_penetration(
-    armor_penetration: f32,
-    victim_kind: EntityKind,
-    base_dmg: u32,
-    victim_terrain: Option<TerrainKind>,
-) -> u32 {
-    let armor_class = armor_class(victim_kind);
-    let penetration = armor_penetration.clamp(0.0, 1.0);
-    let armor_adjusted = match armor_class {
-        Some(ArmorClass::Armored) if penetration <= 0.0 => base_dmg / 4,
-        Some(ArmorClass::Armored) => damage_after_armor_reduction(base_dmg, 0.75, penetration),
-        _ => base_dmg,
-    };
-    let terrain = victim_terrain.unwrap_or(TerrainKind::Open);
-    (armor_adjusted as f32 * terrain::cover_modifier(victim_kind, terrain)).round() as u32
-}
-
 pub fn classify_armor_facing(
     victim_facing: f32,
     victim_pos: (f32, f32),
@@ -704,27 +687,6 @@ pub fn effective_damage_with_facing(
                 attacker_pos,
             )
         })
-}
-
-#[allow(clippy::too_many_arguments)]
-pub fn effective_damage_with_facing_for_weapon(
-    profile: &WeaponProfile,
-    victim_kind: EntityKind,
-    base_dmg: u32,
-    victim_terrain: Option<TerrainKind>,
-    victim_facing: Option<f32>,
-    victim_pos: (f32, f32),
-    attacker_pos: (f32, f32),
-) -> u32 {
-    let damage = effective_damage_for_weapon(profile, victim_kind, base_dmg, victim_terrain);
-    apply_facing_damage_multiplier(
-        damage,
-        Some(profile),
-        victim_kind,
-        victim_facing,
-        victim_pos,
-        attacker_pos,
-    )
 }
 
 fn apply_facing_damage_multiplier(

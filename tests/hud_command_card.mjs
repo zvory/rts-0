@@ -1237,6 +1237,8 @@ for (const factionId of ["cultivators", "kriegsia", "ekat"]) {
   assert.equal(menu.slots[1].cost.oil, 50);
   assert.equal(menu.slots[4].ability, ABILITY.ARMOR_TREASURE);
   assert.equal(menu.slots[4].hotkey, "S");
+  assert.equal(menu.slots[4].label, "+50% ARM");
+  assert.equal(menu.slots[3].label, "+3/s");
   assert.equal(menu.slots[5].ability, ABILITY.VITALITY_TREASURE);
   assert.equal(menu.slots[5].hotkey, "D");
   const unavailable = buildCommandCardDescriptors({ ...ctx, entities: [unit], commandCardMode: "shopBuy" });

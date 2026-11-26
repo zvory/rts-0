@@ -133,3 +133,8 @@
   line-height: 1.1;
   padding: 0 3px;
 }
+
+#command-card .cmd-btn[data-ability="regen"] .cmd-label,
+#command-card .cmd-btn[data-ability="armorTreasure"] .cmd-label {
+  white-space: nowrap;
+}

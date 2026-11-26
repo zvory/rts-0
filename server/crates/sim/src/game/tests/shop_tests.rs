@@ -732,7 +732,7 @@ fn carried_items_are_passive_and_permanent_after_checkpoint() {
         .shop_item_active(AbilityKind::ArmorTreasure));
     let target = game.state.entities.get_mut(unit).unwrap();
     let hp = target.hp;
-    target.apply_damage(20, None);
+    target.apply_damage(target.damage_after_armor(20, 0.0), None);
     assert_eq!(target.hp, hp - 10);
     buy(&mut game, shop, unit, AbilityKind::DoubleDamage);
     game.tick();
@@ -896,7 +896,7 @@ fn armor_treasure_applies_on_delivery_without_activation_or_expiry() {
     }
     let target = game.state.entities.get_mut(unit).unwrap();
     let hp = target.hp;
-    target.apply_damage(20, None);
+    target.apply_damage(target.damage_after_armor(20, 0.0), None);
     assert_eq!(target.hp, hp - 10);
     activate_item(&mut game, unit, AbilityKind::ArmorTreasure);
     game.tick();
@@ -918,7 +918,7 @@ fn armor_treasure_applies_on_delivery_without_activation_or_expiry() {
     assert!(!target
         .ability_cooldowns
         .contains_key(&AbilityKind::ArmorTreasure));
-    target.apply_damage(20, None);
+    target.apply_damage(target.damage_after_armor(20, 0.0), None);
     assert_eq!(target.hp, hp - 20);
     let restored = Game::restore_checkpoint_payload_text_for_test(
         &game.checkpoint_payload_text_for_test().unwrap(),

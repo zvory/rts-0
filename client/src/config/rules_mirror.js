@@ -344,7 +344,7 @@ export const ABILITIES = Object.freeze({
     queued: false, queuePolicy: "notQueueable",
   }),
   [ABILITY.REGEN]: Object.freeze({
-    ability: ABILITY.REGEN, label: "+3 per second", icon: "HP", hotkey: "A",
+    ability: ABILITY.REGEN, label: "+3/s", icon: "HP", hotkey: "A",
     title: "Defense item: Deliver Regen to a friendly unit at any distance; permanently regenerates 3 HP per second on arrival",
     carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: null,
     cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 50 }),
@@ -373,8 +373,8 @@ export const ABILITIES = Object.freeze({
     queued: false, queuePolicy: "notQueueable",
   }),
   [ABILITY.ARMOR_TREASURE]: Object.freeze({
-    ability: ABILITY.ARMOR_TREASURE, label: "+50% base armor", icon: "ARM", hotkey: "S",
-    title: "Deliver a permanent passive defense item at any distance; grants 50% additional armor on arrival",
+    ability: ABILITY.ARMOR_TREASURE, label: "+50% ARM", icon: "ARM", hotkey: "S",
+    title: "Deliver a permanent passive defense item at any distance; adds 50 percentage points of armor on arrival, capped at 100% before weapon penetration",
     carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: null,
     cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 100 }),
     queued: false, queuePolicy: "notQueueable",
