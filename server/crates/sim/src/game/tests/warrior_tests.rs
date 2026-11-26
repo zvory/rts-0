@@ -1281,10 +1281,10 @@ fn dao_waiting_research_reprices_when_payment_starts() {
 }
 
 #[test]
-fn disciple_dash_reaches_fifteen_tiles_for_immediate_and_queued_casts() {
+fn disciple_blink_reaches_twelve_tiles_for_immediate_and_queued_casts() {
     use crate::game::ability::AbilityKind;
     for queued in [false, true] {
-        for requested_tiles in [12.0, 15.0, 20.0] {
+        for requested_tiles in [8.0, 12.0, 15.0] {
             let mut game = empty_flat_game(&[cultivator_player()]);
             let origin = game.state.map.tile_center(10, 10);
             let unit = game
@@ -1311,7 +1311,7 @@ fn disciple_dash_reaches_fifteen_tiles_for_immediate_and_queued_casts() {
             game.tick();
             game.tick();
             let entity = game.state.entities.get(unit).unwrap();
-            let expected = origin.0 + requested_tiles.min(15.0) * config::TILE_SIZE as f32;
+            let expected = origin.0 + requested_tiles.min(12.0) * config::TILE_SIZE as f32;
             assert!((entity.pos_x() - expected).abs() < 0.001);
             assert!((entity.pos_y() - origin.1).abs() < 0.001);
             assert!(game
@@ -1324,7 +1324,7 @@ fn disciple_dash_reaches_fifteen_tiles_for_immediate_and_queued_casts() {
 }
 
 #[test]
-fn wind_master_gains_second_dash_charge_and_recharges_sequentially() {
+fn wind_master_gains_second_blink_charge_and_recharges_sequentially() {
     use crate::game::ability::AbilityKind;
     let mut game = empty_flat_game(&[cultivator_player()]);
     let unit = game
@@ -1349,6 +1349,14 @@ fn wind_master_gains_second_dash_charge_and_recharges_sequentially() {
             .unwrap()
             .ability_uses_remaining(AbilityKind::WindDash),
         Some(0)
+    );
+    assert_eq!(
+        game.state
+            .entities
+            .get(unit)
+            .unwrap()
+            .ability_charge_recharge_ticks(AbilityKind::WindDash),
+        Some(18 * config::TICK_HZ as u16)
     );
     game.state.entities.get_mut(unit).unwrap().insight = config::DISCIPLE_EVOLVED_INSIGHT_CAP;
     game.tick();
@@ -1383,9 +1391,45 @@ fn wind_master_gains_second_dash_charge_and_recharges_sequentially() {
         game.state.map_metadata.clone(),
     )
     .unwrap();
-    for _ in 0..config::EKAT_TELEPORT_COOLDOWN_TICKS * 2 {
+    let first_recharge_left = game
+        .state
+        .entities
+        .get(unit)
+        .unwrap()
+        .ability_charge_recharge_ticks(AbilityKind::WindDash)
+        .unwrap();
+    for _ in 1..first_recharge_left {
         game.tick();
     }
+    assert_eq!(
+        game.state
+            .entities
+            .get(unit)
+            .unwrap()
+            .ability_uses_remaining(AbilityKind::WindDash),
+        Some(0)
+    );
+    game.tick();
+    assert_eq!(
+        game.state
+            .entities
+            .get(unit)
+            .unwrap()
+            .ability_uses_remaining(AbilityKind::WindDash),
+        Some(1)
+    );
+    for _ in 1..config::DAO_WIND_DASH_RECHARGE_TICKS {
+        game.tick();
+    }
+    assert_eq!(
+        game.state
+            .entities
+            .get(unit)
+            .unwrap()
+            .ability_uses_remaining(AbilityKind::WindDash),
+        Some(1)
+    );
+    game.tick();
     assert_eq!(
         game.state
             .entities

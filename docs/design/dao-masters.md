@@ -118,7 +118,7 @@ frames, atlas dimensions and unclipped frame edges; pipeline determinism, client
 architecture, source caps and docs health pass. The task-only Lab server is stopped.
 
 Integration with current main retains separate authoritative Adept kinds, Novice
-Charge and fifteen-tile Wind Dash. Master rank is the appended public `daoMaster`
+Charge and twelve-tile Wind Blink. Master rank is the appended public `daoMaster`
 boolean on each Adept kind; compact snapshot vocabulary is version 65.
 
 ### Safe body growth beside blockers
@@ -130,6 +130,6 @@ HP unchanged until a legal nearby body position becomes available. Movement, uni
 collision pushes, Dash/return and Lab placement validate the entity’s actual radius.
 This prevents promotion or movement from leaving the larger body inside a building.
 
-## Wind Dash charges
+## Wind Blink charges
 
-Wind uses its own fifteen-tile Dash without a return marker or recast. Adepts hold one charge; Masters hold two. Promotion adds one ready charge and preserves an existing recharge timer. Charges recharge sequentially, one every eight seconds; either ready charge can be used immediately. Kat retains its existing Dash and return behavior.
+Wind uses its own twelve-tile Blink without a return marker or recast. Adepts hold one charge; Masters hold two. Promotion adds one ready charge and preserves an existing recharge timer. Charges recharge sequentially, one every eighteen seconds; either ready charge can be used immediately. Kat retains its existing Dash and return behavior.
