@@ -561,6 +561,7 @@ export class HUD {
       cls: descriptor.cls,
       countBadge: descriptor.countBadge,
       cooldownClocks: descriptor.cooldownClocks,
+      cooldownSeconds: descriptor.cooldownSeconds,
       autobuildIndicatorCount: descriptor.autobuildIndicatorCount,
       repeatable: descriptor.repeatable,
       contextHotkeyModifiers: descriptor.contextHotkeyModifiers,
@@ -1014,7 +1015,7 @@ export class HUD {
       );
       if (!button) continue;
       this._recordHudDiagnostic("hud.dirty.abilityCooldownClocks.sync");
-      this._syncCooldownClockElement(button, affordance.cooldownClocks);
+      this._syncCooldownClockElement(button, affordance.cooldownClocks, affordance.cooldownSeconds);
     }
   }
 
@@ -1022,8 +1023,8 @@ export class HUD {
     this._profiler?.recordDiagnosticCounter?.(label, amount);
   }
 
-  _syncCooldownClockElement(button, cooldownClocks) {
-    syncCooldownClockElement(button, cooldownClocks);
+  _syncCooldownClockElement(button, cooldownClocks, cooldownSeconds) {
+    syncCooldownClockElement(button, cooldownClocks, cooldownSeconds);
   }
 
   _cmdButton(opts) {

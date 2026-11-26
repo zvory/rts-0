@@ -1,5 +1,5 @@
 import { ABILITY } from "./protocol.js";
-import { VECTOR_FIELD_MASTER_COOLDOWN_TICKS } from "./config.js";
+import { TICK_HZ, VECTOR_FIELD_MASTER_COOLDOWN_TICKS } from "./config.js";
 
 function abilityStatus(entity, ability) {
   return Array.isArray(entity.abilities)
@@ -35,6 +35,18 @@ export function abilityCooldownClocks(carriers, definition, groupCooldownClocks)
       groupCooldownClocks(cooldowns, total)).flat(),
     ...groupCooldownClocks(chargeRecharges, definition.chargeRechargeTicks),
   ];
+}
+
+/** Seconds until the next displayed cooldown/recharge ends, independent of clock grouping. */
+export function abilityCooldownSeconds(carriers, definition) {
+  let next = Infinity;
+  for (const entity of carriers) {
+    const cooldown = abilityCooldownLeft(entity, definition.ability);
+    const recharge = abilityChargeRechargeLeft(entity, definition.ability);
+    if (definition.cooldownTicks > 0 && cooldown > 0) next = Math.min(next, cooldown);
+    if (definition.chargeRechargeTicks > 0 && recharge > 0) next = Math.min(next, recharge);
+  }
+  return Number.isFinite(next) ? Math.ceil(next / TICK_HZ) : 0;
 }
 
 export function abilityRemainingUses(entity, ability) {

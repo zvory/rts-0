@@ -2,6 +2,10 @@ import { COMMAND_CARD_SLOT_ORDER } from "./hud_command_layout.js";
 import { ABILITY } from "./protocol.js";
 import { resourceIconHtml } from "./resource_icons.js";
 
+function cooldownLabel(seconds) {
+  return `Next cooldown ends in ${seconds} ${seconds === 1 ? "second" : "seconds"}`;
+}
+
 export function renderDescriptorCardDom(card, descriptorCard, buttonForDescriptor) {
   const frag = document.createDocumentFragment();
   const slots = Array.isArray(descriptorCard?.slots) ? descriptorCard.slots : [];
@@ -19,7 +23,14 @@ export function emptyCommandSlot() {
   return el;
 }
 
-export function syncCooldownClockElement(button, cooldownClocks) {
+export function syncCooldownClockElement(button, cooldownClocks, cooldownSeconds = 0) {
+  const countdown = button.querySelector?.(".cmd-cd-seconds");
+  const text = cooldownSeconds > 0 ? `${cooldownSeconds}s` : "";
+  if (countdown && countdown.textContent !== text) {
+    countdown.textContent = text;
+    countdown.classList.toggle("long", cooldownSeconds >= 100);
+    countdown.setAttribute("aria-label", cooldownLabel(cooldownSeconds));
+  }
   const clocks = Array.isArray(cooldownClocks) ? cooldownClocks : [];
   const arms = typeof button.querySelectorAll === "function"
     ? Array.from(button.querySelectorAll(".cmd-cd-arm"))
@@ -49,6 +60,7 @@ export function syncCooldownClockElement(button, cooldownClocks) {
  * @param {string} [opts.cls] extra class (e.g. "cancel").
  * @param {string} [opts.countBadge] top-right ready count for partially-available abilities.
  * @param {{count:number,rotationDeg:number}[]} [opts.cooldownClocks] grouped cooldown clocks.
+ * @param {number} [opts.cooldownSeconds] rounded-up seconds until the next cooldown ends.
  * @param {number} [opts.autobuildIndicatorCount] evenly-spaced rotating auto-build indicators.
  * @param {boolean} [opts.repeatable] whether native keyboard repeat may trigger this button.
  * @param {string[]} [opts.contextHotkeyModifiers] modifiers that invoke the context hotkey action.
@@ -67,6 +79,7 @@ export function createCommandButton(opts) {
     typeof opts.onAltClick === "function" || typeof opts.onContextMenu === "function";
   const primaryDisabled = !opts.enabled && !opts.unaffordable;
   const classes = ["cmd-btn"];
+  if (opts.cooldownClocks?.length > 0) classes.push("has-cooldown");
   if (opts.cls) classes.push(opts.cls);
   if (opts.unaffordable) classes.push("unaffordable");
   if (primaryDisabled && hasSecondaryAction) classes.push("primary-disabled");
@@ -112,12 +125,14 @@ export function createCommandButton(opts) {
     : "";
   const cooldownClocks = Array.isArray(opts.cooldownClocks) ? opts.cooldownClocks : [];
   const cooldownHtml = cooldownClocks.length > 0
-    ? `<span class="cmd-cooldowns" aria-hidden="true">` +
-        `<span class="cmd-cd-clock">` +
+    ? `<span class="cmd-cooldowns">` +
+        `<span class="cmd-cd-clock" aria-hidden="true">` +
           cooldownClocks.map((group) =>
             `<span class="cmd-cd-arm" style="--cooldown-rotation:${group.rotationDeg.toFixed(1)}deg"></span>`
           ).join("") +
         `</span>` +
+        `<span class="cmd-cd-seconds${opts.cooldownSeconds >= 100 ? " long" : ""}" role="img" aria-label="${cooldownLabel(opts.cooldownSeconds || 0)}">` +
+          `${opts.cooldownSeconds > 0 ? `${opts.cooldownSeconds}s` : ""}</span>` +
       `</span>`
     : "";
   const autobuildIndicatorCount = Number.isInteger(opts.autobuildIndicatorCount)

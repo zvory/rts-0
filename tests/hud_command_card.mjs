@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
-import { renderDescriptorCardDom } from "../client/src/hud_command_dom.js";
-import { withFakeHudDocument } from "./client_contracts/fakes.mjs";
+import { createCommandButton, renderDescriptorCardDom, syncCooldownClockElement } from "../client/src/hud_command_dom.js";
+import { fakeClassList, withFakeDocument, withFakeHudDocument } from "./client_contracts/fakes.mjs";
+import { groupCooldownClocks } from "../client/src/hud.js";
 import { COMMAND_CARD_SLOT_ORDER } from "../client/src/hud_command_layout.js";
 
 import {
@@ -434,6 +435,52 @@ for (const [kind, upgrade] of [
   assert.equal(rechargingSmoke.countBadge, "0");
   assert.equal(rechargingSmoke.cooldownClocks.length, 1);
   assert.equal(rechargingSmoke.cooldownClocks[0].rotationDeg, 180);
+  assert.equal(rechargingSmoke.cooldownSeconds, 8, "charge recharge rounds up instead of showing 0s early");
+}
+
+// Countdowns describe the next actual timer, not ready units, clock angles, or cluster averages.
+{
+  const unit = (id, cooldownLeft, extra = {}) => ({
+    id, owner: 1, kind: KIND.WAR_ADEPT, dao: "war",
+    abilities: [{ ability: ABILITY.THROW_SWORD, cooldownLeft }], ...extra,
+  });
+  const cardFor = (selection) => buildCommandCardDescriptors({
+    playerId: 1, factionId: "cultivators", selection, resources: {}, upgrades: [],
+    groupCooldownClocks, playerHasCompleteKind: () => true,
+  });
+  const sword = (card) => card.slots.find((slot) => slot?.ability === ABILITY.THROW_SWORD);
+  const mixed = sword(cardFor([
+    unit(1, 0), unit(2, 900), unit(3, 600, { daoMaster: true }),
+    unit(4, 1, { kind: KIND.WARRIOR }), unit(5, 1, { owner: 2 }),
+  ]));
+  assert.equal(mixed.cooldownSeconds, 20, "ignore ready units and non-carriers/other owners");
+  assert.equal(mixed.countBadge, "1");
+  assert.equal(mixed.enabled, true, "the countdown must not disable a partly ready group");
+  assert.equal(sword(cardFor([unit(1, 0)])).cooldownSeconds, 0);
+
+  const before = cardFor([unit(1, 31), unit(2, 33)]);
+  const after = cardFor([unit(1, 30), unit(2, 32)]);
+  assert.equal(sword(after).cooldownClocks[0].cooldownLeft, 31, "nearby timers share an averaged arm");
+  assert.equal(sword(after).cooldownSeconds, 1, "use the raw minimum despite the averaged arm crossing 1s");
+  assert.equal(before.signature, after.signature, "seconds alone must not rebuild the command card");
+  assert.equal(sword(before).cooldownSeconds, 2);
+
+  withFakeDocument(() => {
+    const button = createCommandButton({ ...sword(after), onClick() {} });
+    assert(button.innerHTML.includes('aria-label="Next cooldown ends in 1 second">1s</span>'));
+    const ready = createCommandButton({ ...sword(cardFor([unit(1, 0)])), onClick() {} });
+    assert(!ready.innerHTML.includes("cmd-cd-seconds"), "ready buttons have no countdown");
+  });
+  let label;
+  const countdown = { textContent: "2s", classList: fakeClassList(), setAttribute(_name, value) { label = value; } };
+  const button = { querySelector: () => countdown, querySelectorAll: () => [] };
+  syncCooldownClockElement(button, [], 1);
+  assert.equal(countdown.textContent, "1s", "update existing countdown without replacing the button");
+  assert.equal(label, "Next cooldown ends in 1 second");
+  syncCooldownClockElement(button, [], 100);
+  assert(countdown.classList.contains("long"));
+  syncCooldownClockElement(button, [], 99);
+  assert(!countdown.classList.contains("long"));
 }
 
 {

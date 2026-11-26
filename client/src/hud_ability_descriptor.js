@@ -16,6 +16,7 @@ export function abilityButtonDescriptor({
       passive: true, enabled: false, intent: null, contextIntent: null, onUnavailableIntent: null,
       contextHotkeyModifiers: [], cls: "autocast-enabled",
       cooldownClocks: affordance.cooldownClocks,
+      cooldownSeconds: affordance.cooldownSeconds,
     };
   }
   const evolution = definition.ability.startsWith("evolve");
@@ -57,6 +58,7 @@ export function abilityButtonDescriptor({
       ? `${affordance.remainingUsesTotal}`
       : (showReadyCount ? `${readyCount}` : ""),
     cooldownClocks: affordance.cooldownClocks,
+    cooldownSeconds: affordance.cooldownSeconds,
     cost: affordance.cost,
     cls: [
       active ? "active" : "",
