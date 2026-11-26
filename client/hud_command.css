@@ -179,3 +179,35 @@
     line-height: 1;
   }
 }
+
+
+/* Shop content uses the same .cmd-tooltip and hover/focus behavior as training.
+   Offset every column to the left of the grid, leaving the row labels visible. */
+#command-card .shop-item .cmd-tooltip {
+  right: calc(100% + var(--cmd-column, 0) * (100% + 11px) + 65px);
+  bottom: -1px;
+  width: 260px;
+  max-width: calc(100vw - 24px);
+  box-sizing: border-box;
+  gap: 5px;
+  padding: 14px 16px;
+  border-top: 2px solid var(--accent);
+  white-space: normal;
+}
+#command-card .shop-item .cmd-tooltip-title { text-transform: none; font-size: 14px; }
+#command-card .cmd-shop-effect { color: var(--good); font-weight: 700; }
+#command-card .cmd-shop-qualifier { color: var(--ink-dim); font-size: 11px; }
+#command-card .cmd-shop-status { color: var(--bad); }
+@media (max-width: 1366px), (max-height: 768px) {
+  #command-card .shop-item .cmd-tooltip {
+    right: calc(100% + var(--cmd-column, 0) * (100% + 8px) + 65px);
+  }
+}
+@media (pointer: coarse) and (max-width: 1024px) and (max-height: 1024px) {
+  #command-card .shop-item .cmd-tooltip {
+    position: fixed;
+    left: 12px;
+    right: auto;
+    bottom: calc(var(--mobile-debug-bottom) + 160px);
+  }
+}

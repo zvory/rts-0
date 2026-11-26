@@ -13,6 +13,7 @@ export function renderDescriptorCardDom(card, descriptorCard, buttonForDescripto
   for (const [position, i] of COMMAND_CARD_SLOT_ORDER.entries()) {
     const descriptor = slots[i] || null;
     const cell = descriptor ? buttonForDescriptor(descriptor) : emptyCommandSlot();
+    cell.style.setProperty("--cmd-column", String(position % 4));
     if (descriptorCard.rowLabels && position % 4 === 0) {
       const anchor = document.createElement("div");
       anchor.className = "shop-row-start";
@@ -102,7 +103,11 @@ export function createCommandButton(opts) {
   // secondary-action buttons interactive while the primary action is unavailable; the click
   // dispatcher below still suppresses an ordinary primary click.
   btn.disabled = primaryDisabled && !hasSecondaryAction;
-  if (opts.title) btn.title = opts.title;
+  if (opts.title) {
+    // Rich tooltips already reveal immediately; do not add a second delayed native popup.
+    if (opts.tooltipHtml) btn.setAttribute("aria-label", opts.title);
+    else btn.title = opts.title;
+  }
   if (opts.hotkey) {
     btn.dataset.hotkey = opts.hotkey;
   }
