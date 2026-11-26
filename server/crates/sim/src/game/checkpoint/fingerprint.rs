@@ -7,7 +7,7 @@ use sha2::{Digest, Sha256};
 
 use super::*;
 
-pub(in crate::game) const END_STATE_HASH_ALGORITHM: &str = "rts-end-state-json-sha256-v4";
+pub(in crate::game) const END_STATE_HASH_ALGORITHM: &str = "rts-end-state-json-sha256-v5";
 
 impl Game {
     /// Fingerprint committed simulation state, excluding unapplied input and historical commands.

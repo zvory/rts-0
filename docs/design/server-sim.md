@@ -290,7 +290,7 @@ check once on reaching the end through playback or seeking, log status and cost,
 on mismatches or unavailable algorithms. Seeking backward re-arms verification. A mismatch signals
 divergence; it does not distinguish nondeterminism from build/rules/platform drift or corruption.
 
-The algorithm `rts-end-state-json-sha256-v4` hashes its ASCII identifier followed immediately by
+The algorithm `rts-end-state-json-sha256-v5` hashes its ASCII identifier followed immediately by
 compact serde_json serialization of the explicit ordered projection in
 `game/checkpoint/fingerprint.rs`. SHA-256 is streamed through a 64 KiB buffer. Struct fields have
 fixed serialization order; entity ids and unordered fog/memory collections are sorted by their
@@ -298,7 +298,8 @@ checkpoint adapters. Numbers use serde_json's locale-independent decimal represe
 native-endian memory, pointer addresses, Rust `Hash`, or debug text. Valid simulation floats are
 finite and their exact round-trip values participate without rounding/tolerance. Arrays retain
 semantic order. Changes to projection/serialization semantics require a new algorithm identifier.
-Version 4 includes committed pivot-vehicle forward/reverse choices. Version 3 removes the redundant
+Version 5 adds Cosmic Energy balances and pending insight credits. Version 4 includes committed
+pivot-vehicle forward/reverse choices. Version 3 removes the redundant
 mutable Dao field; simulation schema 7 records Adept identity in kind.
 The map uses its existing canonical materialized binding; map content is immutable during live play.
 The projection includes all committed authoritative owners (players/private economy/scores/upgrades,
@@ -546,7 +547,7 @@ Top-level shape:
   "compatibility": {
     "createdBy": "server|replay|lab|debug",
     "serverBuildSha": "...",
-    "simSchemaVersion": 8,
+    "simSchemaVersion": 9,
     "rulesVersion": 1,
     "protocolVersion": 1,
     "requiredFeatures": [],
