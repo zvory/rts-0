@@ -157,8 +157,8 @@ struct GameCheckpointV1 {
     ability_runtime: AbilityRuntime,
     mortar_shells: MortarShellStore,
     artillery_shells: ArtilleryShellStore,
-    #[serde(default)]
     disciple_shots: super::disciple_shot::DiscipleShotStore,
+    #[serde(default)]
     panzerfaust_shots: PanzerfaustShotStore,
     active_construction_sites: BTreeSet<u32>,
     lab_god_mode_players: BTreeSet<u32>,

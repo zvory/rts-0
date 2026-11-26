@@ -680,6 +680,18 @@ fn checkpoint_payload_rejects_invalid_magic_orb_state() {
         .disciple_shots
         .schedule(1, attacker, target, start, end, 28, 0.5, game.state.tick);
     let text = checkpoint_payload_text_for(&game, "magic orb validation");
+    let missing_shots = mutate_payload(&text, |payload| {
+        payload.as_object_mut().unwrap().remove("discipleShots");
+    });
+    assert!(
+        Game::restore_checkpoint_payload_text_for_test(
+            &missing_shots,
+            game.state.map.clone(),
+            game.map_metadata().clone()
+        )
+        .is_err(),
+        "omitting pending orb state must not silently cancel its damage"
+    );
     for (field, value) in [
         ("owner", serde_json::json!(999)),
         ("target", serde_json::json!(999999)),
