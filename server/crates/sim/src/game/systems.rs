@@ -548,7 +548,7 @@ mod tests {
 
     fn player_state(id: u32) -> PlayerState {
         PlayerState {
-        cosmic_energy: 0,
+            cosmic_energy: 0,
             id,
             team_id: id,
             faction_id: "kriegsia".to_string(),

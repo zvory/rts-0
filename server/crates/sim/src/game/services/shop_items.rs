@@ -465,16 +465,26 @@ pub(in crate::game) fn heal_regen(entities: &mut EntityStore, tick: u32) {
 }
 
 /// Rebuild a non-stacking movement aura from the same pre-movement positions for all units.
-pub(in crate::game) fn refresh_breakthrough_auras(entities: &mut EntityStore, teams: &TeamRelations) {
-    let carriers: Vec<_> = entities.iter()
-        .filter(|e| e.hp > 0 && e.is_unit() && e.shop_item_active(AbilityKind::BreakthroughTreasure))
-        .map(|e| (e.owner, e.pos_x(), e.pos_y())).collect();
+pub(in crate::game) fn refresh_breakthrough_auras(
+    entities: &mut EntityStore,
+    teams: &TeamRelations,
+) {
+    let carriers: Vec<_> = entities
+        .iter()
+        .filter(|e| {
+            e.hp > 0 && e.is_unit() && e.shop_item_active(AbilityKind::BreakthroughTreasure)
+        })
+        .map(|e| (e.owner, e.pos_x(), e.pos_y()))
+        .collect();
     let radius = config::BREAKTHROUGH_ITEM_RADIUS_TILES * config::TILE_SIZE as f32;
     for id in entities.ids() {
         if let Some(unit) = entities.get_mut(id) {
-            unit.breakthrough_aura = unit.hp > 0 && unit.is_unit() && carriers.iter().any(|&(owner, x, y)|
-                teams.same_team_or_same_owner(owner, unit.owner)
-                && dist2(x, y, unit.pos_x(), unit.pos_y()) <= radius * radius);
+            unit.breakthrough_aura = unit.hp > 0
+                && unit.is_unit()
+                && carriers.iter().any(|&(owner, x, y)| {
+                    teams.same_team_or_same_owner(owner, unit.owner)
+                        && dist2(x, y, unit.pos_x(), unit.pos_y()) <= radius * radius
+                });
         }
     }
 }

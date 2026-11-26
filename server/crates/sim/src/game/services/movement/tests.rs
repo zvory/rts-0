@@ -92,7 +92,8 @@ fn flat_map(player_count: usize) -> Map {
 
 fn player_with_oil(id: u32, oil: u32) -> PlayerState {
     PlayerState {
-        cosmic_energy: 0,        id,
+        cosmic_energy: 0,
+        id,
         team_id: id,
         faction_id: "kriegsia".to_string(),
         name: format!("p{id}"),

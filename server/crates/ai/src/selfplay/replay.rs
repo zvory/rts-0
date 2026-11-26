@@ -1285,7 +1285,7 @@ mod tests {
 
     fn snapshot(entities: Vec<EntityView>) -> Snapshot {
         Snapshot {
-        cosmic_energy: 0,
+            cosmic_energy: 0,
             tick: 0,
             ground_decal_revision: 0,
             ground_decal_delta: None,

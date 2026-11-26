@@ -25,7 +25,13 @@ pub(super) fn validate(entity: &Entity) -> Result<(), CheckpointPayloadError> {
     for (&ability, &remaining) in &entity.ability_uses_remaining {
         if matches!(
             ability,
-            BreakthroughTreasure | Regen | Haste | DoubleXp | DoubleDamage | ArmorTreasure | VitalityTreasure
+            BreakthroughTreasure
+                | Regen
+                | Haste
+                | DoubleXp
+                | DoubleDamage
+                | ArmorTreasure
+                | VitalityTreasure
         ) {
             if !entity.is_unit()
                 || remaining != 1
