@@ -396,16 +396,9 @@ impl AbilityRuntime {
         }
     }
 
-    pub(crate) fn vector_field_at(
-        &self,
-        owner: u32,
-        teams: &TeamRelations,
-        x: f32,
-        y: f32,
-        tick: u32,
-    ) -> Option<[f32; 2]> {
+    pub(crate) fn vector_field_at(&self, x: f32, y: f32, tick: u32) -> Option<[f32; 2]> {
         self.world_objects()
-            .filter(|o| o.active_at(tick) && teams.is_enemy_owner(owner, o.owner))
+            .filter(|o| o.active_at(tick))
             .find_map(|o| {
                 let AbilityObjectPayload::VectorField {
                     direction: [dx, dy],

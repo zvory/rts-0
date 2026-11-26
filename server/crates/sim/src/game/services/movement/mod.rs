@@ -247,7 +247,7 @@ fn apply_magic_anchor_pull(
             .min(distance);
             offset = (dir.0 * amount, dir.1 * amount);
         }
-        if let Some([dx, dy]) = ability_runtime.vector_field_at(owner, &teams, x, y, tick) {
+        if let Some([dx, dy]) = ability_runtime.vector_field_at(x, y, tick) {
             offset.0 += dx * config::VECTOR_FIELD_SPEED_PX_PER_TICK;
             offset.1 += dy * config::VECTOR_FIELD_SPEED_PX_PER_TICK;
         }
