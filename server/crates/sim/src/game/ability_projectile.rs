@@ -371,12 +371,10 @@ fn apply_projectile_hits(
         } else {
             0
         };
-        if projectile.ability != AbilityKind::ThrowSword {
-            if let (Some(caster), Some(target_kind)) =
-                (entities.get_mut(projectile.caster_id), target_kind)
-            {
-                caster.gain_insight(actual, target_kind);
-            }
+        if let (Some(caster), Some(target_kind)) =
+            (entities.get_mut(projectile.caster_id), target_kind)
+        {
+            caster.gain_insight(actual, target_kind);
         }
     }
 }

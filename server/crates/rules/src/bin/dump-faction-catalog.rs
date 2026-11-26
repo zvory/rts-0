@@ -570,6 +570,10 @@ fn print_client_constants(indent: &str) {
         json_f32(balance::VECTOR_FIELD_DURATION_TICKS as f32)
     );
     println!(
+        "{indent}    \"vectorFieldMasterCooldownTicks\": {},",
+        balance::VECTOR_FIELD_MASTER_COOLDOWN_TICKS
+    );
+    println!(
         "{indent}    \"breakthroughRadiusTiles\": {},",
         json_f32(balance::BREAKTHROUGH_RADIUS_TILES)
     );

@@ -1,4 +1,5 @@
 import { ABILITY } from "./protocol.js";
+import { VECTOR_FIELD_MASTER_COOLDOWN_TICKS } from "./config.js";
 
 function abilityStatus(entity, ability) {
   return Array.isArray(entity.abilities)
@@ -15,9 +16,12 @@ export function abilityCooldownClocks(carriers, definition, groupCooldownClocks)
   const cooldownGroups = new Map();
   for (const entity of carriers) {
     const cooldown = abilityCooldownLeft(entity, definition.ability);
-    const total = definition.cooldownTicks * (
-      definition.ability === ABILITY.THROW_SWORD && !entity.daoMaster ? 2 : 1
-    );
+    let total = definition.cooldownTicks;
+    if (definition.ability === ABILITY.THROW_SWORD && !entity.daoMaster) {
+      total *= 2;
+    } else if (definition.ability === ABILITY.VECTOR_FIELD && entity.daoMaster) {
+      total = VECTOR_FIELD_MASTER_COOLDOWN_TICKS;
+    }
     // Promotion preserves the Adept cooldown. The clock helper clamps values
     // above the current rank's duration while still grouping nearby cooldowns.
     if (!cooldownGroups.has(total)) cooldownGroups.set(total, []);

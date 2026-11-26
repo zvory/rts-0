@@ -1046,8 +1046,8 @@ fn war_throw_sword_has_rank_cooldown_and_hits_harder_on_return_after_checkpoint(
         );
         assert_eq!(
             game.state.entities.get(caster).unwrap().insight,
-            0,
-            "Throw Sword grants no insight from unit or building hits"
+            if master { 0 } else { 8 },
+            "Adept earns 7 Insight for the lethal hit and 1 for building damage"
         );
         // The depot is 76 px off the path: outside the former 64 + 9.6 px hit radius.
         // The 1.76-second target rounds each leg up to 27 ticks (54 ticks total).
@@ -1078,8 +1078,13 @@ fn war_throw_sword_has_rank_cooldown_and_hits_harder_on_return_after_checkpoint(
             "exactly one 10 damage return hit after building armor"
         );
         assert_eq!(restored.state.entities.get(victim).unwrap().hp, 165);
-        assert_eq!(game.state.entities.get(caster).unwrap().insight, 0);
-        assert_eq!(restored.state.entities.get(caster).unwrap().insight, 0);
+        // The 15 total building HP removed earns 3 Insight at quarter rate.
+        let insight = if master { 0 } else { 10 };
+        assert_eq!(game.state.entities.get(caster).unwrap().insight, insight);
+        assert_eq!(
+            restored.state.entities.get(caster).unwrap().insight,
+            insight
+        );
         assert_eq!(game.state.ability_runtime.world_objects().count(), 0);
         let remaining = game
             .state

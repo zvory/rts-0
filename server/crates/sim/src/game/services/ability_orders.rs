@@ -496,7 +496,12 @@ pub(crate) fn launch_world_ability(
             {
                 return false;
             }
-            e.start_ability_cooldown(ability, definition.cooldown_ticks);
+            let cooldown = if vector && e.dao_master {
+                config::VECTOR_FIELD_MASTER_COOLDOWN_TICKS
+            } else {
+                definition.cooldown_ticks
+            };
+            e.start_ability_cooldown(ability, cooldown);
             if !preserve_active_order {
                 e.clear_active_order();
             }

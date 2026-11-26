@@ -69,15 +69,21 @@ for (const daoMaster of [false, true]) {
     "Throw Sword appears for War Adepts and Masters");
 }
 
-for (const [daoMaster, total] of [[false, 1200], [true, 600]]) {
-  const affordance = selectedAbilityAffordances({
-    playerId: 1, factionId: "cultivators", groupCooldownClocks,
-    resources: { steel: 0, oil: 0 }, upgrades: [],
-  }, [{ id: 107, owner: 1, kind: KIND.WAR_ADEPT, daoMaster,
-    abilities: [{ ability: ABILITY.THROW_SWORD, cooldownLeft: total / 2 }] }])
-    .find((entry) => entry.definition.ability === ABILITY.THROW_SWORD);
-  assertDeepEqual(affordance.cooldownClocks, groupCooldownClocks([total / 2], total),
-    "Throw Sword clock uses its rank's full cooldown");
+for (const [ability, kind, adeptTicks, masterTicks] of [
+  [ABILITY.THROW_SWORD, KIND.WAR_ADEPT, 1200, 600],
+  [ABILITY.VECTOR_FIELD, KIND.MAGIC_ADEPT, 900, 600],
+]) {
+  for (const [daoMaster, total] of [[false, adeptTicks], [true, masterTicks]]) {
+    const affordance = selectedAbilityAffordances({
+      playerId: 1, factionId: "cultivators", groupCooldownClocks,
+      resources: { steel: 0, oil: 0 }, upgrades: [],
+    }, [{ id: 107, owner: 1, kind, daoMaster,
+      abilities: [{ ability, cooldownLeft: total / 2 }] }])
+      .find((entry) => entry.definition.ability === ability);
+    assertDeepEqual(affordance.cooldownClocks, groupCooldownClocks([total / 2], total),
+      `${ability} clock uses its rank's full cooldown`);
+    assertDeepEqual(affordance.readyIds, [], `${ability} is unavailable during cooldown`);
+  }
 }
 
 const mixedSword = selectedAbilityAffordances({
