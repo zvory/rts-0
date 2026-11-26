@@ -1109,11 +1109,11 @@ for (const researched of [false, true]) {
   assert.deepEqual(idle.rowLabels, ["Util", "Defense", "Offense"]);
 }
 
-// Portal Adepts require their Dao, 150 steel, 35 oil and three supply.
+// Portal Adepts require their Dao, 150 steel, 45 oil and three supply.
 {
   const portal = { id: 42, owner: 1, kind: KIND.PORTAL };
   const ctx = { playerId: 1, factionId: "cultivators", selection: [portal], entities: [portal],
-    resources: { steel: 150, oil: 35, supplyUsed: 0, supplyCap: 20 }, upgrades: [] };
+    resources: { steel: 150, oil: 45, supplyUsed: 0, supplyCap: 20 }, upgrades: [] };
   const locked = buildCommandCardDescriptors(ctx);
   const choices = [
     [KIND.WIND_ADEPT, UPGRADE.DAO_WIND],
@@ -1127,7 +1127,7 @@ for (const researched of [false, true]) {
     const unlocked = buildCommandCardDescriptors({ ...ctx, upgrades: [upgrade] });
     assert.equal(slotFor(unlocked).enabled, true);
     assert.equal(slotFor(unlocked).unaffordable, false);
-    assert.deepEqual(slotFor(unlocked).cost, { steel: 150, oil: 35 });
+    assert.deepEqual(slotFor(unlocked).cost, { steel: 150, oil: 45 });
     for (const [other] of choices.filter(([other]) => other !== kind)) {
       assert.equal(unlocked.slots.find((slot) => slot?.intent?.unit === other).enabled, false);
     }
@@ -1135,7 +1135,7 @@ for (const researched of [false, true]) {
     assert.equal(slotFor(noSteel).unaffordable, true);
     const noSupply = buildCommandCardDescriptors({ ...ctx, upgrades: [upgrade], resources: { ...ctx.resources, supplyUsed: 18 } });
     assert.equal(slotFor(noSupply).unaffordable, true);
-    const poor = buildCommandCardDescriptors({ ...ctx, upgrades: [upgrade], resources: { ...ctx.resources, oil: 34 } });
+    const poor = buildCommandCardDescriptors({ ...ctx, upgrades: [upgrade], resources: { ...ctx.resources, oil: 44 } });
     assert.equal(slotFor(poor).unaffordable, true);
   }
 }
