@@ -333,6 +333,8 @@ export const cmd = Object.freeze({
       target,
       ...(tankTrapCluster ? { tankTrapCluster: true } : {}),
     }, queued),
+  repair: (units, target, queued = false) =>
+    withQueued({ c: CMD.REPAIR, units, target }, queued),
   deconstruct: (units, target, queued = false) =>
     withQueued({ c: CMD.DECONSTRUCT, units, target }, queued),
   setupAntiTankGuns: (units, x, y, queued = false) =>

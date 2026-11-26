@@ -712,6 +712,9 @@ fn active_order_plan_marker(
         Order::Build(order) => {
             build_marker(order.intent.kind, order.intent.tile_x, order.intent.tile_y)
         }
+        Order::Repair(order) => {
+            target_marker("repair", order.intent.target, entities, viewer, fog, smokes)
+        }
         Order::Deconstruct(order) => target_marker(
             "deconstruct",
             order.intent.target,
@@ -762,6 +765,9 @@ fn intent_plan_marker(
         }
         OrderIntent::Gather(gather) => entity_point_marker("gather", gather.node, entities),
         OrderIntent::Build(build) => build_marker(build.kind, build.tile_x, build.tile_y),
+        OrderIntent::Repair(intent) => {
+            target_marker("repair", intent.target, entities, viewer, fog, smokes)
+        }
         OrderIntent::Deconstruct(intent) => {
             target_marker("deconstruct", intent.target, entities, viewer, fog, smokes)
         }

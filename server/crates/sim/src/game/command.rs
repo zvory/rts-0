@@ -44,6 +44,11 @@ pub enum SimCommand {
         target: u32,
         queued: bool,
     },
+    Repair {
+        units: Vec<u32>,
+        target: u32,
+        queued: bool,
+    },
     Deconstruct {
         units: Vec<u32>,
         target: u32,
@@ -237,6 +242,15 @@ impl SimCommand {
                     }
                 }
             }
+            protocol::Command::Repair {
+                units,
+                target,
+                queued,
+            } => SimCommand::Repair {
+                units,
+                target,
+                queued,
+            },
             protocol::Command::Deconstruct {
                 units,
                 target,
@@ -520,6 +534,15 @@ impl SimCommand {
                 units: units.clone(),
                 target: *target,
                 tank_trap_cluster: true,
+                queued: *queued,
+            },
+            SimCommand::Repair {
+                units,
+                target,
+                queued,
+            } => protocol::Command::Repair {
+                units: units.clone(),
+                target: *target,
                 queued: *queued,
             },
             SimCommand::Deconstruct {

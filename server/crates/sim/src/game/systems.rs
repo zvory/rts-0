@@ -372,6 +372,9 @@ pub(crate) fn run_tick(
             active_construction_sites,
         );
     });
+    crate::perf::timed(perf.as_deref_mut(), "repair", || {
+        services::repair::repair_system(entities, players);
+    });
     crate::perf::timed(perf.as_deref_mut(), "deconstruction", || {
         services::construction::deconstruction_system(entities, players);
     });

@@ -38,6 +38,8 @@ mod artillery;
 mod attack;
 mod clear_obstacle_area;
 mod point_promotion;
+mod worker_targets;
+use worker_targets::{deconstruct_intent_valid, repair_intent_valid};
 
 /// Outcome of popping the next queued intent for a unit. Move/AttackMove are batched into a
 /// group move per destination point; gather/build are issued directly per worker.
@@ -54,6 +56,9 @@ enum PromotedIntent {
         kind: EntityKind,
         tx: u32,
         ty: u32,
+    },
+    Repair {
+        target: u32,
     },
     Deconstruct {
         target: u32,
@@ -218,6 +223,9 @@ pub(crate) fn promote_ready_orders(
             PromotedIntent::Build { kind, tx, ty } => {
                 coordinator.order_build(entities, id, kind, tx, ty);
             }
+            PromotedIntent::Repair { target } => {
+                coordinator.order_repair(entities, id, target);
+            }
             PromotedIntent::Deconstruct { target } => {
                 coordinator.order_deconstruct(entities, id, target);
             }
@@ -371,6 +379,7 @@ fn ready_for_next_order(
         }
         Order::Gather(_)
         | Order::Build(_)
+        | Order::Repair(_)
         | Order::Deconstruct(_)
         | Order::ArtilleryPointFire(_)
         | Order::ArtilleryBlanketFire { .. } => false,
@@ -458,6 +467,13 @@ fn pop_next_valid_intent(
                         kind: build.kind,
                         tx: build.tile_x,
                         ty: build.tile_y,
+                    });
+                }
+            }
+            OrderIntent::Repair(intent) => {
+                if repair_intent_valid(entities, owner, id, intent.target) {
+                    return Some(PromotedIntent::Repair {
+                        target: intent.target,
                     });
                 }
             }
@@ -662,28 +678,6 @@ fn gather_intent_valid(entities: &EntityStore, owner: u32, worker: u32, node: u3
         return false;
     }
     true
-}
-
-fn deconstruct_intent_valid(
-    entities: &EntityStore,
-    teams: &TeamRelations,
-    fog: &Fog,
-    owner: u32,
-    worker: u32,
-    target: u32,
-) -> bool {
-    if !matches!(entities.get(worker), Some(e) if e.owner == owner && e.kind == EntityKind::Worker && e.hp > 0)
-    {
-        return false;
-    }
-    let Some(target) = entities.get(target) else {
-        return false;
-    };
-    if target.kind != EntityKind::TankTrap || target.hp == 0 || target.under_construction() {
-        return false;
-    }
-    teams.same_team_or_same_owner(owner, target.owner)
-        || rules::projection::team_visible_world(owner, target.pos_x(), target.pos_y(), fog, teams)
 }
 
 #[allow(clippy::too_many_arguments)]

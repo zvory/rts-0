@@ -5,6 +5,7 @@ import { MAX_COMPACT_ORDER_PLAN } from "../../client/src/protocol_constants.js";
 import {
   assert,
   assertApprox,
+  assertDeepEqual,
   assertThrows,
 } from "./assertions.mjs";
 import {
@@ -608,6 +609,8 @@ assert(
       JSON.stringify({ c: "cancel", building: 91, construction: true }),
     "construction cancel builder emits an explicit scope distinct from production cancel",
   );
+  assertDeepEqual(cmd.repair([7, 8], 55, true), { c: "repair", units: [7, 8], target: 55, queued: true },
+    "repair command builder emits worker target wire shape");
   const deconstructCommand = cmd.deconstruct([7, 8], 55, true);
   assert(
     deconstructCommand.c === "deconstruct" &&

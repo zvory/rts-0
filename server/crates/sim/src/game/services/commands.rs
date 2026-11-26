@@ -55,6 +55,7 @@ mod production_repeat;
 mod scout_plane_ability;
 mod support_weapon_setup;
 mod tank_point;
+mod worker_targets;
 use self::command_helpers::{
     artillery_fire_mode_for, choose_smoke_caster, clear_queued_orders,
     clear_staged_anti_tank_gun_setup, gather_node_valid, immediate_unit_can_replace,
@@ -72,6 +73,9 @@ use self::planner_facts::{
 #[cfg(test)]
 use crate::game::services::artillery_fire::artillery_blanket_point;
 use crate::game::services::artillery_fire::{artillery_min_fire_radius_tiles, try_fire_artillery};
+use worker_targets::{
+    deconstruct_target_valid, deconstruct_unit_can_target, repair_unit_can_target,
+};
 struct CommandExecutionContext<'a, 'pathing> {
     map: &'a Map,
     entities: &'a mut EntityStore,
@@ -418,6 +422,25 @@ pub(in crate::game) fn apply_commands(
                         target_valid,
                     },
                 };
+                apply_planned!(
+                    player,
+                    admission_facts!(player, &faction_id, command_admission, units, None),
+                    &request,
+                    command_admission
+                );
+            }
+            SimCommand::Repair {
+                units,
+                target,
+                queued,
+            } => {
+                let Some(units) =
+                    validate_command_units(entities, events, player, units, command_admission)
+                else {
+                    continue;
+                };
+                let request =
+                    worker_targets::repair_request(entities, player, &units, target, queued);
                 apply_planned!(
                     player,
                     admission_facts!(player, &faction_id, command_admission, units, None),
@@ -1017,6 +1040,17 @@ mod planned_actions {
                             events,
                         );
                     }
+                    planner::OrderIntent::Repair(target) => {
+                        if immediate_unit_can_replace(entities, player, unit)
+                            && repair_unit_can_target(entities, player, unit, target)
+                        {
+                            if let Some(e) = entities.get_mut(unit) {
+                                e.clear_queued_orders();
+                            }
+                            clear_staged_anti_tank_gun_setup(entities, &[unit]);
+                            coordinator.order_repair(entities, unit, target);
+                        }
+                    }
                     planner::OrderIntent::Deconstruct(target) => {
                         if immediate_unit_can_replace(entities, player, unit)
                             && deconstruct_unit_can_target(
@@ -1156,6 +1190,16 @@ mod planned_actions {
                                     attack_query(map, entities, teams, fog, smokes, player),
                                     &[unit],
                                     attack.target,
+                                ) =>
+                            {
+                                continue;
+                            }
+                            OrderIntent::Repair(repair)
+                                if !repair_unit_can_target(
+                                    entities,
+                                    player,
+                                    unit,
+                                    repair.target,
                                 ) =>
                             {
                                 continue;
@@ -1395,50 +1439,6 @@ fn tank_trap_cluster_targets(
             .then_with(|| a.0.cmp(&b.0))
     });
     targets.into_iter().map(|(id, _)| id).collect()
-}
-
-fn deconstruct_target_valid(
-    entities: &EntityStore,
-    teams: &TeamRelations,
-    fog: &Fog,
-    smokes: &SmokeCloudStore,
-    player: u32,
-    units: &[u32],
-    target: u32,
-) -> bool {
-    units
-        .iter()
-        .copied()
-        .any(|unit| deconstruct_unit_can_target(entities, teams, fog, smokes, player, unit, target))
-}
-
-fn deconstruct_unit_can_target(
-    entities: &EntityStore,
-    teams: &TeamRelations,
-    fog: &Fog,
-    smokes: &SmokeCloudStore,
-    player: u32,
-    unit: u32,
-    target: u32,
-) -> bool {
-    if !matches!(entities.get(unit), Some(e) if e.owner == player && e.kind == EntityKind::Worker && e.hp > 0)
-    {
-        return false;
-    }
-    let Some(target) = entities.get(target) else {
-        return false;
-    };
-    if target.kind != EntityKind::TankTrap || target.hp == 0 || target.under_construction() {
-        return false;
-    }
-    teams.same_team_or_same_owner(player, target.owner)
-        || (rules::projection::team_visible_world(
-            player,
-            target.pos_x(),
-            target.pos_y(),
-            fog,
-            teams,
-        ) && !smokes.point_inside(target.pos_x(), target.pos_y()))
 }
 
 fn gather_unit_can_use_node(

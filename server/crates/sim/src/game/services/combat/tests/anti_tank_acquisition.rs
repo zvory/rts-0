@@ -406,3 +406,40 @@ fn deployed_anti_tank_gun_fires_at_mortars_but_prioritizes_tanks() {
         }
     }
 }
+
+#[test]
+fn anti_tank_gun_shoots_every_adept_and_master_but_not_novices() {
+    for kind in [
+        EntityKind::Warrior,
+        EntityKind::WindAdept,
+        EntityKind::WarAdept,
+        EntityKind::MagicAdept,
+    ] {
+        for master in [false, true] {
+            let mut entities = EntityStore::new();
+            let gun = entities
+                .spawn_unit(1, EntityKind::AntiTankGun, 100.0, 100.0)
+                .unwrap();
+            let target = entities.spawn_unit(2, kind, 200.0, 100.0).unwrap();
+            let at = entities.get_mut(gun).unwrap();
+            at.set_weapon_setup(WeaponSetup::Deployed);
+            at.set_emplacement_facing(Some(0.0));
+            at.set_facing(0.0);
+            at.set_weapon_facing(0.0);
+            let victim = entities.get_mut(target).unwrap();
+            victim.dao_master = master;
+            victim.set_order(Order::HoldPosition);
+            let before = victim.hp;
+            run_combat_tick_on_map(
+                &mut entities,
+                &[player_state(1, false), player_state(2, false)],
+                &open_map(16),
+            );
+            assert_eq!(
+                entities.get(target).unwrap().hp < before,
+                kind != EntityKind::Warrior,
+                "{kind:?} master={master}"
+            );
+        }
+    }
+}

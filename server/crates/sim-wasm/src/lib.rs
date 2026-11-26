@@ -655,7 +655,7 @@ impl CorePredictor {
                 }
             }
             Command::HoldPosition { units, queued } => self.apply_hold_position(units, *queued),
-            Command::Build { .. } | Command::Deconstruct { .. } => {
+            Command::Build { .. } | Command::Repair { .. } | Command::Deconstruct { .. } => {
                 self.note_disabled("buildPredictionUnsupported");
             }
             Command::Attack { .. }
@@ -1147,6 +1147,7 @@ fn command_kind(command: &Command) -> &'static str {
         Command::AttackMove { .. } => "attackMove",
         Command::ClearObstacleArea { .. } => "clearObstacleArea",
         Command::Attack { .. } => "attack",
+        Command::Repair { .. } => "repair",
         Command::Deconstruct { .. } => "deconstruct",
         Command::SetupAntiTankGuns { .. } => "setupAntiTankGuns",
         Command::TearDownAntiTankGuns { .. } => "tearDownAntiTankGuns",

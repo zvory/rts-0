@@ -51,6 +51,7 @@ const SERVICE_ROLES: &[(&str, ServiceRole)] = &[
     ("order_queue", ServiceRole::CommandAdapter),
     ("pathing", ServiceRole::QueryIndex),
     ("production", ServiceRole::TickSystem),
+    ("repair", ServiceRole::TickSystem),
     ("scout_plane", ServiceRole::MutationHelper),
     ("shop_items", ServiceRole::MutationHelper),
     ("spatial", ServiceRole::QueryIndex),

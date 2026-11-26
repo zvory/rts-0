@@ -238,6 +238,16 @@ fn command_trace_label(command: &Command) -> String {
             tile_y,
             queued
         ),
+        Command::Repair {
+            units,
+            target,
+            queued,
+        } => format!(
+            "repair units={} target={} queued={}",
+            id_list(units),
+            target,
+            queued
+        ),
         Command::Deconstruct {
             units,
             target,

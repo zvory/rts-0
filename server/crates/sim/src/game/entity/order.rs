@@ -31,7 +31,9 @@ pub enum Order {
     /// weapon range.
     HoldPosition,
     /// Hold ground with an explicit shared hull heading; turret targeting remains automatic.
-    Point { facing: f32 },
+    Point {
+        facing: f32,
+    },
     /// Move to a world point; stop on arrival. No engaging en route.
     Move(MoveOrder),
     /// Move to a world point while engaging enemies encountered along the way.
@@ -44,6 +46,8 @@ pub enum Order {
     /// not exist until the worker arrives, re-validates placement/affordability, and pays
     /// the cost; until then the order carries only the intent (kind + top-left tile).
     Build(BuildOrder),
+    /// Walk to an owned completed building and repair damage until full health.
+    Repair(RepairOrder),
     /// Walk to a completed Tank Trap and dismantle it for the issuing player's refund.
     Deconstruct(DeconstructOrder),
     /// Move into range of a world-targeted ability, then execute it at the target point.
@@ -92,6 +96,14 @@ impl Order {
 
     pub fn build(kind: EntityKind, tile_x: u32, tile_y: u32) -> Self {
         Order::Build(BuildOrder::new(kind, tile_x, tile_y))
+    }
+
+    pub fn repair(target: u32) -> Self {
+        Order::Repair(RepairOrder {
+            intent: TargetIntent { target },
+            ticks: 0,
+            routing: FootprintRouting::default(),
+        })
     }
 
     pub fn deconstruct(target: u32) -> Self {
@@ -188,6 +200,7 @@ pub enum OrderIntent {
     Attack(AttackIntent),
     Gather(GatherIntent),
     Build(BuildIntent),
+    Repair(TargetIntent),
     Deconstruct(TargetIntent),
     WorldAbility(AbilityIntent),
     SelfAbility(SelfAbilityIntent),
@@ -238,6 +251,10 @@ impl OrderIntent {
             tile_x,
             tile_y,
         })
+    }
+
+    pub fn repair(target: u32) -> Self {
+        OrderIntent::Repair(TargetIntent { target })
     }
 
     pub fn deconstruct(target: u32) -> Self {
@@ -649,4 +666,13 @@ pub enum GatherPhase {
     Harvesting,
     /// Walking back to the home Resource Depot with a load.
     ToHome,
+}
+
+/// Repair intent and authoritative work timer; path routing is rebuilt normally after restores.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RepairOrder {
+    pub intent: TargetIntent,
+    pub ticks: u32,
+    #[serde(default)]
+    pub(crate) routing: FootprintRouting,
 }
