@@ -137,12 +137,35 @@ fn dao_master_combat_threshold_and_damage_apply_to_combat_paths() {
         );
         game.state.entities.get_mut(id).unwrap().set_attack_cd(0);
         game.tick();
+        assert_eq!(game.state.entities.get(id).unwrap().attack_cd(), cooldown);
+        // At 55 px, magic's 100 ms release plus 650 px/s flight takes six ticks.
+        // Insight and damage must resolve on impact, while reload starts at launch.
+        let flight_ticks = if ability == AbilityKind::EvolveMagic {
+            assert_eq!(
+                game.state.entities.get(target).unwrap().hp,
+                target_hp - adept_damage
+            );
+            for _ in 0..5 {
+                game.tick();
+                assert_eq!(
+                    game.state.entities.get(target).unwrap().hp,
+                    target_hp - adept_damage
+                );
+            }
+            game.tick();
+            6
+        } else {
+            0
+        };
         assert_eq!(
             game.state.entities.get(target).unwrap().hp,
             target_hp - adept_damage - master_damage
         );
         assert_eq!(game.state.entities.get(id).unwrap().insight, 0);
-        assert_eq!(game.state.entities.get(id).unwrap().attack_cd(), cooldown);
+        assert_eq!(
+            game.state.entities.get(id).unwrap().attack_cd(),
+            cooldown - flight_ticks
+        );
         let enemy = game
             .snapshot_for(2)
             .entities
