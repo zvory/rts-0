@@ -165,6 +165,6 @@ export { statsForFaction } from "./config/factions.js";
 
 export { REPAIRABLE_UNIT_KINDS } from "./config/rules_mirror.js";
 
-export { CULTIVATOR_ITEM_CAPACITY, CULTIVATOR_MASTER_ITEM_CAPACITY } from "./config/rules_mirror.js";
+export { CULTIVATOR_NOVICE_ITEM_CAPACITY, CULTIVATOR_ITEM_CAPACITY, CULTIVATOR_MASTER_ITEM_CAPACITY } from "./config/rules_mirror.js";
 
 export { ITEM_ICON_SHAPES, CARRIED_ITEMS, carriedItemMask, carriedItemsForEntity } from "./config/carried_items.js";

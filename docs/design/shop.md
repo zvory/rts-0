@@ -43,7 +43,18 @@ Focused checks and the owned PR record the final verification and merge outcome.
 ## Targeted goods
 
 Completed Shops sell Regen for **50 oil** and Escape Treasure for **100 oil**.
-Select the Shop, click an item, then click a living friendly unit (including allied units).
+Select a completed Shop, click an item, then click a living friendly unit (including allied units).
+Alternatively, select one or more Novices, Adepts or Masters and press **R** to open the
+**Buy menu** without changing selection (Serfs have no Buy menu). Each item click/key buys
+one copy for an eligible selected owned fighter. The server ranks eligible recipients by
+Master > Adept > Novice, then descending Insight, then descending carried-plus-in-flight item
+count, then ascending entity id. Full inventories and duplicate equipped/in-flight items are
+skipped. This lets repeated purchases distribute copies without waiting for delivery.
+The client chooses the lowest-id completed owned Shop as source; a missing or destroyed
+source cannot purchase. The menu stays open until Return (V), Escape, or selection change.
+Throw Sword remains on E. While the Buy menu is open, dotted lines connect its Shop to all
+selected owned fighters, including full carriers. Existing resource costs, shared Escape
+cooldown, visibility and command admission limits still apply.
 Buildings and enemies are invalid targets. Purchases require the target to be visible.
 All unit-targeted goods have **unlimited range**. Invalid purchases spend nothing.
 All targeted items travel directly from the Shop toward the target at **7.5 tiles per second**;
@@ -58,7 +69,7 @@ with **1 HP**, regardless of the unit's distance when it takes damage. The appli
 shown only to the unit’s owner and allies as a purple **ESC** label below the health bar,
 even when health bars are hidden. Enemies receive no protection flag even when they see the unit.
 
-Novices and Adepts carry up to three items; Masters carry up to six, without category limits and no RFV command-card controls. Distinct passive goods can coexist with Escape Treasure within the rank limit. In-flight deliveries reserve slots; Healing Seal does not use slots; Regen uses one. Other unit kinds retain their existing behavior. Duplicate copies of the same item are rejected,
+Novices carry one item, Adepts carry up to three, and Masters carry up to six, without category limits and no RFV command-card controls. Distinct passive goods can coexist with Escape Treasure within the rank limit. In-flight deliveries reserve slots; Healing Seal does not use slots; Regen uses one. Other unit kinds retain their existing behavior. Duplicate copies of the same item are rejected,
 including a copy already in flight, without spending oil. Escape automatically activates on lethal
 damage by default. Healing Seal is placed rather than carried.
 
@@ -78,15 +89,12 @@ Shop-to-unit line.
 
 ### Healing Seal placement
 
-The Shop also sells [Healing Seal](healing-seal.md) for **150 oil** (S). Choose the good,
-then click visible ground within 30 tiles. It appears immediately as a selectable,
-non-blocking 3×3 green circle. Friendly ground units inside heal 3 HP/s each from a shared
-400 HP budget. Its green capacity bar and selection text show healing remaining; it
-disappears when empty. It is ground magic, not a carried item or projectile.
+Healing Seal is no longer sold or exposed on the Shop command card. Its reserved ability id,
+authored fields, healing, rendering and checkpoint behavior remain available for Lab/replays.
 
 ### Carried attack and defense goods
 
-Shops also deliver Haste (**100 oil**, Z), Double Damage (**150 oil**, X), and Armor Treasure (**100 oil**, D) to visible friendly units at any distance, using the same delivery speed and lifetime as Escape Treasure. Attack and defense describe item roles only. A delivery reserves its distinct item type immediately, preventing duplicate purchases. Invalid purchases spend nothing.
+Shops also deliver Haste (**100 oil**, Z), Double Damage (**150 oil**, X), and Armor Treasure (**100 oil**, S) to visible friendly units at any distance, using the same delivery speed and lifetime as Escape Treasure. Attack and defense describe item roles only. A delivery reserves its distinct item type immediately, preventing duplicate purchases. Invalid purchases spend nothing.
 
 Attack items are permanent passives applied immediately on delivery, with no activation, consumption, or expiry. Haste increases movement speed by **15%**, increases primary weapon attack speed by **25%** (reload divided by 1.25, rounded upward to a whole tick, minimum one tick), and permits attacks while moving; Double Damage doubles primary weapon damage before normal mitigation. Double Damage also affects primary tank splash and manual mortar/artillery shells; launched shells retain the bonus through impact. Haste also reduces manual mortar and artillery reload. Automatic direct primary fire may bypass deployment while carrying Haste; ordinary weapon targeting restrictions and indirect-fire deployment rules still apply. Neither affects spells, rockets, disposable panzerfaust shots, or secondary weapons. Armor Treasure is a permanent passive item: delivery immediately applies an additional **50% damage reduction**, rounded upward per hit, including units without native armor. It is never activated or consumed. Within the rank slot limit, permanent passive effects can coexist; identical copies do not stack. Escape occupies one slot alongside the passive items.
 
@@ -94,10 +102,13 @@ Carried passive items use existing entity ability-use state; the owner and privi
 
 ### Vitality Treasure
 
-Vitality Treasure is a **100 oil** defense item, purchased from a completed Shop with **F** and can coexist with Armor Treasure. It uses the same visible friendly-unit targeting, unlimited purchase range, delivery, same-item reservation, and non-stacking rules. Delivery immediately grants **+150 maximum HP and +150 current HP permanently**, preserving any pre-existing missing HP. It remains carried and passive, with no activation, consumption, or expiry. For example, 30/58 HP becomes 180/208 HP. Dao evolution and Master advancement retain the flat 150 bonus without multiplying it. Carried passive state, including the health pair, survives checkpoints. Destroying the supplying Shop after delivery does not remove Armor or Vitality.
+Vitality Treasure is a **100 oil** defense item, purchased from a completed Shop with **D** and can coexist with Armor Treasure. It uses the same visible friendly-unit targeting, unlimited purchase range, delivery, same-item reservation, and non-stacking rules. Delivery immediately grants **+150 maximum HP and +150 current HP permanently**, preserving any pre-existing missing HP. It remains carried and passive, with no activation, consumption, or expiry. For example, 30/58 HP becomes 180/208 HP. Dao evolution and Master advancement retain the flat 150 bonus without multiplying it. Carried passive state, including the health pair, survives checkpoints. Destroying the supplying Shop after delivery does not remove Armor or Vitality.
 
-Shop command rows mirror the carried categories: top row movement (Escape Q); middle row defense
-(Regen A, Healing Seal S, Armor D, Vitality F); bottom row attack (Haste Z, Double Damage X).
+Both Shop and Buy menu cards attach a small tab to the existing left edge of each row, without extending the panel: **Util** (Escape Q), **Defense**
+(Regen A, Armor S, Vitality D; F empty), **Offense** (Haste Z, Double Damage X). Buy menu Return occupies V.
+Item glyph/subtitle pairs are `ESC` / Escape, `HP` / +3 per second, `ARM` / +50% base armor,
+`+HP` / +150 HP, `HST` / Haste, and `DD` / 2x damage. Armor's subtitle describes the existing
+50% mitigation effect; no armor or other item balance value changes.
 Carried goods appear as a rosette of colored icons at the unit center: a green cross for Regen,
 a purple return diamond for Escape, a shield for Armor, a heart for Vitality, a bolt for Haste,
 and a sword for Double Damage. Flying goods and minimap markers use the same icons.

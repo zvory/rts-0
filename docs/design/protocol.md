@@ -2158,6 +2158,13 @@ Generic `useAbility` accepts optional `targetId` for `friendlyUnit` abilities. `
 and `escapeTreasure` are Shop abilities with compact ability codes 19/20 and order stage codes
 27/28. Unit targeting is authoritative: a visible living friendly unit at any distance is required;
 buildings are rejected. Purchases are immediate and do not enqueue a movement order.
+For the R Buy menu, `useAbility` omits `targetId` and includes the source Shop id plus the
+selected fighter ids in `units`. This uses existing bounded/deduplicated command admission.
+One item is purchased per command. The server considers only living visible owned Novices,
+Adepts and Masters with a free slot and without that item equipped or in flight. Priority is
+rank, Insight, carried-plus-reserved count (descending), then entity id (ascending). Source
+ownership/completion, resources and Escape cooldown are checked normally. Missing/dead sources
+spend nothing. The menu does not require new message fields or expose recipient identities.
 
 Compact vocabulary version 72 adds `shop_delivery` (kind code 39), a transient 10-HP
 combat body with ordinary entity HP, targeting, and visibility. Its id is server-linked to
@@ -2177,7 +2184,7 @@ consumed effects normally, including replay seeks and observer perspective chang
 ### Carried Escape Treasure activation
 
 `useAbility` with `ability: "escapeTreasure"`, no `targetId`, and owned living treasure
-carriers in `units` manually consumes their item and returns them to the supplying Shop,
+carriers alone in `units` manually consumes their item and returns them to the supplying Shop,
 preserving current HP. With `targetId`, it retains the Shop purchase behavior. Neither form
 is queueable. `setAutocast` for `escapeTreasure` toggles lethal-damage rescue on owned carriers.
 Private carrier `abilities` includes `escapeTreasure`, `remainingUses: 1`, and
@@ -2188,10 +2195,9 @@ Wind Dash has its own `windDash` ability (21) and order stage (29). Compact snap
 
 ### Healing Seal
 
-Cultivator Shops expose `healingSeal` (ability code 22, order stage 30) through the
-existing non-queued `useAbility` world-point command. The server checks ownership,
-faction, completed Shop, current target visibility, 30-tile range, terrain, map bounds,
-static overlap, active-field cap and affordability before charging 150 oil.
+`healingSeal` (ability code 22, order stage 30) remains reserved but has no carriers and
+is hidden from command cards. Shops no longer sell it; even a direct command spends nothing.
+Authored/checkpointed fields retain the entity projection below.
 
 `healing_seal` is selectable building-kind code 38, a non-blocking, non-attackable field.
 Its existing entity `hp` / `maxHp` pair represents **healing remaining / total capacity**

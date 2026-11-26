@@ -21,12 +21,8 @@ input._resourceAtScreen = () => null;
 input._addCommandFeedback = () => {};
 input.commandInteraction = { issueCommand: (command) => commands.push(command) };
 input._issueTargetedCommand({ x: 656, y: 336 });
-assert.equal(commands.length, 1, "Shop can issue a world-point seal purchase without selecting units");
-assert.equal(commands[0].ability, "healingSeal");
-assert.deepEqual(commands[0].units, [7]);
-assert.equal(commands[0].x, 656);
-assert.equal(commands[0].y, 336);
-assert.equal(ABILITIES[ABILITY.HEALING_SEAL].cost.oil, 150);
+assert.equal(commands.length, 0, "Shops no longer sell Healing Seal");
+assert.equal(ABILITIES[ABILITY.HEALING_SEAL].commandCard, false);
 
 // Ground magic remains selectable, but must not swallow movement or attack-move clicks.
 const seal = { id: 8, owner: 2, kind: KIND.HEALING_SEAL, x: 656, y: 336, hp: 400, maxHp: 400 };

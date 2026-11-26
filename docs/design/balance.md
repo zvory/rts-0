@@ -925,12 +925,14 @@ Completed Shops offer Regen (50 oil, permanent 3 HP/s regeneration after deliver
 units at unlimited range and travel at 7.5 tiles/second without a flight timeout. All flying
 goods have 10 HP and can be destroyed by enemy weapons. Destroyed goods and dead targets
 cancel delivery without a refund.
-See [Shop](shop.md#targeted-goods).
+The R Buy menu purchases one item at a time for selected fighters, prioritizing rank,
+Insight and existing carried/reserved items. See [Shop](shop.md#targeted-goods).
 
 
 ### Healing Seal
 
-Completed Cultivator Shops sell Healing Seals for **150 oil / 0 steel**. Each seal is a
+Healing Seal is no longer sold by Cultivator Shops. Authored and checkpointed fields retain
+the following behavior. Each seal is a
 walk-through 3×3-tile field (circular radius **1.5 tiles**) with **400 HP** of shared
 healing capacity. Every 10 simulation ticks, each wounded living friendly ground unit
 whose center is inside the circle recovers **1 HP** (3 HP per second); only actual HP
@@ -938,10 +940,10 @@ restored consumes capacity. Stable seal/unit id order resolves the last points.
 Overlapping seals stack. Full-health units, enemies, buildings and air sorties consume
 nothing. The seal expires on depletion, persists after its Shop dies, has no combat HP,
 sight, supply, weapon, repair/refund, or survival-building status, and costs no construction
-time. Purchase uses visible, terrain-valid ground within 30 tiles of the Shop.
+time. The reserved ability has no live carriers or command-card entry.
 See [Healing Seal](healing-seal.md).
 
-Cultivator Novices and Adepts carry up to three items; Masters carry up to six, with no category cap and no carried-item hotkeys. Distinct effects coexist; duplicate copies do not stack. Haste costs 100 oil, Double Damage 150 oil, Armor Treasure 100 oil; Haste, Double Damage, Armor, and Vitality are permanent passives applied on delivery. Haste grants 15% movement speed, 25% primary weapon attack speed (reload / 1.25, rounded upward to a whole tick), and attacks while moving, Double Damage doubles primary weapon damage, Armor Treasure adds 50% damage mitigation (round damage upward). Escape's 100-oil purchase starts a 60-second per-player cooldown shared across all owned Shops. See [Shop item rules](shop.md#carried-attack-and-defense-goods).
+Cultivator Novices carry one item, Adepts carry up to three, and Masters carry up to six, with no category cap and no carried-item hotkeys. Distinct effects coexist; duplicate copies do not stack. Haste costs 100 oil, Double Damage 150 oil, Armor Treasure 100 oil; Haste, Double Damage, Armor, and Vitality are permanent passives applied on delivery. Haste grants 15% movement speed, 25% primary weapon attack speed (reload / 1.25, rounded upward to a whole tick), and attacks while moving, Double Damage doubles primary weapon damage, Armor Treasure adds 50% damage mitigation (round damage upward). Escape's 100-oil purchase starts a 60-second per-player cooldown shared across all owned Shops. See [Shop item rules](shop.md#carried-attack-and-defense-goods).
 
 Vitality Treasure costs **100 oil** and can coexist with all other distinct carried items. Delivery permanently adds **150 maximum HP and 150 current HP**. The item remains carried and passive, without activation or expiry. See [Vitality rules](shop.md#vitality-treasure).
 

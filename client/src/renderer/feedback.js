@@ -1231,8 +1231,8 @@ function drawDashedCircle(g, x, y, radius, segments, width, color, alpha) {
 }
 
 export function _drawResourceMiningPreview(view) {
-  const delivery = view?.shopDeliveryPreview;
-  if (delivery) {
+  const preview = view?.shopDeliveryPreview;
+  for (const delivery of (preview?.lines || (preview ? [preview] : []))) {
     const g = this._feedbackGfx;
     const dx = delivery.targetX - delivery.x, dy = delivery.targetY - delivery.y;
     const length = Math.hypot(dx, dy);

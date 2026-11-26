@@ -1,7 +1,8 @@
 # Healing Seal
 
-Status: Implementation authorized by the user after the written brief/spec. Runtime rules and
-contracts are documented below and in the balance, protocol, Shop and client UI references.
+Status: **Removed from the Shop.** The ability id has no live carriers and no command-card
+entry. The original specification below records the authored/checkpointed field behavior;
+purchases are no longer available. Current availability is owned by [Shop](shop.md#healing-seal-placement).
 
 ## Phase 0: building brief
 

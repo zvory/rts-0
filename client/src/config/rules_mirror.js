@@ -11,6 +11,7 @@ export const REPAIRABLE_UNIT_KINDS = Object.freeze([
 ]);
 
 // Mirrored from rules balance: total carried-item slots by rank.
+export const CULTIVATOR_NOVICE_ITEM_CAPACITY = 1;
 export const CULTIVATOR_ITEM_CAPACITY = 3;
 export const CULTIVATOR_MASTER_ITEM_CAPACITY = 6;
 
@@ -259,7 +260,7 @@ export const STATS = Object.freeze({
     description: "Friendly units inside recover 3 HP per second. Expires after restoring 400 HP." },
   [KIND.SHOP]: { label: "Shop", icon: "SH", footW: 3, footH: 4, sight: 1,
     cost: { steel: 100, oil: 100 }, buildTicks: TICK_HZ * 20, trains: [],
-    description: "Sells Regen items, Escape Treasures and Healing Seals for nearby friendly units." },
+    description: "Sells permanent equipment and Escape items for friendly units at any distance." },
   [KIND.PROVEN_GROUNDS]: { label: "Proving Grounds", icon: "PG", footW: 3, footH: 3, sight: 1,
     cost: { steel: 100, oil: 0 }, buildTicks: 200, trains: [], requires: [KIND.PORTAL],
     description: "Send base Novices inside for researched Dao training. Queue any mix of Wind, War and Magic; each costs 100 oil and takes 10 seconds. Supports a rally point." },
@@ -331,19 +332,19 @@ export const ABILITIES = Object.freeze({
   [ABILITY.HEALING_SEAL]: Object.freeze({
     ability: ABILITY.HEALING_SEAL, label: "Healing Seal", icon: "+", hotkey: "S",
     title: "Defense item: Place a 3-tile-wide healing circle within 30 tiles; friendly units recover 3 HP per second, up to 400 HP total",
-    carriers: Object.freeze([KIND.SHOP]), targetMode: "worldPoint", rangeTiles: 30,
+    commandCard: false, carriers: Object.freeze([]), targetMode: "worldPoint", rangeTiles: 30,
     radiusTiles: 1.5, cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 150 }),
     queued: false, queuePolicy: "notQueueable",
   }),
   [ABILITY.REGEN]: Object.freeze({
-    ability: ABILITY.REGEN, label: "Regen", icon: "HP", hotkey: "A",
+    ability: ABILITY.REGEN, label: "+3 per second", icon: "HP", hotkey: "A",
     title: "Defense item: Deliver Regen to a friendly unit at any distance; permanently regenerates 3 HP per second on arrival",
     carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: null,
     cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 50 }),
     queued: false, queuePolicy: "notQueueable",
   }),
   [ABILITY.ESCAPE_TREASURE]: Object.freeze({
-    ability: ABILITY.ESCAPE_TREASURE, label: "Escape Treasure", icon: "E", hotkey: "Q",
+    ability: ABILITY.ESCAPE_TREASURE, label: "Escape", icon: "ESC", hotkey: "Q",
     title: "Deliver a one-use treasure to a friendly unit at any distance; lethal damage returns it to this Shop at 1 HP; 60-second purchase cooldown shared across all your Shops",
     carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: null,
     cooldownTicks: 1800, cost: Object.freeze({ steel: 0, oil: 100 }),
@@ -351,21 +352,21 @@ export const ABILITIES = Object.freeze({
   }),
 
   [ABILITY.HASTE]: Object.freeze({
-    ability: ABILITY.HASTE, label: "Haste", icon: "H", hotkey: "Z",
+    ability: ABILITY.HASTE, label: "Haste", icon: "HST", hotkey: "Z",
     title: "Deliver a permanent passive attack item at any distance; grants 15% movement speed, 25% primary weapon attack speed, and attacks while moving on arrival",
     carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: null,
     cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 100 }),
     queued: false, queuePolicy: "notQueueable",
   }),
   [ABILITY.DOUBLE_DAMAGE]: Object.freeze({
-    ability: ABILITY.DOUBLE_DAMAGE, label: "Double Damage", icon: "2X", hotkey: "X",
+    ability: ABILITY.DOUBLE_DAMAGE, label: "2x damage", icon: "DD", hotkey: "X",
     title: "Deliver a permanent passive attack item at any distance; doubles primary weapon damage on arrival",
     carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: null,
     cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 150 }),
     queued: false, queuePolicy: "notQueueable",
   }),
   [ABILITY.ARMOR_TREASURE]: Object.freeze({
-    ability: ABILITY.ARMOR_TREASURE, label: "Armor Treasure", icon: "AR", hotkey: "D",
+    ability: ABILITY.ARMOR_TREASURE, label: "+50% base armor", icon: "ARM", hotkey: "S",
     title: "Deliver a permanent passive defense item at any distance; grants 50% additional armor on arrival",
     carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: null,
     cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 100 }),
@@ -373,7 +374,7 @@ export const ABILITIES = Object.freeze({
   }),
 
   [ABILITY.VITALITY_TREASURE]: Object.freeze({
-    ability: ABILITY.VITALITY_TREASURE, label: "Vitality Treasure", icon: "+HP", hotkey: "F",
+    ability: ABILITY.VITALITY_TREASURE, label: "+150 HP", icon: "+HP", hotkey: "D",
     title: "Deliver a permanent passive defense item at any distance; grants +150 maximum and current HP on arrival",
     carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: null,
     cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 100 }),
