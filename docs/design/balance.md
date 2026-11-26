@@ -925,6 +925,10 @@ multiplier after Adept rounding: 210 (Wind/Magic) or 246 (War). See [Master rule
 
 ### Shop goods
 
+The Regen command subtitle is **+3 HP per second** and Armor Treasure is **+50% armor**
+(American spelling). These summarize the existing effects; the full descriptions retain
+permanent delivery semantics and Armor Treasure’s percentage-point/cap details.
+
 Completed Shops offer Regen (50 oil, permanent 3 HP/s regeneration after delivery, one carried slot) and Escape Treasure
 (100 oil, one lethal-damage escape to the supplying Shop at 1 HP). Both target visible friendly
 units at unlimited range and travel at 7.5 tiles/second without a flight timeout. All flying

@@ -141,7 +141,7 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 17] = [
     },
     AbilityCatalogEntry {
         kind: AbilityKind::Regen,
-        label: "+3/s", icon: "HP", hotkey: Some("A"),
+        label: "+3 HP per second", icon: "HP", hotkey: Some("A"),
         title: "Defense item: Deliver Regen to a friendly unit at any distance; permanently regenerates 3 HP per second on arrival",
         carriers: &[EntityKind::Shop], target_mode: AbilityTargetMode::FriendlyUnit,
         range_tiles: None, min_range_tiles: None, cooldown_ticks: 0,
@@ -192,7 +192,7 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 17] = [
         command_card: true, protocol_code: 24, order_stage_code: 32,
     },
     AbilityCatalogEntry {
-        kind: AbilityKind::ArmorTreasure, label: "+50% ARM", icon: "ARM", hotkey: Some("S"),
+        kind: AbilityKind::ArmorTreasure, label: "+50% armor", icon: "ARM", hotkey: Some("S"),
         title: "Deliver a permanent passive defense item at any distance; adds 50 percentage points of armor on arrival, capped at 100% before weapon penetration", carriers: &[EntityKind::Shop], target_mode: AbilityTargetMode::FriendlyUnit,
         range_tiles: None, min_range_tiles: None, cooldown_ticks: 0,
         charges: None, charge_recharge_ticks: None, cost: ResourceCost::new(0, 100),
