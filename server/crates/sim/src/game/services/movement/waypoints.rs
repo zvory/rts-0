@@ -241,10 +241,12 @@ pub(super) fn advance_moving_units(
         let mut static_blocked_this_tick = false;
         let mut yielding_to_traffic = false;
         let mut accepted_pivot_waypoints = 0;
+        let mut pivot_commitment = None;
         if is_pivot_vehicle {
             if let Some(e) = entities.get(id) {
                 if let Some(mut intent) = pivot_drive_intent(map, occ, e, x, y) {
                     accepted_pivot_waypoints = intent.pre_pop_count;
+                    pivot_commitment = Some(intent.commitment);
                     let traffic = vehicle_traffic_adjustment(
                         entities,
                         spatial,
@@ -586,6 +588,14 @@ pub(super) fn advance_moving_units(
         };
 
         if let Some(e) = entities.get_mut(id) {
+            // Prefix pops clear old decisions. Retain this tick's choice only if its
+            // effective target still owns the remaining segment; recovery takes priority.
+            let next_waypoint = e.next_waypoint();
+            if let Some(m) = e.movement.as_mut() {
+                m.pivot_drive = pivot_commitment.filter(|choice| {
+                    Some(choice.waypoint) == next_waypoint && m.pivot_recovery.is_none()
+                });
+            }
             let next_x = x.clamp(0.0, map.world_width_px() - 0.01);
             let next_y = y.clamp(0.0, map.world_height_px() - 0.01);
             e.set_position(next_x, next_y);

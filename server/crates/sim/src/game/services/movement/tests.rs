@@ -29,6 +29,7 @@ mod barbed_wire;
 mod cultivator_footing;
 mod enemy_blocking;
 mod infantry_facing;
+mod pivot_commitment;
 mod pivot_drive;
 mod side_push;
 mod static_repath;
