@@ -53,13 +53,14 @@ fn cosmic_energy_pending_survives_checkpoint_and_masters_earn_none() {
     let id = game.state.entities.spawn_unit(1, EntityKind::WarAdept, 500.0, 500.0).unwrap();
     game.tick();
     let unit = game.state.entities.get_mut(id).unwrap();
+    unit.receive_shop_item(AbilityKind::DoubleXp);
     unit.gain_insight(7, EntityKind::Tank);
-    assert_eq!(unit.cosmic_energy_pending, 14);
+    assert_eq!(unit.cosmic_energy_pending, 28);
     let mut game = Game::restore_checkpoint_payload_text_for_test(
         &game.checkpoint_payload_text_for_test().unwrap(), game.state.map.clone(), game.state.map_metadata.clone(),
     ).unwrap();
     game.tick();
-    assert_eq!(game.snapshot_for(1).cosmic_energy, 14);
+    assert_eq!(game.snapshot_for(1).cosmic_energy, 28);
     let unit = game.state.entities.get_mut(id).unwrap();
     unit.insight = 200;
     unit.advance_dao_master();

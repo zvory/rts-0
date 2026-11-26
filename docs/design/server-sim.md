@@ -374,6 +374,7 @@ architecture failures.
 | `ability_runtime` | `authoritative/serialized` | Serialize active ability runtime state, object ids, world objects, projectiles, cooldown-linked runtime payloads, and expiry/return data. | `AbilityRuntime` owns deterministic active instances and non-entity world objects; systems and snapshots read it for Ekat return markers, line projectiles, anchors, and owner/enemy projection. |
 | `mortar_shells` | `authoritative/serialized` | Serialize all scheduled mortar impacts with owner, attacker, impact point, and impact tick. | `MortarShellStore::schedule` records delayed impacts; later ticks resolve area damage/events even if the firing mortar dies before impact. |
 | `artillery_shells` | `authoritative/serialized` | Serialize all scheduled artillery impacts with their owners, source data (including fixed launch coordinates used for shield crossing), impact points, and impact ticks. | The artillery store mirrors the delayed-shell contract used by the tick pipeline; dropping it would cancel future area damage and reveal/event output. |
+| `disciple_shots` | `authoritative/serialized` | Serialize detached magic-orb target, owner, source/endpoint, damage, launch-rank penetration, and impact tick; restore and fingerprint pending impacts. | `shot::resolve_orbs` applies the locked hit after the 100 ms release plus flight at 650 px/s (minimum 60 ms), rounded up to a simulation tick. Caster death does not cancel a launched orb; dead/missing/untargetable victims are ignored. Protection and shields apply at impact. |
 | `panzerfaust_shots` | `authoritative/serialized` | Serialize all launched Panzerfaust loaded shots with owner/source facts, locked target id, launch-safe impact point, and impact tick. | `PanzerfaustShotStore::schedule` records detached loaded-shot impacts; later ticks resolve the direct damage/event even if the firing Panzerfaust dies before impact. |
 | `seed` | `compatibility metadata` | Serialize the original match seed as setup/replay metadata. Do not use it as a substitute for `rng`. | Constructors and replay artifacts expose `seed`; the current map is stored separately and the current random stream lives in `rng`. |
 | `starting_loadouts` | `compatibility metadata` | Serialize per-player starting loadout records for replay/setup compatibility. | Replay constructors and artifacts persist these records so mixed faction/resource starts can be reconstructed without a global resource pair. |
@@ -545,7 +546,7 @@ Top-level shape:
   "compatibility": {
     "createdBy": "server|replay|lab|debug",
     "serverBuildSha": "...",
-    "simSchemaVersion": 7,
+    "simSchemaVersion": 8,
     "rulesVersion": 1,
     "protocolVersion": 1,
     "requiredFeatures": [],
@@ -583,6 +584,7 @@ Top-level shape:
   "abilityRuntime": {},
   "mortarShells": [],
   "artilleryShells": [],
+  "discipleShots": { "shots": [] },
   "panzerfaustShots": [],
   "activeConstructionSites": [],
   "labGodModePlayers": []
@@ -701,6 +703,7 @@ Field map for Phase 2 DTO conversion:
 | `ability_runtime` | `AbilityRuntimeV1` with active ability instance ids, cooldown-linked runtime payloads, world objects, projectiles, return/expiry data, owner facts, and any visibility-relevant projection state. |
 | `mortar_shells` | `MortarShellStoreV1` scheduled impacts with owner, attacker/source, impact point, damage/reveal facts, and impact tick. |
 | `artillery_shells` | `ArtilleryShellStoreV1` scheduled impacts with owner/source, scatter/impact point, damage/reveal facts, and impact tick. |
+| `disciple_shots` | Detached magic-orb impacts, capped at 4,096 on import; player/allocated entity references, in-map coordinates, damage, and future impact ticks are validated. |
 | `panzerfaust_shots` | `PanzerfaustShotStoreV1` scheduled loaded-shot impacts with owner/source facts, locked target id, launch-safe impact point, and impact tick. |
 | `seed` | Top-level `seed` compatibility value. It is retained for setup/replay metadata and for `rng.seed`, but it is never enough to restore current RNG state by itself. |
 | `starting_loadouts` | `startingLoadouts` compatibility records, preserving per-player faction/loadout/resource start facts. |
@@ -2345,7 +2348,7 @@ Its standability and occupancy queries select legal rescue exits; it does not im
 adapters or invoke another tick phase. Entity-owned protection and runtime projectiles use the
 existing checkpoint policies for entities and ability runtime.
 
-Carried Shop attack/defense items (Regen, Haste, Double Damage, Armor, and Vitality) persist permanently under entity `ability_uses_remaining`; their effects apply immediately on delivery without cooldowns or activation. Escape's global 60-second purchase timer uses existing durable player `ability_cooldowns`. These existing owners checkpoint and fingerprint the state without a new state-tree owner. See [categorized Shop items](shop.md#carried-attack-and-defense-goods).
+Carried Shop attack/defense items (Regen, Haste, Double Damage, Armor, and Vitality) persist permanently under entity `ability_uses_remaining`; their effects apply immediately on delivery without cooldowns or activation. Armor is resolved with native/Dao armor before penetration at hit production, rather than inside raw `Entity::apply_damage`; shared rules combine and cap additive bonuses before other defenses. Escape's global 60-second purchase timer uses existing durable player `ability_cooldowns`. These existing owners checkpoint and fingerprint the state without a new state-tree owner. See [categorized Shop items](shop.md#carried-attack-and-defense-goods).
 
 Vitality Treasure shares the existing carried owner and checkpoints its permanent bonus in the existing `hp`/`max_hp` pair. It has no expiry. Dao promotion excludes this flat bonus before scaling base health. See [Vitality rules](shop.md#vitality-treasure).
 

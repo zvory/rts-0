@@ -20,6 +20,7 @@ pub(in crate::game) fn is_shop_item(ability: AbilityKind) -> bool {
             | AbilityKind::EscapeTreasure
             | AbilityKind::HealingSeal
             | AbilityKind::Haste
+            | AbilityKind::DoubleXp
             | AbilityKind::BreakthroughTreasure
             | AbilityKind::DoubleDamage
             | AbilityKind::ArmorTreasure
@@ -276,6 +277,7 @@ pub(in crate::game) fn is_buff_item(ability: AbilityKind) -> bool {
         ability,
         AbilityKind::Regen
             | AbilityKind::Haste
+            | AbilityKind::DoubleXp
             | AbilityKind::BreakthroughTreasure
             | AbilityKind::DoubleDamage
             | AbilityKind::ArmorTreasure

@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 16] = [
+pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 17] = [
     AbilityCatalogEntry {
         kind: AbilityKind::EvolveWind,
         label: "Dao of Wind",
@@ -141,7 +141,7 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 16] = [
     },
     AbilityCatalogEntry {
         kind: AbilityKind::Regen,
-        label: "+3 per second", icon: "HP", hotkey: Some("A"),
+        label: "+3/s", icon: "HP", hotkey: Some("A"),
         title: "Defense item: Deliver Regen to a friendly unit at any distance; permanently regenerates 3 HP per second on arrival",
         carriers: &[EntityKind::Shop], target_mode: AbilityTargetMode::FriendlyUnit,
         range_tiles: None, min_range_tiles: None, cooldown_ticks: 0,
@@ -192,8 +192,8 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 16] = [
         command_card: true, protocol_code: 24, order_stage_code: 32,
     },
     AbilityCatalogEntry {
-        kind: AbilityKind::ArmorTreasure, label: "+50% base armor", icon: "ARM", hotkey: Some("S"),
-        title: "Deliver a permanent passive defense item at any distance; grants 50% additional armor on arrival", carriers: &[EntityKind::Shop], target_mode: AbilityTargetMode::FriendlyUnit,
+        kind: AbilityKind::ArmorTreasure, label: "+50% ARM", icon: "ARM", hotkey: Some("S"),
+        title: "Deliver a permanent passive defense item at any distance; adds 50 percentage points of armor on arrival, capped at 100% before weapon penetration", carriers: &[EntityKind::Shop], target_mode: AbilityTargetMode::FriendlyUnit,
         range_tiles: None, min_range_tiles: None, cooldown_ticks: 0,
         charges: None, charge_recharge_ticks: None, cost: ResourceCost::new(0, 100),
         tech_requirement: None, upgrade_requirement: None,
@@ -210,12 +210,21 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 16] = [
         command_card: true, protocol_code: 26, order_stage_code: 34,
     },
     AbilityCatalogEntry {
+        kind: AbilityKind::DoubleXp, label: "2X XP", icon: "2X", hotkey: Some("W"),
+        title: "Deliver a permanent passive utility item at any distance; doubles all Insight gain on arrival", carriers: &[EntityKind::Shop], target_mode: AbilityTargetMode::FriendlyUnit,
+        range_tiles: None, min_range_tiles: None, cooldown_ticks: 0,
+        charges: None, charge_recharge_ticks: None, cost: ResourceCost::new(0, 50),
+        tech_requirement: None, upgrade_requirement: None,
+        queue_policy: AbilityQueuePolicy::NotQueueable, autocast: false,
+        command_card: true, protocol_code: 28, order_stage_code: 37,
+    },
+    AbilityCatalogEntry {
         kind: AbilityKind::BreakthroughTreasure, label: "Breakthrough", icon: "BT", hotkey: Some("E"),
         title: "Utility item: Deliver a permanent aura at any distance; grants this unit and friendly units within 3 tiles 25% movement speed; overlapping Breakthrough auras do not stack", carriers: &[EntityKind::Shop], target_mode: AbilityTargetMode::FriendlyUnit,
         range_tiles: None, min_range_tiles: None, cooldown_ticks: 0,
         charges: None, charge_recharge_ticks: None, cost: ResourceCost::new(0, 100),
         tech_requirement: None, upgrade_requirement: None,
         queue_policy: AbilityQueuePolicy::NotQueueable, autocast: false,
-        command_card: true, protocol_code: 28, order_stage_code: 37,
+        command_card: true, protocol_code: 29, order_stage_code: 38,
     },
 ];

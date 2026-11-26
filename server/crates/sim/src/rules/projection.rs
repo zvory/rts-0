@@ -516,6 +516,7 @@ pub fn project_entity(
             ability::AbilityKind::Haste,
             ability::AbilityKind::BreakthroughTreasure,
             ability::AbilityKind::DoubleDamage,
+            ability::AbilityKind::DoubleXp,
             ability::AbilityKind::ArmorTreasure,
             ability::AbilityKind::VitalityTreasure,
         ] {

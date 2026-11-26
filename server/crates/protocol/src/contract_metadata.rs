@@ -140,6 +140,7 @@ pub mod abilities {
     pub const HEALING_SEAL: &str = "healingSeal";
     pub const ESCAPE_TREASURE: &str = "escapeTreasure";
     pub const HASTE: &str = "haste";
+    pub const DOUBLE_XP: &str = "doubleXp";
     pub const DOUBLE_DAMAGE: &str = "doubleDamage";
     pub const ARMOR_TREASURE: &str = "armorTreasure";
     pub const VITALITY_TREASURE: &str = "vitalityTreasure";
@@ -170,6 +171,7 @@ pub mod abilities {
         HEALING_SEAL,
         ESCAPE_TREASURE,
         HASTE,
+        DOUBLE_XP,
         DOUBLE_DAMAGE,
         ARMOR_TREASURE,
         VITALITY_TREASURE,
@@ -532,10 +534,11 @@ const ORDER_STAGE_CODES: &[(&str, u8)] = &[
     (abilities::HEALING_SEAL, 30),
     (abilities::ESCAPE_TREASURE, 28),
     (abilities::HASTE, 31),
+    (abilities::DOUBLE_XP, 37),
     (abilities::DOUBLE_DAMAGE, 32),
     (abilities::ARMOR_TREASURE, 33),
     (abilities::VITALITY_TREASURE, 34),
-    (abilities::BREAKTHROUGH_TREASURE, 37),
+    (abilities::BREAKTHROUGH_TREASURE, 38),
 ];
 
 const ABILITY_CODES: &[(&str, u8)] = &[
@@ -563,10 +566,11 @@ const ABILITY_CODES: &[(&str, u8)] = &[
     (abilities::HEALING_SEAL, 22),
     (abilities::ESCAPE_TREASURE, 20),
     (abilities::HASTE, 23),
+    (abilities::DOUBLE_XP, 28),
     (abilities::DOUBLE_DAMAGE, 24),
     (abilities::ARMOR_TREASURE, 25),
     (abilities::VITALITY_TREASURE, 26),
-    (abilities::BREAKTHROUGH_TREASURE, 28),
+    (abilities::BREAKTHROUGH_TREASURE, 29),
 ];
 
 const ABILITY_OBJECT_KIND_CODES: &[(&str, u8)] = &[
@@ -896,6 +900,7 @@ fn ability_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("HEALING_SEAL", abilities::HEALING_SEAL),
         ("ESCAPE_TREASURE", abilities::ESCAPE_TREASURE),
         ("HASTE", abilities::HASTE),
+        ("DOUBLE_XP", abilities::DOUBLE_XP),
         ("DOUBLE_DAMAGE", abilities::DOUBLE_DAMAGE),
         ("ARMOR_TREASURE", abilities::ARMOR_TREASURE),
         ("VITALITY_TREASURE", abilities::VITALITY_TREASURE),
@@ -1003,6 +1008,7 @@ fn order_stage_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("HEALING_SEAL", abilities::HEALING_SEAL),
         ("ESCAPE_TREASURE", abilities::ESCAPE_TREASURE),
         ("HASTE", abilities::HASTE),
+        ("DOUBLE_XP", abilities::DOUBLE_XP),
         ("DOUBLE_DAMAGE", abilities::DOUBLE_DAMAGE),
         ("ARMOR_TREASURE", abilities::ARMOR_TREASURE),
         ("VITALITY_TREASURE", abilities::VITALITY_TREASURE),

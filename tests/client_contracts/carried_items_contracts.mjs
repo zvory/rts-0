@@ -13,7 +13,7 @@ import { withFakeHudDocument } from "./fakes.mjs";
 
 const equipped = { id: 5, owner: 1, kind: KIND.WAR_ADEPT, dao: "war", daoMaster: true,
   x: 320, y: 400, hp: 100, maxHp: 300, escapeTreasure: true,
-  abilities: CARRIED_ITEMS.slice(0, 6).filter(({ ability }) => ability !== ABILITY.ESCAPE_TREASURE).map(({ ability }) => ({ ability, remainingUses: 1 })) };
+  abilities: CARRIED_ITEMS.filter(({ ability }) => ability !== ABILITY.ESCAPE_TREASURE && ability !== ABILITY.HASTE && ability !== ABILITY.BREAKTHROUGH_TREASURE).map(({ ability }) => ({ ability, remainingUses: 1 })) };
 assert.equal(carriedItemsForEntity(equipped).length, 6);
 assert.equal(carriedItemMask({ ...equipped, kind: KIND.SHOP }), 0, "Shop abilities are not inventory");
 assert.equal(carriedItemMask({ id: 9, kind: KIND.WAR_ADEPT, itemRadianceTier: 6 }), 0,
@@ -59,7 +59,7 @@ withFakeHudDocument(({ FakeElement }) => {
   const ui = new HudSelectionPanel(panel, { players, selectedEntities: () => selection }, null, () => "");
   ui.render();
   let summary = panel.querySelector(".sel-item-summary");
-  const value = CARRIED_ITEMS.slice(0, 6).reduce((sum, { ability }) => sum + ABILITIES[ability].cost.oil, 0);
+  const value = carriedItemsForEntity(equipped).reduce((sum, { ability }) => sum + ABILITIES[ability].cost.oil, 0);
   assert(summary.textContent.includes(`War Master · 6 carried items · ${value} oil value`));
   let portraits = panel.querySelectorAll("[data-selection-entity-id]");
   assert.equal(portraits[0].querySelector(".sel-item-count").textContent, "6");

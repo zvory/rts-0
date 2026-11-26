@@ -24,7 +24,7 @@ pub(super) struct ShotOutcome {
     pub(super) reveals_attacker: bool,
 }
 
-/// Apply `dmg` to `victim` from `attacker`, emitting an `Attack` event for every fired shot.
+/// Resolve a fired shot, emitting its attack event and applying or scheduling its damage.
 /// Returns the resolved shot outcome when a shot was emitted. Death itself is
 /// handled by the death system (we only zero hp here).
 #[allow(clippy::too_many_arguments)]
@@ -35,6 +35,7 @@ pub(super) fn apply_damage(
     teams: &TeamRelations,
     events: &mut HashMap<u32, Vec<Event>>,
     fog: &Fog,
+    disciple_shots: &mut crate::game::disciple_shot::DiscipleShotStore,
     rng: &mut impl Rng,
     attacker: u32,
     victim: u32,
@@ -108,7 +109,22 @@ pub(super) fn apply_damage(
     } else {
         false
     };
-    let outcome = if primary_missed {
+    let outcome = if !primary_missed && weapon_profile.id == combat_rules::WeaponKind::DiscipleOrb {
+        disciple_shots.schedule(
+            attacker_owner,
+            attacker,
+            shot_victim,
+            (ax, ay),
+            shot_victim_pos,
+            dmg,
+            weapon_profile.armor_penetration,
+            tick,
+        );
+        victim.map(|v| ShotOutcome {
+            victim_owner: v.owner,
+            reveals_attacker,
+        })
+    } else if primary_missed {
         victim.map(|v| ShotOutcome {
             victim_owner: v.owner,
             reveals_attacker,
@@ -178,7 +194,7 @@ pub(super) fn apply_direct_hit(
     let before_hp = target.hp;
     let target_kind = target.kind;
     let full_damage = damage;
-    let damage = combat_rules::effective_damage_with_facing_for_weapon(
+    let damage = combat_rules::effective_damage_with_facing_for_weapon_and_armor_bonus(
         weapon,
         target.kind,
         damage,
@@ -186,8 +202,8 @@ pub(super) fn apply_direct_hit(
         Some(target.facing()),
         pos,
         source,
+        target.armor_bonus_reduction(),
     );
-    let damage = target.dao_damage_after_armor(damage, weapon.armor_penetration);
     let damage = entrenchment_combat::reduce_direct_damage(target, damage);
     let damage = map
         .damage_after_reduction_tile(pos.0, pos.1, damage)
@@ -282,13 +298,7 @@ fn apply_tank_he_splash(
         {
             continue;
         }
-        let damage = combat_rules::effective_damage(
-            crate::game::entity::EntityKind::MortarTeam,
-            target.kind,
-            splash_damage,
-            Some(TerrainKind::Open),
-        );
-        let damage = target.dao_damage_after_armor(damage, 0.0);
+        let damage = target.damage_after_armor(splash_damage, 0.0);
         let damage = entrenchment_combat::reduce_direct_damage(target, damage);
         let damage = map.damage_after_reduction_tile(target.pos_x(), target.pos_y(), damage);
         let victim_owner = target.owner;

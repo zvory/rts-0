@@ -72,6 +72,8 @@ pub const DAO_ADEPT_HP: u32 = 150;
 pub const DAO_WAR_HP_BONUS: u32 = 26;
 pub const DAO_WAR_DAMAGE_MULTIPLIER: f32 = 1.5;
 pub const DAO_WAR_ARMOR_REDUCTION: f32 = 0.5;
+/// Additive armor percentage points from the permanent Shop item.
+pub const SHOP_ARMOR_BONUS_REDUCTION: f32 = 0.5;
 /// Yari ready-tip reach, with the usual attacker radius and combat slack.
 pub const DAO_WAR_RANGE_TILES: f32 = 1.75;
 /// War artwork and collision body shrink together to 70% of the former size.

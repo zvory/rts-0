@@ -250,6 +250,7 @@ fn world_ability_order_policy(ability: AbilityKind) -> (bool, bool) {
         // Self-targeted abilities or abilities with dedicated command dispatch.
         AbilityKind::BreakthroughTreasure
         | AbilityKind::Haste
+        | AbilityKind::DoubleXp
         | AbilityKind::DoubleDamage
         | AbilityKind::ArmorTreasure
         | AbilityKind::VitalityTreasure

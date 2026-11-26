@@ -70,6 +70,10 @@ const previewInput = {_intent:()=>previewIntent,mouse:{x:50,y:50},
   _entityAtScreen:(_point,_own,eligible)=>eligible(hovered)?hovered:null};
 updateShopDeliveryPreview(previewInput);
 assert(previewIntent.shopDeliveryPreview?.targetX===1500,'hover line has unlimited range');
+previewIntent.commandTarget={kind:'ability',ability:ABILITY.DOUBLE_XP};
+updateShopDeliveryPreview(previewInput);
+assert(previewIntent.shopDeliveryPreview?.targetX===1500,'2X XP targeting retains the delivery line');
+previewIntent.commandTarget=null;
 assert(buildRendererFeedbackView(previewInput.state,{clientIntent:previewIntent}).shopDeliveryPreview?.x===100,
   'hover line reaches renderer feedback');
 hovered={...hovered,owner:2};

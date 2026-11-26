@@ -10,7 +10,6 @@ use crate::game::teams::TeamRelations;
 use crate::protocol::{Event, NoticeSeverity};
 use crate::rules::combat;
 use crate::rules::projection;
-use crate::rules::terrain::TerrainKind;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -139,13 +138,15 @@ fn resolve(
         .unwrap_or((shot.impact_x.to_world(), shot.impact_y.to_world()));
     emit_impact(events, fog, smokes, teams, shot.owner, visual_impact);
 
-    if let Some((victim_owner, victim_kind, victim_pos)) = damage_result {
+    if let Some((victim_owner, _, victim_pos)) = damage_result {
         let triggers_tank_armor_reaction =
             combat::weapon_profile(combat::WeaponKind::PanzerfaustLoadedShot)
                 .is_some_and(combat::weapon_triggers_tank_armor_reaction);
-        let damage = combat::panzerfaust_loaded_shot_damage(victim_kind, Some(TerrainKind::Open));
-        let damage = entities.get(shot.target).map_or(damage, |target| {
-            target.dao_damage_after_armor(damage, config::PANZERFAUST_ARMOR_PENETRATION)
+        let damage = entities.get(shot.target).map_or(0, |target| {
+            target.damage_after_armor(
+                config::PANZERFAUST_DAMAGE,
+                config::PANZERFAUST_ARMOR_PENETRATION,
+            )
         });
         let damage = map.damage_after_reduction_tile(victim_pos.0, victim_pos.1, damage);
         let source_pos = (shot.source_x.to_world(), shot.source_y.to_world());

@@ -30,6 +30,7 @@ impl Entity {
                 crate::game::ability::AbilityKind::BreakthroughTreasure,
                 crate::game::ability::AbilityKind::VitalityTreasure,
                 crate::game::ability::AbilityKind::DoubleDamage,
+                crate::game::ability::AbilityKind::DoubleXp,
             ]
             .iter()
             .filter(|&&kind| self.shop_item_active(kind))
@@ -54,6 +55,30 @@ impl Entity {
             .copied()
             .unwrap_or(0)
             > 0
+    }
+
+    pub(crate) fn armor_bonus_reduction(&self) -> f32 {
+        let dao = if self.dao() == Some(crate::game::upgrade::UpgradeKind::DaoOfHeaviness) {
+            crate::config::DAO_WAR_ARMOR_REDUCTION
+        } else {
+            0.0
+        };
+        dao + if self.shop_item_active(crate::game::ability::AbilityKind::ArmorTreasure) {
+            crate::config::SHOP_ARMOR_BONUS_REDUCTION
+        } else {
+            0.0
+        }
+    }
+
+    /// Resolve native, Dao and item armor together, before terrain and separate shields.
+    pub(crate) fn damage_after_armor(&self, damage: u32, penetration: f32) -> u32 {
+        crate::rules::combat::effective_damage_for_armor_penetration_with_bonus(
+            penetration,
+            self.kind,
+            damage,
+            None,
+            self.armor_bonus_reduction(),
+        )
     }
 
     pub(in crate::game) fn receive_shop_item(

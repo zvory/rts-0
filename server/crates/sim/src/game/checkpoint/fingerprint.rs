@@ -85,6 +85,7 @@ impl Serialize for EndState<'_> {
         field!("abilityRuntime", state.ability_runtime);
         field!("mortarShells", state.mortar_shells);
         field!("artilleryShells", state.artillery_shells);
+        field!("discipleShots", state.disciple_shots);
         field!("panzerfaustShots", state.panzerfaust_shots);
         field!("activeConstructionSites", state.active_construction_sites);
         field!("labGodModePlayers", state.lab_god_mode_players);

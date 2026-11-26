@@ -30,6 +30,7 @@ pub(super) fn try_fire(
     los: &LineOfSight<'_>,
     fog: &Fog,
     smokes: &SmokeCloudStore,
+    disciple_shots: &mut crate::game::disciple_shot::DiscipleShotStore,
     rng: &mut impl Rng,
     events: &mut HashMap<u32, Vec<Event>>,
     firing_reveals: &mut Vec<FiringRevealSource>,
@@ -93,6 +94,7 @@ pub(super) fn try_fire(
             teams,
             events,
             fog,
+            disciple_shots,
             rng,
             attacker,
             target,
@@ -132,6 +134,55 @@ pub(super) fn try_fire(
         }
     }
     true
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn resolve_orbs(
+    map: &Map,
+    entities: &mut EntityStore,
+    teams: &TeamRelations,
+    fog: &Fog,
+    events: &mut HashMap<u32, Vec<Event>>,
+    store: &mut crate::game::disciple_shot::DiscipleShotStore,
+    tick: u32,
+) {
+    let shots = std::mem::take(&mut store.shots);
+    for shot in shots {
+        if shot.impact_tick > tick {
+            store.shots.push(shot);
+            continue;
+        }
+        if !entities.get(shot.target).is_some_and(|target| {
+            target.hp > 0
+                && target.is_targetable()
+                && (target.owner == shot.owner
+                    || teams.is_enemy_owner(shot.owner, target.owner)
+                    || target.is_neutral_obstacle())
+        }) {
+            continue;
+        }
+        if let Some(mut weapon) =
+            crate::rules::combat::weapon_profile(crate::rules::combat::WeaponKind::DiscipleOrb)
+                .copied()
+        {
+            weapon.armor_penetration = shot.penetration;
+            damage::apply_direct_hit(
+                map,
+                entities,
+                teams,
+                events,
+                fog,
+                shot.attacker,
+                shot.target,
+                &weapon,
+                shot.damage,
+                shot.owner,
+                (shot.source[0].to_world(), shot.source[1].to_world()),
+                0,
+                tick,
+            );
+        }
+    }
 }
 
 #[cfg(test)]

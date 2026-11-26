@@ -2,7 +2,7 @@ import { KIND, WEAPON_KIND } from "../protocol.js";
 import { loadWorkerSafeTexture } from "./raster_primitives.js";
 import { gfxCircle, gfxFill, gfxNoFill, gfxStroke, gfxStrokeLine } from "./native_graphics.js";
 
-// Presentation only: damage and visibility remain authoritative at the attack event.
+// Orb damage resolves server-side after this release and flight time. Arrows remain immediate.
 // Release follows the first 100 ms pose of the four-frame, 400 ms attack cycle.
 export const DISCIPLE_RELEASE_DELAY_MS = 100;
 export const DISCIPLE_FLIGHT_TTL_MS = 600;

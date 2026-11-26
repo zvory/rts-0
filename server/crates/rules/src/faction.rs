@@ -115,6 +115,7 @@ pub enum AbilityKind {
     DoubleDamage,
     ArmorTreasure,
     VitalityTreasure,
+    DoubleXp,
     BreakthroughTreasure,
 }
 
@@ -147,6 +148,7 @@ impl AbilityKind {
         Self::DoubleDamage,
         Self::ArmorTreasure,
         Self::VitalityTreasure,
+        Self::DoubleXp,
         Self::BreakthroughTreasure,
     ];
 
@@ -179,6 +181,7 @@ impl AbilityKind {
             Self::DoubleDamage => "doubleDamage",
             Self::ArmorTreasure => "armorTreasure",
             Self::VitalityTreasure => "vitalityTreasure",
+            Self::DoubleXp => "doubleXp",
             Self::BreakthroughTreasure => "breakthroughTreasure",
         }
     }
@@ -1075,7 +1078,8 @@ pub fn ability_definition(kind: AbilityKind) -> AbilityCatalogEntry {
         AbilityKind::DoubleDamage => CULTIVATOR_ABILITIES[12],
         AbilityKind::ArmorTreasure => CULTIVATOR_ABILITIES[13],
         AbilityKind::VitalityTreasure => CULTIVATOR_ABILITIES[14],
-        AbilityKind::BreakthroughTreasure => CULTIVATOR_ABILITIES[15],
+        AbilityKind::DoubleXp => CULTIVATOR_ABILITIES[15],
+        AbilityKind::BreakthroughTreasure => CULTIVATOR_ABILITIES[16],
     }
 }
 

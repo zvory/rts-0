@@ -96,6 +96,11 @@ impl Entity {
         let (numerator, denominator) = config::disciple_insight_ratio(self.kind, target_kind);
         let total = u64::from(damage)
             .saturating_mul(numerator)
+            .saturating_mul(if self.shop_item_active(AbilityKind::DoubleXp) {
+                2
+            } else {
+                1
+            })
             .saturating_add(self.insight_fraction);
         let earned = (total / denominator).min(u64::from(self.insight_cap() - self.insight));
         self.insight += earned as u32;
@@ -112,6 +117,11 @@ impl Entity {
         if self.kind != EntityKind::MagicAdept || self.hp == 0 || self.dao_master {
             return;
         }
+        let amount = amount.saturating_mul(if self.shop_item_active(AbilityKind::DoubleXp) {
+            2
+        } else {
+            1
+        });
         self.gain_non_passive_insight(amount);
     }
 
@@ -253,17 +263,6 @@ impl Entity {
         });
         self.hp = self.max_hp;
         true
-    }
-
-    pub(crate) fn dao_damage_after_armor(&self, damage: u32, penetration: f32) -> u32 {
-        if self.dao() != Some(UpgradeKind::DaoOfHeaviness) {
-            return damage;
-        }
-        crate::rules::combat::damage_after_armor_reduction(
-            damage,
-            config::DAO_WAR_ARMOR_REDUCTION,
-            penetration,
-        )
     }
 
     pub(in crate::game) fn try_start_novice_charge(

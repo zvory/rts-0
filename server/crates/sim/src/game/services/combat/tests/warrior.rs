@@ -130,9 +130,9 @@ fn war_armor_uses_weapon_penetration_and_wind_changes_attack_rate() {
     assert!((unit.movement_speed() - 2.0).abs() < 0.001);
     unit.set_disciple_kind_for_test(EntityKind::WarAdept);
     assert!((unit.movement_speed() - 2.1).abs() < 0.001);
-    assert_eq!(unit.dao_damage_after_armor(100, 0.0), 50);
-    assert_eq!(unit.dao_damage_after_armor(100, 0.5), 75);
-    assert_eq!(unit.dao_damage_after_armor(100, 1.0), 100);
+    assert_eq!(unit.damage_after_armor(100, 0.0), 50);
+    assert_eq!(unit.damage_after_armor(100, 0.5), 75);
+    assert_eq!(unit.damage_after_armor(100, 1.0), 100);
     let war = effective_attack_profile(&unit);
     assert_eq!(war.dmg, 35);
     assert_eq!(war.range_tiles, config::DAO_WAR_RANGE_TILES);
@@ -310,7 +310,7 @@ fn dao_profiles_keep_wind_melee_and_magic_ranged() {
         assert_eq!(profile.cooldown, cooldown);
         assert_eq!(profile.weapon.unwrap().id, weapon);
         assert_eq!(profile.weapon.unwrap().armor_penetration, 0.25);
-        let events = run_combat_tick(&mut entities);
+        let events = run_combat_through_orb_impacts(&mut entities);
         assert_eq!(entities.get(target).unwrap().hp, 282);
         assert_eq!(entities.get(disciple).unwrap().attack_cd(), cooldown);
         assert_eq!(
@@ -328,7 +328,7 @@ fn dao_profiles_keep_wind_melee_and_magic_ranged() {
             Event::Attack {from, weapon_kind: Some(kind), ..} if *from == disciple && kind == weapon.stable_id()
         )).count(), 1);
         // The resolved primary cooldown is ticked by the compatibility helper as well.
-        run_combat_tick(&mut entities);
+        run_combat_through_orb_impacts(&mut entities);
         assert_eq!(entities.get(target).unwrap().hp, 282);
         assert_eq!(entities.get(disciple).unwrap().attack_cd(), cooldown - 1);
     }
@@ -377,7 +377,7 @@ fn wind_fires_during_move_and_magic_keeps_normal_stop_to_fire_policy() {
         unit.set_path_goal(Some(goal));
         unit.mark_move_phase(MovePhase::Moving);
         unit.set_movement_delta(2.0, 0.0);
-        run_combat_tick(&mut entities);
+        run_combat_through_orb_impacts(&mut entities);
         assert_eq!(
             entities.get(target).unwrap().hp,
             if dao == UpgradeKind::DaoWind { 22 } else { 45 }
@@ -387,7 +387,7 @@ fn wind_fires_during_move_and_magic_keeps_normal_stop_to_fire_policy() {
         assert_eq!(unit.path_goal(), Some(goal));
         if dao == UpgradeKind::DaoOfMagic {
             unit.set_order(Order::attack_move_to(goal.0, goal.1));
-            run_combat_tick(&mut entities);
+            run_combat_through_orb_impacts(&mut entities);
             assert_eq!(entities.get(target).unwrap().hp, 22);
             assert!(entities.get(disciple).unwrap().path_is_empty());
         }
@@ -420,10 +420,14 @@ fn magic_vehicle_range_uses_center_and_never_acquires_beyond_attack_range() {
                 )
                 .unwrap();
             let hp = entities.get(target).unwrap().hp;
-            run_combat_tick_on_map(
+            run_combat_tick_and_impacts(
                 &mut entities,
                 &[player_state(1, false), player_state(2, false)],
                 &map,
+                0,
+                &SmokeCloudStore::new(),
+                10,
+                true,
             );
             assert_eq!(entities.get(target).unwrap().hp < hp, inside);
             let unit = entities.get(disciple).unwrap();
@@ -632,7 +636,7 @@ fn wind_strikes_without_canceling_its_melee_approach() {
             unit.set_path(vec![(110.0, 100.0)]);
             unit.set_path_goal(Some((110.0, 100.0)));
             let hp_before = entities.get(target).unwrap().hp;
-            run_combat_tick(&mut entities);
+            run_combat_through_orb_impacts(&mut entities);
             assert!(entities.get(target).unwrap().hp < hp_before);
             let unit = entities.get(attacker).unwrap();
             assert_eq!(
@@ -693,7 +697,7 @@ fn war_adept_tank_insight_doubles_actual_damage_only() {
                 // A prior building hit's fractional credit must survive the tank bonus.
                 unit.gain_insight(1, EntityKind::ResourceDepot);
                 unit.set_order(Order::attack(target));
-                run_combat_tick(&mut entities);
+                run_combat_through_orb_impacts(&mut entities);
                 let damage = hp - entities.get(target).unwrap().hp;
                 assert!(damage > 0);
                 let multiplier = if kind == EntityKind::WarAdept && target_kind == EntityKind::Tank

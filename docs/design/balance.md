@@ -946,7 +946,7 @@ sight, supply, weapon, repair/refund, or survival-building status, and costs no 
 time. The reserved ability has no live carriers or command-card entry.
 See [Healing Seal](healing-seal.md).
 
-Cultivator Novices carry one item, Adepts carry up to three, and Masters carry up to six, with no category cap and no carried-item hotkeys. Distinct effects coexist; duplicate copies do not stack. Haste costs 100 oil, Double Damage 150 oil, Armor Treasure 100 oil; Haste, Double Damage, Armor, and Vitality are permanent passives applied on delivery. Haste grants 15% movement speed, 25% primary weapon attack speed (reload / 1.25, rounded upward to a whole tick), and attacks while moving, Double Damage doubles primary weapon damage, Armor Treasure adds 50% damage mitigation (round damage upward). Escape's 100-oil purchase starts a 60-second per-player cooldown shared across all owned Shops. See [Shop item rules](shop.md#carried-attack-and-defense-goods).
+Cultivator Novices carry one item, Adepts carry up to three, and Masters carry up to six, with no category cap and no carried-item hotkeys. Distinct effects coexist; duplicate copies do not stack. Haste costs 100 oil, Double Damage 150 oil, Armor Treasure 100 oil; Haste, Double Damage, Armor, and Vitality are permanent passives applied on delivery. Haste grants 15% movement speed, 25% primary weapon attack speed (reload / 1.25, rounded upward to a whole tick), and attacks while moving, Double Damage doubles primary weapon damage, Armor Treasure adds 50 percentage points to native/War Dao armor, capped at 100% before penetration; it no longer halves final damage. Escape's 100-oil purchase starts a 60-second per-player cooldown shared across all owned Shops. See [Shop item rules](shop.md#carried-attack-and-defense-goods).
 
 Vitality Treasure costs **100 oil** and can coexist with all other distinct carried items. Delivery permanently adds **150 maximum HP and 150 current HP**. The item remains carried and passive, without activation or expiry. See [Vitality rules](shop.md#vitality-treasure).
 
@@ -979,6 +979,9 @@ AT guns may target Wind, War, and Magic Adepts and Masters (all three Adept kind
 Novices (Warrior), workers, and Kriegsia rifle infantry remain excluded. The existing 30% infantry
 damage multiplier on Dao Adept bodies is unchanged.
 
+### 2X XP
+
+The Shop sells a permanent utility item with glyph **2X**, subtitle **2X XP**, hotkey **W**, and cost **50 oil** (no steel). After delivery it doubles all Insight gain, including combat, fractional building damage, War-versus-Tank bonuses, and Magic Vector Field death rewards. It uses one carried slot, does not stack, survives supplying-Shop destruction after delivery, and follows existing delivery, reservation, visibility, checkpoint, and rank-cap rules. Multiplication applies to new rewards before fractional carry and the existing Insight caps.
 ### Cosmic Energy
 
 Each player starts with zero **Cosmic Energy**, displayed with the **✨** sparkle icon.

@@ -205,6 +205,31 @@ fn run_combat_tick_on_map_with_seed_smokes_and_tick(
     smokes: &SmokeCloudStore,
     tick: u32,
 ) -> HashMap<u32, Vec<Event>> {
+    run_combat_tick_and_impacts(entities, players, map, rng_seed, smokes, tick, false)
+}
+
+fn run_combat_through_orb_impacts(entities: &mut EntityStore) -> HashMap<u32, Vec<Event>> {
+    run_combat_tick_and_impacts(
+        entities,
+        &[player_state(1, false), player_state(2, false)],
+        &Map::generate(2, 0x00C0_FFEE),
+        0,
+        &SmokeCloudStore::new(),
+        10,
+        true,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_combat_tick_and_impacts(
+    entities: &mut EntityStore,
+    players: &[PlayerState],
+    map: &Map,
+    rng_seed: u64,
+    smokes: &SmokeCloudStore,
+    tick: u32,
+    resolve_impacts: bool,
+) -> HashMap<u32, Vec<Event>> {
     let occ = Occupancy::build(map, entities);
     let spatial = SpatialIndex::build(entities, map.width, map.height);
     let mut pathing = PathingService::new(256, 64);
@@ -221,6 +246,7 @@ fn run_combat_tick_on_map_with_seed_smokes_and_tick(
 
     let mut rng = PortableRng::seed_from_u64(rng_seed);
     let mut panzerfaust_shots = crate::game::panzerfaust_shot::PanzerfaustShotStore::default();
+    let mut disciple_shots = crate::game::disciple_shot::DiscipleShotStore::default();
     let mut firing_reveals = Vec::new();
     let methamphetamines_researched = |owner| {
         players
@@ -237,11 +263,23 @@ fn run_combat_tick_on_map_with_seed_smokes_and_tick(
         &fog,
         smokes,
         &mut panzerfaust_shots,
+        &mut disciple_shots,
         &mut rng,
         &mut events,
         &mut firing_reveals,
         tick,
     );
+    if resolve_impacts {
+        super::shot::resolve_orbs(
+            map,
+            entities,
+            &teams,
+            &fog,
+            &mut events,
+            &mut disciple_shots,
+            tick + config::TICK_HZ,
+        );
+    }
     events
 }
 
@@ -1265,6 +1303,7 @@ fn attack_move_resumes_original_destination_after_target_is_gone() {
         &fog,
         &smokes,
         &mut panzerfaust_shots,
+        &mut crate::game::disciple_shot::DiscipleShotStore::default(),
         &mut rng,
         &mut events,
         &mut firing_reveals,
@@ -2863,4 +2902,60 @@ fn attack_move_prefers_clear_target_over_target_behind_friendly_tank() {
 
     assert_eq!(target, Some(clear_target));
     assert_ne!(target, Some(blocked_target));
+}
+
+// Damage-focused tests include any detached orb impact; timing has separate shot coverage.
+#[allow(clippy::too_many_arguments)]
+fn apply_damage(
+    map: &Map,
+    entities: &mut EntityStore,
+    blockers: &ShotBlockerIndex,
+    teams: &TeamRelations,
+    events: &mut HashMap<u32, Vec<Event>>,
+    fog: &Fog,
+    rng: &mut impl Rng,
+    attacker: u32,
+    victim: u32,
+    weapon_profile: &combat_rules::WeaponProfile,
+    dmg: u32,
+    attacker_owner: u32,
+    ax: f32,
+    ay: f32,
+    vx: f32,
+    vy: f32,
+    extra_miss_chance: f32,
+    tick: u32,
+) -> Option<super::damage::ShotOutcome> {
+    let mut shots = crate::game::disciple_shot::DiscipleShotStore::default();
+    let outcome = super::damage::apply_damage(
+        map,
+        entities,
+        blockers,
+        teams,
+        events,
+        fog,
+        &mut shots,
+        rng,
+        attacker,
+        victim,
+        weapon_profile,
+        dmg,
+        attacker_owner,
+        ax,
+        ay,
+        vx,
+        vy,
+        extra_miss_chance,
+        tick,
+    );
+    super::shot::resolve_orbs(
+        map,
+        entities,
+        teams,
+        fog,
+        events,
+        &mut shots,
+        tick + config::TICK_HZ,
+    );
+    outcome
 }

@@ -11,7 +11,6 @@ use crate::game::entrenchment_combat;
 use crate::game::map::Map;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::teams::TeamRelations;
-use crate::rules::combat as combat_rules;
 use serde::{Deserialize, Serialize};
 
 const MAX_ACTIVE_ABILITY_PROJECTILES: usize = 512;
@@ -327,14 +326,8 @@ fn apply_projectile_hits(
         projectile.hits_for_current_leg().insert(id);
         let damage = entities.get(id).map_or(0, |target| {
             let damage = if projectile.ability == AbilityKind::ThrowSword {
-                let damage = combat_rules::effective_damage_for_armor_penetration(
-                    crate::config::THROW_SWORD_ARMOR_PENETRATION,
-                    target.kind,
-                    base_damage,
-                    None,
-                );
                 let damage = target
-                    .dao_damage_after_armor(damage, crate::config::THROW_SWORD_ARMOR_PENETRATION);
+                    .damage_after_armor(base_damage, crate::config::THROW_SWORD_ARMOR_PENETRATION);
                 entrenchment_combat::reduce_direct_damage(target, damage)
             } else {
                 base_damage

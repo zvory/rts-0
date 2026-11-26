@@ -135,8 +135,8 @@ export function _issueTargetedCommand(p, ev = {}) {
         && e.buildProgress == null && e.hp > 0
         && (definition.rangeTiles == null || Math.hypot(e.x - target.x, e.y - target.y) <= range));
       if (!shop || (ability === ABILITY.ESCAPE_TREASURE && target.escapeTreasure)) return false;
-      const passiveItem = [ABILITY.BREAKTHROUGH_TREASURE, ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE,
-        ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE].includes(ability);
+      const passiveItem = [ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE,
+        ABILITY.HASTE, ABILITY.DOUBLE_XP, ABILITY.BREAKTHROUGH_TREASURE, ABILITY.DOUBLE_DAMAGE].includes(ability);
       if (passiveItem && target.abilities?.some((entry) => entry.ability === ability)) return false;
       this.commandInteraction.issueCommand(cmd.useAbility(ability, [shop.id], null, null, false, target.id));
       this._addCommandFeedback("move", target.x, target.y, false);
@@ -1171,8 +1171,8 @@ export function _shopFullCursorTarget() {
       this.inputRouter?.activePreviewSurface?.()) return null;
   const mode = intent?.commandTarget;
   if (mode && !(mode.kind === "ability" && [ABILITY.REGEN, ABILITY.ESCAPE_TREASURE,
-    ABILITY.BREAKTHROUGH_TREASURE, ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE, ABILITY.HASTE,
-    ABILITY.DOUBLE_DAMAGE].includes(mode.ability))) return null;
+    ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE, ABILITY.HASTE,
+    ABILITY.DOUBLE_XP, ABILITY.BREAKTHROUGH_TREASURE, ABILITY.DOUBLE_DAMAGE].includes(mode.ability))) return null;
   if (!this.state.selectedEntities().some((entity) => entity.kind === KIND.SHOP &&
       entity.hp > 0 && entity.buildProgress == null && ownOwner(this.state, entity.owner, this.controlPolicy))) return null;
   // Item purchases pick through overlapping buildings and hostile units. Keep
