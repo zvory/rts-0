@@ -48,7 +48,7 @@ fn issue(game: &mut Game, worker: u32, target: u32, queued: bool) {
 }
 
 #[test]
-fn vehicle_repair_all_four_targets_share_rate_price_and_queue_completion() {
+fn vehicle_repair_all_mobile_targets_share_rate_price_and_queue_completion() {
     for kind in crate::rules::target::REPAIRABLE_UNIT_KINDS {
         let (mut game, worker, target) = fixture(kind);
         let before = game.state.entities.get(target).unwrap().hp;

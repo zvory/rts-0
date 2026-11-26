@@ -1499,7 +1499,7 @@ spatial indexes across later mutations.
 
 Building and vehicle repairs use a dedicated `Repair` command/order and queued target intent. Engineers and
 Serfs (the Worker kind) may repair their own living, completed, damaged buildings and their own
-damaged Tanks, Rocket Trucks, Mortar Teams, and AT Guns; legality
+damaged Tanks, Scout Cars, Rocket Trucks, Mortar Teams, and AT Guns; legality
 is checked at issue, queue promotion, and every work tick. All eligible selected workers repair
 concurrently, routing to the normal outside footprint staging ring for buildings. For mobile
 targets workers follow the current target position using normal throttled, budgeted path requests;

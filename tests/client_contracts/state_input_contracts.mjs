@@ -1254,7 +1254,7 @@ function buttonByLabel(card, label) {
       rightClickCommands[0].queued === true,
     "Shift right-click on a Tank Trap with workers selected should send queued deconstruct",
   );
-  for (const kind of [KIND.BARRACKS, KIND.HEALING_SEAL, KIND.RIFLEMAN, KIND.TANK, KIND.ROCKET_LAUNCHER, KIND.MORTAR_TEAM, KIND.ANTI_TANK_GUN]) for (const queued of [false, true]) {
+  for (const kind of [KIND.BARRACKS, KIND.HEALING_SEAL, KIND.RIFLEMAN, KIND.TANK, KIND.ROCKET_LAUNCHER, KIND.MORTAR_TEAM, KIND.ANTI_TANK_GUN, KIND.SCOUT_CAR]) for (const queued of [false, true]) {
     const building = { id: 44, owner: 1, kind, x: 240, y: 240, hp: 100, maxHp: 500 };
     input.state.entitiesInterpolated = () => [deconstructWorker, building];
     publishSelectionTestScene(input);

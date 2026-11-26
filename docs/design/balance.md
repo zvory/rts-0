@@ -953,7 +953,7 @@ See [Vector Field](vector-field.md) for placement, rank geometry, force, and pre
 
 ### Building repair and AT gun Dao targets
 
-Right-clicking a damaged owned completed building, Tank, Rocket Truck, Mortar Team, or AT Gun
+Right-clicking a damaged owned completed building, Tank, Scout Car, Rocket Truck, Mortar Team, or AT Gun
 with Engineers or Serfs assigns repairs at
 2 HP per second per worker; multiple repairers add their rates. Healing Seals retain their
 non-repairable consumable capacity, and neutral field obstacles remain outside owned-building

@@ -96,11 +96,12 @@ pub fn is_anti_tank_gun_infantry_target(kind: EntityKind) -> bool {
 }
 
 /// Mobile bodies that workers may repair, independently of ordinary infantry healing.
-pub const REPAIRABLE_UNIT_KINDS: [EntityKind; 4] = [
+pub const REPAIRABLE_UNIT_KINDS: [EntityKind; 5] = [
     EntityKind::Tank,
     EntityKind::RocketLauncher,
     EntityKind::MortarTeam,
     EntityKind::AntiTankGun,
+    EntityKind::ScoutCar,
 ];
 
 pub fn is_repairable_unit(kind: EntityKind) -> bool {

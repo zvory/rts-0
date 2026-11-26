@@ -7,7 +7,7 @@ import { TICK_HZ } from "./timing.js";
 
 // Mirrored from rules::target; catalog parity checks this complete set.
 export const REPAIRABLE_UNIT_KINDS = Object.freeze([
-  KIND.TANK, KIND.ROCKET_LAUNCHER, KIND.MORTAR_TEAM, KIND.ANTI_TANK_GUN,
+  KIND.TANK, KIND.ROCKET_LAUNCHER, KIND.MORTAR_TEAM, KIND.ANTI_TANK_GUN, KIND.SCOUT_CAR,
 ]);
 
 // Mirrored from rules balance: total carried-item slots by rank.
