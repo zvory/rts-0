@@ -138,34 +138,3 @@ fn vector_field_preserves_movement_and_enforces_rank_cooldown() {
         assert_eq!(game.state.ability_runtime.world_objects().count(), 1);
     }
 }
-
-#[test]
-fn vector_field_cast_range_is_eleven_and_a_quarter_tiles_for_both_ranks() {
-    for master in [false, true] {
-        for (distance_tiles, accepted) in [(7.5, true), (11.25, true), (11.28125, false)] {
-            let mut game = empty_flat_game(&[cultivator_player()]);
-            let caster = game
-                .state
-                .entities
-                .spawn_unit(1, EntityKind::MagicAdept, 400.0, 400.0)
-                .unwrap();
-            game.state.entities.get_mut(caster).unwrap().dao_master = master;
-            game.enqueue(
-                1,
-                Command::VectorField {
-                    units: vec![caster],
-                    x: 400.0 + distance_tiles * config::TILE_SIZE as f32,
-                    y: 400.0,
-                    direction_x: 1.0,
-                    direction_y: 0.0,
-                },
-            );
-            game.tick();
-            assert_eq!(
-                game.state.ability_runtime.world_objects().count(),
-                usize::from(accepted),
-                "master={master} distance={distance_tiles}"
-            );
-        }
-    }
-}

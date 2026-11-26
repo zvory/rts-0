@@ -153,7 +153,7 @@ export const EKAT_LINE_SHOT_COOLDOWN_TICKS = TICK_HZ * 20;
 export const VECTOR_FIELD_SPEED_PX_PER_TICK = 3;
 export const VECTOR_FIELD_ADEPT_SIZE_TILES = 4;
 export const VECTOR_FIELD_MASTER_SIZE_TILES = 5;
-export const VECTOR_FIELD_RANGE_TILES = 11.25;
+export const VECTOR_FIELD_RANGE_TILES = 7.5;
 export const VECTOR_FIELD_DURATION_TICKS = TICK_HZ * 10;
 export const VECTOR_FIELD_ADEPT_COOLDOWN_TICKS = TICK_HZ * 30;
 export const VECTOR_FIELD_MASTER_COOLDOWN_TICKS = TICK_HZ * 20;
@@ -614,7 +614,7 @@ export const ABILITIES = Object.freeze({
     label: "Vector Field",
     icon: "VEC",
     hotkey: "C",
-    title: "Direct a 4 x 4 tile field (5 x 5 for Masters); moves enemy ground units 3 pixels per tick; cooldown 30s for Magic Adepts, 20s for Magic Masters",
+    title: "Direct a 4 x 4 tile field (5 x 5 for Masters); moves every ground unit 3 pixels per tick; cooldown 30s for Magic Adepts, 20s for Magic Masters",
     carriers: Object.freeze([KIND.MAGIC_ADEPT]),
     targetMode: "worldPoint",
     rangeTiles: VECTOR_FIELD_RANGE_TILES,
