@@ -47,10 +47,22 @@ fn purchase(game: &mut Game, shop: u32, x: f32, y: f32) {
 }
 
 #[test]
-fn healing_seal_purchase_cost_placement_and_checkpoint() {
+fn authored_healing_seal_capacity_and_checkpoint() {
     let (mut game, shop, unit) = fixture();
     purchase(&mut game, shop, 656.0, 336.0);
-    assert_eq!(game.state.players[0].oil, 850);
+    assert_eq!(
+        game.state.players[0].oil, 1000,
+        "Healing Seal is no longer sold"
+    );
+    assert!(!game
+        .state
+        .entities
+        .iter()
+        .any(|e| e.kind == EntityKind::HealingSeal));
+    game.state
+        .entities
+        .spawn_building(1, EntityKind::HealingSeal, 656.0, 336.0, true)
+        .unwrap();
     let seal = game
         .state
         .entities
@@ -157,10 +169,13 @@ fn healing_seals_do_not_block_building_sites_for_any_owner() {
 
 #[test]
 fn healing_seal_overlaps_survive_normal_ticks() {
-    let (mut game, shop, unit) = fixture();
-    purchase(&mut game, shop, 656.0, 336.0);
-    purchase(&mut game, shop, 656.0, 336.0);
-    assert_eq!(game.state.players[0].oil, 700);
+    let (mut game, _, unit) = fixture();
+    for _ in 0..2 {
+        game.state
+            .entities
+            .spawn_building(1, EntityKind::HealingSeal, 656.0, 336.0, true)
+            .unwrap();
+    }
     assert_eq!(
         game.state
             .entities

@@ -590,6 +590,19 @@ export class HUD {
       case "beginCommandTarget":
         this._intent()?.beginCommandTarget?.(intent.target, { shiftKey: !!ev.shiftKey });
         return;
+      case "openShopBuyMenu":
+        this._intent()?.openShopBuyMenu?.();
+        return;
+      case "buyShopItem": {
+        const ctx = this._commandDescriptorContext();
+        const shop = ctx.currentEntities.filter((e) => e.owner === ctx.playerId
+          && e.kind === KIND.SHOP && e.hp > 0 && e.buildProgress == null).sort((a, b) => a.id - b.id)[0];
+        const buyers = ctx.selection.filter((e) => e.owner === ctx.playerId &&
+          [KIND.WARRIOR, KIND.WIND_ADEPT, KIND.WAR_ADEPT, KIND.MAGIC_ADEPT].includes(e.kind));
+        if (shop && buyers.length) this.commandInteraction.issueCommand(
+          cmd.useAbility(intent.ability, [shop.id, ...buyers.map((e) => e.id)], null, null, false));
+        return;
+      }
       case "openWorkerBuildMenu":
         this._intent()?.openWorkerBuildMenu?.(!!intent.advanced);
         return;

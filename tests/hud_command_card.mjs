@@ -759,12 +759,14 @@ for (const [kind, upgrade] of [
     "cultivators-double-damage",
     "cultivators-war-master",
     "cultivators-shop",
+    "cultivators-buy-menu",
     "cultivators-worker",
     "cultivators-build",
     "cultivators-producer-resource_depot",
     "cultivators-producer-portal",
     "cultivators-producer-three_dao_pavilion",
     "cultivators-producer-tournament_grounds",
+    "cultivators-producer-proven_grounds",
   ]);
   assert(
     catalog.some((entry) =>
@@ -1017,7 +1019,7 @@ for (const researched of [false, true]) {
   }
   const charge = card.slots.find((slot) => slot?.ability === ABILITY.CHARGE);
   assert.equal(charge, undefined, "a full mixed card gives active abilities priority over passive Charge");
-  assert.equal(card.slots[9] ?? null, null);
+  assert.equal(card.slots[9]?.intent.type, "openShopBuyMenu");
 }
 
 // Dao order is chosen by the player; completed and paid active researches reserve tiers.
@@ -1097,21 +1099,12 @@ for (const researched of [false, true]) {
     resources: { steel: 1000, oil: 1000 },
   });
   const items = idle.slots.filter(Boolean);
-  assert.equal(items.length, 7);
-  assert.deepEqual(items.map((item) => item.ability), [ABILITY.ESCAPE_TREASURE, ABILITY.REGEN, ABILITY.HEALING_SEAL, ABILITY.ARMOR_TREASURE, ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE, ABILITY.VITALITY_TREASURE]);
-  assert.deepEqual(items.map((item) => item.intent.targetMode), ["friendlyUnit", "friendlyUnit", "worldPoint", "friendlyUnit", "friendlyUnit", "friendlyUnit", "friendlyUnit"]);
-  assert.deepEqual(items.map((item) => item.cost.oil), [100, 50, 150, 100, 100, 150, 100]);
-  const seal = items.find((item) => item.ability === ABILITY.HEALING_SEAL);
-  assert.equal(seal.hotkey, "S");
-  assert.equal(seal.commandId, "cultivators.ability.healingSeal");
-  for (const oil of [149, 150]) {
-    const card = buildCommandCardDescriptors({
-      playerId: 1, factionId: "cultivators",
-      selection: [{ id: 2, owner: 1, kind: KIND.SHOP }],
-      groupCooldownClocks: () => [], resources: { steel: 0, oil },
-    });
-    assert.equal(card.slots.find((slot) => slot?.ability === ABILITY.HEALING_SEAL).unaffordable, oil < 150);
-  }
+  assert.equal(items.length, 6);
+  assert.deepEqual(items.map((item) => item.ability), [ABILITY.ESCAPE_TREASURE, ABILITY.REGEN, ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE, ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE]);
+  assert.deepEqual(items.map((item) => item.intent.targetMode), Array(6).fill("friendlyUnit"));
+  assert.deepEqual(items.map((item) => item.cost.oil), [100, 50, 100, 100, 100, 150]);
+  assert(!items.some((item) => item.ability === ABILITY.HEALING_SEAL));
+  assert.deepEqual(idle.rowLabels, ["Util", "Defense", "Offense"]);
 }
 
 // Portal Adepts require their Dao, 150 steel, 35 oil and three supply.
@@ -1151,7 +1144,7 @@ assert.deepEqual(COMMAND_CARD_SLOT_ORDER.map(gridHotkeyForSlot),
 for (const context of buildCommandCardContextCatalog()) {
   for (const slot of context.card.slots.filter(Boolean)) {
     if (slot.slotIndex === 9) {
-      assert.equal(slot.commandId, "cultivators.item.escape");
+      assert.equal(slot.intent.type, "openShopBuyMenu");
       continue;
     }
     if (slot.slotIndex === 10) {
@@ -1161,8 +1154,8 @@ for (const context of buildCommandCardContextCatalog()) {
       continue;
     }
     if (slot.slotIndex === 11) {
-      assert([ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE].includes(slot.ability));
-      assert.equal(slot.hotkey, "");
+      assert.equal(slot.intent.type, "closeCommandCardMenu");
+      assert.equal(slot.hotkey, "V");
       continue;
     }
     assert(slot.slotIndex < 9, `${context.id}: other fourth-column slots remain reserved`);
@@ -1195,8 +1188,8 @@ for (const factionId of ["cultivators", "kriegsia", "ekat"]) {
       abilities: [ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE, ABILITY.ARMOR_TREASURE,
         ABILITY.VITALITY_TREASURE].map((ability) => ({ ability, remainingUses: 1 })) }],
     resources: {}, groupCooldownClocks: () => [] });
-  assert(!card.slots.some((slot) => slot?.commandId?.startsWith("cultivators.item.")));
-  for (const index of [9, 10, 11]) assert.equal(card.slots[index] ?? null, null);
+  assert(!card.slots.some((slot) => slot?.commandId?.startsWith("cultivators.item.") && slot.action !== "openShopBuyMenu"));
+  for (const index of [10, 11]) assert.equal(card.slots[index] ?? null, null);
 }
 
 // Shop goods occupy the same rows as the carried movement/defense/attack slots.
@@ -1208,7 +1201,7 @@ for (const factionId of ["cultivators", "kriegsia", "ekat"]) {
   });
   const rows = COMMAND_CARD_SLOT_ORDER.map((i) => card.slots[i]?.ability || null);
   assert.deepEqual(rows.slice(0, 4), [ABILITY.ESCAPE_TREASURE, null, null, null]);
-  assert.deepEqual(rows.slice(4, 8), [ABILITY.REGEN, ABILITY.HEALING_SEAL, ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE]);
+  assert.deepEqual(rows.slice(4, 8), [ABILITY.REGEN, ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE, null]);
   assert.deepEqual(rows.slice(8), [ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE, null, null]);
   for (const ability of [ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE, ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE]) {
     const carried = buildCommandCardDescriptors({
@@ -1220,4 +1213,38 @@ for (const factionId of ["cultivators", "kriegsia", "ekat"]) {
     const slot = carried.slots.find((entry) => entry?.ability === ability);
     assert.equal(slot, undefined);
   }
+}
+
+// R opens a persistent buy menu without changing selected units or arming a world target.
+{
+  const unit = { id: 10, owner: 1, kind: KIND.WAR_ADEPT, hp: 176 };
+  const shop = { id: 20, owner: 1, kind: KIND.SHOP, hp: 200 };
+  const ctx = { playerId: 1, factionId: "cultivators", selection: [unit], entities: [unit, shop],
+    resources: { oil: 1000, steel: 0 }, groupCooldownClocks: () => [] };
+  const main = buildCommandCardDescriptors(ctx);
+  assert.equal(main.slots[9].hotkey, "R");
+  assert.equal(main.slots[9].intent.type, "openShopBuyMenu");
+  const menu = buildCommandCardDescriptors({ ...ctx, commandCardMode: "shopBuy" });
+  assert.deepEqual(menu.rowLabels, ["Util", "Defense", "Offense"]);
+  const goods = menu.slots.filter((s) => s?.action === "ability");
+  assert.equal(goods.length, 6);
+  assert(goods.every((s) => s.intent.type === "buyShopItem" && s.enabled));
+  assert.deepEqual(goods.map((s) => s.icon), ["ESC", "HP", "ARM", "+HP", "HST", "DD"]);
+  assert.equal(menu.slots[11].intent.type, "closeCommandCardMenu");
+  assert.equal(menu.slots[11].hotkey, "V");
+  assert.equal(menu.slots[4].ability, ABILITY.ARMOR_TREASURE);
+  assert.equal(menu.slots[4].hotkey, "S");
+  assert.equal(menu.slots[5].ability, ABILITY.VITALITY_TREASURE);
+  assert.equal(menu.slots[5].hotkey, "D");
+  const unavailable = buildCommandCardDescriptors({ ...ctx, entities: [unit], commandCardMode: "shopBuy" });
+  assert(unavailable.slots.filter((s) => s?.action === "ability").every((s) => !s.enabled && !s.unaffordable));
+  const serf = buildCommandCardDescriptors({ ...ctx, selection: [{ ...unit, kind: KIND.WORKER }] });
+  assert(!serf.slots.some((s) => s?.intent?.type === "openShopBuyMenu"));
+  withFakeHudDocument(() => {
+    const element = document.createElement("div");
+    renderDescriptorCardDom(element, menu, createCommandButton);
+    assert.equal(element.children[0].children.length, 12, "edge tabs preserve twelve grid cells");
+    assert.deepEqual(Array.from(element.children[0].children).filter((e) => e.className === "shop-row-start")
+      .map((e) => e.children[1].textContent), ["Util", "Defense", "Offense"]);
+  });
 }

@@ -729,16 +729,15 @@ assert.equal(createClassicPreset(buildHotkeyCommandCatalog(buildCommandCardConte
     "Custom Dao training bindings survive export");
 }
 
-// Escape can share a card with each Dao's abilities and with the worker build menu.
+// Buy menu coexists with each Dao's combat abilities.
 for (const [contextId, otherCommand] of [
   ["cultivators-disciple-wind", `cultivators.ability.${ABILITY.WIND_DASH}`],
   ["cultivators-war-master", `cultivators.ability.${ABILITY.THROW_SWORD}`],
   ["cultivators-disciple-magic", `cultivators.ability.${ABILITY.DISCIPLE_SHIELD}`],
-  ["cultivators-worker", "worker.buildMenu"],
 ]) {
   const hotkeys = service();
   const classic = hotkeys.profileById(HOTKEY_PRESET_CLASSIC);
-  const itemCommand = "cultivators.item.escape";
+  const itemCommand = "cultivators.item.buyMenu";
   const draft = structuredClone({ ...classic, id: "custom.item-conflict", type: "custom" });
   const otherKey = otherCommand.startsWith("cultivators.")
     ? draft.factionBindings.cultivators[otherCommand]

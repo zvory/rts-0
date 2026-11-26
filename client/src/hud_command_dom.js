@@ -9,9 +9,23 @@ function cooldownLabel(seconds) {
 export function renderDescriptorCardDom(card, descriptorCard, buttonForDescriptor) {
   const frag = document.createDocumentFragment();
   const slots = Array.isArray(descriptorCard?.slots) ? descriptorCard.slots : [];
-  for (const i of COMMAND_CARD_SLOT_ORDER) {
+  card.dataset.shopCard = descriptorCard.rowLabels ? "true" : "false";
+  for (const [position, i] of COMMAND_CARD_SLOT_ORDER.entries()) {
     const descriptor = slots[i] || null;
-    frag.appendChild(descriptor ? buttonForDescriptor(descriptor) : emptyCommandSlot());
+    const cell = descriptor ? buttonForDescriptor(descriptor) : emptyCommandSlot();
+    if (descriptorCard.rowLabels && position % 4 === 0) {
+      const anchor = document.createElement("div");
+      anchor.className = "shop-row-start";
+      const label = document.createElement("div");
+      label.className = "shop-row-label";
+      label.dataset.row = String(position / 4);
+      label.textContent = descriptorCard.rowLabels[position / 4];
+      anchor.appendChild(cell);
+      anchor.appendChild(label);
+      frag.appendChild(anchor);
+    } else {
+      frag.appendChild(cell);
+    }
   }
   card.innerHTML = "";
   card.appendChild(frag);

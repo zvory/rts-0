@@ -86,3 +86,23 @@ assert(!previewIntent.shopDeliveryPreview,'Regen is rejected at full inventory')
 hovered={...hovered,visionOnly:true};
 updateShopDeliveryPreview(previewInput);
 assert(!previewIntent.shopDeliveryPreview,'vision-only entities never show line');
+
+// The buy menu draws every selected cultivator, independent of hover or free slots.
+previewIntent.commandTarget = null;
+previewIntent.commandCardMode = "shopBuy";
+previewInput.mouse = null;
+const buyers = [
+  {id:93, kind:KIND.WAR_ADEPT, owner:1, hp:176, x:300, y:220, itemRadianceTier:3},
+  {id:94, kind:KIND.WARRIOR, owner:1, hp:58, x:400, y:240},
+  {id:95, kind:KIND.WORKER, owner:1, hp:58, x:500, y:250},
+  {id:96, kind:KIND.WARRIOR, owner:2, hp:58, x:600, y:260},
+];
+previewInput.state.selectedEntities = () => buyers;
+let previewEntities = [previewShop, ...buyers];
+previewInput.state.entitiesInterpolated = () => previewEntities;
+updateShopDeliveryPreview(previewInput);
+assert(previewIntent.shopDeliveryPreview.lines.length === 2, 'buy menu connects only owned selected fighters, including full carriers');
+assert(previewIntent.shopDeliveryPreview.lines.every((line) => line.x === previewShop.x), 'lines use the source Shop');
+previewEntities = buyers;
+updateShopDeliveryPreview(previewInput);
+assert(!previewIntent.shopDeliveryPreview, 'destroyed source clears buy lines');

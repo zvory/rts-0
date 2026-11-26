@@ -19,6 +19,8 @@ const DEFAULT_EXPORT_BUILD = "unknown";
 // familiar action keys here, including the mnemonic conflict resolutions for
 // commands that can share a card.
 const CLASSIC_DIRECT_BINDINGS = Object.freeze({
+  "cultivators.item.buyMenu": "KeyR",
+  "cultivators.item.returnBuyMenu": "KeyV",
   "cultivators.item.escape": "KeyR",
   "cultivators.dao-training.dao_wind": "KeyL",
   "cultivators.dao-training.dao_of_heaviness": "KeyW",

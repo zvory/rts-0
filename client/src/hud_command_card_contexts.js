@@ -60,9 +60,11 @@ export function buildCultivatorCommandCardContextSamples(buildCard) {
       { ability: ABILITY.DOUBLE_DAMAGE, remainingUses: 1 }] }])) },
     { id: "cultivators-war-master", card: buildCard(ctx([{ ...disciple, kind: KIND.WAR_ADEPT, dao: "war", daoMaster: true }])) },
     { id: "cultivators-shop", card: buildCard(ctx([{ id: 30, owner: 1, kind: KIND.SHOP }])) },
+    { id: "cultivators-buy-menu", card: buildCard({ ...ctx([disciple]), commandCardMode: "shopBuy",
+      entities: [disciple, { id: 30, owner: 1, kind: KIND.SHOP, hp: 200 }] }) },
     { id: "cultivators-worker", card: buildCard(ctx([worker])) },
     { id: "cultivators-build", card: buildCard({ ...ctx([worker]), commandCardMode: "workerBuild" }) },
-    ...[KIND.RESOURCE_DEPOT, KIND.PORTAL, KIND.THREE_DAO_PAVILION, KIND.TOURNAMENT_GROUNDS].map((kind, i) => ({
+    ...[KIND.RESOURCE_DEPOT, KIND.PORTAL, KIND.THREE_DAO_PAVILION, KIND.TOURNAMENT_GROUNDS, KIND.PROVEN_GROUNDS].map((kind, i) => ({
       id: `cultivators-producer-${kind}`,
       card: buildCard({ ...ctx([{ id: 22 + i, owner: 1, kind }]), upgrades: [] }),
     })),

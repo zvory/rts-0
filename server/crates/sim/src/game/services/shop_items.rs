@@ -39,17 +39,34 @@ pub(super) fn purchase(
     shops: &[u32],
     ability: AbilityKind,
     target_id: Option<u32>,
-    point: (Option<f32>, Option<f32>),
+    _point: (Option<f32>, Option<f32>),
     tick: u32,
 ) {
     if !is_shop_item(ability) {
         return;
     }
     if ability == AbilityKind::HealingSeal {
-        place_healing_seal(map, entities, players, fog, events, player, shops, point);
         return;
     }
-    if ability == AbilityKind::EscapeTreasure && target_id.is_none() {
+    // A Shop plus selected fighters requests one automatic purchase. Resolve against
+    // authoritative inventory and in-flight reservations, even for rapid keypresses.
+    let has_shop = shops
+        .iter()
+        .filter_map(|id| entities.get(*id))
+        .any(|e| e.kind == EntityKind::Shop);
+    let target_id = if target_id.is_none() && has_shop {
+        auto_recipient(entities, runtime, fog, player, shops, ability)
+    } else {
+        target_id
+    };
+    if ability == AbilityKind::EscapeTreasure && target_id.is_none() && !has_shop {
+        // A removed source Shop must not turn a pending purchase into manual escape.
+        if shops
+            .iter()
+            .any(|id| entities.get(*id).is_none_or(|e| !e.is_unit()))
+        {
+            return;
+        }
         activate_escape(map, entities, teams, player, shops);
         return;
     }
@@ -200,6 +217,59 @@ pub(super) fn purchase(
     }
 }
 
+/// Stable rank/insight/inventory preference; no hidden or foreign units may be candidates.
+fn auto_recipient(
+    entities: &EntityStore,
+    runtime: &AbilityRuntime,
+    fog: &Fog,
+    player: u32,
+    selected: &[u32],
+    ability: AbilityKind,
+) -> Option<u32> {
+    selected
+        .iter()
+        .filter_map(|id| entities.get(*id))
+        .filter_map(|unit| {
+            let capacity = unit.carried_item_capacity()?;
+            if unit.owner != player
+                || unit.hp == 0
+                || !fog.is_visible_world(player, unit.pos_x(), unit.pos_y())
+                || unit.shop_item_active(ability)
+                || (ability == AbilityKind::EscapeTreasure && unit.escape_treasure.is_some())
+            {
+                return None;
+            }
+            let mut incoming = 0_usize;
+            for delivery in runtime.projectiles().filter(|p|
+            matches!(p.return_target, AbilityProjectileReturnTarget::Entity { id } if id == unit.id)
+                && (is_buff_item(p.ability) || p.ability == AbilityKind::EscapeTreasure))
+        {
+            if delivery.ability == ability { return None; }
+            incoming += 1;
+        }
+            let count = usize::from(unit.carried_item_count()) + incoming;
+            if count >= usize::from(capacity)
+                || (ability == AbilityKind::VitalityTreasure
+                    && unit.max_hp.checked_add(150).is_none())
+            {
+                return None;
+            }
+            let rank = if unit.dao_master {
+                2
+            } else if unit.kind != EntityKind::Warrior {
+                1
+            } else {
+                0
+            };
+            Some((
+                (rank, unit.insight, count, std::cmp::Reverse(unit.id)),
+                unit.id,
+            ))
+        })
+        .max_by_key(|(priority, _)| *priority)
+        .map(|(_, id)| id)
+}
+
 pub(in crate::game) fn is_buff_item(ability: AbilityKind) -> bool {
     matches!(
         ability,
@@ -332,85 +402,6 @@ pub(super) fn set_autocast(
         {
             unit.escape_autocast_disabled = !enabled;
         }
-    }
-}
-
-/// Selectable, non-blocking ground magic. Capacity uses hp/max_hp and is immune to combat/repair.
-#[allow(clippy::too_many_arguments)]
-fn place_healing_seal(
-    map: &Map,
-    entities: &mut EntityStore,
-    players: &mut [PlayerState],
-    fog: &Fog,
-    events: &mut HashMap<u32, Vec<Event>>,
-    player: u32,
-    shops: &[u32],
-    point: (Option<f32>, Option<f32>),
-) {
-    let (Some(x), Some(y)) = point else {
-        return;
-    };
-    if !map.contains_world_point(x, y) {
-        return;
-    }
-    let ts = config::TILE_SIZE as f32;
-    let (tx, ty) = map.tile_of(x, y);
-    let (Some(left), Some(top)) = (tx.checked_sub(1), ty.checked_sub(1)) else {
-        return;
-    };
-    if !standability::building_site_clear(map, entities, EntityKind::HealingSeal, left, top) {
-        return;
-    }
-    let (x, y) = map.tile_center(tx, ty);
-    if !fog.is_visible_world(player, x, y) {
-        return;
-    }
-    let definition = ability::definition(AbilityKind::HealingSeal);
-    let range = definition.range_tiles.unwrap_or(0.0) * ts;
-    if !shops.iter().filter_map(|id| entities.get(*id)).any(|shop| {
-        shop.owner == player
-            && shop.kind == EntityKind::Shop
-            && shop.hp > 0
-            && !shop.under_construction()
-            && dist2(shop.pos_x(), shop.pos_y(), x, y) <= range * range
-    }) {
-        return;
-    }
-    if entities
-        .iter()
-        .filter(|e| e.kind == EntityKind::HealingSeal)
-        .count()
-        >= crate::game::ability_runtime::MAX_ACTIVE_ABILITY_OBJECTS
-    {
-        return;
-    }
-    let Some(ps) = players.iter_mut().find(|p| p.id == player) else {
-        return;
-    };
-    if !crate::rules::faction::catalog_for(&ps.faction_id)
-        .is_some_and(|c| c.allows_ability(AbilityKind::HealingSeal, EntityKind::Shop))
-    {
-        return;
-    }
-    if !ps.can_afford(definition.cost.steel, definition.cost.oil) {
-        events.entry(player).or_default().push(Event::Notice {
-            msg: crate::rules::economy::resource_shortage_notice_for_cost(
-                ps.steel,
-                ps.oil,
-                definition.cost,
-            )
-            .to_string(),
-            x: None,
-            y: None,
-            severity: crate::protocol::NoticeSeverity::Info,
-        });
-        return;
-    }
-    if entities
-        .spawn_building(player, EntityKind::HealingSeal, x, y, true)
-        .is_some()
-    {
-        ps.spend_cost(definition.cost);
     }
 }
 

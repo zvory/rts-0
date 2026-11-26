@@ -23,7 +23,7 @@ export class ClientIntent {
     this._now = now;
     /** @type {null | {building:string, tileX:number, tileY:number, valid:boolean, lineSites?:Array<{tileX:number,tileY:number,valid:boolean}>}} */
     this.placement = null;
-    /** @type {null | "workerBuild" | "workerAdvancedBuild"} */
+    /** @type {null | "workerBuild" | "workerAdvancedBuild" | "shopBuy"} */
     this.commandCardMode = null;
     /** @type {null | "move" | "attack" | "setupAntiTankGuns" | "pointTanks" | {kind:"ability",ability:string}} */
     this.commandTarget = null;
@@ -70,6 +70,11 @@ export class ClientIntent {
     this.pointTargetPreview = null;
     this.attackTargetPreview = null;
     this.commandCardMode = advanced ? "workerAdvancedBuild" : "workerBuild";
+  }
+
+  openShopBuyMenu() {
+    this.openWorkerBuildMenu();
+    this.commandCardMode = "shopBuy";
   }
 
   /**
