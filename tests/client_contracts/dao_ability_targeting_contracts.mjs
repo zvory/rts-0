@@ -205,7 +205,7 @@ console.log("Dao ability targeting contracts passed");
   assert(input._issueTargetedCommand({ x: 200, y: 100 }), "Regen accepts distant allies");
   assert(sent.length === 2, "Distant potion purchase is issued");
   for (const ability of [ABILITY.ESCAPE_TREASURE, ABILITY.ARMOR_TREASURE,
-    ABILITY.VITALITY_TREASURE, ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE]) {
+    ABILITY.VITALITY_TREASURE, ABILITY.DOUBLE_XP, ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE]) {
     input.clientIntent.beginCommandTarget({ kind: "ability", ability });
     const before = sent.length;
     assert(input._issueTargetedCommand({ x: 200, y: 100 }), "Every carried Shop good accepts distant allies");
@@ -216,7 +216,7 @@ console.log("Dao ability targeting contracts passed");
 
   target = { ...target, owner: 1, x: 200 };
   const passiveItems = [ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE,
-    ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE];
+    ABILITY.DOUBLE_XP, ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE];
   for (const equipped of passiveItems) {
     target.abilities = [{ ability: equipped, remainingUses: 1 }];
     for (const ability of passiveItems) {

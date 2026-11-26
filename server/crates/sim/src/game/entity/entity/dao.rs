@@ -96,6 +96,11 @@ impl Entity {
         let (numerator, denominator) = config::disciple_insight_ratio(self.kind, target_kind);
         let total = u64::from(damage)
             .saturating_mul(numerator)
+            .saturating_mul(if self.shop_item_active(AbilityKind::DoubleXp) {
+                2
+            } else {
+                1
+            })
             .saturating_add(self.insight_fraction);
         let earned = (total / denominator).min(u64::from(self.insight_cap() - self.insight));
         self.insight += earned as u32;
@@ -111,6 +116,11 @@ impl Entity {
         if self.kind != EntityKind::MagicAdept || self.hp == 0 || self.dao_master {
             return;
         }
+        let amount = amount.saturating_mul(if self.shop_item_active(AbilityKind::DoubleXp) {
+            2
+        } else {
+            1
+        });
         self.insight = self.insight.saturating_add(amount).min(self.insight_cap());
         if self.insight == self.insight_cap() {
             self.insight_fraction = 0;

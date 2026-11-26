@@ -29,6 +29,7 @@ impl Entity {
                 Haste,
                 crate::game::ability::AbilityKind::VitalityTreasure,
                 crate::game::ability::AbilityKind::DoubleDamage,
+                crate::game::ability::AbilityKind::DoubleXp,
             ]
             .iter()
             .filter(|&&kind| self.shop_item_active(kind))

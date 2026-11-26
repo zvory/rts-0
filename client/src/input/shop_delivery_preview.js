@@ -21,7 +21,7 @@ export function updateShopDeliveryPreview(input) {
   if (!input.mouse) return;
   const mode = intent.commandTarget;
   if (mode && !(mode.kind === "ability" && [ABILITY.REGEN,
-    ABILITY.ESCAPE_TREASURE, ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE,
+    ABILITY.DOUBLE_XP, ABILITY.ESCAPE_TREASURE, ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE,
     ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE].includes(mode.ability))) return;
   const shop = input.state.selectedEntities().find((e) => e.kind === KIND.SHOP
     && e.hp > 0 && e.buildProgress == null && ownOwner(input.state, e.owner, input.controlPolicy));

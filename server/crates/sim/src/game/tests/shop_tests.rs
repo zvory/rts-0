@@ -937,6 +937,7 @@ fn armor_treasure_applies_on_delivery_without_activation_or_expiry() {
 #[test]
 fn every_passive_item_applies_on_delivery_and_ignores_activation_forever() {
     for ability in [
+        AbilityKind::DoubleXp,
         AbilityKind::Regen,
         AbilityKind::Haste,
         AbilityKind::DoubleDamage,
@@ -1470,3 +1471,6 @@ fn regen_reserves_slot_rejects_duplicates_projects_privately_and_survives_checkp
     }
     assert_eq!(game.state.entities.get(unit).unwrap().hp, hp + 3);
 }
+
+#[path = "shop_double_xp_tests.rs"]
+mod double_xp;

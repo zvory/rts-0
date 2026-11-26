@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 15] = [
+pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 16] = [
     AbilityCatalogEntry {
         kind: AbilityKind::EvolveWind,
         label: "Dao of Wind",
@@ -208,5 +208,14 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 15] = [
         tech_requirement: None, upgrade_requirement: None,
         queue_policy: AbilityQueuePolicy::NotQueueable, autocast: false,
         command_card: true, protocol_code: 26, order_stage_code: 34,
+    },
+    AbilityCatalogEntry {
+        kind: AbilityKind::DoubleXp, label: "2X XP", icon: "2X", hotkey: Some("W"),
+        title: "Deliver a permanent passive utility item at any distance; doubles all Insight gain on arrival", carriers: &[EntityKind::Shop], target_mode: AbilityTargetMode::FriendlyUnit,
+        range_tiles: None, min_range_tiles: None, cooldown_ticks: 0,
+        charges: None, charge_recharge_ticks: None, cost: ResourceCost::new(0, 50),
+        tech_requirement: None, upgrade_requirement: None,
+        queue_policy: AbilityQueuePolicy::NotQueueable, autocast: false,
+        command_card: true, protocol_code: 28, order_stage_code: 37,
     },
 ];

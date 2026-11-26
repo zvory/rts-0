@@ -329,6 +329,13 @@ export const STATS = Object.freeze({
 });
 
 export const ABILITIES = Object.freeze({
+  [ABILITY.DOUBLE_XP]: Object.freeze({
+    ability: ABILITY.DOUBLE_XP, label: "2X XP", icon: "2X", hotkey: "W",
+    title: "Deliver a permanent passive utility item at any distance; doubles all Insight gain on arrival",
+    carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: null,
+    cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 50 }),
+    queued: false, queuePolicy: "notQueueable",
+  }),
   [ABILITY.HEALING_SEAL]: Object.freeze({
     ability: ABILITY.HEALING_SEAL, label: "Healing Seal", icon: "+", hotkey: "S",
     title: "Defense item: Place a 3-tile-wide healing circle within 30 tiles; friendly units recover 3 HP per second, up to 400 HP total",
