@@ -262,7 +262,7 @@ pub fn project_entity(
     if entity.kind.is_disciple() {
         view.item_radiance_tier = (!vision_only).then(|| entity.item_radiance_tier());
         view.dao_master = Some(entity.dao_master);
-        view.insight = owner_or_ally.then_some(entity.insight);
+        view.insight = Some(entity.insight);
         view.dao_ready =
             Some(entity.dao().is_none() && entity.insight >= config::DISCIPLE_INSIGHT_REQUIRED);
         view.dao_advance_ticks = (entity.dao_advance_ticks > 0).then_some(entity.dao_advance_ticks);

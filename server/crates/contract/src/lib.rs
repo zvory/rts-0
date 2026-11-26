@@ -922,7 +922,7 @@ pub struct EntityView {
     pub tournament_entrants: Option<u8>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dao_training_queue: Option<Vec<String>>,
-    /// Public rank on a visible Disciple; exact insight remains team-private.
+    /// Public rank on a visible Disciple; exact insight is also public.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dao_master: Option<bool>,
 
