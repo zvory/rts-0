@@ -102,7 +102,11 @@ export function createCommandButton(opts) {
   // secondary-action buttons interactive while the primary action is unavailable; the click
   // dispatcher below still suppresses an ordinary primary click.
   btn.disabled = primaryDisabled && !hasSecondaryAction;
-  if (opts.title) btn.title = opts.title;
+  if (opts.title) {
+    // Rich tooltips already reveal immediately; do not add a second delayed native popup.
+    if (opts.tooltipHtml) btn.setAttribute("aria-label", opts.title);
+    else btn.title = opts.title;
+  }
   if (opts.hotkey) {
     btn.dataset.hotkey = opts.hotkey;
   }

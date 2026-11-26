@@ -11,15 +11,16 @@ export const ITEM_ICON_SHAPES = Object.freeze({
   return: [0, -5, 5, 0, 0, 5, -5, 0],
 });
 
+// Short authored HUD copy. Costs come from the ability affordance, never this table.
 export const CARRIED_ITEMS = Object.freeze([
-  { ability: ABILITY.REGEN, label: "Regen", shortLabel: "RGN", color: 0x54e878, shape: "cross" },
-  { ability: ABILITY.HASTE, label: "Haste", shortLabel: "HST", color: 0xffd15e, shape: "bolt" },
-  { ability: ABILITY.DOUBLE_DAMAGE, label: "Double Damage", shortLabel: "DD", color: 0xff825d, shape: "sword" },
-  { ability: ABILITY.ARMOR_TREASURE, label: "Armor Treasure", shortLabel: "ARM", color: 0x73d8ff, shape: "shield" },
-  { ability: ABILITY.VITALITY_TREASURE, label: "Vitality Treasure", shortLabel: "VIT", color: 0x87edaa, shape: "heart" },
-  { ability: ABILITY.ESCAPE_TREASURE, label: "Escape Treasure", shortLabel: "ESC", color: 0xdfa5ff, shape: "return" },
-  { ability: ABILITY.DOUBLE_XP, label: "2X XP", shortLabel: "2X", color: 0x68a9ff, shape: "xp" },
-  { ability: ABILITY.BREAKTHROUGH_TREASURE, label: "Breakthrough", shortLabel: "BT", color: 0xafffff, shape: "bolt" },
+  { ability: ABILITY.REGEN, tooltipName: "HP Regen", summary: "+3 HP per second", qualifier: "Permanent", label: "Regen", shortLabel: "RGN", color: 0x54e878, shape: "cross" },
+  { ability: ABILITY.HASTE, tooltipName: "Haste", summary: "+15% move speed · +25% primary weapon attack speed", qualifier: "Permanent · Attack while moving", label: "Haste", shortLabel: "HST", color: 0xffd15e, shape: "bolt" },
+  { ability: ABILITY.DOUBLE_DAMAGE, tooltipName: "Double Damage", summary: "2× primary weapon damage", qualifier: "Permanent", label: "Double Damage", shortLabel: "DD", color: 0xff825d, shape: "sword" },
+  { ability: ABILITY.ARMOR_TREASURE, tooltipName: "Armor Treasure", summary: "+50 percentage points of armor", qualifier: "Permanent · 100% cap before armor piercing", label: "Armor Treasure", shortLabel: "ARM", color: 0x73d8ff, shape: "shield" },
+  { ability: ABILITY.VITALITY_TREASURE, tooltipName: "Vitality Treasure", summary: "+150 max and current HP", qualifier: "Permanent", label: "Vitality Treasure", shortLabel: "VIT", color: 0x87edaa, shape: "heart" },
+  { ability: ABILITY.ESCAPE_TREASURE, tooltipName: "Escape Treasure", summary: "Lethal damage returns unit to Shop at 1 HP", qualifier: "One use · 60s purchase cooldown", label: "Escape Treasure", shortLabel: "ESC", color: 0xdfa5ff, shape: "return" },
+  { ability: ABILITY.DOUBLE_XP, tooltipName: "2X XP", summary: "2× Insight gain", qualifier: "Permanent", label: "2X XP", shortLabel: "2X", color: 0x68a9ff, shape: "xp" },
+  { ability: ABILITY.BREAKTHROUGH_TREASURE, tooltipName: "Breakthrough", summary: "+25% move speed within 3 tiles", qualifier: "Permanent · Auras do not stack", label: "Breakthrough", shortLabel: "BT", color: 0xafffff, shape: "bolt" },
 ].map(Object.freeze));
 
 export function carriedItemMask(entity) {

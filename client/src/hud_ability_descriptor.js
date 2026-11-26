@@ -1,4 +1,5 @@
 import { ABILITY } from "./protocol.js";
+import { shopItemTooltipHtml } from "./hud_shop_tooltip.js";
 
 export function abilityButtonDescriptor({
   affordance,
@@ -19,6 +20,8 @@ export function abilityButtonDescriptor({
       cooldownSeconds: affordance.cooldownSeconds,
     };
   }
+  const shopTooltip = shopItemTooltipHtml(definition.ability, affordance.cost,
+    disabledReason !== definition.title ? disabledReason : "");
   const evolution = definition.ability.startsWith("evolve");
   const recastActive = affordance.recastTargetObjectId != null;
   const readyCount = recastActive ? affordance.recastReadyIds.length : affordance.readyIds.length;
@@ -47,10 +50,10 @@ export function abilityButtonDescriptor({
     icon: definition.icon,
     label: definition.label,
     title: disabledReason,
-    tooltipHtml: !affordance.unlocked
+    tooltipHtml: shopTooltip || (!affordance.unlocked
       ? `<span class="cmd-tooltip-title">${definition.label}</span>` +
         `<span class="cmd-tooltip-desc">${disabledReason}</span>`
-      : "",
+      : ""),
     ability: definition.ability,
     enabled: (evolution || affordance.unlocked) && commandableCount > 0 && affordance.affordable,
     unaffordable: affordance.unlocked && commandableCount > 0 && !affordance.affordable,

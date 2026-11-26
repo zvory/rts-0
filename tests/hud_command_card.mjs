@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { shopItemTooltipHtml } from "../client/src/hud_shop_tooltip.js";
 import { createCommandButton, renderDescriptorCardDom, syncCooldownClockElement } from "../client/src/hud_command_dom.js";
 import { fakeClassList, withFakeDocument, withFakeHudDocument } from "./client_contracts/fakes.mjs";
 import { groupCooldownClocks } from "../client/src/hud.js";
@@ -1253,5 +1254,40 @@ for (const factionId of ["cultivators", "kriegsia", "ekat"]) {
     assert.equal(element.children[0].children.length, 12, "edge tabs preserve twelve grid cells");
     assert.deepEqual(Array.from(element.children[0].children).filter((e) => e.className === "shop-row-start")
       .map((e) => e.children[1].textContent), ["Util", "Defense", "Offense"]);
+  });
+}
+
+
+// Shop and Buy reuse command tooltips; short copy never parses the verbose title.
+{
+  const shop = { id: 20, owner: 1, kind: KIND.SHOP, hp: 200 };
+  const card = buildCommandCardDescriptors({ playerId: 1, factionId: "cultivators",
+    selection: [shop], entities: [shop], resources: { steel: 1000, oil: 1000 },
+    groupCooldownClocks: () => [] });
+  const items = card.slots.filter((s) => s?.action === "ability");
+  assert.equal(items.length, 8);
+  for (const item of items) {
+    assert.match(item.tooltipHtml, /cmd-tooltip-title/);
+    assert.match(item.tooltipHtml, /cmd-tooltip-desc/);
+    assert.match(item.tooltipHtml, /cmd-tooltip-cost/);
+    assert.match(item.tooltipHtml, new RegExp(`${item.cost.oil} oil`));
+    assert(!item.tooltipHtml.includes("at any distance"));
+    withFakeHudDocument(() => {
+      const button = createCommandButton(item);
+      assert.equal(button.title, "", "rich tooltip suppresses delayed native popup");
+      assert.equal(button.getAttribute("aria-label"), item.title);
+      assert.match(button.innerHTML, /role="tooltip"/);
+    });
+  }
+  const regen = items.find((s) => s.ability === ABILITY.REGEN);
+  assert.match(regen.tooltipHtml, /HP Regen/);
+  assert.match(regen.tooltipHtml, /\+3 HP per second/);
+  assert.match(regen.tooltipHtml, /Permanent/);
+  assert.match(shopItemTooltipHtml(ABILITY.REGEN, { oil: 73 }, "Requires <Shop>"),
+    /73 oil.*Requires &lt;Shop&gt;/);
+  assert.equal(shopItemTooltipHtml("not-an-item", {}), "");
+  withFakeHudDocument(() => {
+    const button = createCommandButton({ label: "Move", title: "Move units", enabled: true });
+    assert.equal(button.title, "Move units", "plain buttons keep existing native help");
   });
 }

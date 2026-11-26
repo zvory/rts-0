@@ -130,6 +130,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "hud_train_card_helpers.js": "ui",
   "hud_dao_training_card.js": "ui",
   "hud_shop_card.js": "ui",
+  "hud_shop_tooltip.js": "ui",
   "hud_control_groups.js": "ui",
   "hud_resources.js": "ui",
   "hud_selection_panel.js": "ui",

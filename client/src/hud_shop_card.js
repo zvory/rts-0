@@ -1,3 +1,4 @@
+import { shopItemTooltipHtml } from "./hud_shop_tooltip.js";
 import { KIND } from "./protocol.js";
 import { gridHotkeyForSlot } from "./hud_command_layout.js";
 
@@ -26,7 +27,10 @@ export function buildShopBuyCard(ctx, isOwn, buildTrainCard) {
     slot.intent = { type: "buyShopItem", ability: slot.ability };
     slot.enabled &&= shops.length > 0;
     slot.unaffordable &&= shops.length > 0;
-    if (!shops.length) slot.title = "Requires a completed Shop";
+    if (!shops.length) {
+      slot.title = "Requires a completed Shop";
+      slot.tooltipHtml = shopItemTooltipHtml(slot.ability, slot.cost, slot.title);
+    }
   }
   result.slots[11] = {
     id: "shop:return", commandId: "cultivators.item.returnBuyMenu", kind: "button", action: "return",
