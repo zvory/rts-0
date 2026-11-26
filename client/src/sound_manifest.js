@@ -5,6 +5,7 @@
 export const SOUND_MANIFEST = Object.freeze([
   { id: "combat_lightness_dash_01", url: "/assets/sound/combat/combat_lightness_dash_01.mp3", category: "combat_other" },
   { id: "combat_magic_shield_01", url: "/assets/sound/combat/combat_magic_shield_01.mp3", category: "combat_other" },
+  { id: "combat_vector_field_01", url: "/assets/sound/combat/combat_vector_field_01.mp3", category: "combat_other" },
   { id: "combat_magic_anchor_01", url: "/assets/sound/combat/combat_magic_anchor_01.mp3", category: "combat_other" },
   { id: "combat_throw_sword_01", url: "/assets/sound/combat/combat_throw_sword_01.mp3", category: "combat_other" },
   { id: "combat_disciple_orb_01", url: "/assets/sound/combat/combat_disciple_orb_01.mp3", category: "combat_other" },
