@@ -10,6 +10,7 @@ replays. `Match` owns the only animation-frame loop.
 ```
 index.html        # PINNED — #app + module entry + screens markup; no main-thread Pixi script
 styles.css        # HUD, lobby, menus, command card
+hud_command.css   # Command-card ability status, cooldown clocks/countdowns, and Dao choices
 lobby_map_selector.css # Custom lobby map picker layout and responsive preview popover
 live_pause.css    # live-match pause overlay and actions
 assets/decals/    # SVG decal source art plus generated worker-decodable PNG mask atlas
@@ -2012,6 +2013,14 @@ half the minimap width. The status counts live local Workers whose authoritative
 shows the active profile's selection hotkey in parentheses, and remains pointer-disabled. Pressing
 the configured hotkey selects the current idle set through normal command-supply admission when the
 command surface is writable.
+
+Ability command buttons show whole seconds remaining beside their cooldown clock. The countdown
+uses the earliest strictly positive authoritative cooldown or charge-recharge timer among selected
+owned ability carriers, rounded up; it never uses averaged clock arms or normalized progress.
+It remains visible when other carriers are already ready and disappears when no displayed timer
+is running. The existing ready/charge count and command availability remain separate. HUD refreshes
+the countdown on retained buttons without rebuilding the card each second. Compact touch cards
+show the number alone below the ability label to keep it clear of the hotkey and count badges.
 
 Match passes replay-only `showEntityIds` selection options through HUD to HudSelectionPanel.
 Replay single-selection details show the authoritative entity ID beside the unit kill count

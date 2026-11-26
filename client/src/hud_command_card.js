@@ -16,6 +16,7 @@ import {
   abilityActiveObjectId,
   abilityAutocastEnabled,
   abilityCooldownClocks,
+  abilityCooldownSeconds,
   abilityRemainingUses,
   abilityUnitQueueAdmissible,
   abilityUnitReady,
@@ -562,6 +563,7 @@ export function selectedAbilityAffordances(ctx, selection) {
           : null,
         autocastEnabledIds,
         cooldownClocks: abilityCooldownClocks(carriers, definition, ctx.groupCooldownClocks),
+        cooldownSeconds: abilityCooldownSeconds(carriers, definition),
       };
     })
     .filter(Boolean);

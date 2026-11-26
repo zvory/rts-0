@@ -23,3 +23,71 @@
   0%, 100% { box-shadow: 0 0 4px 1px #ffdc7080, inset 0 0 7px #ffdc7020; }
   50% { box-shadow: 0 0 15px 3px #ffdc70b0, inset 0 0 12px #ffdc7040; }
 }
+
+/* Ability cooldown clocks and remaining-seconds feedback. */
+.cmd-btn .cmd-cooldowns {
+  position: absolute;
+  top: 5px;
+  left: 17px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 1px;
+}
+.cmd-btn.has-cooldown .cmd-hotkey {
+  width: 16px;
+  height: 16px;
+  font-size: 10px;
+}
+.cmd-btn.has-cooldown .cmd-ready-count {
+  box-sizing: border-box;
+  padding: 0 2px;
+  font-size: 9px;
+}
+.cmd-btn .cmd-cd-seconds {
+  color: var(--ink);
+  font-size: 8px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+}
+.cmd-btn .cmd-cd-seconds.long { font-size: 7px; }
+.cmd-btn .cmd-cd-clock {
+  box-sizing: border-box;
+  position: relative;
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--panel-edge);
+  border-radius: 999px;
+  background: rgba(17, 17, 15, 0.92);
+}
+.cmd-btn .cmd-cd-arm {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 1px;
+  height: 3px;
+  background: var(--accent);
+  box-shadow: 0 0 0 1px rgba(17, 17, 15, 0.18);
+  transform-origin: 50% 100%;
+  transform: translateX(-50%) rotate(var(--cooldown-rotation, 0deg));
+}
+
+@media (pointer: coarse) and (max-width: 1024px) and (max-height: 1024px) {
+  .cmd-btn.has-cooldown .cmd-hotkey {
+    width: 14px;
+    height: 14px;
+    font-size: 8px;
+  }
+  .cmd-btn.has-cooldown .cmd-cooldowns {
+    left: auto;
+    right: 2px;
+    top: auto;
+    bottom: 1px;
+  }
+  .cmd-btn.has-cooldown .cmd-cd-clock { display: none; }
+  .cmd-btn.has-cooldown .cmd-cd-seconds { font-size: 7px; }
+  .cmd-btn.has-cooldown .cmd-ready-count { font-size: 8px; }
+  .cmd-btn.has-cooldown .cmd-label { line-height: 1; transform: translateY(-2px); }
+}

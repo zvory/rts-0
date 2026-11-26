@@ -5,8 +5,8 @@
   "exceptions": [
     {
       "path": "client/styles.css",
-      "lines": 5734,
-      "reason": "The production stylesheet still owns shared shell, lobby, HUD, Lab, replay, and responsive presentation rules. Twelve focused lines lay out the new default zoom slider and its endpoint labels beside the existing minimap slider; keep ratcheting until these responsibilities have an evidence-backed split."
+      "lines": 5706,
+      "reason": "Shared shell, lobby, HUD, Lab, replay, and responsive presentation rules remain in the production stylesheet. Command-card cooldown feedback now lives in hud_command.css; lower the frozen ceiling after this focused extraction."
     },
     {
       "path": "scripts/client-perf-harness.mjs",
