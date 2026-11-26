@@ -622,7 +622,8 @@ impl<'a> MoveCoordinator<'a> {
             .filter(|e| {
                 e.is_unit()
                     && ((e.path_is_empty() && matches!(e.order(), Order::Repair(order) if entities.get(order.intent.target).is_none_or(|t| {
-                        super::dist2(e.pos_x(), e.pos_y(), t.pos_x(), t.pos_y()) > super::interact_range_for_kind(t.kind).powi(2)
+                        let range = super::interact_range_for_kind(t.kind);
+                        super::dist2(e.pos_x(), e.pos_y(), t.pos_x(), t.pos_y()) > range * range
                     }))) || e.move_phase() == Some(MovePhase::AwaitingPath)
                         || (e.path_is_empty()
                             && matches!(e.build_phase(), Some(BuildPhase::ToSite)))

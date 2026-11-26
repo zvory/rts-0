@@ -27,8 +27,8 @@ pub(in crate::game) fn repair_system(entities: &mut EntityStore, players: &mut [
         }
         let in_range = match (entities.get(id), entities.get(target)) {
             (Some(w), Some(t)) => {
-                dist2(w.pos_x(), w.pos_y(), t.pos_x(), t.pos_y())
-                    <= interact_range_for_kind(t.kind).powi(2)
+                let range = interact_range_for_kind(t.kind);
+                dist2(w.pos_x(), w.pos_y(), t.pos_x(), t.pos_y()) <= range * range
             }
             _ => false,
         };
