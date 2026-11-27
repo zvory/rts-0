@@ -222,7 +222,8 @@ completes Entrenchment before expanding. At two completed bases it targets two B
 researches Panzerfaust and Methamphetamines, and balances completed plus queued Machine Gunners
 and Panzerfausts toward equal counts. At three bases it targets four Barracks; it then expands to
 four bases and continues mixed infantry production, adding Barracks when money accumulates.
-Required mining, supply, tech, and expansion spending precede optional troop/overflow spending.
+Required mining, tech, and expansion spending precede optional troop/overflow spending. Supply
+uses the game's fixed cap; Eco pauses unaffordable training rather than building supply structures.
 Expansion candidates follow SDK ground-distance rank, excluding unreachable and known hostile
 sites. Completed owned Depots drive base stages; submitted commands are never treated as proof
 of completed construction. Defensive assignments follow the shared cut/garrison planner and move
