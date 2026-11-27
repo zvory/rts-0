@@ -1,9 +1,7 @@
 //! Exercise the public planner from an unrelated external strategy, through the normal host.
 use std::sync::{Arc, Mutex};
 
-use rts_ai::sdk::{
-    AiActions, AiFrame, AiStrategy, DefensePlan, DefensePlanner, WorldQueries,
-};
+use rts_ai::sdk::{AiActions, AiFrame, AiStrategy, DefensePlan, DefensePlanner, WorldQueries};
 use rts_ai::{AiAlivePolicy, AiController, CanonicalAiTickDriver};
 use rts_sim::game::{Game, PlayerInit};
 
@@ -52,8 +50,7 @@ fn external_strategy_reuses_defense_without_adopting_eco_or_emitting_orders() {
         color: "#4cc9f0".into(),
         is_ai: true,
     });
-    let map = rts_sim::game::map::Map::load_for_players("Classic", &[(1, 1), (2, 2)], 7)
-        .unwrap();
+    let map = rts_sim::game::map::Map::load_for_players("Classic", &[(1, 1), (2, 2)], 7).unwrap();
     let mut game = Game::new_with_random_ai_profiles_and_map_metadata(
         &players,
         7,
@@ -80,8 +77,7 @@ fn external_strategy_reuses_defense_without_adopting_eco_or_emitting_orders() {
     assert_eq!(evidence.plans.len(), 3);
     assert!(evidence.flows_after_first_request > 0);
     assert_eq!(
-        evidence.flows_after_first_request,
-        evidence.flows_after_budget_changes,
+        evidence.flows_after_first_request, evidence.flows_after_budget_changes,
         "a changing force budget must reuse the static cut work"
     );
     for (budget, plan) in &evidence.plans {
@@ -97,7 +93,10 @@ fn external_strategy_reuses_defense_without_adopting_eco_or_emitting_orders() {
         }
         for slot in &plan.slots {
             assert!(slot.position.0.is_finite() && slot.position.1.is_finite());
-            assert!(plan.sectors.iter().any(|sector| sector.id == slot.sector_id));
+            assert!(plan
+                .sectors
+                .iter()
+                .any(|sector| sector.id == slot.sector_id));
         }
     }
 }
