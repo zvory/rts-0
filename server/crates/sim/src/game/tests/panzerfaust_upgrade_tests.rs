@@ -241,7 +241,11 @@ fn panzerfaust_fires_once_at_war_adepts_and_masters_automatically_and_on_order()
             let mut game = empty_flat_game(&players());
             let attacker = spawn_on_tile(&mut game, 1, EntityKind::Panzerfaust, 8, 8);
             let target = spawn_on_tile(&mut game, 2, EntityKind::WarAdept, 11, 8);
-            game.state.entities.get_mut(attacker).unwrap().set_invulnerable(true);
+            game.state
+                .entities
+                .get_mut(attacker)
+                .unwrap()
+                .set_invulnerable(true);
             let victim = game.state.entities.get_mut(target).unwrap();
             if master {
                 victim.insight = config::DISCIPLE_EVOLVED_INSIGHT_CAP;
@@ -263,13 +267,18 @@ fn panzerfaust_fires_once_at_war_adepts_and_masters_automatically_and_on_order()
             for _ in 0..90 {
                 let events = game.tick();
                 launches += launch_count(&events, 1, attacker);
-                impacts += player_events(&events, 1).iter().filter(|event| {
-                    matches!(event, Event::PanzerfaustImpact { .. })
-                }).count();
+                impacts += player_events(&events, 1)
+                    .iter()
+                    .filter(|event| matches!(event, Event::PanzerfaustImpact { .. }))
+                    .count();
             }
             assert_eq!(launches, 1, "master={master}, ordered={ordered}");
             assert_eq!(impacts, 1, "master={master}, ordered={ordered}");
-            let remaining_hp = game.state.entities.get(target).map_or(0, |entity| entity.hp);
+            let remaining_hp = game
+                .state
+                .entities
+                .get(target)
+                .map_or(0, |entity| entity.hp);
             assert!(remaining_hp <= starting_hp.saturating_sub(rocket_damage),
                 "rocket damage should land: master={master}, ordered={ordered}, hp={remaining_hp}, start={starting_hp}, damage={rocket_damage}");
         }
