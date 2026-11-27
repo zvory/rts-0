@@ -71,15 +71,15 @@ impl DefenseAssignments {
                 continue;
             }
             if dist2(e.position, point) > (frame.map().tile_size as f32 * 0.3).det_powi(2) {
-                if changed || e.state != AiEntityState::Move {
-                    if actions.move_group(&group, point.0, point.1, false).is_ok() {
-                        self.held.remove(&e.id);
-                    }
+                if (changed || e.state != AiEntityState::Move)
+                    && actions.move_group(&group, point.0, point.1, false).is_ok()
+                {
+                    self.held.remove(&e.id);
                 }
-            } else if changed || !self.held.contains(&e.id) || e.state != AiEntityState::Idle {
-                if actions.hold_position(&group, false).is_ok() {
-                    self.held.insert(e.id);
-                }
+            } else if (changed || !self.held.contains(&e.id) || e.state != AiEntityState::Idle)
+                && actions.hold_position(&group, false).is_ok()
+            {
+                self.held.insert(e.id);
             }
         }
         self.held.retain(|id| assigned.contains_key(id));
