@@ -3,6 +3,7 @@ use crate::sdk::{
     AiActions, AiBaseSiteId, AiCompletion, AiEntity, AiEntityState, AiFrame, AiRulebook,
     AiStrategy, DefensePlanner, EntityKind, KnownBuildSiteExclusions, UpgradeKind, WorldQueries,
 };
+use rts_rules::math::GameplayMath as _;
 use std::collections::BTreeSet;
 mod construction;
 mod tactics;
@@ -190,7 +191,7 @@ impl AiStrategy for EcoStrategy {
                 );
                 let distance = construction::dist2(worker.position, target);
                 let (since, best) = self.travel_progress.get_or_insert((frame.tick(), distance));
-                if distance + (frame.map().tile_size as f32).powi(2) < *best {
+                if distance + (frame.map().tile_size as f32).det_powi(2) < *best {
                     *since = frame.tick();
                     *best = distance;
                 } else if frame.tick().saturating_sub(*since) >= 600 {

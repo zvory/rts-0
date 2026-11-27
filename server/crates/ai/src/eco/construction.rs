@@ -1,5 +1,6 @@
 use super::*;
 use crate::sdk::KnownBuildSite;
+use rts_rules::math::GameplayMath as _;
 impl EcoStrategy {
     /// Returns true when this decision has reserved money for a not-yet-paid travel order.
     pub(super) fn construct(
@@ -39,12 +40,10 @@ impl EcoStrategy {
                 )
         }) {
             if let Some(foot) = rules.entity(building.kind).and_then(|r| r.footprint) {
-                let x = (building.position.0 / size - foot.width_tiles as f32 / 2.)
-                    .round()
-                    .max(0.) as u32;
-                let y = (building.position.1 / size - foot.height_tiles as f32 / 2.)
-                    .round()
-                    .max(0.) as u32;
+                let x = (building.position.0 / size - foot.width_tiles as f32 / 2. + 0.5).max(0.)
+                    as u32;
+                let y = (building.position.1 / size - foot.height_tiles as f32 / 2. + 0.5).max(0.)
+                    as u32;
                 let _ = actions.resume_build(&[worker.id], building.kind, x, y);
             }
             return false;
@@ -102,8 +101,8 @@ impl EcoStrategy {
         let mut seen = BTreeSet::new();
         let mut candidates = Vec::new();
         for anchor in anchors {
-            let cx = (anchor.0 / size).floor() as i32;
-            let cy = (anchor.1 / size).floor() as i32;
+            let cx = (anchor.0 / size) as i32;
+            let cy = (anchor.1 / size) as i32;
             for dy in -12i32..=12 {
                 for dx in -12i32..=12 {
                     let x = cx + dx;
@@ -123,7 +122,7 @@ impl EcoStrategy {
                     );
                     // Match the SDK's twelve-tile association bound as well as nearest landmark.
                     if kind == EntityKind::ResourceDepot
-                        && dist2(center, point) > (12. * size).powi(2)
+                        && dist2(center, point) > (12. * size).det_powi(2)
                     {
                         continue;
                     }

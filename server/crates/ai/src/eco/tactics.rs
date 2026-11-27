@@ -1,6 +1,7 @@
 use super::construction::dist2;
 use super::*;
 use crate::sdk::UnitGroup;
+use rts_rules::math::GameplayMath as _;
 use std::collections::{BTreeMap, BTreeSet};
 #[derive(Default)]
 pub(super) struct DefenseAssignments {
@@ -69,7 +70,7 @@ impl DefenseAssignments {
             if e.state == AiEntityState::Attack {
                 continue;
             }
-            if dist2(e.position, point) > (frame.map().tile_size as f32 * 0.3).powi(2) {
+            if dist2(e.position, point) > (frame.map().tile_size as f32 * 0.3).det_powi(2) {
                 if changed || e.state != AiEntityState::Move {
                     if actions.move_group(&group, point.0, point.1, false).is_ok() {
                         self.held.remove(&e.id);
