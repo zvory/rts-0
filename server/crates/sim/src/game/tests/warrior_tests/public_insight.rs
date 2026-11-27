@@ -105,40 +105,33 @@ fn disciple_insight_is_public_but_chosen_dao_stays_team_private() {
 }
 
 #[test]
-fn passive_insight_ticks_in_game_and_triggers_automatic_evolution() {
+fn idle_cultivators_gain_no_insight_or_cosmic_energy_across_restore() {
     let mut game = empty_flat_game(&[cultivator_player()]);
-    let novice = game
-        .state
-        .entities
-        .spawn_unit(1, EntityKind::Warrior, 400.0, 400.0)
-        .unwrap();
-    let serf = game
-        .state
-        .entities
-        .spawn_unit(1, EntityKind::Worker, 600.0, 400.0)
-        .unwrap();
-    let unit = game.state.entities.get_mut(novice).unwrap();
-    unit.insight = 59;
-    unit.chosen_dao = Some(crate::game::upgrade::UpgradeKind::DaoWind);
-    for _ in 1..config::DISCIPLE_PASSIVE_INSIGHT_TICKS {
+    let kinds = [
+        EntityKind::Warrior,
+        EntityKind::WindAdept,
+        EntityKind::WarAdept,
+        EntityKind::MagicAdept,
+    ];
+    let mut ids = Vec::new();
+    for (i, kind) in kinds.into_iter().enumerate() {
+        let id = game
+            .state
+            .entities
+            .spawn_unit(1, kind, 400.0 + i as f32 * 100.0, 400.0)
+            .unwrap();
+        let unit = game.state.entities.get_mut(id).unwrap();
+        unit.insight = if kind == EntityKind::Warrior { 59 } else { 199 };
+        unit.insight_fraction = 1;
+        if kind == EntityKind::Warrior {
+            unit.chosen_dao = Some(crate::game::upgrade::UpgradeKind::DaoWind);
+        }
+        ids.push(id);
+    }
+    // Cross several former five-second income boundaries before and after restore.
+    for _ in 0..config::TICK_HZ * 10 {
         game.tick();
     }
-    assert_eq!(
-        game.state.entities.get(novice).unwrap().kind,
-        EntityKind::Warrior
-    );
-    // A later spawn must start its own cadence, including across a real game checkpoint.
-    let late = game
-        .state
-        .entities
-        .spawn_unit(1, EntityKind::Warrior, 800.0, 400.0)
-        .unwrap();
-    // Refresh derived state and supply before exporting the newly spawned fixture.
-    game.tick();
-    let evolved = game.state.entities.get(novice).unwrap();
-    assert_eq!(evolved.kind, EntityKind::WindAdept);
-    assert_eq!(evolved.insight, 0);
-    assert_eq!(game.state.entities.get(serf).unwrap().insight, 0);
     let payload = game.checkpoint_payload_text_for_test().unwrap();
     let mut restored = Game::restore_checkpoint_payload_text_for_test(
         &payload,
@@ -146,18 +139,21 @@ fn passive_insight_ticks_in_game_and_triggers_automatic_evolution() {
         game.state.map_metadata.clone(),
     )
     .unwrap();
-    for _ in 1..config::DISCIPLE_PASSIVE_INSIGHT_TICKS {
+    for _ in 0..config::TICK_HZ * 10 {
         game.tick();
         restored.tick();
     }
     for continued in [&game, &restored] {
-        assert_eq!(continued.state.entities.get(novice).unwrap().insight, 0);
-        assert_eq!(continued.state.entities.get(late).unwrap().insight, 1);
-    }
-    game.tick();
-    restored.tick();
-    for continued in [&game, &restored] {
-        assert_eq!(continued.state.entities.get(novice).unwrap().insight, 1);
-        assert_eq!(continued.state.entities.get(late).unwrap().insight, 1);
+        for (&id, kind) in ids.iter().zip(kinds) {
+            let unit = continued.state.entities.get(id).unwrap();
+            assert_eq!(unit.kind, kind);
+            assert_eq!(
+                unit.insight,
+                if kind == EntityKind::Warrior { 59 } else { 199 }
+            );
+            assert_eq!(unit.insight_fraction, 1);
+            assert!(!unit.dao_master);
+        }
+        assert_eq!(continued.snapshot_for(1).cosmic_energy, 0);
     }
 }

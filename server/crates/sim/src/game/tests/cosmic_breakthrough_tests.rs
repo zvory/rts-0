@@ -33,7 +33,7 @@ fn fixture() -> Game {
 }
 
 #[test]
-fn cosmic_energy_counts_only_actual_non_passive_insight_and_survives_restore() {
+fn cosmic_energy_counts_only_actual_insight_and_survives_restore() {
     let mut game = fixture();
     let id = game
         .state
@@ -41,10 +41,7 @@ fn cosmic_energy_counts_only_actual_non_passive_insight_and_survives_restore() {
         .spawn_unit(1, EntityKind::MagicAdept, 500.0, 500.0)
         .unwrap();
     let unit = game.state.entities.get_mut(id).unwrap();
-    for _ in 0..config::DISCIPLE_PASSIVE_INSIGHT_TICKS {
-        unit.tick_passive_insight();
-    }
-    assert_eq!(unit.insight, 1);
+    assert_eq!(unit.insight, 0);
     assert_eq!(unit.cosmic_energy_pending, 0);
     // Exact quarter-rate building carry; no energy until a whole insight is gained.
     unit.gain_insight(3, EntityKind::ResourceDepot);

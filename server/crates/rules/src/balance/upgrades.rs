@@ -56,8 +56,6 @@ pub const DAO_WIND_SPEED_MULTIPLIER: f32 = 1.15;
 /// Ordinary Disciple attacks run at 70% of their former rate, rounded to whole ticks.
 pub const DISCIPLE_ATTACK_COOLDOWN_TICKS: u32 = (64 * 10 + 3) / 7;
 
-/// One passive insight for every five seconds of a living Disciple’s lifetime.
-pub const DISCIPLE_PASSIVE_INSIGHT_TICKS: u16 = (TICK_HZ * 5) as u16;
 pub const DISCIPLE_INSIGHT_REQUIRED: u32 = 60;
 pub const DISCIPLE_EVOLVED_INSIGHT_CAP: u32 = 200;
 pub const DAO_MASTER_BODY_SCALE: f32 = 1.2;

@@ -24,12 +24,8 @@ one-for-one training in the [Proving Grounds](proven-grounds.md),
 with the existing shared research price tiers, serial queue and prerequisite/faction gates.
 Combat-earned evolution requires neither research nor a Pavilion.
 
-Every living Novice, Wind Adept, War Adept, and Magic Adept also earns one passive
-insight per five seconds (150 simulation ticks) since spawning. Serfs and other factions’
-units earn none. Each unit’s tick remainder is checkpointed and survives evolution;
-passive income adds to combat income, respects the 60/200 caps, and uses the same
-automatic advancement. Masters retain their terminal zero-insight state and earn none.
-Dead units do not advance the timer. Time at a cap is not banked as extra insight.
+Cultivators gain no passive insight from time alive. Novices and Adepts earn insight
+from combat and the rewards described below; Masters retain their terminal zero-insight state.
 
 Novices, War Adepts, and War Masters have **Charge**, an automatic passive shown as a disabled command-card tile with the
 autocast swirl and authoritative cooldown clock. It has no hotkey, cast action, or autocast toggle. Against a living
@@ -184,10 +180,10 @@ at 200; Masters earn none. No public death information or wire fields are added.
 ### Cosmic Energy
 
 Each player starts with zero **Cosmic Energy**, displayed with the **✨** sparkle icon.
-Every whole point of non-passive insight actually gained by an owned Cultivator also grants
+Every whole point of insight actually gained by an owned Cultivator also grants
 one Cosmic Energy. This includes hostile damage (with existing unit/building ratios and fractional
 carry), Throw Sword, Magic field death rewards, and insight granted by training or tournament
-promotion. Passive five-second insight grants none. Existing insight caps apply, so over-cap
+promotion. Existing insight caps apply, so over-cap
 rewards and terminal Masters grant none. Spending/resetting insight on evolution does not remove
 Cosmic Energy. It accumulates with saturating u32 arithmetic, survives checkpoints/replays, and
 has no spending action or effect yet. Lab-authored initial insight does not generate income.

@@ -17,10 +17,6 @@ use super::{
     WeaponSetup, WorkerState, MAX_QUEUED_ORDERS, NEUTRAL,
 };
 
-fn passive_insight_ticks_is_zero(value: &u16) -> bool {
-    *value == 0
-}
-
 fn insight_fraction_is_zero(value: &u64) -> bool {
     *value == 0
 }
@@ -68,9 +64,6 @@ pub struct Entity {
     /// Rebuilt from living friendly carriers before movement; never checkpointed.
     #[serde(skip)]
     pub(crate) breakthrough_aura: bool,
-    /// Living ticks toward the next passive insight; preserved through Dao evolution.
-    #[serde(default, skip_serializing_if = "passive_insight_ticks_is_zero")]
-    pub(crate) passive_insight_ticks: u16,
     /// Numerator remainder in the current kind's insight-ratio denominator.
     #[serde(default, skip_serializing_if = "insight_fraction_is_zero")]
     pub(crate) insight_fraction: u64,
@@ -149,7 +142,6 @@ impl Entity {
             insight: 0,
             cosmic_energy_pending: 0,
             breakthrough_aura: false,
-            passive_insight_ticks: 0,
             insight_fraction: 0,
             dao_master: false,
             chosen_dao: None,
@@ -212,7 +204,6 @@ impl Entity {
             insight: 0,
             cosmic_energy_pending: 0,
             breakthrough_aura: false,
-            passive_insight_ticks: 0,
             insight_fraction: 0,
             dao_master: false,
             chosen_dao: None,
@@ -277,7 +268,6 @@ impl Entity {
             insight: 0,
             cosmic_energy_pending: 0,
             breakthrough_aura: false,
-            passive_insight_ticks: 0,
             insight_fraction: 0,
             dao_master: false,
             chosen_dao: None,
