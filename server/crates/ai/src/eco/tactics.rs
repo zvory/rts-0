@@ -1,6 +1,6 @@
 use super::construction::dist2;
-use super::*;
 use crate::sdk::UnitGroup;
+use crate::sdk::{AiActions, AiBaseSiteId, AiEntityState, AiFrame, DefensePlanner, EntityKind};
 use rts_rules::math::GameplayMath as _;
 use std::collections::{BTreeMap, BTreeSet};
 #[derive(Default)]
