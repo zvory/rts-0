@@ -22,7 +22,6 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::process;
-use std::sync::{Arc, Mutex};
 
 use rayon::prelude::*;
 use rts_rules::math::GameplayMath as _;
@@ -283,7 +282,6 @@ impl AiStrategy for Opponent {
 /// The candidate: one Panzerfaust tactic.
 struct Candidate {
     tactic: Tactic,
-    spent: Arc<Mutex<BTreeSet<u32>>>,
     home: (f32, f32),
     toward: (f32, f32),
     spawn_center: (f32, f32),
@@ -315,7 +313,7 @@ impl AiStrategy for Candidate {
         let Some(obs) = AiObservation::from_frame(frame) else {
             return;
         };
-        let spent = self.spent.lock().unwrap().clone();
+        let spent: BTreeSet<u32> = obs.spent_panzerfausts.iter().copied().collect();
         let units: Vec<&AiEntitySummary> = obs
             .owned
             .iter()
@@ -920,12 +918,10 @@ fn run_fight(setup: &Setup<'_>) -> Result<FightResult, String> {
     };
     let ours = start_units(&game, candidate);
     let theirs = start_units(&game, opponent);
-    let spent = Arc::new(Mutex::new(BTreeSet::new()));
     let cand_center = center_of(1.0);
     let opp_center = center_of(-1.0);
     let cand_side = Candidate {
         tactic: setup.tactic.clone(),
-        spent: spent.clone(),
         home,
         toward: u,
         spawn_center: cand_center,
@@ -979,7 +975,7 @@ fn run_fight(setup: &Setup<'_>) -> Result<FightResult, String> {
     while game.tick_count() < setup.ticks {
         CanonicalAiTickDriver::run(&mut game, &mut controllers, AiAlivePolicy::Normal);
         let events = game.tick();
-        // Spent rockets, seen by the lab (the AI frame does not carry them).
+        // Spent rockets, recorded by the lab for the fight's score.
         let snapshot = game.snapshot_full_for(candidate);
         {
             let mut attacks: BTreeSet<(u32, u32, String)> = BTreeSet::new();
@@ -1105,9 +1101,7 @@ fn run_fight(setup: &Setup<'_>) -> Result<FightResult, String> {
             .map(|e| e.id)
             .collect();
         if !now.is_empty() {
-            let mut set = spent.lock().unwrap();
             for id in now {
-                set.insert(id);
                 fired.insert(id);
             }
         }

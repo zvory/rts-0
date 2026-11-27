@@ -1,7 +1,6 @@
 use super::*;
 use crate::ai_core::observation::{AiAbilitySummary, AiEconomy};
 use crate::ai_core::profiles::JEFFS_AI;
-use rts_rules::math::GameplayMath as _;
 
 fn target_test_entity(id: u32, kind: EntityKind, x: f32, y: f32) -> AiEntitySummary {
     AiEntitySummary {

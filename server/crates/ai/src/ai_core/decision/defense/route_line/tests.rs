@@ -1,6 +1,5 @@
 use super::*;
 use crate::ai_core::observation::AiEconomy;
-use rts_rules::math::GameplayMath as _;
 use rts_sim::game::map::Map;
 use rts_sim::game::{Game, MapMetadata, PlayerInit};
 

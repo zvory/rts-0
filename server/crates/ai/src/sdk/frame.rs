@@ -739,6 +739,68 @@ mod tests {
     }
 
     #[test]
+    fn panzerfaust_rocket_state_is_owner_only_and_matches_legacy_observation() {
+        let game = Game::new_without_ai_controllers(&players(), 47);
+        let mut start = game.start_payload();
+        let mut ally = start.players[0].clone();
+        ally.id = 3;
+        start.players.push(ally);
+        let mut snapshot = game.snapshot_for(1);
+        let template = snapshot.entities[0].clone();
+        for (id, owner, loaded) in [
+            (9_000_001, 1, false),
+            (9_000_002, 1, true),
+            (9_000_003, 2, false),
+            (9_000_004, 3, false),
+        ] {
+            let mut entity = template.clone();
+            entity.id = id;
+            entity.owner = owner;
+            entity.kind = "panzerfaust".to_string();
+            entity.panzerfaust_loaded = Some(loaded);
+            snapshot.entities.push(entity);
+        }
+
+        let frame = AiFrame::from_host(&start, &snapshot, 1, [], Some(&[1, 2, 3])).unwrap();
+        for (id, loaded) in [(9_000_001, false), (9_000_002, true)] {
+            assert_eq!(
+                frame
+                    .owned()
+                    .iter()
+                    .find(|entity| entity.id == id)
+                    .unwrap()
+                    .panzerfaust_loaded,
+                Some(loaded)
+            );
+        }
+        for (entities, id) in [
+            (frame.visible_enemies(), 9_000_003),
+            (frame.visible_allies(), 9_000_004),
+        ] {
+            assert_eq!(
+                entities
+                    .iter()
+                    .find(|entity| entity.id == id)
+                    .unwrap()
+                    .panzerfaust_loaded,
+                None
+            );
+        }
+        let observation = crate::ai_core::observation::AiObservation::from_frame(&frame).unwrap();
+        assert_eq!(observation.spent_panzerfausts, vec![9_000_001]);
+        assert_eq!(
+            Some(observation),
+            crate::ai_core::observation::AiObservation::from_snapshot_with_alive(
+                &start,
+                &snapshot,
+                1,
+                [],
+                Some(&[1, 2, 3]),
+            )
+        );
+    }
+
+    #[test]
     fn public_and_legacy_resource_knowledge_are_deliberately_distinct() {
         let game = Game::new_without_ai_controllers(&players(), 43);
         let start = game.start_payload();

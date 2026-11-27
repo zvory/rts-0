@@ -7,7 +7,6 @@ use crate::ai_core::profiles::{
     JEFFS_AI_PRE_HELD_SITE_ID, JEFFS_AI_PRE_SAFE_BASES_ID, JEFFS_AI_PRE_SPEND_PLAN_ID,
     JEFFS_AI_PRE_THIRD_PRESSURE_ID,
 };
-use rts_rules::math::GameplayMath as _;
 use rts_sim::game::command::SimCommand as Command;
 use targets::{enemy_bases, off_route_tiles, OPEN_OFF_ROUTE_TILES};
 

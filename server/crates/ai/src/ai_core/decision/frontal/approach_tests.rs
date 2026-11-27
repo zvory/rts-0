@@ -1,7 +1,6 @@
 use super::*;
 use crate::ai_core::observation::AiEconomy;
 use crate::ai_core::profiles::JEFFS_AI;
-use rts_rules::math::GameplayMath as _;
 
 #[test]
 fn failed_pushes_go_straight_then_a_random_side_then_the_other_side_then_straight_again() {
