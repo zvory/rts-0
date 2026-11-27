@@ -115,7 +115,11 @@ fn idle_cultivators_gain_no_insight_or_cosmic_energy_across_restore() {
     ];
     let mut ids = Vec::new();
     for (i, kind) in kinds.into_iter().enumerate() {
-        let id = game.state.entities.spawn_unit(1, kind, 400.0 + i as f32 * 100.0, 400.0).unwrap();
+        let id = game
+            .state
+            .entities
+            .spawn_unit(1, kind, 400.0 + i as f32 * 100.0, 400.0)
+            .unwrap();
         let unit = game.state.entities.get_mut(id).unwrap();
         unit.insight = if kind == EntityKind::Warrior { 59 } else { 199 };
         unit.insight_fraction = 1;
@@ -133,7 +137,8 @@ fn idle_cultivators_gain_no_insight_or_cosmic_energy_across_restore() {
         &payload,
         game.state.map.clone(),
         game.state.map_metadata.clone(),
-    ).unwrap();
+    )
+    .unwrap();
     for _ in 0..config::TICK_HZ * 10 {
         game.tick();
         restored.tick();
@@ -142,7 +147,10 @@ fn idle_cultivators_gain_no_insight_or_cosmic_energy_across_restore() {
         for (&id, kind) in ids.iter().zip(kinds) {
             let unit = continued.state.entities.get(id).unwrap();
             assert_eq!(unit.kind, kind);
-            assert_eq!(unit.insight, if kind == EntityKind::Warrior { 59 } else { 199 });
+            assert_eq!(
+                unit.insight,
+                if kind == EntityKind::Warrior { 59 } else { 199 }
+            );
             assert_eq!(unit.insight_fraction, 1);
             assert!(!unit.dao_master);
         }
