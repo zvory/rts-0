@@ -52,7 +52,13 @@ fn preferred_color_validation_spectators_and_priority_are_stable() {
     task.match_countdown_deadline = Some(TokioInstant::now());
     task.on_set_preferred_color(1, Some(PLAYER_PALETTE[5].into()));
     assert_eq!(task.players[&1].color, PLAYER_PALETTE[4]);
+    assert_eq!(
+        task.color_preferences[&1].0.as_deref(),
+        Some(PLAYER_PALETTE[5])
+    );
     task.match_countdown_deadline = None;
+    task.broadcast_lobby();
+    assert_eq!(task.players[&1].color, PLAYER_PALETTE[5]);
     task.on_leave(1);
     assert!(!task.color_preferences.contains_key(&1));
 }
@@ -88,5 +94,19 @@ fn preferred_color_saved_during_match_applies_only_in_next_lobby() {
     assert_eq!(task.players[&1].color, original);
     task.phase = Phase::Lobby;
     task.broadcast_lobby();
+    assert_eq!(task.players[&1].color, PLAYER_PALETTE[7]);
+}
+
+#[test]
+fn preferred_color_saved_during_post_match_replay_applies_in_next_lobby() {
+    let mut task = room();
+    add_test_room_player(&mut task, 1, false);
+    add_test_room_player(&mut task, 2, false);
+    let (_, artifact) = replay_test_artifact(&replay_test_players(2), 1);
+    task.phase = Phase::ReplayViewer(Box::new(ReplaySession::new(artifact).unwrap()));
+    let original = task.players[&1].color.clone();
+    task.on_set_preferred_color(1, Some(PLAYER_PALETTE[7].into()));
+    assert_eq!(task.players[&1].color, original);
+    task.return_to_lobby();
     assert_eq!(task.players[&1].color, PLAYER_PALETTE[7]);
 }

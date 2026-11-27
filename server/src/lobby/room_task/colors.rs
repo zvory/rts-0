@@ -3,11 +3,12 @@ use crate::lobby::PLAYER_PALETTE;
 
 impl RoomTask {
     pub(super) fn on_set_preferred_color(&mut self, player_id: u32, color: Option<String>) {
-        if !matches!(self.phase, Phase::Lobby | Phase::InGame(_))
-            || !matches!(self.mode, super::RoomMode::Normal)
+        if !matches!(
+            self.phase,
+            Phase::Lobby | Phase::InGame(_) | Phase::ReplayViewer(_)
+        ) || !matches!(self.mode, super::RoomMode::Normal)
             || self.is_dev_watch()
             || self.is_replay_staging_lobby()
-            || self.match_countdown_deadline.is_some()
             || !self.players.contains_key(&player_id)
         {
             return;
@@ -28,7 +29,8 @@ impl RoomTask {
             return;
         }
         entry.0 = color;
-        if matches!(self.phase, Phase::Lobby) {
+        // Countdown and replay colors are frozen; retain edits for the next lobby.
+        if matches!(self.phase, Phase::Lobby) && self.match_countdown_deadline.is_none() {
             self.broadcast_lobby();
         }
     }
