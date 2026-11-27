@@ -279,6 +279,11 @@ export const STATS = Object.freeze({
     researches: [UPGRADE.DAO_WIND, UPGRADE.DAO_OF_MAGIC, UPGRADE.DAO_OF_HEAVINESS],
     requires: [KIND.RESOURCE_DEPOT, KIND.PORTAL],
     description: "Unlock better units." },
+  [KIND.TECHNIQUE_LIBRARY]: { label: "Technique Library", icon: "LIB", footW: 3, footH: 3, sight: 1,
+    cost: { steel: 100, oil: 25 }, buildTicks: 560, trains: [],
+    researches: [UPGRADE.TECHNIQUE_CHARGE, UPGRADE.TECHNIQUE_BLINK, UPGRADE.TECHNIQUE_SHIELD, UPGRADE.TECHNIQUE_THROW_SWORD],
+    requires: [KIND.RESOURCE_DEPOT, KIND.PORTAL],
+    description: "Research combat techniques for Disciples and Dao Adepts." },
   [KIND.ZAMOK]: { label: "Zamok", icon: "ZK", footW: 3, footH: 3, sight: 1,
     cost: { steel: 0, oil: 0 }, buildTicks: 0, trains: [KIND.GOLEM] },
   [KIND.DEPOT]: { label: "Supply Depot", icon: "SD", footW: 2, footH: 2, sight: 1,
@@ -411,6 +416,7 @@ export const ABILITIES = Object.freeze({
     rangeTiles: 5, radiusTiles: DISCIPLE_SHIELD_RADIUS_TILES,
     cooldownTicks: 300, cost: Object.freeze({ steel: 0, oil: 0 }),
     queued: true, queuePolicy: "skipIfNotReady",
+    upgradeRequirement: UPGRADE.TECHNIQUE_SHIELD,
   }),
   [ABILITY.EVOLVE_WIND]: Object.freeze({
     ability: ABILITY.EVOLVE_WIND, label: "Dao of Wind", icon: "Z", hotkey: "Z",
@@ -437,6 +443,7 @@ export const ABILITIES = Object.freeze({
     carriers: Object.freeze([KIND.WARRIOR, KIND.WAR_ADEPT]), targetMode: "self",
     cooldownTicks: 450, cost: Object.freeze({ steel: 0, oil: 0 }),
     queued: false, queuePolicy: "notQueueable",
+    upgradeRequirement: UPGRADE.TECHNIQUE_CHARGE,
   }),
   [ABILITY.SMOKE]: Object.freeze({
     ability: ABILITY.SMOKE,
@@ -572,6 +579,7 @@ export const ABILITIES = Object.freeze({
     targetMode: "worldPoint", rangeTiles: DAO_WIND_DASH_RANGE_TILES,
     cooldownTicks: 0, charges: 1, chargeRechargeTicks: 18 * TICK_HZ,
     cost: Object.freeze({ steel: 0, oil: 0 }), queued: true, queuePolicy: "skipIfNotReady",
+    upgradeRequirement: UPGRADE.TECHNIQUE_BLINK,
   }),
   [ABILITY.EKAT_TELEPORT]: Object.freeze({
     ability: ABILITY.EKAT_TELEPORT,
@@ -603,6 +611,7 @@ export const ABILITIES = Object.freeze({
     damage: THROW_SWORD_DAMAGE,
     queued: true,
     queuePolicy: "skipIfNotReady",
+    upgradeRequirement: UPGRADE.TECHNIQUE_THROW_SWORD,
   }),
   [ABILITY.EKAT_LINE_SHOT]: Object.freeze({
     ability: ABILITY.EKAT_LINE_SHOT,
@@ -671,6 +680,26 @@ export const ABILITIES = Object.freeze({
 });
 
 export const UPGRADES = Object.freeze({
+  [UPGRADE.TECHNIQUE_CHARGE]: Object.freeze({
+    upgrade: UPGRADE.TECHNIQUE_CHARGE, label: "Charge", icon: "CHG",
+    cost: Object.freeze({ steel: 100, oil: 100 }), researchTicks: TICK_HZ * 20,
+    description: "Unlocks Charge for eligible Cultivators.", researchedAt: KIND.TECHNIQUE_LIBRARY,
+  }),
+  [UPGRADE.TECHNIQUE_BLINK]: Object.freeze({
+    upgrade: UPGRADE.TECHNIQUE_BLINK, label: "Blink", icon: "BLK",
+    cost: Object.freeze({ steel: 100, oil: 100 }), researchTicks: TICK_HZ * 10,
+    description: "Unlocks Blink for eligible Cultivators.", researchedAt: KIND.TECHNIQUE_LIBRARY,
+  }),
+  [UPGRADE.TECHNIQUE_SHIELD]: Object.freeze({
+    upgrade: UPGRADE.TECHNIQUE_SHIELD, label: "Shield", icon: "SHD",
+    cost: Object.freeze({ steel: 100, oil: 100 }), researchTicks: TICK_HZ * 20,
+    description: "Unlocks Shield for eligible Cultivators.", researchedAt: KIND.TECHNIQUE_LIBRARY,
+  }),
+  [UPGRADE.TECHNIQUE_THROW_SWORD]: Object.freeze({
+    upgrade: UPGRADE.TECHNIQUE_THROW_SWORD, label: "Throw Sword", icon: "SWD",
+    cost: Object.freeze({ steel: 100, oil: 100 }), researchTicks: TICK_HZ * 20,
+    description: "Unlocks Throw Sword for eligible Cultivators.", researchedAt: KIND.TECHNIQUE_LIBRARY,
+  }),
   [UPGRADE.DAO_OF_HEAVINESS]: Object.freeze({
     upgrade: UPGRADE.DAO_OF_HEAVINESS, label: "Dao of War", icon: "HVY",
     cost: Object.freeze({ steel: 100, oil: 200 }), researchTicks: DAO_RESEARCH_TICKS,

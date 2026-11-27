@@ -190,6 +190,7 @@ export const KIND = Object.freeze({
   EKAT: "ekat",
   RESOURCE_DEPOT: "resource_depot",
   PORTAL: "portal",
+  TECHNIQUE_LIBRARY: "technique_library",
   THREE_DAO_PAVILION: "three_dao_pavilion",
   TOURNAMENT_GROUNDS: "tournament_grounds",
   PROVEN_GROUNDS: "proven_grounds",
@@ -234,6 +235,7 @@ export const BUILDING_KINDS = Object.freeze([
   KIND.RESOURCE_DEPOT,
   KIND.PORTAL,
   KIND.THREE_DAO_PAVILION,
+  KIND.TECHNIQUE_LIBRARY,
   KIND.TOURNAMENT_GROUNDS,
   KIND.PROVEN_GROUNDS,
   KIND.SHOP,
@@ -383,7 +385,7 @@ export const MOVEMENT_PATH_DIAGNOSTICS = Object.freeze({
 // --- Compact snapshot wire schema (must match protocol.rs) ---
 export const PREDICTION_PROTOCOL_VERSION = 1;
 export const DEFAULT_FACTION_ID = "kriegsia";
-export const COMPACT_SNAPSHOT_VERSION = 77;
+export const COMPACT_SNAPSHOT_VERSION = 78;
 export const MAX_COMPACT_GROUND_DECALS = 64;
 export const SNAPSHOT_CODEC_VERSION = 1;
 export const SNAPSHOT_CODEC = Object.freeze({
@@ -411,6 +413,7 @@ export const KIND_CODE = Object.freeze({
   [KIND.RESOURCE_DEPOT]: 6,
   [KIND.PORTAL]: 28,
   [KIND.THREE_DAO_PAVILION]: 31,
+  [KIND.TECHNIQUE_LIBRARY]: 40,
   [KIND.TOURNAMENT_GROUNDS]: 32,
   [KIND.PROVEN_GROUNDS]: 33,
   [KIND.SHOP]: 34,
@@ -466,6 +469,10 @@ export const UPGRADE = Object.freeze({
   TANK_PLUS: "tank_plus",
   SMOKE_PLUS: "smoke_plus",
   SCOUT_PLANE_UNLOCK: "scout_plane_unlock",
+  TECHNIQUE_CHARGE: "technique_charge",
+  TECHNIQUE_BLINK: "technique_blink",
+  TECHNIQUE_SHIELD: "technique_shield",
+  TECHNIQUE_THROW_SWORD: "technique_throw_sword",
   DAO_WIND: "dao_wind",
   DAO_OF_MAGIC: "dao_of_magic",
   DAO_OF_HEAVINESS: "dao_of_heaviness",
@@ -484,6 +491,11 @@ export const UPGRADE_CODE = Object.freeze({
   [UPGRADE.SMOKE_PLUS]: 9,
   [UPGRADE.SCOUT_PLANE_UNLOCK]: 11,
   [UPGRADE.DAO_WIND]: 14,
+  [UPGRADE.TECHNIQUE_CHARGE]: 18,
+  [UPGRADE.TECHNIQUE_BLINK]: 19,
+  [UPGRADE.TECHNIQUE_SHIELD]: 20,
+  [UPGRADE.TECHNIQUE_THROW_SWORD]: 21,
+
   [UPGRADE.DAO_OF_MAGIC]: 15,
   [UPGRADE.DAO_OF_HEAVINESS]: 16,
   [UPGRADE.ROCKETS]: 12,

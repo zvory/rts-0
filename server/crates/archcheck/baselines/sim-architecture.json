@@ -1,5 +1,5 @@
 {
-  "reason": "Production extractor target admission reads authoritative footprint occupancy before choosing or paying an automatic/manual extractor target; retain building non-overlap invariant for rotated node grids.",
+  "reason": "Technique Library adds four research definitions to upgrade.rs; other architecture ratchets are unchanged.",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -1259,7 +1259,7 @@
     },
     {
       "path": "upgrade.rs",
-      "lines": 167
+      "lines": 260
     },
     {
       "path": "world_combat.rs",

@@ -12,6 +12,20 @@ fn cultivator_player() -> PlayerInit {
     }
 }
 
+fn researched_flat_game(players: &[PlayerInit]) -> Game {
+    use crate::game::upgrade::UpgradeKind;
+    let mut game = empty_flat_game(players);
+    for player in &mut game.state.players {
+        player.upgrades.extend([
+            UpgradeKind::TechniqueCharge,
+            UpgradeKind::TechniqueBlink,
+            UpgradeKind::TechniqueShield,
+            UpgradeKind::TechniqueThrowSword,
+        ]);
+    }
+    game
+}
+
 mod master_rank;
 mod public_insight;
 mod random_tao;
@@ -299,7 +313,7 @@ fn disciple_dash_casts_for_every_selected_ready_wind_unit() {
             team_id: 2,
             ..cultivator_player()
         };
-        let mut game = empty_flat_game(&[cultivator_player(), enemy]);
+        let mut game = researched_flat_game(&[cultivator_player(), enemy]);
         let mut units = Vec::new();
         let mut origins = Vec::new();
         for (index, owner) in [1, 1, 1, 1, 2].into_iter().enumerate() {
@@ -362,7 +376,7 @@ fn disciple_dash_casts_for_every_selected_ready_wind_unit() {
 fn disciple_dao_gates_vector_field_and_preserves_ekat_anchor() {
     use crate::game::ability::AbilityKind;
     use crate::game::upgrade::UpgradeKind;
-    let mut game = empty_flat_game(&[cultivator_player()]);
+    let mut game = researched_flat_game(&[cultivator_player()]);
     let unit = game
         .state
         .entities
@@ -472,7 +486,7 @@ fn disciple_shield_durability_breaking_hit_teams_and_checkpoint() {
         id: 3,
         ..cultivator_player()
     };
-    let mut game = empty_flat_game(&[cultivator_player(), enemy, ally]);
+    let mut game = researched_flat_game(&[cultivator_player(), enemy, ally]);
     let caster = game
         .state
         .entities
@@ -603,7 +617,7 @@ fn disciple_shield_does_not_identify_a_smoke_hidden_caster() {
         team_id: 2,
         ..cultivator_player()
     };
-    let mut game = empty_flat_game(&[cultivator_player(), enemy]);
+    let mut game = researched_flat_game(&[cultivator_player(), enemy]);
     let caster = game
         .state
         .entities
@@ -857,7 +871,8 @@ fn war_throw_sword_has_rank_cooldown_and_hits_harder_on_return_after_checkpoint(
     for master in [false, true] {
         use crate::game::ability::AbilityKind;
         use crate::game::upgrade::UpgradeKind;
-        let mut game = empty_flat_game(&[cultivator_player(), human_vs_ai_players()[1].clone()]);
+        let mut game =
+            researched_flat_game(&[cultivator_player(), human_vs_ai_players()[1].clone()]);
         let caster = game
             .state
             .entities
@@ -1208,7 +1223,7 @@ fn disciple_blink_reaches_twelve_tiles_for_immediate_and_queued_casts() {
     use crate::game::ability::AbilityKind;
     for queued in [false, true] {
         for requested_tiles in [8.0, 12.0, 15.0] {
-            let mut game = empty_flat_game(&[cultivator_player()]);
+            let mut game = researched_flat_game(&[cultivator_player()]);
             let origin = game.state.map.tile_center(10, 10);
             let unit = game
                 .state
@@ -1249,7 +1264,7 @@ fn disciple_blink_reaches_twelve_tiles_for_immediate_and_queued_casts() {
 #[test]
 fn wind_master_gains_second_blink_charge_and_recharges_sequentially() {
     use crate::game::ability::AbilityKind;
-    let mut game = empty_flat_game(&[cultivator_player()]);
+    let mut game = researched_flat_game(&[cultivator_player()]);
     let unit = game
         .state
         .entities
@@ -1346,7 +1361,7 @@ fn disciple_blink_snaps_unwalkable_landings_and_can_cross_them() {
     use crate::game::ability::AbilityKind;
     for queued in [false, true] {
         for blocked_landing in [false, true] {
-            let mut game = empty_flat_game(&[cultivator_player()]);
+            let mut game = researched_flat_game(&[cultivator_player()]);
             let origin = game.state.map.tile_center(10, 10);
             let target = game.state.map.tile_center(20, 10);
             game.state.map.unwalkable_tiles = if blocked_landing {

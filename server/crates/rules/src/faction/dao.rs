@@ -69,6 +69,7 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 17] = [
     },
     AbilityCatalogEntry {
         range_tiles: Some(balance::DAO_WIND_DASH_RANGE_TILES as f32),
+        upgrade_requirement: Some(UpgradeKind::TechniqueBlink),
         kind: AbilityKind::WindDash,
         label: "Blink",
         icon: "BLK",
@@ -119,7 +120,7 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 17] = [
         charge_recharge_ticks: None,
         cost: ResourceCost::new(0, 0),
         tech_requirement: None,
-        upgrade_requirement: None,
+        upgrade_requirement: Some(UpgradeKind::TechniqueShield),
         queue_policy: AbilityQueuePolicy::QueueSkipIfNotReady,
         autocast: false,
         command_card: true,
@@ -127,6 +128,7 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 17] = [
         order_stage_code: 25,
     },
     AbilityCatalogEntry {
+        upgrade_requirement: Some(UpgradeKind::TechniqueThrowSword),
         kind: AbilityKind::ThrowSword,
         range_tiles: Some(balance::THROW_SWORD_RANGE_TILES),
         label: "Throw Sword",

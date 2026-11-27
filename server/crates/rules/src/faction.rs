@@ -30,6 +30,10 @@ pub enum UpgradeKind {
     DaoWind,
     DaoOfMagic,
     DaoOfHeaviness,
+    TechniqueCharge,
+    TechniqueBlink,
+    TechniqueShield,
+    TechniqueThrowSword,
 }
 
 impl UpgradeKind {
@@ -48,6 +52,10 @@ impl UpgradeKind {
         Self::DaoWind,
         Self::DaoOfMagic,
         Self::DaoOfHeaviness,
+        Self::TechniqueCharge,
+        Self::TechniqueBlink,
+        Self::TechniqueShield,
+        Self::TechniqueThrowSword,
     ];
 
     pub const fn stable_id(self) -> &'static str {
@@ -66,6 +74,10 @@ impl UpgradeKind {
             Self::DaoWind => "dao_wind",
             Self::DaoOfMagic => "dao_of_magic",
             Self::DaoOfHeaviness => "dao_of_heaviness",
+            Self::TechniqueCharge => "technique_charge",
+            Self::TechniqueBlink => "technique_blink",
+            Self::TechniqueShield => "technique_shield",
+            Self::TechniqueThrowSword => "technique_throw_sword",
         }
     }
 
@@ -471,7 +483,7 @@ const DEFAULT_ABILITIES: [AbilityCatalogEntry; 9] = [
         charge_recharge_ticks: None,
         cost: ResourceCost::new(0, 0),
         tech_requirement: None,
-        upgrade_requirement: None,
+        upgrade_requirement: Some(UpgradeKind::TechniqueCharge),
         queue_policy: AbilityQueuePolicy::NotQueueable,
         autocast: false,
         command_card: true,
@@ -800,7 +812,7 @@ pub const EKAT_CATALOG: FactionCatalog = FactionCatalog {
     production_anchors: &[EntityKind::Zamok],
 };
 
-const CULTIVATORS_UPGRADES: [UpgradeCatalogEntry; 3] = [
+const CULTIVATORS_UPGRADES: [UpgradeCatalogEntry; 7] = [
     UpgradeCatalogEntry {
         kind: UpgradeKind::DaoWind,
         researched_at: EntityKind::ThreeDaoPavilion,
@@ -812,6 +824,22 @@ const CULTIVATORS_UPGRADES: [UpgradeCatalogEntry; 3] = [
     UpgradeCatalogEntry {
         kind: UpgradeKind::DaoOfHeaviness,
         researched_at: EntityKind::ThreeDaoPavilion,
+    },
+    UpgradeCatalogEntry {
+        kind: UpgradeKind::TechniqueCharge,
+        researched_at: EntityKind::TechniqueLibrary,
+    },
+    UpgradeCatalogEntry {
+        kind: UpgradeKind::TechniqueBlink,
+        researched_at: EntityKind::TechniqueLibrary,
+    },
+    UpgradeCatalogEntry {
+        kind: UpgradeKind::TechniqueShield,
+        researched_at: EntityKind::TechniqueLibrary,
+    },
+    UpgradeCatalogEntry {
+        kind: UpgradeKind::TechniqueThrowSword,
+        researched_at: EntityKind::TechniqueLibrary,
     },
 ];
 
@@ -834,6 +862,7 @@ pub const CULTIVATORS_CATALOG: FactionCatalog = FactionCatalog {
         EntityKind::ResourceDepot,
         EntityKind::Portal,
         EntityKind::ThreeDaoPavilion,
+        EntityKind::TechniqueLibrary,
         EntityKind::TournamentGrounds,
         EntityKind::Shop,
         EntityKind::HealingSeal,
@@ -845,6 +874,7 @@ pub const CULTIVATORS_CATALOG: FactionCatalog = FactionCatalog {
         EntityKind::PumpJack,
         EntityKind::Portal,
         EntityKind::ThreeDaoPavilion,
+        EntityKind::TechniqueLibrary,
         EntityKind::TournamentGrounds,
         EntityKind::Shop,
     ],
@@ -1118,6 +1148,10 @@ pub fn upgrade_definition(kind: UpgradeKind) -> UpgradeCatalogEntry {
         UpgradeKind::ArtilleryUnlock => artillery_unlock,
         UpgradeKind::ScoutPlaneUnlock => scout_plane_unlock,
         UpgradeKind::Rockets => rockets,
+        UpgradeKind::TechniqueCharge => CULTIVATORS_UPGRADES[3],
+        UpgradeKind::TechniqueBlink => CULTIVATORS_UPGRADES[4],
+        UpgradeKind::TechniqueShield => CULTIVATORS_UPGRADES[5],
+        UpgradeKind::TechniqueThrowSword => CULTIVATORS_UPGRADES[6],
         UpgradeKind::DaoWind => CULTIVATORS_UPGRADES[0],
         UpgradeKind::DaoOfMagic => CULTIVATORS_UPGRADES[1],
         UpgradeKind::DaoOfHeaviness => CULTIVATORS_UPGRADES[2],

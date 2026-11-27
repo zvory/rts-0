@@ -26,6 +26,7 @@ pub enum EntityKind {
     ResourceDepot,
     Portal,
     ThreeDaoPavilion,
+    TechniqueLibrary,
     TournamentGrounds,
     ProvenGrounds,
     Shop,
@@ -47,7 +48,7 @@ pub enum EntityKind {
 }
 
 impl EntityKind {
-    pub const ALL: [EntityKind; 39] = [
+    pub const ALL: [EntityKind; 40] = [
         EntityKind::Worker,
         EntityKind::Golem,
         EntityKind::Warrior,
@@ -69,6 +70,7 @@ impl EntityKind {
         EntityKind::ResourceDepot,
         EntityKind::Portal,
         EntityKind::ThreeDaoPavilion,
+        EntityKind::TechniqueLibrary,
         EntityKind::TournamentGrounds,
         EntityKind::ProvenGrounds,
         EntityKind::Shop,
@@ -164,6 +166,7 @@ impl EntityKind {
             EntityKind::ResourceDepot => "resource_depot",
             EntityKind::Portal => "portal",
             EntityKind::ThreeDaoPavilion => "three_dao_pavilion",
+            EntityKind::TechniqueLibrary => "technique_library",
             EntityKind::TournamentGrounds => "tournament_grounds",
             EntityKind::ProvenGrounds => "proven_grounds",
             EntityKind::Shop => "shop",
@@ -212,6 +215,7 @@ impl FromStr for EntityKind {
             "resource_depot" => Ok(EntityKind::ResourceDepot),
             "portal" => Ok(EntityKind::Portal),
             "three_dao_pavilion" => Ok(EntityKind::ThreeDaoPavilion),
+            "technique_library" => Ok(EntityKind::TechniqueLibrary),
             "tournament_grounds" => Ok(EntityKind::TournamentGrounds),
             "proven_grounds" => Ok(EntityKind::ProvenGrounds),
             "shop" => Ok(EntityKind::Shop),

@@ -17,6 +17,9 @@ fn setup() -> (Game, u32) {
         ..player.clone()
     };
     let mut game = empty_flat_game(&[player, enemy]);
+    game.state.players[0]
+        .upgrades
+        .insert(crate::game::upgrade::UpgradeKind::TechniqueShield);
     let caster = game
         .state
         .entities

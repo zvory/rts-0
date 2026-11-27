@@ -75,6 +75,7 @@ RUN test -s ./client/vendor/sim-wasm/rts_sim_wasm.js \
     && test -s ./client/assets/rigs/resource-depot-worksite-preview/resource_depot-atlas.png \
     && test -s ./client/assets/rigs/cultivator-nexus/nexus-atlas.png \
     && test -s ./client/assets/rigs/three-dao-pavilion/pavilion-atlas.png \
+    && test -s ./client/assets/rigs/technique-library/library-atlas.png \
     && test -s ./client/assets/rigs/tournament-grounds/tournament-atlas.png \
     && test -s ./client/assets/rigs/proven-grounds/proven-atlas.png \
     && test -s ./client/assets/rigs/cultivator-shop/shop-atlas.png \
