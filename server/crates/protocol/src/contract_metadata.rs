@@ -81,6 +81,7 @@ pub mod kinds {
     pub const EKAT: &str = "ekat";
     pub const RESOURCE_DEPOT: &str = "resource_depot";
     pub const PORTAL: &str = "portal";
+    pub const TECHNIQUE_LIBRARY: &str = "technique_library";
     pub const THREE_DAO_PAVILION: &str = "three_dao_pavilion";
     pub const TOURNAMENT_GROUNDS: &str = "tournament_grounds";
     pub const PROVEN_GROUNDS: &str = "proven_grounds";
@@ -206,6 +207,10 @@ pub mod upgrades {
     pub const TANK_PLUS: &str = "tank_plus";
     pub const SMOKE_PLUS: &str = "smoke_plus";
     pub const SCOUT_PLANE_UNLOCK: &str = "scout_plane_unlock";
+    pub const TECHNIQUE_CHARGE: &str = "technique_charge";
+    pub const TECHNIQUE_BLINK: &str = "technique_blink";
+    pub const TECHNIQUE_SHIELD: &str = "technique_shield";
+    pub const TECHNIQUE_THROW_SWORD: &str = "technique_throw_sword";
     pub const DAO_WIND: &str = "dao_wind";
     pub const DAO_OF_MAGIC: &str = "dao_of_magic";
     pub const DAO_OF_HEAVINESS: &str = "dao_of_heaviness";
@@ -221,6 +226,10 @@ pub mod upgrades {
         TANK_PLUS,
         SMOKE_PLUS,
         SCOUT_PLANE_UNLOCK,
+        TECHNIQUE_CHARGE,
+        TECHNIQUE_BLINK,
+        TECHNIQUE_SHIELD,
+        TECHNIQUE_THROW_SWORD,
         DAO_WIND,
         DAO_OF_MAGIC,
         DAO_OF_HEAVINESS,
@@ -257,7 +266,7 @@ pub mod notices {
 /// transport-side optimization for `ServerMessage::Snapshot`.
 pub const PREDICTION_PROTOCOL_VERSION: u32 = 1;
 
-pub const COMPACT_SNAPSHOT_VERSION: u8 = 77;
+pub const COMPACT_SNAPSHOT_VERSION: u8 = 78;
 
 pub const SNAPSHOT_CODEC_COMPACT_JSON: &str = "compact-json";
 pub const SNAPSHOT_CODEC_MESSAGEPACK_COMPACT: &str = "messagepack-compact";
@@ -442,6 +451,7 @@ const KIND_CODES: &[(&str, u8)] = &[
     (kinds::RESOURCE_DEPOT, 6),
     (kinds::PORTAL, 28),
     (kinds::THREE_DAO_PAVILION, 31),
+    (kinds::TECHNIQUE_LIBRARY, 40),
     (kinds::TOURNAMENT_GROUNDS, 32),
     (kinds::PROVEN_GROUNDS, 33),
     (kinds::SHOP, 34),
@@ -593,6 +603,10 @@ const UPGRADE_CODES: &[(&str, u8)] = &[
     (upgrades::SMOKE_PLUS, 9),
     (upgrades::SCOUT_PLANE_UNLOCK, 11),
     (upgrades::DAO_WIND, 14),
+    (upgrades::TECHNIQUE_CHARGE, 18),
+    (upgrades::TECHNIQUE_BLINK, 19),
+    (upgrades::TECHNIQUE_SHIELD, 20),
+    (upgrades::TECHNIQUE_THROW_SWORD, 21),
     (upgrades::DAO_OF_MAGIC, 15),
     (upgrades::DAO_OF_HEAVINESS, 16),
     (upgrades::ROCKETS, 12),
@@ -825,6 +839,7 @@ fn kind_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("RESOURCE_DEPOT", kinds::RESOURCE_DEPOT),
         ("PORTAL", kinds::PORTAL),
         ("THREE_DAO_PAVILION", kinds::THREE_DAO_PAVILION),
+        ("TECHNIQUE_LIBRARY", kinds::TECHNIQUE_LIBRARY),
         ("TOURNAMENT_GROUNDS", kinds::TOURNAMENT_GROUNDS),
         ("PROVEN_GROUNDS", kinds::PROVEN_GROUNDS),
         ("SHOP", kinds::SHOP),
@@ -939,6 +954,10 @@ fn upgrade_vocabulary() -> BTreeMap<&'static str, &'static str> {
         ("SMOKE_PLUS", upgrades::SMOKE_PLUS),
         ("SCOUT_PLANE_UNLOCK", upgrades::SCOUT_PLANE_UNLOCK),
         ("DAO_WIND", upgrades::DAO_WIND),
+        ("TECHNIQUE_CHARGE", upgrades::TECHNIQUE_CHARGE),
+        ("TECHNIQUE_BLINK", upgrades::TECHNIQUE_BLINK),
+        ("TECHNIQUE_SHIELD", upgrades::TECHNIQUE_SHIELD),
+        ("TECHNIQUE_THROW_SWORD", upgrades::TECHNIQUE_THROW_SWORD),
         ("DAO_OF_MAGIC", upgrades::DAO_OF_MAGIC),
         ("DAO_OF_HEAVINESS", upgrades::DAO_OF_HEAVINESS),
         ("ROCKETS", upgrades::ROCKETS),

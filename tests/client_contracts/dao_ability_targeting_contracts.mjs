@@ -270,3 +270,31 @@ for (const [kind, daoMaster] of [[KIND.WARRIOR, false], [KIND.WAR_ADEPT, false],
     }
   }
 }
+
+for (const [kind, ability, research] of [
+  [KIND.WARRIOR, ABILITY.CHARGE, UPGRADE.TECHNIQUE_CHARGE],
+  [KIND.WAR_ADEPT, ABILITY.CHARGE, UPGRADE.TECHNIQUE_CHARGE],
+  [KIND.WIND_ADEPT, ABILITY.WIND_DASH, UPGRADE.TECHNIQUE_BLINK],
+  [KIND.MAGIC_ADEPT, ABILITY.DISCIPLE_SHIELD, UPGRADE.TECHNIQUE_SHIELD],
+  [KIND.WAR_ADEPT, ABILITY.THROW_SWORD, UPGRADE.TECHNIQUE_THROW_SWORD],
+]) {
+  for (const daoMaster of [false, true]) {
+    const ctx = { playerId: 1, factionId: "cultivators", groupCooldownClocks,
+      resources: { steel: 1000, oil: 1000 }, upgrades: [],
+      selection: [{ id: 1, owner: 1, kind, daoMaster }] };
+    const locked = selectedAbilityAffordances(ctx, ctx.selection).find((a) => a.definition.ability === ability);
+    assert(!locked.unlocked, `${ability} starts research locked at both ranks`);
+    const lockedButton = buildCommandCardDescriptors(ctx).slots.find((a) => a?.ability === ability);
+    assert(lockedButton && !lockedButton.enabled && lockedButton.title.includes("Requires"),
+      `${ability} visibly explains its research lock`);
+    const unlocked = selectedAbilityAffordances({ ...ctx, upgrades: [research] }, ctx.selection)
+      .find((a) => a.definition.ability === ability);
+    assert(unlocked.unlocked, `${ability} unlocks with its own research`);
+  }
+}
+const libraryCard = buildCommandCardDescriptors({ playerId: 1, factionId: "cultivators",
+  selection: [{ id: 2, owner: 1, kind: KIND.TECHNIQUE_LIBRARY }],
+  resources: { steel: 1000, oil: 1000 }, upgrades: [] });
+assertDeepEqual(libraryCard.slots.filter((s) => s?.action === "research").map((s) => s.intent.upgrade),
+  [UPGRADE.TECHNIQUE_CHARGE, UPGRADE.TECHNIQUE_BLINK, UPGRADE.TECHNIQUE_SHIELD, UPGRADE.TECHNIQUE_THROW_SWORD],
+  "Technique Library offers all four independent researches");

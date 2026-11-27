@@ -1,6 +1,6 @@
 # Capsule: wire protocol
 
-Use for wire protocol changes.
+Wire protocol changes.
 
 ## Read first
 - [docs/design/protocol.md](../design/protocol.md) — wire protocol
@@ -14,8 +14,8 @@ Use for wire protocol changes.
   - §2.5.1 Projection contract summary
   - §2.6 Replay playback state and vision
   - §2.7 Observer analysis state
-  - Three Dao Pavilion prototype vocabulary
-  - Tournament Grounds
+  - Three Dao Pavilion vocabulary
+  - Technique Library; Tournament Grounds
 - Proving Grounds and Portal Adept production
 - [docs/projection-audit-checklist.md](../projection-audit-checklist.md) — checklist for new
   projection-affecting snapshot fields, events, or observer modes

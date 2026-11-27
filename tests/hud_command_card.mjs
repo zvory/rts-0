@@ -446,7 +446,7 @@ for (const [kind, upgrade] of [
     abilities: [{ ability: ABILITY.THROW_SWORD, cooldownLeft }], ...extra,
   });
   const cardFor = (selection) => buildCommandCardDescriptors({
-    playerId: 1, factionId: "cultivators", selection, resources: {}, upgrades: [],
+    playerId: 1, factionId: "cultivators", selection, resources: {}, upgrades: [UPGRADE.TECHNIQUE_THROW_SWORD],
     groupCooldownClocks, playerHasCompleteKind: () => true,
   });
   const sword = (card) => card.slots.find((slot) => slot?.ability === ABILITY.THROW_SWORD);
@@ -766,6 +766,7 @@ for (const [kind, upgrade] of [
     "cultivators-producer-resource_depot",
     "cultivators-producer-portal",
     "cultivators-producer-three_dao_pavilion",
+    "cultivators-producer-technique_library",
     "cultivators-producer-tournament_grounds",
     "cultivators-producer-proven_grounds",
   ]);
@@ -835,7 +836,7 @@ for (const [kind, upgrade] of [
   const builds = card.slots.filter((slot) => slot?.action === "build");
   assert.deepEqual(
     builds.map((slot) => slot.intent.building),
-    [KIND.RESOURCE_DEPOT, KIND.PUMP_JACK, KIND.PORTAL, KIND.THREE_DAO_PAVILION, KIND.TOURNAMENT_GROUNDS, KIND.SHOP],
+    [KIND.RESOURCE_DEPOT, KIND.PUMP_JACK, KIND.PORTAL, KIND.THREE_DAO_PAVILION, KIND.TOURNAMENT_GROUNDS, KIND.TECHNIQUE_LIBRARY, KIND.SHOP],
   );
   assert.equal(builds[0].label, "Nexus");
   assert.equal(builds[0].commandId, "cultivators.build." + KIND.RESOURCE_DEPOT);
@@ -850,6 +851,8 @@ for (const [kind, upgrade] of [
   assert.equal(builds[3].hotkey, "A");
   assert.equal(builds[4].label, "Tournament Grounds");
   assert.equal(builds[4].commandId, "cultivators.build." + KIND.TOURNAMENT_GROUNDS);
+  assert.equal(builds[5].commandId, "cultivators.build." + KIND.TECHNIQUE_LIBRARY);
+  assert.equal(builds[5].hotkey, "D");
 }
 
 {
@@ -933,7 +936,8 @@ for (const researched of [false, true]) {
   const context = {
     playerId: 1, factionId: "cultivators",
     resources: { steel: 1000, oil: 1000 },
-    upgrades: [UPGRADE.DAO_WIND, UPGRADE.DAO_OF_HEAVINESS, UPGRADE.DAO_OF_MAGIC],
+    upgrades: [UPGRADE.DAO_WIND, UPGRADE.DAO_OF_HEAVINESS, UPGRADE.DAO_OF_MAGIC,
+      UPGRADE.TECHNIQUE_BLINK, UPGRADE.TECHNIQUE_SHIELD],
     playerHasCompleteKind: () => true, groupCooldownClocks: () => [],
   };
   const unit = { id: 50, owner: 1, kind: KIND.WARRIOR, insight: 59 };
@@ -979,7 +983,7 @@ for (const researched of [false, true]) {
     { id: 4, owner: 2, kind: KIND.WARRIOR, insight: 0 },
     { id: 5, owner: 1, kind: KIND.WORKER },
   ];
-  const context = { playerId: 1, factionId: "cultivators", selection, upgrades: [],
+  const context = { playerId: 1, factionId: "cultivators", selection, upgrades: [UPGRADE.TECHNIQUE_THROW_SWORD],
     resources: { steel: 0, oil: 0 }, playerHasCompleteKind: () => false,
     groupCooldownClocks: () => [] };
   const card = buildCommandCardDescriptors(context);
@@ -1011,7 +1015,8 @@ for (const researched of [false, true]) {
     .map((kind, index) => ({ id: index + 1, owner: 1, kind, insight: 60, daoMaster: kind === KIND.WAR_ADEPT }));
   selection[0].escapeTreasure = {};
   const card = buildCommandCardDescriptors({ playerId: 1, factionId: "cultivators", selection,
-    resources: { steel: 0, oil: 0 }, upgrades: [], groupCooldownClocks: () => [] });
+    resources: { steel: 0, oil: 0 }, upgrades: [UPGRADE.TECHNIQUE_BLINK, UPGRADE.TECHNIQUE_THROW_SWORD],
+    groupCooldownClocks: () => [] });
   for (const ability of [ABILITY.WIND_DASH, ABILITY.THROW_SWORD, ABILITY.VECTOR_FIELD]) {
     const slot = card.slots.find((slot) => slot?.ability === ability);
     assert(slot?.enabled, `mixed selection preserves active ${ability}`);

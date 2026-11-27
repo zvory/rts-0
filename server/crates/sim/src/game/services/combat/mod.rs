@@ -112,6 +112,7 @@ pub(in crate::game) fn combat_system(
     entities: &mut EntityStore,
     teams: &TeamRelations,
     methamphetamines_researched: &dyn Fn(u32) -> bool,
+    charge_researched: &dyn Fn(u32) -> bool,
     spatial: &SpatialIndex,
     coordinator: &mut MoveCoordinator<'_>,
     fog: &Fog,
@@ -362,10 +363,12 @@ pub(in crate::game) fn combat_system(
         {
             continue; // Auto-acquisition stays hostile/obstacle-only; self-attacks are ordered.
         }
-        if entities.get(id).is_some_and(|e| {
-            matches!(e.kind, EntityKind::Warrior | EntityKind::WarAdept)
-                && e.ability_cooldown_ticks(crate::game::ability::AbilityKind::Charge) == 0
-        }) {
+        if charge_researched(owner)
+            && entities.get(id).is_some_and(|e| {
+                matches!(e.kind, EntityKind::Warrior | EntityKind::WarAdept)
+                    && e.ability_cooldown_ticks(crate::game::ability::AbilityKind::Charge) == 0
+            })
+        {
             if let Some((position, movement, hostile_unit)) = entities.get(tid).map(|target| {
                 (
                     (target.pos_x(), target.pos_y()),

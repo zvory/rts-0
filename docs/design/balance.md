@@ -1014,3 +1014,11 @@ movement each tick. Identical auras do not stack; the multiplier combines with H
 Master rank and other movement modifiers. Leaving range or losing the carrier removes the aura
 on the next movement tick. It grants no attack speed or moving attacks. Constants are owned by
 Rust balance; the client catalog mirrors the price and description.
+
+### Technique Library
+
+See [Technique Library specification](technique-library.md). The Serf-built 3×3 Library matches
+the Pavilion: 100 steel / 25 oil, 560 build ticks, 120 HP. Charge, Blink, Shield and Throw Sword
+are permanent independent unlocks at 100 steel / 100 oil each; Blink takes 10 seconds and the
+others take 20 seconds. Novice/War Charge is gated, as are Wind Blink, Magic Shield and War
+Throw Sword at both ranks. Magic Vector Field needs no research.

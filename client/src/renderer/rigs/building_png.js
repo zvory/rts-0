@@ -83,6 +83,9 @@ const BUILDING_PNG_SPECS = Object.freeze([
   buildingSpec(KIND.THREE_DAO_PAVILION, 384, 384,
     "/assets/rigs/three-dao-pavilion/pavilion-atlas.png?v=triad-01",
     { silhouetteShadow: false, omitFootprintShadow: true, visualScale: 1.1 }),
+  buildingSpec(KIND.TECHNIQUE_LIBRARY, 384, 384,
+    "/assets/rigs/technique-library/library-atlas.png?v=library-02",
+    { silhouetteShadow: false, omitFootprintShadow: true, visualScale: 1.1 }),
   buildingSpec(KIND.BARBED_WIRE, 256, 256,
     "/assets/rigs/barbed-wire-tangled/barbed-wire.png?v=tangled-01",
     {

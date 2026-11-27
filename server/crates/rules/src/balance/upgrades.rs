@@ -123,3 +123,9 @@ pub const fn disciple_shield_duration_ticks(master: bool) -> u32 {
         DISCIPLE_SHIELD_DURATION_TICKS
     }
 }
+
+// Technique Library researches use fixed prices, independent of Dao tiers.
+pub const TECHNIQUE_COST_STEEL: u32 = 100;
+pub const TECHNIQUE_COST_OIL: u32 = 100;
+pub const TECHNIQUE_RESEARCH_TICKS: u32 = TICK_HZ * 20;
+pub const BLINK_RESEARCH_TICKS: u32 = TICK_HZ * 10;

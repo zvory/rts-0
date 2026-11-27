@@ -49,8 +49,8 @@ Lifecycle status is explicit and separate from catalog existence:
 
 ## Current Entity Identity
 
-Runtime identity is still global `EntityKind`. The current roster has 39 global kinds: 18 units,
-18 buildings, 2 resource nodes, and 1 transient Shop delivery combat body. Server rules own the stable ids in
+Runtime identity is still global `EntityKind`. The current roster has 40 global kinds: 18 units,
+19 buildings, 2 resource nodes, and 1 transient Shop delivery combat body. Server rules own the stable ids in
 `server/crates/rules/src/kind.rs`; protocol mirrors expose the same string ids in
 `server/crates/protocol/src/lib.rs` and `client/src/protocol.js`.
 

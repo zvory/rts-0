@@ -596,6 +596,42 @@ fn print_client_constants(indent: &str) {
 
 fn print_upgrades(indent: &str) {
     println!("{indent}  \"upgrades\": {{");
+    print_upgrade(
+        indent,
+        faction::UpgradeKind::TechniqueCharge.stable_id(),
+        balance::TECHNIQUE_COST_STEEL,
+        balance::TECHNIQUE_COST_OIL,
+        balance::TECHNIQUE_RESEARCH_TICKS,
+        None,
+        true,
+    );
+    print_upgrade(
+        indent,
+        faction::UpgradeKind::TechniqueBlink.stable_id(),
+        balance::TECHNIQUE_COST_STEEL,
+        balance::TECHNIQUE_COST_OIL,
+        balance::BLINK_RESEARCH_TICKS,
+        None,
+        true,
+    );
+    print_upgrade(
+        indent,
+        faction::UpgradeKind::TechniqueShield.stable_id(),
+        balance::TECHNIQUE_COST_STEEL,
+        balance::TECHNIQUE_COST_OIL,
+        balance::TECHNIQUE_RESEARCH_TICKS,
+        None,
+        true,
+    );
+    print_upgrade(
+        indent,
+        faction::UpgradeKind::TechniqueThrowSword.stable_id(),
+        balance::TECHNIQUE_COST_STEEL,
+        balance::TECHNIQUE_COST_OIL,
+        balance::TECHNIQUE_RESEARCH_TICKS,
+        None,
+        true,
+    );
     for kind in [
         faction::UpgradeKind::DaoWind,
         faction::UpgradeKind::DaoOfMagic,

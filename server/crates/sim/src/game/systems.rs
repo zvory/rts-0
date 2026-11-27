@@ -308,6 +308,11 @@ pub(crate) fn run_tick(
             entities,
             &teams,
             &methamphetamines_researched,
+            &|owner| {
+                players
+                    .iter()
+                    .any(|p| p.id == owner && p.has_upgrade(UpgradeKind::TechniqueCharge))
+            },
             &post_movement.spatial,
             &mut coordinator,
             fog,
