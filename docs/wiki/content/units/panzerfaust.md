@@ -3,11 +3,11 @@ constants: PANZERFAUST_
 ---
 ## Rocket
 
-A Rifleman with one disposable anti-vehicle rocket.
+A Rifleman with one disposable anti-armor rocket.
 
 - {{PANZERFAUST_DAMAGE}} damage, {{PANZERFAUST_ARMOR_PENETRATION|pct}} armor penetration, {{PANZERFAUST_RANGE_TILES}}-tile range.
 - Aims for {{PANZERFAUST_WINDUP_TICKS|s}} ({{METHAMPHETAMINES_PANZERFAUST_WINDUP_TICKS|s}} with {{research:methamphetamines}}); the rocket flies for {{PANZERFAUST_TRAVEL_TICKS|s}}.
-- Only fired at vehicles. Ignores Tank facing.
+- Fires at vehicles, War Adepts, and War Masters. Ignores Tank facing.
 - After firing, fights as a normal Rifleman.
 
 | Target | Rocket damage | Target HP |
