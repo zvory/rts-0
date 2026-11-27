@@ -1,7 +1,7 @@
 //! Economic infantry defense, authored exclusively against the public, fog-filtered SDK.
 use crate::sdk::{
-    AiActions, AiBaseSiteId, AiCompletion, AiEntity, AiEntityState, AiFrame, AiRulebook,
-    AiStrategy, DefensePlanner, EntityKind, KnownBuildSiteExclusions, UpgradeKind, WorldQueries,
+    AiActions, AiBaseSiteId, AiCompletion, AiEntity, AiFrame, AiRulebook, AiStrategy,
+    DefensePlanner, EntityKind, KnownBuildSiteExclusions, UpgradeKind, WorldQueries,
 };
 use rts_rules::math::GameplayMath as _;
 use std::collections::BTreeSet;
