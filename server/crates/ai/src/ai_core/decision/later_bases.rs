@@ -13,6 +13,8 @@
 //! contested, so it is abandoned for a while instead of feeding Tanks into it one at a time.
 //! The guards keep covering the finished Depot for a while before rejoining the army.
 
+use rts_rules::math::GameplayMath as _;
+
 use super::geometry::{building_center, clamp_to_map, dist2, normalized_direction, squared};
 use super::*;
 
@@ -350,8 +352,8 @@ where
             let own = observation.own_start_tile;
             let foe = (enemy.0 / ts, enemy.1 / ts);
             let exposure = |tile: (u32, u32)| {
-                let to_own = (tile.0 as f32 - own.0 as f32).hypot(tile.1 as f32 - own.1 as f32);
-                let to_foe = (tile.0 as f32 - foe.0).hypot(tile.1 as f32 - foe.1);
+                let to_own = (tile.0 as f32 - own.0 as f32).det_hypot(tile.1 as f32 - own.1 as f32);
+                let to_foe = (tile.0 as f32 - foe.0).det_hypot(tile.1 as f32 - foe.1);
                 to_own / (to_own + to_foe).max(1.0)
             };
             let ceiling = if memory.later_bases.base_retry {

@@ -1,6 +1,7 @@
 //! `pfdef`: the Panzerfaust pack's base guard (see the parent module docs). Off by default.
 
 use super::*;
+use rts_rules::math::GameplayMath as _;
 
 /// `pfdef`: one charge of the base guard at an enemy Tank.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -383,14 +384,14 @@ pub(super) fn guard_orders(
             let base = unit_vector(at(tank), mid).unwrap_or((0.0, 1.0));
             let angle = |unit: &AiEntitySummary| {
                 let (dx, dy) = (unit.x - tank.x, unit.y - tank.y);
-                (base.0 * dy - base.1 * dx).atan2(base.0 * dx + base.1 * dy)
+                (base.0 * dy - base.1 * dx).det_atan2(base.0 * dx + base.1 * dy)
             };
             let mut order: Vec<&&AiEntitySummary> = chargers.iter().collect();
             order.sort_by(|a, b| angle(a).total_cmp(&angle(b)).then(a.id.cmp(&b.id)));
             let step = GUARD_SPACING_TILES / GUARD_STAGE_TILES;
             for (index, unit) in order.into_iter().enumerate() {
                 let offset = (index as f32 - (n - 1.0) / 2.0) * step;
-                let (sin, cos) = offset.sin_cos();
+                let (sin, cos) = offset.det_sin_cos();
                 let dir = (base.0 * cos - base.1 * sin, base.0 * sin + base.1 * cos);
                 stage.insert(
                     unit.id,

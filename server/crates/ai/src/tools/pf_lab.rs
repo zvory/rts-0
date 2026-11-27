@@ -662,8 +662,8 @@ impl AiStrategy for Candidate {
                                 slot.div_ceil(2) as f32 * if slot % 2 == 1 { 1.0 } else { -1.0 };
                             let angle = base + k * 40f32.to_radians();
                             let wp = (
-                                t.x + angle.cos() * radius * TILE_PX,
-                                t.y + angle.sin() * radius * TILE_PX,
+                                t.x + angle.det_cos() * radius * TILE_PX,
+                                t.y + angle.det_sin() * radius * TILE_PX,
                             );
                             if let Some(g) = group([f.id]) {
                                 if self.tactic.kind == Kind::Split {

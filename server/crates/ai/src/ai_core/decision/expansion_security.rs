@@ -620,7 +620,7 @@ pub(super) fn prepare<F: FnMut(EntityKind, u32, u32) -> bool>(
                     &resources,
                     &mut |kind, x, y| {
                         !rejected_sites.iter().any(|site| {
-                            (site.0 as f32 - x as f32).hypot(site.1 as f32 - y as f32)
+                            (site.0 as f32 - x as f32).det_hypot(site.1 as f32 - y as f32)
                                 <= NATMOVE_CLEAR_TILES
                         }) && placeable(kind, x, y)
                     },
