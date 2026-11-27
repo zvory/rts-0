@@ -301,9 +301,7 @@ fn validate_entity(
         });
     }
     let (_, insight_denominator) = config::disciple_insight_ratio(entity.kind, entity.kind);
-    if entity.passive_insight_ticks >= config::DISCIPLE_PASSIVE_INSIGHT_TICKS
-        || (entity.passive_insight_ticks != 0 && !entity.kind.is_disciple())
-        || entity.insight_fraction >= insight_denominator
+    if entity.insight_fraction >= insight_denominator
         || (entity.insight_fraction != 0
             && (!entity.kind.is_disciple() || entity.insight >= entity.insight_cap()))
         || entity.insight > entity.insight_cap()
