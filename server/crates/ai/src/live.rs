@@ -59,9 +59,8 @@ pub const LIVE_PROFILE_IDS: [&str; 8] = [
     ECO_AI_ID,
 ];
 
-/// The pool random picks draw from: every live profile but Jeff's AI V1.0, which is internal-only
-/// (offline tools and observer-only sessions). Jeff's AI V1.1 holds V1.0's old place, so the random
-/// stream is unchanged.
+/// The established random pool. Jeff's AI V1.1 holds V1.0's old place; Eco is selectable explicitly
+/// without changing this pool or its random stream.
 const RANDOM_LIVE_PROFILE_IDS: [&str; 6] = [
     AI_2_3_ID,
     AI_2_1_ID,

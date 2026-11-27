@@ -449,7 +449,7 @@ import { textWithin } from "./dom_text.mjs";
       "host lobby exposes an AI 2.3 profile selector",
     );
     assert(textWithin(root).includes("AI 2.3"), "host lobby labels AI seats as AI 2.3");
-    assert(profileSelectors[0].children.length === 4, "host lobby exposes all player-facing AI profiles");
+    assert(profileSelectors[0].children.length === AI_PROFILES.length, "host lobby exposes all player-facing AI profiles");
     assert(
       !profileSelectors[0].children.some((option) => option.value === "jeffs_ai"),
       "host lobby no longer offers Jeff's AI V1.0",
