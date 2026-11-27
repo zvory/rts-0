@@ -4,6 +4,7 @@ Lets {{units:entrenchmentEligible}} dig in.
 |---|---|
 | Direct damage taken | −{{ENTRENCHMENT_DIRECT_DAMAGE_REDUCTION|pct}} |
 | Area damage taken | −{{ENTRENCHMENT_AREA_DAMAGE_REDUCTION|pct}} |
+| Vector Field displacement | Immune |
 | Range | +{{ENTRENCHMENT_RANGE_BONUS_TILES}} tile |
 | Time to dig in | {{ENTRENCHMENT_DIG_IN_TICKS|s}} |
 

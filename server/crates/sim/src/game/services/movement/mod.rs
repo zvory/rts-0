@@ -247,7 +247,11 @@ fn apply_magic_anchor_pull(
             .min(distance);
             offset = (dir.0 * amount, dir.1 * amount);
         }
-        if let Some([dx, dy]) = ability_runtime.vector_field_at(x, y, tick) {
+        if let Some([dx, dy]) = ability_runtime.vector_field_at(x, y, tick).filter(|_| {
+            entities
+                .get(id)
+                .is_some_and(|e| crate::game::entity::active_trench_occupation(e).is_none())
+        }) {
             offset.0 += dx * config::VECTOR_FIELD_SPEED_PX_PER_TICK;
             offset.1 += dy * config::VECTOR_FIELD_SPEED_PX_PER_TICK;
         }
