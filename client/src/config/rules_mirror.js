@@ -682,7 +682,7 @@ export const UPGRADES = Object.freeze({
     icon: "METH",
     cost: Object.freeze({ steel: 100, oil: 200 }),
     researchTicks: METHAMPHETAMINES_RESEARCH_TICKS,
-    description: "Boosts Rifleman and Panzerfaust movement and attack speed; speeds up Machine Gunner movement and setup.",
+    description: "Boosts infantry movement and attack speed.",
     researchedAt: KIND.TRAINING_CENTRE,
   }),
   [UPGRADE.PANZERFAUSTS]: Object.freeze({
