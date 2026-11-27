@@ -4,7 +4,6 @@ use crate::sdk::{
     DefensePlanner, EntityKind, KnownBuildSiteExclusions, UpgradeKind, WorldQueries,
 };
 use rts_rules::math::GameplayMath as _;
-use std::collections::BTreeSet;
 mod construction;
 mod tactics;
 #[cfg(test)]
@@ -13,7 +12,6 @@ mod tests;
 pub(crate) const ECO_AI_ID: &str = "eco_ai";
 
 pub(crate) struct EcoStrategy {
-    configured: BTreeSet<u32>,
     exclusions: KnownBuildSiteExclusions,
     last_build: Option<(EntityKind, u32, u32)>,
     failed_sites: usize,
@@ -25,7 +23,6 @@ pub(crate) struct EcoStrategy {
 impl Default for EcoStrategy {
     fn default() -> Self {
         Self {
-            configured: BTreeSet::new(),
             exclusions: Default::default(),
             last_build: None,
             failed_sites: 0,
@@ -123,33 +120,8 @@ impl AiStrategy for EcoStrategy {
         let sites = owned_sites(frame);
         let bases = sites.len();
         self.defense.step(frame, actions, &mut self.planner, &sites);
-        for depot in frame
-            .owned()
-            .iter()
-            .filter(|e| e.kind == EntityKind::ResourceDepot && complete(e))
-        {
-            if frame.owned().iter().any(|e| e.kind == EntityKind::Worker)
-                && !self.configured.contains(&depot.id)
-            {
-                let steel = actions.set_production_repeat(&[depot.id], EntityKind::SteelMine, true);
-                let oil = actions.set_production_repeat(&[depot.id], EntityKind::PumpJack, true);
-                if steel.is_ok() && oil.is_ok() {
-                    self.configured.insert(depot.id);
-                }
-            }
-        }
         if !frame.owned().iter().any(|e| e.kind == EntityKind::Worker) {
-            // Finish the current extractor, then free its producer for a replacement builder.
-            for d in frame
-                .owned()
-                .iter()
-                .filter(|e| e.kind == EntityKind::ResourceDepot && complete(e))
-            {
-                if self.configured.remove(&d.id) {
-                    let _ = actions.set_production_repeat(&[d.id], EntityKind::SteelMine, false);
-                    let _ = actions.set_production_repeat(&[d.id], EntityKind::PumpJack, false);
-                }
-            }
+            // Extractors use permanent automatic jobs, independent of this manual queue.
             if !frame.owned().iter().any(|e| {
                 e.production
                     .is_some_and(|p| p.current_kind == Some(EntityKind::Worker))

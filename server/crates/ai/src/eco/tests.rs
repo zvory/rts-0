@@ -203,7 +203,7 @@ fn traveling_build_keeps_bank_reserved_and_stale_build_worker_can_retry() {
     )));
 }
 #[test]
-fn builder_recovery_disables_extractor_repeats_and_pays_for_one_worker() {
+fn builder_recovery_pays_for_one_worker_without_changing_automatic_extraction() {
     let (start, mut s, sites) = fixture();
     let f = frame(&start, &s, &sites);
     let mut eco = EcoStrategy::default();
@@ -222,9 +222,9 @@ fn builder_recovery_disables_extractor_repeats_and_pays_for_one_worker() {
     let mut a = AiActions::for_frame(&f);
     eco.step(&f, &mut a);
     let requests = a.into_requests();
-    assert!(requests
+    assert!(!requests
         .iter()
-        .any(|r| matches!(r, AiActionRequest::AdjustProductionRepeat { delta: -1, .. })));
+        .any(|r| matches!(r, AiActionRequest::AdjustProductionRepeat { .. })));
     assert_eq!(
         requests
             .iter()
@@ -238,6 +238,23 @@ fn builder_recovery_disables_extractor_repeats_and_pays_for_one_worker() {
             .count(),
         1
     );
+    // Automatic extractor jobs do not occupy the manual queue. An actual manual Worker
+    // already in that queue does: never enqueue a duplicate replacement behind it.
+    for d in s
+        .entities
+        .iter_mut()
+        .filter(|e| e.owner == 1 && e.kind == "resource_depot")
+    {
+        d.prod_kind = Some("worker".into());
+        d.prod_queue = Some(1);
+    }
+    let f = frame(&start, &s, &sites);
+    let mut a = AiActions::for_frame(&f);
+    eco.step(&f, &mut a);
+    assert!(!a
+        .into_requests()
+        .iter()
+        .any(|r| matches!(r, AiActionRequest::Train { .. })));
 }
 
 #[test]
