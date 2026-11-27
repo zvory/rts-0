@@ -18,7 +18,7 @@ For simulation, rules, and AI.
 - Tournament Grounds; Cosmic Energy and Breakthrough
 - Proving Grounds and Portal Adept production
 - [docs/projection-audit-checklist.md](../projection-audit-checklist.md) — projection checklist
-- [docs/design/ai.md](../design/ai.md) — AI opponents
+- [docs/design/ai.md](../design/ai.md) — AI, SDK defense, Eco
 - [docs/design/testing.md](../design/testing.md) §9 and §10 — self-play and dev scenarios when
   touching scripted tests or scenario setup
 
