@@ -115,6 +115,37 @@ pub(crate) fn profile_identity_by_id(id: &str) -> Option<AiProfileIdentity> {
             ),
         });
     }
+    if id == crate::eco::ECO_AI_ID {
+        let label = "Eco AI";
+        let summary = "Four-base economic infantry defense with terrain-derived defensive posts.";
+        let modules = [
+            "typed_strategy_sdk",
+            "economic_defense_planner",
+            "completed_base_stages",
+            "paid_infantry_mix",
+        ];
+        let sources = (
+            include_str!("../eco.rs"),
+            include_str!("../eco/construction.rs"),
+            include_str!("../eco/tactics.rs"),
+            crate::sdk::DEFENSE_PLANNER_SOURCE,
+            include_str!("../sdk/actions.rs"),
+            include_str!("../sdk/frame.rs"),
+            include_str!("../sdk/bases.rs"),
+            include_str!("../sdk/world_queries.rs"),
+            include_str!("../sdk/rulebook.rs"),
+        );
+        return Some(AiProfileIdentity {
+            composition: None,
+            profile_id: id.to_string(),
+            label: label.to_string(),
+            base_profile_id: None,
+            summary: summary.to_string(),
+            modules: modules.iter().map(|s| s.to_string()).collect(),
+            overlays: Vec::new(),
+            fingerprint: profile_fingerprint(&sources, label, None, summary, &modules, &[]),
+        });
+    }
     if id == crate::rush::RUSH_AI_ID {
         let label = "Rush AI";
         let summary =
