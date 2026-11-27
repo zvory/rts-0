@@ -1178,6 +1178,10 @@ pub fn run_from_env() {
             }
         };
     let seeds: u32 = get("--seeds").and_then(|s| s.parse().ok()).unwrap_or(6);
+    if scenarios.is_empty() || tactics.is_empty() || seeds == 0 {
+        eprintln!("ai-pf-lab: at least one scenario, tactic and seed are required");
+        process::exit(2);
+    }
     let map = get("--map").unwrap_or_else(|| "1v1 No Terrain".to_string());
     let ticks: u32 = get("--ticks").and_then(|s| s.parse().ok()).unwrap_or(2700);
     let gap: f32 = get("--gap").and_then(|s| s.parse().ok()).unwrap_or(20.0);
@@ -1219,6 +1223,12 @@ pub fn run_from_env() {
                 let result =
                     std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run_fight(&setup)))
                         .unwrap_or_else(|_| Err("panic".to_string()));
+                if let Err(err) = &result {
+                    eprintln!(
+                        "ai-pf-lab: scenario {:?}, tactic {:?}, seed {seed}, p{candidate}: {err}",
+                        scenario.name, tactics[ti].label
+                    );
+                }
                 ((si, ti), result)
             })
             .collect()
@@ -1335,6 +1345,9 @@ pub fn run_from_env() {
                 avg(&|h| h.pf_dead_loaded as f32),
             );
         }
+    }
+    if results.iter().any(|(_, result)| result.is_err()) {
+        process::exit(1);
     }
 }
 

@@ -200,7 +200,12 @@ fn parse_cands(text: &str) -> Result<Vec<Cand>, String> {
         .map(str::trim)
         .filter(|c| !c.is_empty())
         .map(|c| {
-            let (label, spec) = c.split_once('=').map_or((c, c), |(l, s)| (l, s));
+            // In an unlabelled `mm:key=value` candidate, `=` belongs to the parameters.
+            let (label, spec) = if c.starts_with("mm:") {
+                (c, c)
+            } else {
+                c.split_once('=').map_or((c, c), |(l, s)| (l, s))
+            };
             let params = match spec {
                 "naive" => None,
                 "mm" => Some(Params::default()),
@@ -686,6 +691,10 @@ pub fn run_from_env() {
         }
     };
     let seeds: u32 = get("--seeds").and_then(|s| s.parse().ok()).unwrap_or(6);
+    if scenarios.is_empty() || cands.is_empty() || seeds == 0 {
+        eprintln!("ai-engage-lab: at least one scenario, candidate and seed are required");
+        process::exit(2);
+    }
     let map = get("--map").unwrap_or_else(|| "1v1 No Terrain".to_string());
     let ticks: u32 = get("--ticks").and_then(|s| s.parse().ok()).unwrap_or(2700);
     let gap: f32 = get("--gap").and_then(|s| s.parse().ok()).unwrap_or(20.0);
@@ -732,15 +741,22 @@ pub fn run_from_env() {
                 let result =
                     std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run_fight(&setup)))
                         .unwrap_or_else(|_| Err("panic".to_string()));
+                if let Err(err) = &result {
+                    eprintln!(
+                        "ai-engage-lab: scenario {:?}, candidate {:?}, seed {seed}, p{candidate}: {err}",
+                        scenario.name, cands[ci].label
+                    );
+                }
                 ((si, ci, seed, candidate), result)
             })
             .collect()
     });
     if let Some(path) = fights_out {
-        if let Ok(mut file) = std::fs::File::create(&path) {
+        let write_fights = || -> std::io::Result<()> {
+            let mut file = std::fs::File::create(&path)?;
             for ((si, ci, seed, candidate), result) in &results {
                 if let Ok(r) = result {
-                    let _ = writeln!(
+                    writeln!(
                         file,
                         "{}\t{}\t{}\tp{}\t{:.0}\t{:.0}\t{}\t{}\t{}\t{}\t{}{}",
                         scenarios[*si].name,
@@ -755,9 +771,14 @@ pub fn run_from_env() {
                         r.their_alive,
                         r.ticks,
                         r.orders
-                    );
+                    )?;
                 }
             }
+            Ok(())
+        };
+        if let Err(err) = write_fights() {
+            eprintln!("ai-engage-lab: cannot write fights to {path:?}: {err}");
+            process::exit(1);
         }
     }
     println!(
@@ -812,5 +833,8 @@ pub fn run_from_env() {
                 }
             );
         }
+    }
+    if results.iter().any(|(_, result)| result.is_err()) {
+        process::exit(1);
     }
 }
