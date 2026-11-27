@@ -494,14 +494,14 @@ profiles and explicit activation/autocast policy instead of being folded into de
   `ANTI_TANK_GUN_BODY_TURN_RATE_DEGREES_PER_SECOND = 110`; sharp heading changes still reduce throttle
   until the gun pivots in place.
 - Panzerfaust units carry a one-shot 5-tile loaded weapon that targets only visible
-  Scout Cars, Tanks, and Command Cars with
+  Scout Cars, Tanks, Command Cars, Rocket Trucks, War Adepts, and War Masters with
   `PANZERFAUST_DAMAGE = 100`, `PANZERFAUST_ARMOR_PENETRATION = 0.5`,
   `PANZERFAUST_WINDUP_TICKS = 15`, and `PANZERFAUST_TRAVEL_TICKS = 15`. The Panzerfaust becomes spent
   immediately at launch and can move and use its rifle while the detached projectile travels.
   Against Armored Tanks, the 50% penetration lands as 63
   effective damage; unarmored Scout Cars take the full 100 damage. Methamphetamines reduces the
   windup constant to 12 ticks; travel stays 15 ticks. The dedicated runtime owns only the one-shot
-  launcher, exact vehicle whitelist, and disposable state; the entity remains a Panzerfaust throughout.
+  launcher, exact target whitelist, and disposable state; the entity remains a Panzerfaust throughout.
 - Tank hull-facing damage modifiers for tank and anti-tank gun hits are 1.0x front, 1.5x side,
   and 1.7x rear.
 - Tanks turn their hulls at `TANK_BODY_TURN_RATE_RAD_PER_TICK = 0.04375`, 25% faster than the

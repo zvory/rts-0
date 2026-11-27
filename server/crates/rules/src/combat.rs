@@ -477,6 +477,7 @@ pub fn is_panzerfaust_loaded_shot_target(kind: EntityKind) -> bool {
             | EntityKind::Tank
             | EntityKind::CommandCar
             | EntityKind::RocketLauncher
+            | EntityKind::WarAdept
     )
 }
 
@@ -1104,7 +1105,7 @@ mod tests {
     }
 
     #[test]
-    fn panzerfaust_loaded_shot_targets_only_real_vehicles_with_half_penetration() {
+    fn panzerfaust_loaded_shot_targets_vehicles_and_war_dao_with_half_penetration() {
         for kind in EntityKind::ALL {
             assert_eq!(
                 is_panzerfaust_loaded_shot_target(kind),
@@ -1114,6 +1115,7 @@ mod tests {
                         | EntityKind::Tank
                         | EntityKind::CommandCar
                         | EntityKind::RocketLauncher
+                        | EntityKind::WarAdept
                 ),
                 "{kind:?}"
             );
