@@ -22,7 +22,7 @@ mod repeat;
 /// spawn point is blocked, keep the complete item queued and retry next tick.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn production_system(
-    _map: &Map,
+    map: &Map,
     entities: &mut EntityStore,
     players: &mut [PlayerState],
     coordinator: &mut MoveCoordinator<'_>,
@@ -32,7 +32,7 @@ pub(crate) fn production_system(
     tick: u32,
     mut pending_spending: std::collections::HashMap<u32, rules::economy::ResourceCost>,
 ) {
-    manual::pay_and_protect(entities, players, &mut pending_spending);
+    manual::pay_and_protect(map, entities, players, &mut pending_spending);
     let mut completed_buildings_by_owner = None;
     for id in entities.ids() {
         let active_producer = entities.get(id).is_some_and(|producer| {
@@ -48,7 +48,8 @@ pub(crate) fn production_system(
                 .find(|player| player.id == owner)
                 .map(|player| player.faction_id.as_str())
                 .unwrap_or("");
-            for (owner, kind) in extractors::advance_automatic(entities, id, faction_id, tick) {
+            for (owner, kind) in extractors::advance_automatic(map, entities, id, faction_id, tick)
+            {
                 if let Some(player) = players.iter_mut().find(|player| player.id == owner) {
                     player.record_entity_created(kind);
                 }
@@ -94,7 +95,7 @@ pub(crate) fn production_system(
             if let Some(unit) = repeat_request {
                 let build_ticks = production_ticks(unit);
                 let extractor_target_available = !unit.is_resource_extractor()
-                    || extractors::target(entities, id, unit).is_some();
+                    || extractors::target(map, entities, id, unit).is_some();
                 if !extractor_target_available {
                     // A Depot may repeat both extractor kinds. Saturation of the current kind must
                     // yield to the next allocation instead of starving a still-buildable kind.
@@ -150,7 +151,7 @@ pub(crate) fn production_system(
                     .any(|player| player.id == building.owner && player.is_ai)
             })
         {
-            manual::pay_front(entities, players, id);
+            manual::pay_front(map, entities, players, id);
         }
         let completed_research = {
             match entities.get_mut(id) {
@@ -188,7 +189,7 @@ pub(crate) fn production_system(
             continue;
         }
 
-        if !extractors::ensure_scaffold(entities, id) {
+        if !extractors::ensure_scaffold(map, entities, id) {
             continue;
         }
 
@@ -340,6 +341,7 @@ mod tests {
     use crate::protocol::terrain;
     use rts_rules::math::GameplayMath as _;
 
+    mod extractor_footprints;
     mod rally;
     mod repeat_locking;
     mod upgrades;
