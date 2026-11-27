@@ -10,12 +10,13 @@ When several seats use the same profile, their lobby names receive deterministic
 
 ### Canonical profiles
 
-The player-facing lobby supports four AI profile IDs:
+The player-facing lobby supports five AI profile IDs:
 
 - ai_2_3 — AI 2.3, a weighted composition: equal thirds Rush AI, Pressure AI, and Jeff's AI (one-third probability each).
 - jeffs_ai_v1_1 — Jeff's AI (V1.1), the default opponent: Jeff's AI V1.0 plus the V1.1 changes, played with the feature set fixed in `JEFF_V1_1_FEATURES` (profiles.rs). On a symmetric map it decides in one frame, as if on the start it won more from (`live/mirror.rs`), so both starts play the same way.
 - rush_ai — Rush AI, an immediate infantry attack with forward construction.
 - pressure_ai — Pressure AI, the AI 2.1 economy and technology with independent forward staging and a value-based response.
+- eco_ai — Eco AI, a defensive four-base economy using the SDK cut/garrison planner and Machine Gunner/Panzerfaust production.
 
 `ai_turtle` is deprecated and internal-only. It remains registered for offline self-play,
 diagnostics, and observer-only AI sessions, but it is not exposed in the lobby and the server
@@ -23,7 +24,7 @@ replaces it with `jeffs_ai_v1_1` whenever a room has an active human player. The
 again at the authoritative match-start seam, so stale or crafted clients cannot put Turtle into a
 human match.
 
-The convenience inputs ai and default resolve to jeffs_ai_v1_1. The lobby exposes AI 2.3, Jeff's AI, Rush AI, and Pressure AI. Jeff's AI V1.0 (`jeffs_ai`, the server-authoritative port of the locally evaluated V3 champion policy and the baseline V1.1 is measured against) is internal-only like AI 2.1. AI 2.1 remains a concrete internal profile (`ai_2_1`) for offline tools and
+The convenience inputs ai and default resolve to jeffs_ai_v1_1. The lobby exposes AI 2.3, Jeff's AI, Rush AI, Pressure AI, and Eco AI. Jeff's AI V1.0 (`jeffs_ai`, the server-authoritative port of the locally evaluated V3 champion policy and the baseline V1.1 is measured against) is internal-only like AI 2.1. AI 2.1 remains a concrete internal profile (`ai_2_1`) for offline tools and
 observer-only sessions, but is hidden and rejected as a direct selection in human player lobbies.
 Unsupported or internal IDs fall back to Jeff's AI when adding a seat and are ignored when changing a
 seat; stale internal seats are normalized to Jeff's AI when humans join and again at match start.
@@ -168,8 +169,9 @@ production-exit, ring traversal, and tie-breaking approximation. Results are nam
 or command acceptance. Public queries depend only on `AiFrame` and explicit controller-owned
 failed-site exclusions. Legacy profiles retain their historical global-producer exit check through
 a narrow compatibility policy, while all other placement work is shared. General route queries,
-dynamic pathing, firing lanes, target legality, line of fire, and hidden occupancy remain outside
-the SDK because no Phase 4 consumer required them.
+dynamic pathing, target legality, full line of fire, and hidden occupancy remain outside the
+public query seam. The defensive planner below uses static terrain routes and bounded rock-ray
+checks for its recommendations; those do not establish authoritative movement or firing legality.
 
 `AiFrame::base_sites()` exposes cached public base landmarks from the existing static map
 analysis: a site for each original player start and each non-home resource cluster. Start sites
@@ -192,6 +194,40 @@ entity. Empty evidence means unknown occupancy, never confirmed vacancy. Constru
 as Depot evidence; none of these queries reads hidden state. The canonical host attaches the cached
 landmarks before either strategy initialization or step. Pressure uses these queries to order its
 expansions; other built-in profiles retain their existing placement policies.
+
+### Shared cut/garrison defense and Eco AI
+
+`sdk::DefensePlanner` is a reusable, command-free implementation of the B defensive hybrid.
+Strategies supply their frame, chosen base-site IDs, and defender budget. The result contains cut
+and garrison sectors, protected economic value, relative priority, estimated ground approach time
+from public enemy starting positions, and usable world-pixel slots with sector IDs. Static terrain/cut work is cached;
+the caller retains the planner between decisions. The planner does not choose expansion timing,
+assign entity IDs, issue orders, or take tactical ownership from its caller.
+
+Staffing combines uniquely attributed mining/production value with decreasing urgency as enemy
+ground approach time increases. Actual known remaining steel affects mining value; unknown
+amounts retain their uncertainty. Length influences whether a compact cut or garrison is selected,
+but does not multiply economic staffing priority. Entrenchment restrictions, static reachability,
+known occupancy, and firing-distance checks reject unusable posts. Unsupported sectors and
+unallocated defenders are explicit. Neither a cut nor a suggested slot certifies a sealed front,
+dynamic path clearance, command acceptance, or combat effectiveness. No map-specific choke
+coordinates are embedded in this policy.
+
+Eco AI is an independent typed strategy, registered as selectable `eco_ai` / **Eco AI**. It uses
+ordinary SDK actions and the same fog-filtered canonical host as other strategies. It does not
+change the default opponent, composition members, or random-profile pool.
+
+Its economy builds one Barracks and a Training Centre on one base, trains Machine Gunners, and
+completes Entrenchment before expanding. At two completed bases it targets two Barracks,
+researches Panzerfaust and Methamphetamines, and balances completed plus queued Machine Gunners
+and Panzerfausts toward equal counts. At three bases it targets four Barracks; it then expands to
+four bases and continues mixed infantry production, adding Barracks when money accumulates.
+Required mining, tech, and expansion spending precede optional troop/overflow spending. Supply
+uses the game's fixed cap; Eco pauses unaffordable training rather than building supply structures.
+Expansion candidates follow SDK ground-distance rank, excluding unreachable and known hostile
+sites. Completed owned Depots drive base stages; submitted commands are never treated as proof
+of completed construction. Defensive assignments follow the shared cut/garrison planner and move
+forward when the defended base set changes.
 
 ### Shared decision core
 

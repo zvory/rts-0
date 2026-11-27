@@ -187,6 +187,9 @@ fn route_and_staging_follow_the_passable_approach_around_a_wall() {
         height: 96,
         tile_size: 32,
         terrain: vec![AiTerrain::Grass; 96 * 96],
+        no_entrenchment_tiles: Default::default(),
+        slow_movement_tiles: Default::default(),
+        concealment_tiles: Default::default(),
         no_building_tiles: BTreeSet::new(),
         unwalkable_tiles: BTreeSet::new(),
     };
@@ -684,6 +687,9 @@ fn pressure_ground_connectivity_does_not_cut_diagonally_blocked_corners() {
         height: 3,
         tile_size: 32,
         terrain: vec![AiTerrain::Grass; 9],
+        no_entrenchment_tiles: Default::default(),
+        slow_movement_tiles: Default::default(),
+        concealment_tiles: Default::default(),
         no_building_tiles: BTreeSet::new(),
         unwalkable_tiles: BTreeSet::new(),
     };

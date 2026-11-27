@@ -7,6 +7,7 @@ export const AI_PROFILES = Object.freeze([
   { id: "jeffs_ai_v1_1", label: "Jeff's AI" },
   { id: "rush_ai", label: "Rush AI" },
   { id: "pressure_ai", label: "Pressure AI" },
+  { id: "eco_ai", label: "Eco AI" },
 ]);
 
 export const DEFAULT_AI_PROFILE_ID = "jeffs_ai_v1_1";

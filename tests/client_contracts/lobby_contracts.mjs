@@ -303,6 +303,7 @@ import { textWithin } from "./dom_text.mjs";
       { id: "jeffs_ai_v1_1", label: "Jeff's AI" },
       { id: "rush_ai", label: "Rush AI" },
       { id: "pressure_ai", label: "Pressure AI" },
+      { id: "eco_ai", label: "Eco AI" },
     ],
     "lobby AI profile selector exposes all supported player opponents",
   );
@@ -448,7 +449,7 @@ import { textWithin } from "./dom_text.mjs";
       "host lobby exposes an AI 2.3 profile selector",
     );
     assert(textWithin(root).includes("AI 2.3"), "host lobby labels AI seats as AI 2.3");
-    assert(profileSelectors[0].children.length === 4, "host lobby exposes all player-facing AI profiles");
+    assert(profileSelectors[0].children.length === AI_PROFILES.length, "host lobby exposes all player-facing AI profiles");
     assert(
       !profileSelectors[0].children.some((option) => option.value === "jeffs_ai"),
       "host lobby no longer offers Jeff's AI V1.0",
@@ -560,7 +561,7 @@ import { textWithin } from "./dom_text.mjs";
     assert(
       staleProfileSelectors.length === 1 &&
         staleProfileSelectors[0].value === "jeffs_ai_v1_1" &&
-        staleProfileSelectors[0].children.length === 4,
+        staleProfileSelectors[0].children.length === AI_PROFILES.length,
       "player lobby does not expose an internal Turtle profile received from stale state",
     );
   });

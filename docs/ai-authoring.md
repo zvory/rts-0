@@ -82,6 +82,49 @@ and ignore dynamic units/buildings and unit-specific clearance. Distances are wo
 cardinal/diagonal steps cost 1/1.4 tiles. Reachable distances are available on each site's
 `ground_distances_from_starts` map.
 
+## Plan a shared cut/garrison defense
+
+Keep a `DefensePlanner` in your strategy's cross-tick memory. Pass the current frame, the base
+site IDs you want to defend, and your available defender count:
+
+```rust
+use rts_ai::sdk::DefensePlanner;
+
+// Store this planner on the strategy rather than recreating it every decision.
+let mut planner = DefensePlanner::default();
+let plan = planner.plan(frame, &owned_base_ids, defender_count);
+for slot in &plan.slots {
+    // slot.position is a world-pixel destination; slot.sector_id identifies its sector.
+    // The caller assigns units, moves them, and issues Hold Position after arrival.
+}
+```
+
+The B hybrid compares terrain cuts around groups of bases with compact local garrisons. Cut
+sectors and garrisons report economic value, relative staffing priority, estimated enemy ground
+approach time, and suggested firing slots. It favors shorter enemy approaches and valuable
+mining/production; frontage length does not multiply staffing weight. Economic value is shared
+across alternative entrances so a producer or mine is not counted repeatedly at full value.
+Known remaining steel limits mine value. Unknown stock remains unknown; it contributes only a
+discounted potential estimate to the score. `known_remaining_steel` excludes unknown quantities,
+and `unknown_resource_count` reports their attributed share separately. Enemy approach uses public
+enemy starts and static terrain, not hidden enemy army positions.
+
+The planner caches terrain and cut geometry. Keep its instance alive to reuse that work. For up
+to four bases it compares cut/garrison partitions; larger holdings use bounded candidate merges.
+Oversized cut graphs fall back to garrisons. Economic scores refresh every 90 ticks, with earlier
+refreshes for changed budgets, owned sites, known buildings, or public enemy status. Exact cut
+building is synchronous, so a cold topology change can exceed one simulation tick. It emits
+no commands, chooses no build order, and does not reserve units in `AiActions`. The caller owns
+base selection, unit-to-slot assignment, tactical reactions, and cross-tick order suppression.
+Use `DefensePlanner::with_firing_range_tiles(range)` for a force with a shorter firing range than
+the default Machine Gunner assumption. Eco uses 4.8 tiles for its mixed infantry. Check
+`unallocated_budget` when insufficient usable slots exist; an unsupported cut must not be
+interpreted as staffed. Slots are terrain-based recommendations using known occupancy, not
+authoritative pathing, command acceptance, continuous frontage coverage, or a combat guarantee.
+
+Eco AI (`eco_ai`) is the built-in consumer: it updates defensive positions when its completed base
+set or available infantry changes, while keeping its economy separate from the shared planner.
+
 ## Emit actions
 
 Call typed helpers on the `AiActions` supplied to `step`. The builder supports `paid_build`,
@@ -116,7 +159,8 @@ cargo nextest run --config-file .config/nextest.toml \
 
 Upgrade costs remain owned by the simulation; `research` consults that existing definition for
 local affordability without publishing a duplicate rule table. Cross-tick goals, command receipts,
-task status, automatic planning, and completion inference remain outside this SDK.
+task status, and completion inference remain caller-owned; defensive recommendations do not add a
+task or command-acceptance system.
 
 ## Optional wounded-unit pull-back
 

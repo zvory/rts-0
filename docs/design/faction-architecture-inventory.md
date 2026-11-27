@@ -183,6 +183,13 @@ likewise select the current Kriegsia roster directly. The checker lists those th
 explicitly. Pressure uses the same fog-filtered SDK and catalog-derived production costs; adding
 it as an AI 2.3 member or standalone opponent does not admit another AI faction.
 
+Eco (`server/crates/ai/src/eco.rs`) is another explicit Kriegsia roster policy, using one-to-four
+bases, Machine Gunners, Panzerfausts and their research. It consumes the reusable SDK defensive
+planner; the planner's geometry is independent of the build order, while its economic scoring
+(`sdk/defense/scoring.rs`) explicitly values the current Steel mines and production roster.
+These current-roster policy files are checker-listed. Neither the planner nor Eco changes public
+AI faction admission or replaces the catalog as the source of costs and prerequisites.
+
 ## Current Prediction And WASM Coupling
 
 Prediction/WASM assumes the current start payload, global entity ids, current command set,

@@ -71,6 +71,10 @@ pub struct AiMap {
     pub tile_size: u32,
     pub terrain: Vec<AiTerrain>,
     pub no_building_tiles: BTreeSet<(u32, u32)>,
+    /// Public authored terrain overlays; independent of fog.
+    pub no_entrenchment_tiles: BTreeSet<(u32, u32)>,
+    pub slow_movement_tiles: BTreeSet<(u32, u32)>,
+    pub concealment_tiles: BTreeSet<(u32, u32)>,
     pub unwalkable_tiles: BTreeSet<(u32, u32)>,
 }
 
@@ -153,6 +157,8 @@ pub struct AiEntity {
     pub completion: AiCompletion,
     pub production: Option<AiProduction>,
     pub latched_resource: Option<u32>,
+    /// Recipient-projected extractor activity; absent means unknown/not an extractor.
+    pub extractor_active: Option<bool>,
     pub target: Option<u32>,
     /// Public active trench occupation, already gated by the recipient snapshot.
     pub occupied_trench_id: Option<u32>,
@@ -502,6 +508,24 @@ impl AiFrame {
                     .copied()
                     .map(AiTerrain::from_code)
                     .collect(),
+                concealment_tiles: start
+                    .map
+                    .concealment_tiles
+                    .iter()
+                    .map(|t| (t.x, t.y))
+                    .collect(),
+                no_entrenchment_tiles: start
+                    .map
+                    .no_entrenchment_tiles
+                    .iter()
+                    .map(|t| (t.x, t.y))
+                    .collect(),
+                slow_movement_tiles: start
+                    .map
+                    .slow_movement_tiles
+                    .iter()
+                    .map(|t| (t.x, t.y))
+                    .collect(),
                 unwalkable_tiles: start
                     .map
                     .unwalkable_tiles
@@ -574,6 +598,7 @@ fn normalize_entity(
             waiting_for_resources: production_details_known.then_some(view.prod_waiting),
         }),
         latched_resource: view.latched_node,
+        extractor_active: view.extractor_active,
         target: view.target_id,
         occupied_trench_id: view.occupied_trench_id,
         abilities: view

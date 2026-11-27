@@ -4,6 +4,7 @@ use crate::rules::economy::ResourceCost;
 use std::collections::HashMap;
 
 pub(super) fn pay_and_protect(
+    map: &Map,
     entities: &mut EntityStore,
     players: &mut [PlayerState],
     pending: &mut HashMap<u32, ResourceCost>,
@@ -25,10 +26,10 @@ pub(super) fn pay_and_protect(
         if !active_producer {
             continue;
         }
-        pay_front(entities, players, id);
+        pay_front(map, entities, players, id);
         // Claim a paid extractor's patch before another front can pay against it.
         // Scaffolds used to be created between payments in the per-producer loop.
-        extractors::ensure_scaffold(entities, id);
+        extractors::ensure_scaffold(map, entities, id);
 
         let Some(building) = entities.get(id) else {
             continue;
@@ -59,7 +60,7 @@ pub(super) fn pay_and_protect(
             .filter(|item| !item.paid)
             .filter(|item| {
                 !item.unit.is_resource_extractor()
-                    || extractors::target(entities, id, item.unit).is_some()
+                    || extractors::target(map, entities, id, item.unit).is_some()
             })
             .map(|item| rules::economy::resource_cost(item.unit))
             .unwrap_or(ResourceCost::new(0, 0));
@@ -80,7 +81,12 @@ pub(super) fn pay_and_protect(
 }
 
 // AI repeat scheduling retains its existing per-producer payment order.
-pub(super) fn pay_front(entities: &mut EntityStore, players: &mut [PlayerState], id: u32) {
+pub(super) fn pay_front(
+    map: &Map,
+    entities: &mut EntityStore,
+    players: &mut [PlayerState],
+    id: u32,
+) {
     let active_producer = entities.get(id).is_some_and(|producer| {
         producer.hp > 0 && producer.is_building() && !producer.under_construction()
     });
@@ -121,7 +127,7 @@ pub(super) fn pay_front(entities: &mut EntityStore, players: &mut [PlayerState],
                 .map(|item| (building.owner, item.unit))
         })
     {
-        if unit.is_resource_extractor() && extractors::target(entities, id, unit).is_none() {
+        if unit.is_resource_extractor() && extractors::target(map, entities, id, unit).is_none() {
             return;
         }
         let cost = rules::economy::resource_cost(unit);

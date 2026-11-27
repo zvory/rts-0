@@ -539,7 +539,8 @@ fn live_adapter_knows_public_and_internal_profiles() {
             JEFFS_AI_V1_1_ID,
             AI_TURTLE_ID,
             RUSH_AI_ID,
-            PRESSURE_AI_ID
+            PRESSURE_AI_ID,
+            ECO_AI_ID
         ]
     );
 }
