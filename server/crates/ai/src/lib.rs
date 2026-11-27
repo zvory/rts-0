@@ -14,6 +14,7 @@ mod config {
     pub(crate) use rts_rules::balance::*;
 }
 mod compositions;
+mod eco;
 mod live;
 mod pressure;
 mod rush;

@@ -5,6 +5,7 @@
 
 pub(crate) mod actions;
 mod bases;
+mod defense;
 mod frame;
 mod losses;
 mod pullback;
@@ -17,6 +18,9 @@ pub use actions::{
     ReservationNamespace, UnitGroup, MAX_ACTIONS_PER_STEP,
 };
 pub use bases::{AiBaseDepot, AiBaseEvidence, AiBaseSite, AiBaseSiteId, AiRankedBase};
+pub use defense::{
+    DefenseMode, DefensePlan, DefensePlanner, DefenseSector, DefenseSlot, DEFENSE_PLANNER_SOURCE,
+};
 pub use frame::{
     AiAbilityState, AiBuildObservation, AiBuildObservationPhase, AiCompletion, AiEconomy, AiEntity,
     AiEntityState, AiFrame, AiHealth, AiMap, AiPlayer, AiProduction, AiRememberedContact,

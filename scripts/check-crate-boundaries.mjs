@@ -13,7 +13,8 @@ const allowedWorkspaceDeps = new Map([
   ["rts-sim", ["rts-contract", "rts-protocol", "rts-rules"]],
   ["rts-sim-wasm", ["rts-contract", "rts-protocol", "rts-rules", "rts-sim"]],
   ["rts-ai", ["rts-contract", "rts-protocol", "rts-rules", "rts-sim"]],
-  ["rts-server", ["rts-ai", "rts-contract", "rts-protocol", "rts-rules", "rts-sim"]],
+  ["rts-wiki", ["rts-rules", "rts-sim"]],
+  ["rts-server", ["rts-ai", "rts-contract", "rts-protocol", "rts-rules", "rts-sim", "rts-wiki"]],
 ]);
 
 const serverOnlyDeps = new Set(["axum", "tokio", "tower-http", "tracing-subscriber"]);

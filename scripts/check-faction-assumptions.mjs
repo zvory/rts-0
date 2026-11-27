@@ -343,6 +343,13 @@ const approvedCurrentFactionFiles = new Set([
   // and faction catalog still own faction admission, while costs remain catalog-derived.
   "server/crates/ai/src/rush.rs",
   "server/crates/ai/src/rush/staging.rs",
+  // Eco deliberately selects the Kriegsia economy/infantry roster through the public SDK.
+  // Its costs and prerequisites remain faction-catalog derived.
+  "server/crates/ai/src/eco.rs",
+  "server/crates/ai/src/eco/construction.rs",
+  "server/crates/ai/src/eco/tactics.rs",
+  // SDK defense scoring explicitly values the current infantry economy.
+  "server/crates/ai/src/sdk/defense/scoring.rs",
   // Pressure independently owns a Kriegsia-only copied macro policy, staging formation, and
   // timed Panzerfaust production; public faction admission and catalog-derived costs stay shared.
   "server/crates/ai/src/ai_core/profiles/pressure.rs",

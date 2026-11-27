@@ -1,5 +1,7 @@
 use crate::config;
 use crate::game::entity::{EntityKind, EntityStore};
+use crate::game::map::Map;
+use crate::game::services::occupancy::{building_footprint, footprint_tiles};
 use crate::rules;
 
 const AUTOMATIC_KINDS: [EntityKind; 2] = [EntityKind::SteelMine, EntityKind::PumpJack];
@@ -7,6 +9,7 @@ const AUTOMATIC_KINDS: [EntityKind; 2] = [EntityKind::SteelMine, EntityKind::Pum
 /// Advance both free depot-local extractor jobs independently. Each kind pauses when its matching
 /// patches are saturated and waits through its combat restart delay after an extractor is killed.
 pub(super) fn advance_automatic(
+    map: &Map,
     entities: &mut EntityStore,
     producer_id: u32,
     faction_id: &str,
@@ -53,7 +56,7 @@ pub(super) fn advance_automatic(
             continue;
         }
         let scaffold = scaffold_id(entities, producer_id, kind).or_else(|| {
-            let (x, y) = target(entities, producer_id, kind)?;
+            let (x, y) = target(map, entities, producer_id, kind)?;
             let scaffold = entities.spawn_building(owner, kind, x, y, false)?;
             let associated = entities.get_mut(scaffold).is_some_and(|entity| {
                 let Some(construction) = entity.construction.as_mut() else {
@@ -87,7 +90,7 @@ pub(super) fn advance_automatic(
     completed
 }
 
-pub(super) fn ensure_scaffold(entities: &mut EntityStore, producer_id: u32) -> bool {
+pub(super) fn ensure_scaffold(map: &Map, entities: &mut EntityStore, producer_id: u32) -> bool {
     let Some((owner, kind, paid)) = entities.get(producer_id).and_then(|producer| {
         producer
             .prod_queue()
@@ -106,7 +109,7 @@ pub(super) fn ensure_scaffold(entities: &mut EntityStore, producer_id: u32) -> b
         // in the tick, or the already-paid production item would survive the destruction.
         return scaffold.hp > 0;
     }
-    let Some((x, y)) = target(entities, producer_id, kind) else {
+    let Some((x, y)) = target(map, entities, producer_id, kind) else {
         return false;
     };
     let Some(scaffold_id) = entities.spawn_building(owner, kind, x, y, false) else {
@@ -164,6 +167,7 @@ pub(super) fn scaffold_id(
 }
 
 pub(super) fn target(
+    map: &Map,
     entities: &EntityStore,
     producer_id: u32,
     extractor_kind: EntityKind,
@@ -176,6 +180,15 @@ pub(super) fn target(
     {
         return None;
     }
+    let stats = config::building_stats(extractor_kind)?;
+    // Automatic extraction keeps the exact patch position, but collision and invariants reserve
+    // quantized building footprints. Distinct rotated resource-grid nodes can occupy one tile.
+    // Use the same occupancy helpers as placement/invariants before choosing or paying a target.
+    let occupied: std::collections::BTreeSet<_> = entities
+        .iter()
+        .filter(|e| e.is_building() && e.kind != EntityKind::HealingSeal)
+        .flat_map(|e| building_footprint(map, e))
+        .collect();
     let range = config::MINING_ANCHOR_RANGE_TILES * config::TILE_SIZE as f32;
     let range2 = range * range;
     entities
@@ -185,7 +198,18 @@ pub(super) fn target(
             let dx = node.pos_x() - producer.pos_x();
             let dy = node.pos_y() - producer.pos_y();
             let dist2 = dx * dx + dy * dy;
-            if dist2 > range2 + 0.01
+            let tile = map.tile_of(node.pos_x(), node.pos_y());
+            let (Some(tx), Some(ty)) = (
+                tile.0.checked_sub(stats.foot_w / 2),
+                tile.1.checked_sub(stats.foot_h / 2),
+            ) else {
+                return None;
+            };
+            let footprint = footprint_tiles(extractor_kind, tx, ty);
+            let blocked =
+                footprint.is_empty() || footprint.iter().any(|tile| occupied.contains(tile));
+            if blocked
+                || dist2 > range2 + 0.01
                 || entities.node_slot_holder(node.id).is_some()
                 || entities.resource_extractor_for_node(node.id).is_some()
             {
@@ -238,6 +262,9 @@ mod tests {
         }
         assert!(entities.claim_miner(node, gatherer));
 
-        assert_eq!(target(&entities, depot, extractor_kind), None);
+        assert_eq!(
+            target(&Map::generate(2, 7), &entities, depot, extractor_kind),
+            None
+        );
     }
 }

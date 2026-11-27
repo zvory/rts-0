@@ -1,5 +1,5 @@
 {
-  "reason": "Allow explicit through-impact combat test helper player slices for detached magic-orb coverage.",
+  "reason": "Production extractor target admission reads authoritative footprint occupancy before choosing or paying an automatic/manual extractor target; retain building non-overlap invariant for rotated node grids.",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -1784,6 +1784,12 @@
       "target": "move_coordinator",
       "path": "services/production.rs",
       "line": 6
+    },
+    {
+      "source": "production",
+      "target": "occupancy",
+      "path": "services/production/extractors.rs",
+      "line": 4
     },
     {
       "source": "standability",

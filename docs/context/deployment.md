@@ -12,7 +12,7 @@ Use when changing server bind/config, the build pipeline, or the input-hardening
 cd server && cargo run            # serves client + /ws on RTS_ADDR; open the printed URL
 cd server && cargo run --release  # fast build
 cd server && cargo build && cargo clippy
-node scripts/check-wiki.mjs       # wiki routes, generated stats, and catalog parity
+node scripts/check-wiki.mjs       # wiki routes, player wiki generator, stats, catalog parity
 node scripts/check-crate-boundaries.mjs
 ```
 
@@ -46,9 +46,18 @@ still gate merging; serialized deploys finish the active rollout and coalesce pe
   match-history/replay write wait, then WebSocket/Axum slack. Beta/mainline validation should check
   logs for forced-finalization success/failure, `match recorded outcome=aborted replay=true`, and
   any write-wait timeout before treating an interrupted deploy as healthy.
-- `/wiki` is server-rendered and read-only. It may serve only allowlisted Markdown from
-  `docs/context` and `docs/design`; `/wiki/stats` must be generated from `rts-rules` definitions
-  and faction catalogs, not scraped from client config or rendered docs.
+- `/wiki` is server-rendered and read-only. `/wiki/` is the player wiki, generated once per
+  process by `server/crates/wiki` (`rts-wiki`) from the compiled `rts-rules` definitions, faction
+  catalogs and the sim research table; numbers are never copied into its data. Its only file
+  inputs are `docs/wiki/` (Markdown notes, `icons.json`, `history.json`, all fixed names) and the
+  client's `rules_mirror.js` for labels/tooltips. Developer docs live at `/wiki/dev/` and may serve
+  only allowlisted Markdown from `docs/context` and `docs/design`; the old `/wiki/docs|context|design/...`
+  links redirect there. `/wiki/stats` must be generated from `rts-rules` definitions and faction
+  catalogs, not scraped from client config or rendered docs. The release image copies `docs/wiki`
+  alongside `docs/context` and `docs/design`.
+- `docs/wiki/history.json` (changelog with PR attribution) and `icons.json` (unit art drawn by the
+  client) are refreshed outside CI by the local wiki tool (`update-wiki.cmd -ExportTo <checkout>`);
+  a build newer than the last export still shows current numbers everywhere.
 
 ## Cross-capsule triggers
 - Touching the wire surface → [protocol.md](protocol.md).

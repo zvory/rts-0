@@ -44,10 +44,11 @@ runserver
 runserver.sh
 rust-toolchain.toml
 
-# The deployed wiki reads only these documentation trees.
+# The deployed wiki reads only these documentation trees (player wiki data: docs/wiki).
 docs/*
 !docs/context
 !docs/design
+!docs/wiki
 
 # The Docker build consumes only the prediction-WASM builder script.
 scripts/*

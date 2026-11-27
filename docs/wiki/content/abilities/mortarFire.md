@@ -1,0 +1,2 @@
+- One shell per order.
+- Very inaccurate without vision of the target.

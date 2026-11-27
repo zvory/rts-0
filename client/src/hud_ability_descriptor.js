@@ -13,7 +13,7 @@ export function abilityButtonDescriptor({
     return {
       id: `ability:${definition.ability}`, commandId, kind: "button", action: "ability",
       ability: definition.ability, icon: definition.icon, label: definition.label,
-      title: `${definition.title}. Passive: always automatic; cannot be cast or toggled. 15-second cooldown.`,
+      title: definition.title,
       passive: true, enabled: false, intent: null, contextIntent: null, onUnavailableIntent: null,
       contextHotkeyModifiers: [], cls: "autocast-enabled",
       cooldownClocks: affordance.cooldownClocks,

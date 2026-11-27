@@ -1454,6 +1454,7 @@ dependencies = [
  "rts-protocol",
  "rts-rules",
  "rts-sim",
+ "rts-wiki",
  "serde",
  "serde_json",
  "sqlx",
@@ -1494,6 +1495,16 @@ dependencies = [
  "serde",
  "serde_json",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "rts-wiki"
+version = "0.1.0"
+dependencies = [
+ "pulldown-cmark",
+ "rts-rules",
+ "rts-sim",
+ "serde_json",
 ]
 
 [[package]]

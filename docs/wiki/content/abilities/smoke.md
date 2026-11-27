@@ -1,0 +1,2 @@
+- With {{research:smoke_plus}}: {{SMOKE_PLUS_CLOUD_RADIUS_TILES}}-tile radius for {{SMOKE_PLUS_CLOUD_DURATION_TICKS|s}}.
+- Units inside smoke see each other only at close range (melee visibility above).

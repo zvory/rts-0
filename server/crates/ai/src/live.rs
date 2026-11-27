@@ -17,6 +17,7 @@ use crate::ai_core::profiles::{
 };
 use crate::ai_shared;
 use crate::compositions::{composition_by_id, AI_2_3_ID};
+use crate::eco::{EcoStrategy, ECO_AI_ID};
 use crate::rush::{RushStrategy, RUSH_AI_ID};
 use crate::sdk::{AiActions, AiFrame, AiStrategy, KnownBuildSite, WorldQueries};
 use crate::selfplay::pending_build::PendingBuildTracker;
@@ -47,7 +48,7 @@ pub const DEFAULT_LIVE_PROFILE_ID: &str = JEFFS_AI_V1_1_ID;
 
 /// Canonical profile ids understood by the live adapter. Experimental profiles are available to
 /// internal observer-only sessions; the room actor prevents them from entering human matches.
-pub const LIVE_PROFILE_IDS: [&str; 7] = [
+pub const LIVE_PROFILE_IDS: [&str; 8] = [
     AI_2_3_ID,
     AI_2_1_ID,
     JEFFS_AI_ID,
@@ -55,11 +56,11 @@ pub const LIVE_PROFILE_IDS: [&str; 7] = [
     AI_TURTLE_ID,
     RUSH_AI_ID,
     PRESSURE_AI_ID,
+    ECO_AI_ID,
 ];
 
-/// The pool random picks draw from: every live profile but Jeff's AI V1.0, which is internal-only
-/// (offline tools and observer-only sessions). Jeff's AI V1.1 holds V1.0's old place, so the random
-/// stream is unchanged.
+/// The established random pool. Jeff's AI V1.1 holds V1.0's old place; Eco is selectable explicitly
+/// without changing this pool or its random stream.
 const RANDOM_LIVE_PROFILE_IDS: [&str; 6] = [
     AI_2_3_ID,
     AI_2_1_ID,
@@ -77,6 +78,7 @@ pub fn canonical_live_profile_id(input: &str) -> Option<&'static str> {
         JEFFS_AI_ID => Some(JEFFS_AI_ID),
         JEFFS_AI_V1_1_ID => Some(JEFFS_AI_V1_1_ID),
         RUSH_AI_ID => Some(RUSH_AI_ID),
+        ECO_AI_ID => Some(ECO_AI_ID),
         PRESSURE_AI_ID => Some(PRESSURE_AI_ID),
         AI_TURTLE_ID => Some(AI_TURTLE_ID),
         _ => None,
@@ -93,6 +95,7 @@ pub fn live_profile_label(profile_id: &str) -> &'static str {
         Some(JEFFS_AI_ID) => "Jeff's AI V1.0",
         Some(JEFFS_AI_V1_1_ID) => "Jeff's AI",
         Some(RUSH_AI_ID) => "Rush AI",
+        Some(ECO_AI_ID) => "Eco AI",
         Some(PRESSURE_AI_ID) => "Pressure AI",
         Some(AI_TURTLE_ID) => "AI Turtle",
         _ => "AI",
@@ -102,7 +105,7 @@ pub fn live_profile_label(profile_id: &str) -> &'static str {
 pub fn is_player_live_profile_id(profile_id: &str) -> bool {
     matches!(
         profile_id,
-        AI_2_3_ID | JEFFS_AI_V1_1_ID | RUSH_AI_ID | PRESSURE_AI_ID
+        AI_2_3_ID | JEFFS_AI_V1_1_ID | RUSH_AI_ID | PRESSURE_AI_ID | ECO_AI_ID
     )
 }
 
@@ -301,6 +304,7 @@ pub struct AiController {
     pressure_waves: crate::pressure::PressureWaves,
     retired_barracks: BTreeSet<u32>,
     rush_strategy: RushStrategy,
+    eco_strategy: EcoStrategy,
     opening: opening::OpeningProgress,
     /// Jeff's AI V1.1 (`mirror`): the frame he decides in off the canonical start, worked out on
     /// the match's first think.
@@ -333,8 +337,8 @@ impl AiController {
         let profile = profile_by_id(profile_id).unwrap_or_else(legacy_fallback_profile);
         Self {
             player,
-            behavior_profile_id: if profile_id == RUSH_AI_ID {
-                RUSH_AI_ID
+            behavior_profile_id: if matches!(profile_id, RUSH_AI_ID | ECO_AI_ID) {
+                profile_id
             } else {
                 profile.id
             },
@@ -354,6 +358,7 @@ impl AiController {
             pressure_waves: Default::default(),
             retired_barracks: BTreeSet::new(),
             rush_strategy: Default::default(),
+            eco_strategy: Default::default(),
             opening: Default::default(),
             mirror: None,
         }
@@ -560,6 +565,8 @@ impl AiController {
 
         let strategy: Option<&mut dyn AiStrategy> = if self.behavior_profile_id == RUSH_AI_ID {
             Some(&mut self.rush_strategy)
+        } else if self.behavior_profile_id == ECO_AI_ID {
+            Some(&mut self.eco_strategy)
         } else {
             self.custom_strategy
                 .as_mut()

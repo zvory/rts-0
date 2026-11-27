@@ -40,6 +40,8 @@ try {
   assert.doesNotThrow(() => validateCommandInput("game-open", { spectate: ["ai_2_3", "ai_2_1"] }));
   assert.doesNotThrow(() => validateCommandInput("game-open", { spectate: ["ai_2_1", "ai_turtle"] }));
   assert.doesNotThrow(() => validateCommandInput("game-open", { spectate: ["rush_ai", "jeffs_ai"] }));
+  assert.doesNotThrow(() => validateCommandInput("game-open", { opponent: "eco_ai" }));
+  assert.doesNotThrow(() => validateCommandInput("game-open", { spectate: ["eco_ai", "ai_2_3"] }));
   assert.doesNotThrow(() => validateCommandInput("game-open", { spectate: ["ai_2_1", "ai_turtle"], autoSpectator: true }));
   assert.throws(() => validateCommandInput("game-open", { opponent: "ai_2_1", autoSpectator: true }), (error) => error?.code === "invalidInput");
   assert.throws(() => validateCommandInput("game-open", { opponent: "ai_2_1", spectate: ["ai_2_1", "ai_turtle"] }), (error) => error?.code === "invalidInput");

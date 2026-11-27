@@ -322,7 +322,7 @@ pub fn available_profile_ids() -> Vec<&'static str> {
     required_profiles()
         .into_iter()
         .map(|profile| profile.id)
-        .chain([crate::rush::RUSH_AI_ID])
+        .chain([crate::rush::RUSH_AI_ID, crate::eco::ECO_AI_ID])
         .chain(crate::compositions::COMPOSITIONS.iter().map(|c| c.id))
         .collect()
 }
@@ -331,6 +331,7 @@ pub fn canonical_profile_id(input: &str) -> Option<&'static str> {
     match input {
         "ai" | "default" => Some(DEFAULT_LIVE_PROFILE_ID),
         crate::rush::RUSH_AI_ID => Some(crate::rush::RUSH_AI_ID),
+        crate::eco::ECO_AI_ID => Some(crate::eco::ECO_AI_ID),
         id => crate::compositions::composition_by_id(id)
             .map(|c| c.id)
             .or_else(|| profile_by_id(id).map(|profile| profile.id)),
@@ -1058,6 +1059,7 @@ mod tests {
                 AI_TURTLE_ID,
                 "pressure_ai",
                 "rush_ai",
+                "eco_ai",
                 "ai_2_3"
             ]
         );
