@@ -74,7 +74,14 @@ catalogs. Its unit/building damage, range, cooldown, and weapon columns intentio
 primary/default weapon stats only; secondary weapons such as the Tank coax are documented here until
 generated secondary-weapon rows exist. For changes that affect visible stats, faction availability,
 upgrades, or ability metadata, run `node scripts/check-wiki.mjs`; it includes the wiki route/table
-checks and the client catalog parity check.
+checks, the player wiki generator tests and the client catalog parity check.
+
+The player wiki at `/wiki/` (`server/crates/wiki`) is generated from the same compiled definitions
+plus the sim research table (`rts_sim::game::upgrade::definition`). Its build script indexes where
+each `pub const` scalar and definition field is set and used, so pages link numbers to code lines at
+the running commit. Hand-written notes in `docs/wiki/content/` reference numbers only through
+`{{CONSTANT}}`-style templates, never literal copies, so a balance change needs no wiki edit unless
+it renames something a note references (the `rts-wiki` tests catch that).
 
 `server/src/config.rs` and `server/crates/sim/src/config.rs` are compatibility shims for
 Rust-owned balance exports while call sites are migrated. They should not accumulate server-shell

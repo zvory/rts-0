@@ -58,10 +58,14 @@ to the live session and stays outside checkpoints.
 Completed living buildings satisfy prerequisites; destroyed or unfinished buildings do not.
 `game-core` implementer: provide exactly these. `server-shell` implementer: call only these.
 The server shell may also serve non-simulation HTTP routes such as `/wiki`, `/wiki/`, and
-`/wiki/{*path}`. Those routes generate the wiki index from the allowlisted packaged Markdown docs
-roots (`docs/context` and `docs/design`), route canonical `/wiki/docs/...` doc pages while
-preserving legacy short aliases, rewrite allowlisted relative Markdown doc links under `/wiki` with
-anchors preserved, render allowlisted docs Markdown as no-cache HTML, and do not call into `Game`.
+`/wiki/{*path}`. `/wiki` redirects to `/wiki/`, the player wiki: pages generated once per process
+by `rts-wiki` (`server/crates/wiki`) from the compiled rules plus the fixed `docs/wiki` data files,
+served as no-cache HTML by file name (`/wiki/unit-tank.html`). Developer docs live under
+`/wiki/dev/`: the index is generated from the allowlisted packaged Markdown docs roots
+(`docs/context` and `docs/design`), canonical `/wiki/dev/docs/...` doc pages keep the short
+`/wiki/dev/context/...` aliases, allowlisted relative Markdown doc links are rewritten under
+`/wiki/dev` with anchors preserved, and the pre-move `/wiki/docs|context|design/...` links redirect
+(308) to `/wiki/dev/...`. None of these routes call into `Game`.
 
 ```rust
 pub struct Game { /* private */ }

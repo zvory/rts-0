@@ -1,0 +1,369 @@
+//! Indexes the rules and simulation source at build time, so every number on the wiki can name
+//! the variable and the line that sets it:
+//!
+//! * `constants.rs` — `constants()`: every public scalar constant of `rts-rules`, read through its
+//!   real public path so the compiled value (not the source text) is used. New constants appear
+//!   without code changes.
+//! * `code_index.json` — where each unit/building/weapon/ability/research field is set
+//!   (`definitions`), where each constant is read (`usage`), and a few player-facing private
+//!   simulation constants (`sim`, evaluated at run time against the rules values).
+
+use std::fmt::Write as _;
+use std::fs;
+use std::path::{Path, PathBuf};
+
+#[allow(dead_code)]
+#[path = "build/code_index.rs"]
+mod code_index;
+
+const SCALARS: &[&str] = &[
+    "u8",
+    "u16",
+    "u32",
+    "u64",
+    "usize",
+    "i8",
+    "i16",
+    "i32",
+    "i64",
+    "isize",
+    "f32",
+    "f64",
+    "bool",
+    "&str",
+    "&'static str",
+];
+
+/// Player-facing numbers that live (privately) in the simulation crate.
+const SIM_DIR: &str = "server/crates/sim/src/game/services/combat";
+const SIM_CONSTANTS: &[&str] = &[
+    "TANK_STATIONARY_RANGE_MAX_TILES",
+    "TANK_STATIONARY_RANGE_RAMP_TICKS",
+    "TANK_TURRET_TURN_RATE_RAD_PER_TICK",
+    "ANTI_TANK_GUN_TURN_RATE_RAD_PER_TICK",
+    "ARTILLERY_SETUP_TURN_RATE_RAD_PER_TICK",
+];
+
+struct Found {
+    name: String,
+    module: String,
+    file: String,
+    line: usize,
+    ty: String,
+    doc: String,
+}
+
+fn main() {
+    let manifest = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
+    let repo = manifest.join("../../..");
+    let rules = repo.join("server/crates/rules/src");
+    println!("cargo:rerun-if-changed=../rules/src");
+    println!("cargo:rerun-if-changed=../sim/src");
+
+    // Optional rules APIs (src/compat.rs): each is compiled in only when the rules source has it,
+    // so a renamed helper blanks one wiki field instead of breaking the server build.
+    let optional: &[(&str, &str, &str)] = &[
+        (
+            "has_engagement_range",
+            "combat.rs",
+            "pub fn engagement_range_tiles",
+        ),
+        (
+            "has_carrier_range",
+            "faction.rs",
+            "pub fn ability_range_for_carrier",
+        ),
+        (
+            "has_carrier_cost",
+            "faction.rs",
+            "pub fn ability_cost_for_carrier",
+        ),
+        ("has_tank_coax", "combat.rs", "TankCoax"),
+        ("has_panzerfaust_shot", "combat.rs", "PanzerfaustLoadedShot"),
+        ("has_burst_weapons", "combat.rs", "ScoutCarMg"),
+        ("has_disciples", "kind.rs", "pub const fn is_disciple"),
+        (
+            "has_target_priority",
+            "combat.rs",
+            "pub fn default_target_priority_policy",
+        ),
+        ("has_threat_role", "combat.rs", "pub fn target_threat_role"),
+        (
+            "has_armor_reaction",
+            "combat.rs",
+            "pub fn weapon_triggers_tank_armor_reaction",
+        ),
+        ("has_queue_policy", "faction.rs", "pub queue_policy"),
+        ("has_charges", "faction.rs", "pub charge_recharge_ticks"),
+        (
+            "has_entrenchment",
+            "balance/entrenchment.rs",
+            "pub fn is_entrenchment_eligible_infantry",
+        ),
+        (
+            "has_support_setup",
+            "balance/support_weapons.rs",
+            "pub const fn support_weapon_setup_ticks",
+        ),
+        (
+            "has_extractor_kind",
+            "kind.rs",
+            "pub const fn extracted_resource_kind",
+        ),
+        ("has_barbed_wire", "lib.rs", "barbed_wire_affects"),
+        ("has_crushes_wire", "lib.rs", "crushes_barbed_wire"),
+        ("has_fires_while_moving", "lib.rs", "fires_while_moving"),
+        ("has_rifle_infantry", "lib.rs", "is_rifle_infantry"),
+        (
+            "has_manual_emplacement",
+            "lib.rs",
+            "supports_manual_emplacement",
+        ),
+        ("has_blocks_sight", "lib.rs", "blocks_line_of_sight"),
+        ("has_body_class", "lib.rs", "movement_body_class"),
+        (
+            "has_infantry_policy",
+            "combat.rs",
+            "pub infantry_target_policy",
+        ),
+        (
+            "has_entrenchment_damage",
+            "combat.rs",
+            "pub fn direct_damage_after_entrenchment",
+        ),
+    ];
+    for (cfg, file, needle) in optional {
+        println!("cargo:rustc-check-cfg=cfg({cfg})");
+        if fs::read_to_string(rules.join(file)).is_ok_and(|t| t.contains(needle)) {
+            println!("cargo:rustc-cfg={cfg}");
+        }
+    }
+
+    // ---- rules constants
+    let mut found = Vec::new();
+    let lib = fs::read_to_string(rules.join("lib.rs")).expect("rules crate source");
+    for (module, is_pub) in module_decls(&lib) {
+        if is_pub {
+            if let Some(file) = module_file(&rules, &module) {
+                scan(&rules, &file, &module, &mut found);
+            }
+        }
+    }
+    let mut out = String::from("// @generated by build.rs\npub fn constants() -> Vec<crate::snapshot::ConstEntry> {\n    vec![\n");
+    for f in &found {
+        let path = format!("rts_rules::{}::{}", f.module.replace('/', "::"), f.name);
+        let value = match f.ty.as_str() {
+            "bool" => format!("crate::snapshot::Val::Bool({path})"),
+            "&str" | "&'static str" => format!("crate::snapshot::Val::Str({path}.to_string())"),
+            "f32" => format!("crate::snapshot::Val::num_f32({path})"),
+            _ => format!("crate::snapshot::Val::Num({path} as f64)"),
+        };
+        let _ = writeln!(
+            out,
+            "        crate::snapshot::ConstEntry {{ name: {:?}, file: {:?}, line: {}, ty: {:?}, value: {value}, doc: {:?} }},",
+            f.name, f.file, f.line, f.ty, f.doc
+        );
+    }
+    out.push_str("    ]\n}\n");
+    let out_dir = PathBuf::from(std::env::var("OUT_DIR").unwrap());
+    fs::write(out_dir.join("constants.rs"), out).unwrap();
+
+    // ---- private simulation constants (expression text; evaluated at run time)
+    let sim = sim_constants(&repo);
+    let mut names: std::collections::HashSet<String> =
+        found.iter().map(|f| f.name.clone()).collect();
+    names.extend(
+        sim.iter()
+            .filter_map(|v| v["name"].as_str().map(str::to_string)),
+    );
+
+    // ---- definitions and usage
+    let index = serde_json::json!({
+        "definitions": code_index::definitions_raw(&repo, &names),
+        "usage": code_index::usage(&repo, &names, 12),
+        "sim": sim,
+    });
+    fs::write(
+        out_dir.join("code_index.json"),
+        serde_json::to_string(&index).unwrap(),
+    )
+    .unwrap();
+}
+
+fn sim_constants(repo: &Path) -> Vec<serde_json::Value> {
+    let mut out = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    let Ok(dir) = fs::read_dir(repo.join(SIM_DIR)) else {
+        return out;
+    };
+    let mut files: Vec<_> = dir
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().is_some_and(|x| x == "rs"))
+        .collect();
+    files.sort();
+    for file in files {
+        let text = fs::read_to_string(&file).unwrap_or_default();
+        let lines: Vec<&str> = text.lines().collect();
+        let fname = file.file_name().unwrap().to_string_lossy().to_string();
+        for (i, line) in lines.iter().enumerate() {
+            let t = line.trim_start();
+            let t = ["pub(super) ", "pub(crate) ", "pub "]
+                .iter()
+                .fold(t, |acc, p| acc.strip_prefix(p).unwrap_or(acc));
+            let Some(rest) = t.strip_prefix("const ") else {
+                continue;
+            };
+            let Some((name, after)) = rest.split_once(':') else {
+                continue;
+            };
+            let name = name.trim();
+            if !SIM_CONSTANTS.contains(&name) || seen.contains(name) {
+                continue;
+            }
+            let Some((ty, expr)) = after.split_once('=') else {
+                continue;
+            };
+            let Some(expr) = expr.trim().strip_suffix(';') else {
+                continue;
+            };
+            seen.insert(name.to_string());
+            let doc: Vec<&str> = lines[..i]
+                .iter()
+                .rev()
+                .take_while(|l| l.trim_start().starts_with("//"))
+                .map(|l| l.trim_start().trim_start_matches('/').trim())
+                .collect();
+            out.push(serde_json::json!({
+                "name": name,
+                "type": ty.trim(),
+                "expr": expr.replace("config::", "").replace(" as u16", "").replace(" as u32", "").replace(" as f32", ""),
+                "file": format!("sim: combat/{fname}"),
+                "path": format!("{SIM_DIR}/{fname}"),
+                "line": i + 1,
+                "doc": doc.into_iter().rev().collect::<Vec<_>>().join(" "),
+            }));
+        }
+    }
+    out
+}
+
+/// `mod x;` / `pub mod x;` declarations at the top level of a file.
+fn module_decls(text: &str) -> Vec<(String, bool)> {
+    let mut mods = Vec::new();
+    for line in text.lines() {
+        let (is_pub, rest) = if let Some(r) = line.strip_prefix("pub mod ") {
+            (true, r)
+        } else if let Some(r) = line.strip_prefix("mod ") {
+            (false, r)
+        } else {
+            continue;
+        };
+        if let Some(name) = rest.trim().strip_suffix(';') {
+            mods.push((name.trim().to_string(), is_pub));
+        }
+    }
+    mods
+}
+
+fn module_file(src: &Path, module: &str) -> Option<PathBuf> {
+    let flat = src.join(format!("{module}.rs"));
+    if flat.exists() {
+        return Some(flat);
+    }
+    let nested = src.join(module).join("mod.rs");
+    nested.exists().then_some(nested)
+}
+
+/// Top-level `pub const NAME: <scalar>` items of a public module, and of private child modules
+/// re-exported with `pub use child::*`.
+fn scan(src: &Path, file: &Path, module: &str, found: &mut Vec<Found>) {
+    let Ok(text) = fs::read_to_string(file) else {
+        return;
+    };
+    let rel = file
+        .strip_prefix(src)
+        .unwrap()
+        .to_string_lossy()
+        .replace('\\', "/");
+    let lines: Vec<&str> = text.lines().collect();
+    for (index, line) in lines.iter().enumerate() {
+        let Some(rest) = line.strip_prefix("pub const ") else {
+            continue;
+        };
+        if rest.starts_with("fn ") {
+            continue;
+        }
+        let Some((name, after)) = rest.split_once(':') else {
+            continue;
+        };
+        let Some((ty, _)) = after.split_once('=') else {
+            continue;
+        };
+        let ty = ty.trim().to_string();
+        let name = name.trim().to_string();
+        if !SCALARS.contains(&ty.as_str())
+            || !name
+                .chars()
+                .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_')
+        {
+            continue;
+        }
+        found.push(Found {
+            name,
+            module: module.to_string(),
+            file: rel.clone(),
+            line: index + 1,
+            ty,
+            doc: doc_above(&lines, index),
+        });
+    }
+    let parent_dir = if file.file_name().is_some_and(|n| n == "mod.rs") {
+        file.parent().unwrap().to_path_buf()
+    } else {
+        file.with_extension("")
+    };
+    for (child, is_pub) in module_decls(&text) {
+        let glob = text.contains(&format!("pub use {child}::*;"));
+        if !is_pub && !glob {
+            continue;
+        }
+        let flat = parent_dir.join(format!("{child}.rs"));
+        let child_file = if flat.exists() {
+            flat
+        } else {
+            parent_dir.join(&child).join("mod.rs")
+        };
+        if !child_file.exists() {
+            continue;
+        }
+        let child_module = if is_pub {
+            format!("{module}/{child}")
+        } else {
+            module.to_string()
+        };
+        scan(src, &child_file, &child_module, found);
+    }
+}
+
+fn doc_above(lines: &[&str], index: usize) -> String {
+    let mut doc = Vec::new();
+    let mut i = index;
+    while i > 0 {
+        i -= 1;
+        let t = lines[i].trim();
+        if t.starts_with("#[") {
+            continue;
+        }
+        if let Some(c) = t.strip_prefix("///").or_else(|| t.strip_prefix("//")) {
+            if c.starts_with('!') || c.trim_start().starts_with("---") {
+                break;
+            }
+            doc.push(c.trim().to_string());
+        } else {
+            break;
+        }
+    }
+    doc.reverse();
+    doc.join(" ")
+}

@@ -38,9 +38,11 @@ Use when tuning costs, supply, sight, sizes, unit/building stats, or any number 
   values stay sim-owned but must continue to match the client exports.
 - **Parity.** Run `node scripts/check-faction-catalog-parity.mjs` after client-visible rules,
   faction catalog, upgrade, ability descriptor/effect, resource amount, or mirrored config changes.
-- `/wiki/stats` is generated from Rust rules definitions and faction catalogs. Run
-  `node scripts/check-wiki.mjs` after visible rules, catalog, upgrade, or ability metadata changes
-  so the generated reference tables and client catalog mirror are checked together.
+- The player wiki (`/wiki/`, `server/crates/wiki`) and `/wiki/stats` are generated from Rust rules
+  definitions and faction catalogs. Run `node scripts/check-wiki.mjs` after visible rules, catalog,
+  upgrade, or ability metadata changes so the generated pages, reference tables and client catalog
+  mirror are checked together. Its `rts-wiki` tests fail when a renamed constant or unit leaves a
+  `{{...}}` reference in `docs/wiki/content/` notes broken; fix the note in the same change.
 - Patch notes: collect player-facing bullets as you work (changed stats, economy, combat
   behavior, UI affordances, expected strategic impact). Factual, evidence-backed; if uncertain,
   say what changed and what to watch in playtest.

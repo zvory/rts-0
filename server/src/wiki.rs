@@ -1,8 +1,10 @@
+use std::collections::BTreeMap;
 use std::path::{Component, Path, PathBuf};
+use std::sync::OnceLock;
 
 use axum::extract::Path as AxumPath;
 use axum::http::{header, StatusCode};
-use axum::response::{Html, IntoResponse, Response};
+use axum::response::{Html, IntoResponse, Redirect, Response};
 use pulldown_cmark::{html, CowStr, Event, Options, Parser, Tag};
 use rts_rules::{defs, faction, EntityKind};
 
@@ -49,15 +51,98 @@ enum WikiPathError {
     Missing,
 }
 
+/// `/wiki` → `/wiki/`: the player wiki's pages link to each other by relative file name.
+pub async fn wiki_root_redirect() -> Response {
+    Redirect::permanent("/wiki/").into_response()
+}
+
+/// `/wiki/`: the player wiki's main page.
 pub async fn wiki_index_handler() -> Response {
+    player_wiki_page("index.html")
+        .unwrap_or_else(|| (StatusCode::NOT_FOUND, "wiki page not found").into_response())
+}
+
+/// `/wiki/{path}`: player wiki pages (`unit-tank.html`, ...), the generated stats tables
+/// (`stats`), and the developer docs under `dev/`. Links into the developer docs from before
+/// they moved (`/wiki/docs/...`, `/wiki/context/...`) redirect to `/wiki/dev/...`.
+pub async fn wiki_page_handler(AxumPath(path): AxumPath<String>) -> Response {
+    wiki_route(&path)
+}
+
+fn wiki_route(path: &str) -> Response {
+    let clean = path.trim_start_matches('/');
+    if clean == "dev" {
+        return Redirect::permanent("/wiki/dev/").into_response();
+    }
+    if clean == "dev/" {
+        return dev_index_response();
+    }
+    if let Some(rest) = clean.strip_prefix("dev/") {
+        return wiki_response_for(rest);
+    }
+    if is_stats_route(clean) {
+        return stats_page_html().into_response();
+    }
+    if let Some(page) = player_wiki_page(clean) {
+        return page;
+    }
+    if matches!(clean.split('/').next(), Some("docs" | "context" | "design")) {
+        return match resolve_wiki_doc(clean) {
+            Ok(doc) if doc.path.is_file() => {
+                Redirect::permanent(&format!("/wiki/dev/{}", doc.route_path)).into_response()
+            }
+            Ok(_) => (StatusCode::NOT_FOUND, "wiki page not found").into_response(),
+            Err(WikiPathError::Traversal) => {
+                (StatusCode::BAD_REQUEST, "invalid wiki path").into_response()
+            }
+            Err(WikiPathError::Missing) => {
+                (StatusCode::NOT_FOUND, "wiki page not found").into_response()
+            }
+        };
+    }
+    (StatusCode::NOT_FOUND, "wiki page not found").into_response()
+}
+
+fn dev_index_response() -> Response {
     match wiki_index_markdown() {
         Ok(markdown) => wiki_html("docs/context/README.md", &markdown).into_response(),
         Err(_) => (StatusCode::INTERNAL_SERVER_ERROR, "wiki index unavailable").into_response(),
     }
 }
 
-pub async fn wiki_page_handler(AxumPath(path): AxumPath<String>) -> Response {
-    wiki_response_for(&path)
+/// The player wiki, generated once per process from this build's compiled rules plus the
+/// `docs/wiki` data (notes, icons, version history). See `server/crates/wiki`.
+fn player_wiki() -> &'static BTreeMap<String, String> {
+    static SITE: OnceLock<BTreeMap<String, String>> = OnceLock::new();
+    SITE.get_or_init(|| {
+        let root = Path::new(REPO_ROOT);
+        let client_rules_js =
+            std::fs::read_to_string(root.join("client/src/config/rules_mirror.js"))
+                .unwrap_or_default();
+        let icons = std::fs::read_to_string(root.join("docs/wiki/icons.json")).ok();
+        let history = std::fs::read_to_string(root.join("docs/wiki/history.json")).ok();
+        rts_wiki::build_site(&rts_wiki::Inputs {
+            client_rules_js: &client_rules_js,
+            content_dir: &root.join("docs/wiki/content"),
+            icons: icons.as_deref(),
+            history: history.as_deref(),
+            build_id: rts_server::build_info::build_id(),
+        })
+    })
+}
+
+fn player_wiki_page(file: &str) -> Option<Response> {
+    let html = player_wiki().get(file)?;
+    Some(
+        (
+            [
+                (header::CONTENT_TYPE, "text/html; charset=utf-8"),
+                (header::CACHE_CONTROL, "no-cache"),
+            ],
+            Html(html.clone()),
+        )
+            .into_response(),
+    )
 }
 
 fn wiki_response_for(route_path: &str) -> Response {
@@ -114,7 +199,7 @@ fn wiki_shell_html(title: &str, body_class: &str, body: &str) -> impl IntoRespon
 </style>
 </head>
 <body class="{body_class}">
-<nav><a href="/">Play Bewegungskrieg</a> · <a href="/wiki">Wiki index</a></nav>
+<nav><a href="/">Play Bewegungskrieg</a> · <a href="/wiki/">Player wiki</a> · <a href="/wiki/dev/">Developer docs</a></nav>
 <main>
 {body}
 </main>
@@ -609,7 +694,8 @@ fn resolve_wiki_doc(route_path: &str) -> Result<WikiDoc, WikiPathError> {
     let normalized = normalize_wiki_route_path(route_path)?;
     let path = Path::new(REPO_ROOT).join(&normalized);
     Ok(WikiDoc {
-        route_path: normalized.to_string_lossy().into_owned(),
+        // route paths use `/` on every platform (they become URLs)
+        route_path: normalized.to_string_lossy().replace('\\', "/"),
         path,
     })
 }
@@ -722,7 +808,7 @@ fn rewrite_markdown_link(route_path: &str, dest_url: &str) -> Option<Box<str>> {
         return None;
     }
 
-    let mut rewritten = format!("/wiki/{}", target.to_string_lossy());
+    let mut rewritten = format!("/wiki/dev/{}", target.to_string_lossy().replace('\\', "/"));
     if let Some(anchor) = anchor {
         rewritten.push('#');
         rewritten.push_str(anchor);
@@ -756,7 +842,7 @@ fn normalize_path_components(path: &Path) -> Option<PathBuf> {
 }
 
 fn wiki_index_markdown() -> std::io::Result<String> {
-    let mut markdown = String::from("# Bewegungskrieg Wiki\n\n## Context Capsules\n\n");
+    let mut markdown = String::from("# Bewegungskrieg Developer Docs\n\nThe player wiki is at [/wiki/](/wiki/).\n\n## Context Capsules\n\n");
     for doc in docs_in_root("docs/context")? {
         markdown.push_str(&format_doc_link(&doc)?);
     }
@@ -791,9 +877,9 @@ fn format_doc_link(route_path: &Path) -> std::io::Result<String> {
     let route_path = route_path.to_string_lossy();
     let title = raw_page_title(&route_path, &markdown);
     Ok(format!(
-        "- [{}](/wiki/{})\n",
+        "- [{}](/wiki/dev/{})\n",
         escape_markdown_link_text(&title),
-        route_path
+        route_path.replace('\\', "/")
     ))
 }
 
@@ -876,8 +962,8 @@ mod tests {
             "docs/context/protocol.md",
             "[design](../design/protocol.md#snapshot) [local](client-ui.md)",
         );
-        assert!(rendered.contains(r#"href="/wiki/docs/design/protocol.md#snapshot""#));
-        assert!(rendered.contains(r#"href="/wiki/docs/context/client-ui.md""#));
+        assert!(rendered.contains(r#"href="/wiki/dev/docs/design/protocol.md#snapshot""#));
+        assert!(rendered.contains(r#"href="/wiki/dev/docs/context/client-ui.md""#));
     }
 
     #[test]
@@ -1114,104 +1200,157 @@ mod tests {
         assert!(!rendered.contains("<script>"));
     }
 
-    #[tokio::test]
-    async fn wiki_index_route_renders_docs_readme() {
-        for uri in ["/wiki", "/wiki/"] {
-            let response = wiki_router()
-                .oneshot(Request::builder().uri(uri).body(Body::empty()).unwrap())
-                .await
-                .unwrap();
-            assert_eq!(response.status(), StatusCode::OK, "{uri}");
-            assert_eq!(
-                response.headers().get(header::CONTENT_TYPE).unwrap(),
-                "text/html; charset=utf-8"
-            );
-            assert_eq!(
-                response.headers().get(header::CACHE_CONTROL).unwrap(),
-                "no-cache"
-            );
+    async fn get_page(uri: &str) -> (StatusCode, axum::http::HeaderMap, String) {
+        let response = wiki_router()
+            .oneshot(Request::builder().uri(uri).body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        let status = response.status();
+        let headers = response.headers().clone();
+        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        (status, headers, String::from_utf8(body.to_vec()).unwrap())
+    }
 
-            let body = axum::body::to_bytes(response.into_body(), usize::MAX)
-                .await
-                .unwrap();
-            let body = String::from_utf8(body.to_vec()).unwrap();
-            assert!(body.contains("<title>Bewegungskrieg Wiki - Bewegungskrieg Wiki</title>"));
-            assert!(body.contains(r#"href="/wiki/docs/context/balance.md""#));
-            assert!(body.contains(r#"href="/wiki/docs/design/balance.md""#));
-            assert!(body.contains(r#"href="/wiki/stats""#));
-            assert!(body.contains(r#"<a href="/">Play Bewegungskrieg</a>"#));
-            assert!(body.contains("<main>"));
-            assert!(body.contains("color-scheme: dark;"));
-            assert!(body.contains(r#"<body class="wiki-doc">"#));
+    #[tokio::test]
+    async fn wiki_root_redirects_to_player_wiki() {
+        let (status, headers, _) = get_page("/wiki").await;
+        assert_eq!(status, StatusCode::PERMANENT_REDIRECT);
+        assert_eq!(headers.get(header::LOCATION).unwrap(), "/wiki/");
+    }
+
+    #[tokio::test]
+    async fn wiki_index_route_renders_player_wiki() {
+        let (status, headers, body) = get_page("/wiki/").await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(
+            headers.get(header::CONTENT_TYPE).unwrap(),
+            "text/html; charset=utf-8"
+        );
+        assert_eq!(headers.get(header::CACHE_CONTROL).unwrap(), "no-cache");
+        assert!(body.contains("Bewegungskrieg"));
+        assert!(body.contains(r#"href="unit-tank.html""#));
+        assert!(body.contains(r#"href="dev/""#));
+        let short: String = rts_server::build_info::build_id().chars().take(9).collect();
+        assert!(
+            body.contains(&short),
+            "page should name the running build {short}"
+        );
+    }
+
+    #[tokio::test]
+    async fn wiki_player_pages_are_served() {
+        for uri in [
+            "/wiki/unit-tank.html",
+            "/wiki/building-barracks.html",
+            "/wiki/research-tank_plus.html",
+            "/wiki/changes.html",
+            "/wiki/maintenance.html",
+        ] {
+            let (status, headers, body) = get_page(uri).await;
+            assert_eq!(status, StatusCode::OK, "{uri}");
+            assert_eq!(
+                headers.get(header::CONTENT_TYPE).unwrap(),
+                "text/html; charset=utf-8",
+                "{uri}"
+            );
+            assert!(
+                body.to_ascii_lowercase().starts_with("<!doctype html>"),
+                "{uri}"
+            );
+        }
+        let (_, _, tank) = get_page("/wiki/unit-tank.html").await;
+        let hp = rts_rules::defs::unit_def(EntityKind::Tank)
+            .expect("Tank has a unit def")
+            .stats
+            .hp
+            .to_string();
+        assert!(
+            tank.contains(&format!(">{hp}<")),
+            "Tank page should show the compiled Tank HP {hp}"
+        );
+    }
+
+    #[tokio::test]
+    async fn wiki_dev_index_renders_docs_readme() {
+        let (status, headers, _) = get_page("/wiki/dev").await;
+        assert_eq!(status, StatusCode::PERMANENT_REDIRECT);
+        assert_eq!(headers.get(header::LOCATION).unwrap(), "/wiki/dev/");
+
+        let (status, headers, body) = get_page("/wiki/dev/").await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(
+            headers.get(header::CONTENT_TYPE).unwrap(),
+            "text/html; charset=utf-8"
+        );
+        assert_eq!(headers.get(header::CACHE_CONTROL).unwrap(), "no-cache");
+        assert!(body.contains("<title>Bewegungskrieg Developer Docs - Bewegungskrieg Wiki</title>"));
+        assert!(body.contains(r#"href="/wiki/dev/docs/context/balance.md""#));
+        assert!(body.contains(r#"href="/wiki/dev/docs/design/balance.md""#));
+        assert!(body.contains(r#"href="/wiki/stats""#));
+        assert!(body.contains(r#"href="/wiki/""#));
+        assert!(body.contains(r#"<a href="/">Play Bewegungskrieg</a>"#));
+        assert!(body.contains("<main>"));
+        assert!(body.contains("color-scheme: dark;"));
+        assert!(body.contains(r#"<body class="wiki-doc">"#));
+    }
+
+    #[tokio::test]
+    async fn wiki_dev_doc_route_renders_allowlisted_page() {
+        let (status, _, body) = get_page("/wiki/dev/context/server-sim.md").await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(body.contains("Capsule: server simulation"));
+        assert!(body.contains(r#"href="/wiki/dev/docs/design/server-sim.md""#));
+    }
+
+    #[tokio::test]
+    async fn wiki_dev_doc_route_renders_canonical_docs_path() {
+        let (status, _, body) = get_page("/wiki/dev/docs/context/balance.md").await;
+        assert_eq!(status, StatusCode::OK);
+        assert!(body.contains("Capsule: balance"));
+        assert!(body.contains(r#"href="/wiki/dev/docs/design/balance.md""#));
+    }
+
+    #[tokio::test]
+    async fn wiki_legacy_doc_routes_redirect_to_dev() {
+        for (uri, target) in [
+            (
+                "/wiki/docs/context/balance.md",
+                "/wiki/dev/docs/context/balance.md",
+            ),
+            (
+                "/wiki/context/server-sim.md",
+                "/wiki/dev/docs/context/server-sim.md",
+            ),
+            (
+                "/wiki/design/protocol.md",
+                "/wiki/dev/docs/design/protocol.md",
+            ),
+        ] {
+            let (status, headers, _) = get_page(uri).await;
+            assert_eq!(status, StatusCode::PERMANENT_REDIRECT, "{uri}");
+            assert_eq!(headers.get(header::LOCATION).unwrap(), target, "{uri}");
         }
     }
 
     #[tokio::test]
-    async fn wiki_doc_route_renders_allowlisted_page() {
-        let response = wiki_router()
-            .oneshot(
-                Request::builder()
-                    .uri("/wiki/context/server-sim.md")
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(response.status(), StatusCode::OK);
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
-            .await
-            .unwrap();
-        let body = String::from_utf8(body.to_vec()).unwrap();
-        assert!(body.contains("Capsule: server simulation"));
-        assert!(body.contains(r#"href="/wiki/docs/design/server-sim.md""#));
-    }
-
-    #[tokio::test]
-    async fn wiki_doc_route_renders_canonical_docs_path() {
-        let response = wiki_router()
-            .oneshot(
-                Request::builder()
-                    .uri("/wiki/docs/context/balance.md")
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(response.status(), StatusCode::OK);
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
-            .await
-            .unwrap();
-        let body = String::from_utf8(body.to_vec()).unwrap();
-        assert!(body.contains("Capsule: balance"));
-        assert!(body.contains(r#"href="/wiki/docs/design/balance.md""#));
-    }
-
-    #[tokio::test]
     async fn wiki_missing_doc_is_not_found() {
-        let response = wiki_router()
-            .oneshot(
-                Request::builder()
-                    .uri("/wiki/context/missing.md")
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        for uri in ["/wiki/dev/context/missing.md", "/wiki/context/missing.md"] {
+            let (status, _, _) = get_page(uri).await;
+            assert_eq!(status, StatusCode::NOT_FOUND, "{uri}");
+        }
     }
 
     #[tokio::test]
     async fn wiki_traversal_route_is_bad_request() {
-        let response = wiki_router()
-            .oneshot(
-                Request::builder()
-                    .uri("/wiki/context/%2e%2e/%2e%2e/server/Cargo.toml")
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        for uri in [
+            "/wiki/dev/context/%2e%2e/%2e%2e/server/Cargo.toml",
+            "/wiki/context/%2e%2e/%2e%2e/server/Cargo.toml",
+        ] {
+            let (status, _, _) = get_page(uri).await;
+            assert_eq!(status, StatusCode::BAD_REQUEST, "{uri}");
+        }
     }
 
     #[tokio::test]
@@ -1220,12 +1359,12 @@ mod tests {
             "/wiki/server/Cargo.toml",
             "/wiki/docs/context/README.txt",
             "/wiki/docs/assets/logo.md",
+            "/wiki/dev/server/Cargo.toml",
+            "/wiki/dev/docs/context/README.txt",
+            "/wiki/no-such-page.html",
         ] {
-            let response = wiki_router()
-                .oneshot(Request::builder().uri(uri).body(Body::empty()).unwrap())
-                .await
-                .unwrap();
-            assert_eq!(response.status(), StatusCode::NOT_FOUND, "{uri}");
+            let (status, _, _) = get_page(uri).await;
+            assert_eq!(status, StatusCode::NOT_FOUND, "{uri}");
         }
     }
 
@@ -1269,11 +1408,19 @@ mod tests {
                 .expect("allowlisted doc should read");
             let rendered = render_markdown(&doc.to_string_lossy(), &markdown);
             for href in wiki_hrefs(&rendered) {
-                let path_without_anchor = href
-                    .trim_start_matches("/wiki/")
+                // links to the player wiki and the stats tables are routes, not docs
+                let Some(doc_href) = href.strip_prefix("/wiki/dev/") else {
+                    assert!(
+                        matches!(href, "/wiki/" | "/wiki/stats"),
+                        "{href} from {} is not a developer-doc link",
+                        doc.display()
+                    );
+                    continue;
+                };
+                let path_without_anchor = doc_href
                     .split_once('#')
                     .map(|(path, _)| path)
-                    .unwrap_or_else(|| href.trim_start_matches("/wiki/"));
+                    .unwrap_or(doc_href);
                 let resolved = resolve_wiki_doc(path_without_anchor)
                     .map(|doc| doc.path)
                     .unwrap_or_else(|error| {
@@ -1313,7 +1460,7 @@ mod tests {
 
     fn wiki_router() -> Router {
         Router::new()
-            .route("/wiki", get(wiki_index_handler))
+            .route("/wiki", get(wiki_root_redirect))
             .route("/wiki/", get(wiki_index_handler))
             .route("/wiki/{*path}", get(wiki_page_handler))
     }

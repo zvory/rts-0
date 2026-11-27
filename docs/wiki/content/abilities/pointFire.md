@@ -1,0 +1,2 @@
+- The second click sets how widely shells spread around the target.
+- Minimum spread {{ARTILLERY_MIN_FIRE_RADIUS_TILES}} tiles; {{ARTILLERY_FIRE_CONTROL_MIN_FIRE_RADIUS_TILES}} tile with {{research:ballistic_tables}}.

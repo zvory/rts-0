@@ -194,7 +194,7 @@ async fn main() {
         .route("/stress-test", get(stress_test_index_handler))
         .route("/stress-test/", get(stress_test_index_handler))
         .route("/version", get(version_handler))
-        .route("/wiki", get(wiki::wiki_index_handler))
+        .route("/wiki", get(wiki::wiki_root_redirect))
         .route("/wiki/", get(wiki::wiki_index_handler))
         .route("/wiki/{*path}", get(wiki::wiki_page_handler))
         .route("/ws", get(ws_handler))
