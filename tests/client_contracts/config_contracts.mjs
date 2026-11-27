@@ -256,7 +256,7 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
       UPGRADES[UPGRADE.PANZERFAUSTS].cost.oil === 100 &&
       UPGRADES[UPGRADE.PANZERFAUSTS].researchTicks === PANZERFAUSTS_RESEARCH_TICKS &&
       PANZERFAUSTS_RESEARCH_TICKS === TICK_HZ * 20 &&
-      UPGRADES[UPGRADE.PANZERFAUSTS].description.includes("Unlock Panzerfaust"),
+      UPGRADES[UPGRADE.PANZERFAUSTS].description.includes("Unlocks anti-vehicle infantry"),
     "Panzerfausts research metadata exposes its Training Centre, 100/100 cost, 20-second duration, and unit unlock",
   );
   assert(
@@ -1084,8 +1084,8 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
     const separateArtilleryResearchButton = renderedButtons.find((button) => button.innerHTML.includes("AR+"));
     assert(mortarButton?.dataset.hotkey === "Q", "Mortar Team training should occupy the top-left Q slot");
     assert(
-      mortarButton?.innerHTML.includes("Manual indirect fire, extremely inaccurate without vision. Every shell requires a Mortar Fire command."),
-      "Mortar Team tooltip should explain indirect fire inaccuracy and explicit manual fire",
+      mortarButton?.innerHTML.includes("Manual fire, infantry killer."),
+      "Mortar Team tooltip should show the requested concise description",
     );
     assert(antiTankGunButton?.dataset.hotkey === "W", "Anti-Tank Gun training should occupy the top-middle W slot");
     assert(!artilleryButton, "Artillery training is hidden for playtests");

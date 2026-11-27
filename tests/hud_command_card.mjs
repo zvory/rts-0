@@ -432,7 +432,7 @@ for (const [kind, upgrade] of [
   });
   const rechargingSmoke = rechargingCard.slots.find((slot) => slot?.commandId === smokeCommandId);
   assert.equal(rechargingSmoke.enabled, false);
-  assert.equal(rechargingSmoke.title, "Target a smoke grenade location");
+  assert.equal(rechargingSmoke.title, "Hide and deny vision.");
   assert.equal(rechargingSmoke.countBadge, "0");
   assert.equal(rechargingSmoke.cooldownClocks.length, 1);
   assert.equal(rechargingSmoke.cooldownClocks[0].rotationDeg, 180);
