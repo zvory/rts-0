@@ -431,7 +431,7 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
   assert(msg.setFaction("ekat").factionId === "ekat", "faction selection builder payload");
   assert(DEFAULT_AI_PROFILE_ID === "jeffs_ai_v1_1", "lobby defaults to Jeff's AI");
   assert(
-    AI_PROFILES.length === 4 &&
+    AI_PROFILES.length === 5 &&
       AI_PROFILES[0].id === "ai_2_3" &&
       AI_PROFILES[0].label === "AI 2.3" &&
       AI_PROFILES[1].id === "jeffs_ai_v1_1" &&
@@ -439,8 +439,10 @@ import { messagePackSnapshotFrame } from "./snapshot_frame_helpers.mjs";
       AI_PROFILES[2].id === "rush_ai" &&
       AI_PROFILES[2].label === "Rush AI" &&
       AI_PROFILES[3].id === "pressure_ai" &&
-      AI_PROFILES[3].label === "Pressure AI",
-    "lobby exposes all four supported player-facing AI profiles",
+      AI_PROFILES[3].label === "Pressure AI" &&
+      AI_PROFILES[4].id === "eco_ai" &&
+      AI_PROFILES[4].label === "Eco AI",
+    "lobby exposes all five supported player-facing AI profiles",
   );
   assert(msg.addAi(2).teamId === 2, "addAi builder can include teamId");
   assert(

@@ -303,6 +303,7 @@ import { textWithin } from "./dom_text.mjs";
       { id: "jeffs_ai_v1_1", label: "Jeff's AI" },
       { id: "rush_ai", label: "Rush AI" },
       { id: "pressure_ai", label: "Pressure AI" },
+      { id: "eco_ai", label: "Eco AI" },
     ],
     "lobby AI profile selector exposes all supported player opponents",
   );
