@@ -329,6 +329,7 @@ fn spawn_first(game: &mut Game, owner: u32, kind: EntityKind, points: &[(f32, f3
             y: point.1,
             completed: true,
             dao: None,
+            dao_master: false,
             faction_id: None,
         }))
         .is_ok()
