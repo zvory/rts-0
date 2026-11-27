@@ -164,6 +164,9 @@ pub struct AiEntity {
     pub occupied_trench_id: Option<u32>,
     /// Owner-only ability availability. Enemy entities intentionally expose no private state.
     pub abilities: Vec<AiAbilityState>,
+    /// Owner-only: whether an own Panzerfaust still carries its rocket (`None` for every other
+    /// kind and for allies' and enemies' units).
+    pub panzerfaust_loaded: Option<bool>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -349,7 +352,7 @@ impl AiFrame {
             .entities
             .iter()
             .filter(|entity| entity.owner == player_id)
-            .filter_map(|entity| normalize_entity(entity, true, true))
+            .filter_map(|entity| normalize_entity(entity, true, true, true))
             .filter(gameplay_entity)
             .collect::<Vec<_>>();
         owned.sort_by_key(|entity| entity.id);
@@ -359,7 +362,7 @@ impl AiFrame {
             .filter(|entity| entity.owner != NEUTRAL && entity.owner != player_id)
             .filter(|entity| !entity.vision_only)
             .filter(|entity| is_ally(&players, team_id, entity.owner))
-            .filter_map(|entity| normalize_entity(entity, false, true))
+            .filter_map(|entity| normalize_entity(entity, false, true, false))
             .filter(gameplay_entity)
             .collect::<Vec<_>>();
         visible_allies.sort_by_key(|entity| entity.id);
@@ -369,7 +372,7 @@ impl AiFrame {
             .filter(|entity| entity.owner != NEUTRAL && entity.owner != player_id)
             .filter(|entity| !entity.vision_only)
             .filter(|entity| is_enemy(&players, player_id, team_id, entity.owner))
-            .filter_map(|entity| normalize_entity(entity, false, false))
+            .filter_map(|entity| normalize_entity(entity, false, false, false))
             .filter(gameplay_entity)
             .collect::<Vec<_>>();
         visible_enemies.sort_by_key(|entity| entity.id);
@@ -377,7 +380,7 @@ impl AiFrame {
             .entities
             .iter()
             .filter(|entity| entity.owner == NEUTRAL && !entity.vision_only)
-            .filter_map(|entity| normalize_entity(entity, false, false))
+            .filter_map(|entity| normalize_entity(entity, false, false, false))
             .filter(|entity| entity.kind == EntityKind::TankTrap)
             .collect::<Vec<_>>();
         tank_traps.sort_by_key(|entity| entity.id);
@@ -557,6 +560,7 @@ fn normalize_entity(
     view: &EntityView,
     completion_activity_known: bool,
     production_details_known: bool,
+    owned: bool,
 ) -> Option<AiEntity> {
     let kind = view.kind.parse::<EntityKind>().ok()?;
     let state = match view.state.as_str() {
@@ -615,6 +619,7 @@ fn normalize_entity(
                 })
             })
             .collect(),
+        panzerfaust_loaded: view.panzerfaust_loaded.filter(|_| owned),
     })
 }
 
@@ -731,6 +736,68 @@ mod tests {
             .iter()
             .any(|entity| entity.id == remembered.id));
         assert!(visible_frame.remembered_contacts().is_empty());
+    }
+
+    #[test]
+    fn panzerfaust_rocket_state_is_owner_only_and_matches_legacy_observation() {
+        let game = Game::new_without_ai_controllers(&players(), 47);
+        let mut start = game.start_payload();
+        let mut ally = start.players[0].clone();
+        ally.id = 3;
+        start.players.push(ally);
+        let mut snapshot = game.snapshot_for(1);
+        let template = snapshot.entities[0].clone();
+        for (id, owner, loaded) in [
+            (9_000_001, 1, false),
+            (9_000_002, 1, true),
+            (9_000_003, 2, false),
+            (9_000_004, 3, false),
+        ] {
+            let mut entity = template.clone();
+            entity.id = id;
+            entity.owner = owner;
+            entity.kind = "panzerfaust".to_string();
+            entity.panzerfaust_loaded = Some(loaded);
+            snapshot.entities.push(entity);
+        }
+
+        let frame = AiFrame::from_host(&start, &snapshot, 1, [], Some(&[1, 2, 3])).unwrap();
+        for (id, loaded) in [(9_000_001, false), (9_000_002, true)] {
+            assert_eq!(
+                frame
+                    .owned()
+                    .iter()
+                    .find(|entity| entity.id == id)
+                    .unwrap()
+                    .panzerfaust_loaded,
+                Some(loaded)
+            );
+        }
+        for (entities, id) in [
+            (frame.visible_enemies(), 9_000_003),
+            (frame.visible_allies(), 9_000_004),
+        ] {
+            assert_eq!(
+                entities
+                    .iter()
+                    .find(|entity| entity.id == id)
+                    .unwrap()
+                    .panzerfaust_loaded,
+                None
+            );
+        }
+        let observation = crate::ai_core::observation::AiObservation::from_frame(&frame).unwrap();
+        assert_eq!(observation.spent_panzerfausts, vec![9_000_001]);
+        assert_eq!(
+            Some(observation),
+            crate::ai_core::observation::AiObservation::from_snapshot_with_alive(
+                &start,
+                &snapshot,
+                1,
+                [],
+                Some(&[1, 2, 3]),
+            )
+        );
     }
 
     #[test]

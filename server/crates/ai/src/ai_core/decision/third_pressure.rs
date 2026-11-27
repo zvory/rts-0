@@ -463,6 +463,7 @@ fn party_tanks(observation: &AiObservation, memory: &AiDecisionMemory) -> Option
                 && !memory.expansion_security.clearers.contains(&unit.id)
                 && Some(unit.id) != memory.home_defensive_tank
                 && Some(unit.id) != forward
+                && !breakout_holds(memory, unit.id)
         })
         .collect();
     // Tanks away from the main first, then the healthiest.
@@ -494,6 +495,15 @@ fn v1_1_denial(memory: &AiDecisionMemory) -> bool {
     memory.profile_id().is_some_and(is_jeff_v1_1) && !jeff_v1_1::off("denial")
 }
 
+/// Jeff's AI V1.1 leaves the breakout's sortie its units (`bkheld`): the raid took a sortie's last
+/// two Riflemen as scouts while the sortie still counted them, so the sortie's Tanks followed the
+/// scouts away and stayed out of home defense (Wald des Todes, 5:16-6:39).
+fn breakout_holds(memory: &AiDecisionMemory, id: u32) -> bool {
+    memory.profile_id().is_some_and(is_jeff_v1_1)
+        && !jeff_v1_1::off("bkheld")
+        && memory.jeff_v1_1.breakout.holds(id)
+}
+
 /// `count` Riflemen nobody else holds, besides `besides`, and never the home pocket's: its posts
 /// go to the oldest home Riflemen (the lowest ids), so those stay home. Riflemen not dug in come
 /// first, so the raid takes those walking to a post, not those holding one; then the healthiest,
@@ -523,6 +533,7 @@ fn party_riflemen(
                 && !memory.expansion_security.riflemen.contains(&unit.id)
                 && !memory.containment.active_riflemen.contains(&unit.id)
                 && !memory.third_pressure.is_reserved(unit.id)
+                && !breakout_holds(memory, unit.id)
         })
         .collect();
     free.sort_by_key(|unit| unit.id);

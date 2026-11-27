@@ -191,8 +191,15 @@ pub(super) fn stage_home_riflemen(
                     && !memory.jeff_v1_1.natural.holds(unit.id)
                     && !memory.jeff_v1_1.front_line.holds(unit.id)
                     && !memory.jeff_v1_1.deny.holds(unit.id)
+                    && !memory.jeff_v1_1.rifle_raid.holds(unit.id)
                     && !memory.jeff_v1_1.rovers.holds(unit.id)
                     && !super::jeff_v1_1::south_route::push_spotter(memory, unit.id)
+                    // Jeff's AI V1.1 (`guardfree`): a new base's guards are the base's. Staged here
+                    // too, the live adapter dropped their guard orders as repeats of this staging:
+                    // 188 of 1385 reached their posts within 60 s (bench vs Pressure AI, 4:00-10:00).
+                    && !(is_jeff_v1_1(profile.id)
+                        && !jeff_v1_1::off("guardfree")
+                        && memory.later_bases.guards.contains(&unit.id))
             })
             .map(|unit| unit.id)
             .collect()
@@ -466,7 +473,7 @@ pub(super) fn live_spend_plan(
                     expansion_security::secure_wait_ticks(observation, map_analysis, memory)
                         .unwrap_or(config::TICK_HZ * 30)
                 },
-                prepaid: jeff_v1_1::research_ahead(profile.id, facts, memory),
+                prepaid: jeff_v1_1::research_ahead(profile.id, observation, facts, memory),
                 opening: facts.v1_1_opening,
                 no_guns: jeff_v1_1::no_guns(profile.id),
                 rifle_opening: jeff_v1_1::rifle_opening(profile.id).then(|| {

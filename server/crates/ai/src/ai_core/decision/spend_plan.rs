@@ -473,6 +473,19 @@ impl SpendPlan {
         Some(current + spare as usize)
     }
 
+    /// `pairbuy` (testing): the Riflemen of the plan's own Rifleman pairs charged by `now`. They
+    /// are steps, not slack: paid only from the slack, the pairs that make the natural due waited
+    /// while the natural's Depot (600 Steel) used all of it, and the natural came 15-20 s late.
+    pub(super) fn due_pair_riflemen(&self, now: u32) -> usize {
+        2 * self
+            .steps
+            .iter()
+            .filter(|(step, tick)| {
+                *step == StepKind::RiflePair && tick.is_some_and(|tick| tick <= now)
+            })
+            .count()
+    }
+
     pub(super) fn charged_at(&self, kind: StepKind) -> Option<u32> {
         self.steps
             .iter()

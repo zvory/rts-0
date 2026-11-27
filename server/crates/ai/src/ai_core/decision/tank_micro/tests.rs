@@ -1,5 +1,4 @@
 use super::*;
-use rts_rules::math::GameplayMath as _;
 
 const TS: f32 = 32.0;
 
@@ -139,6 +138,7 @@ fn observation(
         visible_allies: Vec::new(),
         visible_enemies,
         ability_states: Vec::new(),
+        spent_panzerfausts: Vec::new(),
         smokes: Vec::new(),
         visible_tank_traps: Vec::new(),
         pending_builds: Vec::new(),

@@ -1,7 +1,6 @@
 use super::*;
 use crate::ai_core::observation::AiEconomy;
 use crate::ai_core::profiles::JEFFS_AI;
-use rts_rules::math::GameplayMath as _;
 
 #[test]
 fn failed_pushes_go_straight_then_a_random_side_then_the_other_side_then_straight_again() {
@@ -91,6 +90,7 @@ fn leg_observation(tick: u32) -> AiObservation {
         visible_allies: Vec::new(),
         visible_enemies: Vec::new(),
         ability_states: Vec::new(),
+        spent_panzerfausts: Vec::new(),
         smokes: Vec::new(),
         visible_tank_traps: Vec::new(),
         pending_builds: Vec::new(),

@@ -582,6 +582,24 @@ impl AiActions {
         )
     }
 
+    pub fn point_tanks(
+        &mut self,
+        group: &UnitGroup,
+        x: f32,
+        y: f32,
+        queued: bool,
+    ) -> Result<(), ActionError> {
+        self.emit_reserved_group(
+            group,
+            AiActionRequest::PointTanks {
+                units: group.0.clone(),
+                x,
+                y,
+                queued,
+            },
+        )
+    }
+
     pub fn setup_anti_tank_guns(
         &mut self,
         group: &UnitGroup,
@@ -799,6 +817,13 @@ pub(crate) enum AiActionRequest {
     ClearObstacleArea {
         units: Vec<u32>,
         target: u32,
+        queued: bool,
+    },
+    /// Turn Tanks' hulls toward a point.
+    PointTanks {
+        units: Vec<u32>,
+        x: f32,
+        y: f32,
         queued: bool,
     },
     SetupAntiTankGuns {

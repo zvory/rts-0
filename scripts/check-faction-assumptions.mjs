@@ -268,6 +268,24 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/ai/src/ai_core/decision/jeff_v1_1/strike.rs",
   "server/crates/ai/src/ai_core/decision/jeff_v1_1/tank_raid.rs",
   "server/crates/ai/src/ai_core/decision/jeff_v1_1/third_base.rs",
+  // Jeff's AI V1.1's field gate, matchup micro, Meth strike fights, paid Pump Jack, push march,
+  // rifle raid and spotters name current-roster units and buildings; profile/catalog layers still
+  // own faction admission.
+  "server/crates/ai/src/ai_core/decision/jeff_v1_1/field_gate.rs",
+  "server/crates/ai/src/ai_core/decision/jeff_v1_1/matchup.rs",
+  "server/crates/ai/src/ai_core/decision/jeff_v1_1/matchup/kinds.rs",
+  "server/crates/ai/src/ai_core/decision/jeff_v1_1/matchup/live.rs",
+  "server/crates/ai/src/ai_core/decision/jeff_v1_1/meth_strike/combat.rs",
+  "server/crates/ai/src/ai_core/decision/jeff_v1_1/paid_pump.rs",
+  "server/crates/ai/src/ai_core/decision/jeff_v1_1/push/march.rs",
+  "server/crates/ai/src/ai_core/decision/jeff_v1_1/rifle_raid.rs",
+  "server/crates/ai/src/ai_core/decision/jeff_v1_1/spotters.rs",
+  // Jeff's AI V1.1's Panzerfaust pack and home Tank duel train and steer current-roster
+  // Panzerfausts, Riflemen and Tanks; profile/catalog layers still own faction admission.
+  "server/crates/ai/src/ai_core/decision/jeff_v1_1/faust_pack.rs",
+  "server/crates/ai/src/ai_core/decision/jeff_v1_1/faust_pack/guard.rs",
+  "server/crates/ai/src/ai_core/decision/jeff_v1_1/faust_pack/rest.rs",
+  "server/crates/ai/src/ai_core/decision/jeff_v1_1/home_duel.rs",
   // Unit priority and cap adjustments moved verbatim out of the approved decision orchestrator.
   "server/crates/ai/src/ai_core/decision/unit_mix.rs",
   // Jeff's Kriegsia-only expansion screen and upgrade policy are focused modules beneath the
@@ -313,6 +331,10 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/ai/src/ai_core/squad_micro/mod.rs",
   // The ai-tank-lab harness spawns Kriegsia Tanks, Scout Cars, and Tank tech for Tank micro fights.
   "server/crates/ai/src/tools/tank_lab.rs",
+  // The ai-engage-lab and ai-pf-lab harnesses spawn Kriegsia Tanks, infantry and Panzerfausts for
+  // Jeff's AI V1.1 fight benches.
+  "server/crates/ai/src/tools/engage_lab.rs",
+  "server/crates/ai/src/tools/pf_lab.rs",
   "server/crates/ai/src/ai_core/profiles.rs",
   // Kriegsia-only AI resource scanner; non-Kriegsia AI remains unsupported by public lobby flow.
   "server/crates/ai/src/ai_core/resource_availability.rs",

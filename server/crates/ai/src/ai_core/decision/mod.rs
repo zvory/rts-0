@@ -37,6 +37,7 @@ mod geometry;
 mod home_armor;
 mod jeff;
 mod jeff_v1_1;
+pub(crate) use jeff_v1_1::matchup;
 mod later_bases;
 mod memory;
 mod obstacles;
@@ -322,11 +323,15 @@ where
     }
     let save_for_required_tech_building =
         should_save_for_required_tech_building(&facts, required_tech_path, production_policy);
-    let delay_opening_barracks = profile.fast_tank_timing.is_some_and(|timing| {
+    // Jeff's AI V1.1's paid Pump Jacks (`pumpfirst`): the opening Barracks waits for the main's.
+    let live = (&mut actions, observation, &facts, &mut *memory);
+    let pump_waits = jeff_v1_1::paid_pump::run(live, profile.id, (&builder_pools, &mut intents));
+    let fast_tank_wait = profile.fast_tank_timing.is_some_and(|timing| {
         facts.complete_building_count(EntityKind::Barracks) == 0
             && (facts.worker_count < timing.workers_before_barracks
                 || facts.building_count(EntityKind::PumpJack) < timing.pump_jacks_before_barracks)
     });
+    let delay_opening_barracks = pump_waits || fast_tank_wait;
     let preserve_fast_tank_economy = profile
         .fast_tank_timing
         .map(|timing| timing.preserve_during_defensive_panic)
@@ -430,6 +435,8 @@ where
             expansion_secured || natural_sheltered,
             spend_plan.as_ref(),
         );
+    let live = (&mut actions, &facts, &mut *memory, &mut intents);
+    jeff_v1_1::entrenchment_after_meth(live, profile.id);
     if (jeff_natural && natural_ready)
         || (!jeff_natural
             && (economy_manager_output.proposes(EconomyProposal::BuildExpansionResourceDepot)
@@ -487,7 +494,7 @@ where
     }
     jeff_v1_1::push::note_enemy_army(observation, memory);
     let live = (&mut actions, &facts, &mut *memory, &mut intents);
-    jeff_v1_1::early_research(live, profile.id, spend_plan.as_ref());
+    jeff_v1_1::research_all(live, profile.id, spend_plan.as_ref(), observation);
     // Jeff's bases beyond the natural. A second Factory that is due takes priority this decision.
     let factory_due = uses_current_jeffs_ai_policy(profile.id)
         && should_build_extra_factory(
@@ -764,7 +771,16 @@ where
             UpgradeKind::Methamphetamines,
         );
     }
-    queue_jeff_infantry_mass_methamphetamines(&mut actions, &facts, memory, &mut intents, profile);
+    // Jeff's AI V1.1 `methlate`: no Meth for a large infantry count while it waits for the Tank tech.
+    if !(is_jeff_v1_1(profile.id) && jeff_v1_1::meth_held(observation, &facts, memory)) {
+        queue_jeff_infantry_mass_methamphetamines(
+            &mut actions,
+            &facts,
+            memory,
+            &mut intents,
+            profile,
+        );
+    }
     queue_jeff_smoke_plus(&mut actions, &facts, memory, &mut intents, profile);
     if profile.turtle_defense.is_none() {
         queue_profile_upgrades(&mut actions, &facts, memory, &mut intents, profile);
@@ -869,6 +885,8 @@ where
         &intents,
         &mut production_max_counts,
     );
+    let pf = (&actions, &facts, &*memory);
+    jeff_v1_1::faust_pack::cap(pf, profile.id, fausts, &mut production_max_counts);
     // Jeff's AI V1.1 (`nomg`) trains two Riflemen for every gun, before the counts are taken so the
     // Riflemen are counted.
     let rifle_guns = jeff_v1_1::guns_to_riflemen(
@@ -1251,6 +1269,11 @@ where
         let held = &held | &memory.jeff_v1_1.natural.support.keys().copied().collect();
         jeff_v1_1::base_line::hold(live, memory, profile, &defensive_machine_gunners, &held);
         actions.mark("baseline");
+        // Jeff's AI V1.1 posts free Riflemen on the enemy's way (`spotters`) before the rovers.
+        let live = (&mut actions, observation, map_analysis, &mut intents);
+        jeff_v1_1::spotters::post(live, memory, &held);
+        actions.mark("spotters");
+        let held = &held | &memory.jeff_v1_1.spotters.units().collect();
         // Jeff's AI V1.1's free Riflemen roam between its bases and run at raids on them.
         let live = (&mut actions, observation, map_analysis, &mut intents);
         jeff_v1_1::rovers::roam(live, memory, &held);

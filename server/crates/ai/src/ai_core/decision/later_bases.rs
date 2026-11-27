@@ -13,6 +13,8 @@
 //! contested, so it is abandoned for a while instead of feeding Tanks into it one at a time.
 //! The guards keep covering the finished Depot for a while before rejoining the army.
 
+use rts_rules::math::GameplayMath as _;
+
 use super::geometry::{building_center, clamp_to_map, dist2, normalized_direction, squared};
 use super::*;
 
@@ -46,12 +48,30 @@ const MAX_SITE_FAILURES: u8 = 2;
 /// A rejected site rules out every candidate this close to it; the search would otherwise pick
 /// the tile next door at the same contested base.
 const REJECTED_SITE_RADIUS_TILES: f32 = 6.0;
+/// Jeff's AI V1.1 (`baseretry`): failures and rejections belong to the base, every tile within
+/// this of the first one tried. Against Pressure AI the search drifted up to 7 tiles around one
+/// contested base (Schone Tage's centre: 83,55 / 82,55 / 83,56 / 82,61 / 81,61), so each try was
+/// a new site with no failures, and the guards died there four and five times a game. Bases are
+/// 25+ tiles apart on the maps played.
+const BASE_CLUSTER_TILES: f32 = 10.0;
+/// `baseretry`: each further rejection of the same base doubles how long it stays out (from
+/// `jeff_v1_1::third_base::SITE_REJECT_TICKS`), at most this many times.
+const MAX_REJECT_DOUBLINGS: u32 = 2;
+/// `baseretry`: while a base is ruled out, a site is tried only if it lies this much less of the
+/// way toward the enemy main (share of the distance between the mains) than that base.
+const EXPOSURE_MARGIN: f32 = 0.05;
 /// After a site is abandoned or its Depot is destroyed, wait this long before taking a base.
 const SITE_RETRY_COOLDOWN_TICKS: u32 = config::TICK_HZ * 60;
 /// An en-route guard's move order is refreshed at most this often.
 const GUARD_REORDER_TICKS: u32 = config::TICK_HZ * 3;
 /// Guards keep covering a finished Depot this long before rejoining the army.
 const GUARD_AFTER_COMPLETE_TICKS: u32 = config::TICK_HZ * 45;
+/// `bankbase` (testing): the most Depots a banked bank alone makes due.
+const BANK_BASE_MAX: usize = 5;
+/// `basehold` (testing): how long V1.1's escort stays with a finished base.
+const BASE_HOLD_TICKS: u32 = config::TICK_HZ * 150;
+/// `sitealt` (testing): a base given up this many times is passed over while another site will do.
+const SITEALT_TRIES: u8 = 2;
 /// A pumped oil well at or below this is about to run dry (about 27 seconds of pumping left).
 const DRY_WELL_WARNING_REMAINING: u32 = 40;
 /// A real well loses 2 per 40 ticks. A larger drop between decisions means the reading was not a
@@ -59,6 +79,12 @@ const DRY_WELL_WARNING_REMAINING: u32 = 40;
 const MAX_PLAUSIBLE_WELL_DROP: u32 = 12;
 /// Pump Jacks and Steel Mines within this range of a Depot belong to that base.
 const BASE_MINING_RANGE_TILES: f32 = 12.0;
+/// Jeff's AI V1.1 (`guardloss`): its escort has lost the site once this share of it has died, or
+/// a guard Tank. The escort is a Tank and a dozen Riflemen, and any one death called the base off:
+/// of 76 tries called off so with the guards free to reach their posts (bench vs Pressure AI,
+/// 4:00-10:00), 68 had lost under a tenth of the escort, most of it 20-40 tiles short of the site
+/// still, and 24 had no enemy fighter near it.
+const GUARD_LOSS_SHARE: f32 = 1.0 / 3.0;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(super) struct LaterBases {
@@ -90,8 +116,20 @@ pub(super) struct LaterBases {
     guard_release_tick: Option<u32>,
     /// Jeff's AI V1.1 takes bases by escort and bank (`jeff_v1_1::third_base`).
     v1_1: bool,
+    /// V1.1 `baseretry`: failures and rejections counted per base, not per tile.
+    base_retry: bool,
+    /// `baseretry`: rejections so far per base (keyed by its first rejected tile).
+    base_rejections: BTreeMap<(u32, u32), u32>,
+    /// `baseretry`: how long each rejected site stays out.
+    reject_ticks: BTreeMap<(u32, u32), u32>,
     /// V1.1: each Steel node's fullest reading and where it lies.
     steel_start: BTreeMap<u32, (u32, (i32, i32))>,
+    /// V1.1 `guardloss`: the escort's size when picked, its Tanks, and how many of it have died.
+    guards_start: usize,
+    guard_tanks: BTreeSet<u32>,
+    guards_dead: usize,
+    /// V1.1 `sitealt`: tries given up per base, keyed by its first given-up tile.
+    abandons: BTreeMap<(u32, u32), u8>,
 }
 
 /// What the rest of the decision needs from this cycle.
@@ -105,6 +143,11 @@ pub(super) struct LaterBaseStatus {
 }
 
 impl LaterBases {
+    /// `basehold` (testing): whether a later base is being taken or its escort still covers it.
+    pub(super) fn covering(&self) -> bool {
+        self.guard_site.is_some()
+    }
+
     /// The site of the base being taken, if any.
     pub(super) fn site(&self) -> Option<(u32, u32)> {
         self.site
@@ -151,6 +194,7 @@ where
     note_dry_wells(observation, &mut memory.later_bases);
     let v1_1 = is_jeff_v1_1(profile.id) && !jeff_v1_1::off("base3");
     memory.later_bases.v1_1 = v1_1;
+    memory.later_bases.base_retry = v1_1 && !jeff_v1_1::off("baseretry");
     if v1_1 && !jeff_v1_1::off("steelunlock") {
         note_low_steel(observation, &mut memory.later_bases);
     }
@@ -166,9 +210,14 @@ where
     if v1_1 && jeff_v1_1::third_base::site_retry() {
         let state = &mut memory.later_bases;
         let rejected_at = &state.rejected_at;
+        let reject_ticks = &state.reject_ticks;
         state.rejected_sites.retain(|site| {
             rejected_at.get(site).is_none_or(|at| {
-                tick.saturating_sub(*at) < jeff_v1_1::third_base::SITE_REJECT_TICKS
+                let out = reject_ticks
+                    .get(site)
+                    .copied()
+                    .unwrap_or(jeff_v1_1::third_base::SITE_REJECT_TICKS);
+                tick.saturating_sub(*at) < out
             })
         });
     }
@@ -183,8 +232,32 @@ where
     // takes base 4 without waiting for a dry well.
     let ungated = memory.profile_id().is_some_and(is_jeff_v1_1) && !jeff_v1_1::off("nowellgate");
     let extra_base = usize::from(jeff_v1_1::trading_ahead(memory));
-    let base_due =
-        natural_done && (ungated || depots < memory.later_bases.target_bases() + extra_base);
+    // `fieldgate`: one base more when the fields are about to run short and the army can spare it.
+    let field_due = jeff_v1_1::field_gate::base_due(observation, memory, BASE_MINING_RANGE_TILES);
+    // `bankbase` (testing): Steel banked at `BANK_STEEL` for `BANK_TICKS` makes one more base due,
+    // up to `BANK_BASE_MAX` Depots. Against Pressure AI V1.1 floated 650-750 Steel from 4:00 to 7:00
+    // and held 3 Depots at 8:00 to Pressure's 4-5.
+    let bank_due = v1_1
+        && !jeff_v1_1::off("bankbase")
+        && depots < BANK_BASE_MAX
+        && jeff_v1_1::third_base::base_banked(observation, memory);
+    let base_due = natural_done
+        && (ungated
+            || field_due
+            || bank_due
+            || depots < memory.later_bases.target_bases() + extra_base);
+    if v1_1 {
+        let counted = depots < memory.later_bases.target_bases() + extra_base;
+        memory.jeff_v1_1.field_gate.wait = if !base_due {
+            format!("nodue{depots}")
+        } else if memory.later_bases.site.is_some() {
+            format!("taking{depots}")
+        } else if tick < memory.later_bases.retry_after_tick {
+            format!("retry{depots}")
+        } else {
+            format!("{}{depots}", if counted { "count" } else { "field" })
+        };
+    }
 
     if base_due && memory.later_bases.site.is_none() && tick >= memory.later_bases.retry_after_tick
     {
@@ -237,12 +310,26 @@ where
                 && depots == 2
                 && escort_ready
                 && jeff_v1_1::fast_third_ready(observation, profile.id));
+        // `thirdnow` (testing): base 3 waits for neither the Tank line's cover nor the next Factory.
+        let third_now = v1_1 && depots == 2 && !jeff_v1_1::off("thirdnow");
         let ready = army_ready
-            && jeff_v1_1::front_line::covers_next_base(memory, depots)
+            && (third_now || jeff_v1_1::front_line::covers_next_base(memory, depots))
             && defense::local_defense_contact(observation).is_none()
             && observation.economy.steel >= steel
             && observation.economy.oil >= oil
-            && !factory_due;
+            && (third_now || !factory_due);
+        if v1_1 {
+            let note = format!(
+                "/e{}a{}f{}c{}m{}x{}",
+                u8::from(escort_ready),
+                u8::from(army_ready),
+                u8::from(jeff_v1_1::front_line::covers_next_base(memory, depots)),
+                u8::from(defense::local_defense_contact(observation).is_none()),
+                u8::from(observation.economy.steel >= steel && observation.economy.oil >= oil),
+                u8::from(!factory_due)
+            );
+            memory.jeff_v1_1.field_gate.wait.push_str(&note);
+        }
         // V1.1 keeps the Depot's cost aside once an escort is free and the bases are quiet, so
         // Tanks and Barracks do not spend it first: on The River V1.1 held two bases all game with
         // under 250 Steel in the bank while Pressure AI took five.
@@ -256,24 +343,89 @@ where
         if ready {
             let resources = expansion::expansion_candidate_resources(observation);
             let rejected = memory.later_bases.rejected_sites.clone();
+            let radius = rejected_radius(&memory.later_bases);
+            // `baseretry`: while a base is ruled out, no site at least as far toward the enemy is
+            // tried either. Counting per base alone sent the next try to the other contested base
+            // or the enemy's own (Schone Tage vs Pressure AI: enemy-side picks 1 -> 8, guards lost
+            // 37 -> 45); Jeff waits for the base he could not hold instead.
+            let ts = observation.map.tile_size.max(1) as f32;
+            let own = observation.own_start_tile;
+            let foe = (enemy.0 / ts, enemy.1 / ts);
+            let exposure = |tile: (u32, u32)| {
+                let to_own = (tile.0 as f32 - own.0 as f32).det_hypot(tile.1 as f32 - own.1 as f32);
+                let to_foe = (tile.0 as f32 - foe.0).det_hypot(tile.1 as f32 - foe.1);
+                to_own / (to_own + to_foe).max(1.0)
+            };
+            let ceiling = if memory.later_bases.base_retry {
+                rejected.iter().map(|site| exposure(*site)).reduce(f32::min)
+            } else {
+                None
+            };
             let route =
                 map_analysis.and_then(|analysis| analysis.base_route_tiles(observation.player_id));
-            let site = expansion::defensible_expansion_depot_site_adjusted(
-                observation,
-                map_analysis,
-                expansion,
-                EntityKind::ResourceDepot,
-                &resources,
-                &mut |kind, x, y| !site_is_rejected(&rejected, (x, y)) && placeable(kind, x, y),
-                |tile| {
-                    let scale = if v1_1 {
-                        jeff_v1_1::third_base::ROUTE_PENALTY_SCALE
-                    } else {
-                        1
-                    };
-                    route_exposure_penalty(observation, route, tile) * scale
-                },
-            );
+            // `sitesafe` (testing): a site within `SAFE_ROUTE_TILES` of the enemy's way in costs
+            // `SAFE_ROUTE_SCALE` times the head start.
+            let site_safe = v1_1 && !jeff_v1_1::off("sitesafe");
+            // `basewait` (testing): no site with enemy fighters seen near it lately.
+            let base_wait = v1_1 && !jeff_v1_1::off("basewait");
+            let enemy_near = |x: u32, y: u32| {
+                base_wait
+                    && building_center((x, y), EntityKind::ResourceDepot, observation.map.tile_size)
+                        .is_some_and(|center| enemies_near_site(observation, memory, center))
+            };
+            // `sitealt` (testing): a base given up `SITEALT_TRIES` times is passed over while any
+            // other site will do. Wald des Todes vs Pressure AI from the top right as player 2:
+            // the third went back to the base on Pressure's way in six times, 4:31-8:54.
+            let worn_bases: Vec<(u32, u32)> = if v1_1 && !jeff_v1_1::off("sitealt") {
+                memory
+                    .later_bases
+                    .abandons
+                    .iter()
+                    .filter(|(_, tries)| **tries >= SITEALT_TRIES)
+                    .map(|(base, _)| *base)
+                    .collect()
+            } else {
+                Vec::new()
+            };
+            let mut site = None;
+            for avoid_worn in [true, false] {
+                if !avoid_worn && (site.is_some() || worn_bases.is_empty()) {
+                    break;
+                }
+                site = expansion::defensible_expansion_depot_site_adjusted(
+                    observation,
+                    map_analysis,
+                    expansion,
+                    EntityKind::ResourceDepot,
+                    &resources,
+                    &mut |kind, x, y| {
+                        !site_is_rejected(&rejected, (x, y), radius)
+                            && ceiling.is_none_or(|c| exposure((x, y)) < c - EXPOSURE_MARGIN)
+                            && !enemy_near(x, y)
+                            && !(avoid_worn
+                                && worn_bases
+                                    .iter()
+                                    .any(|base| tiles_within(*base, (x, y), BASE_CLUSTER_TILES)))
+                            && placeable(kind, x, y)
+                    },
+                    |tile| {
+                        if site_safe {
+                            return route_exposure_penalty_within(
+                                observation,
+                                route,
+                                tile,
+                                SAFE_ROUTE_TILES,
+                            ) * SAFE_ROUTE_SCALE;
+                        }
+                        let scale = if v1_1 {
+                            jeff_v1_1::third_base::ROUTE_PENALTY_SCALE
+                        } else {
+                            1
+                        };
+                        route_exposure_penalty(observation, route, tile) * scale
+                    },
+                );
+            }
             let site_center = site.and_then(|site| {
                 building_center(site, EntityKind::ResourceDepot, observation.map.tile_size)
             });
@@ -286,6 +438,11 @@ where
                 state.build_attempt_tick = None;
                 state.guard_release_tick = None;
                 select_guards(observation, memory, site_center);
+            } else if v1_1 {
+                memory.jeff_v1_1.field_gate.wait.push_str("/nosite");
+            }
+            if let (true, Some(site)) = (v1_1, memory.later_bases.site) {
+                memory.jeff_v1_1.field_gate.note_abandon("pick", site, tick);
             }
         }
     }
@@ -305,6 +462,10 @@ where
         if let Some(site) = memory.later_bases.site {
             // A guard died before the Depot went down, so the site is contested. Replacing it
             // would feed Tanks one at a time into whatever killed it; back off and retry later.
+            memory
+                .jeff_v1_1
+                .field_gate
+                .note_abandon("guard", site, tick);
             let state = &mut memory.later_bases;
             let reject = note_site_failure(state, site);
             abandon_site(state, site, tick, reject);
@@ -337,6 +498,10 @@ where
     let staged_for = tick.saturating_sub(staging_since);
 
     if staged_for >= SITE_GIVE_UP_TICKS {
+        memory
+            .jeff_v1_1
+            .field_gate
+            .note_abandon("stale", site, tick);
         abandon_site(&mut memory.later_bases, site, tick, true);
         return status;
     }
@@ -345,6 +510,7 @@ where
             intent.kind == EntityKind::ResourceDepot && (intent.tile_x, intent.tile_y) == site
         });
         if !order_pending && tick.saturating_sub(attempt) >= BUILD_START_TIMEOUT_TICKS {
+            memory.jeff_v1_1.field_gate.note_abandon("drop", site, tick);
             let state = &mut memory.later_bases;
             if note_site_failure(state, site) {
                 abandon_site(state, site, tick, true);
@@ -380,8 +546,15 @@ where
     // The builder crosses the base to reach the site, and a worker hit on the way retreats and
     // drops its order, so an enemy inside the base also holds the order back.
     let base_quiet = defense::local_defense_contact(observation).is_none();
-    let may_build =
-        !contested && base_quiet && (guards_arrived || staged_for >= STAGING_TIMEOUT_TICKS);
+    // `basewait` (testing): the order also waits while enemy fighters were seen near the site
+    // lately; the stale timeout still gives the site up.
+    let waiting = memory.later_bases.v1_1
+        && !jeff_v1_1::off("basewait")
+        && enemies_near_site(observation, memory, site_center);
+    let may_build = !contested
+        && !waiting
+        && base_quiet
+        && (guards_arrived || staged_for >= STAGING_TIMEOUT_TICKS);
     if may_build
         && actions::try_build_at(
             actions,
@@ -416,10 +589,45 @@ const ROUTE_EXPOSURE_TILES: f32 = 8.0;
 /// unless it gives up more head start than that.
 const ROUTE_EXPOSURE_PENALTY: i32 = 60;
 
+/// `sitesafe` (testing): the wider reach of the enemy's way in, and the heavier penalty. Bases on
+/// the enemy's way died fast against Pressure AI: Wald des Todes (49,86) 7-28 s after finishing,
+/// Open Basin (77,116) 5 of 5 within about 1:40.
+const SAFE_ROUTE_TILES: f32 = 16.0;
+const SAFE_ROUTE_SCALE: i32 = 4;
+
+/// `basewait` (testing): enemy fighters worth this much, seen this close to a site within the last
+/// `BASE_WAIT_TICKS`, keep a later base off it.
+const BASE_WAIT_VALUE: u32 = 300;
+const BASE_WAIT_TILES: f32 = 20.0;
+const BASE_WAIT_TICKS: u32 = config::TICK_HZ * 45;
+
+fn enemies_near_site(
+    observation: &AiObservation,
+    memory: &AiDecisionMemory,
+    center: (f32, f32),
+) -> bool {
+    let ts = observation.map.tile_size as f32;
+    jeff_v1_1::push::value_seen_near(
+        memory,
+        center,
+        BASE_WAIT_TILES * ts,
+        observation.tick.saturating_sub(BASE_WAIT_TICKS),
+    ) >= BASE_WAIT_VALUE
+}
+
 fn route_exposure_penalty(
     observation: &AiObservation,
     route: Option<&[crate::ai_core::map_analysis::AiTile]>,
     tile: (u32, u32),
+) -> i32 {
+    route_exposure_penalty_within(observation, route, tile, ROUTE_EXPOSURE_TILES)
+}
+
+fn route_exposure_penalty_within(
+    observation: &AiObservation,
+    route: Option<&[crate::ai_core::map_analysis::AiTile]>,
+    tile: (u32, u32),
+    tiles: f32,
 ) -> i32 {
     let Some(center) = building_center(tile, EntityKind::ResourceDepot, observation.map.tile_size)
     else {
@@ -433,7 +641,7 @@ fn route_exposure_penalty(
                 (step.y as f32 + 0.5) * ts,
                 center.0,
                 center.1,
-            ) <= squared(ROUTE_EXPOSURE_TILES * ts)
+            ) <= squared(tiles * ts)
         })
     });
     if exposed {
@@ -542,6 +750,7 @@ fn free_tank_ids(observation: &AiObservation, memory: &AiDecisionMemory) -> Vec<
 
 /// Once a Depot stands on the guarded site, stop taking it and start the release countdown.
 fn refresh_guard_site(observation: &AiObservation, memory: &mut AiDecisionMemory, tick: u32) {
+    let mut lost = false;
     let state = &mut memory.later_bases;
     let Some(guard_site) = state.guard_site else {
         return;
@@ -566,9 +775,16 @@ fn refresh_guard_site(observation: &AiObservation, memory: &mut AiDecisionMemory
         state.build_attempt_tick = None;
         state.guard_site_built = true;
         if depot.is_complete && state.guard_release_tick.is_none() {
-            state.guard_release_tick = Some(tick.saturating_add(GUARD_AFTER_COMPLETE_TICKS));
+            // `basehold` (testing): the escort stays `BASE_HOLD_TICKS` with the new base.
+            let hold = if state.v1_1 && !jeff_v1_1::off("basehold") {
+                BASE_HOLD_TICKS
+            } else {
+                GUARD_AFTER_COMPLETE_TICKS
+            };
+            state.guard_release_tick = Some(tick.saturating_add(hold));
         }
     } else if state.guard_site_built {
+        lost = true;
         // The Depot was destroyed while still covered. The base is due again, but not at once:
         // whatever killed it is probably still there, and a second loss rules the site out.
         if note_site_failure(state, guard_site) || rejects_first_failure(state) {
@@ -589,21 +805,53 @@ fn refresh_guard_site(observation: &AiObservation, memory: &mut AiDecisionMemory
         state.guard_site_built = false;
         state.guards.clear();
     }
+    if lost {
+        memory
+            .jeff_v1_1
+            .field_gate
+            .note_abandon("lost", guard_site, tick);
+    }
 }
 
 /// Count a dropped order or destroyed Depot at a site; true once the site should be rejected.
+/// With `baseretry` the count is the base's: any earlier site within `BASE_CLUSTER_TILES`.
 fn note_site_failure(state: &mut LaterBases, site: (u32, u32)) -> bool {
-    let failures = state.site_failures.entry(site).or_insert(0);
+    let key = if state.base_retry {
+        base_key(state.site_failures.keys().copied(), site)
+    } else {
+        site
+    };
+    let failures = state.site_failures.entry(key).or_insert(0);
     *failures = failures.saturating_add(1);
     *failures >= MAX_SITE_FAILURES
 }
 
-fn site_is_rejected(rejected: &BTreeSet<(u32, u32)>, tile: (u32, u32)) -> bool {
-    rejected.iter().any(|site| {
-        let dx = site.0 as f32 - tile.0 as f32;
-        let dy = site.1 as f32 - tile.1 as f32;
-        dx * dx + dy * dy <= squared(REJECTED_SITE_RADIUS_TILES)
-    })
+/// The first of `keys` within `BASE_CLUSTER_TILES` of `site`, or `site` itself.
+fn base_key(keys: impl Iterator<Item = (u32, u32)>, site: (u32, u32)) -> (u32, u32) {
+    keys.into_iter()
+        .find(|key| tiles_within(*key, site, BASE_CLUSTER_TILES))
+        .unwrap_or(site)
+}
+
+fn tiles_within(a: (u32, u32), b: (u32, u32), radius: f32) -> bool {
+    let dx = a.0 as f32 - b.0 as f32;
+    let dy = a.1 as f32 - b.1 as f32;
+    dx * dx + dy * dy <= squared(radius)
+}
+
+/// How far a rejected site rules out its neighbours: the whole base with `baseretry`.
+fn rejected_radius(state: &LaterBases) -> f32 {
+    if state.base_retry {
+        BASE_CLUSTER_TILES
+    } else {
+        REJECTED_SITE_RADIUS_TILES
+    }
+}
+
+fn site_is_rejected(rejected: &BTreeSet<(u32, u32)>, tile: (u32, u32), radius: f32) -> bool {
+    rejected
+        .iter()
+        .any(|site| tiles_within(*site, tile, radius))
 }
 
 /// Move each guard to its slot and hold it there. These go out as ordinary moves, not staging:
@@ -676,12 +924,29 @@ fn rejects_first_failure(state: &LaterBases) -> bool {
 fn reject_site(state: &mut LaterBases, site: (u32, u32), tick: u32) {
     state.rejected_sites.insert(site);
     state.rejected_at.insert(site, tick);
+    if state.base_retry {
+        // A base ruled out again stays out twice as long each time.
+        let key = base_key(state.base_rejections.keys().copied(), site);
+        let count = state.base_rejections.entry(key).or_insert(0);
+        let most = crate::ai_core::profiles::jeff_v1_1_param("brdbl")
+            .map_or(MAX_REJECT_DOUBLINGS, |v| v.max(0.0) as u32);
+        let doublings = (*count).min(most);
+        *count = count.saturating_add(1);
+        let out = jeff_v1_1::third_base::SITE_REJECT_TICKS.saturating_mul(1 << doublings);
+        state.reject_ticks.insert(site, out);
+    }
 }
 
 /// Give up on a site for now: release the guards and wait out the cooldown. A rejected site is
 /// never chosen again (V1.1 with `siteretry`: not for `SITE_REJECT_TICKS`); V1.1 without it
 /// rejects every site it gives up, and tries the next.
 fn abandon_site(state: &mut LaterBases, site: (u32, u32), tick: u32, reject: bool) {
+    if state.v1_1 {
+        // `sitealt`: tries given up per base (keyed by its first given-up tile).
+        let key = base_key(state.abandons.keys().copied(), site);
+        let tries = state.abandons.entry(key).or_insert(0);
+        *tries = tries.saturating_add(1);
+    }
     if reject || rejects_first_failure(state) {
         reject_site(state, site, tick);
     }
@@ -695,7 +960,9 @@ fn abandon_site(state: &mut LaterBases, site: (u32, u32), tick: u32, reject: boo
     state.guards.clear();
 }
 
-/// Drop guards that died or became the home Tank; true when one died.
+/// Drop guards that died or became the home Tank; true when the losses mean the site is contested:
+/// one dead guard, or under V1.1's `guardloss` a dead guard Tank or `GUARD_LOSS_SHARE` of the
+/// escort.
 fn drop_lost_guards(observation: &AiObservation, memory: &mut AiDecisionMemory) -> bool {
     // V1.1's escort may be infantry.
     let any_kind = memory.later_bases.v1_1;
@@ -706,20 +973,41 @@ fn drop_lost_guards(observation: &AiObservation, memory: &mut AiDecisionMemory) 
         .map(|unit| unit.id)
         .collect();
     let home_tank = memory.home_defensive_tank;
-    let guards = &mut memory.later_bases.guards;
-    let before = guards.len();
-    guards.retain(|id| alive.contains(id));
-    let died = guards.len() < before;
-    guards.retain(|id| Some(*id) != home_tank);
-    died
+    let state = &mut memory.later_bases;
+    let dead: Vec<u32> = state
+        .guards
+        .iter()
+        .copied()
+        .filter(|id| !alive.contains(id))
+        .collect();
+    state.guards.retain(|id| alive.contains(id));
+    state.guards.retain(|id| Some(*id) != home_tank);
+    if dead.is_empty() {
+        return false;
+    }
+    if !(state.v1_1 && !jeff_v1_1::off("guardloss")) {
+        return true;
+    }
+    state.guards_dead += dead.len();
+    dead.iter().any(|id| state.guard_tanks.contains(id))
+        || state.guards_dead as f32 >= GUARD_LOSS_SHARE * state.guards_start as f32
 }
 
 /// Pick the two Tanks nearest the site that neither the push nor home defense is using. Guards are
 /// chosen once per site: losses are not replaced, because that would send Tanks in one at a time.
 fn select_guards(observation: &AiObservation, memory: &mut AiDecisionMemory, site: (f32, f32)) {
     if memory.later_bases.v1_1 {
-        let escort = jeff_v1_1::third_base::escort(observation, memory, site);
-        memory.later_bases.guards = escort.unwrap_or_default();
+        let escort = jeff_v1_1::third_base::escort(observation, memory, site).unwrap_or_default();
+        let state = &mut memory.later_bases;
+        state.guards_start = escort.len();
+        state.guards_dead = 0;
+        state.guard_tanks = observation
+            .owned
+            .iter()
+            .filter(|unit| unit.kind == EntityKind::Tank && escort.contains(&unit.id))
+            .map(|unit| unit.id)
+            .collect();
+        state.guards = escort;
         return;
     }
     let home_tank = memory.home_defensive_tank;

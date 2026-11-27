@@ -92,6 +92,7 @@ impl<'a> AiActionContext<'a> {
                     | AiActionRequest::Gather { units, .. }
                     | AiActionRequest::Build { units, .. }
                     | AiActionRequest::SetupAntiTankGuns { units, .. }
+                    | AiActionRequest::PointTanks { units, .. }
                     | AiActionRequest::UseAbility { units, .. } => (units, false),
                     AiActionRequest::Train { .. }
                     | AiActionRequest::SetRally { .. }

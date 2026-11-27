@@ -136,6 +136,15 @@ pub(super) fn build_tech<F>(
         jeff_v1_1::third_base::barracks_target(profile.id, banked, target_barracks);
     let target_barracks =
         jeff_v1_1::rifle_barracks_target(profile.id, observation, facts, memory, target_barracks);
+    // `clearbuy` (testing): the natural's clearing group short of Riflemen builds Barracks on the
+    // bank, past the spend plan's slack and the expansion's savings.
+    let clear_barracks = jeff_v1_1::natclear::barracks_wanted(
+        profile.id,
+        observation,
+        memory,
+        facts.building_count(EntityKind::Barracks),
+    );
+    let target_barracks = target_barracks.max(clear_barracks.unwrap_or(0));
     // The Rifleman opening's second Barracks is a step of its spend plan, paid for there.
     let planned_barracks =
         jeff_v1_1::rifle_opening(profile.id) && facts.building_count(EntityKind::Barracks) < 2;
@@ -154,11 +163,12 @@ pub(super) fn build_tech<F>(
         && facts.building_count(EntityKind::Barracks)
             + planned_in_intents(intents, EntityKind::Barracks)
             < target_barracks
-        && !expansion_blocks_tech_path
-        && !save_for_unplanned_expansion
+        && (clear_barracks.is_some() || !expansion_blocks_tech_path)
+        && (clear_barracks.is_some() || !save_for_unplanned_expansion)
         && planned_in_intents(intents, EntityKind::Barracks) == 0
         && (facts.building_count(EntityKind::Barracks) == 0
             || planned_barracks
+            || clear_barracks.is_some()
             || spend_plan.is_none_or(|plan| {
                 plan.affords_off_plan(intents, rts_rules::economy::cost(EntityKind::Barracks).0)
             }))
@@ -330,12 +340,26 @@ pub(super) fn train_units(
                 production_unit_counts,
                 actions.budget().steel(),
                 facts.unit_count(EntityKind::Tank) > 0,
+                observation.tick,
+                jeff_v1_1::pairs_held(profile.id, observation, memory),
             )
             .max(security_recruits.unwrap_or(0))
             .max(emergency_recruits.unwrap_or(0))
             .max(early_recruits.unwrap_or(0));
             building_max_counts.retain(|(kind, _)| *kind != EntityKind::Rifleman);
             building_max_counts.push((EntityKind::Rifleman, cap));
+        }
+        // `clearbuy` (testing): the natural's clearing group short of the Riflemen it needs buys
+        // them from the bank, past the spend plan's cap.
+        if building_kind == EntityKind::Barracks {
+            if let Some(target) = jeff_v1_1::natclear::buy_target(
+                profile.id,
+                observation,
+                memory,
+                production_unit_counts,
+            ) {
+                opening_rush::raise_rifle_cap(&mut building_max_counts, target);
+            }
         }
         let home_holds_tank_reserve = !uses_current_jeffs_ai_policy(profile.id)
             || later_bases::main_tank_ids(observation, memory).len() >= memory.home_tank_reserve();
@@ -466,6 +490,11 @@ pub(super) fn late_orders(
         reserved,
     );
     actions.mark("reveal");
+    // Jeff's AI V1.1's idle Riflemen raid the enemy's outer bases (`rifleraid`), last, so their
+    // orders stand.
+    let held = route_line_reserved | local_defense_assigned;
+    jeff_v1_1::rifle_raid::raid(actions, observation, map_analysis, memory, intents, &held);
+    actions.mark("rifleraid");
 }
 
 /// Home defense's staging when local defense did not take over: the current Jeff's home Riflemen,
@@ -591,6 +620,27 @@ pub(super) fn finish_trace(
         (push, raid) => push.or(raid),
     };
     tank_micro::finish(decision, observation, map_analysis, memory);
+    // Units on raids and scouting roles keep their own systems' fight rules: the opening rush, the
+    // Meth strike (the starters' raid), Tank raids, spotters, rifle raids and natural denial.
+    let reserved: std::collections::BTreeSet<u32> = memory
+        .opening_rush
+        .reserved()
+        .chain(memory.jeff_v1_1.meth_strike.units())
+        .chain(memory.jeff_v1_1.tank_raid.units())
+        .chain(memory.jeff_v1_1.spotters.units())
+        .chain(memory.jeff_v1_1.rifle_raid.units())
+        .chain(memory.jeff_v1_1.deny.units())
+        .collect();
+    jeff_v1_1::matchup::finish(
+        decision,
+        observation,
+        &mut memory.jeff_v1_1.matchup,
+        &reserved,
+    );
+    // Jeff's AI V1.1's home Tank duel (`hduel`) takes its responders over.
+    jeff_v1_1::home_duel::finish(decision, observation, memory);
+    // Jeff's AI V1.1's Panzerfaust pack (`pfpack`) owns its Panzerfausts, over every other order.
+    jeff_v1_1::faust_pack::finish(decision, observation, memory);
     if memory.profile_id().is_some_and(is_jeff_v1_1) {
         // Which system holds each Tank, for the decision trace: two short lines, under the
         // trace's line cap.
@@ -651,15 +701,20 @@ pub(super) fn finish_trace(
             .trace
             .notes
             .push(jeff_v1_1::south_route::trace(memory));
+        if jeff_v1_1::rifle_raid::active(memory) {
+            decision.trace.rifle_raid = Some(memory.jeff_v1_1.rifle_raid.trace());
+        }
         decision.trace.strike = Some(format!(
-            "v1_1_meth {} opening={:?} trade={}/{} value={}/{} ahead={}",
+            "v1_1_meth {} opening={:?} trade={}/{} value={}/{} ahead={} {} {}",
             memory.jeff_v1_1.meth_strike.trace(),
             memory.jeff_v1_1.opening,
             memory.jeff_v1_1.kills,
             memory.jeff_v1_1.deaths,
             memory.jeff_v1_1.value_killed,
             memory.jeff_v1_1.value_lost,
-            jeff_v1_1::trading_ahead(memory)
+            jeff_v1_1::trading_ahead(memory),
+            memory.jeff_v1_1.spotters.trace(),
+            memory.jeff_v1_1.field_gate.trace()
         ));
     }
 }

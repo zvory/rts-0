@@ -174,6 +174,8 @@ pub(crate) struct AiObservation {
     pub(crate) visible_allies: Vec<AiEntitySummary>,
     pub(crate) visible_enemies: Vec<AiEntitySummary>,
     pub(crate) ability_states: Vec<AiAbilitySummary>,
+    /// Own Panzerfausts whose rocket is spent, by id (owner-only).
+    pub(crate) spent_panzerfausts: Vec<u32>,
     pub(crate) smokes: Vec<AiSmokeSummary>,
     /// Completed Tank Traps in sight (neutral, so in neither list above).
     pub(crate) visible_tank_traps: Vec<AiEntitySummary>,
@@ -282,6 +284,12 @@ impl AiObservation {
             visible_allies,
             visible_enemies,
             ability_states,
+            spent_panzerfausts: frame
+                .owned()
+                .iter()
+                .filter(|entity| entity.panzerfaust_loaded == Some(false))
+                .map(|entity| entity.id)
+                .collect(),
             smokes,
             visible_tank_traps: frame.tank_traps().iter().map(project_entity).collect(),
             pending_builds,
@@ -471,6 +479,13 @@ impl AiObservation {
             })
             .collect::<Vec<_>>();
         ability_states.sort_by_key(|ability| (ability.entity_id, ability.kind));
+        let mut spent_panzerfausts: Vec<u32> = snapshot
+            .entities
+            .iter()
+            .filter(|entity| entity.owner == player_id && entity.panzerfaust_loaded == Some(false))
+            .map(|entity| entity.id)
+            .collect();
+        spent_panzerfausts.sort_unstable();
         let mut smokes = snapshot
             .smokes
             .iter()
@@ -496,6 +511,7 @@ impl AiObservation {
             visible_allies,
             visible_enemies,
             ability_states,
+            spent_panzerfausts,
             smokes,
             visible_tank_traps,
             pending_builds,

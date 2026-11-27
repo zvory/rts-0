@@ -567,12 +567,15 @@ impl AiDecisionMemory {
             .chain(self.jeff_v1_1.tank_raid.units())
             .chain(self.jeff_v1_1.deny.units())
             .chain(self.jeff_v1_1.meth_strike.units())
+            .chain(self.jeff_v1_1.rifle_raid.units())
             .collect()
     }
 
     /// Whether the opening rush or Jeff's AI V1.1's Meth strike owns the unit.
     pub(super) fn rush_reserved(&self, id: u32) -> bool {
-        self.opening_rush.is_reserved(id) || self.jeff_v1_1.meth_strike.holds(id)
+        self.opening_rush.is_reserved(id)
+            || self.jeff_v1_1.meth_strike.holds(id)
+            || self.jeff_v1_1.rifle_raid.holds(id)
     }
 
     /// Whether the trap breach (its concave is the defense where it stands) or the third-base
@@ -582,6 +585,7 @@ impl AiDecisionMemory {
             || self.third_pressure.is_reserved(id)
             || self.jeff_v1_1.tank_raid.holds(id)
             || self.jeff_v1_1.deny.holds(id)
+            || self.jeff_v1_1.rifle_raid.holds(id)
             || self.jeff_v1_1.meth_strike.holds(id)
             || self.jeff_v1_1.scout.unit == Some(id)
             || self.jeff_v1_1.natclear.holds(id)

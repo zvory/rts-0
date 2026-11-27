@@ -21,6 +21,18 @@ const RIFLES_PER_TANK: usize = 6;
 const GROUP_TILES: f32 = 6.0;
 /// The charge goes only while the enemy infantry near the target is at most this share of it.
 const ESCORT_SHARE: f32 = 0.5;
+/// `chargeesc`: no charge at a Tank with this much infantry near it, and a charge under way is
+/// called back when its escort grows to it. Bench vs Pressure AI (80 games, 4:00-10:00), Riflemen
+/// lost per Tank killed: escort 4+ from 6-10 tiles 20-29, escort grown during the charge 33 for 1.
+const MAX_ESCORT: usize = 4;
+/// `chargeesc`: with this much infantry near the Tank, only the Riflemen this close start a charge:
+/// from farther the Tank shells them all the way in. Escort 2-3: 7 lost per Tank from under 8
+/// tiles, 30 for 3 Tanks from farther; escort 0-1: 1.2-2.6 per Tank out to 10 tiles.
+const CLOSE_ESCORT: usize = 2;
+const CLOSE_TILES: f32 = 8.0;
+/// `chargeesc`: escort infantry seen this recently counts though out of sight; the Tank fires from
+/// out of the Riflemen's sight and its escort stays hidden until they are in among it.
+const ESCORT_MEMORY_TICKS: u32 = config::TICK_HZ * 20;
 
 /// V1.1's charge: the Tank charged and the Riflemen charging it.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -56,6 +68,9 @@ pub(in crate::ai_core::decision) fn charge_tanks(
             .any(|depot| dist2(depot.0, depot.1, at.0, at.1) <= squared(tiles * ts))
     };
     let reserved = memory.squad_reserved();
+    // `chargeesc`: a breakout sortie fights its own fight; charging its Riflemen at one Tank swapped
+    // their orders every few ticks while Panzerfausts shot them.
+    let escort_rule = !super::off("chargeesc");
     let free: Vec<&AiEntitySummary> = observation
         .owned
         .iter()
@@ -66,6 +81,7 @@ pub(in crate::ai_core::decision) fn charge_tanks(
                 && memory.containment.active_scout != Some(unit.id)
                 && !memory.containment.active_riflemen.contains(&unit.id)
                 && !memory.rush_reserved(unit.id)
+                && !(escort_rule && memory.jeff_v1_1.breakout.holds(unit.id))
         })
         .collect();
     let defenders: Vec<&&AiEntitySummary> = free
@@ -106,7 +122,7 @@ pub(in crate::ai_core::decision) fn charge_tanks(
         memory.jeff_v1_1.charge = ChargeMemory::default();
         return;
     };
-    let chargers: Vec<&&AiEntitySummary> = free
+    let mut chargers: Vec<&&AiEntitySummary> = free
         .iter()
         .filter(|unit| dist2(unit.x, unit.y, target.x, target.y) <= squared(SHELL_TILES * ts))
         .collect();
@@ -114,24 +130,87 @@ pub(in crate::ai_core::decision) fn charge_tanks(
         .iter()
         .filter(|tank| dist2(tank.x, tank.y, target.x, target.y) <= squared(GROUP_TILES * ts))
         .count();
-    let escort = observation
+    let infantry = |kind: EntityKind| {
+        matches!(
+            kind,
+            EntityKind::Rifleman | EntityKind::MachineGunner | EntityKind::Panzerfaust
+        )
+    };
+    let near_target = |x: f32, y: f32| dist2(x, y, target.x, target.y) <= squared(GROUP_TILES * ts);
+    let seen_escort: BTreeSet<u32> = observation
         .visible_enemies
         .iter()
-        .filter(|enemy| enemy.hp > 0)
-        .filter(|enemy| {
-            matches!(
-                enemy.kind,
-                EntityKind::Rifleman | EntityKind::MachineGunner | EntityKind::Panzerfaust
-            )
-        })
-        .filter(|enemy| dist2(enemy.x, enemy.y, target.x, target.y) <= squared(GROUP_TILES * ts))
-        .count();
+        .filter(|enemy| enemy.hp > 0 && infantry(enemy.kind) && near_target(enemy.x, enemy.y))
+        .map(|enemy| enemy.id)
+        .collect();
+    let escort = seen_escort.len();
+    // `chargeesc`: with the infantry remembered near it too.
+    let full_escort = if escort_rule {
+        let tick = observation.tick;
+        escort
+            + memory
+                .jeff_v1_1
+                .push
+                .remembered()
+                .filter(|(id, kind, _, at, seen)| {
+                    !seen_escort.contains(id)
+                        && infantry(*kind)
+                        && tick.saturating_sub(*seen) <= ESCORT_MEMORY_TICKS
+                        && near_target(at.0, at.1)
+                })
+                .count()
+    } else {
+        escort
+    };
+    let crowded = escort_rule && full_escort >= MAX_ESCORT;
+    // `chargeesc`: an escorted Tank is charged only by the Riflemen already close to it.
+    if escort_rule && previous != Some(target.id) && full_escort >= CLOSE_ESCORT {
+        chargers
+            .retain(|unit| dist2(unit.x, unit.y, target.x, target.y) <= squared(CLOSE_TILES * ts));
+    }
     let enough = chargers.len() >= RIFLES_PER_TANK * group.max(1)
-        && escort as f32 <= chargers.len() as f32 * ESCORT_SHARE;
+        && escort as f32 <= chargers.len() as f32 * ESCORT_SHARE
+        && !crowded;
     // A charge under way keeps going while it still outnumbers the Tanks.
-    let going =
-        previous == Some(target.id) && chargers.len() >= RIFLES_PER_TANK.div_ceil(2) * group;
+    let going = previous == Some(target.id)
+        && chargers.len() >= RIFLES_PER_TANK.div_ceil(2) * group
+        && !crowded;
     if !enough && !going {
+        if crowded && previous == Some(target.id) {
+            // `chargeesc`: call the charge back to the nearest Depot, and let the stations and
+            // the home staging place its Riflemen again (their attack order otherwise keeps them
+            // out of staging for a while).
+            let back: Vec<u32> = memory
+                .jeff_v1_1
+                .charge
+                .riflemen
+                .iter()
+                .copied()
+                .filter(|id| {
+                    observation
+                        .owned
+                        .iter()
+                        .any(|unit| unit.id == *id && unit.hp > 0)
+                })
+                .collect();
+            for id in &back {
+                let Some(unit) = observation.owned.iter().find(|unit| unit.id == *id) else {
+                    continue;
+                };
+                let home = depots
+                    .iter()
+                    .min_by(|a, b| {
+                        dist2(a.0, a.1, unit.x, unit.y).total_cmp(&dist2(b.0, b.1, unit.x, unit.y))
+                    })
+                    .copied();
+                if let Some(home) = home {
+                    let _ = actions::move_units(actions, [*id], home.0, home.1);
+                }
+            }
+            if !back.is_empty() {
+                intents.push(AiIntent::Assemble { units: back });
+            }
+        }
         memory.jeff_v1_1.charge = ChargeMemory::default();
         return;
     }

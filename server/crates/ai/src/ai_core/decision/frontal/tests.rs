@@ -1,7 +1,6 @@
 use super::*;
 use crate::ai_core::observation::{AiAbilitySummary, AiEconomy};
 use crate::ai_core::profiles::JEFFS_AI;
-use rts_rules::math::GameplayMath as _;
 
 fn target_test_entity(id: u32, kind: EntityKind, x: f32, y: f32) -> AiEntitySummary {
     AiEntitySummary {
@@ -44,6 +43,7 @@ fn regroup_test_observation(owned: Vec<AiEntitySummary>) -> AiObservation {
         visible_allies: Vec::new(),
         visible_enemies: Vec::new(),
         ability_states: Vec::new(),
+        spent_panzerfausts: Vec::new(),
         smokes: Vec::new(),
         visible_tank_traps: Vec::new(),
         pending_builds: Vec::new(),
@@ -295,6 +295,7 @@ fn main_resource_depot_is_acquired_outside_nominal_standoff_radius() {
         visible_allies: Vec::new(),
         visible_enemies: vec![resource_depot],
         ability_states: Vec::new(),
+        spent_panzerfausts: Vec::new(),
         smokes: Vec::new(),
         visible_tank_traps: Vec::new(),
         pending_builds: Vec::new(),

@@ -389,6 +389,7 @@ pub(super) fn sync_containment_recovery(
     // while 40 Tanks gathered at home.
     if memory.containment.active_tanks.is_empty() {
         if runs_live_jeff(profile.id) {
+            jeff_v1_1::push::note_fell(observation, memory, "dead");
             begin_containment_recovery(memory);
         }
         return;
@@ -471,6 +472,11 @@ pub(super) fn sync_containment_recovery(
             .approach
             .note_failed_push(observation.player_id, observation.tick);
     }
+    jeff_v1_1::push::note_fell(
+        observation,
+        memory,
+        if tanks_intact { "scout" } else { "losses" },
+    );
     begin_containment_recovery(memory);
 }
 
@@ -509,6 +515,7 @@ pub(super) fn recall_small_push_home(
         |post| post.center(),
     );
     let repush_count = memory.containment.repush_count;
+    jeff_v1_1::push::note_fell(observation, memory, "recall");
     begin_containment_recovery(memory);
     memory.containment.repush_count = repush_count;
     actions::move_units(actions, units, home.0, home.1)

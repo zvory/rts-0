@@ -542,17 +542,23 @@ pub(crate) fn is_live_jeff(id: &str) -> bool {
     matches!(id, JEFFS_AI_ID | JEFFS_AI_V1_1_ID)
 }
 
-/// The V1.1 features Jeff's AI plays with: the set behind its best 120 on beta bee2b6c
-/// (2026-11-06; vs Pressure AI 25-4-11, vs Rush AI 28-0-12). Every other V1.1 switch stays off.
+/// The V1.1 features Jeff's AI plays with: the set behind its best fresh-seed bench on beta
+/// faa132b75 (2026-11-25, 12 maps x seeds 5-9 x both sides; vs Pressure AI 65-12-41, vs Rush AI
+/// 94-3-13), plus the late Panzerfaust pack (`pfpack` .. `pfpush`, `jeff_v1_1::faust_pack`).
+/// Every other V1.1 switch stays off.
 const JEFF_V1_1_FEATURES: &str = "meth,earlyrifles,factoryfirst,natforward,natsupport,tankcharge,\
 surplus,committed,tankraid,scout,smokecover,raidcar,raidwindow,deny,tankplus,base3,tug,tug2,mghome,\
 push,rifleline,opening4,methstrike,scoutsafe,upgradebank,nomg,riflenat,depot4,facwait,tcrifles,\
 nearnat,keephome,tankgroup,strikebig,goin,wideline,southroute,natsiege,marchorders,marchstrike,\
 thirdguard,noschoneraid,southhold,keepspotter,natclear,resume,spareworker,keepguards,raidodds,\
 ncskipguards,sitewalk,stations,pushstation,wayhalf,riflestations,natseat,siteclear,openfight,\
-breakout,mainfront,rebuild,ncbreak,siteretry,mirror";
+breakout,mainfront,rebuild,ncbreak,siteretry,mirror,skipmid,raidcamp,raidfight,fieldgate,mm,\
+standfire,pumpfirst,entafter,pfpack,pfscreen,pflate,pfready,pffill,pfsafe,pfwave,pfpush";
 /// The Tank line's numbers Jeff's AI plays with (`jeff_v1_1::front_line`).
 const JEFF_V1_1_LINE: &str = "shape=2,spacing=8";
+/// The matchup micro's tuning Jeff's AI plays with (`jeff_v1_1::matchup`, the `mm` feature), over
+/// its defaults. Local testing may replace it with `JEFF_V11_MM`.
+pub(crate) const JEFF_V1_1_MM: &str = "sm=0,fmin=0,fst=0,siege=12,gather=8,join=12,tb=16,jh=8";
 
 /// Whether a V1.1 feature is off: not in `JEFF_V1_1_FEATURES`. Local ablation testing may replace
 /// that set with `JEFF_V11_ONLY` and turn features off with `JEFF_V11_OFF`. Unit tests check each

@@ -91,6 +91,8 @@ pub(in crate::ai_core::decision) struct StationMemory {
     /// `riflestations`: where each free Rifleman stands this decision.
     rifles: BTreeMap<u32, RiflePlace>,
     rifle_summary: String,
+    /// `riflestations`: the Riflemen the main keeps at least (`rifleraid` takes those past it).
+    rifle_main_floor: usize,
 }
 
 /// `riflestations`: where a free Rifleman stands.
@@ -119,6 +121,27 @@ impl StationMemory {
     /// `riflestations`: the post the Rifle split gave this Rifleman.
     pub(in crate::ai_core::decision) fn rifle_post(&self, id: u32) -> Option<RiflePost> {
         self.rifles.get(&id).map(|place| place.post)
+    }
+
+    /// `rifleraid`: the Riflemen past what each post keeps: the main's floor in its pocket, and
+    /// `keep_base` on each base line past the natural (the natural's line keeps all of its own).
+    /// The newest go first.
+    pub(in crate::ai_core::decision) fn rifle_surplus(&self, keep_base: usize) -> Vec<u32> {
+        let mut by_post: BTreeMap<RiflePost, Vec<u32>> = BTreeMap::new();
+        for (id, place) in &self.rifles {
+            by_post.entry(place.post).or_default().push(*id);
+        }
+        let mut surplus = Vec::new();
+        for (post, mut ids) in by_post {
+            let keep = match post {
+                RiflePost::Main => self.rifle_main_floor,
+                RiflePost::Base(_) => keep_base,
+                RiflePost::Natural => continue,
+            };
+            ids.sort_unstable();
+            surplus.extend(ids.into_iter().skip(keep));
+        }
+        surplus
     }
 
     /// `riflestations`: whether this Rifleman holds a base past the natural.
@@ -1096,6 +1119,7 @@ pub(in crate::ai_core::decision) fn place_riflemen(
         parts.join(" ")
     );
     memory.jeff_v1_1.stations.rifles = places;
+    memory.jeff_v1_1.stations.rifle_main_floor = main_floor;
     if !sent.is_empty() {
         intents.push(AiIntent::Assemble { units: sent });
     }

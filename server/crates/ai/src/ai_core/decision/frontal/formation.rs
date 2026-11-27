@@ -162,6 +162,7 @@ pub(super) fn select_rifle_escorts(
                     .any(|reserved| reserved == unit.id)
                 && !memory.third_pressure.is_reserved(unit.id)
                 && !memory.jeff_v1_1.deny.holds(unit.id)
+                && !memory.jeff_v1_1.rifle_raid.holds(unit.id)
                 && !memory.jeff_v1_1.tank_raid.holds(unit.id)
                 && dist2(unit.x, unit.y, anchor.0, anchor.1) <= radius2
         })

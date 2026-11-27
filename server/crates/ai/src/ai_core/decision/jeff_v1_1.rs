@@ -9,21 +9,28 @@ pub(super) mod base_line;
 pub(super) mod breakout;
 pub(super) mod charge;
 pub(super) mod deny;
+pub(super) mod faust_pack;
+pub(super) mod field_gate;
 pub(super) mod front_line;
+pub(super) mod home_duel;
 pub(super) mod home_guard;
 pub(super) mod hunt;
+pub(crate) mod matchup;
 pub(super) mod meth_strike;
 pub(super) mod natclear;
 pub(super) mod natsiege;
 pub(super) mod natural;
+pub(super) mod paid_pump;
 pub(super) mod push;
 pub(super) mod resume;
 pub(super) mod reveal;
+pub(super) mod rifle_raid;
 pub(super) mod rovers;
 pub(super) mod scout;
 pub(super) mod screen;
 pub(super) mod smoke_cover;
 pub(super) mod south_route;
+pub(super) mod spotters;
 pub(super) mod stations;
 pub(super) mod strike;
 pub(super) mod tank_pause;
@@ -58,10 +65,17 @@ pub(super) struct V1_1Memory {
     pub(super) front_line: front_line::FrontLineMemory,
     pub(super) home_guard: home_guard::HomeGuardMemory,
     pub(super) rovers: rovers::RoverMemory,
+    pub(super) spotters: spotters::SpotterMemory,
     pub(super) smoke: smoke_cover::SmokeMemory,
     pub(super) deny: deny::DenyMemory,
+    pub(super) rifle_raid: rifle_raid::RifleRaidMemory,
     pub(super) meth_strike: meth_strike::MethStrikeMemory,
     pub(super) tank_pause: tank_pause::TankPauseMemory,
+    pub(super) field_gate: field_gate::FieldGateMemory,
+    pub(super) matchup: matchup::MatchupMemory,
+    pub(super) paid_pump: paid_pump::PaidPumpMemory,
+    pub(super) faust_pack: faust_pack::FaustPackMemory,
+    pub(super) home_duel: home_duel::HomeDuelMemory,
     /// Enemy fighters seen dying and Jeff's fighters lost so far (`AiDecisionMemory::note_losses`).
     pub(super) kills: u32,
     pub(super) deaths: u32,
@@ -73,15 +87,8 @@ pub(super) struct V1_1Memory {
     pub(super) car_ordered: bool,
 }
 
-/// Methamphetamines comes first. It is ordered the moment the Training Centre is free and its cost
-/// is in the bank, ahead of the Engineering Complex and every other Oil purchase, and until then this
-/// decision's budget holds that cost back. Meth Riflemen fire twice as fast, move a quarter faster and
-/// shoot on the move; Rush AI researches it at 0:30 and Pressure AI at 1:05, where V1.0 got it at
-/// 4:14 against Pressure and in 27 of 40 games against Rush.
-///
-/// Entrenchment costs no Oil, so it takes the Training Centre first only while its research ends
-/// before Meth's Oil is in: it then costs Meth nothing. Otherwise it follows right after Meth.
-pub(super) fn early_research(
+/// V1.1's research this decision: `early_research`, then the Panzerfaust pack's (`pfpack`).
+pub(super) fn research_all(
     (actions, facts, memory, intents): (
         &mut AiActionContext<'_>,
         &AiFacts,
@@ -90,6 +97,31 @@ pub(super) fn early_research(
     ),
     profile_id: &str,
     plan: Option<&spend_plan::SpendPlan>,
+    observation: &AiObservation,
+) {
+    let live = (&mut *actions, facts, &mut *memory, &mut *intents);
+    early_research(live, profile_id, plan, observation);
+    faust_pack::research((actions, facts, memory, intents), observation, profile_id);
+}
+
+/// Methamphetamines comes first. It is ordered the moment the Training Centre is free and its cost
+/// is in the bank, ahead of the Engineering Complex and every other Oil purchase, and until then this
+/// decision's budget holds that cost back. Meth Riflemen fire twice as fast, move a quarter faster and
+/// shoot on the move; Rush AI researches it at 0:30 and Pressure AI at 1:05, where V1.0 got it at
+/// 4:14 against Pressure and in 27 of 40 games against Rush.
+///
+/// Entrenchment costs no Oil, so it takes the Training Centre first only while its research ends
+/// before Meth's Oil is in: it then costs Meth nothing. Otherwise it follows right after Meth.
+fn early_research(
+    (actions, facts, memory, intents): (
+        &mut AiActionContext<'_>,
+        &AiFacts,
+        &mut AiDecisionMemory,
+        &mut Vec<AiIntent>,
+    ),
+    profile_id: &str,
+    plan: Option<&spend_plan::SpendPlan>,
+    observation: &AiObservation,
 ) {
     memory.jeff_v1_1.entrenchment_waits = false;
     if !is_jeff_v1_1(profile_id)
@@ -100,6 +132,21 @@ pub(super) fn early_research(
     }
     let meth = UpgradeKind::Methamphetamines;
     let entrenchment = UpgradeKind::Entrenchment;
+    if meth_held(observation, facts, memory) {
+        if !ordered(facts, memory, entrenchment) {
+            research(actions, facts, memory, intents, entrenchment);
+        }
+        return;
+    }
+    // `entfirst` (testing): Entrenchment always opens the Training Centre. Meth goes first when its
+    // Oil comes within Entrenchment's 20 s, and under `pumpfirst` it always did: Entrenchment then
+    // waited behind Meth and the natural (2:20 instead of 0:48), and the main's Riflemen met the
+    // first waves without trenches (half damage, +1 range); Rush AI took the main by 4:40-5:10 as P2
+    // on Crossroads and Schone Tage, Pressure AI on Wald des Todes P1 at 4:21.
+    if !off("entfirst") && !ordered(facts, memory, entrenchment) {
+        research(actions, facts, memory, intents, entrenchment);
+        return;
+    }
     if !ordered(facts, memory, meth) {
         if research(actions, facts, memory, intents, meth) {
             return;
@@ -121,6 +168,94 @@ pub(super) fn early_research(
     if !ordered(facts, memory, entrenchment) {
         research(actions, facts, memory, intents, entrenchment);
     }
+}
+
+/// `methlate` (testing): Methamphetamines waits for the Tank tech. At 200 Oil since #1869 it took
+/// the main's Oil from the Training Centre's finish to 1:26, done at 2:06, and the natural, the
+/// Factory and the first Tank (3:45) all waited behind it; Pressure AI researches Tank Production at
+/// 1:26 and holds its first wave for its own Meth past 4:00. Held until `methat`: 1 = the natural is
+/// placed, 2 = the first Factory is placed, 3 = Tank Production is ordered, 4 (default) = the first
+/// Tank is ordered (released at Tank Production, Meth's held cost would keep the first Tank's Oil),
+/// and never past `methmax` seconds (default 300). Entrenchment takes the Training Centre
+/// meanwhile, and the Rifleman opening's natural waits for Entrenchment instead
+/// (`opening_research_in`).
+pub(super) fn meth_held(
+    observation: &AiObservation,
+    facts: &AiFacts,
+    memory: &AiDecisionMemory,
+) -> bool {
+    if off("methlate")
+        || ordered(facts, memory, UpgradeKind::Methamphetamines)
+        || observation.tick >= (param("methmax", 300.0) * config::TICK_HZ as f32) as u32
+    {
+        return false;
+    }
+    match param("methat", 4.0) as u32 {
+        1 => facts.building_count(EntityKind::ResourceDepot) < 2,
+        2 => facts.building_count(EntityKind::Factory) == 0,
+        3 => !ordered(facts, memory, UpgradeKind::TankUnlock),
+        _ => {
+            facts.unit_count(EntityKind::Tank) == 0
+                && !observation
+                    .owned
+                    .iter()
+                    .any(|unit| unit.production_kind == Some(EntityKind::Tank))
+        }
+    }
+}
+
+/// The research the Rifleman opening's natural and its nonstop Riflemen wait for: Methamphetamines,
+/// or under `methlate` Entrenchment.
+pub(super) fn opening_research_in(observation: &AiObservation) -> bool {
+    observation
+        .upgrades
+        .contains(&UpgradeKind::Methamphetamines)
+        || (!off("methlate") && observation.upgrades.contains(&UpgradeKind::Entrenchment))
+}
+
+/// `entafter` (testing): when Methamphetamines goes first (`pumpfirst` brings its Oil within
+/// Entrenchment's 20 s), Entrenchment takes the Training Centre the moment Meth is done, ahead of the
+/// natural's Steel. Under `pumpfirst` the natural took the Steel at Meth's finish (1:50) and the Worker
+/// and Factory after it, so Entrenchment waited until 2:20: Rush AI's first contact (~2:25) met the
+/// main's Riflemen without trenches, and it took the main by 4:20-5:20 in 6 of 110 games (2 without
+/// `pumpfirst`). `entfirst` put Entrenchment first instead, but Meth then came 12 s later and the
+/// starters' Meth raid killed 405 Pressure AI mines instead of 499 (344 without `pumpfirst`), and the
+/// gain vs Pressure AI went (good/bad 67/32 vs 80/26, base 67/33). Runs before the natural's holdback.
+pub(super) fn entrenchment_after_meth(
+    (actions, facts, memory, intents): (
+        &mut AiActionContext<'_>,
+        &AiFacts,
+        &mut AiDecisionMemory,
+        &mut Vec<AiIntent>,
+    ),
+    profile_id: &str,
+) {
+    let entrenchment = UpgradeKind::Entrenchment;
+    if !is_jeff_v1_1(profile_id)
+        || off("entafter")
+        || off("meth")
+        || ordered(facts, memory, entrenchment)
+        || !ordered(facts, memory, UpgradeKind::Methamphetamines)
+        || facts.complete_building_count(EntityKind::TrainingCentre) == 0
+    {
+        return;
+    }
+    research(actions, facts, memory, intents, entrenchment);
+}
+
+/// Whether Entrenchment is in or being researched; the Rifleman opening's natural waits for it under
+/// `entafter`.
+pub(super) fn entrenchment_started(observation: &AiObservation) -> bool {
+    off("entafter")
+        || observation.upgrades.contains(&UpgradeKind::Entrenchment)
+        || observation.owned.iter().any(|unit| {
+            unit.research
+                .is_some_and(|(upgrade, _)| upgrade == UpgradeKind::Entrenchment)
+        })
+}
+
+fn param(name: &str, default: f32) -> f32 {
+    crate::ai_core::profiles::jeff_v1_1_param(name).unwrap_or(default)
 }
 
 /// Tanks in the field before Tank+ comes ahead of the next one.
@@ -200,15 +335,18 @@ pub(super) fn factory_for_float(
 /// plan so the natural, the Factory and the first Tank are timed after it.
 pub(super) fn research_ahead(
     profile_id: &str,
+    observation: &AiObservation,
     facts: &AiFacts,
     memory: &AiDecisionMemory,
 ) -> (u32, u32) {
     if !is_jeff_v1_1(profile_id) || off("meth") {
         return (0, 0);
     }
+    let held = meth_held(observation, facts, memory);
     [UpgradeKind::Methamphetamines, UpgradeKind::Entrenchment]
         .into_iter()
         .filter(|upgrade| !ordered(facts, memory, *upgrade))
+        .filter(|upgrade| !(held && *upgrade == UpgradeKind::Methamphetamines))
         .map(upgrade::definition)
         .fold((0, 0), |(steel, oil), definition| {
             (steel + definition.cost_steel, oil + definition.cost_oil)
@@ -558,19 +696,13 @@ pub(super) fn riflemen_first(
     if rifle_opening(profile_id)
         && !off("tcrifles")
         && facts.building_count(EntityKind::TrainingCentre) > 0
-        && !observation
-            .upgrades
-            .contains(&UpgradeKind::Methamphetamines)
+        && !opening_research_in(observation)
     {
         priorities.retain(|unit| *unit != EntityKind::Rifleman);
         priorities.insert(0, EntityKind::Rifleman);
         return Some(riflemen + facts.building_count(EntityKind::Barracks).max(1));
     }
-    if !off("opening4")
-        && !observation
-            .upgrades
-            .contains(&UpgradeKind::Methamphetamines)
-    {
+    if !off("opening4") && !opening_research_in(observation) {
         priorities.retain(|unit| *unit != EntityKind::Rifleman);
         if facts.building_count(EntityKind::TrainingCentre) == 0
             || fresh >= OPENING_RIFLES
@@ -589,6 +721,7 @@ pub(super) fn riflemen_first(
     } else if facts.building_count(EntityKind::TrainingCentre) > 0
         && !off("meth")
         && !ordered(facts, memory, UpgradeKind::Methamphetamines)
+        && !meth_held(observation, facts, memory)
     {
         riflemen + 1
     } else {
@@ -670,6 +803,18 @@ pub(super) fn refit_natural(profile_id: &str, observation: &AiObservation) -> Op
     }
 }
 
+/// `pairbuy`'s holds: `pairmg` once an enemy Machine Gunner was seen, `pairsite` where the natural
+/// is hand-placed (Schone Tage, The River: Rush AI's guns reach it by 3:10-4:10 and the early
+/// Depot dies, 11 good to 41 bad over 60 games against 29 to 20 without `pairbuy`).
+pub(super) fn pairs_held(
+    profile_id: &str,
+    observation: &AiObservation,
+    memory: &AiDecisionMemory,
+) -> bool {
+    (!off("pairmg") && push::enemy_mg_seen(memory))
+        || (!off("pairsite") && refit_natural(profile_id, observation).is_some())
+}
+
 /// `nearnat`: V1.1's natural is ranked below every other site for lying on the enemy's way in only
 /// past this walk from the main, not the shared 30 tiles. On Classic the full base at the top-left
 /// main's door, 31 tiles' walk east (score 92), fell under that rule by one tile, and the natural went
@@ -745,14 +890,28 @@ pub(super) fn rifle_opening_cap(
     counts: &[(EntityKind, usize)],
     steel: u32,
     tank_out: bool,
+    now: u32,
+    mg_seen: bool,
 ) -> usize {
     let current = counts
         .iter()
         .find_map(|(kind, count)| (*kind == EntityKind::Rifleman).then_some(*count))
         .unwrap_or(0);
     if !tank_out {
-        if let Some(cap) = plan.and_then(|plan| plan.rifle_cap(intents, counts)) {
-            return cap;
+        if let Some(plan) = plan {
+            if let Some(cap) = plan.rifle_cap(intents, counts) {
+                // `pairbuy` (testing): the plan's own Rifleman pairs due by now come on top of the
+                // slack.
+                // `pairmg`: not once an enemy Machine Gunner was seen (Rush AI's guns kill the
+                // early natural on Schone Tage and The River). `pairsite`: not where the natural
+                // is a hand-placed site (those two maps; `mg_seen` carries both holds).
+                let due = if off("pairbuy") || mg_seen {
+                    0
+                } else {
+                    plan.due_pair_riflemen(now)
+                };
+                return cap + due;
+            }
         }
     }
     // After the first Tank Riflemen leave a Tank's Steel in the bank.
@@ -978,16 +1137,17 @@ pub(super) fn rifle_line(
     Some(line)
 }
 
-/// The Panzerfausts V1.1 keeps: none.
+/// The Panzerfausts V1.1 keeps: none, but for the `pfpack` pack (`faust_pack::target`).
 pub(super) fn faust_target(
-    _profile_id: &str,
-    _facts: &AiFacts,
-    _memory: &AiDecisionMemory,
+    profile_id: &str,
+    facts: &AiFacts,
+    memory: &AiDecisionMemory,
     _banked: bool,
 ) -> usize {
-    // No Panzerfausts: the owner's call is Riflemen and guns to kill the enemy's Panzerfausts, and
-    // Tanks to trade with its Tanks. With 16-32 a game, V1.1 fielded 7-15 Tanks and did worse.
-    0
+    // No Panzerfausts on the base lines: the owner's call is Riflemen and guns to kill the enemy's
+    // Panzerfausts, and Tanks to trade with its Tanks. With 16-32 a game, 2 to each outer base,
+    // V1.1 fielded 7-15 Tanks and did worse.
+    faust_pack::target(profile_id, facts, memory)
 }
 
 /// V1.1 trains Machine Gunners for every gun post it has: the home pocket's, four in front of each

@@ -1,7 +1,6 @@
 use super::*;
 use crate::ai_core::observation::AiEconomy;
 use crate::ai_core::profiles::{JEFFS_AI, JEFFS_AI_BETA};
-use rts_rules::math::GameplayMath as _;
 
 fn test_entity(id: u32, kind: EntityKind, x: f32, y: f32) -> AiEntitySummary {
     AiEntitySummary {
@@ -51,6 +50,7 @@ fn test_observation(owned: Vec<AiEntitySummary>, tick: u32) -> AiObservation {
         visible_allies: Vec::new(),
         visible_enemies: Vec::new(),
         ability_states: Vec::new(),
+        spent_panzerfausts: Vec::new(),
         smokes: Vec::new(),
         visible_tank_traps: Vec::new(),
         pending_builds: Vec::new(),

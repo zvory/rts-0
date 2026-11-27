@@ -69,6 +69,25 @@ pub(super) struct ExpansionSecurity {
     contest_armor: bool,
     /// The live Jeff's Tanks sent to clear the natural.
     pub(super) clearers: Vec<u32>,
+    /// `natmove` (testing): since when the natural at this site has been due.
+    due_since: Option<u32>,
+    /// `natmove`: whether a natural was given up, so the next is searched for.
+    moved: bool,
+}
+
+/// `natmove` (testing): a natural due this long, still without its Depot and held by enemies seen
+/// within `NATMOVE_RECENT_TICKS`, is given up for another site (`nmt` seconds in `JEFF_V11_LINE`).
+/// Against Rush AI on Schone Tage V1.1 never took its natural in 9 of 10 games: five or six guns and
+/// later Panzerfausts dug in on it from 2:06, while the rest of the map stood empty.
+const NATMOVE_TICKS: u32 = config::TICK_HZ * 90;
+const NATMOVE_RECENT_TICKS: u32 = config::TICK_HZ * 20;
+/// `natmove`: a moved natural keeps this far from the site given up.
+const NATMOVE_CLEAR_TILES: f32 = 12.0;
+
+fn natmove_ticks() -> u32 {
+    crate::ai_core::profiles::jeff_v1_1_param("nmt").map_or(NATMOVE_TICKS, |seconds| {
+        (seconds.max(10.0) as u32) * config::TICK_HZ
+    })
 }
 
 impl ExpansionSecurity {
@@ -146,11 +165,11 @@ fn early_natural_due(observation: &AiObservation, facts: &AiFacts, profile: &AiP
         .map_or(0, |policy| policy.target_count)
         .min(OPENING_GUNS);
     // Jeff's AI V1.1's Rifleman opening (`riflenat`): the natural once Methamphetamines is in and
-    // `natural_rifles` Riflemen stand at home to take and hold it.
+    // `natural_rifles` Riflemen stand at home to take and hold it (under `methlate` once
+    // Entrenchment is in).
     if jeff_v1_1::rifle_opening(profile.id) {
-        return facts
-            .completed_upgrades()
-            .contains(&UpgradeKind::Methamphetamines)
+        return jeff_v1_1::opening_research_in(observation)
+            && jeff_v1_1::entrenchment_started(observation)
             && jeff_v1_1::home_riflemen(observation) >= jeff_v1_1::natural_rifles();
     }
     // Jeff's AI V1.1 (`fastnat`) takes its natural once Methamphetamines is under way and its four
@@ -310,6 +329,35 @@ pub(super) fn natural_attempt_ready_funded(
         && observation.tick >= security.next_attempt_tick
         && funded
         && natural_route_quiet(observation, analysis, site, watch_site)
+        && !natural_watched(observation, memory, site)
+}
+
+/// `natwait` (testing): enemy fighters worth this much, seen this close to the natural within the
+/// last `NATWAIT_TICKS`, hold its Depot order back. With `pairbuy` the natural went down at 2:13-2:27
+/// against Rush AI and its guns killed it within a minute on Schone Tage and The River (Depots lost
+/// 0.30 -> 1.70 a game there), after which Rush expanded unopposed.
+const NATWAIT_VALUE: u32 = 300;
+const NATWAIT_TILES: f32 = 25.0;
+const NATWAIT_TICKS: u32 = config::TICK_HZ * 45;
+
+fn natural_watched(
+    observation: &AiObservation,
+    memory: &AiDecisionMemory,
+    site: (u32, u32),
+) -> bool {
+    if !memory.profile_id().is_some_and(is_jeff_v1_1) || jeff_v1_1::off("natwait") {
+        return false;
+    }
+    let Some(center) = building_center(site, EntityKind::ResourceDepot, observation.map.tile_size)
+    else {
+        return false;
+    };
+    jeff_v1_1::push::value_seen_near(
+        memory,
+        center,
+        NATWAIT_TILES * observation.map.tile_size as f32,
+        observation.tick.saturating_sub(NATWAIT_TICKS),
+    ) >= NATWAIT_VALUE
 }
 
 /// Ticks until the guards could have secured the natural: the slowest one's walk to its post plus
@@ -521,6 +569,37 @@ pub(super) fn prepare<F: FnMut(EntityKind, u32, u32) -> bool>(
         security.build_attempt_worker = None;
         security.retry_builder = None;
     }
+    if is_jeff_v1_1(profile.id) && !jeff_v1_1::off("natmove") {
+        let due = expansion_is_next(observation, facts, profile)
+            && facts.building_count(EntityKind::ResourceDepot) < 2;
+        let security = &mut memory.expansion_security;
+        if !due {
+            security.due_since = None;
+        } else if let Some(site) = security.site {
+            let since = *security.due_since.get_or_insert(observation.tick);
+            let held_lately = security
+                .contested_tick
+                .is_some_and(|tick| observation.tick.saturating_sub(tick) <= NATMOVE_RECENT_TICKS);
+            if observation.tick.saturating_sub(since) >= natmove_ticks()
+                && held_lately
+                && !depot_order_pending(observation, site)
+                && security.build_attempt_tick.is_none()
+            {
+                security.rejected_sites.insert(site);
+                security.site = None;
+                security.riflemen.clear();
+                security.slots.clear();
+                security.secure_since = None;
+                security.near_since = None;
+                security.contested_tick = None;
+                security.contest_point = None;
+                security.contest_armor = false;
+                security.reserve_since = None;
+                security.due_since = None;
+                security.moved = true;
+            }
+        }
+    }
     if memory.expansion_security.site.is_none()
         && ((uses_current_jeffs_ai_policy(profile.id)
             && predicts_natural_from_opening(observation))
@@ -529,14 +608,34 @@ pub(super) fn prepare<F: FnMut(EntityKind, u32, u32) -> bool>(
     {
         if let Some(policy) = profile.expansion {
             let rejected_sites = &memory.expansion_security.rejected_sites;
-            memory.expansion_security.site = expansion::expansion_resource_depot_site(
-                observation,
-                policy,
-                EntityKind::ResourceDepot,
-                profile.id,
-                analysis,
-                &mut |kind, x, y| !rejected_sites.contains(&(x, y)) && placeable(kind, x, y),
-            );
+            memory.expansion_security.site = if memory.expansion_security.moved {
+                // `natmove`: the hand-placed naturals (The River, Schone Tage, `depot4`) never fall
+                // back to a search, so a moved natural searches the map, clear of the old site.
+                let resources = expansion::expansion_candidate_resources(observation);
+                expansion::defensible_expansion_depot_site_adjusted(
+                    observation,
+                    analysis,
+                    policy,
+                    EntityKind::ResourceDepot,
+                    &resources,
+                    &mut |kind, x, y| {
+                        !rejected_sites.iter().any(|site| {
+                            (site.0 as f32 - x as f32).det_hypot(site.1 as f32 - y as f32)
+                                <= NATMOVE_CLEAR_TILES
+                        }) && placeable(kind, x, y)
+                    },
+                    |_| 0,
+                )
+            } else {
+                expansion::expansion_resource_depot_site(
+                    observation,
+                    policy,
+                    EntityKind::ResourceDepot,
+                    profile.id,
+                    analysis,
+                    &mut |kind, x, y| !rejected_sites.contains(&(x, y)) && placeable(kind, x, y),
+                )
+            };
         }
     }
     if memory.expansion_security.site.is_none() {
