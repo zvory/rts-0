@@ -136,7 +136,10 @@ The server treats every client as potentially hostile. Scout Planes are exposed 
   deploy context excludes local development state and rig authoring artifacts while retaining only
   the documentation and build script used by the image; the build also fails if the checked-in
   snapshot stream or any runtime rig texture is missing. Generated WASM files stay ignored in git,
-  so deploys must not depend on untracked files in a local checkout. Missing static asset requests
+  so deploys must not depend on untracked files in a local checkout. The image also carries
+  `docs/wiki` (player wiki notes, icons and history, re-included in `.dockerignore`); the server
+  reads only fixed file names there and generates every player wiki page itself, so no request path
+  reaches the filesystem. Missing static asset requests
   under paths such as `/vendor`, `/src`, `/assets`, or root files with extensions return 404 instead
   of the SPA
   `index.html`, making packaging mistakes visible to the client and probes. Every push to `main`

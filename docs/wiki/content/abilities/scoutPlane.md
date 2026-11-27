@@ -1,0 +1,2 @@
+- {{SCOUT_PLANE_HP}} HP, {{SCOUT_PLANE_SIGHT_TILES}}-tile sight.
+- Circles {{SCOUT_PLANE_ORBIT_RADIUS_TILES}} tiles around its target for up to {{SCOUT_PLANE_LIFETIME_TICKS|s}}.

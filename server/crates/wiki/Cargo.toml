@@ -1,0 +1,15 @@
+[package]
+name = "rts-wiki"
+version = "0.1.0"
+edition = "2021"
+description = "Player wiki for Bewegungskrieg, generated from the compiled rules plus docs/wiki data"
+publish = false
+
+[dependencies]
+rts-rules = { path = "../rules" }
+rts-sim = { path = "../sim" }
+serde_json = "1"
+pulldown-cmark = { version = "0.12", default-features = false, features = ["html"] }
+
+[build-dependencies]
+serde_json = "1"

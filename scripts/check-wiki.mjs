@@ -11,6 +11,11 @@ const checks = [
     args: ["test", "--manifest-path", "server/Cargo.toml", "-p", "rts-server", "wiki"],
   },
   {
+    label: "player wiki generator (pages, notes, compiled numbers)",
+    command: "cargo",
+    args: ["test", "--manifest-path", "server/Cargo.toml", "-p", "rts-wiki"],
+  },
+  {
     label: "faction catalog parity",
     command: "node",
     args: ["scripts/check-faction-catalog-parity.mjs"],

@@ -1,0 +1,1 @@
+- Spreads shells over a {{ARTILLERY_BLANKET_RADIUS_TILES}}-tile radius.

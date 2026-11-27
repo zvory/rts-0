@@ -52,6 +52,7 @@ COPY --from=wasm-builder /app/sim-wasm-out/rts_sim_wasm.js ./client/vendor/sim-w
 COPY --from=wasm-builder /app/sim-wasm-out/rts_sim_wasm_bg.wasm ./client/vendor/sim-wasm/rts_sim_wasm_bg.wasm
 COPY docs/context ./docs/context
 COPY docs/design ./docs/design
+COPY docs/wiki ./docs/wiki
 
 RUN test -s ./client/vendor/sim-wasm/rts_sim_wasm.js \
     && test -s ./client/vendor/sim-wasm/rts_sim_wasm_bg.wasm \

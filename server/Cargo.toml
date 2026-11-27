@@ -15,6 +15,7 @@ members = [
     "crates/rules",
     "crates/sim",
     "crates/sim-wasm",
+    "crates/wiki",
 ]
 default-members = [
     ".",
@@ -25,6 +26,7 @@ default-members = [
     "crates/rules",
     "crates/sim",
     "crates/sim-wasm",
+    "crates/wiki",
 ]
 resolver = "2"
 
@@ -61,6 +63,7 @@ rts-contract = { path = "crates/contract" }
 rts-ai = { path = "crates/ai" }
 rts-protocol = { path = "crates/protocol" }
 rts-rules = { path = "crates/rules" }
+rts-wiki = { path = "crates/wiki" }
 rts-sim = { path = "crates/sim" }
 tokio = { version = "1", features = ["full"] }
 axum = { version = "0.8", features = ["ws"] }

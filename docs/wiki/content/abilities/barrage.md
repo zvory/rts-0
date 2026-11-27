@@ -1,0 +1,9 @@
+Each rocket's damage by distance from where it lands (before armor):
+
+| Lands within | Damage |
+|---|---|
+| {{ROCKET_BARRAGE_AP_RADIUS_TILES}} tiles | {{ROCKET_BARRAGE_DIRECT_DAMAGE}} |
+| {{ROCKET_BARRAGE_INNER_RADIUS_TILES}} tile | {{ROCKET_BARRAGE_INNER_DAMAGE}} |
+| {{ROCKET_BARRAGE_OUTER_RADIUS_TILES}} tiles | {{ROCKET_BARRAGE_OUTER_DAMAGE}} |
+
+Buildings take {{ROCKET_BARRAGE_BUILDING_DAMAGE_NUMERATOR}}/{{ROCKET_BARRAGE_BUILDING_DAMAGE_DENOMINATOR}} of that.
