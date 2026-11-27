@@ -109,7 +109,11 @@ discounted potential estimate to the score. `known_remaining_steel` excludes unk
 and `unknown_resource_count` reports their attributed share separately. Enemy approach uses public
 enemy starts and static terrain, not hidden enemy army positions.
 
-The planner caches terrain and cut geometry. Keep its instance alive to reuse that work. It emits
+The planner caches terrain and cut geometry. Keep its instance alive to reuse that work. For up
+to four bases it compares cut/garrison partitions; larger holdings use bounded candidate merges.
+Oversized cut graphs fall back to garrisons. Economic scores refresh every 90 ticks, with earlier
+refreshes for changed budgets, owned sites, known buildings, or public enemy status. Exact cut
+building is synchronous, so a cold topology change can exceed one simulation tick. It emits
 no commands, chooses no build order, and does not reserve units in `AiActions`. The caller owns
 base selection, unit-to-slot assignment, tactical reactions, and cross-tick order suppression.
 Use `DefensePlanner::with_firing_range_tiles(range)` for a force with a shorter firing range than
