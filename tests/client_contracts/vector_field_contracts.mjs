@@ -51,7 +51,7 @@ for (const sizeTiles of [4,5]) {
  for(let i=0;i<frames[0].length;i++) {
   const dx=frames[1][i][1]-frames[0][i][1];
   if(dx<0)continue; // edge respawn
-  assert(Math.abs(dx-0.9)<1e-7);
+  assert(Math.abs(dx-0.3)<1e-7); // 30 world px/s over 10 ms
   assert.equal(frames[1][i][2],frames[0][i][2]);checked++;
  }
  assert(checked>0);
