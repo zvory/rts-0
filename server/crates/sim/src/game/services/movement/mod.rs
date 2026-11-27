@@ -257,15 +257,23 @@ fn apply_magic_anchor_pull(
         }
         let next_x = (x + offset.0).clamp(0.0, world_max_x);
         let next_y = (y + offset.1).clamp(0.0, world_max_y);
-        if !crate::game::services::standability::unit_static_standable_with_radius(
-            map,
-            occ,
-            kind,
-            next_x,
-            next_y,
-            facing,
-            entities.get(id).map(|e| e.radius()),
-        ) {
+        // Stacked fields can cross whole tiles in one tick. Check the path with
+        // the body's unchanged facing, rather than only admitting the landing.
+        let delta = (next_x - x, next_y - y);
+        let steps = (delta.0.abs().max(delta.1.abs()).ceil() as u32).max(1);
+        let radius = entities.get(id).map(|e| e.radius());
+        if !(1..=steps).all(|step| {
+            let t = step as f32 / steps as f32;
+            standability::unit_static_standable_with_radius(
+                map,
+                occ,
+                kind,
+                x + delta.0 * t,
+                y + delta.1 * t,
+                facing,
+                radius,
+            )
+        }) {
             continue;
         }
         if entities

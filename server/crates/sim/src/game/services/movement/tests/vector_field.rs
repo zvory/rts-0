@@ -138,7 +138,10 @@ fn vector_field_overlap_sums_directions_and_excludes_expired_or_outside_fields()
         add_field(&mut runtime, center, direction, 2, 100);
         add_field(&mut runtime, center, [1.0, 0.0], 1, 1);
         add_field(&mut runtime, (800.0, 800.0), [1.0, 0.0], 1, 100);
-        assert_eq!(runtime.vector_field_at(center.0, center.1, 1), Some(expected));
+        assert_eq!(
+            runtime.vector_field_at(center.0, center.1, 1),
+            Some(expected)
+        );
     }
 }
 
@@ -153,7 +156,9 @@ fn vector_field_halves_tank_progress_and_two_fields_stop_it() {
             add_field(&mut runtime, center, [-1.0, 0.0], 2, 100);
         }
         let mut entities = EntityStore::new();
-        let id = entities.spawn_unit(1, EntityKind::Tank, center.0, center.1).unwrap();
+        let id = entities
+            .spawn_unit(1, EntityKind::Tank, center.0, center.1)
+            .unwrap();
         entities.get_mut(id).unwrap().set_facing(0.0);
         mark_moving(&mut entities, id, (center.0 + 300.0, center.1));
         let occ = Occupancy::build(&map, &entities);
@@ -161,13 +166,50 @@ fn vector_field_halves_tank_progress_and_two_fields_stop_it() {
         for tick in 1..=10 {
             let spatial = SpatialIndex::build(&entities, map.width, map.height);
             movement_system_with_context(
-                &map, &mut entities, &players, &occ, &spatial, tick, &smokes, &runtime,
+                &map,
+                &mut entities,
+                &players,
+                &occ,
+                &spatial,
+                tick,
+                &smokes,
+                &runtime,
             );
             let tank = entities.get(id).unwrap();
             let expected = center.0 + tick as f32 * (2.0 - count as f32);
-            assert!((tank.pos_x() - expected).abs() < 0.02,
-                "fields={count} tick={tick}: got {}, expected {expected}", tank.pos_x());
+            assert!(
+                (tank.pos_x() - expected).abs() < 0.02,
+                "fields={count} tick={tick}: got {}, expected {expected}",
+                tank.pos_x()
+            );
             assert!((tank.pos_y() - center.1).abs() < 0.02);
         }
     }
+}
+
+#[test]
+fn vector_field_stack_cannot_push_through_blocked_terrain() {
+    let mut map = flat_map(2);
+    map.unwalkable_tiles.push((11, 10));
+    let center = map.tile_center(10, 10);
+    let mut runtime = AbilityRuntime::new();
+    // Both endpoints are clear, but the displacement crosses a blocked tile.
+    for _ in 0..64 {
+        add_field(&mut runtime, center, [1.0, 0.0], 1, 100);
+    }
+    let players = [player_with_oil(1, 0), player_with_oil(2, 0)];
+    let mut entities = EntityStore::new();
+    let id = entities
+        .spawn_unit(1, EntityKind::Rifleman, center.0, center.1)
+        .unwrap();
+    let occ = Occupancy::build(&map, &entities);
+    assert!(standability::unit_static_standable(
+        &map,
+        &occ,
+        EntityKind::Rifleman,
+        center.0 + 64.0,
+        center.1,
+    ));
+    apply_magic_anchor_pull(&map, &mut entities, &players, &occ, 1, &runtime);
+    assert_eq!(pos(&entities, id), center);
 }
