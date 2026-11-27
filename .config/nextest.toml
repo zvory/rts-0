@@ -16,9 +16,3 @@ path = "junit.xml"
 [[profile.default.overrides]]
 filter = 'binary(=rush_ai) & (test(=rush_classic_keeps_the_engineer_back_and_finishes_the_timed_transitions) | test(=rush_opening_transitions_research_production_and_respects_engineer_standoff))'
 slow-timeout = { period = "60s", terminate-after = 4 }
-
-# Eco's ordinary-income integration covers four expansions, three research steps and a surplus
-# fifth Barracks (up to 18,000 ticks), with debug simulation invariants enabled throughout.
-[[profile.default.overrides]]
-filter = 'binary(=eco_ai) & test(=eco_classic_economy_reaches_four_bases_and_mixed_entrenched_defense)'
-slow-timeout = { period = "60s", terminate-after = 4 }
