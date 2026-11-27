@@ -37,6 +37,7 @@ export const LOBBY_KIND = Object.freeze({
 export const C = Object.freeze({
   JOIN: "join",
   SET_NAME: "setName",
+  SET_PREFERRED_COLOR: "setPreferredColor",
   READY: "ready",
   MATCH_LOAD_READY: "matchLoadReady",
   START: "start",

@@ -10,6 +10,7 @@ const clientSrc = path.join(repoRoot, "client/src");
 const AREA_BY_FILE = new Map(Object.entries({
   "main.js": "app-shell",
   "app.js": "app-shell",
+  "lobby_settings_context.js": "app-shell",
   "beta_badge.js": "app-shell",
   "version_guard.js": "app-shell",
   "birthday_banner_composition.js": "app-shell",
@@ -100,6 +101,8 @@ const AREA_BY_FILE = new Map(Object.entries({
   "prediction_frame.js": "model",
   "sim_wasm_adapter.js": "model",
   "prediction_settings.js": "platform",
+  "preferred_color_settings.js": "platform",
+  "preferred_color_control.js": "ui",
   "unit_range_settings.js": "platform",
   "health_bar_settings.js": "platform",
   "unit_shadow_settings.js": "platform",

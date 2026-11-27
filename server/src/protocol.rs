@@ -1,5 +1,6 @@
 // replayResourceHistory also carries players[] with id, lifetimeSteel/lifetimeOil and absolute steel/oil, aliveSteel/aliveOil, lostSteel/lostOil, unitSteel/unitOil values for up to four players.
 // replayResourceHistory samples carry signed steel/oil trailing-five-second collection totals (client displays totals / 5 per second) and aliveSteel/aliveOil lifetime-minus-loss advantages, lostSteel/lostOil destroyed-value differences, and unitSteel/unitOil current-army-value differences.
+//! Lobby color preferences use the shared SetPreferredColor DTO.
 //! Server-shell adapter for the extracted protocol crate.
 //!
 //! Keeps existing `rts_server::protocol` call sites stable while wire protocol DTOs live in

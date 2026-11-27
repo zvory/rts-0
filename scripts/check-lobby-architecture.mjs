@@ -31,6 +31,7 @@ const roomTaskRootBudget = {
 const roomTaskChildLineBudgets = new Map(Object.entries({
   "room_task/branch.rs": 340,
   "room_task/chat.rs": 220,
+  "room_task/colors.rs": 100,
   "room_task/dev.rs": 470,
   "room_task/ground_decals.rs": 100,
   "room_task/helpers.rs": 140,
@@ -56,7 +57,8 @@ const roomTaskChildLineBudgets = new Map(Object.entries({
 // Compare imported rosters before refreshing Lab viewers; unchanged rosters retain their session.
 // Replay takeover wires frozen snapshot delivery and setup; projection stays in replay_branch.rs.
 // Lobby broadcasts expose one authoritative countdown flag for safe client version recovery.
-const roomTaskTotalLineBudget = 6809;
+// Preferred-color negotiation is isolated in colors.rs; no simulation authority changes.
+const roomTaskTotalLineBudget = 6900;
 
 const lobbyRustFiles = listRustFiles(lobbySrc);
 

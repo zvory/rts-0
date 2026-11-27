@@ -137,3 +137,18 @@ fn unit_targeted_ability_keeps_target_id_without_world_point() {
         }
     ));
 }
+
+#[test]
+fn preferred_color_accepts_palette_value_and_null() {
+    let message: ClientMessage =
+        serde_json::from_str(r##"{"t":"setPreferredColor","color":"#009e73"}"##).unwrap();
+    assert!(
+        matches!(message, ClientMessage::SetPreferredColor { color: Some(color) } if color == "#009e73")
+    );
+    let message: ClientMessage =
+        serde_json::from_str(r#"{"t":"setPreferredColor","color":null}"#).unwrap();
+    assert!(matches!(
+        message,
+        ClientMessage::SetPreferredColor { color: None }
+    ));
+}

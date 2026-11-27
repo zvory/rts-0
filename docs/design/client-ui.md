@@ -1,5 +1,8 @@
 ## 4. JS client — modules & exported APIs
 
+Preferred color appears as the final row of the Game settings tab in lobby and match contexts, with the label and swatch dropdown on one line. Choices are No preference plus the eight server palette colors; arbitrary colors are unsupported. The browser stores the preference and sends `setPreferredColor` after each join or a setting change. Changes during countdown, a match, or its post-match replay apply when the room returns to the lobby or the player joins another lobby. The dropdown supports keyboard navigation and tears down its document listener with the settings panel.
+
+
 `client/` (ES modules, no bundler; `index.html` imports `src/main.js` as a module).
 PixiJS v8.19.0 is pinned to its CDN ESM build and imported only by the Pixi render module worker.
 The worker uses the native async `Application.init({preference:"webgl"})` lifecycle after receiving

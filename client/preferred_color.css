@@ -1,0 +1,46 @@
+.preferred-color-setting {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  min-height: 36px;
+  padding: 0 10px;
+  font: inherit;
+  font-weight: 700;
+}
+.preferred-color-wrap { position: relative; }
+#settings-menu .preferred-color-trigger,
+#settings-menu .preferred-color-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+#settings-menu .preferred-color-trigger {
+  background: var(--void);
+  border-color: var(--panel-edge);
+}
+.preferred-color-swatch {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: var(--radius-sm);
+}
+.preferred-color-auto { background: linear-gradient(135deg, #0072b2 0 50%, #d55e00 50%); }
+.preferred-color-arrow,
+.preferred-color-check { margin-left: auto; color: var(--accent); }
+.preferred-color-options {
+  position: fixed;
+  z-index: 200;
+  max-height: 340px;
+  overflow-y: auto;
+  background: var(--panel);
+  border: 1px solid var(--panel-edge);
+  padding: 4px;
+  box-shadow: var(--shadow);
+}
+#settings-menu .preferred-color-option[aria-selected="true"] {
+  background: rgba(199, 208, 122, 0.14);
+  border-color: rgba(199, 208, 122, 0.4);
+}

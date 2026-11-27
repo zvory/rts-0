@@ -179,6 +179,7 @@ export const msg = Object.freeze({
     return payload;
   },
   setName: (name) => ({ t: C.SET_NAME, name }),
+  setPreferredColor: (color) => ({ t: C.SET_PREFERRED_COLOR, color }),
   ready: (ready) => ({ t: C.READY, ready: !!ready }),
   matchLoadReady: (countdownId) => ({ t: C.MATCH_LOAD_READY, countdownId }),
   start: () => ({ t: C.START }),

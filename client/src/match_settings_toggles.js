@@ -4,6 +4,7 @@ export function configureMatchDisplayPreferences(match, options = {}) {
   if (!match?.state) return;
   match.onUnitRangesEnabledChange = options.onUnitRangesEnabledChange;
   match.onHealthBarsAlwaysEnabledChange = options.onHealthBarsAlwaysEnabledChange;
+  match.preferredColor = options.preferredColor;
   match.onProjectedUnitShadowsEnabledChange = options.onProjectedUnitShadowsEnabledChange;
   match.onUnitRangeToggle = match.toggleUnitRangeOverlays.bind(match);
   match.onHealthBarToggle = () => toggleHealthBars(match);

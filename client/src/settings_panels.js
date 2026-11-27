@@ -1,9 +1,11 @@
 import { initializeMinimapSize, renderMinimapSizeControl } from "./minimap_size_control.js";
 import { renderDefaultZoomControl } from "./default_zoom_control.js";
+import { renderPreferredColorControl } from "./preferred_color_control.js";
 import { renderHotkeyEditor } from "./hotkey_editor.js";
 
 export function buildSettingsTabs({
   audio,
+  preferredColor = null,
   hotkeyProfiles = null,
   game = null,
   debug = null,
@@ -13,7 +15,7 @@ export function buildSettingsTabs({
     {
       id: "game",
       label: "Game",
-      render: (root) => renderGamePanel(root, game),
+      render: (root) => renderGamePanel(root, game, preferredColor),
     },
     {
       id: "hotkeys",
@@ -81,7 +83,7 @@ export function buildPauseAction({ visible, disabled = false, label = "Pause", t
   };
 }
 
-function renderGamePanel(root, game) {
+function renderGamePanel(root, game, preferredColor) {
   root.classList.add("settings-game-panel");
   renderMinimapSizeControl(root);
   renderDefaultZoomControl(root);
@@ -95,6 +97,7 @@ function renderGamePanel(root, game) {
   }
   if (game?.unitRanges) renderUnitRangeControl(root, game.unitRanges);
   if (game?.healthBars) renderHealthBarControl(root, game.healthBars);
+  if (preferredColor) return renderPreferredColorControl(root, preferredColor);
 }
 
 function renderProjectedUnitShadowControl(root, projectedUnitShadows) {

@@ -251,9 +251,14 @@ export class Net {
    */
   join(name, room, spectator = false, replayOk = false) {
     this._send(msg.join(name, room, spectator, replayOk));
+    if (this.preferredColor) this._send(msg.setPreferredColor(this.preferredColor.read()));
   }
 
   /** Update our display name while waiting in the lobby. */
+  setPreferredColor(color) {
+    if (this._playerId != null) this._send(msg.setPreferredColor(color));
+  }
+
   setName(name) {
     this._send(msg.setName(name));
   }

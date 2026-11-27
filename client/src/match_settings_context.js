@@ -3,6 +3,7 @@ import { MOVEMENT_PATH_DIAGNOSTICS } from "./protocol.js";
 
 export function buildMatchSettingsContextForMatch(match) {
   return buildMatchSettingsContext({
+    preferredColor: match.preferredColor,
     replayViewer: match.replayViewer,
     labMetadata: match.labMetadata,
     state: match.state,
@@ -31,6 +32,7 @@ export function buildMatchSettingsContextForMatch(match) {
 }
 
 export function buildMatchSettingsContext({
+  preferredColor = null,
   replayViewer,
   labMetadata,
   state,
@@ -84,6 +86,7 @@ export function buildMatchSettingsContext({
       leaveAction,
     ],
     tabs: buildSettingsTabs({
+      preferredColor,
       audio,
       hotkeyProfiles,
       game: {

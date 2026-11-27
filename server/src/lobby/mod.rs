@@ -95,14 +95,12 @@ pub fn replay_launch_incompatibility_reason(
     replay_session::ReplaySession::validate_artifact_for_launch(artifact, expected_build_sha).err()
 }
 
-/// Player colors, assigned in colorblind-safer order. MUST match `client/src/config.js`
-/// `PLAYER_PALETTE`.
+/// Preferred colors and automatic fallback order; mirrored by client `PLAYER_PALETTE`.
 const PLAYER_PALETTE: [&str; 8] = [
     "#0072b2", "#d55e00", "#009e73", "#cc79a7", "#56b4e9", "#e69f00", "#f0e442", "#7e57c2",
 ];
 
-/// Hard cap on players in a single match (humans + AI). The hardcoded map has four authored
-/// player-start slots, so we never seat more than this.
+/// Cap humans + AI at the map’s four authored player-start slots.
 const MAX_PLAYERS: usize = 4;
 
 /// Bound on a player's reliable outbound message queue. Snapshots do not use this FIFO; each
@@ -411,6 +409,10 @@ pub enum RoomEvent {
     },
     /// A connected human updated their display name while waiting in the lobby.
     SetName { player_id: u32, name: String },
+    SetPreferredColor {
+        player_id: u32,
+        color: Option<String>,
+    },
     /// A player left (socket closed). During a match this eliminates them so it can resolve.
     Leave { player_id: u32 },
     /// A player toggled their lobby ready flag.

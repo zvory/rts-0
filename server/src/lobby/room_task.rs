@@ -22,6 +22,7 @@ use tokio::time::Instant as TokioInstant;
 
 mod branch;
 mod chat;
+mod colors;
 mod dev;
 mod ground_decals;
 pub(super) mod helpers;
@@ -72,6 +73,8 @@ pub(super) struct RoomTask {
     human_team_assignments: HashMap<u32, TeamId>,
     /// Per-human active-seat faction selection. Spectators are omitted.
     human_faction_assignments: HashMap<u32, String>,
+    /// Palette preference and stable random conflict priority, scoped to each connection.
+    color_preferences: HashMap<u32, (Option<String>, u64)>,
     /// Name of the map the host has selected (display name from JSON `name` field).
     selected_map: String,
     /// Current host (first joiner; reassigned to the next in `order` when the host leaves).
@@ -156,6 +159,7 @@ impl RoomTask {
             ai_players: Vec::new(),
             human_team_assignments: HashMap::new(),
             human_faction_assignments: HashMap::new(),
+            color_preferences: HashMap::new(),
             selected_map: "Classic".to_string(),
             host_id: None,
             phase: Phase::Lobby,
@@ -382,6 +386,9 @@ impl RoomTask {
                 ack,
             } => self.on_join(player_id, name, spectator, replay_ok, msg_tx, ack),
             RoomEvent::SetName { player_id, name } => self.on_set_name(player_id, name),
+            RoomEvent::SetPreferredColor { player_id, color } => {
+                self.on_set_preferred_color(player_id, color)
+            }
             RoomEvent::Leave { player_id } => self.on_leave(player_id),
             RoomEvent::Ready { player_id, ready } => self.on_ready(player_id, ready),
             RoomEvent::MatchLoadReady {

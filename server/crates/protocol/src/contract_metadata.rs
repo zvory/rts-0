@@ -644,6 +644,7 @@ pub fn protocol_contract() -> ProtocolContract {
             client: string_map(&[
                 ("JOIN", "join"),
                 ("SET_NAME", "setName"),
+                ("SET_PREFERRED_COLOR", "setPreferredColor"),
                 ("READY", "ready"),
                 ("MATCH_LOAD_READY", "matchLoadReady"),
                 ("START", "start"),

@@ -1,6 +1,7 @@
 mod support;
 
 mod branch;
+mod colors;
 mod dev;
 mod lab;
 mod lab_bulk;
