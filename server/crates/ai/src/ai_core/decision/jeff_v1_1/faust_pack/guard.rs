@@ -1,7 +1,6 @@
 //! `pfdef`: the Panzerfaust pack's base guard (see the parent module docs). Off by default.
 
 use super::*;
-use rts_rules::math::GameplayMath as _;
 
 /// `pfdef`: one charge of the base guard at an enemy Tank.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
