@@ -158,6 +158,9 @@ pub struct AiEntity {
     pub occupied_trench_id: Option<u32>,
     /// Owner-only ability availability. Enemy entities intentionally expose no private state.
     pub abilities: Vec<AiAbilityState>,
+    /// Owner-only: whether an own Panzerfaust still carries its rocket (`None` for every other
+    /// kind and for allies' and enemies' units).
+    pub panzerfaust_loaded: Option<bool>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -343,7 +346,7 @@ impl AiFrame {
             .entities
             .iter()
             .filter(|entity| entity.owner == player_id)
-            .filter_map(|entity| normalize_entity(entity, true, true))
+            .filter_map(|entity| normalize_entity(entity, true, true, true))
             .filter(gameplay_entity)
             .collect::<Vec<_>>();
         owned.sort_by_key(|entity| entity.id);
@@ -353,7 +356,7 @@ impl AiFrame {
             .filter(|entity| entity.owner != NEUTRAL && entity.owner != player_id)
             .filter(|entity| !entity.vision_only)
             .filter(|entity| is_ally(&players, team_id, entity.owner))
-            .filter_map(|entity| normalize_entity(entity, false, true))
+            .filter_map(|entity| normalize_entity(entity, false, true, false))
             .filter(gameplay_entity)
             .collect::<Vec<_>>();
         visible_allies.sort_by_key(|entity| entity.id);
@@ -363,7 +366,7 @@ impl AiFrame {
             .filter(|entity| entity.owner != NEUTRAL && entity.owner != player_id)
             .filter(|entity| !entity.vision_only)
             .filter(|entity| is_enemy(&players, player_id, team_id, entity.owner))
-            .filter_map(|entity| normalize_entity(entity, false, false))
+            .filter_map(|entity| normalize_entity(entity, false, false, false))
             .filter(gameplay_entity)
             .collect::<Vec<_>>();
         visible_enemies.sort_by_key(|entity| entity.id);
@@ -371,7 +374,7 @@ impl AiFrame {
             .entities
             .iter()
             .filter(|entity| entity.owner == NEUTRAL && !entity.vision_only)
-            .filter_map(|entity| normalize_entity(entity, false, false))
+            .filter_map(|entity| normalize_entity(entity, false, false, false))
             .filter(|entity| entity.kind == EntityKind::TankTrap)
             .collect::<Vec<_>>();
         tank_traps.sort_by_key(|entity| entity.id);
@@ -533,6 +536,7 @@ fn normalize_entity(
     view: &EntityView,
     completion_activity_known: bool,
     production_details_known: bool,
+    owned: bool,
 ) -> Option<AiEntity> {
     let kind = view.kind.parse::<EntityKind>().ok()?;
     let state = match view.state.as_str() {
@@ -590,6 +594,7 @@ fn normalize_entity(
                 })
             })
             .collect(),
+        panzerfaust_loaded: view.panzerfaust_loaded.filter(|_| owned),
     })
 }
 

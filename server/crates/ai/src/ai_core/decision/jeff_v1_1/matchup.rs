@@ -29,7 +29,7 @@ mod live;
 
 use kinds::{armored, avoids, fights, fires_moving, infantry, steers, vehicle};
 pub(crate) use kinds::{cost, dps, reach};
-pub(in crate::ai_core::decision) use live::finish;
+pub(in crate::ai_core::decision) use live::{finish, strip};
 
 const TICK_HZ: f32 = 30.0;
 /// A Tank's cannon reach while moving, and after standing still for `TANK_RAMP_TICKS`.

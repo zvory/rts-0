@@ -42,6 +42,7 @@ fn jeffs_ai_v1_1_sends_defenders_home_once_their_fight_is_quiet() {
         visible_allies: Vec::new(),
         visible_enemies: vec![rifleman(90, 480.0, 2)],
         ability_states: Vec::new(),
+        spent_panzerfausts: Vec::new(),
         smokes: Vec::new(),
         visible_tank_traps: Vec::new(),
         pending_builds: Vec::new(),

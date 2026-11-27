@@ -421,6 +421,24 @@ pub(in crate::ai_core::decision) fn remembered_tanks(memory: &AiDecisionMemory) 
         .count()
 }
 
+/// Where enemy Tanks were last seen, by id, for those seen within `max_age` ticks.
+pub(in crate::ai_core::decision) fn recent_tank_spots(
+    memory: &AiDecisionMemory,
+    tick: u32,
+    max_age: u32,
+) -> Vec<(u32, (f32, f32))> {
+    memory
+        .jeff_v1_1
+        .push
+        .enemies
+        .iter()
+        .filter(|(_, sighting)| {
+            sighting.kind == EntityKind::Tank && tick.saturating_sub(sighting.tick) <= max_age
+        })
+        .map(|(id, sighting)| (*id, point(sighting.at)))
+        .collect()
+}
+
 /// Remembered enemy strength within `radius_tiles` of `at`, each fighter fading with age.
 fn threat_at(
     observation: &AiObservation,

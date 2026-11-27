@@ -51,6 +51,7 @@ fn test_observation(owned: Vec<AiEntitySummary>, tick: u32) -> AiObservation {
         visible_allies: Vec::new(),
         visible_enemies: Vec::new(),
         ability_states: Vec::new(),
+        spent_panzerfausts: Vec::new(),
         smokes: Vec::new(),
         visible_tank_traps: Vec::new(),
         pending_builds: Vec::new(),

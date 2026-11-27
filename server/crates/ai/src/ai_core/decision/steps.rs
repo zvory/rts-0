@@ -637,6 +637,10 @@ pub(super) fn finish_trace(
         &mut memory.jeff_v1_1.matchup,
         &reserved,
     );
+    // Jeff's AI V1.1's home Tank duel (`hduel`) takes its responders over.
+    jeff_v1_1::home_duel::finish(decision, observation, memory);
+    // Jeff's AI V1.1's Panzerfaust pack (`pfpack`) owns its Panzerfausts, over every other order.
+    jeff_v1_1::faust_pack::finish(decision, observation, memory);
     if memory.profile_id().is_some_and(is_jeff_v1_1) {
         // Which system holds each Tank, for the decision trace: two short lines, under the
         // trace's line cap.

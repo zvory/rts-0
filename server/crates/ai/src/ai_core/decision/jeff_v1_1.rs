@@ -9,8 +9,10 @@ pub(super) mod base_line;
 pub(super) mod breakout;
 pub(super) mod charge;
 pub(super) mod deny;
+pub(super) mod faust_pack;
 pub(super) mod field_gate;
 pub(super) mod front_line;
+pub(super) mod home_duel;
 pub(super) mod home_guard;
 pub(super) mod hunt;
 pub(crate) mod matchup;
@@ -72,6 +74,8 @@ pub(super) struct V1_1Memory {
     pub(super) field_gate: field_gate::FieldGateMemory,
     pub(super) matchup: matchup::MatchupMemory,
     pub(super) paid_pump: paid_pump::PaidPumpMemory,
+    pub(super) faust_pack: faust_pack::FaustPackMemory,
+    pub(super) home_duel: home_duel::HomeDuelMemory,
     /// Enemy fighters seen dying and Jeff's fighters lost so far (`AiDecisionMemory::note_losses`).
     pub(super) kills: u32,
     pub(super) deaths: u32,
@@ -83,6 +87,23 @@ pub(super) struct V1_1Memory {
     pub(super) car_ordered: bool,
 }
 
+/// V1.1's research this decision: `early_research`, then the Panzerfaust pack's (`pfpack`).
+pub(super) fn research_all(
+    (actions, facts, memory, intents): (
+        &mut AiActionContext<'_>,
+        &AiFacts,
+        &mut AiDecisionMemory,
+        &mut Vec<AiIntent>,
+    ),
+    profile_id: &str,
+    plan: Option<&spend_plan::SpendPlan>,
+    observation: &AiObservation,
+) {
+    let live = (&mut *actions, facts, &mut *memory, &mut *intents);
+    early_research(live, profile_id, plan, observation);
+    faust_pack::research((actions, facts, memory, intents), observation, profile_id);
+}
+
 /// Methamphetamines comes first. It is ordered the moment the Training Centre is free and its cost
 /// is in the bank, ahead of the Engineering Complex and every other Oil purchase, and until then this
 /// decision's budget holds that cost back. Meth Riflemen fire twice as fast, move a quarter faster and
@@ -91,7 +112,7 @@ pub(super) struct V1_1Memory {
 ///
 /// Entrenchment costs no Oil, so it takes the Training Centre first only while its research ends
 /// before Meth's Oil is in: it then costs Meth nothing. Otherwise it follows right after Meth.
-pub(super) fn early_research(
+fn early_research(
     (actions, facts, memory, intents): (
         &mut AiActionContext<'_>,
         &AiFacts,
@@ -1116,16 +1137,17 @@ pub(super) fn rifle_line(
     Some(line)
 }
 
-/// The Panzerfausts V1.1 keeps: none.
+/// The Panzerfausts V1.1 keeps: none, but for the `pfpack` pack (`faust_pack::target`).
 pub(super) fn faust_target(
-    _profile_id: &str,
-    _facts: &AiFacts,
-    _memory: &AiDecisionMemory,
+    profile_id: &str,
+    facts: &AiFacts,
+    memory: &AiDecisionMemory,
     _banked: bool,
 ) -> usize {
-    // No Panzerfausts: the owner's call is Riflemen and guns to kill the enemy's Panzerfausts, and
-    // Tanks to trade with its Tanks. With 16-32 a game, V1.1 fielded 7-15 Tanks and did worse.
-    0
+    // No Panzerfausts on the base lines: the owner's call is Riflemen and guns to kill the enemy's
+    // Panzerfausts, and Tanks to trade with its Tanks. With 16-32 a game, 2 to each outer base,
+    // V1.1 fielded 7-15 Tanks and did worse.
+    faust_pack::target(profile_id, facts, memory)
 }
 
 /// V1.1 trains Machine Gunners for every gun post it has: the home pocket's, four in front of each

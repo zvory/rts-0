@@ -69,6 +69,7 @@ fn home_observation(
             .map(|(id, kind, t)| at(*id, 2, *kind, *t))
             .collect(),
         ability_states: Vec::new(),
+        spent_panzerfausts: Vec::new(),
         smokes: Vec::new(),
         visible_tank_traps: Vec::new(),
         pending_builds: Vec::new(),

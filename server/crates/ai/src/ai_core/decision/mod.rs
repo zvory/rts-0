@@ -494,7 +494,7 @@ where
     }
     jeff_v1_1::push::note_enemy_army(observation, memory);
     let live = (&mut actions, &facts, &mut *memory, &mut intents);
-    jeff_v1_1::early_research(live, profile.id, spend_plan.as_ref(), observation);
+    jeff_v1_1::research_all(live, profile.id, spend_plan.as_ref(), observation);
     // Jeff's bases beyond the natural. A second Factory that is due takes priority this decision.
     let factory_due = uses_current_jeffs_ai_policy(profile.id)
         && should_build_extra_factory(
@@ -885,6 +885,8 @@ where
         &intents,
         &mut production_max_counts,
     );
+    let pf = (&actions, &facts, &*memory);
+    jeff_v1_1::faust_pack::cap(pf, profile.id, fausts, &mut production_max_counts);
     // Jeff's AI V1.1 (`nomg`) trains two Riflemen for every gun, before the counts are taken so the
     // Riflemen are counted.
     let rifle_guns = jeff_v1_1::guns_to_riflemen(

@@ -5,5 +5,6 @@ pub mod balance_matrix;
 pub mod engage_lab;
 pub mod map_analysis_debug;
 pub mod matchup;
+pub mod pf_lab;
 pub mod skirmish;
 pub mod tank_lab;

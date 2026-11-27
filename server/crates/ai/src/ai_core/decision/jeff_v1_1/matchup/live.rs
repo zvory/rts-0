@@ -38,7 +38,7 @@ fn units_of(command: &Command) -> &[u32] {
 
 /// Takes `held` out of a movement or attack order; abilities (smoke) and economy orders stay.
 /// Returns false when the order no longer orders anyone.
-fn strip(command: &mut Command, held: &BTreeSet<u32>) -> bool {
+pub(in crate::ai_core::decision) fn strip(command: &mut Command, held: &BTreeSet<u32>) -> bool {
     match command {
         Command::FormationMove { units, points, .. } => {
             let pairs: Vec<(u32, (f32, f32))> = units
