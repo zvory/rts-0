@@ -9,15 +9,17 @@ Rank is captured when placed; later rank changes do not resize an existing field
 direction are projected only with a visible field, so enemies and allies render identical geometry
 without needing visibility of its caster. It lasts ten seconds and casts up to 7.5 tiles away.
 
-Every allied or hostile ground unit inside receives an additive 3-world-pixel-per-tick displacement
-(90 px/s at 30 Hz), independent of footing. Static terrain and enemy-body admission remain.
+Every allied or hostile ground unit inside receives an additive 1-world-pixel-per-tick displacement
+(30 px/s at 30 Hz), independent of footing. Static terrain and enemy-body admission remain.
 Normal commanded movement continues. Displacement does not rotate bodies. Overlapping fields
-select the first active field rather than stacking. Placement is immediate and preserves the caster's active order and queued orders. A successful
-cast starts a 30-second cooldown for Magic Adepts or a 20-second cooldown for Magic Masters.
+sum their directional vectors without normalization: matching directions stack, opposite directions
+cancel, and perpendicular directions combine diagonally. An unupgraded Tank on normal ground moves
+at 2 px/tick, so one opposing field halves its progress and two cancel its movement. Placement is
+immediate and preserves the caster's active order and queued orders. A successful cast starts a 30-second cooldown for Magic Adepts or a 20-second cooldown for Magic Masters.
 Promotion preserves a cooldown already in progress.
 
 Preview and placed field share a green arrow, square outline, and green particles. Particles move
-at 90 world pixels per second in field direction, using the renderer clock so fixed captures and
+at 30 world pixels per second in field direction, using the renderer clock so fixed captures and
 pause behavior follow the existing presentation timing. They fade at the entry/exit edges.
 
 The server validates finite center/direction, normalizes a nonzero vector, deduplicates/caps unit

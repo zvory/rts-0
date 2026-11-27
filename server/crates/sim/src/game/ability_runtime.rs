@@ -399,7 +399,7 @@ impl AbilityRuntime {
     pub(crate) fn vector_field_at(&self, x: f32, y: f32, tick: u32) -> Option<[f32; 2]> {
         self.world_objects()
             .filter(|o| o.active_at(tick))
-            .find_map(|o| {
+            .filter_map(|o| {
                 let AbilityObjectPayload::VectorField {
                     direction: [dx, dy],
                     size_tiles,
@@ -413,6 +413,7 @@ impl AbilityRuntime {
                 let half = size_tiles * 0.5 * crate::config::TILE_SIZE as f32;
                 (along.abs() <= half && across.abs() <= half).then_some([dx, dy])
             })
+            .reduce(|[ax, ay], [bx, by]| [ax + bx, ay + by])
     }
 
     pub(crate) fn clear_vector_fields(&mut self, owner: u32, caster: u32) {
