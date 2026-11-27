@@ -117,6 +117,12 @@ pub(super) fn score(planner: &mut DefensePlanner, frame: &AiFrame, budget: usize
         };
     };
     let assets = assets(g, frame, &planner.owned);
+    // Keep fields only for current economic assets; a long match with repeatedly relocated
+    // production cannot accumulate one full-map distance buffer per historical placement.
+    let current_points: BTreeSet<_> = assets.iter().map(|a| a.point).collect();
+    planner
+        .time_fields
+        .retain(|point, _| current_points.contains(point));
     let blocked = occupied(g, frame);
     // Dynamic reachability includes known occupied footprints. Start outside each owned Depot's
     // footprint, never flood through the building center. Reservations ignore transient unit bodies.
@@ -160,6 +166,13 @@ pub(super) fn score(planner: &mut DefensePlanner, frame: &AiFrame, budget: usize
             .max(0.)
             - 0.2
     });
+    // Representative infantry approach speed derives from the same authoritative MG stats.
+    // Road/slow terrain is already included in the integer time-equivalent distance field.
+    let approach_speed = rts_rules::balance::unit_stats(EntityKind::MachineGunner)
+        .map_or(1.0, |s| {
+            s.speed * rts_rules::balance::TICK_HZ as f32 / g.size
+        })
+        .max(0.01);
     let mut candidates = vec![];
     let mut sectors = vec![];
     let mut weights = vec![];
@@ -180,7 +193,7 @@ pub(super) fn score(planner: &mut DefensePlanner, frame: &AiFrame, budget: usize
             .map(|i| planner.enemy[*i])
             .min()
             .filter(|d| *d < FAR)
-            .map(|d| d as f32 / 120. / 1.2);
+            .map(|d| d as f32 / 120. / approach_speed);
         candidates.push(slots);
         sectors.push(DefenseSector {
             id,

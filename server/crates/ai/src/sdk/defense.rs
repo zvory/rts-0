@@ -48,12 +48,18 @@ pub struct DefenseSector {
     pub asset_value: f32,
     /// Normalized economic-urgency weight (including unsupported sectors).
     pub priority: f32,
+    /// Fastest public enemy-start ground approach, at the authoritative MG's base speed.
+    /// Roads/slow terrain count; current enemy positions, upgrades and smoke do not.
     pub enemy_approach_seconds: Option<f32>,
+    /// Economic diagnostics are fractional conserved asset shares, not literal counts.
     pub known_remaining_steel: f32,
+    /// Steel nodes whose remaining quantity is unknown; no estimated stock enters the field above.
     pub unknown_resource_count: f32,
     pub active_mine_share: f32,
     pub production_share: f32,
     pub tech_share: f32,
+    /// At least one reachable, known-unoccupied, entrenchable firing position exists. Does not
+    /// certify that every cut tile is covered, a particular unit can get there, or smoke is clear.
     pub supported: bool,
     pub slots: Vec<DefenseSlot>,
 }
@@ -71,6 +77,14 @@ struct SectorGeometry {
     points: Vec<usize>,
     center: usize,
 }
+#[derive(PartialEq)]
+struct AssetSignature {
+    id: u32,
+    kind: EntityKind,
+    position: (i32, i32),
+    active: bool,
+    complete: bool,
+}
 #[derive(Default)]
 pub struct DefensePlanner {
     firing_range_tiles: Option<f32>,
@@ -85,10 +99,11 @@ pub struct DefensePlanner {
     owned: Vec<AiBaseSiteId>,
     geometry_capacity: usize,
     enemy: Vec<u32>,
+    enemy_sources: Vec<usize>,
     last_plan: Option<DefensePlan>,
     last_tick: u32,
     last_budget: usize,
-    last_assets: Vec<(u32, EntityKind, (i32, i32), bool)>,
+    last_assets: Vec<AssetSignature>,
     /// Number of max-flow computations; useful for profiling cache behavior.
     pub geometry_builds: u64,
 }
@@ -97,7 +112,7 @@ impl DefensePlanner {
         Self::default()
     }
     /// Restrict placements to a caller's conservative firing range (tiles), e.g. the shortest
-    /// range in a mixed infantry group. Invalid values use the authoritative MG range minus0.2.
+    /// range in a mixed infantry group. Invalid values use the authoritative MG range minus 0.2.
     pub fn with_firing_range_tiles(range: f32) -> Self {
         Self {
             firing_range_tiles: range
@@ -111,6 +126,10 @@ impl DefensePlanner {
     /// are ignored. Static topology/flows survive budget changes; geometry selection depends on
     /// budget, economic weights refresh every 90 simulation ticks, and known building changes
     /// invalidate slot legality immediately. Current units do not obstruct reserved slots.
+    /// Slots are reachable from the union of owned base perimeters, not from each individual
+    /// caller unit. The caller owns assignment, movement recovery and transient combat decisions.
+    /// Static full-map distance buffers are kept per base/current economic asset, and asset fields
+    /// are evicted on destruction/relocation. Map replacement resets every cache.
     pub fn plan(
         &mut self,
         frame: &AiFrame,
@@ -132,14 +151,6 @@ impl DefensePlanner {
                     b.position.1.to_bits() as u64,
                 ]
             })
-            .chain(frame.players().iter().flat_map(|p| {
-                [
-                    p.id as u64,
-                    p.team_id as u64,
-                    p.start_tile.0 as u64,
-                    p.start_tile.1 as u64,
-                ]
-            }))
             .chain(frame.resources().iter().flat_map(|r| {
                 [
                     r.id as u64,
@@ -159,22 +170,30 @@ impl DefensePlanner {
             self.map = Some(frame.map().clone());
             self.player = frame.player_id();
             self.grid = Some(Grid::new(frame.map()));
-            if let Some(g) = &self.grid {
-                let sources = frame
-                    .players()
-                    .iter()
-                    .filter(|p| {
-                        p.id != frame.player_id()
-                            && (p.team_id == 0 || p.team_id != frame.team_id())
-                    })
-                    .filter_map(|p| {
-                        g.near((
-                            (p.start_tile.0 as f32 + 0.5) * g.size,
-                            (p.start_tile.1 as f32 + 0.5) * g.size,
-                        ))
-                    })
-                    .collect::<Vec<_>>();
+        }
+        // Public living-player/team/start changes affect threat approach, not static cuts.
+        if let Some(g) = &self.grid {
+            let mut sources = frame
+                .players()
+                .iter()
+                .filter(|p| {
+                    p.is_alive
+                        && p.id != frame.player_id()
+                        && (p.team_id == 0 || p.team_id != frame.team_id())
+                })
+                .filter_map(|p| {
+                    g.near((
+                        (p.start_tile.0 as f32 + 0.5) * g.size,
+                        (p.start_tile.1 as f32 + 0.5) * g.size,
+                    ))
+                })
+                .collect::<Vec<_>>();
+            sources.sort_unstable();
+            sources.dedup();
+            if self.enemy.is_empty() || sources != self.enemy_sources {
                 self.enemy = g.field(&sources, true);
+                self.enemy_sources = sources;
+                self.last_plan = None;
             }
         }
         let query = WorldQueries::new(frame);
@@ -212,13 +231,12 @@ impl DefensePlanner {
                     .filter(|e| e.kind.is_building()),
             )
             .chain(frame.tank_traps())
-            .map(|e| {
-                (
-                    e.id,
-                    e.kind,
-                    ((e.position.0 * 16.) as i32, (e.position.1 * 16.) as i32),
-                    e.extractor_active.unwrap_or(false),
-                )
+            .map(|e| AssetSignature {
+                id: e.id,
+                kind: e.kind,
+                position: ((e.position.0 * 16.) as i32, (e.position.1 * 16.) as i32),
+                active: e.extractor_active.unwrap_or(false),
+                complete: e.completion == AiCompletion::Complete,
             })
             .collect::<Vec<_>>();
         if owned == self.owned

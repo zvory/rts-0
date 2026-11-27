@@ -29,22 +29,48 @@ impl Flow {
             cap: 0,
         });
     }
-    fn push(&mut self, i: usize, t: usize, amount: u32, level: &[i32], next: &mut [usize]) -> u32 {
-        if i == t {
-            return amount;
-        }
-        while next[i] < self.edges[i].len() {
-            let k = next[i];
-            let e = self.edges[i][k].clone();
-            if e.cap > 0 && level[e.to] == level[i] + 1 {
-                let sent = self.push(e.to, t, amount.min(e.cap), level, next);
-                if sent > 0 {
-                    self.edges[i][k].cap -= sent;
-                    self.edges[e.to][e.rev].cap += sent;
-                    return sent;
+    fn push(
+        &mut self,
+        source: usize,
+        target: usize,
+        amount: u32,
+        level: &[i32],
+        next: &mut [usize],
+    ) -> u32 {
+        // Explicit path stack: user-authored corridors cannot overflow the simulation stack.
+        let mut nodes = vec![source];
+        let mut path: Vec<(usize, usize)> = vec![];
+        let mut available = vec![amount];
+        while let Some(&i) = nodes.last() {
+            if i == target {
+                let sent = available.last().copied().unwrap_or(0);
+                for &(from, edge) in &path {
+                    let to = self.edges[from][edge].to;
+                    let rev = self.edges[from][edge].rev;
+                    self.edges[from][edge].cap -= sent;
+                    self.edges[to][rev].cap += sent;
                 }
+                return sent;
             }
-            next[i] += 1;
+            while next[i] < self.edges[i].len() {
+                let e = &self.edges[i][next[i]];
+                if e.cap > 0 && level[e.to] == level[i] + 1 {
+                    break;
+                }
+                next[i] += 1;
+            }
+            if next[i] == self.edges[i].len() {
+                nodes.pop();
+                available.pop();
+                if let Some((parent, _)) = path.pop() {
+                    next[parent] += 1;
+                }
+            } else {
+                let e = &self.edges[i][next[i]];
+                available.push(available.last().copied().unwrap_or(0).min(e.cap));
+                path.push((i, next[i]));
+                nodes.push(e.to);
+            }
         }
         0
     }
