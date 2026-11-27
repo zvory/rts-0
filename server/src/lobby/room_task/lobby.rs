@@ -172,6 +172,7 @@ impl RoomTask {
         self.order.retain(|&id| id != player_id);
         self.human_team_assignments.remove(&player_id);
         self.human_faction_assignments.remove(&player_id);
+        self.color_preferences.remove(&player_id);
         self.pending_recipient_notices.remove(&player_id);
         self.recent_chat_times.remove(&player_id);
         self.observer_views.remove(&player_id);
@@ -861,6 +862,7 @@ impl RoomTask {
 
     /// Build and broadcast the current `lobby` message to everyone in the room.
     pub(super) fn broadcast_lobby(&mut self) {
+        self.resolve_preferred_colors();
         let host_id = self.host_id.unwrap_or(0);
         let kind = self.lobby_kind();
         // Humans first (in join order), then AI opponents. AIs always read as ready.

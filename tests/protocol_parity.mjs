@@ -885,3 +885,6 @@ const chargeSnapshot = decodeServerMessage({ t: "snapshot", v: COMPACT_SNAPSHOT_
   s: [1, 0, 0, 2, 300], e: [chargeRecord], ev: [], n: [0, 0, 0, 0, 0] });
 assert(chargeSnapshot.entities[0].chargeActive === true, "active Charge decodes at slot 55");
 assert(daoMasterSnapshot.entities[0].chargeActive === undefined, "absent Charge stays absent");
+
+assert(JSON.stringify(msg.setPreferredColor("#009e73")) === JSON.stringify({ t: "setPreferredColor", color: "#009e73" }), "preferred-color builder preserves palette value");
+assert(msg.setPreferredColor(null).color === null, "preferred-color builder supports no preference");

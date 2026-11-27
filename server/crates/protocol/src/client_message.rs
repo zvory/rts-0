@@ -22,6 +22,8 @@ pub enum ClientMessage {
     },
     /// Update this connection's display name while it is still in a lobby.
     SetName { name: String },
+    /// Select a palette color, or null for automatic assignment, for the next lobby assignment.
+    SetPreferredColor { color: Option<String> },
     /// Toggle ready state in the lobby.
     Ready { ready: bool },
     /// Confirm that this client's renderer finished warming for the active countdown.

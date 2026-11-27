@@ -1265,6 +1265,14 @@ async fn handle_client_message(
             )
             .await;
         }
+        ClientMessage::SetPreferredColor { color } => {
+            send_room_event(
+                player_id,
+                current_room,
+                RoomEvent::SetPreferredColor { player_id, color },
+            )
+            .await;
+        }
         ClientMessage::Start => {
             send_room_event(
                 player_id,

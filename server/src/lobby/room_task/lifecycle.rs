@@ -449,6 +449,7 @@ impl RoomTask {
         self.ai_players.clear();
         self.human_team_assignments.clear();
         self.human_faction_assignments.clear();
+        self.color_preferences.clear();
         self.dev_driver = None;
         self.dev_view_player_id = None;
         self.lab_driver = None;

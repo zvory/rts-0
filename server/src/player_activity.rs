@@ -8,6 +8,7 @@ pub(crate) fn is_player_activity(message: &ClientMessage) -> bool {
         | ClientMessage::RequestGroundDecals { .. } => false,
         ClientMessage::Join { .. }
         | ClientMessage::SetName { .. }
+        | ClientMessage::SetPreferredColor { .. }
         | ClientMessage::Ready { .. }
         | ClientMessage::Start
         | ClientMessage::SetTeamPreset { .. }

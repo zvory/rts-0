@@ -73,8 +73,9 @@ import { createDefaultControlPolicy, createLabControlPolicy } from "./lab_contro
 import { LabPanel } from "./lab_panel.js";
 import { MapEditorSession, authoredMapFromMaterialized } from "./map_editor_session.js";
 import { createMapHandoff, consumeMapHandoff } from "./map_editor_handoff.js";
+import { createPreferredColorSettings } from "./preferred_color_settings.js";
 import { SettingsContainer } from "./settings_container.js";
-import { buildSettingsTabs } from "./settings_panels.js";
+import { mountLobbySettings } from "./lobby_settings_context.js";
 import { resolveVisualProfileLaunch } from "./visual_profiles.js";
 import { InteractBridge, interactLaunchEnabled } from "./interact_bridge.js";
 import {
@@ -152,6 +153,8 @@ export class App {
   } = {}) {
     /** @type {Net} connection opened on demand and retained across an active room + match. */
     this.net = net || new Net(wsUrl(), diagnostics);
+    this.preferredColor = createPreferredColorSettings((color) => this.net.setPreferredColor(color));
+    this.net.preferredColor = this.preferredColor;
     dom.connectionLostClose?.addEventListener("click", () => {
       dom.connectionLost.hidden = true;
     });
@@ -865,6 +868,7 @@ export class App {
         initialCamera: carriedCamera,
         hotkeyProfiles: this.hotkeyProfiles,
         settings: this.settings,
+        preferredColor: this.preferredColor,
         onBackToLobby: this.onBackToLobby,
         predictionEnabled: this.predictionEnabled,
         unitRangesEnabled: this.unitRangesEnabled,
@@ -1206,56 +1210,7 @@ export class App {
   }
 
   mountLobbySettings() {
-    this.settings?.setContext({
-      kind: "lobby",
-      spectator: false,
-      replay: false,
-      tabs: buildSettingsTabs({
-        audio: this.audio,
-        hotkeyProfiles: this.hotkeyProfiles,
-        game: {
-          prediction: {
-            state: () => ({
-              enabled: this.predictionEnabled,
-              active: false,
-              available: true,
-            }),
-            onToggle: () => this.setPredictionEnabled(!this.predictionEnabled),
-          },
-          unitRanges: {
-            state: () => ({
-              enabled: this.unitRangesEnabled,
-              available: true,
-            }),
-            onToggle: () => this.setUnitRangesEnabled(!this.unitRangesEnabled),
-          },
-          projectedUnitShadows: {
-            state: () => ({
-              enabled: this.projectedUnitShadowsEnabled,
-              available: true,
-            }),
-            onToggle: () =>
-              this.setProjectedUnitShadowsEnabled(!this.projectedUnitShadowsEnabled),
-          },
-          healthBars: {
-            state: () => ({
-              enabled: this.healthBarsAlwaysEnabled,
-              available: true,
-            }),
-            onToggle: () => this.setHealthBarsAlwaysEnabled(!this.healthBarsAlwaysEnabled),
-          },
-          exclusiveFullscreen: {
-            state: () => ({
-              hidden: !exclusiveFullscreenSupported(),
-              supported: exclusiveFullscreenSupported(),
-              enabled: this.exclusiveFullscreenEnabled,
-            }),
-            onToggle: () =>
-              this.setExclusiveFullscreenEnabled(!this.exclusiveFullscreenEnabled),
-          },
-        },
-      }),
-    });
+    mountLobbySettings(this);
   }
 
   setPredictionEnabled(enabled) {
