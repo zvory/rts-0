@@ -104,14 +104,17 @@ sectors and garrisons report economic value, relative staffing priority, estimat
 approach time, and suggested firing slots. It favors shorter enemy approaches and valuable
 mining/production; frontage length does not multiply staffing weight. Economic value is shared
 across alternative entrances so a producer or mine is not counted repeatedly at full value.
-Known remaining steel limits mine value. Unknown stock remains unknown, rather than becoming
-invented resource knowledge. Enemy approach uses public enemy starts and static terrain, not
-hidden enemy army positions.
+Known remaining steel limits mine value. Unknown stock remains unknown; it contributes only a
+discounted potential estimate to the score. `known_remaining_steel` excludes unknown quantities,
+and `unknown_resource_count` reports their attributed share separately. Enemy approach uses public
+enemy starts and static terrain, not hidden enemy army positions.
 
 The planner caches terrain and cut geometry. Keep its instance alive to reuse that work. It emits
 no commands, chooses no build order, and does not reserve units in `AiActions`. The caller owns
 base selection, unit-to-slot assignment, tactical reactions, and cross-tick order suppression.
-Check `unallocated_budget` when insufficient usable slots exist; an unsupported cut must not be
+Use `DefensePlanner::with_firing_range_tiles(range)` for a force with a shorter firing range than
+the default Machine Gunner assumption. Eco uses 4.8 tiles for its mixed infantry. Check
+`unallocated_budget` when insufficient usable slots exist; an unsupported cut must not be
 interpreted as staffed. Slots are terrain-based recommendations using known occupancy, not
 authoritative pathing, command acceptance, continuous frontage coverage, or a combat guarantee.
 
