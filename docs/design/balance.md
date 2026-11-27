@@ -844,7 +844,7 @@ baseline; runtime pricing applies ½×, 1×, or 2× to costs and duration. Compl
 researches and paid active Dao researches across all owned pavilions reserve tiers.
 Unpaid entries select their tier when payment starts; a paid entry keeps its duration
 and refund value even if another research is cancelled or its pavilion destroyed.
-Each unlocks its corresponding 150-steel / 35-oil Adept production at Portals. Existing research queue, cancellation,
+Each unlocks its corresponding 150-steel / 60-oil Adept production at Portals. Existing research queue, cancellation,
 refund, completion, and destruction rules apply; completed research persists.
 See [Cultivators](cultivators.md#three-dao-pavilion-prototype) for the approved brief.
 
@@ -891,7 +891,7 @@ entry movement to newly trained base Disciples. Busy grounds retain waiting entr
 ### Portal Adept production
 
 A completed Cultivator Portal trains Novices and, after matching Pavilion research,
-Wind, War and Magic Adepts. Each Adept costs **150 steel, 45 oil, three supply**
+Wind, War and Magic Adepts. Each Adept costs **150 steel, 60 oil, three supply**
 and takes **300 ticks (ten seconds)**, without a Novice input. Use normal train/repeat
 commands, queue payment/refunds, legal spawn exits and rally behavior. An unresearched
 Dao cannot be trained. Combat-earned evolution and Tournament Grounds are unchanged.
