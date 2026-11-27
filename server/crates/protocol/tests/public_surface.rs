@@ -193,11 +193,16 @@ fn stable_rust_public_surface_compiles() {
     assert_eq!(upgrades::SMOKE_PLUS, "smoke_plus");
     assert_eq!(upgrades::SCOUT_PLANE_UNLOCK, "scout_plane_unlock");
     assert_eq!(upgrades::ROCKETS, "rockets");
+    assert_eq!(kinds::TECHNIQUE_LIBRARY, "technique_library");
+    assert_eq!(upgrades::TECHNIQUE_CHARGE, "technique_charge");
+    assert_eq!(upgrades::TECHNIQUE_BLINK, "technique_blink");
+    assert_eq!(upgrades::TECHNIQUE_SHIELD, "technique_shield");
+    assert_eq!(upgrades::TECHNIQUE_THROW_SWORD, "technique_throw_sword");
 
     assert_eq!(PREDICTION_PROTOCOL_VERSION, 1);
     assert_eq!(DEFAULT_FACTION_ID, "kriegsia");
     assert_eq!(GAME_CHECKPOINT_CURRENT_VERSION, 2);
-    assert_eq!(COMPACT_SNAPSHOT_VERSION, 77);
+    assert_eq!(COMPACT_SNAPSHOT_VERSION, 78);
     assert_eq!(abilities::REGEN, "regen");
     assert_eq!(SNAPSHOT_CODEC_VERSION, 1);
     assert_eq!(COMPACT_UNKNOWN_CODE, 255);
