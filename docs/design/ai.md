@@ -199,8 +199,8 @@ expansions; other built-in profiles retain their existing placement policies.
 
 `sdk::DefensePlanner` is a reusable, command-free implementation of the B defensive hybrid.
 Strategies supply their frame, chosen base-site IDs, and defender budget. The result contains cut
-and garrison sectors, protected economic value, relative priority, estimated enemy ground
-approach time, and usable world-pixel slots with sector IDs. Static terrain/cut work is cached;
+and garrison sectors, protected economic value, relative priority, estimated ground approach time
+from public enemy starting positions, and usable world-pixel slots with sector IDs. Static terrain/cut work is cached;
 the caller retains the planner between decisions. The planner does not choose expansion timing,
 assign entity IDs, issue orders, or take tactical ownership from its caller.
 
