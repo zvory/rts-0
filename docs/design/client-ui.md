@@ -2848,6 +2848,15 @@ presentation, ownership, capture, backend, parity-gate, and benchmark contracts 
   `panzerfaustLoaded` flips false at launch—then normal live frame-strip routing resumes for the same
   entity id. These swaps remain local to that lab session; server state, selection, fog, HP bars,
   and the native shadow route remain unchanged.
+- The opt-in `rifleman-directional-prototype` Lab profile uses sixteen low-detail oblique
+  Rifleman views. Directional frame strips choose the nearest heading from `facing` while
+  moving and `weaponFacing` while stationary; `directional.firstFacing` identifies frame zero.
+  Their containers stay unrotated, and optional `anchorX`/`anchorY` register the sprite's ground
+  contact instead of the outline's center. This profile has no walk or fire cycle: the normal
+  server movement translates the registered sprite. Default match art is unchanged. The atlas,
+  deterministic registration script, and provenance live under
+  `client/assets/rigs/rifleman-directional-prototype/` and
+  `scripts/build-rifleman-directional-prototype.mjs`.
 - Fog: unexplored = 80% dark overlay so terrain remains faintly readable; explored-but-not-visible =
   48% dark overlay; visible = clear. Use a single overlay sprite/graphics updated from `fog`
   grids; soften edges if cheap.

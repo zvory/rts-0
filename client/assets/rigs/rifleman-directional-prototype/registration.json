@@ -1,0 +1,218 @@
+{
+  "frameSize": 128,
+  "anchor": {
+    "x": 64,
+    "y": 112
+  },
+  "scale": 0.3333333333333333,
+  "registrations": [
+    {
+      "frame": 0,
+      "sourceCell": {
+        "x": 0,
+        "y": 0,
+        "width": 311,
+        "height": 316
+      },
+      "footX": 196.00512295081967,
+      "footY": 289,
+      "offsetX": -1,
+      "offsetY": 16
+    },
+    {
+      "frame": 1,
+      "sourceCell": {
+        "x": 311,
+        "y": 0,
+        "width": 312,
+        "height": 316
+      },
+      "footX": 170.97873485868104,
+      "footY": 284,
+      "offsetX": 7,
+      "offsetY": 17
+    },
+    {
+      "frame": 2,
+      "sourceCell": {
+        "x": 623,
+        "y": 0,
+        "width": 311,
+        "height": 316
+      },
+      "footX": 153.1249252839211,
+      "footY": 288,
+      "offsetX": 13,
+      "offsetY": 16
+    },
+    {
+      "frame": 3,
+      "sourceCell": {
+        "x": 934,
+        "y": 0,
+        "width": 311,
+        "height": 316
+      },
+      "footX": 127.66223977027997,
+      "footY": 294,
+      "offsetX": 21,
+      "offsetY": 14
+    },
+    {
+      "frame": 4,
+      "sourceCell": {
+        "x": 0,
+        "y": 316,
+        "width": 311,
+        "height": 316
+      },
+      "footX": 207.21418389166072,
+      "footY": 282,
+      "offsetX": -5,
+      "offsetY": 18
+    },
+    {
+      "frame": 5,
+      "sourceCell": {
+        "x": 311,
+        "y": 316,
+        "width": 312,
+        "height": 316
+      },
+      "footX": 177.7851941747573,
+      "footY": 279,
+      "offsetX": 5,
+      "offsetY": 19
+    },
+    {
+      "frame": 6,
+      "sourceCell": {
+        "x": 623,
+        "y": 316,
+        "width": 311,
+        "height": 316
+      },
+      "footX": 149.17221747793909,
+      "footY": 265,
+      "offsetX": 14,
+      "offsetY": 24
+    },
+    {
+      "frame": 7,
+      "sourceCell": {
+        "x": 934,
+        "y": 316,
+        "width": 311,
+        "height": 316
+      },
+      "footX": 125.34588946934286,
+      "footY": 269,
+      "offsetX": 22,
+      "offsetY": 22
+    },
+    {
+      "frame": 8,
+      "sourceCell": {
+        "x": 0,
+        "y": 632,
+        "width": 311,
+        "height": 315
+      },
+      "footX": 198.42216748768473,
+      "footY": 263,
+      "offsetX": -2,
+      "offsetY": 24
+    },
+    {
+      "frame": 9,
+      "sourceCell": {
+        "x": 311,
+        "y": 632,
+        "width": 312,
+        "height": 315
+      },
+      "footX": 166.23708609271523,
+      "footY": 258,
+      "offsetX": 9,
+      "offsetY": 26
+    },
+    {
+      "frame": 10,
+      "sourceCell": {
+        "x": 623,
+        "y": 632,
+        "width": 311,
+        "height": 315
+      },
+      "footX": 134.09216850438224,
+      "footY": 266,
+      "offsetX": 19,
+      "offsetY": 23
+    },
+    {
+      "frame": 11,
+      "sourceCell": {
+        "x": 934,
+        "y": 632,
+        "width": 311,
+        "height": 315
+      },
+      "footX": 98.06616442843105,
+      "footY": 269,
+      "offsetX": 31,
+      "offsetY": 22
+    },
+    {
+      "frame": 12,
+      "sourceCell": {
+        "x": 0,
+        "y": 947,
+        "width": 311,
+        "height": 316
+      },
+      "footX": 169.0058083252662,
+      "footY": 260,
+      "offsetX": 8,
+      "offsetY": 25
+    },
+    {
+      "frame": 13,
+      "sourceCell": {
+        "x": 311,
+        "y": 947,
+        "width": 312,
+        "height": 316
+      },
+      "footX": 144.9977765425236,
+      "footY": 255,
+      "offsetX": 16,
+      "offsetY": 27
+    },
+    {
+      "frame": 14,
+      "sourceCell": {
+        "x": 623,
+        "y": 947,
+        "width": 311,
+        "height": 316
+      },
+      "footX": 126.99806629834254,
+      "footY": 243,
+      "offsetX": 22,
+      "offsetY": 31
+    },
+    {
+      "frame": 15,
+      "sourceCell": {
+        "x": 934,
+        "y": 947,
+        "width": 311,
+        "height": 316
+      },
+      "footX": 107.6110545084055,
+      "footY": 252,
+      "offsetX": 28,
+      "offsetY": 28
+    }
+  ]
+}

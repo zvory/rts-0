@@ -6,7 +6,45 @@ import {
   frameStripSpriteOffset,
   frameStripVisualFacing,
   frameStripWorldScale,
+  renderFrameStripUnit,
 } from "../../client/src/renderer/rigs/frame_strip_runtime.js";
+import { RIFLEMAN_DIRECTIONAL_PROTOTYPE } from "../../client/src/renderer/rigs/rifleman_directional_prototype.js";
+import { createInspectionPngPixiFactory, FakeContainer } from "../helpers/rig_inspection_pixi.mjs";
+
+// A directional body must stay upright and fixed to its ground anchor while
+// heading crosses zero, wraps full turns, or differs from stale weapon aim.
+{
+  const strip = RIFLEMAN_DIRECTIONAL_PROTOTYPE;
+  const entity = { id: 1, kind: KIND.RIFLEMAN, state: STATE.MOVE, x: 123, y: 456 };
+  const layer = new FakeContainer();
+  const renderer = { _liveRigPools: { units: new Map() }, _seen: { units: new Set() },
+    layers: { units: layer }, _rigPixiFactory: createInspectionPngPixiFactory() };
+  const texture = { source: {} };
+  for (let direction = 0; direction < 16; direction++) {
+    const facing = Math.PI / 2 + direction * Math.PI / 8;
+    for (const turns of [-2, 0, 2]) {
+      entity.facing = facing + turns * 2 * Math.PI;
+      entity.weaponFacing = entity.facing + Math.PI;
+      const context = { now: direction * 1234, frameStripMoving: true };
+      assert(frameStripFrameIndex(strip, entity, context) === direction, `moving heading ${direction} wraps correctly`);
+      assert(frameStripVisualFacing(strip, entity, context) === 0, "directional body never rotates as a flat card");
+      const instance = renderFrameStripUnit(renderer, entity, strip, texture, {
+        poolName: "units", layerName: "units", renderContext: context,
+      });
+      assert(instance.container.x === 123 && instance.container.y === 456, "turning preserves authoritative position");
+      assert(instance.sprite.anchorX === 0.5 && instance.sprite.anchorY === 112 / 128,
+        "every heading uses the registered foot anchor");
+      assert(instance.sprite.texture.frame.x === direction * 128, "runtime selects the directional cell");
+      assert(instance.sprite.x === 0 && instance.sprite.y === 0, "turning adds no translation or bob");
+    }
+    entity.state = STATE.IDLE;
+    entity.weaponFacing = facing;
+    assert(frameStripFrameIndex(strip, entity, { frameStripMoving: false }) === direction,
+      "stationary directional body follows weapon heading");
+    entity.state = STATE.MOVE;
+  }
+  renderer._liveRigPools.units.get(entity.id).destroy();
+}
 import { _frameStripMovementVisual } from "../../client/src/renderer/units.js";
 import { MACHINE_GUNNER_PNG_FRAME_STRIP } from "../../client/src/renderer/rigs/machine_gunner_png_strip.js";
 import { RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP } from "../../client/src/renderer/rigs/rifleman_panzerfaust_png_strip.js";

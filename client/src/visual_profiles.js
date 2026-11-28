@@ -2,6 +2,7 @@ import { KIND } from "./protocol.js";
 import { LOADED_RIFLEMAN_RIG_KEY } from "./renderer/rigs/live_routing.js";
 import { RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP } from "./renderer/rigs/rifleman_panzerfaust_png_strip.js";
 import { SCOUT_PLANE_PNG_FRAME_STRIP } from "./renderer/rigs/scout_plane_png_strip.js";
+import { RIFLEMAN_DIRECTIONAL_PROTOTYPE } from "./renderer/rigs/rifleman_directional_prototype.js";
 
 const VISUAL_PROFILE_ERROR_MESSAGES = Object.freeze({
   invalid: "Invalid visualProfile. Use letters, numbers, underscores, or dashes, up to 48 characters.",
@@ -165,6 +166,17 @@ const GRASS_SURVEY_PROFILES = Object.freeze([
 })));
 
 const VISUAL_PROFILE_ENTRIES = Object.freeze([
+  Object.freeze({
+    id: "rifleman-directional-prototype",
+    label: "Rifleman 16-direction prototype",
+    description: "Low-detail oblique Rifleman with registered foot anchors; slides without a walk cycle.",
+    initialCamera: cameraSnapshot(2050, 1930, 2.1),
+    frameStripOverrides: Object.freeze([Object.freeze({
+      id: "rifleman-directional-prototype",
+      kind: KIND.RIFLEMAN,
+      strip: RIFLEMAN_DIRECTIONAL_PROTOTYPE,
+    })]),
+  }),
   ...GRASS_SURVEY_PROFILES,
   ...[
     [1, "Autotiled sandy bank", "Neighbor-selected edge and corner masks with sand and pebbles."],

@@ -54,6 +54,14 @@ export function frameStripFrameIndex(strip, entity, nowOrContext = 0) {
   const idleFrame = validFrame(strip, strip?.idleFrame ?? 0);
   const renderContext = typeof nowOrContext === "object" && nowOrContext !== null ? nowOrContext : {};
   const now = typeof nowOrContext === "number" ? nowOrContext : renderContext.now;
+  if (strip?.directional) {
+    const moving = frameStripEntityIsMoving(entity, renderContext);
+    const facing = !moving && Number.isFinite(entity?.weaponFacing)
+      ? entity.weaponFacing : finite(entity?.facing, 0);
+    const count = Math.max(1, Math.trunc(finite(strip.frameCount, 1)));
+    const turn = (facing - finite(strip.directional.firstFacing, 0)) / (2 * Math.PI);
+    return ((Math.round(turn * count) % count) + count) % count;
+  }
   const setupFrame = frameStripSetupFrameIndex(strip, entity, renderContext, idleFrame);
   if (setupFrame != null) return setupFrame;
   const windupFrame = frameStripWindupFrameIndex(strip, entity, idleFrame);
@@ -126,6 +134,8 @@ function frameStripFiringFrameIndex(strip, entity, renderContext = {}, fallback 
 
 export function frameStripVisualFacing(stripOrEntity, maybeEntity = null, renderContext = null, frameIndex = null) {
   const strip = maybeEntity ? stripOrEntity : null;
+  // Oblique directional art already contains the view of the upright body.
+  if (strip?.directional) return 0;
   const entity = maybeEntity ?? stripOrEntity;
   const resolvedFrame = frameIndex ?? frameStripFrameIndex(strip, entity, renderContext ?? {});
   const facingOffset = frameStripFacingOffset(strip, resolvedFrame);
@@ -239,7 +249,7 @@ class FrameStripUnitInstance {
     }
 
     this.sprite = pixiFactory.createSprite(this.frameTextures[0]);
-    this.sprite.anchor?.set?.(0.5, 0.5);
+    this.sprite.anchor?.set?.(finite(strip.anchorX, 0.5), finite(strip.anchorY, 0.5));
     this.sprite.position?.set?.(0, 0);
     this.container.addChild(this.sprite);
     this.trailTextures = [];
