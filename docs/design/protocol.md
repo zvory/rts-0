@@ -688,7 +688,7 @@ AI, self-play and dev contexts. Explicit `kriegsia`, `ekat` and `cultivators` re
 playable lifecycle policy; the `phase2_empty_fixture` test fixture and unknown ids remain restricted. Cultivators uses the
 `cultivators.standard` loadout; Nexus is a faction-specific presentation name for
 `resource_depot`, and Serf is the presentation name for `worker`, while Portal uses the dedicated `portal` entity kind (compact kind code 28).
-Cultivator Novices use `warrior` (compact kind code 29); evolved Adepts use
+Sword Disciples use `warrior` (compact kind code 29), Bow Novices use `bow_novice` (41); both evolve. Evolved Adepts use
 `wind_adept` (35), `war_adept` (36), and `magic_adept` (37). Their generic
 base/War/Wind attack events carry `warrior_sword` (compact weapon-kind code 12). The retained arrow identity is `disciple_arrow` (13), and Magic orbs use `disciple_orb` (14), through the same fog-filtered attack event and immediate authoritative damage timing.
 
@@ -1019,7 +1019,7 @@ Compact numeric codes:
 
 | Vocabulary | Codes |
 |------------|-------|
-| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `resource_depot`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `engineering_complex`, 18 `command_car`, 19 `ekat`, 20 `zamok`, 21 `tank_trap`, 30 `barbed_wire`, 22 `golem`, 23 `pump_jack`, 24 `panzerfaust`, 25 `scout_plane`, 26 `steel_mine`, 27 `rocket_launcher`, 28 `portal`, 29 `warrior`, 31 `three_dao_pavilion`, 32 `tournament_grounds`, 33 `proven_grounds`, 34 `shop`, 35 `wind_adept`, 36 `war_adept`, 37 `magic_adept`, 38 `healing_seal`, 39 `shop_delivery`, 40 `technique_library` |
+| `kind` | 1 `worker`, 2 `rifleman`, 3 `machine_gunner`, 4 `anti_tank_gun`, 5 `tank`, 6 `resource_depot`, 7 `depot`, 8 `barracks`, 9 `training_centre`, 10 `factory`, 11 `steel`, 12 `oil`, 13 `steelworks`, 14 `scout_car`, 15 `mortar_team`, 16 `artillery`, 17 `engineering_complex`, 18 `command_car`, 19 `ekat`, 20 `zamok`, 21 `tank_trap`, 30 `barbed_wire`, 22 `golem`, 23 `pump_jack`, 24 `panzerfaust`, 25 `scout_plane`, 26 `steel_mine`, 27 `rocket_launcher`, 28 `portal`, 29 `warrior`, 31 `three_dao_pavilion`, 32 `tournament_grounds`, 33 `proven_grounds`, 34 `shop`, 35 `wind_adept`, 36 `war_adept`, 37 `magic_adept`, 38 `healing_seal`, 39 `shop_delivery`, 40 `technique_library`, 41 `bow_novice` |
 | `state` | 1 `idle`, 2 `move`, 3 `attack`, 4 `gather`, 5 `build`, 6 `train`, 7 `construct`, 8 `dead` |
 | `setupState` | 1 `packed`, 2 `setting_up`, 3 `deployed`, 4 `tearing_down` |
 | `orderStage` | 1 `move`, 2 `attackMove`, 3 `attack`, 4 `gather`, 5 `build`, 6 `smoke`, 7 `setupAntiTankGuns`, 8 `charge`, 9 `mortarFire`, 10 `pointFire`, 11 `breakthrough`, 12 `ekatTeleport`, 13 `ekatLineShot`, 14 `ekatMagicAnchor`, 15 `deconstruct`, 16 `ekatConsumeGolem`, 17 `blanketFire`, 18 `dismissScoutPlane`, 19 `scoutPlane`, 20 `holdPosition`, 21 `barrage`, 22 `evolveWind`, 23 `evolveWar`, 24 `evolveMagic`, 25 `discipleShield`, 26 `throwSword`, 27 `regen`, 28 `escapeTreasure`, 29 `windDash`, 30 `healingSeal`, 31 `haste`, 32 `doubleDamage`, 33 `armorTreasure`, 34 `vitalityTreasure`, 35 `vectorField`, 36 `repair`, 37 `doubleXp`, 38 `breakthroughTreasure` |
@@ -2264,3 +2264,11 @@ server/src/protocol.rs re-exports the authoritative protocol contract unchanged.
 Compact snapshot version 78 adds these identities. Existing build/research commands, queues,
 cancellation, completed-upgrade lists and owner-only research visibility apply. No new fields
 or events are introduced. See [Technique Library](technique-library.md).
+
+### Bow Novice identity
+
+`bow_novice` uses compact entity kind code 41. `warrior` (29) is displayed as Sword
+Disciple. Both base kinds share the existing insight/chosenDao/evolution snapshot fields
+and evolution commands; Bow Novice attacks emit existing `disciple_arrow` (weapon code 13)
+events, with the same visibility gates and immediate damage as other direct-fire weapons.
+No new message, event, or snapshot field is introduced.

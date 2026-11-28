@@ -151,7 +151,7 @@ impl Entity {
 
     /// Persistent intent is independent of combat/movement orders and can be replaced.
     pub(in crate::game) fn choose_dao(&mut self, ability: AbilityKind) -> bool {
-        if self.kind != EntityKind::Warrior || self.hp == 0 {
+        if !self.kind.is_novice() || self.hp == 0 {
             return false;
         }
         self.chosen_dao = Some(match ability {
@@ -165,7 +165,7 @@ impl Entity {
 
     /// Ready novices without player intent pick uniformly from the three paths.
     pub(in crate::game) fn advance_dao(&mut self, rng: &mut impl rand::Rng) {
-        if self.kind != EntityKind::Warrior
+        if !self.kind.is_novice()
             || self.hp == 0
             || self.insight < config::DISCIPLE_INSIGHT_REQUIRED
         {
@@ -227,8 +227,7 @@ impl Entity {
     }
 
     pub(crate) fn evolve_dao(&mut self, ability: AbilityKind) -> bool {
-        if self.kind != EntityKind::Warrior || self.hp == 0 || !self.dao_ability_available(ability)
-        {
+        if !self.kind.is_novice() || self.hp == 0 || !self.dao_ability_available(ability) {
             return false;
         }
         let attack_cd = self.attack_cd();

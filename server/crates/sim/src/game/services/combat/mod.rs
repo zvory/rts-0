@@ -552,14 +552,12 @@ pub(in crate::game) fn combat_system(
             }
         }
         if fired {
-            if methamphetamines_researched(owner) {
-                if let Some(e) = entities
-                    .get_mut(id)
-                    .filter(|e| e.kind == EntityKind::Rifleman)
-                {
-                    if let Some(combat) = e.combat.as_mut() {
-                        combat.rifle_post_shot_tick = Some(tick);
-                    }
+            if let Some(e) = entities.get_mut(id).filter(|e| {
+                e.kind == EntityKind::BowNovice
+                    || (e.kind == EntityKind::Rifleman && methamphetamines_researched(owner))
+            }) {
+                if let Some(combat) = e.combat.as_mut() {
+                    combat.rifle_post_shot_tick = Some(tick);
                 }
             }
             // Keep the shot's target through the reload if it remains legal. Re-ranking here

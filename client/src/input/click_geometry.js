@@ -7,6 +7,7 @@ function radiusScale(entity) {
     case KIND.RIFLEMAN:
     case KIND.PANZERFAUST:
     case KIND.MACHINE_GUNNER: return 1.5;
+    case KIND.BOW_NOVICE:
     case KIND.WARRIOR: return 0.75;
     case KIND.WIND_ADEPT:
     case KIND.MAGIC_ADEPT: return entity.daoMaster ? 1 : 0.75;
@@ -21,7 +22,7 @@ export function clickGeometry(entity, footprint) {
   let scale = 1;
   if (footprint.kind === "circle") {
     scale = radiusScale(entity);
-    if (entity.kind === KIND.WARRIOR) {
+    if (entity.kind === KIND.WARRIOR || entity.kind === KIND.BOW_NOVICE) {
       // Preserve the reviewed art-based click area independently of collision size.
       clickFootprint = Object.freeze({ kind: "circle", radiusPx: 19.5 });
       directClickFootprint = clickFootprint;

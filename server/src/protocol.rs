@@ -155,7 +155,7 @@ mod tests {
 
 // Cultivator Shop: wire kind shop, compact kind code 34; no additional snapshot fields.
 
-// Novice warrior (29) evolves into distinct kinds wind_adept (35), war_adept (36),
+// Sword Disciple warrior (29) and Bow Novice bow_novice (41) evolve into distinct kinds wind_adept (35), war_adept (36),
 // or magic_adept (37). EntityView.dao is derived presentation metadata, not engine identity.
 
 // EntityView daoMaster: public Master rank at compact slot 52 (v65).

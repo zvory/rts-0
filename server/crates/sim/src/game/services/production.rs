@@ -256,7 +256,7 @@ pub(crate) fn production_system(
                 // to attack-move for combat units, but Engineers and faction gatherers keep move
                 // rally behavior.
                 if let Some(first) = rally_plan.first().copied() {
-                    if unit == EntityKind::Warrior
+                    if unit.is_novice()
                         && entities
                             .get(id)
                             .is_some_and(|e| e.kind == EntityKind::Portal)
