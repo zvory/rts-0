@@ -1,11 +1,11 @@
 const GOLDEN_IMAGES = Object.freeze({
-  "warrior-runtime-strip.png": "/assets/rigs/cultivator-golden/generated/warrior-runtime-strip.png",
-  "wind-melee-b-runtime-strip.png": "/assets/rigs/cultivator-golden/generated/wind-melee-b-runtime-strip.png",
-  "war-yari-runtime-strip.png": "/assets/rigs/cultivator-golden/generated/war-yari-runtime-strip.png",
-  "magic-runtime-strip.png": "/assets/rigs/cultivator-golden/generated/magic-runtime-strip.png",
-  "wind-master-runtime-strip.png": "/assets/rigs/cultivator-golden/generated/wind-master-runtime-strip.png",
-  "war-master-runtime-strip.png": "/assets/rigs/cultivator-golden/generated/war-master-runtime-strip.png",
-  "magic-master-runtime-strip.png": "/assets/rigs/cultivator-golden/generated/magic-master-runtime-strip.png",
+  "warrior-runtime-strip.png": "/assets/rigs/cultivator-team-color-preview/packed/warrior-runtime-strip.png",
+  "wind-melee-b-runtime-strip.png": "/assets/rigs/cultivator-team-color-preview/packed/wind-melee-b-runtime-strip.png",
+  "war-yari-runtime-strip.png": "/assets/rigs/cultivator-team-color-preview/packed/war-yari-runtime-strip.png",
+  "magic-runtime-strip.png": "/assets/rigs/cultivator-team-color-preview/packed/magic-runtime-strip.png",
+  "wind-master-runtime-strip.png": "/assets/rigs/cultivator-team-color-preview/packed/wind-master-runtime-strip.png",
+  "war-master-runtime-strip.png": "/assets/rigs/cultivator-team-color-preview/packed/war-master-runtime-strip.png",
+  "magic-master-runtime-strip.png": "/assets/rigs/cultivator-team-color-preview/packed/magic-master-runtime-strip.png",
 });
 
 // The first row remains the original team-tinted character atlas. The second row

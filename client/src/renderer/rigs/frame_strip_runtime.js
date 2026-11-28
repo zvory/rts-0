@@ -1,3 +1,4 @@
+import { isTeamPaintPreview, createTeamPaintPreview } from "./team_paint_preview.js";
 import { updateItemRadiance, destroyItemRadiance } from "../item_radiance.js";
 import { goldenAttackTrailFrame } from "./golden_attack_strip.js";
 import { SETUP, STATE } from "../../protocol.js";
@@ -26,6 +27,7 @@ export function renderFrameStripUnit(renderer, entity, strip, texture, options =
       texture,
       renderer._rigPixiFactory ?? createDefaultFrameStripPixiFactory(),
       options.silhouetteShadow === true,
+      renderer.world?.tint,
     );
     renderer._recordRenderDiagnostic?.(`renderer.frameStrip.instance.created.${options.poolName}`);
     renderer._recordRenderDiagnostic?.("renderer.pixi.displayObject.created.frameStripContainer");
@@ -206,7 +208,7 @@ function createDefaultFrameStripPixiFactory(pixi = globalThis.PIXI) {
 }
 
 class FrameStripUnitInstance {
-  constructor(kind, strip, texture, pixiFactory, silhouetteShadow = false) {
+  constructor(kind, strip, texture, pixiFactory, silhouetteShadow = false, sunTint = 0xffffff) {
     this.kind = kind;
     this.strip = strip;
     this.texture = texture;
@@ -234,6 +236,9 @@ class FrameStripUnitInstance {
     this.sprite.anchor?.set?.(0.5, 0.5);
     this.sprite.position?.set?.(0, 0);
     this.container.addChild(this.sprite);
+    this.teamPaintPreview = !silhouetteShadow && isTeamPaintPreview(strip)
+      ? createTeamPaintPreview(globalThis.PIXI, strip, texture, sunTint) : null;
+    if (this.teamPaintPreview) this.container.addChild(this.teamPaintPreview.mesh);
     this.trailTextures = [];
     if (strip.attackTrail && !silhouetteShadow) {
       for (let i = 0; i < strip.attackTrail.frameCount; i += 1) {
@@ -277,6 +282,10 @@ class FrameStripUnitInstance {
     this.sprite.tint = this.silhouetteShadow ? 0x000000 : tintForSlot(this.strip.tintSlot, renderContext);
     this.sprite.visible = true;
     updateItemRadiance(this, entity, renderContext.now || 0);
+    if (this.teamPaintPreview) {
+      this.sprite.visible = false;
+      this.teamPaintPreview.update(entity, worldScale, spriteOffset);
+    }
     if (this.trailSprite) {
       const trailFrame = goldenAttackTrailFrame(this.strip, renderContext);
       this.trailSprite.visible = trailFrame != null;
@@ -299,6 +308,7 @@ class FrameStripUnitInstance {
     if (this._destroyed) return;
     this._destroyed = true;
     destroyItemRadiance(this);
+    this.teamPaintPreview?.destroy();
     this.shadowBlur?.destroy?.();
     this.container.parent?.removeChild?.(this.container);
     this.sprite?.destroy?.({ texture: false, textureSource: false });

@@ -1,3 +1,4 @@
+import { previewColorForEntity } from "./team_paint_preview.js";
 import { gfxNoFill, gfxCircle, gfxEllipse, gfxPoly, gfxFill, gfxStroke } from "../native_graphics.js";
 import { createRigAnimationStage, rigContainerScale, sampleRigAnimationInto } from "./animation.js";
 import { hexToInt, lightenColor } from "../shared.js";
@@ -134,6 +135,7 @@ export class UnitRigInstance {
       }
       sampled = sampleRigAnimationInto(this._animationStage, entity, renderContext);
     }
+    const previewContext = entity.kind === "worker" ? { ...sampled.context, teamColor: previewColorForEntity(entity) } : sampled.context;
     const diagnosticCounts = this._diagnosticCounts;
     diagnosticCounts.fill(0);
     for (const [partId, rec] of this.parts) {
@@ -143,7 +145,7 @@ export class UnitRigInstance {
         diagnosticCounts[SVG_RIG_HIDDEN] += 1;
         continue;
       }
-      applyPartState(rec, partState, sampled.context, diagnosticCounts);
+      applyPartState(rec, partState, previewContext, diagnosticCounts);
     }
     flushRigDiagnosticCounts(options, SVG_RIG_DIAGNOSTIC_LABELS, diagnosticCounts);
   }

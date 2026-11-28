@@ -1,0 +1,10 @@
+[
+{"name":"Worker","kind":"worker","vector":true},
+{"name":"Novice","kind":"warrior","file":"warrior-runtime-strip.png","w":160,"h":160,"count":12,"source":"approved","column":0},
+{"name":"Wind Adept","kind":"wind_adept","file":"wind-melee-b-runtime-strip.png","w":256,"h":256,"count":8,"source":"approved","column":1},
+{"name":"War Adept","kind":"war_adept","file":"war-yari-runtime-strip.png","w":256,"h":256,"count":7,"source":"approved","column":2},
+{"name":"Magic Adept","kind":"magic_adept","file":"magic-runtime-strip.png","w":256,"h":256,"count":8,"source":"new","column":3},
+{"name":"Wind Master","kind":"wind_adept","daoMaster":true,"file":"wind-master-runtime-strip.png","w":256,"h":256,"count":8,"source":"new","column":0},
+{"name":"War Master","kind":"war_adept","daoMaster":true,"file":"war-master-runtime-strip.png","w":256,"h":384,"count":8,"source":"new","column":1},
+{"name":"Magic Master","kind":"magic_adept","daoMaster":true,"file":"magic-master-runtime-strip.png","w":256,"h":256,"count":8,"source":"new","column":2}
+]
