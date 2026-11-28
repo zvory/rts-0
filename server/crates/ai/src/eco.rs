@@ -8,6 +8,7 @@ mod armor;
 mod construction;
 mod offense;
 mod production;
+mod recon;
 mod support;
 mod tactics;
 #[cfg(test)]
@@ -30,6 +31,7 @@ pub(crate) struct EcoStrategy {
     production: production::EcoProduction,
     offense: offense::EcoOffense,
     support: support::CommandSupport,
+    recon: recon::Recon,
 }
 impl Default for EcoStrategy {
     fn default() -> Self {
@@ -44,6 +46,7 @@ impl Default for EcoStrategy {
             production: Default::default(),
             offense: Default::default(),
             support: Default::default(),
+            recon: Default::default(),
         }
     }
 }
@@ -186,6 +189,8 @@ impl AiStrategy for EcoStrategy {
         if bases >= base_target(frame) {
             self.offense.observe(frame);
         }
+        self.recon
+            .step(frame, actions, self.defense.recon_target(frame));
         let push = self.defense.expansion_push_ids(frame);
         let mut reserved = self.defense.screen_ids().clone();
         reserved.extend(&push);

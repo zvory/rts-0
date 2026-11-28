@@ -355,6 +355,7 @@ const approvedCurrentFactionFiles = new Set([
   // Eco deliberately stages the catalog-gated Kriegsia infantry/Tank roster and Command Car.
   "server/crates/ai/src/eco/offense.rs",
   "server/crates/ai/src/eco/support.rs",
+  "server/crates/ai/src/eco/recon.rs",
   // SDK defense scoring explicitly values the current infantry economy.
   "server/crates/ai/src/sdk/defense/scoring.rs",
   // Pressure independently owns a Kriegsia-only copied macro policy, staging formation, and
@@ -366,6 +367,7 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/ai/src/pressure/response.rs",
   // Eco opts into Kriegsia infantry/armor recruitment and cohesion; value uses AiRulebook.
   "server/crates/ai/src/pressure/response/cohesion.rs",
+  "server/crates/ai/src/pressure/response/cohesion/withdrawal.rs",
   // The SDK frame adapter converts the protocol's dedicated remembered-anti-tank-gun records back
   // into the typed kind that the wire record omits. Keep this exception at one occurrence.
   "server/crates/ai/src/sdk/frame.rs",

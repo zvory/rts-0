@@ -234,6 +234,9 @@ impl DefenseAssignments {
         }
         (!self.claim_ready).then_some(center)
     }
+    pub(super) fn recon_target(&self, frame: &AiFrame) -> Option<(f32, f32)> {
+        self.response.recon_target(frame)
+    }
     pub(super) fn attacking_ids(&self) -> BTreeSet<u32> {
         self.response.attacking_ids()
     }

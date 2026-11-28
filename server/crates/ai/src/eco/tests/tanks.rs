@@ -569,3 +569,45 @@ fn command_car_target_is_completed_bases_minus_two() {
         }
     }
 }
+
+#[test]
+fn scout_plane_research_waits_for_four_completed_bases() {
+    for bases in [3, 4] {
+        let (start, mut s, sites) = staged(bases);
+        let home = sites
+            .iter()
+            .find(|b| b.id == AiBaseSiteId::Start(1))
+            .unwrap()
+            .position;
+        building(
+            &mut s,
+            9000,
+            "engineering_complex",
+            (home.0 + 256., home.1),
+            None,
+        );
+        let mut production = production::EcoProduction::default();
+        let f = frame(&start, &s, &sites);
+        let mut a = AiActions::for_frame(&f);
+        production.step(&f, &mut a);
+        let queued = a.into_requests().iter().any(|r| {
+            matches!(
+                r,
+                AiActionRequest::Research {
+                    upgrade: UpgradeKind::ScoutPlaneUnlock,
+                    ..
+                }
+            )
+        });
+        assert_eq!(queued, bases == 4);
+        let mut a = AiActions::for_frame(&f);
+        production.step(&f, &mut a);
+        assert!(!a.into_requests().iter().any(|r| matches!(
+            r,
+            AiActionRequest::Research {
+                upgrade: UpgradeKind::ScoutPlaneUnlock,
+                ..
+            }
+        )));
+    }
+}

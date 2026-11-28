@@ -102,7 +102,7 @@ fn distant_reinforcements_do_not_authorize_feeding_and_arrival_releases_attack()
     );
 }
 #[test]
-fn tank_response_recruits_two_per_enemy_but_commits_each_ready_compact_group() {
+fn tank_response_recruits_two_per_enemy_and_keeps_one_withdrawal_order() {
     let (start, mut s) = fixture(0, 8, 3);
     for e in s
         .entities
@@ -121,34 +121,25 @@ fn tank_response_recruits_two_per_enemy_but_commits_each_ready_compact_group() {
             .count(),
         6
     );
-    assert!(
-        !orders
-            .iter()
-            .any(|a| matches!(a,AiActionRequest::AttackMove{units,..} if units.contains(&100))),
-        "the isolated Tank still waits for local support"
-    );
-    assert!(orders.iter().any(|a|matches!(a,AiActionRequest::AttackMove{units,..} if units.iter().any(|id|(101..108).contains(id)))),"the assembled group can advance without waiting for the distant straggler");
-    for e in s
-        .entities
-        .iter_mut()
-        .filter(|e| e.owner == 1 && e.kind == "tank")
-    {
-        e.x = 66.5 * 32.;
+    assert!(!orders.iter().any(|a|matches!(a,AiActionRequest::AttackMove{units,..}if units.iter().any(|id|(100..108).contains(id)))));
+    let posts = orders
+        .iter()
+        .filter_map(|a| match a {
+            AiActionRequest::Move { units, x, y, .. } => Some((units[0], (*x, *y))),
+            _ => None,
+        })
+        .collect::<BTreeMap<_, _>>();
+    for e in &mut s.entities {
+        if let Some(p) = posts.get(&e.id) {
+            e.x = p.0;
+            e.y = p.1;
+        }
     }
     s.tick += 9;
     let orders = run(&mut response, &start, &s);
-    assert!(orders
-        .iter()
-        .any(|a| matches!(a,AiActionRequest::AttackMove{units,..} if units.contains(&100))));
-    assert_eq!(
-        response
-            .fighting
-            .iter()
-            .filter(|(id, ready)| (100..108).contains(*id) && **ready)
-            .count(),
-        6
-    );
+    assert_eq!(orders.iter().filter(|a|matches!(a,AiActionRequest::AttackMove{units,..}if units.iter().any(|id|(100..108).contains(id)))).count(),6);
 }
+
 #[test]
 fn infantry_raids_leave_tanks_in_reserve() {
     let (start, s) = fixture(10, 8, 0);
@@ -284,4 +275,228 @@ fn infantry_still_recruits_a_fifty_percent_overmatch() {
         2,
         "one equal-value enemy still recruits two infantry even though one may now fight"
     );
+}
+
+#[test]
+fn ten_seen_tanks_do_not_become_one_or_zero_threats_in_fog() {
+    let (start, mut s) = fixture(0, 6, 10);
+    s.visible_tiles.fill(0);
+    let mut response = PressureResponse::with_cohesive_reserve();
+    run(&mut response, &start, &s);
+    assert_eq!(response.threat_memory.len(), 10);
+    s.entities.retain(|e| e.owner == 1 || e.id == 900);
+    s.tick += 9;
+    s.entities.iter_mut().find(|e| e.id == 900).unwrap().hp = 50;
+    let orders = run(&mut response, &start, &s);
+    assert_eq!(
+        response.threat_memory.len(),
+        10,
+        "visible sightings update, rather than duplicate, remembered units"
+    );
+    assert_eq!(response.threat_memory[&900].1.health.current, 50);
+    assert!(!orders
+        .iter()
+        .any(|r| matches!(r,AiActionRequest::AttackMove{units,..}if units.contains(&100))));
+    assert_eq!(response.fighting.get(&100), Some(&false));
+    s.entities.retain(|e| e.owner == 1);
+    s.tick += 90;
+    let orders = run(&mut response, &start, &s);
+    assert_eq!(response.threat_memory.len(), 10);
+    assert_eq!(response.fighting.get(&100), Some(&false));
+    let target = (70.5 * 32., 60.5 * 32.);
+    let point = orders
+        .iter()
+        .find_map(|r| match r {
+            AiActionRequest::Move { units, x, y, .. } if units.contains(&100) => Some((*x, *y)),
+            _ => None,
+        })
+        .unwrap();
+    assert!(
+        distance(point, target) >= 16. * 32.,
+        "unseen stationary Tanks retain their full firing envelope"
+    );
+    s.tick += MEMORY_TICKS;
+    run(&mut response, &start, &s);
+    assert!(response.threat_memory.is_empty());
+}
+#[test]
+fn recon_clears_a_remembered_threat_when_its_whole_firing_area_is_observable() {
+    let (start, mut s) = fixture(0, 1, 2);
+    s.visible_tiles.fill(0);
+    let mut response = PressureResponse::with_cohesive_reserve();
+    run(&mut response, &start, &s);
+    assert_eq!(response.threat_memory.len(), 2);
+    s.entities.retain(|e| e.owner == 1);
+    s.tick += 9;
+    run(&mut response, &start, &s);
+    assert_eq!(response.threat_memory.len(), 2);
+    s.visible_tiles.fill(1);
+    s.tick += 9;
+    run(&mut response, &start, &s);
+    assert!(response.threat_memory.is_empty());
+}
+
+#[test]
+fn retreat_survives_guard_relevance_loss_and_reentry_waits_for_regrouping() {
+    let (start, mut s) = fixture(0, 2, 4);
+    s.visible_tiles.fill(0);
+    let mut response = PressureResponse::with_cohesive_reserve();
+    let first = run(&mut response, &start, &s);
+    let posts = first
+        .iter()
+        .filter_map(|r| match r {
+            AiActionRequest::Move { units, x, y, .. } => Some((units[0], (*x, *y))),
+            _ => None,
+        })
+        .collect::<BTreeMap<_, _>>();
+    assert_eq!(posts.len(), 2);
+    let no_guard = |response: &mut PressureResponse, s: &Snapshot| {
+        let f = AiFrame::from_host(&start, s, 1, [], Some(&[1, 2])).unwrap();
+        let eligible = f.owned().iter().map(|e| e.id).collect();
+        let mut a = AiActions::for_frame(&f);
+        let plan = response.step_defended(&f, &eligible, &[], &mut a);
+        (plan, a.into_requests())
+    };
+    s.tick += 9;
+    let (plan, orders) = no_guard(&mut response, &s);
+    assert_eq!(
+        plan.active,
+        BTreeSet::from([100, 101]),
+        "guard relevance changes must not release a retreating group to macro"
+    );
+    assert!(!orders
+        .iter()
+        .any(|r| matches!(r, AiActionRequest::AttackMove { .. })));
+    // Visible witnessed destruction changes the balance, but does not cancel regrouping.
+    for e in s.entities.iter_mut().filter(|e| (900..903).contains(&e.id)) {
+        e.hp = 0;
+    }
+    let p = posts[&100];
+    let e = s.entities.iter_mut().find(|e| e.id == 100).unwrap();
+    e.x = p.0;
+    e.y = p.1;
+    s.tick += 9;
+    let (_, orders) = no_guard(&mut response, &s);
+    assert!(
+        !orders
+            .iter()
+            .any(|r| matches!(r, AiActionRequest::AttackMove { .. })),
+        "one of two regrouped is not90%"
+    );
+    let p = posts[&101];
+    let e = s.entities.iter_mut().find(|e| e.id == 101).unwrap();
+    e.x = p.0;
+    e.y = p.1;
+    s.tick += 9;
+    let (_, orders) = no_guard(&mut response, &s);
+    assert_eq!(
+        orders
+            .iter()
+            .filter(|r| matches!(r, AiActionRequest::AttackMove { .. }))
+            .count(),
+        2
+    );
+    // Fresh overwhelming reinforcements can abort an attack immediately.
+    let enemy = s.entities.iter().find(|e| e.id == 903).unwrap().clone();
+    for id in 950..955 {
+        let mut e = enemy.clone();
+        e.id = id;
+        s.entities.push(e);
+    }
+    s.tick += 9;
+    let (_, orders) = no_guard(&mut response, &s);
+    assert!(!orders
+        .iter()
+        .any(|r| matches!(r, AiActionRequest::AttackMove { .. })));
+    assert!(response.fighting.values().all(|ready| !*ready));
+}
+#[test]
+fn nine_of_ten_regrouped_tanks_can_reenter_without_a_forward_straggler_flipping_them_back() {
+    let (start, mut s) = fixture(0, 10, 10);
+    s.visible_tiles.fill(0);
+    for e in s.entities.iter_mut().filter(|e| e.owner == 1) {
+        e.hp = 80;
+    }
+    let mut response = PressureResponse::with_cohesive_reserve();
+    let orders = run(&mut response, &start, &s);
+    let posts = orders
+        .iter()
+        .filter_map(|r| match r {
+            AiActionRequest::Move { units, x, y, .. } => Some((units[0], (*x, *y))),
+            _ => None,
+        })
+        .collect::<BTreeMap<_, _>>();
+    assert_eq!(posts.len(), 10);
+    for e in s.entities.iter_mut().filter(|e| e.owner == 1) {
+        e.hp = 100;
+        if e.id != 109 {
+            let p = posts[&e.id];
+            e.x = p.0;
+            e.y = p.1;
+        }
+    }
+    s.tick += 9;
+    let orders = run(&mut response, &start, &s);
+    assert_eq!(
+        orders
+            .iter()
+            .filter(|r| matches!(r, AiActionRequest::AttackMove { .. }))
+            .count(),
+        10
+    );
+    s.tick += 9;
+    run(&mut response, &start, &s);
+    assert!(response.fighting.values().all(|ready| *ready));
+}
+
+#[test]
+fn wounded_micro_can_borrow_the_whole_group_without_forgetting_its_retreat() {
+    let (start, mut s) = fixture(0, 2, 4);
+    s.visible_tiles.fill(0);
+    let mut response = PressureResponse::with_cohesive_reserve();
+    run(&mut response, &start, &s);
+    s.tick += 9;
+    let f = AiFrame::from_host(&start, &s, 1, [], Some(&[1, 2])).unwrap();
+    let mut a = AiActions::for_frame(&f);
+    let plan = response.step_defended(&f, &BTreeSet::new(), &[], &mut a);
+    assert!(plan.active.is_empty());
+    assert!(a.is_empty());
+    assert!(response.armor_encounter.is_some());
+    s.tick += 9;
+    let f = AiFrame::from_host(&start, &s, 1, [], Some(&[1, 2])).unwrap();
+    let eligible = f.owned().iter().map(|e| e.id).collect();
+    let mut a = AiActions::for_frame(&f);
+    let plan = response.step_defended(&f, &eligible, &[], &mut a);
+    assert_eq!(plan.active, BTreeSet::from([100, 101]));
+    assert!(response.fighting.values().all(|ready| !*ready));
+}
+
+#[test]
+fn threat_expiry_does_not_cancel_an_unfinished_withdrawal() {
+    let (start, mut s) = fixture(0, 2, 4);
+    s.visible_tiles.fill(0);
+    let mut response = PressureResponse::with_cohesive_reserve();
+    let orders = run(&mut response, &start, &s);
+    let posts = orders
+        .iter()
+        .filter_map(|r| match r {
+            AiActionRequest::Move { units, x, y, .. } => Some((units[0], (*x, *y))),
+            _ => None,
+        })
+        .collect::<BTreeMap<_, _>>();
+    s.entities.retain(|e| e.owner == 1);
+    s.tick += MEMORY_TICKS;
+    run(&mut response, &start, &s);
+    assert!(response.threat_memory.is_empty());
+    assert!(response.has_withdrawal());
+    assert_eq!(response.responders, BTreeSet::from([100, 101]));
+    for e in &mut s.entities {
+        let p = posts[&e.id];
+        e.x = p.0;
+        e.y = p.1;
+    }
+    s.tick += 9;
+    run(&mut response, &start, &s);
+    assert!(!response.has_withdrawal());
+    assert!(response.responders.is_empty());
 }

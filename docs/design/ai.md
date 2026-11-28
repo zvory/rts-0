@@ -326,6 +326,33 @@ two tiles toward home from the cluster, uses body-aware queued routes and a two-
 deadband, and casts ready Breakthrough when it can cover an engaged Tank group with visible enemies
 nearby or while escorting a claim. Cars rotate casts and wait for active Breakthrough to expire. Support commands run before large infantry batches so the action cap cannot starve the car.
 
+At four completed bases Eco queues Scout Plane research at an Engineering Complex. After the
+research completes, one ready Command Car launch is held for an incoming defensive incident;
+spare ready carriers rotate sorties toward public enemy-side base sites, excluding known friendly
+Depots. The reserve is a ready ability, not a stored plane unit. Defensive sorties may spend it;
+routine flights resume only when another ready launch can remain in reserve. Same-area sorties
+are deduplicated for their thirty-second lifetime, with local cooldown bookkeeping preventing
+repeated orders before the native snapshot updates. Reconnaissance runs before support movement
+and Breakthrough, and uses only known defensive contacts and public geography.
+
+Eco's cohesive response remembers legally seen armed enemies for thirty seconds, merging live
+observations by entity ID. Both HP-adjusted strength and retreat danger geometry use this same
+formation estimate. Losing visibility of most of a formation does not reduce it to the remaining
+visible front unit. An unseen observation clears when its full last-known firing envelope is
+observable, or expires; a visible zero-HP observation also clears it. Hidden health and position
+are never updated from authoritative state.
+
+A Tank encounter retains tactical ownership through withdrawal even if the original protected
+guard dies or enemies change targets outside the initial admission bubble. The main Tank
+concentration makes one advance/withdraw decision. A withdrawing group receives separate
+body-reachable, two-tile-spaced destinations around one safe rally area. Re-entry requires ninety
+percent of surviving assigned Tanks within two tiles of their posts and local HP-adjusted friendly
+strength at least ninety percent of the remembered enemy force. New overwhelming information can
+trigger withdrawal immediately; no fixed timer forces an unfavorable engagement. Confirmed area
+clearance or stale-memory expiry ends the bounded encounter after an unfinished withdrawal has
+regrouped; loss of the assigned force ends it immediately.
+Infantry's independent local ninety-percent gate and other profiles' response policies remain.
+
 After claiming its territory goal, at 300 supply Eco permanently unlocks a staged offensive. Public geographic ranks, snapshotted
 for a living enemy, choose targets from half the map's base-site count inward to that enemy's main
 (12 sites starts at rank six; ten at rank five). Confirmed friendly sites are skipped. Each target

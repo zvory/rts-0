@@ -33,6 +33,11 @@ impl EcoProduction {
                 EntityKind::EngineeringComplex,
                 bases >= 2,
             ),
+            (
+                UpgradeKind::ScoutPlaneUnlock,
+                EntityKind::EngineeringComplex,
+                bases >= 4,
+            ),
         ];
         for (upgrade, kind, enabled) in research {
             if !enabled

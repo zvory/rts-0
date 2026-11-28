@@ -15,6 +15,8 @@ const MEMORY_TICKS: u32 = 30 * 30;
 pub(crate) struct PressureResponse {
     include_machine_gunners: bool,
     cohesive: bool,
+    threat_memory: BTreeMap<u32, (u32, AiEntity)>,
+    armor_encounter: Option<cohesion::withdrawal::ArmorEncounter>,
     fighting: BTreeMap<u32, bool>,
     release_cleared_contacts: bool,
     defended: defended::DefendedResponse,
@@ -51,6 +53,22 @@ fn on_home_half(position: Point, home: Point, enemy: Point) -> bool {
 }
 
 impl PressureResponse {
+    pub(crate) fn recon_target(&self, frame: &AiFrame) -> Option<Point> {
+        self.contacts
+            .iter()
+            .max_by_key(|(id, c)| {
+                let strength: u64 = self
+                    .contacts
+                    .values()
+                    .filter(|other| {
+                        distance(c.position, other.position) <= 15. * frame.map().tile_size as f32
+                    })
+                    .map(|other| u64::from(other.value))
+                    .sum();
+                (strength, std::cmp::Reverse(**id))
+            })
+            .map(|(_, c)| c.position)
+    }
     /// Read-only tactical ownership for support vehicles; staging/withdrawal is not an attack.
     pub(crate) fn attacking_ids(&self) -> BTreeSet<u32> {
         self.fighting
@@ -120,6 +138,9 @@ impl PressureResponse {
             .iter()
             .find(|player| player.team_id != frame.team_id() && player.is_alive)
             .map(base_position);
+        if self.cohesive {
+            self.observe_threats(frame);
+        }
         let owned: BTreeSet<_> = frame.owned().iter().map(|unit| unit.id).collect();
         self.responders.retain(|id| owned.contains(id));
         // Construction clearance may replace the unit's order while we cannot command it.
@@ -127,16 +148,11 @@ impl PressureResponse {
         self.issued.retain(|id, _| eligible.contains(id));
         self.contacts
             .retain(|_, contact| frame.tick().saturating_sub(contact.seen) < MEMORY_TICKS);
+        let previous_contacts = self.contacts.keys().copied().collect::<BTreeSet<_>>();
+        let mut changed_incident = false;
         if let Some(areas) = areas {
-            let contacts = self.defended.update(frame, book, areas);
-            // A released/leashed-out attacker must not keep a stale movement goal through
-            // the normal retry cooldown when another defensive incident remains active.
-            if self.defended.changed_incident
-                || self.contacts.keys().any(|id| !contacts.contains_key(id))
-            {
-                self.issued.clear();
-            }
-            self.contacts = contacts;
+            self.contacts = self.defended.update(frame, book, areas);
+            changed_incident = self.defended.changed_incident;
         } else {
             // Only sightings on our half start or refresh a response. Crossing the midpoint cannot
             // drag the response into the enemy base: retain the last in-bounds position for 30 s.
@@ -175,7 +191,18 @@ impl PressureResponse {
                 });
             }
         }
-        if self.contacts.is_empty() {
+        if self.cohesive {
+            self.retain_encounter(frame, eligible, book);
+        }
+        if areas.is_some()
+            && (changed_incident
+                || previous_contacts
+                    .iter()
+                    .any(|id| !self.contacts.contains_key(id)))
+        {
+            self.issued.clear();
+        }
+        if self.contacts.is_empty() && !self.has_withdrawal() {
             self.issued.clear();
             self.fighting.clear();
             return ResponsePlan {
