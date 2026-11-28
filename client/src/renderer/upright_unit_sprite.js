@@ -27,7 +27,7 @@ export function uprightWorldPoint(renderer, anchor, point) {
 
 export function updateUprightUnitSprite(renderer, instance) {
   const enabled = renderer._mapTiltDegrees
-    && instance.strip.image?.includes("rifleman-experimental/") && !instance.silhouetteShadow;
+    && instance.strip.uprightBillboard && !instance.silhouetteShadow;
   if (!enabled) {
     if (instance.uprightMesh) instance.uprightMesh.visible = false;
     return;

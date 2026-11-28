@@ -351,7 +351,7 @@ export class GameState extends VisualEffectBackedState {
     this._pruneSelection({ controlPolicy, enforceCommandBudget: true });
     this._pruneControlGroups({ controlPolicy });
 
-    this.visualEffects.applySnapshotEvents(this.events, visualNow, (id) => this.entityById(id));
+    this.applySnapshotVisualEvents(this.events, visualNow);
   }
 
   setObserverView(observerView = null) {

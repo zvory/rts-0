@@ -2528,20 +2528,30 @@ origins and health-bar anchors. Other world artwork shares the tilted ground pla
 Assets load lazily on opt-in; the normal Rifleman remains visible until that load completes.
 Disabling restores normal routing immediately, including when an earlier load finishes later.
 
-`rifleman_experimental_png_strip.js` describes a sixteen-column, 144-cell oblique atlas: sixteen
-idle frames, four running frames per heading, and four shot-triggered firing/recovery frames per
-heading. `directional` strips select body bearing during displacement and weapon bearing while
-firing or stationary. Firing samples the existing 420 ms Rifleman recoil cycle; the sprite stays
-upright and uses the shared foot anchor. Ground-contact shadows, HP placement, authored torso
-point-click bounds, and presentation muzzle offsets follow the oblique body. Selection rings,
-marquee footprints, collision, and fog authority remain unchanged.
+`rifleman_experimental_png_strip.js` describes a sixteen-column, 256-cell oblique atlas:
+sixteen headings with sixteen poses each. A heading block contains lowered idle, ready, six
+running poses, settle/raise/shoulder/aim, recoil/bolt/re-aim and lower. The `poseSequence` sampler
+uses the existing snapshot-aware movement signal, body bearing for running and weapon bearing
+for combat; repeated positions between 30Hz snapshots do not select idle. The first shot has a
+350ms presentation-only shoulder windup, with ready experimental Rifleman flashes delayed to match.
+Normal-art fallback keeps immediate feedback while the atlas loads; a readiness change cannot
+replay an already presented shot. Damage,
+audio and server combat timing remain unchanged. Repeated shots retain the aimed stance; an
+inactive unit lowers its rifle after the combat hold. The presentation entity snapshot preserves
+the server-filtered `targetId` so the worker retains aimed combat holds between shots.
+All poses share a foot anchor. Per-heading
+sprite envelopes keep HP bars above the body, and muzzle positions follow the authored rifle.
+The experimental selection ring is centered on that ground point; marquee footprints, collision
+and fog authority remain unchanged. Health-bar visibility keeps its separate existing preference.
 
-The original white-material art is split offline into fixed and shaded paint layers by
-`scripts/build-rifleman-experimental.mjs`. The existing team-paint compositor also accepts
-separate `baseImage` / `paintImage` atlas images with `frameColumns`, preserving neutral art,
-skin, equipment, edge alpha, and per-match palette teardown. Packed Cultivator sheets keep their
-existing path. Source sheets, prompts, registration metadata and runtime layers live under
-`client/assets/rigs/rifleman-experimental/`.
+`scripts/build-rifleman-sixteen.mjs` extracts the Cultivator magenta material mask before
+premultiplied area filtering. Its fixed/paint atlas pair preserves skin, equipment and soft edge
+coverage through the existing team-paint compositor and palette teardown. Selected source sheets,
+exact prompts, registration metadata and runtime layers live under
+`client/assets/rigs/rifleman-experimental-v3/`. The four approved cardinal source families are
+preserved; `scripts/check-rifleman-sixteen.mjs` verifies their recorded pixel hashes, all 256
+poses, size/clipping/anchor/HP bounds, palette alpha and 60/144/240Hz movement/heading stability.
+See [unit-sprite-generation.md](unit-sprite-generation.md) for generation and matte checks.
 
 This section owns the current Pixi look and module behavior. Renderer-neutral camera,
 presentation, ownership, capture, backend, parity-gate, and benchmark contracts live in

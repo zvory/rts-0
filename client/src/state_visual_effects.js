@@ -89,7 +89,7 @@ export class VisualEffectBuffers {
     }
   }
 
-  applySnapshotEvents(events, now, entityById) {
+  applySnapshotEvents(events, now, entityById, experimentalGraphicsEnabled = false) {
     const burstIndices = new Map();
     for (const ev of events) {
       if (ev && ev.e === EVENT.ATTACK && typeof ev.from === "number" && typeof ev.to === "number") {
@@ -97,6 +97,7 @@ export class VisualEffectBuffers {
         const daoShot = DISCIPLE_PROJECTILE_KINDS.has(ev.weaponKind);
         const daoShooter = daoShot && typeof entityById === "function" ? entityById(ev.from) : null;
         const daoTarget = daoShot && !targetPos && typeof entityById === "function" ? entityById(ev.to) : null;
+        const experimentalDelayMs = experimentalGraphicsEnabled && ev.weaponKind === WEAPON_KIND.RIFLEMAN_RIFLE ? 350 : 0;
         if (ev.from !== ev.to && ev.weaponKind !== WEAPON_KIND.WARRIOR_SWORD) {
           this.muzzleFlashes.push({
             from: ev.from,
@@ -106,7 +107,9 @@ export class VisualEffectBuffers {
             daoOrigin: daoShooter ? { x: daoShooter.x, y: daoShooter.y } : null,
             weaponKind: normalizedWeaponKind(ev.weaponKind),
             shotOrigin: ev.shotOrigin,
-            createdAt: now + (ev.shotOrigin ? (burstIndices.get(ev.from) || 0) * 20 : 0),
+            ...(experimentalDelayMs ? { experimentalDelayMs } : {}),
+            createdAt: now + experimentalDelayMs
+              + (ev.shotOrigin ? (burstIndices.get(ev.from) || 0) * 20 : 0),
           });
         }
         if (ev.shotOrigin) burstIndices.set(ev.from, (burstIndices.get(ev.from) || 0) + 1);
@@ -494,6 +497,17 @@ export class VisualEffectBuffers {
 export class VisualEffectBackedState {
   constructor() {
     this.visualEffects = new VisualEffectBuffers();
+  }
+
+  restoreExperimentalShotTiming() {
+    for (const flash of this.muzzleFlashes) if (flash.experimentalDelayMs) {
+      flash.createdAt -= flash.experimentalDelayMs;
+      delete flash.experimentalDelayMs;
+    }
+  }
+
+  applySnapshotVisualEvents(events, now) {
+    this.visualEffects.applySnapshotEvents(events, now, (id) => this.entityById(id), this.experimentalGraphicsEnabled === true);
   }
 
   get smokeCanisters() { return this.visualEffects.smokeCanisters; }

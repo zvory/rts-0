@@ -265,7 +265,7 @@ export function _ringRadius(e) {
     return { rx: body.halfLen + 7, ry: body.halfWidth + 7, cy: 2 };
   }
   const r = (entityBodyRadius(e) || 9) + 6;
-  return { rx: r, ry: r * 0.68, cy: r * 0.36 };
+  return { rx: r, ry: r * 0.68, cy: e.kind === KIND.RIFLEMAN && this._experimentalRiflemanFrameStrip?.()?.strip.poseSequence ? 0 : r * 0.36 };
 }
 
 export function _hpBar(g, e, status = null, ownerColor = null, showHp = true, ownerFactionId = null) {
@@ -292,8 +292,21 @@ export function _hpBar(g, e, status = null, ownerColor = null, showHp = true, ow
     }
   }
   const barW = halfW * 2;
-  if (e.kind === KIND.RIFLEMAN && this._experimentalRiflemanFrameStrip?.()) {
-    topY = e.y - 48 * rigContainerScale(this._unitRenderContexts?.get?.(e.id));
+  const experimental = e.kind === KIND.RIFLEMAN ? this._experimentalRiflemanFrameStrip?.() : null;
+  if (experimental) {
+    const scale = rigContainerScale(this._unitRenderContexts?.get?.(e.id));
+    const pool = e.shotReveal || e.aboveFogReveal
+      ? this._liveRigPools?.liveShotRevealRigs : this._liveRigPools?.liveUnitRigs;
+    const instance = pool?.get?.(e.id);
+    if (Number.isFinite(instance?.visualTopY)) topY = instance.visualTopY - 8;
+    else if (experimental.strip.poseGeometry) {
+      const strip = experimental.strip;
+      const facing = Number.isFinite(e.weaponFacing) ? e.weaponFacing : e.facing || 0;
+      const count = strip.directional.directionCount;
+      const step = Math.PI * 2 / count;
+      const direction = ((Math.round((facing - strip.directional.firstFacing) / step) % count) + count) % count;
+      topY = e.y + (strip.poseGeometry.topByDirection[direction] - strip.anchorY * strip.frameHeight) * strip.worldScale * scale - 8;
+    } else topY = e.y - 48 * scale;
   }
   const barH = 4;
   if (isDiscipleKind(e.kind) || (e.kind === KIND.WORKER && ownerFactionId === "cultivators")) topY += barH / 2;
