@@ -361,6 +361,10 @@ combat responses, expansion cover, or offensive pushes borrow units. These posts
 fixed garrison planner, independent of remaining-Steel economic weights; scarce infantry spread
 across supported bases in rounds. Surviving exact posts keep their guards; casualties are
 replaced, wounded micro retains priority, and unsupported terrain never fabricates a legal post.
+Assignment and retention require the actual infantry body's current known-world reachable
+component to contain the post; unreachable infantry remain available instead of being locked
+into phantom guards. Potential ring posts are matched in rounds, so an unreachable site's
+quota does not consume another base's reachable guards.
 The normal hybrid planner staffs terrain cuts with the remaining infantry. Garrison rings are
 seven to nine tiles from the base center (four tiles farther than the previous three-to-five
 ring), using the same footprint, resource, access, reachability, spacing and spreading checks.

@@ -24,19 +24,23 @@ fn two_base_scene(count: usize) -> (StartPayload, Snapshot, Vec<AiBaseSite>) {
         })
         .unwrap();
     building(&mut s, 800, "resource_depot", second.position, None);
+    let f = frame(&start, &s, &sites);
+    let owned = owned_sites(&f);
+    let plan = DefensePlanner::with_garrison_posts_per_base(4).plan(&f, &owned, 8);
+    let rings = [home.id, second.id].map(|id| {
+        plan.sectors
+            .iter()
+            .find(|sector| sector.base_ids == [id])
+            .unwrap()
+            .slots
+            .clone()
+    });
     for i in 0..count {
         let mut e = template.clone();
         e.id = 1000 + i as u32;
-        e.x = if i % 2 == 0 {
-            home.position.0
-        } else {
-            second.position.0
-        };
-        e.y = if i % 2 == 0 {
-            home.position.1
-        } else {
-            second.position.1
-        };
+        let post = rings[i % 2][(i / 2) % 4].position;
+        e.x = post.0;
+        e.y = post.1;
         e.hp = 100;
         e.max_hp = 100;
         s.entities.push(e);
@@ -180,4 +184,86 @@ fn newly_assigned_attacking_guards_hold_once_then_keep_shooting_without_reorders
         actions.into_requests().is_empty(),
         "existing guards shooting in place must not restart weapon setup"
     );
+}
+
+#[test]
+fn unreachable_infantry_do_not_count_as_observation_guards() {
+    let (mut start, mut s, sites) = fixture();
+    start.map.terrain.fill(0);
+    start.map.unwalkable_tiles.clear();
+    start.map.no_vehicle_tiles.clear();
+    start.map.no_entrenchment_tiles.clear();
+    start.map.doodads.clear();
+    let wall = start.map.width / 2;
+    for y in 0..start.map.height {
+        start
+            .map
+            .unwalkable_tiles
+            .push(rts_sim::protocol::MapTile { x: wall, y });
+    }
+    let home = sites
+        .iter()
+        .find(|b| b.id == AiBaseSiteId::Start(1))
+        .unwrap()
+        .position;
+    let far = if home.0 < wall as f32 * 32. {
+        (wall + 10) as f32 * 32. + 16.
+    } else {
+        (wall - 10) as f32 * 32. + 16.
+    };
+    for e in s
+        .entities
+        .iter_mut()
+        .filter(|e| e.owner == 1 && e.kind == "rifleman")
+    {
+        e.x = far;
+        e.y = home.1;
+        e.hp = 100;
+    }
+    let f = frame(&start, &s, &sites);
+    let mut defense = tactics::DefenseAssignments::default();
+    assert!(defense.prepare_sentries(&f, &owned_sites(&f)).is_empty());
+    assert!(defense.assigned_sentry_posts().is_empty());
+}
+
+#[test]
+fn formerly_assigned_guards_are_replaced_if_they_can_no_longer_reach_their_posts() {
+    let (mut start, mut s, sites) = fixture();
+    start.map.terrain.fill(0);
+    start.map.unwalkable_tiles.clear();
+    start.map.no_vehicle_tiles.clear();
+    start.map.no_entrenchment_tiles.clear();
+    start.map.doodads.clear();
+    let wall = start.map.width / 2;
+    for y in 0..start.map.height {
+        start
+            .map
+            .unwalkable_tiles
+            .push(rts_sim::protocol::MapTile { x: wall, y });
+    }
+    add_observation_garrisons(&start, &mut s, &sites);
+    let f = frame(&start, &s, &sites);
+    let owned = owned_sites(&f);
+    let mut defense = tactics::DefenseAssignments::default();
+    let previous = defense.prepare_sentries(&f, &owned);
+    assert_eq!(previous.len(), 4);
+    let home = sites
+        .iter()
+        .find(|b| b.id == AiBaseSiteId::Start(1))
+        .unwrap()
+        .position;
+    let far = if home.0 < wall as f32 * 32. {
+        (wall + 10) as f32 * 32. + 16.
+    } else {
+        (wall - 10) as f32 * 32. + 16.
+    };
+    for e in s.entities.iter_mut().filter(|e| previous.contains(&e.id)) {
+        e.x = far;
+        e.y = home.1;
+    }
+    s.tick += 9;
+    let f = frame(&start, &s, &sites);
+    let replacements = defense.prepare_sentries(&f, &owned);
+    assert_eq!(replacements.len(), 4);
+    assert!(previous.is_disjoint(&replacements));
 }

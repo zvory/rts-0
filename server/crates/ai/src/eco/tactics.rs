@@ -63,7 +63,15 @@ impl DefenseAssignments {
         frame: &AiFrame,
         sites: &[AiBaseSiteId],
     ) -> BTreeSet<u32> {
+        let previous = self
+            .sentries
+            .posts()
+            .keys()
+            .copied()
+            .collect::<BTreeSet<_>>();
         let ids = self.sentries.refresh(frame, sites);
+        self.guard_posts
+            .retain(|id, _| !previous.contains(id) || ids.contains(id));
         self.guard_posts.extend(self.sentries.posts());
         ids
     }
