@@ -107,6 +107,9 @@ async function handleMessage(candidate) {
       renderer?.setProjectedUnitShadowsEnabled?.(
         message.payload.projectedUnitShadowsEnabled,
       );
+      if (message.payload.experimentalGraphicsEnabled != null) {
+        renderer?.setExperimentalGraphicsEnabled?.(message.payload.experimentalGraphicsEnabled);
+      }
       break;
     case RENDER_WORKER_MESSAGE.DESTROY:
       destroy(message.generation);

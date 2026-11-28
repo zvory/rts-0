@@ -1,5 +1,5 @@
 import { STATS, entityBodyRadius } from "../config.js";
-import { isBuilding, isResource, isUnit } from "../protocol.js";
+import { KIND, isBuilding, isResource, isUnit } from "../protocol.js";
 import { clickGeometry } from "./click_geometry.js";
 import { DEFAULT_HIT_RADIUS, DEFAULT_TILE_SIZE } from "./constants.js";
 
@@ -14,6 +14,7 @@ export function buildSelectionScene({
   tileSize = DEFAULT_TILE_SIZE,
   generation = 1,
   frameId = 0,
+  experimentalGraphicsEnabled = false,
 } = {}) {
   if (!projection || projection.version !== 1 || typeof projection.project !== "function") {
     throw new TypeError("SelectionSceneV1 requires a ProjectionSnapshotV1");
@@ -21,7 +22,7 @@ export function buildSelectionScene({
   const proxies = [];
   const sourceEntities = Array.isArray(entities) ? entities : [];
   for (let index = 0; index < sourceEntities.length; index += 1) {
-    const proxy = selectionProxyForEntity(sourceEntities[index], tileSize, preparedEntities?.[index]);
+    const proxy = selectionProxyForEntity(sourceEntities[index], tileSize, preparedEntities?.[index], experimentalGraphicsEnabled);
     if (proxy) proxies.push(proxy);
   }
   const rememberedProxies = [];
@@ -39,7 +40,7 @@ export function buildSelectionScene({
   });
 }
 
-export function selectionProxyForEntity(entity, tileSize = DEFAULT_TILE_SIZE, prepared = null) {
+export function selectionProxyForEntity(entity, tileSize = DEFAULT_TILE_SIZE, prepared = null, experimentalGraphicsEnabled = false) {
   if (
     !entity ||
     entity.shotReveal ||
@@ -79,6 +80,12 @@ export function selectionProxyForEntity(entity, tileSize = DEFAULT_TILE_SIZE, pr
   const heightPx = isBuilding(entity.kind)
     ? Math.max(8, Math.max(finitePositive(stat.footW, 1), finitePositive(stat.footH, 1)) * mapTileSize * 0.5)
     : Math.max(8, size);
+  const pointClick = clickGeometry(entity, footprint);
+  if (experimentalGraphicsEnabled && entity.kind === KIND.RIFLEMAN) {
+    // Authored body bounds only; collision, marquee and selection rings keep the ground footprint.
+    pointClick.clickFootprint = polygonFootprint(entity.x, entity.y - 20, 28, 52, 0);
+    pointClick.directClickFootprint = polygonFootprint(entity.x, entity.y - 20, 22, 46, 0);
+  }
   return Object.freeze({
     version: 1,
     id: entity.id,
@@ -89,7 +96,7 @@ export function selectionProxyForEntity(entity, tileSize = DEFAULT_TILE_SIZE, pr
     setupState: typeof entity.setupState === "string" ? entity.setupState : null,
     anchor: Object.freeze({ x: entity.x, y: entity.y, heightPx }),
     footprint,
-    ...clickGeometry(entity, footprint),
+    ...pointClick,
     minScreenRadiusCssPx: 6,
     interaction: prepared?.source === entity && prepared.interaction
       ? prepared.interaction

@@ -35,9 +35,11 @@ import { MatchHistory, requestReplayRoom } from "./match_history.js";
 import {
   applyMatchHealthBars,
   applyMatchProjectedUnitShadows,
+  applyMatchExperimentalGraphics,
   applyMatchUnitRanges,
 } from "./match_settings_toggles.js";
 import { readPredictionEnabled, writePredictionEnabled } from "./prediction_settings.js";
+import { readExperimentalGraphicsEnabled, writeExperimentalGraphicsEnabled } from "./experimental_graphics_settings.js";
 import { readUnitRangesEnabled, writeUnitRangesEnabled } from "./unit_range_settings.js";
 import {
   readAlwaysShowHealthBarsEnabled,
@@ -297,6 +299,7 @@ export class App {
     this.unitRangesEnabled = readUnitRangesEnabled();
     this.healthBarsAlwaysEnabled = readAlwaysShowHealthBarsEnabled();
     this.projectedUnitShadowsEnabled = readProjectedUnitShadowsEnabled();
+    this.experimentalGraphicsEnabled = readExperimentalGraphicsEnabled();
     this.exclusiveFullscreenEnabled = exclusiveFullscreenSupported() &&
       readExclusiveFullscreenEnabled();
     this.observerAnalysisOverlayPreferences = createObserverAnalysisOverlayPreferences();
@@ -874,6 +877,8 @@ export class App {
         unitRangesEnabled: this.unitRangesEnabled,
         healthBarsAlwaysEnabled: this.healthBarsAlwaysEnabled,
         projectedUnitShadowsEnabled: this.projectedUnitShadowsEnabled,
+        experimentalGraphicsEnabled: this.experimentalGraphicsEnabled,
+        onExperimentalGraphicsEnabledChange: (enabled) => this.setExperimentalGraphicsEnabled(enabled),
         exclusiveFullscreenEnabled: this.exclusiveFullscreenEnabled,
         autoSpectatorEnabled: interactAutoSpectatorEnabled(),
         onPredictionEnabledChange: (enabled) => this.setPredictionEnabled(enabled),
@@ -1261,6 +1266,13 @@ export class App {
     this.projectedUnitShadowsEnabled = !!enabled;
     writeProjectedUnitShadowsEnabled(this.projectedUnitShadowsEnabled);
     applyMatchProjectedUnitShadows(this.match, this.projectedUnitShadowsEnabled);
+    this.refreshSettingsAfterPreferenceChange();
+  }
+
+  setExperimentalGraphicsEnabled(enabled) {
+    this.experimentalGraphicsEnabled = !!enabled;
+    writeExperimentalGraphicsEnabled(this.experimentalGraphicsEnabled);
+    applyMatchExperimentalGraphics(this.match, this.experimentalGraphicsEnabled);
     this.refreshSettingsAfterPreferenceChange();
   }
 

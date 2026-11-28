@@ -29,6 +29,7 @@ import { gfxNoFill, gfxRect, gfxReset, gfxFill, gfxStroke } from "./native_graph
 // This module is worker-owned production code; main-thread client modules must not import it.
 
 import { COLORS } from "../config.js";
+import { setExperimentalGraphicsEnabled, _experimentalRiflemanFrameStrip } from "./experimental_graphics.js";
 import { isUnit, isBuilding, isResource } from "../protocol.js";
 import { _drawBuilding } from "./buildings.js";
 import {
@@ -1414,6 +1415,8 @@ function updateStaticDoodadVisibility(camera) {
 }
 
 Object.assign(Renderer.prototype, {
+  setExperimentalGraphicsEnabled,
+  _experimentalRiflemanFrameStrip,
   buildStaticMap: buildStaticMapWithDoodads,
   replaceStaticDoodads,
   patchStaticDoodads,
