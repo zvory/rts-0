@@ -1,3 +1,6 @@
+import { RecordingGraphics } from "./pixi_fakes.mjs";
+import { assertApprox } from "./assertions.mjs";
+import { _drawMuzzleFlashes } from "../../client/src/renderer/muzzle_feedback.js";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { PNG } from "pngjs";
@@ -11,6 +14,30 @@ import { selectionProxyForEntity } from "../../client/src/input/selection_projec
 import { buildSettingsTabs } from "../../client/src/settings_panels.js";
 import { memoryStorage, withFakeSettingsDocument, findFakeById } from "./fakes.mjs";
 import { createInspectionPngPixiFactory, FakeContainer } from "../helpers/rig_inspection_pixi.mjs";
+
+{
+  const attacker = { id: 1, kind: "rifleman", x: 100, y: 200, facing: 0, weaponFacing: 0 };
+  const state = {
+    entityById: id => id === attacker.id ? attacker : null,
+    liveMuzzleFlashes: () => [{ from: attacker.id, weaponKind: "rifleman_rifle", createdAt: 1000 }],
+  };
+  for (const experimental of [false, true]) {
+    const graphics = new RecordingGraphics();
+    _drawMuzzleFlashes.call({
+      visualNow: () => 1000,
+      _feedbackGfx: graphics,
+      _experimentalRiflemanFrameStrip: () => experimental ? {} : null,
+      _unitRenderContexts: new Map([[attacker.id, { visualScale: 0.5 }]]),
+    }, state);
+    const flashes = graphics.calls.filter(call => call[0] === "drawCircle");
+    assert(flashes.length === (experimental ? 2 : 0),
+      "experimental art needs rendered muzzle flashes; normal Rifleman art supplies its own");
+    for (const flash of flashes) {
+      assertApprox(flash[1], 112, 0.001, "experimental flash follows the scaled muzzle x");
+      assertApprox(flash[2], 185, 0.001, "experimental flash follows the scaled muzzle height");
+    }
+  }
+}
 
 const storage = memoryStorage();
 storage.removeItem = key => storage.data.delete(key);
