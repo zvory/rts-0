@@ -5,13 +5,29 @@ use rts_sim::game::{Game, PlayerInit};
 
 #[test]
 fn eco_classic_opening_reaches_three_bases_with_staged_vehicle_works() {
+    if !full_ai_enabled() {
+        eprintln!(
+            "skipping controlled Eco progression; set RTS_FULL_AI_TESTS=1 to run full AI coverage"
+        );
+        return;
+    }
     run_economy_progression(3);
 }
 
 #[test]
 fn eco_extended_economy_claims_seven_bases() {
-    // Match the repository's full-AI opt-in so the soak runs in --full-ai coverage.
-    let full_ai = ["RTS_FULL_AI_TESTS", "RTS_SELFPLAY_FULL"]
+    if !full_ai_enabled() {
+        eprintln!(
+            "skipping seven-base Eco progression; set RTS_FULL_AI_TESTS=1 to run full AI coverage"
+        );
+        return;
+    }
+    run_economy_progression(7);
+}
+
+fn full_ai_enabled() -> bool {
+    // Controlled economy progression is opt-in, like the repository's other long AI coverage.
+    ["RTS_FULL_AI_TESTS", "RTS_SELFPLAY_FULL"]
         .into_iter()
         .any(|name| {
             matches!(
@@ -21,14 +37,7 @@ fn eco_extended_economy_claims_seven_bases() {
                     .as_str(),
                 "1" | "true" | "yes" | "on"
             )
-        });
-    if !full_ai {
-        eprintln!(
-            "skipping seven-base Eco progression; set RTS_FULL_AI_TESTS=1 to run full AI coverage"
-        );
-        return;
-    }
-    run_economy_progression(7);
+        })
 }
 
 fn run_economy_progression(goal: usize) {
