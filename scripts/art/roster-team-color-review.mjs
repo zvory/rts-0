@@ -31,6 +31,7 @@ if(modes.includes('--restore')) {
   process.exit(0);
 }
 if(!modes.includes('--install-preview')) {
+ if(fs.existsSync(backup))throw Error('Restore the preview before packing or checking: renderer metadata is a production source input');
 const sources={
  ...Object.fromEntries(EXPANDED_REVIEW.map(s=>[s.name,s.runtime])),
  rifleman:'rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-recoil-review-strip.png',

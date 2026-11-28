@@ -58,6 +58,7 @@ The installer uses existing packed textures, backs up thirteen renderer modules 
 both backup hashes and installed files before writing, then removes the backup. Changed renderer
 files or legacy backups require manual preservation/reconciliation rather than automatic overwrite.
 Restore before committing. `--check` compares generated outputs without writing them.
+Packing and checking refuse an installed preview because production renderer metadata is a source input.
 The capture script requires an unused Interact runtime and uses its authoritative Lab,
 pauses the scene, and takes seven separate game screenshots at camera scale 1 and DPR 2, using
 seven colors from the current player palette. Each color launches the same checkpoint through a temporary catalog scenario in a fresh
