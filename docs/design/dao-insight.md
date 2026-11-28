@@ -70,11 +70,11 @@ Magic Disciples can place Shield within five tiles: a shimmering circle with a
 It also protects an entire allied building when at least 50% of the shield's circular area
 overlaps the building's tile footprint; full containment is unnecessary. The denominator is
 the shield area, not the building area. Building coverage uses the same armor and HP pool rules.
-The field has 150 HP and grants a separate 75% armor layer against hostile attacks entering
+The field has 150 HP and grants a separate 100% armor layer against hostile attacks entering
 from outside; attacks originating inside bypass its armor and do not drain its HP. Existing
 unit armor, facing, cover, and terrain reductions apply first. Shield armor then uses the ordinary
-armor-penetration formula: `damage × (1 − 0.75 × (1 − penetration))`, rounded to the nearest HP.
-An otherwise 100-damage hit deals 25 HP at 0% piercing, 63 HP at 50% piercing, and 100 HP at
+armor-penetration formula: `damage × penetration`, rounded to the nearest HP.
+Non-piercing attacks damage only the shield. An otherwise 100-damage hit deals 0 HP at 0% piercing, 50 HP at 50% piercing, and 100 HP at
 100% piercing. Regardless of piercing or the unit's defenses, the shield loses the attack's full
 pre-reduction damage (area hits use their distance-falloff damage). Even fully piercing hits drain it.
 A field active at impact protects the entire hit, including the hit that depletes it; excess durability
@@ -86,7 +86,7 @@ tank HE splash is non-piercing. Mortar/rocket and artillery checks use recorded 
 which survive attacker death and checkpoint restore. Friendly fire, environmental damage,
 invulnerable targets, and enemy entities receive no shield armor and do not drain it.
 Shield costs no resources, has a ten-second
-cooldown, replaces the caster’s prior shield, and expires after 5 seconds (10 seconds for Magic Masters, whose shield also has 300 HP) or earlier on
+cooldown, replaces the caster’s prior shield, and expires after 10 seconds (15 seconds for Magic Masters, whose shield also has 300 HP) or earlier on
 depletion, replacement, or caster death. In-range casts preserve movement and queued orders;
 out-of-range immediate casts replace the current order with an approach-and-cast order. The pool, fixed world center, and absolute expiry tick live on the caster entity and survive
 checkpoints; the existing ability-runtime allocator supplies its unique visual id.

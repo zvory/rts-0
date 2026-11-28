@@ -37,7 +37,7 @@ fn disciple_shield_armors_projectiles_crossing_barrier_and_pays_full_damage_on_b
         }
         assert_eq!(
             entities.get(victim).unwrap().hp,
-            hp - total / 4,
+            hp,
             "{ability:?}"
         );
         assert_eq!(

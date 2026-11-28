@@ -2068,7 +2068,7 @@ to its matching [Master](dao-masters.md), resets insight, and fully heals to the
 
 Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md).
 Shield uses ability `discipleShield` (code 17, order stage 25), world-point target,
-ability-object kind `shield` (code 4). It expires after 5 seconds for Adepts or 10 seconds for Masters, projected through `expiresIn`; `ownerState.hp` carries
+ability-object kind `shield` (code 4). It expires after 10 seconds for Adepts or 15 seconds for Masters, projected through `expiresIn`; `ownerState.hp` carries
 the remaining pool (150 HP for Adepts, 300 HP for Masters); `ownerState.maxHp` and `ownerState.durationTicks` carry the cast-time maxima for the bars to every viewer who can see the field, including enemies and allies. The client renders this pool as a cyan HP bar above the public gray lifetime bar, updating it as full incoming hit damage drains shield HP. The radius
 is 2.1 tiles for every viewer. Field visibility is gated at its center, independently
 of its caster; `sourceCasterId` is omitted when that caster is hidden.

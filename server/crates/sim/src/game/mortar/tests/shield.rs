@@ -63,7 +63,7 @@ fn disciple_shield_armors_mortar_and_rocket_hits_and_drains_full_damage() {
                     if inside {
                         unshielded_damage
                     } else {
-                        ((unshielded_damage as f32) * if piercing { 1.0 } else { 0.25 }).round()
+                        ((unshielded_damage as f32) * if piercing { 1.0 } else { 0.0 }).round()
                             as u32
                     }
                 );
