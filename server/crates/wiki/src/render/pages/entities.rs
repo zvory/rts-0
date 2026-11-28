@@ -420,11 +420,19 @@ pub(super) fn unit_page(w: &Wiki, u: &Value) {
     ];
     if nz(at, "dmg") > 0.0 || weapon_v.is_some() {
         rows.push(Row::Section("Attack".into()));
+        let area = weapon_v.is_some_and(|wv| !get(wv, "area").is_null());
         let dmg_text = weapon_v
-            .filter(|wv| !get(wv, "burst").is_null())
+            .filter(|wv| !get(wv, "burst").is_null() || area)
             .map(weapon_dmg_text)
             .unwrap_or_else(|| fmt(nz(at, "dmg")));
-        rows.push(field("Damage", w.coded(&akey, adm, dmg_text)));
+        rows.push(field(
+            "Damage",
+            if area {
+                w.coded_const("MORTAR_INNER_DAMAGE", dmg_text)
+            } else {
+                w.coded(&akey, adm, dmg_text)
+            },
+        ));
         let sr = get(u, "stationaryRange");
         match (n(u, "deployedRangeTiles"), n(sr, "maxTiles")) {
             (Some(d), _) => rows.push(field(
@@ -473,12 +481,47 @@ pub(super) fn unit_page(w: &Wiki, u: &Value) {
                 "Weapon",
                 format!(
                     "<a href=\"weapons.html#w-{weapon}\">{}</a><br><span class=\"muted\">{}, armor pen. {}%</span>",
-                    esc(&weapon_name(&weapon)),
+                    esc(&w.weapon_label(&weapon)),
                     esc(&human(&s(wv, "weaponClass"))),
                     fmt(nz(wv, "armorPenetration") * 100.0)
                 ),
             ));
         }
+    }
+    // Adepts become Masters once their insight reaches the cap
+    let master = get(u, "master");
+    if !master.is_null() {
+        rows.push(Row::Section("Master rank".into()));
+        rows.push(field(
+            "Reached at",
+            w.coded_const(
+                "DISCIPLE_EVOLVED_INSIGHT_CAP",
+                format!("{} insight", fmt(nz(master, "insight"))),
+            ),
+        ));
+        rows.push(field(
+            "HP",
+            w.coded_const("DAO_MASTER_HP_MULTIPLIER", fmt(nz(master, "hp"))),
+        ));
+        let dmg_const = if id == "war_adept" {
+            "DAO_WAR_MASTER_DAMAGE_MULTIPLIER"
+        } else {
+            "DAO_MASTER_DAMAGE_MULTIPLIER"
+        };
+        rows.push(field(
+            "Damage",
+            w.coded_const(dmg_const, fmt(nz(master, "dmg"))),
+        ));
+        if let Some(ap) = n(master, "armorPenetration") {
+            rows.push(field("Armor pen.", format!("{}%", fmt(ap * 100.0))));
+        }
+        rows.push(field(
+            "Speed",
+            w.coded_const(
+                "DAO_MASTER_SPEED_MULTIPLIER",
+                format!("{} tiles/s", fmt2(w.u.speed(nz(master, "speedPxPerTick")))),
+            ),
+        ));
     }
     rows.push(Row::Section("Movement & vision".into()));
     rows.push(field(
@@ -540,10 +583,10 @@ pub(super) fn unit_page(w: &Wiki, u: &Value) {
             let _ = write!(
                 h,
                 "<tr><td><a href=\"weapons.html#w-{wid}\">{}</a></td><td class=\"num\">{}</td><td class=\"num\">{}</td><td class=\"num\">{}</td><td class=\"num\">{}</td><td>{}</td><td class=\"num\">{}%</td><td>{}</td></tr>",
-                esc(&weapon_name(wid)),
+                esc(&w.weapon_label(wid)),
                 weapon_dmg_text(wv),
-                fmt(nz(wv, "rangeTiles")),
-                w.u.secs(nz(wv, "cooldownTicks")),
+                weapon_range_text(wv),
+                weapon_cooldown_text(w, wv),
                 weapon_dps(w, wv),
                 esc(&human(&s(wv, "weaponClass"))),
                 fmt(nz(wv, "armorPenetration") * 100.0),
@@ -631,7 +674,7 @@ pub(super) fn unit_page(w: &Wiki, u: &Value) {
                 h,
                 "<details{}><summary>{}</summary>{}</details>",
                 if i == 0 { " open" } else { "" },
-                esc(&weapon_name(&s(wv, "id"))),
+                esc(&w.weapon_label(&s(wv, "id"))),
                 weapon_damage_table(w, wv)
             );
         }
@@ -753,11 +796,14 @@ pub(super) fn building_page(w: &Wiki, bv: &Value) {
     h.push_str(&description(bv));
     h.push_str(&notes_html(w, "buildings", &id, &file));
 
-    let trains: Vec<String> = strs(bv, "trains");
-    if !trains.is_empty() {
-        h.push_str(&h2("trains", "Trains"));
+    let (trains, builds) = trains_and_builds(w, bv);
+    for (anchor, title, list) in [("trains", "Trains", &trains), ("builds", "Builds", &builds)] {
+        if list.is_empty() {
+            continue;
+        }
+        h.push_str(&h2(anchor, title));
         h.push_str("<div class=\"card-grid\">");
-        for t in &trains {
+        for t in list {
             if let Some(v) = w.unit(t).or_else(|| w.building(t)) {
                 h.push_str(&card(w, w.kind_of(t), t, v));
             }

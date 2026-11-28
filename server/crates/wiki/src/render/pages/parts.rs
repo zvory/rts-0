@@ -181,14 +181,52 @@ pub(super) fn row_hit(row: &Value) -> (f64, f64) {
 
 pub(super) fn weapon_hit(wv: &Value) -> (f64, f64) {
     let burst = get(wv, "burst");
-    match (n(burst, "min"), n(burst, "max")) {
-        (Some(a), Some(b)) => (a, b),
+    let area = get(wv, "area");
+    match (
+        n(burst, "min"),
+        n(burst, "max"),
+        n(area, "min"),
+        n(area, "max"),
+    ) {
+        (Some(a), Some(b), _, _) | (_, _, Some(a), Some(b)) => (a, b),
         _ => (nz(wv, "dmg"), nz(wv, "dmg")),
+    }
+}
+
+/// "5", "5 (20 set up)" for the Anti-Tank Gun, "5–14" for the Tank Cannon.
+pub(super) fn weapon_range_text(wv: &Value) -> String {
+    let base = fmt(nz(wv, "rangeTiles"));
+    if let Some(d) = n(wv, "deployedRangeTiles") {
+        format!("{base} <span class=\"muted\">({} set up)</span>", fmt(d))
+    } else if let Some(max) = n(wv, "stationaryRangeTiles") {
+        format!(
+            "{base}–{} <span class=\"muted\">(standing still)</span>",
+            fmt(max)
+        )
+    } else {
+        base
+    }
+}
+
+/// A one-shot weapon (the Panzerfaust's rocket) has no cooldown to show.
+pub(super) fn weapon_cooldown_text(w: &Wiki, wv: &Value) -> String {
+    match n(wv, "cooldownTicks") {
+        Some(cd) if cd > 0.0 => w.u.secs(cd),
+        _ => "one shot".into(),
     }
 }
 
 pub(super) fn weapon_dmg_text(wv: &Value) -> String {
     let burst = get(wv, "burst");
+    let area = get(wv, "area");
+    if !area.is_null() {
+        return format!(
+            "{} <span class=\"muted\">at impact, {} at {}</span>",
+            fmt(nz(area, "max")),
+            fmt(nz(area, "min")),
+            tiles(nz(area, "radiusTiles"))
+        );
+    }
     if burst.is_null() {
         return fmt(nz(wv, "dmg"));
     }
@@ -304,9 +342,15 @@ pub(super) fn building_lead(w: &Wiki, bv: &Value) -> String {
         article(&fac),
         esc(&fac)
     );
-    let trains: Vec<String> = strs(bv, "trains").iter().map(|x| w.link(x)).collect();
+    // a production list can hold units and buildings (a Resource Depot's extractors)
+    let (units, builds) = trains_and_builds(w, bv);
+    let trains: Vec<String> = units.iter().map(|x| w.link(x)).collect();
     if !trains.is_empty() {
         let _ = write!(t, " Trains {}.", and_list(&trains));
+    }
+    let builds: Vec<String> = builds.iter().map(|x| w.link(x)).collect();
+    if !builds.is_empty() {
+        let _ = write!(t, " Builds {}.", and_list(&builds));
     }
     let research: Vec<String> = strs(bv, "researches")
         .iter()
@@ -325,6 +369,13 @@ pub(super) fn building_lead(w: &Wiki, bv: &Value) -> String {
         );
     }
     t
+}
+
+/// A building's production list split into the units it trains and the buildings it puts up.
+pub(super) fn trains_and_builds(w: &Wiki, bv: &Value) -> (Vec<String>, Vec<String>) {
+    strs(bv, "trains")
+        .into_iter()
+        .partition(|x| w.building(x).is_none())
 }
 
 pub(super) fn research_lead(w: &Wiki, r: &Value) -> String {
@@ -747,7 +798,7 @@ pub(super) fn damage_taken_table(w: &Wiki, target: &str) -> String {
             sort,
             format!(
                 "<tr><td><a href=\"weapons.html#w-{id}\">{}</a></td><td>{}</td><td class=\"num\" data-v=\"{}\">{}</td><td class=\"num\" data-v=\"{}\">{}</td></tr>",
-                esc(&weapon_name(&id)),
+                esc(&w.weapon_label(&id)),
                 w.links(&users),
                 nz(row, "dmg"),
                 dmg_cell,
@@ -798,12 +849,20 @@ pub(super) fn ability_card(w: &Wiki, a: &Value, file: &str) -> String {
             .map(|x| w.coded(&key, "min_range_tiles", tiles(x)))
             .unwrap_or_default(),
     ));
+    let cooldown = n(a, "cooldownTicks")
+        .filter(|x| *x > 0.0)
+        .map(|x| w.coded(&key, "cooldown_ticks", w.u.secs(x)))
+        .unwrap_or_default();
     rows.push((
         "Cooldown".into(),
-        n(a, "cooldownTicks")
-            .filter(|x| *x > 0.0)
-            .map(|x| w.coded(&key, "cooldown_ticks", w.u.secs(x)))
-            .unwrap_or_default(),
+        match n(a, "adeptCooldownTicks") {
+            // longer below Master rank (Throw Sword)
+            Some(adept) if !cooldown.is_empty() => format!(
+                "{} <span class=\"muted\">({cooldown} as a Master)</span>",
+                w.u.secs(adept)
+            ),
+            _ => cooldown,
+        },
     ));
     if let Some(c) = n(a, "charges") {
         let mut t = w.coded(&key, "charges", fmt(c));
@@ -875,15 +934,90 @@ pub(super) fn extra_properties(w: &Wiki, kind: &str, id: &str) -> Vec<(String, S
         .filter(|c| is_value(c) && !shown.contains(&s(c, "name")))
         .collect();
     entries.sort_by_key(|c| (Wiki::const_path(c), nz(c, "line") as i64));
+    // research times belong on research pages (BLINK_RESEARCH_TICKS is not a Blink property)
+    entries.retain(|c| kind != "ability" || !s(c, "name").ends_with("_RESEARCH_TICKS"));
     let prefixes = w.prefixes_of(kind, id);
-    entries
-        .into_iter()
-        .map(|c| {
-            let name = s(c, "name");
-            let (label, value) = prop_label_value(w, &name, get(c, "value"), &prefixes);
-            (label, w.coded_const(&name, value))
-        })
+    let carriers = w
+        .find("abilities", id)
+        .filter(|_| kind == "ability")
+        .map(|a| strs(a, "carriers"))
+        .unwrap_or_default();
+    let mut rows: Vec<(String, String, String)> = Vec::new();
+    for c in &entries {
+        let name = s(c, "name");
+        // X_NUMERATOR + X_DENOMINATOR make one fraction row
+        if name.ends_with("_DENOMINATOR")
+            && entries
+                .iter()
+                .any(|o| s(o, "name") == name.replace("_DENOMINATOR", "_NUMERATOR"))
+        {
+            continue;
+        }
+        if let Some(stem) = name.strip_suffix("_NUMERATOR") {
+            let den_name = format!("{stem}_DENOMINATOR");
+            if let Some(den) = entries.iter().find(|o| s(o, "name") == den_name) {
+                let (label, _) = prop_label_value(w, stem, &Value::Null, &prefixes);
+                let value = format!(
+                    "×{}/{}",
+                    w.coded_const(&name, scalar(get(c, "value"))),
+                    w.coded_const(&den_name, scalar(get(den, "value")))
+                );
+                rows.push((label, value, stem.to_string()));
+                continue;
+            }
+        }
+        let (label, value) = prop_label_value(w, &name, get(c, "value"), &prefixes);
+        rows.push((label, w.coded_const(&name, value), name));
+    }
+    // two rows with one label (NOVICE_CHARGE_DURATION_TICKS, WAR_CHARGE_DURATION_TICKS): name the
+    // unit each one is for, from the part of the name before the ability's own prefix
+    let labels: Vec<String> = rows.iter().map(|r| r.0.clone()).collect();
+    for row in rows.iter_mut() {
+        if labels.iter().filter(|l| **l == row.0).count() < 2 {
+            continue;
+        }
+        if let Some(who) = qualifier(w, &row.2, &prefixes, &carriers) {
+            row.0 = format!("{} ({who})", row.0);
+        }
+    }
+    rows.into_iter()
+        .map(|(label, value, _)| (label, value))
         .collect()
+}
+
+/// "War Adept" for WAR_CHARGE_DURATION_TICKS on Charge: the words before the entity's prefix,
+/// matched to one of its users, or to a unit's earlier name in the history (NOVICE → Sword
+/// Disciple), else spelled out.
+fn qualifier(w: &Wiki, name: &str, prefixes: &[String], carriers: &[String]) -> Option<String> {
+    let q = prefixes.iter().find_map(|p| {
+        name.find(&format!("_{p}_"))
+            .or_else(|| {
+                name.ends_with(&format!("_{p}"))
+                    .then(|| name.len() - p.len() - 1)
+            })
+            .map(|pos| name[..pos].to_string())
+    })?;
+    let matches = |text: &str| {
+        let t = upper_snake(text);
+        t == q || t.starts_with(&format!("{q}_"))
+    };
+    let users: Vec<String> = if carriers.is_empty() {
+        w.list("units").iter().map(|u| s(u, "id")).collect()
+    } else {
+        carriers.to_vec()
+    };
+    if let Some(u) = users.iter().find(|u| matches(u) || matches(&w.name_of(u))) {
+        return Some(w.name_of(u));
+    }
+    let renamed = w
+        .diffs
+        .iter()
+        .flatten()
+        .find(|c| c.kind == "unit" && users.contains(&c.id) && upper_snake(&c.name) == q);
+    Some(match renamed {
+        Some(c) => w.name_of(&c.id),
+        None => title_case(&q.to_lowercase()),
+    })
 }
 
 // ---------------------------------------------------------------- change log formatting
@@ -935,6 +1069,9 @@ pub(super) fn field_label(field: &str) -> String {
         ("trainRequirement.kinds", "Requires"),
         ("requires", "Requires"),
         ("trains", "Trains"),
+        ("trainables", "Production"),
+        ("loadout.starting", "Starting units"),
+        ("loadout.steel", "Starting steel"),
         ("footW", "Footprint width"),
         ("footH", "Footprint height"),
         ("chargeRechargeTicks", "Charge recharge"),
@@ -982,8 +1119,10 @@ pub(super) fn change_value(w: &Wiki, c: &Change, v: &Option<Value>) -> String {
 
 /// Display name for an id of any kind (unit, building, research, ability, faction).
 pub(super) fn any_name(w: &Wiki, v: &Value) -> String {
-    let Value::String(id) = v else {
-        return scalar(v);
+    let id = match v {
+        Value::String(id) => id,
+        Value::Object(_) => return item_name(w, v),
+        _ => return scalar(v),
     };
     if w.unit(id).is_some() || w.building(id).is_some() {
         w.name_of(id)
@@ -993,9 +1132,46 @@ pub(super) fn any_name(w: &Wiki, v: &Value) -> String {
         w.entity_name("ability", id)
     } else if w.faction(id).is_some() {
         w.faction_name(id)
-    } else {
+    } else if !id.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+        // ordinary text (a tooltip), not an id
         id.clone()
+    } else {
+        // no longer in the game: the name the history last recorded, else the id spelled out
+        w.diffs
+            .iter()
+            .rev()
+            .flatten()
+            .find(|c| c.kind != "constant" && c.id == *id && !c.name.is_empty())
+            .map(|c| c.name.clone())
+            .unwrap_or_else(|| title_case(&upper_snake(id).to_lowercase()))
     }
+}
+
+/// A list entry that is a record, in words: research { id } → its name, a starting army entry
+/// { kind, count } → "2 × Sword Disciple", a production list { building, units } → "Portal: …".
+fn item_name(w: &Wiki, v: &Value) -> String {
+    let id = s(v, "id");
+    if !id.is_empty() {
+        return any_name(w, &Value::String(id));
+    }
+    let kind = s(v, "kind");
+    if !kind.is_empty() {
+        let name = any_name(w, &Value::String(kind));
+        return match n(v, "count") {
+            Some(count) => format!("{} × {name}", fmt(count)),
+            None => name,
+        };
+    }
+    let building = s(v, "building");
+    if !building.is_empty() {
+        let units: Vec<String> = arr(v, "units").iter().map(|u| any_name(w, u)).collect();
+        return format!(
+            "{} ({})",
+            any_name(w, &Value::String(building)),
+            units.join(", ")
+        );
+    }
+    scalar(v)
 }
 
 pub(super) fn change_line(w: &Wiki, c: &Change) -> String {
@@ -1011,6 +1187,22 @@ pub(super) fn change_line(w: &Wiki, c: &Change) -> String {
             .filter(|x| !new.contains(x))
             .map(|x| any_name(w, x))
             .collect();
+        // a record that changed only in a detail its summary leaves out reads the same both ways
+        let (added, removed): (Vec<String>, Vec<String>) = (
+            added
+                .iter()
+                .filter(|a| !removed.contains(a))
+                .cloned()
+                .collect(),
+            removed
+                .iter()
+                .filter(|r| !added.contains(r))
+                .cloned()
+                .collect(),
+        );
+        if added.is_empty() && removed.is_empty() && old != new && old.len() == new.len() {
+            return format!("{}: details changed", esc(&field_label(&c.field)));
+        }
         if !added.is_empty() || !removed.is_empty() {
             let mut parts = Vec::new();
             if !added.is_empty() {
@@ -1084,7 +1276,7 @@ pub(super) fn entity_ref(w: &Wiki, c: &Change) -> String {
         "weapon" => format!(
             "<a href=\"weapons.html#w-{}\">{}</a>",
             esc(&c.id),
-            esc(&weapon_name(&c.id))
+            esc(&w.weapon_label(&c.id))
         ),
         "faction" => format!(
             "<a href=\"faction-{}.html\">{}</a>",
@@ -1148,17 +1340,31 @@ pub(super) fn changelog(w: &Wiki, kind: &str, id: &str) -> String {
         }
     }
     let first = get(&w.snaps[0], "game");
+    let last = get(&w.snaps[w.snaps.len() - 1], "game");
+    let span = format!(
+        "{} to {} (game <code>{}</code>)",
+        esc(&day(&s(first, "date"))),
+        esc(&day(&s(last, "date"))),
+        esc(&s(last, "short"))
+    );
+    // the history is exported separately; a newer build's own changes are not in it yet
+    let newer = if s(last, "short") != s(w.game(), "short") {
+        format!(
+            " This build (<code>{}</code>) is newer; its changes appear after the next history update.",
+            esc(&s(w.game(), "short"))
+        )
+    } else {
+        String::new()
+    };
     if h.is_empty() {
         format!(
-            "{}<p class=\"muted\">No changes since tracking began ({}).</p>",
+            "{}<p class=\"muted\">No changes recorded from {span}.{newer}</p>",
             h2("changelog", "Changelog"),
-            esc(&day(&s(first, "date")))
         )
     } else {
         format!(
-            "{}{h}<p class=\"muted\">Tracked since {}.</p>",
+            "{}{h}<p class=\"muted\">Recorded from {span}.{newer}</p>",
             h2("changelog", "Changelog"),
-            esc(&day(&s(first, "date")))
         )
     }
 }

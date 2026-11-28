@@ -12,9 +12,9 @@ use reference::*;
 use crate::render::content::Doc;
 use crate::render::diff::Change;
 use crate::render::util::{
-    arr, b, day, esc, fmt, fmt2, get, n, nz, s, scalar, slug, strs, title_case,
+    arr, b, day, esc, fmt, fmt2, get, n, nz, s, scalar, slug, strs, title_case, upper_snake,
 };
-use crate::render::{weapon_name, Wiki};
+use crate::render::Wiki;
 use serde_json::Value;
 use std::collections::{BTreeMap, HashMap};
 use std::fmt::Write as _;

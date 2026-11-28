@@ -196,6 +196,24 @@ fn current_wiki_hides_archived_content_and_links() {
 }
 
 #[test]
+fn hidden_content_leaves_no_constants_or_history_behind() {
+    // constants whose home is hidden content: not listed, not searchable, not in any changelog
+    for (page, html) in site() {
+        for prefix in ["EKAT_", "ARTILLERY_", "HEALING_SEAL_", "BALLISTIC_TABLES_"] {
+            assert!(!html.contains(prefix), "{page} shows a {prefix}* constant");
+        }
+        // raw ids of hidden abilities used to leak into faction list changes
+        for id in ["ekatTeleport", "ekatMagicAnchor", "healingSeal"] {
+            assert!(!html.contains(id), "{page} shows the hidden id {id}");
+        }
+    }
+    // ...while the constants that shown pages still read stay
+    assert!(site()["constants.html"].contains("id=\"c-TANK_HE_SPLASH_DAMAGE\""));
+    let economy = &site()["mechanics-economy.html"];
+    assert!(!economy.contains("Golem") && !economy.contains("Zamok"));
+}
+
+#[test]
 fn homepage_keeps_version_without_counts_or_explanation() {
     let page = &site()["index.html"];
     assert!(page.contains("Game version <a"));

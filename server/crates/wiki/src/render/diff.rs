@@ -33,6 +33,10 @@ impl Change {
             _ => return None,
         };
         let opt = |key: &str| v.get(key).filter(|x| !x.is_null()).cloned();
+        // a field change with neither value recorded says nothing ("burst: — → —")
+        if !s(v, "field").is_empty() && opt("old").is_none() && opt("new").is_none() {
+            return None;
+        }
         Some(Change {
             kind,
             id: s(v, "id"),
