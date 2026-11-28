@@ -187,14 +187,20 @@ pub(crate) fn launch_world_ability(
             if !ps.spend_cost(definition.cost) {
                 return false;
             }
-            let cooldown = e.shop_item_reload(u32::from(definition.cooldown_ticks)) as u16;
-            e.start_ability_cooldown(ability, cooldown);
+            let reload = crate::rules::combat::randomized_attack_reload(
+                e.kind,
+                caster,
+                crate::rules::combat::WeaponKind::MortarTeamMortar.stable_id(),
+                tick,
+                e.shop_item_reload(mortar_fire_weapon_cooldown_ticks()),
+            );
+            // Manual ability and weapon readiness share one randomized firing cycle.
+            e.start_ability_cooldown(ability, reload.min(u32::from(u16::MAX)) as u16);
             if !preserve_active_order {
                 e.clear_active_order();
                 e.set_path_goal(None);
             }
-            let reload = mortar_fire_weapon_cooldown_ticks();
-            e.set_attack_cd(e.shop_item_reload(reload));
+            e.set_attack_cd(reload);
             let double_damage = e.shop_item_active(AbilityKind::DoubleDamage);
             mortar_shells.schedule_manual(
                 events,
@@ -225,7 +231,14 @@ pub(crate) fn launch_world_ability(
             } else if !ps.spend_cost(definition.cost) {
                 return false;
             }
-            e.start_ability_cooldown(ability, definition.cooldown_ticks);
+            let reload = crate::rules::combat::randomized_attack_reload(
+                e.kind,
+                caster,
+                ability.stable_id(),
+                tick,
+                u32::from(definition.cooldown_ticks),
+            );
+            e.start_ability_cooldown(ability, reload.min(u32::from(u16::MAX)) as u16);
             e.start_barrage_unload(config::ROCKET_BARRAGE_UNLOAD_TICKS);
             if !preserve_active_order {
                 e.clear_active_order();

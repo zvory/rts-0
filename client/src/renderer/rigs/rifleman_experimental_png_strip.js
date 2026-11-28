@@ -9,6 +9,7 @@ export const RIFLEMAN_EXPERIMENTAL_FRAME_STRIP = Object.freeze({
     runStart: 2, runFrames: 6, firingStart: 8, firingFrames: 8 }),
   firingWeaponKinds: Object.freeze(["rifleman_rifle"]),
   poseSequence: true,
+  uprightBillboard: true,
   poseGeometry: RIFLEMAN_EXPERIMENTAL_GEOMETRY,
   fps: 11, anchorX: 0.5, anchorY: 112 / 128, worldScale: 0.45,
   groundContactShadow: true,

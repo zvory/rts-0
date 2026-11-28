@@ -241,14 +241,17 @@ fn artillery_point_fire_system_fires_without_steel() {
         players[0].steel, 0,
         "artillery fire should leave zero steel unchanged"
     );
-    assert_eq!(
-        entities
+    {
+        let actual = entities
             .get(artillery)
             .expect("artillery should exist")
-            .attack_cd(),
-        config::ARTILLERY_RELOAD_TICKS,
-        "firing still applies the normal reload cooldown"
-    );
+            .attack_cd();
+        let base: u32 = config::ARTILLERY_RELOAD_TICKS;
+        assert!(
+            (base.saturating_sub(1)..=base.saturating_add(2)).contains(&actual),
+            "reload {actual} outside jitter range around {base}"
+        );
+    };
     assert!(events
         .values()
         .flatten()
@@ -305,14 +308,17 @@ fn artillery_blanket_fire_system_fires_without_steel() {
         players[0].steel, 0,
         "blanket fire should leave zero steel unchanged"
     );
-    assert_eq!(
-        entities
+    {
+        let actual = entities
             .get(artillery)
             .expect("artillery should exist")
-            .attack_cd(),
-        config::ARTILLERY_RELOAD_TICKS,
-        "blanket firing still applies the normal reload cooldown"
-    );
+            .attack_cd();
+        let base: u32 = config::ARTILLERY_RELOAD_TICKS;
+        assert!(
+            (base.saturating_sub(1)..=base.saturating_add(2)).contains(&actual),
+            "reload {actual} outside jitter range around {base}"
+        );
+    };
     assert!(events
         .values()
         .flatten()

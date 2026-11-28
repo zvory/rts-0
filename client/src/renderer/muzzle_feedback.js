@@ -6,6 +6,7 @@ import { attackFeedbackKindForWeapon, attackFeedbackOriginForWeapon } from "./at
 import { muzzleFeedbackStyle } from "./weapon_feedback_style.js";
 import { isDiscipleProjectile } from "./disciple_projectiles.js";
 import { experimentalRiflemanMuzzle } from "./rigs/rifleman_experimental_png_strip.js";
+import { uprightWorldPoint } from "./upright_unit_sprite.js";
 import { rigContainerScale } from "./rigs/animation.js";
 
 export function _drawMuzzleFlashes(state, colorByOwner) {
@@ -53,7 +54,7 @@ export function _drawMuzzleFlashes(state, colorByOwner) {
     if (baseR <= 0) continue;
 
     const stat = STATS[feedbackKind] || STATS[attacker.kind] || {};
-    const origin = experimental
+    let origin = experimental
       ? experimentalRiflemanMuzzle(attacker, rigContainerScale(this._unitRenderContexts?.get?.(attacker.id))) : attackFeedbackOriginForWeapon({
       definitionsByKind: this._liveRigDefinitionsByKind,
       attacker,
@@ -64,6 +65,7 @@ export function _drawMuzzleFlashes(state, colorByOwner) {
       map: this._map,
       stat,
     });
+    if (experimental) origin = uprightWorldPoint(this, attacker, origin);
     const mx = origin.x;
     const my = origin.y;
 

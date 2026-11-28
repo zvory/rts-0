@@ -32,7 +32,18 @@ Scout Car MG and Tank coax retain 12-tick cooldowns.
 Mortar Fire has a further 50% cooldown increase to 180 ticks (6 seconds).
 Novice and all Dao Adept/Master ordinary attack rates are reduced a further 30%,
 using whole-tick cooldowns: 91 ticks for Novice/War/Magic and 61 for Wind.
-Non-attack ability timers and attack-speed multipliers are unchanged.
+Each committed repeating unit attack adds an OpenBW-style pseudorandom offset of -1, 0, +1,
+or +2 simulation ticks to the final modified reload (minimum one tick). This includes melee,
+arrows/orbs, rifles/MGs, both Tank weapons, Mortar Fire, artillery and the Rocket Truck barrage
+reload. Ekat, buildings, one-shot weapon windups, burst spacing and non-attack ability timers
+are excluded. First-shot readiness is unchanged; subsequent volleys drift apart. The offset
+averages +0.5 tick, so sustained attack rates are slightly lower than the listed base cadence.
+Offsets are a stable integer hash of entity id, weapon/attack id and firing tick, so replay and
+checkpoint continuation reproduce them without adding state or consuming the damage RNG stream.
+Mortar manual-ability and weapon reload gates use the same offset; artillery command-phase
+cooldown compensation is applied afterward. Failed/unaffordable attacks do not randomize reload. Rocket rack ammunition follows the existing
+unload clock independently of the randomized reload, keeping each visible round aligned with launch.
+Attack-speed multipliers are unchanged.
 Base weapon ranges use fractional tiles (`f32`) throughout stat records and attack profiles.
 The Machine Gunner has 6.1 tiles of base range (7.1 while entrenched), giving an approaching
 attack-moving MG a small standoff margin against a stationary entrenched Rifleman's 6 tiles.

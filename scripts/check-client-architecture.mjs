@@ -229,6 +229,7 @@ const ALLOWED_CROSS_AREA_IMPORTS = new Map(Object.entries({
   "minimap_commands.js -> input/artillery_targeting.js": "Minimap command targeting shares the pure artillery target-lock predictor with viewport input so local feedback matches server locking.",
   "minimap.js -> input/support_weapon_setup_targeting.js": "Minimap and viewport setup targeting share the same pure AT-gun convergence, parallel, and fan curves so preview and issued facing agree.",
   "renderer/backend_bundle.js -> camera.js": "The selected Pixi bundle owns construction of its orthographic semantic camera.",
+  "renderer/upright_unit_sprite.js -> camera_tilt.js": "Experimental body quads invert the same ground homography while retaining layer ownership.",
   "renderer/map_tilt.js -> camera_tilt.js": "The battlefield mesh and semantic picking share the same pure ground-plane homography.",
   "renderer/pixi_compatibility_adapter.js -> presentation/submission.js": "The Pixi backend returns the renderer-neutral asynchronous presentation lifecycle result.",
   "renderer/pixi_compatibility_adapter.js -> presentation/grid_snapshot.js": "The Pixi owner materializes cloneable revisioned grid records into private staging buffers.",

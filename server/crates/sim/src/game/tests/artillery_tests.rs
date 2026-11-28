@@ -426,15 +426,18 @@ fn assert_deployed_artillery_attack_move_reload(haste: bool) {
         .get(artillery)
         .expect("artillery exists");
     assert_eq!(artillery_entity.weapon_setup(), WeaponSetup::Deployed);
-    assert_eq!(
-        artillery_entity.attack_cd(),
-        if haste {
+    {
+        let actual = artillery_entity.attack_cd();
+        let base: u32 = if haste {
             (config::ARTILLERY_RELOAD_TICKS * 4).div_ceil(5)
         } else {
             config::ARTILLERY_RELOAD_TICKS
-        },
-        "autonomous fire should retain the same effective reload as manual fire"
-    );
+        };
+        assert!(
+            (base.saturating_sub(1)..=base.saturating_add(2)).contains(&actual),
+            "reload {actual} outside jitter range around {base}"
+        );
+    };
     assert!(artillery_entity.path_is_empty());
     assert!(matches!(artillery_entity.order(), Order::AttackMove(_)));
     assert!(events.iter().any(|(player, events)| {

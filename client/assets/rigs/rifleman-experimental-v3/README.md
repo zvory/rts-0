@@ -1,7 +1,8 @@
 # Experimental Rifleman, version 3
 
 Available only through Settings → Game → Use experimental graphics. The persisted
-preference stays off by default. Disabling it restores the regular Rifleman;
+preference stays off by default. The atlas explicitly opts into the upright
+billboard treatment when the experimental setting tilts the battlefield. Disabling it restores the regular Rifleman;
 health-bar visibility, portraits, minimap icons and simulation rules stay separate.
 
 Sixteen headings use sixteen poses each (256 total), with 128×128 cells in a

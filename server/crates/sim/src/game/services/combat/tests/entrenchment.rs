@@ -341,11 +341,14 @@ fn entrenched_meth_rifleman_keeps_faster_attack_cooldown() {
     run_combat_tick_with_players(&mut entities, &[meth_player, player_state(2, false)]);
 
     let rifleman = entities.get(rifleman_id).expect("rifleman should exist");
-    assert_eq!(
-        rifleman.attack_cd(),
-        config::METHAMPHETAMINES_RIFLE_ATTACK_COOLDOWN_TICKS,
-        "Methamphetamines attack cadence should still apply while entrenched"
-    );
+    {
+        let actual = rifleman.attack_cd();
+        let base: u32 = config::METHAMPHETAMINES_RIFLE_ATTACK_COOLDOWN_TICKS;
+        assert!(
+            (base.saturating_sub(1)..=base.saturating_add(2)).contains(&actual),
+            "reload {actual} outside jitter range around {base}"
+        );
+    };
     assert!(
         entities.get(enemy_id).expect("enemy should exist").hp < enemy_hp,
         "entrenched meth rifleman should still fire"

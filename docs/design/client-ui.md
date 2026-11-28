@@ -2520,8 +2520,10 @@ selection rings):
 
 **Experimental Rifleman graphics.** Game settings includes **Use experimental graphics**, a
 localStorage-backed checkbox that defaults off in the lobby, live matches, Lab, spectators, and
-replays. It switches world Rifleman rendering during a match; it does not alter simulation,
-other unit kinds, HUD portraits, or minimap icons. The render-worker presentation preference
+replays. It switches world Rifleman rendering and enables 45-degree battlefield tilt during
+a match. Disabling restores top-down projection. It does not alter simulation, HUD portraits,
+or minimap icons. The experimental Rifleman stays upright with perspective-scaled body click bounds, muzzle
+origins and health-bar anchors. Other world artwork shares the tilted ground plane. The render-worker presentation preference
 `experimentalGraphicsEnabled` is a boolean and remains independent of detailed-shadow settings.
 Assets load lazily on opt-in; the normal Rifleman remains visible until that load completes.
 Disabling restores normal routing immediately, including when an earlier load finishes later.

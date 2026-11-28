@@ -1,3 +1,4 @@
+import { uprightWorldPoint } from "./upright_unit_sprite.js";
 import { drawCarriedItemRosette } from "./carried_items.js";
 import { rigContainerScale } from "./rigs/animation.js";
 import { createDaoCorona } from "./dao_corona.js";
@@ -326,7 +327,9 @@ export function _hpBar(g, e, status = null, ownerColor = null, showHp = true, ow
     }
     if (dividerCount > 0) g.rtsTicks.fill({ color: 0x000000, alpha: 0.95 });
   }
-  g.position.set(e.x, topY);
+  const barOrigin = e.kind === KIND.RIFLEMAN && this._experimentalRiflemanFrameStrip?.()
+    ? uprightWorldPoint(this, e, { x: e.x, y: topY }) : { x: e.x, y: topY };
+  g.position.set(barOrigin.x, barOrigin.y);
   g.rtsBackground.visible = g.rtsFill.visible = g.rtsTicks.visible = showHp;
   let color = Number.isFinite(ownerColor)
     ? ownerColor

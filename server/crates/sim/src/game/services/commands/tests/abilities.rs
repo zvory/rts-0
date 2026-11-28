@@ -91,7 +91,14 @@ fn blanket_fire_command_starts_runtime_order() {
         0,
         "Blanket Fire uses the artillery weapon reload, not an ability cooldown"
     );
-    assert_eq!(gun.attack_cd(), config::ARTILLERY_RELOAD_TICKS);
+    {
+        let actual = gun.attack_cd();
+        let base: u32 = config::ARTILLERY_RELOAD_TICKS;
+        assert!(
+            (base.saturating_sub(1)..=base.saturating_add(2)).contains(&actual),
+            "reload {actual} outside jitter range around {base}"
+        );
+    };
     assert!(
         matches!(gun.order(), Order::ArtilleryBlanketFire { .. }),
         "Blanket Fire must replace the current order with its own runtime order"

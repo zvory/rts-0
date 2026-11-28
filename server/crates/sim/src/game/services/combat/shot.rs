@@ -128,6 +128,13 @@ pub(super) fn try_fire(
         }
     }
     if let Some(source) = entities.get_mut(attacker) {
+        let cooldown = crate::rules::combat::randomized_attack_reload(
+            source.kind,
+            attacker,
+            weapon.id.stable_id(),
+            tick,
+            cooldown,
+        );
         source.set_weapon_cooldown(weapon.id, cooldown);
         if source.default_weapon_kind() == Some(weapon.id) {
             source.end_war_charge();

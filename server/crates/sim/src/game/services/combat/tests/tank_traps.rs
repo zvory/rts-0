@@ -309,7 +309,7 @@ fn tank_destroys_only_commanded_tank_trap_on_second_shot() {
         "the coax must not broaden an explicit attack to another neutral Tank Trap"
     );
 
-    for _ in 0..tank_cooldown {
+    for _ in 0..tank_cooldown + 2 {
         run_combat_tick_on_map(
             &mut entities,
             &[player_state(1, false), player_state(2, false)],

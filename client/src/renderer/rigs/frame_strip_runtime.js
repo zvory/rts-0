@@ -1,4 +1,5 @@
 import { riflemanPoseFrame } from "./rifleman_pose_animation.js";
+import { updateUprightUnitSprite } from "../upright_unit_sprite.js";
 import { teamPaintTextureFor } from "./team_paint.js";
 import { updateItemRadiance, destroyItemRadiance } from "../item_radiance.js";
 import { goldenAttackTrailFrame } from "./golden_attack_strip.js";
@@ -48,6 +49,7 @@ export function renderFrameStripUnit(renderer, entity, strip, texture, options =
     shadowOffset: options.shadowOffset,
     diagnostics: (label, amount = 1) => renderer._recordRenderDiagnostic?.(label, amount),
   });
+  updateUprightUnitSprite(renderer, instance);
   return instance;
 }
 

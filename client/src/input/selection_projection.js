@@ -83,6 +83,7 @@ export function selectionProxyForEntity(entity, tileSize = DEFAULT_TILE_SIZE, pr
   const pointClick = clickGeometry(entity, footprint);
   if (experimentalGraphicsEnabled && entity.kind === KIND.RIFLEMAN) {
     // Authored body bounds only; collision, marquee and selection rings keep the ground footprint.
+    pointClick.uprightClick = true;
     pointClick.clickFootprint = polygonFootprint(entity.x, entity.y - 20, 28, 52, 0);
     pointClick.directClickFootprint = polygonFootprint(entity.x, entity.y - 20, 22, 46, 0);
   }
@@ -119,10 +120,10 @@ export function projectSelectionProxy(proxy, projection) {
   const clickFootprint = proxy.clickFootprint || proxy.footprint;
   const directFootprint = proxy.directClickFootprint || proxy.footprint;
   const screenClickPolygon = clickFootprint === proxy.footprint ? screenPolygon
-    : projectFootprint(clickFootprint, proxy.anchor, projection);
+    : projectFootprint(clickFootprint, proxy.anchor, projection, proxy.uprightClick);
   const screenDirectClickPolygon = directFootprint === proxy.footprint ? screenPolygon
     : directFootprint === clickFootprint ? screenClickPolygon
-    : projectFootprint(directFootprint, proxy.anchor, projection);
+    : projectFootprint(directFootprint, proxy.anchor, projection, proxy.uprightClick);
   return Object.freeze({
     proxy,
     anchor,
@@ -135,14 +136,19 @@ export function projectSelectionProxy(proxy, projection) {
   });
 }
 
-function projectFootprint(footprint, anchor, projection) {
+function projectFootprint(footprint, anchor, projection, upright = false) {
   const worldPoints = footprint?.kind === "polygon"
     ? footprint.points : circlePoints(anchor, footprint?.radiusPx);
   const points = [];
+  const foot = upright ? projection.project(anchor) : null;
+  const uprightScale = upright ? projection.camera.framingScale / foot.depth : 0;
   for (const point of worldPoints) {
     let projected;
     try {
-      projected = projection.project({ x: point.x, y: point.y, heightPx: 0 });
+      projected = upright ? { ...foot,
+        x: foot.x + (point.x - anchor.x) * uprightScale,
+        y: foot.y + (point.y - anchor.y) * uprightScale,
+      } : projection.project({ x: point.x, y: point.y, heightPx: 0 });
     } catch {
       return null;
     }

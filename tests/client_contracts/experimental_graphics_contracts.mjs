@@ -6,6 +6,8 @@ import { applyMatchExperimentalGraphics } from "../../client/src/match_settings_
 import { VisualEffectBackedState, VisualEffectBuffers } from "../../client/src/state_visual_effects.js";
 import { EVENT } from "../../client/src/protocol.js";
 import { prepareEntitySnapshots, preparedPresentationEntityRecord } from "../../client/src/presentation/entity_snapshot.js";
+import { uprightBodyCorners, uprightWorldPoint, updateUprightUnitSprite } from "../../client/src/renderer/upright_unit_sprite.js";
+import { tiltScreen } from "../../client/src/camera_tilt.js";
 import fs from "node:fs";
 import { PNG } from "pngjs";
 import { readExperimentalGraphicsEnabled, writeExperimentalGraphicsEnabled } from "../../client/src/experimental_graphics_settings.js";
@@ -14,7 +16,8 @@ import { RIFLEMAN_EXPERIMENTAL_FRAME_STRIP as strip } from "../../client/src/ren
 import { experimentalRiflemanMuzzle } from "../../client/src/renderer/rigs/rifleman_experimental_png_strip.js";
 import { composeTeamPaintRgba } from "../../client/src/renderer/rigs/team_paint.js";
 import { Renderer } from "../../client/src/renderer/index.js";
-import { selectionProxyForEntity } from "../../client/src/input/selection_projection.js";
+import { Camera } from "../../client/src/camera.js";
+import { selectionProxyForEntity, projectSelectionProxy } from "../../client/src/input/selection_projection.js";
 import { buildSettingsTabs } from "../../client/src/settings_panels.js";
 import { memoryStorage, withFakeSettingsDocument, findFakeById } from "./fakes.mjs";
 import { createInspectionPngPixiFactory, FakeContainer } from "../helpers/rig_inspection_pixi.mjs";
@@ -233,3 +236,72 @@ for (const enabled of [false,true]) {
  assert.equal(state.muzzleFlashes[1].createdAt,2000);
 }
 await import("../../scripts/check-rifleman-sixteen.mjs");
+{
+  const angles = [], flags = [];
+  const match = { state: {}, camera: { setMapTilt: a => angles.push(a) },
+    renderer: { setExperimentalGraphicsEnabled: enabled => flags.push(enabled) } };
+  applyMatchExperimentalGraphics(match, true);
+  applyMatchExperimentalGraphics(match, false);
+  assert.deepEqual(angles, [45, 0], "graphics preference owns the ground tilt");
+  assert.deepEqual(flags, [true, false], "graphics preference still updates the worker");
+  assert.equal(match.state.experimentalGraphicsEnabled, false);
+}
+for (const y of [100, 400, 700]) for (const x of [150, 600, 1050]) {
+  const view = { viewW: 1200, viewH: 800, mapTilt: 45 }, anchor = { x, y };
+  const offsets = [{ x: -40, y: -160 }, { x: 40, y: -160 },
+    { x: 40, y: 0 }, { x: -40, y: 0 }];
+  const foot = tiltScreen(view, anchor);
+  const corners = uprightBodyCorners(view, anchor, offsets);
+  corners.forEach((p, i) => {
+    const presented = tiltScreen(view, p);
+    assert.ok(Math.abs(presented.x - foot.x - offsets[i].x / foot.depth) < 1e-8);
+    assert.ok(Math.abs(presented.y - foot.y - offsets[i].y / foot.depth) < 1e-8);
+  });
+}
+
+// Body interactions and effect anchors follow the same upright pixels at every depth.
+for (const y of [4700, 5000, 5300]) {
+  const camera = new Camera(1200, 800, { mapTilt: 45 });
+  camera.setBounds(10000, 10000, 1200, 800); camera.focusAt({ x: 5000, y: 5000 });
+  const soldier = { id: 100, kind: "rifleman", owner: 1, x: 5150, y };
+  const projection = camera.projectionSnapshot();
+  const body = projectSelectionProxy(selectionProxyForEntity(soldier, 32, null, true), projection);
+  const foot = projection.project({ ...soldier, heightPx: 0 });
+  const headY = Math.min(...body.screenClickPolygon.map(p => p.y));
+  assertApprox(headY, foot.y - 46 * camera.zoom / foot.depth, 1e-7,
+    "body click bounds retain authored upright height");
+  const renderer = { _mapTiltDegrees: 45, app: { renderer: { screen: { width: 1200, height: 800 } } },
+    world: { x: -camera.x * camera.zoom + 600, y: -camera.y * camera.zoom + 400,
+      scale: { x: camera.zoom } } };
+  for (const offset of [{ x: 24, y: -30 }, { x: 0, y: -48 }]) {
+    const plane = uprightWorldPoint(renderer, soldier, { x: soldier.x + offset.x, y: soldier.y + offset.y });
+    const projected = projection.project({ ...plane, heightPx: 0 });
+    assertApprox(projected.x, foot.x + offset.x * camera.zoom / foot.depth, 1e-7,
+      "muzzle/HP x anchors align with upright body");
+    assertApprox(projected.y, foot.y + offset.y * camera.zoom / foot.depth, 1e-7,
+      "muzzle/HP y anchors align with upright body");
+  }
+}
+
+// The v3 atlas opts into the upright mesh explicitly; changing its directory must
+// not silently flatten the sprite back onto the tilted ground plane.
+{
+ const previousPixi=globalThis.PIXI;
+ try {
+  globalThis.PIXI={PerspectiveMesh:class{setCorners(...corners){this.corners=corners;}}};
+  const renderer={_mapTiltDegrees:45,app:{renderer:{screen:{width:1200,height:800}}},
+   world:{x:0,y:0,scale:{x:1}}};
+  const instance={strip,silhouetteShadow:false,
+   sprite:{anchor:{x:.5,y:112/128},scale:{x:.45,y:.45},x:0,y:0,texture:{},tint:0xffffff,visible:true},
+   container:{x:600,y:400,scale:{x:1},addChild(){}}};
+  assert.equal(strip.uprightBillboard,true);
+  updateUprightUnitSprite(renderer,instance);
+  assert.equal(instance.uprightMesh.visible,true);
+  assert.equal(instance.sprite.visible,false);
+  assert.ok(instance.uprightMesh.corners.every(Number.isFinite));
+  renderer._mapTiltDegrees=0;instance.sprite.visible=true;
+  updateUprightUnitSprite(renderer,instance);
+  assert.equal(instance.uprightMesh.visible,false);
+  assert.equal(instance.sprite.visible,true);
+ }finally{if(previousPixi===undefined)delete globalThis.PIXI;else globalThis.PIXI=previousPixi;}
+}

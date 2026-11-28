@@ -72,10 +72,14 @@ fn tank_coax_fires_in_arc_with_small_arms_damage_and_weapon_event() {
         "three seeded burst rays should hit this infantry target"
     );
     let tank_entity = entities.get(tank).expect("tank should exist");
-    assert_eq!(
-        tank_entity.weapon_cooldown(combat_rules::WeaponKind::TankCoax),
-        12
-    );
+    {
+        let actual = tank_entity.weapon_cooldown(combat_rules::WeaponKind::TankCoax);
+        let base: u32 = 12;
+        assert!(
+            (base.saturating_sub(1)..=base.saturating_add(2)).contains(&actual),
+            "reload {actual} outside jitter range around {base}"
+        );
+    };
     assert_eq!(
         tank_entity.weapon_cooldown(combat_rules::WeaponKind::TankCannon),
         98,
@@ -144,17 +148,20 @@ fn moving_breakthrough_halves_tank_coax_cooldown() {
         &map,
     );
 
-    assert_eq!(
-        entities
+    {
+        let actual = entities
             .get(tank)
             .expect("tank should survive")
-            .weapon_cooldown(combat_rules::WeaponKind::TankCoax),
-        combat_rules::weapon_profile(combat_rules::WeaponKind::TankCoax)
+            .weapon_cooldown(combat_rules::WeaponKind::TankCoax);
+        let base: u32 = combat_rules::weapon_profile(combat_rules::WeaponKind::TankCoax)
             .expect("coax profile should exist")
             .cooldown
-            / 2,
-        "Breakthrough should halve every weapon cooldown fired while moving"
-    );
+            / 2;
+        assert!(
+            (base.saturating_sub(1)..=base.saturating_add(2)).contains(&actual),
+            "reload {actual} outside jitter range around {base}"
+        );
+    };
 }
 
 #[test]
@@ -465,14 +472,15 @@ fn tank_cannon_and_coax_same_tick_emit_cannon_before_coax() {
         "Tank cannon attack feedback must be emitted before the same-tick coax feedback"
     );
     let tank_entity = entities.get(tank).expect("tank should exist");
-    assert_eq!(
-        tank_entity.weapon_cooldown(combat_rules::WeaponKind::TankCannon),
-        144
-    );
-    assert_eq!(
-        tank_entity.weapon_cooldown(combat_rules::WeaponKind::TankCoax),
-        12
-    );
+    {
+        let actual = tank_entity.weapon_cooldown(combat_rules::WeaponKind::TankCannon);
+        let base: u32 = 144;
+        assert!(
+            (base.saturating_sub(1)..=base.saturating_add(2)).contains(&actual),
+            "reload {actual} outside jitter range around {base}"
+        );
+    };
+    assert!((11..=14).contains(&tank_entity.weapon_cooldown(combat_rules::WeaponKind::TankCoax)));
 }
 
 #[test]

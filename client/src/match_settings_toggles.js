@@ -25,6 +25,7 @@ export function applyMatchExperimentalGraphics(match, enabled) {
   if (!match?.state) return;
   match.state.experimentalGraphicsEnabled = !!enabled;
   if (!enabled) match.state.restoreExperimentalShotTiming?.();
+  match.camera?.setMapTilt?.(enabled ? 45 : 0);
   match.renderer?.setExperimentalGraphicsEnabled?.(!!enabled);
 }
 

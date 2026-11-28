@@ -51,11 +51,14 @@ fn breakthrough_rifleman_fires_during_move_and_uses_half_cooldown() {
         !rifleman.path_is_empty(),
         "Breakthrough moving fire should preserve the commanded Move path"
     );
-    assert_eq!(
-        rifleman.attack_cd(),
-        combat_rules::attack_profile(EntityKind::Rifleman).cooldown / 2,
-        "a weapon fired while moving under Breakthrough should reload in half the normal time"
-    );
+    {
+        let actual = rifleman.attack_cd();
+        let base: u32 = combat_rules::attack_profile(EntityKind::Rifleman).cooldown / 2;
+        assert!(
+            (base.saturating_sub(1)..=base.saturating_add(2)).contains(&actual),
+            "reload {actual} outside jitter range around {base}"
+        );
+    };
 }
 
 #[test]
@@ -74,14 +77,17 @@ fn stationary_breakthrough_attack_keeps_normal_cooldown() {
 
     run_combat_tick(&mut entities);
 
-    assert_eq!(
-        entities
+    {
+        let actual = entities
             .get(rifleman)
             .expect("rifleman should survive")
-            .attack_cd(),
-        combat_rules::attack_profile(EntityKind::Rifleman).cooldown,
-        "Breakthrough should not accelerate stationary attacks"
-    );
+            .attack_cd();
+        let base: u32 = combat_rules::attack_profile(EntityKind::Rifleman).cooldown;
+        assert!(
+            (base.saturating_sub(1)..=base.saturating_add(2)).contains(&actual),
+            "reload {actual} outside jitter range around {base}"
+        );
+    };
 }
 
 #[test]
@@ -673,7 +679,14 @@ fn haste_grants_moving_fire_without_interrupting_move_destination() {
         let cooldown = combat_rules::attack_profile(kind).cooldown;
         run_combat_tick(&mut entities);
         let unit = entities.get(id).unwrap();
-        assert_eq!(unit.attack_cd(), (cooldown * 4).div_ceil(5), "{kind:?}");
+        {
+            let actual = unit.attack_cd();
+            let base: u32 = (cooldown * 4).div_ceil(5);
+            assert!(
+                (base.saturating_sub(1)..=base.saturating_add(2)).contains(&actual),
+                "reload {actual} outside jitter range around {base}"
+            );
+        };
         assert_eq!(unit.path_goal(), Some(goal));
         assert!(!unit.path_is_empty());
         assert_eq!(unit.target_id(), Some(target));
