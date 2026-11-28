@@ -46,7 +46,7 @@ export function buildCultivatorCommandCardContextSamples(buildCard) {
   const ctx = (selection) => ({
     playerId: 1, factionId: CULTIVATORS_FACTION_ID, selection,
     entities: selection, resources: { steel: 1000, oil: 1000 },
-    upgrades: [UPGRADE.DAO_WIND, UPGRADE.DAO_OF_HEAVINESS, UPGRADE.DAO_OF_MAGIC],
+    upgrades: [UPGRADE.DAO_WIND, UPGRADE.DAO_OF_HEAVINESS, UPGRADE.DAO_OF_MAGIC, UPGRADE.TECHNIQUE_CHARGE, UPGRADE.TECHNIQUE_SHIELD, UPGRADE.TECHNIQUE_THROW_SWORD],
     groupCooldownClocks: () => [], playerHasCompleteKind: () => true,
   });
   const unitCards = [null, "wind", "war", "magic"].map((dao) => ({
@@ -64,7 +64,7 @@ export function buildCultivatorCommandCardContextSamples(buildCard) {
       entities: [disciple, { id: 30, owner: 1, kind: KIND.SHOP, hp: 200 }] }) },
     { id: "cultivators-worker", card: buildCard(ctx([worker])) },
     { id: "cultivators-build", card: buildCard({ ...ctx([worker]), commandCardMode: "workerBuild" }) },
-    ...[KIND.RESOURCE_DEPOT, KIND.PORTAL, KIND.THREE_DAO_PAVILION, KIND.TOURNAMENT_GROUNDS, KIND.PROVEN_GROUNDS].map((kind, i) => ({
+    ...[KIND.RESOURCE_DEPOT, KIND.PORTAL, KIND.THREE_DAO_PAVILION, KIND.TECHNIQUE_LIBRARY, KIND.TOURNAMENT_GROUNDS, KIND.PROVEN_GROUNDS].map((kind, i) => ({
       id: `cultivators-producer-${kind}`,
       card: buildCard({ ...ctx([{ id: 22 + i, owner: 1, kind }]), upgrades: [] }),
     })),

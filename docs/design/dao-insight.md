@@ -24,12 +24,8 @@ one-for-one training in the [Proving Grounds](proven-grounds.md),
 with the existing shared research price tiers, serial queue and prerequisite/faction gates.
 Combat-earned evolution requires neither research nor a Pavilion.
 
-Every living Novice, Wind Adept, War Adept, and Magic Adept also earns one passive
-insight per five seconds (150 simulation ticks) since spawning. Serfs and other factions’
-units earn none. Each unit’s tick remainder is checkpointed and survives evolution;
-passive income adds to combat income, respects the 60/200 caps, and uses the same
-automatic advancement. Masters retain their terminal zero-insight state and earn none.
-Dead units do not advance the timer. Time at a cap is not banked as extra insight.
+Cultivators gain no passive insight from time alive. Novices and Adepts earn insight
+from combat and the rewards described below; Masters retain their terminal zero-insight state.
 
 Novices, War Adepts, and War Masters have **Charge**, an automatic passive shown as a disabled command-card tile with the
 autocast swirl and authoritative cooldown clock. It has no hotkey, cast action, or autocast toggle. Against a living
@@ -48,7 +44,7 @@ Charge, Master movement bonuses, and Haste multiply together.
 - War: armored melee damage dealer; 1.05 times base movement speed (2.1 px/tick), 1.5 damage, +26 maximum HP relative to the other Adepts, 50% armor
   reduction using the existing penetration mechanic (full AP bypasses it), keeps the Disciple's existing
   100% primary armor penetration at both ranks. Uses the approved larger armored candidate B Yari silhouette, with idle, two walking poses and four thrust poses. Its sprite scale is 0.56, halfway from the former 0.8 toward the base Disciple’s 0.32. The collision/interaction circle shrinks by the same 30%, from 13.5 to 18.2 world pixels. Its 1.75-tile weapon range plus that radius and four-pixel range slack matches the smaller spear. Vehicle hulls and building footprints retain their existing contact geometry. The 400 ms attack clip anticipates, drives, extends and recovers, with a smooth 11.2-world-pixel presentation-only forward step; collision, authoritative position and damage timing do not move with the artwork. Classic W; grid X.
-- Magic: battlefield support; 1.05 times base movement speed (2.1 px/tick), Vector Field and Shield. Vector Field is a centered 4-by-4-tile square (5 by 5 at Master rank) that adds 3 world pixels per tick in the selected direction to every allied or enemy ground unit, independent of weight. Ekat retains her separate radial Magic Anchor. Magic uses the approved Magic C hooded spellcaster, with arms swept backward and flowing mantle while running. Its five-tile orbs deal the same 23 damage with 25% armor penetration (50% at Master rank) and 91-tick cooldown. It stops to fire normally and has no secondary sword. Classic C; grid C. All three Dao silhouettes replace their legacy glyphs; insight, readiness and advancement overlays remain. Bespoke audio remains deferred.
+- Magic: battlefield support; 1.05 times base movement speed (2.1 px/tick), Vector Field and Shield. Vector Field is a centered 4-by-4-tile square (5 by 5 at Master rank) that adds half the affected unit's effective movement speed in the selected direction to every allied or enemy ground unit except actively entrenched infantry, independent of weight. Ekat retains her separate radial Magic Anchor. Magic uses the approved Magic C hooded spellcaster, with arms swept backward and flowing mantle while running. Its five-tile orbs deal the same 23 damage with 25% armor penetration (50% at Master rank) and 91-tick cooldown. It stops to fire normally and has no secondary sword. Classic C; grid C. All three Dao silhouettes replace their legacy glyphs; insight, readiness and advancement overlays remain. Bespoke audio remains deferred.
 
 Each paid training path has a separate researched unlock; combat-earned evolution is unrestricted. No automatic AI evolution in this pass;
 AI can encounter and damage evolved units. Insight uses a blue fill over red background
@@ -70,12 +66,15 @@ see the unit radiance, with ordinary fog filtering. Realm advancement projects a
 (half-second) expanding gold corona reaching about one tile, alongside the public insight bar.
 
 Magic Disciples can place Shield within five tiles: a shimmering circle with a
-2.1-tile radius, covering allied units (including the caster).
-The field has 150 HP and grants a separate 75% armor layer against hostile attacks entering
+2.1-tile radius, covering allied units (including the caster) whose centers are inside.
+It also protects an entire allied building when at least 50% of the shield's circular area
+overlaps the building's tile footprint; full containment is unnecessary. The denominator is
+the shield area, not the building area. Building coverage uses the same armor and HP pool rules.
+The field has 150 HP and grants a separate 100% armor layer against hostile attacks entering
 from outside; attacks originating inside bypass its armor and do not drain its HP. Existing
 unit armor, facing, cover, and terrain reductions apply first. Shield armor then uses the ordinary
-armor-penetration formula: `damage × (1 − 0.75 × (1 − penetration))`, rounded to the nearest HP.
-An otherwise 100-damage hit deals 25 HP at 0% piercing, 63 HP at 50% piercing, and 100 HP at
+armor-penetration formula: `damage × penetration`, rounded to the nearest HP.
+Non-piercing attacks damage only the shield. An otherwise 100-damage hit deals 0 HP at 0% piercing, 50 HP at 50% piercing, and 100 HP at
 100% piercing. Regardless of piercing or the unit's defenses, the shield loses the attack's full
 pre-reduction damage (area hits use their distance-falloff damage). Even fully piercing hits drain it.
 A field active at impact protects the entire hit, including the hit that depletes it; excess durability
@@ -85,9 +84,9 @@ stable caster-id order supplies the armor and pays the full hit, even when that 
 This applies to direct weapons, Throw Sword (per leg), Line Shot, and each area-damage victim;
 tank HE splash is non-piercing. Mortar/rocket and artillery checks use recorded firing positions,
 which survive attacker death and checkpoint restore. Friendly fire, environmental damage,
-buildings, invulnerable targets, and enemy units receive no shield armor and do not drain it.
+invulnerable targets, and enemy entities receive no shield armor and do not drain it.
 Shield costs no resources, has a ten-second
-cooldown, replaces the caster’s prior shield, and expires after 5 seconds (10 seconds for Magic Masters, whose shield also has 300 HP) or earlier on
+cooldown, replaces the caster’s prior shield, and expires after 10 seconds (15 seconds for Magic Masters, whose shield also has 300 HP) or earlier on
 depletion, replacement, or caster death. In-range casts preserve movement and queued orders;
 out-of-range immediate casts replace the current order with an approach-and-cast order. The pool, fixed world center, and absolute expiry tick live on the caster entity and survive
 checkpoints; the existing ability-runtime allocator supplies its unique visual id.
@@ -184,10 +183,10 @@ at 200; Masters earn none. No public death information or wire fields are added.
 ### Cosmic Energy
 
 Each player starts with zero **Cosmic Energy**, displayed with the **✨** sparkle icon.
-Every whole point of non-passive insight actually gained by an owned Cultivator also grants
+Every whole point of insight actually gained by an owned Cultivator also grants
 one Cosmic Energy. This includes hostile damage (with existing unit/building ratios and fractional
 carry), Throw Sword, Magic field death rewards, and insight granted by training or tournament
-promotion. Passive five-second insight grants none. Existing insight caps apply, so over-cap
+promotion. Existing insight caps apply, so over-cap
 rewards and terminal Masters grant none. Spending/resetting insight on evolution does not remove
 Cosmic Energy. It accumulates with saturating u32 arithmetic, survives checkpoints/replays, and
 has no spending action or effect yet. Lab-authored initial insight does not generate income.

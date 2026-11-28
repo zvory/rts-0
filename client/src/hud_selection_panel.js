@@ -463,6 +463,13 @@ export class HudSelectionPanel {
       resourceRemainingHtml +
       entrenchmentHtml +
       prodHtml;
+    if (this.state.spectator) {
+      const upgrades = inspectedUpgrades(this.state, e.owner).map((id) => UPGRADES[id]?.label).filter(Boolean);
+      const research = document.createElement("div");
+      research.className = "sel-stat sel-researched";
+      research.textContent = `Player research: ${upgrades.join(", ") || "None"}`;
+      node.appendChild(research);
+    }
     return node;
   }
 
@@ -528,6 +535,7 @@ function selectionDetailSignature(entity, state = null) {
     sigValue(entity.occupiedTrenchId),
     entrenchment ? `${entrenchment.label}:${entrenchment.value}` : "",
     resource ? `${resource.kind}:${formatResourceRemaining(resource.remaining)}` : "",
+    inspectedUpgrades(state, entity.owner).join(","),
     sigValue(entity.prodQueue),
     sigValue(entity.prodKind),
     sigValue(entity.tournamentEntrants),
@@ -715,4 +723,8 @@ function selectionBudgetSpaceFree(occupied, row, col, shape) {
     }
   }
   return true;
+}
+
+function inspectedUpgrades(state, owner) {
+  return state?.spectator ? state.playerResources?.find((row) => row.id === owner)?.upgrades || [] : [];
 }

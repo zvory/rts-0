@@ -279,6 +279,7 @@ fn cultivators_catalog_trains_warriors_from_portals() {
             EntityKind::PumpJack,
             EntityKind::Portal,
             EntityKind::ThreeDaoPavilion,
+            EntityKind::TechniqueLibrary,
             EntityKind::TournamentGrounds,
             EntityKind::Shop
         ]
@@ -380,4 +381,45 @@ fn faction_catalogs_define_starting_loadouts() {
     assert_eq!(EKAT_CATALOG.loadout.initial_steel, 0);
     assert_eq!(EKAT_CATALOG.loadout.initial_oil, 0);
     assert_eq!(EKAT_CATALOG.loadout.starting_entities, EKAT_START_ENTITIES);
+}
+
+#[test]
+fn technique_library_matches_pavilion_body_and_separates_techniques_from_dao() {
+    let library = defs::building_def(EntityKind::TechniqueLibrary).unwrap();
+    let pavilion = defs::building_def(EntityKind::ThreeDaoPavilion).unwrap();
+    let body = |s: balance::BuildingStats| {
+        (
+            s.hp,
+            s.sight_tiles,
+            s.cost_steel,
+            s.cost_oil,
+            s.foot_w,
+            s.foot_h,
+            s.build_ticks,
+        )
+    };
+    assert_eq!(body(library.stats), body(pavilion.stats));
+    assert_eq!(library.stats.dmg, 0);
+    assert_eq!(library.build_requires, pavilion.build_requires);
+    assert!(CULTIVATORS_CATALOG
+        .buildables
+        .contains(&EntityKind::TechniqueLibrary));
+    assert!(!CURRENT_CATALOG
+        .buildables
+        .contains(&EntityKind::TechniqueLibrary));
+    let researches = CULTIVATORS_CATALOG
+        .researchable_upgrade_kinds(EntityKind::TechniqueLibrary)
+        .collect::<Vec<_>>();
+    assert_eq!(
+        researches,
+        vec![
+            UpgradeKind::TechniqueCharge,
+            UpgradeKind::TechniqueShield,
+            UpgradeKind::TechniqueThrowSword
+        ]
+    );
+    assert_eq!(
+        ability_definition(AbilityKind::VectorField).upgrade_requirement,
+        None
+    );
 }

@@ -26,6 +26,7 @@ mod car_drive;
 mod collision;
 mod pivot_drive;
 mod pivot_recovery;
+mod speed;
 mod standability;
 mod steering;
 mod tank_point;
@@ -168,7 +169,6 @@ pub(crate) fn movement_system_with_context(
             if let Some(movement) = e.movement.as_mut() {
                 movement.novice_charge_ticks = movement.novice_charge_ticks.saturating_sub(1);
             }
-            e.tick_passive_insight();
             e.tick_breakthrough_status();
             e.expire_shield(tick);
             e.tick_ability_cooldowns();
@@ -215,6 +215,7 @@ fn apply_magic_anchor_pull(
         players.iter().map(|p| (p.id, p.team_id)),
     );
     let mut blockers = crate::game::services::standability::UnitBlockers::new(entities);
+    let mut field_context = None;
     let world_max_x = map.world_width_px() - 0.01;
     let world_max_y = map.world_height_px() - 0.01;
     for id in entities.ids() {
@@ -248,24 +249,57 @@ fn apply_magic_anchor_pull(
             .min(distance);
             offset = (dir.0 * amount, dir.1 * amount);
         }
-        if let Some([dx, dy]) = ability_runtime.vector_field_at(x, y, tick) {
-            offset.0 += dx * config::VECTOR_FIELD_SPEED_PX_PER_TICK;
-            offset.1 += dy * config::VECTOR_FIELD_SPEED_PX_PER_TICK;
+        if let Some([dx, dy]) = ability_runtime.vector_field_at(x, y, tick).filter(|_| {
+            entities
+                .get(id)
+                .is_some_and(|e| crate::game::entity::active_trench_occupation(e).is_none())
+        }) {
+            if let Some(e) = entities.get(id) {
+                let (spatial, wire_tiles) = field_context.get_or_insert_with(|| {
+                    (
+                        SpatialIndex::build(entities, map.width, map.height),
+                        barbed_wire::tiles(map, entities),
+                    )
+                });
+                let on_wire = wire_tiles
+                    .get(&map.tile_of(x, y))
+                    .is_some_and(|id| entities.get(*id).is_some_and(|wire| wire.hp > 0));
+                // Sample one tile along the push, independent of overlap strength.
+                let lookahead = config::TILE_SIZE as f32 / dx.det_hypot(dy).max(f32::EPSILON);
+                let field_speed =
+                    speed::movement_speed(map, entities, players, spatial, e, on_wire)
+                        * map.elevation_movement_multiplier_at(
+                            x,
+                            y,
+                            (dx * lookahead, dy * lookahead),
+                        )
+                        * config::VECTOR_FIELD_UNIT_SPEED_MULTIPLIER;
+                offset.0 += dx * field_speed;
+                offset.1 += dy * field_speed;
+            }
         }
         if offset.0 == 0.0 && offset.1 == 0.0 {
             continue;
         }
         let next_x = (x + offset.0).clamp(0.0, world_max_x);
         let next_y = (y + offset.1).clamp(0.0, world_max_y);
-        if !crate::game::services::standability::unit_static_standable_with_radius(
-            map,
-            occ,
-            kind,
-            next_x,
-            next_y,
-            facing,
-            entities.get(id).map(|e| e.radius()),
-        ) {
+        // Stacked fields can cross whole tiles in one tick. Check the path with
+        // the body's unchanged facing, rather than only admitting the landing.
+        let delta = (next_x - x, next_y - y);
+        let steps = (delta.0.abs().max(delta.1.abs()).ceil() as u32).max(1);
+        let radius = entities.get(id).map(|e| e.radius());
+        if !(1..=steps).all(|step| {
+            let t = step as f32 / steps as f32;
+            standability::unit_static_standable_with_radius(
+                map,
+                occ,
+                kind,
+                x + delta.0 * t,
+                y + delta.1 * t,
+                facing,
+                radius,
+            )
+        }) {
             continue;
         }
         if entities

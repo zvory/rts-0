@@ -19,6 +19,8 @@ pub use armor::{
     effective_damage_for_armor_penetration_with_bonus, effective_damage_with_facing_for_weapon,
     effective_damage_with_facing_for_weapon_and_armor_bonus,
 };
+mod shield;
+pub use shield::shield_covers_building;
 mod dao;
 pub use dao::{ranked_primary_damage, ranked_primary_weapon_profile};
 
@@ -359,6 +361,7 @@ pub fn default_weapon_kind(kind: EntityKind) -> Option<WeaponKind> {
         | EntityKind::ResourceDepot
         | EntityKind::Portal
         | EntityKind::ThreeDaoPavilion
+        | EntityKind::TechniqueLibrary
         | EntityKind::TournamentGrounds
         | EntityKind::ProvenGrounds
         | EntityKind::HealingSeal
@@ -477,6 +480,7 @@ pub fn is_panzerfaust_loaded_shot_target(kind: EntityKind) -> bool {
             | EntityKind::Tank
             | EntityKind::CommandCar
             | EntityKind::RocketLauncher
+            | EntityKind::WarAdept
     )
 }
 
@@ -826,6 +830,7 @@ mod tests {
             (EntityKind::ResourceDepot, None),
             (EntityKind::Portal, None),
             (EntityKind::ThreeDaoPavilion, None),
+            (EntityKind::TechniqueLibrary, None),
             (EntityKind::TournamentGrounds, None),
             (EntityKind::ProvenGrounds, None),
             (EntityKind::Shop, None),
@@ -1104,7 +1109,7 @@ mod tests {
     }
 
     #[test]
-    fn panzerfaust_loaded_shot_targets_only_real_vehicles_with_half_penetration() {
+    fn panzerfaust_loaded_shot_targets_vehicles_and_war_dao_with_half_penetration() {
         for kind in EntityKind::ALL {
             assert_eq!(
                 is_panzerfaust_loaded_shot_target(kind),
@@ -1114,6 +1119,7 @@ mod tests {
                         | EntityKind::Tank
                         | EntityKind::CommandCar
                         | EntityKind::RocketLauncher
+                        | EntityKind::WarAdept
                 ),
                 "{kind:?}"
             );

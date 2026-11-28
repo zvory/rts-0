@@ -56,8 +56,6 @@ pub const DAO_WIND_SPEED_MULTIPLIER: f32 = 1.15;
 /// Ordinary Disciple attacks run at 70% of their former rate, rounded to whole ticks.
 pub const DISCIPLE_ATTACK_COOLDOWN_TICKS: u32 = (64 * 10 + 3) / 7;
 
-/// One passive insight for every five seconds of a living Disciple’s lifetime.
-pub const DISCIPLE_PASSIVE_INSIGHT_TICKS: u16 = (TICK_HZ * 5) as u16;
 pub const DISCIPLE_INSIGHT_REQUIRED: u32 = 60;
 pub const DISCIPLE_EVOLVED_INSIGHT_CAP: u32 = 200;
 pub const DAO_MASTER_BODY_SCALE: f32 = 1.2;
@@ -82,13 +80,13 @@ pub const DAO_RANGED_RANGE_TILES: f32 = 5.0;
 pub const DAO_WIND_ATTACK_RATE: f32 = 1.5;
 pub const DAO_MAGIC_SPEED_MULTIPLIER: f32 = 1.05;
 
-pub const DISCIPLE_SHIELD_ARMOR_REDUCTION: f32 = 0.75;
+pub const DISCIPLE_SHIELD_ARMOR_REDUCTION: f32 = 1.0;
 pub const DISCIPLE_SHIELD_CAPACITY: u32 = 150;
 pub const MAGIC_MASTER_SHIELD_CAPACITY: u32 = DISCIPLE_SHIELD_CAPACITY * 2;
-pub const MAGIC_MASTER_SHIELD_DURATION_TICKS: u32 = DISCIPLE_SHIELD_DURATION_TICKS * 2;
+pub const MAGIC_MASTER_SHIELD_DURATION_TICKS: u32 = TICK_HZ * 15;
 pub const MAGIC_ANCHOR_DEATH_INSIGHT: u32 = 20;
 pub const DISCIPLE_SHIELD_RADIUS_TILES: f32 = 2.1;
-pub const DISCIPLE_SHIELD_DURATION_TICKS: u32 = TICK_HZ * 5;
+pub const DISCIPLE_SHIELD_DURATION_TICKS: u32 = TICK_HZ * 10;
 pub const DISCIPLE_SHIELD_COOLDOWN_TICKS: u16 = (TICK_HZ * 10) as u16;
 
 /// Completed and paid active Dao researches reserve player-wide price tiers.
@@ -125,3 +123,9 @@ pub const fn disciple_shield_duration_ticks(master: bool) -> u32 {
         DISCIPLE_SHIELD_DURATION_TICKS
     }
 }
+
+// Technique Library researches use fixed prices, independent of Dao tiers.
+pub const TECHNIQUE_COST_STEEL: u32 = 100;
+pub const TECHNIQUE_COST_OIL: u32 = 100;
+pub const TECHNIQUE_RESEARCH_TICKS: u32 = TICK_HZ * 20;
+pub const BLINK_RESEARCH_TICKS: u32 = TICK_HZ * 10;

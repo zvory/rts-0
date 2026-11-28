@@ -60,3 +60,5 @@ mod tank_trap_tests;
 mod tournament_tests;
 mod vehicle_repair_tests;
 mod warrior_tests;
+
+mod technique_library_tests;

@@ -35,11 +35,7 @@ fn disciple_shield_armors_projectiles_crossing_barrier_and_pays_full_damage_on_b
         for tick in 1..=6 {
             tick_runtime(&mut runtime, &mut entities, tick);
         }
-        assert_eq!(
-            entities.get(victim).unwrap().hp,
-            hp - total / 4,
-            "{ability:?}"
-        );
+        assert_eq!(entities.get(victim).unwrap().hp, hp, "{ability:?}");
         assert_eq!(
             entities
                 .get(shield_caster)

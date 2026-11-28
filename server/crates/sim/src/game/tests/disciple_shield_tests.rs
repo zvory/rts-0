@@ -17,6 +17,9 @@ fn setup() -> (Game, u32) {
         ..player.clone()
     };
     let mut game = empty_flat_game(&[player, enemy]);
+    game.state.players[0]
+        .upgrades
+        .insert(crate::game::upgrade::UpgradeKind::TechniqueShield);
     let caster = game
         .state
         .entities
@@ -228,11 +231,11 @@ fn disciple_shield_shift_waits_for_move_and_cooldown_does_not_replace_field() {
 }
 
 #[test]
-fn disciple_shield_expires_at_5_seconds_after_checkpoint_restore() {
+fn disciple_shield_expires_at_10_seconds_after_checkpoint_restore() {
     let (mut game, caster) = setup();
     game.enqueue(1, cast(caster, 440.0, false));
     game.tick();
-    assert_eq!(config::DISCIPLE_SHIELD_DURATION_TICKS, 5 * config::TICK_HZ);
+    assert_eq!(config::DISCIPLE_SHIELD_DURATION_TICKS, 10 * config::TICK_HZ);
     let expires = game.state.tick + config::DISCIPLE_SHIELD_DURATION_TICKS;
     assert_eq!(
         game.state
@@ -276,7 +279,7 @@ fn disciple_shield_expires_at_5_seconds_after_checkpoint_restore() {
                 (0.0, 0.0),
                 &crate::game::teams::TeamRelations::from_player_teams([(1, 1), (2, 2)])
             ),
-            5
+            0
         );
         game.tick();
         assert!(game.state.entities.get(caster).unwrap().shield.is_none());
@@ -323,8 +326,8 @@ fn disciple_shield_recast_after_cooldown_gets_fresh_expiry() {
     {
         game.tick();
     }
-    assert!(game.state.tick >= original.expires_tick);
-    assert!(game.state.entities.get(caster).unwrap().shield.is_none());
+    assert_eq!(game.state.tick + 1, original.expires_tick);
+    assert!(game.state.entities.get(caster).unwrap().shield.is_some());
     game.enqueue(1, cast(caster, 500.0, false));
     game.tick();
     let replacement = game
@@ -359,7 +362,7 @@ fn disciple_shield_snapshots_track_full_hit_cost_and_remove_depleted_pool() {
             game.state
                 .entities
                 .shielded_damage(caster, 2, damage, damage, 0.0, (0.0, 0.0), &teams),
-            ((damage as f32) * 0.25).round() as u32
+            0
         );
         let shield = game
             .snapshot_full_for(1)
@@ -373,7 +376,7 @@ fn disciple_shield_snapshots_track_full_hit_cost_and_remove_depleted_pool() {
         game.state
             .entities
             .shielded_damage(caster, 2, 70, 70, 0.0, (0.0, 0.0), &teams),
-        18
+        0
     );
     assert!(!game
         .snapshot_full_for(1)
@@ -415,7 +418,7 @@ fn disciple_shield_only_protects_inside_targets_and_piercing_still_drains_hp() {
         game.state
             .entities
             .shielded_damage(inside, 2, 20, 20, 0.0, (0.0, 0.0), &teams),
-        5
+        0
     );
     let shield = game
         .snapshot_full_for(1)
@@ -432,13 +435,13 @@ fn disciple_shield_only_protects_inside_targets_and_piercing_still_drains_hp() {
 fn disciple_shield_armor_uses_normal_piercing_and_drains_full_hits_without_stacking() {
     let teams = crate::game::teams::TeamRelations::from_player_teams([(1, 1), (2, 2)]);
     for (penetration, damage, expected_hit, expected_pool) in [
-        (0.0, 100, 25, 50),
-        (0.25, 100, 44, 50),
-        (0.5, 100, 63, 50),
-        (0.75, 100, 81, 50),
+        (0.0, 100, 0, 50),
+        (0.25, 100, 25, 50),
+        (0.5, 100, 50, 50),
+        (0.75, 100, 75, 50),
         (0.5, 5, 3, 145),
         (1.0, 100, 100, 50),
-        (0.5, 400, 250, 0),
+        (0.5, 400, 200, 0),
     ] {
         let (mut game, caster) = setup();
         game.enqueue(1, cast(caster, 440.0, false));
@@ -483,7 +486,7 @@ fn disciple_shield_armor_uses_normal_piercing_and_drains_full_hits_without_stack
         game.state
             .entities
             .shielded_damage(caster, 2, 400, 400, 0.5, (0.0, 0.0), &teams),
-        250
+        200
     );
     assert!(game.state.entities.get(caster).unwrap().shield.is_none());
     assert_eq!(
@@ -603,7 +606,7 @@ fn disciple_shield_full_attack_cost_ignores_existing_reductions_and_breaking_hit
         game.state
             .entities
             .shielded_damage(caster, 2, 20, 100, 0.0, (0.0, 0.0), &teams),
-        5
+        0
     );
     assert_eq!(
         game.state
@@ -620,7 +623,7 @@ fn disciple_shield_full_attack_cost_ignores_existing_reductions_and_breaking_hit
         game.state
             .entities
             .shielded_damage(caster, 2, 100, 100, 0.0, (0.0, 0.0), &teams),
-        25
+        0
     );
     assert!(game.state.entities.get(caster).unwrap().shield.is_none());
     assert_eq!(
@@ -736,7 +739,7 @@ fn magic_support_insight_anchor_rewards_enemy_unit_deaths_once_per_caster() {
 }
 
 #[test]
-fn magic_master_shield_doubles_capacity_lifetime_and_survives_checkpoint() {
+fn magic_master_shield_doubles_capacity_extends_lifetime_and_survives_checkpoint() {
     for master in [false, true] {
         let (mut game, caster) = setup();
         if master {
@@ -749,7 +752,7 @@ fn magic_master_shield_doubles_capacity_lifetime_and_survives_checkpoint() {
         let unit = game.state.entities.get(caster).unwrap();
         let shield = unit.shield.as_ref().unwrap();
         let capacity = if master { 300 } else { 150 };
-        let duration = config::TICK_HZ * if master { 10 } else { 5 };
+        let duration = config::TICK_HZ * if master { 15 } else { 10 };
         assert_eq!(shield.remaining, capacity);
         assert_eq!(shield.duration_ticks, duration);
         assert_eq!(shield.expires_tick - game.state.tick, duration);
@@ -803,7 +806,7 @@ fn promotion_preserves_existing_adept_shield_strength() {
     unit.advance_dao_master();
     let shield = unit.shield.as_ref().unwrap();
     assert_eq!(shield.capacity, 150);
-    assert_eq!(shield.duration_ticks, config::TICK_HZ * 5);
+    assert_eq!(shield.duration_ticks, config::TICK_HZ * 10);
     assert_eq!(shield.expires_tick, expires);
     let checkpoint = game.checkpoint_payload_text_for_test().unwrap();
     Game::restore_checkpoint_payload_text_for_test(
@@ -812,4 +815,64 @@ fn promotion_preserves_existing_adept_shield_strength() {
         game.state.map_metadata.clone(),
     )
     .unwrap();
+}
+
+#[test]
+fn disciple_shield_building_coverage_uses_half_the_field_area() {
+    let teams = crate::game::teams::TeamRelations::from_player_teams([(1, 1), (2, 2), (3, 1)]);
+    // Resource Depot footprint is [416, 544] on both axes. Edge placement can cover
+    // enough of the field without containing the building; corner slivers cannot.
+    for (owner, center, invulnerable, source, piercing, expected) in [
+        (1, (480.0, 480.0), false, (0.0, 0.0), 0.0, 0),
+        (1, (536.0, 480.0), false, (0.0, 0.0), 0.0, 0),
+        (1, (552.0, 480.0), false, (0.0, 0.0), 0.0, 20),
+        (1, (536.0, 536.0), false, (0.0, 0.0), 0.0, 20),
+        (3, (480.0, 480.0), false, (0.0, 0.0), 0.0, 0),
+        (2, (480.0, 480.0), false, (0.0, 0.0), 0.0, 20),
+        (1, (480.0, 480.0), true, (0.0, 0.0), 0.0, 20),
+        (1, (480.0, 480.0), false, (480.0, 480.0), 0.0, 20),
+        (1, (480.0, 480.0), false, (0.0, 0.0), 1.0, 20),
+    ] {
+        let (mut game, caster) = setup();
+        game.state
+            .entities
+            .get_mut(caster)
+            .unwrap()
+            .place_shield(1, center.0, center.1, 0, 150, true);
+        let building = game
+            .state
+            .entities
+            .spawn_building(owner, EntityKind::ResourceDepot, 480.0, 480.0, true)
+            .unwrap();
+        game.state
+            .entities
+            .get_mut(building)
+            .unwrap()
+            .set_invulnerable(invulnerable);
+        assert_eq!(
+            game.state.entities.shielded_damage(
+                building,
+                if owner == 2 { 1 } else { 2 },
+                20,
+                20,
+                piercing,
+                source,
+                &teams,
+            ),
+            expected,
+            "owner={owner}, center={center:?}, invulnerable={invulnerable}"
+        );
+        let drains = expected == 0 || (piercing == 1.0);
+        assert_eq!(
+            game.state
+                .entities
+                .get(caster)
+                .unwrap()
+                .shield
+                .as_ref()
+                .unwrap()
+                .remaining,
+            if drains { 130 } else { 150 }
+        );
+    }
 }

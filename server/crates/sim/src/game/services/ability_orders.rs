@@ -150,6 +150,12 @@ pub(crate) fn launch_world_ability(
     let Some(ps) = players.iter_mut().find(|p| p.id == player) else {
         return false;
     };
+    if definition
+        .upgrade_requirement
+        .is_some_and(|required| !ps.has_upgrade(required))
+    {
+        return false;
+    }
     let initial_barrage_free = ability == AbilityKind::Barrage
         && entities
             .get(caster)

@@ -15,7 +15,7 @@ Serfs and automatically creates free Steel Mines and Oil Pumpjacks using the exi
 Serfs inherit all Worker stats, cost, training time, movement, construction and presentation;
 the faction build catalog permits only Nexus. Existing hotkeys and audio are reused.
 
-The standard start contains one completed Nexus, one Serf, one completed Disciple, six Steel
+The standard start contains one completed Nexus, one Serf, two completed Novices, six Steel
 Mines, one Oil Pumpjack, 25 Steel and zero Oil, matching Kriegsia's economy without its starting Riflemen. Resource-patch
 placement uses the existing loadout logic. The Disciple starts in the defensive line near the Nexus.
 No research is available. Losing the Nexus interrupts its economy in exactly the same way as losing a Resource Depot. Expansion has

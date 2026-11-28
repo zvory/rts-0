@@ -142,7 +142,7 @@ The single-unit selection panel displays Armored or Unarmored beneath the kill c
 against non-piercing attacks and partial/full armor penetration. Artillery is Small/unarmored
 and receives no armor damage reduction. Buildings and resource nodes omit this unit-only row.
 
-Shield grants a separate 75% armor layer against attacks entering its field, using ordinary
+Shield grants a separate 100% armor layer against attacks entering its field, using ordinary
 armor penetration after existing target defenses. Its 150 HP durability pays each hit's full
 pre-reduction damage, including fully piercing hits. See [Dao insight](dao-insight.md) for
 breaking-hit, overlap, and area-damage rules.
@@ -241,7 +241,7 @@ The playable `cultivators` catalog reuses Resource Depot (displayed as Nexus), W
 Steel Mine and Oil Pumpjack, with Nexus, Pump Jack, Portal, Three Dao Pavilion, Tournament Grounds,
 and Shop available for Serf construction. Serfs construct Pump Jacks on Oil patches
 for 150 Steel in 300 ticks (10 seconds), using the existing extractor placement and mining rules. Its
-`cultivators.standard` loadout matches Kriegsia's starting economy and replaces the starting Riflemen with one completed Disciple.
+`cultivators.standard` loadout matches Kriegsia's starting economy and replaces the starting Riflemen with two completed Novices.
 Cultivator Serfs can also construct the faction-specific Portal for 150 Steel: it has a 3x3
 footprint, 123 HP, one tile of sight, a five-second construction time, no prerequisite, and no
 research. A completed Portal trains the Cultivator Novice for 50 Steel and 2 Supply in 300 ticks.
@@ -497,14 +497,14 @@ profiles and explicit activation/autocast policy instead of being folded into de
   `ANTI_TANK_GUN_BODY_TURN_RATE_DEGREES_PER_SECOND = 110`; sharp heading changes still reduce throttle
   until the gun pivots in place.
 - Panzerfaust units carry a one-shot 5-tile loaded weapon that targets only visible
-  Scout Cars, Tanks, and Command Cars with
+  Scout Cars, Tanks, Command Cars, Rocket Trucks, War Adepts, and War Masters with
   `PANZERFAUST_DAMAGE = 100`, `PANZERFAUST_ARMOR_PENETRATION = 0.5`,
   `PANZERFAUST_WINDUP_TICKS = 15`, and `PANZERFAUST_TRAVEL_TICKS = 15`. The Panzerfaust becomes spent
   immediately at launch and can move and use its rifle while the detached projectile travels.
   Against Armored Tanks, the 50% penetration lands as 63
   effective damage; unarmored Scout Cars take the full 100 damage. Methamphetamines reduces the
   windup constant to 12 ticks; travel stays 15 ticks. The dedicated runtime owns only the one-shot
-  launcher, exact vehicle whitelist, and disposable state; the entity remains a Panzerfaust throughout.
+  launcher, exact target whitelist, and disposable state; the entity remains a Panzerfaust throughout.
 - Tank hull-facing damage modifiers for tank and anti-tank gun hits are 1.0x front, 1.5x side,
   and 1.7x rear.
 - Tanks turn their hulls at `TANK_BODY_TURN_RATE_RAD_PER_TICK = 0.04375`, 25% faster than the
@@ -583,7 +583,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   Leaving an occupied trench has no delay: movement orders release occupation immediately,
   and Machine Gunners skip weapon pack-up when leaving a trench, including Attack-order pursuit.
   Attacking a target in range preserves trench occupation and weapon deployment.
-  Active occupation grants +1 tile weapon range, reduces incoming direct damage by 50% after
+  Active occupation grants immunity to Vector Field displacement, +1 tile weapon range, reduces incoming direct damage by 50% after
   normal weapon/armor/facing calculations,
   reduces incoming area damage by 25% after existing falloff/armor rules. Entrenchment does not add a direct-shot
   miss chance. Tank cannon direct shots have no intrinsic infantry dodge chance. Anti-Tank Guns
@@ -847,7 +847,7 @@ baseline; runtime pricing applies ½×, 1×, or 2× to costs and duration. Compl
 researches and paid active Dao researches across all owned pavilions reserve tiers.
 Unpaid entries select their tier when payment starts; a paid entry keeps its duration
 and refund value even if another research is cancelled or its pavilion destroyed.
-Each unlocks its corresponding 150-steel / 35-oil Adept production at Portals. Existing research queue, cancellation,
+Each unlocks its corresponding 150-steel / 60-oil Adept production at Portals. Existing research queue, cancellation,
 refund, completion, and destruction rules apply; completed research persists.
 See [Cultivators](cultivators.md#three-dao-pavilion-prototype) for the approved brief.
 
@@ -863,15 +863,13 @@ through checkpoints. Evolution changes Novice `warrior` (29) to `wind_adept` (35
 Permanent Dao identity is derived from kind; the engine stores no separate mutable `dao`. Visible Disciple snapshots append `insight` (compact slot 45) and
 `dao` (slot 46: wind/war/magic). Evolution buttons set replaceable, entity-owned `chosenDao` intent (team-private compact slot 49), independent of orders. Codes 14–16 and order stages 22–24 retain their positions.
 Evolution automatically occurs once 60 insight is ready, without research or a Pavilion.
-Living Novices and all three Adept paths additionally earn one passive insight every five seconds
-(150 ticks per unit since spawning, with the remainder preserved through evolution and checkpoints).
-Serfs are excluded; existing 60/200 caps and terminal zero-insight Masters are unchanged.
+Cultivators gain no passive insight from time alive.
 Evolution clears all insight and raises the cap to 200. Wind and War Adepts continue earning
 insight from actual hostile HP damage (one insight per unit HP removed, quarter-rate building damage, with exact fractional carry; Wind earns full one-per-HP insight from Pumpjacks and Steel Mines; War Adepts earn double insight from actual Tank HP removed; both legs of Throw Sword earn Insight at these rates). Magic Adepts earn the same combat insight, plus 20 per enemy unit death inside their active Vector Field; Shield grants no insight; reaching 200 automatically advances a living Adept to its matching Master. Research ids are
 `dao_wind`, `dao_of_heaviness` (War), `dao_of_magic` (Magic).
 
 `DISCIPLE_SHIELD_CAPACITY` (150), `DISCIPLE_SHIELD_RADIUS_TILES` (2.1), and `DISCIPLE_SHIELD_DURATION_TICKS` are mirrored for the Shield HP and lifetime bars and checked by faction catalog parity. `DISCIPLE_EVOLVED_INSIGHT_CAP` (200) is also parity-checked. Master Shield capacity and duration are sent as public cast-time maxima with each visible field for accurate bars.
-Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md). Wind Adepts and Masters have 14 tiles of base sight, one less than the Scout Car’s 15 (Novices, War, and Magic retain 11). Wind uses the base Disciple’s 0.75-tile sword reach, retaining 23 damage, 25% penetration (50% at Master rank), 61-tick cooldown, moving attacks, 2.7025 px/tick movement, and Blink. Its five-tile automatic engagement closes to melee reach. Magic uses a five-tile orb primary, retaining 23 damage, 25% penetration (50% at Master rank), and 91-tick cooldown, and stops to fire. Novices retain automatic Charge at 1.5× speed for one second. War Adepts and Masters charge at 2× speed for up to four seconds, ending on their first committed primary attack (including a miss), loss of a legal target, or replacement of the engagement order. Both use the existing 15-second cooldown from activation against a hostile unit within five tiles (center distance), at least two tiles away or moving away; Charge has no selectable command and does not grant moving attacks. Wind Blink reaches twelve tiles with no return recast, while Ekat retains its five-tile Dash and return. Wind Adepts hold one Blink charge; Masters hold two. Each spent charge recharges sequentially in eighteen seconds, and promotion grants the additional ready charge without resetting an existing recharge. War uses 1.75-tile spear reach (`DAO_WAR_RANGE_TILES`) and 100% primary armor penetration at both ranks, with 35 primary damage at Adept rank and 84 at Master rank (the ordinary rounded 42 doubled). Its cooldown, defensive armor and HP bonuses remain unchanged. Novice primary penetration remains 50%; ability weapons retain their own penetration. Its sprite scale remains 0.56. The Novice collision/interaction radius is 17 world pixels; Wind and Magic retain independent 26-pixel radii, while War retains 18.2 pixels (26 × `DAO_WAR_BODY_SCALE`, 0.7). Master body scaling is unchanged. Proving/Tournament Grounds choose spawn exits using the finished Adept’s body before materializing and evolving the queued Novice, so a smaller entrant cannot create an overlapping larger exit body. Novice artwork is unchanged, and its direct/outer click radius remains 19.5 pixels independently of the smaller collision/marquee footprint. The starting Novice stands five tiles toward the enemy from the Nexus to clear the base with its larger body. These footprints cover the rendered torsos instead of allowing tightly stacked bodies. Sprite origins center each torso on the authoritative position, including the War atlas's forward-offset torso. Weapons, scarves, and the presentation-only 11.2-pixel War lunge may extend outside the body footprint. `DAO_WAR_BODY_SCALE` remains mirrored for artwork, selection, and collision geometry. `DAO_WAR_RANGE_TILES` and `DAO_RANGED_RANGE_TILES` are mirrored in client config and range overlays.
+Dao presentation and support Shield follow [Disciple insight and Dao evolution](dao-insight.md). Wind Adepts and Masters have 14 tiles of base sight, one less than the Scout Car’s 15 (Novices, War, and Magic retain 11). Wind uses the base Disciple’s 0.75-tile sword reach, retaining 23 damage, 25% penetration (50% at Master rank), 61-tick cooldown, moving attacks, 2.7025 px/tick movement, and Blink. Its five-tile automatic engagement closes to melee reach. Magic uses a five-tile orb primary, retaining 23 damage, 25% penetration (50% at Master rank), and 91-tick cooldown, and stops to fire. Novices retain automatic Charge at 1.5× speed for one second. War Adepts and Masters charge at 2× speed for up to four seconds, ending on their first committed primary attack (including a miss), loss of a legal target, or replacement of the engagement order. Both use the existing 15-second cooldown from activation against a hostile unit within five tiles (center distance), at least two tiles away or moving away; Charge has no selectable command and does not grant moving attacks. Wind Blink reaches twelve tiles with no return recast, while Ekat retains its five-tile Dash and return. Wind Adepts hold one Blink charge; Masters hold two. Each spent charge recharges sequentially in eighteen seconds, and promotion grants the additional ready charge without resetting an existing recharge. War uses 1.75-tile spear reach (`DAO_WAR_RANGE_TILES`) and 100% primary armor penetration at both ranks, with 35 primary damage at Adept rank and 84 at Master rank (the ordinary rounded 42 doubled). Its cooldown, defensive armor and HP bonuses remain unchanged. Novice primary penetration remains 50%; ability weapons retain their own penetration. Its sprite scale remains 0.56. The Novice collision/interaction radius is 17 world pixels; Wind and Magic retain independent 26-pixel radii, while War retains 18.2 pixels (26 × `DAO_WAR_BODY_SCALE`, 0.7). Master body scaling is unchanged. Proving/Tournament Grounds choose spawn exits using the finished Adept’s body before materializing and evolving the queued Novice, so a smaller entrant cannot create an overlapping larger exit body. Novice artwork is unchanged, and its direct/outer click radius remains 19.5 pixels independently of the smaller collision/marquee footprint. The two starting Novices stand five tiles toward the enemy from the Nexus to clear the base with its larger body. These footprints cover the rendered torsos instead of allowing tightly stacked bodies. Sprite origins center each torso on the authoritative position, including the War atlas's forward-offset torso. Weapons, scarves, and the presentation-only 11.2-pixel War lunge may extend outside the body footprint. `DAO_WAR_BODY_SCALE` remains mirrored for artwork, selection, and collision geometry. `DAO_WAR_RANGE_TILES` and `DAO_RANGED_RANGE_TILES` are mirrored in client config and range overlays.
 
 War Adepts can cast Throw Sword with a 40-second cooldown; War Masters retain the normal 20-second cooldown. Advancement preserves a cooldown already in progress. It uses fractional ability range metadata: 7.5 tiles, 100/11 px/tick, and a
 0.9-tile damage width and zero armor penetration (5/10 damage against armored
@@ -894,7 +892,7 @@ entry movement to newly trained base Disciples. Busy grounds retain waiting entr
 ### Portal Adept production
 
 A completed Cultivator Portal trains Novices and, after matching Pavilion research,
-Wind, War and Magic Adepts. Each Adept costs **150 steel, 45 oil, three supply**
+Wind, War and Magic Adepts. Each Adept costs **150 steel, 55 oil, three supply**
 and takes **300 ticks (ten seconds)**, without a Novice input. Use normal train/repeat
 commands, queue payment/refunds, legal spawn exits and rally behavior. An unresearched
 Dao cannot be trained. Combat-earned evolution and Tournament Grounds are unchanged.
@@ -929,7 +927,7 @@ placement, cancellation, damage, fog and destruction apply. See [Shop](shop.md) 
 At 200 insight, each living Adept automatically becomes its matching Master and fully
 heals. Relative to that path’s Adept, size/collision ×1.2, movement ×1.1, ordinary
 attack damage ×1.2 (nearest integer), maximum HP ×1.4. No resource or supply cost,
-research or attack-rate change; War Masters halve Throw Sword cooldown to 20 seconds and double their otherwise rank-scaled primary damage from 42 to 84; both War ranks share the four-second, 2× Charge; Magic Masters double Shield capacity to 300 HP and lifetime to ten seconds; Wind Masters gain a second Blink charge; no repeat advancement. Adept maximum HP is 150 (Wind/Magic) or 176 (War), a 30% increase rounded to
+research or attack-rate change; War Masters halve Throw Sword cooldown to 20 seconds and double their otherwise rank-scaled primary damage from 42 to 84; both War ranks share the four-second, 2× Charge; Magic Masters double Shield capacity to 300 HP and extend lifetime to fifteen seconds; Wind Masters gain a second Blink charge; no repeat advancement. Adept maximum HP is 150 (Wind/Magic) or 176 (War), a 30% increase rounded to
 whole HP; Novices have 58 HP. Master HP follows the existing ×1.4 advancement
 multiplier after Adept rounding: 210 (Wind/Magic) or 246 (War). See [Master rules and review](dao-masters.md).
 
@@ -939,8 +937,8 @@ The Regen command subtitle is **+3 HP per second** and Armor Treasure is **+50% 
 (American spelling). These summarize the existing effects; the full descriptions retain
 permanent delivery semantics and Armor Treasure’s percentage-point/cap details.
 
-Completed Shops offer Regen (50 oil, permanent 3 HP/s regeneration after delivery, one carried slot) and Escape Treasure
-(100 oil, one lethal-damage escape to the supplying Shop at 1 HP). Both target visible friendly
+Completed Shops offer Regen (35 oil, permanent 3 HP/s regeneration after delivery, one carried slot) and Escape Treasure
+(70 oil, one lethal-damage escape to the supplying Shop at 1 HP). Both target visible friendly
 units at unlimited range and travel at 7.5 tiles/second without a flight timeout. All flying
 goods have 10 HP and can be destroyed by enemy weapons. Destroyed goods and dead targets
 cancel delivery without a refund.
@@ -962,13 +960,13 @@ sight, supply, weapon, repair/refund, or survival-building status, and costs no 
 time. The reserved ability has no live carriers or command-card entry.
 See [Healing Seal](healing-seal.md).
 
-Cultivator Novices carry one item, Adepts carry up to three, and Masters carry up to six, with no category cap and no carried-item hotkeys. Distinct effects coexist; duplicate copies do not stack. Haste costs 100 oil, Double Damage 150 oil, Armor Treasure 100 oil; Haste, Double Damage, Armor, and Vitality are permanent passives applied on delivery. Haste grants 15% movement speed, 25% primary weapon attack speed (reload / 1.25, rounded upward to a whole tick), and attacks while moving, Double Damage doubles primary weapon damage, Armor Treasure adds 50 percentage points to native/War Dao armor, capped at 100% before penetration; it no longer halves final damage. Escape's 100-oil purchase starts a 60-second per-player cooldown shared across all owned Shops. See [Shop item rules](shop.md#carried-attack-and-defense-goods).
+Cultivator Novices carry one item, Adepts carry up to three, and Masters carry up to six, with no category cap and no carried-item hotkeys. Distinct effects coexist; duplicate copies do not stack. Haste costs 70 oil, Double Damage 105 oil, Armor Treasure 70 oil; Haste, Double Damage, Armor, and Vitality are permanent passives applied on delivery. Haste grants 15% movement speed, 25% primary weapon attack speed (reload / 1.25, rounded upward to a whole tick), and attacks while moving, Double Damage doubles primary weapon damage, Armor Treasure adds 50 percentage points to native/War Dao armor, capped at 100% before penetration; it no longer halves final damage. Escape's 70-oil purchase starts a 60-second per-player cooldown shared across all owned Shops. See [Shop item rules](shop.md#carried-attack-and-defense-goods).
 
-Vitality Treasure costs **100 oil** and can coexist with all other distinct carried items. Delivery permanently adds **150 maximum HP and 150 current HP**. The item remains carried and passive, without activation or expiry. See [Vitality rules](shop.md#vitality-treasure).
+Vitality Treasure costs **70 oil** and can coexist with all other distinct carried items. Delivery permanently adds **150 maximum HP and 150 current HP**. The item remains carried and passive, without activation or expiry. See [Vitality rules](shop.md#vitality-treasure).
 
 ### Vector Field
 
-Vector Field is a separate ability (`vectorField`) replacing Anchor for Magic Adepts and Magic Masters only. Ekat retains her original Magic Anchor and radial pull. The centered square is 4 by 4 tiles for Magic Adepts and 5 by 5 tiles for Magic Masters, oriented along the selected arrow, lasts ten seconds, and uses the existing 7.5-tile cast range. Successful placement starts a 30-second cooldown for Magic Adepts and a 20-second cooldown for Magic Masters. Promotion preserves a cooldown already in progress. Every ground unit in it, allied or enemy, receives an additive three-world-pixel-per-tick displacement along the arrow, independent of mass/footing. Inward/outward movement resistance and spiral forces are not applied by this ability. Terrain and hostile-body admission remain. Magic Dao death Insight is preserved for hostile unit deaths inside the rectangle.
+Vector Field is a separate ability (`vectorField`) replacing Anchor for Magic Adepts and Magic Masters only. Ekat retains her original Magic Anchor and radial pull. The centered square is 4 by 4 tiles for Magic Adepts and 5 by 5 tiles for Magic Masters, oriented along the selected arrow, lasts ten seconds, and has a 10.5-tile cast range. Successful placement starts a 30-second cooldown for Magic Adepts and a 20-second cooldown for Magic Masters. Promotion preserves a cooldown already in progress. Every ground unit in it, allied or enemy, except actively entrenched infantry, receives an additive displacement along the arrow equal to half its own effective movement speed, including movement upgrades and active speed/terrain modifiers, independent of mass/footing resistance. Overlapping fields sum their vectors without normalization; one opposing field halves forward speed on uniform terrain, and two cancel it for Scout Cars, Tanks, Riflemen, and meth-boosted Riflemen alike. Inward/outward movement resistance and spiral forces are not applied by this ability. Terrain and hostile-body admission remain. Magic Dao death Insight is preserved for hostile unit deaths inside the rectangle.
 
 See [Vector Field](vector-field.md) for placement, rank geometry, force, and presentation rules.
 
@@ -997,21 +995,21 @@ damage multiplier on Dao Adept bodies is unchanged.
 
 ### 2X XP
 
-The Shop sells a permanent utility item with glyph **2X**, subtitle **2X XP**, hotkey **W**, and cost **50 oil** (no steel). After delivery it doubles all Insight gain, including combat, fractional building damage, War-versus-Tank bonuses, and Magic Vector Field death rewards. It uses one carried slot, does not stack, survives supplying-Shop destruction after delivery, and follows existing delivery, reservation, visibility, checkpoint, and rank-cap rules. Multiplication applies to new rewards before fractional carry and the existing Insight caps.
+The Shop sells a permanent utility item with glyph **2X**, subtitle **2X XP**, hotkey **W**, and cost **35 oil** (no steel). After delivery it doubles all Insight gain, including combat, fractional building damage, War-versus-Tank bonuses, and Magic Vector Field death rewards. It uses one carried slot, does not stack, survives supplying-Shop destruction after delivery, and follows existing delivery, reservation, visibility, checkpoint, and rank-cap rules. Multiplication applies to new rewards before fractional carry and the existing Insight caps.
 ### Cosmic Energy
 
 Each player starts with zero **Cosmic Energy**, displayed with the **✨** sparkle icon.
-Every whole point of non-passive insight actually gained by an owned Cultivator also grants
+Every whole point of insight actually gained by an owned Cultivator also grants
 one Cosmic Energy. This includes hostile damage (with existing unit/building ratios and fractional
 carry), Throw Sword, Magic field death rewards, and insight granted by training or tournament
-promotion. Passive five-second insight grants none. Existing insight caps apply, so over-cap
+promotion. Existing insight caps apply, so over-cap
 rewards and terminal Masters grant none. Spending/resetting insight on evolution does not remove
 Cosmic Energy. It accumulates with saturating u32 arithmetic, survives checkpoints/replays, and
 has no spending action or effect yet. Lab-authored initial insight does not generate income.
 
 ### Breakthrough utility item
 
-Breakthrough costs **100 oil**, occupies the Shop's **E** utility slot, and permanently grants
+Breakthrough costs **70 oil**, occupies the Shop's **E** utility slot, and permanently grants
 its carrier and living friendly units within **3 tiles** (inclusive center distance) **25% movement
 speed**. Friendly includes allies. The carried item uses one normal slot and ordinary targeted
 delivery; no activation, cooldown, or expiry. Aura membership is sampled simultaneously before
@@ -1019,3 +1017,11 @@ movement each tick. Identical auras do not stack; the multiplier combines with H
 Master rank and other movement modifiers. Leaving range or losing the carrier removes the aura
 on the next movement tick. It grants no attack speed or moving attacks. Constants are owned by
 Rust balance; the client catalog mirrors the price and description.
+
+### Technique Library
+
+See [Technique Library specification](technique-library.md). The Serf-built 3×3 Library matches
+the Pavilion: 100 steel / 25 oil, 560 build ticks, 120 HP. Charge, Shield and Throw Sword
+are permanent independent unlocks at 100 steel / 100 oil each and take 20 seconds.
+Novice/War Charge, Magic Shield and War Throw Sword are gated at both ranks.
+Wind Blink and Magic Vector Field need no research.

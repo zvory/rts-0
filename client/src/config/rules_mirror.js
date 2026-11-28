@@ -156,10 +156,10 @@ export const EKAT_LINE_SHOT_WIDTH_TILES = 0.6;
 export const EKAT_LINE_SHOT_SPEED_PX_PER_TICK = 8;
 export const EKAT_LINE_SHOT_DAMAGE = 40;
 export const EKAT_LINE_SHOT_COOLDOWN_TICKS = TICK_HZ * 20;
-export const VECTOR_FIELD_SPEED_PX_PER_TICK = 3;
+export const VECTOR_FIELD_SPEED_PX_PER_TICK = 1;
 export const VECTOR_FIELD_ADEPT_SIZE_TILES = 4;
 export const VECTOR_FIELD_MASTER_SIZE_TILES = 5;
-export const VECTOR_FIELD_RANGE_TILES = 7.5;
+export const VECTOR_FIELD_RANGE_TILES = 10.5;
 export const VECTOR_FIELD_DURATION_TICKS = TICK_HZ * 10;
 export const VECTOR_FIELD_ADEPT_COOLDOWN_TICKS = TICK_HZ * 30;
 export const VECTOR_FIELD_MASTER_COOLDOWN_TICKS = TICK_HZ * 20;
@@ -180,7 +180,7 @@ export const SCOUT_PLANE_ABILITY_COOLDOWN_TICKS = TICK_HZ * 30;
 export const DAO_TRAINING_COST_OIL = 100;
 export const DISCIPLE_SHIELD_CAPACITY = 150;
 export const DISCIPLE_SHIELD_RADIUS_TILES = 2.1;
-export const DISCIPLE_SHIELD_DURATION_TICKS = TICK_HZ * 5;
+export const DISCIPLE_SHIELD_DURATION_TICKS = TICK_HZ * 10;
 
 export const DAO_TRAINING_TICKS = TICK_HZ * 10;
 export const MAX_DAO_TRAINING_QUEUE = 64;
@@ -204,15 +204,15 @@ export const STATS = Object.freeze({
     rangeTiles: 0.75, cost: { steel: 50, oil: 0 }, supply: 2, buildTicks: 300,
     description: "Weak trash." },
   [KIND.WIND_ADEPT]: { armored: false, label: "Wind Adept", icon: "WI", size: 26, sight: 14,
-    rangeTiles: 0.75, cost: { steel: 150, oil: 45 }, supply: 3, buildTicks: 300,
+    rangeTiles: 0.75, cost: { steel: 150, oil: 55 }, supply: 3, buildTicks: 300,
     trainSlots: { [KIND.PORTAL]: 3 }, upgradeRequires: UPGRADE.DAO_WIND,
     description: "Harassing unit with blink." },
   [KIND.WAR_ADEPT]: { armored: false, label: "War Adept", icon: "WA", size: Math.fround(26 * Math.fround(DAO_WAR_BODY_SCALE)), sight: 11,
-    rangeTiles: DAO_WAR_RANGE_TILES, cost: { steel: 150, oil: 45 }, supply: 3, buildTicks: 300,
+    rangeTiles: DAO_WAR_RANGE_TILES, cost: { steel: 150, oil: 55 }, supply: 3, buildTicks: 300,
     trainSlots: { [KIND.PORTAL]: 4 }, upgradeRequires: UPGRADE.DAO_OF_HEAVINESS,
     description: "Anti-tank heavy hitter." },
   [KIND.MAGIC_ADEPT]: { armored: false, label: "Magic Adept", icon: "MA", size: 26, sight: 11,
-    rangeTiles: DAO_RANGED_RANGE_TILES, cost: { steel: 150, oil: 45 }, supply: 3, buildTicks: 300,
+    rangeTiles: DAO_RANGED_RANGE_TILES, cost: { steel: 150, oil: 55 }, supply: 3, buildTicks: 300,
     trainSlots: { [KIND.PORTAL]: 5 }, upgradeRequires: UPGRADE.DAO_OF_MAGIC,
     description: "Ranged magician with shields and fields." },
   [KIND.MACHINE_GUNNER]: { armored: false, label: "Machine Gunner", icon: "MG", size: 10, sight: 11,
@@ -279,6 +279,11 @@ export const STATS = Object.freeze({
     researches: [UPGRADE.DAO_WIND, UPGRADE.DAO_OF_MAGIC, UPGRADE.DAO_OF_HEAVINESS],
     requires: [KIND.RESOURCE_DEPOT, KIND.PORTAL],
     description: "Unlock better units." },
+  [KIND.TECHNIQUE_LIBRARY]: { label: "Technique Library", icon: "LIB", footW: 3, footH: 3, sight: 1,
+    cost: { steel: 100, oil: 25 }, buildTicks: 560, trains: [],
+    researches: [UPGRADE.TECHNIQUE_CHARGE, UPGRADE.TECHNIQUE_SHIELD, UPGRADE.TECHNIQUE_THROW_SWORD],
+    requires: [KIND.RESOURCE_DEPOT, KIND.PORTAL],
+    description: "Research combat techniques for Disciples and Dao Adepts." },
   [KIND.ZAMOK]: { label: "Zamok", icon: "ZK", footW: 3, footH: 3, sight: 1,
     cost: { steel: 0, oil: 0 }, buildTicks: 0, trains: [KIND.GOLEM] },
   [KIND.DEPOT]: { label: "Supply Depot", icon: "SD", footW: 2, footH: 2, sight: 1,
@@ -342,7 +347,7 @@ export const ABILITIES = Object.freeze({
     ability: ABILITY.DOUBLE_XP, label: "2X XP", icon: "2X", hotkey: "W",
     title: "Deliver a permanent passive utility item at any distance; doubles all Insight gain on arrival",
     carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: null,
-    cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 50 }),
+    cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 35 }),
     queued: false, queuePolicy: "notQueueable",
   }),
   [ABILITY.HEALING_SEAL]: Object.freeze({
@@ -356,14 +361,14 @@ export const ABILITIES = Object.freeze({
     ability: ABILITY.REGEN, label: "+3 HP per second", icon: "HP", hotkey: "A",
     title: "Defense item: Deliver Regen to a friendly unit at any distance; permanently regenerates 3 HP per second on arrival",
     carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: null,
-    cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 50 }),
+    cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 35 }),
     queued: false, queuePolicy: "notQueueable",
   }),
   [ABILITY.ESCAPE_TREASURE]: Object.freeze({
     ability: ABILITY.ESCAPE_TREASURE, label: "Escape", icon: "ESC", hotkey: "Q",
     title: "Deliver a one-use treasure to a friendly unit at any distance; lethal damage returns it to this Shop at 1 HP; 60-second purchase cooldown shared across all your Shops",
     carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: null,
-    cooldownTicks: 1800, cost: Object.freeze({ steel: 0, oil: 100 }),
+    cooldownTicks: 1800, cost: Object.freeze({ steel: 0, oil: 70 }),
     queued: false, queuePolicy: "notQueueable",
   }),
 
@@ -371,28 +376,28 @@ export const ABILITIES = Object.freeze({
     ability: ABILITY.HASTE, label: "Haste", icon: "HST", hotkey: "Z",
     title: "Deliver a permanent passive attack item at any distance; grants 15% movement speed, 25% primary weapon attack speed, and attacks while moving on arrival",
     carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: null,
-    cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 100 }),
+    cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 70 }),
     queued: false, queuePolicy: "notQueueable",
   }),
   [ABILITY.BREAKTHROUGH_TREASURE]: Object.freeze({
     ability: ABILITY.BREAKTHROUGH_TREASURE, label: "Breakthrough", icon: "BT", hotkey: "E",
     title: "Utility item: Deliver a permanent aura at any distance; grants this unit and friendly units within 3 tiles 25% movement speed; overlapping Breakthrough auras do not stack",
     carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: null,
-    cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 100 }),
+    cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 70 }),
     queued: false, queuePolicy: "notQueueable",
   }),
   [ABILITY.DOUBLE_DAMAGE]: Object.freeze({
     ability: ABILITY.DOUBLE_DAMAGE, label: "2x damage", icon: "DD", hotkey: "X",
     title: "Deliver a permanent passive attack item at any distance; doubles primary weapon damage on arrival",
     carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: null,
-    cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 150 }),
+    cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 105 }),
     queued: false, queuePolicy: "notQueueable",
   }),
   [ABILITY.ARMOR_TREASURE]: Object.freeze({
     ability: ABILITY.ARMOR_TREASURE, label: "+50% armor", icon: "ARM", hotkey: "S",
     title: "Deliver a permanent passive defense item at any distance; adds 50 percentage points of armor on arrival, capped at 100% before weapon penetration",
     carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: null,
-    cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 100 }),
+    cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 70 }),
     queued: false, queuePolicy: "notQueueable",
   }),
 
@@ -400,17 +405,18 @@ export const ABILITIES = Object.freeze({
     ability: ABILITY.VITALITY_TREASURE, label: "+150 HP", icon: "+HP", hotkey: "D",
     title: "Deliver a permanent passive defense item at any distance; grants +150 maximum and current HP on arrival",
     carriers: Object.freeze([KIND.SHOP]), targetMode: "friendlyUnit", rangeTiles: null,
-    cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 100 }),
+    cooldownTicks: 0, cost: Object.freeze({ steel: 0, oil: 70 }),
     queued: false, queuePolicy: "notQueueable",
   }),
 
   [ABILITY.DISCIPLE_SHIELD]: Object.freeze({
     ability: ABILITY.DISCIPLE_SHIELD, label: "Shield", icon: "SHD", hotkey: "X",
-    title: "Place a 150 HP shield granting allied units within 2.1 tiles 75% armor against attacks from outside; armor piercing works normally; each hit drains full attack damage from shield HP; lasts up to 5 seconds; Magic Masters place a 300 HP shield lasting up to 10 seconds",
+    title: "Place a 150 HP shield blocking non-piercing attacks from outside against allies within 2.1 tiles; armor piercing lets its percentage of damage through; each hit drains full attack damage from shield HP; lasts up to 10 seconds; Magic Masters place a 300 HP shield lasting up to 15 seconds",
     carriers: Object.freeze([KIND.MAGIC_ADEPT]), targetMode: "worldPoint",
     rangeTiles: 5, radiusTiles: DISCIPLE_SHIELD_RADIUS_TILES,
     cooldownTicks: 300, cost: Object.freeze({ steel: 0, oil: 0 }),
     queued: true, queuePolicy: "skipIfNotReady",
+    upgradeRequirement: UPGRADE.TECHNIQUE_SHIELD,
   }),
   [ABILITY.EVOLVE_WIND]: Object.freeze({
     ability: ABILITY.EVOLVE_WIND, label: "Dao of Wind", icon: "Z", hotkey: "Z",
@@ -437,6 +443,7 @@ export const ABILITIES = Object.freeze({
     carriers: Object.freeze([KIND.WARRIOR, KIND.WAR_ADEPT]), targetMode: "self",
     cooldownTicks: 450, cost: Object.freeze({ steel: 0, oil: 0 }),
     queued: false, queuePolicy: "notQueueable",
+    upgradeRequirement: UPGRADE.TECHNIQUE_CHARGE,
   }),
   [ABILITY.SMOKE]: Object.freeze({
     ability: ABILITY.SMOKE,
@@ -572,6 +579,7 @@ export const ABILITIES = Object.freeze({
     targetMode: "worldPoint", rangeTiles: DAO_WIND_DASH_RANGE_TILES,
     cooldownTicks: 0, charges: 1, chargeRechargeTicks: 18 * TICK_HZ,
     cost: Object.freeze({ steel: 0, oil: 0 }), queued: true, queuePolicy: "skipIfNotReady",
+    upgradeRequirement: null,
   }),
   [ABILITY.EKAT_TELEPORT]: Object.freeze({
     ability: ABILITY.EKAT_TELEPORT,
@@ -603,6 +611,7 @@ export const ABILITIES = Object.freeze({
     damage: THROW_SWORD_DAMAGE,
     queued: true,
     queuePolicy: "skipIfNotReady",
+    upgradeRequirement: UPGRADE.TECHNIQUE_THROW_SWORD,
   }),
   [ABILITY.EKAT_LINE_SHOT]: Object.freeze({
     ability: ABILITY.EKAT_LINE_SHOT,
@@ -671,6 +680,21 @@ export const ABILITIES = Object.freeze({
 });
 
 export const UPGRADES = Object.freeze({
+  [UPGRADE.TECHNIQUE_CHARGE]: Object.freeze({
+    upgrade: UPGRADE.TECHNIQUE_CHARGE, label: "Charge", icon: "CHG",
+    cost: Object.freeze({ steel: 100, oil: 100 }), researchTicks: TICK_HZ * 20,
+    description: "Unlocks Charge for eligible Cultivators.", researchedAt: KIND.TECHNIQUE_LIBRARY,
+  }),
+  [UPGRADE.TECHNIQUE_SHIELD]: Object.freeze({
+    upgrade: UPGRADE.TECHNIQUE_SHIELD, label: "Shield", icon: "SHD",
+    cost: Object.freeze({ steel: 100, oil: 100 }), researchTicks: TICK_HZ * 20,
+    description: "Unlocks Shield for eligible Cultivators.", researchedAt: KIND.TECHNIQUE_LIBRARY,
+  }),
+  [UPGRADE.TECHNIQUE_THROW_SWORD]: Object.freeze({
+    upgrade: UPGRADE.TECHNIQUE_THROW_SWORD, label: "Throw Sword", icon: "SWD",
+    cost: Object.freeze({ steel: 100, oil: 100 }), researchTicks: TICK_HZ * 20,
+    description: "Unlocks Throw Sword for eligible Cultivators.", researchedAt: KIND.TECHNIQUE_LIBRARY,
+  }),
   [UPGRADE.DAO_OF_HEAVINESS]: Object.freeze({
     upgrade: UPGRADE.DAO_OF_HEAVINESS, label: "Dao of War", icon: "HVY",
     cost: Object.freeze({ steel: 100, oil: 200 }), researchTicks: DAO_RESEARCH_TICKS,

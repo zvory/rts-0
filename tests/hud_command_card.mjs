@@ -237,7 +237,8 @@ function buttonSlots(card) {
     playerHasCompleteKind: () => true,
     groupCooldownClocks: () => [],
   });
-  assert.equal(viewerCard.kind, "spectator", "read-only lab viewer command card stays hidden");
+  assert.equal(viewerCard.readOnly, true, "read-only lab viewer receives an inspection card");
+  assert(viewerCard.slots.filter(Boolean).every((slot) => !slot.enabled && !slot.intent && !slot.contextIntent && !slot.hotkey));
 
   const mixedSelection = [
     { id: 25, owner: 1, kind: KIND.RIFLEMAN },
@@ -446,7 +447,7 @@ for (const [kind, upgrade] of [
     abilities: [{ ability: ABILITY.THROW_SWORD, cooldownLeft }], ...extra,
   });
   const cardFor = (selection) => buildCommandCardDescriptors({
-    playerId: 1, factionId: "cultivators", selection, resources: {}, upgrades: [],
+    playerId: 1, factionId: "cultivators", selection, resources: {}, upgrades: [UPGRADE.TECHNIQUE_THROW_SWORD],
     groupCooldownClocks, playerHasCompleteKind: () => true,
   });
   const sword = (card) => card.slots.find((slot) => slot?.ability === ABILITY.THROW_SWORD);
@@ -766,6 +767,7 @@ for (const [kind, upgrade] of [
     "cultivators-producer-resource_depot",
     "cultivators-producer-portal",
     "cultivators-producer-three_dao_pavilion",
+    "cultivators-producer-technique_library",
     "cultivators-producer-tournament_grounds",
     "cultivators-producer-proven_grounds",
   ]);
@@ -835,7 +837,7 @@ for (const [kind, upgrade] of [
   const builds = card.slots.filter((slot) => slot?.action === "build");
   assert.deepEqual(
     builds.map((slot) => slot.intent.building),
-    [KIND.RESOURCE_DEPOT, KIND.PUMP_JACK, KIND.PORTAL, KIND.THREE_DAO_PAVILION, KIND.TOURNAMENT_GROUNDS, KIND.SHOP],
+    [KIND.RESOURCE_DEPOT, KIND.PUMP_JACK, KIND.PORTAL, KIND.THREE_DAO_PAVILION, KIND.TOURNAMENT_GROUNDS, KIND.TECHNIQUE_LIBRARY, KIND.SHOP],
   );
   assert.equal(builds[0].label, "Nexus");
   assert.equal(builds[0].commandId, "cultivators.build." + KIND.RESOURCE_DEPOT);
@@ -850,6 +852,8 @@ for (const [kind, upgrade] of [
   assert.equal(builds[3].hotkey, "A");
   assert.equal(builds[4].label, "Tournament Grounds");
   assert.equal(builds[4].commandId, "cultivators.build." + KIND.TOURNAMENT_GROUNDS);
+  assert.equal(builds[5].commandId, "cultivators.build." + KIND.TECHNIQUE_LIBRARY);
+  assert.equal(builds[5].hotkey, "D");
 }
 
 {
@@ -933,7 +937,8 @@ for (const researched of [false, true]) {
   const context = {
     playerId: 1, factionId: "cultivators",
     resources: { steel: 1000, oil: 1000 },
-    upgrades: [UPGRADE.DAO_WIND, UPGRADE.DAO_OF_HEAVINESS, UPGRADE.DAO_OF_MAGIC],
+    upgrades: [UPGRADE.DAO_WIND, UPGRADE.DAO_OF_HEAVINESS, UPGRADE.DAO_OF_MAGIC,
+      UPGRADE.TECHNIQUE_SHIELD],
     playerHasCompleteKind: () => true, groupCooldownClocks: () => [],
   };
   const unit = { id: 50, owner: 1, kind: KIND.WARRIOR, insight: 59 };
@@ -979,7 +984,7 @@ for (const researched of [false, true]) {
     { id: 4, owner: 2, kind: KIND.WARRIOR, insight: 0 },
     { id: 5, owner: 1, kind: KIND.WORKER },
   ];
-  const context = { playerId: 1, factionId: "cultivators", selection, upgrades: [],
+  const context = { playerId: 1, factionId: "cultivators", selection, upgrades: [UPGRADE.TECHNIQUE_THROW_SWORD],
     resources: { steel: 0, oil: 0 }, playerHasCompleteKind: () => false,
     groupCooldownClocks: () => [] };
   const card = buildCommandCardDescriptors(context);
@@ -1011,7 +1016,8 @@ for (const researched of [false, true]) {
     .map((kind, index) => ({ id: index + 1, owner: 1, kind, insight: 60, daoMaster: kind === KIND.WAR_ADEPT }));
   selection[0].escapeTreasure = {};
   const card = buildCommandCardDescriptors({ playerId: 1, factionId: "cultivators", selection,
-    resources: { steel: 0, oil: 0 }, upgrades: [], groupCooldownClocks: () => [] });
+    resources: { steel: 0, oil: 0 }, upgrades: [UPGRADE.TECHNIQUE_THROW_SWORD],
+    groupCooldownClocks: () => [] });
   for (const ability of [ABILITY.WIND_DASH, ABILITY.THROW_SWORD, ABILITY.VECTOR_FIELD]) {
     const slot = card.slots.find((slot) => slot?.ability === ability);
     assert(slot?.enabled, `mixed selection preserves active ${ability}`);
@@ -1105,16 +1111,16 @@ for (const researched of [false, true]) {
   assert.equal(idle.slots[2].hotkey, "E");
   assert.deepEqual(items.map((item) => item.ability), [ABILITY.ESCAPE_TREASURE, ABILITY.DOUBLE_XP, ABILITY.BREAKTHROUGH_TREASURE, ABILITY.REGEN, ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE, ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE]);
   assert.deepEqual(items.map((item) => item.intent.targetMode), Array(8).fill("friendlyUnit"));
-  assert.deepEqual(items.map((item) => item.cost.oil), [100, 50, 100, 50, 100, 100, 100, 150]);
+  assert.deepEqual(items.map((item) => item.cost.oil), [70, 35, 70, 35, 70, 70, 70, 105]);
   assert(!items.some((item) => item.ability === ABILITY.HEALING_SEAL));
   assert.deepEqual(idle.rowLabels, ["Util", "Defense", "Offense"]);
 }
 
-// Portal Adepts require their Dao, 150 steel, 45 oil and three supply.
+// Portal Adepts require their Dao, 150 steel, 55 oil and three supply.
 {
   const portal = { id: 42, owner: 1, kind: KIND.PORTAL };
   const ctx = { playerId: 1, factionId: "cultivators", selection: [portal], entities: [portal],
-    resources: { steel: 150, oil: 45, supplyUsed: 0, supplyCap: 20 }, upgrades: [] };
+    resources: { steel: 150, oil: 55, supplyUsed: 0, supplyCap: 20 }, upgrades: [] };
   const locked = buildCommandCardDescriptors(ctx);
   const choices = [
     [KIND.WIND_ADEPT, UPGRADE.DAO_WIND],
@@ -1128,7 +1134,7 @@ for (const researched of [false, true]) {
     const unlocked = buildCommandCardDescriptors({ ...ctx, upgrades: [upgrade] });
     assert.equal(slotFor(unlocked).enabled, true);
     assert.equal(slotFor(unlocked).unaffordable, false);
-    assert.deepEqual(slotFor(unlocked).cost, { steel: 150, oil: 45 });
+    assert.deepEqual(slotFor(unlocked).cost, { steel: 150, oil: 55 });
     for (const [other] of choices.filter(([other]) => other !== kind)) {
       assert.equal(unlocked.slots.find((slot) => slot?.intent?.unit === other).enabled, false);
     }
@@ -1136,7 +1142,7 @@ for (const researched of [false, true]) {
     assert.equal(slotFor(noSteel).unaffordable, true);
     const noSupply = buildCommandCardDescriptors({ ...ctx, upgrades: [upgrade], resources: { ...ctx.resources, supplyUsed: 18 } });
     assert.equal(slotFor(noSupply).unaffordable, true);
-    const poor = buildCommandCardDescriptors({ ...ctx, upgrades: [upgrade], resources: { ...ctx.resources, oil: 44 } });
+    const poor = buildCommandCardDescriptors({ ...ctx, upgrades: [upgrade], resources: { ...ctx.resources, oil: 54 } });
     assert.equal(slotFor(poor).unaffordable, true);
   }
 }
@@ -1237,7 +1243,7 @@ for (const factionId of ["cultivators", "kriegsia", "ekat"]) {
   assert.equal(menu.slots[11].hotkey, "V");
   assert.equal(menu.slots[1].ability, ABILITY.DOUBLE_XP);
   assert.equal(menu.slots[1].label, "2X XP");
-  assert.equal(menu.slots[1].cost.oil, 50);
+  assert.equal(menu.slots[1].cost.oil, 35);
   assert.equal(menu.slots[4].ability, ABILITY.ARMOR_TREASURE);
   assert.equal(menu.slots[4].hotkey, "S");
   assert.equal(menu.slots[4].label, "+50% armor");
@@ -1290,4 +1296,36 @@ for (const factionId of ["cultivators", "kriegsia", "ekat"]) {
     const button = createCommandButton({ label: "Move", title: "Move units", enabled: true });
     assert.equal(button.title, "Move units", "plain buttons keep existing native help");
   });
+}
+
+// Passive cards retain authoritative ability and production indicators without command paths.
+{
+  const selection = [{ id: 800, owner: 2, kind: KIND.SCOUT_CAR, abilities: [{ ability: ABILITY.SMOKE, cooldownLeft: 0, chargeRechargeLeft: 60, remainingUses: 1 }] }];
+  const ctx = { spectator: true, playerId: 99, selection, upgrades: [UPGRADE.SMOKE_PLUS],
+    resources: { steel: 1000, oil: 1000 }, playerHasCompleteKind: () => true,
+    groupCooldownClocks: testGroupCooldownClocks };
+  const card = buildCommandCardDescriptors(ctx);
+  assert.equal(card.readOnly, true);
+  const smoke = card.slots.find((slot) => slot?.ability === ABILITY.SMOKE);
+  assert(smoke, "spectators can inspect another owner's ability");
+  assert(smoke.cooldownSeconds > 0, "spectators retain ability cooldowns");
+  for (const slot of card.slots.filter(Boolean)) {
+    assert.equal(slot.enabled, false);
+    assert.equal(slot.intent, null);
+    assert.equal(slot.contextIntent, null);
+    assert.equal(slot.onUnavailableIntent, null);
+    assert.equal(slot.hotkeyCode, "");
+  }
+  const producer = { id: 801, owner: 2, kind: KIND.BARRACKS,
+    prodRepeatKinds: [KIND.RIFLEMAN], prodKind: KIND.RIFLEMAN, prodQueue: 2 };
+  const production = buildCommandCardDescriptors({ ...ctx, selection: [producer] });
+  assert.equal(production.slots.find((slot) => slot?.id === `train:${KIND.RIFLEMAN}`).autobuildIndicatorCount, 1);
+  const research = buildCommandCardDescriptors({ ...ctx,
+    selection: [{ ...engineeringComplex, owner: 2 }] });
+  const completed = research.slots.find((slot) => slot?.id === `research:${UPGRADE.SMOKE_PLUS}`);
+  assert.equal(completed.title, "Researched");
+  assert(completed.label.endsWith("✓"));
+  const unreasearched = buildCommandCardDescriptors({ ...ctx, upgrades: [],
+    selection: [{ ...engineeringComplex, owner: 2 }] });
+  assert.notEqual(research.signature, unreasearched.signature, "research completion refreshes inspection");
 }

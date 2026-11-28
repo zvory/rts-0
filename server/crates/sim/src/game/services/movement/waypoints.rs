@@ -11,9 +11,7 @@ use crate::game::services::occupancy::Occupancy;
 use crate::game::services::spatial::SpatialIndex;
 use crate::game::services::standability::{self as static_standability, UnitBlockers};
 use crate::game::teams::TeamRelations;
-use crate::game::upgrade::UpgradeKind;
 use crate::game::PlayerState;
-use crate::rules::terrain::{movement_speed_multiplier, TerrainKind};
 use rts_rules::math::GameplayMath as _;
 
 use super::car_drive::{
@@ -79,17 +77,7 @@ pub(super) fn advance_moving_units(
                 e.mark_move_phase(MovePhase::Moving);
             }
         }
-        let (
-            kind,
-            owner,
-            breakthrough_ticks,
-            recent_smoke_ticks,
-            has_meth,
-            mut x,
-            mut y,
-            can_local_steer,
-            movement_target,
-        ) = {
+        let (kind, mut x, mut y, can_local_steer, movement_target) = {
             let e = match entities.get(id) {
                 Some(e) if e.is_unit() && (!e.path_is_empty() || barrage_target.is_some()) => e,
                 _ => continue,
@@ -108,15 +96,8 @@ pub(super) fn advance_moving_units(
             if requires_weapon_setup(e.kind) && !matches!(e.weapon_setup(), WeaponSetup::Packed) {
                 continue;
             }
-            let has_meth = players
-                .iter()
-                .any(|p| p.id == e.owner && p.has_upgrade(UpgradeKind::Methamphetamines));
             (
                 e.kind,
-                e.owner,
-                e.breakthrough_ticks(),
-                e.recent_smoke_ticks(),
-                has_meth,
                 e.pos_x(),
                 e.pos_y(),
                 !uses_oriented_vehicle_body(e.kind)
@@ -143,56 +124,11 @@ pub(super) fn advance_moving_units(
                 map, occ, kind, x, y, facing, radius,
             ) && blockers.motion_clear(&motion_entity, (x, y), facing, &teams)
         };
-        let breakthrough_multiplier = breakthrough_speed_multiplier(
-            entities,
-            spatial,
-            owner,
-            x,
-            y,
-            breakthrough_ticks,
-            recent_smoke_ticks,
-        );
-        let tank_plus = kind == EntityKind::Tank
-            && players
-                .iter()
-                .any(|p| p.id == owner && p.has_upgrade(UpgradeKind::TankPlus));
-        let speed_multiplier = if crate::rules::is_rifle_infantry(kind) && has_meth {
-            config::METHAMPHETAMINES_SPEED_MULTIPLIER
-        } else if breakthrough_multiplier > 1.0 {
-            breakthrough_multiplier
-        } else if kind == EntityKind::MachineGunner && has_meth {
-            config::METHAMPHETAMINES_SPEED_MULTIPLIER
-        } else {
-            1.0
-        };
-        let terrain_speed_multiplier = {
-            let (tx, ty) = map.tile_of(x, y);
-            TerrainKind::from_map_code(map.terrain_at(tx, ty))
-                .map(|terrain| movement_speed_multiplier(kind, terrain))
-                .unwrap_or(1.0)
-        };
-        let mut speed = config::unit_stats(kind)
-            .map(|s| {
-                entities.get(id).map_or(s.speed, |e| e.movement_speed())
-                    * speed_multiplier
-                    * if tank_plus {
-                        config::TANK_PLUS_SPEED_MULTIPLIER
-                    } else {
-                        1.0
-                    }
-                    * terrain_speed_multiplier
-                    * map.slow_movement_multiplier_at(x, y)
-                    * if rts_rules::barbed_wire_affects(kind)
-                        && wire_tiles
-                            .get(&map.tile_of(x, y))
-                            .is_some_and(|id| entities.get(*id).is_some_and(|wire| wire.hp > 0))
-                    {
-                        0.7
-                    } else {
-                        1.0
-                    }
-            })
-            .unwrap_or(0.0);
+        let on_wire = wire_tiles
+            .get(&map.tile_of(x, y))
+            .is_some_and(|id| entities.get(*id).is_some_and(|wire| wire.hp > 0));
+        let mut speed =
+            super::speed::movement_speed(map, entities, players, spatial, &motion_entity, on_wire);
         let directional_multiplier =
             |direction| map.elevation_movement_multiplier_at(x, y, direction);
         let directional_speed =
@@ -789,53 +725,6 @@ pub(super) fn advance_moving_units(
                 }
             }
         }
-    }
-}
-
-/// Return the strongest current Command Car speed effect for an owned unit.
-///
-/// A timed Breakthrough status preserves its existing full-speed/smoke behavior. Otherwise an
-/// owned, completed Command Car continuously supplies the smaller passive aura while in range.
-fn breakthrough_speed_multiplier(
-    entities: &EntityStore,
-    spatial: &SpatialIndex,
-    owner: u32,
-    x: f32,
-    y: f32,
-    breakthrough_ticks: u16,
-    recent_smoke_ticks: u16,
-) -> f32 {
-    if breakthrough_ticks > 0 {
-        return if recent_smoke_ticks > 0 {
-            config::BREAKTHROUGH_SMOKE_SPEED_MULTIPLIER
-        } else {
-            config::BREAKTHROUGH_BASE_SPEED_MULTIPLIER
-        };
-    }
-
-    let radius_px = config::BREAKTHROUGH_RADIUS_TILES * config::TILE_SIZE as f32;
-    let radius2 = radius_px * radius_px;
-    let has_owned_command_car = spatial
-        .ids_in_circle_bbox(x, y, radius_px)
-        .any(|candidate| {
-            let Some(car) = entities.get(candidate) else {
-                return false;
-            };
-            if car.kind != EntityKind::CommandCar
-                || car.owner != owner
-                || car.hp == 0
-                || car.under_construction()
-            {
-                return false;
-            }
-            let dx = car.pos_x() - x;
-            let dy = car.pos_y() - y;
-            dx * dx + dy * dy <= radius2
-        });
-    if has_owned_command_car {
-        config::COMMAND_CAR_AURA_SPEED_MULTIPLIER
-    } else {
-        1.0
     }
 }
 

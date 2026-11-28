@@ -77,6 +77,21 @@ pub(crate) fn paid_cost(item: &ResearchItem) -> crate::rules::economy::ResourceC
 pub fn definition(kind: UpgradeKind) -> UpgradeDefinition {
     let catalog = crate::rules::faction::upgrade_definition(kind);
     match kind {
+        UpgradeKind::TechniqueCharge
+        | UpgradeKind::TechniqueBlink
+        | UpgradeKind::TechniqueShield
+        | UpgradeKind::TechniqueThrowSword => UpgradeDefinition {
+            kind,
+            researched_at: catalog.researched_at,
+            requires_upgrade: None,
+            cost_steel: crate::config::TECHNIQUE_COST_STEEL,
+            cost_oil: crate::config::TECHNIQUE_COST_OIL,
+            research_ticks: if kind == UpgradeKind::TechniqueBlink {
+                crate::config::BLINK_RESEARCH_TICKS
+            } else {
+                crate::config::TECHNIQUE_RESEARCH_TICKS
+            },
+        },
         UpgradeKind::Methamphetamines => UpgradeDefinition {
             kind,
             researched_at: catalog.researched_at,

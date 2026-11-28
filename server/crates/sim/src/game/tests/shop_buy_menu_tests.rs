@@ -127,7 +127,7 @@ fn rapid_buy_menu_purchases_skip_duplicates_and_full_carriers() {
     game.tick();
     assert_eq!(recipients(&game, AbilityKind::Regen), units);
     assert_eq!(
-        game.state.players[0].oil, 1800,
+        game.state.players[0].oil, 1860,
         "only four eligible purchases are charged"
     );
     let target = units[1];
@@ -139,7 +139,7 @@ fn rapid_buy_menu_purchases_skip_duplicates_and_full_carriers() {
         recipients(&game, AbilityKind::DoubleDamage).is_empty(),
         "three in-flight goods fill an Adept"
     );
-    assert_eq!(game.state.players[0].oil, 1600);
+    assert_eq!(game.state.players[0].oil, 1720);
 }
 
 #[test]
@@ -158,7 +158,7 @@ fn buy_menu_escape_buys_once_and_never_activates_equipped_escape() {
     buy(&mut game, shop, &units, AbilityKind::EscapeTreasure);
     game.tick();
     assert_eq!(recipients(&game, AbilityKind::EscapeTreasure).len(), 1);
-    assert_eq!(game.state.players[0].oil, 1900);
+    assert_eq!(game.state.players[0].oil, 1930);
 }
 
 #[test]

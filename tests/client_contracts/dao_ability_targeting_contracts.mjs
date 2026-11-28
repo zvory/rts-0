@@ -270,3 +270,41 @@ for (const [kind, daoMaster] of [[KIND.WARRIOR, false], [KIND.WAR_ADEPT, false],
     }
   }
 }
+
+for (const [kind, ability, research] of [
+  [KIND.WARRIOR, ABILITY.CHARGE, UPGRADE.TECHNIQUE_CHARGE],
+  [KIND.WAR_ADEPT, ABILITY.CHARGE, UPGRADE.TECHNIQUE_CHARGE],
+  [KIND.MAGIC_ADEPT, ABILITY.DISCIPLE_SHIELD, UPGRADE.TECHNIQUE_SHIELD],
+  [KIND.WAR_ADEPT, ABILITY.THROW_SWORD, UPGRADE.TECHNIQUE_THROW_SWORD],
+]) {
+  for (const daoMaster of [false, true]) {
+    const ctx = { playerId: 1, factionId: "cultivators", groupCooldownClocks,
+      resources: { steel: 1000, oil: 1000 }, upgrades: [],
+      selection: [{ id: 1, owner: 1, kind, daoMaster }] };
+    const locked = selectedAbilityAffordances(ctx, ctx.selection).find((a) => a.definition.ability === ability);
+    assert(!locked.unlocked, `${ability} starts research locked at both ranks`);
+    const lockedButton = buildCommandCardDescriptors(ctx).slots.find((a) => a?.ability === ability);
+    assert(lockedButton && !lockedButton.enabled && lockedButton.title.includes("Requires"),
+      `${ability} visibly explains its research lock`);
+    const unlocked = selectedAbilityAffordances({ ...ctx, upgrades: [research] }, ctx.selection)
+      .find((a) => a.definition.ability === ability);
+    assert(unlocked.unlocked, `${ability} unlocks with its own research`);
+  }
+}
+const libraryCard = buildCommandCardDescriptors({ playerId: 1, factionId: "cultivators",
+  selection: [{ id: 2, owner: 1, kind: KIND.TECHNIQUE_LIBRARY }],
+  resources: { steel: 1000, oil: 1000 }, upgrades: [] });
+assertDeepEqual(libraryCard.slots.filter((s) => s?.action === "research").map((s) => s.intent.upgrade),
+  [UPGRADE.TECHNIQUE_CHARGE, UPGRADE.TECHNIQUE_SHIELD, UPGRADE.TECHNIQUE_THROW_SWORD],
+  "Technique Library offers three independent researches");
+
+for (const daoMaster of [false, true]) {
+  const ctx = { playerId: 1, factionId: "cultivators", groupCooldownClocks,
+    resources: { steel: 0, oil: 0 }, upgrades: [],
+    selection: [{ id: 1, owner: 1, kind: KIND.WIND_ADEPT, daoMaster }] };
+  const blink = selectedAbilityAffordances(ctx, ctx.selection)
+    .find((a) => a.definition.ability === ABILITY.WIND_DASH);
+  assert(blink.unlocked, "Blink starts unlocked at both Wind ranks");
+  assert(buildCommandCardDescriptors(ctx).slots.some((s) => s?.ability === ABILITY.WIND_DASH && s.enabled),
+    "Blink is usable without research");
+}

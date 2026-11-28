@@ -198,7 +198,7 @@ pub const UNITS: &[UnitDef] = &[
             speed: SCOUT_CAR_DEF.stats.speed * balance::DAO_WIND_SPEED_MULTIPLIER,
             sight_tiles: SCOUT_CAR_DEF.stats.sight_tiles - 1,
             cost_steel: 150,
-            cost_oil: 45,
+            cost_oil: 55,
             supply: 3,
             ..NOVICE_DEF.stats
         },
@@ -213,7 +213,7 @@ pub const UNITS: &[UnitDef] = &[
             speed: NOVICE_DEF.stats.speed * balance::DAO_WAR_SPEED_MULTIPLIER,
             radius: ADEPT_BODY_RADIUS * balance::DAO_WAR_BODY_SCALE,
             cost_steel: 150,
-            cost_oil: 45,
+            cost_oil: 55,
             supply: 3,
             ..NOVICE_DEF.stats
         },
@@ -227,7 +227,7 @@ pub const UNITS: &[UnitDef] = &[
             range_tiles: balance::DAO_RANGED_RANGE_TILES,
             speed: NOVICE_DEF.stats.speed * balance::DAO_MAGIC_SPEED_MULTIPLIER,
             cost_steel: 150,
-            cost_oil: 45,
+            cost_oil: 55,
             supply: 3,
             ..NOVICE_DEF.stats
         },
@@ -691,6 +691,25 @@ pub const BUILDINGS: &[BuildingDef] = &[
         build_requires: &[EntityKind::ResourceDepot, EntityKind::Portal],
     },
     BuildingDef {
+        kind: EntityKind::TechniqueLibrary,
+        stats: balance::BuildingStats {
+            hp: 120,
+            sight_tiles: 1,
+            cost_steel: 100,
+            cost_oil: 25,
+            foot_w: 3,
+            foot_h: 3,
+            build_ticks: 560,
+            dmg: 0,
+            range_tiles: 0.0,
+            cooldown: 0,
+        },
+        armor_class: ArmorClass::Armored,
+        weapon: WeaponClass::None,
+        trains: &[],
+        build_requires: &[EntityKind::ResourceDepot, EntityKind::Portal],
+    },
+    BuildingDef {
         kind: EntityKind::Factory,
         stats: balance::BuildingStats {
             hp: 120,
@@ -944,6 +963,7 @@ mod tests {
                 EntityKind::TournamentGrounds,
                 EntityKind::ProvenGrounds,
                 EntityKind::ThreeDaoPavilion,
+                EntityKind::TechniqueLibrary,
                 EntityKind::Factory,
                 EntityKind::EngineeringComplex,
                 EntityKind::Steelworks,

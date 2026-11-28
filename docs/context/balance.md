@@ -10,6 +10,7 @@ Use when tuning costs, supply, sight, sizes, unit/building stats, or any number 
   - §5.1 Target theme and MVP combat loop
   - §5.2 Current implementation constants
   - Three Dao Pavilion prototype
+  - Technique Library
   - Tournament Grounds
   - Portal Adept production
   - Proving Grounds

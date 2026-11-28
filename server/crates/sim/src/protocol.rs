@@ -38,6 +38,7 @@ mod tests {
         kinds::RESOURCE_DEPOT,
         kinds::PORTAL,
         kinds::THREE_DAO_PAVILION,
+        kinds::TECHNIQUE_LIBRARY,
         kinds::TOURNAMENT_GROUNDS,
         kinds::PROVEN_GROUNDS,
         kinds::SHOP,

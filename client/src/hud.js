@@ -455,7 +455,7 @@ export class HUD {
     const card = this.elCommand;
     if (!card) return;
     let descriptorCard = buildCommandCardDescriptors(this._commandDescriptorContext(frameViews));
-    if (this.hotkeyProfiles) descriptorCard = this.hotkeyProfiles.resolveCard(descriptorCard);
+    if (this.hotkeyProfiles && !descriptorCard.readOnly) descriptorCard = this.hotkeyProfiles.resolveCard(descriptorCard);
     const cardSig = `${descriptorCard.signature}|hotkeys:${this.hotkeyProfiles?.revision || 0}` +
       `|unitIconColor:${this._selectedOwnerColor()}`;
     if (descriptorCard.kind === "spectator") {
@@ -585,7 +585,7 @@ export class HUD {
   }
 
   _dispatchCommandIntent(intent, ev = {}) {
-    if (!intent || typeof intent !== "object") return;
+    if (!HUD.prototype._canUseCommandSurface.call(this) || !intent || typeof intent !== "object") return;
     switch (intent.type) {
       case "beginCommandTarget":
         this._intent()?.beginCommandTarget?.(intent.target, { shiftKey: !!ev.shiftKey });
@@ -969,6 +969,10 @@ export class HUD {
   _commandOwnerForSelection(selection = null) {
     const policy = this.controlPolicy;
     const selected = selection || (typeof this.state?.selectedEntities === "function" ? this.state.selectedEntities() || [] : []);
+    if (!this._canUseCommandSurface()) {
+      const inspectedOwner = Number(selected.find((e) => Number(e.owner) > 0)?.owner);
+      return Number.isInteger(inspectedOwner) && inspectedOwner > 0 ? inspectedOwner : null;
+    }
     const owner = typeof policy?.commandOwnerForSelection === "function"
       ? policy.commandOwnerForSelection(selected, this.state)
       : typeof policy?.commandOwner === "function"
@@ -980,6 +984,7 @@ export class HUD {
 
   _commandResources(owner = this._commandOwnerForSelection()) {
     const policy = this.controlPolicy;
+    if (!this._canUseCommandSurface()) return this.state.playerResources?.find((row) => row.id === owner) || {};
     if (typeof policy?.commandResources === "function") {
       return policy.commandResources(this.state, owner);
     }
@@ -988,6 +993,7 @@ export class HUD {
 
   _commandFactionId(owner = this._commandOwnerForSelection()) {
     const policy = this.controlPolicy;
+    if (!this._canUseCommandSurface()) return this.state.players?.find((row) => row.id === owner)?.factionId;
     if (typeof policy?.commandFactionId === "function") {
       return policy.commandFactionId(this.state, owner);
     }
@@ -996,6 +1002,7 @@ export class HUD {
 
   _commandUpgrades(owner = this._commandOwnerForSelection()) {
     const policy = this.controlPolicy;
+    if (!this._canUseCommandSurface()) return this.state.playerResources?.find((row) => row.id === owner)?.upgrades || [];
     if (typeof policy?.commandUpgrades === "function") {
       return policy.commandUpgrades(this.state, owner);
     }
