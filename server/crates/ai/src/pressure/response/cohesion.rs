@@ -219,12 +219,6 @@ impl PressureResponse {
         };
         self.issued.retain(|id, _| self.responders.contains(id));
         self.fighting.retain(|id, _| self.responders.contains(id));
-        let armor: Vec<_> = defenders
-            .iter()
-            .filter(|e| e.kind == EntityKind::Tank)
-            .map(|e| e.id)
-            .collect();
-        let columns = (armor.len() as f32).det_sqrt().ceil().max(1.) as usize;
         let armor_plan = self.armor_plan(frame, book, &known, &defenders, rear);
         for unit in &defenders {
             let contact = self
@@ -304,17 +298,7 @@ impl PressureResponse {
             } else if ready {
                 Some(target)
             } else {
-                let slot = armor
-                    .iter()
-                    .position(|id| *id == unit.id)
-                    .map(|i| {
-                        (
-                            (i % columns) as f32 - (columns - 1) as f32 / 2.,
-                            (i / columns) as f32,
-                        )
-                    })
-                    .unwrap_or((0., 0.));
-                cached.or_else(|| staging_point(frame, unit, target, rear, &known, slot))
+                cached.or_else(|| staging_point(frame, unit, target, rear, &known))
             };
             let changed_mode = self.fighting.get(&unit.id) != Some(&ready);
             let Some(point) = destination else {
@@ -361,7 +345,6 @@ fn staging_point(
     target: Point,
     rear: Point,
     enemies: &[&AiEntity],
-    slot: Point,
 ) -> Option<Point> {
     let size = frame.map().tile_size as f32;
     let clearance = |p: Point| {
@@ -393,8 +376,7 @@ fn staging_point(
     let from = q.world_point(unit.position.0, unit.position.1)?;
     for depth in [3., 5., 8., 12.] {
         for side in [0., 2., -2., 4., -4.] {
-            let r = reach + depth * size + slot.1.max(0.) * 2. * size;
-            let side = side + slot.0 * 2.;
+            let r = reach + depth * size;
             let p = (
                 target.0 + away.0 * r - away.1 * side * size,
                 target.1 + away.1 * r + away.0 * side * size,

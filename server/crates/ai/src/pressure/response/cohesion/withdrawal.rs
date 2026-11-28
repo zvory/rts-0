@@ -208,7 +208,7 @@ impl PressureResponse {
                         })
             };
             if encounter.rally.is_none_or(|p| !usable(front, p)) {
-                encounter.rally = staging_point(frame, front, target, rear, known, (0., 0.))
+                encounter.rally = staging_point(frame, front, target, rear, known)
                     .or_else(|| usable(front, front.position).then_some(front.position));
                 encounter.slots.clear();
             }
