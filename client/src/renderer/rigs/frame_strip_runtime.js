@@ -1,3 +1,4 @@
+import { teamPaintTextureFor } from "./team_paint.js";
 import { updateItemRadiance, destroyItemRadiance } from "../item_radiance.js";
 import { goldenAttackTrailFrame } from "./golden_attack_strip.js";
 import { SETUP, STATE } from "../../protocol.js";
@@ -10,6 +11,8 @@ export function renderFrameStripUnit(renderer, entity, strip, texture, options =
   const pool = renderer._liveRigPools?.[options.poolName];
   if (!pool) return null;
   const renderContext = options.renderContext || {};
+  const sourceTexture = texture;
+  if (strip.teamPaint) texture = teamPaintTextureFor(texture, renderContext.teamColor);
   if (typeof options.alpha === "number") renderContext.shotRevealAlpha = options.alpha;
 
   let instance = pool.get(entity.id);
@@ -26,6 +29,7 @@ export function renderFrameStripUnit(renderer, entity, strip, texture, options =
       texture,
       renderer._rigPixiFactory ?? createDefaultFrameStripPixiFactory(),
       options.silhouetteShadow === true,
+      sourceTexture,
     );
     renderer._recordRenderDiagnostic?.(`renderer.frameStrip.instance.created.${options.poolName}`);
     renderer._recordRenderDiagnostic?.("renderer.pixi.displayObject.created.frameStripContainer");
@@ -206,13 +210,14 @@ function createDefaultFrameStripPixiFactory(pixi = globalThis.PIXI) {
 }
 
 class FrameStripUnitInstance {
-  constructor(kind, strip, texture, pixiFactory, silhouetteShadow = false) {
+  constructor(kind, strip, texture, pixiFactory, silhouetteShadow = false, sourceTexture = texture) {
     this.kind = kind;
     this.strip = strip;
     this.texture = texture;
     this._pixiFactory = pixiFactory;
     this.container = pixiFactory.createContainer();
     this.frameTextures = [];
+    this.itemGlowFrames = [];
     this._frameIndex = -1;
     this._destroyed = false;
     this.silhouetteShadow = silhouetteShadow;
@@ -228,6 +233,9 @@ class FrameStripUnitInstance {
     for (let i = 0; i < frameCount; i += 1) {
       const rectangle = pixiFactory.createRectangle(i * frameWidth, 0, frameWidth, frameHeight);
       this.frameTextures.push(pixiFactory.createTexture(baseTexture, rectangle));
+      if (strip.teamPaint && !silhouetteShadow) {
+        this.itemGlowFrames.push(pixiFactory.createTexture(sourceTexture.source, rectangle));
+      }
     }
 
     this.sprite = pixiFactory.createSprite(this.frameTextures[0]);
@@ -266,6 +274,7 @@ class FrameStripUnitInstance {
     this.container.rotation = frameStripVisualFacing(this.strip, entity, renderContext, frameIndex);
     if (frameIndex !== this._frameIndex) {
       this.sprite.texture = this.frameTextures[frameIndex] ?? this.frameTextures[0];
+      this.itemGlowTexture = this.itemGlowFrames[frameIndex] ?? null;
       this._frameIndex = frameIndex;
     }
 
@@ -274,7 +283,7 @@ class FrameStripUnitInstance {
     const spriteOffset = frameStripSpriteOffset(this.strip, frameIndex, renderContext);
     setPoint(this.sprite.position, spriteOffset.x, spriteOffset.y);
     this.sprite.alpha = 1;
-    this.sprite.tint = this.silhouetteShadow ? 0x000000 : tintForSlot(this.strip.tintSlot, renderContext);
+    this.sprite.tint = this.silhouetteShadow ? 0x000000 : this.strip.teamPaint ? 0xffffff : tintForSlot(this.strip.tintSlot, renderContext);
     this.sprite.visible = true;
     updateItemRadiance(this, entity, renderContext.now || 0);
     if (this.trailSprite) {
@@ -307,6 +316,8 @@ class FrameStripUnitInstance {
     this.trailTextures = [];
     for (const texture of this.frameTextures) texture?.destroy?.(false);
     this.frameTextures = [];
+    for (const texture of this.itemGlowFrames) texture.destroy?.(false);
+    this.itemGlowFrames = [];
     this.container.destroy?.({ children: true });
   }
 }

@@ -18,7 +18,7 @@ import { buildControlGroupSummaries } from "../../client/src/hud_control_groups.
 
 withFakeHudDocument(({ FakeElement }) => {
   const players = [{ id: 1, factionId: "cultivators" }];
-  for (const [dao, label] of [[null, "Novice"], ["wind", "Wind Adept"],
+  for (const [dao, label] of [[null, "Sword Disciple"], ["wind", "Wind Adept"],
     ["war", "War Adept"], ["magic", "Magic Adept"]]) {
     const entity = { id: 1, owner: 1, kind: ({ wind: KIND.WIND_ADEPT, war: KIND.WAR_ADEPT, magic: KIND.MAGIC_ADEPT })[dao] || KIND.WARRIOR, dao };
     const state = {

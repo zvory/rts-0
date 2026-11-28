@@ -6,7 +6,7 @@ impl Game {
         input: LabSpawnEntity,
     ) -> Result<LabOpOutcome, LabError> {
         self.validate_owner(input.owner)?;
-        if input.dao.is_some() && input.kind != EntityKind::Warrior {
+        if input.dao.is_some() && !input.kind.is_novice() {
             return Err(invalid_kind(
                 input.kind,
                 "Dao specialization requires a Novice",

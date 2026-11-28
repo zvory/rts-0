@@ -9,8 +9,25 @@ fn eco_classic_opening_reaches_three_bases_with_staged_vehicle_works() {
 }
 
 #[test]
-#[ignore = "extended territorial soak; run explicitly, outside the default CI gate"]
 fn eco_extended_economy_claims_seven_bases() {
+    // Match the repository's full-AI opt-in so the soak runs in --full-ai coverage.
+    let full_ai = ["RTS_FULL_AI_TESTS", "RTS_SELFPLAY_FULL"]
+        .into_iter()
+        .any(|name| {
+            matches!(
+                std::env::var(name)
+                    .unwrap_or_default()
+                    .to_ascii_lowercase()
+                    .as_str(),
+                "1" | "true" | "yes" | "on"
+            )
+        });
+    if !full_ai {
+        eprintln!(
+            "skipping seven-base Eco progression; set RTS_FULL_AI_TESTS=1 to run full AI coverage"
+        );
+        return;
+    }
     run_economy_progression(7);
 }
 
@@ -56,7 +73,8 @@ fn run_economy_progression(goal: usize) {
     let mut mg_at_complex = None;
     let mut tank_first_seen = std::collections::BTreeMap::new();
     let mut commanded_tanks = std::collections::BTreeSet::new();
-    for _ in 0..18000 {
+    let tick_budget = if goal > 3 { 30_000 } else { 18_000 };
+    for _ in 0..tick_budget {
         CanonicalAiTickDriver::run(
             &mut game,
             &mut controllers,

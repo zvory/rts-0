@@ -1,3 +1,4 @@
+import { destroyTeamPaintTextures } from "./rigs/team_paint.js";
 import { drawChargeStreaks } from "./charge_streaks.js";
 import { reconcileShorelineLayer, destroyShorelineLayer } from "./shoreline.js";
 import { reconcileGrassLayer, destroyGrassLayer, updateTerrainMaterials } from "./grass.js";
@@ -1382,6 +1383,7 @@ function destroyRendererTextureMap(map) {
 }
 
 function destroyRendererOwnedTexture(texture) {
+  destroyTeamPaintTextures(texture);
   if (!texture?.rtsRendererOwnedTexture) return;
   if (texture.destroyed) return;
   texture.destroy?.(true);

@@ -1,3 +1,4 @@
+import { loadTeamPaintTexture } from "./team_paint.js";
 import { KIND } from "../../protocol.js";
 import { loadColorAdjustedTexture } from "./color_adjusted_texture.js";
 import { loadWorkerSafeTexture } from "../raster_primitives.js";
@@ -11,7 +12,7 @@ import { WARRIOR_PNG_FRAME_STRIP } from "./warrior_png_strip.js";
 
 import {
   WIND_FRAME_STRIP_KEY, MAGIC_FRAME_STRIP_KEY, WAR_FRAME_STRIP_KEY,
-  WIND_PNG_FRAME_STRIP, MAGIC_PNG_FRAME_STRIP, WAR_PNG_FRAME_STRIP,
+  BOW_NOVICE_PNG_FRAME_STRIP, WIND_PNG_FRAME_STRIP, MAGIC_PNG_FRAME_STRIP, WAR_PNG_FRAME_STRIP,
   WIND_MASTER_FRAME_STRIP_KEY, MAGIC_MASTER_FRAME_STRIP_KEY, WAR_MASTER_FRAME_STRIP_KEY,
   WIND_MASTER_PNG_FRAME_STRIP, MAGIC_MASTER_PNG_FRAME_STRIP, WAR_MASTER_PNG_FRAME_STRIP,
 } from "./disciple_png_strips.js";
@@ -22,6 +23,7 @@ const LIVE_FRAME_STRIPS = Object.freeze([
   [KIND.RIFLEMAN, RIFLEMAN_PNG_FRAME_STRIP],
   [KIND.SCOUT_PLANE, SCOUT_PLANE_PNG_FRAME_STRIP],
   [KIND.WARRIOR, WARRIOR_PNG_FRAME_STRIP],
+  [KIND.BOW_NOVICE, BOW_NOVICE_PNG_FRAME_STRIP],
   [WIND_FRAME_STRIP_KEY, WIND_PNG_FRAME_STRIP],
   [MAGIC_FRAME_STRIP_KEY, MAGIC_PNG_FRAME_STRIP],
   [WAR_FRAME_STRIP_KEY, WAR_PNG_FRAME_STRIP],
@@ -55,6 +57,7 @@ export function liveFrameStripFor(strips, kind) {
 export function loadFrameStripTexture(pixi, strip) {
   if (!pixi || !strip?.image) return Promise.resolve(null);
   const adjustment = frameStripRuntimeColorAdjustment(strip);
+  if (strip.teamPaint) return loadTeamPaintTexture(pixi, strip, adjustment);
   const frameWidth = positiveDimension(strip.frameWidth, 1);
   const frameHeight = positiveDimension(strip.frameHeight, 1);
   const frameCount = Math.max(1, Math.trunc(positiveDimension(strip.frameCount, 1)));

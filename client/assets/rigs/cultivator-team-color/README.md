@@ -1,0 +1,11 @@
+# Cultivator selective team color
+
+One shared fixed-material layer and shaded paint mask per animation frame cover Novice, the three Adepts and the three Masters. The Worker retains its existing selective vector-part tint. Clothing, War helmets and magic inner hood trim receive player color. Skin, hair, leather, weapon metal, gold ornaments and dark plum fabric retain their authored materials.
+
+`source/*-animation.png` are built-in imagegen edits of the production pose sheets, using the approved idle material board as reference. Exact prompts, original pose references and approved idle source cells accompany them. No AI generation or checked-in art varies by player color. `specs.json` declares all 59 cells and their dimensions. Alpha cleaning, pose-bounds alignment, calibrated Novice head alignment, magenta extraction, magic plum rejection and normal-alpha layer separation are implemented in the pipeline.
+
+Run `node scripts/art/cultivator-team-color-pipeline.mjs` to pack, or append `--check` to verify. The aligner uses headless Chrome (set `CHROME` on non-macOS machines); pngjs packs deterministic 8-bit PNGs. All atlas dimensions fit within 2048x2048. Rows 0/1 preserve the existing body and golden attack art byte for byte; rows 2/3 store fixed color and grayscale paint. Every animation frame contains both layers.
+
+At load time the worker decodes the shared layers. On first use of a player color it composites and caches a two-row texture for that unit appearance. All units with the same appearance/color reuse it; per-frame drawing remains an ordinary sprite with no whole-body tint. This runtime cache is derived from the shared artwork, not a separate authored asset per color. The neutral texture remains available for item glow; all derived GPU textures are destroyed with the match. HUD and minimap use the same fixed/paint layers directly in their SVG raster source, tinting only the mask without changing alpha.
+
+Validation includes all-pose mask coverage, original-effect byte parity, fixed-color/alpha composition, palette reuse and cleanup, and game-rendered movement/combat review. Animation timing, facing axes, Novice calibrated firing scale/anchors, Magic hand effect centers, gameplay and the wire protocol are unchanged.

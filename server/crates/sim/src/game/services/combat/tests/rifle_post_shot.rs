@@ -4,6 +4,7 @@ use super::*;
 fn meth_rifleman_post_shot_lock_preserves_new_move_orders_and_expires() {
     for (kind, meth, should_lock) in [
         (EntityKind::Rifleman, true, true),
+        (EntityKind::BowNovice, false, true),
         (EntityKind::Rifleman, false, false),
         (EntityKind::Panzerfaust, true, false),
     ] {

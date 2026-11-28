@@ -190,3 +190,11 @@ promotion. Existing insight caps apply, so over-cap
 rewards and terminal Masters grant none. Spending/resetting insight on evolution does not remove
 Cosmic Energy. It accumulates with saturating u32 arithmetic, survives checkpoints/replays, and
 has no spending action or effect yet. Lab-authored initial insight does not generate income.
+
+## Bow Novice
+
+Bow Novice (`bow_novice`) is a second base cultivator. It shares Sword Disciple
+(`warrior`, formerly Novice) combat insight, chosen/random Dao evolution at 60,
+item capacity, Cosmic Energy, conversion admissions and subsequent Master progression.
+It has no Charge. Its arrow primary uses Rifleman damage/range/cadence and zero armor
+penetration. See [approved Bow Novice rules](bow-novice.md).

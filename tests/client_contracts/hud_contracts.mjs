@@ -1028,7 +1028,10 @@ withFakeHudDocument(({ FakeElement }) => {
 
   const portal = { id: 22, owner: 1, kind: KIND.PORTAL, buildProgress: null, state: STATE.IDLE, prodQueue: 0 };
   const portalCard = buildCommandCardDescriptors(commandCardCtx({ selection: [portal], entities: [portal], factionId: "cultivators", resources: { steel: 50, oil: 0 } }));
-  assert(portalCard.slots[0].label === "Novice" && portalCard.slots[0].hotkey === "Q" && portalCard.slots[0].enabled, "Cultivator Portal trains an affordable Novice from hotkey Q");
+  assert(portalCard.slots[1].label === "Bow Novice" && portalCard.slots[1].hotkey === "W" && portalCard.slots[1].enabled,
+    "Cultivator Portal immediately trains an affordable Bow Novice from W without research");
+  assert(portalCard.slots[1].intent.unit === KIND.BOW_NOVICE, "bow training command uses its own kind");
+  assert(portalCard.slots[0].label === "Sword Disciple" && portalCard.slots[0].hotkey === "Q" && portalCard.slots[0].enabled, "Cultivator Portal trains an affordable Sword Disciple from hotkey Q");
   assert(portalCard.slots[0].cost.steel === 50 && STATS[KIND.WARRIOR].supply === 2, "Novice train descriptor exposes its 50-Steel and 2-Supply cost");
 
   const pavilion = { ...portal, id: 23, kind: KIND.THREE_DAO_PAVILION };

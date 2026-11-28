@@ -757,6 +757,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | worker          | 40  | 4   | 1     | 48 | 2.0   | 10    | 50  | 0   | 1   | 150 (5s) |
 | golem           | 160 | 16  | 1     | 48 | 2.0   | 10    | 0   | 0   | 4   | 396 (~13.2s); provisional free Ekat worker-like economy body trained at Zamok; mines at 4x worker load; can be consumed by Ekat for full heal |
 | warrior         | 58  | 23  | 0.75   | 91 | 2.0   | 11    | 50  | 0   | 2   | 300 (~10s); Cultivator Portal-trained melee bruiser; 50% armor penetration; no projectile or tracer |
+| bow_novice      | 48  | 5   | 5     | 32 | 2.0   | 11    | 50  | 0   | 2   | 300 (10s); Portal-trained immediately; no research; earns insight and evolves to any Dao at 60; zero penetration; stops to shoot with a five-tick post-shot movement pause; no Charge |
 | rifleman        | 45  | 5   | 5     | 32 | 1.6   | 11    | 35  | 0   | 1   | 300 (~10s) |
 | panzerfaust     | 45  | 5 rifle / 100 launcher | 5 | 32 rifle / one lifetime launcher | 1.6 | 11 | 55 | 10 | 1 | 300 (~10s); requires completed Panzerfausts research |
 | machine_gunner  | 55  | 4   | 6.1   | 10  | 1.28  | 11    | 75  | 10  | 2   | 400 (~13s) |
@@ -788,7 +789,7 @@ footprint plus a one-tile perimeter around it. Sight 0 buildings do not reveal f
 | engineering_complex           | Engineering Complex        | 98 | 1     | 100 steel + 100 oil | 3x3  | 450       | research-only building for Artillery, Rockets, Tank Production, Tank Plus, Smoke Plus, and Scout Plane; its first command-card slot remains empty to preserve existing research hotkeys; requires a Resource Depot and Training Centre |
 | factory                    | Vehicle Works      | 120 | 1     | 125 steel + 125 oil | 3x3  | 749       | Mobile Warfare path building; trains scout_car immediately, command_car after a completed Engineering Complex, and tank after Tank Production research; requires a Resource Depot and Training Centre |
 | steelworks                 | Gun Works          | 120 | 1     | 150 steel + 100 oil | 3x3  | 599       | Superior Firepower path building; trains mortar_team immediately, Anti-Tank Guns after ever owning a completed Engineering Complex (temporary hack), Artillery after Artillery research, and Rocket Trucks after Rockets research; requires a Resource Depot and Training Centre |
-| tank_trap                  | Tank Trap          | 72 | 0     | 20 steel + 0 oil | 1x1  | 150       | engineer-built vehicle obstacle available from the worker build card after a completed Training Centre; A-clicking a visible or remembered completed trap creates a four-tile clear-area Attack Move objective whose actionable traps outrank ordinary enemies; workers deconstruct completed traps in 75 ticks and refund the cost to the deconstructing player; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, no fog reveal, not an elimination building |
+| tank_trap                  | Tank Trap          | 72 | 0     | 15 steel + 0 oil | 1x1  | 120       | engineer-built vehicle obstacle available from the worker build card after a completed Training Centre; A-clicking a visible or remembered completed trap creates a four-tile clear-area Attack Move objective whose actionable traps outrank ordinary enemies; workers deconstruct completed traps in 60 ticks and refund the cost to the deconstructing player; sparse orthogonal pairs close the single tile between them for vehicle movement only; armored, no trains, no supply, no weapon, no fog reveal, not an elimination building |
 | steel_mine                 | Steel Mine         | 37  | 1     | 0 | 1x1  | 720       | free permanent Resource Depot background job on in-range Steel patches; mines 2 steel per 40 ticks; unarmored, immobile, no trains, no supply, and no weapon |
 | pump_jack                  | Pump Jack          | 56  | 1     | 150 steel | 1x1  | 300      | manual Engineer or Serf construction; also a free 1080-tick permanent Resource Depot background job on in-range Oil patches; mines 2 oil per 40 ticks; unarmored, immobile, no trains, no supply, no weapon, and does not block shots or line of sight |
 
@@ -833,7 +834,7 @@ The marker uses existing upgrade snapshot/checkpoint persistence. **TODO: remove
 tech requirements are revisited, including the marker grant and server/client/AI exceptions.
 Other units retain their current prerequisites.
 
-Barbed Wire: Engineer-built, completed Training Centre required; 5 steel, 120 ticks per 1×1
+Barbed Wire: Engineer-built, completed Training Centre required; 4 steel, 90 ticks per 1×1
 segment, 2 crossing HP, no sight/supply or blocking. Untargetable and immune to weapon damage.
 Tank entry immediately destroys the segment; other ground unit entries consume one HP.
 Infantry and mortar teams additionally take 10 direct HP
@@ -860,8 +861,8 @@ See [Cultivators](cultivators.md#three-dao-pavilion-prototype) for the approved 
 
 ### Disciple insight and Dao specializations
 
-Player-facing ranks are **Novice** for the base `warrior` and **Wind Adept**,
-**War Adept**, or **Magic Adept** for its permanent Dao specialization. Each Adept is a distinct authoritative unit kind; the base retains the `warrior` identifier.
+Player-facing base units are **Sword Disciple** (`warrior`) and **Bow Novice** (`bow_novice`), which can permanently evolve into **Wind Adept**,
+**War Adept**, or **Magic Adept**. Each base and Adept is a distinct authoritative unit kind.
 
 
 See [Dao evolution playtest](dao-insight.md). Entity-owned `insight` and authoritative unit `kind` persist
@@ -1032,3 +1033,8 @@ the Pavilion: 100 steel / 25 oil, 560 build ticks, 120 HP. Charge, Shield and Th
 are permanent independent unlocks at 100 steel / 100 oil each and take 20 seconds.
 Novice/War Charge, Magic Shield and War Throw Sword are gated at both ranks.
 Wind Blink and Magic Vector Field need no research.
+
+Bow Novice approved brief and complete rules: [Bow Novice](bow-novice.md). Both base kinds
+share the existing insight, shop inventory, tournament/training and Dao evolution rules.
+Bow Novice uses the preserved Wind archer strip and `disciple_arrow` profile (5 damage,
+5 tiles, 32 ticks, zero penetration). Sword Disciple retains its existing melee rules.

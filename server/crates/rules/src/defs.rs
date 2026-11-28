@@ -69,6 +69,7 @@ const RESOURCE_DEPOT_UNITS: &[EntityKind] = &[
 const GOLEM_ONLY: &[EntityKind] = &[EntityKind::Golem];
 const PORTAL_UNITS: &[EntityKind] = &[
     EntityKind::Warrior,
+    EntityKind::BowNovice,
     EntityKind::WindAdept,
     EntityKind::WarAdept,
     EntityKind::MagicAdept,
@@ -187,6 +188,17 @@ pub const UNITS: &[UnitDef] = &[
         train_requirement: TechRequirement::All(&[]),
     },
     NOVICE_DEF,
+    UnitDef {
+        kind: EntityKind::BowNovice,
+        stats: balance::UnitStats {
+            hp: NOVICE_DEF.stats.hp - 10,
+            dmg: 5,
+            range_tiles: 5.0,
+            cooldown: 32,
+            ..NOVICE_DEF.stats
+        },
+        ..NOVICE_DEF
+    },
     // Adept bodies, HP and production costs are independent of the base Novice.
     UnitDef {
         kind: EntityKind::WindAdept,
@@ -771,11 +783,11 @@ pub const BUILDINGS: &[BuildingDef] = &[
         stats: balance::BuildingStats {
             hp: 72,
             sight_tiles: 0,
-            cost_steel: 20,
+            cost_steel: 15,
             cost_oil: 0,
             foot_w: 1,
             foot_h: 1,
-            build_ticks: balance::TICK_HZ * 5,
+            build_ticks: balance::TICK_HZ * 4,
             dmg: 0,
             range_tiles: 0.0,
             cooldown: 0,
@@ -790,11 +802,11 @@ pub const BUILDINGS: &[BuildingDef] = &[
         stats: balance::BuildingStats {
             hp: 2,
             sight_tiles: 0,
-            cost_steel: 5,
+            cost_steel: 4,
             cost_oil: 0,
             foot_w: 1,
             foot_h: 1,
-            build_ticks: balance::TICK_HZ * 4,
+            build_ticks: balance::TICK_HZ * 3,
             dmg: 0,
             range_tiles: 0.0,
             cooldown: 0,
@@ -929,6 +941,7 @@ mod tests {
                 EntityKind::Worker,
                 EntityKind::Golem,
                 EntityKind::Warrior,
+                EntityKind::BowNovice,
                 EntityKind::WindAdept,
                 EntityKind::WarAdept,
                 EntityKind::MagicAdept,
@@ -1107,9 +1120,9 @@ mod tests {
 
         assert_eq!(def.stats.hp, 72);
         assert_eq!(def.stats.sight_tiles, 0);
-        assert_eq!((def.stats.cost_steel, def.stats.cost_oil), (20, 0));
+        assert_eq!((def.stats.cost_steel, def.stats.cost_oil), (15, 0));
         assert_eq!((def.stats.foot_w, def.stats.foot_h), (1, 1));
-        assert_eq!(def.stats.build_ticks, balance::TICK_HZ * 5);
+        assert_eq!(def.stats.build_ticks, balance::TICK_HZ * 4);
         assert_eq!(def.armor_class, ArmorClass::Armored);
         assert_eq!(def.weapon, WeaponClass::None);
         assert!(def.trains.is_empty());

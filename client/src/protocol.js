@@ -391,6 +391,7 @@ export const cmd = Object.freeze({
 
 // MG prototype: Attack.shotOrigin (compact v57, slot 6) fixes the ray origin; toPos fixes its endpoint.
 
+// Bow Novice (kind 41) shares all Disciple insight/evolution fields and commands.
 // Disciple EntityView slots 45–49: team-private chosenDao; public insight, dao, daoReady and daoAdvanceTicks.
 
 // Tournament Grounds: kind code 32; compact v62 slot 50 is team-private tournamentEntrants (0–4).

@@ -267,6 +267,7 @@ fn cultivators_catalog_trains_warriors_from_portals() {
         &[
             EntityKind::Worker,
             EntityKind::Warrior,
+            EntityKind::BowNovice,
             EntityKind::WindAdept,
             EntityKind::WarAdept,
             EntityKind::MagicAdept
