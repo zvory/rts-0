@@ -111,8 +111,8 @@ impl Sentries {
                     self.issued.insert(unit.id, point);
                     self.held.remove(&unit.id);
                 }
-            } else if unit.state != AiEntityState::Attack
-                && (!self.held.contains(&unit.id) || unit.state != AiEntityState::Idle)
+            } else if (!self.held.contains(&unit.id)
+                || !matches!(unit.state, AiEntityState::Idle | AiEntityState::Attack))
                 && actions.hold_position(&group, false).is_ok()
             {
                 self.held.insert(unit.id);

@@ -225,7 +225,8 @@ impl PressureResponse {
                 .get(&unit.id)
                 .filter(|(tick, p)| {
                     self.fighting.get(&unit.id) == Some(&false)
-                        && frame.tick().saturating_sub(*tick) < 90
+                        && (unit.kind == EntityKind::Tank
+                            || frame.tick().saturating_sub(*tick) < 90)
                         && visible.iter().all(|e| {
                             distance(unit.position, e.position)
                                 >= weapon_reach(frame, e) + 2. * size
@@ -233,6 +234,8 @@ impl PressureResponse {
                         && visible
                             .iter()
                             .all(|e| distance(*p, e.position) >= weapon_reach(frame, e) + 2. * size)
+                        && (unit.kind != EntityKind::Tank
+                            || retreat_route(frame, unit, *p, &visible).is_some())
                 })
                 .map(|(_, p)| *p);
             let destination = if ready {
@@ -277,6 +280,21 @@ impl PressureResponse {
                 if let Ok(group) = UnitGroup::new([unit.id]) {
                     let result = if ready {
                         actions.attack_move(&group, point.0, point.1, false)
+                    } else if unit.kind == EntityKind::Tank {
+                        if let Some(route) = retreat_route(frame, unit, point, &visible) {
+                            let points = crate::sdk::ground_route_corners(&route)
+                                .into_iter()
+                                .skip(1)
+                                .take(24)
+                                .collect::<Vec<_>>();
+                            if let Some((first, rest)) = points.split_first() {
+                                actions.move_route(&group, *first, rest)
+                            } else {
+                                actions.hold_position(&group, false)
+                            }
+                        } else {
+                            actions.hold_position(&group, false)
+                        }
                     } else {
                         actions.move_group(&group, point.0, point.1, false)
                     };
@@ -288,6 +306,35 @@ impl PressureResponse {
             }
         }
     }
+}
+// Route safety is current-visible geometry only. Preserve the checked turns in
+// native movement; this does not retain a threat formation or a group encounter.
+fn retreat_route(
+    frame: &AiFrame,
+    unit: &AiEntity,
+    point: Point,
+    enemies: &[&AiEntity],
+) -> Option<Vec<Point>> {
+    let size = frame.map().tile_size as f32;
+    let clearance = |p: Point| {
+        enemies
+            .iter()
+            .map(|e| distance(p, e.position) - weapon_reach(frame, e) - 2. * size)
+            .min_by(f32::total_cmp)
+            .unwrap_or(f32::INFINITY)
+    };
+    if clearance(point) < 0. {
+        return None;
+    }
+    let q = WorldQueries::new(frame);
+    let route = q
+        .world_point(unit.position.0, unit.position.1)
+        .zip(q.world_point(point.0, point.1))
+        .and_then(|(from, to)| q.ground_route(from, to, unit.kind))?;
+    route
+        .iter()
+        .all(|p| clearance(p.as_tuple()) >= clearance(unit.position).min(0.) - size * 0.25)
+        .then(|| route.into_iter().map(|p| p.as_tuple()).collect())
 }
 fn staging_point(
     frame: &AiFrame,

@@ -141,3 +141,43 @@ fn scarce_infantry_spread_across_bases_instead_of_emptying_one() {
         .collect::<BTreeSet<_>>();
     assert_eq!(staffed, BTreeSet::from([1, 2]));
 }
+
+#[test]
+fn newly_assigned_attacking_guards_hold_once_then_keep_shooting_without_reorders() {
+    let (start, mut s, sites) = two_base_scene(8);
+    let mut defense = tactics::DefenseAssignments::default();
+    let f = frame(&start, &s, &sites);
+    let owned = owned_sites(&f);
+    let ids = defense.prepare_sentries(&f, &owned);
+    let posts = defense.assigned_sentry_posts().clone();
+    for e in s.entities.iter_mut().filter(|e| ids.contains(&e.id)) {
+        let p = posts[&e.id];
+        e.x = p.0;
+        e.y = p.1;
+        e.state = "attack".into();
+    }
+    let f = frame(&start, &s, &sites);
+    let mut actions = AiActions::for_frame(&f);
+    defense.step(&f, &mut actions, &mut DefensePlanner::default(), &owned);
+    let held = actions
+        .into_requests()
+        .into_iter()
+        .filter_map(|r| match r {
+            AiActionRequest::HoldPosition { units, .. } => Some(units),
+            _ => None,
+        })
+        .flatten()
+        .collect::<BTreeSet<_>>();
+    assert_eq!(
+        held, ids,
+        "new guards must cancel the previous chase order even at the post"
+    );
+    s.tick += 9;
+    let f = frame(&start, &s, &sites);
+    let mut actions = AiActions::for_frame(&f);
+    defense.step(&f, &mut actions, &mut DefensePlanner::default(), &owned);
+    assert!(
+        actions.into_requests().is_empty(),
+        "existing guards shooting in place must not restart weapon setup"
+    );
+}

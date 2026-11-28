@@ -347,7 +347,10 @@ Recon sortie coverage is reconciled with observed living owned planes after laun
 plane releases coverage immediately rather than waiting for its nominal lifetime.
 
 Eco uses the earlier visible-enemy local combat assessment, with HP-adjusted value and the
-existing ninety-percent local parity gate. It does not retain a remembered enemy formation or
+existing ninety-percent local parity gate. Individual Tank retreat posts stay fixed while safe;
+current-visible route checks retain queued corners so the simulator follows the checked retreat
+instead of replanning an endpoint-only move. No group waits for members to gather at these posts.
+It does not retain a remembered enemy formation or
 an armor encounter, require ninety-percent group regrouping, or hold tanks after an incident
 clears while waiting for a shared rally. Tanks are recruited at two per observed enemy Tank;
 a Scout Car alone does not mobilize them. Bounded incident/contact bookkeeping still prevents
