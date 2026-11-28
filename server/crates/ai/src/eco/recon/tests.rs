@@ -103,3 +103,43 @@ fn research_and_cooldown_gate_launches_and_existing_sorties_prevent_duplicates()
     s.tick += u32::from(rts_rules::balance::SCOUT_PLANE_LIFETIME_TICKS);
     assert_eq!(casts(&mut recon, &start, &s, &sites, Some(p)).len(), 1);
 }
+
+#[test]
+fn native_readiness_gates_do_not_consume_the_reserved_launch() {
+    let (start, original, sites) = scene(1);
+    let future = original.tick + 9;
+    for (name, cooldown, uses, available, lockout) in [
+        ("cooldown", 1, None, None, None),
+        ("exhausted uses", 0, Some(0), None, None),
+        ("availability", 0, None, Some(future), None),
+        ("lockout", 0, None, None, Some(future)),
+    ] {
+        let mut s = original.clone();
+        let car = s.entities.iter_mut().find(|e| e.id == 1000).unwrap();
+        let ability = &mut car.abilities[0];
+        ability.cooldown_left = cooldown;
+        ability.remaining_uses = uses;
+        ability.available_tick = available;
+        ability.lockout_until_tick = lockout;
+        let p = (car.x + 128., car.y + 128.);
+        let mut recon = Recon::default();
+        assert!(
+            casts(&mut recon, &start, &s, &sites, Some(p)).is_empty(),
+            "{name} must prevent a defensive launch"
+        );
+        let car = s.entities.iter_mut().find(|e| e.id == 1000).unwrap();
+        car.abilities = original
+            .entities
+            .iter()
+            .find(|e| e.id == 1000)
+            .unwrap()
+            .abilities
+            .clone();
+        s.tick = future;
+        assert_eq!(
+            casts(&mut recon, &start, &s, &sites, Some(p)),
+            vec![(1000, p)],
+            "{name} must not spend the reserve or record a nonexistent flight"
+        );
+    }
+}
