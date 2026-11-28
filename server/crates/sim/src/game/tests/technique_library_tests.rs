@@ -84,11 +84,7 @@ fn technique_library_research_pays_fixed_prices_and_survives_building_loss() {
 fn technique_library_gates_abilities_for_adepts_and_masters_but_not_blink_or_vector_field() {
     for master in [false, true] {
         for (unit_kind, ability, required) in [
-            (
-                EntityKind::WindAdept,
-                AbilityKind::WindDash,
-                None,
-            ),
+            (EntityKind::WindAdept, AbilityKind::WindDash, None),
             (
                 EntityKind::MagicAdept,
                 AbilityKind::DiscipleShield,
@@ -214,11 +210,28 @@ fn technique_library_gates_automatic_charge_for_novice_and_war_ranks() {
 fn technique_library_rejects_retired_blink_research() {
     let mut game = library_game();
     game.state.players[0].set_resources(100, 100);
-    let library = game.state.entities
+    let library = game
+        .state
+        .entities
         .spawn_building(1, EntityKind::TechniqueLibrary, 500.0, 500.0, true)
         .unwrap();
-    game.enqueue(1, Command::Research { building: library, upgrade: UpgradeKind::TechniqueBlink });
+    game.enqueue(
+        1,
+        Command::Research {
+            building: library,
+            upgrade: UpgradeKind::TechniqueBlink,
+        },
+    );
     game.tick();
-    assert!(game.state.entities.get(library).unwrap().research_queue().is_empty());
-    assert_eq!((game.state.players[0].steel, game.state.players[0].oil), (100, 100));
+    assert!(game
+        .state
+        .entities
+        .get(library)
+        .unwrap()
+        .research_queue()
+        .is_empty());
+    assert_eq!(
+        (game.state.players[0].steel, game.state.players[0].oil),
+        (100, 100)
+    );
 }
