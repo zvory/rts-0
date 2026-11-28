@@ -112,6 +112,16 @@ RUN test -s ./client/vendor/sim-wasm/rts_sim_wasm.js \
     && test -s ./client/assets/rigs/cultivator-team-color/generated/wind-master-runtime-strip.png \
     && test -s ./client/assets/rigs/cultivator-team-color/generated/war-master-runtime-strip.png \
     && test -s ./client/assets/rigs/cultivator-team-color/generated/magic-master-runtime-strip.png \
+    && test -s ./client/assets/rigs/kriegsia-team-color/generated/rifleman-atlas.png \
+    && test -s ./client/assets/rigs/kriegsia-team-color/generated/panzerfaust-atlas.png \
+    && test -s ./client/assets/rigs/kriegsia-team-color/generated/machine_gunner-atlas.png \
+    && test -s ./client/assets/rigs/kriegsia-team-color/generated/scout_plane-atlas.png \
+    && test -s ./client/assets/rigs/kriegsia-team-color/generated/tank-atlas.png \
+    && test -s ./client/assets/rigs/kriegsia-team-color/generated/artillery-atlas.png \
+    && test -s ./client/assets/rigs/kriegsia-team-color/generated/anti_tank_gun-atlas.png \
+    && test -s ./client/assets/rigs/kriegsia-team-color/generated/mortar_team-atlas.png \
+    && test -s ./client/assets/rigs/kriegsia-team-color/generated/scout_car-atlas.png \
+    && test -s ./client/assets/rigs/kriegsia-team-color/generated/rocket_launcher-atlas.png \
     && test -s ./client/assets/effects/disciple-arrow/arrow.png \
     && test -s ./client/assets/rigs/rocket-truck-preview/truck.png \
     && test -s ./client/assets/rigs/rocket-truck-preview/rocket.png \

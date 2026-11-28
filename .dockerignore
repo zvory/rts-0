@@ -126,3 +126,15 @@ client/assets/effects/disciple-arrow/arrow-source.png
 !client/assets/rigs/cultivator-team-color/generated/wind-master-runtime-strip.png
 !client/assets/rigs/cultivator-team-color/generated/war-master-runtime-strip.png
 !client/assets/rigs/cultivator-team-color/generated/magic-master-runtime-strip.png
+
+# Approved Kriegsia runtime palettes; retain authoring assets only in Git.
+!client/assets/rigs/kriegsia-team-color/generated/rifleman-atlas.png
+!client/assets/rigs/kriegsia-team-color/generated/panzerfaust-atlas.png
+!client/assets/rigs/kriegsia-team-color/generated/machine_gunner-atlas.png
+!client/assets/rigs/kriegsia-team-color/generated/scout_plane-atlas.png
+!client/assets/rigs/kriegsia-team-color/generated/tank-atlas.png
+!client/assets/rigs/kriegsia-team-color/generated/artillery-atlas.png
+!client/assets/rigs/kriegsia-team-color/generated/anti_tank_gun-atlas.png
+!client/assets/rigs/kriegsia-team-color/generated/mortar_team-atlas.png
+!client/assets/rigs/kriegsia-team-color/generated/scout_car-atlas.png
+!client/assets/rigs/kriegsia-team-color/generated/rocket_launcher-atlas.png

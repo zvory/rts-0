@@ -1,6 +1,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createLiveFrameStrips } from "../client/src/renderer/rigs/frame_strip_routing.js";
+import { createLivePngRigAtlases } from "../client/src/renderer/rigs/png_routing.js";
 import { KIND } from "../client/src/protocol.js";
 import { liveUnitIconMarkupFor } from "../client/src/renderer/rigs/unit_icon_sources.js";
 
@@ -206,6 +208,9 @@ for (const kind of Object.values(KIND)) {
     runtimeRigAssets.add(`./client${pathname}`);
   }
 }
+// Shared authoring rows are decoded on the CPU; only rendered rows reach Pixi/GPU.
+const paintSources = new Map([...createLiveFrameStrips().values(), ...createLivePngRigAtlases().values()]
+  .filter(asset => asset.teamPaint).map(asset => [`./client${new URL(asset.image, "http://localhost").pathname}`, asset]));
 const checkedInRuntimeAssets = [
   "./client/assets/snapshot-streams/fixed-roster-hellhole.rtsstream",
   ...Array.from(runtimeRigAssets).sort(),
@@ -223,9 +228,20 @@ for (const asset of checkedInRuntimeAssets) {
   );
   if (asset.includes("/assets/rigs/")) {
     const png = readPngHeader(localAsset);
-    if (png.width > MAX_RUNTIME_RIG_TEXTURE_DIMENSION || png.height > MAX_RUNTIME_RIG_TEXTURE_DIMENSION) {
+    const paintSource = paintSources.get(asset);
+    const renderedHeight = paintSource
+      ? png.height / paintSource.sheetRows * (paintSource.teamPaint.renderRows ?? 2)
+      : png.height;
+    if (paintSource) {
+      const width = paintSource.grid?.width ?? paintSource.frameWidth * paintSource.frameCount;
+      const height = paintSource.grid?.height ?? paintSource.frameHeight;
+      if (png.width !== width || png.height !== height * paintSource.sheetRows || png.height > 8192) {
+        throw new Error(`${asset} does not match its bounded shared team-paint source dimensions`);
+      }
+    }
+    if (png.width > MAX_RUNTIME_RIG_TEXTURE_DIMENSION || renderedHeight > MAX_RUNTIME_RIG_TEXTURE_DIMENSION) {
       throw new Error(
-        `${asset} is ${png.width}x${png.height}; runtime rig textures must fit within ` +
+        `${asset} renders ${png.width}x${renderedHeight}; runtime rig textures must fit within ` +
           `${MAX_RUNTIME_RIG_TEXTURE_DIMENSION}x${MAX_RUNTIME_RIG_TEXTURE_DIMENSION}`,
       );
     }
