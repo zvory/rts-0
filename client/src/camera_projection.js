@@ -193,10 +193,9 @@ export function projectOrthographic(state, point) {
   const x = requireFinite(point?.x, "presented point x");
   const y = requireFinite(point?.y, "presented point y");
   requireFinite(point?.heightPx, "presented point heightPx");
-  return classifyProjectedPoint({
-    ...tiltScreen(state, { x: (x - state.x) * state.zoom, y: (y - state.y) * state.zoom }),
-    depth: 1,
-  }, {
+  return classifyProjectedPoint(tiltScreen(state, {
+    x: (x - state.x) * state.zoom, y: (y - state.y) * state.zoom,
+  }), {
     widthCssPx: state.viewW,
     heightCssPx: state.viewH,
   });
@@ -215,13 +214,21 @@ export function projectedExtentOrthographic(state, point, worldWidthPx, worldHei
   const projected = projectOrthographic(state, point);
   let width = requireNonNegative(worldWidthPx, "world extent width") * state.zoom;
   let height = requireNonNegative(worldHeightPx, "world extent height") * state.zoom;
+  let minX = projected.x - width / 2;
+  let maxX = projected.x + width / 2;
+  let minY = projected.y - height / 2;
+  let maxY = projected.y + height / 2;
   if (state.mapTilt) {
     const center = { x: (point.x - state.x) * state.zoom, y: (point.y - state.y) * state.zoom };
     const corners = [-1, 1].flatMap((dx) => [-1, 1].map((dy) => tiltScreen(state, {
       x: center.x + dx * width / 2, y: center.y + dy * height / 2,
     })));
-    width = Math.max(...corners.map((p) => p.x)) - Math.min(...corners.map((p) => p.x));
-    height = Math.max(...corners.map((p) => p.y)) - Math.min(...corners.map((p) => p.y));
+    minX = Math.min(...corners.map((p) => p.x));
+    maxX = Math.max(...corners.map((p) => p.x));
+    minY = Math.min(...corners.map((p) => p.y));
+    maxY = Math.max(...corners.map((p) => p.y));
+    width = maxX - minX;
+    height = maxY - minY;
   }
   requireFinite(width, "projected extent width");
   requireFinite(height, "projected extent height");
@@ -234,10 +241,8 @@ export function projectedExtentOrthographic(state, point, worldWidthPx, worldHei
       && state.viewH > 0
       && projected.depth > 0
       && projected.clip !== PROJECTION_CLIP.OUTSIDE_DEPTH
-      && projected.x + width / 2 >= 0
-      && projected.x - width / 2 <= state.viewW
-      && projected.y + height / 2 >= 0
-      && projected.y - height / 2 <= state.viewH,
+      && maxX >= 0 && minX <= state.viewW
+      && maxY >= 0 && minY <= state.viewH,
   });
 }
 

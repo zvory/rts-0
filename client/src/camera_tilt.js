@@ -6,7 +6,7 @@ export function mapTiltDegrees(value) {
 
 export function tiltScreen(state, point, inverse = false) {
   const angle = mapTiltDegrees(state.mapTilt) * Math.PI / 180;
-  if (!angle || !state.viewH) return { x: point.x, y: point.y };
+  if (!angle || !state.viewH) return { x: point.x, y: point.y, depth: 1 };
   const cx = state.viewW / 2;
   const cy = state.viewH / 2;
   const sinDistance = Math.sin(angle) / (state.viewH * 3);
@@ -19,5 +19,8 @@ export function tiltScreen(state, point, inverse = false) {
     return { x: cx + x * depth, y: cy + groundY };
   }
   const depth = 1 - y * sinDistance;
-  return { x: cx + x / depth, y: cy + y * cosine / depth };
+  // Keep horizon queries finite so an off-screen entity cannot abort selection.
+  const divisor = Math.abs(depth) < Number.EPSILON
+    ? (depth < 0 ? -Number.EPSILON : Number.EPSILON) : depth;
+  return { x: cx + x / divisor, y: cy + y * cosine / divisor, depth };
 }

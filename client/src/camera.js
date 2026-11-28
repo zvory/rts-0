@@ -559,9 +559,19 @@ export class Camera {
 
   /** @private */
   _refreshZoomLimits() {
+    let span = Math.max(this.viewW, this.viewH);
+    if (this.maxVisibleWorldPx != null && this.mapTilt && this.viewW > 0 && this.viewH > 0) {
+      const state = { x: 0, y: 0, zoom: 1, mapTilt: this.mapTilt,
+        viewW: this.viewW, viewH: this.viewH };
+      const bounds = boundsForGroundPolygon([
+        { x: 0, y: 0 }, { x: this.viewW, y: 0 },
+        { x: this.viewW, y: this.viewH }, { x: 0, y: this.viewH },
+      ].map((point) => groundAtScreenOrthographic(state, point)));
+      span = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
+    }
     const viewportMinZoom = this.maxVisibleWorldPx == null
       ? 0
-      : Math.max(this.viewW, this.viewH) / this.maxVisibleWorldPx;
+      : span / this.maxVisibleWorldPx;
     this.minZoom = Math.max(this._baseMinZoom, viewportMinZoom);
     this.maxZoom = Math.max(this.minZoom, this._baseMaxZoom);
     this.zoom = clampZoom(this.zoom, this.minZoom, this.maxZoom);

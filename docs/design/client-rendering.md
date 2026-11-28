@@ -112,6 +112,7 @@ apply the same homography as the worker. With centered screen coordinates `(u,v)
 `a`, and focal distance `d=3*viewportHeight`, projection is
 `(u/(1-v*sin(a)/d), v*cos(a)/(1-v*sin(a)/d))`. Thus the far side is smaller.
 Camera movement changes the sampled ground under this fixed view; there is no orbit or yaw.
+Live-player zoom limits apply to the inverse-projected ground span on both axes.
 The worker draws a two-viewport-wide/high ground sheet to a temporary texture and maps it
 through a Pixi perspective mesh, with conservative source culling. HUD and drag marquee
 remain in screen space. The extra texture is resized with DPR/viewport and disposed on teardown.

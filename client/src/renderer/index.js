@@ -723,8 +723,8 @@ export class Renderer {
           x: camera?.x,
           y: camera?.y,
           zoom: camera?.zoom,
-          viewportWidth: this.app.renderer.screen?.width,
-          viewportHeight: this.app.renderer.screen?.height,
+          viewportWidth: camera?.viewW ?? this.app.renderer.screen?.width,
+          viewportHeight: camera?.viewH ?? this.app.renderer.screen?.height,
         }),
       );
     });

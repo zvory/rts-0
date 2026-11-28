@@ -314,6 +314,8 @@ function buildCameraFacade(projection) {
     x: queries.state.x,
     y: queries.state.y,
     zoom: queries.state.zoom,
+    viewW: queries.state.viewW,
+    viewH: queries.state.viewH,
     snapshot: queries.snapshot,
     projectedExtent: queries.projectedExtent,
     containsProjected: queries.containsProjected,

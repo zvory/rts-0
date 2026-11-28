@@ -1,5 +1,7 @@
 // Experimental full-battlefield plane; the HUD and marquee stay in screen space.
 // Overscan prevents missing terrain at the far corners after perspective projection.
+import { tiltScreen } from "../camera_tilt.js";
+
 export class MapTiltPresentation {
   constructor(app) {
     this.app = app;
@@ -19,10 +21,10 @@ export class MapTiltPresentation {
       this.mesh = new PIXI.PerspectiveMesh({ texture: this.texture, verticesX: 32, verticesY: 32 });
       stage.addChildAt(this.mesh, 0);
     }
-    const angle = degrees * Math.PI / 180;
+    const state = { viewW: w, viewH: h, mapTilt: degrees };
     const project = (x, y) => {
-      const depth = 1 - y * Math.sin(angle) / (h * 3);
-      return [w / 2 + x / depth, h / 2 + y * Math.cos(angle) / depth];
+      const point = tiltScreen(state, { x: w / 2 + x, y: h / 2 + y });
+      return [point.x, point.y];
     };
     this.mesh.setCorners(...project(-w, -h), ...project(w, -h),
       ...project(w, h), ...project(-w, h));

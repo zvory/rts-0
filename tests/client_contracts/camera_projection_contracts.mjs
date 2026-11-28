@@ -410,4 +410,33 @@ for (const angle of [0, 20, 35, 45]) {
     "tilted frozen projection stays detached after camera changes");
 }
 
+// Tilt must not expand the live-player overview budget, including after resize.
+for (const angle of [0, 30, 45]) {
+  const camera = new Camera(1920, 1080, { mapTilt: angle, maxVisibleWorldPx: 3200 });
+  camera.setMapBounds(20000, 20000);
+  for (const [width, height] of [[1920, 1080], [800, 4000]]) {
+    camera.resize(width, height);
+    camera.setZoom(0.001);
+    camera.centerOn(10000, 10000);
+    const bounds = camera.viewportGroundBounds();
+    assertApprox(Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY),
+      3200, 1e-8, "actual tilted footprint respects the live-player span limit");
+  }
+}
+
+{
+  const camera = new Camera(1200, 800, { mapTilt: 45 });
+  const horizonY = 400 + 1 / (Math.sin(Math.PI / 4) / (800 * 3));
+  const horizon = camera.project({ x: 600, y: horizonY, heightPx: 0 });
+  assert(Number.isFinite(horizon.x) && Number.isFinite(horizon.y),
+    "an entity on the projection horizon does not throw or yield non-finite coordinates");
+  const behind = camera.project({ x: 600, y: horizonY + 100, heightPx: 0 });
+  assert(behind.depth < 0 && behind.clip === PROJECTION_CLIP.BEHIND_CAMERA,
+    "tilted projection reports entities behind the camera plane");
+  assert(!camera.projectedExtent({ x: 600, y: horizonY + 100, heightPx: 0 }, 30, 30).visible,
+    "behind-plane extents cannot be visible");
+  assert(camera.projectedExtent({ x: 600, y: -570, heightPx: 0 }, 100, 600).visible,
+    "extent visibility uses projected corners rather than assuming a centered screen AABB");
+}
+
 console.log("✅ camera_projection_contracts.mjs: semantic camera/projection contracts passed");
