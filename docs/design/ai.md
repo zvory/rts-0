@@ -345,6 +345,9 @@ visible front unit. An unseen observation clears when its full last-known firing
 observable, or expires; a visible zero-HP observation also clears it. Hidden health and position
 are never updated from authoritative state.
 
+Recon sortie coverage is reconciled with observed living owned planes after launch; losing a
+plane releases coverage immediately rather than waiting for its nominal lifetime.
+
 A Tank encounter retains tactical ownership through withdrawal even if the original protected
 guard dies or enemies change targets outside the initial admission bubble. The main Tank
 concentration makes one advance/withdraw decision. A fixed encounter anchor bounds pursuit while

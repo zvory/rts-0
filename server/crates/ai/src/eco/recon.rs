@@ -5,11 +5,19 @@ use crate::sdk::{
     WorldQueries,
 };
 use rts_rules::math::GameplayMath as _;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
+struct Flight {
+    goal: (f32, f32),
+    origin: (f32, f32),
+    launched: u32,
+    until: u32,
+    plane: Option<u32>,
+    existing_planes: BTreeSet<u32>,
+}
 #[derive(Default)]
 pub(super) struct Recon {
     launched: BTreeMap<u32, u32>,
-    flights: Vec<((f32, f32), u32)>,
+    flights: Vec<Flight>,
     visited: BTreeMap<AiBaseSiteId, u32>,
 }
 impl Recon {
@@ -25,7 +33,42 @@ impl Recon {
         {
             return;
         }
-        self.flights.retain(|(_, until)| *until > frame.tick());
+        self.flights.retain(|flight| flight.until > frame.tick());
+        let planes = frame
+            .owned()
+            .iter()
+            .filter(|e| e.kind == EntityKind::ScoutPlane && e.health.current > 0)
+            .collect::<Vec<_>>();
+        let mut assigned = self
+            .flights
+            .iter()
+            .filter_map(|f| f.plane)
+            .collect::<BTreeSet<_>>();
+        self.flights.retain_mut(|flight| {
+            if let Some(id) = flight.plane {
+                return planes.iter().any(|e| e.id == id);
+            }
+            // A submitted launch has no entity until the next host frame. Match
+            // each observed new plane once, nearest its launch origin.
+            if frame.tick() <= flight.launched {
+                return true;
+            }
+            if let Some(plane) = planes
+                .iter()
+                .filter(|e| !assigned.contains(&e.id) && !flight.existing_planes.contains(&e.id))
+                .min_by(|a, b| {
+                    dist2(a.position, flight.origin)
+                        .total_cmp(&dist2(b.position, flight.origin))
+                        .then(a.id.cmp(&b.id))
+                })
+            {
+                flight.plane = Some(plane.id);
+                assigned.insert(plane.id);
+                true
+            } else {
+                false
+            }
+        });
         self.launched
             .retain(|id, _| frame.owned().iter().any(|e| e.id == *id));
         let mut ready = frame
@@ -52,7 +95,7 @@ impl Recon {
         let covered = |p| {
             self.flights
                 .iter()
-                .any(|(goal, _)| dist2(*goal, p) <= (9. * size).det_powi(2))
+                .any(|flight| dist2(flight.goal, p) <= (9. * size).det_powi(2))
         };
         if let Some(target) = incoming {
             // Defensive reconnaissance may spend the reserved carrier. Never substitute a
@@ -153,12 +196,21 @@ impl Recon {
             return false;
         }
         self.launched.insert(car.id, frame.tick());
-        self.flights.push((
-            target,
-            frame
+        self.flights.push(Flight {
+            goal: target,
+            origin: car.position,
+            launched: frame.tick(),
+            until: frame
                 .tick()
                 .saturating_add(u32::from(rts_rules::balance::SCOUT_PLANE_LIFETIME_TICKS)),
-        ));
+            plane: None,
+            existing_planes: frame
+                .owned()
+                .iter()
+                .filter(|e| e.kind == EntityKind::ScoutPlane)
+                .map(|e| e.id)
+                .collect(),
+        });
         true
     }
 }

@@ -98,6 +98,10 @@ fn research_and_cooldown_gate_launches_and_existing_sorties_prevent_duplicates()
     assert!(casts(&mut recon, &start, &s, &sites, Some(p)).is_empty());
     s.upgrades.push("scout_plane_unlock".into());
     assert_eq!(casts(&mut recon, &start, &s, &sites, Some(p)).len(), 1);
+    let mut plane = s.entities.iter().find(|e| e.id == 1000).unwrap().clone();
+    plane.id = 5000;
+    plane.kind = "scout_plane".into();
+    s.entities.push(plane);
     s.tick += 9;
     assert!(casts(&mut recon, &start, &s, &sites, Some(p)).is_empty());
     s.tick += u32::from(rts_rules::balance::SCOUT_PLANE_LIFETIME_TICKS);
@@ -278,4 +282,41 @@ fn same_frame_clearance_resumes_spare_scouting_without_waiting_for_contact_expir
     assert_eq!(orders.len(), 1);
     assert_eq!(orders[0].0, 1002);
     assert_ne!(orders[0].1, attack);
+}
+
+#[test]
+fn a_lost_plane_releases_coverage_for_a_replacement_defensive_sortie() {
+    let (start, mut s, sites) = scene(2);
+    let mut recon = Recon::default();
+    let p = (s.entities[0].x + 128., s.entities[0].y + 128.);
+    assert_eq!(casts(&mut recon, &start, &s, &sites, Some(p)).len(), 1);
+    let mut plane = s.entities.iter().find(|e| e.id == 1000).unwrap().clone();
+    plane.id = 5000;
+    plane.kind = "scout_plane".into();
+    s.entities.push(plane);
+    s.tick += 9;
+    assert!(casts(&mut recon, &start, &s, &sites, Some(p)).is_empty());
+    s.entities.retain(|e| e.id != 5000);
+    s.tick += 9;
+    assert_eq!(
+        casts(&mut recon, &start, &s, &sites, Some(p)),
+        vec![(1001, p)]
+    );
+}
+
+#[test]
+fn a_failed_launch_does_not_adopt_an_existing_unrelated_plane() {
+    let (start, mut s, sites) = scene(2);
+    let mut plane = s.entities.iter().find(|e| e.id == 1000).unwrap().clone();
+    plane.id = 5000;
+    plane.kind = "scout_plane".into();
+    s.entities.push(plane);
+    let mut recon = Recon::default();
+    let p = (s.entities[0].x + 128., s.entities[0].y + 128.);
+    assert_eq!(casts(&mut recon, &start, &s, &sites, Some(p)).len(), 1);
+    s.tick += 9;
+    assert_eq!(
+        casts(&mut recon, &start, &s, &sites, Some(p)),
+        vec![(1001, p)]
+    );
 }
