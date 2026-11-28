@@ -151,10 +151,19 @@ fn disciple_shield_armors_direct_hits_and_tank_splash_and_charges_full_damage() 
             .shield
             .as_ref()
             .map_or(0, |s| s.remaining);
-        assert_eq!(hp - entities.get(primary).unwrap().hp,
+        assert_eq!(
+            hp - entities.get(primary).unwrap().hp,
             ((combat_rules::effective_damage_for_weapon(
-                weapon, EntityKind::Rifleman, weapon.dmg, Some(crate::rules::terrain::TerrainKind::Open),
-            ) as f32 * weapon.armor_penetration).round() as u32).min(hp), "{kind:?}");
+                weapon,
+                EntityKind::Rifleman,
+                weapon.dmg,
+                Some(crate::rules::terrain::TerrainKind::Open),
+            ) as f32
+                * weapon.armor_penetration)
+                .round() as u32)
+                .min(hp),
+            "{kind:?}"
+        );
         let splash = if kind == combat_rules::WeaponKind::TankCannon {
             config::TANK_HE_SPLASH_DAMAGE
         } else {
@@ -166,10 +175,7 @@ fn disciple_shield_armors_direct_hits_and_tank_splash_and_charges_full_damage() 
             "{kind:?}"
         );
         if kind == combat_rules::WeaponKind::TankCannon {
-            assert_eq!(
-                neighbor_hp - entities.get(neighbor).unwrap().hp,
-                0
-            );
+            assert_eq!(neighbor_hp - entities.get(neighbor).unwrap().hp, 0);
         }
     }
 }
