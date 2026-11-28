@@ -1,6 +1,7 @@
 ---
 title: Combat
 order: 10
+constants: ARMOR_, FRONT_ARC_, SIDE_ARC_
 ---
 How damage is worked out. Per-weapon numbers are on [Weapons & damage](weapons.html).
 
@@ -10,16 +11,16 @@ Every unit and building is **Small** or **Armored**.
 
 | Armor | Damage taken |
 |---|---|
-| Small | 100% |
-| Armored | 25% from weapons with no armor penetration (AP) |
+| Small | {{ARMOR_SMALL_DAMAGE_TAKEN|pct}} |
+| Armored | {{ARMOR_ARMORED_DAMAGE_TAKEN|pct}} from weapons with no armor penetration (AP) |
 
-AP cancels part of the armor: damage × (1 − 0.75 × (1 − AP)).
+AP cancels part of the armor: damage × (1 − {{ARMOR_ARMORED_REDUCTION}} × (1 − AP)).
 
 | Shot | vs Small | vs Armored (Tank) |
 |---|---|---|
-| Rifle — {{unit:rifleman.attack.dmg}} damage, 0% AP | {{dmg:rifleman_rifle>rifleman}} | {{dmg:rifleman_rifle>tank}} |
+| Rifle — {{unit:rifleman.attack.dmg}} damage, {{weapon:rifleman_rifle.armorPenetration|pct}} AP | {{dmg:rifleman_rifle>rifleman}} | {{dmg:rifleman_rifle>tank}} |
 | Panzerfaust — {{PANZERFAUST_DAMAGE}} damage, {{PANZERFAUST_ARMOR_PENETRATION|pct}} AP | — | {{dmg:panzerfaust_loaded_shot>tank}} |
-| Tank Cannon — {{unit:tank.attack.dmg}} damage, 100% AP | {{dmg:tank_cannon>rifleman}} | {{dmg:tank_cannon>tank.front}} |
+| Tank Cannon — {{unit:tank.attack.dmg}} damage, {{weapon:tank_cannon.armorPenetration|pct}} AP | {{dmg:tank_cannon>rifleman}} | {{dmg:tank_cannon>tank.front}} |
 
 ## Tank facing
 
@@ -31,7 +32,7 @@ The Tank Cannon and Anti-Tank Gun deal more damage to a Tank's side and rear.
 | Side | ×{{rules:facing.side}} | {{dmg:tank_cannon>tank.side}} | {{dmg:anti_tank_gun>tank.side}} |
 | Rear | ×{{rules:facing.rear}} | {{dmg:tank_cannon>tank.rear}} | {{dmg:anti_tank_gun>tank.rear}} |
 
-- Front: the 90° cone ahead of the hull. Rear: the 90° cone behind. Side: the rest.
+- Front: shots from within {{FRONT_ARC_RAD|deg}} of where the hull points. Side: from there out to {{SIDE_ARC_RAD|deg}}. Rear: the rest.
 - The Panzerfaust ignores facing.
 - A Tank hit by an Anti-Tank Gun, Panzerfaust or Tank Cannon turns its hull toward the shooter and holds it for {{TANK_ARMOR_REACTION_LOCK_TICKS|s}} (turns at most {{TANK_ARMOR_REACTION_MAX_PIVOT_RAD|deg}}).
 

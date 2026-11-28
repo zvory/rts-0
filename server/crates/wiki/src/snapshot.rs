@@ -116,7 +116,7 @@ pub fn build(client_rules_js: &str, game: Value) -> Value {
     snapshot.insert("nodes".into(), nodes(&text));
     snapshot.insert("weapons".into(), weapons(&numeric));
     snapshot.insert("upgrades".into(), upgrades(&text));
-    snapshot.insert("abilities".into(), abilities());
+    snapshot.insert("abilities".into(), abilities(&numeric));
     snapshot.insert("facing".into(), facing_table());
     snapshot.insert("sources".into(), sources(&index));
     snapshot.insert(
@@ -142,7 +142,8 @@ pub fn build(client_rules_js: &str, game: Value) -> Value {
     Value::Object(snapshot)
 }
 
-/// The private simulation constants indexed by build.rs, evaluated against the rules values.
+/// The private simulation constants and inline numbers indexed by build.rs, evaluated against the
+/// rules values (or, for `"read": "called"`, by calling the rules function).
 fn sim_constants(index: &Value, rules: &HashMap<String, f64>) -> Vec<Value> {
     let mut out = Vec::new();
     for c in index
@@ -151,7 +152,11 @@ fn sim_constants(index: &Value, rules: &HashMap<String, f64>) -> Vec<Value> {
         .map(|a| a.as_slice())
         .unwrap_or(&[])
     {
-        let Some(value) = c["expr"].as_str().and_then(|e| client_text::eval(e, rules)) else {
+        let value = match c["read"].as_str() {
+            Some("called") => c["name"].as_str().and_then(called_value),
+            _ => c["expr"].as_str().and_then(|e| client_text::eval(e, rules)),
+        };
+        let Some(value) = value else {
             continue;
         };
         let mut c = c.clone();
@@ -163,6 +168,26 @@ fn sim_constants(index: &Value, rules: &HashMap<String, f64>) -> Vec<Value> {
         out.push(c);
     }
     out
+}
+
+/// Values of build.rs `CODE_VALUES` read by calling the rules (`Read::Called`).
+fn called_value(key: &str) -> Option<f64> {
+    use EntityKind::*;
+    match key {
+        "DISCIPLE_INSIGHT_PER_HP_UNITS" => compat::insight_per_hp(Warrior, Rifleman),
+        "DISCIPLE_INSIGHT_PER_HP_BUILDINGS" => compat::insight_per_hp(Warrior, Barracks),
+        "DISCIPLE_INSIGHT_PER_HP_WIND_EXTRACTORS" => compat::insight_per_hp(WindAdept, SteelMine),
+        "DISCIPLE_INSIGHT_PER_HP_WAR_TANKS" => compat::insight_per_hp(WarAdept, Tank),
+        // a 1000-damage hit with no armor penetration, in the open
+        "ARMOR_SMALL_DAMAGE_TAKEN" => Some(
+            combat::effective_damage_for_armor_penetration(0.0, Rifleman, 1000, None) as f64
+                / 1000.0,
+        ),
+        "ARMOR_ARMORED_DAMAGE_TAKEN" => Some(
+            combat::effective_damage_for_armor_penetration(0.0, Tank, 1000, None) as f64 / 1000.0,
+        ),
+        _ => None,
+    }
 }
 
 /// Code definitions keyed by page ("unit:tank") instead of enum variant ("EntityKind:Tank").
@@ -333,6 +358,54 @@ fn burst_damage(w: &WeaponProfile, rays: u32, b: &Burst) -> u32 {
     (w.dmg as f32 * rays as f32 * b.multiplier).round() as u32
 }
 
+/// The attack a unit really makes with its default weapon. Cultivators take damage, range and
+/// cooldown from their own stats (`combat::attack_profile`) and armor penetration from their Dao
+/// rank (`combat::ranked_primary_weapon_profile`), so one shared sword hits differently per unit.
+fn effective_weapon(k: EntityKind) -> Option<WeaponProfile> {
+    let mut p = combat::ranked_primary_weapon_profile(k, false)?;
+    let a = combat::attack_profile(k);
+    p.dmg = a.dmg;
+    p.range_tiles = a.range_tiles;
+    p.cooldown = a.cooldown;
+    Some(p)
+}
+
+fn same_attack(a: &WeaponProfile, b: &WeaponProfile) -> bool {
+    a.dmg == b.dmg
+        && a.range_tiles == b.range_tiles
+        && a.cooldown == b.cooldown
+        && a.armor_penetration == b.armor_penetration
+}
+
+/// The weapons-list entry for a unit's default attack: the profile's own id, or
+/// `<profile>@<unit>` when the unit's attack differs from the shared profile.
+fn weapon_entry_id(k: EntityKind) -> Option<String> {
+    let kind = combat::default_weapon_kind(k)?;
+    let base = combat::weapon_profile(kind)?;
+    let eff = effective_weapon(k)?;
+    Some(if same_attack(base, &eff) {
+        kind.stable_id().to_string()
+    } else {
+        format!("{}@{}", kind.stable_id(), id(k))
+    })
+}
+
+/// What an Adept gains on reaching Master rank (sim entity/dao.rs `advance_dao_master`,
+/// `movement_speed`; rules `ranked_primary_damage`, `ranked_primary_weapon_profile`).
+fn master_rank(k: EntityKind, s: &balance::UnitStats) -> Option<Value> {
+    if !k.is_disciple() || k.is_novice() {
+        return None;
+    }
+    let attack = combat::attack_profile(k);
+    Some(json!({
+        "insight": balance::DISCIPLE_EVOLVED_INSIGHT_CAP,
+        "hp": (s.hp as f32 * balance::DAO_MASTER_HP_MULTIPLIER).round() as u32,
+        "dmg": combat::ranked_primary_damage(k, true, attack.dmg),
+        "armorPenetration": combat::ranked_primary_weapon_profile(k, true).map(|p| v(p.armor_penetration)),
+        "speedPxPerTick": v(s.speed * balance::DAO_MASTER_SPEED_MULTIPLIER),
+    }))
+}
+
 /// Extra weapons a unit carries besides its default weapon.
 fn secondary_weapons(kind: EntityKind) -> Vec<WeaponKind> {
     let wanted = match kind.stable_id() {
@@ -381,7 +454,11 @@ fn units(text: &client_text::ClientText, consts: &HashMap<String, f64>) -> Value
                     "requiresText": req_text,
                     "attack": { "dmg": attack.dmg, "rangeTiles": v(attack.range_tiles), "cooldownTicks": attack.cooldown },
                     "engagementRangeTiles": compat::engagement(k),
-                    "weapon": combat::default_weapon_kind(k).map(|w| w.stable_id()),
+                    "weapon": weapon_entry_id(k),
+                    "targetable": targetable(k),
+                    "master": master_rank(k, &s),
+                    // a Dao of War Adept wears extra armor (sim entity/items.rs armor_bonus_reduction)
+                    "armorBonus": (k.dao() == Some(UpgradeKind::DaoOfHeaviness)).then_some(v(balance::DAO_WAR_ARMOR_REDUCTION)),
                     "secondaryWeapons": secondary_weapons(k).iter().map(|w| w.stable_id()).collect::<Vec<_>>(),
                     "movementBody": compat::movement_body(k),
                     "threatRole": compat::threat_role(k),
@@ -452,6 +529,7 @@ fn buildings(text: &client_text::ClientText) -> Value {
                     "requires": ids(d.build_requires),
                     "researches": researches,
                     "blocksSight": compat::blocks_sight(k),
+                    "targetable": targetable(k),
                     "extracts": compat::extracts(k),
                 })
             })
@@ -468,13 +546,44 @@ fn nodes(text: &client_text::ClientText) -> Value {
     )
 }
 
+/// One hit on open ground, as the sim resolves it: armor (with a War Adept's Dao armor bonus,
+/// sim entity/items.rs `armor_bonus_reduction`), then weapon-specific target modifiers.
+fn hit_damage(w: &WeaponProfile, t: EntityKind, dmg: u32) -> u32 {
+    let bonus = if t.dao() == Some(UpgradeKind::DaoOfHeaviness) {
+        balance::DAO_WAR_ARMOR_REDUCTION
+    } else {
+        0.0
+    };
+    if bonus <= 0.0 {
+        return combat::effective_damage_for_weapon(w, t, dmg, Some(TerrainKind::Open));
+    }
+    let after_armor = combat::effective_damage_for_armor_penetration_with_bonus(
+        w.armor_penetration,
+        t,
+        dmg,
+        Some(TerrainKind::Open),
+        bonus,
+    );
+    combat::damage_after_target_type_modifier(w, t, after_armor)
+}
+
 /// Every unit and building that can be shot at, for the damage tables.
 fn targets() -> Vec<EntityKind> {
     defs::UNITS
         .iter()
         .map(|d| d.kind)
         .chain(defs::BUILDINGS.iter().map(|d| d.kind))
+        .filter(|k| targetable(*k))
         .collect()
+}
+
+/// Weapons can't target Barbed Wire, healing seals or the Scout Plane (sim entity.rs
+/// `is_targetable`), so they stay out of the damage tables.
+fn targetable(k: EntityKind) -> bool {
+    !matches!(
+        k,
+        EntityKind::BarbedWire | EntityKind::HealingSeal | EntityKind::ScoutPlane
+    )
 }
 
 fn facing_damage(w: &WeaponProfile, victim: EntityKind, facing: ArmorFacing) -> u32 {
@@ -495,87 +604,137 @@ fn facing_damage(w: &WeaponProfile, victim: EntityKind, facing: ArmorFacing) -> 
     )
 }
 
+/// One entry per attack as units really make it: a profile's own entry for the units that fire it
+/// unchanged, plus `<profile>@<unit>` for each unit whose attack differs (see `effective_weapon`).
 fn weapons(consts: &HashMap<String, f64>) -> Value {
     let all_kinds: Vec<EntityKind> = EntityKind::ALL.to_vec();
     let burst = burst_rules(consts);
-    Value::Array(
-        combat::WEAPON_PROFILES
+    let mut out = Vec::new();
+    for w in combat::WEAPON_PROFILES {
+        let base_id = w.id.stable_id().to_string();
+        let mut used_by: Vec<Value> = all_kinds
             .iter()
-            .map(|w| {
-                let mut used_by: Vec<Value> = all_kinds
-                    .iter()
-                    .filter(|k| combat::default_weapon_kind(**k) == Some(w.id))
-                    .map(|k| json!(id(*k)))
-                    .collect();
-                used_by.extend(
-                    all_kinds
-                        .iter()
-                        .filter(|k| secondary_weapons(**k).contains(&w.id))
-                        .map(|k| json!(id(*k))),
-                );
-                let vs: Vec<Value> = targets()
-                    .into_iter()
-                    .map(|t| {
-                        let open = combat::effective_damage_for_weapon(
-                            w,
-                            t,
-                            w.dmg,
-                            Some(TerrainKind::Open),
-                        );
-                        let mut row = json!({ "target": id(t), "dmg": open });
-                        if combat::facing_damage_multiplier_for_weapon(w, t, ArmorFacing::Rear)
-                            != 1.0
-                        {
-                            row["front"] = json!(facing_damage(w, t, ArmorFacing::Front));
-                            row["side"] = json!(facing_damage(w, t, ArmorFacing::Side));
-                            row["rear"] = json!(facing_damage(w, t, ArmorFacing::Rear));
-                        }
-                        if let Some(b) = burst.as_ref().filter(|_| is_burst(w.id)) {
-                            let one = combat::effective_damage_for_weapon(
-                                w,
-                                t,
-                                burst_damage(w, 1, b),
-                                Some(TerrainKind::Open),
-                            );
-                            let all = combat::effective_damage_for_weapon(
-                                w,
-                                t,
-                                burst_damage(w, b.rays, b),
-                                Some(TerrainKind::Open),
-                            );
-                            row["burstMin"] = json!(one);
-                            row["burstMax"] = json!(all);
-                            if let Some(e) = compat::entrenched_damage(t, all) {
-                                row["entrenched"] = json!(e);
-                            }
-                        } else if let Some(e) = compat::entrenched_damage(t, open) {
-                            row["entrenched"] = json!(e);
-                        }
-                        row
-                    })
-                    .collect();
-                json!({
-                    "id": w.id.stable_id(),
-                    "rangeTiles": v(w.range_tiles),
-                    "dmg": w.dmg,
-                    "cooldownTicks": w.cooldown,
-                    "weaponClass": format!("{:?}", w.weapon_class),
-                    "armorPenetration": v(w.armor_penetration),
-                    "facingArmor": w.facing_damage_policy == FacingDamagePolicy::TankArmorFacing,
-                    "infantryPolicy": compat::infantry_policy(w),
-                    "triggersTankArmorReaction": compat::triggers_armor_reaction(w),
-                    "burst": burst.as_ref().filter(|_| is_burst(w.id)).map(|b| json!({
-                        "rays": b.rays,
-                        "rayMultiplier": f(b.multiplier),
-                        "min": burst_damage(w, 1, b),
-                        "max": burst_damage(w, b.rays, b),
-                    })),
-                    "usedBy": used_by,
-                    "vs": vs,
-                })
-            })
-            .collect(),
-    )
+            .filter(|k| weapon_entry_id(**k).as_deref() == Some(base_id.as_str()))
+            .map(|k| json!(id(*k)))
+            .collect();
+        used_by.extend(
+            all_kinds
+                .iter()
+                .filter(|k| secondary_weapons(**k).contains(&w.id))
+                .map(|k| json!(id(*k))),
+        );
+        out.push(weapon_entry(
+            w,
+            &base_id,
+            None,
+            used_by,
+            burst.as_ref(),
+            consts,
+        ));
+        for k in all_kinds
+            .iter()
+            .filter(|k| combat::default_weapon_kind(**k) == Some(w.id))
+        {
+            let (Some(entry), Some(p)) = (weapon_entry_id(*k), effective_weapon(*k)) else {
+                continue;
+            };
+            if entry != base_id {
+                out.push(weapon_entry(
+                    &p,
+                    &entry,
+                    Some(*k),
+                    vec![json!(id(*k))],
+                    burst.as_ref(),
+                    consts,
+                ));
+            }
+        }
+    }
+    Value::Array(out)
+}
+
+fn weapon_entry(
+    w: &WeaponProfile,
+    entry_id: &str,
+    variant_of: Option<EntityKind>,
+    used_by: Vec<Value>,
+    burst: Option<&Burst>,
+    consts: &HashMap<String, f64>,
+) -> Value {
+    let burst = burst.filter(|_| is_burst(w.id));
+    // Mortar shells don't use the profile's damage: each one deals MORTAR_INNER_DAMAGE where it
+    // lands, falling to MORTAR_OUTER_DAMAGE at MORTAR_OUTER_RADIUS_TILES (balance
+    // mortar_damage_at_distance_squared). The tables count a direct hit; entrenchment cuts area
+    // damage, not direct damage.
+    let area = (w.id.stable_id() == "mortar_team_mortar")
+        .then(|| {
+            Some((
+                *consts.get("MORTAR_INNER_DAMAGE")? as u32,
+                *consts.get("MORTAR_OUTER_DAMAGE")?,
+                *consts.get("MORTAR_OUTER_RADIUS_TILES")?,
+            ))
+        })
+        .flatten();
+    let profile = WeaponProfile {
+        dmg: area.map_or(w.dmg, |(inner, _, _)| inner),
+        ..*w
+    };
+    let w = &profile;
+    let vs: Vec<Value> = targets()
+        .into_iter()
+        .map(|t| {
+            let open = hit_damage(w, t, w.dmg);
+            let mut row = json!({ "target": id(t), "dmg": open });
+            if combat::facing_damage_multiplier_for_weapon(w, t, ArmorFacing::Rear) != 1.0 {
+                row["front"] = json!(facing_damage(w, t, ArmorFacing::Front));
+                row["side"] = json!(facing_damage(w, t, ArmorFacing::Side));
+                row["rear"] = json!(facing_damage(w, t, ArmorFacing::Rear));
+            }
+            if let Some(b) = burst {
+                let one = hit_damage(w, t, burst_damage(w, 1, b));
+                let all = hit_damage(w, t, burst_damage(w, b.rays, b));
+                row["burstMin"] = json!(one);
+                row["burstMax"] = json!(all);
+                if let Some(e) = compat::entrenched_damage(t, all) {
+                    row["entrenched"] = json!(e);
+                }
+            } else if area.is_some() {
+                if compat::entrenchment_eligible(t) {
+                    row["entrenched"] =
+                        json!(combat::area_damage_after_entrenchment(t, open, true));
+                }
+            } else if let Some(e) = compat::entrenched_damage(t, open) {
+                row["entrenched"] = json!(e);
+            }
+            row
+        })
+        .collect();
+    json!({
+        "id": entry_id,
+        // a unit's own version of a shared profile: which profile, and whose attack it is
+        "base": variant_of.map(|_| w.id.stable_id()),
+        "variantOf": variant_of.map(id),
+        "rangeTiles": v(w.range_tiles),
+        "dmg": w.dmg,
+        "cooldownTicks": w.cooldown,
+        "weaponClass": format!("{:?}", w.weapon_class),
+        "armorPenetration": v(w.armor_penetration),
+        "facingArmor": w.facing_damage_policy == FacingDamagePolicy::TankArmorFacing,
+        "infantryPolicy": compat::infantry_policy(w),
+        "triggersTankArmorReaction": compat::triggers_armor_reaction(w),
+        "burst": burst.map(|b| json!({
+            "rays": b.rays,
+            "rayMultiplier": f(b.multiplier),
+            "min": burst_damage(w, 1, b),
+            "max": burst_damage(w, b.rays, b),
+        })),
+        "area": area.map(|(inner, outer, radius)| json!({ "max": inner, "min": num(outer), "radiusTiles": num(radius) })),
+        // sim combat/weapons.rs: a set-up Anti-Tank Gun fires farther; a still Tank's range ramps up
+        "deployedRangeTiles": (w.id.stable_id() == "anti_tank_gun").then(|| consts.get("ANTI_TANK_GUN_DEPLOYED_RANGE_TILES").copied().map(num)).flatten(),
+        "stationaryRangeTiles": (w.id.stable_id() == "tank_cannon").then(|| consts.get("TANK_STATIONARY_RANGE_MAX_TILES").copied().map(num)).flatten(),
+        "usedBy": used_by,
+        "vs": vs,
+    })
 }
 
 fn facing_table() -> Value {
@@ -615,15 +774,27 @@ fn upgrades(text: &client_text::ClientText) -> Value {
                     })
                     .map(|c| json!(c.id))
                     .collect();
+                // sim game/upgrade.rs `next_definition`: every Dao already researched or paid for
+                // moves the next one up a price tier (balance::dao_research_tier, capped at the third)
+                let tiers: Option<Vec<(u32, u32, u32)>> = matches!(
+                    u,
+                    UpgradeKind::DaoWind | UpgradeKind::DaoOfMagic | UpgradeKind::DaoOfHeaviness
+                )
+                .then(|| (0..3).map(balance::dao_research_tier).collect());
+                let (steel, oil, ticks) = tiers
+                    .as_ref()
+                    .and_then(|t| t.first().copied())
+                    .unwrap_or((def.cost_steel, def.cost_oil, def.research_ticks));
                 json!({
                     "id": sid,
                     "name": e.label.unwrap_or_else(|| title_case(sid)),
                     "icon": e.icon,
                     "description": e.description,
                     "researchedAt": id(def.researched_at),
-                    "steel": def.cost_steel,
-                    "oil": def.cost_oil,
-                    "researchTicks": def.research_ticks,
+                    "steel": steel,
+                    "oil": oil,
+                    "researchTicks": ticks,
+                    "priceTiers": tiers.map(|t| t.iter().map(|(s, o, r)| json!({ "steel": s, "oil": o, "researchTicks": r })).collect::<Vec<_>>()),
                     "requiresUpgrade": def.requires_upgrade.map(UpgradeKind::stable_id),
                     "factions": factions,
                 })
@@ -632,7 +803,7 @@ fn upgrades(text: &client_text::ClientText) -> Value {
     )
 }
 
-fn abilities() -> Value {
+fn abilities(numeric: &HashMap<String, f64>) -> Value {
     Value::Array(
         AbilityKind::ALL
             .iter()
@@ -676,6 +847,11 @@ fn abilities() -> Value {
                     "rangeTiles": vo(a.range_tiles),
                     "minRangeTiles": a.min_range_tiles,
                     "cooldownTicks": a.cooldown_ticks,
+                    // Throw Sword below Master rank; build.rs CODE_VALUES reads the multiplier from the sim
+                    "adeptCooldownTicks": (*k == AbilityKind::ThrowSword)
+                        .then(|| numeric.get("THROW_SWORD_ADEPT_COOLDOWN_MULTIPLIER"))
+                        .flatten()
+                        .map(|m| num(f64::from(a.cooldown_ticks) * m)),
                     "charges": charges,
                     "chargeRechargeTicks": recharge,
                     "steel": a.cost.steel,
@@ -690,4 +866,120 @@ fn abilities() -> Value {
             })
             .collect(),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Every number build.rs reads from the source (CODE_VALUES) must still be found, with the
+    /// value the code uses, so a moved or reworded line fails here rather than going stale.
+    #[test]
+    fn code_values_are_found_in_the_source() {
+        let index: Value = serde_json::from_str(CODE_INDEX).expect("code index");
+        let numeric: HashMap<String, f64> = constants()
+            .iter()
+            .filter_map(|c| match c.value {
+                Val::Num(n) => Some((c.name.to_string(), n)),
+                _ => None,
+            })
+            .collect();
+        let found: HashMap<String, f64> = sim_constants(&index, &numeric)
+            .iter()
+            .filter_map(|c| Some((c["name"].as_str()?.to_string(), c["value"].as_f64()?)))
+            .collect();
+        let keys = index["codeValueKeys"].as_array().expect("keys");
+        assert!(!keys.is_empty());
+        for key in keys {
+            let key = key.as_str().expect("key");
+            assert!(
+                found.contains_key(key),
+                "{key}: not found in the source; update build.rs CODE_VALUES"
+            );
+        }
+        // spot checks against the compiled code
+        assert_eq!(found["TOURNAMENT_DURATION_TICKS"], 150.0);
+        let (n, d) = balance::disciple_insight_ratio(EntityKind::WarAdept, EntityKind::Tank);
+        assert_eq!(
+            found["DISCIPLE_INSIGHT_PER_HP_WAR_TANKS"],
+            n as f64 / d as f64
+        );
+        assert_eq!(found["FRONT_ARC_RAD"], std::f64::consts::FRAC_PI_4);
+    }
+
+    /// The weapon row a unit page shows must be the attack the simulation makes: Cultivators'
+    /// own damage, range and cooldown, and their Dao rank's armor penetration.
+    #[test]
+    fn unit_weapon_entries_match_the_attack_the_sim_uses() {
+        let weapons = weapons(&HashMap::new());
+        let weapons = weapons.as_array().expect("weapons list");
+        for d in defs::UNITS {
+            let k = d.kind;
+            let Some(entry) = weapon_entry_id(k) else {
+                continue;
+            };
+            let w = weapons
+                .iter()
+                .find(|w| w["id"] == entry.as_str())
+                .unwrap_or_else(|| panic!("no weapon entry {entry} for {}", id(k)));
+            let attack = combat::attack_profile(k);
+            let ranked = combat::ranked_primary_weapon_profile(k, false).expect("profile");
+            assert_eq!(w["dmg"], json!(attack.dmg), "{} damage", id(k));
+            assert_eq!(w["rangeTiles"], v(attack.range_tiles), "{} range", id(k));
+            assert_eq!(
+                w["cooldownTicks"],
+                json!(attack.cooldown),
+                "{} cooldown",
+                id(k)
+            );
+            assert_eq!(
+                w["armorPenetration"],
+                v(ranked.armor_penetration),
+                "{} armor penetration",
+                id(k)
+            );
+            assert!(
+                w["usedBy"]
+                    .as_array()
+                    .is_some_and(|u| u.contains(&json!(id(k)))),
+                "{} not listed as a user of {entry}",
+                id(k)
+            );
+        }
+    }
+
+    /// The damage tables leave out what weapons can't target, and count a War Adept's Dao armor.
+    #[test]
+    fn damage_tables_follow_targeting_and_dao_armor() {
+        let kinds = targets();
+        assert!(!kinds.contains(&EntityKind::BarbedWire));
+        assert!(!kinds.contains(&EntityKind::ScoutPlane));
+        assert!(kinds.contains(&EntityKind::Tank));
+        let rifle = combat::weapon_profile(WeaponKind::RiflemanRifle).expect("rifle");
+        assert!(
+            hit_damage(rifle, EntityKind::WarAdept, rifle.dmg)
+                < hit_damage(rifle, EntityKind::Warrior, rifle.dmg),
+            "the Dao of War armor bonus must reduce non-penetrating hits"
+        );
+    }
+
+    /// Dao research is listed at the price the sim charges for the first Dao, with the later tiers.
+    #[test]
+    fn dao_research_lists_its_price_tiers() {
+        let research = upgrades(&client_text::read("", &HashMap::new()));
+        let dao = research
+            .as_array()
+            .and_then(|r| {
+                r.iter()
+                    .find(|u| u["id"] == UpgradeKind::DaoWind.stable_id())
+            })
+            .expect("Dao of Wind");
+        let (steel, oil, ticks) = balance::dao_research_tier(0);
+        assert_eq!(dao["steel"], json!(steel));
+        assert_eq!(dao["oil"], json!(oil));
+        assert_eq!(dao["researchTicks"], json!(ticks));
+        let tiers = dao["priceTiers"].as_array().expect("tiers");
+        assert_eq!(tiers.len(), 3);
+        assert!(tiers[2]["steel"].as_u64() > tiers[0]["steel"].as_u64());
+    }
 }

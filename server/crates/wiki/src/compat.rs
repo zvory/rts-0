@@ -168,3 +168,13 @@ pub fn queue_policy(a: &AbilityCatalogEntry) -> Value {
     #[cfg(not(has_queue_policy))]
     return Value::Null;
 }
+
+/// Insight per HP of damage, from `balance::disciple_insight_ratio`.
+pub fn insight_per_hp(attacker: EntityKind, target: EntityKind) -> Option<f64> {
+    #[cfg(has_insight_ratio)]
+    return Some(balance::disciple_insight_ratio(attacker, target))
+        .filter(|(_, d)| *d > 0)
+        .map(|(n, d)| n as f64 / d as f64);
+    #[cfg(not(has_insight_ratio))]
+    return None;
+}

@@ -1,6 +1,6 @@
 ---
 title: Terrain and vision
-constants: MAP_TERRAIN_, ROAD_, SLOW_MOVEMENT_, UPHILL_, DOWNHILL_, MAX_ELEVATION_, CONCEALMENT_, DAMAGE_REDUCTION_TILE_
+constants: MAP_TERRAIN_, ROAD_, SLOW_MOVEMENT_, UPHILL_, DOWNHILL_, MAX_ELEVATION_, CONCEALMENT_, DAMAGE_REDUCTION_TILE_, ELEVATION_
 order: 30
 ---
 ## Movement
@@ -18,7 +18,7 @@ Rock and water can't be crossed.
 ## Line of sight
 
 - Rock blocks sight. Water doesn't.
-- High ground: +1 tile of sight per 2 levels of elevation, up to +{{MAX_ELEVATION_SIGHT_BONUS_TILES}}.
+- High ground: +1 tile of sight per {{ELEVATION_LEVELS_PER_SIGHT_TILE}} levels of elevation, up to +{{MAX_ELEVATION_SIGHT_BONUS_TILES}}.
 
 ## Forests and concealment
 

@@ -330,9 +330,24 @@ pub(super) fn research_table(w: &Wiki, ids: &[String]) -> String {
             w.link_kind("research", id),
             w.link(&s(r, "researchedAt")),
             nz(r, "steel") + nz(r, "oil"),
-            cost_of(r),
+            match arr(r, "priceTiers").last() {
+                // Dao research: the first price, rising for each later Dao
+                Some(top) if arr(r, "priceTiers").len() > 1 => format!(
+                    "{} <span class=\"muted\">(1st Dao; up to {})</span>",
+                    cost_of(r),
+                    cost_of(top)
+                ),
+                _ => cost_of(r),
+            },
             nz(r, "researchTicks"),
-            n(r, "researchTicks").map(|t| w.u.secs(t)).unwrap_or("—".into()),
+            match arr(r, "priceTiers").last() {
+                Some(top) if arr(r, "priceTiers").len() > 1 => format!(
+                    "{} <span class=\"muted\">(up to {})</span>",
+                    w.u.secs(nz(r, "researchTicks")),
+                    w.u.secs(nz(top, "researchTicks"))
+                ),
+                _ => n(r, "researchTicks").map(|t| w.u.secs(t)).unwrap_or("—".into()),
+            },
             if req.is_empty() { "—".into() } else { w.link_kind("research", &req) },
             esc(&s(r, "description")),
         );
@@ -418,13 +433,33 @@ pub(super) fn unit_page(w: &Wiki, u: &Value) {
         field("HP", w.coded(&key, "stats.hp", fmt(nz(u, "hp")))),
         field("Armor", w.coded(&key, "armor_class", esc(&s(u, "armor")))),
     ];
+    if let Some(bonus) = n(u, "armorBonus") {
+        rows.push(field(
+            "Armor bonus",
+            w.coded_const(
+                "DAO_WAR_ARMOR_REDUCTION",
+                format!(
+                    "+{}% <span class=\"muted\">(before penetration)</span>",
+                    fmt(bonus * 100.0)
+                ),
+            ),
+        ));
+    }
     if nz(at, "dmg") > 0.0 || weapon_v.is_some() {
         rows.push(Row::Section("Attack".into()));
+        let area = weapon_v.is_some_and(|wv| !get(wv, "area").is_null());
         let dmg_text = weapon_v
-            .filter(|wv| !get(wv, "burst").is_null())
+            .filter(|wv| !get(wv, "burst").is_null() || area)
             .map(weapon_dmg_text)
             .unwrap_or_else(|| fmt(nz(at, "dmg")));
-        rows.push(field("Damage", w.coded(&akey, adm, dmg_text)));
+        rows.push(field(
+            "Damage",
+            if area {
+                w.coded_const("MORTAR_INNER_DAMAGE", dmg_text)
+            } else {
+                w.coded(&akey, adm, dmg_text)
+            },
+        ));
         let sr = get(u, "stationaryRange");
         match (n(u, "deployedRangeTiles"), n(sr, "maxTiles")) {
             (Some(d), _) => rows.push(field(
@@ -473,12 +508,47 @@ pub(super) fn unit_page(w: &Wiki, u: &Value) {
                 "Weapon",
                 format!(
                     "<a href=\"weapons.html#w-{weapon}\">{}</a><br><span class=\"muted\">{}, armor pen. {}%</span>",
-                    esc(&weapon_name(&weapon)),
+                    esc(&w.weapon_label(&weapon)),
                     esc(&human(&s(wv, "weaponClass"))),
                     fmt(nz(wv, "armorPenetration") * 100.0)
                 ),
             ));
         }
+    }
+    // Adepts become Masters once their insight reaches the cap
+    let master = get(u, "master");
+    if !master.is_null() {
+        rows.push(Row::Section("Master rank".into()));
+        rows.push(field(
+            "Reached at",
+            w.coded_const(
+                "DISCIPLE_EVOLVED_INSIGHT_CAP",
+                format!("{} insight", fmt(nz(master, "insight"))),
+            ),
+        ));
+        rows.push(field(
+            "HP",
+            w.coded_const("DAO_MASTER_HP_MULTIPLIER", fmt(nz(master, "hp"))),
+        ));
+        let dmg_const = if id == "war_adept" {
+            "DAO_WAR_MASTER_DAMAGE_MULTIPLIER"
+        } else {
+            "DAO_MASTER_DAMAGE_MULTIPLIER"
+        };
+        rows.push(field(
+            "Damage",
+            w.coded_const(dmg_const, fmt(nz(master, "dmg"))),
+        ));
+        if let Some(ap) = n(master, "armorPenetration") {
+            rows.push(field("Armor pen.", format!("{}%", fmt(ap * 100.0))));
+        }
+        rows.push(field(
+            "Speed",
+            w.coded_const(
+                "DAO_MASTER_SPEED_MULTIPLIER",
+                format!("{} tiles/s", fmt2(w.u.speed(nz(master, "speedPxPerTick")))),
+            ),
+        ));
     }
     rows.push(Row::Section("Movement & vision".into()));
     rows.push(field(
@@ -540,10 +610,10 @@ pub(super) fn unit_page(w: &Wiki, u: &Value) {
             let _ = write!(
                 h,
                 "<tr><td><a href=\"weapons.html#w-{wid}\">{}</a></td><td class=\"num\">{}</td><td class=\"num\">{}</td><td class=\"num\">{}</td><td class=\"num\">{}</td><td>{}</td><td class=\"num\">{}%</td><td>{}</td></tr>",
-                esc(&weapon_name(wid)),
+                esc(&w.weapon_label(wid)),
                 weapon_dmg_text(wv),
-                fmt(nz(wv, "rangeTiles")),
-                w.u.secs(nz(wv, "cooldownTicks")),
+                weapon_range_text(wv),
+                weapon_cooldown_text(w, wv),
                 weapon_dps(w, wv),
                 esc(&human(&s(wv, "weaponClass"))),
                 fmt(nz(wv, "armorPenetration") * 100.0),
@@ -631,19 +701,12 @@ pub(super) fn unit_page(w: &Wiki, u: &Value) {
                 h,
                 "<details{}><summary>{}</summary>{}</details>",
                 if i == 0 { " open" } else { "" },
-                esc(&weapon_name(&s(wv, "id"))),
+                esc(&w.weapon_label(&s(wv, "id"))),
                 weapon_damage_table(w, wv)
             );
         }
     }
-    h.push_str(&h2("damage-taken", "Damage taken"));
-    let _ = write!(
-        h,
-        "<details><summary>Every weapon vs {} ({} HP)</summary>{}</details>",
-        esc(&name),
-        fmt(nz(u, "hp")),
-        damage_taken_table(w, &id)
-    );
+    h.push_str(&damage_taken_section(w, u));
     h.push_str(&related_constants(w, "unit", &id));
     h.push_str(&changelog(w, "unit", &id));
     for f in &factions {
@@ -753,11 +816,14 @@ pub(super) fn building_page(w: &Wiki, bv: &Value) {
     h.push_str(&description(bv));
     h.push_str(&notes_html(w, "buildings", &id, &file));
 
-    let trains: Vec<String> = strs(bv, "trains");
-    if !trains.is_empty() {
-        h.push_str(&h2("trains", "Trains"));
+    let (trains, builds) = trains_and_builds(w, bv);
+    for (anchor, title, list) in [("trains", "Trains", &trains), ("builds", "Builds", &builds)] {
+        if list.is_empty() {
+            continue;
+        }
+        h.push_str(&h2(anchor, title));
         h.push_str("<div class=\"card-grid\">");
-        for t in &trains {
+        for t in list {
             if let Some(v) = w.unit(t).or_else(|| w.building(t)) {
                 h.push_str(&card(w, w.kind_of(t), t, v));
             }
@@ -771,6 +837,20 @@ pub(super) fn building_page(w: &Wiki, bv: &Value) {
     if !research.is_empty() {
         h.push_str(&h2("research", "Research"));
         h.push_str(&research_table(w, &research));
+    }
+    // what the building itself casts or sells (the Shop's items)
+    let abilities: Vec<&Value> = w
+        .list("abilities")
+        .iter()
+        .filter(|a| strs(a, "carriers").contains(&id) && !arr(a, "factions").is_empty())
+        .collect();
+    if !abilities.is_empty() {
+        h.push_str(&h2("abilities", "Abilities"));
+        h.push_str("<div class=\"ability-list\">");
+        for a in abilities {
+            h.push_str(&ability_card(w, a, &file));
+        }
+        h.push_str("</div>");
     }
     let needed_by: Vec<String> = w
         .list("buildings")
@@ -791,14 +871,7 @@ pub(super) fn building_page(w: &Wiki, bv: &Value) {
         h.push_str(&h2("unlocks", "Required by"));
         let _ = write!(h, "<p>{}</p>", w.links(&needed_by));
     }
-    h.push_str(&h2("damage-taken", "Damage taken"));
-    let _ = write!(
-        h,
-        "<details><summary>Every weapon vs {} ({} HP)</summary>{}</details>",
-        esc(&name),
-        fmt(nz(bv, "hp")),
-        damage_taken_table(w, &id)
-    );
+    h.push_str(&damage_taken_section(w, bv));
     h.push_str(&related_constants(w, "building", &id));
     h.push_str(&changelog(w, "building", &id));
     for f in &factions {
@@ -819,7 +892,7 @@ pub(super) fn research_page(w: &Wiki, r: &Value) {
     let name = s(r, "name");
     let factions = w.factions_of("research", &id);
     let req = s(r, "requiresUpgrade");
-    let rows = vec![
+    let mut rows = vec![
         Row::Section("Research".into()),
         field("Cost", {
             let steel = research_const(w, &id, "COST_STEEL");
@@ -872,6 +945,24 @@ pub(super) fn research_page(w: &Wiki, r: &Value) {
             },
         ),
     ];
+    // Dao research gets dearer with every Dao already researched or paid for
+    let tiers = arr(r, "priceTiers");
+    if tiers.len() > 1 {
+        rows.push(Row::Section("Price by order".into()));
+        for (i, t) in tiers.iter().enumerate() {
+            let label = ["1st Dao", "2nd Dao", "3rd Dao"]
+                .get(i)
+                .copied()
+                .unwrap_or("Later Daos");
+            rows.push(field(
+                label,
+                w.coded_const(
+                    "DAO_COST_STEEL",
+                    format!("{}, {}", cost_of(t), w.u.secs(nz(t, "researchTicks"))),
+                ),
+            ));
+        }
+    }
     let sub = factions
         .iter()
         .map(|f| {

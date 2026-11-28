@@ -1,0 +1,4 @@
+- A {{building:resource_depot}} builds Steel Mines for free on the steel patches near it.
+- Extracts {{STEEL_LOAD}} steel every {{HARVEST_TICKS|s}} until its patch ({{STEEL_PATCH_AMOUNT}}) runs out: {{calc: STEEL_LOAD / HARVEST_TICKS * TICK_HZ * 60}} steel per minute.
+- Works only within {{MINING_ANCHOR_RANGE_TILES}} tiles of a completed depot; without one it loses all its HP over {{EXTRACTOR_DECAY_TICKS|s}}.
+- Doesn't block movement. See {{page:mechanics/economy}}.

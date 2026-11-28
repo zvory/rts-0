@@ -3,7 +3,7 @@ title: Economy
 constants: STARTING_, STEEL_, OIL_, HARVEST_, EXTRACTOR_, REPAIR_, START_RESOURCE_, PLAYER_SUPPLY_, MINING_ANCHOR_
 order: 20
 ---
-Steel and oil come from extractors on resource patches. Kriegsia and Cultivators get all income this way; Ekat gathers with Golems.
+Steel and oil come from extractors on resource patches: Steel Mines on steel and Pump Jacks on oil.
 
 ## Resources
 
@@ -20,7 +20,7 @@ Steel and oil come from extractors on resource patches. Kriegsia and Cultivators
 
 - A Resource Depot builds Steel Mines on nearby steel for free.
 - It also builds a Pump Jack on nearby oil for free, taking {{AUTOMATIC_PUMP_JACK_BUILD_TICKS|s}}. An Engineer can build one for {{building:pump_jack.steel}} steel in {{building:pump_jack.buildTicks|s}}.
-- Extractors only work within {{MINING_ANCHOR_RANGE_TILES}} tiles of a completed Resource Depot or Zamok.
+- Extractors only work within {{MINING_ANCHOR_RANGE_TILES}} tiles of a completed Resource Depot.
 - An extractor without a depot in range loses all its HP over {{EXTRACTOR_DECAY_TICKS|s}}.
 
 ## Income

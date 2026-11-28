@@ -1,0 +1,1 @@
+Gives every {{unit:command_car}} the {{ability:scoutPlane}} ability: a {{unit:scout_plane}} that circles a chosen point with {{SCOUT_PLANE_SIGHT_TILES}}-tile sight for up to {{SCOUT_PLANE_LIFETIME_TICKS|s}}, one every {{SCOUT_PLANE_ABILITY_COOLDOWN_TICKS|s}}.

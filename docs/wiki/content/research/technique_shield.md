@@ -1,0 +1,1 @@
+Unlocks {{ability:discipleShield}} for {{unit:magic_adept|Magic Adepts}}: a {{DISCIPLE_SHIELD_CAPACITY}}-HP dome over allies within {{DISCIPLE_SHIELD_RADIUS_TILES}} tiles ({{MAGIC_MASTER_SHIELD_CAPACITY}} HP from a Magic Master).

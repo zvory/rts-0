@@ -1,0 +1,4 @@
+- A {{building:resource_depot}} builds one for free on nearby oil, taking {{AUTOMATIC_PUMP_JACK_BUILD_TICKS|s}}. An {{unit:worker}} can build one sooner, for {{building:pump_jack.steel}} steel in {{building:pump_jack.buildTicks|s}}.
+- Extracts {{OIL_LOAD}} oil every {{HARVEST_TICKS|s}} until its patch ({{OIL_GEYSER_AMOUNT}}) runs out: {{calc: OIL_LOAD / HARVEST_TICKS * TICK_HZ * 60}} oil per minute.
+- Works only within {{MINING_ANCHOR_RANGE_TILES}} tiles of a completed depot; without one it loses all its HP over {{EXTRACTOR_DECAY_TICKS|s}}.
+- Doesn't block movement. See {{page:mechanics/economy}}.

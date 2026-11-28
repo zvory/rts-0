@@ -1,0 +1,1 @@
+Infantry research, and the gate to the rest of Kriegsia's tech tree: the {{building:factory}}, {{building:engineering_complex}}, {{building:steelworks}}, {{building:tank_trap|Tank Traps}} and {{building:barbed_wire}} all need one.
