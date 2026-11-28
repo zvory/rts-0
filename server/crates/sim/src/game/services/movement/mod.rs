@@ -26,6 +26,7 @@ mod car_drive;
 mod collision;
 mod pivot_drive;
 mod pivot_recovery;
+mod speed;
 mod standability;
 mod steering;
 mod tank_point;
@@ -214,6 +215,7 @@ fn apply_magic_anchor_pull(
         players.iter().map(|p| (p.id, p.team_id)),
     );
     let mut blockers = crate::game::services::standability::UnitBlockers::new(entities);
+    let mut field_context = None;
     let world_max_x = map.world_width_px() - 0.01;
     let world_max_y = map.world_height_px() - 0.01;
     for id in entities.ids() {
@@ -252,8 +254,29 @@ fn apply_magic_anchor_pull(
                 .get(id)
                 .is_some_and(|e| crate::game::entity::active_trench_occupation(e).is_none())
         }) {
-            offset.0 += dx * config::VECTOR_FIELD_SPEED_PX_PER_TICK;
-            offset.1 += dy * config::VECTOR_FIELD_SPEED_PX_PER_TICK;
+            if let Some(e) = entities.get(id) {
+                let (spatial, wire_tiles) = field_context.get_or_insert_with(|| {
+                    (
+                        SpatialIndex::build(entities, map.width, map.height),
+                        barbed_wire::tiles(map, entities),
+                    )
+                });
+                let on_wire = wire_tiles
+                    .get(&map.tile_of(x, y))
+                    .is_some_and(|id| entities.get(*id).is_some_and(|wire| wire.hp > 0));
+                // Sample one tile along the push, independent of overlap strength.
+                let lookahead = config::TILE_SIZE as f32 / dx.det_hypot(dy).max(f32::EPSILON);
+                let field_speed =
+                    speed::movement_speed(map, entities, players, spatial, e, on_wire)
+                        * map.elevation_movement_multiplier_at(
+                            x,
+                            y,
+                            (dx * lookahead, dy * lookahead),
+                        )
+                        * config::VECTOR_FIELD_UNIT_SPEED_MULTIPLIER;
+                offset.0 += dx * field_speed;
+                offset.1 += dy * field_speed;
+            }
         }
         if offset.0 == 0.0 && offset.1 == 0.0 {
             continue;

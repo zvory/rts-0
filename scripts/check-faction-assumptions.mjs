@@ -502,6 +502,8 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/sim/src/game/services/movement/vehicle_route.rs",
   "server/crates/sim/src/game/services/movement/standability.rs",
   "server/crates/sim/src/game/services/movement/waypoints.rs",
+  // Existing upgrade and Command Car speed rules shared by travel and Vector Field push.
+  "server/crates/sim/src/game/services/movement/speed.rs",
   // Committed pivot recovery preserves the existing Tank stationary-range reset on movement;
   // route/body eligibility remains shared pivot-vehicle policy, not faction admission.
   "server/crates/sim/src/game/services/movement/pivot_recovery.rs",
