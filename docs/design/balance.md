@@ -580,7 +580,7 @@ profiles and explicit activation/autocast policy instead of being folded into de
   Leaving an occupied trench has no delay: movement orders release occupation immediately,
   and Machine Gunners skip weapon pack-up when leaving a trench, including Attack-order pursuit.
   Attacking a target in range preserves trench occupation and weapon deployment.
-  Active occupation grants +1 tile weapon range, reduces incoming direct damage by 50% after
+  Active occupation grants immunity to Vector Field displacement, +1 tile weapon range, reduces incoming direct damage by 50% after
   normal weapon/armor/facing calculations,
   reduces incoming area damage by 25% after existing falloff/armor rules. Entrenchment does not add a direct-shot
   miss chance. Tank cannon direct shots have no intrinsic infantry dodge chance. Anti-Tank Guns
@@ -963,7 +963,7 @@ Vitality Treasure costs **100 oil** and can coexist with all other distinct carr
 
 ### Vector Field
 
-Vector Field is a separate ability (`vectorField`) replacing Anchor for Magic Adepts and Magic Masters only. Ekat retains her original Magic Anchor and radial pull. The centered square is 4 by 4 tiles for Magic Adepts and 5 by 5 tiles for Magic Masters, oriented along the selected arrow, lasts ten seconds, and uses the existing 7.5-tile cast range. Successful placement starts a 30-second cooldown for Magic Adepts and a 20-second cooldown for Magic Masters. Promotion preserves a cooldown already in progress. Every ground unit in it, allied or enemy, receives an additive one-world-pixel-per-tick displacement along the arrow, independent of mass/footing. Overlapping fields sum their vectors without normalization; one opposing field halves an unupgraded Tank’s normal-ground speed (2 px/tick), and two cancel it. Inward/outward movement resistance and spiral forces are not applied by this ability. Terrain and hostile-body admission remain. Magic Dao death Insight is preserved for hostile unit deaths inside the rectangle.
+Vector Field is a separate ability (`vectorField`) replacing Anchor for Magic Adepts and Magic Masters only. Ekat retains her original Magic Anchor and radial pull. The centered square is 4 by 4 tiles for Magic Adepts and 5 by 5 tiles for Magic Masters, oriented along the selected arrow, lasts ten seconds, and uses the existing 7.5-tile cast range. Successful placement starts a 30-second cooldown for Magic Adepts and a 20-second cooldown for Magic Masters. Promotion preserves a cooldown already in progress. Every ground unit in it, allied or enemy, except actively entrenched infantry, receives an additive one-world-pixel-per-tick displacement along the arrow, independent of mass/footing. Overlapping fields sum their vectors without normalization; one opposing field halves an unupgraded Tank’s normal-ground speed (2 px/tick), and two cancel it. Inward/outward movement resistance and spiral forces are not applied by this ability. Terrain and hostile-body admission remain. Magic Dao death Insight is preserved for hostile unit deaths inside the rectangle.
 
 See [Vector Field](vector-field.md) for placement, rank geometry, force, and presentation rules.
 

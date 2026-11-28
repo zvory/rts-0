@@ -213,3 +213,50 @@ fn vector_field_stack_cannot_push_through_blocked_terrain() {
     apply_magic_anchor_pull(&map, &mut entities, &players, &occ, 1, &runtime);
     assert_eq!(pos(&entities, id), center);
 }
+
+#[test]
+fn vector_field_spares_active_trench_occupants_until_they_leave() {
+    let map = flat_map(2);
+    let center = map.tile_center(10, 10);
+    let players = [player_with_oil(1, 0), player_with_oil(2, 0)];
+    let mut runtime = field(center, [1.0, 0.0]);
+    add_field(&mut runtime, center, [1.0, 0.0], 2, 100);
+    for owner in [1, 2] {
+        for kind in [
+            EntityKind::Rifleman,
+            EntityKind::Panzerfaust,
+            EntityKind::MachineGunner,
+        ] {
+            let mut entities = EntityStore::new();
+            let id = entities
+                .spawn_unit(owner, kind, center.0, center.1)
+                .unwrap();
+            entities
+                .get_mut(id)
+                .unwrap()
+                .movement
+                .as_mut()
+                .unwrap()
+                .occupied_trench_id = Some(1);
+            let occ = Occupancy::build(&map, &entities);
+            apply_magic_anchor_pull(&map, &mut entities, &players, &occ, 1, &runtime);
+            assert_eq!(pos(&entities, id), center, "{kind:?} owner={owner}");
+            assert_eq!(entities.get(id).unwrap().movement_delta(), (0.0, 0.0));
+            assert_eq!(
+                crate::game::entity::active_trench_occupation(entities.get(id).unwrap()),
+                Some(1)
+            );
+
+            // Dig-in progress alone does not grant immunity after occupation ends.
+            let movement = entities.get_mut(id).unwrap().movement.as_mut().unwrap();
+            movement.occupied_trench_id = None;
+            movement.entrenchment_dig_ticks = config::ENTRENCHMENT_DIG_IN_TICKS - 1;
+            apply_magic_anchor_pull(&map, &mut entities, &players, &occ, 2, &runtime);
+            assert_eq!(
+                pos(&entities, id),
+                (center.0 + 2.0, center.1),
+                "{kind:?} owner={owner}"
+            );
+        }
+    }
+}
