@@ -356,7 +356,9 @@ percent of surviving assigned Tanks within two tiles of their posts and local HP
 strength at least ninety percent of the remembered enemy force. New overwhelming information can
 trigger withdrawal immediately; no fixed timer forces an unfavorable engagement. Confirmed area
 clearance or stale-memory expiry ends the bounded encounter after an unfinished withdrawal has
-regrouped; loss of the assigned force ends it immediately.
+regrouped; loss of the assigned force ends it immediately. After clearance, members with no
+physical route to the rally return to local control so disconnected terrain cannot hold the
+reachable group indefinitely. Hidden but remembered enemies do not permit this release.
 Infantry's independent local ninety-percent gate and other profiles' response policies remain.
 
 After claiming its territory goal, at 300 supply Eco permanently unlocks a staged offensive. Public geographic ranks, snapshotted

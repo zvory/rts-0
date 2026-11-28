@@ -785,3 +785,45 @@ fn simulator_executes_the_checked_withdrawal_around_a_wall_and_known_firing_area
     }
     panic!("native Tanks did not finish the queued safe withdrawal");
 }
+
+#[test]
+fn disconnected_tank_cannot_hold_a_cleared_encounter_forever() {
+    let (mut start, mut s) = fixture(0, 2, 4);
+    s.visible_tiles.fill(0);
+    for y in 0..start.map.height {
+        start
+            .map
+            .unwalkable_tiles
+            .push(rts_sim::protocol::MapTile { x: 30, y });
+    }
+    s.entities.iter_mut().find(|e| e.id == 101).unwrap().x = 10.5 * 32.;
+    let mut response = PressureResponse::with_cohesive_reserve();
+    let orders = run(&mut response, &start, &s);
+    let post = orders
+        .iter()
+        .filter_map(|r| match r {
+            AiActionRequest::Move { units, x, y, .. } if units.contains(&100) => Some((*x, *y)),
+            _ => None,
+        })
+        .last()
+        .unwrap();
+    // Losing sight alone must preserve ownership even for the disconnected member.
+    s.entities.retain(|e| e.owner == 1);
+    s.tick += 9;
+    run(&mut response, &start, &s);
+    assert_eq!(response.armor_encounter.as_ref().unwrap().members.len(), 2);
+    s.tick += MEMORY_TICKS;
+    run(&mut response, &start, &s);
+    assert!(
+        response.has_withdrawal(),
+        "reachable Tank still has to finish retreating"
+    );
+    assert!(!response.responders.contains(&101));
+    let tank = s.entities.iter_mut().find(|e| e.id == 100).unwrap();
+    tank.x = post.0;
+    tank.y = post.1;
+    s.tick += 9;
+    run(&mut response, &start, &s);
+    assert!(response.armor_encounter.is_none());
+    assert!(response.responders.is_empty());
+}

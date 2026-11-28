@@ -37,6 +37,27 @@ impl PressureResponse {
                 distance(enemy.position, encounter.anchor) <= 15. * frame.map().tile_size as f32
             })
             .collect::<Vec<_>>();
+        // Once the encounter is clear, physically disconnected Tanks belong to
+        // their local reserve again. They cannot reach this rally and must not
+        // indefinitely hold its reachable members. Fog alone is not clearance.
+        if nearby.is_empty() && encounter.withdrawing {
+            if let Some(center) = encounter.rally {
+                let q = WorldQueries::new(frame);
+                encounter.members.retain(|id| {
+                    let connected = frame.owned().iter().find(|e| e.id == *id).is_some_and(|e| {
+                        q.world_point(e.position.0, e.position.1)
+                            .zip(q.world_point(center.0, center.1))
+                            .and_then(|(a, b)| q.ground_route(a, b, EntityKind::Tank))
+                            .is_some()
+                    });
+                    if !connected {
+                        self.responders.remove(id);
+                        encounter.slots.remove(id);
+                    }
+                    connected
+                });
+            }
+        }
         let regrouped = encounter
             .members
             .iter()
