@@ -4,7 +4,7 @@ Phase 0 brief and Phase 1 rules specification are complete. The user explicitly 
 implementation and reasonable assumptions in the task request.
 
 - Engineer-built anti-infantry field obstacle, available after a completed Training Centre.
-- Costs 5 steel, no oil; each 1×1 tile segment takes 4 seconds (120 ticks).
+- Costs 4 steel, no oil; each 1×1 tile segment takes 3 seconds (90 ticks).
 - Any team's infantry (Engineer, Warrior, Rifleman, Panzerfaust, Machine Gunner, Ekat) and
   Golem and Mortar Team take 10 direct HP damage on entering a completed segment's tile and move at
   70% speed while their centre is on that tile. Includes the builder. Leaving and re-entering
@@ -24,5 +24,5 @@ implementation and reasonable assumptions in the task request.
   Ordinary fog and neutral-obstacle damage/death projection rules apply; no new events.
 - Uses the selected tangled-barrier PNG with neutral steel/wood colors. Dedicated audio remains
   deferred; standard construction audio is reused.
-- Player note: Engineers can build Barbed Wire after a Training Centre for 5 steel per tile in
-  4 seconds; it slows infantry and mortars by 30% and deals 10 damage on entry, including allies.
+- Player note: Engineers can build Barbed Wire after a Training Centre for 4 steel per tile in
+  3 seconds; it slows infantry and mortars by 30% and deals 10 damage on entry, including allies.

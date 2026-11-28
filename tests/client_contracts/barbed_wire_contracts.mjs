@@ -26,8 +26,8 @@ for (const end of [{ tileX: 5, tileY: 0 }, { tileX: 0, tileY: 5 }, { tileX: 4, t
 const blocked = buildTankTrapLineSites({ start: { tileX: 0, tileY: 0 }, end: { tileX: 4, tileY: 0 }, building: KIND.BARBED_WIRE, isValid: (x) => x !== 2 });
 assert.deepEqual(blocked.map((s) => s.valid), [true, true, false, false, false]);
 assert.equal(tankTrapBuildCommands([11], blocked, KIND.BARBED_WIRE).length, 2);
-assert.equal(STATS[KIND.BARBED_WIRE].cost.steel, 5);
-assert.equal(STATS[KIND.BARBED_WIRE].buildTicks, 120);
+assert.equal(STATS[KIND.BARBED_WIRE].cost.steel, 4);
+assert.equal(STATS[KIND.BARBED_WIRE].buildTicks, 90);
 assert.equal(STATS[KIND.BARBED_WIRE].requires, KIND.TRAINING_CENTRE);
 assert(WORKER_BUILDABLE.includes(KIND.BARBED_WIRE));
 assert(WORKER_BUILD_CARD_SLOTS.includes(KIND.BARBED_WIRE));
