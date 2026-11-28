@@ -29,6 +29,7 @@ for (const [label, strip, variant] of [
   assert(strip.frameHeight === runtime.frameHeight, `${label} frame height matches the manifest`);
   const expectedFrameCount = variant.frameCount ?? runtime.frameCount;
   assert(strip.frameCount === expectedFrameCount, `${label} frame count matches the manifest`);
+  assert(strip.sheetRows === runtime.sheetRows && JSON.stringify(strip.teamPaint) === JSON.stringify(runtime.teamPaint), `${label} shared layers match the production manifest`);
   assert(strip.idleFrame === runtime.idleFrame, `${label} idle frame matches the manifest`);
   assert(JSON.stringify(strip.movementFrames) === JSON.stringify(runtime.movementFrames), `${label} movement frames match the manifest`);
   assert(JSON.stringify(strip.firingFrames) === JSON.stringify(runtime.firingFrames), `${label} firing frames match the manifest`);
@@ -45,7 +46,7 @@ for (const [label, strip, variant] of [
   assert(repoPathFromClientAssetUrl(strip.image) === variant.runtimeStrip, `${label} runtime URL maps back to the checked-in strip`);
   const runtimeStripSize = readPngDimensions(variant.runtimeStrip);
   assert(runtimeStripSize.width === runtime.frameWidth * expectedFrameCount, `${label} runtime strip width matches frame geometry`);
-  assert(runtimeStripSize.height === runtime.frameHeight, `${label} runtime strip height matches frame geometry`);
+  assert(runtimeStripSize.height === runtime.frameHeight * runtime.sheetRows, `${label} runtime strip height matches frame geometry`);
 }
 
 assert(

@@ -1,0 +1,7 @@
+{
+  "generator": "built-in image_gen",
+  "transparent_background": true,
+  "reference": "source/mortar_team-v2.png",
+  "output": "source/mortar_team-v3.png",
+  "prompt": "Use case: precise-object-edit. Edit target: referenced mortar team-paint authoring component sheet. Change ONLY the OUTSIDE of the mortar barrel/tube to saturated shaded MAGENTA team paint, both in the assembled left-hand mortar and the separate tube on the right. This includes the full outer cylindrical tube and its outer muzzle rim. Keep the muzzle bore/interior black. Preserve all other magenta carriage/frame/baseplate areas unchanged. Keep axle, wheel hubs, mounting collars, hinge fittings and handles dark charcoal blackened steel; tires matte black rubber. NO white-painted parts, silver/chrome, copper, bronze, pale ivory or tan metal. Restrained neutral medium-dark steel highlights only on unpainted fittings. Preserve exact shapes, silhouettes, component positions, pose, proportions, layout, top-down game-art style, alpha edges and transparent background. No new objects, glow, shadow, text or background. User explicitly wants a team-colored mortar barrel."
+}

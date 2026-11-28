@@ -153,10 +153,14 @@ test('articulated minimap layers follow live facing and setup without loading ea
   assert.equal(loaded.length, 6, 'continuous aim uses cached components');
   const packed = liveUnitIconMarkupFor('anti_tank_gun', { minimapPart: 'packed-base' });
   const deployed = liveUnitIconMarkupFor('anti_tank_gun', { minimapPart: 'deployed-base' });
-  assert.match(packed, /data-unit-icon-component="sprite.at.leftTrail.deployed"/);
-  assert.match(packed, /data-unit-icon-component="sprite.at.rightTrail.deployed"/);
-  assert.match(deployed, /data-unit-icon-component="sprite.at.leftTrail.deployed"/);
-  assert.match(deployed, /data-unit-icon-component="sprite.at.rightTrail.deployed"/);
+  assert.match(packed, /data-unit-icon-component="sprite.at.leftTrail.deployed:fixed"/);
+  assert.match(packed, /data-unit-icon-component="sprite.at.rightTrail.deployed:fixed"/);
+  assert.match(deployed, /data-unit-icon-component="sprite.at.leftTrail.deployed:fixed"/);
+  assert.match(deployed, /data-unit-icon-component="sprite.at.rightTrail.deployed:fixed"/);
+  for (const markup of [packed, deployed]) {
+    assert.match(markup, /data-unit-icon-component="sprite.at.leftTrail.deployed:team-paint"/);
+    assert.match(markup, /data-unit-icon-component="sprite.at.rightTrail.deployed:team-paint"/);
+  }
   assert.equal(packed.match(/viewBox="[^"]*"/)[0], deployed.match(/viewBox="[^"]*"/)[0]);
   icons.destroy();
 });
@@ -219,7 +223,7 @@ test('minimap uses production setup frames and shot envelopes, with a bounded im
   assert.notDeepEqual(firing, resting, 'recoil moves the hull/turret and retracts the barrel');
   assert.equal(firing.find(layer => layer.part.includes('barrel')).rotation, 1.2);
   assert.equal(firing.find(layer => layer.part === 'sprite:sprite.commanderGun').rotation, -0.5);
-  assert.match(liveUnitIconMarkupFor('tank', { minimapPart: 'sprite:sprite.commanderGun' }), /scout-car-white-atlas/);
+  assert.match(liveUnitIconMarkupFor('tank', { minimapPart: 'sprite:sprite.commanderGun' }), /kriegsia-team-color\/generated\/tank-atlas/);
   const requested = [];
   const icons = new MinimapUnitIcons({ animation,
     createCanvas: () => ({ width: 0, height: 0, getContext: () => ({ drawImage() {}, fillRect() {} }) }),
@@ -266,14 +270,16 @@ test('all production atlas and strip minimap routes can sample each setup state'
 
 test('animated strip images retain full setup silhouettes and switch unloaded Panzerfaust art', () => {
   const markup = liveUnitIconMarkupFor('machine_gunner', { minimapPart: 'frame:11' });
-  assert.match(markup, /viewBox="1408 0 128 128"/,
+  assert.match(markup, /viewBox="1408 256 128 128"/,
     'deployed heads and barrels must not be clipped to the carry portrait bounds');
+  assert.match(markup, /viewBox="1408 384 128 128"/, 'paint uses the same full setup cell');
+  assert.match(markup, /feColorMatrix/, 'selective paint preserves setup silhouette alpha');
   const animation = createMinimapAnimation();
   const entity = { id: 1, kind: 'panzerfaust', panzerfaustLoaded: false };
   animation.beginFrame([entity], {}, 0);
   assert.equal(animation.layers(entity)[0].part, 'unloaded-frame:0');
   const unloaded = liveUnitIconMarkupFor('panzerfaust', { minimapPart: 'unloaded-frame:0' });
-  assert.match(unloaded, /rifleman-recoil-review-strip/);
+  assert.match(unloaded, /kriegsia-team-color\/generated\/rifleman-atlas/);
   entity.panzerfaustLoaded = true;
   animation.beginFrame([entity], {}, 0);
   assert.equal(animation.layers(entity)[0].part, 'frame:0');

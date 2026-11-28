@@ -10,8 +10,10 @@ function deepFreeze(value) {
 export const MACHINE_GUNNER_PNG_FRAME_STRIP = deepFreeze({
   enabled: true,
   unit: "machine_gunner",
-  image: "/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png?v=white-chroma-v1-rgba8",
-  imageVersion: "white-chroma-v1-rgba8",
+  image: "/assets/rigs/kriegsia-team-color/generated/machine_gunner-atlas.png?v=team-paint-1",
+  sheetRows: 4,
+  teamPaint: { baseRow: 2, paintRow: 3, renderRows: 1 },
+  imageVersion: "team-paint-1",
   frameWidth: 128,
   frameHeight: 128,
   frameCount: 15,
@@ -46,6 +48,6 @@ export const MACHINE_GUNNER_PNG_FRAME_STRIP = deepFreeze({
     deployAlpha: "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-white-deploy-alpha.png",
     fireSource: "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-white-fire-source.png",
     fireAlpha: "client/assets/rigs/machine-gunner-pass-01/generated/machine-gunner-white-fire-alpha.png",
-    runtimeStrip: "client/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png",
+    runtimeStrip: "client/assets/rigs/kriegsia-team-color/generated/machine_gunner-atlas.png",
   },
 });

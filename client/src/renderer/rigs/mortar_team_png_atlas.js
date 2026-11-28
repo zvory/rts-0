@@ -10,7 +10,6 @@ function deepFreeze(value) {
 }
 
 const PPU = 17.8;
-const TEAM_TINT_ADJUSTMENT = PRODUCTION_RASTER_COLOR_TARGET;
 
 const WHEEL_LEFT_NAMES = Object.freeze([
   "wheel.left.body",
@@ -129,7 +128,10 @@ const RIGHT_TIRE_FRAME = carriageCropFrame(568, 247, 87, 38);
 export const MORTAR_TEAM_PNG_RIG_ATLAS = deepFreeze({
   enabled: true,
   unit: "mortar_team",
-  image: "/assets/rigs/mortar-bulky-white/generated/mortar-bulky-white-atlas.png?v=bulky-white-20pct-v1",
+  image: "/assets/rigs/kriegsia-team-color/generated/mortar_team-atlas.png?v=team-paint-1",
+  runtimeColorAdjustment: PRODUCTION_RASTER_COLOR_TARGET,
+  sheetRows: 4,
+  teamPaint: { baseRow: 2, paintRow: 3, renderRows: 1 },
   iconVisibleBounds: {
     x: 24,
     y: 78,
@@ -142,7 +144,7 @@ export const MORTAR_TEAM_PNG_RIG_ATLAS = deepFreeze({
     height: 362,
     sourceSheet: "client/assets/rigs/mortar-bulky-white/generated/mortar-bulky-white-atlas.png",
     generatedSource: "client/assets/rigs/mortar-bulky-white/generated/mortar-bulky-white-source.png",
-    imageVersion: "bulky-white-20pct-v1",
+    imageVersion: "team-paint-1",
     cells: [
       "reference.assembled",
       "sprite.carriage",
@@ -162,7 +164,7 @@ export const MORTAR_TEAM_PNG_RIG_ATLAS = deepFreeze({
       mortarParts(CARRIAGE_NAMES, "packed"),
       20,
       CARRIAGE_FRAME,
-      { tintSlot: "team-light", tintAdjustment: TEAM_TINT_ADJUSTMENT }
+      { tintSlot: "fixed" }
     ),
     sprite(
       "sprite.mortar.tire.left.packed",
@@ -184,7 +186,7 @@ export const MORTAR_TEAM_PNG_RIG_ATLAS = deepFreeze({
       mortarParts(CARRIAGE_NAMES, "deployed"),
       21,
       CARRIAGE_FRAME,
-      { tintSlot: "team-light", tintAdjustment: TEAM_TINT_ADJUSTMENT }
+      { tintSlot: "fixed" }
     ),
     sprite(
       "sprite.mortar.tire.left.deployed",
@@ -206,7 +208,7 @@ export const MORTAR_TEAM_PNG_RIG_ATLAS = deepFreeze({
       mortarParts(TUBE_NAMES, "packed"),
       30,
       TUBE_FRAME,
-      { tintSlot: "team-light", tintAdjustment: TEAM_TINT_ADJUSTMENT }
+      { tintSlot: "fixed" }
     ),
     sprite(
       "sprite.mortar.tube.deployed",
@@ -214,7 +216,7 @@ export const MORTAR_TEAM_PNG_RIG_ATLAS = deepFreeze({
       mortarParts(TUBE_NAMES, "deployed"),
       31,
       TUBE_FRAME,
-      { tintSlot: "team-light", tintAdjustment: TEAM_TINT_ADJUSTMENT }
+      { tintSlot: "fixed" }
     ),
   ],
 });

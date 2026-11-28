@@ -1,3 +1,4 @@
+import { loadTeamPaintTexture } from "./team_paint.js";
 import { KIND } from "../../protocol.js";
 import { loadColorAdjustedTexture } from "./color_adjusted_texture.js";
 import { createWorkerSafeCanvas } from "../raster_primitives.js";
@@ -34,6 +35,12 @@ export function livePngRigAtlasFor(atlases, kind) {
 
 export async function loadPngRigAtlasTexture(pixi, atlas) {
   if (!pixi || !atlas?.image) return Promise.resolve(null);
+  if (atlas.teamPaint) {
+    return loadTeamPaintTexture(pixi, {
+      image: atlas.image, frameWidth: atlas.grid.width, frameHeight: atlas.grid.height,
+      frameCount: 1, sheetRows: atlas.sheetRows, teamPaint: atlas.teamPaint,
+    }, atlas.runtimeColorAdjustment);
+  }
   const base = await loadColorAdjustedTexture(pixi, {
     image: atlas.image,
     adjustment: atlas.runtimeColorAdjustment,

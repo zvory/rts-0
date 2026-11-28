@@ -721,9 +721,9 @@ test("tank PNG atlas route splits native shadow, unit, and muzzle flash metadata
       `${spriteId} keeps explicit raster-native world scaling`);
   }
   assert.equal(TANK_PNG_RIG_ATLAS.grid?.semanticPaintTintSlot, undefined);
-  assert.equal(TANK_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.hull")?.tintSlot, "team");
-  assert.equal(TANK_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.turret")?.tintSlot, "team-light");
-  assert.equal(TANK_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.barrel")?.tintSlot, "team");
+  assert.equal(TANK_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.hull")?.tintSlot, "fixed");
+  assert.equal(TANK_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.turret")?.tintSlot, "fixed");
+  assert.equal(TANK_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.barrel")?.tintSlot, "fixed");
   const turretSprite = TANK_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.turret");
   assert.equal(turretSprite?.originMode, "visible-center");
   assert.ok(Math.abs(turretSprite.frame.originX - turretSprite.frame.w * 0.5) < 0.001);
@@ -824,8 +824,8 @@ test("command car PNG atlas keeps its native shadow and Breakthrough aura", () =
 test("Rocket Truck portrait uses the live truck PNG instead of the legacy SVG", () => {
   const icon = liveUnitIconMarkupFor(KIND.ROCKET_LAUNCHER);
   assert.ok(icon.includes('data-unit-icon-source="png-atlas-composition"'));
-  assert.ok(icon.includes('/assets/rigs/rocket-truck-preview/truck.png'));
-  assert.ok(icon.includes('data-unit-icon-component="sprite.truck"'));
+  assert.ok(icon.includes('/assets/rigs/kriegsia-team-color/generated/rocket_launcher-atlas.png'));
+  assert.ok(icon.includes('data-unit-icon-component="sprite.truck:team-paint"'));
   assert.ok(!icon.includes('rocket-launcher.prototype'));
 });
 
@@ -978,9 +978,9 @@ test("anti-tank gun PNG atlas covers the unit route and keeps barrel recoil spli
   assert.equal(rightTrail.visible, true);
   assert.ok(Math.abs(carriage.x + 3.12) < 0.001);
   assert.ok(Math.abs(barrel.x + 26) < 0.001);
-  assert.notEqual(carriage.tint, 0xffffff);
-  assert.notEqual(barrel.tint, 0xffffff);
-  assert.notEqual(carriage.tint, barrel.tint);
+  assert.equal(carriage.tint, 0xffffff);
+  assert.equal(barrel.tint, 0xffffff);
+  assert.equal(carriage.tint, barrel.tint);
   assert.equal(Math.sign(leftTrail.scaleX), -1);
   assert.equal(Math.sign(leftTrail.scaleY), -1);
   assert.equal(Math.sign(rightTrail.scaleX), 1);
@@ -1013,7 +1013,7 @@ test("mortar PNG atlas renders carriage and tube without a base plate", () => {
   for (const sprite of [packedCarriageSprite, packedTubeSprite, packedLeftTireSprite, packedRightTireSprite]) assert.ok(sprite);
   assert.deepEqual(
     [packedCarriageSprite, packedTubeSprite, packedLeftTireSprite, packedRightTireSprite].map((sprite) => sprite.tintSlot),
-    ["team-light", "team-light", "fixed", "fixed"],
+    ["fixed", "fixed", "fixed", "fixed"],
   );
   assert.ok(packedCarriageSprite.sourceParts.includes("part.mortar.body.packed"));
   assert.ok(packedCarriageSprite.sourceParts.includes("part.mortar.wheel.left.body.packed"));
@@ -1057,8 +1057,8 @@ test("mortar PNG atlas renders carriage and tube without a base plate", () => {
     assert.equal(display.visible, true);
     assert.equal(display.alpha, 1);
   }
-  assert.notEqual(carriage.tint, 0xffffff);
-  assert.notEqual(tube.tint, 0xffffff);
+  assert.equal(carriage.tint, 0xffffff);
+  assert.equal(tube.tint, 0xffffff);
   assert.equal(leftTire.tint, 0xffffff);
   assert.equal(rightTire.tint, 0xffffff);
   for (const tire of [leftTire, rightTire]) assert.deepEqual([tire.scaleX, tire.scaleY], [carriage.scaleX, carriage.scaleY]);
@@ -1125,7 +1125,7 @@ test("rifleman PNG frame strip uses idle frame and movement cycle", () => {
   assert.equal(stripInstance.container.rotation, entity.weaponFacing);
   assert.equal(stripInstance.sprite.scaleX, strip.worldScale);
   assert.equal(stripInstance.sprite.x, 10);
-  assert.equal(stripInstance.sprite.tint, 0x6194c7);
+  assert.equal(stripInstance.sprite.tint, 0xffffff);
 
   renderNow = 1000 / strip.fps;
   entity.state = STATE.MOVE;
@@ -1211,17 +1211,8 @@ test("frame-strip color profile applies shared and per-strip targets only when n
   assert.deepEqual(frameStripRuntimeColorAdjustment({}), FRAME_STRIP_TARGET_COLOR_ADJUSTMENT);
 });
 
-test("tank PNG runtime color pass compensates its baked source to the production target", () => {
-  const metadata = JSON.parse(fs.readFileSync(tankPngMetadataPath, "utf8"));
-  const baked = {
-    brightness: metadata.pipelineOptions.brightness,
-    saturation: metadata.pipelineOptions.saturation,
-    hue: metadata.pipelineOptions.hue,
-  };
-  assert.deepEqual(
-    TANK_PNG_RIG_ATLAS.runtimeColorAdjustment,
-    relativeColorAdjustment(metadata.presentationColorTarget, baked),
-  );
+test("tank team-paint source uses the shared production presentation target", () => {
+  assert.deepEqual(TANK_PNG_RIG_ATLAS.runtimeColorAdjustment, PRODUCTION_RASTER_COLOR_TARGET);
 });
 
 test("relative color adjustment composes scale channels and hue rotation correctly", () => {
@@ -1270,6 +1261,8 @@ test("machine gunner PNG frame strip mirrors asset manifest runtime metadata", (
     "runtimeStrip",
     "setupForwardAngleRadians",
     "setupFrames",
+    "sheetRows",
+    "teamPaint",
     "stripImageUrl",
     "targetColorAdjustment",
     "tintSlot",
@@ -1283,6 +1276,8 @@ test("machine gunner PNG frame strip mirrors asset manifest runtime metadata", (
   assert.equal(strip.frameWidth, runtime.frameWidth);
   assert.equal(strip.frameHeight, runtime.frameHeight);
   assert.equal(strip.frameCount, runtime.frameCount);
+  assert.equal(strip.sheetRows, runtime.sheetRows);
+  assert.deepEqual(strip.teamPaint, runtime.teamPaint);
   assert.equal(strip.idleFrame, runtime.idleFrame);
   assert.deepEqual(strip.movementFrames, runtime.movementFrames);
   assert.deepEqual(strip.setupFrames, runtime.setupFrames);
@@ -1304,7 +1299,7 @@ test("machine gunner PNG frame strip mirrors asset manifest runtime metadata", (
 
   const runtimeStripSize = readPngDimensions(runtime.runtimeStrip);
   assert.equal(runtimeStripSize.width, runtime.frameWidth * runtime.frameCount);
-  assert.equal(runtimeStripSize.height, runtime.frameHeight);
+  assert.equal(runtimeStripSize.height, runtime.frameHeight * runtime.sheetRows);
 
   const fireSourceSize = readPngDimensions(manifest.sourceSheets.fireSource);
   const fireAlphaSize = readPngDimensions(manifest.sourceSheets.fireAlpha);

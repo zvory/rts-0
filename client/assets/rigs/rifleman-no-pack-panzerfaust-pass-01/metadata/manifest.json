@@ -31,15 +31,41 @@
   "comparison": {
     "runtimeScale": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/rifleman-comparison-runtime-color.png",
     "fourTimesPreview": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/rifleman-comparison-runtime-color-4x.png",
-    "order": ["production idle", "no backpack", "Panzerfaust on back"]
+    "order": [
+      "production idle",
+      "no backpack",
+      "Panzerfaust on back"
+    ]
   },
   "alignment": {
-    "canvas": {"width": 160, "height": 112},
-    "productionIdleOpaqueBounds": {"width": 133, "height": 59, "x": 19, "y": 26},
-    "noPackOpaqueBounds": {"width": 133, "height": 59, "x": 19, "y": 26},
-    "panzerfaustVariantOpaqueBounds": {"width": 143, "height": 94, "x": 1, "y": 5},
+    "canvas": {
+      "width": 160,
+      "height": 112
+    },
+    "productionIdleOpaqueBounds": {
+      "width": 133,
+      "height": 59,
+      "x": 19,
+      "y": 26
+    },
+    "noPackOpaqueBounds": {
+      "width": 133,
+      "height": 59,
+      "x": 19,
+      "y": 26
+    },
+    "panzerfaustVariantOpaqueBounds": {
+      "width": 143,
+      "height": 94,
+      "x": 1,
+      "y": 5
+    },
     "sharedTransform": "rotate source 90 degrees counterclockwise, resize full 887x1774 canvas to 222x105, composite at -39,+2 on 160x112",
-    "colorAdjustment": {"brightness": 170, "saturation": 118, "hue": 100}
+    "colorAdjustment": {
+      "brightness": 170,
+      "saturation": 118,
+      "hue": 100
+    }
   },
   "runtime": {
     "normalModule": "client/src/renderer/rigs/rifleman_png_strip.js",
@@ -48,7 +74,11 @@
     "frameHeight": 112,
     "frameCount": 5,
     "idleFrame": 0,
-    "movementFrames": [1, 2, 3],
+    "movementFrames": [
+      1,
+      2,
+      3
+    ],
     "firingFrames": [
       4
     ],
@@ -62,23 +92,41 @@
     "windupOriginForwardPx": 0,
     "firingRecoilPx": 4,
     "tintSlot": "team-light",
-    "bakedColorAdjustment": {"brightness": 100, "saturation": 100, "hue": 100},
-    "targetColorAdjustment": {"brightness": 90, "saturation": 90, "hue": 100},
+    "bakedColorAdjustment": {
+      "brightness": 100,
+      "saturation": 100,
+      "hue": 100
+    },
+    "targetColorAdjustment": {
+      "brightness": 90,
+      "saturation": 90,
+      "hue": 100
+    },
     "normal": {
-      "stripImageUrl": "/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-recoil-review-strip.png?v=recoil-review-1-rgba8",
-      "imageVersion": "recoil-review-1-rgba8",
-      "runtimeStrip": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-recoil-review-strip.png"
+      "stripImageUrl": "/assets/rigs/kriegsia-team-color/generated/rifleman-atlas.png?v=team-paint-1",
+      "imageVersion": "team-paint-1",
+      "runtimeStrip": "client/assets/rigs/kriegsia-team-color/generated/rifleman-atlas.png"
     },
     "panzerfaustLoaded": {
-      "stripImageUrl": "/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-panzerfaust-windup-runtime-strip.png?v=windup-a-scaled-60-rgba8",
-      "imageVersion": "windup-a-scaled-60-rgba8",
+      "stripImageUrl": "/assets/rigs/kriegsia-team-color/generated/panzerfaust-atlas.png?v=team-paint-1",
+      "imageVersion": "team-paint-1",
       "frameCount": 8,
-      "windupFrames": [5, 6, 7],
+      "windupFrames": [
+        5,
+        6,
+        7
+      ],
       "windupProgressField": "panzerfaustWindupProgress",
       "windupOriginForwardPx": 0,
       "windupSource": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-panzerfaust-windup-frames.png",
-      "runtimeStrip": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-panzerfaust-windup-runtime-strip.png",
+      "runtimeStrip": "client/assets/rigs/kriegsia-team-color/generated/panzerfaust-atlas.png",
       "routeKey": "rifleman.panzerfaustLoaded"
+    },
+    "sheetRows": 4,
+    "teamPaint": {
+      "baseRow": 2,
+      "paintRow": 3,
+      "renderRows": 1
     }
   },
   "notes": [
@@ -88,5 +136,10 @@
     "The composited eight-frame launcher strip is live only while panzerfaustLoaded is true; launch immediately returns the same entity to the normal strip.",
     "Both strips use the shared 90% runtime brightness and saturation target before team tinting.",
     "The loaded Panzerfaust runtime appends three scale-matched wind-up frames selected from Set A; the rifle is absent throughout the wind-up."
-  ]
+  ],
+  "originalRuntimeStrips": {
+    "normal": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-recoil-review-strip.png",
+    "panzerfaustLoaded": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-panzerfaust-windup-runtime-strip.png"
+  },
+  "teamColorPipeline": "scripts/art/kriegsia-team-color-pipeline.mjs"
 }

@@ -10,8 +10,10 @@ function deepFreeze(value) {
 export const RIFLEMAN_PNG_FRAME_STRIP = deepFreeze({
   enabled: true,
   unit: "rifleman",
-  image: "/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-recoil-review-strip.png?v=recoil-review-1-rgba8",
-  imageVersion: "recoil-review-1-rgba8",
+  image: "/assets/rigs/kriegsia-team-color/generated/rifleman-atlas.png?v=team-paint-1",
+  sheetRows: 4,
+  teamPaint: { baseRow: 2, paintRow: 3, renderRows: 1 },
+  imageVersion: "team-paint-1",
   frameWidth: 160,
   frameHeight: 112,
   frameCount: 5,
@@ -40,6 +42,6 @@ export const RIFLEMAN_PNG_FRAME_STRIP = deepFreeze({
   source: {
     generatedSource: "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/no-pack/idle-source.png",
     alphaSource: "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/no-pack/idle-alpha.png",
-    runtimeStrip: "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-recoil-review-strip.png",
+    runtimeStrip: "client/assets/rigs/kriegsia-team-color/generated/rifleman-atlas.png",
   },
 });

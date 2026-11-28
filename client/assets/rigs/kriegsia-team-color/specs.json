@@ -1,0 +1,101 @@
+[
+  {
+    "name": "rifleman",
+    "type": "strip",
+    "original": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-recoil-review-strip.png",
+    "author": "client/assets/rigs/kriegsia-team-color/source/rifleman-animation.png",
+    "idle": "client/assets/rigs/roster-team-color-review/generated/rifleman-author.png",
+    "width": 160,
+    "height": 112,
+    "count": 5,
+    "columns": 4,
+    "rows": 2
+  },
+  {
+    "name": "panzerfaust",
+    "type": "strip",
+    "original": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-panzerfaust-windup-runtime-strip.png",
+    "author": "client/assets/rigs/kriegsia-team-color/source/panzerfaust-animation.png",
+    "idle": "client/assets/rigs/roster-team-color-review/generated/panzerfaust-author.png",
+    "width": 160,
+    "height": 112,
+    "count": 8,
+    "columns": 4,
+    "rows": 2
+  },
+  {
+    "name": "machine_gunner",
+    "type": "strip",
+    "original": "client/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png",
+    "author": "client/assets/rigs/kriegsia-team-color/source/machine_gunner-animation.png",
+    "idle": "client/assets/rigs/roster-team-color-review/generated/machine_gunner-author.png",
+    "width": 128,
+    "height": 128,
+    "count": 15,
+    "columns": 4,
+    "rows": 4
+  },
+  {
+    "name": "scout_plane",
+    "type": "strip",
+    "original": "client/assets/rigs/scout-plane-fw189-pass-01/generated/scout-plane-fw189-pass-01-alpha.png",
+    "author": "client/assets/rigs/roster-team-color-review/generated/scout_plane-author.png",
+    "width": 942,
+    "height": 1163,
+    "count": 1
+  },
+  {
+    "name": "tank",
+    "type": "atlas",
+    "original": "client/assets/rigs/tank-ps1/tank-atlas.png",
+    "author": "client/assets/rigs/roster-team-color-review/generated/tank-author.png",
+    "width": 1145,
+    "height": 1373,
+    "count": 1
+  },
+  {
+    "name": "artillery",
+    "type": "atlas",
+    "original": "client/assets/rigs/artillery-a19-pass-03/generated/artillery-a19-components-pass-03-alpha.png",
+    "author": "client/assets/rigs/roster-team-color-review/generated/artillery-author.png",
+    "width": 1536,
+    "height": 1024,
+    "count": 1
+  },
+  {
+    "name": "anti_tank_gun",
+    "type": "atlas",
+    "original": "client/assets/rigs/anti-tank-gun-noshield-lowdetail/anti-tank-gun-noshield-lowdetail-white-v1-alpha.png",
+    "author": "client/assets/rigs/roster-team-color-review/generated/anti_tank_gun-author.png",
+    "width": 1254,
+    "height": 1254,
+    "count": 1
+  },
+  {
+    "name": "mortar_team",
+    "type": "atlas",
+    "original": "client/assets/rigs/mortar-bulky-white/generated/mortar-bulky-white-atlas.png",
+    "author": "client/assets/rigs/roster-team-color-review/generated/mortar_team-author.png",
+    "width": 1150,
+    "height": 362,
+    "count": 1
+  },
+  {
+    "name": "scout_car",
+    "type": "atlas",
+    "original": "client/assets/rigs/scout-car-white-pass-01/generated/scout-car-white-atlas.png",
+    "author": "client/assets/rigs/roster-team-color-review/generated/scout_car-author.png",
+    "width": 656,
+    "height": 504,
+    "count": 1
+  },
+  {
+    "name": "rocket_launcher",
+    "type": "atlas",
+    "original": "client/assets/rigs/rocket-truck-preview/truck.png",
+    "author": "client/assets/rigs/roster-team-color-review/generated/rocket_launcher-author.png",
+    "width": 1774,
+    "height": 887,
+    "count": 1
+  }
+]

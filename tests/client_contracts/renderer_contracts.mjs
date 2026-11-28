@@ -57,24 +57,24 @@ assert(
   const riflemanIcon = liveUnitIconMarkupFor(KIND.RIFLEMAN);
   assert(
     riflemanIcon.includes('data-unit-icon-source="frame-strip"') &&
-      riflemanIcon.includes("rifleman-recoil-review-strip.png") &&
+      riflemanIcon.includes("rifleman-atlas.png") &&
       riflemanIcon.includes('viewBox="16.725 25.575 137.55 59.85"') &&
       riflemanIcon.includes('width="137.55" height="59.85"') &&
       riflemanIcon.includes('preserveAspectRatio="xMidYMid meet"') &&
-      riflemanIcon.includes('flood-color="#0072b2"') &&
+      riflemanIcon.includes('<feColorMatrix') &&
       riflemanIcon.includes('style="overflow:hidden"') &&
       !riflemanIcon.includes("<img"),
     "unit icon resolver fits the live Rifleman PNG silhouette without exposing adjacent frames",
   );
   assert(
-    liveUnitIconMarkupFor(KIND.PANZERFAUST).includes('viewBox="0 3.7 154.725 96.6"') &&
+    liveUnitIconMarkupFor(KIND.PANZERFAUST).includes('viewBox="-1.725 3.7 156.45 96.6"') &&
       liveUnitIconMarkupFor(KIND.MACHINE_GUNNER).includes('viewBox="3.125 20.975 120.75 85.05"'),
     "unit icon resolver independently fits each production PNG silhouette",
   );
   assert(
     liveUnitIconMarkupFor(KIND.RIFLEMAN, { teamColor: "#d55e00" })
-      .includes('flood-color="#d55e00"'),
-    "unit icon resolver multiplies PNG detail by the selected owner's team color",
+      .includes('<feColorMatrix'),
+    "unit icon resolver selectively colors PNG paint layers for the selected owner",
   );
   assert(
     liveUnitIconMarkupFor(KIND.WORKER, { teamColor: "#d55e00" })
@@ -85,40 +85,38 @@ assert(
   );
   const scoutCarIcon = liveUnitIconMarkupFor(KIND.SCOUT_CAR, { teamColor: "#d55e00" });
   assert(
-    ["scout-car-white-atlas.png", 'viewBox="0 0 656 339"', 'flood-color="#d55e00"'].every((fragment) => scoutCarIcon.includes(fragment)),
-    "unit icon resolver applies the owning team tint to the white Scout Car frame",
+    ["scout_car-atlas.png", 'data-unit-icon-component="sprite.body:team-paint"', '<feColorMatrix'].every((fragment) => scoutCarIcon.includes(fragment)),
+    "unit icon resolver applies the owning team color to the Scout Car paint layer",
   );
   assert(
     liveUnitIconMarkupFor(KIND.SCOUT_PLANE)
-      .includes('viewBox="1.65 0 938.7 1163"'),
+      .includes('viewBox="1.65 -3.875 938.7 1170.75"'),
     "unit icon resolver fits the Scout Plane silhouette instead of center-cropping it",
   );
   const tankIcon = liveUnitIconMarkupFor(KIND.TANK);
-  assert(['data-unit-icon-source="png-atlas-reference"', "tank-tiger-i-pass-11-white-alpha.png",
-      'viewBox="41.025 108.9 531.975 298.2"', 'id="unit-icon-tint-0072b2"',
-      'filter="url(#unit-icon-tint-0072b2)"', 'in2="maskedTeamColor" mode="multiply"']
-      .every((fragment) => tankIcon.includes(fragment)) && !tankIcon.includes("brightenedTeamColor") &&
-      !tankIcon.includes("feComponentTransfer"),
-    "unit icon resolver fits and applies the standard team tint to the live Tank PNG reference");
+  assert(['data-unit-icon-source="png-atlas-composition"', "tank-atlas.png",
+      'data-unit-icon-component="sprite.hull:fixed"', 'data-unit-icon-component="sprite.turret:team-paint"',
+      '<feColorMatrix'].every(fragment => tankIcon.includes(fragment)) && !tankIcon.includes('mode="multiply"'),
+    "tank portraits compose the production fixed materials and alpha-preserving team paint");
   const artilleryIcon = liveUnitIconMarkupFor(KIND.ARTILLERY);
   const antiTankGunIcon = liveUnitIconMarkupFor(KIND.ANTI_TANK_GUN);
   assert(
     artilleryIcon.includes('data-unit-icon-source="png-atlas-composition"') &&
-      artilleryIcon.includes("artillery-a19-components-pass-03-alpha.png") &&
+      artilleryIcon.includes("artillery-atlas.png") &&
       artilleryIcon.includes(
-        'data-unit-icon-component="sprite.art.leftTrail.deployed" ' +
+        'data-unit-icon-component="sprite.art.leftTrail.deployed:fixed" ' +
           'transform="translate(-21.0573 -5.0533) rotate(30.9397)"',
       ) &&
-      artilleryIcon.includes('data-unit-icon-component="sprite.art.rightTrail.deployed"') &&
-      artilleryIcon.includes('data-unit-icon-component="sprite.art.barrelAssembly.deployed"') &&
+      artilleryIcon.includes('data-unit-icon-component="sprite.art.rightTrail.deployed:fixed"') &&
+      artilleryIcon.includes('data-unit-icon-component="sprite.art.barrelAssembly.deployed:fixed"') &&
       antiTankGunIcon.includes('data-unit-icon-source="png-atlas-composition"') &&
-      antiTankGunIcon.includes("anti-tank-gun-noshield-lowdetail-white-v1-alpha.png") &&
+      antiTankGunIcon.includes("anti_tank_gun-atlas.png") &&
       antiTankGunIcon.includes(
-        'data-unit-icon-component="sprite.at.leftTrail.deployed" ' +
+        'data-unit-icon-component="sprite.at.leftTrail.deployed:fixed" ' +
           'transform="translate(-28.9952 -10.1935) rotate(30)"',
       ) &&
-      antiTankGunIcon.includes('data-unit-icon-component="sprite.at.rightTrail.deployed"') &&
-      antiTankGunIcon.includes('data-unit-icon-component="sprite.at.barrelAssembly.deployed"'),
+      antiTankGunIcon.includes('data-unit-icon-component="sprite.at.rightTrail.deployed:fixed"') &&
+      antiTankGunIcon.includes('data-unit-icon-component="sprite.at.barrelAssembly.deployed:fixed"'),
     "support-weapon icons preserve deployed live PNG sprite offsets, pivots, and rotations",
   );
   const workerIcon = liveUnitIconMarkupFor(KIND.WORKER);

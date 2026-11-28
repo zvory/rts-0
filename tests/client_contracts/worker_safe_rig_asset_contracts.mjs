@@ -117,7 +117,8 @@ function restoreGlobals(saved) {
 {
   const scout = SCOUT_CAR_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.rearMachineGun");
   const tank = TANK_PNG_RIG_ATLAS.sprites.find((sprite) => sprite.id === "sprite.commanderGun");
-  assert(TANK_PNG_RIG_ATLAS.attachments[0].source === scout.frame, "tank reuses the exact Scout Car gun crop");
+  assert(!TANK_PNG_RIG_ATLAS.attachments, "fixed roof-gun pixels are packed by the reproducible team-color pipeline");
+  assert(tank.frame.w === scout.frame.w && tank.frame.h === scout.frame.h && tank.frame.y === 1373, "tank retains the exact Scout Car crop dimensions and anchor row");
   assert(Math.abs(scout.frame.pixelsPerUnitX / tank.frame.pixelsPerUnitX - 0.7) < 1e-12, "roof gun width is reduced by 30%");
   assert(Math.abs(scout.frame.pixelsPerUnitY / tank.frame.pixelsPerUnitY - 0.7) < 1e-12, "roof gun height is reduced by 30%");
 }

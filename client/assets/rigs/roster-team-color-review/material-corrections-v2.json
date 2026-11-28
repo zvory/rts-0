@@ -1,0 +1,16 @@
+{
+  "mortar_team": {
+    "prompt": "Use case: precise-object-edit. Edit target: the referenced mortar team team-paint authoring component sheet. Fix materials only. Preserve ALL existing saturated magenta painted regions exactly, all poses, component positions, outlines, silhouettes, proportions, gun/tube shapes and low-poly game-art style. Every unpainted metal surface must be BLACKENED STEEL / dark charcoal gunmetal, including axle, hubs, pivots, recoil cylinders, mounting collars, handles, entire gun tube and muzzle, and trail feet. NO white paint, NO white metal bodies, NO silver/chrome, NO copper, NO bronze, NO orange metal, NO pale ivory. Steel highlights are restrained medium-dark neutral gray only; keep shading legible. Tires remain matte black rubber. Magenta paint remains bright enough for mask extraction, with shaded edges. True transparent background, no glow or background shadow, no text, no new objects. Keep the exact original component layout for packing.",
+    "reference": "source/mortar_team.png",
+    "output": "source/mortar_team-v2.png",
+    "generator": "built-in image_gen",
+    "transparent_background": true
+  },
+  "anti_tank_gun": {
+    "prompt": "Use case: precise-object-edit. Edit target: the referenced anti tank gun team-paint authoring component sheet. Fix materials only. Preserve ALL existing saturated magenta painted regions exactly, all poses, component positions, outlines, silhouettes, proportions, gun/tube shapes and low-poly game-art style. Every unpainted metal surface must be BLACKENED STEEL / dark charcoal gunmetal, including axle, hubs, pivots, recoil cylinders, mounting collars, handles, entire gun tube and muzzle, and trail feet. NO white paint, NO white metal bodies, NO silver/chrome, NO copper, NO bronze, NO orange metal, NO pale ivory. Steel highlights are restrained medium-dark neutral gray only; keep shading legible. Tires remain matte black rubber. Magenta paint remains bright enough for mask extraction, with shaded edges. True transparent background, no glow or background shadow, no text, no new objects. Keep the exact original component layout for packing.",
+    "reference": "source/anti_tank_gun.png",
+    "output": "source/anti_tank_gun-v2.png",
+    "generator": "built-in image_gen",
+    "transparent_background": true
+  }
+}

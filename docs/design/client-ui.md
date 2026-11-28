@@ -457,6 +457,16 @@ Raster rig workflow:
   compose the same fixed/paint rows with an alpha-preserving tint matrix. Match teardown destroys
   every cached palette. `scripts/art/cultivator-team-color-pipeline.mjs` aligns authored poses and
   packs both additional layers while retaining original rows byte for byte.
+  Kriegsia Rifleman, Panzerfaust, Machine Gunner and Scout Plane strips, plus Tank,
+  Scout Car, Rocket Truck, Artillery, Anti-Tank Gun and Mortar component atlases use the same
+  fixed/paint contract. `teamPaint.renderRows=1` allocates only their composited character/component
+  row; the existing Cultivator default remains two rows for independent attack effects. Atlas
+  palette textures are cached by owner color just like strips and remain ordinary batched sprites.
+  HUD portraits and animated minimap parts split the same component frames into fixed and paint
+  layers while retaining sampled rig transforms. Mortar tubes receive paint; gunmetal, wood,
+  skin, tan equipment, tires and tracks stay fixed. The Tank roof gun is packed as fixed artwork
+  at its original attachment coordinates. `scripts/art/kriegsia-team-color-pipeline.mjs` reproducibly
+  packs all original frame counts, alpha silhouettes and fixed muzzle tips from retained sources.
   The body uses the same palette throughout every pose; Novice adds six intermediate body and effect
   frames, while Magic Adept/Master gather hand-centered energy instead of weapon swooshes.
   Novice firing poses use a calibrated `firingWorldScale` and firing-origin overrides so their

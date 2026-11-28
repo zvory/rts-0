@@ -136,7 +136,7 @@ const TEST_WORKER_OVERRIDES = Object.freeze([
     "composited Panzerfaust profile targets only units whose disposable launcher is still loaded",
   );
   assert(
-    strip.image.includes("/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-panzerfaust-windup-runtime-strip.png"),
+    strip.image.includes("/kriegsia-team-color/generated/panzerfaust-atlas.png"),
     "composited Panzerfaust profile uses the deterministic wind-up runtime strip",
   );
   assert(
@@ -175,7 +175,7 @@ const TEST_WORKER_OVERRIDES = Object.freeze([
   const strip = override.strip;
   assert(override.kind === KIND.SCOUT_PLANE, "Scout Plane Fw 189 profile targets Scout Plane units");
   assert(
-    strip.image.includes("/assets/rigs/scout-plane-fw189-pass-01/generated/scout-plane-fw189-pass-01-alpha.png"),
+    strip.image.includes("/assets/rigs/kriegsia-team-color/generated/scout_plane-atlas.png"),
     "Scout Plane Fw 189 profile uses the generated alpha strip asset",
   );
   assert(
@@ -189,7 +189,7 @@ const TEST_WORKER_OVERRIDES = Object.freeze([
     imageSize.width === strip.frameWidth * strip.frameCount,
     "Scout Plane Fw 189 strip PNG width matches runtime atlas geometry",
   );
-  assert(imageSize.height === strip.frameHeight, "Scout Plane Fw 189 strip PNG height matches runtime atlas geometry");
+  assert(imageSize.height === strip.frameHeight * strip.sheetRows, "Scout Plane Fw 189 strip PNG height matches runtime atlas geometry");
 }
 
 {
@@ -210,8 +210,8 @@ const TEST_WORKER_OVERRIDES = Object.freeze([
   ));
   assert(atlas?.enabled, "scout car PNG atlas is registered for live rendering");
   assert(
-    atlas.image.includes("/assets/rigs/scout-car-white-pass-01/generated/scout-car-white-atlas.png"),
-    "scout car PNG atlas uses the checked-in white-painted runtime-tint asset",
+    atlas.image.includes("/assets/rigs/kriegsia-team-color/generated/scout_car-atlas.png"),
+    "scout car PNG atlas uses the checked-in shared fixed-material and paint asset",
   );
   assert(
     !atlas.bakedColorAdjustment &&
@@ -219,10 +219,10 @@ const TEST_WORKER_OVERRIDES = Object.freeze([
       atlas.runtimeColorAdjustment?.brightness === 90 &&
       atlas.runtimeColorAdjustment?.saturation === 90 &&
       atlas.runtimeColorAdjustment?.hue === 100,
-    "scout car PNG atlas applies the shared runtime color target to its white source",
+    "scout car PNG atlas applies the shared runtime color target to its composited source",
   );
   assert(
-    atlas.image.includes(manifest.runtimeAtlas.replace(/^client/, "")) &&
+    atlas.teamPaint.baseRow === 2 && atlas.teamPaint.paintRow === 3 &&
       atlas.grid?.width === manifest.runtimeAtlasSize[0] &&
       atlas.grid?.height === manifest.runtimeAtlasSize[1] &&
       JSON.stringify(atlas.runtimeColorAdjustment) ===
@@ -232,10 +232,10 @@ const TEST_WORKER_OVERRIDES = Object.freeze([
   const bodySprite = atlas.sprites.find((sprite) => sprite.id === "sprite.body");
   const gunSprite = atlas.sprites.find((sprite) => sprite.id === "sprite.rearMachineGun");
   assert(
-    bodySprite?.tintSlot === "team-light" &&
+    bodySprite?.tintSlot === "fixed" &&
       !bodySprite.paletteFrames &&
       bodySprite.frame,
-    "scout car PNG body uses one white-painted frame with runtime team tint",
+    "scout car PNG body uses one cached selectively painted frame",
   );
   assert(
     gunSprite?.tintSlot === "fixed" &&
@@ -277,7 +277,7 @@ const TEST_WORKER_OVERRIDES = Object.freeze([
   const atlas = createLivePngRigAtlases().get(KIND.MORTAR_TEAM);
   assert(atlas?.enabled, "mortar PNG atlas is registered for live rendering");
   assert(
-    atlas.image.includes("/assets/rigs/mortar-bulky-white/generated/mortar-bulky-white-atlas.png"),
+    atlas.image.includes("/assets/rigs/kriegsia-team-color/generated/mortar_team-atlas.png"),
     "mortar PNG atlas uses the checked-in generated alpha asset",
   );
   const imageSize = readPngDimensions(atlas.image);
@@ -299,16 +299,12 @@ const TEST_WORKER_OVERRIDES = Object.freeze([
   const rightTireSprite = atlas.sprites.find((sprite) => sprite.id === "sprite.mortar.tire.right.packed");
   const basePlateSprite = atlas.sprites.find((sprite) => sprite.id === "sprite.mortar.basePlate.deployed");
   assert(
-    carriageSprite?.tintSlot === "team-light" &&
-      carriageSprite.tintAdjustment?.brightness === 90 &&
-      carriageSprite.tintAdjustment?.saturation === 90,
-    "mortar PNG carriage keeps the off-white frame team-tinted in lab render preview",
+    carriageSprite?.tintSlot === "fixed" && atlas.teamPaint?.renderRows === 1,
+    "mortar PNG carriage uses the selective palette texture",
   );
   assert(
-    tubeSprite?.tintSlot === "team-light" &&
-      tubeSprite.tintAdjustment?.brightness === 90 &&
-      tubeSprite.tintAdjustment?.saturation === 90,
-    "mortar PNG tube and barrel assembly are team-tinted in lab render preview",
+    tubeSprite?.tintSlot === "fixed" && atlas.teamPaint?.paintRow === 3,
+    "mortar PNG tube uses the selective palette texture",
   );
   assert(
     leftTireSprite?.tintSlot === "fixed" &&
