@@ -22,8 +22,15 @@ const browser = await puppeteer.launch({
 try {
   const page = await browser.newPage();
   const png = await page.evaluate(async (svg) => {
+    // Give the SVG a square viewport before rasterizing. Stretching its intrinsic
+    // rectangular image into a square canvas would distort the truck's proportions.
+    const svgDocument = new DOMParser().parseFromString(svg, "image/svg+xml");
+    const root = svgDocument.documentElement;
+    root.setAttribute("width", "192");
+    root.setAttribute("height", "192");
+    root.setAttribute("preserveAspectRatio", "xMidYMid meet");
     const image = new Image();
-    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(root))}`;
     await image.decode();
     const canvas = document.createElement("canvas");
     canvas.width = canvas.height = 192;
