@@ -6,6 +6,7 @@ export const ROCKET_TRUCK_PREVIEW_ATLAS = Object.freeze({
   unit: "rocket_launcher",
   image: "/assets/rigs/rocket-truck-preview/truck.png",
   viewBox: { x: -36, y: -28, width: 72, height: 56 },
+  iconComposition: { sprites: ["sprite.truck"] },
   grid: { layout: "semantic", width: 1774, height: 887 },
   sprites: [{
     id: "sprite.truck",

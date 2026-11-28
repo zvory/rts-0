@@ -80,3 +80,14 @@ Write `{{` … `}}` instead of a number and it stays correct after every update:
 ## How it works
 
 `server/crates/wiki` reads the compiled `rts-rules` definitions and the simulation's research table, and indexes where each constant is set and used while the server compiles. New units, abilities and constants appear automatically. Names and tooltips come from the game client (`client/src/config/rules_mirror.js`).
+
+## Current roster
+
+The player wiki filters archived and playtest-hidden content in
+`server/crates/wiki/src/visibility.rs` before building pages, tables, navigation and search.
+Update that presentation policy when content returns to play. Raw rules snapshots, historical
+changelog entries and the full constants reference remain available; hidden entries have no
+current entity page. Notes for hidden entries can stay in the repository for reuse.
+
+The Rocket Truck icon can also be refreshed from the current client portrait with
+`node scripts/update-wiki-rocket-icon.mjs`; it replaces only that entry in `icons.json`.

@@ -52,10 +52,9 @@ Before armor.
 |---|---|---|
 | Tank shell (splash) | {{TANK_HE_SPLASH_DAMAGE}} | {{TANK_HE_RADIUS_TILES}} tiles |
 | Mortar shell | {{MORTAR_INNER_DAMAGE}} at impact, falling to {{MORTAR_OUTER_DAMAGE}} at the edge | {{MORTAR_OUTER_RADIUS_TILES}} tiles |
-| Artillery shell | {{ARTILLERY_INNER_DAMAGE}} within {{ARTILLERY_INNER_RADIUS_TILES|2}} tiles, then falling evenly to {{ARTILLERY_OUTER_MIN_DAMAGE}} at the edge | {{ARTILLERY_OUTER_RADIUS_TILES}} tiles |
 | Rocket (each of {{ROCKET_BARRAGE_ROCKETS}}) | {{ROCKET_BARRAGE_DIRECT_DAMAGE}} direct hit / {{ROCKET_BARRAGE_INNER_DAMAGE}} / {{ROCKET_BARRAGE_OUTER_DAMAGE}} | {{ROCKET_BARRAGE_AP_RADIUS_TILES}} / {{ROCKET_BARRAGE_INNER_RADIUS_TILES}} / {{ROCKET_BARRAGE_OUTER_RADIUS_TILES}} tiles |
 
-Mortar, artillery and rocket damage counts as area damage (see entrenchment below).
+Mortar and rocket damage counts as area damage (see entrenchment below).
 
 ## Other modifiers
 

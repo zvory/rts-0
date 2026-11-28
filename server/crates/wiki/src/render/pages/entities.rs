@@ -15,13 +15,7 @@ pub(super) fn index(w: &Wiki) {
         .unwrap_or_default();
     let _ = write!(
         h,
-        "<section class=\"banner\"><div class=\"prose\">{intro}</div><div class=\"chips\"><span>{} factions</span><span>{} units</span><span>{} buildings</span><span>{} research</span><span>{} abilities</span><span>{} balance constants</span></div><p class=\"muted\">Game version <a href=\"{}/commit/{}\"><code>{}</code></a>{}: the build this server is running.</p></section>",
-        w.list("factions").len(),
-        w.list("units").iter().filter(|u| playable(w, &s(u, "id"))).count(),
-        w.list("buildings").iter().filter(|u| playable(w, &s(u, "id"))).count(),
-        w.list("upgrades").iter().filter(|r| !w.factions_of("research", &s(r, "id")).is_empty()).count(),
-        w.list("abilities").iter().filter(|a| !arr(a, "factions").is_empty()).count(),
-        w.list("constants").len(),
+        "<section class=\"banner\"><div class=\"prose\">{intro}</div><p class=\"muted\">Game version <a href=\"{}/commit/{}\"><code>{}</code></a>{}.</p></section>",
         esc(&s(g, "repo")),
         esc(&s(g, "commit")),
         esc(&s(g, "short")),

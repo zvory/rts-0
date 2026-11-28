@@ -38,7 +38,6 @@ A new {{building:resource_depot}} costs {{building:resource_depot.steel}} steel 
 |---|---|---|
 | {{faction:kriegsia}} | {{faction:kriegsia.loadout.steel}} | {{faction:kriegsia.loadout.oil}} |
 | {{faction:cultivators}} | {{faction:cultivators.loadout.steel}} | {{faction:cultivators.loadout.oil}} |
-| {{faction:ekat}} | {{faction:ekat.loadout.steel}} | {{faction:ekat.loadout.oil}} |
 
 ## Supply
 

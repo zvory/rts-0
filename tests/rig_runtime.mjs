@@ -821,6 +821,14 @@ test("command car PNG atlas keeps its native shadow and Breakthrough aura", () =
   }
 });
 
+test("Rocket Truck portrait uses the live truck PNG instead of the legacy SVG", () => {
+  const icon = liveUnitIconMarkupFor(KIND.ROCKET_LAUNCHER);
+  assert.ok(icon.includes('data-unit-icon-source="png-atlas-composition"'));
+  assert.ok(icon.includes('/assets/rigs/rocket-truck-preview/truck.png'));
+  assert.ok(icon.includes('data-unit-icon-component="sprite.truck"'));
+  assert.ok(!icon.includes('rocket-launcher.prototype'));
+});
+
 test("command car PNG icon preserves fixed details while tinting the team paint", () => {
   const icon = liveUnitIconMarkupFor(KIND.COMMAND_CAR, { teamColor: "#d55e00" });
 

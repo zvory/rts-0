@@ -1073,6 +1073,9 @@ pub(super) fn dedupe<'a>(changes: impl Iterator<Item = &'a Change>) -> Vec<&'a C
 }
 
 pub(super) fn entity_ref(w: &Wiki, c: &Change) -> String {
+    if c.kind != "constant" && w.entity(c.kind, &c.id).is_none() {
+        return esc(&c.name);
+    }
     match c.kind {
         "constant" => format!(
             "<a href=\"constants.html#c-{0}\"><code>{0}</code></a>",
