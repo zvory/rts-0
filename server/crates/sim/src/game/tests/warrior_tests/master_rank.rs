@@ -137,7 +137,15 @@ fn dao_master_combat_threshold_and_damage_apply_to_combat_paths() {
         );
         game.state.entities.get_mut(id).unwrap().set_attack_cd(0);
         game.tick();
-        assert_eq!(game.state.entities.get(id).unwrap().attack_cd(), cooldown);
+        {
+            let actual = game.state.entities.get(id).unwrap().attack_cd();
+            let base: u32 = cooldown;
+            assert!(
+                (base.saturating_sub(1)..=base.saturating_add(2)).contains(&actual),
+                "reload {actual} outside jitter range around {base}"
+            );
+        };
+        let actual_reload = game.state.entities.get(id).unwrap().attack_cd();
         // At 55 px, magic's 100 ms release plus 650 px/s flight takes six ticks.
         // Insight and damage must resolve on impact, while reload starts at launch.
         let flight_ticks = if ability == AbilityKind::EvolveMagic {
@@ -164,7 +172,7 @@ fn dao_master_combat_threshold_and_damage_apply_to_combat_paths() {
         assert_eq!(game.state.entities.get(id).unwrap().insight, 0);
         assert_eq!(
             game.state.entities.get(id).unwrap().attack_cd(),
-            cooldown - flight_ticks
+            actual_reload - flight_ticks
         );
         let enemy = game
             .snapshot_for(2)

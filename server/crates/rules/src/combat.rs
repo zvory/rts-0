@@ -13,6 +13,9 @@ use serde::{Deserialize, Serialize};
 
 pub use crate::target::{damage_after_target_type_modifier, InfantryTargetPolicy};
 
+mod reload;
+pub use reload::randomized_attack_reload;
+
 mod armor;
 pub use armor::{
     damage_after_armor_reduction, effective_damage_for_armor_penetration,

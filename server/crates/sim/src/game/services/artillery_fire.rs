@@ -86,7 +86,16 @@ pub(in crate::game) fn try_fire_artillery(
             return false;
         };
         let shot_number = entity.increment_artillery_blanket_shots_fired();
-        entity.set_attack_cd(initial_attack_cd);
+        // Compensate for the later cooldown tick only after randomizing the true reload.
+        let reload = crate::rules::combat::randomized_attack_reload(
+            entity.kind,
+            unit,
+            WeaponKind::ArtilleryGun.stable_id(),
+            tick,
+            entity.shop_item_reload(config::ARTILLERY_RELOAD_TICKS),
+        )
+        .saturating_add(u32::from(cooldown_tick_pending));
+        entity.set_attack_cd(reload);
         let fire_radius_tiles = match ability {
             AbilityKind::PointFire => min_fire_radius_tiles,
             AbilityKind::BlanketFire => radius_tiles.clamp(

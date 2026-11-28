@@ -72,10 +72,14 @@ fn direct_and_ray_weapons_share_reveal_attribution_alert_and_reload_effects() {
         assert!(reveals.iter().all(|source| source.entity_id() == attacker
             && source.is_active_at(204)
             && !source.is_active_at(205)));
-        assert_eq!(
-            entities.get(attacker).unwrap().weapon_cooldown(weapon.id),
-            weapon.cooldown
-        );
+        {
+            let actual = entities.get(attacker).unwrap().weapon_cooldown(weapon.id);
+            let base: u32 = weapon.cooldown;
+            assert!(
+                (base.saturating_sub(1)..=base.saturating_add(2)).contains(&actual),
+                "reload {actual} outside jitter range around {base}"
+            );
+        };
         let remaining_hp = victim.hp;
         let counts: Vec<_> = events
             .iter()
@@ -186,10 +190,8 @@ fn magic_orbs_land_after_release_and_distance_based_flight_for_both_ranks() {
                         .count(),
                     1
                 );
-                assert_eq!(
-                    entities.get(attacker).unwrap().weapon_cooldown(weapon.id),
-                    profile.cooldown
-                );
+                assert!((profile.cooldown - 1..=profile.cooldown + 2)
+                    .contains(&entities.get(attacker).unwrap().weapon_cooldown(weapon.id)));
                 assert!(events[&2]
                     .iter()
                     .all(|event| !matches!(event, Event::Notice { .. })));
