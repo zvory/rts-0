@@ -729,7 +729,7 @@ withFakeHudDocument(({ FakeElement }) => {
     state: labState,
     controlPolicy: labViewerPolicy,
   }));
-  assert(labViewerCard.kind === "spectator", "read-only lab viewers keep the command card hidden");
+  assert(labViewerCard.readOnly && labViewerCard.slots.filter(Boolean).every((slot) => !slot.intent && !slot.hotkey), "read-only lab viewers inspect without command bindings");
   const mixedLabSelection = [
     { id: 15, owner: 1, kind: KIND.RIFLEMAN },
     { id: 16, owner: 2, kind: KIND.RIFLEMAN },

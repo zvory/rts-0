@@ -2284,10 +2284,16 @@ all their buildings, or lost their primary base. The score table
 includes a Team column, highlights every row matching `winnerTeamId`, and falls back to `winnerId`
 for singleton FFA compatibility.
 For spectator starts without command-surface permission, `match.js` keeps the selected-unit panel
-visible for passive inspection while hiding the command card and give-up action. Click selects a
+visible with a read-only command card while hiding the give-up action. Click selects a
 unit or building, drag selects multiple units, and Shift adds to or removes from the selection.
 Single-entity details include units killed and current production or research progress. Read-only
-Lab viewers share this inspection panel. The client computes local fog from the server-filtered
+Lab viewers share this inspection panel. Passive cards use the first selected real owner's faction,
+resources, and completed upgrades from the projected `playerResources` row; mixed-owner selections
+only contribute that owner's entities to the card. Ability cooldowns and autocast indicators and
+production auto-build indicators remain visible. Completed research stays on building cards with
+a check mark and appears as player research in single-entity details. Passive cards expose no
+command intents, secondary actions, hotkeys, or targeting previews; HUD dispatch also rejects
+commands without command-surface permission. Live spectators and replay viewers use the same path. The client computes local fog from the server-filtered
 union snapshot and keeps the ordinary renderer/minimap/HUD pointed at snapshots with
 `playerResources`. Lab operators also retain a real command card through
 `LabControlPolicy.canUseCommandSurface(state)` while prediction stays disabled and issue-as
