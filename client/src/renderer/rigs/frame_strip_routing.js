@@ -1,3 +1,4 @@
+import { loadTeamPaintTexture } from "./team_paint.js";
 import { KIND } from "../../protocol.js";
 import { loadColorAdjustedTexture } from "./color_adjusted_texture.js";
 import { loadWorkerSafeTexture } from "../raster_primitives.js";
@@ -55,6 +56,7 @@ export function liveFrameStripFor(strips, kind) {
 export function loadFrameStripTexture(pixi, strip) {
   if (!pixi || !strip?.image) return Promise.resolve(null);
   const adjustment = frameStripRuntimeColorAdjustment(strip);
+  if (strip.teamPaint) return loadTeamPaintTexture(pixi, strip, adjustment);
   const frameWidth = positiveDimension(strip.frameWidth, 1);
   const frameHeight = positiveDimension(strip.frameHeight, 1);
   const frameCount = Math.max(1, Math.trunc(positiveDimension(strip.frameCount, 1)));

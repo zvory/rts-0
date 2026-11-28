@@ -110,14 +110,14 @@ try {
     for (const teamColor of [0x0072b2, 0xd55e00]) {
       const rig = draw({ teamColor, recoilProgress: 0 });
       const teamTint = rig.sprite.tint;
-      assert.notEqual(teamTint, 0xffffff);
+      assert.equal(teamTint, 0xffffff, "team-paint palettes preserve fixed materials without a whole-body multiply");
       assert.equal(rig.trailSprite.visible, false);
       for (let i = 0; i < strip.attackTrail.frameCount; i++) {
         const context = { teamColor, recoilProgress: .8, recoilPhase: (i + .1) / strip.attackTrail.frameCount * (strip.firingFrameHoldPhase || 1),
           recoilWeaponKind: strip.firingWeaponKinds[0] };
         assert.equal(goldenAttackTrailFrame(strip, context), i);
         draw(context);
-        assert.equal(rig.sprite.tint, teamTint, 'team tint remains active in every attack phase');
+        assert.equal(rig.sprite.tint, teamTint, 'fixed-material palette stays unmultiplied in every attack phase');
         assert.equal(rig.trailSprite.tint, 0xffffff, 'gold texture is independent of team tint');
         assert.equal(rig.trailSprite.visible, true);
         assert.equal(rig.trailSprite.texture, rig.trailTextures[i]);
