@@ -267,6 +267,9 @@ ordinary all-owned-base planning has no per-base minimum. `plan_expansion_reserv
 cut and garrison scoring reserve the structure plus a one-tile Engineer access ring and defender
 body radius. Changed reservations invalidate cached placements; all sector/global slots remain
 consistent. Unsupported space stays unallocated rather than duplicating a surviving post.
+`plan_claim` uses the same combined owned/prospective geometry and reservations, while allowing
+known hostile occupation of the prospective site for a deliberate territorial assault. It does
+not legalize occupied construction footprints or relax the ordinary expansion helper's checks.
 
 Staffing combines uniquely attributed remaining-Steel/production value with decreasing urgency
 as enemy ground approach time increases. Each 100 remaining Steel contributes one economic value
