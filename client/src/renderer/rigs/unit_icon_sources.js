@@ -31,6 +31,24 @@ export function liveUnitIconMarkupFor(kind, { teamColor = "#0072b2", minimapPart
   if (strip) {
     const frameIndex = minimapPart?.includes("frame:") ? Number(minimapPart.split(":").at(-1)) : (strip.idleFrame || 0);
     const frameX = strip.frameWidth * frameIndex;
+    if (strip.teamPaint) {
+      return composedRasterIconMarkup({
+        source: "frame-strip",
+        image: strip.image,
+        sheetWidth: strip.frameWidth * strip.frameCount,
+        sheetHeight: strip.frameHeight * strip.sheetRows,
+        fixedBounds: minimapPart?.includes("frame:")
+          ? { x: 0, y: 0, w: strip.frameWidth, h: strip.frameHeight }
+          : strip.iconVisibleBounds || { x: 0, y: 0, w: strip.frameWidth, h: strip.frameHeight },
+        teamTint: true,
+        preserveTintAlpha: true,
+        teamColor: tintColor,
+        components: [
+          { id: "fixed", frame: { x: frameX, y: strip.teamPaint.baseRow * strip.frameHeight, w: strip.frameWidth, h: strip.frameHeight, pixelsPerUnit: 1 } },
+          { id: "team-paint", frame: { x: frameX, y: strip.teamPaint.paintRow * strip.frameHeight, w: strip.frameWidth, h: strip.frameHeight, pixelsPerUnit: 1 }, teamTint: true },
+        ],
+      });
+    }
     return rasterIconMarkup({
       source: "frame-strip",
       image: strip.image,
@@ -433,6 +451,7 @@ function rasterIconMarkup({
   visibleFrame = null,
   teamTint = false,
   teamColor = "#0072b2",
+  preserveTintAlpha = false,
 }) {
   const safeSheetWidth = positiveDimension(sheetWidth);
   const safeSheetHeight = positiveDimension(sheetHeight);
@@ -485,6 +504,7 @@ function composedRasterIconMarkup({
   fixedBounds = null,
   teamTint = false,
   teamColor = "#0072b2",
+  preserveTintAlpha = false,
 }) {
   const safeSheetWidth = positiveDimension(sheetWidth);
   const safeSheetHeight = positiveDimension(sheetHeight);
@@ -504,8 +524,11 @@ function composedRasterIconMarkup({
     h: bounds.h + padY * 2,
   };
   const tintColor = normalizeTeamColor(teamColor);
-  const tintId = `unit-icon-tint-${tintColor.slice(1).toLowerCase()}`;
-  const tintFilter = teamTint
+  const tintId = `unit-icon-${preserveTintAlpha ? "paint" : "tint"}-${tintColor.slice(1).toLowerCase()}`;
+  const tintChannels = [1, 3, 5].map(index => parseInt(tintColor.slice(index, index + 2), 16) / 255);
+  const tintFilter = teamTint && preserveTintAlpha
+    ? `<defs><filter id="${tintId}" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="${tintChannels[0]} 0 0 0 0 0 ${tintChannels[1]} 0 0 0 0 0 ${tintChannels[2]} 0 0 0 0 0 1 0" /></filter></defs>`
+    : teamTint
     ? `<defs><filter id="${tintId}" color-interpolation-filters="sRGB">` +
         `<feFlood flood-color="${tintColor}" result="teamColor" />` +
         `<feComposite in="teamColor" in2="SourceGraphic" operator="in" result="maskedTeamColor" />` +

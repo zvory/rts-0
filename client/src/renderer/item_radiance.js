@@ -65,7 +65,7 @@ export function updateItemRadiance(instance, entity, now) {
   if (instance.itemGlow) instance.itemGlow.visible = count >= 2;
   if (count >= 2) {
     if (!instance.itemGlow) {
-      instance.itemGlow = new PIXI.Sprite(instance.sprite.texture);
+      instance.itemGlow = new PIXI.Sprite(instance.itemGlowTexture ?? instance.sprite.texture);
       instance.itemGlow.anchor.set(0.5);
       instance.itemGlow.tint = 0xffc34f;
       instance.itemGlow.blendMode = "add";
@@ -74,7 +74,7 @@ export function updateItemRadiance(instance, entity, now) {
       instance.container.addChildAt(instance.itemGlow, 0);
     }
     const glow = instance.itemGlow;
-    glow.texture = instance.sprite.texture;
+    glow.texture = instance.itemGlowTexture ?? instance.sprite.texture;
     glow.position.copyFrom(instance.sprite.position);
     glow.scale.copyFrom(instance.sprite.scale);
     instance.itemGlowBlur.strength = tier <= 2 ? 3 * bloom : 3 + 3 * (tier - 2);

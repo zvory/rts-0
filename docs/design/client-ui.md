@@ -446,8 +446,17 @@ Raster rig workflow:
   part ids, recoil, facing, shadows, effects, and route splits; frame strips may declare a base
   facing offset plus a firing-frame override when authored locomotion and attack poses use different
   forward axes. Cultivator combat strips retain the original character row and carry
-  image-generated golden attack-effect cells in a second row (`attackTrail`). The body keeps
-  its normal team tint through every attack pose; Novice adds six intermediate body and effect
+  image-generated golden attack-effect cells in a second row (`attackTrail`). Their four-row
+  team-color atlases add fixed-material and shaded paint layers (`teamPaint.baseRow=2`,
+  `teamPaint.paintRow=3`, `sheetRows=4`) for every idle, movement and firing cell.
+  `team_paint.js` composites those shared source layers into match-owned palette textures, cached
+  by player color; ordinary batchable sprites then preserve skin, black hair, weapon metal,
+  source alpha, fog/shot-reveal alpha and sunlight without a whole-body multiply. Neutral original
+  cells still supply item bloom, and gold effects are unchanged. HUD and animated minimap icons
+  compose the same fixed/paint rows with an alpha-preserving tint matrix. Match teardown destroys
+  every cached palette. `scripts/art/cultivator-team-color-pipeline.mjs` aligns authored poses and
+  packs both additional layers while retaining original rows byte for byte.
+  The body uses the same palette throughout every pose; Novice adds six intermediate body and effect
   frames, while Magic Adept/Master gather hand-centered energy instead of weapon swooshes.
   Novice firing poses use a calibrated `firingWorldScale` and firing-origin overrides so their
   head size and world anchor match idle; the minimap applies the same scale correction.

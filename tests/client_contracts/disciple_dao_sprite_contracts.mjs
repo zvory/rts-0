@@ -55,7 +55,7 @@ for (const [dao, strip, weaponKind] of [
   assert.equal(liveFrameStripFor(strips, liveFrameStripKeyForEntity(entity)), strip);
   const png = PNG.sync.read(fs.readFileSync(new URL(`../../${strip.source.runtimeStrip}`, import.meta.url)));
   assert.equal(png.width, strip.frameWidth * strip.frameCount);
-  assert.equal(png.height, strip.frameHeight * (strip.attackTrail ? 2 : 1));
+  assert.equal(png.height, strip.frameHeight * (strip.sheetRows || (strip.attackTrail ? 2 : 1)));
   const context = { now: 600, frameStripMoving: true };
   const gait = frameStripFrameIndex(strip, entity, context);
   assert.ok(strip.movementFrames.includes(gait));
@@ -133,7 +133,7 @@ for (const [dao, master, adept] of [["wind", WIND_MASTER_PNG_FRAME_STRIP, WIND_P
   assert.equal(entityBodyRadius(unit), entityBodyRadius({ ...unit, daoMaster: false }) * 1.2);
   const png = PNG.sync.read(fs.readFileSync(new URL(`../../${master.source.runtimeStrip}`, import.meta.url)));
   assert.equal(png.width, 8 * master.frameWidth);
-  assert.equal(png.height, master.frameHeight * (master.attackTrail ? 2 : 1));
+  assert.equal(png.height, master.frameHeight * (master.sheetRows || (master.attackTrail ? 2 : 1)));
   for (let frame = 0; frame < 8; frame++) {
     let opaque = 0;
     for (let y = 0; y < master.frameHeight; y++) for (let x = 0; x < master.frameWidth; x++) {

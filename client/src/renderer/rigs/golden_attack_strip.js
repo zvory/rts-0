@@ -8,17 +8,20 @@ const GOLDEN_IMAGES = Object.freeze({
   "magic-master-runtime-strip.png": "/assets/rigs/cultivator-golden/generated/magic-master-runtime-strip.png",
 });
 
-// The first row remains the original team-tinted character atlas. The second row
-// contains generated, independently colored attack effects in its first cells.
+// Original body and untinted gold effects occupy rows 0/1. Fixed-color and
+// shaded team-paint layers occupy rows 2/3; both are shared by every player color.
 export function withGoldenAttackTrail(strip) {
   const basename = strip.image.split('/').at(-1).split('?')[0];
-  const image = GOLDEN_IMAGES[basename];
+  const originalImage = GOLDEN_IMAGES[basename];
+  const image = originalImage?.replace("cultivator-golden/generated", "cultivator-team-color/generated");
   if (!image) throw new Error(`Unknown Cultivator attack strip: ${basename}`);
   const revised = /^(warrior|magic|magic-master)-runtime-strip\.png$/.test(basename);
   const revision = revised ? "gold-2" : "gold-1";
   return Object.freeze({
     ...strip,
-    image: `${image}?v=${revision}`,
+    image: `${image}?v=${revision}-team-1`,
+    sheetRows: 4,
+    teamPaint: Object.freeze({ baseRow: 2, paintRow: 3 }),
     imageVersion: `${strip.imageVersion.replace(/-gold-\d+$/, "")}-${revision}`,
     attackTrail: Object.freeze({ row: 1, frameCount: basename === "warrior-runtime-strip.png" ? 6 : 4,
       ...(/^magic/.test(basename) ? {
@@ -33,7 +36,7 @@ export function withGoldenAttackTrail(strip) {
       } : {}),
     }),
     source: Object.freeze({ ...strip.source,
-      generator: 'scripts/art/cultivator-golden-pipeline.mjs', runtimeStrip: `client${image}` }),
+      generator: 'scripts/art/cultivator-team-color-pipeline.mjs', runtimeStrip: `client${image}` }),
   });
 }
 
