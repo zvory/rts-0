@@ -42,7 +42,7 @@ Focused checks and the owned PR record the final verification and merge outcome.
 
 ## Targeted goods
 
-Completed Shops sell Regen for **50 oil** and Escape Treasure for **100 oil**.
+Completed Shops sell Regen for **35 oil** and Escape Treasure for **70 oil**.
 Select a completed Shop, click an item, then click a living friendly unit (including allied units).
 Alternatively, select one or more Novices, Adepts or Masters and press **R** to open the
 **Buy menu** without changing selection (Serfs have no Buy menu). Each item click/key buys
@@ -94,7 +94,7 @@ authored fields, healing, rendering and checkpoint behavior remain available for
 
 ### Carried attack and defense goods
 
-Shops also deliver Haste (**100 oil**, Z), Double Damage (**150 oil**, X), and Armor Treasure (**100 oil**, S) to visible friendly units at any distance, using the same delivery speed and lifetime as Escape Treasure. Attack and defense describe item roles only. A delivery reserves its distinct item type immediately, preventing duplicate purchases. Invalid purchases spend nothing.
+Shops also deliver Haste (**70 oil**, Z), Double Damage (**105 oil**, X), and Armor Treasure (**70 oil**, S) to visible friendly units at any distance, using the same delivery speed and lifetime as Escape Treasure. Attack and defense describe item roles only. A delivery reserves its distinct item type immediately, preventing duplicate purchases. Invalid purchases spend nothing.
 
 Attack items are permanent passives applied immediately on delivery, with no activation, consumption, or expiry. Haste increases movement speed by **15%**, increases primary weapon attack speed by **25%** (reload divided by 1.25, rounded upward to a whole tick, minimum one tick), and permits attacks while moving; Double Damage doubles primary weapon damage before normal mitigation. Double Damage also affects primary tank splash and manual mortar/artillery shells; launched shells retain the bonus through impact. Haste also reduces manual mortar and artillery reload. Automatic direct primary fire may bypass deployment while carrying Haste; ordinary weapon targeting restrictions and indirect-fire deployment rules still apply. Neither affects spells, rockets, disposable panzerfaust shots, or secondary weapons. Armor Treasure is a permanent passive item: delivery adds **50 percentage points of armor** to native armor and War Dao armor, capped at **100% before armor penetration**. A War Adept/Master with 50% armor reaches 100%; an unarmored recipient reaches 50%. Weapon penetration applies once to the combined armor; fully piercing attacks bypass it. Existing minimum-damage floors still apply. Terrain, entrenchment and Shield remain separate defenses. Armor-bypassing magic and raw environmental damage bypass this item as they bypass ordinary armor; the item no longer halves final HP damage. It is never activated or consumed. Within the rank slot limit, permanent passive effects can coexist; identical copies do not stack. Escape occupies one slot alongside the passive items.
 
@@ -102,7 +102,7 @@ Carried passive items use existing entity ability-use state; the owner and privi
 
 ### Vitality Treasure
 
-Vitality Treasure is a **100 oil** defense item, purchased from a completed Shop with **D** and can coexist with Armor Treasure. It uses the same visible friendly-unit targeting, unlimited purchase range, delivery, same-item reservation, and non-stacking rules. Delivery immediately grants **+150 maximum HP and +150 current HP permanently**, preserving any pre-existing missing HP. It remains carried and passive, with no activation, consumption, or expiry. For example, 30/58 HP becomes 180/208 HP. Dao evolution and Master advancement retain the flat 150 bonus without multiplying it. Carried passive state, including the health pair, survives checkpoints. Destroying the supplying Shop after delivery does not remove Armor or Vitality.
+Vitality Treasure is a **70 oil** defense item, purchased from a completed Shop with **D** and can coexist with Armor Treasure. It uses the same visible friendly-unit targeting, unlimited purchase range, delivery, same-item reservation, and non-stacking rules. Delivery immediately grants **+150 maximum HP and +150 current HP permanently**, preserving any pre-existing missing HP. It remains carried and passive, with no activation, consumption, or expiry. For example, 30/58 HP becomes 180/208 HP. Dao evolution and Master advancement retain the flat 150 bonus without multiplying it. Carried passive state, including the health pair, survives checkpoints. Destroying the supplying Shop after delivery does not remove Armor or Vitality.
 
 Both Shop and Buy menu cards attach a small tab to the existing left edge of each row, without extending the panel: **Util** (Escape Q, 2X XP W), **Defense**
 (Regen A, Armor S, Vitality D; F empty), **Offense** (Haste Z, Double Damage X). Buy menu Return occupies V.
@@ -116,10 +116,10 @@ Rejected duplicate purchases send the purchasing player an info Notice:
 
 ### 2X XP
 
-The Shop sells a permanent utility item with glyph **2X**, subtitle **2X XP**, hotkey **W**, and cost **50 oil** (no steel). After delivery it doubles all Insight gain, including combat, fractional building damage, War-versus-Tank bonuses, and Magic Vector Field death rewards. It uses one carried slot, does not stack, survives supplying-Shop destruction after delivery, and follows existing delivery, reservation, visibility, checkpoint, and rank-cap rules. Multiplication applies to new rewards before fractional carry and the existing Insight caps.
+The Shop sells a permanent utility item with glyph **2X**, subtitle **2X XP**, hotkey **W**, and cost **35 oil** (no steel). After delivery it doubles all Insight gain, including combat, fractional building damage, War-versus-Tank bonuses, and Magic Vector Field death rewards. It uses one carried slot, does not stack, survives supplying-Shop destruction after delivery, and follows existing delivery, reservation, visibility, checkpoint, and rank-cap rules. Multiplication applies to new rewards before fractional carry and the existing Insight caps.
 ### Breakthrough utility item
 
-The Shop sells **Breakthrough** in utility slot **E** for **100 oil**. It is a permanent carried
+The Shop sells **Breakthrough** in utility slot **E** for **70 oil**. It is a permanent carried
 passive delivered through the same targeted goods and Buy menu pipeline. It uses one slot,
 reserves capacity in flight, rejects duplicates, survives source-Shop destruction after arrival,
 and contributes one public radiance tier. Its carrier and friendly units whose centers are within

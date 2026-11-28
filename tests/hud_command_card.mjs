@@ -1110,7 +1110,7 @@ for (const researched of [false, true]) {
   assert.equal(idle.slots[2].hotkey, "E");
   assert.deepEqual(items.map((item) => item.ability), [ABILITY.ESCAPE_TREASURE, ABILITY.DOUBLE_XP, ABILITY.BREAKTHROUGH_TREASURE, ABILITY.REGEN, ABILITY.ARMOR_TREASURE, ABILITY.VITALITY_TREASURE, ABILITY.HASTE, ABILITY.DOUBLE_DAMAGE]);
   assert.deepEqual(items.map((item) => item.intent.targetMode), Array(8).fill("friendlyUnit"));
-  assert.deepEqual(items.map((item) => item.cost.oil), [100, 50, 100, 50, 100, 100, 100, 150]);
+  assert.deepEqual(items.map((item) => item.cost.oil), [70, 35, 70, 35, 70, 70, 70, 105]);
   assert(!items.some((item) => item.ability === ABILITY.HEALING_SEAL));
   assert.deepEqual(idle.rowLabels, ["Util", "Defense", "Offense"]);
 }
@@ -1242,7 +1242,7 @@ for (const factionId of ["cultivators", "kriegsia", "ekat"]) {
   assert.equal(menu.slots[11].hotkey, "V");
   assert.equal(menu.slots[1].ability, ABILITY.DOUBLE_XP);
   assert.equal(menu.slots[1].label, "2X XP");
-  assert.equal(menu.slots[1].cost.oil, 50);
+  assert.equal(menu.slots[1].cost.oil, 35);
   assert.equal(menu.slots[4].ability, ABILITY.ARMOR_TREASURE);
   assert.equal(menu.slots[4].hotkey, "S");
   assert.equal(menu.slots[4].label, "+50% armor");
