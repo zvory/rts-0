@@ -17,4 +17,5 @@ point at the authoritative unit position; no visual rotation or locomotion bob i
 
 Run `node scripts/capture-rifleman-directional-prototype.mjs` in a clean worktree for a real
 in-game WebM of one circuit of normal queued move orders. The script owns a temporary Interact
-Lab session and shuts it down after capture. It never composites sprites over a screenshot.
+Lab session and closes it after capture, refusing to reuse an active session. It never composites
+sprites over a screenshot.

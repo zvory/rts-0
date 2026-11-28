@@ -7,11 +7,18 @@ const command = async (namespace, name, input = {}) => {
   return response.result;
 };
 let capture;
+let sessionId;
+// Interact open reuses an existing Lab session, regardless of launch options.
+// Refuse that case before making scene changes or taking cleanup ownership.
+const status = await command("lab", "status");
+if (status.opening || status.closing || status.sessions.length > 0) {
+  throw new Error("Directional capture requires an idle Interact workspace; close the active session first.");
+}
 try {
-  const { sessionId } = await command("lab", "open", {
+  ({ sessionId } = await command("lab", "open", {
     visualProfile: "rifleman-directional-prototype",
     viewport: { width: 1000, height: 700, deviceScaleFactor: 1 },
-  });
+  }));
   await command("lab", "catalog", { sessionId, categories: ["players", "units", "buildings"] });
   await command("lab", "time", { sessionId, control: { action: "pause" } });
   await command("lab", "spawn", { sessionId, spawns: [
@@ -50,7 +57,7 @@ try {
     sessionId, refs: ["directionalWalker"],
   }) }));
 } finally {
-  await command("lab", "shutdown");
+  if (sessionId) await command("lab", "close", { sessionId });
 }
 const video = await command("media", "export", {
   artifactId: capture.artifactId, format: "webm", preset: "quality",
