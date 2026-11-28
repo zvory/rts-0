@@ -222,7 +222,6 @@ fn individual_tank_retreats_keep_separate_two_tile_destinations() {
 }
 
 #[test]
-#[ignore = "Known defect: independent fallback searches can assign the same Tank retreat post"]
 fn blocked_tank_retreat_post_does_not_overlap_another_tanks_fallback() {
     assert_separate_tank_retreat_destinations(true);
 }

@@ -178,6 +178,23 @@ impl PressureResponse {
             .collect();
         let columns = (armor.len() as f32).det_sqrt().ceil().max(1.) as usize;
         let queries = std::cell::LazyCell::new(|| WorldQueries::new(frame));
+        // Placement reservations only: each unit still decides independently whether
+        // to fight. Preserve valid old destinations before any fallback search runs.
+        let mut retreat_posts: BTreeMap<u32, Point> = BTreeMap::new();
+        for unit in defenders.iter().filter(|e| e.kind == EntityKind::Tank) {
+            if self.fighting.get(&unit.id) != Some(&false) {
+                continue;
+            }
+            if let Some((_, point)) = self.issued.get(&unit.id) {
+                if retreat_posts
+                    .values()
+                    .all(|p| distance(*p, *point) >= 2. * size - 0.01)
+                    && retreat_route(frame, &queries, unit, *point, &visible).is_some()
+                {
+                    retreat_posts.insert(unit.id, *point);
+                }
+            }
+        }
         for unit in &defenders {
             let contact = self
                 .contacts
@@ -235,8 +252,7 @@ impl PressureResponse {
                         && visible
                             .iter()
                             .all(|e| distance(*p, e.position) >= weapon_reach(frame, e) + 2. * size)
-                        && (unit.kind != EntityKind::Tank
-                            || retreat_route(frame, &queries, unit, *p, &visible).is_some())
+                        && (unit.kind != EntityKind::Tank || retreat_posts.get(&unit.id) == Some(p))
                 })
                 .map(|(_, p)| *p);
             let destination = if ready {
@@ -252,10 +268,21 @@ impl PressureResponse {
                         )
                     })
                     .unwrap_or((0., 0.));
-                cached.or_else(|| staging_point(frame, unit, target, rear, &visible, slot))
+                let occupied = if unit.kind == EntityKind::Tank {
+                    retreat_posts
+                        .iter()
+                        .filter(|(id, _)| **id != unit.id)
+                        .map(|(_, p)| *p)
+                        .collect::<Vec<_>>()
+                } else {
+                    Vec::new()
+                };
+                cached
+                    .or_else(|| staging_point(frame, unit, target, rear, &visible, slot, &occupied))
             };
             let changed_mode = self.fighting.get(&unit.id) != Some(&ready);
             let Some(point) = destination else {
+                retreat_posts.remove(&unit.id);
                 if changed_mode || self.issued.remove(&unit.id).is_some() {
                     if let Ok(group) = UnitGroup::new([unit.id]) {
                         let _ = actions.hold_position(&group, false);
@@ -264,6 +291,13 @@ impl PressureResponse {
                 self.fighting.insert(unit.id, ready);
                 continue;
             };
+            if unit.kind == EntityKind::Tank {
+                if ready {
+                    retreat_posts.remove(&unit.id);
+                } else {
+                    retreat_posts.insert(unit.id, point);
+                }
+            }
             let unsafe_goal = !ready
                 && self.issued.get(&unit.id).is_some_and(|(_, p)| {
                     visible
@@ -344,6 +378,7 @@ fn staging_point(
     rear: Point,
     enemies: &[&AiEntity],
     slot: Point,
+    reserved: &[Point],
 ) -> Option<Point> {
     let size = frame.map().tile_size as f32;
     let clearance = |p: Point| {
@@ -381,7 +416,11 @@ fn staging_point(
                 target.0 + away.0 * r - away.1 * side * size,
                 target.1 + away.1 * r + away.0 * side * size,
             );
-            if clearance(p) < 0. {
+            if clearance(p) < 0.
+                || reserved
+                    .iter()
+                    .any(|other| distance(*other, p) < 2. * size - 0.01)
+            {
                 continue;
             }
             let Some(to) = q.world_point(p.0, p.1) else {

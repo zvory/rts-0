@@ -349,7 +349,8 @@ plane releases coverage immediately rather than waiting for its nominal lifetime
 Eco uses the earlier visible-enemy local combat assessment, with HP-adjusted value and the
 existing ninety-percent local parity gate. Individual Tank retreat posts stay fixed while safe;
 current-visible route checks retain queued corners so the simulator follows the checked retreat
-instead of replanning an endpoint-only move. No group waits for members to gather at these posts.
+instead of replanning an endpoint-only move. Current-step placement reservations keep independent retreat destinations two tiles apart,
+including fallback positions around new obstacles. No group waits for members to gather at these posts.
 It does not retain a remembered enemy formation or
 an armor encounter, require ninety-percent group regrouping, or hold tanks after an incident
 clears while waiting for a shared rally. Tanks are recruited at two per observed enemy Tank;
