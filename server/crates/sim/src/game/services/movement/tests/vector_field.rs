@@ -77,6 +77,38 @@ fn vector_field_push_scales_with_each_body_and_also_moves_allies() {
 }
 
 #[test]
+fn vector_field_slope_follows_push_direction_independent_of_stack_strength() {
+    let mut map = flat_map(2);
+    // An eastward ramp; sampling only the field's unit vector misses either slope.
+    map.elevation = (0..map.height)
+        .flat_map(|_| (0..map.width).map(|x| x as u8))
+        .collect();
+    let center = map.tile_center(10, 10);
+    let players = [player_with_oil(1, 0), player_with_oil(2, 0)];
+    for (direction, slope) in [([1.0, 0.0], 0.8), ([-1.0, 0.0], 1.3), ([0.0, 1.0], 1.0)] {
+        for count in [1, 2] {
+            let mut runtime = AbilityRuntime::new();
+            for _ in 0..count {
+                add_field(&mut runtime, center, direction, 1, 100);
+            }
+            let mut entities = EntityStore::new();
+            let id = entities
+                .spawn_unit(1, EntityKind::Rifleman, center.0, center.1)
+                .unwrap();
+            let occ = Occupancy::build(&map, &entities);
+            apply_magic_anchor_pull(&map, &mut entities, &players, &occ, 1, &runtime);
+            let unit = entities.get(id).unwrap();
+            let push = config::unit_stats(EntityKind::Rifleman).unwrap().speed
+                * 0.5
+                * slope
+                * count as f32;
+            assert!((unit.pos_x() - center.0 - direction[0] * push).abs() < 0.02);
+            assert!((unit.pos_y() - center.1 - direction[1] * push).abs() < 0.02);
+        }
+    }
+}
+
+#[test]
 fn vector_field_is_distinct_from_ekat_anchor_for_both_magic_ranks() {
     use crate::rules::faction::{ability_definition, catalog_for, CULTIVATORS_FACTION_ID};
     let catalog = catalog_for(CULTIVATORS_FACTION_ID).unwrap();

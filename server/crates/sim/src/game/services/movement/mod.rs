@@ -264,9 +264,15 @@ fn apply_magic_anchor_pull(
                 let on_wire = wire_tiles
                     .get(&map.tile_of(x, y))
                     .is_some_and(|id| entities.get(*id).is_some_and(|wire| wire.hp > 0));
+                // Sample one tile along the push, independent of overlap strength.
+                let lookahead = config::TILE_SIZE as f32 / dx.det_hypot(dy).max(f32::EPSILON);
                 let field_speed =
                     speed::movement_speed(map, entities, players, spatial, e, on_wire)
-                        * map.elevation_movement_multiplier_at(x, y, (-dx, -dy))
+                        * map.elevation_movement_multiplier_at(
+                            x,
+                            y,
+                            (dx * lookahead, dy * lookahead),
+                        )
                         * config::VECTOR_FIELD_UNIT_SPEED_MULTIPLIER;
                 offset.0 += dx * field_speed;
                 offset.1 += dy * field_speed;
