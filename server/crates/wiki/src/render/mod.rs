@@ -8,11 +8,12 @@ pub(crate) mod pages;
 mod util;
 
 pub use content::Doc;
-use diff::Change;
+pub(crate) use diff::Change;
 use serde_json::Value;
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
-use util::{arr, esc, get, s, title_case, upper_snake, Units};
+pub(crate) use util::upper_snake;
+use util::{arr, esc, get, s, title_case, Units};
 
 pub struct Wiki {
     /// generated pages: file name → HTML
@@ -37,12 +38,11 @@ pub struct Wiki {
 
 /// Build every page. `history` is docs/wiki/history.json, `icons` docs/wiki/icons.json.
 pub fn render(
-    mut cur: Value,
+    cur: Value,
     content: BTreeMap<String, Doc>,
     icons: Option<&str>,
     history: Option<&str>,
 ) -> BTreeMap<String, String> {
-    super::visibility::filter_current(&mut cur);
     let u = Units {
         tick_hz: util::n(get(&cur, "timing"), "tickHz").unwrap_or(30.0),
         tile: util::n(get(&cur, "timing"), "tileSize").unwrap_or(32.0),
@@ -79,6 +79,11 @@ pub fn render(
         icons: icons.map(load_icons).unwrap_or_default(),
         verification: get(&history, "verification").clone(),
     };
+    // Hide archived and playtest-only content. A constant is hidden with the page it would have
+    // on the unfiltered rules, so that assignment runs first.
+    let unfiltered_owner = wiki.assign_constants();
+    let hidden = super::visibility::filter_current(&mut wiki.cur, &unfiltered_owner);
+    wiki.diffs = hidden.filter_history(std::mem::take(&mut wiki.diffs));
     wiki.const_owner = wiki.assign_constants();
     pages::render_all(&wiki);
     wiki.pages.into_inner()
@@ -184,7 +189,7 @@ impl Wiki {
                 .get(id)
                 .map(|d| pages::doc_title(id, d))
                 .unwrap_or_else(|| title_case(id)),
-            "weapon" => weapon_name(id),
+            "weapon" => self.weapon_label(id),
             "ability" => self
                 .ability(id)
                 .map(|a| s(a, "label"))
@@ -410,12 +415,21 @@ impl Wiki {
                     let inside = own_id
                         && p.len() >= 5
                         && (name.contains(&format!("_{p}_")) || name.ends_with(&format!("_{p}")));
-                    // score: longer match wins; a match at the start beats one inside
-                    (at_start || inside)
-                        .then(|| (p.len() * 2 + usize::from(at_start), *prio, *kind, id))
+                    // score: longer match wins; a match at the start beats one inside; on a tie
+                    // the entity whose own id it is beats one whose display name only spells it
+                    // (the Command Car's `breakthrough` over the Shop item called "Breakthrough")
+                    (at_start || inside).then(|| {
+                        (
+                            p.len() * 2 + usize::from(at_start),
+                            own_id,
+                            *prio,
+                            *kind,
+                            id,
+                        )
+                    })
                 })
-                .max_by(|a, b| a.0.cmp(&b.0).then(b.1.cmp(&a.1)));
-            if let Some((_, _, kind, id)) = best {
+                .max_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)).then(b.2.cmp(&a.2)));
+            if let Some((_, _, _, kind, id)) = best {
                 owner.insert(name, (kind, id.clone()));
             }
         }
@@ -603,9 +617,44 @@ impl Wiki {
     }
 }
 
+/// A weapon's display name. Profile ids keep old unit names (`warrior_sword`, `worker_tools`), so
+/// the common ones get plain names; anything new is spelled out from its id.
 pub fn weapon_name(id: &str) -> String {
-    let t = title_case(id);
-    t.replace(" Mg", " MG").replace("Anti Tank", "Anti-Tank")
+    let (base, unit) = id.split_once('@').unwrap_or((id, ""));
+    let name = match base {
+        "worker_tools" => "Tools".to_string(),
+        "warrior_sword" => "Sword".to_string(),
+        "disciple_orb" => "Orb".to_string(),
+        "disciple_arrow" => "Bow".to_string(),
+        "rifleman_rifle" => "Rifle".to_string(),
+        "machine_gunner_mg" => "Machine Gun".to_string(),
+        "mortar_team_mortar" => "Mortar".to_string(),
+        "tank_coax" => "Coaxial MG".to_string(),
+        "panzerfaust_loaded_shot" => "Panzerfaust Rocket".to_string(),
+        _ => title_case(base)
+            .replace(" Mg", " MG")
+            .replace("Anti Tank", "Anti-Tank"),
+    };
+    if unit.is_empty() {
+        name
+    } else {
+        format!("{name} ({})", title_case(unit))
+    }
+}
+
+impl Wiki {
+    /// A weapon's display name; a unit's own version of a shared weapon names that unit:
+    /// "Sword (War Adept)".
+    pub fn weapon_label(&self, id: &str) -> String {
+        match self.weapon(id) {
+            Some(wv) if !s(wv, "variantOf").is_empty() => format!(
+                "{} ({})",
+                weapon_name(&s(wv, "base")),
+                self.name_of(&s(wv, "variantOf"))
+            ),
+            _ => weapon_name(id),
+        }
+    }
 }
 
 /// All `*.md` notes under docs/wiki/content.

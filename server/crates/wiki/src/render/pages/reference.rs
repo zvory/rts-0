@@ -34,16 +34,33 @@ pub(super) fn weapons_page(w: &Wiki) {
         if pol != "None" {
             special.push(human(&pol));
         }
+        // a unit's own version of a shared weapon takes its numbers from that unit's stats
+        let variant = s(wv, "variantOf");
+        let (key, f_dmg, f_range, f_cd) = if variant.is_empty() {
+            (format!("weapon:{id}"), "dmg", "range_tiles", "cooldown")
+        } else {
+            (
+                format!("unit:{variant}"),
+                "stats.dmg",
+                "stats.range_tiles",
+                "stats.cooldown",
+            )
+        };
+        let dmg = if get(wv, "area").is_null() {
+            w.coded(&key, f_dmg, weapon_dmg_text(wv))
+        } else {
+            w.coded_const("MORTAR_INNER_DAMAGE", weapon_dmg_text(wv))
+        };
         let _ = write!(
             h,
             "<tr id=\"w-{id}\"><td><b>{}</b></td><td>{}</td><td class=\"num\" data-v=\"{}\">{}</td><td class=\"num\">{}</td><td class=\"num\" data-v=\"{}\">{}</td><td class=\"num\">{}</td><td>{}</td><td class=\"num\">{}%</td><td>{}</td></tr>",
-            esc(&weapon_name(&id)),
+            esc(&w.weapon_label(&id)),
             w.links(&users),
             weapon_hit(wv).1,
-            w.coded(&format!("weapon:{id}"), "dmg", weapon_dmg_text(wv)),
-            w.coded(&format!("weapon:{id}"), "range_tiles", fmt(nz(wv, "rangeTiles"))),
+            dmg,
+            w.coded(&key, f_range, weapon_range_text(wv)),
             nz(wv, "cooldownTicks"),
-            w.coded(&format!("weapon:{id}"), "cooldown", w.u.secs(nz(wv, "cooldownTicks"))),
+            w.coded(&key, f_cd, weapon_cooldown_text(w, wv)),
             weapon_dps(w, wv),
             esc(&human(&s(wv, "weaponClass"))),
             w.coded(&format!("weapon:{id}"), "armor_penetration", fmt(nz(wv, "armorPenetration") * 100.0)),
@@ -71,7 +88,7 @@ pub(super) fn weapons_page(w: &Wiki) {
             "<th title=\"{}\"><a href=\"#w-{}\">{}</a></th>",
             esc(&users.join(", ")),
             s(wv, "id"),
-            esc(&weapon_name(&s(wv, "id")))
+            esc(&w.weapon_label(&s(wv, "id")))
         );
     }
     h.push_str("</tr></thead><tbody>");
@@ -260,9 +277,13 @@ pub(super) fn const_change_line(
     owner: Option<&(&'static str, String)>,
 ) -> String {
     let prefixes = owner.map(|(k, i)| w.prefixes_of(k, i)).unwrap_or_default();
+    // an added or removed constant is recorded whole ({ name, value }); a changed value as the
+    // bare old and new values
     let val = |v: &Option<Value>| {
-        v.as_ref()
-            .map(|v| prop_label_value(w, &c.id, get(v, "value"), &prefixes))
+        v.as_ref().map(|v| {
+            let raw = if v.is_object() { get(v, "value") } else { v };
+            prop_label_value(w, &c.id, raw, &prefixes)
+        })
     };
     let (label, old) = val(&c.old).unwrap_or_default();
     let (label_new, new) = val(&c.new).unwrap_or_default();
@@ -645,7 +666,7 @@ pub(super) fn search_index(w: &Wiki) {
     for wv in w.list("weapons") {
         let id = s(wv, "id");
         push(
-            weapon_name(&id),
+            w.weapon_label(&id),
             format!("weapons.html#w-{id}"),
             "Weapon",
             id,
