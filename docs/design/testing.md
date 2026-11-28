@@ -38,6 +38,8 @@ server/Cargo.toml --profile default` keeps the self-play harness in the default 
 the fast scripted coverage. Long profile-backed and real-AI self-play tests return early unless
 `RTS_FULL_AI_TESTS=1` is set; `tests/run-all.sh --full-ai` enables that mode for the full
 orchestrator.
+Eco’s 30,000-tick six-base progression test is part of this opt-in full suite;
+its shorter opening and footprint regressions remain in the normal merge gate.
 `RTS_SELFPLAY_FULL=1` remains accepted as an alias for manual self-play runs. Use full AI coverage
 when touching AI strategy, profile-backed self-play, replay determinism, or balance behavior that
 depends on long matches.
