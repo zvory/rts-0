@@ -430,7 +430,10 @@ fn units(text: &client_text::ClientText, consts: &HashMap<String, f64>) -> Value
                     "attack": { "dmg": attack.dmg, "rangeTiles": v(attack.range_tiles), "cooldownTicks": attack.cooldown },
                     "engagementRangeTiles": compat::engagement(k),
                     "weapon": weapon_entry_id(k),
+                    "targetable": targetable(k),
                     "master": master_rank(k, &s),
+                    // a Dao of War Adept wears extra armor (sim entity/items.rs armor_bonus_reduction)
+                    "armorBonus": (k.dao() == Some(UpgradeKind::DaoOfHeaviness)).then_some(v(balance::DAO_WAR_ARMOR_REDUCTION)),
                     "secondaryWeapons": secondary_weapons(k).iter().map(|w| w.stable_id()).collect::<Vec<_>>(),
                     "movementBody": compat::movement_body(k),
                     "threatRole": compat::threat_role(k),
@@ -501,6 +504,7 @@ fn buildings(text: &client_text::ClientText) -> Value {
                     "requires": ids(d.build_requires),
                     "researches": researches,
                     "blocksSight": compat::blocks_sight(k),
+                    "targetable": targetable(k),
                     "extracts": compat::extracts(k),
                 })
             })
@@ -517,13 +521,44 @@ fn nodes(text: &client_text::ClientText) -> Value {
     )
 }
 
+/// One hit on open ground, as the sim resolves it: armor (with a War Adept's Dao armor bonus,
+/// sim entity/items.rs `armor_bonus_reduction`), then weapon-specific target modifiers.
+fn hit_damage(w: &WeaponProfile, t: EntityKind, dmg: u32) -> u32 {
+    let bonus = if t.dao() == Some(UpgradeKind::DaoOfHeaviness) {
+        balance::DAO_WAR_ARMOR_REDUCTION
+    } else {
+        0.0
+    };
+    if bonus <= 0.0 {
+        return combat::effective_damage_for_weapon(w, t, dmg, Some(TerrainKind::Open));
+    }
+    let after_armor = combat::effective_damage_for_armor_penetration_with_bonus(
+        w.armor_penetration,
+        t,
+        dmg,
+        Some(TerrainKind::Open),
+        bonus,
+    );
+    combat::damage_after_target_type_modifier(w, t, after_armor)
+}
+
 /// Every unit and building that can be shot at, for the damage tables.
 fn targets() -> Vec<EntityKind> {
     defs::UNITS
         .iter()
         .map(|d| d.kind)
         .chain(defs::BUILDINGS.iter().map(|d| d.kind))
+        .filter(|k| targetable(*k))
         .collect()
+}
+
+/// Weapons can't target Barbed Wire, healing seals or the Scout Plane (sim entity.rs
+/// `is_targetable`), so they stay out of the damage tables.
+fn targetable(k: EntityKind) -> bool {
+    !matches!(
+        k,
+        EntityKind::BarbedWire | EntityKind::HealingSeal | EntityKind::ScoutPlane
+    )
 }
 
 fn facing_damage(w: &WeaponProfile, victim: EntityKind, facing: ArmorFacing) -> u32 {
@@ -623,7 +658,7 @@ fn weapon_entry(
     let vs: Vec<Value> = targets()
         .into_iter()
         .map(|t| {
-            let open = combat::effective_damage_for_weapon(w, t, w.dmg, Some(TerrainKind::Open));
+            let open = hit_damage(w, t, w.dmg);
             let mut row = json!({ "target": id(t), "dmg": open });
             if combat::facing_damage_multiplier_for_weapon(w, t, ArmorFacing::Rear) != 1.0 {
                 row["front"] = json!(facing_damage(w, t, ArmorFacing::Front));
@@ -631,18 +666,8 @@ fn weapon_entry(
                 row["rear"] = json!(facing_damage(w, t, ArmorFacing::Rear));
             }
             if let Some(b) = burst {
-                let one = combat::effective_damage_for_weapon(
-                    w,
-                    t,
-                    burst_damage(w, 1, b),
-                    Some(TerrainKind::Open),
-                );
-                let all = combat::effective_damage_for_weapon(
-                    w,
-                    t,
-                    burst_damage(w, b.rays, b),
-                    Some(TerrainKind::Open),
-                );
+                let one = hit_damage(w, t, burst_damage(w, 1, b));
+                let all = hit_damage(w, t, burst_damage(w, b.rays, b));
                 row["burstMin"] = json!(one);
                 row["burstMax"] = json!(all);
                 if let Some(e) = compat::entrenched_damage(t, all) {
@@ -724,15 +749,27 @@ fn upgrades(text: &client_text::ClientText) -> Value {
                     })
                     .map(|c| json!(c.id))
                     .collect();
+                // sim game/upgrade.rs `next_definition`: every Dao already researched or paid for
+                // moves the next one up a price tier (balance::dao_research_tier, capped at the third)
+                let tiers: Option<Vec<(u32, u32, u32)>> = matches!(
+                    u,
+                    UpgradeKind::DaoWind | UpgradeKind::DaoOfMagic | UpgradeKind::DaoOfHeaviness
+                )
+                .then(|| (0..3).map(balance::dao_research_tier).collect());
+                let (steel, oil, ticks) = tiers
+                    .as_ref()
+                    .and_then(|t| t.first().copied())
+                    .unwrap_or((def.cost_steel, def.cost_oil, def.research_ticks));
                 json!({
                     "id": sid,
                     "name": e.label.unwrap_or_else(|| title_case(sid)),
                     "icon": e.icon,
                     "description": e.description,
                     "researchedAt": id(def.researched_at),
-                    "steel": def.cost_steel,
-                    "oil": def.cost_oil,
-                    "researchTicks": def.research_ticks,
+                    "steel": steel,
+                    "oil": oil,
+                    "researchTicks": ticks,
+                    "priceTiers": tiers.map(|t| t.iter().map(|(s, o, r)| json!({ "steel": s, "oil": o, "researchTicks": r })).collect::<Vec<_>>()),
                     "requiresUpgrade": def.requires_upgrade.map(UpgradeKind::stable_id),
                     "factions": factions,
                 })
@@ -846,5 +883,40 @@ mod tests {
                 id(k)
             );
         }
+    }
+
+    /// The damage tables leave out what weapons can't target, and count a War Adept's Dao armor.
+    #[test]
+    fn damage_tables_follow_targeting_and_dao_armor() {
+        let kinds = targets();
+        assert!(!kinds.contains(&EntityKind::BarbedWire));
+        assert!(!kinds.contains(&EntityKind::ScoutPlane));
+        assert!(kinds.contains(&EntityKind::Tank));
+        let rifle = combat::weapon_profile(WeaponKind::RiflemanRifle).expect("rifle");
+        assert!(
+            hit_damage(rifle, EntityKind::WarAdept, rifle.dmg)
+                < hit_damage(rifle, EntityKind::Warrior, rifle.dmg),
+            "the Dao of War armor bonus must reduce non-penetrating hits"
+        );
+    }
+
+    /// Dao research is listed at the price the sim charges for the first Dao, with the later tiers.
+    #[test]
+    fn dao_research_lists_its_price_tiers() {
+        let research = upgrades(&client_text::read("", &HashMap::new()));
+        let dao = research
+            .as_array()
+            .and_then(|r| {
+                r.iter()
+                    .find(|u| u["id"] == UpgradeKind::DaoWind.stable_id())
+            })
+            .expect("Dao of Wind");
+        let (steel, oil, ticks) = balance::dao_research_tier(0);
+        assert_eq!(dao["steel"], json!(steel));
+        assert_eq!(dao["oil"], json!(oil));
+        assert_eq!(dao["researchTicks"], json!(ticks));
+        let tiers = dao["priceTiers"].as_array().expect("tiers");
+        assert_eq!(tiers.len(), 3);
+        assert!(tiers[2]["steel"].as_u64() > tiers[0]["steel"].as_u64());
     }
 }

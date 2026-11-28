@@ -96,6 +96,8 @@ pub(super) fn weapons_page(w: &Wiki) {
         .list("units")
         .iter()
         .chain(w.list("buildings").iter())
+        // weapons can't aim at Barbed Wire or the Scout Plane
+        .filter(|v| v.get("targetable").and_then(Value::as_bool) != Some(false))
         .map(|v| s(v, "id"))
         .filter(|t| playable(w, t))
         .collect();
@@ -952,11 +954,15 @@ pub(super) fn maintenance_page(w: &Wiki) {
             }
         }
     }
-    let _ = write!(
-        h,
-        "<p>{} pages have no hand-written notes yet: {}</p>",
-        stubs.len(),
-        stubs.join(", ")
-    );
+    if stubs.is_empty() {
+        h.push_str("<p>Every page has hand-written notes.</p>");
+    } else {
+        let _ = write!(
+            h,
+            "<p>{} pages have no hand-written notes yet: {}</p>",
+            stubs.len(),
+            stubs.join(", ")
+        );
+    }
     write(w, "maintenance.html", "Maintenance", &[], &h);
 }

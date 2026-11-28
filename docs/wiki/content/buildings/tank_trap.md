@@ -1,0 +1,4 @@
+- Blocks vehicles only: infantry walk through.
+- A finished trap belongs to no one, so it blocks your own vehicles too.
+- Doesn't block sight.
+- Units attacking a trap move on to the other visible traps within {{TANK_TRAP_CLUSTER_ATTACK_RADIUS_TILES}} tiles.

@@ -1,0 +1,4 @@
+- Infantry and Mortar Teams on the wire move ×0.7 as fast and take 10 damage each time they step onto a wire tile: {{units:slowedByBarbedWire}}.
+- A finished segment belongs to no one, so it slows and hurts your own units too.
+- Every unit that crosses uses up one of its {{building:barbed_wire.hp}} HP; a {{unit:tank}} crushes it in one crossing.
+- Weapons can't target it.

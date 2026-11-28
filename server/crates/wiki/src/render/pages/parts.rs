@@ -752,6 +752,25 @@ pub(super) fn weapon_damage_table(w: &Wiki, weapon: &Value) -> String {
     h
 }
 
+/// "Damage taken": every weapon against this unit or building, or a line saying none can aim at it.
+pub(super) fn damage_taken_section(w: &Wiki, v: &Value) -> String {
+    let id = s(v, "id");
+    let name = s(v, "name");
+    let mut h = h2("damage-taken", "Damage taken");
+    if v.get("targetable").and_then(Value::as_bool) == Some(false) {
+        let _ = write!(h, "<p>Weapons can't target the {}.</p>", esc(&name));
+        return h;
+    }
+    let _ = write!(
+        h,
+        "<details><summary>Every weapon vs {} ({} HP)</summary>{}</details>",
+        esc(&name),
+        fmt(nz(v, "hp")),
+        damage_taken_table(w, &id)
+    );
+    h
+}
+
 pub(super) fn damage_taken_table(w: &Wiki, target: &str) -> String {
     let hp = target_hp(w, target);
     let mut rows: Vec<(f64, String)> = Vec::new();
