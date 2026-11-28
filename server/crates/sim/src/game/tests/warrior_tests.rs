@@ -561,13 +561,13 @@ fn disciple_shield_durability_breaking_hit_teams_and_checkpoint() {
         game.state
             .entities
             .shielded_damage(friend, 2, 60, 60, 0.0, (0.0, 0.0), &teams),
-        15
+        0
     );
     assert_eq!(
         game.state
             .entities
             .shielded_damage(caster, 2, 40, 40, 0.0, (0.0, 0.0), &teams),
-        10
+        0
     );
     let payload = game.checkpoint_payload_text_for_test().unwrap();
     let mut restored = Game::restore_checkpoint_payload_text_for_test(
@@ -581,7 +581,7 @@ fn disciple_shield_durability_breaking_hit_teams_and_checkpoint() {
             .state
             .entities
             .shielded_damage(friend, 2, 100, 100, 0.0, (0.0, 0.0), &teams),
-        25
+        0
     );
     assert!(restored
         .state

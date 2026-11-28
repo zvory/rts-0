@@ -110,7 +110,7 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 17] = [
         icon: "SHD",
         hotkey: Some("X"),
         title:
-            "Place a 150 HP shield granting allied units within 2.1 tiles 75% armor against attacks from outside; armor piercing works normally; each hit drains full attack damage from shield HP; lasts up to 5 seconds; Magic Masters place a 300 HP shield lasting up to 10 seconds",
+            "Place a 150 HP shield blocking non-piercing attacks from outside against allies within 2.1 tiles; armor piercing lets its percentage of damage through; each hit drains full attack damage from shield HP; lasts up to 10 seconds; Magic Masters place a 300 HP shield lasting up to 15 seconds",
         carriers: &[EntityKind::MagicAdept],
         target_mode: AbilityTargetMode::WorldPoint,
         range_tiles: Some(5.0),

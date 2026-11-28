@@ -180,7 +180,7 @@ export const SCOUT_PLANE_ABILITY_COOLDOWN_TICKS = TICK_HZ * 30;
 export const DAO_TRAINING_COST_OIL = 100;
 export const DISCIPLE_SHIELD_CAPACITY = 150;
 export const DISCIPLE_SHIELD_RADIUS_TILES = 2.1;
-export const DISCIPLE_SHIELD_DURATION_TICKS = TICK_HZ * 5;
+export const DISCIPLE_SHIELD_DURATION_TICKS = TICK_HZ * 10;
 
 export const DAO_TRAINING_TICKS = TICK_HZ * 10;
 export const MAX_DAO_TRAINING_QUEUE = 64;
@@ -411,7 +411,7 @@ export const ABILITIES = Object.freeze({
 
   [ABILITY.DISCIPLE_SHIELD]: Object.freeze({
     ability: ABILITY.DISCIPLE_SHIELD, label: "Shield", icon: "SHD", hotkey: "X",
-    title: "Place a 150 HP shield granting allied units within 2.1 tiles 75% armor against attacks from outside; armor piercing works normally; each hit drains full attack damage from shield HP; lasts up to 5 seconds; Magic Masters place a 300 HP shield lasting up to 10 seconds",
+    title: "Place a 150 HP shield blocking non-piercing attacks from outside against allies within 2.1 tiles; armor piercing lets its percentage of damage through; each hit drains full attack damage from shield HP; lasts up to 10 seconds; Magic Masters place a 300 HP shield lasting up to 15 seconds",
     carriers: Object.freeze([KIND.MAGIC_ADEPT]), targetMode: "worldPoint",
     rangeTiles: 5, radiusTiles: DISCIPLE_SHIELD_RADIUS_TILES,
     cooldownTicks: 300, cost: Object.freeze({ steel: 0, oil: 0 }),
