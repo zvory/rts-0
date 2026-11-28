@@ -407,7 +407,6 @@ fn staging_point(
         .max_by(f32::total_cmp)
         .unwrap_or(4. * size);
     let q = WorldQueries::new(frame);
-    let from = q.world_point(unit.position.0, unit.position.1)?;
     for depth in [3., 5., 8., 12.] {
         for side in [0., 2., -2., 4., -4.] {
             let r = reach + depth * size + slot.1.max(0.) * 2. * size;
@@ -423,18 +422,9 @@ fn staging_point(
             {
                 continue;
             }
-            let Some(to) = q.world_point(p.0, p.1) else {
-                continue;
-            };
-            let Some(route) = q.ground_route(from, to, unit.kind) else {
-                continue;
-            };
             // Never walk through an enemy firing envelope to reach the rally. When already under
             // fire, allow a retreat route that does not go deeper into the observed danger.
-            if route
-                .iter()
-                .all(|p| clearance(p.as_tuple()) >= clearance(unit.position).min(0.) - size * 0.25)
-            {
+            if retreat_route(frame, &q, unit, p, enemies).is_some() {
                 return Some(p);
             }
         }
