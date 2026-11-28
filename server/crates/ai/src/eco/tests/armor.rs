@@ -1,6 +1,7 @@
 use super::super::armor::ArmorAssignments;
 use super::*;
 use crate::sdk::{DefenseMode, DefensePlan, DefenseSector};
+use rts_rules::math::GameplayMath as _;
 use std::collections::{BTreeMap, BTreeSet};
 
 fn arena(tanks: usize) -> (StartPayload, Snapshot, Vec<AiBaseSite>, DefensePlan) {
@@ -103,7 +104,7 @@ fn idle_armor_forms_one_compact_reachable_reserve() {
     for (id, (_, p)) in &posts {
         for (other, (_, q)) in &posts {
             if id != other {
-                assert!(construction::dist2(*p, *q) >= (2_f32 * 32.).powi(2));
+                assert!(construction::dist2(*p, *q) >= (2_f32 * 32.).det_powi(2));
             }
         }
     }
@@ -250,7 +251,7 @@ fn reserve_remains_compact_when_infantry_uses_different_fronts() {
     let positions: Vec<_> = posts.values().map(|(_, p)| *p).collect();
     assert!(positions.iter().all(|p| positions
         .iter()
-        .all(|q| construction::dist2(*p, *q) < (10_f32 * 32.).powi(2))));
+        .all(|q| construction::dist2(*p, *q) < (10_f32 * 32.).det_powi(2))));
 }
 #[test]
 fn depleted_base_stops_pulling_the_reserve_centroid() {
@@ -292,7 +293,7 @@ fn depleted_base_stops_pulling_the_reserve_centroid() {
     assert!(armor
         .posts()
         .values()
-        .all(|(_, p)| construction::dist2(*p, sites[2].position) < (6_f32 * 32.).powi(2)));
+        .all(|(_, p)| construction::dist2(*p, sites[2].position) < (6_f32 * 32.).det_powi(2)));
 }
 
 #[test]
