@@ -53,7 +53,7 @@ node scripts/art/capture-roster-team-color-review.mjs
 node scripts/art/roster-team-color-review.mjs --restore
 ```
 
-The installer uses existing packed textures, backs up five renderer modules beneath ignored
+The installer uses existing packed textures, backs up thirteen renderer modules beneath ignored
 `target/`, and rewrites them only for local preview. It refuses existing backups; restore verifies
 both backup hashes and installed files before writing, then removes the backup. Changed renderer
 files or legacy backups require manual preservation/reconciliation rather than automatic overwrite.

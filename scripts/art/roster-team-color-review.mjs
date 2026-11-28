@@ -138,8 +138,6 @@ if(modes.includes('--install-preview')) {
    edit(spec.file,s=>s.replace(/image: .*\n/,'image: "'+image+'",\n  sheetRows:4, teamPaint:{baseRow:2,paintRow:3},\n').replace(/frameCount: \d+/,'frameCount: 1').replace(/movementFrames: \[[^\]]*\]/,'movementFrames: [0]').replace(/firingFrames: \[[^\]]*\]/,'firingFrames: [0]').replace(/setupFrames: \[[^\]]*\]/,'setupFrames: [0]').replace(/deployedFrame: \d+/,'deployedFrame: 0').replace(/windupFrames: \[[^\]]*\]/,'windupFrames: [0]'));
   } else edit(spec.file,s=>s.replace(/image: .*\n/,'image: "'+image+'",\n  reviewTeamPaint:true,\n').replace(/tintSlot: "team[^"\n]*"/g,'tintSlot: "fixed"'));
  }
- // A paused Scout Plane needs no flight trajectory; retain its production strip scale/height.
- edit(s=>s);
  // Prepare all edits first, then keep verified originals until restoration succeeds.
  fs.mkdirSync(backup,{recursive:true});
  for(const f of files)fs.writeFileSync(path.join(backup,f),originals[f]);
