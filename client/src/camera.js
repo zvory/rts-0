@@ -14,6 +14,7 @@
 // The renderer drives the Pixi world container from `x`, `y`, `zoom`; the input
 // layer uses `screenToWorld` for picking and `worldToScreen` for overlays.
 
+import { mapTiltDegrees } from "./camera_tilt.js";
 import { CAMERA } from "./config.js";
 import {
   boundsForGroundPolygon,
@@ -87,6 +88,7 @@ export class Camera {
     this.y = 0;
     /** Zoom factor: screen px per world px. */
     this.zoom = 1;
+    this.mapTilt = mapTiltDegrees(options?.mapTilt);
     /** Zoom limits for this session. Defaults to the live-match range. */
     this._baseMinZoom = resolveMinZoom(options?.minZoom);
     this._baseMaxZoom = resolveMaxZoom(options?.maxZoom, this._baseMinZoom);
@@ -218,10 +220,9 @@ export class Camera {
    * @returns {{x:number, y:number}}
    */
   worldToScreen(wx, wy) {
-    return {
-      x: (wx - this.x) * this.zoom,
-      y: (wy - this.y) * this.zoom,
-    };
+    if (!this.mapTilt) return { x: (wx - this.x) * this.zoom, y: (wy - this.y) * this.zoom };
+    const { x, y } = projectOrthographic(this, { x: wx, y: wy, heightPx: 0 });
+    return { x, y };
   }
 
   /**
@@ -231,10 +232,8 @@ export class Camera {
    * @returns {{x:number, y:number}}
    */
   screenToWorld(sx, sy) {
-    return {
-      x: this.x + sx / this.zoom,
-      y: this.y + sy / this.zoom,
-    };
+    if (!this.mapTilt) return { x: this.x + sx / this.zoom, y: this.y + sy / this.zoom };
+    return groundAtScreenOrthographic(this, { x: sx, y: sy });
   }
 
   /**
@@ -364,8 +363,10 @@ export class Camera {
     const x = requireFinite(deltaX, "pan delta x");
     const y = requireFinite(deltaY, "pan delta y");
     const before = this._rawView();
-    this.x -= x / this.zoom;
-    this.y -= y / this.zoom;
+    const center = this.screenToWorld(this.viewW / 2, this.viewH / 2);
+    const shifted = this.screenToWorld(this.viewW / 2 + x, this.viewH / 2 + y);
+    this.x -= shifted.x - center.x;
+    this.y -= shifted.y - center.y;
     this._clamp();
     this._emitIfChanged(before);
   }
@@ -558,9 +559,19 @@ export class Camera {
 
   /** @private */
   _refreshZoomLimits() {
+    let span = Math.max(this.viewW, this.viewH);
+    if (this.maxVisibleWorldPx != null && this.mapTilt && this.viewW > 0 && this.viewH > 0) {
+      const state = { x: 0, y: 0, zoom: 1, mapTilt: this.mapTilt,
+        viewW: this.viewW, viewH: this.viewH };
+      const bounds = boundsForGroundPolygon([
+        { x: 0, y: 0 }, { x: this.viewW, y: 0 },
+        { x: this.viewW, y: this.viewH }, { x: 0, y: this.viewH },
+      ].map((point) => groundAtScreenOrthographic(state, point)));
+      span = Math.max(bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
+    }
     const viewportMinZoom = this.maxVisibleWorldPx == null
       ? 0
-      : Math.max(this.viewW, this.viewH) / this.maxVisibleWorldPx;
+      : span / this.maxVisibleWorldPx;
     this.minZoom = Math.max(this._baseMinZoom, viewportMinZoom);
     this.maxZoom = Math.max(this.minZoom, this._baseMaxZoom);
     this.zoom = clampZoom(this.zoom, this.minZoom, this.maxZoom);

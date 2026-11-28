@@ -362,6 +362,10 @@ assert(
       placementDraws += 1;
     };
 
+    let shadowViewport = null;
+    renderer._projectedUnitShadows = {
+      update(_entities, viewport) { shadowViewport = viewport; },
+    };
     renderer.render(
       {
         playerId: 1,
@@ -377,12 +381,16 @@ assert(
         x: 0,
         y: 0,
         zoom: 1,
+        viewW: 1280,
+        viewH: 960,
       },
       null,
       1,
       { profiler },
     );
 
+    assert(shadowViewport?.viewportWidth === 1280 && shadowViewport?.viewportHeight === 960,
+      "shadow masks cover the source camera viewport even when it exceeds the canvas");
     const fallback = renderer._pools.units.get(101);
     const rendererPhases = new Set(profiler.summary().phases.map((phase) => phase.label));
     assert(placementDraws === 1, "renderer continues later overlays after a render helper throws");

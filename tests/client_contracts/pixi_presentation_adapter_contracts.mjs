@@ -250,6 +250,18 @@ const replacementFrame = assembler.assemble({
 assert((await adapter.render(replacementFrame).settled).status === PRESENTATION_OUTCOME.PRESENTED, "Lab/replay static-map reset presents a fresh generation");
 assert(engine.staticMaps.length === 2 && engine.staticMaps[1].tileSize === 16, "changed static revision rebuilds Pixi-owned staging once");
 
+const tiltedProjection = { ...projection,
+  orthographic: { ...projection.orthographic, mapTilt: 45 } };
+const tiltedFrame = assembler.assemble({ ...frameInputs, map: replacementMap,
+  projection: tiltedProjection, visualTimeMs: 560, sourceTick: 1 });
+assert((await adapter.render(tiltedFrame).settled).status === PRESENTATION_OUTCOME.PRESENTED,
+  "tilted frame presents through the same adapter");
+const sourceCamera = engine.renders.at(-1).camera;
+assert(sourceCamera.viewW === 200 && sourceCamera.viewH === 160,
+  "tilted source camera exposes the full overscan viewport to shadow coverage");
+assert(sourceCamera.x === -18 && sourceCamera.y === -24,
+  "tilted source origin centers the original viewport inside the overscan texture");
+
 adapter.destroy();
 adapter.destroy();
 assert(engine.destroyed === 1, "Pixi adapter delegates teardown exactly once");

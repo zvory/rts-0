@@ -1,6 +1,8 @@
 // Renderer-neutral projection helpers. Public screen values are viewport-local CSS pixels;
 // renderer matrices, canvas offsets, backing dimensions, and DPR never enter these shapes.
 
+import { tiltScreen } from "./camera_tilt.js";
+
 export const PROJECTION_CLIP = Object.freeze({
   INSIDE: "inside",
   OUTSIDE_VIEWPORT: "outsideViewport",
@@ -191,11 +193,9 @@ export function projectOrthographic(state, point) {
   const x = requireFinite(point?.x, "presented point x");
   const y = requireFinite(point?.y, "presented point y");
   requireFinite(point?.heightPx, "presented point heightPx");
-  return classifyProjectedPoint({
-    x: (x - state.x) * state.zoom,
-    y: (y - state.y) * state.zoom,
-    depth: 1,
-  }, {
+  return classifyProjectedPoint(tiltScreen(state, {
+    x: (x - state.x) * state.zoom, y: (y - state.y) * state.zoom,
+  }), {
     widthCssPx: state.viewW,
     heightCssPx: state.viewH,
   });
@@ -203,35 +203,46 @@ export function projectOrthographic(state, point) {
 
 export function groundAtScreenOrthographic(state, screen) {
   if (!Number.isFinite(screen?.x) || !Number.isFinite(screen?.y)) return null;
+  const ground = tiltScreen(state, screen, true);
   return finitePointOrNull(
-    state.x + screen.x / state.zoom,
-    state.y + screen.y / state.zoom,
+    state.x + ground.x / state.zoom,
+    state.y + ground.y / state.zoom,
   );
 }
 
 export function projectedExtentOrthographic(state, point, worldWidthPx, worldHeightPx) {
   const projected = projectOrthographic(state, point);
-  const width = requireFinite(
-    requireNonNegative(worldWidthPx, "world extent width") * state.zoom,
-    "projected extent width",
-  );
-  const height = requireFinite(
-    requireNonNegative(worldHeightPx, "world extent height") * state.zoom,
-    "projected extent height",
-  );
+  let width = requireNonNegative(worldWidthPx, "world extent width") * state.zoom;
+  let height = requireNonNegative(worldHeightPx, "world extent height") * state.zoom;
+  let minX = projected.x - width / 2;
+  let maxX = projected.x + width / 2;
+  let minY = projected.y - height / 2;
+  let maxY = projected.y + height / 2;
+  if (state.mapTilt) {
+    const center = { x: (point.x - state.x) * state.zoom, y: (point.y - state.y) * state.zoom };
+    const corners = [-1, 1].flatMap((dx) => [-1, 1].map((dy) => tiltScreen(state, {
+      x: center.x + dx * width / 2, y: center.y + dy * height / 2,
+    })));
+    minX = Math.min(...corners.map((p) => p.x));
+    maxX = Math.max(...corners.map((p) => p.x));
+    minY = Math.min(...corners.map((p) => p.y));
+    maxY = Math.max(...corners.map((p) => p.y));
+    width = maxX - minX;
+    height = maxY - minY;
+  }
+  requireFinite(width, "projected extent width");
+  requireFinite(height, "projected extent height");
   return Object.freeze({
     width,
     height,
-    scaleX: state.zoom,
-    scaleY: state.zoom,
+    scaleX: state.mapTilt && worldWidthPx > 0 ? width / worldWidthPx : state.zoom,
+    scaleY: state.mapTilt && worldHeightPx > 0 ? height / worldHeightPx : state.zoom,
     visible: state.viewW > 0
       && state.viewH > 0
       && projected.depth > 0
       && projected.clip !== PROJECTION_CLIP.OUTSIDE_DEPTH
-      && projected.x + width / 2 >= 0
-      && projected.x - width / 2 <= state.viewW
-      && projected.y + height / 2 >= 0
-      && projected.y - height / 2 <= state.viewH,
+      && maxX >= 0 && minX <= state.viewW
+      && maxY >= 0 && minY <= state.viewH,
   });
 }
 
@@ -242,12 +253,13 @@ export function viewportGroundPolygonOrthographic(state) {
   const maxX = state.x + state.viewW / state.zoom;
   const maxY = state.y + state.viewH / state.zoom;
   if (!Number.isFinite(maxX) || !Number.isFinite(maxY)) return Object.freeze([]);
-  return clipGroundPolygonToBounds([
-    { x: state.x, y: state.y },
-    { x: maxX, y: state.y },
-    { x: maxX, y: maxY },
-    { x: state.x, y: maxY },
-  ], {
+  const corners = state.mapTilt
+    ? [{ x: 0, y: 0 }, { x: state.viewW, y: 0 },
+      { x: state.viewW, y: state.viewH }, { x: 0, y: state.viewH }]
+      .map((p) => groundAtScreenOrthographic(state, p))
+    : [{ x: state.x, y: state.y }, { x: maxX, y: state.y },
+      { x: maxX, y: maxY }, { x: state.x, y: maxY }];
+  return clipGroundPolygonToBounds(corners, {
     minX: 0,
     minY: 0,
     maxX: state.worldW,
@@ -274,6 +286,7 @@ export function createOrthographicProjectionSnapshot(rawState, fallbackReference
     x: requireFinite(rawState?.x, "camera origin x"),
     y: requireFinite(rawState?.y, "camera origin y"),
     zoom: requireFinite(rawState?.zoom, "camera framing scale"),
+    mapTilt: rawState?.mapTilt || 0,
     worldW: requireNonNegative(rawState?.worldW, "map width"),
     worldH: requireNonNegative(rawState?.worldH, "map height"),
     viewW: requireNonNegative(rawState?.viewW, "viewport width"),
@@ -308,6 +321,7 @@ export function createOrthographicProjectionSnapshot(rawState, fallbackReference
     viewport,
     mapBounds,
     orthographic: Object.freeze({
+      ...(state.mapTilt ? { mapTilt: state.mapTilt } : {}),
       originX: state.x,
       originY: state.y,
       framingScale: state.zoom,

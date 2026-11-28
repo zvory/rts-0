@@ -30,7 +30,7 @@ export function interactLaunchUrl({
     url.searchParams.set("map", map);
     url.searchParams.set("interact", "map-editor");
     url.searchParams.set("rtsNoAutoPointerLock", "1");
-    return url.href;
+    return withMapTilt(url);
   }
   if (mode === "lab") {
     const url = new URL("/lab", baseUrl);
@@ -41,7 +41,7 @@ export function interactLaunchUrl({
     if (visualProfile) url.searchParams.set("visualProfile", safeToken(visualProfile, "", 48));
     url.searchParams.set("interact", "lab");
     url.searchParams.set("rtsNoAutoPointerLock", "1");
-    return url.href;
+    return withMapTilt(url);
   }
   if (mode === "scenario") {
     const url = new URL("/", baseUrl);
@@ -53,7 +53,7 @@ export function interactLaunchUrl({
     if (devScenario.case) url.searchParams.set("case", devScenario.case);
     url.searchParams.set("interact", "dev-scenario");
     url.searchParams.set("rtsNoAutoPointerLock", "1");
-    return url.href;
+    return withMapTilt(url);
   }
   const url = new URL("/", baseUrl);
   const aiPlayers = Array.isArray(spectate) && spectate.length === 2 ? spectate : null;
@@ -72,10 +72,16 @@ export function interactLaunchUrl({
   if (map && map !== "Chokes") url.searchParams.set("rtsMap", map);
   url.searchParams.set("interact", "game");
   url.searchParams.set("rtsNoAutoPointerLock", "1");
-  return url.href;
+  return withMapTilt(url);
 }
 
 function safeToken(value: unknown, fallback: string, maxLength: number) {
   const token = String(value || "").replace(/[^A-Za-z0-9_-]/g, "_").slice(0, maxLength);
   return token || fallback;
+}
+
+function withMapTilt(url: URL) {
+  const tilt = Number(process.env.RTS_INTERACT_MAP_TILT);
+  if (Number.isFinite(tilt) && tilt > 0 && tilt <= 45) url.searchParams.set("rtsMapTilt", String(tilt));
+  return url.href;
 }

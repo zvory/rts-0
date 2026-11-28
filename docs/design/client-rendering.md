@@ -98,6 +98,31 @@ viewport axis. `Match` converts that tile count to a world-pixel span and both c
 combine it with their existing minimum framing scale on every viewport resize. Spectators,
 replays, Lab sessions, and the Map Editor retain their wider overview ranges.
 
+### Experimental battlefield tilt
+
+Append `?rtsMapTilt=30` (or `&rtsMapTilt=30` on an existing URL) to opt into
+an experimental whole-plane projection, bounded to 0–45 degrees away from top-down.
+Zero/absent retains the normal renderer. The URL setting is session-local and is not
+persisted in `CameraSnapshotV1`. Interact launches accept `RTS_INTERACT_MAP_TILT=30`
+on the command that starts the daemon; shutdown the daemon before changing the value.
+
+The orthographic base coefficients optionally include `mapTilt` in detached projection
+records. Public projection, ground picking, visible-ground polygons and selection queries
+apply the same homography as the worker. With centered screen coordinates `(u,v)`, angle
+`a`, and focal distance `d=3*viewportHeight`, projection is
+`(u/(1-v*sin(a)/d), v*cos(a)/(1-v*sin(a)/d))`. Thus the far side is smaller.
+Camera movement changes the sampled ground under this fixed view; there is no orbit or yaw.
+Live-player zoom limits apply to the inverse-projected ground span on both axes.
+The worker draws a two-viewport-wide/high ground sheet to a temporary texture and maps it
+through a Pixi perspective mesh, with conservative source culling. HUD and drag marquee
+remain in screen space. The extra texture is resized with DPR/viewport and disposed on teardown.
+
+This is a visual experiment: buildings, trees, units, shadows and world labels are all
+flattened together. Height remains ignored; upright billboards and depth-aware occlusion
+are deferred. Overview fitting and camera bounds retain their orthographic policy, so
+map edges may be visible. The overscan render pass has additional GPU/memory cost and
+is not a performance-validated replacement for the default renderer.
+
 ## 3. Renderer-neutral selection
 
 Selection is an app-side sibling of the presentation frame and is never sent to a backend:
