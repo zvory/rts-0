@@ -61,11 +61,12 @@ export function loadFrameStripTexture(pixi, strip) {
   const frameWidth = positiveDimension(strip.frameWidth, 1);
   const frameHeight = positiveDimension(strip.frameHeight, 1);
   const frameCount = Math.max(1, Math.trunc(positiveDimension(strip.frameCount, 1)));
+  const columns = Math.max(1, Math.trunc(positiveDimension(strip.frameColumns, frameCount)));
   return loadColorAdjustedTexture(pixi, {
     image: strip.image,
     adjustment,
-    widthFallbacks: [frameWidth * frameCount],
-    heightFallbacks: [frameHeight],
+    widthFallbacks: [frameWidth * columns],
+    heightFallbacks: [frameHeight * Math.ceil(frameCount / columns)],
     rawLoad: () => loadRawFrameStripTexture(pixi, strip),
     errorLabel: "frame strip image",
   });

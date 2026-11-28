@@ -1,4 +1,5 @@
 import { drawCarriedItemRosette } from "./carried_items.js";
+import { rigContainerScale } from "./rigs/animation.js";
 import { createDaoCorona } from "./dao_corona.js";
 import { gfxNoFill, gfxEllipse, gfxPoly, gfxRect, gfxReset, gfxFill, gfxStroke } from "./native_graphics.js";
 import {
@@ -290,6 +291,9 @@ export function _hpBar(g, e, status = null, ownerColor = null, showHp = true, ow
     }
   }
   const barW = halfW * 2;
+  if (e.kind === KIND.RIFLEMAN && this._experimentalRiflemanFrameStrip?.()) {
+    topY = e.y - 48 * rigContainerScale(this._unitRenderContexts?.get?.(e.id));
+  }
   const barH = 4;
   if (isDiscipleKind(e.kind) || (e.kind === KIND.WORKER && ownerFactionId === "cultivators")) topY += barH / 2;
   const maxHp = Number.isFinite(e.maxHp) && e.maxHp > 0 ? e.maxHp : 0;

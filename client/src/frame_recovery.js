@@ -174,6 +174,7 @@ function runMatchFrame(match, now, { capture = false } = {}) {
     );
 
     const selectionScene = time("match.selectionScene", () => buildSelectionScene({
+      experimentalGraphicsEnabled: match.state.experimentalGraphicsEnabled === true,
       entities: frameViews.interpolatedEntities,
       rememberedEntities: match.state.rememberedBuildings,
       preparedEntities: frameViews.preparedEntities,

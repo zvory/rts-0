@@ -34,6 +34,10 @@ app.settings?.setContext({
         onToggle: () =>
           app.setProjectedUnitShadowsEnabled(!app.projectedUnitShadowsEnabled),
       },
+      experimentalGraphics: {
+        state: () => ({ enabled: app.experimentalGraphicsEnabled, available: true }),
+        onToggle: () => app.setExperimentalGraphicsEnabled(!app.experimentalGraphicsEnabled),
+      },
       healthBars: {
         state: () => ({
           enabled: app.healthBarsAlwaysEnabled,

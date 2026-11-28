@@ -6,12 +6,25 @@ export function configureMatchDisplayPreferences(match, options = {}) {
   match.onHealthBarsAlwaysEnabledChange = options.onHealthBarsAlwaysEnabledChange;
   match.preferredColor = options.preferredColor;
   match.onProjectedUnitShadowsEnabledChange = options.onProjectedUnitShadowsEnabledChange;
+  match.onExperimentalGraphicsEnabledChange = options.onExperimentalGraphicsEnabledChange;
+  match.onExperimentalGraphicsToggle = () => {
+    const enabled = !match.state.experimentalGraphicsEnabled;
+    applyMatchExperimentalGraphics(match, enabled);
+    match.onExperimentalGraphicsEnabledChange?.(enabled);
+  };
   match.onUnitRangeToggle = match.toggleUnitRangeOverlays.bind(match);
   match.onHealthBarToggle = () => toggleHealthBars(match);
   match.onProjectedUnitShadowToggle = () => toggleProjectedUnitShadows(match);
   match.state.showUnitRangesEnabled = options.unitRangesEnabled !== false;
   match.state.showHealthBarsAlwaysEnabled = !!options.healthBarsAlwaysEnabled;
   match.state.showProjectedUnitShadowsEnabled = options.projectedUnitShadowsEnabled !== false;
+  match.state.experimentalGraphicsEnabled = options.experimentalGraphicsEnabled === true;
+}
+
+export function applyMatchExperimentalGraphics(match, enabled) {
+  if (!match?.state) return;
+  match.state.experimentalGraphicsEnabled = !!enabled;
+  match.renderer?.setExperimentalGraphicsEnabled?.(!!enabled);
 }
 
 export function applyMatchUnitRanges(match, enabled) {

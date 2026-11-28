@@ -5,6 +5,8 @@ import { clamp01, rendererVisualNow } from "./shared.js";
 import { attackFeedbackKindForWeapon, attackFeedbackOriginForWeapon } from "./attack_feedback_origin.js";
 import { muzzleFeedbackStyle } from "./weapon_feedback_style.js";
 import { isDiscipleProjectile } from "./disciple_projectiles.js";
+import { experimentalRiflemanMuzzle } from "./rigs/rifleman_experimental_png_strip.js";
+import { rigContainerScale } from "./rigs/animation.js";
 
 export function _drawMuzzleFlashes(state, colorByOwner) {
   const g = this._feedbackGfx;
@@ -32,7 +34,9 @@ export function _drawMuzzleFlashes(state, colorByOwner) {
     if (baseR <= 0) continue;
 
     const stat = STATS[feedbackKind] || STATS[attacker.kind] || {};
-    const origin = attackFeedbackOriginForWeapon({
+    const experimental = attacker.kind === KIND.RIFLEMAN && this._experimentalRiflemanFrameStrip?.();
+    const origin = experimental
+      ? experimentalRiflemanMuzzle(attacker, rigContainerScale(this._unitRenderContexts?.get?.(attacker.id))) : attackFeedbackOriginForWeapon({
       definitionsByKind: this._liveRigDefinitionsByKind,
       attacker,
       weaponKind: f.weaponKind,
@@ -46,7 +50,7 @@ export function _drawMuzzleFlashes(state, colorByOwner) {
     const my = origin.y;
 
     if (targetPos && f.shotOrigin) {
-      const sx = f.shotOrigin[0], sy = f.shotOrigin[1];
+      const sx = experimental ? mx : f.shotOrigin[0], sy = experimental ? my : f.shotOrigin[1];
       const dx = targetPos.x - sx, dy = targetPos.y - sy;
       const distance = Math.hypot(dx, dy);
       const head = Math.min(distance, age * 2.7);

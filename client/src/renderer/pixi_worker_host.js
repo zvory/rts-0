@@ -71,6 +71,8 @@ export class PixiWorkerPresentationAdapter {
     this._gpuShadowTimingEnabled = gpuShadowTiming === true && this.surface === "match";
     this._gpuCompletePresentations = gpuCompletePresentations === true && this.surface === "match";
     this._castShadowsEnabled = castShadowsEnabled !== false;
+    this._projectedUnitShadowsEnabled = true;
+    this._experimentalGraphicsEnabled = false;
     this._parent = canvasParent;
     this._canvas = canvas;
     this._worker = worker;
@@ -201,8 +203,19 @@ export class PixiWorkerPresentationAdapter {
 
   setProjectedUnitShadowsEnabled(enabled) {
     if (this._destroyed || this._fatal || this.surface !== "match") return;
+    this._projectedUnitShadowsEnabled = !!enabled;
     this._post(createPresentationPreferencesMessage(this._generation, {
       projectedUnitShadowsEnabled: !!enabled,
+      experimentalGraphicsEnabled: this._experimentalGraphicsEnabled,
+    }));
+  }
+
+  setExperimentalGraphicsEnabled(enabled) {
+    if (this._destroyed || this._fatal || this.surface !== "match") return;
+    this._experimentalGraphicsEnabled = !!enabled;
+    this._post(createPresentationPreferencesMessage(this._generation, {
+      projectedUnitShadowsEnabled: this._projectedUnitShadowsEnabled,
+      experimentalGraphicsEnabled: this._experimentalGraphicsEnabled,
     }));
   }
 
