@@ -294,26 +294,11 @@ pub(super) fn move_withdrawal(
     let Some(route) = checked_route(frame, unit, point, known) else {
         return false;
     };
-    let mut corners = Vec::new();
-    if let Some(first) = route.first() {
-        corners.push(*first);
-    }
-    for triple in route.windows(3) {
-        let [a, b, c] = triple else {
-            continue;
-        };
-        let ab = (b.0 - a.0, b.1 - a.1);
-        let bc = (c.0 - b.0, c.1 - b.1);
-        if (ab.0 * bc.1 - ab.1 * bc.0).abs() > 0.01 || ab.0 * bc.0 + ab.1 * bc.1 <= 0. {
-            corners.push(*b);
-        }
-    }
-    if route.len() > 1 {
-        if let Some(last) = route.last() {
-            corners.push(*last);
-        }
-    }
-    let waypoints = corners.into_iter().skip(1).take(24).collect::<Vec<_>>();
+    let waypoints = crate::sdk::ground_route_corners(&route)
+        .into_iter()
+        .skip(1)
+        .take(24)
+        .collect::<Vec<_>>();
     if let Some((first, rest)) = waypoints.split_first() {
         actions.move_route(group, *first, rest).is_ok()
     } else {

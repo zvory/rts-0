@@ -236,7 +236,9 @@ impl ArmorAssignments {
                 .zip(q.world_point(post.position.0, post.position.1))
                 .and_then(|(from, to)| q.ground_route(from, to, EntityKind::Tank));
             let Some(route) = route else { continue };
-            let points = corners(&route.iter().map(|p| p.as_tuple()).collect::<Vec<_>>());
+            let points = crate::sdk::ground_route_corners(
+                &route.iter().map(|p| p.as_tuple()).collect::<Vec<_>>(),
+            );
             // Bound queued route batches below the native order queue cap. An idle Tank
             // replans the remainder after reaching a partial route's last waypoint.
             let points: Vec<_> = points.into_iter().skip(1).take(24).collect();
@@ -330,21 +332,4 @@ fn reserve_points(center: (f32, f32), size: f32, radius: i32) -> Vec<(f32, f32)>
         }
     }
     points
-}
-pub(super) fn corners(route: &[(f32, f32)]) -> Vec<(f32, f32)> {
-    if route.len() < 3 {
-        return route.to_vec();
-    }
-    let mut out = vec![route[0]];
-    for p in route.windows(3) {
-        let a = (p[1].0 - p[0].0, p[1].1 - p[0].1);
-        let b = (p[2].0 - p[1].0, p[2].1 - p[1].1);
-        if (a.0 * b.1 - a.1 * b.0).abs() > 0.01 || a.0 * b.0 + a.1 * b.1 <= 0. {
-            out.push(p[1]);
-        }
-    }
-    if let Some(last) = route.last() {
-        out.push(*last)
-    }
-    out
 }
