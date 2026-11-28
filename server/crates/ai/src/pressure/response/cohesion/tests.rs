@@ -583,3 +583,32 @@ fn withdrawal_revalidates_a_route_when_the_endpoint_is_still_safe() {
         "a safe endpoint cannot justify retaining an unsafe route"
     );
 }
+
+#[test]
+fn an_advancing_encounter_tracks_new_sightings_without_extending_its_pursuit_bound() {
+    let (start, mut s) = fixture(0, 2, 1);
+    s.visible_tiles.fill(0);
+    let mut response = PressureResponse::with_cohesive_reserve();
+    run(&mut response, &start, &s);
+    let e = s.entities.iter_mut().find(|e| e.id == 900).unwrap();
+    e.x += 3. * 32.;
+    let current = (e.x, e.y);
+    s.tick += 9;
+    let orders = run(&mut response, &start, &s);
+    assert_eq!(
+        orders
+            .iter()
+            .filter(|r| matches!(r,AiActionRequest::AttackMove{x,y,..}if (*x,*y)==current))
+            .count(),
+        2,
+        "fresh positions must replace the old attack destination"
+    );
+    // A moving target does not keep extending an encounter indefinitely.
+    s.entities.iter_mut().find(|e| e.id == 900).unwrap().x += 20. * 32.;
+    s.tick += 9;
+    let orders = run(&mut response, &start, &s);
+    assert!(!orders
+        .iter()
+        .any(|r| matches!(r, AiActionRequest::AttackMove { .. })));
+    assert!(response.responders.is_empty());
+}

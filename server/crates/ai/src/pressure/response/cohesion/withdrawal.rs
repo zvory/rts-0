@@ -2,6 +2,7 @@
 use super::*;
 #[derive(Debug)]
 pub(crate) struct ArmorEncounter {
+    anchor: Point,
     target: Point,
     pub(super) members: BTreeSet<u32>,
     withdrawing: bool,
@@ -33,7 +34,7 @@ impl PressureResponse {
             .threat_memory
             .iter()
             .filter(|(_, (_, enemy))| {
-                distance(enemy.position, encounter.target) <= 15. * frame.map().tile_size as f32
+                distance(enemy.position, encounter.anchor) <= 15. * frame.map().tile_size as f32
             })
             .collect::<Vec<_>>();
         let regrouped = encounter
@@ -58,6 +59,26 @@ impl PressureResponse {
         {
             self.armor_encounter = None;
             return;
+        }
+        // The encounter anchor bounds pursuit, while the attack destination follows
+        // the latest legal sightings inside that bound. Do not attack a frozen old point.
+        if let Some((_, (_, enemy))) = nearby.iter().max_by_key(|(id, (seen, candidate))| {
+            let strength: u64 = nearby
+                .iter()
+                .filter(|(_, (_, other))| {
+                    distance(candidate.position, other.position)
+                        <= 15. * frame.map().tile_size as f32
+                })
+                .map(|(_, (_, other))| fighting_value(book, other).ceil() as u64)
+                .sum();
+            (
+                candidate.kind == EntityKind::Tank,
+                strength,
+                *seen,
+                std::cmp::Reverse(**id),
+            )
+        }) {
+            encounter.target = enemy.position;
         }
         // Admission bubbles decide when an encounter starts, not when an unfinished
         // withdrawal ends. Changing targets or losing the original guard cannot hand
@@ -146,6 +167,7 @@ impl PressureResponse {
             >= tanks.len() * 9;
         let strong = supporting_value(front.position) >= enemy_value * 0.9;
         let encounter = self.armor_encounter.get_or_insert_with(|| ArmorEncounter {
+            anchor: target,
             target,
             members: BTreeSet::new(),
             withdrawing: !compact || !strong,
