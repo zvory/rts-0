@@ -7,6 +7,7 @@ import { projectedUnitShadowCandidate } from "./projected_unit_shadow_model_cand
 const PROXIES = Object.freeze({
   [KIND.RIFLEMAN]: [{ length: 10, width: 7, height: 15 }, { length: 6, width: 6, height: 22, forward: 0.8 }],
   [KIND.MACHINE_GUNNER]: [{ length: 13, width: 10, height: 15 }, { length: 7, width: 7, height: 22, forward: 0.8 }],
+  [KIND.BOW_NOVICE]: [{ length: 15, width: 12, height: 16 }, { length: 7, width: 7, height: 22, forward: 0.8 }],
   [KIND.WARRIOR]: [{ length: 15, width: 12, height: 16 }, { length: 7, width: 7, height: 22, forward: 0.8 }],
   [KIND.WIND_ADEPT]: [{ length: 15, width: 12, height: 16 }, { length: 7, width: 7, height: 22, forward: 0.8 }],
   [KIND.WAR_ADEPT]: [{ length: 15, width: 12, height: 16 }, { length: 7, width: 7, height: 22, forward: 0.8 }],

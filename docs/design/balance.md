@@ -757,6 +757,7 @@ Unit stats (hp, dmg, range[tiles], cooldown[ticks], speed[px/tick], sight[tiles]
 | worker          | 40  | 4   | 1     | 48 | 2.0   | 10    | 50  | 0   | 1   | 150 (5s) |
 | golem           | 160 | 16  | 1     | 48 | 2.0   | 10    | 0   | 0   | 4   | 396 (~13.2s); provisional free Ekat worker-like economy body trained at Zamok; mines at 4x worker load; can be consumed by Ekat for full heal |
 | warrior         | 58  | 23  | 0.75   | 91 | 2.0   | 11    | 50  | 0   | 2   | 300 (~10s); Cultivator Portal-trained melee bruiser; 50% armor penetration; no projectile or tracer |
+| bow_novice      | 48  | 5   | 5     | 32 | 2.0   | 11    | 50  | 0   | 2   | 300 (10s); Portal-trained immediately; no research; earns insight and evolves to any Dao at 60; zero penetration; stops to shoot with a five-tick post-shot movement pause; no Charge |
 | rifleman        | 45  | 5   | 5     | 32 | 1.6   | 11    | 35  | 0   | 1   | 300 (~10s) |
 | panzerfaust     | 45  | 5 rifle / 100 launcher | 5 | 32 rifle / one lifetime launcher | 1.6 | 11 | 55 | 10 | 1 | 300 (~10s); requires completed Panzerfausts research |
 | machine_gunner  | 55  | 4   | 6.1   | 10  | 1.28  | 11    | 75  | 10  | 2   | 400 (~13s) |
@@ -860,8 +861,8 @@ See [Cultivators](cultivators.md#three-dao-pavilion-prototype) for the approved 
 
 ### Disciple insight and Dao specializations
 
-Player-facing ranks are **Novice** for the base `warrior` and **Wind Adept**,
-**War Adept**, or **Magic Adept** for its permanent Dao specialization. Each Adept is a distinct authoritative unit kind; the base retains the `warrior` identifier.
+Player-facing base units are **Sword Disciple** (`warrior`) and **Bow Novice** (`bow_novice`), which can permanently evolve into **Wind Adept**,
+**War Adept**, or **Magic Adept**. Each base and Adept is a distinct authoritative unit kind.
 
 
 See [Dao evolution playtest](dao-insight.md). Entity-owned `insight` and authoritative unit `kind` persist
@@ -1032,3 +1033,8 @@ the Pavilion: 100 steel / 25 oil, 560 build ticks, 120 HP. Charge, Shield and Th
 are permanent independent unlocks at 100 steel / 100 oil each and take 20 seconds.
 Novice/War Charge, Magic Shield and War Throw Sword are gated at both ranks.
 Wind Blink and Magic Vector Field need no research.
+
+Bow Novice approved brief and complete rules: [Bow Novice](bow-novice.md). Both base kinds
+share the existing insight, shop inventory, tournament/training and Dao evolution rules.
+Bow Novice uses the preserved Wind archer strip and `disciple_arrow` profile (5 damage,
+5 tiles, 32 ticks, zero penetration). Sword Disciple retains its existing melee rules.

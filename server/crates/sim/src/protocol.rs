@@ -20,6 +20,7 @@ mod tests {
         kinds::WORKER,
         kinds::GOLEM,
         kinds::WARRIOR,
+        kinds::BOW_NOVICE,
         kinds::WIND_ADEPT,
         kinds::WAR_ADEPT,
         kinds::MAGIC_ADEPT,
@@ -129,7 +130,7 @@ mod tests {
     }
 }
 
-// Novice warrior (29) evolves into distinct kinds wind_adept (35), war_adept (36),
+// Sword Disciple warrior (29) and Bow Novice bow_novice (41) evolve into distinct kinds wind_adept (35), war_adept (36),
 // or magic_adept (37). EntityView.dao is derived presentation metadata, not engine identity.
 
 // Lab spawnEntity/spawnEntities entries accept optional daoMaster: bool (Adepts only).

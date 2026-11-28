@@ -288,7 +288,7 @@ fn validate_entity(
         });
     }
     if entity.chosen_dao.is_some_and(|choice| {
-        entity.kind != crate::game::entity::EntityKind::Warrior
+        !entity.kind.is_novice()
             || !matches!(
                 choice,
                 crate::game::upgrade::UpgradeKind::DaoWind

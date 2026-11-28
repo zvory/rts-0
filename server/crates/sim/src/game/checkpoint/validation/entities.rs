@@ -44,7 +44,7 @@ pub(super) fn validate_tournament_state(entity: &Entity) -> Result<(), Checkpoin
     if entity
         .movement
         .as_ref()
-        .is_some_and(|m| m.tournament_target.is_some() && entity.kind != EntityKind::Warrior)
+        .is_some_and(|m| m.tournament_target.is_some() && !entity.kind.is_novice())
     {
         return Err(CheckpointPayloadError::InvalidValue {
             field: "entities.tournamentTarget",

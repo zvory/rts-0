@@ -181,11 +181,11 @@ pub const WEAPON_PROFILES: &[WeaponProfile] = &[
     },
     WeaponProfile {
         id: WeaponKind::DiscipleArrow,
-        range_tiles: crate::balance::DAO_RANGED_RANGE_TILES,
-        dmg: 23,
-        cooldown: crate::balance::DISCIPLE_ATTACK_COOLDOWN_TICKS,
+        range_tiles: 5.0,
+        dmg: 5,
+        cooldown: 32,
         weapon_class: WeaponClass::SmallArms,
-        armor_penetration: 0.5,
+        armor_penetration: NO_ARMOR_PENETRATION,
         infantry_target_policy: InfantryTargetPolicy::None,
         facing_damage_policy: FacingDamagePolicy::None,
     },
@@ -347,6 +347,7 @@ pub fn default_weapon_kind(kind: EntityKind) -> Option<WeaponKind> {
             Some(WeaponKind::WarriorSword)
         }
         EntityKind::MagicAdept => Some(WeaponKind::DiscipleOrb),
+        EntityKind::BowNovice => Some(WeaponKind::DiscipleArrow),
         EntityKind::Rifleman | EntityKind::Panzerfaust => Some(WeaponKind::RiflemanRifle),
         EntityKind::MachineGunner => Some(WeaponKind::MachineGunnerMg),
         EntityKind::AntiTankGun => Some(WeaponKind::AntiTankGun),
@@ -812,6 +813,7 @@ mod tests {
             (EntityKind::Worker, Some(WeaponKind::WorkerTools)),
             (EntityKind::Golem, Some(WeaponKind::GolemFists)),
             (EntityKind::Warrior, Some(WeaponKind::WarriorSword)),
+            (EntityKind::BowNovice, Some(WeaponKind::DiscipleArrow)),
             (EntityKind::WindAdept, Some(WeaponKind::WarriorSword)),
             (EntityKind::WarAdept, Some(WeaponKind::WarriorSword)),
             (EntityKind::MagicAdept, Some(WeaponKind::DiscipleOrb)),

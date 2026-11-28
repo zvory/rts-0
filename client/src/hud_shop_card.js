@@ -3,7 +3,7 @@ import { KIND } from "./protocol.js";
 import { gridHotkeyForSlot } from "./hud_command_layout.js";
 
 export function isShopBuyer(entity) {
-  return [KIND.WARRIOR, KIND.WIND_ADEPT, KIND.WAR_ADEPT, KIND.MAGIC_ADEPT].includes(entity.kind);
+  return [KIND.WARRIOR, KIND.BOW_NOVICE, KIND.WIND_ADEPT, KIND.WAR_ADEPT, KIND.MAGIC_ADEPT].includes(entity.kind);
 }
 
 export function shopBuyMenuDescriptor() {

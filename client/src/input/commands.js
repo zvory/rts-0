@@ -273,7 +273,7 @@ function normalRightClickAction(input, p) {
       && !Number.isFinite(target.buildProgress)) {
     const entrants = ownUnits.filter((id) => {
       const unit = input.state.entityById(id);
-      return unit?.kind === KIND.WARRIOR && !unit.dao;
+      return (unit?.kind === KIND.WARRIOR || unit?.kind === KIND.BOW_NOVICE) && !unit.dao;
     });
     if (entrants.length) return { kind: "move", units: entrants, x: target.x, y: target.y,
       feedback: rightClickFeedback("move", target.x, target.y) };

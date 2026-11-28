@@ -850,6 +850,7 @@ pub const CULTIVATORS_CATALOG: FactionCatalog = FactionCatalog {
     units: &[
         EntityKind::Worker,
         EntityKind::Warrior,
+        EntityKind::BowNovice,
         EntityKind::WindAdept,
         EntityKind::WarAdept,
         EntityKind::MagicAdept,

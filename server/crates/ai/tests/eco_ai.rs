@@ -5,6 +5,24 @@ use rts_sim::game::{Game, PlayerInit};
 
 #[test]
 fn eco_classic_economy_reaches_six_bases_with_staged_vehicle_works() {
+    // Long progression belongs to the opt-in full AI suite, not every PR's fast gate.
+    let full_ai = ["RTS_FULL_AI_TESTS", "RTS_SELFPLAY_FULL"]
+        .into_iter()
+        .any(|name| {
+            matches!(
+                std::env::var(name)
+                    .unwrap_or_default()
+                    .to_ascii_lowercase()
+                    .as_str(),
+                "1" | "true" | "yes" | "on"
+            )
+        });
+    if !full_ai {
+        eprintln!(
+            "skipping six-base Eco progression; set RTS_FULL_AI_TESTS=1 to run full AI coverage"
+        );
+        return;
+    }
     let players = [1, 2].map(|id| PlayerInit {
         id,
         team_id: id,

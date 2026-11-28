@@ -3,7 +3,7 @@ import fs from "node:fs";
 import { PNG } from "pngjs";
 import { KIND, STATE } from "../../client/src/protocol.js";
 import { createLiveFrameStrips, liveFrameStripFor, liveFrameStripKeyForEntity } from "../../client/src/renderer/rigs/frame_strip_routing.js";
-import { WIND_PNG_FRAME_STRIP, MAGIC_PNG_FRAME_STRIP, WAR_PNG_FRAME_STRIP,
+import { BOW_NOVICE_PNG_FRAME_STRIP, WIND_PNG_FRAME_STRIP, MAGIC_PNG_FRAME_STRIP, WAR_PNG_FRAME_STRIP,
   WIND_MASTER_PNG_FRAME_STRIP, MAGIC_MASTER_PNG_FRAME_STRIP, WAR_MASTER_PNG_FRAME_STRIP } from "../../client/src/renderer/rigs/disciple_png_strips.js";
 import { PRESENTATION_ENTITY_FIELDS } from "../../client/src/presentation/entity_snapshot.js";
 import { WARRIOR_PNG_FRAME_STRIP } from "../../client/src/renderer/rigs/warrior_png_strip.js";
@@ -152,3 +152,17 @@ for (const [dao, master, adept] of [["wind", WIND_MASTER_PNG_FRAME_STRIP, WIND_P
 }
 minimap.destroy();
 console.log("disciple_dao_sprite_contracts: ok");
+
+// The preserved archer art is a live first-class kind, including its shot-driven frames.
+assert.equal(liveFrameStripFor(strips, KIND.BOW_NOVICE), BOW_NOVICE_PNG_FRAME_STRIP);
+assert.equal(entityAttackRangeTiles({ kind: KIND.BOW_NOVICE }), 5);
+assert.equal(entityBodyRadius({ kind: KIND.BOW_NOVICE }), 17);
+assert.match(liveUnitIconMarkupFor(KIND.BOW_NOVICE), /disciple-dao.*wind-runtime-strip/);
+const bowPng = PNG.sync.read(fs.readFileSync(new URL(`../../${BOW_NOVICE_PNG_FRAME_STRIP.source.runtimeStrip}`, import.meta.url)));
+assert.equal(bowPng.width, 8 * 256);
+assert.equal(bowPng.height, 256);
+for (const [index, phase] of [0, 0.25, 0.5, 0.75].entries()) {
+  assert.equal(frameStripFrameIndex(BOW_NOVICE_PNG_FRAME_STRIP, { kind: KIND.BOW_NOVICE }, {
+    now: 600, recoilProgress: 0.9, recoilPhase: phase, recoilWeaponKind: "disciple_arrow",
+  }), 4 + index);
+}

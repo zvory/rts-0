@@ -29,6 +29,7 @@ const DEFAULT_WEAPON_KIND_BY_ATTACKER_KIND = Object.freeze({
   [KIND.RIFLEMAN]: WEAPON_KIND.RIFLEMAN_RIFLE,
   [KIND.PANZERFAUST]: WEAPON_KIND.RIFLEMAN_RIFLE,
   [KIND.WARRIOR]: WEAPON_KIND.WARRIOR_SWORD,
+  [KIND.BOW_NOVICE]: WEAPON_KIND.DISCIPLE_ARROW,
   [KIND.WIND_ADEPT]: WEAPON_KIND.WARRIOR_SWORD,
   [KIND.WAR_ADEPT]: WEAPON_KIND.WARRIOR_SWORD,
   [KIND.MAGIC_ADEPT]: WEAPON_KIND.DISCIPLE_ORB,
@@ -48,6 +49,7 @@ const ATTACK_FEEDBACK_KIND_BY_WEAPON = Object.freeze({
   [WEAPON_KIND.PANZERFAUST_LOADED_SHOT]: KIND.RIFLEMAN,
   [WEAPON_KIND.WARRIOR_SWORD]: KIND.WARRIOR,
   [WEAPON_KIND.DISCIPLE_ORB]: KIND.WARRIOR,
+  [WEAPON_KIND.DISCIPLE_ARROW]: KIND.BOW_NOVICE,
   [WEAPON_KIND.SCOUT_CAR_MG]: KIND.SCOUT_CAR,
   [WEAPON_KIND.ANTI_TANK_GUN]: KIND.ANTI_TANK_GUN,
   [WEAPON_KIND.MORTAR_TEAM_MORTAR]: KIND.MORTAR_TEAM,
@@ -78,6 +80,7 @@ export function defaultWeaponKindForAttackerKind(kind) {
 }
 
 export function attackFeedbackKind(kind, weaponKind) {
+  if (kind === KIND.BOW_NOVICE || weaponKind === WEAPON_KIND.DISCIPLE_ARROW) return KIND.BOW_NOVICE;
   const defaultWeaponKind = defaultWeaponKindForAttackerKind(kind);
   if (!weaponKind || weaponKind === defaultWeaponKind) {
     return isDiscipleKind(kind) ? KIND.WARRIOR : kind;
@@ -86,7 +89,8 @@ export function attackFeedbackKind(kind, weaponKind) {
 }
 
 export function attackKindHasCombatSound(kind, weaponKind) {
-  if (weaponKind === WEAPON_KIND.PANZERFAUST_LOADED_SHOT) return false;
+  if (kind === KIND.BOW_NOVICE || weaponKind === WEAPON_KIND.DISCIPLE_ARROW
+    || weaponKind === WEAPON_KIND.PANZERFAUST_LOADED_SHOT) return false;
   const feedbackKind = attackFeedbackKind(kind, weaponKind);
   return feedbackKind !== KIND.WORKER;
 }

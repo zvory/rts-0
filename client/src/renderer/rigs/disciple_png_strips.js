@@ -11,7 +11,7 @@ export const WAR_MASTER_FRAME_STRIP_KEY = "war_adept:master";
 export const MAGIC_MASTER_FRAME_STRIP_KEY = "magic_adept:master";
 
 function discipleStrip(image, frameCount, firingFrames, iconVisibleBounds, weaponKind, imageVersion = "dao-ranged-1") {
-  return withGoldenAttackTrail({
+  return Object.freeze({
     enabled: true,
     unit: "warrior",
     image,
@@ -46,10 +46,12 @@ function discipleStrip(image, frameCount, firingFrames, iconVisibleBounds, weapo
 
 // Candidate B: scarf rests at idle, streams while running, and follows the sword swing.
 // Original archer source and runtime strips are preserved for future reuse.
-export const WIND_PNG_FRAME_STRIP = discipleStrip("/assets/rigs/disciple-dao/generated/wind-melee-b-runtime-strip.png?v=melee-b-wind-2", 8, [4, 5, 6, 7],
-  { x: 75, y: 93, w: 131, h: 120 }, "warrior_sword", "melee-b-wind-2");
-export const MAGIC_PNG_FRAME_STRIP = discipleStrip("/assets/rigs/disciple-dao/generated/magic-runtime-strip.png?v=dao-ranged-1", 8, [4, 5, 6, 7],
-  { x: 63, y: 80, w: 128, h: 113 }, "disciple_orb");
+export const BOW_NOVICE_PNG_FRAME_STRIP = discipleStrip("/assets/rigs/disciple-dao/generated/wind-runtime-strip.png?v=bow-novice-1", 8, [4, 5, 6, 7],
+  { x: 50, y: 50, w: 180, h: 190 }, "disciple_arrow", "bow-novice-1");
+export const WIND_PNG_FRAME_STRIP = withGoldenAttackTrail(discipleStrip("/assets/rigs/disciple-dao/generated/wind-melee-b-runtime-strip.png?v=melee-b-wind-2", 8, [4, 5, 6, 7],
+  { x: 75, y: 93, w: 131, h: 120 }, "warrior_sword", "melee-b-wind-2"));
+export const MAGIC_PNG_FRAME_STRIP = withGoldenAttackTrail(discipleStrip("/assets/rigs/disciple-dao/generated/magic-runtime-strip.png?v=dao-ranged-1", 8, [4, 5, 6, 7],
+  { x: 63, y: 80, w: 128, h: 113 }, "disciple_orb"));
 
 // Armored Yari B with a longer reach and an event-driven forward step.
 export const WAR_PNG_FRAME_STRIP = withGoldenAttackTrail({

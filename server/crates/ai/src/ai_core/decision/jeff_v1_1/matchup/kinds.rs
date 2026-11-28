@@ -27,6 +27,7 @@ pub(super) fn fights(kind: EntityKind) -> bool {
             | EntityKind::AntiTankGun
             | EntityKind::MortarTeam
             | EntityKind::Warrior
+            | EntityKind::BowNovice
             | EntityKind::Golem
             | EntityKind::Ekat
     )
@@ -35,7 +36,10 @@ pub(super) fn fights(kind: EntityKind) -> bool {
 pub(super) fn infantry(kind: EntityKind) -> bool {
     matches!(
         kind,
-        EntityKind::Rifleman | EntityKind::Panzerfaust | EntityKind::MachineGunner
+        EntityKind::Rifleman
+            | EntityKind::Panzerfaust
+            | EntityKind::MachineGunner
+            | EntityKind::BowNovice
     )
 }
 
@@ -72,6 +76,7 @@ pub(crate) fn reach(attacker: EntityKind, target: EntityKind, still_ticks: u32) 
                 cannon.max(6.0)
             }
         }
+        EntityKind::BowNovice => 5.0,
         EntityKind::ScoutCar => 7.0,
         EntityKind::MachineGunner => 6.1,
         EntityKind::Rifleman | EntityKind::Panzerfaust | EntityKind::AntiTankGun => 5.0,
@@ -89,6 +94,7 @@ pub(crate) fn dps(attacker: EntityKind, target: EntityKind, meth: bool) -> f32 {
     let rifle = if hard { 1.0 } else { 5.0 } * TICK_HZ / if meth { 24.0 } else { 32.0 };
     match attacker {
         EntityKind::Rifleman => rifle,
+        EntityKind::BowNovice => (if hard { 1.0 } else { 5.0 }) * TICK_HZ / 32.0,
         EntityKind::Panzerfaust => rifle + if vehicle(target) { 10.0 } else { 0.0 },
         EntityKind::MachineGunner => {
             if hard {
