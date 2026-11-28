@@ -274,7 +274,14 @@ pub(super) fn build(planner: &mut DefensePlanner, frame: &AiFrame) -> Vec<Sector
     if ids.is_empty() {
         return vec![];
     }
-    let mut groups = if ids.len() <= 4 {
+    let mut groups = if planner.garrison_posts_per_base.is_some() {
+        ids.iter()
+            .map(|id| Group {
+                bases: vec![*id],
+                cut: None,
+            })
+            .collect()
+    } else if ids.len() <= 4 {
         let mut options = vec![];
         for blocks in partitions(&ids) {
             alternatives(planner, frame, &blocks, 0, &mut vec![], &mut options);
@@ -361,7 +368,9 @@ pub(super) fn build(planner: &mut DefensePlanner, frame: &AiFrame) -> Vec<Sector
                 .filter(|i| grid.entrench[*i])
                 .filter(|i| {
                     let d = dist2(grid.point(*i), base.position) / (grid.size * grid.size);
-                    (9. ..=25.).contains(&d)
+                    (GARRISON_INNER_TILES * GARRISON_INNER_TILES
+                        ..=GARRISON_OUTER_TILES * GARRISON_OUTER_TILES)
+                        .contains(&d)
                 })
                 .collect();
             out.push(SectorGeometry {

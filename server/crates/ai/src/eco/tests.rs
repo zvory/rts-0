@@ -58,6 +58,34 @@ pub(super) fn building(
     .into();
     s.entities.push(e);
 }
+/// Fixtures exercising expansion/combat need infantry in addition to the new
+/// four-per-base observation floor. Station those guards on the real SDK posts.
+pub(super) fn add_observation_garrisons(
+    start: &StartPayload,
+    s: &mut Snapshot,
+    sites: &[AiBaseSite],
+) {
+    let f = frame(start, s, sites);
+    let owned = owned_sites(&f);
+    let plan = DefensePlanner::with_garrison_posts_per_base(4).plan(&f, &owned, owned.len() * 4);
+    let template = s
+        .entities
+        .iter()
+        .find(|e| e.owner == 1 && e.kind == "resource_depot")
+        .unwrap()
+        .clone();
+    for (i, slot) in plan.slots.iter().enumerate() {
+        let mut e = template.clone();
+        e.id = 20000 + i as u32;
+        e.kind = "rifleman".into();
+        e.x = slot.position.0;
+        e.y = slot.position.1;
+        e.hp = 100;
+        e.max_hp = 100;
+        e.state = "idle".into();
+        s.entities.push(e);
+    }
+}
 #[test]
 fn incomplete_depots_do_not_unlock_research_or_capacity() {
     let (start, mut s, sites) = fixture();
@@ -396,6 +424,7 @@ fn second_base_completes_both_required_upgrades_before_third_expansion() {
         None,
     );
     building(&mut s, 805, "factory", (home.0 + 512., home.1 + 256.), None);
+    add_observation_garrisons(&start, &mut s, &sites);
     for upgrades in [vec!["entrenchment"], vec!["entrenchment", "panzerfausts"]] {
         s.upgrades = upgrades.into_iter().map(str::to_string).collect();
         let f = frame(&start, &s, &sites);
@@ -740,7 +769,7 @@ fn assigned_expansion_screen_advances_before_engineer_while_rear_posts_remain() 
         assert!(
             requests.iter().any(|r| matches!(r,
                 AiActionRequest::AttackMove { units,x,y,.. } if units.contains(id)
-                    && line.slots.iter().any(|slot| construction::dist2(slot.position,(*x,*y))<1.)
+                    && eco.defense.assigned_posts().get(id).is_some_and(|point| construction::dist2(*point,(*x,*y))<1.)
             )),
             "infantry {id} must attack-move to the future line even while fighting"
         );
@@ -952,6 +981,7 @@ fn pressure_response_mobilizes_mgs_keeps_ownership_and_rejoins_expansion_screen(
 #[test]
 fn cleared_visible_contact_releases_screen_without_thirty_second_expansion_delay() {
     let (start, mut s, sites) = fixture();
+    add_observation_garrisons(&start, &mut s, &sites);
     s.visible_tiles = vec![1; (start.map.width * start.map.height) as usize];
     let mut enemy = s
         .entities
@@ -1055,6 +1085,7 @@ fn contact_clearance_requires_visible_open_ground_without_smoke() {
 #[test]
 fn engineer_uses_its_route_instead_of_waiting_for_every_combat_contact() {
     let (start, mut s, sites) = fixture();
+    add_observation_garrisons(&start, &mut s, &sites);
     s.visible_tiles.fill(0);
     let f = frame(&start, &s, &sites);
     let site = expansion(&f).unwrap().0;
@@ -1125,6 +1156,7 @@ fn engineer_uses_its_route_instead_of_waiting_for_every_combat_contact() {
 #[test]
 fn retry_footprint_is_shared_by_defense_and_the_engineer() {
     let (start, mut s, sites) = fixture();
+    add_observation_garrisons(&start, &mut s, &sites);
     let f = frame(&start, &s, &sites);
     let q = WorldQueries::new(&f);
     let site = expansion(&f).unwrap().0;
@@ -1182,3 +1214,5 @@ mod tanks;
 mod armor;
 
 mod micro;
+
+mod sentries;

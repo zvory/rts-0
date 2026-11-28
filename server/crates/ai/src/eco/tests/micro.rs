@@ -52,6 +52,7 @@ fn combat(kind: &str, beyond_midfield: bool) -> (StartPayload, Snapshot, Vec<AiB
     enemy.state = "attack".into();
     s.entities.push(enemy);
     s.tick = 100;
+    add_observation_garrisons(&start, &mut s, &sites);
     (start, s, sites, 900)
 }
 fn targets(request: &AiActionRequest, id: u32) -> bool {
@@ -127,7 +128,15 @@ fn low_health_without_visible_target_or_healthy_combat_cover_does_not_pull_back(
     for no_cover in [false, true] {
         let (start, mut s, sites, id) = combat("machine_gunner", false);
         if no_cover {
-            s.entities.iter_mut().find(|e| e.id == 901).unwrap().hp = 10;
+            for e in s.entities.iter_mut().filter(|e| {
+                e.owner == 1
+                    && matches!(
+                        e.kind.as_str(),
+                        "rifleman" | "machine_gunner" | "panzerfaust" | "tank"
+                    )
+            }) {
+                e.hp = 10;
+            }
         } else {
             s.entities
                 .iter_mut()
@@ -149,6 +158,7 @@ fn low_health_without_visible_target_or_healthy_combat_cover_does_not_pull_back(
 #[test]
 fn retreating_infantry_no_longer_counts_as_the_expansion_screen() {
     let (start, mut s, sites) = fixture();
+    add_observation_garrisons(&start, &mut s, &sites);
     let mut defense = tactics::DefenseAssignments::default();
     let f = frame(&start, &s, &sites);
     let owned = owned_sites(&f);
@@ -267,7 +277,10 @@ fn combat_borrows_home_posts_without_collapsing_the_four_base_plan() {
             })
             .collect();
     assert!(
-        posts.keys().all(|id| returns.contains(id)),
+        posts
+            .keys()
+            .filter(|id| !defense.assigned_sentry_posts().contains_key(id))
+            .all(|id| returns.contains(id)),
         "release must replace stale retreat movement with home-post orders"
     );
 }

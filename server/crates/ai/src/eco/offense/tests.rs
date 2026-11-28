@@ -176,14 +176,20 @@ fn outbound_troops_yield_to_micro_without_receiving_reserve_or_post_orders() {
     let f = frame(&start, &s, &sites);
     let mut off = EcoOffense::default();
     off.observe(&f);
-    let pool = off.controlled(&f, &BTreeSet::new());
     let mut defense = crate::eco::tactics::DefenseAssignments::default();
+    let owned = crate::eco::owned_sites(&f);
+    let guards = defense.prepare_sentries(&f, &owned);
+    let pool = off.controlled(&f, &guards);
     let mut planner = crate::sdk::DefensePlanner::new();
     let mut a = AiActions::for_frame(&f);
-    let owned = crate::eco::owned_sites(&f);
     let feedback = defense.step_with_outbound(&f, &mut a, &mut planner, &owned, &pool);
-    assert!(a.is_empty());
-    assert!(feedback.active.is_empty());
+    assert_eq!(feedback.active, guards);
+    assert!(a.into_requests().iter().all(|r| match r {
+        AiActionRequest::Move { units, .. } | AiActionRequest::HoldPosition { units, .. } =>
+            units.iter().all(|id| guards.contains(id)),
+        _ => false,
+    }));
+    let mut a = AiActions::for_frame(&f);
     off.step(&f, &mut a, &pool, &feedback);
     assert!(!a.is_empty());
 }

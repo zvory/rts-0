@@ -779,7 +779,7 @@ fn garrison_posts_surround_base_on_bounded_ring_and_keep_construction_access_cle
         for slot in &ring.slots {
             let radius = dist2(slot.position, base.position) / (ts * ts);
             assert!(
-                (9. ..=25.).contains(&radius),
+                (49. ..=81.).contains(&radius),
                 "P{player} radius squared={radius}"
             );
             quadrants.insert((
@@ -819,7 +819,7 @@ fn garrison_posts_surround_base_on_bounded_ring_and_keep_construction_access_cle
             "exhausted ring must not invent fallback posts"
         );
         for (i, slot) in reserved.slots.iter().enumerate() {
-            assert!((9. ..=25.).contains(&(dist2(slot.position, base.position) / (ts * ts))));
+            assert!((49. ..=81.).contains(&(dist2(slot.position, base.position) / (ts * ts))));
             assert!(!super::super::unit_circle_touches_rect(
                 slot.position,
                 rts_rules::balance::unit_placement_radius(EntityKind::MachineGunner) + ts,

@@ -16,8 +16,6 @@ pub(crate) struct PressureResponse {
     include_machine_gunners: bool,
     cohesive: bool,
     prepared_defended_tick: Option<u32>,
-    threat_memory: BTreeMap<u32, (u32, AiEntity)>,
-    armor_encounter: Option<cohesion::withdrawal::ArmorEncounter>,
     fighting: BTreeMap<u32, bool>,
     release_cleared_contacts: bool,
     defended: defended::DefendedResponse,
@@ -116,18 +114,16 @@ impl PressureResponse {
     pub(crate) fn prepare_defended(
         &mut self,
         frame: &AiFrame,
-        eligible: &BTreeSet<u32>,
         areas: &[DefendedArea],
     ) -> Option<Point> {
         let book = AiRulebook::for_frame(frame)?;
-        self.observe_contacts(frame, eligible, Some(areas), book);
+        self.observe_contacts(frame, Some(areas), book);
         self.prepared_defended_tick = Some(frame.tick());
         self.recon_target(frame)
     }
     fn observe_contacts(
         &mut self,
         frame: &AiFrame,
-        eligible: &BTreeSet<u32>,
         areas: Option<&[DefendedArea]>,
         book: AiRulebook,
     ) {
@@ -148,9 +144,6 @@ impl PressureResponse {
             .iter()
             .find(|player| player.team_id != frame.team_id() && player.is_alive)
             .map(base_position);
-        if self.cohesive {
-            self.observe_threats(frame);
-        }
         self.contacts
             .retain(|_, contact| frame.tick().saturating_sub(contact.seen) < MEMORY_TICKS);
         let previous_contacts = self.contacts.keys().copied().collect::<BTreeSet<_>>();
@@ -196,9 +189,6 @@ impl PressureResponse {
                 });
             }
         }
-        if self.cohesive {
-            self.retain_encounter(frame, eligible, book);
-        }
         if areas.is_some()
             && (changed_incident
                 || previous_contacts
@@ -224,9 +214,9 @@ impl PressureResponse {
         // Its next eligible decision must issue a fresh response, even if it is still moving.
         self.issued.retain(|id, _| eligible.contains(id));
         if self.prepared_defended_tick.take() != Some(frame.tick()) {
-            self.observe_contacts(frame, eligible, areas, book);
+            self.observe_contacts(frame, areas, book);
         }
-        if self.contacts.is_empty() && !self.has_withdrawal() {
+        if self.contacts.is_empty() {
             self.issued.clear();
             self.fighting.clear();
             return ResponsePlan {

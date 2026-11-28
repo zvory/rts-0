@@ -195,7 +195,7 @@ pub(super) fn score(planner: &mut DefensePlanner, frame: &AiFrame, budget: usize
     for (id, geo) in planner.geometry.iter().enumerate() {
         let center = g.point(geo.center);
         let slots = if geo.mode == DefenseMode::Garrison {
-            // The ring is already restricted to 3–5 tiles from the public base center.
+            // The ring is already restricted to 7–9 tiles from the public base center.
             // Do not expand it by weapon range or require a ray through the Depot itself.
             geo.points
                 .iter()
@@ -213,6 +213,15 @@ pub(super) fn score(planner: &mut DefensePlanner, frame: &AiFrame, budget: usize
                 })
                 .collect::<Vec<_>>()
         };
+        let slots = slots
+            .into_iter()
+            .filter(|i| {
+                planner
+                    .reserved_posts
+                    .iter()
+                    .all(|p| dist2(g.point(*i), *p) > (1.4 * g.size).det_powi(2))
+            })
+            .collect::<Vec<_>>();
         let eta = geo
             .points
             .iter()
@@ -323,15 +332,21 @@ pub(super) fn score(planner: &mut DefensePlanner, frame: &AiFrame, budget: usize
                     })
                     .max_by(|a, b| weights[*a].total_cmp(&weights[*b]).then_with(|| b.cmp(a)))
             });
-        let selected = screen.or_else(|| {
+        let selected = if let Some(cap) = planner.garrison_posts_per_base {
             (0..plan.sectors.len())
-                .filter(|i| weights[*i] > 0. && !candidates[*i].is_empty())
-                .max_by(|a, b| {
-                    let qa = weights[*a] / (plan.sectors[*a].slots.len() + 1) as f32;
-                    let qb = weights[*b] / (plan.sectors[*b].slots.len() + 1) as f32;
-                    qa.total_cmp(&qb).then_with(|| b.cmp(a))
-                })
-        });
+                .filter(|i| plan.sectors[*i].slots.len() < cap && !candidates[*i].is_empty())
+                .min_by_key(|i| (plan.sectors[*i].slots.len(), *i))
+        } else {
+            screen.or_else(|| {
+                (0..plan.sectors.len())
+                    .filter(|i| weights[*i] > 0. && !candidates[*i].is_empty())
+                    .max_by(|a, b| {
+                        let qa = weights[*a] / (plan.sectors[*a].slots.len() + 1) as f32;
+                        let qb = weights[*b] / (plan.sectors[*b].slots.len() + 1) as f32;
+                        qa.total_cmp(&qb).then_with(|| b.cmp(a))
+                    })
+            })
+        };
         let Some(si) = selected else {
             break;
         };

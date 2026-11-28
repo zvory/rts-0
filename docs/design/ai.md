@@ -253,11 +253,16 @@ the previous surviving partition extended with new sites. Each search evaluates 
 candidate merges, preserving useful shared cuts across the fifth-site transition without
 exponential subset enumeration. Removed sites invalidate any old group containing them. The planner does not choose expansion timing,
 assign entity IDs, issue orders, or take tactical ownership from its caller.
-Garrison sectors use the public base center and offer posts in a three-to-five-tile ring around
+Garrison sectors use the public base center and offer posts in a seven-to-nine-tile ring around
 it. After a forward-facing first post, successive posts maximize separation around the legal
 ring instead of clustering at one forward point. Known obstacles, entrenchment restrictions,
 reachable paths, reserved building footprints and Engineer access still restrict available posts;
 a blocked or exhausted ring leaves staffing unallocated rather than piling units onto a fallback.
+`with_garrison_posts_per_base(n)` opts into fixed observation rings (one to sixteen posts per
+completed requested base), allocating scarce budgets in rounds instead of economic weights.
+`reserve_posts` excludes another formation's planned posts from slot allocation without turning
+friendly guards into walls for route reachability or cut geometry. Eco uses a four-post observer
+planner alongside its normal hybrid planner and includes both sets when parking armor.
 `plan_with_expansion` combines validated completed owned sites with one prospective site in the
 same geometry and economic staffing allocation. It never substitutes the expansion for the owned
 base set. With nonzero budget it allocates one physically supported expansion post first, so a
@@ -315,8 +320,8 @@ by remaining Steel stock (unknown deposits use the same 312.5 planning estimate 
 When all deposits are exhausted, the average completed-base position is the fallback. The nearest
 body-clear reachable reserve anchor is chosen; disconnected components form local reserves rather
 than crossing impassable terrain. Stable posts form a square grid with two-tile spacing, exclude infantry slots
-and the reserved Depot footprint, and tolerate small centroid shifts without reshuffling parked units. Combat regrouping uses
-separate two-tile Tank grid destinations as well. Bounded atomic Move
+and the reserved Depot footprint, and tolerate small centroid shifts without reshuffling parked units. Local combat staging also uses
+separate two-tile Tank grid destinations. Bounded atomic Move
 route batches reserve each Tank once and retain all queued corners, gathering armor without acquiring fights en route; idle/stalled units retry and released
 responders return to reserve. Armor does not entrench. Supply and standing production remain native.
 Eco targets one Command Car per completed base beyond the second, replaces losses,
@@ -338,31 +343,26 @@ and Breakthrough, and uses only current defensive contacts and public geography.
 to reach the incident within eighty percent of their lifetime, preserving observation time; an
 unreachable incident neither spends the reserve nor creates a covered-area record.
 
-Eco's cohesive response remembers legally seen armed enemies for thirty seconds, merging live
-observations by entity ID. Both HP-adjusted strength and retreat danger geometry use this same
-formation estimate. Losing visibility of most of a formation does not reduce it to the remaining
-visible front unit. An unseen observation clears when its full last-known firing envelope is
-observable, or expires; a visible zero-HP observation also clears it. Hidden health and position
-are never updated from authoritative state.
-
 Recon sortie coverage is reconciled with observed living owned planes after launch; losing a
 plane releases coverage immediately rather than waiting for its nominal lifetime.
 
-A Tank encounter retains tactical ownership through withdrawal even if the original protected
-guard dies or enemies change targets outside the initial admission bubble. The main Tank
-concentration makes one advance/withdraw decision. A fixed encounter anchor bounds pursuit while
-the attack destination follows refreshed observations inside that bound. A withdrawing group receives separate
-body-reachable, two-tile-spaced destinations around one safe rally area. Retreat orders preserve
-the checked route with queued corner waypoints rather than asking the simulator to choose a new
-route to the endpoint. Re-entry requires ninety
-percent of surviving assigned Tanks within two tiles of their posts and local HP-adjusted friendly
-strength at least ninety percent of the remembered enemy force. New overwhelming information can
-trigger withdrawal immediately; no fixed timer forces an unfavorable engagement. Confirmed area
-clearance or stale-memory expiry ends the bounded encounter after an unfinished withdrawal has
-regrouped; loss of the assigned force ends it immediately. After clearance, members with no
-physical route to the rally return to local control so disconnected terrain cannot hold the
-reachable group indefinitely. Hidden but remembered enemies do not permit this release.
-Infantry's independent local ninety-percent gate and other profiles' response policies remain.
+Eco uses the earlier visible-enemy local combat assessment, with HP-adjusted value and the
+existing ninety-percent local parity gate. It does not retain a remembered enemy formation or
+an armor encounter, require ninety-percent group regrouping, or hold tanks after an incident
+clears while waiting for a shared rally. Tanks are recruited at two per observed enemy Tank;
+a Scout Car alone does not mobilize them. Bounded incident/contact bookkeeping still prevents
+unlimited pursuit and releases a contact when its last position is visibly clear.
+
+Every completed owned base reserves four available infantry on observation garrisons before
+combat responses, expansion cover, or offensive pushes borrow units. These posts use the SDK's
+fixed garrison planner, independent of remaining-Steel economic weights; scarce infantry spread
+across supported bases in rounds. Surviving exact posts keep their guards; casualties are
+replaced, wounded micro retains priority, and unsupported terrain never fabricates a legal post.
+The normal hybrid planner staffs terrain cuts with the remaining infantry. Garrison rings are
+seven to nine tiles from the base center (four tiles farther than the previous three-to-five
+ring), using the same footprint, resource, access, reachability, spacing and spreading checks.
+The earlier entire-reserve expansion claim remains: tanks escort a proposed base until clear,
+then return to the updated reserve centroid. This is separate from defensive threat recruitment.
 
 After claiming its territory goal, at 300 supply Eco permanently unlocks a staged offensive. Public geographic ranks, snapshotted
 for a living enemy, choose targets from half the map's base-site count inward to that enemy's main

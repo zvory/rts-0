@@ -6,6 +6,8 @@
 //! Unknown resource amounts remain unknown: valuation alone uses a 312.5-Steel
 //! remaining-stock estimate (half a full patch). The public diagnostics distinguish known stock and unknown node counts.
 //! All coordinates in public results except `cut_tiles` are world pixels.
+pub(super) const GARRISON_INNER_TILES: f32 = 7.;
+pub(super) const GARRISON_OUTER_TILES: f32 = 9.;
 mod flow;
 mod geometry;
 mod grid;
@@ -95,6 +97,8 @@ struct AssetSignature {
 #[derive(Default)]
 pub struct DefensePlanner {
     firing_range_tiles: Option<f32>,
+    garrison_posts_per_base: Option<usize>,
+    reserved_posts: Vec<(f32, f32)>,
     map: Option<AiMap>,
     player: u32,
     topology_identity: Vec<u64>,
@@ -119,6 +123,31 @@ pub struct DefensePlanner {
 impl DefensePlanner {
     pub fn new() -> Self {
         Self::default()
+    }
+    /// A fixed observation garrison for every completed requested base, independent of
+    /// economic weighting. Posts per base are clamped to 1..=16; scarce budgets spread
+    /// one post per supported base before adding the next round. Normal planners keep
+    /// using the hybrid cut/garrison algorithm.
+    pub fn with_garrison_posts_per_base(posts: usize) -> Self {
+        Self {
+            garrison_posts_per_base: Some(posts.clamp(1, 16)),
+            ..Self::default()
+        }
+    }
+    /// Exclude another formation's destinations from slot allocation, while leaving
+    /// them traversable for route/line geometry. Transient friendly bodies are not walls.
+    pub fn reserve_posts(&mut self, posts: &[(f32, f32)]) {
+        let mut posts = posts
+            .iter()
+            .copied()
+            .filter(|p| p.0.is_finite() && p.1.is_finite())
+            .collect::<Vec<_>>();
+        posts.sort_by(|a, b| a.0.total_cmp(&b.0).then(a.1.total_cmp(&b.1)));
+        posts.dedup();
+        if posts != self.reserved_posts {
+            self.reserved_posts = posts;
+            self.last_plan = None;
+        }
     }
     /// Restrict placements to a caller's conservative firing range (tiles), e.g. the shortest
     /// range in a mixed infantry group. Invalid values use the authoritative MG range minus 0.2.
@@ -242,8 +271,12 @@ impl DefensePlanner {
             || self.topology_identity != topology_identity
         {
             let firing_range_tiles = self.firing_range_tiles;
+            let garrison_posts_per_base = self.garrison_posts_per_base;
+            let reserved_posts = std::mem::take(&mut self.reserved_posts);
             *self = Self::default();
             self.firing_range_tiles = firing_range_tiles;
+            self.garrison_posts_per_base = garrison_posts_per_base;
+            self.reserved_posts = reserved_posts;
             self.topology_identity = topology_identity;
             self.map = Some(frame.map().clone());
             self.player = frame.player_id();

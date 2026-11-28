@@ -23,6 +23,7 @@ pub(super) struct DefenseAssignments {
     screen_wave: BTreeSet<u32>,
     guard_posts: BTreeMap<u32, (f32, f32)>,
     armor: super::armor::ArmorAssignments,
+    sentries: super::sentries::Sentries,
     pullback: PullbackMemory,
     response: crate::pressure::response::PressureResponse,
     responding: BTreeSet<u32>,
@@ -42,6 +43,7 @@ impl Default for DefenseAssignments {
             screen_wave: Default::default(),
             guard_posts: Default::default(),
             armor: Default::default(),
+            sentries: Default::default(),
             pullback: Default::default(),
             response: crate::pressure::response::PressureResponse::with_cohesive_reserve(),
             responding: Default::default(),
@@ -52,6 +54,20 @@ impl Default for DefenseAssignments {
     }
 }
 impl DefenseAssignments {
+    #[cfg(test)]
+    pub(super) fn assigned_sentry_posts(&self) -> &BTreeMap<u32, (f32, f32)> {
+        self.sentries.posts()
+    }
+    pub(super) fn prepare_sentries(
+        &mut self,
+        frame: &AiFrame,
+        sites: &[AiBaseSiteId],
+    ) -> BTreeSet<u32> {
+        let ids = self.sentries.refresh(frame, sites);
+        self.guard_posts.extend(self.sentries.posts());
+        ids
+    }
+
     pub(super) fn prepare_expansion(&mut self, site: AiBaseSiteId) {
         if self.frontier != Some(site) {
             self.frontier = Some(site);
@@ -241,13 +257,7 @@ impl DefenseAssignments {
     ) -> Option<(f32, f32)> {
         self.guard_posts.retain(|id, _| !outbound.contains(id));
         let areas = self.defended_areas(frame);
-        let eligible = frame
-            .owned()
-            .iter()
-            .filter(|e| infantry(e.kind) || e.kind == EntityKind::Tank)
-            .map(|e| e.id)
-            .collect();
-        self.response.prepare_defended(frame, &eligible, &areas)
+        self.response.prepare_defended(frame, &areas)
     }
     pub(super) fn attacking_ids(&self) -> BTreeSet<u32> {
         self.response.attacking_ids()
@@ -269,6 +279,7 @@ impl DefenseAssignments {
         sites: &[AiBaseSiteId],
         outbound: &BTreeSet<u32>,
     ) -> TacticalOwnership {
+        let sentries = self.prepare_sentries(frame, sites);
         let members: Vec<_> = frame
             .owned()
             .iter()
@@ -285,9 +296,10 @@ impl DefenseAssignments {
             self.advance_orders.remove(id);
             self.screen_units.remove(id);
         }
+        self.sentries.step(frame, actions, &pullback.active);
         let eligible = members
             .into_iter()
-            .filter(|id| !pullback.active.contains(id))
+            .filter(|id| !pullback.active.contains(id) && !sentries.contains(id))
             .collect();
         // Outbound troops no longer staff their old posts. Buildings remain home anchors,
         // and the shared response may still borrow these troops for a real home invasion.
@@ -321,7 +333,7 @@ impl DefenseAssignments {
         let infantry: Vec<_> = frame
             .owned()
             .iter()
-            .filter(|e| infantry(e.kind) && e.health.current > 0)
+            .filter(|e| infantry(e.kind) && e.health.current > 0 && !sentries.contains(&e.id))
             .collect();
         if infantry.is_empty() {
             self.destinations.clear();
@@ -343,11 +355,33 @@ impl DefenseAssignments {
             })
             .into_iter()
             .collect::<Vec<_>>();
-        let plan = if let Some(site) = self.frontier {
+        planner.reserve_posts(&self.sentries.posts().values().copied().collect::<Vec<_>>());
+        let mut plan = if let Some(site) = self.frontier {
             planner.plan_claim(frame, sites, site, infantry.len(), &reservations)
         } else {
             planner.plan(frame, sites, infantry.len())
         };
+        // Armor and role lookup see both fixed observation garrisons and the hybrid
+        // line, so a reserve post cannot overlap the guards left at a base.
+        let offset = plan.sectors.len();
+        for sector in &self.sentries.plan().sectors {
+            let mut sector = sector.clone();
+            sector.id += offset;
+            for slot in &mut sector.slots {
+                slot.sector_id += offset;
+            }
+            plan.sectors.push(sector);
+        }
+        plan.slots.extend(
+            self.sentries
+                .plan()
+                .slots
+                .iter()
+                .map(|slot| crate::sdk::DefenseSlot {
+                    position: slot.position,
+                    sector_id: slot.sector_id + offset,
+                }),
+        );
         let armor_unavailable = unavailable.union(outbound).copied().collect();
         let claim = self.claim_goal(frame);
         if self.frontier.is_some() {
@@ -370,8 +404,15 @@ impl DefenseAssignments {
         }
         let previous_screen = self.screen_units.clone();
         self.screen_units.retain(|id| self.responding.contains(id));
-        let mut available: BTreeSet<_> = (0..plan.slots.len()).collect();
-        let mut assigned = BTreeMap::new();
+        let mut available: BTreeSet<_> = (0..plan.slots.len())
+            .filter(|i| {
+                self.sentries.posts().values().all(|p| {
+                    dist2(*p, plan.slots[*i].position)
+                        > (1.4 * frame.map().tile_size as f32).det_powi(2)
+                })
+            })
+            .collect();
+        let mut assigned = self.sentries.posts().clone();
         // Preserve exact surviving posts before matching newly produced/repositioned infantry.
         for e in &infantry {
             if let Some(old) = self.destinations.get(&e.id) {
@@ -424,8 +465,12 @@ impl DefenseAssignments {
                 self.screen_units.insert(*id);
             }
         }
-        for e in infantry {
-            if unavailable.contains(&e.id) || outbound.contains(&e.id) {
+        for e in frame
+            .owned()
+            .iter()
+            .filter(|e| self::infantry(e.kind) && e.health.current > 0)
+        {
+            if unavailable.contains(&e.id) || outbound.contains(&e.id) || sentries.contains(&e.id) {
                 continue;
             }
             let resume = response.released.contains(&e.id) || pullback.released.contains(&e.id);
@@ -504,7 +549,7 @@ impl DefenseAssignments {
         self.held.retain(|id| assigned.contains_key(id));
         self.destinations = assigned;
         TacticalOwnership {
-            active: unavailable,
+            active: unavailable.union(&sentries).copied().collect(),
             released: response
                 .released
                 .union(&pullback.released)
@@ -514,7 +559,7 @@ impl DefenseAssignments {
     }
 }
 
-fn infantry(kind: EntityKind) -> bool {
+pub(super) fn infantry(kind: EntityKind) -> bool {
     matches!(
         kind,
         EntityKind::Rifleman | EntityKind::MachineGunner | EntityKind::Panzerfaust

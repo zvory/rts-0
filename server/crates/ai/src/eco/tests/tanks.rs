@@ -187,14 +187,23 @@ fn expansion_plan_keeps_rear_posts_and_completion_returns_to_owned_base_plan() {
     assert_eq!(owned.len(), 3);
     defense.finish_completed_expansion(&owned);
     assert_eq!(defense.frontier(), None);
-    let expected = DefensePlanner::with_firing_range_tiles(4.8).plan(&f, &owned, 34);
     let mut a = AiActions::for_frame(&f);
     defense.step(&f, &mut a, &mut planner, &owned);
-    assert_eq!(defense.assigned_posts().len(), expected.slots.len());
+    assert_eq!(defense.assigned_posts().len(), 34);
+    assert_eq!(defense.assigned_sentry_posts().len(), 12);
+    let fixed = defense
+        .assigned_sentry_posts()
+        .values()
+        .copied()
+        .collect::<Vec<_>>();
+    let mut expected = DefensePlanner::with_firing_range_tiles(4.8);
+    expected.reserve_posts(&fixed);
+    let hybrid = expected.plan(&f, &owned, 34 - fixed.len());
     assert!(defense
         .assigned_posts()
         .values()
-        .all(|point| expected.slots.iter().any(|slot| slot.position == *point)));
+        .all(|point| fixed.contains(point)
+            || hybrid.slots.iter().any(|slot| slot.position == *point)));
 }
 
 #[test]
@@ -252,7 +261,8 @@ fn standing_tanks_configure_scaffolds_once_and_replace_destroyed_works() {
 
 #[test]
 fn small_army_keeps_rear_defense_and_has_a_screen_before_future_mines_exist() {
-    let (start, s, sites) = staged(2);
+    let (start, mut s, sites) = staged(2);
+    add_observation_garrisons(&start, &mut s, &sites);
     let f = frame(&start, &s, &sites);
     let owned = owned_sites(&f);
     let site = expansion(&f).unwrap().0;
@@ -277,6 +287,7 @@ fn small_army_keeps_rear_defense_and_has_a_screen_before_future_mines_exist() {
 #[test]
 fn a_changed_screen_post_restarts_the_full_engineer_lead() {
     let (start, mut s, sites) = staged(2);
+    add_observation_garrisons(&start, &mut s, &sites);
     let f = frame(&start, &s, &sites);
     let site = expansion(&f).unwrap().0;
     let mut defense = tactics::DefenseAssignments::default();
@@ -428,6 +439,7 @@ fn strategy_queues_building_without_waiting_for_income_or_cash() {
 #[test]
 fn losing_the_initial_screen_requires_a_fresh_replacement_lead() {
     let (start, mut s, sites) = staged(2);
+    add_observation_garrisons(&start, &mut s, &sites);
     let f = frame(&start, &s, &sites);
     let site = expansion(&f).unwrap().0;
     let mut defense = tactics::DefenseAssignments::default();
