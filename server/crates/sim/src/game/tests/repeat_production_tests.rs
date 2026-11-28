@@ -509,7 +509,7 @@ fn auto_build_resource_floors_do_not_block_manual_training() {
 }
 
 #[test]
-fn auto_build_settings_do_not_change_ai_repeat_production() {
+fn auto_build_settings_pause_ai_repeat_production() {
     let (mut game, barracks) = repeat_fixture();
     let cost = rules::economy::resource_cost(EntityKind::Rifleman);
     game.state.players[0].is_ai = true;
@@ -528,11 +528,10 @@ fn auto_build_settings_do_not_change_ai_repeat_production() {
         .get(barracks)
         .expect("barracks")
         .prod_queue();
-    assert_eq!(queue.len(), 1);
-    assert!(queue[0].paid);
+    assert!(queue.is_empty());
     assert_eq!(
         (game.state.players[0].steel, game.state.players[0].oil),
-        (0, 0)
+        (cost.steel, cost.oil)
     );
 }
 

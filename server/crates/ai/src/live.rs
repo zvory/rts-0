@@ -529,7 +529,11 @@ impl AiController {
             snapshot: context.snapshot,
             alive_player_ids: context.alive_player_ids,
         };
-        self.pending_builds.observe(view);
+        if self.behavior_profile_id == ECO_AI_ID {
+            self.pending_builds.observe_unfunded(view);
+        } else {
+            self.pending_builds.observe(view);
+        }
         let pending_builds = self.pending_builds.intents();
         let Some(frame) = AiFrame::from_host(
             context.start,

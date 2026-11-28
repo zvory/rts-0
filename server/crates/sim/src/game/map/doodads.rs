@@ -4,7 +4,7 @@ use crate::protocol::{validate_map_doodads, MapDoodad};
 
 /// Every visual tree species shares this authoritative circular trunk footprint. Vehicles treat
 /// it as hard geometry. Infantry may pass through, with a finite route cost for tree tiles.
-pub(crate) const TREE_TRUNK_RADIUS_PX: f32 = 4.5;
+pub(crate) const TREE_TRUNK_RADIUS_PX: f32 = rts_rules::balance::TREE_TRUNK_RADIUS_PX;
 
 pub(crate) fn is_tree(doodad: &MapDoodad) -> bool {
     // Canonical maps are validated against the server catalog before reaching the simulation.

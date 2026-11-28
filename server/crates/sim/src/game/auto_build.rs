@@ -30,18 +30,17 @@ impl PlayerState {
         cost: ResourceCost,
         pending: ResourceCost,
     ) -> bool {
-        self.is_ai
-            || (!self.auto_build.paused
-                && reserve_allows_spend(
-                    self.steel,
-                    cost.steel,
-                    self.auto_build.reserve_steel.max(pending.steel),
-                )
-                && reserve_allows_spend(
-                    self.oil,
-                    cost.oil,
-                    self.auto_build.reserve_oil.max(pending.oil),
-                ))
+        !self.auto_build.paused
+            && reserve_allows_spend(
+                self.steel,
+                cost.steel,
+                self.auto_build.reserve_steel.max(pending.steel),
+            )
+            && reserve_allows_spend(
+                self.oil,
+                cost.oil,
+                self.auto_build.reserve_oil.max(pending.oil),
+            )
     }
 }
 

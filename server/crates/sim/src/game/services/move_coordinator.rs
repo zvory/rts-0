@@ -1136,7 +1136,13 @@ fn count_awaiting_paths(entities: &EntityStore) -> usize {
 }
 
 fn begin_weapon_teardown_for_ground_order(entity: &mut Entity, attack_move: bool) {
-    if attack_move && entity.kind == EntityKind::Artillery {
+    // These weapons resolve engagement versus travel before movement, using combat legality.
+    if attack_move
+        && matches!(
+            entity.kind,
+            EntityKind::Artillery | EntityKind::MachineGunner
+        )
+    {
         return;
     }
     entity.begin_weapon_teardown_for_movement();

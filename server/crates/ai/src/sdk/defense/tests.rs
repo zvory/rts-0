@@ -164,7 +164,10 @@ fn depleted_stock_lowers_value_unknown_stays_unknown_and_activity_is_actual() {
         .iter()
         .map(|a| a.value)
         .sum();
-    assert!(full_value > empty_value);
+    assert!(
+        (full_value - empty_value - 6.25).abs() < 0.001,
+        "all 625 remaining Steel must count, without a cap or unmined discount"
+    );
 }
 #[test]
 fn unsupported_no_entrenchment_returns_unallocated_and_ignores_unowned_sites() {
@@ -402,4 +405,432 @@ fn public_enemy_elimination_updates_threat_without_rebuilding_static_cuts() {
     let restored = planner.plan(&alive, &ids, 12);
     assert_eq!(flows, planner.geometry_builds);
     assert_eq!(restored, before);
+}
+
+#[test]
+fn prospective_line_requires_a_reachable_public_site_without_hostile_depot() {
+    let (start, mut snapshot, sites, owned) = fixture("Classic", 1, 1);
+    let f = frame(&start, &snapshot, &sites, 1);
+    let query = WorldQueries::new(&f);
+    let candidate = query
+        .ranked_bases(1)
+        .into_iter()
+        .find(|b| {
+            !owned.contains(&b.site.id)
+                && b.distance_from_main.is_some()
+                && !matches!(b.site.id, AiBaseSiteId::Start(_))
+        })
+        .unwrap();
+    let mut planner = DefensePlanner::with_firing_range_tiles(4.8);
+    assert!(planner.plan(&f, &[candidate.site.id], 8).slots.is_empty());
+    assert!(!planner
+        .plan_expansion(&f, candidate.site.id, 8)
+        .slots
+        .is_empty());
+    assert!(planner
+        .plan_expansion(&f, AiBaseSiteId::Start(2), 8)
+        .slots
+        .is_empty());
+    assert!(planner
+        .plan_expansion(&f, AiBaseSiteId::ResourceCluster(u32::MAX), 8)
+        .slots
+        .is_empty());
+    let mut enemy = snapshot
+        .entities
+        .iter()
+        .find(|e| e.owner == 1 && e.kind == "resource_depot")
+        .unwrap()
+        .clone();
+    enemy.id = 999999;
+    enemy.owner = 2;
+    enemy.x = candidate.site.position.0;
+    enemy.y = candidate.site.position.1;
+    snapshot.entities.push(enemy);
+    let f = frame(&start, &snapshot, &sites, 1);
+    assert!(planner
+        .plan_expansion(&f, candidate.site.id, 8)
+        .slots
+        .is_empty());
+}
+
+#[test]
+fn prospective_construction_is_reserved_before_slot_allocation_and_cache_reuse() {
+    for player in [1, 2] {
+        let (start, mut snapshot, sites, _) = fixture("Classic", player, 1);
+        let f = frame(&start, &snapshot, &sites, player);
+        let q = WorldQueries::new(&f);
+        let site = q
+            .ranked_bases(player)
+            .into_iter()
+            .find(|b| {
+                q.known_base_depots(b.site.id).is_empty()
+                    && !matches!(b.site.id,AiBaseSiteId::Start(p) if p!=player)
+            })
+            .unwrap()
+            .site
+            .id;
+        let tile = q.base_depot_site(site, &Default::default()).unwrap();
+        let foot = super::super::AiRulebook::for_frame(&f)
+            .unwrap()
+            .entity(EntityKind::ResourceDepot)
+            .unwrap()
+            .footprint
+            .unwrap();
+        let mut planner = DefensePlanner::with_firing_range_tiles(4.8);
+        let plain = planner.plan_expansion(&f, site, 5);
+        eprintln!(
+            "Classic P{player} prospective modes: {:?}",
+            plain.sectors.iter().map(|s| s.mode).collect::<Vec<_>>()
+        );
+        for shifted in [tile, q.tile(tile.x() + 1, tile.y()).unwrap(), tile] {
+            let reservation = DefenseReservation {
+                building: EntityKind::ResourceDepot,
+                tile: shifted,
+            };
+            let plan = planner.plan_expansion_reserved(&f, site, 5, &[reservation]);
+            assert_eq!(
+                plan.slots.len(),
+                5,
+                "allocate replacement posts rather than filter an already allocated plan"
+            );
+            let ts = f.map().tile_size as f32;
+            let rect = (
+                shifted.x() as f32 * ts,
+                shifted.y() as f32 * ts,
+                (shifted.x() + foot.width_tiles) as f32 * ts,
+                (shifted.y() + foot.height_tiles) as f32 * ts,
+            );
+            for (i, slot) in plan.slots.iter().enumerate() {
+                assert!(!super::super::unit_circle_touches_rect(
+                    slot.position,
+                    rts_rules::balance::unit_placement_radius(EntityKind::MachineGunner) + ts,
+                    rect
+                ));
+                assert!(plan.slots[..i]
+                    .iter()
+                    .all(|s| dist2(s.position, slot.position) > ts * ts));
+                assert!(plan.sectors[slot.sector_id].slots.contains(slot));
+            }
+            assert_eq!(
+                plan,
+                planner.plan_expansion_reserved(&f, site, 5, &[reservation])
+            );
+        }
+        // Adding an actual scaffold must keep both the footprint and access ring clear.
+        let mut scaffold = snapshot
+            .entities
+            .iter()
+            .find(|e| e.owner == player)
+            .unwrap()
+            .clone();
+        scaffold.id = 9999;
+        scaffold.x = (tile.x() as f32 + foot.width_tiles as f32 / 2.) * start.map.tile_size as f32;
+        scaffold.y = (tile.y() as f32 + foot.height_tiles as f32 / 2.) * start.map.tile_size as f32;
+        scaffold.build_progress = Some(0.1);
+        snapshot.entities.push(scaffold);
+        let f = frame(&start, &snapshot, &sites, player);
+        assert_eq!(
+            planner
+                .plan_expansion_reserved(
+                    &f,
+                    site,
+                    5,
+                    &[DefenseReservation {
+                        building: EntityKind::ResourceDepot,
+                        tile
+                    }]
+                )
+                .slots
+                .len(),
+            5
+        );
+    }
+}
+
+#[test]
+fn adding_fifth_base_keeps_useful_shared_cuts_from_four_base_plan() {
+    for player in [1, 2] {
+        let (start, snapshot, sites, ids) = fixture("Classic", player, 5);
+        assert_eq!(ids.len(), 5);
+        let f = frame(&start, &snapshot, &sites, player);
+        let mut planner = DefensePlanner::with_firing_range_tiles(4.8);
+        planner.plan(&f, &ids[..4], 60);
+        let previous = planner
+            .geometry
+            .iter()
+            .filter(|sector| sector.mode == DefenseMode::Cut && sector.bases.len() > 1)
+            .map(|sector| sector.bases.clone())
+            .collect::<BTreeSet<_>>();
+        assert!(
+            !previous.is_empty(),
+            "Classic P{player} must exercise a shared cut"
+        );
+        let before_cost = planner
+            .geometry
+            .iter()
+            .map(|sector| sector.bases.clone())
+            .collect::<BTreeSet<_>>()
+            .iter()
+            .map(|ids| {
+                planner
+                    .cuts
+                    .get(ids)
+                    .and_then(Option::as_ref)
+                    .map_or(43, |c| c.cost)
+            })
+            .sum::<usize>();
+        let flows = planner.geometry_builds;
+        let after = planner.plan(&f, &ids, 60);
+        let selected = planner
+            .geometry
+            .iter()
+            .map(|sector| sector.bases.clone())
+            .collect::<BTreeSet<_>>();
+        eprintln!("Classic P{player} shared={previous:?} five={selected:?}");
+        assert!(
+            previous.iter().all(|group| selected
+                .iter()
+                .any(|new| group.iter().all(|id| new.contains(id)))),
+            "adding a base must retain or profitably extend the existing shared cuts"
+        );
+        let after_cost = selected
+            .iter()
+            .map(|ids| {
+                planner
+                    .cuts
+                    .get(ids)
+                    .and_then(Option::as_ref)
+                    .map_or(43, |c| c.cost)
+            })
+            .sum::<usize>();
+        assert!(after_cost <= before_cost + 43);
+        assert!(
+            planner.geometry_builds - flows <= 69,
+            "two bounded 32-merge seeds plus singleton cuts"
+        );
+        let flows = planner.geometry_builds;
+        assert_eq!(after, planner.plan(&f, &ids, 60));
+        assert_eq!(flows, planner.geometry_builds);
+        assert_eq!(after.slots.len() + after.unallocated_budget, 60);
+    }
+}
+
+#[test]
+fn shared_cut_without_profitable_intermediate_pairs_survives_fifth_site() {
+    let (start, snapshot, sites, ids) = fixture("Classic", 1, 6);
+    let f = frame(&start, &snapshot, &sites, 1);
+    let mut planner = DefensePlanner::default();
+    planner.grid = Some(Grid::new(f.map()));
+    planner.enemy = vec![FAR; planner.grid.as_ref().unwrap().walk.len()];
+    let mut ordered = ids.clone();
+    ordered.sort_unstable();
+    // Isolate a legitimate min-cut selection shape: no pair has a useful cut, but protecting
+    // three nearby sites together exposes a cheap shared choke. Singleton agglomeration
+    // cannot reach that partition, even with an unlimited staffing budget.
+    for mask in 1..1usize << ordered.len() {
+        let group = ordered
+            .iter()
+            .enumerate()
+            .filter_map(|(i, id)| (mask & (1 << i) != 0).then_some(*id))
+            .collect::<Vec<_>>();
+        planner.cuts.insert(group, None);
+    }
+    let shared = ordered[..3].to_vec();
+    let point = planner
+        .grid
+        .as_ref()
+        .unwrap()
+        .near(sites[0].position)
+        .unwrap();
+    planner.cuts.insert(
+        shared.clone(),
+        Some(geometry::Cut {
+            components: vec![vec![point]],
+            demand: 2,
+            cost: 10,
+        }),
+    );
+    planner.geometry_capacity = 60;
+    planner.owned = ordered[..4].to_vec();
+    planner.geometry = geometry::build(&mut planner, &f);
+    assert!(planner.geometry.iter().any(|g| g.bases == shared));
+    planner.owned = ordered[..5].to_vec();
+    planner.geometry = geometry::build(&mut planner, &f);
+    assert!(
+        planner.geometry.iter().any(|g| g.bases == shared),
+        "the fifth site must not discard the selected three-site choke"
+    );
+    assert_eq!(planner.geometry_builds, 0, "reuse cached cuts");
+    // A destroyed base invalidates its whole old group; no hidden protection of lost sites.
+    planner.owned.retain(|id| *id != shared[0]);
+    planner.owned.push(ordered[5]);
+    planner.owned.sort_unstable();
+    planner.geometry = geometry::build(&mut planner, &f);
+    assert!(planner
+        .geometry
+        .iter()
+        .all(|g| !g.bases.contains(&shared[0])));
+}
+
+#[test]
+fn resource_defense_value_tracks_stock_instead_of_mine_activity() {
+    let (start, mut snapshot, sites, ids) = fixture("Classic", 1, 1);
+    let site = sites.iter().find(|s| s.id == ids[0]).unwrap();
+    let resource = start
+        .map
+        .resources
+        .iter()
+        .find(|r| site.resource_ids.contains(&r.id) && r.kind == "steel")
+        .unwrap();
+    snapshot.resource_deltas.clear();
+    snapshot
+        .entities
+        .retain(|e| e.id != resource.id && e.kind != "steel_mine");
+    let mut node = snapshot.entities[0].clone();
+    node.id = resource.id;
+    node.owner = rts_sim::game::entity::NEUTRAL;
+    node.kind = "steel".into();
+    node.x = resource.x;
+    node.y = resource.y;
+    node.remaining = Some(625);
+    snapshot.entities.push(node);
+    let g = Grid::new(frame(&start, &snapshot, &sites, 1).map());
+    let value = |snapshot: &Snapshot| {
+        scoring::assets(&g, &frame(&start, snapshot, &sites, 1), &ids)
+            .iter()
+            .map(|a| a.value)
+            .sum::<f32>()
+    };
+    let fresh = value(&snapshot);
+    let mut mine = snapshot
+        .entities
+        .iter()
+        .find(|e| e.owner == 1)
+        .unwrap()
+        .clone();
+    mine.id = 910000;
+    mine.kind = "steel_mine".into();
+    mine.x = resource.x;
+    mine.y = resource.y;
+    mine.latched_node = Some(resource.id);
+    mine.extractor_active = Some(false);
+    snapshot.entities.push(mine);
+    for (progress, active) in [(Some(0.5), false), (None, false), (None, true)] {
+        let mine = snapshot
+            .entities
+            .iter_mut()
+            .find(|e| e.id == 910000)
+            .unwrap();
+        mine.build_progress = progress;
+        mine.extractor_active = Some(active);
+        assert!(
+            (value(&snapshot) - fresh).abs() < 0.001,
+            "starting, finishing, or activating a mine must not change defensive stock value"
+        );
+    }
+    for remaining in [500, 250, 100, 0] {
+        snapshot
+            .entities
+            .iter_mut()
+            .find(|e| e.id == resource.id)
+            .unwrap()
+            .remaining = Some(remaining);
+        assert!(
+            (fresh - value(&snapshot) - (625 - remaining) as f32 / 100.).abs() < 0.001,
+            "defensive value must fall proportionally to extracted Steel"
+        );
+    }
+    assert!(
+        fresh > value(&snapshot),
+        "a fresh unmined base must retain more resource value than a depleted active mine"
+    );
+    snapshot
+        .entities
+        .retain(|e| e.id != resource.id && e.id != 910000);
+    let unknown = value(&snapshot);
+    assert!(
+        (fresh - unknown - 3.125).abs() < 0.001,
+        "unseen stock uses a half-patch estimate, without inventing exact known stock"
+    );
+    assert!(frame(&start, &snapshot, &sites, 1)
+        .resources()
+        .iter()
+        .any(|r| r.id == resource.id && r.remaining == AiResourceAmount::Unknown));
+}
+
+#[test]
+fn garrison_posts_surround_base_on_bounded_ring_and_keep_construction_access_clear() {
+    for player in [1, 2] {
+        let (start, snapshot, sites, ids) = fixture("Classic", player, 1);
+        let f = frame(&start, &snapshot, &sites, player);
+        let base = sites.iter().find(|site| site.id == ids[0]).unwrap();
+        let ts = f.map().tile_size as f32;
+        let mut planner = DefensePlanner::with_firing_range_tiles(4.8);
+        // Exercise the fallback policy independently of the map's selected min-cut.
+        planner.plan(&f, &ids, 8);
+        planner.cuts.insert(vec![ids[0]], None);
+        planner.last_plan = None;
+        let ring = planner.plan(&f, &ids, 8);
+        assert_eq!(ring.slots.len(), 8);
+        assert_eq!(ring.sectors.len(), 1);
+        assert_eq!(ring.sectors[0].mode, DefenseMode::Garrison);
+        assert!(dist2(ring.sectors[0].center, base.position) <= ts * ts);
+        let mut quadrants = BTreeSet::new();
+        for slot in &ring.slots {
+            let radius = dist2(slot.position, base.position) / (ts * ts);
+            assert!(
+                (9. ..=25.).contains(&radius),
+                "P{player} radius squared={radius}"
+            );
+            quadrants.insert((
+                slot.position.0 >= base.position.0,
+                slot.position.1 >= base.position.1,
+            ));
+        }
+        assert_eq!(
+            quadrants.len(),
+            4,
+            "garrison must surround the base, not cluster forward"
+        );
+        let p = ring.slots[0].position;
+        let tile = WorldQueries::new(&f)
+            .tile((p.0 / ts) as u32, (p.1 / ts) as u32)
+            .unwrap();
+        let reservation = DefenseReservation {
+            building: EntityKind::Barracks,
+            tile,
+        };
+        let foot = super::super::AiRulebook::for_frame(&f)
+            .unwrap()
+            .entity(reservation.building)
+            .unwrap()
+            .footprint
+            .unwrap();
+        let rect = (
+            tile.x() as f32 * ts,
+            tile.y() as f32 * ts,
+            (tile.x() + foot.width_tiles) as f32 * ts,
+            (tile.y() + foot.height_tiles) as f32 * ts,
+        );
+        let reserved = planner.plan_sites(&f, &ids, None, 256, &[reservation]);
+        assert!(!reserved.slots.is_empty());
+        assert!(
+            reserved.unallocated_budget > 0,
+            "exhausted ring must not invent fallback posts"
+        );
+        for (i, slot) in reserved.slots.iter().enumerate() {
+            assert!((9. ..=25.).contains(&(dist2(slot.position, base.position) / (ts * ts))));
+            assert!(!super::super::unit_circle_touches_rect(
+                slot.position,
+                rts_rules::balance::unit_placement_radius(EntityKind::MachineGunner) + ts,
+                rect
+            ));
+            assert!(
+                reserved.slots[..i].iter().all(|previous| {
+                    dist2(previous.position, slot.position) > 1.4 * 1.4 * ts * ts
+                }),
+                "fallback must never pile multiple posts onto one point"
+            );
+        }
+    }
 }

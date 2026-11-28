@@ -319,3 +319,94 @@ fn attack_move_route_reservation_failure_leaves_existing_orders_unchanged() {
         .is_err());
     assert_eq!(state(&batch), before);
 }
+
+#[test]
+fn move_route_reserves_once_and_emits_ordered_queue_flags() {
+    let mut batch = actions(0, 0, 0);
+    let group = UnitGroup::new([9, 2]).unwrap();
+    batch
+        .move_route(&group, (30.0, 40.0), &[(20.0, 40.0), (10.0, 40.0)])
+        .unwrap();
+    assert_eq!(batch.reservation_counts().actors, 2);
+    let before = state(&batch);
+    assert!(batch.hold_position(&group, false).is_err());
+    assert_eq!(state(&batch), before);
+    assert!(matches!(batch.into_requests().as_slice(), [
+        AiActionRequest::Move { units:a,x:30.0,y:40.0,queued:false },
+        AiActionRequest::Move { units:b,x:20.0,y:40.0,queued:true },
+        AiActionRequest::Move { units:c,x:10.0,y:40.0,queued:true },
+    ] if a==&[2,9] && a==b && b==c));
+}
+
+#[test]
+fn move_route_capacity_failure_does_not_emit_a_partial_route() {
+    let mut batch = actions(0, 0, 0);
+    for _ in 0..MAX_ACTIONS_PER_STEP - 2 {
+        batch.emit_compat(AiActionRequest::HoldPosition {
+            units: vec![1],
+            queued: false,
+        });
+    }
+    let before = state(&batch);
+    let group = UnitGroup::new([9]).unwrap();
+    assert_eq!(
+        batch
+            .move_route(&group, (1.0, 2.0), &[(3.0, 4.0), (5.0, 6.0)])
+            .unwrap_err()
+            .blocker(),
+        &ActionBlocker::ActionCapacity
+    );
+    assert_eq!(state(&batch), before);
+    batch.move_route(&group, (1.0, 2.0), &[(3.0, 4.0)]).unwrap();
+    assert_eq!(batch.len(), MAX_ACTIONS_PER_STEP);
+}
+
+#[test]
+fn move_route_reservation_failure_leaves_existing_orders_unchanged() {
+    let mut batch = actions(0, 0, 0);
+    let group = UnitGroup::new([9]).unwrap();
+    batch.hold_position(&group, false).unwrap();
+    let before = state(&batch);
+    assert!(batch.move_route(&group, (1.0, 2.0), &[(3.0, 4.0)]).is_err());
+    assert_eq!(state(&batch), before);
+}
+
+#[test]
+fn future_funded_build_reserves_available_cash_without_inventing_funds() {
+    let mut batch = actions(100, 0, 20);
+    batch
+        .build_when_funded(&[1], EntityKind::Barracks, 4, 5)
+        .unwrap();
+    assert_eq!(batch.remaining_budget().steel, 0);
+    assert_eq!(batch.remaining_budget().oil, 0);
+    assert_eq!(batch.reservation_counts().actors, 1);
+    assert!(matches!(
+        batch.requests.first(),
+        Some(AiActionRequest::Build {
+            building: EntityKind::Barracks,
+            ..
+        })
+    ));
+    let before = state(&batch);
+    assert!(batch
+        .build_when_funded(&[1], EntityKind::Barracks, 8, 8)
+        .is_err());
+    assert_eq!(state(&batch), before);
+    assert!(batch.paid_build(&[2], EntityKind::Barracks, 4, 5).is_err());
+}
+
+#[test]
+fn manual_queue_helpers_wait_for_native_funding_without_local_accounting() {
+    let mut batch = actions(0, 0, 0);
+    batch.owned_kinds.insert(1, EntityKind::Worker);
+    batch.owned_kinds.insert(20, EntityKind::Barracks);
+    let budget = batch.remaining_budget();
+    assert_eq!(batch.queue_build(&[1], EntityKind::Barracks, 4, 5), Ok(1));
+    assert_eq!(batch.queue_train(&[20], EntityKind::MachineGunner), Ok(20));
+    assert_eq!(batch.remaining_budget(), budget);
+    assert_eq!(batch.len(), 2);
+    assert!(batch.queue_train(&[20], EntityKind::MachineGunner).is_err());
+    assert!(batch.queue_build(&[1], EntityKind::Barracks, 6, 5).is_err());
+    assert_eq!(batch.remaining_budget(), budget);
+    assert_eq!(batch.len(), 2);
+}

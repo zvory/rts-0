@@ -173,6 +173,102 @@ fn alternatives(
         current.pop();
     }
 }
+fn partition_score(groups: &[Group]) -> (usize, usize, usize) {
+    (
+        groups.iter().map(Group::cost).sum(),
+        usize::MAX
+            - groups
+                .iter()
+                .filter(|g| g.cut.is_some())
+                .map(|g| g.bases.len())
+                .sum::<usize>(),
+        groups.len(),
+    )
+}
+
+/// Only whole surviving, disjoint groups are reusable. Removed sites cannot remain protected
+/// implicitly, and overlapping prospective fallback geometry is not a valid partition.
+fn previous_partition(planner: &DefensePlanner, ids: &[AiBaseSiteId]) -> Option<Vec<Group>> {
+    let blocks = planner
+        .geometry
+        .iter()
+        .map(|sector| sector.bases.clone())
+        .collect::<BTreeSet<_>>();
+    let mut covered = BTreeSet::new();
+    let mut groups = vec![];
+    for bases in blocks {
+        if bases.is_empty() || !bases.iter().all(|id| ids.contains(id)) {
+            continue;
+        }
+        if bases.iter().any(|id| !covered.insert(*id)) {
+            return None;
+        }
+        let c = planner.cuts.get(&bases).cloned().flatten();
+        let was_cut = planner
+            .geometry
+            .iter()
+            .any(|sector| sector.bases == bases && sector.mode == DefenseMode::Cut);
+        if was_cut && c.is_none() || !was_cut && bases.len() != 1 {
+            return None;
+        }
+        groups.push(Group {
+            bases,
+            cut: c.filter(|_| was_cut),
+        });
+    }
+    (!groups.is_empty()).then_some(groups)
+}
+
+fn agglomerate(
+    planner: &mut DefensePlanner,
+    frame: &AiFrame,
+    mut groups: Vec<Group>,
+) -> Vec<Group> {
+    // At most 32 cached exact cuts per seed; no exponential subset search above four.
+    let mut pairs = vec![];
+    for i in 0..groups.len() {
+        for j in i + 1..groups.len() {
+            let nearest = groups[i]
+                .bases
+                .iter()
+                .flat_map(|a| {
+                    groups[j].bases.iter().filter_map(|b| {
+                        let a = frame.base_sites().iter().find(|site| site.id == *a)?;
+                        let b = frame.base_sites().iter().find(|site| site.id == *b)?;
+                        Some(dist2(a.position, b.position))
+                    })
+                })
+                .min_by(f32::total_cmp);
+            if let Some(distance) = nearest {
+                pairs.push((distance, i, j));
+            }
+        }
+    }
+    pairs.sort_by(|a, b| {
+        a.0.total_cmp(&b.0)
+            .then_with(|| (a.1, a.2).cmp(&(b.1, b.2)))
+    });
+    for (_, i, j) in pairs.into_iter().take(32) {
+        if groups[i].bases.is_empty() || groups[j].bases.is_empty() {
+            continue;
+        }
+        let mut merged = groups[i].bases.clone();
+        merged.extend_from_slice(&groups[j].bases);
+        merged.sort_unstable();
+        if let Some(c) = cut(planner, frame, &merged) {
+            if c.cost < groups[i].cost() + groups[j].cost() {
+                groups[i] = Group {
+                    bases: merged,
+                    cut: Some(c),
+                };
+                groups[j].bases.clear();
+            }
+        }
+    }
+    groups.retain(|group| !group.bases.is_empty());
+    groups
+}
+
 pub(super) fn build(planner: &mut DefensePlanner, frame: &AiFrame) -> Vec<SectorGeometry> {
     let ids = planner.owned.clone();
     if ids.is_empty() {
@@ -191,22 +287,13 @@ pub(super) fn build(planner: &mut DefensePlanner, frame: &AiFrame) -> Vec<Sector
             .filter(|p| {
                 !feasible || p.iter().map(Group::demand).sum::<usize>() <= planner.geometry_capacity
             })
-            .min_by_key(|p| {
-                (
-                    p.iter().map(Group::cost).sum::<usize>(),
-                    usize::MAX
-                        - p.iter()
-                            .filter(|g| g.cut.is_some())
-                            .map(|g| g.bases.len())
-                            .sum::<usize>(),
-                    p.len(),
-                )
-            })
+            .min_by_key(|p| partition_score(p))
             .unwrap_or_default()
     } else {
-        // Bounded agglomeration for arbitrary owned-site counts. The closest 32 candidate merges
-        // are evaluated, each exact cut cached. Never enumerate exponential subsets above four.
-        let mut groups = ids
+        // Keep the singleton search, but also extend the last selected partition. A useful
+        // shared cut can require three or four bases even when every intermediate pair is
+        // more expensive; restarting from singletons at base five loses those cuts.
+        let singletons = ids
             .iter()
             .map(|id| {
                 let c = cut(planner, frame, &[*id]);
@@ -216,39 +303,32 @@ pub(super) fn build(planner: &mut DefensePlanner, frame: &AiFrame) -> Vec<Sector
                 }
             })
             .collect::<Vec<_>>();
-        let mut pairs = vec![];
-        for i in 0..groups.len() {
-            for j in i + 1..groups.len() {
-                let a = frame.base_sites().iter().find(|b| b.id == ids[i]);
-                let b = frame.base_sites().iter().find(|b| b.id == ids[j]);
-                if let (Some(a), Some(b)) = (a, b) {
-                    pairs.push((dist2(a.position, b.position), i, j));
-                }
-            }
+        let mut options = vec![agglomerate(planner, frame, singletons.clone())];
+        if let Some(previous) = previous_partition(planner, &ids) {
+            let mut covered = previous
+                .iter()
+                .flat_map(|group| group.bases.iter().copied())
+                .collect::<BTreeSet<_>>();
+            let mut extended = previous;
+            extended.extend(
+                singletons
+                    .into_iter()
+                    .filter(|group| covered.insert(group.bases[0])),
+            );
+            options.push(extended.clone());
+            options.push(agglomerate(planner, frame, extended));
         }
-        pairs.sort_by(|a, b| {
-            a.0.total_cmp(&b.0)
-                .then_with(|| (a.1, a.2).cmp(&(b.1, b.2)))
+        let feasible = options.iter().any(|groups| {
+            groups.iter().map(Group::demand).sum::<usize>() <= planner.geometry_capacity
         });
-        for (_, i, j) in pairs.into_iter().take(32) {
-            if groups[i].bases.is_empty() || groups[j].bases.is_empty() {
-                continue;
-            }
-            let mut merged = groups[i].bases.clone();
-            merged.extend_from_slice(&groups[j].bases);
-            merged.sort_unstable();
-            if let Some(c) = cut(planner, frame, &merged) {
-                if c.cost < groups[i].cost() + groups[j].cost() {
-                    groups[i] = Group {
-                        bases: merged,
-                        cut: Some(c),
-                    };
-                    groups[j].bases.clear();
-                }
-            }
-        }
-        groups.retain(|g| !g.bases.is_empty());
-        groups
+        options
+            .into_iter()
+            .filter(|groups| {
+                !feasible
+                    || groups.iter().map(Group::demand).sum::<usize>() <= planner.geometry_capacity
+            })
+            .min_by_key(|groups| partition_score(groups))
+            .unwrap_or_default()
     };
     groups.sort_by_key(|g| g.bases[0]);
     let Some(grid) = planner.grid.as_ref() else {
@@ -275,41 +355,48 @@ pub(super) fn build(planner: &mut DefensePlanner, frame: &AiFrame) -> Vec<Sector
             let Some(anchor) = grid.near(base.position) else {
                 continue;
             };
-            let resources = frame
-                .resources()
-                .iter()
-                .filter(|r| base.resource_ids.contains(&r.id))
-                .collect::<Vec<_>>();
-            let center = (0..grid.walk.len())
+            // A garrison surrounds the economic center rather than clustering around one
+            // forward post. Dynamic footprint/access and reachability checks stay in scoring.
+            let points = (0..grid.walk.len())
                 .filter(|i| grid.entrench[*i])
                 .filter(|i| {
                     let d = dist2(grid.point(*i), base.position) / (grid.size * grid.size);
-                    (25. ..=81.).contains(&d) && planner.enemy[*i] < FAR
+                    (9. ..=25.).contains(&d)
                 })
-                .max_by(|a, b| {
-                    let quality = |i: usize| {
-                        let p = grid.point(i);
-                        let visible = resources
-                            .iter()
-                            .filter(|r| dist2(p, r.position) <= 49. * grid.size * grid.size)
-                            .count() as f32;
-                        let forward =
-                            (planner.enemy[anchor] as f32 - planner.enemy[i] as f32) / 120.;
-                        visible + 0.25 * forward
-                            - 0.5 * (dist2(p, base.position).det_sqrt() / grid.size - 6.).abs()
-                    };
-                    quality(*a).total_cmp(&quality(*b)).then_with(|| b.cmp(a))
-                })
-                .unwrap_or(anchor);
+                .collect();
             out.push(SectorGeometry {
                 mode: DefenseMode::Garrison,
                 bases: group.bases,
-                points: vec![center],
-                center,
+                points,
+                center: anchor,
             });
         }
     }
     out
+}
+/// A prospective garrison can be obstructed by the current economy even though its
+/// terrain cut has usable firing posts. Reuse that cached cut rather than inventing slots.
+pub(super) fn expansion_cut(
+    planner: &mut DefensePlanner,
+    frame: &AiFrame,
+    site: AiBaseSiteId,
+) -> Vec<SectorGeometry> {
+    let Some(cut) = cut(planner, frame, &[site]) else {
+        return vec![];
+    };
+    let Some(grid) = planner.grid.as_ref() else {
+        return vec![];
+    };
+    cut.components
+        .into_iter()
+        .flat_map(|component| split(grid, &component))
+        .map(|points| SectorGeometry {
+            mode: DefenseMode::Cut,
+            bases: vec![site],
+            center: medoid(grid, &points),
+            points,
+        })
+        .collect()
 }
 fn medoid(g: &Grid, p: &[usize]) -> usize {
     let sum = p.iter().fold((0., 0.), |a, i| {

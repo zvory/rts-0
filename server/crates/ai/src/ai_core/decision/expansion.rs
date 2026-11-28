@@ -751,35 +751,15 @@ pub(super) fn expansion_cluster_resources_for_anchor<'a>(
 pub(super) fn estimated_expansion_center_tile(
     observation: &AiObservation,
     resource: &AiResourceSummary,
-    map_center_tiles: (f32, f32),
+    _map_center_tiles: (f32, f32),
     tile_size: f32,
 ) -> Option<(u32, u32)> {
-    let resource_tile = (resource.x / tile_size, resource.y / tile_size);
-    let dir = (
-        map_center_tiles.0 - resource_tile.0,
-        map_center_tiles.1 - resource_tile.1,
-    );
-    let len = (dir.0 * dir.0 + dir.1 * dir.1).det_sqrt();
-    if len <= f32::EPSILON {
-        return None;
-    }
-    let estimated_center = (
-        resource_tile.0 - dir.0 / len * config::STEEL_BLOCK_DIST_TILES,
-        resource_tile.1 - dir.1 / len * config::STEEL_BLOCK_DIST_TILES,
-    );
-    if !estimated_center.0.is_finite() || !estimated_center.1.is_finite() {
-        return None;
-    }
-    Some((
-        estimated_center
-            .0
-            .round()
-            .clamp(0.0, observation.map.width.saturating_sub(1) as f32) as u32,
-        estimated_center
-            .1
-            .round()
-            .clamp(0.0, observation.map.height.saturating_sub(1) as f32) as u32,
-    ))
+    crate::sdk::base_placement::resource_base_anchor(
+        (resource.x, resource.y),
+        tile_size,
+        observation.map.width,
+        observation.map.height,
+    )
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -839,26 +819,17 @@ pub(super) fn expansion_site_candidate(
         return None;
     }
     let (cx, cy) = building_center((tile_x, tile_y), kind, observation.map.tile_size)?;
-    let max_dist = config::MINING_ANCHOR_RANGE_TILES * observation.map.tile_size as f32;
-    let max_dist2 = squared(max_dist);
-    let mut steel_in_range = 0usize;
-    let mut oil_in_range = 0usize;
-    let mut max_resource_distance2 = 0.0f32;
-    let mut sum_resource_distance2 = 0.0f32;
-
-    for resource in resources {
-        let distance2 = dist2(cx, cy, resource.x, resource.y);
-        if distance2 > max_dist2 {
-            continue;
-        }
-        match resource.kind {
-            EntityKind::Steel => steel_in_range += 1,
-            EntityKind::Oil => oil_in_range += 1,
-            _ => {}
-        }
-        max_resource_distance2 = max_resource_distance2.max(distance2);
-        sum_resource_distance2 += distance2;
-    }
+    let coverage = crate::sdk::base_placement::resource_coverage(
+        (cx, cy),
+        observation.map.tile_size,
+        resources
+            .iter()
+            .map(|resource| (resource.kind, (resource.x, resource.y))),
+    );
+    let steel_in_range = coverage.steel;
+    let oil_in_range = coverage.oil;
+    let max_resource_distance2 = coverage.max_distance2;
+    let sum_resource_distance2 = coverage.sum_distance2;
     if steel_in_range == 0 && oil_in_range == 0 {
         return None;
     }

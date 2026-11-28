@@ -4,9 +4,11 @@
 //! allowed to know, and action requests still pass through the ordinary simulation command path.
 
 pub(crate) mod actions;
+pub(crate) mod base_placement;
 mod bases;
 mod defense;
 mod frame;
+mod ground_route;
 mod losses;
 mod pullback;
 mod rulebook;
@@ -19,18 +21,21 @@ pub use actions::{
 };
 pub use bases::{AiBaseDepot, AiBaseEvidence, AiBaseSite, AiBaseSiteId, AiRankedBase};
 pub use defense::{
-    DefenseMode, DefensePlan, DefensePlanner, DefenseSector, DefenseSlot, DEFENSE_PLANNER_SOURCE,
+    DefenseMode, DefensePlan, DefensePlanner, DefenseReservation, DefenseSector, DefenseSlot,
+    DEFENSE_PLANNER_SOURCE,
 };
 pub use frame::{
     AiAbilityState, AiBuildObservation, AiBuildObservationPhase, AiCompletion, AiEconomy, AiEntity,
     AiEntityState, AiFrame, AiHealth, AiMap, AiPlayer, AiProduction, AiRememberedContact,
     AiResource, AiResourceAmount, AiSmokeCloud, AiTerrain,
 };
+pub use ground_route::AiGroundReachability;
 pub use losses::AiLosses;
 pub use pullback::{PullbackMemory, PullbackMove, PullbackParams, PullbackPlan, PullbackUnit};
 pub(crate) use rts_rules::balance::unit_placement_radius;
 pub use rts_rules::faction::{AbilityKind, UpgradeKind};
 pub use rts_rules::EntityKind;
+pub use rts_sim::game::entity::RallyKind;
 pub use rulebook::{AiCost, AiEntityRule, AiFootprint, AiPrerequisites, AiRulebook};
 pub use strategy::AiStrategy;
 pub(crate) use world_queries::unit_circle_touches_rect;

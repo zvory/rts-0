@@ -348,6 +348,10 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/ai/src/eco.rs",
   "server/crates/ai/src/eco/construction.rs",
   "server/crates/ai/src/eco/tactics.rs",
+  // Eco owns its Kriegsia Tank tech/standing production policy; costs remain catalog-derived.
+  "server/crates/ai/src/eco/production.rs",
+  // Eco groups its catalog-gated Kriegsia Tanks at body-aware economic reserve posts.
+  "server/crates/ai/src/eco/armor.rs",
   // SDK defense scoring explicitly values the current infantry economy.
   "server/crates/ai/src/sdk/defense/scoring.rs",
   // Pressure independently owns a Kriegsia-only copied macro policy, staging formation, and
@@ -357,6 +361,8 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/ai/src/pressure/production.rs",
   // Pressure is a Kriegsia-only profile: this owner selects its mobile roster; costs use AiRulebook.
   "server/crates/ai/src/pressure/response.rs",
+  // Eco opts into Kriegsia infantry/armor recruitment and cohesion; value uses AiRulebook.
+  "server/crates/ai/src/pressure/response/cohesion.rs",
   // The SDK frame adapter converts the protocol's dedicated remembered-anti-tank-gun records back
   // into the typed kind that the wire record omits. Keep this exception at one occurrence.
   "server/crates/ai/src/sdk/frame.rs",
@@ -369,6 +375,11 @@ const approvedCurrentFactionFiles = new Set([
   // Cultivators' reused kind. Geography is faction-neutral; this does not classify every faction's
   // production buildings as bases. Keep the two current/remembered kind checks bounded.
   "server/crates/ai/src/sdk/bases.rs",
+  // Explicit resource-Depot recommendation API shares Pressure geometry and binds footprint
+  // availability to the caller's faction catalog; this is intentionally a Depot/Steel/Oil query.
+  "server/crates/ai/src/sdk/base_placement.rs",
+  // Ground-route production is mover/catalog-driven; only inline fixtures name roster kinds.
+  "server/crates/ai/src/sdk/ground_route.rs",
   "server/crates/ai/src/selfplay/milestones.rs",
   "server/crates/ai/src/selfplay/pending_build.rs",
   "server/crates/ai/src/selfplay/player_view.rs",
@@ -649,8 +660,12 @@ const approvedSpecialCaseBudgets = new Map([
   // Frame tests select a real Depot to verify fog-scoped base evidence.
   ["server/crates/ai/src/sdk/frame.rs", 2],
   ["server/crates/ai/src/sdk/rulebook.rs", 6],
-  ["server/crates/ai/src/sdk/world_queries.rs", 12],
+  // Opt-in layout keeps the resource-centered Depot exception explicit; route fixtures cover
+  // wide-body lanes and reciprocal production access without adding production roster policy.
+  ["server/crates/ai/src/sdk/world_queries.rs", 13],
   ["server/crates/ai/src/sdk/bases.rs", 2],
+  ["server/crates/ai/src/sdk/base_placement.rs", 18],
+  ["server/crates/ai/src/sdk/ground_route.rs", 50],
   // Cultivators intentionally reuses the existing depot/worker kinds in catalog rows and tests.
   // Tank Plus adds one Engineering Complex research row in the authoritative catalog.
   ["server/crates/rules/src/faction.rs", 139],

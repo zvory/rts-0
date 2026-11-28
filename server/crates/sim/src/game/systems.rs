@@ -239,8 +239,8 @@ pub(crate) fn run_tick(
             tick,
         );
     });
-    crate::perf::timed(perf.as_deref_mut(), "charged_tank_attack_move", || {
-        services::combat::hold_charged_attack_move_tanks(map, entities, &teams, fog, smokes);
+    crate::perf::timed(perf.as_deref_mut(), "stationary_attack_move", || {
+        services::combat::hold_attack_move_engagements(map, entities, &teams, fog, smokes);
     });
     services::tournament::advance(entities, players, rng, &coordinator);
     services::shop_items::refresh_breakthrough_auras(entities, &teams);
