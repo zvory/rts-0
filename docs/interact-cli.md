@@ -646,3 +646,11 @@ or Magic Adept kind to spawn it at Master rank. Catalog `unitOptions` exposes th
 same unit and rank choices as the human palette.
 
 Lab `record-start` also accepts `presentation:"normal"` to retain command-card and placement UI during gesture review. Default remains `clean`.
+
+## Experimental map tilt capture
+
+Start a fresh daemon with `RTS_INTERACT_MAP_TILT=30 node scripts/interact/cli.mjs lab open '{"map":"Chokes"}'`
+to capture the opt-in battlefield-plane prototype (0–45 degrees from top-down). The override
+also applies to game/dev-scenario launches. Run `lab shutdown` before changing the angle.
+The HUD stays flat; all world artwork shares the tilted plane. See
+[the rendering contract](design/client-rendering.md#experimental-battlefield-tilt) for limitations.

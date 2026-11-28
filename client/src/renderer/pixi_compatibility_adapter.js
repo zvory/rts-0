@@ -300,8 +300,17 @@ function materializeStaticMap(staticMap) {
 }
 
 function buildCameraFacade(projection) {
-  const queries = createRendererProjectionQueries(projection);
+  const raw = projection.orthographic;
+  const tilt = raw.mapTilt || 0;
+  const source = tilt ? { ...projection, orthographic: { ...raw, mapTilt: 0,
+    originX: raw.originX - raw.viewportWidthCssPx / (2 * raw.framingScale),
+    originY: raw.originY - raw.viewportHeightCssPx / (2 * raw.framingScale),
+    viewportWidthCssPx: raw.viewportWidthCssPx * 2,
+    viewportHeightCssPx: raw.viewportHeightCssPx * 2,
+  } } : projection;
+  const queries = createRendererProjectionQueries(source);
   return Object.freeze({
+    mapTilt: tilt,
     x: queries.state.x,
     y: queries.state.y,
     zoom: queries.state.zoom,

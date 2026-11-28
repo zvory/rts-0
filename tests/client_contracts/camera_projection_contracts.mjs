@@ -375,4 +375,39 @@ class FakePerspectiveProjection {
   );
 }
 
+// The prototype uses one homography for the view, inverse picking and frozen queries.
+for (const angle of [0, 20, 35, 45]) {
+  const tilted = new Camera(1200, 800, { mapTilt: angle });
+  tilted.setBounds(10000, 10000, 1200, 800);
+  tilted.centerOn(5000, 5000);
+  const frozen = tilted.projectionSnapshot();
+  for (const screen of [{ x: 0, y: 0 }, { x: 1200, y: 0 },
+    { x: 1200, y: 800 }, { x: 0, y: 800 }, { x: 600, y: 400 }]) {
+    const ground = tilted.screenToWorld(screen.x, screen.y);
+    const presented = tilted.worldToScreen(ground.x, ground.y);
+    assertApprox(presented.x, screen.x, 1e-8, "tilted picking round-trips x");
+    assertApprox(presented.y, screen.y, 1e-8, "tilted picking round-trips y");
+    const detached = frozen.groundAtScreen(screen);
+    assertApprox(detached.x, ground.x, 1e-8, "frozen tilted picking x");
+    assertApprox(detached.y, ground.y, 1e-8, "frozen tilted picking y");
+  }
+  const polygon = tilted.viewportGroundPolygon();
+  assert(polygon.length === 4, "interior tilted footprint has four corners");
+  if (angle > 0) {
+    assert(polygon[1].x - polygon[0].x > polygon[2].x - polygon[3].x,
+      "far viewport spans more ground than near viewport");
+    const far = tilted.projectedExtent({ x: 5000, y: 4800, heightPx: 0 }, 30, 30);
+    const near = tilted.projectedExtent({ x: 5000, y: 5200, heightPx: 0 }, 30, 30);
+    assert(near.width > far.width, "near objects appear larger");
+  }
+  const anchor = { x: 300, y: 200 };
+  const before = tilted.groundAtScreen(anchor);
+  tilted.dollyBy(1.2, anchor);
+  const after = tilted.groundAtScreen(anchor);
+  assertApprox(before.x, after.x, 1e-8, "tilted dolly anchors x");
+  assertApprox(before.y, after.y, 1e-8, "tilted dolly anchors y");
+  assertApprox(frozen.groundAtScreen(anchor).x, before.x, 1e-8,
+    "tilted frozen projection stays detached after camera changes");
+}
+
 console.log("✅ camera_projection_contracts.mjs: semantic camera/projection contracts passed");

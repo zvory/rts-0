@@ -48,6 +48,7 @@ export function createRendererProjectionQueries(record) {
     x: finite(record.orthographic?.originX, "camera origin x"),
     y: finite(record.orthographic?.originY, "camera origin y"),
     zoom: scale,
+    ...(record.orthographic?.mapTilt ? { mapTilt: record.orthographic.mapTilt } : {}),
     worldW: nonNegative(record.orthographic?.worldWidthPx, "map width"),
     worldH: nonNegative(record.orthographic?.worldHeightPx, "map height"),
     viewW: width,

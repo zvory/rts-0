@@ -1,3 +1,4 @@
+import { presentBattlefield } from "./map_tilt.js";
 import { destroyTeamPaintTextures } from "./rigs/team_paint.js";
 import { drawChargeStreaks } from "./charge_streaks.js";
 import { reconcileShorelineLayer, destroyShorelineLayer } from "./shoreline.js";
@@ -415,11 +416,12 @@ export class Renderer {
   present(nowMs = this.visualNow()) {
     if (this._destroyed) throw new Error("Cannot present a destroyed Pixi renderer.");
     updateTerrainMaterials(this, nowMs);
+    const present = () => presentBattlefield(this);
     if (this._gpuShadowTimer) {
-      this._gpuShadowTimer.measure("renderer.present.total", () => this.app.render());
+      this._gpuShadowTimer.measure("renderer.present.total", present);
       this._gpuShadowTimer.poll();
     } else {
-      this.app.render();
+      present();
     }
     if (this._gpuCompletePresentations) {
       this.app.renderer.gl.finish();
@@ -634,6 +636,7 @@ export class Renderer {
     this._profiler = profiler || null;
     const time = (label, fn) => profiler ? profiler.time(label, fn) : fn();
     // Drive the world container from the camera (single transform for all layers).
+    this._mapTiltDegrees = camera.mapTilt || 0;
     this.world.position.set(-camera.x * camera.zoom, -camera.y * camera.zoom);
     this.world.scale.set(camera.zoom);
     time("renderer.doodads", () => this._doodads?.updateVisibility(camera));
@@ -1374,6 +1377,7 @@ export class Renderer {
     // Detach the canvas from the DOM, then destroy the app + WebGL context.
     const view = this.app.canvas;
     if (view && view.parentNode) view.parentNode.removeChild(view);
+    this._mapTiltPresentation?.destroy();
     this.app.destroy({ removeView: true }, { children: true, texture: true, textureSource: true });
   }
 }

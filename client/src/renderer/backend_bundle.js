@@ -7,7 +7,9 @@ export function createPixiBackendBundle() {
     id: "pixi",
     unitIconMarkupForKind: liveUnitIconMarkupFor,
     createCamera(options = {}) {
-      return new Camera(0, 0, options);
+      return new Camera(0, 0, {
+        ...options, mapTilt: new URLSearchParams(globalThis.location?.search || "").get("rtsMapTilt"),
+      });
     },
     async createRenderer(canvasParent, sources) {
       return PixiWorkerPresentationAdapter.create(canvasParent, sources, {
