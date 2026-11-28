@@ -529,13 +529,16 @@ fn tank_coax_inspection_scenario_sets_up_static_mixed_targets() {
         config::TICK_HZ * 4 - elapsed,
         "inspection scenario should keep the Tank cannon delayed on the first tick"
     );
-    assert_eq!(
-        ticked_tank.weapon_cooldown(WeaponKind::TankCoax),
-        crate::rules::combat::weapon_profile(WeaponKind::TankCoax)
+    {
+        let actual = ticked_tank.weapon_cooldown(WeaponKind::TankCoax);
+        let base: u32 = crate::rules::combat::weapon_profile(WeaponKind::TankCoax)
             .expect("Tank coax profile should exist")
-            .cooldown,
-        "inspection scenario should let the independent MG traverse and fire"
-    );
+            .cooldown;
+        assert!(
+            (base.saturating_sub(1)..=base.saturating_add(2)).contains(&actual),
+            "reload {actual} outside jitter range around {base}"
+        );
+    };
     assert!(
         enemy_hp_total(&ticked) < enemy_hp_before,
         "inspection scenario should place at least one enemy target in MG range"

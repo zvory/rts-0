@@ -303,6 +303,10 @@ pub fn project_entity(
     if entity.kind == EntityKind::RocketLauncher {
         view.rocket_rack_count = Some(config::rocket_rack_count(
             entity.ability_cooldown_ticks(ability::AbilityKind::Barrage),
+            entity
+                .movement
+                .as_ref()
+                .map_or(0, |movement| movement.barrage_unload_ticks),
         ));
     }
     let acquired_combat_target = entity.can_attack() && entity.target_id().is_some();

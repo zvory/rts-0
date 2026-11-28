@@ -639,7 +639,7 @@ fn visible_rack_count_matches_each_launch_and_origins_are_distinct_rear_slots() 
         .get(launcher)
         .map(|e| (e.pos_x(), e.pos_y()))
         .unwrap();
-    assert_eq!(config::rocket_rack_count(0), 16);
+    assert_eq!(config::rocket_rack_count(0, 0), 16);
     order_barrage(&mut game, launcher, target);
     let mut fired = 0;
     for _ in 0..=config::ROCKET_BARRAGE_UNLOAD_TICKS + 2 {
@@ -673,14 +673,27 @@ fn visible_rack_count_matches_each_launch_and_origins_are_distinct_rear_slots() 
             .get(launcher)
             .unwrap()
             .ability_cooldown_ticks(ability::AbilityKind::Barrage);
-        assert_eq!(u32::from(config::rocket_rack_count(cooldown)), 16 - fired);
+        assert_eq!(
+            u32::from(config::rocket_rack_count(
+                cooldown,
+                game.state
+                    .entities
+                    .get(launcher)
+                    .unwrap()
+                    .movement
+                    .as_ref()
+                    .unwrap()
+                    .barrage_unload_ticks
+            )),
+            16 - fired
+        );
         let snapshot = game.snapshot_for(1);
         let view = snapshot.entities.iter().find(|e| e.id == launcher).unwrap();
         assert_eq!(view.rocket_rack_count, Some((16 - fired) as u8));
     }
     assert_eq!(fired, 16);
-    assert_eq!(config::rocket_rack_count(1), 0);
-    assert_eq!(config::rocket_rack_count(0), 16);
+    assert_eq!(config::rocket_rack_count(1, 0), 0);
+    assert_eq!(config::rocket_rack_count(0, 0), 16);
 }
 
 #[test]

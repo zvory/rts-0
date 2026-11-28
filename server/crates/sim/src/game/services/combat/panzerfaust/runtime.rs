@@ -153,6 +153,13 @@ fn tick_windup(
         } else {
             base_rifle_cooldown
         };
+        let rifle_cooldown = crate::rules::combat::randomized_attack_reload(
+            attacker.kind,
+            id,
+            crate::rules::combat::WeaponKind::RiflemanRifle.stable_id(),
+            tick,
+            rifle_cooldown,
+        );
         attacker.set_attack_cd(rifle_cooldown);
         attacker.spend_panzerfaust();
     }

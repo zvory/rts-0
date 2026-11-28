@@ -56,15 +56,14 @@ pub fn rocket_rack_slot(index: u32) -> (f32, f32) {
     (-3.5 - column as f32 * 9.8, -7.9 + row as f32 * 2.8)
 }
 
-/// Derive visible ammunition from the same cooldown clock that starts the unload.
-/// No private reload timer is exposed to opponents and no second ammo state can drift.
-pub fn rocket_rack_count(cooldown_left: u16) -> u8 {
+/// Derive visible ammunition from the unload clock; randomized reloads must not shift
+/// the rack's launch cadence. No private timer is exposed to opponents.
+pub fn rocket_rack_count(cooldown_left: u16, unload_ticks_left: u16) -> u8 {
     if cooldown_left == 0 {
         return ROCKET_BARRAGE_ROCKETS as u8;
     }
-    // Cooldowns tick down at the end of the activation tick, after its first launch.
-    let elapsed =
-        u32::from(ROCKET_BARRAGE_RELOAD_TICKS.saturating_sub(cooldown_left)).saturating_sub(1);
+    // The unload lock ticks down during the activation tick, after its first launch.
+    let elapsed = ROCKET_BARRAGE_UNLOAD_TICKS.saturating_sub(u32::from(unload_ticks_left));
     (0..ROCKET_BARRAGE_ROCKETS)
         .filter(|index| {
             index * ROCKET_BARRAGE_UNLOAD_TICKS / (ROCKET_BARRAGE_ROCKETS - 1) > elapsed
