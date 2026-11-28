@@ -85,6 +85,9 @@ RUN test -s ./client/vendor/sim-wasm/rts_sim_wasm.js \
     && test -s ./client/assets/rigs/mortar-bulky-white/generated/mortar-bulky-white-atlas.png \
     && test -s ./client/assets/rigs/mortar-png-pass-04/generated/mortar-m2-wheeled-baseplate-pass-04-alpha.png \
     && test -s ./client/assets/rigs/rifleman-pass-02/generated/rifleman-pass-02-recoil-strip.png \
+    && test -s ./client/assets/rigs/rifleman-experimental/neutral-atlas.png \
+    && test -s ./client/assets/rigs/rifleman-experimental/fixed-atlas.png \
+    && test -s ./client/assets/rigs/rifleman-experimental/paint-atlas.png \
     && test -s ./client/assets/rigs/rifleman-pass-02/generated/rifleman-down-rifle-iteration/rifleman-down-rifle-strip.png \
     && test -s ./client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-recoil-review-strip.png \
     && test -s ./client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-panzerfaust-windup-runtime-strip.png \

@@ -18,6 +18,14 @@ async function queueAndLifecycleContracts() {
   assert(worker.messages.at(-1).type === "presentationPreferences"
     && worker.messages.at(-1).payload.projectedUnitShadowsEnabled === true,
   "projected unit-shadow preference crosses the worker control boundary immediately");
+  adapter.setExperimentalGraphicsEnabled(true);
+  adapter.setProjectedUnitShadowsEnabled(false);
+  assert(worker.messages.at(-1).payload.experimentalGraphicsEnabled === true,
+    "changing shadows preserves experimental graphics");
+  adapter.setExperimentalGraphicsEnabled(false);
+  assert(worker.messages.at(-1).payload.projectedUnitShadowsEnabled === false,
+    "changing experimental graphics preserves the shadow preference");
+  adapter.setProjectedUnitShadowsEnabled(true);
   const frame1 = assemble(assembler, 1);
   const frame2 = assemble(assembler, 2);
   const frame3 = assemble(assembler, 3);

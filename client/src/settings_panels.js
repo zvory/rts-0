@@ -97,7 +97,28 @@ function renderGamePanel(root, game, preferredColor) {
   }
   if (game?.unitRanges) renderUnitRangeControl(root, game.unitRanges);
   if (game?.healthBars) renderHealthBarControl(root, game.healthBars);
+  if (game?.experimentalGraphics) renderExperimentalGraphicsControl(root, game.experimentalGraphics);
   if (preferredColor) return renderPreferredColorControl(root, preferredColor);
+}
+
+function renderExperimentalGraphicsControl(root, control) {
+  const label = document.createElement("label");
+  label.className = "settings-toggle";
+  const input = document.createElement("input");
+  input.type = "checkbox";
+  input.id = "experimental-graphics-toggle";
+  const sync = () => {
+    const state = control.state?.() || {};
+    input.checked = state.enabled === true;
+    input.disabled = state.available === false;
+  };
+  input.addEventListener("change", () => { control.onToggle?.(); sync(); });
+  label.appendChild(input);
+  const text = document.createElement("span");
+  text.textContent = " Use experimental graphics";
+  label.appendChild(text);
+  root.appendChild(label);
+  sync();
 }
 
 function renderProjectedUnitShadowControl(root, projectedUnitShadows) {

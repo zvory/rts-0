@@ -152,6 +152,12 @@ Both click polygons use the presented projection and reject depth-plane gaps. Ho
 entity-target commands share this picker; marquee and viewport admission retain original bodies.
 Simulation collision, placement, formation spacing, visuals and selection rings are unchanged.
 
+With the default-off experimental-graphics preference enabled, Rifleman point-click proxies
+use an authored upright body box: 22×46 world pixels centered 20 pixels above the foot anchor,
+with a 28×52 near-miss box. The normal ground circle remains the marquee footprint. This is a
+presentation-only preference, sent to the Pixi worker as `experimentalGraphicsEnabled`; it
+never changes the authoritative entity, fog admission, collision, or command coordinates.
+
 ## 4. Presentation frame
 
 Static map presentation changes only with the static-map revision. Per-rAF data is assembled once

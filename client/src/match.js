@@ -287,6 +287,7 @@ export class Match {
     this.renderer.setProjectedUnitShadowsEnabled?.(
       this.state.showProjectedUnitShadowsEnabled,
     );
+    this.renderer.setExperimentalGraphicsEnabled?.(this.state.experimentalGraphicsEnabled);
     this.fog = this._timeInit(
       "match.fog",
       () => new Fog(this.state.map.width, this.state.map.height, this.state.map.terrain),
