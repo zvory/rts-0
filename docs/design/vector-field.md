@@ -7,7 +7,7 @@ The first press/click fixes the center. Drag-release or a second click sets the 
 Escape/right-click cancel. The square is 4 by 4 tiles for an Adept, 5 by 5 for a Master.
 Rank is captured when placed; later rank changes do not resize an existing field. Public size and
 direction are projected only with a visible field, so enemies and allies render identical geometry
-without needing visibility of its caster. It lasts ten seconds and casts up to 7.5 tiles away.
+without needing visibility of its caster. It lasts ten seconds and casts up to 10.5 tiles away.
 
 Every allied or hostile ground unit inside, except actively entrenched infantry, receives an additive displacement equal to half its own effective movement speed, independent of footing resistance.
 The rate includes movement upgrades (including Methamphetamines and Tank+), active speed effects,
