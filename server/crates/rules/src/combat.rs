@@ -19,6 +19,8 @@ pub use armor::{
     effective_damage_for_armor_penetration_with_bonus, effective_damage_with_facing_for_weapon,
     effective_damage_with_facing_for_weapon_and_armor_bonus,
 };
+mod shield;
+pub use shield::shield_covers_building;
 mod dao;
 pub use dao::{ranked_primary_damage, ranked_primary_weapon_profile};
 
