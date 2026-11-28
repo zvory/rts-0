@@ -466,13 +466,18 @@ fn shop_purchase_accepts_allies_and_checks_visibility_range_money_and_source() {
     game.state
         .fog
         .recompute(&[1, 2], &game.state.entities, &game.state.map);
-    buy(&mut game, shop, unit, AbilityKind::Regen);
-    game.tick();
-    assert_eq!(game.state.players[0].oil, 895);
+    // Check affordability before reserving the item, so duplicate rejection cannot
+    // hide an incorrect price or a missing resource check.
     game.state.players[0].set_resources(0, 34);
     buy(&mut game, shop, unit, AbilityKind::Regen);
     game.tick();
     assert_eq!(game.state.players[0].oil, 34);
+    assert_eq!(game.state.ability_runtime.world_objects().count(), 0);
+    game.state.players[0].set_resources(0, 35);
+    buy(&mut game, shop, unit, AbilityKind::Regen);
+    game.tick();
+    assert_eq!(game.state.players[0].oil, 0);
+    assert_eq!(game.state.ability_runtime.world_objects().count(), 1);
 
     game.state.players[0].set_resources(0, 1000);
     let unfinished = game
@@ -1229,10 +1234,7 @@ fn rank_slot_limits_reserve_deliveries_and_reject_regen_when_full() {
             let oil = game.state.players[0].oil;
             buy(&mut game, shop, unit, AbilityKind::VitalityTreasure);
             game.tick();
-            assert_eq!(
-                game.state.players[0].oil,
-                oil - if master { 70 } else { 0 }
-            );
+            assert_eq!(game.state.players[0].oil, oil - if master { 70 } else { 0 });
             for _ in 0..60 {
                 game.tick();
             }
