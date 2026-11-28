@@ -333,7 +333,9 @@ Depots. The reserve is a ready ability, not a stored plane unit. Defensive sorti
 routine flights resume only when another ready launch can remain in reserve. Same-area sorties
 are deduplicated for their thirty-second lifetime, with local cooldown bookkeeping preventing
 repeated orders before the native snapshot updates. Reconnaissance runs before support movement
-and Breakthrough, and uses only known defensive contacts and public geography.
+and Breakthrough, and uses only known defensive contacts and public geography. Defensive flights must be able
+to reach the incident within eighty percent of their lifetime, preserving observation time; an
+unreachable incident neither spends the reserve nor creates a covered-area record.
 
 Eco's cohesive response remembers legally seen armed enemies for thirty seconds, merging live
 observations by entity ID. Both HP-adjusted strength and retreat danger geometry use this same

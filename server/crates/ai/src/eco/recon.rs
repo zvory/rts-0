@@ -64,6 +64,14 @@ impl Recon {
                         .then(a.id.cmp(&b.id))
                 });
                 for car in ready {
+                    // Preserve observation time after transit. A launch that cannot reach
+                    // this incident must not spend the reserve or mark it covered.
+                    let travel = rts_rules::balance::SCOUT_PLANE_SPEED_PX_PER_TICK
+                        * f32::from(rts_rules::balance::SCOUT_PLANE_LIFETIME_TICKS)
+                        * 0.8;
+                    if dist2(car.position, target) > travel * travel {
+                        continue;
+                    }
                     if self.launch(frame, actions, car, target) {
                         break;
                     }

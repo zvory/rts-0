@@ -143,3 +143,41 @@ fn native_readiness_gates_do_not_consume_the_reserved_launch() {
         );
     }
 }
+
+#[test]
+fn unreachable_defensive_flights_do_not_spend_the_reserve_or_create_phantom_coverage() {
+    let (start, mut s, sites) = scene(1);
+    let mut recon = Recon::default();
+    let p = (
+        (start.map.width as f32 - 2.) * start.map.tile_size as f32,
+        (start.map.height as f32 - 2.) * start.map.tile_size as f32,
+    );
+    assert!(casts(&mut recon, &start, &s, &sites, Some(p)).is_empty());
+    assert!(recon.launched.is_empty());
+    assert!(recon.flights.is_empty());
+    let car = s.entities.iter_mut().find(|e| e.id == 1000).unwrap();
+    car.x = p.0 - 128.;
+    car.y = p.1;
+    s.tick += 9;
+    assert_eq!(
+        casts(&mut recon, &start, &s, &sites, Some(p)),
+        vec![(1000, p)]
+    );
+}
+#[test]
+fn a_nearer_ready_car_can_scout_when_the_other_car_is_out_of_range() {
+    let (start, mut s, sites) = scene(2);
+    let mut recon = Recon::default();
+    let p = (
+        (start.map.width as f32 - 2.) * start.map.tile_size as f32,
+        (start.map.height as f32 - 2.) * start.map.tile_size as f32,
+    );
+    let car = s.entities.iter_mut().find(|e| e.id == 1001).unwrap();
+    car.x = p.0 - 128.;
+    car.y = p.1;
+    assert_eq!(
+        casts(&mut recon, &start, &s, &sites, Some(p)),
+        vec![(1001, p)]
+    );
+    assert!(!recon.launched.contains_key(&1000));
+}
