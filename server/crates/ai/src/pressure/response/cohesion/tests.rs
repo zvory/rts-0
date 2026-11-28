@@ -218,7 +218,24 @@ fn outnumbered_defenders_stage_outside_stationary_tank_reach() {
 
 #[test]
 fn individual_tank_retreats_keep_separate_two_tile_destinations() {
-    let (start, s) = fixture(0, 4, 5);
+    assert_separate_tank_retreat_destinations(false);
+}
+
+#[test]
+#[ignore = "Known defect: independent fallback searches can assign the same Tank retreat post"]
+fn blocked_tank_retreat_post_does_not_overlap_another_tanks_fallback() {
+    assert_separate_tank_retreat_destinations(true);
+}
+
+fn assert_separate_tank_retreat_destinations(block_first_post: bool) {
+    let (mut start, s) = fixture(0, 4, 5);
+    if block_first_post {
+        // Tank 100's next lateral candidate is also Tank 101's first candidate.
+        start
+            .map
+            .unwalkable_tiles
+            .push(rts_sim::protocol::MapTile { x: 53, y: 61 });
+    }
     let mut response = PressureResponse::with_cohesive_reserve();
     let points: BTreeMap<_, _> = run(&mut response, &start, &s)
         .into_iter()
