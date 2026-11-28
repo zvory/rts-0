@@ -43,19 +43,34 @@ impl PressureResponse {
         if nearby.is_empty() && encounter.withdrawing {
             if let Some(center) = encounter.rally {
                 let q = WorldQueries::new(frame);
-                encounter.members.retain(|id| {
-                    let connected = frame.owned().iter().find(|e| e.id == *id).is_some_and(|e| {
-                        q.world_point(e.position.0, e.position.1)
-                            .zip(q.world_point(center.0, center.1))
-                            .and_then(|(a, b)| q.ground_route(a, b, EntityKind::Tank))
-                            .is_some()
+                // Compare actual member components, not reachability of the old
+                // endpoint: a new building can obstruct the rally without splitting
+                // the force. Missing component evidence must retain ownership.
+                let component = frame
+                    .owned()
+                    .iter()
+                    .filter(|e| encounter.members.contains(&e.id))
+                    .min_by(|a, b| {
+                        distance(a.position, center)
+                            .total_cmp(&distance(b.position, center))
+                            .then(a.id.cmp(&b.id))
+                    })
+                    .and_then(|e| q.world_point(e.position.0, e.position.1))
+                    .and_then(|p| q.ground_reachability(p, EntityKind::Tank));
+                if let Some(component) = component {
+                    encounter.members.retain(|id| {
+                        let connected =
+                            frame.owned().iter().find(|e| e.id == *id).is_none_or(|e| {
+                                q.world_point(e.position.0, e.position.1)
+                                    .is_none_or(|p| component.contains(p))
+                            });
+                        if !connected {
+                            self.responders.remove(id);
+                            encounter.slots.remove(id);
+                        }
+                        connected
                     });
-                    if !connected {
-                        self.responders.remove(id);
-                        encounter.slots.remove(id);
-                    }
-                    connected
-                });
+                }
             }
         }
         let regrouped = encounter

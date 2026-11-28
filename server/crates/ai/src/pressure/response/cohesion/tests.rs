@@ -829,7 +829,6 @@ fn disconnected_tank_cannot_hold_a_cleared_encounter_forever() {
 }
 
 #[test]
-#[ignore = "Known defect: a blocked rally is treated as disconnected terrain; fixing AI behavior requires separate authorization"]
 fn blocked_rally_must_not_release_an_unfinished_withdrawal() {
     let (start, mut s) = fixture(0, 2, 4);
     s.visible_tiles.fill(0);
@@ -855,4 +854,5 @@ fn blocked_rally_must_not_release_an_unfinished_withdrawal() {
     s.tick += MEMORY_TICKS;
     run(&mut response, &start, &s);
     assert!(response.has_withdrawal(), "blocking the old rally must replan the unfinished withdrawal, not release every member as disconnected");
+    assert_eq!(response.armor_encounter.as_ref().unwrap().members.len(), 2);
 }
