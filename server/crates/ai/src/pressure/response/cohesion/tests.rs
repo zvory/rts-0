@@ -194,16 +194,16 @@ fn outnumbered_defenders_stage_outside_stationary_tank_reach() {
     let (start, s) = fixture(1, 1, 2);
     let mut response = PressureResponse::with_cohesive_reserve();
     let orders = run(&mut response, &start, &s);
-    let positions: Vec<_> = orders
+    let positions = orders
         .iter()
         .filter_map(|a| match a {
-            AiActionRequest::Move { x, y, .. } => Some((*x, *y)),
+            AiActionRequest::Move { units, x, y, .. } => Some((units[0], (*x, *y))),
             _ => None,
         })
-        .collect();
+        .collect::<BTreeMap<_, _>>();
     assert!(!positions.is_empty());
     assert!(positions
-        .iter()
+        .values()
         .all(|p| distance(*p, (70.5 * 32., 60.5 * 32.)) >= 16. * 32.));
 }
 
@@ -211,17 +211,18 @@ fn outnumbered_defenders_stage_outside_stationary_tank_reach() {
 fn armor_regroups_at_separate_two_tile_grid_slots() {
     let (start, s) = fixture(0, 4, 5);
     let mut response = PressureResponse::with_cohesive_reserve();
-    let points: Vec<_> = run(&mut response, &start, &s)
+    let destinations = run(&mut response, &start, &s)
         .into_iter()
         .filter_map(|a| match a {
             AiActionRequest::Move { units, x, y, .. }
                 if units.iter().any(|id| (100..104).contains(id)) =>
             {
-                Some((x, y))
+                Some((units[0], (x, y)))
             }
             _ => None,
         })
-        .collect();
+        .collect::<BTreeMap<_, _>>();
+    let points = destinations.values().copied().collect::<Vec<_>>();
     assert_eq!(points.len(), 4);
     for (i, p) in points.iter().enumerate() {
         for q in points.iter().skip(i + 1) {
@@ -306,10 +307,11 @@ fn ten_seen_tanks_do_not_become_one_or_zero_threats_in_fog() {
     let target = (70.5 * 32., 60.5 * 32.);
     let point = orders
         .iter()
-        .find_map(|r| match r {
+        .filter_map(|r| match r {
             AiActionRequest::Move { units, x, y, .. } if units.contains(&100) => Some((*x, *y)),
             _ => None,
         })
+        .last()
         .unwrap();
     assert!(
         distance(point, target) >= 16. * 32.,
@@ -509,10 +511,11 @@ fn withdrawal_replans_a_post_blocked_by_new_construction() {
     let orders = run(&mut response, &start, &s);
     let old = orders
         .iter()
-        .find_map(|r| match r {
+        .filter_map(|r| match r {
             AiActionRequest::Move { units, x, y, .. } if units.contains(&100) => Some((*x, *y)),
             _ => None,
         })
+        .last()
         .unwrap();
     let mut building = s.entities.iter().find(|e| e.id == 100).unwrap().clone();
     building.id = 2000;
@@ -524,10 +527,11 @@ fn withdrawal_replans_a_post_blocked_by_new_construction() {
     let orders = run(&mut response, &start, &s);
     let new = orders
         .iter()
-        .find_map(|r| match r {
+        .filter_map(|r| match r {
             AiActionRequest::Move { units, x, y, .. } if units.contains(&100) => Some((*x, *y)),
             _ => None,
         })
+        .last()
         .unwrap();
     assert_ne!(new, old);
     let f = AiFrame::from_host(&start, &s, 1, [], Some(&[1, 2])).unwrap();
@@ -549,10 +553,11 @@ fn withdrawal_revalidates_a_route_when_the_endpoint_is_still_safe() {
     let orders = run(&mut response, &start, &s);
     let old = orders
         .iter()
-        .find_map(|r| match r {
+        .filter_map(|r| match r {
             AiActionRequest::Move { units, x, y, .. } if units.contains(&100) => Some((*x, *y)),
             _ => None,
         })
+        .last()
         .unwrap();
     // Both endpoints are outside the new Rifleman's range, but the old straight route
     // crosses its firing envelope after our Tanks have already reached safe ground.
@@ -573,10 +578,11 @@ fn withdrawal_revalidates_a_route_when_the_endpoint_is_still_safe() {
     let orders = run(&mut response, &start, &s);
     let new = orders
         .iter()
-        .find_map(|r| match r {
+        .filter_map(|r| match r {
             AiActionRequest::Move { units, x, y, .. } if units.contains(&100) => Some((*x, *y)),
             _ => None,
         })
+        .last()
         .unwrap();
     assert_ne!(
         new, old,
@@ -611,4 +617,171 @@ fn an_advancing_encounter_tracks_new_sightings_without_extending_its_pursuit_bou
         .iter()
         .any(|r| matches!(r, AiActionRequest::AttackMove { .. })));
     assert!(response.responders.is_empty());
+}
+
+#[test]
+fn simulator_executes_the_checked_withdrawal_around_a_wall_and_known_firing_area() {
+    use rts_sim::game::command::SimCommand;
+    use rts_sim::game::lab::{LabOp, LabOpOutcome, LabSpawnEntity};
+    use rts_sim::protocol::Command;
+    let players = [1, 2].map(|id| PlayerInit {
+        id,
+        team_id: id,
+        faction_id: "kriegsia".into(),
+        name: format!("P{id}"),
+        color: "#ffffff".into(),
+        is_ai: true,
+    });
+    let mut map =
+        rts_sim::game::map::Map::load_for_players("Classic", &[(1, 1), (2, 2)], 7).unwrap();
+    map.terrain.fill(0);
+    map.elevation.fill(0);
+    map.doodads.clear();
+    map.concealment_tiles.clear();
+    map.no_vehicle_tiles.clear();
+    map.no_building_tiles.clear();
+    map.no_entrenchment_tiles.clear();
+    map.damage_reduction_tiles.clear();
+    map.slow_movement_tiles.clear();
+    map.unwalkable_tiles.clear();
+    map.base_sites.clear();
+    for y in 58..63 {
+        map.unwalkable_tiles.push((45, y));
+    }
+    let metadata = rts_sim::game::map::Map::metadata_for_name("Classic").unwrap();
+    let mut game = Game::new_lab(&players, 7, map, metadata);
+    let initial = game
+        .snapshot_full_for(1)
+        .entities
+        .iter()
+        .map(|e| e.id)
+        .collect();
+    game.apply_lab_op(LabOp::DeleteEntities(initial)).unwrap();
+    let mut own = BTreeSet::new();
+    let rifle_reach = rts_rules::combat::attack_profile(EntityKind::Rifleman).range_tiles * 32.;
+    let rifle = (1456., 1936. + rifle_reach + 64. - 16.);
+    for (owner, kind, p) in [
+        (1, EntityKind::Tank, (1200., 1936.)),
+        (1, EntityKind::Tank, (1200., 1872.)),
+        (2, EntityKind::Tank, (2256., 1936.)),
+        (2, EntityKind::Tank, (2320., 1936.)),
+        (2, EntityKind::Tank, (2256., 2000.)),
+        (2, EntityKind::Tank, (2320., 2000.)),
+        (2, EntityKind::Rifleman, rifle),
+    ] {
+        let result = game
+            .apply_lab_op(LabOp::SpawnEntity(LabSpawnEntity {
+                owner,
+                kind,
+                x: p.0,
+                y: p.1,
+                completed: true,
+                dao: None,
+                dao_master: false,
+                faction_id: None,
+            }))
+            .unwrap();
+        if let LabOpOutcome::Spawned { entity_id } = result {
+            if owner == 1 {
+                own.insert(entity_id);
+            }
+        }
+    }
+    assert_eq!(own.len(), 2);
+    let start = game.start_payload();
+    let mut response = PressureResponse::with_cohesive_reserve();
+    let mut destinations = BTreeMap::new();
+    let mut queued = false;
+    let initial_hp = game
+        .snapshot_full_for(1)
+        .entities
+        .iter()
+        .filter(|e| own.contains(&e.id))
+        .map(|e| (e.id, e.hp))
+        .collect::<BTreeMap<_, _>>();
+    for _ in 0..1200 {
+        if game.current_tick() % 9 == 0 {
+            // Deliberately disclose this tiny scene: this test verifies executed movement,
+            // while separate observation tests verify fog filtering and memory.
+            let mut s = game.snapshot_full_for(1);
+            s.visible_tiles.fill(1);
+            let f = AiFrame::from_host(&start, &s, 1, [], Some(&[1, 2])).unwrap();
+            let area = DefendedArea {
+                anchor: (2128., 1936.),
+                radius_tiles: None,
+                members: own.clone(),
+            };
+            let mut a = AiActions::for_frame(&f);
+            response.step_defended(&f, &own, &[area], &mut a);
+            for action in a.into_requests() {
+                match action {
+                    AiActionRequest::Move {
+                        units,
+                        x,
+                        y,
+                        queued: is_queued,
+                    } => {
+                        queued |= is_queued;
+                        for id in &units {
+                            destinations.insert(*id, (x, y));
+                        }
+                        game.enqueue(
+                            1,
+                            SimCommand::from_protocol(Command::Move {
+                                units,
+                                x,
+                                y,
+                                queued: is_queued,
+                            }),
+                        );
+                    }
+                    AiActionRequest::HoldPosition { units, queued } => {
+                        game.enqueue(
+                            1,
+                            SimCommand::from_protocol(Command::HoldPosition { units, queued }),
+                        );
+                    }
+                    AiActionRequest::AttackMove { .. } => {
+                        panic!("the two-versus-four group must keep withdrawing")
+                    }
+                    _ => {}
+                }
+            }
+        }
+        game.tick();
+        let s = game.snapshot_full_for(1);
+        let tanks = s
+            .entities
+            .iter()
+            .filter(|e| own.contains(&e.id))
+            .collect::<Vec<_>>();
+        assert_eq!(tanks.len(), 2);
+        for e in &tanks {
+            assert_eq!(
+                e.hp, initial_hp[&e.id],
+                "executed retreat entered enemy fire at tick{} ({},{})",
+                s.tick, e.x, e.y
+            );
+            assert!(
+                distance((e.x, e.y), rifle) > rifle_reach,
+                "executed path crossed the Rifleman's firing area"
+            );
+        }
+        if destinations.len() == 2
+            && tanks
+                .iter()
+                .all(|e| distance((e.x, e.y), destinations[&e.id]) <= 64.)
+        {
+            assert!(
+                queued,
+                "the checked detour must be preserved as queued waypoints"
+            );
+            assert!(
+                s.tick > 10,
+                "arrival must be produced by native movement, not manual relocation"
+            );
+            return;
+        }
+    }
+    panic!("native Tanks did not finish the queued safe withdrawal");
 }

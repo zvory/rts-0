@@ -187,26 +187,8 @@ impl PressureResponse {
                     distance(p, enemy.position) >= weapon_reach(frame, enemy) + 2. * size
                 })
             };
-            let q = WorldQueries::new(frame);
-            let clearance = |p: Point| {
-                known
-                    .iter()
-                    .map(|e| distance(p, e.position) - weapon_reach(frame, e) - 2. * size)
-                    .min_by(f32::total_cmp)
-                    .unwrap_or(f32::INFINITY)
-            };
-            let usable = |unit: &AiEntity, point: Point| {
-                safe(point)
-                    && q.world_point(unit.position.0, unit.position.1)
-                        .zip(q.world_point(point.0, point.1))
-                        .and_then(|(a, b)| q.ground_route(a, b, EntityKind::Tank))
-                        .is_some_and(|route| {
-                            route.iter().all(|p| {
-                                clearance(p.as_tuple())
-                                    >= clearance(unit.position).min(0.) - size * 0.25
-                            })
-                        })
-            };
+            let usable =
+                |unit: &AiEntity, point: Point| checked_route(frame, unit, point, known).is_some();
             if encounter.rally.is_none_or(|p| !usable(front, p)) {
                 encounter.rally = staging_point(frame, front, target, rear, known)
                     .or_else(|| usable(front, front.position).then_some(front.position));
@@ -266,5 +248,75 @@ impl PressureResponse {
             fight: !encounter.withdrawing,
             slots: encounter.slots.clone(),
         })
+    }
+}
+
+// Keep the checked route's turns, as Eco's reserve routing does. Sending only the
+// destination would let the simulator independently choose an unchecked detour.
+fn checked_route(
+    frame: &AiFrame,
+    unit: &AiEntity,
+    point: Point,
+    known: &[&AiEntity],
+) -> Option<Vec<Point>> {
+    let size = frame.map().tile_size as f32;
+    let clearance = |p: Point| {
+        known
+            .iter()
+            .map(|e| distance(p, e.position) - weapon_reach(frame, e) - 2. * size)
+            .min_by(f32::total_cmp)
+            .unwrap_or(f32::INFINITY)
+    };
+    if clearance(point) < 0. {
+        return None;
+    }
+    let q = WorldQueries::new(frame);
+    let route = q
+        .world_point(unit.position.0, unit.position.1)
+        .zip(q.world_point(point.0, point.1))
+        .and_then(|(a, b)| q.ground_route(a, b, EntityKind::Tank))?;
+    if !route
+        .iter()
+        .all(|p| clearance(p.as_tuple()) >= clearance(unit.position).min(0.) - size * 0.25)
+    {
+        return None;
+    }
+    Some(route.into_iter().map(|p| p.as_tuple()).collect())
+}
+pub(super) fn move_withdrawal(
+    frame: &AiFrame,
+    actions: &mut AiActions,
+    group: &UnitGroup,
+    unit: &AiEntity,
+    point: Point,
+    known: &[&AiEntity],
+) -> bool {
+    let Some(route) = checked_route(frame, unit, point, known) else {
+        return false;
+    };
+    let mut corners = Vec::new();
+    if let Some(first) = route.first() {
+        corners.push(*first);
+    }
+    for triple in route.windows(3) {
+        let [a, b, c] = triple else {
+            continue;
+        };
+        let ab = (b.0 - a.0, b.1 - a.1);
+        let bc = (c.0 - b.0, c.1 - b.1);
+        if (ab.0 * bc.1 - ab.1 * bc.0).abs() > 0.01 || ab.0 * bc.0 + ab.1 * bc.1 <= 0. {
+            corners.push(*b);
+        }
+    }
+    if route.len() > 1 {
+        if let Some(last) = route.last() {
+            corners.push(*last);
+        }
+    }
+    let waypoints = corners.into_iter().skip(1).take(24).collect::<Vec<_>>();
+    if let Some((first, rest)) = waypoints.split_first() {
+        actions.move_route(group, *first, rest).is_ok()
+    } else {
+        actions.hold_position(group, false).is_ok()
     }
 }

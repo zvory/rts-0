@@ -349,7 +349,9 @@ A Tank encounter retains tactical ownership through withdrawal even if the origi
 guard dies or enemies change targets outside the initial admission bubble. The main Tank
 concentration makes one advance/withdraw decision. A fixed encounter anchor bounds pursuit while
 the attack destination follows refreshed observations inside that bound. A withdrawing group receives separate
-body-reachable, two-tile-spaced destinations around one safe rally area. Re-entry requires ninety
+body-reachable, two-tile-spaced destinations around one safe rally area. Retreat orders preserve
+the checked route with queued corner waypoints rather than asking the simulator to choose a new
+route to the endpoint. Re-entry requires ninety
 percent of surviving assigned Tanks within two tiles of their posts and local HP-adjusted friendly
 strength at least ninety percent of the remembered enemy force. New overwhelming information can
 trigger withdrawal immediately; no fixed timer forces an unfavorable engagement. Confirmed area

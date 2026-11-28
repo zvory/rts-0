@@ -325,12 +325,14 @@ impl PressureResponse {
                 });
             if reissue {
                 if let Ok(group) = UnitGroup::new([unit.id]) {
-                    let result = if ready {
-                        actions.attack_move(&group, point.0, point.1, false)
+                    let sent = if ready {
+                        actions.attack_move(&group, point.0, point.1, false).is_ok()
+                    } else if unit.kind == EntityKind::Tank {
+                        withdrawal::move_withdrawal(frame, actions, &group, unit, point, &known)
                     } else {
-                        actions.move_group(&group, point.0, point.1, false)
+                        actions.move_group(&group, point.0, point.1, false).is_ok()
                     };
-                    if result.is_ok() {
+                    if sent {
                         self.issued.insert(unit.id, (frame.tick(), point));
                         self.fighting.insert(unit.id, ready);
                     }
