@@ -165,29 +165,45 @@ impl PressureResponse {
                     distance(p, enemy.position) >= weapon_reach(frame, enemy) + 2. * size
                 })
             };
-            if encounter.rally.is_none_or(|p| !safe(p)) {
-                encounter.rally = staging_point(frame, front, target, rear, known, (0., 0.));
+            let q = WorldQueries::new(frame);
+            let clearance = |p: Point| {
+                known
+                    .iter()
+                    .map(|e| distance(p, e.position) - weapon_reach(frame, e) - 2. * size)
+                    .min_by(f32::total_cmp)
+                    .unwrap_or(f32::INFINITY)
+            };
+            let usable = |unit: &AiEntity, point: Point| {
+                safe(point)
+                    && q.world_point(unit.position.0, unit.position.1)
+                        .zip(q.world_point(point.0, point.1))
+                        .and_then(|(a, b)| q.ground_route(a, b, EntityKind::Tank))
+                        .is_some_and(|route| {
+                            route.iter().all(|p| {
+                                clearance(p.as_tuple())
+                                    >= clearance(unit.position).min(0.) - size * 0.25
+                            })
+                        })
+            };
+            if encounter.rally.is_none_or(|p| !usable(front, p)) {
+                encounter.rally = staging_point(frame, front, target, rear, known, (0., 0.))
+                    .or_else(|| usable(front, front.position).then_some(front.position));
                 encounter.slots.clear();
             }
             if let Some(center) = encounter.rally {
-                let q = WorldQueries::new(frame);
                 let mut offsets = (-8i32..=8)
                     .flat_map(|y| (-8i32..=8).map(move |x| (x, y)))
                     .collect::<Vec<_>>();
                 offsets.sort_by_key(|(x, y)| (x * x + y * y, *y, *x));
                 for tank in &tanks {
-                    if encounter.slots.get(&tank.id).is_some_and(|p| safe(*p)) {
+                    if encounter
+                        .slots
+                        .get(&tank.id)
+                        .is_some_and(|p| usable(tank, *p))
+                    {
                         continue;
                     }
                     encounter.slots.remove(&tank.id);
-                    let from = q.world_point(tank.position.0, tank.position.1);
-                    let clearance = |p: Point| {
-                        known
-                            .iter()
-                            .map(|e| distance(p, e.position) - weapon_reach(frame, e) - 2. * size)
-                            .min_by(f32::total_cmp)
-                            .unwrap_or(f32::INFINITY)
-                    };
                     for (x, y) in &offsets {
                         let p = (
                             center.0 + *x as f32 * 2. * size,
@@ -201,15 +217,7 @@ impl PressureResponse {
                         {
                             continue;
                         }
-                        let route = from
-                            .zip(q.world_point(p.0, p.1))
-                            .and_then(|(a, b)| q.ground_route(a, b, EntityKind::Tank));
-                        if route.is_some_and(|route| {
-                            route.iter().all(|point| {
-                                clearance(point.as_tuple())
-                                    >= clearance(tank.position).min(0.) - size * 0.25
-                            })
-                        }) {
+                        if usable(tank, p) {
                             encounter.slots.insert(tank.id, p);
                             break;
                         }

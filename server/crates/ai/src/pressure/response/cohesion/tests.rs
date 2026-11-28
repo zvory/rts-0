@@ -500,3 +500,86 @@ fn threat_expiry_does_not_cancel_an_unfinished_withdrawal() {
     assert!(!response.has_withdrawal());
     assert!(response.responders.is_empty());
 }
+
+#[test]
+fn withdrawal_replans_a_post_blocked_by_new_construction() {
+    let (start, mut s) = fixture(0, 2, 4);
+    s.visible_tiles.fill(0);
+    let mut response = PressureResponse::with_cohesive_reserve();
+    let orders = run(&mut response, &start, &s);
+    let old = orders
+        .iter()
+        .find_map(|r| match r {
+            AiActionRequest::Move { units, x, y, .. } if units.contains(&100) => Some((*x, *y)),
+            _ => None,
+        })
+        .unwrap();
+    let mut building = s.entities.iter().find(|e| e.id == 100).unwrap().clone();
+    building.id = 2000;
+    building.kind = "barracks".into();
+    building.x = old.0;
+    building.y = old.1;
+    s.entities.push(building);
+    s.tick += 9;
+    let orders = run(&mut response, &start, &s);
+    let new = orders
+        .iter()
+        .find_map(|r| match r {
+            AiActionRequest::Move { units, x, y, .. } if units.contains(&100) => Some((*x, *y)),
+            _ => None,
+        })
+        .unwrap();
+    assert_ne!(new, old);
+    let f = AiFrame::from_host(&start, &s, 1, [], Some(&[1, 2])).unwrap();
+    let q = WorldQueries::new(&f);
+    let tank = f.owned().iter().find(|e| e.id == 100).unwrap();
+    assert!(q
+        .ground_route(
+            q.world_point(tank.position.0, tank.position.1).unwrap(),
+            q.world_point(new.0, new.1).unwrap(),
+            EntityKind::Tank
+        )
+        .is_some());
+}
+#[test]
+fn withdrawal_revalidates_a_route_when_the_endpoint_is_still_safe() {
+    let (start, mut s) = fixture(0, 2, 4);
+    s.visible_tiles.fill(0);
+    let mut response = PressureResponse::with_cohesive_reserve();
+    let orders = run(&mut response, &start, &s);
+    let old = orders
+        .iter()
+        .find_map(|r| match r {
+            AiActionRequest::Move { units, x, y, .. } if units.contains(&100) => Some((*x, *y)),
+            _ => None,
+        })
+        .unwrap();
+    // Both endpoints are outside the new Rifleman's range, but the old straight route
+    // crosses its firing envelope after our Tanks have already reached safe ground.
+    for e in s.entities.iter_mut().filter(|e| e.owner == 1) {
+        e.x = old.0 - 512.;
+        e.y = old.1;
+    }
+    let mut enemy = s.entities.iter().find(|e| e.id == 900).unwrap().clone();
+    enemy.id = 950;
+    enemy.kind = "rifleman".into();
+    let reach = (rts_rules::combat::attack_profile(EntityKind::Rifleman).range_tiles + 2.) * 32.;
+    enemy.x = old.0 - 256.;
+    enemy.y = old.1 + reach - 16.;
+    s.entities.push(enemy);
+    let e = s.entities.iter().find(|e| e.id == 950).unwrap();
+    assert!(distance(old, (e.x, e.y)) >= reach);
+    s.tick += 9;
+    let orders = run(&mut response, &start, &s);
+    let new = orders
+        .iter()
+        .find_map(|r| match r {
+            AiActionRequest::Move { units, x, y, .. } if units.contains(&100) => Some((*x, *y)),
+            _ => None,
+        })
+        .unwrap();
+    assert_ne!(
+        new, old,
+        "a safe endpoint cannot justify retaining an unsafe route"
+    );
+}
