@@ -765,7 +765,7 @@ fn cultivators_start_train_and_mine_with_only_nexus_construction() {
     assert_eq!(owned_kind_count(&game, 1, EntityKind::ResourceDepot), 1);
     assert_eq!(owned_kind_count(&game, 1, EntityKind::Worker), 1);
     assert_eq!(owned_kind_count(&game, 1, EntityKind::Rifleman), 0);
-    assert_eq!(owned_kind_count(&game, 1, EntityKind::Warrior), 1);
+    assert_eq!(owned_kind_count(&game, 1, EntityKind::Warrior), 2);
     assert_eq!(owned_kind_count(&game, 1, EntityKind::SteelMine), 6);
     assert_eq!(owned_kind_count(&game, 1, EntityKind::PumpJack), 1);
     let worker = game

@@ -27,7 +27,7 @@ fn library_game() -> Game {
 #[test]
 fn technique_library_research_pays_fixed_prices_and_survives_building_loss() {
     let mut game = library_game();
-    game.state.players[0].set_resources(400, 400);
+    game.state.players[0].set_resources(300, 300);
     let library = game
         .state
         .entities
@@ -35,21 +35,13 @@ fn technique_library_research_pays_fixed_prices_and_survives_building_loss() {
         .unwrap();
     let techniques = [
         UpgradeKind::TechniqueCharge,
-        UpgradeKind::TechniqueBlink,
         UpgradeKind::TechniqueShield,
         UpgradeKind::TechniqueThrowSword,
     ];
     for kind in techniques {
         let def = upgrade::definition(kind);
         assert_eq!((def.cost_steel, def.cost_oil), (100, 100));
-        assert_eq!(
-            def.research_ticks,
-            if kind == UpgradeKind::TechniqueBlink {
-                300
-            } else {
-                600
-            }
-        );
+        assert_eq!(def.research_ticks, 600);
         game.enqueue(
             1,
             Command::Research {
@@ -73,7 +65,7 @@ fn technique_library_research_pays_fixed_prices_and_survives_building_loss() {
             .unwrap()
             .research_queue()
             .len(),
-        4
+        3
     );
     for _ in 0..2100 {
         game.tick();
@@ -89,13 +81,13 @@ fn technique_library_research_pays_fixed_prices_and_survives_building_loss() {
 }
 
 #[test]
-fn technique_library_gates_abilities_for_adepts_and_masters_but_not_vector_field() {
+fn technique_library_gates_abilities_for_adepts_and_masters_but_not_blink_or_vector_field() {
     for master in [false, true] {
         for (unit_kind, ability, required) in [
             (
                 EntityKind::WindAdept,
                 AbilityKind::WindDash,
-                Some(UpgradeKind::TechniqueBlink),
+                None,
             ),
             (
                 EntityKind::MagicAdept,
@@ -216,4 +208,17 @@ fn technique_library_gates_automatic_charge_for_novice_and_war_ranks() {
             );
         }
     }
+}
+
+#[test]
+fn technique_library_rejects_retired_blink_research() {
+    let mut game = library_game();
+    game.state.players[0].set_resources(100, 100);
+    let library = game.state.entities
+        .spawn_building(1, EntityKind::TechniqueLibrary, 500.0, 500.0, true)
+        .unwrap();
+    game.enqueue(1, Command::Research { building: library, upgrade: UpgradeKind::TechniqueBlink });
+    game.tick();
+    assert!(game.state.entities.get(library).unwrap().research_queue().is_empty());
+    assert_eq!((game.state.players[0].steel, game.state.players[0].oil), (100, 100));
 }

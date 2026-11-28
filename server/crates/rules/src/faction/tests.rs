@@ -414,7 +414,6 @@ fn technique_library_matches_pavilion_body_and_separates_techniques_from_dao() {
         researches,
         vec![
             UpgradeKind::TechniqueCharge,
-            UpgradeKind::TechniqueBlink,
             UpgradeKind::TechniqueShield,
             UpgradeKind::TechniqueThrowSword
         ]

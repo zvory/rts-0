@@ -198,7 +198,7 @@ pub const UNITS: &[UnitDef] = &[
             speed: SCOUT_CAR_DEF.stats.speed * balance::DAO_WIND_SPEED_MULTIPLIER,
             sight_tiles: SCOUT_CAR_DEF.stats.sight_tiles - 1,
             cost_steel: 150,
-            cost_oil: 60,
+            cost_oil: 55,
             supply: 3,
             ..NOVICE_DEF.stats
         },
@@ -213,7 +213,7 @@ pub const UNITS: &[UnitDef] = &[
             speed: NOVICE_DEF.stats.speed * balance::DAO_WAR_SPEED_MULTIPLIER,
             radius: ADEPT_BODY_RADIUS * balance::DAO_WAR_BODY_SCALE,
             cost_steel: 150,
-            cost_oil: 60,
+            cost_oil: 55,
             supply: 3,
             ..NOVICE_DEF.stats
         },
@@ -227,7 +227,7 @@ pub const UNITS: &[UnitDef] = &[
             range_tiles: balance::DAO_RANGED_RANGE_TILES,
             speed: NOVICE_DEF.stats.speed * balance::DAO_MAGIC_SPEED_MULTIPLIER,
             cost_steel: 150,
-            cost_oil: 60,
+            cost_oil: 55,
             supply: 3,
             ..NOVICE_DEF.stats
         },

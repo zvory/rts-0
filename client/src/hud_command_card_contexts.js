@@ -46,7 +46,7 @@ export function buildCultivatorCommandCardContextSamples(buildCard) {
   const ctx = (selection) => ({
     playerId: 1, factionId: CULTIVATORS_FACTION_ID, selection,
     entities: selection, resources: { steel: 1000, oil: 1000 },
-    upgrades: [UPGRADE.DAO_WIND, UPGRADE.DAO_OF_HEAVINESS, UPGRADE.DAO_OF_MAGIC, UPGRADE.TECHNIQUE_CHARGE, UPGRADE.TECHNIQUE_BLINK, UPGRADE.TECHNIQUE_SHIELD, UPGRADE.TECHNIQUE_THROW_SWORD],
+    upgrades: [UPGRADE.DAO_WIND, UPGRADE.DAO_OF_HEAVINESS, UPGRADE.DAO_OF_MAGIC, UPGRADE.TECHNIQUE_CHARGE, UPGRADE.TECHNIQUE_SHIELD, UPGRADE.TECHNIQUE_THROW_SWORD],
     groupCooldownClocks: () => [], playerHasCompleteKind: () => true,
   });
   const unitCards = [null, "wind", "war", "magic"].map((dao) => ({
