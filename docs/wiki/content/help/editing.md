@@ -91,3 +91,7 @@ current entity page. Notes for hidden entries can stay in the repository for reu
 
 The Rocket Truck icon can also be refreshed from the current client portrait with
 `node scripts/update-wiki-rocket-icon.mjs`; it replaces only that entry in `icons.json`.
+
+Refresh the Technique Library portrait (fixed base plus team-painted roof) with
+`node scripts/update-wiki-library-icon.mjs`; it reads the current building atlas metadata and
+replaces only `buildings.technique_library` in `icons.json`.
