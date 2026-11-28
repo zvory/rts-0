@@ -13,7 +13,7 @@ use crate::selfplay::{
 };
 use crate::DEFAULT_LIVE_PROFILE_ID;
 
-const DEFAULT_TICKS: u32 = 25_000;
+const DEFAULT_TICKS: u32 = 18_000;
 const DEFAULT_SEED: u32 = 0;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -386,7 +386,7 @@ Options:
 Examples:
   cargo run --bin ai-matchup -- ai ai
   cargo run --bin ai-matchup -- ai_2_1 ai_turtle --seed 7 --ticks 3000 --json
-  cargo run --bin ai-matchup -- default ai_turtle --seed 7 --ticks 25000 --json
+  cargo run --bin ai-matchup -- default ai_turtle --seed 7 --ticks 18000 --json
 "
     );
 }
@@ -401,13 +401,13 @@ mod tests {
     use std::collections::BTreeMap;
 
     #[test]
-    fn default_tick_cap_is_twenty_five_thousand() {
+    fn default_tick_cap_is_ten_minutes() {
         let config = parse_args(vec!["ai_2_1".to_string(), "ai_turtle".to_string()])
             .expect("default args should parse")
             .expect("default args should return config");
 
-        assert_eq!(DEFAULT_TICKS, 25_000);
-        assert_eq!(config.ticks, 25_000);
+        assert_eq!(DEFAULT_TICKS, 18_000);
+        assert_eq!(config.ticks, 18_000);
     }
 
     #[test]

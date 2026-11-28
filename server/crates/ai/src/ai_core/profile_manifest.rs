@@ -121,7 +121,7 @@ pub(crate) fn profile_identity_by_id(id: &str) -> Option<AiProfileIdentity> {
     if id == crate::eco::ECO_AI_ID {
         let label = "Eco AI";
         let summary =
-            "Six-base economic defense with shared terrain posts and staged Tank production.";
+            "Territorial economy with Command Car-supported armor and capacity-triggered staged assaults.";
         let modules = [
             "typed_strategy_sdk",
             "economic_defense_planner",
@@ -133,13 +133,20 @@ pub(crate) fn profile_identity_by_id(id: &str) -> Option<AiProfileIdentity> {
             "concentrated_armor_reserve",
             "local_force_cohesion",
             "shared_wounded_pullback",
+            "command_car_tank_support",
+            "capacity_triggered_staged_assault",
         ];
         let sources = (
             include_str!("../eco.rs"),
             include_str!("../eco/construction.rs"),
             include_str!("../eco/tactics.rs"),
             include_str!("../eco/production.rs"),
-            include_str!("../eco/armor.rs"),
+            (
+                include_str!("../eco/armor.rs"),
+                include_str!("../eco/offense.rs"),
+                include_str!("../eco/support.rs"),
+                include_str!("../pressure.rs"),
+            ),
             include_str!("../sdk/pullback.rs"),
             crate::sdk::DEFENSE_PLANNER_SOURCE,
             include_str!("../sdk/actions.rs"),

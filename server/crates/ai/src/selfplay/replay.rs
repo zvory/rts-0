@@ -512,17 +512,23 @@ pub fn run_profile_matchup_result(
         false
     };
 
+    let winner = objective.winner();
     let replay_artifact = match &options.save_replay_name {
         Some(name) => Some(
-            write_replay_artifact(name, options.replay_dir.as_ref(), &replay_start, &game)?
-                .display()
-                .to_string(),
+            write_replay_artifact(
+                name,
+                options.replay_dir.as_ref(),
+                &replay_start,
+                &game,
+                winner.as_ref().map(|w| w.player_id),
+            )?
+            .display()
+            .to_string(),
         ),
         None => None,
     };
 
     let alive = objective.alive_player_ids();
-    let winner = objective.winner();
     let end_reason = objective.end_reason();
     let starting_resource_depots = objective.results();
     let final_counts = final_unit_counts(&game, &players);
@@ -845,6 +851,7 @@ fn write_replay_artifact(
     replay_dir: Option<&PathBuf>,
     replay_start: &ReplayStartComposition,
     game: &Game,
+    winner_id: Option<u32>,
 ) -> Result<PathBuf, String> {
     let dir = replay_dir
         .cloned()
@@ -855,7 +862,7 @@ fn write_replay_artifact(
         })
         .join(name);
     fs::create_dir_all(&dir).map_err(|err| err.to_string())?;
-    let artifact = replay_start.finalize(game, None, game.scores());
+    let artifact = replay_start.finalize(game, winner_id, game.scores());
     let json = serde_json::to_vec_pretty(&artifact).map_err(|err| err.to_string())?;
     fs::write(dir.join("replay.json"), json).map_err(|err| err.to_string())?;
     Ok(dir)
@@ -1268,6 +1275,7 @@ mod tests {
         assert!(objective.winner().is_none());
         assert!(objective.results().iter().all(|centre| centre.alive));
 
+        let replay_start = super::ReplayStartComposition::capture(&game, "test").unwrap();
         game.eliminate(2);
         let snapshot = game.snapshot_full_for(1);
         assert!(objective.observe_snapshot(42, &snapshot));
@@ -1275,6 +1283,21 @@ mod tests {
         let winner = objective.winner().expect("player 1 should win");
         assert_eq!(winner.player_id, 1);
         assert_eq!(winner.profile, AI_2_1_ID);
+        let root = std::env::temp_dir().join(format!("rts-matchup-winner-{}", std::process::id()));
+        let dir = super::write_replay_artifact(
+            "winner",
+            Some(&root),
+            &replay_start,
+            &game,
+            Some(winner.player_id),
+        )
+        .unwrap();
+        let artifact: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(dir.join("replay.json")).unwrap()).unwrap();
+        assert_eq!(artifact["winnerId"], 1);
+        assert_eq!(artifact["winnerTeamId"], 1);
+        std::fs::remove_dir_all(root).unwrap();
+
         assert_eq!(
             objective.end_reason(),
             super::ProfileMatchupEndReason::StartingResourceDepotKilled

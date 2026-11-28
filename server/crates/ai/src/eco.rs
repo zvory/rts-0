@@ -6,12 +6,16 @@ use crate::sdk::{
 use std::collections::BTreeMap;
 mod armor;
 mod construction;
+mod offense;
 mod production;
+mod support;
 mod tactics;
 #[cfg(test)]
 mod tests;
 
-const BASE_TARGET: usize = 6;
+fn base_target(frame: &AiFrame) -> usize {
+    frame.base_sites().len() / 2 + 1
+}
 const SCREEN_LEAD_TICKS: u32 = rts_rules::balance::TICK_HZ * 5;
 pub(crate) const ECO_AI_ID: &str = "eco_ai";
 
@@ -24,6 +28,8 @@ pub(crate) struct EcoStrategy {
     planner: DefensePlanner,
     defense: tactics::DefenseAssignments,
     production: production::EcoProduction,
+    offense: offense::EcoOffense,
+    support: support::CommandSupport,
 }
 impl Default for EcoStrategy {
     fn default() -> Self {
@@ -36,6 +42,8 @@ impl Default for EcoStrategy {
             planner: DefensePlanner::with_firing_range_tiles(4.8),
             defense: Default::default(),
             production: Default::default(),
+            offense: Default::default(),
+            support: Default::default(),
         }
     }
 }
@@ -69,7 +77,7 @@ fn next_structure(frame: &AiFrame, bases: usize, overflow_works: usize) -> Optio
     } else if bases >= 2 && count(frame, EntityKind::EngineeringComplex) == 0 {
         Some(EntityKind::EngineeringComplex)
     } else if count(frame, EntityKind::Factory)
-        < works_target(bases).max(if bases >= BASE_TARGET {
+        < works_target(bases).max(if bases >= base_target(frame) {
             overflow_works
         } else {
             0
@@ -107,7 +115,13 @@ fn expansion(frame: &AiFrame) -> Option<(AiBaseSiteId, (f32, f32))> {
         .find(|b| {
             b.distance_from_main.is_some()
                 && !matches!(b.site.id,AiBaseSiteId::Start(id) if id!=frame.player_id())
-                && q.known_base_depots(b.site.id).is_empty()
+                && q.known_base_depots(b.site.id).iter().all(|d| {
+                    frame.players().iter().any(|p| {
+                        p.id == d.owner
+                            && p.id != frame.player_id()
+                            && (p.team_id == 0 || p.team_id != frame.team_id())
+                    })
+                })
         })
         .map(|b| (b.site.id, b.site.position))
 }
@@ -133,7 +147,7 @@ impl AiStrategy for EcoStrategy {
             || [UpgradeKind::Panzerfausts, UpgradeKind::Methamphetamines]
                 .iter()
                 .all(|u| frame.completed_upgrades().contains(u));
-        let next_base = (bases < BASE_TARGET
+        let next_base = (bases < base_target(frame)
             && expansion_tech
             && frame
                 .completed_upgrades()
@@ -169,7 +183,34 @@ impl AiStrategy for EcoStrategy {
             }
         }
         self.refresh_depot_reservation(frame, rules);
-        self.defense.step(frame, actions, &mut self.planner, &sites);
+        if bases >= base_target(frame) {
+            self.offense.observe(frame);
+        }
+        let push = self.defense.expansion_push_ids(frame);
+        let mut reserved = self.defense.screen_ids().clone();
+        reserved.extend(&push);
+        let outbound = self.offense.controlled(frame, &reserved);
+        // Give the support vehicle a turn before large infantry batches consume action capacity.
+        let mut mobilized: std::collections::BTreeSet<u32> = self
+            .defense
+            .attacking_ids()
+            .union(self.offense.attacking_ids())
+            .copied()
+            .collect();
+        mobilized.extend(&push);
+        if push.is_empty() {
+            self.support.step(frame, actions, &mobilized);
+        } else {
+            self.support
+                .step_mobilized(frame, actions, &mobilized, true);
+        }
+        let tactical = if outbound.is_empty() {
+            self.defense.step(frame, actions, &mut self.planner, &sites)
+        } else {
+            self.defense
+                .step_with_outbound(frame, actions, &mut self.planner, &sites, &outbound)
+        };
+        self.offense.step(frame, actions, &outbound, &tactical);
         // Configure standing orders before travel/construction can return from this decision.
         self.production.step(frame, actions);
         if !frame.owned().iter().any(|e| e.kind == EntityKind::Worker)
@@ -206,12 +247,12 @@ impl AiStrategy for EcoStrategy {
             return;
         }
         // Add capacity after six bases when every existing Works is actively producing.
-        let target = works_target(bases).max(if bases >= BASE_TARGET {
+        let target = works_target(bases).max(if bases >= base_target(frame) {
             self.overflow_works
         } else {
             0
         });
-        if bases >= BASE_TARGET
+        if bases >= base_target(frame)
             && count(frame, EntityKind::Factory) >= target
             && frame
                 .owned()

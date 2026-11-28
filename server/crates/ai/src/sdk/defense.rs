@@ -145,7 +145,7 @@ impl DefensePlanner {
         owned_completed_sites: &[AiBaseSiteId],
         unit_budget: usize,
     ) -> DefensePlan {
-        self.plan_sites(frame, owned_completed_sites, None, unit_budget, &[])
+        self.plan_sites(frame, owned_completed_sites, None, unit_budget, &[], false)
     }
     /// Plan a defensive line for one public, reachable expansion landmark before a Depot
     /// exists. Known hostile occupancy is rejected. This is a prospective policy input,
@@ -188,7 +188,22 @@ impl DefensePlanner {
             Some(expansion),
             unit_budget,
             reservations,
+            false,
         )
+    }
+    /// Plan a deliberate claim of a reachable public site, including known hostile occupation.
+    /// This is positioning policy only; occupied footprints remain illegal for construction.
+    pub fn plan_claim(
+        &mut self,
+        frame: &AiFrame,
+        owned: &[AiBaseSiteId],
+        site: AiBaseSiteId,
+        budget: usize,
+        reservations: &[DefenseReservation],
+    ) -> DefensePlan {
+        let mut requested = owned.to_vec();
+        requested.push(site);
+        self.plan_sites(frame, &requested, Some(site), budget, reservations, true)
     }
     fn plan_sites(
         &mut self,
@@ -197,6 +212,7 @@ impl DefensePlanner {
         prospective: Option<AiBaseSiteId>,
         unit_budget: usize,
         reservations: &[DefenseReservation],
+        allow_hostile: bool,
     ) -> DefensePlan {
         let topology_identity = frame
             .base_sites()
@@ -268,10 +284,11 @@ impl DefensePlanner {
                 b.site.id == *id
                     && b.distance_from_main.is_some()
                     && !matches!(b.site.id, AiBaseSiteId::Start(p) if p != frame.player_id())
-            }) && query
-                .known_base_depots(*id)
-                .iter()
-                .all(|d| d.owner == frame.player_id())
+            }) && (allow_hostile
+                || query
+                    .known_base_depots(*id)
+                    .iter()
+                    .all(|d| d.owner == frame.player_id()))
         });
         if self.prospective != prospective {
             self.prospective = prospective;

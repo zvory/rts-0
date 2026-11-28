@@ -812,7 +812,7 @@ fn garrison_posts_surround_base_on_bounded_ring_and_keep_construction_access_cle
             (tile.x() + foot.width_tiles) as f32 * ts,
             (tile.y() + foot.height_tiles) as f32 * ts,
         );
-        let reserved = planner.plan_sites(&f, &ids, None, 256, &[reservation]);
+        let reserved = planner.plan_sites(&f, &ids, None, 256, &[reservation], false);
         assert!(!reserved.slots.is_empty());
         assert!(
             reserved.unallocated_budget > 0,
