@@ -65,6 +65,7 @@ pub(crate) fn profile_identity(profile: &AiProfile) -> AiProfileIdentity {
                     include_str!("../pressure/response.rs"),
                     include_str!("../pressure/response/defended.rs"),
                     include_str!("../pressure/response/cohesion.rs"),
+                    include_str!("../pressure/response/cohesion/withdrawal.rs"),
                     include_str!("decision/pressure_economy.rs"),
                     include_str!("../sdk/base_placement.rs"),
                 ),
@@ -134,6 +135,8 @@ pub(crate) fn profile_identity_by_id(id: &str) -> Option<AiProfileIdentity> {
             "local_force_cohesion",
             "shared_wounded_pullback",
             "command_car_tank_support",
+            "reserved_scout_plane_reconnaissance",
+            "remembered_threat_withdrawal",
             "capacity_triggered_staged_assault",
         ];
         let sources = (
@@ -145,6 +148,7 @@ pub(crate) fn profile_identity_by_id(id: &str) -> Option<AiProfileIdentity> {
                 include_str!("../eco/armor.rs"),
                 include_str!("../eco/offense.rs"),
                 include_str!("../eco/support.rs"),
+                include_str!("../eco/recon.rs"),
                 include_str!("../pressure.rs"),
             ),
             include_str!("../sdk/pullback.rs"),
@@ -158,6 +162,7 @@ pub(crate) fn profile_identity_by_id(id: &str) -> Option<AiProfileIdentity> {
             (
                 include_str!("../pressure/response/defended.rs"),
                 include_str!("../pressure/response/cohesion.rs"),
+                include_str!("../pressure/response/cohesion/withdrawal.rs"),
             ),
             include_str!("../sdk/base_placement.rs"),
             include_str!("../sdk/ground_route.rs"),

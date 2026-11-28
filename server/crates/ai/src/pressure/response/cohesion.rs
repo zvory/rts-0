@@ -1,5 +1,6 @@
 //! Eco's opt-in concentration gate. Other profiles retain their original response orders.
 use super::*;
+pub(super) mod withdrawal;
 use crate::sdk::WorldQueries;
 use rts_rules::math::GameplayMath as _;
 
@@ -26,6 +27,44 @@ pub(super) fn weapon_reach(frame: &AiFrame, unit: &AiEntity) -> f32 {
     (range.max(0.) + trench) * frame.map().tile_size as f32
 }
 impl PressureResponse {
+    pub(super) fn observe_threats(&mut self, frame: &AiFrame) {
+        // Record only legal observations. A missing unit is not a witnessed death.
+        for enemy in frame.visible_enemies() {
+            if enemy.health.current > 0 && weapon_reach(frame, enemy) > 0. {
+                self.threat_memory
+                    .insert(enemy.id, (frame.tick(), enemy.clone()));
+            } else {
+                self.threat_memory.remove(&enemy.id);
+            }
+        }
+        let q = WorldQueries::new(frame);
+        self.threat_memory.retain(|id, (seen, enemy)| {
+            if frame.tick().saturating_sub(*seen) >= MEMORY_TICKS {
+                return false;
+            }
+            if frame.visible_enemies().iter().any(|e| e.id == *id) {
+                return true;
+            }
+            // Clear an unseen threat only when its entire firing area is observable,
+            // not just its last tile. Reconnaissance can positively clear this area.
+            let size = frame.map().tile_size as f32;
+            let radius = weapon_reach(frame, enemy) + 2. * size;
+            let tiles = (radius / size).ceil() as i32;
+            !(-tiles..=tiles).all(|dy| {
+                (-tiles..=tiles).all(|dx| {
+                    let p = (
+                        enemy.position.0 + dx as f32 * size,
+                        enemy.position.1 + dy as f32 * size,
+                    );
+                    if distance(enemy.position, p) > radius {
+                        return true;
+                    }
+                    q.world_point(p.0, p.1)
+                        .is_none_or(|p| q.ground_position_is_observable(p))
+                })
+            })
+        });
+    }
     fn armor_target(&self, size: f32) -> Option<Point> {
         // Concentrate on one armored incident. Independently choosing every Tank's nearest
         // enemy would split the reserve between attacks and recreate piecemeal arrivals.
@@ -66,7 +105,12 @@ impl PressureResponse {
                 && frame.owned().iter().any(|u| {
                     u.id == *id
                         && u.health.current > 0
-                        && (u.kind != EntityKind::Tank || tanks_required > 0)
+                        && (u.kind != EntityKind::Tank
+                            || tanks_required > 0
+                            || self
+                                .armor_encounter
+                                .as_ref()
+                                .is_some_and(|group| group.members.contains(id)))
                 })
         });
         let armor_target = self.armor_target(frame.map().tile_size as f32);
@@ -141,8 +185,12 @@ impl PressureResponse {
     ) {
         let size = frame.map().tile_size as f32;
         let radius = 15. * size;
-        let visible: Vec<_> = frame
-            .visible_enemies()
+        let remembered = self
+            .threat_memory
+            .values()
+            .map(|(_, enemy)| enemy.clone())
+            .collect::<Vec<_>>();
+        let known: Vec<_> = remembered
             .iter()
             .filter(|e| {
                 e.health.current > 0
@@ -171,12 +219,7 @@ impl PressureResponse {
         };
         self.issued.retain(|id, _| self.responders.contains(id));
         self.fighting.retain(|id, _| self.responders.contains(id));
-        let armor: Vec<_> = defenders
-            .iter()
-            .filter(|e| e.kind == EntityKind::Tank)
-            .map(|e| e.id)
-            .collect();
-        let columns = (armor.len() as f32).det_sqrt().ceil().max(1.) as usize;
+        let armor_plan = self.armor_plan(frame, book, &known, &defenders, rear);
         for unit in &defenders {
             let contact = self
                 .contacts
@@ -186,15 +229,20 @@ impl PressureResponse {
                     distance(unit.position, a.position)
                         .total_cmp(&distance(unit.position, b.position))
                 });
-            let Some(contact) = contact else { continue };
             let target = if unit.kind == EntityKind::Tank {
-                self.armor_target(size).unwrap_or(contact.position)
+                let Some(plan) = &armor_plan else {
+                    continue;
+                };
+                plan.target
             } else {
+                let Some(contact) = contact else {
+                    continue;
+                };
                 contact.position
             };
             // Count forces that can actually support this unit and this engagement, not distant
-            // commitments. Use visible enemy reinforcements too, even outside admitted incidents.
-            let enemies: Vec<_> = visible
+            // commitments. Use known enemy reinforcements too, even outside admitted incidents.
+            let enemies: Vec<_> = known
                 .iter()
                 .filter(|e| distance(e.position, target) <= radius)
                 .collect();
@@ -202,7 +250,7 @@ impl PressureResponse {
             let enemy_value = if enemy_value > 0. {
                 enemy_value
             } else {
-                f64::from(contact.value)
+                contact.map_or(0., |contact| f64::from(contact.value))
             };
             // Tank support counts inside the compact ten-tile core; infantry support has
             // the usual fifteen-tile radius. Composition does not impose another veto:
@@ -219,36 +267,38 @@ impl PressureResponse {
                 })
                 .map(|e| fighting_value(book, e))
                 .sum();
-            let ready = friendly_value >= enemy_value * 0.9;
+            let ready = if unit.kind == EntityKind::Tank {
+                armor_plan.as_ref().is_some_and(|plan| plan.fight)
+            } else {
+                friendly_value >= enemy_value * 0.9
+            };
             let cached = self
                 .issued
                 .get(&unit.id)
                 .filter(|(tick, p)| {
                     self.fighting.get(&unit.id) == Some(&false)
                         && frame.tick().saturating_sub(*tick) < 90
-                        && visible.iter().all(|e| {
+                        && known.iter().all(|e| {
                             distance(unit.position, e.position)
                                 >= weapon_reach(frame, e) + 2. * size
                         })
-                        && visible
+                        && known
                             .iter()
                             .all(|e| distance(*p, e.position) >= weapon_reach(frame, e) + 2. * size)
                 })
                 .map(|(_, p)| *p);
-            let destination = if ready {
+            let destination = if unit.kind == EntityKind::Tank {
+                armor_plan.as_ref().and_then(|plan| {
+                    if plan.fight {
+                        Some(plan.target)
+                    } else {
+                        plan.slots.get(&unit.id).copied()
+                    }
+                })
+            } else if ready {
                 Some(target)
             } else {
-                let slot = armor
-                    .iter()
-                    .position(|id| *id == unit.id)
-                    .map(|i| {
-                        (
-                            (i % columns) as f32 - (columns - 1) as f32 / 2.,
-                            (i / columns) as f32,
-                        )
-                    })
-                    .unwrap_or((0., 0.));
-                cached.or_else(|| staging_point(frame, unit, target, rear, &visible, slot))
+                cached.or_else(|| staging_point(frame, unit, target, rear, &known))
             };
             let changed_mode = self.fighting.get(&unit.id) != Some(&ready);
             let Some(point) = destination else {
@@ -262,7 +312,7 @@ impl PressureResponse {
             };
             let unsafe_goal = !ready
                 && self.issued.get(&unit.id).is_some_and(|(_, p)| {
-                    visible
+                    known
                         .iter()
                         .any(|e| distance(*p, e.position) < weapon_reach(frame, e) + 2. * size)
                 });
@@ -275,12 +325,14 @@ impl PressureResponse {
                 });
             if reissue {
                 if let Ok(group) = UnitGroup::new([unit.id]) {
-                    let result = if ready {
-                        actions.attack_move(&group, point.0, point.1, false)
+                    let sent = if ready {
+                        actions.attack_move(&group, point.0, point.1, false).is_ok()
+                    } else if unit.kind == EntityKind::Tank {
+                        withdrawal::move_withdrawal(frame, actions, &group, unit, point, &known)
                     } else {
-                        actions.move_group(&group, point.0, point.1, false)
+                        actions.move_group(&group, point.0, point.1, false).is_ok()
                     };
-                    if result.is_ok() {
+                    if sent {
                         self.issued.insert(unit.id, (frame.tick(), point));
                         self.fighting.insert(unit.id, ready);
                     }
@@ -295,7 +347,6 @@ fn staging_point(
     target: Point,
     rear: Point,
     enemies: &[&AiEntity],
-    slot: Point,
 ) -> Option<Point> {
     let size = frame.map().tile_size as f32;
     let clearance = |p: Point| {
@@ -327,8 +378,7 @@ fn staging_point(
     let from = q.world_point(unit.position.0, unit.position.1)?;
     for depth in [3., 5., 8., 12.] {
         for side in [0., 2., -2., 4., -4.] {
-            let r = reach + depth * size + slot.1.max(0.) * 2. * size;
-            let side = side + slot.0 * 2.;
+            let r = reach + depth * size;
             let p = (
                 target.0 + away.0 * r - away.1 * side * size,
                 target.1 + away.1 * r + away.0 * side * size,

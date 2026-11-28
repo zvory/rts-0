@@ -326,6 +326,44 @@ two tiles toward home from the cluster, uses body-aware queued routes and a two-
 deadband, and casts ready Breakthrough when it can cover an engaged Tank group with visible enemies
 nearby or while escorting a claim. Cars rotate casts and wait for active Breakthrough to expire. Support commands run before large infantry batches so the action cap cannot starve the car.
 
+At four completed bases Eco queues Scout Plane research at an Engineering Complex. After the
+research completes, one ready Command Car launch is held for an incoming defensive incident;
+spare ready carriers rotate sorties toward public enemy-side base sites, excluding known friendly
+Depots. The reserve is a ready ability, not a stored plane unit. Defensive sorties may spend it;
+routine flights resume only when another ready launch can remain in reserve. Same-area sorties
+are deduplicated for their thirty-second lifetime, with local cooldown bookkeeping preventing
+repeated orders before the native snapshot updates. Defensive observations refresh before reconnaissance without issuing troop orders; the troop
+controller then consumes that preparation once in the same tick. Reconnaissance runs before support movement
+and Breakthrough, and uses only current defensive contacts and public geography. Defensive flights must be able
+to reach the incident within eighty percent of their lifetime, preserving observation time; an
+unreachable incident neither spends the reserve nor creates a covered-area record.
+
+Eco's cohesive response remembers legally seen armed enemies for thirty seconds, merging live
+observations by entity ID. Both HP-adjusted strength and retreat danger geometry use this same
+formation estimate. Losing visibility of most of a formation does not reduce it to the remaining
+visible front unit. An unseen observation clears when its full last-known firing envelope is
+observable, or expires; a visible zero-HP observation also clears it. Hidden health and position
+are never updated from authoritative state.
+
+Recon sortie coverage is reconciled with observed living owned planes after launch; losing a
+plane releases coverage immediately rather than waiting for its nominal lifetime.
+
+A Tank encounter retains tactical ownership through withdrawal even if the original protected
+guard dies or enemies change targets outside the initial admission bubble. The main Tank
+concentration makes one advance/withdraw decision. A fixed encounter anchor bounds pursuit while
+the attack destination follows refreshed observations inside that bound. A withdrawing group receives separate
+body-reachable, two-tile-spaced destinations around one safe rally area. Retreat orders preserve
+the checked route with queued corner waypoints rather than asking the simulator to choose a new
+route to the endpoint. Re-entry requires ninety
+percent of surviving assigned Tanks within two tiles of their posts and local HP-adjusted friendly
+strength at least ninety percent of the remembered enemy force. New overwhelming information can
+trigger withdrawal immediately; no fixed timer forces an unfavorable engagement. Confirmed area
+clearance or stale-memory expiry ends the bounded encounter after an unfinished withdrawal has
+regrouped; loss of the assigned force ends it immediately. After clearance, members with no
+physical route to the rally return to local control so disconnected terrain cannot hold the
+reachable group indefinitely. Hidden but remembered enemies do not permit this release.
+Infantry's independent local ninety-percent gate and other profiles' response policies remain.
+
 After claiming its territory goal, at 300 supply Eco permanently unlocks a staged offensive. Public geographic ranks, snapshotted
 for a living enemy, choose targets from half the map's base-site count inward to that enemy's main
 (12 sites starts at rank six; ten at rank five). Confirmed friendly sites are skipped. Each target

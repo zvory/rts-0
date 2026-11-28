@@ -272,6 +272,25 @@ impl WorldQueries<'_> {
     }
 }
 
+/// Preserve a route's endpoints, turns and reversals while dropping collinear interior points.
+pub(crate) fn ground_route_corners(route: &[(f32, f32)]) -> Vec<(f32, f32)> {
+    if route.len() < 3 {
+        return route.to_vec();
+    }
+    let mut out = vec![route[0]];
+    for p in route.windows(3) {
+        let a = (p[1].0 - p[0].0, p[1].1 - p[0].1);
+        let b = (p[2].0 - p[1].0, p[2].1 - p[1].1);
+        if (a.0 * b.1 - a.1 * b.0).abs() > 0.01 || a.0 * b.0 + a.1 * b.1 <= 0. {
+            out.push(p[1]);
+        }
+    }
+    if let Some(last) = route.last() {
+        out.push(*last)
+    }
+    out
+}
+
 fn segment_distance2(point: (f32, f32), from: (f32, f32), to: (f32, f32)) -> f32 {
     let dx = to.0 - from.0;
     let dy = to.1 - from.1;

@@ -29,6 +29,7 @@ pub use frame::{
     AiEntityState, AiFrame, AiHealth, AiMap, AiPlayer, AiProduction, AiRememberedContact,
     AiResource, AiResourceAmount, AiSmokeCloud, AiTerrain,
 };
+pub(crate) use ground_route::ground_route_corners;
 pub use ground_route::AiGroundReachability;
 pub use losses::AiLosses;
 pub use pullback::{PullbackMemory, PullbackMove, PullbackParams, PullbackPlan, PullbackUnit};

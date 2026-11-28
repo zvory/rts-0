@@ -388,8 +388,9 @@ impl EcoOffense {
                 self.issued.remove(&e.id);
                 continue;
             };
-            let points =
-                super::armor::corners(&route.iter().map(|p| p.as_tuple()).collect::<Vec<_>>());
+            let points = crate::sdk::ground_route_corners(
+                &route.iter().map(|p| p.as_tuple()).collect::<Vec<_>>(),
+            );
             let points = points.into_iter().skip(1).take(24).collect::<Vec<_>>();
             if let Some((first, rest)) = points.split_first() {
                 if actions.move_route(&group, *first, rest).is_ok() {

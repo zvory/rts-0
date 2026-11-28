@@ -8,6 +8,7 @@ mod armor;
 mod construction;
 mod offense;
 mod production;
+mod recon;
 mod support;
 mod tactics;
 #[cfg(test)]
@@ -30,6 +31,7 @@ pub(crate) struct EcoStrategy {
     production: production::EcoProduction,
     offense: offense::EcoOffense,
     support: support::CommandSupport,
+    recon: recon::Recon,
 }
 impl Default for EcoStrategy {
     fn default() -> Self {
@@ -44,6 +46,7 @@ impl Default for EcoStrategy {
             production: Default::default(),
             offense: Default::default(),
             support: Default::default(),
+            recon: Default::default(),
         }
     }
 }
@@ -190,6 +193,8 @@ impl AiStrategy for EcoStrategy {
         let mut reserved = self.defense.screen_ids().clone();
         reserved.extend(&push);
         let outbound = self.offense.controlled(frame, &reserved);
+        let incoming = self.defense.prepare_recon(frame, &outbound);
+        self.recon.step(frame, actions, incoming);
         // Give the support vehicle a turn before large infantry batches consume action capacity.
         let mut mobilized: std::collections::BTreeSet<u32> = self
             .defense
