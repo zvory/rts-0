@@ -177,7 +177,7 @@ fn buy(game: &mut Game, shop: u32, target: u32, ability: AbilityKind) {
 }
 
 #[test]
-fn regen_costs_50_and_arrives_after_ten_tiles_of_flight() {
+fn regen_costs_35_and_arrives_after_ten_tiles_of_flight() {
     let (mut game, shop, unit) = item_fixture();
     game.state
         .entities
@@ -187,7 +187,7 @@ fn regen_costs_50_and_arrives_after_ten_tiles_of_flight() {
     let hp = game.state.entities.get(unit).unwrap().hp;
     buy(&mut game, shop, unit, AbilityKind::Regen);
     game.tick();
-    assert_eq!(game.state.players[0].oil, 950);
+    assert_eq!(game.state.players[0].oil, 965);
     let object = game.state.ability_runtime.world_objects().next().unwrap();
     assert!((object.x.to_world() - (320.0 + 8.0)).abs() < 0.01);
     for _ in 1..39 {
@@ -225,7 +225,7 @@ fn regen_has_unlimited_range_and_tracks_a_moving_target_until_arrival() {
     assert!(game.state.fog.is_visible_world(1, 1600.0, 320.0));
     buy(&mut game, shop, unit, AbilityKind::Regen);
     game.tick();
-    assert_eq!(game.state.players[0].oil, 950);
+    assert_eq!(game.state.players[0].oil, 965);
     assert_eq!(
         game.state
             .ability_runtime
@@ -271,7 +271,7 @@ fn regen_disappears_without_refund_when_target_dies_or_is_removed() {
         }
         game.tick();
         assert!(game.state.entities.get(unit).is_none());
-        assert_eq!(game.state.players[0].oil, 950);
+        assert_eq!(game.state.players[0].oil, 965);
         assert_eq!(game.state.ability_runtime.projectiles().count(), 0);
         assert_eq!(game.state.ability_runtime.world_objects().count(), 0);
     }
@@ -309,7 +309,7 @@ fn escape_treasure_is_delivered_once_checkpointed_and_saves_a_lethal_unit_anywhe
     for _ in 1..41 {
         game.tick();
     }
-    assert_eq!(game.state.players[0].oil, 900);
+    assert_eq!(game.state.players[0].oil, 930);
     assert_eq!(
         game.state.entities.get(unit).unwrap().escape_treasure,
         Some(shop)
@@ -437,7 +437,7 @@ fn shop_purchase_accepts_allies_and_checks_visibility_range_money_and_source() {
         .recompute(&[1, 2], &game.state.entities, &game.state.map);
     buy(&mut game, shop, ally, AbilityKind::EscapeTreasure);
     game.tick();
-    assert_eq!(game.state.players[0].oil, 900);
+    assert_eq!(game.state.players[0].oil, 930);
     for _ in 0..60 {
         game.tick();
     }
@@ -455,7 +455,7 @@ fn shop_purchase_accepts_allies_and_checks_visibility_range_money_and_source() {
     game.state.fog = crate::game::fog::Fog::new(game.state.map.width, game.state.map.height);
     buy(&mut game, shop, unit, AbilityKind::Regen);
     game.tick();
-    assert_eq!(game.state.players[0].oil, 900);
+    assert_eq!(game.state.players[0].oil, 930);
 
     // Exactly thirty tiles is accepted after the unit's sight is recomputed.
     game.state
@@ -468,11 +468,11 @@ fn shop_purchase_accepts_allies_and_checks_visibility_range_money_and_source() {
         .recompute(&[1, 2], &game.state.entities, &game.state.map);
     buy(&mut game, shop, unit, AbilityKind::Regen);
     game.tick();
-    assert_eq!(game.state.players[0].oil, 850);
-    game.state.players[0].set_resources(0, 49);
+    assert_eq!(game.state.players[0].oil, 895);
+    game.state.players[0].set_resources(0, 34);
     buy(&mut game, shop, unit, AbilityKind::Regen);
     game.tick();
-    assert_eq!(game.state.players[0].oil, 49);
+    assert_eq!(game.state.players[0].oil, 34);
 
     game.state.players[0].set_resources(0, 1000);
     let unfinished = game
@@ -598,7 +598,7 @@ fn escape_manual_use_preserves_hp_and_consumes_once_even_with_autocast_off() {
     assert_eq!(target.hp, 40);
     assert_eq!(target.escape_treasure, None);
     assert!((target.pos_x() - 320.0).abs() < 200.0);
-    assert_eq!(game.state.players[0].oil, 900);
+    assert_eq!(game.state.players[0].oil, 930);
 }
 
 #[test]
@@ -682,7 +682,7 @@ fn carried_items_are_passive_and_permanent_after_checkpoint() {
     for _ in 0..42 {
         game.tick();
     }
-    assert_eq!(game.state.players[0].oil, 650);
+    assert_eq!(game.state.players[0].oil, 755);
     let target = game.state.entities.get(unit).unwrap();
     assert_eq!(
         target.ability_uses_remaining.get(&AbilityKind::Haste),
@@ -736,7 +736,7 @@ fn carried_items_are_passive_and_permanent_after_checkpoint() {
     assert_eq!(target.hp, hp - 10);
     buy(&mut game, shop, unit, AbilityKind::DoubleDamage);
     game.tick();
-    assert_eq!(game.state.players[0].oil, 650);
+    assert_eq!(game.state.players[0].oil, 755);
     for _ in 0..900 {
         game.tick();
     }
@@ -750,7 +750,7 @@ fn carried_items_are_passive_and_permanent_after_checkpoint() {
     for _ in 0..42 {
         game.tick();
     }
-    assert_eq!(game.state.players[0].oil, 650);
+    assert_eq!(game.state.players[0].oil, 755);
     assert!(game
         .state
         .entities
@@ -775,7 +775,7 @@ fn escape_purchase_cooldown_is_shared_by_old_and_new_shops_and_checkpointed() {
     buy(&mut game, shop, unit, AbilityKind::EscapeTreasure);
     buy(&mut game, second, other, AbilityKind::EscapeTreasure);
     game.tick();
-    assert_eq!(game.state.players[0].oil, 900);
+    assert_eq!(game.state.players[0].oil, 930);
     assert!(game.state.players[0].ability_cooldowns[&AbilityKind::EscapeTreasure] >= 1799);
     let mut game = Game::restore_checkpoint_payload_text_for_test(
         &game.checkpoint_payload_text_for_test().unwrap(),
@@ -790,7 +790,7 @@ fn escape_purchase_cooldown_is_shared_by_old_and_new_shops_and_checkpointed() {
         .unwrap();
     buy(&mut game, third, other, AbilityKind::EscapeTreasure);
     game.tick();
-    assert_eq!(game.state.players[0].oil, 900);
+    assert_eq!(game.state.players[0].oil, 930);
     let view = game.snapshot_for(1);
     for id in [shop, second, third] {
         assert!(view
@@ -807,7 +807,7 @@ fn escape_purchase_cooldown_is_shared_by_old_and_new_shops_and_checkpointed() {
     }
     buy(&mut game, third, other, AbilityKind::EscapeTreasure);
     game.tick();
-    assert_eq!(game.state.players[0].oil, 800);
+    assert_eq!(game.state.players[0].oil, 860);
 }
 
 #[test]
@@ -822,7 +822,7 @@ fn vitality_treasure_is_passive_on_delivery_and_permanent_after_checkpoint() {
         game.tick();
     }
     assert_eq!(
-        game.state.players[0].oil, 800,
+        game.state.players[0].oil, 860,
         "distinct defense items can be purchased together"
     );
     let target = game.state.entities.get(unit).unwrap();
@@ -843,7 +843,7 @@ fn vitality_treasure_is_passive_on_delivery_and_permanent_after_checkpoint() {
     assert_eq!((target.hp, target.max_hp), (wounded, base + 150));
     buy(&mut game, shop, unit, AbilityKind::ArmorTreasure);
     game.tick();
-    assert_eq!(game.state.players[0].oil, 800);
+    assert_eq!(game.state.players[0].oil, 860);
     for _ in 0..900 {
         game.tick();
     }
@@ -854,7 +854,7 @@ fn vitality_treasure_is_passive_on_delivery_and_permanent_after_checkpoint() {
     for _ in 0..42 {
         game.tick();
     }
-    assert_eq!(game.state.players[0].oil, 800);
+    assert_eq!(game.state.players[0].oil, 860);
     let target = game.state.entities.get(unit).unwrap();
     assert_eq!((target.hp, target.max_hp), (wounded, base + 150));
     game.state
@@ -1224,14 +1224,14 @@ fn rank_slot_limits_reserve_deliveries_and_reject_regen_when_full() {
             game.tick();
             assert_eq!(
                 game.state.players[0].oil,
-                if capacity == 1 { 900 } else { 650 }
+                if capacity == 1 { 930 } else { 755 }
             );
             let oil = game.state.players[0].oil;
             buy(&mut game, shop, unit, AbilityKind::VitalityTreasure);
             game.tick();
             assert_eq!(
                 game.state.players[0].oil,
-                oil - if master { 100 } else { 0 }
+                oil - if master { 70 } else { 0 }
             );
             for _ in 0..60 {
                 game.tick();
@@ -1350,7 +1350,7 @@ fn destroyed_delivery_keeps_payment_releases_slot_and_never_applies_after_checkp
     assert!(game.state.entities.get(body_id).is_none());
     assert_eq!(game.state.ability_runtime.projectiles().count(), 0);
     assert_eq!(game.state.ability_runtime.world_objects().count(), 0);
-    assert_eq!(game.state.players[0].oil, 900);
+    assert_eq!(game.state.players[0].oil, 930);
     for _ in 0..50 {
         game.tick();
     }
@@ -1364,7 +1364,7 @@ fn destroyed_delivery_keeps_payment_releases_slot_and_never_applies_after_checkp
     for _ in 0..40 {
         game.tick();
     }
-    assert_eq!(game.state.players[0].oil, 800);
+    assert_eq!(game.state.players[0].oil, 860);
     assert!(game
         .state
         .entities
@@ -1412,7 +1412,7 @@ fn enemy_rifle_fire_intercepts_flying_goods_without_refund() {
     for _ in 0..170 {
         game.tick();
     }
-    assert_eq!(game.state.players[0].oil, 900);
+    assert_eq!(game.state.players[0].oil, 930);
     assert_eq!(game.state.ability_runtime.projectiles().count(), 0);
     assert!(!game
         .state
@@ -1434,7 +1434,7 @@ fn regen_reserves_slot_rejects_duplicates_projects_privately_and_survives_checkp
     game.tick();
     buy(&mut game, shop, unit, AbilityKind::Regen);
     game.tick();
-    assert_eq!(game.state.players[0].oil, 950);
+    assert_eq!(game.state.players[0].oil, 965);
     for _ in 0..40 {
         game.tick();
     }
@@ -1453,7 +1453,7 @@ fn regen_reserves_slot_rejects_duplicates_projects_privately_and_survives_checkp
         .any(|entry| entry.ability == "regen" && entry.remaining_uses == Some(1)));
     buy(&mut game, shop, unit, AbilityKind::Regen);
     game.tick();
-    assert_eq!(game.state.players[0].oil, 950);
+    assert_eq!(game.state.players[0].oil, 965);
     game.state.entities.remove(shop);
     let mut restored = Game::restore_checkpoint_payload_text_for_test(
         &game.checkpoint_payload_text_for_test().unwrap(),

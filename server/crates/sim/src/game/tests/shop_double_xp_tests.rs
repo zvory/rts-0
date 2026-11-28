@@ -5,7 +5,7 @@ fn double_xp_purchase_delivery_checkpoint_and_privacy() {
     let (mut game, shop, unit) = item_fixture_for_kind(EntityKind::Warrior);
     buy(&mut game, shop, unit, AbilityKind::DoubleXp);
     game.tick();
-    assert_eq!(game.state.players[0].oil, 950);
+    assert_eq!(game.state.players[0].oil, 965);
     assert!(!game
         .state
         .entities
@@ -15,7 +15,7 @@ fn double_xp_purchase_delivery_checkpoint_and_privacy() {
     buy(&mut game, shop, unit, AbilityKind::DoubleXp);
     game.tick();
     assert_eq!(
-        game.state.players[0].oil, 950,
+        game.state.players[0].oil, 965,
         "in-flight duplicates spend nothing"
     );
     for _ in 0..42 {
