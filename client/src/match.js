@@ -287,6 +287,7 @@ export class Match {
     this.renderer.setProjectedUnitShadowsEnabled?.(
       this.state.showProjectedUnitShadowsEnabled,
     );
+    this.camera.setMapTilt?.(this.state.experimentalGraphicsEnabled ? 45 : this.camera.mapTilt);
     this.renderer.setExperimentalGraphicsEnabled?.(this.state.experimentalGraphicsEnabled);
     this.fog = this._timeInit(
       "match.fog",

@@ -68,6 +68,7 @@ framingForWorldPoints(points, { paddingCssPx = 0 } = {}) -> CameraSnapshotV1 | n
 fitWorldPoints(points, { paddingCssPx = 0 } = {}) -> boolean
 panByScreenDelta(delta) -> void
 dollyBy(factor, anchorScreen?) -> void
+setMapTilt(degrees) -> void // experimental projection preference, bounded to 0..45
 resize(viewportWidthCssPx, viewportHeightCssPx) -> void
 setMapBounds(worldWidthPx, worldHeightPx) -> void
 snapshot() -> CameraSnapshotV1
@@ -100,28 +101,31 @@ replays, Lab sessions, and the Map Editor retain their wider overview ranges.
 
 ### Experimental battlefield tilt
 
-Append `?rtsMapTilt=30` (or `&rtsMapTilt=30` on an existing URL) to opt into
-an experimental whole-plane projection, bounded to 0–45 degrees away from top-down.
-Zero/absent retains the normal renderer. The URL setting is session-local and is not
-persisted in `CameraSnapshotV1`. Interact launches accept `RTS_INTERACT_MAP_TILT=30`
-on the command that starts the daemon; shutdown the daemon before changing the value.
+The experimental graphics preference enables 45 degrees of ground-plane tilt along with
+the 16-direction Rifleman artwork. Switching it off restores top-down projection.
+`rtsMapTilt=0..45` remains available for isolated angle studies when the preference is off.
+The tilt is session-local and is not persisted in `CameraSnapshotV1`.
+Interact launches accept `RTS_INTERACT_MAP_TILT=30` when starting a fresh daemon.
 
 The orthographic base coefficients optionally include `mapTilt` in detached projection
 records. Public projection, ground picking, visible-ground polygons and selection queries
-apply the same homography as the worker. With centered screen coordinates `(u,v)`, angle
-`a`, and focal distance `d=3*viewportHeight`, projection is
-`(u/(1-v*sin(a)/d), v*cos(a)/(1-v*sin(a)/d))`. Thus the far side is smaller.
-Camera movement changes the sampled ground under this fixed view; there is no orbit or yaw.
-Live-player zoom limits apply to the inverse-projected ground span on both axes.
-The worker draws a two-viewport-wide/high ground sheet to a temporary texture and maps it
-through a Pixi perspective mesh, with conservative source culling. HUD and drag marquee
-remain in screen space. The extra texture is resized with DPR/viewport and disposed on teardown.
+share the worker's homography. With centered screen coordinates `(u,v)`, angle `a`, and
+focal distance `d=3*viewportHeight`, projection is
+`(u/(1-v*sin(a)/d), v*cos(a)/(1-v*sin(a)/d))`. Camera movement changes the sampled ground;
+there is no orbit or yaw. The worker draws an overscan ground sheet to a temporary texture,
+then maps it through a perspective mesh. HUD and marquee remain in screen space. The actual
+inverse-projected ground span controls live-player zoom limits. GPU resources resize with
+viewport/DPR and are disposed on teardown.
 
-This is a visual experiment: buildings, trees, units, shadows and world labels are all
-flattened together. Height remains ignored; upright billboards and depth-aware occlusion
-are deferred. Overview fitting and camera bounds retain their orthographic policy, so
-map edges may be visible. The overscan render pass has additional GPU/memory cost and
-is not a performance-validated replacement for the default renderer.
+Experimental Riflemen preserve the baked sprite shape: feet use the ground homography and
+bodies use uniform `zoom/depth` scale. An inverse-projected body quad cancels the sheet's
+warp while retaining its world-Y-sorted layer, fog, alpha and canopy ownership. The body
+click polygon, muzzle origin and health-bar anchor use the same upright offset convention.
+Contact shadows, collision/marquee footprints and selection rings remain on the ground.
+Other unit kinds, buildings, trees, effects and world labels share the ground sheet.
+
+This extra render pass has GPU/memory cost and is not performance-validated. Map bounds and
+overview fitting retain their orthographic policy, so map edges may be visible. Upright buildings, trees and other unit kinds remain outside this feature.
 
 ## 3. Renderer-neutral selection
 

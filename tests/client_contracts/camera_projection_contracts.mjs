@@ -440,3 +440,20 @@ for (const angle of [0, 30, 45]) {
 }
 
 console.log("✅ camera_projection_contracts.mjs: semantic camera/projection contracts passed");
+
+// Experimental preference can switch projection without losing the ground focus.
+{
+  const camera = new Camera(1200, 800);
+  camera.setBounds(10000, 10000, 1200, 800);
+  camera.focusAt({ x: 5000, y: 5000 });
+  const before = camera.snapshot();
+  let changes = 0;
+  const unsubscribe = camera.subscribe(() => { changes += 1; });
+  camera.setMapTilt(45);
+  assert(camera.mapTilt === 45, "experimental projection enables tilt");
+  assertDeepEqual(camera.snapshot(), before, "tilt preserves focus and zoom");
+  camera.setMapTilt(0);
+  assert(camera.mapTilt === 0, "experimental projection disables tilt");
+  assert(changes >= 2, "projection changes notify semantic camera listeners");
+  unsubscribe();
+}

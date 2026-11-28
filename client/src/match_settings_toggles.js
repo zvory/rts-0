@@ -24,6 +24,7 @@ export function configureMatchDisplayPreferences(match, options = {}) {
 export function applyMatchExperimentalGraphics(match, enabled) {
   if (!match?.state) return;
   match.state.experimentalGraphicsEnabled = !!enabled;
+  match.camera?.setMapTilt?.(enabled ? 45 : 0);
   match.renderer?.setExperimentalGraphicsEnabled?.(!!enabled);
 }
 
