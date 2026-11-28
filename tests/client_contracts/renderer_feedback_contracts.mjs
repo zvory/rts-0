@@ -51,6 +51,30 @@ import { muzzleFeedbackStyle } from "../../client/src/renderer/weapon_feedback_s
 import { RecordingGraphics, installFakePixi } from "./pixi_fakes.mjs";
 
 {
+  const attacker = { id: 1, kind: KIND.RIFLEMAN, x: 100, y: 200, facing: 0, weaponFacing: 0 };
+  const state = {
+    entityById: id => id === attacker.id ? attacker : null,
+    liveMuzzleFlashes: () => [{ from: attacker.id, weaponKind: WEAPON_KIND.RIFLEMAN_RIFLE, createdAt: 1000 }],
+  };
+  for (const experimental of [false, true]) {
+    const graphics = new RecordingGraphics();
+    _drawMuzzleFlashes.call({
+      visualNow: () => 1000,
+      _feedbackGfx: graphics,
+      _experimentalRiflemanFrameStrip: () => experimental ? {} : null,
+      _unitRenderContexts: new Map([[attacker.id, { visualScale: 0.5 }]]),
+    }, state);
+    const flashes = graphics.calls.filter(call => call[0] === "drawCircle");
+    assert(flashes.length === (experimental ? 2 : 0),
+      "experimental art needs rendered muzzle flashes; normal Rifleman art supplies its own");
+    for (const flash of flashes) {
+      assertApprox(flash[1], 112, 0.001, "experimental flash follows the scaled muzzle x");
+      assertApprox(flash[2], 185, 0.001, "experimental flash follows the scaled muzzle height");
+    }
+  }
+}
+
+{
   const artillery = {
     id: 89,
     owner: 1,
