@@ -5,6 +5,7 @@ import assert from "node:assert/strict";
 import { applyMatchExperimentalGraphics } from "../../client/src/match_settings_toggles.js";
 import { VisualEffectBackedState, VisualEffectBuffers } from "../../client/src/state_visual_effects.js";
 import { EVENT } from "../../client/src/protocol.js";
+import { prepareEntitySnapshots, preparedPresentationEntityRecord } from "../../client/src/presentation/entity_snapshot.js";
 import fs from "node:fs";
 import { PNG } from "pngjs";
 import { readExperimentalGraphicsEnabled, writeExperimentalGraphicsEnabled } from "../../client/src/experimental_graphics_settings.js";
@@ -40,6 +41,46 @@ import { createInspectionPngPixiFactory, FakeContainer } from "../helpers/rig_in
       assertApprox(flash[2], experimentalRiflemanMuzzle(attacker, 0.5).y, 0.001, "experimental flash follows the scaled muzzle height");
     }
   }
+}
+
+// An enabled preference does not imply a ready atlas. Fallback tracers must
+// accompany the normal art's immediate shot, and expire on that same clock.
+{
+  const attacker = { id: 1, kind: "rifleman", x: 100, y: 200, facing: 0 };
+  const effects = new VisualEffectBuffers();
+  effects.applySnapshotEvents([
+    { e: EVENT.ATTACK, from: 1, to: 2, weaponKind: "rifleman_rifle" },
+  ], 1000, () => null, true);
+  const state = {
+    entityById: id => id === 1 ? attacker : { x: 200, y: 200 },
+    liveMuzzleFlashes: now => effects.liveMuzzleFlashes(now),
+  };
+  for (const ready of [false, true]) for (const now of [1000, 1350]) {
+    const graphics = new RecordingGraphics();
+    _drawMuzzleFlashes.call({
+      visualNow: () => now,
+      _feedbackGfx: graphics,
+      _experimentalRiflemanFrameStrip: () => ready ? {} : null,
+    }, state);
+    assert.equal(graphics.calls.length > 0, ready ? now === 1350 : now === 1000,
+      "feedback timing follows ready experimental art or immediate normal fallback");
+  }
+  let ready = false, now = 1000;
+  const graphics = new RecordingGraphics();
+  const renderer = {
+    visualNow: () => now,
+    _feedbackGfx: graphics,
+    _experimentalRiflemanFrameStrip: () => ready ? {} : null,
+  };
+  _drawMuzzleFlashes.call(renderer, state);
+  assert.ok(graphics.calls.length > 0);
+  graphics.calls.length = 0;
+  ready = true; now = 1350;
+  _drawMuzzleFlashes.call(renderer, state);
+  assert.equal(graphics.calls.length, 0, "atlas readiness cannot replay a fallback shot");
+  now = 1600;
+  _drawMuzzleFlashes.call(renderer, state);
+  assert.equal(renderer._experimentalShotTimes.size, 0, "expired shot timing is released");
 }
 
 const storage = memoryStorage();
@@ -81,6 +122,19 @@ Renderer.prototype.setExperimentalGraphicsEnabled.call(rendererState, false);
 assert.equal(rendererState._experimentalRiflemanFrameStrip(), null);
 
 const entity = { id: 1, kind: "rifleman", state: "move", x: 100, y: 200, facing: 0, hp: 45, maxHp: 45 };
+{
+  const source = { ...entity, state: "attack", targetId: 2 };
+  const prepared = prepareEntitySnapshots([source]).entries[0];
+  const presented = preparedPresentationEntityRecord(prepared, source);
+  assert.equal(presented.targetId, 2, "engagement survives the worker presentation handoff");
+  const animationState = { strip };
+  frameStripFrameIndex(strip, presented, { now: 0, recoilProgress: 1,
+    recoilPhase: 0, recoilWeaponKind: "rifleman_rifle" }, animationState);
+  assert.equal(frameStripFrameIndex(strip, presented, { now: 1700 }, animationState) % 16, 11,
+    "an engaged unit retains its aimed hold between shots");
+  assert.equal(frameStripFrameIndex(strip, { ...presented, targetId: null }, { now: 1700 }, animationState) % 16, 0,
+    "a unit without a target returns to lowered idle after the combat hold");
+}
 const renderHarness = { _liveRigPools: { units: new Map() }, _seen: { units: new Set() },
   layers: { units: new FakeContainer() }, _rigPixiFactory: createInspectionPngPixiFactory() };
 for (let direction = 0; direction < 16; direction++) {

@@ -2531,9 +2531,13 @@ sixteen headings with sixteen poses each. A heading block contains lowered idle,
 running poses, settle/raise/shoulder/aim, recoil/bolt/re-aim and lower. The `poseSequence` sampler
 uses the existing snapshot-aware movement signal, body bearing for running and weapon bearing
 for combat; repeated positions between 30Hz snapshots do not select idle. The first shot has a
-350ms presentation-only shoulder windup, with opt-in Rifleman flashes delayed to match. Damage,
+350ms presentation-only shoulder windup, with ready experimental Rifleman flashes delayed to match.
+Normal-art fallback keeps immediate feedback while the atlas loads; a readiness change cannot
+replay an already presented shot. Damage,
 audio and server combat timing remain unchanged. Repeated shots retain the aimed stance; an
-inactive unit lowers its rifle after the combat hold. All poses share a foot anchor. Per-heading
+inactive unit lowers its rifle after the combat hold. The presentation entity snapshot preserves
+the server-filtered `targetId` so the worker retains aimed combat holds between shots.
+All poses share a foot anchor. Per-heading
 sprite envelopes keep HP bars above the body, and muzzle positions follow the authored rifle.
 The experimental selection ring is centered on that ground point; marquee footprints, collision
 and fog authority remain unchanged. Health-bar visibility keeps its separate existing preference.

@@ -12,6 +12,10 @@ export function _drawMuzzleFlashes(state, colorByOwner) {
   const g = this._feedbackGfx;
   if (!state || typeof state.liveMuzzleFlashes !== "function") return;
   const now = rendererVisualNow(this);
+  const shotTimes = this._experimentalShotTimes ??= new Map();
+  for (const [key, timing] of shotTimes) {
+    if (now > timing.expiresAt) shotTimes.delete(key);
+  }
   const flashes = state.liveMuzzleFlashes(now);
   this._discipleProjectiles?.update(flashes, now, g, colorByOwner);
   if (!flashes.length) return;
@@ -23,8 +27,23 @@ export function _drawMuzzleFlashes(state, colorByOwner) {
     const target = state.entityById(f.to);
     const targetPos = f.shotOrigin ? f.targetPos : (target || f.targetPos);
 
-    const age = now - f.createdAt;
-    if (age < 0) continue;
+    const experimental = attacker.kind === KIND.RIFLEMAN && this._experimentalRiflemanFrameStrip?.();
+    // The setting can be on while the atlas is still loading (or failed to load).
+    // Keep normal-art feedback on its original clock during that fallback.
+    let createdAt = f.createdAt;
+    if (f.experimentalDelayMs) {
+      const key = `${f.from}:${f.createdAt}`;
+      let timing = shotTimes.get(key);
+      if (!timing) {
+        timing = { createdAt: f.createdAt - (experimental ? 0 : f.experimentalDelayMs),
+          expiresAt: f.createdAt + 240 };
+        shotTimes.set(key, timing);
+      }
+      // Loading the atlas midway through a shot must not play that shot twice.
+      createdAt = timing.createdAt;
+    }
+    const age = now - createdAt;
+    if (age < 0 || age > 240) continue;
     const t = clamp01(age / 240);
     const fade = 1 - t;
 
@@ -34,7 +53,6 @@ export function _drawMuzzleFlashes(state, colorByOwner) {
     if (baseR <= 0) continue;
 
     const stat = STATS[feedbackKind] || STATS[attacker.kind] || {};
-    const experimental = attacker.kind === KIND.RIFLEMAN && this._experimentalRiflemanFrameStrip?.();
     const origin = experimental
       ? experimentalRiflemanMuzzle(attacker, rigContainerScale(this._unitRenderContexts?.get?.(attacker.id))) : attackFeedbackOriginForWeapon({
       definitionsByKind: this._liveRigDefinitionsByKind,

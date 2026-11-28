@@ -1,5 +1,5 @@
 export const PRESENTATION_ENTITY_FIELDS = Object.freeze([
-  "id", "kind", "owner", "x", "y", "facing", "weaponFacing", "commanderFacing", "state",
+  "id", "kind", "owner", "x", "y", "facing", "weaponFacing", "commanderFacing", "state", "targetId",
   "hp", "maxHp", "insight", "dao", "daoMaster", "chosenDao", "daoReady", "daoAdvanceTicks", "remaining", "latchedNode", "occupiedTrenchId",
   "tournamentEntrants", "daoTrainingQueue", "prodKind", "buildProgress", "deconstructProgress", "prodProgress", "prodQueue", "prodWaiting", "prodRepeatKinds",
   "setupState", "setupFacing", "recoilPhase", "recoilProgress",

@@ -39,7 +39,7 @@ export function riflemanPoseFrame(instance, entity, context) {
       else {
         const age = now - instance._riflemanShot - 350;
         pose = age < 0 ? 11 : age < 70 ? 12 : age < 260 ? 13 : age < 380 ? 14 : 11;
-        const engaging = entity.targetId != null || entity.activity === "engaging";
+        const engaging = entity.targetId != null;
         if (!engaging && now - instance._riflemanShot > 1500) {
           pose = now - instance._riflemanShot < 1660 ? 15 : 0;
           if (pose === 0) { instance._riflemanFirstShot = null; instance._riflemanShot = null; }
