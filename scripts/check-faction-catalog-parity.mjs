@@ -757,7 +757,6 @@ for (const [kind, expected] of Object.entries(rustClientConfig.bodies)) {
 
 const clientUpgradeResearchTicks = {
   [UPGRADE.TECHNIQUE_CHARGE]: UPGRADES[UPGRADE.TECHNIQUE_CHARGE].researchTicks,
-  [UPGRADE.TECHNIQUE_BLINK]: UPGRADES[UPGRADE.TECHNIQUE_BLINK].researchTicks,
   [UPGRADE.TECHNIQUE_SHIELD]: UPGRADES[UPGRADE.TECHNIQUE_SHIELD].researchTicks,
   [UPGRADE.TECHNIQUE_THROW_SWORD]: UPGRADES[UPGRADE.TECHNIQUE_THROW_SWORD].researchTicks,
 

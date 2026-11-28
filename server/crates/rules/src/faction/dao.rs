@@ -69,7 +69,7 @@ pub(super) const CULTIVATOR_ABILITIES: [AbilityCatalogEntry; 17] = [
     },
     AbilityCatalogEntry {
         range_tiles: Some(balance::DAO_WIND_DASH_RANGE_TILES as f32),
-        upgrade_requirement: Some(UpgradeKind::TechniqueBlink),
+        upgrade_requirement: None,
         kind: AbilityKind::WindDash,
         label: "Blink",
         icon: "BLK",

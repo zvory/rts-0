@@ -607,15 +607,6 @@ fn print_upgrades(indent: &str) {
     );
     print_upgrade(
         indent,
-        faction::UpgradeKind::TechniqueBlink.stable_id(),
-        balance::TECHNIQUE_COST_STEEL,
-        balance::TECHNIQUE_COST_OIL,
-        balance::BLINK_RESEARCH_TICKS,
-        None,
-        true,
-    );
-    print_upgrade(
-        indent,
         faction::UpgradeKind::TechniqueShield.stable_id(),
         balance::TECHNIQUE_COST_STEEL,
         balance::TECHNIQUE_COST_OIL,

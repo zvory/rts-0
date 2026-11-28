@@ -70,6 +70,17 @@ fn every_playable_unit_building_and_research_has_a_page() {
 }
 
 #[test]
+fn technique_library_lists_only_available_research() {
+    let site = site();
+    let library = &site["building-technique_library.html"];
+    for technique in ["charge", "shield", "throw_sword"] {
+        assert!(library.contains(&format!("research-technique_{technique}.html")));
+    }
+    assert!(!library.contains("research-technique_blink.html"));
+    assert!(!site.contains_key("research-technique_blink.html"));
+}
+
+#[test]
 fn notes_have_no_broken_references() {
     let broken: Vec<&String> = site()
         .iter()

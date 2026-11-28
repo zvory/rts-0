@@ -422,7 +422,11 @@ fn buildings(text: &client_text::ClientText) -> Value {
                 let (name, icon, desc, upg, req_text) = text_fields(k, text);
                 let researches: Vec<Value> = faction::UpgradeKind::ALL
                     .iter()
-                    .filter(|u| faction::upgrade_definition(**u).researched_at == k)
+                    .filter(|u| {
+                        faction::CATALOGS
+                            .iter()
+                            .any(|c| !c.id.contains("fixture") && c.allows_research(**u, k))
+                    })
                     .map(|u| json!(u.stable_id()))
                     .collect();
                 json!({
@@ -595,6 +599,11 @@ fn upgrades(text: &client_text::ClientText) -> Value {
     Value::Array(
         UpgradeKind::ALL
             .iter()
+            .filter(|u| {
+                faction::CATALOGS.iter().any(|c| {
+                    !c.id.contains("fixture") && c.upgrades.iter().any(|entry| entry.kind == **u)
+                })
+            })
             .map(|u| {
                 let sid = u.stable_id();
                 let def = rts_sim::game::upgrade::definition(*u);

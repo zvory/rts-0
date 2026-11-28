@@ -61,7 +61,7 @@ fn cultivator_portal_trains_warrior_and_reserves_two_supply() {
 }
 
 #[test]
-fn cultivator_portal_trains_researched_adepts_for_60_oil_without_novices() {
+fn cultivator_portal_trains_researched_adepts_for_55_oil_without_novices() {
     use crate::game::entity::{Order, RallyIntent, RallyKind};
     use crate::game::upgrade::UpgradeKind;
 
@@ -71,7 +71,7 @@ fn cultivator_portal_trains_researched_adepts_for_60_oil_without_novices() {
         (EntityKind::MagicAdept, UpgradeKind::DaoOfMagic),
     ] {
         let mut game = empty_flat_game(&[cultivator_player()]);
-        game.state.players[0].set_resources(150, 59);
+        game.state.players[0].set_resources(150, 54);
         let portal = game
             .state
             .entities
@@ -119,13 +119,13 @@ fn cultivator_portal_trains_researched_adepts_for_60_oil_without_novices() {
         let queued = &game.state.entities.get(portal).unwrap().prod_queue()[0];
         assert!(!queued.paid);
         assert_eq!(queued.progress, 0);
-        assert_eq!(game.state.players[0].oil, 59);
+        assert_eq!(game.state.players[0].oil, 54);
         assert_eq!(game.state.players[0].supply_used, 0);
-        game.state.players[0].set_resources(149, 60);
+        game.state.players[0].set_resources(149, 55);
         game.tick();
         assert!(!game.state.entities.get(portal).unwrap().prod_queue()[0].paid);
-        assert_eq!(game.state.players[0].oil, 60);
-        game.state.players[0].set_resources(150, 60);
+        assert_eq!(game.state.players[0].oil, 55);
+        game.state.players[0].set_resources(150, 55);
         game.tick();
         assert_eq!(game.state.players[0].steel, 0);
         assert_eq!(game.state.players[0].oil, 0);
@@ -163,10 +163,10 @@ fn cultivator_portal_trains_researched_adepts_for_60_oil_without_novices() {
 }
 
 #[test]
-fn cultivator_portal_adept_cancellation_refunds_60_oil() {
+fn cultivator_portal_adept_cancellation_refunds_55_oil() {
     use crate::game::upgrade::UpgradeKind;
     let mut game = empty_flat_game(&[cultivator_player()]);
-    game.state.players[0].set_resources(150, 60);
+    game.state.players[0].set_resources(150, 55);
     game.state.players[0]
         .upgrades
         .insert(UpgradeKind::DaoOfMagic);
@@ -199,7 +199,7 @@ fn cultivator_portal_adept_cancellation_refunds_60_oil() {
         .unwrap()
         .prod_queue()
         .is_empty());
-    assert_eq!(game.state.players[0].oil, 60);
+    assert_eq!(game.state.players[0].oil, 55);
     assert_eq!(game.state.players[0].steel, 150);
     assert_eq!(game.state.players[0].supply_used, 0);
 }
@@ -208,7 +208,7 @@ fn cultivator_portal_adept_cancellation_refunds_60_oil() {
 fn cultivator_portal_repeat_adept_waits_for_research_and_charges_each_output() {
     use crate::game::upgrade::UpgradeKind;
     let mut game = empty_flat_game(&[cultivator_player()]);
-    game.state.players[0].set_resources(300, 120);
+    game.state.players[0].set_resources(300, 110);
     let portal = game
         .state
         .entities
@@ -230,7 +230,7 @@ fn cultivator_portal_repeat_adept_waits_for_research_and_charges_each_output() {
         .unwrap()
         .prod_queue()
         .is_empty());
-    assert_eq!(game.state.players[0].oil, 120);
+    assert_eq!(game.state.players[0].oil, 110);
     game.state.players[0]
         .upgrades
         .insert(UpgradeKind::DaoOfMagic);

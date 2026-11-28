@@ -18,15 +18,15 @@ cancellation/refund, research queue, destruction and fog rules apply. Worker bui
 (hotkey D) fills an existing empty slot. Standard minimap, selection, construction and damage
 presentation apply; white roof is player-tinted, timber/stone/parchment remain fixed.
 
-Four independent researches cost 100 steel and 100 oil each:
+Three independent researches cost 100 steel and 100 oil each:
 
 | Research | Time | Unlock |
 | --- | --- | --- |
 | Charge | 20 seconds | Automatic Charge for Disciples/Novices, War Adepts and War Masters |
-| Blink | 10 seconds | Blink for Wind Adepts and Wind Masters |
 | Shield | 20 seconds | Shield for Magic Adepts and Magic Masters |
 | Throw Sword | 20 seconds | Throw Sword for War Adepts and War Masters |
 
+Blink remains available to Wind Adepts and Wind Masters without research.
 Vector Field remains available to Magic Adepts and Magic Masters without research. Existing
 ability strength, cooldowns, charge recharge, and advancement rules stay unchanged. Technique
 research never uses the Pavilion's escalating Dao prices. Command admission, queued execution,

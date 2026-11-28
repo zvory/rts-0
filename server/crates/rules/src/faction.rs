@@ -341,16 +341,16 @@ pub const EKAT_LOADOUT: FactionLoadout = FactionLoadout {
     opening_upgrades: &[],
 };
 
-// Reuse the standard economy with one starting Cultivator Disciple.
+// Reuse the standard economy with two starting Cultivator Novices.
 const CULTIVATORS_START_ENTITIES: &[StartingEntityGroup] = &[
     CURRENT_STANDARD_START_ENTITIES[0],
     CURRENT_STANDARD_START_ENTITIES[1],
     StartingEntityGroup {
         kind: EntityKind::Warrior,
-        count: 1,
+        count: 2,
         formation: StartingFormation::DefensiveLine {
             distance_tiles_x10: 50,
-            spacing_tiles_x10: 10,
+            spacing_tiles_x10: 15,
         },
         completed: true,
     },
@@ -812,7 +812,7 @@ pub const EKAT_CATALOG: FactionCatalog = FactionCatalog {
     production_anchors: &[EntityKind::Zamok],
 };
 
-const CULTIVATORS_UPGRADES: [UpgradeCatalogEntry; 7] = [
+const CULTIVATORS_UPGRADES: [UpgradeCatalogEntry; 6] = [
     UpgradeCatalogEntry {
         kind: UpgradeKind::DaoWind,
         researched_at: EntityKind::ThreeDaoPavilion,
@@ -827,10 +827,6 @@ const CULTIVATORS_UPGRADES: [UpgradeCatalogEntry; 7] = [
     },
     UpgradeCatalogEntry {
         kind: UpgradeKind::TechniqueCharge,
-        researched_at: EntityKind::TechniqueLibrary,
-    },
-    UpgradeCatalogEntry {
-        kind: UpgradeKind::TechniqueBlink,
         researched_at: EntityKind::TechniqueLibrary,
     },
     UpgradeCatalogEntry {
@@ -1149,9 +1145,13 @@ pub fn upgrade_definition(kind: UpgradeKind) -> UpgradeCatalogEntry {
         UpgradeKind::ScoutPlaneUnlock => scout_plane_unlock,
         UpgradeKind::Rockets => rockets,
         UpgradeKind::TechniqueCharge => CULTIVATORS_UPGRADES[3],
-        UpgradeKind::TechniqueBlink => CULTIVATORS_UPGRADES[4],
-        UpgradeKind::TechniqueShield => CULTIVATORS_UPGRADES[5],
-        UpgradeKind::TechniqueThrowSword => CULTIVATORS_UPGRADES[6],
+        // Retained vocabulary for stored fixtures; unavailable in live catalogs.
+        UpgradeKind::TechniqueBlink => UpgradeCatalogEntry {
+            kind,
+            researched_at: EntityKind::TechniqueLibrary,
+        },
+        UpgradeKind::TechniqueShield => CULTIVATORS_UPGRADES[4],
+        UpgradeKind::TechniqueThrowSword => CULTIVATORS_UPGRADES[5],
         UpgradeKind::DaoWind => CULTIVATORS_UPGRADES[0],
         UpgradeKind::DaoOfMagic => CULTIVATORS_UPGRADES[1],
         UpgradeKind::DaoOfHeaviness => CULTIVATORS_UPGRADES[2],

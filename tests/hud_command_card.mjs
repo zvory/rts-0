@@ -937,7 +937,7 @@ for (const researched of [false, true]) {
     playerId: 1, factionId: "cultivators",
     resources: { steel: 1000, oil: 1000 },
     upgrades: [UPGRADE.DAO_WIND, UPGRADE.DAO_OF_HEAVINESS, UPGRADE.DAO_OF_MAGIC,
-      UPGRADE.TECHNIQUE_BLINK, UPGRADE.TECHNIQUE_SHIELD],
+      UPGRADE.TECHNIQUE_SHIELD],
     playerHasCompleteKind: () => true, groupCooldownClocks: () => [],
   };
   const unit = { id: 50, owner: 1, kind: KIND.WARRIOR, insight: 59 };
@@ -1015,7 +1015,7 @@ for (const researched of [false, true]) {
     .map((kind, index) => ({ id: index + 1, owner: 1, kind, insight: 60, daoMaster: kind === KIND.WAR_ADEPT }));
   selection[0].escapeTreasure = {};
   const card = buildCommandCardDescriptors({ playerId: 1, factionId: "cultivators", selection,
-    resources: { steel: 0, oil: 0 }, upgrades: [UPGRADE.TECHNIQUE_BLINK, UPGRADE.TECHNIQUE_THROW_SWORD],
+    resources: { steel: 0, oil: 0 }, upgrades: [UPGRADE.TECHNIQUE_THROW_SWORD],
     groupCooldownClocks: () => [] });
   for (const ability of [ABILITY.WIND_DASH, ABILITY.THROW_SWORD, ABILITY.VECTOR_FIELD]) {
     const slot = card.slots.find((slot) => slot?.ability === ability);
@@ -1115,11 +1115,11 @@ for (const researched of [false, true]) {
   assert.deepEqual(idle.rowLabels, ["Util", "Defense", "Offense"]);
 }
 
-// Portal Adepts require their Dao, 150 steel, 60 oil and three supply.
+// Portal Adepts require their Dao, 150 steel, 55 oil and three supply.
 {
   const portal = { id: 42, owner: 1, kind: KIND.PORTAL };
   const ctx = { playerId: 1, factionId: "cultivators", selection: [portal], entities: [portal],
-    resources: { steel: 150, oil: 60, supplyUsed: 0, supplyCap: 20 }, upgrades: [] };
+    resources: { steel: 150, oil: 55, supplyUsed: 0, supplyCap: 20 }, upgrades: [] };
   const locked = buildCommandCardDescriptors(ctx);
   const choices = [
     [KIND.WIND_ADEPT, UPGRADE.DAO_WIND],
@@ -1133,7 +1133,7 @@ for (const researched of [false, true]) {
     const unlocked = buildCommandCardDescriptors({ ...ctx, upgrades: [upgrade] });
     assert.equal(slotFor(unlocked).enabled, true);
     assert.equal(slotFor(unlocked).unaffordable, false);
-    assert.deepEqual(slotFor(unlocked).cost, { steel: 150, oil: 60 });
+    assert.deepEqual(slotFor(unlocked).cost, { steel: 150, oil: 55 });
     for (const [other] of choices.filter(([other]) => other !== kind)) {
       assert.equal(unlocked.slots.find((slot) => slot?.intent?.unit === other).enabled, false);
     }
@@ -1141,7 +1141,7 @@ for (const researched of [false, true]) {
     assert.equal(slotFor(noSteel).unaffordable, true);
     const noSupply = buildCommandCardDescriptors({ ...ctx, upgrades: [upgrade], resources: { ...ctx.resources, supplyUsed: 18 } });
     assert.equal(slotFor(noSupply).unaffordable, true);
-    const poor = buildCommandCardDescriptors({ ...ctx, upgrades: [upgrade], resources: { ...ctx.resources, oil: 59 } });
+    const poor = buildCommandCardDescriptors({ ...ctx, upgrades: [upgrade], resources: { ...ctx.resources, oil: 54 } });
     assert.equal(slotFor(poor).unaffordable, true);
   }
 }
