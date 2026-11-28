@@ -177,6 +177,7 @@ impl PressureResponse {
             .map(|e| e.id)
             .collect();
         let columns = (armor.len() as f32).det_sqrt().ceil().max(1.) as usize;
+        let queries = std::cell::LazyCell::new(|| WorldQueries::new(frame));
         for unit in &defenders {
             let contact = self
                 .contacts
@@ -235,7 +236,7 @@ impl PressureResponse {
                             .iter()
                             .all(|e| distance(*p, e.position) >= weapon_reach(frame, e) + 2. * size)
                         && (unit.kind != EntityKind::Tank
-                            || retreat_route(frame, unit, *p, &visible).is_some())
+                            || retreat_route(frame, &queries, unit, *p, &visible).is_some())
                 })
                 .map(|(_, p)| *p);
             let destination = if ready {
@@ -281,7 +282,7 @@ impl PressureResponse {
                     let result = if ready {
                         actions.attack_move(&group, point.0, point.1, false)
                     } else if unit.kind == EntityKind::Tank {
-                        if let Some(route) = retreat_route(frame, unit, point, &visible) {
+                        if let Some(route) = retreat_route(frame, &queries, unit, point, &visible) {
                             let points = crate::sdk::ground_route_corners(&route)
                                 .into_iter()
                                 .skip(1)
@@ -311,6 +312,7 @@ impl PressureResponse {
 // native movement; this does not retain a threat formation or a group encounter.
 fn retreat_route(
     frame: &AiFrame,
+    q: &WorldQueries<'_>,
     unit: &AiEntity,
     point: Point,
     enemies: &[&AiEntity],
@@ -326,7 +328,6 @@ fn retreat_route(
     if clearance(point) < 0. {
         return None;
     }
-    let q = WorldQueries::new(frame);
     let route = q
         .world_point(unit.position.0, unit.position.1)
         .zip(q.world_point(point.0, point.1))
