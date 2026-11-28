@@ -295,7 +295,9 @@ export function _hpBar(g, e, status = null, ownerColor = null, showHp = true, ow
   const experimental = e.kind === KIND.RIFLEMAN ? this._experimentalRiflemanFrameStrip?.() : null;
   if (experimental) {
     const scale = rigContainerScale(this._unitRenderContexts?.get?.(e.id));
-    const instance = this._liveRigPools?.liveUnitRigs?.get?.(e.id);
+    const pool = e.shotReveal || e.aboveFogReveal
+      ? this._liveRigPools?.liveShotRevealRigs : this._liveRigPools?.liveUnitRigs;
+    const instance = pool?.get?.(e.id);
     if (Number.isFinite(instance?.visualTopY)) topY = instance.visualTopY - 8;
     else if (experimental.strip.poseGeometry) {
       const strip = experimental.strip;

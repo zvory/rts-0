@@ -116,6 +116,13 @@ try {
     assert.ok(bar.y+5<=top-2,`HP overlaps sprite direction ${direction} pose ${pose} scale ${scale}`);
    }
    renderer._liveRigPools={liveUnitRigs:new Map([[1,{visualTopY:80}]])};_hpBar.call(renderer,bar,e,null,0x0072b2);assert.equal(bar.y,72);
+   renderer._liveRigPools.liveShotRevealRigs=new Map([[1,{visualTopY:120}]]);
+   for(const reveal of [{shotReveal:true},{aboveFogReveal:true}]){
+    _hpBar.call(renderer,bar,{...e,...reveal},null,0x0072b2);
+    assert.equal(bar.y,112,'firing-reveal HP must follow its current sprite, not a retained visible rig');
+   }
+   _hpBar.call(renderer,bar,e,null,0x0072b2);
+   assert.equal(bar.y,72,'visible HP must keep following the visible sprite');
   }
   assert.equal(_ringRadius.call({_experimentalRiflemanFrameStrip:()=>({strip})},e).cy,0);
  }
