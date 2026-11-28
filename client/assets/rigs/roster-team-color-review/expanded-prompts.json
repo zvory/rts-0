@@ -1,0 +1,46 @@
+{
+  "generator": "built-in image_gen",
+  "transparent_background": true,
+  "specs": [
+    {
+      "name": "machine_gunner",
+      "reference": "client/assets/rigs/roster-team-color-review/references/machine-gunner-carry.png",
+      "prompt": "Use case: precise-object-edit. Edit target: referenced production top-down game sprite/component artwork. Material colors only. Paint only uniform jacket, sleeves and helmet saturated shaded magenta. Give backpack/bedroll khaki canvas and brown leather straps, hands warm natural skin. Preserve rifle stock brown wood, machine gun dark gunmetal, ammo brass and olive box. Keep all those materials fixed. Preserve exact pose, silhouettes, proportions, outlines, part placement, weapon shapes and existing top-down low-poly game-art style. Use shaded pure magenta highlights and dark magenta shadows as authoring team-paint key, retaining smooth edges. Do not tint fixed materials. Transparent background, no glow, no cast shadow, no backdrop, no labels, no added objects. This is one representative-pose art review, not an animation sheet."
+    },
+    {
+      "name": "panzerfaust",
+      "reference": "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/panzerfaust-back/idle-runtime.png",
+      "prompt": "Use case: precise-object-edit. Edit target: referenced production top-down game sprite/component artwork. Material colors only. Paint uniform and helmet saturated shaded magenta. Preserve hands natural warm skin, rifle stock wood brown, rifle mechanism and barrel dark gunmetal, carried anti-tank launcher dark olive tube with tan warhead and leather strap. Launcher is fixed material, no magenta. Preserve exact pose, silhouettes, proportions, outlines, part placement, weapon shapes and existing top-down low-poly game-art style. Use shaded pure magenta highlights and dark magenta shadows as authoring team-paint key, retaining smooth edges. Do not tint fixed materials. Transparent background, no glow, no cast shadow, no backdrop, no labels, no added objects. This is one representative-pose art review, not an animation sheet."
+    },
+    {
+      "name": "anti_tank_gun",
+      "reference": "client/assets/rigs/anti-tank-gun-noshield-lowdetail/anti-tank-gun-noshield-lowdetail-white-v1-alpha.png",
+      "prompt": "Use case: precise-object-edit. Edit target: referenced production top-down game sprite/component artwork. Material colors only. Paint only broad flat trail panels, carriage crossbeams and broad outer breech/cradle panels saturated shaded magenta. Keep tires black rubber, axle/pivots/handles dark gunmetal, recoil cylinders steel, entire gun tube and muzzle dark gunmetal. Keep all four separate components in their original positions and orientations. Preserve exact pose, silhouettes, proportions, outlines, part placement, weapon shapes and existing top-down low-poly game-art style. Use shaded pure magenta highlights and dark magenta shadows as authoring team-paint key, retaining smooth edges. Do not tint fixed materials. Transparent background, no glow, no cast shadow, no backdrop, no labels, no added objects. This is one representative-pose art review, not an animation sheet."
+    },
+    {
+      "name": "mortar_team",
+      "reference": "client/assets/rigs/mortar-bulky-white/generated/mortar-bulky-white-atlas.png",
+      "prompt": "Use case: precise-object-edit. Edit target: referenced production top-down game sprite/component artwork. Material colors only. Paint triangular carriage frame and broad mounting plates saturated shaded magenta. Keep wheels black rubber, hubs/axle/joints steel, entire mortar tube dark gunmetal, muzzle interior black. Baseplate can be painted magenta. Keep the three separate assemblies and small baseplate in their exact existing arrangement. Preserve exact pose, silhouettes, proportions, outlines, part placement, weapon shapes and existing top-down low-poly game-art style. Use shaded pure magenta highlights and dark magenta shadows as authoring team-paint key, retaining smooth edges. Do not tint fixed materials. Transparent background, no glow, no cast shadow, no backdrop, no labels, no added objects. This is one representative-pose art review, not an animation sheet."
+    },
+    {
+      "name": "scout_car",
+      "reference": "client/assets/rigs/scout-car-white-pass-01/generated/scout-car-white-atlas.png",
+      "prompt": "Use case: precise-object-edit. Edit target: referenced production top-down game sprite/component artwork. Material colors only. Paint outer hood, fenders and pickup bed exterior panels saturated shaded magenta. Keep tires black rubber, open bed interior warm brown wood, cabin seats dark brown leather, steering wheel/control area black, bumpers and fittings gunmetal. Keep separate machine gun below entirely unchanged dark gunmetal. Preserve both component positions. Preserve exact pose, silhouettes, proportions, outlines, part placement, weapon shapes and existing top-down low-poly game-art style. Use shaded pure magenta highlights and dark magenta shadows as authoring team-paint key, retaining smooth edges. Do not tint fixed materials. Transparent background, no glow, no cast shadow, no backdrop, no labels, no added objects. This is one representative-pose art review, not an animation sheet."
+    },
+    {
+      "name": "rocket_launcher",
+      "reference": "client/assets/rigs/rocket-truck-preview/truck.png",
+      "prompt": "Use case: precise-object-edit. Edit target: referenced production top-down game sprite/component artwork. Material colors only. Paint cab roof, hood, fenders and body panels saturated shaded magenta. Keep windows dark smoked gray glass, tires black rubber, bumpers gunmetal, launcher rails and entire rocket rack dark exposed steel with subtle gray highlights, no magenta rails. Do not add rockets. Preserve exact truck silhouette, six wheels, rack geometry and viewpoint. Preserve exact pose, silhouettes, proportions, outlines, part placement, weapon shapes and existing top-down low-poly game-art style. Use shaded pure magenta highlights and dark magenta shadows as authoring team-paint key, retaining smooth edges. Do not tint fixed materials. Transparent background, no glow, no cast shadow, no backdrop, no labels, no added objects. This is one representative-pose art review, not an animation sheet."
+    },
+    {
+      "name": "scout_plane",
+      "reference": "client/assets/rigs/scout-plane-fw189-pass-01/generated/scout-plane-fw189-pass-01-alpha.png",
+      "prompt": "Use case: precise-object-edit. Edit target: referenced production top-down game sprite/component artwork. Material colors only. Paint broad wing panels, twin booms, tail and outer cockpit frame saturated shaded magenta. Keep cockpit windows smoked blue-gray glass, propeller hubs/nose tips engine-metal gray, vents charcoal, narrow leading-edge strips silver-gray metal. Preserve exact twin-boom plane shape, all wing outlines and canopy geometry. No symbols or insignia. Preserve exact pose, silhouettes, proportions, outlines, part placement, weapon shapes and existing top-down low-poly game-art style. Use shaded pure magenta highlights and dark magenta shadows as authoring team-paint key, retaining smooth edges. Do not tint fixed materials. Transparent background, no glow, no cast shadow, no backdrop, no labels, no added objects. This is one representative-pose art review, not an animation sheet."
+    },
+    {
+      "name": "bow_novice",
+      "reference": "client/assets/rigs/roster-team-color-review/references/bow-novice.png",
+      "prompt": "Use case: precise-object-edit. Edit target: referenced production top-down Bow Novice idle game sprite. Material recolor only; preserve exact top-down pose, silhouette, proportions, hands, bow shape, quiver, scarf shape and facing. Paint white tunic and long cloth scarf saturated shaded pure magenta as team-paint authoring key. Preserve hair black, warm natural skin, bow natural brown wood, bowstring off-white, quiver brown leather and arrows wood with off-white feathers, any weapon fittings dark metal. Do not change pose or add details. Original low-poly game sprite style, smooth edges, actual transparent background, no glow/shadow/backdrop, no text. Single idle pose only."
+    }
+  ]
+}

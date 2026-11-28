@@ -70,3 +70,47 @@ The labeled source board and shared layer PNGs are under `generated/`. Game capt
 are ignored local artifacts under `target/team-color-review-captures/`, never checked into Git.
 The image generator's edits have small internal line/shading differences; original alpha preserves
 outer boundaries, but this is an art review rather than a claim of pixel-identical recoloring.
+
+## Expanded full-roster review
+
+The follow-up covers 23 appearance/rank/faction rows: all 12 Kriegsia units (including the
+Command Car-launched Scout Plane), nine Cultivator rows (worker, Novice, Bow Novice, all three
+Adepts and all three Masters), and Ekat/Golem. The shared worker is shown in both factions.
+The new Bow Novice from current main is included with a representative selective-color idle.
+Existing Command Car, Cultivator, worker and Ekat/Golem selective/vector artwork is retained.
+The Golem remains the current geometric prototype artwork.
+
+Eight additional built-in imagegen edits are preserved in `source/`, with exact prompts and
+reference paths in `expanded-prompts.json`. `references/machine-gunner-carry.png` is the first
+sixth-width cell of the existing carry alpha sheet; `references/bow-novice.png` is the first
+256×256 cell of the current archer strip. These crops are generation references only.
+`roster-team-color-review-specs.mjs` declares the production image and representative cell sizes.
+Rifleman, Panzerfaust, Machine Gunner, Bow Novice and Scout Plane use one preview frame; applicable
+movement/setup/fire metadata points to that representative pose temporarily. This does not
+constitute animation production or animation-continuity validation. All modular atlas transforms
+and normal body scale remain in the actual renderer. Machine Gunner shows the carrying pose.
+
+The extended packer emits shared fixed/paint layers and a labeled `expanded-source-material-board.png`.
+Use the same pack/check/install/restore commands above; for all units replace the capture step with:
+
+```sh
+node scripts/art/capture-full-roster-team-color-review.mjs
+```
+
+An optional `--group=kriegsia`, `--group=cultivators` or `--group=ekat` recaptures that faction
+and retains the other faction evidence. Each group is arranged in a clear region of the unchanged
+Classic map. Off-screen headquarters remain to keep the scene valid. The Scout Plane is launched
+through the normal Command Car ability and captured during flight; its crop follows its actual
+paused position. No synthetic airplane entity is spawned. The command car is separated from the
+launch position before capture. New captures must not overlap other unit artwork.
+
+Local `target/full-roster-team-color-review/` contains the 21 raw game captures, full readiness/
+subject evidence, and three labeled unit-by-color sheets. The sheets copy 200-world-pixel terrain
+regions at 1:1 DPR-2 pixel size. They retain ordinary game health bars and effects. They are
+presentation crops of actual game pixels; they are not separate team-color illustrations.
+
+Rebuild the labeled sheets from existing captures without launching another game:
+
+```sh
+node scripts/art/roster-team-color-review-boards.mjs
+```
