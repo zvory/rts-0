@@ -79,53 +79,57 @@ impl Sentries {
             .planner
             .plan(frame, sites, sites.len().saturating_mul(4));
         let mut assigned = BTreeMap::new();
-        let mut pending = Vec::new();
-        // Reserve surviving exact posts everywhere before filling any vacancies, so a
-        // casualty at the main cannot steal another base's whole observation garrison.
-        for slot in &plan.slots {
-            if let Some(id) = self.posts.iter().find_map(|(id, p)| {
-                (candidates.contains_key(id)
-                    && dist2(*p, slot.position) < 1.
-                    && reachable(*id, slot.position))
-                .then_some(*id)
-            }) {
-                candidates.remove(&id);
-                assigned.insert(id, slot.position);
-            } else {
-                pending.push(slot.position);
-            }
-        }
-        // Round-robin unfilled ring positions when infantry are scarce.
-        pending.sort_by_key(|point| {
+        let mut slots = plan.slots.clone();
+        slots.sort_by_key(|slot| {
             plan.sectors
-                .iter()
-                .find_map(|sector| {
+                .get(slot.sector_id)
+                .and_then(|sector| {
                     sector
                         .slots
                         .iter()
-                        .position(|slot| slot.position == *point)
+                        .position(|p| p.position == slot.position)
                         .map(|rank| (rank, sector.id))
                 })
                 .unwrap_or((usize::MAX, usize::MAX))
         });
-        for point in pending {
-            let Some(id) = candidates
-                .values()
-                .filter(|e| reachable(e.id, point))
-                .min_by(|a, b| {
-                    dist2(a.position, point)
-                        .total_cmp(&dist2(b.position, point))
-                        .then(a.id.cmp(&b.id))
-                })
-                .map(|e| e.id)
-            else {
-                continue;
-            };
+        // Fill one post per base per round. Prefer the exact old guard, then free
+        // infantry before borrowing a guard from a later post. This preserves posts
+        // when staffed, but lets a new base share a genuinely scarce guard pool.
+        for slot in slots {
+            let previous = self.posts.iter().find_map(|(id, p)| {
+                (candidates.contains_key(id)
+                    && dist2(*p, slot.position) < 1.
+                    && reachable(*id, slot.position))
+                .then_some(*id)
+            });
+            let id = previous.or_else(|| {
+                candidates
+                    .values()
+                    .filter(|e| reachable(e.id, slot.position))
+                    .min_by(|a, b| {
+                        self.posts
+                            .contains_key(&a.id)
+                            .cmp(&self.posts.contains_key(&b.id))
+                            .then(
+                                dist2(a.position, slot.position)
+                                    .total_cmp(&dist2(b.position, slot.position)),
+                            )
+                            .then(a.id.cmp(&b.id))
+                    })
+                    .map(|e| e.id)
+            });
+            let Some(id) = id else { continue };
             candidates.remove(&id);
-            assigned.insert(id, point);
+            assigned.insert(id, slot.position);
         }
-        self.issued.retain(|id, _| assigned.contains_key(id));
-        self.held.retain(|id| assigned.contains_key(id));
+        self.issued
+            .retain(|id, p| assigned.get(id).is_some_and(|next| dist2(*p, *next) < 1.));
+        self.held.retain(|id| {
+            self.posts
+                .get(id)
+                .zip(assigned.get(id))
+                .is_some_and(|(old, next)| dist2(*old, *next) < 1.)
+        });
         let staffed = |point| assigned.values().any(|p| *p == point);
         plan.slots.retain(|slot| staffed(slot.position));
         for sector in &mut plan.sectors {

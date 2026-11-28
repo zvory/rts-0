@@ -267,3 +267,73 @@ fn formerly_assigned_guards_are_replaced_if_they_can_no_longer_reach_their_posts
     assert_eq!(replacements.len(), 4);
     assert!(previous.is_disjoint(&replacements));
 }
+
+#[test]
+fn completing_a_base_shares_scarce_surviving_guards_instead_of_leaving_it_empty() {
+    let (start, mut s, sites) = two_base_scene(4);
+    let second = s.entities.iter().find(|e| e.id == 800).unwrap().clone();
+    s.entities.retain(|e| e.id != 800);
+    let mut defense = tactics::DefenseAssignments::default();
+    let f = frame(&start, &s, &sites);
+    assert_eq!(defense.prepare_sentries(&f, &owned_sites(&f)).len(), 4);
+    for e in s.entities.iter_mut() {
+        if let Some(post) = defense.assigned_sentry_posts().get(&e.id) {
+            e.x = post.0;
+            e.y = post.1;
+        }
+    }
+    let original = defense.assigned_sentry_posts().clone();
+    let f = frame(&start, &s, &sites);
+    let mut planner = DefensePlanner::default();
+    defense.step(
+        &f,
+        &mut AiActions::for_frame(&f),
+        &mut planner,
+        &owned_sites(&f),
+    );
+    s.entities.push(second);
+    s.tick += 9;
+    let f = frame(&start, &s, &sites);
+    let owned = owned_sites(&f);
+    assert_eq!(defense.prepare_sentries(&f, &owned).len(), 4);
+    for site in sites.iter().filter(|site| owned.contains(&site.id)) {
+        assert_eq!(
+            defense
+                .assigned_sentry_posts()
+                .values()
+                .filter(|p| construction::dist2(**p, site.position) <= (9. * 32f32).det_powi(2))
+                .count(),
+            2
+        );
+    }
+    let moved = defense
+        .assigned_sentry_posts()
+        .iter()
+        .filter(|(id, p)| original.get(id) != Some(*p))
+        .map(|(id, _)| *id)
+        .collect::<BTreeSet<_>>();
+    assert_eq!(moved.len(), 2);
+    for e in s.entities.iter_mut() {
+        if let Some(post) = defense.assigned_sentry_posts().get(&e.id) {
+            e.x = post.0;
+            e.y = post.1;
+            e.state = "attack".into();
+        }
+    }
+    let f = frame(&start, &s, &sites);
+    let mut actions = AiActions::for_frame(&f);
+    defense.step(&f, &mut actions, &mut planner, &owned);
+    let held = actions
+        .into_requests()
+        .into_iter()
+        .filter_map(|r| match r {
+            AiActionRequest::HoldPosition { units, .. } => Some(units),
+            _ => None,
+        })
+        .flatten()
+        .collect::<BTreeSet<_>>();
+    assert_eq!(
+        held, moved,
+        "changed posts must take ownership once; unchanged guards keep shooting"
+    );
+}

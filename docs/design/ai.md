@@ -360,7 +360,8 @@ unlimited pursuit and releases a contact when its last position is visibly clear
 Every completed owned base reserves four available infantry on observation garrisons before
 combat responses, expansion cover, or offensive pushes borrow units. These posts use the SDK's
 fixed garrison planner, independent of remaining-Steel economic weights; scarce infantry spread
-across supported bases in rounds. Surviving exact posts keep their guards; casualties are
+across supported bases in rounds, including newly completed bases when all surviving infantry
+were previously guards. Existing guards keep their exact posts when enough infantry are available; casualties are
 replaced, wounded micro retains priority, and unsupported terrain never fabricates a legal post.
 Assignment and retention require the actual infantry body's current known-world reachable
 component to contain the post; unreachable infantry remain available instead of being locked
