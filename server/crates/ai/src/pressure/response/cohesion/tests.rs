@@ -827,3 +827,32 @@ fn disconnected_tank_cannot_hold_a_cleared_encounter_forever() {
     assert!(response.armor_encounter.is_none());
     assert!(response.responders.is_empty());
 }
+
+#[test]
+#[ignore = "Known defect: a blocked rally is treated as disconnected terrain; fixing AI behavior requires separate authorization"]
+fn blocked_rally_must_not_release_an_unfinished_withdrawal() {
+    let (start, mut s) = fixture(0, 2, 4);
+    s.visible_tiles.fill(0);
+    let mut response = PressureResponse::with_cohesive_reserve();
+    let orders = run(&mut response, &start, &s);
+    let post = orders
+        .iter()
+        .filter_map(|r| match r {
+            AiActionRequest::Move { units, x, y, .. } if units.contains(&100) => Some((*x, *y)),
+            _ => None,
+        })
+        .last()
+        .unwrap();
+    // The force has not reached its posts. Construction invalidates the old rally,
+    // but does not partition this open map or disconnect either surviving Tank.
+    s.entities.retain(|e| e.owner == 1);
+    let mut building = s.entities[0].clone();
+    building.id = 2000;
+    building.kind = "barracks".into();
+    building.x = post.0;
+    building.y = post.1;
+    s.entities.push(building);
+    s.tick += MEMORY_TICKS;
+    run(&mut response, &start, &s);
+    assert!(response.has_withdrawal(), "blocking the old rally must replan the unfinished withdrawal, not release every member as disconnected");
+}
