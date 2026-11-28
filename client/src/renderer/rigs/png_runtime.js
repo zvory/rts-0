@@ -1,3 +1,4 @@
+import { teamPaintTextureFor } from "./team_paint.js";
 import { hexToInt, lightenColor } from "../shared.js";
 import { createRigAnimationStage, rigContainerScale, sampleRigAnimationInto } from "./animation.js";
 import { flushRigDiagnosticCounts } from "./diagnostics.js";
@@ -17,9 +18,10 @@ const PNG_RIG_COMPLETED = 1;
 
 export function renderPngUnitRig(renderer, entity, colorByOwner, state, definition, options = {}) {
   const atlas = options.atlas;
-  const atlasTexture = options.atlasTexture;
+  let atlasTexture = options.atlasTexture;
   if (!definition || !atlas || !atlasTexture) return null;
   const context = options.renderContext ?? renderer._rigRenderContextFor?.(entity, colorByOwner, state) ?? {};
+  if (atlas.teamPaint) atlasTexture = teamPaintTextureFor(atlasTexture, context.teamColor);
   if (typeof options.alpha === "number") context.shotRevealAlpha = options.alpha;
   const rendered = options.collectResults === false ? null : [];
   if (options.route) {

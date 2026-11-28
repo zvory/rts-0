@@ -1,9 +1,6 @@
 // Checked-in production metadata for the Tank PNG atlas.
 // Raster-native rig metadata supplies animation bindings, anchors, and native effects.
-import {
-  PRODUCTION_RASTER_COLOR_TARGET,
-  relativeColorAdjustment,
-} from "./color_adjustment.js";
+import { PRODUCTION_RASTER_COLOR_TARGET } from "./color_adjustment.js";
 
 import { SCOUT_CAR_PNG_RIG_ATLAS } from "./scout_car_png_atlas.js";
 
@@ -17,17 +14,13 @@ function deepFreeze(value) {
   return value;
 }
 
-const BAKED_COLOR_ADJUSTMENT = Object.freeze({ brightness: 70, saturation: 80, hue: 100 });
-
 export const TANK_PNG_RIG_ATLAS = deepFreeze({
   "enabled": true,
   "unit": "tank",
-  "image": "/assets/rigs/tank-ps1/tank-atlas.png?v=pass11-white-dim30",
-  "iconImage": "/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-11-white-alpha.png?v=pass11-white-dim30",
-  "runtimeColorAdjustment": relativeColorAdjustment(
-    PRODUCTION_RASTER_COLOR_TARGET,
-    BAKED_COLOR_ADJUSTMENT,
-  ),
+  image: "/assets/rigs/kriegsia-team-color/generated/tank-atlas.png?v=team-paint-1",
+  sheetRows: 4,
+  teamPaint: { baseRow: 2, paintRow: 3, renderRows: 1 },
+  runtimeColorAdjustment: PRODUCTION_RASTER_COLOR_TARGET,
   "iconVisibleBounds": {
     "x": 54,
     "y": 116,
@@ -46,7 +39,7 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
     "layout": "tight",
     "profile": "semantic",
     "width": 1145,
-    "height": 1373,
+    "height": 1538,
     "sourceSheet": "client/assets/rigs/tank-ps1/generated/tank-tiger-i-pass-11-white-alpha.png",
     "cells": [
       "reference.full",
@@ -101,16 +94,16 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
       "guideMaskMorphology": null,
       "worldScale": 1.2
     },
-    "imageVersion": "pass11-white-dim30",
+    "imageVersion": "team-paint-1",
     "colorAdjustment": {
       "brightness": 70,
       "saturation": 80,
       "hue": 100
     }
   },
-  // Pack the existing Scout Car gun into the texture at load time, without changing either asset.
-  attachments: [{ atlas: SCOUT_CAR_PNG_RIG_ATLAS, source: SCOUT_GUN.frame, x: 0, y: 1373 }],
+  // The shared fixed layer contains the original roof gun at its unchanged frame coordinates.
   "frames": {},
+  iconComposition: { sprites: ["sprite.hull", "sprite.barrel", "sprite.turret", "sprite.commanderGun"] },
   "sprites": [
     {
       id: "sprite.commanderGun",
@@ -192,7 +185,7 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
         "part.hull.noseShadow",
         "part.noseTick"
       ],
-      "tintSlot": "team",
+      tintSlot: "fixed",
       "drawOrder": 20,
       "sourceCell": "sprite.hull",
       "frame": {
@@ -218,7 +211,7 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
       "sourceParts": [
         "part.turret"
       ],
-      "tintSlot": "team-light",
+      tintSlot: "fixed",
       "originMode": "visible-center",
       "drawOrder": 30,
       "sourceCell": "sprite.turret",
@@ -245,7 +238,7 @@ export const TANK_PNG_RIG_ATLAS = deepFreeze({
       "sourceParts": [
         "part.barrel"
       ],
-      "tintSlot": "team",
+      tintSlot: "fixed",
       "drawOrder": 29,
       "sourceCell": "sprite.barrel",
       "frame": {

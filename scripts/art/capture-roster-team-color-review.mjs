@@ -1,4 +1,4 @@
-// Run after roster-team-color-review.mjs --install-preview. Review captures only.
+// Capture the production selective-color material treatment in an authoritative Lab.
 import fs from 'node:fs';
 import path from 'node:path';
 import {runCli} from '../interact/cli.ts';

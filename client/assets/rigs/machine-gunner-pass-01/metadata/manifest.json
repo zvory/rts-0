@@ -14,17 +14,35 @@
   },
   "runtime": {
     "module": "client/src/renderer/rigs/machine_gunner_png_strip.js",
-    "stripImageUrl": "/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png?v=white-chroma-v1-rgba8",
-    "imageVersion": "white-chroma-v1-rgba8",
-    "runtimeStrip": "client/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png",
+    "stripImageUrl": "/assets/rigs/kriegsia-team-color/generated/machine_gunner-atlas.png?v=team-paint-1",
+    "imageVersion": "team-paint-1",
+    "runtimeStrip": "client/assets/rigs/kriegsia-team-color/generated/machine_gunner-atlas.png",
     "frameWidth": 128,
     "frameHeight": 128,
     "frameCount": 15,
     "idleFrame": 0,
-    "movementFrames": [0, 1, 2, 3, 4, 5],
-    "setupFrames": [6, 7, 8, 9, 10, 11],
+    "movementFrames": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "setupFrames": [
+      6,
+      7,
+      8,
+      9,
+      10,
+      11
+    ],
     "deployedFrame": 11,
-    "firingFrames": [12, 13, 14],
+    "firingFrames": [
+      12,
+      13,
+      14
+    ],
     "fps": 12,
     "worldScale": 0.306,
     "movementWorldScale": 0.306,
@@ -41,6 +59,14 @@
       "hue": 100
     },
     "packedFacing": "body",
-    "setupForwardAngleRadians": 1.5707963267948966
-  }
+    "setupForwardAngleRadians": 1.5707963267948966,
+    "sheetRows": 4,
+    "teamPaint": {
+      "baseRow": 2,
+      "paintRow": 3,
+      "renderRows": 1
+    }
+  },
+  "originalRuntimeStrip": "client/assets/rigs/machine-gunner-pass-01/machine-gunner-pass-01-strip.png",
+  "teamColorPipeline": "scripts/art/kriegsia-team-color-pipeline.mjs"
 }

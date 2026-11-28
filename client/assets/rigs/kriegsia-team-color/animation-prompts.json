@@ -1,0 +1,33 @@
+{
+  "generator": "built-in image_gen",
+  "transparent_background": true,
+  "specs": [
+    {
+      "name": "rifleman",
+      "count": 5,
+      "columns": 4,
+      "rows": 2,
+      "reference": "references/rifleman-poses.png",
+      "approved": "../roster-team-color-review/source/rifleman.png",
+      "prompt": "Use case: precise-object-edit. Image 1 is the edit target: exact production rifleman animation pose contact sheet in a FOUR-column 2-row grid. Image 2 is the APPROVED material/color reference ONLY; do not copy its pose into other cells. Recolor all 5 occupied cells in row-major order without rearranging, adding or dropping poses. Keep empty cells empty. Paint ONLY uniform tunic, sleeves and helmet saturated shaded pure magenta (bright magenta highlights, dark magenta shadows) for team-mask extraction. Warm natural skin, black outlines, brown wooden rifle stock, dark gunmetal bolt/barrel and dark brown leather strap remain fixed. The final cell (row 2 column 1) is the firing/recoil pose and keeps its existing muzzle flash. NO white-painted uniform, metal or equipment. Preserve exact silhouette, proportions, pose, gun shapes, hand locations, internal mechanical boundaries, top-down projection and original game sprite style in EACH cell. Do not invent animation, new equipment, effects or scenery. This is a material edit of the existing complete pose set. Maintain ample transparent separation between the exact four columns and rows, same grid. True transparent background; no glow, cast shadow, text, labels or grid lines. Soften alpha edges naturally and retain shaded volume."
+    },
+    {
+      "name": "panzerfaust",
+      "count": 8,
+      "columns": 4,
+      "rows": 2,
+      "reference": "references/panzerfaust-poses.png",
+      "approved": "../roster-team-color-review/source/panzerfaust.png",
+      "prompt": "Use case: precise-object-edit. Image 1 is the edit target: exact production panzerfaust animation pose contact sheet in a FOUR-column 2-row grid. Image 2 is the APPROVED material/color reference ONLY; do not copy its pose into other cells. Recolor all 8 occupied cells in row-major order without rearranging, adding or dropping poses. Keep empty cells empty. Paint ONLY uniform tunic, sleeves and helmet saturated shaded pure magenta (bright magenta highlights, dark magenta shadows) for team-mask extraction. Warm skin, rifle wood brown, rifle metal charcoal, launcher tan/olive with tan warhead, brown leather straps remain fixed. Preserve the last three raising/aiming poses exactly: launcher vertical in row 2 column 2, diagonal in column 3, horizontal in column 4. Keep every weapon/hand orientation from image 1. NO white-painted uniform, metal or equipment. Preserve exact silhouette, proportions, pose, gun shapes, hand locations, internal mechanical boundaries, top-down projection and original game sprite style in EACH cell. Do not invent animation, new equipment, effects or scenery. This is a material edit of the existing complete pose set. Maintain ample transparent separation between the exact four columns and rows, same grid. True transparent background; no glow, cast shadow, text, labels or grid lines. Soften alpha edges naturally and retain shaded volume."
+    },
+    {
+      "name": "machine_gunner",
+      "count": 15,
+      "columns": 4,
+      "rows": 4,
+      "reference": "references/machine_gunner-poses.png",
+      "approved": "../roster-team-color-review/source/machine_gunner.png",
+      "prompt": "Use case: precise-object-edit. Image 1 is the edit target: exact production machine gunner animation pose contact sheet in a FOUR-column 4-row grid. Image 2 is the APPROVED material/color reference ONLY; do not copy its pose into other cells. Recolor all 15 occupied cells in row-major order without rearranging, adding or dropping poses. Keep empty cells empty. Paint ONLY uniform jacket, sleeves and helmet saturated shaded pure magenta (bright magenta highlights, dark magenta shadows) for team-mask extraction. Hands warm natural skin, backpack/bedroll tan khaki canvas, brown leather straps, wooden gun stock brown, all machine-gun metal charcoal blackened steel, ammo brass and olive box remain fixed. Match the approved idle material board. Preserve carrying frames 0-5, six setup poses 6-11 and firing poses 12-14, including changing weapon direction/bipod and pose. NO white-painted uniform, metal or equipment. Preserve exact silhouette, proportions, pose, gun shapes, hand locations, internal mechanical boundaries, top-down projection and original game sprite style in EACH cell. Do not invent animation, new equipment, effects or scenery. This is a material edit of the existing complete pose set. Maintain ample transparent separation between the exact four columns and rows, same grid. True transparent background; no glow, cast shadow, text, labels or grid lines. Soften alpha edges naturally and retain shaded volume."
+    }
+  ]
+}

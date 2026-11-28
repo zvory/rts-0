@@ -18,7 +18,7 @@ assert.equal(red[11], Math.round((80 / 255 + 90 / 255 * (1 - 80 / 255)) * 255));
 assert.throws(() => composeTeamPaintRgba(fixed, paint.slice(0, 4), 0xff0000));
 
 for (const strip of createLiveFrameStrips().values()) {
-  if (!strip.teamPaint) continue;
+  if (!strip.teamPaint || !strip.source.runtimeStrip.includes("cultivator-team-color")) continue;
   const png = PNG.sync.read(fs.readFileSync(new URL('../../' + strip.source.runtimeStrip, import.meta.url)));
   const oldPath = strip.source.runtimeStrip.replace('cultivator-team-color', 'cultivator-golden');
   const original = PNG.sync.read(fs.readFileSync(new URL('../../' + oldPath, import.meta.url)));
@@ -94,6 +94,16 @@ try {
     assert.equal(body._destroyed, true, 'owner color changes release the prior instance');
     for (const instance of renderer._liveRigPools.units.values()) instance.destroy();
   } finally { restorePixi(); }
+  const atlas = await loadTeamPaintTexture(pixi, { image: '/component-atlas.png', frameWidth: 1,
+    frameHeight: 1, frameCount: 1, sheetRows: 4,
+    teamPaint: { baseRow: 2, paintRow: 3, renderRows: 1 } },
+    { brightness: 100, saturation: 100, hue: 100 });
+  const atlasBlue = teamPaintTextureFor(atlas, 0x0000ff);
+  assert.equal(atlas.source.resource.height, 1, 'component atlases allocate only their rendered row');
+  assert.equal(atlasBlue.source.resource.height, 1);
+  assert.equal(teamPaintTextureFor(atlas, 0x0000ff), atlasBlue, 'component palettes share the strip cache contract');
+  destroyTeamPaintTextures(atlas);
+  assert.ok(atlasBlue.destroyed, 'single-row component palettes are released at teardown');
   destroyTeamPaintTextures(original);
   destroyTeamPaintTextures(original);
   assert.ok(r.destroyed && b.destroyed, 'all derived GPU resources are released exactly with their match source');

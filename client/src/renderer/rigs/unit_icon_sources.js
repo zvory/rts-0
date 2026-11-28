@@ -1,4 +1,4 @@
-import { spriteRasterSource } from "./png_icon_source.js";
+import { spriteRasterSource, teamPaintComponents } from "./png_icon_source.js";
 import { KIND, SETUP } from "../../protocol.js";
 import { lightenColor } from "../shared.js";
 import { createLiveFrameStrips, liveFrameStripKeyForEntity } from "./frame_strip_routing.js";
@@ -81,8 +81,9 @@ export function liveUnitIconMarkupFor(kind, { teamColor = "#0072b2", minimapPart
     if (!sprite) throw new Error(`Unknown minimap sprite: ${minimapPart}`);
     const { frame, ...source } = spriteRasterSource(atlas, sprite);
     return composedRasterIconMarkup({ source: "png-atlas-minimap", ...source,
-      components: [{ id: sprite.id, frame, teamTint: sprite.tintSlot !== "fixed" }],
-      teamTint: sprite.tintSlot !== "fixed", teamColor: tintColor,
+      components: teamPaintComponents(atlas, [{ id: sprite.id, frame, teamTint: sprite.tintSlot !== "fixed" }]),
+      preserveTintAlpha: !!atlas.teamPaint,
+      teamTint: !!atlas.teamPaint || sprite.tintSlot !== "fixed", teamColor: tintColor,
       fixedBounds: { x: -64, y: -64, w: 128, h: 128 } });
   }
   if (minimapPart && atlas) return minimapPartMarkup(kind, atlas, tintColor, minimapPart);
@@ -182,7 +183,10 @@ function createAnimatedRasterIcon(root, kind, atlas, definition, teamColor) {
     ...nativeEntries.map((part) => ({ type: "native", drawOrder: part.drawOrder || 0, value: part })),
   ].sort((a, b) => a.drawOrder - b.drawOrder);
   const viewBox = atlas.viewBox || { x: -40, y: -32, width: 80, height: 64 };
-  const tintFilter = `<defs><filter id="${tintId}" color-interpolation-filters="sRGB">` +
+  const channels = [1, 3, 5].map(index => parseInt(teamColor.slice(index, index + 2), 16) / 255);
+  const tintFilter = atlas.teamPaint
+    ? `<defs><filter id="${tintId}" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="${channels[0]} 0 0 0 0 0 ${channels[1]} 0 0 0 0 0 ${channels[2]} 0 0 0 0 0 1 0" /></filter></defs>`
+    : `<defs><filter id="${tintId}" color-interpolation-filters="sRGB">` +
     `<feFlood flood-color="${teamColor}" result="teamColor" />` +
     `<feComposite in="teamColor" in2="SourceGraphic" operator="in" result="maskedTeamColor" />` +
     `<feBlend in="SourceGraphic" in2="maskedTeamColor" mode="multiply" />` +
@@ -240,16 +244,17 @@ function animatedRasterLayerMarkup(sprite, atlas, tintId) {
     -finiteNumber(frame.originY) / pixelsPerUnitY,
     (frame.h - finiteNumber(frame.originY)) / pixelsPerUnitY,
   );
-  const filter = sprite.tintSlot === "fixed" ? "" : ` filter="url(#${tintId})"`;
+  const components = teamPaintComponents(atlas, [{ id: sprite.id, frame, teamTint: sprite.tintSlot !== "fixed" }]);
+  const layers = components.map(component => {
+    const frame = component.frame;
+    const filter = component.teamTint ? ` filter="url(#${tintId})"` : "";
+    return `<svg data-unit-icon-component="${component.id}" x="${number(x)}" y="${number(y)}" width="${number(w)}" height="${number(h)}" ` +
+      `viewBox="${frame.x} ${frame.y} ${frame.w} ${frame.h}" preserveAspectRatio="none" overflow="hidden">` +
+      `<image href="${source.image}" x="0" y="0" width="${source.sheetWidth}" height="${source.sheetHeight}" preserveAspectRatio="none"${filter} />` +
+      `</svg>`;
+  }).join("");
   return `<g data-unit-icon-animation-part="${sprite.animationPart}" data-unit-icon-sprite="${sprite.id}">` +
-    `<g data-unit-icon-scale>` +
-      `<svg x="${number(x)}" y="${number(y)}" width="${number(w)}" height="${number(h)}" ` +
-        `viewBox="${frame.x} ${frame.y} ${frame.w} ${frame.h}" preserveAspectRatio="none" overflow="hidden">` +
-        `<image href="${source.image}" x="0" y="0" width="${source.sheetWidth}" height="${source.sheetHeight}" ` +
-          `preserveAspectRatio="none"${filter} />` +
-      `</svg>` +
-    `</g>` +
-  `</g>`;
+    `<g data-unit-icon-scale>${layers}</g></g>`;
 }
 
 function animatedNativeLayerMarkup(part) {
@@ -314,12 +319,31 @@ function minimapPartMarkup(kind, atlas, teamColor, part) {
     return { id: sprite.id, ...spriteRasterSource(atlas, sprite), ...transform, teamTint: sprite.tintSlot !== "fixed" };
   });
   return composedRasterIconMarkup({ source: "png-atlas-minimap", image: atlas.image,
-    sheetWidth: atlas.grid.width, sheetHeight: atlas.grid.height, components,
+    sheetWidth: atlas.grid.width, sheetHeight: atlas.grid.height * (atlas.sheetRows || 1),
+    components: teamPaintComponents(atlas, components), preserveTintAlpha: !!atlas.teamPaint,
     teamTint: true, teamColor, fixedBounds: { x: -64, y: -64, w: 128, h: 128 } });
 }
 
 function atlasPortrait(atlas, teamColor) {
   if (!atlas?.image || !atlas?.grid) return null;
+  if (atlas.teamPaint) {
+    const entity = { kind: atlas.unit, facing: 0, weaponFacing: 0, setupState: SETUP.DEPLOYED };
+    const definition = RASTER_RIG_DEFINITIONS.get(atlas.unit);
+    const context = createRigRenderContext(entity);
+    const pose = definition ? sampleRigAnimation(definition, entity, context) : null;
+    const iconSprites = atlas.iconComposition?.sprites?.map(entry => typeof entry === "string" ? entry : entry.spriteId);
+    const components = pose ? atlas.sprites.filter(sprite => {
+      const state = pose.parts[sprite.animationPart];
+      return state?.visible && state.alpha > 0 && (!iconSprites || iconSprites.includes(sprite.id));
+    })
+      .sort((a, b) => a.drawOrder - b.drawOrder).map(sprite => ({
+        id: sprite.id, ...spriteRasterSource(atlas, sprite),
+        ...resolvePngSpriteTransform(pose.parts[sprite.animationPart], sprite.frame, sprite, {}, context),
+      })) : atlasComposition(atlas);
+    return { source: "png-atlas-composition", image: atlas.image,
+      sheetWidth: atlas.grid.width, sheetHeight: atlas.grid.height * atlas.sheetRows,
+      components: teamPaintComponents(atlas, components), teamTint: true, preserveTintAlpha: true };
+  }
   const assembled = atlas.grid.components?.assembledReference;
   if (assembled) {
     return {

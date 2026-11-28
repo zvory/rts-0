@@ -10,8 +10,10 @@ function deepFreeze(value) {
 export const RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP = deepFreeze({
   enabled: true,
   unit: "rifleman",
-  image: "/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-panzerfaust-windup-runtime-strip.png?v=windup-a-scaled-60-rgba8",
-  imageVersion: "windup-a-scaled-60-rgba8",
+  image: "/assets/rigs/kriegsia-team-color/generated/panzerfaust-atlas.png?v=team-paint-1",
+  sheetRows: 4,
+  teamPaint: { baseRow: 2, paintRow: 3, renderRows: 1 },
+  imageVersion: "team-paint-1",
   frameWidth: 160,
   frameHeight: 112,
   frameCount: 8,
@@ -44,6 +46,6 @@ export const RIFLEMAN_PANZERFAUST_PNG_FRAME_STRIP = deepFreeze({
     launcherSource: "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/panzerfaust-back/idle-runtime.png",
     launcherLayer: "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/panzerfaust-composited/launcher-main-layer.png",
     windupFrames: "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-panzerfaust-windup-frames.png",
-    runtimeStrip: "client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-panzerfaust-windup-runtime-strip.png",
+    runtimeStrip: "client/assets/rigs/kriegsia-team-color/generated/panzerfaust-atlas.png",
   },
 });

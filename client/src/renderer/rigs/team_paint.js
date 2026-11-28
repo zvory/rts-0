@@ -35,11 +35,15 @@ export async function loadTeamPaintTexture(pixi, strip, adjustment) {
     context.drawImage(bitmap, 0, 0);
     const fixed = context.getImageData(0, height * strip.teamPaint.baseRow, width, height).data;
     const paint = context.getImageData(0, height * strip.teamPaint.paintRow, width, height).data;
-    const neutral = context.getImageData(0, 0, width, height * 2);
+    const renderRows = strip.teamPaint.renderRows ?? 2;
+    if (!Number.isInteger(renderRows) || renderRows < 1 || renderRows > strip.sheetRows) {
+      throw new Error(`Invalid team-paint rendered row count: ${strip.image}`);
+    }
+    const neutral = context.getImageData(0, 0, width, height * renderRows);
     const createTexture = (pixels) => {
-      const target = createWorkerSafeCanvas(width, height * 2), ctx = target.getContext("2d");
+      const target = createWorkerSafeCanvas(width, height * renderRows), ctx = target.getContext("2d");
       if (!ctx) throw new Error("Team paint requires a palette canvas");
-      const frame = ctx.createImageData(width, height * 2);
+      const frame = ctx.createImageData(width, height * renderRows);
       frame.data.set(pixels);
       applyColorAdjustmentToRgba(frame.data, adjustment);
       ctx.putImageData(frame, 0, 0);

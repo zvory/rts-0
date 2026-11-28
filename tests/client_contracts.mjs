@@ -38,6 +38,7 @@ await import("./client_contracts/pixi_presentation_adapter_contracts.mjs");
 await import("./client_contracts/frame_strip_runtime_contracts.mjs");
 await import("./client_contracts/cultivator_golden_attack_contracts.mjs");
 await import("./client_contracts/team_paint_contracts.mjs");
+await import("./client_contracts/kriegsia_team_paint_contracts.mjs");
 await import("./client_contracts/machine_gunner_white_strip_contracts.mjs");
 await import("./client_contracts/rifleman_png_strip_contracts.mjs");
 await import("./client_contracts/launch_url_contracts.mjs");

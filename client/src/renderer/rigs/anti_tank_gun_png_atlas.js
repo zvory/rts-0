@@ -14,7 +14,6 @@ const TRAIL_BACK_OFFSET = -17.1;
 const TRAIL_LATERAL_OFFSET = 17;
 const TRAIL_ROTATION = Math.PI / 9;
 const TRAIL_CENTER_COUNTER_ROTATION = (Math.PI * 5 / 18) - TRAIL_ROTATION;
-const TEAM_TINT_ADJUSTMENT = PRODUCTION_RASTER_COLOR_TARGET;
 
 const WHEEL_NAMES = Object.freeze([
   "wheel.left.body",
@@ -127,14 +126,17 @@ const RIGHT_TRAIL_FRAME = Object.freeze({
 export const ANTI_TANK_GUN_PNG_RIG_ATLAS = deepFreeze({
   enabled: true,
   unit: "anti_tank_gun",
-  image: "/assets/rigs/anti-tank-gun-noshield-lowdetail/anti-tank-gun-noshield-lowdetail-white-v1-alpha.png?v=white-v1-br70-sat90",
+  image: "/assets/rigs/kriegsia-team-color/generated/anti_tank_gun-atlas.png?v=team-paint-1",
+  runtimeColorAdjustment: PRODUCTION_RASTER_COLOR_TARGET,
+  sheetRows: 4,
+  teamPaint: { baseRow: 2, paintRow: 3, renderRows: 1 },
   grid: {
     profile: "semantic-components",
     width: 1254,
     height: 1254,
     sourceSheet: "client/assets/rigs/anti-tank-gun-noshield-lowdetail/anti-tank-gun-noshield-lowdetail-white-v1-alpha.png",
     generatedSource: "client/assets/rigs/anti-tank-gun-noshield-lowdetail/generated/anti-tank-gun-noshield-lowdetail-white-v1-source.png",
-    imageVersion: "white-v1",
+    imageVersion: "team-paint-1",
     components: {
       carriage: CARRIAGE_FRAME,
       barrelAssembly: BARREL_ASSEMBLY_FRAME,
@@ -162,9 +164,8 @@ export const ANTI_TANK_GUN_PNG_RIG_ATLAS = deepFreeze({
       15,
       RIGHT_TRAIL_FRAME,
       {
-        tintSlot: "team-light",
-        tintAdjustment: TEAM_TINT_ADJUSTMENT,
-        positionOffsetX: TRAIL_BACK_OFFSET,
+        tintSlot: "fixed",
+                positionOffsetX: TRAIL_BACK_OFFSET,
         positionOffsetY: -TRAIL_LATERAL_OFFSET,
         rotationOffset: TRAIL_CENTER_COUNTER_ROTATION,
         rotationPivotX: RIGHT_TRAIL_FRAME.w * 0.5,
@@ -182,9 +183,8 @@ export const ANTI_TANK_GUN_PNG_RIG_ATLAS = deepFreeze({
       16,
       LEFT_TRAIL_FRAME,
       {
-        tintSlot: "team-light",
-        tintAdjustment: TEAM_TINT_ADJUSTMENT,
-        positionOffsetX: TRAIL_BACK_OFFSET,
+        tintSlot: "fixed",
+                positionOffsetX: TRAIL_BACK_OFFSET,
         positionOffsetY: TRAIL_LATERAL_OFFSET,
         rotationOffset: -TRAIL_CENTER_COUNTER_ROTATION,
         rotationPivotX: LEFT_TRAIL_FRAME.w * 0.5,
@@ -198,7 +198,7 @@ export const ANTI_TANK_GUN_PNG_RIG_ATLAS = deepFreeze({
       atParts(CARRIAGE_PACKED_NAMES, "packed"),
       20,
       CARRIAGE_FRAME,
-      { tintSlot: "team-light", tintAdjustment: TEAM_TINT_ADJUSTMENT }
+      { tintSlot: "fixed" }
     ),
     sprite(
       "sprite.at.carriage.deployed",
@@ -206,7 +206,7 @@ export const ANTI_TANK_GUN_PNG_RIG_ATLAS = deepFreeze({
       atParts(CARRIAGE_BASE_NAMES, "deployed"),
       21,
       CARRIAGE_FRAME,
-      { tintSlot: "team-light", tintAdjustment: TEAM_TINT_ADJUSTMENT }
+      { tintSlot: "fixed" }
     ),
     sprite(
       "sprite.at.barrelAssembly.packed",
@@ -214,7 +214,7 @@ export const ANTI_TANK_GUN_PNG_RIG_ATLAS = deepFreeze({
       atParts(BARREL_ASSEMBLY_NAMES, "packed"),
       30,
       BARREL_ASSEMBLY_FRAME,
-      { tintSlot: "team-light-soft", tintAdjustment: TEAM_TINT_ADJUSTMENT }
+      { tintSlot: "fixed" }
     ),
     sprite(
       "sprite.at.barrelAssembly.deployed",
@@ -222,7 +222,7 @@ export const ANTI_TANK_GUN_PNG_RIG_ATLAS = deepFreeze({
       atParts(BARREL_ASSEMBLY_NAMES, "deployed"),
       31,
       BARREL_ASSEMBLY_FRAME,
-      { tintSlot: "team-light-soft", tintAdjustment: TEAM_TINT_ADJUSTMENT }
+      { tintSlot: "fixed" }
     ),
   ],
 });

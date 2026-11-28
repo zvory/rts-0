@@ -36,7 +36,9 @@ const GUN_NEUTRAL_FRAME = Object.freeze({
 export const SCOUT_CAR_PNG_RIG_ATLAS = deepFreeze({
   enabled: true,
   unit: "scout_car",
-  image: "/assets/rigs/scout-car-white-pass-01/generated/scout-car-white-atlas.png?v=white-runtime-tint-pass01",
+  image: "/assets/rigs/kriegsia-team-color/generated/scout_car-atlas.png?v=team-paint-1",
+  sheetRows: 4,
+  teamPaint: { baseRow: 2, paintRow: 3, renderRows: 1 },
   iconVisibleBounds: {
     x: 4,
     y: 1,
@@ -59,7 +61,7 @@ export const SCOUT_CAR_PNG_RIG_ATLAS = deepFreeze({
       "sprite.body",
       "sprite.rearMachineGun",
     ],
-    imageVersion: "white-runtime-tint-pass01",
+    imageVersion: "team-paint-1",
   },
   frames: {},
   sprites: [
@@ -78,7 +80,7 @@ export const SCOUT_CAR_PNG_RIG_ATLAS = deepFreeze({
         "part.hoodLine",
         "part.noseTick",
       ],
-      tintSlot: "team-light",
+      tintSlot: "fixed",
       drawOrder: 20,
       frame: BODY_FRAME,
     },

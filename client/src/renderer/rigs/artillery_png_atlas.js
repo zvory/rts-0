@@ -22,7 +22,6 @@ const TRAIL_LATERAL_SHIFT_RATIO = 0.1;
 const DEPLOYED_TRAIL_LATERAL_LENGTH_RATIO = 0.1;
 const DEPLOYED_TRAIL_ROTATION = 0.54;
 const PACKED_TRAIL_ROTATION = 0.22;
-const TEAM_TINT_ADJUSTMENT = PRODUCTION_RASTER_COLOR_TARGET;
 
 const WHEEL_NAMES = Object.freeze([
   "wheel.left.body",
@@ -148,9 +147,8 @@ function trailSprite(side, suffix, frame, rotationOffset) {
     side === "left" ? 15 : 16,
     frame,
     {
-      tintSlot: "team-light",
-      tintAdjustment: TEAM_TINT_ADJUSTMENT,
-      positionOffsetX: TRAIL_ROOT_X - trailLength * TRAIL_BACK_SHIFT_RATIO,
+      tintSlot: "fixed",
+            positionOffsetX: TRAIL_ROOT_X - trailLength * TRAIL_BACK_SHIFT_RATIO,
       positionOffsetY: lateralDirection * (
         trailWidth * TRAIL_LATERAL_SHIFT_RATIO
         + (deployed ? trailLength * DEPLOYED_TRAIL_LATERAL_LENGTH_RATIO : 0)
@@ -163,14 +161,17 @@ function trailSprite(side, suffix, frame, rotationOffset) {
 export const ARTILLERY_PNG_RIG_ATLAS = deepFreeze({
   enabled: true,
   unit: "artillery",
-  image: "/assets/rigs/artillery-a19-pass-03/generated/artillery-a19-components-pass-03-alpha.png?v=a19-pass03-d485-spaced-team-tint",
+  image: "/assets/rigs/kriegsia-team-color/generated/artillery-atlas.png?v=team-paint-1",
+  runtimeColorAdjustment: PRODUCTION_RASTER_COLOR_TARGET,
+  sheetRows: 4,
+  teamPaint: { baseRow: 2, paintRow: 3, renderRows: 1 },
   grid: {
     profile: "semantic-components",
     width: 1536,
     height: 1024,
     sourceSheet: "client/assets/rigs/artillery-a19-pass-03/generated/artillery-a19-components-pass-03-alpha.png",
     generatedSource: "client/assets/rigs/artillery-a19-pass-03/generated/artillery-a19-components-pass-03-source.png",
-    imageVersion: "a19-pass03-d485-spaced-team-tint",
+    imageVersion: "team-paint-1",
     components: {
       leftTrail: LEFT_TRAIL_FRAME,
       rightTrail: RIGHT_TRAIL_FRAME,
@@ -198,7 +199,7 @@ export const ARTILLERY_PNG_RIG_ATLAS = deepFreeze({
       artilleryParts(CARRIAGE_NAMES, "packed"),
       20,
       CARRIAGE_FRAME,
-      { tintSlot: "team-light", tintAdjustment: TEAM_TINT_ADJUSTMENT },
+      { tintSlot: "fixed" },
     ),
     sprite(
       "sprite.art.carriage.deployed",
@@ -206,7 +207,7 @@ export const ARTILLERY_PNG_RIG_ATLAS = deepFreeze({
       artilleryParts(CARRIAGE_NAMES, "deployed"),
       21,
       CARRIAGE_FRAME,
-      { tintSlot: "team-light", tintAdjustment: TEAM_TINT_ADJUSTMENT },
+      { tintSlot: "fixed" },
     ),
     sprite(
       "sprite.art.barrelAssembly.packed",
@@ -214,7 +215,7 @@ export const ARTILLERY_PNG_RIG_ATLAS = deepFreeze({
       artilleryParts(BARREL_ASSEMBLY_NAMES, "packed"),
       30,
       BARREL_ASSEMBLY_FRAME,
-      { tintSlot: "team-light-soft", tintAdjustment: TEAM_TINT_ADJUSTMENT },
+      { tintSlot: "fixed" },
     ),
     sprite(
       "sprite.art.barrelAssembly.deployed",
@@ -222,7 +223,7 @@ export const ARTILLERY_PNG_RIG_ATLAS = deepFreeze({
       artilleryParts(BARREL_ASSEMBLY_NAMES, "deployed"),
       31,
       BARREL_ASSEMBLY_FRAME,
-      { tintSlot: "team-light-soft", tintAdjustment: TEAM_TINT_ADJUSTMENT },
+      { tintSlot: "fixed" },
     ),
   ],
 });
