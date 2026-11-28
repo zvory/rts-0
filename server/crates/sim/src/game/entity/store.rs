@@ -132,7 +132,7 @@ impl EntityStore {
         let Some(target) = self.get(victim) else {
             return damage;
         };
-        if !target.is_unit()
+        if (!target.is_unit() && !target.is_building())
             || target.hp == 0
             || target.invulnerable()
             || !teams.is_enemy_owner(attacker_owner, target.owner)
@@ -140,6 +140,15 @@ impl EntityStore {
             return damage;
         }
         let (owner, x, y) = (target.owner, target.pos_x(), target.pos_y());
+        // Match occupancy's tile-centered rectangular building footprint.
+        let footprint = crate::config::building_stats(target.kind).map(|stats| {
+            let ts = crate::config::TILE_SIZE as f32;
+            let left = ((x / ts).floor() - (stats.foot_w / 2) as f32).max(0.0) * ts;
+            let top = ((y / ts).floor() - (stats.foot_h / 2) as f32).max(0.0) * ts;
+            let right = ((x / ts).floor() + (stats.foot_w - stats.foot_w / 2) as f32) * ts;
+            let bottom = ((y / ts).floor() + (stats.foot_h - stats.foot_h / 2) as f32) * ts;
+            (left, top, right, bottom)
+        });
         let radius = crate::config::DISCIPLE_SHIELD_RADIUS_TILES * crate::config::TILE_SIZE as f32;
         let mut shields: Vec<_> = self
             .map
@@ -162,7 +171,14 @@ impl EntityStore {
             };
             let dx = x - shield.x.to_world();
             let dy = y - shield.y.to_world();
-            if dx * dx + dy * dy > radius * radius {
+            let covered = footprint.map_or(dx * dx + dy * dy <= radius * radius, |rect| {
+                crate::rules::combat::shield_covers_building(
+                    (shield.x.to_world(), shield.y.to_world()),
+                    radius,
+                    rect,
+                )
+            });
+            if !covered {
                 continue;
             }
             let sx = source.0 - shield.x.to_world();

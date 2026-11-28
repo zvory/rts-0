@@ -816,3 +816,63 @@ fn promotion_preserves_existing_adept_shield_strength() {
     )
     .unwrap();
 }
+
+#[test]
+fn disciple_shield_building_coverage_uses_half_the_field_area() {
+    let teams = crate::game::teams::TeamRelations::from_player_teams([(1, 1), (2, 2), (3, 1)]);
+    // Resource Depot footprint is [416, 544] on both axes. Edge placement can cover
+    // enough of the field without containing the building; corner slivers cannot.
+    for (owner, center, invulnerable, source, piercing, expected) in [
+        (1, (480.0, 480.0), false, (0.0, 0.0), 0.0, 5),
+        (1, (536.0, 480.0), false, (0.0, 0.0), 0.0, 5),
+        (1, (552.0, 480.0), false, (0.0, 0.0), 0.0, 20),
+        (1, (536.0, 536.0), false, (0.0, 0.0), 0.0, 20),
+        (3, (480.0, 480.0), false, (0.0, 0.0), 0.0, 5),
+        (2, (480.0, 480.0), false, (0.0, 0.0), 0.0, 20),
+        (1, (480.0, 480.0), true, (0.0, 0.0), 0.0, 20),
+        (1, (480.0, 480.0), false, (480.0, 480.0), 0.0, 20),
+        (1, (480.0, 480.0), false, (0.0, 0.0), 1.0, 20),
+    ] {
+        let (mut game, caster) = setup();
+        game.state
+            .entities
+            .get_mut(caster)
+            .unwrap()
+            .place_shield(1, center.0, center.1, 0, 150, true);
+        let building = game
+            .state
+            .entities
+            .spawn_building(owner, EntityKind::ResourceDepot, 480.0, 480.0, true)
+            .unwrap();
+        game.state
+            .entities
+            .get_mut(building)
+            .unwrap()
+            .set_invulnerable(invulnerable);
+        assert_eq!(
+            game.state.entities.shielded_damage(
+                building,
+                if owner == 2 { 1 } else { 2 },
+                20,
+                20,
+                piercing,
+                source,
+                &teams,
+            ),
+            expected,
+            "owner={owner}, center={center:?}, invulnerable={invulnerable}"
+        );
+        let drains = expected == 5 || (piercing == 1.0);
+        assert_eq!(
+            game.state
+                .entities
+                .get(caster)
+                .unwrap()
+                .shield
+                .as_ref()
+                .unwrap()
+                .remaining,
+            if drains { 130 } else { 150 }
+        );
+    }
+}

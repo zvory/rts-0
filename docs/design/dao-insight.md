@@ -66,7 +66,10 @@ see the unit radiance, with ordinary fog filtering. Realm advancement projects a
 (half-second) expanding gold corona reaching about one tile, alongside the public insight bar.
 
 Magic Disciples can place Shield within five tiles: a shimmering circle with a
-2.1-tile radius, covering allied units (including the caster).
+2.1-tile radius, covering allied units (including the caster) whose centers are inside.
+It also protects an entire allied building when at least 50% of the shield's circular area
+overlaps the building's tile footprint; full containment is unnecessary. The denominator is
+the shield area, not the building area. Building coverage uses the same armor and HP pool rules.
 The field has 150 HP and grants a separate 75% armor layer against hostile attacks entering
 from outside; attacks originating inside bypass its armor and do not drain its HP. Existing
 unit armor, facing, cover, and terrain reductions apply first. Shield armor then uses the ordinary
@@ -81,7 +84,7 @@ stable caster-id order supplies the armor and pays the full hit, even when that 
 This applies to direct weapons, Throw Sword (per leg), Line Shot, and each area-damage victim;
 tank HE splash is non-piercing. Mortar/rocket and artillery checks use recorded firing positions,
 which survive attacker death and checkpoint restore. Friendly fire, environmental damage,
-buildings, invulnerable targets, and enemy units receive no shield armor and do not drain it.
+invulnerable targets, and enemy entities receive no shield armor and do not drain it.
 Shield costs no resources, has a ten-second
 cooldown, replaces the caster’s prior shield, and expires after 5 seconds (10 seconds for Magic Masters, whose shield also has 300 HP) or earlier on
 depletion, replacement, or caster death. In-range casts preserve movement and queued orders;
