@@ -86,6 +86,9 @@ client/assets/rigs/**/*.*
 !client/assets/rigs/rifleman-experimental/neutral-atlas.png
 !client/assets/rigs/rifleman-experimental/fixed-atlas.png
 !client/assets/rigs/rifleman-experimental/paint-atlas.png
+!client/assets/rigs/rifleman-experimental-v3/neutral-atlas.png
+!client/assets/rigs/rifleman-experimental-v3/fixed-atlas.png
+!client/assets/rigs/rifleman-experimental-v3/paint-atlas.png
 !client/assets/rigs/rifleman-pass-02/generated/rifleman-down-rifle-iteration/rifleman-down-rifle-strip.png
 !client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-recoil-review-strip.png
 !client/assets/rigs/rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-panzerfaust-windup-runtime-strip.png

@@ -1,0 +1,10 @@
+{
+  "reference": "approved north/east/west idle helmet spans measured after packing",
+  "referenceHelmetWidths": {
+    "north": 20.124031007751938,
+    "east": 22.548042704626333,
+    "west": 23.067961165048544
+  },
+  "southTargetHelmetWidth": 22.548042704626333,
+  "method": "match the median approved helmet span; one uniform scale for the entire south pose family"
+}

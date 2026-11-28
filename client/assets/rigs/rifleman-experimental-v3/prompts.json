@@ -1,0 +1,236 @@
+[
+  {
+    "heading": "ssw",
+    "tool": "built-in image_gen",
+    "transparent_background": true,
+    "prompt": "Create the south-southwest-facing version of this same Rifleman (between south and southwest: mostly south, turned slightly toward screen left). Use the supplied south, west, north and east sheets as character and camera references. Match their proportions, moderate detail and material colors. Keep the camera fixed; only rotate the character, preserving anatomical handedness. All sixteen poses face this one heading. Same 4-by-4 sixteen-pose layout as the south/north/east references, read left to right: idle with lowered rifle, ready, six distinct alternating running poses carrying the rifle low across the body with modest lean, settle, raise, shoulder, aim, recoil, bolt, re-aim, lower. Combat uses a planted staggered stance and shouldered rifle. Match character scale throughout. Shaded magenta uniform and helmet; natural skin, leather, wood and steel. Transparent background; generous cell margins; no shadows, text, labels or muzzle effects.",
+    "generatedPath": "/Users/az/.codex/generated_images/01a22017-9642-7470-93cb-1e324d8d45b9/exec-dee70d6a-cf9a-4cc3-84bd-94f5564d1264.png",
+    "file": "sources/ssw-source.png",
+    "generationReferences": [
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/south-source-v3.png",
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/west-carry-source.png",
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/west-aim-source.png",
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/north-source.png",
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/east-source.png"
+    ],
+    "references": [
+      "sources/south-source-v3.png",
+      "sources/west-carry-source.png",
+      "sources/west-aim-source.png",
+      "sources/north-source.png",
+      "sources/east-source.png"
+    ]
+  },
+  {
+    "heading": "sw",
+    "tool": "built-in image_gen",
+    "transparent_background": true,
+    "prompt": "Create the southwest-facing version of this same Rifleman (halfway between south and west: diagonally down and left). Use the supplied south, west, north and east sheets as character and camera references. Match their proportions, moderate detail and material colors. Keep the camera fixed; only rotate the character, preserving anatomical handedness. All sixteen poses face this one heading. Same 4-by-4 sixteen-pose layout as the south/north/east references, read left to right: idle with lowered rifle, ready, six distinct alternating running poses carrying the rifle low across the body with modest lean, settle, raise, shoulder, aim, recoil, bolt, re-aim, lower. Combat uses a planted staggered stance and shouldered rifle. Match character scale throughout. Shaded magenta uniform and helmet; natural skin, leather, wood and steel. Transparent background; generous cell margins; no shadows, text, labels or muzzle effects.",
+    "generatedPath": "/Users/az/.codex/generated_images/01a22017-9642-7470-93cb-1e324d8d45b9/exec-8ad098a3-9e5a-48a1-b665-1349859ca456.png",
+    "file": "sources/sw-source.png",
+    "generationReferences": [
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/south-source-v3.png",
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/west-carry-source.png",
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/west-aim-source.png",
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/north-source.png",
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/east-source.png"
+    ],
+    "references": [
+      "sources/south-source-v3.png",
+      "sources/west-carry-source.png",
+      "sources/west-aim-source.png",
+      "sources/north-source.png",
+      "sources/east-source.png"
+    ]
+  },
+  {
+    "heading": "wsw",
+    "tool": "built-in image_gen",
+    "transparent_background": true,
+    "prompt": "Create the west-southwest-facing version of this same Rifleman (between west and southwest: mostly west, turned slightly toward screen down). Use the supplied south, west, north and east sheets as character and camera references. Match their proportions, moderate detail and material colors. Keep the camera fixed; only rotate the character, preserving anatomical handedness. All sixteen poses face this one heading. Same 4-by-4 sixteen-pose layout as the south/north/east references, read left to right: idle with lowered rifle, ready, six distinct alternating running poses carrying the rifle low across the body with modest lean, settle, raise, shoulder, aim, recoil, bolt, re-aim, lower. Combat uses a planted staggered stance and shouldered rifle. Match character scale throughout. Shaded magenta uniform and helmet; natural skin, leather, wood and steel. Transparent background; generous cell margins; no shadows, text, labels or muzzle effects.",
+    "generatedPath": "/Users/az/.codex/generated_images/01a22017-9642-7470-93cb-1e324d8d45b9/exec-2b131d65-013c-49ad-8aa7-51c317cb724b.png",
+    "file": "sources/wsw-source.png",
+    "generationReferences": [
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/south-source-v3.png",
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/west-carry-source.png",
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/west-aim-source.png",
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/north-source.png",
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/east-source.png"
+    ],
+    "references": [
+      "sources/south-source-v3.png",
+      "sources/west-carry-source.png",
+      "sources/west-aim-source.png",
+      "sources/north-source.png",
+      "sources/east-source.png"
+    ]
+  },
+  {
+    "heading": "wnw",
+    "tool": "built-in image_gen",
+    "transparent_background": true,
+    "prompt": "Generate this same Rifleman facing west-northwest: mostly left, slightly away/up. The first image is the approved NORTH view: use its visible BACK, rear helmet, rear tunic and equipment as the main reference; the other images show the neighboring side view. Rotate the character between these views while preserving the fixed camera and handedness. This is a rear/side view, moving and aiming away from us, with the chest hidden. All poses face the SAME heading. Match the reference detail and proportions. A 4-by-4 grid: idle lowered carry, ready, six distinct running strides with low crossbody carry and modest lean, settle, raise, shoulder, aim, recoil, bolt, re-aim, lower. Keep staggered combat feet planted. Same character scale throughout; magenta uniform and helmet, natural fixed materials. Transparent background, cell margins, no shadows, text or muzzle effects.",
+    "generatedPath": "/Users/az/.codex/generated_images/01a22017-9642-7470-93cb-1e324d8d45b9/exec-fa7ce5f9-4b5f-4cc3-b6d8-0c7b8970e45d.png",
+    "file": "sources/wnw-source-v2.png",
+    "generationReferences": [
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/north-source.png",
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/west-carry-source.png",
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/west-aim-source.png"
+    ],
+    "references": [
+      "sources/north-source.png",
+      "sources/west-carry-source.png",
+      "sources/west-aim-source.png"
+    ]
+  },
+  {
+    "heading": "nw",
+    "tool": "built-in image_gen",
+    "transparent_background": true,
+    "prompt": "Generate this same Rifleman facing northwest: away/up and left equally. The first image is the approved NORTH view: use its visible BACK, rear helmet, rear tunic and equipment as the main reference; the other images show the neighboring side view. Rotate the character between these views while preserving the fixed camera and handedness. This is a rear/side view, moving and aiming away from us, with the chest hidden. All poses face the SAME heading. Match the reference detail and proportions. A 4-by-4 grid: idle lowered carry, ready, six distinct running strides with low crossbody carry and modest lean, settle, raise, shoulder, aim, recoil, bolt, re-aim, lower. Keep staggered combat feet planted. Same character scale throughout; magenta uniform and helmet, natural fixed materials. Transparent background, cell margins, no shadows, text or muzzle effects.",
+    "generatedPath": "/Users/az/.codex/generated_images/01a22017-9642-7470-93cb-1e324d8d45b9/exec-0144abb7-85bf-47ee-92c9-44992dad78ee.png",
+    "file": "sources/nw-source-v2.png",
+    "generationReferences": [
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/north-source.png",
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/west-carry-source.png",
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/west-aim-source.png"
+    ],
+    "references": [
+      "sources/north-source.png",
+      "sources/west-carry-source.png",
+      "sources/west-aim-source.png"
+    ]
+  },
+  {
+    "heading": "nnw",
+    "tool": "built-in image_gen",
+    "transparent_background": true,
+    "prompt": "Generate this same Rifleman facing north-northwest: mostly away/up, slightly left. The first image is the approved NORTH view: use its visible BACK, rear helmet, rear tunic and equipment as the main reference; the other images show the neighboring side view. Rotate the character between these views while preserving the fixed camera and handedness. This is a rear/side view, moving and aiming away from us, with the chest hidden. All poses face the SAME heading. Match the reference detail and proportions. A 4-by-4 grid: idle lowered carry, ready, six distinct running strides with low crossbody carry and modest lean, settle, raise, shoulder, aim, recoil, bolt, re-aim, lower. Keep staggered combat feet planted. Same character scale throughout; magenta uniform and helmet, natural fixed materials. Transparent background, cell margins, no shadows, text or muzzle effects.",
+    "generatedPath": "/Users/az/.codex/generated_images/01a22017-9642-7470-93cb-1e324d8d45b9/exec-5293fa58-7361-413f-9483-b4c15790d8c9.png",
+    "file": "sources/nnw-source-v2.png",
+    "generationReferences": [
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/north-source.png",
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/west-carry-source.png",
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/west-aim-source.png"
+    ],
+    "references": [
+      "sources/north-source.png",
+      "sources/west-carry-source.png",
+      "sources/west-aim-source.png"
+    ]
+  },
+  {
+    "heading": "nne",
+    "tool": "built-in image_gen",
+    "transparent_background": true,
+    "prompt": "Generate this same Rifleman facing north-northeast: mostly away/up, slightly right. The first image is the approved NORTH view: use its visible BACK, rear helmet, rear tunic and equipment as the main reference; the other images show the neighboring side view. Rotate the character between these views while preserving the fixed camera and handedness. This is a rear/side view, moving and aiming away from us, with the chest hidden. All poses face the SAME heading. Match the reference detail and proportions. A 4-by-4 grid: idle lowered carry, ready, six distinct running strides with low crossbody carry and modest lean, settle, raise, shoulder, aim, recoil, bolt, re-aim, lower. Keep staggered combat feet planted. Same character scale throughout; magenta uniform and helmet, natural fixed materials. Transparent background, cell margins, no shadows, text or muzzle effects.",
+    "generatedPath": "/Users/az/.codex/generated_images/01a22017-9642-7470-93cb-1e324d8d45b9/exec-c9d61918-88f7-48c5-ba7f-29d7103c18fc.png",
+    "file": "sources/nne-source-v2.png",
+    "generationReferences": [
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/north-source.png",
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/east-source.png"
+    ],
+    "references": [
+      "sources/north-source.png",
+      "sources/east-source.png"
+    ]
+  },
+  {
+    "heading": "ne",
+    "tool": "built-in image_gen",
+    "transparent_background": true,
+    "prompt": "Generate this same Rifleman facing northeast: away/up and right equally. The first image is the approved NORTH view: use its visible BACK, rear helmet, rear tunic and equipment as the main reference; the other images show the neighboring side view. Rotate the character between these views while preserving the fixed camera and handedness. This is a rear/side view, moving and aiming away from us, with the chest hidden. All poses face the SAME heading. Match the reference detail and proportions. A 4-by-4 grid: idle lowered carry, ready, six distinct running strides with low crossbody carry and modest lean, settle, raise, shoulder, aim, recoil, bolt, re-aim, lower. Keep staggered combat feet planted. Same character scale throughout; magenta uniform and helmet, natural fixed materials. Transparent background, cell margins, no shadows, text or muzzle effects.",
+    "generatedPath": "/Users/az/.codex/generated_images/01a22017-9642-7470-93cb-1e324d8d45b9/exec-820af5eb-8ed2-4eb4-b741-2b4943a21e28.png",
+    "file": "sources/ne-source-v2.png",
+    "generationReferences": [
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/north-source.png",
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/east-source.png"
+    ],
+    "references": [
+      "sources/north-source.png",
+      "sources/east-source.png"
+    ]
+  },
+  {
+    "heading": "ene",
+    "tool": "built-in image_gen",
+    "transparent_background": true,
+    "prompt": "Generate this same Rifleman facing east-northeast: mostly right, slightly away/up. The first image is the approved NORTH view: use its visible BACK, rear helmet, rear tunic and equipment as the main reference; the other images show the neighboring side view. Rotate the character between these views while preserving the fixed camera and handedness. This is a rear/side view, moving and aiming away from us, with the chest hidden. All poses face the SAME heading. Match the reference detail and proportions. A 4-by-4 grid: idle lowered carry, ready, six distinct running strides with low crossbody carry and modest lean, settle, raise, shoulder, aim, recoil, bolt, re-aim, lower. Keep staggered combat feet planted. Same character scale throughout; magenta uniform and helmet, natural fixed materials. Transparent background, cell margins, no shadows, text or muzzle effects.",
+    "generatedPath": "/Users/az/.codex/generated_images/01a22017-9642-7470-93cb-1e324d8d45b9/exec-206bab2b-3ddf-4eec-adb6-485535957528.png",
+    "file": "sources/ene-source-v2.png",
+    "generationReferences": [
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/north-source.png",
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/east-source.png"
+    ],
+    "references": [
+      "sources/north-source.png",
+      "sources/east-source.png"
+    ]
+  },
+  {
+    "heading": "ese",
+    "tool": "built-in image_gen",
+    "transparent_background": true,
+    "prompt": "Create the east-southeast-facing version of this same Rifleman (between east and southeast: mostly east, turned slightly toward screen down). Use the supplied south, west, north and east sheets as character and camera references. Match their proportions, moderate detail and material colors. Keep the camera fixed; only rotate the character, preserving anatomical handedness. All sixteen poses face this one heading. Same 4-by-4 sixteen-pose layout as the south/north/east references, read left to right: idle with lowered rifle, ready, six distinct alternating running poses carrying the rifle low across the body with modest lean, settle, raise, shoulder, aim, recoil, bolt, re-aim, lower. Combat uses a planted staggered stance and shouldered rifle. Match character scale throughout. Shaded magenta uniform and helmet; natural skin, leather, wood and steel. Transparent background; generous cell margins; no shadows, text, labels or muzzle effects.",
+    "generatedPath": "/Users/az/.codex/generated_images/01a22017-9642-7470-93cb-1e324d8d45b9/exec-4d8d30ba-0bb6-4618-8636-5b0e6b4b6a81.png",
+    "file": "sources/ese-source.png",
+    "generationReferences": [
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/south-source-v3.png",
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/west-carry-source.png",
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/west-aim-source.png",
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/north-source.png",
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/east-source.png"
+    ],
+    "references": [
+      "sources/south-source-v3.png",
+      "sources/west-carry-source.png",
+      "sources/west-aim-source.png",
+      "sources/north-source.png",
+      "sources/east-source.png"
+    ]
+  },
+  {
+    "heading": "se",
+    "tool": "built-in image_gen",
+    "transparent_background": true,
+    "prompt": "Create the southeast-facing version of this same Rifleman (halfway between east and south: diagonally down and right). Use the supplied south, west, north and east sheets as character and camera references. Match their proportions, moderate detail and material colors. Keep the camera fixed; only rotate the character, preserving anatomical handedness. All sixteen poses face this one heading. Same 4-by-4 sixteen-pose layout as the south/north/east references, read left to right: idle with lowered rifle, ready, six distinct alternating running poses carrying the rifle low across the body with modest lean, settle, raise, shoulder, aim, recoil, bolt, re-aim, lower. Combat uses a planted staggered stance and shouldered rifle. Match character scale throughout. Shaded magenta uniform and helmet; natural skin, leather, wood and steel. Transparent background; generous cell margins; no shadows, text, labels or muzzle effects.",
+    "generatedPath": "/Users/az/.codex/generated_images/01a22017-9642-7470-93cb-1e324d8d45b9/exec-6ccdcd36-e590-4347-8728-153706aad4a2.png",
+    "file": "sources/se-source.png",
+    "generationReferences": [
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/south-source-v3.png",
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/west-carry-source.png",
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/west-aim-source.png",
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/north-source.png",
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/east-source.png"
+    ],
+    "references": [
+      "sources/south-source-v3.png",
+      "sources/west-carry-source.png",
+      "sources/west-aim-source.png",
+      "sources/north-source.png",
+      "sources/east-source.png"
+    ]
+  },
+  {
+    "heading": "sse",
+    "tool": "built-in image_gen",
+    "transparent_background": true,
+    "prompt": "Create the south-southeast-facing version of this same Rifleman (between south and southeast: mostly south, turned slightly toward screen right). Use the supplied south, west, north and east sheets as character and camera references. Match their proportions, moderate detail and material colors. Keep the camera fixed; only rotate the character, preserving anatomical handedness. All sixteen poses face this one heading. Same 4-by-4 sixteen-pose layout as the south/north/east references, read left to right: idle with lowered rifle, ready, six distinct alternating running poses carrying the rifle low across the body with modest lean, settle, raise, shoulder, aim, recoil, bolt, re-aim, lower. Combat uses a planted staggered stance and shouldered rifle. Match character scale throughout. Shaded magenta uniform and helmet; natural skin, leather, wood and steel. Transparent background; generous cell margins; no shadows, text, labels or muzzle effects.",
+    "generatedPath": "/Users/az/.codex/generated_images/01a22017-9642-7470-93cb-1e324d8d45b9/exec-2e738118-73bd-47b8-8155-82b75b3d0d73.png",
+    "file": "sources/sse-source.png",
+    "generationReferences": [
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/south-source-v3.png",
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/west-carry-source.png",
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/west-aim-source.png",
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/north-source.png",
+      "/tmp/rts-worktrees/rifleman-cardinal-review/client/assets/rigs/rifleman-cardinal-review/east-source.png"
+    ],
+    "references": [
+      "sources/south-source-v3.png",
+      "sources/west-carry-source.png",
+      "sources/west-aim-source.png",
+      "sources/north-source.png",
+      "sources/east-source.png"
+    ]
+  }
+]

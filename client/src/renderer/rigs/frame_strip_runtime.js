@@ -1,3 +1,4 @@
+import { riflemanPoseFrame } from "./rifleman_pose_animation.js";
 import { teamPaintTextureFor } from "./team_paint.js";
 import { updateItemRadiance, destroyItemRadiance } from "../item_radiance.js";
 import { goldenAttackTrailFrame } from "./golden_attack_strip.js";
@@ -50,10 +51,14 @@ export function renderFrameStripUnit(renderer, entity, strip, texture, options =
   return instance;
 }
 
-export function frameStripFrameIndex(strip, entity, nowOrContext = 0) {
+export function frameStripFrameIndex(strip, entity, nowOrContext = 0, animationState = null) {
   const idleFrame = validFrame(strip, strip?.idleFrame ?? 0);
   const renderContext = typeof nowOrContext === "object" && nowOrContext !== null ? nowOrContext : {};
   const now = typeof nowOrContext === "number" ? nowOrContext : renderContext.now;
+  if (strip?.poseSequence) {
+    return riflemanPoseFrame(animationState || { strip }, entity,
+      typeof nowOrContext === "number" ? { now } : renderContext);
+  }
   if (strip?.directional) {
     const moving = frameStripEntityIsMoving(entity, renderContext);
     const firing = strip.directional.firingFrames > 0 && finite(renderContext.recoilProgress, 0) > 0
@@ -300,7 +305,7 @@ class FrameStripUnitInstance {
     applyWorldYDepth(this.container, entity);
     const scale = rigContainerScale(renderContext);
     setPoint(this.container.scale, scale, scale);
-    const frameIndex = frameStripFrameIndex(this.strip, entity, renderContext);
+    const frameIndex = frameStripFrameIndex(this.strip, entity, renderContext, this);
     this.container.rotation = frameStripVisualFacing(this.strip, entity, renderContext, frameIndex);
     if (frameIndex !== this._frameIndex) {
       this.sprite.texture = this.frameTextures[frameIndex] ?? this.frameTextures[0];
@@ -311,6 +316,10 @@ class FrameStripUnitInstance {
     const worldScale = frameStripWorldScale(this.strip, entity, renderContext, frameIndex);
     setPoint(this.sprite.scale, worldScale, worldScale);
     const spriteOffset = frameStripSpriteOffset(this.strip, frameIndex, renderContext);
+    if (this.strip.poseSequence) {
+      const top = this.strip.poseGeometry.topByDirection[this.poseDirection];
+      this.visualTopY = entity.y + ((top - this.strip.anchorY * this.strip.frameHeight) * worldScale + spriteOffset.y) * scale;
+    }
     setPoint(this.sprite.position, spriteOffset.x, spriteOffset.y);
     this.sprite.alpha = 1;
     this.sprite.tint = this.silhouetteShadow ? 0x000000 : this.strip.teamPaint ? 0xffffff : tintForSlot(this.strip.tintSlot, renderContext);
