@@ -352,6 +352,9 @@ const approvedCurrentFactionFiles = new Set([
   "server/crates/ai/src/eco/production.rs",
   // Eco groups its catalog-gated Kriegsia Tanks at body-aware economic reserve posts.
   "server/crates/ai/src/eco/armor.rs",
+  // Eco deliberately stages the catalog-gated Kriegsia infantry/Tank roster and Command Car.
+  "server/crates/ai/src/eco/offense.rs",
+  "server/crates/ai/src/eco/support.rs",
   // SDK defense scoring explicitly values the current infantry economy.
   "server/crates/ai/src/sdk/defense/scoring.rs",
   // Pressure independently owns a Kriegsia-only copied macro policy, staging formation, and

@@ -410,3 +410,35 @@ fn manual_queue_helpers_wait_for_native_funding_without_local_accounting() {
     assert_eq!(batch.remaining_budget(), budget);
     assert_eq!(batch.len(), 2);
 }
+
+#[test]
+fn ability_requests_share_actor_ownership_and_fail_atomically_when_full() {
+    let mut a = actions(0, 0, 0);
+    let group = UnitGroup::new([7]).unwrap();
+    a.use_ability(&group, AbilityKind::Breakthrough, None, false)
+        .unwrap();
+    let before = state(&a);
+    assert!(a.move_group(&group, 10., 20., false).is_err());
+    assert_eq!(state(&a), before);
+    assert!(
+        matches!(&a.requests[0],AiActionRequest::UseAbility{units,ability:AbilityKind::Breakthrough,x:None,y:None,queued:false}if units==&[7])
+    );
+    let mut full = actions(0, 0, 0);
+    for id in 0..MAX_ACTIONS_PER_STEP as u32 {
+        full.hold_position(&UnitGroup::new([id]).unwrap(), false)
+            .unwrap();
+    }
+    let before = state(&full);
+    assert_eq!(
+        full.use_ability(
+            &UnitGroup::new([999]).unwrap(),
+            AbilityKind::Breakthrough,
+            None,
+            false
+        )
+        .unwrap_err()
+        .blocker(),
+        &ActionBlocker::ActionCapacity
+    );
+    assert_eq!(state(&full), before);
+}

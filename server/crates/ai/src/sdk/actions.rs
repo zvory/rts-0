@@ -666,6 +666,27 @@ impl AiActions {
         )
     }
 
+    /// Issue an ordinary ability command. The caller observes public own ability readiness;
+    /// the authoritative game validates carrier, target, costs and cooldown at execution.
+    pub fn use_ability(
+        &mut self,
+        group: &UnitGroup,
+        ability: AbilityKind,
+        target: Option<(f32, f32)>,
+        queued: bool,
+    ) -> Result<(), ActionError> {
+        self.emit_reserved_group(
+            group,
+            AiActionRequest::UseAbility {
+                units: group.0.clone(),
+                ability,
+                x: target.map(|p| p.0),
+                y: target.map(|p| p.1),
+                queued,
+            },
+        )
+    }
+
     pub fn point_tanks(
         &mut self,
         group: &UnitGroup,

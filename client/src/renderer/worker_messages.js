@@ -171,9 +171,11 @@ export function createCaptureMessage({ generation, frameId, captureId, readPixel
 
 export function createPresentationPreferencesMessage(generation, {
   projectedUnitShadowsEnabled = false,
+  experimentalGraphicsEnabled = false,
 } = {}) {
   return request(RENDER_WORKER_MESSAGE.PRESENTATION_PREFERENCES, generation, {
     projectedUnitShadowsEnabled: !!projectedUnitShadowsEnabled,
+    experimentalGraphicsEnabled: !!experimentalGraphicsEnabled,
   });
 }
 
@@ -265,6 +267,9 @@ export function validateRenderWorkerRequest(message, { requireCanvas = false } =
     case RENDER_WORKER_MESSAGE.PRESENTATION_PREFERENCES:
       if (typeof payload?.projectedUnitShadowsEnabled !== "boolean") {
         throw new TypeError("projectedUnitShadowsEnabled must be boolean");
+      }
+      if (payload?.experimentalGraphicsEnabled != null && typeof payload.experimentalGraphicsEnabled !== "boolean") {
+        throw new TypeError("experimentalGraphicsEnabled must be boolean");
       }
       break;
     default:

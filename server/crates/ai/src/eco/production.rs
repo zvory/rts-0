@@ -7,6 +7,8 @@ pub(super) struct EcoProduction {
     research_queued: BTreeSet<(u32, UpgradeKind)>,
     configured: BTreeMap<(u32, EntityKind), bool>,
     worker_order: Option<u32>,
+    command_car_order: Option<u32>,
+    known_cars: BTreeSet<u32>,
 }
 impl EcoProduction {
     pub(super) fn step(&mut self, frame: &AiFrame, actions: &mut AiActions) {
@@ -74,6 +76,34 @@ impl EcoProduction {
             .filter(|e| e.kind == EntityKind::Factory)
         {
             self.repeat(actions, works.id, EntityKind::Tank, true);
+        }
+        let cars: BTreeSet<_> = frame
+            .owned()
+            .iter()
+            .filter(|e| e.kind == EntityKind::CommandCar && e.health.current > 0)
+            .map(|e| e.id)
+            .collect();
+        if cars.difference(&self.known_cars).next().is_some()
+            || self.command_car_order.is_some_and(|id| !owned(&id))
+        {
+            self.command_car_order = None;
+        }
+        self.known_cars = cars.clone();
+        let target = bases.saturating_sub(2);
+        let queued = frame.owned().iter().any(|e| {
+            e.production
+                .is_some_and(|p| p.current_kind == Some(EntityKind::CommandCar))
+        });
+        if cars.len() < target && self.command_car_order.is_none() && !queued {
+            let works = frame
+                .owned()
+                .iter()
+                .filter(|e| e.kind == EntityKind::Factory && super::complete(e))
+                .map(|e| e.id)
+                .collect::<Vec<_>>();
+            if let Ok(id) = actions.queue_train(&works, EntityKind::CommandCar) {
+                self.command_car_order = Some(id);
+            }
         }
         if frame.owned().iter().any(|e| e.kind == EntityKind::Worker) {
             self.worker_order = None;

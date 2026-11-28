@@ -113,7 +113,8 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
   }
 
   const frameStripKey = liveFrameStripKeyForEntity(e);
-  const visualFrameStrip = !visualOverride ? pools.visualFrameStrip || null : null;
+  const visualFrameStrip = !visualOverride ? pools.visualFrameStrip
+    || (e.kind === KIND.RIFLEMAN ? this._experimentalRiflemanFrameStrip?.() : null) || null : null;
   const frameStrip = visualFrameStrip?.strip || (visualOverride ? null : liveFrameStripFor(this._liveFrameStripsByKind, frameStripKey));
   const frameStripTexture = visualFrameStrip?.texture || this._liveFrameStripTextures?.get?.(frameStripKey) || null;
   if (frameStrip && !frameStripTexture) {
@@ -141,7 +142,7 @@ export function _drawUnit(e, colorByOwner, state, pools = {}) {
         silhouetteShadow: true,
         shadowOffset: { x: -sun.directionX * distance, y: -sun.directionY * distance },
       });
-    } else if (drawPlan.shadowRoute && !projectedShadow) {
+    } else if (drawPlan.shadowRoute && !projectedShadow && !frameStrip.groundContactShadow) {
       const sampledAnimation = sampleRigAnimationInto(
         animationStageFor(definition, drawPlan.sampledParts),
         e,

@@ -6,6 +6,11 @@ use crate::sdk::{
 };
 use rts_rules::math::GameplayMath as _;
 use std::collections::{BTreeMap, BTreeSet};
+#[derive(Default)]
+pub(super) struct TacticalOwnership {
+    pub(super) active: BTreeSet<u32>,
+    pub(super) released: BTreeSet<u32>,
+}
 #[derive(Debug)]
 pub(super) struct DefenseAssignments {
     destinations: BTreeMap<u32, (f32, f32)>,
@@ -21,6 +26,9 @@ pub(super) struct DefenseAssignments {
     pullback: PullbackMemory,
     response: crate::pressure::response::PressureResponse,
     responding: BTreeSet<u32>,
+    claim_site: Option<AiBaseSiteId>,
+    claim_ready: bool,
+    claim_wave: BTreeSet<u32>,
 }
 impl Default for DefenseAssignments {
     fn default() -> Self {
@@ -37,6 +45,9 @@ impl Default for DefenseAssignments {
             pullback: Default::default(),
             response: crate::pressure::response::PressureResponse::with_cohesive_reserve(),
             responding: Default::default(),
+            claim_site: None,
+            claim_ready: true,
+            claim_wave: Default::default(),
         }
     }
 }
@@ -44,6 +55,9 @@ impl DefenseAssignments {
     pub(super) fn prepare_expansion(&mut self, site: AiBaseSiteId) {
         if self.frontier != Some(site) {
             self.frontier = Some(site);
+            self.claim_site = None;
+            self.claim_ready = false;
+            self.claim_wave.clear();
             self.screen_units.clear();
             self.screen_wave.clear();
             self.reserved_depot = None;
@@ -59,7 +73,6 @@ impl DefenseAssignments {
             self.screen_wave.clear();
         }
     }
-    #[cfg(test)]
     pub(super) fn screen_ids(&self) -> &BTreeSet<u32> {
         &self.screen_units
     }
@@ -105,7 +118,7 @@ impl DefenseAssignments {
             && count > 0
     }
     pub(super) fn ready_for_builder(&self, frame: &AiFrame, site: AiBaseSiteId) -> bool {
-        self.screen_ready(frame, site) && self.builder_route_clear(frame)
+        self.screen_ready(frame, site) && self.claim_ready && self.builder_route_clear(frame)
     }
     fn builder_route_clear(&self, frame: &AiFrame) -> bool {
         let q = crate::sdk::WorldQueries::new(frame);
@@ -163,13 +176,84 @@ impl DefenseAssignments {
         }
         areas
     }
+    pub(super) fn expansion_push_ids(&self, frame: &AiFrame) -> BTreeSet<u32> {
+        if self.frontier.is_none() || self.claim_ready {
+            return BTreeSet::new();
+        }
+        frame
+            .owned()
+            .iter()
+            .filter(|e| e.kind == EntityKind::Tank && e.health.current > 0)
+            .map(|e| e.id)
+            .collect()
+    }
+    fn claim_goal(&mut self, frame: &AiFrame) -> Option<(f32, f32)> {
+        let Some(site) = self.frontier else {
+            self.claim_site = None;
+            self.claim_ready = true;
+            return None;
+        };
+        let center = frame.base_sites().iter().find(|b| b.id == site)?.position;
+        if self.claim_site != Some(site) {
+            self.claim_site = Some(site);
+            self.claim_ready = false;
+            self.claim_wave = frame
+                .owned()
+                .iter()
+                .filter(|e| e.kind == EntityKind::Tank && e.health.current > 0)
+                .map(|e| e.id)
+                .collect();
+        }
+        self.claim_wave.retain(|id| {
+            frame
+                .owned()
+                .iter()
+                .any(|e| e.id == *id && e.health.current > 0)
+        });
+        let size = frame.map().tile_size as f32;
+        let present = frame
+            .owned()
+            .iter()
+            .filter(|e| {
+                self.claim_wave.contains(&e.id)
+                    && dist2(e.position, center) <= (10. * size).det_powi(2)
+            })
+            .count();
+        let q = crate::sdk::WorldQueries::new(frame);
+        let observable = q
+            .world_point(center.0, center.1)
+            .is_some_and(|p| q.ground_position_is_observable(p));
+        let hostile = frame
+            .visible_enemies()
+            .iter()
+            .any(|e| e.health.current > 0 && dist2(e.position, center) <= (14. * size).det_powi(2));
+        if self.claim_wave.is_empty()
+            || (observable && !hostile && present * 10 >= self.claim_wave.len() * 9)
+        {
+            self.claim_ready = true;
+        }
+        (!self.claim_ready).then_some(center)
+    }
+    pub(super) fn attacking_ids(&self) -> BTreeSet<u32> {
+        self.response.attacking_ids()
+    }
     pub(super) fn step(
         &mut self,
         frame: &AiFrame,
         actions: &mut AiActions,
         planner: &mut DefensePlanner,
         sites: &[AiBaseSiteId],
-    ) {
+    ) -> TacticalOwnership {
+        self.step_with_outbound(frame, actions, planner, sites, &BTreeSet::new())
+    }
+    pub(super) fn step_with_outbound(
+        &mut self,
+        frame: &AiFrame,
+        actions: &mut AiActions,
+        planner: &mut DefensePlanner,
+        sites: &[AiBaseSiteId],
+        outbound: &BTreeSet<u32>,
+    ) -> TacticalOwnership {
         let members: Vec<_> = frame
             .owned()
             .iter()
@@ -190,6 +274,9 @@ impl DefenseAssignments {
             .into_iter()
             .filter(|id| !pullback.active.contains(id))
             .collect();
+        // Outbound troops no longer staff their old posts. Buildings remain home anchors,
+        // and the shared response may still borrow these troops for a real home invasion.
+        self.guard_posts.retain(|id, _| !outbound.contains(id));
         let areas = self.defended_areas(frame);
         let response = self
             .response
@@ -242,12 +329,30 @@ impl DefenseAssignments {
             .into_iter()
             .collect::<Vec<_>>();
         let plan = if let Some(site) = self.frontier {
-            planner.plan_with_expansion(frame, sites, site, infantry.len(), &reservations)
+            planner.plan_claim(frame, sites, site, infantry.len(), &reservations)
         } else {
             planner.plan(frame, sites, infantry.len())
         };
-        self.armor
-            .step(frame, actions, &plan, &unavailable, self.reserved_depot);
+        let armor_unavailable = unavailable.union(outbound).copied().collect();
+        let claim = self.claim_goal(frame);
+        if self.frontier.is_some() {
+            self.armor.step_goal(
+                frame,
+                actions,
+                &plan,
+                &armor_unavailable,
+                self.reserved_depot,
+                (self.frontier, claim),
+            );
+        } else {
+            self.armor.step(
+                frame,
+                actions,
+                &plan,
+                &armor_unavailable,
+                self.reserved_depot,
+            );
+        }
         let previous_screen = self.screen_units.clone();
         self.screen_units.retain(|id| self.responding.contains(id));
         let mut available: BTreeSet<_> = (0..plan.slots.len()).collect();
@@ -305,7 +410,7 @@ impl DefenseAssignments {
             }
         }
         for e in infantry {
-            if unavailable.contains(&e.id) {
+            if unavailable.contains(&e.id) || outbound.contains(&e.id) {
                 continue;
             }
             let resume = response.released.contains(&e.id) || pullback.released.contains(&e.id);
@@ -370,11 +475,27 @@ impl DefenseAssignments {
                         .any(|e| e.id == *id && e.health.current > 0)
                 }));
         }
-        self.guard_posts
-            .extend(assigned.iter().map(|(id, p)| (*id, *p)));
-        self.guard_posts.extend(self.armor.guard_posts());
+        self.guard_posts.extend(
+            assigned
+                .iter()
+                .filter(|(id, _)| !outbound.contains(id))
+                .map(|(id, p)| (*id, *p)),
+        );
+        self.guard_posts.extend(
+            self.armor
+                .guard_posts()
+                .filter(|(id, _)| !outbound.contains(id)),
+        );
         self.held.retain(|id| assigned.contains_key(id));
         self.destinations = assigned;
+        TacticalOwnership {
+            active: unavailable,
+            released: response
+                .released
+                .union(&pullback.released)
+                .copied()
+                .collect(),
+        }
     }
 }
 

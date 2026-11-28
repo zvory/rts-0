@@ -35,6 +35,7 @@ src/
   unit_range_settings.js # localStorage-backed selected-unit range overlay toggle
   health_bar_settings.js # localStorage-backed always-show HP-bar toggle (damaged-only by default)
   unit_shadow_settings.js # localStorage-backed detailed-unit-shadow toggle (on by default)
+  experimental_graphics_settings.js # opt-in directional Rifleman graphics (off by default)
   sim_wasm_adapter.js # optional WASM prediction adapter
   state.js        # GameState: holds prev+current snapshot, selection, control groups, display overlays
   state_runtime_reset.js # shared clearing of state derived from one authoritative timeline
@@ -2516,6 +2517,29 @@ selection rings):
   the next snapshot.
 
 ### 4.2 Rendering & look (PixiJS rigs — neutral PS1 field-command style)
+
+**Experimental Rifleman graphics.** Game settings includes **Use experimental graphics**, a
+localStorage-backed checkbox that defaults off in the lobby, live matches, Lab, spectators, and
+replays. It switches world Rifleman rendering during a match; it does not alter simulation,
+other unit kinds, HUD portraits, or minimap icons. The render-worker presentation preference
+`experimentalGraphicsEnabled` is a boolean and remains independent of detailed-shadow settings.
+Assets load lazily on opt-in; the normal Rifleman remains visible until that load completes.
+Disabling restores normal routing immediately, including when an earlier load finishes later.
+
+`rifleman_experimental_png_strip.js` describes a sixteen-column, 144-cell oblique atlas: sixteen
+idle frames, four running frames per heading, and four shot-triggered firing/recovery frames per
+heading. `directional` strips select body bearing during displacement and weapon bearing while
+firing or stationary. Firing samples the existing 420 ms Rifleman recoil cycle; the sprite stays
+upright and uses the shared foot anchor. Ground-contact shadows, HP placement, authored torso
+point-click bounds, and presentation muzzle offsets follow the oblique body. Selection rings,
+marquee footprints, collision, and fog authority remain unchanged.
+
+The original white-material art is split offline into fixed and shaded paint layers by
+`scripts/build-rifleman-experimental.mjs`. The existing team-paint compositor also accepts
+separate `baseImage` / `paintImage` atlas images with `frameColumns`, preserving neutral art,
+skin, equipment, edge alpha, and per-match palette teardown. Packed Cultivator sheets keep their
+existing path. Source sheets, prompts, registration metadata and runtime layers live under
+`client/assets/rigs/rifleman-experimental/`.
 
 This section owns the current Pixi look and module behavior. Renderer-neutral camera,
 presentation, ownership, capture, backend, parity-gate, and benchmark contracts live in

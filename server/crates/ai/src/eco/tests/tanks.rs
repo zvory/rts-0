@@ -36,7 +36,7 @@ pub(super) fn staged(bases: usize) -> (StartPayload, Snapshot, Vec<AiBaseSite>) 
 }
 
 #[test]
-fn works_stages_precede_expansion_without_overflow_before_six_bases() {
+fn works_stages_precede_expansion_without_overflow_before_territory_target() {
     for bases in 1..=6 {
         let (start, mut s, sites) = staged(bases);
         let f = frame(&start, &s, &sites);
@@ -64,7 +64,7 @@ fn works_stages_precede_expansion_without_overflow_before_six_bases() {
             let next = next_structure(&f, bases, 99);
             assert_eq!(
                 next == Some(EntityKind::Factory),
-                works < works_target(bases) || bases >= BASE_TARGET
+                works < works_target(bases) || bases >= base_target(&f)
             );
             if works < works_target(bases) {
                 building(
@@ -465,4 +465,107 @@ fn losing_the_initial_screen_requires_a_fresh_replacement_lead() {
     s.tick += SCREEN_LEAD_TICKS;
     let f = frame(&start, &s, &sites);
     assert!(defense.ready_for_builder(&f, site));
+}
+
+#[test]
+fn command_car_is_requested_after_three_completed_bases_once_and_replaced_after_loss() {
+    let (start, mut s, sites) = staged(2);
+    let home = frame(&start, &s, &sites)
+        .owned()
+        .iter()
+        .find(|e| e.kind == EntityKind::ResourceDepot)
+        .unwrap()
+        .position;
+    building(&mut s, 860, "factory", (home.0 + 512., home.1 + 256.), None);
+    let mut p = production::EcoProduction::default();
+    let run = |p: &mut production::EcoProduction, s: &Snapshot| {
+        let f = frame(&start, s, &sites);
+        let mut a = AiActions::for_frame(&f);
+        p.step(&f, &mut a);
+        a.into_requests()
+    };
+    let car = |orders: &[AiActionRequest]| {
+        orders.iter().any(|r| {
+            matches!(
+                r,
+                AiActionRequest::Train {
+                    unit: EntityKind::CommandCar,
+                    ..
+                }
+            )
+        })
+    };
+    assert!(!car(&run(&mut p, &s)));
+    let f = frame(&start, &s, &sites);
+    let next = WorldQueries::new(&f)
+        .ranked_bases(1)
+        .into_iter()
+        .find(|b| {
+            WorldQueries::new(&f)
+                .known_base_depots(b.site.id)
+                .is_empty()
+        })
+        .unwrap()
+        .site
+        .position;
+    building(&mut s, 803, "resource_depot", next, Some(0.5));
+    assert!(!car(&run(&mut p, &s)));
+    s.entities
+        .iter_mut()
+        .find(|e| e.id == 803)
+        .unwrap()
+        .build_progress = None;
+    assert!(car(&run(&mut p, &s)));
+    assert!(!car(&run(&mut p, &s)));
+    let mut vehicle = s
+        .entities
+        .iter()
+        .find(|e| e.owner == 1 && e.kind == "rifleman")
+        .unwrap()
+        .clone();
+    vehicle.id = 999;
+    vehicle.kind = "command_car".into();
+    s.entities.push(vehicle);
+    assert!(!car(&run(&mut p, &s)));
+    s.entities.retain(|e| e.id != 999);
+    assert!(car(&run(&mut p, &s)));
+}
+
+#[test]
+fn command_car_target_is_completed_bases_minus_two() {
+    for bases in 3..=7 {
+        let (start, mut s, sites) = staged(bases);
+        let home = sites
+            .iter()
+            .find(|b| b.id == AiBaseSiteId::Start(1))
+            .unwrap()
+            .position;
+        building(&mut s, 860, "factory", (home.0 + 512., home.1 + 256.), None);
+        let template = s
+            .entities
+            .iter()
+            .find(|e| e.kind == "rifleman" && e.owner == 1)
+            .unwrap()
+            .clone();
+        let mut p = production::EcoProduction::default();
+        for n in 0..=bases - 2 {
+            let f = frame(&start, &s, &sites);
+            let mut a = AiActions::for_frame(&f);
+            p.step(&f, &mut a);
+            let queued = a.into_requests().iter().any(|r| {
+                matches!(
+                    r,
+                    AiActionRequest::Train {
+                        unit: EntityKind::CommandCar,
+                        ..
+                    }
+                )
+            });
+            assert_eq!(queued, n < bases - 2, "bases={bases}, cars={n}");
+            let mut car = template.clone();
+            car.kind = "command_car".into();
+            car.id = 2000 + n as u32;
+            s.entities.push(car);
+        }
+    }
 }

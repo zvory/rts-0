@@ -133,6 +133,8 @@ pub struct AiProduction {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct AiAbilityState {
+    /// Remaining public/owned effect duration, distinct from cooldown.
+    pub active_ticks: u16,
     pub kind: AbilityKind,
     pub cooldown_left: u16,
     pub remaining_uses: Option<u16>,
@@ -640,6 +642,12 @@ fn normalize_entity(
             .iter()
             .filter_map(|ability| {
                 Some(AiAbilityState {
+                    active_ticks: ability
+                        .expires_in
+                        .or(view
+                            .breakthrough_ticks
+                            .filter(|_| ability.ability == "breakthrough"))
+                        .unwrap_or(0),
                     kind: ability.ability.parse().ok()?,
                     cooldown_left: ability.cooldown_left,
                     remaining_uses: ability.remaining_uses,

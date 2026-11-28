@@ -106,6 +106,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "unit_range_settings.js": "platform",
   "health_bar_settings.js": "platform",
   "unit_shadow_settings.js": "platform",
+  "experimental_graphics_settings.js": "platform",
   "exclusive_fullscreen_settings.js": "platform",
 
   "net.js": "transport",

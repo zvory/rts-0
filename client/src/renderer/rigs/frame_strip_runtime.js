@@ -54,6 +54,27 @@ export function frameStripFrameIndex(strip, entity, nowOrContext = 0) {
   const idleFrame = validFrame(strip, strip?.idleFrame ?? 0);
   const renderContext = typeof nowOrContext === "object" && nowOrContext !== null ? nowOrContext : {};
   const now = typeof nowOrContext === "number" ? nowOrContext : renderContext.now;
+  if (strip?.directional) {
+    const moving = frameStripEntityIsMoving(entity, renderContext);
+    const firing = strip.directional.firingFrames > 0 && finite(renderContext.recoilProgress, 0) > 0
+      && (!strip.firingWeaponKinds?.length || strip.firingWeaponKinds.includes(renderContext.recoilWeaponKind));
+    const facing = (firing || !moving) && Number.isFinite(entity?.weaponFacing)
+      ? entity.weaponFacing : finite(entity?.facing, 0);
+    const count = Math.max(1, Math.trunc(finite(strip.directional.directionCount, strip.frameCount)));
+    const turn = (facing - finite(strip.directional.firstFacing, 0)) / (2 * Math.PI);
+    const direction = ((Math.round(turn * count) % count) + count) % count;
+    if (firing) {
+      const phase = Math.min(strip.directional.firingFrames - 1,
+        Math.floor(clamp01(finite(renderContext.recoilPhase, 0)) * strip.directional.firingFrames));
+      return validFrame(strip, strip.directional.firingStart + direction * strip.directional.firingFrames + phase);
+    }
+    const poses = Math.max(0, Math.trunc(finite(strip.directional.runFrames, 0)));
+    if (moving && poses > 0) {
+      const phase = Math.floor(Math.max(0, finite(now, 0)) * finite(strip.fps, 10) / 1000) % poses;
+      return validFrame(strip, finite(strip.directional.runStart, count) + direction * poses + phase);
+    }
+    return direction;
+  }
   const setupFrame = frameStripSetupFrameIndex(strip, entity, renderContext, idleFrame);
   if (setupFrame != null) return setupFrame;
   const windupFrame = frameStripWindupFrameIndex(strip, entity, idleFrame);
@@ -126,6 +147,8 @@ function frameStripFiringFrameIndex(strip, entity, renderContext = {}, fallback 
 
 export function frameStripVisualFacing(stripOrEntity, maybeEntity = null, renderContext = null, frameIndex = null) {
   const strip = maybeEntity ? stripOrEntity : null;
+  // Oblique directional art already contains the view of the upright body.
+  if (strip?.directional) return 0;
   const entity = maybeEntity ?? stripOrEntity;
   const resolvedFrame = frameIndex ?? frameStripFrameIndex(strip, entity, renderContext ?? {});
   const facingOffset = frameStripFacingOffset(strip, resolvedFrame);
@@ -205,6 +228,7 @@ function createDefaultFrameStripPixiFactory(pixi = globalThis.PIXI) {
     createRectangle: (x, y, width, height) => new pixi.Rectangle(x, y, width, height),
     createTexture: (source, rectangle) => new pixi.Texture({ source, frame: rectangle }),
     createSprite: (spriteTexture) => new pixi.Sprite(spriteTexture),
+    createGraphics: () => new pixi.Graphics(),
     createShadowBlur: () => new pixi.BlurFilter({ strength: 2, quality: 4, resolution: 2 }),
   };
 }
@@ -230,16 +254,22 @@ class FrameStripUnitInstance {
     const frameHeight = Math.max(1, finite(strip.frameHeight, 1));
     const frameCount = Math.max(1, Math.trunc(finite(strip.frameCount, 1)));
     const baseTexture = texture.source;
+    const columns = Math.max(1, Math.trunc(finite(strip.frameColumns, frameCount)));
     for (let i = 0; i < frameCount; i += 1) {
-      const rectangle = pixiFactory.createRectangle(i * frameWidth, 0, frameWidth, frameHeight);
+      const rectangle = pixiFactory.createRectangle((i % columns) * frameWidth, Math.floor(i / columns) * frameHeight, frameWidth, frameHeight);
       this.frameTextures.push(pixiFactory.createTexture(baseTexture, rectangle));
       if (strip.teamPaint && !silhouetteShadow) {
         this.itemGlowFrames.push(pixiFactory.createTexture(sourceTexture.source, rectangle));
       }
     }
 
+    if (strip.groundContactShadow && !silhouetteShadow) {
+      this.groundShadow = pixiFactory.createGraphics();
+      this.groundShadow.ellipse(0, 0, 7, 2.5).fill({ color: 0x000000, alpha: 0.28 });
+      this.container.addChild(this.groundShadow);
+    }
     this.sprite = pixiFactory.createSprite(this.frameTextures[0]);
-    this.sprite.anchor?.set?.(0.5, 0.5);
+    this.sprite.anchor?.set?.(finite(strip.anchorX, 0.5), finite(strip.anchorY, 0.5));
     this.sprite.position?.set?.(0, 0);
     this.container.addChild(this.sprite);
     this.trailTextures = [];

@@ -51,6 +51,15 @@ fn on_home_half(position: Point, home: Point, enemy: Point) -> bool {
 }
 
 impl PressureResponse {
+    /// Read-only tactical ownership for support vehicles; staging/withdrawal is not an attack.
+    pub(crate) fn attacking_ids(&self) -> BTreeSet<u32> {
+        self.fighting
+            .iter()
+            .filter(|(id, fighting)| **fighting && self.responders.contains(id))
+            .map(|(id, _)| *id)
+            .collect()
+    }
+
     pub(crate) fn with_cohesive_reserve() -> Self {
         Self {
             cohesive: true,

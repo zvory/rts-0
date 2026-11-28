@@ -4,9 +4,30 @@ use rts_sim::game::lab::LabOp;
 use rts_sim::game::{Game, PlayerInit};
 
 #[test]
-fn eco_classic_economy_reaches_six_bases_with_staged_vehicle_works() {
-    // Long progression belongs to the opt-in full AI suite, not every PR's fast gate.
-    let full_ai = ["RTS_FULL_AI_TESTS", "RTS_SELFPLAY_FULL"]
+fn eco_classic_opening_reaches_three_bases_with_staged_vehicle_works() {
+    if !full_ai_enabled() {
+        eprintln!(
+            "skipping controlled Eco progression; set RTS_FULL_AI_TESTS=1 to run full AI coverage"
+        );
+        return;
+    }
+    run_economy_progression(3);
+}
+
+#[test]
+fn eco_extended_economy_claims_seven_bases() {
+    if !full_ai_enabled() {
+        eprintln!(
+            "skipping seven-base Eco progression; set RTS_FULL_AI_TESTS=1 to run full AI coverage"
+        );
+        return;
+    }
+    run_economy_progression(7);
+}
+
+fn full_ai_enabled() -> bool {
+    // Controlled economy progression is opt-in, like the repository's other long AI coverage.
+    ["RTS_FULL_AI_TESTS", "RTS_SELFPLAY_FULL"]
         .into_iter()
         .any(|name| {
             matches!(
@@ -16,13 +37,10 @@ fn eco_classic_economy_reaches_six_bases_with_staged_vehicle_works() {
                     .as_str(),
                 "1" | "true" | "yes" | "on"
             )
-        });
-    if !full_ai {
-        eprintln!(
-            "skipping six-base Eco progression; set RTS_FULL_AI_TESTS=1 to run full AI coverage"
-        );
-        return;
-    }
+        })
+}
+
+fn run_economy_progression(goal: usize) {
     let players = [1, 2].map(|id| PlayerInit {
         id,
         team_id: id,
@@ -64,7 +82,8 @@ fn eco_classic_economy_reaches_six_bases_with_staged_vehicle_works() {
     let mut mg_at_complex = None;
     let mut tank_first_seen = std::collections::BTreeMap::new();
     let mut commanded_tanks = std::collections::BTreeSet::new();
-    for _ in 0..30000 {
+    let tick_budget = if goal > 3 { 30_000 } else { 18_000 };
+    for _ in 0..tick_budget {
         CanonicalAiTickDriver::run(
             &mut game,
             &mut controllers,
@@ -179,10 +198,10 @@ fn eco_classic_economy_reaches_six_bases_with_staged_vehicle_works() {
             first_six = Some(s.tick);
         }
         assert!(
-            bases >= 6 || works <= works_target_for_test(bases),
-            "no surplus Works before six completed bases"
+            bases >= 7 || works <= works_target_for_test(bases),
+            "no surplus Works before seven completed bases"
         );
-        assert!(bases <= 6, "six bases is the expansion cap");
+        assert!(bases <= 7, "seven bases is the Classic expansion cap");
         let mg_count = owned.iter().filter(|e| e.kind == "machine_gunner").count();
         if mg_at_complex.is_none() && owned.iter().any(|e| e.kind == "engineering_complex") {
             mg_at_complex = Some(mg_count);
@@ -229,8 +248,8 @@ fn eco_classic_economy_reaches_six_bases_with_staged_vehicle_works() {
         if s.tick % 1500 == 0 {
             eprintln!("Eco tick={} bases={bases} barracks={barracks} bank={}/{} supply={}/{} upgrades={:?} troops={}/{} trenches={entrenched}",s.tick,s.steel,s.oil,s.supply_used,s.supply_cap,s.upgrades,owned.iter().filter(|e|e.kind=="machine_gunner").count(),owned.iter().filter(|e|e.kind=="panzerfaust").count());
         }
-        if bases >= 6
-            && works >= 3
+        if bases >= goal
+            && works >= works_target_for_test(goal)
             && tank_seen
             && mg_seen
             && pf_seen
@@ -242,7 +261,7 @@ fn eco_classic_economy_reaches_six_bases_with_staged_vehicle_works() {
             assert!(
                 first_works.is_some()
                     && second_works.is_some()
-                    && third_works.is_some()
+                    && (goal < 4 || third_works.is_some())
                     && research_scaffold_checked
             );
             assert!(

@@ -23,6 +23,9 @@ export function composeTeamPaintRgba(base, paint, teamColor, output = new Uint8C
 
 /** Decode once; cache derived palettes per match so ordinary sprites remain batchable. */
 export async function loadTeamPaintTexture(pixi, strip, adjustment) {
+  if (strip.teamPaint.baseImage && strip.teamPaint.paintImage) {
+    return loadSeparatedTeamPaintTexture(pixi, strip, adjustment);
+  }
   const bitmap = await fetchImageBitmap(strip.image);
   try {
     const width = strip.frameWidth * strip.frameCount, height = strip.frameHeight;
@@ -71,6 +74,55 @@ export async function loadTeamPaintTexture(pixi, strip, adjustment) {
   } finally {
     bitmap.close?.();
   }
+}
+
+async function readPaintLayer(url) {
+  const bitmap = await fetchImageBitmap(url);
+  try {
+    const canvas = createWorkerSafeCanvas(bitmap.width, bitmap.height);
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) throw new Error("Team paint requires a 2D asset canvas");
+    ctx.drawImage(bitmap, 0, 0);
+    const pixels = ctx.getImageData(0, 0, bitmap.width, bitmap.height).data;
+    canvas.width = canvas.height = 0;
+    return { width: bitmap.width, height: bitmap.height, pixels };
+  } finally {
+    bitmap.close?.();
+  }
+}
+
+async function loadSeparatedTeamPaintTexture(pixi, strip, adjustment) {
+  const layers = await Promise.all([
+    strip.image, strip.teamPaint.baseImage, strip.teamPaint.paintImage,
+  ].map(readPaintLayer));
+  const width = strip.frameWidth * (strip.frameColumns || strip.frameCount);
+  const height = strip.frameHeight * Math.ceil(strip.frameCount / (strip.frameColumns || strip.frameCount));
+  if (layers.some(layer => layer.width !== width || layer.height !== height)) {
+    throw new Error(`Invalid team-paint atlas dimensions: ${strip.image}`);
+  }
+  const [neutral, fixed, paint] = layers.map(layer => layer.pixels);
+  const createTexture = pixels => {
+    const canvas = createWorkerSafeCanvas(width, height), ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Team paint requires a palette canvas");
+    const frame = ctx.createImageData(width, height);
+    frame.data.set(pixels);
+    applyColorAdjustmentToRgba(frame.data, adjustment);
+    ctx.putImageData(frame, 0, 0);
+    const result = pixi.Texture.from(canvas);
+    result.rtsRendererOwnedTexture = true;
+    result.source.scaleMode = "nearest";
+    return result;
+  };
+  const texture = createTexture(neutral), colors = new Map();
+  PALETTES.set(texture, {
+    colors,
+    get(color) {
+      const key = hexToInt(color) & 0xffffff;
+      if (!colors.has(key)) colors.set(key, createTexture(composeTeamPaintRgba(fixed, paint, key)));
+      return colors.get(key);
+    },
+  });
+  return texture;
 }
 
 export function teamPaintTextureFor(texture, color) {
