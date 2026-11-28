@@ -36,6 +36,7 @@ try {
   await command('time',{sessionId,control:{action:'pause'}});
   await command('camera',{sessionId,camera:{action:'set',snapshot:{version:1,focus:{x:1992,y:1824},framingScale:1,boundsPolicy:'mapOverscroll'}}});
   const capture=await command('screenshot',{sessionId,name:`selective-${label.toLowerCase().replaceAll(' ','-')}`,viewport:{width:480,height:280,deviceScaleFactor:2},subjects:subjectIds});
+  if(capture.readiness.renderErrors.length||!capture.readiness.ready||!capture.readiness.roomTime.paused)throw Error(`Invalid selective-color capture: ${label}`);
   const destination=path.join(out,`${label.toLowerCase().replaceAll(' ','-')}.png`);
   if(capture.preview.localPath)fs.copyFileSync(capture.preview.localPath,destination);else {const r=await fetch(capture.preview.url);if(!r.ok)throw Error(`Capture download ${r.status}`);fs.writeFileSync(destination,Buffer.from(await r.arrayBuffer()));}
   captures.push({label,color,path:destination,url:capture.preview.url,tick:capture.readiness.snapshotTick,camera:capture.readiness.camera,roomTime:capture.readiness.roomTime,renderErrors:capture.readiness.renderErrors,subjects:capture.readiness.subjects});

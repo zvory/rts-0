@@ -3,7 +3,25 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import puppeteer from 'puppeteer-core';
+// A failed capture leaves partial evidence on disk. Never publish it as a complete comparison.
+export function validateRosterReviewEvidence(evidence){
+ if(!Array.isArray(evidence)||!evidence.length)throw Error('No roster review evidence');
+ const labels=['Blue','Vermilion','Green','Pink','Sky blue','Orange','Yellow'];
+ for(const id of new Set(evidence.map(e=>e.group))){
+  if(!['kriegsia','cultivators','ekat'].includes(id))throw Error(`Unknown review group: ${id}`);
+  const captures=evidence.filter(e=>e.group===id),units=captures[0].units;
+  if(!Array.isArray(units)||!units.length||captures.length!==labels.length||labels.some(label=>captures.filter(c=>c.label===label).length!==1))throw Error(`Incomplete seven-color review: ${id}`);
+  for(const c of captures){
+   if(JSON.stringify(c.units)!==JSON.stringify(units)||c.ids?.length!==units.length||c.spawns?.length!==units.length||!c.readiness?.ready||!c.readiness.roomTime?.paused||!Array.isArray(c.readiness.renderErrors)||c.readiness.renderErrors.length)throw Error(`Invalid review capture: ${id} / ${c.label}`);
+   for(let i=0;i<units.length;i++){
+    const p=units[i].kind==='scout_plane'?c.inspected?.entities?.find(e=>e.id===c.ids[i]):c.spawns[i];
+    if(!Number.isFinite(p?.x)||!Number.isFinite(p?.y))throw Error(`Missing review position: ${id} / ${c.label} / ${units[i].kind}`);
+   }
+  }
+ }
+}
 export async function buildRosterReviewBoards(out,evidence){
+validateRosterReviewEvidence(evidence);
 const browser=await puppeteer.launch({executablePath:process.env.CHROME||'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true});
 try{
  const page=await browser.newPage();
@@ -30,7 +48,7 @@ try{
  const blue=evidence.filter(e=>e.label==='Blue').sort((a,b)=>['kriegsia','cultivators','ekat'].indexOf(a.group)-['kriegsia','cultivators','ekat'].indexOf(b.group)).map(e=>({...e,data:fs.readFileSync(e.path).toString('base64')}));
  const overview=await page.evaluate(async(captures)=>{
   const all=captures.flatMap(c=>c.units.map((u,i)=>({capture:c,unit:u,index:i}))),cell=360,columns=4,header=110;
-  const canvas=Object.assign(document.createElement('canvas'),{width:cell*columns,height:header+Math.ceil(all.length/columns)*cell}),ctx=canvas.getContext('2d');ctx.fillStyle='#20252b';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle='#fff';ctx.font='bold 32px sans-serif';ctx.fillText('Full roster — 23 appearances and ranks',25,43);ctx.font='21px sans-serif';ctx.fillText('Actual paused game pixels • Blue review overview • Full seven-color sheets supplied separately',25,82);
+  const canvas=Object.assign(document.createElement('canvas'),{width:cell*columns,height:header+Math.ceil(all.length/columns)*cell}),ctx=canvas.getContext('2d');ctx.fillStyle='#20252b';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle='#fff';ctx.font='bold 32px sans-serif';ctx.fillText(`Reviewed roster — ${all.length} appearances and ranks`,25,43);ctx.font='21px sans-serif';ctx.fillText('Actual paused game pixels • Blue review overview • Full seven-color sheets supplied separately',25,82);
   const images={};for(const c of captures){const i=new Image();i.src='data:image/png;base64,'+c.data;await i.decode();images[c.group]=i;}
   for(let i=0;i<all.length;i++){
    const {capture:c,unit:u,index}=all[i],p=u.kind==='scout_plane'?c.inspected.entities.find(e=>e.id===c.ids[index]):c.spawns[index],x=i%columns*cell,y=header+Math.floor(i/columns)*cell;
