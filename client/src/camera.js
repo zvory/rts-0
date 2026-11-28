@@ -65,7 +65,8 @@ function requireNonNegative(value, name) {
 }
 
 function sameView(camera, before) {
-  return camera.x === before.x
+  return camera.mapTilt === before.mapTilt
+    && camera.x === before.x
     && camera.y === before.y
     && camera.zoom === before.zoom
     && camera.worldW === before.worldW
@@ -108,6 +109,16 @@ export class Camera {
     this._lastAudioReferenceDistancePx = 1920;
     /** @private Semantic camera snapshot listeners. */
     this._listeners = new Set();
+  }
+
+  /** Change the experimental ground projection, preserving the ground focus. */
+  setMapTilt(degrees) {
+    const before = this._rawView();
+    const focus = this.snapshot();
+    this.mapTilt = mapTiltDegrees(degrees);
+    this._refreshZoomLimits();
+    this._centerOn(focus.focus.x, focus.focus.y);
+    this._emitIfChanged(before);
   }
 
   /**
@@ -519,6 +530,7 @@ export class Camera {
   /** @private */
   _rawView() {
     return {
+      mapTilt: this.mapTilt,
       x: this.x,
       y: this.y,
       zoom: this.zoom,

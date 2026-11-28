@@ -2,6 +2,9 @@ import { RecordingGraphics } from "./pixi_fakes.mjs";
 import { assertApprox } from "./assertions.mjs";
 import { _drawMuzzleFlashes } from "../../client/src/renderer/muzzle_feedback.js";
 import assert from "node:assert/strict";
+import { applyMatchExperimentalGraphics } from "../../client/src/match_settings_toggles.js";
+import { uprightBodyCorners, uprightWorldPoint } from "../../client/src/renderer/upright_unit_sprite.js";
+import { tiltScreen } from "../../client/src/camera_tilt.js";
 import fs from "node:fs";
 import { PNG } from "pngjs";
 import { readExperimentalGraphicsEnabled, writeExperimentalGraphicsEnabled } from "../../client/src/experimental_graphics_settings.js";
@@ -10,7 +13,8 @@ import { RIFLEMAN_EXPERIMENTAL_FRAME_STRIP as strip } from "../../client/src/ren
 import { experimentalRiflemanMuzzle } from "../../client/src/renderer/rigs/rifleman_experimental_png_strip.js";
 import { composeTeamPaintRgba } from "../../client/src/renderer/rigs/team_paint.js";
 import { Renderer } from "../../client/src/renderer/index.js";
-import { selectionProxyForEntity } from "../../client/src/input/selection_projection.js";
+import { Camera } from "../../client/src/camera.js";
+import { selectionProxyForEntity, projectSelectionProxy } from "../../client/src/input/selection_projection.js";
 import { buildSettingsTabs } from "../../client/src/settings_panels.js";
 import { memoryStorage, withFakeSettingsDocument, findFakeById } from "./fakes.mjs";
 import { createInspectionPngPixiFactory, FakeContainer } from "../helpers/rig_inspection_pixi.mjs";
@@ -144,3 +148,50 @@ for (const [frame, count] of counts.entries()) {
   assert.ok(count.visible > 300 && count.colored > 40 && count.fixed > 40, `complete fixed/paint split in frame ${frame}`);
 }
 console.log("experimental_graphics_contracts: default-off persistence, live routing, 16-direction run/fire, hit areas and material masks passed");
+
+{
+  const angles = [], flags = [];
+  const match = { state: {}, camera: { setMapTilt: a => angles.push(a) },
+    renderer: { setExperimentalGraphicsEnabled: enabled => flags.push(enabled) } };
+  applyMatchExperimentalGraphics(match, true);
+  applyMatchExperimentalGraphics(match, false);
+  assert.deepEqual(angles, [45, 0], "graphics preference owns the ground tilt");
+  assert.deepEqual(flags, [true, false], "graphics preference still updates the worker");
+  assert.equal(match.state.experimentalGraphicsEnabled, false);
+}
+for (const y of [100, 400, 700]) for (const x of [150, 600, 1050]) {
+  const view = { viewW: 1200, viewH: 800, mapTilt: 45 }, anchor = { x, y };
+  const offsets = [{ x: -40, y: -160 }, { x: 40, y: -160 },
+    { x: 40, y: 0 }, { x: -40, y: 0 }];
+  const foot = tiltScreen(view, anchor);
+  const corners = uprightBodyCorners(view, anchor, offsets);
+  corners.forEach((p, i) => {
+    const presented = tiltScreen(view, p);
+    assert.ok(Math.abs(presented.x - foot.x - offsets[i].x / foot.depth) < 1e-8);
+    assert.ok(Math.abs(presented.y - foot.y - offsets[i].y / foot.depth) < 1e-8);
+  });
+}
+
+// Body interactions and effect anchors follow the same upright pixels at every depth.
+for (const y of [4700, 5000, 5300]) {
+  const camera = new Camera(1200, 800, { mapTilt: 45 });
+  camera.setBounds(10000, 10000, 1200, 800); camera.focusAt({ x: 5000, y: 5000 });
+  const soldier = { id: 100, kind: "rifleman", owner: 1, x: 5150, y };
+  const projection = camera.projectionSnapshot();
+  const body = projectSelectionProxy(selectionProxyForEntity(soldier, 32, null, true), projection);
+  const foot = projection.project({ ...soldier, heightPx: 0 });
+  const headY = Math.min(...body.screenClickPolygon.map(p => p.y));
+  assertApprox(headY, foot.y - 46 * camera.zoom / foot.depth, 1e-7,
+    "body click bounds retain authored upright height");
+  const renderer = { _mapTiltDegrees: 45, app: { renderer: { screen: { width: 1200, height: 800 } } },
+    world: { x: -camera.x * camera.zoom + 600, y: -camera.y * camera.zoom + 400,
+      scale: { x: camera.zoom } } };
+  for (const offset of [{ x: 24, y: -30 }, { x: 0, y: -48 }]) {
+    const plane = uprightWorldPoint(renderer, soldier, { x: soldier.x + offset.x, y: soldier.y + offset.y });
+    const projected = projection.project({ ...plane, heightPx: 0 });
+    assertApprox(projected.x, foot.x + offset.x * camera.zoom / foot.depth, 1e-7,
+      "muzzle/HP x anchors align with upright body");
+    assertApprox(projected.y, foot.y + offset.y * camera.zoom / foot.depth, 1e-7,
+      "muzzle/HP y anchors align with upright body");
+  }
+}
