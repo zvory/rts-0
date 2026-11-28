@@ -445,7 +445,7 @@ pub(super) fn properties(w: &Wiki, kind: &str, id: &str) -> String {
             value,
             esc(&w.gh(&Wiki::const_path(c), nz(c, "line"))),
             esc(&s(c, "doc")),
-            esc(&name),
+            esc(&Wiki::const_label(c)),
             usage_links(w, &name, 3)
         );
     }
@@ -530,7 +530,7 @@ pub(super) fn prop_label_value(
         Some(x)
             if (0.0..=1.0).contains(&x)
                 && words.last().is_some_and(|l| {
-                    matches!(l.as_str(), "reduction" | "penetration" | "chance")
+                    matches!(l.as_str(), "reduction" | "penetration" | "chance" | "taken")
                 }) =>
         {
             format!("{}%", fmt(x * 100.0))
@@ -562,6 +562,12 @@ pub(super) fn prop_label_value(
         }
     }
     let mut label = words.join(" ");
+    if label.is_empty() {
+        // the name is a page prefix plus a unit (FRONT_ARC_RAD): the prefix is the label
+        let mut all: Vec<String> = name.split('_').map(str::to_lowercase).collect();
+        all.truncate(all.len().saturating_sub(drop));
+        label = all.join(" ");
+    }
     if label.is_empty() {
         label = title_case(&name.to_lowercase());
     }
@@ -632,8 +638,9 @@ pub(super) fn constants_table(w: &Wiki, list: &[&Value]) -> String {
         );
         let _ = write!(
             h,
-            "<tr id=\"c-{n}\"><td><code>{n}</code></td><td class=\"num\" data-v=\"{raw}\">{value}</td><td>{doc}</td><td><a href=\"{src}\" class=\"src\">{file}:{line}</a></td><td class=\"used\">{used}</td></tr>",
+            "<tr id=\"c-{n}\"><td><code>{n}</code>{origin}</td><td class=\"num\" data-v=\"{raw}\">{value}</td><td>{doc}</td><td><a href=\"{src}\" class=\"src\">{file}:{line}</a></td><td class=\"used\">{used}</td></tr>",
             used = usage_links(w, &name, 3),
+            origin = const_origin(c),
             n = esc(&name),
             raw = esc(&scalar(v)),
             doc = esc(&s(c, "doc")),
@@ -643,6 +650,22 @@ pub(super) fn constants_table(w: &Wiki, list: &[&Value]) -> String {
     }
     h.push_str("</tbody></table>");
     h
+}
+
+/// Under the key of a value with no public name: where the code keeps it.
+fn const_origin(c: &Value) -> String {
+    let label = esc(&Wiki::const_label(c));
+    let note = match s(c, "read").as_str() {
+        "const" => format!("private <code>{label}</code>"),
+        "literal" => format!(
+            "written as <code>{}</code> in <code>{}()</code>",
+            esc(&scalar(get(c, "value"))),
+            esc(&s(c, "fn"))
+        ),
+        "called" => format!("returned by <code>{label}</code>"),
+        _ => return String::new(),
+    };
+    format!("<br><span class=\"muted\">{note}</span>")
 }
 
 /// "Tank" / "Tank (front 60, side 90, rear 102)"
@@ -878,7 +901,7 @@ pub(super) fn ability_card(w: &Wiki, a: &Value, file: &str) -> String {
             // longer below Master rank (Throw Sword)
             Some(adept) if !cooldown.is_empty() => format!(
                 "{} <span class=\"muted\">({cooldown} as a Master)</span>",
-                w.u.secs(adept)
+                w.coded_const(ADEPT_COOLDOWN_MULTIPLIER, w.u.secs(adept))
             ),
             _ => cooldown,
         },
@@ -945,6 +968,9 @@ pub(super) fn ability_card(w: &Wiki, a: &Value, file: &str) -> String {
 }
 
 /// Rows for constants that belong to an entity but are not already shown from its definition.
+/// Throw Sword's longer cooldown below Master rank (build.rs CODE_VALUES).
+const ADEPT_COOLDOWN_MULTIPLIER: &str = "THROW_SWORD_ADEPT_COOLDOWN_MULTIPLIER";
+
 pub(super) fn extra_properties(w: &Wiki, kind: &str, id: &str) -> Vec<(String, String)> {
     let shown = w.referenced_constants(&format!("{kind}:{id}"));
     let mut entries: Vec<&Value> = w
@@ -953,8 +979,13 @@ pub(super) fn extra_properties(w: &Wiki, kind: &str, id: &str) -> Vec<(String, S
         .filter(|c| is_value(c) && !shown.contains(&s(c, "name")))
         .collect();
     entries.sort_by_key(|c| (Wiki::const_path(c), nz(c, "line") as i64));
-    // research times belong on research pages (BLINK_RESEARCH_TICKS is not a Blink property)
-    entries.retain(|c| kind != "ability" || !s(c, "name").ends_with("_RESEARCH_TICKS"));
+    // research times belong on research pages (BLINK_RESEARCH_TICKS is not a Blink property);
+    // the adept cooldown multiplier is already in the Cooldown row
+    entries.retain(|c| {
+        let name = s(c, "name");
+        kind != "ability"
+            || !(name.ends_with("_RESEARCH_TICKS") || name == ADEPT_COOLDOWN_MULTIPLIER)
+    });
     let prefixes = w.prefixes_of(kind, id);
     let carriers = w
         .find("abilities", id)

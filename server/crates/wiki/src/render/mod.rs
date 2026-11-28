@@ -543,6 +543,21 @@ impl Wiki {
         )
     }
 
+    /// What "Show code" calls a constant: its name; for a value with no public name (build.rs
+    /// `CODE_VALUES`), the private name, `file:line` of an inline number, or the rules function.
+    pub fn const_label(c: &Value) -> String {
+        match s(c, "read").as_str() {
+            "const" => s(c, "label"),
+            "literal" => {
+                let path = Self::const_path(c);
+                let file = path.rsplit('/').next().unwrap_or(&path).to_string();
+                format!("{file}:{}", s(c, "line"))
+            }
+            "called" => format!("{}()", s(c, "fn")),
+            _ => s(c, "name"),
+        }
+    }
+
     /// `display` for a named constant.
     pub fn coded_const(&self, name: &str, display: String) -> String {
         let Some(c) = self.const_entry(name) else {
@@ -558,7 +573,7 @@ impl Wiki {
             "<span class=\"cv\" title=\"{}\">{display}<a class=\"var\" href=\"{}\">{}</a></span>",
             esc(&title),
             esc(&self.gh(&Self::const_path(c), util::nz(c, "line"))),
-            esc(name)
+            esc(&Self::const_label(c))
         )
     }
 

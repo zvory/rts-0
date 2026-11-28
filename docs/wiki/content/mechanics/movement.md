@@ -27,7 +27,7 @@ constants: STUCK_, TOLERANT_ARRIVAL_, SIDESTEP_, STATIC_BLOCKED_, ARRIVE_RADIUS_
 
 - **Terrain:** roads, slow tiles and slopes; see {{page:mechanics/terrain}}.
 - **Speed bonuses:** the {{unit:command_car}}'s aura (×{{COMMAND_CAR_AURA_SPEED_MULTIPLIER}}), {{ability:breakthrough}}, {{research:methamphetamines}} and the Shop's {{ability:haste}} item. Bonuses don't stack; see each page for which one wins.
-- **Barbed Wire:** infantry on it move ×0.7 as fast; see {{building:barbed_wire}}.
+- **Barbed Wire:** infantry on it move {{BARBED_WIRE_SPEED_MULTIPLIER|x}} as fast; see {{building:barbed_wire}}.
 - **Masters:** Cultivator Masters move ×{{DAO_MASTER_SPEED_MULTIPLIER}} as fast.
 
 ## Vehicles and obstacles

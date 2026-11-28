@@ -239,7 +239,7 @@ pub(super) fn building_table(w: &Wiki) {
 
 pub(super) fn constants_page(w: &Wiki) {
     let mut h = format!(
-        "<p>All {} balance constants at <code>{}</code>: every public value in the rules code, plus a few combat values from the simulation (marked <i>sim</i>). <code>_TICKS</code> values also show seconds. Descriptions are the code's own comments.</p><div class=\"filters\"><input type=\"search\" placeholder=\"Filter constants…\" data-filter-consts autofocus></div>",
+        "<p>All {} balance constants at <code>{}</code>: every public value in the rules code, plus a few values the simulation keeps privately or writes inline, and numbers read from rules functions (each says where). <code>_TICKS</code> values also show seconds. Descriptions are the code's own comments.</p><div class=\"filters\"><input type=\"search\" placeholder=\"Filter constants…\" data-filter-consts autofocus></div>",
         w.list("constants").len(),
         esc(&s(w.game(), "short"))
     );

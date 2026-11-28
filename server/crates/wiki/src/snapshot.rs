@@ -116,7 +116,7 @@ pub fn build(client_rules_js: &str, game: Value) -> Value {
     snapshot.insert("nodes".into(), nodes(&text));
     snapshot.insert("weapons".into(), weapons(&numeric));
     snapshot.insert("upgrades".into(), upgrades(&text));
-    snapshot.insert("abilities".into(), abilities());
+    snapshot.insert("abilities".into(), abilities(&numeric));
     snapshot.insert("facing".into(), facing_table());
     snapshot.insert("sources".into(), sources(&index));
     snapshot.insert(
@@ -142,7 +142,8 @@ pub fn build(client_rules_js: &str, game: Value) -> Value {
     Value::Object(snapshot)
 }
 
-/// The private simulation constants indexed by build.rs, evaluated against the rules values.
+/// The private simulation constants and inline numbers indexed by build.rs, evaluated against the
+/// rules values (or, for `"read": "called"`, by calling the rules function).
 fn sim_constants(index: &Value, rules: &HashMap<String, f64>) -> Vec<Value> {
     let mut out = Vec::new();
     for c in index
@@ -151,7 +152,11 @@ fn sim_constants(index: &Value, rules: &HashMap<String, f64>) -> Vec<Value> {
         .map(|a| a.as_slice())
         .unwrap_or(&[])
     {
-        let Some(value) = c["expr"].as_str().and_then(|e| client_text::eval(e, rules)) else {
+        let value = match c["read"].as_str() {
+            Some("called") => c["name"].as_str().and_then(called_value),
+            _ => c["expr"].as_str().and_then(|e| client_text::eval(e, rules)),
+        };
+        let Some(value) = value else {
             continue;
         };
         let mut c = c.clone();
@@ -163,6 +168,26 @@ fn sim_constants(index: &Value, rules: &HashMap<String, f64>) -> Vec<Value> {
         out.push(c);
     }
     out
+}
+
+/// Values of build.rs `CODE_VALUES` read by calling the rules (`Read::Called`).
+fn called_value(key: &str) -> Option<f64> {
+    use EntityKind::*;
+    match key {
+        "DISCIPLE_INSIGHT_PER_HP_UNITS" => compat::insight_per_hp(Warrior, Rifleman),
+        "DISCIPLE_INSIGHT_PER_HP_BUILDINGS" => compat::insight_per_hp(Warrior, Barracks),
+        "DISCIPLE_INSIGHT_PER_HP_WIND_EXTRACTORS" => compat::insight_per_hp(WindAdept, SteelMine),
+        "DISCIPLE_INSIGHT_PER_HP_WAR_TANKS" => compat::insight_per_hp(WarAdept, Tank),
+        // a 1000-damage hit with no armor penetration, in the open
+        "ARMOR_SMALL_DAMAGE_TAKEN" => Some(
+            combat::effective_damage_for_armor_penetration(0.0, Rifleman, 1000, None) as f64
+                / 1000.0,
+        ),
+        "ARMOR_ARMORED_DAMAGE_TAKEN" => Some(
+            combat::effective_damage_for_armor_penetration(0.0, Tank, 1000, None) as f64 / 1000.0,
+        ),
+        _ => None,
+    }
 }
 
 /// Code definitions keyed by page ("unit:tank") instead of enum variant ("EntityKind:Tank").
@@ -778,7 +803,7 @@ fn upgrades(text: &client_text::ClientText) -> Value {
     )
 }
 
-fn abilities() -> Value {
+fn abilities(numeric: &HashMap<String, f64>) -> Value {
     Value::Array(
         AbilityKind::ALL
             .iter()
@@ -822,8 +847,11 @@ fn abilities() -> Value {
                     "rangeTiles": vo(a.range_tiles),
                     "minRangeTiles": a.min_range_tiles,
                     "cooldownTicks": a.cooldown_ticks,
-                    // sim services/ability_orders.rs: Throw Sword's cooldown doubles below Master rank
-                    "adeptCooldownTicks": (*k == AbilityKind::ThrowSword).then(|| a.cooldown_ticks.saturating_mul(2)),
+                    // Throw Sword below Master rank; build.rs CODE_VALUES reads the multiplier from the sim
+                    "adeptCooldownTicks": (*k == AbilityKind::ThrowSword)
+                        .then(|| numeric.get("THROW_SWORD_ADEPT_COOLDOWN_MULTIPLIER"))
+                        .flatten()
+                        .map(|m| num(f64::from(a.cooldown_ticks) * m)),
                     "charges": charges,
                     "chargeRechargeTicks": recharge,
                     "steel": a.cost.steel,
@@ -843,6 +871,41 @@ fn abilities() -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Every number build.rs reads from the source (CODE_VALUES) must still be found, with the
+    /// value the code uses, so a moved or reworded line fails here rather than going stale.
+    #[test]
+    fn code_values_are_found_in_the_source() {
+        let index: Value = serde_json::from_str(CODE_INDEX).expect("code index");
+        let numeric: HashMap<String, f64> = constants()
+            .iter()
+            .filter_map(|c| match c.value {
+                Val::Num(n) => Some((c.name.to_string(), n)),
+                _ => None,
+            })
+            .collect();
+        let found: HashMap<String, f64> = sim_constants(&index, &numeric)
+            .iter()
+            .filter_map(|c| Some((c["name"].as_str()?.to_string(), c["value"].as_f64()?)))
+            .collect();
+        let keys = index["codeValueKeys"].as_array().expect("keys");
+        assert!(!keys.is_empty());
+        for key in keys {
+            let key = key.as_str().expect("key");
+            assert!(
+                found.contains_key(key),
+                "{key}: not found in the source; update build.rs CODE_VALUES"
+            );
+        }
+        // spot checks against the compiled code
+        assert_eq!(found["TOURNAMENT_DURATION_TICKS"], 150.0);
+        let (n, d) = balance::disciple_insight_ratio(EntityKind::WarAdept, EntityKind::Tank);
+        assert_eq!(
+            found["DISCIPLE_INSIGHT_PER_HP_WAR_TANKS"],
+            n as f64 / d as f64
+        );
+        assert_eq!(found["FRONT_ARC_RAD"], std::f64::consts::FRAC_PI_4);
+    }
 
     /// The weapon row a unit page shows must be the attack the simulation makes: Cultivators'
     /// own damage, range and cooldown, and their Dao rank's armor penetration.
