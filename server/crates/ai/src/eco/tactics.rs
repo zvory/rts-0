@@ -234,8 +234,20 @@ impl DefenseAssignments {
         }
         (!self.claim_ready).then_some(center)
     }
-    pub(super) fn recon_target(&self, frame: &AiFrame) -> Option<(f32, f32)> {
-        self.response.recon_target(frame)
+    pub(super) fn prepare_recon(
+        &mut self,
+        frame: &AiFrame,
+        outbound: &BTreeSet<u32>,
+    ) -> Option<(f32, f32)> {
+        self.guard_posts.retain(|id, _| !outbound.contains(id));
+        let areas = self.defended_areas(frame);
+        let eligible = frame
+            .owned()
+            .iter()
+            .filter(|e| infantry(e.kind) || e.kind == EntityKind::Tank)
+            .map(|e| e.id)
+            .collect();
+        self.response.prepare_defended(frame, &eligible, &areas)
     }
     pub(super) fn attacking_ids(&self) -> BTreeSet<u32> {
         self.response.attacking_ids()

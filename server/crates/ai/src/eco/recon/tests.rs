@@ -181,3 +181,101 @@ fn a_nearer_ready_car_can_scout_when_the_other_car_is_out_of_range() {
     );
     assert!(!recon.launched.contains_key(&1000));
 }
+
+#[test]
+fn strategy_uses_current_incidents_before_spending_scouting_launches() {
+    let (start, mut s, sites) = scene(2);
+    let depot = s
+        .entities
+        .iter()
+        .find(|e| e.kind == "resource_depot")
+        .unwrap();
+    let attack = (depot.x + 256., depot.y);
+    let mut enemy = s.entities.iter().find(|e| e.id == 1000).unwrap().clone();
+    enemy.id = 9000;
+    enemy.owner = 2;
+    enemy.kind = "tank".into();
+    enemy.abilities.clear();
+    enemy.x = attack.0;
+    enemy.y = attack.1;
+    s.entities.push(enemy);
+    let mut eco = crate::eco::EcoStrategy::default();
+    let step = |eco: &mut crate::eco::EcoStrategy, s: &Snapshot| {
+        let f = frame(&start, s, &sites);
+        let mut a = AiActions::for_frame(&f);
+        crate::sdk::AiStrategy::step(eco, &f, &mut a);
+        a.into_requests()
+            .into_iter()
+            .filter_map(|r| match r {
+                AiActionRequest::UseAbility {
+                    ability: AbilityKind::ScoutPlane,
+                    units,
+                    x: Some(x),
+                    y: Some(y),
+                    ..
+                } => Some((units[0], (x, y))),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        step(&mut eco, &s),
+        vec![(1000, attack)],
+        "a first-frame attack must take priority over a routine sortie"
+    );
+    // At the next ready opportunity, current clearance must replace the old incident
+    // before scouting. Otherwise the reserve is spent on an already cleared attack.
+    s.entities.retain(|e| e.id != 9000);
+    s.visible_tiles.fill(1);
+    s.tick += u32::from(rts_rules::balance::SCOUT_PLANE_LIFETIME_TICKS);
+    let orders = step(&mut eco, &s);
+    assert_eq!(orders.len(), 1);
+    assert_eq!(orders[0].0, 1001);
+    assert_ne!(orders[0].1, attack);
+}
+
+#[test]
+fn same_frame_clearance_resumes_spare_scouting_without_waiting_for_contact_expiry() {
+    let (start, mut s, sites) = scene(3);
+    let depot = s
+        .entities
+        .iter()
+        .find(|e| e.kind == "resource_depot")
+        .unwrap();
+    let attack = (depot.x + 256., depot.y);
+    let mut enemy = s.entities.iter().find(|e| e.id == 1000).unwrap().clone();
+    enemy.id = 9000;
+    enemy.owner = 2;
+    enemy.kind = "tank".into();
+    enemy.abilities.clear();
+    enemy.x = attack.0;
+    enemy.y = attack.1;
+    s.entities.push(enemy);
+    let mut eco = crate::eco::EcoStrategy::default();
+    let step = |eco: &mut crate::eco::EcoStrategy, s: &Snapshot| {
+        let f = frame(&start, s, &sites);
+        let mut a = AiActions::for_frame(&f);
+        crate::sdk::AiStrategy::step(eco, &f, &mut a);
+        a.into_requests()
+            .into_iter()
+            .filter_map(|r| match r {
+                AiActionRequest::UseAbility {
+                    ability: AbilityKind::ScoutPlane,
+                    units,
+                    x: Some(x),
+                    y: Some(y),
+                    ..
+                } => Some((units[0], (x, y))),
+                _ => None,
+            })
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(step(&mut eco, &s), vec![(1000, attack)]);
+    s.entities.retain(|e| e.id != 9000);
+    s.visible_tiles.fill(1);
+    s.tick += 9;
+    let orders = step(&mut eco, &s);
+    assert_eq!(orders.len(), 1);
+    assert_eq!(orders[0].0, 1002);
+    assert_ne!(orders[0].1, attack);
+}

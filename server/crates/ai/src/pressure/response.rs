@@ -15,6 +15,7 @@ const MEMORY_TICKS: u32 = 30 * 30;
 pub(crate) struct PressureResponse {
     include_machine_gunners: bool,
     cohesive: bool,
+    prepared_defended_tick: Option<u32>,
     threat_memory: BTreeMap<u32, (u32, AiEntity)>,
     armor_encounter: Option<cohesion::withdrawal::ArmorEncounter>,
     fighting: BTreeMap<u32, bool>,
@@ -111,16 +112,25 @@ impl PressureResponse {
     ) -> ResponsePlan {
         self.step_inner(frame, eligible, Some(areas), actions)
     }
-    fn step_inner(
+    /// Refresh the same observations used by troop control before spending support abilities.
+    pub(crate) fn prepare_defended(
+        &mut self,
+        frame: &AiFrame,
+        eligible: &BTreeSet<u32>,
+        areas: &[DefendedArea],
+    ) -> Option<Point> {
+        let book = AiRulebook::for_frame(frame)?;
+        self.observe_contacts(frame, eligible, Some(areas), book);
+        self.prepared_defended_tick = Some(frame.tick());
+        self.recon_target(frame)
+    }
+    fn observe_contacts(
         &mut self,
         frame: &AiFrame,
         eligible: &BTreeSet<u32>,
         areas: Option<&[DefendedArea]>,
-        actions: &mut AiActions,
-    ) -> ResponsePlan {
-        let Some(book) = AiRulebook::for_frame(frame) else {
-            return ResponsePlan::default();
-        };
+        book: AiRulebook,
+    ) {
         let size = frame.map().tile_size as f32;
         let base_position = |player: &crate::sdk::AiPlayer| {
             (
@@ -141,11 +151,6 @@ impl PressureResponse {
         if self.cohesive {
             self.observe_threats(frame);
         }
-        let owned: BTreeSet<_> = frame.owned().iter().map(|unit| unit.id).collect();
-        self.responders.retain(|id| owned.contains(id));
-        // Construction clearance may replace the unit's order while we cannot command it.
-        // Its next eligible decision must issue a fresh response, even if it is still moving.
-        self.issued.retain(|id, _| eligible.contains(id));
         self.contacts
             .retain(|_, contact| frame.tick().saturating_sub(contact.seen) < MEMORY_TICKS);
         let previous_contacts = self.contacts.keys().copied().collect::<BTreeSet<_>>();
@@ -201,6 +206,25 @@ impl PressureResponse {
                     .any(|id| !self.contacts.contains_key(id)))
         {
             self.issued.clear();
+        }
+    }
+    fn step_inner(
+        &mut self,
+        frame: &AiFrame,
+        eligible: &BTreeSet<u32>,
+        areas: Option<&[DefendedArea]>,
+        actions: &mut AiActions,
+    ) -> ResponsePlan {
+        let Some(book) = AiRulebook::for_frame(frame) else {
+            return ResponsePlan::default();
+        };
+        let owned: BTreeSet<_> = frame.owned().iter().map(|unit| unit.id).collect();
+        self.responders.retain(|id| owned.contains(id));
+        // Construction clearance may replace the unit's order while we cannot command it.
+        // Its next eligible decision must issue a fresh response, even if it is still moving.
+        self.issued.retain(|id, _| eligible.contains(id));
+        if self.prepared_defended_tick.take() != Some(frame.tick()) {
+            self.observe_contacts(frame, eligible, areas, book);
         }
         if self.contacts.is_empty() && !self.has_withdrawal() {
             self.issued.clear();

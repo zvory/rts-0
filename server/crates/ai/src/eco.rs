@@ -189,12 +189,12 @@ impl AiStrategy for EcoStrategy {
         if bases >= base_target(frame) {
             self.offense.observe(frame);
         }
-        self.recon
-            .step(frame, actions, self.defense.recon_target(frame));
         let push = self.defense.expansion_push_ids(frame);
         let mut reserved = self.defense.screen_ids().clone();
         reserved.extend(&push);
         let outbound = self.offense.controlled(frame, &reserved);
+        let incoming = self.defense.prepare_recon(frame, &outbound);
+        self.recon.step(frame, actions, incoming);
         // Give the support vehicle a turn before large infantry batches consume action capacity.
         let mut mobilized: std::collections::BTreeSet<u32> = self
             .defense

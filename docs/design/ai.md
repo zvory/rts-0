@@ -332,8 +332,9 @@ spare ready carriers rotate sorties toward public enemy-side base sites, excludi
 Depots. The reserve is a ready ability, not a stored plane unit. Defensive sorties may spend it;
 routine flights resume only when another ready launch can remain in reserve. Same-area sorties
 are deduplicated for their thirty-second lifetime, with local cooldown bookkeeping preventing
-repeated orders before the native snapshot updates. Reconnaissance runs before support movement
-and Breakthrough, and uses only known defensive contacts and public geography. Defensive flights must be able
+repeated orders before the native snapshot updates. Defensive observations refresh before reconnaissance without issuing troop orders; the troop
+controller then consumes that preparation once in the same tick. Reconnaissance runs before support movement
+and Breakthrough, and uses only current defensive contacts and public geography. Defensive flights must be able
 to reach the incident within eighty percent of their lifetime, preserving observation time; an
 unreachable incident neither spends the reserve nor creates a covered-area record.
 
