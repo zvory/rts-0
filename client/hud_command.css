@@ -179,3 +179,13 @@
     line-height: 1;
   }
 }
+
+/* Keep passive inspection readable while commands remain disabled. */
+#command-card[data-read-only="true"] .cmd-btn:disabled {
+  cursor: default;
+}
+#command-card[data-read-only="true"] .cmd-btn:disabled .cmd-icon,
+#command-card[data-read-only="true"] .cmd-btn:disabled .cmd-label,
+#command-card[data-read-only="true"] .cmd-btn:disabled .cmd-cost {
+  opacity: 0.85;
+}
