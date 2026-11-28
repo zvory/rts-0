@@ -4,6 +4,8 @@ import { PNG } from 'pngjs';
 import { composeTeamPaintRgba, loadTeamPaintTexture, teamPaintTextureFor, destroyTeamPaintTextures } from '../../client/src/renderer/rigs/team_paint.js';
 import { createLiveFrameStrips } from '../../client/src/renderer/rigs/frame_strip_routing.js';
 import { liveUnitIconMarkupFor } from '../../client/src/renderer/rigs/unit_icon_sources.js';
+import { renderFrameStripUnit } from '../../client/src/renderer/rigs/frame_strip_runtime.js';
+import { installFakePixi } from './pixi_fakes.mjs';
 
 const fixed = new Uint8ClampedArray([180, 120, 80, 255, 0, 0, 0, 0, 30, 40, 50, 90]);
 const paint = new Uint8ClampedArray([0, 0, 0, 0, 210, 210, 210, 255, 180, 180, 180, 80]);
@@ -74,6 +76,24 @@ try {
   assert.equal(created.length, 3, 'neutral and two shared palettes; no per-entity texture');
   assert.deepEqual([...r.source.resource.data.slice(4)], [...pixels.slice(4, 8)], 'gold attack pixels never receive player tint');
   assert.deepEqual([...original.source.resource.data.slice(0, 4)], [...pixels.slice(0, 4)], 'item glow keeps the neutral source');
+  const restorePixi = installFakePixi();
+  try {
+    const strip = { frameWidth: 1, frameHeight: 1, frameCount: 1, teamPaint: { baseRow: 2, paintRow: 3 } };
+    const renderer = { _liveRigPools: { units: new Map() }, _seen: { units: new Set() }, layers: { units: new PIXI.Container() } };
+    const draw = (id, silhouetteShadow, teamColor) => renderFrameStripUnit(renderer,
+      { id, kind: 'warrior', x: 0, y: 0 }, strip, original,
+      { poolName: 'units', layerName: 'units', silhouetteShadow, renderContext: { teamColor } });
+    const body = draw(1, false, 0xff0000);
+    const shadow = draw(2, true, 0xff0000);
+    assert.equal(body.texture, r);
+    assert.equal(shadow.texture, body.texture, 'shadow alpha follows the authored body, rather than the original neutral pose');
+    assert.equal(shadow.sprite.tint, 0x000000);
+    assert.equal(body.itemGlowFrames[0].resource.source, original.source, 'item bloom retains its neutral source');
+    const recolored = draw(1, false, 0x0000ff);
+    assert.equal(recolored.texture, b);
+    assert.equal(body._destroyed, true, 'owner color changes release the prior instance');
+    for (const instance of renderer._liveRigPools.units.values()) instance.destroy();
+  } finally { restorePixi(); }
   destroyTeamPaintTextures(original);
   destroyTeamPaintTextures(original);
   assert.ok(r.destroyed && b.destroyed, 'all derived GPU resources are released exactly with their match source');

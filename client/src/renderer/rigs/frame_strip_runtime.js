@@ -12,7 +12,7 @@ export function renderFrameStripUnit(renderer, entity, strip, texture, options =
   if (!pool) return null;
   const renderContext = options.renderContext || {};
   const sourceTexture = texture;
-  if (strip.teamPaint && !options.silhouetteShadow) texture = teamPaintTextureFor(texture, renderContext.teamColor);
+  if (strip.teamPaint) texture = teamPaintTextureFor(texture, renderContext.teamColor);
   if (typeof options.alpha === "number") renderContext.shotRevealAlpha = options.alpha;
 
   let instance = pool.get(entity.id);
