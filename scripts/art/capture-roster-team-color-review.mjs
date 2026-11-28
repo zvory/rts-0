@@ -2,18 +2,22 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {runCli} from '../interact/cli.ts';
+import {runtimePaths} from '../interact/runtime.ts';
 import puppeteer from 'puppeteer-core';
 const root=path.resolve(import.meta.dirname,'../..');process.chdir(root);
 const command=async(name,input)=>{const r=await runCli(['lab',name,JSON.stringify(input)]);if(!r.ok)throw Error(JSON.stringify(r.error));return r.result;};
 const out=path.join(root,'target/team-color-review-captures');fs.mkdirSync(out,{recursive:true});
 const palette=[['Blue','#0072b2'],['Vermilion','#d55e00'],['Green','#009e73'],['Pink','#cc79a7'],['Sky blue','#56b4e9'],['Orange','#e69f00'],['Yellow','#f0e442']];
-let {sessionId}=await command('open',{seed:1,viewport:{width:480,height:280,deviceScaleFactor:2}});
+let sessionId;
 const captures=[];
 const scenarioDir=path.join(root,'server/assets/lab-scenarios');
 const manifestPath=path.join(scenarioDir,'manifest.json'),manifestBytes=fs.readFileSync(manifestPath);
 const scenarioPath=path.join(scenarioDir,'team-paint-review.json');
 if(fs.existsSync(scenarioPath))throw Error('Temporary review scenario already exists');
+const runtime=runtimePaths(root);
+if([runtime.state,runtime.socket,runtime.lock].some(file=>fs.existsSync(file)))throw Error('Capture requires an unused Interact runtime so cleanup cannot stop another session');
 try {
+ ({sessionId}=await command('open',{seed:1,viewport:{width:480,height:280,deviceScaleFactor:2}}));
  await command('catalog',{sessionId,categories:['players','units']});
  await command('time',{sessionId,control:{action:'pause'}});
  const spawned=await command('spawn',{sessionId,spawns:[['rifleman',1888,'infantry'],['tank',1992,'vehicle'],['artillery',2096,'gun']].map(([kind,x,alias])=>({owner:1,kind,x,y:1824,alias}))});

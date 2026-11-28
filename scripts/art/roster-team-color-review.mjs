@@ -1,6 +1,7 @@
 // Review-only packing and reversible renderer wiring. No full animation generation.
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { PNG } from 'pngjs';
 import puppeteer from 'puppeteer-core';
@@ -8,14 +9,27 @@ import {SCOUT_CAR_PNG_RIG_ATLAS as scout} from '../../client/src/renderer/rigs/s
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'../..');
 const dir=path.join(root,'client/assets/rigs/roster-team-color-review');
 const generated=path.join(dir,'generated');
-const write=(file,bytes)=>{if(process.argv.includes('--check')){if(!fs.existsSync(file)||!fs.readFileSync(file).equals(bytes))throw Error(`Stale review output: ${file}`);}else fs.writeFileSync(file,bytes);};
+const modes=process.argv.slice(2);
+if(modes.length>1||modes.some(mode=>!['--check','--install-preview','--restore'].includes(mode)))throw Error('Use at most one of --check, --install-preview, --restore');
+const write=(file,bytes)=>{if(modes.includes('--check')){if(!fs.existsSync(file)||!fs.readFileSync(file).equals(bytes))throw Error(`Stale review output: ${file}`);}else fs.writeFileSync(file,bytes);};
 const files=['rifleman_png_strip.js','tank_png_atlas.js','artillery_png_atlas.js','png_routing.js','png_runtime.js'];
 const rig=path.join(root,'client/src/renderer/rigs');
 const backup=path.join(root,'target/team-color-review-backup');
-if(process.argv.includes('--restore')) {
-  for(const f of files) if(fs.existsSync(path.join(backup,f))) fs.copyFileSync(path.join(backup,f),path.join(rig,f));
+const statePath=path.join(backup,'state.json');
+const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
+if(modes.includes('--restore')) {
+  if(!fs.existsSync(statePath))throw Error('No verified preview backup; refusing to restore stale or incomplete backups');
+  const state=JSON.parse(fs.readFileSync(statePath,'utf8'));
+  // Validate every file before restoring any of them. Preserve edits made after installation.
+  for(const f of files) {
+    const saved=fs.readFileSync(path.join(backup,f)),current=fs.readFileSync(path.join(rig,f));
+    if(hash(saved)!==state[f]?.original||![state[f].original,state[f].installed].includes(hash(current)))throw Error(`Preview file changed; preserve your edits before restoring: ${f}`);
+  }
+  for(const f of files)fs.copyFileSync(path.join(backup,f),path.join(rig,f));
+  fs.rmSync(backup,{recursive:true});
   process.exit(0);
 }
+if(!modes.includes('--install-preview')) {
 const sources={
  rifleman:'rifleman-no-pack-panzerfaust-pass-01/generated/white/recoil-pass-01/rifleman-recoil-review-strip.png',
  tank:'tank-ps1/tank-atlas.png',
@@ -81,15 +95,29 @@ try {
    for(const [j,k] of ['author','mask'].entries()) {const image=new Image();image.src=`data:image/png;base64,${imgs[`${name}-${k}`]}`;await image.decode();const scale=Math.min(470/image.width,270/image.height);x.drawImage(image,510+j*490,top+20,image.width*scale,image.height*scale);x.font='16px sans-serif';x.fillStyle='#fff';x.fillText(k==='author'?'Magenta authoring artwork':'Soft grayscale paint mask',510+j*490,top+10);}
   }return c.toDataURL();
  },imgs);
- fs.writeFileSync(path.join(generated,'source-material-board.png'),Buffer.from(board.split(',')[1],'base64'));
+ write(path.join(generated,'source-material-board.png'),Buffer.from(board.split(',')[1],'base64'));
 } finally {await browser.close();}
-if(process.argv.includes('--install-preview')) {
- fs.mkdirSync(backup,{recursive:true});
- for(const f of files) {if(!fs.existsSync(path.join(backup,f)))fs.copyFileSync(path.join(rig,f),path.join(backup,f));}
- const edit=(f,fn)=>fs.writeFileSync(path.join(rig,f),fn(fs.readFileSync(path.join(backup,f),'utf8')));
+}
+if(modes.includes('--install-preview')) {
+ if(fs.existsSync(backup))throw Error('Preview backup already exists; refusing to reuse it');
+ for(const name of ['rifleman','tank','artillery'])if(!fs.existsSync(path.join(generated,`${name}-packed.png`)))throw Error(`Generate review textures before installing: ${name}`);
+ const originals=Object.fromEntries(files.map(f=>[f,fs.readFileSync(path.join(rig,f))]));
+ const installed={};
+ const edit=(f,fn)=>{installed[f]=Buffer.from(fn(originals[f].toString('utf8')));};
  edit('rifleman_png_strip.js',s=>s.replace(/image: .*\n/, 'image: "/assets/rigs/roster-team-color-review/generated/rifleman-packed.png",\n  sheetRows: 4,\n  teamPaint: {baseRow:2,paintRow:3},\n').replace('frameCount: 5','frameCount: 1').replace('movementFrames: [1, 2, 3]','movementFrames: [0]').replace('firingFrames: [4]','firingFrames: [0]'));
  for(const name of ['tank','artillery']) edit(`${name}_png_atlas.js`,s=>s.replace(/("?image"?): .*\n/,`image: "/assets/rigs/roster-team-color-review/generated/${name}-packed.png",\n  reviewTeamPaint: true,\n`).replace(/"?tintSlot"?: "team[^"\n]*"/g,'tintSlot: "fixed"').replaceAll('x: 0, y: 1373','x: 700, y: 1100').replace(/"runtimeColorAdjustment": relativeColorAdjustment\([\s\S]*?\),/,'runtimeColorAdjustment: PRODUCTION_RASTER_COLOR_TARGET,'));
  edit('png_routing.js',s=>'import { loadTeamPaintTexture } from "./team_paint.js";\n'+s.replace('const base = await loadColorAdjustedTexture(pixi, {','if (atlas.reviewTeamPaint) return loadTeamPaintTexture(pixi, {image:atlas.image, frameWidth:atlas.grid.width, frameHeight:atlas.grid.height, frameCount:1, sheetRows:4, teamPaint:{baseRow:2,paintRow:3}}, atlas.runtimeColorAdjustment);\n  const base = await loadColorAdjustedTexture(pixi, {'));
  edit('png_runtime.js',s=>'import { teamPaintTextureFor } from "./team_paint.js";\n'+s.replace('const atlasTexture = options.atlasTexture;','let atlasTexture = options.atlasTexture;').replace('if (typeof options.alpha', 'if (atlas.reviewTeamPaint) atlasTexture = teamPaintTextureFor(atlasTexture, context.teamColor);\n  if (typeof options.alpha'));
+ // Prepare all edits first, then keep verified originals until restoration succeeds.
+ fs.mkdirSync(backup,{recursive:true});
+ for(const f of files)fs.writeFileSync(path.join(backup,f),originals[f]);
+ fs.writeFileSync(statePath,JSON.stringify(Object.fromEntries(files.map(f=>[f,{original:hash(originals[f]),installed:hash(installed[f])}]))));
+ try {
+  for(const f of files)fs.writeFileSync(path.join(rig,f),installed[f]);
+ } catch(error) {
+  for(const f of files)fs.writeFileSync(path.join(rig,f),originals[f]);
+  fs.rmSync(backup,{recursive:true});
+  throw error;
+ }
  console.log('Installed temporary idle/component review wiring. Restore with --restore.');
 }

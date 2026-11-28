@@ -53,8 +53,12 @@ node scripts/art/capture-roster-team-color-review.mjs
 node scripts/art/roster-team-color-review.mjs --restore
 ```
 
-The installer backs up five renderer modules beneath ignored `target/` and rewrites them only for
-local preview. Restore before committing. The capture script uses Interact's authoritative Lab,
+The installer uses existing packed textures, backs up five renderer modules beneath ignored
+`target/`, and rewrites them only for local preview. It refuses existing backups; restore verifies
+both backup hashes and installed files before writing, then removes the backup. Changed renderer
+files or legacy backups require manual preservation/reconciliation rather than automatic overwrite.
+Restore before committing. `--check` compares generated outputs without writing them.
+The capture script requires an unused Interact runtime and uses its authoritative Lab,
 pauses the scene, and takes seven separate game screenshots at camera scale 1 and DPR 2, using
 seven colors from the current player palette. Each color launches the same checkpoint through a temporary catalog scenario in a fresh
 Lab session. The catalog bytes are restored and the temporary scenario is removed in `finally`. It closes sessions and shuts down
