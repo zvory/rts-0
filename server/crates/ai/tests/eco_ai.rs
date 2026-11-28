@@ -190,9 +190,9 @@ fn run_economy_progression(goal: usize) {
         }
         assert!(
             bases >= 7 || works <= works_target_for_test(bases),
-            "no surplus Works before six completed bases"
+            "no surplus Works before seven completed bases"
         );
-        assert!(bases <= 6, "six bases is the expansion cap");
+        assert!(bases <= 7, "seven bases is the Classic expansion cap");
         let mg_count = owned.iter().filter(|e| e.kind == "machine_gunner").count();
         if mg_at_complex.is_none() && owned.iter().any(|e| e.kind == "engineering_complex") {
             mg_at_complex = Some(mg_count);
