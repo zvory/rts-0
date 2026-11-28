@@ -33,7 +33,7 @@ fn every_playable_unit_building_and_research_has_a_page() {
     // test fixtures are not factions anyone plays
     for catalog in rts_rules::faction::CATALOGS
         .iter()
-        .filter(|c| !c.units.is_empty() && !c.id.contains("fixture"))
+        .filter(|c| !c.units.is_empty() && !c.id.contains("fixture") && c.id != "ekat")
     {
         let units = catalog
             .units
@@ -49,6 +49,17 @@ fn every_playable_unit_building_and_research_has_a_page() {
             .map(|u| format!("research-{}.html", u.kind.stable_id()));
         let factions = std::iter::once(format!("faction-{}.html", catalog.id));
         for file in units.chain(buildings).chain(research).chain(factions) {
+            if [
+                "unit-artillery.html",
+                "building-depot.html",
+                "building-healing_seal.html",
+                "research-artillery_unlock.html",
+                "research-ballistic_tables.html",
+            ]
+            .contains(&file.as_str())
+            {
+                continue;
+            }
             if !site.contains_key(&file) {
                 missing.push(file);
             }
@@ -133,4 +144,61 @@ fn unit_pages_show_compiled_numbers() {
         "Tank HP {} not on its page",
         tank.stats.hp
     );
+}
+
+#[test]
+fn current_wiki_hides_archived_content_and_links() {
+    for file in [
+        "faction-ekat.html",
+        "unit-ekat.html",
+        "unit-golem.html",
+        "building-zamok.html",
+        "unit-artillery.html",
+        "research-artillery_unlock.html",
+        "research-ballistic_tables.html",
+        "building-healing_seal.html",
+        "building-depot.html",
+    ] {
+        assert!(
+            !site().contains_key(file),
+            "archived page generated: {file}"
+        );
+        for (page, html) in site() {
+            assert!(
+                !html.contains(&format!("href=\"{file}")),
+                "{page} links to {file}"
+            );
+            assert!(
+                !html.contains(&format!("\"u\":\"{file}")),
+                "{file} is searchable"
+            );
+        }
+    }
+    let abilities = &site()["abilities.html"];
+    for id in [
+        "healingSeal",
+        "pointFire",
+        "blanketFire",
+        "ekatTeleport",
+        "ekatLineShot",
+        "ekatMagicAnchor",
+        "ekatConsumeGolem",
+    ] {
+        assert!(
+            !abilities.contains(&format!("id=\"{id}\"")),
+            "archived ability: {id}"
+        );
+    }
+    let weapons = &site()["weapons.html"];
+    assert!(!weapons.contains("id=\"w-artillery_gun\""));
+    assert!(site().contains_key("unit-rocket_launcher.html"));
+    assert!(site().contains_key("faction-cultivators.html"));
+}
+
+#[test]
+fn homepage_keeps_version_without_counts_or_explanation() {
+    let page = &site()["index.html"];
+    assert!(page.contains("Game version <a"));
+    assert!(!page.contains("class=\"chips\""));
+    assert!(!page.contains(": the build this server is running"));
 }

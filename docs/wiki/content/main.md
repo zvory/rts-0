@@ -1,4 +1,4 @@
-The **Bewegungskrieg Wiki** covers every unit, building, research topic and rule in Bewegungskrieg. All stats are read from the game's code at the version below.
+The **Bewegungskrieg Wiki** covers the current playable units, buildings, research and rules in Bewegungskrieg. All stats are read from the game's code at the version below.
 
 - **Time** is in seconds ({{TICK_HZ}} ticks = 1 s).
 - **Distance** is in tiles (1 tile = {{TILE_SIZE}} px).

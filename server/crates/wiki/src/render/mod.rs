@@ -37,11 +37,12 @@ pub struct Wiki {
 
 /// Build every page. `history` is docs/wiki/history.json, `icons` docs/wiki/icons.json.
 pub fn render(
-    cur: Value,
+    mut cur: Value,
     content: BTreeMap<String, Doc>,
     icons: Option<&str>,
     history: Option<&str>,
 ) -> BTreeMap<String, String> {
+    super::visibility::filter_current(&mut cur);
     let u = Units {
         tick_hz: util::n(get(&cur, "timing"), "tickHz").unwrap_or(30.0),
         tile: util::n(get(&cur, "timing"), "tileSize").unwrap_or(32.0),
@@ -432,6 +433,9 @@ impl Wiki {
                     "ability" => "ability",
                     _ => continue,
                 };
+                if self.entity(kind, id).is_none() {
+                    continue;
+                }
                 if let Value::Object(fields) = fields {
                     for f in fields.values() {
                         for c in util::strs(f, "consts") {

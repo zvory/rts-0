@@ -82,6 +82,13 @@ each `pub const` scalar and definition field is set and used, so pages link numb
 the running commit. Hand-written notes in `docs/wiki/content/` reference numbers only through
 `{{CONSTANT}}`-style templates, never literal copies, so a balance change needs no wiki edit unless
 it renames something a note references (the `rts-wiki` tests catch that).
+The player presentation applies `server/crates/wiki/src/visibility.rs` to hide archived or
+playtest-hidden factions, entities, research and abilities, and weapons without current users.
+The filter runs before page, table, navigation and search generation, including nested catalog
+relations. Raw snapshots and recorded changelog history remain intact; historical entries for
+hidden content have no link to a current entity page. This is a wiki presentation policy, not a
+change to simulation legality or the developer `/wiki/stats` reference.
+
 
 `server/src/config.rs` and `server/crates/sim/src/config.rs` are compatibility shims for
 Rust-owned balance exports while call sites are migrated. They should not accumulate server-shell

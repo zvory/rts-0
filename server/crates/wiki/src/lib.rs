@@ -12,6 +12,7 @@ mod client_text;
 mod compat;
 pub mod render;
 pub mod snapshot;
+mod visibility;
 
 use serde_json::json;
 use std::collections::BTreeMap;

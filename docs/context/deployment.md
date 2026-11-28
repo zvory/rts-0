@@ -48,7 +48,9 @@ still gate merging; serialized deploys finish the active rollout and coalesce pe
   any write-wait timeout before treating an interrupted deploy as healthy.
 - `/wiki` is server-rendered and read-only. `/wiki/` is the player wiki, generated once per
   process by `server/crates/wiki` (`rts-wiki`) from the compiled `rts-rules` definitions, faction
-  catalogs and the sim research table; numbers are never copied into its data. Its only file
+  catalogs and the sim research table; numbers are never copied into its data. The player
+  presentation filters archived/playtest-hidden content via `server/crates/wiki/src/visibility.rs`
+  before pages, tables and search are built (see `docs/design/balance.md`). Its only file
   inputs are `docs/wiki/` (Markdown notes, `icons.json`, `history.json`, all fixed names) and the
   client's `rules_mirror.js` for labels/tooltips. Developer docs live at `/wiki/dev/` and may serve
   only allowlisted Markdown from `docs/context` and `docs/design`; the old `/wiki/docs|context|design/...`

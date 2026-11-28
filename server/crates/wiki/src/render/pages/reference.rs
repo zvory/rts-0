@@ -855,7 +855,7 @@ pub(super) fn maintenance_page(w: &Wiki) {
             orphans.push(key.clone());
         }
     }
-    h.push_str(&h2("orphans", "Notes for things that no longer exist"));
+    h.push_str(&h2("orphans", "Notes for hidden or missing entries"));
     if orphans.is_empty() {
         h.push_str("<p class=\"ok\">None.</p>");
     } else {
