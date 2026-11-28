@@ -228,8 +228,8 @@ for (const masterFirst of [true, false]) {
       kind = selectedKind;
       hud._renderSelectedPanel();
       const html = panel.children[0].innerHTML;
-      assert(html.includes(`>${armored ? "Armored" : "Unarmored"}</abbr>`),
-        `${kind} selection reports its armor classification`);
+      assert(html.includes(`>${armored ? "75%" : "0%"}</abbr>`),
+        `${kind} selection reports its armor damage reduction percentage`);
       assert(html.includes(armored ? "75% less HP damage" : "no armor damage reduction") &&
         html.includes('title="') && (!armored || html.includes("Armor-piercing attacks")),
       `${kind} armor hover explains damage protection and penetration`);

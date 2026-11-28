@@ -29,9 +29,9 @@ withFakeHudDocument(({ FakeElement }) => {
   const hud = new HUD({ querySelector: (selector) => selector === "#selected-panel" ? panel : null }, state, {}, null);
   hud._renderSelectedPanel();
   const before = panel.children[0];
-  assert(before.children.some((child) => child.textContent === "Player research: None"), "observer selection shows current player research");
+  assert(!before.children.some((child) => child.className === "sel-stat sel-researched"), "observer selection omits player-wide research");
   row.upgrades = [UPGRADE.SMOKE_PLUS];
   hud._renderSelectedPanel();
-  assert(panel.children[0] !== before, "research completion invalidates selected detail cache");
-  assert(panel.children[0].children.some((child) => child.textContent.includes("Smoke")), "completed research appears without reselection");
+  assert(panel.children[0] === before, "unrelated player research does not rebuild selected unit details");
+  assert(!panel.children[0].children.some((child) => child.className === "sel-stat sel-researched"), "completed research stays out of observer selection details");
 });
