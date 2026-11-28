@@ -1,9 +1,10 @@
 ---
 name: Cultivators
-summary: Novices that grow into Wind, War and Magic Adepts.
+summary: Sword Disciples and Bow Novices that grow into Wind, War and Magic Adepts.
 constants: DAO_, DISCIPLE_, CULTIVATOR_, MAGIC_, MAX_DAO_
 ---
-**Cultivators** train {{unit:warrior|Novices}} that evolve into Adepts.
+**Cultivators** train {{unit:warrior|Sword Disciples}} and {{unit:bow_novice|Bow Novices}} that evolve into Adepts.
+Both are immediately available at a Portal. Bow Novices stop to shoot arrows; Sword Disciples fight in melee.
 
 ## Overview
 

@@ -38,7 +38,7 @@ pub(super) fn order_entry(
     for id in units {
         let Some(unit) = entities
             .get(*id)
-            .filter(|e| e.owner == owner && e.kind == EntityKind::Warrior && e.hp > 0)
+            .filter(|e| e.owner == owner && e.kind.is_novice() && e.hp > 0)
         else {
             continue;
         };
@@ -73,7 +73,7 @@ pub(in crate::game) fn advance(
                 e.movement.as_ref()?.tournament_target?,
                 e.pos_x(),
                 e.pos_y(),
-                e.hp > 0 && e.kind == EntityKind::Warrior,
+                e.hp > 0 && e.kind.is_novice(),
             ))
         }) else {
             continue;

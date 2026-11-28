@@ -21,7 +21,8 @@ Ship through normal Portal production, not as a hidden or debug-only unit.
 - Speed 2 world pixels/tick, sight 11 tiles, collision radius 17 world pixels.
   Selection uses the same base cultivator affordance; artwork retains its original scale.
 - Primary: five-tile range, five damage, 32-tick cooldown, zero armor penetration,
-  ordinary Rifleman target legality and stationary firing/pause behavior. Immediate server
+  ordinary Rifleman target legality and stationary firing, with the existing five-tick
+  Rifleman post-shot movement pause. Immediate server
   damage with the preserved arrow presentation/release timing. No area damage.
 - No Charge, Blink, secondary melee attack, or passive insight. Normal commands and queues.
 - Same insight rate as Sword Disciple: one per hostile unit HP removed, quarter-rate building
@@ -38,12 +39,18 @@ Ship through normal Portal production, not as a hidden or debug-only unit.
 
 - [x] Phase 0 brief written and reviewed in conversation.
 - [x] Phase 1 rules written; user authorized implementation.
-- [ ] Rules, protocol mirrors, production and progression integrated.
-- [ ] Client card, artwork, projectile and selection integrated.
-- [ ] Focused production/combat/evolution and parity validation.
-- [ ] Interact combat WebM captured and visually inspected.
+- [x] Rules, protocol mirrors, production and progression integrated.
+- [x] Client card, artwork, projectile and selection integrated.
+- [x] Focused production/combat/evolution and parity validation.
+- [x] Interact combat WebM captured and visually inspected.
 - [ ] Patch-note copy staged; owned PR merged.
 
 Patch-note draft: Portals can immediately train Bow Novices for 50 steel. Bow Novices
 stop to fire arrows, earn insight and evolve into any of the three existing Dao Adepts.
 The former Novice is now named Sword Disciple.
+
+Validation: rules/protocol/simulation nextest coverage, client contracts, protocol and faction
+parity, wiki generation, client/simulation architecture checks and `tests/run-all.sh --no-rust`.
+Interact verified an unresearched Portal produces a 48-HP Bow Novice in 300 ticks.
+Combat demo: three Bow Novices versus three Riflemen; 360 fixed-step frames, 30 FPS,
+12-second WebM. Dedicated bow audio remains deferred.

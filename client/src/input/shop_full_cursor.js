@@ -1,12 +1,12 @@
 import { KIND } from "../protocol.js";
 import { CULTIVATOR_NOVICE_ITEM_CAPACITY, CULTIVATOR_ITEM_CAPACITY, CULTIVATOR_MASTER_ITEM_CAPACITY } from "../config.js";
 
-const FIGHTERS = new Set([KIND.WARRIOR, KIND.WIND_ADEPT, KIND.WAR_ADEPT, KIND.MAGIC_ADEPT]);
+const FIGHTERS = new Set([KIND.WARRIOR, KIND.BOW_NOVICE, KIND.WIND_ADEPT, KIND.WAR_ADEPT, KIND.MAGIC_ADEPT]);
 
 export function carriedItemSlotsFull(entity) {
   if (!FIGHTERS.has(entity?.kind)) return false;
   const capacity = entity.daoMaster ? CULTIVATOR_MASTER_ITEM_CAPACITY
-    : entity.kind === KIND.WARRIOR ? CULTIVATOR_NOVICE_ITEM_CAPACITY : CULTIVATOR_ITEM_CAPACITY;
+    : (entity.kind === KIND.WARRIOR || entity.kind === KIND.BOW_NOVICE) ? CULTIVATOR_NOVICE_ITEM_CAPACITY : CULTIVATOR_ITEM_CAPACITY;
   return Number.isInteger(entity.itemRadianceTier) && entity.itemRadianceTier >= capacity;
 }
 

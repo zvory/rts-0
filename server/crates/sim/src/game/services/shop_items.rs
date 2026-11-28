@@ -258,7 +258,7 @@ fn auto_recipient(
             }
             let rank = if unit.dao_master {
                 2
-            } else if unit.kind != EntityKind::Warrior {
+            } else if !unit.kind.is_novice() {
                 1
             } else {
                 0

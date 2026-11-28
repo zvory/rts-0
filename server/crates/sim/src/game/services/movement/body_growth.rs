@@ -1,7 +1,7 @@
 use super::standability::unit_static_standable_with_radius;
 use super::Occupancy;
 use crate::config;
-use crate::game::entity::{EntityKind, EntityStore};
+use crate::game::entity::EntityStore;
 use crate::game::map::Map;
 
 /// Commit growth only at a legal body position, using the current post-production topology.
@@ -20,8 +20,7 @@ pub(crate) fn advance_dao_units(
         let Some(unit) = entities.get(id) else {
             continue;
         };
-        let novice =
-            unit.kind == EntityKind::Warrior && unit.insight >= config::DISCIPLE_INSIGHT_REQUIRED;
+        let novice = unit.kind.is_novice() && unit.insight >= config::DISCIPLE_INSIGHT_REQUIRED;
         let master = unit.dao().is_some()
             && !unit.dao_master
             && unit.insight >= config::DISCIPLE_EVOLVED_INSIGHT_CAP;

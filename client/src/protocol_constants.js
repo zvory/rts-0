@@ -175,6 +175,7 @@ export const KIND = Object.freeze({
   RIFLEMAN: "rifleman",
   PANZERFAUST: "panzerfaust",
   WARRIOR: "warrior",
+  BOW_NOVICE: "bow_novice",
   WIND_ADEPT: "wind_adept",
   WAR_ADEPT: "war_adept",
   MAGIC_ADEPT: "magic_adept",
@@ -217,6 +218,7 @@ export const UNIT_KINDS = Object.freeze([
   KIND.RIFLEMAN,
   KIND.PANZERFAUST,
   KIND.WARRIOR,
+  KIND.BOW_NOVICE,
   KIND.WIND_ADEPT,
   KIND.WAR_ADEPT,
   KIND.MAGIC_ADEPT,
@@ -420,6 +422,7 @@ export const KIND_CODE = Object.freeze({
   [KIND.HEALING_SEAL]: 38,
   [KIND.SHOP_DELIVERY]: 39,
   [KIND.WARRIOR]: 29,
+  [KIND.BOW_NOVICE]: 41,
   [KIND.WIND_ADEPT]: 35,
   [KIND.WAR_ADEPT]: 36,
   [KIND.MAGIC_ADEPT]: 37,
@@ -709,5 +712,5 @@ export function daoForKind(kind) {
 }
 
 export function isDiscipleKind(kind) {
-  return kind === KIND.WARRIOR || daoForKind(kind) !== null;
+  return kind === KIND.WARRIOR || kind === KIND.BOW_NOVICE || daoForKind(kind) !== null;
 }

@@ -8,6 +8,7 @@ pub enum EntityKind {
     Worker,
     Golem,
     Warrior,
+    BowNovice,
     WindAdept,
     WarAdept,
     MagicAdept,
@@ -48,10 +49,11 @@ pub enum EntityKind {
 }
 
 impl EntityKind {
-    pub const ALL: [EntityKind; 40] = [
+    pub const ALL: [EntityKind; 41] = [
         EntityKind::Worker,
         EntityKind::Golem,
         EntityKind::Warrior,
+        EntityKind::BowNovice,
         EntityKind::WindAdept,
         EntityKind::WarAdept,
         EntityKind::MagicAdept,
@@ -94,8 +96,12 @@ impl EntityKind {
     pub const fn is_disciple(self) -> bool {
         matches!(
             self,
-            Self::Warrior | Self::WindAdept | Self::WarAdept | Self::MagicAdept
+            Self::Warrior | Self::BowNovice | Self::WindAdept | Self::WarAdept | Self::MagicAdept
         )
+    }
+
+    pub const fn is_novice(self) -> bool {
+        matches!(self, Self::Warrior | Self::BowNovice)
     }
 
     pub const fn dao(self) -> Option<crate::faction::UpgradeKind> {
@@ -151,6 +157,7 @@ impl EntityKind {
             EntityKind::WarAdept => "war_adept",
             EntityKind::MagicAdept => "magic_adept",
             EntityKind::Warrior => "warrior",
+            EntityKind::BowNovice => "bow_novice",
             EntityKind::Rifleman => "rifleman",
             EntityKind::Panzerfaust => "panzerfaust",
             EntityKind::MachineGunner => "machine_gunner",
@@ -200,6 +207,7 @@ impl FromStr for EntityKind {
             "war_adept" => Ok(EntityKind::WarAdept),
             "magic_adept" => Ok(EntityKind::MagicAdept),
             "warrior" => Ok(EntityKind::Warrior),
+            "bow_novice" => Ok(EntityKind::BowNovice),
             "rifleman" => Ok(EntityKind::Rifleman),
             "panzerfaust" => Ok(EntityKind::Panzerfaust),
             "machine_gunner" => Ok(EntityKind::MachineGunner),
@@ -349,6 +357,7 @@ pub fn death_ground_decal_class(kind: EntityKind) -> Option<&'static str> {
     match kind {
         EntityKind::Worker
         | EntityKind::Warrior
+        | EntityKind::BowNovice
         | EntityKind::WindAdept
         | EntityKind::WarAdept
         | EntityKind::MagicAdept
@@ -452,6 +461,7 @@ pub fn barbed_wire_affects(kind: EntityKind) -> bool {
         EntityKind::Worker
             | EntityKind::Golem
             | EntityKind::Warrior
+            | EntityKind::BowNovice
             | EntityKind::WindAdept
             | EntityKind::WarAdept
             | EntityKind::MagicAdept

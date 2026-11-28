@@ -3,6 +3,7 @@ import { KIND } from "../protocol.js";
 
 const CULTIVATOR_FIGHTERS = new Set([
   KIND.WARRIOR,
+  KIND.BOW_NOVICE,
   KIND.WIND_ADEPT,
   KIND.WAR_ADEPT,
   KIND.MAGIC_ADEPT,

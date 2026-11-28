@@ -17,6 +17,7 @@ use rand::SeedableRng;
 mod accuracy;
 mod anti_tank_acquisition;
 mod anti_tank_behavior;
+mod bow_novice;
 mod coax;
 mod dao_balance;
 mod direct_hits;

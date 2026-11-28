@@ -69,6 +69,7 @@ const RESOURCE_DEPOT_UNITS: &[EntityKind] = &[
 const GOLEM_ONLY: &[EntityKind] = &[EntityKind::Golem];
 const PORTAL_UNITS: &[EntityKind] = &[
     EntityKind::Warrior,
+    EntityKind::BowNovice,
     EntityKind::WindAdept,
     EntityKind::WarAdept,
     EntityKind::MagicAdept,
@@ -187,6 +188,17 @@ pub const UNITS: &[UnitDef] = &[
         train_requirement: TechRequirement::All(&[]),
     },
     NOVICE_DEF,
+    UnitDef {
+        kind: EntityKind::BowNovice,
+        stats: balance::UnitStats {
+            hp: NOVICE_DEF.stats.hp - 10,
+            dmg: 5,
+            range_tiles: 5.0,
+            cooldown: 32,
+            ..NOVICE_DEF.stats
+        },
+        ..NOVICE_DEF
+    },
     // Adept bodies, HP and production costs are independent of the base Novice.
     UnitDef {
         kind: EntityKind::WindAdept,
@@ -929,6 +941,7 @@ mod tests {
                 EntityKind::Worker,
                 EntityKind::Golem,
                 EntityKind::Warrior,
+                EntityKind::BowNovice,
                 EntityKind::WindAdept,
                 EntityKind::WarAdept,
                 EntityKind::MagicAdept,

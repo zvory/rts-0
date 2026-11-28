@@ -9,7 +9,7 @@ export function updateShopDeliveryPreview(input) {
       || input.inputRouter?.activePreviewSurface?.()) return;
   if (intent.commandCardMode === "shopBuy") {
     const selected = input.state.selectedEntities().filter((e) =>
-      [KIND.WARRIOR, KIND.WIND_ADEPT, KIND.WAR_ADEPT, KIND.MAGIC_ADEPT].includes(e.kind)
+      [KIND.WARRIOR, KIND.BOW_NOVICE, KIND.WIND_ADEPT, KIND.WAR_ADEPT, KIND.MAGIC_ADEPT].includes(e.kind)
       && e.hp > 0 && !e.visionOnly && ownOwner(input.state, e.owner, input.controlPolicy));
     const owner = selected[0]?.owner;
     const shop = input.state.entitiesInterpolated(1).filter((e) => e.owner === owner

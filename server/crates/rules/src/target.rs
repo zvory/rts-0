@@ -67,6 +67,7 @@ pub fn is_coax_infantry_priority(kind: EntityKind) -> bool {
     matches!(
         kind,
         EntityKind::Warrior
+            | EntityKind::BowNovice
             | EntityKind::WindAdept
             | EntityKind::WarAdept
             | EntityKind::MagicAdept
@@ -86,6 +87,7 @@ pub fn is_anti_tank_gun_infantry_target(kind: EntityKind) -> bool {
         EntityKind::Worker
             | EntityKind::Golem
             | EntityKind::Warrior
+            | EntityKind::BowNovice
             | EntityKind::WindAdept
             | EntityKind::WarAdept
             | EntityKind::MagicAdept
@@ -192,6 +194,20 @@ mod tests {
                     armor_class: Some(ArmorClass::Small),
                     weapon_class: WeaponClass::SmallArms,
                     threat_role: TargetThreatRole::AntiArmorThreat,
+                    is_vehicle_body: false,
+                    is_economy_unit: false,
+                    is_coax_infantry_priority: true,
+                },
+            ),
+            (
+                EntityKind::BowNovice,
+                ExpectedTargetFacts {
+                    is_unit: true,
+                    is_building: false,
+                    is_resource_node: false,
+                    armor_class: Some(ArmorClass::Small),
+                    weapon_class: WeaponClass::SmallArms,
+                    threat_role: TargetThreatRole::Ordinary,
                     is_vehicle_body: false,
                     is_economy_unit: false,
                     is_coax_infantry_priority: true,
@@ -783,6 +799,7 @@ mod tests {
             EntityKind::Worker,
             EntityKind::Golem,
             EntityKind::Warrior,
+            EntityKind::BowNovice,
             EntityKind::WindAdept,
             EntityKind::WarAdept,
             EntityKind::MagicAdept,

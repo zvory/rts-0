@@ -12,6 +12,7 @@ mod ai_identity_tests;
 mod artillery_blanket_tests;
 mod artillery_tests;
 mod at_gun_firing_reveal_tests;
+mod bow_novice_tests;
 mod build_wait_tests;
 mod checkpoint_helpers;
 mod checkpoint_lab_tests;
