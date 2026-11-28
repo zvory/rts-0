@@ -450,9 +450,9 @@ import { CommandInteraction } from "../../client/src/command_interaction.js";
       STATS[KIND.TANK_TRAP].footW === 1 &&
       STATS[KIND.TANK_TRAP].footH === 1 &&
       STATS[KIND.TANK_TRAP].sight === 0 &&
-      STATS[KIND.TANK_TRAP].cost.steel === 20 &&
+      STATS[KIND.TANK_TRAP].cost.steel === 15 &&
       STATS[KIND.TANK_TRAP].cost.oil === 0 &&
-      STATS[KIND.TANK_TRAP].buildTicks === TICK_HZ * 5 &&
+      STATS[KIND.TANK_TRAP].buildTicks === TICK_HZ * 4 &&
       STATS[KIND.TANK_TRAP].requires === KIND.TRAINING_CENTRE,
     "Tank Trap active metadata mirrors server rules",
   );
