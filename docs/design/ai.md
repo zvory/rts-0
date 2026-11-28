@@ -16,7 +16,7 @@ The player-facing lobby supports five AI profile IDs:
 - jeffs_ai_v1_1 — Jeff's AI (V1.1), the default opponent: Jeff's AI V1.0 plus the V1.1 changes, played with the feature set fixed in `JEFF_V1_1_FEATURES` (profiles.rs). On a symmetric map it decides in one frame, as if on the start it won more from (`live/mirror.rs`), so both starts play the same way.
 - rush_ai — Rush AI, an immediate infantry attack with forward construction.
 - pressure_ai — Pressure AI, the AI 2.1 economy and technology with independent forward staging and a value-based response.
-- eco_ai — Eco AI, a defensive four-base economy using the SDK cut/garrison planner and Machine Gunner/Panzerfaust production.
+- eco_ai — Eco AI, a defensive six-base economy using the SDK cut/garrison planner, Machine Gunner/Panzerfaust infantry, and staged Tank production.
 
 `ai_turtle` is deprecated and internal-only. It remains registered for offline self-play,
 diagnostics, and observer-only AI sessions, but it is not exposed in the lobby and the server
@@ -107,8 +107,9 @@ Likewise, `AiBuildObservation` means only that this controller inferred an outst
 build; it is not an accepted, legal, or active-build receipt.
 
 `AiActions` is a typed per-think builder that retains at most 256 emitted actions in helper-call
-order. Its supported helpers are paid explicit-site build, resume-without-repay, train, standing
-production repeat, research, gather, move, attack-move, attack-move routes, direct attack, Hold Position, and Anti-Tank
+order. Its supported helpers are paid explicit-site build, `build_when_funded` (travel now,
+wait for funding at the site), unpriced `queue_build`/`queue_train`, resume-without-repay, train, standing
+production repeat, research, gather, move, atomic Move routes, attack-move, attack-move routes, direct attack, Hold Position, and Anti-Tank
 Gun setup. `UnitGroup`
 canonicalizes tactical unit IDs into a sorted, deduplicated, non-empty set; caller-ordered worker,
 resource-node, and producer candidate lists are not normalized. `attack_move_route` reserves a
@@ -121,7 +122,9 @@ reservations, batch, or trace. `ActionError` exposes an `ActionBlocker` only for
 facts: empty input, unsupported kind, no compatible producer, insufficient same-think budget, an
 already reserved id, no known candidate, or the action cap. Local success means only that an
 SDK-owned action was emitted. It is not simulation acceptance, legality, completion, or atomicity,
-and there are no intent IDs or task statuses.
+and there are no intent IDs or task statuses. `build_when_funded` reserves the available
+portion of a building's cost without an affordability preflight or crediting projected income;
+`paid_build` retains its full-cost preflight. `queue_build` and `queue_train` reserve only their actor or producer and emit ordinary manual commands without budget or supply preflight; the native scheduler handles funding.
 
 The runtime emitter is the sole translator from SDK-owned actions to ordinary `SimCommand`s after
 the strategy returns. Built-in profiles share the same budget/reservation implementations, typed
@@ -133,8 +136,8 @@ controller ordering, all-controller observation before enqueue, worker-retreat-f
 normal simulation validation, and replay logging are unchanged. The builder is deliberately not a
 planner, task system, command receipt, or cross-tick scheduler.
 
-`PullbackMemory` is an optional tactical helper shared by Jeff, Pressure, and approaching Rush
-Riflemen. Its pure `plan` accepts explicit live squad facts and currently visible enemy-unit facts;
+`PullbackMemory` is an optional tactical helper shared by Jeff, Pressure, approaching Rush
+Riflemen, and Eco combat units. Its pure `plan` accepts explicit live squad facts and currently visible enemy-unit facts;
 its `step` adapter reads those facts from `AiFrame` and emits SDK Moves. The default policy pulls a
 member at or below 15 HP three tiles away from the nearest visible enemy when a visible enemy is
 targeting it, then excludes it from normal orders for 45 ticks. At least one squad member must
@@ -154,7 +157,10 @@ a strength claim.
 `AiRulebook` binds the authoritative `rts-rules` faction catalog to a strategy frame. Its bounded
 answers cover catalog order and availability, costs, supply, production time, health, footprint,
 builders, producers, prerequisites, gather capability, and train/research relationships; it owns
-no duplicate definitions. Upgrade costs/timing remain absent because their current owner is
+no duplicate definitions. `projected_income` estimates Steel and Oil separately from completed,
+currently active own extractors at the authoritative harvest amount/interval, capped by known
+remaining node stock. Inactive, unfinished and enemy extractors contribute nothing. Future
+payout phases, new extractors and combat are not guaranteed. Upgrade costs/timing remain absent because their current owner is
 `rts-sim`, and the SDK does not move that authority merely to fill a catalog row.
 
 `WorldQueries` builds stable-id indexes over the frame's owned entities, currently visible allies
@@ -162,15 +168,18 @@ and enemies, remembered contacts, and public known resources. It keeps current a
 knowledge distinct, filters only explicitly exhausted resources, reports known mining conflicts,
 and uses stable-id tie-breaking after squared-`f32` distance for nearest selection. Checked world
 and tile helpers reject non-finite, overflowing, or out-of-bounds coordinates.
+`ground_position_is_observable` reads the recipient visibility grid and rejects concealment
+and covering smoke; missing visibility stays uncertain. It supports clearing an absent contact
+at a visible open-ground position without claiming the enemy died or exposing hidden state.
 
 Known building placement reuses the established AI footprint, public-resource, visible-building,
 production-exit, ring traversal, and tie-breaking approximation. Results are named `Invalid`,
 `KnownBlocked`, and `NoKnownConflict`; none claims authoritative legality, clearance, reachability,
 or command acceptance. Public queries depend only on `AiFrame` and explicit controller-owned
 failed-site exclusions. Legacy profiles retain their historical global-producer exit check through
-a narrow compatibility policy, while all other placement work is shared. General route queries,
-dynamic pathing, target legality, full line of fire, and hidden occupancy remain outside the
-public query seam. The defensive planner below uses static terrain routes and bounded rock-ray
+a narrow compatibility policy, while all other placement work is shared. Dynamic pathing, target legality, full line of fire, and hidden occupancy remain outside the
+public query seam. The known-ground route queries below use static terrain plus current
+known footprints. The defensive planner uses static terrain routes and bounded rock-ray
 checks for its recommendations; those do not establish authoritative movement or firing legality.
 
 `AiFrame::base_sites()` exposes cached public base landmarks from the existing static map
@@ -192,8 +201,45 @@ tiles, using stable-ID ties. It reports owner and owned/currently visible/rememb
 including last-seen tick for remembered contacts. Current evidence supersedes memory of the same
 entity. Empty evidence means unknown occupancy, never confirmed vacancy. Construction sites count
 as Depot evidence; none of these queries reads hidden state. The canonical host attaches the cached
-landmarks before either strategy initialization or step. Pressure uses these queries to order its
+landmarks before either strategy initialization or step. The defense planner's explicit
+`plan_expansion` entry point may use one reachable public landmark before Depot ownership,
+rejecting unknown IDs, unreachable/enemy starts, and known hostile Depot occupancy. It makes
+no ownership or authoritative placement claim; ordinary `plan` still requires completed own Depots.
+If a prospective garrison has no legal firing posts, the planner tries that landmark's cached
+terrain cut with the same reachability/occupancy/firing checks, retaining other defended sectors; unsupported lines stay explicit. Pressure uses these queries to order its
 expansions; other built-in profiles retain their existing placement policies.
+
+`WorldQueries::base_depot_site(site_id, exclusions)` recommends the Depot's top-left tile for a
+specific public base, using the resource-anchor geometry and mining-range/distance scoring
+shared with Pressure. To build at geography rank K, callers use `base(player_id, K)` then pass
+that site's stable ID to this query. It tries the exact landmark footprint first when it covers
+the normal Steel and Oil patch counts, then searches resource-centered alternatives. Both kinds
+must remain within authoritative mining-anchor range (up to twelve Steel/three Oil patches,
+or the cluster's remaining count if fewer). Unknown stock remains unknown. Known occupied,
+hostile, unreachable, exhausted or excluded sites return no recommendation. The result uses
+ordinary known terrain/resource/building/exit checks while ignoring movable own unit bodies;
+callers must clear friendly units from the reserved footprint. It is never an authoritative
+legality or dynamic-route receipt. Landmark position itself remains geographic metadata, not a build coordinate.
+
+`ground_route` and `ground_route_to_build_site` return deterministic public-terrain routes for a
+specified mover, avoiding the authoritative static-blocker classes and diagonal corner cutting.
+`AiMap` carries the public vehicle-forbidden overlays and tree trunks as well as ordinary terrain;
+vehicle-only obstacles affect vehicle bodies, while resources and walk-through extractors do not
+invent movement walls. Building placement still rejects resource footprint overlap independently.
+The latter route ends
+at a reachable exterior footprint ring sized for the mover's conservative body clearance. Unit bodies and hidden/remembered entities do not affect
+route geometry. Wide bodies additionally sample tile-boundary positions on a half-tile lattice,
+so a physically passable two-tile lane is not rejected merely for lacking a tile-center sample.
+`ground_reachability` exposes a reusable body-aware component with point membership checks;
+callers can reject disconnected posts without pathfinding separately to every candidate.
+The opt-in `known_build_site_with_access` layout query adds two/three-tile spacing and checks
+producer escape after virtually adding a proposed footprint. It evaluates all native spawn sides,
+out to six rings, and requires every component of the first full-rotation spawn ring to escape the
+producer's immediate enclosure. Existing ordinary placement APIs retain their policies. These remain known-world hints, not dynamic or hidden-world guarantees.
+`route_has_visible_ground_threat` checks every route segment against currently
+visible living enemies capable of targeting the mover, using weapon range, public trench bonus
+and body margins. This is conservative dispatch policy, not authoritative pathfinding or a
+promise of safety in fog; remembered contact expiry is a separate tactical concern.
 
 ### Shared cut/garrison defense and Eco AI
 
@@ -201,12 +247,35 @@ expansions; other built-in profiles retain their existing placement policies.
 Strategies supply their frame, chosen base-site IDs, and defender budget. The result contains cut
 and garrison sectors, protected economic value, relative priority, estimated ground approach time
 from public enemy starting positions, and usable world-pixel slots with sector IDs. Static terrain/cut work is cached;
-the caller retains the planner between decisions. The planner does not choose expansion timing,
+the caller retains the planner between decisions. Up to four defended sites, geometry compares
+all cut/garrison partitions. Larger sets compare two bounded merge searches: singleton sites and
+the previous surviving partition extended with new sites. Each search evaluates at most 32
+candidate merges, preserving useful shared cuts across the fifth-site transition without
+exponential subset enumeration. Removed sites invalidate any old group containing them. The planner does not choose expansion timing,
 assign entity IDs, issue orders, or take tactical ownership from its caller.
+Garrison sectors use the public base center and offer posts in a three-to-five-tile ring around
+it. After a forward-facing first post, successive posts maximize separation around the legal
+ring instead of clustering at one forward point. Known obstacles, entrenchment restrictions,
+reachable paths, reserved building footprints and Engineer access still restrict available posts;
+a blocked or exhausted ring leaves staffing unallocated rather than piling units onto a fallback.
+`plan_with_expansion` combines validated completed owned sites with one prospective site in the
+same geometry and economic staffing allocation. It never substitutes the expansion for the owned
+base set. With nonzero budget it allocates one physically supported expansion post first, so a
+future site's small asset value split across several cut sectors cannot round its entire screen
+down to zero and deadlock Engineer dispatch. Remaining units follow normal economic staffing;
+ordinary all-owned-base planning has no per-base minimum. `plan_expansion_reserved` accepts typed future building footprints. Before choosing posts, both
+cut and garrison scoring reserve the structure plus a one-tile Engineer access ring and defender
+body radius. Changed reservations invalidate cached placements; all sector/global slots remain
+consistent. Unsupported space stays unallocated rather than duplicating a surviving post.
 
-Staffing combines uniquely attributed mining/production value with decreasing urgency as enemy
-ground approach time increases. Actual known remaining steel affects mining value; unknown
-amounts retain their uncertainty. Length influences whether a compact cut or garrison is selected,
+Staffing combines uniquely attributed remaining-Steel/production value with decreasing urgency
+as enemy ground approach time increases. Each 100 remaining Steel contributes one economic value
+point, without a cap, active-mine bonus, or unmined discount. Thus a fresh resource-rich base counts
+before its mines are built, while depletion proportionally removes its resource value. Unknown
+nodes retain their uncertainty and use a policy-only 312.5-Steel estimate (half a full patch);
+that estimate is never reported as known stock. Actual active-mine counts remain diagnostics only.
+Production/tech building values, the nominal Depot value, approach weighting, and search methods
+are unchanged. Length influences whether a compact cut or garrison is selected,
 but does not multiply economic staffing priority. Entrenchment restrictions, static reachability,
 known occupancy, and firing-distance checks reject unusable posts. Unsupported sectors and
 unallocated defenders are explicit. Neither a cut nor a suggested slot certifies a sealed front,
@@ -217,13 +286,109 @@ Eco AI is an independent typed strategy, registered as selectable `eco_ai` / **E
 ordinary SDK actions and the same fog-filtered canonical host as other strategies. It does not
 change the default opponent, composition members, or random-profile pool.
 
-Its economy builds one Barracks and a Training Centre on one base, trains Machine Gunners, and
-completes Entrenchment before expanding. At two completed bases it targets two Barracks,
-researches Panzerfaust and Methamphetamines, and balances completed plus queued Machine Gunners
-and Panzerfausts toward equal counts. At three bases it targets four Barracks; it then expands to
-four bases and continues mixed infantry production, adding Barracks when money accumulates.
-Required mining, tech, and expansion spending precede optional troop/overflow spending. Supply
-uses the game's fixed cap; Eco pauses unaffordable training rather than building supply structures.
+Its economy builds one Barracks and a Training Centre on one base, enables Machine Gunner
+auto-production, and completes Entrenchment before expanding. At two completed bases it builds
+an Engineering Complex, queues Tank Production research on its scaffold, then builds the first
+Vehicle Works and second Barracks. Panzerfaust and Methamphetamines research are queued at two
+bases. At three bases it targets two Works and three Barracks (the Barracks cap); at four bases it completes the third
+Works before expanding to bases five and six. Expansion stops at six completed bases. Beyond six,
+all completed Works actively producing Tanks without a resource wait trigger another Works;
+desired capacity persists to replace destroyed Works. No stockpile or income threshold drives
+these decisions.
+
+Every Barracks has standing production: Machine Gunners initially, then alternating dedicated
+Machine Gunner and Panzerfaust producers once Panzerfaust research completes. Dedicated lines keep
+a Panzerfaust's Oil wait from blocking a Machine Gunner producer. Every Vehicle Works keeps Tank
+auto-production enabled, including during travel, construction, research and resource waits.
+Standing orders are configured once per state transition, including on unfinished buildings, and
+recover after producer destruction. Eco does not maintain a spending ledger or forecast income.
+It uses `queue_build`, `queue_research`, and (only to replace a missing Engineer) `queue_train`
+without requiring funds. The native scheduler pays eligible manual orders before automatic
+production for both human and AI seats. Travelling Engineers and research on unfinished buildings
+become spending priorities only once their orders can start, matching player behavior. Paid automatic
+jobs continue working. Supply uses the game's fixed cap and native production waits.
+Tanks form one concentrated reserve near the centroid of completed owned base sites, weighted
+by remaining Steel stock (unknown deposits use the same 312.5 planning estimate as defense scoring).
+When all deposits are exhausted, the average completed-base position is the fallback. The nearest
+body-clear reachable reserve anchor is chosen; disconnected components form local reserves rather
+than crossing impassable terrain. Stable posts form a square grid with two-tile spacing, exclude infantry slots
+and the reserved Depot footprint, and tolerate small centroid shifts without reshuffling parked units. Combat regrouping uses
+separate two-tile Tank grid destinations as well. Bounded atomic Move
+route batches reserve each Tank once and retain all queued corners, gathering armor without acquiring fights en route; idle/stalled units retry and released
+responders return to reserve. Armor does not entrench. Supply and standing production remain native.
+Construction reuses the established Jeff/Pressure outward ring placement search for ordinary
+buildings. Expansion Depots use the SDK's Pressure-derived resource-centered placement query,
+which keeps Steel and Oil coverage instead of moving the Depot outward from its resource cluster.
+Both paths use shared SDK footprint checks. Ordinary Eco construction additionally requests two
+full clear tiles around buildings, three around Vehicle Works, including solid terrain and map
+edges. It checks body-clear exits and connectivity for both new and existing vehicle producers
+before accepting later construction, so a newly legal footprint cannot silently seal a factory.
+Other profiles retain their existing spacing policy. Like Pressure's expansion guards,
+Eco excludes the predicted Depot footprint plus unit clearance from its infantry post assignment;
+its own screen must not occupy the footprint that the Engineer is about to build. Like Rush, Eco leaves an Engineer's active build/travel
+order alone. Like Jeff, recovery waits three seconds for an unattended paid scaffold and avoids
+visible fighters within ten tiles. Recovery is restricted to Eco's Barracks, Training Centres,
+Resource Depots, Engineering Complexes, and Vehicle Works: automatic Steel Mine/Pump Jack jobs
+never claim the Engineer. Starting
+Riflemen join the same defensive post assignment as the later infantry. Before sending the
+Engineer to build or resume an expansion Depot, Eco plans all completed owned sites plus the
+prospective expansion together. Only infantry assigned to the expansion screen receive its advance
+orders; rear sectors retain their share of defenders. A shared cut can protect several bases;
+screen readiness follows the SDK sector's covered base IDs rather than Euclidean proximity. This plan does not guarantee one unit per base when staffing is scarce.
+Eco submits Engineer-built structures when their strategy stage is ready, even with no funds.
+For expansion, the Engineer waits five simulation seconds for the initial screen cohort's advance
+orders; fresh auto-produced reinforcements do not restart that lead. Surviving cohort members whose
+posts change still need fresh advance time. If the cohort disappears, a new current screen forms
+another wave; a changed intended Depot footprint resets the wave. Production remains enabled
+throughout. New infantry join whichever sector the shared planner allocates them. Temporarily mobilized or
+wounded infantry retain intended home posts and remain in the planning capacity; combat only
+borrows command ownership. Planning uses the living roster, so temporary combat assignments do not shrink the layout.
+Release explicitly resumes the home-post order even if a unit is still moving or attacking. The prospective frontier persists through travel and
+construction, then clears immediately when its Depot completes, returning to the all-owned-base plan.
+An unpaid Build order remains tracked while the Engineer waits for resources; once funded, normal
+stuck travel recovery applies. Other profiles retain their existing submitted-build expiry policy.
+Eco reuses the same SDK wounded-unit helper called by Pressure and Rush, with its default
+15-HP threshold, three-tile backward Move, and 45-tick ownership window. Its combat roster
+(Riflemen, Machine Gunners, Panzerfausts and Tanks) is eligible when a visible enemy targets a
+wounded member and another healthy combat member remains. Pullback runs before mobilization;
+active retreaters are excluded from response recruitment, infantry posts, armor routes and the
+Engineer screen. When the helper releases a unit, response or defensive movement is reissued,
+rather than leaving its retreat order in place. It can retreat again if it remains targeted;
+it does not wait for healing. Pressure/Rush's own integrations are unchanged.
+Eco reuses Pressure's incident memory and recruitment machinery with opt-in cohesive orders and a defended-area
+policy, replacing the original midfield boundary for Eco only. Persistent assigned infantry and
+armor posts identify guard roles even while mobilization or wounded micro owns their commands;
+current `Attack`/`AttackMove` state never defines a protected role. Every living owned or currently visible allied building provides an additional 20-tile reaction
+bubble, including unfinished scaffolds, extractors and exhausted Depots. This reaction policy is
+independent of remaining-Steel weighting for routine defensive staffing.
+A visible enemy is relevant within its known weapon envelope (including public trench bonus,
+and the conservative 14-tile stationary maximum for Tanks) plus two tiles of a staffed-post anchor,
+within 20 tiles of a friendly building, or when targeting an assigned guard/protected building.
+Visible enemy units and buildings qualify; noncombatants near a staffed post use a two-tile envelope. Admission,
+refresh and release all use that same relevance policy, on either half of the map. Every incident
+pins its original anchor and pursuit leash. A leashed-out contact cannot rearm merely by shifting
+the same guard's anchor; arrival at a genuinely distinct protected role can start a new incident.
+Visible irrelevance or observable clear ground releases active commitment immediately; fog,
+concealment and smoke preserve uncertain contacts for up to 30 seconds. Pressure's default
+home-half policy remains unchanged. Eco recruits infantry worth at least 150% of admitted enemy
+purchase value scaled by last observed remaining HP (rounded up to whole resources), then separately recruits two Tanks per admitted enemy Tank. Remembered contacts retain the last observed health discount; hidden health is never queried. Armor concentrates on
+one armored incident (the largest nearby enemy Tank cluster), rather than splitting by each Tank's
+nearest attacker. Recruitment alone does not authorize an attack: each responder counts healthy
+purchase value within 15 tiles of itself against visible enemy combat value
+within 15 tiles of the contact. At 90% of nearby enemy fighting value it stops local pullbacks and attack-moves. Tank support counts within ten tiles and infantry support within fifteen tiles; the two-to-one
+Tank target applies only to recruitment, with no separate local Tank-count veto. Otherwise units use Move to
+rally outside observed weapon ranges plus two tiles (Tanks conservatively use the public 14-tile
+stationary maximum because enemy ramp timers are private); under-fire units retreat first and known-world
+routes must not deepen their initial exposure. A change between gathering and fighting immediately
+replaces the old order. No safe route falls back to Hold Position. This policy uses fog-filtered
+observations, not omniscient combat strength. Retreaters are excluded from recruitment, and responder
+orders cannot be overwritten by normal frontier/armor maintenance. Released guards get fresh
+assignments; only the initial cover wave controls expansion lead time. Engineer dispatch
+requires the infantry lead and a known terrain route to the actual Depot perimeter with no visible
+in-range ground threats. Unrelated active or remembered combat contacts do not globally block it;
+reinforcement training can continue during response. Defense and construction share the same
+intended tile, including failed-site exclusions, submitted orders, and scaffold positions. Posts
+are allocated around that reservation before assignment, with no shared-slot overflow fallback.
 Expansion candidates follow SDK ground-distance rank, excluding unreachable and known hostile
 sites. Completed owned Depots drive base stages; submitted commands are never treated as proof
 of completed construction. Defensive assignments follow the shared cut/garrison planner and move

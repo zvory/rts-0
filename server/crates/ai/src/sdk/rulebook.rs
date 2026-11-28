@@ -73,6 +73,46 @@ impl AiRulebook {
         }
     }
 
+    /// Expected income from the frame's completed, active own extractors over a bounded
+    /// horizon, at authoritative payout rates. This is a forecast, not guaranteed money:
+    /// phase, combat and future extractors are not inferred. Known stock caps each node.
+    pub fn projected_income(self, frame: &AiFrame, ticks: u32) -> AiCost {
+        use super::{AiCompletion, AiResourceAmount};
+        use rts_rules::balance::{HARVEST_TICKS, OIL_LOAD, STEEL_LOAD};
+        if self.faction_id() != frame.faction_id() {
+            return AiCost::default();
+        }
+        let mut steel = 0u64;
+        let mut oil = 0u64;
+        for e in frame.owned().iter().filter(|e| {
+            e.completion == AiCompletion::Complete
+                && e.health.current > 0
+                && e.extractor_active == Some(true)
+        }) {
+            let (load, total) = match e.kind {
+                EntityKind::SteelMine => (STEEL_LOAD, &mut steel),
+                EntityKind::PumpJack => (OIL_LOAD, &mut oil),
+                _ => continue,
+            };
+            let mut projected = u64::from(load).saturating_mul(u64::from(ticks));
+            if let Some(super::AiResource {
+                remaining: AiResourceAmount::Known(n),
+                ..
+            }) = frame.resources().iter().find(|r| {
+                e.latched_resource == Some(r.id)
+                    || (r.position.0 - e.position.0).abs() < 0.01
+                        && (r.position.1 - e.position.1).abs() < 0.01
+            }) {
+                projected = projected.min(u64::from(*n).saturating_mul(u64::from(HARVEST_TICKS)));
+            }
+            *total = total.saturating_add(projected);
+        }
+        AiCost {
+            steel: (steel / u64::from(HARVEST_TICKS)).min(u64::from(u32::MAX)) as u32,
+            oil: (oil / u64::from(HARVEST_TICKS)).min(u64::from(u32::MAX)) as u32,
+        }
+    }
+
     pub fn faction_id(self) -> &'static str {
         self.catalog.id
     }

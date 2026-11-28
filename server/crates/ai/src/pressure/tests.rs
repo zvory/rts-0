@@ -192,6 +192,8 @@ fn route_and_staging_follow_the_passable_approach_around_a_wall() {
         concealment_tiles: Default::default(),
         no_building_tiles: BTreeSet::new(),
         unwalkable_tiles: BTreeSet::new(),
+        no_vehicle_tiles: BTreeSet::new(),
+        tree_trunks: BTreeSet::new(),
     };
     let mut blocked = map.clone();
     for y in 0..60 {
@@ -692,6 +694,8 @@ fn pressure_ground_connectivity_does_not_cut_diagonally_blocked_corners() {
         concealment_tiles: Default::default(),
         no_building_tiles: BTreeSet::new(),
         unwalkable_tiles: BTreeSet::new(),
+        no_vehicle_tiles: BTreeSet::new(),
+        tree_trunks: BTreeSet::new(),
     };
     map.terrain[1] = AiTerrain::Water;
     map.terrain[3] = AiTerrain::Rock;

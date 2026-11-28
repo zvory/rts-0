@@ -76,6 +76,9 @@ pub struct AiMap {
     pub slow_movement_tiles: BTreeSet<(u32, u32)>,
     pub concealment_tiles: BTreeSet<(u32, u32)>,
     pub unwalkable_tiles: BTreeSet<(u32, u32)>,
+    pub no_vehicle_tiles: BTreeSet<(u32, u32)>,
+    /// Public visual-tree trunk centers, in world pixels.
+    pub tree_trunks: BTreeSet<(u32, u32)>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -229,6 +232,7 @@ pub struct AiFrame {
     owned: Vec<AiEntity>,
     visible_allies: Vec<AiEntity>,
     visible_enemies: Vec<AiEntity>,
+    visible_tiles: Vec<u8>,
     remembered_contacts: Vec<AiRememberedContact>,
     resources: Vec<AiResource>,
     submitted_builds: Vec<AiBuildObservation>,
@@ -240,6 +244,18 @@ pub struct AiFrame {
 }
 
 impl AiFrame {
+    /// Recipient visibility only; missing or malformed grids remain unknown.
+    pub(crate) fn tile_visible(&self, x: u32, y: u32) -> bool {
+        if x >= self.map.width || y >= self.map.height {
+            return false;
+        }
+        let index = u64::from(y) * u64::from(self.map.width) + u64::from(x);
+        usize::try_from(index)
+            .ok()
+            .and_then(|i| self.visible_tiles.get(i))
+            .is_some_and(|v| *v != 0)
+    }
+
     /// Static sites shared by every player; use WorldQueries for per-player ranking.
     pub fn base_sites(&self) -> &[super::AiBaseSite] {
         &self.base_sites
@@ -494,6 +510,7 @@ impl AiFrame {
             faction_id: own.faction_id.clone(),
             tick: snapshot.tick,
             team_id,
+            visible_tiles: snapshot.visible_tiles.clone(),
             economy: AiEconomy {
                 steel: snapshot.steel,
                 oil: snapshot.oil,
@@ -534,6 +551,19 @@ impl AiFrame {
                     .unwalkable_tiles
                     .iter()
                     .map(|tile| (tile.x, tile.y))
+                    .collect(),
+                no_vehicle_tiles: start
+                    .map
+                    .no_vehicle_tiles
+                    .iter()
+                    .map(|t| (t.x, t.y))
+                    .collect(),
+                tree_trunks: start
+                    .map
+                    .doodads
+                    .iter()
+                    .filter(|d| d.type_id.starts_with("tree."))
+                    .map(|d| (d.x, d.y))
                     .collect(),
                 no_building_tiles: start
                     .map

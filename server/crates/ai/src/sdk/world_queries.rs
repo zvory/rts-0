@@ -247,13 +247,139 @@ impl<'a> WorldQueries<'a> {
         )
     }
 
+    /// Current recipient visibility of open ground. An absent grid, concealment tile or
+    /// covering smoke is uncertain, so absence of an enemy there cannot clear its contact.
+    pub fn ground_position_is_observable(&self, point: AiWorldPoint) -> bool {
+        let Some(tile) = self.world_to_tile(point) else {
+            return false;
+        };
+        if !self.frame.tile_visible(tile.x(), tile.y())
+            || self
+                .frame
+                .map()
+                .concealment_tiles
+                .contains(&tile.as_tuple())
+        {
+            return false;
+        }
+        let size = self.frame.map().tile_size as f32;
+        !self.frame.smokes().iter().any(|smoke| {
+            let dx = point.x() - smoke.position.0;
+            let dy = point.y() - smoke.position.1;
+            dx * dx + dy * dy <= smoke.radius_tiles * smoke.radius_tiles * size * size
+        })
+    }
+
     pub fn known_build_site(
         &self,
         building: EntityKind,
         tile: AiTile,
         exclusions: &KnownBuildSiteExclusions,
     ) -> KnownBuildSite {
-        self.known_build_site_with_production_policy(building, tile, exclusions, true)
+        self.known_build_site_with_production_policy(building, tile, exclusions, true, false, true)
+    }
+
+    /// Opt-in building layout policy: two full clear tiles between ordinary structures,
+    /// three around vehicle production, with matching solid-terrain/map-edge clearance.
+    /// Public resources retain footprint/body checks instead of a blanket spacing buffer.
+    /// All-side producer exits are checked after virtually adding the footprint, including
+    /// existing producers, so later buildings cannot seal a previously usable escape.
+    pub fn known_build_site_with_access(
+        &self,
+        building: EntityKind,
+        tile: AiTile,
+        exclusions: &KnownBuildSiteExclusions,
+    ) -> KnownBuildSite {
+        self.layout_build_site(building, tile, exclusions, false)
+    }
+    pub(crate) fn planned_build_site_with_access(
+        &self,
+        building: EntityKind,
+        tile: AiTile,
+        exclusions: &KnownBuildSiteExclusions,
+    ) -> KnownBuildSite {
+        self.layout_build_site(building, tile, exclusions, true)
+    }
+    fn layout_build_site(
+        &self,
+        building: EntityKind,
+        tile: AiTile,
+        exclusions: &KnownBuildSiteExclusions,
+        ignore_units: bool,
+    ) -> KnownBuildSite {
+        let result = self.known_build_site_with_production_policy(
+            building,
+            tile,
+            exclusions,
+            true,
+            ignore_units,
+            false,
+        );
+        if result != KnownBuildSite::NoKnownConflict {
+            return result;
+        }
+        let Some(stats) = rts_rules::balance::building_stats(building) else {
+            return KnownBuildSite::Invalid;
+        };
+        let clearance = crate::ai_shared::building_clearance_tiles(building) + 1;
+        let vehicle_producer =
+            rts_rules::economy::trainable_units_for_faction(self.frame.faction_id(), building)
+                .iter()
+                .any(|kind| {
+                    rts_rules::movement_body_class(*kind)
+                        == rts_rules::MovementBodyClass::VehicleBody
+                });
+        let left = i64::from(tile.x());
+        let top = i64::from(tile.y());
+        let right = left + i64::from(stats.foot_w);
+        let bottom = top + i64::from(stats.foot_h);
+        if self.current_buildings().any(|existing| {
+            let Some(other) = self.building_top_left(existing) else {
+                return false;
+            };
+            let Some(other_stats) = rts_rules::balance::building_stats(existing.kind) else {
+                return false;
+            };
+            let gap = i64::from(
+                clearance.max(crate::ai_shared::building_clearance_tiles(existing.kind) + 1),
+            );
+            let x = i64::from(other.x());
+            let y = i64::from(other.y());
+            !(left >= x + i64::from(other_stats.foot_w) + gap
+                || x >= right + gap
+                || top >= y + i64::from(other_stats.foot_h) + gap
+                || y >= bottom + gap)
+        }) {
+            return KnownBuildSite::KnownBlocked(KnownBuildSiteBlocker::CurrentBuilding);
+        }
+        // Resource-centered Depots keep their landmark geometry, including nearby patches.
+        if building != EntityKind::ResourceDepot && !building.is_resource_extractor() {
+            let gap = i64::from(clearance);
+            if left < gap
+                || top < gap
+                || right + gap > i64::from(self.frame.map().width)
+                || bottom + gap > i64::from(self.frame.map().height)
+            {
+                return KnownBuildSite::KnownBlocked(KnownBuildSiteBlocker::KnownTerrain);
+            }
+            for y in top - gap..bottom + gap {
+                for x in left - gap..right + gap {
+                    let x = x as u32;
+                    let y = y as u32;
+                    if tile_index(self.frame, x, y)
+                        .is_none_or(|i| !is_passable(self.frame.map().terrain[i]))
+                        || self.frame.map().unwalkable_tiles.contains(&(x, y))
+                        || vehicle_producer && self.frame.map().no_vehicle_tiles.contains(&(x, y))
+                    {
+                        return KnownBuildSite::KnownBlocked(KnownBuildSiteBlocker::KnownTerrain);
+                    }
+                }
+            }
+        }
+        if !self.placement_preserves_producer_access(building, tile) {
+            return KnownBuildSite::KnownBlocked(KnownBuildSiteBlocker::ProductionExit);
+        }
+        KnownBuildSite::NoKnownConflict
     }
 
     /// Legacy profiles historically used the global producer list for the exit-tile check. Keep
@@ -264,7 +390,18 @@ impl<'a> WorldQueries<'a> {
         tile: AiTile,
         exclusions: &KnownBuildSiteExclusions,
     ) -> KnownBuildSite {
-        self.known_build_site_with_production_policy(building, tile, exclusions, false)
+        self.known_build_site_with_production_policy(building, tile, exclusions, false, false, true)
+    }
+
+    /// Plan a persistent footprint before friendly units move clear. Other placement,
+    /// resource, building-clearance and production-exit checks remain identical.
+    pub(crate) fn planned_build_site(
+        &self,
+        building: EntityKind,
+        tile: AiTile,
+        exclusions: &KnownBuildSiteExclusions,
+    ) -> KnownBuildSite {
+        self.known_build_site_with_production_policy(building, tile, exclusions, true, true, true)
     }
 
     fn known_build_site_with_production_policy(
@@ -273,6 +410,8 @@ impl<'a> WorldQueries<'a> {
         tile: AiTile,
         exclusions: &KnownBuildSiteExclusions,
         faction_aware_production: bool,
+        ignore_own_units: bool,
+        check_production_exit: bool,
     ) -> KnownBuildSite {
         let Some(stats) = rts_rules::balance::building_stats(building) else {
             return KnownBuildSite::Invalid;
@@ -333,14 +472,16 @@ impl<'a> WorldQueries<'a> {
             right as f32 * tile_size,
             bottom as f32 * tile_size,
         );
-        if self.owned().iter().any(|entity| {
-            entity.kind.is_unit()
-                && unit_circle_touches_rect(
-                    entity.position,
-                    rts_rules::balance::unit_placement_radius(entity.kind),
-                    footprint,
-                )
-        }) {
+        if !ignore_own_units
+            && self.owned().iter().any(|entity| {
+                entity.kind.is_unit()
+                    && unit_circle_touches_rect(
+                        entity.position,
+                        rts_rules::balance::unit_placement_radius(entity.kind),
+                        footprint,
+                    )
+            })
+        {
             return KnownBuildSite::KnownBlocked(KnownBuildSiteBlocker::CurrentUnit);
         }
 
@@ -350,7 +491,7 @@ impl<'a> WorldQueries<'a> {
         } else {
             !rts_rules::economy::trainable_units(building).is_empty()
         };
-        if has_production_exit {
+        if check_production_exit && has_production_exit {
             let spawn_x = tile.x + stats.foot_w / 2;
             let Some(spawn_y) = tile.y.checked_add(stats.foot_h) else {
                 return KnownBuildSite::Invalid;

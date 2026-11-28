@@ -53,7 +53,7 @@ use weapons::{
     update_attack_move_no_target_teardown, uses_vehicle_weapon_policy,
 };
 
-pub(in crate::game) use pre_movement::hold_charged_attack_move_tanks;
+pub(in crate::game) use pre_movement::hold_attack_move_engagements;
 
 #[cfg(test)]
 #[allow(clippy::too_many_arguments)]

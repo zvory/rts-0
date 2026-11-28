@@ -3,8 +3,8 @@
 //! This is a policy, not a guarantee of stopping an attack. Cuts separate six-tile base cores
 //! and two-tile resource envelopes from a 32-tile exterior; garrisons leave approaches open.
 //! Units share asset value by ground-route detours, then inverse-cube enemy approach urgency.
-//! Unknown resource amounts remain unknown: valuation alone uses a discounted 312.5-Steel
-//! potential estimate. The public diagnostics distinguish known stock and unknown node counts.
+//! Unknown resource amounts remain unknown: valuation alone uses a 312.5-Steel
+//! remaining-stock estimate (half a full patch). The public diagnostics distinguish known stock and unknown node counts.
 //! All coordinates in public results except `cut_tiles` are world pixels.
 mod flow;
 mod geometry;
@@ -13,7 +13,7 @@ mod scoring;
 #[cfg(test)]
 mod tests;
 use super::{
-    AiBaseSiteId, AiCompletion, AiFrame, AiMap, AiResourceAmount, AiTerrain, EntityKind,
+    AiBaseSiteId, AiCompletion, AiFrame, AiMap, AiResourceAmount, AiTerrain, AiTile, EntityKind,
     WorldQueries,
 };
 use grid::{dist2, Grid, FAR};
@@ -32,6 +32,13 @@ pub const DEFENSE_PLANNER_SOURCE: &[&str] = &[
 pub enum DefenseMode {
     Cut,
     Garrison,
+}
+/// Space reserved for a future building and an Engineer access ring. Slot generation treats
+/// this like known occupancy, before allocating distinct defensive posts.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DefenseReservation {
+    pub building: EntityKind,
+    pub tile: AiTile,
 }
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct DefenseSlot {
@@ -101,6 +108,8 @@ pub struct DefensePlanner {
     enemy: Vec<u32>,
     enemy_sources: Vec<usize>,
     last_plan: Option<DefensePlan>,
+    reservations: Vec<DefenseReservation>,
+    prospective: Option<AiBaseSiteId>,
     last_tick: u32,
     last_budget: usize,
     last_assets: Vec<AssetSignature>,
@@ -135,6 +144,59 @@ impl DefensePlanner {
         frame: &AiFrame,
         owned_completed_sites: &[AiBaseSiteId],
         unit_budget: usize,
+    ) -> DefensePlan {
+        self.plan_sites(frame, owned_completed_sites, None, unit_budget, &[])
+    }
+    /// Plan a defensive line for one public, reachable expansion landmark before a Depot
+    /// exists. Known hostile occupancy is rejected. This is a prospective policy input,
+    /// not an assertion of ownership or authoritative building/movement legality.
+    pub fn plan_expansion(
+        &mut self,
+        frame: &AiFrame,
+        site: AiBaseSiteId,
+        unit_budget: usize,
+    ) -> DefensePlan {
+        self.plan_expansion_reserved(frame, site, unit_budget, &[])
+    }
+    /// Reserve intended construction footprints before scoring/allocating defensive slots.
+    /// Reservations affect both cut and garrison plans and invalidate cached placements.
+    pub fn plan_expansion_reserved(
+        &mut self,
+        frame: &AiFrame,
+        site: AiBaseSiteId,
+        unit_budget: usize,
+        reservations: &[DefenseReservation],
+    ) -> DefensePlan {
+        self.plan_with_expansion(frame, &[], site, unit_budget, reservations)
+    }
+    /// Defend every completed owned site while including one prospective expansion. The
+    /// expansion is a policy input, not invented ownership. One supported expansion post is
+    /// allocated first when budget permits; the remaining staffing follows economic weights.
+    pub fn plan_with_expansion(
+        &mut self,
+        frame: &AiFrame,
+        owned_completed_sites: &[AiBaseSiteId],
+        expansion: AiBaseSiteId,
+        unit_budget: usize,
+        reservations: &[DefenseReservation],
+    ) -> DefensePlan {
+        let mut requested = owned_completed_sites.to_vec();
+        requested.push(expansion);
+        self.plan_sites(
+            frame,
+            &requested,
+            Some(expansion),
+            unit_budget,
+            reservations,
+        )
+    }
+    fn plan_sites(
+        &mut self,
+        frame: &AiFrame,
+        requested: &[AiBaseSiteId],
+        prospective: Option<AiBaseSiteId>,
+        unit_budget: usize,
+        reservations: &[DefenseReservation],
     ) -> DefensePlan {
         let topology_identity = frame
             .base_sites()
@@ -171,6 +233,10 @@ impl DefensePlanner {
             self.player = frame.player_id();
             self.grid = Some(Grid::new(frame.map()));
         }
+        if self.reservations != reservations {
+            self.reservations = reservations.to_vec();
+            self.last_plan = None;
+        }
         // Public living-player/team/start changes affect threat approach, not static cuts.
         if let Some(g) = &self.grid {
             let mut sources = frame
@@ -197,19 +263,33 @@ impl DefensePlanner {
             }
         }
         let query = WorldQueries::new(frame);
-        let owned: Vec<_> = owned_completed_sites
+        let prospective = prospective.filter(|id| {
+            query.ranked_bases(frame.player_id()).iter().any(|b| {
+                b.site.id == *id
+                    && b.distance_from_main.is_some()
+                    && !matches!(b.site.id, AiBaseSiteId::Start(p) if p != frame.player_id())
+            }) && query
+                .known_base_depots(*id)
+                .iter()
+                .all(|d| d.owner == frame.player_id())
+        });
+        if self.prospective != prospective {
+            self.prospective = prospective;
+            self.last_plan = None;
+        }
+        let owned: Vec<_> = requested
             .iter()
             .copied()
             .collect::<BTreeSet<_>>()
             .into_iter()
             .filter(|id| {
-                query.known_base_depots(*id).iter().any(|d| {
-                    d.owner == frame.player_id()
-                        && frame
-                            .owned()
-                            .iter()
-                            .any(|e| e.id == d.entity_id && e.completion == AiCompletion::Complete)
-                })
+                prospective == Some(*id)
+                    || query.known_base_depots(*id).iter().any(|d| {
+                        d.owner == frame.player_id()
+                            && frame.owned().iter().any(|e| {
+                                e.id == d.entity_id && e.completion == AiCompletion::Complete
+                            })
+                    })
             })
             .collect();
         // Asset identity/placement/activity changes immediately refresh slots and values. Node
@@ -254,7 +334,21 @@ impl DefensePlanner {
             self.geometry_capacity = unit_budget;
             self.geometry = geometry::build(self, frame);
         }
-        let result = scoring::score(self, frame, unit_budget);
+        let mut result = scoring::score(self, frame, unit_budget);
+        if let Some(site) = prospective.filter(|site| {
+            !result
+                .sectors
+                .iter()
+                .any(|sector| sector.base_ids.contains(site) && sector.supported)
+        }) {
+            let cut = geometry::expansion_cut(self, frame, site);
+            if !cut.is_empty() {
+                // Recover an unsupported prospective garrison without discarding rear sectors.
+                self.geometry.retain(|sector| sector.bases != [site]);
+                self.geometry.extend(cut);
+                result = scoring::score(self, frame, unit_budget);
+            }
+        }
         self.last_assets = assets;
         self.last_budget = unit_budget;
         self.last_tick = frame.tick();

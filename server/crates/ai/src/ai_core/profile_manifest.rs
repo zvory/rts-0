@@ -63,7 +63,10 @@ pub(crate) fn profile_identity(profile: &AiProfile) -> AiProfileIdentity {
                     include_str!("../pressure/production.rs"),
                     include_str!("../pressure/objective.rs"),
                     include_str!("../pressure/response.rs"),
+                    include_str!("../pressure/response/defended.rs"),
+                    include_str!("../pressure/response/cohesion.rs"),
                     include_str!("decision/pressure_economy.rs"),
+                    include_str!("../sdk/base_placement.rs"),
                 ),
                 "Pressure AI",
                 None,
@@ -117,23 +120,40 @@ pub(crate) fn profile_identity_by_id(id: &str) -> Option<AiProfileIdentity> {
     }
     if id == crate::eco::ECO_AI_ID {
         let label = "Eco AI";
-        let summary = "Four-base economic infantry defense with terrain-derived defensive posts.";
+        let summary =
+            "Six-base economic defense with shared terrain posts and staged Tank production.";
         let modules = [
             "typed_strategy_sdk",
             "economic_defense_planner",
             "completed_base_stages",
-            "paid_infantry_mix",
+            "standing_infantry_production",
+            "protected_sector_value_response",
+            "resource_centered_base_placement",
+            "staged_tank_production",
+            "concentrated_armor_reserve",
+            "local_force_cohesion",
+            "shared_wounded_pullback",
         ];
         let sources = (
             include_str!("../eco.rs"),
             include_str!("../eco/construction.rs"),
             include_str!("../eco/tactics.rs"),
+            include_str!("../eco/production.rs"),
+            include_str!("../eco/armor.rs"),
+            include_str!("../sdk/pullback.rs"),
             crate::sdk::DEFENSE_PLANNER_SOURCE,
             include_str!("../sdk/actions.rs"),
             include_str!("../sdk/frame.rs"),
             include_str!("../sdk/bases.rs"),
             include_str!("../sdk/world_queries.rs"),
             include_str!("../sdk/rulebook.rs"),
+            include_str!("../pressure/response.rs"),
+            (
+                include_str!("../pressure/response/defended.rs"),
+                include_str!("../pressure/response/cohesion.rs"),
+            ),
+            include_str!("../sdk/base_placement.rs"),
+            include_str!("../sdk/ground_route.rs"),
         );
         return Some(AiProfileIdentity {
             composition: None,

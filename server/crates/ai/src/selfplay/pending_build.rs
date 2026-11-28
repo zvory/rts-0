@@ -59,6 +59,12 @@ pub(crate) struct PendingBuildTracker {
 
 impl PendingBuildTracker {
     pub(crate) fn observe(&mut self, view: PlayerView<'_>) {
+        self.observe_inner(view, false);
+    }
+    pub(crate) fn observe_unfunded(&mut self, view: PlayerView<'_>) {
+        self.observe_inner(view, true);
+    }
+    fn observe_inner(&mut self, view: PlayerView<'_>, preserve_unfunded: bool) {
         let own: Vec<&EntityView> = view
             .snapshot
             .entities
@@ -79,6 +85,11 @@ impl PendingBuildTracker {
             let keep = worker
                 .map(|worker| {
                     pending.observe_worker(worker, view.tick);
+                    let (steel, oil) = rts_rules::economy::cost(pending.kind);
+                    if preserve_unfunded && (view.snapshot.steel < steel || view.snapshot.oil < oil)
+                    {
+                        pending.last_progress_tick = view.tick;
+                    }
                     !pending.stale_at(view.tick)
                 })
                 .unwrap_or_else(|| {

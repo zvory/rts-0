@@ -329,6 +329,51 @@ impl AiActions {
         Ok(worker)
     }
 
+    /// Send a normal build order before its full cost is banked. The simulation waits
+    /// at the site and charges only when the scaffold starts. Reserve the available
+    /// portion of the cost locally; never invent future funds or change paid_build.
+    pub fn build_when_funded(
+        &mut self,
+        workers: &[u32],
+        building: EntityKind,
+        tile_x: u32,
+        tile_y: u32,
+    ) -> Result<u32, ActionError> {
+        if !building.is_building() {
+            return Err(ActionBlocker::UnsupportedKind(building).into());
+        }
+        let worker = self.preflight_candidate(workers, ReservationNamespace::Actor, None)?;
+        self.preflight_capacity()?;
+        let cost = cost_for_building(building);
+        let available = self.remaining_budget();
+        self.budget.reserve(ActionCost {
+            steel: cost.steel.min(available.steel),
+            oil: cost.oil.min(available.oil),
+            supply: 0,
+        });
+        self.reservations.reserve_worker(worker);
+        self.requests.push(AiActionRequest::Build {
+            units: vec![worker],
+            building,
+            tile_x,
+            tile_y,
+            queued: false,
+        });
+        Ok(worker)
+    }
+
+    /// Queue a manual building order without requiring or reserving its price locally.
+    /// The server owns payment, automatic-production priority and waiting at the site.
+    pub fn queue_build(
+        &mut self,
+        workers: &[u32],
+        building: EntityKind,
+        tile_x: u32,
+        tile_y: u32,
+    ) -> Result<u32, ActionError> {
+        self.resume_build(workers, building, tile_x, tile_y)
+    }
+
     pub fn resume_build(
         &mut self,
         workers: &[u32],
@@ -363,6 +408,23 @@ impl AiActions {
         self.preflight_cost(cost)?;
         self.preflight_capacity()?;
         self.budget.reserve(cost);
+        self.reservations.reserve_production_building(producer);
+        self.requests.push(AiActionRequest::Train {
+            building: producer,
+            unit,
+        });
+        Ok(producer)
+    }
+
+    /// Queue a manual unit request even before it is funded or the producer completes.
+    pub fn queue_train(&mut self, producers: &[u32], unit: EntityKind) -> Result<u32, ActionError> {
+        if !unit.is_unit() {
+            return Err(ActionBlocker::UnsupportedKind(unit).into());
+        }
+        let producer = self.preflight_producer(producers, |kind| {
+            rts_rules::economy::trainable_units(kind).contains(&unit)
+        })?;
+        self.preflight_capacity()?;
         self.reservations.reserve_production_building(producer);
         self.requests.push(AiActionRequest::Train {
             building: producer,
@@ -531,6 +593,28 @@ impl AiActions {
                 queued,
             },
         )
+    }
+
+    /// Issue one Move and its queued waypoints atomically, reserving the group once.
+    pub fn move_route(
+        &mut self,
+        group: &UnitGroup,
+        first: (f32, f32),
+        queued_waypoints: &[(f32, f32)],
+    ) -> Result<(), ActionError> {
+        if queued_waypoints.len() >= MAX_ACTIONS_PER_STEP.saturating_sub(self.requests.len()) {
+            return Err(ActionBlocker::ActionCapacity.into());
+        }
+        self.move_group(group, first.0, first.1, false)?;
+        for &(x, y) in queued_waypoints {
+            self.requests.push(AiActionRequest::Move {
+                units: group.0.clone(),
+                x,
+                y,
+                queued: true,
+            });
+        }
+        Ok(())
     }
 
     /// Issue one attack-move followed by queued attack-moves as a single reserved group action.

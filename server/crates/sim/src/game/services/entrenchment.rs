@@ -9,6 +9,7 @@ use std::collections::BTreeMap;
 use crate::config;
 use crate::game::entity::{
     active_trench_occupation, AttackPhase, Entity, EntityKind, EntityStore, MovePhase, Order,
+    WeaponSetup,
 };
 use crate::game::map::Map;
 use crate::game::services::geometry::{
@@ -164,7 +165,16 @@ fn holds_ground(entity: &Entity) -> bool {
     match entity.order() {
         Order::Idle | Order::HoldPosition | Order::Point { .. } => true,
         Order::Attack(order) => order.execution.phase == AttackPhase::Firing,
-        Order::AttackMove(_) => entity.move_phase() == Some(MovePhase::Arrived),
+        Order::AttackMove(_) => {
+            entity.move_phase() == Some(MovePhase::Arrived)
+                || (entity.kind == EntityKind::MachineGunner
+                    && active_trench_occupation(entity).is_some()
+                    && entity.target_id().is_some()
+                    && matches!(
+                        entity.weapon_setup(),
+                        WeaponSetup::SettingUp { .. } | WeaponSetup::Deployed
+                    ))
+        }
         Order::Move(_)
         | Order::Gather(_)
         | Order::Build(_)

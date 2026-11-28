@@ -11,7 +11,7 @@ use crate::sdk::{
 
 mod objective;
 mod production;
-mod response;
+pub(crate) mod response;
 use objective::Objective;
 pub(crate) use production::uses_panzerfaust_production;
 

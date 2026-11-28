@@ -16,3 +16,10 @@ path = "junit.xml"
 [[profile.default.overrides]]
 filter = 'binary(=rush_ai) & (test(=rush_classic_keeps_the_engineer_back_and_finishes_the_timed_transitions) | test(=rush_opening_transitions_research_production_and_respects_engineer_standoff))'
 slow-timeout = { period = "60s", terminate-after = 4 }
+
+# Eco's controlled six-base progression runs 30,000 authoritative ticks. It passes
+# locally but exceeds the default two-minute limit on shared CI runners; retain
+# its full progression assertions without extending unrelated tests.
+[[profile.default.overrides]]
+filter = 'binary(=eco_ai) & test(=eco_classic_economy_reaches_six_bases_with_staged_vehicle_works)'
+slow-timeout = { period = "60s", terminate-after = 6 }

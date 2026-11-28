@@ -1179,14 +1179,13 @@ pays immediately when the queue is empty and its cost (plus unit supply) is avai
 is stored unpaid at zero progress and retries each production tick. Entries appended behind existing
 work never prepay. An unpaid unit reserves neither resources nor supply, cancellation and producer
 death refund only paid entries, and owner/team projections expose `prodWaiting` so clients do not
-extrapolate false progress. Human manual front entries attempt payment in stable entity-id order
-before any standing repeat admission, still before construction payment. AI producers retain their
-per-producer repeat/payment order. Dao research selects a player-wide tier at payment from
+extrapolate false progress. Manual front entries for every player seat attempt payment in stable entity-id order
+before any standing repeat admission, still before construction payment. Dao research selects a player-wide tier at payment from
 completed plus paid active Dao researches, including other pavilions. Its committed `total`
 duration identifies the paid tier for cancellation/death refunds; unpaid entries reprice at
 activation. See [balance](balance.md#three-dao-pavilion-prototype) for tier costs and times.
 
-Human Auto-Build protects the combined Steel/Oil cost of remaining unpaid manual front entries on
+Auto-Build for human and AI seats protects the combined Steel/Oil cost of remaining unpaid manual front entries on
 living, completed producers and active worker build purchases already in interaction range at a
 currently valid site. Construction is checked after movement, including first arrival; travelling
 workers, queued build intents, blocked/invalid placements, and resuming existing scaffolds protect
@@ -1343,9 +1342,14 @@ one tile of weapon range through `entrenchment_combat::attack_range_tiles`, incl
 Panzerfaust launcher shot. Combat target acquisition treats actively entrenched units, including
 units retaining an arrived Attack Move stance, and Machine Gunners that are setting up or deployed
 like Hold Position: they can acquire and fire at legal targets inside current weapon range but do
-not request enemy-directed paths or tear down the weapon to pursue. A fresh Move, Attack Move, or
-direct Attack order clears active occupation before later combat decisions use it; direct Attack
-then follows its normal target-pursuit rule and may tear down a Machine Gunner to close range.
+not request enemy-directed paths or tear down the weapon to pursue. A fresh ground Attack Move
+for an MG that is setting up or deployed preserves setup progress and existing trench occupation
+when normal acquisition finds a visible, legal target within its current weapon range before
+movement. The new destination remains active and resumes after combat's no-target grace. This
+continuation preserves an occupied trench without authorizing mid-route digging. If no legal target
+exists, the new order starts teardown normally. Plain Move always leaves occupation and packs the
+weapon, including explicit retreats. Direct Attack retains occupation until combat decides whether
+its target requires pursuit.
 
 Incoming direct-fire accuracy is weapon-specific: Anti-Tank Guns may deliberately target
 infantry-sized units, and those intended hits have no intrinsic miss roll but deal only 30% damage.
@@ -1746,7 +1750,11 @@ General rules:
   blocked steps and arrival-only position snaps retain the last walking heading. Collision cleanup
   does not choose facing. When a Machine Gunner arrives without a combat target, automatic setup
   copies body facing into weapon facing so deployment preserves that heading; an acquired target
-  still chooses combat aim normally. Vehicle movement retains its separate turning rules.
+  still chooses combat aim normally. A new ground Attack Move preserves an MG's ongoing setup or
+  deployment when it can legally engage an enemy in range; it does not restart the setup timer.
+  Visibility, smoke, line of sight, and friendly blockers use ordinary combat legality. Without a
+  shootable enemy it packs and follows the new destination; plain Move still forces teardown.
+  Vehicle movement retains its separate turning rules.
 - Non-queued `HoldPosition` clears each selected unit's active order and queued intents, then marks
   the unit as held. Queued `HoldPosition` appends a terminal intent, so the unit finishes earlier
   queued stages before entering that same held stance. Held units keep normal collision behavior

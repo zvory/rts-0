@@ -197,3 +197,31 @@ fn pending_factory_build_waits_for_clearance_then_excludes_failed_site() {
     assert!(tracker.intents().is_empty());
     assert!(tracker.failed(EntityKind::Factory, 20, 70));
 }
+
+#[test]
+fn eco_keeps_stationary_resource_waits_then_expires_funded_stuck_orders() {
+    let start = pending_tracker_start_payload();
+    let mut tracker = PendingBuildTracker::default();
+    tracker.record_commands(
+        10,
+        &[Command::Build {
+            units: vec![2],
+            building: EntityKind::Barracks,
+            tile_x: 48,
+            tile_y: 70,
+            queued: false,
+        }],
+    );
+    for tick in [20, 20 + PENDING_BUILD_STALE_TICKS, 2000] {
+        let snapshot = pending_tracker_snapshot(tick, 100., 200.);
+        tracker.observe_unfunded(pending_tracker_view(tick, &start, &snapshot));
+        assert_eq!(tracker.intents().len(), 1);
+        assert!(!tracker.failed(EntityKind::Barracks, 48, 70));
+    }
+    let tick = 2000 + PENDING_BUILD_STALE_TICKS;
+    let mut funded = pending_tracker_snapshot(tick, 100., 200.);
+    funded.steel = 10000;
+    funded.oil = 10000;
+    tracker.observe_unfunded(pending_tracker_view(tick, &start, &funded));
+    assert!(tracker.intents().is_empty());
+}

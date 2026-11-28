@@ -334,7 +334,14 @@ impl Entity {
     pub(crate) fn replace_active_order(&mut self, order: Order) {
         self.cancel_panzerfaust_windup();
         self.end_war_charge();
-        if matches!(order, Order::Move(_) | Order::AttackMove(_)) {
+        // Combat decides before movement whether this attack-move can keep engaging.
+        let preserve_mg_emplacement = self.kind == EntityKind::MachineGunner
+            && matches!(order, Order::AttackMove(_))
+            && matches!(
+                self.weapon_setup(),
+                WeaponSetup::SettingUp { .. } | WeaponSetup::Deployed
+            );
+        if matches!(order, Order::Move(_) | Order::AttackMove(_)) && !preserve_mg_emplacement {
             self.leave_trench_for_movement();
         }
         if let Some(m) = self.movement.as_mut() {
@@ -346,7 +353,7 @@ impl Entity {
             m.clear_vehicle_recovery();
             m.entrenchment_dig_ticks = 0;
             // Keep occupation until combat decides whether an Attack order needs pursuit.
-            if !matches!(m.order, Order::Attack(_)) {
+            if !matches!(m.order, Order::Attack(_)) && !preserve_mg_emplacement {
                 m.occupied_trench_id = None;
             }
         }

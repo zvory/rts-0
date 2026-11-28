@@ -3,6 +3,9 @@
 use crate::math::GameplayMath as _;
 use crate::EntityKind;
 
+/// Static visual-tree trunk collision shared by native movement and SDK route planning.
+pub const TREE_TRUNK_RADIUS_PX: f32 = 4.5;
+
 pub const TANK_BODY_LENGTH_PX: f32 = 50.4;
 pub const TANK_BODY_WIDTH_PX: f32 = 28.8;
 pub const TANK_BODY_CLEARANCE_PX: f32 = 1.5;

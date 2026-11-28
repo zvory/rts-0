@@ -10,11 +10,6 @@ pub(super) struct Asset {
     producer: f32,
     tech: f32,
 }
-fn steel_value(remaining: f32, active: bool) -> f32 {
-    remaining.min(270.) / 100. * if active { 1. } else { 0.15 }
-        + if active && remaining > 0. { 0.25 } else { 0. }
-        + 0.15 * remaining / 625.
-}
 pub(super) fn assets(g: &Grid, frame: &AiFrame, ids: &[AiBaseSiteId]) -> Vec<Asset> {
     let mut out = vec![];
     for site in frame.base_sites().iter().filter(|b| ids.contains(&b.id)) {
@@ -37,7 +32,9 @@ pub(super) fn assets(g: &Grid, frame: &AiFrame, ids: &[AiBaseSiteId]) -> Vec<Ass
                 out.push(Asset {
                     point,
                     base: site.id,
-                    value: steel_value(remaining, active) * if unknown > 0. { 0.5 } else { 1. },
+                    // Defend the remaining deposit, including a fresh base before its mines
+                    // are built. Activity is a diagnostic, not a valuation multiplier.
+                    value: remaining / 100.,
                     known,
                     unknown,
                     mine: if active { 1. } else { 0. },
@@ -85,7 +82,7 @@ pub(super) fn assets(g: &Grid, frame: &AiFrame, ids: &[AiBaseSiteId]) -> Vec<Ass
     }
     out
 }
-fn occupied(g: &Grid, frame: &AiFrame) -> Vec<bool> {
+fn occupied(g: &Grid, frame: &AiFrame, reservations: &[DefenseReservation]) -> Vec<bool> {
     let radius = rts_rules::balance::unit_placement_radius(EntityKind::MachineGunner);
     let buildings = frame
         .owned()
@@ -95,12 +92,31 @@ fn occupied(g: &Grid, frame: &AiFrame) -> Vec<bool> {
         .chain(frame.tank_traps())
         .filter_map(|e| rts_rules::balance::building_stats(e.kind).map(|s| (e, s)))
         .collect::<Vec<_>>();
+    let reserved = reservations
+        .iter()
+        .filter_map(|reservation| {
+            let foot = super::super::AiRulebook::for_frame(frame)?
+                .entity(reservation.building)?
+                .footprint?;
+            let x = reservation.tile.x() as f32 * g.size;
+            let y = reservation.tile.y() as f32 * g.size;
+            Some((
+                x,
+                y,
+                x + foot.width_tiles as f32 * g.size,
+                y + foot.height_tiles as f32 * g.size,
+            ))
+        })
+        .collect::<Vec<_>>();
     (0..g.walk.len())
         .map(|i| {
             let p = g.point(i);
             frame.resources().iter().any(|r| {
                 r.remaining != AiResourceAmount::Known(0)
                     && dist2(p, r.position) < (1.7 * g.size).det_powi(2)
+            }) || reserved.iter().any(|rect| {
+                // Keep an Engineer access ring clear as well as the structure itself.
+                super::super::unit_circle_touches_rect(p, radius + g.size, *rect)
             }) || buildings.iter().any(|(e, s)| {
                 let hw = s.foot_w as f32 * g.size * 0.5 + radius;
                 let hh = s.foot_h as f32 * g.size * 0.5 + radius;
@@ -123,7 +139,7 @@ pub(super) fn score(planner: &mut DefensePlanner, frame: &AiFrame, budget: usize
     planner
         .time_fields
         .retain(|point, _| current_points.contains(point));
-    let blocked = occupied(g, frame);
+    let blocked = occupied(g, frame, &planner.reservations);
     // Dynamic reachability includes known occupied footprints. Start outside each owned Depot's
     // footprint, never flood through the building center. Reservations ignore transient unit bodies.
     let starts = frame
@@ -178,15 +194,25 @@ pub(super) fn score(planner: &mut DefensePlanner, frame: &AiFrame, budget: usize
     let mut weights = vec![];
     for (id, geo) in planner.geometry.iter().enumerate() {
         let center = g.point(geo.center);
-        let slots = (0..g.walk.len())
-            .filter(|i| g.entrench[*i] && !blocked[*i] && reached[*i])
-            .filter(|i| {
-                geo.points.iter().any(|p| {
-                    dist2(g.point(*i), g.point(*p)) <= range * range * g.size * g.size
-                        && g.ray_blocked(*i, *p, &blocked)
+        let slots = if geo.mode == DefenseMode::Garrison {
+            // The ring is already restricted to 3–5 tiles from the public base center.
+            // Do not expand it by weapon range or require a ray through the Depot itself.
+            geo.points
+                .iter()
+                .copied()
+                .filter(|i| g.entrench[*i] && !blocked[*i] && reached[*i])
+                .collect::<Vec<_>>()
+        } else {
+            (0..g.walk.len())
+                .filter(|i| g.entrench[*i] && !blocked[*i] && reached[*i])
+                .filter(|i| {
+                    geo.points.iter().any(|p| {
+                        dist2(g.point(*i), g.point(*p)) <= range * range * g.size * g.size
+                            && g.ray_blocked(*i, *p, &blocked)
+                    })
                 })
-            })
-            .collect::<Vec<_>>();
+                .collect::<Vec<_>>()
+        };
         let eta = geo
             .points
             .iter()
@@ -283,61 +309,95 @@ pub(super) fn score(planner: &mut DefensePlanner, frame: &AiFrame, budget: usize
     let mut used = vec![];
     // Allocate only if a physically supported, unoccupied candidate remains. Highest averages
     // gives a meaningful choice even with one unit or many bases, with no per-base minimum.
-    for _ in 0..budget.min(g.walk.len()) {
-        let selected = (0..plan.sectors.len())
-            .filter(|i| weights[*i] > 0. && !candidates[*i].is_empty())
-            .max_by(|a, b| {
-                let qa = weights[*a] / (plan.sectors[*a].slots.len() + 1) as f32;
-                let qb = weights[*b] / (plan.sectors[*b].slots.len() + 1) as f32;
-                qa.total_cmp(&qb).then_with(|| b.cmp(a))
+    for allocation in 0..budget.min(g.walk.len()) {
+        // A declared expansion needs a construction screen even before its mines are active.
+        // Pure asset weighting can otherwise spread its small future value across many cut
+        // sectors and allocate none, permanently blocking the caller's Engineer lead.
+        let screen = (allocation == 0)
+            .then_some(planner.prospective)
+            .flatten()
+            .and_then(|site| {
+                (0..plan.sectors.len())
+                    .filter(|i| {
+                        plan.sectors[*i].base_ids.contains(&site) && !candidates[*i].is_empty()
+                    })
+                    .max_by(|a, b| weights[*a].total_cmp(&weights[*b]).then_with(|| b.cmp(a)))
             });
+        let selected = screen.or_else(|| {
+            (0..plan.sectors.len())
+                .filter(|i| weights[*i] > 0. && !candidates[*i].is_empty())
+                .max_by(|a, b| {
+                    let qa = weights[*a] / (plan.sectors[*a].slots.len() + 1) as f32;
+                    let qb = weights[*b] / (plan.sectors[*b].slots.len() + 1) as f32;
+                    qa.total_cmp(&qb).then_with(|| b.cmp(a))
+                })
+        });
         let Some(si) = selected else {
             break;
         };
         let geo = &planner.geometry[si];
-        let sample = if plan.sectors[si].slots.is_empty() {
-            geo.center
+        let slot = if geo.mode == DefenseMode::Garrison {
+            candidates[si].iter().copied().max_by(|a, b| {
+                let spread = |i: usize| {
+                    plan.sectors[si]
+                        .slots
+                        .iter()
+                        .map(|s| dist2(g.point(i), s.position))
+                        .fold(f32::INFINITY, f32::min)
+                };
+                // After the first post, maximize separation around the ring. Stable forward
+                // preference starts an empty ring; tile order breaks any remaining tie.
+                spread(*a)
+                    .total_cmp(&spread(*b))
+                    .then_with(|| planner.enemy[*b].cmp(&planner.enemy[*a]))
+                    .then_with(|| b.cmp(a))
+            })
         } else {
-            *geo.points
-                .iter()
-                .max_by(|a, b| {
-                    let quality = |p: usize| {
-                        plan.sectors[si]
-                            .slots
-                            .iter()
-                            .map(|s| dist2(g.point(p), s.position))
-                            .fold(f32::INFINITY, f32::min)
-                    };
-                    quality(**a).total_cmp(&quality(**b)).then_with(|| b.cmp(a))
-                })
-                .unwrap_or(&geo.center)
-        };
-        let sample = g.point(sample);
-        let want = if geo.mode == DefenseMode::Cut {
-            let base = frame
-                .base_sites()
-                .iter()
-                .filter(|b| geo.bases.contains(&b.id))
-                .min_by(|a, b| dist2(a.position, sample).total_cmp(&dist2(b.position, sample)));
-            if let Some(b) = base {
-                let dx = b.position.0 - sample.0;
-                let dy = b.position.1 - sample.1;
-                let len = dx.det_hypot(dy).max(1.);
-                (
-                    sample.0 + 2. * g.size * dx / len,
-                    sample.1 + 2. * g.size * dy / len,
-                )
+            let sample = if plan.sectors[si].slots.is_empty() {
+                geo.center
             } else {
-                sample
-            }
-        } else {
-            g.point(geo.center)
+                *geo.points
+                    .iter()
+                    .max_by(|a, b| {
+                        let quality = |p: usize| {
+                            plan.sectors[si]
+                                .slots
+                                .iter()
+                                .map(|s| dist2(g.point(p), s.position))
+                                .fold(f32::INFINITY, f32::min)
+                        };
+                        quality(**a).total_cmp(&quality(**b)).then_with(|| b.cmp(a))
+                    })
+                    .unwrap_or(&geo.center)
+            };
+            let sample = g.point(sample);
+            let want = if geo.mode == DefenseMode::Cut {
+                let base = frame
+                    .base_sites()
+                    .iter()
+                    .filter(|b| geo.bases.contains(&b.id))
+                    .min_by(|a, b| dist2(a.position, sample).total_cmp(&dist2(b.position, sample)));
+                if let Some(b) = base {
+                    let dx = b.position.0 - sample.0;
+                    let dy = b.position.1 - sample.1;
+                    let len = dx.det_hypot(dy).max(1.);
+                    (
+                        sample.0 + 2. * g.size * dx / len,
+                        sample.1 + 2. * g.size * dy / len,
+                    )
+                } else {
+                    sample
+                }
+            } else {
+                g.point(geo.center)
+            };
+            candidates[si].iter().copied().min_by(|a, b| {
+                dist2(g.point(*a), want)
+                    .total_cmp(&dist2(g.point(*b), want))
+                    .then_with(|| a.cmp(b))
+            })
         };
-        let Some(slot) = candidates[si].iter().copied().min_by(|a, b| {
-            dist2(g.point(*a), want)
-                .total_cmp(&dist2(g.point(*b), want))
-                .then_with(|| a.cmp(b))
-        }) else {
+        let Some(slot) = slot else {
             continue;
         };
         let position = g.point(slot);

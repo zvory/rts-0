@@ -17,6 +17,9 @@ starting resources, supply caps, mining amounts, support-weapon constants, body 
 and ability scalars, and stat helpers. Its internal `server/crates/rules/src/balance/*.rs` modules
 group those Rust-owned values by domain, and its `unit_stats(kind)` and `building_stats(kind)`
 helpers read the defs table.
+`balance::TREE_TRUNK_RADIUS_PX` is the existing 4.5 px native vehicle/tree collision radius,
+shared with SDK known-world route planning; the simulation map module retains its compatibility
+alias. Moving its ownership into rules does not change collision or rendering behavior.
 Default attack range, damage, cooldown, weapon class, and weapon-policy metadata are exposed through
 `server/crates/rules/src/combat.rs` weapon profiles; current profile values mirror the defs records
 so legacy `attack_profile(kind)` and `weapon_class(kind)` callers remain behavior-compatible.
