@@ -53,7 +53,7 @@ node scripts/art/capture-roster-team-color-review.mjs
 node scripts/art/roster-team-color-review.mjs --restore
 ```
 
-The installer uses existing packed textures, backs up thirteen renderer modules beneath ignored
+The installer uses existing packed textures, backs up twelve renderer modules beneath ignored
 `target/`, and rewrites them only for local preview. It refuses existing backups; restore verifies
 both backup hashes and installed files before writing, then removes the backup. Changed renderer
 files or legacy backups require manual preservation/reconciliation rather than automatic overwrite.
@@ -72,46 +72,48 @@ are ignored local artifacts under `target/team-color-review-captures/`, never ch
 The image generator's edits have small internal line/shading differences; original alpha preserves
 outer boundaries, but this is an art review rather than a claim of pixel-identical recoloring.
 
-## Expanded full-roster review
+## Expanded Kriegsia review and material corrections
 
-The follow-up covers 23 appearance/rank/faction rows: all 12 Kriegsia units (including the
-Command Car-launched Scout Plane), nine Cultivator rows (worker, Novice, Bow Novice, all three
-Adepts and all three Masters), and Ekat/Golem. The shared worker is shown in both factions.
-The new Bow Novice from current main is included with a representative selective-color idle.
-Existing Command Car, Cultivator, worker and Ekat/Golem selective/vector artwork is retained.
-The Golem remains the current geometric prototype artwork.
+Scope is Kriegsia only. Cultivators (including Bow Novice, Adepts and Masters) and Ekat/Golem
+retain their existing production artwork and renderer metadata. The former Bow Novice study and
+its temporary override have been removed at the user's request. Historical full-roster captures
+are reference evidence; they do not authorize changes to those factions.
 
-Eight additional built-in imagegen edits are preserved in `source/`, with exact prompts and
+Seven additional built-in imagegen edits are preserved in `source/`, with exact prompts and
 reference paths in `expanded-prompts.json`. `references/machine-gunner-carry.png` is the first
-sixth-width cell of the existing carry alpha sheet; `references/bow-novice.png` is the first
-256×256 cell of the current archer strip. These crops are generation references only.
-`roster-team-color-review-specs.mjs` declares the production image and representative cell sizes.
-Rifleman, Panzerfaust, Machine Gunner, Bow Novice and Scout Plane use one preview frame; applicable
-movement/setup/fire metadata points to that representative pose temporarily. This does not
-constitute animation production or animation-continuity validation. All modular atlas transforms
-and normal body scale remain in the actual renderer. Machine Gunner shows the carrying pose.
+sixth-width cell of the existing carry alpha sheet. `roster-team-color-review-specs.mjs` declares
+production images, representative sizes and selected authoring revisions.
 
-The extended packer emits shared fixed/paint layers and a labeled `expanded-source-material-board.png`.
-Use the same pack/check/install/restore commands above; for all units replace the capture step with:
+Mortar v3 paints the entire outer tube and muzzle rim with team color; the bore is black.
+Its axle, mounting collars, pivots and wheel hubs are dark blackened steel, and tires black rubber.
+Anti-Tank Gun v2 similarly replaces pale/silver/coppery exposed fittings with dark neutral steel.
+There is no white paint. Small shaded steel highlights remain gray. Both exact revision prompts
+and their references are retained in `material-corrections-v2.json` and
+`mortar-barrel-correction-v3.json`. The packer uses mortar v3 and anti-tank gun v2.
 
-```sh
-node scripts/art/capture-full-roster-team-color-review.mjs
-```
+Rifleman, Panzerfaust, Machine Gunner and Scout Plane use one representative preview frame;
+applicable movement/setup/fire metadata temporarily points to that pose. These material previews
+are not complete animation sets or animation-continuity validation. Modular atlas transforms and
+normal body scale remain in the actual renderer. Machine Gunner shows its carrying pose.
 
-An optional `--group=kriegsia`, `--group=cultivators` or `--group=ekat` recaptures that faction
-and retains the other faction evidence. Each group is arranged in a clear region of the unchanged
-Classic map. Off-screen headquarters remain to keep the scene valid. The Scout Plane is launched
-through the normal Command Car ability and captured during flight; its crop follows its actual
-paused position. No synthetic airplane entity is spawned. The command car is separated from the
-launch position before capture. New captures must not overlap other unit artwork.
+The same pack/check/install/restore commands above apply. All twelve temporarily patched renderer
+files restore byte-for-byte, and no Cultivator/Ekat source file is among them. Existing Command Car
+selective artwork remains unchanged.
 
-Local `target/full-roster-team-color-review/` contains the 21 raw game captures, full readiness/
-subject evidence, and three labeled unit-by-color sheets. The sheets copy 200-world-pixel terrain
-regions at 1:1 DPR-2 pixel size. They retain ordinary game health bars and effects. They are
-presentation crops of actual game pixels; they are not separate team-color illustrations.
-
-Rebuild the labeled sheets from existing captures without launching another game:
+The full-roster capture tool can inspect unchanged factions as references, or recapture Kriegsia only:
 
 ```sh
+node scripts/art/capture-full-roster-team-color-review.mjs --group=kriegsia
 node scripts/art/roster-team-color-review-boards.mjs
 ```
+
+Existing game screenshot sheets copy 200-world-pixel regions at 1:1 DPR-2 pixel size. The Scout Plane
+is launched through its normal Command Car ability and its crop follows its actual paused position.
+The blue overview and color sheets are crops of actual game pixels, never separate AI team-color
+illustrations. All local capture evidence remains under ignored `target/`.
+
+For a live Lab review, serve an isolated copy of the installed preview client through
+`RTS_CLIENT_DIR`, then restore the task checkout. The ordinary Lab allows spawning, movement,
+combat, pausing, stepping and setup review. Material-only preview poses remain a limitation until
+full animation production is approved. Live previews expire after one hour and must terminate their
+owned server/supervisor and remove their copied client assets. They do not restart automatically.

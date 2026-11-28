@@ -36,11 +36,6 @@
       "name": "scout_plane",
       "reference": "client/assets/rigs/scout-plane-fw189-pass-01/generated/scout-plane-fw189-pass-01-alpha.png",
       "prompt": "Use case: precise-object-edit. Edit target: referenced production top-down game sprite/component artwork. Material colors only. Paint broad wing panels, twin booms, tail and outer cockpit frame saturated shaded magenta. Keep cockpit windows smoked blue-gray glass, propeller hubs/nose tips engine-metal gray, vents charcoal, narrow leading-edge strips silver-gray metal. Preserve exact twin-boom plane shape, all wing outlines and canopy geometry. No symbols or insignia. Preserve exact pose, silhouettes, proportions, outlines, part placement, weapon shapes and existing top-down low-poly game-art style. Use shaded pure magenta highlights and dark magenta shadows as authoring team-paint key, retaining smooth edges. Do not tint fixed materials. Transparent background, no glow, no cast shadow, no backdrop, no labels, no added objects. This is one representative-pose art review, not an animation sheet."
-    },
-    {
-      "name": "bow_novice",
-      "reference": "client/assets/rigs/roster-team-color-review/references/bow-novice.png",
-      "prompt": "Use case: precise-object-edit. Edit target: referenced production top-down Bow Novice idle game sprite. Material recolor only; preserve exact top-down pose, silhouette, proportions, hands, bow shape, quiver, scarf shape and facing. Paint white tunic and long cloth scarf saturated shaded pure magenta as team-paint authoring key. Preserve hair black, warm natural skin, bow natural brown wood, bowstring off-white, quiver brown leather and arrows wood with off-white feathers, any weapon fittings dark metal. Do not change pose or add details. Original low-poly game sprite style, smooth edges, actual transparent background, no glow/shadow/backdrop, no text. Single idle pose only."
     }
   ]
 }

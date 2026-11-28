@@ -43,7 +43,8 @@ try {
  const page=await browser.newPage();
  for(const name of Object.keys(sources)) {
   const old=fs.readFileSync(path.join(root,'client/assets/rigs',sources[name])).toString('base64');
-  const art=fs.readFileSync(path.join(dir,'source',`${name}.png`)).toString('base64');
+  const sourceName=EXPANDED_REVIEW.find(s=>s.name===name)?.sourceName||name;
+  const art=fs.readFileSync(path.join(dir,'source',`${sourceName}.png`)).toString('base64');
   const gun=fs.readFileSync(path.join(root,'client',scout.image.split('?')[0])).toString('base64');
   const gunFrame=scout.sprites.find(s=>s.id==='sprite.rearMachineGun').frame;
   const result=await page.evaluate(async({name,old,art,gun,gunFrame,spec})=>{
@@ -133,9 +134,7 @@ if(modes.includes('--install-preview')) {
  // Review-only metadata redirects; existing production definitions are restored after capture.
  for(const spec of EXPANDED_REVIEW) {
   const image='/assets/rigs/roster-team-color-review/generated/'+spec.name+'-packed.png';
-  if(spec.name==='bow_novice') {
-   edit(spec.file,s=>s.replace(/export const BOW_NOVICE_PNG_FRAME_STRIP = discipleStrip\([\s\S]*?"bow-novice-1"\);/,     'export const BOW_NOVICE_PNG_FRAME_STRIP = Object.freeze({...discipleStrip("'+image+'", 1, [0], {x:50,y:50,w:180,h:190}, "disciple_arrow", "material-review"), sheetRows:4, teamPaint:{baseRow:2,paintRow:3}, movementFrames:[0]});'));
-  } else if(spec.strip) {
+  if(spec.strip) {
    edit(spec.file,s=>s.replace(/image: .*\n/,'image: "'+image+'",\n  sheetRows:4, teamPaint:{baseRow:2,paintRow:3},\n').replace(/frameCount: \d+/,'frameCount: 1').replace(/movementFrames: \[[^\]]*\]/,'movementFrames: [0]').replace(/firingFrames: \[[^\]]*\]/,'firingFrames: [0]').replace(/setupFrames: \[[^\]]*\]/,'setupFrames: [0]').replace(/deployedFrame: \d+/,'deployedFrame: 0').replace(/windupFrames: \[[^\]]*\]/,'windupFrames: [0]'));
   } else edit(spec.file,s=>s.replace(/image: .*\n/,'image: "'+image+'",\n  reviewTeamPaint:true,\n').replace(/tintSlot: "team[^"\n]*"/g,'tintSlot: "fixed"'));
  }
