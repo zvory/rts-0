@@ -16,7 +16,7 @@ The player-facing lobby supports five AI profile IDs:
 - jeffs_ai_v1_1 — Jeff's AI (V1.1), the default opponent: Jeff's AI V1.0 plus the V1.1 changes, played with the feature set fixed in `JEFF_V1_1_FEATURES` (profiles.rs). On a symmetric map it decides in one frame, as if on the start it won more from (`live/mirror.rs`), so both starts play the same way.
 - rush_ai — Rush AI, an immediate infantry attack with forward construction.
 - pressure_ai — Pressure AI, the AI 2.1 economy and technology with independent forward staging and a value-based response.
-- eco_ai — Eco AI, a defensive six-base economy using the SDK cut/garrison planner, Machine Gunner/Panzerfaust infantry, and staged Tank production.
+- eco_ai — Eco AI, an expanding economy using the SDK cut/garrison planner, Machine Gunner/Panzerfaust infantry, Command Car-supported Tanks, and capacity-triggered staged assaults.
 
 `ai_turtle` is deprecated and internal-only. It remains registered for offline self-play,
 diagnostics, and observer-only AI sessions, but it is not exposed in the lobby and the server
@@ -110,11 +110,11 @@ build; it is not an accepted, legal, or active-build receipt.
 order. Its supported helpers are paid explicit-site build, `build_when_funded` (travel now,
 wait for funding at the site), unpriced `queue_build`/`queue_train`, resume-without-repay, train, standing
 production repeat, research, gather, move, atomic Move routes, attack-move, attack-move routes, direct attack, Hold Position, and Anti-Tank
-Gun setup. `UnitGroup`
+Gun setup, and ordinary `use_ability` commands. `UnitGroup`
 canonicalizes tactical unit IDs into a sorted, deduplicated, non-empty set; caller-ordered worker,
 resource-node, and producer candidate lists are not normalized. `attack_move_route` reserves a
 group once and emits an initial unqueued AttackMove followed by queued waypoints in order. Its
-whole route must fit the local action capacity before any request or reservation changes.
+whole route must fit the local action capacity before any request or reservation changes. `use_ability` reserves its actors and action capacity, while native execution validates ability carrier, readiness, targeting, and cost; policies can inspect owned entities’ projected ability states.
 
 The builder tracks Steel, Oil, and free Supply plus independent actor, resource-node, and producer
 reservation namespaces. Every helper completes local preflight before changing the budget,
@@ -290,8 +290,8 @@ Its economy builds one Barracks and a Training Centre on one base, enables Machi
 auto-production, and completes Entrenchment before expanding. At two completed bases it builds
 an Engineering Complex, queues Tank Production research on its scaffold, then builds the first
 Vehicle Works and second Barracks. Panzerfaust and Methamphetamines research are queued at two
-bases. At three bases it targets two Works and three Barracks (the Barracks cap); at four bases it completes the third
-Works before expanding to bases five and six. Expansion stops at six completed bases. Beyond six,
+bases. At three bases it requests one Command Car and targets two Works and three Barracks (the Barracks cap); at four bases it completes the third
+Works before resuming expansion. Expansion targets half the map’s base sites plus one (seven on Classic). After that target,
 all completed Works actively producing Tanks without a resource wait trigger another Works;
 desired capacity persists to replace destroyed Works. No stockpile or income threshold drives
 these decisions.
@@ -302,12 +302,12 @@ a Panzerfaust's Oil wait from blocking a Machine Gunner producer. Every Vehicle 
 auto-production enabled, including during travel, construction, research and resource waits.
 Standing orders are configured once per state transition, including on unfinished buildings, and
 recover after producer destruction. Eco does not maintain a spending ledger or forecast income.
-It uses `queue_build`, `queue_research`, and (only to replace a missing Engineer) `queue_train`
+It uses `queue_build`, `queue_research`, and `queue_train` for a missing Engineer or Command Car
 without requiring funds. The native scheduler pays eligible manual orders before automatic
 production for both human and AI seats. Travelling Engineers and research on unfinished buildings
 become spending priorities only once their orders can start, matching player behavior. Paid automatic
 jobs continue working. Supply uses the game's fixed cap and native production waits.
-Tanks form one concentrated reserve near the centroid of completed owned base sites, weighted
+Tanks form one concentrated reserve near the centroid of owned and prospective expansion base sites, weighted
 by remaining Steel stock (unknown deposits use the same 312.5 planning estimate as defense scoring).
 When all deposits are exhausted, the average completed-base position is the fallback. The nearest
 body-clear reachable reserve anchor is chosen; disconnected components form local reserves rather
@@ -316,6 +316,29 @@ and the reserved Depot footprint, and tolerate small centroid shifts without res
 separate two-tile Tank grid destinations as well. Bounded atomic Move
 route batches reserve each Tank once and retain all queued corners, gathering armor without acquiring fights en route; idle/stalled units retry and released
 responders return to reserve. Armor does not entrench. Supply and standing production remain native.
+Eco targets one Command Car per completed base beyond the second, replaces losses,
+and keeps Tank auto-production enabled. The car follows the greatest Tank concentration within
+a nine-tile clustering radius, prioritizing attacking/mobilized Tanks over idle reserves. It parks
+two tiles toward home from the cluster, uses body-aware queued routes and a two-tile destination
+deadband, and casts ready Breakthrough when it can cover an engaged Tank group with visible enemies
+nearby or while escorting a claim. Cars rotate casts and wait for active Breakthrough to expire. Support commands run before large infantry batches so the action cap cannot starve the car.
+
+After claiming its territory goal, at 300 supply Eco permanently unlocks a staged offensive. Public geographic ranks, snapshotted
+for a living enemy, choose targets from half the map's base-site count inward to that enemy's main
+(12 sites starts at rank six; ten at rank five). Confirmed friendly sites are skipped. Each target
+uses Pressure’s staging geometry in three parallel ranks, two tiles apart. Ordinary movement gathers the cohort; attack-move begins at launch. Cohort membership
+is frozen so ongoing production cannot postpone departure. An armored cohort attacks once 90% of
+its surviving Tanks are within two tiles of their posts, taking all ready infantry with it.
+Precise parking still uses the normal 0.9-tile arrival radius; launch readiness is more tolerant. Late infantry does not
+hold the armor. Infantry-only cohorts retain the 90% healthy purchase-value gate. Later reinforcement
+cohorts form in batches of at least 20. New Tanks search the full formation frontage, so existing
+infantry posts cannot leave them without orders inside a smaller Tank-only slot budget.
+A new target is selected only after the current site's center/resource positions are observable,
+no known enemy Depot or relevant visible enemies remain, and attackers have reached the area.
+Each new target restages the surviving army. Outbound troops yield to shared wounded micro and
+home-defense mobilization, resume their offensive mission after release, and do not receive normal
+post/reserve commands or count as staffed home-line anchors. Expansion screens retain their roles. Each new claim sends the entire available Tank reserve in a spaced attack-move formation, with Breakthrough, before the Engineer is released once the site is observed and clear.
+
 Construction reuses the established Jeff/Pressure outward ring placement search for ordinary
 buildings. Expansion Depots use the SDK's Pressure-derived resource-centered placement query,
 which keeps Steel and Oil coverage instead of moving the Depot outward from its resource cluster.

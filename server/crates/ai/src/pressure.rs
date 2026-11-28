@@ -42,7 +42,7 @@ pub(crate) struct PressureWaves {
 }
 
 #[derive(Clone, Copy, Debug)]
-struct StagingLine {
+pub(crate) struct StagingLine {
     center: Point,
     forward: Point,
     routed: bool,
@@ -273,7 +273,18 @@ impl PressureWaves {
 }
 
 impl StagingLine {
-    fn on_axis(map: &AiMap, home: Point, target: Point) -> Option<Self> {
+    /// Additional rows use the same Pressure geometry, translated backwards in world pixels.
+    pub(crate) fn shifted_back(self, distance_px: f32) -> Self {
+        Self {
+            center: (
+                self.center.0 - self.forward.0 * distance_px,
+                self.center.1 - self.forward.1 * distance_px,
+            ),
+            ..self
+        }
+    }
+
+    pub(crate) fn on_axis(map: &AiMap, home: Point, target: Point) -> Option<Self> {
         let length = distance(home, target);
         if length <= f32::EPSILON {
             return None;
@@ -331,29 +342,65 @@ impl StagingLine {
         None
     }
 
-    fn free_slot(
+    pub(crate) fn free_slot(
         &self,
         frame: &AiFrame,
         kind: EntityKind,
         occupied: impl Iterator<Item = Point>,
         reachable: &[bool],
     ) -> Option<Point> {
+        self.free_slot_bounded(frame, kind, occupied, reachable, 129)
+    }
+
+    pub(crate) fn free_slot_bounded(
+        &self,
+        frame: &AiFrame,
+        kind: EntityKind,
+        occupied: impl Iterator<Item = Point>,
+        reachable: &[bool],
+        columns: usize,
+    ) -> Option<Point> {
+        self.free_slot_layout(frame, kind, occupied, reachable, columns, true)
+    }
+    pub(crate) fn free_slot_rank(
+        &self,
+        frame: &AiFrame,
+        kind: EntityKind,
+        occupied: impl Iterator<Item = Point>,
+        reachable: &[bool],
+        columns: usize,
+    ) -> Option<Point> {
+        self.free_slot_layout(frame, kind, occupied, reachable, columns, false)
+    }
+    fn free_slot_layout(
+        &self,
+        frame: &AiFrame,
+        kind: EntityKind,
+        occupied: impl Iterator<Item = Point>,
+        reachable: &[bool],
+        columns: usize,
+        tank_rear: bool,
+    ) -> Option<Point> {
         let occupied = occupied.collect::<Vec<_>>();
         let size = frame.map().tile_size as f32;
         let lateral = (-self.forward.1, self.forward.0);
         // Two fixed parallel lines: front infantry at zero depth, Tanks three tiles back.
         // Skip blocked slots rather than putting Riflemen into the armor formation.
-        let back = if kind == EntityKind::Tank {
+        let back = if tank_rear && kind == EntityKind::Tank {
             TANK_REAR_OFFSET_TILES * size
         } else {
             0.0
         };
         let spacing = if kind == EntityKind::Tank {
-            3.0
+            if tank_rear {
+                3.0
+            } else {
+                2.0
+            }
         } else {
             SLOT_SPACING_TILES
         };
-        for column in 0..129 {
+        for column in 0..columns.min(129) as i32 {
             let signed = if column % 2 == 0 {
                 column / 2
             } else {
@@ -406,7 +453,7 @@ impl StagingLine {
 
 /// Static ground connectivity from Pressure's original main, ignoring dynamic occupants.
 /// Later straight staging lines may cross water, but recruits must stay on reachable ground.
-fn ground_reachable(map: &AiMap, home: Point) -> Vec<bool> {
+pub(crate) fn ground_reachable(map: &AiMap, home: Point) -> Vec<bool> {
     let mut reachable = vec![false; map.terrain.len()];
     let size = map.tile_size as f32;
     if size <= 0.0 {

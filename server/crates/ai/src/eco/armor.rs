@@ -19,6 +19,7 @@ pub(super) struct ArmorAssignments {
     issued: BTreeMap<u32, ((f32, f32), u32)>,
     progress: BTreeMap<u32, ((f32, f32), u32)>,
     held: BTreeSet<u32>,
+    assault: bool,
 }
 impl ArmorAssignments {
     pub(super) fn step(
@@ -29,6 +30,23 @@ impl ArmorAssignments {
         responding: &BTreeSet<u32>,
         reserved: Option<AiTile>,
     ) {
+        self.step_goal(frame, actions, plan, responding, reserved, (None, None));
+    }
+    pub(super) fn step_goal(
+        &mut self,
+        frame: &AiFrame,
+        actions: &mut AiActions,
+        plan: &DefensePlan,
+        responding: &BTreeSet<u32>,
+        reserved: Option<AiTile>,
+        goal: (Option<AiBaseSiteId>, Option<(f32, f32)>),
+    ) {
+        let (future, attack) = goal;
+        if self.assault != attack.is_some() {
+            self.issued.clear();
+            self.held.clear();
+            self.assault = attack.is_some();
+        }
         let tanks: Vec<_> = frame
             .owned()
             .iter()
@@ -97,7 +115,7 @@ impl ArmorAssignments {
                     )
                 })
         };
-        let center = reserve_center(frame);
+        let center = attack.unwrap_or_else(|| reserve_center(frame, future));
         let mut assigned: BTreeMap<u32, Post> = BTreeMap::new();
         let mut used = vec![];
         // One compact reserve per reachable component; disconnected armor cannot share a post.
@@ -223,7 +241,13 @@ impl ArmorAssignments {
             // replans the remainder after reaching a partial route's last waypoint.
             let points: Vec<_> = points.into_iter().skip(1).take(24).collect();
             if let Some((first, rest)) = points.split_first() {
-                if actions.move_route(&group, *first, rest).is_ok() {
+                if (if attack.is_some() {
+                    actions.attack_move_route(&group, *first, rest)
+                } else {
+                    actions.move_route(&group, *first, rest)
+                })
+                .is_ok()
+                {
                     self.issued.insert(tank.id, (post.position, frame.tick()));
                     self.progress.insert(tank.id, (tank.position, frame.tick()));
                     self.held.remove(&tank.id);
@@ -243,8 +267,8 @@ impl ArmorAssignments {
             .collect()
     }
 }
-fn reserve_center(frame: &AiFrame) -> (f32, f32) {
-    let sites: BTreeSet<_> = frame
+fn reserve_center(frame: &AiFrame, future: Option<AiBaseSiteId>) -> (f32, f32) {
+    let mut sites: BTreeSet<_> = frame
         .owned()
         .iter()
         .filter(|e| e.kind == EntityKind::ResourceDepot && super::complete(e))
@@ -258,6 +282,7 @@ fn reserve_center(frame: &AiFrame) -> (f32, f32) {
                 .map(|s| s.id)
         })
         .collect();
+    sites.extend(future);
     let mut weighted = (0., 0.);
     let mut total = 0.;
     let mut fallback = (0., 0.);
@@ -306,7 +331,7 @@ fn reserve_points(center: (f32, f32), size: f32, radius: i32) -> Vec<(f32, f32)>
     }
     points
 }
-fn corners(route: &[(f32, f32)]) -> Vec<(f32, f32)> {
+pub(super) fn corners(route: &[(f32, f32)]) -> Vec<(f32, f32)> {
     if route.len() < 3 {
         return route.to_vec();
     }

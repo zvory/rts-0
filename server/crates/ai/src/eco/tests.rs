@@ -4,7 +4,7 @@ use crate::sdk::{AiBaseSite, AiBuildObservation, AiBuildObservationPhase};
 use rts_sim::game::{Game, PlayerInit};
 use rts_sim::protocol::{Snapshot, StartPayload};
 
-fn fixture() -> (StartPayload, Snapshot, Vec<AiBaseSite>) {
+pub(super) fn fixture() -> (StartPayload, Snapshot, Vec<AiBaseSite>) {
     let players = [1, 2].map(|id| PlayerInit {
         id,
         team_id: id,
@@ -23,12 +23,18 @@ fn fixture() -> (StartPayload, Snapshot, Vec<AiBaseSite>) {
     let sites = cache.get_or_analyze(&start).base_sites().to_vec();
     (start, s, sites)
 }
-fn frame(start: &StartPayload, s: &Snapshot, sites: &[AiBaseSite]) -> AiFrame {
+pub(super) fn frame(start: &StartPayload, s: &Snapshot, sites: &[AiBaseSite]) -> AiFrame {
     AiFrame::from_host(start, s, 1, [], Some(&[1, 2]))
         .unwrap()
         .with_base_sites(sites)
 }
-fn building(s: &mut Snapshot, id: u32, kind: &str, p: (f32, f32), progress: Option<f32>) {
+pub(super) fn building(
+    s: &mut Snapshot,
+    id: u32,
+    kind: &str,
+    p: (f32, f32),
+    progress: Option<f32>,
+) {
     let mut e = s
         .entities
         .iter()
@@ -270,7 +276,7 @@ fn fixed_supply_cap_never_builds_useless_depots_and_scaffolds_resume() {
 }
 
 #[test]
-fn six_base_busy_vehicle_works_add_capacity_and_remember_destroyed_overflow() {
+fn target_base_busy_vehicle_works_add_capacity_and_remember_destroyed_overflow() {
     let (start, mut s, sites) = fixture();
     let home = sites
         .iter()
@@ -280,9 +286,9 @@ fn six_base_busy_vehicle_works_add_capacity_and_remember_destroyed_overflow() {
     let candidates: Vec<_> = sites
         .iter()
         .filter(|b| matches!(b.id, AiBaseSiteId::ResourceCluster(_)))
-        .take(5)
+        .take(6)
         .collect();
-    assert_eq!(candidates.len(), 5);
+    assert_eq!(candidates.len(), 6);
     for (i, b) in candidates.iter().enumerate() {
         building(&mut s, 800 + i as u32, "resource_depot", b.position, None);
     }
@@ -332,7 +338,7 @@ fn six_base_busy_vehicle_works_add_capacity_and_remember_destroyed_overflow() {
         e.prod_queue = Some(1);
     }
     let f = frame(&start, &s, &sites);
-    assert_eq!(owned_sites(&f).len(), 6);
+    assert_eq!(owned_sites(&f).len(), 7);
     let mut eco = EcoStrategy::default();
     let mut a = AiActions::for_frame(&f);
     eco.step(&f, &mut a);
