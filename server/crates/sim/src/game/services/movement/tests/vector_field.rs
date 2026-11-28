@@ -42,12 +42,12 @@ fn vector_field_rectangle_is_centered_rotated_and_expires() {
     assert_eq!(runtime.vector_field_at(400.0, 400.0, 100), None);
 }
 #[test]
-fn vector_field_moves_every_body_one_pixel_and_also_moves_allies() {
+fn vector_field_push_scales_with_each_body_and_also_moves_allies() {
     let map = flat_map(2);
     let center = map.tile_center(10, 10);
     let players = [player_with_oil(1, 0), player_with_oil(2, 0)];
     for owner in [1, 2] {
-        for kind in [EntityKind::Rifleman, EntityKind::Tank] {
+        for kind in [EntityKind::Rifleman, EntityKind::Tank, EntityKind::ScoutCar] {
             let mut entities = EntityStore::new();
             let id = entities
                 .spawn_unit(owner, kind, center.0, center.1)
@@ -63,7 +63,7 @@ fn vector_field_moves_every_body_one_pixel_and_also_moves_allies() {
             );
             let unit = entities.get(id).unwrap();
             assert_eq!(unit.pos_x(), center.0);
-            let expected = 1.0;
+            let expected = config::unit_stats(kind).unwrap().speed * 0.5;
             assert!(
                 (unit.pos_y() - center.1 - expected).abs() < 0.02,
                 "{kind:?} owner={owner}"
@@ -146,43 +146,58 @@ fn vector_field_overlap_sums_directions_and_excludes_expired_or_outside_fields()
 }
 
 #[test]
-fn vector_field_halves_tank_progress_and_two_fields_stop_it() {
+fn vector_field_halves_each_units_progress_and_two_fields_stop_it() {
     let map = flat_map(2);
     let center = map.tile_center(10, 10);
-    let players = [player_with_oil(1, 0), player_with_oil(2, 0)];
-    for count in 0..=3 {
-        let mut runtime = AbilityRuntime::new();
-        for _ in 0..count {
-            add_field(&mut runtime, center, [-1.0, 0.0], 2, 100);
+    for (kind, upgrade) in [
+        (EntityKind::Tank, None),
+        (EntityKind::Tank, Some(UpgradeKind::TankPlus)),
+        (EntityKind::ScoutCar, None),
+        (EntityKind::Rifleman, None),
+        (EntityKind::Rifleman, Some(UpgradeKind::Methamphetamines)),
+    ] {
+        let mut players = [player_with_oil(1, 0), player_with_oil(2, 0)];
+        if let Some(upgrade) = upgrade {
+            players[0].upgrades.insert(upgrade);
         }
-        let mut entities = EntityStore::new();
-        let id = entities
-            .spawn_unit(1, EntityKind::Tank, center.0, center.1)
-            .unwrap();
-        entities.get_mut(id).unwrap().set_facing(0.0);
-        mark_moving(&mut entities, id, (center.0 + 300.0, center.1));
-        let occ = Occupancy::build(&map, &entities);
-        let smokes = SmokeCloudStore::new();
-        for tick in 1..=10 {
-            let spatial = SpatialIndex::build(&entities, map.width, map.height);
-            movement_system_with_context(
-                &map,
-                &mut entities,
-                &players,
-                &occ,
-                &spatial,
-                tick,
-                &smokes,
-                &runtime,
-            );
-            let tank = entities.get(id).unwrap();
-            let expected = center.0 + tick as f32 * (2.0 - count as f32);
-            assert!(
-                (tank.pos_x() - expected).abs() < 0.02,
-                "fields={count} tick={tick}: got {}, expected {expected}",
-                tank.pos_x()
-            );
-            assert!((tank.pos_y() - center.1).abs() < 0.02);
+        let speed = config::unit_stats(kind).unwrap().speed
+            * match upgrade {
+                Some(UpgradeKind::Methamphetamines) => config::METHAMPHETAMINES_SPEED_MULTIPLIER,
+                Some(UpgradeKind::TankPlus) => config::TANK_PLUS_SPEED_MULTIPLIER,
+                _ => 1.0,
+            };
+        for count in 0..=3 {
+            let mut runtime = AbilityRuntime::new();
+            for _ in 0..count {
+                add_field(&mut runtime, center, [-1.0, 0.0], 2, 100);
+            }
+            let mut entities = EntityStore::new();
+            let id = entities.spawn_unit(1, kind, center.0, center.1).unwrap();
+            entities.get_mut(id).unwrap().set_facing(0.0);
+            mark_moving(&mut entities, id, (center.0 + 300.0, center.1));
+            let occ = Occupancy::build(&map, &entities);
+            let smokes = SmokeCloudStore::new();
+            for tick in 1..=10 {
+                let spatial = SpatialIndex::build(&entities, map.width, map.height);
+                movement_system_with_context(
+                    &map,
+                    &mut entities,
+                    &players,
+                    &occ,
+                    &spatial,
+                    tick,
+                    &smokes,
+                    &runtime,
+                );
+                let unit = entities.get(id).unwrap();
+                let expected = center.0 + tick as f32 * speed * (1.0 - count as f32 * 0.5);
+                assert!(
+                    (unit.pos_x() - expected).abs() < 0.02,
+                    "{kind:?} {upgrade:?} fields={count} tick={tick}: got {}, expected {expected}",
+                    unit.pos_x()
+                );
+                assert!((unit.pos_y() - center.1).abs() < 0.02);
+            }
         }
     }
 }
@@ -194,7 +209,7 @@ fn vector_field_stack_cannot_push_through_blocked_terrain() {
     let center = map.tile_center(10, 10);
     let mut runtime = AbilityRuntime::new();
     // Both endpoints are clear, but the displacement crosses a blocked tile.
-    for _ in 0..64 {
+    for _ in 0..80 {
         add_field(&mut runtime, center, [1.0, 0.0], 1, 100);
     }
     let players = [player_with_oil(1, 0), player_with_oil(2, 0)];
@@ -207,7 +222,7 @@ fn vector_field_stack_cannot_push_through_blocked_terrain() {
         &map,
         &occ,
         EntityKind::Rifleman,
-        center.0 + 64.0,
+        center.0 + 80.0 * config::unit_stats(EntityKind::Rifleman).unwrap().speed * 0.5,
         center.1,
     ));
     apply_magic_anchor_pull(&map, &mut entities, &players, &occ, 1, &runtime);
@@ -252,11 +267,12 @@ fn vector_field_spares_active_trench_occupants_until_they_leave() {
             movement.occupied_trench_id = None;
             movement.entrenchment_dig_ticks = config::ENTRENCHMENT_DIG_IN_TICKS - 1;
             apply_magic_anchor_pull(&map, &mut entities, &players, &occ, 2, &runtime);
-            assert_eq!(
-                pos(&entities, id),
-                (center.0 + 2.0, center.1),
+            let (x, y) = pos(&entities, id);
+            assert!(
+                (x - center.0 - config::unit_stats(kind).unwrap().speed).abs() < 0.001,
                 "{kind:?} owner={owner}"
             );
+            assert_eq!(y, center.1);
         }
     }
 }

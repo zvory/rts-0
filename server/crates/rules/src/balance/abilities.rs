@@ -124,7 +124,10 @@ pub const CULTIVATOR_NOVICE_ITEM_CAPACITY: u8 = 1;
 pub const CULTIVATOR_ITEM_CAPACITY: u8 = 3;
 pub const CULTIVATOR_MASTER_ITEM_CAPACITY: u8 = 6;
 
+/// Fixed presentation speed for field particles; gameplay push is unit-relative.
 pub const VECTOR_FIELD_SPEED_PX_PER_TICK: f32 = 1.0;
+/// Fraction of the affected unit's effective movement speed added by each field.
+pub const VECTOR_FIELD_UNIT_SPEED_MULTIPLIER: f32 = 0.5;
 pub const VECTOR_FIELD_ADEPT_SIZE_TILES: f32 = 4.0;
 pub const VECTOR_FIELD_MASTER_SIZE_TILES: f32 = 5.0;
 

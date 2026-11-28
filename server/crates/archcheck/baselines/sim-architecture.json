@@ -1,5 +1,5 @@
 {
-  "reason": "Technique Library adds four research definitions to upgrade.rs; other architecture ratchets are unchanged.",
+  "reason": "Share existing movement rate policy with unit-relative Vector Field push; preserve PlayerState and spatial dependencies inside movement service",
   "line_counts": [
     {
       "path": "ability.rs",
@@ -751,7 +751,7 @@
     },
     {
       "path": "services/movement/mod.rs",
-      "lines": 222
+      "lines": 319
     },
     {
       "path": "services/movement/pivot_drive.rs",
@@ -1296,6 +1296,10 @@
     {
       "path": "services/shop_items.rs",
       "lines": 413
+    },
+    {
+      "path": "services/movement/speed.rs",
+      "lines": 111
     }
   ],
   "service_edges": [
@@ -1850,6 +1854,12 @@
       "target": "move_coordinator",
       "path": "services/tournament.rs",
       "line": 5
+    },
+    {
+      "source": "movement",
+      "target": "spatial",
+      "path": "services/movement/speed.rs",
+      "line": 5
     }
   ],
   "broad_mutable_signatures": [
@@ -2339,6 +2349,11 @@
       "path": "services/repair.rs",
       "line": 9,
       "code": "pub(in crate::game) fn repair_system(entities: &mut EntityStore, players: &mut [PlayerState]) {"
+    },
+    {
+      "path": "services/movement/speed.rs",
+      "line": 13,
+      "code": "players: &[PlayerState],"
     }
   ],
   "player_state_field_writes": [
