@@ -162,6 +162,7 @@ pub(crate) fn profile_identity_by_id(id: &str) -> Option<AiProfileIdentity> {
             (
                 include_str!("../pressure/response/defended.rs"),
                 include_str!("../pressure/response/cohesion.rs"),
+                include_str!("../pressure/response/cohesion/withdrawal.rs"),
             ),
             include_str!("../sdk/base_placement.rs"),
             include_str!("../sdk/ground_route.rs"),
