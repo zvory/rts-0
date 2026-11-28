@@ -237,7 +237,8 @@ function buttonSlots(card) {
     playerHasCompleteKind: () => true,
     groupCooldownClocks: () => [],
   });
-  assert.equal(viewerCard.kind, "spectator", "read-only lab viewer command card stays hidden");
+  assert.equal(viewerCard.readOnly, true, "read-only lab viewer receives an inspection card");
+  assert(viewerCard.slots.filter(Boolean).every((slot) => !slot.enabled && !slot.intent && !slot.contextIntent && !slot.hotkey));
 
   const mixedSelection = [
     { id: 25, owner: 1, kind: KIND.RIFLEMAN },
@@ -1295,4 +1296,36 @@ for (const factionId of ["cultivators", "kriegsia", "ekat"]) {
     const button = createCommandButton({ label: "Move", title: "Move units", enabled: true });
     assert.equal(button.title, "Move units", "plain buttons keep existing native help");
   });
+}
+
+// Passive cards retain authoritative ability and production indicators without command paths.
+{
+  const selection = [{ id: 800, owner: 2, kind: KIND.SCOUT_CAR, abilities: [{ ability: ABILITY.SMOKE, cooldownLeft: 0, chargeRechargeLeft: 60, remainingUses: 1 }] }];
+  const ctx = { spectator: true, playerId: 99, selection, upgrades: [UPGRADE.SMOKE_PLUS],
+    resources: { steel: 1000, oil: 1000 }, playerHasCompleteKind: () => true,
+    groupCooldownClocks: testGroupCooldownClocks };
+  const card = buildCommandCardDescriptors(ctx);
+  assert.equal(card.readOnly, true);
+  const smoke = card.slots.find((slot) => slot?.ability === ABILITY.SMOKE);
+  assert(smoke, "spectators can inspect another owner's ability");
+  assert(smoke.cooldownSeconds > 0, "spectators retain ability cooldowns");
+  for (const slot of card.slots.filter(Boolean)) {
+    assert.equal(slot.enabled, false);
+    assert.equal(slot.intent, null);
+    assert.equal(slot.contextIntent, null);
+    assert.equal(slot.onUnavailableIntent, null);
+    assert.equal(slot.hotkeyCode, "");
+  }
+  const producer = { id: 801, owner: 2, kind: KIND.BARRACKS,
+    prodRepeatKinds: [KIND.RIFLEMAN], prodKind: KIND.RIFLEMAN, prodQueue: 2 };
+  const production = buildCommandCardDescriptors({ ...ctx, selection: [producer] });
+  assert.equal(production.slots.find((slot) => slot?.id === `train:${KIND.RIFLEMAN}`).autobuildIndicatorCount, 1);
+  const research = buildCommandCardDescriptors({ ...ctx,
+    selection: [{ ...engineeringComplex, owner: 2 }] });
+  const completed = research.slots.find((slot) => slot?.id === `research:${UPGRADE.SMOKE_PLUS}`);
+  assert.equal(completed.title, "Researched");
+  assert(completed.label.endsWith("✓"));
+  const unreasearched = buildCommandCardDescriptors({ ...ctx, upgrades: [],
+    selection: [{ ...engineeringComplex, owner: 2 }] });
+  assert.notEqual(research.signature, unreasearched.signature, "research completion refreshes inspection");
 }

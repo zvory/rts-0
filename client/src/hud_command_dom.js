@@ -9,6 +9,7 @@ function cooldownLabel(seconds) {
 export function renderDescriptorCardDom(card, descriptorCard, buttonForDescriptor) {
   const frag = document.createDocumentFragment();
   const slots = Array.isArray(descriptorCard?.slots) ? descriptorCard.slots : [];
+  card.dataset.readOnly = descriptorCard.readOnly ? "true" : "false";
   card.dataset.shopCard = descriptorCard.rowLabels ? "true" : "false";
   for (const [position, i] of COMMAND_CARD_SLOT_ORDER.entries()) {
     const descriptor = slots[i] || null;

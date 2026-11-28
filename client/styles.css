@@ -3327,6 +3327,14 @@ input[type="text"]:focus {
 .cmd-btn.primary-disabled .cmd-cost {
   opacity: 0.38;
 }
+#command-card[data-read-only="true"] .cmd-btn:disabled {
+  cursor: default;
+}
+#command-card[data-read-only="true"] .cmd-btn:disabled .cmd-icon,
+#command-card[data-read-only="true"] .cmd-btn:disabled .cmd-label,
+#command-card[data-read-only="true"] .cmd-btn:disabled .cmd-cost {
+  opacity: 0.85;
+}
 .cmd-btn.unaffordable:not(:disabled) .cmd-icon,
 .cmd-btn.unaffordable:not(:disabled) .cmd-label,
 .cmd-btn.unaffordable:not(:disabled) .cmd-hotkey {

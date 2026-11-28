@@ -129,6 +129,7 @@ const AREA_BY_FILE = new Map(Object.entries({
   "hud_command_dom.js": "ui",
   "hud_command_layout.js": "ui",
   "hud_command_card.js": "ui",
+  "hud_inspection_card.js": "ui",
   "hud_command_card_contexts.js": "ui",
   "hud_train_card_helpers.js": "ui",
   "hud_dao_training_card.js": "ui",
@@ -298,7 +299,8 @@ const LARGE_FILE_BASELINES = new Map(Object.entries({
   // Point adds a tank hotkey catalog sample and delegates its descriptor to hud_unit_commands.
   // Proven Grounds dispatches its descriptors to the separate training card module.
   // Shop submenu composition stays here; its layout and eligibility live in hud_shop_card.js.
-  "hud_command_card.js": 29900,
+  // Passive projection lives in hud_inspection_card.js; keep research status in shared layout.
+  "hud_command_card.js": 30000,
   // Interact Phase 6 centralizes renderer visual-clock fallback so extracted draw modules
   // share the injected clock without each growing its own compatibility expression.
   "renderer/shared.js": 28217,

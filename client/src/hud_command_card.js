@@ -1,3 +1,4 @@
+import { buildInspectionCard, commandSurfaceEnabled, researchStatus } from "./hud_inspection_card.js";
 import { buildShopBuyCard, isShopBuyer, shopBuyMenuDescriptor, shopCardExtras } from "./hud_shop_card.js";
 import { buildDaoTrainingCard } from "./hud_dao_training_card.js";
 import { ABILITY, DEFAULT_FACTION_ID, KIND, SETUP, UPGRADE, isBuilding, isUnit } from "./protocol.js";
@@ -198,7 +199,7 @@ export function buildCommandCardContextCatalog() {
 }
 
 export function buildCommandCardDescriptors(ctx) {
-  if (!commandSurfaceEnabled(ctx)) return { kind: "spectator", signature: "spectator", slots: [] };
+  if (!commandSurfaceEnabled(ctx)) return buildInspectionCard(ctx, buildCommandCardDescriptors);
 
   const selection = ctx?.selection || [];
   const primary = commandSubject(ctx, selection);
@@ -218,10 +219,6 @@ export function buildCommandCardDescriptors(ctx) {
   return buildTrainCard(ctx, primary);
 }
 
-export function commandSurfaceEnabled(ctx) {
-  if (typeof ctx?.commandSurfaceEnabled === "boolean") return ctx.commandSurfaceEnabled;
-  return !ctx?.spectator;
-}
 
 export function commandSubject(ctx, selection) {
   for (const e of selection || []) {
@@ -413,7 +410,7 @@ export function buildTrainCard(ctx, building, { underConstruction = false } = {}
     researches.map((upgrade) => {
       const target = selectedResearchBuilding(ctx, upgrade, isOwn);
       const def = researchDefinition(upgrade, ctx.upgrades, ctx.currentEntities || ctx.entities || ctx.selection, ctx.playerId);
-      return `${upgrade}:${researchAvailability(ctx, upgrade, resources, isOwn)}:${target?.id ?? ""}:${def.cost.steel}:${def.cost.oil}:${def.researchTicks}`;
+      return `${upgrade}:${(ctx.upgrades || []).includes(upgrade)}:${researchAvailability(ctx, upgrade, resources, isOwn)}:${target?.id ?? ""}:${def.cost.steel}:${def.cost.oil}:${def.researchTicks}`;
     }).join(",") +
     `|abilities:${abilityAffordances.map((affordance) =>
       `${affordance.definition.ability}:${affordance.unlocked ? 1 : 0}:` +
@@ -481,11 +478,10 @@ export function buildTrainCard(ctx, building, { underConstruction = false } = {}
       action: "research",
       intent: { type: "research", upgrade, buildingId: target?.id ?? null },
       icon: def.icon,
-      label: def.label,
       cost: def.cost,
       enabled: availability !== "locked",
       unaffordable: availability === "unaffordable",
-      title: researchDisabledReason(ctx, upgrade, resources, isOwn),
+      ...researchStatus(ctx, upgrade, def, researchDisabledReason(ctx, upgrade, resources, isOwn)),
       cls: upgrade.startsWith("dao_of_") ? `dao-choice${availability === "ready" ? " dao-ready" : ""}` : "",
       tooltipUpgrade: upgrade,
       researchDefinition: def,
@@ -696,7 +692,7 @@ function buildRequirementsAvailable(ctx, kind) {
 }
 
 function availableResearchesOf(ctx, kind) {
-  const completed = ctx.upgrades || [];
+  const completed = ctx.readOnly ? [] : ctx.upgrades || [];
   return factionResearchesOf(ctx, kind).filter((upgrade) => !completed.includes(upgrade));
 }
 
@@ -730,3 +726,5 @@ function abilityDisabledReason(ctx, affordance) {
   ) return "On cooldown";
   return affordance.definition.title || "";
 }
+
+export { commandSurfaceEnabled };
